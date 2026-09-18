@@ -1,0 +1,38 @@
+/**
+ * @file print/print.css
+ * @description Physical print pages and their preview. App branding enters through scoped variables.
+ * @version-history v1.0.0 - 2026-09-18 - Initial paged document styles.
+ */
+:root { color-scheme: light; }
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body { background: #e7e9ed; color: var(--ap-ink, #18212d); font: var(--ap-font-size, 11pt)/1.45 var(--ap-font, Arial, sans-serif); }
+.ap-page { width: var(--ap-width); height: var(--ap-height); padding: var(--ap-margin); background: var(--ap-paper, white); margin: 16px auto; display: flex; flex-direction: column; break-after: page; box-shadow: 0 2px 12px #0002; }
+.ap-page:last-child { break-after: auto; }
+.ap-header, .ap-footer { display: grid; grid-template-columns: 1fr 1fr 1fr; align-items: center; gap: 8px; flex: 0 0 var(--ap-header-height); font-size: 9pt; overflow-wrap: anywhere; }
+.ap-header { border-bottom: 1px solid var(--ap-line, #c9ced5); padding-bottom: 3mm; margin-bottom: 4mm; }
+.ap-footer { flex-basis: var(--ap-footer-height); border-top: 1px solid var(--ap-line, #c9ced5); padding-top: 3mm; margin-top: 4mm; }
+.ap-header > :nth-child(2), .ap-footer > :nth-child(2) { text-align: center; }
+.ap-header > :nth-child(3), .ap-footer > :nth-child(3) { text-align: right; }
+.ap-header img { max-height: 12mm; max-width: 35mm; vertical-align: middle; margin-right: 3mm; }
+.ap-body { flex: 1 1 0; min-height: 0; display: grid; grid-template-columns: repeat(var(--ap-columns), minmax(0, 1fr)); gap: 7mm; }
+.ap-column { min-width: 0; min-height: 0; overflow-wrap: anywhere; }
+.ap-column > :first-child { margin-top: 0; }
+h1, h2, h3, h4, h5, h6 { color: var(--ap-heading, var(--ap-ink, #18212d)); line-height: 1.2; margin: 0 0 3mm; }
+h1 { font-size: 24pt; } h2 { font-size: 17pt; } h3 { font-size: 12pt; }
+p, ul, ol, blockquote, pre, dl { margin: 0 0 3mm; }
+p { white-space: pre-wrap; }
+pre { white-space: pre-wrap; }
+img { display: block; max-width: 100%; max-height: var(--ap-image-height, 180mm); object-fit: contain; }
+table { width: 100%; border-collapse: collapse; table-layout: fixed; margin-bottom: 4mm; }
+th, td { border: 1px solid var(--ap-line, #c9ced5); padding: 2mm; text-align: left; vertical-align: top; overflow-wrap: anywhere; }
+th { background: var(--ap-tint, #eff2f5); font-weight: 700; }
+a { color: inherit; text-decoration: underline; }
+.ap-card { border: 1px solid var(--ap-line, #c9ced5); border-radius: 2mm; padding: 4mm; margin-bottom: 4mm; }
+.ap-calendar-day { border-top: 2px solid var(--ap-line, #c9ced5); padding-top: 3mm; margin-bottom: 4mm; }
+.ap-subtitle { color: var(--ap-muted, #536174); }
+.ap-compact { --ap-font-size: 9pt; }
+@media print {
+  html, body { width: var(--ap-width); background: transparent; }
+  .ap-page { margin: 0; box-shadow: none; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+}

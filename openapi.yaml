@@ -13043,6 +13043,32 @@ paths:
         '200':
           description: '{ ok, libraries: [...], packs_index }'
 
+  /v1/libs/aimeat-calendar.js:
+    get:
+      operationId: getCalendarLibrary
+      summary: Calendar browser library
+      description: Public JavaScript exposing AIMEAT.calendar for bounded civil-time recurrence, IANA timezones, ICS interchange, overlaps and free intervals. No storage or authorization side effects.
+      tags: [Discovery]
+      responses:
+        '200':
+          description: Self-contained calendar JavaScript bundle
+          content:
+            application/javascript:
+              schema: { type: string }
+
+  /v1/libs/aimeat-print.js:
+    get:
+      operationId: getPrintLibrary
+      summary: Paged printing browser library
+      description: Public JavaScript exposing AIMEAT.print for safe printable content, measured pages with headers and footers, preview and browser printing. Save as PDF is provided by the browser print dialog.
+      tags: [Discovery]
+      responses:
+        '200':
+          description: Self-contained printing JavaScript bundle
+          content:
+            application/javascript:
+              schema: { type: string }
+
   /v1/app-templates:
     get:
       operationId: listAppTemplates
