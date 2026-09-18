@@ -9,6 +9,8 @@
  * @structure appdevOverviewRouter(config, storage) → Router
  * @usage app.use(appdevOverviewRouter(config, storage)) from the routes loader.
  * @version-history
+ *   v1.1.0 — 2026-09-18 — GET /v1/appdev/templates/:id answers for a template the node ships when
+ *     no proposal carries the id, and the list names them (`node_templates`).
  *   2026-07-19 — AppDev tab (KB UI): learned-pitfall + template management surface, start-prompt copy, model badge
  *   v1.0.0 — 2026-07-19 — initial (AppDev KB Phase 5).
  */
@@ -23,6 +25,7 @@ import { logger } from '../utils/logger.js';
 import {
   listTemplateProposals, getTemplateProposal, deleteTemplateProposal,
 } from '../services/app-template-proposals.js';
+import { nodeTemplateAnswer, nodeTemplateIndex, unknownTemplateMessage } from '../services/node-templates.js';
 
 export function appdevOverviewRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -48,7 +51,9 @@ export function appdevOverviewRouter(config: AimeatConfig, storage: Storage): Ro
   router.get('/v1/appdev/templates', requireAuth(), requireScope('memory:read'), async (req, res) => {
     const identity = resolveIdentity(req.auth!, config.nodeId);
     const templates = await listTemplateProposals(storage, config, identity);
-    res.json(success(config.nodeId, { templates, total: templates.length }));
+    // `node_templates`: what the node ships, without content, beside the owner's proposals, so
+    // the tool that lists templates can name the shell a build starts from.
+    res.json(success(config.nodeId, { templates, total: templates.length, node_templates: nodeTemplateIndex() }));
   });
 
   // GET /v1/appdev/templates/:id — one proposal + the source app's live state.
@@ -56,7 +61,14 @@ export function appdevOverviewRouter(config: AimeatConfig, storage: Storage): Ro
     const identity = resolveIdentity(req.auth!, config.nodeId);
     const found = await getTemplateProposal(storage, config, identity, req.params.id as string);
     if (!found) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such template proposal'));
+      // A template the node ships answers here too, as it does on the MCP tool: this route is
+      // what the connector's aimeat_app_template_get calls (services/node-templates.ts).
+      const shipped = nodeTemplateAnswer(req.params.id as string);
+      if (shipped) {
+        res.json(success(config.nodeId, { template: shipped }));
+        return;
+      }
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', unknownTemplateMessage(req.params.id as string)));
       return;
     }
     const m = found.manifest;

@@ -58,7 +58,8 @@ required, upserts by slug, share:true publishes platform-wide) · \`aimeat_app_t
 
 ## Research-first build flow (research → frame → propose → build → finish)
 1. RESEARCH: load the \`node:aimeat-app-builder\` skill (\`aimeat_skill_get\`), call
-   \`aimeat_appdev_overview\`, and fetch the canonical spec \`GET /v1/prompts/build-app\` (it is law).
+   \`aimeat_appdev_overview\`, and fetch the canonical spec \`GET /v1/prompts/build-app\` (it is law). Over MCP the same spec
+   comes in parts: \`aimeat_handbook_get { tier: "build-app" }\` is the first and lists the rest.
 2. FRAME: tier (T1 pure client / T2 +cortex / T3 +extension), packs, start point (fork a prior
    app / template proposal / shell), own-users → aimeat-iam pack (gate) + AIMEAT.iam (panel),
    decided NOW. A role belongs to the PERSON: a member's agents inherit it.

@@ -24,6 +24,8 @@ export interface RunRecord {
     marker: string;
     ok: boolean;
     detail: string;
+    /** What a passing run is worth knowing about, e.g. what the published app is like. */
+    note?: string;
     /** Tools the run used that the task's `goodTools` does not name. A detour, not a failure. */
     wandered: string[];
     metrics: RunMetrics;
@@ -102,6 +104,11 @@ export function renderReport(meta: RunMeta, records: RunRecord[], tasks: Task[])
     const failures = records.filter(r => !r.ok);
     if (!failures.length) lines.push('Nowhere.', '');
     for (const f of failures) lines.push(`- **${f.task}** #${f.run}: ${f.detail}. It said: "${f.metrics.finalText.replace(/\s+/g, ' ').slice(0, 220)}"`);
+    const noted = records.filter(r => r.ok && r.note);
+    if (noted.length) {
+        lines.push('', '## What the passing runs produced', '', 'A pass says the thing exists. This says what it is like, which is what two wordings of the same guidance are compared on.', '');
+        for (const r of noted) lines.push(`- **${r.task}** #${r.run}: ${r.note}`);
+    }
     lines.push('', '## Walls it hit', '', 'Every distinct error a tool call returned. Each one is a place where the node could have said what to do next.', '');
     const walls = sums.filter(s => s.walls.length);
     if (!walls.length) lines.push('None.', '');

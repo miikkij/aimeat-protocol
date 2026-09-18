@@ -15,6 +15,8 @@
  * @usage import { buildAppPrompt } from '../services/build-app-prompt.js';
  *   const { full, body } = buildAppPrompt(config, { lang: 'en', mode: 'new', idea: '...' });
  * @version-history
+ *   2026-09-18 — ADDITIVE, one parenthesis in the shape section: the shell is also read with
+ *     aimeat_app_template_get, for a chat that cannot make the GET the sentence names.
  *   2026-09-13 — ADDITIVE, one sentence before Design Guidelines: a library that uses eval() or new
  *     Function() fails under the app CSP (appdev pitfall app/vendor-lib-eval-vs-app-csp).
  *   2026-09-13 — CORRECTION (the developer's UNDECLARED_SPACE decision): the heal step's first two
@@ -186,7 +188,7 @@ function composeAppPrompt(
 
   // Tier decision tree — the shape decision comes BEFORE any code (AppDev KB Phase 7).
   body += "### Choose the app's shape (T1/T2/T3)\n";
-  body += 'Decide the tier first; start from the matching shell at GET ' + nodeUrl + '/v1/app-templates:\n';
+  body += 'Decide the tier first; start from the matching shell at GET ' + nodeUrl + '/v1/app-templates (over MCP: `aimeat_app_template_get { id }` returns the shell with its file):\n';
   body += '- **T1 — pure client** (shell-pure-client): auth + data + UI in one HTML file. The default; most apps end here.\n';
   body += '- **T2 — +cortex** (shell-cortex): the app leans on ready-made cortex UI libs (DataTable, forms, charts). Pick when the UI is data-heavy.\n';
   body += '- **T3 — +extension** (shell-extension): the app needs SERVER-side work — a third-party API (ctx.fetch), server-enforced rules (only-author-can-delete, one-vote-per-user), or its own `ext:` data. Only tier that ships an extension.\n';

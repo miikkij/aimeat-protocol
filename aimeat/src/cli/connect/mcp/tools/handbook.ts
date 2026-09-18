@@ -13,6 +13,8 @@
  *     bearer token, so the routed token must match the agent the caller meant.
  *   v1.2.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
  *   v1.3.0 -- 2026-05-30 -- Add `surface` param → fetches the v2 per-role surface handbook.
+ *   v1.4.0 -- 2026-09-18 -- Add `tier`, which the node's own tool has always had: "build-app" is the
+ *     layered build specification (cli/connect/handbook-path.ts).
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
@@ -20,15 +22,17 @@ import type { AgentRegistry } from '../../agent-registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../mcp/catalog/shape.js';
 import { agentNameSchema, pickAgent, envelopeResult } from './_registry.js';
+import { handbookTierPath } from '../../handbook-path.js';
 
 export function registerHandbookTools(mcp: McpServer, registry: AgentRegistry): void {
   mcp.tool('aimeat_handbook_get', descriptionFor('aimeat_handbook_get'), {
     agent_name: agentNameSchema,
     module: z.string().optional().describe('Specific handbook module to retrieve'),
     surface: z.enum(['appdev', 'agent', 'service', 'admin']).optional().describe('Return the v2 purpose-scoped surface handbook for this role (use the surface you serve, e.g. "agent") instead of a module.'),
-  }, annotationsFor('aimeat_handbook_get'), async ({ agent_name, module, surface }) => {
+    tier: z.string().optional().describe('A prompt by id. "build-app" is the first part of the build specification every app follows; "build-app/<id>" is one of the parts or sections it lists.'),
+  }, annotationsFor('aimeat_handbook_get'), async ({ agent_name, module, surface, tier }) => {
     const { client } = pickAgent(registry, agent_name);
-    const path = surface
+    const path = tier ? handbookTierPath(tier) : surface
       ? `/v1/agents/me/handbook/surface/${encodeURIComponent(surface)}`
       : module
         ? `/v1/agents/me/handbook/${encodeURIComponent(module)}`

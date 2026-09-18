@@ -24,6 +24,10 @@
  * @structure APP_BUILDER_SKILL_ENTRY
  * @usage import { APP_BUILDER_SKILL_ENTRY } from './builtin-skills.app-builder.js';
  * @version-history
+ *   v1.4.0 — 2026-09-18 — Says how a chat connected over MCP reads the spec. The skill named three
+ *     GET calls and nothing else, and an MCP-only chat can make none of them: six of six cold-agent
+ *     build runs asked the handbook tool for `build-app`, were told "Prompt not found", and built
+ *     without the spec this skill calls law.
  *   v1.3.0 — 2026-09-13 — A word is not a unit: fmt.relative and fmt.duration follow the LANGUAGE,
  *     and the {n}-key trap is named, because it is the repair every app author reaches for first.
  *   v1.2.0 — 2026-09-12 — "Dates, times and numbers: never from the language". The app-side half of
@@ -74,6 +78,15 @@ GET /v1/prompts/build-app        ← the spec (law; re-fetch every time, it chan
 GET /v1/app-templates            ← starter templates (start from one, do not invent structure)
 GET /v1/appdev/pitfalls          ← curated "what bites app builders" registry
 \`\`\`
+
+**Connected over MCP and cannot make HTTP calls?** The same spec comes through the handbook tool:
+\`aimeat_handbook_get { tier: "build-app" }\` returns its first part, which lists the rest: three
+more parts every app needs (\`libraries\`, \`data\`, \`look\`) and sections by situation (a group
+app, files, AI calls, selling, realtime). Read each with
+\`aimeat_handbook_get { tier: "build-app/<id>" }\`: the three parts always, a section when this
+app is in that situation. It comes in parts because one tool result cannot carry all of it.
+The shell to start from: \`aimeat_app_template_get { id: "shell-pure-client" }\` (the list:
+\`aimeat_app_template_list\`). Pitfalls: \`aimeat_appdev_pitfall_list\`.
 
 Everything the app loads at runtime — CSS, auth, data, UI libraries — must be a URL
 **listed in that spec**. Never invent script/style \`src\` URLs; they 404 and break the app.

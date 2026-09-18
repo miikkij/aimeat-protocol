@@ -10,6 +10,9 @@
  * @structure registerAppTemplateProposalTools()
  * @usage registerAppTemplateProposalTools(mcp, storage, config, () => agentGaii);
  * @version-history
+ *   v1.1.0 — 2026-09-18 — _get and _list also answer for the templates the node ships (shells,
+ *     components, use cases). They read agent proposals only, so the shell every build text names
+ *     as the starting point could not be read over MCP at all.
  *   Limits raised -- 2026-07-30 -- description/rationale/notes to 10 000, reuse_notes to 40 000.
  *   v1.0.0 — 2026-07-19 — initial (AppDev KB Phase 6).
  */
@@ -24,6 +27,7 @@ import { logger } from '../utils/logger.js';
 import {
     proposeTemplate, listTemplateProposals, getTemplateProposal, deleteTemplateProposal,
 } from '../services/app-template-proposals.js';
+import { nodeTemplateAnswer, nodeTemplateIndex, unknownTemplateMessage } from '../services/node-templates.js';
 
 const text = (v: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(v, null, 2) }] });
 const errText = (msg: string) => ({ content: [{ type: 'text' as const, text: msg }], isError: true as const });
@@ -75,6 +79,9 @@ export function registerAppTemplateProposalTools(
         async () => {
             const proposals = await listTemplateProposals(storage, config, agentGaii);
             return text({
+                // What the node ships, without content: aimeat_app_template_get { id } returns one
+                // with its file. The same index GET /v1/app-templates serves.
+                node_templates: nodeTemplateIndex(),
                 templates: proposals.map(p => ({
                     id: p.id, title: p.title, tier: p.tier, tags: p.tags,
                     model: p.model, start_mode: p.startMode,
@@ -93,7 +100,15 @@ export function registerAppTemplateProposalTools(
         annotationsFor('aimeat_app_template_get'),
         async ({ id }) => {
             const found = await getTemplateProposal(storage, config, agentGaii, id);
-            if (!found) return errText(`Template proposal not found: ${id}`);
+            if (!found) {
+                // The templates the node ships: the shells, the components, the use cases. Every
+                // build text says "start from the shell at GET /v1/app-templates", and a chat
+                // connected over MCP cannot make that call: a cold-agent build run asked this
+                // tool for `shell-pure-client` and was told it did not exist (2026-09-18). Same
+                // registry and same fields as GET /v1/app-templates/:id (services/node-templates.ts).
+                const shipped = nodeTemplateAnswer(id);
+                return shipped ? text(shipped) : errText(unknownTemplateMessage(id));
+            }
             const m = found.manifest;
 
             // Live commerce/fork state of the source app so the next builder knows how to start.

@@ -11690,6 +11690,156 @@ paths:
                               ok | stale | missing | skipped.
                             example: spec-9f21c4ab77de
 
+  /v1/prompts/build-app/core:
+    get:
+      operationId: getBuildAppPromptCore
+      summary: The build specification, the part every app needs
+      description: >-
+        The same specification as GET /v1/prompts/build-app, without the sections only some apps
+        need (a group application, files, AI calls, selling, realtime and others). Those are listed
+        in data.sections with the situation each covers and are read one at a time from
+        /v1/prompts/build-app/sections/{id}. The text is cut at the specification's own headings and
+        never rewritten, and it carries the same spec_token. For a reader over HTTP who does not
+        want the whole specification. A reader over MCP gets the same core in four parts
+        (start, libraries, data, look) from /v1/prompts/build-app/sections/{id}, because one tool
+        result does not carry 66 000 characters. Public.
+      tags:
+        - Discovery
+      parameters:
+        - name: mode
+          in: query
+          schema: { type: string, enum: [new, improve], default: new }
+        - name: lang
+          in: query
+          schema: { type: string, enum: [en, fi], default: en }
+        - name: idea
+          in: query
+          schema: { type: string, maxLength: 500 }
+        - name: format
+          in: query
+          schema: { type: string, enum: [txt] }
+          description: txt returns the core as text/plain instead of the JSON envelope
+      responses:
+        '200':
+          description: The core of the build specification and the index of its other sections
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          prompt: { type: string }
+                          spec_token: { type: string, example: spec-9f21c4ab77de }
+                          sections:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id: { type: string, example: group }
+                                title: { type: string }
+                                when: { type: string, description: The situation in which a builder reads this section }
+                                chars: { type: integer }
+                                url: { type: string }
+
+  /v1/prompts/build-app/sections:
+    get:
+      operationId: listBuildAppPromptSections
+      summary: The parts and sections of the build specification
+      description: >-
+        The four parts of the core (start, libraries, data, look), each small enough for one MCP
+        tool result, and every section by id with its layer (core or on-demand), its part and its
+        size. Public.
+      tags:
+        - Discovery
+      parameters:
+        - name: mode
+          in: query
+          schema: { type: string, enum: [new, improve], default: new }
+      responses:
+        '200':
+          description: The section list
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          spec_token: { type: string }
+                          parts:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id: { type: string, enum: [start, libraries, data, look] }
+                                what: { type: string }
+                                chars: { type: integer }
+                          sections:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id: { type: string }
+                                title: { type: string }
+                                layer: { type: string, enum: [core, on-demand] }
+                                part: { type: string, enum: [start, libraries, data, look] }
+                                when: { type: string }
+                                chars: { type: integer }
+
+  /v1/prompts/build-app/sections/{id}:
+    get:
+      operationId: getBuildAppPromptSection
+      summary: One part or one section of the build specification
+      description: >-
+        A part of the core (start, libraries, data, look) or a single section, byte for byte as the
+        full specification carries it; part `start` also carries the index of the rest. The MCP
+        tool aimeat_handbook_get serves `start` for tier "build-app" and this route for
+        "build-app/{id}". Public.
+      tags:
+        - Discovery
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, example: group }
+        - name: mode
+          in: query
+          schema: { type: string, enum: [new, improve], default: new }
+        - name: format
+          in: query
+          schema: { type: string, enum: [txt] }
+          description: txt returns the section as text/plain instead of the JSON envelope
+      responses:
+        '200':
+          description: The section
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          id: { type: string, example: build-app/group }
+                          kind: { type: string, enum: [part, section] }
+                          prompt: { type: string }
+                          spec_token: { type: string }
+        '404':
+          description: The specification has no section by that id; the message lists the ids it has
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+
   /v1/prompts/build-app-atelier:
     get:
       operationId: getBuildAppAtelierPrompt
@@ -13315,7 +13465,9 @@ paths:
         - BearerAuth: []
       responses:
         '200':
-          description: data.templates + data.total
+          description: >-
+            data.templates + data.total, and data.node_templates: the templates the node ships
+            (shells, components, use cases) by id, kind and title.
         '401':
           $ref: '#/components/responses/Unauthorized'
 
@@ -13330,9 +13482,12 @@ paths:
         - { name: id, in: path, required: true, schema: { type: string } }
       responses:
         '200':
-          description: data.template + data.source_app
+          description: >-
+            data.template + data.source_app for a proposal. When no proposal carries the id and the
+            node ships a template by it (a shell such as shell-pure-client), data.template is that
+            template with its starting file in `content` and `source: node`.
         '404':
-          description: No such template proposal
+          description: Neither a proposal nor a shipped template carries the id; the message names the shells
     delete:
       operationId: deleteAppdevTemplateProposal
       summary: Delete a template proposal

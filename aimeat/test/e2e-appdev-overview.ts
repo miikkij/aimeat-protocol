@@ -435,6 +435,15 @@ await test('templates REST: seed manifest → list/get with source app → cross
     const { status: bg } = await json('/v1/appdev/templates/ui-test-template', { headers: { Authorization: `Bearer ${tokenB}` } });
     assert(bg === 404, `B get expected 404, got ${bg}`);
 
+    // The templates the node ships answer on the same two routes (2026-09-18): this is what the
+    // connector's aimeat_app_template_get calls, and the shell every build starts from was not
+    // reachable through it. A's proposal stays invisible to B above; a shipped shell is for anyone.
+    assert(list.data.node_templates.some((t: any) => t.id === 'shell-pure-client'), 'the list names the shipped shell');
+    const { status: ss, body: shell } = await json('/v1/appdev/templates/shell-pure-client', { headers: { Authorization: `Bearer ${tokenB}` } });
+    assert(ss === 200 && shell.data.template.source === 'node' && String(shell.data.template.content).includes('<html'), `shipped shell: ${ss}`);
+    const { status: ns, body: none } = await json('/v1/appdev/templates/no-such-template', { headers: { Authorization: `Bearer ${tokenA}` } });
+    assert(ns === 404 && String(none.error?.message).includes('shell-pure-client'), `unknown id names the shells: ${ns}`);
+
     const { status: ds } = await json('/v1/appdev/templates/ui-test-template', { method: 'DELETE', headers: { Authorization: `Bearer ${tokenA}` } });
     assert(ds === 200, `delete ${ds}`);
     const { body: after } = await json('/v1/appdev/templates', { headers: { Authorization: `Bearer ${tokenA}` } });

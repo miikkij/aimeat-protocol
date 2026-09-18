@@ -23,6 +23,11 @@
  *     the server instructions send every agent here first, and five of nine cold-agent baseline
  *     tasks opened with it. `surface` takes all seven roles (it took four, so three handbooks
  *     could not be read over MCP), and a tier asked for by name has its variables filled.
+ *   v1.7.0 -- 2026-09-18 -- `tier: "build-app"` returns the first of the four parts of the build
+ *     specification every app needs, with an index of the rest; `"build-app/<id>"` returns one
+ *     part or one section. It answered
+ *     "Prompt not found", because the specification is code-built and this tool read managed
+ *     prompts only.
  *   v1.5.0 -- 2026-08-22 -- The surface handbook carries the proactive guidance while the owner
  *     keeps that setting on (services/proactive-mode.ts). Tier prompts are left alone on purpose:
  *     that response reports a managed prompt's own content, and appending to it would misreport it.
@@ -38,6 +43,8 @@ import { handbookForRole } from '../services/handbooks/index.js';
 import { proactiveGuidance } from '../services/proactive-mode.js';
 import { skillsBySituation } from '../services/skills-by-situation.js';
 import { substituteVariables } from '../services/prompt-variables.js';
+import { buildAppPrompt } from '../services/build-app-prompt.js';
+import { buildAppPiece, buildAppPieceIds } from '../services/build-app-layers.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
 import { V2_ROLES, toolsForSurface, type SurfaceRole } from './catalog/surfaces.js';
 
@@ -57,7 +64,7 @@ export function registerPromptsTools(
         'aimeat_handbook_get',
         descriptionFor('aimeat_handbook_get'),
         {
-            tier: z.string().optional().describe('A REST-style tier handbook or a managed prompt by id (e.g. "tier1", "tier2", or a custom prompt ID), for an agent that works over HTTP. Leave it out over MCP: the handbook for your own surface comes back.'),
+            tier: z.string().optional().describe('A REST-style tier handbook or a managed prompt by id (e.g. "tier1", "tier2", or a custom prompt ID), for an agent that works over HTTP. Leave it out over MCP: the handbook for your own surface comes back. One value is for every builder: "build-app" returns the first part of the app build specification, and "build-app/<id>" one of the parts or sections it lists.'),
             surface: z.enum(V2_ROLES as unknown as [SurfaceRole, ...SurfaceRole[]]).optional().describe('Read another surface\'s handbook than your own. Leave it out to get the one for the surface you are connected to.'),
         },
         annotationsFor('aimeat_handbook_get'),
@@ -84,6 +91,22 @@ export function registerPromptsTools(
                 return { content: [{ type: 'text' as const, text }] };
             }
             const tierKey = tier;
+            // The build specification is code-built, not a managed prompt, so the lookup below
+            // never found it: every cold-agent build run asked for `build-app` here and was told
+            // "Prompt not found", and then built without the text the app-builder skill calls law.
+            // Served in pieces, because the whole of it is more than one tool result carries: even
+            // the 66 kB core never reached the model in the first measured run (the client wrote
+            // it to a file a chat cannot read). "build-app" is the first of four parts.
+            if (tierKey === 'build-app' || tierKey.startsWith('build-app/')) {
+                const full = buildAppPrompt(config, { mode: 'new', lang: 'en' }).full;
+                const id = tierKey.slice('build-app/'.length) || 'start';
+                const piece = buildAppPiece(full, id, config.baseUrl);
+                if (piece) return { content: [{ type: 'text' as const, text: piece.text }] };
+                return {
+                    content: [{ type: 'text' as const, text: `The build specification has no part or section "${id}". It has: ${buildAppPieceIds(full).join(', ')}. Ask for "build-app" to read the first part, which lists the others.` }],
+                    isError: true,
+                };
+            }
             // Normalize tier aliases used in routes (tier1 → tier-1, etc.)
             const normalized = tierKey
                 .replace(/^tier(\d)$/, 'tier-$1')

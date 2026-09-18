@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Onboarding, agent, message, DM and task connect-call tool definitions. Extracted from cli/connect/tool-call.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.11.0 -- 2026-09-18 -- aimeat_handbook_get takes `tier` here too, so "build-app" reaches the
+ *     layered build specification on this door as it does on the node's own MCP tool.
  *   v1.10.0 -- 2026-09-13 -- aimeat_dm_archive_as_owner / aimeat_dm_organize_as_owner on the CLI
  *     dispatch, over POST /v1/messages/organize/archive and GET/PUT /v1/messages/organize.
  *   v1.9.0 -- 2026-09-12 -- aimeat_dm_inbox_as_owner / aimeat_dm_thread_as_owner on the CLI dispatch,
@@ -31,6 +33,7 @@ import { agentCrewCliTools } from './tool-call-defs-agent-crew.js';
 import { agentV2CliTools } from './tool-call-defs-agent-v2.js';
 import { query, optionalString, requiredString, optionalArray, requiredArray, optionalRecord, optionalNumber, optionalBoolean, taskTodoPayload } from './tool-call-helpers.js';
 import { organizePatchBody } from './tool-call-helpers-organize.js';
+import { handbookTierPath } from './handbook-path.js';
 
 export const agentTools: ConnectCliToolDefinition[] = [
     {
@@ -39,8 +42,11 @@ export const agentTools: ConnectCliToolDefinition[] = [
         input: {
             module: { type: 'string', description: 'Optional handbook module name, such as tasks or messages.' },
             surface: { type: 'string', description: 'Which surface the handbook is for. The catalog has published this since the surfaces split; this door read only `module`, so asking for one was the same as asking for none.' },
+            tier: { type: 'string', description: 'A prompt by id. "build-app" is the first part of the build specification every app follows; "build-app/<id>" is one of the parts or sections it lists.' },
         },
         handler: ({ client }, input) => {
+            const tier = optionalString(input, 'tier');
+            if (tier) return client.get(handbookTierPath(tier));
             const module = optionalString(input, 'module');
             const q = query({ surface: optionalString(input, 'surface') });
             return client.get(module ? `/v1/agents/me/handbook/${encodeURIComponent(module)}${q}` : `/v1/agents/me/handbook${q}`);
