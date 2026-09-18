@@ -190,7 +190,7 @@ import { logger } from '../utils/logger.js';
 // reads dist/aimeat-<name>.js. `auth` (OIDC-provider prelude) + `portfolio-standalone` (non-aimeat
 // URL) are wired explicitly below; everything else is this list. Sources: src/static/sdk-libs/<name>/.
 const SDK_LIB_NAMES = [
-  'calendar', 'print',
+  'calendar', 'print', 'voice',
   'speech', 'data', 'wallet', 'ai', 'capabilities', 'agents', 'agentface', 'intake', 'organism',
   'workflows', 'header', 'editor', 'live', 'storage', 'social', 'work', 'commerce', 'exchange',
   'webmcp', 'markdown', 'audio', 'tunnel', 'game', 'iam', 'connect', 'datapackage', 'events',

@@ -1,0 +1,26 @@
+/* @file voice.css
+ * @description Responsive development harness for the shared voice SDK.
+ * @version-history v1.0.0 - 2026-09-19 - Initial voice pipeline controls.
+ */
+html, body { height: auto; min-height: 100%; overflow: auto; }
+.vl-page { max-width: 1200px; margin: auto; padding: 24px; color: var(--text); background: var(--bg); font-family: var(--font-sans, sans-serif); }
+.vl-page * { box-sizing: border-box; }
+.vl-eyebrow { font-size: 12px; letter-spacing: .12em; }
+.vl-page h1 { font-size: 40px; margin: 12px 0; }
+.vl-page h2 { font-size: 22px; }
+.vl-page p { line-height: 1.5; }
+.vl-toolbar, .vl-actions { display: flex; flex-wrap: wrap; gap: 12px; margin: 20px 0; }
+.vl-toolbar label { flex: 1 1 180px; }
+.vl-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.vl-columns section { min-width: 0; border-top: 2px solid var(--border); }
+.vl-page label { display: block; font-size: 14px; }
+.vl-page textarea, .vl-page select { width: 100%; max-width: 100%; min-height: 44px; padding: 10px; margin: 8px 0; background: var(--card); color: var(--text); border: 1px solid var(--border); border-radius: 4px; font: inherit; }
+.vl-page textarea { resize: vertical; }
+.vl-page #config { font: 13px/1.6 monospace; }
+.vl-page button { min-height: 44px; padding: 8px 16px; background: var(--card); color: var(--text); border: 1px solid var(--border); border-radius: 4px; cursor: pointer; }
+.vl-page button:disabled { opacity: .5; cursor: default; }
+.vl-page pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 240px; overflow: auto; font-size: 12px; }
+.vl-page #transcript { min-height: 80px; overflow-wrap: anywhere; }
+.vl-page #error { font-weight: bold; }
+.vl-page meter { width: 100%; }
+@media (max-width: 720px) { .vl-page { padding: 16px; } .vl-columns { grid-template-columns: 1fr; } }

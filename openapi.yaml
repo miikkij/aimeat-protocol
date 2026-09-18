@@ -14814,6 +14814,110 @@ paths:
           description: RATE_LIMITED by the provider
         '502':
           description: PROVIDER_ERROR - the provider failed; the message carries what it said
+  /v1/ai/stream:
+    post:
+      operationId: aiStream
+      summary: Stream a metered conversation for an application
+      description: >
+        Requires ai:use (owners bypass scopes). Uses the caller's provider and shared AI budget.
+        An app token's signed app identity supplies app_id; a conflicting value is refused with 403.
+        Returns newline-delimited JSON start, text and done frames. The done frame carries model,
+        finish_reason, truncated, usage, budget, cost_exact and provenance when available.
+        Failures after headers are error frames. Missing done is a failed stream. Disconnect cancels
+        generation and records available usage. Accepts text messages, not arbitrary tools or URLs.
+      tags: [AI]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [messages]
+              properties:
+                app_id: { type: string, minLength: 1, maxLength: 200, description: 'Required for owner/agent callers; signed owner/filename for app grants.' }
+                model: { type: string, maxLength: 200 }
+                messages:
+                  type: array
+                  minItems: 1
+                  maxItems: 201
+                  description: Total content is limited to 200000 characters.
+                  items:
+                    type: object
+                    additionalProperties: false
+                    required: [role, content]
+                    properties:
+                      role: { type: string, enum: [system, user, assistant] }
+                      content: { type: string, maxLength: 100000 }
+                temperature: { type: number, minimum: 0, maximum: 2 }
+                top_p: { type: number, minimum: 0, maximum: 1 }
+                max_tokens: { type: integer, minimum: 1, maximum: 32768 }
+                reasoning:
+                  type: object
+                  nullable: true
+                  additionalProperties: false
+                  properties:
+                    enabled: { type: boolean }
+                    effort: { type: string, enum: [low, medium, high] }
+                    max_tokens: { type: integer, minimum: 1, maximum: 32768 }
+                    exclude: { type: boolean }
+      responses:
+        '200':
+          description: NDJSON stream. Success requires a terminal done frame.
+          content:
+            application/x-ndjson:
+              schema: { type: string }
+        '400': { description: Invalid parameters }
+        '401': { description: Authentication required }
+        '402': { description: AI budget exhausted }
+        '403': { description: Missing ai:use or conflicting application identity }
+        '429': { description: Rate limited }
+        '502': { description: Provider failure before streaming started }
+  /v1/ai/speak:
+    post:
+      operationId: aiSpeak
+      summary: Stream synthesized speech using the caller's provider
+      description: >
+        Requires ai:use. Uses the same daily and application AI budgets as completions.
+        App identity is bound to the signed grant. Returns NDJSON start, audio (base64 bytes),
+        done or error frames. Done carries bytes, model, usage, budget, cost_exact, cost_known,
+        provenance and syntheticAudio. PCM format is provider-specific signed PCM; configure
+        the browser's sample rate and channels to match. MP3 is available where the model supports it.
+        OpenRouter cost uses the generation endpoint, falling back to its per-character catalogue
+        estimate. Custom providers without pricing return cost_known false. Cancellation may be billed.
+      tags: [AI]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [input, model, voice]
+              properties:
+                app_id: { type: string, minLength: 1, maxLength: 200, description: 'Required for owner/agent callers; signed owner/filename for app grants.' }
+                input: { type: string, minLength: 1, maxLength: 4000 }
+                model: { type: string, minLength: 1, maxLength: 200 }
+                voice: { type: string, minLength: 1, maxLength: 200 }
+                response_format: { type: string, enum: [pcm, mp3], default: pcm }
+                speed: { type: number, minimum: 0.25, maximum: 4, default: 1 }
+                instructions: { type: string, maxLength: 2000, description: 'OpenRouter OpenAI provider speech instructions.' }
+      responses:
+        '200':
+          description: NDJSON audio stream. Success requires a terminal done frame.
+          content:
+            application/x-ndjson:
+              schema: { type: string }
+        '400': { description: Invalid parameters or unknown speech model }
+        '401': { description: Authentication required }
+        '402': { description: AI budget exhausted }
+        '403': { description: Missing ai:use or conflicting application identity }
+        '429': { description: Rate limited }
+        '502': { description: Provider failure before streaming started }
   /v1/ai/transcribe:
     post:
       operationId: aiTranscribe
@@ -14862,6 +14966,11 @@ paths:
                 language:
                   type: string
                   description: ISO-639-1 hint. Omitted = the owner's sttLanguage, then auto-detect.
+                temperature:
+                  type: number
+                  minimum: 0
+                  maximum: 1
+                  description: Optional transcription sampling temperature.
                 verbose:
                   type: boolean
                   description: Ask for segment timestamps (verbose_json).
