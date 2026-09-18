@@ -15774,6 +15774,87 @@ paths:
         '401':
           $ref: '#/components/responses/AimeatError'
 
+  /v1/apps/visitors:
+    get:
+      operationId: appVisitors
+      summary: Who opened one of my apps, when, and from where
+      description: >
+        For the app's own account only (another owner gets 403). Requires scope signals:read.
+        Two halves. `opens` is always there: every open inside the window, split by whether anybody
+        was signed in, with the number of different signed-in people. It answers counts and never
+        names a visitor. `visitors` is null until measurement is on
+        (PUT /v1/apps/visitors/measurement); after that it holds people against AI fetchers against
+        other bots, the AIs by name (`asked` = a person's assistant fetched the page to answer them,
+        `crawled` = an index or training corpus), a per-day series, and, at the precision the owner
+        chose, where PEOPLE came from: `countries` (ISO 3166-1 alpha-2, `ZZ` = could not be told) and
+        `places` (region or city, coordinates to one decimal). AI fetchers are never placed. The
+        place comes from headers the reverse proxy sets; `measurement.geo_available` is false on a
+        node that is not told, and no address is stored anywhere. Response `data`:
+        `{ app, days, from, to, opens: { total, signed_in, anonymous, signed_in_people, lifetime,
+        series: [{ day, signed_in, anonymous }], computed_through },
+        measurement: { on, stream_id, geo, geo_available, geo_attribution },
+        visitors: null | { total, humans, ai, bots, ai_agents: [{ name, asked, crawled }],
+        series: [{ day, humans, ai, bots }], countries: [{ country, people }],
+        places: [{ country, region, city, lat, lon, people }], places_truncated, unknown_country,
+        reading } }`.
+      tags: [Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: app_id
+          in: query
+          required: false
+          schema: { type: string }
+          description: App id ("owner/filename"). The owner half must be the caller's own account. One of app_id and filename is required.
+        - name: filename
+          in: query
+          required: false
+          schema: { type: string }
+          description: The filename of one of the caller's own apps, in place of app_id.
+        - name: days
+          in: query
+          required: false
+          schema: { type: integer, minimum: 0, maximum: 360, default: 30 }
+          description: The trailing window in days. 0 is today only; larger than 360 is read as 360.
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/AimeatError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/apps/visitors/measurement:
+    put:
+      operationId: setAppVisitorMeasurement
+      summary: Switch visitor measurement on or off for one of my apps
+      description: >
+        Creates (or re-enables) the signal stream the app's page views are counted into, so the
+        caller never has to derive its id, and sets how precisely a person's place is kept. Off
+        disables the stream and KEEPS what it collected; deleting the counts is
+        DELETE /v1/signals/streams/{streamId}. Switching off an app that was never measured writes
+        nothing. For the app's own account only. Requires scope signals:write.
+      tags: [Apps]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: ['on']
+              properties:
+                app_id: { type: string, description: 'App id ("owner/filename"). One of app_id and filename is required.' }
+                filename: { type: string, description: 'The filename of one of the caller''s own apps, in place of app_id.' }
+                'on': { type: boolean }
+                geo: { type: string, enum: ['off', country, region, city], description: 'Absent keeps the precision the stream had; a new stream starts at off.' }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/AimeatError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
   /v1/exchange/entitlements:
     post:
       operationId: exchangeAcceptContract
@@ -57974,6 +58055,7 @@ paths:
                 per_subject: { type: boolean, description: 'Roll up per opaque recipient token so "who opened this" is answerable. False keeps totals and forgets who.' }
                 group: { type: string, maxLength: 80, nullable: true }
                 enabled: { type: boolean }
+                geo: { type: string, enum: ['off', country, region, city], description: 'How precisely a place is kept for each PERSON who reaches this stream (AI fetchers are never placed). Off until asked for. The place comes from headers the reverse proxy sets (AIMEAT_GEO_HEADERS, docs/visitor-geography.md); the node never sees or stores the address it was derived from.' }
       responses:
         '200': { $ref: '#/components/responses/AimeatSuccess' }
         '400': { $ref: '#/components/responses/AimeatError' }
@@ -58015,6 +58097,8 @@ paths:
         - { name: streamId, in: path, required: true, schema: { type: string } }
         - { name: from, in: query, required: false, schema: { type: string, pattern: '^\d{4}-\d{2}$' }, description: 'First month, YYYY-MM. Defaults to the current month.' }
         - { name: to, in: query, required: false, schema: { type: string, pattern: '^\d{4}-\d{2}$' }, description: 'Last month, YYYY-MM.' }
+        - { name: from_day, in: query, required: false, schema: { type: string, pattern: '^\d{4}-\d{2}-\d{2}$' }, description: 'First day, YYYY-MM-DD. With to_day it wins over the month bounds, for a trailing window.' }
+        - { name: to_day, in: query, required: false, schema: { type: string, pattern: '^\d{4}-\d{2}-\d{2}$' }, description: 'Last day, YYYY-MM-DD.' }
         - { name: subjects, in: query, required: false, schema: { type: string, enum: ['true'] } }
       responses:
         '200': { $ref: '#/components/responses/AimeatSuccess' }

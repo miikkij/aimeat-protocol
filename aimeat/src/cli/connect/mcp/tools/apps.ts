@@ -460,6 +460,29 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
     return out(await client.patch(`/v1/apps/${encodeURIComponent(args.filename)}`, { marks }));
   });
 
+  // → GET /v1/apps/visitors?filename=… — who opened one of the owner's own apps. The app is named
+  //   by filename alone: the route reads a bare filename as "one of mine", so this door never has
+  //   to know which account it acts in.
+  mcp.tool('aimeat_app_visitors', descriptionFor('aimeat_app_visitors'), {
+    filename: z.string().describe('One of your own apps, with its extension (e.g. "shop.html").'),
+    days: z.number().int().min(0).max(360).optional().describe('The trailing window in days, 0 to 360. 0 is today only. Default 30.'),
+  }, annotationsFor('aimeat_app_visitors'), async (args) => {
+    const days = args.days !== undefined ? `&days=${args.days}` : '';
+    return out(await client.get(`/v1/apps/visitors?filename=${encodeURIComponent(args.filename)}${days}`));
+  });
+
+  // → PUT /v1/apps/visitors/measurement — the switch, and the precision a person's place is kept at.
+  //   `geo` travels only when named: an absent one means "keep what it was".
+  mcp.tool('aimeat_app_visitors_measure', descriptionFor('aimeat_app_visitors_measure'), {
+    filename: z.string().describe('One of your own apps, with its extension (e.g. "shop.html").'),
+    on: z.boolean().describe('true starts counting who opens the app (people, named AIs, other bots); false stops and keeps what was counted.'),
+    geo: z.enum(['off', 'country', 'region', 'city']).optional().describe('How precisely a person\'s place is kept: off, country, region or city. Omit to keep what it was.'),
+  }, annotationsFor('aimeat_app_visitors_measure'), async (args) => {
+    const body: Record<string, unknown> = { filename: args.filename, on: args.on };
+    if (args.geo !== undefined) body.geo = args.geo;
+    return out(await client.put('/v1/apps/visitors/measurement', body));
+  });
+
   // → PATCH /v1/apps/:filename { legal } — one of the app's own legal pages, set or removed; with no
   //   kind, GET /v1/apps/:owner/:filename/legal reports where the app stands. The node MCP calls
   //   the same service the route does.

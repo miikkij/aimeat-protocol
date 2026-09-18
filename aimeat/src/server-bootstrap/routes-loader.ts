@@ -232,6 +232,7 @@ import { agentCrewRouter } from '../routes/agent-crew.js';
 import { agentTelemetryRouter } from '../routes/agent-telemetry.js';
 import { ledgerRouter } from '../routes/ledger.js';
 import { appsCostRouter } from '../routes/apps-cost.js';
+import { appsVisitorsRouter } from '../routes/apps-visitors.js';
 import { exchangeRouter } from '../routes/exchange.js';
 import { exchangeMarketRouter } from '../routes/exchange-market.js';
 import { agentSkillBundleRouter } from '../routes/agent-skill-bundle.js';
@@ -474,6 +475,7 @@ export async function mountRoutes(
   app.use(agentTelemetryRouter(config, storage));
   app.use(ledgerRouter(config, storage));         // LEDGER (TARGET-016) — agent LLM usage/cost read API
   app.use(appsCostRouter(config, storage));       // EXCHANGE G3 (TARGET-045) — per-app cost & contracts
+  app.use(appsVisitorsRouter(config, storage));   // Who opened my app, when and from where (App Catalog Visitors section)
   app.use(exchangeRouter(config, storage));       // EXCHANGE (TARGET-045) — contract acceptance / entitlement mint
   app.use(exchangeMarketRouter(config, storage));  // EXCHANGE (TARGET-045 Phase C) — marketplace: offerings/needs/bids
   app.use(agentSkillBundleRouter(config, storage));
