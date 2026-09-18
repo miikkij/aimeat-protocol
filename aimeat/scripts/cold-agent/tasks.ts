@@ -96,7 +96,10 @@ export const TASKS: Task[] = [
         prompt: 'Write down our house rules as a short document and share it with my family in a workspace called "{marker}". Make the workspace if it does not exist yet. The rules: shoes off at the door, quiet after ten, whoever cooks does not wash up.',
         goodTools: ['aimeat_organism_create', 'aimeat_workspace_create', 'aimeat_workspace_write', 'aimeat_workspace_publish'],
         verify: async (ctx) => {
-            const orgs = await api<{ organisms: { id: string }[] }>(ctx.baseUrl, '/v1/organisms', ctx.ownerToken);
+            // By MEMBER. The unfiltered list carries public organisms only, and an agent asked to
+            // share something with a family rightly makes a private one: the first baseline scored
+            // this task 0 of 3 while all three workspaces existed.
+            const orgs = await api<{ organisms: { id: string }[] }>(ctx.baseUrl, `/v1/organisms?member=${encodeURIComponent(ctx.ownerName)}`, ctx.ownerToken);
             for (const o of orgs.data?.organisms ?? []) {
                 const ws = await api(ctx.baseUrl, `/v1/organisms/${o.id}/workspaces`, ctx.ownerToken);
                 if (JSON.stringify(ws.data ?? '').includes(ctx.marker)) return { ok: true, detail: `workspace found in organism ${o.id}` };
@@ -131,8 +134,12 @@ export const TASKS: Task[] = [
         prompt: 'I want to make a little platform game for my kid. Is there anything here that tells you how to build one properly?',
         goodTools: ['aimeat_skill_list', 'aimeat_skill_get'],
         verify: async (ctx) => {
-            const loaded = ctx.metrics.toolCalls.some(c => c.name === 'aimeat_skill_get' && /phaser|game/i.test(JSON.stringify(c.input)));
-            return { ok: loaded, detail: loaded ? 'a game skill was loaded' : 'no game skill was loaded' };
+            // The person asked whether a guide EXISTS. Loading it proves that, and so does naming
+            // it: the third baseline run found the whole Phaser chain through the app-building
+            // overview and was scored a failure for not having opened it.
+            const loaded = ctx.metrics.toolCalls.some(c => c.name === 'aimeat_skill_get' && !c.isError && /phaser|game/i.test(JSON.stringify(c.input)));
+            const named = /aimeat-phaser|aimeat-game-apps/i.test(ctx.metrics.finalText);
+            return { ok: loaded || named, detail: loaded ? 'a game skill was loaded' : named ? 'the game skill was named' : 'the node\'s game skills were never found' };
         },
     },
     {
