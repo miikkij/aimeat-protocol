@@ -3,12 +3,37 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Extracted from prompt-defaults.ts (max-file-lines). Builders group — custom app / game / notes / dashboard / chat builders + CSM builder.
- * @structure Exports a PromptSeedEntry[] slice of PROMPT_SEEDS, verbatim (same names/values/order).
+ * @structure BUILD_FROM_SPEC (the shared pointer to the build specification) · APP_BUILDER_SEEDS,
+ *   a PromptSeedEntry[] slice of PROMPT_SEEDS (same ids and order as before the extraction).
  * @usage Imported and spread by prompt-defaults.ts into PROMPT_SEEDS.
- * @version-history v1.0.0 — 2026-07-13 — Extracted from prompt-defaults.ts
+ * @version-history
+ *   v1.1.0 — 2026-09-18 — The five app-builder prompts keep what the app IS and hand the HOW to the
+ *     build specification (BUILD_FROM_SPEC). Each carried its own short platform guide, and by the
+ *     instruction review every one of them was wrong somewhere: hand-written theme colours where
+ *     the node ships a design system, charts "with no external dependencies" where it ships
+ *     chart libraries, one memory key per note (the shape the key budget forbids), a three-second
+ *     poll where live updates exist, a game on board posts where realtime rooms exist, and a
+ *     self-publish button. Approved by the developer as item 6 of that review. csm-builder is
+ *     untouched.
+ *   v1.0.0 — 2026-07-13 — Extracted from prompt-defaults.ts
  */
 
 import type { PromptSeedEntry } from '../prompt-defaults.js';
+
+/**
+ * The half every app-builder prompt shares. One text, so the five cannot drift apart again, and
+ * short, so the specification stays the only place that says how an app is built here.
+ */
+const BUILD_FROM_SPEC = `## How to build it
+
+The complete, current build specification for this AIMEAT is one document. Read it before you write code:
+
+  GET {{node_url}}/v1/prompts/build-app?format=txt
+
+Connected over MCP, the same document comes in parts: aimeat_handbook_get { tier: "build-app" } is the first and lists the rest.
+
+It decides everything this prompt leaves out: which libraries to load and from where, how a person signs in, where data is kept and in what shape, the design system, realtime and live updates, and how the finished app is published or brought back. Where this prompt and that document disagree, the document is right.
+{{cortex_extensions}}`;
 
 export const APP_BUILDER_SEEDS: PromptSeedEntry[] = [
   // ═══════════════════════════════════════════════════════════════════
@@ -24,18 +49,12 @@ export const APP_BUILDER_SEEDS: PromptSeedEntry[] = [
 
 Ask the user what their app should do. Then build a complete, self-contained HTML file.
 
-## AIMEAT Platform
-- Load client libraries from {{node_url}}/v1/libs/ (aimeat-auth.js, aimeat-data.js, aimeat-storage.js, aimeat-social.js, aimeat-wallet.js, aimeat-work.js)
-- Auth: AIMEAT.auth.mountLoginButton("#login", { onLogin: fn, onLogout: fn }) — onLogin fires ONLY on a fresh sign-in, NOT on reload; also call AIMEAT.auth.login().then(s => { if (s) fn(s); }) on load to restore an already-signed-in session
-- Data: AIMEAT.data.set(key, value), AIMEAT.data.get(key), AIMEAT.data.search(q)
-- Dark theme: --bg:#0f0a14; --text:#f0e6f6; --accent:#ff6b9d
-{{cortex_extensions}}
+${BUILD_FROM_SPEC}
 
 ## Rules
-- Return COMPLETE HTML file, not fragments
+- Return the complete HTML file, not fragments
 - Mobile-first responsive design
-- Include error handling and loading states
-- Include a self-publish button using POST {{node_url}}/v1/apps`,
+- Include error handling and loading states`,
     variables: ['owner_name', 'node_url', 'cortex_extensions'],
     usedIn: ['/v1/portal/prompts/app-builder-general'],
   },
@@ -44,30 +63,22 @@ Ask the user what their app should do. Then build a complete, self-contained HTM
     id: 'app-builder-game',
     group: 'builders',
     name: 'Multiplayer Game Builder',
-    description: 'Game with lobby, turns, and scoreboard using AIMEAT boards',
+    description: 'Game with lobby, turns, and scoreboard',
     content: `Build a multiplayer HTML game for "{{owner_name}}" on AIMEAT node {{node_url}}.
 
-## Game Architecture
-- Use AIMEAT boards for real-time game state (POST/GET /v1/boards/{id}/posts)
-- Use AIMEAT memory for persistent scores and player profiles
-- Use AIMEAT auth for player identity
-
 ## Required Features
-- Game lobby (create/join using a board as the lobby channel)
-- Turn-based or real-time gameplay via board posts
-- Scoreboard stored in AIMEAT memory (key: games.{gamename}.scores)
-- Player profiles with wins/losses
+- Game lobby: create a game, join a game
+- Turn-based or real-time play between the people in the game
+- A scoreboard that persists: one memory key holding the whole table (games.{gamename}.scores), not one key per score
+- Player profiles with wins and losses
+- Players are signed-in people; their identity comes from the sign-in, never from a name they type
 
-## Libraries
-Load from {{node_url}}/v1/libs/:
-- aimeat-auth.js — Login/identity
-- aimeat-data.js — Score persistence
-- aimeat-social.js — Game state via boards
-{{cortex_extensions}}
+${BUILD_FROM_SPEC}
+
+For this app, read the specification's sections on realtime rooms and on the game look as well. If it is an arcade or platform game, load the skill aimeat-game-apps first.
 
 ## Design
-Dark theme (--bg:#0f0a14; --accent:#ff6b9d), mobile-first, smooth animations.
-Return a COMPLETE single HTML file.`,
+Mobile-first, smooth animations. Return the complete single HTML file.`,
     variables: ['owner_name', 'node_url', 'cortex_extensions'],
     usedIn: ['/v1/portal/prompts/app-builder-game'],
   },
@@ -86,20 +97,15 @@ Return a COMPLETE single HTML file.`,
 - Set visibility (private/public) per note
 - Markdown support in note body
 
-## Data Storage
-- Notes stored as AIMEAT memory keys: notes.{id}
-- Value: { title, body, folder, tags, createdAt, updatedAt }
-- Use AIMEAT.data.search("notes.") to list all notes
-- Use AIMEAT.data.set() / .get() / .delete()
+## Data
+- A note is { id, title, body, folder, tags, createdAt, updatedAt }
+- Keep the notes of one folder (or of one month) together in one memory key as an array, not one key per note: an account holds a limited number of keys, and search finds a note inside an array as well as it finds a key
+- A note made public is written with public visibility; the rest stay private
 
-## Libraries
-Load from {{node_url}}/v1/libs/:
-- aimeat-auth.js — Login
-- aimeat-data.js — Note CRUD
-{{cortex_extensions}}
+${BUILD_FROM_SPEC}
 
 ## Design
-Dark theme, mobile-first, sidebar + editor layout. Return COMPLETE HTML file.`,
+Mobile-first, sidebar and editor layout. Return the complete HTML file.`,
     variables: ['owner_name', 'node_url', 'cortex_extensions'],
     usedIn: ['/v1/portal/prompts/app-builder-notes'],
   },
@@ -118,18 +124,12 @@ Dark theme, mobile-first, sidebar + editor layout. Return COMPLETE HTML file.`,
 - Configurable data sources (user picks which memory keys to visualize)
 - Summary cards with key metrics
 
-## Libraries
-Load from {{node_url}}/v1/libs/:
-- aimeat-auth.js — Login
-- aimeat-data.js — Read data
-{{cortex_extensions}}
+${BUILD_FROM_SPEC}
 
-## Chart Implementation
-Use Canvas API or inline SVG for charts (no external dependencies).
-Dashboard should be fully self-contained in one HTML file.
+For the charts and tables, use the chart and table libraries the specification lists before you draw anything by hand. For data that changes while the page is open, read its section on live updates instead of polling.
 
 ## Design
-Dark theme, grid layout, responsive cards. Return COMPLETE HTML file.`,
+Grid layout, responsive cards. Return the complete HTML file.`,
     variables: ['owner_name', 'node_url', 'cortex_extensions'],
     usedIn: ['/v1/portal/prompts/app-builder-dashboard'],
   },
@@ -147,7 +147,7 @@ Dark theme, grid layout, responsive cards. Return COMPLETE HTML file.`,
 - Send message (POST to board)
 - Reply threading
 - Emoji reactions
-- Auto-poll for new messages (every 3 seconds)
+- New messages appear without a reload
 - Create new channels (create board)
 
 ## Architecture
@@ -155,15 +155,12 @@ Dark theme, grid layout, responsive cards. Return COMPLETE HTML file.`,
 - Messages = board posts
 - Replies = posts with replyTo field
 - Reactions = post reaction API
+- The boards library is aimeat-social.js
 
-## Libraries
-Load from {{node_url}}/v1/libs/:
-- aimeat-auth.js — Login/identity
-- aimeat-social.js — Boards, posts, reactions
-{{cortex_extensions}}
+${BUILD_FROM_SPEC}
 
 ## Design
-Dark theme, Discord-like layout, mobile-responsive. Return COMPLETE HTML file.`,
+Channel list beside the conversation, mobile-responsive. Return the complete HTML file.`,
     variables: ['owner_name', 'node_url', 'cortex_extensions'],
     usedIn: ['/v1/portal/prompts/app-builder-chat'],
   },
