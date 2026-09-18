@@ -127,6 +127,7 @@
     "gate": "tsx scripts/gate.ts",
     "gate:full": "tsx scripts/gate.ts --full",
     "sandbox": "tsx scripts/sandbox.ts",
+    "cold-agent": "tsx scripts/cold-agent/run.ts",
     "sandbox:stop": "tsx scripts/sandbox.ts --stop",
     "sandbox:reset": "tsx scripts/sandbox.ts --reset",
     "sandbox:status": "tsx scripts/sandbox.ts --status",

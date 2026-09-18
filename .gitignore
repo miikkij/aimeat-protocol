@@ -71,6 +71,10 @@ logs/**
 aimeat/.sandbox.json
 aimeat/.sandbox.log
 
+# `pnpm cold-agent` — one folder per run: the agent's transcripts, results.json and report.md.
+# A transcript carries the sandbox agent's token in its MCP config echo, and none of it is source.
+aimeat/.cold-agent/
+
 # OS files
 Thumbs.db
 Desktop.ini
