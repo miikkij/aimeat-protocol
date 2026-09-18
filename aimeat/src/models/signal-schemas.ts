@@ -29,6 +29,11 @@
  *   SignalMonthRecord · key builders · emptyMonth/emptyDay helpers
  * @usage import { streamKey, monthKey, type SignalMonthRecord } from '../models/signal-schemas.js';
  * @version-history
+ *   v1.1.0 — 2026-09-18 — WHERE a person came from: a stream may keep a place per hit at a
+ *     precision its owner picks (`geo`: off, country, region, city). The place comes from the
+ *     reverse proxy as request headers and the address it was derived from is never seen here.
+ *     Day counts gain `countries` and `places`, the month gains the `places` table behind them.
+ *     All three are optional on read, so every record written before this still reads.
  *   v1.0.0 — 2026-08-24 — Initial: the generic hit-collection contract.
  */
 
@@ -62,6 +67,32 @@ export type VisitorClass = (typeof VISITOR_CLASSES)[number];
  */
 export type AiFetchKind = 'assistant' | 'crawler';
 
+/**
+ * How precisely a stream keeps WHERE a person came from. The owner picks it per stream, and `off`
+ * is the default: nothing about place is kept until somebody asks for it.
+ *
+ * Each step down is a step towards being able to tell one visitor from another. A country never
+ * identifies anyone; a city on a page with three readers a month very nearly does, which is why the
+ * choice belongs to the person who answers for the page and is stored where they can see it.
+ */
+export const SIGNAL_GEO_LEVELS = ['off', 'country', 'region', 'city'] as const;
+export type SignalGeoLevel = (typeof SIGNAL_GEO_LEVELS)[number];
+
+/**
+ * A place as the reverse proxy reported it for one request. Every field is optional because a
+ * lookup misses often (a private address, a new allocation, a proxy with no geo database), and a
+ * miss is counted as "unknown" rather than dropped.
+ */
+export interface SignalGeoInput {
+  /** ISO 3166-1 alpha-2, upper case. */
+  country?: string | null;
+  /** Subdivision name or code as the proxy's database spells it (`Uusimaa`, `CA`). */
+  region?: string | null;
+  city?: string | null;
+  lat?: number | null;
+  lon?: number | null;
+}
+
 // ── Caps ──────────────────────────────────────────────────────────────────────────────────────
 // Every one of these bounds an UNAUTHENTICATED write path. They are constants rather than config
 // because the safe value does not differ between localhost and the public internet: they exist to
@@ -81,6 +112,13 @@ export const RETAIN_MONTHS = 24;
 /** Length ceilings for the free-text-ish parts of a hit. */
 export const MAX_SUBJECT_LEN = 64;
 export const MAX_REF_LEN = 64;
+/** Distinct regions or cities kept inside one month record. Past it a hit still counts in its
+ *  country and in the totals; only the finer place stops growing, and the record says so. Measured
+ *  against the 1024 kB value ceiling: 300 places on every day of a month is under 300 kB. */
+export const MAX_PLACES_PER_MONTH = 300;
+export const MAX_PLACE_NAME_LEN = 64;
+/** The country key for a hit whose place the proxy could not tell. Two letters ISO never assigns. */
+export const UNKNOWN_COUNTRY = 'ZZ';
 
 // ── The stream ────────────────────────────────────────────────────────────────────────────────
 
@@ -106,6 +144,8 @@ export interface SignalStreamConfig {
   enabled: boolean;
   /** Free-text grouping the owner chooses (an app id, a campaign family). Used for listing only. */
   group: string | null;
+  /** How precisely a place is kept per hit. Absent on a stream saved before v1.1.0: read as `off`. */
+  geo?: SignalGeoLevel;
   createdAt: string;
   updatedAt: string;
 }
@@ -125,6 +165,23 @@ export interface SignalDayCounts {
   /** Named AI agents seen that day and how often (`{ chatgpt: 4, claude: 1 }`). The evidence
    *  behind an AI-visibility claim: a count with no names is not something a customer can show. */
   aiAgents: Record<string, number>;
+  /** PEOPLE by country (`{ FI: 12, SE: 3, ZZ: 1 }`), kept when the stream's `geo` is not `off`.
+   *  People only: an AI fetcher's address is a data centre, and a map of data centres answers
+   *  nobody's question about where the readers are. */
+  countries?: Record<string, number>;
+  /** PEOPLE by finer place, keyed as in `SignalMonthRecord.places`. Kept at `region` and `city`. */
+  places?: Record<string, number>;
+}
+
+/** One region or city, written once per month however many hits it collects. */
+export interface SignalPlace {
+  country: string;
+  region: string;
+  /** Null at `region` precision. */
+  city: string | null;
+  /** Rounded to one decimal (about 11 km), and only kept at `city` precision. */
+  lat: number | null;
+  lon: number | null;
 }
 
 /** What one subject (one recipient, one visitor token) did this month. */
@@ -161,6 +218,11 @@ export interface SignalMonthRecord {
   /** True once MAX_SUBJECTS_PER_MONTH was reached: the totals stayed honest, the detail stopped.
    *  Named in the record rather than inferred, so a report can say so instead of looking complete. */
   subjectsTruncated: boolean;
+  /** The regions and cities the day counts refer to, keyed `CC|region|city`. A key always starts
+   *  with a validated two-letter country, so it can never be a prototype name. */
+  places?: Record<string, SignalPlace>;
+  /** True once MAX_PLACES_PER_MONTH was reached: countries stayed exact, finer places stopped. */
+  placesTruncated?: boolean;
   /** Hits the day caps refused, so a suppressed flood is visible rather than silent. */
   dropped: number;
   updatedAt: string;

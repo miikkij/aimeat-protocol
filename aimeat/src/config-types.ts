@@ -164,6 +164,17 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, Se
    */
   appOriginEnabled: boolean;
   /**
+   * The reverse proxy tells this node where a request came from (`X-Geo-Country` and friends,
+   * utils/geo-headers.ts). OFF by default, because on a node with no such proxy the same headers
+   * would come straight from the visitor. The node never locates anybody itself.
+   */
+  geoHeaders: boolean;
+  /**
+   * The credit line the proxy's address database asks for (DB-IP Lite is CC BY 4.0), shown under
+   * the visitor map. The database is the operator's, so the words are too. Empty shows nothing.
+   */
+  geoAttribution: string;
+  /**
    * Dedicated origin family for standalone published portfolios: a portfolio
    * resolves at `<username>.portfolio.<apex>` as a top-level document (same
    * isolation argument as the app origin — host-only cookies mean no visitor

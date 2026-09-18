@@ -23,6 +23,8 @@
  *     closers of the dialogs whose closing does more than hide them. The per-dialog backdrop
  *     handlers and the dialog half of the Escape cascade leave, because the dialog closes itself
  *     and keeps a half-written form; the page's own keys stand aside while a dialog is open.
+ *   v2.9.0 — 2026-09-18 — Visitors: expose visitorsSetDays / visitorsApplyDays / visitorsToggle /
+ *     visitorsSetGeo / visitorsCountry / visitorsZoom.
  */
 import { t, getLang, setLang, applyI18n } from './i18n.js';
 import { escapeHtml, jsArg, sourceLabel, sourceLabelText, bareOwnerName, sameOwner, filterAttr, isSameOriginUrl, currentOwnerName, generateId, readFileAsText } from './util.js';
@@ -36,6 +38,7 @@ import { monetizeAddTool, monetizeEditTool, monetizeCancelEdit, monetizeSaveTool
   odpsGenerateSampleUi, odpsUseMeasuredUi } from './monetize.js';
 import { seoToggle, seoSave, seoToggleEditor } from './seo.js';
 import { marksToggle, marksDeclare, marksWithdraw } from './marks.js';
+import { visitorsSetDays, visitorsApplyDays, visitorsToggle, visitorsSetGeo, visitorsCountry, visitorsZoom } from './visitors.js';
 import { legalEdit, legalCancel, legalSave, legalRemove, legalFormatHint, legalScrollTo, auditMore } from './legal.js';
 import { loadCortexExtensions, showCortexPopup, cortexCopy, getCortexOwnerToken, openCortexEditor, cortexEditorAddLib, cortexEditorSave, cortexEditorExport, closeCortexEditor, openPromptBuilder, closePbPanel, buildPromptFromBuilder, updatePbPreview } from './cortex.js';
 import { initSettings, applyTheme, updateThemeToggle, toggleTheme, getThemePref, openSettings, saveSettings, syncConfigToServer, loadConfigFromServer, closeSettings, openHelp, closeHelp } from './settings.js';
@@ -167,6 +170,12 @@ import { initDialogs, closeDlg, anyDlgOpen, onDlgClose } from './dialogs.js';
     marksToggle: marksToggle,
     marksDeclare: marksDeclare,
     marksWithdraw: marksWithdraw,
+    visitorsSetDays: visitorsSetDays,
+    visitorsApplyDays: visitorsApplyDays,
+    visitorsToggle: visitorsToggle,
+    visitorsSetGeo: visitorsSetGeo,
+    visitorsCountry: visitorsCountry,
+    visitorsZoom: visitorsZoom,
     legalEdit: legalEdit,
     legalCancel: legalCancel,
     legalSave: legalSave,

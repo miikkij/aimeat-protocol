@@ -20,6 +20,8 @@
  * @usage
  *   recordAppOpen({ appOwnerGaii: app.ownerGaii, filename: app.filename, viewer: req.auth?.sub });
  * @version-history
+ *   v1.1.0 — 2026-09-18 — `anonymous`: the node's synthetic anonymous principal is nobody, and an
+ *     open it carries is an anonymous open. It had been counted as a signed-in one.
  *   v1.0.0 — 2026-08-14 — Initial: app opens become a measured, time-dimensioned surface.
  */
 import { recordUsageCall } from './usage-buffer.js';
@@ -43,8 +45,16 @@ export function recordAppOpen(args: {
   filename: string;
   /** The signed-in visitor, when there is one. */
   viewer?: string | null;
+  /**
+   * True when the principal on the request is the node's stand-in for nobody (`req.auth.anonymous`).
+   * A node in anonymous mode gives every unauthenticated request a synthetic principal with a real
+   * looking `sub`, so the viewer alone cannot say whether anybody was signed in. Until 2026-09-18
+   * nobody passed this, and on such a node every anonymous open was filed as a signed-in person
+   * named after the anonymous account (found by e2e-app-visitors, which read 5 signed-in of 5).
+   */
+  anonymous?: boolean;
 }): void {
-  const anon = isAnonymous(args.viewer);
+  const anon = !!args.anonymous || isAnonymous(args.viewer);
   const viewer = anon ? '' : args.viewer as string;
   recordUsageCall({
     ownerGhii: anon ? '' : ownerGhiiOf(viewer),
