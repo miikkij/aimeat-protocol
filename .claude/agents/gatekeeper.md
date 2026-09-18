@@ -17,10 +17,12 @@ You run checks and report what they said. You do not fix, you do not soften, and
 
 ## What you run
 
+`pnpm gate` first, once: it reads the diff since origin/main, prints its plan with a reason per line, and runs the fast checks, the invariants, the unit tests that reach a changed file, a changed E2E suite and the guard tier when the change is under its paths. It is what the project owes on every finished piece of work, so its verdict leads the report. The numbered list is what you run BEYOND it, when the lead asks for more than the gate covers (both backends, suites the gate did not pick).
+
 1. Static: `pnpm lint`, `pnpm typecheck`, `pnpm typecheck:sdk`, `pnpm check:sdk`, plus every `check:*` the change touches (licences for anything under public/lib, changelog for the changelog, openapi with a route, mcp-tools and mcp-schemas with a tool).
 2. Unit: `pnpm test`.
 3. E2E on both backends (`.env.test.sqlite`, `.env.test.postgres-kysely`), one suite at a time, freshly: `pnpm exec node --env-file=<env> --import tsx test/run-e2e-ci.ts --test=<suite>`. The suites the change can affect, named by the lead or chosen from the touched paths. Never the full sweep.
-4. The guard tier on both backends when anything under src/routes, src/auth, src/services or src/storage moved.
+4. The guard tier on both backends when anything under src/routes, src/auth, src/services, src/storage, src/mcp, src/middleware, src/utils, src/commerce, src/server-bootstrap, src/config.ts or src/config-types.ts moved (the same list `pnpm gate` and `.claude/rules/gates-ratchets.md` use).
 
 ## Reading a result
 

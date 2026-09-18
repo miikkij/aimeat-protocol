@@ -38,7 +38,7 @@ Grep for the component or class across `public/`, list every view that renders i
 
 ## Measure
 
-Against the dev server on port 40050. Get an authenticated session first (the task will say how, or `docs/internal/TESTING.md` has it).
+Against the address the lead gives: the session's own sandbox node (`pnpm sandbox`, port 40600 upward; its owners and passwords are in `aimeat/.sandbox.json`), not the shared dev server on 40050, which another session may restart under you. Get an authenticated session first (the task says how; `docs/internal/TESTING.md` holds the production accounts and exists only on the developer's main machine, so when it is absent, ask the lead). You drive the session's one browser tab: the lead runs one browser agent at a time.
 
 Three viewports, always: **390x844, 1280x900, 1280x460**. The short one catches overlays and centring.
 

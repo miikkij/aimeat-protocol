@@ -113,9 +113,10 @@ asked in turn. Three hooks and a variable answer it; the ritual around them is s
 
 - **`AIMEAT_SESSION=cc-<owner>-<tag>`** in the shell a session commits from. The
   `prepare-commit-msg` hook stamps `Session: <name>` as a trailer on every commit; the same name
-  is on the session's claim record. A missing variable warns today and will refuse once every
-  active session has adopted it.
-- **`check:imports-tracked`** (pre-commit) refuses a tracked file whose relative import
+  is on the session's claim record. In a Claude Code session (`CLAUDECODE=1`) a missing variable
+  REFUSES the commit; a person committing from VS Code or a terminal is never asked.
+- **`check:imports-tracked`** (in `pnpm gate` and CI, not in the pre-commit hook since the hook
+  was slimmed on 2026-09-05) refuses a tracked file whose relative import
   resolves to a file git does not track. It reads the index copy of a file with unstaged edits,
   so a peer's half-done work in a shared checkout is not this commit's problem, and an
   untracked importer is ignored until it is staged. c932f2f17 shipped without the two files it
@@ -123,6 +124,9 @@ asked in turn. Three hooks and a variable answer it; the ritual around them is s
 - **`pre-push`** fetches and refuses a push from behind `origin/main` (rebase first), lists the
   commits about to go that carry no `Session:` trailer, and runs `pnpm boot:smoke`, which
   imports the modules on the server's boot path and refuses when one throws at load.
-- **One session, one worktree.** `git worktree add ../aimeat-protocol-<tag> main`, then
-  everything from there. In a shared checkout `git log origin/main..HEAD` shows a peer's
+- **One session, one worktree**, made by Claude Code (`claude --worktree cc-<owner>-<tag>`, or
+  the `EnterWorktree` tool), whose hook runs the whole recipe. By hand it is
+  `git worktree add --detach .worktrees/cc-<owner>-<tag> origin/main`, then `cd aimeat`,
+  `pnpm install` and `pnpm test:env:init`: inside the repository under `.worktrees/`, detached at
+  `origin/main`, never a branch and never a sibling directory. Then everything from there. In a shared checkout `git log origin/main..HEAD` shows a peer's
   commits, and a push would carry them; stop and message the peer.
