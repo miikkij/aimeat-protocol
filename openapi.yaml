@@ -22325,80 +22325,6 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
-  /v1/federation/auth/refresh:
-    post:
-      operationId: federationAuthRefresh
-      summary: Re-verify a federated session
-      description: |
-        Re-verify a federated session without requiring the password again.
-        Checks that the user still exists and the auth consent is still active,
-        then returns a fresh signed attestation.
-      tags: [Federation]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [ghii, requesting_node, timestamp]
-              properties:
-                ghii:
-                  type: string
-                  description: Full GHII of the user (e.g. alice@home-node)
-                requesting_node:
-                  type: string
-                  description: Node ID of the node requesting refresh
-                timestamp:
-                  type: string
-                  format: date-time
-                  description: ISO timestamp (must be within 5 minutes of server time)
-      responses:
-        '200':
-          description: Fresh signed attestation
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/AimeatEnvelope'
-                  - type: object
-                    properties:
-                      data:
-                        type: object
-                        properties:
-                          verified:
-                            type: boolean
-                          ghii:
-                            type: string
-                          display_name:
-                            type: string
-                          home_node:
-                            type: string
-                          home_url:
-                            type: string
-                            format: uri
-                          owner:
-                            type: string
-                          scopes:
-                            type: array
-                            items:
-                              type: string
-                          requesting_node:
-                            type: string
-                          issued_at:
-                            type: string
-                            format: date-time
-                          expires_at:
-                            type: string
-                            format: date-time
-                          signature:
-                            type: string
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-
   # ── Federation Internal (node-to-node) ─────────────────────
   /v1/federation/ping:
     post:
@@ -58817,3 +58743,2207 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+
+  # ══ Routes the code served and the contract did not name ════════════════════
+  # Found on 2026-09-18 by comparing every router declaration with this file (the gate is
+  # aimeat/scripts/check-openapi-routes.ts). Each entry below was written from its handler.
+
+  # ── Conventional agent paths (routes/agent-conventions.ts) ────
+  /openapi.json:
+    get:
+      operationId: getOpenapiJson
+      summary: This contract as JSON, at the conventional path
+      description: >-
+        The OpenAPI file parsed and served as JSON. Scanners and agent tooling probe this address at
+        an origin root; the YAML at /v1/spec stays canonical and a Link header points at it. The
+        document is parsed per request from the same file, so the two cannot describe different APIs.
+        Public, CORS-open. Apex only: an app origin falls through to its own routes.
+      tags: [Catalogue]
+      responses:
+        '200':
+          description: The OpenAPI document
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '404':
+          description: The deployment ships no openapi.yaml
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error: { type: string }
+
+  /skill.md:
+    get:
+      operationId: getNodeSkillMd
+      summary: The node as one agent skill (SKILL.md)
+      description: >-
+        A SKILL.md document with YAML frontmatter describing this node as a single capability: what
+        it is, when to reach for it, the first steps to connect, how scopes are approved, and links
+        to the manual, the vocabulary and the contract. Public, CORS-open. Apex only.
+      tags: [Catalogue]
+      responses:
+        '200':
+          description: The node's skill document
+          content:
+            text/markdown:
+              schema: { type: string }
+
+  /agents.txt:
+    get:
+      operationId: getAgentsTxt
+      summary: What an AI agent may do on this node (robots.txt shape)
+      description: >-
+        A robots.txt-shaped statement for agents: which documents are free to read, that writing
+        needs an identity the owner approves through the RFC 8628 device flow, where the identity
+        document and the machine-readable surfaces are, the operator contact, and that rate limits
+        are per identity. Public, CORS-open. Apex only.
+      tags: [Catalogue]
+      responses:
+        '200':
+          description: The agents.txt document
+          content:
+            text/plain:
+              schema: { type: string }
+
+  /.well-known/webmcp.json:
+    get:
+      operationId: getWebmcpManifest
+      summary: Node-level WebMCP tool manifest
+      description: >-
+        The in-page tools a browser-resident agent can call on this node's own pages, plus the
+        bridge library URL and the per-app tool-listing URL template. A published app declares its
+        own tools on its own origin; this document covers the node. Public, CORS-open. Apex only.
+      tags: [Catalogue]
+      responses:
+        '200':
+          description: The WebMCP manifest
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name: { type: string }
+                  description: { type: string }
+                  version: { type: string }
+                  library: { type: string, description: 'URL of the in-page bridge library.' }
+                  pages:
+                    type: array
+                    items: { type: string }
+                  tools:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        name: { type: string }
+                        description: { type: string }
+                        inputSchema: { type: object, additionalProperties: true }
+                  app_tools:
+                    type: object
+                    properties:
+                      note: { type: string }
+                      listing: { type: string, description: 'URL template for one app''s tool listing.' }
+
+  /.well-known/x402.json:
+    get:
+      operationId: getX402Discovery
+      summary: x402 machine-payment discovery
+      description: >-
+        What a buying agent needs before it pays: who sells (the node id, because a self-hosted node
+        is its own seller), whether x402 is enabled here, the network and whether that network is a
+        test one, the facilitator, the scheme, the assets this node can settle, and the discovery
+        links for priced tools, the product feed, checkout and the UCP and ACP profiles. Derived from
+        the network registry, so it cannot advertise a chain the node cannot settle. There is no
+        node-level payTo: the buyer pays the seller's own address and the node never holds funds.
+        Public, CORS-open. Apex only.
+      tags: [Commerce]
+      responses:
+        '200':
+          description: The x402 discovery document
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  x402Version: { type: integer }
+                  name: { type: string, description: 'The selling party: this node''s id.' }
+                  enabled: { type: boolean }
+                  network: { type: string }
+                  testnet: { type: boolean }
+                  notice: { type: string, description: 'Present only on a test network.' }
+                  facilitator: { type: string }
+                  scheme: { type: string, example: exact }
+                  assets:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        currency: { type: string }
+                        symbol: { type: string }
+                        address: { type: string }
+                        decimals: { type: integer }
+                        network: { type: string }
+                  settlement:
+                    type: object
+                    properties:
+                      custodial: { type: boolean }
+                      note: { type: string }
+                  discovery:
+                    type: object
+                    properties:
+                      priced_tools: { type: string }
+                      product_feed: { type: string }
+                      checkout: { type: string }
+                      ucp_profile: { type: string }
+                      acp_profile: { type: string }
+
+  # ── DID document (server-bootstrap/routes-loader.ts) ──────────
+  /.well-known/did.json:
+    get:
+      operationId: getDidDocument
+      summary: The node's DID document
+      description: >-
+        The W3C DID document for the node's verifiable-credential issuer: the issuer DID and the
+        public key that signs credentials, as a JsonWebKey verification method used for both
+        authentication and assertion. Registered only once the node key has loaded, so a node with
+        no key answers 404. Public.
+      tags: [Verification]
+      responses:
+        '200':
+          description: The DID document
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  '@context':
+                    type: array
+                    items: { type: string }
+                  id: { type: string }
+                  verificationMethod:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string }
+                        type: { type: string, example: JsonWebKey }
+                        controller: { type: string }
+                        publicKeyJwk: { type: object, additionalProperties: true }
+                  authentication:
+                    type: array
+                    items: { type: string }
+                  assertionMethod:
+                    type: array
+                    items: { type: string }
+
+  # ── OAuth protected-resource metadata (mcp/oauth.ts) ──────────
+  /.well-known/oauth-protected-resource:
+    get:
+      operationId: getOauthProtectedResource
+      summary: Protected-resource metadata (RFC 9728)
+      description: >-
+        Tells an MCP client where the authorization server is and which scopes a token needs. The
+        answer depends on the origin the request arrived on: the apex describes the apex, an app
+        origin and a portfolio origin describe themselves, because each is a distinct protected
+        resource. RFC 9728 has a client reject metadata whose `resource` is not the resource it is
+        talking to, which is why the origin decides. Public.
+      tags: [MCP]
+      responses:
+        '200':
+          description: Protected-resource metadata for the origin the request arrived on
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  resource: { type: string }
+                  authorization_servers:
+                    type: array
+                    items: { type: string }
+                  scopes_supported:
+                    type: array
+                    items: { type: string }
+                  bearer_methods_supported:
+                    type: array
+                    items: { type: string }
+                  resource_name: { type: string }
+                  resource_documentation: { type: string }
+                  aimeat:
+                    type: object
+                    additionalProperties: true
+                    description: 'AIMEAT extension: what this resource is, in the node''s own terms.'
+
+  # ── App-origin markdown mirror (routes/subdomain-origin-docs.ts) ──
+  /.md:
+    get:
+      operationId: getAppOriginRootMarkdown
+      summary: Markdown mirror of a published app's root
+      description: >-
+        On an app origin, the markdown an agent gets for the app's front page: the app's agent face
+        wrapped as a root mirror, with a canonical Link header back to the app root. Served on both
+        `/.md` (the page URL plus `.md`, which is what a scanner constructs) and `/index.md`, so
+        there is one document and two ways in. The apex has no such document and falls through.
+      tags: [Catalogue]
+      responses:
+        '200':
+          description: The app root as markdown
+          content:
+            text/markdown:
+              schema: { type: string }
+
+  # ── Portal (routes/portal.ts, routes/prompts.ts, routes/portal-api.ts) ──
+  /v1/portal/platforms:
+    get:
+      operationId: listPortalPlatforms
+      summary: The AI platforms the portal knows how to connect
+      description: >-
+        The platform list behind the portal's connect picker: each platform with its variants, used
+        to build the address for GET /v1/portal/prompt/{platformId}. Public.
+      tags: [Public]
+      responses:
+        '200':
+          description: The platform list
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          platforms:
+                            type: array
+                            items: { type: object, additionalProperties: true }
+
+  /v1/portal/prompt/{platformId}:
+    get:
+      operationId: getPortalPlatformPrompt
+      summary: A ready-to-run prompt for one AI platform
+      description: >-
+        Builds the prompt a person pastes into their own AI for one platform and variant. The
+        platform id is `<platform>-<variant>`; the variant decides which stored system prompt is
+        used (MCP, API, browse, or the app builder), and the node fills in its own URL, id, agent
+        count and action count. With the app-builder path the chosen goal appends a short
+        pre-selected goal section, and `mode=authenticated` appends the instructions for uploading
+        the finished app. Public.
+      tags: [Discovery]
+      parameters:
+        - name: platformId
+          in: path
+          required: true
+          schema: { type: string }
+          description: 'Platform and variant joined by a hyphen, for example claude-mcp.'
+        - name: goal
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [dashboard, notes, game, news, marketplace, chat, iot, custom]
+            default: dashboard
+          description: Appends a pre-selected goal section for the app-builder path. `custom` appends nothing.
+        - name: mode
+          in: query
+          required: false
+          schema: { type: string, enum: [anonymous, authenticated], default: anonymous }
+          description: '`authenticated` appends the app upload instructions.'
+      responses:
+        '200':
+          description: The prompt package for this platform
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          platform: { type: string }
+                          variant: { type: string }
+                          tier: { type: string }
+                          path: { type: string, enum: [mcp, api, browse, prompt-package] }
+                          goal: { type: string }
+                          prompt: { type: string }
+        '404':
+          description: No such platform, or no prompt available for it
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      error:
+                        type: object
+                        properties:
+                          code: { example: NOT_FOUND }
+
+  /v1/portal/prompts:
+    get:
+      operationId: listPortalPromptPackages
+      summary: The prompt packages in the builders group
+      description: >-
+        Index of the stored system prompts grouped as `builders`: id, name, description and
+        category, without the prompt text. Read one with GET /v1/portal/prompts/{promptId}. Public.
+      tags: [Discovery]
+      responses:
+        '200':
+          description: The prompt package index
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          packages:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id: { type: string }
+                                name: { type: string }
+                                description: { type: string }
+                                category: { type: string }
+                          total: { type: integer }
+
+  /v1/portal/prompts/{promptId}:
+    get:
+      operationId: getPortalPromptPackage
+      summary: One prompt package with the node's own values filled in
+      description: >-
+        The stored prompt for this id with the node URL, the owner name and the descriptions of the
+        active cortex extensions substituted in, so the text is ready to paste. The owner name comes
+        from the caller's token when there is one, else from `?owner=`, else the word `user`. An
+        inactive or unknown prompt answers 404. Public.
+      tags: [Discovery]
+      parameters:
+        - name: promptId
+          in: path
+          required: true
+          schema: { type: string }
+        - name: owner
+          in: query
+          required: false
+          schema: { type: string }
+          description: Owner name to substitute when the request carries no token.
+      responses:
+        '200':
+          description: The filled-in prompt
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          id: { type: string }
+                          name: { type: string }
+                          description: { type: string }
+                          category: { type: string }
+                          prompt: { type: string }
+                          node_url: { type: string }
+                          owner: { type: string }
+                          cortex_extensions_available: { type: integer }
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/portal/try-memory:
+    post:
+      operationId: postPortalTryMemory
+      summary: Append a message to a public demo board
+      description: >-
+        The write behind the portal's try-it surface. It appends one short message to a public
+        memory record under a `board.` key, keeps only the last 20 messages and gives the record a
+        72-hour lifetime, so the demo cleans up after itself. Text is at most 280 characters. An
+        unrecognised board key falls back to `board.public`.
+      tags: [Memory]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [text]
+              properties:
+                text:
+                  type: string
+                  maxLength: 280
+                boardKey:
+                  type: string
+                  pattern: '^board\.[a-z][a-z0-9._-]{0,60}$'
+                  default: board.public
+      responses:
+        '200':
+          description: The message was appended
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          posted: { type: boolean }
+                          count: { type: integer, description: Messages now held on the board, at most 20. }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /v1/prompts/intent-pool:
+    get:
+      operationId: getIntentPoolPrompt
+      summary: What a connected agent needs to know about its owner's intent pool
+      description: >-
+        The node-served text that tells an agent how its owner's list works: promoted items arrive
+        as tasks, the rest is readable but not the agent's to act on. Served by the node so a
+        correction reaches every agent instead of the copies people pasted last month. `?format=txt`
+        returns the text alone. Public: it is guidance, and the permissions it describes are
+        enforced by the routes.
+      tags: [Discovery]
+      parameters:
+        - name: format
+          in: query
+          required: false
+          schema: { type: string, enum: [txt] }
+          description: '`txt` returns the prompt as plain text instead of the envelope.'
+      responses:
+        '200':
+          description: The intent-pool prompt
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          id: { type: string, example: intent-pool }
+                          name: { type: string }
+                          description: { type: string }
+                          prompt: { type: string }
+                          system_prompt: { type: string, description: The same text as `prompt`. }
+                          body: { type: string, description: The prompt body without the framing. }
+            text/plain:
+              schema: { type: string }
+
+  # ── Sharing groups: shares (routes/sharing-groups.ts) ─────────
+  /v1/groups/{id}/shares:
+    post:
+      operationId: createGroupShare
+      summary: Share a key space with a sharing group
+      description: >-
+        Give a group read access to every memory record whose key matches a pattern. The same
+        pattern shared with the same group twice returns the share that already exists rather than
+        adding a second row. An owner may hold a limited number of shares; the refusal names it.
+        The permission is the human at their own keyboard or an agent carrying `share:manage`: an
+        agent's token carries its owner's `owner` role, so the role alone decides nothing here.
+      tags: [Sharing Groups]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+          description: The sharing group id.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [key_pattern]
+              properties:
+                key_pattern:
+                  type: string
+                  description: The memory key pattern the group may read. Reserved keys are refused.
+                note:
+                  type: string
+                  description: Free text for the owner's own reference.
+                expires_at:
+                  type: string
+                  format: date-time
+                  nullable: true
+                  description: When the share stops working. Null means it does not expire.
+      responses:
+        '201':
+          description: The share, new or the identical one that already existed
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          share:
+                            type: object
+                            properties:
+                              id: { type: string }
+                              group_id: { type: string }
+                              owner_gaii: { type: string }
+                              key_pattern: { type: string }
+                              note: { type: string, nullable: true }
+                              expires_at: { type: string, format: date-time, nullable: true }
+                              created_at: { type: string, format: date-time }
+                              created_by: { type: string }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: >-
+            SCOPE_DENIED (the session carries no share:manage and is not the human owner) or
+            RESERVED_KEY (the pattern names a key space that is never shareable).
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      error:
+                        type: object
+                        properties:
+                          code: { example: SCOPE_DENIED }
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '413':
+          description: QUOTA_EXCEEDED. The owner already holds the maximum number of shares.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      error:
+                        type: object
+                        properties:
+                          code: { example: QUOTA_EXCEEDED }
+    get:
+      operationId: listGroupShares
+      summary: What one sharing group can reach
+      description: >-
+        The key spaces shared with this group. The group's owner and its members may read it; anyone
+        else gets 404 and learns nothing, not even that the group exists.
+      tags: [Sharing Groups]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: The group's shares
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          shares:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id: { type: string }
+                                group_id: { type: string }
+                                owner_gaii: { type: string }
+                                key_pattern: { type: string }
+                                note: { type: string, nullable: true }
+                                expires_at: { type: string, format: date-time, nullable: true }
+                                created_at: { type: string, format: date-time }
+                                created_by: { type: string }
+                          total: { type: integer }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/shares:
+    get:
+      operationId: listOutgoingShares
+      summary: What you have shared, and with whom
+      description: Every share this owner has created, across all of their groups.
+      tags: [Sharing Groups]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: The owner's outgoing shares
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          shares:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id: { type: string }
+                                group_id: { type: string }
+                                owner_gaii: { type: string }
+                                key_pattern: { type: string }
+                                note: { type: string, nullable: true }
+                                expires_at: { type: string, format: date-time, nullable: true }
+                                created_at: { type: string, format: date-time }
+                                created_by: { type: string }
+                          total: { type: integer }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /v1/shares/incoming:
+    get:
+      operationId: listIncomingShares
+      summary: What has been shared with you
+      description: >-
+        The live shares reaching the calling identity through the groups it belongs to. Without this
+        a reader had to be handed the owner's identity and the exact key out of band. Expired shares
+        are left out. The caller's resolved identity decides, not the raw token subject: an owner
+        session carries a bare account name while every membership is keyed under the GHII.
+      tags: [Sharing Groups]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: The shares this identity can read
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          shares:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id: { type: string }
+                                group_id: { type: string }
+                                owner_gaii: { type: string }
+                                key_pattern: { type: string }
+                                note: { type: string, nullable: true }
+                                expires_at: { type: string, format: date-time, nullable: true }
+                                created_at: { type: string, format: date-time }
+                                created_by: { type: string }
+                          total: { type: integer }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /v1/shares/{shareId}:
+    delete:
+      operationId: revokeGroupShare
+      summary: Stop sharing a key space
+      description: >-
+        Removes the share. It takes effect at once: the next read finds no share and falls back to
+        the record's own visibility. A share belonging to someone else answers 404.
+      tags: [Sharing Groups]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: The share that was removed
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          revoked: { type: boolean }
+                          share:
+                            type: object
+                            properties:
+                              id: { type: string }
+                              group_id: { type: string }
+                              owner_gaii: { type: string }
+                              key_pattern: { type: string }
+                              note: { type: string, nullable: true }
+                              expires_at: { type: string, format: date-time, nullable: true }
+                              created_at: { type: string, format: date-time }
+                              created_by: { type: string }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: SCOPE_DENIED. The session carries no share:manage and is not the human owner.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      error:
+                        type: object
+                        properties:
+                          code: { example: SCOPE_DENIED }
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── Owner-scoped tab and overview aggregates ──────────────────
+  /v1/memory/tab:
+    get:
+      operationId: getMemoryTab
+      summary: The Memory tab in one read
+      description: >-
+        Everything the Memory tab shows, composed in one read scope: the owner's agents, the
+        owner-scope memory records as metadata with the quota, the stored files with the node's
+        upload limit, the consent grants, the sharing groups the owner owns or belongs to, and the
+        organisms they are a member of. No memory values are loaded. The individual endpoints stay
+        for interactive re-fetches. Owner role only, which is stricter than the endpoints it folds.
+      tags: [Memory]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: The Memory tab composite
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          agents:
+                            type: array
+                            items: { type: object, additionalProperties: true }
+                          memory:
+                            type: object
+                            properties:
+                              items:
+                                type: array
+                                items:
+                                  type: object
+                                  properties:
+                                    key: { type: string }
+                                    owner_gaii: { type: string }
+                                    bytes: { type: integer }
+                                    visibility: { type: string }
+                                    zone: { type: string }
+                                    tags: { type: array, items: { type: string } }
+                                    version: { type: integer }
+                                    flagCount: { type: integer }
+                                    created_at: { type: string, format: date-time }
+                                    updated_at: { type: string, format: date-time }
+                              total: { type: integer }
+                              quota:
+                                type: object
+                                properties:
+                                  max_keys: { type: integer }
+                                  used_keys: { type: integer }
+                                  max_bytes: { type: integer }
+                                  used_bytes: { type: integer }
+                          files:
+                            type: object
+                            properties:
+                              files:
+                                type: array
+                                items:
+                                  type: object
+                                  properties:
+                                    key: { type: string }
+                                    owner_gaii: { type: string }
+                                    size: { type: integer }
+                                    mime_type: { type: string }
+                                    visibility: { type: string }
+                                    tags: { type: array, items: { type: string } }
+                                    created_at: { type: string, format: date-time }
+                              total: { type: integer }
+                              max_file_size_bytes: { type: integer }
+                          consents:
+                            type: object
+                            properties:
+                              consents:
+                                type: array
+                                items: { type: object, additionalProperties: true }
+                              total: { type: integer }
+                          groups:
+                            type: object
+                            properties:
+                              groups:
+                                type: array
+                                items: { type: object, additionalProperties: true }
+                          organisms:
+                            type: object
+                            properties:
+                              organisms:
+                                type: array
+                                items: { type: object, additionalProperties: true }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /v1/notebook:
+    get:
+      operationId: getNotebookTab
+      summary: The Notebook tab in one read
+      description: >-
+        The owner's notebook inbox, their notebook settings and the organisms they belong to, in one
+        read scope. The inbox is scanned by key prefix across the owner's own identity and their
+        agents', newest first, and only the notebook inbox keys are loaded. Owner role only.
+      tags: [Memory]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: The Notebook tab composite
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          inbox:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                key: { type: string }
+                                owner_gaii: { type: string }
+                                value: {}
+                                visibility: { type: string }
+                                zone: { type: string }
+                                tags: { type: array, items: { type: string } }
+                                version: { type: integer }
+                                flagCount: { type: integer }
+                                created_at: { type: string, format: date-time }
+                                updated_at: { type: string, format: date-time }
+                          settings: { type: object, additionalProperties: true }
+                          organisms:
+                            type: object
+                            properties:
+                              organisms:
+                                type: array
+                                items: { type: object, additionalProperties: true }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /v1/knowledge/tab:
+    get:
+      operationId: getKnowledgeTab
+      summary: The Knowledge tab in one read
+      description: >-
+        The owner's knowledge packages and their consent grants, in one read scope. The tab derives
+        the federated packages from the consents. Public discovery and the per-organism shared
+        package scan stay separate calls. Owner role only.
+      tags: [Knowledge]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: The Knowledge tab composite
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          packages:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                key: { type: string }
+                                value: {}
+                                owner_gaii: { type: string }
+                                visibility: { type: string }
+                                version: { type: integer }
+                                tags: { type: array, items: { type: string } }
+                                created_at: { type: string, format: date-time }
+                                updated_at: { type: string, format: date-time }
+                          consents:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id: { type: string }
+                                data_pattern: { type: string }
+                                recipient: { type: string }
+                                purpose: { type: string }
+                                scope: { type: string }
+                                expires: { type: string, nullable: true }
+                                status: { type: string }
+                                granted_at: { type: string, format: date-time }
+                                revoked_at: { type: string, format: date-time, nullable: true }
+                                metadata: { type: object, additionalProperties: true }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /v1/organisms/tab:
+    get:
+      operationId: getOrganismsTab
+      summary: The Organisms tab in one read
+      description: >-
+        The organisms the owner belongs to with their workspace counts, the public discovery list,
+        and the saved list-order preferences. Owner role only.
+      tags: [Organisms]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: The Organisms tab composite
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          mine:
+                            type: array
+                            items: { type: object, additionalProperties: true }
+                          public:
+                            type: array
+                            items: { type: object, additionalProperties: true }
+                          uiPrefs:
+                            nullable: true
+                            description: The owner's saved list-order preferences, or null when they have none.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /v1/packages/tab:
+    get:
+      operationId: getPackagesTab
+      summary: The Packages tab in one read
+      description: >-
+        The owner's installed instances, their own live packages, the newest template listings and
+        the publicly available packages, in one read scope. The cross-node federation templates call
+        stays separate. Owner role only.
+      tags: [Packages]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: The Packages tab composite
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          instances:
+                            type: object
+                            properties:
+                              instances: { type: array, items: { type: object, additionalProperties: true } }
+                              total: { type: integer }
+                          packages:
+                            type: object
+                            properties:
+                              packages: { type: array, items: { type: object, additionalProperties: true } }
+                              total: { type: integer }
+                          templates:
+                            type: object
+                            properties:
+                              templates: { type: array, items: { type: object, additionalProperties: true } }
+                              total: { type: integer }
+                          available:
+                            type: object
+                            properties:
+                              packages: { type: array, items: { type: object, additionalProperties: true } }
+                              total: { type: integer }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /v1/scheduler/tab:
+    get:
+      operationId: getSchedulerTab
+      summary: The Scheduler tab in one read
+      description: >-
+        The owner's schedules together with the names of their agents, for the create-schedule
+        picker. The calendar's occurrence projection stays a separate call because it is driven by
+        the range the person is looking at.
+      tags: [Schedules]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: The Scheduler tab composite
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          schedules:
+                            type: array
+                            items: { type: object, additionalProperties: true }
+                          agents:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                name: { type: string }
+                                gaii: { type: string }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          description: The schedules could not be read.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      error:
+                        type: object
+                        properties:
+                          code: { example: INTERNAL_ERROR }
+
+  /v1/security/overview:
+    get:
+      operationId: getSecurityOverview
+      summary: The Security tab in one read
+      description: >-
+        The owner's allowed browser origins and the resolved origins of each of their agents (with
+        where each agent inherits from), whether an organisation connection manages the account,
+        the two-factor state, and the person's own open sessions. Agent sessions are left out: this
+        is a device list, and an agent is ended from the Agents surface. Owner role only.
+      tags: [Owner]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: The Security tab composite
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          ghii:
+                            type: object
+                            nullable: true
+                            properties:
+                              ghii: { type: string }
+                              allowed_origins: { type: array, items: { type: string }, nullable: true }
+                              effective: { type: array, items: { type: string } }
+                              inherited: { type: boolean }
+                          agents:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                gaii: { type: string }
+                                allowed_origins: { type: array, items: { type: string }, nullable: true }
+                                effective: { type: array, items: { type: string } }
+                                inherited_from: { type: string, enum: [none, ghii, node] }
+                          managed_by:
+                            type: object
+                            nullable: true
+                            properties:
+                              connection: { type: string }
+                              name: { type: string }
+                          two_factor:
+                            type: object
+                            properties:
+                              available: { type: boolean }
+                              enabled: { type: boolean }
+                              pending: { type: boolean }
+                              backup_codes_left: { type: integer }
+                          sessions:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                session_id: { type: string }
+                                gaii: { type: string }
+                                issued_at: { type: string, format: date-time }
+                                expires_at: { type: string, format: date-time }
+                                last_used_at: { type: string, format: date-time, nullable: true }
+                                device_label: { type: string, nullable: true }
+                                current: { type: boolean }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /v1/wallet/overview:
+    get:
+      operationId: getWalletOverview
+      summary: The Wallet tab in one read
+      description: >-
+        The owner's morsel balance with what is held in escrow and the lifetime totals, the 20 most
+        recent transactions, the checkout sessions they opened as a buyer and the orders they
+        received as a seller, composed in one read scope. A morsel paces what agents may push into
+        the store; it buys nothing, and money runs on its own rails. Selling and payout settings
+        stay on their own call. Owner role only.
+      tags: [Owner]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: The Wallet tab composite
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          wallet:
+                            type: object
+                            properties:
+                              gaii: { type: string }
+                              balance: { type: number }
+                              in_escrow: { type: number }
+                              available: { type: number }
+                              daily_allowance:
+                                type: object
+                                properties:
+                                  amount: { type: number }
+                                  accumulation_cap: { type: number }
+                              lifetime: { type: object, additionalProperties: true }
+                          transactions:
+                            type: object
+                            properties:
+                              transactions:
+                                type: array
+                                items:
+                                  type: object
+                                  properties:
+                                    id: { type: string }
+                                    type: { type: string }
+                                    amount: { type: number }
+                                    counterparty_gaii: { type: string, nullable: true }
+                                    tracking_code: { type: string, nullable: true }
+                                    timestamp: { type: string, format: date-time }
+                              total: { type: integer }
+                          checkoutSessions:
+                            type: object
+                            properties:
+                              sessions: { type: array, items: { type: object, additionalProperties: true } }
+                              total: { type: integer }
+                          orders:
+                            type: object
+                            properties:
+                              orders: { type: array, items: { type: object, additionalProperties: true } }
+                              total: { type: integer }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /v1/work/overview:
+    get:
+      operationId: getWorkOverview
+      summary: The Work tab in one read
+      description: >-
+        The work waiting for the caller as a provider and the work they sent as a requester, in one
+        read. An owner session sees the work of all their agents; an agent or federated principal
+        sees only its own, for the same reason the individual inbox and sent endpoints do.
+      tags: [Owner]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: The Work tab composite
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          inbox:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                tracking_code: { type: string }
+                                status: { type: string }
+                                action_id: { type: string }
+                                requester_gaii: { type: string }
+                                cost: { type: number }
+                                ttl_expires_at: { type: string, format: date-time, nullable: true }
+                                created_at: { type: string, format: date-time }
+                          sent:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                tracking_code: { type: string }
+                                status: { type: string }
+                                action_id: { type: string }
+                                provider_gaii: { type: string }
+                                cost: { type: number }
+                                rating: { type: number, nullable: true }
+                                ttl_expires_at: { type: string, format: date-time, nullable: true }
+                                created_at: { type: string, format: date-time }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /v1/living-docs:
+    get:
+      operationId: getLivingDocsOverview
+      summary: The Living Docs tab in one read
+      description: >-
+        The owner's living-document templates, the deployed instances with where each one lives
+        (organism, workspace, document) and when it last changed, and the organisms available as a
+        deploy target. Both lists are partitioned server-side from a single owner-memory scan.
+        Owner role only.
+      tags: [Memory]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: The Living Docs composite
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          templates:
+                            type: array
+                            items: { type: object, additionalProperties: true }
+                          instances:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                loc:
+                                  type: object
+                                  properties:
+                                    orgId: { type: string }
+                                    wsId: { type: string }
+                                    docId: { type: string }
+                                config: { type: object, additionalProperties: true }
+                                updatedAt: { type: string, format: date-time }
+                          organisms:
+                            type: array
+                            items: { type: object, additionalProperties: true }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /v1/ledger/usage/overview:
+    get:
+      operationId: getLedgerUsageOverview
+      summary: AI usage grouped by model, with the per-run drill, in one read
+      description: >-
+        The owner's AI usage for a date window grouped by model with the grand totals, plus the
+        per-run rollups, from a single read scope. The daily aggregates honour the window; the
+        per-run drill reads raw events without it, mirroring GET /v1/ledger/usage/runs. Owner-scoped
+        and reachable through an application grant.
+      tags: [Agents]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: agent
+          in: query
+          required: false
+          schema: { type: string }
+          description: Limit to one agent GAII.
+        - name: from
+          in: query
+          required: false
+          schema: { type: string, format: date }
+          description: First day of the window. Defaults to 30 days ago.
+        - name: to
+          in: query
+          required: false
+          schema: { type: string, format: date }
+          description: Last day of the window. Defaults to today.
+        - name: runs_limit
+          in: query
+          required: false
+          schema: { type: integer, default: 50 }
+          description: How many raw events the per-run drill reads.
+      responses:
+        '200':
+          description: Usage grouped by model, plus the runs
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          from: { type: string, format: date }
+                          to: { type: string, format: date }
+                          agent: { type: string, nullable: true }
+                          group_by: { type: string, example: model }
+                          groups:
+                            type: array
+                            items: { type: object, additionalProperties: true }
+                          totals: { type: object, additionalProperties: true }
+                          runs:
+                            type: array
+                            items: { type: object, additionalProperties: true }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  # ── Per-agent subtab aggregates ───────────────────────────────
+  /v1/agents/{name}/activity/overview:
+    get:
+      operationId: getAgentActivityOverview
+      summary: The agent's Activity subtab in one read
+      description: >-
+        The agent's activity statistics, the first page of its event log, the budget limits from its
+        directives, its webhook state and the buffered telemetry events, in one call. Each part
+        mirrors the shape of the endpoint it folds, so a client can seed the subtab from this and
+        re-fetch any one part on its own. The owner, or the agent itself, may read it.
+      tags: [Agents]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+          description: The agent name, or its full GAII.
+      responses:
+        '200':
+          description: The Activity subtab composite
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          activity:
+                            type: object
+                            properties:
+                              activity_stats: { type: object, additionalProperties: true, nullable: true }
+                          log:
+                            type: object
+                            properties:
+                              events:
+                                type: array
+                                items: { type: object, additionalProperties: true }
+                              pagination:
+                                type: object
+                                properties:
+                                  page: { type: integer }
+                                  per_page: { type: integer }
+                                  total: { type: integer }
+                                  total_pages: { type: integer }
+                          directives:
+                            type: object
+                            properties:
+                              budget_limits:
+                                type: object
+                                properties:
+                                  max_tokens_per_task: { type: integer, nullable: true }
+                                  max_tokens_per_day: { type: integer, nullable: true }
+                                  max_tasks_per_day: { type: integer, nullable: true }
+                                  alert_threshold: { type: number, nullable: true }
+                          webhook:
+                            type: object
+                            properties:
+                              configured: { type: boolean }
+                              url: { type: string }
+                              enabled: { type: boolean }
+                              last_success: { type: string, format: date-time, nullable: true }
+                              last_failure: { type: string, format: date-time, nullable: true }
+                              fail_count: { type: integer }
+                          telemetry:
+                            type: object
+                            properties:
+                              events:
+                                type: array
+                                items: { type: object, additionalProperties: true }
+                              count: { type: integer }
+                              per_page: { type: integer }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/agents/{name}/quality/overview:
+    get:
+      operationId: getAgentQualityOverview
+      summary: The agent's Quality subtab in one read
+      description: >-
+        The agent's recomputed statistics (performance, reviews, custom metrics) together with the
+        tasks it has finished. Like the statistics endpoint it folds, this recomputes and caches, so
+        it is a request fold rather than a pure read. The owner, or the agent itself, may read it.
+      tags: [Agents]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: The Quality subtab composite
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          statistics:
+                            type: object
+                            properties:
+                              performance: { type: object, additionalProperties: true }
+                              reviews: { type: object, additionalProperties: true }
+                              custom: { type: object, additionalProperties: true }
+                          done_tasks:
+                            type: array
+                            items: { type: object, additionalProperties: true }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/agents/{name}/data-access/overview:
+    get:
+      operationId: getAgentDataAccessOverview
+      summary: The agent's Data Access subtab in one read
+      description: >-
+        What the agent may reach: the memory areas and resources its directives name, its own memory
+        keys as metadata only, and the skills linked to it. Memory values are not loaded. The owner,
+        or the agent itself, may read it.
+      tags: [Agent Directives]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: The Data Access subtab composite
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          directives:
+                            type: object
+                            properties:
+                              memory_areas:
+                                type: array
+                                items:
+                                  type: object
+                                  properties:
+                                    key_prefix: { type: string }
+                                    description: { type: string }
+                                    schema: { type: object, additionalProperties: true, nullable: true }
+                                    csm_id: { type: string, nullable: true }
+                              resources:
+                                type: array
+                                items: { type: object, additionalProperties: true }
+                          memory_keys:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                key: { type: string }
+                                visibility: { type: string }
+                                version: { type: integer }
+                                created_at: { type: string, format: date-time }
+                                updated_at: { type: string, format: date-time }
+                          skill_links:
+                            type: array
+                            items: { type: object, additionalProperties: true }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/agents/{name}/integration/overview:
+    get:
+      operationId: getAgentIntegrationOverview
+      summary: The agent's Integration subtab in one read
+      description: >-
+        The agent's webhook configuration, its recent delivery log and its post-onboarding
+        checklist. The skill bundle stays a separate call because it runs the bundle-generation
+        pipeline rather than a read. The owner, or the agent itself, may read it.
+      tags: [Agent Webhooks]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: The Integration subtab composite
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          webhook:
+                            type: object
+                            properties:
+                              configured: { type: boolean }
+                              url: { type: string }
+                              enabled: { type: boolean }
+                              last_success: { type: string, format: date-time, nullable: true }
+                              last_failure: { type: string, format: date-time, nullable: true }
+                              fail_count: { type: integer }
+                          deliveries:
+                            type: object
+                            properties:
+                              deliveries:
+                                type: array
+                                items: { type: object, additionalProperties: true }
+                          onboarding:
+                            type: object
+                            properties:
+                              post_onboarding_checklist:
+                                nullable: true
+                                description: Null when the agent has never run the hello-integration flow.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/agents/{name}/messages/overview:
+    get:
+      operationId: getAgentMessagesOverview
+      summary: The agent's Messages subtab in one read
+      description: >-
+        The agent's command palette, its conversation threads with a title resolved for each, and
+        the first page of the message history. The messages carry the same provenance block the
+        individual message endpoint returns, so a label does not appear on a click and vanish on a
+        reload. The owner, or the agent itself, may read it.
+      tags: [Agent Messages]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: The Messages subtab composite
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          commands:
+                            type: array
+                            items: { type: object, additionalProperties: true }
+                          threads:
+                            type: array
+                            items:
+                              type: object
+                              additionalProperties: true
+                              properties:
+                                threadId: { type: string }
+                                title: { type: string, nullable: true }
+                                linkedTaskId: { type: string, nullable: true }
+                          messages:
+                            type: object
+                            properties:
+                              messages:
+                                type: array
+                                items: { type: object, additionalProperties: true }
+                              total: { type: integer }
+                              page: { type: integer }
+                              per_page: { type: integer }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  # ── Apps: the "me" doors and the guest list ───────────────────
+  /v1/apps/me/{filename}/legal:
+    get:
+      operationId: getOwnAppLegal
+      summary: The signed-in account's own app legal state
+      description: >-
+        The same answer as GET /v1/apps/{owner}/{filename}/legal for the account the token belongs
+        to. It resolves the owner name and redirects with 307, which preserves the method and the
+        query string. This is the door the connector and the command line use: they hold a filename
+        and a token and no owner name.
+      tags: [Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: filename
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '307':
+          description: Redirect to /v1/apps/{owner}/{filename}/legal, carrying the query string
+          headers:
+            Location:
+              schema: { type: string }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /v1/apps/me/{filename}/audit:
+    get:
+      operationId: getOwnAppAudit
+      summary: The signed-in account's own app audit log
+      description: >-
+        The same answer as GET /v1/apps/{owner}/{filename}/audit for the account the token belongs
+        to, by a 307 redirect that keeps the method and the query string. The query travels on
+        purpose: a dropped `?limit=1` answered oldest-first and handed an agent the first entry as
+        if it were the latest.
+      tags: [Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: filename
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '307':
+          description: Redirect to /v1/apps/{owner}/{filename}/audit, carrying the query string
+          headers:
+            Location:
+              schema: { type: string }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /v1/apps/{owner}/{filename}/members/seen/{account}:
+    delete:
+      operationId: dismissAppVisitor
+      summary: Dismiss a visitor from the app's guest list
+      description: >-
+        Marks that the owner has looked at this visitor and takes them off the list. It is not a
+        block and not a punishment: the person is recorded again the next time they open the app,
+        because the list answers who is here rather than who is unread. Only the app owner may do it.
+      tags: [Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: owner
+          in: path
+          required: true
+          schema: { type: string }
+        - name: filename
+          in: path
+          required: true
+          schema: { type: string }
+        - name: account
+          in: path
+          required: true
+          schema: { type: string }
+          description: The visitor's account name.
+      responses:
+        '200':
+          description: The visitor was taken off the list
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          dismissed: { type: boolean }
+                          note: { type: string }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  # ── Extensions ────────────────────────────────────────────────
+  /v1/ext-hash:
+    get:
+      operationId: getExtensionHashReference
+      summary: The reference source of the sandbox hash function
+      description: >-
+        The JavaScript source of `ctx.hash`, byte for byte as an extension runs it in the sandbox,
+        with the algorithm named and a worked example. An extension and a browser app must agree on
+        the same hash, and a value hashed by a different function is silently wrong at reveal time,
+        which is where it costs most. Use it for sealed-bid commitments, idempotency keys and
+        content fingerprints. Public.
+      tags: [Extensions]
+      responses:
+        '200':
+          description: The reference hash function
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          name: { type: string, example: aimeatHash }
+                          algorithm: { type: string }
+                          source: { type: string, description: The JavaScript source of the function. }
+                          note: { type: string }
+                          examples:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                input: { type: string }
+                                output: { type: string }
+
+  # ── OData ─────────────────────────────────────────────────────
+  /v1/odata:
+    get:
+      operationId: getOdataServiceRootHint
+      summary: The OData service-root form
+      description: >-
+        There is no whole-node OData feed: one service root is one data package. This address always
+        answers 400 with an OData error naming the real form, /v1/odata/{owner}/{package}, and the
+        query options an entity set supports, so a client that guessed the root learns the right
+        address instead of a bare 404. Public.
+      tags: [Data Packages]
+      responses:
+        '400':
+          description: An OData error naming the correct service-root form
+          content:
+            application/json;odata.metadata=minimal:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code: { type: string, example: BadRequest }
+                      message: { type: string }
+
+  # ── Admin ─────────────────────────────────────────────────────
+  /v1/admin/usage/house:
+    get:
+      operationId: getAdminHouseUsage
+      summary: AI spend split by whose key paid
+      description: >-
+        What the node's own key has cost, against what people paid for with their own. The split is
+        the same field the monthly billing rollup uses: `own` is the person's own account and costs
+        the operator nothing, `node` is the house key. The ten biggest house-key spenders are named.
+        The built-in chat agent is reported beside these figures and deliberately not summed with
+        them: its turns run on one process-wide provider key, never reach the ledger, and are
+        invisible to every total here. Operator only.
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: from
+          in: query
+          required: false
+          schema: { type: string, format: date }
+          description: First day of the window. Defaults to 29 days ago.
+        - name: to
+          in: query
+          required: false
+          schema: { type: string, format: date }
+          description: Last day of the window. Defaults to today.
+      responses:
+        '200':
+          description: The house-key usage report
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          from: { type: string, format: date }
+                          to: { type: string, format: date }
+                          house_key_configured: { type: boolean }
+                          free_allowance_usd: { type: number }
+                          free_fallback_model: { type: string, nullable: true }
+                          by_key_scope:
+                            type: object
+                            properties:
+                              node:
+                                type: object
+                                properties:
+                                  cost_usd: { type: number }
+                                  calls: { type: integer }
+                                  people: { type: integer }
+                              own:
+                                type: object
+                                properties:
+                                  cost_usd: { type: number }
+                                  calls: { type: integer }
+                                  people: { type: integer }
+                          top_house_spenders:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                owner_ghii: { type: string }
+                                cost_usd: { type: number }
+                                calls: { type: integer }
+                          chat_agent:
+                            type: object
+                            properties:
+                              enabled: { type: boolean }
+                              model: { type: string, nullable: true }
+                              key_configured: { type: boolean }
+                              metered_here: { type: boolean, description: Always false. These turns are not in the ledger. }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /v1/admin/site/sync:
+    post:
+      operationId: triggerAdminSiteSync
+      summary: Push portal content to the load-balancer origin now
+      description: >-
+        Runs the site sync that otherwise runs on a timer: the portal template and the portal memory
+        keys are pushed to the configured origin. The response says how much moved. Registered only
+        on a node with the site load balancer configured. Operator only.
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: The sync ran
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          synced: { type: boolean }
+                          template_updated: { type: boolean }
+                          memory_keys_synced: { type: integer }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '502':
+          description: SYNC_FAILED. The origin could not be reached or refused the push.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      error:
+                        type: object
+                        properties:
+                          code: { example: SYNC_FAILED }
+
+  /v1/admin/maintenance/backfill-home-feed:
+    post:
+      operationId: backfillAdminHomeFeed
+      summary: Write the missing home-feed history for existing accounts
+      description: >-
+        Builds the home-feed entries an account should already have, from the markers it carries.
+        Idempotent per account: it skips any kind already recorded and stamps each row with the
+        marker's own time, so an old account reads as old. Run it twice and the second run writes
+        nothing. Naming one owner does that account; omitting the field does every account on the
+        node, which is the deploy-day case. One account whose markers cannot be read is named in
+        `failed` rather than stopping the rest. Operator only.
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                owner:
+                  type: string
+                  description: One account name. Omit to run for every account on the node.
+      responses:
+        '200':
+          description: The backfill ran
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          owners: { type: integer, description: How many accounts were attempted. }
+                          written: { type: integer, description: How many feed rows were written. }
+                          failed:
+                            type: array
+                            items: { type: string }
+                            description: Accounts whose markers could not be read.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          description: BACKFILL_FAILED. The run could not start or the owner list could not be read.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      error:
+                        type: object
+                        properties:
+                          code: { example: BACKFILL_FAILED }
+
+  # ── MCP OAuth consent ─────────────────────────────────────────
+  /v1/mcp/approval-check:
+    get:
+      operationId: getMcpApprovalCheck
+      summary: Has this client already been approved for this agent
+      description: >-
+        Says whether the owner has previously approved this OAuth client for this agent, so the
+        consent page can submit itself instead of asking again. A missing parameter answers
+        `approved: false` rather than an error. The response is a bare JSON object, not the AIMEAT
+        envelope, because the consent page is an OAuth surface.
+      tags: [MCP]
+      parameters:
+        - name: client_id
+          in: query
+          required: true
+          schema: { type: string }
+        - name: gaii
+          in: query
+          required: true
+          schema: { type: string }
+          description: The agent the client would act as.
+      responses:
+        '200':
+          description: Whether a remembered approval exists
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  approved: { type: boolean }
+
+  /v1/mcp/authorize-consent:
+    post:
+      operationId: submitMcpAuthorizeConsent
+      summary: Approve an OAuth client for one of your agents
+      description: >-
+        The consent page posts this after the person has signed in, chosen an agent and approved.
+        It mints a single-use authorization code, remembers the approval so the next authorization
+        skips the screen, and answers with the redirect URL. A caller that asks for JSON gets
+        `redirect_url`; a form post is redirected with 302; with no redirect URI at all the code and
+        state are returned directly.
+
+        The client must be registered or must publish a Client ID Metadata Document at its
+        `client_id` URL, and the redirect URI must be one that client lists. The `owner_token` is
+        checked four ways, not one: the signature, the expiry, whether the credential has been
+        revoked, and whether the principal is the account holder with its CURRENT permissions rather
+        than the ones its token was minted with. This door hands out a credential carrying the
+        target agent's full permission list, so it takes the same tests every authenticated route
+        takes. The agent must belong to the same account.
+
+        Errors here are bare OAuth error objects, not the AIMEAT envelope.
+      tags: [MCP]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [client_id, gaii, owner_token]
+              properties:
+                client_id: { type: string }
+                client_name: { type: string, description: Falls back to the registered or published name. }
+                redirect_uri: { type: string, description: Must be one the client lists. Falls back to the client's first. }
+                state: { type: string }
+                gaii: { type: string, description: The agent the client will act as. }
+                owner_token: { type: string, description: The account holder's own session token. }
+                code_challenge: { type: string, description: PKCE challenge. When present the method is S256. }
+      responses:
+        '200':
+          description: The authorization code, as a redirect URL or on its own
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  redirect_url: { type: string, description: Present when a redirect URI was resolved. }
+                  code: { type: string, description: Present when there is no redirect URI. }
+                  state: { type: string, nullable: true }
+        '302':
+          description: Redirect to the client's redirect URI carrying the code and state (form post)
+          headers:
+            Location:
+              schema: { type: string }
+        '400':
+          description: >-
+            invalid_request (a required field is missing, the redirect URI is not registered or is
+            not a parseable URL, or the agent does not exist) or invalid_client (the client_id is
+            neither registered nor a usable metadata document URL).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error: { type: string, example: invalid_request }
+                  error_description: { type: string }
+        '401':
+          description: access_denied. The owner_token is invalid, expired or no longer valid.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error: { type: string, example: access_denied }
+                  error_description: { type: string }
+        '403':
+          description: >-
+            access_denied. The principal is not the account holder, or the agent belongs to someone
+            else.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error: { type: string, example: access_denied }
+                  error_description: { type: string }

@@ -18,6 +18,7 @@ export const FAST_CHECKS = [
     { script: 'check:config-coverage', label: 'Every setting reachable in the admin Config tab' },
     { script: 'check:no-max-tokens', label: 'No max_tokens caps on AI calls' },
     { script: 'check:openapi', label: 'openapi.yaml parses + refs resolve' },
+    { script: 'check:openapi-routes', label: 'The contract and the code name the same routes' },
     { script: 'check:app-catalog', label: 'app-catalog.html ↔ sources in sync' },
     { script: 'check:everything', label: 'everything.json ↔ docs/AIMEAT-Feature-List.md in sync' },
     { script: 'check:changelog', label: 'Landing change log parses + newest first' },
