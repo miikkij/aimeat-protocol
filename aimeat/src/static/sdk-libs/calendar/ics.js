@@ -3,11 +3,12 @@
  * @description RFC 5545 VEVENT interchange: escaped/folded text, civil times, RRULE, RDATE, EXDATE and overrides.
  *   IANA zones use the runtime timezone database. Custom VTIMEZONE identifiers are refused.
  * @version-history v1.0.0 - 2026-09-18 - Initial calendar interchange.
+ *   2026-09-18 - Escape lone CR characters in text fields as ICS newlines.
  */
 import { Temporal, local, zoned, fromInstant, wallMs, wallString } from './time.js';
 import { normalize, ruleOptions } from './events.js';
 
-const textEscape = value => String(value ?? '').replace(/\\/g,'\\\\').replace(/\r?\n/g,'\\n').replace(/;/g,'\\;').replace(/,/g,'\\,');
+const textEscape = value => String(value ?? '').replace(/\\/g,'\\\\').replace(/\r\n|\r|\n/g,'\\n').replace(/;/g,'\\;').replace(/,/g,'\\,');
 const textRead = value => value.replace(/\\([nN,;\\])/g,(_,s)=>s.toLowerCase()==='n'?'\n':s);
 const compact = value => value.replace(/[-:]/g,'');
 function expanded(value) {
