@@ -123,6 +123,10 @@ export const SECTION_TABLE: Record<string, SectionRule> = {
     id: 'files', layer: 'on-demand',
     when: 'The app uploads images or files, or shows them to other people.',
   },
+  "AI work in the person's own chat: the prompt-driven workflow (aimeat-prompt.js)": {
+    id: 'prompt-driven', layer: 'on-demand',
+    when: "The app needs AI work done and should cost nothing to run, or the person's AI cannot connect to this node: they run a prompt in their own chat and paste the answer back.",
+  },
   'AI (prompt-driven)': {
     id: 'ai', layer: 'on-demand',
     when: 'The app itself calls a language model while it runs.',

@@ -206,6 +206,9 @@ const SDK_LIB_NAMES = [
   // and icon. It registers the app-origin worker (src/static/app-sw.js, served at /sw.js there) and
   // needs the `push:receive` app grant on the two /v1/push/subscribe doors.
   'push',
+  // aimeat-prompt.js — the prompt-driven workflow as one component: show a prompt, copy it, take
+  // the answer back. No node calls of its own.
+  'prompt',
 ] as const;
 
 function sendJavascriptLibrary(res: Response, source: string): void {

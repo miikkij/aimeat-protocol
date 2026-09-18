@@ -96,6 +96,7 @@ export const SDK_LIBS: SdkLib[] = [
   { name: 'living', entry: 'living/index.js' },
   { name: 'onto', entry: 'onto/index.js' },
   { name: 'push', entry: 'push/index.js' },
+  { name: 'prompt', entry: 'prompt/index.js' },
 ];
 
 function banner(name: string): string {

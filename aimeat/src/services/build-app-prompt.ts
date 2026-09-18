@@ -15,6 +15,8 @@
  * @usage import { buildAppPrompt } from '../services/build-app-prompt.js';
  *   const { full, body } = buildAppPrompt(config, { lang: 'en', mode: 'new', idea: '...' });
  * @version-history
+ *   2026-09-18 — ADDITIVE, a new section before the aimeat-ai one: the prompt-driven workflow with
+ *     aimeat-prompt.js (build-app-prompt-driven.ts). Instruction review, item 10.
  *   2026-09-18 — ADDITIVE, one parenthesis in the shape section: the shell is also read with
  *     aimeat_app_template_get, for a chat that cannot make the GET the sentence names.
  *   2026-09-13 — ADDITIVE, one sentence before Design Guidelines: a library that uses eval() or new
@@ -148,6 +150,7 @@ import { APP_GRANTABLE_SCOPES } from '../routes/app-grants.js';
 // of the Library Acceleration Program killed the 4-way hardcoded-list drift).
 import { buildPromptLibrarySections } from '../data/library-packs.js';
 import { buildPromptSessionSections } from './build-app-prompt-session.js';
+import { buildPromptDrivenSection } from './build-app-prompt-driven.js';
 import { buildResearchStep, buildFinishChecklist } from './appdev-flow-constants.js';
 
 export interface BuildAppPromptOptions {
@@ -405,6 +408,10 @@ function composeAppPrompt(
   body += '```\n';
   body += "Gotcha: `AIMEAT.storage.publicUrl(key)` returns the OWNER's `/v1/storage/...` URL, which requires the owner's auth — it will NOT load for other users. Cross-user image display always uses `/v1/pub/<owner-ghii>/<key>`.\n";
   body += "The same rule covers the app's OWN pictures — logo, background, samples. An asset inlined as a data URI is carried in the source forever and re-uploaded on every publish; one app on this node reached 3.18 MB that way, of which 477 kB was base64 and one line was 294 490 characters long, and its author's small changes went from five minutes to forty. Past roughly 300 kB, keep the sources split behind a build step on your own machine that assembles the one HTML file: skill `node:aimeat-app-workstation`, starter `GET /v1/app-templates/workstation-project`.\n\n";
+
+  // The prompt-driven workflow (aimeat-prompt.js): AI work done in the person's own chat. Its own
+  // file, services/build-app-prompt-driven.ts, because this one is at the 800-line limit.
+  body += buildPromptDrivenSection(nodeUrl);
 
   // AI
   body += '### AI (prompt-driven)\n';
