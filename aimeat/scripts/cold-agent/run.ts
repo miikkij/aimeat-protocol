@@ -25,8 +25,8 @@
  *   build-app, a shorter handbook or a composed brief, and compared with `--compare`.
  *
  *   IT SPENDS MONEY. The default driver is the `claude` CLI in print mode, and every run is a
- *   model session. Each session is held to `--max-turns`, and the runner starts no new session
- *   once `--max-total-usd` is reached. `--driver scripted` spends nothing: it
+ *   model session. Each session is held to `--max-budget-usd`, and the runner starts no new
+ *   session once `--max-total-usd` is reached. `--driver scripted` spends nothing: it
  *   performs each task over MCP by hand, to prove the verifiers and the report, not the agent.
  * @structure parseArgs · loadSandbox · applyArm/restoreArm · autoApprove · drivers (claude,
  *   scripted) · runOne · main
@@ -61,8 +61,11 @@ interface Args {
     runs: number;
     tasks: string[] | null;
     arm: string | null;
-    maxTurns: number;
+    /** The ceiling for ONE session. The CLI stops the session when it is reached. */
+    maxBudgetUsd: number;
     maxTotalUsd: number;
+    /** The `claude` program. A path when it is not on PATH, as with the VS Code extension's copy. */
+    claudeCmd: string;
     compare: [string, string] | null;
 }
 
@@ -78,7 +81,8 @@ function parseArgs(argv: string[]): Args {
         tasks: get('tasks')?.split(',') ?? null,
         arm: get('arm') ?? null,
         // A skill case measures the decision to load, which happens in the first few turns.
-        maxTurns: Number(get('max-turns') ?? (suite === 'skills' ? 8 : 30)),
+        maxBudgetUsd: Number(get('max-budget-usd') ?? (suite === 'skills' ? 0.5 : 1.5)),
+        claudeCmd: get('claude-cmd') ?? process.env.AIMEAT_CLAUDE_CMD ?? 'claude',
         maxTotalUsd: Number(get('max-total-usd') ?? 10),
         compare: ci >= 0 ? [argv[ci + 1], argv[ci + 2]] : null,
     };
@@ -128,19 +132,36 @@ function autoApprove(s: Sandbox): () => void {
     return () => clearInterval(timer);
 }
 
+/**
+ * One headless session. Three things here were measured on 2026-09-18 rather than assumed:
+ *   - `--setting-sources project` in an empty directory is what makes the run COLD. Without it the
+ *     session loads the developer's own user settings, memory, skills and connectors: a prompt of
+ *     "Reply OK" carried 52,809 tokens and cost $0.21; with it, 10,228 tokens and $0.05.
+ *     (`--bare` goes further and cannot sign in.)
+ *   - this CLI version has no `--max-turns`; a session is held by `--max-budget-usd`.
+ *   - the prompt goes in on stdin. As a shell argument it would pass through cmd.exe quoting on
+ *     Windows, where a quote or a percent sign in a person's sentence changes what is asked.
+ * On the `mcp` door only the node's tools are allowed, so the agent is a chat client without a
+ * shell: it cannot curl its way around a tool that did not do the job, which is the point.
+ */
 function claudeTranscript(task: Task, prompt: string, s: Sandbox, args: Args, cwd: string): Promise<string> {
-    const cli = ['-p', JSON.stringify(prompt), '--output-format', 'stream-json', '--verbose', '--model', args.model,
-        '--max-turns', String(args.maxTurns), '--setting-sources', '""', '--strict-mcp-config'];
+    const cli = ['-p', '--output-format', 'stream-json', '--verbose', '--model', args.model,
+        '--max-budget-usd', String(args.maxBudgetUsd), '--setting-sources', 'project', '--strict-mcp-config'];
     if (task.door === 'mcp') {
         const cfg = join(cwd, 'mcp.json');
         writeFileSync(cfg, JSON.stringify({ mcpServers: { aimeat: { type: 'http', url: `${s.baseUrl}/v1/mcp`, headers: { Authorization: `Bearer ${s.agent!.token}` } } } }));
-        cli.push('--mcp-config', JSON.stringify(cfg), '--allowedTools', 'mcp__aimeat');
+        // `--tools` names the BUILT-IN tools the session has. ToolSearch alone: it is how this
+        // client loads a deferred MCP tool, and everything else (Bash, Read, Write) is what a chat
+        // client does not have. The first baseline attempt left them on, and "remember this" went
+        // into the client's own file memory through Bash three times out of three.
+        cli.push('--mcp-config', 'mcp.json', '--tools', 'ToolSearch', '--allowedTools', 'mcp__aimeat', 'ToolSearch');
     } else {
         // The address-only door: the agent has a shell to make HTTP requests with, and nothing else.
-        cli.push('--allowedTools', 'Bash');
+        cli.push('--tools', 'Bash', '--allowedTools', 'Bash');
     }
     return new Promise((settle, fail) => {
-        const child = spawn(`claude ${cli.join(' ')}`, { shell: true, cwd, stdio: ['ignore', 'pipe', 'pipe'] });
+        const child = spawn(`"${args.claudeCmd}" ${cli.join(' ')}`, { shell: true, cwd, stdio: ['pipe', 'pipe', 'pipe'] });
+        child.stdin.end(prompt);
         let out = '', err = '';
         child.stdout.on('data', (d: Buffer) => { out += d.toString(); });
         child.stderr.on('data', (d: Buffer) => { err += d.toString(); });
@@ -175,7 +196,7 @@ async function runOne(task: Task, run: number, s: Sandbox, args: Args, outDir: s
     const metrics: RunMetrics = parseTranscript(raw);
     const ctx: TaskContext = { ...base, metrics };
     const verdict = await task.verify(ctx);
-    const wandered = metrics.distinctTools.filter(t => !task.goodTools.includes(t));
+    const wandered = metrics.distinctTools.filter(t => t !== 'ToolSearch' && !task.goodTools.includes(t));
     return { task: task.id, run, marker, ok: verdict.ok, detail: verdict.detail, wandered, metrics: { ...metrics, toolCalls: metrics.toolCalls.map(c => ({ ...c, input: undefined })) } };
 }
 
