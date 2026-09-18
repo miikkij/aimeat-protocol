@@ -82,6 +82,21 @@ if (existsSync(bridgeSrc)) {
 //    --no-optional would drop the entire QuickJS runtime and crash the server at startup.
 const pkg = JSON.parse(readFileSync(join(aimeatDir, 'package.json'), 'utf8'));
 delete pkg.optionalDependencies;
+
+// The staged folder is a place to install dependencies into, not a checkout: it holds dist/ and
+// no scripts/. So an install lifecycle script from the server's own package.json cannot run here
+// and takes the whole install down with it. On 2026-09-18 the release build failed exactly that
+// way, at `postinstall: node scripts/vendor-libs.mjs --optional`, which the node had gained since
+// the last installer was built in June. Nothing is lost by removing it: vendor-libs writes the
+// browser libraries into public/lib, and dist/public/lib was copied in whole a few lines above,
+// already vendored by the `pnpm build` this script ran. prepublishOnly is npm-publish only and
+// would be worse: it runs the licence gates and a second build.
+for (const hook of ['preinstall', 'install', 'postinstall', 'prepare', 'prepublish', 'prepublishOnly']) {
+  if (pkg.scripts?.[hook]) {
+    console.log(`[stage-server] dropped the "${hook}" script: this folder has dist/ and no scripts/`);
+    delete pkg.scripts[hook];
+  }
+}
 writeFileSync(join(serverDir, 'package.json'), JSON.stringify(pkg, null, 2));
 const lockfile = join(aimeatDir, 'pnpm-lock.yaml');
 if (existsSync(lockfile)) {
