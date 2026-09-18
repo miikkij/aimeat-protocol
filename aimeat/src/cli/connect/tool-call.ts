@@ -55,6 +55,7 @@ import { commerceCliTools } from './tool-call-defs-commerce.js';
 import { packageTools } from './tool-call-defs-packages.js';
 import { workflowTools } from './tool-call-defs-workflows.js';
 import { aiJobTools } from './tool-call-defs-ai-jobs.js';
+import { voiceTools } from './tool-call-defs-ai-voice.js';
 import { appDraftEditTools } from './tool-call-defs-app-draft-edit.js';
 import { exchangeTools } from './tool-call-defs-exchange.js';
 import { connectionCliTools } from './tool-call-defs-connections.js';
@@ -81,6 +82,7 @@ export const CONNECT_CLI_TOOLS: ConnectCliToolDefinition[] = [
     ...packageTools,
     ...workflowTools,
     ...aiJobTools,
+    ...voiceTools,
     ...appDraftEditTools,
     ...exchangeTools,
     ...connectionCliTools,
