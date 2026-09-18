@@ -235,5 +235,6 @@ The source column identifies the implementation or rule to read at the next chan
 | [docs/specs/signals-contract.md](specs/signals-contract.md) | maintained | Signals contract | `aimeat/src/routes/signals.ts` |
 | [docs/specs/tracked-response-contract.md](specs/tracked-response-contract.md) | maintained | Tracked response contract | `aimeat/src/routes/tracked-responses.ts` |
 | [docs/visitor-geography.md](visitor-geography.md) | maintained | Current feature or operating guide; verify against implementation when changing it | `aimeat/src/utils/geo-headers.ts` |
+| [docs/voice-library.md](voice-library.md) | maintained | Configurable voice sessions, adapters, streaming API and browser verification | `aimeat/src/static/sdk-libs/voice` |
 | [docs/templates/b2b-sales-hub/README.md](templates/b2b-sales-hub/README.md) | reference | Example artifact; adapt and validate before publishing | `docs/portal-developer-guide.md` |
 | [docs/templates/b2b-sales-hub/template-meta.json](templates/b2b-sales-hub/template-meta.json) | reference | Example artifact; adapt and validate before publishing | `docs/portal-developer-guide.md` |

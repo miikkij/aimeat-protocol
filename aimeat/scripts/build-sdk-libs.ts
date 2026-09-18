@@ -58,6 +58,7 @@ interface SdkLib {
  * (and the drift guard makes sure every committed bundle stays in sync with its sources).
  */
 export const SDK_LIBS: SdkLib[] = [
+  { name: 'voice', entry: 'voice/index.js' },
   { name: 'calendar', entry: 'calendar/index.js' },
   { name: 'print', entry: 'print/index.js' },
   { name: 'speech', entry: 'speech/index.js' },

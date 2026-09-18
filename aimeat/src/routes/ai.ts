@@ -69,6 +69,7 @@ import {
 import { getAdminAiUsage } from '../services/ai-usage-admin.js';
 import { getUsageHistory } from '../services/ai-usage-history.js';
 import { transcribeForOwner } from '../services/ai-transcription.js';
+import { registerVoiceRoutes, voiceAppId } from './ai-voice.js';
 import { generateForOwner } from '../services/ai-image.js';
 import { servedProvenanceOf, envelopeMeta, setProvenanceHeaders } from '../services/ai-provenance-marks.js';
 
@@ -78,6 +79,7 @@ const INLINE_AUDIO_MAX_CHARS = 8_000_000;
 
 export function aiRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
+  registerVoiceRoutes(router, config, storage);
   const resolve = (req: Request) => resolveIdentity(req.auth!, config.nodeId);
   // Reuse the openrouter rate limit bucket — same provider, same spend concerns.
   const aiRateLimit = rateLimit(config.rateLimits.openrouter);
@@ -199,9 +201,9 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
       res.setTimeout(180_000);
 
       const gaii = resolve(req);
-      const { storage_key, audio_base64, mime, filename, model, language, verbose, app_id } = req.body as {
+      const { storage_key, audio_base64, mime, filename, model, language, verbose, app_id, temperature } = req.body as {
         storage_key?: string; audio_base64?: string; mime?: string; filename?: string;
-        model?: string; language?: string; verbose?: boolean; app_id?: string;
+        model?: string; language?: string; verbose?: boolean; app_id?: string; temperature?: number;
       };
 
       let audio: { data: Buffer; mime: string; filename: string };
@@ -235,8 +237,13 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
       }
 
       try {
+        if (temperature !== undefined && (typeof temperature !== 'number' || !Number.isFinite(temperature) || temperature < 0 || temperature > 1)) {
+          throw new AiCompletionError('INVALID_BODY', 400, 'temperature must be 0..1.');
+        }
+        const controller = new AbortController();
+        res.on('close', () => { if (!res.writableEnded) controller.abort(); });
         const r = await transcribeForOwner(storage, config, gaii, {
-          audio, model, language, verbose: !!verbose, appId: app_id,
+          audio, model, language, verbose: !!verbose, appId: voiceAppId(req, app_id), temperature, signal: controller.signal,
         });
         res.json(success(config.nodeId, {
           text: r.text,

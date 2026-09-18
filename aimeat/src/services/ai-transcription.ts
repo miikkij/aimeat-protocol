@@ -47,6 +47,8 @@ export interface TranscribeForOwnerOptions {
   verbose?: boolean;
   /** App/source attribution — enables the per-app allowlist and quota, and labels the spend. */
   appId?: string;
+  temperature?: number;
+  signal?: AbortSignal;
 }
 
 export interface TranscribeForOwnerResult {
@@ -119,7 +121,7 @@ export async function transcribeForOwner(
 
   let result;
   try {
-    result = await transcribe(decryptedKey, model, opts.audio, baseUrl, { language, verbose: opts.verbose });
+    result = await transcribe(decryptedKey, model, opts.audio, baseUrl, { language, verbose: opts.verbose, temperature: opts.temperature, signal: opts.signal });
   } catch (e) {
     const status = (e as { status?: number }).status;
     if (status === 401) throw new AiCompletionError('INVALID_API_KEY', 401, 'API key was rejected by the provider.');

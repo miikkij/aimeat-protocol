@@ -150,6 +150,12 @@ const LLM_CHOKEPOINT = 'src/services/ai-completion.ts';
  * one is deliberately awkward: it means editing this file, in front of this comment.
  */
 const LLM_TRANSPORT_LEGACY_CALLERS: Record<string, string> = {
+  'src/services/ai-voice.ts':
+    'Reviewed 2026-09-19. Voice must emit text and PCM frames before generation finishes, so the '
+    + 'buffered completeForOwner result cannot carry this transport. Both streamReply and '
+    + 'streamSpeech use prepareAiCall before the provider and settleAiCall in finally, including '
+    + 'disconnects. These are the same key, scope, budget, allowance, usage and provenance decisions '
+    + 'as the completion chokepoint. Speech provenance hashes observed audio bytes, never input text.',
   'src/routes/llm-proxy.ts':
     'Reviewed 2026-08-16. It forwards an OpenAI-shaped request and the provider response back byte '
     + 'for byte, streamed frames included, so it needs the raw transport rather than the parsed '
@@ -160,7 +166,7 @@ const LLM_TRANSPORT_LEGACY_CALLERS: Record<string, string> = {
 };
 
 /** The exports of the transport file that actually reach a provider over HTTP. */
-const RAW_TRANSPORT_EXPORTS = ['complete', 'chatCompletionRaw'];
+const RAW_TRANSPORT_EXPORTS = ['complete', 'chatCompletionRaw', 'speechRaw'];
 
 /**
  * Does this file import a provider-reaching export FROM the raw transport?
