@@ -282,6 +282,12 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   // ── Proactive guidance (mutable) ──
   { key: 'proactiveGuidanceEnabled', dotPath: 'proactive.guidance_enabled', envVar: 'AIMEAT_PROACTIVE_GUIDANCE', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Connected AIs are told what this node makes possible, so they can offer it when it fits (each owner still has their own switch; off here is off for everybody)' },
 
+  // ── Visitor geography ── the switch is immutable on purpose: it says what the reverse proxy in
+  //    front of this node does, and that is a fact about the deployment, not a preference to flip
+  //    from a browser. Turned on with no such proxy, the place headers would be the visitor's own.
+  { key: 'geoHeaders', dotPath: 'geo.headers', envVar: 'AIMEAT_GEO_HEADERS', type: 'boolean', validate: v => typeof v === 'boolean', immutable: true, description: 'The reverse proxy reports where each request came from (X-Geo-Country, -Region, -City, -Lat, -Lon), so an app owner can see visitors by place. Leave off unless the proxy sets and overwrites these headers: docs/visitor-geography.md. No address is stored either way' },
+  { key: 'geoAttribution', dotPath: 'geo.attribution', envVar: 'AIMEAT_GEO_ATTRIBUTION', type: 'string', validate: v => typeof v === 'string' && (v as string).length <= 200, immutable: false, description: 'The credit line your proxy\'s address database asks for (DB-IP Lite is CC BY 4.0), shown under the visitor map. Empty shows nothing' },
+
   // ── Marketplace (Phase 2.6, mutable) ──
   { key: 'marketplaceEnabled', dotPath: 'marketplace.enabled', envVar: 'AIMEAT_MARKETPLACE_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Marketplace feature enabled' },
   { key: 'marketplaceListingFeeMorsels', dotPath: 'marketplace.listing_fee', envVar: 'AIMEAT_MARKETPLACE_LISTING_FEE', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 10000, immutable: false, description: 'Morsel fee for creating a listing', range: '0-10000' },
