@@ -140,15 +140,28 @@ jobs:
       # signature. It is marked prerelease so it never takes the repository's "Latest" label
       # away from a real release, and its name does not match the `desktop-v*.*.*` trigger
       # above, so publishing it cannot start this workflow again.
-      - name: Point the fixed updater address at this release
-        if: startsWith(github.ref, 'refs/tags/') && hashFiles('dist/latest.json') != ''
+      # A DOWNLOAD LINK CANNOT CARRY A VERSION, or every release breaks the page that points at it.
+      # The installer is copied to a name that never changes, beside the manifest, so aimeat.io has
+      # one address to give a person for as long as this app exists.
+      - name: Copy the installer to its fixed name
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: cp "$(ls dist/*-setup.exe | head -1)" "dist/AIMEAT-Personal-Node-setup.exe"
+
+      - name: Point the fixed address at this release
+        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
         with:
-          name: Updater manifest (always the newest desktop release)
+          name: AIMEAT Personal Node (newest)
           tag_name: desktop-latest
           body: |
-            The address the installed app polls for updates. Not a download: the installer lives on
-            the release this manifest names. Rewritten by CI on every `desktop-v*` release.
+            The newest Windows installer, at an address that never changes, and the manifest the
+            installed app polls for updates. Both are rewritten by CI on every `desktop-v*`
+            release, so a link to this page or to the installer below keeps working.
+
+            The release notes for each version are on its own `desktop-v*` release.
           draft: false
           prerelease: true
-          files: dist/latest.json
+          files: |
+            dist/AIMEAT-Personal-Node-setup.exe
+            dist/latest.json
