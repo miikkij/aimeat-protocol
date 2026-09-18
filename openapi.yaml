@@ -12014,7 +12014,11 @@ paths:
           description: Language of the steps, notes and placement lines (default en)
       responses:
         '200':
-          description: The tool table, plus this node's mcp_url
+          description: >-
+            The tool table, plus this node's mcp_url and data.model_recommendation
+            ({ claude, chatgpt, reviewedOn }): the one model recommendation every setup note reads,
+            with the day it was last checked against the vendors' pages, for a client that writes a
+            "pick this model" sentence of its own.
 
   /v1/connect/mcp.json:
     get:
