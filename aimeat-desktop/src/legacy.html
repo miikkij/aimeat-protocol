@@ -1244,9 +1244,7 @@
         'home.recheck': 'Re-check',
         'home.advancedBadge': 'Advanced · needs an OpenRouter key (paid)',
         'home.setup': 'How to set this up →',
-        'home.updateAvail': 'A new version is available',
         'home.download': 'Download',
-        'home.install': 'Install update',
         'fw.ramHint': '(needs ~8 GB RAM; a lighter model is used on smaller machines)',
         'or.title': 'Unlock premium agents (like images) with an OpenRouter key',
         'or.sub': 'Some agents need a stronger or image-capable model than the free local one. OpenRouter gives you many models behind one key — pay only for what you use, you set the budget. Here is how:',
@@ -1397,9 +1395,7 @@
         'home.recheck': 'Tarkista uudelleen',
         'home.advancedBadge': 'Edistynyt · vaatii OpenRouter-avaimen (maksullinen)',
         'home.setup': 'Näin otat käyttöön →',
-        'home.updateAvail': 'Uusi versio saatavilla',
         'home.download': 'Lataa',
-        'home.install': 'Asenna päivitys',
         'fw.ramHint': '(tarvitsee ~8 GB RAM; pienemmillä koneilla käytetään kevyempää mallia)',
         'or.title': 'Avaa edistyneet agentit (kuten kuvat) OpenRouter-avaimella',
         'or.sub': 'Osa agenteista tarvitsee vahvemman tai kuvia osaavan mallin kuin ilmainen paikallinen. OpenRouter antaa monta mallia yhdellä avaimella — maksat vain käytöstä ja asetat budjetin. Näin:',
@@ -1513,7 +1509,9 @@
     //   tier 'local' — runs free on Ollama/Gemma (research/brief/explain via research_crew).
     //   tier 'cloud' — needs a paid OpenRouter key + the right model (e.g. images). We never
     //   run these as if free; the card opens a step-by-step setup guide instead (no letdown).
-    const APP_VERSION = '0.4.11';
+    // Read from the app itself, never written here: the hand-kept copy said 0.4.11 while the app
+    // it shipped in was 0.4.12, which is what a second home for a value always does eventually.
+    let APP_VERSION = '';
     const PLAYBOOKS = [
       { id: 'research', crew: 'crewaimeat.research_crew', tier: 'local' },
       { id: 'brief',    crew: 'crewaimeat.research_crew', tier: 'local' },
@@ -1522,7 +1520,6 @@
     ];
     let activePlaybook = null;
     let ollamaReady = null;   // null = unknown, true/false after detect
-    let updateInfo = null;    // { version, url } when a newer release exists
     let firstWinAgent = null;
     let fwFirstWinOpen = false;
     let fwProvisionResolve = null;
@@ -1541,19 +1538,12 @@
         const r = document.createElement('button'); r.className = 'btn'; r.textContent = t('home.recheck'); r.onclick = () => homeOpened(); b.appendChild(r);
         box.appendChild(b);
       }
-      if (updateInfo) {
-        const u = document.createElement('div');
-        u.className = 'home-banner home-banner-update';
-        const s = document.createElement('span'); s.textContent = t('home.updateAvail') + ' (' + updateInfo.version + ')'; u.appendChild(s);
-        const d = document.createElement('button'); d.className = 'btn'; d.textContent = t('home.install');
-        d.onclick = async () => {
-          // Prefer the built-in updater (one-click install); fall back to the download page.
-          try { const ok = await invoke('install_update'); if (!ok) openExternal(updateInfo.url); }
-          catch (e) { openExternal(updateInfo.url); }
-        };
-        u.appendChild(d);
-        box.appendChild(u);
-      }
+      // The update banner moved to the front door (index.html), and with it the mechanism: the
+      // Tauri updater against the fixed address in tauri.conf.json, which compares the versions
+      // and verifies the installer's signature. What stood here read the repository's
+      // `releases/latest` and returned early unless its tag began with `desktop-v`, which the
+      // node's own far more frequent releases made false in June 2026; it then said nothing, for
+      // three months, which is the worst way for a check to fail.
     }
 
     function renderHome() {
@@ -1597,24 +1587,6 @@
       try { const svc = await invoke('detect_ai_services'); ollamaReady = !!(svc||[]).find(s => s.service_type === 'ollama' && s.status === 'available'); }
       catch(e){ ollamaReady = null; }
       renderHome();
-      checkForUpdate();
-    }
-
-    function isNewer(a, b) {
-      const pa = String(a).split('.').map(Number), pb = String(b).split('.').map(Number);
-      for (let i = 0; i < 3; i++) { const x = pa[i] || 0, y = pb[i] || 0; if (x !== y) return x > y; }
-      return false;
-    }
-    async function checkForUpdate() {
-      try {
-        const r = await fetch('https://api.github.com/repos/miikkij/aimeat-protocol/releases/latest', { headers: { 'Accept': 'application/vnd.github+json' } });
-        if (!r.ok) return;
-        const j = await r.json();
-        const tag = j.tag_name || '';
-        if (!tag.startsWith('desktop-v')) return;
-        const ver = tag.replace(/^desktop-v/, '');
-        if (isNewer(ver, APP_VERSION)) { updateInfo = { version: ver, url: j.html_url }; renderHomeBanners(); }
-      } catch(e){}
     }
 
     // OpenRouter guided setup — the honest paid path for premium/image agents (no false free promise).
@@ -2793,8 +2765,15 @@
     // ── Init ────────────────────────────────────────────────────
     document.documentElement.lang = LANG;
     const _langSel = document.getElementById('langSelect'); if (_langSel) _langSel.value = LANG;
-    const _av = document.getElementById('appVersion'); if (_av) _av.textContent = 'v' + APP_VERSION;
-    try { document.title = 'AIMEAT Personal Node — v' + APP_VERSION; } catch (e) {}
+    (async () => {
+      const app = window.__TAURI__ && window.__TAURI__.app;
+      if (!app || !app.getVersion) return;
+      try {
+        APP_VERSION = await app.getVersion();
+        const _av = document.getElementById('appVersion'); if (_av) _av.textContent = 'v' + APP_VERSION;
+        document.title = 'AIMEAT Personal Node — v' + APP_VERSION;
+      } catch (e) { /* the version is a nicety, not a reason to stop */ }
+    })();
     applyI18n();
     homeOpened();
     maybeShowWelcome();
