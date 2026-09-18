@@ -104,7 +104,8 @@ export function parseTranscript(raw: string): RunMetrics {
         toolCalls: order,
         errors: order.filter(c => c.isError).length,
         distinctTools: distinct,
-        firstTool: order[0]?.name ?? null,
+        // ToolSearch is how this client loads a deferred tool, not a choice about the node.
+        firstTool: order.find(c => c.name !== 'ToolSearch')?.name ?? null,
         inputTokens: usage.input_tokens ?? 0,
         outputTokens: usage.output_tokens ?? 0,
         cacheReadTokens: usage.cache_read_input_tokens ?? 0,
