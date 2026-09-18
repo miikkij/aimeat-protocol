@@ -86,4 +86,9 @@ describe('calendar', () => {
     const until={...meeting,rrule:'FREQ=WEEKLY;UNTIL=20260330T060000Z'};
     expect(calendar.occurrences([until],range).map(r=>r.start)).toEqual(['2026-03-23T07:00:00Z','2026-03-30T06:00:00Z']);
   });
+  it('escapes a lone carriage return instead of writing a new ICS property', () => {
+    const ics=calendar.toICS([{...meeting,title:'Meeting\rATTENDEE:unexpected'}]);
+    expect(ics).not.toContain('Meeting\rATTENDEE:');
+    expect(calendar.fromICS(ics)[0].title).toBe('Meeting\nATTENDEE:unexpected');
+  });
 });

@@ -8151,7 +8151,7 @@
   }
 
   // src/static/sdk-libs/calendar/ics.js
-  var textEscape = (value) => String(value ?? "").replace(/\\/g, "\\\\").replace(/\r?\n/g, "\\n").replace(/;/g, "\\;").replace(/,/g, "\\,");
+  var textEscape = (value) => String(value ?? "").replace(/\\/g, "\\\\").replace(/\r\n|\r|\n/g, "\\n").replace(/;/g, "\\;").replace(/,/g, "\\,");
   var textRead = (value) => value.replace(/\\([nN,;\\])/g, (_2, s2) => s2.toLowerCase() === "n" ? "\n" : s2);
   var compact = (value) => value.replace(/[-:]/g, "");
   function expanded(value) {
