@@ -220,6 +220,23 @@ describe('lintAppArtifact — the head declarations', () => {
     }
   });
 
+  it('warns when aimeat-app still holds the shell\'s placeholder, and the shipped shells otherwise pass this check', async () => {
+    // The shells carry the two head lines since 2026-09-19: every cold-agent build published
+    // twice, the second time only to add them after this same warning.
+    const html = CLEAN.replace('content="clean.html"', 'content="REPLACE-WITH-YOUR-FILENAME.html"');
+    const meta = (await lintAppArtifact(html, config)).warnings.filter(f => f.pitfall === 'app-meta-declarations');
+    expect(meta).toHaveLength(1);
+    expect(meta[0]?.message).toContain('placeholder');
+
+    const { getAppTemplates } = await import('../../src/data/app-templates.js');
+    for (const id of ['shell-pure-client', 'shell-cortex', 'shell-extension']) {
+      const shell = getAppTemplates().find(t => t.id === id)!;
+      const filled = shell.content.replace('REPLACE-WITH-YOUR-FILENAME.html', 'my-app.html');
+      const about = (await lintAppArtifact(filled, config)).warnings.filter(f => f.pitfall === 'app-meta-declarations');
+      expect(about, id).toEqual([]);
+    }
+  });
+
   it('reads an empty aimeat-scopes as declaring nothing, because the SDK does', async () => {
     const html = CLEAN.replace('content="memory:read memory:write"', 'content=" "');
     const { warnings } = await lintAppArtifact(html, config);
