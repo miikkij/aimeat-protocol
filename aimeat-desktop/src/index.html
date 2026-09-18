@@ -267,23 +267,26 @@
         stOff: 'not connected',
         stOn: '✓ connected',
         stOther: 'connected elsewhere',
+        stCloud: 'in its own settings',
         connect: 'Connect',
         disconnect: 'Disconnect',
         copy: 'Copy the lines',
+        copyAddress: 'Copy the address',
         connectAll: 'Connect them all',
         where: 'Its settings file:',
         restart: 'Restart {tool}, and it will find your AIMEAT. The first time it asks, sign in as yourself.',
         restartAll: 'Restart the tools you connected, and they will find your AIMEAT. The first time each one asks, sign in as yourself.',
         removed: '{tool} no longer reaches your AIMEAT. Restart it to be sure.',
-        copied: 'Copied. Paste the lines into the file above, then restart {tool}.',
+        copied: 'Copied. Paste it where {tool} asks for it, then restart {tool}.',
         failed: 'Did not work: {why}',
         noBackend: 'This page is open in a plain browser, so it cannot see the tools on this computer.',
         legacy: 'Server, settings and logs',
         updateFound: 'Version {version} is out. You have {current}.',
         updateInstall: 'Install it',
         updateWorking: 'Installing. The app closes and opens again by itself.',
-        'note.claude-desktop': 'Claude Desktop reads only a tool that runs on this computer, so reaching your AIMEAT needs a small bridge beside it. That bridge is not built yet. Until it is, attach your AIMEAT in Claude Desktop’s own connector settings.',
-        'note.codex': 'Codex keeps its tools in a TOML file, which this app does not edit yet. Paste these lines into it.',
+        'note.claude-desktop': 'Claude Desktop is attached in its own settings: Settings, then Connectors, then Add custom connector. Paste the address below into it. Claude then signs you in through your browser.',
+        'note.codex': 'Codex keeps its tools in a TOML file, which this app does not edit yet. Paste these lines into it. The address only works once the client they switch on is running, so both spellings are there and your version ignores the one it does not know.',
+        warnLocal: 'Claude reaches this address from Anthropic’s cloud, not from this computer, so an AIMEAT that answers only here cannot be attached to Claude Desktop. Use an AIMEAT that answers from the internet, or attach a tool that runs on this computer, such as Claude Code.',
       },
       fi: {
         title: 'Tekoälysi',
@@ -296,23 +299,26 @@
         stOff: 'ei kytketty',
         stOn: '✓ kytketty',
         stOther: 'kytketty muualle',
+        stCloud: 'omissa asetuksissaan',
         connect: 'Kytke',
         disconnect: 'Irrota',
         copy: 'Kopioi rivit',
+        copyAddress: 'Kopioi osoite',
         connectAll: 'Kytke kaikki',
         where: 'Sen asetustiedosto:',
         restart: 'Käynnistä {tool} uudelleen, niin se löytää AIMEATisi. Kun se ensimmäisen kerran kysyy, kirjaudu sisään omana itsenäsi.',
         restartAll: 'Käynnistä kytkemäsi ohjelmat uudelleen, niin ne löytävät AIMEATisi. Kun ohjelma ensimmäisen kerran kysyy, kirjaudu sisään omana itsenäsi.',
         removed: '{tool} ei enää tavoita AIMEATiasi. Käynnistä se uudelleen varmuuden vuoksi.',
-        copied: 'Kopioitu. Liitä rivit yllä olevaan tiedostoon ja käynnistä {tool} uudelleen.',
+        copied: 'Kopioitu. Liitä se siihen mihin {tool} sitä pyytää ja käynnistä {tool} uudelleen.',
         failed: 'Ei onnistunut: {why}',
         noBackend: 'Tämä sivu on auki tavallisessa selaimessa, joten se ei näe tämän koneen ohjelmia.',
         legacy: 'Palvelin, asetukset ja lokit',
         updateFound: 'Versio {version} on julkaistu. Sinulla on {current}.',
         updateInstall: 'Asenna se',
         updateWorking: 'Asennan. Sovellus sulkeutuu ja avautuu itse uudelleen.',
-        'note.claude-desktop': 'Claude Desktop lukee vain ohjelmaa, joka on tällä koneella, joten AIMEATiisi tarvitaan pieni välittäjä sen viereen. Sitä ei ole vielä rakennettu. Siihen asti liitä AIMEATisi Claude Desktopin omista liitinasetuksista.',
-        'note.codex': 'Codex pitää työkalunsa TOML-tiedostossa, jota tämä sovellus ei vielä muokkaa. Liitä nämä rivit siihen.',
+        'note.claude-desktop': 'Claude Desktop liitetään sen omista asetuksista: Asetukset, sitten Liittimet, sitten Lisää oma liitin. Liitä alla oleva osoite siihen. Claude kirjaa sinut sisään selaimessa.',
+        'note.codex': 'Codex pitää työkalunsa TOML-tiedostossa, jota tämä sovellus ei vielä muokkaa. Liitä nämä rivit siihen. Osoite toimii vasta kun rivien kytkemä asiakasohjelma on käytössä, joten mukana ovat molemmat kirjoitusasut ja versiosi ohittaa sen jota se ei tunne.',
+        warnLocal: 'Claude ottaa yhteyden tähän osoitteeseen Anthropicin pilvestä eikä tältä koneelta, joten AIMEATia joka vastaa vain täällä ei voi liittää Claude Desktopiin. Käytä AIMEATia joka vastaa internetistä, tai kytke ohjelma joka toimii tällä koneella, esimerkiksi Claude Code.',
       },
     };
 
@@ -375,6 +381,9 @@
 
     function statusOf(c) {
       if (!c.installed) return { text: t('stAbsent'), cls: 'poster-chip poster-chip--dim' };
+      // A cloud tool keeps its connectors in the person's own account, so this app cannot see
+      // whether it is attached. Saying "not connected" would be a guess dressed as a fact.
+      if (c.method === 'cloud') return { text: t('stCloud'), cls: 'poster-chip poster-chip--dim' };
       if (c.connected) return { text: t('stOn'), cls: 'poster-chip poster-chip--on' };
       if (c.connected_url) return { text: t('stOther'), cls: 'poster-chip' };
       return { text: t('stOff'), cls: 'poster-chip' };
@@ -399,28 +408,33 @@
         }
         line.appendChild(state);
 
+        // A cloud tool whose address answers only here cannot be attached at all, so it is offered
+        // no action: a copy button would hand the person an address that cannot work.
+        const unreachable = c.method === 'cloud' && c.address_is_local;
         const acts = el('div', 'acts');
         if (c.installed && c.method === 'file') {
           const button = el('button', 'poster-action', c.connected ? t('disconnect') : t('connect'));
           button.addEventListener('click', () => (c.connected ? disconnectOne(c) : connectOne(c)));
           acts.appendChild(button);
-        } else if (c.installed && c.method === 'manual') {
-          const button = el('button', 'poster-action', t('copy'));
+        } else if (c.installed && !unreachable) {
+          const button = el('button', 'poster-action', c.method === 'cloud' ? t('copyAddress') : t('copy'));
           button.addEventListener('click', () => copySnippet(c));
           acts.appendChild(button);
         }
         line.appendChild(acts);
         row.appendChild(line);
 
-        if (c.installed && c.method === 'manual') {
-          row.appendChild(el('div', 'why', t('note.' + c.id)));
+        if (c.installed && c.method !== 'file') {
+          row.appendChild(el('div', 'why', unreachable ? t('warnLocal') : t('note.' + c.id)));
           if (c.config_path) {
             row.appendChild(el('div', 'path', t('where') + ' ' + c.config_path));
           }
-          const pre = el('div', 'snippet', '');
-          pre.id = 'snippet-' + c.id;
-          pre.hidden = true;
-          row.appendChild(pre);
+          if (!unreachable) {
+            const pre = el('div', 'snippet', '');
+            pre.id = 'snippet-' + c.id;
+            pre.hidden = true;
+            row.appendChild(pre);
+          }
         } else if (c.installed && c.config_path) {
           row.appendChild(el('div', 'path', c.config_path));
         }
