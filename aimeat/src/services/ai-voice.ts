@@ -14,6 +14,7 @@ import { prepareAiCall, settleAiCall, getTodayUsage, AiCompletionError, type AiC
 import { chatCompletionRaw, speechRaw, generationCost, listModels } from './openrouter.js';
 import { servedProvenanceOf } from './ai-provenance-marks.js';
 import { logger } from '../utils/logger.js';
+import { emitChange } from './event-bus.js';
 
 export type VoiceEmit = (event: Record<string, unknown>) => Promise<void>;
 export interface ReplyOptions {
@@ -59,6 +60,8 @@ async function settled(storage: Storage, config: AimeatConfig, gaii: string, pla
     model: plan.model, promptTokens: tokens.prompt, completionTokens: tokens.completion,
     totalTokens: tokens.prompt + tokens.completion, costUsd: cost, content, contentHash, appId: options.app_id, source,
   });
+  // The owner's usage memory changed, including when a disconnected call settles.
+  emitChange('memory', gaii);
   return { usage: result.usage, budget: { daily_budget_usd: plan.dailyBudgetUsd,
     spent_today_usd: result.usage.total_cost_usd, remaining_usd: Math.max(0, plan.dailyBudgetUsd - result.usage.total_cost_usd) },
     provenance: result.provenance ? servedProvenanceOf(config, result.provenance, { full: true }) : undefined };

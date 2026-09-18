@@ -14825,6 +14825,13 @@ paths:
         finish_reason, truncated, usage, budget, cost_exact and provenance when available.
         Failures after headers are error frames. Missing done is a failed stream. Disconnect cancels
         generation and records available usage. Accepts text messages, not arbitrary tools or URLs.
+        With json=1, returns a JSON envelope containing final text and done metadata for agent clients.
+        Agent calls use the owner's AI key and budget, preserving the identity's home node.
+      parameters:
+        - in: query
+          name: json
+          schema: { type: string, enum: ['1'] }
+          description: Return the completed result in a JSON envelope instead of streaming frames.
       tags: [AI]
       security:
         - BearerAuth: []
@@ -14865,10 +14872,17 @@ paths:
                     exclude: { type: boolean }
       responses:
         '200':
-          description: NDJSON stream. Success requires a terminal done frame.
+          description: NDJSON stream, or completed JSON result when json=1. Success requires a terminal done frame.
           content:
             application/x-ndjson:
               schema: { type: string }
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data: { type: object, description: 'Final text, model, usage, budget and provenance.' }
         '400': { description: Invalid parameters }
         '401': { description: Authentication required }
         '402': { description: AI budget exhausted }
@@ -14887,6 +14901,14 @@ paths:
         the browser's sample rate and channels to match. MP3 is available where the model supports it.
         OpenRouter cost uses the generation endpoint, falling back to its per-character catalogue
         estimate. Custom providers without pricing return cost_known false. Cancellation may be billed.
+        With json=1, stores the completed audio privately in the calling principal's storage namespace
+        and returns storage_key, fetch_url, mime_type, size_bytes and done metadata in a JSON envelope.
+        The file persists until deleted; download requires storage:read and deletion storage:write.
+      parameters:
+        - in: query
+          name: json
+          schema: { type: string, enum: ['1'] }
+          description: Store completed speech privately and return a JSON handle instead of audio frames.
       tags: [AI]
       security:
         - BearerAuth: []
@@ -14908,10 +14930,17 @@ paths:
                 instructions: { type: string, maxLength: 2000, description: 'OpenRouter OpenAI provider speech instructions.' }
       responses:
         '200':
-          description: NDJSON audio stream. Success requires a terminal done frame.
+          description: NDJSON audio stream, or private audio handle when json=1. Success requires a terminal done frame.
           content:
             application/x-ndjson:
               schema: { type: string }
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data: { type: object, description: 'Private storage_key, fetch_url, mime_type, size_bytes, usage, budget and provenance.' }
         '400': { description: Invalid parameters or unknown speech model }
         '401': { description: Authentication required }
         '402': { description: AI budget exhausted }

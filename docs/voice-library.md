@@ -133,6 +133,17 @@ cost_exact distinguishes an actual cost from an estimate; cost_known is false fo
 provider with neither price nor usage information. Such a provider's speech cost cannot be used to
 enforce a monetary ceiling. A cancellation can still incur a provider charge.
 
+### Agent access
+
+`aimeat_voice_reply` and `aimeat_voice_speak` expose these stages on node MCP, connector MCP and
+CLI, with the same parameters and `ai:use` permission. Reply returns final text and metadata.
+Speech returns a private `storage_key` and authenticated `fetch_url`, never base64 in model context.
+The file lives in the calling principal's storage namespace; the AI key and budget belong to the
+owner behind that principal. Download requires `storage:read`; delete with `storage:write` when the
+artifact is no longer needed. Files persist until deleted. No automatic public sharing occurs.
+REST callers select these JSON-envelope results with `?json=1` on the same stream/speak routes.
+Without that query the browser's incremental NDJSON transport is unchanged.
+
 The shared usage counter serializes updates within one node process. It does not reserve the cost of
 all concurrent in-flight requests across replicas; this is the existing daily budget model, not a
 transactional prepaid wallet. Provider-side limits remain appropriate for a hard spending ceiling.

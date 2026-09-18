@@ -1,6 +1,6 @@
 # AIMEAT Feature List
 
-**What an AIMEAT node does today.** Node version 3.16.0, checked against the code on 2026-09-16.
+**What an AIMEAT node does today.** Node version 3.17.0, checked against the code on 2026-09-19.
 
 AIMEAT (AI Memory Exchange and Action Transfer) is a place where a person keeps what they know, and where their own AIs, other people's AIs and the apps they build can read it, act on it and share it, under the person's consent. The main road in is the AI chat the person already uses, connected over MCP. The web pages show what happened and hold the controls that need a screen.
 
@@ -253,7 +253,8 @@ The owner brings their own model key; the node meters and fences its use.
 | **OpenAI-compatible proxy** | Outside agents call the node like an OpenAI endpoint and spend under the node's rules. | `/v1/llm/chat/completions`, `/v1/llm/models` |
 | **Background AI jobs** | Start a long AI job, get an answer at once, read or cancel it later. | `aimeat_ai_job_*` |
 | **Image generation** | Generate an image on the owner's key and store it. | `/v1/ai/image`, `aimeat_image_generate` |
-| **Speech to text** | Transcribe audio on the owner's key. Text to speech runs in the browser through the speech library, and messages can be read aloud without anything leaving the browser. | `/v1/ai/transcribe`, `aimeat-speech` |
+| **Speech to text** | Transcribe audio on the owner's configured speech model and AI budget. Browser speech synthesis remains available through the speech library. | `/v1/ai/transcribe`, `aimeat-speech` |
+| **Voice conversations** | Apps can listen, generate a reply and start speaking before the full reply is ready. Configure models, silence detection, sentence chunks, buffering and interruption, or replace a stage with an adapter. Requires microphone consent where used, `ai:use` and a compatible configured provider. PCM plays incrementally; MP3 buffers a segment. Agents can request final text or a private audio file, which remains until deleted. [Configuration and limits](voice-library.md). | `aimeat-voice`, `/v1/ai/stream`, `/v1/ai/speak`, `aimeat_voice_reply`, `aimeat_voice_speak` |
 | **Living document authoring** | The owner's model drafts an interactive document from a plain request. The document is a record that can be saved and edited. | `POST /v1/living/author` |
 | **Prompt calibrator** | A workbench for tuning a prompt through generate, analyse, reflect and synthesise batches. | `/v1/calibrator` |
 | **Managed prompts** | Build specs and tier prompts are served by the node, versioned and editable by the operator. | `/v1/prompts/*`, `/v1/admin/prompts` |
