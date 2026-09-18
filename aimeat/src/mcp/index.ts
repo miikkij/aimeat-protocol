@@ -11,6 +11,9 @@
  * @usage
  *   import { mcpRouter, emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
  * @version-history
+ *   v1.27.0 -- 2026-09-18 -- Every tool is registered through withErrorNextStep as well: a failing
+ *            tool now says what to do next (try once more, then support@operators), which REST
+ *            errors always did and no MCP error did. See mcp/error-next-step.ts.
  *   v1.26.0 -- 2026-09-17 -- A POST that has already passed through this node (X-AIMEAT-MCP-Via) is
  *            refused with 508 before anything else, and the chain it arrived with stays in scope so
  *            a remote MCP call made while serving it carries the chain on. A node could attach its
@@ -118,6 +121,7 @@ import { registerAllServerTools } from './register-all.js';
 import { registerRemoteTools } from './remote-tools.js';
 import { scopeAllowsTool } from './catalog/scopes.js';
 import { wrapToolHandler } from './tool-usage-wrap.js';
+import { withErrorNextStep } from './error-next-step.js';
 import { toolsForSurface, isV2Role, V2_ROLES, type SurfaceRole } from './catalog/surfaces.js';
 import { instructionsFor } from './instructions.js';
 import { proactiveGuidance } from '../services/proactive-mode.js';
@@ -242,8 +246,10 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         // tool that was never offered is never counted as one that was not called. The wrap sits at
         // registration for the same reason the gate does — one place, every tool, nothing for a new
         // tool's author to remember. See mcp/tool-usage-wrap.ts.
-        const measuredTool = wrapToolHandler(originalTool, () => agentGaii);
-        const measuredRegisterTool = wrapToolHandler(originalRegisterTool, () => agentGaii);
+        // A failing tool says what to do next (mcp/error-next-step.ts). It sits OUTSIDE the
+        // measurement, so what is measured is what the tool itself returned.
+        const measuredTool = wrapToolHandler(withErrorNextStep(originalTool), () => agentGaii);
+        const measuredRegisterTool = wrapToolHandler(withErrorNextStep(originalRegisterTool), () => agentGaii);
         patchable.tool = (...args: unknown[]) => gate(args[0] as string) ? measuredTool(...args) : undefined;
         patchable.registerTool = (...args: unknown[]) => gate(args[0] as string) ? measuredRegisterTool(...args) : undefined;
 

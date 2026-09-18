@@ -57,6 +57,7 @@ const SOURCES: string[] = [
     'aimeat/src/services/auth-md.ts',
     'aimeat/src/services/markdown-negotiation.ts',
     'aimeat/src/mcp/instructions.ts',
+    'aimeat/src/mcp/error-next-step.ts',
     'aimeat/src/services/handbooks',
     'aimeat/src/services/prompt-defaults',
     'aimeat/src/services/prompt-defaults.ts',
