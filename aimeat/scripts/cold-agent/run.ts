@@ -215,9 +215,15 @@ async function main(): Promise<void> {
     const records: RunRecord[] = [];
     let spent = 0;
     try {
-        for (const task of tasks) {
-            for (let run = 1; run <= args.runs; run++) {
-                if (spent >= args.maxTotalUsd) { console.warn(`stopping: $${spent.toFixed(2)} spent, the ceiling is $${args.maxTotalUsd}`); break; }
+        // Runs go round by round, every task once before any task twice, so a run that stops on
+        // the ceiling has covered every task rather than the first few three times over: the
+        // first skill baseline spent its $10 on four skills of seven and never reached the rest.
+        rounds: for (let run = 1; run <= args.runs; run++) {
+            for (const task of tasks) {
+                if (spent >= args.maxTotalUsd) {
+                    console.warn(`stopping: $${spent.toFixed(2)} spent, the ceiling is $${args.maxTotalUsd}; ${records.length} run(s) done`);
+                    break rounds;
+                }
                 process.stdout.write(`${task.id} #${run} … `);
                 const rec = await runOne(task, run, s, args, outDir);
                 spent += rec.metrics.costUsd ?? 0;
