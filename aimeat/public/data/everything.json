@@ -1,11 +1,11 @@
 {
  "title": "AIMEAT Feature List",
  "stamp": {
-  "version": "3.16.0",
-  "date": "2026-09-16"
+  "version": "3.17.0",
+  "date": "2026-09-19"
  },
  "intro": [
-  "<strong>What an AIMEAT node does today.</strong> Node version 3.16.0, checked against the code on 2026-09-16.",
+  "<strong>What an AIMEAT node does today.</strong> Node version 3.17.0, checked against the code on 2026-09-19.",
   "AIMEAT (AI Memory Exchange and Action Transfer) is a place where a person keeps what they know, and where their own AIs, other people's AIs and the apps they build can read it, act on it and share it, under the person's consent. The main road in is the AI chat the person already uses, connected over MCP. The web pages show what happened and hold the controls that need a screen.",
   "This list covers two layers:",
   "- <strong>Core</strong> is the protocol any node can implement: identity, memory, consent, organisms and workspaces, the economy, federation. Specified in <a href=\"https://github.com/miikkij/aimeat-protocol/blob/main/docs/AIMEAT-RFC-v4.0-Core-full.md\" target=\"_blank\" rel=\"noopener\">AIMEAT-RFC-v4.0-Core-full.md</a>.",
@@ -1363,10 +1363,19 @@
      "slug": "g-9-speech-to-text",
      "cells": [
       "<strong>Speech to text</strong>",
-      "Transcribe audio on the owner's key. Text to speech runs in the browser through the speech library, and messages can be read aloud without anything leaving the browser.",
+      "Transcribe audio on the owner's configured speech model and AI budget. Browser speech synthesis remains available through the speech library.",
       "<code>/v1/ai/transcribe</code>, <code>aimeat-speech</code>"
      ],
-     "plain": "Speech to text Transcribe audio on the owner's key. Text to speech runs in the browser through the speech library, and messages can be read aloud without anything leaving the browser. /v1/ai/transcribe, aimeat-speech"
+     "plain": "Speech to text Transcribe audio on the owner's configured speech model and AI budget. Browser speech synthesis remains available through the speech library. /v1/ai/transcribe, aimeat-speech"
+    },
+    {
+     "slug": "g-9-voice-conversations",
+     "cells": [
+      "<strong>Voice conversations</strong>",
+      "Apps can listen, generate a reply and start speaking before the full reply is ready. Configure models, silence detection, sentence chunks, buffering and interruption, or replace a stage with an adapter. Requires microphone consent where used, <code>ai:use</code> and a compatible configured provider. PCM plays incrementally; MP3 buffers a segment. Agents can request final text or a private audio file, which remains until deleted. <a href=\"https://github.com/miikkij/aimeat-protocol/blob/main/docs/voice-library.md\" target=\"_blank\" rel=\"noopener\">Configuration and limits</a>.",
+      "<code>aimeat-voice</code>, <code>/v1/ai/stream</code>, <code>/v1/ai/speak</code>, <code>aimeat_voice_reply</code>, <code>aimeat_voice_speak</code>"
+     ],
+     "plain": "Voice conversations Apps can listen, generate a reply and start speaking before the full reply is ready. Configure models, silence detection, sentence chunks, buffering and interruption, or replace a stage with an adapter. Requires microphone consent where used, ai:use and a compatible configured provider. PCM plays incrementally; MP3 buffers a segment. Agents can request final text or a private audio file, which remains until deleted. Configuration and limits. aimeat-voice, /v1/ai/stream, /v1/ai/speak, aimeat_voice_reply, aimeat_voice_speak"
     },
     {
      "slug": "g-9-living-document-authoring",
@@ -3254,6 +3263,6 @@
  "outro": "AIMEAT Feature List, reviewed 2026-09-15 against node 3.15.0. The contract is <code>openapi.yaml</code>; the specifications are RFC v4.0 Core and Platform; later changes are at <a href=\"/v1/changelog\">the change log</a>.",
  "counts": {
   "groups": 23,
-  "rows": 321
+  "rows": 322
  }
 }

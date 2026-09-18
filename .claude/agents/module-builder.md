@@ -18,7 +18,7 @@ You write one thing, in files that are yours, and you hand back a report the lea
 ## While you write
 
 - Your files only. Never `index.js`, never a sibling, never CSS you were not given, never `package.json`. If a sibling needs one line, quote the line in the report instead of applying it.
-- Another session may share the checkout: `git status` will show files that are not yours; leave them.
+- You work in the lead's own worktree, which no other session shares (CLAUDE.md: every session has its own). `git status` may still show files that are not yours: they are the lead's or another subagent's, so leave them.
 - No browser, no node, no ports, no E2E suites. Verification is a node script against the shared stub harness (`aimeat/test/unit/phaser-stub.mjs` for Phaser modules; the brief names others). Write the script in the scratchpad, not the repo, unless the brief asks for a unit test.
 - Gates you own: `pnpm exec eslint <your files>`, `node --check`, `pnpm typecheck:sdk` or `pnpm typecheck` as the brief says. An error in a file that is not yours belongs to whoever is writing it; say so, and make sure yours is clean.
 

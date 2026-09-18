@@ -19,15 +19,17 @@ Route to the organism where that product's roadmap lives: each MACHINE ROOM app 
 
 ## Dev organism session rituals
 
-Organism id `fbb51de5-56d5-4143-9871-b998a1187655`, appdev MCP (`mcp__claude_ai_AIMEAT_Appdev__*`). Source of truth for coordination and working context; the repo stays source of truth for code and the protocol contract. Full design: `docs/internal/aimeat-dev-organism-plan.md`.
+**Starting, claiming and handing off a session is not here.** That ritual is skill `aimeat-dev-session` on the node (`aimeat_skill_get`), and it runs in organism AIMEAT CODING CENTRAL (`da438a5f-609b-41e5-ad9f-8dd2cc76cbe1`) through the Lifecycle Central tools: the board, claims, incidents, decisions, handoffs and the wish bucket (CLAUDE.md, "Working beside other sessions"). This section is about the DEV organism, where designs and build notes live.
 
-Workspaces: Development `ws-mq664uyfz21`, Handbook `ws-mq6653ry24h`, Protocol `ws-mq665ahqc6b`.
+Organism id `fbb51de5-56d5-4143-9871-b998a1187655`, reached with the node's MCP tools (`mcp__claude_ai_AIMEAT__aimeat_workspace_*`; the separate appdev connector this section used to name is gone). The repo stays source of truth for code and the protocol contract.
 
-1. **Session start:** read the `context` doc `main-context` in Development, the last few `decision`s, and the activity feed delta. Do not ingest the whole organism.
+Workspaces: Development `ws-mq664uyfz21`, Handbook `ws-mq6653ry24h`, Protocol `ws-mq665ahqc6b`, Platform Development Notes `ws-mslunjvcgxj`, App Development Notes `ws-mslr8u99kzk`.
+
+1. **Before design work:** read the `context` doc `main-context` in Development and the last few `decision`s. Do not ingest the whole organism.
 2. **Planning a task:** read just-in-time. The area's Handbook page(s), open `feature`/`bug` records, relevant `decision`/`invariant`.
 3. **Finishing significant work:** update the `feature`/`bug`; log a `decision` or `known-gap` (both gated on human approval); update the Handbook page and the sub-context doc's current-state.
 4. **Milestones:** a sub-context draft is the live current-state and can be edited freely. A publish is a milestone and needs the developer's explicit go-ahead.
-5. **Sync:** keep `docs/known_gaps.md` and the roadmap in two-way sync (`pnpm organism:sync`, once it exists).
+5. **Sync:** `docs/known_gaps.md` and the roadmap are kept in step by hand. No command does it; the `pnpm organism:sync` this line used to name was never written.
 
 Never add a `known-gap` entry on your own, in the organism or in `docs/known_gaps.md`.
 
