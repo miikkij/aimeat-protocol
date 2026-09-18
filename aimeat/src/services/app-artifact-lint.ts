@@ -41,6 +41,7 @@
  *   const { blocking, warnings } = await lintAppArtifact(html, config);
  *   if (blocking.length) return refusal;
  * @version-history
+ *   v1.5.1 — 2026-09-19 — A warning when `aimeat-app` still holds the shell's REPLACE placeholder.
  *   v1.5.0 — 2026-09-13 — checkServedCopy is gone. The developer decided that a served copy is
  *     stored as its source: services/app-publish.ts removes the node's serve marks before this check
  *     runs and names them in the publish response (services/app-serve-marks-strip.ts), which
@@ -625,6 +626,13 @@ function checkMetas(html: string): AppArtifactFinding[] {
     out.push(finding('app-meta-declarations', 'warn',
       `The head declares none of: ${missing.join('; ')}. They are one line each and the build spec shows `
       + 'the exact form.'));
+  }
+  // The shells carry `aimeat-app` with a placeholder since 2026-09-19, so that a first publish is
+  // clean. A placeholder left in is worse than no tag: the page then claims a filename that is
+  // not its own.
+  if (/<meta\b[^>]*name\s*=\s*["']aimeat-app["'][^>]*content\s*=\s*["']\s*REPLACE/i.test(head)) {
+    out.push(finding('app-meta-declarations', 'warn',
+      '`<meta name="aimeat-app">` still holds the shell\'s placeholder. Put your published filename in it, exactly as you publish it (for example `my-app.html`).'));
   }
 
   // A word outside the vocabulary refuses the WHOLE list: the silent bridge answers invalid_scope

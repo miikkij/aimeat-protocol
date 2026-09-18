@@ -7,6 +7,10 @@
  *   from scratch. Consumed by ../app-templates.ts which assembles the TEMPLATES registry.
  * @structure SHELL_PURE_CLIENT · SHELL_CORTEX · SHELL_EXTENSION
  * @version-history
+ *   v1.6.0 — 2026-09-19 — The three classic shells carry `aimeat-app` (with a placeholder the
+ *     publish lint names when it is left in) and `aimeat-scopes` (the default grant). Neither was in
+ *     a shell, the lint warns about both on every app, and every measured cold-agent build
+ *     published twice: once to be told, once to add them.
  *   v1.5.0 — 2026-09-05 — SHELL_ATELIER carries a REPLACE-ME `aimeat-register` line on purpose:
  *     the publish gate refuses it, so the bare shell cannot go live as a page. A builder forks a
  *     genre (which names its own register) or replaces the line with `custom:<name>`.
@@ -46,6 +50,10 @@ entry: index.html
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
   <!-- Bilingual? Declare it and the login pill renders the language button. Delete this line if not. -->
   <meta name="aimeat-locales" content="en fi" />
+  <!-- Your published filename, exactly as you publish it. On an app subdomain the page cannot work it out. -->
+  <meta name="aimeat-app" content="REPLACE-WITH-YOUR-FILENAME.html" />
+  <!-- EVERY scope the app uses; sign-in asks the person to approve these. This is the default grant: add memory:delete, ai:use and the rest only when you use them. -->
+  <meta name="aimeat-scopes" content="memory:read memory:write storage:read storage:write" />
   <title>{{App Title}}</title>
   <!-- Self-hosted Tailwind v4 + daisyUI 5 + theme bridge (served by the node, not a CDN) -->
   <link href="/lib/daisyui@5.css" rel="stylesheet" type="text/css" />
@@ -133,6 +141,10 @@ entry: index.html
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
   <!-- Bilingual? Declare it and the login pill renders the language button. Delete this line if not. -->
   <meta name="aimeat-locales" content="en fi" />
+  <!-- Your published filename, exactly as you publish it. On an app subdomain the page cannot work it out. -->
+  <meta name="aimeat-app" content="REPLACE-WITH-YOUR-FILENAME.html" />
+  <!-- EVERY scope the app uses; sign-in asks the person to approve these. This is the default grant: add memory:delete, ai:use and the rest only when you use them. -->
+  <meta name="aimeat-scopes" content="memory:read memory:write storage:read storage:write" />
   <title>{{App Title}}</title>
   <link href="/lib/daisyui@5.css" rel="stylesheet" type="text/css" />
   <link href="/lib/aimeat-theme.css" rel="stylesheet" type="text/css" />
@@ -227,6 +239,10 @@ entry: index.html
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
   <!-- Bilingual? Declare it and the login pill renders the language button. Delete this line if not. -->
   <meta name="aimeat-locales" content="en fi" />
+  <!-- Your published filename, exactly as you publish it. On an app subdomain the page cannot work it out. -->
+  <meta name="aimeat-app" content="REPLACE-WITH-YOUR-FILENAME.html" />
+  <!-- EVERY scope the app uses; sign-in asks the person to approve these. This is the default grant: add memory:delete, ai:use and the rest only when you use them. -->
+  <meta name="aimeat-scopes" content="memory:read memory:write storage:read storage:write" />
   <title>{{App Title}}</title>
   <link href="/lib/daisyui@5.css" rel="stylesheet" type="text/css" />
   <link href="/lib/aimeat-theme.css" rel="stylesheet" type="text/css" />
@@ -303,6 +319,10 @@ entry: index.html
   <meta name="aimeat-track" content="atelier" />
   <meta name="aimeat-register" content="REPLACE-ME: fork a genre from the Design Book (GET /v1/designbook?kind=genre) or name your own register" />
   <meta name="aimeat-locales" content="en fi" />
+  <!-- Your published filename, exactly as you publish it. On an app subdomain the page cannot work it out. -->
+  <meta name="aimeat-app" content="REPLACE-WITH-YOUR-FILENAME.html" />
+  <!-- EVERY scope the app uses; sign-in asks the person to approve these. This is the default grant: add memory:delete, ai:use and the rest only when you use them. -->
+  <meta name="aimeat-scopes" content="memory:read memory:write storage:read storage:write" />
   <title>{{App Title}}</title>
   <link href="/lib/aimeat-atelier.css" rel="stylesheet" type="text/css" />
   <script src="/lib/aimeat-boot.js"></script>

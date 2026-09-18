@@ -43,7 +43,7 @@ import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { randomBytes } from 'node:crypto';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { TASKS, api, type Task, type TaskContext } from './tasks.js';
 import { parseTranscript, type RunMetrics } from './transcript.js';
@@ -61,6 +61,12 @@ interface Args {
     runs: number;
     tasks: string[] | null;
     arm: string | null;
+    /**
+     * A text file put in front of every task prompt, as if the person had pasted it into the chat.
+     * For measuring a task-fit brief (the condenser wish) against the agent finding the guidance
+     * itself: the same task, run once without and once with.
+     */
+    preface: string | null;
     /** The ceiling for ONE session. The CLI stops the session when it is reached. */
     maxBudgetUsd: number;
     maxTotalUsd: number;
@@ -83,6 +89,7 @@ function parseArgs(argv: string[]): Args {
         runs: Number(get('runs') ?? 3),
         tasks: get('tasks')?.split(',') ?? null,
         arm: get('arm') ?? null,
+        preface: get('preface') ?? null,
         // A skill case measures the decision to load, which happens in the first few turns.
         maxBudgetUsd: Number(get('max-budget-usd') ?? (suite === 'skills' ? 0.5 : 1.5)),
         claudeCmd: get('claude-cmd') ?? process.env.AIMEAT_CLAUDE_CMD ?? 'claude',
@@ -180,7 +187,8 @@ async function runOne(task: Task, run: number, s: Sandbox, args: Args, outDir: s
     const marker = `ca-${randomBytes(4).toString('hex')}`;
     const owner = s.owners[0];
     const base = { baseUrl: s.baseUrl, ownerName: owner.name, ownerToken: owner.token, agentToken: s.agent!.token, marker };
-    const prompt = task.prompt.replaceAll('{marker}', marker).replaceAll('{baseUrl}', s.baseUrl).replaceAll('{ownerName}', owner.name);
+    const fill = (text: string) => text.replaceAll('{marker}', marker).replaceAll('{baseUrl}', s.baseUrl).replaceAll('{ownerName}', owner.name);
+    const prompt = (args.preface ? fill(readFileSync(args.preface, 'utf8')).trimEnd() + '\n\n' : '') + fill(task.prompt);
     await task.setup?.(base);
 
     // A task id may carry a colon (`skill:<name>:<n>`), which a Windows file name cannot.
@@ -238,7 +246,7 @@ async function main(): Promise<void> {
         if (arm) await restoreArm(s, arm.ids);
     }
 
-    const meta = { stamp, driver: args.driver, model: args.driver === 'scripted' ? 'none' : args.model, runs: args.runs, arm: arm?.name ?? 'baseline', spentUsd: spent };
+    const meta = { stamp, driver: args.driver, model: args.driver === 'scripted' ? 'none' : args.model, runs: args.runs, arm: arm?.name ?? (args.preface ? 'preface:' + basename(args.preface) : 'baseline'), spentUsd: spent };
     writeFileSync(join(outDir, 'results.json'), JSON.stringify({ meta, records }, null, 2));
     const report = renderReport(meta, records, suite);
     writeFileSync(join(outDir, 'report.md'), report);

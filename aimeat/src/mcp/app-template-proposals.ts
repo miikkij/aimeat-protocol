@@ -29,6 +29,7 @@ import {
     proposeTemplate, listTemplateProposals, getTemplateProposal, deleteTemplateProposal,
 } from '../services/app-template-proposals.js';
 import { nodeTemplateAnswer, nodeTemplateIndex, unknownTemplateMessage } from '../services/node-templates.js';
+import { toolError } from './tool-error.js';
 
 const text = (v: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(v, null, 2) }] });
 const errText = (msg: string) => ({ content: [{ type: 'text' as const, text: msg }], isError: true as const });
@@ -111,8 +112,8 @@ export function registerAppTemplateProposalTools(
                 // tool for `shell-pure-client` and was told it did not exist (2026-09-18). Same
                 // registry and same fields as GET /v1/app-templates/:id (services/node-templates.ts).
                 const shipped = nodeTemplateAnswer(id, part);
-                if (!shipped) return errText(unknownTemplateMessage(id));
-                return typeof shipped.part_error === 'string' ? errText(shipped.part_error) : text(shipped);
+                if (!shipped) return toolError('NOT_FOUND', unknownTemplateMessage(id));
+                return typeof shipped.part_error === 'string' ? toolError('INVALID_INPUT', shipped.part_error) : text(shipped);
             }
             const m = found.manifest;
 

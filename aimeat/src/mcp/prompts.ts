@@ -45,6 +45,7 @@ import { skillsBySituation } from '../services/skills-by-situation.js';
 import { substituteVariables } from '../services/prompt-variables.js';
 import { buildAppPrompt } from '../services/build-app-prompt.js';
 import { buildAppPiece, buildAppPieceIds } from '../services/build-app-layers.js';
+import { toolError } from './tool-error.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
 import { V2_ROLES, toolsForSurface, type SurfaceRole } from './catalog/surfaces.js';
 
@@ -102,10 +103,7 @@ export function registerPromptsTools(
                 const id = tierKey.slice('build-app/'.length) || 'start';
                 const piece = buildAppPiece(full, id, config.baseUrl);
                 if (piece) return { content: [{ type: 'text' as const, text: piece.text }] };
-                return {
-                    content: [{ type: 'text' as const, text: `The build specification has no part or section "${id}". It has: ${buildAppPieceIds(full).join(', ')}. Ask for "build-app" to read the first part, which lists the others.` }],
-                    isError: true,
-                };
+                return toolError('NOT_FOUND', `The build specification has no part or section "${id}". It has: ${buildAppPieceIds(full).join(', ')}. Ask for "build-app" to read the first part, which lists the others.`);
             }
             // Normalize tier aliases used in routes (tier1 → tier-1, etc.)
             const normalized = tierKey
