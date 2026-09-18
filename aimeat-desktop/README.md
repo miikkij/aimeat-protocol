@@ -167,10 +167,13 @@ the app-data folder. To iterate on the **server** itself, run it the normal way 
 - **Unsigned, on purpose for now.** The first launch shows a Windows SmartScreen warning ("More info → Run
   anyway"). Ruled 2026-09-18: no code signing until the app has been judged good; it costs money and the
   free routes were all measured closed (see the Platform Development Note `installer-code-signing`).
-- **Neither update path works** (measured 2026-09-18). Both look at the repository's `releases/latest`, which
-  is now a node release rather than a `desktop-v*` one: the Tauri updater's `latest.json` answers 404, and the
-  in-app banner returns early because the tag does not start with `desktop-v`. Until both are fixed, a new
-  version is installed by hand.
+- **Auto-update is fixed but unproven** until the next release carries it. It broke because both paths looked
+  at the repository's `releases/latest`, which this repository gives to the node's own far more frequent `v*`
+  releases: the updater's `latest.json` answered 404 and the in-app banner returned early, silently, from June
+  to 2026-09-18. There is one mechanism now, the Tauri updater, and it polls a fixed address,
+  `releases/download/desktop-latest/latest.json`. `release-desktop.yml` rewrites that manifest on every
+  `desktop-v*` release, in a prerelease so it never takes the repository's "Latest" label. Nothing proves the
+  round trip until a release publishes the manifest once.
 - **SQLite only.** MongoDB/PostgreSQL backends are intentionally excluded from the desktop bundle.
 
 ## Troubleshooting

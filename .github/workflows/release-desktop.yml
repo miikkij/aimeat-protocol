@@ -130,3 +130,25 @@ jobs:
           prerelease: false
           generate_release_notes: true
           files: dist/*
+
+      # THE MANIFEST ALSO GOES TO A FIXED ADDRESS, and this is what makes auto-update work at all.
+      # The app cannot poll `releases/latest`: this repository releases the node under `v*` far
+      # more often than the desktop app under `desktop-v*`, so "latest" stopped being a desktop
+      # release in June and the updater has answered 404 ever since (measured 2026-09-18). The
+      # tag `desktop-latest` never moves, so tauri.conf.json can name one address forever, and
+      # the manifest inside it keeps pointing at the versioned release's own installer and
+      # signature. It is marked prerelease so it never takes the repository's "Latest" label
+      # away from a real release, and its name does not match the `desktop-v*.*.*` trigger
+      # above, so publishing it cannot start this workflow again.
+      - name: Point the fixed updater address at this release
+        if: startsWith(github.ref, 'refs/tags/') && hashFiles('dist/latest.json') != ''
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
+        with:
+          name: Updater manifest (always the newest desktop release)
+          tag_name: desktop-latest
+          body: |
+            The address the installed app polls for updates. Not a download: the installer lives on
+            the release this manifest names. Rewritten by CI on every `desktop-v*` release.
+          draft: false
+          prerelease: true
+          files: dist/latest.json
