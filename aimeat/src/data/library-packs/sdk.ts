@@ -10,6 +10,7 @@
  * @structure SDK_PACKS: LibraryPack[]
  * @usage Imported by ../library-packs.ts (registry assembly). Do not import directly.
  * @version-history
+ *   v1.14.0 — 2026-09-18 — aimeat-prompt joins, from library-packs/sdk-prompt.ts.
  *   v1.13.1 — 2026-09-18 — aimeat-social is `stable`. v1.3.1 renamed it back to "Boards" and rewrote
  *     its aiDoc when boards were reinstated, and left `status: 'deprecated'`, so the pack index
  *     still told a builder the library was deprecated. Confirmed current by the developer.
@@ -80,6 +81,7 @@ import { SDK_UI_PACKS } from './sdk-ui.js';
 // The living document's aiDoc teaches a whole record format and is the longest text in the
 // registry, so it lives in its own file for the same reason. Pure list, spread back in below.
 import { LIVING_PACKS } from './sdk-living.js';
+import { PROMPT_PACKS } from './sdk-prompt.js';
 
 export const SDK_PACKS: LibraryPack[] = [
   ...CALENDAR_PRINT_PACKS,
@@ -556,6 +558,7 @@ export const SDK_PACKS: LibraryPack[] = [
   },
   ...SDK_UI_PACKS,
   ...LIVING_PACKS,
+  ...PROMPT_PACKS,
   {
     id: 'aimeat-audio',
     kind: 'sdk',

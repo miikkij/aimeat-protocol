@@ -1752,6 +1752,15 @@
      "plain": "Ontology library Attach meaning to records and read shared vocabularies: search names across languages, follow broader or narrower concepts, and find replacements for retired terms. /v1/libs/aimeat-onto.js, /v1/ns"
     },
     {
+     "slug": "g-11-prompt-card-for-apps",
+     "cells": [
+      "<strong>Prompt card for apps</strong>",
+      "An app shows a prompt it composed, you copy it into your own AI chat and paste the answer back, and the app reads it as text or as data. The app needs no model key and pays nothing, and it works with any AI. Preview.",
+      "<code>/v1/libs/aimeat-prompt.js</code>"
+     ],
+     "plain": "Prompt card for apps An app shows a prompt it composed, you copy it into your own AI chat and paste the answer back, and the app reads it as text or as data. The app needs no model key and pays nothing, and it works with any AI. Preview. /v1/libs/aimeat-prompt.js"
+    },
+    {
      "slug": "g-11-atelier",
      "cells": [
       "<strong>Atelier</strong>",
@@ -3245,6 +3254,6 @@
  "outro": "AIMEAT Feature List, reviewed 2026-09-15 against node 3.15.0. The contract is <code>openapi.yaml</code>; the specifications are RFC v4.0 Core and Platform; later changes are at <a href=\"/v1/changelog\">the change log</a>.",
  "counts": {
   "groups": 23,
-  "rows": 320
+  "rows": 321
  }
 }
