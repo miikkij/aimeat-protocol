@@ -389,6 +389,8 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     // Open world: it posts to api.indexnow.org. Idempotent: the same notice twice is the same notice.
     aimeat_seo_announce: { title: 'Instant Update to Search Engines', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     aimeat_image_generate: { title: 'Generate Image', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+    aimeat_voice_reply: { title: 'Generate Voice Reply', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+    aimeat_voice_speak: { title: 'Generate Speech', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     aimeat_ai_job_start: { title: 'Start AI Job', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     aimeat_ai_job_list: { title: 'List AI Jobs', readOnlyHint: true },
     aimeat_ai_job_get: { title: 'Get AI Job', readOnlyHint: true },

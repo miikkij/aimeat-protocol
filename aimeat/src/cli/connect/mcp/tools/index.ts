@@ -41,6 +41,7 @@ import { registerMcpProxyTools } from './mcp-proxy.js';
 import { registerSchedulesTools } from './schedules.js';
 import { registerWorkflowTools } from './workflows.js';
 import { registerAiJobTools } from './ai-jobs.js';
+import { registerAiVoiceTools } from './ai-voice.js';
 import { registerConsentTools } from './consent.js';
 import { registerAccessTools } from './access.js';
 import { registerSecretTools } from './secrets.js';
@@ -89,6 +90,7 @@ export function registerAllTools(mcp: McpServer, registry: AgentRegistry): void 
   registerSchedulesTools(mcp, registry);
   registerWorkflowTools(mcp, registry);
   registerAiJobTools(mcp, registry);
+  registerAiVoiceTools(mcp, registry);
   registerConsentTools(mcp, registry);
   registerAccessTools(mcp, registry);
   registerSecretTools(mcp, registry);
