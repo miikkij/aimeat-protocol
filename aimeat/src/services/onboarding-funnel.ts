@@ -25,6 +25,9 @@
  *   import { recordFirstMcpCall } from '../services/onboarding-funnel.js';
  *   void recordFirstMcpCall(storage, config, owner, platform);   // fire-and-forget at MCP init
  * @version-history
+ *   v1.4.1 — 2026-09-18 — An asked answer naming a different app replaces an earlier asked answer
+ *     ("Gemini", then "gemini-app"). It was dropped, which left the state on the name that raised
+ *     the question. The replaced reading stays in `superseded`.
  *   v1.4.0 — 2026-08-27 — The `switched` counter and recordTrackSwitch are gone with the switch they
  *     counted: the home and the profile are two layers of one thing now (home in front, settings and
  *     controls behind), so there is no "leaving for the old path" to measure. `track` stays as the
@@ -393,13 +396,21 @@ export async function recordAiModelDetected(
     const gaii = ownerGhii(config, owner);
     try {
         const existing = await storage.getMemory(gaii, ONBOARDING_KEYS.aiModelDetected);
-        const prev = (existing?.value ?? null) as { source?: string } | null;
+        const prev = (existing?.value ?? null) as { source?: string; client?: string | null } | null;
         // Ordering, weakest to strongest: a page's claim < the person's answer ABOUT that page <
         // a NEW page. A fresh mat supersedes everything, because it is a new artifact made in a
         // different app — this is the whole mechanism of branch B, where someone takes up an app
         // that can connect and pastes a new mat. Without it, the stale "no, I have no paid tier"
         // answer would outlive the app it was about and hold them on the branch-B screen forever.
-        if (prev && !detection.supersedes && !(detection.source === 'asked' && prev.source !== 'asked')) return;
+        //
+        // One more step since 2026-09-18: the person's answer may be followed by a NARROWER answer.
+        // "Gemini" raises the which-variant question, and "gemini-app" answers it; both are theirs,
+        // and the second has to land or the state keeps the name that raised the question. So an
+        // asked answer that names a different app replaces an asked one. The earlier reading stays
+        // in `superseded` below, as every replaced reading does.
+        const refines = detection.source === 'asked' && prev?.source === 'asked'
+            && !!detection.client && detection.client !== prev.client;
+        if (prev && !detection.supersedes && !refines && !(detection.source === 'asked' && prev.source !== 'asked')) return;
         const now = new Date().toISOString();
         await storage.setMemory({
             key: ONBOARDING_KEYS.aiModelDetected,

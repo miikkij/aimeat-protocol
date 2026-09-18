@@ -21,6 +21,9 @@
  * @structure registerWelcomeMatRoutes(router, ctx): POST /v1/home/welcome-mat, POST /v1/home/ai-client
  * @usage Registered from src/routes/home.ts.
  * @version-history
+ *   v1.1.0 — 2026-09-18 — The branch payload carries `family` and `variant_options` with the
+ *     which-variant question (Gemini, Microsoft Copilot), and a named variant records a real
+ *     `mcp: yes|no`. See services/ai-tool-setup.ts v1.6.0.
  *   v1.0.0 — 2026-08-07 — Initial (remake phase 2).
  */
 import type { Router, RequestHandler } from 'express';
@@ -32,7 +35,7 @@ import { emitChange } from '../../services/event-bus.js';
 import { logger } from '../../utils/logger.js';
 import { parseWelcomeMat } from '../../services/welcome-mat-parse.js';
 import {
-    resolveAiClient, decideBranch, type BranchDecision, type AiClientResolution,
+    resolveAiClient, decideBranch, aiClientVariantOptions, type BranchDecision, type AiClientResolution,
 } from '../../services/ai-tool-setup.js';
 import {
     ONBOARDING_KEYS, recordOnboardingEvent, recordWelcomeMatPasted, recordAiModelDetected,
@@ -80,6 +83,10 @@ function branchPayload(decision: BranchDecision) {
         reason: 'reason' in decision ? decision.reason : null,
         question: decision.branch === 'ask' ? decision.question : null,
         tool_id: 'toolId' in decision ? decision.toolId ?? null : null,
+        /** Set with the which-variant question, and with a B that a variant answer decided. */
+        family: 'family' in decision ? decision.family ?? null : null,
+        variant_options: decision.branch === 'ask' && decision.question === 'which-variant' && decision.family
+            ? aiClientVariantOptions(decision.family) : null,
     };
 }
 
@@ -132,7 +139,9 @@ async function recordAiDetection(
         vendor: fields.vendor,
         client: fields.client,
         // Our reading of the app, not the model's claim about its own capability.
-        mcp: resolution.kind === 'known' ? (resolution.capability === 'yes' ? 'yes' : 'unknown') : 'unknown',
+        // A named variant of a two-app name (the Gemini app, Gemini CLI) is the one case we know a NO.
+        mcp: resolution.kind === 'known' ? (resolution.capability === 'yes' ? 'yes' : 'unknown')
+            : resolution.kind === 'variant' ? (resolution.variant.mcp ? 'yes' : 'no') : 'unknown',
         source,
         // The unmatched name is the list from which the alias map grows.
         unknownClient: resolution.kind === 'unknown' ? resolution.claim : null,

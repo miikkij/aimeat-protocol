@@ -12146,8 +12146,13 @@ paths:
                             items: { type: string }
                           question:
                             type: string
-                            enum: [which-client, paid-plan]
+                            enum: [which-client, paid-plan, which-variant]
                             nullable: true
+                            description: >-
+                              `which-variant` is raised by a name two apps share (Gemini, Microsoft
+                              Copilot), one of which cannot connect over MCP. Its options arrive in
+                              `client_options`, and the answer goes to POST /v1/home/ai-client as
+                              `client`.
                           rooms:
                             type: array
                             description: >-
@@ -12234,8 +12239,18 @@ paths:
                             type: object
                             description: The ai-* fields as the page stated them (every one optional).
                           branch: { type: string, enum: [A, B, ask] }
-                          question: { type: string, enum: [which-client, paid-plan], nullable: true }
+                          question: { type: string, enum: [which-client, paid-plan, which-variant], nullable: true }
                           tool_id: { type: string, nullable: true }
+                          family: { type: string, nullable: true, description: 'Set with `which-variant`: `gemini` or `microsoft-copilot`.' }
+                          variant_options:
+                            type: array
+                            nullable: true
+                            description: The two apps the name covers. The answer is an option's `id`, sent as `client` to POST /v1/home/ai-client.
+                            items:
+                              type: object
+                              properties:
+                                id: { type: string }
+                                label: { type: string }
                           portfolio_url: { type: string }
                           standalone_url: { type: string, nullable: true }
         '400':
@@ -12835,8 +12850,11 @@ paths:
 
         `client` accepts one of the ids from `/v1/ai-tools`, `other`, `dont-know`, or free text. An
         unrecognised answer leads to branch A, never to B: a wrong A costs one attempt, whereas a
-        wrong B tells someone whose tools were fine that their tools are not good enough. The ONLY
-        route to branch B is `has_paid_plan: false` for an app that requires a paid tier.
+        wrong B tells someone whose tools were fine that their tools are not good enough. There are
+        two routes to branch B, and both are the person's own answer: `has_paid_plan: false` for an
+        app that requires a paid tier, and a `client` naming the variant of a shared name that
+        cannot connect (`gemini-app`, `microsoft-copilot-app`). A name alone, the person's or a
+        model's, never leads to B: "Gemini" raises the `which-variant` question instead.
       tags:
         - Portal
       security:
@@ -12850,7 +12868,7 @@ paths:
               properties:
                 client:
                   type: string
-                  description: An id from /v1/ai-tools, `other`, `dont-know`, or free text.
+                  description: An id from /v1/ai-tools, a variant id from `variant_options`, `other`, `dont-know`, or free text.
                 has_paid_plan:
                   type: boolean
                   description: Whether the person has the tier their app requires.
