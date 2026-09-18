@@ -11,6 +11,8 @@
  * @structure appSettingsTools: ConnectCliToolDefinition[]
  * @usage import { appSettingsTools } from './tool-call-defs-apps-settings.js';
  * @version-history
+ *   v1.4.0 -- 2026-09-18 -- aimeat_app_visitors and aimeat_app_visitors_measure, on the third surface
+ *     in the same change as the other two.
  *   v1.3.0 -- 2026-09-11 -- aimeat_seo_announce: the whole site to IndexNow (or its plan), on the
  *     third surface in the same change as the other two.
  *   v1.2.0 -- 2026-09-02 -- aimeat_app_audit forwards `playtest`, so a fleet agent on this door can
@@ -20,7 +22,7 @@
  *   v1.0.0 -- 2026-08-29 -- Extracted from tool-call-defs-apps.ts (max-file-lines), no behaviour change.
  */
 import type { JsonObject, ConnectCliToolDefinition } from './tool-call-helpers.js';
-import { requiredString, optionalString, optionalBoolean, optionalArray } from './tool-call-helpers.js';
+import { requiredString, optionalString, optionalBoolean, optionalNumber, optionalArray } from './tool-call-helpers.js';
 
 export const appSettingsTools: ConnectCliToolDefinition[] = [
     {
@@ -71,6 +73,43 @@ export const appSettingsTools: ConnectCliToolDefinition[] = [
                 if (v !== undefined) marks[field] = v;
             }
             return client.patch(`/v1/apps/${encodeURIComponent(requiredString(input, 'filename'))}`, { marks });
+        },
+    },
+    {
+        // → GET /v1/apps/visitors?filename=… — who opened one of the owner's own apps. A bare
+        //   filename is "one of mine" on the route, so this door never spells the account out.
+        name: 'aimeat_app_visitors',
+        description: 'Who opened one of your own apps over the last 0 to 360 days: opens by signed-in people against opens by nobody signed in, and, once measurement is on, people against named AIs against other bots, and where the people came from.',
+        input: {
+            filename: { type: 'string', required: true, description: 'One of your own apps, with its extension (e.g. "shop.html").' },
+            days: { type: 'number', description: 'The trailing window in days, 0 to 360. 0 is today only. Default 30.' },
+        },
+        handler: ({ client }, input) => {
+            // The node clamps the window; what this door owes is that the number leaves the process.
+            const window = optionalNumber(input, 'days');
+            const days = window !== undefined ? `&days=${window}` : '';
+            return client.get(`/v1/apps/visitors?filename=${encodeURIComponent(requiredString(input, 'filename'))}${days}`);
+        },
+    },
+    {
+        // → PUT /v1/apps/visitors/measurement — the switch, and the precision a place is kept at.
+        //   `geo` travels only when named: an absent one means "keep what it was".
+        name: 'aimeat_app_visitors_measure',
+        description: 'Switch visitor measurement on or off for one of your own apps, and choose how precisely a person\'s place is kept (off, country, region, city). Off keeps what was counted.',
+        input: {
+            filename: { type: 'string', required: true, description: 'One of your own apps, with its extension (e.g. "shop.html").' },
+            on: { type: 'boolean', required: true, description: 'true starts counting who opens the app; false stops and keeps what was counted.' },
+            geo: { type: 'string', description: 'off, country, region or city. Omit to keep what it was.' },
+        },
+        handler: ({ client }, input) => {
+            // A missing or unreadable `on` is refused here: read as false it would switch a working
+            // measurement off, which is the opposite of doing nothing.
+            const on = optionalBoolean(input, 'on');
+            if (on === undefined) throw new Error('Missing required field: on (true or false)');
+            const body: JsonObject = { filename: requiredString(input, 'filename'), on };
+            const geo = optionalString(input, 'geo');
+            if (geo !== undefined) body.geo = geo;
+            return client.put('/v1/apps/visitors/measurement', body);
         },
     },
     {

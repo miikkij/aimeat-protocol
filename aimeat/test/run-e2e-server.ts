@@ -231,6 +231,10 @@ export function pinnedEnv(target: RunnerTarget): Record<string, string> {
         // for every e2e run so the tunnel suites work in CI too (the .env.test.*
         // files are gitignored, so they can't carry this for CI).
         AIMEAT_CONNECT_TUNNEL_ENABLED: process.env.AIMEAT_CONNECT_TUNNEL_ENABLED ?? 'true',
+        // Visitor geography is off in production until a proxy sets the place headers. On for every
+        // e2e run so e2e-app-visitors can stand in for that proxy; a suite that sends no X-Geo-*
+        // header is unaffected, because a stream keeps no place until its owner picks a precision.
+        AIMEAT_GEO_HEADERS: process.env.AIMEAT_GEO_HEADERS ?? 'true',
         // Outbound connections (TARGET-057) are opt-in and off by default in prod; on for every
         // e2e run, same reason as the tunnel flag above. The fake provider's port is FIXED because
         // the server reads this at boot, before the test process has started the provider — they

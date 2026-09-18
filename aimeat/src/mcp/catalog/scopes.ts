@@ -33,6 +33,8 @@
  *     them the power to rotate the owner's keys with nobody ever asked.
  *   v1.18.0 -- 2026-09-05 -- aimeat_admin_security_overview and aimeat_admin_incident_resolve join
  *     the operator-gated list: the handler checks the role, no scope word narrows them.
+ *   2026-09-18 -- aimeat_app_visitors -> signals:read, aimeat_app_visitors_measure -> signals:write:
+ *     the first two tools on the signals words, which the REST doors have carried since 2026-08-24.
  *   v1.17.0 -- 2026-08-29 -- aimeat_app_legal_set and aimeat_app_audit → app:write (the one app
  *     scope the owner's checkboxes carry; the routes behind every door are gated on it).
  *   v1.16.0 -- 2026-08-29 -- aimeat_app_marks_set → app:write.
@@ -243,6 +245,10 @@ export const TOOL_SCOPES: Record<string, string> = {
     aimeat_app_seo_set:                       'app:write',
     aimeat_app_marks_set:                     'app:write',
     aimeat_app_legal_set:                     'app:write',
+    // The signals words, not app:*: the numbers live in the owner's signal stream, the REST doors
+    // are gated on these two, and reading is kept apart from switching on purpose.
+    aimeat_app_visitors:                      'signals:read',
+    aimeat_app_visitors_measure:              'signals:write',
     // app:write, not app:read: the route behind every door is gated on the one app scope the
     // owner's checkboxes carry, and an agent that may manage an app may read its log.
     aimeat_app_audit:                         'app:write',

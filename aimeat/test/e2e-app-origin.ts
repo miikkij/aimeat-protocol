@@ -10,6 +10,9 @@
  *       subdomain form (x-app-origin + x-subdomain).
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-app-origin.ts
  * @version-history
+ *   v1.7.0 — 2026-09-18 — Phase 11: a page whose owner opted it in is counted when it is fetched on
+ *     its own origin. The page-view counter was wired to the apex route alone, and with the app
+ *     origin on the apex only redirects, so an opted-in page counted nothing where people land.
  *   v1.6.0 — 2026-09-13 — The tagless case no longer asserts the author's bytes START the served
  *     document: the app-ref block now leads a document with no head, so the app's first script can
  *     read it. The discovery case also parses that block as served and finds it in the head.
@@ -1070,6 +1073,36 @@ async function main() {
             assert(d.apps.on === 1, `${d.apps.on} apps reported findable, expected exactly the one switched on`);
             assert(d.apps.off >= 1, 'the sibling app should be counted as off');
             assert(d.sitemap.app_host_count === d.apps.on, 'the status disagrees with itself about how many hosts are listed');
+        });
+
+        console.log('\nPhase 11: a page its owner measures is counted on its own origin');
+        await test('a fetch of the per-app subdomain lands in the owner\'s page stream, split by who came', async () => {
+            // The convention from services/signals/page-views.ts: `page-` plus the slugged filename.
+            const streamId = `page-${filename.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')}`;
+            const made = await json('/v1/signals/streams', {
+                method: 'POST', headers: { Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ stream_id: streamId, label: 'Origin demo page', channel: 'page' }),
+            });
+            assert(made.status === 200, `stream creation failed: ${made.status} ${JSON.stringify(made.body)}`);
+
+            // A person, an AI that was asked, and a crawler: the three a report keeps apart.
+            const CHROME = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36';
+            const CHATGPT_ASKED = 'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; ChatGPT-User/1.0; +https://openai.com/bot';
+            const GPTBOT = 'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; GPTBot/1.2; +https://openai.com/gptbot';
+            for (const ua of [CHROME, CHATGPT_ASKED, GPTBOT]) {
+                const res = await onAppOrigin('/', SUB, 'header', { 'user-agent': ua });
+                assert(res.status === 200, `the app origin answered ${res.status}`);
+            }
+            await new Promise((r) => setTimeout(r, 500));   // the serve path deliberately does not await the count
+
+            const report = await json(`/v1/signals/streams/${streamId}/report`, { headers: { Authorization: `Bearer ${token}` } });
+            assert(report.status === 200, `expected a report, got ${report.status}`);
+            const totals = report.body.data.totals;
+            assert(totals.hits === 3, `expected 3 page views from the app origin, got ${totals.hits}`);
+            assert(totals.classes.human === 1, `expected 1 human, got ${JSON.stringify(totals.classes)}`);
+            assert(totals.aiAgents['chatgpt:asked'] === 1, `expected an asked-AI fetch, got ${JSON.stringify(totals.aiAgents)}`);
+            assert(totals.aiAgents['chatgpt'] === 1, `expected a crawler fetch, got ${JSON.stringify(totals.aiAgents)}`);
+            assert(totals.channels.page === 3, 'the hits must be attributed to the page channel');
         });
 
         console.log('\n─────────────────────────────────────');

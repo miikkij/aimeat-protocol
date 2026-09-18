@@ -8,6 +8,7 @@
 
 mod node_manager;
 mod ai_connector;
+mod connectors;
 mod chat;
 mod agent_runtime;
 mod updater;
@@ -26,6 +27,10 @@ fn main() {
             node_manager::clear_node_logs,
             node_manager::open_portal,
             node_manager::open_external,
+            connectors::detect_connectors,
+            connectors::connect_connector,
+            connectors::disconnect_connector,
+            connectors::connector_snippet,
             ai_connector::detect_ai_services,
             ai_connector::connect_ai_service,
             ai_connector::node_login,

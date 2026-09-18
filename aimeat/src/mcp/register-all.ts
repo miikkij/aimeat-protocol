@@ -61,6 +61,7 @@ import { registerCapabilitiesTools } from './capabilities.js';
 import { registerCortexTools } from './cortex.js';
 import { registerSeoTools } from './seo.js';
 import { registerAppMarksTools } from './app-marks.js';
+import { registerAppVisitorsTools } from './app-visitors.js';
 import { registerAppLegalTools } from './app-legal.js';
 import { registerAppsTools } from './apps.js';
 import { registerAppDraftEditTools } from './apps-draft-edit.js';
@@ -165,6 +166,7 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     registerAppScreenshotTool(mcp, storage, config, agentGaii);
     registerSeoTools(mcp, storage, config, agentGaii);
     registerAppMarksTools(mcp, storage, config, agentGaii);
+    registerAppVisitorsTools(mcp, storage, config, agentGaii);
     registerAppLegalTools(mcp, storage, config, agentGaii);
     registerAiImageTool(mcp, storage, config, agentGaii);
     registerSharingGroupTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);

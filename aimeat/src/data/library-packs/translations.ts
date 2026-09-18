@@ -10,12 +10,15 @@
  * @structure TRANSLATIONS[lang][packId] = { title?, description }
  * @usage import { TRANSLATIONS } from './library-packs/translations.js'; (getLibraryPackIndex(lang))
  * @version-history
+ *   v1.1.0 - 2026-09-18 - Calendar and print descriptions in Finnish and Spanish.
  *   v1.0.0 — 2026-09-03 — Moved out of library-packs.ts (8 Finnish entries) and completed: every
  *     node pack in Finnish and Spanish, for the Libraries page (design canvas "AIMEAT Kirjastot-sivu").
  */
 
 export const TRANSLATIONS: Record<string, Record<string, { title?: string; description: string }>> = {
   fi: {
+    'aimeat-calendar': { title: 'Kalenterilogiikka', description: 'Toistuvat tapahtumat, aikavyöhykkeet, yksittäisten toistojen muutokset, ICS-tuonti ja -vienti sekä vapaiden aikojen laskenta.' },
+    'aimeat-print': { title: 'Tulostus ja sivutetut asiakirjat', description: 'Tulosta tekstiä, taulukoita, kortteja ja kalenteritapahtumia. Esikatselu, ylä- ja alatunnisteet, sivunumerot ja PDF-tallennus selaimesta.' },
     // ── The base: what an app signs in, stores and talks with ──────────────────────────────────
     'aimeat-auth': { description: 'Kirjautuminen ja istunto: rekisteröinti, avainpari, kirjautumisnappi ja session.fetch, joka palauttaa valmiiksi luetun JSONin.' },
     'aimeat-data': { description: 'Muisti: avain–arvo-tallennus, haku ja julkiseksi merkityn tiedon lukeminen.' },
@@ -85,6 +88,8 @@ export const TRANSLATIONS: Record<string, Record<string, { title?: string; descr
     leaflet: { title: 'Leaflet (oikeat kartat OpenStreetMapilla)', description: 'Tavallinen vuorovaikutteinen verkkokartta: panorointi, zoom, merkit, ponnahdusikkunat ja GeoJSON, tältä palvelimelta OpenStreetMapin katuruuduilla. Kun sovellus tarvitsee oikean maailman oikean kartan, tämä on se. Atelier-linjan sovellukset saavat saman map-lohkona kitin tyyleillä.' },
   },
   es: {
+    'aimeat-calendar': { title: 'Lógica de calendario', description: 'Eventos recurrentes, zonas horarias, excepciones, importación y exportación ICS e intervalos disponibles.' },
+    'aimeat-print': { title: 'Impresión y documentos paginados', description: 'Imprime texto, tablas, tarjetas y eventos con vista previa, encabezados, pies y números de página. Guarda un PDF desde el navegador.' },
     'aimeat-auth': { description: 'Inicio de sesión y sesión: registro, par de claves, botón de inicio de sesión y session.fetch, que devuelve el JSON ya leído.' },
     'aimeat-data': { description: 'Memoria: almacenamiento clave–valor, búsqueda y lectura de lo marcado como público.' },
     'aimeat-events': { description: 'Eventos: registra lo que pasó en la app en el propio feed del titular de la cuenta, y léelo de vuelta.' },

@@ -86,6 +86,10 @@ everywhere at once, and say so in the Changes section.
 | where a person puts conversations away | nothing is deleted; a conversation comes back when someone other than their own agents writes | archive / archive (verb) | arkisto / arkistoida | archivo / archivar |
 | a rule for the Messages list | folds, groups or archives the conversations it matches; the first one that fits decides | rule | sääntö | regla |
 | a tool server a person attaches | somewhere else that offers tools (an issue tracker, a wiki) which their AI, agents and apps call through their AIMEAT; its credentials stay in their AIMEAT | MCP server | MCP-palvelin | servidor MCP |
+| one time an app was shown | the app was served to somebody once; counted for every app, always | open / opens | avaus / avaukset | apertura / aperturas |
+| whoever opened an app | a person, a named AI or another program; "visitor" says nothing about which | visitor | kävijä | visitante |
+| counting what kind of visitor came | off until the app's owner switches it on; then each visit is a person, a named AI or another bot, and people may be placed by country, region or city | visitor measurement | kävijämittaus | medición de visitantes |
+| a person who opened an app without an account session | the node knows nothing about them, and the word says only that | not signed in | kirjautumaton | sin iniciar sesión |
 
 ## Never translated, in any language
 
@@ -194,6 +198,12 @@ service, the directory, the token, the identifier and the username: the test nam
 
 ## Changes
 
+- **2026-09-18** — open, visitor, visitor measurement and not signed in, with the App Catalog's
+  Visitors section (en and fi; the Spanish column is decided here and not yet on a screen).
+  *Kävijämittaus* is the word Finnish web analytics already uses. *Kirjautumaton* was chosen over
+  *anonyymi*, which promises more than the node knows: the person is not signed in, and nothing
+  else is claimed about them. The app's own word stays *sovellus*, as the table already said; the
+  catalog's older strings still say *appi* and were left alone.
 - **2026-09-16** — MCP server added, with the Access page's section of its own. *MCP-palvelin* and
   *servidor MCP* are what the panel already shipped on 2026-09-16 and what Finnish guides use; the
   row records them. Two cold readers, working separately, rejected the same two phrases on evidence:

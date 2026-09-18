@@ -10,9 +10,10 @@
  * @structure SDK_PACKS: LibraryPack[]
  * @usage Imported by ../library-packs.ts (registry assembly). Do not import directly.
  * @version-history
- *   v1.12.6 — 2026-09-18 — aimeat-social is `stable`. v1.3.1 renamed it back to "Boards" and rewrote
+ *   v1.13.1 — 2026-09-18 — aimeat-social is `stable`. v1.3.1 renamed it back to "Boards" and rewrote
  *     its aiDoc when boards were reinstated, and left `status: 'deprecated'`, so the pack index
  *     still told a builder the library was deprecated. Confirmed current by the developer.
+ *   v1.13.0 - 2026-09-18 - Add calendar and print discovery and usage guides.
  *   v1.12.5 — 2026-09-13 — Four facts appdev pitfalls carried and the aiDocs did not: getSession() is null
  *     for a visitor (aimeat-auth), RESERVED_KEY (aimeat-data), declare() stores the bare record and
  *     disclose() replaces its target (aimeat-ai).
@@ -72,6 +73,7 @@
  *     build-app-prompt lines + llms-template table (Library Acceleration Program, Phase 1).
  */
 import type { LibraryPack } from '../library-packs.js';
+import { CALENDAR_PRINT_PACKS } from './sdk-calendar-print.js';
 // The three UI packs live in their own file: their aiDoc texts are the longest in the registry
 // and this file crossed the 800-line ceiling carrying them. Pure extraction, spread back in below.
 import { SDK_UI_PACKS } from './sdk-ui.js';
@@ -80,6 +82,7 @@ import { SDK_UI_PACKS } from './sdk-ui.js';
 import { LIVING_PACKS } from './sdk-living.js';
 
 export const SDK_PACKS: LibraryPack[] = [
+  ...CALENDAR_PRINT_PACKS,
   {
     id: 'aimeat-auth',
     kind: 'sdk',

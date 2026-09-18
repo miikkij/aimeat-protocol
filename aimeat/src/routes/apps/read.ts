@@ -10,6 +10,8 @@
  *   - registerReadRoutes() — versions, forks, lineage, screenshot GET/POST/DELETE, app download
  * @usage registerReadRoutes(router, config, storage, canonicalOwner); // from appsRouter
  * @version-history
+ *   v1.9.0 — 2026-09-18 — The page-view count carries the place the proxy reported for the request
+ *     (utils/geo-headers.ts), kept only when the page's owner chose a precision.
  *   v1.8.0 — 2026-08-29 — The apex inline serve reads the owner's badge switch and the named
  *     reviewer from the manifest (services/app-marks.ts).
  *   v1.7.0 — 2026-08-27 — The apex inline serve injects the SAME agent-discovery block the app
@@ -66,6 +68,7 @@ import { appOriginUrl, appTargetOr, type AppTargetFor, type CanonicalOwner } fro
 import { logger } from '../../utils/logger.js';
 import { recordAppOpen } from '../../services/usage/record-app-open.js';
 import { countPageView } from '../../services/signals/page-views.js';
+import { geoFromHeaders } from '../../utils/geo-headers.js';
 import {
     loadServedProvenance, envelopeMeta, setProvenanceHeaders,
 } from '../../services/ai-provenance-marks.js';
@@ -670,12 +673,13 @@ export function registerReadRoutes(
 
         storage.incrementAppDownloads(app.ownerGaii, filename).catch(err => { logger.warn('body: continuing after a suppressed failure', { error: String(err) }); });
         // The lifetime counter above answers "how many"; this answers when, and by whom.
-        recordAppOpen({ appOwnerGaii: app.ownerGaii, filename, viewer: req.auth?.sub });
+        recordAppOpen({ appOwnerGaii: app.ownerGaii, filename, viewer: req.auth?.sub, anonymous: !!req.auth?.anonymous });
         // And this answers WHAT KIND of visitor, which the other two cannot: an AI crawler runs no
         // script and loads no image, so a page fetch is the only place it is visible. No-op unless
         // the owner opted this page in by creating its stream. Never awaited.
         countPageView(storage, {
             ownerGaii: app.ownerGaii, name: filename, userAgent: req.get('user-agent'),
+            geo: geoFromHeaders(config.geoHeaders, (name) => req.get(name)),
         });
 
         res.send(body);
