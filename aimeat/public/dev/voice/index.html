@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="aimeat-scopes" content="ai:use">
+  <title>AIMEAT Voice Lab</title>
+  <link rel="stylesheet" href="/css/theme.css">
+  <link rel="stylesheet" href="/dev/voice/voice.css">
+  <script src="/v1/libs/aimeat-auth.js"></script>
+  <script src="/v1/libs/aimeat-voice.js"></script>
+  <script type="module" src="/dev/voice/voice.js"></script>
+</head>
+<body>
+  <main class="vl-page">
+    <header><p class="vl-eyebrow">AIMEAT / DEVELOPMENT</p><h1>Voice Lab</h1>
+      <p>Configure a conversation. Hear each segment as it arrives. Interrupt at any time.</p><div id="login"></div></header>
+    <section class="vl-toolbar" aria-label="Session controls">
+      <label>Backend<select id="backend"><option value="local">Local test: generated tones, no AI calls</option><option value="node">Node: real STT, model and speech (uses AI budget)</option></select></label>
+      <label>Preset<select id="preset"><option>balanced</option><option>responsive</option><option>patient</option></select></label>
+      <label>Input<select id="mode"><option value="text">Text</option><option value="manual">Manual microphone</option><option value="vad">Automatic microphone (VAD)</option></select></label>
+    </section>
+    <div class="vl-columns">
+      <section><h2>Pipeline configuration</h2><p>Changes apply on Start. Node mode needs an app identity and speech model. Match PCM settings to your provider.</p>
+        <label for="config">JSON settings</label><textarea id="config" rows="20" spellcheck="false"></textarea>
+      </section>
+      <section><h2>Conversation</h2><p id="notice">Local test mode produces tones, not synthesized speech. Microphone audio stays in this browser.</p>
+        <div class="vl-actions"><button id="start">Start</button><button id="record" disabled>Record</button><button id="commit" disabled>Send recording</button><button id="interrupt" disabled>Interrupt</button><button id="stop" disabled>Stop</button></div>
+        <p role="status" id="state">idle</p><meter id="level" min="0" max="0.2" value="0" aria-label="Microphone level"></meter>
+        <label for="prompt">Your message</label><textarea id="prompt" rows="3">Kerro lyhyesti, miten tämä puhekeskustelu toimii.</textarea><button id="send" disabled>Send message</button>
+        <p id="error" role="alert"></p>
+        <div id="transcript" aria-live="polite"></div>
+        <h3>Measured events</h3><pre id="events"></pre>
+      </section>
+    </div>
+  </main>
+</body>
+</html>

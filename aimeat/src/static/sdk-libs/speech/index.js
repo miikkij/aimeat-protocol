@@ -4,17 +4,20 @@
  *   `AIMEAT.speech` — text-to-speech, speech-to-text, voice-command matching, and a pluggable
  *   provider architecture for cloud TTS/STT (ElevenLabs, Whisper, …). This is the real, JSDoc-typed
  *   ESM source that esbuild bundles to the classic IIFE served, unchanged, at /v1/libs/aimeat-speech.js.
- *   Behavior is identical to the former `aimeatSpeechLib()` string generator — the only differences
- *   are: (1) the non-deterministic `Generated:` timestamp comment is gone, and (2) the global attach
- *   goes through the shared `_core/namespace` helper instead of an inline `global.AIMEAT` block.
+ *   The public API retains browser-native speech and custom provider slots. Cloud playback shares
+ *   the voice library's cancellable player and finishes when the audio has actually played.
  * @structure emit() · capability detection · TTS (native + cloud) · STT (native + cloud) · voice
  *   command matching · the `speech` public API · attach('speech', …).
  * @usage <script src="/v1/libs/aimeat-speech.js"></script>
  *   AIMEAT.speech.say('Hello'); await AIMEAT.speech.listen();
  * @version-history
+ *   v1.1.0 - 2026-09-19 - Wait for cloud audio playback and cancel both playback and provider work.
  *   v1.0.0 — 2026-07-19 — Migrated verbatim from src/routes/lib-speech.ts (SDK-libs migration Phase 0).
  */
 import { attach } from '../_core/namespace.js';
+import { createPlayer } from '../voice/player.js';
+import { configure } from '../voice/config.js';
+import { abortable } from '../voice/segments.js';
 
 // ══════════════════════════════════════════════════════
 // Event system
@@ -47,6 +50,7 @@ let _sttProvider = null;
 // ══════════════════════════════════════════════════════
 
 let _speaking = false;
+let _cloudController = null;
 /** @type {Array<{ text: string, opts: any }>} */
 let _ttsQueue = [];
 
@@ -114,24 +118,26 @@ function nativeSay(text, opts) {
 // TTS: Cloud provider playback
 // ══════════════════════════════════════════════════════
 
-function cloudSay(text, opts) {
+async function cloudSay(text, opts) {
   if (!_ttsProvider || !_ttsProvider.say) return Promise.resolve();
+  const controller = new AbortController(); _cloudController = controller;
+  const player = createPlayer(configure({ tts: { format: 'mp3' } }), () => {});
+  controller.signal.addEventListener('abort', () => player.stop(), { once: true });
   _speaking = true;
   emit('start', {});
-  return _ttsProvider.say(text, opts || {}).then(function (blob) {
-    if (!blob) { _speaking = false; processQueue(); emit('end', {}); return; }
-    const ac = new (window.AudioContext || window.webkitAudioContext)();
-    return blob.arrayBuffer().then(function (ab) { return ac.decodeAudioData(ab); }).then(function (buf) {
-      const source = ac.createBufferSource();
-      source.buffer = buf;
-      source.connect(ac.destination);
-      source.onended = function () { _speaking = false; processQueue(); emit('end', {}); };
-      source.start();
-    });
-  }).catch(function (e) {
-    _speaking = false; processQueue();
-    emit('error', { error: e.message });
-  });
+  try {
+    await player.open();
+    const blob = await abortable(Promise.resolve(_ttsProvider.say(text, { ...opts, signal: controller.signal })), controller.signal);
+    if (blob) {
+      const bytes = new Uint8Array(await blob.arrayBuffer());
+      await player.play((async function* () { yield bytes; })(), controller.signal);
+    }
+  } catch (e) {
+    if (!controller.signal.aborted) emit('error', { error: e.message });
+  } finally {
+    await player.close();
+    if (_cloudController === controller) { _cloudController = null; _speaking = false; processQueue(); emit('end', {}); }
+  }
 }
 
 function processQueue() {
@@ -270,6 +276,8 @@ const speech = {
 
   stop: function () {
     if (_supported.tts) speechSynthesis.cancel();
+    if (_cloudController) _cloudController.abort();
+    _cloudController = null;
     _speaking = false;
     _ttsQueue = [];
   },

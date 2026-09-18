@@ -583,6 +583,18 @@ export const SDK_PACKS: LibraryPack[] = [
     promptLine: '- aimeat-audio.js — audio engine: instruments, synth, soundboard',
   },
   {
+    id: 'aimeat-voice',
+    kind: 'sdk', category: 'media', title: 'Voice conversations',
+    description: 'Configurable STT, streaming conversation and TTS sessions with turn detection, bounded playback and interruption.',
+    url: '/v1/libs/aimeat-voice.js',
+    include: ['<script src="{{BASE_URL}}/v1/libs/aimeat-auth.js"></script>', '<script src="{{BASE_URL}}/v1/libs/aimeat-voice.js"></script>'],
+    requires: ['aimeat-auth'], license: 'MIT', apiSurface: 'AIMEAT.voice',
+    aiDoc: 'AIMEAT.voice.createSession(options, adapters?) returns a session. Declare ai:use. options: appId must match the signed grant owner/filename; preset balanced|responsive|patient; language fi-FI; systemPrompt; input.mode manual|vad|text; stt {provider:node|custom,model,language,temperature}; llm {provider,model,temperature,topP,maxTokens,reasoning}; tts {provider,model(required for node),voice,format:pcm|mp3,sampleRate:24000,channels:1,speed,instructions}; turn {silenceMs:700,minSpeechMs:250,maxSpeechMs:30000,threshold:0.025,preRollMs:200,bargeIn:true,interruptMs:200}; chunking {minChars:24,maxChars:180,maxWaitMs:350}; playback {bufferMs:80,maxBufferedMs:3000,maxPendingSegments:3,volume:1}; history.maxTurns:12; timeoutMs:120000. Start from a user gesture: await session.start(). Manual input: begin(), commit(). Also sendText(text), sendAudio(blob), interrupt(), stop(), close(), clearHistory(), configure(patch) while stopped. on(event,fn) returns unsubscribe: state,transcript,segment,audio,level,interrupted,timing,usage,error. config/history/defaults/presets are copies. Node stages keep keys on the server and use the owner provider and shared AI budgets. Custom adapters: transcribe(blob,{signal,config,turn})->Promise<string>; complete(messages,ctx)->AsyncIterable<string>; speak(text,ctx)->AsyncIterable<Uint8Array>. Set that stage provider to custom. PCM is signed 16-bit little-endian; sampleRate/channels must match the provider. MP3 buffers one segment. VAD is local energy detection. Only completed spoken segments enter assistant history. No persistence or automatic paid retry. See docs/voice-library.md for the full contract and /dev/voice/index.html for local verification.',
+    changelog: [], tierHint: 'T1', interviewTriggers: ['voice conversation', 'puhekeskustelu', 'STT', 'TTS'],
+    sizeEstimate: '~40KB', status: 'stable', modelTier: 'needs-doc', promptGroup: 'media',
+    promptLine: '- aimeat-voice.js — configurable STT / streaming model / TTS conversations, interruption and turn detection',
+  },
+  {
     id: 'aimeat-speech',
     kind: 'sdk',
     category: 'media',

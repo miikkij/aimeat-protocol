@@ -260,7 +260,20 @@ async function reportYesterdaysSpend(
  * model reporting had no data behind it. Both are written here rather than at the two call sites,
  * so a third caller cannot arrive and write only one of them.
  */
-export async function recordAiUsage(
+const usageWrites = new WeakMap<Storage, Map<string, Promise<unknown>>>();
+
+/** Serialize the read/modify/write across overlapping voice stages on this node. */
+export async function recordAiUsage(...args: Parameters<typeof appendAiUsage>): Promise<UsageRecord> {
+  const [storage, gaii] = args;
+  let pending = usageWrites.get(storage);
+  if (!pending) { pending = new Map(); usageWrites.set(storage, pending); }
+  const previous = pending.get(gaii) ?? Promise.resolve();
+  const next = previous.then(() => appendAiUsage(...args), () => appendAiUsage(...args));
+  pending.set(gaii, next);
+  try { return await next; } finally { if (pending.get(gaii) === next) pending.delete(gaii); }
+}
+
+async function appendAiUsage(
   storage: Storage, gaii: string, usage: UsageRecord,
   call: {
     costUsd: number; tokens: number; audioSeconds?: number; appId?: string;
@@ -275,6 +288,7 @@ export async function recordAiUsage(
    *  have it, and a caller that does not gets the default rather than a compile error. */
   config?: AimeatConfig,
 ): Promise<UsageRecord> {
+  usage = await getTodayUsage(storage, gaii);
   const updated: UsageRecord = {
     date: todayKey(),
     total_cost_usd: usage.total_cost_usd + call.costUsd,
@@ -571,6 +585,8 @@ export interface AiCallOutcome {
   costUsd: number;
   /** The text the model produced, hashed into the provenance record. */
   content: string;
+  /** Observed binary output, hashed incrementally without retaining the audio. */
+  contentHash?: string;
   appId?: string;
   /** Where this call came from, for the usage record. */
   source: string;
@@ -624,7 +640,7 @@ export async function settleAiCall(
   // attaches it to something public, and goes back to a 404 when they unpublish. A completion is
   // the owner's own until then.
   let provenance: AiProvenanceRecordRow | undefined;
-  if (config.aiProvenance && outcome.content) {
+  if (config.aiProvenance && (outcome.content || outcome.contentHash)) {
     try {
       provenance = await mintProvenance(storage, {
         stampedBy: 'node',
@@ -633,7 +649,7 @@ export async function settleAiCall(
         level: 'ai-generated',
         humanInvolvement: 'none',
         method: 'fully-generated',
-        content: outcome.content,
+        ...(outcome.contentHash ? { contentHash: outcome.contentHash } : { content: outcome.content }),
         generator: {
           model: outcome.model,
           provider: plan.provider,

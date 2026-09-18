@@ -167,13 +167,21 @@ the app-data folder. To iterate on the **server** itself, run it the normal way 
 - **Unsigned, on purpose for now.** The first launch shows a Windows SmartScreen warning ("More info → Run
   anyway"). Ruled 2026-09-18: no code signing until the app has been judged good; it costs money and the
   free routes were all measured closed (see the Platform Development Note `installer-code-signing`).
-- **Auto-update is fixed but unproven** until the next release carries it. It broke because both paths looked
-  at the repository's `releases/latest`, which this repository gives to the node's own far more frequent `v*`
+- **Auto-update works from 0.5.0 onwards, and not backwards.** It broke because both paths looked at the
+  repository's `releases/latest`, which this repository gives to the node's own far more frequent `v*`
   releases: the updater's `latest.json` answered 404 and the in-app banner returned early, silently, from June
   to 2026-09-18. There is one mechanism now, the Tauri updater, and it polls a fixed address,
-  `releases/download/desktop-latest/latest.json`. `release-desktop.yml` rewrites that manifest on every
-  `desktop-v*` release, in a prerelease so it never takes the repository's "Latest" label. Nothing proves the
-  round trip until a release publishes the manifest once.
+  `releases/download/desktop-latest/latest.json`, which `release-desktop.yml` rewrites on every `desktop-v*`
+  release (a prerelease, so it never takes the repository's "Latest" label). An app installed at 0.4.12 still
+  carries the old address compiled in and will never see an update: that one has to be replaced by hand.
+- **Claude Desktop is attached in its own settings, and only to an AIMEAT the internet can reach.** It takes a
+  remote MCP server as a custom connector (Settings → Connectors → Add custom connector) on every plan, so it
+  needs no bridge and no file on this machine, and the app hands over the address to paste. But "Claude
+  connects to your remote MCP server from Anthropic's cloud infrastructure, rather than from your local
+  device", and a server "behind a VPN, or blocked by a firewall won't connect, even if you can reach it from
+  your own machine" (support.claude.com article 11175166, read 2026-09-18). So a person running their own
+  AIMEAT on this computer cannot attach Claude Desktop to it at all, and the app says so instead of offering
+  an address that cannot work. A tool that runs on the machine, like Claude Code, has no such limit.
 - **SQLite only.** MongoDB/PostgreSQL backends are intentionally excluded from the desktop bundle.
 
 ## Troubleshooting
