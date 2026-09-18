@@ -26,6 +26,7 @@
  *     operators, orientation and a missing record.
  */
 import type { RunMetrics } from './transcript.js';
+import { appQuality, describeQuality } from './app-quality.js';
 
 /** `mcp`: the agent is connected over MCP as the owner's agent. `url`: it gets the address only. */
 export type Door = 'mcp' | 'url';
@@ -48,7 +49,8 @@ export interface Task {
     goodTools: string[];
     /** Runs before the agent starts, for a task that needs something to exist first. */
     setup?: (ctx: Omit<TaskContext, 'metrics'>) => Promise<void>;
-    verify: (ctx: TaskContext) => Promise<{ ok: boolean; detail: string }>;
+    /** `note` is what a PASSING run is worth knowing about; the report lists it. */
+    verify: (ctx: TaskContext) => Promise<{ ok: boolean; detail: string; note?: string }>;
 }
 
 export async function api<T = Record<string, unknown>>(baseUrl: string, path: string, token: string | null, init: { method?: string; body?: unknown } = {}): Promise<{ status: number; data: T | null }> {
@@ -114,8 +116,12 @@ export const TASKS: Task[] = [
         goodTools: ['aimeat_skill_get', 'aimeat_app_publish'],
         verify: async (ctx) => {
             const r = await api<{ apps: unknown[] }>(ctx.baseUrl, `/v1/apps?owner=${ctx.ownerName}`, ctx.ownerToken);
-            const hit = (r.data?.apps ?? []).find(a => JSON.stringify(a).includes(ctx.marker));
-            return { ok: !!hit, detail: hit ? 'the app is published' : 'no published app carries the name' };
+            const hit = (r.data?.apps ?? []).find(a => JSON.stringify(a).includes(ctx.marker)) as { filename?: string } | undefined;
+            if (!hit?.filename) return { ok: false, detail: 'no published app carries the name' };
+            // Published is the pass. What the app is LIKE goes in the note, because that is what a
+            // change to the specification's wording has to be compared on (app-quality.ts).
+            const quality = await appQuality(ctx.baseUrl, ctx.ownerName, hit.filename, ctx.metrics.toolCalls);
+            return { ok: true, detail: 'the app is published', note: describeQuality(quality) };
         },
     },
     {

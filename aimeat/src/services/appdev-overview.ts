@@ -155,7 +155,9 @@ export async function buildAppdevOverview(
                 title: (t as { title?: string }).title ?? t.id,
             }))),
             tier_guide: 'T1 pure client (auth+data) · T2 +cortex UI libs · T3 +extension (server-side work)',
-            drill_down: 'GET /v1/app-templates/{id} for the scaffold content',
+            // Both doors: the tool read agent proposals only until 2026-09-18, so a chat connected
+            // over MCP was pointed at a call it could not make.
+            drill_down: 'The scaffold content of one: aimeat_app_template_get { id } over MCP, or GET /v1/app-templates/{id}.',
         };
     }
 

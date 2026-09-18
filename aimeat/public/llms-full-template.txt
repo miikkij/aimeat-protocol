@@ -484,7 +484,13 @@ for completeness but are NOT needed for typical app building:
 primary build instructions:**
 `GET {{BASE_URL}}/v1/prompts/build-app?format=txt` (add
 `?idea=<what to build>` to embed the idea, `?lang=fi` for a Finnish-facing
-app). It is the SAME battle-tested prompt the app-catalog's "Create new app"
+app). If 95 000 characters is more than you can take in one piece, read
+`GET {{BASE_URL}}/v1/prompts/build-app/core?format=txt` instead: the part every
+app needs (66 000), with a list of the further sections by situation
+(`/v1/prompts/build-app/sections/<id>`). Over MCP, where one tool result
+carries about 20 000 characters, the same specification comes in parts:
+`aimeat_handbook_get { tier: "build-app" }` is the first and lists the rest,
+each read with `{ tier: "build-app/<id>" }`. It is the SAME battle-tested prompt the app-catalog's "Create new app"
 button copies: the complete library catalog, the correct auth pattern (login
 bar + session restore — the #1 mistake hand-rolled apps make), data-visibility
 patterns, image/file sharing, AI usage, realtime, theming, and the publish

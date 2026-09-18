@@ -413,14 +413,14 @@ export const capabilitiesGroupsSkillsTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_app_template_list',
-        description: 'List your owner\'s agent-proposed app templates (id, title, tier, model, start mode, derived-from app, proof count). Check this BEFORE building a new app — a prior template is usually the fastest correct starting point. Full detail + how-to-start via aimeat_app_template_get.',
+        description: 'List your owner\'s agent-proposed app templates (id, title, tier, model, start mode, derived-from app, proof count). Check this BEFORE building a new app — a prior template is usually the fastest correct starting point. Full detail + how-to-start via aimeat_app_template_get. `node_templates` lists what the node itself ships (the app shells such as shell-pure-client, components, use cases) by id, kind and title, for a client that cannot call GET /v1/app-templates.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {},
     },
     {
         name: 'aimeat_app_template_get',
-        description: 'Read one agent-proposed template: the full manifest (reuse notes, packs, per-model notes, proofs) plus the source app\'s LIVE state (forkable, price, version, download URL) and a concrete how_to_start instruction (fork via aimeat_app_fork vs scaffold from the notes; priced apps are bought through checkout, never with morsels directly).',
+        description: 'Read one agent-proposed template: the full manifest (reuse notes, packs, per-model notes, proofs) plus the source app\'s LIVE state (forkable, price, version, download URL) and a concrete how_to_start instruction (fork via aimeat_app_fork vs scaffold from the notes; priced apps are bought through checkout, never with morsels directly). An id the node ships (a shell such as shell-pure-client, a component, a use case) returns that template with its starting file in `content`, the same as GET /v1/app-templates/{id}.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: { id: { type: 'string', required: true, description: 'Template proposal id.' } },

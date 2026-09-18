@@ -29,11 +29,12 @@ import { AI_PROVENANCE_TOOL_NOTE, aiProvenanceCatalogInput } from './ai-provenan
 export const agentMessagingTools: AimeatToolDefinition[] = [
     {
         name: 'aimeat_handbook_get',
-        description: 'This node\'s operating guide. Call it with no arguments, first: it returns the handbook for the surface you are connected to, which names the tools that matter for the job and the order to use them in, followed by this node\'s skills, one line each, saying which situation each one covers. When a line matches what the person asked for, load that skill with aimeat_skill_get before you start. Pass `surface` only to read another surface\'s handbook. An agent working over HTTP can ask for a tier handbook by id ("tier1", "tier2") or a managed prompt by its id; that answer carries the prompt name, description, content and variables.',
+        description: 'This node\'s operating guide. Call it with no arguments, first: it returns the handbook for the surface you are connected to, which names the tools that matter for the job and the order to use them in, followed by this node\'s skills, one line each, saying which situation each one covers. When a line matches what the person asked for, load that skill with aimeat_skill_get before you start. Pass `surface` only to read another surface\'s handbook. Before building an app, pass `tier: "build-app"`: it returns the first part of the build specification every app follows, and lists the other parts and the sections for particular situations, each read with "build-app/<id>". An agent working over HTTP can ask for a tier handbook by id ("tier1", "tier2") or a managed prompt by its id; that answer carries the prompt name, description, content and variables.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
             module: { type: 'string', description: 'Optional handbook module name, such as tasks or messages.' },
+            tier: { type: 'string', description: 'A prompt by id. "build-app" is the first part of the build specification every app follows; "build-app/<id>" is one of the parts or sections it lists.' },
             surface: { type: 'string', enum: ['appdev', 'agent', 'service', 'admin', 'commerce', 'primitives', 'full'], description: 'Another surface\'s handbook than your own. Leave it out to get the one for the surface you are connected to.' },
         },
     },

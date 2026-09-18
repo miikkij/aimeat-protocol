@@ -200,7 +200,7 @@ async function runOne(task: Task, run: number, s: Sandbox, args: Args, outDir: s
     const ctx: TaskContext = { ...base, metrics };
     const verdict = await task.verify(ctx);
     const wandered = metrics.distinctTools.filter(t => t !== 'ToolSearch' && !task.goodTools.includes(t));
-    return { task: task.id, run, marker, ok: verdict.ok, detail: verdict.detail, wandered, metrics: { ...metrics, toolCalls: metrics.toolCalls.map(c => ({ ...c, input: undefined })) } };
+    return { task: task.id, run, marker, ok: verdict.ok, detail: verdict.detail, ...(verdict.note ? { note: verdict.note } : {}), wandered, metrics: { ...metrics, toolCalls: metrics.toolCalls.map(c => ({ ...c, input: undefined })) } };
 }
 
 async function main(): Promise<void> {

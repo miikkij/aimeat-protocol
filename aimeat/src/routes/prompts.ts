@@ -6,6 +6,7 @@
  *   openclaw, package-builder) and prompt packages. Each tier provides progressively
  *   more context to AI agents based on their authentication level.
  * @version-history
+ *   v1.11.0 -- 2026-09-18 -- Mounts the layered build specification (prompts-build-app-layers.ts).
  *   v1.0.0 -- 2026-03-01 -- Initial tiered prompts (0, 1, 2, anonymous)
  *   v1.1.0 -- 2026-05-21 -- Extend tier1 response with directives, task queue, and agent endpoints
  *   v1.2.0 -- 2026-05-22 -- Add GET /v1/prompts/tier1/:module for modular prompt system
@@ -49,6 +50,7 @@ import { registerIntentPoolPrompt } from './prompts-intent-pool.js';
 import { registerOpenItemsPrompt } from './prompts-open-items.js';
 import { registerAtelierPrompt } from './prompts-atelier.js';
 import { registerHelloIntegrationPrompt } from './prompts-hello-integration.js';
+import { registerBuildAppLayerPrompts } from './prompts-build-app-layers.js';
 import { buildAgentConnectPrompt, buildAgentConnectSteps } from '../services/agent-connect-prompt.js';
 import { buildAgentOnboardPrompt } from '../services/agent-onboard-prompt.js';
 import { buildAiToolSetup } from '../services/ai-tool-setup.js';
@@ -350,6 +352,7 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
 
   registerOpenItemsPrompt(router, config, storage);
   registerHelloIntegrationPrompt(router, config);
+  registerBuildAppLayerPrompts(router, config);
 
   router.get('/v1/prompts/agent-onboard', (req, res) => {
     const lang = typeof req.query.lang === 'string' ? req.query.lang : 'en';

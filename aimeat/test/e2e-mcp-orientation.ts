@@ -11,6 +11,8 @@
  *     - listing an app whose subdomain mapping is gone falls back to the shared path form and
  *       MINTS NOTHING (the whole reason the lister uses resolveAppUrls and not appOriginUrl);
  *     - a missing app is an error rather than an invented address;
+ *     - aimeat_handbook_get serves the build specification in layers ("build-app", "build-app/<id>"),
+ *       byte for byte what REST serves, and an unknown section is an error naming the real ones;
  *     - prompts/list offers the portal prompt packages and withholds the librarian templates that
  *       share their group, and prompts/get returns a body with the node values already filled.
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-mcp-orientation.ts
@@ -423,6 +425,84 @@ async function main() {
         await test('14. an unknown ui:// page is an error rather than an empty frame', async () => {
             const { body } = await v1('resources/read', { uri: 'ui://aimeat/no-such-page.html' }, 303);
             assert(body.error !== undefined, `expected a JSON-RPC error, got ${JSON.stringify(body).slice(0, 200)}`);
+        });
+
+        console.log('\nPhase 6: the build specification over MCP');
+
+        // Until 2026-09-18 the handbook tool answered "Prompt not found" for build-app, because the
+        // specification is code-built and the tool read managed prompts only, so a chat connected
+        // over MCP built apps without it.
+        await test('15. tier "build-app" returns the first part: small enough to arrive, the same text REST serves, naming the rest', async () => {
+            const { body } = await v1('tools/call', { name: 'aimeat_handbook_get', arguments: { tier: 'build-app' } }, 400);
+            assert(!body.result?.isError, `not an error: ${toolText(body).slice(0, 160)}`);
+            const start = toolText(body);
+            const rest = await fetch(`${BASE}/v1/prompts/build-app/sections/start?format=txt`).then(r => r.text());
+            assert(start === rest, `the MCP part equals the REST part (${start.length} vs ${rest.length})`);
+            // 66 kB in one result never reached the model in the first measured run; 18 kB did.
+            assert(start.length < 24_000, `one tool result carries it: ${start.length} characters`);
+            const full = await json('/v1/prompts/build-app');
+            assert(start.includes(full.body.data.spec_token), 'it names the same spec token as the full spec');
+            assert(start.includes('### Auth Pattern'), 'a section of this part is in it');
+            assert(!start.includes('### If several people share it'), 'an on-demand section is not');
+            for (const id of ['libraries', 'data', 'look', 'group']) assert(start.includes('- `' + id + '` — '), `the index names ${id}`);
+        });
+
+        await test('15b. the four parts are each under the limit and carry the whole core between them', async () => {
+            const core = await fetch(`${BASE}/v1/prompts/build-app/core?format=txt`).then(r => r.text());
+            const list = await json('/v1/prompts/build-app/sections');
+            assert(list.body.data.parts.map((p: any) => p.id).join() === 'start,libraries,data,look', `four parts in order: ${JSON.stringify(list.body.data.parts)}`);
+            for (const p of list.body.data.parts) {
+                const { body } = await v1('tools/call', { name: 'aimeat_handbook_get', arguments: { tier: 'build-app/' + p.id } }, 410);
+                const text = toolText(body);
+                assert(text.length === p.chars && text.length < 24_000, `${p.id}: ${text.length} characters, listed as ${p.chars}`);
+            }
+            for (const s of list.body.data.sections.filter((x: any) => x.layer === 'core')) {
+                const part = await fetch(`${BASE}/v1/prompts/build-app/sections/${s.part}?format=txt`).then(r => r.text());
+                const own = await fetch(`${BASE}/v1/prompts/build-app/sections/${s.id}?format=txt`).then(r => r.text());
+                assert(s.id === s.part || (part.includes(own) && core.includes(own)), `core section ${s.id} is whole in part ${s.part} and in the one-piece core`);
+            }
+        });
+
+        await test('16. "build-app/<id>" returns that section byte for byte; the sections put together are the full spec', async () => {
+            const { body } = await v1('tools/call', { name: 'aimeat_handbook_get', arguments: { tier: 'build-app/group' } }, 401);
+            const section = toolText(body);
+            assert(section.startsWith('### If several people share it'), `the section starts at its heading: ${section.slice(0, 60)}`);
+            const fullTxt = await fetch(`${BASE}/v1/prompts/build-app?format=txt`).then(r => r.text());
+            assert(fullTxt.includes(section), 'the section is a piece of the full text, unchanged');
+            const list = await json('/v1/prompts/build-app/sections');
+            const parts: string[] = [];
+            for (const s of list.body.data.sections) {
+                parts.push(await fetch(`${BASE}/v1/prompts/build-app/sections/${s.id}?format=txt`).then(r => r.text()));
+            }
+            assert(parts.join('\n') === fullTxt, 'nothing is lost: the sections in order are the full specification');
+        });
+
+        await test('17. a section that does not exist is an error that lists the ones that do, on both doors', async () => {
+            const { body } = await v1('tools/call', { name: 'aimeat_handbook_get', arguments: { tier: 'build-app/no-such-section' } }, 402);
+            assert(body.result?.isError === true, 'MCP: isError');
+            assert(toolText(body).includes('group') && toolText(body).includes('no-such-section'), `MCP names the id and the real ones: ${toolText(body).slice(0, 160)}`);
+            const rest = await json('/v1/prompts/build-app/sections/no-such-section');
+            assert(rest.status === 404, `REST 404, got ${rest.status}`);
+            assert(String(rest.body.error?.message).includes('group'), 'REST lists the real ids');
+        });
+
+        // Every build text says "start from the shell", and the template tools read agent
+        // proposals only, so over MCP the shell did not exist.
+        await test('18. aimeat_app_template_get returns a shell the node ships, with its file; the list names it', async () => {
+            const got = await v1('tools/call', { name: 'aimeat_app_template_get', arguments: { id: 'shell-pure-client' } }, 420);
+            assert(!got.body.result?.isError, `not an error: ${toolText(got.body).slice(0, 160)}`);
+            const shell = JSON.parse(toolText(got.body));
+            assert(shell.source === 'node' && String(shell.content).includes('<html'), 'the shell comes with its starting file');
+            const rest = await json('/v1/app-templates/shell-pure-client');
+            assert(rest.body.data.template.content === shell.content, 'the same file GET /v1/app-templates/:id serves');
+            const listed = JSON.parse(toolText((await v1('tools/call', { name: 'aimeat_app_template_list', arguments: {} }, 421)).body));
+            assert(listed.node_templates.some((t: any) => t.id === 'shell-pure-client'), 'the list names the shell');
+        });
+
+        await test('19. a template nobody ships or proposed is an error that names the shells', async () => {
+            const { body } = await v1('tools/call', { name: 'aimeat_app_template_get', arguments: { id: 'no-such-template' } }, 422);
+            assert(body.result?.isError === true, 'isError');
+            assert(toolText(body).includes('shell-pure-client'), `names a real shell: ${toolText(body).slice(0, 200)}`);
         });
 
         console.log(`\n=== ${passed} passed, ${failed} failed ===\n`);
