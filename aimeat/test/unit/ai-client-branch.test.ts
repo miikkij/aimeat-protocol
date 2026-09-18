@@ -23,6 +23,7 @@ import {
     capabilityOf,
     normalizeAiClientClaim,
     aiClientQuestionOptions,
+    aiClientVariantOptions,
     buildAiToolSetup,
     type AiToolId,
 } from '../../src/services/ai-tool-setup.js';
@@ -192,5 +193,59 @@ describe('what the person answers', () => {
         for (const claim of claims) {
             expect(branchOf(claim).branch, `"${claim}" reached B on the name alone`).not.toBe('B');
         }
+    });
+});
+
+// One name, two apps (2026-09-18). "Gemini" and "Microsoft Copilot" each cover an app that cannot
+// connect and one that can. Before this, neither name was known: the person picked "something
+// else", was sent down the MCP road, failed, and only then reached the prompt-driven road. The
+// name now raises ONE question, and the rule this file exists for still holds.
+describe('a name two apps share raises a question, and only the person\'s answer decides', () => {
+    const FAMILY_NAMES = ['Gemini', 'Google Gemini', 'gemini 2.5 pro', 'Bard', 'Microsoft Copilot', 'M365 Copilot', 'Bing Chat', 'Copilot in Windows (Microsoft Copilot)'];
+
+    it('the name alone asks which of the two, and never reaches B', () => {
+        for (const name of FAMILY_NAMES) {
+            const d = decideBranch(resolveAiClient(name));
+            expect(d, name).toMatchObject({ branch: 'ask', question: 'which-variant' });
+        }
+    });
+
+    it('"copilot" on its own is still GitHub Copilot in VS Code', () => {
+        expect(resolveAiClient('GitHub Copilot')).toMatchObject({ kind: 'known', id: 'vscode' });
+        expect(resolveAiClient('copilot')).toMatchObject({ kind: 'known', id: 'vscode' });
+        expect(resolveAiClient('Microsoft Copilot')).toMatchObject({ kind: 'family' });
+    });
+
+    it('the person naming the variant that cannot connect is the second entrance to B', () => {
+        expect(decideBranch(resolveAiClient('Gemini'), { clientAnswer: 'gemini-app' }))
+            .toEqual({ branch: 'B', reason: 'variant-has-no-mcp', family: 'gemini', variant: 'gemini-app' });
+        expect(decideBranch(resolveAiClient('Microsoft Copilot'), { clientAnswer: 'microsoft-copilot-app' }))
+            .toMatchObject({ branch: 'B', reason: 'variant-has-no-mcp' });
+    });
+
+    it('the person naming the variant that can connect goes to A', () => {
+        expect(decideBranch(resolveAiClient('Gemini'), { clientAnswer: 'gemini-cli' })).toEqual({ branch: 'A', reason: 'variant-capable' });
+        expect(decideBranch(resolveAiClient('Microsoft Copilot'), { clientAnswer: 'copilot-studio' })).toEqual({ branch: 'A', reason: 'variant-capable' });
+    });
+
+    it('a MODEL saying it is the Gemini app is still a name: it asks, it does not refuse', () => {
+        // The page's metadata is a model's claim about its own app. With no answer from the
+        // person, even an unambiguous "no MCP" variant raises the question.
+        expect(decideBranch(resolveAiClient('gemini-app'))).toMatchObject({ branch: 'ask', question: 'which-variant', family: 'gemini' });
+        expect(decideBranch(resolveAiClient('Gemini CLI'))).toEqual({ branch: 'A', reason: 'variant-capable' });
+    });
+
+    it('an answer of "something else" or a different app is read like any other answer', () => {
+        expect(decideBranch(resolveAiClient('Gemini'), { clientAnswer: 'other' })).toMatchObject({ branch: 'A' });
+        expect(decideBranch(resolveAiClient('Gemini'), { clientAnswer: 'claude.ai' })).toMatchObject({ branch: 'A', toolId: 'claude-web' });
+        // Naming the other family's app is still the person's own answer about what they use.
+        expect(decideBranch(resolveAiClient('Gemini'), { clientAnswer: 'microsoft-copilot-app' }).branch).toBe('B');
+    });
+
+    it('the variant options are the two apps, in the person\'s language', () => {
+        const en = aiClientVariantOptions('gemini');
+        expect(en.map(o => o.id)).toEqual(['gemini-app', 'gemini-cli']);
+        expect(aiClientVariantOptions('gemini', { lang: 'fi' })[0].label).toContain('Gemini-sovellus');
+        expect(aiClientVariantOptions('no-such-family')).toEqual([]);
     });
 });

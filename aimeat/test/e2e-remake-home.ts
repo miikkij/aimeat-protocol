@@ -421,6 +421,44 @@ await test('Only a stated missing tier reaches branch B', async () => {
     assert(s.step === 'first-agent', `the current path connects an AI independently of the page, got ${s.step}`);
 });
 
+// One name, two apps (2026-09-18). A page made in Gemini used to read as an unknown app: the person
+// was asked "which app", picked "something else", was sent down the MCP road and failed once
+// before the prompt-driven road opened. The name now raises one question, and only their own
+// answer decides. The page below is a MODEL's claim, which is why it may not reach B by itself.
+await test('A page made in Gemini asks which Gemini, and the person\'s answer decides', async () => {
+    const t = await registerOwner(`hmgem${stamp}`);
+    const p = await paste(t, page('Gemini', 'gemini-2.5-pro'));
+    assert(p.body.data.branch === 'ask' && p.body.data.question === 'which-variant',
+        `a Gemini page raises the variant question, got ${JSON.stringify(p.body.data)}`);
+    assert(p.body.data.family === 'gemini', `the family is named, got ${p.body.data.family}`);
+    const ids = (p.body.data.variant_options ?? []).map((o: { id: string }) => o.id);
+    assert(ids.includes('gemini-app') && ids.includes('gemini-cli'), `both apps are offered, got ${ids.join(', ')}`);
+
+    const a = await json('/v1/home/ai-client', auth(t, { method: 'POST', body: JSON.stringify({ client: 'gemini-app' }) }));
+    assert(a.status === 200, `answer ${a.status}: ${JSON.stringify(a.body.error)}`);
+    assert(a.body.data.branch === 'B' && a.body.data.reason === 'variant-has-no-mcp',
+        `the Gemini app → B on the person's own word, got ${JSON.stringify(a.body.data)}`);
+    const s = await homeState(t);
+    assert(s.branch === 'B', `branch recorded, got ${s.branch}`);
+    assert(s.ai.source === 'asked' && s.ai.client === 'gemini-app', `their answer is what is kept, got ${JSON.stringify(s.ai)}`);
+});
+
+await test('Gemini CLI is the same name and goes to branch A', async () => {
+    const t = await registerOwner(`hmgcli${stamp}`);
+    await paste(t, page('Google Gemini', 'gemini-2.5-pro'));
+    const a = await json('/v1/home/ai-client', auth(t, { method: 'POST', body: JSON.stringify({ client: 'gemini-cli' }) }));
+    assert(a.body.data.branch === 'A', `Gemini CLI speaks MCP → A, got ${JSON.stringify(a.body.data)}`);
+});
+
+await test('FAILURE MODE: a page CLAIMING to be the Gemini app does not reach B without the person', async () => {
+    const t = await registerOwner(`hmgclaim${stamp}`);
+    const p = await paste(t, page('gemini-app', 'gemini-2.5-pro'));
+    assert(p.body.data.branch === 'ask' && p.body.data.question === 'which-variant',
+        `a model's claim is a name, and a name only asks; got ${JSON.stringify(p.body.data)}`);
+    const s = await homeState(t);
+    assert(s.branch !== 'B', `nobody is sent to B on a model's word, got ${s.branch}`);
+});
+
 console.log('\nPhase 5: the first agent (branch A, step 2)');
 
 await test('GET /v1/prompts/agent-connect carries the prompt AND the manual steps', async () => {

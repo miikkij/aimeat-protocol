@@ -105,10 +105,10 @@
      "slug": "g-1-prompt-driven-road",
      "cells": [
       "<strong>Prompt-driven road</strong>",
-      "For AIs that cannot connect over MCP (a consumer Gemini app, Copilot without Copilot Studio), the pages compose a ready prompt, you run it in your chat and paste the result back. Free and vendor-neutral.",
+      "For AIs that cannot connect over MCP (a consumer Gemini app, Copilot without Copilot Studio), the pages compose a ready prompt, you run it in your chat and paste the result back. Free and vendor-neutral. A name two apps share (Gemini, Microsoft Copilot) raises one question, which of the two you use, and your answer picks the road.",
       "Contacts, Email, Workflows, Portfolio, front page and home layout pages"
      ],
-     "plain": "Prompt-driven road For AIs that cannot connect over MCP (a consumer Gemini app, Copilot without Copilot Studio), the pages compose a ready prompt, you run it in your chat and paste the result back. Free and vendor-neutral. Contacts, Email, Workflows, Portfolio, front page and home layout pages"
+     "plain": "Prompt-driven road For AIs that cannot connect over MCP (a consumer Gemini app, Copilot without Copilot Studio), the pages compose a ready prompt, you run it in your chat and paste the result back. Free and vendor-neutral. A name two apps share (Gemini, Microsoft Copilot) raises one question, which of the two you use, and your answer picks the road. Contacts, Email, Workflows, Portfolio, front page and home layout pages"
     },
     {
      "slug": "g-1-attach-another-mcp-server",

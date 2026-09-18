@@ -12,6 +12,8 @@
  * @structure registerHomeStateRoutes(router, ctx): GET /v1/home/state
  * @usage Registered from src/routes/home.ts.
  * @version-history
+ *   v1.3.0 — 2026-09-18 — `client_options` carries the two apps behind a shared name when the
+ *     pending question is which-variant.
  *   v1.2.0 — 2026-09-09 — Next actions lead to connection instructions and useful work.
  *   v1.1.0 — 2026-08-19 — The response carries `playbooks`: the named outcomes this node can
  *     actually deliver (services/home-playbooks.ts), each with its prompt, step count and whatever
@@ -22,7 +24,7 @@ import type { Router } from 'express';
 import { requireAuth, requireRole } from '../../auth/middleware.js';
 import { success } from '../../middleware/envelope.js';
 import { readHomeState, HOME_STEPS } from '../../services/home-state.js';
-import { aiClientQuestionOptions, resolveAiClient, decideBranch } from '../../services/ai-tool-setup.js';
+import { aiClientQuestionOptions, aiClientVariantOptions, resolveAiClient, decideBranch } from '../../services/ai-tool-setup.js';
 import { openRooms } from '../../services/home-rooms.js';
 import { openPlaybooks } from '../../services/home-playbooks.js';
 import { resolveIdentity } from '../../utils/gaii.js';
@@ -71,7 +73,12 @@ export function registerHomeStateRoutes(router: Router, ctx: HomeRouteCtx): void
             /** What still needs asking, if anything. */
             question,
             /** Built from the tool table itself — never a second hardcoded list. */
-            client_options: question === 'which-client' ? aiClientQuestionOptions(config, { lang }) : null,
+            client_options: question === 'which-client' ? aiClientQuestionOptions(config, { lang })
+                // One name, two apps (Gemini, Microsoft Copilot): the answer goes back in the same
+                // `client` field, as the option's id.
+                : question === 'which-variant' && decision?.branch === 'ask' && decision.family
+                    ? aiClientVariantOptions(decision.family, { lang })
+                    : null,
         }, nextActions(state.step)));
     });
 }

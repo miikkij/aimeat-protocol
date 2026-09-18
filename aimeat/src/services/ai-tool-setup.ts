@@ -32,6 +32,12 @@
  *   remake's branch decision, kept beside the list it reads rather than in the calling code.
  * @usage import { buildAiToolSetup } from '../services/ai-tool-setup.js';
  * @version-history
+ *   v1.6.0 — 2026-09-18 — A name two apps share (Gemini, Microsoft Copilot) raises ONE question,
+ *     `which-variant`, and the person's answer decides: the Gemini app goes to B, Gemini CLI to A.
+ *     Neither name was known before, so such a person lost one attempt down the MCP road before
+ *     the prompt-driven road opened. The file's rule is kept and tested: a name, the person's or
+ *     a model's, never reaches B. The answer travels in the existing `client` field. Ruled by the
+ *     developer in the instruction review.
  *   v1.5.0 — 2026-08-27 — `mcp.install` on Claude Code, VS Code and Cursor: the one-click link and
  *     the config file GET /v1/connect/mcp.json serves. Both come from services/mcp-install.ts, so
  *     what this table advertises and what that route hands over cannot drift. The steps stay: a
@@ -590,10 +596,9 @@ export const AI_CLIENT_ALIASES: Readonly<Record<string, AiToolId>> = {
     xaigrok: 'grok',
 } as const;
 
-/** Lowercase, drop everything that is not a letter or digit. "Claude Web" and "claude.ai" collapse. */
-export function normalizeAiClientClaim(raw: string): string {
-    return raw.toLowerCase().replace(/[^a-z0-9]/g, '');
-}
+import { AI_CLIENT_FAMILIES, AI_FAMILY_ALIASES, VARIANT_BY_ID, normalizeAiClientClaim, type AiClientFamily, type AiClientVariant } from './ai-client-families.js';
+
+export { AI_CLIENT_FAMILIES, normalizeAiClientClaim, type AiClientFamily, type AiClientVariant } from './ai-client-families.js';
 
 /** Aliases longest-first, so "claudecode" wins over "claude" in a containment match. */
 const ALIASES_BY_LENGTH: ReadonlyArray<readonly [string, AiToolId]> =
@@ -602,6 +607,10 @@ const ALIASES_BY_LENGTH: ReadonlyArray<readonly [string, AiToolId]> =
 
 export type AiClientResolution =
     | { kind: 'known'; id: AiToolId; capability: McpCapability; matched: string }
+    /** A name two apps share, one of which cannot connect. Raises a question, never a refusal. */
+    | { kind: 'family'; family: AiClientFamily; claim: string }
+    /** One named variant of a family. Whether it counts depends on WHO named it — see decideBranch. */
+    | { kind: 'variant'; family: AiClientFamily; variant: AiClientVariant }
     /** Nothing matched, or nothing was claimed. NOT the same as "incapable" — see decideBranch. */
     | { kind: 'unknown'; claim: string | null };
 
@@ -619,12 +628,22 @@ export function resolveAiClient(claim: string | null | undefined): AiClientResol
     const norm = normalizeAiClientClaim(raw);
     if (!norm) return { kind: 'unknown', claim: raw };
 
+    // A variant id is only ever an ANSWER to the which-variant question, so it is matched whole.
+    const variant = VARIANT_BY_ID.get(norm);
+    if (variant) return { kind: 'variant', family: variant.family, variant: variant.variant };
+
     const exact = AI_CLIENT_ALIASES[norm];
     if (exact) return { kind: 'known', id: exact, capability: capabilityOf(exact), matched: norm };
 
-    for (const [alias, id] of ALIASES_BY_LENGTH) {
-        if (norm.includes(alias)) return { kind: 'known', id, capability: capabilityOf(id), matched: alias };
+    // Families before the containment pass, longest name first: "microsoftcopilot" contains
+    // "copilot", which would otherwise resolve as GitHub Copilot in VS Code.
+    const familyAlias = Object.keys(AI_FAMILY_ALIASES).sort((a, b) => b.length - a.length).find(a => norm.includes(a));
+    const longestTool = ALIASES_BY_LENGTH.find(([alias]) => norm.includes(alias));
+    if (familyAlias && (!longestTool || familyAlias.length >= longestTool[0].length)) {
+        const family = AI_CLIENT_FAMILIES.find(f => f.id === AI_FAMILY_ALIASES[familyAlias]);
+        if (family) return { kind: 'family', family, claim: raw };
     }
+    if (longestTool) return { kind: 'known', id: longestTool[1], capability: capabilityOf(longestTool[1]), matched: longestTool[0] };
     return { kind: 'unknown', claim: raw };
 }
 
@@ -634,13 +653,17 @@ export function capabilityOf(id: string): McpCapability {
 }
 
 /** What the person still has to be asked, if anything. */
-export type BranchQuestion = 'which-client' | 'paid-plan';
+export type BranchQuestion = 'which-client' | 'paid-plan' | 'which-variant';
 
 export type BranchDecision =
-    | { branch: 'A'; reason: 'known-capable' | 'plan-confirmed' | 'unknown-defaults-to-a'; toolId?: AiToolId }
-    /** The ONLY route to B: the person said they do not have the tier their app requires. */
+    | { branch: 'A'; reason: 'known-capable' | 'plan-confirmed' | 'unknown-defaults-to-a' | 'variant-capable'; toolId?: AiToolId }
+    /**
+     * The two routes to B, and both are the PERSON's own answer: they do not have the tier their
+     * app requires, or they said which of two same-named apps they use and that one cannot connect.
+     */
     | { branch: 'B'; reason: 'plan-missing'; toolId: AiToolId }
-    | { branch: 'ask'; question: BranchQuestion; toolId?: AiToolId };
+    | { branch: 'B'; reason: 'variant-has-no-mcp'; family: string; variant: string }
+    | { branch: 'ask'; question: BranchQuestion; toolId?: AiToolId; family?: string };
 
 /**
  * The branch, from what we know so far.
@@ -668,9 +691,32 @@ export function decideBranch(
             // They named an app. Read it through the same map — the answer is not privileged.
             const again = resolveAiClient(ans);
             if (again.kind === 'known') return decideBranch(again, { hasPaidPlan: answers.hasPaidPlan });
+            // A family or one of its variants keeps the answer with it: whether a variant that
+            // cannot connect means B depends on the person having said it themselves.
+            if (again.kind !== 'unknown') return decideBranch(again, answers);
         }
         if (ans) return { branch: 'A', reason: 'unknown-defaults-to-a' };
         return { branch: 'ask', question: 'which-client' };
+    }
+
+    if (resolution.kind === 'family') {
+        // The person may have answered the variant question already; their answer is read through
+        // the same resolver, and only a variant of THIS family counts.
+        const again = answers.clientAnswer ? resolveAiClient(answers.clientAnswer) : null;
+        if (again?.kind === 'variant' && again.family.id === resolution.family.id) return decideBranch(again, answers);
+        if (again && again.kind !== 'family') return decideBranch(again, answers);
+        return { branch: 'ask', question: 'which-variant', family: resolution.family.id };
+    }
+
+    if (resolution.kind === 'variant') {
+        if (resolution.variant.mcp) return { branch: 'A', reason: 'variant-capable' };
+        // A variant that cannot connect sends the person to B only when THEY named it. A model that
+        // says "I am the Gemini app" is still a name, and a name raises the question instead.
+        const theySaidSo = !!answers.clientAnswer
+            && normalizeAiClientClaim(answers.clientAnswer) === normalizeAiClientClaim(resolution.variant.id);
+        return theySaidSo
+            ? { branch: 'B', reason: 'variant-has-no-mcp', family: resolution.family.id, variant: resolution.variant.id }
+            : { branch: 'ask', question: 'which-variant', family: resolution.family.id };
     }
 
     if (resolution.capability === 'yes') {
@@ -680,6 +726,16 @@ export function decideBranch(
     if (answers.hasPaidPlan === true) return { branch: 'A', reason: 'plan-confirmed', toolId: resolution.id };
     if (answers.hasPaidPlan === false) return { branch: 'B', reason: 'plan-missing', toolId: resolution.id };
     return { branch: 'ask', question: 'paid-plan', toolId: resolution.id };
+}
+
+/**
+ * The options for the which-variant question: the two apps one name covers, in the person's words.
+ * The answer is the option's `id`, sent back in the same `client` field.
+ */
+export function aiClientVariantOptions(familyId: string, opts: { lang?: string } = {}): AiClientOption[] {
+    const l = lang(opts.lang);
+    const family = AI_CLIENT_FAMILIES.find(f => f.id === familyId);
+    return (family?.variants ?? []).map(v => ({ id: v.id, label: s(l, v.label.en, v.label.fi) }));
 }
 
 /** One option in the "which app did you talk in?" question. */
