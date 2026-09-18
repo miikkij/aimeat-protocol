@@ -46,7 +46,7 @@
   "plugins": {
     "updater": {
       "endpoints": [
-        "https://github.com/miikkij/aimeat-protocol/releases/latest/download/latest.json"
+        "https://github.com/miikkij/aimeat-protocol/releases/download/desktop-latest/latest.json"
       ],
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEQxOUNFREU3RjE3OTE1NTcKUldSWEZYbng1KzJjMFRCMFJwTGx5SDBSeXI1KytCL3hHTkQ2MkZ1Q1V3VVFxOUwreXgxeWlPREgK"
     }

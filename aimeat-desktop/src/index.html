@@ -180,6 +180,8 @@
     .wordmark .at { color: var(--accent); }
     .wordmark svg { width: .85em; height: .85em; fill: var(--accent); }
     .head .spacer { flex: 1; }
+    .version { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); }
+    .update { margin-bottom: 2rem; display: flex; align-items: center; gap: 1.2rem; flex-wrap: wrap; }
     .lang {
       font-family: var(--font-mono); font-size: .75rem; color: var(--text);
       background: transparent; border: 1px solid var(--text); border-radius: 0; padding: .15rem .35rem;
@@ -214,6 +216,7 @@
       <span class="wordmark">AIME<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21C5 16 2 12.5 2 8.8 2 6.1 4.1 4 6.8 4c1.7 0 3.3.8 4.2 2.1L12 7.2l1-1.1C13.9 4.8 15.5 4 17.2 4 19.9 4 22 6.1 22 8.8c0 3.7-3 7.2-10 12.2z"/></svg><span class="at">AT</span></span>
       <span class="poster-crumb" id="crumb"></span>
       <span class="spacer"></span>
+      <span class="version" id="version"></span>
       <select class="lang" id="lang" aria-label="Language">
         <option value="en">EN</option>
         <option value="fi">FI</option>
@@ -221,6 +224,7 @@
     </header>
 
     <main>
+      <div id="update"></div>
       <h1 class="poster-page-title" id="t-title">Your AI tools</h1>
       <p class="lead" id="t-lead"></p>
 
@@ -275,6 +279,9 @@
         failed: 'Did not work: {why}',
         noBackend: 'This page is open in a plain browser, so it cannot see the tools on this computer.',
         legacy: 'Server, settings and logs',
+        updateFound: 'Version {version} is out. You have {current}.',
+        updateInstall: 'Install it',
+        updateWorking: 'Installing. The app closes and opens again by itself.',
         'note.claude-desktop': 'Claude Desktop reads only a tool that runs on this computer, so reaching your AIMEAT needs a small bridge beside it. That bridge is not built yet. Until it is, attach your AIMEAT in Claude Desktop’s own connector settings.',
         'note.codex': 'Codex keeps its tools in a TOML file, which this app does not edit yet. Paste these lines into it.',
       },
@@ -301,6 +308,9 @@
         failed: 'Ei onnistunut: {why}',
         noBackend: 'Tämä sivu on auki tavallisessa selaimessa, joten se ei näe tämän koneen ohjelmia.',
         legacy: 'Palvelin, asetukset ja lokit',
+        updateFound: 'Versio {version} on julkaistu. Sinulla on {current}.',
+        updateInstall: 'Asenna se',
+        updateWorking: 'Asennan. Sovellus sulkeutuu ja avautuu itse uudelleen.',
         'note.claude-desktop': 'Claude Desktop lukee vain ohjelmaa, joka on tällä koneella, joten AIMEATiisi tarvitaan pieni välittäjä sen viereen. Sitä ei ole vielä rakennettu. Siihen asti liitä AIMEATisi Claude Desktopin omista liitinasetuksista.',
         'note.codex': 'Codex pitää työkalunsa TOML-tiedostossa, jota tämä sovellus ei vielä muokkaa. Liitä nämä rivit siihen.',
       },
@@ -493,6 +503,54 @@
       connectors = connectors.map((c) => (c.id === updated.id ? updated : c));
     }
 
+    // ── Updates ───────────────────────────────────────────────────────────
+    // One mechanism, not two. The Tauri updater polls the fixed address in tauri.conf.json,
+    // compares the versions itself and verifies the installer's minisign signature; this page
+    // only asks it and shows the answer. The hand-rolled check that used to live in the old
+    // window read the repository's `releases/latest`, which stopped being a desktop release in
+    // June, so it went quiet exactly when it was needed. A version is never written here either:
+    // it is read from the app itself.
+    let appVersion = '';
+
+    async function showVersion() {
+      const app = window.__TAURI__ && window.__TAURI__.app;
+      if (!app || !app.getVersion) return;
+      try {
+        appVersion = await app.getVersion();
+        document.getElementById('version').textContent = 'v' + appVersion;
+      } catch (e) { /* the version is a nicety, not a reason to stop */ }
+    }
+
+    async function checkUpdate() {
+      if (!invoke) return;
+      let version = null;
+      try {
+        version = await invoke('check_update');
+      } catch (e) {
+        // No manifest at the address yet, or no network. Neither is the person's problem.
+        console.warn('update check: ' + e);
+        return;
+      }
+      if (!version) return;
+      const box = document.getElementById('update');
+      box.innerHTML = '';
+      const aside = el('div', 'poster-aside update');
+      aside.appendChild(el('span', '', t('updateFound', { version, current: appVersion })));
+      const button = el('button', 'poster-action', t('updateInstall'));
+      button.addEventListener('click', async () => {
+        button.disabled = true;
+        say(t('updateWorking'));
+        try {
+          await invoke('install_update');
+        } catch (e) {
+          button.disabled = false;
+          say(t('failed', { why: String(e) }), 'error');
+        }
+      });
+      aside.appendChild(button);
+      box.appendChild(aside);
+    }
+
     document.getElementById('lang').addEventListener('change', (e) => {
       lang = e.target.value;
       try { localStorage.setItem('aimeat.lang', lang); } catch (err) { /* private mode */ }
@@ -510,6 +568,7 @@
     document.getElementById('addr').value = saved || DEFAULT_ADDRESS;
     applyLanguage();
     refresh();
+    showVersion().then(checkUpdate);
   </script>
 </body>
 </html>
