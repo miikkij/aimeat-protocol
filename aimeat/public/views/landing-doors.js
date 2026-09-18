@@ -135,6 +135,10 @@ export function BuildHero({ onNavigate }) {
       </div>
       <div class="ld-hero2-more">
         <a href="https://github.com/miikkij/aimeat-protocol/releases/latest" target="_blank" rel="noopener">${tr('landing.heroGetOwn', 'Run it on your own server →')}</a>
+        <!-- The desktop app, at an address that never carries a version: the release workflow
+             copies each new installer to this same name, so this link outlives every release.
+             Windows is named in the words because it is the only build there is today. -->
+        <a href="https://github.com/miikkij/aimeat-protocol/releases/download/desktop-latest/AIMEAT-Personal-Node-setup.exe">${tr('landing.heroGetApp', 'Put it on your computer (Windows) →')}</a>
         ${hasSite('learn') ? html`<a href=${siteLink('learn')} target="_blank" rel="noopener">${tr('landing.ecLinkShort', 'Learn it hands-on, free →')}</a>` : ''}
         ${storeHref() ? html`<a href=${storeHref()} target="_blank" rel="noopener">${tr('landing.heroPricing', 'Pricing →')}</a>` : ''}
       </div>

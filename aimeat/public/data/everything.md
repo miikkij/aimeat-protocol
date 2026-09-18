@@ -568,7 +568,7 @@ The operator dashboard is the one place with server-built screens. Everything on
 | Project | What it is | Where |
 |---|---|---|
 | <a id="g-22-aimeat-crewai"></a> **aimeat-crewai** | A pip-installable CrewAI integration: drop one liaison agent into a crew and it handles onboarding, capability reports, memory, knowledge and task updates over MCP. | `python/aimeat-crewai/` |
-| <a id="g-22-aimeat-desktop"></a> **aimeat-desktop** | A Windows app that runs your own node on SQLite from one installer, with a control panel and tray icon. | `aimeat-desktop/` |
+| <a id="g-22-aimeat-desktop"></a> **aimeat-desktop** | A Windows app that opens on the AI tools installed on that computer and attaches them to your AIMEAT with one click, whether your AIMEAT is aimeat.io or your own. The same installer also runs an AIMEAT of your own on SQLite, with a control panel and a tray icon. | `aimeat-desktop/`, [download](https://github.com/miikkij/aimeat-protocol/releases/download/desktop-latest/AIMEAT-Personal-Node-setup.exe) |
 | <a id="g-22-aimeat-openhands"></a> **AIMEAT OpenHands** | A preconfigured OpenHands deployment that builds apps against the node's build spec and publishes them over MCP. | `tools/aimeat-openhands/` |
 | <a id="g-22-guides-for-builders"></a> **Guides for builders** | Building an agent, an ecosystem app, apps that use the owner's AI key. | [building-an-aimeat-compatible-agent.md](https://github.com/miikkij/aimeat-protocol/blob/main/docs/building-an-aimeat-compatible-agent.md), [building-an-aimeat-compatible-ecosystem-app.md](https://github.com/miikkij/aimeat-protocol/blob/main/docs/building-an-aimeat-compatible-ecosystem-app.md), [app-developer-ai-guide.md](https://github.com/miikkij/aimeat-protocol/blob/main/docs/app-developer-ai-guide.md) |
 
