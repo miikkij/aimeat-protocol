@@ -38,6 +38,7 @@
  *   2026-09-01 — A sixth surface, `primitives` (Agent v2 V2): twelve tools, and everything else
  *     reached through aimeat_discover + aimeat_invoke. The other five are unchanged, and so is
  *     /v1/mcp — this is one more door, not a replacement for any of them.
+ *   2026-09-18 — aimeat_app_visitors and aimeat_app_visitors_measure beside the other app settings.
  *   2026-08-29 — aimeat_app_marks_set, aimeat_app_legal_set and aimeat_app_audit beside aimeat_app_seo_set.
  *   2026-08-28 — The five aimeat_crew_* tools on `appdev`, `agent` and `admin`: the chat path to
  *     building a JSON agent, beside the other owner-managed agent tools.
@@ -138,6 +139,7 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_app_draft_write', 'aimeat_app_draft_replace', 'aimeat_app_draft_read', 'aimeat_app_draft_seed',
         'aimeat_app_screenshot',
         'aimeat_app_seo_set', 'aimeat_app_marks_set', 'aimeat_app_legal_set', 'aimeat_app_audit', 'aimeat_seo_status',
+        'aimeat_app_visitors', 'aimeat_app_visitors_measure',
         'aimeat_seo_announce',
         'aimeat_image_generate',
         'aimeat_ai_job_start', 'aimeat_ai_job_list', 'aimeat_ai_job_get', 'aimeat_ai_job_cancel',

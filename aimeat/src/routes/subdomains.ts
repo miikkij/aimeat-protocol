@@ -17,6 +17,7 @@
  *   v1.21.0 — 2026-09-18 — serveApp counts the page view (services/signals/page-views.ts) for a page
  *     its owner opted in. The counter was called from the apex route alone, and with the app origin
  *     on the apex only redirects here, so an opted-in page counted nothing where visitors land.
+ *     The count also carries the place the proxy reported (utils/geo-headers.ts).
  *   v1.20.0 — 2026-09-12 — ensureAppSubdomain reads a target's mapping whatever its state: an
  *     address the operator turned off used to make the next open mint a second label for the same
  *     app, so the switch on the Subdomains page undid itself.
@@ -117,6 +118,8 @@ import { appSeoIndexable, appSeoMeta, appScreenshotUrl, appDeclaredLocales, appH
 import { portfolioSeoIndexable, type PortfolioSeoConfig } from '../services/portfolio-seo.js';
 import { recordAppOpen } from '../services/usage/record-app-open.js';
 import { countPageView } from '../services/signals/page-views.js';
+import { geoFromHeaders } from '../utils/geo-headers.js';
+import type { SignalGeoInput } from '../models/signal-schemas.js';
 import { verifyDraftToken, verifyFrameToken, DraftTokenError } from '../services/draft-token.js';
 import { appAccessGranted } from '../services/app-access-token.js';
 import { prefersMarkdown } from '../services/markdown-negotiation.js';
@@ -308,7 +311,7 @@ async function serveApp(res: Response, storage: Storage, app: AppRecord, csp: st
                   // is no safe value to invent.
                   // `userAgent` is required although it may be undefined, so a new call site cannot
                   // forget it: a missing one would count every AI fetch as a person.
-                  protect: { config: AimeatConfig; viewer: string; userAgent: string | undefined },
+                  protect: { config: AimeatConfig; viewer: string; anonymous: boolean; userAgent: string | undefined; geo: SignalGeoInput | null },
                   discover?: { baseUrl: string; toolNames: string[]; origin?: string },
                   prov?: ServedProvenance,
                   // TARGET-058: what the VISIBLE label needs. Separate from `protect` because this
@@ -326,11 +329,11 @@ async function serveApp(res: Response, storage: Storage, app: AppRecord, csp: st
   res.setHeader('X-Content-Type-Options', 'nosniff');
   storage.incrementAppDownloads(app.ownerGaii, app.filename).catch(err => { logger.warn('serveApp: continuing after a suppressed failure', { error: String(err) }); });
   // The lifetime counter above answers "how many"; this answers when, and by whom.
-  recordAppOpen({ appOwnerGaii: app.ownerGaii, filename: app.filename, viewer: protect?.viewer });
+  recordAppOpen({ appOwnerGaii: app.ownerGaii, filename: app.filename, viewer: protect.viewer, anonymous: protect.anonymous });
   // And this answers WHAT KIND of visitor, the same call the apex route makes (routes/apps/read.ts).
   // This origin is where people and AI fetchers actually land. No-op unless the owner opted this
   // page in by creating its stream. Never awaited.
-  countPageView(storage, { ownerGaii: app.ownerGaii, name: app.filename, userAgent: protect.userAgent });
+  countPageView(storage, { ownerGaii: app.ownerGaii, name: app.filename, userAgent: protect.userAgent, geo: protect.geo });
 
   // Search visibility, decided once (services/app-seo.ts) and used twice below: the header here,
   // and the head metadata inside the marks pass. The header is the half that stops a LISTING —
@@ -597,7 +600,7 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
       // The front page is an app, so it is served through the app path unchanged: same CSP,
       // same serve-time marks, same download accounting.
       await serveApp(res, storage, companyApp, csp, apexOrigin,
-        { config, viewer: req.auth?.sub ?? 'anon', userAgent: req.get('user-agent') },
+        { config, viewer: req.auth?.sub ?? 'anon', anonymous: !!req.auth?.anonymous, userAgent: req.get('user-agent'), geo: geoFromHeaders(config.geoHeaders, (n) => req.get(n)) },
         { baseUrl: config.baseUrl, toolNames: await appToolNames(storage, companyApp.ownerGaii, companyApp.filename) },
         await loadServedProvenance(storage, config, companyApp.aiProvenanceId),
         { config, locale: detectLocale(req.headers['accept-language']) });
@@ -680,7 +683,7 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
       origin: appOriginFor(req, config),
     };
     await serveApp(res, storage, app, appCspForRequest, apexOrigin,
-      { config, viewer: req.auth?.sub ?? 'anon', userAgent: req.get('user-agent') }, discover,
+      { config, viewer: req.auth?.sub ?? 'anon', anonymous: !!req.auth?.anonymous, userAgent: req.get('user-agent'), geo: geoFromHeaders(config.geoHeaders, (n) => req.get(n)) }, discover,
       await loadServedProvenance(storage, config, app.aiProvenanceId),  // the SDK (aimeat-auth.js) does the silent SSO itself
       { config, locale: detectLocale(req.headers['accept-language']) });
   });
@@ -728,7 +731,7 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
     }
     const discoverShared = { baseUrl: config.baseUrl, toolNames: await appToolNames(storage, app.ownerGaii, app.filename) };
     await serveApp(res, storage, app, csp, apexOrigin,
-      { config, viewer: req.auth?.sub ?? 'anon', userAgent: req.get('user-agent') }, discoverShared,
+      { config, viewer: req.auth?.sub ?? 'anon', anonymous: !!req.auth?.anonymous, userAgent: req.get('user-agent'), geo: geoFromHeaders(config.geoHeaders, (n) => req.get(n)) }, discoverShared,
       await loadServedProvenance(storage, config, app.aiProvenanceId), // no subdomain available → serve on the shared host (no SSO)
       { config, locale: detectLocale(req.headers['accept-language']) });
   });

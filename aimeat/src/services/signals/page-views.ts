@@ -27,12 +27,15 @@
  * @structure pageStreamId · countPageView · resetPageViewCache (tests)
  * @usage countPageView(storage, { ownerGhii: app.ownerGaii, name: filename, userAgent: … });
  * @version-history
+ *   v1.1.0 — 2026-09-18 — Carries the place the route read from the proxy's headers through to the
+ *     hit, so a page whose owner chose a precision can say where its readers are.
  *   v1.0.0 — 2026-08-24 — Initial, with the signals collector.
  *   v1.0.1 — 2026-08-24 — SECURITY (CodeQL js/polynomial-redos): the edge-dash trim in pageStreamId
  *     used `/^-+|-+$/g`, which backtracks quadratically on a long adversarial page name. Replaced
  *     with a single-character trim, safe because the run-collapse before it leaves one dash at most.
  */
 import type { Storage } from '../../storage/interface.js';
+import type { SignalGeoInput } from '../../models/signal-schemas.js';
 import { getStream, recordHit, streamsRevision } from './signal-service.js';
 import { ownerGhiiOf } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
@@ -84,6 +87,9 @@ export function countPageView(storage: Storage, args: {
   /** Overrides the derived stream id when the caller knows the stream by name. */
   streamId?: string;
   ref?: string | null;
+  /** Where the request came from, as the route read it from the proxy's headers. Kept only at the
+   *  precision the stream's owner chose, and only for people. */
+  geo?: SignalGeoInput | null;
 }): void {
   const ownerGhii = ownerGhiiOf(args.ownerGaii);
   const streamId = args.streamId ?? pageStreamId(args.name);
@@ -106,7 +112,7 @@ export function countPageView(storage: Storage, args: {
       notMeasured.delete(cacheKey);
       await recordHit(storage, {
         ownerGhii, streamId, event: 'view', channel: 'page',
-        ref: args.ref ?? args.name, userAgent: args.userAgent,
+        ref: args.ref ?? args.name, userAgent: args.userAgent, geo: args.geo,
       });
     } catch (e) {
       logger.warn('signals: a page view could not be counted', { streamId, error: String(e) });
