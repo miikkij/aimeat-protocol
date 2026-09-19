@@ -15064,6 +15064,44 @@ paths:
         '403':
           $ref: '#/components/responses/AimeatError'
 
+  /v1/ai/decide/settings/test:
+    post:
+      operationId: testDecideKey
+      summary: Test the TypeSafe key that would pay for this owner
+      description: >
+        One tiny real call on fixed text, on the owner's own key when set and the node's otherwise.
+        Metered on the owner's budget; leaves no decision record. The owner in person only.
+        `data` is `{ ok, key_source, model?, request_id?, code?, message? }`; a refused key is
+        `ok: false` with `code: INVALID_API_KEY`, not an HTTP error.
+      tags: [Memory]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '403':
+          $ref: '#/components/responses/AimeatError'
+        '503':
+          $ref: '#/components/responses/AimeatError'
+
+  /v1/admin/decide/test:
+    post:
+      operationId: adminTestDecideKey
+      summary: Test the node's own TypeSafe key
+      description: >
+        The operator's check that decide.instance_key works: one tiny real call on fixed text. Same
+        answer shape as /v1/ai/decide/settings/test. Operator role required.
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '403':
+          $ref: '#/components/responses/AimeatError'
+        '503':
+          $ref: '#/components/responses/AimeatError'
+
   /v1/ai/decide/settings/key:
     delete:
       operationId: deleteDecideKey

@@ -19,12 +19,15 @@
  * @structure decideRouter(config, storage)
  * @usage mounted in server-bootstrap/routes-loader.ts
  * @version-history
+ *   v1.1.0 — 2026-09-19 — Key tests: the owner's (POST /v1/ai/decide/settings/test, the key that would
+ *     pay for them) and the operator's (POST /v1/admin/decide/test, the node's key).
  *   v1.0.0 — 2026-09-19 — Initial (TARGET-080).
  */
 import { Router, type Request, type Response } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { requireAuth } from '../auth/middleware.js';
+import { requireAuth, requireRole } from '../auth/middleware.js';
+import { testDecideKey } from '../services/decide/key-test.js';
 import { assertAiUseAllowed } from '../auth/ai-gate.js';
 import { requireOwnerPrincipal, isOwnerPrincipal } from '../auth/account-security.js';
 import { rateLimit } from '../middleware/rate-limit.js';
@@ -225,6 +228,20 @@ export function decideRouter(config: AimeatConfig, storage: Storage): Router {
         });
       }
       res.json(success(config.nodeId, await decideSettingsView(storage, config, gaii)));
+    } catch (e) { fail(res, e); }
+  });
+
+  // ── POST /v1/ai/decide/settings/test ── one tiny real call on the key that would pay for this owner
+  router.post('/v1/ai/decide/settings/test', requireAuth(), requireOwnerPrincipal(), aiRateLimit, async (req: Request, res: Response) => {
+    try {
+      res.json(success(config.nodeId, await testDecideKey(storage, config, { gaii: decideOwnerOf(req.auth!, config.nodeId), which: 'mine' })));
+    } catch (e) { fail(res, e); }
+  });
+
+  // ── POST /v1/admin/decide/test ── the operator tests the node's own key
+  router.post('/v1/admin/decide/test', requireAuth(), requireRole('operator'), aiRateLimit, async (req: Request, res: Response) => {
+    try {
+      res.json(success(config.nodeId, await testDecideKey(storage, config, { gaii: decideOwnerOf(req.auth!, config.nodeId), which: 'node' })));
     } catch (e) { fail(res, e); }
   });
 
