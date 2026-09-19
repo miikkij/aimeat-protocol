@@ -12,6 +12,7 @@
  *   function alone: the decision was never the hard part, the wiring was.
  * @usage cd aimeat && pnpm vitest run test/unit/skill-seeds.test.ts
  * @version-history
+ *   v1.1.0 — 2026-09-19 — A retired skill leaves an unedited node and stays on an edited one.
  *   v1.0.0 — 2026-08-25 — Initial, with the seeder that follows the repo on an unedited node.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -45,6 +46,9 @@ const EDITED_ON_NODE = skillMd('the operator improved this here');
 vi.mock('../../src/data/builtin-skills.js', () => ({
   BUILTIN_SKILLS: [{ name: 'probe-skill', visibility: 'public', skillMd: '' }],
 }));
+
+/** Empty unless a test retires something, so no real retired name reaches these cases. */
+vi.mock('../../src/data/builtin-skills.retired.js', () => ({ RETIRED_BUILTIN_SKILLS: [] }));
 
 async function seedWith(storage: Storage, text: string) {
   const mod = await import('../../src/data/builtin-skills.js');
@@ -119,6 +123,58 @@ describe('a node seeded before any of this existed', () => {
     const r = await seedWith(storage, REPO_V1);
     expect(r.diverged).toEqual(['probe-skill']);
     expect(await readNodeSkillBody(storage, config, 'probe-skill')).toBe(EDITED_ON_NODE);
+  });
+});
+
+describe('a skill this repo stopped shipping', () => {
+  /** Seed it while it is still built in, then start again with it retired. */
+  async function retire(storage: Storage) {
+    const live = await import('../../src/data/builtin-skills.js');
+    (live.BUILTIN_SKILLS as unknown[]).length = 0;
+    const retired = await import('../../src/data/builtin-skills.retired.js');
+    (retired.RETIRED_BUILTIN_SKILLS as { name: string; reason: string }[]).push({ name: 'probe-skill', reason: 'test' });
+    const { seedBuiltinSkills } = await import('../../src/services/skill-seeds.js');
+    try { return await seedBuiltinSkills(storage, config); }
+    finally {
+      (retired.RETIRED_BUILTIN_SKILLS as unknown[]).length = 0;
+      (live.BUILTIN_SKILLS as unknown[]).push({ name: 'probe-skill', visibility: 'public', skillMd: '' });
+    }
+  }
+
+  it('leaves the node when nobody has touched it, and takes its fingerprint along', async () => {
+    await seedWith(storage, REPO_V1);
+    const r = await retire(storage);
+    expect(r.removed).toEqual(['probe-skill']);
+    expect(await readNodeSkillBody(storage, config, 'probe-skill')).toBeNull();
+    expect(await storage.getMemory(SYSTEM, seedStampKey('probe-skill'))).toBeNull();
+  });
+
+  it('stays when an operator edited it, and is named', async () => {
+    await seedWith(storage, REPO_V1);
+    await publishSkill(storage, config, {
+      scope: 'node', publisher: SYSTEM,
+      files: new Map([['SKILL.md', EDITED_ON_NODE]]), visibility: 'public',
+    });
+    const r = await retire(storage);
+    expect(r.removed).toEqual([]);
+    expect(r.diverged).toEqual(['probe-skill']);
+    expect(await readNodeSkillBody(storage, config, 'probe-skill')).toBe(EDITED_ON_NODE);
+  });
+
+  it('stays when the seeder never recorded writing it', async () => {
+    await publishSkill(storage, config, {
+      scope: 'node', publisher: SYSTEM,
+      files: new Map([['SKILL.md', REPO_V1]]), visibility: 'public',
+    });
+    const r = await retire(storage);
+    expect(r.removed).toEqual([]);
+    expect(await readNodeSkillBody(storage, config, 'probe-skill')).toBe(REPO_V1);
+  });
+
+  it('is a quiet no-op on a node that never had it', async () => {
+    const r = await retire(storage);
+    expect(r.removed).toEqual([]);
+    expect(r.diverged).toEqual([]);
   });
 });
 

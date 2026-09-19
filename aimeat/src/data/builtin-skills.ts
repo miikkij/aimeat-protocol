@@ -11,6 +11,12 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   v1.16.0 -- 2026-09-19 -- add-a-crew-agent describes how an agent is made today: a crew
+ *     definition proposed with aimeat_agent_propose and approved by the owner, the basic-agents
+ *     button, and the aimeat_crew_* chain for an agent that runs. It described device
+ *     authorization only, which is now the path for a runtime the owner hosts themselves. No skill
+ *     taught the crew tools before this. hatchery-agent-requests is retired for good
+ *     (builtin-skills.retired.ts): there is no agent hatchery.
  *   v1.15.2 -- 2026-09-19 -- Content audit of the game skills: aimeat-game-apps still counted six
  *     area skills when the entry skill has named eight since 2026-09-03, sent the reader to the
  *     `phaser` pack that was deprecated in favour of `phaser4`, taught hand-rolled
@@ -440,7 +446,7 @@ Everything is MEMORY records under the owner's identity (GHII) or their agents' 
     name: 'add-a-crew-agent',
     skillMd: `---
 name: add-a-crew-agent
-description: Operator runbook for adding a new automation/crew agent to an AIMEAT node — device authorization, scope selection, skills, tags, and verifying it came online. Use when the owner wants to connect a new CrewAI/automation agent or a new AI runtime to the node.
+description: How a new agent comes into being on an AIMEAT node. You design it as a crew definition (a JSON document of roles, tasks and tools), propose it with aimeat_agent_propose, and the owner approves it with one press. Also covers the two agents every owner can create from a button, connecting a runtime of your own by device authorization, changing a running agent's definition, scopes, skills, tags, and checking that it came online. Use when the owner wants a new agent, a new crew, or a new AI runtime connected.
 license: MIT
 metadata:
   audience: operator
@@ -448,25 +454,84 @@ metadata:
 
 # Add a crew agent
 
-Agents are NEVER created implicitly. The flow is device authorization (RFC 8628):
+An agent is never created implicitly, and never by another agent alone. Adding one changes the
+owner's account, so the last step is always the owner's own press. Everything before it is yours.
 
-1. **The agent side** starts the flow (\`POST /v1/agents/device-authorize\` — the crew runtime or
-   connect CLI does this) and shows a code.
-2. **The owner approves** in profile → Agents → the pending approval, choosing the agent's
-   SCOPES. Recommend least privilege for the agent's purpose (a task-runner needs
-   \`memory:read/write, work:read/accept\` — not \`*\`).
-3. **Teach it:** attach skills with \`aimeat_skill_link\` (browse \`aimeat_skill_list\` view
-   "library" first). Crew runtimes fetch linked skills at start via
-   \`GET /v1/agents/{name}/skills\`.
-4. **Organize it:** tags via \`aimeat_agent_tags_set\`; mode/display via
-   \`aimeat_operator_agent_configure\` (propose-then-confirm — show the owner the diff).
-5. **Verify it came online:** \`aimeat_agents_list\` — the new agent's row carries \`last_seen\`,
-   \`mode\` and \`tags\`. \`aimeat_agent_activity\` and \`aimeat_onboarding_status\` report on the
-   CALLING agent only, so neither one can answer for the agent you just connected.
+## 0. Look before you add
+
+\`aimeat_agents_list\` shows what the owner already has. \`aimeat_agent_basics_get\` says whether
+the two basic agents exist: \`concierge\`, which answers what arrives, and \`workflow-manager\`,
+which orders work from the owner's other agents. If they are missing and would do the job,
+\`aimeat_agent_basics_request\` puts one line on the owner's open items, and the button behind it
+creates both with their definitions. Design a new agent only for a job those two do not cover.
+
+## 1. The usual way: propose it, with its definition
+
+1. **Ask a running agent what a definition may use.** \`aimeat_crew_menu\` on any agent of the
+   owner that is connected returns the tool names its runtime resolves and the model profiles its
+   machine can reach. Take tool names from there. The list inside the tool descriptions is this
+   node's copy and can be behind the runtime.
+2. **Write the crew definition.** One JSON document: \`agent_name\`, \`agents[]\` (each with name,
+   role, goal, backstory, tools), \`tasks[]\` (each with id, description, expected_output, agent,
+   and \`context\` naming EARLIER task ids only). At least one task description contains
+   \`{{ctx.prompt}}\`, which is where the incoming work lands. \`listen_for\` says what wakes the
+   crew: it defaults to \`["tasks"]\`, and that is wrong for an agent whose work arrives as a
+   message or a DM. The full shape is in the \`doc\` parameter of \`aimeat_crew_publish\`.
+3. **Propose it.** \`aimeat_agent_propose\` with \`name\`, a \`purpose\` the owner can decide from
+   (it is the sentence they read), \`scopes\`, \`mode\`, \`run_mode\` and the \`crew_def\`. The
+   definition is checked before the proposal is written, so a broken one is refused now. Nothing
+   is created. One line appears on the owner's open items.
+4. **The owner presses approve.** That one press creates the agent, gives it the definition and
+   hands it to the owner's connector, which runs it on the owner's own machine
+   (\`aimeat connect serve\`). The answer says which of four states it ended in. If the connector
+   could not be reached, the agent exists with its instructions and nothing runs it: the owner
+   starts the connector and presses Attach.
+
+Always send the \`crew_def\`. An agent approved without one exists and cannot start, and
+\`aimeat_crew_publish\` cannot repair that, because publishing asks the agent's own runtime to
+validate and a new agent has none.
+
+**Scopes and modes.** Name each scope, never \`*\`, and never more than you hold yourself. An agent
+that reads and writes the owner's memory needs \`memory:read\` and \`memory:write\`; one that takes
+queued work also needs \`work:read\` and \`work:accept\`. \`mode: "task-runner"\` lets a queued task
+start without asking the owner each time, so say that in the purpose. \`run_mode: "spawn"\` starts
+a worker per piece of work and suits bursty jobs; \`"resident"\` stays up and suits a front door.
+
+## 2. A runtime of your own: device authorization
+
+For a Python crew built on \`aimeat-crewai\`, or any other runtime the owner hosts themselves, the
+agent side starts device authorization (RFC 8628): \`POST /v1/agents/device-authorize\`, which the
+runtime or the connect CLI does, and it shows a code. The owner approves in profile → Agents and
+chooses the scopes. If that agent is to run a JSON definition and has none yet,
+\`aimeat_crew_seed\` gives it its first one; it is refused when a definition already exists. A
+crew that needs a tool of its own, outside the runtime's menu, is a Python crew and not a
+definition.
+
+## 3. Changing an agent that runs
+
+\`aimeat_crew_get\` reads the live definition, the draft, the kept revisions and whether the agent
+is online. Edit the document, then \`aimeat_crew_validate\` (the agent's own runtime answers, and
+its messages go to the owner unchanged), \`aimeat_crew_try\` (one run with a prompt, nothing
+stored), \`aimeat_crew_publish\` (live within seconds, the last ten revisions stay restorable).
+\`aimeat_crew_draft\` keeps half-finished edits. \`aimeat_crew_llm_set\` chooses the model for one
+agent or the owner's default. Never write \`crews.registry.<agent>\` with \`aimeat_memory_write\`:
+it lands in YOUR namespace, where neither the runtime nor the Crew tab looks.
+
+## 4. After it exists
+
+- **Teach it:** attach skills with \`aimeat_skill_link\` (browse \`aimeat_skill_list\` view
+  "library" first). Crew runtimes fetch linked skills at start via
+  \`GET /v1/agents/{name}/skills\`.
+- **Organize it:** tags via \`aimeat_agent_tags_set\`; mode and display via
+  \`aimeat_operator_agent_configure\` (propose, then confirm: show the owner the diff).
+- **Verify it came online:** \`aimeat_agents_list\`. The new agent's row carries \`last_seen\`,
+  \`mode\` and \`tags\`. \`aimeat_agent_activity\` and \`aimeat_onboarding_status\` report on the
+  CALLING agent only, so neither one can answer for the agent you just added.
 
 ## Principles
-- Never mint or paste credentials yourself; approval is the owner's UI action.
+- Never mint or paste credentials yourself; approval is the owner's own action.
 - One agent per purpose beats one agent with every scope.
+- The definition is the agent. Propose the two together.
 `,
   },
   {

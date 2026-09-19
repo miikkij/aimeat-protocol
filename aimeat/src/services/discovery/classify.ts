@@ -34,7 +34,7 @@ const ORG_OFFERS = /^org\.([^.]+)\.offerings$/; // org.{slug}.offerings
 const AGENT_OFFERS = /^agents\.([^.]+)\.offers$/; // agents.{name}.offers
 
 /** Key prefixes the machine writes for its own use: theirs to own, rarely theirs to read. */
-const BOOKKEEPING_PREFIXES = ['agents.', 'workflows.run.', 'notif.', 'ai-usage.', 'usage.', 'gate.', 'commerce.', 'onboarding.', 'generator.', 'hatchery.'];
+const BOOKKEEPING_PREFIXES = ['agents.', 'workflows.run.', 'notif.', 'ai-usage.', 'usage.', 'gate.', 'commerce.', 'onboarding.', 'generator.'];
 export function isBookkeepingKey(key: string): boolean {
   return BOOKKEEPING_PREFIXES.some(p => key.startsWith(p));
 }

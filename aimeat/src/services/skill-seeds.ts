@@ -32,13 +32,21 @@
  *   THE FINGERPRINT IS NOT A SECURITY BOUNDARY. It answers "has this text changed since we wrote
  *   it", nothing else. It lives under the node's own system identity, which no owner-scoped
  *   principal can address, next to the skill it describes.
+ *
+ *   A SKILL THE REPO STOPPED SHIPPING. Until 2026-09-19 nothing here could take a skill away: the
+ *   loop walks BUILTIN_SKILLS, so a name dropped from that table was never looked at again and its
+ *   node copy was served for ever. data/builtin-skills.retired.ts names those skills, and the same
+ *   fingerprint decides: an unedited copy is removed together with its fingerprint, an edited or
+ *   unaccounted-for one stays and is named in the log.
  * @structure
  *   - decideSeedAction(live, stamp, repo) — the pure decision
- *   - seedBuiltinSkills(storage, config) — apply it to every built-in skill, return the counts
+ *   - decideRetireAction(live, stamp) — the same for a skill the repo no longer ships
+ *   - seedBuiltinSkills(storage, config) — apply both, return the counts
  * @usage
  *   import { seedBuiltinSkills } from '../services/skill-seeds.js';
  *   seedBuiltinSkills(storage, config).then(r => ...);
  * @version-history
+ *   v2.1.0 -- 2026-09-19 -- Removes a retired built-in skill from a node that never edited it.
  *   v2.0.0 -- 2026-08-25 -- Follows the repo on an unedited node instead of never updating. Returns
  *     counts per outcome rather than one number.
  *   v1.1.0 -- 2026-07-14 -- Honor per-skill visibility (aimeat-node-guide seeds 'public' so the
@@ -49,7 +57,8 @@ import { createHash } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
-import { publishSkill, readNodeSkillBody, scopeOwnerGhii } from './skills.js';
+import { RETIRED_BUILTIN_SKILLS } from '../data/builtin-skills.retired.js';
+import { deleteSkill, publishSkill, readNodeSkillBody, scopeOwnerGhii } from './skills.js';
 import { logger } from '../utils/logger.js';
 
 /** What to do with one built-in skill this startup. */
@@ -88,6 +97,24 @@ export function decideSeedAction(live: string | null, stamp: string | null, repo
   return live === repo ? 'current' : 'update';
 }
 
+/** What to do with one skill this repo no longer ships. */
+export type RetireAction =
+  /** Not on this node. Nothing to do. */
+  | 'absent'
+  /** On this node exactly as the seeder wrote it. Take it off. */
+  | 'remove'
+  /** Edited on this node. The operator's text stays, although the repo dropped the skill. */
+  | 'keep-edited'
+  /** On this node with no record that the seeder wrote it. It may be the operator's own. */
+  | 'keep-unknown';
+
+/** Decide what happens to one retired skill. Same inputs as decideSeedAction, without a repo text. */
+export function decideRetireAction(live: string | null, stamp: string | null): RetireAction {
+  if (live === null) return 'absent';
+  if (stamp === null) return 'keep-unknown';
+  return skillFingerprint(live) === stamp ? 'remove' : 'keep-edited';
+}
+
 export interface SeedResult {
   created: number;
   updated: number;
@@ -95,12 +122,14 @@ export interface SeedResult {
   unchanged: number;
   /** Names of the skills this node has edited, or whose provenance is unknown. Left untouched. */
   diverged: string[];
+  /** Names of the retired skills taken off this node at this startup. */
+  removed: string[];
 }
 
 /** Bring every built-in skill into step with this build, without overwriting an edit made here. */
 export async function seedBuiltinSkills(storage: Storage, config: AimeatConfig): Promise<SeedResult> {
   const systemGhii = scopeOwnerGhii(config, 'node');
-  const result: SeedResult = { created: 0, updated: 0, adopted: 0, unchanged: 0, diverged: [] };
+  const result: SeedResult = { created: 0, updated: 0, adopted: 0, unchanged: 0, diverged: [], removed: [] };
 
   for (const builtin of BUILTIN_SKILLS) {
     try {
@@ -147,6 +176,34 @@ export async function seedBuiltinSkills(storage: Storage, config: AimeatConfig):
       });
     } catch (err) {
       logger.error(`Failed to seed built-in skill ${builtin.name}`, { error: (err as Error).message });
+    }
+  }
+
+  const shipped = new Set(BUILTIN_SKILLS.map(s => s.name));
+  for (const retired of RETIRED_BUILTIN_SKILLS) {
+    // A name on both lists is a mistake in the data, and the live skill wins.
+    if (shipped.has(retired.name)) continue;
+    try {
+      const live = await readNodeSkillBody(storage, config, retired.name);
+      const stampRecord = await storage.getMemory(systemGhii, seedStampKey(retired.name));
+      const stamp = stampRecord ? String((stampRecord.value as { fingerprint?: unknown })?.fingerprint ?? '') || null : null;
+      const action = decideRetireAction(live, stamp);
+
+      if (action === 'absent') continue;
+      if (action === 'remove') {
+        await deleteSkill(storage, config, 'node', retired.name);
+        await storage.deleteMemory(systemGhii, seedStampKey(retired.name));
+        result.removed.push(retired.name);
+        continue;
+      }
+      result.diverged.push(retired.name);
+      logger.info(
+        action === 'keep-edited'
+          ? `Built-in skill ${retired.name} is retired in this build but has been edited on this node — keeping the local text. Delete it by hand if it should go.`
+          : `Built-in skill ${retired.name} is retired in this build, and this node has no record of having seeded it — keeping it. Delete it by hand if it should go.`,
+      );
+    } catch (err) {
+      logger.error(`Failed to retire built-in skill ${retired.name}`, { error: (err as Error).message });
     }
   }
   return result;

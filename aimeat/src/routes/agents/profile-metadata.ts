@@ -369,7 +369,7 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
 
   // PATCH /v1/agents/:name/console-url — where this agent's HOST manages it.
   // Same-owner gated (mirrors /tags and /mode), and deliberately so: the party that knows the
-  // address is usually the sibling that created the agent — a hatchery concierge reporting back
+  // address is usually the sibling that created the agent — a fleet concierge reporting back
   // after it built and started one — not a person at a keyboard. Body: { console_url } — an
   // absolute http(s) URL, or null/'' to clear it. The node stores and links it; it never fetches it.
   // `agent:write` names what this is, matching aimeat_agent_console_set. An owner session passes on
