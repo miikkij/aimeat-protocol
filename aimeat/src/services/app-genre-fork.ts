@@ -42,6 +42,51 @@ export function genreClassNames(genreId: string): string[] {
   return [...names];
 }
 
+/** A dot followed by one of these is a file name inside `url(...)`, not a class. */
+const NOT_A_CLASS = new Set(['png', 'jpg', 'jpeg', 'webp', 'svg', 'gif', 'woff', 'woff2', 'ttf', 'css', 'html', 'com', 'org', 'w3']);
+
+/**
+ * From this many styles of its own, an app has made something that could be a part. Measured on
+ * 2026-09-19: two live apps that built real things of their own carried 35 and 43, and a small tip
+ * calculator forked from a genre carried 11, all of them names like `line`, `bill` and `cur`.
+ */
+export const OWN_PARTS_MIN = 20;
+
+/**
+ * The class names the app's own stylesheets define that are neither the kit's (`ak-`) nor the
+ * genre's it forked: what this app MADE. A register of its own (`custom:<name>`) has no genre to
+ * subtract, so everything but the kit counts.
+ */
+export function ownClassNames(html: string): string[] {
+  const register = /<meta\b[^>]*name\s*=\s*["']aimeat-register["'][^>]*content\s*=\s*["']genre-([a-z0-9-]+)["']/i.exec(html.slice(0, 8192))?.[1];
+  const genre = new Set(register ? genreClassNames(register) : []);
+  const styles = [...html.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/gi)].map(m => m[1]).join('\n');
+  const own = new Set<string>();
+  for (const m of styles.matchAll(/\.([a-zA-Z][\w-]{2,})/g)) {
+    const name = m[1];
+    if (name.startsWith('ak-') || name.startsWith('aimeat-') || genre.has(name) || NOT_A_CLASS.has(name.toLowerCase())) continue;
+    own.add(name);
+  }
+  return [...own];
+}
+
+/**
+ * What the publish says to a builder whose app carries enough of its own to be a part. The Design
+ * Book held 90 parts on 2026-09-19 and none had come from a builder: every app that needed
+ * something custom made it again. The moment to propose a part is the moment it was made, by
+ * whoever still knows how it works, and the publish response is the one text a builder is measured
+ * to act on.
+ */
+export function designBookStep(html: string): string | undefined {
+  const own = ownClassNames(html);
+  if (own.length < OWN_PARTS_MIN) return undefined;
+  const shown = own.slice(0, 6).map(n => '.' + n).join(', ');
+  return `This app carries ${own.length} styles of its own beyond the kit and the genre it forked (${shown}${own.length > 6 ? ', …' : ''}). `
+    + 'What was made here is what the next app should not have to make again. If any of it is a component, a layout or a fill another app could use, '
+    + 'put it in the Design Book NOW, while you know how it works: search first so you do not add what is there (`aimeat_designbook_search`), '
+    + 'then `aimeat_designbook_propose` with what it is for, when to choose it and its body. A part that is already in the book is adopted, and improved as a new version of it, never copied beside it.';
+}
+
 /** The share of the genre's own class names the app still carries, or null when the genre is unknown. */
 export function genreKeptShare(html: string, genreId: string): number | null {
   const names = genreClassNames(genreId);

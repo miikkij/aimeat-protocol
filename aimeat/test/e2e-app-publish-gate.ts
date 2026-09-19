@@ -378,6 +378,36 @@ const publish = (token: string, body: Record<string, unknown>) =>
         assert(hintsOf(again, 'hand-rolled').length === 0, `with the library loaded the rule stands down: ${JSON.stringify(hintsOf(again, 'hand-rolled'))}`);
     });
 
+    await test('every genre says whether it keeps its own colours or follows the theme, with an address to look at', async () => {
+        const list = await json('/v1/app-templates');
+        const genres = (list.body.data.templates as any[]).filter(t => t.kind === 'genre');
+        assert(genres.length > 10 && genres.every(g => g.light === 'fixed' || g.light === 'follows'), `every genre carries light: ${JSON.stringify(genres.filter(g => !g.light).map(g => g.id))}`);
+        assert(genres.some(g => g.light === 'follows') && genres.some(g => g.light === 'fixed'), 'both roads exist');
+        const genrePart = await fetch(`${BASE}/v1/prompts/build-app-atelier/sections/genre?format=txt`).then(r => r.text());
+        assert(/LIGHT: fixed/.test(genrePart) && /LIGHT: follows/.test(genrePart), 'the specification says it per genre');
+        assert(genrePart.includes('/v1/designbook/genre-receipt/preview'), 'and gives an address to look at each');
+        assert(/FIXED OR FOLLOWING is the owner's choice/.test(genrePart), 'and whose choice it is');
+        const start = await fetch(`${BASE}/v1/prompts/build-app-atelier/sections/start?format=txt`).then(r => r.text());
+        assert(/Fixed colours or following their theme\?/.test(start), 'the proposal asks it');
+    });
+
+    await test('an Atelier app that made things of its own is asked to put them in the Design Book; a plain fork is not', async () => {
+        const genre = await json('/v1/app-templates/genre-receipt');
+        const served = genre.body.data.template.content as string;
+        const plainName = `gatebookplain${Date.now()}.html`;
+        const plain = await publish(o.token, { filename: plainName, mime_type: 'text/html', content: b64(served.replace('content="receipt.html"', `content="${plainName}"`)), name: 'Plain fork', description: 'The receipt genre, as served.', spec_token: atelierToken });
+        assert(plain.status === 201, `publish ${plain.status}: ${JSON.stringify(plain.body?.error)}`);
+        assert(plain.body.data.next_steps?.design_book === undefined, `a plain fork has made nothing: ${JSON.stringify(plain.body.data.next_steps?.design_book)}`);
+
+        const madeName = `gatebookmade${Date.now()}.html`;
+        const own = Array.from({ length: 24 }, (_, i) => `.tipdial-part${i} { outline: 1px solid; }`).join('\n');
+        const made = served.replace('content="receipt.html"', `content="${madeName}"`).replace('</style>', own + '\n</style>');
+        const r = await publish(o.token, { filename: madeName, mime_type: 'text/html', content: b64(made), name: 'Made parts', description: 'A fork that made parts of its own.', spec_token: atelierToken });
+        assert(r.status === 201, `publish ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        const step = String(r.body.data.next_steps?.design_book ?? '');
+        assert(step.includes('24 styles of its own') && step.includes('aimeat_designbook_propose') && step.includes('aimeat_designbook_search'), `expected the Design Book step: ${JSON.stringify(r.body.data.next_steps)}`);
+    });
+
     await test('the Atelier specification comes in parts over HTTP, each inside one tool result', async () => {
         const list = await json('/v1/prompts/build-app-atelier/sections');
         assert(list.status === 200, `parts list ${list.status}`);

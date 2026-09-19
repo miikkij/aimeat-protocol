@@ -58,10 +58,11 @@ export const ATELIER_HEADING_PART: Record<string, AtelierPartId> = {
   'Start from a GENRE — a complete committed register, and the register is required': 'genre',
   'A fork people sign in to, in two languages': 'genre',
   'The pattern shelf': 'genre',
-  'The Design Book first': 'genre',
   'The signature: this app\'s own hand': 'genre',
 
   'The node\'s libraries: read this list before you write a mechanism': 'libraries',
+  // What already exists, in one part: the libraries, and the proven parts of the Design Book.
+  'The Design Book first': 'libraries',
 
   'A LIVING DOCUMENT: A SHEET WHOSE NUMBERS STAND ON EACH OTHER IS A RECORD': 'patterns',
   'Six patterns to copy': 'patterns',

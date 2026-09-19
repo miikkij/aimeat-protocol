@@ -461,10 +461,19 @@ function composeBody(config: AimeatConfig): string {
     + 'stagecraft. When an app needs a full animation library, the node serves three as packs — '
     + 'Motion (`motion`), anime.js (`anime`) and Lenis (`lenis`) — read the pack\'s doc before '
     + 'writing a line, because every one of them changed its API after the version you know.\n\n';
+  // Each line ends with the two things an owner chooses by: whether the page keeps its own
+  // colours or follows their theme, and an address where they can LOOK at it.
+  const bookUrl = config.baseUrl.replace(/\/+$/, '');
   for (const g of genres) {
-    body += '- `' + g.id + '` — **' + g.title + '**: ' + g.description + '\n';
+    body += '- `' + g.id + '` — **' + g.title + '**: ' + g.description
+      + (g.light === 'follows' ? ' LIGHT: follows the person\'s light/dark and palette.' : ' LIGHT: fixed, keeps its own colours in both modes.')
+      + ' See it: ' + bookUrl + '/v1/designbook/' + g.id + '/preview\n';
   }
   body += '\n';
+  const following = genres.filter(g => g.light === 'follows').map(g => '`' + g.id + '`');
+  body += 'FIXED OR FOLLOWING is the owner\'s choice, and both are right. A FIXED genre is a finished object with its own colours: it looks the same at noon and at night, and the sign-in bar\'s light/dark control stands down on it. A FOLLOWING page is drawn in the theme\'s `--ak-*` tokens and changes with the person\'s light/dark and palette, which is what a tool people work in all day usually wants. '
+    + (following.length ? 'Following today: ' + following.join(', ') + '; every other genre is fixed. ' : 'Every genre is fixed today. ')
+    + 'A fixed genre becomes a following one by replacing its hardcoded colours with `--ak-*` tokens and changing `<meta name="aimeat-light">` to `follows`: keep the composition, the type and the physics, and check it in BOTH modes beside the original, because a palette that was tuned for one ground rarely survives the other untouched. Every picture of a genre is one address away (`See it`), and the whole shelf is ' + bookUrl + '/v1/design-book; give the owner the links, do not describe a look in words when they can look.\n\n';
   body += 'THE TRAP THIS SECTION EXISTS TO STOP: a mosaic block stack wearing a look is a tool '
     + 'screen, never a statement — assembling components and applying a world reads as "the '
     + 'same dashboard in new paint" no matter which world. When a page must IMPRESS, start '

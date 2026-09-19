@@ -13,6 +13,10 @@
  * @structure APP_BUILDER_ATELIER_SKILL_ENTRY
  * @usage import { APP_BUILDER_ATELIER_SKILL_ENTRY } from './builtin-skills.app-builder-atelier.js';
  * @version-history
+ *   v1.12.0 — 2026-09-19 — The Design Book is a step at both ends: look in it before code and say in
+ *     the proposal which proven parts you take; put what you made into it after the publish. It held
+ *     90 parts and none from a builder, so every custom piece was made again. And the owner is asked
+ *     whether the page keeps its own colours or follows their theme, with a link to look at each.
  *   v1.11.0 — 2026-09-19 — PROPOSE BEFORE YOU BUILD is a step, two languages is the default, and
  *     the genre is the look. Steps 1 and 3 said the owner's answer "picks the look preset" and
  *     "vivid unless the owner asked for something else", in the same list that says a build starts
@@ -137,7 +141,17 @@ moved under you says so.
    first screen in a sentence. Say which genre you would take. The language you are talking in
    is not the app's language list, and one language is the owner's decision. If they said "just
    build it", still name the genre and the languages in one line so they can stop you.
-2. **Research first** — \`aimeat_appdev_overview\`, existing apps and skills, the pitfalls.
+   **Fixed colours or following their theme** is part of that choice, and both are right: a
+   fixed genre is a finished object that looks the same at noon and at night, a following page
+   changes with the person's light/dark and palette. The specification's part \`genre\` says which
+   each genre is and gives an address to LOOK at each; send the links, or recommend one and say
+   why. A fixed genre can be made to follow by moving its colours to the theme's \`--ak-*\` tokens,
+   shown in both modes beside the original before the owner decides.
+2. **Research first** — \`aimeat_appdev_overview\`, existing apps and skills, the pitfalls, and
+   **the Design Book** (\`aimeat_designbook_search\`): layouts, fills, looks, motion, ambients and
+   effects that each passed their own bench. Adopting one is one call (\`aimeat_designbook_adopt\`)
+   and is faster than making it. Say in the proposal which parts you take; an app built without
+   looking there makes again what is already made.
 3. **Build** — start from a GENRE, never from the bare shell: pick the register the page belongs
    in from \`GET /v1/designbook?kind=genre\`, fork it from \`GET /v1/app-templates/genre-<id>\`,
    and keep its \`<meta name="aimeat-register">\` line (or name your own register with
@@ -207,7 +221,12 @@ moved under you says so.
    carries one more measured check: move the control the sheet is built around and watch the
    figure, the printed maths, the sentence and the state all follow it in the same paint.
 9. **Publish** — \`aimeat_app_publish\` with \`spec_token\`; report the live URL in the owner's
-   words.
+   words. Read \`next_steps\` in the answer: it is the node's list of what this app still owes.
+10. **Put what you made into the Design Book.** A component, a layout or a fill you had to make
+   because the book did not have it is what the next app should start from.
+   \`aimeat_designbook_propose\` with what it is for, when to choose it and its body, NOW, while you
+   know how it works; the publish answer's \`design_book\` line names the styles this app made for
+   itself. Improve a part that is already there as a new version of it, never as a copy beside it.
 
 ## Never, on this track
 

@@ -17,6 +17,8 @@
  * @structure buildPublishNextSteps(storage, config, ownerName, filename) -> record | undefined
  * @usage import { buildPublishNextSteps } from './app-publish-next-steps.js';
  * @version-history
+ *   2026-09-19 — `design_book`: an Atelier app that carries styles of its own beyond the kit and its
+ *     genre is asked to propose them to the Design Book, which held 90 parts and none from a builder.
  *   v1.2.0 — 2026-09-05 — `acceptance`, on an Atelier app only: the app is accepted from
  *     screenshots at 390 and 1440 in both themes, placed beside the genre it forked (the address
  *     is the genre's own template when the register names one, the Book's genre shelf otherwise),
@@ -38,6 +40,7 @@ import { getOwnerScopePublicMemory } from './owner-memory.js';
 import { listSkillsByBinding } from './skills.js';
 import { appSizeHealth, type AppSizeHealth } from './app-size-health.js';
 import { logger } from '../utils/logger.js';
+import { designBookStep } from './app-genre-fork.js';
 
 /**
  * The post-publish reflection: does this app have its agent face and its bound skill yet, and what
@@ -46,7 +49,7 @@ import { logger } from '../utils/logger.js';
  */
 export async function buildPublishNextSteps(
   storage: Storage, config: AimeatConfig, ownerName: string, filename: string, publishedBytes?: number,
-  track?: 'classic' | 'atelier', register?: string,
+  track?: 'classic' | 'atelier', register?: string, html?: string,
 ): Promise<Record<string, unknown> | undefined> {
   try {
     // Resolve the face across the owner's whole keyspace (GHII + the owner's agents), matching what
@@ -91,6 +94,8 @@ export async function buildPublishNextSteps(
           + 'control under 40 px at 390, contrast 4.5 for body text, no animation still running '
           + 'under reduced motion, and a clean console.',
       } : {}),
+      // What this app made for itself, and the Design Book it belongs in (app-genre-fork.ts).
+      ...(track === 'atelier' && html && designBookStep(html) ? { design_book: designBookStep(html) } : {}),
       agent_face_present: !!faceRec,
       bound_skills_count: boundSkills.length,
       // Stated every time, present or not. An app without a face is a page agents have to scrape,
