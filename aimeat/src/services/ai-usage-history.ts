@@ -11,11 +11,14 @@
  *   - getUsageHistory(storage, gaii, days) — the read
  * @usage  import { getUsageHistory } from '../services/ai-usage-history.js';
  * @version-history
+ *   v1.1.0 — 2026-09-19 — Each day's apps are folded to one name per app (services/ai-app-id.ts), so
+ *     a day recorded under `app` and `app.html` charts as one app.
  *   v1.0.0 — 2026-09-09 — Moved out of ai-completion.ts unchanged (it arrived there as v1.5.0 on
  *     2026-07-05 for the AI-spend charts).
  */
 import type { Storage } from '../storage/interface.js';
 import { todayKey, type UsageRecord } from './ai-completion.js';
+import { mergePerApp } from './ai-app-id.js';
 
 /** A rolled-up spend window (today / 7d / 30d) — same per-app shape as a day, summed. */
 export interface UsageWindow {
@@ -63,6 +66,8 @@ export async function getUsageHistory(storage: Storage, gaii: string, days = 30)
   const sorted = records
     .map((r) => r.value as UsageRecord)
     .filter((v): v is UsageRecord => !!v && typeof v.date === 'string')
+    // A day recorded before one app had one name (services/ai-app-id.ts) shows it once, summed.
+    .map((v) => ({ ...v, per_app: mergePerApp(v.per_app, gaii) }))
     .sort((a, b) => a.date.localeCompare(b.date));
 
   const clampDays = Math.min(Math.max(Math.trunc(days) || 30, 1), 365);

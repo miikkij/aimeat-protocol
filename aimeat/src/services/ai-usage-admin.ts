@@ -22,12 +22,14 @@
  *   import { getAdminAiUsage } from '../services/ai-usage-admin.js';
  *   const data = await getAdminAiUsage(storage, { from: '2026-06-05', to: '2026-07-05' });
  * @version-history
+ *   v2.0.1 — 2026-09-19 — Apps are grouped under one name each (services/ai-app-id.ts).
  *   v2.0.0 — 2026-08-14 — Read the precomputed `llm.owner.app.surface` cut instead of paging every
  *     owner's ai-usage memory records. Response shape unchanged.
  *   v1.0.0 — 2026-07-05 — Initial: operator dashboard "AI Apps Usage" aggregate.
  */
 import type { Storage } from '../storage/interface.js';
 import { queryUsageRollupLive } from './usage/usage-read.js';
+import { canonicalAiAppId } from './ai-app-id.js';
 
 type AppTotals = { cost_usd: number; tokens: number; calls: number };
 
@@ -91,7 +93,8 @@ export async function getAdminAiUsage(
     if (!r.appId) continue;
 
     const tokens = r.tokensIn + r.tokensOut;
-    const app = r.appId;
+    // One name per app (services/ai-app-id.ts), so ledger rows from before the rule join the app.
+    const app = canonicalAiAppId(r.appId, r.ownerGhii) ?? r.appId;
 
     let day = dayMap.get(r.bucket);
     if (!day) {
