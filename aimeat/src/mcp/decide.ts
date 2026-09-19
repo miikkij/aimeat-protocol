@@ -1,0 +1,223 @@
+/**
+ * @file src/mcp/decide.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The decision tools on the node's own MCP surface (TARGET-080). An agent can do what a
+ *   person's app can do: ask the decision model, read what it decided, record a review, run it over
+ *   many records, and read the settings.
+ *
+ *   NONE OF THESE DOES THE WORK. Each calls services/decide/, which the REST routes call too, so the
+ *   scrubber, the budget and the record happen where they were written once. The caller is the
+ *   session's agent acting for its owner: the owner's account pays and holds the record, and the agent
+ *   is named as the principal that asked. An agent is never the owner in person, so it cannot skip the
+ *   scrubber unless the owner's policy says agents may.
+ *
+ *   One of three surfaces. See mcp/catalog/definitions/decide.ts for the other two.
+ * @structure registerDecideTools(mcp, storage, config, getAgentGaii)
+ * @usage registerDecideTools(mcp, storage, config, () => agentGaii);
+ * @version-history
+ *   v1.0.0 — 2026-09-19 — Initial (TARGET-080).
+ */
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { z } from 'zod';
+import type { AimeatConfig } from '../config.js';
+import type { Storage } from '../storage/interface.js';
+import { annotationsFor } from './annotations.js';
+import { descriptionFor } from './catalog/shape.js';
+import { parseGAII } from '../utils/gaii.js';
+import { AiCompletionError } from '../services/ai-completion.js';
+import {
+  decideForOwner, listDecisions, getDecision, reviewDecision, DecideError, type DecideCaller,
+} from '../services/decide/service.js';
+import { decideSettingsView } from '../services/decide/settings.js';
+import {
+  startDecideRun, getDecideRun, listDecideRuns, resumeDecideRun, stopDecideRun, runSummary, type RunItem,
+} from '../services/decide/runs.js';
+import type { JevQuestion } from '../services/decide/limits.js';
+
+export function registerDecideTools(
+  mcp: McpServer,
+  storage: Storage,
+  config: AimeatConfig,
+  getAgentGaii: () => string,
+): void {
+  const agentGaii = getAgentGaii();
+  const owner = parseGAII(agentGaii)?.owner ?? '';
+  const ownerGhii = `${owner}@${config.nodeId}`;
+
+  const text = (data: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] });
+  const err = (msg: string) => ({ content: [{ type: 'text' as const, text: msg }], isError: true });
+  const failed = (e: unknown) => {
+    if (e instanceof DecideError) {
+      return err(`${e.code}: ${e.message}${e.details ? `\n${JSON.stringify(e.details, null, 2)}` : ''}`);
+    }
+    if (e instanceof AiCompletionError) return err(`${e.code}: ${e.message}`);
+    return err(String((e as Error).message ?? e));
+  };
+  const caller = (appId?: string): DecideCaller => ({
+    gaii: ownerGhii, principal: agentGaii, isOwner: false, ...(appId ? { appId } : {}),
+  });
+
+  const questionsSchema = z.record(z.string(), z.object({
+    type: z.enum(['noul', 'choice', 'score']),
+    instructions: z.unknown(),
+    criteria: z.unknown().optional(),
+  })).describe('Your ids to questions. Instructions and criteria in English.');
+
+  // ── aimeat_decide ──
+  mcp.tool(
+    'aimeat_decide',
+    descriptionFor('aimeat_decide'),
+    {
+      state: z.unknown().describe('What is being judged: a string, an object with named fields, or an array.'),
+      questions: questionsSchema,
+      subject: z.string().optional().describe('What the decision is about: a memory key or record id.'),
+      gates: z.string().optional().describe('What the answer decides, in plain words.'),
+      thresholds: z.record(z.string(), z.unknown()).optional().describe('The thresholds you will apply.'),
+      names: z.array(z.string()).optional().describe('Extra person names to remove before sending.'),
+      public_content: z.boolean().optional().describe('The content is already public. Honoured only when the owner\'s policy allows it.'),
+      cache: z.boolean().optional().describe('Reuse an identical earlier decision (default true).'),
+      app_id: z.string().optional().describe('App attribution for the per-app quota.'),
+    },
+    annotationsFor('aimeat_decide'),
+    async (a) => {
+      if (!owner) return err('Could not resolve caller owner');
+      try {
+        return text(await decideForOwner(storage, config, caller(a.app_id), {
+          state: a.state,
+          questions: a.questions as Record<string, JevQuestion>,
+          ...(a.subject !== undefined ? { subject: a.subject } : {}),
+          ...(a.gates !== undefined ? { gates: a.gates } : {}),
+          ...(a.thresholds ? { thresholds: a.thresholds } : {}),
+          ...(a.names ? { names: a.names } : {}),
+          ...(a.public_content ? { publicContent: true } : {}),
+          ...(a.cache === false ? { cache: false } : {}),
+        }));
+      } catch (e) {
+        return failed(e);
+      }
+    },
+  );
+
+  // ── aimeat_decision_list ──
+  mcp.tool(
+    'aimeat_decision_list',
+    descriptionFor('aimeat_decision_list'),
+    {
+      decision_id: z.string().optional().describe('Read one decision.'),
+      subject: z.string().optional().describe('Only decisions about this subject.'),
+      app_id: z.string().optional().describe('Only decisions made for this app.'),
+      limit: z.number().optional().describe('How many (1-200, default 50).'),
+      before: z.string().optional().describe('Only decisions made before this ISO time.'),
+    },
+    annotationsFor('aimeat_decision_list'),
+    async (a) => {
+      try {
+        if (a.decision_id) {
+          const row = await getDecision(storage, ownerGhii, a.decision_id);
+          return row ? text(row) : err('No such decision.');
+        }
+        const r = await listDecisions(storage, ownerGhii, {
+          ...(a.subject !== undefined ? { subject: a.subject } : {}),
+          ...(a.app_id !== undefined ? { appId: a.app_id } : {}),
+          ...(a.limit !== undefined ? { limit: a.limit } : {}),
+          ...(a.before !== undefined ? { before: a.before } : {}),
+        });
+        return text({ decisions: r.items, total: r.total });
+      } catch (e) {
+        return failed(e);
+      }
+    },
+  );
+
+  // ── aimeat_decision_review ──
+  mcp.tool(
+    'aimeat_decision_review',
+    descriptionFor('aimeat_decision_review'),
+    {
+      decision_id: z.string().describe('The decision.'),
+      outcome: z.enum(['confirmed', 'overridden']).describe('confirmed | overridden'),
+      note: z.string().optional().describe('Why, in the person\'s words.'),
+      override: z.record(z.string(), z.unknown()).optional().describe('What the person decided instead.'),
+    },
+    annotationsFor('aimeat_decision_review'),
+    async (a) => {
+      try {
+        const row = await reviewDecision(storage, ownerGhii, agentGaii, a.decision_id, {
+          outcome: a.outcome,
+          ...(a.note !== undefined ? { note: a.note } : {}),
+          ...(a.override !== undefined ? { override: a.override } : {}),
+        });
+        return row ? text(row) : err('No such decision.');
+      } catch (e) {
+        return failed(e);
+      }
+    },
+  );
+
+  // ── aimeat_decide_run ──
+  mcp.tool(
+    'aimeat_decide_run',
+    descriptionFor('aimeat_decide_run'),
+    {
+      action: z.enum(['start', 'get', 'list', 'resume', 'stop']).describe('start | get | list | resume | stop'),
+      run_id: z.string().optional().describe('The run, for get, resume and stop.'),
+      questions: questionsSchema.optional(),
+      items: z.array(z.object({ subject: z.string(), state: z.unknown().optional() })).optional().describe('For start: [{ subject, state }].'),
+      keys: z.array(z.string()).optional().describe('For start: owner memory keys.'),
+      prefix: z.string().optional().describe('For start: every owner record under this key prefix.'),
+      fields: z.array(z.string()).optional().describe('For start: keep only these top-level fields of each state.'),
+      gates: z.string().optional().describe('What the answers decide.'),
+      thresholds: z.record(z.string(), z.unknown()).optional().describe('The thresholds you will apply.'),
+      names: z.array(z.string()).optional().describe('Extra person names to remove before sending.'),
+      app_id: z.string().optional().describe('App attribution for the per-app quota.'),
+    },
+    annotationsFor('aimeat_decide_run'),
+    async (a) => {
+      if (!owner) return err('Could not resolve caller owner');
+      try {
+        if (a.action === 'list') return text({ runs: await listDecideRuns(storage, ownerGhii) });
+        if (a.action === 'start') {
+          if (!a.questions) return err('INVALID_BODY: start needs questions.');
+          const run = await startDecideRun(storage, config, caller(a.app_id), {
+            questions: a.questions as Record<string, JevQuestion>,
+            ...(a.items ? { items: a.items as RunItem[] } : {}),
+            ...(a.keys ? { keys: a.keys } : {}),
+            ...(a.prefix !== undefined ? { prefix: a.prefix } : {}),
+            ...(a.fields ? { fields: a.fields } : {}),
+            ...(a.gates !== undefined ? { gates: a.gates } : {}),
+            ...(a.thresholds ? { thresholds: a.thresholds } : {}),
+            ...(a.names ? { names: a.names } : {}),
+          });
+          return text(runSummary(run));
+        }
+        if (!a.run_id) return err(`INVALID_BODY: ${a.action} needs run_id.`);
+        const run = a.action === 'get' ? await getDecideRun(storage, ownerGhii, a.run_id)
+          : a.action === 'resume' ? await resumeDecideRun(storage, config, caller(a.app_id), a.run_id)
+            : await stopDecideRun(storage, ownerGhii, a.run_id);
+        if (!run) return err('No such run.');
+        return text(a.action === 'get' ? run : runSummary(run));
+      } catch (e) {
+        return failed(e);
+      }
+    },
+  );
+
+  // ── aimeat_decide_settings ──
+  mcp.tool(
+    'aimeat_decide_settings',
+    descriptionFor('aimeat_decide_settings'),
+    {},
+    annotationsFor('aimeat_decide_settings'),
+    async () => {
+      try {
+        return text({
+          ...(await decideSettingsView(storage, config, ownerGhii)),
+          change_them: 'The owner changes the key and the data policy on the AI settings page (/v1/profile?tab=ai). No tool changes them.',
+        });
+      } catch (e) {
+        return failed(e);
+      }
+    },
+  );
+}

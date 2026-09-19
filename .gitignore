@@ -144,6 +144,13 @@ google*.html
 # Business strategy (private)
 docs/businessfinland/
 
+# TypeSafe's documentation snapshot and our measurements of their model. Their copyrighted pages
+# stay out of the repo, and the Master Customer Agreement (2.3(f)) forbids publishing benchmarks,
+# so FINDINGS.md and the cookbooks never reach a commit. The `*` form lets the README through;
+# `docs/typesafe/` would exclude the directory itself and the negation would never be read.
+docs/typesafe/*
+!docs/typesafe/README.md
+
 # Press / behind-the-scenes diaries + screenshots (local only, never commit)
 press/
 

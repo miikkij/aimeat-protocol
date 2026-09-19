@@ -65,4 +65,5 @@ export type { DirectMessageRepository } from './direct-message.repository.js';
 export type { AgentWebhookRepository } from './agent-webhook.repository.js';
 export type { AgentOnboardingRepository } from './agent-onboarding.repository.js';
 export type { AiProvenanceRepository } from './ai-provenance.repository.js';
+export type { AiDecisionRepository } from './ai-decisions.repository.js';
 export type { McpServerRepository } from './mcp-server.repository.js';

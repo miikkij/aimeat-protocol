@@ -18,6 +18,8 @@
  *   appMayWriteKey(roles, key, delegatedOwnerWrite?, reservedAllowed?)
  * @usage import { appMayWriteKey } from '../utils/reserved-keys.js';
  * @version-history
+ *   v1.10.0 — 2026-09-19 — `decide.` joins the list: the owner's TypeSafe key and the policy that says
+ *     which personal data the decision scrubber may let through (TARGET-080).
  *   v1.9.1 — 2026-09-16 — The `crews.llm.` comment said the runtime publishes its catalogue past this
  *     gate. It did not; the catalogue now lives in the agent's own namespace.
  *   v1.9.0 — 2026-09-13 — `messages.organize.` joins the list: the owner's archive and rules for their
@@ -137,6 +139,13 @@ export const RESERVED_OWNER_KEY_PREFIXES = [
   // `messages.organize.` rather than `messages.`, because nothing else under that word is
   // server-trusted. Measured 2026-09-13: nothing wrote this prefix through the memory API; it is new.
   'messages.organize.',
+  // 2026-09-19: `decide.apikey` is the owner's own TypeSafe key and `decide.policy` is which classes
+  // of their personal data may leave the node unscrubbed for a decision (services/decide/). The
+  // first is the `openrouter.apikey` case exactly: an app that could write it could swap in a key it
+  // controls and read every state the owner sends. The second is worse, because it is the switch the
+  // scrubber obeys: an app that could write it could turn off the cleaning of its own traffic. The
+  // owner's routes (PUT /v1/ai/decide/settings) are the writers. New prefix, nothing wrote it before.
+  'decide.',
 ] as const;
 
 /** True iff `key` falls under a reserved, server-trusted owner-namespace prefix. */

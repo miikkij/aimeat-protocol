@@ -1,0 +1,76 @@
+/**
+ * @file src/config-decide.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The decision provider's settings (TARGET-080, AIMEAT.decide): TypeSafe's Jev, a model
+ *   that returns typed answers with probabilities and writes no text. It sits BESIDE the text
+ *   provider, never inside it, so none of these fields is read by the chat path or the model picker.
+ *
+ *   Its own file for the same reason config-ai-jobs.ts is one: config.ts is at the line ceiling, and
+ *   everything here answers one question, how this node reaches a decision model.
+ *
+ *   THE MODEL IS PINNED. `jev-latest` moves when TypeSafe ships, and a threshold an owner tuned
+ *   against one version can shift under the alias with no change on their side. The default is a
+ *   versioned id, and the id that answered is written into every decision record.
+ *
+ *   THE LIMITS ARE CONFIGURATION, NOT CONSTANTS. TypeSafe states that its rate limits change without
+ *   notice, and its own pages disagree on the context size, so every number an operator may need to
+ *   move is here. The context default is the smaller of the two documented figures.
+ * @structure DecideConfig · decideDefaults()
+ * @usage
+ *   import { decideDefaults } from './config-decide.js';
+ *   const config = { ...decideDefaults(), ... };
+ * @version-history
+ *   v1.0.0 — 2026-09-19 — Initial (TARGET-080).
+ */
+
+/**
+ * Named here rather than picked from AimeatConfig, for the reason config-ai-jobs.ts gives: a type
+ * import from config-types.ts would close a cycle. AiCapabilityConfig extends this interface, and the
+ * spread in loadConfig is where the compiler checks the two agree.
+ */
+export interface DecideConfig {
+  /** Operator switch for the whole node. Off answers every decide call with DECIDE_DISABLED. */
+  decideEnabled: boolean;
+  /**
+   * The node's own TypeSafe key, spent for a person who has not brought one, from the same per-person
+   * allowance as the node's OpenRouter key. Empty means everyone brings their own. It is sent to
+   * `decideBaseUrl`'s host and nowhere else.
+   */
+  decideInstanceKey: string;
+  /** The endpoint. One address, fixed by default: the node's key may only go here. */
+  decideBaseUrl: string;
+  /** Pinned, versioned model id. Never an alias by default. */
+  decideModel: string;
+  /** USD per million INPUT tokens. Output is free. Used to price a call into the ledger. */
+  decidePricePerMtok: number;
+  /** Estimated tokens allowed for one request (state plus every question). */
+  decideMaxRequestTokens: number;
+  /** Options one choice question may carry. TypeSafe documents 255 and measured about 240. */
+  decideMaxChoiceOptions: number;
+  /** Requests per minute this node sends, all owners together, on the node's key. */
+  decideRequestsPerMinute: number;
+  /** Parallel requests one bulk run may have open. A cookbook hit a limit at eight on a shared key. */
+  decideConcurrency: number;
+  /** How long an identical decision (same owner, model, scrubbed state and questions) is reused. 0 = never. */
+  decideCacheHours: number;
+  /** How many days a decision record is kept before the nightly prune removes it. */
+  decideRetentionDays: number;
+}
+
+/** The decision provider's settings, from the environment. */
+export function decideDefaults(): DecideConfig {
+  return {
+    decideEnabled: process.env.AIMEAT_DECIDE_ENABLED !== 'false',
+    decideInstanceKey: process.env.AIMEAT_TYPESAFE_INSTANCE_KEY ?? '',
+    decideBaseUrl: process.env.AIMEAT_DECIDE_BASE_URL ?? 'https://api.typesafe.ai/v1/systemone',
+    decideModel: process.env.AIMEAT_DECIDE_MODEL ?? 'jev-1.13.0',
+    decidePricePerMtok: parseFloat(process.env.AIMEAT_DECIDE_PRICE_PER_MTOK ?? '0.042') || 0,
+    decideMaxRequestTokens: parseInt(process.env.AIMEAT_DECIDE_MAX_REQUEST_TOKENS ?? '32000', 10),
+    decideMaxChoiceOptions: parseInt(process.env.AIMEAT_DECIDE_MAX_CHOICE_OPTIONS ?? '240', 10),
+    decideRequestsPerMinute: parseInt(process.env.AIMEAT_DECIDE_REQUESTS_PER_MINUTE ?? '1200', 10),
+    decideConcurrency: parseInt(process.env.AIMEAT_DECIDE_CONCURRENCY ?? '4', 10),
+    decideCacheHours: parseFloat(process.env.AIMEAT_DECIDE_CACHE_HOURS ?? '24') || 0,
+    decideRetentionDays: parseInt(process.env.AIMEAT_DECIDE_RETENTION_DAYS ?? '365', 10),
+  };
+}

@@ -396,6 +396,12 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_ai_job_get: { title: 'Get AI Job', readOnlyHint: true },
     // Destructive: it stops work the owner asked for, and a cancelled job cannot be resumed.
     aimeat_ai_job_cancel: { title: 'Cancel AI Job', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+    // The decision provider (TARGET-080). Asking sends scrubbed data to an outside model: open world.
+    aimeat_decide: { title: 'Ask the Decision Model', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+    aimeat_decision_list: { title: 'List AI Decisions', readOnlyHint: true },
+    aimeat_decision_review: { title: 'Review an AI Decision', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    aimeat_decide_run: { title: 'Run a Decision over Many Records', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+    aimeat_decide_settings: { title: 'Read Decision Settings', readOnlyHint: true },
     aimeat_app_draft_publish: { title: 'Publish App Draft', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     aimeat_app_draft_discard: { title: 'Discard App Draft', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     aimeat_app_fork: { title: 'Fork App', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
