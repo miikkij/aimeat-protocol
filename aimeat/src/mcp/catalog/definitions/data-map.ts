@@ -14,10 +14,29 @@
  * @structure dataMapTools — the three definitions
  * @usage imported by catalog/definitions.ts into CLI_FALLBACK_TOOL_DEFINITIONS
  * @version-history
+ *   v2.1.0 — 2026-09-20 — DATA_MAP_PARAM: what the `data_map` parameter says on both MCP doors,
+ *     built from the service's own spec constant, with a whole example object an E2E test writes.
  *   v2.0.0 — 2026-08-25 — spec/2 wording; the coverage mode is gone with the Data Wallet list.
  *   v1.0.0 — 2026-08-25 — TARGET-073.
  */
 import { agentEverywhere, type AimeatToolDefinition } from './types.js';
+import { DATA_MAP_SPEC } from '../../../services/data-map/data-map-types.js';
+
+/**
+ * What the `data_map` parameter says about itself, on both MCP doors. ONE text built from the
+ * service's own constant: until 2026-09-20 both doors spelled the spec out by hand as
+ * "aimeat.datamap/1" while the service took only /2, so the tool told every builder to send the
+ * version it would refuse. Nine measured builds in a row made that first call and hit the wall.
+ */
+export const DATA_MAP_PARAM = `The WHOLE map in one object, carrying spec "${DATA_MAP_SPEC}": `
+    + `{ "spec": "${DATA_MAP_SPEC}", "what": "one sentence on what the app is", "usedFor": "what people use it for", `
+    + '"form": "one-person", "arrangement": "how its data is arranged", "machinery": [], "leaves": [], '
+    + '"held": [ { "what": "habits.v1", "holds": "every habit and its ticks", "kind": "user-written", "usedFor": "app-cannot-run-without", '
+    + '"where": "owner-memory-private", "owner": "person", "readers": "owner-and-their-agents", "writers": ["the-app-for-the-person"], '
+    + '"shape": "one-record", "keptFor": "until-deleted", "lossRisk": "only-copy", "personalData": "yes", "why": "" } ], "elsewhere": [] }. '
+    + 'One `held` row per key FAMILY, never per key; leave a `why` you do not know empty. '
+    + 'This write REPLACES the map: read the current one first (aimeat_datamap_get) and send all of it back. '
+    + 'Every field of a `held` row and every allowed value: aimeat_handbook_get { tier: "build-app/data-map" }.';
 
 export const dataMapTools: AimeatToolDefinition[] = [
     {
