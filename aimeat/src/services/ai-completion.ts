@@ -21,6 +21,9 @@
  *   import { completeForOwner, AiCompletionError } from '../services/ai-completion.js';
  *   const r = await completeForOwner(storage, config, gaii, { prompt });
  * @version-history
+ *   v3.3.0 — 2026-09-19 — One name per app in the budget (services/ai-app-id.ts): the day's spend is
+ *     recorded under the canonical name, and the allowlist and the per-app cap match any of an app's
+ *     names, so `app`, `app.html` and `owner/app.html` are one app with one cap.
  *   v3.2.1 — 2026-09-16 — prepareAiCall passes the call's baseUrl to resolveAiKey, which refuses
  *     the node's shared key for any address but OpenRouter's own.
  *   v3.2.0 — 2026-09-13 — The result carries finishReason and truncated (finish_reason === 'length').
@@ -89,6 +92,7 @@ import { resolveModelFor, type ModelRole } from './ai-model-defaults.js';
 import { resolveAiKey, debitAllowance } from './ai-allowance.js';
 import { recordUsageEvent } from './usage-metering.js';
 import { recordAccountEvent } from './account-events.js';
+import { canonicalAiAppId, appSpentToday, appQuotaFor, appAllowlisted, mergePerApp } from './ai-app-id.js';
 
 /**
  * Rough cost estimate when the provider didn't report one (LM Studio, custom).
@@ -164,10 +168,11 @@ export function assertProviderAllowed(config: AimeatConfig, baseUrl: string): vo
 }
 
 /** The owner's per-app allowlist (only meaningful once they configured one). */
-export function assertAppAllowed(prefs: Record<string, unknown>, appId?: string): void {
+export function assertAppAllowed(prefs: Record<string, unknown>, appId?: string, ownerGhii?: string): void {
   const allowlist = Array.isArray(prefs.app_allowlist) ? (prefs.app_allowlist as string[]) : null;
   if (!allowlist) return;
-  if (appId && !allowlist.includes(appId)) {
+  // Under any of the app's names (services/ai-app-id.ts): an entry saved as `app.html` still allows `app`.
+  if (appId && !appAllowlisted(allowlist, appId, ownerGhii)) {
     throw new AiCompletionError('APP_NOT_ALLOWED', 403,
       `App "${appId}" is not in your AI allowlist. Enable it from Settings.`);
   }
@@ -203,7 +208,7 @@ export function decryptOwnerKey(
  * resolved daily budget so the caller can report it.
  */
 export function assertWithinBudget(
-  usage: UsageRecord, prefs: Record<string, unknown>, appId?: string,
+  usage: UsageRecord, prefs: Record<string, unknown>, appId?: string, ownerGhii?: string,
 ): number {
   const dailyBudget = getDailyBudgetUsd(prefs);
   if (usage.total_cost_usd >= dailyBudget) {
@@ -214,9 +219,9 @@ export function assertWithinBudget(
     // Per-app cap. By DEFAULT an app may spend the whole daily budget the owner set (the "AI apps
     // daily budget") — there is no separate hidden per-app default. An explicit app_quotas.<app>
     // override throttles that one app below the budget when the owner wants it.
-    const appQuotas = (prefs.app_quotas as Record<string, { daily_usd?: number }> | undefined) ?? {};
-    const appQuota = appQuotas[appId]?.daily_usd ?? dailyBudget;
-    const appSpent = usage.per_app[appId]?.cost_usd ?? 0;
+    // One app, one cap, whatever name a door recorded it under (services/ai-app-id.ts).
+    const appQuota = appQuotaFor(prefs.app_quotas as Record<string, { daily_usd?: number }> | undefined, appId, ownerGhii, dailyBudget);
+    const appSpent = appSpentToday(usage.per_app, appId, ownerGhii);
     if (appSpent >= appQuota) {
       throw new AiCompletionError('APP_QUOTA_EXHAUSTED', 402,
         `Daily AI quota for "${appId}" hit ($${appSpent.toFixed(4)} / $${appQuota}). Raise it in Settings.`);
@@ -295,10 +300,11 @@ async function appendAiUsage(
     total_calls: usage.total_calls + 1,
     total_tokens: usage.total_tokens + call.tokens,
     audio_seconds: (usage.audio_seconds ?? 0) + (call.audioSeconds ?? 0),
-    per_app: { ...usage.per_app },
+    // Folded on write, so a day that began under an older name continues as one app.
+    per_app: mergePerApp(usage.per_app, gaii),
     updated_at: new Date().toISOString(),
   };
-  const appKey = call.appId || '_unknown';
+  const appKey = canonicalAiAppId(call.appId, gaii) || '_unknown';
   const existing = updated.per_app[appKey] ?? { cost_usd: 0, calls: 0, tokens: 0 };
   updated.per_app[appKey] = {
     cost_usd: existing.cost_usd + call.costUsd,
@@ -335,7 +341,7 @@ async function appendAiUsage(
         providerCostUsd: call.costUsd,
         source: call.source ?? 'ai-complete',
         apiKeyScope: call.apiKeyScope ?? 'own',
-        appId: call.appId ?? '',
+        appId: canonicalAiAppId(call.appId, gaii) ?? '',
         surface: 'app',
       });
     } catch (err) {
@@ -522,14 +528,14 @@ export async function prepareAiCall(
   const baseUrl = (prefs.baseUrl as string) || DEFAULT_BASE_URLS[provider];
 
   assertProviderAllowed(config, baseUrl);
-  assertAppAllowed(prefs, opts.appId);
+  assertAppAllowed(prefs, opts.appId, gaii);
   // Whose key pays is one decision and it lives in services/ai-allowance.ts: the person's own key,
   // then the node's if they have allowance left. An own key is never metered here — it is their
   // money and their provider account, which is the whole reason bringing one is recommended.
   const keyChoice = await resolveAiKey(storage, config, gaii, provider, apiKeyRecord?.value, baseUrl);
 
   const usage = (usageRecord?.value as UsageRecord | undefined) ?? emptyUsage();
-  const dailyBudgetUsd = assertWithinBudget(usage, prefs, opts.appId);
+  const dailyBudgetUsd = assertWithinBudget(usage, prefs, opts.appId, gaii);
 
   // ── Model selection ──
   // Each role asks the owner first and the node second (services/ai-model-defaults.ts). With no

@@ -15,7 +15,7 @@ const voice = AIMEAT.voice.createSession({
   stt: { model: 'your-transcription-model', language: 'fi' },
   llm: { model: 'your-conversation-model', temperature: 0.5 },
   tts: { model: 'your-speech-model', voice: 'your-voice', format: 'pcm', sampleRate: 24000 },
-  turn: { silenceMs: 700, minSpeechMs: 250, maxSpeechMs: 30000, bargeIn: true },
+  turn: { silenceMs: 700, minSpeechMs: 250, maxSpeechMs: 30000, bargeIn: false, resumeQuietMs: 300 },
   chunking: { mode: 'sentence', minChars: 24, maxChars: 1200, maxWaitMs: 350 },
   playback: { bufferMs: 80, maxBufferedMs: 3000, maxPendingSegments: 3 },
 });
@@ -38,8 +38,12 @@ PCM starts playing incrementally. A provider that does not support PCM must use 
 - `start()` opens playback and, unless input.mode is text, the microphone. Call it from a user gesture.
 - Manual mode: `begin()` starts recording and interrupts a reply; `commit()` submits the recorded turn.
 - VAD mode: local audio energy detects a turn; silenceMs ends it. This is energy detection, not a
-  semantic end-of-turn model. Echo cancellation is requested from the browser. Speaker/microphone
-  placement and background noise affect interruption; use headphones or manual mode when needed.
+  semantic end-of-turn model. Echo cancellation is requested from the browser but is not guaranteed.
+  By default, capture discards input during a response and waits for 300 ms of continuous quiet
+  afterwards (`turn.resumeQuietMs`). This rejects speaker feedback and its tail before the next
+  automatic turn. Wait for the reply to finish before speaking. `interrupt()` remains available.
+  With headphones, opt into `turn.bargeIn: true` to interrupt by speaking. Energy detection cannot
+  distinguish residual echo from user speech, so this option can self-interrupt on speakers.
 - `sendText(text)` skips STT; `sendAudio(blob)` runs STT without requiring manual capture.
 - `interrupt()` cancels STT/model/TTS requests, stops scheduled sound and discards the pending queue.
 - `stop()` releases devices and allows reconfiguration; `close()` also clears history and listeners.
@@ -68,7 +72,7 @@ retained. history.maxTurns bounds memory; closing a session clears it.
 | Group | Parameters and balanced defaults |
 |---|---|
 | input | mode manual; echoCancellation, noiseSuppression, autoGainControl true |
-| turn | silenceMs 700; minSpeechMs 250; maxSpeechMs 30000; threshold 0.025 RMS; preRollMs 200; bargeIn true; interruptMs 200 |
+| turn | silenceMs 700; minSpeechMs 250; maxSpeechMs 30000; threshold 0.025 RMS; preRollMs 200; bargeIn false; interruptMs 200; resumeQuietMs 300 |
 | stt | provider node; model empty uses owner/node STT default; language empty uses session language; temperature 0 |
 | llm | provider node; model empty uses existing model selection; temperature 0.7; topP 1; maxTokens null (no default cap, optional explicit limit); reasoning null |
 | tts | provider node; explicit model required; voice alloy; format pcm; sampleRate 24000; channels 1; speed 1; instructions empty |

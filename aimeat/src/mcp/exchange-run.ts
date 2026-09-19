@@ -21,6 +21,8 @@
  *   import { registerExchangeRunTools } from './exchange-run.js';
  *   registerExchangeRunTools(mcp, storage, config, () => agentGaii, () => sessionToken);
  * @version-history
+ *   v1.5.0 — 2026-09-19 — aimeat_app_tool_invoke checks the input against the tool's published
+ *     schema before metering, and a refusal names every missing field at once.
  *   v1.4.0 — 2026-08-30 — aimeat_app_tool_invoke asks the chokepoint BEFORE looking for an
  *     entitlement, which is what its REST twin has done since webmcp.ts v1.3.0. This door kept the
  *     pre-check that fix removed, and a pre-check reads as prudent while being the whole defect: an
@@ -60,6 +62,7 @@ import { takeDesignations } from '../commerce/beneficiary-designation.js';
 import { recordCallDuration } from '../services/call-timing.js';
 import { meteredRefusalText } from '../routes/extensions/metered-response.js';
 import { appToolsKey, appIdFromToolsKey, AppToolsDocSchema, applyLockedInput } from '../models/app-tool-schemas.js';
+import { checkAppToolInput } from '../services/app-tool-input.js';
 import { getInterfaceVersion } from '../services/app-tool-interfaces.js';
 import { sendDirectMessage } from '../services/message-send.js';
 import type { PeerInfo } from '../services/federation.js';
@@ -149,6 +152,12 @@ export function registerExchangeRunTools(
             const toolDef = parsed.data.tools.find(t => t.name === tool);
             if (!toolDef) return fail(`TOOL_NOT_FOUND: no tool "${tool}" on app "${ownerName}/${app}"`);
 
+            // Checked against the tool's published schema BEFORE anything is metered, and every
+            // problem named at once (services/app-tool-input.ts).
+            const toolInput = applyLockedInput(toolDef, (input ?? {}) as Record<string, unknown>);
+            const inputCheck = checkAppToolInput(toolDef, toolInput);
+            if (!inputCheck.ok) return fail(`INVALID_INPUT: ${inputCheck.message}`);
+
             const coordExt = `apptool:${ownerName}/${app}`;
 
             // The SAME decision the REST twin makes, from the same function — not a re-derivation of
@@ -197,8 +206,7 @@ export function registerExchangeRunTools(
                 // so it billed the same contract a second time. One call, one settlement, whichever twin
                 // of this route the caller reached (the REST WebMCP path carries the same pass).
                 const startedAt = Date.now();
-                const invoked = await invokeCapability(config, storage, cap,
-                    applyLockedInput(toolDef, (input ?? {}) as Record<string, unknown>),
+                const invoked = await invokeCapability(config, storage, cap, toolInput,
                     callerGaii, getToken() ?? '', 'normal', mintInternalPass(coordExt, tool));
                 // Measured, so the provider can propose a service commitment from evidence rather
                 // than from a guess (services/call-timing.ts). The REST twin has recorded this since

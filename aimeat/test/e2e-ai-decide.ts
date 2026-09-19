@@ -24,6 +24,7 @@
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-ai-decide.ts
  *   cd aimeat && pnpm exec node --env-file=.env.test.postgres-kysely --import tsx test/e2e-ai-decide.ts
  * @version-history
+ *   v1.1.0 — 2026-09-19 — 3c/3d: one app has one name in the register, the spend and the cap.
  *   v1.0.0 — 2026-09-19 — Initial (TARGET-080).
  */
 import * as ed from '@noble/ed25519';
@@ -366,6 +367,39 @@ const QUESTIONS = {
     assert(w.status === 200, `datamap ${w.status}: ${JSON.stringify(w.body.error)}`);
     const r = await json('/v1/ai/decide', { method: 'POST', headers: auth(appToken), body: JSON.stringify({ state: 'Pay today.', questions: { q: QUESTIONS.urgent } }) });
     assert(r.status === 200, `got ${r.status} ${JSON.stringify(r.body.error)}`);
+  });
+
+  // One app, one name (services/ai-app-id.ts). The app token names the app by its file
+  // (`decide-probe.html`), an owner session by what the app says (`decide-probe`); Päätöspaja was
+  // recorded under both on aimeat.io on 2026-09-19, with the daily cap split between them.
+  const APP_NAME = FILENAME.replace(/\.html$/, '');
+  await test('3c. the app token and the owner naming the app land under ONE name', async () => {
+    const r = await json('/v1/ai/decide', {
+      method: 'POST', headers: auth(A.token),
+      body: JSON.stringify({ state: 'Pay tomorrow.', questions: { q: QUESTIONS.urgent }, app_id: APP_NAME }),
+    });
+    assert(r.status === 200, `owner call ${r.status} ${JSON.stringify(r.body.error)}`);
+    const byName = await json(`/v1/ai/decisions?app_id=${APP_NAME}`, { headers: auth(A.token) });
+    const byFile = await json(`/v1/ai/decisions?app_id=${FILENAME}`, { headers: auth(A.token) });
+    assert(byName.body.data.total === 2, `both calls under "${APP_NAME}", got ${byName.body.data.total}`);
+    assert(byFile.body.data.total === 2, `the file name finds the same two, got ${byFile.body.data.total}`);
+    const u = await json('/v1/ai/usage', { headers: auth(A.token) });
+    assert(u.body.data.per_app[APP_NAME]?.calls === 2, `one spend row with both calls: ${JSON.stringify(u.body.data.per_app)}`);
+    assert(u.body.data.per_app[FILENAME] === undefined, 'no second row under the file name');
+  });
+  await test('3d. a cap saved under the app\'s full reference holds for every name', async () => {
+    const set = await json('/v1/ai/settings', {
+      method: 'POST', headers: auth(A.token), body: JSON.stringify({ app_quotas: { [`${A.name}/${FILENAME}`]: { daily_usd: 0 } } }),
+    });
+    assert(set.status === 200, `settings ${set.status}`);
+    const before = seen.length;
+    const r = await json('/v1/ai/decide', {
+      method: 'POST', headers: auth(A.token),
+      body: JSON.stringify({ state: 'Pay next week.', questions: { q: QUESTIONS.urgent }, app_id: APP_NAME }),
+    });
+    assert(r.status === 402 && r.body.error?.code === 'APP_QUOTA_EXHAUSTED', `got ${r.status} ${JSON.stringify(r.body.error)}`);
+    assert(seen.length === before, 'the stub was not called');
+    await json('/v1/ai/settings', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ app_quotas: {} }) });
   });
 
   console.log('\nPhase 4: the owner\'s settings');
