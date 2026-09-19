@@ -10,6 +10,9 @@
  *   import { registerPromptsTools } from './prompts.js';
  *   registerPromptsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-09-19 — aimeat_handbook_get serves the ATELIER specification in parts
+ *     ("build-app-atelier", "build-app-atelier/<id>"). It had no MCP door at all, so a chat could
+ *     not read the guide of the track a new app is built on.
  *   v1.0.0 -- 2026-03-21 -- Initial creation: 1 tool for managed system prompt retrieval via MCP
  *   v1.1.0 -- 2026-05-27 -- Rename tool from aimeat_prompts_get to aimeat_handbook_get
  *   v1.2.0 -- 2026-05-29 -- Add tool annotations (title + readOnlyHint) from shared
@@ -45,6 +48,8 @@ import { skillsBySituation } from '../services/skills-by-situation.js';
 import { substituteVariables } from '../services/prompt-variables.js';
 import { buildAppPrompt } from '../services/build-app-prompt.js';
 import { buildAppPiece, buildAppPieceIds } from '../services/build-app-layers.js';
+import { buildAtelierPrompt } from '../services/build-atelier-prompt.js';
+import { atelierPiece, atelierPieceIds } from '../services/build-atelier-layers.js';
 import { toolError } from './tool-error.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
 import { V2_ROLES, toolsForSurface, type SurfaceRole } from './catalog/surfaces.js';
@@ -65,7 +70,7 @@ export function registerPromptsTools(
         'aimeat_handbook_get',
         descriptionFor('aimeat_handbook_get'),
         {
-            tier: z.string().optional().describe('A REST-style tier handbook or a managed prompt by id (e.g. "tier1", "tier2", or a custom prompt ID), for an agent that works over HTTP. Leave it out over MCP: the handbook for your own surface comes back. One value is for every builder: "build-app" returns the first part of the app build specification, and "build-app/<id>" one of the parts or sections it lists.'),
+            tier: z.string().optional().describe('A REST-style tier handbook or a managed prompt by id (e.g. "tier1", "tier2", or a custom prompt ID), for an agent that works over HTTP. Leave it out over MCP: the handbook for your own surface comes back. Two values are for every builder. "build-app-atelier" returns the first part of the ATELIER build specification, the track an app is built on unless there is a reason not to, and "build-app-atelier/<id>" one of the parts it lists. "build-app" and "build-app/<id>" do the same for the Classic specification.'),
             surface: z.enum(V2_ROLES as unknown as [SurfaceRole, ...SurfaceRole[]]).optional().describe('Read another surface\'s handbook than your own. Leave it out to get the one for the surface you are connected to.'),
         },
         annotationsFor('aimeat_handbook_get'),
@@ -104,6 +109,16 @@ export function registerPromptsTools(
                 const piece = buildAppPiece(full, id, config.baseUrl);
                 if (piece) return { content: [{ type: 'text' as const, text: piece.text }] };
                 return toolError('NOT_FOUND', `The build specification has no part or section "${id}". It has: ${buildAppPieceIds(full).join(', ')}. Ask for "build-app" to read the first part, which lists the others.`);
+            }
+            // The Atelier specification had no MCP door at all until 2026-09-19: it is 68 kB, a
+            // chat with no HTTP tool could not read it, and the track every app is meant to be
+            // built on was therefore the one whose guide a chat could not open.
+            if (tierKey === 'build-app-atelier' || tierKey.startsWith('build-app-atelier/')) {
+                const full = buildAtelierPrompt(config, { mode: 'new', lang: 'en' }).full;
+                const id = tierKey.slice('build-app-atelier/'.length) || 'start';
+                const piece = atelierPiece(full, id, config.baseUrl);
+                if (piece) return { content: [{ type: 'text' as const, text: piece.text }] };
+                return toolError('NOT_FOUND', `The Atelier build specification has no part "${id}". It has: ${atelierPieceIds().join(', ')}. Ask for "build-app-atelier" to read the first part, which lists the others.`);
             }
             // Normalize tier aliases used in routes (tier1 → tier-1, etc.)
             const normalized = tierKey

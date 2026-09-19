@@ -5,6 +5,7 @@
  * @description MCP tool registration for retrieving the agent operating handbook,
  *   with optional module-level drill-down.
  * @version-history
+ *   2026-09-19 — The `tier` description names the Atelier specification first.
  *   v1.0.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
  *     from shared annotations.ts for Connectors Directory compliance.
  *   v1.1.0 -- 2026-05-29 -- Per-call agent routing via pickAgent so the handbook
@@ -29,7 +30,7 @@ export function registerHandbookTools(mcp: McpServer, registry: AgentRegistry): 
     agent_name: agentNameSchema,
     module: z.string().optional().describe('Specific handbook module to retrieve'),
     surface: z.enum(['appdev', 'agent', 'service', 'admin']).optional().describe('Return the v2 purpose-scoped surface handbook for this role (use the surface you serve, e.g. "agent") instead of a module.'),
-    tier: z.string().optional().describe('A prompt by id. "build-app" is the first part of the build specification every app follows; "build-app/<id>" is one of the parts or sections it lists.'),
+    tier: z.string().optional().describe('A prompt by id. "build-app-atelier" is the first part of the Atelier build specification, the track an app is built on unless there is a reason not to, and "build-app-atelier/<id>" is one of the parts it lists. "build-app" and "build-app/<id>" do the same for the Classic specification.'),
   }, annotationsFor('aimeat_handbook_get'), async ({ agent_name, module, surface, tier }) => {
     const { client } = pickAgent(registry, agent_name);
     const path = tier ? handbookTierPath(tier) : surface

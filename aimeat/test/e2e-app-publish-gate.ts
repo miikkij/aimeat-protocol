@@ -287,6 +287,66 @@ const publish = (token: string, body: Record<string, unknown>) =>
             `an undeclared track must stay absent, got ${JSON.stringify(row?.manifest?.track)}`);
     });
 
+    // ── A build that left the Atelier track (services/app-track-drift.ts, 2026-09-19) ──
+    const drift = (r: any) => ((r.body.data.app_hints ?? []) as any[]).filter(h => h.pitfall === 'track-drift');
+    const driftName = `gatedrift${Date.now()}.html`;
+
+    await test('a NEW app on Classic is published, and the hints say which track a new app is built on', async () => {
+        const r = await publish(o.token, {
+            filename: driftName, mime_type: 'text/html', content: b64(app(driftName)),
+            name: 'New on Classic', description: 'A new app built on the Classic track.', spec_token: specToken,
+        });
+        assert(r.status === 201, `a warning must never refuse: ${r.status} ${JSON.stringify(r.body?.error)}`);
+        const d = drift(r);
+        assert(d.length === 1, `expected one track-drift hint, got ${JSON.stringify(r.body.data.app_hints)}`);
+        assert(/new app/i.test(d[0].message) && d[0].message.includes('build-app-atelier'), `the hint must name the Atelier specification: ${d[0].message}`);
+    });
+
+    await test('UPDATING that Classic app says nothing: sixty Classic apps are updated every week', async () => {
+        const r = await publish(o.token, {
+            filename: driftName, mime_type: 'text/html', content: b64(app(driftName)),
+            name: 'New on Classic', description: 'A new app built on the Classic track.', spec_token: specToken,
+        });
+        assert(r.status === 201, `update ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        assert(drift(r).length === 0, `an update of a Classic app must stay quiet: ${JSON.stringify(drift(r))}`);
+    });
+
+    await test('the ATELIER token with a Classic app says the track changed mid-build, on an update too', async () => {
+        const r = await publish(o.token, {
+            filename: driftName, mime_type: 'text/html', content: b64(app(driftName)),
+            name: 'New on Classic', description: 'A new app built on the Classic track.', spec_token: atelierToken,
+        });
+        assert(r.status === 201, `publish ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        const d = drift(r);
+        assert(d.length === 1 && /carried the Atelier/i.test(d[0].message), `expected the mid-build hint, got ${JSON.stringify(d)}`);
+    });
+
+    await test('a NEW Atelier app leaves no track-drift hint', async () => {
+        const name = `gatedriftat${Date.now()}.html`;
+        const atelier = app(name).replace(
+            '<meta name="aimeat-scopes"',
+            '<meta name="aimeat-track" content="atelier">\n<meta name="aimeat-register" content="genre-receipt">\n<meta name="aimeat-scopes"');
+        const r = await publish(o.token, {
+            filename: name, mime_type: 'text/html', content: b64(atelier),
+            name: 'New on Atelier', description: 'A new app on the Atelier track.', spec_token: atelierToken,
+        });
+        assert(r.status === 201, `publish ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        assert(drift(r).length === 0, `an Atelier app must leave no drift hint: ${JSON.stringify(drift(r))}`);
+    });
+
+    await test('the Atelier specification comes in parts over HTTP, each inside one tool result', async () => {
+        const list = await json('/v1/prompts/build-app-atelier/sections');
+        assert(list.status === 200, `parts list ${list.status}`);
+        const ids = (list.body.data.parts as any[]).map(p => p.id);
+        assert(JSON.stringify(ids) === JSON.stringify(['start', 'genre', 'patterns', 'look']), `parts: ${JSON.stringify(ids)}`);
+        for (const p of list.body.data.parts as any[]) assert(p.chars > 1000 && p.chars <= 24000, `${p.id} is ${p.chars} characters`);
+        const start = await json('/v1/prompts/build-app-atelier/sections/start');
+        assert(start.status === 200 && start.body.data.spec_token === atelierToken, 'part start carries the Atelier token');
+        assert((start.body.data.prompt as string).includes('build-app-atelier/<id>'), 'part start says how to read the others');
+        const none = await json('/v1/prompts/build-app-atelier/sections/libraries');
+        assert(none.status === 404 && /start, genre, patterns, look/.test(none.body.error.message), `an unknown part names the ones there are: ${JSON.stringify(none.body.error)}`);
+    });
+
     await test('the Atelier shell is served, declares its track, and points at its own guide', async () => {
         const r = await json('/v1/app-templates/shell-atelier');
         assert(r.status === 200, `shell-atelier ${r.status}`);
@@ -599,8 +659,12 @@ const publish = (token: string, body: Record<string, unknown>) =>
             name: 'Clean', description: 'Follows the spec.', spec_token: specToken,
         });
         assert(r.status === 201, `publish ${r.status}: ${JSON.stringify(r.body?.error)}`);
-        assert(!r.body.data.app_hints,
-            `a correct app must publish in silence, or the findings become noise: ${JSON.stringify(r.body.data.app_hints)}`);
+        // Setup no longer matched the ruling of 2026-09-19: this is a NEW app on the CLASSIC track, and
+        // a new app is built on Atelier, so the publish says so once (track-drift, tested above).
+        // What this test holds is unchanged: the artifact lint has nothing to say about a correct app.
+        const others = ((r.body.data.app_hints ?? []) as any[]).filter(h => h.pitfall !== 'track-drift');
+        assert(others.length === 0,
+            `a correct app must publish in silence, or the findings become noise: ${JSON.stringify(others)}`);
     });
 
     // ── The reminder every door owes ───────────────────────────────────────────────────────────

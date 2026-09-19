@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Onboarding, agent, message, DM and task connect-call tool definitions. Extracted from cli/connect/tool-call.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-09-19 — The `tier` description of aimeat_handbook_get names the Atelier specification
+ *     first.
  *   v1.11.0 -- 2026-09-18 -- aimeat_handbook_get takes `tier` here too, so "build-app" reaches the
  *     layered build specification on this door as it does on the node's own MCP tool.
  *   v1.10.0 -- 2026-09-13 -- aimeat_dm_archive_as_owner / aimeat_dm_organize_as_owner on the CLI
@@ -42,7 +44,7 @@ export const agentTools: ConnectCliToolDefinition[] = [
         input: {
             module: { type: 'string', description: 'Optional handbook module name, such as tasks or messages.' },
             surface: { type: 'string', description: 'Which surface the handbook is for. The catalog has published this since the surfaces split; this door read only `module`, so asking for one was the same as asking for none.' },
-            tier: { type: 'string', description: 'A prompt by id. "build-app" is the first part of the build specification every app follows; "build-app/<id>" is one of the parts or sections it lists.' },
+            tier: { type: 'string', description: 'A prompt by id. "build-app-atelier" is the first part of the Atelier build specification, the track an app is built on unless there is a reason not to, and "build-app-atelier/<id>" is one of the parts it lists. "build-app" and "build-app/<id>" do the same for the Classic specification.' },
         },
         handler: ({ client }, input) => {
             const tier = optionalString(input, 'tier');

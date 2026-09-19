@@ -1488,9 +1488,9 @@
      "cells": [
       "<strong>Build spec with a token</strong>",
       "The canonical build prompt hands out a token; the publish says whether the app was built against today's spec.",
-      "<code>/v1/prompts/build-app</code>, <code>/v1/prompts/build-app/core</code> (the part every app needs; the rest by section), <code>aimeat_handbook_get { tier: &quot;build-app&quot; }</code> over MCP, <code>/v1/prompts/build-app-atelier</code>, <code>/v1/how-an-app-builds</code>"
+      "<code>/v1/prompts/build-app</code>, <code>/v1/prompts/build-app/core</code> (the part every app needs; the rest by section), <code>aimeat_handbook_get { tier: &quot;build-app&quot; }</code> over MCP, <code>/v1/prompts/build-app-atelier</code> and its four parts (<code>/v1/prompts/build-app-atelier/sections/{id}</code>, <code>aimeat_handbook_get { tier: &quot;build-app-atelier&quot; }</code> over MCP), <code>/v1/how-an-app-builds</code>"
      ],
-     "plain": "Build spec with a token The canonical build prompt hands out a token; the publish says whether the app was built against today's spec. /v1/prompts/build-app, /v1/prompts/build-app/core (the part every app needs; the rest by section), aimeat_handbook_get { tier: \"build-app\" } over MCP, /v1/prompts/build-app-atelier, /v1/how-an-app-builds"
+     "plain": "Build spec with a token The canonical build prompt hands out a token; the publish says whether the app was built against today's spec. /v1/prompts/build-app, /v1/prompts/build-app/core (the part every app needs; the rest by section), aimeat_handbook_get { tier: \"build-app\" } over MCP, /v1/prompts/build-app-atelier and its four parts (/v1/prompts/build-app-atelier/sections/{id}, aimeat_handbook_get { tier: \"build-app-atelier\" } over MCP), /v1/how-an-app-builds"
     },
     {
      "slug": "g-10-its-own-origin",
@@ -1782,10 +1782,10 @@
      "slug": "g-11-atelier",
      "cells": [
       "<strong>Atelier</strong>",
-      "A second way to build: the app starts from a shell and a genre and composes its screen from finished parts (lists, tables, forms, charts, a map, a timeline, tabs). One word picks the whole look in light and dark. Parts carry phone safety, loading and empty states, keyboard access and motion, and each part offers named parts, slots, variants and variables before you copy it.",
+      "The way a new app is built: the app starts from a genre, a complete page in a committed look, and composes its screen from finished parts (lists, tables, forms, charts, a map, a timeline, tabs). One word picks the whole look in light and dark. Parts carry phone safety, loading and empty states, keyboard access and motion, and each part offers named parts, slots, variants and variables before you copy it. The Classic track stays for apps that are already Classic; a publish says so when a new app lands on it, or when a build that began on Atelier changed over on the way.",
       "<code>aimeat-atelier</code>, <code>/v1/prompts/build-app-atelier</code>, <code>aimeat_app_ui_*</code>"
      ],
-     "plain": "Atelier A second way to build: the app starts from a shell and a genre and composes its screen from finished parts (lists, tables, forms, charts, a map, a timeline, tabs). One word picks the whole look in light and dark. Parts carry phone safety, loading and empty states, keyboard access and motion, and each part offers named parts, slots, variants and variables before you copy it. aimeat-atelier, /v1/prompts/build-app-atelier, aimeat_app_ui_*"
+     "plain": "Atelier The way a new app is built: the app starts from a genre, a complete page in a committed look, and composes its screen from finished parts (lists, tables, forms, charts, a map, a timeline, tabs). One word picks the whole look in light and dark. Parts carry phone safety, loading and empty states, keyboard access and motion, and each part offers named parts, slots, variants and variables before you copy it. The Classic track stays for apps that are already Classic; a publish says so when a new app lands on it, or when a build that began on Atelier changed over on the way. aimeat-atelier, /v1/prompts/build-app-atelier, aimeat_app_ui_*"
     },
     {
      "slug": "g-11-design-book",

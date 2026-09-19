@@ -11,6 +11,8 @@
  * @usage
  *   import { renderReport, compareReports } from './report.js';
  * @version-history
+ *   2026-09-19 — The note of a FAILING run is printed too: what a build made instead is the thing
+ *     worth reading.
  *   v1.0.0 — 2026-09-18 — Initial.
  */
 import { readFileSync } from 'node:fs';
@@ -104,10 +106,12 @@ export function renderReport(meta: RunMeta, records: RunRecord[], tasks: Task[])
     const failures = records.filter(r => !r.ok);
     if (!failures.length) lines.push('Nowhere.', '');
     for (const f of failures) lines.push(`- **${f.task}** #${f.run}: ${f.detail}. It said: "${f.metrics.finalText.replace(/\s+/g, ' ').slice(0, 220)}"`);
-    const noted = records.filter(r => r.ok && r.note);
+    // Failing runs as well: a build that published on the wrong track fails, and what it built
+    // instead is the thing worth reading.
+    const noted = records.filter(r => r.note);
     if (noted.length) {
-        lines.push('', '## What the passing runs produced', '', 'A pass says the thing exists. This says what it is like, which is what two wordings of the same guidance are compared on.', '');
-        for (const r of noted) lines.push(`- **${r.task}** #${r.run}: ${r.note}`);
+        lines.push('', '## What the runs produced', '', 'A pass says the thing exists. This says what it is like, which is what two wordings of the same guidance are compared on.', '');
+        for (const r of noted) lines.push(`- **${r.task}** #${r.run} (${r.ok ? 'pass' : 'FAIL'}): ${r.note}`);
     }
     lines.push('', '## Walls it hit', '', 'Every distinct error a tool call returned. Each one is a place where the node could have said what to do next.', '');
     const walls = sums.filter(s => s.walls.length);

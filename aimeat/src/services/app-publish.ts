@@ -40,6 +40,9 @@
  *   });
  *   if ('refusal' in out) return res.status(out.refusal.status).json(error(...));
  * @version-history
+ *   2026-09-19 — A build that left the Atelier track is named in the publish hints
+ *     (services/app-track-drift.ts): the Atelier token carried with a Classic app, or a NEW app on
+ *     Classic. Warnings, never a refusal.
  *   v1.10.0 — 2026-09-13 — A served copy is stored as its source (the developer's decision): the
  *     node's own serve marks are removed first (services/app-serve-marks-strip.ts), so the lints, the
  *     AI posture, the provenance hash, the stored bytes, the size and the dependency map all read
@@ -95,6 +98,9 @@ import { lintAppAiDisclosure, type AppAiLintResult } from './app-ai-posture.js';
 import { lintAppArtifact, type AppArtifactFinding } from './app-artifact-lint.js';
 import { stripServedMarks, type ServedMarkRemoval } from './app-serve-marks-strip.js';
 import { evaluateSpecCheck, type AppSpecCheck } from './app-spec-gate.js';
+import { buildAtelierSpecToken } from './build-atelier-prompt.js';
+import { trackDriftFindings } from './app-track-drift.js';
+import { loadsAtelierKit } from './app-artifact-lint.js';
 import { buildPublishNextSteps } from './app-publish-next-steps.js';
 import { readAppDataMap } from './data-map/data-map-store.js';
 import { stampFor } from './data-map/data-map-check.js';
@@ -627,7 +633,12 @@ export async function publishApp(
     aiLint,
     ...(aiProvenanceId ? { aiProvenanceId } : {}),
     specCheck,
-    artifactWarnings: artifact.warnings,
+    // A build that left the Atelier track is named here, beside the other hints, on every door
+    // (services/app-track-drift.ts). A warning: an owner may have asked for Classic.
+    artifactWarnings: [...artifact.warnings, ...(isHtml ? trackDriftFindings({
+      isUpdate, track, loadsAtelier: loadsAtelierKit(html),
+      carriedAtelierToken: typeof input.specToken === 'string' && input.specToken.trim() === buildAtelierSpecToken(config),
+    }) : [])],
     servedMarksRemoved,
     // Every door returns this now. It used to exist only on the MCP inline branch, so the two
     // things an app most often lacks went unmentioned on the door most apps come through.

@@ -9,7 +9,9 @@ description: The research-first precondition for building any app on AIMEAT, and
 
 The moment the task is "build / make / publish an app on AIMEAT":
 
-> You have `aimeat_*` MCP tools. Follow the research-first flow: load the skill `node:aimeat-app-builder` and call `aimeat_appdev_overview` first, then fetch `GET /v1/prompts/build-app` and `/v1/app-templates` and start from a template.
+> You have `aimeat_*` MCP tools. Follow the research-first flow: load the skill `node:aimeat-app-builder` and call `aimeat_appdev_overview` first. A NEW app goes on the **Atelier track**: load `node:aimeat-app-builder-atelier`, read its specification (`aimeat_handbook_get { tier: "build-app-atelier" }`, four parts, or `GET /v1/prompts/build-app-atelier`) and fork a genre (`aimeat_designbook_search { kind: "genre" }`, then `aimeat_app_template_get { id: "genre-<id>" }`). `GET /v1/prompts/build-app` and the Classic shells are for improving an app that is already Classic, or when Jouni asks for Classic by name.
+
+**The track is not changed in the middle of a build.** On 2026-09-19 a model began on Atelier, judged the Classic shell quicker to start from, changed over, and handed Jouni an app with a hand-built header and a broken sign-in bar; it had accepted that because its own tests passed. "Quicker to start" is not a reason. If the Atelier road stops you, say what stopped you and wait. The publish names a build that left the track (`app_hints`, pitfall `track-drift`), and a finished app is compared with the genre it was forked from before it is shown.
 
 This is a hard precondition of the build, not an optional preamble, and it comes **before** reading repo source: existing published apps and the KB show which libs and patterns are already proven, so reuse beats re-deriving from lib sources. Skipping it once produced non-theming (hardcoded colours), meta-less, duplicate, low-polish apps.
 

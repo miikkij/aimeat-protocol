@@ -12,6 +12,8 @@
  *   getAppdevPitfalls() / getAppdevPitfallIndex() / getAppdevPitfallFacets() — accessors.
  * @usage import { getAppdevPitfalls, getAppdevPitfallIndex } from '../data/appdev-pitfalls.js';
  * @version-history
+ *   2026-09-19 — track-drift: a new app that ended up on Classic, and what the publish says about
+ *     it.
  *   v1.7.1 — 2026-09-13 — handle-both-auth-paths names onSession, the one handler for a restore and a
  *     sign-in, and keeps the two-path wiring for a page that does not use it.
  *   v1.7.0 — 2026-09-13 — Every entry re-read against the code and stamped (verifiedAt,
@@ -145,6 +147,17 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     severity: 'warn',
     source: 'curated',
     updatedAt: '2026-08-27',
+    ...CHECKED,
+  }),
+  E({
+    id: 'track-drift',
+    title: 'A new app that ended up on the Classic track',
+    symptom: 'A new app is published on Classic, or a build that read the Atelier specification publishes an app with no Atelier kit in it. It works and it looks like every hand-built page: a header written by hand, a sign-in bar that breaks at phone width, states nobody designed. Publishing warns (`app_hints`, pitfall `track-drift`). It happens because the Classic shell can be started from at once and the Atelier road asks for a genre and its own specification first.',
+    fix: 'A new app is built on the Atelier track: load `node:aimeat-app-builder-atelier`, read its specification (`aimeat_handbook_get { tier: "build-app-atelier" }`, four parts; over HTTP `GET /v1/prompts/build-app-atelier`), fork a genre (`aimeat_designbook_search { kind: "genre" }`, then `aimeat_app_template_get { id: "genre-<id>" }`) and keep its shell. Classic is for improving an app that is already Classic, or when the owner asks for it by name, and then you say so to the owner. Never change track in the middle of a build: stop and tell the owner what you found.',
+    appliesTo: ['app', 'publish'],
+    severity: 'warn',
+    source: 'curated',
+    updatedAt: '2026-09-19',
     ...CHECKED,
   }),
   E({

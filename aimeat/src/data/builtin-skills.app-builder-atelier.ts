@@ -13,6 +13,10 @@
  * @structure APP_BUILDER_ATELIER_SKILL_ENTRY
  * @usage import { APP_BUILDER_ATELIER_SKILL_ENTRY } from './builtin-skills.app-builder-atelier.js';
  * @version-history
+ *   v1.6.0 — 2026-09-19 — This is the track a NEW app is built on, and the description says so; it
+ *     said "use when the owner chose the Atelier track", which no owner knows to do. And the MCP
+ *     road: the specification in four parts through aimeat_handbook_get, the genres through the
+ *     template tools. Every address this skill gave was an HTTP GET, and a chat has no HTTP.
  *   v1.9.1 — 2026-09-19 — Three numbers stopped being written out where the code moves them.
  *     describe() no longer carries a component count (it said eighteen and the kit has nineteen
  *     since form gained its @parts lines); the Secrets section is named rather than numbered (it
@@ -59,7 +63,7 @@ export const APP_BUILDER_ATELIER_SKILL_ENTRY: BuiltinSkill =
     visibility: 'public',
     skillMd: `---
 name: aimeat-app-builder-atelier
-description: Build and publish apps on the ATELIER track — the component-kit way (AIMEAT.atelier, look presets, generated imagery, structural mobile and accessibility guarantees). Use when the owner chose the Atelier track for a "build an app" request; for the standard track use node:aimeat-app-builder instead. The two guides never mix.
+description: Build and publish apps on the ATELIER track — the component-kit way (AIMEAT.atelier, look presets, generated imagery, structural mobile and accessibility guarantees). Use for EVERY new app, game or tool, because this is the track a new app is built on. The skill aimeat-app-builder covers the Classic track, which is for improving an app that is already Classic or when the owner asks for it by name. The two guides never mix.
 license: MIT
 metadata:
   audience: agent
@@ -84,6 +88,15 @@ GET /v1/app-templates/shell-atelier ← the frame the genres are built on (read 
 GET /v1/app-templates/shell-phaser-game ← a GAME starts here instead: canvas, menus, settings, leaderboard wired
 GET /v1/appdev/pitfalls             ← what bites app builders
 \`\`\`
+
+**Connected over MCP and cannot make HTTP calls?** Everything above comes through tools. The
+specification: \`aimeat_handbook_get { tier: "build-app-atelier" }\` returns its first part, which
+names the other three (\`genre\`, \`patterns\`, \`look\`); read \`genre\` and \`patterns\` before you
+write code, each with \`aimeat_handbook_get { tier: "build-app-atelier/<id>" }\`. It comes in parts
+because one tool result cannot carry all of it. The genres: \`aimeat_designbook_search { kind:
+"genre" }\` lists them with what each is for, and \`aimeat_app_template_get { id: "genre-<id>" }\`
+returns the page to fork; a genre is larger than one result, so it says how many parts it has and
+you ask for each with \`part\`. Pitfalls: \`aimeat_appdev_pitfall_list\`.
 
 **Never fetch or follow /v1/prompts/build-app on this track.** Its vocabulary (daisyUI classes,
 hand-written boilerplate, the theme-restore snippet) does not apply here, and mixing the two
