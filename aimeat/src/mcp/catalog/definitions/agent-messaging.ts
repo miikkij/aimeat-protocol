@@ -5,6 +5,7 @@
  * @description Handbook/onboarding, agent self-management (capabilities, activity, telemetry, tags, mode), owner-agent messaging, and federated direct-message (DM) tool definitions, plus aimeat_agents_list.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-09-19 — aimeat_handbook_get: the `tier` description names the Atelier specification first.
  *   v1.5.1 — 2026-09-18 — aimeat_dm_send declares `subject` and `conversation_id`. The node's tool and
  *     the connector's dispatch have both taken them all along; only this shared definition did
  *     not, so the one place an agent reads the tool's fields said it had no way to title a thread,
@@ -34,7 +35,7 @@ export const agentMessagingTools: AimeatToolDefinition[] = [
         visibility: agentEverywhere,
         input: {
             module: { type: 'string', description: 'Optional handbook module name, such as tasks or messages.' },
-            tier: { type: 'string', description: 'A prompt by id. "build-app" is the first part of the build specification every app follows; "build-app/<id>" is one of the parts or sections it lists.' },
+            tier: { type: 'string', description: 'A prompt by id. "build-app-atelier" is the first part of the Atelier build specification, the track an app is built on unless there is a reason not to, and "build-app-atelier/<id>" is one of the parts it lists. "build-app" and "build-app/<id>" do the same for the Classic specification.' },
             surface: { type: 'string', enum: ['appdev', 'agent', 'service', 'admin', 'commerce', 'primitives', 'full'], description: 'Another surface\'s handbook than your own. Leave it out to get the one for the surface you are connected to.' },
         },
     },

@@ -22,11 +22,13 @@
  * @usage
  *   import { TASKS } from './tasks.js';
  * @version-history
+ *   2026-09-19 — build-app passes only when the app is on the Atelier track with a register.
+ *     Published used to be enough, and three Classic apps in a row counted as good.
  *   v1.0.0 — 2026-09-18 — Initial: ten tasks across memory, apps, skills, joining, asking the
  *     operators, orientation and a missing record.
  */
 import type { RunMetrics } from './transcript.js';
-import { appQuality, describeQuality } from './app-quality.js';
+import { appQuality, describeQuality, onAtelier } from './app-quality.js';
 
 /** `mcp`: the agent is connected over MCP as the owner's agent. `url`: it gets the address only. */
 export type Door = 'mcp' | 'url';
@@ -161,10 +163,12 @@ export const TASKS: Task[] = [
             const r = await api<{ apps: unknown[] }>(ctx.baseUrl, `/v1/apps?owner=${ctx.ownerName}`, ctx.ownerToken);
             const hit = (r.data?.apps ?? []).find(a => JSON.stringify(a).includes(ctx.marker)) as { filename?: string } | undefined;
             if (!hit?.filename) return { ok: false, detail: 'no published app carries the name' };
-            // Published is the pass. What the app is LIKE goes in the note, because that is what a
-            // change to the specification's wording has to be compared on (app-quality.ts).
+            // Published ON THE ATELIER TRACK is the pass, since 2026-09-19. Until then published was
+            // enough, and three Classic apps in a row counted as good while the developer was being
+            // handed exactly that and rejecting it. What else the app is like goes in the note.
             const quality = await appQuality(ctx.baseUrl, ctx.ownerName, hit.filename, ctx.metrics.toolCalls);
-            return { ok: true, detail: 'the app is published', note: describeQuality(quality) };
+            const ok = onAtelier(quality);
+            return { ok, detail: ok ? 'the app is published on the Atelier track' : 'the app is published, and it is not an Atelier app with a register', note: describeQuality(quality) };
         },
     },
     {

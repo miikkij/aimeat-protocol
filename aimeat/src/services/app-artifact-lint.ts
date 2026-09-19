@@ -41,6 +41,8 @@
  *   const { blocking, warnings } = await lintAppArtifact(html, config);
  *   if (blocking.length) return refusal;
  * @version-history
+ *   2026-09-19 — loadsAtelierKit is exported, for the track-drift check the publish runs beside
+ *     this one.
  *   v1.5.1 — 2026-09-19 — A warning when `aimeat-app` still holds the shell's REPLACE placeholder.
  *   v1.5.0 — 2026-09-13 — checkServedCopy is gone. The developer decided that a served copy is
  *     stored as its source: services/app-publish.ts removes the node's serve marks before this check
@@ -278,7 +280,7 @@ function declaredTrack(head: string): 'classic' | 'atelier' | undefined {
 }
 
 /** Whether the page loads the Atelier kit (its script or its stylesheet) anywhere. */
-function loadsAtelierKit(html: string): boolean {
+export function loadsAtelierKit(html: string): boolean {
   return /aimeat-atelier\.(js|css)/i.test(html);
 }
 

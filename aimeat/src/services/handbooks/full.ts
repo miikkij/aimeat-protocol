@@ -8,6 +8,8 @@
  * @structure FULL_HANDBOOK — markdown, served by GET /v1/agents/me/handbook?surface=full
  * @usage import { FULL_HANDBOOK } from './full.js';
  * @version-history
+ *   v1.2.0 — 2026-09-19 — The Apps line sends a builder to the app-builder skill, which says the
+ *     track first, and no longer straight to the Classic specification.
  *   v1.1.0 — 2026-09-19 — A paragraph on aimeat_discover and its three reaches. The agent handbook
  *     has said "master directory, start here" all along, and this page, which is the one a plain
  *     connection reads, named discovery only as a row in the table of surfaces.
@@ -29,8 +31,10 @@ Three grounds carry most of the work:
   \`aimeat_memory_search\` finds by content. A feature here is usually a memory record under a key
   prefix plus something that reads it, so look before you build.
 - **Apps** are single-file web apps published on this node. \`aimeat_app_list\` gives each one the
-  \`url\` you hand the person. Before you build one, read the build specification:
-  \`aimeat_handbook_get { tier: "build-app" }\` is its first part and lists the rest.
+  \`url\` you hand the person. Before you build one, load the skill
+  \`node:aimeat-app-builder\`: a new app is built on the Atelier track, from a genre, and its
+  specification is \`aimeat_handbook_get { tier: "build-app-atelier" }\` in four parts. \`{ tier:
+  "build-app" }\` is the Classic track's, for an app that is already Classic.
 - **Organisms and workspaces** are how the person shares knowledge with others. A **skill**
   (\`aimeat_skill_list\`, \`aimeat_skill_get\`) is the operating guide for one named capability, and
   reading the skill first is faster than deriving it.

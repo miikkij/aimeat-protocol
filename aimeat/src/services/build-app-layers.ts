@@ -34,6 +34,8 @@
  *   import { buildAppPiece } from './build-app-layers.js';
  *   const first = buildAppPiece(buildAppPrompt(config).full, 'start', config.baseUrl);
  * @version-history
+ *   2026-09-19 — Part `start` opens by saying this is the CLASSIC specification and that a new app
+ *     is built on Atelier. Nothing in it said another track existed.
  *   v1.1.0 — 2026-09-19 — The decision model's section is on demand (TARGET-080).
  *   v1.0.0 — 2026-09-18 — Initial creation.
  */
@@ -265,6 +267,16 @@ export function layeredBuildAppPrompt(full: string, baseUrl: string): { prompt: 
   return { prompt: withIndex(all.filter(s => s.layer === 'core'), index), sections: pointers };
 }
 
+/**
+ * What a builder who opened the Classic specification first is told before anything else. Added to
+ * part `start` only, which is the door a chat uses: the whole-document prompt a person copies from
+ * the app catalogue is chosen by that person, on a screen that offers both tracks. Until
+ * 2026-09-19 nothing in this specification said another track existed.
+ */
+export const CLASSIC_TRACK_NOTICE = '### Which track this is\n'
+  + 'This is the CLASSIC build specification. A NEW app is built on the Atelier track instead: forked from a genre, with the served component kit carrying the header, the sign-in and the loading, empty and error states. Its specification is `aimeat_handbook_get { tier: "build-app-atelier" }`, and its skill is `node:aimeat-app-builder-atelier`. '
+  + 'Read on here only if you are improving an app that is already Classic, or the owner asked for the Classic track by name. If you began on Atelier, stay on it: the two guides do not describe each other, and changing over in the middle means starting again.\n\n';
+
 export interface SpecPiece { id: string; kind: 'part' | 'section'; text: string }
 
 /**
@@ -279,7 +291,7 @@ export function buildAppPiece(full: string, id: string, baseUrl: string): SpecPi
     const mine = all.filter(s => s.part === id);
     if (!mine.length) return null;
     const pointers = pointersOf(all, nodeUrl);
-    const text = id === 'start' ? withIndex(mine, sectionIndex(pointers, nodeUrl, true)) : mine.map(s => s.text).join('\n');
+    const text = id === 'start' ? CLASSIC_TRACK_NOTICE + withIndex(mine, sectionIndex(pointers, nodeUrl, true)) : mine.map(s => s.text).join('\n');
     return { id, kind: 'part', text };
   }
   const section = all.find(s => s.id === id);

@@ -5,6 +5,8 @@
  * @description Operating handbook for the v2 `appdev` surface (/v2/mcp/appdev · `aimeat connect serve
  *   --surface appdev`). Self-contained; tool list mirrors MCP_SURFACES.appdev.
  * @version-history
+ *   2026-09-19 — The build flow names the track first: a new app goes on Atelier, from a genre, and
+ *     the flow sent every builder straight to the Classic specification.
  *   2026-09-19 — Decisions in an app: aimeat-decide.js, the data map row, English, the app's
  *     responsibility for what it sends (TARGET-080).
  *   2026-09-18 — Names only tools this surface carries: the package line listed versions, publish
@@ -67,8 +69,14 @@ required, upserts by slug, share:true publishes platform-wide) · \`aimeat_app_t
 \`_list\`/\`_get\` (distill a reusable template after a publish; the next build starts from it).
 
 ## Research-first build flow (research → frame → propose → build → finish)
+0. THE TRACK: a NEW app is built on the **Atelier track**, forked from a genre, with the served
+   component kit carrying the header, the sign-in and the states. Load
+   \`node:aimeat-app-builder-atelier\` and read its specification, \`aimeat_handbook_get { tier:
+   "build-app-atelier" }\` (four parts; over HTTP \`GET /v1/prompts/build-app-atelier\`). The Classic
+   track below is for improving an app that is already Classic, or when the owner asks for it by
+   name. A track is not changed in the middle of a build.
 1. RESEARCH: load the \`node:aimeat-app-builder\` skill (\`aimeat_skill_get\`), call
-   \`aimeat_appdev_overview\`, and fetch the canonical spec \`GET /v1/prompts/build-app\` (it is law). Over MCP the same spec
+   \`aimeat_appdev_overview\`, and on the Classic track fetch the canonical spec \`GET /v1/prompts/build-app\` (it is law). Over MCP the same spec
    comes in parts: \`aimeat_handbook_get { tier: "build-app" }\` is the first and lists the rest.
 2. FRAME: tier (T1 pure client / T2 +cortex / T3 +extension), packs, start point (fork a prior
    app / template proposal / shell), own-users → aimeat-iam pack (gate) + AIMEAT.iam (panel),

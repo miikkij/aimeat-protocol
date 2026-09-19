@@ -13,6 +13,9 @@
  *     - use-case   : composes an app-shell + components (+ optional package) (future).
  * @structure AppTemplate · getAppTemplates() · getAppTemplateIndex()
  * @version-history
+ *   v1.16.0 — 2026-09-19 — The index opens with the Atelier track (genres, then its shells), and
+ *     shell-pure-client says it is the Classic track's shell. It said "the 80% case", which is a
+ *     recommendation, and it stood first in a list whose genres came thirty rows later.
  *   v1.15.0 — 2026-09-02 — shell-phaser-game: the GAME shell on the Atelier track (Atelier app
  *     shell + the served aimeat-phaser base). Body in ./app-templates/game-shell.ts.
  *   v1.14.0 — 2026-08-29 — comp-leaflet-map: the real-map component template (leaflet pack).
@@ -107,7 +110,7 @@ const TEMPLATES: AppTemplate[] = [
     kind: 'app-shell',
     tier: 'T1',
     title: 'Standard app — login + saves your data',
-    description: 'Single-file HTML app: login + private/shared memory, self-hosted Tailwind + daisyUI, light/dark theme. The 80% case — notes, trackers, boards, dashboards.',
+    description: 'The CLASSIC track\'s shell. Single-file HTML app: login + private/shared memory, self-hosted Tailwind + daisyUI, light/dark theme. For improving an app that is already Classic, or when the owner asks for this track; a NEW app starts from a genre on the Atelier track.',
     libs: ['aimeat-auth', 'aimeat-data'],
     content: SHELL_PURE_CLIENT,
   },
@@ -262,7 +265,12 @@ export function getAppTemplates(): AppTemplate[] {
  */
 export function getAppTemplateIndex(lang?: string): Array<Pick<AppTemplate, 'id' | 'kind' | 'tier' | 'track' | 'title' | 'description' | 'libs'>> {
   const tr = (lang && TRANSLATIONS[lang]) || null;
-  return TEMPLATES.map(({ id, kind, tier, track, title, description, libs }) => {
+  // The Atelier track first: the genres, then its two shells, then everything else in registry
+  // order. A list is read from the top, and until 2026-09-19 this one opened with the Classic
+  // shell and ended, thirty rows later, with the genres a build is meant to start from.
+  const rank = (t: AppTemplate): number => (t.kind === 'genre' ? 0 : t.id === 'shell-atelier' || t.track === 'atelier' ? 1 : 2);
+  const ordered = TEMPLATES.map((t, i) => ({ t, i })).sort((a, b) => rank(a.t) - rank(b.t) || a.i - b.i).map(x => x.t);
+  return ordered.map(({ id, kind, tier, track, title, description, libs }) => {
     const o = tr && tr[id];
     return { id, kind, tier, track, title: (o && o.title) || title, description: (o && o.description) || description, libs };
   });

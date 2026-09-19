@@ -15,6 +15,10 @@
  * @structure appQuality(baseUrl, ownerName, filename, toolCalls) → AppQuality
  * @usage const q = await appQuality(ctx.baseUrl, ctx.ownerName, app.filename, ctx.metrics.toolCalls);
  * @version-history
+ *   v1.1.0 — 2026-09-19 — The build track. The measurement passed three Classic apps in a row as
+ *     good on the day the developer was handed a Classic app by a model that had started on
+ *     Atelier and changed over because Classic was quicker to begin. Nothing here looked at which
+ *     track an app was on, so the thing he was angry about was invisible to it.
  *   v1.0.0 — 2026-09-18 — Initial.
  */
 import type { AimeatConfig } from '../../src/config.js';
@@ -34,6 +38,16 @@ export interface AppQuality {
     sectionsRead: string[];
     /** Whether the publish carried the spec token the specification hands out. */
     sentSpecToken: boolean;
+    /** What the head declares in `aimeat-track`, or null. */
+    declaredTrack: string | null;
+    /** Whether the page loads the Atelier kit, which is what makes an app an Atelier app. */
+    loadsAtelier: boolean;
+    /** The `aimeat-register` the head names: the genre it was forked from, or its own. Null when absent or still the shell's placeholder. */
+    register: string | null;
+    /** Whether the run read the ATELIER build specification over MCP, and which parts. */
+    atelierPartsRead: string[];
+    /** Every template id the run fetched, in order: which shell or genre it started from, and what it moved to. */
+    templatesFetched: string[];
 }
 
 interface Call { name: string; input: unknown; isError: boolean }
@@ -54,6 +68,19 @@ export async function appQuality(baseUrl: string, ownerName: string, filename: s
         .map(c => String((c.input as { tier?: unknown } | null)?.tier ?? ''))
         .filter(t => t === 'build-app' || t.startsWith('build-app/'));
     const publish = toolCalls.filter(c => /^aimeat_app_(publish|draft_publish)$/.test(c.name));
+    const atelierTiers = toolCalls
+        .filter(c => c.name === 'aimeat_handbook_get' && !c.isError)
+        .map(c => String((c.input as { tier?: unknown } | null)?.tier ?? ''))
+        .filter(t => t === 'build-app-atelier' || t.startsWith('build-app-atelier/'));
+    const templates = toolCalls
+        .filter(c => c.name === 'aimeat_app_template_get' && !c.isError)
+        .map(c => String((c.input as { id?: unknown } | null)?.id ?? ''))
+        .filter(Boolean);
+    const meta = (name: string): string | null => {
+        const m = html.match(new RegExp('<meta[^>]+name=["\']' + name + '["\'][^>]*content=["\']([^"\']*)["\']', 'i'));
+        return m ? m[1].trim() : null;
+    };
+    const register = meta('aimeat-register');
     return {
         bytes: html.length,
         blocking: lint.blocking.map(f => f.pitfall),
@@ -63,9 +90,21 @@ export async function appQuality(baseUrl: string, ownerName: string, filename: s
         viewportMeta: /<meta[^>]+name=["']viewport["']/i.test(html),
         readSpec: tiers.includes('build-app'),
         sectionsRead: tiers.filter(t => t !== 'build-app').map(t => t.slice('build-app/'.length)),
-        sentSpecToken: publish.some(c => /"spec_token"\s*:\s*"spec-/.test(JSON.stringify(c.input))),
+        sentSpecToken: publish.some(c => /"spec_token"\s*:\s*"(spec|atelier)-/.test(JSON.stringify(c.input))),
+        declaredTrack: meta('aimeat-track'),
+        // The node's own test (loadsAtelierKit in app-artifact-lint.ts): the script OR the
+        // stylesheet. A forked genre is a committed page on the kit's stylesheet and boot script and
+        // may never call the component library; the first version of this line asked for the script
+        // only and failed a run that had read three parts of the specification and forked a genre.
+        loadsAtelier: /aimeat-atelier\.(js|css)/i.test(html),
+        register: register && !/^REPLACE-ME/i.test(register) ? register : null,
+        atelierPartsRead: atelierTiers.map(t => t.slice('build-app-atelier'.length).replace(/^\//, '') || 'start'),
+        templatesFetched: [...new Set(templates)],
     };
 }
+
+/** Is this an Atelier app in fact and not in name: the kit is loaded and the register is a real one. */
+export const onAtelier = (q: AppQuality): boolean => q.loadsAtelier && !!q.register;
 
 /** One line for the report: what was wrong first, then what was read. */
 export function describeQuality(q: AppQuality): string {
@@ -73,9 +112,16 @@ export function describeQuality(q: AppQuality): string {
         ...q.blocking.map(b => `blocking ${b}`),
         ...q.warnings.map(w => `warning ${w}`),
         ...q.externalHosts.map(h => `loads from ${h}`),
-        ...(q.loadsAuthLib ? [] : ['no aimeat-auth']),
+        // A Classic app mounts sign-in itself, so the library has to be there. An Atelier page gets
+        // it from the shell or the boot script, and a page nobody signs in to needs none.
+        ...(q.loadsAuthLib || onAtelier(q) ? [] : ['no aimeat-auth']),
         ...(q.viewportMeta ? [] : ['no viewport meta']),
     ];
-    const read = q.readSpec ? `read the spec${q.sectionsRead.length ? ' + ' + q.sectionsRead.join(', ') : ''}` : 'did NOT read the spec';
-    return `${Math.round(q.bytes / 1024)} kB; ${wrong.length ? wrong.join(', ') : 'nothing the lint or the head checks object to'}; ${read}; spec token ${q.sentSpecToken ? 'sent' : 'not sent'}`;
+    // "The spec" is the Classic one; the Atelier parts are reported beside the track.
+    const read = q.readSpec ? `read the Classic spec${q.sectionsRead.length ? ' + ' + q.sectionsRead.join(', ') : ''}`
+        : onAtelier(q) ? 'Classic spec not read, as it should be' : 'did NOT read the spec';
+    const track =`${onAtelier(q) ? 'ATELIER' : q.loadsAtelier ? 'Atelier kit, no register' : 'CLASSIC'}${q.register ? ' (' + q.register.slice(0, 40) + ')' : ''}`
+        + `; Atelier spec ${q.atelierPartsRead.length ? 'read: ' + q.atelierPartsRead.join(', ') : 'not read'}`
+        + `; templates ${q.templatesFetched.length ? q.templatesFetched.join(' → ') : 'none'}`;
+    return `${track}; ${Math.round(q.bytes / 1024)} kB; ${wrong.length ? wrong.join(', ') : 'nothing the lint or the head checks object to'}; ${read}; spec token ${q.sentSpecToken ? 'sent' : 'not sent'}`;
 }

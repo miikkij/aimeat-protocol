@@ -24,6 +24,12 @@
  * @structure APP_BUILDER_SKILL_ENTRY
  * @usage import { APP_BUILDER_SKILL_ENTRY } from './builtin-skills.app-builder.js';
  * @version-history
+ *   v1.5.0 — 2026-09-19 — The track comes first. This skill is where a "build me an app" request
+ *     lands, and it did not contain the word Atelier: a builder who followed it never learned the
+ *     track existed, and one who began on Atelier found a guide that needed HTTP and a Classic
+ *     shell that did not. A model told the developer exactly that after handing him a Classic app.
+ *     Added, above everything else: a new app is built on Atelier, what Classic is still for, that
+ *     "quicker to start" is not a reason, and that a track is not changed mid-build.
  *   v1.4.0 — 2026-09-18 — Says how a chat connected over MCP reads the spec. The skill named three
  *     GET calls and nothing else, and an MCP-only chat can make none of them: six of six cold-agent
  *     build runs asked the handbook tool for `build-app`, were told "Prompt not found", and built
@@ -47,7 +53,7 @@ export const APP_BUILDER_SKILL_ENTRY: BuiltinSkill =
     visibility: 'public',
     skillMd: `---
 name: aimeat-app-builder
-description: Build and publish apps ON an AIMEAT node over MCP (the aimeat_* tools) or REST. The paved path for any "build/make/publish an app, game or tool on AIMEAT" request — fetch the canonical build spec first, research what already exists, build a single-file app from a template, verify, publish, and report the live URL. Use whenever an owner asks for an app on the node.
+description: Build and publish apps ON an AIMEAT node over MCP (the aimeat_* tools) or REST. The paved path for any "build/make/publish an app, game or tool on AIMEAT" request. It says first which build track the app goes on (Atelier for a new app, from a genre), then the Classic road — fetch the canonical build spec first, research what already exists, build a single-file app from a template, verify, publish, and report the live URL. Use whenever an owner asks for an app on the node.
 license: MIT
 metadata:
   audience: agent
@@ -66,6 +72,32 @@ That holds for the node. Past roughly 300 kB it stops holding for YOU: one file 
 to edit, and the fix is sources split behind a build step on your own machine that assembles the
 same single file. Load \`node:aimeat-app-workstation\` when the app gets there, or when the publish
 response's \`next_steps.size\` says so.
+
+## First, the track: a new app is built on Atelier
+
+There are two build tracks, and a new app goes on the **Atelier track**. It is forked from a
+**genre**, a complete page in a committed look from this node's Design Book, and made of the served
+component kit. The kit carries what every app otherwise writes by hand and gets wrong: the header
+with the sign-in pill and the language switch, the loading, empty and error states, and the
+guarantees that the page fits a phone. Load \`node:aimeat-app-builder-atelier\` now and follow it. Its
+specification replaces the specification, the templates and the styling this skill describes
+below; the research, the proposal in the person's own words and the finish still apply.
+
+Over MCP the Atelier specification is \`aimeat_handbook_get { tier: "build-app-atelier" }\`, in four
+parts, and the genres are in \`aimeat_app_template_list\` (the ids that begin \`genre-\`).
+
+The **Classic track**, which is the rest of this skill, is for two cases: you are improving an
+app that is already Classic (its head says \`aimeat-track\` \`classic\`, or it loads no Atelier kit),
+or the owner asks for Classic by name. Putting a NEW app on Classic is the owner's decision, not yours: say in
+the proposal that you would, and why, in their words, and wait for the answer.
+
+"It is quicker to start" and "I know this one better" are not reasons. The Atelier guide exists so
+that you do not build the header, the sign-in and the states yourself, and an app where you did is
+the one that gets sent back.
+
+**A track is not changed in the middle of a build.** The two guides do not describe each other, so
+changing over means starting again against the other one. If you come to think it is necessary,
+stop and tell the owner what you found; do not decide it alone.
 
 ## The one rule that matters: fetch the canonical spec first
 

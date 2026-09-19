@@ -486,6 +486,60 @@ async function main() {
             assert(String(rest.body.error?.message).includes('group'), 'REST lists the real ids');
         });
 
+        // The ATELIER specification had no MCP door until 2026-09-19. It is the track a new app is
+        // built on, and a chat could not open its guide: 68 kB of text in a 207 kB HTTP answer.
+        await test('17b. tier "build-app-atelier" returns its first part, which names the other three and what comes before code', async () => {
+            const { body } = await v1('tools/call', { name: 'aimeat_handbook_get', arguments: { tier: 'build-app-atelier' } }, 403);
+            assert(!body.result?.isError, `not an error: ${toolText(body).slice(0, 160)}`);
+            const start = toolText(body);
+            const rest = await fetch(`${BASE}/v1/prompts/build-app-atelier/sections/start?format=txt`).then(r => r.text());
+            assert(start === rest, `the MCP part equals the REST part (${start.length} vs ${rest.length})`);
+            assert(start.length < 24_000, `one tool result carries it: ${start.length} characters`);
+            const full = await json('/v1/prompts/build-app-atelier');
+            assert(start.includes(full.body.data.spec_token), 'it names the Atelier spec token');
+            assert(/Read `genre` and `patterns` BEFORE you write any code/.test(start), 'it says which parts come before code');
+        });
+
+        await test('17c. the four Atelier parts each arrive whole, and between them carry the whole specification', async () => {
+            const fullTxt = await fetch(`${BASE}/v1/prompts/build-app-atelier?format=txt`).then(r => r.text());
+            const list = await json('/v1/prompts/build-app-atelier/sections');
+            assert(list.body.data.parts.map((p: any) => p.id).join() === 'start,genre,patterns,look', `four parts in order: ${JSON.stringify(list.body.data.parts)}`);
+            let carried = 0;
+            for (const p of list.body.data.parts) {
+                const { body } = await v1('tools/call', { name: 'aimeat_handbook_get', arguments: { tier: 'build-app-atelier/' + p.id } }, 404);
+                const text = toolText(body);
+                assert(text.length === p.chars && text.length < 24_000, `${p.id}: ${text.length} characters, listed as ${p.chars}`);
+                carried += text.length;
+            }
+            // The parts add one index to the text and drop nothing.
+            assert(carried >= fullTxt.length, `the parts carry at least the whole text: ${carried} of ${fullTxt.length}`);
+            const genre = toolText((await v1('tools/call', { name: 'aimeat_handbook_get', arguments: { tier: 'build-app-atelier/genre' } }, 405)).body);
+            assert(genre.startsWith('## Start from a GENRE'), `the genre part opens at its heading: ${genre.slice(0, 60)}`);
+            // A part gathers sections that are not neighbours in the whole text, so each SECTION of
+            // it is what has to be found there unchanged.
+            for (const section of genre.split(/\n(?=## )/)) assert(fullTxt.includes(section), `unchanged in the whole text: ${section.slice(0, 50)}`);
+        });
+
+        await test('17d. an Atelier part that does not exist is an error that names the four there are', async () => {
+            const { body } = await v1('tools/call', { name: 'aimeat_handbook_get', arguments: { tier: 'build-app-atelier/libraries' } }, 406);
+            assert(body.result?.isError === true, 'MCP: isError');
+            assert(/start, genre, patterns, look/.test(toolText(body)), `it names the parts: ${toolText(body).slice(0, 200)}`);
+        });
+
+        await test('17e. the Classic first part says it is Classic and where a new app is built', async () => {
+            const start = toolText((await v1('tools/call', { name: 'aimeat_handbook_get', arguments: { tier: 'build-app' } }, 407)).body);
+            assert(start.startsWith('### Which track this is'), `it opens with the track: ${start.slice(0, 80)}`);
+            assert(start.includes('build-app-atelier') && start.includes('node:aimeat-app-builder-atelier'), 'it names the Atelier specification and skill');
+        });
+
+        await test('17f. the template list opens with the genres and the Atelier shells, before the Classic shell', async () => {
+            const list = await json('/v1/app-templates');
+            const ids = (list.body.data.templates as any[]).map(t => t.id);
+            assert(ids[0].startsWith('genre-'), `the list opens with a genre, got ${ids[0]}`);
+            assert(ids.indexOf('shell-atelier') < ids.indexOf('shell-pure-client'), 'the Atelier shell comes before the Classic one');
+            assert(ids.indexOf('genre-living') < ids.indexOf('shell-atelier'), 'every genre comes before the shells');
+        });
+
         // Every build text says "start from the shell", and the template tools read agent
         // proposals only, so over MCP the shell did not exist.
         await test('18. aimeat_app_template_get returns a shell the node ships, with its file; the list names it', async () => {

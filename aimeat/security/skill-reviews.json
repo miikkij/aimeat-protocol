@@ -87,16 +87,17 @@
         "aimeat/src/services/node-templates.ts",
         "aimeat/src/services/app-spec-gate.ts"
       ],
-      "digest": "sha256:626b9332a5865b47dda15265",
+      "digest": "sha256:664b93315eca376b2f33e151",
       "note": "The skill points at the build specification rather than repeating it, so it watches the doors to the specification and not the specification's text."
     },
     "node:aimeat-app-builder-atelier": {
       "reviewedOn": "2026-09-19",
       "watches": [
         "aimeat/src/services/build-atelier-prompt.ts",
+        "aimeat/src/services/build-atelier-layers.ts",
         "aimeat/src/static/sdk-libs/atelier/describe-data.js"
       ],
-      "digest": "sha256:8f3f1308988f48958c542275"
+      "digest": "sha256:cc6aff0de20138d3da33eb8f"
     },
     "node:aimeat-phaser": {
       "reviewedOn": "2026-09-19",
@@ -212,7 +213,7 @@
         "aimeat/src/mcp/core.ts",
         "aimeat/src/mcp/catalog/definitions/agent-messaging.ts"
       ],
-      "digest": "sha256:50cd0d5e255f462f6b28fb6b"
+      "digest": "sha256:84bbcd08b5daffc7101c4404"
     },
     "node:manage-my-profile-data": {
       "reviewedOn": "2026-09-19",
@@ -284,7 +285,7 @@
         "aimeat/src/services/build-app-layers.ts",
         "aimeat/src/routes/app-templates.ts"
       ],
-      "digest": "sha256:c1343c29d6ac66679ce541b1"
+      "digest": "sha256:16e619f44f4afc7aa2951285"
     },
     "project:aimeat-design-language": {
       "reviewedOn": "2026-09-19",
@@ -373,12 +374,13 @@
       "aimeat/src/services/app-publish-next-steps.ts": "404316a05e8cf2d3"
     },
     "node:aimeat-app-builder": {
-      "aimeat/src/services/build-app-layers.ts": "d63af1a52466c986",
+      "aimeat/src/services/build-app-layers.ts": "11efd2e166cbd6e7",
       "aimeat/src/services/node-templates.ts": "d827b8d325a6fc5e",
       "aimeat/src/services/app-spec-gate.ts": "023890ba92c1090e"
     },
     "node:aimeat-app-builder-atelier": {
       "aimeat/src/services/build-atelier-prompt.ts": "fe8dba274131ffe7",
+      "aimeat/src/services/build-atelier-layers.ts": "2f929241c31f0208",
       "aimeat/src/static/sdk-libs/atelier/describe-data.js": "b87046c1071e4940"
     },
     "node:aimeat-phaser": {
@@ -449,7 +451,7 @@
     },
     "node:manage-my-agents": {
       "aimeat/src/mcp/core.ts": "28a39581b76d24e5",
-      "aimeat/src/mcp/catalog/definitions/agent-messaging.ts": "249f5c1f55c6ab87"
+      "aimeat/src/mcp/catalog/definitions/agent-messaging.ts": "5b2ac322e20ad93c"
     },
     "node:manage-my-profile-data": {
       "aimeat/src/routes/memory/shared.ts": "b91f8414d40a59c6"
@@ -484,7 +486,7 @@
       "aimeat/src/static/sdk-libs/phaser/index.js": "036eac5aa666d96a"
     },
     "project:aimeat-app-building": {
-      "aimeat/src/services/build-app-layers.ts": "d63af1a52466c986",
+      "aimeat/src/services/build-app-layers.ts": "11efd2e166cbd6e7",
       "aimeat/src/routes/app-templates.ts": "48da5b8d0573d8d7"
     },
     "project:aimeat-design-language": {
