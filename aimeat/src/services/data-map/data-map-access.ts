@@ -90,7 +90,18 @@ export async function readProgramMap(
 
 /** Everything a stated map must carry before it is worth storing. */
 function readMap(body: Partial<DataMap>, at: string): DataMap | string {
-  if (body.spec !== DATA_MAP_SPEC) return `A data map must carry spec "${DATA_MAP_SPEC}".`;
+  // The refusal says what to send. Three measured cold builds in a row (2026-09-19) sent a map
+  // without the spec, were told only that it must carry one, and had to find the shape elsewhere.
+  // The spec stays REQUIRED: this write replaces the whole map, and a body without it is how a
+  // half-written map would wipe a good one.
+  if (body.spec !== DATA_MAP_SPEC) {
+    return `A data map must carry spec "${DATA_MAP_SPEC}". Send the WHOLE map in one object: `
+      + `{ "spec": "${DATA_MAP_SPEC}", "what": "...", "usedFor": "...", "form": "one-person", "arrangement": "...", `
+      + '"machinery": [], "leaves": [], "held": [ ...one row per key family... ], "elsewhere": [] }. '
+      + 'This write REPLACES the map, which is why a body without the spec is refused rather than half-stored: read the map first '
+      + '(aimeat_datamap_get, or GET on this address) and send all of it back. The fields of a `held` row and every allowed value are in '
+      + 'the build specification: aimeat_handbook_get { tier: "build-app/data-map" }, or GET /v1/prompts/build-app/sections/data-map.';
+  }
   const str = (v: unknown): string => (typeof v === 'string' ? v : '');
   return {
     spec: DATA_MAP_SPEC,
