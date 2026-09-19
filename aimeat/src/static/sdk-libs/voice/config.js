@@ -8,7 +8,7 @@
 export const defaults = {
   preset: 'balanced', appId: '', language: 'fi-FI', systemPrompt: '',
   input: { mode: 'manual', echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-  turn: { silenceMs: 700, minSpeechMs: 250, maxSpeechMs: 30000, threshold: 0.025, preRollMs: 200, bargeIn: true, interruptMs: 200 },
+  turn: { silenceMs: 700, minSpeechMs: 250, maxSpeechMs: 30000, threshold: 0.025, preRollMs: 200, bargeIn: false, interruptMs: 200, resumeQuietMs: 300 },
   stt: { provider: 'node', model: '', language: '', temperature: 0 },
   llm: { provider: 'node', model: '', temperature: 0.7, topP: 1, maxTokens: null, reasoning: null },
   tts: { provider: 'node', model: '', voice: 'alloy', format: 'pcm', sampleRate: 24000, channels: 1, speed: 1, instructions: '' },
@@ -46,7 +46,7 @@ export function configure(options = {}) {
   if (!['manual', 'vad', 'text'].includes(result.input.mode)) throw new TypeError('input.mode must be manual, vad or text');
   for (const key of ['echoCancellation', 'noiseSuppression', 'autoGainControl']) if (typeof result.input[key] !== 'boolean') throw new TypeError('input.' + key + ' must be boolean');
   if (typeof result.turn.bargeIn !== 'boolean') throw new TypeError('turn.bargeIn must be boolean');
-  for (const key of ['silenceMs', 'minSpeechMs', 'maxSpeechMs', 'preRollMs', 'interruptMs']) range(result.turn[key], 0, 120000, 'turn.' + key);
+  for (const key of ['silenceMs', 'minSpeechMs', 'maxSpeechMs', 'preRollMs', 'interruptMs', 'resumeQuietMs']) range(result.turn[key], 0, 120000, 'turn.' + key);
   range(result.turn.threshold, 0.001, 1, 'turn.threshold');
   if (result.turn.maxSpeechMs <= result.turn.minSpeechMs) throw new TypeError('turn.maxSpeechMs must exceed minSpeechMs');
   for (const phase of ['stt', 'llm', 'tts']) {
