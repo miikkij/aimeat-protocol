@@ -120,11 +120,9 @@ entry: index.html
     });
 
     AIMEAT.auth.mountLoginButton('#login', {
-      onLogin: function () { joinLive(AIMEAT.auth.getSession()); },
+      onSession: function (s) { joinLive(s); },   // history + live load once a session arrives, restored or signed in (anon sees the login prompt)
       onLogout: function () { location.reload(); }
     });
-    var s0 = AIMEAT.auth.getSession && AIMEAT.auth.getSession();
-    if (s0 && s0.jwt) joinLive(s0);   // history + live load after login (anon sees the login prompt)
   </script>
 </body>
 </html>`;
@@ -280,11 +278,9 @@ entry: index.html
     });
 
     AIMEAT.auth.mountLoginButton('#login', {
-      onLogin: function () { maybeEnablePosting(AIMEAT.auth.getSession()); load(); },
+      onSession: function (s) { maybeEnablePosting(s); load(); },   // sets OWNER for the owner's own preview, then loads again as them
       onLogout: function () { location.reload(); }
     });
-    var s0 = AIMEAT.auth.getSession && AIMEAT.auth.getSession();
-    if (s0 && s0.jwt) maybeEnablePosting(s0);   // sets OWNER for the owner's own preview before load
     load();   // everyone browses
   </script>
 </body>
@@ -476,11 +472,9 @@ entry: index.html
     });
 
     AIMEAT.auth.mountLoginButton('#login', {
-      onLogin: function () { session = AIMEAT.auth.getSession(); applyOwnerUi(); load(); },
+      onSession: function (s) { session = s; applyOwnerUi(); load(); },   // restored or signed in
       onLogout: function () { location.reload(); }
     });
-    var s0 = AIMEAT.auth.getSession && AIMEAT.auth.getSession();
-    if (s0 && s0.jwt) { session = s0; applyOwnerUi(); }
     load();   // everyone views
   </script>
 </body>
@@ -577,8 +571,8 @@ entry: index.html
         : JSON.stringify(ran, null, 2);
     });
 
-    AIMEAT.auth.mountLoginButton('#login', { onLogin: boot, onLogout: function () { location.reload(); } });
-    AIMEAT.auth.login().then(function (s) { if (s) boot(s); });
+    // onSession runs for a restored session, the silent one on an app address and a sign-in, once each.
+    AIMEAT.auth.mountLoginButton('#login', { onSession: function (s) { boot(s); }, onLogout: function () { location.reload(); } });
   </script>
 </body>
 </html>`;

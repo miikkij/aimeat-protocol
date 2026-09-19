@@ -16,7 +16,7 @@ const voice = AIMEAT.voice.createSession({
   llm: { model: 'your-conversation-model', temperature: 0.5 },
   tts: { model: 'your-speech-model', voice: 'your-voice', format: 'pcm', sampleRate: 24000 },
   turn: { silenceMs: 700, minSpeechMs: 250, maxSpeechMs: 30000, bargeIn: true },
-  chunking: { minChars: 24, maxChars: 180, maxWaitMs: 350 },
+  chunking: { mode: 'sentence', minChars: 24, maxChars: 1200, maxWaitMs: 350 },
   playback: { bufferMs: 80, maxBufferedMs: 3000, maxPendingSegments: 3 },
 });
 voice.on('transcript', ({ role, text, final }) => showTranscript(role, text, final));
@@ -72,16 +72,29 @@ retained. history.maxTurns bounds memory; closing a session clears it.
 | stt | provider node; model empty uses owner/node STT default; language empty uses session language; temperature 0 |
 | llm | provider node; model empty uses existing model selection; temperature 0.7; topP 1; maxTokens null (no default cap, optional explicit limit); reasoning null |
 | tts | provider node; explicit model required; voice alloy; format pcm; sampleRate 24000; channels 1; speed 1; instructions empty |
-| chunking | minChars 24; maxChars 180; maxWaitMs 350 |
+| chunking | mode sentence; minChars 24; maxChars 1200; maxWaitMs 350 (latency mode only) |
 | playback | bufferMs 80; maxBufferedMs 3000; maxPendingSegments 3; volume 1 |
 | history | maxTurns 12 |
 | session | appId, language fi-FI, systemPrompt empty, timeoutMs 120000 |
 
-responsive uses silenceMs 450, minChars 12, maxChars 120, maxWaitMs 180, bufferMs 40.
-patient uses silenceMs 1200, minChars 50, maxChars 240, maxWaitMs 700, bufferMs 150.
+responsive uses silenceMs 450, minChars 12, maxChars 1200, maxWaitMs 180, bufferMs 40.
+patient uses silenceMs 1200, minChars 50, maxChars 2000, maxWaitMs 700, bufferMs 150.
 These are starting values, not latency guarantees. Shorter segments start sooner but can sound less
 continuous and create more TTS requests. maxPendingSegments applies backpressure to model reads;
 maxBufferedMs bounds scheduled audio. There are no automatic paid retries or silent provider fallbacks.
+
+Version 1.1 uses AudioWorklet for microphone capture, including VAD. It requires a secure browser
+context and permission to load a blob module, which the hosted-app CSP allows. No deprecated
+ScriptProcessor fallback is used. The app decides its input mode; a conversational app should choose
+`input.mode: 'vad'` so one start gesture enables repeated spoken turns without Send buttons.
+
+Sentence mode waits for punctuation or stream completion, with maxChars as the hard safety bound.
+Choose `chunking.mode: 'latency'` explicitly to allow maxWaitMs to flush an incomplete sentence.
+Speech requests are prefetched up to maxPendingSegments while previous audio plays. Each queued
+stream holds at most 1 MB plus one provider frame (maximum 8 MB); consumption applies backpressure.
+PCM sentences share one audio timeline without draining or inserting startup padding between them.
+Provider pauses can still underrun that timeline. Prefetched requests may incur charges even when
+interrupted; interruption cancels all of them and retains only fully played segments in history.
 
 The built-in TTS instructions field maps to OpenRouter's OpenAI provider options. Other vendors'
 extra parameters belong in a custom stage adapter. They are never assumed portable.

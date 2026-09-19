@@ -86,8 +86,10 @@ Desktop.ini
 *~
 
 # OpenMemory - IDE/Assistant specific rules
+# AGENTS.md was on this list from the repository's first commit, as a file that tool's installer
+# writes. It came off on 2026-09-19: the root AGENTS.md is ours, and it is what Codex, Cursor,
+# Copilot and Gemini CLI read where Claude Code reads CLAUDE.md.
 .github\instructions\openmemory.instructions.md
-AGENTS.md
 
 # Development artifacts (never commit)
 *.development.json

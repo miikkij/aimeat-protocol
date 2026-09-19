@@ -36,10 +36,10 @@ export const COMP_AUTH_GATED = `// auth-gated section — show content only to l
 var gate = document.getElementById('members-only');
 function applyAuth(s) { if (gate) gate.style.display = (s && s.jwt) ? '' : 'none'; }
 AIMEAT.auth.mountLoginButton('#login', {
-  onLogin: function () { applyAuth(AIMEAT.auth.getSession()); },
+  onSession: function (s) { applyAuth(s); },   // a restored session, the silent one on an app address, and a sign-in
   onLogout: function () { applyAuth(null); }
 });
-applyAuth(AIMEAT.auth.getSession());`;
+applyAuth(null);   // hidden until a session arrives`;
 
 export const COMP_PRIVATE_STORE = `// private-store — a per-owner private collection (aimeat-data). Only the owner can read it.
 async function listItems() { return (await AIMEAT.data.get('{{app}}.items')) || []; }

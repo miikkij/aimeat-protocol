@@ -20,6 +20,11 @@
  *   await refreshAppDependencies(storage, { ownerName, filename, versionNumber, mimeType, data, manifest });
  *   const { apps, cortexes } = await dependentsOf(storage, 'extension', 'prh-api');
  * @version-history
+ *   v1.2.0 — 2026-09-19 — A pack is used when the app loads the pack's OWN file. "Any include path
+ *     present" counted a prerequisite as the pack: aimeat-voice lists aimeat-auth.js and
+ *     aimeat-living lists the Atelier files, so on aimeat.io every app that signs people in was
+ *     recorded as using the voice library, and the research call told builders so. Scan generation
+ *     3, so a running node re-reads its sources once and the wrong edges go.
  *   v1.0.0 — 2026-09-03 — Initial (dependency map, slice 1; brief doc-mtkr34qa1dg1).
  *   v1.1.0 — 2026-09-03 — Library packs join the map: an app carrying a pack's include path
  *     (`/v1/libs/aimeat-auth.js`, `/lib/phaser@4.min.js`) gets a 'pack' edge, the marker row carries
@@ -36,10 +41,11 @@ export interface Dep { name: string; version: string | null; via: 'source' | 'ma
 export interface ExtractedDependencies { cortex: Dep[]; extensions: Dep[]; packs: Dep[] }
 
 /**
- * The scan generation. Bumped when the scan learns to see something new (2: library packs), so the
- * boot backfill re-reads every source scanned by an older generation exactly once.
+ * The scan generation. Bumped when the scan learns to see something new (2: library packs) or
+ * stops seeing something that is not there (3: a pack's prerequisite is not the pack), so the boot
+ * backfill re-reads every source scanned by an older generation exactly once.
  */
-export const SCAN_MARKER = 'scan:2';
+export const SCAN_MARKER = 'scan:3';
 
 /**
  * A library pack is recognised by the path of its include line with the origin stripped:
@@ -59,6 +65,17 @@ function packNeedlesOnce(): Array<{ id: string; paths: string[] }> {
         .filter((path): path is string => typeof path === 'string' && path.length > 1),
     }))
     .filter(p => p.paths.length > 0);
+  // A pack's include lists its PREREQUISITES beside its own file (aimeat-voice names aimeat-auth.js
+  // first, aimeat-living names the Atelier stylesheet and script), and "any path present" then
+  // recorded every app that signs people in as using the voice library. Keep only the paths that
+  // are the pack's OWN: one no other pack lists, or one named after the pack. A pack whose every
+  // path is shared keeps them all, which is what it had.
+  const listedBy = new Map<string, number>();
+  for (const p of packNeedles) for (const path of new Set(p.paths)) listedBy.set(path, (listedBy.get(path) ?? 0) + 1);
+  packNeedles = packNeedles.map((p) => {
+    const own = p.paths.filter(path => listedBy.get(path) === 1 || path.slice(path.lastIndexOf('/') + 1).startsWith(p.id + '.') || path.slice(path.lastIndexOf('/') + 1).startsWith(p.id + '@'));
+    return { id: p.id, paths: own.length ? own : p.paths };
+  });
   return packNeedles;
 }
 
