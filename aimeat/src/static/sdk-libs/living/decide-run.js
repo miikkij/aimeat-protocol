@@ -46,7 +46,7 @@ import { sayDecide } from './decide-words.js';
 const LOG_SIZE = 50;
 
 /**
- * @param {{ doc: any, graph: any, langs?: () => string[], decide?: () => any,
+ * @param {{ doc: any, graph: any, langs?: () => string[], decide?: () => any, appId?: string,
  *   onResult?: (out: { changed: string[], transitions?: any[] }) => void,
  *   onDecision?: (entry: any) => void,
  *   timers?: { set: (fn: () => void, ms: number) => any, clear: (h: any) => void },
@@ -102,6 +102,16 @@ export function createDecisions(spec) {
       if (v && v.trim()) out.push(v.trim());
     }
     return out;
+  }
+
+  /** The app this page says it is, or undefined on a page that names none. */
+  function appId() {
+    if (spec.appId) return String(spec.appId);
+    try {
+      const meta = document.querySelector('meta[name="aimeat-app"]');
+      const v = meta && meta.getAttribute('content');
+      return v ? String(v) : undefined;
+    } catch { return undefined; }
   }
 
   /** Hand one graph operation to the host, with the node itself counted as changed. */
@@ -195,6 +205,10 @@ export function createDecisions(spec) {
         thresholds: thresholds,
         subject: node.subject ? String(node.subject) : (doc.key ? String(doc.key) + '#' + id : undefined),
         names: namesOf(node),
+        // WHICH APP ASKED. A page signed in with the owner's own session carries no app on its token,
+        // and the decision would then be the owner's alone in the ledger and the app quota. The
+        // page names itself in <meta name="aimeat-app">; an app-grant token still wins on the node.
+        app_id: appId(),
       });
     } catch (e) {
       if (stale()) return null;

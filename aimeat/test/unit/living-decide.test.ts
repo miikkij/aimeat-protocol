@@ -202,6 +202,19 @@ describe('the decide node: when it asks', () => {
     expect(m.asked[0].state).toBe('Hei, laskussa on virhe.');
   });
 
+  it('names the app the page says it is, so the decision is the app\'s in the ledger', async () => {
+    const doc = (globalThis as unknown as { document: Any }).document;
+    const before = doc.querySelector;
+    doc.querySelector = (sel: string) => (sel === 'meta[name="aimeat-app"]' ? { getAttribute: () => 'tyokirja.html' } : null);
+    try {
+      const m = model(() => choice('NORMAL', 0.9));
+      const r = rig(sheet(), m.api);
+      r.type('Laskussa on virhe.');
+      r.clock.run(); await r.flush();
+      expect(m.asked[0].opts.app_id).toBe('tyokirja.html');
+    } finally { doc.querySelector = before; }
+  });
+
   it('does not ask twice about the same text', async () => {
     const m = model(() => choice('NORMAL', 0.9));
     const r = rig(sheet(), m.api);
@@ -223,6 +236,8 @@ describe('the decide node: when it asks', () => {
     expect(sent.opts.thresholds).toEqual({ next: 0.7, angry: 0.8 });
     expect(sent.opts.names).toEqual(['Anna Virtanen']);
     expect(sent.opts.subject).toBe('apps.tyokirja.sheets.tuki#triage');
+    // No <meta name="aimeat-app"> in this stub page, so no app is claimed.
+    expect(sent.opts.app_id).toBeUndefined();
     // In "new", WAIT and REOPEN are not events this state takes; NONE is no event at all, so it stays.
     expect(Object.keys(sent.questions.next.criteria).sort()).toEqual(['NONE', 'NORMAL', 'RESOLVE', 'URGENT']);
     expect(sent.questions.angry).toEqual({ type: 'noul', instructions: 'The customer is angry or threatens to leave.' });

@@ -5014,6 +5014,16 @@
       }
       return out;
     }
+    function appId() {
+      if (spec.appId) return String(spec.appId);
+      try {
+        const meta = document.querySelector('meta[name="aimeat-app"]');
+        const v = meta && meta.getAttribute("content");
+        return v ? String(v) : void 0;
+      } catch {
+        return void 0;
+      }
+    }
     function report(id, out) {
       const changed = out && out.changed ? out.changed.slice() : [];
       if (changed.indexOf(id) < 0) changed.unshift(id);
@@ -5098,7 +5108,11 @@
           gates: String(node2.gates || ""),
           thresholds,
           subject: node2.subject ? String(node2.subject) : doc.key ? String(doc.key) + "#" + id : void 0,
-          names: namesOf(node2)
+          names: namesOf(node2),
+          // WHICH APP ASKED. A page signed in with the owner's own session carries no app on its token,
+          // and the decision would then be the owner's alone in the ledger and the app quota. The
+          // page names itself in <meta name="aimeat-app">; an app-grant token still wins on the node.
+          app_id: appId()
         });
       } catch (e) {
         if (stale()) return null;
