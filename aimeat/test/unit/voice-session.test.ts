@@ -34,7 +34,7 @@ describe('voice session', () => {
     const { session, player, calls } = setup({}, 200);
     await session.start(); const run = session.sendText('Question'); const rejected = expect(run).rejects.toMatchObject({ name: 'AbortError' });
     await new Promise(r => setTimeout(r, 15)); session.interrupt(); await rejected;
-    expect(player.stop).toHaveBeenCalled(); expect(calls).toEqual(['First.']);
+    expect(player.stop).toHaveBeenCalled(); expect(calls).toEqual(['First.', 'Second.']);
     expect(session.history).toEqual([{ role: 'user', content: 'Question' }]);
     await session.close();
   });
@@ -58,8 +58,32 @@ describe('voice session', () => {
     session.configure({ llm: { temperature: 0.2 } }); expect(session.config.llm.temperature).toBe(0.2);
     session.configure({ preset: 'patient', chunking: { maxChars: 300 } });
     expect(session.config.turn.silenceMs).toBe(1200);
-    expect(session.config.chunking).toEqual({ minChars: 50, maxChars: 300, maxWaitMs: 700 });
+    expect(session.config.chunking).toEqual({ mode: 'sentence', minChars: 50, maxChars: 300, maxWaitMs: 700 });
     expect(session.config.llm.temperature).toBe(0.2);
     await session.start(); expect(() => session.configure({})).toThrow('Stop'); await session.close();
+  });
+  it('prepares the following sentence before the first finishes playing', async () => {
+    const { session, calls } = setup({}, 200);
+    await session.start();
+    const run = session.sendText('Question');
+    const rejected = expect(run).rejects.toMatchObject({ name: 'AbortError' });
+    await new Promise(r => setTimeout(r, 20));
+    expect(calls).toEqual(['First.', 'Second.']);
+    expect(session.history).toEqual([{ role: 'user', content: 'Question' }]);
+    session.interrupt(); await rejected; await session.close();
+  });
+  it('cancels all prefetched providers and retains no unheard answer', async () => {
+    const signals: AbortSignal[] = [];
+    const { session } = setup({ async *speak(_text: string, { signal }: { signal: AbortSignal }) {
+      signals.push(signal); yield new Uint8Array([0, 0]); await delay(10000, signal);
+    } });
+    await session.start(); const run = session.sendText('Question');
+    const rejected = expect(run).rejects.toMatchObject({ name: 'AbortError' });
+    await new Promise(r => setTimeout(r, 20));
+    expect(signals).toHaveLength(2);
+    session.interrupt(); await rejected;
+    expect(signals.every(s => s.aborted)).toBe(true);
+    expect(session.history).toEqual([{ role: 'user', content: 'Question' }]);
+    await session.close();
   });
 });

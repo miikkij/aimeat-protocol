@@ -23,7 +23,7 @@ export function delay(ms, signal) {
     signal.addEventListener('abort', stop, { once: true });
   });
 }
-/** @param {AsyncIterable<string>} source @param {{minChars:number,maxChars:number,maxWaitMs:number}} opts @param {AbortSignal} signal */
+/** @param {AsyncIterable<string>} source @param {{mode?:string,minChars:number,maxChars:number,maxWaitMs:number}} opts @param {AbortSignal} signal */
 export async function* segments(source, opts, signal) {
   const iterator = source[Symbol.asyncIterator]();
   let pending = iterator.next();
@@ -38,7 +38,7 @@ export async function* segments(source, opts, signal) {
         cut = buffer.lastIndexOf(' ', opts.maxChars);
         if (cut < opts.minChars) cut = opts.maxChars;
       }
-      if (!cut && buffer.trim() && Date.now() - since >= opts.maxWaitMs) cut = buffer.length;
+      if (!cut && opts.mode !== 'sentence' && buffer.trim() && Date.now() - since >= opts.maxWaitMs) cut = buffer.length;
       if (cut) {
         const part = buffer.slice(0, cut).trim(); buffer = buffer.slice(cut); since = Date.now();
         if (part) yield part;
@@ -47,7 +47,7 @@ export async function* segments(source, opts, signal) {
       let timer;
       const timeout = new Promise(resolve => { timer = setTimeout(() => resolve(null), Math.max(1, opts.maxWaitMs - (Date.now() - since))); });
       let result;
-      try { result = await abortable(buffer.trim() ? Promise.race([pending, timeout]) : pending, signal); }
+      try { result = await abortable(opts.mode !== 'sentence' && buffer.trim() ? Promise.race([pending, timeout]) : pending, signal); }
       finally { clearTimeout(timer); }
       if (!result) continue;
       if (result.done) { if (buffer.trim()) yield buffer.trim(); return; }

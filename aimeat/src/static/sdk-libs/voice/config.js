@@ -12,14 +12,14 @@ export const defaults = {
   stt: { provider: 'node', model: '', language: '', temperature: 0 },
   llm: { provider: 'node', model: '', temperature: 0.7, topP: 1, maxTokens: null, reasoning: null },
   tts: { provider: 'node', model: '', voice: 'alloy', format: 'pcm', sampleRate: 24000, channels: 1, speed: 1, instructions: '' },
-  chunking: { minChars: 24, maxChars: 180, maxWaitMs: 350 },
+  chunking: { mode: 'sentence', minChars: 24, maxChars: 1200, maxWaitMs: 350 },
   playback: { bufferMs: 80, maxBufferedMs: 3000, maxPendingSegments: 3, volume: 1 },
   history: { maxTurns: 12 }, timeoutMs: 120000,
 };
 export const presets = {
   balanced: {},
-  responsive: { turn: { silenceMs: 450 }, chunking: { minChars: 12, maxChars: 120, maxWaitMs: 180 }, playback: { bufferMs: 40 } },
-  patient: { turn: { silenceMs: 1200 }, chunking: { minChars: 50, maxChars: 240, maxWaitMs: 700 }, playback: { bufferMs: 150 } },
+  responsive: { turn: { silenceMs: 450 }, chunking: { minChars: 12, maxChars: 1200, maxWaitMs: 180 }, playback: { bufferMs: 40 } },
+  patient: { turn: { silenceMs: 1200 }, chunking: { minChars: 50, maxChars: 2000, maxWaitMs: 700 }, playback: { bufferMs: 150 } },
 };
 
 /** @param {any} target @param {any} patch @param {string} [path] */
@@ -65,6 +65,7 @@ export function configure(options = {}) {
   if (result.llm.maxTokens !== null) range(result.llm.maxTokens, 1, 32768, 'llm.maxTokens', true);
   if (result.llm.reasoning !== null && (typeof result.llm.reasoning !== 'object' || Array.isArray(result.llm.reasoning))) throw new TypeError('llm.reasoning must be an object or null');
   range(result.chunking.minChars, 1, 2000, 'chunking.minChars', true);
+  if (!['sentence', 'latency'].includes(result.chunking.mode)) throw new TypeError('chunking.mode must be sentence or latency');
   range(result.chunking.maxChars, result.chunking.minChars, 4000, 'chunking.maxChars', true);
   range(result.chunking.maxWaitMs, 1, 10000, 'chunking.maxWaitMs');
   range(result.playback.bufferMs, 0, 2000, 'playback.bufferMs');
