@@ -192,7 +192,10 @@ export const TASKS: Task[] = [
             const quality = await appQuality(ctx.baseUrl, ctx.ownerName, hit.filename, ctx.metrics.toolCalls);
             const html = await fetch(`${ctx.baseUrl}/v1/apps/${encodeURIComponent(ctx.ownerName)}/${encodeURIComponent(hit.filename)}?mode=inline`).then(res => res.text());
             // "Remember everything, on my phone too" is the node's store, not the browser's.
-            const keepsOnNode = /AIMEAT\.data\.(set|get)\s*\(|\/v1\/libs\/aimeat-living\.js/.test(html);
+            // Through any name the page gave the global: two of three runs wrote `var A = window.AIMEAT`
+            // and `A.data.set(`, and the first version of this line failed both.
+            const keepsOnNode = /\/v1\/libs\/aimeat-living\.js/.test(html)
+                || (/\/v1\/libs\/aimeat-data\.js/.test(html) && /\b\w+\.data\.(set|get)\s*\(/.test(html));
             const ok = onAtelier(quality) && keepsOnNode;
             const why = !onAtelier(quality) ? 'it is not an Atelier app with a register' : 'it does not keep the habits on the node, so another device starts empty';
             // Nobody answers a headless run, so what can be measured is whether the builder SAID which

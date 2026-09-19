@@ -79,6 +79,12 @@ export interface AppQuality {
 
 interface Call { name: string; input: unknown; isError: boolean }
 
+/** Every name the page bound to the kit (`var K = A.atelier`), with `a` and `A` kept for the old pages. */
+function kitAliases(html: string): string[] {
+    const bound = [...html.matchAll(/\b([A-Za-z_$][\w$]*)\s*=\s*[\w$.]*\.atelier\b(?!\.)/g)].map(m => m[1].replace(/\$/g, '\\$'));
+    return [...new Set(['a', 'A', ...bound])];
+}
+
 export async function appQuality(baseUrl: string, ownerName: string, filename: string, toolCalls: Call[]): Promise<AppQuality> {
     const res = await fetch(`${baseUrl}/v1/apps/${encodeURIComponent(ownerName)}/${encodeURIComponent(filename)}?mode=inline`);
     const html = res.ok ? await res.text() : '';
@@ -135,7 +141,9 @@ export async function appQuality(baseUrl: string, ownerName: string, filename: s
         // Names the kit HAS (the catalogue the specification renders from, plus the families it
         // describes outside that table). The first version counted any method on a variable called
         // `a`, and reported `splice` as a component.
-        kitComponents: [...new Set([...html.matchAll(/\b(?:AIMEAT\.atelier|[aA])\.([a-z][A-Za-z]+)\s*\(/g)].map(m => m[1]).filter(n => KIT_NAMES.has(n)))],
+        // Through any name the page gave the kit (`K = A.atelier`): a run that called it `K` was
+        // reported as using no component at all.
+        kitComponents: [...new Set([...html.matchAll(new RegExp(`\\b(?:AIMEAT\\.atelier|${kitAliases(html).join('|')})\\.([a-z][A-Za-z]+)\\s*\\(`, 'g'))].map(m => m[1]).filter(n => KIT_NAMES.has(n)))],
         ownStyles: ownClassNames(html).length,
         level: meta('aimeat-level'),
         // The whole Book on one page reaches a builder two ways: part `libraries` of the
