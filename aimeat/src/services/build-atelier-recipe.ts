@@ -24,6 +24,7 @@
  *   import { renderCustomisation, renderLiving, renderPatterns } from './build-atelier-recipe.js';
  *   body += renderCustomisation() + renderLiving(base) + renderPatterns();
  * @version-history
+ *   v1.5.0 — 2026-09-19 — The ninth node type, `decide` (aimeat-living 0.8.0), in the one-line list.
  *   v1.4.0 — 2026-09-06 — The reach-out paragraph names `{{secret:NAME}}` in a trigger's or a
  *     source's headers, the vault it is filled from, and the words to give the person.
  *   v1.3.0 — 2026-09-06 — The living section says what `aimeat-light` is for: a genre that
@@ -111,14 +112,16 @@ export function renderLiving(base: string): string {
     + '`AIMEAT.living.validate(record)` reads a document WITHOUT running it and answers with every '
     + 'refusal in words — an unknown node, a circle naming the two ids, a unit that will not add, '
     + 'a block that is not there. Call it before you save.\n\n'
-    + 'THE EIGHT NODE TYPES, one line each so you know what to ask about: `value` (a named '
+    + 'THE NINE NODE TYPES, one line each so you know what to ask about: `value` (a named '
     + 'quantity, the writable ground the rest stands on), `formula` (a spreadsheet expression over '
     + 'other node ids, worked out with its units and printed as mathematics), `control` (a slider, '
     + 'toggle, pick, number or text field on ONE value), `binding` (one block prop reads one '
     + 'node), `text` (a sentence that changes when the numbers do), `machine` (a statechart in '
     + 'XState\'s vocabulary, whose output is the state it is in), `source` (a live value from a '
-    + 'memory key or from an address) and `trigger` (when a machine transitions, the document '
-    + 'tells an address or one of the owner\'s own agents).\n\n'
+    + 'memory key or from an address), `trigger` (when a machine transitions, the document '
+    + 'tells an address or one of the owner\'s own agents) and `decide` (the decision model reads '
+    + 'a text and moves a machine by its own events above a threshold; below it, a person decides; '
+    + 'the page then also loads aimeat-decide.js and the app asks for ai:use).\n\n'
     + 'WHERE A NODE LANDS ON THE SCREEN, two roads: a `binding` feeds a kit component — a '
     + 'figure\'s value, a gauge\'s reading, a chart\'s series — and the refresh goes through the '
     + 'mosaic\'s own door, so the count-up and the glide run for you; and a `block` field on a '

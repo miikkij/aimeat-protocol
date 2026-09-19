@@ -22,6 +22,8 @@
  * @structure DECIDE_SKILL_ENTRY
  * @usage import { DECIDE_SKILL_ENTRY } from './builtin-skills.decide.js';
  * @version-history
+ *   v1.1.0 — 2026-09-19 — A recipe for moving a statechart when text arrives: the living document's
+ *     decide node (aimeat-living 0.8.0).
  *   v1.0.0 — 2026-09-19 — Initial.
  */
 /** The shape of a BuiltinSkill, named here rather than imported so this file closes no import cycle
@@ -92,6 +94,14 @@ reads only the answers that branch needs.
 **Act, check, or ask a person (routing by confidence).** A pickOne for the intent. Below a floor, send
 it to a person. Low-stakes actions run above the floor; an action that moves money or deletes needs a
 higher bar, or the user's confirmation. Different actions, different thresholds.
+
+**Move a statechart when text arrives (a living document).** The model cannot design a state
+machine, but it can choose which transition one takes, because the options are the machine's own
+events. In a living document this is a \`decide\` node: its pickOne's options are the machine's events
+plus "NONE", the node offers only the events the current state accepts, sends the winner above the
+threshold, and hands anything below it to a person on the sheet, recording their verdict.
+\`AIMEAT.living.describe("decide")\` has the fields; the page still loads aimeat-decide.js and the app
+still names TypeSafe in its data map.
 
 **Send each request to the right handler (intent routing).** A pickOne for intent plus a scale for
 complexity, from "simple lookup" to "unusual, needs escalation". Low confidence or high complexity goes

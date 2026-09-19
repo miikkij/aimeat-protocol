@@ -5,6 +5,7 @@
  *   they only ever warn.
  * @usage cd aimeat && pnpm vitest run test/unit/app-decide-posture.test.ts
  * @version-history
+ *   v1.1.0 — 2026-09-19 — A living document's decide node, written as JSON fields.
  *   v1.0.0 — 2026-09-19 — Initial.
  */
 import { describe, it, expect } from 'vitest';
@@ -55,6 +56,16 @@ describe('lintAppDecideUse', () => {
   it('reminds the app that the people in its own data are its responsibility', () => {
     const hints = lintAppDecideUse(`${HEAD}${LIB}<script>AIMEAT.decide.ask(record, q, { app_id: 'crm' })</script>`);
     expect(hints.some(h => h.includes('its own responsibility') && h.includes('names: [...]'))).toBe(true);
+  });
+
+  it('reads a living document\'s decide node, whose questions and names are JSON fields', () => {
+    const finnish = lintAppDecideUse(`${HEAD}${LIB}<script>var STARTERS = { tuki: { model: { nodes: { triage: {
+      "type": "decide", "names": ["customer"], "questions": { "angry": { "yesNo": "Onko asiakas vihainen?" } } } } } } };</script>`);
+    expect(finnish.some(h => h.includes('not written in English') && h.includes('Onko asiakas'))).toBe(true);
+    expect(finnish.some(h => h.includes('its own responsibility'))).toBe(false);
+    const english = lintAppDecideUse(`${HEAD}${LIB}<script>var S = { "names": ["customer"],
+      "questions": { "next": { "pickOne": "Which step does this message call for?", "options": {} } } };</script>`);
+    expect(english).toEqual([]);
   });
 
   it('reaches every publish door through the AI posture check', () => {

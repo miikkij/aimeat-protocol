@@ -35,6 +35,9 @@
  * @structure controlRow · textView · machineView · valueRow · triggerRow · statesOf · renderNodeInto
  * @usage  import { renderNodeInto } from './render.js';
  * @version-history
+ *   v0.8.0 — 2026-09-19 — A decide node is drawn (render-decide.js): its state, its answers, what it
+ *     gates, and the person's buttons when the model was not sure enough. A control of kind `area`
+ *     is the kit's textarea, for a message of several lines.
  *   v0.6.0 — 2026-09-06 — THE GEAR, AND THE TWO THINGS IT NEEDED ON THE FIELDS IT SITS ON. Every
  *     value, control and source carries an inward gear and every machine and trigger an outward
  *     one, drawn as inline SVG at the kit's touch size. A source's reading gained a line under it
@@ -66,6 +69,7 @@ import { isQuantity, asText, asNumber } from './formula-eval.js';
 import { formatNumber, formatParts } from './format.js';
 import { textOf } from './i18n.js';
 import { gearButton } from './gear.js';
+import { decideRow } from './render-decide.js';
 
 let seq = 0;
 function uid() { seq += 1; return 'ak-living-' + seq; }
@@ -86,7 +90,7 @@ function langsOf(spec) {
 function readout(v, format, lang) { return formatParts(v, format, 'after', lang).text; }
 
 /** Which of the kit's field types each control kind is. */
-const FIELD_TYPE = { slider: 'range', toggle: 'toggle', pick: 'select', number: 'number', text: 'text' };
+const FIELD_TYPE = { slider: 'range', toggle: 'toggle', pick: 'select', number: 'number', text: 'text', area: 'textarea' };
 
 /**
  * WHICH CONTROLS GET A READING BESIDE THEM, and it is the shorter list. A reading earns its place
@@ -181,7 +185,7 @@ export function controlRow(host, spec) {
     if (kind === 'toggle') {
       const on = !!(v === true || asNumber(v) === 1);
       if (input.checked !== on) handle.setValues({ value: on });
-    } else if (kind === 'text' || kind === 'pick') {
+    } else if (kind === 'text' || kind === 'area' || kind === 'pick') {
       const s = isQuantity(v) ? String(v.n) : asText(v);
       if (input.value !== s) handle.setValues({ value: s });
     } else {
@@ -409,7 +413,7 @@ export function statesOf(def) {
  * @param {{ id: string, node: any, graph: any, langs?: () => string[],
  *   set: (id: string, v: any) => void,
  *   gear?: ((id: string, way: 'in'|'out') => void)|null,
- *   reason?: () => string }} spec
+ *   reason?: () => string, resolve?: (id: string, choice: string) => void }} spec
  * @returns {{ el: HTMLElement, update: (...args: any[]) => void, relabel: () => void, kind: string }|null}
  */
 export function renderNodeInto(host, spec) {
@@ -493,6 +497,12 @@ export function renderNodeInto(host, spec) {
       relabel: () => view.relabel(label(), reason()),
       kind: 'trigger',
     };
+  }
+  if (node.type === 'decide') {
+    const view = decideRow(host, {
+      id: spec.id, node: node, graph: graph, label: label, langs: langs, resolve: spec.resolve,
+    });
+    return { el: view.el, update: view.update, relabel: view.relabel, kind: 'decide' };
   }
   if (node.type === 'value' || node.type === 'source') {
     const stale = function () { return String((graph.fieldsOf(spec.id) || {}).stale || ''); };
