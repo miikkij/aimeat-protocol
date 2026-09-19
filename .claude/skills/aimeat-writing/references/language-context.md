@@ -73,6 +73,8 @@ everywhere at once, and say so in the Changes section.
 | an operating guide | instructions for one named capability | skill | taito | habilidad |
 | the write pacer | not money, not credit, never buys anything | morsel | murunen | morsel |
 | granted model spend | real money the house fronts, and it runs out | AI allowance | tekoälysaldo | saldo de IA |
+| a model that answers closed questions | yes or no, pick one, a scale, with probabilities; writes no text; beside the text model, never in its list | decision model | päätösmalli | modelo de decisión |
+| cleaning what leaves for a decision | e-mails, phones, identity codes, account numbers, street addresses and names are taken out before anything is sent, and put back into the answer | remove personal data | henkilötietojen poisto / poistaa henkilötiedot | eliminar los datos personales |
 | permission a person grants | revocable, per agent, per area | permission | oikeus | permiso |
 | sign-in from elsewhere | another AIMEAT vouching that a sign-in is really them | federation | federaatio | federación |
 | the account holder | the human who owns everything here | owner | omistaja | propietario |

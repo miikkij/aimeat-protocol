@@ -10,6 +10,7 @@
  * @structure SDK_PACKS: LibraryPack[]
  * @usage Imported by ../library-packs.ts (registry assembly). Do not import directly.
  * @version-history
+ *   v1.15.0 — 2026-09-19 — aimeat-decide joins after aimeat-ai, from library-packs/sdk-decide.ts.
  *   v1.14.0 — 2026-09-18 — aimeat-prompt joins, from library-packs/sdk-prompt.ts.
  *   v1.13.1 — 2026-09-18 — aimeat-social is `stable`. v1.3.1 renamed it back to "Boards" and rewrote
  *     its aiDoc when boards were reinstated, and left `status: 'deprecated'`, so the pack index
@@ -82,6 +83,7 @@ import { SDK_UI_PACKS } from './sdk-ui.js';
 // registry, so it lives in its own file for the same reason. Pure list, spread back in below.
 import { LIVING_PACKS } from './sdk-living.js';
 import { PROMPT_PACKS } from './sdk-prompt.js';
+import { DECIDE_PACKS } from './sdk-decide.js';
 
 export const SDK_PACKS: LibraryPack[] = [
   ...CALENDAR_PRINT_PACKS,
@@ -270,6 +272,7 @@ export const SDK_PACKS: LibraryPack[] = [
     promptGroup: 'ai',
     promptLine: "- aimeat-ai.js — LLM completions on the USER's own OpenRouter key (`AIMEAT.ai.complete`). Requires aimeat-auth.",
   },
+  ...DECIDE_PACKS,
   {
     id: 'aimeat-datapackage',
     kind: 'sdk',

@@ -191,7 +191,7 @@ import { logger } from '../utils/logger.js';
 // URL) are wired explicitly below; everything else is this list. Sources: src/static/sdk-libs/<name>/.
 const SDK_LIB_NAMES = [
   'calendar', 'print', 'voice',
-  'speech', 'data', 'wallet', 'ai', 'capabilities', 'agents', 'agentface', 'intake', 'organism',
+  'speech', 'data', 'wallet', 'ai', 'decide', 'capabilities', 'agents', 'agentface', 'intake', 'organism',
   'workflows', 'header', 'editor', 'live', 'storage', 'social', 'work', 'commerce', 'exchange',
   'webmcp', 'markdown', 'audio', 'tunnel', 'game', 'iam', 'connect', 'datapackage', 'events',
   'atelier', 'living', 'phaser', 'assets',

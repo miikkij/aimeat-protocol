@@ -11,10 +11,13 @@
  * @structure AiCapabilityConfig — extended by AimeatConfig in config-types.ts
  * @usage config.modelDefaultChat, config.openrouterInstanceKey, … (unchanged; the split is invisible)
  * @version-history
+ *   v1.1.0 — 2026-09-19 — Extends DecideConfig (config-decide.ts): the decision provider's settings,
+ *     beside the text provider's and never inside them (TARGET-080).
  *   v1.0.0 — 2026-08-16 — Extracted from config-types.ts (pure extraction; no behaviour change).
  */
+import type { DecideConfig } from './config-decide.js';
 
-export interface AiCapabilityConfig {
+export interface AiCapabilityConfig extends DecideConfig {
   /**
    * The goose binary the chat agent runs as a child process (`goose acp`, ACP over stdio). Empty
    * (the default) disables the chat entirely, which is what every node does until an operator

@@ -489,6 +489,9 @@ const ALL_SUITES = [
     // The AI paths BEHIND the gate. Spawns its own node on 40314 with a scriptable OpenAI-compatible
     // provider on 40315, because every other AI suite stops at the door for want of one.
     'test/e2e-ai-provider-stub.ts',
+    // The decision provider (TARGET-080): its own node on 40436 and a TypeSafe stand-in on an
+    // ephemeral port, so what the scrubber let out is read from the bytes that arrived.
+    'test/e2e-ai-decide.ts',
     // The operator's provider allowlist, on the two doors that were outside it. Spawns its own node
     // on 40420 with AIMEAT_AI_PROVIDER_ALLOWLIST set, because the list is read from the environment
     // at boot: on a node with no list every host is allowed and there is nothing to prove.

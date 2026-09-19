@@ -12,7 +12,9 @@
  *   - CONFIG_FIELDS: the exhaustive field list grouped by domain (node, morsel policy, auth, features, work, quotas, federation, ...)
  *
  * @version-history
- *   v1.11.0 — 2026-09-17 — ai.chat_agent_env_passthrough (AIMEAT_GOOSE_ENV_PASSTHROUGH), immutable: the
+ *   v1.12.0 — 2026-09-19 — The `decide.` group (TARGET-080): the decision provider's switch, key,
+ *     pinned model, price and limits. decideBaseUrl is immutable: the node's key goes there.
+ *   v1.11.0 — 2026-09-17 —ai.chat_agent_env_passthrough (AIMEAT_GOOSE_ENV_PASSTHROUGH), immutable: the
  *     environment names the chat agent may see beside its allow-list.
  *   v1.10.0 — 2026-09-05 — mcp.session_sweep_ms (AIMEAT_MCP_SESSION_SWEEP_MS), immutable: the idle
  *     sweep's interval is read once at boot.
@@ -648,6 +650,23 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   { key: 'aiJobMaxQueuedPerOwner', dotPath: 'ai.job_max_queued_per_owner', envVar: 'AIMEAT_AI_JOB_MAX_QUEUED_PER_OWNER', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 100000, immutable: false, description: 'How many jobs one owner may have queued. An abuse brake, not a fairness knob — fairness is the round-robin order in the pool', range: '1-100000' },
   { key: 'aiJobMaxChain', dotPath: 'ai.job_max_chain', envVar: 'AIMEAT_AI_JOB_MAX_CHAIN', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 1000, immutable: false, description: 'How deep an on_done chain may go before it is stopped and the parent records why', range: '1-1000' },
   { key: 'aiJobLogRetentionDays', dotPath: 'ai.job_log_retention_days', envVar: 'AIMEAT_AI_JOB_LOG_RETENTION_DAYS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 3650, immutable: false, description: 'How many days of folded ai.jobs.log.<day> records to keep before the nightly prune removes them', range: '1-3650' },
+
+  // ── AI: the decision provider (TARGET-080, AIMEAT.decide — TypeSafe Jev) ──
+  // Beside the text provider, never inside it: nothing here reaches the model picker or the chat.
+  // The key is `configured`, never shown, and is sent to decideBaseUrl's host only.
+  { key: 'decideEnabled', dotPath: 'decide.enabled', envVar: 'AIMEAT_DECIDE_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Whether anyone on this node may ask the decision model. Off refuses every decide call' },
+  { key: 'decideInstanceKey', dotPath: 'decide.instance_key', envVar: 'AIMEAT_TYPESAFE_INSTANCE_KEY', type: 'string', validate: () => true, immutable: false, description: "This node's own TypeSafe key, spent by anyone who has not brought their own, from the same per-person allowance as the OpenRouter key", adminDisplay: 'configured' },
+  // Shown, never editable here: the node's key is sent to this address, so an admin screen that could
+  // change it could redirect the key. Set in the environment, read at boot.
+  { key: 'decideBaseUrl', dotPath: 'decide.base_url', envVar: 'AIMEAT_DECIDE_BASE_URL', type: 'string', validate: v => typeof v === 'string' && /^https?:\/\//.test(v as string), immutable: true, description: 'The decision model endpoint. The node key goes to this address only; change it in the environment' },
+  { key: 'decideModel', dotPath: 'decide.model', envVar: 'AIMEAT_DECIDE_MODEL', type: 'string', validate: v => typeof v === 'string' && /^[a-z0-9][a-z0-9._-]{1,63}$/.test(v as string), immutable: false, description: 'The pinned decision model version (e.g. jev-1.13.0). Pin a versioned id, not an alias: a threshold tuned on one version can move under an alias' },
+  { key: 'decidePricePerMtok', dotPath: 'decide.price_per_mtok', envVar: 'AIMEAT_DECIDE_PRICE_PER_MTOK', type: 'float', validate: v => typeof v === 'number' && (v as number) >= 0 && (v as number) <= 1000, immutable: false, description: 'USD per million input tokens; output is free. Prices a decision into the usage ledger', range: '0-1000' },
+  { key: 'decideMaxRequestTokens', dotPath: 'decide.max_request_tokens', envVar: 'AIMEAT_DECIDE_MAX_REQUEST_TOKENS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1000 && (v as number) <= 1000000, immutable: false, description: 'Estimated tokens one decide request may carry, state and questions together. A larger one is refused before it is sent', range: '1000-1000000' },
+  { key: 'decideMaxChoiceOptions', dotPath: 'decide.max_choice_options', envVar: 'AIMEAT_DECIDE_MAX_CHOICE_OPTIONS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 2 && (v as number) <= 10000, immutable: false, description: 'Options one choice question may offer. A larger taxonomy is walked in stages', range: '2-10000' },
+  { key: 'decideRequestsPerMinute', dotPath: 'decide.requests_per_minute', envVar: 'AIMEAT_DECIDE_REQUESTS_PER_MINUTE', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 1000000, immutable: false, description: 'Requests per minute this node sends to the decision model, everyone together. TypeSafe changes its own limit without notice', range: '1-1000000' },
+  { key: 'decideConcurrency', dotPath: 'decide.concurrency', envVar: 'AIMEAT_DECIDE_CONCURRENCY', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 1000, immutable: false, description: 'Parallel requests one run over many records may have open', range: '1-1000' },
+  { key: 'decideCacheHours', dotPath: 'decide.cache_hours', envVar: 'AIMEAT_DECIDE_CACHE_HOURS', type: 'float', validate: v => typeof v === 'number' && (v as number) >= 0 && (v as number) <= 8760, immutable: false, description: 'How long an identical decision is answered from the record instead of asking again. 0 never reuses', range: '0-8760' },
+  { key: 'decideRetentionDays', dotPath: 'decide.retention_days', envVar: 'AIMEAT_DECIDE_RETENTION_DAYS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 36500, immutable: false, description: 'Days a decision record is kept before the nightly prune removes it', range: '1-36500' },
 
   // ── AI: the built-in chat agent (a `goose acp` child process) ──
   { key: 'gooseBin', dotPath: 'ai.chat_agent_bin', envVar: 'AIMEAT_GOOSE_BIN', type: 'string', validate: () => true, immutable: false, description: 'Path to the goose binary. EMPTY DISABLES THE CHAT ENTIRELY. Takes effect on the next agent start' },

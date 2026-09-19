@@ -1351,6 +1351,15 @@
      "plain": "Background AI jobs Start a long AI job, get an answer at once, read or cancel it later. aimeat_ai_job_*"
     },
     {
+     "slug": "g-9-decision-model",
+     "cells": [
+      "<strong>Decision model</strong>",
+      "A second kind of AI beside the text model: ask closed questions (yes or no, pick one, a scale) about a record and get answers with probabilities, in well under a second, to sort, screen, route or gate. Personal data (e-mails, phones, Finnish identity codes, IBANs, street addresses, names) is removed before anything is sent and put back into the answer. Every decision is recorded with the model version, the thresholds and whether a person reviewed it, so the owner can ask what was decided about a record. Runs over many records resume where they stopped. An app must name TypeSafe in its data map first. The owner's own TypeSafe key, or the node's from the AI allowance; questions must be written in English.",
+      "<code>POST /v1/ai/decide</code>, <code>/v1/ai/decisions</code>, <code>/v1/ai/decide/runs</code>, <code>aimeat_decide</code>, <code>aimeat_decision_*</code>, <code>aimeat_decide_*</code>, <code>aimeat-decide</code>"
+     ],
+     "plain": "Decision model A second kind of AI beside the text model: ask closed questions (yes or no, pick one, a scale) about a record and get answers with probabilities, in well under a second, to sort, screen, route or gate. Personal data (e-mails, phones, Finnish identity codes, IBANs, street addresses, names) is removed before anything is sent and put back into the answer. Every decision is recorded with the model version, the thresholds and whether a person reviewed it, so the owner can ask what was decided about a record. Runs over many records resume where they stopped. An app must name TypeSafe in its data map first. The owner's own TypeSafe key, or the node's from the AI allowance; questions must be written in English. POST /v1/ai/decide, /v1/ai/decisions, /v1/ai/decide/runs, aimeat_decide, aimeat_decision_*, aimeat_decide_*, aimeat-decide"
+    },
+    {
      "slug": "g-9-image-generation",
      "cells": [
       "<strong>Image generation</strong>",
@@ -3263,6 +3272,6 @@
  "outro": "AIMEAT Feature List, reviewed 2026-09-15 against node 3.15.0. The contract is <code>openapi.yaml</code>; the specifications are RFC v4.0 Core and Platform; later changes are at <a href=\"/v1/changelog\">the change log</a>.",
  "counts": {
   "groups": 23,
-  "rows": 322
+  "rows": 323
  }
 }

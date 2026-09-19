@@ -87,6 +87,7 @@ import OffersTab from './profile/offers-tab.js';
 import NotificationsTab from './profile/notifications-tab.js';
 import AiSettingsTab from './profile/ai-tab.js';
 import { AiTransparencyCard } from './profile/ai-transparency-card.js';
+import { DecideCard } from './profile/decide-card.js';
 import { ComplianceCard } from './profile/compliance-card.js';
 import CalibratorTab from './profile/calibrator-tab.js';
 import PackagesTab from './profile/packages-tab.js';
@@ -110,6 +111,7 @@ import LibrariesTab from './profile/libraries-tab.js';
 function AiTab(props) {
   return html`
     <${AiSettingsTab} ...${props} />
+    <${DecideCard} />
     <${AiTransparencyCard} />
     <${ComplianceCard} />`;
 }

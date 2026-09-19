@@ -24,6 +24,7 @@
  * @version-history
  *   v1.0.0 — 2026-07-25 — Initial: scope-gated SSE domains (an app-grant stream no longer
  *     sees every domain in the owner's keyspace).
+ *   v1.4.0 — 2026-09-19 — `ai-decisions` → ai:use: what the decision model decided (TARGET-080).
  *   v1.3.0 — 2026-09-16 — `mcp-servers` → mcp:read: the remote MCP servers this account has
  *     attached. The read word, not the manage word, because a list on screen goes stale otherwise.
  *   v1.2.0 — 2026-09-06 — `secrets` → secrets:manage: the owner's credential vault.
@@ -88,6 +89,8 @@ export const DOMAIN_SCOPE: Readonly<Record<string, string>> = Object.freeze({
   work: 'task:read',
   actions: 'task:read',
   'agent-usage': 'task:read',
+  // What the decision model decided (TARGET-080): the word every decide door already asks.
+  'ai-decisions': 'ai:use',
   'agent-capabilities': 'task:read',
   'agent-directives': 'task:read',
   'agent-onboarding': 'task:read',
