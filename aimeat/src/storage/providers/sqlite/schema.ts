@@ -432,7 +432,7 @@ export function initializeSchema(db: Database.Database): void {
   // runner; not enforced server-side).
   safeAddColumn('agents', 'maxConcurrentTasks', 'INTEGER NOT NULL DEFAULT 1');
 
-  // Where the agent's HOST manages it (hatchery/cockpit settings page). Reported by the owner or a
+  // Where the agent's HOST manages it (a cockpit settings page). Reported by the owner or a
   // same-owner sibling; the node stores and links it and never fetches it.
   safeAddColumn('agents', 'consoleUrl', 'TEXT');
 

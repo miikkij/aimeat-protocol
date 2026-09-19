@@ -68,8 +68,8 @@ const DETAIL = `More on asking the operators. \`support@operators\` gives you a 
 SPEAK TO THE PERSON, NOT ABOUT THE SYSTEM. They did not ask for a receipt, and most of them will
 never learn our vocabulary. Say what you did and what happens next, in their words:
 
-  not this  "Read user:alice/hatchery-agent-requests (v1.0.5), build spec spec-31169dc, T1 shell
-             shell-pure-client, appdev pitfalls (ownerScope, login event, locales-meta). Hatchery
+  not this  "Read user:alice/workshop-requests (v1.0.5), build spec spec-31169dc, T1 shell
+             shell-pure-client, appdev pitfalls (ownerScope, login event, locales-meta). Workshop
              t_48be5aae is alive (heartbeat 18:25, 9/10 free)."
   this      "I read the instructions and checked the workshop is free. Starting now."
 

@@ -137,7 +137,7 @@ export interface AgentRecord {
   maxConcurrentTasks?: number;
   /**
    * Where this agent is managed by whatever HOSTS it: the settings or brain page in the fleet
-   * runtime it lives in (an agent hatchery instance, a CrewAI cockpit, a self-hosted daemon's UI).
+   * runtime it lives in (a CrewAI cockpit, a fleet dashboard, a self-hosted daemon's UI).
    *
    * The node cannot know this address and must not guess it, so the host reports it: the owner, or a
    * same-owner sibling such as the concierge agent that created this one, writes it once. It exists
@@ -148,7 +148,7 @@ export interface AgentRecord {
   consoleUrl?: string | null;
   /**
    * Who authorized this agent's registration: the owner's bare name when a person approved it, or
-   * the approving sibling's GAII when same-owner auto-approval did (a hatchery concierge creating
+   * the approving sibling's GAII when same-owner auto-approval did (a fleet concierge creating
    * the agent it was asked for).
    *
    * Written once, at creation, and never rewritten. Re-running device authorization is a normal

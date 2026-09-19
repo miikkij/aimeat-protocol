@@ -292,7 +292,7 @@ function normaliseConsoleUrl(raw: unknown): { ok: true; consoleUrl: string | nul
  * Point a same-owner agent at the page where its HOST manages it.
  *
  * Same-owner rather than owner-only, matching tags and mode, and for the same reason those are: the
- * writer is usually not a person. An agent created by a sibling (a hatchery concierge acting on a
+ * writer is usually not a person. An agent created by a sibling (a fleet concierge acting on a
  * task) is the case this exists for, and that sibling is the only party that knows the address.
  */
 export async function setAgentConsoleUrl(

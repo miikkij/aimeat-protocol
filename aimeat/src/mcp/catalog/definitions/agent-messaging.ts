@@ -197,7 +197,7 @@ export const agentMessagingTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_agent_console_set',
-        description: "Record where an agent is managed by whatever HOSTS it: its settings or brain page in the fleet runtime it runs in. Call this after creating and starting an agent somewhere the node cannot see — an agent hatchery instance, a cockpit, your own daemon's UI — so the owner's profile can link straight to it. Without it the person is told their agent is running and has nowhere to go and look at it. Must be an absolute http(s) URL; send an empty string to clear it. Display only: the node links this address and never fetches it.",
+        description: "Record where an agent is managed by whatever HOSTS it: its settings or brain page in the fleet runtime it runs in. Call this after creating and starting an agent somewhere the node cannot see — a fleet cockpit, your own daemon's UI — so the owner's profile can link straight to it. Without it the person is told their agent is running and has nowhere to go and look at it. Must be an absolute http(s) URL; send an empty string to clear it. Display only: the node links this address and never fetches it.",
         caller: 'agent',
         visibility: agentEverywhere,
         input: {

@@ -179,6 +179,7 @@ export async function initializeServices(
     .then(r => {
       const moved = r.created + r.updated + r.adopted;
       if (moved > 0) logger.info(`Built-in skills: ${r.created} created, ${r.updated} updated, ${r.adopted} adopted, ${r.unchanged} already current`);
+      if (r.removed.length > 0) logger.info(`Built-in skills retired in this build and removed from this node: ${r.removed.join(', ')}`);
       if (r.diverged.length > 0) logger.info(`Built-in skills edited on this node, left as they are: ${r.diverged.join(', ')}`);
     })
     .catch(err => logger.error('Failed to seed built-in skills', { error: String(err) }));

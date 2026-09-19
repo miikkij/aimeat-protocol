@@ -431,7 +431,7 @@ function renderPopOut(onPopOut, agent) {
 // (PATCH /v1/agents/:name/console-url). An agent created from a chat lives in a fleet runtime this
 // node has never heard of, and until this link existed the owner had a card describing something
 // they could not get to. The host name is read off the URL rather than translated: the person
-// recognises "hatchery.example.com" and would learn nothing from the word "host".
+// recognises "fleet.example.com" and would learn nothing from the word "host".
 // rel=noopener because the target is an address a principal supplied.
 function renderHostConsole(agent) {
   const url = agent.console_url;
