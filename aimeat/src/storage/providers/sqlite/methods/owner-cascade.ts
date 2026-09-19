@@ -12,6 +12,7 @@
  * @structure cascadeMethods.cascadeDeleteAgentData(gaii) — every owner-scoped table for one identity
  * @usage Object.assign(SqliteStorage.prototype, cascadeMethods) in providers/sqlite/index.ts
  * @version-history
+ *   v1.3.0 — 2026-09-19 — ai_decisions joins the cascade (TARGET-080).
  *   v1.2.1 — 2026-09-09 — The tally comment names the function deleteOwner actually calls
  *     (pseudonymiseWriter); the Storage method it named was deleted for having no caller.
  *   v1.2.0 — 2026-09-06 — secrets joins the cascade. A row there is a live credential to somebody
@@ -118,6 +119,8 @@ export const cascadeMethods = {
     this.db.prepare('DELETE FROM agent_usage_event WHERE agentGaii = ? OR ownerGhii = ?').run(gaii, gaii);
     this.db.prepare('DELETE FROM agent_usage_event_archive WHERE agentGaii = ? OR ownerGhii = ?').run(gaii, gaii);
     this.db.prepare('DELETE FROM agent_usage_daily WHERE agentGaii = ? OR ownerGhii = ?').run(gaii, gaii);
+    // What an AI decided on this person's behalf (TARGET-080). Theirs, so it goes with them.
+    this.db.prepare('DELETE FROM ai_decisions WHERE ownerGhii = ? OR principal = ?').run(gaii, gaii);
 
     // Sharing groups, and the key-space shares inside them. The shares go first and by two keys: by
     // ownerGaii for this person's own shares, then by the id of each group being removed, because a

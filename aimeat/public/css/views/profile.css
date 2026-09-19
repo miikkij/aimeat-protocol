@@ -3336,6 +3336,8 @@
 .pf-aitr-error { margin: 0; font-size: 0.85rem; color: var(--danger); }
 .pf-aitr-muted { margin: 0.5rem 0 0; font-size: 0.8rem; color: var(--muted); }
 .pf-aitr-sub { margin: 1.2rem 0 0.4rem; font-size: 0.9rem; font-weight: 600; }
+/* The decision card's "remove my key" door sits under the dashed key field, not against it. */
+.pf-aitr .og-doors { margin-top: 0.6rem; }
 .pf-aitr-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.4rem; }
 .pf-aitr-row, .pf-aitr-policy { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.3rem 0.7rem; padding: 0.55rem 0.7rem; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-dim); min-width: 0; }
 .pf-aitr-policy { flex-direction: column; }

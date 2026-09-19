@@ -271,6 +271,12 @@ export const TOOL_SCOPES: Record<string, string> = {
     aimeat_ai_job_list:                       'ai:use',
     aimeat_ai_job_get:                        'ai:use',
     aimeat_ai_job_cancel:                     'ai:use',
+    // The decision provider (TARGET-080): the same money and the same gate as a completion.
+    aimeat_decide:                            'ai:use',
+    aimeat_decision_list:                     'ai:use',
+    aimeat_decision_review:                   'ai:use',
+    aimeat_decide_run:                        'ai:use',
+    aimeat_decide_settings:                   'ai:use',
     aimeat_app_fork:                          'app:write',
     aimeat_app_publish:                       'app:write',
     aimeat_package_publish:                   'app:write',

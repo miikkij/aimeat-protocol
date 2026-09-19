@@ -18,6 +18,7 @@
  *   v1.0.0 — 2026-07-15 — Phase 5: provider skeleton + migration runner + memory domain.
  *   v1.1.0 — 2026-08-11 — Storage.transaction(): `db` becomes a getter over an AsyncLocalStorage-
  *     bound transaction, so every existing `this.db` call joins an open one without being changed.
+ *   v1.6.0 — 2026-09-19 — aiDecisionMethods bound (TARGET-080, AIMEAT.decide).
  *   v1.5.0 — 2026-09-09 — marketplaceMethods unbound and its module deleted: no caller.
  *   v1.4.0 — 2026-09-06 — secretMethods bound (the owner's secrets vault).
  *   v1.3.0 — 2026-09-04 — passkeyMethods bound.
@@ -50,6 +51,7 @@ import { scheduleMethods } from './methods/schedules.js';
 import { agentTaskMethods } from './methods/agent-tasks.js';
 import { agentUsageMethods } from './methods/agent-usage.js';
 import { aiProvenanceMethods } from './methods/ai-provenance.js';
+import { aiDecisionMethods } from './methods/ai-decisions.js';
 import { connectionMethods } from './methods/connections.js';
 import { mcpServerMethods } from './methods/mcp-servers.js';
 import { financeMethods } from './methods/finance.js';
@@ -169,6 +171,7 @@ Object.assign(
   agentTaskMethods,
   agentUsageMethods,
   aiProvenanceMethods,
+  aiDecisionMethods,
   connectionMethods,
   mcpServerMethods,
   financeMethods,

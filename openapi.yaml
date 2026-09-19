@@ -602,6 +602,37 @@ components:
       type: string
       enum: [dispute_opened, counter_dispute, message, re_delivery, accept_redelivery, withdraw_dispute, accept_fault, partial_offer, partial_accepted, partial_rejected, escalated, operator_ruled, timeout_resolved]
 
+    # === Decision provider (TARGET-080, AIMEAT.decide) ===
+    DecideQuestion:
+      type: object
+      required: [type, instructions]
+      properties:
+        type: { type: string, enum: [noul, choice, score] }
+        instructions:
+          description: The judgment, in English. A string, an object with named parts, or an array.
+        criteria:
+          description: >
+            noul: `{ true?, false? }`. choice: `{ "<option>": "<meaning>" | null }`, 2-240 options.
+            score: an array of 2-10 level descriptions, lowest first. In English.
+
+    DecideRequest:
+      type: object
+      required: [state, questions]
+      properties:
+        state:
+          description: What is being judged. A string, an object with named fields, or an array.
+        questions:
+          type: object
+          additionalProperties: { $ref: '#/components/schemas/DecideQuestion' }
+          description: Your ids (`[A-Za-z0-9_.-]{1,64}`) to questions. Ask everything in one call.
+        subject: { type: string, description: What the decision is about (a memory key, a record id). }
+        gates: { type: string, description: What the answer decides. }
+        thresholds: { type: object, description: The thresholds the caller will apply, recorded with the decision. }
+        names: { type: array, items: { type: string }, description: Extra person names to scrub. }
+        public_content: { type: boolean, description: Skip scrubbing for public content; honoured per the owner's policy. }
+        cache: { type: boolean, default: true, description: Reuse an identical earlier decision. }
+        app_id: { type: string, description: App attribution; an app-grant token's own app always wins. }
+
 
 
     # === Core Envelope ===
@@ -14722,6 +14753,330 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AimeatEnvelope'
+
+  /v1/ai/decide:
+    post:
+      operationId: decide
+      summary: Ask the decision model typed questions (AIMEAT.decide)
+      description: >
+        The decision provider (TypeSafe Jev), beside the text provider and never in the model picker.
+        Send a `state` and a map of typed `questions`; get typed answers with probabilities. No text
+        comes back. Three question types: `noul` (probability a statement is true), `choice` (one of
+        2-240 options, a probability per option and a confidence), `score` (2-10 ordered levels).
+        Write `instructions` and `criteria` in English whatever language the state is in.
+
+
+        Before anything leaves the node: the request is checked against the limits, an app caller must
+        have named TypeSafe in its data map's `leaves`, the owner's AI allowlist and daily budget apply,
+        and personal data is removed from the state, the instructions, the criteria and the choice
+        option names (e-mails, phones, Finnish personal identity codes, IBANs, street addresses, names
+        of the owner's contacts and values under name fields). Real option names are put back into the
+        answers. Every call is metered on the owner's budget and recorded as a decision.
+
+
+        Requires an owner session or a token carrying `ai:use`.
+      tags: [Memory]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DecideRequest'
+      responses:
+        '200':
+          description: >
+            `data` is `{ decision_id, model, answers, cached, scrub: { removed, total, skipped },
+            usage: { input_tokens, cost_usd }, key_source, request_id }`. Each answer is
+            `{ type, value, probabilities?, confidence?, legend? }`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '400':
+          description: '`INVALID_REQUEST` (limits; `details.violations` lists each) or `NO_API_KEY`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '401':
+          $ref: '#/components/responses/AimeatError'
+        '402':
+          description: '`QUOTA_EXHAUSTED` or `APP_QUOTA_EXHAUSTED` — the owner''s budget or allowance is spent.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '403':
+          description: '`DATAMAP_REQUIRED` — the calling app has not declared TypeSafe in its data map; or no `ai:use`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '422':
+          description: '`PROVIDER_REJECTED` — TypeSafe refused the request; `details.provider_detail` names the field.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '429':
+          description: '`RATE_LIMITED` — this node''s minute window for the key is full, or TypeSafe limited it. Carries `Retry-After`.'
+          headers:
+            Retry-After:
+              schema: { type: integer }
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '502':
+          $ref: '#/components/responses/AimeatError'
+        '503':
+          description: '`DECIDE_DISABLED` — the operator has turned the decision model off.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+
+  /v1/ai/decisions:
+    get:
+      operationId: listDecisions
+      summary: What the decision model decided for this owner, newest first
+      description: >
+        Each decision holds the model version that answered, the questions as sent (scrubbed), every
+        answer with its probabilities, the thresholds in force, what it gated, the subject, whether a
+        person reviewed it, what was scrubbed, the cost and TypeSafe's request id. The state itself is
+        kept only as a hash unless the owner's policy says to keep the scrubbed copy.
+
+
+        Requires an owner session or a token carrying `ai:use`.
+      tags: [Memory]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: subject, in: query, schema: { type: string }, description: Only decisions about this subject. }
+        - { name: app_id, in: query, schema: { type: string } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+        - { name: before, in: query, schema: { type: string }, description: 'Paging cursor: only decisions created before this ISO time.' }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '401':
+          $ref: '#/components/responses/AimeatError'
+        '403':
+          $ref: '#/components/responses/AimeatError'
+
+  /v1/ai/decisions/{id}:
+    get:
+      operationId: getDecision
+      summary: Read one decision
+      description: Another owner's decision is a 404. Requires an owner session or a token carrying `ai:use`.
+      tags: [Memory]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '401':
+          $ref: '#/components/responses/AimeatError'
+        '403':
+          $ref: '#/components/responses/AimeatError'
+        '404':
+          $ref: '#/components/responses/AimeatError'
+
+  /v1/ai/decisions/{id}/review:
+    post:
+      operationId: reviewDecision
+      summary: Record that a person confirmed or overrode a decision
+      description: The one change a decision record accepts. Requires an owner session or a token carrying `ai:use`.
+      tags: [Memory]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [outcome]
+              properties:
+                outcome: { type: string, enum: [confirmed, overridden] }
+                note: { type: string, maxLength: 2000 }
+                override: { type: object, description: What the person decided instead. }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '400':
+          $ref: '#/components/responses/AimeatError'
+        '404':
+          $ref: '#/components/responses/AimeatError'
+
+  /v1/ai/decide/runs:
+    post:
+      operationId: startDecideRun
+      summary: Ask the same questions of many records, in the background
+      description: >
+        TypeSafe has no batch endpoint, so a run is N decisions with at most
+        `AIMEAT_DECIDE_CONCURRENCY` open at once, rate limits waited out, every decision scrubbed,
+        metered and recorded like a single one, and progress kept in `decide.runs.<id>` so a stopped
+        run resumes. Give exactly one of `items` ([{ subject, state }]), `keys` (owner memory keys,
+        each value one state) or `prefix`. At most 1000 items. Answers 202 at once.
+
+
+        Requires an owner session or a token carrying `ai:use`.
+      tags: [Memory]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/DecideRequest'
+                - type: object
+                  properties:
+                    items:
+                      type: array
+                      maxItems: 1000
+                      items:
+                        type: object
+                        required: [subject]
+                        properties:
+                          subject: { type: string }
+                          state: {}
+                    keys: { type: array, items: { type: string }, maxItems: 1000 }
+                    prefix: { type: string }
+                    fields: { type: array, items: { type: string }, description: Keep only these top-level fields of each state. }
+      responses:
+        '202':
+          $ref: '#/components/responses/AimeatSuccess'
+        '400':
+          $ref: '#/components/responses/AimeatError'
+        '503':
+          $ref: '#/components/responses/AimeatError'
+    get:
+      operationId: listDecideRuns
+      summary: This owner's runs, newest first (without per-item results)
+      tags: [Memory]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+
+  /v1/ai/decide/runs/{id}:
+    get:
+      operationId: getDecideRun
+      summary: One run with its per-item results
+      description: A run this process is no longer working on reads as `interrupted` and can be resumed.
+      tags: [Memory]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '404':
+          $ref: '#/components/responses/AimeatError'
+
+  /v1/ai/decide/runs/{id}/resume:
+    post:
+      operationId: resumeDecideRun
+      summary: Carry on from the first item without a result
+      tags: [Memory]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '202':
+          $ref: '#/components/responses/AimeatSuccess'
+        '404':
+          $ref: '#/components/responses/AimeatError'
+
+  /v1/ai/decide/runs/{id}/stop:
+    post:
+      operationId: stopDecideRun
+      summary: Stop a run once its open requests finish
+      tags: [Memory]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '404':
+          $ref: '#/components/responses/AimeatError'
+
+  /v1/ai/decide/settings:
+    get:
+      operationId: getDecideSettings
+      summary: The owner's decision settings (never the key)
+      description: >
+        Whether the operator has the decision model on, the pinned model version, whether the owner
+        has their own TypeSafe key, whether the node's key is available, and the data policy: which
+        classes of personal data may leave unscrubbed, whether the scrubbed state is kept on each
+        record, and whether an app or agent may declare content public to skip scrubbing.
+        Requires an owner session or a token carrying `ai:use`.
+      tags: [Memory]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+    put:
+      operationId: putDecideSettings
+      summary: Set the owner's own TypeSafe key and data policy
+      description: >
+        The owner in person only (no app, no agent): these decide what the scrubber lets through.
+        The key is stored encrypted and never returned.
+      tags: [Memory]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                api_key: { type: string }
+                policy:
+                  type: object
+                  properties:
+                    allow:
+                      type: array
+                      items: { type: string, enum: [email, phone, hetu, iban, address, person] }
+                    store_state: { type: boolean }
+                    allow_public_opt_out: { type: boolean }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '400':
+          $ref: '#/components/responses/AimeatError'
+        '403':
+          $ref: '#/components/responses/AimeatError'
+
+  /v1/ai/decide/settings/key:
+    delete:
+      operationId: deleteDecideKey
+      summary: Forget the owner's own TypeSafe key
+      description: The owner in person only. Afterwards the node's key pays, if the node has one.
+      tags: [Memory]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '403':
+          $ref: '#/components/responses/AimeatError'
 
   /v1/ai/image:
     post:

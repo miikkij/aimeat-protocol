@@ -21,6 +21,7 @@
  *   - appMayWriteKey: owner passes, app refused, delegated agent refused, reserved grant passes
  * @usage cd aimeat && pnpm exec vitest run test/unit/reserved-keys.test.ts
  * @version-history
+ *   v1.x — 2026-09-19 — `decide.` is the fourteenth: the owner's TypeSafe key and scrubber policy.
  *   v1.x — 2026-09-13 — `messages.organize.` is the thirteenth: the owner's archive and rules for the
  *     Messages list, which decide what the server shows them.
  *   v1.x — 2026-08-30 — `notifications.` is the ninth: the owner's notification settings, which
@@ -45,7 +46,7 @@ const ACCOUNTANTS_KEY = 'finance.accountants';
 const PSP_KEY = 'commerce.psp';
 
 describe('the list holds every prefix the server reads and acts on', () => {
-    it('carries all thirteen, and a removal is a test failure rather than a silent regression', () => {
+    it('carries all fourteen, and a removal is a test failure rather than a silent regression', () => {
         // `messages.organize.` (2026-09-13): the owner's archive and rules for their Messages list.
         // The server composes the list with it, so an app that could write it could archive the
         // message warning the owner about that very app.
@@ -68,8 +69,18 @@ describe('the list holds every prefix the server reads and acts on', () => {
         // the agent's own namespace since 2026-09-16; the prefix still keeps a forged one out of the
         // owner's.
         expect([...RESERVED_OWNER_KEY_PREFIXES].sort()).toEqual(
-            ['agents.proposals.', 'ai-usage.', 'ai.jobs.', 'audit.', 'chat.', 'commerce.', 'crews.llm.', 'finance.', 'messages.organize.', 'notifications.', 'openrouter.', 'profile.', 'signals.'],
+            ['agents.proposals.', 'ai-usage.', 'ai.jobs.', 'audit.', 'chat.', 'commerce.', 'crews.llm.', 'decide.', 'finance.', 'messages.organize.', 'notifications.', 'openrouter.', 'profile.', 'signals.'],
         );
+    });
+
+    it('refuses a granted app the decision key and the scrubber policy, and lets the owner write them', () => {
+        for (const key of ['decide.apikey', 'decide.policy', 'decide.runs.1b2c']) {
+            expect(appMayWriteKey(['app'], key)).toBe(false);
+            expect(appMayWriteKey(['agent'], key, true)).toBe(false);
+            expect(appMayWriteKey(['owner'], key)).toBe(true);
+        }
+        // A key that merely starts with the word is not the prefix.
+        expect(appMayWriteKey(['app'], 'decider.notes')).toBe(true);
     });
 
     it('refuses a granted app the Messages list organisation, and leaves the rest of `messages.` alone', () => {

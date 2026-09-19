@@ -15,6 +15,7 @@
  *   - loadConfig() (function)
  *   - missingOperatorConfig() / operatorTypeLabel() (helpers)
  * @version-history
+ *   v1.14.0 — 2026-09-19 — decideDefaults(): the decision provider (TARGET-080), config-decide.ts.
  *   v1.13.0 — 2026-09-18 — geoHeaders (AIMEAT_GEO_HEADERS): the reverse proxy tells this node where
  *     a request came from. Off by default, the same on every node: without such a proxy the headers
  *     would be the visitor's own. docs/visitor-geography.md
@@ -63,6 +64,7 @@ import { parseSiteContacts } from './config-site-contacts.js';
 import { loadConnectionsConfig } from './config-load-connections.js';
 import { securityDoorDefaults } from './config-security.js';
 import { aiJobDefaults } from './config-ai-jobs.js';
+import { decideDefaults } from './config-decide.js';
 import { accountSecurityDefaults } from './config-types-account-security.js';
 import { seoDefaults } from './config-site-presence.js';
 import { loadFileSource } from './services/config-loader.js';
@@ -338,6 +340,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
 
     // AI jobs — a model call with a handle (config-ai-jobs.ts, a pure move under the 800-line ceiling).
     ...aiJobDefaults(),
+    ...decideDefaults(),
     maxActionsPerAgent: parseInt(process.env.AIMEAT_MAX_ACTIONS_PER_AGENT ?? '20', 10),
     minTrustForPaidActions: parseInt(process.env.AIMEAT_MIN_TRUST_PAID_ACTIONS ?? '10', 10),
     appMaxSizeMb: parseInt(process.env.AIMEAT_APP_MAX_SIZE_MB ?? '5', 10),

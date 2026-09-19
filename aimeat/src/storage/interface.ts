@@ -16,6 +16,7 @@
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  *   v1.1.0 — 2026-07-13 — Moved record/type declarations into ./types/* and re-exported them
  *     (max-file-lines); Storage interface + repository wiring stay here
+ *   v1.6.0 — 2026-09-19 — AiDecisionRepository joins the Storage composite (TARGET-080, AIMEAT.decide).
  *   v1.5.0 — 2026-09-09 — MarketplaceRepository and AgentTelemetryRepository leave the composite:
  *     every method in them had no caller (the marketplace never got a writer; telemetry moved to the
  *     in-process ring in services/telemetry-buffer.ts). Tables stay.
@@ -45,6 +46,7 @@ export * from './types/agents-messaging.js';
 export * from './types/agent-v2-messaging.js';
 export * from './types/agent-v2-tasks.js';
 export * from './types/ai-provenance.js';
+export * from './types/ai-decisions.js';
 export * from './types/usage.js';
 export * from './types/account-events.js';
 export * from './types/workspace-rows.js';
@@ -116,6 +118,7 @@ import type { AgentWebhookRepository } from './repositories/agent-webhook.reposi
 import type { AgentOnboardingRepository } from './repositories/agent-onboarding.repository.js';
 import type { InvitationRepository } from './repositories/invitation.repository.js';
 import type { AiProvenanceRepository } from './repositories/ai-provenance.repository.js';
+import type { AiDecisionRepository } from './repositories/ai-decisions.repository.js';
 import type { ConnectionRepository } from './repositories/connection.repository.js';
 import type { FinanceRepository } from './repositories/finance.repository.js';
 import type { OutboundRepository } from './repositories/outbound.repository.js';
@@ -157,6 +160,7 @@ export interface Storage extends
   AgentOnboardingRepository,
   InvitationRepository,
   AiProvenanceRepository,
+  AiDecisionRepository,
   ConnectionRepository,
   FinanceRepository,
   OutboundRepository,
