@@ -218,7 +218,9 @@ async function main(): Promise<void> {
 
     const s = loadSandbox();
     const suite = args.suite === 'skills' ? skillTasks() : TASKS;
-    const tasks = suite.filter(t => !args.tasks || args.tasks.some(want => t.id === want || t.id.startsWith(`${want}:`)));
+    // A task marked `byNameOnly` runs when it is asked for and never as part of "everything": the
+    // ten-task baseline is compared run to run, and a three-dollar build must not join it by default.
+    const tasks = suite.filter(t => (args.tasks ? args.tasks.some(want => t.id === want || t.id.startsWith(`${want}:`)) : !t.byNameOnly));
     const stamp = new Date().toISOString().replace(/[:.]/g, '-');
     const outDir = join(AIMEAT, '.cold-agent', stamp);
     mkdirSync(outDir, { recursive: true });

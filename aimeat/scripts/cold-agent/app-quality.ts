@@ -28,6 +28,10 @@
 import type { AimeatConfig } from '../../src/config.js';
 import { lintAppArtifact } from '../../src/services/app-artifact-lint.js';
 import { genreKeptShare, ownClassNames } from '../../src/services/app-genre-fork.js';
+import { ATELIER_COMPONENTS } from '../../src/services/build-atelier-prompt.js';
+
+/** `app` is the shell every Atelier page calls, so it says nothing about what was used. */
+const KIT_NAMES = new Set([...ATELIER_COMPONENTS.map(c => c.id), 'dialog', 'toast', 'chart', 'gauge', 'kanban', 'plan', 'schedule', 'map', 'atlas', 'queue', 'health', 'console', 'rating', 'steps', 'radar', 'mosaic', 'bottomNav', 'aide', 'fx', 'scene3d', 'mural'].filter(n => n !== 'app'));
 
 export interface AppQuality {
     bytes: number;
@@ -124,7 +128,10 @@ export async function appQuality(baseUrl: string, ownerName: string, filename: s
             adopted: toolCalls.filter(c => c.name === 'aimeat_designbook_adopt' && !c.isError).length,
             proposed: toolCalls.filter(c => c.name === 'aimeat_designbook_propose' && !c.isError).length,
         },
-        kitComponents: [...new Set([...html.matchAll(/\b(?:AIMEAT\.atelier|[aA])\.([a-z][A-Za-z]+)\s*\(/g)].map(m => m[1]).filter(n => !['app', 'i18n', 'status', 'describe', 'length', 'push', 'map', 'filter', 'forEach', 'slice', 'join', 'indexOf', 'concat', 'sort', 'reduce', 'find', 'some', 'every', 'includes', 'call', 'apply', 'then'].includes(n)))],
+        // Names the kit HAS (the catalogue the specification renders from, plus the families it
+        // describes outside that table). The first version counted any method on a variable called
+        // `a`, and reported `splice` as a component.
+        kitComponents: [...new Set([...html.matchAll(/\b(?:AIMEAT\.atelier|[aA])\.([a-z][A-Za-z]+)\s*\(/g)].map(m => m[1]).filter(n => KIT_NAMES.has(n)))],
         ownStyles: ownClassNames(html).length,
         light: meta('aimeat-light'),
         locales: (meta('aimeat-locales') ?? '').split(/\s+/).filter(Boolean),
