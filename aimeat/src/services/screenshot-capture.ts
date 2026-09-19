@@ -19,10 +19,11 @@
  *   per-owner throttle; renderAndStore() the shared render both paths use.
  * @version-history
  *   v1.6.0 — 2026-09-19 — browserLaunchEnv(): the browser starts without the node's own LD_PRELOAD,
- *     MALLOC_CONF and NODE_OPTIONS. deploy/aimeat.service preloads jemalloc into the node process,
- *     the browser inherited it, and Chromium died before it opened a page ("browser.newContext:
- *     Target page, context or browser has been closed", on every rung of the ladder including
- *     no-sandbox). aimeat.io took no app thumbnail from about 2026-09-04 and said nothing about it.
+ *     MALLOC_CONF and NODE_OPTIONS, which deploy/aimeat.service sets for node and the browser
+ *     inherited. Under the unit every launch died ("browser.newContext: Target page, context or
+ *     browser has been closed", on every rung of the ladder including no-sandbox), and aimeat.io
+ *     took no app thumbnail from about 2026-09-04 and said nothing about it. Proven on production:
+ *     141 of 163 thumbnails before the deploy, 163 of 163 three minutes after it.
  *   v1.5.0 — 2026-09-02 — NO_HEADLESS_BROWSER: the "there is none" sentence moves here, beside the
  *     launcher that decides it, so the guarantee bench and the app playtest answer alike.
  *   v1.4.0 — 2026-08-28 — launchBrowser() PROVES a page opens before handing the browser out
@@ -74,8 +75,9 @@ export type CaptureResult =
 /**
  * What the node process is started with and a browser must not inherit. deploy/aimeat.service sets
  * all three for node itself: jemalloc through LD_PRELOAD (with its MALLOC_CONF), and the V8 heap
- * ceiling through NODE_OPTIONS. A child process inherits the environment, and Chromium brings its
- * own allocator: with jemalloc preloaded it exits before it opens a page.
+ * ceiling through NODE_OPTIONS. A child process inherits the environment, and with these three the
+ * browser under the unit died before it opened a page; without them it works. Which of the three
+ * does it is not known: from a shell, LD_PRELOAD alone did not reproduce it. → docs/pitfalls.md §12
  */
 const NODE_ONLY_ENV = ['LD_PRELOAD', 'MALLOC_CONF', 'NODE_OPTIONS'];
 
