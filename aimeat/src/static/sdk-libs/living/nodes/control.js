@@ -18,19 +18,21 @@
  * @node       control   A slider, switch, pick, number or text field bound to one value node.
  * @inputs     control   target (the value node this control moves)
  * @outputs    control   value — what the target holds now, so a template can read the control by name
- * @options    control   kind=slider|toggle|pick|number|text · label · options (for pick) · block (a section to put it in)
+ * @options    control   kind=slider|toggle|pick|number|text|area (several lines of text) · label · options (for pick) · block (a section to put it in)
  * @languages  control   label · options[].label
  * @example    control   { "type": "control", "kind": "slider", "target": "t", "label": { "fi": "Lämpötila", "en": "Temperature" }, "block": "controls" }
  * @structure control: the node-type module (dependsOn · prepare · evaluate)
  * @usage  import { control } from './control.js';
  * @version-history
+ *   v0.8.0 — 2026-09-19 — `area`: text of several lines, the shape a message arrives in, for a
+ *     decide node to judge. It is the kit's own textarea field.
  *   v0.4.0 — 2026-09-06 — `label` and a pick option's `label` may be a language map; an option's
  *     `value` may not, because it is what the document stores.
  *   v0.1.0 — 2026-09-05 — Initial (the living document, stage 1).
  */
 
 /** The shapes a control may take. An unknown kind is refused by name in validate(). */
-export const CONTROL_KINDS = ['slider', 'toggle', 'pick', 'number', 'text'];
+export const CONTROL_KINDS = ['slider', 'toggle', 'pick', 'number', 'text', 'area'];
 
 export const control = {
   id: 'control',

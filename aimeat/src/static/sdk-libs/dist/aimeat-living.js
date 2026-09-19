@@ -1598,7 +1598,7 @@
   };
 
   // src/static/sdk-libs/living/nodes/control.js
-  var CONTROL_KINDS = ["slider", "toggle", "pick", "number", "text"];
+  var CONTROL_KINDS = ["slider", "toggle", "pick", "number", "text", "area"];
   var control = {
     id: "control",
     /** A control READS its target so it can show where the value is now. */
@@ -2531,6 +2531,192 @@
     }
   };
 
+  // src/static/sdk-libs/living/nodes/decide.js
+  var WAIT_FLOOR = 300;
+  var WAIT_DEFAULT = 1500;
+  function inputsOf(node2) {
+    const input = node2 && node2.input;
+    if (typeof input === "string" && input) return [input];
+    if (Array.isArray(input)) return input.map(String).filter(Boolean);
+    return [];
+  }
+  function nameNodes(node2, nodes) {
+    const out = [];
+    for (const n of Array.isArray(node2 && node2.names) ? node2.names : []) {
+      if (Object.prototype.hasOwnProperty.call(nodes || {}, String(n))) out.push(String(n));
+    }
+    return out;
+  }
+  function questionsOf(node2) {
+    const out = {};
+    const qs = node2 && node2.questions || {};
+    for (const id of Object.keys(qs)) {
+      const q = qs[id] || {};
+      if (typeof q.yesNo === "string") {
+        const one = { type: "noul", instructions: q.yesNo };
+        if (q.meaning && (q.meaning.yes !== void 0 || q.meaning.no !== void 0)) {
+          one.criteria = {};
+          if (q.meaning.yes !== void 0) one.criteria.true = q.meaning.yes;
+          if (q.meaning.no !== void 0) one.criteria.false = q.meaning.no;
+        }
+        out[id] = one;
+      } else if (typeof q.pickOne === "string") {
+        const options = Array.isArray(q.options) ? Object.fromEntries(q.options.map(function(o) {
+          return [String(o), null];
+        })) : q.options || {};
+        out[id] = { type: "choice", instructions: q.pickOne, criteria: options };
+      } else if (typeof q.scale === "string") {
+        out[id] = { type: "score", instructions: q.scale, criteria: Array.isArray(q.levels) ? q.levels : [] };
+      }
+    }
+    return out;
+  }
+  function stateAt2(def, path) {
+    let states = def && def.states;
+    let at = null;
+    for (const name of path) {
+      if (!states || !states[name]) return null;
+      at = states[name];
+      states = at.states;
+    }
+    return at;
+  }
+  function eventsOf(def) {
+    const out = [];
+    const walk = function(states) {
+      for (const name of Object.keys(states || {})) {
+        const s = states[name] || {};
+        for (const e of Object.keys(s.on || {})) if (out.indexOf(e) < 0) out.push(e);
+        if (s.states) walk(s.states);
+      }
+    };
+    walk(def && def.states);
+    return out;
+  }
+  function eventsAccepted(def, path) {
+    const parts = String(path || "").split(".").filter(Boolean);
+    const out = [];
+    for (let depth = parts.length; depth >= 1; depth--) {
+      const s = stateAt2(def, parts.slice(0, depth));
+      for (const e of Object.keys(s && s.on || {})) if (out.indexOf(e) < 0) out.push(e);
+    }
+    return out;
+  }
+  function blank(node2) {
+    const out = {};
+    for (const id of Object.keys(node2 && node2.questions || {})) {
+      out[id] = "";
+      out[id + ".confidence"] = "";
+      out[id + ".passed"] = "";
+    }
+    return out;
+  }
+  function isMap(v) {
+    return isPlainObject(v);
+  }
+  var decideNode = {
+    id: "decide",
+    settable: true,
+    /** It stands on the text it judges and on the names it removes. Not on the machine it moves:
+     *  that machine's guards may read this node, and an edge both ways would be a circle. */
+    dependsOn(node2, ctx) {
+      const nodes = ((ctx && ctx.doc || {}).model || {}).nodes || {};
+      const out = inputsOf(node2).slice();
+      for (const id of nameNodes(node2, nodes)) if (out.indexOf(id) < 0) out.push(id);
+      return out;
+    },
+    prepare(node2, ctx) {
+      const errors = [];
+      const nodes = ((ctx.doc || {}).model || {}).nodes || {};
+      if (!inputsOf(node2).length) errors.push("a decide node with no input; `input` is the id of the node whose text is judged");
+      if (typeof node2.gates !== "string" || !node2.gates.trim()) {
+        errors.push("a decide node with no `gates`; say in English what the answer decides, because it is recorded with every decision");
+      }
+      const qs = node2.questions;
+      if (!qs || typeof qs !== "object" || !Object.keys(qs).length) {
+        errors.push("a decide node with no questions");
+      } else {
+        for (const id of Object.keys(qs)) {
+          const q = qs[id] || {};
+          if (id.indexOf(".") >= 0) errors.push('a question id "' + id + `" with a dot in it; the dot is how an answer's confidence is read`);
+          const text = q.yesNo !== void 0 ? q.yesNo : q.pickOne !== void 0 ? q.pickOne : q.scale;
+          if (isMap(text) || isMap(q.options) && Object.values(q.options).some(isMap)) {
+            errors.push('question "' + id + '" written as a language map; the decision model is asked in English, whatever language the document is read in');
+          } else if (typeof q.yesNo === "string") {
+          } else if (typeof q.pickOne === "string") {
+            const n = Array.isArray(q.options) ? q.options.length : Object.keys(q.options || {}).length;
+            if (n < 2) errors.push('question "' + id + '", a pickOne with fewer than two options');
+          } else if (typeof q.scale === "string") {
+            const n = Array.isArray(q.levels) ? q.levels.length : 0;
+            if (n < 2 || n > 10) errors.push('question "' + id + '", a scale that needs 2 to 10 levels, lowest first');
+          } else {
+            errors.push('question "' + id + '", which is none of { yesNo }, { pickOne, options }, { scale, levels }');
+          }
+        }
+      }
+      for (const [id, t] of Object.entries(node2.thresholds || {})) {
+        if (!qs || !Object.prototype.hasOwnProperty.call(qs, id)) errors.push('a threshold for "' + id + '", which is not one of its questions');
+        const n = Number(t);
+        if (!Number.isFinite(n) || n < 0 || n > 1) errors.push('a threshold for "' + id + '" of ' + String(t) + "; a threshold is between 0 and 1");
+      }
+      if (node2.machine != null || node2.event != null) {
+        const m = nodes[String(node2.machine)];
+        if (!m) {
+          errors.push('a decide node that moves machine "' + String(node2.machine) + '", which this document does not have');
+        } else if (String(m.type) !== "machine") {
+          errors.push('a decide node that moves "' + String(node2.machine) + '", which is a ' + String(m.type) + " rather than a machine");
+        }
+        const q = qs && qs[String(node2.event)];
+        if (!q || typeof q.pickOne !== "string") {
+          errors.push('an `event` of "' + String(node2.event) + `"; it names the pickOne question whose options are the machine's events`);
+        } else if (m && String(m.type) === "machine") {
+          const known = eventsOf(m);
+          const opts = Array.isArray(q.options) ? q.options.map(String) : Object.keys(q.options || {});
+          if (!opts.some(function(o) {
+            return known.indexOf(o) >= 0;
+          })) {
+            errors.push('question "' + String(node2.event) + '", none of whose options is an event of machine "' + String(node2.machine) + '" (' + known.join(", ") + ")");
+          }
+        }
+        if (!node2.thresholds || node2.thresholds[String(node2.event)] == null) {
+          errors.push('no threshold for the event question "' + String(node2.event) + '"; a machine is moved only above a threshold the record states');
+        }
+      }
+      if (node2.wait != null) {
+        const w = Number(node2.wait);
+        if (!Number.isFinite(w) || w < WAIT_FLOOR) errors.push("a wait of " + String(node2.wait) + " ms; the shortest is " + WAIT_FLOOR);
+      }
+      if (!ctx.state.values.has(ctx.id)) ctx.state.values.set(ctx.id, { status: "" });
+      return errors;
+    },
+    /** Its value is the word for where it is: nothing yet, asking, or what the last answer did. */
+    evaluate(node2, ctx) {
+      const s = ctx.state.values.get(ctx.id) || {};
+      return String(s.status || "");
+    },
+    /** What the runtime hands in is the whole last result; it is kept as it came. */
+    coerce(node2, ctx, raw) {
+      if (raw == null || typeof raw !== "object") return { status: "" };
+      return raw;
+    },
+    /** The answers, flattened so `triage.urgent` and `triage.next.confidence` read like any field. */
+    fields(node2, ctx) {
+      const s = ctx.state.values.get(ctx.id) || {};
+      const out = blank(node2);
+      const answers = s.answers || {};
+      for (const id of Object.keys(answers)) {
+        const a = answers[id] || {};
+        out[id] = a.value == null ? "" : a.value;
+        out[id + ".confidence"] = typeof a.confidence === "number" ? a.confidence : "";
+        if (s.passed && Object.prototype.hasOwnProperty.call(s.passed, id)) out[id + ".passed"] = !!s.passed[id];
+      }
+      out.pending = String(s.pending || "");
+      out.reason = String(s.reason || "");
+      out.decision = String(s.decision || "");
+      return out;
+    }
+  };
+
   // src/static/sdk-libs/living/nodes/index.js
   var NODE_TYPES = {
     value,
@@ -2540,7 +2726,8 @@
     text: textNode,
     machine: machineNode,
     source: sourceNode,
-    trigger
+    trigger,
+    decide: decideNode
   };
   function typeOf(name) {
     return Object.prototype.hasOwnProperty.call(NODE_TYPES, String(name)) ? NODE_TYPES[String(name)] : null;
@@ -3342,6 +3529,158 @@
     }
   }
 
+  // src/static/sdk-libs/living/decide-words.js
+  var DECIDE_WORDS = {
+    fi: {
+      "status.": "Ei vielä kysytty",
+      "status.asking": "Kysyy päätösmallilta",
+      "status.moved": "Siirsi tilaa",
+      "status.stayed": "Tila pysyi ennallaan",
+      "status.person": "Odottaa ihmisen päätöstä",
+      "status.decided": "Arvioitu",
+      "status.unavailable": "Päätösmalli ei ole käytettävissä",
+      "status.failed": "Kysymys epäonnistui",
+      "noLib": "Tämä sivu ei lataa päätösmallin kirjastoa (aimeat-decide.js), joten mitään ei kysytty.",
+      "unavailable": "Päätösmalli ei ole käytettävissä tällä tilillä, joten mitään ei kysytty.",
+      "proposal": "Malli ehdottaa siirtoa {event}, mutta varmuus {conf} jää alle kynnyksen {t}. Sinä päätät.",
+      "proposalNone": "Malli ei löytänyt sopivaa siirtoa tarpeeksi varmasti. Sinä päätät.",
+      "byHand": "Päätösmalli ei vastannut. Valitse seuraava askel itse.",
+      "confirm": "Hyväksy {event}",
+      "keep": "Pidä tila",
+      "gates": "Ratkaisee",
+      "thresholds": "Kynnykset",
+      "step": "Askel {event}"
+    },
+    en: {
+      "status.": "Nothing asked yet",
+      "status.asking": "Asking the decision model",
+      "status.moved": "Moved the state",
+      "status.stayed": "The state stayed",
+      "status.person": "Waiting for a person",
+      "status.decided": "Judged",
+      "status.unavailable": "The decision model is not available",
+      "status.failed": "The question failed",
+      "noLib": "This page does not load the decision model library (aimeat-decide.js), so nothing was asked.",
+      "unavailable": "The decision model is not available on this account, so nothing was asked.",
+      "proposal": "The model proposes {event}, but its confidence {conf} is under the threshold {t}. You decide.",
+      "proposalNone": "The model found no step it was sure enough about. You decide.",
+      "byHand": "The decision model did not answer. Choose the next step yourself.",
+      "confirm": "Accept {event}",
+      "keep": "Keep the state",
+      "gates": "Decides",
+      "thresholds": "Thresholds",
+      "step": "Step {event}"
+    }
+  };
+  function sayDecide(key, langs, values) {
+    const map = {};
+    for (const lang of Object.keys(DECIDE_WORDS)) {
+      if (DECIDE_WORDS[lang][key] != null) map[lang] = DECIDE_WORDS[lang][key];
+    }
+    const got = pickLang(map, langs || []);
+    const text = got ? String(got.text) : String(key);
+    return text.replace(/\{([A-Za-z0-9_]+)\}/g, function(whole, name) {
+      const v = values ? values[name] : void 0;
+      return v == null ? whole : String(v);
+    });
+  }
+
+  // src/static/sdk-libs/living/render-decide.js
+  function num3(v) {
+    return typeof v === "number" && Number.isFinite(v) ? v.toFixed(2) : "";
+  }
+  function decideRow(host, spec) {
+    const node2 = spec.node || {};
+    const graph = spec.graph;
+    const langs = spec.langs;
+    const labelEl = el("span", { class: "ak-living__note-label", text: spec.label() || spec.id });
+    const statusEl = el("span", { class: "ak-living__decide-status" });
+    const reasonEl = el("p", { class: "ak-living__decide-reason", hidden: true });
+    const answersEl = el("dl", { class: "ak-living__decide-answers" });
+    const personEl = el("div", { class: "ak-living__decide-person", hidden: true });
+    const gatesEl = el("p", { class: "ak-living__decide-gates" });
+    const root = el("div", { class: "ak-living__decide", "data-living-node": spec.id }, [
+      labelEl,
+      statusEl,
+      reasonEl,
+      answersEl,
+      personEl,
+      gatesEl
+    ]);
+    host.appendChild(root);
+    function update() {
+      const status = String(graph.valueOf(spec.id) || "");
+      const f = graph.fieldsOf(spec.id) || {};
+      root.setAttribute("data-decide", status || "idle");
+      statusEl.textContent = sayDecide("status." + status, langs());
+      const reason = String(f.reason || "");
+      reasonEl.textContent = reason;
+      reasonEl.hidden = !reason;
+      clear(answersEl);
+      for (const q of Object.keys(node2.questions || {})) {
+        const v = f[q];
+        if (v === "" || v == null) continue;
+        const conf = f[q + ".confidence"];
+        const shown = typeof v === "number" ? num3(v) : String(v);
+        answersEl.appendChild(el("dt", { text: q }));
+        answersEl.appendChild(el("dd", { text: conf === "" || conf == null ? shown : shown + " (" + num3(conf) + ")" }));
+      }
+      answersEl.hidden = !answersEl.firstChild;
+      clear(personEl);
+      const byHand = status === "unavailable" || status === "failed";
+      personEl.hidden = status !== "person" && !byHand;
+      if (!personEl.hidden && node2.machine) {
+        const pending = String(f.pending || "");
+        const conf = f[String(node2.event) + ".confidence"];
+        const t = (node2.thresholds || {})[String(node2.event)];
+        const machine = graph.nodeOf(String(node2.machine)) || {};
+        const accepted = eventsAccepted(machine, String(graph.valueOf(String(node2.machine)) || ""));
+        personEl.appendChild(el("p", {
+          text: byHand ? sayDecide("byHand", langs()) : accepted.indexOf(pending) >= 0 ? sayDecide("proposal", langs(), { event: pending, conf: num3(conf), t: num3(Number(t)) }) : sayDecide("proposalNone", langs())
+        }));
+        const row = el("div", { class: "ak-living__decide-actions" });
+        const ordered = accepted.indexOf(pending) >= 0 ? [pending].concat(accepted.filter(function(e) {
+          return e !== pending;
+        })) : accepted;
+        ordered.forEach(function(event, i) {
+          row.appendChild(el("button", {
+            type: "button",
+            class: i === 0 && event === pending ? "ak-btn ak-btn--primary" : "ak-btn",
+            "data-event": event,
+            text: sayDecide(byHand ? "step" : "confirm", langs(), { event }),
+            on: { click: function() {
+              if (spec.resolve) spec.resolve(spec.id, event);
+            } }
+          }));
+        });
+        row.appendChild(el("button", {
+          type: "button",
+          class: "ak-btn ak-btn--ghost",
+          "data-event": "",
+          text: sayDecide("keep", langs()),
+          on: { click: function() {
+            if (spec.resolve) spec.resolve(spec.id, "");
+          } }
+        }));
+        personEl.appendChild(row);
+      }
+      const ts = Object.entries(node2.thresholds || {}).map(function(e) {
+        return e[0] + " " + num3(Number(e[1]));
+      });
+      gatesEl.textContent = sayDecide("gates", langs()) + ": " + String(node2.gates || "") + (ts.length ? " · " + sayDecide("thresholds", langs()) + ": " + ts.join(", ") : "");
+    }
+    update();
+    return {
+      el: root,
+      update,
+      relabel() {
+        const words2 = spec.label() || spec.id;
+        if (labelEl.textContent !== words2) labelEl.textContent = words2;
+        update();
+      }
+    };
+  }
+
   // src/static/sdk-libs/living/render.js
   var seq = 0;
   function uid() {
@@ -3355,7 +3694,7 @@
   function readout(v, format, lang) {
     return formatParts(v, format, "after", lang).text;
   }
-  var FIELD_TYPE = { slider: "range", toggle: "toggle", pick: "select", number: "number", text: "text" };
+  var FIELD_TYPE = { slider: "range", toggle: "toggle", pick: "select", number: "number", text: "text", area: "textarea" };
   var READS_OUT = ["slider", "number"];
   function asOption(o, langs) {
     const opt = o && typeof o === "object" ? o : { value: o, label: o };
@@ -3420,7 +3759,7 @@
       if (kind === "toggle") {
         const on = !!(v === true || asNumber(v) === 1);
         if (input.checked !== on) handle.setValues({ value: on });
-      } else if (kind === "text" || kind === "pick") {
+      } else if (kind === "text" || kind === "area" || kind === "pick") {
         const s = isQuantity(v) ? String(v.n) : asText(v);
         if (input.value !== s) handle.setValues({ value: s });
       } else {
@@ -3697,6 +4036,17 @@
         relabel: () => view.relabel(label(), reason()),
         kind: "trigger"
       };
+    }
+    if (node2.type === "decide") {
+      const view = decideRow(host, {
+        id: spec.id,
+        node: node2,
+        graph,
+        label,
+        langs,
+        resolve: spec.resolve
+      });
+      return { el: view.el, update: view.update, relabel: view.relabel, kind: "decide" };
     }
     if (node2.type === "value" || node2.type === "source") {
       const stale = function() {
@@ -3987,11 +4337,21 @@
       summary: "A slider, switch, pick, number or text field bound to one value node.",
       inputs: ["target (the value node this control moves)"],
       outputs: ["value — what the target holds now, so a template can read the control by name"],
-      options: ["kind=slider|toggle|pick|number|text", "label", "options (for pick)", "block (a section to put it in)"],
+      options: ["kind=slider|toggle|pick|number|text|area (several lines of text)", "label", "options (for pick)", "block (a section to put it in)"],
       languages: ["label", "options[].label"],
       functions: [],
       example: { "type": "control", "kind": "slider", "target": "t", "label": { "fi": "Lämpötila", "en": "Temperature" }, "block": "controls" },
       file: "nodes/control.js"
+    },
+    "decide": {
+      summary: "Asks the decision model closed questions about a text and exposes the answers; can move a machine by its own events.",
+      inputs: ["input (the node id whose text is judged, or a list of ids sent as named fields)", "names (node ids or strings: the people the text may mention, removed before it leaves)"],
+      outputs: ['value — "" before the first answer, then asking', "moved", "stayed", "person", "unavailable", "failed", '<question id> — the answer: a probability for yesNo, the option name for pickOne, the level for scale ("" until answered)', "<question id>.confidence", "<question id>.passed", "pending — the event waiting for a person", "reason — why it did not ask, in words", "decision — the recorded decision id"],
+      options: ["questions { id: { yesNo, meaning? } | { pickOne, options } | { scale, levels } } (English)", "thresholds { id: 0..1 } (the event question needs one)", "gates (English: what the answer decides; required)", "machine (a machine id)", "event (the pickOne question whose options are that machine's events)", "wait (ms the text must rest before asking; default 1500, floor 300)", "subject", "label", "block (a section to draw it in)"],
+      languages: ["label"],
+      functions: [],
+      example: { "type": "decide", "input": "message", "machine": "ticket", "event": "next", "gates": "which step the support ticket takes next", "questions": { "next": { "pickOne": "Which step does this customer message call for?", "options": { "URGENT": "The customer cannot work at all or loses money now.", "RESOLVE": "The customer says the problem is solved.", "NONE": "None of the steps above." } }, "angry": { "yesNo": "The customer is angry or threatens to leave." } }, "thresholds": { "next": 0.7, "angry": 0.8 }, "label": { "fi": "Viestin arvio", "en": "Reading the message" }, "block": "judge" },
+      file: "nodes/decide.js"
     },
     "formula": {
       summary: "A spreadsheet expression over the other nodes, worked out with its units.",
@@ -4590,6 +4950,303 @@
           }
           watching = null;
         }
+      }
+    };
+  }
+
+  // src/static/sdk-libs/living/decide-run.js
+  var LOG_SIZE = 50;
+  function createDecisions(spec) {
+    const doc = spec.doc || {};
+    const graph = spec.graph;
+    const langs = typeof spec.langs === "function" ? spec.langs : function() {
+      return [];
+    };
+    const api = typeof spec.decide === "function" ? spec.decide : function() {
+      return null;
+    };
+    const timers = spec.timers || {
+      set: function(fn, ms) {
+        return setTimeout(fn, ms);
+      },
+      clear: function(h) {
+        clearTimeout(h);
+      }
+    };
+    const now2 = spec.now || function() {
+      return Date.now();
+    };
+    const nodes = (doc.model || {}).nodes || {};
+    const ids = Object.keys(nodes).filter(function(id) {
+      return String((nodes[id] || {}).type) === "decide";
+    });
+    const last = /* @__PURE__ */ new Map();
+    const waiting = /* @__PURE__ */ new Map();
+    const seq2 = /* @__PURE__ */ new Map();
+    const results = /* @__PURE__ */ new Map();
+    const log = [];
+    let destroyed = false;
+    function stateOf(node2) {
+      const list = inputsOf(node2);
+      const read = function(id) {
+        const v = graph.valueOf(id);
+        return isQuantity(v) ? asText(v) : v == null ? "" : typeof v === "object" ? asText(v) : v;
+      };
+      if (list.length === 1) return String(read(list[0]));
+      const out = {};
+      for (const id of list) out[id] = read(id);
+      return out;
+    }
+    function keyOf(state) {
+      return typeof state === "string" ? state : JSON.stringify(state);
+    }
+    function isEmpty(state) {
+      if (typeof state === "string") return !state.trim();
+      return Object.keys(state).every(function(k) {
+        return !String(state[k] == null ? "" : state[k]).trim();
+      });
+    }
+    function namesOf(node2) {
+      const out = [];
+      for (const n of Array.isArray(node2.names) ? node2.names : []) {
+        const v = Object.prototype.hasOwnProperty.call(nodes, String(n)) ? asText(graph.valueOf(String(n))) : String(n);
+        if (v && v.trim()) out.push(v.trim());
+      }
+      return out;
+    }
+    function appId() {
+      if (spec.appId) return String(spec.appId);
+      try {
+        const meta = document.querySelector('meta[name="aimeat-app"]');
+        const v = meta && meta.getAttribute("content");
+        return v ? String(v) : void 0;
+      } catch {
+        return void 0;
+      }
+    }
+    function report(id, out) {
+      const changed = out && out.changed ? out.changed.slice() : [];
+      if (changed.indexOf(id) < 0) changed.unshift(id);
+      const result = { changed, transitions: out && out.transitions || [] };
+      if (spec.onResult) spec.onResult(result);
+      return result;
+    }
+    function merge(a, b) {
+      const changed = (a.changed || []).slice();
+      for (const c of b.changed || []) if (changed.indexOf(c) < 0) changed.push(c);
+      return { changed, transitions: (a.transitions || []).concat(b.transitions || []) };
+    }
+    function remember(entry) {
+      log.push(entry);
+      while (log.length > LOG_SIZE) log.shift();
+      if (spec.onDecision) {
+        try {
+          spec.onDecision(entry);
+        } catch {
+        }
+      }
+    }
+    function machineOf(node2) {
+      if (!node2.machine || !node2.event) return null;
+      const def = nodes[String(node2.machine)];
+      if (!def || String(def.type) !== "machine") return null;
+      const path = String(graph.valueOf(String(node2.machine)) || "");
+      return { id: String(node2.machine), def, path, accepted: eventsAccepted(def, path), all: eventsOf(def) };
+    }
+    async function ask(id, force) {
+      if (destroyed) return null;
+      const node2 = nodes[id];
+      if (!node2) return null;
+      const state = stateOf(node2);
+      const key = keyOf(state);
+      if (!force && last.get(id) === key) return null;
+      last.set(id, key);
+      if (isEmpty(state)) return null;
+      const mine = (seq2.get(id) || 0) + 1;
+      seq2.set(id, mine);
+      const stale = function() {
+        return destroyed || seq2.get(id) !== mine;
+      };
+      const lib = api();
+      if (!lib || typeof lib.ask !== "function") {
+        return settle(id, { status: "unavailable", reason: sayDecide("noLib", langs()) }, null, "unavailable");
+      }
+      let available = true;
+      if (typeof lib.isAvailable === "function") {
+        try {
+          available = !!await lib.isAvailable();
+        } catch {
+          available = false;
+        }
+      }
+      if (stale()) return null;
+      if (!available) {
+        const why = typeof lib.unavailableReason === "function" ? lib.unavailableReason() : null;
+        return settle(id, { status: "unavailable", reason: String(why || sayDecide("unavailable", langs())) }, null, "unavailable");
+      }
+      const questions = questionsOf(node2);
+      const m = machineOf(node2);
+      let offered = null;
+      if (m) {
+        const q = questions[String(node2.event)];
+        if (q) {
+          const keep = {};
+          for (const opt of Object.keys(q.criteria || {})) {
+            if (m.accepted.indexOf(opt) >= 0 || m.all.indexOf(opt) < 0) keep[opt] = q.criteria[opt];
+          }
+          offered = Object.keys(keep);
+          if (offered.length >= 2) questions[String(node2.event)] = { type: "choice", instructions: q.instructions, criteria: keep };
+          else delete questions[String(node2.event)];
+        }
+      }
+      const thresholds = {};
+      for (const [q, t] of Object.entries(node2.thresholds || {})) if (questions[q]) thresholds[q] = Number(t);
+      report(id, graph.set(id, { status: "asking" }));
+      let r;
+      try {
+        r = await lib.ask(state, questions, {
+          gates: String(node2.gates || ""),
+          thresholds,
+          subject: node2.subject ? String(node2.subject) : doc.key ? String(doc.key) + "#" + id : void 0,
+          names: namesOf(node2),
+          // WHICH APP ASKED. A page signed in with the owner's own session carries no app on its token,
+          // and the decision would then be the owner's alone in the ledger and the app quota. The
+          // page names itself in <meta name="aimeat-app">; an app-grant token still wins on the node.
+          app_id: appId()
+        });
+      } catch (e) {
+        if (stale()) return null;
+        const words2 = e && /** @type {any} */
+        e.message || String(e);
+        return settle(id, { status: "failed", reason: words2 }, null, "failed");
+      }
+      if (stale()) return null;
+      const answers = r && r.answers || {};
+      const passed = {};
+      for (const [q, t] of Object.entries(thresholds)) {
+        const a = answers[q];
+        if (!a) continue;
+        const v = a.type === "choice" ? a.confidence == null ? 0 : a.confidence : Number(a.value);
+        passed[q] = v >= t;
+      }
+      const base = { answers, passed, decision: r && r.decision_id || "", offered: offered || [] };
+      if (!m || !answers[String(node2.event)]) {
+        return settle(id, Object.assign({ status: "decided" }, base), null, "decided");
+      }
+      const winner = String(answers[String(node2.event)].value || "");
+      if (!passed[String(node2.event)]) {
+        return settle(id, Object.assign({ status: "person", pending: winner }, base), null, "person");
+      }
+      if (m.accepted.indexOf(winner) < 0) {
+        return settle(id, Object.assign({ status: "stayed" }, base), null, "stayed");
+      }
+      return settle(id, Object.assign({ status: "moved", event: winner, by: "model" }, base), winner, "moved");
+    }
+    function settle(id, result, event, outcome) {
+      const node2 = nodes[id] || {};
+      results.set(id, result);
+      let out = graph.set(id, result);
+      if (event) {
+        const moved = graph.send(event);
+        if (!moved.transitions || !moved.transitions.length) {
+          const kept = Object.assign({}, result, { status: "stayed", event: "" });
+          results.set(id, kept);
+          out = merge(out, graph.set(id, kept));
+          outcome = "stayed";
+        }
+        out = merge(out, moved);
+      }
+      remember({
+        node: id,
+        at: new Date(now2()).toISOString(),
+        outcome,
+        by: "model",
+        decision: result.decision || "",
+        event: event || "",
+        pending: result.pending || "",
+        gates: String(node2.gates || ""),
+        thresholds: Object.assign({}, node2.thresholds || {}),
+        offered: result.offered || [],
+        reason: result.reason || "",
+        answers: summary(result.answers)
+      });
+      return report(id, out);
+    }
+    function summary(answers) {
+      const out = {};
+      for (const [q, a] of Object.entries(answers || {})) {
+        out[q] = { value: a && a.value, confidence: a && typeof a.confidence === "number" ? a.confidence : void 0 };
+      }
+      return out;
+    }
+    function resolve2(id, choice) {
+      const node2 = nodes[id];
+      if (!node2 || destroyed) return null;
+      const s = graph.fieldsOf(id) || {};
+      if (["person", "unavailable", "failed"].indexOf(String(graph.valueOf(id))) < 0) return null;
+      const pending = String(s.pending || "");
+      const pick = String(choice || "");
+      const m = machineOf(node2);
+      const sendable = !!(m && pick && m.accepted.indexOf(pick) >= 0);
+      const next = Object.assign({}, results.get(id) || {}, { status: sendable ? "moved" : "stayed", pending: "", event: sendable ? pick : "", by: "person" });
+      results.set(id, next);
+      let out = graph.set(id, next);
+      if (sendable) out = merge(out, graph.send(pick));
+      const lib = api();
+      const decision = String(s.decision || "");
+      if (decision && lib && typeof lib.review === "function") {
+        const confirmed = pick === pending;
+        Promise.resolve(lib.review(decision, confirmed ? "confirmed" : "overridden", confirmed ? {} : { override: pick || "NONE" })).catch(function() {
+        });
+      }
+      remember({
+        node: id,
+        at: new Date(now2()).toISOString(),
+        outcome: sendable ? "moved" : "stayed",
+        by: "person",
+        decision,
+        event: sendable ? pick : "",
+        pending,
+        gates: String(node2.gates || ""),
+        thresholds: Object.assign({}, node2.thresholds || {}),
+        offered: [],
+        reason: "",
+        answers: {}
+      });
+      return report(id, out);
+    }
+    return {
+      /** Remember the text each node stands on now. Mounting is not a change, so nothing is asked. */
+      prime() {
+        for (const id of ids) last.set(id, keyOf(stateOf(nodes[id])));
+      },
+      /** Hear one graph operation; a node whose input moved waits for the text to rest, then asks. */
+      after(out) {
+        if (destroyed || !out || !out.changed || !out.changed.length) return;
+        for (const id of ids) {
+          const node2 = nodes[id];
+          const reads = inputsOf(node2);
+          if (!reads.some(function(r) {
+            return out.changed.indexOf(r) >= 0;
+          })) continue;
+          if (waiting.has(id)) timers.clear(waiting.get(id));
+          const wait = Math.max(WAIT_FLOOR, Number(node2.wait) || WAIT_DEFAULT);
+          waiting.set(id, timers.set(function() {
+            waiting.delete(id);
+            ask(id, false);
+          }, wait));
+        }
+      },
+      ask,
+      resolve: resolve2,
+      /** The last fifty decisions this mount made or a person made, oldest first. */
+      list() {
+        return log.slice();
+      },
+      destroy() {
+        destroyed = true;
+        for (const [, h] of waiting) timers.clear(h);
+        waiting.clear();
       }
     };
   }
@@ -5470,8 +6127,8 @@
   }
 
   // src/static/sdk-libs/living/index.js
-  var VERSION = "0.7.0";
-  var DRAWN = ["control", "formula", "text", "machine", "value", "source", "trigger"];
+  var VERSION = "0.8.0";
+  var DRAWN = ["control", "formula", "text", "machine", "value", "source", "trigger", "decide"];
   function validate(doc) {
     const refusals = [];
     if (!doc || typeof doc !== "object") return { ok: false, refusals: ["This is not a document record."] };
@@ -5632,6 +6289,28 @@
         announceResult(out);
       }
     });
+    const judge = createDecisions({
+      doc,
+      graph,
+      langs,
+      decide() {
+        const ns = (
+          /** @type {any} */
+          window.AIMEAT
+        );
+        return options.decide || ns && ns.decide || null;
+      },
+      onResult(out) {
+        announceResult(out);
+      },
+      onDecision(e) {
+        if (options.onDecision) options.onDecision(e);
+        try {
+          host.dispatchEvent(new CustomEvent("aimeat-living-decision", { detail: e, bubbles: true }));
+        } catch {
+        }
+      }
+    });
     const deliveryWatchers = [];
     const recordWatchers = [];
     const sources = {};
@@ -5658,7 +6337,10 @@
               langs,
               set: apply,
               gear: options.gears === false ? null : openGear,
-              reason: guestReason
+              reason: guestReason,
+              resolve: function(nid, choice) {
+                judge.resolve(nid, choice);
+              }
             });
             if (view) views.set(id, view);
           }
@@ -5735,6 +6417,7 @@
     function announceResult(out) {
       announce(out.changed);
       deliveries.after(out);
+      judge.after(out);
       return out;
     }
     function apply(id, raw) {
@@ -5896,6 +6579,7 @@
     };
     if (options.live !== false && sourceIds.length) window.addEventListener("aimeat-live-update", onLive);
     deliveries.prime();
+    judge.prime();
     const ready = Promise.resolve().then(readSources).then(function() {
       return options.live === false ? null : live.start();
     }).then(function() {
@@ -5946,6 +6630,18 @@
       /** Ask one URL source for its reading now, rather than waiting for its next turn. */
       read(id) {
         return live.readOnce(String(id));
+      },
+      /** Ask one decide node about its text now, even when it asked about this text before. */
+      decide(id) {
+        return judge.ask(String(id), true);
+      },
+      /** A person's answer to a proposal under the threshold: the event to send, or '' to keep. */
+      resolve(id, choice) {
+        return judge.resolve(String(id), String(choice || ""));
+      },
+      /** The last fifty decisions of this mount, the model's and the people's, oldest first. */
+      decisions() {
+        return judge.list();
       },
       /** Which sources are on a clock, and how often — after the ten-second floor. */
       polled() {
@@ -6002,6 +6698,7 @@
         if (timer) clearTimeout(timer);
         stopLang();
         deliveries.destroy();
+        judge.destroy();
         live.destroy();
         window.removeEventListener("aimeat-live-update", onLive);
         if (chainHandle) chainHandle.destroy();

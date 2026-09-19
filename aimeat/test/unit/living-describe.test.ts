@@ -66,6 +66,12 @@ describe('every worked example is a document the engine accepts', () => {
           type: 'machine', initial: 'charging',
           states: { charging: { on: { EXPORT: 'exporting' } }, exporting: { on: { CHARGE: 'charging' } } },
         },
+        // A decide node judges a message and moves a ticket by the ticket's own events.
+        message: { type: 'value', value: '' },
+        ticket: {
+          type: 'machine', initial: 'open',
+          states: { open: { on: { URGENT: 'urgent', RESOLVE: 'resolved' } }, urgent: { on: { RESOLVE: 'resolved' } }, resolved: {} },
+        },
         [id === 'value' ? 'example' : id]: example,
       };
       const g = createGraph({ v: 1, model: { nodes } });
