@@ -52,6 +52,8 @@ export interface Task {
     /** What the person says. `{marker}` and `{baseUrl}` are filled in. */
     prompt: string;
     goodTools: string[];
+    /** Left out of a run that names no tasks; asked for with `--tasks <id>`. */
+    byNameOnly?: boolean;
     /** Runs before the agent starts, for a task that needs something to exist first. */
     setup?: (ctx: Omit<TaskContext, 'metrics'>) => Promise<void>;
     /** `note` is what a PASSING run is worth knowing about; the report lists it. */
@@ -169,6 +171,31 @@ export const TASKS: Task[] = [
             const quality = await appQuality(ctx.baseUrl, ctx.ownerName, hit.filename, ctx.metrics.toolCalls);
             const ok = onAtelier(quality);
             return { ok, detail: ok ? 'the app is published on the Atelier track' : 'the app is published, and it is not an Atelier app with a register', note: describeQuality(quality) };
+        },
+    },
+    {
+        // An app that NEEDS PARTS. The tip calculator is covered whole by the genre it forks, so
+        // three measured runs read the Design Book zero times and that was the right answer; it
+        // cannot show whether a builder looks in the book, uses the kit, or keeps a person's data
+        // through the node's library. This one asks for four things no genre hands over as it is:
+        // data that is kept, a list that is ticked, a number, and a chart.
+        // Added 2026-09-19. It is NOT part of the ten-task baseline: run it by name.
+        id: 'build-tracker',
+        byNameOnly: true,
+        door: 'mcp',
+        prompt: 'Build me a habit tracker and put it on my AIMEAT. I add my habits, I tick them off each day, I see this week as a grid, my longest streak as one big number, and a small chart of the last thirty days. It has to remember everything when I come back tomorrow, on my phone too. Call it "{marker}".',
+        goodTools: ['aimeat_skill_get', 'aimeat_designbook_search', 'aimeat_app_template_get', 'aimeat_app_publish'],
+        verify: async (ctx) => {
+            const r = await api<{ apps: unknown[] }>(ctx.baseUrl, `/v1/apps?owner=${ctx.ownerName}`, ctx.ownerToken);
+            const hit = (r.data?.apps ?? []).find(a => JSON.stringify(a).includes(ctx.marker)) as { filename?: string } | undefined;
+            if (!hit?.filename) return { ok: false, detail: 'no published app carries the name' };
+            const quality = await appQuality(ctx.baseUrl, ctx.ownerName, hit.filename, ctx.metrics.toolCalls);
+            const html = await fetch(`${ctx.baseUrl}/v1/apps/${encodeURIComponent(ctx.ownerName)}/${encodeURIComponent(hit.filename)}?mode=inline`).then(res => res.text());
+            // "Remember everything, on my phone too" is the node's store, not the browser's.
+            const keepsOnNode = /AIMEAT\.data\.(set|get)\s*\(|\/v1\/libs\/aimeat-living\.js/.test(html);
+            const ok = onAtelier(quality) && keepsOnNode;
+            const why = !onAtelier(quality) ? 'it is not an Atelier app with a register' : 'it does not keep the habits on the node, so another device starts empty';
+            return { ok, detail: ok ? 'an Atelier app that keeps the habits on the node' : `the app is published, and ${why}`, note: describeQuality(quality) };
         },
     },
     {
