@@ -334,6 +334,37 @@ const publish = (token: string, body: Record<string, unknown>) =>
         assert(drift(r).length === 0, `an Atelier app must leave no drift hint: ${JSON.stringify(drift(r))}`);
     });
 
+    const hintsOf = (r: any, pitfall: string) => ((r.body.data.app_hints ?? []) as any[]).filter(h => h.pitfall === pitfall);
+
+    await test('a NEW app in ONE language publishes, and is told that two is the default and whose decision one is', async () => {
+        const name = `gateonelang${Date.now()}.html`;
+        const one = app(name).replace('content="en fi"', 'content="fi"');
+        const r = await publish(o.token, { filename: name, mime_type: 'text/html', content: b64(one), name: 'One language', description: 'Declares Finnish only.', spec_token: specToken });
+        assert(r.status === 201, `a warning must never refuse: ${r.status} ${JSON.stringify(r.body?.error)}`);
+        const h = hintsOf(r, 'one-language');
+        assert(h.length === 1 && h[0].message.includes('en fi') && /owner/i.test(h[0].message), `expected the one-language hint: ${JSON.stringify(r.body.data.app_hints)}`);
+        const again = await publish(o.token, { filename: name, mime_type: 'text/html', content: b64(one), name: 'One language', description: 'Declares Finnish only.', spec_token: specToken });
+        assert(hintsOf(again, 'one-language').length === 0, 'an UPDATE of a one-language app stays quiet');
+    });
+
+    await test('a genre NAMED over a page that is not its fork is told so; the genre itself, published, is not', async () => {
+        const name = `gatenotfork${Date.now()}.html`;
+        const named = app(name).replace(
+            '<meta name="aimeat-scopes"',
+            '<meta name="aimeat-track" content="atelier">\n<meta name="aimeat-register" content="genre-nightradio">\n<meta name="aimeat-scopes"');
+        const r = await publish(o.token, { filename: name, mime_type: 'text/html', content: b64(named), name: 'Named, not forked', description: 'Names a genre it never forked.', spec_token: atelierToken });
+        assert(r.status === 201, `publish ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        const h = hintsOf(r, 'genre-not-forked');
+        assert(h.length === 1 && h[0].message.includes('genre-nightradio'), `expected the genre-not-forked hint: ${JSON.stringify(r.body.data.app_hints)}`);
+
+        const genre = await json('/v1/app-templates/genre-receipt');
+        const forkName = `gatefork${Date.now()}.html`;
+        const fork = (genre.body.data.template.content as string).replace('content="receipt.html"', `content="${forkName}"`);
+        const f = await publish(o.token, { filename: forkName, mime_type: 'text/html', content: b64(fork), name: 'A real fork', description: 'The receipt genre, as served.', spec_token: atelierToken });
+        assert(f.status === 201, `fork publish ${f.status}: ${JSON.stringify(f.body?.error)}`);
+        assert(hintsOf(f, 'genre-not-forked').length === 0, `a real fork must leave no such hint: ${JSON.stringify(hintsOf(f, 'genre-not-forked'))}`);
+    });
+
     await test('the Atelier specification comes in parts over HTTP, each inside one tool result', async () => {
         const list = await json('/v1/prompts/build-app-atelier/sections');
         assert(list.status === 200, `parts list ${list.status}`);

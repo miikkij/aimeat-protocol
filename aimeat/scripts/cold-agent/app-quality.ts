@@ -23,6 +23,7 @@
  */
 import type { AimeatConfig } from '../../src/config.js';
 import { lintAppArtifact } from '../../src/services/app-artifact-lint.js';
+import { genreKeptShare } from '../../src/services/app-genre-fork.js';
 
 export interface AppQuality {
     bytes: number;
@@ -46,6 +47,12 @@ export interface AppQuality {
     register: string | null;
     /** Whether the run read the ATELIER build specification over MCP, and which parts. */
     atelierPartsRead: string[];
+    /** The languages the head declares. Two is the default on this node. */
+    locales: string[];
+    /** Whether the page reads its words from a dictionary, which is what lets the switch change them. */
+    usesDictionary: boolean;
+    /** The share of its genre's own styles the page kept, or null when it names no shipped genre. */
+    genreKept: number | null;
     /** Every template id the run fetched, in order: which shell or genre it started from, and what it moved to. */
     templatesFetched: string[];
 }
@@ -100,6 +107,9 @@ export async function appQuality(baseUrl: string, ownerName: string, filename: s
         register: register && !/^REPLACE-ME/i.test(register) ? register : null,
         atelierPartsRead: atelierTiers.map(t => t.slice('build-app-atelier'.length).replace(/^\//, '') || 'start'),
         templatesFetched: [...new Set(templates)],
+        locales: (meta('aimeat-locales') ?? '').split(/\s+/).filter(Boolean),
+        usesDictionary: /i18n\.use\(|AIMEAT\.i18n|data-t=|data-i18n/.test(html),
+        genreKept: register && register.startsWith('genre-') ? genreKeptShare(html, register.slice('genre-'.length)) : null,
     };
 }
 
@@ -122,6 +132,8 @@ export function describeQuality(q: AppQuality): string {
         : onAtelier(q) ? 'Classic spec not read, as it should be' : 'did NOT read the spec';
     const track =`${onAtelier(q) ? 'ATELIER' : q.loadsAtelier ? 'Atelier kit, no register' : 'CLASSIC'}${q.register ? ' (' + q.register.slice(0, 40) + ')' : ''}`
         + `; Atelier spec ${q.atelierPartsRead.length ? 'read: ' + q.atelierPartsRead.join(', ') : 'not read'}`
-        + `; templates ${q.templatesFetched.length ? q.templatesFetched.join(' → ') : 'none'}`;
+        + `; templates ${q.templatesFetched.length ? q.templatesFetched.join(' → ') : 'none'}`
+        + `; languages ${q.locales.join(' ') || 'NONE DECLARED'}${q.locales.length >= 2 && !q.usesDictionary ? ' (declared, but no dictionary in the page)' : ''}`
+        + (q.genreKept === null ? '' : `; kept ${Math.round(q.genreKept * 100)} % of its genre`);
     return `${track}; ${Math.round(q.bytes / 1024)} kB; ${wrong.length ? wrong.join(', ') : 'nothing the lint or the head checks object to'}; ${read}; spec token ${q.sentSpecToken ? 'sent' : 'not sent'}`;
 }
