@@ -15,6 +15,10 @@
  * @structure appQuality(baseUrl, ownerName, filename, toolCalls) → AppQuality
  * @usage const q = await appQuality(ctx.baseUrl, ctx.ownerName, app.filename, ctx.metrics.toolCalls);
  * @version-history
+ *   v1.2.0 — 2026-09-19 — The Design Book round trip (searched, adopted, proposed back), how many of
+ *     the kit's components the page calls, how many styles it made for itself, the libraries it
+ *     read about, and whether it keeps its own colours. The book held 90 parts and none from a
+ *     builder; whether that starts to move is only visible if a run's report says what it did there.
  *   v1.1.0 — 2026-09-19 — The build track. The measurement passed three Classic apps in a row as
  *     good on the day the developer was handed a Classic app by a model that had started on
  *     Atelier and changed over because Classic was quicker to begin. Nothing here looked at which
@@ -23,7 +27,7 @@
  */
 import type { AimeatConfig } from '../../src/config.js';
 import { lintAppArtifact } from '../../src/services/app-artifact-lint.js';
-import { genreKeptShare } from '../../src/services/app-genre-fork.js';
+import { genreKeptShare, ownClassNames } from '../../src/services/app-genre-fork.js';
 
 export interface AppQuality {
     bytes: number;
@@ -53,6 +57,14 @@ export interface AppQuality {
     usesDictionary: boolean;
     /** The share of its genre's own styles the page kept, or null when it names no shipped genre. */
     genreKept: number | null;
+    /** What the run did at the Design Book: looked, took a proven part, gave one back. */
+    book: { searched: number; adopted: number; proposed: number };
+    /** Distinct components of the Atelier kit the page calls (`AIMEAT.atelier.<name>(` or `a.<name>(`). */
+    kitComponents: string[];
+    /** Styles the page made for itself, beyond the kit and its genre. */
+    ownStyles: number;
+    /** `fixed` keeps its own colours, `follows` changes with the person's theme; null when not said. */
+    light: string | null;
     /** Every template id the run fetched, in order: which shell or genre it started from, and what it moved to. */
     templatesFetched: string[];
 }
@@ -107,6 +119,14 @@ export async function appQuality(baseUrl: string, ownerName: string, filename: s
         register: register && !/^REPLACE-ME/i.test(register) ? register : null,
         atelierPartsRead: atelierTiers.map(t => t.slice('build-app-atelier'.length).replace(/^\//, '') || 'start'),
         templatesFetched: [...new Set(templates)],
+        book: {
+            searched: toolCalls.filter(c => c.name === 'aimeat_designbook_search' || c.name === 'aimeat_designbook_get').length,
+            adopted: toolCalls.filter(c => c.name === 'aimeat_designbook_adopt' && !c.isError).length,
+            proposed: toolCalls.filter(c => c.name === 'aimeat_designbook_propose' && !c.isError).length,
+        },
+        kitComponents: [...new Set([...html.matchAll(/\b(?:AIMEAT\.atelier|[aA])\.([a-z][A-Za-z]+)\s*\(/g)].map(m => m[1]).filter(n => !['app', 'i18n', 'status', 'describe', 'length', 'push', 'map', 'filter', 'forEach', 'slice', 'join', 'indexOf', 'concat', 'sort', 'reduce', 'find', 'some', 'every', 'includes', 'call', 'apply', 'then'].includes(n)))],
+        ownStyles: ownClassNames(html).length,
+        light: meta('aimeat-light'),
         locales: (meta('aimeat-locales') ?? '').split(/\s+/).filter(Boolean),
         usesDictionary: /i18n\.use\(|AIMEAT\.i18n|data-t=|data-i18n/.test(html),
         genreKept: register && register.startsWith('genre-') ? genreKeptShare(html, register.slice('genre-'.length)) : null,
@@ -134,6 +154,9 @@ export function describeQuality(q: AppQuality): string {
         + `; Atelier spec ${q.atelierPartsRead.length ? 'read: ' + q.atelierPartsRead.join(', ') : 'not read'}`
         + `; templates ${q.templatesFetched.length ? q.templatesFetched.join(' → ') : 'none'}`
         + `; languages ${q.locales.join(' ') || 'NONE DECLARED'}${q.locales.length >= 2 && !q.usesDictionary ? ' (declared, but no dictionary in the page)' : ''}`
-        + (q.genreKept === null ? '' : `; kept ${Math.round(q.genreKept * 100)} % of its genre`);
+        + (q.genreKept === null ? '' : `; kept ${Math.round(q.genreKept * 100)} % of its genre`)
+        + `; light ${q.light ?? 'not said'}`
+        + `; Design Book searched ${q.book.searched}, adopted ${q.book.adopted}, proposed ${q.book.proposed}`
+        + `; kit components ${q.kitComponents.length ? q.kitComponents.join(' ') : 'none'}; own styles ${q.ownStyles}`;
     return `${track}; ${Math.round(q.bytes / 1024)} kB; ${wrong.length ? wrong.join(', ') : 'nothing the lint or the head checks object to'}; ${read}; spec token ${q.sentSpecToken ? 'sent' : 'not sent'}`;
 }
