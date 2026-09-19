@@ -6,6 +6,9 @@
  *   platform → variant → connection type → share app). Composes the panels and
  *   upload sub-modules (extracted to satisfy max-file-lines).
  * @version-history
+ *   v2.2.0 — 2026-09-19 — The standing line tells the AI to find and load the AIMEAT tools and to
+ *     report a failed call; "if the tools are not available, tell me" made a client that loads
+ *     tools on demand report them missing from a list it had not yet filled.
  *   v2.1.0 -- 2026-09-13 -- Compose the existing ink top rule from poster.css.
  *   2026-09-13 -- V2: compose showroom actions and asides from shared shape classes.
  *   v1.1.0 — 2026-06-02 — Component unification (#11): node-badge dot uses
@@ -57,7 +60,7 @@ const BROWSE_PROMPT = `Read this URL and follow the instructions to connect to t
 // The standing instruction that makes the connection survive between sessions. Kept in English
 // on purpose: it is written for the AI, and it ends by telling the AI where the richer
 // per-organism block lives (profile → MCP → step 5 serves it prefilled).
-const STAY_SYNC_LINE = `I work on the AIMEAT node at ${NODE_URL} over MCP (connector "aimeat"). At the start of a task, read my context from it; write durable results back through the AIMEAT tools instead of keeping them only in this chat. If the AIMEAT tools are not available in this conversation, tell me plainly.`;
+const STAY_SYNC_LINE = `I work on the AIMEAT node at ${NODE_URL} over MCP (connector "aimeat"). At the start of a task, read my context from it; write durable results back through the AIMEAT tools instead of keeping them only in this chat. Some AI clients load connected tools on demand, so when the AIMEAT tools are outside your visible tool list, search your tools and connectors for "aimeat" and load them. When a real AIMEAT tool call fails, tell me plainly and show the exact error text.`;
 
 /* One live figure on the ink strip. `value` is undefined until the fetch resolves, and the figure
    shows a quiet placeholder instead of 0 — a zero here reads as "nothing runs on this node". */
