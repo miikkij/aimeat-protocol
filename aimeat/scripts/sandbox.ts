@@ -46,6 +46,11 @@
  *   cd aimeat && pnpm sandbox --stop       # stop the node, keep the data
  *   cd aimeat && pnpm sandbox --status      # is it up, on which port, with what in it
  * @version-history
+ *   v1.2.0 — 2026-09-19 — The free-port probe asks the wildcard, 127.0.0.1 and ::1 in turn, and
+ *     both loopbacks whether somebody answers. v1.1.0 fixed the opposite mistake (a loopback probe
+ *     that missed a wildcard holder) and left this one: a wildcard bind succeeds on Windows while
+ *     another process holds 127.0.0.1, so 40605 read as free, the node started there, and a publish
+ *     was answered by another session's process.
  *   v1.1.0 — 2026-09-12 — The free-port probe binds the wildcard the node binds, and a port that
  *     answers counts as taken. A loopback probe called 40600 free while another session's sandbox
  *     held 0.0.0.0 there, so this script started a second node on it and seeded into the peer's.
@@ -55,8 +60,8 @@
  */
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, openSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
-import { createServer } from 'node:net';
 import { dirname, join, resolve } from 'node:path';
+import { portIsFree } from './lib/port-free.js';
 import { fileURLToPath } from 'node:url';
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
@@ -193,14 +198,15 @@ function writeState(s: SandboxState): void {
  * Answering on the port is taken too, whoever holds it.
  */
 async function canBind(port: number): Promise<boolean> {
-    const bound = await new Promise<boolean>((settle) => {
-        const probe = createServer();
-        probe.once('error', () => settle(false));
-        probe.once('listening', () => probe.close(() => settle(true)));
-        probe.listen(port);
-    });
-    if (!bound) return false;
-    return !(await isUp(`http://localhost:${port}`));
+    // Three binds, not one (scripts/lib/port-free.ts): the wildcard alone answered "free" for a port
+    // another session's process held on 127.0.0.1, on 2026-09-19, and the node started there was
+    // answered for by the other one. And ask both loopbacks whether somebody answers: `localhost`
+    // may resolve to ::1 while the process that holds the port listens on 127.0.0.1 only.
+    if (!(await portIsFree(port))) return false;
+    for (const host of ['127.0.0.1', '[::1]', 'localhost']) {
+        if (await isUp(`http://${host}:${port}`)) return false;
+    }
+    return true;
 }
 
 async function isUp(baseUrl: string): Promise<boolean> {

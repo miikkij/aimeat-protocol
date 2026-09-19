@@ -97,7 +97,7 @@ GET /v1/appdev/pitfalls             ← what bites app builders
 
 **Connected over MCP and cannot make HTTP calls?** Everything above comes through tools. The
 specification: \`aimeat_handbook_get { tier: "build-app-atelier" }\` returns its first part, which
-names the other three (\`genre\`, \`patterns\`, \`look\`); read \`genre\` and \`patterns\` before you
+names the others (\`genre\`, \`libraries\`, \`patterns\`, \`look\`); read \`genre\`, \`libraries\` and \`patterns\` before you
 write code, each with \`aimeat_handbook_get { tier: "build-app-atelier/<id>" }\`. It comes in parts
 because one tool result cannot carry all of it. The genres: \`aimeat_designbook_search { kind:
 "genre" }\` lists them with what each is for, and \`aimeat_app_template_get { id: "genre-<id>" }\`

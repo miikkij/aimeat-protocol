@@ -83,7 +83,7 @@ guarantees that the page fits a phone. Load \`node:aimeat-app-builder-atelier\` 
 specification replaces the specification, the templates and the styling this skill describes
 below; the research, the proposal in the person's own words and the finish still apply.
 
-Over MCP the Atelier specification is \`aimeat_handbook_get { tier: "build-app-atelier" }\`, in four
+Over MCP the Atelier specification is \`aimeat_handbook_get { tier: "build-app-atelier" }\`, in
 parts, and the genres are in \`aimeat_app_template_list\` (the ids that begin \`genre-\`).
 
 The **Classic track**, which is the rest of this skill, is for two cases: you are improving an

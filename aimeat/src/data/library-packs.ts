@@ -254,6 +254,32 @@ export function buildPromptLibrarySections(nodeUrl: string): string {
   return s;
 }
 
+/**
+ * The ATELIER specification's library section, from the same registry and the same lines as the
+ * Classic one, without the Classic track's styling packs (the cortex UI bundles are daisyUI-based,
+ * and an Atelier page gets its components from the kit).
+ *
+ * Until 2026-09-19 the Atelier text named four libraries in passing and never pointed at the list,
+ * and its skill forbids reading the Classic specification, where the list lives. So a builder on
+ * the track every new app goes on never saw that the node has a voice library, a calendar, a print
+ * engine or a storage helper, and wrote them.
+ */
+export function buildAtelierLibrarySection(nodeUrl: string): string {
+  let s = '## The node\'s libraries: read this list before you write a mechanism\n\n';
+  s += 'Speech, audio, files, live updates, notifications, printing, calendars, decisions, payments and agents are already written, served by this node and kept in step with it. '
+    + 'Before you write a mechanism of your own, find it here. An app that runs its own speech loop, its own socket or its own `fetch` to `/v1/memory` works on the day it ships and stops following the platform afterwards, and the publish says so (`app_hints`, pitfall `hand-rolled`).\n\n';
+  s += 'Load with `<script src>` from ' + nodeUrl + '/v1/libs/, after `aimeat-auth` and beside the kit. Include ONLY the ones you use.\n\n';
+  for (const { group, heading } of PROMPT_GROUP_HEADINGS) {
+    const lines = SDK_PACKS.filter(p => p.promptGroup === group && p.promptLine && p.status !== 'deprecated');
+    if (lines.length === 0) continue;
+    s += heading.replace(' (prompt-driven — see the AI section below)', '') + '\n';
+    s += lines.map(p => p.promptLine as string).join('\n') + '\n\n';
+  }
+  s += 'Each library\'s full usage is one call away: `GET ' + nodeUrl + '/v1/library-packs/<id>` (the `ai_doc` field), or `GET ' + nodeUrl + '/v1/libs` for the list with sizes. '
+    + 'Third-party engines the node hosts itself (maps, charts, 3D, editors, game engines) are in `GET ' + nodeUrl + '/v1/library-packs`; never load one from an outside CDN.\n\n';
+  return s;
+}
+
 /** The bootstrap GET / `sdk_libraries` list — "<url> - <description>" per non-deprecated pack. */
 export function buildSdkLibrariesList(baseUrl: string): string[] {
   const base = baseUrl.replace(/\/+$/, '');

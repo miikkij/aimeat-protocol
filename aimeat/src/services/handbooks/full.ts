@@ -33,7 +33,7 @@ Three grounds carry most of the work:
 - **Apps** are single-file web apps published on this node. \`aimeat_app_list\` gives each one the
   \`url\` you hand the person. Before you build one, load the skill
   \`node:aimeat-app-builder\`: a new app is built on the Atelier track, from a genre, and its
-  specification is \`aimeat_handbook_get { tier: "build-app-atelier" }\` in four parts. \`{ tier:
+  specification is \`aimeat_handbook_get { tier: "build-app-atelier" }\` in parts. \`{ tier:
   "build-app" }\` is the Classic track's, for an app that is already Classic.
 - **Organisms and workspaces** are how the person shares knowledge with others. A **skill**
   (\`aimeat_skill_list\`, \`aimeat_skill_get\`) is the operating guide for one named capability, and

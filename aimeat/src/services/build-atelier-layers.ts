@@ -26,12 +26,13 @@
  */
 import { MAX_PART_CHARS } from './build-app-layers.js';
 
-export type AtelierPartId = 'start' | 'genre' | 'patterns' | 'look';
+export type AtelierPartId = 'start' | 'genre' | 'libraries' | 'patterns' | 'look';
 
 /** In reading order. `what` is the line the first part shows for each of the others. */
 export const ATELIER_PARTS: Array<{ id: AtelierPartId; what: string }> = [
   { id: 'start', what: 'The interview, what the Atelier track is, the component kit, how a component is customised, data, how to finish and publish, and what is never done.' },
   { id: 'genre', what: 'REQUIRED before any code: an app starts from a genre, a complete page in a committed register, and the publish refuses an app without a register. Also the pattern shelf, the Design Book and the signature.' },
+  { id: 'libraries', what: 'REQUIRED before any code: every library this node serves, with what it is for. Speech, audio, files, live updates, notifications, printing, calendars and decisions are already written. An address that is not in it does not exist.' },
   { id: 'patterns', what: 'How the code is written: six patterns to copy, the living record, and the mosaic that arranges a screen from outside the file.' },
   { id: 'look', what: 'The look presets, the one ambient layer, effects, motion and imagery. Read it before you change anything the genre did not decide for you.' },
 ];
@@ -59,6 +60,8 @@ export const ATELIER_HEADING_PART: Record<string, AtelierPartId> = {
   'The pattern shelf': 'genre',
   'The Design Book first': 'genre',
   'The signature: this app\'s own hand': 'genre',
+
+  'The node\'s libraries: read this list before you write a mechanism': 'libraries',
 
   'A LIVING DOCUMENT: A SHEET WHOSE NUMBERS STAND ON EACH OTHER IS A RECORD': 'patterns',
   'Six patterns to copy': 'patterns',
@@ -96,8 +99,8 @@ export function splitAtelierSpec(full: string): AtelierSection[] {
 /** What the first part says about the rest, placed right after "The Atelier track". */
 function partsIndex(nodeUrl: string): string {
   let out = '### This specification comes in parts\n';
-  out += 'You are reading part `start`. The other three belong to the same specification and carry the same authority. '
-    + 'Read `genre` and `patterns` BEFORE you write any code: an Atelier app is forked from a genre, and the publish refuses one that names no register. '
+  out += 'You are reading part `start`. The others belong to the same specification and carry the same authority. '
+    + 'Read `genre`, `libraries` and `patterns` BEFORE you write any code: an Atelier app is forked from a genre, the publish refuses one that names no register, and a mechanism you write by hand is usually one this node already serves. '
     + 'Over MCP: `aimeat_handbook_get { tier: "build-app-atelier/<id>" }`. Over HTTP the whole text in one piece: `GET ' + nodeUrl + '/v1/prompts/build-app-atelier?format=txt`.\n';
   for (const p of ATELIER_PARTS.filter(x => x.id !== 'start')) out += '- `' + p.id + '` — ' + p.what + '\n';
   return out;
