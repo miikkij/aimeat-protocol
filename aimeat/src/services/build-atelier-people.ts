@@ -24,6 +24,8 @@
  * @structure ATELIER_PROPOSAL_SECTION · ATELIER_FORK_PEOPLE_SECTION
  * @usage import { ATELIER_PROPOSAL_SECTION, ATELIER_FORK_PEOPLE_SECTION } from './build-atelier-people.js';
  * @version-history
+ *   v1.1.0 — 2026-09-19 — The fork section says that the kit's components wear the genre (THE
+ *     BRIDGE in genres.ts), so a form or an empty state is mounted and never hand-made.
  *   v1.0.0 — 2026-09-19 — Initial.
  */
 
@@ -68,4 +70,5 @@ export const ATELIER_FORK_PEOPLE_SECTION = '## A fork people sign in to, in two 
   + '</script>\n'
   + '```\n\n'
   + 'The switch must keep what the person was doing: a conversation, a half-filled form and the settings survive it, because `paint()` changes words and nothing else. Numbers, dates and money follow the language too (`toLocaleString(i18n.lang())`). Languages of speech recognition or of an AI answer are separate settings; do not tie them to this switch unless the owner asks.\n\n'
-  + 'An app nobody signs in to still mounts the bar when it has two languages, because the switch lives there. Before you call it done, press the switch: English to Finnish and back, in the middle of using the app, and read every screen in both.\n\n';
+  + 'An app nobody signs in to still mounts the bar when it has two languages, because the switch lives there. Before you call it done, press the switch: English to Finnish and back, in the middle of using the app, and read every screen in both.\n\n'
+  + '**What the genre does not have, the kit has, and it wears the genre.** A form, a dialog, an empty state, a toast, a chart or a gauge comes from `AIMEAT.atelier`, never from your own markup. Every fixed-colour genre carries a block marked THE BRIDGE after its `:root`, which hands the kit the genre\'s ground, ink, one accent, corners and faces, so a kit component mounted into the page looks like part of it. When you change a colour of the genre, change it in the bridge with it. Mount a component ON the genre\'s own ground (the paper of a receipt, the panel of a board), where its ink is readable.\n\n';

@@ -11,6 +11,8 @@
  * @structure registerDesignbookTools(mcp, registry)
  * @usage import { registerDesignbookTools } from './designbook.js';
  * @version-history
+ *   v1.4.0 — 2026-09-19 — A search with no word and no kind asks the route for its map view and
+ *     answers the whole published shelf as one page of text (parity with the server MCP).
  *   v1.3.0 — 2026-09-05 — effect joins the kind wording, with its body and its targets (parity
  *     with the server MCP, wish-atelier-post-process-effects, stage 5).
  *   v1.2.0 — 2026-09-05 — genre and ambient join the kind wording (parity with the server MCP,
@@ -43,6 +45,12 @@ export function registerDesignbookTools(mcp: McpServer, registry: AgentRegistry)
     if (status) params.set('status', status);
     if (q) params.set('q', q);
     if (limit != null) params.set('limit', String(limit));
+    // No word, no kind: the whole published shelf on one page (parity with the server MCP).
+    if (![...params.keys()].length) {
+      const resp = await client.get('/v1/designbook?view=map') as { data?: { map?: string; note?: string }; ok?: boolean };
+      if (resp.ok === false || !resp.data?.map) return out(resp);
+      return { content: [{ type: 'text' as const, text: `${resp.data.map}${resp.data.note ?? ''}` }] };
+    }
     const qs = params.toString();
     return out(await client.get(`/v1/designbook${qs ? `?${qs}` : ''}`));
   });

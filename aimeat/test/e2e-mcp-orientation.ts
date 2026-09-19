@@ -520,6 +520,24 @@ async function main() {
             for (const section of genre.split(/\n(?=## )/)) assert(fullTxt.includes(section), `unchanged in the whole text: ${section.slice(0, 50)}`);
         });
 
+        await test('17g. part libraries arrives with what the Design Book holds, and a search given nothing answers the same page', async () => {
+            const libs = toolText((await v1('tools/call', { name: 'aimeat_handbook_get', arguments: { tier: 'build-app-atelier/libraries' } }, 408)).body);
+            assert(libs.includes('## What the Design Book holds'), `the map is in the part: ${libs.slice(-200)}`);
+            assert(/### GENRES[^\n]*\n- `genre-[a-z]+` \[(?:fixed colours|follows the theme)\]: /.test(libs), 'genres come first, each with its light');
+            const rest = await fetch(`${BASE}/v1/prompts/build-app-atelier/sections/libraries?format=txt`).then(r => r.text());
+            assert(libs === rest, `the MCP part equals the REST part (${libs.length} vs ${rest.length})`);
+            // The map is joined when the part is served: inside the digested text it would change the
+            // spec token with every published part, and refuse every build that was under way.
+            const fullTxt = await fetch(`${BASE}/v1/prompts/build-app-atelier?format=txt`).then(r => r.text());
+            assert(!fullTxt.includes('## What the Design Book holds'), 'the map is not part of the text the spec token digests');
+            const bare = toolText((await v1('tools/call', { name: 'aimeat_designbook_search', arguments: {} }, 409)).body);
+            assert(bare.startsWith('## What the Design Book holds'), `a search given nothing answers the page: ${bare.slice(0, 80)}`);
+            const shelf = await json('/v1/designbook?limit=200');
+            for (const p of shelf.body.data.parts as any[]) assert(bare.includes('`' + p.id + '`'), `the page names ${p.id}`);
+            const word = toolText((await v1('tools/call', { name: 'aimeat_designbook_search', arguments: { kind: 'genre' } }, 411)).body);
+            assert(word.trimStart().startsWith('{'), 'a search given a kind still answers rows');
+        });
+
         await test('17d. an Atelier part that does not exist is an error that names the four there are', async () => {
             const { body } = await v1('tools/call', { name: 'aimeat_handbook_get', arguments: { tier: 'build-app-atelier/no-such-part' } }, 406);
             assert(body.result?.isError === true, 'MCP: isError');

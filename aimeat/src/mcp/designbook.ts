@@ -10,6 +10,8 @@
  *   import { registerDesignbookTools } from './designbook.js';
  *   registerDesignbookTools(mcp, storage, config, () => agentGaii);
  * @version-history
+ *   v1.4.0 — 2026-09-19 — A search with no word and no kind answers the whole published shelf as
+ *     one page of text (DesignBookService.map), where it used to answer the first fifty rows.
  *   v1.3.0 — 2026-09-05 — effect joins the kind wording, with its body and its targets, and an
  *     adopted effect is told apart in the answer (wish-atelier-post-process-effects, stage 5).
  *   v1.2.0 — 2026-09-05 — genre and ambient join the kind wording (wish-atelier-ambient-visuals),
@@ -28,6 +30,7 @@ import { aiProvenanceInputs, toDeclaredProvenance } from './ai-provenance-input.
 import { descriptionFor } from './catalog/shape.js';
 import { DesignBookService } from '../services/design-book/service.js';
 import { DesignBookError } from '../services/design-book/validate.js';
+import { MAP_NOTE } from '../services/design-book/map.js';
 
 /** One text block per answer; refusals carry the service's words verbatim. */
 function text(payload: unknown, isError = false) {
@@ -61,7 +64,14 @@ export function registerDesignbookTools(
             limit: z.number().optional().describe('Rows to return, 1-200. Default 50.'),
         },
         annotationsFor('aimeat_designbook_search'),
-        async ({ kind, status, q, limit }) => answer(async () => {
+        async ({ kind, status, q, limit }) => {
+            // No word, no kind: the caller does not know yet what the Book holds, so it gets the
+            // whole shelf on one page as plain text, and not the first fifty rows of JSON.
+            if (!kind && !status && !q && limit == null) {
+                const out = await book.map();
+                return text(`${out.map}${MAP_NOTE}`);
+            }
+            return answer(async () => {
             const parts = await book.list({ kind, status, q, limit });
             return {
                 parts, count: parts.length,
@@ -69,7 +79,8 @@ export function registerDesignbookTools(
                     ? 'Read one whole with aimeat_designbook_get; its body is exactly what an adopt writes.'
                     : 'The Book holds nothing matching that. Propose the first part with aimeat_designbook_propose.',
             };
-        }),
+            });
+        },
     );
 
     mcp.tool(

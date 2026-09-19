@@ -34,6 +34,9 @@
  *   const book = new DesignBookService(storage, config);
  *   const out = await book.propose(callerGaii, raw, provenance);
  * @version-history
+ *   v1.5.0 — 2026-09-19 — map(): the published shelf as one page of text (map.ts). Three measured
+ *     builds searched the Book in none of them, because a search serves a builder that already
+ *     knows what the Book holds.
  *   v1.4.0 — 2026-09-05 — The EFFECT kind (wish-atelier-post-process-effects, stage 5): the
  *     propose bench is named effect-valid (no words sit under a hero band, a figure or the
  *     layer, so the matrix runs at the write that lands it on words); adopt MERGES the effect
@@ -66,6 +69,8 @@ import {
   type PartInput, type PartKind, type PartStatus,
 } from './validate.js';
 import { POST_MAX } from '../../data/atelier-effects.js';
+import { getAppTemplateIndex } from '../../data/app-templates.js';
+import { buildDesignBookMap } from './map.js';
 
 export const PART_KEY_PREFIX = 'atelier.book.part.';
 export const USAGE_KEY_PREFIX = 'atelier.book.usage.';
@@ -302,6 +307,27 @@ export class DesignBookService {
       if (rows.length >= limit) break;
     }
     return rows;
+  }
+
+  /**
+   * The published shelf as ONE page of text: every part on a line, grouped by kind. What a
+   * builder reads before it composes anything, and what a search with no word answers (map.ts).
+   */
+  async map(): Promise<{ map: string; count: number }> {
+    const shelf = await this.list({ status: 'published', limit: 200 });
+    // THE GENRES COME FROM THE SERVED TEMPLATES, which is what a fork reads. A genre part in the
+    // Book only names a template, and the shelf lags the templates: production held 19 of 23 on
+    // 2026-09-19 and a fresh node holds none, so a map of the shelf alone hid genres that fork.
+    const genres = getAppTemplateIndex().filter(t => t.kind === 'genre');
+    const rows = [
+      ...genres.map(g => ({ id: g.id, kind: 'genre', summary: g.description })),
+      ...shelf.filter(r => r.kind !== 'genre'),
+    ];
+    const map = buildDesignBookMap(rows, {
+      baseUrl: this.config.baseUrl,
+      light: new Map(genres.map(g => [g.id, g.light === 'follows' ? 'follows' as const : 'fixed' as const])),
+    });
+    return { map, count: rows.length };
   }
 
   /**
