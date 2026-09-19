@@ -177,6 +177,26 @@ await test('3b. write_draft accepts a JSON-STRINGIFIED value (client coercion)',
     assert(item && item.value.title === 'From string', 'stored as an object with the right fields (not a raw string)');
 });
 
+await test('3c. workspace_read takes the FULL memory key, which is the id aimeat_discover hands out', async () => {
+    // Measured 2026-09-19 with a cold agent: three runs of three passed the discover entry's id
+    // straight to `ids`, were answered `missing`, read the index and asked again. Two calls a run.
+    const root = `organism.${orgId}.w.${WS}.shared.notes`;
+    for (const key of [`${root}.n2.draft`, `${root}.n2.latest`, `${root}.n2`]) {
+        const rd = await A.client.call('aimeat_workspace_read', { organism_id: orgId, ws: WS, ids: [key] }, 1033);
+        const data = JSON.parse(rd.result.content[0].text);
+        assert(!data.missing, `${key} should resolve, got missing: ${JSON.stringify(data.missing)}`);
+        assert(data.items?.[0]?.id === 'n2' && data.items[0].value.title === 'From string', `${key} returns instance n2`);
+    }
+});
+
+await test('3d. a key from ANOTHER workspace or organism stays missing, by its own name', async () => {
+    const foreign = [`organism.${orgId}.w.some-other-ws.shared.notes.n2.latest`, `organism.00000000-0000-0000-0000-000000000000.w.${WS}.shared.notes.n2.latest`, `organism.${orgId}.w.${WS}.shared.nothing.n2.latest`];
+    const rd = await A.client.call('aimeat_workspace_read', { organism_id: orgId, ws: WS, ids: foreign }, 1034);
+    const data = JSON.parse(rd.result.content[0].text);
+    assert((data.items || []).length === 0, 'nothing is returned for a key that is not in this workspace');
+    assert(JSON.stringify(data.missing) === JSON.stringify(foreign), `missing names what was asked, got ${JSON.stringify(data.missing)}`);
+});
+
 await test('4. write_draft rejects a schema-invalid record', async () => {
     const b = await A.client.call('aimeat_workspace_write', { organism_id: orgId, ws: WS, space: 'note', id: 'bad', value: { body: 'no title' } }, 104);
     assert(b.result.isError === true, 'rejected (missing required title)');
