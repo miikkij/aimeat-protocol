@@ -8,6 +8,8 @@
  * @structure registerDataMapTools(mcp, registry)
  * @usage registered from cli/connect/mcp/tools/index.ts
  * @version-history
+ *   v1.0.1 — 2026-09-20 — The `data_map` parameter says spec /2 and shows a whole object
+ *     (DATA_MAP_PARAM in the catalog), in parity with the server MCP. It said /1.
  *   v1.0.0 — 2026-08-25 — TARGET-073.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -17,6 +19,7 @@ import { agentNameSchema, payloadResult, pickAgent } from './_registry.js';
 import type { ApiResponse } from '../../api-client.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../mcp/catalog/shape.js';
+import { DATA_MAP_PARAM } from '../../../../mcp/catalog/definitions/data-map.js';
 
 const text = (resp: ApiResponse) => payloadResult(resp, resp);
 /** A refusal this tool makes itself, before any call. It did not happen either. */
@@ -40,7 +43,7 @@ export function registerDataMapTools(mcp: McpServer, registry: AgentRegistry): v
     agent_name: agentNameSchema,
     app: z.string().describe('The app, as "owner/filename.html".'),
     data_map: z.record(z.string(), z.unknown())
-      .describe('The whole map document, carrying spec "aimeat.datamap/1". Read the current one first — this replaces it.'),
+      .describe(DATA_MAP_PARAM),
   }, annotationsFor('aimeat_datamap_set'), async ({ agent_name, app, data_map }) => {
     const { client } = pickAgent(registry, agent_name);
     const slash = app.indexOf('/');

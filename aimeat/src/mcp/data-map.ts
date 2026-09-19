@@ -18,6 +18,8 @@
  *   import { registerDataMapTools } from './data-map.js';
  *   registerDataMapTools(mcp, storage, config, () => agentGaii, () => scopes);
  * @version-history
+ *   v1.0.1 — 2026-09-20 — The `data_map` parameter says spec /2 and shows a whole object
+ *     (DATA_MAP_PARAM in the catalog). It said /1, which the service refuses.
  *   v1.0.0 — 2026-08-25 — TARGET-073.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -27,6 +29,7 @@ import type { Storage } from '../storage/interface.js';
 import { ownerGhiiOf } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
+import { DATA_MAP_PARAM } from './catalog/definitions/data-map.js';
 import {
   readProgramMap, stateProgramMap, handsOnKey, type DataMapCaller,
 } from '../services/data-map/data-map-access.js';
@@ -75,7 +78,7 @@ export function registerDataMapTools(
     {
       app: z.string().describe('The app, as "owner/filename.html".'),
       data_map: z.record(z.string(), z.unknown())
-        .describe('The whole map document, carrying spec "aimeat.datamap/1". Read the current one first — this replaces it.'),
+        .describe(DATA_MAP_PARAM),
     },
     annotationsFor('aimeat_datamap_set'),
     async ({ app, data_map }) => {

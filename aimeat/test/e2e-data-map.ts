@@ -151,6 +151,24 @@ async function publish(o: Owner, filename: string): Promise<void> {
             `a complete map has nothing missing: ${JSON.stringify(r.body.data.findings)}`);
     });
 
+    await test('the example object the tool itself shows is one the node accepts, with the spec the service takes', async () => {
+        // Both MCP doors spelled the spec by hand as /1 while the service took only /2, so the tool
+        // told every builder to send what it would refuse. The example is parsed out of the text a
+        // builder reads and written for real, so it cannot go false in silence again.
+        const { DATA_MAP_PARAM } = await import('../src/mcp/catalog/definitions/data-map.js');
+        const start = DATA_MAP_PARAM.indexOf('{ "spec"');
+        const end = DATA_MAP_PARAM.indexOf('"elsewhere": [] }') + '"elsewhere": [] }'.length;
+        assert(start > 0 && end > start, 'the parameter text carries an example object');
+        const example = JSON.parse(DATA_MAP_PARAM.slice(start, end));
+        await publish(o, 'probe-example.html');
+        const w = await json(`/v1/datamap/apps/${o.name}/probe-example.html`, {
+            method: 'PUT', headers: auth(o.token), body: JSON.stringify(example),
+        });
+        assert(w.status === 200, `the tool's own example is refused: ${w.status} ${JSON.stringify(w.body?.error)}`);
+        const r = await json(`/v1/datamap/apps/${o.name}/probe-example.html`, { headers: auth(o.token) });
+        assert(r.body.data.data_map?.held?.[0]?.what === 'habits.v1', 'and it is stored as written');
+    });
+
     await test('the stamp lands on the app manifest at the next publish', async () => {
         await publish(o, 'probe-good.html');
         // The catalogue listing is where a stamp is actually read from, so assert it there.
