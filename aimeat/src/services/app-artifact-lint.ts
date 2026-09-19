@@ -41,6 +41,9 @@
  *   const { blocking, warnings } = await lintAppArtifact(html, config);
  *   if (blocking.length) return refusal;
  * @version-history
+ *   2026-09-19 — checkRegister stands down for a page whose owner chose the level "proto" or
+ *     "plain" (`<meta name="aimeat-level">`, app-build-level.ts). Ruled the same day: the default
+ *     look is refused unless the owner chose that level themselves.
  *   2026-09-19 — loadsAtelierKit is exported, for the track-drift check the publish runs beside
  *     this one.
  *   v1.5.1 — 2026-09-19 — A warning when `aimeat-app` still holds the shell's REPLACE placeholder.
@@ -87,6 +90,7 @@ import type { AimeatConfig } from '../config.js';
 import { extractInlineScripts, moduleGoalAvailable, parseSource, selfTest } from '../utils/inline-script-parse.js';
 import { logger } from '../utils/logger.js';
 import { APP_GRANTABLE_SCOPES } from '../routes/app-grant-vocabulary.js';
+import { registerIsOwed } from './app-build-level-meta.js';
 
 /**
  * One finding, shaped so an agent can act on it without prose parsing: a curated pitfall id, the
@@ -317,6 +321,9 @@ function checkRegister(html: string): AppArtifactFinding[] {
   const track = declaredTrack(head);
   const atelier = track === 'atelier' || (track === undefined && loadsAtelierKit(html));
   if (!atelier) return [];
+  // The owner chose a quick prototype or an ordinary page (app-build-level.ts): those levels owe
+  // no register. A page that states no level is held to the finest, as every page was before.
+  if (!registerIsOwed(html)) return [];
 
   const declared = /<meta\b[^>]*name\s*=\s*["']aimeat-register["'][^>]*content\s*=\s*["']([^"']*)["']/i
     .exec(head)?.[1]?.trim() ?? '';

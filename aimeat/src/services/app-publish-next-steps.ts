@@ -41,6 +41,7 @@ import { listSkillsByBinding } from './skills.js';
 import { appSizeHealth, type AppSizeHealth } from './app-size-health.js';
 import { logger } from '../utils/logger.js';
 import { designBookStep } from './app-genre-fork.js';
+import { levelStep } from './app-build-level.js';
 
 /**
  * The post-publish reflection: does this app have its agent face and its bound skill yet, and what
@@ -84,9 +85,15 @@ export async function buildPublishNextSteps(
       ? `/v1/app-templates/${register}`
       : '/v1/designbook?kind=genre';
 
+    // The owner chose the level (app-build-level.ts). A quick prototype and an ordinary page forked
+    // no genre, so they are not judged beside one and owe the Design Book nothing; they are told
+    // which level they were published at, in words the builder can repeat to the owner.
+    const level = html ? levelStep(html) : undefined;
+
     return {
       ...(size ? { size } : {}),
-      ...(track === 'atelier' ? {
+      ...(track === 'atelier' && level ? { level } : {}),
+      ...(track === 'atelier' && !level ? {
         acceptance: 'Accept this app from screenshots at 390 and 1440, in both themes, placed '
           + `beside the genre it forked (${genreAddress}), and ask while looking: would this pass `
           + 'beside the genre? Measure alongside it: page width equal to the viewport, nothing '
@@ -95,7 +102,8 @@ export async function buildPublishNextSteps(
           + 'under reduced motion, and a clean console.',
       } : {}),
       // What this app made for itself, and the Design Book it belongs in (app-genre-fork.ts).
-      ...(track === 'atelier' && html && designBookStep(html) ? { design_book: designBookStep(html) } : {}),
+      // Owed on the finest level only, where hand-made parts are the level's own work.
+      ...(track === 'atelier' && !level && html && designBookStep(html) ? { design_book: designBookStep(html) } : {}),
       agent_face_present: !!faceRec,
       bound_skills_count: boundSkills.length,
       // Stated every time, present or not. An app without a face is a page agents have to scrape,

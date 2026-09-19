@@ -84,7 +84,8 @@ export function designBookStep(html: string): string | undefined {
   return `This app carries ${own.length} styles of its own beyond the kit and the genre it forked (${shown}${own.length > 6 ? ', …' : ''}). `
     + 'What was made here is what the next app should not have to make again. If any of it is a component, a layout or a fill another app could use, '
     + 'put it in the Design Book NOW, while you know how it works: search first so you do not add what is there (`aimeat_designbook_search`), '
-    + 'then `aimeat_designbook_propose` with what it is for, when to choose it and its body. A part that is already in the book is adopted, and improved as a new version of it, never copied beside it.';
+    + 'then `aimeat_designbook_propose` with what it is for, when to choose it and its body. A part that is already in the book is adopted, and improved as a new version of it, never copied beside it. '
+    + 'On the finest level this is a STEP OF THE BUILD and not a suggestion: the build is finished when each hand-made part is either proposed or named to the owner with the reason it stays out.';
 }
 
 /** The share of the genre's own class names the app still carries, or null when the genre is unknown. */

@@ -24,6 +24,8 @@
  * @structure ATELIER_PROPOSAL_SECTION · ATELIER_FORK_PEOPLE_SECTION
  * @usage import { ATELIER_PROPOSAL_SECTION, ATELIER_FORK_PEOPLE_SECTION } from './build-atelier-people.js';
  * @version-history
+ *   v1.2.0 — 2026-09-19 — The proposal opens with THE LEVEL: a quick prototype, an ordinary page or
+ *     the finest, the owner's choice, stated in `<meta name="aimeat-level">` (app-build-level.ts).
  *   v1.1.0 — 2026-09-19 — The fork section says that the kit's components wear the genre (THE
  *     BRIDGE in genres.ts), so a form or an empty state is mounted and never hand-made.
  *   v1.0.0 — 2026-09-19 — Initial.
@@ -32,6 +34,13 @@
 /** After the interview, before the body. Not part of the spec token: it is about the conversation. */
 export const ATELIER_PROPOSAL_SECTION = '## Then propose, and wait for the answer\n\n'
   + 'Before any code, show the owner what you are about to build, in their words, and wait. They decide from this; they must not find out what you chose by looking at the result.\n\n'
+  + '- **FIRST, THE LEVEL. It is the owner\'s choice and never yours; ask it in these words or plainer ones, and say what each one gets them.** '
+  + '(1) **A quick prototype**: a working draft to try one idea, the kit\'s components as they come, no styling. Fast, and plain to look at. '
+  + '(2) **An ordinary page**: works and looks tidy, with a ready layout and a ready look from the Design Book, following their light and dark theme. Not distinctive. '
+  + '(3) **The finest**: a committed look forked from a genre, proven parts from the Design Book, components of its own where the book has none. It takes the longest and is the one worth showing. '
+  + 'All three are built the same way underneath, in two languages, with the data kept on their node, so a prototype can be raised to the finest later without starting over: say that, because it is what makes the quick one a safe choice. '
+  + 'If they do not answer, recommend one and say why; never pick a lower one silently because it is less work. '
+  + 'The page states the level: `<meta name="aimeat-level" content="proto">`, `"plain"` or `"fine"`. On `proto` and `plain` the rest of this list shrinks to the languages, who signs in and the first screen: no genre is forked, the page starts from the Atelier shell (`aimeat_app_template_get { id: "shell-atelier" }`), the publish asks for no register, and nothing is styled by hand (a publish warns when such a page carries a sheet of styles of its own). On `fine`, everything below applies, and so does putting what you made into the Design Book afterwards. A page that states no level is held to `fine`.\n'
   + '- **Two or three genres, named, each with one sentence on why it fits THIS app** and what the first screen would look like in it. Get them from the genre list (part `genre`, or `aimeat_designbook_search { kind: "genre" }`), and look at the owner\'s own apps first (`aimeat_app_list`): the ones already on Atelier show what they like. Say which one you would take. A look preset with components stacked in it is not on this list: that is the default page every app looks like, and it is what gets sent back.\n'
   + '- **Fixed colours or following their theme?** Ask it, or recommend one and say why. A fixed genre keeps its own colours in light and dark; a following page changes with the person\'s theme and palette. Part `genre` says which each genre is and gives an address for each (`See it`), and the whole shelf is one link: send the owner the links so they choose by looking. If they want a genre that is fixed and want it to follow the theme, say that it means moving its colours to the theme\'s tokens, and that you will show it in both modes before they decide.\n'
   + '- **What you take from the Design Book.** Look before you make (`aimeat_designbook_search`, part `libraries`): layouts, fills, looks, motion, ambients and effects that each passed their own bench, adopted in one call. Name the parts you will use. What you have to make because the book lacks it goes INTO the book after the publish (`aimeat_designbook_propose`), so the next app starts from it.\n'
