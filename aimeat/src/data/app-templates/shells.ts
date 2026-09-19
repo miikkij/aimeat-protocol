@@ -48,7 +48,7 @@ entry: index.html
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
-  <!-- Bilingual? Declare it and the login pill renders the language button. Delete this line if not. -->
+  <!-- The languages the app has. Two or more and the login pill renders the language switch; ONE language (content="en") renders nothing. Keep the line either way: the publish check asks for it. -->
   <meta name="aimeat-locales" content="en fi" />
   <!-- Your published filename, exactly as you publish it. On an app subdomain the page cannot work it out. -->
   <meta name="aimeat-app" content="REPLACE-WITH-YOUR-FILENAME.html" />
@@ -139,7 +139,7 @@ entry: index.html
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
-  <!-- Bilingual? Declare it and the login pill renders the language button. Delete this line if not. -->
+  <!-- The languages the app has. Two or more and the login pill renders the language switch; ONE language (content="en") renders nothing. Keep the line either way: the publish check asks for it. -->
   <meta name="aimeat-locales" content="en fi" />
   <!-- Your published filename, exactly as you publish it. On an app subdomain the page cannot work it out. -->
   <meta name="aimeat-app" content="REPLACE-WITH-YOUR-FILENAME.html" />
@@ -237,7 +237,7 @@ entry: index.html
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
-  <!-- Bilingual? Declare it and the login pill renders the language button. Delete this line if not. -->
+  <!-- The languages the app has. Two or more and the login pill renders the language switch; ONE language (content="en") renders nothing. Keep the line either way: the publish check asks for it. -->
   <meta name="aimeat-locales" content="en fi" />
   <!-- Your published filename, exactly as you publish it. On an app subdomain the page cannot work it out. -->
   <meta name="aimeat-app" content="REPLACE-WITH-YOUR-FILENAME.html" />
