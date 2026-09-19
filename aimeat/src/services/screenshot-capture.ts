@@ -18,6 +18,11 @@
  *   runScreenshotCapturePass() one batch scan; captureAppScreenshot() one app, with its own
  *   per-owner throttle; renderAndStore() the shared render both paths use.
  * @version-history
+ *   v1.6.0 — 2026-09-19 — browserLaunchEnv(): the browser starts without the node's own LD_PRELOAD,
+ *     MALLOC_CONF and NODE_OPTIONS. deploy/aimeat.service preloads jemalloc into the node process,
+ *     the browser inherited it, and Chromium died before it opened a page ("browser.newContext:
+ *     Target page, context or browser has been closed", on every rung of the ladder including
+ *     no-sandbox). aimeat.io took no app thumbnail from about 2026-09-04 and said nothing about it.
  *   v1.5.0 — 2026-09-02 — NO_HEADLESS_BROWSER: the "there is none" sentence moves here, beside the
  *     launcher that decides it, so the guarantee bench and the app playtest answer alike.
  *   v1.4.0 — 2026-08-28 — launchBrowser() PROVES a page opens before handing the browser out
@@ -67,6 +72,23 @@ export type CaptureResult =
   | { ok: false; status: number; code: string; message: string };
 
 /**
+ * What the node process is started with and a browser must not inherit. deploy/aimeat.service sets
+ * all three for node itself: jemalloc through LD_PRELOAD (with its MALLOC_CONF), and the V8 heap
+ * ceiling through NODE_OPTIONS. A child process inherits the environment, and Chromium brings its
+ * own allocator: with jemalloc preloaded it exits before it opens a page.
+ */
+const NODE_ONLY_ENV = ['LD_PRELOAD', 'MALLOC_CONF', 'NODE_OPTIONS'];
+
+/** The environment the headless browser starts with: the node's own, minus NODE_ONLY_ENV. */
+export function browserLaunchEnv(env: NodeJS.ProcessEnv): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [name, value] of Object.entries(env)) {
+    if (value !== undefined && !NODE_ONLY_ENV.includes(name)) out[name] = value;
+  }
+  return out;
+}
+
+/**
  * Launch a headless browser WITHOUT a Playwright browser download: prefer the machine's installed
  * Edge/Chrome via `channel`, then a Playwright-installed Chromium. Returns null (and the caller
  * disables the job) if none is usable. playwright-core is imported lazily so a node that never runs
@@ -95,7 +117,9 @@ async function launchBrowser(): Promise<{ close(): Promise<void>; newContext(o: 
   for (const a of attempts) {
     let browser: { close(): Promise<void>; newContext(o: unknown): Promise<unknown> } | null = null;
     try {
-      browser = await chromium.launch({ headless: true, channel: a.channel, args: a.args });
+      browser = await chromium.launch({
+        headless: true, channel: a.channel, args: a.args, env: browserLaunchEnv(process.env),
+      });
       // Prove the browser can actually open a page — a root chromium LAUNCHES fine under the
       // sandbox and then crashes every target, which a launch-only probe never sees.
       const probe = await browser.newContext({}) as {
