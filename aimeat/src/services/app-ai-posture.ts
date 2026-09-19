@@ -34,11 +34,13 @@
  *   const { posture, hints } = lintAppAiDisclosure(html, previous?.manifest.aiPosture);
  *   if (posture) manifest.aiPosture = posture;
  * @version-history
+ *   v1.2.0 — 2026-09-19 — The decision model's publish hints (app-decide-posture.ts) join `hints`.
  *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 8 step 0a: `AppAiLintResult` named, so the one shared
  *     publish path can carry the check's result instead of each door restating its shape.
  *   v1.0.0 — 2026-08-01 — TARGET-058 Phase 5.
  */
 import { parseAppScopes } from './protected-resource.js';
+import { lintAppDecideUse } from './app-decide-posture.js';
 
 /** The modalities Article 50(2) names. Frozen here so the meta and the catalogue agree. */
 export const AI_GENERATES_KINDS = ['text', 'image', 'audio', 'video'] as const;
@@ -207,6 +209,10 @@ export function lintAppAiDisclosure(html: string, previous?: AppAiPosture): AppA
       + '`<meta name="aimeat-ai" content="generates=text; discloses=yes; public-interest=no">` to the head.',
     );
   }
+
+  // The decision model's rules ride the same channel (TARGET-080): the app is responsible for what it
+  // sends, and this is where the platform checks that it followed the rules it was given.
+  hints.push(...lintAppDecideUse(html, parseAppScopes(html)));
 
   return { posture, hints };
 }
