@@ -131,6 +131,26 @@ const GOOD_BODY = {
             `an anonymous reader sees only published parts — found: ${[...new Set(parts.map((p: any) => p.status))].join(', ')}`);
     });
 
+    await test('view=map answers the whole published shelf as one page, without a session, and an unknown view is a listing', async () => {
+        const r = await json('/v1/designbook?view=map');
+        assert(r.status === 200 && typeof r.body?.data?.map === 'string', `the map is 200 with text, got ${r.status}`);
+        const shelf = await json('/v1/designbook?limit=200');
+        // The genres come from the served templates, which a fresh node's shelf does not hold yet.
+        const templates = await json('/v1/app-templates');
+        const genres = (templates.body.data.templates as any[]).filter(t => t.kind === 'genre');
+        assert(genres.length > 10, `the node serves genres: ${genres.length}`);
+        for (const g of genres) assert(r.body.data.map.includes('- `' + g.id + '` ['), `the map names the genre ${g.id} with its light`);
+        for (const p of shelf.body.data.parts as any[]) assert(r.body.data.map.includes('`' + p.id + '`'), `the map names ${p.id}`);
+        assert(r.body.data.map.length < 13_500, `the map stays inside its share of one tool result: ${r.body.data.map.length}`);
+        // The address the map gives for a genre answers a page, in the Book or not.
+        const page = await fetch(`${BASE}/v1/designbook/${genres[0].id}/preview`);
+        assert(page.status === 200 && /<html/i.test(await page.text()), `a served genre has a page to look at: ${page.status}`);
+        const none = await fetch(`${BASE}/v1/designbook/genre-no-such-thing/preview`);
+        assert(none.status === 404, `a genre nobody serves is 404, got ${none.status}`);
+        const other = await json('/v1/designbook?view=nonsense');
+        assert(Array.isArray(other.body?.data?.parts), 'any other view is the ordinary listing');
+    });
+
     await test('the bench refuses a body the validator refuses, in its words', async () => {
         const r = await json('/v1/designbook', {
             method: 'POST', headers: auth(op.token),

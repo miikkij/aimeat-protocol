@@ -12,6 +12,8 @@
  *   import { registerAtelierPrompt } from './prompts-atelier.js';
  *   registerAtelierPrompt(router, config);   // BEFORE /v1/prompts/:tier
  * @version-history
+ *   v1.4.0 — 2026-09-19 — Part `libraries` arrives with the Design Book's map in it
+ *     (build-atelier-book.ts), so the route takes the storage.
  *   v1.3.0 — 2026-09-19 — The specification in parts: GET …/build-app-atelier/sections and
  *     …/sections/:id, the HTTP half of what aimeat_handbook_get { tier: "build-app-atelier/<id>" }
  *     returns. The whole text is 68 kB inside a 207 kB answer, which no chat could receive.
@@ -25,13 +27,15 @@ import type { AimeatConfig } from '../config.js';
 import { success, error } from '../middleware/envelope.js';
 import { sendPlainText } from '../middleware/plain-text.js';
 import { buildAtelierPrompt, buildAtelierSpecToken } from '../services/build-atelier-prompt.js';
-import { ATELIER_PARTS, atelierPiece, atelierPieceIds } from '../services/build-atelier-layers.js';
+import type { Storage } from '../storage/interface.js';
+import { ATELIER_PARTS, atelierPieceIds } from '../services/build-atelier-layers.js';
+import { atelierPieceWithBook } from '../services/build-atelier-book.js';
 
 /**
  * Register the Atelier build-spec route. Public for the same reason build-app is: build
  * guidance, not a secret. ?mode=new|improve, ?lang, ?idea, ?format=txt.
  */
-export function registerAtelierPrompt(router: Router, config: AimeatConfig): void {
+export function registerAtelierPrompt(router: Router, config: AimeatConfig, storage: Storage): void {
   const fullFor = (query: Record<string, unknown>) => buildAtelierPrompt(config, {
     mode: query.mode === 'improve' ? 'improve' : 'new',
     lang: typeof query.lang === 'string' ? query.lang : 'en',
@@ -39,18 +43,21 @@ export function registerAtelierPrompt(router: Router, config: AimeatConfig): voi
   }).full;
 
   // The parts, registered before the whole so the longer paths are matched first.
-  router.get('/v1/prompts/build-app-atelier/sections', (req, res) => {
+  router.get('/v1/prompts/build-app-atelier/sections', async (req, res) => {
     const full = fullFor(req.query);
-    const parts = ATELIER_PARTS.map(p => ({ id: p.id, what: p.what, chars: atelierPiece(full, p.id, config.baseUrl)?.text.length ?? 0 }));
+    const parts = [];
+    for (const p of ATELIER_PARTS) {
+      parts.push({ id: p.id, what: p.what, chars: (await atelierPieceWithBook(full, p.id, config, storage))?.text.length ?? 0 });
+    }
     res.json(success(config.nodeId, { parts, spec_token: buildAtelierSpecToken(config) }, [
       { description: 'One part by id', method: 'GET', url: '/v1/prompts/build-app-atelier/sections/{id}' },
     ]));
   });
 
-  router.get('/v1/prompts/build-app-atelier/sections/:id', (req, res) => {
+  router.get('/v1/prompts/build-app-atelier/sections/:id', async (req, res) => {
     const id = req.params.id as string;
     // The same function the MCP handbook tool reads, so the two doors cannot answer differently.
-    const piece = atelierPiece(fullFor(req.query), id, config.baseUrl);
+    const piece = await atelierPieceWithBook(fullFor(req.query), id, config, storage);
     if (!piece) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND',
         'The Atelier build specification has no part "' + id + '". It has: ' + atelierPieceIds().join(', ') + '.'));

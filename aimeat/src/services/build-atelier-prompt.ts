@@ -28,6 +28,8 @@
  *   import { buildAtelierPrompt, buildAtelierSpecToken } from './build-atelier-prompt.js';
  *   const { full, body } = buildAtelierPrompt(config, { lang: 'en', mode: 'new' });
  * @version-history
+ *   v1.28.0 — 2026-09-19 — "The Design Book first" says where the list of what the Book holds is:
+ *     at the end of part `libraries`, joined when the part is served (build-atelier-book.ts).
  *   v1.27.0 — 2026-09-19 — Two sections about the PERSON (build-atelier-people.ts): after the
  *     interview the owner is shown two or three genres, the languages and the first screen, and
  *     answers before any code; and after the genre section, how a fork signs people in and speaks
@@ -664,7 +666,10 @@ function composeBody(config: AimeatConfig): string {
     + 'forked from its template, never adopted. A starting shape from the '
     + 'Book plus your words beats a fresh composition, and when you make something worth '
     + 'keeping, propose it back (`aimeat_designbook_propose`) so the next build starts where '
-    + 'you finished.\n\n';
+    + 'you finished. WHAT THE BOOK HOLDS is listed at the end of this part when you read the '
+    + 'specification in parts, every part on a line under its kind; `aimeat_designbook_search` '
+    + 'called with nothing answers the same list. Read it before you compose: you cannot search '
+    + 'for a part you do not know exists.\n\n';
 
   body += '## AI inside the app\n\n';
   body += 'The `aide` block puts an AI panel on the screen whose tools are the app\'s OWN '

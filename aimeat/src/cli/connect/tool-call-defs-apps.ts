@@ -8,6 +8,8 @@
  * @usage
  *   import { appTools } from './tool-call-defs-apps.js';
  * @version-history
+ *   v1.9.0 -- 2026-09-19 -- aimeat_designbook_search given nothing asks the route for its map view,
+ *     as the two MCP doors do.
  *   v1.8.0 -- 2026-09-13 -- aimeat_extension_install and aimeat_cortex_install take the YAML manifest
  *     the catalog publishes (they declared an object and JSON-parsed the YAML, so neither could
  *     install anything), and `update` reaches the redeploy route; activate follows the extension
@@ -480,8 +482,9 @@ export const appTools: ConnectCliToolDefinition[] = [
             if (status) params.set('status', status);
             if (q) params.set('q', q);
             if (typeof input.limit === 'number') params.set('limit', String(input.limit));
-            const qs = params.toString();
-            return client.get(`/v1/designbook${qs ? `?${qs}` : ''}`);
+            // No word, no kind: the whole published shelf on one page, as on the two MCP doors.
+            const qs = params.toString() || 'view=map';
+            return client.get(`/v1/designbook?${qs}`);
         },
     },
     {
