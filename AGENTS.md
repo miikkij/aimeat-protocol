@@ -50,6 +50,11 @@ of them built the wrong thing three times in a row.
   not make a page good. Put the result beside the genre it was forked from, at 390 and 1440 px, in
   both themes and both languages, and ask whether it holds up. A broken header in your own
   screenshot is a reason to stop, whatever else passed.
+- **Look for a browser before you say you have none, and never let its absence hold a publish
+  back.** List your tools and search them for `playwright`, `browser` and `chrome`: this machine
+  has a Playwright MCP server driving Chrome, and a session that has it and does not look is the
+  failure seen three builds in a row. With no browser, publish anyway, hand over the address, and
+  say in one line what you could not check yourself.
 - **Done means all of what was agreed.** Check every requirement against the result before you say
   done. Jouni is not the quality check you left out.
 

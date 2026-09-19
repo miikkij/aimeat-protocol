@@ -195,7 +195,10 @@ export const TASKS: Task[] = [
             const keepsOnNode = /AIMEAT\.data\.(set|get)\s*\(|\/v1\/libs\/aimeat-living\.js/.test(html);
             const ok = onAtelier(quality) && keepsOnNode;
             const why = !onAtelier(quality) ? 'it is not an Atelier app with a register' : 'it does not keep the habits on the node, so another device starts empty';
-            return { ok, detail: ok ? 'an Atelier app that keeps the habits on the node' : `the app is published, and ${why}`, note: describeQuality(quality) };
+            // Nobody answers a headless run, so what can be measured is whether the builder SAID which
+            // level it took, in the one message the owner gets.
+            const saidLevel = /\b(prototype|ordinary page|the finest|level)\b/i.test(ctx.metrics.finalText);
+            return { ok, detail: ok ? 'an Atelier app that keeps the habits on the node' : `the app is published, and ${why}`, note: `${describeQuality(quality)}; level ${saidLevel ? 'named' : 'NOT named'} to the owner` };
         },
     },
     {

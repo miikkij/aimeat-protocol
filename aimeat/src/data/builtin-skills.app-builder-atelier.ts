@@ -13,6 +13,9 @@
  * @structure APP_BUILDER_ATELIER_SKILL_ENTRY
  * @usage import { APP_BUILDER_ATELIER_SKILL_ENTRY } from './builtin-skills.app-builder-atelier.js';
  * @version-history
+ *   v1.15.0 — 2026-09-19 — Verify: look for a browser among your tools before saying you have none
+ *     (Playwright MCP with Chrome), and suggest it by name when there is none. A builder on a
+ *     machine that had both connected did not look, three builds in a row.
  *   v1.14.0 — 2026-09-19 — The proposal opens with THE LEVEL (quick prototype, ordinary page, the
  *     finest): the owner's choice, stated in the page's head, and the node warns only when the
  *     result is below it. Ruled the same day: the default look is refused unless the owner chose it.
@@ -221,7 +224,12 @@ moved under you says so.
    (\`aimeat_image_generate\` → storage URL; the spec carries the style-word tables). Check the
    \`atelier.img.*\` cache first; never inline a data: URI. Zero images still looks finished.
 7. **Verify** — 390×844, 1280×900 and 1280×460, both themes, no horizontal scroll, every state
-   reachable, no console errors. A MISSING BROWSER NEVER HOLDS A PUBLISH BACK: the published page
+   reachable, no console errors. LOOK FOR A BROWSER BEFORE YOU SAY YOU HAVE NONE: list the tools
+   you were given and search them for \`playwright\`, \`browser\` and \`chrome\`. A Playwright MCP
+   server driving the machine's own Chrome is the usual one, and a session that has it and does
+   not look is the common failure. If there is none, say so once and suggest it by name
+   (Playwright MCP with Chrome), because it is what lets you see what you built.
+   A MISSING BROWSER NEVER HOLDS A PUBLISH BACK: the published page
    is what gets verified, by you if you have a browser and by the owner if you do not. Publish,
    hand over the address, and say in one line what you could not check yourself (a microphone, a
    camera, a screen you cannot see). An app that sits unpublished waiting for a browser is an app
