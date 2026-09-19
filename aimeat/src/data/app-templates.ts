@@ -91,6 +91,12 @@ export interface AppTemplate {
   tier?: 'T1' | 'T2' | 'T3';
   /** The build track a template belongs to; absent means both. Genres are Atelier's. */
   track?: 'classic' | 'atelier';
+  /**
+   * Genres only, read from the page's own `aimeat-light` meta and never typed here: `fixed` keeps
+   * its own colours whatever the person's light/dark and palette say, `follows` is drawn in the
+   * theme's tokens and changes with them. It is the first thing an owner is asked to choose.
+   */
+  light?: 'fixed' | 'follows';
   title: string;
   /** One line shown in the picker and in the prompt index. */
   description: string;
@@ -263,16 +269,21 @@ export function getAppTemplates(): AppTemplate[] {
  * a picker. Pass a `lang` (e.g. 'fi') to get localized title/description where a
  * translation exists; everything else falls back to the canonical English.
  */
-export function getAppTemplateIndex(lang?: string): Array<Pick<AppTemplate, 'id' | 'kind' | 'tier' | 'track' | 'title' | 'description' | 'libs'>> {
+/** What a genre page says about its own light. A page that says nothing keeps its own colours. */
+export function genreLight(content: string): 'fixed' | 'follows' {
+  return /<meta\b[^>]*name\s*=\s*["']aimeat-light["'][^>]*content\s*=\s*["']follows["']/i.test(content.slice(0, 4096)) ? 'follows' : 'fixed';
+}
+
+export function getAppTemplateIndex(lang?: string): Array<Pick<AppTemplate, 'id' | 'kind' | 'tier' | 'track' | 'title' | 'description' | 'libs' | 'light'>> {
   const tr = (lang && TRANSLATIONS[lang]) || null;
   // The Atelier track first: the genres, then its two shells, then everything else in registry
   // order. A list is read from the top, and until 2026-09-19 this one opened with the Classic
   // shell and ended, thirty rows later, with the genres a build is meant to start from.
   const rank = (t: AppTemplate): number => (t.kind === 'genre' ? 0 : t.id === 'shell-atelier' || t.track === 'atelier' ? 1 : 2);
   const ordered = TEMPLATES.map((t, i) => ({ t, i })).sort((a, b) => rank(a.t) - rank(b.t) || a.i - b.i).map(x => x.t);
-  return ordered.map(({ id, kind, tier, track, title, description, libs }) => {
+  return ordered.map(({ id, kind, tier, track, title, description, libs, content }) => {
     const o = tr && tr[id];
-    return { id, kind, tier, track, title: (o && o.title) || title, description: (o && o.description) || description, libs };
+    return { id, kind, tier, track, title: (o && o.title) || title, description: (o && o.description) || description, libs, ...(kind === 'genre' ? { light: genreLight(content) } : {}) };
   });
 }
 

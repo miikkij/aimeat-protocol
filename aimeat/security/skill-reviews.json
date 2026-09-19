@@ -78,7 +78,7 @@
         "aimeat/src/services/app-size-health.ts",
         "aimeat/src/services/app-publish-next-steps.ts"
       ],
-      "digest": "sha256:b1e6c9ffbecfb1ed9da350de"
+      "digest": "sha256:fc6c748153b9a92a3487ec8f"
     },
     "node:aimeat-app-builder": {
       "reviewedOn": "2026-09-19",
@@ -97,7 +97,7 @@
         "aimeat/src/services/build-atelier-layers.ts",
         "aimeat/src/static/sdk-libs/atelier/describe-data.js"
       ],
-      "digest": "sha256:b7805e4f102e7087546da32c"
+      "digest": "sha256:f155fdb7a49db8bdd759dff9"
     },
     "node:aimeat-phaser": {
       "reviewedOn": "2026-09-19",
@@ -371,7 +371,7 @@
     },
     "node:aimeat-app-workstation": {
       "aimeat/src/services/app-size-health.ts": "b0683f91995656e0",
-      "aimeat/src/services/app-publish-next-steps.ts": "404316a05e8cf2d3"
+      "aimeat/src/services/app-publish-next-steps.ts": "341fdbdf0a78c211"
     },
     "node:aimeat-app-builder": {
       "aimeat/src/services/build-app-layers.ts": "11efd2e166cbd6e7",
@@ -379,8 +379,8 @@
       "aimeat/src/services/app-spec-gate.ts": "023890ba92c1090e"
     },
     "node:aimeat-app-builder-atelier": {
-      "aimeat/src/services/build-atelier-prompt.ts": "f77a33c77b6c1f7e",
-      "aimeat/src/services/build-atelier-layers.ts": "4fabd16588fa5f33",
+      "aimeat/src/services/build-atelier-prompt.ts": "6177bfc4aee813e0",
+      "aimeat/src/services/build-atelier-layers.ts": "4fce3c62daccfa86",
       "aimeat/src/static/sdk-libs/atelier/describe-data.js": "b87046c1071e4940"
     },
     "node:aimeat-phaser": {
