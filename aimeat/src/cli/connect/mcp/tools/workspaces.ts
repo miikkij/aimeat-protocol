@@ -82,7 +82,7 @@ export function registerWorkspaceTools(mcp: McpServer, registry: AgentRegistry):
 
   mcp.tool('aimeat_workspace_read', descriptionFor('aimeat_workspace_read'),
     { organism_id: z.string(), ws: z.string().describe('Workspace id (from aimeat_workspace_list)'),
-      ids: z.array(z.string()).optional().describe('Batch-open: return the FULL value of ONLY these instance ids (from the index). Omit for the lightweight index.'),
+      ids: z.array(z.string()).optional().describe('Batch-open: return the FULL value of ONLY these instance ids (from the index). A full memory key, which is the id aimeat_discover gives a workspace record, is taken as well. Omit for the lightweight index.'),
       space: z.string().optional().describe('With `ids`: optionally restrict the lookup to this space (objectType NAME or namespace).'),
       include_archived: z.boolean().optional().describe('Include archived (hidden) content. Default false.') },
     annotationsFor('aimeat_workspace_read'),

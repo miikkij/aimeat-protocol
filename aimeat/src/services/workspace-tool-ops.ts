@@ -28,6 +28,11 @@
  *   const r = await readWorkspaceOp({ storage, config }, caller, { organismId, ws });
  *   if (!r.ok) return fail(r.message);
  * @version-history
+ *   v1.3.0 — 2026-09-19 — A batch-open takes a record's FULL memory key as well as its instance id.
+ *     aimeat_discover names a workspace record by its key, and a cold agent handed that to `ids`
+ *     in three measured runs of three: it was answered `missing`, read the index and asked again,
+ *     two calls a run on the hand-off between two tools. The key resolves only inside the
+ *     workspace being read; anything else is missing under the name it was asked by.
  *   v1.2.0 — 2026-09-13 — UNDECLARED_SPACE is a refusal on both operations, decided by the developer
  *     on 2026-09-13. The draft write answers 422 UNDECLARED_SPACE from the shared decision
  *     (workspace-write-items.ts undeclaredSpaceRefusal) with the same message POST /v1/memory sends,
@@ -161,6 +166,25 @@ export interface ReadWorkspaceArgs {
 }
 
 /**
+ * Read an instance out of a full memory key, when the key belongs to THIS workspace.
+ *
+ *   organism.<org>.w.<ws>.<namespace>.<instance>[.latest | .draft | .version.N]
+ *
+ * `root` is `organism.<org>.w.<ws>`, so a key from another organism or another workspace matches
+ * no prefix and the answer is null: the caller then treats what was asked as a plain instance id,
+ * finds nothing, and reports it missing under its own name. The longest matching namespace wins,
+ * because one namespace may be the beginning of another (`shared.notes`, `shared.notes-old`).
+ */
+export function instanceFromKey(root: string, namespaces: string[], asked: string): { namespace: string; instance: string } | null {
+    if (!asked.startsWith(`${root}.`)) return null;
+    const rest = asked.slice(root.length + 1);
+    const namespace = namespaces.filter(ns => rest.startsWith(`${ns}.`)).sort((a, b) => b.length - a.length)[0];
+    if (!namespace) return null;
+    const instance = rest.slice(namespace.length + 1).split('.')[0];
+    return instance ? { namespace, instance } : null;
+}
+
+/**
  * Two modes, one function. DEFAULT (no `ids`) → the INDEX: per space, every instance's id + title +
  * updated + version + byte-size, no bodies, plus the manifest, the pinned apps and the locked
  * schemas. BATCH-OPEN (`ids`) → the full value of only those instances. Authorization is at the
@@ -210,9 +234,14 @@ export async function readWorkspaceOp(
         const found: unknown[] = [];
         const missing: string[] = [];
         const provFor = await readProvenanceMany(storage, config, items.map(r => r.aiProvenanceId));
-        for (const id of new Set(ids.map(String))) {
+        for (const asked of new Set(ids.map(String))) {
+            // aimeat_discover names a workspace record by its FULL memory key, and an agent hands
+            // that on as it got it. Inside THIS workspace the key says which space and which
+            // instance; a key from anywhere else matches no prefix here and stays missing.
+            const named = instanceFromKey(root, scoped.map(s => s.ot.namespace as string), asked);
+            const id = named?.instance ?? asked;
             let hit = false;
-            for (const s of scoped) {
+            for (const s of named ? scoped.filter(x => x.ot.namespace === named.namespace) : scoped) {
                 const slot = s.inst.get(id);
                 const cur = slot?.latest ?? slot?.draft;
                 if (!slot || !cur) continue;
@@ -225,7 +254,7 @@ export async function readWorkspaceOp(
                 });
                 hit = true; break;
             }
-            if (!hit) missing.push(id);
+            if (!hit) missing.push(asked);
         }
         return { ok: true, data: { organism_id: organismId, ws, mode: 'content', items: found, ...(missing.length ? { missing } : {}) } };
     }

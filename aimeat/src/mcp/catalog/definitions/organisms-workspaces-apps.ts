@@ -276,7 +276,7 @@ export const organismsWorkspacesAppsTools: AimeatToolDefinition[] = [
         input: {
             organism_id: { type: 'string', required: true, description: 'Organism identifier.' },
             ws: { type: 'string', required: true, description: 'Workspace id (from aimeat_workspace_list).' },
-            ids: { type: 'array', description: 'Batch-open: return the FULL value of ONLY these instance ids (from the index). Omit for the lightweight index.' },
+            ids: { type: 'array', description: 'Batch-open: return the FULL value of ONLY these instance ids (from the index). A full memory key, which is the id aimeat_discover gives a workspace record, is taken as well. Omit for the lightweight index.' },
             space: { type: 'string', description: 'With `ids`: optionally restrict the lookup to this space (objectType name or namespace).' },
             include_archived: { type: 'boolean', description: 'Include archived (hidden) content. Default false.' },
         },
