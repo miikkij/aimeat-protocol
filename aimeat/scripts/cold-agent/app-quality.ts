@@ -67,6 +67,10 @@ export interface AppQuality {
     kitComponents: string[];
     /** Styles the page made for itself, beyond the kit and its genre. */
     ownStyles: number;
+    /** The level the page states (`proto`, `plain`, `fine`), or null when it states none. */
+    level: string | null;
+    /** Whether the run was shown the Design Book's one-page map, by either road. */
+    sawBookMap: boolean;
     /** `fixed` keeps its own colours, `follows` changes with the person's theme; null when not said. */
     light: string | null;
     /** Every template id the run fetched, in order: which shell or genre it started from, and what it moved to. */
@@ -133,6 +137,11 @@ export async function appQuality(baseUrl: string, ownerName: string, filename: s
         // `a`, and reported `splice` as a component.
         kitComponents: [...new Set([...html.matchAll(/\b(?:AIMEAT\.atelier|[aA])\.([a-z][A-Za-z]+)\s*\(/g)].map(m => m[1]).filter(n => KIT_NAMES.has(n)))],
         ownStyles: ownClassNames(html).length,
+        level: meta('aimeat-level'),
+        // The whole Book on one page reaches a builder two ways: part `libraries` of the
+        // specification ends with it, and a search given nothing answers it.
+        sawBookMap: atelierTiers.includes('build-app-atelier/libraries')
+            || toolCalls.some(c => c.name === 'aimeat_designbook_search' && !c.isError && Object.keys((c.input as object | null) ?? {}).length === 0),
         light: meta('aimeat-light'),
         locales: (meta('aimeat-locales') ?? '').split(/\s+/).filter(Boolean),
         usesDictionary: /i18n\.use\(|AIMEAT\.i18n|data-t=|data-i18n/.test(html),
@@ -141,7 +150,8 @@ export async function appQuality(baseUrl: string, ownerName: string, filename: s
 }
 
 /** Is this an Atelier app in fact and not in name: the kit is loaded and the register is a real one. */
-export const onAtelier = (q: AppQuality): boolean => q.loadsAtelier && !!q.register;
+/** On the Atelier track: the kit, and a register or a level whose owner chose to have none. */
+export const onAtelier = (q: AppQuality): boolean => q.loadsAtelier && (!!q.register || q.level === 'proto' || q.level === 'plain');
 
 /** One line for the report: what was wrong first, then what was read. */
 export function describeQuality(q: AppQuality): string {
@@ -163,6 +173,8 @@ export function describeQuality(q: AppQuality): string {
         + `; languages ${q.locales.join(' ') || 'NONE DECLARED'}${q.locales.length >= 2 && !q.usesDictionary ? ' (declared, but no dictionary in the page)' : ''}`
         + (q.genreKept === null ? '' : `; kept ${Math.round(q.genreKept * 100)} % of its genre`)
         + `; light ${q.light ?? 'not said'}`
+        + `; level ${q.level ?? 'NOT STATED'}`
+        + `; Book map ${q.sawBookMap ? 'seen' : 'NOT seen'}`
         + `; Design Book searched ${q.book.searched}, adopted ${q.book.adopted}, proposed ${q.book.proposed}`
         + `; kit components ${q.kitComponents.length ? q.kitComponents.join(' ') : 'none'}; own styles ${q.ownStyles}`;
     return `${track}; ${Math.round(q.bytes / 1024)} kB; ${wrong.length ? wrong.join(', ') : 'nothing the lint or the head checks object to'}; ${read}; spec token ${q.sentSpecToken ? 'sent' : 'not sent'}`;
