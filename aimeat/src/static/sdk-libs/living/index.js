@@ -52,6 +52,9 @@
  *   doc.set('t', 31);
  *   doc.setLanguage('en');   // …or just let the login pill do it
  * @version-history
+ *   v0.8.1 — 2026-09-19 — A decide node says what personal data the node took out of the text before
+ *     it left (`removed`, and a line on its row). The screen keeps the message as written, so the
+ *     first person to test it on aimeat.io saw nothing happen and thought the removal had failed.
  *   v0.8.0 — 2026-09-19 — A JUDGEMENT ABOUT TEXT CAN MOVE THE MACHINE. A `decide` node asks the
  *     decision model (AIMEAT.decide) closed questions about another node's text when that text
  *     changes and rests, never on a render; its answers are fields a formula or a guard reads. With
@@ -162,7 +165,7 @@ import {
   TEXT_KEYS, hasLangMap, localizeLayout, localizeProps, onLanguageChange, preference,
 } from './i18n.js';
 
-const VERSION = '0.8.0';
+const VERSION = '0.8.1';
 
 /** The node types whose rendering this library does itself, when the node names a block. */
 const DRAWN = ['control', 'formula', 'text', 'machine', 'value', 'source', 'trigger', 'decide'];
