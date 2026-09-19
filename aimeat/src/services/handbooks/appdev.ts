@@ -5,6 +5,8 @@
  * @description Operating handbook for the v2 `appdev` surface (/v2/mcp/appdev · `aimeat connect serve
  *   --surface appdev`). Self-contained; tool list mirrors MCP_SURFACES.appdev.
  * @version-history
+ *   2026-09-19 — Decisions in an app: aimeat-decide.js, the data map row, English, the app's
+ *     responsibility for what it sends (TARGET-080).
  *   2026-09-18 — Names only tools this surface carries: the package line listed versions, publish
  *     and delete, which stay on the connector by design, and the contract paragraph named
  *     aimeat_agent_tags_set, which lives on the agent surface. Instruction review.
@@ -46,6 +48,14 @@ manifest.yaml + libs/) · \`aimeat_cortex_activate\` · \`aimeat_cortex_deactiva
 \`aimeat_cortex_list\` · \`aimeat_cortex_delete\`. Re-activate = deactivate then activate.
 
 **Storage.** \`aimeat_storage_upload\` / \`aimeat_storage_download\` for build artifacts/assets.
+
+**Decisions in an app (\`aimeat-decide.js\`, the decision model).** For classify / screen / route /
+gate steps, not text. Before the first call: request \`ai:use\`, and add a data map \`leaves\` row naming
+TypeSafe (\`PUT /v1/datamap/apps/:owner/:filename\`), or the node refuses with DATAMAP_REQUIRED. Questions in ENGLISH, all
+in one \`AIMEAT.decide.ask(state, questions, { subject, gates, thresholds, names, app_id })\`. What the
+app sends is the app's responsibility: send only the fields each question needs and pass the people
+the record mentions as \`names\`. The publish response lists departures as \`ai_hints\` starting
+\`DECIDE:\`. Never call TypeSafe or put its key in an app. Skill: typesafe-jev.
 
 **Reference.** \`aimeat_handbook_get\` — read the appdev / generator directives.
 

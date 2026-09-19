@@ -19,6 +19,7 @@
  * @structure DecideCard — the collapsible card, mounted in the profile AI tab
  * @usage import { DecideCard } from './decide-card.js'; html`<${DecideCard} />`
  * @version-history
+ *   v1.1.0 — 2026-09-19 — A key test: one tiny real call on the key that would pay.
  *   v1.0.0 — 2026-09-19 — Initial (TARGET-080).
  */
 import { h } from 'preact';
@@ -26,7 +27,7 @@ import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { apiGet, apiPut, apiDelete } from '/js/api.js';
+import { apiGet, apiPut, apiPost, apiDelete } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
 
 const shortTime = (iso) => String(iso ?? '').slice(0, 16).replace('T', ' ');
@@ -103,6 +104,24 @@ export function DecideCard() {
     }
   };
 
+  // One tiny real call on the key that would pay (own, else the server's). A refused key comes back
+  // as ok:false with words, not as an HTTP error, so it is shown the same way a success is.
+  const testKey = async () => {
+    setBusy('test');
+    setMsg(null);
+    try {
+      const r = await apiPost('/v1/ai/decide/settings/test', {});
+      const d = r?.data ?? {};
+      setMsg(d.ok
+        ? { key: 'decideCard.keyTestOk', params: { model: d.model || '' }, error: false }
+        : { text: d.message || t('decideCard.keyTestFailed'), error: true });
+    } catch (err) {
+      setMsg({ text: err?.message || t('decideCard.keyTestFailed'), error: true });
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const toggleClass = (cls) => {
     const allow = new Set(settings.policy.allow);
     if (allow.has(cls)) allow.delete(cls); else allow.add(cls);
@@ -122,7 +141,7 @@ export function DecideCard() {
 
       ${!collapsed && html`
         <div class="pf-aitr-body">
-          ${msg && html`<p class=${msg.error ? 'pf-aitr-error' : 'pf-aitr-note'} role="status">${msg.key ? t(msg.key) : msg.text}</p>`}
+          ${msg && html`<p class=${msg.error ? 'pf-aitr-error' : 'pf-aitr-note'} role="status">${msg.key ? t(msg.key, msg.params) : msg.text}</p>`}
           ${!settings && !msg && html`<p class="pf-aitr-muted">${t('decideCard.loading')}</p>`}
 
           ${settings && html`
@@ -141,12 +160,16 @@ export function DecideCard() {
                 ${t('decideCard.keySave')}
               </button>
             </div>
-            ${settings.has_own_key && html`
-              <div class="og-doors">
+            <div class="og-doors">
+              ${(settings.has_own_key || settings.node_key_available) && html`
+                <button type="button" class="og-door og-door--quiet" onClick=${testKey} disabled=${busy}>
+                  ${busy === 'test' ? t('decideCard.keyTesting') : t('decideCard.keyTest')}
+                </button>`}
+              ${settings.has_own_key && html`
                 <button type="button" class="og-door og-door--quiet" onClick=${removeKey} disabled=${busy}>
                   ${t('decideCard.keyRemove')}
-                </button>
-              </div>`}
+                </button>`}
+            </div>
 
             <h4 class="pf-aitr-sub">${t('decideCard.policyTitle')}</h4>
             <p class="pf-aitr-note">${t('decideCard.policyDesc')}</p>

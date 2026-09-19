@@ -2,6 +2,19 @@
   "_format": "Node change log, newest entry FIRST. Served at /changelog.json, rendered by public/views/landing-changelog.js. Add an entry in the same change that ships the thing. Fields: date (YYYY-MM-DD), version (optional, the node version it shipped in), kind (feature|fix|security|notice), title and body. title/body are either a plain string (shown to everyone) or { en, fi } when the wording deserves both languages. Write what a person gets, not what the code does.",
   "entries": [
     {
+      "date": "2026-09-19",
+      "version": "3.17.0",
+      "kind": "feature",
+      "title": {
+        "en": "A decision model beside the text model: sort, screen and route in well under a second",
+        "fi": "Päätösmalli tekstimallin rinnalle: lajittele, seulo ja ohjaa alle sekunnissa"
+      },
+      "body": {
+        "en": "Your apps and AI agents can now ask closed questions about a message or a record (yes or no, pick one option, a scale) and get the answers with probabilities in well under a second. The model is TypeSafe's Jev; it writes no text, so it is for deciding which folder a mail goes to, whether a message needs an answer today, or how upset a customer is. Before anything is sent, e-mail addresses, phone numbers, Finnish personal identity codes, bank account numbers, street addresses and the names of your contacts are removed, and put back into the answer. What else an app sends is the app's responsibility, and the publish check tells its builder where it departs from the rules. Every decision is recorded with the model version, the thresholds it was compared with and whether a person reviewed it, so you can later ask what was decided about a record and why. Pay with your own TypeSafe key or from your AI allowance on the server's key, and test the key with one press. Set it up under Settings, AI, Decision model. For builders: the aimeat-decide.js library, the aimeat_decide tools over MCP, and POST /v1/ai/decide.",
+        "fi": "Sovelluksesi ja tekoälyagenttisi voivat nyt kysyä viestistä tai tietueesta rajattuja kysymyksiä (kyllä vai ei, yksi vaihtoehto, asteikko) ja saada vastaukset todennäköisyyksineen alle sekunnissa. Malli on TypeSafen Jev. Se ei kirjoita tekstiä, joten sillä päätetään esimerkiksi, mihin kansioon viesti menee, tarvitseeko viesti vastauksen tänään tai kuinka tyytymätön asiakas on. Ennen lähetystä sähköpostiosoitteet, puhelinnumerot, henkilötunnukset, tilinumerot, katuosoitteet ja yhteystietojesi nimet poistetaan, ja ne palautetaan vastaukseen. Muusta sovelluksen lähettämästä sisällöstä vastaa sovellus itse, ja julkaisutarkistus kertoo sen tekijälle, missä sovellus poikkeaa säännöistä. Jokainen päätös kirjataan: malliversio, kynnykset, joihin vastausta verrattiin, ja se, tarkistiko ihminen päätöksen. Näin voit myöhemmin kysyä, mitä tietueesta päätettiin ja millä perusteella. Maksat omalla TypeSafe-avaimellasi tai tekoälysaldostasi palvelimen avaimella, ja avaimen voi testata yhdellä painalluksella. Ota käyttöön kohdassa Asetukset, Tekoäly, Päätösmalli. Rakentajille: aimeat-decide.js-kirjasto, aimeat_decide-työkalut MCP:n kautta ja POST /v1/ai/decide."
+      }
+    },
+    {
       "date": "2026-09-13",
       "kind": "notice",
       "title": {

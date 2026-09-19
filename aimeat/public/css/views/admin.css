@@ -661,6 +661,17 @@
   color: var(--success-fg);
   border: 1px solid var(--success-border);
 }
+.adm-config-result-err {
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: var(--danger-bg);
+  color: var(--danger-fg);
+  border: 1px solid var(--danger-border);
+}
+/* An action a config section carries beside its fields (the decision model's key test). */
+.adm-cfg-action { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 10px; }
+.adm-cfg-action small { color: var(--text-muted); font-size: .8rem; }
+.adm-cfg-action p { flex-basis: 100%; margin: 0; }
 
 /* Expandable help sections */
 .adm-help {
