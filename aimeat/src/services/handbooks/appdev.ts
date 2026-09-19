@@ -72,7 +72,7 @@ required, upserts by slug, share:true publishes platform-wide) · \`aimeat_app_t
 0. THE TRACK: a NEW app is built on the **Atelier track**, forked from a genre, with the served
    component kit carrying the header, the sign-in and the states. Load
    \`node:aimeat-app-builder-atelier\` and read its specification, \`aimeat_handbook_get { tier:
-   "build-app-atelier" }\` (four parts; over HTTP \`GET /v1/prompts/build-app-atelier\`). The Classic
+   "build-app-atelier" }\` (in parts; over HTTP \`GET /v1/prompts/build-app-atelier\`). The Classic
    track below is for improving an app that is already Classic, or when the owner asks for it by
    name. A track is not changed in the middle of a build.
 1. RESEARCH: load the \`node:aimeat-app-builder\` skill (\`aimeat_skill_get\`), call

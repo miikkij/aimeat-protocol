@@ -102,6 +102,7 @@ import { buildAtelierSpecToken } from './build-atelier-prompt.js';
 import { trackDriftFindings } from './app-track-drift.js';
 import { oneLanguageFindings } from './app-language-default.js';
 import { genreForkFindings } from './app-genre-fork.js';
+import { handRolledFindings } from './app-hand-rolled.js';
 import { loadsAtelierKit } from './app-artifact-lint.js';
 import { buildPublishNextSteps } from './app-publish-next-steps.js';
 import { readAppDataMap } from './data-map/data-map-store.js';
@@ -640,7 +641,7 @@ export async function publishApp(
     artifactWarnings: [...artifact.warnings, ...(isHtml ? trackDriftFindings({
       isUpdate, track, loadsAtelier: loadsAtelierKit(html),
       carriedAtelierToken: typeof input.specToken === 'string' && input.specToken.trim() === buildAtelierSpecToken(config),
-    }) : []), ...(isHtml ? oneLanguageFindings({ isUpdate, html }) : []), ...(isHtml ? genreForkFindings(html) : [])],
+    }) : []), ...(isHtml ? oneLanguageFindings({ isUpdate, html }) : []), ...(isHtml ? genreForkFindings(html) : []), ...(isHtml ? handRolledFindings(html) : [])],
     servedMarksRemoved,
     // Every door returns this now. It used to exist only on the MCP inline branch, so the two
     // things an app most often lacks went unmentioned on the door most apps come through.

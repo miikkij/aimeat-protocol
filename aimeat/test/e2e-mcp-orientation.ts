@@ -488,7 +488,7 @@ async function main() {
 
         // The ATELIER specification had no MCP door until 2026-09-19. It is the track a new app is
         // built on, and a chat could not open its guide: 68 kB of text in a 207 kB HTTP answer.
-        await test('17b. tier "build-app-atelier" returns its first part, which names the other three and what comes before code', async () => {
+        await test('17b. tier "build-app-atelier" returns its first part, which names the others and what comes before code', async () => {
             const { body } = await v1('tools/call', { name: 'aimeat_handbook_get', arguments: { tier: 'build-app-atelier' } }, 403);
             assert(!body.result?.isError, `not an error: ${toolText(body).slice(0, 160)}`);
             const start = toolText(body);
@@ -497,13 +497,13 @@ async function main() {
             assert(start.length < 24_000, `one tool result carries it: ${start.length} characters`);
             const full = await json('/v1/prompts/build-app-atelier');
             assert(start.includes(full.body.data.spec_token), 'it names the Atelier spec token');
-            assert(/Read `genre` and `patterns` BEFORE you write any code/.test(start), 'it says which parts come before code');
+            assert(/Read `genre`, `libraries` and `patterns` BEFORE you write any code/.test(start), 'it says which parts come before code');
         });
 
-        await test('17c. the four Atelier parts each arrive whole, and between them carry the whole specification', async () => {
+        await test('17c. the Atelier parts each arrive whole, and between them carry the whole specification', async () => {
             const fullTxt = await fetch(`${BASE}/v1/prompts/build-app-atelier?format=txt`).then(r => r.text());
             const list = await json('/v1/prompts/build-app-atelier/sections');
-            assert(list.body.data.parts.map((p: any) => p.id).join() === 'start,genre,patterns,look', `four parts in order: ${JSON.stringify(list.body.data.parts)}`);
+            assert(list.body.data.parts.map((p: any) => p.id).join() === 'start,genre,libraries,patterns,look', `the parts in order: ${JSON.stringify(list.body.data.parts)}`);
             let carried = 0;
             for (const p of list.body.data.parts) {
                 const { body } = await v1('tools/call', { name: 'aimeat_handbook_get', arguments: { tier: 'build-app-atelier/' + p.id } }, 404);
@@ -521,9 +521,9 @@ async function main() {
         });
 
         await test('17d. an Atelier part that does not exist is an error that names the four there are', async () => {
-            const { body } = await v1('tools/call', { name: 'aimeat_handbook_get', arguments: { tier: 'build-app-atelier/libraries' } }, 406);
+            const { body } = await v1('tools/call', { name: 'aimeat_handbook_get', arguments: { tier: 'build-app-atelier/no-such-part' } }, 406);
             assert(body.result?.isError === true, 'MCP: isError');
-            assert(/start, genre, patterns, look/.test(toolText(body)), `it names the parts: ${toolText(body).slice(0, 200)}`);
+            assert(/start, genre, libraries, patterns, look/.test(toolText(body)), `it names the parts: ${toolText(body).slice(0, 200)}`);
         });
 
         await test('17e. the Classic first part says it is Classic and where a new app is built', async () => {

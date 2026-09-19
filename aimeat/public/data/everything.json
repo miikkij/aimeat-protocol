@@ -1488,9 +1488,9 @@
      "cells": [
       "<strong>Build spec with a token</strong>",
       "The canonical build prompt hands out a token; the publish says whether the app was built against today's spec.",
-      "<code>/v1/prompts/build-app</code>, <code>/v1/prompts/build-app/core</code> (the part every app needs; the rest by section), <code>aimeat_handbook_get { tier: &quot;build-app&quot; }</code> over MCP, <code>/v1/prompts/build-app-atelier</code> and its four parts (<code>/v1/prompts/build-app-atelier/sections/{id}</code>, <code>aimeat_handbook_get { tier: &quot;build-app-atelier&quot; }</code> over MCP), <code>/v1/how-an-app-builds</code>"
+      "<code>/v1/prompts/build-app</code>, <code>/v1/prompts/build-app/core</code> (the part every app needs; the rest by section), <code>aimeat_handbook_get { tier: &quot;build-app&quot; }</code> over MCP, <code>/v1/prompts/build-app-atelier</code> and its parts (<code>/v1/prompts/build-app-atelier/sections/{id}</code>, <code>aimeat_handbook_get { tier: &quot;build-app-atelier&quot; }</code> over MCP), <code>/v1/how-an-app-builds</code>"
      ],
-     "plain": "Build spec with a token The canonical build prompt hands out a token; the publish says whether the app was built against today's spec. /v1/prompts/build-app, /v1/prompts/build-app/core (the part every app needs; the rest by section), aimeat_handbook_get { tier: \"build-app\" } over MCP, /v1/prompts/build-app-atelier and its four parts (/v1/prompts/build-app-atelier/sections/{id}, aimeat_handbook_get { tier: \"build-app-atelier\" } over MCP), /v1/how-an-app-builds"
+     "plain": "Build spec with a token The canonical build prompt hands out a token; the publish says whether the app was built against today's spec. /v1/prompts/build-app, /v1/prompts/build-app/core (the part every app needs; the rest by section), aimeat_handbook_get { tier: \"build-app\" } over MCP, /v1/prompts/build-app-atelier and its parts (/v1/prompts/build-app-atelier/sections/{id}, aimeat_handbook_get { tier: \"build-app-atelier\" } over MCP), /v1/how-an-app-builds"
     },
     {
      "slug": "g-10-its-own-origin",

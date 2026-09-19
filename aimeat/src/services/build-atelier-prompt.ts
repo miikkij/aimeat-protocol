@@ -135,6 +135,7 @@ import { AMBIENTS } from '../data/atelier-ambients.js';
 import { EFFECTS, EFFECT_HOSTS, POST_IDS } from '../data/atelier-effects.js';
 import { renderCustomisation, renderLiving, renderPatterns } from './build-atelier-recipe.js';
 import { ATELIER_FORK_PEOPLE_SECTION, ATELIER_PROPOSAL_SECTION } from './build-atelier-people.js';
+import { buildAtelierLibrarySection } from '../data/library-packs.js';
 
 /** Slot the publish gate's token is substituted into (mirrors build-app-prompt.ts). */
 const SPEC_TOKEN_SLOT = '{{aimeat_spec_token}}';
@@ -476,6 +477,10 @@ function composeBody(config: AimeatConfig): string {
   // What a genre does NOT carry: sign-in, the language switch, a second language
   // (build-atelier-people.ts says why this had to be written down).
   body += ATELIER_FORK_PEOPLE_SECTION;
+
+  // The library list. The Classic specification has always carried one; this text named four
+  // libraries in passing, and its skill forbids reading the Classic one.
+  body += buildAtelierLibrarySection(config.baseUrl.replace(/\/+$/, ''));
 
   // THE PATTERN SHELF — rendered from the registry (atelier-patterns.ts), same data the
   // catalogue serves, so the choosing guidance can never drift from what patterns.css ships.
