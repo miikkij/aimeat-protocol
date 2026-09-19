@@ -44,6 +44,12 @@ of them built the wrong thing three times in a row.
 - **English and Finnish, always, unless he asks for one.** The language of the conversation is not
   the app's language list. Every string goes through a dictionary; the node's own sign-in bar
   carries the switch. Never write a header control or a language switch of your own.
+- **The working screen is a mosaic inside the genre, and its arrangement comes from the Design
+  Book.** The genre is the frame; the list, the numbers, the form and the history are
+  `AIMEAT.atelier.mosaic({ target, sources, fallback })` mounted into one element of the genre
+  page, with `fallback` taken from a Book fill. A genre page with no mosaic cannot use one part of
+  the Book. The proposal owes one line: "From the Design Book I take: …" or "… I take nothing,
+  because …".
 - **The genre is the look.** A look preset with components stacked in it, under a genre's name, is
   the default page every app looks like, and it is what gets sent back.
 - **Judge what it looks like, not only that it works.** Passing tests, contrast and page width do

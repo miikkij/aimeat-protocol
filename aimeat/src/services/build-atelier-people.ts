@@ -31,6 +31,34 @@
  *   v1.0.0 — 2026-09-19 — Initial.
  */
 
+/**
+ * The end of the mosaic section. WHY IT EXISTS: until 2026-09-20 the specification asked for two
+ * things that excluded each other. "Fork a genre" gave a hand-composed page, and not one of the 23
+ * genres mounts a mosaic; "take parts from the Design Book" writes an app's STORED ARRANGEMENT,
+ * which only a mosaic renders. So in a genre fork none of the Book's 94 parts could land (a layout
+ * was stored and never drawn, a look was refused with NO_LAYOUT), and twelve measured builds in a
+ * row adopted nothing, correctly. The mosaic has always mounted into any element, and it reads the
+ * app's stored arrangement by itself; what was missing was the sentence saying so.
+ */
+export const ATELIER_MOSAIC_IN_GENRE = 'IN A GENRE FORK, THE WORKING SCREEN IS A MOSAIC INSIDE THE GENRE. The genre is the frame: its masthead, its physics, its look. '
+  + 'The part of the page that is THIS APP (the list the person works through, the numbers, the form, the history) is a mosaic mounted into one element of the genre page. '
+  + 'That is what lets a Design Book part land in a genre at all: adopting a layout or a fill writes the app\'s stored arrangement, only a mosaic draws a stored arrangement, and a genre page without one ignores everything the Book holds.\n\n'
+  + '```js\n'
+  + '// in the genre page, where its own sample content stood: <section id="work"></section>\n'
+  + 'var m = AIMEAT.atelier.mosaic({\n'
+  + "  target: '#work',                       // no app shell: the genre is the frame\n"
+  + "  sources: { 'jobs.': loadJobs, 'stats.': loadStats },\n"
+  + "  fallback: FILL                          // a Design Book fill, its <placeholders> replaced\n"
+  + '});\n'
+  + '```\n\n'
+  + 'THE FILL COMES FROM THE BOOK: pick one from the list at the end of part `libraries`, read it with `aimeat_designbook_get { id }`, '
+  + 'replace every <angle-bracketed> value with this app\'s words and source names, take its `look` line out (in a genre the genre is the look, and the bridge makes every block wear it), and use it as `fallback`. '
+  + 'After the publish, `aimeat_designbook_adopt { id, filename }` records that the part was used and stores it as the app\'s arrangement, '
+  + 'and `aimeat_app_ui_set` writes your filled version over it; from then on the owner\'s AI rearranges the screen without a republish. '
+  + 'Compose blocks of your own only where no fill is near, and then PROPOSE the arrangement you made (`aimeat_designbook_propose`, kind `fill`, its app-specific words turned back into <placeholders>): '
+  + 'it is a layout, the Book has a kind for it, and the next build starts from it.\n\n'
+  + 'What stays hand-made in a genre fork is what the genre itself is made of: a figure only this page has, the masthead, a game board. Everything a mosaic block can show is a block.\n\n';
+
 /** After the interview, before the body. Not part of the spec token: it is about the conversation. */
 export const ATELIER_PROPOSAL_SECTION = '## Then propose, and wait for the answer\n\n'
   + 'Before any code, show the owner what you are about to build, in their words, and wait. They decide from this; they must not find out what you chose by looking at the result.\n\n'
@@ -43,7 +71,7 @@ export const ATELIER_PROPOSAL_SECTION = '## Then propose, and wait for the answe
   + 'The page states the level: `<meta name="aimeat-level" content="proto">`, `"plain"` or `"fine"`. On `proto` and `plain` the rest of this list shrinks to the languages, who signs in and the first screen: no genre is forked, the page starts from the Atelier shell (`aimeat_app_template_get { id: "shell-atelier" }`), the publish asks for no register, and nothing is styled by hand (a publish warns when such a page carries a sheet of styles of its own). On `fine`, everything below applies, and so does putting what you made into the Design Book afterwards. A page that states no level is held to `fine`.\n'
   + '- **Two or three genres, named, each with one sentence on why it fits THIS app** and what the first screen would look like in it. Get them from the genre list (part `genre`, or `aimeat_designbook_search { kind: "genre" }`), and look at the owner\'s own apps first (`aimeat_app_list`): the ones already on Atelier show what they like. Say which one you would take. A look preset with components stacked in it is not on this list: that is the default page every app looks like, and it is what gets sent back.\n'
   + '- **Fixed colours or following their theme?** Ask it, or recommend one and say why. A fixed genre keeps its own colours in light and dark; a following page changes with the person\'s theme and palette. Part `genre` says which each genre is and gives an address for each (`See it`), and the whole shelf is one link: send the owner the links so they choose by looking. If they want a genre that is fixed and want it to follow the theme, say that it means moving its colours to the theme\'s tokens, and that you will show it in both modes before they decide.\n'
-  + '- **What you take from the Design Book.** Look before you make (`aimeat_designbook_search`, part `libraries`): layouts, fills, looks, motion, ambients and effects that each passed their own bench, adopted in one call. Name the parts you will use. What you have to make because the book lacks it goes INTO the book after the publish (`aimeat_designbook_propose`), so the next app starts from it.\n'
+  + '- **What you take from the Design Book.** Look before you make (`aimeat_designbook_search`, part `libraries`): layouts, fills, looks, motion, ambients and effects that each passed their own bench, adopted in one call. The working screen of the app is a mosaic inside the genre, and its arrangement is where a fill from the book lands (the mosaic section of part `patterns`). THIS LINE IS OWED IN EVERY PROPOSAL, word for word in its shape: "From the Design Book I take: <part ids, and what each is for here>", or "From the Design Book I take nothing, because <what you looked at and why none of it fits>". Taking nothing is allowed; taking nothing in silence is not. What you have to make because the book lacks it goes INTO the book after the publish (`aimeat_designbook_propose`), so the next app starts from it.\n'
   + '- **The languages: English and Finnish, unless they say otherwise.** Two languages is the default on this node. The language you are talking in is not the app\'s language list. Building for one language is the owner\'s decision, so ask it as a question if you think one is right, and do not decide it.\n'
   + '- **Who signs in**, and what is kept for them. An app nobody signs in to says so here.\n'
   + '- **The first screen in one or two sentences**: what the person sees and does first. If that sentence is "a header and some cards", you have not designed it yet.\n\n'
