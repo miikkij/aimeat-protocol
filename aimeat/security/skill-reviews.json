@@ -10,7 +10,7 @@
         "aimeat/src/services/decide/settings.ts",
         "aimeat/src/services/app-decide-posture.ts"
       ],
-      "digest": "sha256:8db1e59482bf8263a29bcd23"
+      "digest": "sha256:7ecff2139085644c3faa7057"
     },
     "node:aimeat-open-items": {
       "reviewedOn": "2026-09-19",
@@ -62,7 +62,7 @@
       "watches": [
         "aimeat/src/services/ai-completion.ts"
       ],
-      "digest": "sha256:18435a260d7d8055351e42ce"
+      "digest": "sha256:17a53e44f811bc29aeb79ceb"
     },
     "node:aimeat-mail-to-data": {
       "reviewedOn": "2026-09-19",
@@ -363,7 +363,7 @@
       "aimeat/public/views/chat/parts.js": "12c8246c22bf138a"
     },
     "node:aimeat-paying-for-the-ai": {
-      "aimeat/src/services/ai-completion.ts": "db3dda1a1df28e08"
+      "aimeat/src/services/ai-completion.ts": "87c7a1c25468def3"
     },
     "node:aimeat-mail-to-data": {
       "aimeat/src/mcp/catalog/definitions/connections.ts": "84591ad8fce0795b",
@@ -521,7 +521,7 @@
     },
     "node:aimeat-decide": {
       "aimeat/src/static/sdk-libs/decide/index.js": "96ef87b8d94ac27b",
-      "aimeat/src/services/decide/service.ts": "2c80d4f613f15dfa",
+      "aimeat/src/services/decide/service.ts": "78e40f3e17f278f9",
       "aimeat/src/services/decide/limits.ts": "af13e600bdfea3ab",
       "aimeat/src/services/decide/settings.ts": "a1b49d50eda07c3f",
       "aimeat/src/services/app-decide-posture.ts": "65d4966f4b6ff7a8"

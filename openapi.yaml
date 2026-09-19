@@ -22034,7 +22034,10 @@ paths:
         `accepts` block and a ready-made checkout line item — payment IS the invocation
         (complete the checkout; a callable tool's result rides on session.fulfillment.results).
         An unpriced tool with an action_id binding invokes directly for authenticated principals
-        (body: { input }); an unpriced unbound tool answers 422.
+        (body: { input }); an unpriced unbound tool answers 422. Before anything is metered or
+        paid, the input is checked against the tool's published inputSchema: a mismatch answers
+        400 INVALID_INPUT naming every missing field at once (`details.missing`,
+        `details.violations`). A schema that does not compile is not enforced.
       tags: [Commerce]
       security:
         - BearerAuth: []
@@ -22053,6 +22056,8 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+        '400':
+          description: INVALID_INPUT — the input does not match the tool's inputSchema; every missing field is named
         '402':
           description: Priced tool — pay via the checkout (x402-style accepts + checkout item)
         '404':

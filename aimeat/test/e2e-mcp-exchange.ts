@@ -27,6 +27,8 @@
  *   - Phase 5: the provider side (consumers) and the refusals
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-exchange
  * @version-history
+ *   v1.1.0 — 2026-09-19 — Phase 6: an app tool's input is checked against its published schema on
+ *     both doors, and one refusal names every missing field.
  *   v1.0.0 — 2026-09-08 — Initial: all ten tools of src/mcp/exchange.ts, both branches of
  *     offering_get and of accept, and the scope fence that decides which of them exist at all.
  */
@@ -571,6 +573,57 @@ await test('26. …and refuses the lineage of an offering that is not the caller
     const stranger = await callTool(consumerSession, 'aimeat_exchange_consumers', { offering_id: extOfferingId });
     assert(stranger.isError && stranger.text.includes('NOT_FOUND'),
         `who buys from a provider is the provider's to read: ${stranger.text.slice(0, 200)}`);
+});
+
+console.log('\nPhase 6 — an app tool\'s input is checked against its published schema');
+
+// The shape of Lifecycle Central's decision_record, which on 2026-09-19 took five calls to learn five
+// required fields because the node passed input through and the extension named one field per refusal.
+const STRICT_APP = 'mcpstrictapp';
+const STRICT_SCHEMA = {
+    type: 'object', required: ['title', 'ruling', 'why'], additionalProperties: false,
+    properties: { title: { type: 'string', minLength: 3 }, ruling: { type: 'string' }, why: { type: 'string' } },
+};
+
+await test('27. The provider publishes an unpriced tool whose schema requires three fields', async () => {
+    const w = await json('/v1/memory', {
+        method: 'POST', headers: authed(provider.token),
+        body: JSON.stringify({
+            key: `apps.${STRICT_APP}.tools`, visibility: 'public',
+            value: { version: 1, tools: [{ name: 'record', action_id: `ext:${EXT}:unpriced`, inputSchema: STRICT_SCHEMA }] },
+        }),
+    });
+    assert(w.status === 201, `manifest write ${w.status}: ${JSON.stringify(w.body?.error)}`);
+});
+
+await test('28. aimeat_app_tool_invoke with an empty input names EVERY missing field in one refusal', async () => {
+    const out = await callTool(providerSession, 'aimeat_app_tool_invoke', { owner: provider.owner, app: STRICT_APP, tool: 'record', input: {} });
+    assert(out.isError && out.text.startsWith('INVALID_INPUT'), `expected INVALID_INPUT: ${out.text.slice(0, 300)}`);
+    for (const f of ['title', 'ruling', 'why']) assert(out.text.includes(f), `the refusal must name "${f}": ${out.text.slice(0, 400)}`);
+});
+
+// This suite registers no capability (that is an operator's aggregate, which e2e-money-audit does),
+// so a matching input passes the check and stops at the capability lookup. Passing the check is
+// what is asserted here; running the tool end to end is e2e-money-audit's.
+await test('29. …an undeclared field is named too, and a complete input passes the check', async () => {
+    const extra = await callTool(providerSession, 'aimeat_app_tool_invoke', {
+        owner: provider.owner, app: STRICT_APP, tool: 'record', input: { title: 'abc', ruling: 'r', why: 'w', decidedBy: 'x' },
+    });
+    assert(extra.isError && extra.text.includes('"decidedBy"'), `the unknown field must be named: ${extra.text.slice(0, 300)}`);
+    const ok = await callTool(providerSession, 'aimeat_app_tool_invoke', {
+        owner: provider.owner, app: STRICT_APP, tool: 'record', input: { title: 'abc', ruling: 'r', why: 'w' },
+    });
+    assert(!ok.text.startsWith('INVALID_INPUT'), `a matching input must pass the check: ${ok.text.slice(0, 300)}`);
+    assert(ok.text.includes('CAPABILITY_NOT_FOUND'), `…and reach the capability lookup behind it: ${ok.text.slice(0, 300)}`);
+});
+
+await test('30. The REST twin answers 400 with the same missing fields in details.missing', async () => {
+    const r = await json(`/v1/apps/${provider.owner}/${STRICT_APP}/webmcp/tools/record`, {
+        method: 'POST', headers: authed(consumer.token), body: JSON.stringify({ input: { title: 'abc' } }),
+    });
+    assert(r.status === 400 && r.body?.error?.code === 'INVALID_INPUT', `expected 400 INVALID_INPUT, got ${r.status} ${JSON.stringify(r.body?.error)}`);
+    assert(JSON.stringify(r.body.error.details?.missing) === JSON.stringify(['ruling', 'why']),
+        `details.missing must list both: ${JSON.stringify(r.body.error.details)}`);
 });
 
 console.log(`\n${passed} passed, ${failed} failed out of ${passed + failed}`);

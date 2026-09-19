@@ -24,6 +24,7 @@ export function createCapture(config, hooks) {
   let context, stream, source, processor, silent;
   let closed = false, held = false, active = false, voiced = 0, quiet = 0, duration = 0;
   let chunks = [], preRoll = [], preRollMs = 0;
+  let recovering = false, recoveryQuiet = 0;
   const reset = () => { active = false; chunks = []; voiced = 0; quiet = 0; duration = 0; };
   const finish = () => {
     const saved = chunks; const valid = duration >= config.turn.minSpeechMs;
@@ -56,7 +57,20 @@ export function createCapture(config, hooks) {
           if (held) { chunks.push(samples); duration += ms; if (duration >= config.turn.maxSpeechMs) finish(); }
           return;
         }
-        if (hooks.busy() && !config.turn.bargeIn) { reset(); preRoll = []; preRollMs = 0; return; }
+        if (!config.turn.bargeIn) {
+          if (hooks.busy()) {
+            reset(); preRoll = []; preRollMs = 0;
+            recovering = true; recoveryQuiet = 0;
+            return;
+          }
+          // Discard speaker echo, including its tail after playback. No old samples enter the next turn.
+          if (recovering) {
+            recoveryQuiet = rms < config.turn.threshold ? recoveryQuiet + ms : 0;
+            if (recoveryQuiet < config.turn.resumeQuietMs) return;
+            recovering = false;
+            return;
+          }
+        }
         if (!active) {
           preRoll.push(samples); preRollMs += ms;
           while (preRollMs > Math.max(config.turn.preRollMs, config.turn.minSpeechMs, config.turn.interruptMs) + ms) {

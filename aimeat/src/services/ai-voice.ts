@@ -5,7 +5,10 @@
  * @description Metered text and speech streams sharing the existing AI preflight and settlement.
  * @structure streamReply, streamSpeech; bounded SSE parsing; speech price cache
  * @usage await streamReply(storage, config, principal, options, signal, emit)
- * @version-history v1.0.0 - 2026-09-19 - Configurable voice transport with cancellation and final accounting.
+ * @version-history
+ *   v1.0.1 - 2026-09-19 - The speech pre-check reads the app's spend and cap under any of its names
+ *     (services/ai-app-id.ts).
+ *   v1.0.0 - 2026-09-19 - Configurable voice transport with cancellation and final accounting.
  */
 import { createHash } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
@@ -15,6 +18,7 @@ import { chatCompletionRaw, speechRaw, generationCost, listModels } from './open
 import { servedProvenanceOf } from './ai-provenance-marks.js';
 import { logger } from '../utils/logger.js';
 import { emitChange } from './event-bus.js';
+import { appSpentToday, appQuotaFor } from './ai-app-id.js';
 
 export type VoiceEmit = (event: Record<string, unknown>) => Promise<void>;
 export interface ReplyOptions {
@@ -121,8 +125,8 @@ export async function streamSpeech(storage: Storage, config: AimeatConfig, gaii:
   const unitPrice = await speechPrice(plan);
   const estimate = (unitPrice ?? 0) * Array.from(options.input).length;
   const usage = await getTodayUsage(storage, gaii);
-  const appSpent = usage.per_app[options.app_id]?.cost_usd ?? 0;
-  const appLimit = (plan.prefs.app_quotas as Record<string, { daily_usd?: number }> | undefined)?.[options.app_id]?.daily_usd ?? plan.dailyBudgetUsd;
+  const appSpent = appSpentToday(usage.per_app, options.app_id, gaii);
+  const appLimit = appQuotaFor(plan.prefs.app_quotas as Record<string, { daily_usd?: number }> | undefined, options.app_id, gaii, plan.dailyBudgetUsd);
   if (usage.total_cost_usd + estimate > plan.dailyBudgetUsd || appSpent + estimate > appLimit) {
     throw new AiCompletionError('QUOTA_EXHAUSTED', 402, 'This speech segment would exceed your AI budget.');
   }

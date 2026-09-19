@@ -29,6 +29,7 @@
  * @usage
  *   const run = await startDecideRun(storage, config, caller, { questions, keys, fields });
  * @version-history
+ *   v1.0.1 — 2026-09-19 — A run records its app under the one name (services/ai-app-id.ts).
  *   v1.0.0 — 2026-09-19 — Initial (TARGET-080).
  */
 import { randomUUID } from 'node:crypto';
@@ -37,6 +38,7 @@ import type { Storage } from '../../storage/interface.js';
 import { logger } from '../../utils/logger.js';
 import { upsertPrivateRecord } from '../private-record.js';
 import { emitChange } from '../event-bus.js';
+import { canonicalAiAppId } from '../ai-app-id.js';
 import type { JevQuestion } from './limits.js';
 import { decideForOwner, type DecideCaller } from './service.js';
 import { DecideError } from './errors.js';
@@ -246,7 +248,7 @@ export async function startDecideRun(
     fields: input.fields ?? null, gates: input.gates ?? null, thresholds: input.thresholds ?? null,
     names: input.names ?? [], results: {},
     counts: { total: items.length, done: 0, failed: 0, pending: items.length },
-    cost_usd: 0, principal: caller.principal, app_id: caller.appId ?? null, created_at: now, updated_at: now,
+    cost_usd: 0, principal: caller.principal, app_id: canonicalAiAppId(caller.appId, caller.gaii) ?? null, created_at: now, updated_at: now,
   };
   await save(storage, caller.gaii, run);
   await pruneRuns(storage, caller.gaii).catch(err =>
