@@ -28,6 +28,8 @@
  * @version-history
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v2.3.0 -- 2026-09-13 -- Compose the configuration index rule from poster.css.
+ *   v2.3.0 -- 2026-09-19 -- The `decide` group sits under AI, and SECTION_ACTIONS lets a section carry an
+ *     action beside its fields: the decision model's key test is the first.
  *   v2.2.0 -- 2026-09-13 -- Compose domain and group headings with the shared B1 shape.
  *   v2.1.0 -- 2026-08-31 -- The save controls move into the pinned search row and the old→new
  *     list opens from a word there; the fixed bottom overlay that covered the content is gone.
@@ -48,6 +50,7 @@ import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { Badge, Empty, ExpandableHelp, ErrorBox } from './shared.js';
 import { saveConfig, deleteConfig } from '/js/services/admin.js';
+import { DecideKeyTest } from './decide-key-test.js';
 
 // Map config source to Badge type for visual distinction
 const SOURCE_BADGE = {
@@ -68,7 +71,7 @@ const SOURCE_BADGE = {
  * never make a field unreachable.
  */
 const DOMAINS = [
-  { id: 'ai', groups: ['ai', 'agent', 'tasks', 'mcp', 'cortex', 'calibrator'] },
+  { id: 'ai', groups: ['ai', 'decide', 'agent', 'tasks', 'mcp', 'cortex', 'calibrator'] },
   { id: 'money', groups: ['morsel_policy', 'commerce', 'marketplace', 'work', 'economy', 'portfolio'] },
   { id: 'identity', groups: ['auth', 'totp', 'eudiw', 'consent', 'security', 'moderation'] },
   { id: 'node', groups: ['node', 'storage', 'database_url', 'sqlite_path', 'admin_password', 'setup', 'consul', 'stats', 'metrics'] },
@@ -76,6 +79,14 @@ const DOMAINS = [
   { id: 'federation', groups: ['federation', 'sync', 'personal_nodes', 'genesis', 'tunnel', 'msm'] },
   { id: 'integrations', groups: ['email', 'push', 'indexing', 'cors', 'site', 'portal', 'cookie_consent', 'connections'] },
 ];
+
+/**
+ * A section that needs an action of its own beside its fields, rendered under them. The decision
+ * model's key is the first: a key an operator cannot test is a key they find out about from users.
+ */
+const SECTION_ACTIONS = {
+  decide: DecideKeyTest,
+};
 
 function domainOf(group) {
   for (const d of DOMAINS) if (d.groups.includes(group)) return d.id;
@@ -363,6 +374,7 @@ export default function ConfigTab({ data, reload }) {
                         pending=${pending} onChange=${onChange} onReset=${resetConfig} />
                     `)}
                   </div>
+                  ${SECTION_ACTIONS[g] && html`<${SECTION_ACTIONS[g]} />`}
                 </section>
               `})}
             </div>
