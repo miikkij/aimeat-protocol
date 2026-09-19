@@ -44,6 +44,7 @@ export const ATELIER_PARTS: Array<{ id: AtelierPartId; what: string }> = [
 export const ATELIER_HEADING_PART: Record<string, AtelierPartId> = {
   '': 'start',
   'First, a short interview': 'start',
+  'Then propose, and wait for the answer': 'start',
   'The Atelier track': 'start',
   'The components (`AIMEAT.atelier`)': 'start',
   'A COMPONENT THAT IS NEARLY RIGHT IS CUSTOMISED, NEVER COPIED': 'start',
@@ -54,6 +55,7 @@ export const ATELIER_HEADING_PART: Record<string, AtelierPartId> = {
   'Never': 'start',
 
   'Start from a GENRE — a complete committed register, and the register is required': 'genre',
+  'A fork people sign in to, in two languages': 'genre',
   'The pattern shelf': 'genre',
   'The Design Book first': 'genre',
   'The signature: this app\'s own hand': 'genre',

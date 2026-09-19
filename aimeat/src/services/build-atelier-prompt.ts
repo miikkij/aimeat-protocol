@@ -28,6 +28,11 @@
  *   import { buildAtelierPrompt, buildAtelierSpecToken } from './build-atelier-prompt.js';
  *   const { full, body } = buildAtelierPrompt(config, { lang: 'en', mode: 'new' });
  * @version-history
+ *   v1.27.0 — 2026-09-19 — Two sections about the PERSON (build-atelier-people.ts): after the
+ *     interview the owner is shown two or three genres, the languages and the first screen, and
+ *     answers before any code; and after the genre section, how a fork signs people in and speaks
+ *     two languages, which the specification never said although a genre carries neither. `en fi`
+ *     is the default, and one language is the owner's decision.
  *   v1.26.0 — 2026-09-05 — A LIVING DOCUMENT joins the recipe, between the four doors and the
  *     patterns (the living document, stage 3a): a sheet whose numbers stand on each other is ONE
  *     record on aimeat-living, mounted with one line, and the sixth pattern is such a sheet in
@@ -129,6 +134,7 @@ import { PATTERNS } from '../data/atelier-patterns.js';
 import { AMBIENTS } from '../data/atelier-ambients.js';
 import { EFFECTS, EFFECT_HOSTS, POST_IDS } from '../data/atelier-effects.js';
 import { renderCustomisation, renderLiving, renderPatterns } from './build-atelier-recipe.js';
+import { ATELIER_FORK_PEOPLE_SECTION, ATELIER_PROPOSAL_SECTION } from './build-atelier-people.js';
 
 /** Slot the publish gate's token is substituted into (mirrors build-app-prompt.ts). */
 const SPEC_TOKEN_SLOT = '{{aimeat_spec_token}}';
@@ -467,6 +473,10 @@ function composeBody(config: AimeatConfig): string {
     + 'page is about beyond "it shows the blocks", you are building a demo, and a demo never '
     + 'looks designed.\n\n';
 
+  // What a genre does NOT carry: sign-in, the language switch, a second language
+  // (build-atelier-people.ts says why this had to be written down).
+  body += ATELIER_FORK_PEOPLE_SECTION;
+
   // THE PATTERN SHELF — rendered from the registry (atelier-patterns.ts), same data the
   // catalogue serves, so the choosing guidance can never drift from what patterns.css ships.
   body += '## The pattern shelf\n\n';
@@ -718,8 +728,10 @@ function composeFull(config: AimeatConfig, body: string, opts: AtelierPromptOpti
     + '2. Who uses it — just you, or others too (shared data)?\n'
     + '3. How should it look and FEEL? (Map the answer to a look from the table below.)\n'
     + '4. Which languages should it speak?\n'
-    + '5. Anything it must NOT do?\n\n'
-    + 'Then build on the Atelier track:\n\n';
+    + '5. Anything it must NOT do?\n\n';
+  // The interview ended with "Then build on the Atelier track:"; that line now closes the
+  // proposal, because between the answers and the code the owner is shown what will be built.
+  full += ATELIER_PROPOSAL_SECTION;
   full += body;
   return full;
 }

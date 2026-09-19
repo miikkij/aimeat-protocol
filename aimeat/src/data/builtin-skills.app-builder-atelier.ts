@@ -13,7 +13,13 @@
  * @structure APP_BUILDER_ATELIER_SKILL_ENTRY
  * @usage import { APP_BUILDER_ATELIER_SKILL_ENTRY } from './builtin-skills.app-builder-atelier.js';
  * @version-history
- *   v1.6.0 — 2026-09-19 — This is the track a NEW app is built on, and the description says so; it
+ *   v1.11.0 — 2026-09-19 — PROPOSE BEFORE YOU BUILD is a step, two languages is the default, and
+ *     the genre is the look. Steps 1 and 3 said the owner's answer "picks the look preset" and
+ *     "vivid unless the owner asked for something else", in the same list that says a build starts
+ *     from a genre; a builder followed the first two and handed over the default look with
+ *     components stacked in it, under a genre's name. And the fork's sign-in and languages, which
+ *     no text described.
+ *   v1.10.0 — 2026-09-19 — This is the track a NEW app is built on, and the description says so; it
  *     said "use when the owner chose the Atelier track", which no owner knows to do. And the MCP
  *     road: the specification in four parts through aimeat_handbook_get, the genres through the
  *     template tools. Every address this skill gave was an HTTP GET, and a chat has no HTTP.
@@ -124,6 +130,13 @@ moved under you says so.
 
 1. **Interview** — what the app does, who uses it, how it should FEEL (this picks the look
    preset), which languages, what it must not do.
+   **PROPOSE, THEN WAIT.** Before any code, show the owner what you are about to build and let
+   them choose: two or three GENRES by name, each with a sentence on why it fits this app and
+   what the first screen looks like in it (look at their own Atelier apps first, \`aimeat_app_list\`);
+   the languages, which are English and Finnish unless they say otherwise; who signs in; the
+   first screen in a sentence. Say which genre you would take. The language you are talking in
+   is not the app's language list, and one language is the owner's decision. If they said "just
+   build it", still name the genre and the languages in one line so they can stop you.
 2. **Research first** — \`aimeat_appdev_overview\`, existing apps and skills, the pitfalls.
 3. **Build** — start from a GENRE, never from the bare shell: pick the register the page belongs
    in from \`GET /v1/designbook?kind=genre\`, fork it from \`GET /v1/app-templates/genre-<id>\`,
@@ -132,7 +145,12 @@ moved under you says so.
    from the catalogue in the spec (hero, list, listDetail, cardGrid, mediaCard, form, table,
    statRow, figure, searchBar, timeline, tabs, and the designed \`emptyState\` and \`skeleton\`
    rather than a bare string or a grey box) where the page needs them; the \`section\`
-   component is the ONLY place your own raw markup goes. One look via \`app({ look })\` —
+   component is the ONLY place your own raw markup goes. **In a genre fork the genre IS the
+   look.** Do not put a look preset and a stack of components in its place: that is the default
+   page every app looks like, a genre's name in the head does not change what it is, and it is
+   what gets sent back. Keep the genre's composition, its type and its physics, and let the
+   components serve it where the page needs a live part. A look preset is for a screen that has
+   no genre of its own, such as a settings page: one look via \`app({ look })\` —
    vivid unless the owner asked for something else; flat only on request. The look brings its
    own ambient, the one layer allowed to move at idle: leave it unless the owner asked for
    weather, then name a preset with \`app({ ambient })\` (the spec lists the nine). An EFFECT
@@ -140,6 +158,11 @@ moved under you says so.
    \`AIMEAT.atelier.fx(el, { id })\` in your code: still on the words, a moment on a cue with
    \`fxPlay\`, and living motion only as \`ambient.post\` behind the words (the spec lists the
    nine, where each lands, and the knobs).
+   **The fork signs people in and speaks two languages, and a genre does neither.** Mount the
+   node's own bar (\`AIMEAT.auth.mountLoginButton('#pill', …)\`); never write a header control or a
+   language switch of your own. Declare \`aimeat-locales\` "en fi" and every scope you use, put
+   every string in \`AIMEAT.atelier.i18n.use({ en: {…}, fi: {…} })\`, paint from \`i18n.t()\`
+   and repaint on \`i18n.onChange\`. The specification's part \`genre\` has the whole pattern.
 4. **Ask the kit before you fork.** Before you fork a component, ask the kit what it already gives
    you. \`AIMEAT.atelier.describe("<component>")\` returns
    \`{ parts, slots, variants, tokens, fork }\` for the components that carry the model, and
