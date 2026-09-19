@@ -14,7 +14,11 @@
 import type {
   AiDecisionRow, AiDecisionRecord, AiDecisionListQuery, AiDecisionReview,
 } from '../../../interface.js';
-import type { SqliteStorage } from '../index.js';
+import type Database from 'better-sqlite3';
+
+/** The one member these methods read off the provider. Named structurally rather than imported
+ *  from ../index.js, so this file does not close an import cycle with the class it is merged into. */
+type SqliteStorage = { db: Database.Database };
 
 function deserialize(row: Record<string, unknown>): AiDecisionRow {
   return {

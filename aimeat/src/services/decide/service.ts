@@ -46,6 +46,7 @@ import { assertAppAllowed, assertWithinBudget, getTodayUsage, recordAiUsage, AiC
 import { readAllowance, remainingOf, debitAllowance } from '../ai-allowance.js';
 import { readProgramMap } from '../data-map/data-map-access.js';
 import { logger } from '../../utils/logger.js';
+import { emitChange } from '../event-bus.js';
 import { createScrubber } from './scrub.js';
 import { checkDecideRequest, DEFAULT_DECIDE_LIMITS, type JevQuestion } from './limits.js';
 import { callJev, JevError, type JevAnswer } from './jev-client.js';
@@ -363,6 +364,8 @@ export async function decideForOwner(
 async function writeRecord(storage: Storage, row: AiDecisionRow): Promise<void> {
   try {
     await storage.createAiDecision(row);
+    // The owner's open page lists recent decisions; it hears about this one without polling.
+    emitChange('ai-decisions', row.ownerGhii);
   } catch (err) {
     logger.error('[decide] decision record failed to write: a decision was made and is not on the register', {
       id: row.id, gaii: row.ownerGhii, requestId: row.record.requestId, error: String(err),
@@ -401,7 +404,9 @@ export async function reviewDecision(
     ...(input.override !== undefined ? { override: input.override } : {}),
   };
   const ok = await storage.setAiDecisionReview(id, gaii, review);
-  return ok ? getDecision(storage, gaii, id) : null;
+  if (!ok) return null;
+  emitChange('ai-decisions', gaii);
+  return getDecision(storage, gaii, id);
 }
 
 export { DecideError, AiCompletionError };

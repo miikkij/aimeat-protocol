@@ -35,6 +35,8 @@ import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { logger } from '../../utils/logger.js';
+import { upsertPrivateRecord } from '../private-record.js';
+import { emitChange } from '../event-bus.js';
 import type { JevQuestion } from './limits.js';
 import { decideForOwner, type DecideCaller } from './service.js';
 import { DecideError } from './errors.js';
@@ -90,20 +92,17 @@ export interface StartRunInput {
 /** Runs this process is working on right now, by id, with the flag that stops them. */
 const active = new Map<string, { stop: boolean }>();
 
-const runKey = (id: string) => `${RUN_PREFIX}${id}`;
+// Named for this module: the workflow store exports a `runKey` too, and a scanner that resolves
+// builders by name read this one as the workflows prefix.
+const decideRunKey = (id: string) => `${RUN_PREFIX}${id}`;
 
 async function save(storage: Storage, owner: string, run: DecideRun): Promise<void> {
   run.updated_at = new Date().toISOString();
   const done = Object.values(run.results).filter(r => r.decision_id).length;
   const failed = Object.values(run.results).filter(r => r.error).length;
   run.counts = { total: run.items.length, done, failed, pending: run.items.length - done - failed };
-  const existing = await storage.getMemory(owner, runKey(run.id));
-  await storage.setMemory({
-    key: runKey(run.id), ownerGaii: owner, value: run as unknown as Record<string, unknown>,
-    visibility: 'private', tags: ['decide', 'run'], ttlHours: null,
-    version: existing ? existing.version + 1 : 1,
-    createdAt: existing?.createdAt ?? run.created_at, updatedAt: run.updated_at,
-  });
+  await upsertPrivateRecord(storage, owner, decideRunKey(run.id), run, ['decide', 'run']);
+  emitChange('ai-decisions', owner);
 }
 
 function project(value: unknown, fields: string[] | null): unknown {
@@ -258,7 +257,7 @@ export async function startDecideRun(
 
 /** One run as stored. A `running` run this process is not working on reads as `interrupted`. */
 export async function getDecideRun(storage: Storage, owner: string, id: string): Promise<DecideRun | null> {
-  const rec = await storage.getMemory(owner, runKey(id));
+  const rec = await storage.getMemory(owner, decideRunKey(id));
   const run = rec?.value as DecideRun | undefined;
   if (!run || typeof run !== 'object') return null;
   if (run.state === 'running' && !active.has(id)) run.state = 'interrupted';

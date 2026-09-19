@@ -21,6 +21,7 @@
  *   import { aiRouter } from './routes/ai.js';
  *   app.use(aiRouter(config, storage));
  * @version-history
+ *   v1.x — 2026-09-19 — upsertMemory is services/private-record.ts, shared with services/decide/.
  *   v1.x — 2026-09-13 — POST /v1/ai/complete answers finish_reason and truncated beside content.
  *   v1.x — 2026-08-28 — /v1/ai/image answers with the service's fetchUrl: the anonymous /v1/pub/
  *     form for a public image, the owner-authenticated /v1/storage/ form for a private one. The
@@ -72,6 +73,7 @@ import { transcribeForOwner } from '../services/ai-transcription.js';
 import { registerVoiceRoutes, voiceAppId } from './ai-voice.js';
 import { generateForOwner } from '../services/ai-image.js';
 import { servedProvenanceOf, envelopeMeta, setProvenanceHeaders } from '../services/ai-provenance-marks.js';
+import { upsertPrivateRecord } from '../services/private-record.js';
 
 /** ~6 MB of audio once decoded. Inline base64 is the fallback path, so it is bounded well below the
  *  JSON body limit; anything real goes through storage. */
@@ -84,17 +86,8 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
   // Reuse the openrouter rate limit bucket — same provider, same spend concerns.
   const aiRateLimit = rateLimit(config.rateLimits.openrouter);
 
-  async function upsertMemory(gaii: string, key: string, value: unknown, tags: string[]): Promise<void> {
-    const now = new Date().toISOString();
-    const existing = await storage.getMemory(gaii, key);
-    await storage.setMemory({
-      key, ownerGaii: gaii, value, visibility: 'private', tags,
-      ttlHours: null,
-      version: existing ? existing.version + 1 : 1,
-      createdAt: existing?.createdAt ?? now,
-      updatedAt: now,
-    });
-  }
+  const upsertMemory = (gaii: string, key: string, value: unknown, tags: string[]): Promise<void> =>
+    upsertPrivateRecord(storage, gaii, key, value, tags);
 
   /**
    * Either the caller is an owner JWT (role=owner) OR any scoped principal
