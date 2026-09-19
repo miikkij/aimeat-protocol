@@ -13,6 +13,9 @@
  * @structure APP_BUILDER_ATELIER_SKILL_ENTRY
  * @usage import { APP_BUILDER_ATELIER_SKILL_ENTRY } from './builtin-skills.app-builder-atelier.js';
  * @version-history
+ *   v1.14.0 — 2026-09-19 — The proposal opens with THE LEVEL (quick prototype, ordinary page, the
+ *     finest): the owner's choice, stated in the page's head, and the node warns only when the
+ *     result is below it. Ruled the same day: the default look is refused unless the owner chose it.
  *   v1.13.0 — 2026-09-19 — Step 2 says the search given nothing answers the whole Book on one page,
  *     and that part `libraries` ends with it. Three measured builds searched the Book in none.
  *   v1.12.0 — 2026-09-19 — The Design Book is a step at both ends: look in it before code and say in
@@ -137,7 +140,15 @@ moved under you says so.
 1. **Interview** — what the app does, who uses it, how it should FEEL (this picks the look
    preset), which languages, what it must not do.
    **PROPOSE, THEN WAIT.** Before any code, show the owner what you are about to build and let
-   them choose: two or three GENRES by name, each with a sentence on why it fits this app and
+   them choose. FIRST THE LEVEL, which is theirs to choose and never yours: **a quick prototype**
+   (a working draft to try one idea, the kit as it comes, no styling), **an ordinary page** (a
+   ready layout and look from the Design Book, tidy and not distinctive), or **the finest** (a
+   forked genre, the Book's proven parts, components of its own). All three are Atelier, in two
+   languages, with the data on their node, so a prototype is raised later without starting over.
+   The page states it: \`<meta name="aimeat-level" content="proto|plain|fine">\`; a page that
+   states none is held to the finest. On proto and plain no genre is forked and nothing is styled
+   by hand; never pick a lower level silently because it is less work. On the finest, the rest of
+   this step applies: two or three GENRES by name, each with a sentence on why it fits this app and
    what the first screen looks like in it (look at their own Atelier apps first, \`aimeat_app_list\`);
    the languages, which are English and Finnish unless they say otherwise; who signs in; the
    first screen in a sentence. Say which genre you would take. The language you are talking in
@@ -210,7 +221,11 @@ moved under you says so.
    (\`aimeat_image_generate\` → storage URL; the spec carries the style-word tables). Check the
    \`atelier.img.*\` cache first; never inline a data: URI. Zero images still looks finished.
 7. **Verify** — 390×844, 1280×900 and 1280×460, both themes, no horizontal scroll, every state
-   reachable, no console errors.
+   reachable, no console errors. A MISSING BROWSER NEVER HOLDS A PUBLISH BACK: the published page
+   is what gets verified, by you if you have a browser and by the owner if you do not. Publish,
+   hand over the address, and say in one line what you could not check yourself (a microphone, a
+   camera, a screen you cannot see). An app that sits unpublished waiting for a browser is an app
+   the owner asked for and did not get.
 8. **Accept it beside the genre it forked.** An Atelier app is finished when a screenshot at 390
    and at 1440, in both themes, holds up NEXT TO the genre page it came from (open the genre at
    \`GET /v1/app-templates/genre-<id>\`, or the Design Book's genre shelf at

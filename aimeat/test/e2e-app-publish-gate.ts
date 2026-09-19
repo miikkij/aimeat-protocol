@@ -480,6 +480,31 @@ const publish = (token: string, body: Record<string, unknown>) =>
         assert(!await appRow(o.name, registerless, o.token), 'the refused app is in the catalogue');
     });
 
+    await test('the same registerless app publishes when its owner chose a quick prototype, is told its level, and is warned once it is styled by hand', async () => {
+        const f = `gateproto${Date.now()}.html`;
+        const level = (html: string, l: string) => html.replace('<meta name="aimeat-track"', `<meta name="aimeat-level" content="${l}">\n<meta name="aimeat-track"`);
+        const proto = level(atelierApp(f), 'proto');
+        const r = await publish(o.token, { filename: f, mime_type: 'text/html', content: b64(proto), name: 'A prototype', description: 'The kit as it comes.', spec_token: atelierToken });
+        assert(r.status === 201, `a prototype owes no register: ${r.status} ${JSON.stringify(r.body?.error)}`);
+        assert(/QUICK PROTOTYPE/.test(r.body.data.next_steps?.level ?? ''), `the publish says the level back: ${JSON.stringify(r.body.data.next_steps)}`);
+        assert(!r.body.data.next_steps?.acceptance && !r.body.data.next_steps?.design_book, 'a prototype is not judged beside a genre and owes the Design Book nothing');
+        assert(hintsOf(r, 'below-level').length === 0, `a bare prototype is at its level: ${JSON.stringify(hintsOf(r, 'below-level'))}`);
+
+        const sheet = Array.from({ length: 30 }, (_, i) => `.own-piece-${i} { margin: ${i}px; }`).join('\n');
+        const marks = Array.from({ length: 30 }, (_, i) => `<i class="own-piece-${i}"></i>`).join('');
+        const styled = proto.replace('</head>', `<style>${sheet}</style></head>`).replace('<body>', '<body>' + marks);
+        const again = await publish(o.token, { filename: f, mime_type: 'text/html', content: b64(styled), name: 'A prototype', description: 'The kit as it comes.', spec_token: atelierToken });
+        assert(again.status === 201, `a warning must never refuse: ${again.status} ${JSON.stringify(again.body?.error)}`);
+        const h = hintsOf(again, 'below-level');
+        assert(h.length === 1 && h[0].message.includes('a quick prototype'), `expected the below-level hint: ${JSON.stringify(again.body.data.app_hints)}`);
+
+        // "fine" is the level every page was held to before, and it still owes its register.
+        const ff = `gatefine${Date.now()}.html`;
+        const fine = await publish(o.token, { filename: ff, mime_type: 'text/html', content: b64(level(atelierApp(ff), 'fine')), name: 'Fine', description: 'States the finest level and names no register.', spec_token: atelierToken });
+        assert(fine.status === 422 && (fine.body.error?.details?.findings ?? []).some((x: any) => x.pitfall === 'atelier-register'),
+            `the finest level still owes a register: ${fine.status} ${JSON.stringify(fine.body?.error?.details)}`);
+    });
+
     await test('the shell\'s REPLACE-ME placeholder is refused the same way — the bare shell is a frame, not a page', async () => {
         const f = `gatereplaceme${Date.now()}.html`;
         const r = await publish(o.token, {

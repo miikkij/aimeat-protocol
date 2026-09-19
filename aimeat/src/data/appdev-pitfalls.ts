@@ -150,6 +150,17 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     ...CHECKED,
   }),
   E({
+    id: 'below-level',
+    title: 'The app is not at the level its owner chose',
+    symptom: 'The owner asked for an app and found out by looking at the result what kind of app they got: a bare stack of components where they expected something worth showing, or an hour of styling where they wanted to try one idea today. The builder chose the level, usually the one that was least work. Publishing warns (`app_hints`, pitfall `below-level`) when a page that states `aimeat-level` "proto" or "plain" carries a sheet of styles of its own, and refuses (`atelier-register`) a page that states "fine", or no level, and names no register.',
+    fix: 'Ask the level BEFORE any code, in plain words, and say what each one gets them: a quick prototype (the kit\'s components as they come, no styling), an ordinary page (a ready layout and look from the Design Book, following their theme), or the finest (a forked genre, the Book\'s proven parts, components of its own, and those put into the Design Book afterwards). All three are Atelier, in two languages, with the data on the owner\'s node, so raising the level later is a change of look and never a rewrite. State it in the head: `<meta name="aimeat-level" content="proto">`, `"plain"` or `"fine"`. A page that states none is held to the finest. Never pick a lower level on the owner\'s behalf.',
+    appliesTo: ['app', 'publish'],
+    severity: 'warn',
+    source: 'curated',
+    updatedAt: '2026-09-19',
+    ...CHECKED,
+  }),
+  E({
     id: 'hand-rolled',
     title: 'A mechanism written by hand that a library of this node already is',
     symptom: 'The app runs its own speech recognition loop, its own audio graph, its own `fetch` to `/v1/memory`, `/v1/ai/` or `/v1/storage`, its own `EventSource` to the node, its own notification, its own language control, keeps a person\'s data under several `localStorage` keys, or draws a chart in code (SVG shapes or a 2d canvas) on a page that loads the Atelier kit. It works on the day it ships. It stops following the platform the day the route, the token handling or the consent rule behind it changes, and nobody is told. Publishing warns (`app_hints`, pitfall `hand-rolled`) when the page uses the browser API and loads none of the libraries that would have done it.',

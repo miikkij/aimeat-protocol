@@ -33,7 +33,12 @@ of them built the wrong thing three times in a row.
   "build-app-atelier" }`, in parts: `genre`, `libraries` and `patterns` before any code. The Classic track is
   for an app that is already Classic, or when Jouni asks for it by name. "Quicker to start" is not
   a reason, and a track is never changed in the middle of a build.
-- **Propose before you build, and wait.** Two or three genres by name with why each fits, the
+- **Ask the level first.** A quick prototype (the kit as it comes, no styling), an ordinary page
+  (a ready layout and look from the Design Book), or the finest (a forked genre, the Book's parts,
+  components of its own, and those put into the Book afterwards). All three are Atelier and
+  bilingual, so a prototype is raised later without starting over. The page states it in
+  `<meta name="aimeat-level" content="proto|plain|fine">`. Never pick a lower level silently.
+- **Propose before you build, and wait.** On the finest level: two or three genres by name with why each fits, the
   languages, who signs in, the first screen in a sentence. Jouni chooses. He must not find out what
   you chose by looking at the result.
 - **English and Finnish, always, unless he asks for one.** The language of the conversation is not
