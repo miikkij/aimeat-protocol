@@ -29,6 +29,8 @@
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { encrypt, decrypt, getEncryptionKey } from '../encryption.js';
+import { upsertPrivateRecord } from '../private-record.js';
+import { emitChange } from '../event-bus.js';
 import { PII_CLASSES, type PiiClass } from './scrub.js';
 import { DecideError } from './errors.js';
 
@@ -62,16 +64,10 @@ function normalisePolicy(v: unknown): DecidePolicy {
   };
 }
 
+/** Written server-side past the memory gate (the prefix is reserved), and announced to the open page. */
 async function upsert(storage: Storage, gaii: string, key: string, value: Record<string, unknown>, tags: string[]): Promise<void> {
-  const now = new Date().toISOString();
-  const existing = await storage.getMemory(gaii, key);
-  await storage.setMemory({
-    key, ownerGaii: gaii, value, visibility: 'private', tags,
-    ttlHours: null,
-    version: existing ? existing.version + 1 : 1,
-    createdAt: existing?.createdAt ?? now,
-    updatedAt: now,
-  });
+  await upsertPrivateRecord(storage, gaii, key, value, tags);
+  emitChange('ai-decisions', gaii);
 }
 
 /** The owner's policy, or the default (scrub everything) when there is none. */
@@ -140,6 +136,7 @@ export async function clearOwnDecideKey(storage: Storage, gaii: string): Promise
   const rec = await storage.getMemory(gaii, DECIDE_KEY_RECORD);
   if (!rec) return false;
   await storage.deleteMemory(gaii, DECIDE_KEY_RECORD);
+  emitChange('ai-decisions', gaii);
   return true;
 }
 

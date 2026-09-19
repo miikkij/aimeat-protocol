@@ -17,7 +17,7 @@
  * @version-history
  *   v1.0.0 — 2026-09-19 — TARGET-080. Initial.
  */
-import type { AiDecisionRow, AiDecisionListQuery, AiDecisionReview } from '../interface.js';
+import type { AiDecisionRow, AiDecisionListQuery, AiDecisionReview } from '../types/ai-decisions.js';
 
 export interface AiDecisionRepository {
   createAiDecision(row: AiDecisionRow): Promise<void>;

@@ -11,6 +11,7 @@
  *   - runDailyAllowanceJob / runWorkTimeoutJob / runMemoryTtlCleanupJob / runDisputeTimeoutJob / ...: the handlers
  *
  * @version-history
+ *   v1.5.0 — 2026-09-19 — ai-decision-prune: decision records past their retention window (TARGET-080).
  *   v1.4.0 — 2026-09-13 — The work-expiry webhook goes through fireWebhook() like the two route
  *     paths, instead of a third hand-rolled fetch. work.callbackUrl is caller-supplied, so it
  *     needs safeFetch and its redirect re-validation; the copy here had neither that, nor the
@@ -83,6 +84,12 @@ export function registerCoreHandlers(
   scheduler.registerCoreHandler('ai-job-log-prune', async () => {
     const { runAiJobLogPrune } = await import('./ai-jobs/prune-job.js');
     await runAiJobLogPrune(config, storage);
+  });
+
+  // Decision records past their retention window (TARGET-080). One indexed delete across owners.
+  scheduler.registerCoreHandler('ai-decision-prune', async () => {
+    const { runDecisionPrune } = await import('./decide/prune-job.js');
+    await runDecisionPrune(config, storage);
   });
 
   scheduler.registerCoreHandler('capability-aggregation', async () => {

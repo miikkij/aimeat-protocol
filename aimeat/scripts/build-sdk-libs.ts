@@ -66,6 +66,7 @@ export const SDK_LIBS: SdkLib[] = [
   { name: 'rows', entry: 'rows/index.js' },
   { name: 'wallet', entry: 'wallet/index.js' },
   { name: 'ai', entry: 'ai/index.js' },
+  { name: 'decide', entry: 'decide/index.js' },
   { name: 'capabilities', entry: 'capabilities/index.js' },
   { name: 'agents', entry: 'agents/index.js' },
   { name: 'agentface', entry: 'agentface/index.js' },
@@ -141,7 +142,7 @@ async function checkSdkLibs(): Promise<void> {
   for (const lib of SDK_LIBS) {
     const fresh = await bundleLib(lib);
     const outFile = join(OUT_DIR, `aimeat-${lib.name}.js`);
-    let onDisk = '';
+    let onDisk: string;
     try { onDisk = readFileSync(outFile, 'utf-8'); } catch { onDisk = ''; }
     if (fresh !== onDisk) {
       console.error(`✗ src/static/sdk-libs/dist/aimeat-${lib.name}.js is STALE vs src/static/sdk-libs/${lib.name}/ sources.`);

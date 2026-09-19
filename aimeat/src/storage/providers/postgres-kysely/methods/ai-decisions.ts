@@ -15,8 +15,12 @@ import { sql, type Selectable } from 'kysely';
 import type {
   AiDecisionRow, AiDecisionRecord, AiDecisionListQuery, AiDecisionReview,
 } from '../../../interface.js';
-import type { AiDecision as AiDecisionTable, Json } from '../db-types.js';
-import type { PostgresKyselyStorage } from '../index.js';
+import type { Kysely } from 'kysely';
+import type { AiDecision as AiDecisionTable, DB, Json } from '../db-types.js';
+
+/** The one member these methods read off the provider. Named structurally rather than imported
+ *  from ../index.js, so this file does not close an import cycle with the class it is merged into. */
+type PostgresKyselyStorage = { db: Kysely<DB> };
 import { jsonb } from '../helpers.js';
 
 function toRow(r: Selectable<AiDecisionTable>): AiDecisionRow {

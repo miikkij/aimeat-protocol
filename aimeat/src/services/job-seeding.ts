@@ -11,6 +11,7 @@
  *   - seedCoreScheduledJobs(config, storage): builds the job list and createScheduledJob() for missing ones
  *
  * @version-history
+ *   v1.2.0 — 2026-09-19 — Seed core:ai-decision-prune (nightly, 03:20; TARGET-080).
  *   v1.1.0 — 2026-08-14 — Seed core:usage-rollup (every 5 min) and core:usage-archive (nightly).
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
@@ -38,6 +39,8 @@ export async function seedCoreScheduledJobs(config: AimeatConfig, storage: Stora
     { id: 'core:execution-log-prune', name: 'Execution Log Prune', coreHandler: 'execution-log-prune', cron: '0 3 * * *' },
     // The AI-job day logs, pruned to the retention window. 03:10, after the execution-log prune.
     { id: 'core:ai-job-log-prune', name: 'AI Job Log Prune', coreHandler: 'ai-job-log-prune', cron: '10 3 * * *' },
+    // Decision records past AIMEAT_DECIDE_RETENTION_DAYS (TARGET-080). 03:20, after the two above.
+    { id: 'core:ai-decision-prune', name: 'AI Decision Prune', coreHandler: 'ai-decision-prune', cron: '20 3 * * *' },
     { id: 'core:designbook-aging', name: 'Design Book Aging', coreHandler: 'designbook-aging', cron: '0 5 * * *' },
     // Mark still-pending email invitations expired once their TTL passes (lazy checks also enforce this).
     { id: 'core:invitation-expiry', name: 'Invitation Expiry', coreHandler: 'invitation-expiry', cron: '*/10 * * * *' },

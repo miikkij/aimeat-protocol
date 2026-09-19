@@ -219,7 +219,7 @@
         "aimeat/src/routes/agents-v2/agent-proposals.ts",
         "aimeat/src/data/basic-agents.ts"
       ],
-      "digest": "sha256:8329ae55dcc2e19efa5efe42"
+      "digest": "sha256:bb79bf179f8090e6c2c3cd39"
     },
     "node:set-up-content-pipeline": {
       "reviewedOn": "2026-09-19",
@@ -234,7 +234,7 @@
       "watches": [
         "aimeat/src/routes/ai.ts"
       ],
-      "digest": "sha256:789b465d299ae568af7ecf1a"
+      "digest": "sha256:1590c31aac62c0cc9d766ceb"
     },
     "node:use-app-bound-skills": {
       "reviewedOn": "2026-09-19",
@@ -306,7 +306,7 @@
         ".githooks/pre-commit",
         "aimeat/src/services/build-extension-prompt.ts"
       ],
-      "digest": "sha256:14dff6e794cf0b1a8b42d758"
+      "digest": "sha256:026f7267a11d9c115f0301c6"
     },
     "project:aimeat-organism-records": {
       "reviewedOn": "2026-09-19",
@@ -445,7 +445,7 @@
     },
     "node:add-a-crew-agent": {
       "aimeat/src/routes/agents/device-auth.ts": "7d37b0bbc2105613",
-      "aimeat/src/mcp/catalog/scopes.ts": "d2e4e1c9110702d8",
+      "aimeat/src/mcp/catalog/scopes.ts": "5cda3dcd6c70cf7d",
       "aimeat/src/mcp/catalog/definitions/crew.ts": "f18f927aad1a04d6",
       "aimeat/src/routes/agents-v2/agent-proposals.ts": "1da72b752ee164bc",
       "aimeat/src/data/basic-agents.ts": "aff54b3a43cbd71d"
@@ -455,7 +455,7 @@
       "aimeat/src/services/workflow/lifecycle.ts": "a6a052a36360f00f"
     },
     "node:configure-routing": {
-      "aimeat/src/routes/ai.ts": "fa82f0c4081d26d9"
+      "aimeat/src/routes/ai.ts": "9b64be089ebfa0da"
     },
     "node:use-app-bound-skills": {
       "aimeat/src/routes/skills.ts": "b0c9b667b1187bba"
@@ -488,7 +488,7 @@
       "scripts/gen_image.py": "e2435908849b31d3"
     },
     "project:aimeat-library-authoring": {
-      "aimeat/scripts/build-sdk-libs.ts": "47ec177dc33d0100",
+      "aimeat/scripts/build-sdk-libs.ts": "043098bf1614d12a",
       ".githooks/pre-commit": "e8840eb33aa805c0",
       "aimeat/src/services/build-extension-prompt.ts": "fead7de034bc589e"
     },
