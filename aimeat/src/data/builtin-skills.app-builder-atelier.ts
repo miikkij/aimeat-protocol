@@ -13,6 +13,8 @@
  * @structure APP_BUILDER_ATELIER_SKILL_ENTRY
  * @usage import { APP_BUILDER_ATELIER_SKILL_ENTRY } from './builtin-skills.app-builder-atelier.js';
  * @version-history
+ *   v1.13.0 — 2026-09-19 — Step 2 says the search given nothing answers the whole Book on one page,
+ *     and that part `libraries` ends with it. Three measured builds searched the Book in none.
  *   v1.12.0 — 2026-09-19 — The Design Book is a step at both ends: look in it before code and say in
  *     the proposal which proven parts you take; put what you made into it after the publish. It held
  *     90 parts and none from a builder, so every custom piece was made again. And the owner is asked
@@ -149,7 +151,10 @@ moved under you says so.
    shown in both modes beside the original before the owner decides.
 2. **Research first** — \`aimeat_appdev_overview\`, existing apps and skills, the pitfalls, and
    **the Design Book** (\`aimeat_designbook_search\`): layouts, fills, looks, motion, ambients and
-   effects that each passed their own bench. Adopting one is one call (\`aimeat_designbook_adopt\`)
+   effects that each passed their own bench. Called with nothing, the search answers the WHOLE
+   Book on one page, every part on a line under its kind, and part \`libraries\` of the
+   specification ends with the same page: read it, because you cannot search for a part you do
+   not know exists. Adopting one is one call (\`aimeat_designbook_adopt\`)
    and is faster than making it. Say in the proposal which parts you take; an app built without
    looking there makes again what is already made.
 3. **Build** — start from a GENRE, never from the bare shell: pick the register the page belongs
