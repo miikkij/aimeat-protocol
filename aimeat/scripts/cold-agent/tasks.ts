@@ -36,6 +36,9 @@ export interface TaskContext {
     ownerName: string;
     ownerToken: string;
     agentToken: string;
+    /** A second person on the node, for a task where somebody else shares something. */
+    otherOwnerName: string;
+    otherOwnerToken: string;
     /** Unique to this run of this task. */
     marker: string;
     metrics: RunMetrics;
@@ -68,6 +71,10 @@ async function ownerRecords(ctx: TaskContext): Promise<string[]> {
     const r = await api<{ items: unknown[] }>(ctx.baseUrl, '/v1/memory?owner_scope=true&limit=500', ctx.ownerToken);
     return (r.data?.items ?? []).map(i => JSON.stringify(i));
 }
+
+/** find-shared: a fact no other run shares (20 to 99, so never the 14 or the 18 of the date), and the organism to put away afterwards. */
+const pierOf = (marker: string): string => String(20 + (parseInt(marker.replace(/[^0-9a-f]/g, '').slice(0, 6) || '0', 16) % 80));
+const sharedOrgs = new Map<string, string>();
 
 const says = (ctx: TaskContext, ...needles: string[]) => needles.every(n => ctx.metrics.finalText.toLowerCase().includes(n.toLowerCase()));
 
@@ -107,6 +114,42 @@ export const TASKS: Task[] = [
                 if (JSON.stringify(ws.data ?? '').includes(ctx.marker)) return { ok: true, detail: `workspace found in organism ${o.id}` };
             }
             return { ok: false, detail: 'no workspace by that name in any of the owner\'s organisms' };
+        },
+    },
+    {
+        // The fact lives in SOMEBODY ELSE's organism, which the person belongs to. Nothing of it is
+        // in their own memory, so memory search finds nothing and the answer needs the shared scope.
+        // Added 2026-09-19: none of the first ten tasks needed anything outside the owner's own store.
+        id: 'find-shared',
+        door: 'mcp',
+        prompt: 'When is the spring meeting of the {marker} rowing club, and where? Somebody in the club wrote it down, I did not.',
+        goodTools: ['aimeat_discover', 'aimeat_organism_list', 'aimeat_organism_search', 'aimeat_workspace_read'],
+        setup: async (ctx) => {
+            const must = (r: { status: number }, what: string) => { if (r.status >= 300) throw new Error(`find-shared setup: ${what} answered ${r.status}`); };
+            const org = await api<{ organism: { id: string } }>(ctx.baseUrl, '/v1/organisms', ctx.otherOwnerToken, { method: 'POST', body: { name: `${ctx.marker} rowing club`, description: 'The members of the rowing club.', type: 'project', join_policy: 'open', visibility: 'private' } });
+            must(org, 'creating the organism');
+            const orgId = org.data!.organism.id;
+            sharedOrgs.set(ctx.marker, orgId);
+            const manifest = { manifestVersion: '1.0', id: orgId, name: 'Club notes', kind: 'project', status: 'active', objectTypes: [{ name: 'notes', schemaRef: 'schema:notes@1', namespace: 'shared.notes', backing: 'memory', writeRole: 'member', cardinality: 'many', versioned: true, mode: 'document' }] };
+            const ws = await api<{ ws?: string }>(ctx.baseUrl, `/v1/organisms/${orgId}/workspaces`, ctx.otherOwnerToken, { method: 'POST', body: { name: 'Club notes', manifest } });
+            must(ws, 'creating the workspace');
+            const wsId = ws.data?.ws;
+            if (!wsId) throw new Error(`find-shared setup: the workspace answer carried no id: ${JSON.stringify(ws.data)}`);
+            const key = `organism.${orgId}.w.${wsId}.shared.notes.spring-meeting.latest`;
+            must(await api(ctx.baseUrl, '/v1/memory', ctx.otherOwnerToken, { method: 'POST', body: { key, value: { title: 'Spring meeting', markdown: `# Spring meeting\n\nThe spring meeting is on 14 May at 18:00, at pier ${pierOf(ctx.marker)} of the old harbour. Bring your membership card.` }, visibility: 'private' } }), 'writing the document');
+            must(await api(ctx.baseUrl, `/v1/organisms/${orgId}/join`, ctx.ownerToken, { method: 'POST', body: {} }), 'joining');
+            must(await api(ctx.baseUrl, `/v1/organisms/${orgId}/workspace-access`, ctx.ownerToken, { method: 'POST', body: { ws: wsId, message: 'member' } }), 'asking for workspace access');
+            must(await api(ctx.baseUrl, `/v1/organisms/${orgId}/workspace-access/decision`, ctx.otherOwnerToken, { method: 'POST', body: { ws: wsId, requester: ctx.ownerName, decision: 'approve' } }), 'approving workspace access');
+            // The task is only fair if the AGENT can reach it. Ask as the agent before it starts.
+            const seen = await api<{ entries: unknown[] }>(ctx.baseUrl, '/v1/discover?scope=shared&per_page=100', ctx.agentToken);
+            if (!JSON.stringify(seen.data?.entries ?? []).includes(key)) throw new Error(`find-shared setup: the agent cannot see the shared document (discover answered ${seen.status}), so the task would measure a permission and not the guidance`);
+        },
+        verify: async (ctx) => {
+            const ok = says(ctx, pierOf(ctx.marker)) && says(ctx, '14');
+            // Put the club away, or every later run walks one organism more and the numbers drift.
+            const orgId = sharedOrgs.get(ctx.marker);
+            if (orgId) await api(ctx.baseUrl, `/v1/organisms/${orgId}/archive`, ctx.otherOwnerToken, { method: 'POST', body: { level: 'organism' } });
+            return { ok, detail: ok ? 'the answer gives the date and the pier' : `the answer lacks the date or pier ${pierOf(ctx.marker)}` };
         },
     },
     {
