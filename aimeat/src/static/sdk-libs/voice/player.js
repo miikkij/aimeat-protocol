@@ -45,10 +45,11 @@ export function createPlayer(config, onAudio) {
     schedule(audio) {
       const source = context.createBufferSource(); source.buffer = audio; source.connect(gain);
       sources.add(source); source.onended = () => { sources.delete(source); source.disconnect(); };
-      next = Math.max(next, context.currentTime + config.playback.bufferMs / 1000);
+      // Buffer only a fresh start or a real underrun, never every frame or sentence.
+      if (next <= context.currentTime) next = context.currentTime + config.playback.bufferMs / 1000;
       source.start(next); next += audio.duration; onAudio();
     },
-    async play(stream, signal) {
+    async enqueue(stream, signal) {
       tail = new Uint8Array();
       if (config.tts.format === 'pcm') {
         for await (const bytes of stream) await api.write(bytes, signal);
@@ -65,8 +66,14 @@ export function createPlayer(config, onAudio) {
         const audio = await context.decodeAudioData(data.buffer);
         signal.throwIfAborted(); api.schedule(audio);
       }
-      await api.drain(signal);
+      const end = next;
+      const played = (async () => { while (context && context.currentTime < end) await delay(10, signal); signal.throwIfAborted(); })();
+      // The next sentence can be scheduled before this one finishes. The caller still awaits
+      // `played` before retaining it in history or reporting the completed turn.
+      void played.catch(() => {}); // The session observes the same promise.
+      return { played };
     },
+    async play(stream, signal) { const queued = await api.enqueue(stream, signal); await queued.played; },
     async drain(signal) { while (sources.size) await delay(20, signal); },
     stop() { for (const source of sources) { source.stop(); source.disconnect(); } sources.clear(); next = 0; tail = new Uint8Array(); },
     async close() { api.stop(); if (context) await context.close(); context = null; gain = null; },

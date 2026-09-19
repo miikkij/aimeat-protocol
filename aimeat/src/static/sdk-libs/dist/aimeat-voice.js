@@ -24,15 +24,15 @@
     stt: { provider: "node", model: "", language: "", temperature: 0 },
     llm: { provider: "node", model: "", temperature: 0.7, topP: 1, maxTokens: null, reasoning: null },
     tts: { provider: "node", model: "", voice: "alloy", format: "pcm", sampleRate: 24e3, channels: 1, speed: 1, instructions: "" },
-    chunking: { minChars: 24, maxChars: 180, maxWaitMs: 350 },
+    chunking: { mode: "sentence", minChars: 24, maxChars: 1200, maxWaitMs: 350 },
     playback: { bufferMs: 80, maxBufferedMs: 3e3, maxPendingSegments: 3, volume: 1 },
     history: { maxTurns: 12 },
     timeoutMs: 12e4
   };
   var presets = {
     balanced: {},
-    responsive: { turn: { silenceMs: 450 }, chunking: { minChars: 12, maxChars: 120, maxWaitMs: 180 }, playback: { bufferMs: 40 } },
-    patient: { turn: { silenceMs: 1200 }, chunking: { minChars: 50, maxChars: 240, maxWaitMs: 700 }, playback: { bufferMs: 150 } }
+    responsive: { turn: { silenceMs: 450 }, chunking: { minChars: 12, maxChars: 1200, maxWaitMs: 180 }, playback: { bufferMs: 40 } },
+    patient: { turn: { silenceMs: 1200 }, chunking: { minChars: 50, maxChars: 2e3, maxWaitMs: 700 }, playback: { bufferMs: 150 } }
   };
   function merge(target, patch, path = "") {
     if (!patch || typeof patch !== "object" || Array.isArray(patch)) throw new TypeError(path + " must be an object");
@@ -75,6 +75,7 @@
     if (result.llm.maxTokens !== null) range(result.llm.maxTokens, 1, 32768, "llm.maxTokens", true);
     if (result.llm.reasoning !== null && (typeof result.llm.reasoning !== "object" || Array.isArray(result.llm.reasoning))) throw new TypeError("llm.reasoning must be an object or null");
     range(result.chunking.minChars, 1, 2e3, "chunking.minChars", true);
+    if (!["sentence", "latency"].includes(result.chunking.mode)) throw new TypeError("chunking.mode must be sentence or latency");
     range(result.chunking.maxChars, result.chunking.minChars, 4e3, "chunking.maxChars", true);
     range(result.chunking.maxWaitMs, 1, 1e4, "chunking.maxWaitMs");
     range(result.playback.bufferMs, 0, 2e3, "playback.bufferMs");
@@ -123,7 +124,7 @@
           cut = buffer.lastIndexOf(" ", opts.maxChars);
           if (cut < opts.minChars) cut = opts.maxChars;
         }
-        if (!cut && buffer.trim() && Date.now() - since >= opts.maxWaitMs) cut = buffer.length;
+        if (!cut && opts.mode !== "sentence" && buffer.trim() && Date.now() - since >= opts.maxWaitMs) cut = buffer.length;
         if (cut) {
           const part = buffer.slice(0, cut).trim();
           buffer = buffer.slice(cut);
@@ -137,7 +138,7 @@
         });
         let result;
         try {
-          result = await abortable(buffer.trim() ? Promise.race([pending, timeout]) : pending, signal);
+          result = await abortable(opts.mode !== "sentence" && buffer.trim() ? Promise.race([pending, timeout]) : pending, signal);
         } finally {
           clearTimeout(timer);
         }
@@ -157,6 +158,64 @@
         if (!signal.aborted) console.warn("[voice] stream cleanup failed", err);
       });
     }
+  }
+
+  // src/static/sdk-libs/voice/prefetch.js
+  function prefetchAudio(source, signal) {
+    const queue = [];
+    const iterator = source[Symbol.asyncIterator]();
+    let bytes = 0, done = false, error, wake, space;
+    const notify = () => {
+      if (wake) {
+        wake();
+        wake = null;
+      }
+    };
+    const producer = (async () => {
+      try {
+        while (true) {
+          while (bytes >= 1e6) await abortable(new Promise((resolve) => {
+            space = resolve;
+          }), signal);
+          const result = await abortable(iterator.next(), signal);
+          if (result.done) break;
+          if (!(result.value instanceof Uint8Array) || result.value.byteLength > 8e6) throw new Error("Invalid or oversized speech chunk");
+          queue.push(result.value);
+          bytes += result.value.byteLength;
+          notify();
+        }
+      } catch (err) {
+        error = err;
+      } finally {
+        done = true;
+        notify();
+        if (iterator.return) void iterator.return().catch((err) => {
+          if (!signal.aborted) console.warn("[voice] speech cleanup failed", err);
+        });
+      }
+    })();
+    return {
+      async *[Symbol.asyncIterator]() {
+        while (true) {
+          signal.throwIfAborted();
+          if (error) throw error;
+          if (queue.length) {
+            const chunk = queue.shift();
+            bytes -= chunk.byteLength;
+            if (space) {
+              space();
+              space = null;
+            }
+            yield chunk;
+          } else if (done) {
+            await producer;
+            return;
+          } else await abortable(new Promise((resolve) => {
+            wake = resolve;
+          }), signal);
+        }
+      }
+    };
   }
 
   // src/static/sdk-libs/voice/session.js
@@ -354,17 +413,26 @@
         for await (const part of segments(tokens(), config.chunking, signal)) {
           while (jobs.size >= config.playback.maxPendingSegments) await abortable(Promise.race(jobs), signal);
           if (workerError) throw workerError;
-          const job = chain.then(async () => {
+          const audio2 = prefetchAudio(stage("tts", "speak")(part, ctx), signal);
+          const scheduled = chain.then(async () => {
             signal.throwIfAborted();
             setState("speaking");
             emit("segment", { text: part, turn });
-            await player.play(stage("tts", "speak")(part, ctx), signal);
+            if (player.enqueue) return player.enqueue(audio2, signal);
+            await player.play(audio2, signal);
+            return { played: Promise.resolve() };
+          });
+          chain = scheduled.then(() => {
+          });
+          void chain.catch(() => {
+          });
+          const job = scheduled.then(async ({ played }) => {
+            await played;
             signal.throwIfAborted();
             spoken += (spoken ? " " : "") + part;
             historyAnswer.content = spoken;
           });
           jobs.add(job);
-          chain = job;
           void job.then(() => jobs.delete(job), (error) => {
             jobs.delete(job);
             workerError = error;
@@ -372,6 +440,7 @@
           });
         }
         await abortable(chain, signal);
+        await abortable(Promise.all(jobs), signal);
         signal.throwIfAborted();
         if (!answer.trim()) throw new Error("The conversation model returned no text");
         emit("transcript", { role: "assistant", text: answer, final: true, turn });
@@ -398,6 +467,31 @@
     }
     return api;
   }
+
+  // src/static/sdk-libs/voice/capture-worklet.js
+  var captureWorkletSource = `
+class AimeatVoiceCapture extends AudioWorkletProcessor {
+  constructor() {
+    super();
+    this.samples = new Float32Array(1024);
+    this.offset = 0;
+  }
+  process(inputs) {
+    const input = inputs[0] && inputs[0][0];
+    if (!input) return true;
+    for (let i = 0; i < input.length; i++) {
+      this.samples[this.offset++] = input[i];
+      if (this.offset === this.samples.length) {
+        this.port.postMessage(this.samples, [this.samples.buffer]);
+        this.samples = new Float32Array(1024);
+        this.offset = 0;
+      }
+    }
+    return true;
+  }
+}
+registerProcessor('aimeat-voice-capture', AimeatVoiceCapture);
+`;
 
   // src/static/sdk-libs/voice/capture.js
   function wav(chunks, rate) {
@@ -450,6 +544,14 @@
         if (closed) throw new Error("Microphone capture is closed");
         context = new AudioContext();
         await context.resume();
+        if (!context.audioWorklet) throw new Error("AudioWorklet requires a secure, supported browser");
+        const moduleUrl = URL.createObjectURL(new Blob([captureWorkletSource], { type: "text/javascript" }));
+        try {
+          await context.audioWorklet.addModule(moduleUrl);
+        } finally {
+          URL.revokeObjectURL(moduleUrl);
+        }
+        if (closed) return;
         stream = await navigator.mediaDevices.getUserMedia({ audio: {
           echoCancellation: config.input.echoCancellation,
           noiseSuppression: config.input.noiseSuppression,
@@ -462,15 +564,15 @@
           return;
         }
         source = context.createMediaStreamSource(stream);
-        processor = context.createScriptProcessor(2048, 1, 1);
+        processor = new AudioWorkletNode(context, "aimeat-voice-capture", { channelCount: 1, channelCountMode: "explicit" });
         silent = context.createGain();
         silent.gain.value = 0;
         source.connect(processor);
         processor.connect(silent);
         silent.connect(context.destination);
-        processor.onaudioprocess = (event) => {
+        processor.port.onmessage = (event) => {
           if (closed) return;
-          const samples = new Float32Array(event.inputBuffer.getChannelData(0));
+          const samples = event.data;
           const ms = samples.length / context.sampleRate * 1e3;
           const rms = Math.sqrt(samples.reduce((sum, value) => sum + value * value, 0) / samples.length);
           hooks.level(rms);
@@ -524,7 +626,8 @@
         reset();
         preRoll = [];
         if (processor) {
-          processor.onaudioprocess = null;
+          processor.port.onmessage = null;
+          processor.port.close();
           processor.disconnect();
         }
         if (source) source.disconnect();
@@ -583,12 +686,12 @@
           sources.delete(source);
           source.disconnect();
         };
-        next = Math.max(next, context.currentTime + config.playback.bufferMs / 1e3);
+        if (next <= context.currentTime) next = context.currentTime + config.playback.bufferMs / 1e3;
         source.start(next);
         next += audio.duration;
         onAudio();
       },
-      async play(stream, signal) {
+      async enqueue(stream, signal) {
         tail = new Uint8Array();
         if (config.tts.format === "pcm") {
           for await (const bytes of stream) await api.write(bytes, signal);
@@ -612,7 +715,18 @@
           signal.throwIfAborted();
           api.schedule(audio);
         }
-        await api.drain(signal);
+        const end = next;
+        const played = (async () => {
+          while (context && context.currentTime < end) await delay(10, signal);
+          signal.throwIfAborted();
+        })();
+        void played.catch(() => {
+        });
+        return { played };
+      },
+      async play(stream, signal) {
+        const queued = await api.enqueue(stream, signal);
+        await queued.played;
       },
       async drain(signal) {
         while (sources.size) await delay(20, signal);
@@ -784,7 +898,7 @@
 
   // src/static/sdk-libs/voice/index.js
   attach("voice", {
-    version: "1.0.0",
+    version: "1.1.0",
     get defaults() {
       return structuredClone(defaults);
     },

@@ -85,12 +85,12 @@
           sources.delete(source);
           source.disconnect();
         };
-        next = Math.max(next, context.currentTime + config.playback.bufferMs / 1e3);
+        if (next <= context.currentTime) next = context.currentTime + config.playback.bufferMs / 1e3;
         source.start(next);
         next += audio.duration;
         onAudio();
       },
-      async play(stream, signal) {
+      async enqueue(stream, signal) {
         tail = new Uint8Array();
         if (config.tts.format === "pcm") {
           for await (const bytes of stream) await api.write(bytes, signal);
@@ -114,7 +114,18 @@
           signal.throwIfAborted();
           api.schedule(audio);
         }
-        await api.drain(signal);
+        const end = next;
+        const played = (async () => {
+          while (context && context.currentTime < end) await delay(10, signal);
+          signal.throwIfAborted();
+        })();
+        void played.catch(() => {
+        });
+        return { played };
+      },
+      async play(stream, signal) {
+        const queued = await api.enqueue(stream, signal);
+        await queued.played;
       },
       async drain(signal) {
         while (sources.size) await delay(20, signal);
@@ -149,15 +160,15 @@
     stt: { provider: "node", model: "", language: "", temperature: 0 },
     llm: { provider: "node", model: "", temperature: 0.7, topP: 1, maxTokens: null, reasoning: null },
     tts: { provider: "node", model: "", voice: "alloy", format: "pcm", sampleRate: 24e3, channels: 1, speed: 1, instructions: "" },
-    chunking: { minChars: 24, maxChars: 180, maxWaitMs: 350 },
+    chunking: { mode: "sentence", minChars: 24, maxChars: 1200, maxWaitMs: 350 },
     playback: { bufferMs: 80, maxBufferedMs: 3e3, maxPendingSegments: 3, volume: 1 },
     history: { maxTurns: 12 },
     timeoutMs: 12e4
   };
   var presets = {
     balanced: {},
-    responsive: { turn: { silenceMs: 450 }, chunking: { minChars: 12, maxChars: 120, maxWaitMs: 180 }, playback: { bufferMs: 40 } },
-    patient: { turn: { silenceMs: 1200 }, chunking: { minChars: 50, maxChars: 240, maxWaitMs: 700 }, playback: { bufferMs: 150 } }
+    responsive: { turn: { silenceMs: 450 }, chunking: { minChars: 12, maxChars: 1200, maxWaitMs: 180 }, playback: { bufferMs: 40 } },
+    patient: { turn: { silenceMs: 1200 }, chunking: { minChars: 50, maxChars: 2e3, maxWaitMs: 700 }, playback: { bufferMs: 150 } }
   };
   function merge(target, patch, path = "") {
     if (!patch || typeof patch !== "object" || Array.isArray(patch)) throw new TypeError(path + " must be an object");
@@ -200,6 +211,7 @@
     if (result.llm.maxTokens !== null) range(result.llm.maxTokens, 1, 32768, "llm.maxTokens", true);
     if (result.llm.reasoning !== null && (typeof result.llm.reasoning !== "object" || Array.isArray(result.llm.reasoning))) throw new TypeError("llm.reasoning must be an object or null");
     range(result.chunking.minChars, 1, 2e3, "chunking.minChars", true);
+    if (!["sentence", "latency"].includes(result.chunking.mode)) throw new TypeError("chunking.mode must be sentence or latency");
     range(result.chunking.maxChars, result.chunking.minChars, 4e3, "chunking.maxChars", true);
     range(result.chunking.maxWaitMs, 1, 1e4, "chunking.maxWaitMs");
     range(result.playback.bufferMs, 0, 2e3, "playback.bufferMs");
