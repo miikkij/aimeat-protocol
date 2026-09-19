@@ -28,6 +28,9 @@
  * @structure appUsesDecide(html) · lintAppDecideUse(html, scopes) → string[]
  * @usage const hints = lintAppDecideUse(html, parseAppScopes(html)); // [] when the app does not use it
  * @version-history
+ *   v1.1.0 — 2026-09-19 — A living document's decide node (aimeat-living 0.8.0) writes its questions
+ *     as JSON fields ("yesNo": "…") and its names as "names": [...]; both are read now, so a sheet
+ *     embedded in an app gets the same English and names hints as a call written in code.
  *   v1.0.0 — 2026-09-19 — Initial (TARGET-080).
  */
 // No import of protected-resource.ts: its import chain closes a cycle back through the app types.
@@ -35,8 +38,11 @@
 
 const USES_DECIDE = /aimeat-decide\.js|\/v1\/ai\/decide\b|AIMEAT\s*\.\s*decide\b/;
 const DIRECT_TYPESAFE = /api\.typesafe\.ai|\bTYPESAFE_API_KEY\b|["'`]Bearer\s+ts[_-]/i;
-/** The text inside a question builder: yesNo("…"), pickOne('…', …), scale(`…`, …), or instructions: "…". */
-const QUESTION_TEXT = /(?:yesNo|pickOne|scale)\s*\(\s*(["'`])((?:\\.|(?!\1)[^\\])*)\1|instructions\s*:\s*(["'`])((?:\\.|(?!\3)[^\\])*)\3/g;
+/**
+ * The text inside a question builder: yesNo("…"), pickOne('…', …), scale(`…`, …), instructions: "…",
+ * or a living document's decide node, which writes the same builders as JSON fields: "yesNo": "…".
+ */
+const QUESTION_TEXT = /(?:yesNo|pickOne|scale)\s*\(\s*(["'`])((?:\\.|(?!\1)[^\\])*)\1|(?:instructions|["'](?:yesNo|pickOne|scale)["'])\s*:\s*(["'`])((?:\\.|(?!\3)[^\\])*)\3/g;
 /** Finnish letters, or a handful of words that do not occur in English questions. */
 const NOT_ENGLISH = /[äöåÄÖÅ]|\b(onko|mikä|mitä|kuinka|viesti|asiakas|lähettäjä|kysyy|pyytää)\b/i;
 
@@ -84,7 +90,7 @@ export function lintAppDecideUse(html: string, scopes: string[]): string[] {
     );
   }
 
-  if (appUsesDecide(html) && !/\bnames\s*:/.test(html) && !/\bfields\s*:/.test(html)) {
+  if (appUsesDecide(html) && !/\bnames["']?\s*:/.test(html) && !/\bfields\s*:/.test(html)) {
     hints.push(
       'DECIDE: what this app sends to the decision model is its own responsibility. The node removes '
       + 'e-mails, phones, identity codes, IBANs, street addresses and the names of the owner\'s contacts, '

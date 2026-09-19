@@ -1755,10 +1755,10 @@
      "slug": "g-11-interactive-living-documents",
      "cells": [
       "<strong>Interactive living documents</strong>",
-      "Connect values, formulas with units, controls, text, charts, state and live sources in one saved record. Changing a control recalculates dependent values in the browser. Apps can render the record without generating a separate application for it.",
-      "<code>/v1/libs/aimeat-living.js</code>"
+      "Connect values, formulas with units, controls, text, charts, state and live sources in one saved record. Changing a control recalculates dependent values in the browser. Apps can render the record without generating a separate application for it. A decision node can ask the decision model about incoming text and move the document's state by its own events; an answer below the record's threshold waits for a person instead. It needs the decision model to be available to the viewer and the app to name TypeSafe in its data map.",
+      "<code>/v1/libs/aimeat-living.js</code> (with <code>/v1/libs/aimeat-decide.js</code> for a decision node)"
      ],
-     "plain": "Interactive living documents Connect values, formulas with units, controls, text, charts, state and live sources in one saved record. Changing a control recalculates dependent values in the browser. Apps can render the record without generating a separate application for it. /v1/libs/aimeat-living.js"
+     "plain": "Interactive living documents Connect values, formulas with units, controls, text, charts, state and live sources in one saved record. Changing a control recalculates dependent values in the browser. Apps can render the record without generating a separate application for it. A decision node can ask the decision model about incoming text and move the document's state by its own events; an answer below the record's threshold waits for a person instead. It needs the decision model to be available to the viewer and the app to name TypeSafe in its data map. /v1/libs/aimeat-living.js (with /v1/libs/aimeat-decide.js for a decision node)"
     },
     {
      "slug": "g-11-ontology-library",
