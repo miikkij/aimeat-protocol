@@ -225,7 +225,13 @@ export function createDecisions(spec) {
       const v = a.type === 'choice' ? (a.confidence == null ? 0 : a.confidence) : Number(a.value);
       passed[q] = v >= t;
     }
-    const base = { answers: answers, passed: passed, decision: (r && r.decision_id) || '', offered: offered || [] };
+    // WHAT WAS TAKEN OUT BEFORE THE TEXT LEFT. The node removes personal data from what goes to the
+    // model, not from the screen, so without this a person sees their message unchanged and has no
+    // way to tell that the name in it never left (Jouni, 2026-09-19, on the first live sheet).
+    const scrub = r && r.scrub && typeof r.scrub === 'object'
+      ? { total: Number(r.scrub.total) || 0, removed: Object.assign({}, r.scrub.removed || {}), skipped: !!r.scrub.skipped }
+      : null;
+    const base = { answers: answers, passed: passed, decision: (r && r.decision_id) || '', offered: offered || [], scrub: scrub };
 
     if (!m || !answers[String(node.event)]) {
       return settle(id, Object.assign({ status: 'decided' }, base), null, 'decided');
