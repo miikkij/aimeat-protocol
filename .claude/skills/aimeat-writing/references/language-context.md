@@ -74,6 +74,8 @@ everywhere at once, and say so in the Changes section.
 | the write pacer | not money, not credit, never buys anything | morsel | murunen | morsel |
 | granted model spend | real money the house fronts, and it runs out | AI allowance | tekoälysaldo | saldo de IA |
 | a model that answers closed questions | yes or no, pick one, a scale, with probabilities; writes no text; beside the text model, never in its list | decision model | päätösmalli | modelo de decisión |
+| the states a document or a process moves through | a named set of states and the events that move between them; in a living document the `machine` node | state machine | tilakone | máquina de estados |
+| the bar a decision must reach | the confidence or probability under which the decision model moves nothing and a person decides | threshold | kynnys | umbral |
 | cleaning what leaves for a decision | e-mails, phones, identity codes, account numbers, street addresses and names are taken out before anything is sent, and put back into the answer | remove personal data | henkilötietojen poisto / poistaa henkilötiedot | eliminar los datos personales |
 | permission a person grants | revocable, per agent, per area | permission | oikeus | permiso |
 | sign-in from elsewhere | another AIMEAT vouching that a sign-in is really them | federation | federaatio | federación |

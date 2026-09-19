@@ -52,6 +52,13 @@
  *   doc.set('t', 31);
  *   doc.setLanguage('en');   // …or just let the login pill do it
  * @version-history
+ *   v0.8.0 — 2026-09-19 — A JUDGEMENT ABOUT TEXT CAN MOVE THE MACHINE. A `decide` node asks the
+ *     decision model (AIMEAT.decide) closed questions about another node's text when that text
+ *     changes and rests, never on a render; its answers are fields a formula or a guard reads. With
+ *     `machine` and `event` it offers the model only the events the machine accepts now and sends
+ *     the winner when its confidence reaches the record's threshold; below it, a person decides on
+ *     the drawn row and the verdict is recorded on the decision. No model on the page, no session,
+ *     no key: "unavailable" in words, and no answer is invented (decide-run.js, render-decide.js).
  *   v0.7.0 — 2026-09-06 — A CALL MAY CARRY A KEY WITHOUT THE DOCUMENT HOLDING ONE. A `source` that
  *     reads a URL and a `trigger` that tells one both take `headers`, and a header's value may
  *     name a secret of the owner's as `{{secret:NAME}}`: the name is what the record carries, and
@@ -144,6 +151,7 @@ import { unitLabel } from './units.js';
 import { createHooks } from './hooks.js';
 import { createDeliveries } from './deliver.js';
 import { createUrlSources } from './sources-url.js';
+import { createDecisions } from './decide-run.js';
 import { openInward } from './dialog-inward.js';
 import { openOutward } from './dialog-outward.js';
 import { relabelGears } from './gear.js';
@@ -154,10 +162,10 @@ import {
   TEXT_KEYS, hasLangMap, localizeLayout, localizeProps, onLanguageChange, preference,
 } from './i18n.js';
 
-const VERSION = '0.7.0';
+const VERSION = '0.8.0';
 
 /** The node types whose rendering this library does itself, when the node names a block. */
-const DRAWN = ['control', 'formula', 'text', 'machine', 'value', 'source', 'trigger'];
+const DRAWN = ['control', 'formula', 'text', 'machine', 'value', 'source', 'trigger', 'decide'];
 
 /**
  * Read a document without running it: every refusal it would hit, in words, before anything is
@@ -239,7 +247,7 @@ function refusalPanel(host, refusals) {
  * @param {string|Element} target
  * @param {any} doc
  * @param {{ onChange?: (e: any) => void, onDelivery?: (e: any) => void, chainBlock?: string,
- *   live?: boolean, language?: string, gears?: boolean,
+ *   live?: boolean, language?: string, gears?: boolean, decide?: any, onDecision?: (e: any) => void,
  *   hooks?: { transport?: (req: any) => Promise<any>, signedIn?: boolean, extension?: string } }} [opts]
  * @returns {any}
  */
@@ -323,6 +331,16 @@ export function mount(target, doc, opts) {
     doc: doc, graph: graph, hooks: hooks, langs: langs,
     onResult(out) { announceResult(out); },
   });
+  // A decide node asks the page's own AIMEAT.decide unless the host hands in another (a test).
+  const judge = createDecisions({
+    doc: doc, graph: graph, langs: langs,
+    decide() { const ns = /** @type {any} */ (window).AIMEAT; return options.decide || (ns && ns.decide) || null; },
+    onResult(out) { announceResult(out); },
+    onDecision(e) {
+      if (options.onDecision) options.onDecision(e);
+      try { host.dispatchEvent(new CustomEvent('aimeat-living-decision', { detail: e, bubbles: true })); } catch { /* no CustomEvent */ }
+    },
+  });
   /** Whoever is listening for a delivery, and for the record being edited through a gear. */
   const deliveryWatchers = [];
   const recordWatchers = [];
@@ -346,7 +364,7 @@ export function mount(target, doc, opts) {
           const view = renderNodeInto(body, {
             id: id, node: nodes[id], graph: graph, langs: langs, set: apply,
             gear: options.gears === false ? null : openGear,
-            reason: guestReason,
+            reason: guestReason, resolve: function (nid, choice) { judge.resolve(nid, choice); },
           });
           if (view) views.set(id, view);
         }
@@ -416,6 +434,7 @@ export function mount(target, doc, opts) {
   function announceResult(out) {
     announce(out.changed);
     deliveries.after(out);
+    judge.after(out);
     return out;
   }
 
@@ -606,6 +625,7 @@ export function mount(target, doc, opts) {
   // as they stand, and the first message goes out when the document actually moves. A page opened
   // twice must not tell an inverter twice that nothing happened.
   deliveries.prime();
+  judge.prime();
   const ready = Promise.resolve()
     .then(readSources)
     .then(function () { return options.live === false ? null : live.start(); })
@@ -643,6 +663,12 @@ export function mount(target, doc, opts) {
     test(triggerId) { return deliveries.test(String(triggerId)); },
     /** Ask one URL source for its reading now, rather than waiting for its next turn. */
     read(id) { return live.readOnce(String(id)); },
+    /** Ask one decide node about its text now, even when it asked about this text before. */
+    decide(id) { return judge.ask(String(id), true); },
+    /** A person's answer to a proposal under the threshold: the event to send, or '' to keep. */
+    resolve(id, choice) { return judge.resolve(String(id), String(choice || '')); },
+    /** The last fifty decisions of this mount, the model's and the people's, oldest first. */
+    decisions() { return judge.list(); },
     /** Which sources are on a clock, and how often — after the ten-second floor. */
     polled() { return live.polled(); },
     /**
@@ -697,6 +723,7 @@ export function mount(target, doc, opts) {
       if (timer) clearTimeout(timer);
       stopLang();
       deliveries.destroy();
+      judge.destroy();
       live.destroy();
       window.removeEventListener('aimeat-live-update', onLive);
       if (chainHandle) chainHandle.destroy();
