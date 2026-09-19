@@ -34,6 +34,7 @@
  *   import { buildAppPiece } from './build-app-layers.js';
  *   const first = buildAppPiece(buildAppPrompt(config).full, 'start', config.baseUrl);
  * @version-history
+ *   v1.1.0 — 2026-09-19 — The decision model's section is on demand (TARGET-080).
  *   v1.0.0 — 2026-09-18 — Initial creation.
  */
 
@@ -130,6 +131,10 @@ export const SECTION_TABLE: Record<string, SectionRule> = {
   'AI (prompt-driven)': {
     id: 'ai', layer: 'on-demand',
     when: 'The app itself calls a language model while it runs.',
+  },
+  'Decisions without text: the decision model (aimeat-decide.js)': {
+    id: 'decide', layer: 'on-demand',
+    when: 'The app classifies, screens, routes, scores or gates something (which folder, is it urgent, which candidate) rather than writing text, and the owner can use the decision model.',
   },
   'Tell the person when something happened (one call)': {
     id: 'notify', layer: 'on-demand',
