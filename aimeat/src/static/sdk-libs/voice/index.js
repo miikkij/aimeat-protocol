@@ -13,7 +13,7 @@ import { createPlayer } from './player.js';
 import { nodeAdapters } from './adapters.js';
 
 attach('voice', {
-  version: '1.1.0',
+  version: '1.1.1',
   get defaults() { return structuredClone(defaults); },
   get presets() { return structuredClone(presets); },
   configure,
