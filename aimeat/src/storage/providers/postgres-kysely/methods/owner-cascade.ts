@@ -30,6 +30,7 @@
  *   - deleteOwnerCascade(db, name) — agents + GHIIs through the cascade, then the owner-level tables
  * @usage Called by identityMethods.deleteOwner inside one db.transaction().
  * @version-history
+ *   v1.3.0 — 2026-09-19 — AiDecision joins the cascade (TARGET-080).
  *   v1.2.1 — 2026-09-09 — The tally comment names the function this cascade actually calls
  *     (pseudonymiseTallyWriterDb); the Storage method it named was deleted for having no caller.
  *   v1.2.0 — 2026-09-06 — Secret joins the cascade. A row there is a live credential to somebody
@@ -158,6 +159,9 @@ export async function cascadeDeleteIdentityData(db: Db, gaii: string): Promise<v
     .where(eb => eb.or([eb('agentGaii', '=', gaii), eb('ownerGhii', '=', gaii)])).execute();
   await db.deleteFrom('AgentUsageDaily')
     .where(eb => eb.or([eb('agentGaii', '=', gaii), eb('ownerGhii', '=', gaii)])).execute();
+  // What an AI decided on this person's behalf (TARGET-080). Theirs, so it goes with them.
+  await db.deleteFrom('AiDecision')
+    .where(eb => eb.or([eb('ownerGhii', '=', gaii), eb('principal', '=', gaii)])).execute();
 
   // Sharing groups, and the key-space shares inside them. The shares go first and by two keys: by
   // ownerGaii for this person's own shares, then by the id of each group being removed, because a

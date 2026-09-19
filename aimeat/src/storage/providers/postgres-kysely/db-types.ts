@@ -492,6 +492,19 @@ export interface WorkspaceRow {
   bytes: Generated<number>;
 }
 
+/** TARGET-080 (migration 0079). `record` is the aimeat.decision/v1 document. */
+export interface AiDecision {
+  appId: string | null;
+  cacheKey: string;
+  createdAt: string;
+  id: string;
+  model: string;
+  ownerGhii: string;
+  principal: string;
+  record: Json;
+  subject: string | null;
+}
+
 export interface AiProvenance {
   contentHash: string | null;
   createdAt: string;
@@ -2269,6 +2282,7 @@ export interface DB {
   SsoConnection: SsoConnection;
   McpServer: McpServer;
   AiProvenance: AiProvenance;
+  AiDecision: AiDecision;
   App: App;
   AppDownload: AppDownload;
   AppDraft: AppDraft;

@@ -6,6 +6,7 @@
  *   to satisfy max-file-lines. Idempotent (IF NOT EXISTS); applied in numeric order so
  *   the on-disk DDL order is byte-for-byte unchanged from the original single exec block.
  * @version-history
+ *   2026-09-19 — ai_decisions table (TARGET-080), beside ai_provenance. Mirrors Postgres 0079.
  *   2026-08-22 — direct_messages.ownerReadAt (fresh installs; schema.ts adds it and backfills
  *     existing databases).
  *   2026-08-15 — agent_tasks.createdBy (fresh installs; schema.ts adds it to existing databases).
@@ -572,6 +573,25 @@ export function applySchemaTables3(db: Database.Database): void {
     -- so it is the one query that must stay index-backed under anonymous traffic.
     CREATE INDEX IF NOT EXISTS idx_ai_provenance_hash ON ai_provenance(contentHash);
     CREATE INDEX IF NOT EXISTS idx_ai_provenance_owner ON ai_provenance(ownerGhii, generatedAt);
+
+    -- ── AI decisions (TARGET-080, AIMEAT.decide) — mirrors Postgres 0079 ──
+    -- One row per call to the decision model; record holds the aimeat.decision/v1 document as JSON.
+    -- Unlike provenance, rows age out, and only record.review changes after the write.
+    CREATE TABLE IF NOT EXISTS ai_decisions (
+      id        TEXT PRIMARY KEY,
+      ownerGhii TEXT NOT NULL,
+      principal TEXT NOT NULL,
+      appId     TEXT,
+      subject   TEXT,
+      cacheKey  TEXT NOT NULL,
+      model     TEXT NOT NULL,
+      createdAt TEXT NOT NULL,
+      record    TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_ai_decisions_owner ON ai_decisions(ownerGhii, createdAt);
+    CREATE INDEX IF NOT EXISTS idx_ai_decisions_cache ON ai_decisions(ownerGhii, cacheKey, createdAt);
+    CREATE INDEX IF NOT EXISTS idx_ai_decisions_subject ON ai_decisions(ownerGhii, subject, createdAt);
+    CREATE INDEX IF NOT EXISTS idx_ai_decisions_created ON ai_decisions(createdAt);
 
     -- ── Outbound connections (TARGET-057, aimeat-connect) ──
     -- "principal" is WHOEVER CONNECTED THE ACCOUNT, which in a multi-user app is the app's USER and
