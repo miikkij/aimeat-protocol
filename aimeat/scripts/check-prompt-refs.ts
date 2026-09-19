@@ -83,7 +83,7 @@ const SOURCES: string[] = [
     'aimeat/src/cli/connect/onboarding-prompt.ts',
     'aimeat/src/data/builtin-skills.ts',
     'aimeat/src/data/builtin-skills.conversation.ts',
-    'aimeat/src/data/builtin-skills.hatchery.ts',
+    'aimeat/src/data/builtin-skills.recurring-work.ts',
     'aimeat/src/data/builtin-skills.open-items.ts',
     'aimeat/src/data/builtin-skills.workstation.ts',
     'aimeat/src/data/builtin-skills.app-builder.ts',

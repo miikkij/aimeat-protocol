@@ -16,21 +16,34 @@
  *   they teach to the catalogue. Found when the cold-agent skill suite named three of them and
  *   the sandbox, a fresh node, had none. Ruled by the developer the same day.
  *
- *   A PURE MOVE. The text is what aimeat.io served on 2026-09-18, byte for byte; the digests below
- *   say which. Two things in it are aimeat.io's own and stay for now: the experience-centre link,
- *   which is a public address and works from any node, and the model names, which match
- *   services/ai-tool-setup.ts and move with it when the model recommendation becomes one
- *   reviewed config value.
+ *   WHERE THE TEXTS CAME FROM, AND WHO KEEPS THEM NOW. They were taken from what aimeat.io served
+ *   on 2026-09-18, and the digests below record which text each entry started as. They are
+ *   maintained HERE since: this file is the source, and the seeder carries a correction to every
+ *   node on its next start unless somebody edited that node's copy by hand. Two things in them are
+ *   aimeat.io's own and stay for now: the experience-centre link, which is a public address and
+ *   works from any node, and the model names, which match services/ai-tool-setup.ts and move with
+ *   it when the model recommendation becomes one reviewed config value.
  *
  *   ON A NODE THAT ALREADY HAS THEM (aimeat.io). A copy published by hand carries no seed
  *   fingerprint. The seeder ADOPTS such a copy when it is identical to the text here, and from
  *   then on it follows the repo like any other built-in skill; a copy that differs is kept as it
- *   is and named in the log (decideSeedAction in services/skill-seeds.ts). Which is why this text
- *   must stay byte-identical to what aimeat.io serves until that node has booted on this build.
+ *   is and named in the log (decideSeedAction in services/skill-seeds.ts). A node that had not yet
+ *   booted on the build that adopted these keeps its own copy and says so in the log; correcting
+ *   it there is then a hand edit, or a re-adopt once the two texts agree again.
  * @structure CONVERSATION_SKILL_ENTRIES
  * @usage
  *   import { CONVERSATION_SKILL_ENTRIES } from './builtin-skills.conversation.js';
  * @version-history
+ *   v1.1.0 — 2026-09-19 — Four corrections, the first two of which handed the reader something
+ *     that failed the moment it was used. aimeat-welcome-pages gave out /p/{owner} as the person's
+ *     address, which no route has ever answered (mcp/portfolio.ts dropped it from the tool's own
+ *     answer on 2026-09-03); aimeat-mail-to-data sent the reader to node:aimeat-photos-to-dataset,
+ *     which is in no node's BUILTIN_SKILLS, so the rules it needed are inlined instead; the same
+ *     skill taught HTTP routes to an audience reached over MCP, where aimeat_mail_search and
+ *     aimeat_mail_read do the same work, so the tools lead and the routes stay as the REST
+ *     equivalent; and its closing rule said there is no sending, which stopped being true when the
+ *     mail providers grew read/send PAIRS on 2026-08-26. The content audit of 2026-09-19 compared
+ *     every claim in these six skills with the code.
  *   v1.0.0 — 2026-09-18 — Initial: six skills moved in from aimeat.io.
  */
 /**
@@ -160,7 +173,8 @@ their agent kept working.
 - The guided tour, mentioned once if it fits: https://experience-center.apps.aimeat.io
 `,
     },
-    // aimeat-welcome-pages — as published on aimeat.io, sha256 cd5ac67b8ac9…
+    // aimeat-welcome-pages — started as the aimeat.io text, sha256 cd5ac67b8ac9…; corrected here
+    // on 2026-09-19 (the published address), so it no longer matches that digest.
     {
         name: 'aimeat-welcome-pages',
         visibility: 'public',
@@ -205,7 +219,9 @@ aimeat_portfolio_publish({ html: "<!DOCTYPE html>…" })
 - \`html\` is the **complete document**. It replaces whatever is there now.
 - The limit is 512 KB. A page that overruns it is refused with the size, so keep images as data URIs
   only when they are small, and prefer CSS to bitmaps.
-- The answer carries the address: \`<node>/p/{owner}\`.
+- The answer carries two addresses: \`url\`, the page on this node, and \`standalone_url\`, the
+  person's own address when the node serves one. Give them whichever the answer actually returned,
+  and never an address you worked out yourself.
 
 ## Publishing a company's page
 
@@ -500,7 +516,9 @@ Say it once. If they are not interested, the free model keeps answering and that
 answer too.
 `,
     },
-    // aimeat-mail-to-data — as published on aimeat.io, sha256 cd781ec246b3…
+    // aimeat-mail-to-data — started as the aimeat.io text, sha256 cd781ec246b3…; corrected here on
+    // 2026-09-19 (the MCP tools, the inlined table rules, the send pair), so it no longer matches
+    // that digest.
     {
         name: 'aimeat-mail-to-data',
         visibility: 'public',
@@ -520,18 +538,28 @@ their own node.
 
 ## Connect the mailbox first, once
 
-\`GET /v1/connections/providers\` lists what this node can connect. Gmail appears as \`google-mail\`.
-The person goes through the authorization at Google and approves ONE permission: read. Sending,
-deleting and changing are never asked for, so they are never granted, and that is worth telling them
-in one sentence because it is the question they are actually asking.
+\`aimeat_connection_providers\` lists what this node can connect. Gmail's READING half appears as
+\`google-mail\`. Mail comes in read/send PAIRS and the names are exact: \`google-mail\` reads a
+mailbox, \`google-mail-send\` sends from it, and neither implies the other. For this job you want
+the read half only.
+
+\`aimeat_connection_start\` with \`provider: "google-mail"\` returns an address for the PERSON to
+open — you cannot approve it for them, and fetching the address yourself does nothing. They go
+through the authorization at Google and approve ONE permission: read. Sending, deleting and
+changing are never asked for on this connection, so they are never granted, and that is worth
+telling them in one sentence because it is the question they are actually asking. The connection
+then appears in \`aimeat_connection_list\`, which is where its id comes from.
+
+Over REST the same two are \`GET /v1/connections/providers\` and \`POST /v1/connections/start\`.
 
 If the provider is missing from that list, this node has not registered an application at Google.
 That is the operator's to fix, not the person's, and the list says so.
 
 ## Read, and read narrowly
 
-\`POST /v1/connections/{id}/read/messages\` with \`{ "query": "...", "limit": 25 }\`. The query is
-Gmail's own search, which is the difference between a useful answer and forty thousand messages:
+\`aimeat_mail_search\` with \`connection_id\`, \`query\` and \`limit\` (default 25, max 100;
+\`page_token\` continues a search). The query is Gmail's own search, which is the difference
+between a useful answer and forty thousand messages:
 
 - \`from:lasku@example.com has:attachment newer_than:90d\`
 - \`subject:(kuitti OR receipt) has:attachment\`
@@ -542,7 +570,11 @@ came back, and say to the person what you found before reading hundreds of messa
 allowance. A search that returns nothing is a fact worth reporting, not a reason to re-run it wider
 without asking.
 
-The list gives ids and nothing else. \`POST .../read/message\` with \`{ "id": "..." }\` opens one.
+The list gives ids and nothing else. \`aimeat_mail_read\` with \`connection_id\` and
+\`message_id\` opens one.
+
+Over REST the same three are \`POST /v1/connections/{id}/read/messages\`,
+\`POST .../read/message\` with \`{ "id": "..." }\`, and \`POST .../read/attachment\` below.
 
 ## What a message actually looks like
 
@@ -557,17 +589,24 @@ This is the part that surprises people. A message is a tree of parts, and the te
 - Decode base64url, which is NOT base64: \`-\` for \`+\`, \`_\` for \`/\`, and the padding is often missing.
 
 An attachment part carries \`body.attachmentId\` rather than bytes. Fetch it with
-\`POST .../read/attachment\` and \`{ "message_id": "...", "attachment_id": "..." }\`. Fetch it only when
-you need it: that is a real download against the person's own rate limit, and most of the time the
-answer is in the text.
+\`aimeat_mail_read\` again, passing \`attachment_id\` beside the \`message_id\` — that is the same
+tool, and the attachment comes back instead of the message. Fetch it only when you need it: that is
+a real download against the person's own rate limit, and most of the time the answer is in the
+text.
 
-## Then it is a table, and there is already a flow for that
+## Then it is a table
 
-Once you have the fields, everything downstream is the same job the photographs are:
-**\`node:aimeat-photos-to-dataset\`**, and the rules there apply unchanged. One growing package per
-subject by default. Read the existing rows before publishing an addition, because a resource is the
-whole table and publishing today's on their own deletes yesterday's. Stable column names between
-batches.
+Once you have the fields, everything downstream is the same job reading numbers out of photographs
+is, and it goes through \`aimeat_datapackage_publish\`. Four rules carry it:
+
+- **One growing package per subject**, by default. Not one per batch, and not one per month.
+- **A resource is the WHOLE table, not an append.** Publishing today's rows on their own REPLACES
+  yesterday's. To add to a package that exists, read the current rows with
+  \`aimeat_datapackage_export\` first and publish them together with the new ones.
+- **Stable column names between batches.** A column renamed halfway through is a column the reader
+  has to reconcile by hand.
+- **\`changes\` is required**: every version says what moved and why. The version IS the content
+  hash, so re-publishing identical data answers \`unchanged: true\` rather than making a second one.
 
 Two things specific to mail:
 
@@ -585,9 +624,12 @@ Two things specific to mail:
   document that happens to contain a number.
 - **Do not guess a number you could not read.** Leave the cell empty and name the message that needs
   a look. A confident wrong amount is worse than a gap, because nobody checks it.
-- **Do not ask for more permission than you have.** There is no sending, no deleting and no
-  labelling. If the person asks for one of those, say plainly that this connection only reads, which
-  is also the reason they could approve it without thinking hard.
+- **Do not ask for more permission than you have.** This connection reads. It cannot send, delete
+  or label, which is also the reason they could approve it without thinking hard. Sending is a
+  SEPARATE connection they approve separately — \`google-mail-send\`, and then
+  \`aimeat_mail_send\` — so if they ask for it, say that rather than that it cannot be done. Never
+  fold the two into one request: reading somebody's mail and writing in their name are different
+  consent, and neither implies the other.
 
 ## Say it in their words
 

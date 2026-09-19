@@ -8,8 +8,11 @@ description: How AIMEAT videos are made from live captures and existing recordin
 Every video here shows the production node with real data. Nothing is mocked and no slide is
 re-narrated: the deck says what is claimed, the video shows it moving. Three tools cover the
 three kinds of footage, and all three live in `aimeat/scripts/demo-video/`, which is gitignored
-on purpose (marketing tooling, plus login paths). They exist on Jouni's machine; a fresh clone
-does not have them.
+on purpose (marketing tooling, plus login paths). They exist on Jouni's MAIN machine only, in the
+main checkout, together with `genimages/videos/` and its two worked examples: a fresh clone, a
+worktree and his other machines do not have them (checked 2026-09-19, when neither folder was on
+the machine the check ran on). So look first: `ls aimeat/scripts/demo-video` from the main
+checkout. When it is absent, say so and ask, rather than rebuilding the tools from this page.
 
 | You need | Tool | Output |
 |---|---|---|
@@ -27,7 +30,7 @@ video, ten scenes, 2:56).
 - **ffmpeg on PATH, Python with Pillow, and for the performer `@playwright/test`** (already a
   devDep in `aimeat/`; run its scripts from `aimeat/` so it resolves).
 - **Signed-in state for the performer and the camera:** `node scripts/demo-video/_login-state.mjs`
-  (from `aimeat/`). It reads `docs/internal/prod-login-happydude500001.json`, signs in on
+  (from `aimeat/`). It reads `docs/internal/prod-login-happydude500001.json` (gitignored, main checkout only), signs in on
   aimeat.io and on the ORIGAMI origin, and writes `genimages/videos/_state/prod-owner-state.json`,
   which every `scenes.*.json` points at. The ORIGAMI session is bridge-based and goes stale;
   re-run this before a shoot rather than debugging a stale state.
@@ -89,9 +92,10 @@ genimages/videos/<project>/
 ```
 
 ```bash
-python aimeat/scripts/demo-video/stills/render_cards.py genimages/videos/<project>
-python aimeat/scripts/demo-video/stills/build.py genimages/videos/<project>          # whole cut
-python aimeat/scripts/demo-video/stills/build.py genimages/videos/<project> --scene 07
+# No `python` on PATH on these machines: every script runs through uv.
+uv run python aimeat/scripts/demo-video/stills/render_cards.py genimages/videos/<project>
+uv run python aimeat/scripts/demo-video/stills/build.py genimages/videos/<project>          # whole cut
+uv run python aimeat/scripts/demo-video/stills/build.py genimages/videos/<project> --scene 07
 ```
 
 Segment kinds in `cut.json`: `zoom` (viewport still, slow push-in), `scroll` (full-page still,

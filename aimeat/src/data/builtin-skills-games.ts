@@ -23,6 +23,10 @@
  * @structure GAME_SKILL_ENTRIES: the seven entries, entry skill first
  * @usage import { GAME_SKILL_ENTRIES } from './builtin-skills-games.js';
  * @version-history
+ *   v1.2.0 -- 2026-09-19 -- The content audit of 2026-09-19: the tiles() gotcha taught the trap
+ *     that assets.js v1.1.1 removed (the prefix now defaults to 'tile-' and the kinds to the
+ *     platformer's six), so it said the opposite of what the module does. The routing table also
+ *     had no road to net, levelEditor and mobile, which index.js has exported since v1.1.0.
  *   v1.1.0 -- 2026-09-03 -- aimeat-phaser-world and aimeat-phaser-story join (wave two), and the
  *     entry skill's table names them.
  *   v1.0.0 -- 2026-09-02 -- Initial: aimeat-phaser and the six area skills, written against
@@ -76,6 +80,9 @@ Without them the game still runs, and everything it saves stays in the browser.
 | sound, music, the synth, screen feel | \`node:aimeat-phaser-audio-juice\` |
 | particle effects, parallax backdrops, day and night, generated sprites and the actor, enemy brains and pathfinding, the boss fight, the overworld map, the tile world and minimap, the designer panels | \`node:aimeat-phaser-world\` |
 | dialogue and cutscenes, the player's status HUD, achievements and the trophy room, chiptune music | \`node:aimeat-phaser-story\` |
+| two people in one game (\`net\`) | \`node:aimeat-phaser-controls-hud\` |
+| a level editor a player paints in (\`levelEditor\`) | \`node:aimeat-phaser-menus-levels\` |
+| the phone half: turn-your-phone, the notch, the wake lock, install (\`mobile\`) | \`node:aimeat-phaser-boot\` |
 
 ## Quick Start: the paved path
 
@@ -158,10 +165,11 @@ beside each one. Copy from a demo that runs rather than from memory of an API.
 
 ## Gotchas and Common Mistakes
 
-1. **\`textures.tiles()\` makes only the kinds you name, and names them exactly what you asked
-   for.** \`tiles(this, { size: 32 })\` with no \`kinds\` makes nothing at all, and
-   \`kinds: { ground: true }\` makes a texture called \`ground\`, not \`tile-ground\`. The
-   platformer looks for \`tile-ground\`, so pass \`prefix: 'tile-'\` as the Quick Start does.
+1. **\`textures.tiles()\` already makes the keys the platformer reads.** \`tiles(this)\` with
+   nothing passed makes \`tile-ground\`, \`tile-brick\`, \`tile-spike\`, \`tile-coin\`,
+   \`tile-goal\` and \`tile-enemy\`: the prefix defaults to \`tile-\` and the kinds to those six.
+   Name \`kinds\` to add one or to give one a colour of its own, and pass \`prefix: ''\` only
+   when you deliberately want bare names.
 2. **Calling \`P.game()\` twice into the same element gives you two games.** Each call appends
    its own frame. Keep the handle and call \`h.destroy()\` before booting another.
 3. **\`await P.game(...)\`: it is a promise**, because the engine may still be loading. A game

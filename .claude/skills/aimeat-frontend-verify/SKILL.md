@@ -46,7 +46,7 @@ Under the picture, eight measured checks, all reported as numbers:
 | Check | Passes at |
 |---|---|
 | Page width | `scrollWidth === clientWidth` at 390 and 1440 |
-| Past the edge | no element whose right edge passes `clientWidth + 2`, **including inside a box with `overflow-x: clip` or `hidden`** — the width check is blind to those |
+| Past the edge | no element whose right edge passes `clientWidth + 2`, **including inside a box with `overflow-x: clip` or `hidden`**: the width check is blind to those |
 | Text size | no visible text under 11 px |
 | Tap targets | at 390, no control under 40 px in either dimension |
 | Contrast | 4.5 for body text, 3.0 for ≥24 px or ≥19 px bold |

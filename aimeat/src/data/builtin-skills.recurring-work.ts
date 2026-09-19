@@ -1,13 +1,28 @@
 /**
- * @file src/data/builtin-skills.hatchery.ts
+ * @file src/data/builtin-skills.recurring-work.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The `hatchery-agent-requests` built-in skill: what to do when somebody asks for
- *   something to happen regularly, before you build the mechanism yourself.
+ * @description The `aimeat-recurring-work` built-in skill: what to do when somebody asks for
+ *   something to happen regularly, before you build the mechanism yourself. Until 2026-09-19 it
+ *   was called `hatchery-agent-requests`.
  *
- *   WHY IT EXISTS. Two tool descriptions have been naming it since July — aimeat_schedule_create
- *   and aimeat_extension_install both tell the reader to load `node:hatchery-agent-requests` BEFORE
- *   they build — and the skill did not exist. Every agent that obeyed got NOT_FOUND and then built
+ *   WHY THE NAME CHANGED. The node has no agent hatchery and never had one: the word named a
+ *   third-party fleet runtime an agent might live in, and appears ONCE in the skill's body, as one
+ *   example of a host. The skill's subject is its first heading, "Somebody wants something to
+ *   happen regularly", and nobody looking for that would search for "hatchery". The developer
+ *   asked on 2026-09-19 whether the skill was obsolete because of the name; every dependency it
+ *   has is live, so it was renamed, not removed.
+ *
+ *   HOW THE OLD NAME LEAVES A RUNNING NODE. The seeder never deletes (skill-seeds.ts has six
+ *   outcomes and none is a delete), so a skill dropped from the table is served for ever. The old
+ *   name therefore STAYS in the table as a three-line text whose frontmatter carries
+ *   `metadata.superseded_by`, which the registry already understands: the handbook's list of
+ *   skills leaves a superseded one out, and an agent that still asks for it by name is told where
+ *   it went. A node that had the old skill unedited takes the stub on its next start.
+ *
+ *   WHY IT EXISTS. Two tool descriptions had been naming it since July: aimeat_schedule_create
+ *   and aimeat_extension_install both told the reader to load the skill BEFORE
+ *   they build, and the skill did not exist. Every agent that obeyed got NOT_FOUND and then built
  *   the thing the instruction was written to prevent, which is the most expensive kind of missing
  *   file: one that two other files promise.
  *
@@ -15,20 +30,52 @@
  *   builtin-skills.open-items.ts is separate. It also earns the separation: the two descriptions
  *   that point here are edited on their own rhythm, and when one of them changes what it promises,
  *   this is the file that has to agree with it.
- * @structure HATCHERY_SKILL_ENTRY
+ * @structure RECURRING_WORK_SKILL_ENTRIES (the skill, and the retired name pointing at it)
  * @usage
- *   import { HATCHERY_SKILL_ENTRY } from './builtin-skills.hatchery.js';
+ *   import { RECURRING_WORK_SKILL_ENTRIES } from './builtin-skills.recurring-work.js';
  * @version-history
+ *   v1.1.0 — 2026-09-19 — Renamed to aimeat-recurring-work; the old name stays as a superseded stub.
+ *   v1.0.1 — 2026-09-19 — `kind: "ai"` no longer claims the person's own OpenRouter key pays for
+ *     it. The content audit of 2026-09-19 compared every claim in this skill with the code; the
+ *     rest of it holds.
  *   v1.0.0 — 2026-08-23 — Initial.
  */
-import type { BuiltinSkill } from './builtin-skills.js';
+/**
+ * The shape of a built-in skill entry, stated here and not imported: builtin-skills.ts imports this
+ * file, so importing its type back is an import cycle (check:deps). builtin-skills.ts spreads these
+ * entries into a BuiltinSkill[], so a field this lacks or spells differently fails the type check.
+ */
+interface BuiltinSkill { name: string; skillMd: string; visibility?: 'members' | 'public' }
 
-export const HATCHERY_SKILL_ENTRY: BuiltinSkill =
+/** The old name. It stays so that a node which has it learns where the skill went. */
+const RETIRED_HATCHERY_ENTRY: BuiltinSkill =
 {
     name: 'hatchery-agent-requests',
     visibility: 'public',
     skillMd: `---
 name: hatchery-agent-requests
+description: Retired name. The skill for "someone asks for something to happen regularly" is now aimeat-recurring-work. Load that one.
+license: MIT
+metadata:
+  audience: agent
+  superseded_by: node:aimeat-recurring-work
+---
+
+# This skill was renamed
+
+It is \`node:aimeat-recurring-work\` now, with the same content. Load it with
+\`aimeat_skill_get { ref: "node:aimeat-recurring-work" }\`. The old name said "hatchery", and this
+node has no hatchery: the skill is about what to do when somebody wants something to happen
+regularly.
+`,
+};
+
+const RECURRING_WORK_ENTRY: BuiltinSkill =
+{
+    name: 'aimeat-recurring-work',
+    visibility: 'public',
+    skillMd: `---
+name: aimeat-recurring-work
 description: What to do when someone asks for something to happen regularly ("every morning", "each week", "keep an eye on"). Find out whether they already have an agent that could do it and give the work to that agent, rather than building a fourth parallel implementation they will never find again. Covers how to look, how to hand work over, and the two token-free options when there is nobody to hand it to. Use before creating any schedule or installing any extension that runs on a clock.
 license: MIT
 metadata:
@@ -57,8 +104,8 @@ Read it for two things:
 - **Is one of them ALIVE?** \`last_seen\` is the test. An agent that has not been seen for weeks
   is a record, not a runtime, and handing it work means the work never happens.
 
-An agent whose profile carries a console address is hosted somewhere that actually runs it — a
-hatchery, a cockpit, the person's own daemon. That is the strongest signal you can get from
+An agent whose profile carries a console address is hosted somewhere that actually runs it: a
+fleet runtime, a cockpit, the person's own daemon. That is the strongest signal you can get from
 here, because it means something outside this node is keeping it alive.
 
 ## 2. Hand the work over
@@ -86,8 +133,9 @@ Then offer what the node itself can do, cheapest first:
 - **\`kind: "extension"\`** — a sandboxed action on the node's own clock. **Zero tokens**, no key
   of theirs, no account anywhere else. This is the right answer for fetch-and-store, for
   checking whether something changed, and for any tidying that needs no judgement.
-- **\`kind: "ai"\`** — a server-side completion over memory keys, on **their own OpenRouter key**
-  and against their own daily cap. Right when the work genuinely needs a model: summarising,
+- **\`kind: "ai"\`** — a server-side completion over memory keys, on **their own OpenRouter key if
+  they have set one**, otherwise on the node's key while their allowance has something left, and on
+  a free model once it is spent. Right when the work genuinely needs a model: summarising,
   translating, drafting.
 
 Prefer the extension whenever the work does not need reasoning. A model called on a clock to do
@@ -103,3 +151,5 @@ And whatever you build: it belongs where the person will look for it. A schedule
 find in their own agent surfaces is a thing that happens TO them rather than something they own.
 `,
 };
+
+export const RECURRING_WORK_SKILL_ENTRIES: BuiltinSkill[] = [RECURRING_WORK_ENTRY, RETIRED_HATCHERY_ENTRY];

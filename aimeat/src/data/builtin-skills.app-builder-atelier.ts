@@ -13,6 +13,13 @@
  * @structure APP_BUILDER_ATELIER_SKILL_ENTRY
  * @usage import { APP_BUILDER_ATELIER_SKILL_ENTRY } from './builtin-skills.app-builder-atelier.js';
  * @version-history
+ *   v1.9.1 — 2026-09-19 — Three numbers stopped being written out where the code moves them.
+ *     describe() no longer carries a component count (it said eighteen and the kit has nineteen
+ *     since form gained its @parts lines); the Secrets section is named rather than numbered (it
+ *     is 05 now, and 04 became MCP servers on 2026-09-16); and the catalogue parenthesis names
+ *     the designed empty and loading states, which the never-list forbids a builder to hand-roll
+ *     and that list had left out. The content audit of 2026-09-19 compared every claim in this
+ *     skill with the code; every address, meta name, refusal and registry count in it holds.
  *   v1.9.0 — 2026-09-06 — "Never" gains a field for an API key: a key is named as `{{secret:NAME}}`
  *     in an extension's or a living document's headers and filled from the person's vault.
  *   v1.8.0 — 2026-09-06 — A page says whether it keeps its own light: `aimeat-light` beside the
@@ -109,8 +116,9 @@ moved under you says so.
    in from \`GET /v1/designbook?kind=genre\`, fork it from \`GET /v1/app-templates/genre-<id>\`,
    and keep its \`<meta name="aimeat-register">\` line (or name your own register with
    \`custom:<name>\`); the publish refuses an Atelier app that names none. Then compose screens
-   from the catalogue in the spec (hero, list, listDetail, cardGrid, form, table, statRow,
-   searchBar, timeline, tabs) where the page needs them; the \`section\`
+   from the catalogue in the spec (hero, list, listDetail, cardGrid, mediaCard, form, table,
+   statRow, figure, searchBar, timeline, tabs, and the designed \`emptyState\` and \`skeleton\`
+   rather than a bare string or a grey box) where the page needs them; the \`section\`
    component is the ONLY place your own raw markup goes. One look via \`app({ look })\` —
    vivid unless the owner asked for something else; flat only on request. The look brings its
    own ambient, the one layer allowed to move at idle: leave it unless the owner asked for
@@ -121,8 +129,8 @@ moved under you says so.
    nine, where each lands, and the knobs).
 4. **Ask the kit before you fork.** Before you fork a component, ask the kit what it already gives
    you. \`AIMEAT.atelier.describe("<component>")\` returns
-   \`{ parts, slots, variants, tokens, fork }\` for the eighteen components that carry the model,
-   and \`describe()\` lists them; the answer is generated from each component's source and held to
+   \`{ parts, slots, variants, tokens, fork }\` for the components that carry the model, and
+   \`describe()\` lists them; the answer is generated from each component's source and held to
    it by \`pnpm check:atelier-parts\`. The order, stopping at the first that works: a token
    (\`--ak-list-aside-size\` on your own element); a variant (\`variant: "dense"\`); a slot
    (\`extra\`, \`aside\`, \`before\`, \`after\` — the four the kit renders empty); a part selector
@@ -171,7 +179,7 @@ moved under you says so.
 - A field for an API key. A key for an outside service is NAMED, in an extension's header or in
   a living document's trigger or source \`headers\`, as \`{{secret:NAME}}\`; the node fills it
   from the signed-in person's vault on the way out and a missing name fails by name. The page
-  tells the person the name and where it goes (their Access page, section 04 Secrets, or their
+  tells the person the name and where it goes (the Secrets section of their Access page, or their
   own AI with \`aimeat_secret_set\`), and the living document's gear dialogs pick from the
   stored names.
 - Hand-written ARIA, focus management or animation code — the components carry them, and a

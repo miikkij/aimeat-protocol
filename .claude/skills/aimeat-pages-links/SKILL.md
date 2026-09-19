@@ -69,7 +69,7 @@ There is no MCP or CLI tool for the workspace share state, on any of the three a
 (checked 2026-09-08). The route exists and only the UI calls it:
 
 ```bash
-# token: POST https://aimeat.io/v1/ghii/login with the owner credentials in docs/internal/TESTING.md
+# token: POST https://aimeat.io/v1/ghii/login with the owner credentials (docs/internal/TESTING.md or docs/internal/prod-login-*.json; both are gitignored and exist only in the MAIN checkout on the developer's main machine, never in a worktree, so ask the developer when they are absent)
 curl -s -X PUT "https://aimeat.io/v1/organisms/<org>/workspace/share?ws=<ws>" \
   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
   --data-binary @share.json

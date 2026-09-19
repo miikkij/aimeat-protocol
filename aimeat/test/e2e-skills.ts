@@ -807,9 +807,13 @@ await test('27b2. seeded aimeat-node-guide serves anonymously and its bytes hash
 
 // The six conversation skills existed only as hand-published skills on aimeat.io until 2026-09-18,
 // so a fresh node had the chat and none of the guidance that steers it. They were moved in byte for
-// byte, and the digest below is the one aimeat.io published that day: equal bytes is what lets that
-// node ADOPT its own copies instead of keeping them as unknown (services/skill-seeds.ts).
-await test('27b2b. a fresh node carries the six conversation skills, byte-identical to what aimeat.io served', async () => {
+// byte, and equal bytes is what let that node ADOPT its own copies instead of keeping them as
+// unknown (services/skill-seeds.ts). Since 2026-09-19 the repository is their source: the content
+// audit corrected aimeat-welcome-pages and aimeat-mail-to-data here, so those two no longer equal
+// what aimeat.io served that day, and a node takes the corrections on its next start. The digest
+// below pins aimeat-first-conversation, which the audit found nothing wrong in; when that text is
+// corrected, this string moves with it.
+await test('27b2b. a fresh node carries the six conversation skills, and the untouched one is still the text aimeat.io served', async () => {
     const idx = await (await rawFetch('/.well-known/agent-skills/index.json')).json() as any;
     const names = ['aimeat-first-conversation', 'aimeat-welcome-pages', 'aimeat-activating-a-person',
         'aimeat-offering-choices', 'aimeat-paying-for-the-ai', 'aimeat-mail-to-data'];

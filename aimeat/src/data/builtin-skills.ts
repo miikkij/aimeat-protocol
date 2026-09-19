@@ -11,6 +11,18 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   v1.15.2 -- 2026-09-19 -- Content audit of the game skills: aimeat-game-apps still counted six
+ *     area skills when the entry skill has named eight since 2026-09-03, sent the reader to the
+ *     `phaser` pack that was deprecated in favour of `phaser4`, taught hand-rolled
+ *     generateTexture over AIMEAT.phaser.textures, named the raw realtime pack where
+ *     AIMEAT.phaser.net already does the wiring, and asked for a tab-hide pause boot.js performs
+ *     by itself. Only that skill was touched.
+ *   v1.15.1 -- 2026-09-19 -- Content audit: every claim in the inline skills was compared with the
+ *     code. What was wrong was advice a gate cannot see — three tools that report only on the
+ *     CALLING agent (aimeat_agent_activity, aimeat_onboarding_status, aimeat_task_list) named as the
+ *     way to inspect another one, workflow `resume` and `skip_done` stated as the default when both
+ *     are opt-in and off, aimeat_schedule_create credited with a workflow kind it does not have, the
+ *     human registration route (POST /v1/ghii, not POST /v1/owners), and a profile page label.
  *   v1.15.0 -- 2026-09-18 -- Six conversation skills join from builtin-skills.conversation.ts:
  *     aimeat-first-conversation, aimeat-welcome-pages, aimeat-activating-a-person,
  *     aimeat-offering-choices, aimeat-paying-for-the-ai and aimeat-mail-to-data. They existed only
@@ -73,7 +85,7 @@
  */
 
 import { OPEN_ITEMS_SKILL_ENTRY } from './builtin-skills.open-items.js';
-import { HATCHERY_SKILL_ENTRY } from './builtin-skills.hatchery.js';
+import { RECURRING_WORK_SKILL_ENTRIES } from './builtin-skills.recurring-work.js';
 import { CONVERSATION_SKILL_ENTRIES } from './builtin-skills.conversation.js';
 import { WORKSTATION_SKILL_ENTRY } from './builtin-skills.workstation.js';
 import { APP_BUILDER_SKILL_ENTRY } from './builtin-skills.app-builder.js';
@@ -90,7 +102,7 @@ export interface BuiltinSkill {
 
 export const BUILTIN_SKILLS: BuiltinSkill[] = [
   OPEN_ITEMS_SKILL_ENTRY,
-  HATCHERY_SKILL_ENTRY,
+  ...RECURRING_WORK_SKILL_ENTRIES,
   ...CONVERSATION_SKILL_ENTRIES,
   WORKSTATION_SKILL_ENTRY,
   APP_BUILDER_SKILL_ENTRY,
@@ -111,8 +123,8 @@ metadata:
 
 AIMEAT (AI Memory Exchange and Action Transfer) is an open protocol for AI-agent
 infrastructure. A node gives humans and their AI agents persistent memory, identity,
-shared workspaces (organisms), skills, tasks/workflows, app hosting, and a morsel
-economy — over plain REST and MCP.
+shared workspaces (organisms), skills, tasks/workflows, app hosting, and morsel
+pacing — over plain REST and MCP.
 
 ## Discover the node
 
@@ -135,7 +147,8 @@ Fetch these in order of depth; each is self-describing:
 
 ## Humans: register and log in
 
-- Register: \`POST /v1/owners\` with \`{ name, public_key }\`, or use the web portal at \`/\`.
+- Register: \`POST /v1/ghii\` with \`{ username, display_name, password, email }\` — it creates the
+  owner account and the GHII profile in one step — or use the web portal at \`/\`.
 - Log in (web/API): \`POST /v1/ghii/login\` with \`{ username, password }\` → a session JWT.
 - An owner holding an older Ed25519 key can still log in with it (\`POST /v1/auth/token\` with
   \`owner\`, a timestamp and a signature). That is a legacy path; the password login above is the
@@ -344,9 +357,10 @@ You are assisting a node OPERATOR. Always inspect before you suggest changes, an
 show the owner what you found before acting.
 
 ## Answering "what's in my system?"
-1. \`aimeat_admin_stats\` — node totals: owners, agents, memory, morsels in circulation.
+1. \`aimeat_admin_stats\` — node totals: agents, active agents, actions, boards, work items,
+   morsels in circulation. For owners and memory, \`aimeat_admin_statistics\`.
 2. \`aimeat_admin_agents\` (or \`aimeat_agents_list\` for your own owner) — who is registered,
-   their platform, last-seen, trust.
+   their owner, trust, morsel balance, last-seen.
 3. \`aimeat_organism_list\` + \`aimeat_organism_overview\` — the shared workspaces and what lives in them.
 4. \`aimeat_discover\` with \`mode: "map"\` — a faceted map of every content type (skills,
    knowledge, workflows, apps, documents) the caller can see.
@@ -373,9 +387,10 @@ metadata:
 You are assisting an OWNER with their own agents (never another owner's).
 
 ## Common tasks
-- **List agents:** \`aimeat_agents_list\` — name, GAII, platform, mode, last-seen.
-- **Inspect one:** \`aimeat_agent_profile\` — capabilities, tags, trust, telemetry.
-- **Onboarding state:** \`aimeat_onboarding_status\` — which Hello-Integration steps remain.
+- **List agents:** \`aimeat_agents_list\` — name, GAII, tags, mode, last-seen.
+- **Inspect one:** \`aimeat_agent_profile\` — capabilities, trust, linked skills; pass the agent's GAII.
+- **Onboarding state:** \`aimeat_onboarding_status\` — which Hello-Integration steps remain. It
+  reports the calling agent's own onboarding only.
 - **Give an agent expertise:** browse \`aimeat_skill_list\` (view "library"), then
   \`aimeat_skill_link\` with the skill's ref and the target \`agent_name\`. Links are
   references — the agent loads current content at start.
@@ -410,7 +425,8 @@ Everything is MEMORY records under the owner's identity (GHII) or their agents' 
   content search, \`aimeat_discover\` for a cross-domain map.
 - **Read/write:** \`aimeat_memory_read\` / \`aimeat_memory_write\`.
 - **Visibility ladder** (low → high reach): private < owner < group < workspace < members < public.
-  \`public\` is federated — visible beyond this node. Never raise visibility without the
+  \`public\` is federated — visible beyond this node. \`workspace\` is a REST-only tier today:
+  \`aimeat_memory_write\` takes the other five. Never raise visibility without the
   owner's explicit confirmation.
 - **Sharing with people/organisms:** consents (\`aimeat_consent_grant\` / \`aimeat_consent_list\` /
   \`aimeat_consent_revoke\`) grant scoped read access without copying data.
@@ -444,8 +460,9 @@ Agents are NEVER created implicitly. The flow is device authorization (RFC 8628)
    \`GET /v1/agents/{name}/skills\`.
 4. **Organize it:** tags via \`aimeat_agent_tags_set\`; mode/display via
    \`aimeat_operator_agent_configure\` (propose-then-confirm — show the owner the diff).
-5. **Verify it came online:** \`aimeat_agent_profile\` / \`aimeat_agent_activity\` (last-seen,
-   telemetry) and \`aimeat_onboarding_status\` for remaining Hello-Integration steps.
+5. **Verify it came online:** \`aimeat_agents_list\` — the new agent's row carries \`last_seen\`,
+   \`mode\` and \`tags\`. \`aimeat_agent_activity\` and \`aimeat_onboarding_status\` report on the
+   CALLING agent only, so neither one can answer for the agent you just connected.
 
 ## Principles
 - Never mint or paste credentials yourself; approval is the owner's UI action.
@@ -471,11 +488,14 @@ A pipeline = a WORKFLOW definition (chained steps dispatched to agents) + a TRIG
    linked skills (\`aimeat_skill_list\` view "linked"). Attach domain skills first
    (e.g. an editorial-style skill) so output quality is set by reference, not by prompt copies.
 2. **Author the workflow:** \`aimeat_workflow_get\` an existing one as a template, then
-   \`aimeat_workflow_save\`. Steps signal each other through memory keys; the engine
-   re-evaluates steps against reality on retry (resume-on-retry).
+   \`aimeat_workflow_save\`. Steps signal each other through memory keys; set \`resume: true\` in
+   the definition to have the engine re-evaluate steps against reality on retry, which is off
+   by default (the default is restart-and-skip).
 3. **Dry-run:** \`aimeat_workflow_run\` with \`mode: "signals-only"\` before scheduling.
-4. **Schedule the trigger:** \`aimeat_schedule_create\` (cron or interval) targeting the
-   workflow; verify with \`aimeat_schedule_list\`.
+4. **Schedule the trigger:** the trigger is part of the definition, not a separate schedule —
+   put \`trigger: { kind: "schedule", cron: "0 7 * * *", timezone: "Europe/Helsinki" }\` in the
+   \`aimeat_workflow_save\` descriptor and the save creates the backing cron; verify with
+   \`aimeat_workflow_get\`.
 5. **Deliver to a workspace:** the final step writes via \`aimeat_workspace_write\` (drafts) —
    publish stays a human decision unless the owner says otherwise.
 
@@ -499,7 +519,7 @@ metadata:
 Three separate "routing" layers — identify which one the owner means:
 
 1. **AI provider/model routing** (whose key, which models): configured per-owner in
-   profile → Settings → AI provider. Inspect availability via \`GET /v1/ai/available\`;
+   profile → AI. Inspect availability via \`GET /v1/ai/available\`;
    spend history via \`GET /v1/ai/usage/history\` (surfaced on the Home usage card and the
    admin AI-usage tab). Changing the provider/key is an owner UI action — guide, don't do.
 2. **Work routing** (which agent does what): driven by agent capabilities, tags, and offers.
@@ -510,7 +530,9 @@ Three separate "routing" layers — identify which one the owner means:
    the owner's balance; escrow holds show as in_escrow.
 
 ## Principles
-- Never change provider keys or budgets yourself — propose the change, the owner applies it.
+- Model routing and the daily budget go through \`aimeat_operator_ai_config\`: call it without
+  \`confirm_token\` to get current/proposed/diff, show the owner the diff, then call again with
+  the token. The API key can never be read or changed through it.
 - When spend looks wrong, correlate \`/v1/ai/usage/history\` with schedules (\`aimeat_schedule_list\`)
   before blaming a model.
 `,
@@ -587,7 +609,7 @@ should work without the connector, or auto-trigger via Claude's native skill dis
 ## claude.ai / Claude Desktop chat (no filesystem)
 - Zero-install: keep using \`aimeat_skill_get\` through the connector.
 - Real install: download \`GET /v1/skills/{name}/zip\` (the profile/workspace Skills tabs have
-  a ⤓ .zip button) and upload it in claude.ai Settings → Skills — the ZIP is already in the
+  a Download .zip button) and upload it in claude.ai Settings → Skills — the ZIP is already in the
   expected \`{name}/SKILL.md\` layout.
 
 ## Checking for updates
@@ -618,12 +640,17 @@ metadata:
 2. **Dry-run the signals:** \`aimeat_workflow_run\` with \`mode: "signals-only"\` — evaluates each
    step's signals against current memory WITHOUT dispatching work. A step whose signal never
    becomes true is usually the stall point.
-3. **Check the schedule:** \`aimeat_schedule_list\` — does the trigger exist, when did it last run,
-   is it enabled? Scheduled-job successes are not logged individually; errors and skips are.
-4. **Check the worker:** \`aimeat_agent_profile\` / \`aimeat_agent_activity\` for the agent a step
-   dispatches to — is it connected and seen recently? \`aimeat_task_list\` for its task queue.
-5. **Retry semantics:** workflow retries re-evaluate steps against reality (resume-on-retry) —
-   steps whose outputs already exist are not redone. Safe to suggest a retry after fixing the cause.
+3. **Check the trigger:** \`aimeat_workflow_get\` returns the trigger and the recent runs. A
+   workflow's backing cron is not in \`aimeat_schedule_list\`, which returns only the schedules an
+   agent created. Every user schedule logs each run; only the node's internal \`core\` ticks leave
+   their successes out of the log.
+4. **Check the worker:** \`aimeat_agents_list\` for the agent a step dispatches to — is it
+   connected and seen recently (\`last_seen\`, \`mode\`)? \`aimeat_agent_activity\` and
+   \`aimeat_task_list\` report on the CALLING agent only, so neither reads the worker's queue.
+5. **Retry semantics:** both are flags on the definition and both are off unless the workflow
+   sets them — \`resume: true\` re-evaluates steps against reality instead of restart-and-skip,
+   and \`skip_done: true\` leaves a step whose output already exists alone. Safe to suggest a
+   retry after fixing the cause.
 
 ## Principles
 - Diagnose before touching: collect the evidence from steps 1-4 and present the likely cause.
@@ -636,7 +663,7 @@ metadata:
     visibility: 'public',
     skillMd: `---
 name: aimeat-game-apps
-description: Build 2D games and creative-canvas apps on an AIMEAT node with the self-hosted library packs — phaser (full game engine), pixi (fast 2D WebGL rendering) and p5 (creative coding). Covers pack selection, the correct modern API idioms per engine, single-file-app asset strategy, AIMEAT high-score/leaderboard glue, and realtime multiplayer wiring. Use when the owner wants a game, arcade, generative-art or heavy-2D-animation app.
+description: Build 2D games and creative-canvas apps on an AIMEAT node with the self-hosted library packs — phaser4 through aimeat-phaser (full game engine), pixi (fast 2D WebGL rendering) and p5 (creative coding). Covers pack selection, the correct modern API idioms per engine, single-file-app asset strategy, AIMEAT high-score/leaderboard glue, and realtime multiplayer wiring. Use when the owner wants a game, arcade, generative-art or heavy-2D-animation app.
 license: MIT
 metadata:
   audience: agent
@@ -645,15 +672,15 @@ metadata:
 # Building game & creative-canvas apps
 
 The node self-hosts three engines as library packs — fetch each pack's live doc before
-coding: \`GET /v1/library-packs/phaser\` (or \`pixi\` / \`p5\`). Never load engines
+coding: \`GET /v1/library-packs/phaser4\` (or \`pixi\` / \`p5\`). Never load engines
 from an external CDN; the include line in the pack doc points at this node's /lib/ copy.
 
 ## Pick the right engine
 
 - **phaser4** (\`GET /v1/library-packs/phaser4\`) — a GAME: scenes, physics, collisions, input,
   score, sound. The default for games. **Load the skill \`node:aimeat-phaser\` first: it is the
-  entry point, and it names the six area skills (boot, assets, saves, controls and the HUD, menus
-  and levels, audio) for whichever part you are working on.** Load the library THROUGH \`aimeat-phaser\`
+  entry point, and it names the eight area skills (boot, assets, saves, controls and the HUD, menus
+  and levels, audio and juice, the world, the story) for whichever part you are working on.** Load the library THROUGH \`aimeat-phaser\`
   (\`GET /v1/library-packs/aimeat-phaser\`): \`AIMEAT.phaser.game()\` boots into an element with
   fit / resize / fixed scaling and fullscreen, \`textures\` generate tiles and a character with
   animations, \`preloadPack\` draws the loading bar, \`audio\` is the bus, \`saves\` is the
@@ -671,7 +698,9 @@ from an external CDN; the include line in the pack doc points at this node's /li
 ## Single-file-app asset strategy
 
 Published AIMEAT apps are one HTML file — avoid external asset files entirely:
-- Phaser: generate textures from Graphics (\`g.generateTexture('name', w, h)\`).
+- Phaser: \`AIMEAT.phaser.textures.tiles(this)\` and \`textures.character(this, { key: 'hero' })\`
+  draw the art on the page's own colours, and \`textures.shapes()\` takes anything else you draw.
+  A game not using \`aimeat-phaser\` generates its own from Graphics (\`g.generateTexture('name', w, h)\`).
 - Sound: the \`aimeat-audio\` SDK lib (instruments + synth) instead of audio files.
 - If real images are needed, upload once via \`AIMEAT.storage\` (public) and load by URL.
 
@@ -684,15 +713,20 @@ Published AIMEAT apps are one HTML file — avoid external asset files entirely:
   exactly this, keeps a guest copy in the browser until sign-in and merges it then, and
   version-gates the record. Never one key per score or per level: the budget is 1000 keys per
   person.
-- **Multiplayer**: the \`realtime\` pack (AimeatRealtime rooms — WS + WebRTC + Yjs). Broadcast
-  inputs/state deltas, never frames; throttle to ~30ms; register handlers BEFORE connect().
+- **Multiplayer**: in a Phaser game, \`AIMEAT.phaser.net({ room, app, onPeer, onInput })\` already
+  does the wiring (find or make the room, elect the host as the lowest peer id, throttle and
+  change-gate \`sendInput\`); add \`/lib/realtime.js\` to the page and sign in first, because a
+  room belongs to an account. Anywhere else, the \`realtime\` pack itself (AimeatRealtime rooms —
+  WS + WebRTC + Yjs): broadcast inputs/state deltas, never frames; throttle to ~30ms; register
+  handlers BEFORE connect().
 - **Theme**: read the app CSS variables for colors so the game respects light/dark.
 
 ## Checklist before publishing
 
 1. Boots from a cold load while signed OUT (game playable; saving prompts sign-in).
 2. Works at mobile width (Phaser Scale.FIT / p5 windowResized / pixi resizeTo).
-3. Pauses when the tab hides (battery): phaser \`game.loop.sleep()/wake()\`.
+3. Pauses when the tab hides (battery): \`AIMEAT.phaser.game()\` already does this unless you
+   passed \`pauseOnHide: false\`; \`h.sleep()\` / \`h.wake()\` are for your own pauses.
 4. High-score write → read back → visible on the leaderboard without a reload.
 `,
   },

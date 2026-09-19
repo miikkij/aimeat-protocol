@@ -20,10 +20,10 @@ third-party packs from `/lib/`. Mixing them 404s.
 
 ## Served SDK libs (`/v1/libs/aimeat-*.js`)
 
-29 libs today. Authored as **componentized, JSDoc-typed ESM** under `src/static/sdk-libs/<name>/`,
+About forty libs (count the directories under `src/static/sdk-libs/`, leaving out `_core` and `dist`). Authored as **componentized, JSDoc-typed ESM** under `src/static/sdk-libs/<name>/`,
 sharing code through `_core/`, **under 800 lines per file**, esbuild-bundled to a classic IIFE with
 `pnpm build:sdk`, and served with a per-node config prelude by `src/routes/libs.ts`. Guarded by
-`check:sdk` (bundle in sync with sources) and `typecheck:sdk`, both in the pre-commit hook.
+`check:sdk` (bundle in sync with sources), which runs in `pnpm gate` and CI, and `typecheck:sdk`, which runs in the pre-commit hook. A stale bundle therefore passes a commit and is caught by the gate, so run `pnpm build:sdk` before you commit.
 
 - **Never author a served lib as JavaScript inside a TypeScript template string.** That was the old
   `lib-*.ts` / `auth-lib-part*.ts` pattern, removed 2026-07-19. Edit the ESM source and rebuild.

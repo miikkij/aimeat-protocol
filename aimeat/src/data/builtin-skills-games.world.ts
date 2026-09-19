@@ -10,6 +10,9 @@
  * @structure PHASER_WORLD_SKILL · PHASER_STORY_SKILL
  * @usage import { PHASER_WORLD_SKILL, PHASER_STORY_SKILL } from './builtin-skills-games.world.js';
  * @version-history
+ *   v1.1.0 — 2026-09-19 — The content audit of 2026-09-19: the follower list named six of the
+ *     eight presets that carry a follow family, so two were unreachable by a reader who trusted
+ *     it. Everything else in both skills matched the modules.
  *   v1.0.0 — 2026-09-03 — Initial (wish-phaser-fx-sprites-parallax-worldmap).
  */
 import type { BuiltinSkill } from './builtin-skills.js';
@@ -44,7 +47,8 @@ fx.define('my-sparks', { ...fx.preset('sparks'), quantity: 40 });
 
 Weather kinds: rain, snow, fog, stars, leaves, embers, bubbles, dust, confetti. Bursts:
 explosion, sparks, splash, confetti, portal, dust, smoke, footsteps, coin bursts and more
-(\`fx.kinds('at')\` lists them). Followers: trail, fire, smoke, dust, bubbles, footsteps.
+(\`fx.kinds('at')\` lists them). Followers: trail, fire, smoke, dust, sparks, embers, bubbles,
+footsteps.
 Colours are theme words (\`colour: 'ok'\`) or numbers. Under the less-motion switch weather
 runs thin and slow, a burst becomes one puff and followers stand down; write nothing for it.
 
