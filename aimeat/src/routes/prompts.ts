@@ -298,7 +298,7 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
   registerIntentPoolPrompt(router, config);
   // The Atelier track's build spec (TARGET-074) — its own module and route so the two tracks'
   // guides never mix. MUST be registered before /v1/prompts/:tier.
-  registerAtelierPrompt(router, config);
+  registerAtelierPrompt(router, config, storage);
 
   router.get('/v1/prompts/build-extension', (req, res) => {
     const lang = typeof req.query.lang === 'string' ? req.query.lang : 'en';

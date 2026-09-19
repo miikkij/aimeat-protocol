@@ -91,8 +91,8 @@ export function handRolledFindings(html: string): AppArtifactFinding[] {
     found.push(`${rule.what}: ${rule.instead ?? rule.libs.slice(0, 2).map(l => '`' + l + '`').join(' or ') + ' does this'}`);
   }
   // A chart built in code, on a page that loads the kit and never calls its chart or its gauge.
-  // Quiet when the forked genre draws in SVG or canvas itself: keeping the genre's drawing is the
-  // point of a fork, and the kit's chart would wear the default look inside it.
+  // Quiet when the forked genre draws in SVG or canvas itself: keeping the genre's own figures
+  // is the point of a fork.
   if (loaded(html, 'aimeat-atelier') && /createElementNS\s*\([^)]*\)|\.getContext\s*\(/.test(bare)
     && /createElementNS\s*\([^)]{0,80}["'](?:rect|polyline|path|circle|line)["']|getContext\s*\(\s*["']2d["']/.test(code)
     && !/\.(?:chart|gauge|radar)\s*\(/.test(bare)) {

@@ -13,6 +13,9 @@
  * @structure designbookRouter(config, storage): Router
  * @usage mounted by server-bootstrap/routes-loader.ts
  * @version-history
+ *   v1.4.0 — 2026-09-19 — GET /v1/designbook?view=map: the whole published shelf as one page of
+ *     text, which is what the search tools answer when they are given no word. And the preview
+ *     answers a served genre the shelf does not hold yet, where it answered 404.
  *   v1.3.1 — 2026-09-02 — The preview's img-src is the app policy (* data: blob:). Framed from
  *     design-book.apps.aimeat.io, 'self' meant the subdomain and every illustration on the apex
  *     was blocked — found on prod the day the gallery front shipped.
@@ -38,6 +41,8 @@ import { parseDeclaredProvenanceInput } from '../mcp/ai-provenance-input.js';
 import type { WriteProvenance } from '../services/app-ui/service.js';
 import { DesignBookService } from '../services/design-book/service.js';
 import { DesignBookError } from '../services/design-book/validate.js';
+import { MAP_NOTE } from '../services/design-book/map.js';
+import { getAppTemplates } from '../data/app-templates.js';
 
 export function designbookRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -79,6 +84,16 @@ export function designbookRouter(config: AimeatConfig, storage: Storage): Router
   // parts still in proposal.
   router.get('/v1/designbook', async (req: Request, res: Response) => {
     try {
+      // The whole published shelf as one page of text, for a reader that does not know yet what
+      // to search for. Public, as the listing is.
+      if (req.query.view === 'map') {
+        const out = await book.map();
+        res.json(success(config.nodeId, { ...out, note: MAP_NOTE }, [
+          { description: 'Read one part whole', method: 'GET', url: '/v1/designbook/{id}' },
+          { description: 'Search by word or kind', method: 'GET', url: '/v1/designbook?q={word}' },
+        ]));
+        return;
+      }
       const rows = await book.list({
         kind: req.query.kind as string | undefined,
         status: isSignedIn(req) ? (req.query.status as string | undefined) : 'published',
@@ -116,11 +131,25 @@ export function designbookRouter(config: AimeatConfig, storage: Storage): Router
   router.get('/v1/designbook/:id/preview', async (req: Request, res: Response) => {
     try {
       const { partPreviewHtml } = await import('../services/design-book/preview.js');
-      const { part } = await book.get(req.params.id as string);
-      const html = partPreviewHtml(part);
+      const id = req.params.id as string;
+      // A GENRE THE SHELF DOES NOT HOLD YET is still a page this node serves: the specification
+      // and the map give every genre this address to look at, and the shelf lags the templates
+      // (production held 19 of 23 on 2026-09-19, a fresh node holds none). The template is the
+      // node's own HTML, the same a genre part would have pointed at.
+      let part: Awaited<ReturnType<typeof book.get>>['part'] | null = null;
+      try {
+        part = (await book.get(id)).part;
+      } catch (err) {
+        if (!(err instanceof DesignBookError) || err.status !== 404) throw err;
+      }
+      const served = part ? null : getAppTemplates().find(t => t.kind === 'genre' && t.id === id);
+      if (!part && !served) {
+        return res.status(404).json(error(config.nodeId, 'NOT_FOUND', `The Design Book holds no part "${id}", and this node serves no genre by that name.`));
+      }
+      const html = part ? partPreviewHtml(part) : served!.content;
       if (html === null) {
         return res.status(404).json(error(config.nodeId, 'NOT_RENDERABLE',
-          `"${part.id}" points at a template this node no longer carries, so there is nothing to render.`));
+          `"${id}" points at a template this node no longer carries, so there is nothing to render.`));
       }
       // A preview is a rendering of the part's current version, not a page of its own: no store,
       // no index — the gallery at /v1/design-book is the address a person keeps. The page's

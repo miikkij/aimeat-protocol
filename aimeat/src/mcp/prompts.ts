@@ -49,7 +49,8 @@ import { substituteVariables } from '../services/prompt-variables.js';
 import { buildAppPrompt } from '../services/build-app-prompt.js';
 import { buildAppPiece, buildAppPieceIds } from '../services/build-app-layers.js';
 import { buildAtelierPrompt } from '../services/build-atelier-prompt.js';
-import { atelierPiece, atelierPieceIds } from '../services/build-atelier-layers.js';
+import { atelierPieceIds } from '../services/build-atelier-layers.js';
+import { atelierPieceWithBook } from '../services/build-atelier-book.js';
 import { toolError } from './tool-error.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
 import { V2_ROLES, toolsForSurface, type SurfaceRole } from './catalog/surfaces.js';
@@ -116,7 +117,8 @@ export function registerPromptsTools(
             if (tierKey === 'build-app-atelier' || tierKey.startsWith('build-app-atelier/')) {
                 const full = buildAtelierPrompt(config, { mode: 'new', lang: 'en' }).full;
                 const id = tierKey.slice('build-app-atelier/'.length) || 'start';
-                const piece = atelierPiece(full, id, config.baseUrl);
+                // Part `libraries` arrives with the Design Book's map in it (build-atelier-book.ts).
+                const piece = await atelierPieceWithBook(full, id, config, storage);
                 if (piece) return { content: [{ type: 'text' as const, text: piece.text }] };
                 return toolError('NOT_FOUND', `The Atelier build specification has no part "${id}". It has: ${atelierPieceIds().join(', ')}. Ask for "build-app-atelier" to read the first part, which lists the others.`);
             }

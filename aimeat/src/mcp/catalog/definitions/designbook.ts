@@ -11,6 +11,8 @@
  * @structure designbookTools
  * @usage import { designbookTools } from './designbook.js';
  * @version-history
+ *   v1.2.0 — 2026-09-19 — The search says what it answers when it is given nothing: the whole
+ *     published Book on one page.
  *   v1.1.0 — 2026-09-05 — Seven kinds, said out loud (wish-atelier-ambient-visuals): the search,
  *     the read, the propose and the adopt name look, motion, illustration, genre and ambient
  *     beside layout and fill — this catalogue had said two kinds while six existed, so a fleet
@@ -24,7 +26,7 @@ import { AI_PROVENANCE_TOOL_NOTE, aiProvenanceCatalogInput } from './ai-provenan
 export const designbookTools: AimeatToolDefinition[] = [
     {
         name: 'aimeat_designbook_search',
-        description: "Browse the Design Book: the node's shared library of proven parts. Each row is a part — `layout` (a complete Atelier mosaic arrangement), `fill` (the same shape with <placeholder> slots, a starting shape), `look` (a signature token sheet with an optional preset), `motion` (a motion-token recipe), `illustration` (art direction for the imagery pipeline), `genre` (one of the node's served page templates, shown and forked rather than adopted) or `ambient` (the one layer allowed to move at idle: a preset with its alpha and speed, proven on a look) — with its title, what it is for, lifecycle status and how many builds have adopted it. Published parts are what everyone builds from; proposed ones are still earning it. Filter by kind, status or a word.",
+        description: "Browse the Design Book: the node's shared library of proven parts. Each row is a part — `layout` (a complete Atelier mosaic arrangement), `fill` (the same shape with <placeholder> slots, a starting shape), `look` (a signature token sheet with an optional preset), `motion` (a motion-token recipe), `illustration` (art direction for the imagery pipeline), `genre` (one of the node's served page templates, shown and forked rather than adopted) or `ambient` (the one layer allowed to move at idle: a preset with its alpha and speed, proven on a look) — with its title, what it is for, lifecycle status and how many builds have adopted it. Published parts are what everyone builds from; proposed ones are still earning it. Filter by kind, status or a word. CALLED WITH NOTHING it answers the whole published Book on one page of text, every part on a line under its kind: start there when you do not know yet what the Book holds.",
         caller: 'agent',
         visibility: { publicMcp: true, connectorMcp: true, cliFallback: true },
         input: {
