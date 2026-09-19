@@ -20,9 +20,9 @@
  *   is low), because what is measured is the decision to load, not the work after it.
  *
  *   ONLY SKILLS A FRESH NODE SHIPS. The sandbox is a fresh node, so every skill named here comes
- *   from src/data/builtin-skills*.ts. Skills published by hand on aimeat.io alone
- *   (aimeat-first-conversation, aimeat-paying-for-the-ai, aimeat-mail-to-data were the first three
- *   tried) do not exist on it, and a case naming one can only fail.
+ *   from src/data/builtin-skills*.ts. A skill published by hand on aimeat.io alone does not exist
+ *   on it, and a case naming one can only fail. (The six conversation skills were such skills until
+ *   they moved into the repository on 2026-09-18; they have cases now.)
  *
  *   GROWING IT. Ten to twenty sentences per skill is what the testing guides recommend. This
  *   starts smaller, with the skills a new person's first week reaches for, and a sentence joins
@@ -32,10 +32,14 @@
  *   cd aimeat && pnpm cold-agent --suite skills --model sonnet --runs 3
  * @version-history
  *   v1.0.0 — 2026-09-18 — Initial: 7 skills, 30 sentences, 6 of them needing no skill.
+ *   v1.1.0 — 2026-09-19 — Every entry-point skill has sentences now: 21 skills, 71 sentences. A case
+ *     may accept more than one skill, and a name is matched as a whole word. Sub-skills reached only
+ *     through a parent get no sentence of their own. Not yet run: about 0.5 USD a sentence per run.
  */
 import type { Task } from './tasks.js';
 
-export interface SkillCase { expect: string | null; say: string }
+/** `expect` may name several skills when more than one is a right answer (a generic game skill and the engine-specific one). */
+export interface SkillCase { expect: string | string[] | null; say: string }
 
 export const SKILL_CASES: SkillCase[] = [
     // Building an app
@@ -69,6 +73,60 @@ export const SKILL_CASES: SkillCase[] = [
     { expect: 'ai-transparency', say: 'Someone sent me a picture from this site. Can I check whether it is AI-generated?' },
     { expect: 'ai-transparency', say: 'Do I have to label what you write for me before I publish it?' },
     { expect: 'ai-transparency', say: 'What does this place do about the EU rules on marking AI content?' },
+    // ── Added 2026-09-19: the entry-point skills that had no sentence at all. A sub-skill that is
+    // only ever reached through its parent (the eight aimeat-phaser-* area skills) gets none of its
+    // own: the handbook lists entry points, and the parent routes to them.
+    // Something that should happen regularly
+    { expect: 'aimeat-recurring-work', say: 'Every Monday morning I want a summary of what my agents did last week.' },
+    { expect: 'aimeat-recurring-work', say: 'Can something check the price of my flight once a day and tell me when it drops?' },
+    { expect: 'aimeat-recurring-work', say: 'Keep track of new job ads for nurses in Tampere for me.' },
+    // A recurring content pipeline
+    { expect: 'set-up-content-pipeline', say: 'I want a weekly newsletter draft written from my notes, ready for me to check on Fridays.' },
+    { expect: 'set-up-content-pipeline', say: 'Set it up so my agents produce a market report every month.' },
+    { expect: 'set-up-content-pipeline', say: 'Two of my agents should research and then write an article each week. How do we wire that?' },
+    // Connecting a new automation agent
+    { expect: 'add-a-crew-agent', say: 'I have a CrewAI agent running on my server. How do I connect it here?' },
+    { expect: 'add-a-crew-agent', say: 'I want to add another AI that only picks up tasks and does them.' },
+    { expect: 'add-a-crew-agent', say: 'Hook my Python bot up to this so it can take work from my other agents.' },
+    // Models, routing and spend
+    { expect: 'configure-routing', say: 'Which model do my agents use, and can I make the cheap one the default?' },
+    { expect: 'configure-routing', say: 'How much have the AI calls cost me this month?' },
+    { expect: 'configure-routing', say: 'Put a daily limit on what the AI is allowed to spend.' },
+    // Running the node
+    { expect: 'aimeat-node-operations', say: 'How many people and agents are on this node right now?' },
+    { expect: 'aimeat-node-operations', say: 'I run this server. Give me a health check of the whole thing.' },
+    { expect: 'aimeat-node-operations', say: 'Show me which agents are registered here and when each was last seen.' },
+    // Operating an app somebody else built
+    { expect: 'use-app-bound-skills', say: 'Add the three new customers to my CRM app.' },
+    { expect: 'use-app-bound-skills', say: 'There is a booking app on my account. Can you use it to reserve Thursday at two?' },
+    { expect: 'use-app-bound-skills', say: 'Go through my recipe app and mark the ones I cooked this week.' },
+    // Taking a skill with you
+    { expect: 'install-skills-locally', say: 'Can I have that writing guide on my own computer, for Claude Code?' },
+    { expect: 'install-skills-locally', say: 'I want to use one of these skills in claude.ai without connecting anything. How?' },
+    { expect: 'install-skills-locally', say: 'Download the skill for my project folder.' },
+    // An app that outgrew one file
+    { expect: 'aimeat-app-workstation', say: 'My app is getting huge and every change takes forever. Is there a better way to work on it?' },
+    { expect: 'aimeat-app-workstation', say: 'The publish said my app is too big. What now?' },
+    { expect: 'aimeat-app-workstation', say: 'I want to split my app into files on my machine and still publish it as one.' },
+    // Games that are not platformers, and creative canvas work
+    { expect: ['aimeat-game-apps', 'aimeat-phaser'], say: 'Make me a generative art piece that draws slowly changing flowers.' },
+    { expect: ['aimeat-game-apps', 'aimeat-phaser'], say: 'I want a fast particle toy with thousands of dots that follow the mouse.' },
+    { expect: ['aimeat-game-apps', 'aimeat-phaser'], say: 'Which game engine should we use here for a card battler?' },
+    // The designed track
+    { expect: ['aimeat-app-builder-atelier', 'aimeat-app-builder'], say: 'Build me a good-looking dashboard for my sales numbers, with a proper design, not a default look.' },
+    { expect: ['aimeat-app-builder-atelier', 'aimeat-app-builder'], say: 'I want an app that looks like a magazine, for my travel notes.' },
+    // The first minutes with a new person, and the conversation skills
+    { expect: 'aimeat-first-conversation', say: 'Hi. I just connected this. What is it and what should I do first?' },
+    { expect: 'aimeat-first-conversation', say: 'My friend told me to try this. I have no idea where to start.' },
+    { expect: 'aimeat-welcome-pages', say: 'Can I have a page about me that I can send to people?' },
+    { expect: 'aimeat-welcome-pages', say: 'Make me a simple portfolio page with my projects.' },
+    { expect: 'aimeat-paying-for-the-ai', say: 'Does this cost me anything? Who pays for the AI?' },
+    { expect: 'aimeat-paying-for-the-ai', say: 'It says I have run out of free AI use. What do I do?' },
+    { expect: 'aimeat-mail-to-data', say: 'Go through my email and make a table of all the invoices from this year.' },
+    { expect: 'aimeat-mail-to-data', say: 'Find the order confirmations in my Gmail and list what I bought.' },
+    // The node itself
+    { expect: 'aimeat-node-guide', say: 'What is this AIMEAT thing, technically? How does an AI connect to it?' },
+    { expect: 'aimeat-node-guide', say: 'I am a developer. Where is the API and how do I get a token?' },
     // Sentences that need no skill
     { expect: null, say: 'Remember that the plumber is coming on Thursday at nine.' },
     { expect: null, say: 'What did I ask you to remember about the plumber?' },
@@ -83,10 +141,20 @@ const loaded = (input: unknown): string => {
     return `${typeof i.name === 'string' ? i.name : ''} ${typeof i.ref === 'string' ? i.ref : ''}`.toLowerCase();
 };
 
+/**
+ * Whether what an agent asked `aimeat_skill_get` for names one of the wanted skills. A whole
+ * name: `node:aimeat-app-builder` and `aimeat-app-builder@1.2.0` count, and a load of
+ * `aimeat-app-builder-atelier` does not count as `aimeat-app-builder`.
+ */
+export function namesSkill(asked: string, wanted: string[]): boolean {
+    return wanted.some(w => new RegExp(`(^|[\\s:/])${w}(\\s|@|$)`).test(asked));
+}
+
 export function skillTasks(): Task[] {
     const seen = new Map<string, number>();
     return SKILL_CASES.map((c) => {
-        const group = c.expect ?? 'none';
+        const wanted = c.expect === null ? [] : Array.isArray(c.expect) ? c.expect : [c.expect];
+        const group = wanted[0] ?? 'none';
         const n = (seen.get(group) ?? 0) + 1;
         seen.set(group, n);
         return {
@@ -99,7 +167,8 @@ export function skillTasks(): Task[] {
                 // node does not ship fails the case, which is the truth about that node.
                 const gets = ctx.metrics.toolCalls.filter(t => t.name === 'aimeat_skill_get' && !t.isError).map(t => loaded(t.input));
                 if (c.expect === null) return { ok: gets.length === 0, detail: gets.length ? `loaded a skill it did not need:${gets.join(',')}` : 'loaded no skill' };
-                const hit = gets.some(g => g.includes(c.expect as string));
+                // A whole word, so that aimeat-app-builder does not count a load of aimeat-app-builder-atelier.
+                const hit = gets.some(g => namesSkill(g, wanted));
                 return { ok: hit, detail: hit ? 'loaded the skill' : gets.length ? `loaded something else:${gets.join(',')}` : 'loaded no skill' };
             },
         };

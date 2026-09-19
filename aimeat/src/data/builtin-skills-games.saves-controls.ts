@@ -13,6 +13,12 @@
  * @structure PHASER_SAVES_SKILL · PHASER_CONTROLS_HUD_SKILL
  * @usage import { PHASER_SAVES_SKILL, PHASER_CONTROLS_HUD_SKILL } from './builtin-skills-games.saves-controls.js';
  * @version-history
+ *   v1.1.0 -- 2026-09-19 -- The content audit of 2026-09-19. Three of the controls skill's gotchas
+ *     taught traps that boot.js v1.1.1 and settings.js v1.1.0 had already removed: the gamepad
+ *     plugin is on by default now (and the old text told the reader to build the Phaser.Game by
+ *     hand), and the panel applies the stored touch and motion choices when it is built. The saves
+ *     skill said the guest merge happens on sign-in without saying that nothing re-runs `load()`.
+ *     net() is documented here because its payload IS the controls state.
  *   v1.0.0 -- 2026-09-02 -- Initial, written against phaser/save.js, phaser/controls.js,
  *     phaser/hud.js and phaser/settings.js at aimeat-phaser 1.0.0.
  */
@@ -104,9 +110,12 @@ else you put there is kept and never removed.
 
 ### The guest-to-signed-in merge
 
-The first \`load()\` after a person signs in folds the browser copy into the node's copy. The
-node's copy is the base, because that is the one the player has been building on their other
-devices; the guest copy only ever RAISES something:
+The first \`load()\` after a person signs in folds the browser copy into the node's copy, and
+nothing re-runs it for you: \`saves()\` reads the session at the moment \`load()\` is called and
+registers no login listener at all. **Call \`store.load()\` again from wherever your app learns
+that somebody signed in** (the Atelier shell's \`onReady\`, or \`onSession\`), or the merge never
+happens. The node's copy is the base, because that is the one the player has been building on
+their other devices; the guest copy only ever RAISES something:
 
 - \`levels\`: \`unlocked\` is a union, \`stars\` and \`best\` take the higher of the two.
 - \`best\`: the higher.
@@ -220,7 +229,7 @@ export const PHASER_CONTROLS_HUD_SKILL: BuiltinSkill = {
   visibility: 'public',
   skillMd: `---
 name: aimeat-phaser-controls-hud
-description: "Input and the heads-up display for a Phaser 4 game on an AIMEAT node: AIMEAT.phaser.controls() folds keyboard, gamepad and an on-screen touch pad into one state per frame with press edges and rebinding; hud() and toast() draw score, lives, level, timer and a passing message on the page's own colours; settingsPanel() is the DOM settings page. Triggers on: input, controls, keyboard, arrow keys, WASD, gamepad, joystick, touch controls, virtual joystick, rebind, key bindings, HUD, score display, lives, timer, toast, settings page, näppäimet, ohjaimet, peliohjain, kosketusohjaus, näppäinasetukset, pistenäyttö, asetukset."
+description: "Input and the heads-up display for a Phaser 4 game on an AIMEAT node: AIMEAT.phaser.controls() folds keyboard, gamepad and an on-screen touch pad into one state per frame with press edges and rebinding; hud() and toast() draw score, lives, level, timer and a passing message on the page's own colours; settingsPanel() is the DOM settings page; net() puts that same input state on the wire so two people play one game. Triggers on: input, controls, keyboard, arrow keys, WASD, gamepad, joystick, touch controls, virtual joystick, rebind, key bindings, HUD, score display, lives, timer, toast, settings page, multiplayer, two players, room, näppäimet, ohjaimet, peliohjain, kosketusohjaus, näppäinasetukset, pistenäyttö, asetukset, moninpeli, kaksinpeli."
 license: MIT
 metadata:
   audience: agent
@@ -355,6 +364,59 @@ Rebinding arms a ONE-SHOT key listener: the next key is taken, the listener is g
 happens, and Escape leaves the binding as it was. A rebind REPLACES the whole list for that
 action, because the person pressed one key and expects that key to be the answer.
 
+## The second player: net(spec)
+
+\`AIMEAT.phaser.net()\` puts the state above on the wire, over the node's own realtime rooms. It
+belongs in this skill because its payload IS the controls state: what travels is "this player is
+holding left and jump", and each peer runs its own copy of the game on those inputs.
+
+\`\`\`html
+<script src="/lib/realtime.js"></script>
+\`\`\`
+
+\`\`\`js
+const link = AIMEAT.phaser.net({
+  room: 'ridge-1', app: 'ridge', name: 'Ada',
+  onPeer: (peer, joined) => list(peer.id, peer.name, joined),
+  onInput: (peerId, i) => { remote[peerId] = i; },
+  onState: (peerId, s) => applyHostSnapshot(s),
+});
+const { id, room, isHost } = await link.connect();
+// in update(): c.update(); link.sendInput({ l: c.left, r: c.right, j: c.jump });
+if (link.isHost()) link.sendState(world, { every: 100 });
+\`\`\`
+
+| Field | Meaning |
+|---|---|
+| \`room\` | the room's NAME; peers asking for the same name in the same app meet |
+| \`app\` | the app type the room is filed under, so two different games never share a room |
+| \`name\` | what this player is called. Default \`'player'\` |
+| \`rate\` | milliseconds between input packets. Default 30 |
+| \`onPeer\` | \`(peer, joined) => void\`, where \`peer\` is \`{ id, name }\` |
+| \`onInput\` \`onState\` \`onMessage\` | \`(peerId, payload) => void\` |
+| \`onClose\` | \`({ code, reason }) => void\` |
+
+Handle: \`connect()\` (resolves \`{ id, room, isHost }\`) · \`leave()\` · \`peers()\` (rows of
+\`{ id, name, latency }\`) · \`sendInput(input)\` · \`sendState(state, { every })\` ·
+\`send(msg)\` · \`isHost()\` · \`id()\` · \`destroy()\`. The three senders return whether a packet
+went out now.
+
+**It sends input and state, never frames.** \`sendInput()\` goes out at most once per \`rate\`
+and only when the input CHANGED, so a player holding right for ten seconds costs one packet; a
+change that lands inside the window is held and sent as the window closes, so the last input of
+a press never goes missing. \`sendState()\` has its own slower window, 100 ms by default, and is
+the HOST's snapshot of the shared world.
+
+**The host is the lowest peer id present.** Every peer sorts the same list the same way and
+reaches the same answer with no election traffic, and the next id up takes over when the host
+leaves. **A peer id is a label, not an authority**: the room's broadcast carries exactly what the
+sender passed and nothing the server vouches for, so the host decides what is true about the
+shared world and that is the whole point of electing one.
+
+\`connect()\` rejects with a sentence naming the fix when \`/lib/realtime.js\` is not on the page,
+when nobody is signed in (a room belongs to an account, so this is the one part of a game that
+is not playable as a guest), or when \`room\` or \`app\` is missing.
+
 ## Events
 
 | Call | Fires |
@@ -364,11 +426,11 @@ action, because the person pressed one key and expects that key to be the answer
 
 ## Gotchas and Common Mistakes
 
-1. **The gamepad needs \`input: { gamepad: true }\` in the Phaser game config, and
-   \`AIMEAT.phaser.game()\` has no option for it.** Without that key Phaser never starts its
-   gamepad plugin, \`scene.input.gamepad\` is undefined, and \`controls()\` runs on keyboard and
-   touch alone with no error. If a pad is required, build the \`Phaser.Game\` yourself with that
-   key set; everything else in this library works the same on it.
+1. **The gamepad plugin is on unless you turn it off.** \`AIMEAT.phaser.game()\` sets
+   \`input: { gamepad: true }\` in the Phaser config, because \`controls()\` is what reads it;
+   pass \`gamepad: false\` to \`game()\` when you do not want it. A \`Phaser.Game\` you built
+   yourself still needs that key by hand, and without it \`scene.input.gamepad\` is undefined and
+   \`controls()\` runs on keyboard and touch alone with no error.
 2. **A Phaser 4 gamepad axis is an OBJECT, not a number.** \`pad.axes[0].getValue()\` is the
    reading; \`pad.axes[0]\` used as a number is \`NaN\`. \`pad.leftStick\` is the shortcut where
    it exists, and the library tries it first.
@@ -381,14 +443,12 @@ action, because the person pressed one key and expects that key to be the answer
    Digits are spelled out.
 6. **\`showTouch(on)\` only SETS.** Nothing reads the overlay's state back, which is why the
    settings panel remembers its own answer for that switch. Do not treat it as a getter.
-7. **The touch switch in the settings panel is remembered but not applied on load.** The switch
-   comes back showing what the player chose; the overlay itself starts wherever \`controls()\`
-   put it. Call \`c.showTouch(store.settings().touch)\` after boot if you want the two to agree.
-8. **Less motion is saved but not restored.** The panel writes \`motion: 'less'\` into the save
-   and reads the setting back off the document, so apply it yourself on boot.
-9. **\`controls().destroy()\` gives the keys back.** Two live controls handles on one scene both
+7. **\`controls().destroy()\` gives the keys back.** Two live controls handles on one scene both
    add the same keys and the first \`destroy()\` removes them from under the second.
-10. **\`hud.time()\` takes SECONDS, not milliseconds**, and formats them as \`m:ss\`.
-11. **The HUD is per scene.** Restarting the scene destroys it; build it in \`create()\`.
+8. **\`hud.time()\` takes SECONDS, not milliseconds**, and formats them as \`m:ss\`.
+9. **The HUD is per scene.** Restarting the scene destroys it; build it in \`create()\`.
+10. **Register nothing on a \`net\` link after \`connect()\`.** The room dispatches 'joined' the
+    moment the socket answers, so a handler added later misses the message that says who you
+    are. Every handler is a field on the spec for exactly this reason.
 `,
 };

@@ -44,7 +44,7 @@ describe('a tool description that names a node skill names one that exists', () 
         // The check above is a regex over prose. If somebody rewrites the descriptions to point at
         // skills a different way, this test would go green by finding nothing at all — which is the
         // failure mode of every scan-based test. One known reference keeps it honest.
-        expect(referenced.map(r => r.skill)).toContain('hatchery-agent-requests');
+        expect(referenced.map(r => r.skill)).toContain('aimeat-recurring-work');
     });
 
     it('every named node skill is in BUILTIN_SKILLS', () => {

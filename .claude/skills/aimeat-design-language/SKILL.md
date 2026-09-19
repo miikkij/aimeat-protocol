@@ -29,7 +29,7 @@ alias of one of them, so a face changes once and reaches every page, outside and
 | Token | Value | Where |
 |---|---|---|
 | `--font-headline` | **Fjalla One**, uppercase, one weight | every headline, big numeral, sticker, slab and tab (the wordmark is its own token, below) |
-| `--font-body` | **Archivo** | everything read as a sentence on every face: body 400, emphasis 600, actions and row names 700 to 800; also form controls and the classic shell |
+| `--font-body` | **Archivo** | everything read as a sentence on every face: body 400, emphasis 600, actions and row names 700 (the vendored Archivo carries 400 to 700, so an 800 would be synthesised); also form controls and the classic shell |
 | `--font-mono` | **JetBrains Mono** | identifiers, keys, crumbs, addresses, commands, small labels that name a machine thing |
 
 The aliases a view sheet reads, and what they resolve to: `--font-showroom` and `--font-poster` are
@@ -224,8 +224,8 @@ normalizations under brief 10.7.
 
 An app on the Atelier track does not read `theme.css`; it reads the `--ak-*` contract in
 `aimeat/public/lib/aimeat-atelier.css`, where the looks are `[data-ak-look]` blocks and the pace of
-every entrance is four tokens — `--ak-motion` (how long), `--ak-ease` (the curve),
-`--ak-enter-distance` (how far a row rises) and `--ak-enter-stagger` (the beat between rows) —
+every entrance is four tokens, `--ak-motion` (how long), `--ak-ease` (the curve),
+`--ak-enter-distance` (how far a row rises) and `--ak-enter-stagger` (the beat between rows),
 with the spring hand beside them in `--ak-spring-*`, read off the element the kit is moving. Each
 `--ak-*` token falls back to the matching AIMEAT theme token and then to a literal, so an app
 served with `theme.css` inherits the house and an app served without it still looks finished. The
@@ -242,7 +242,7 @@ login pill's light/dark control renders disabled there and says why rather than 
 Absent, or `content="follows"`, means the switch works, which is what a page whose every colour is
 a token wants. The signal is the page's own declaration and not its register, because the register
 names what a page IS while keeping a fixed palette is a fact about how it was built. And the kit's light `--ak-accent` carries a lightness cap,
-because white is the action ink on paper and the house coral at `#E8564A` measured 3.58:1 under it —
+because white is the action ink on paper and the house coral at `#E8564A` measured 3.58:1 under it:
 inside the kit it deepens to `#cf3e35`; the house surfaces above keep the coral as it is.
 
 Code that runs **outside** the node cannot read a token: the portfolio prompt a person carries to

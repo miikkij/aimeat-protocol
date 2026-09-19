@@ -93,7 +93,7 @@ Kun et tiedä kumpi, pidä englanti. Se on rehellisempää kuin arvaus ja se on 
 Tarkistus on sama kuin muullakin kohdekielellä: hae termi lainausmerkeissä ja katso käyttääkö sitä
 luonnollinen kohdekielinen teksti. **Tämä koskee myös keskustelua, commit-viestejä ja nodelle
 kirjoitettuja tietueita**, ei vain julkaistavaa käyttöliittymätekstiä, koska niissä ei aja mikään
-portti — kirjoittaja on ainoa tarkistus.
+portti: kirjoittaja on ainoa tarkistus.
 
 Mitattu 12.9.2026: "sviitti" (test suite) ja "kalkkaus" (calque) kirjoitettiin molemmat
 tarkistamatta, ja molemmat päätyivät julkaistuihin tietueisiin asti. Oikeat muodot: testijoukko tai
@@ -102,7 +102,7 @@ testisarja, ja käännöslaina.
 **Kaksikielinen sisältö kirjoitetaan kahdesti, ei käännetä kertaakaan** (opittu 23.8.2026, kun
 PITCH-esityksen suomi paljastui sanasta sanaan siirretyksi englanniksi). Fi- ja en-versio syntyvät
 samoista faktoista erillisinä sävellyksinä: englannin retoriikka ("two built-in flaws, and neither is
-a law of nature") EI käänny suomeksi rakenteensa kanssa — suomeksi sama ajatus on "kaksi vikaa, ja
+a law of nature") EI käänny suomeksi rakenteensa kanssa: suomeksi sama ajatus on "kaksi vikaa, ja
 molemmat ovat valintoja". Jos suomenkielinen lause aukeaa vasta kun arvaa englanninkielisen
 alkuperäisen, se kirjoitetaan uusiksi.
 
@@ -211,15 +211,15 @@ What gives a translation away, in the order it shows up here:
 stage labels and identifiers a person reads as a machine's vocabulary (`AUTH`, `DELIVR`, `SNIF`,
 `FRESH`, `done`, `failed`) are not translated. Everything a person reads as a sentence is.
 
-**Suomen asiakassanasto** (Jouni 23.8.2026, kun sekä "node" että "solmu" kaatuivat asiakasteksteissä
-— kumpikaan ei kanna merkitystä lukijalle, joka ei tunne järjestelmää):
+**Suomen asiakassanasto** (Jouni 23.8.2026, kun sekä "node" että "solmu" kaatuivat asiakasteksteissä:
+kumpikaan ei kanna merkitystä lukijalle, joka ei tunne järjestelmää):
 
 | Käsite | Asiakaspinnassa | Teknisessä/sisäisessä tekstissä |
 |---|---|---|
 | node | **oma AIMEAT** tai **oma ympäristö** (fyysinen kone: **oma palvelin**) | `node` säilyy koneistoterminä (dev-liitteet, SUUNTA, `€/node/kk`), ensimaininta selitetään |
-| solmu | **ei käytetä koskaan** — kukaan ei tajua mikä on solmu | ei käytetä |
+| solmu | **ei käytetä koskaan**: kukaan ei tajua mikä on solmu | ei käytetä |
 | instanssi | käy resurssikuoren osana ("2 GB instanssi") | käy |
-| toimittaja (vendor) | **ei käytetä** — hankintajargonia, ja arkilukija lukee sen journalistiksi. Tilalle: **työkalun tekijä**, **valmistaja**, tunteessa **jonkun muun koneilla**, vuokralainen-vertauksessa **isäntä** | käy hankinta- ja sopimusteksteissä |
+| toimittaja (vendor) | **ei käytetä**: hankintajargonia, ja arkilukija lukee sen journalistiksi. Tilalle: **työkalun tekijä**, **valmistaja**, tunteessa **jonkun muun koneilla**, vuokralainen-vertauksessa **isäntä** | käy hankinta- ja sopimusteksteissä |
 | SLA | avataan aina: **tukilupaus (SLA)** | käy |
 
 Sama testi kuin muullekin sanastolle: jos sana ei kanna merkitystään samassa lauseessa lukijalle,
@@ -236,7 +236,7 @@ once, and every string on the node follows them:
 - **`tú`, never `usted` and never `vos`.** Spoken Bogotá leans on `usted`, but software addresses
   the reader as `tú` across the region, and the whole UI has to pick one and hold it.
 
-Vocabulary is fixed so 8000 strings agree with each other:
+Vocabulary is fixed so about 18 000 strings agree with each other:
 
 | English | Spanish | Note |
 |---|---|---|

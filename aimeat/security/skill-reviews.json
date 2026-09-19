@@ -1,0 +1,508 @@
+{
+  "about": "When each skill was last read against the code it describes, and which files that code is. pnpm check:skill-reviews fails when a watched file changes after the review, so whoever changed the code re-reads the skill. Re-stamp after reading with: pnpm check:skill-reviews --record <name>. Reasoning: aimeat/scripts/check-skill-reviews.ts.",
+  "skills": {
+    "node:aimeat-open-items": {
+      "reviewedOn": "2026-09-19",
+      "watches": [
+        "aimeat/src/services/open-items.ts"
+      ],
+      "digest": "sha256:69a9a313edbc0a842a2f39b5"
+    },
+    "node:aimeat-recurring-work": {
+      "reviewedOn": "2026-09-19",
+      "watches": [
+        "aimeat/src/services/schedule-gate.ts",
+        "aimeat/src/mcp/agent-schedules.ts"
+      ],
+      "digest": "sha256:f835a11735b8afb16f540c19"
+    },
+    "node:hatchery-agent-requests": {
+      "reviewedOn": "2026-09-19",
+      "watches": [],
+      "digest": "",
+      "note": "The retired name of aimeat-recurring-work: a three-line text that points at it. Nothing to watch."
+    },
+    "node:aimeat-first-conversation": {
+      "reviewedOn": "2026-09-19",
+      "watches": [
+        "aimeat/src/services/model-recommendation.ts"
+      ],
+      "digest": "sha256:fb3efbd03a7eb4cdaed29026",
+      "note": "It names the recommended models; the rest is how to talk, which no file decides."
+    },
+    "node:aimeat-welcome-pages": {
+      "reviewedOn": "2026-09-19",
+      "watches": [
+        "aimeat/src/mcp/portfolio.ts"
+      ],
+      "digest": "sha256:8eb987753d674043842c35fb"
+    },
+    "node:aimeat-activating-a-person": {
+      "reviewedOn": "2026-09-19",
+      "watches": [],
+      "digest": "",
+      "note": "How to talk; nothing in the code decides it."
+    },
+    "node:aimeat-offering-choices": {
+      "reviewedOn": "2026-09-19",
+      "watches": [
+        "aimeat/public/views/chat/parts.js"
+      ],
+      "digest": "sha256:3aae77ae48bec81917e28635",
+      "note": "The choices format is rendered by this file."
+    },
+    "node:aimeat-paying-for-the-ai": {
+      "reviewedOn": "2026-09-19",
+      "watches": [
+        "aimeat/src/services/ai-completion.ts"
+      ],
+      "digest": "sha256:18435a260d7d8055351e42ce"
+    },
+    "node:aimeat-mail-to-data": {
+      "reviewedOn": "2026-09-19",
+      "watches": [
+        "aimeat/src/mcp/catalog/definitions/connections.ts",
+        "aimeat/src/services/connections/providers.ts"
+      ],
+      "digest": "sha256:e90eef7358cf0ac171c358e5"
+    },
+    "node:aimeat-app-workstation": {
+      "reviewedOn": "2026-09-19",
+      "watches": [
+        "aimeat/src/services/app-size-health.ts",
+        "aimeat/src/services/app-publish-next-steps.ts"
+      ],
+      "digest": "sha256:b1e6c9ffbecfb1ed9da350de"
+    },
+    "node:aimeat-app-builder": {
+      "reviewedOn": "2026-09-19",
+      "watches": [
+        "aimeat/src/services/build-app-layers.ts",
+        "aimeat/src/services/node-templates.ts",
+        "aimeat/src/services/app-spec-gate.ts"
+      ],
+      "digest": "sha256:52c2b3fedf086c5ddd5db645",
+      "note": "The skill points at the build specification rather than repeating it, so it watches the doors to the specification and not the specification's text."
+    },
+    "node:aimeat-app-builder-atelier": {
+      "reviewedOn": "2026-09-19",
+      "watches": [
+        "aimeat/src/services/build-atelier-prompt.ts",
+        "aimeat/src/static/sdk-libs/atelier/describe-data.js"
+      ],
+      "digest": "sha256:8f3f1308988f48958c542275"
+    },
+    "node:aimeat-phaser": {
+      "reviewedOn": "2026-09-19",
+      "watches": [
+        "aimeat/src/static/sdk-libs/phaser/index.js"
+      ],
+      "digest": "sha256:c38e5b2fb072479d80ff8cea",
+      "note": "The entry skill routes to the area skills; what it must follow is the list of modules the library exports."
+    },
+    "node:aimeat-phaser-boot": {
+      "reviewedOn": "2026-09-19",
+      "watches": [
+        "aimeat/src/static/sdk-libs/phaser/boot.js",
+        "aimeat/src/static/sdk-libs/phaser/mobile.js"
+      ],
+      "digest": "sha256:f5924bd82b359cbdaa49cf81"
+    },
+    "node:aimeat-phaser-assets": {
+      "reviewedOn": "2026-09-19",
+      "watches": [
+        "aimeat/src/static/sdk-libs/phaser/assets.js",
+        "aimeat/src/static/sdk-libs/assets"
+      ],
+      "digest": "sha256:354e4c1c4a6f7a7ea46ca2eb"
+    },
+    "node:aimeat-phaser-saves": {
+      "reviewedOn": "2026-09-19",
+      "watches": [
+        "aimeat/src/static/sdk-libs/phaser/save.js"
+      ],
+      "digest": "sha256:2ff8484742eec72716e2ee7d"
+    },
+    "node:aimeat-phaser-controls-hud": {
+      "reviewedOn": "2026-09-19",
+      "watches": [
+        "aimeat/src/static/sdk-libs/phaser/controls.js",
+        "aimeat/src/static/sdk-libs/phaser/hud.js",
+        "aimeat/src/static/sdk-libs/phaser/settings.js"
+      ],
+      "digest": "sha256:f1ca6a472aca32d01e1bb6c9"
+    },
+    "node:aimeat-phaser-menus-levels": {
+      "reviewedOn": "2026-09-19",
+      "watches": [
+        "aimeat/src/static/sdk-libs/phaser/menus.js",
+        "aimeat/src/static/sdk-libs/phaser/level.js",
+        "aimeat/src/static/sdk-libs/phaser/transitions.js",
+        "aimeat/src/static/sdk-libs/phaser/editor.js"
+      ],
+      "digest": "sha256:397200bde1bf981c20f02bfe"
+    },
+    "node:aimeat-phaser-audio-juice": {
+      "reviewedOn": "2026-09-19",
+      "watches": [
+        "aimeat/src/static/sdk-libs/phaser/audio.js",
+        "aimeat/src/static/sdk-libs/phaser/juice.js"
+      ],
+      "digest": "sha256:445c27b8ef4eee42ab5ee164"
+    },
+    "node:aimeat-phaser-world": {
+      "reviewedOn": "2026-09-19",
+      "watches": [
+        "aimeat/src/static/sdk-libs/phaser/fx.js",
+        "aimeat/src/static/sdk-libs/phaser/fx-presets.js",
+        "aimeat/src/static/sdk-libs/phaser/parallax.js",
+        "aimeat/src/static/sdk-libs/phaser/daynight.js",
+        "aimeat/src/static/sdk-libs/phaser/sprites.js",
+        "aimeat/src/static/sdk-libs/phaser/ai.js",
+        "aimeat/src/static/sdk-libs/phaser/boss.js",
+        "aimeat/src/static/sdk-libs/phaser/worldmap.js",
+        "aimeat/src/static/sdk-libs/phaser/tileworld.js"
+      ],
+      "digest": "sha256:d5ef534145a4005ea7e15073"
+    },
+    "node:aimeat-phaser-story": {
+      "reviewedOn": "2026-09-19",
+      "watches": [
+        "aimeat/src/static/sdk-libs/phaser/dialogue.js",
+        "aimeat/src/static/sdk-libs/phaser/cutscene.js",
+        "aimeat/src/static/sdk-libs/phaser/status.js",
+        "aimeat/src/static/sdk-libs/phaser/achievements.js",
+        "aimeat/src/static/sdk-libs/phaser/chiptune.js"
+      ],
+      "digest": "sha256:03e6a1ea7cae56de132ca606"
+    },
+    "node:aimeat-node-guide": {
+      "reviewedOn": "2026-09-19",
+      "watches": [
+        "aimeat/src/routes/agents/device-auth.ts",
+        "aimeat/src/routes/ghii/register-login.ts",
+        "aimeat/src/services/first-steps.ts"
+      ],
+      "digest": "sha256:857553632458c55dad15e7f4"
+    },
+    "node:ai-transparency": {
+      "reviewedOn": "2026-09-19",
+      "watches": [
+        "aimeat/src/mcp/ai-provenance-input.ts",
+        "aimeat/src/services/ai-provenance.ts"
+      ],
+      "digest": "sha256:b416ac94aac73b04af05b121"
+    },
+    "node:aimeat-node-operations": {
+      "reviewedOn": "2026-09-19",
+      "watches": [
+        "aimeat/src/mcp/core-admin.ts"
+      ],
+      "digest": "sha256:4e32d698c8810195fdb9810c"
+    },
+    "node:manage-my-agents": {
+      "reviewedOn": "2026-09-19",
+      "watches": [
+        "aimeat/src/mcp/core.ts",
+        "aimeat/src/mcp/catalog/definitions/agent-messaging.ts"
+      ],
+      "digest": "sha256:4a973518fd0751eb9893bc2c"
+    },
+    "node:manage-my-profile-data": {
+      "reviewedOn": "2026-09-19",
+      "watches": [
+        "aimeat/src/routes/memory/shared.ts"
+      ],
+      "digest": "sha256:184fb3a1ed1959b0032a449a"
+    },
+    "node:add-a-crew-agent": {
+      "reviewedOn": "2026-09-19",
+      "watches": [
+        "aimeat/src/routes/agents/device-auth.ts",
+        "aimeat/src/mcp/catalog/scopes.ts"
+      ],
+      "digest": "sha256:9405de9c63bc32968f6b3157"
+    },
+    "node:set-up-content-pipeline": {
+      "reviewedOn": "2026-09-19",
+      "watches": [
+        "aimeat/src/models/workflow-schemas.ts",
+        "aimeat/src/services/workflow/lifecycle.ts"
+      ],
+      "digest": "sha256:a8528c723fc349838d9b6522"
+    },
+    "node:configure-routing": {
+      "reviewedOn": "2026-09-19",
+      "watches": [
+        "aimeat/src/routes/ai.ts"
+      ],
+      "digest": "sha256:789b465d299ae568af7ecf1a"
+    },
+    "node:use-app-bound-skills": {
+      "reviewedOn": "2026-09-19",
+      "watches": [
+        "aimeat/src/routes/skills.ts"
+      ],
+      "digest": "sha256:2b209ec7b47f0509aee1bd3c"
+    },
+    "node:install-skills-locally": {
+      "reviewedOn": "2026-09-19",
+      "watches": [
+        "aimeat/src/cli/skill-install.ts"
+      ],
+      "digest": "sha256:cec4c74bb67ae7d2b7990016"
+    },
+    "node:diagnose-a-workflow": {
+      "reviewedOn": "2026-09-19",
+      "watches": [
+        "aimeat/src/models/workflow-schemas.ts",
+        "aimeat/src/mcp/agent-schedules.ts",
+        "aimeat/src/services/scheduler.ts"
+      ],
+      "digest": "sha256:f115e2fe5c24ad18c1927dc7"
+    },
+    "node:aimeat-game-apps": {
+      "reviewedOn": "2026-09-19",
+      "watches": [
+        "aimeat/src/data/library-packs/vendored-creative.ts",
+        "aimeat/src/static/sdk-libs/phaser/index.js"
+      ],
+      "digest": "sha256:e85afc8e3cb9f610c0140d11"
+    },
+    "project:aimeat-app-building": {
+      "reviewedOn": "2026-09-19",
+      "watches": [
+        "aimeat/src/services/build-app-layers.ts",
+        "aimeat/src/routes/app-templates.ts"
+      ],
+      "digest": "sha256:7e3f2863f6b13d87681e09ce"
+    },
+    "project:aimeat-design-language": {
+      "reviewedOn": "2026-09-19",
+      "watches": [
+        "aimeat/public/css/theme.css",
+        "aimeat/public/css/poster.css",
+        "aimeat/public/lib/aimeat-fonts.css"
+      ],
+      "digest": "sha256:cea992e89cb458496c30bd16"
+    },
+    "project:aimeat-frontend-verify": {
+      "reviewedOn": "2026-09-19",
+      "watches": [
+        "aimeat/scripts/sandbox.ts"
+      ],
+      "digest": "sha256:a51c0f409723423a7305e612",
+      "note": "It sends the check to the sandbox node; the styling rules it states live in the frontend path rule."
+    },
+    "project:aimeat-imagery": {
+      "reviewedOn": "2026-09-19",
+      "watches": [
+        "scripts/gen_image.py"
+      ],
+      "digest": "sha256:8c61e7dcccc52219f8bcdd8b"
+    },
+    "project:aimeat-library-authoring": {
+      "reviewedOn": "2026-09-19",
+      "watches": [
+        "aimeat/scripts/build-sdk-libs.ts",
+        ".githooks/pre-commit",
+        "aimeat/src/services/build-extension-prompt.ts"
+      ],
+      "digest": "sha256:14dff6e794cf0b1a8b42d758"
+    },
+    "project:aimeat-organism-records": {
+      "reviewedOn": "2026-09-19",
+      "watches": [],
+      "digest": "",
+      "note": "It describes records on the node and ids in CLAUDE.md, not code in this tree."
+    },
+    "project:aimeat-pages-links": {
+      "reviewedOn": "2026-09-19",
+      "watches": [
+        "aimeat/src/routes/organisms/workspace-ops.ts"
+      ],
+      "digest": "sha256:2968dcef1e483ed52fba5271"
+    },
+    "project:aimeat-video": {
+      "reviewedOn": "2026-09-19",
+      "watches": [],
+      "digest": "",
+      "note": "Its tools are gitignored and live on the developer's main machine only."
+    },
+    "project:aimeat-writing": {
+      "reviewedOn": "2026-09-19",
+      "watches": [
+        "aimeat/src/i18n.ts",
+        "aimeat/scripts/locale-merge.ts"
+      ],
+      "digest": "sha256:da9c86cfce31f85acf16b433"
+    }
+  },
+  "fileDigests": {
+    "node:aimeat-open-items": {
+      "aimeat/src/services/open-items.ts": "471b7eab4f5ddc8d"
+    },
+    "node:aimeat-first-conversation": {
+      "aimeat/src/services/model-recommendation.ts": "bd4bb581e6178a21"
+    },
+    "node:aimeat-welcome-pages": {
+      "aimeat/src/mcp/portfolio.ts": "89ad000b9f585bb2"
+    },
+    "node:aimeat-activating-a-person": {},
+    "node:aimeat-offering-choices": {
+      "aimeat/public/views/chat/parts.js": "12c8246c22bf138a"
+    },
+    "node:aimeat-paying-for-the-ai": {
+      "aimeat/src/services/ai-completion.ts": "db3dda1a1df28e08"
+    },
+    "node:aimeat-mail-to-data": {
+      "aimeat/src/mcp/catalog/definitions/connections.ts": "84591ad8fce0795b",
+      "aimeat/src/services/connections/providers.ts": "6ad885b6987db150"
+    },
+    "node:aimeat-app-workstation": {
+      "aimeat/src/services/app-size-health.ts": "b0683f91995656e0",
+      "aimeat/src/services/app-publish-next-steps.ts": "404316a05e8cf2d3"
+    },
+    "node:aimeat-app-builder": {
+      "aimeat/src/services/build-app-layers.ts": "4c497b2a17fb0c11",
+      "aimeat/src/services/node-templates.ts": "d827b8d325a6fc5e",
+      "aimeat/src/services/app-spec-gate.ts": "023890ba92c1090e"
+    },
+    "node:aimeat-app-builder-atelier": {
+      "aimeat/src/services/build-atelier-prompt.ts": "fe8dba274131ffe7",
+      "aimeat/src/static/sdk-libs/atelier/describe-data.js": "b87046c1071e4940"
+    },
+    "node:aimeat-phaser": {
+      "aimeat/src/static/sdk-libs/phaser/index.js": "036eac5aa666d96a"
+    },
+    "node:aimeat-phaser-boot": {
+      "aimeat/src/static/sdk-libs/phaser/boot.js": "a274f67e618731ec",
+      "aimeat/src/static/sdk-libs/phaser/mobile.js": "3cbc99e3bbd9c32a"
+    },
+    "node:aimeat-phaser-assets": {
+      "aimeat/src/static/sdk-libs/phaser/assets.js": "d5fcbb515be2d3e6",
+      "aimeat/src/static/sdk-libs/assets/index.js": "4eaa06c31a4f3b57",
+      "aimeat/src/static/sdk-libs/assets/library.js": "b265acf1aff0635f",
+      "aimeat/src/static/sdk-libs/assets/manifest.js": "eaf1bb840cea6d65",
+      "aimeat/src/static/sdk-libs/assets/pack.js": "042a502cb1ec488f",
+      "aimeat/src/static/sdk-libs/assets/preview.js": "84cff76abb12a292",
+      "aimeat/src/static/sdk-libs/assets/sound.js": "27807ae3b0e5256b",
+      "aimeat/src/static/sdk-libs/assets/texts.js": "3bbe0b7318114bcf",
+      "aimeat/src/static/sdk-libs/assets/upload.js": "71ce355789bad92e"
+    },
+    "node:aimeat-phaser-saves": {
+      "aimeat/src/static/sdk-libs/phaser/save.js": "423e7f284289c0dc"
+    },
+    "node:aimeat-phaser-controls-hud": {
+      "aimeat/src/static/sdk-libs/phaser/controls.js": "c91989af0d27c26c",
+      "aimeat/src/static/sdk-libs/phaser/hud.js": "1a406b56c68c9ee1",
+      "aimeat/src/static/sdk-libs/phaser/settings.js": "45404559ffcc38ef"
+    },
+    "node:aimeat-phaser-menus-levels": {
+      "aimeat/src/static/sdk-libs/phaser/menus.js": "a9f1bdcce5af75d3",
+      "aimeat/src/static/sdk-libs/phaser/level.js": "0d652514ee83cab0",
+      "aimeat/src/static/sdk-libs/phaser/transitions.js": "6800da4fa9c38247",
+      "aimeat/src/static/sdk-libs/phaser/editor.js": "207638ad769671c3"
+    },
+    "node:aimeat-phaser-audio-juice": {
+      "aimeat/src/static/sdk-libs/phaser/audio.js": "a22dca0175020a5f",
+      "aimeat/src/static/sdk-libs/phaser/juice.js": "8b8aefbe2ee3aa13"
+    },
+    "node:aimeat-phaser-world": {
+      "aimeat/src/static/sdk-libs/phaser/fx.js": "37e2dadcae09dc24",
+      "aimeat/src/static/sdk-libs/phaser/fx-presets.js": "f6fba21401ea446d",
+      "aimeat/src/static/sdk-libs/phaser/parallax.js": "b2d7a108dfc15e4b",
+      "aimeat/src/static/sdk-libs/phaser/daynight.js": "172dc55b3591bf0b",
+      "aimeat/src/static/sdk-libs/phaser/sprites.js": "53f084f8bcb99998",
+      "aimeat/src/static/sdk-libs/phaser/ai.js": "7d2e7f8b4600095d",
+      "aimeat/src/static/sdk-libs/phaser/boss.js": "91e57d544d1ab8a4",
+      "aimeat/src/static/sdk-libs/phaser/worldmap.js": "c3b85d603201573e",
+      "aimeat/src/static/sdk-libs/phaser/tileworld.js": "fa1c2c54ddd1665c"
+    },
+    "node:aimeat-phaser-story": {
+      "aimeat/src/static/sdk-libs/phaser/dialogue.js": "65e0e7d2e681e98b",
+      "aimeat/src/static/sdk-libs/phaser/cutscene.js": "5eef782f06e09060",
+      "aimeat/src/static/sdk-libs/phaser/status.js": "7fe2fab6ac3797c2",
+      "aimeat/src/static/sdk-libs/phaser/achievements.js": "24205b962d348196",
+      "aimeat/src/static/sdk-libs/phaser/chiptune.js": "4305c95f9370f982"
+    },
+    "node:aimeat-node-guide": {
+      "aimeat/src/routes/agents/device-auth.ts": "7d37b0bbc2105613",
+      "aimeat/src/routes/ghii/register-login.ts": "ec36d3ac666da6f1",
+      "aimeat/src/services/first-steps.ts": "8b9905de90360fa2"
+    },
+    "node:ai-transparency": {
+      "aimeat/src/mcp/ai-provenance-input.ts": "449e2c4e36182748",
+      "aimeat/src/services/ai-provenance.ts": "03a8185fe7688c45"
+    },
+    "node:aimeat-node-operations": {
+      "aimeat/src/mcp/core-admin.ts": "db0624d23f6ee92b"
+    },
+    "node:manage-my-agents": {
+      "aimeat/src/mcp/core.ts": "28a39581b76d24e5",
+      "aimeat/src/mcp/catalog/definitions/agent-messaging.ts": "9100d0bc3da98808"
+    },
+    "node:manage-my-profile-data": {
+      "aimeat/src/routes/memory/shared.ts": "b91f8414d40a59c6"
+    },
+    "node:add-a-crew-agent": {
+      "aimeat/src/routes/agents/device-auth.ts": "7d37b0bbc2105613",
+      "aimeat/src/mcp/catalog/scopes.ts": "d2e4e1c9110702d8"
+    },
+    "node:set-up-content-pipeline": {
+      "aimeat/src/models/workflow-schemas.ts": "edbe2be4d1205eec",
+      "aimeat/src/services/workflow/lifecycle.ts": "a6a052a36360f00f"
+    },
+    "node:configure-routing": {
+      "aimeat/src/routes/ai.ts": "fa82f0c4081d26d9"
+    },
+    "node:use-app-bound-skills": {
+      "aimeat/src/routes/skills.ts": "b0c9b667b1187bba"
+    },
+    "node:install-skills-locally": {
+      "aimeat/src/cli/skill-install.ts": "e6ba3efb63c188a5"
+    },
+    "node:diagnose-a-workflow": {
+      "aimeat/src/models/workflow-schemas.ts": "edbe2be4d1205eec",
+      "aimeat/src/mcp/agent-schedules.ts": "3e2a000c330237b0",
+      "aimeat/src/services/scheduler.ts": "cbda6b12ca974775"
+    },
+    "node:aimeat-game-apps": {
+      "aimeat/src/data/library-packs/vendored-creative.ts": "d4c59f171eb2fb20",
+      "aimeat/src/static/sdk-libs/phaser/index.js": "036eac5aa666d96a"
+    },
+    "project:aimeat-app-building": {
+      "aimeat/src/services/build-app-layers.ts": "4c497b2a17fb0c11",
+      "aimeat/src/routes/app-templates.ts": "48da5b8d0573d8d7"
+    },
+    "project:aimeat-design-language": {
+      "aimeat/public/css/theme.css": "658d30b66d70540f",
+      "aimeat/public/css/poster.css": "a8aa3f1f18f33385",
+      "aimeat/public/lib/aimeat-fonts.css": "6754e84dc93d141f"
+    },
+    "project:aimeat-frontend-verify": {
+      "aimeat/scripts/sandbox.ts": "b6342f7c64dffd6e"
+    },
+    "project:aimeat-imagery": {
+      "scripts/gen_image.py": "e2435908849b31d3"
+    },
+    "project:aimeat-library-authoring": {
+      "aimeat/scripts/build-sdk-libs.ts": "47ec177dc33d0100",
+      ".githooks/pre-commit": "e8840eb33aa805c0",
+      "aimeat/src/services/build-extension-prompt.ts": "fead7de034bc589e"
+    },
+    "project:aimeat-organism-records": {},
+    "project:aimeat-pages-links": {
+      "aimeat/src/routes/organisms/workspace-ops.ts": "de8e54d3b83431f6"
+    },
+    "project:aimeat-video": {},
+    "project:aimeat-writing": {
+      "aimeat/src/i18n.ts": "5010fd431bbb999b",
+      "aimeat/scripts/locale-merge.ts": "e1c28235732aafa5"
+    },
+    "node:aimeat-recurring-work": {
+      "aimeat/src/services/schedule-gate.ts": "5d6d832ec8021f6f",
+      "aimeat/src/mcp/agent-schedules.ts": "3e2a000c330237b0"
+    }
+  }
+}

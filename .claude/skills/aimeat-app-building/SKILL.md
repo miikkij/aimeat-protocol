@@ -33,7 +33,7 @@ Where a new lesson goes depends on who needs it, and the three are not interchan
 
 Non-negotiables that flow enforces:
 
-- Never hardcode theme colours. Light default plus `:root[data-theme="dark"]` CSS variables, or model on `prh.html` with vendored Tailwind `/lib/tailwindcss@4.js` + daisyUI `/lib/daisyui@5.css` + `/lib/aimeat-daisyui-bridge.css`.
+- Never hardcode theme colours. Light default plus `:root[data-theme="dark"]` CSS variables, or model on the published PRH app (`prh.html` on the node, not a file in this repo) with vendored Tailwind `/lib/tailwindcss@4.js` + daisyUI `/lib/daisyui@5.css` + `/lib/aimeat-daisyui-bridge.css`.
 - Include `<meta name="aimeat-scopes">`, and use only scopes that exist in the node's vocabulary. An invented scope means `INVALID_SCOPE` and nobody can log in.
 - AIMEAT SDK libs load from `/v1/libs/`; vendored styling from `/lib/`. Do not mix the two.
 - **Touch input goes through `aimeat-input`, never a hand-rolled `touchstart` listener.** `AIMEAT.input.tappable(el, fn)` for every button, card and row (built on `click`, so tap, mouse and Enter/Space each arrive once and a screen reader announces it); `AIMEAT.input.on(el, handlers, { axis })` when a click is not enough, declaring `axis` on anything that also scrolls. A hand-rolled touch listener fires twice, triggers mid-scroll, and locks out the keyboard. The mobile rules in the build-app prompt cover LAYOUT; this is the other half.
@@ -67,7 +67,7 @@ before any code is written.
 **The data map is a deliverable, and the owner approves it before the first `set()`.** Columns: what
 · where it lives · who owns it · who can read it · what happens when a member leaves · is it
 personal data. The last two are also exactly what a GDPR audit asks for, so this table is worth
-keeping rather than drawing once. Four homes, and one question picks between them — *whose question
+keeping rather than drawing once. Four homes, and one question picks between them: *whose question
 does this answer?*
 
 | Home | For | Owner |
@@ -91,11 +91,11 @@ The last row of that table is the one to design against. An erasure request cann
 delivered last week, so decide BEFORE building what you keep about it: an opaque token instead of an
 address, a hash instead of the value, the fact of a send instead of its content. **Deliberate
 non-holding only exists if you chose it early.** And in-flight work needs its own answer on screen:
-finished, still running, or given up on — a row that renders identically in all three is a lie the
+finished, still running, or given up on: a row that renders identically in all three is a lie the
 person will repeat.
 
 **Owner memory is the wrong default and it wins by being one line shorter.** Group data stored per
-person follows the PERSON between groups while staying invisible to their own TEAM — wrong in both
+person follows the PERSON between groups while staying invisible to their own TEAM, wrong in both
 directions at once. The CADENCE campaign work (2026-08-24) made that mistake four times in one
 feature: campaigns, pipeline stages, follow-up thresholds and the permission binding. Nothing had
 shipped, so it cost a rewrite instead of a migration. → appdev pitfalls
@@ -143,7 +143,7 @@ value back. What the app owes the person is the NAME and where it goes: their Ac
 wildcard scope carries; `aimeat_secret_list` shows names and which extensions used them). A living
 document names a key the same way in a trigger's or a source's `headers`, and its gear dialogs pick
 from the stored names. Show a missing key by its name in the UI; never draw a text field for the key.
-→ `docs/coding-guidelines/extension-memory-architecture.md` (Secrets: the fourth namespace), `docs/pitfalls.md` §52.
+→ `docs/coding-guidelines/extension-memory-architecture.md` (Secrets: the fourth namespace). `docs/pitfalls.md` §52 is a different trap that the `{{secret:NAME}}` placeholder exposed: a capability with a shared builder and a VM bridge was implemented twice, and one copy was dead.
 
 ## Removed, do not revive
 

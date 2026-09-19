@@ -14,6 +14,12 @@
  * @usage
  *   import { OPEN_ITEMS_SKILL_ENTRY } from './builtin-skills.open-items.js';
  * @version-history
+ *   v1.0.1 — 2026-09-19 — Three corrections. `prompt_ref` IS fetchable over MCP and has been since
+ *     aimeat_handbook_get took a managed prompt by id (mcp/prompts.ts), so the known-gap paragraph
+ *     was telling every reader to give up on something that works; the owner-scoped write names the
+ *     permission it needs; and `workspace` moved out of the kind column, where it never was (it is
+ *     an object.type only — ITEM_KINDS in services/open-items.ts). The content audit of 2026-09-19
+ *     compared every claim in this skill with the code; the rest of it holds.
  *   v1.0.0 — 2026-08-09 — Initial.
  */
 import type { BuiltinSkill } from './builtin-skills.js';
@@ -117,22 +123,24 @@ then, so GO is about acting on it rather than about starting to think.
 | \`kind\` / \`object.type\` | What to do |
 |---|---|
 | \`app\` | Building an app is a big piece of work with its own session. Do NOT start it here. Write the draft, say plainly that it needs its own run, and point them at it: \`aimeat_handbook_get\` with surface \`appdev\`. |
-| \`organism\`, \`workspace\` | Read what exists first (\`aimeat_organism_overview\`), then draft, then GO. |
+| \`organism\`, or \`workspace\` as an \`object.type\` (never a \`kind\`) | Read what exists first (\`aimeat_organism_overview\`), then draft, then GO. |
 | \`document\`, \`knowledge\` | Usually doable here and now, once the draft exists. |
 | \`memory\` | Read the record before proposing anything about it. |
 | no kind | Ask what it is. That is question two, and it comes before depth. |
 
-\`prompt_ref\` names a prompt the node serves. **You probably cannot fetch it over
-MCP**, and that is a known gap rather than something to work around: use
-\`aimeat_handbook_get\` for the app and appdev guidance, and otherwise proceed
-without it. Do not tell the person to go and fetch it for you.
+\`prompt_ref\` names a prompt the node serves. Fetch it with
+\`aimeat_handbook_get\` and \`tier\` set to that name: the tool takes a managed
+prompt by its id, and answers with the prompt's name, description, content and
+variables. Do not tell the person to go and fetch it for you.
 
 ## Switch something off when it is done
 
 Read the key, remove that item from \`items\`, write it back:
 
 - \`aimeat_memory_write\` with \`owner_scope: true\` AND \`expected_version\` set to the
-  version you read.
+  version you read. \`owner_scope\` needs the \`memory:write-as-owner\` permission,
+  which the owner grants per agent in Profile › Agents. Without it the write is
+  refused: that is a permission they can give you, not a fault to work around.
 
 **On \`VERSION_CONFLICT\`, read again and re-apply.** Somebody else wrote in between
 and overwriting them silently is the one thing this list must never do. Never

@@ -13,6 +13,13 @@
  * @structure PHASER_MENUS_LEVELS_SKILL · PHASER_AUDIO_JUICE_SKILL
  * @usage import { PHASER_MENUS_LEVELS_SKILL, PHASER_AUDIO_JUICE_SKILL } from './builtin-skills-games.menus-audio.js';
  * @version-history
+ *   v1.1.0 -- 2026-09-19 -- The content audit of 2026-09-19. The level-editor section invented a
+ *     `maps` object nothing reads: editor.js has shipped since v1.1.0 and keeps levels as an
+ *     ARRAY under `levelSet`, so a game saved the old way could not be opened by the editor the
+ *     library already had. The platformer's `parallaxBackdrop` row predated level.js v1.1.0 (a
+ *     preset name or a parallax spec) and disagreed with aimeat-phaser-world, the handle list
+ *     dropped `backdrop`, and the audio skill's Reset gotcha taught numbers settings.js v1.1.0
+ *     had already changed to the bus's own.
  *   v1.0.0 -- 2026-09-02 -- Initial, written against phaser/menus.js, phaser/transitions.js,
  *     phaser/level.js and phaser/audio.js at aimeat-phaser 1.0.0.
  */
@@ -162,10 +169,11 @@ and a kind you add is SOLID by default, which is the useful assumption.
 | \`controls\` | none | a controls state |
 | \`camera\` | \`'follow'\` | or \`'fixed'\` |
 | \`bounds\` | true | world and camera bounds from the map size |
-| \`parallaxBackdrop\` | false | two drawn layers behind the level, both off the theme |
+| \`parallaxBackdrop\` | false | \`true\` draws two plain layers off the theme; a preset name (\`'forest'\`) or a \`parallax()\` spec runs the real layer stack → \`node:aimeat-phaser-world\` |
 
 Handle: \`player\`, \`groups\` (\`ground\`, \`coins\`, \`enemies\`, \`spikes\`, \`goal\`), \`map\`,
-\`on(event, fn)\`, \`update()\`, \`reset()\`, \`destroy()\`.
+\`backdrop\` (the parallax handle, when one was built), \`on(event, fn)\`, \`update()\`,
+\`reset()\`, \`destroy()\`.
 
 **It runs with no art.** A texture key that does not exist is drawn on the spot as a plain
 rectangle in the theme's colours, so a level built five minutes into a project already plays
@@ -174,17 +182,36 @@ and adding real art later changes nothing but the look.
 Enemies walk until a wall or a LEDGE turns them round, and the ledge check reads the map rather
 than adding a probe sprite.
 
-## What a level editor writes
+## The level editor: levelEditor(spec)
 
-A level is the rows array plus the legend, which means an editor writes plain text into the
-game's own save record, with no new key and no new table:
+A level is the rows array plus the legend, so the editor paints into the same text
+\`parseMap()\` reads and there is no project file and nothing to import. It is DOM beside the
+canvas; the grid itself is one canvas, because 1800 hover-ruled elements stutter under a drag.
 
 \`\`\`js
-store.set({ levels: store.get().levels, maps: { '1-1': { rows: MAP, legend: { '~': 'water' } } } });
+const ed = AIMEAT.phaser.levelEditor({ target: '#editor', store: store, map: MAP });
+play.addEventListener('click', () => start(ed.rows()));
 \`\`\`
 
-Levels the app SHIPS belong in the source; levels a PLAYER made belong in that one record with
-the rest of their save. Never one key per level: the budget is 1000 keys per person.
+\`{ target, map, legend, tile, tools, onChange, store, readOnly }\`, where \`target\` is an
+element or a selector, \`map\` opens an existing rows array (a blank 26 by 12 otherwise),
+\`legend\` takes \`{ '~': { kind: 'water', label: 'Water', colour } }\` or \`{ '~': 'water' }\`,
+\`tile\` is the drawn cell size (24), \`tools\` names which marks the palette offers, and
+\`onChange(rows)\` fires as the map changes. Handle: \`el\` · \`rows()\` · \`set(rows)\` ·
+\`tool(char)\` · \`undo()\` · \`redo()\` · \`clear()\` · \`resize(cols, rows)\` · \`destroy()\`.
+
+**Levels are ONE record, never one key each.** Given a \`saves()\` store, every level a player
+saves goes into that store's own record under \`levelSet\`, an ARRAY of
+\`{ id, name, rows, updated }\`; the editor reads and writes it for you.
+
+\`\`\`js
+store.get().levelSet   // [{ id, name, rows: ['#####', …], updated }, …]
+\`\`\`
+
+Given a plain \`{ load, save }\` pair instead, the app picks the key and the right shape for
+authored content is ONE key per game (say \`<app>.levels\`) holding the whole array. Levels the
+app SHIPS belong in the source; levels a PLAYER made belong in that one record with the rest of
+their save. Never one key per level: the budget is 1000 keys per person.
 
 ## Events
 
@@ -280,6 +307,7 @@ bus.apply(store.settings());             // and put them back next visit
 | \`unlock()\` | ask the browser; call it from a real gesture |
 | \`settings()\` | \`{ master, music, sfx, muted }\` |
 | \`apply(settings)\` | put a remembered set back in force |
+| \`context\` \`destination\` | getters: the Web Audio context and the node the game plays through, so a generated voice connects under the same master and mute. \`chiptune()\` uses them |
 | \`destroy()\` | stop every ramp, drop every track |
 
 ### The lock is honoured, not worked around
@@ -402,21 +430,18 @@ whole set re-tones with the page's palette and mode.
    started at.
 7. **\`synth()\` needs Web Audio.** Where the game is not running on it, the call returns false
    and is silent, so pair a sound with something visible.
-8. **The settings panel's Reset to defaults is not the bus's own defaults.** The panel resets
-   master to 0.8 and effects to 0.8; a fresh bus starts at 1 and 1. If those two need to agree,
-   pass the panel's numbers to \`audio()\` when you build the bus.
-9. **\`destroy()\` the bus when you destroy the game.** Ramps and tracks outlive a dropped
+8. **\`destroy()\` the bus when you destroy the game.** Ramps and tracks outlive a dropped
    reference otherwise.
-10. **The arcade world scales the OTHER WAY from everything else.** \`scene.time.timeScale\` and
-    \`scene.tweens.timeScale\` are multipliers (0.3 is three-tenths speed) and Phaser's arcade
-    \`world.timeScale\` is a divisor (2 is half speed). One asked-for scale is therefore \`scale\`
-    on three of them and \`1 / scale\` on the fourth. \`juice()\` does this for you; hand-rolled
-    slow motion is where it goes wrong.
-11. **A hit-stop cannot be timed on the clock it is stopping.** A \`delayedCall\` on the scene's
+9. **The arcade world scales the OTHER WAY from everything else.** \`scene.time.timeScale\` and
+   \`scene.tweens.timeScale\` are multipliers (0.3 is three-tenths speed) and Phaser's arcade
+   \`world.timeScale\` is a divisor (2 is half speed). One asked-for scale is therefore \`scale\`
+   on three of them and \`1 / scale\` on the fourth. \`juice()\` does this for you; hand-rolled
+   slow motion is where it goes wrong.
+10. **A hit-stop cannot be timed on the clock it is stopping.** A \`delayedCall\` on the scene's
     own clock takes \`1 / scale\` as long to fire, so a scene stopped at 0.05 waits twenty times
     its hit-stop. \`hitStop()\` and \`slowmo()\` recover from real time, which is also what a
     hit-stop IS: a fixed number of the player's milliseconds, not the game's.
-12. **A juice call that returns false did nothing**, and the reason is almost always less
+11. **A juice call that returns false did nothing**, and the reason is almost always less
     motion. Do not treat it as an error, and do not pair the only feedback with a movement
     effect.
 `,

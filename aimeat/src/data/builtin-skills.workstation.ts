@@ -24,11 +24,16 @@
  *   exactly that file. Any wording suggesting the node runs a build is wrong.
  *
  *   Its own module because builtin-skills.ts is at 777 of its 800 lines, the same reason
- *   builtin-skills.hatchery.ts and builtin-skills.open-items.ts are separate.
+ *   builtin-skills.recurring-work.ts and builtin-skills.open-items.ts are separate.
  * @structure WORKSTATION_SKILL_ENTRY
  * @usage
  *   import { WORKSTATION_SKILL_ENTRY } from './builtin-skills.workstation.js';
  * @version-history
+ *   v1.0.1 — 2026-09-19 — "What does NOT change" names the Atelier spec and guide beside the
+ *     classic ones. The publish size note points here for EVERY oversized app whatever its track
+ *     (services/app-size-health.ts), so an Atelier app arriving here was sent to the one spec its
+ *     own guide forbids. The content audit of 2026-09-19 compared every claim in this skill with
+ *     the code; the rest of it holds.
  *   v1.0.0 — 2026-08-25 — Initial. Written from the drum-slicer measurement and from the build
  *     pipelines that already keep four apps in aimeat-apps small.
  */
@@ -140,11 +145,13 @@ much, something was inlined.
 ## What does NOT change
 
 - The app is still one HTML file: no imports at runtime, no bundler output with module syntax, no
-  CDN. Everything it loads is a URL the build spec lists (\`GET /v1/prompts/build-app\`).
+  CDN. Everything it loads is a URL the build spec lists — \`GET /v1/prompts/build-app\`, or
+  \`GET /v1/prompts/build-app-atelier\` when the app was built on the Atelier track.
 - The build step is **yours**, on your machine. The node does not build anything; it serves what
   you publish.
-- Everything in \`aimeat-app-builder\` still applies — the spec first, research before building,
-  the agent face and the bound skill after publishing.
+- Whichever of the two guides built this app still applies — \`aimeat-app-builder\` or
+  \`aimeat-app-builder-atelier\`, and the app's own \`<meta name="aimeat-track">\` line says which.
+  The spec first, research before building, the agent face and the bound skill after publishing.
 
 ## When you have finished a change
 

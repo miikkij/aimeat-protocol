@@ -13,6 +13,12 @@
  * @structure PHASER_BOOT_SKILL · PHASER_ASSETS_SKILL
  * @usage import { PHASER_BOOT_SKILL, PHASER_ASSETS_SKILL } from './builtin-skills-games.boot-assets.js';
  * @version-history
+ *   v1.1.0 -- 2026-09-19 -- The content audit of 2026-09-19. Both skills taught traps their module
+ *     had already removed: boot.js v1.1.0 shipped the phone half as `spec.mobile` while the boot
+ *     skill still said no `mobile` module existed, boot.js v1.1.1 turned the gamepad plugin on
+ *     while the spec table had no row for it, and assets.js v1.1.1 gave `tiles()` the 'tile-'
+ *     prefix and the platformer's six kinds while both gotchas said the opposite. The
+ *     aimeat-assets include block also dropped the stylesheet its own gallery needs.
  *   v1.0.0 -- 2026-09-02 -- Initial, written against phaser/boot.js and phaser/assets.js at
  *     aimeat-phaser 1.0.0.
  */
@@ -71,6 +77,8 @@ h.destroy();
 | \`background\` | \`'bg'\` | \`'bg'\`, \`'surface'\`, \`'ink'\` or a number |
 | \`pixelArt\` | false | nearest-neighbour scaling |
 | \`transparent\` | false | let the page show through |
+| \`gamepad\` | true | Phaser's gamepad plugin, which \`controls()\` reads. \`false\` turns it off |
+| \`mobile\` | off | \`{ orientation, keepAwake, safeArea }\`; puts the phone half on \`h.mobile\` |
 | \`pauseOnHide\` | true | the loop sleeps while the tab is hidden |
 | \`fps\` | Phaser's own | a target frame rate |
 | \`fullscreenLabel\` / \`exitFullscreenLabel\` | English | the button's two labels |
@@ -155,9 +163,33 @@ The library's own menus, transitions and coin pops already check this; the rule 
   pointer through a CSS media query, so nothing has to be re-run when the device changes.
 - The loop sleeps when the tab hides, which is the battery rule.
 
-Orientation locking, the safe-area inset and a PWA install are agreed for the game programme
-and are NOT in the library yet. Do not write code against a \`mobile\` module until
-\`AIMEAT.phaser\` reports one.
+### The phone half: \`mobile\`
+
+Orientation, the notch, the screen that dims and the install offer are asked for, never assumed.
+A spec without \`mobile\` gets no \`h.mobile\` and not one extra listener; naming any one of the
+three members is enough to have it.
+
+\`\`\`js
+const h = await AIMEAT.phaser.game({
+  parent: '#stage', scale: 'fit',
+  mobile: { orientation: 'landscape', keepAwake: true, safeArea: true },
+  scenes: [play],
+});
+h.mobile.orientation('landscape');        // 'landscape', 'portrait' or 'any'
+const inset = h.mobile.safeArea();        // { top, right, bottom, left }, measured not guessed
+await h.mobile.keepAwake(true);           // resolves with whether the lock is held now
+const offer = h.mobile.install();         // { canInstall, prompt() }
+if (offer.canInstall) await offer.prompt();   // 'accepted', 'dismissed' or 'unavailable'
+h.mobile.vibrate(30);                     // false where the device will not
+\`\`\`
+
+The "Turn your phone" prompt is DOM INSIDE THE FRAME, so it travels into full screen with the
+picture, and a CSS media query decides whether it shows. \`screen.orientation.lock()\` is asked
+for as a shortcut when full screen makes it available and is refused everywhere else, so the
+prompt is the real answer and a refusal is a console warning, not a broken game.
+\`AIMEAT.phaser.mobile(h, { orientation, keepAwake, title, hint })\` is the same thing called by
+hand, which is how you change the prompt's two words; \`h.destroy()\` takes it down with
+everything else.
 
 ## Events
 
@@ -279,11 +311,13 @@ registers and waits; later, nothing is going to start it, so the call does.
 - \`textures.shapes(scene, [{ key, width, height, draw(g, look) }])\`: you draw, the library
   keeps it as a texture. \`look\` is the theme, so use \`look.accent\` and the shape re-tones
   with the palette. Returns the keys.
-- \`textures.tiles(scene, { size, prefix, kinds })\`: one square texture per kind. \`kinds\` is
+- \`textures.tiles(scene, { size, prefix, kinds })\`: one square texture per kind. \`prefix\`
+  defaults to \`tile-\` and \`kinds\` to the platformer's six (\`ground\`, \`brick\`, \`spike\`,
+  \`coin\`, \`goal\`, \`enemy\`), so \`tiles(this)\` alone dresses a level. \`kinds\` is
   \`{ ground: true, spike: 0xff0000 }\`: \`true\` takes the kind's own theme colour, a number
   overrides it. The kinds with a colour of their own are \`ground\`, \`brick\`, \`spike\`, \`coin\`,
   \`goal\`, \`water\` and \`crate\`; anything else you name is drawn as a solid block in the
-  accent colour. Returns the keys.
+  accent colour. \`size\` defaults to 32. Returns the keys.
 - \`textures.character(scene, { key, width, height, palette })\`: a six-frame hero strip with
   its animations registered. Returns
   \`{ key, frames, anims: { idle, run, jump } }\`, where the animation names are
@@ -343,8 +377,12 @@ files. One app's whole asset list is ONE memory record (images, atlases, audio, 
 tilemaps, videos and the app's texts), for the same reason a save is one record.
 
 \`\`\`html
+<link rel="stylesheet" href="/lib/aimeat-assets.css">
 <script src="/v1/libs/aimeat-assets.js"></script>
 \`\`\`
+
+Both lines, in that order: the gallery \`preview()\` draws is ordinary DOM and the stylesheet is
+what dresses it on the page's own colours.
 
 \`\`\`js
 const lib = AIMEAT.assets.library({ app: 'ridge' });
@@ -411,35 +449,34 @@ const gallery = AIMEAT.assets.preview('#library', lib, { check: true });
 
 ## Gotchas and Common Mistakes
 
-1. **\`tiles()\` with no \`kinds\` makes nothing.** \`kinds\` is the list; \`size\` and \`prefix\`
-   only describe them. This is the single most common wrong call.
-2. **The generated key is \`prefix + kind\`, and the prefix defaults to empty.** So
-   \`kinds: { ground: true }\` gives you \`ground\`, and \`platformer()\` looking for
-   \`tile-ground\` will not find it: it draws its own plain rectangle instead, which is why the
-   level still plays and the art is silently unused.
-3. **A \`data:\` URI in a pack is dropped, not loaded.** The console says which entry and why.
-4. **Call \`textures.*\` in \`create()\`, not \`preload()\`.** They draw with the scene's own
+1. **The generated key is \`prefix + kind\`, and the prefix defaults to \`tile-\`.** So
+   \`tiles(this)\` gives you \`tile-ground\` and friends, which is exactly what \`platformer()\`
+   looks for. Pass \`prefix: ''\` and \`kinds: { ground: true }\` gives you \`ground\` instead,
+   and the platformer draws its own plain rectangle: the level still plays and your art is
+   silently unused.
+2. **A \`data:\` URI in a pack is dropped, not loaded.** The console says which entry and why.
+3. **Call \`textures.*\` in \`create()\`, not \`preload()\`.** They draw with the scene's own
    graphics and the theme, both of which want the scene to exist.
-5. **\`preloadPack\` from \`create()\` must be awaited.** From \`preload()\` you may ignore the
+4. **\`preloadPack\` from \`create()\` must be awaited.** From \`preload()\` you may ignore the
    promise, because the scene manager waits for the loader anyway.
-6. **A failed file is not an exception.** If you need the level to refuse to start, read
+5. **A failed file is not an exception.** If you need the level to refuse to start, read
    \`failed\` and decide; nothing throws for you.
-7. **The progress bar is drawn at depth 9999 and scroll factor 0** and destroys itself on
+6. **The progress bar is drawn at depth 9999 and scroll factor 0** and destroys itself on
    \`complete\`. Do not add your own on top; pass \`bar: false\` if you want to draw the loading
    screen yourself.
-8. **An audio pair is two addresses for one sound**, not two sounds. \`{ coin: ['coin.mp3',
+7. **An audio pair is two addresses for one sound**, not two sounds. \`{ coin: ['coin.mp3',
    'coin.ogg'] }\` registers one key that every browser between them can play.
-9. **The manifest is saved PUBLIC and the save file is saved PRIVATE.** They are two records
+8. **The manifest is saved PUBLIC and the save file is saved PRIVATE.** They are two records
    with opposite visibility, and it is not an oversight: a player who is signed out has to read
    the art list, and nobody but the player may read their save.
-10. **\`/v1/storage/<key>\` is not an asset address.** It needs an Authorization header, so it
-    works for the file's owner and for nobody else. Every manifest entry uses
-    \`/v1/pub/<owner-ghii>/<key>\`, which is what \`upload()\` hands back.
-11. **\`lib.save()\` needs \`aimeat-data.js\` on the page**, and says so in words when it is not
+9. **\`/v1/storage/<key>\` is not an asset address.** It needs an Authorization header, so it
+   works for the file's owner and for nobody else. Every manifest entry uses
+   \`/v1/pub/<owner-ghii>/<key>\`, which is what \`upload()\` hands back.
+10. **\`lib.save()\` needs \`aimeat-data.js\` on the page**, and says so in words when it is not
     there. Everything else in the asset library works without it.
-12. **A manifest over 1024 kB is refused rather than written.** Split the app into two
+11. **A manifest over 1024 kB is refused rather than written.** Split the app into two
     manifests, one per chapter, or move the long texts into their own record.
-13. **A duplicate frame name in \`packAtlas()\` is refused**, because one of the two pictures
+12. **A duplicate frame name in \`packAtlas()\` is refused**, because one of the two pictures
     would then be unreachable inside the sheet.
 `,
 };

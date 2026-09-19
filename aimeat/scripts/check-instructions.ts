@@ -134,10 +134,15 @@ function main(): void {
             problems.push(`.claude/rules/${name} is not named in CLAUDE.md's "Rules that load by path" table.`);
         }
     }
-    // 2. The root file bans em-dashes and used them on eight lines.
-    rootText.split('\n').forEach((line, i) => {
-        if (line.includes('—')) problems.push(`CLAUDE.md:${i + 1} has an em-dash, which the file itself bans. Use a comma, a colon or two sentences.`);
-    });
+    // 2. The root file bans em-dashes and used them on eight lines; skill aimeat-writing bans them
+    //    and used them on five, with two more skills beside it. The project skills are held to it
+    //    too. The rule files and the agent files still carry thirteen between them (2026-09-19),
+    //    moved verbatim from the old root file, and are not read here until somebody rewrites them.
+    for (const file of [CLAUDE_MD, ...skills]) {
+        readFileSync(file, 'utf-8').split('\n').forEach((line, i) => {
+            if (line.includes('—')) problems.push(`${rel(file)}:${i + 1} has an em-dash, which this project's writing rule bans. Use a comma, a colon or two sentences.`);
+        });
+    }
     // 3. A `pnpm <script>` the instructions name that no package.json defines. A skill named
     //    `pnpm organism:sync`, which was never written.
     const scripts = new Set<string>();
