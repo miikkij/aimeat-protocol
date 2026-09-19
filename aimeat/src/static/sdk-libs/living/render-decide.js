@@ -17,6 +17,7 @@
  * @structure decideRow(host, spec) → { el, update, relabel }
  * @usage  import { decideRow } from './render-decide.js';
  * @version-history
+ *   v0.8.1 — 2026-09-19 — A line that says what personal data was taken out before the text left.
  *   v0.8.0 — 2026-09-19 — Initial (living 0.8.0).
  */
 import { el, clear } from './dom.js';
@@ -40,9 +41,10 @@ export function decideRow(host, spec) {
   const reasonEl = el('p', { class: 'ak-living__decide-reason', hidden: true });
   const answersEl = el('dl', { class: 'ak-living__decide-answers' });
   const personEl = el('div', { class: 'ak-living__decide-person', hidden: true });
+  const removedEl = el('p', { class: 'ak-living__decide-removed', hidden: true });
   const gatesEl = el('p', { class: 'ak-living__decide-gates' });
   const root = el('div', { class: 'ak-living__decide', 'data-living-node': spec.id }, [
-    labelEl, statusEl, reasonEl, answersEl, personEl, gatesEl,
+    labelEl, statusEl, reasonEl, answersEl, removedEl, personEl, gatesEl,
   ]);
   host.appendChild(root);
 
@@ -65,6 +67,21 @@ export function decideRow(host, spec) {
       answersEl.appendChild(el('dd', { text: conf === '' || conf == null ? shown : shown + ' (' + num(conf) + ')' }));
     }
     answersEl.hidden = !answersEl.firstChild;
+
+    // WHAT NEVER LEFT. The text on the screen is the person's own and stays as written; the node
+    // takes personal data out of the copy that goes to the model, and this line is the only place
+    // that is visible. Drawn only once there is an answer to say it about.
+    removedEl.hidden = f.removed === '' || f.removed == null;
+    if (!removedEl.hidden) {
+      const parts = [];
+      for (const kind of ['person', 'email', 'phone', 'hetu', 'iban', 'address']) {
+        const n = Number(f['removed.' + kind]) || 0;
+        if (n > 0) parts.push(n + ' ' + sayDecide('kind.' + kind + (n === 1 ? '.1' : '.n'), langs()));
+      }
+      removedEl.textContent = parts.length
+        ? sayDecide('removedLead', langs()) + parts.join(', ') + sayDecide('removedTail', langs())
+        : sayDecide('removedNone', langs());
+    }
 
     clear(personEl);
     const byHand = status === 'unavailable' || status === 'failed';

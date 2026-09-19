@@ -32,7 +32,7 @@
  *
  * @node       decide    Asks the decision model closed questions about a text and exposes the answers; can move a machine by its own events.
  * @inputs     decide    input (the node id whose text is judged, or a list of ids sent as named fields) · names (node ids or strings: the people the text may mention, removed before it leaves)
- * @outputs    decide    value — "" before the first answer, then asking · moved · stayed · person · unavailable · failed · <question id> — the answer: a probability for yesNo, the option name for pickOne, the level for scale ("" until answered) · <question id>.confidence · <question id>.passed · pending — the event waiting for a person · reason — why it did not ask, in words · decision — the recorded decision id
+ * @outputs    decide    value — "" before the first answer, then asking · moved · stayed · person · unavailable · failed · <question id> — the answer: a probability for yesNo, the option name for pickOne, the level for scale ("" until answered) · <question id>.confidence · <question id>.passed · pending — the event waiting for a person · reason — why it did not ask, in words · decision — the recorded decision id · removed — how many pieces of personal data were taken out of the text before it left (removed.person, removed.email, … per kind)
  * @options    decide    questions { id: { yesNo, meaning? } | { pickOne, options } | { scale, levels } } (English) · thresholds { id: 0..1 } (the event question needs one) · gates (English: what the answer decides; required) · machine (a machine id) · event (the pickOne question whose options are that machine's events) · wait (ms the text must rest before asking; default 1500, floor 300) · subject · label · block (a section to draw it in)
  * @languages  decide    label
  * @example    decide    { "type": "decide", "input": "message", "machine": "ticket", "event": "next", "gates": "which step the support ticket takes next", "questions": { "next": { "pickOne": "Which step does this customer message call for?", "options": { "URGENT": "The customer cannot work at all or loses money now.", "RESOLVE": "The customer says the problem is solved.", "NONE": "None of the steps above." } }, "angry": { "yesNo": "The customer is angry or threatens to leave." } }, "thresholds": { "next": 0.7, "angry": 0.8 }, "label": { "fi": "Viestin arvio", "en": "Reading the message" }, "block": "judge" }
@@ -40,6 +40,8 @@
  *   inputsOf · questionsOf · eventsAccepted · WAIT_FLOOR · WAIT_DEFAULT
  * @usage  import { decideNode } from './decide.js';
  * @version-history
+ *   v0.8.1 — 2026-09-19 — `removed`: what the node took out of the text before it left, because
+ *     the screen keeps the text as written and a person could not otherwise tell.
  *   v0.8.0 — 2026-09-19 — Initial (living 0.8.0): a judgement about text moves a statechart.
  */
 import { isPlainObject } from '../i18n.js';
@@ -258,6 +260,12 @@ export const decideNode = {
     out.pending = String(s.pending || '');
     out.reason = String(s.reason || '');
     out.decision = String(s.decision || '');
+    // How many pieces of personal data the node took out of the text before it left: a number once
+    // there is an answer, empty before. Per kind it is `removed.person`, `removed.email` and so on.
+    out.removed = s.scrub ? Number(s.scrub.total) || 0 : '';
+    for (const kind of Object.keys((s.scrub && s.scrub.removed) || {})) {
+      out['removed.' + kind] = Number(s.scrub.removed[kind]) || 0;
+    }
     return out;
   },
 };
