@@ -399,12 +399,31 @@ const QUESTIONS = {
     assert(r.status === 200 && r.body.data.key_source === 'own', `got ${r.status} ${r.body.data?.key_source}`);
     assert(seen[seen.length - 1].auth === `Bearer ${OWN_KEY}`, 'their key was sent');
   });
+  await test('4d2. the key test makes one tiny call on the owner\'s key and says it works', async () => {
+    const before = seen.length;
+    const r = await json('/v1/ai/decide/settings/test', { method: 'POST', headers: auth(A.token), body: '{}' });
+    assert(r.status === 200 && r.body.data.ok === true && r.body.data.key_source === 'own', `got ${r.status} ${JSON.stringify(r.body.data ?? r.body.error)}`);
+    assert(seen.length === before + 1 && seen[seen.length - 1].auth === `Bearer ${OWN_KEY}`, 'exactly one call, on their key');
+    const agentTry = await json('/v1/ai/decide/settings/test', { method: 'POST', headers: auth(agentAi), body: '{}' });
+    assert(agentTry.status === 403, `an agent may not run the owner's key test, got ${agentTry.status}`);
+    // B, not A: on this node the first owner registered is the operator.
+    const adminTry = await json('/v1/admin/decide/test', { method: 'POST', headers: auth(B.token), body: '{}' });
+    assert(adminTry.status === 403, `a non-operator may not test the node key, got ${adminTry.status}`);
+    const adminOk = await json('/v1/admin/decide/test', { method: 'POST', headers: auth(A.token), body: '{}' });
+    assert(adminOk.status === 200 && adminOk.body.data.ok === true && adminOk.body.data.key_source === 'node', `operator test, got ${JSON.stringify(adminOk.body.data)}`);
+    assert(seen[seen.length - 1].auth === `Bearer ${NODE_KEY}`, 'the operator test used the node key');
+  });
+
   await test('4e. a key the provider refuses is the owner\'s to fix: 401 INVALID_API_KEY', async () => {
     stubStatus = 401;
     const r = await json('/v1/ai/decide', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ state: 'Refused.', questions: { q: QUESTIONS.urgent }, cache: false }) });
     stubStatus = 200;
     assert(r.status === 401 && r.body.error?.code === 'INVALID_API_KEY', `got ${r.status} ${JSON.stringify(r.body.error)}`);
     assert(!JSON.stringify(r.body).includes(OWN_KEY), 'the key is not in the error');
+    stubStatus = 401;
+    const t = await json('/v1/ai/decide/settings/test', { method: 'POST', headers: auth(A.token), body: '{}' });
+    stubStatus = 200;
+    assert(t.status === 200 && t.body.data.ok === false && t.body.data.code === 'INVALID_API_KEY', `key test on a refused key, got ${JSON.stringify(t.body.data)}`);
     const d = await json('/v1/ai/decide/settings/key', { method: 'DELETE', headers: auth(A.token) });
     assert(d.status === 200 && d.body.data.has_own_key === false, 'the key is forgotten');
   });
