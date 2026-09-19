@@ -88,11 +88,12 @@ function answerFor(q: any): any {
     const probs = Object.fromEntries(opts.map((o, i) => [o, i === 0 ? 0.9 : 0.1 / (opts.length - 1)]));
     return { type: 'choice', choice: opts[0], probabilities: probs, confidence: 0.88 };
   }
+  // Levels are numbered from 0, as the live model answers (its documentation says 1).
   const levels = q.criteria as unknown[];
   return {
     type: 'score', score: 2, confidence: 0.7,
-    legend: Object.fromEntries(levels.map((l, i) => [String(i + 1), l])),
-    probabilities: Object.fromEntries(levels.map((_, i) => [String(i + 1), i === 1 ? 1 : 0])),
+    legend: Object.fromEntries(levels.map((l, i) => [String(i), l])),
+    probabilities: Object.fromEntries(levels.map((_, i) => [String(i), i === 2 ? 1 : 0])),
   };
 }
 
