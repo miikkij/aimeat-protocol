@@ -201,7 +201,7 @@ export const TASKS: Task[] = [
             // Nobody answers a headless run, so what can be measured is whether the builder SAID which
             // level it took, in the one message the owner gets.
             const saidLevel = /\b(prototype|ordinary page|the finest|level)\b/i.test(ctx.metrics.finalText);
-            return { ok, detail: ok ? 'an Atelier app that keeps the habits on the node' : `the app is published, and ${why}`, note: `${describeQuality(quality)}; level ${saidLevel ? 'named' : 'NOT named'} to the owner` };
+            return { ok, detail: ok ? 'an Atelier app that keeps the habits on the node' : `the app is published, and ${why}`, note: `${describeQuality(quality)}; level ${saidLevel ? 'named' : 'NOT named'} to the owner; Book line ${/From the Design Book I take/i.test(ctx.metrics.finalText) ? 'said' : 'NOT said'}` };
         },
     },
     {

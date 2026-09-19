@@ -69,6 +69,8 @@ export interface AppQuality {
     ownStyles: number;
     /** The level the page states (`proto`, `plain`, `fine`), or null when it states none. */
     level: string | null;
+    /** Whether the page mounts a mosaic, the one thing that draws an adopted arrangement. */
+    mountsMosaic: boolean;
     /** Whether the run was shown the Design Book's one-page map, by either road. */
     sawBookMap: boolean;
     /** `fixed` keeps its own colours, `follows` changes with the person's theme; null when not said. */
@@ -146,6 +148,9 @@ export async function appQuality(baseUrl: string, ownerName: string, filename: s
         kitComponents: [...new Set([...html.matchAll(new RegExp(`\\b(?:AIMEAT\\.atelier|${kitAliases(html).join('|')})\\.([a-z][A-Za-z]+)\\s*\\(`, 'g'))].map(m => m[1]).filter(n => KIT_NAMES.has(n)))],
         ownStyles: ownClassNames(html).length,
         level: meta('aimeat-level'),
+        // Only a mosaic draws the stored arrangement a Design Book adopt writes, so a genre fork
+        // without one cannot use a single part of the Book.
+        mountsMosaic: /\.mosaic\s*\(\s*\{/.test(html),
         // The whole Book on one page reaches a builder two ways: part `libraries` of the
         // specification ends with it, and a search given nothing answers it.
         sawBookMap: atelierTiers.includes('build-app-atelier/libraries')
@@ -183,6 +188,7 @@ export function describeQuality(q: AppQuality): string {
         + `; light ${q.light ?? 'not said'}`
         + `; level ${q.level ?? 'NOT STATED'}`
         + `; Book map ${q.sawBookMap ? 'seen' : 'NOT seen'}`
+        + `; mosaic ${q.mountsMosaic ? 'MOUNTED' : 'not mounted'}`
         + `; Design Book searched ${q.book.searched}, adopted ${q.book.adopted}, proposed ${q.book.proposed}`
         + `; kit components ${q.kitComponents.length ? q.kitComponents.join(' ') : 'none'}; own styles ${q.ownStyles}`;
     return `${track}; ${Math.round(q.bytes / 1024)} kB; ${wrong.length ? wrong.join(', ') : 'nothing the lint or the head checks object to'}; ${read}; spec token ${q.sentSpecToken ? 'sent' : 'not sent'}`;
