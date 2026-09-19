@@ -5,6 +5,8 @@
  * @description Portable task prompts for the owner's connected AI. No credentials or vendor assumptions.
  * @version-history
  *   v1.0.0 — 2026-09-09 — Approved home journey: useful work through the owner's AI.
+ *   v1.1.0 — 2026-09-19 — The tools paragraph tells the AI to find and load the tools and to report
+ *     a failed call verbatim; it had told the AI to stop when its tool list looked empty.
  */
 export const FIRST_NOTE_KEY = 'home.first-note';
 
@@ -21,7 +23,12 @@ export function buildJourneyPrompt(action, origin, owner) {
   return [
     'Talk to me in the language I use with you.',
     `Use my connected AIMEAT at ${origin}. My account is ${owner}. Verify the authenticated identity and use only the permissions I granted.`,
-    'First check that AIMEAT tools are available in this conversation. If they are missing, say so clearly and direct me to the connection instructions on my AIMEAT home. Report completion only after a successful tool call and read-back; make missing capabilities and failures explicit.',
+    // This paragraph used to open with "First check that AIMEAT tools are available... If they are
+    // missing, say so". A client that loads connected tools on demand (Codex, 2026-09-19) shows an
+    // empty list until the model looks, so the model read the list, found nothing and took the exit
+    // the prompt offered, while the same task with no prompt at all went straight to work. The
+    // evidence that a connection is broken is a failed call, so that is what the prompt asks for.
+    'My AIMEAT tools are connected to this conversation. Some AI clients load connected tools on demand, so when they are outside your visible tool list, search your tools and connectors for "aimeat" and load them. Begin with aimeat_handbook_get, which is this AIMEAT\'s operating guide and names the tools for this task. When a real AIMEAT tool call fails, show me the exact error text and the one step that fixes it; the connection instructions are on my AIMEAT home. Report completion after a successful tool call and read-back.',
     task,
     `My home is ${origin}/v1/home. Show the real result and the next step when finished.`,
   ].join('\n\n');
