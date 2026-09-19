@@ -161,6 +161,21 @@
   function settings() {
     return call("/v1/ai/decide/settings");
   }
-  var decide = { yesNo, pickOne, scale, ask, gate, questionSet, decisions, review, run, settings };
+  var _availCache = null;
+  async function isAvailable() {
+    if (_availCache && Date.now() - _availCache.t < 6e4) return _availCache.v;
+    try {
+      const s = await settings();
+      _availCache = { v: !!(s && s.available), reason: s && s.unavailable_reason || null, t: Date.now() };
+    } catch (e) {
+      _availCache = { v: false, reason: e && /** @type {any} */
+      e.message || null, t: Date.now() };
+    }
+    return _availCache.v;
+  }
+  function unavailableReason() {
+    return _availCache ? _availCache.reason : null;
+  }
+  var decide = { yesNo, pickOne, scale, ask, gate, questionSet, decisions, review, run, settings, isAvailable, unavailableReason };
   attach("decide", decide);
 })();

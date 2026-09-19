@@ -19,6 +19,8 @@
  *     instead of filtering to the entries that model wrote. The drill-down names the doors that can
  *     open one entry (aimeat_knowledge_get cannot: it reads only the calling agent's namespace). The
  *     owner-scope listing is appdev-kb's, not a copy kept here.
+ *   2026-09-19 — `decision_model`: whether this owner's apps can use the decision model, and the
+ *     skill to read if so, so nothing is built around a model its owner cannot reach (TARGET-080).
  *   2026-09-06 — `secrets_note` beside `scope_note`: a key for an outside service is named as
  *     `{{secret:NAME}}` in an extension's header and filled from the person's vault, never held
  *     by the app; the note says where the person stores it and which tools an agent uses.
@@ -38,6 +40,7 @@ import { getAppdevPitfallIndex, getAppdevPitfallFacets } from '../data/appdev-pi
 import { filterPitfalls, listLearnedPitfalls, listOwnerScopeMemory } from './appdev-kb.js';
 import { listSkills, type SkillAccessor } from './skills.js';
 import { dependencyIndex, appRef as depAppRef } from './dependency-map.js';
+import { decideAvailableFor } from './decide/settings.js';
 import { logger } from '../utils/logger.js';
 
 const CAP = 25;
@@ -87,6 +90,13 @@ export async function buildAppdevOverview(
         secrets_note: 'A key for an outside service is never held by an app or typed into one. The call lives in an extension whose header names it as {{secret:NAME}}; the node fills it from the signed-in person\'s vault on the way out, and a missing name fails as SECRET_UNKNOWN naming it. The person stores it on their Access page (section 04 Secrets) or via an agent holding secrets:manage (aimeat_secret_set); aimeat_secret_list shows names and who used them, never a value.',
         ...(model ? { model } : {}),
     };
+
+    // ── Can this owner's apps use the decision model? Answered before anything is designed, so no
+    //    app is built around a model its owner cannot reach (TARGET-080). Always included: one read.
+    const decide = await decideAvailableFor(storage, config, ownerGhii);
+    out.decision_model = decide.available
+        ? { available: true, library: 'aimeat-decide', skill: 'node:aimeat-decide', note: 'Classify, screen, route, gate: typed questions, answers with probabilities, no text. Read skill node:aimeat-decide for when it fits and the recipes before designing a feature on it.' }
+        : { available: false, reason: decide.reason, note: 'Do not build a feature on the decision model for this owner. Tell them what to set up, or design the feature without it.' };
 
     // ── The owner's existing apps — often the best starting template ──
     if (wanted.has('apps')) {

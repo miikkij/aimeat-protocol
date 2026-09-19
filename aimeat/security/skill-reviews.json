@@ -1,6 +1,17 @@
 {
   "about": "When each skill was last read against the code it describes, and which files that code is. pnpm check:skill-reviews fails when a watched file changes after the review, so whoever changed the code re-reads the skill. Re-stamp after reading with: pnpm check:skill-reviews --record <name>. Reasoning: aimeat/scripts/check-skill-reviews.ts.",
   "skills": {
+    "node:aimeat-decide": {
+      "reviewedOn": "2026-09-19",
+      "watches": [
+        "aimeat/src/static/sdk-libs/decide/index.js",
+        "aimeat/src/services/decide/service.ts",
+        "aimeat/src/services/decide/limits.ts",
+        "aimeat/src/services/decide/settings.ts",
+        "aimeat/src/services/app-decide-posture.ts"
+      ],
+      "digest": "sha256:1ac7a14a28008bbe4b1112d1"
+    },
     "node:aimeat-open-items": {
       "reviewedOn": "2026-09-19",
       "watches": [
@@ -76,7 +87,7 @@
         "aimeat/src/services/node-templates.ts",
         "aimeat/src/services/app-spec-gate.ts"
       ],
-      "digest": "sha256:52c2b3fedf086c5ddd5db645",
+      "digest": "sha256:626b9332a5865b47dda15265",
       "note": "The skill points at the build specification rather than repeating it, so it watches the doors to the specification and not the specification's text."
     },
     "node:aimeat-app-builder-atelier": {
@@ -273,7 +284,7 @@
         "aimeat/src/services/build-app-layers.ts",
         "aimeat/src/routes/app-templates.ts"
       ],
-      "digest": "sha256:7e3f2863f6b13d87681e09ce"
+      "digest": "sha256:c1343c29d6ac66679ce541b1"
     },
     "project:aimeat-design-language": {
       "reviewedOn": "2026-09-19",
@@ -362,7 +373,7 @@
       "aimeat/src/services/app-publish-next-steps.ts": "404316a05e8cf2d3"
     },
     "node:aimeat-app-builder": {
-      "aimeat/src/services/build-app-layers.ts": "4c497b2a17fb0c11",
+      "aimeat/src/services/build-app-layers.ts": "d63af1a52466c986",
       "aimeat/src/services/node-templates.ts": "d827b8d325a6fc5e",
       "aimeat/src/services/app-spec-gate.ts": "023890ba92c1090e"
     },
@@ -473,7 +484,7 @@
       "aimeat/src/static/sdk-libs/phaser/index.js": "036eac5aa666d96a"
     },
     "project:aimeat-app-building": {
-      "aimeat/src/services/build-app-layers.ts": "4c497b2a17fb0c11",
+      "aimeat/src/services/build-app-layers.ts": "d63af1a52466c986",
       "aimeat/src/routes/app-templates.ts": "48da5b8d0573d8d7"
     },
     "project:aimeat-design-language": {
@@ -505,6 +516,13 @@
       "aimeat/src/services/schedule-gate.ts": "5d6d832ec8021f6f",
       "aimeat/src/mcp/agent-schedules.ts": "3e2a000c330237b0",
       "aimeat/src/routes/agents-v2/agent-proposals.ts": "1da72b752ee164bc"
+    },
+    "node:aimeat-decide": {
+      "aimeat/src/static/sdk-libs/decide/index.js": "96ef87b8d94ac27b",
+      "aimeat/src/services/decide/service.ts": "2c80d4f613f15dfa",
+      "aimeat/src/services/decide/limits.ts": "af13e600bdfea3ab",
+      "aimeat/src/services/decide/settings.ts": "a1b49d50eda07c3f",
+      "aimeat/src/services/app-decide-posture.ts": "37b3abafb01be288"
     }
   }
 }

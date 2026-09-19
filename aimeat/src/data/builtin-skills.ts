@@ -97,6 +97,7 @@ import { WORKSTATION_SKILL_ENTRY } from './builtin-skills.workstation.js';
 import { APP_BUILDER_SKILL_ENTRY } from './builtin-skills.app-builder.js';
 import { APP_BUILDER_ATELIER_SKILL_ENTRY } from './builtin-skills.app-builder-atelier.js';
 import { GAME_SKILL_ENTRIES } from './builtin-skills-games.js';
+import { DECIDE_SKILL_ENTRY } from './builtin-skills.decide.js';
 
 export interface BuiltinSkill {
   name: string;
@@ -113,6 +114,7 @@ export const BUILTIN_SKILLS: BuiltinSkill[] = [
   WORKSTATION_SKILL_ENTRY,
   APP_BUILDER_SKILL_ENTRY,
   APP_BUILDER_ATELIER_SKILL_ENTRY,
+  DECIDE_SKILL_ENTRY,
   ...GAME_SKILL_ENTRIES,
   {
     name: 'aimeat-node-guide',
