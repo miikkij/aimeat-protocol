@@ -374,6 +374,11 @@ const QUESTIONS = {
     const r = await json('/v1/ai/decide/settings', { headers: auth(A.token) });
     assert(r.status === 200 && r.body.data.node_key_available === true && r.body.data.has_own_key === false, JSON.stringify(r.body.data));
     assert(!JSON.stringify(r.body).includes(NODE_KEY), 'the node key is not shown');
+    assert(r.body.data.available === true && r.body.data.unavailable_reason === null, 'available, because the node has a key');
+    const ov = await json('/v1/appdev/overview?sections=apps', { headers: auth(A.token) });
+    assert(ov.status === 200, `appdev overview ${ov.status}`);
+    assert(ov.body.data.decision_model?.available === true && ov.body.data.decision_model?.skill === 'node:aimeat-decide',
+      `the appdev overview says the builder may use it, got ${JSON.stringify(ov.body.data.decision_model)}`);
   });
   await test('4b. an agent cannot change them', async () => {
     const r = await json('/v1/ai/decide/settings', { method: 'PUT', headers: auth(agentAi), body: JSON.stringify({ policy: { allow: ['email'] } }) });

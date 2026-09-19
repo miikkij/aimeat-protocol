@@ -23,7 +23,7 @@
  *   record the owner can edit without a redeploy; the thresholds are what gate() compares against,
  *   and they are recorded with every decision so the decision can be audited later.
  * @structure yesNo / pickOne / scale (question builders) · ask · gate · questionSet · decisions ·
- *   review · run · settings · attach('decide', …)
+ *   review · run · settings · isAvailable / unavailableReason · attach('decide', …)
  * @usage
  *   <script src="/v1/libs/aimeat-auth.js"></script><script src="/v1/libs/aimeat-decide.js"></script>
  *   const r = await AIMEAT.decide.ask({ text: mail.body }, {
@@ -32,6 +32,8 @@
  *   }, { subject: mail.key, gates: 'which folder the mail goes to', app_id: 'mail-sorter' });
  *   if (r.answers.urgent.value > 0.8) { ... }
  * @version-history
+ *   v1.1.0 - 2026-09-19 - isAvailable() / unavailableReason(): gate a decision feature on whether this
+ *     account can reach the model, the way AIMEAT.ai.isAvailable() gates a text one.
  *   v1.0.0 - 2026-09-19 - Initial (TARGET-080).
  */
 import { makeSession } from '../_core/session.js';
@@ -220,6 +222,29 @@ const run = {
 /** The owner's settings as the node shows them: never the key. */
 function settings() { return call('/v1/ai/decide/settings'); }
 
-export const decide = { yesNo, pickOne, scale, ask, gate, questionSet, decisions, review, run, settings };
+/** @type {{ v: boolean, reason: string|null, t: number } | null} */
+let _availCache = null;
+
+/**
+ * Can this person's account ask the decision model right now? False when nobody is signed in, the
+ * app lacks ai:use, the operator turned it off, or no TypeSafe key is set. Gate every decision
+ * feature on it and hide or explain the feature when it is false. Cached for 60 s.
+ * @returns {Promise<boolean>}
+ */
+async function isAvailable() {
+  if (_availCache && Date.now() - _availCache.t < 60_000) return _availCache.v;
+  try {
+    const s = await settings();
+    _availCache = { v: !!(s && s.available), reason: (s && s.unavailable_reason) || null, t: Date.now() };
+  } catch (e) {
+    _availCache = { v: false, reason: (e && /** @type {any} */ (e).message) || null, t: Date.now() };
+  }
+  return _availCache.v;
+}
+
+/** Why isAvailable() said false, in words to show the person, or null. Call after isAvailable(). */
+function unavailableReason() { return _availCache ? _availCache.reason : null; }
+
+export const decide = { yesNo, pickOne, scale, ask, gate, questionSet, decisions, review, run, settings, isAvailable, unavailableReason };
 
 attach('decide', decide);

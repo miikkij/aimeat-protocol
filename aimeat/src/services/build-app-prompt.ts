@@ -15,6 +15,8 @@
  * @usage import { buildAppPrompt } from '../services/build-app-prompt.js';
  *   const { full, body } = buildAppPrompt(config, { lang: 'en', mode: 'new', idea: '...' });
  * @version-history
+ *   2026-09-19 — ADDITIVE, a new section after the aimeat-ai one: the decision model, checked for
+ *     availability before building (build-app-prompt-decide.ts, TARGET-080).
  *   2026-09-18 — ADDITIVE, a new section before the aimeat-ai one: the prompt-driven workflow with
  *     aimeat-prompt.js (build-app-prompt-driven.ts). Instruction review, item 10.
  *   2026-09-18 — ADDITIVE, one parenthesis in the shape section: the shell is also read with
@@ -151,6 +153,7 @@ import { APP_GRANTABLE_SCOPES } from '../routes/app-grants.js';
 import { buildPromptLibrarySections } from '../data/library-packs.js';
 import { buildPromptSessionSections } from './build-app-prompt-session.js';
 import { buildPromptDrivenSection } from './build-app-prompt-driven.js';
+import { buildDecideSection } from './build-app-prompt-decide.js';
 import { buildResearchStep, buildFinishChecklist } from './appdev-flow-constants.js';
 
 export interface BuildAppPromptOptions {
@@ -428,6 +431,7 @@ function composeAppPrompt(
   body += '// Structured output: const { parsed } = await AIMEAT.ai.completeJson({ app_id, prompt, schema });\n';
   body += '```\n';
   body += 'Always handle isAvailable()===false and catch errors; never hardcode an API key in the app.\n\n';
+  body += buildDecideSection(nodeUrl);
   body += "**Any OTHER key the app needs — a weather service, a payment provider, a mail relay — is never asked for, held or sent by the app.** The browser cannot keep a secret, so the call that needs it lives in an extension (T3), and the extension names the key in an outbound header as `{{secret:NAME}}`: the node fills it from the SIGNED-IN PERSON's own vault on the way out, and neither the app, the extension's script nor any record ever holds the value. What the app does is tell the person the NAME: \"store your OpenWeather key as `OPENWEATHER_KEY` on your Access page, section 04 Secrets, or ask your AI to store it\" (an agent stores it with `aimeat_secret_set` once the owner has ticked `secrets:manage` for it). A call made before the key is stored fails by name (`SECRET_UNKNOWN`, naming the header and the secret), so show that name in the UI rather than a generic error, and never offer a text field for the key itself. The vault is per person: two people using the same app reach the same service with their own keys, with nothing to configure in the app.\n\n";
 
   // NOTIFICATIONS. The route and the SDK call have existed since July; no builder was told, so no

@@ -111,8 +111,8 @@ when you already know the domain: \`aimeat_catalogue_agents\` (find peers to del
 belongs to the service surface).
 
 **Decisions — classify, screen, route, gate.** \`aimeat_decide\` asks the decision model closed
-questions (yes/no probability, pick one of up to 240, a 2-10 scale) about a record and answers in
-well under a second; it writes no text. Ask every question in ONE call, write them in ENGLISH, pass
+questions (yes/no probability, pick one of up to 240, a 2-10 scale) about a record and answers
+with typed values; it writes no text. Ask every question in ONE call, write them in ENGLISH, pass
 \`subject\`, \`gates\` and \`thresholds\`, and \`names\` for the people the record mentions: the node
 removes the personal data it recognises, the rest of what you send is your responsibility.
 \`aimeat_decide_run\` does many records in the background · \`aimeat_decision_list\` reads what was
