@@ -23,9 +23,14 @@
  * @structure HAND_ROLLED_RULES · handRolledFindings(html)
  * @usage const hints = handRolledFindings(html);
  * @version-history
+ *   v1.1.0 — 2026-09-19 — A chart drawn in code on a page that loads the Atelier kit. NOT a genre's
+ *     own drawing: the first reading of three measured builds called their bar strip hand-drawn, and
+ *     it was the almanac genre's own `.bars`, kept as a fork should keep it. So the rule is quiet for
+ *     bars made of plain elements and for any genre that draws in SVG or canvas itself.
  *   v1.0.0 — 2026-09-19 — Initial.
  */
 import type { AppArtifactFinding } from './app-artifact-lint.js';
+import { GENRE_BODIES } from '../data/app-templates/genres.js';
 
 const PITFALL = 'hand-rolled';
 
@@ -84,6 +89,18 @@ export function handRolledFindings(html: string): AppArtifactFinding[] {
     const hay = rule.address ? code : bare;
     if (!rule.test.test(hay)) continue;
     found.push(`${rule.what}: ${rule.instead ?? rule.libs.slice(0, 2).map(l => '`' + l + '`').join(' or ') + ' does this'}`);
+  }
+  // A chart built in code, on a page that loads the kit and never calls its chart or its gauge.
+  // Quiet when the forked genre draws in SVG or canvas itself: keeping the genre's drawing is the
+  // point of a fork, and the kit's chart would wear the default look inside it.
+  if (loaded(html, 'aimeat-atelier') && /createElementNS\s*\([^)]*\)|\.getContext\s*\(/.test(bare)
+    && /createElementNS\s*\([^)]{0,80}["'](?:rect|polyline|path|circle|line)["']|getContext\s*\(\s*["']2d["']/.test(code)
+    && !/\.(?:chart|gauge|radar)\s*\(/.test(bare)) {
+    const genre = /<meta\b[^>]*name\s*=\s*["']aimeat-register["'][^>]*content\s*=\s*["']genre-([a-z0-9-]+)["']/i.exec(html.slice(0, 8192))?.[1];
+    const genreDraws = genre ? /<svg|createElementNS|getContext\(/.test((GENRE_BODIES as Record<string, string>)[genre] ?? '') : false;
+    if (!genreDraws) {
+      found.push('a chart drawn in code (SVG shapes or a 2d canvas) while the kit is loaded: `AIMEAT.atelier.chart` draws bars, lines, areas, donuts, scatter and sparklines in the page\'s own tokens and follows the theme, and `gauge` and `radar` are beside it');
+    }
   }
   // A draft and a preference are not a store; a third key is.
   const keys = new Set([...code.matchAll(/\blocalStorage\.setItem\s*\(\s*(["'`])([^"'`]+)\1/g)].map(m => m[2]));

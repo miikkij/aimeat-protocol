@@ -38,6 +38,33 @@ describe('done by hand where the node has a library', () => {
   });
 });
 
+describe('a chart drawn in code on a page that loads the kit', () => {
+  const kitPage = (register: string, script: string) => `<!DOCTYPE html><html><head><meta name="aimeat-register" content="${register}" /></head><body>
+<script src="/v1/libs/aimeat-atelier.js"></` + `script><script>${script}</` + 'script></body></html>';
+  const SVG_BARS = 'var r = document.createElementNS("http://www.w3.org/2000/svg", "rect"); r.setAttribute("height", v); svg.appendChild(r);';
+
+  it('is named with the kit\'s chart, on a look of its own', () => {
+    const f = handRolledFindings(kitPage('custom:ledger', SVG_BARS));
+    expect(f).toHaveLength(1);
+    expect(f[0].message).toMatch(/AIMEAT\.atelier\.chart/);
+  });
+  it('a canvas chart counts too', () => {
+    expect(handRolledFindings(kitPage('custom:ledger', 'var ctx = c.getContext("2d"); ctx.fillRect(x, y, w, h);'))[0].message).toMatch(/chart/);
+  });
+  it('is quiet when the page calls the kit\'s chart or gauge as well', () => {
+    expect(handRolledFindings(kitPage('custom:ledger', SVG_BARS + ' a.chart(host, { kind: "bar" });'))).toEqual([]);
+  });
+  it('is quiet in a genre that draws in SVG itself: keeping the genre\'s drawing is the point of a fork', () => {
+    expect(handRolledFindings(kitPage('genre-blueprint', SVG_BARS))).toEqual([]);
+  });
+  it('is quiet for bars made of plain elements, which is how the almanac genre draws its own', () => {
+    expect(handRolledFindings(kitPage('genre-almanac', 'var i = document.createElement("i"); i.style.height = pct + "%"; bars.appendChild(i);'))).toEqual([]);
+  });
+  it('is quiet on a page without the kit: a Classic app has its own chart libraries', () => {
+    expect(handRolledFindings(page([], SVG_BARS))).toEqual([]);
+  });
+});
+
 describe('what stays quiet', () => {
   it('the same code with the library loaded: the library may need it, and so may the app', () => {
     expect(handRolledFindings(page(['aimeat-voice'], 'new webkitSpeechRecognition(); new MediaRecorder(s); new AudioContext();'))).toEqual([]);

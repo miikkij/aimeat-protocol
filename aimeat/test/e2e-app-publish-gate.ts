@@ -378,6 +378,22 @@ const publish = (token: string, body: Record<string, unknown>) =>
         assert(hintsOf(again, 'hand-rolled').length === 0, `with the library loaded the rule stands down: ${JSON.stringify(hintsOf(again, 'hand-rolled'))}`);
     });
 
+    await test('a chart drawn in code beside a loaded kit is named with the kit\'s chart; calling the kit\'s chart is silence', async () => {
+        const name = `gatechart${Date.now()}.html`;
+        const kit = '<script src="/v1/libs/aimeat-atelier.js"></' + 'script><script src="/v1/libs/aimeat-auth.js">';
+        const drawn = app(name).replace('<script src="/v1/libs/aimeat-auth.js">', kit)
+            .replace('<head>', '<head><meta name="aimeat-register" content="custom:gatechart">')
+            .replace('async function start() {', 'var bar = document.createElementNS("http://www.w3.org/2000/svg", "rect");\nasync function start() {');
+        const r = await publish(o.token, { filename: name, mime_type: 'text/html', content: b64(drawn), name: 'Drawn by hand', description: 'Draws its own bars.', spec_token: specToken });
+        assert(r.status === 201, `a warning must never refuse: ${r.status} ${JSON.stringify(r.body?.error)}`);
+        const h = hintsOf(r, 'hand-rolled');
+        assert(h.length === 1 && h[0].message.includes('AIMEAT.atelier.chart'), `expected the hand-rolled hint naming the kit's chart: ${JSON.stringify(r.body.data.app_hints)}`);
+        const withKit = drawn.replace('async function start() {', 'function draw(el, rows) { AIMEAT.atelier.chart(el, { type: "bar", data: rows }); }\nasync function start() {');
+        const again = await publish(o.token, { filename: name, mime_type: 'text/html', content: b64(withKit), name: 'Drawn by hand', description: 'Draws its own bars.', spec_token: specToken });
+        assert(again.status === 201, `publish ${again.status}: ${JSON.stringify(again.body?.error)}`);
+        assert(hintsOf(again, 'hand-rolled').length === 0, `with the kit's chart called the rule stands down: ${JSON.stringify(hintsOf(again, 'hand-rolled'))}`);
+    });
+
     await test('every genre says whether it keeps its own colours or follows the theme, with an address to look at', async () => {
         const list = await json('/v1/app-templates');
         const genres = (list.body.data.templates as any[]).filter(t => t.kind === 'genre');
