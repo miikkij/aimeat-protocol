@@ -7,6 +7,11 @@
  *   from scratch. Consumed by ../app-templates.ts which assembles the TEMPLATES registry.
  * @structure SHELL_PURE_CLIENT · SHELL_CORTEX · SHELL_EXTENSION
  * @version-history
+ *   v1.6.0 — 2026-09-19 — The three Classic shells sign in with `onSession`. They started the app from
+ *     `onLogin` and polled getSession every 300 ms for the silent sign-in, while the build specification
+ *     has taught `onSession(session, { restored })` since 2026-09-13 as the one handler for a restored
+ *     session, the silent one on an app address and a sign-in. A builder that compared the shell with
+ *     the specification found them disagreeing and reported it.
  *   v1.6.0 — 2026-09-19 — The three classic shells carry `aimeat-app` (with a placeholder the
  *     publish lint names when it is left in) and `aimeat-scopes` (the default grant). Neither was in
  *     a shell, the lint warns about both on every app, and every measured cold-agent build
@@ -108,18 +113,16 @@ entry: index.html
       // {{LOAD DATA + RENDER YOUR VIEWS — handle empty/loading/error states}}
     }
 
-    var booted = false;
-    function tryBoot() { if (booted) return; var s = AIMEAT.auth.getSession && AIMEAT.auth.getSession(); if (s && s.jwt) { booted = true; boot(s); } }
+    // onSession runs once for every session that appears: the one restored when the page loads,
+    // the silent one on an app address, and a sign-in. It is the ONE handler; do not poll for a
+    // session and do not start the app from onLogin, which never runs for a restored session.
     AIMEAT.auth.mountLoginButton('#login', {
-      onLogin: function () { tryBoot(); },
-      onLogout: function () { booted = false; setStatus('Log in to continue.', 'alert-warning'); }
+      onSession: function (s) { boot(s); },
+      onLogout: function () { session = null; setStatus('Log in to continue.', 'alert-warning'); }
     });
     // The language button lives in the pill (from the aimeat-locales meta above). React to it.
     var lang = AIMEAT.auth.getLang();
     window.addEventListener('aimeat-lang-change', function (e) { lang = e.detail.lang; /* {{RE-RENDER}} */ });
-    // App origin: the silent/grant login resolves async and may not call onLogin — poll getSession.
-    var _iv = setInterval(function () { tryBoot(); if (booted) clearInterval(_iv); }, 300);
-    tryBoot();
   </script>
 </body>
 </html>`;
@@ -212,11 +215,8 @@ entry: index.html
       // Forms via AIMEAT.ui.forms.FormGroup({ target, fields:[…], onSubmit }).
       // {{BUILD YOUR VIEWS — load data from AIMEAT.data, render with the cortex libs}}
     }
-    var booted = false;
-    function tryBoot() { if (booted) return; var s = AIMEAT.auth.getSession && AIMEAT.auth.getSession(); if (s && s.jwt) { booted = true; boot(s); } }
-    AIMEAT.auth.mountLoginButton('#login', { onLogin: function () { tryBoot(); }, onLogout: function () { booted = false; setStatus('Log in to continue.', 'alert-warning'); } });
-    var _iv = setInterval(function () { tryBoot(); if (booted) clearInterval(_iv); }, 300);
-    tryBoot();
+    // onSession covers a restored session, the silent one on an app address and a sign-in; no polling.
+    AIMEAT.auth.mountLoginButton('#login', { onSession: function (s) { boot(s); }, onLogout: function () { session = null; setStatus('Log in to continue.', 'alert-warning'); } });
   </script>
 </body>
 </html>`;
@@ -291,11 +291,8 @@ entry: index.html
       // Example: var r = await callExt('{{action}}', { /* input */ }); render(r.data);
       // {{CALL YOUR EXTENSION ACTIONS + RENDER — handle loading/empty/error}}
     }
-    var booted = false;
-    function tryBoot() { if (booted) return; var s = AIMEAT.auth.getSession && AIMEAT.auth.getSession(); if (s && s.jwt) { booted = true; boot(s); } }
-    AIMEAT.auth.mountLoginButton('#login', { onLogin: function () { tryBoot(); }, onLogout: function () { booted = false; setStatus('Log in to continue.', 'alert-warning'); } });
-    var _iv = setInterval(function () { tryBoot(); if (booted) clearInterval(_iv); }, 300);
-    tryBoot();
+    // onSession covers a restored session, the silent one on an app address and a sign-in; no polling.
+    AIMEAT.auth.mountLoginButton('#login', { onSession: function (s) { boot(s); }, onLogout: function () { session = null; setStatus('Log in to continue.', 'alert-warning'); } });
   </script>
 </body>
 </html>`;

@@ -97,7 +97,7 @@
         "aimeat/src/services/build-atelier-layers.ts",
         "aimeat/src/static/sdk-libs/atelier/describe-data.js"
       ],
-      "digest": "sha256:e8ad20b223fccc07d68510ec"
+      "digest": "sha256:b7805e4f102e7087546da32c"
     },
     "node:aimeat-phaser": {
       "reviewedOn": "2026-09-19",
@@ -301,7 +301,7 @@
       "watches": [
         "aimeat/scripts/sandbox.ts"
       ],
-      "digest": "sha256:a51c0f409723423a7305e612",
+      "digest": "sha256:e70e81073fb3d11e8305806a",
       "note": "It sends the check to the sandbox node; the styling rules it states live in the frontend path rule."
     },
     "project:aimeat-imagery": {
@@ -379,8 +379,8 @@
       "aimeat/src/services/app-spec-gate.ts": "023890ba92c1090e"
     },
     "node:aimeat-app-builder-atelier": {
-      "aimeat/src/services/build-atelier-prompt.ts": "2acda4f493a435e7",
-      "aimeat/src/services/build-atelier-layers.ts": "f407a9b855d51010",
+      "aimeat/src/services/build-atelier-prompt.ts": "f77a33c77b6c1f7e",
+      "aimeat/src/services/build-atelier-layers.ts": "4fabd16588fa5f33",
       "aimeat/src/static/sdk-libs/atelier/describe-data.js": "b87046c1071e4940"
     },
     "node:aimeat-phaser": {
@@ -495,7 +495,7 @@
       "aimeat/public/lib/aimeat-fonts.css": "6754e84dc93d141f"
     },
     "project:aimeat-frontend-verify": {
-      "aimeat/scripts/sandbox.ts": "b6342f7c64dffd6e"
+      "aimeat/scripts/sandbox.ts": "18f267eb867e21a9"
     },
     "project:aimeat-imagery": {
       "scripts/gen_image.py": "e2435908849b31d3"

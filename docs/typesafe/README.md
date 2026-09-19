@@ -10,6 +10,10 @@ README is in git. Everything else here is ignored on purpose:
   repository is publishing. Keep measurements in this folder or in an unpublished draft in the
   development organism, never in a committed file, a published document or a post.
 
+**One exception** (Jouni, 2026-09-19): a figure TypeSafe publishes itself, on its site or its
+blog, may be repeated. It is TypeSafe's claim, not our measurement: name TypeSafe as the source
+next to the figure, link the page it comes from, and say it was not measured here.
+
 The snapshot goes stale. Refetch it from `https://docs.typesafe.ai/llms.txt`, which lists every
 page; each page is served as Markdown at its own path with `.md` appended.
 
