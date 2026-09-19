@@ -15,6 +15,11 @@
  *   import { instructionsFor } from './instructions.js';
  *   new McpServer({ name, version }, { capabilities, instructions: instructionsFor(role, { guidance }) });
  * @version-history
+ *   v1.3.0 — 2026-09-19 — One sentence after the three grounds names aimeat_discover as the way to
+ *     find something whose place is not known, and says its three reaches: the person's own, what
+ *     their organisms share with them, what is public. Until now only the tool's own description
+ *     and the agent-surface handbook said it, and a connection to the full surface read neither.
+ *     Measured before and after with the cold-agent task `find-shared`.
  *   v1.2.0 — 2026-09-18 — What an agent acts on comes first, inside the first 1 500 characters, and
  *     the long form follows. Several clients cut this string at about 2 kB; the cut fell inside
  *     the block on how to speak and removed "their own language", the order to work in when
@@ -58,6 +63,8 @@ Three grounds carry most of the work:
 - Memory holds the person's own knowledge. aimeat_memory_list takes a key prefix and an owner scope, aimeat_memory_search finds by content, and many features here live as a memory record under a key prefix plus a prompt that reads it.
 - Apps are single-file web apps published on this node. aimeat_app_list gives each one a \`url\`, which is the address to hand the person when they want to open it.
 - Organisms and workspaces are how the person shares knowledge with others. Skills (aimeat_skill_list, aimeat_skill_get) are the operating guide for one named capability.
+
+When you do not know where something is, or what the person can reach, aimeat_discover searches every kind of content in one call, one reach at a time: scope "own" is their own content, "shared" is what the organisms they belong to share with them, "public" is what anyone can read.
 
 When something does not work, act on what the error says. When that does not get there, or a decision is a human's to make, send it to \`support@operators\` with aimeat_dm_send: it reaches the people who run this node in one thread they answer in. Say what you were doing and what happened instead.
 
