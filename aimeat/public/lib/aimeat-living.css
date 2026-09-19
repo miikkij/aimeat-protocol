@@ -23,6 +23,7 @@
  * @structure tokens · control row · formula · sentence · machine state · chain · gear · stale ·
  *   trigger · dialogs · refusals · still
  * @version-history
+ *   v0.8.1 — 2026-09-19 — The decide row's line that says what was taken out before sending.
  *   v0.8.0 — 2026-09-19 — THE DECIDE ROW. Where a judgement about text stands, each answer with its
  *     confidence, what it gates and the thresholds, and — when the model was not sure enough — the
  *     person's buttons, which wrap under each other on a phone rather than overflow it.
@@ -410,6 +411,7 @@
 }
 
 .ak-living__decide-reason,
+.ak-living__decide-removed,
 .ak-living__decide-gates {
   margin: 0;
   font-size: var(--ak-living-label-size);
