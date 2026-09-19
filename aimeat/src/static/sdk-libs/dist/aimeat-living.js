@@ -2713,6 +2713,10 @@
       out.pending = String(s.pending || "");
       out.reason = String(s.reason || "");
       out.decision = String(s.decision || "");
+      out.removed = s.scrub ? Number(s.scrub.total) || 0 : "";
+      for (const kind of Object.keys(s.scrub && s.scrub.removed || {})) {
+        out["removed." + kind] = Number(s.scrub.removed[kind]) || 0;
+      }
       return out;
     }
   };
@@ -3549,7 +3553,22 @@
       "keep": "Pidä tila",
       "gates": "Ratkaisee",
       "thresholds": "Kynnykset",
-      "step": "Askel {event}"
+      "step": "Askel {event}",
+      "removedNone": "Henkilötietoja ei löytynyt, joten tekstistä ei poistettu mitään ennen lähetystä.",
+      "removedLead": "Poistettiin tekstistä ennen lähetystä: ",
+      "removedTail": ". Ruudulla viesti näkyy sellaisena kuin kirjoitit sen.",
+      "kind.person.1": "nimi",
+      "kind.person.n": "nimeä",
+      "kind.email.1": "sähköpostiosoite",
+      "kind.email.n": "sähköpostiosoitetta",
+      "kind.phone.1": "puhelinnumero",
+      "kind.phone.n": "puhelinnumeroa",
+      "kind.hetu.1": "henkilötunnus",
+      "kind.hetu.n": "henkilötunnusta",
+      "kind.iban.1": "tilinumero",
+      "kind.iban.n": "tilinumeroa",
+      "kind.address.1": "katuosoite",
+      "kind.address.n": "katuosoitetta"
     },
     en: {
       "status.": "Nothing asked yet",
@@ -3569,7 +3588,22 @@
       "keep": "Keep the state",
       "gates": "Decides",
       "thresholds": "Thresholds",
-      "step": "Step {event}"
+      "step": "Step {event}",
+      "removedNone": "No personal data was found, so nothing was taken out of the text before sending.",
+      "removedLead": "Taken out of the text before sending: ",
+      "removedTail": ". The screen shows the message as you wrote it.",
+      "kind.person.1": "name",
+      "kind.person.n": "names",
+      "kind.email.1": "e-mail address",
+      "kind.email.n": "e-mail addresses",
+      "kind.phone.1": "phone number",
+      "kind.phone.n": "phone numbers",
+      "kind.hetu.1": "identity code",
+      "kind.hetu.n": "identity codes",
+      "kind.iban.1": "account number",
+      "kind.iban.n": "account numbers",
+      "kind.address.1": "street address",
+      "kind.address.n": "street addresses"
     }
   };
   function sayDecide(key, langs, values) {
@@ -3598,12 +3632,14 @@
     const reasonEl = el("p", { class: "ak-living__decide-reason", hidden: true });
     const answersEl = el("dl", { class: "ak-living__decide-answers" });
     const personEl = el("div", { class: "ak-living__decide-person", hidden: true });
+    const removedEl = el("p", { class: "ak-living__decide-removed", hidden: true });
     const gatesEl = el("p", { class: "ak-living__decide-gates" });
     const root = el("div", { class: "ak-living__decide", "data-living-node": spec.id }, [
       labelEl,
       statusEl,
       reasonEl,
       answersEl,
+      removedEl,
       personEl,
       gatesEl
     ]);
@@ -3626,6 +3662,15 @@
         answersEl.appendChild(el("dd", { text: conf === "" || conf == null ? shown : shown + " (" + num3(conf) + ")" }));
       }
       answersEl.hidden = !answersEl.firstChild;
+      removedEl.hidden = f.removed === "" || f.removed == null;
+      if (!removedEl.hidden) {
+        const parts = [];
+        for (const kind of ["person", "email", "phone", "hetu", "iban", "address"]) {
+          const n = Number(f["removed." + kind]) || 0;
+          if (n > 0) parts.push(n + " " + sayDecide("kind." + kind + (n === 1 ? ".1" : ".n"), langs()));
+        }
+        removedEl.textContent = parts.length ? sayDecide("removedLead", langs()) + parts.join(", ") + sayDecide("removedTail", langs()) : sayDecide("removedNone", langs());
+      }
       clear(personEl);
       const byHand = status === "unavailable" || status === "failed";
       personEl.hidden = status !== "person" && !byHand;
@@ -4346,7 +4391,7 @@
     "decide": {
       summary: "Asks the decision model closed questions about a text and exposes the answers; can move a machine by its own events.",
       inputs: ["input (the node id whose text is judged, or a list of ids sent as named fields)", "names (node ids or strings: the people the text may mention, removed before it leaves)"],
-      outputs: ['value — "" before the first answer, then asking', "moved", "stayed", "person", "unavailable", "failed", '<question id> — the answer: a probability for yesNo, the option name for pickOne, the level for scale ("" until answered)', "<question id>.confidence", "<question id>.passed", "pending — the event waiting for a person", "reason — why it did not ask, in words", "decision — the recorded decision id"],
+      outputs: ['value — "" before the first answer, then asking', "moved", "stayed", "person", "unavailable", "failed", '<question id> — the answer: a probability for yesNo, the option name for pickOne, the level for scale ("" until answered)', "<question id>.confidence", "<question id>.passed", "pending — the event waiting for a person", "reason — why it did not ask, in words", "decision — the recorded decision id", "removed — how many pieces of personal data were taken out of the text before it left (removed.person, removed.email, … per kind)"],
       options: ["questions { id: { yesNo, meaning? } | { pickOne, options } | { scale, levels } } (English)", "thresholds { id: 0..1 } (the event question needs one)", "gates (English: what the answer decides; required)", "machine (a machine id)", "event (the pickOne question whose options are that machine's events)", "wait (ms the text must rest before asking; default 1500, floor 300)", "subject", "label", "block (a section to draw it in)"],
       languages: ["label"],
       functions: [],
@@ -5129,7 +5174,8 @@
         const v = a.type === "choice" ? a.confidence == null ? 0 : a.confidence : Number(a.value);
         passed[q] = v >= t;
       }
-      const base = { answers, passed, decision: r && r.decision_id || "", offered: offered || [] };
+      const scrub = r && r.scrub && typeof r.scrub === "object" ? { total: Number(r.scrub.total) || 0, removed: Object.assign({}, r.scrub.removed || {}), skipped: !!r.scrub.skipped } : null;
+      const base = { answers, passed, decision: r && r.decision_id || "", offered: offered || [], scrub };
       if (!m || !answers[String(node2.event)]) {
         return settle(id, Object.assign({ status: "decided" }, base), null, "decided");
       }
@@ -6127,7 +6173,7 @@
   }
 
   // src/static/sdk-libs/living/index.js
-  var VERSION = "0.8.0";
+  var VERSION = "0.8.1";
   var DRAWN = ["control", "formula", "text", "machine", "value", "source", "trigger", "decide"];
   function validate(doc) {
     const refusals = [];

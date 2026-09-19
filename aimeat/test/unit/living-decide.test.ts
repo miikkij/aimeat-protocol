@@ -261,6 +261,18 @@ describe('the decide node: what an answer does', () => {
     expect(r.judge.list()[0]).toMatchObject({ outcome: 'moved', by: 'model', event: 'URGENT', gates: 'which step the support ticket takes next' });
   });
 
+  it('says what personal data never left: the node counts it, the sheet reads it', async () => {
+    const m = model(() => ({ ...choice('NORMAL', 0.9), scrub: { total: 2, removed: { person: 1, email: 1, phone: 0 } } }));
+    const r = rig(sheet(), m.api);
+    expect(r.graph.fieldsOf('triage').removed).toBe('');
+    r.type('Anna Virtanen, anna@example.fi: laskussa on virhe.');
+    r.clock.run(); await r.flush();
+    const f = r.graph.fieldsOf('triage');
+    expect(f.removed).toBe(2);
+    expect(f['removed.person']).toBe(1);
+    expect(f['removed.email']).toBe(1);
+  });
+
   it('an answer under the threshold does not move the machine; it waits for a person', async () => {
     const m = model(() => choice('RESOLVE', 0.55));
     const r = rig(sheet(), m.api);
