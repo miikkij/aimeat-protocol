@@ -13,14 +13,17 @@
  *   read. The showroom's own blocks (the counters, the store, the safety list) are reused where the
  *   frame keeps them.
  *
- *   The default order (operators can save another): the hero (the claim, the wish box, the two doors, the picture) · the
+ *   The default order (operators can save another): the hero (the claim, the three steps, the wish box, the two doors, the picture) · the
  *   counters · ten seconds under the hood (six outcomes, then the question, then the answer that is
  *   the hinge of the whole page) · the slide projector (landing-v2-projector.js) · prompts and what
  *   they produced (landing-v2-cards.js) · the wall, the community first (same file) · the store ·
  *   ownership and AI processing limits · the safety list · the last word.
- * @structure Hero2 · WishBox2 · TenSeconds · LinuxLine · Close2
+ * @structure Hero2 · Steps2 · WishBox2 · TenSeconds · LinuxLine · Close2
  * @usage import { Hero2, TenSeconds, LinuxLine, Close2 } from '/views/landing-v2.js';
  * @version-history
+ *   v1.3.0 - 2026-09-19 - TARGET-080: three steps and what opens after them stand between the
+ *     headline and the wish box, because an empty box asked a visitor for an idea before the page
+ *     had said what is possible. The long paragraph left the hero; the steps say the same.
  *   v1.2.0 - 2026-09-17 - TARGET-078: ownership, AI processing limits and continuity in one block.
  *   v1.1.0 — 2026-09-15 — Built here, with itself: the kicker says it, and the ten seconds end on a
  *     frame of this very page. Jouni, as the proof of the hero's claim.
@@ -77,11 +80,58 @@ function WishBox2({ navigate }) {
     </form>`;
 }
 
+/** What it takes, in the order a person does it: a title and one line each. */
+const STEPS = [
+  ['landing2.step1Title', 'Bring the AI you already pay for',
+    'landing2.step1Body', 'Claude or ChatGPT on a paid plan, or any other AI chat that supports MCP. You keep using the one you have.'],
+  ['landing2.step2Title', 'Plug it into AIMEAT',
+    'landing2.step2Body', 'One connection, made once. Your AI gets hands, a memory and your own AIMEAT to work in. It is yours, and nothing happens there without your permission.'],
+  ['landing2.step3Title', 'Then ask for what you need',
+    'landing2.step3Body', 'You work in the chat you already use. There is no new interface to learn.'],
+];
+/** What a person can ask for once the three steps are done. */
+const OPENS = [
+  ['landing2.opens1', 'Apps, built in an hour.'],
+  ['landing2.opens2', 'What you know, kept in your own AIMEAT and ready to reuse.'],
+  ['landing2.opens3', 'Other people in the same work, each with their own AI.'],
+  ['landing2.opens4', 'Your own products, and a shop to sell them in.'],
+  ['landing2.opens5', 'Agents that do the work on their own, for you and for others who pay you.'],
+];
+
 /**
- * The hero: the frame's claim in two lines, the one sentence under it, the four steps as one
- * paragraph, the wish box, and the two doors with "plug in the AI you already use" first, because
- * that is the step the whole page turns on. The picture and the sticker are the showroom's;
- * `picture` is the block's one setting.
+ * The three steps and what opens after them. They stand before the wish box on purpose (Jouni,
+ * 2026-09-19, TARGET-080): a visitor who has not yet heard what is possible cannot fill an empty
+ * box, and one who has read this can.
+ */
+function Steps2() {
+  return html`
+    <div class="ld-v2-steps">
+      <h2 class="ld-v2-steps-title">${tr('landing2.stepsTitle', 'Three steps, and your AI gets to work.')}</h2>
+      <ol class="ld-v2-steps-list">
+        ${STEPS.map(([titleKey, title, bodyKey, body], i) => html`
+          <li class="ld-v2-step poster-row--thing" key=${titleKey}>
+            <span class="poster-stat-number poster-stat-number--step">${i + 1}</span>
+            <div class="ld-v2-step-text">
+              <h3 class="ld-v2-step-title">${tr(titleKey, title)}</h3>
+              <p class="ld-v2-step-body">${tr(bodyKey, body)}</p>
+            </div>
+          </li>`)}
+      </ol>
+      <p class="ld-v2-steps-note">${tr('landing2.stepsNote', 'Microsoft 365 Copilot cannot connect this way yet. With it, AIMEAT gives you a ready-made prompt: you paste it into the chat and bring the answer back here. That works today, with more steps.')}</p>
+      <div class="ld-v2-opens">
+        <h3 class="ld-v2-opens-label">${tr('landing2.opensLabel', 'After that, you can ask for:')}</h3>
+        <ul class="ld-v2-opens-list">
+          ${OPENS.map(([key, text]) => html`<li class="ld-v2-opens-item poster-panel" key=${key}>${tr(key, text)}</li>`)}
+        </ul>
+      </div>
+    </div>`;
+}
+
+/**
+ * The hero: the frame's claim in two lines, the one sentence under it, the three steps and what
+ * opens after them, then the wish box, and the two doors with "plug in the AI you already use"
+ * first, because that is the step the whole page turns on. The picture and the sticker are the
+ * showroom's; `picture` is the block's one setting.
  */
 export function Hero2({ navigate, picture = true }) {
   const store = storeHref();
@@ -111,17 +161,15 @@ export function Hero2({ navigate, picture = true }) {
         <span>${tr('landing2.title2', 'Then make sure it happens.')}</span>
       </h1>
       <p class="ld-sh-position">${tr('landing2.position', 'That is the whole job now. AIMEAT is where it happens.')}</p>
-      <div class="ld-sh-hero-cols">
-        <p class="ld-sh-sub">${tr('landing2.body', 'You already talk to an AI. It is smart, but it works alone and it forgets. Here it gets hands, a memory and colleagues. You learn nothing new: you keep talking to the same AI, and it picks up its powers from here. Everything it does happens in your place, with your permission, on your record. So you can let others in.')}</p>
-        <div class="ld-sh-action">
-          <${WishBox2} navigate=${navigate} />
-          <p class="ld-sh-lead">${tr('landing2.wishLead', 'Type it, hit GO. A chat opens and starts on it with you. New here? You get an account on the way, and nothing you typed is lost.')}</p>
-          <div class="ld-v2-doors">
-            <a class="ld-sh-btn showroom-slab ld-sh-btn--hot showroom-slab--hot" href="/v1/connect-your-ai" onClick=${go('/v1/connect-your-ai')}>
-              ${tr('landing2.plugIn', 'Plug in the AI you already use →')}
-            </a>
-            ${store ? html`<a class="ld-sh-door showroom-door" href=${store} target="_blank" rel="noopener">${tr('landing2.getOwn', 'Get your own AIMEAT →')}</a>` : ''}
-          </div>
+      <${Steps2} />
+      <div class="ld-sh-action ld-v2-action">
+        <${WishBox2} navigate=${navigate} />
+        <p class="ld-sh-lead">${tr('landing2.wishLead', 'Type it, hit GO. A chat opens and starts on it with you. New here? You get an account on the way, and nothing you typed is lost.')}</p>
+        <div class="ld-v2-doors">
+          <a class="ld-sh-btn showroom-slab ld-sh-btn--hot showroom-slab--hot" href="/v1/connect-your-ai" onClick=${go('/v1/connect-your-ai')}>
+            ${tr('landing2.plugIn', 'Plug in the AI you already use →')}
+          </a>
+          ${store ? html`<a class="ld-sh-door showroom-door" href=${store} target="_blank" rel="noopener">${tr('landing2.getOwn', 'Get your own AIMEAT →')}</a>` : ''}
         </div>
       </div>
       ${picture ? html`
