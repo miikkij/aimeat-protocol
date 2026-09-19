@@ -20,6 +20,8 @@
  *   import { generateForOwner } from '../services/ai-image.js';
  *   const out = await generateForOwner(storage, config, gaii, { prompt: 'a red bicycle' });
  * @version-history
+ *   v1.1.1 — 2026-09-19 — The allowlist and cap checks take the owner, so they match an app under
+ *     any of its names (services/ai-app-id.ts).
  *   v1.1.0 — 2026-08-28 — imageFetchUrl + fetchUrl on the result: the URL that loads for the
  *     visibility's audience, built once. Both doors used to hand back the owner-authenticated
  *     /v1/storage/ form for public images, and the first imagery-pipeline demo shipped it into an
@@ -134,7 +136,7 @@ export async function generateForOwner(
   const baseUrl = (prefs.baseUrl as string) || DEFAULT_BASE_URLS[provider];
 
   assertProviderAllowed(config, baseUrl);
-  assertAppAllowed(prefs, opts.appId);
+  assertAppAllowed(prefs, opts.appId, gaii);
 
   const model = opts.model || resolveModelFor(config, prefs, 'image');
   if (!model) throw new AiCompletionError('NO_IMAGE_MODEL', 400, IMAGE_UNSET_MESSAGE);
@@ -142,7 +144,7 @@ export async function generateForOwner(
   const decryptedKey = decryptOwnerKey(config, apiKeyRecord?.value, provider);
 
   const usage = (usageRecord?.value as UsageRecord | undefined) ?? emptyUsage();
-  const dailyBudget = assertWithinBudget(usage, prefs, opts.appId);
+  const dailyBudget = assertWithinBudget(usage, prefs, opts.appId, gaii);
 
   let result;
   try {

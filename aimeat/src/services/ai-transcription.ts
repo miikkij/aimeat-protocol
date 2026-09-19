@@ -13,6 +13,8 @@
  *   import { transcribeForOwner } from '../services/ai-transcription.js';
  *   const r = await transcribeForOwner(storage, config, gaii, { audio, appId: 'inbox' });
  * @version-history
+ *   v1.x — 2026-09-19 — The allowlist and cap checks take the owner, so they match an app under any
+ *     of its names (services/ai-app-id.ts).
  *   v1.x — 2026-08-16 — The speech model and the language hint fall back to the node's defaults
  *     before refusing. NO_STT_MODEL stays as the last answer rather than becoming a chat model:
  *     handing audio to a text model turns a clear local refusal into an opaque provider error.
@@ -105,7 +107,7 @@ export async function transcribeForOwner(
   const baseUrl = (prefs.baseUrl as string) || DEFAULT_BASE_URLS[provider];
 
   assertProviderAllowed(config, baseUrl);
-  assertAppAllowed(prefs, opts.appId);
+  assertAppAllowed(prefs, opts.appId, gaii);
 
   // Owner setting, then the node's default, then a refusal by name. The refusal stays: handing
   // audio to a chat model turns a clear local error into an opaque provider one.
@@ -115,7 +117,7 @@ export async function transcribeForOwner(
   const decryptedKey = decryptOwnerKey(config, apiKeyRecord?.value, provider);
 
   const usage = (usageRecord?.value as UsageRecord | undefined) ?? emptyUsage();
-  const dailyBudget = assertWithinBudget(usage, prefs, opts.appId);
+  const dailyBudget = assertWithinBudget(usage, prefs, opts.appId, gaii);
 
   const language = opts.language || resolveSttLanguage(config, prefs);
 

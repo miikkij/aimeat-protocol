@@ -35,6 +35,8 @@
  * @usage
  *   const r = await decideForOwner(storage, config, { gaii, principal, appId, isOwner }, { state, questions });
  * @version-history
+ *   v1.1.0 — 2026-09-19 — The app is named once (services/ai-app-id.ts) before the checks, the
+ *     record and the list filter: Päätöspaja was recorded as both `paatospaja` and `paatospaja.html`.
  *   v1.0.0 — 2026-09-19 — Initial (TARGET-080).
  */
 import { createHash, randomUUID } from 'node:crypto';
@@ -47,6 +49,7 @@ import { readAllowance, remainingOf, debitAllowance } from '../ai-allowance.js';
 import { readProgramMap } from '../data-map/data-map-access.js';
 import { logger } from '../../utils/logger.js';
 import { emitChange } from '../event-bus.js';
+import { canonicalAiAppId } from '../ai-app-id.js';
 import { createScrubber } from './scrub.js';
 import { checkDecideRequest, DEFAULT_DECIDE_LIMITS, type JevQuestion } from './limits.js';
 import { callJev, JevError, type JevAnswer } from './jev-client.js';
@@ -229,8 +232,11 @@ function mapJevError(e: JevError, scope: 'own' | 'node'): DecideError {
  * shared budget checks) before anything is sent when the call may not happen.
  */
 export async function decideForOwner(
-  storage: Storage, config: AimeatConfig, caller: DecideCaller, input: DecideInput,
+  storage: Storage, config: AimeatConfig, callerIn: DecideCaller, input: DecideInput,
 ): Promise<DecideResult> {
+  // One name per app, whichever door asked (services/ai-app-id.ts): an app token's `app.html` and
+  // the `app` an app names itself are the same app, with one cap and one row in the register.
+  const caller: DecideCaller = { ...callerIn, appId: canonicalAiAppId(callerIn.appId, callerIn.gaii) };
   // 1 ── switch, shape, limits
   if (!config.decideEnabled) {
     throw new DecideError('DECIDE_DISABLED', 503, 'The operator has turned the decision model off on this node.');
@@ -251,9 +257,9 @@ export async function decideForOwner(
   // 3 ── the owner's allowlist and budget, the same money as a completion
   const prefsRec = await storage.getMemory(caller.gaii, 'openrouter.settings');
   const prefs = (prefsRec?.value as Record<string, unknown>) ?? {};
-  assertAppAllowed(prefs, caller.appId);
+  assertAppAllowed(prefs, caller.appId, caller.gaii);
   const usageToday = await getTodayUsage(storage, caller.gaii);
-  assertWithinBudget(usageToday, prefs, caller.appId);
+  assertWithinBudget(usageToday, prefs, caller.appId, caller.gaii);
 
   // 4 ── scrub
   const policy = await readDecidePolicy(storage, caller.gaii);
@@ -378,7 +384,9 @@ export async function listDecisions(
   storage: Storage, gaii: string, q: { subject?: string; appId?: string; limit?: number; before?: string },
 ): Promise<{ items: AiDecisionRow[]; total: number }> {
   const limit = Math.min(200, Math.max(1, Math.floor(q.limit ?? 50)));
-  return storage.listAiDecisions({ ownerGhii: gaii, subject: q.subject, appId: q.appId, limit, before: q.before });
+  return storage.listAiDecisions({
+    ownerGhii: gaii, subject: q.subject, appId: canonicalAiAppId(q.appId, gaii), limit, before: q.before,
+  });
 }
 
 /** One decision, or null for "absent" and "not yours" alike. */
