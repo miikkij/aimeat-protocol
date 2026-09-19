@@ -13,6 +13,8 @@
  *   Morsels are plain integers; money is 6-decimal micro-units. The two never mix.
  * @usage import { exchangeTools } from './definitions/exchange.js';
  * @version-history
+ *   v1.1.2 — 2026-09-19 — aimeat_app_tool_invoke says to read the tool's inputSchema first, and that a
+ *     mismatch is refused before charging with every missing field named.
  *   v1.1.1 — 2026-09-03 — Say WHY the six agentMcp tools are off the CLI dispatch, and where a fleet
  *     agent reaches them instead. The bare "Not a CLI fallback" had been read as a missing door twice.
  *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 8b: aimeat_exchange_work_deliver documents `ai_provenance`.
@@ -156,7 +158,7 @@ export const exchangeTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_app_tool_invoke',
-        description: 'CALL an app\'s offered tool (a method like getCompanyBrief) through YOUR metered contract — the generic "one app/agent calls another app\'s function" channel. You must already hold a contract for this app-tool (accept its offering with aimeat_exchange_accept). The call is metered + charged to your budget at the provider price (+ platform rake), routed to the pinned interface version\'s backing capability; the provider\'s own upstream API keys stay server-side (you never see or need them). Returns the tool\'s result. If the invocation throws you are refunded.',
+        description: 'CALL an app\'s offered tool (a method like getCompanyBrief) through YOUR metered contract — the generic "one app/agent calls another app\'s function" channel. You must already hold a contract for this app-tool (accept its offering with aimeat_exchange_accept). The call is metered + charged to your budget at the provider price (+ platform rake), routed to the pinned interface version\'s backing capability; the provider\'s own upstream API keys stay server-side (you never see or need them). Returns the tool\'s result. If the invocation throws you are refunded. Read the tool\'s input fields first with aimeat_app_tools_get (its inputSchema): an input that does not match is refused before anything is charged, and the refusal names every missing field at once.',
         caller: 'agent',
         visibility: agentMcp,
         input: {

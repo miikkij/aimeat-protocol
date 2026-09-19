@@ -16,6 +16,8 @@
  *   - GET  /v1/apps/:owner/:filename/webmcp             public WebMCP-shaped tool listing
  *   - POST /v1/apps/:owner/:filename/webmcp/tools/:tool invoke (402 for priced; auth for free)
  * @version-history
+ *   v1.5.0 — 2026-09-19 — The invoke checks the input against the tool's published schema before
+ *     metering or payment, and answers 400 INVALID_INPUT naming every missing field at once.
  *   v1.4.0 — 2026-07-28 — The listing carries `app_surface` (declared scopes, bound SKILL.md packs,
  *     bundled crew-defs, live EXCHANGE listings) and answers 200 with an empty `tools` array for a
  *     published app that sells nothing yet; 404 is now reserved for "no such public app".
@@ -38,6 +40,7 @@ import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity, callerPrincipal } from '../utils/gaii.js';
 import { AppToolsDocSchema, appToolsKey, isToolPriced, applyLockedInput, type AppTool } from '../models/app-tool-schemas.js';
 import { paymentChallenge } from '../commerce/x402.js';
+import { checkAppToolInput } from '../services/app-tool-input.js';
 import { getInterfaceVersion } from '../services/app-tool-interfaces.js';
 import { authoriseMeteredCall } from '../services/metered-access.js';
 import { takeDesignations } from '../commerce/beneficiary-designation.js';
@@ -172,6 +175,16 @@ export function webmcpRouter(config: AimeatConfig, storage: Storage): Router {
     }
     const appRef = `${ownerName}/${filename}`;
 
+    // Checked against the tool's published schema BEFORE anything is metered or paid for, and every
+    // problem named at once (services/app-tool-input.ts). Same check as the MCP twin.
+    const toolInput = applyLockedInput(tool, (req.body?.input ?? req.body ?? {}) as Record<string, unknown>);
+    const inputCheck = checkAppToolInput(tool, toolInput);
+    if (!inputCheck.ok) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', inputCheck.message, 400,
+        { missing: inputCheck.missing, violations: inputCheck.violations }));
+      return;
+    }
+
     // ── The metered path: one question, asked of the one place that answers it ──
     // This route's job is to name the PRODUCT — which it alone knows, because a price belongs to a
     // product and the capability underneath may be sold under several. Everything after that (is the
@@ -221,8 +234,7 @@ export function webmcpRouter(config: AimeatConfig, storage: Storage): Router {
           const startedAt = Date.now();
           // The capability runs over this node's own HTTP surface and meets the raw-invoke paywall,
           // which cannot know which product was bought. The pass says this call was already ruled on.
-          const invoked = await invokeCapability(config, storage, cap,
-            applyLockedInput(tool, (req.body?.input ?? req.body ?? {}) as Record<string, unknown>),
+          const invoked = await invokeCapability(config, storage, cap, toolInput,
             callerGaii, jwt, 'normal', mintInternalPass(coordExt, toolName));
           // Measured so the provider can propose a service commitment from evidence (call-timing.ts).
           recordCallDuration(storage, providerGhii, coordExt, toolName, Date.now() - startedAt);
@@ -303,8 +315,7 @@ export function webmcpRouter(config: AimeatConfig, storage: Storage): Router {
         // still be sold under a sibling tool, and the raw paywall — which sees only the action —
         // would then bill this free call at that neighbour's price. Say what was decided instead of
         // letting it be re-decided by the one place with less information.
-        const invoked = await invokeCapability(config, storage, cap,
-          applyLockedInput(tool, (req.body?.input ?? req.body ?? {}) as Record<string, unknown>),
+        const invoked = await invokeCapability(config, storage, cap, toolInput,
           callerGhii, jwt, 'normal', mintInternalPass(`apptool:${ownerName}/${filename}`, toolName, 'unpriced'));
         res.json(success(config.nodeId, { app: appRef, tool: toolName, result: invoked.result }));
       } catch (err) {
