@@ -7,6 +7,7 @@
  */
 import { configure } from './config.js';
 import { segments, abortable } from './segments.js';
+import { prefetchAudio } from './prefetch.js';
 
 /** @param {any} options @param {any} adapters @param {any} factories */
 export function createSession(options, adapters, factories) {
@@ -123,16 +124,25 @@ export function createSession(options, adapters, factories) {
       for await (const part of segments(tokens(), config.chunking, signal)) {
         while (jobs.size >= config.playback.maxPendingSegments) await abortable(Promise.race(jobs), signal);
         if (workerError) throw workerError;
-        const job = chain.then(async () => {
+        const audio = prefetchAudio(stage('tts', 'speak')(part, ctx), signal);
+        const scheduled = chain.then(async () => {
           signal.throwIfAborted(); setState('speaking'); emit('segment', { text: part, turn });
-          await player.play(stage('tts', 'speak')(part, ctx), signal);
+          if (player.enqueue) return player.enqueue(audio, signal);
+          await player.play(audio, signal);
+          return { played: Promise.resolve() };
+        });
+        chain = scheduled.then(() => {});
+        void chain.catch(() => {}); // The job reports errors and aborts the turn immediately.
+        const job = scheduled.then(async ({ played }) => {
+          await played;
           signal.throwIfAborted(); spoken += (spoken ? ' ' : '') + part;
           historyAnswer.content = spoken;
         });
-        jobs.add(job); chain = job;
+        jobs.add(job);
         void job.then(() => jobs.delete(job), error => { jobs.delete(job); workerError = error; ctl.abort(error); });
       }
-      await abortable(chain, signal); signal.throwIfAborted();
+      await abortable(chain, signal);
+      await abortable(Promise.all(jobs), signal); signal.throwIfAborted();
       if (!answer.trim()) throw new Error('The conversation model returned no text');
       emit('transcript', { role: 'assistant', text: answer, final: true, turn });
       emit('timing', { phase: 'complete', ms: performance.now() - began, turn });
