@@ -13,6 +13,8 @@
  * @structure SDK_UI_PACKS: LibraryPack[]
  * @usage Imported by ./sdk.ts and spread into SDK_PACKS. Do not import directly.
  * @version-history
+ *   v1.1.1 — 2026-09-19 — aimeat-phaser aiDoc: weather() names all nine kinds. It listed seven;
+ *     dust and confetti have been in fx-presets.js, and the aimeat-phaser-world skill had them.
  *   v1.1.0 — 2026-09-05 — aimeat-atelier 0.53.0: the form's range field and per-field
  *     onInput/onChange, the graph's pill clamp, the mosaic's blocks(); the per-component token
  *     count in the aiDoc follows the kit at thirty-nine.
@@ -53,7 +55,7 @@ export const SDK_UI_PACKS: LibraryPack[] = [
       'HUD: const hud = AIMEAT.phaser.hud(this); hud.score(120); hud.lives(3); AIMEAT.phaser.toast(this, "Level up").',
       'Settings page (DOM): AIMEAT.phaser.settingsPanel({ target: el, audio: bus, controls: c, saves: store, game: h }) renders volumes, fullscreen, touch controls, less motion and key bindings on the Atelier kit when it is on the page.',
       'Physics: arcade by default; body.blocked.down is the ground test for a jump. Pause with h.sleep() / h.wake(); the library already sleeps the loop when the tab hides.',
-      'Effects: const fx = AIMEAT.phaser.fx(this); fx.weather("rain"|"snow"|"fog"|"stars"|"leaves"|"embers"|"bubbles", { density, wind }); fx.at(x, y, "explosion"|"sparks"|"confetti"|"splash"|"portal"|"dust"|"smoke"|"footsteps") is a finite burst; fx.follow(obj, "trail"|"fire"|"dust"); fx.define(name, { ...fx.preset("sparks"), quantity: 40 }) for your own. Colours are theme words; under less motion weather thins and a burst is one puff.',
+      'Effects: const fx = AIMEAT.phaser.fx(this); fx.weather("rain"|"snow"|"fog"|"stars"|"leaves"|"embers"|"bubbles"|"dust"|"confetti", { density, wind }); fx.at(x, y, "explosion"|"sparks"|"confetti"|"splash"|"portal"|"dust"|"smoke"|"footsteps") is a finite burst; fx.follow(obj, "trail"|"fire"|"dust"); fx.define(name, { ...fx.preset("sparks"), quantity: 40 }) for your own. Colours are theme words; under less motion weather thins and a burst is one puff.',
       'Backdrop: AIMEAT.phaser.parallax(this, "hills"|"night"|"city"|"sea"|"forest"|"desert"|"cave") draws a generated layer stack (sky, stars, clouds, mountains, hills, forest, city, sea, fog, ground) on the theme, moved by the camera at each layer\'s factor; bg.set({ time: "day"|"dusk"|"night", seed, drift }); or { layers: [{ kind, scroll, tone, alpha, height, haze, drift }] }. The platformer takes the same word: platformer(this, { map, parallaxBackdrop: "forest" }).',
       'Time and weather: const sky = AIMEAT.phaser.dayNight(this, { create: true, preset: "hills", speed: 0.05, hour: 9, weather: "auto", lights: [{ x, y }] }) drives the parallax time, an ambient tint, lamps and the fx weather on one game-hour clock; sky.set({ hour: 18.5, weather: "storm" }); sky.on("phase"|"hour"|"weather"|"lightning", fn). Pass your own parallax and fx handles instead of create.',
       'Sprites with no art: AIMEAT.phaser.spriteSheet(this, { kind: "hero"|"topdown"|"slime"|"bat"|"walker"|"coin"|"pickup", palette }) draws a whole sheet on the theme and registers <key>-idle/-walk/-run/-jump/-fall/-hit/-die (top-down: -walk-down/-left/-right/-up); animations(this, key, { walk: { start, end, rate, repeat } }) for a real strip loaded by a pack or an aimeat-assets library (frames on the image entry); spriteFromLibrary(this, lib, key, { animations }).',
