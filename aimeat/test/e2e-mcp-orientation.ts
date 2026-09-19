@@ -538,6 +538,17 @@ async function main() {
             assert(word.trimStart().startsWith('{'), 'a search given a kind still answers rows');
         });
 
+        await test('17h. the specification says how a Design Book part reaches a genre fork, and the proposal owes a line about the Book', async () => {
+            // No genre mounts a mosaic, and only a mosaic draws the stored arrangement an adopt
+            // writes: until this text existed the two instructions excluded each other.
+            const patterns = toolText((await v1('tools/call', { name: 'aimeat_handbook_get', arguments: { tier: 'build-app-atelier/patterns' } }, 412)).body);
+            assert(patterns.includes('THE WORKING SCREEN IS A MOSAIC INSIDE THE GENRE'), 'part patterns says where the mosaic goes in a genre fork');
+            assert(/target: '#work'/.test(patterns) && patterns.includes('aimeat_designbook_adopt') && patterns.includes('aimeat_app_ui_set'), 'with the mount, the adopt and the write of the filled version');
+            assert(patterns.length < 24_000, `and the part still fits one tool result: ${patterns.length}`);
+            const start = toolText((await v1('tools/call', { name: 'aimeat_handbook_get', arguments: { tier: 'build-app-atelier' } }, 413)).body);
+            assert(start.includes('From the Design Book I take nothing, because'), 'the proposal owes the line, in both of its shapes');
+        });
+
         await test('17d. an Atelier part that does not exist is an error that names the four there are', async () => {
             const { body } = await v1('tools/call', { name: 'aimeat_handbook_get', arguments: { tier: 'build-app-atelier/no-such-part' } }, 406);
             assert(body.result?.isError === true, 'MCP: isError');

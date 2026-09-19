@@ -13,6 +13,10 @@
  * @structure APP_BUILDER_ATELIER_SKILL_ENTRY
  * @usage import { APP_BUILDER_ATELIER_SKILL_ENTRY } from './builtin-skills.app-builder-atelier.js';
  * @version-history
+ *   v1.16.0 — 2026-09-20 — The working screen of a genre fork is a MOSAIC inside the genre, and
+ *     the proposal owes one line on what it takes from the Design Book. Twelve measured builds
+ *     adopted nothing, correctly: no genre mounts a mosaic, and only a mosaic draws the stored
+ *     arrangement an adopt writes, so the two instructions excluded each other.
  *   v1.15.0 — 2026-09-19 — Verify: look for a browser among your tools before saying you have none
  *     (Playwright MCP with Chrome), and suggest it by name when there is none. A builder on a
  *     machine that had both connected did not look, three builds in a row.
@@ -169,8 +173,10 @@ moved under you says so.
    Book on one page, every part on a line under its kind, and part \`libraries\` of the
    specification ends with the same page: read it, because you cannot search for a part you do
    not know exists. Adopting one is one call (\`aimeat_designbook_adopt\`)
-   and is faster than making it. Say in the proposal which parts you take; an app built without
-   looking there makes again what is already made.
+   and is faster than making it. THE PROPOSAL OWES ONE LINE ABOUT IT, every time: "From the
+   Design Book I take: <part ids, and what each is for here>", or "From the Design Book I take
+   nothing, because <what you looked at and why none fits>". Taking nothing is allowed; taking
+   nothing in silence is not. An app built without looking there makes again what is already made.
 3. **Build** — start from a GENRE, never from the bare shell: pick the register the page belongs
    in from \`GET /v1/designbook?kind=genre\`, fork it from \`GET /v1/app-templates/genre-<id>\`,
    and keep its \`<meta name="aimeat-register">\` line (or name your own register with
@@ -191,6 +197,17 @@ moved under you says so.
    \`AIMEAT.atelier.fx(el, { id })\` in your code: still on the words, a moment on a cue with
    \`fxPlay\`, and living motion only as \`ambient.post\` behind the words (the spec lists the
    nine, where each lands, and the knobs).
+   **The working screen is a MOSAIC inside the genre.** The genre is the frame; the part of the
+   page that is this app (the list, the numbers, the form, the history) is
+   \`AIMEAT.atelier.mosaic({ target: '#work', sources, fallback })\` mounted into one element of
+   the genre page, with no app shell. This is what lets the Design Book reach a genre fork at
+   all: adopting a layout or a fill writes the app's STORED ARRANGEMENT, only a mosaic draws
+   one, and a genre page without a mosaic ignores every part the Book holds. Take the
+   \`fallback\` from a Book fill (\`aimeat_designbook_get\`), its <placeholders> replaced and its
+   \`look\` line out; after the publish \`aimeat_designbook_adopt\` records the part and
+   \`aimeat_app_ui_set\` stores your filled version. The specification's part \`patterns\` has
+   the pattern. Hand-made stays what the genre itself is made of: its masthead, a figure only
+   this page has, a game board.
    **The fork signs people in and speaks two languages, and a genre does neither.** Mount the
    node's own bar (\`AIMEAT.auth.mountLoginButton('#pill', …)\`); never write a header control or a
    language switch of your own. Declare \`aimeat-locales\` "en fi" and every scope you use, put
@@ -250,8 +267,11 @@ moved under you says so.
    figure, the printed maths, the sentence and the state all follow it in the same paint.
 9. **Publish** — \`aimeat_app_publish\` with \`spec_token\`; report the live URL in the owner's
    words. Read \`next_steps\` in the answer: it is the node's list of what this app still owes.
-10. **Put what you made into the Design Book.** A component, a layout or a fill you had to make
-   because the book did not have it is what the next app should start from.
+10. **Put what you made into the Design Book.** The arrangement of your working screen is a
+   layout, and the Book has a kind for it: propose it as a \`fill\`, its app-specific words turned
+   back into <placeholders>, so the next app starts from it. (The Book has no kind for a
+   hand-made HTML component yet; say to the owner which ones you made, by name, so they are not
+   lost.)
    \`aimeat_designbook_propose\` with what it is for, when to choose it and its body, NOW, while you
    know how it works; the publish answer's \`design_book\` line names the styles this app made for
    itself. Improve a part that is already there as a new version of it, never as a copy beside it.

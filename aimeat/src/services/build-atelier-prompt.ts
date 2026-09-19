@@ -28,6 +28,8 @@
  *   import { buildAtelierPrompt, buildAtelierSpecToken } from './build-atelier-prompt.js';
  *   const { full, body } = buildAtelierPrompt(config, { lang: 'en', mode: 'new' });
  * @version-history
+ *   v1.29.0 — 2026-09-20 — The mosaic section ends with the working screen of a genre fork being a
+ *     mosaic inside the genre (build-atelier-people.ts), which is what lets a Design Book part land.
  *   v1.28.0 — 2026-09-19 — "The Design Book first" says where the list of what the Book holds is:
  *     at the end of part `libraries`, joined when the part is served (build-atelier-book.ts).
  *   v1.27.0 — 2026-09-19 — Two sections about the PERSON (build-atelier-people.ts): after the
@@ -136,7 +138,7 @@ import { PATTERNS } from '../data/atelier-patterns.js';
 import { AMBIENTS } from '../data/atelier-ambients.js';
 import { EFFECTS, EFFECT_HOSTS, POST_IDS } from '../data/atelier-effects.js';
 import { renderCustomisation, renderLiving, renderPatterns } from './build-atelier-recipe.js';
-import { ATELIER_FORK_PEOPLE_SECTION, ATELIER_PROPOSAL_SECTION } from './build-atelier-people.js';
+import { ATELIER_FORK_PEOPLE_SECTION, ATELIER_MOSAIC_IN_GENRE, ATELIER_PROPOSAL_SECTION } from './build-atelier-people.js';
 import { buildAtelierLibrarySection } from '../data/library-packs.js';
 
 /** Slot the publish gate's token is substituted into (mirrors build-app-prompt.ts). */
@@ -434,6 +436,7 @@ function composeBody(config: AimeatConfig): string {
     + 'story-deck, guided-flow). Pick the one nearest the app, replace every <angle-bracketed> '
     + 'value with the app\'s own words and source names, and use it as the fallback — and as the '
     + 'first stored layout when the owner wants one.\n\n';
+  body += ATELIER_MOSAIC_IN_GENRE;
 
   // THE GENRES — rendered from the template registry, never hand-listed (the surface-layout
   // lesson: a hand-written menu drifts and the builder reads the refusal as a broken AI).
