@@ -140,21 +140,42 @@ export async function clearOwnDecideKey(storage: Storage, gaii: string): Promise
   return true;
 }
 
+/**
+ * Can this owner ask the decision model at all, and if not, why, in words a builder can pass on.
+ * The one answer every surface gives (the settings door, the library's isAvailable(), the appdev
+ * overview), so an app is not built for a model its owner cannot reach.
+ */
+export function decideAvailability(config: AimeatConfig, hasOwnKey: boolean): { available: boolean; reason: string | null } {
+  if (!config.decideEnabled) return { available: false, reason: 'The operator has turned the decision model off on this node.' };
+  if (hasOwnKey || config.decideInstanceKey.trim()) return { available: true, reason: null };
+  return { available: false, reason: 'No TypeSafe key is set. The owner adds one under Settings, AI, Decision model.' };
+}
+
 /** What the settings door shows: never the key, only whether one is set and who would pay. */
 export async function decideSettingsView(storage: Storage, config: AimeatConfig, gaii: string): Promise<{
-  enabled: boolean; model: string; has_own_key: boolean; node_key_available: boolean; policy: DecidePolicy;
-  pii_classes: readonly PiiClass[];
+  enabled: boolean; available: boolean; unavailable_reason: string | null; model: string;
+  has_own_key: boolean; node_key_available: boolean; policy: DecidePolicy; pii_classes: readonly PiiClass[];
 }> {
   const [keyRec, policy] = await Promise.all([
     storage.getMemory(gaii, DECIDE_KEY_RECORD),
     readDecidePolicy(storage, gaii),
   ]);
+  const hasOwnKey = typeof (keyRec?.value as { encrypted?: unknown } | undefined)?.encrypted === 'string';
+  const { available, reason } = decideAvailability(config, hasOwnKey);
   return {
     enabled: config.decideEnabled,
+    available,
+    unavailable_reason: reason,
     model: config.decideModel,
-    has_own_key: typeof (keyRec?.value as { encrypted?: unknown } | undefined)?.encrypted === 'string',
+    has_own_key: hasOwnKey,
     node_key_available: !!config.decideInstanceKey.trim(),
     policy,
     pii_classes: PII_CLASSES,
   };
+}
+
+/** The same answer for a caller that only needs the yes/no (the appdev overview). */
+export async function decideAvailableFor(storage: Storage, config: AimeatConfig, gaii: string): Promise<{ available: boolean; reason: string | null }> {
+  const keyRec = await storage.getMemory(gaii, DECIDE_KEY_RECORD);
+  return decideAvailability(config, typeof (keyRec?.value as { encrypted?: unknown } | undefined)?.encrypted === 'string');
 }
