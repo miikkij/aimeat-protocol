@@ -12,9 +12,11 @@
  *
  *   WHERE THE RECIPES COME FROM. TypeSafe's own cookbooks and pattern pages (read 2026-09-19),
  *   rewritten in AIMEAT's terms and around AIMEAT.decide. THEIR MEASUREMENTS ARE LEFT OUT ON PURPOSE:
- *   the customer agreement (2.3(f)) forbids publishing benchmarks or performance information, and
- *   this skill is public. Keep it that way when editing: no accuracy, speed, cost or comparison
- *   figures, and no thresholds presented as defaults.
+ *   the customer agreement (2.3(f)) forbids the customer to publish benchmarks or performance
+ *   information, and this skill is public. Keep it that way when editing: no accuracy, speed, cost or
+ *   comparison figures of ours, and no thresholds presented as defaults. The one exception (Jouni,
+ *   2026-09-19) is a figure TypeSafe publishes itself, repeated as its claim with the source named
+ *   and linked; the skill's last section says so.
  *
  *   WHAT IT MUST AGREE WITH. The node's behaviour (services/decide/), the library (sdk-libs/decide/),
  *   the publish check (services/app-decide-posture.ts) and the ruling that what an app sends is the
@@ -22,6 +24,8 @@
  * @structure DECIDE_SKILL_ENTRY
  * @usage import { DECIDE_SKILL_ENTRY } from './builtin-skills.decide.js';
  * @version-history
+ *   v1.0.1 — 2026-09-19 — TypeSafe's own published figures may be quoted as its claim, with the
+ *     source named and linked (Jouni's ruling); our own measurements stay unpublished.
  *   v1.0.0 — 2026-09-19 — Initial.
  */
 /** The shape of a BuiltinSkill, named here rather than imported so this file closes no import cycle
@@ -168,8 +172,11 @@ Every decision is recorded (model version, questions, answers with probabilities
 gated, whether a person reviewed it): pass \`subject\` and \`gates\`, and record a person's verdict with
 \`AIMEAT.decide.review(id, "confirmed" | "overridden")\`. Many records at once: \`AIMEAT.decide.run.start()\`.
 
-**Do not publish measurements of the model** (accuracy, speed, cost): TypeSafe's customer agreement
-forbids it. Keep them in a draft. **Do not sell access to the model**: a priced tool that is one decide
+**Do not publish your own measurements of the model** (accuracy, speed, cost): TypeSafe's customer
+agreement forbids it. Keep them in a draft. **Figures TypeSafe publishes itself** (on its site or its
+blog) may be repeated, as TypeSafe's claim and never as a result of ours: name TypeSafe as the source
+next to the figure, link the page it comes from, and say it was not measured here.
+**Do not sell access to the model**: a priced tool that is one decide
 call is reselling; a product that uses decisions inside its own work is yours.
 `,
 };
