@@ -6,11 +6,15 @@ Local developer utilities for the AIMEAT repo. Standalone and dependency-free: s
 ## `gen_image.py` — the AIMEAT image generator
 
 Whenever an image is needed — an app icon, a banner, a hero graphic, an illustration, an og-image —
-generate a proper **AIMEAT-quality** one instead of shipping a bland placeholder. This is
-[**Rule 12**](../CLAUDE.md) in the project instructions: no stock/clip-art/placeholder junk, ever.
+generate a proper **AIMEAT-quality** one instead of shipping a bland placeholder. The project skill
+`aimeat-imagery` (`.claude/skills/aimeat-imagery/SKILL.md`) is the rule: no stock, clip-art or
+placeholder art, ever. Python is not on PATH on the developer's machine, so run the script with
+`uv run python scripts/gen_image.py …`.
 
 It renders a text description via an OpenRouter image model, applies the AIMEAT house style
-(coral-red `#E8564A` + slate/near-black, premium/geometric), and saves the result under
+(bright, warm and light: a light airy ground, a palette led by coral-red `#E8564A`, darks kept to
+outlines and type and never used as the background; `HOUSE_STYLE` in the script is the source), and
+saves the result under
 `genimages/<subfolder>/` (gitignored). Optionally it uploads the image public to AIMEAT storage so
 apps can reference it by URL.
 
