@@ -186,7 +186,8 @@ function claudeTranscript(task: Task, prompt: string, s: Sandbox, args: Args, cw
 async function runOne(task: Task, run: number, s: Sandbox, args: Args, outDir: string): Promise<RunRecord> {
     const marker = `ca-${randomBytes(4).toString('hex')}`;
     const owner = s.owners[0];
-    const base = { baseUrl: s.baseUrl, ownerName: owner.name, ownerToken: owner.token, agentToken: s.agent!.token, marker };
+    const other = s.owners[1] ?? owner;
+    const base = { baseUrl: s.baseUrl, ownerName: owner.name, ownerToken: owner.token, agentToken: s.agent!.token, otherOwnerName: other.name, otherOwnerToken: other.token, marker };
     const fill = (text: string) => text.replaceAll('{marker}', marker).replaceAll('{baseUrl}', s.baseUrl).replaceAll('{ownerName}', owner.name);
     const prompt = (args.preface ? fill(readFileSync(args.preface, 'utf8')).trimEnd() + '\n\n' : '') + fill(task.prompt);
     await task.setup?.(base);

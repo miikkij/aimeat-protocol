@@ -8,6 +8,9 @@
  * @structure FULL_HANDBOOK — markdown, served by GET /v1/agents/me/handbook?surface=full
  * @usage import { FULL_HANDBOOK } from './full.js';
  * @version-history
+ *   v1.1.0 — 2026-09-19 — A paragraph on aimeat_discover and its three reaches. The agent handbook
+ *     has said "master directory, start here" all along, and this page, which is the one a plain
+ *     connection reads, named discovery only as a row in the table of surfaces.
  *   v1.0.1 — 2026-09-18 — This is what aimeat_handbook_get returns on /v1/mcp when called with no
  *     arguments, so it is the first thing most connected agents read. The primitives row no
  *     longer states a tool count: it said twelve, and the surface carries thirteen.
@@ -31,6 +34,15 @@ Three grounds carry most of the work:
 - **Organisms and workspaces** are how the person shares knowledge with others. A **skill**
   (\`aimeat_skill_list\`, \`aimeat_skill_get\`) is the operating guide for one named capability, and
   reading the skill first is faster than deriving it.
+
+**When you do not know where something is, or what the person can reach, start with
+\`aimeat_discover\`.** It is the master directory: one query across every kind of content
+(capabilities, workflows, knowledge, documents, apps, skills, memory and more). \`mode: "map"\`
+is a cheap count of WHAT exists by type and tag; \`mode: "find"\` with \`q\`, \`type\` or \`tags\`
+returns the entries. It looks in one reach at a time: \`scope: "own"\` (the default) is the
+person's own content, \`"shared"\` is what the organisms they belong to share with them, and
+\`"public"\` is what anyone can read. Something a colleague or a club wrote down is under
+\`"shared"\`, and no memory search will find it. Use the narrower tools once you know the domain.
 
 ## If your work has a shape, take the surface named after it
 
