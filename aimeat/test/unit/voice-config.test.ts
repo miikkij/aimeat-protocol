@@ -25,6 +25,12 @@ describe('voice configuration', () => {
 });
 
 describe('incremental speech segments', () => {
+  it('keeps a slowly generated sentence together in sentence mode', async () => {
+    async function* text() { yield 'This sentence'; await new Promise(r => setTimeout(r, 40)); yield ' stays together. '; yield 'And ends.'; }
+    const parts: string[] = [];
+    for await (const part of segments(text(), { mode: 'sentence', minChars: 2, maxChars: 1200, maxWaitMs: 5 }, new AbortController().signal)) parts.push(part);
+    expect(parts).toEqual(['This sentence stays together.', 'And ends.']);
+  });
   it('joins a short opening sentence and bounds a single oversized token chunk', async () => {
     async function* text() { yield 'Hi. This is a sentence. ' + 'x'.repeat(105) + '.'; }
     const parts: string[] = [];

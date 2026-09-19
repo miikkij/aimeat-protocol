@@ -3,8 +3,9 @@
  * @description Microphone capture with manual turns or energy-based voice activity detection.
  * @structure wav, createCapture
  * @usage createCapture(config, { utterance, interrupt, busy, level }).start()
- * @version-history v1.0.0 - 2026-09-19 - Bounded PCM capture, pre-roll and explicit microphone lifecycle.
+ * @version-history v1.1.0 - 2026-09-19 - AudioWorklet capture with deterministic teardown.
  */
+import { captureWorkletSource } from './capture-worklet.js';
 /** @param {Float32Array[]} chunks @param {number} rate */
 export function wav(chunks, rate) {
   const frames = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
@@ -32,18 +33,22 @@ export function createCapture(config, hooks) {
   return {
     async start() {
       if (closed) throw new Error('Microphone capture is closed');
-      // ScriptProcessor avoids a blob: worklet URL that many hosted apps' CSP cannot load.
-      // This captures PCM once for VAD and WAV; adapters can supply an AudioWorklet capture instead.
       context = new AudioContext(); await context.resume();
+      if (!context.audioWorklet) throw new Error('AudioWorklet requires a secure, supported browser');
+      const moduleUrl = URL.createObjectURL(new Blob([captureWorkletSource], { type: 'text/javascript' }));
+      try { await context.audioWorklet.addModule(moduleUrl); }
+      finally { URL.revokeObjectURL(moduleUrl); }
+      if (closed) return;
       stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: config.input.echoCancellation,
         noiseSuppression: config.input.noiseSuppression, autoGainControl: config.input.autoGainControl, channelCount: 1 } });
       if (closed) { stream.getTracks().forEach(track => track.stop()); if (context.state !== 'closed') await context.close(); return; }
-      source = context.createMediaStreamSource(stream); processor = context.createScriptProcessor(2048, 1, 1);
+      source = context.createMediaStreamSource(stream);
+      processor = new AudioWorkletNode(context, 'aimeat-voice-capture', { channelCount: 1, channelCountMode: 'explicit' });
       silent = context.createGain(); silent.gain.value = 0;
       source.connect(processor); processor.connect(silent); silent.connect(context.destination);
-      processor.onaudioprocess = event => {
+      processor.port.onmessage = event => {
         if (closed) return;
-        const samples = new Float32Array(event.inputBuffer.getChannelData(0));
+        const samples = event.data;
         const ms = samples.length / context.sampleRate * 1000;
         const rms = Math.sqrt(samples.reduce((sum, value) => sum + value * value, 0) / samples.length);
         hooks.level(rms);
@@ -71,7 +76,7 @@ export function createCapture(config, hooks) {
     commit() { if (held || active) finish(); },
     async close() {
       closed = true; reset(); preRoll = [];
-      if (processor) { processor.onaudioprocess = null; processor.disconnect(); }
+      if (processor) { processor.port.onmessage = null; processor.port.close(); processor.disconnect(); }
       if (source) source.disconnect(); if (silent) silent.disconnect();
       if (stream) stream.getTracks().forEach(track => track.stop());
       if (context && context.state !== 'closed') await context.close();
