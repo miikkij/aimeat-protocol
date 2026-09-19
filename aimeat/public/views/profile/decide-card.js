@@ -36,7 +36,10 @@ function answerText(a) {
   if (!a) return '';
   if (a.type === 'choice') return String(a.value);
   if (a.type === 'noul') return `${Math.round(Number(a.value) * 100)} %`;
-  return `${Number(a.value).toFixed(1)} / ${Object.keys(a.probabilities || {}).length || '?'}`;
+  // A scale answer is a probability-weighted level. Levels are numbered from 0 on the wire (measured
+  // against the live model; TypeSafe's pages say 1), so the nearest level's own words are shown.
+  const words = a.legend && a.legend[String(Math.round(Number(a.value)))];
+  return typeof words === 'string' ? words : Number(a.value).toFixed(1);
 }
 
 export function DecideCard() {
