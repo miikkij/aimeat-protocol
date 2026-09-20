@@ -29,6 +29,8 @@
  * @usage
  *   const run = await startDecideRun(storage, config, caller, { questions, keys, fields });
  * @version-history
+ *   v1.1.0 — 2026-09-20 — A run may name one of the owner's decision rules in place of questions;
+ *     each result then carries the rule's outcome.
  *   v1.0.1 — 2026-09-19 — A run records its app under the one name (services/ai-app-id.ts).
  *   v1.0.0 — 2026-09-19 — Initial (TARGET-080).
  */
@@ -40,7 +42,8 @@ import { upsertPrivateRecord } from '../private-record.js';
 import { emitChange } from '../event-bus.js';
 import { canonicalAiAppId } from '../ai-app-id.js';
 import type { JevQuestion } from './limits.js';
-import { decideForOwner, type DecideCaller } from './service.js';
+import { decideForOwner, ruleCallerKind, type DecideCaller } from './service.js';
+import { ruleForCaller } from './rules.js';
 import { DecideError } from './errors.js';
 import { Semaphore } from './pacer.js';
 
@@ -58,11 +61,16 @@ export interface RunResult {
   /** One value per question: the choice, the score, or the yes-probability. The record has the rest. */
   values?: Record<string, number | string>;
   cached?: boolean;
+  /** When the run named a decision rule: what its bands made of this item, and whether a gate stopped it. */
+  outcome?: 'act' | 'ask' | 'stop';
+  proceed?: boolean;
   error?: { code: string; message: string };
 }
 export interface DecideRun {
   id: string;
   state: RunState;
+  /** The owner's decision rule every item is run through, or null when the run carries its own questions. */
+  rule?: string | null;
   questions: Record<string, JevQuestion>;
   /** Items the caller sent carry their state; key items are read when their turn comes. */
   items: RunItem[];
@@ -81,7 +89,9 @@ export interface DecideRun {
 }
 
 export interface StartRunInput {
-  questions: Record<string, JevQuestion>;
+  /** One of the owner's decision rules, in place of questions, thresholds and gates. */
+  rule?: string;
+  questions?: Record<string, JevQuestion>;
   items?: RunItem[];
   keys?: string[];
   prefix?: string;
@@ -145,15 +155,20 @@ async function work(storage: Storage, config: AimeatConfig, caller: DecideCaller
     for (let attempt = 0; ; attempt++) {
       if (flag.stop) return;
       try {
+        // A run that names a rule sends each state and nothing else, exactly as a single call does.
         const r = await decideForOwner(storage, config, caller, {
-          state: project(state, run.fields), questions: run.questions, subject: item.subject,
-          ...(run.gates ? { gates: run.gates } : {}),
-          ...(run.thresholds ? { thresholds: run.thresholds } : {}),
+          state: project(state, run.fields), subject: item.subject,
+          ...(run.rule ? { rule: run.rule } : {
+            questions: run.questions,
+            ...(run.gates ? { gates: run.gates } : {}),
+            ...(run.thresholds ? { thresholds: run.thresholds } : {}),
+          }),
           ...(run.names.length ? { names: run.names } : {}),
         });
         run.results[item.subject] = {
           decision_id: r.decision_id, cached: r.cached,
           values: Object.fromEntries(Object.entries(r.answers).map(([q, a]) => [q, a.value])),
+          ...(r.outcome ? { outcome: r.outcome, proceed: r.proceed !== false } : {}),
         };
         run.cost_usd += r.usage.cost_usd;
         return;
@@ -165,7 +180,8 @@ async function work(storage: Storage, config: AimeatConfig, caller: DecideCaller
           continue;
         }
         // A run that has run out of money or been switched off stops: every next item would fail the same way.
-        if (['QUOTA_EXHAUSTED', 'APP_QUOTA_EXHAUSTED', 'DECIDE_DISABLED', 'NO_API_KEY', 'INVALID_API_KEY', 'DATAMAP_REQUIRED'].includes(de.code ?? '')) {
+        if (['QUOTA_EXHAUSTED', 'APP_QUOTA_EXHAUSTED', 'AGENT_QUOTA_EXHAUSTED', 'DECIDE_DISABLED', 'NO_API_KEY', 'INVALID_API_KEY',
+          'DATAMAP_REQUIRED', 'RULE_NOT_FOUND', 'RULE_NOT_FOR_CALLER'].includes(de.code ?? '')) {
           flag.stop = true;
         }
         run.results[item.subject] = { error: { code: de.code ?? 'ERROR', message: (e as Error).message } };
@@ -212,6 +228,16 @@ export async function startDecideRun(
     throw new DecideError('DECIDE_DISABLED', 503, 'The operator has turned the decision model off on this node.');
   }
   validateInput(input);
+  if (input.rule !== undefined) {
+    // Refused here, once, rather than a thousand times in the background: the rule is not there, is
+    // not for this kind of caller, or the caller sent what the rule fixes.
+    const fixed = (['questions', 'thresholds', 'gates'] as const).filter(f => input[f] !== undefined);
+    if (typeof input.rule !== 'string' || fixed.length) {
+      throw new DecideError('RULE_FIXES_QUESTIONS', 400,
+        `A run that names a rule sends only the items: the rule holds the ${fixed.join(', ') || 'questions'}. Leave them out, or run without a rule.`);
+    }
+    await ruleForCaller(storage, caller.gaii, input.rule, ruleCallerKind(caller));
+  }
   let items: RunItem[];
   let source: DecideRun['source'];
   if (input.items) {
@@ -244,7 +270,7 @@ export async function startDecideRun(
 
   const now = new Date().toISOString();
   const run: DecideRun = {
-    id: randomUUID(), state: 'running', questions: input.questions, items, source,
+    id: randomUUID(), state: 'running', rule: input.rule ?? null, questions: input.questions ?? {}, items, source,
     fields: input.fields ?? null, gates: input.gates ?? null, thresholds: input.thresholds ?? null,
     names: input.names ?? [], results: {},
     counts: { total: items.length, done: 0, failed: 0, pending: items.length },

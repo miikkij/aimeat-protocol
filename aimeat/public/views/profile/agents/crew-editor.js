@@ -14,6 +14,8 @@
  *     bundle, and its verbs behind a "pick verbs" toggle
  *   - IdentitySection · CrewSection · RunSection · ContractSection
  * @version-history
+ *   2026-09-20 -- ToolMenu has a Decisions group: `decide` and `decide:<rule>`, disabled with the
+ *     reason and a link to the settings when no TypeSafe key exists for this agent.
  *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
  *   v1.1.0 -- 2026-08-28 -- A list field never flattens what it cannot show. capabilities.technical is
  *     a list of {name, type} objects; the comma input rendered them as "[object Object]" and a blur
@@ -139,8 +141,14 @@ function Field({ label, hint, children, htmlFor }) {
  * fallback for an agent that is offline or older — and it is a copy, which is exactly why it drifted
  * two tools behind before anybody asked the runtime.
  */
-export function ToolMenu({ selected, onChange, idPrefix, runtimeTools }) {
+export function ToolMenu({ selected, onChange, idPrefix, runtimeTools, decideTools }) {
   const set = new Set(Array.isArray(selected) ? selected : []);
+  // The decision rows: `decide`, one `decide:<rule>` per rule the owner made for agents, and any
+  // `decide:` id the definition already names whose rule is gone, so it stays visible and removable.
+  const ruleIds = (decideTools?.rules ?? []).map(r => `decide:${r.id}`);
+  const orphans = [...set].filter(id => id.startsWith('decide:') && !ruleIds.includes(id));
+  const decideIds = ['decide', ...ruleIds, ...orphans];
+  const ruleOf = new Map((decideTools?.rules ?? []).map(r => [`decide:${r.id}`, r]));
   const [refine, setRefine] = useState(EXCHANGE_VERBS.some(v => set.has(v)));
   const live = Array.isArray(runtimeTools) && runtimeTools.length > 0 ? runtimeTools : null;
   const livePurpose = new Map((live ?? []).map(x => [x.id, x.purpose]));
@@ -155,7 +163,23 @@ export function ToolMenu({ selected, onChange, idPrefix, runtimeTools }) {
   const toggle = (id) => {
     const next = new Set(set);
     if (next.has(id)) next.delete(id); else next.add(id);
-    onChange([...core, EXCHANGE_BUNDLE, ...verbs].filter(x => next.has(x)));
+    onChange([...core.filter(id => !decideIds.includes(id)), EXCHANGE_BUNDLE, ...verbs, ...decideIds].filter(x => next.has(x)));
+  };
+  // A decision row is ticked only when a key exists somewhere in the order. A ticked one stays
+  // untickable, so a definition can always be cleaned up.
+  const decideOff = !decideTools?.available;
+  const decideRow = (id) => {
+    const rule = ruleOf.get(id);
+    const desc = id === 'decide' ? t(`${K}.tools.decide`)
+      : rule ? t(`${K}.tools.decideRule`, { title: rule.title, decides: rule.decides })
+        : t(`${K}.tools.decideRuleGone`);
+    return html`
+      <label key=${id} class=${`pf-agd-crew-tool ${decideOff && !set.has(id) ? 'pf-agd-crew-tool--off' : ''}`}>
+        <input type="checkbox" id=${`${idPrefix}-${id}`} checked=${set.has(id)} disabled=${decideOff && !set.has(id)}
+               onChange=${() => toggle(id)} />
+        <span class="pf-agd-crew-tool-id">${id}</span>
+        <span class="pf-agd-crew-tool-desc">${desc}</span>
+      </label>`;
   };
   const row = (id) => html`
     <label key=${id} class="pf-agd-crew-tool">
@@ -177,6 +201,17 @@ export function ToolMenu({ selected, onChange, idPrefix, runtimeTools }) {
           ${refine ? '▾' : '▸'} ${t(`${K}.tools.exchangeRefine`)}
         </button>
         ${refine && html`<div class="pf-agd-crew-tools-verbs">${verbs.map(row)}</div>`}
+      </div>
+      <div class="pf-agd-crew-tools-group poster-row--thing">
+        <div class="pf-agd-crew-tools-title">${t(`${K}.tools.decisions`)}</div>
+        ${decideOff && html`
+          <p class="pf-agd-help-text" role="note">
+            ${decideTools && !decideTools.enabled ? t(`${K}.tools.decideOffOperator`) : t(`${K}.tools.decideNoKey`)}
+            ${' '}<a class="pf-agd-crew-link" href="/v1/profile?tab=ai&open=decide-card">${t(`${K}.tools.decideNoKeyLink`)} →</a>
+          </p>`}
+        ${decideIds.map(decideRow)}
+        ${!decideOff && ruleIds.length === 0 && html`
+          <p class="pf-agd-help-text">${t(`${K}.tools.decideNoRules`)} <a class="pf-agd-crew-link" href="/v1/profile?tab=ai&open=decide-card">${t(`${K}.tools.decideNoKeyLink`)} →</a></p>`}
       </div>
     </div>
   `;
@@ -227,7 +262,7 @@ export function IdentitySection({ doc, onChange, errors }) {
 
 function memberKey(m) { return (m && (m.name || m.role)) || ''; }
 
-export function CrewSection({ doc, onChange, errors, runtimeTools }) {
+export function CrewSection({ doc, onChange, errors, runtimeTools, decideTools }) {
   const agents = Array.isArray(doc.agents) ? doc.agents : [];
   const tasks = Array.isArray(doc.tasks) ? doc.tasks : [];
   const setAgents = (next) => onChange({ ...doc, agents: next });
@@ -261,7 +296,7 @@ export function CrewSection({ doc, onChange, errors, runtimeTools }) {
             <textarea id=${`crew-m${i}-backstory`} class="input-field" rows="2" value=${a.backstory || ''} onInput=${e => patchAgent(i, { backstory: e.target.value })}></textarea>
           <//>
           <${Field} label=${t(`${K}.fields.memberTools`)}>
-            <${ToolMenu} idPrefix=${`crew-m${i}-tool`} selected=${a.tools} runtimeTools=${runtimeTools} onChange=${v => patchAgent(i, { tools: v })} />
+            <${ToolMenu} idPrefix=${`crew-m${i}-tool`} selected=${a.tools} runtimeTools=${runtimeTools} decideTools=${decideTools} onChange=${v => patchAgent(i, { tools: v })} />
           <//>
           <label class="pf-agd-crew-check">
             <input type="checkbox" checked=${!!a.allow_delegation} onChange=${e => patchAgent(i, { allow_delegation: e.target.checked })} />

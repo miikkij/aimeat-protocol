@@ -18,6 +18,8 @@
  *   - TabCrew — load, actions (validate / try / publish / draft / restore), the header and the
  *     form-or-JSON body; sections live in ./crew-editor.js, templates in ./crew-templates.js
  * @version-history
+ *   2026-09-20 -- Loads what the tool picker's Decisions group needs: the rules made for agents, and
+ *     whether a TypeSafe key exists for this agent.
  *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
  *   v1.1.0 -- 2026-08-28 -- A definition published from outside the tab (crewaimeat CLI) has no
  *     revision number; the live line says so instead of "revision 0", and the runtime line shows
@@ -64,6 +66,7 @@ export default function TabCrew({ agentName, showToast }) {
   const [tryPrompt, setTryPrompt] = useState('');
   const [tryRun, setTryRun] = useState(null);         // { id, status, result, error }
   const [menu, setMenu] = useState(null);             // GET /crew/menu — the runtime's own answer
+  const [decideTools, setDecideTools] = useState(null); // { rules, available, enabled } for the tool picker
   const { confirm, ConfirmUI } = useConfirm();
   const docRef = useRef(doc);
   docRef.current = doc;
@@ -99,14 +102,33 @@ export default function TabCrew({ agentName, showToast }) {
     } catch (err) { swallowed('tab-crew: menu', err); setMenu(null); }
   }, [base]);
 
+  // THE DECISION ROWS of the tool picker: `decide` and one `decide:<rule>` per rule the owner made
+  // for agents. Whether they can be ticked depends on a key existing somewhere in the order (this
+  // agent's own, the owner's, the node's); when none does, the rows are disabled and say why.
+  const loadDecide = useCallback(async () => {
+    try {
+      const [rules, settings, mine] = await Promise.all([
+        apiGet('/v1/ai/decide/rules'), apiGet('/v1/ai/decide/settings'),
+        apiGet(`/v1/agents/${encodeURIComponent(agentName)}/ai-keys`),
+      ]);
+      const s = settings?.data ?? {};
+      setDecideTools({
+        rules: (rules?.data?.rules ?? []).filter(r => r.use !== 'app').map(r => ({ id: r.id, title: r.title, decides: r.decides })),
+        available: !!s.enabled && (!!s.available || !!mine?.data?.decide?.has_key),
+        enabled: !!s.enabled,
+      });
+    } catch (err) { swallowed('tab-crew: decide tools', err); setDecideTools(null); }
+  }, [agentName]);
+
   useEffect(() => { load({ keepEdits: false }); }, [load]);
   useEffect(() => { loadMenu(); }, [loadMenu]);
+  useEffect(() => { loadDecide(); }, [loadDecide]);
 
   useEffect(() => {
-    const handler = () => load({ keepEdits: true });
+    const handler = () => { load({ keepEdits: true }); loadDecide(); };
     window.addEventListener('aimeat-live-update', handler);
     return () => window.removeEventListener('aimeat-live-update', handler);
-  }, [load]);
+  }, [load, loadDecide]);
 
   const status = statusOf({ doc, published: state?.published, validation });
   const online = !!state?.online;
@@ -319,7 +341,7 @@ export default function TabCrew({ agentName, showToast }) {
           </div>
         ` : html`
           <${IdentitySection} doc=${doc} onChange=${edit} errors=${errors} />
-          <${CrewSection} doc=${doc} onChange=${edit} errors=${errors} runtimeTools=${menu?.tools} />
+          <${CrewSection} doc=${doc} onChange=${edit} errors=${errors} runtimeTools=${menu?.tools} decideTools=${decideTools} />
           <${RunSection} doc=${doc} onChange=${edit} errors=${errors} />
           <${ContractSection} doc=${doc} onChange=${edit} errors=${errors} />
         `}

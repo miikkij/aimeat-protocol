@@ -103,6 +103,21 @@
     if (!v || typeof v !== "object" || !v.questions) throw new Error(`No question set at ${key}`);
     return { questions: v.questions, thresholds: v.thresholds || {} };
   }
+  async function rule(id) {
+    const r = await call(`/v1/ai/decide/rules/${encodeURIComponent(id)}`);
+    const def = r && r.rule || {};
+    return {
+      ...def,
+      /**
+       * @param {any} state
+       * @param {{ subject?: string, names?: string[], public_content?: boolean, cache?: boolean, app_id?: string }} [opts]
+       */
+      ask: (state, opts) => post("/v1/ai/decide", { rule: id, state, ...opts || {} })
+    };
+  }
+  function rules() {
+    return call("/v1/ai/decide/rules");
+  }
   async function decisions(q) {
     const o = q || {};
     if (o.id) return call(`/v1/ai/decisions/${encodeURIComponent(o.id)}`);
@@ -110,7 +125,7 @@
     for (
       const k of
       /** @type {const} */
-      ["subject", "app_id", "limit", "before"]
+      ["subject", "rule", "app_id", "limit", "before"]
     ) {
       if (o[k] !== void 0) p.set(k, String(o[k]));
     }
@@ -176,6 +191,6 @@
   function unavailableReason() {
     return _availCache ? _availCache.reason : null;
   }
-  var decide = { yesNo, pickOne, scale, ask, gate, questionSet, decisions, review, run, settings, isAvailable, unavailableReason };
+  var decide = { yesNo, pickOne, scale, ask, gate, questionSet, rule, rules, decisions, review, run, settings, isAvailable, unavailableReason };
   attach("decide", decide);
 })();

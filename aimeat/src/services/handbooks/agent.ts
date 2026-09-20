@@ -7,6 +7,9 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/mcp/catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
+ *   v1.9.0 -- 2026-09-20 -- Decision rules: aimeat_decide_rules, aimeat_decide_rule_propose, `rule`
+ *     on aimeat_decide, `proceed`, and the one setup order. The Decisions section named a skill
+ *     `typesafe-jev` that does not exist; it is `aimeat-decide`.
  *   v1.8.0 -- 2026-09-19 -- A Decisions section: the aimeat_decide family (TARGET-080).
  *   v1.7.1 -- 2026-09-18 -- Moderation is named by its route (POST /v1/flags): aimeat_flag_report is
  *     not on this surface, and the handbook told an agent to reach for it. Instruction review.
@@ -117,7 +120,21 @@ with typed values; it writes no text. Ask every question in ONE call, write them
 removes the personal data it recognises, the rest of what you send is your responsibility.
 \`aimeat_decide_run\` does many records in the background · \`aimeat_decision_list\` reads what was
 decided · \`aimeat_decision_review\` records a person's confirm or override · \`aimeat_decide_settings\`
-says whether the owner can ask at all. Skill: typesafe-jev.
+says whether the owner can ask at all. Skill: aimeat-decide.
+
+**Decision rules.** A decision rule is a set of questions, thresholds and two bands your owner wrote
+once. \`aimeat_decide_rules\` lists the ones you may run; run one with \`aimeat_decide { rule, state }\`
+and send ONLY the state (the fields the rule lists under \`sends\`): questions, thresholds or bands
+beside a rule are refused. The answer carries \`outcome\` (act | ask | stop) and \`proceed\`. When
+\`proceed\` is false your owner has switched the gate on for you and the model was not sure enough:
+do NOT take the action, your owner has a task about it. \`aimeat_decide_rule_propose\` proposes a new
+rule and creates nothing until your owner approves it. Everything is set up in one order: (1) a
+TypeSafe key, the owner's own or one for you alone; (2) test the key; (3) write a rule and try it;
+(4) give the rule to an agent (the Crew tab rows \`decide\` and \`decide:<rule>\`); (5) decide about the
+gate, which is off until the owner turns it on; (6) read the decisions and tune the thresholds. When
+a key is missing, the refusal says what to set and where: pass it to your owner as it is. No tool
+ever returns a key; \`aimeat_decide_settings\` names the environment variable that holds yours, when
+your owner set one.
 
 **Self & onboarding.** \`aimeat_agent_profile\` · \`aimeat_agent_activity\` ·
 \`aimeat_agent_capabilities_report\` · \`aimeat_agent_telemetry_report\` · \`aimeat_agents_list\`

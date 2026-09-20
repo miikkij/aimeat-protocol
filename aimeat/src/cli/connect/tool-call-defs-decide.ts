@@ -11,6 +11,8 @@
  * @structure decideTools[] -- the shell handler table, registered by tool-call.ts
  * @usage import { decideTools } from './tool-call-defs-decide.js';
  * @version-history
+ *   v1.1.0 -- 2026-09-20 -- Decision rules: `rule` on aimeat_decide, aimeat_decide_run and
+ *     aimeat_decision_list; aimeat_decide_rules; aimeat_decide_rule_propose.
  *   v1.0.0 -- 2026-09-19 -- Initial (TARGET-080).
  */
 import type { ConnectCliToolDefinition, JsonObject } from './tool-call-helpers.js';
@@ -25,6 +27,8 @@ function common(input: JsonObject, body: JsonObject): JsonObject {
   const thresholds = optionalRecord(input, 'thresholds');
   const names = optionalArray(input, 'names');
   const appId = optionalString(input, 'app_id');
+  const rule = optionalString(input, 'rule');
+  if (rule !== undefined) body.rule = rule;
   if (gates !== undefined) body.gates = gates;
   if (thresholds) body.thresholds = thresholds;
   if (names) body.names = names.filter((n): n is string => typeof n === 'string');
@@ -39,7 +43,8 @@ export const decideTools: ConnectCliToolDefinition[] = [
     description: 'Ask the decision model typed questions (noul, choice, score) about a state; the node scrubs personal data first, meters the call and records the decision. Instructions and criteria in English.',
     input: {
       state: { type: 'object', required: true, description: 'What is being judged: a string, an object with named fields, or an array.' },
-      questions: { type: 'object', required: true, description: 'Your ids to { type, instructions, criteria }.' },
+      rule: { type: 'string', description: 'One of the owner\'s decision rules (aimeat_decide_rules). It holds the questions, thresholds and bands: send only the state beside it.' },
+      questions: { type: 'object', description: 'Required unless rule is given. Your ids to { type, instructions, criteria }.' },
       subject: { type: 'string', description: 'What the decision is about.' },
       gates: { type: 'string', description: 'What the answer decides.' },
       thresholds: { type: 'object', description: 'The thresholds you will apply.' },
@@ -49,10 +54,10 @@ export const decideTools: ConnectCliToolDefinition[] = [
       app_id: { type: 'string', description: 'App attribution for the per-app quota.' },
     },
     handler: ({ client }, input) => {
-      const body: JsonObject = {
-        state: requiredValue(input, 'state') as JsonObject,
-        questions: requiredRecord(input, 'questions'),
-      };
+      const body: JsonObject = { state: requiredValue(input, 'state') as JsonObject };
+      // With a rule the questions are the rule's; without one they are required, as before.
+      const questions = optionalString(input, 'rule') !== undefined ? optionalRecord(input, 'questions') : requiredRecord(input, 'questions');
+      if (questions) body.questions = questions;
       const subject = optionalString(input, 'subject');
       const publicContent = optionalBoolean(input, 'public_content');
       const cache = optionalBoolean(input, 'cache');
@@ -69,6 +74,9 @@ export const decideTools: ConnectCliToolDefinition[] = [
     input: {
       decision_id: { type: 'string', description: 'Read one decision.' },
       subject: { type: 'string', description: 'Only decisions about this subject.' },
+      rule: { type: 'string', description: 'Only decisions one decision rule made (its id).' },
+      principal: { type: 'string', description: 'Only decisions one principal asked for (an agent\'s full identity).' },
+      stats_by: { type: 'string', description: 'rule | principal: return the quality numbers instead, one group per rule or per principal.' },
       app_id: { type: 'string', description: 'Only decisions made for this app.' },
       limit: { type: 'number', description: 'How many (1-200, default 50).' },
       before: { type: 'string', description: 'Only decisions made before this ISO time.' },
@@ -81,6 +89,16 @@ export const decideTools: ConnectCliToolDefinition[] = [
       const appId = optionalString(input, 'app_id');
       const limit = optionalNumber(input, 'limit');
       const before = optionalString(input, 'before');
+      const rule = optionalString(input, 'rule');
+      const principal = optionalString(input, 'principal');
+      const statsBy = optionalString(input, 'stats_by');
+      if (rule !== undefined) q.set('rule', rule);
+      if (principal !== undefined) q.set('principal', principal);
+      // → GET /v1/ai/decisions/stats: the quality numbers, counted by the node
+      if (statsBy !== undefined) {
+        q.set('group_by', statsBy);
+        return client.get(`/v1/ai/decisions/stats?${q.toString()}`);
+      }
       if (subject !== undefined) q.set('subject', subject);
       if (appId !== undefined) q.set('app_id', appId);
       if (limit !== undefined) q.set('limit', String(limit));
@@ -115,6 +133,7 @@ export const decideTools: ConnectCliToolDefinition[] = [
     input: {
       action: { type: 'string', required: true, description: 'start | get | list | resume | stop' },
       run_id: { type: 'string', description: 'The run, for get, resume and stop.' },
+      rule: { type: 'string', description: 'For start: one of the owner\'s decision rules, in place of questions, thresholds and gates.' },
       questions: { type: 'object', description: 'For start: the questions.' },
       items: { type: 'array', description: 'For start: [{ subject, state }].' },
       keys: { type: 'array', description: 'For start: owner memory keys.' },
@@ -153,5 +172,29 @@ export const decideTools: ConnectCliToolDefinition[] = [
     description: 'Read the owner\'s decision-model settings (never the key). The owner changes them on the AI settings page.',
     input: {},
     handler: ({ client }) => client.get('/v1/ai/decide/settings'),
+  },
+  {
+    // → GET /v1/ai/decide/rules[/:id]
+    name: 'aimeat_decide_rules',
+    description: 'List the owner\'s decision rules this caller may run (id, title, what each decides, the state fields it takes), or read one in full by rule_id.',
+    input: {
+      rule_id: { type: 'string', description: 'Read one rule in full.' },
+    },
+    handler: ({ client }, input) => {
+      const id = optionalString(input, 'rule_id');
+      return client.get(id ? `/v1/ai/decide/rules/${encodeURIComponent(id)}` : '/v1/ai/decide/rules');
+    },
+  },
+  {
+    // → POST /v1/ai/decide/rule-proposals
+    name: 'aimeat_decide_rule_propose',
+    description: 'Propose a decision rule to the owner. Creates nothing: the rule exists only after the owner approves it.',
+    input: {
+      rule: { type: 'object', required: true, description: '{ id, title, decides, sends, questions, thresholds, bands, use, gate, sample }. Questions in English.' },
+      reason: { type: 'string', required: true, description: 'Why this rule should exist, in a sentence the owner can decide from.' },
+    },
+    handler: ({ client }, input) => client.post('/v1/ai/decide/rule-proposals', {
+      rule: requiredRecord(input, 'rule'), reason: requiredString(input, 'reason'),
+    }),
   },
 ];

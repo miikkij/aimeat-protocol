@@ -6,6 +6,8 @@
  *   to satisfy max-file-lines. Idempotent (IF NOT EXISTS); applied in numeric order so
  *   the on-disk DDL order is byte-for-byte unchanged from the original single exec block.
  * @version-history
+ *   2026-09-20 — ai_decisions.rule, ruleVersion, outcome, keyScope (fresh installs; schema.ts adds
+ *     them and their indexes to existing databases). Mirrors Postgres 0080.
  *   2026-09-19 — ai_decisions table (TARGET-080), beside ai_provenance. Mirrors Postgres 0079.
  *   2026-08-22 — direct_messages.ownerReadAt (fresh installs; schema.ts adds it and backfills
  *     existing databases).
@@ -586,7 +588,11 @@ export function applySchemaTables3(db: Database.Database): void {
       cacheKey  TEXT NOT NULL,
       model     TEXT NOT NULL,
       createdAt TEXT NOT NULL,
-      record    TEXT NOT NULL
+      record    TEXT NOT NULL,
+      rule        TEXT,
+      ruleVersion INTEGER,
+      outcome     TEXT,
+      keyScope    TEXT
     );
     CREATE INDEX IF NOT EXISTS idx_ai_decisions_owner ON ai_decisions(ownerGhii, createdAt);
     CREATE INDEX IF NOT EXISTS idx_ai_decisions_cache ON ai_decisions(ownerGhii, cacheKey, createdAt);

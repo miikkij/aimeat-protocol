@@ -24,6 +24,8 @@
  *   const policy = await readDecidePolicy(storage, gaii);
  *   const own = await readOwnDecideKey(storage, config, gaii); // string | null, never logged
  * @version-history
+ *   v1.1.0 — 2026-09-20 — The view carries `setup_order`, and for an agent caller what the owner set
+ *     for that agent (a key of its own, the name of its variable, cap, gate). Never a key.
  *   v1.0.0 — 2026-09-19 — Initial (TARGET-080).
  */
 import type { AimeatConfig } from '../../config.js';
@@ -33,6 +35,9 @@ import { upsertPrivateRecord } from '../private-record.js';
 import { emitChange } from '../event-bus.js';
 import { PII_CLASSES, type PiiClass } from './scrub.js';
 import { DecideError } from './errors.js';
+import { agentAiView } from '../agent-ai-keys.js';
+import { gateSettingOf, type GateSetting } from './gate.js';
+import { DECIDE_SETUP_ORDER, type SetupStep } from './setup-order.js';
 
 export const DECIDE_KEY_RECORD = 'decide.apikey';
 export const DECIDE_POLICY_RECORD = 'decide.policy';
@@ -148,21 +153,35 @@ export async function clearOwnDecideKey(storage: Storage, gaii: string): Promise
 export function decideAvailability(config: AimeatConfig, hasOwnKey: boolean): { available: boolean; reason: string | null } {
   if (!config.decideEnabled) return { available: false, reason: 'The operator has turned the decision model off on this node.' };
   if (hasOwnKey || config.decideInstanceKey.trim()) return { available: true, reason: null };
-  return { available: false, reason: 'No TypeSafe key is set. The owner adds one under Settings, AI, Decision model.' };
+  // An instruction, not a bare error: what to set, where, and what comes next.
+  return { available: false, reason: 'No TypeSafe key is set. The owner adds one under Settings, AI, Decision model (or one for a single agent on that agent\'s page under AI keys), presses Test, and then writes a decision rule.' };
 }
 
-/** What the settings door shows: never the key, only whether one is set and who would pay. */
-export async function decideSettingsView(storage: Storage, config: AimeatConfig, gaii: string): Promise<{
+/**
+ * What the settings door shows: never the key, only whether one is set and who would pay. For an
+ * agent caller, `agent` is its bare name, and the answer adds what the owner set for THAT agent.
+ */
+export async function decideSettingsView(storage: Storage, config: AimeatConfig, gaii: string, agent?: string | null): Promise<{
   enabled: boolean; available: boolean; unavailable_reason: string | null; model: string;
   has_own_key: boolean; node_key_available: boolean; policy: DecidePolicy; pii_classes: readonly PiiClass[];
+  setup_order: readonly SetupStep[];
+  agent?: { name: string; has_key: boolean; key_env: string | null; daily_usd: number | null; spent_today_usd: number; gate: GateSetting };
 }> {
-  const [keyRec, policy] = await Promise.all([
+  const [keyRec, policy, mine, gate] = await Promise.all([
     storage.getMemory(gaii, DECIDE_KEY_RECORD),
     readDecidePolicy(storage, gaii),
+    agent ? agentAiView(storage, gaii, agent) : null,
+    agent ? gateSettingOf(storage, gaii, agent) : null,
   ]);
   const hasOwnKey = typeof (keyRec?.value as { encrypted?: unknown } | undefined)?.encrypted === 'string';
-  const { available, reason } = decideAvailability(config, hasOwnKey);
+  // An agent with a key of its own can ask even when the owner and the node have none.
+  const { available, reason } = decideAvailability(config, hasOwnKey || !!mine?.decide.has_key);
   return {
+    setup_order: DECIDE_SETUP_ORDER,
+    ...(agent && mine && gate ? { agent: {
+      name: agent, has_key: mine.decide.has_key, key_env: mine.decide.key_env,
+      daily_usd: mine.daily_usd, spent_today_usd: mine.spent_today_usd, gate,
+    } } : {}),
     enabled: config.decideEnabled,
     available,
     unavailable_reason: reason,

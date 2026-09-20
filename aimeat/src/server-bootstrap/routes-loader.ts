@@ -198,6 +198,8 @@ import { openrouterRouter } from '../routes/openrouter.js';
 import { aiRouter } from '../routes/ai.js';
 import { aiJobsRouter } from '../routes/ai-jobs.js';
 import { decideRouter } from '../routes/ai-decide.js';
+import { decideRulesRouter } from '../routes/ai-decide-rules.js';
+import { agentAiKeysRouter } from '../routes/agent-ai-keys.js';
 import type { AiJobService } from '../services/ai-jobs/index.js';
 import { chatRouter } from '../routes/chat.js';
 import { llmProxyRouter } from '../routes/llm-proxy.js';
@@ -514,7 +516,10 @@ export async function mountRoutes(
   app.use(aiJobsRouter(config, storage, aiJobService));
   // The decision provider (TARGET-080): the same money, a different model kind. Beside the text
   // routes, never inside them, and every byte it sends is scrubbed first.
+  // Decision rules first: `/v1/ai/decisions/stats` must be matched before `/v1/ai/decisions/:id`.
+  app.use(decideRulesRouter(config, storage));
   app.use(decideRouter(config, storage));
+  app.use(agentAiKeysRouter(config, storage));  // A key per agent, its daily cap and its gate switch
   app.use(chatRouter(config, storage));         // The person's own chat with their built-in agent
   app.use(llmProxyRouter(config, storage));   // The OpenAI-shaped door the chat agent's model calls come through
   // AI provenance (TARGET-058). The by-hash detection lookup is PUBLIC + unauthenticated by
