@@ -6,6 +6,7 @@
  *   and two-way sync. Shows files pushed by the agent (soul.md, AGENTS.md, etc).
  *   Supports edit, copy, download, and upload actions.
  * @version-history
+ *   2026-09-20 -- The agent's AI section (agent-ai-section.js): its own keys, cap, gate and numbers.
  *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
  *   v1.0.0 -- 2026-05-24 -- Initial creation for Agent Detail Tab-View
  *   v1.1.0 -- 2026-05-24 -- Add edit/copy/download buttons (F8), edit mode (F9), upload (F10), file metadata (F11)
@@ -31,6 +32,7 @@ import { copyToClipboard } from '/js/utils.js';
 import { apiGet, apiPut, apiPatch } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
 import { date as fmtDate } from '/js/format.js';
+import { AgentAiSection } from './agent-ai-section.js';
 
 const html = htm.bind(h);
 
@@ -232,6 +234,7 @@ export default function TabAgentConfig({ agent, agentName, showToast, onDeleteCl
     return html`
       <div>
         <${ScheduleBudgetSection} agent=${agent} agentName=${agentName} showToast=${showToast} />
+        <${AgentAiSection} agentName=${agentName} showToast=${showToast} />
         <div class="pf-agd-config-upload">
           <button class="btn-outline btn-sm" onClick=${handleUploadClick}>+ ${t('profile.agents.detail.agent_config.upload')}</button>
           <input ref=${fileInputRef} type="file" accept=".md,.yaml,.yml,.json" class="pf-agd-hidden-input" onChange=${handleFileUpload} />
@@ -245,6 +248,7 @@ export default function TabAgentConfig({ agent, agentName, showToast, onDeleteCl
   return html`
     <div>
       <${ScheduleBudgetSection} agent=${agent} agentName=${agentName} showToast=${showToast} />
+      <${AgentAiSection} agentName=${agentName} showToast=${showToast} />
       <div class="pf-agd-config-upload">
         <button class="btn-outline btn-sm" onClick=${handleUploadClick}>+ ${t('profile.agents.detail.agent_config.upload')}</button>
         <input ref=${fileInputRef} type="file" accept=".md,.yaml,.yml,.json" class="pf-agd-hidden-input" onChange=${handleFileUpload} />

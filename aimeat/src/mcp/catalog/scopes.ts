@@ -277,6 +277,8 @@ export const TOOL_SCOPES: Record<string, string> = {
     aimeat_decision_review:                   'ai:use',
     aimeat_decide_run:                        'ai:use',
     aimeat_decide_settings:                   'ai:use',
+    aimeat_decide_rules:                      'ai:use',
+    aimeat_decide_rule_propose:               'ai:use',
     aimeat_app_fork:                          'app:write',
     aimeat_app_publish:                       'app:write',
     aimeat_package_publish:                   'app:write',

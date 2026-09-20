@@ -417,7 +417,8 @@ stays open underneath with "or say something else", because three options are ne
   who wanted that otherwise has to fight the buttons to say so.
 `,
     },
-    // aimeat-paying-for-the-ai — as published on aimeat.io, sha256 ce6851f02c65…
+    // aimeat-paying-for-the-ai — as published on aimeat.io, sha256 ce6851f02c65…, plus one paragraph
+    // added here on 2026-09-20 (a key for a single agent), which the published copy does not have yet.
     {
         name: 'aimeat-paying-for-the-ai',
         visibility: 'public',
@@ -441,6 +442,11 @@ not you:
 2. **The node's key**, while their allowance has something left.
 3. **A free model** once the allowance is spent — \`openrouter/free\` by default. The answer still
    comes; it comes from a weaker model.
+
+**One step can come before all three: a key for a single agent.** The owner may give one agent a key
+of its own on that agent's page (AI keys, cap and gate). That key then pays for that agent's calls
+first, a daily cap can sit beside it, and no key is ever shown to the agent: for an agent that makes
+its own calls on the owner's computer, the owner gives the NAME of the environment variable instead.
 
 Step 3 is the one to be honest about. The response carries \`degradedToFreeModel: true\` when it
 happens, and a person whose answers quietly got worse and was never told will conclude the system

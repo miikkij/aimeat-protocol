@@ -20,7 +20,7 @@
  */
 
 import type { Storage } from '../storage/interface.js';
-import { getDailyBudgetUsd } from './ai-completion.js';
+import { getDailyBudgetUsd } from './ai-daily-budget.js';
 
 /** Default alert thresholds (fraction of daily budget). Overridable per owner via prefs. */
 export const DEFAULT_WARN_RATIO = 0.8;

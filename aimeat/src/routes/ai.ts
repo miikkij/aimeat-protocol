@@ -62,6 +62,7 @@ import { assertAiUseAllowed } from '../auth/ai-gate.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
+import { agentOfPrincipal } from '../services/agent-ai-keys.js';
 import { recordAccountEvent } from '../services/account-events.js';
 import {
   completeForOwner, AiCompletionError, getTodayUsage, getDailyBudgetUsd,
@@ -137,6 +138,8 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
         const r = await completeForOwner(storage, config, gaii, {
           prompt: prompt as string, systemPrompt, model: modelOverride, modelRole,
           temperature, topP: top_p, maxTokens: max_tokens, appId: app_id, images: imageList,
+          // An agent's own key pays first and its daily cap applies (services/agent-ai-keys.ts).
+          ...agentOfPrincipal(gaii),
         });
         // TARGET-058: the provenance of the bytes we are about to hand back, on the ONE envelope
         // carrier. `meta`, never `data` — the `data` shape is what every published app reads, and it

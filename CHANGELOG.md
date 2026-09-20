@@ -4,6 +4,48 @@ All notable changes to AIMEAT are documented in this file.
 
 ## [Unreleased]
 
+## aimeat-crewai 0.27.0 - 2026-09-20
+
+**The judgement step, with a record: the node's decision rules as CrewAI tools.** A crew's weak
+point is the place where it decides whether to send, deliver, publish or pay. The decision model
+answers closed questions with probabilities and writes no text; a DECISION RULE is the owner's
+named set of questions, thresholds and bands, and running one is recorded on the owner's register.
+
+- **`decide.py`** -- a typed client over the node's REST: the question builders `yes_no` /
+  `pick_one` / `scale`, `decide()`, `rules()` / `rule()` / `rule_tools_data()`, `decisions()`,
+  `review()`, `settings()` and the five run calls. Refusals arrive as `DecideRefused` carrying the
+  node's OWN code (`NO_API_KEY`, `AGENT_QUOTA_EXHAUSTED`, `DATAMAP_REQUIRED`, `RULE_NOT_FOR_CALLER`,
+  `RATE_LIMITED`, `DECIDE_DISABLED`, ...), so a caller branches on the real reason. **Only a rate
+  limit is retryable**, with its `Retry-After` honoured: a quota that is used up is used up and a
+  missing permission is a standing fact, so a retry loop around either burns the budget it is
+  reacting to. `evaluate_rule()` ports the node's own threshold-and-band arithmetic, where a score
+  level of 0 and a probability of 0.0 are ANSWERS and an absent answer is not.
+- **Rules as tools** (`decide_tool.py`) -- `decide_tools()` reads the rules this agent is allowed to
+  run and mints ONE TOOL PER RULE, named after the job (`decide_sort_a_message`), described by the
+  owner's own title and `decides`, with an input schema that is exactly the rule's `sends`. There is
+  deliberately no argument anywhere for questions, thresholds or bands: they are the owner's, and a
+  rule the agent can reword is not a rule. A crew JSON selects `decide` or `decide:<rule>`; a named
+  rule the owner does not allow is an error at minting, not a silent omission.
+- **The gate** -- `gate(rule, state, on=False)` runs the bound rule before an irreversible action
+  and answers whether to proceed. Off by default, because a comparison run needs an agent that acts
+  unguarded; the decision is recorded either way. The NODE's own per-agent gate is what puts a held
+  action on the owner's list, and this package says so rather than implying it notified anybody:
+  `/v1/open-items` is `requireRole('owner')` and refuses an agent token by design. `report()` names
+  the band that fired and the decision id.
+- **Direct mode** -- for a run with no node, behind the explicit `AIMEAT_DECIDE_DIRECT` switch and
+  never inferred. The key is read from this machine's environment, from the variable named in
+  `AIMEAT_DECIDE_KEY_ENV`; the node never sends a key, only ever the variable's NAME. It states once
+  what it loses -- no scrubbing, no record, no cap, no cache -- still sends only the fields the rule
+  names, and writes every decision to `<AIMEAT_HOME>/decide/direct-log.jsonl`. `push_direct_log()`
+  puts that log on a node later, into memory and plainly labelled, never onto the decision register:
+  a row claiming to be one would make the owner's quality numbers read as though the scrubber and
+  the cap had been in force.
+- 85 offline tests (`test_decide.py`, `test_decide_tools.py`), a README section and
+  `examples/decide_gate.py`.
+
+Mirrors the node contract (`routes/ai-decide.ts`, `services/decide/`); the NODE WINS on any
+mismatch. Our own measurements of the decision model stay unpublished, per the locked ruling.
+
 ## [3.15.0] - 2026-09-14
 
 **A visitor signed in from another node became the local account that happened to share their name.** Federated sign-in mints a session whose `sub` is the bare account name, and `resolveIdentity` composed a GHII out of it with the LOCAL node id. So `alice@other-node` signing in here resolved to `alice@this-node`, and the collision was not theoretical: it was driven end to end before anything was written. The visitor read the local namesake's private memory, wrote into their namespace, and `GET /v1/ghii/me` answered with the local person's GHII. The fix is at the resolver, which now composes the federated visitor's identity from their HOME node, and at every door that keys off a name rather than a principal: owners, identity, cortex, the message doors, the address book, the memory owner-scope fan-outs and their `?agent=` branch, and `/v1/work/sent`, which was the one door in that family without the guard. Federated sign-in stays open, and deliberately: the answer to a federation defect is a better federation, not a closed one. Seventeen message doors and nine contact doors now say that a session from another node has no mailbox and no address book here, which is the honest answer rather than somebody else's.

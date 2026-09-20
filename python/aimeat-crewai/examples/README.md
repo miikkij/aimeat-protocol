@@ -49,3 +49,21 @@ Once `crew_daemon.py` (or watchdog → crew_daemon.py) is running:
 3. **REST** (with an owner JWT): `POST /v1/agents/demo-crew/tasks` with the same JSON shape
 
 The daemon picks up the queued task within `poll_interval_seconds` (default 30s).
+
+## `decide_gate.py` — decision rules as tools, and a gate on the irreversible step
+
+A support agent that sorts an incoming message with one of the owner's **decision rules**, drafts a reply, and then runs a second rule as a **gate** before sending — the step that cannot be undone. Below the act band it does not send: it hands the draft back with the decision id, and the owner decides.
+
+Shows the whole shape: check `settings()` before building on the model, mint one tool per allowed rule with `decide_tools()`, gate the irreversible step, report which band fired, and record a person's verdict with `review()`.
+
+```bash
+AIMEAT_NODE_URL=https://aimeat.io AIMEAT_AGENT_NAME=support-crew python decide_gate.py
+
+# with the local gate on (off by default: a comparison run needs an agent that acts unguarded)
+AIMEAT_DECIDE_GATE=1 python decide_gate.py
+
+# no node at all — prints what direct mode gives up before it does anything
+AIMEAT_DECIDE_DIRECT=1 AIMEAT_DECIDE_KEY_ENV=TYPESAFE_API_KEY python decide_gate.py
+```
+
+The owner needs a TypeSafe key and at least one rule whose `use` admits an agent; the example says so and stops when either is missing.

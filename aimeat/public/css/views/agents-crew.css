@@ -72,7 +72,13 @@
 .pf .pf-agd-form-field label.pf-agd-crew-tool { display: grid; grid-template-columns: auto minmax(110px, 150px) 1fr; gap: 0.5rem; align-items: baseline; font-size: 0.8rem; font-weight: 400; color: var(--text); padding: 0.15rem 0; margin: 0; cursor: pointer; }
 .pf .pf-agd-form-field label.pf-agd-crew-check { display: flex; font-weight: 400; margin: 0.3rem 0; }
 .pf .pf-agd-form-field label.pf-agd-crew-check--inline { display: inline-flex; margin: 0 0.75rem 0.25rem 0; }
-.pf .pf-agd-crew-tool-id { font-family: var(--font-mono, monospace); }
+/* A decision row that cannot be ticked yet (no TypeSafe key for this agent). The reason is the help
+   line above the rows, so the row itself only has to look unavailable. */
+.pf .pf-agd-crew-tool--off,
+.pf .pf-agd-form-field label.pf-agd-crew-tool--off { cursor: not-allowed; opacity: 0.55; }
+/* The way out of a disabled group has to read as something to press: the help text around it is dim. */
+.pf .pf-agd-crew-link { color: var(--accent); font-weight: 600; text-decoration: underline; }
+.pf .pf-agd-crew-tool-id { font-family: var(--font-mono, monospace); overflow-wrap: anywhere; }
 .pf .pf-agd-crew-tool-desc { color: var(--text-dim); }
 .pf .pf-agd-crew-tools-refine { margin-top: 0.25rem; }
 .pf .pf-agd-crew-tools-verbs { margin-top: 0.25rem; padding-left: 0.5rem; border-left: 2px solid var(--border); }

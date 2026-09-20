@@ -21,6 +21,10 @@
  *   import { completeForOwner, AiCompletionError } from '../services/ai-completion.js';
  *   const r = await completeForOwner(storage, config, gaii, { prompt });
  * @version-history
+ *   v3.4.0 — 2026-09-20 — A key per agent: `agent` on the options; that agent's own OpenRouter key
+ *     pays before the owner's and the node's, and its daily cap is checked beside the app's
+ *     (services/agent-ai-keys.ts). The usage-accounting group moved to ai-usage-record.ts, unchanged
+ *     and re-exported from here (max-file-lines).
  *   v3.3.0 — 2026-09-19 — One name per app in the budget (services/ai-app-id.ts): the day's spend is
  *     recorded under the canonical name, and the allowlist and the per-app cap match any of an app's
  *     names, so `app`, `app.html` and `owner/app.html` are one app with one cap.
@@ -89,10 +93,12 @@ import { mintProvenance } from './ai-provenance.js';
 import type { AiProvenanceRecordRow } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 import { resolveModelFor, type ModelRole } from './ai-model-defaults.js';
-import { resolveAiKey, debitAllowance } from './ai-allowance.js';
-import { recordUsageEvent } from './usage-metering.js';
-import { recordAccountEvent } from './account-events.js';
-import { canonicalAiAppId, appSpentToday, appQuotaFor, appAllowlisted, mergePerApp } from './ai-app-id.js';
+import { resolveAiKey, debitAllowance, type AiKeyChoice } from './ai-allowance.js';
+import { appSpentToday, appQuotaFor, appAllowlisted } from './ai-app-id.js';
+import { todayKey, getTodayUsage, recordAiUsage, emptyUsage, type UsageRecord } from './ai-usage-record.js';
+import { readAgentKey, agentCapRefusal } from './agent-ai-keys.js';
+import { DEFAULT_DAILY_BUDGET_USD, getDailyBudgetUsd } from './ai-daily-budget.js';
+export { todayKey, getTodayUsage, recordAiUsage, type UsageRecord, DEFAULT_DAILY_BUDGET_USD, getDailyBudgetUsd };
 
 /**
  * Rough cost estimate when the provider didn't report one (LM Studio, custom).
@@ -102,37 +108,14 @@ import { canonicalAiAppId, appSpentToday, appQuotaFor, appAllowlisted, mergePerA
 const FALLBACK_PROMPT_COST_PER_TOKEN = 0.000005;
 const FALLBACK_COMPLETION_COST_PER_TOKEN = 0.000015;
 
-/** Default applied when the owner hasn't set an explicit daily budget. A per-app cap defaults to
- *  this same budget (an app may spend the whole "AI apps daily budget"); set app_quotas.<app> to
- *  throttle a single app below it. */
-export const DEFAULT_DAILY_BUDGET_USD = 1.0;
-
-export interface UsageRecord {
-  /** ISO date key (YYYY-MM-DD). */
-  date: string;
-  total_cost_usd: number;
-  total_calls: number;
-  total_tokens: number;
-  /** Audio seconds transcribed today. Optional: records written before speech-to-text existed do not
-   *  have it, and every reader treats a missing value as 0. */
-  audio_seconds?: number;
-  per_app: Record<string, { cost_usd: number; calls: number; tokens: number; audio_seconds?: number }>;
-  updated_at: string;
-}
-
-export function todayKey(): string {
-  return new Date().toISOString().slice(0, 10);
-}
+// DEFAULT_DAILY_BUDGET_USD and getDailyBudgetUsd live in ai-daily-budget.ts (a leaf, so the ledger's
+// budget alert can read the number without importing this file) and are re-exported below.
 
 /** The fallback when the provider does not report a cost. Exported so the chat proxy uses the same
  *  arithmetic rather than a second guess at what a turn was worth. */
 export function estimateCostUsd(promptTokens: number, completionTokens: number): number {
   return promptTokens * FALLBACK_PROMPT_COST_PER_TOKEN
     + completionTokens * FALLBACK_COMPLETION_COST_PER_TOKEN;
-}
-
-export function getDailyBudgetUsd(prefs: Record<string, unknown>): number {
-  return typeof prefs.daily_budget_usd === 'number' ? prefs.daily_budget_usd : DEFAULT_DAILY_BUDGET_USD;
 }
 
 /** Typed error so the HTTP route can map to a status/code and the scheduler can log it. */
@@ -230,130 +213,6 @@ export function assertWithinBudget(
   return dailyBudget;
 }
 
-/**
- * Record what yesterday cost, once. Silent when there was no spend: "you spent nothing" is not news,
- * and a feed that says it every morning is a feed people stop reading.
- */
-async function reportYesterdaysSpend(
-  storage: Storage, gaii: string, config?: AimeatConfig,
-): Promise<void> {
-  const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
-  const rec = (await storage.getMemory(gaii, `ai-usage.${gaii}.${yesterday}`))?.value as UsageRecord | undefined;
-  if (!rec || !(rec.total_cost_usd > 0)) return;
-  await recordAccountEvent(storage, {
-    ownerGhii: gaii,
-    kind: 'ai_spend_daily',
-    subject: yesterday,
-    link: '/v1/profile?tab=usage',
-    data: {
-      day: yesterday,
-      amount: `$${rec.total_cost_usd < 1 ? rec.total_cost_usd.toFixed(4) : rec.total_cost_usd.toFixed(2)}`,
-      calls: String(rec.total_calls ?? 0),
-    },
-  }, config);
-}
-
-/**
- * Fold one call into today's usage record and persist it. Text completions and transcriptions share
- * ONE record, so the daily budget covers both and the spend charts show them together — an owner
- * whose budget is being eaten by voice messages sees it in the same place as everything else.
- *
- * IT WRITES TWO PLACES, AND THEY ARE NOT REDUNDANT. The per-day memory record is the LIVE budget
- * counter: it must be readable in one get before every completion, so it stays a single small key
- * and carries no model dimension. The ledger event is the REPORTING row: append-only, priced,
- * carrying model, provider and appId. Before this, only the first existed, which is why per-app
- * model reporting had no data behind it. Both are written here rather than at the two call sites,
- * so a third caller cannot arrive and write only one of them.
- */
-const usageWrites = new WeakMap<Storage, Map<string, Promise<unknown>>>();
-
-/** Serialize the read/modify/write across overlapping voice stages on this node. */
-export async function recordAiUsage(...args: Parameters<typeof appendAiUsage>): Promise<UsageRecord> {
-  const [storage, gaii] = args;
-  let pending = usageWrites.get(storage);
-  if (!pending) { pending = new Map(); usageWrites.set(storage, pending); }
-  const previous = pending.get(gaii) ?? Promise.resolve();
-  const next = previous.then(() => appendAiUsage(...args), () => appendAiUsage(...args));
-  pending.set(gaii, next);
-  try { return await next; } finally { if (pending.get(gaii) === next) pending.delete(gaii); }
-}
-
-async function appendAiUsage(
-  storage: Storage, gaii: string, usage: UsageRecord,
-  call: {
-    costUsd: number; tokens: number; audioSeconds?: number; appId?: string;
-    /** Ledger dimensions. Omitted only by a caller that genuinely has no model to name. */
-    model?: string; provider?: string; promptTokens?: number; completionTokens?: number;
-    source?: string;
-    /** Which key paid. The ledger has carried this dimension since it was written; before the node
-     *  had a key of its own there was only one possible answer, so it was hardcoded. */
-    apiKeyScope?: 'own' | 'node';
-  },
-  /** The node's config, so the event window is the operator's number. Optional: the two callers
-   *  have it, and a caller that does not gets the default rather than a compile error. */
-  config?: AimeatConfig,
-): Promise<UsageRecord> {
-  usage = await getTodayUsage(storage, gaii);
-  const updated: UsageRecord = {
-    date: todayKey(),
-    total_cost_usd: usage.total_cost_usd + call.costUsd,
-    total_calls: usage.total_calls + 1,
-    total_tokens: usage.total_tokens + call.tokens,
-    audio_seconds: (usage.audio_seconds ?? 0) + (call.audioSeconds ?? 0),
-    // Folded on write, so a day that began under an older name continues as one app.
-    per_app: mergePerApp(usage.per_app, gaii),
-    updated_at: new Date().toISOString(),
-  };
-  const appKey = canonicalAiAppId(call.appId, gaii) || '_unknown';
-  const existing = updated.per_app[appKey] ?? { cost_usd: 0, calls: 0, tokens: 0 };
-  updated.per_app[appKey] = {
-    cost_usd: existing.cost_usd + call.costUsd,
-    calls: existing.calls + 1,
-    tokens: existing.tokens + call.tokens,
-    audio_seconds: (existing.audio_seconds ?? 0) + (call.audioSeconds ?? 0),
-  };
-  // THE DAY BEFORE, told once. A row per completion would be the loudest thing on the account and
-  // the least interesting; what a person wants told is what a day cost. `usage.total_calls === 0`
-  // means this is the first call of a new UTC day for them, so yesterday's record is final and can
-  // be reported — one extra read per owner per active day, and no marker to keep in step.
-  if ((usage.total_calls ?? 0) === 0) {
-    void reportYesterdaysSpend(storage, gaii, config).catch(err =>
-      logger.warn('[ai] daily spend digest is best-effort', { gaii, error: String(err) }));
-  }
-
-  await upsertUsage(storage, gaii, updated);
-
-  // The reporting half. Best-effort on purpose: the owner has already been served and the budget
-  // counter above is already correct, so a ledger failure must not surface as a failed completion.
-  // It is logged rather than swallowed, because an operator seeing this knows spend is happening
-  // that their reports will not show.
-  if (call.model) {
-    try {
-      await recordUsageEvent(storage, {
-        agentGaii: gaii,
-        ownerGhii: gaii,
-        model: call.model,
-        provider: call.provider,
-        promptTokens: call.promptTokens ?? 0,
-        completionTokens: call.completionTokens ?? 0,
-        // The provider's own figure when we have it. `costUsd` here is already either the exact
-        // reported cost or this node's estimate, and priceUsd() prefers what it is given.
-        providerCostUsd: call.costUsd,
-        source: call.source ?? 'ai-complete',
-        apiKeyScope: call.apiKeyScope ?? 'own',
-        appId: canonicalAiAppId(call.appId, gaii) ?? '',
-        surface: 'app',
-      });
-    } catch (err) {
-      logger.warn('[ai] ledger event failed; the budget counter is still correct', {
-        gaii, model: call.model, error: String(err),
-      });
-    }
-  }
-
-  return updated;
-}
-
 export interface CompleteForOwnerOptions {
   prompt: string;
   systemPrompt?: string;
@@ -364,6 +223,9 @@ export interface CompleteForOwnerOptions {
   maxTokens?: number;
   /** Optional app/source attribution — enables allowlist + per-app quota. */
   appId?: string;
+  /** The owner's agent that is asking, by bare name, and its owner (see PrepareAiCallOptions). */
+  agent?: string;
+  agentOwner?: string;
   /** Optional image attachments (data: or https URLs) for vision-capable models. */
   images?: string[];
   /**
@@ -426,7 +288,7 @@ export interface CompleteForOwnerResult {
    * has to be able to tell "you spent your own money" from "you used the node's allowance", and the
    * two are different sentences.
    */
-  keySource: 'own' | 'node';
+  keySource: 'agent' | 'own' | 'node';
   allowanceRemainingUsd?: number;
   /**
    * True when the allowance was spent and the answer came from a free model instead of a refusal.
@@ -434,33 +296,6 @@ export interface CompleteForOwnerResult {
    * an unannounced one is not.
    */
   degradedToFreeModel?: boolean;
-}
-
-const emptyUsage = (): UsageRecord => ({
-  date: todayKey(), total_cost_usd: 0, total_calls: 0, total_tokens: 0,
-  per_app: {}, updated_at: new Date().toISOString(),
-});
-
-/** Read today's usage record for an owner (used by the daily_limit constraint + the usage route). */
-export async function getTodayUsage(storage: Storage, gaii: string): Promise<UsageRecord> {
-  const rec = await storage.getMemory(gaii, `ai-usage.${gaii}.${todayKey()}`);
-  return (rec?.value as UsageRecord | undefined) ?? emptyUsage();
-}
-
-// getUsageHistory and its UsageWindow / UsageHistory shapes live in ai-usage-history.ts since
-// 2026-09-09 (a pure move, max-file-lines). The per-day records are still written below.
-
-async function upsertUsage(storage: Storage, gaii: string, value: UsageRecord): Promise<void> {
-  const key = `ai-usage.${gaii}.${todayKey()}`;
-  const existing = await storage.getMemory(gaii, key);
-  const now = new Date().toISOString();
-  await storage.setMemory({
-    key, ownerGaii: gaii, value, visibility: 'private', tags: ['ai', 'usage'],
-    ttlHours: null,
-    version: existing ? existing.version + 1 : 1,
-    createdAt: existing?.createdAt ?? now,
-    updatedAt: now,
-  });
 }
 
 /**
@@ -485,7 +320,9 @@ export interface AiCallPlan {
   baseUrl: string;
   /** The decrypted key that will pay. Never logged, never returned to a caller. */
   key: string | undefined;
-  keyScope: 'own' | 'node';
+  keyScope: 'agent' | 'own' | 'node';
+  /** The owner's agent that asked, by bare name, so the settle step adds the spend to its cap. */
+  agent?: string;
   /** What is left on the node's allowance, when the node is paying. */
   allowanceRemainingUsd?: number;
   /** Today's usage record, read once so the settle step does not read it again. */
@@ -503,6 +340,12 @@ export interface PrepareAiCallOptions {
   appId?: string;
   /** Image inputs need a vision-capable model, whatever the owner's text default is. */
   hasImages?: boolean;
+  /** The bare name of the owner's agent that is asking: its own key pays first, and its daily cap
+   *  applies. The door derives it from the principal (agentNameOf), never from the body. */
+  agent?: string;
+  /** The GHII of that agent's owner, whose records hold the agent's key and cap. Needed because a
+   *  text door resolves the payer to the principal, so `gaii` is the agent's own namespace there. */
+  agentOwner?: string;
 }
 
 /**
@@ -532,10 +375,18 @@ export async function prepareAiCall(
   // Whose key pays is one decision and it lives in services/ai-allowance.ts: the person's own key,
   // then the node's if they have allowance left. An own key is never metered here — it is their
   // money and their provider account, which is the whole reason bringing one is recommended.
-  const keyChoice = await resolveAiKey(storage, config, gaii, provider, apiKeyRecord?.value, baseUrl);
+  // An agent's own key comes before both (services/agent-ai-keys.ts): the owner pinned that agent's
+  // spend to it. It is the owner's money on the owner's chosen address, like their own key.
+  const agentHome = opts.agentOwner ?? gaii;
+  const agentKey = opts.agent ? await readAgentKey(storage, config, agentHome, opts.agent, 'openrouter') : null;
+  const keyChoice: Omit<AiKeyChoice, 'scope'> & { scope: 'agent' | 'own' | 'node' } = agentKey
+    ? { key: agentKey, scope: 'agent', exhausted: false, remainingUsd: 0 }
+    : await resolveAiKey(storage, config, gaii, provider, apiKeyRecord?.value, baseUrl);
 
   const usage = (usageRecord?.value as UsageRecord | undefined) ?? emptyUsage();
   const dailyBudgetUsd = assertWithinBudget(usage, prefs, opts.appId, gaii);
+  const overCap = await agentCapRefusal(storage, agentHome, opts.agent);
+  if (overCap) throw new AiCompletionError('AGENT_QUOTA_EXHAUSTED', 402, overCap);
 
   // ── Model selection ──
   // Each role asks the owner first and the node second (services/ai-model-defaults.ts). With no
@@ -577,6 +428,7 @@ export async function prepareAiCall(
     prefs, provider, baseUrl,
     key: keyChoice.key,
     keyScope: keyChoice.scope,
+    ...(opts.agent ? { agent: opts.agent } : {}),
     ...(keyChoice.scope === 'node' ? { allowanceRemainingUsd: keyChoice.remainingUsd } : {}),
     usage, dailyBudgetUsd, model, degradedToFree,
   };
@@ -622,7 +474,7 @@ export async function settleAiCall(
     costUsd: outcome.costUsd, tokens: outcome.totalTokens, appId: outcome.appId,
     model: outcome.model, provider: plan.provider,
     promptTokens: outcome.promptTokens, completionTokens: outcome.completionTokens,
-    source: outcome.source, apiKeyScope: plan.keyScope,
+    source: outcome.source, apiKeyScope: plan.keyScope, ...(plan.agent ? { agent: plan.agent } : {}),
   }, config);
   // Only the node's key draws down an allowance. An own key is the person's own account.
   const allowanceAfter = plan.keyScope === 'node'
@@ -700,7 +552,7 @@ export async function completeForOwner(
 
   const hasImages = Array.isArray(opts.images) && opts.images.length > 0;
   const plan = await prepareAiCall(storage, config, gaii, {
-    model: opts.model, modelRole: opts.modelRole, appId: opts.appId, hasImages,
+    model: opts.model, modelRole: opts.modelRole, appId: opts.appId, hasImages, agent: opts.agent, agentOwner: opts.agentOwner,
   });
   const { prefs } = plan;
 

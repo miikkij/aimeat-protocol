@@ -19,6 +19,8 @@
  *     instead of filtering to the entries that model wrote. The drill-down names the doors that can
  *     open one entry (aimeat_knowledge_get cannot: it reads only the calling agent's namespace). The
  *     owner-scope listing is appdev-kb's, not a copy kept here.
+ *   2026-09-20 — `decision_model.rules` (the owner's decision rules an app may run) and
+ *     `decision_model.setup_order` (the one order, from services/decide/setup-order.ts).
  *   2026-09-19 — `decision_model`: whether this owner's apps can use the decision model, and the
  *     skill to read if so, so nothing is built around a model its owner cannot reach (TARGET-080).
  *   2026-09-06 — `secrets_note` beside `scope_note`: a key for an outside service is named as
@@ -41,6 +43,8 @@ import { filterPitfalls, listLearnedPitfalls, listOwnerScopeMemory } from './app
 import { listSkills, type SkillAccessor } from './skills.js';
 import { dependencyIndex, appRef as depAppRef } from './dependency-map.js';
 import { decideAvailableFor } from './decide/settings.js';
+import { rulesRunnableBy } from './decide/rules.js';
+import { decideSetupOrderText } from './decide/setup-order.js';
 import { logger } from '../utils/logger.js';
 
 const CAP = 25;
@@ -94,9 +98,12 @@ export async function buildAppdevOverview(
     // ── Can this owner's apps use the decision model? Answered before anything is designed, so no
     //    app is built around a model its owner cannot reach (TARGET-080). Always included: one read.
     const decide = await decideAvailableFor(storage, config, ownerGhii);
+    // The decision rules an APP may run, so a builder reuses the owner's rule instead of shipping a
+    // second copy of its questions, and the one order everything is set up in.
+    const appRules = await rulesRunnableBy(storage, ownerGhii, 'app');
     out.decision_model = decide.available
-        ? { available: true, library: 'aimeat-decide', skill: 'node:aimeat-decide', note: 'Classify, screen, route, gate: typed questions, answers with probabilities, no text. Read skill node:aimeat-decide for when it fits and the recipes before designing a feature on it.' }
-        : { available: false, reason: decide.reason, note: 'Do not build a feature on the decision model for this owner. Tell them what to set up, or design the feature without it.' };
+        ? { available: true, library: 'aimeat-decide', skill: 'node:aimeat-decide', rules: appRules, setup_order: decideSetupOrderText(), note: 'Classify, screen, route, gate: typed questions, answers with probabilities, no text. Read skill node:aimeat-decide for when it fits and the recipes before designing a feature on it. When one of `rules` decides what the app needs decided, run it with AIMEAT.decide.rule(id) and send only the fields it lists under `sends`; otherwise tell the owner which rule to write.' }
+        : { available: false, reason: decide.reason, setup_order: decideSetupOrderText(), note: 'Do not build a feature on the decision model for this owner. Tell them what to set up, in the order under setup_order, or design the feature without it.' };
 
     // ── The owner's existing apps — often the best starting template ──
     if (wanted.has('apps')) {

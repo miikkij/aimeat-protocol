@@ -19,6 +19,8 @@
  * @structure decideRouter(config, storage)
  * @usage mounted in server-bootstrap/routes-loader.ts
  * @version-history
+ *   v1.2.0 — 2026-09-20 — `rule` on POST /v1/ai/decide and on a run; the decisions list filters by
+ *     rule and by principal. The rules' own doors are routes/ai-decide-rules.ts.
  *   v1.1.0 — 2026-09-19 — Key tests: the owner's (POST /v1/ai/decide/settings/test, the key that would
  *     pay for them) and the operator's (POST /v1/admin/decide/test, the node's key).
  *   v1.0.0 — 2026-09-19 — Initial (TARGET-080).
@@ -34,6 +36,7 @@ import { rateLimit } from '../middleware/rate-limit.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { AiCompletionError } from '../services/ai-completion.js';
+import { agentNameOf } from '../services/agent-ai-keys.js';
 import {
   decideForOwner, listDecisions, getDecision, reviewDecision, DecideError,
   type DecideCaller, type DecideInput,
@@ -71,10 +74,15 @@ export function decideCallerOf(req: Request, nodeId: string, bodyAppId?: unknown
 export function decideInputOf(body: Record<string, unknown>): DecideInput {
   return {
     state: body.state,
-    questions: body.questions as DecideInput['questions'],
+    // Passed through as given when present, so a caller who sends them BESIDE a rule is refused by
+    // the service rather than silently ignored here.
+    ...(body.questions !== undefined ? { questions: body.questions as DecideInput['questions'] } : {}),
+    ...(body.rule !== undefined ? { rule: body.rule as string } : {}),
+    ...(body.bands !== undefined ? { bands: body.bands } : {}),
     ...(typeof body.subject === 'string' ? { subject: body.subject.slice(0, 500) } : {}),
     ...(typeof body.gates === 'string' ? { gates: body.gates.slice(0, 500) } : {}),
-    ...(body.thresholds && typeof body.thresholds === 'object' && !Array.isArray(body.thresholds)
+    ...((body.thresholds && typeof body.thresholds === 'object' && !Array.isArray(body.thresholds))
+      || (body.rule !== undefined && body.thresholds !== undefined)
       ? { thresholds: body.thresholds as Record<string, unknown> } : {}),
     ...(Array.isArray(body.names) ? { names: (body.names as unknown[]).filter((n): n is string => typeof n === 'string').slice(0, 1000) } : {}),
     ...(body.public_content === true ? { publicContent: true } : {}),
@@ -115,7 +123,7 @@ export function decideRouter(config: AimeatConfig, storage: Storage): Router {
     const q = req.query as Record<string, string | undefined>;
     try {
       const r = await listDecisions(storage, decideOwnerOf(req.auth!, config.nodeId), {
-        subject: q.subject, appId: q.app_id, before: q.before,
+        subject: q.subject, appId: q.app_id, rule: q.rule, principal: q.principal, before: q.before,
         limit: q.limit ? parseInt(q.limit, 10) : undefined,
       });
       res.json(success(config.nodeId, { decisions: r.items, total: r.total }));
@@ -150,7 +158,8 @@ export function decideRouter(config: AimeatConfig, storage: Storage): Router {
     try {
       const input = decideInputOf(body);
       const run = await startDecideRun(storage, config, decideCallerOf(req, config.nodeId, body.app_id), {
-        questions: input.questions,
+        ...(input.rule !== undefined ? { rule: input.rule } : {}),
+        ...(input.questions !== undefined ? { questions: input.questions } : {}),
         ...(body.items !== undefined ? { items: body.items as RunItem[] } : {}),
         ...(body.keys !== undefined ? { keys: body.keys as string[] } : {}),
         ...(body.prefix !== undefined ? { prefix: body.prefix as string } : {}),
@@ -208,7 +217,10 @@ export function decideRouter(config: AimeatConfig, storage: Storage): Router {
   router.get('/v1/ai/decide/settings', requireAuth(), async (req: Request, res: Response) => {
     if (!assertAiUseAllowed(req, res, config.nodeId)) return;
     try {
-      res.json(success(config.nodeId, await decideSettingsView(storage, config, decideOwnerOf(req.auth!, config.nodeId))));
+      const gaii = decideOwnerOf(req.auth!, config.nodeId);
+      // An agent is also told what its owner set for IT: the name of its key's variable, its gate.
+      const agent = agentNameOf(resolveIdentity(req.auth!, config.nodeId), gaii);
+      res.json(success(config.nodeId, await decideSettingsView(storage, config, gaii, agent)));
     } catch (e) { fail(res, e); }
   });
 

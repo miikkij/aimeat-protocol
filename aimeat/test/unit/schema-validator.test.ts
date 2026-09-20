@@ -162,6 +162,47 @@ describe('a failed validation names what it is about', () => {
   });
 });
 
+describe('validateValueAgainstSchema — what a wide value costs', () => {
+  const schema = { type: 'object', properties: { a: { type: 'string' } }, additionalProperties: false };
+
+  it('lists every violation while the value is small enough to be worth listing', () => {
+    const r = validateValueAgainstSchema({ a: 1, b: 1, c: 1 }, schema);
+    expect(r.ok).toBe(false);
+    expect(r.violations?.length).toBe(3);
+  });
+
+  it('stops at the first violation on a value too wide to list, and says so', () => {
+    // 40 000 refused fields. ajv with allErrors builds one error object per violation, and this
+    // validator runs with `verbose`, so each object also carries a copy of the data it is about:
+    // measured 40 001 objects for this value against the two below. The callers all pass a value
+    // somebody else chose (CodeQL resource-exhaustion-from-deep-object-traversal, alert 1643).
+    const wide: Record<string, unknown> = { a: 1 };
+    for (let i = 0; i < 40_000; i++) wide[`k${i}`] = 'xxxxxxxxxx';
+
+    const started = Date.now();
+    const r = validateValueAgainstSchema(wide, schema);
+
+    expect(r.ok).toBe(false);
+    expect(r.violations?.length).toBe(1);
+    expect(r.errors?.at(-1)).toMatch(/only the first violation is listed/);
+    expect(Date.now() - started).toBeLessThan(2000);
+  });
+
+  it('answers a valid wide value the same as any other', () => {
+    const wide: Record<string, unknown> = { a: 'x' };
+    for (let i = 0; i < 40_000; i++) wide[`k${i}`] = 'xxxxxxxxxx';
+    expect(validateValueAgainstSchema(wide, { type: 'object' }).ok).toBe(true);
+  });
+
+  it('refuses a value nested past the depth bound before it validates at all', () => {
+    let deep: unknown = 'leaf';
+    for (let i = 0; i < 80; i++) deep = { next: deep };
+    const r = validateValueAgainstSchema(deep, { type: 'object' });
+    expect(r.ok).toBe(false);
+    expect(r.errors?.[0]).toMatch(/nested too deeply/);
+  });
+});
+
 describe('clearValidatorCache', () => {
   it('does not throw', () => {
     expect(() => clearValidatorCache()).not.toThrow();

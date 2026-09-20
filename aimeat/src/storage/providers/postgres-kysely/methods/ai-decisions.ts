@@ -6,14 +6,17 @@
  *   One row per call to the decision model; only `record.review` changes after the write, and rows
  *   age out through deleteAiDecisionsBefore(). Mirrors ../../sqlite/methods/ai-decisions.ts.
  * @structure aiDecisionMethods — createAiDecision · getAiDecision · findCachedAiDecision ·
- *   listAiDecisions · setAiDecisionReview · deleteAiDecisionsBefore
+ *   listAiDecisions · setAiDecisionReview · aiDecisionStats · deleteAiDecisionsBefore
  * @usage merged onto PostgresKyselyStorage.prototype in ../index.ts
  * @version-history
+ *   v1.1.0 — 2026-09-20 — Decision rules: the rule, ruleVersion, outcome and keyScope columns, the
+ *     list's rule and principal filters, and aiDecisionStats. Schema: 0080_ai_decision_rules.sql.
  *   v1.0.0 — 2026-09-19 — TARGET-080. Initial. Schema: migrations/0079_ai_decisions.sql.
  */
 import { sql, type Selectable } from 'kysely';
 import type {
   AiDecisionRow, AiDecisionRecord, AiDecisionListQuery, AiDecisionReview,
+  AiDecisionStatsQuery, AiDecisionStatsGroup, AiDecisionOutcome, AiDecisionKeyScope,
 } from '../../../interface.js';
 import type { Kysely } from 'kysely';
 import type { AiDecision as AiDecisionTable, DB, Json } from '../db-types.js';
@@ -24,6 +27,7 @@ type PostgresKyselyStorage = { db: Kysely<DB> };
 import { jsonb } from '../helpers.js';
 
 function toRow(r: Selectable<AiDecisionTable>): AiDecisionRow {
+  const record = r.record as unknown as AiDecisionRecord;
   return {
     id: r.id,
     ownerGhii: r.ownerGhii,
@@ -33,7 +37,12 @@ function toRow(r: Selectable<AiDecisionTable>): AiDecisionRow {
     cacheKey: r.cacheKey,
     model: r.model,
     createdAt: r.createdAt,
-    record: r.record as unknown as AiDecisionRecord,
+    rule: r.rule ?? null,
+    ruleVersion: r.ruleVersion ?? null,
+    outcome: (r.outcome as AiDecisionOutcome | null) ?? null,
+    // A row written before the column existed carries its scope in the document only.
+    keyScope: (r.keyScope as AiDecisionKeyScope | null) ?? record.keyScope ?? 'node',
+    record,
   };
 }
 
@@ -53,6 +62,10 @@ export const aiDecisionMethods = {
       cacheKey: row.cacheKey,
       model: row.model,
       createdAt: row.createdAt,
+      rule: row.rule,
+      ruleVersion: row.ruleVersion,
+      outcome: row.outcome,
+      keyScope: row.keyScope,
       // jsonb() yields a `<json>::jsonb` SQL fragment; kysely-codegen types the column as the
       // VALUE it reads back, so the fragment needs one narrowing cast on the way in.
       record: jsonb(row.record) as unknown as Json,
@@ -88,6 +101,8 @@ export const aiDecisionMethods = {
     let base = this.db.selectFrom('AiDecision').where('ownerGhii', '=', query.ownerGhii);
     if (query.subject !== undefined) base = base.where('subject', '=', query.subject);
     if (query.appId !== undefined) base = base.where('appId', '=', query.appId);
+    if (query.rule !== undefined) base = base.where('rule', '=', query.rule);
+    if (query.principal !== undefined) base = base.where('principal', '=', query.principal);
 
     const counted = await base.select(sql<string>`COUNT(*)`.as('n')).executeTakeFirst();
     let page = base.selectAll();
@@ -111,6 +126,41 @@ export const aiDecisionMethods = {
       .where('ownerGhii', '=', ownerGhii)
       .executeTakeFirst();
     return Number(res.numUpdatedRows) > 0;
+  },
+
+  async aiDecisionStats(
+    this: PostgresKyselyStorage, query: AiDecisionStatsQuery, groupBy: 'rule' | 'principal',
+  ): Promise<AiDecisionStatsGroup[]> {
+    let base = this.db.selectFrom('AiDecision').where('ownerGhii', '=', query.ownerGhii);
+    if (query.rule !== undefined) base = base.where('rule', '=', query.rule);
+    if (query.principal !== undefined) base = base.where('principal', '=', query.principal);
+    if (groupBy === 'rule') base = base.where('rule', 'is not', null);
+    const rows = await base
+      .select([
+        sql<string | null>`${sql.ref(groupBy)}`.as('k'),
+        sql<string>`COUNT(*)`.as('decisions'),
+        sql<string>`COUNT(*) FILTER (WHERE "outcome" = 'act')`.as('act'),
+        sql<string>`COUNT(*) FILTER (WHERE "outcome" = 'ask')`.as('ask'),
+        sql<string>`COUNT(*) FILTER (WHERE "outcome" = 'stop')`.as('stop'),
+        sql<string>`COUNT(*) FILTER (WHERE "record"->'gate'->>'stopped' = 'true')`.as('gateStops'),
+        sql<string>`COUNT(*) FILTER (WHERE "record"->'review'->>'outcome' = 'overridden')`.as('overridden'),
+        sql<string>`COUNT(*) FILTER (WHERE "record"->'review'->>'outcome' = 'confirmed')`.as('confirmed'),
+        sql<string>`COALESCE(SUM(("record"->'usage'->>'costUsd')::double precision), 0)`.as('costUsd'),
+        sql<string | null>`MAX("createdAt")`.as('lastAt'),
+      ])
+      .groupBy(groupBy)
+      .execute();
+    // COUNT() and SUM() come back as strings on this driver.
+    return rows.map(r => ({
+      key: r.k ?? '',
+      decisions: Number(r.decisions ?? 0),
+      outcomes: { act: Number(r.act ?? 0), ask: Number(r.ask ?? 0), stop: Number(r.stop ?? 0) },
+      gateStops: Number(r.gateStops ?? 0),
+      overridden: Number(r.overridden ?? 0),
+      confirmed: Number(r.confirmed ?? 0),
+      costUsd: Number(r.costUsd ?? 0),
+      lastAt: r.lastAt ?? null,
+    }));
   },
 
   async deleteAiDecisionsBefore(this: PostgresKyselyStorage, before: string): Promise<number> {

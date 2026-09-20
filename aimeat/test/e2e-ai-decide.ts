@@ -81,9 +81,11 @@ function readBody(req: IncomingMessage): Promise<string> {
   });
 }
 
-/** Answers every question by its type, the way the real service shapes an answer. */
-function answerFor(q: any): any {
-  if (q.type === 'noul') return { type: 'noul', noul: 0.91 };
+/** Answers every question by its type, the way the real service shapes an answer. A state that
+ *  carries the word UNSURE gets a middling yes/no, and one with HOPELESS a low one, so a rule's
+ *  bands have something to cut. */
+function answerFor(q: any, state: string): any {
+  if (q.type === 'noul') return { type: 'noul', noul: state.includes('HOPELESS') ? 0.2 : state.includes('UNSURE') ? 0.6 : 0.91 };
   if (q.type === 'choice') {
     const opts = Object.keys(q.criteria);
     const probs = Object.fromEntries(opts.map((o, i) => [o, i === 0 ? 0.9 : 0.1 / (opts.length - 1)]));
@@ -108,7 +110,8 @@ async function startStub(): Promise<{ server: Server; url: string }> {
       res.end(JSON.stringify({ detail: 'refused by the stub' }));
       return;
     }
-    const answers = Object.fromEntries(Object.entries(body.questions ?? {}).map(([id, q]) => [id, answerFor(q)]));
+    const stateText = JSON.stringify(body.state ?? '');
+    const answers = Object.fromEntries(Object.entries(body.questions ?? {}).map(([id, q]) => [id, answerFor(q, stateText)]));
     res.writeHead(200, { 'content-type': 'application/json', 'x-typesafe-request-id': `req-${seen.length}` });
     res.end(JSON.stringify({ model: body.model, answers, usage: { input_tokens: 1200, output_tokens: 40 } }));
   });
@@ -498,6 +501,244 @@ const QUESTIONS = {
     const src = await res.text();
     assert(res.status === 200 && src.includes('decide'), `lib ${res.status}`);
     assert(!src.includes(NODE_KEY) && !src.includes(OWN_KEY), 'no key in the served library');
+  });
+
+  console.log('\nPhase 7: a decision rule, written once and run by name');
+
+  const RULE = {
+    title: 'Send the reply without a person reading it',
+    decides: 'whether the drafted reply goes out on its own',
+    sends: ['draft', 'question'],
+    questions: { good: { type: 'noul', instructions: 'The draft answers the question fully and politely.' } },
+    thresholds: { good: 0.5 },
+    bands: { act: 0.85, ask: 0.5 },
+    use: 'agent',
+    gate: false,
+    sample: { draft: 'Thank you, the invoice is attached.', question: 'Where is my invoice?' },
+  };
+  const put = (id: string, body: unknown, token = A.token) =>
+    json(`/v1/ai/decide/rules/${id}`, { method: 'PUT', headers: auth(token), body: JSON.stringify(body) });
+  const runRule = (token: string, rule: string, state: unknown, extra: Record<string, unknown> = {}) =>
+    json('/v1/ai/decide', { method: 'POST', headers: auth(token), body: JSON.stringify({ rule, state, cache: false, ...extra }) });
+
+  await test('7a. a rule with bands out of order, or a threshold naming no question, is refused with every problem', async () => {
+    const r = await put('send-reply', { ...RULE, bands: { act: 0.4, ask: 0.6 }, thresholds: { nosuch: 0.5 } });
+    assert(r.status === 400 && r.body.error?.code === 'INVALID_RULE', `got ${r.status} ${JSON.stringify(r.body.error)}`);
+    const codes = (r.body.error.details?.problems ?? []).map((p: any) => p.code);
+    assert(codes.includes('BANDS_NOT_ORDERED') && codes.includes('UNKNOWN_QUESTION'), `both problems named, got ${codes}`);
+  });
+  await test('7b. the owner writes a rule; an agent and another owner cannot', async () => {
+    const asAgent = await put('send-reply', RULE, agentAi);
+    assert(asAgent.status === 403, `an agent may not write a rule, got ${asAgent.status}`);
+    const r = await put('send-reply', RULE);
+    assert(r.status === 201 && r.body.data.rule.version === 1, `got ${r.status} ${JSON.stringify(r.body.error ?? r.body.data)}`);
+    const other = await json('/v1/ai/decide/rules/send-reply', { headers: auth(B.token) });
+    assert(other.status === 404, `another owner does not see it, got ${other.status}`);
+  });
+  await test('7c. the version is bumped by a question change, and not by tuning a threshold', async () => {
+    const tuned = await put('send-reply', { ...RULE, thresholds: { good: 0.55 } });
+    assert(tuned.status === 200 && tuned.body.data.rule.version === 1, `tuning keeps the version, got ${tuned.body.data?.rule?.version}`);
+    const reworded = await put('send-reply', { ...RULE, questions: { good: { type: 'noul', instructions: 'The draft fully answers the question and is polite.' } } });
+    assert(reworded.body.data.rule.version === 2, `a new wording is version 2, got ${reworded.body.data?.rule?.version}`);
+  });
+  let ruleDecision = '';
+  await test('7d. an agent runs it by name: the record carries the rule, its version and the outcome', async () => {
+    const r = await runRule(agentAi, 'send-reply', RULE.sample, { subject: 'ticket.1' });
+    assert(r.status === 200, `got ${r.status} ${JSON.stringify(r.body.error)}`);
+    const d = r.body.data;
+    ruleDecision = d.decision_id;
+    assert(d.rule?.id === 'send-reply' && d.rule?.version === 2, `rule on the answer, got ${JSON.stringify(d.rule)}`);
+    assert(d.outcome === 'act' && d.proceed === true && d.passed?.good === true, `0.91 is in the act band, got ${d.outcome}`);
+    assert(JSON.stringify(seen[seen.length - 1].body.questions) === JSON.stringify(RULE.questions).replace('answers the question fully and politely', 'fully answers the question and is polite'),
+      'the questions that left the node are the rule\'s own');
+    const rec = (await json(`/v1/ai/decisions/${ruleDecision}`, { headers: auth(A.token) })).body.data;
+    assert(rec.rule === 'send-reply' && rec.ruleVersion === 2 && rec.outcome === 'act', `columns, got ${rec.rule} ${rec.ruleVersion} ${rec.outcome}`);
+    assert(rec.record.thresholds?.good === 0.5 && rec.record.bands?.act === 0.85 && rec.record.gates === RULE.decides, 'thresholds, bands and what it gates are the rule\'s');
+  });
+  await test('7e. a caller may not override the rule: questions, thresholds or bands beside it are refused unsent', async () => {
+    const before = seen.length;
+    for (const extra of [{ questions: QUESTIONS }, { thresholds: { good: 0.01 } }, { bands: { act: 0, ask: 0 } }]) {
+      const r = await runRule(agentAi, 'send-reply', RULE.sample, extra);
+      assert(r.status === 400 && r.body.error?.code === 'RULE_FIXES_QUESTIONS', `${Object.keys(extra)[0]}: got ${r.status} ${r.body.error?.code}`);
+    }
+    const outside = await runRule(agentAi, 'send-reply', { ...RULE.sample, customerEmail: EMAIL });
+    assert(outside.status === 400 && outside.body.error?.code === 'STATE_OUTSIDE_RULE', `a field the rule does not send, got ${outside.status} ${outside.body.error?.code}`);
+    assert(seen.length === before, 'nothing reached the provider');
+  });
+  await test('7f. the use lock: a rule for agents refuses an app, and a rule for apps refuses an agent', async () => {
+    const before = seen.length;
+    const app = await runRule(appToken, 'send-reply', RULE.sample);
+    assert(app.status === 403 && app.body.error?.code === 'RULE_NOT_FOR_CALLER', `app on an agent rule, got ${app.status} ${app.body.error?.code}`);
+    const mk = await put('app-only', { ...RULE, title: 'App only', use: 'app' });
+    assert(mk.status === 201, `put app-only ${mk.status}`);
+    const agent = await runRule(agentAi, 'app-only', RULE.sample);
+    assert(agent.status === 403 && agent.body.error?.code === 'RULE_NOT_FOR_CALLER', `agent on an app rule, got ${agent.status} ${agent.body.error?.code}`);
+    assert(seen.length === before, 'neither reached the provider');
+    const okApp = await runRule(appToken, 'app-only', RULE.sample);
+    assert(okApp.status === 200 && okApp.body.data.outcome === 'act', `the app runs its own kind, got ${okApp.status} ${JSON.stringify(okApp.body.error)}`);
+    const list = await json('/v1/ai/decide/rules', { headers: auth(agentAi) });
+    const ids = (list.body.data.rules ?? []).map((x: any) => x.id);
+    assert(ids.includes('send-reply') && !ids.includes('app-only'), `an agent is shown only what it may run, got ${ids}`);
+    const missing = await runRule(agentAi, 'no-such-rule', RULE.sample);
+    assert(missing.status === 404 && missing.body.error?.code === 'RULE_NOT_FOUND', `got ${missing.status}`);
+  });
+  await test('7g. the owner tries a rule on its sample, and a try is not counted as the rule\'s decision', async () => {
+    const before = (await json('/v1/ai/decisions?rule=send-reply', { headers: auth(A.token) })).body.data.total;
+    const r = await json('/v1/ai/decide/rules/send-reply/try', { method: 'POST', headers: auth(A.token), body: '{}' });
+    assert(r.status === 200 && r.body.data.outcome === 'act', `got ${r.status} ${JSON.stringify(r.body.error ?? r.body.data?.outcome)}`);
+    const after = (await json('/v1/ai/decisions?rule=send-reply', { headers: auth(A.token) })).body.data.total;
+    assert(after === before, `the try is not among the rule's decisions (${before} then ${after})`);
+    const agentTry = await json('/v1/ai/decide/rules/send-reply/try', { method: 'POST', headers: auth(agentAi), body: '{}' });
+    assert(agentTry.status === 403, `an agent may not run the owner's try, got ${agentTry.status}`);
+  });
+
+  console.log('\nPhase 8: an agent proposes a rule, and nothing exists until the owner approves');
+
+  let proposalId = '';
+  await test('8a. a proposal creates no rule and lands on the owner\'s open-items list', async () => {
+    const r = await json('/v1/ai/decide/rule-proposals', {
+      method: 'POST', headers: auth(agentAi),
+      body: JSON.stringify({ rule: { ...RULE, id: 'refund-ok', title: 'Refund without asking', use: 'agent' }, reason: 'Small refunds wait a day for a person today.' }),
+    });
+    assert(r.status === 202, `got ${r.status} ${JSON.stringify(r.body.error)}`);
+    proposalId = r.body.data.proposal_id;
+    const rule = await json('/v1/ai/decide/rules/refund-ok', { headers: auth(A.token) });
+    assert(rule.status === 404, `no rule was created, got ${rule.status}`);
+    const run = await runRule(agentAi, 'refund-ok', RULE.sample);
+    assert(run.status === 404, `and it cannot be run, got ${run.status}`);
+    const items = await json('/v1/open-items', { headers: auth(A.token) });
+    assert((items.body.data.items ?? []).some((i: any) => i.object?.type === 'decision-rule-proposal' && i.object?.id === proposalId),
+      'the owner\'s list carries the proposal');
+    const bad = await json('/v1/ai/decide/rule-proposals', {
+      method: 'POST', headers: auth(agentAi), body: JSON.stringify({ rule: { ...RULE, id: 'bad', bands: { act: 0.1, ask: 0.9 } }, reason: 'A rule the node would refuse.' }),
+    });
+    assert(bad.status === 400 && bad.body.error?.code === 'INVALID_RULE', `an invalid proposal never reaches the owner, got ${bad.status}`);
+    const asApp = await json('/v1/ai/decide/rule-proposals', {
+      method: 'POST', headers: auth(appToken), body: JSON.stringify({ rule: { ...RULE, id: 'from-app' }, reason: 'An app has no business proposing rules.' }),
+    });
+    assert(asApp.status === 403, `an app may not propose, got ${asApp.status}`);
+  });
+  await test('8b. the agent cannot approve its own proposal; the owner\'s press creates the rule', async () => {
+    const self = await json(`/v1/ai/decide/rule-proposals/${proposalId}/approve`, { method: 'POST', headers: auth(agentAi), body: '{}' });
+    assert(self.status === 403, `got ${self.status}`);
+    const other = await json(`/v1/ai/decide/rule-proposals/${proposalId}/approve`, { method: 'POST', headers: auth(B.token), body: '{}' });
+    assert(other.status === 404, `another owner, got ${other.status}`);
+    const ok = await json(`/v1/ai/decide/rule-proposals/${proposalId}/approve`, { method: 'POST', headers: auth(A.token), body: '{}' });
+    assert(ok.status === 201 && ok.body.data.rule.id === 'refund-ok', `got ${ok.status} ${JSON.stringify(ok.body.error)}`);
+    const run = await runRule(agentAi, 'refund-ok', RULE.sample);
+    assert(run.status === 200, `now it runs, got ${run.status}`);
+    const items = await json('/v1/open-items', { headers: auth(A.token) });
+    assert(!(items.body.data.items ?? []).some((i: any) => i.object?.id === proposalId), 'the item is closed');
+  });
+
+  console.log('\nPhase 9: the gate, per agent, off by default');
+
+  const gateItems = async () => ((await json('/v1/open-items', { headers: auth(A.token) })).body.data.items ?? [])
+    .filter((i: any) => i.object?.type === 'ai-decision');
+  await test('9a. switched off, a sub-threshold answer is recorded and the agent may proceed; nothing lands on the list', async () => {
+    const r = await runRule(agentAi, 'send-reply', { draft: 'UNSURE draft', question: 'q' });
+    assert(r.status === 200 && r.body.data.outcome === 'ask', `0.6 is in the ask band, got ${r.body.data?.outcome}`);
+    assert(r.body.data.proceed === true && r.body.data.gate?.on === false, `ungated, got ${JSON.stringify(r.body.data.gate)}`);
+    const rec = (await json(`/v1/ai/decisions/${r.body.data.decision_id}`, { headers: auth(A.token) })).body.data;
+    assert(rec.outcome === 'ask' && rec.record.gate === undefined, 'recorded, with no gate');
+    assert((await gateItems()).length === 0, 'no task for the owner');
+  });
+  await test('9b. only the owner switches it; switched on, the same answer becomes a task and the agent is told not to proceed', async () => {
+    const byAgent = await json('/v1/agents/deciderbot/ai-keys', { method: 'PUT', headers: auth(agentAi), body: JSON.stringify({ gate: 'on' }) });
+    assert(byAgent.status === 403, `an agent may not open its own gate, got ${byAgent.status}`);
+    const on = await json('/v1/agents/deciderbot/ai-keys', { method: 'PUT', headers: auth(A.token), body: JSON.stringify({ gate: 'on' }) });
+    assert(on.status === 200 && on.body.data.gate === 'on', `got ${on.status} ${JSON.stringify(on.body.error ?? on.body.data)}`);
+    const r = await runRule(agentAi, 'send-reply', { draft: 'UNSURE second draft', question: 'q' }, { subject: 'ticket.2' });
+    assert(r.status === 200 && r.body.data.outcome === 'ask' && r.body.data.proceed === false, `got ${JSON.stringify(r.body.data)}`);
+    assert(r.body.data.gate?.on === true && r.body.data.gate?.stopped === true && typeof r.body.data.gate?.task === 'string', 'the gate stopped it and names the task');
+    const items = await gateItems();
+    assert(items.length === 1 && items[0].object.id === r.body.data.decision_id, `one task, about this decision, got ${items.length}`);
+    const low = await runRule(agentAi, 'send-reply', { draft: 'HOPELESS draft', question: 'q' });
+    assert(low.body.data.outcome === 'stop' && low.body.data.proceed === false, `under its floor is stop, got ${low.body.data?.outcome}`);
+    const fine = await runRule(agentAi, 'send-reply', { draft: 'A good draft', question: 'q' });
+    assert(fine.body.data.outcome === 'act' && fine.body.data.proceed === true && fine.body.data.gate?.stopped === false, 'an answer in the act band passes the gate');
+  });
+  await test('9c. the quality numbers count decisions, gate stops and overrides, per rule and per agent', async () => {
+    await json(`/v1/ai/decisions/${ruleDecision}/review`, { method: 'POST', headers: auth(A.token), body: JSON.stringify({ outcome: 'overridden' }) });
+    const s = await json('/v1/ai/decisions/stats?group_by=rule&rule=send-reply', { headers: auth(A.token) });
+    assert(s.status === 200, `got ${s.status} ${JSON.stringify(s.body.error)}`);
+    const g = s.body.data.groups[0];
+    assert(g.key === 'send-reply' && g.decisions === 5, `five decisions by the rule, got ${JSON.stringify(g)}`);
+    assert(g.gateStops === 2 && g.overridden === 1 && g.outcomes.ask === 2 && g.outcomes.stop === 1, `counts, got ${JSON.stringify(g)}`);
+    const agentGaii = `deciderbot#${A.gaii}`;
+    const pa = await json(`/v1/ai/decisions/stats?group_by=principal&principal=${encodeURIComponent(agentGaii)}`, { headers: auth(A.token) });
+    assert(pa.body.data.groups[0]?.gateStops === 2, `the agent's own numbers, got ${JSON.stringify(pa.body.data.groups)}`);
+    const theirs = await json('/v1/ai/decisions/stats?group_by=rule', { headers: auth(B.token) });
+    assert(theirs.body.data.groups.length === 0, 'another owner counts nothing of this');
+  });
+
+  console.log('\nPhase 10: a key per agent');
+
+  const AGENT_KEY = 'ts-agent-key-e2e-0003';
+  await test('10a. the agent\'s own key pays, the record says so, and no door returns it', async () => {
+    const set = await json('/v1/agents/deciderbot/ai-keys', {
+      method: 'PUT', headers: auth(A.token), body: JSON.stringify({ decide: { api_key: AGENT_KEY, key_env: 'TYPESAFE_API_KEY' } }),
+    });
+    assert(set.status === 200 && set.body.data.decide.has_key === true && set.body.data.decide.key_env === 'TYPESAFE_API_KEY', `got ${set.status} ${JSON.stringify(set.body.error ?? set.body.data)}`);
+    assert(!JSON.stringify(set.body).includes(AGENT_KEY), 'the key is not echoed');
+    const r = await runRule(agentAi, 'send-reply', { draft: 'Paid by the agent', question: 'q' });
+    assert(r.status === 200 && r.body.data.key_source === 'agent', `got ${r.status} ${r.body.data?.key_source}`);
+    assert(seen[seen.length - 1].auth === `Bearer ${AGENT_KEY}`, 'the agent\'s key was sent to the provider');
+    const rec = (await json(`/v1/ai/decisions/${r.body.data.decision_id}`, { headers: auth(A.token) })).body.data;
+    assert(rec.keyScope === 'agent' && rec.record.keyScope === 'agent', `key_scope on the record, got ${rec.keyScope}`);
+    const ownerCall = await runRule(A.token, 'send-reply', { draft: 'Asked by the owner', question: 'q' });
+    assert(ownerCall.body.data.key_source === 'node', `the owner's own call does not use an agent's key, got ${ownerCall.body.data?.key_source}`);
+    const otherAgent = await json('/v1/ai/decide', { method: 'POST', headers: auth(agentNoAi), body: JSON.stringify({ state: 'x', questions: { q: QUESTIONS.urgent } }) });
+    assert(otherAgent.status === 403, 'another agent still needs ai:use');
+  });
+  await test('10b. the key is unreadable through every door: its own view, the memory doors, search and export', async () => {
+    const recKey = 'decide.apikey.agent.deciderbot';
+    const doors = [
+      await json('/v1/agents/deciderbot/ai-keys', { headers: auth(A.token) }),
+      await json('/v1/agents/deciderbot/ai-keys', { headers: auth(agentAi) }),
+      await json(`/v1/memory/${recKey}`, { headers: auth(A.token) }),
+      await json(`/v1/memory?prefix=decide.apikey`, { headers: auth(A.token) }),
+      await json(`/v1/memory/search?q=${encodeURIComponent('decide.apikey')}`, { headers: auth(A.token) }),
+      await json('/v1/memory/export', { headers: auth(A.token) }),
+      await json('/v1/ai/decide/settings', { headers: auth(agentAi) }),
+    ];
+    for (const [i, d] of doors.entries()) {
+      const raw = JSON.stringify(d.body);
+      assert(!raw.includes(AGENT_KEY), `door ${i} returned the key`);
+      assert(!/"encrypted"\s*:/.test(raw), `door ${i} returned the ciphertext`);
+    }
+    assert(doors[1].status === 200 && doors[1].body.data.decide.key_env === 'TYPESAFE_API_KEY', 'the agent is told the NAME of the variable, never the key');
+    const write = await json(`/v1/memory/${recKey}`, { method: 'PUT', headers: auth(A.token), body: JSON.stringify({ value: { encrypted: 'x' }, version: 1 }) });
+    assert(write.status === 403 && write.body.error?.code === 'SECRET_RECORD', `the generic memory door refuses to write it, got ${write.status}`);
+    const sibling = await json('/v1/agents/deciderbot/ai-keys', { headers: auth(agentNoAi) });
+    assert(sibling.status === 403, `a sibling agent may not read another agent's settings, got ${sibling.status}`);
+    const stranger = await json('/v1/agents/deciderbot/ai-keys', { headers: auth(B.token) });
+    assert(stranger.status === 404, `another owner, got ${stranger.status}`);
+  });
+  await test('10c. a key name that is a key is refused, and the owner tests the agent\'s key', async () => {
+    const bad = await json('/v1/agents/deciderbot/ai-keys', { method: 'PUT', headers: auth(A.token), body: JSON.stringify({ decide: { key_env: 'ts-live-abcdef123456' } }) });
+    assert(bad.status === 400, `got ${bad.status}`);
+    const before = seen.length;
+    const t = await json('/v1/agents/deciderbot/ai-keys/decide/test', { method: 'POST', headers: auth(A.token), body: '{}' });
+    assert(t.status === 200 && t.body.data.ok === true && t.body.data.key_source === 'agent', `got ${t.status} ${JSON.stringify(t.body.data ?? t.body.error)}`);
+    assert(seen.length === before + 1 && seen[seen.length - 1].auth === `Bearer ${AGENT_KEY}`, 'one call, on the agent\'s key');
+  });
+  await test('10d. the per-agent daily cap refuses the agent and nobody else, before anything is sent', async () => {
+    const cap = await json('/v1/agents/deciderbot/ai-keys', { method: 'PUT', headers: auth(A.token), body: JSON.stringify({ daily_usd: 0 }) });
+    assert(cap.status === 200 && cap.body.data.daily_usd === 0, `got ${cap.status}`);
+    const before = seen.length;
+    const r = await runRule(agentAi, 'send-reply', { draft: 'Over the cap', question: 'q' });
+    assert(r.status === 402 && r.body.error?.code === 'AGENT_QUOTA_EXHAUSTED', `got ${r.status} ${JSON.stringify(r.body.error)}`);
+    assert(seen.length === before, 'the stub was not called');
+    const owner = await runRule(A.token, 'send-reply', { draft: 'The owner is not capped by it', question: 'q' });
+    assert(owner.status === 200, `got ${owner.status}`);
+    await json('/v1/agents/deciderbot/ai-keys', { method: 'PUT', headers: auth(A.token), body: JSON.stringify({ daily_usd: null }) });
+  });
+  await test('10e. forgetting the agent\'s key moves the next call down the order, to the node\'s key', async () => {
+    const del = await json('/v1/agents/deciderbot/ai-keys/decide', { method: 'DELETE', headers: auth(A.token) });
+    assert(del.status === 200 && del.body.data.decide.has_key === false, `got ${del.status}`);
+    const r = await runRule(agentAi, 'send-reply', { draft: 'Back on the node key', question: 'q' });
+    assert(r.status === 200 && r.body.data.key_source === 'node', `falls back to the node's key, got ${r.body.data?.key_source}`);
   });
 
   await stopServer(server);
