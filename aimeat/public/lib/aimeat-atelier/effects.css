@@ -17,6 +17,8 @@
  *   .ak-fx-glitch · .ak-fx-ripple · the moment children (.ak-fx__band, .ak-fx__glitch-band)
  * @usage  @import url('./aimeat-atelier/effects.css'); from aimeat-atelier.css
  * @version-history
+ *   v0.48.1 — 2026-09-20 — The four effects that make their element a positioning context leave
+ *     the hero's picture alone: it was collapsing to 0 × 0 under them.
  *   v0.48.0 — 2026-09-05 — Initial (wish-atelier-post-process-effects, stage 3).
  */
 
@@ -35,10 +37,15 @@
   --ak-fx-filter: none;
   isolation: isolate;
 }
-.ak-fx-scanlines,
-.ak-fx-vignette,
-.ak-fx-vhs,
-.ak-fx-glitch {
+/* NOT ON THE HERO'S PICTURE. That element is `position: absolute; inset: 0` (shell.css): it is
+   already the positioning context an overlay needs, and `relative` here, loaded later, won the
+   cascade and turned it into an inline span of 0 × 0. A hero WITH a picture that wore any of these
+   four showed no picture and no effect, which is how the Design Book's effects looked on
+   2026-09-20 (measured: .ak-hero__image at 0 × 0 with the image loaded and set). */
+.ak-fx-scanlines:not(.ak-hero__image),
+.ak-fx-vignette:not(.ak-hero__image),
+.ak-fx-vhs:not(.ak-hero__image),
+.ak-fx-glitch:not(.ak-hero__image) {
   position: relative;
 }
 .ak-fx-vhs,
