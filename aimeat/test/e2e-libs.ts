@@ -1212,7 +1212,10 @@ await test('GET /v1/libs/aimeat-atelier.js — one named network call, and no ha
     const paths = code.match(/\/v1\/[a-z-]+/g) || [];
     assert(paths.length > 0 && paths.every((p) => p === '/v1/apps'),
         `the only node API path is the layout read under /v1/apps — found: ${[...new Set(paths)].join(', ')}`);
-    assert(/["']\/ui["']/.test(code), 'the one API call targets the /ui layout record');
+    // `/ui` and whatever follows it in the same string: the read asks for the arrangement alone
+    // now (`/ui?catalogue=none`), so the path stopped being a string of its own. What is asserted
+    // is still the same thing — the one API call goes to the layout record.
+    assert(/["']\/ui(\?[^"']*)?["']/.test(code), 'the one API call targets the /ui layout record');
     // THE THEMING CONTRACT. Every colour is a CSS variable; a hex in the JS cannot be re-skinned.
     assert(!/#[0-9a-fA-F]{6}\b/.test(code), 'must not hardcode a colour in JavaScript');
     assert(!/rgba?\s*\(\s*\d/.test(code), 'must not hardcode a colour in JavaScript');
