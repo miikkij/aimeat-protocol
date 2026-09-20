@@ -215,7 +215,11 @@ export const TASKS: Task[] = [
         // app a measured build left behind (one with `made` rows its owner has not kept), so it runs on
         // a sandbox that has run `build-tracker`, and each run takes the next such app.
         // PASS: the owner's word is recorded AND at least one component from that app is proposed with
-        // a judgement. Whether the judgements are SENSIBLE is read by a person from the note.
+        // a judgement, or the owner is told the Book already holds what the app made. Whether the
+        // judgements are SENSIBLE is read by a person from the note.
+        // MEASURED 2026-09-20, Opus, three runs each: 0/3 recorded the owner's word before the MCP
+        // instructions named aimeat_designbook_keep (each thanked the person and called nothing);
+        // 3/3 after, with four components published and one run rightly declining a duplicate.
         // Added 2026-09-20. By name only.
         id: 'keep-app',
         byNameOnly: true,
@@ -246,8 +250,12 @@ export const TASKS: Task[] = [
                 if (b?.from_app === filename) from.push(`${row.id} [${b.judgement?.reach}, ${one.data?.part.status}] "${b.judgement?.why}"`);
             }
             const refused = ctx.metrics.toolCalls.filter(c => /designbook_propose/.test(c.name) && c.isError).length;
-            const ok = kept && from.length > 0;
-            const detail = ok ? `the owner's word is recorded and ${from.length} component(s) came out of ${filename}`
+            // Offering nothing is right when the shelf already holds the part, IF the owner is told so:
+            // the first measured run declined to put a second week grid beside the one on the shelf.
+            const declined = from.length === 0 && /already (has|holds|carries|on the shelf)|duplicate|second,? near-identical|same thing/i.test(ctx.metrics.finalText);
+            const ok = kept && (from.length > 0 || declined);
+            const detail = ok ? (declined ? `the owner's word is recorded, and nothing was offered because the Book already holds what ${filename} made, which the owner was told`
+                : `the owner's word is recorded and ${from.length} component(s) came out of ${filename}`)
                 : !kept ? `the owner's word about ${filename} was not recorded (aimeat_designbook_keep)` : `kept, and nothing from ${filename} was offered to the Book`;
             return { ok, detail, note: `made by hand: ${made.map(m => m.name).join(', ') || 'nothing'}; offered: ${from.join(' · ') || 'nothing'}; proposals the bench refused on the way: ${refused}; the owner was told what went onto the shelf: ${/shelf|Design Book|component/i.test(ctx.metrics.finalText) ? 'yes' : 'NO'}` };
         },
