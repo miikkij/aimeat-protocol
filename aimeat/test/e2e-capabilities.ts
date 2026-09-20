@@ -961,10 +961,16 @@ await test('Webhooks disabled: refused with AND without `source`, and nothing is
     }
 });
 
-// The allowlist branch is a boot-time setting, so it needs a node of its own. The port is derived
-// from this suite's own so two suites running side by side cannot land on the same one.
-const ALT_PORT = String(Number(new URL(BASE).port || '80') + 500);
-const ALT_BASE = `http://localhost:${ALT_PORT}`;
+// The allowlist branch is a boot-time setting, so it needs a node of its own, and its port is
+// derived from this suite's so that two lanes cannot land on the same one.
+//
+// A BLOCK OF ITS OWN, NOT AN OFFSET. `+ 500` and e2e-capability-webhook-update's `+ 501` looked
+// separate and were not: lane ports are consecutive, so lane 1 (40501 + 501) and lane 2
+// (40502 + 500) both came out 41002 and raced for it. That is the EADDRINUSE the sweep of
+// 2026-09-20 reported at last, after the boot wait learned to say why a node exited. 41000-41099
+// belongs to this suite alone and 41100-41199 to that one, whatever port each lane was given.
+const ALT_PORT = String(41000 + Number(new URL(BASE).port || '80') % 100);
+const ALT_BASE = `http://127.0.0.1:${ALT_PORT}`;
 const ALT_DB = resolve(process.cwd(), `test/.caps-allowlist-${ALT_PORT}.db`);
 let altNode: ChildProcess | null = null;
 let altToken = '';
