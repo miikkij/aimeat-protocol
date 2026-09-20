@@ -450,7 +450,7 @@
     },
     {
       "id": "fonts",
-      "name": "Baloo 2, Bangers, Inter, Archivo, Archivo Black, Space Grotesk, Fraunces, JetBrains Mono, Fjalla One, DM Sans, VT323",
+      "name": "Baloo 2, Bangers, Inter, Archivo, Archivo Black, Space Grotesk, Fraunces, JetBrains Mono, Fjalla One, DM Sans, VT323, Bungee",
       "version": "see fonts/LICENSE.md",
       "spdx": "OFL-1.1",
       "copyright": "see fonts/LICENSE.md for the copyright holder of each family",

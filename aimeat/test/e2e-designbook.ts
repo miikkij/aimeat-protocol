@@ -923,15 +923,21 @@ const GOOD_BODY = {
             `NO_LAYOUT with the app-code way out: ${bareApp.status} ${JSON.stringify(bareApp.body?.error)}`);
     });
 
-    await test('an EFFECT part previews as the demo arrangement wearing it where it lands: a moment gets a Play control, a pass rides the layer', async () => {
+    // 2026-09-20: this asserted the demo arrangement (a figure beside the hero). The stage changed on
+    // purpose (preview-stages.ts): an effect is shown on the ONE block it lands on, over a picture,
+    // and a pass over the layer on the layer alone at a strength that is said.
+    await test('an EFFECT part previews on the one thing it lands on: the band over a picture with a Play control for a moment, the layer alone for a pass', async () => {
         const res = await fetch(`${BASE}/v1/designbook/${effectId}/preview`);
         assert(res.status === 200 && (res.headers.get('content-type') ?? '').includes('text/html'), `preview ${res.status}`);
         const page = await res.text();
         assert(/"component":"hero"[^}]*\}[^}]*"effect":\{"id":"glitch"/.test(page) || /"effect":\{"id":"glitch","params":\{"strength":0\.8\}\}/.test(page), 'the hero block wears the effect');
-        assert(/"component":"figure"/.test(page) && /"look":"broadcast"/.test(page), 'the demo arrangement carries a figure, on the part\'s own look');
-        assert(/data-ak-fx-play/.test(page), 'a moment gets a real Play control in the frame');
+        assert(!/"component":"figure"/.test(page) && !/"component":"list"/.test(page) && /"look":"broadcast"/.test(page), 'nothing stands beside the band, and it is on the part\'s own look');
+        assert(/"image":"\/img\//.test(page) && /"__stage":"worn"/.test(page), 'the band carries a real picture for the effect to work on');
+        assert(/data-ak-fx-play/.test(page) && page.includes('Play the effect'), 'a moment gets a real Play control in the frame');
+        assert(/\.dbp-frame \{[^}]*background-color: var\(--ak-bg\)/.test(page), 'the frame paints the look\'s ground');
         const layerPage = await (await fetch(`${BASE}/v1/designbook/${effectId}-layer/preview`)).text();
         assert(/"post":\[\{"id":"kaleidoscope"\}\]/.test(layerPage) && /"preset":"waves"/.test(layerPage), `a pass rides the look's own ambient: ${layerPage.match(/"ambient":\{[^}]*\}/)?.[0]}`);
+        assert(/"__stage":"layer"/.test(layerPage) && /"alpha":0\.\d/.test(layerPage) && !/"component":"(list|statRow|cardGrid)"/.test(layerPage), 'the layer stands alone, at a strength that is said');
     });
 
     await test('a fresh node\'s EFFECTS shelf is never empty: the nine effects are seeded published, each where the registry says it lands', async () => {
