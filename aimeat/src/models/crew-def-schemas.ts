@@ -16,6 +16,8 @@
  *   const check = validateCortexAgents(req.body.cortex?.agents);
  *   if (!check.ok) return res.status(400).json(error(..., check.errors.join('; ')));
  * @version-history
+ *   v1.1.0 — 2026-09-20 — A tool id may carry ONE ':' so a decision rule can be named
+ *     (`decide:<rule>`). The charset refused it, and that form is what the Crew tab offers.
  *   v1.0.0 — 2026-07-16 — Initial creation (Agent-Bundled Apps Slice 1, node side)
  */
 import { z } from 'zod';
@@ -23,12 +25,22 @@ import { z } from 'zod';
 /**
  * One crew member. `tools`/`skills` are NAMES resolved fleet-side against the vetted
  * forge_catalog / local skills dir — the node validates only shape + a safe charset.
+ *
+ * THE COLON IS A SELECTOR, and exactly one of them is allowed. A few tools take a parameter
+ * rather than being one fixed thing: `decide` is every decision rule this agent may run, and
+ * `decide:sort-a-message` is one of them. Both are rows in the Crew tab's picker and both are
+ * documented in the node's own `aimeat-decide` skill, but the charset here admitted only the
+ * first — so a crew-def that reached this schema through an app manifest was refused for using
+ * the syntax the node told it to use. The part after the colon is a rule id, whose own charset
+ * (RULE_ID_RE, services/decide/rule-validate.ts) is a subset of what is allowed here; the
+ * FLEET still resolves the name, and this remains a shape-and-charset check only.
  */
 const CrewAgentSchema = z.object({
   role: z.string().min(1).max(256),
   goal: z.string().min(1).max(4000),
   backstory: z.string().max(8000).optional().default(''),
-  tools: z.array(z.string().regex(/^[a-z0-9_-]{1,64}$/, 'tool names are lowercase alphanumeric with _ or -')).max(16).optional(),
+  tools: z.array(z.string().regex(/^[a-z0-9_-]{1,64}(:[a-z0-9_-]{1,64})?$/,
+    "tool names are lowercase alphanumeric with _ or -, optionally with one ':' and a selector (for example decide:sort-a-message)")).max(16).optional(),
   skills: z.array(z.string().min(1).max(128)).max(20).optional(),
   allow_delegation: z.boolean().optional(),
 });
