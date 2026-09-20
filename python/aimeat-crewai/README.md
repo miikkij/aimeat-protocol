@@ -622,9 +622,16 @@ from aimeat_crewai import push_direct_log
 push_direct_log(agent_name="mailer")
 ```
 
-It lands in memory under `agents.<name>.decide.direct-log`, labelled as decisions made without the
-node — **not** on the decision register, because a row claiming to be one would make the owner's
-quality numbers read as though the scrubber and the cap had been in force.
+It lands in memory under `agents.<name>.decide.direct-log.<day>`, one key per UTC day, with
+`agents.<name>.decide.direct-log.__index` listing the days held. Each one is labelled as decisions
+made without the node — **not** on the decision register, because a row claiming to be one would
+make the owner's quality numbers read as though the scrubber and the cap had been in force.
+
+A push sends only what is new: the log is append-only, so the lines already pushed are kept as a
+cursor beside it (`direct-log.jsonl.pushed`). One key per day rather than one key for everything is
+the same rule every collector here follows — a memory value holds 1024 kB, and a long run used to
+meet that ceiling and be refused. `push_direct_log(all_of_it=True)` ignores the cursor and sends the
+whole log again.
 
 The node never sends a key. When the owner has given an agent one, `settings()` names the
 environment variable it lives in (`agent.key_env`) and never the key itself.

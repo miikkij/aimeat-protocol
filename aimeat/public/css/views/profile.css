@@ -3352,6 +3352,37 @@
 .pf .pf-aitr-row-verdict .btn-outline {
   min-height: 44px; padding: 12px 0 11px;
 }
+/* EVERY control in the decision-model card and the rules screen is a real tap target, 44 px at every
+   width. The house's poster buttons are text with an underline and `min-height: 0`, which reads well
+   and measures 15 to 18 px high: on a phone, the key, the test, the delete and the eight policy
+   checkboxes were all under the 40 px floor this repo holds itself to. The look is kept — the box
+   around the words grows, the words do not. `.pf` in front because profile-poster.css sets that
+   `min-height: 0` and loads after this file.
+   A checkbox is its LABEL: the whole row is the target, and the box itself grows to 20 px so it can
+   be hit on its own. */
+.pf .pf-aitr .og-door,
+.pf .pf-aitr .btn-outline,
+.pf .pf-aitr .btn-primary,
+.pf .pf-dr .og-door,
+.pf .pf-dr .btn-outline {
+  min-height: 44px; min-width: 44px;
+}
+/* Both dimensions: "Edit" measured 26.8 px wide and "Test" 28.8, which are as easy to miss as a
+   short button is. A field is a target too, and the card's key field sat at 36 px under a 44 px
+   Save, which read as a mismatch as well as measuring short. */
+.pf .pf-aitr .og-input,
+.pf .pf-aitr select,
+.pf .pf-aitr input[type="number"],
+.pf .pf-dr .og-input,
+.pf .pf-dr select,
+.pf .pf-dr input[type="number"] {
+  min-height: 44px;
+}
+.pf .pf-aitr .pf-aitr-row > label.pf-aitr-row-main,
+.pf .pf-dr .pf-dr-check {
+  display: flex; align-items: center; gap: 0.5rem; min-height: 44px; margin: 0;
+}
+.pf .pf-aitr .checkbox, .pf .pf-dr .checkbox { width: 20px; height: 20px; flex: none; }
 /* The verdict already recorded stays visible and unpressable, so a mis-tap has a way back: the other
    button is still there and records the opposite. */
 .pf .pf-aitr-row-verdict .btn-outline[disabled] {
@@ -3383,6 +3414,17 @@
 .pf-aai-row .og-input { flex: 1 1 12rem; min-width: 0; width: auto; }
 .pf-aai-row .og-door { flex: none; }
 .pf-aai .og-choice { margin-top: 0.5rem; flex-wrap: wrap; }
+/* The agent's keys, its cap and its gate: every control a thumb has to hit, 44 px at every width.
+   Measured at 390 before this: the three SAVE buttons 16 px, the two tests 18, the gate's three
+   positions 28, the four fields 36. Same reason and same shape as the decision-model card above. */
+.pf .pf-aai .og-door,
+.pf .pf-aai .og-input,
+.pf .pf-aai .og-choice-btn {
+  min-height: 44px;
+}
+/* The three SAVE buttons measured 37.2 px wide and the two tests 28.8: short in the other
+   dimension is just as easy to miss. */
+.pf .pf-aai .og-door, .pf .pf-aai .og-choice-btn { min-width: 44px; }
 .pf-aai-rules { margin-top: 0.6rem; }
 @media (max-width: 600px) {
   .pf-dr-q-top, .pf-dr-pair { grid-template-columns: minmax(0, 1fr); }

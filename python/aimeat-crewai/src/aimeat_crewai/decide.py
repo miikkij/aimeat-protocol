@@ -35,14 +35,18 @@ wins on any mismatch), and the node skill ``aimeat-decide``.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 
 from .offers import resolve_agent_token
 from .paths import aimeat_home
+
+logger = logging.getLogger(__name__)
 
 __all__ = [
     "DIRECT_DEFAULT_MODEL",
@@ -60,6 +64,7 @@ __all__ = [
     "decision_stats",
     "decisions",
     "direct_enabled",
+    "direct_log_cursor_path",
     "direct_log_path",
     "evaluate_rule",
     "fields_outside",
@@ -1233,6 +1238,28 @@ def read_direct_log(path: Path | str | None = None) -> list[dict[str, Any]]:
     return out
 
 
+def direct_log_cursor_path(path: Path | str | None = None) -> Path:
+    """Beside the log, the number of its lines already pushed to a node."""
+    p = Path(path) if path is not None else direct_log_path()
+    return p.with_suffix(p.suffix + ".pushed")
+
+
+def _read_cursor(path: Path | str | None = None) -> int:
+    try:
+        return max(0, int(direct_log_cursor_path(path).read_text(encoding="utf-8").strip() or "0"))
+    except (OSError, ValueError):
+        return 0
+
+
+def _write_cursor(lines: int, path: Path | str | None = None) -> None:
+    cursor = direct_log_cursor_path(path)
+    try:
+        cursor.parent.mkdir(parents=True, exist_ok=True)
+        cursor.write_text(str(lines), encoding="utf-8")
+    except OSError as exc:  # pragma: no cover - a read-only home is the caller's to fix
+        logger.warning("[decide] the direct log was pushed and its cursor could not be written: %s", exc)
+
+
 def push_direct_log(
     *,
     path: Path | str | None = None,
@@ -1241,6 +1268,7 @@ def push_direct_log(
     agent_token: str | None = None,
     session: Any = None,
     key: str | None = None,
+    all_of_it: bool = False,
 ) -> dict[str, Any]:
     """Put direct mode's local decision log onto a node, so decisions made offline are on the record
     once there is a record to be on.
@@ -1248,34 +1276,92 @@ def push_direct_log(
     It is written to MEMORY, not to the decision register: the register is written by the node when
     the node made the decision, and a row claiming to be one when it is not would make the owner's
     quality numbers -- decisions, gate stops, overrides, cost -- read as if the scrubber and the cap
-    had been in force. So these land beside it, under ``agents.<name>.decide.direct-log``, plainly
-    labelled as decisions made without the node.
+    had been in force. So these land beside it, under ``agents.<name>.decide.direct-log.<day>``,
+    plainly labelled as decisions made without the node.
 
-    Returns the node's response envelope, and the count that was pushed.
+    ONE KEY PER DAY, AND ONLY WHAT IS NEW. A memory value holds 1024 kB, and this used to write every
+    decision ever logged into ONE key on every push: a long run met that ceiling and was refused, and
+    until then each push re-sent the whole history. The log is append-only, so the number of lines
+    already pushed is a cursor (``direct-log.jsonl.pushed``); a push sends the lines after it, grouped
+    by the UTC day they were decided on, merging into that day's key rather than replacing it.
+    ``agents.<name>.decide.direct-log.__index`` lists the days held, so a reader finds them without
+    guessing. Pass ``all_of_it=True`` to ignore the cursor and push the whole log again.
+
+    Returns what was pushed, per day, and the index key.
     """
-    entries = read_direct_log(path)
+    lines = read_direct_log(path)
+    start = 0 if all_of_it else _read_cursor(path)
+    entries = lines[start:]
     if not entries:
-        return {"pushed": 0, "note": "The local decision log is empty; nothing to push."}
+        return {
+            "pushed": 0,
+            "note": (
+                "Nothing new in the local decision log."
+                if lines else "The local decision log is empty; nothing to push."
+            ),
+        }
     if not agent_name:
         raise DecideError("push_direct_log needs agent_name= to know which agent's key to write.")
     node = _node(agent_name=agent_name, node_url=node_url, agent_token=agent_token, session=session)
-    memory_key = key or f"agents.{agent_name}.decide.direct-log"
-    body = _call(
-        node,
-        "post",
-        "/v1/memory",
-        {
-            "key": memory_key,
+    prefix = key or f"agents.{agent_name}.decide.direct-log"
+    note = (
+        "Decisions this agent made in DIRECT mode, with no node in the path: not scrubbed, not "
+        "capped, not cached, and not on the decision register."
+    )
+    now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+    by_day: dict[str, list[dict[str, Any]]] = {}
+    for e in entries:
+        day = str(e.get("at") or now)[:10] or now[:10]
+        by_day.setdefault(day, []).append(e)
+
+    pushed: dict[str, int] = {}
+    for day, day_entries in sorted(by_day.items()):
+        day_key = f"{prefix}.{day}"
+        held = _read_memory_value(node, day_key)
+        old = held.get("decisions") if isinstance(held, dict) else None
+        seen = {str(d.get("decision_id")) for d in old or [] if isinstance(d, dict)}
+        merged = list(old or []) + [e for e in day_entries if str(e.get("decision_id")) not in seen]
+        _call(node, "post", "/v1/memory", {
+            "key": day_key,
             "value": {
                 "spec": "aimeat.decision-log/v1-direct",
-                "note": (
-                    "Decisions this agent made in DIRECT mode, with no node in the path: not "
-                    "scrubbed, not capped, not cached, and not on the decision register."
-                ),
-                "pushed_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-                "count": len(entries),
-                "decisions": entries,
+                "note": note,
+                "day": day,
+                "pushed_at": now,
+                "count": len(merged),
+                "decisions": merged,
             },
+        })
+        pushed[day] = len(day_entries)
+
+    index_key = f"{prefix}.__index"
+    held_index = _read_memory_value(node, index_key)
+    days = dict((held_index or {}).get("days") or {}) if isinstance(held_index, dict) else {}
+    for day, n in pushed.items():
+        days[day] = int(days.get(day) or 0) + n
+    _call(node, "post", "/v1/memory", {
+        "key": index_key,
+        "value": {
+            "spec": "aimeat.decision-log-index/v1-direct",
+            "note": f"{note} One key per day under {prefix}.<day>.",
+            "pushed_at": now,
+            "days": dict(sorted(days.items())),
+            "count": sum(days.values()),
         },
-    )
-    return {"pushed": len(entries), "key": memory_key, "node": body}
+    })
+
+    _write_cursor(len(lines), path)
+    return {"pushed": len(entries), "days": pushed, "index": index_key, "keys": [f"{prefix}.{d}" for d in sorted(pushed)]}
+
+
+def _read_memory_value(node: _Node, memory_key: str) -> Any:
+    """What the node already holds under a key, or None. A day that is not there yet is not an error:
+    the first push of a day writes it."""
+    try:
+        body = _call(node, "get", f"/v1/memory/{quote(memory_key, safe='')}")
+    except DecideRefused as exc:
+        if exc.code in {"NOT_FOUND", "MEMORY_NOT_FOUND"}:
+            return None
+        raise
+    return body.get("value") if isinstance(body, dict) else None
