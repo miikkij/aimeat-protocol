@@ -173,7 +173,8 @@ async function appendAiUsage(
   if (call.model) {
     try {
       await recordUsageEvent(storage, {
-        agentGaii: gaii,
+        // The ledger names who asked beside who paid: an agent's call is paid by its owner.
+        agentGaii: call.agent ? `${call.agent}#${gaii}` : gaii,
         ownerGhii: gaii,
         model: call.model,
         provider: call.provider,

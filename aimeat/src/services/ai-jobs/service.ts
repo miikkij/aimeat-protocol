@@ -21,6 +21,8 @@
  *   const service = new AiJobService(config, storage);
  *   await service.startJob({ prompt, result_key }, { ownerGhii, createdBy });
  * @version-history
+ *   v1.1.0 — 2026-09-20 — An agent's job is paid by its owner, in the agent's name (aiPayerOf), as
+ *     POST /v1/ai/complete pays. The job and its result stay in the caller's namespace.
  *   v1.0.0 — 2026-08-31 — Initial.
  */
 import { randomUUID } from 'node:crypto';
@@ -29,6 +31,7 @@ import type { Storage } from '../../storage/interface.js';
 import type { EmailService } from '../email.js';
 import { SlotPool, SlotAbortedError } from '../slot-pool.js';
 import { completeForOwner, AiCompletionError } from '../ai-completion.js';
+import { aiPayerOf } from '../agent-ai-keys.js';
 import { isReservedServerKey } from '../../utils/reserved-keys.js';
 import { parseGAII } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
@@ -252,7 +255,12 @@ export class AiJobService implements AiJobStarter {
             entry.job = { ...entry.job, state: 'running', started_at: new Date().toISOString() };
             await writeJob(this.storage, entry.job);
 
-            const result = await completeForOwner(this.storage, this.config, owner, {
+            // The job and its result stay in the CALLER's namespace; the money is the human's. An
+            // agent's job is paid by its owner, in the agent's name, exactly as POST /v1/ai/complete
+            // pays (services/agent-ai-keys.ts aiPayerOf), so the two doors cannot disagree on a key.
+            const { payer, agent } = aiPayerOf(owner);
+            const result = await completeForOwner(this.storage, this.config, payer, {
+                ...(agent ? { agent } : {}),
                 prompt: entry.prompt,
                 ...(entry.job.system_prompt ? { systemPrompt: entry.job.system_prompt } : {}),
                 ...(entry.job.model ? { model: entry.job.model } : {}),
