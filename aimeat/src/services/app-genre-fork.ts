@@ -21,10 +21,16 @@
  * @structure genreKeptShare(html, genreId) · genreForkFindings(html)
  * @usage const hints = genreForkFindings(html);
  * @version-history
+ *   v1.0.1 — 2026-09-20 — Two CodeQL findings, both about text a stranger uploaded. The `<style>`
+ *     bodies are read by utils/html-blocks in one pass instead of a pattern that restarts at every
+ *     `<style` (alert 1642), and a genre's class name goes into its pattern through
+ *     utils/regex-literal, which escapes the backslash the old `-` escape left alone (alert 1640).
  *   v1.0.0 — 2026-09-19 — Initial.
  */
 import { GENRE_BODIES } from '../data/app-templates/genres.js';
 import type { AppArtifactFinding } from './app-artifact-lint.js';
+import { regexLiteral } from '../utils/regex-literal.js';
+import { elementBodies } from '../utils/html-blocks.js';
 
 const PITFALL = 'genre-not-forked';
 /** Below this share of the genre's own class names, the page is not a fork of it. */
@@ -34,7 +40,7 @@ export const GENRE_KEPT_MIN = 0.2;
 export function genreClassNames(genreId: string): string[] {
   const body = (GENRE_BODIES as Record<string, string>)[genreId];
   if (!body) return [];
-  const styles = [...body.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/gi)].map(m => m[1]).join('\n');
+  const styles = elementBodies(body, 'style').join('\n');
   const names = new Set<string>();
   for (const m of styles.matchAll(/\.([a-zA-Z][\w-]{2,})/g)) {
     if (!m[1].startsWith('ak-')) names.add(m[1]);
@@ -60,7 +66,7 @@ export const OWN_PARTS_MIN = 20;
 export function ownClassNames(html: string): string[] {
   const register = /<meta\b[^>]*name\s*=\s*["']aimeat-register["'][^>]*content\s*=\s*["']genre-([a-z0-9-]+)["']/i.exec(html.slice(0, 8192))?.[1];
   const genre = new Set(register ? genreClassNames(register) : []);
-  const styles = [...html.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/gi)].map(m => m[1]).join('\n');
+  const styles = elementBodies(html, 'style').join('\n');
   const own = new Set<string>();
   for (const m of styles.matchAll(/\.([a-zA-Z][\w-]{2,})/g)) {
     const name = m[1];
@@ -92,7 +98,7 @@ export function designBookStep(html: string): string | undefined {
 export function genreKeptShare(html: string, genreId: string): number | null {
   const names = genreClassNames(genreId);
   if (names.length < 8) return null;
-  const kept = names.filter(n => new RegExp(`[\\s"'.]${n.replace(/[-]/g, '\\-')}[\\s"'{,:.>]`).test(html)).length;
+  const kept = names.filter(n => new RegExp(`[\\s"'.]${regexLiteral(n)}[\\s"'{,:.>]`).test(html)).length;
   return kept / names.length;
 }
 

@@ -15,6 +15,9 @@
  * @structure appQuality(baseUrl, ownerName, filename, toolCalls) → AppQuality
  * @usage const q = await appQuality(ctx.baseUrl, ctx.ownerName, app.filename, ctx.metrics.toolCalls);
  * @version-history
+ *   v1.2.1 — 2026-09-20 — A kit alias goes into its pattern through utils/regex-literal. The escape
+ *     here covered `$` and left the backslash, which is the character that changes what the pattern
+ *     means (CodeQL js/incomplete-sanitization, alert 1644).
  *   v1.2.0 — 2026-09-19 — The Design Book round trip (searched, adopted, proposed back), how many of
  *     the kit's components the page calls, how many styles it made for itself, the libraries it
  *     read about, and whether it keeps its own colours. The book held 90 parts and none from a
@@ -29,6 +32,7 @@ import type { AimeatConfig } from '../../src/config.js';
 import { lintAppArtifact } from '../../src/services/app-artifact-lint.js';
 import { genreKeptShare, ownClassNames } from '../../src/services/app-genre-fork.js';
 import { ATELIER_COMPONENTS } from '../../src/services/build-atelier-prompt.js';
+import { regexLiteral } from '../../src/utils/regex-literal.js';
 
 /** `app` is the shell every Atelier page calls, so it says nothing about what was used. */
 const KIT_NAMES = new Set([...ATELIER_COMPONENTS.map(c => c.id), 'dialog', 'toast', 'chart', 'gauge', 'kanban', 'plan', 'schedule', 'map', 'atlas', 'queue', 'health', 'console', 'rating', 'steps', 'radar', 'mosaic', 'bottomNav', 'aide', 'fx', 'scene3d', 'mural'].filter(n => n !== 'app'));
@@ -87,7 +91,7 @@ interface Call { name: string; input: unknown; isError: boolean }
 
 /** Every name the page bound to the kit (`var K = A.atelier`), with `a` and `A` kept for the old pages. */
 function kitAliases(html: string): string[] {
-    const bound = [...html.matchAll(/\b([A-Za-z_$][\w$]*)\s*=\s*[\w$.]*\.atelier\b(?!\.)/g)].map(m => m[1].replace(/\$/g, '\\$'));
+    const bound = [...html.matchAll(/\b([A-Za-z_$][\w$]*)\s*=\s*[\w$.]*\.atelier\b(?!\.)/g)].map(m => regexLiteral(m[1]));
     return [...new Set(['a', 'A', ...bound])];
 }
 
