@@ -48,6 +48,7 @@ __all__ = [
     "DIRECT_DEFAULT_MODEL",
     "DIRECT_ENV",
     "DIRECT_KEY_ENV_VAR",
+    "STATS_GROUPS",
     "DecideError",
     "DecideRefused",
     "DecideUnreachable",
@@ -56,6 +57,7 @@ __all__ = [
     "RuleEvaluation",
     "decide",
     "decision",
+    "decision_stats",
     "decisions",
     "direct_enabled",
     "direct_log_path",
@@ -659,6 +661,60 @@ def decisions(
     }
     node = _node(agent_name=agent_name, node_url=node_url, agent_token=agent_token, session=session)
     return dict(_call(node, "get", "/v1/ai/decisions", params=params) or {})
+
+
+#: How a quality count may be grouped. The node requires one; there is no "everything" grouping,
+#: because a number that mixes two rules is not a quality number of either.
+STATS_GROUPS = ("rule", "principal")
+
+
+def decision_stats(
+    *,
+    group_by: str,
+    rule_id: str | None = None,
+    principal: str | None = None,
+    agent_name: str | None = None,
+    node_url: str | None = None,
+    agent_token: str | None = None,
+    session: Any = None,
+) -> list[dict[str, Any]]:
+    """The quality numbers of the owner's decisions, per rule or per principal.
+
+    This is the sixth step of the setup order, and the one the other five exist for: thresholds are
+    tuned from decisions that have already been made, not chosen in advance. Counted in the STORE,
+    so the figures are exact however many decisions there are -- unlike anything a caller could
+    tally from ``decisions()``, which is paged.
+
+    Each group is ``{key, decisions, outcomes: {act, ask, stop}, gateStops, overridden, confirmed,
+    costUsd, lastAt}``. ``gateStops`` is how often a switched-on gate held the action; ``overridden``
+    and ``confirmed`` are what people said afterwards with :func:`review`, which is why recording a
+    person's verdict matters -- without it every decision looks equally good forever.
+
+    Grouped by rule, decisions that named no rule are left out, and so is the owner's Try of a rule
+    on its sample: a try is a real, paid, recorded decision, but it is not one of the RULE's, and
+    counted among them it would flatter or spoil the numbers with a state written to get a known
+    answer.
+
+    Args:
+        group_by: 'rule' or 'principal'. Required by the node, and checked here so a typo costs
+            nothing instead of a round trip.
+        rule_id / principal: narrow the count to one rule, one caller, or both -- an agent's share
+            of a rule is `group_by='rule'` with `principal=` its GAII.
+
+    Returns:
+        The list of groups, newest activity in each one's ``lastAt``.
+    """
+    if group_by not in STATS_GROUPS:
+        raise DecideError(f"group_by must be one of {' or '.join(STATS_GROUPS)}, not {group_by!r}.")
+    params = {
+        k: v
+        for k, v in (("group_by", group_by), ("rule", rule_id), ("principal", principal))
+        if v is not None
+    }
+    node = _node(agent_name=agent_name, node_url=node_url, agent_token=agent_token, session=session)
+    data = _call(node, "get", "/v1/ai/decisions/stats", params=params) or {}
+    got = data.get("groups")
+    return list(got) if isinstance(got, list) else []
 
 
 def decision(

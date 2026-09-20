@@ -154,6 +154,15 @@ extensions used each one in the last 30 days, never a value), `aimeat_secret_set
 stored, tell the owner the exact name and that it goes on their Access page, section 04 Secrets,
 or ask for it once and store it with `aimeat_secret_set`; never write it into memory or a document.
 
+**Who pays for an agent's text completion (node 3.18.0+).** `POST /v1/ai/complete`, both `/v1/llm`
+doors and `POST /v1/ai/jobs` now run on the **owner's** settings, daily budget and usage record;
+the agent's own namespace is no longer read for them. The key order is the agent's key, then the
+owner's, then the server's, and a new `402 AGENT_QUOTA_EXHAUSTED` means this agent's own cap is
+used up — not retryable, like every other quota code. So a crew that wrote its own
+`openrouter.settings` record to reach a provider must stop: no text door reads that record any
+more, and the owner sets the provider. (Neither this package nor crewfive writes one — checked
+2026-09-20.) Transcription and image generation still pay from the agent's namespace.
+
 ## Restricting the toolset
 
 By default the liaison sees every `aimeat_*` tool the node exposes (currently ~90+). If you want a narrower surface -- e.g. only memory + knowledge, no wallet, no admin -- pass `tool_filter`:
@@ -551,6 +560,29 @@ from aimeat_crewai import review
 review(v.decision_id, "overridden", note="Sent it by hand instead.", agent_name="mailer")
 ```
 
+### Tuning the thresholds (0.27.1+)
+
+Step six of the setup order, and the one the other five exist for: a threshold nobody tuned is a
+guess with a decimal point, and what you tune it from is the decisions already made.
+
+```python
+from aimeat_crewai import decision_stats
+
+for g in decision_stats(group_by="rule", agent_name="mailer"):
+    print(g["key"], g["decisions"], g["outcomes"], "held:", g["gateStops"],
+          "overridden:", g["overridden"], "$", g["costUsd"])
+```
+
+Counted in the store, so the figures are exact however many decisions there are — a tally taken
+from `decisions()` would be a tally of one page. `group_by="principal"` gives the same numbers per
+caller, and `rule_id=` with `principal=` gives one agent's share of one rule.
+
+`overridden` and `confirmed` are only as good as your `review()` calls: with nobody's verdict on
+record, every decision looks equally good forever. Grouped by rule, decisions that named no rule are
+left out, and so is the owner's Try of a rule on its sample — a try is a real, paid, recorded
+decision, but it is not one of the rule's, and counted among them it would flatter or spoil the
+numbers with a state written to get a known answer.
+
 ### Check before you build on it
 
 ```python
@@ -613,7 +645,7 @@ environment variable it lives in (`agent.key_env`) and never the key itself.
 | 0.17.x | 2.2.0+ for file helpers (`?mode=handle` on `/v1/pub`, `resources.files` on tasks). Against an older node, reading a file the owner shared still works over plain `GET /v1/pub/{owner}/{key}` — only the handle + task-attachment helpers need 2.2.0. | 0.80+ |
 | 0.20.x | 3.3.0+ for data packages (`/v1/datapackages`). `read_package` and `to_dataframe` need only the package's public address, so they read a package from ANY node that publishes one; `publish_package` and `package_versions` need the routes. | 0.80+ |
 | 0.22.x | 3.9.0+ node AND `aimeat` connector for server-initiated invokes (`/local/invoke/next` on the serve daemon). On an older serve daemon the listener logs once that the surface is missing and the rest of the daemon is unchanged. | 0.80+ |
-| 0.27.x | A node with decision rules (`/v1/ai/decide`, `/v1/ai/decide/rules`) and an owner who has set a TypeSafe key. `settings()` says whether this owner can use it at all and why not — check it before building a path on it. Direct mode needs no node. | 0.80+ |
+| 0.27.x | **Node 3.18.0+** for decision rules (`/v1/ai/decide`, `/v1/ai/decide/rules`, and `/v1/ai/decisions/stats` for `decision_stats()`), and an owner who has set a TypeSafe key. `settings()` says whether this owner can use it at all and why not — check it before building a path on it. A node below 3.18.0 has none of these doors. For the liaison to SEE the decide tools over MCP, the machine also needs the `aimeat` connector at 3.18.0+: an older CLI refuses an undeclared parameter, so check the CLI version before reporting a node fault. Direct mode needs no node at all. | 0.80+ |
 
 ## License
 

@@ -47,12 +47,14 @@ from .decide import (
     DIRECT_ENV as DECIDE_DIRECT_ENV,
 )
 from .decide import (
+    STATS_GROUPS,
     DecideError,
     DecideRefused,
     DecideUnreachable,
     Decision,
     GateVerdict,
     decide,
+    decision_stats,
     decisions,
     direct_enabled,
     evaluate_rule,
@@ -145,7 +147,7 @@ from .workflow_spec import (
 
 # Kept in step with pyproject BY HAND, which is why it was wrong: 0.20.0 shipped announcing
 # itself as 0.19.0, and the first crew to install it reported the mismatch before we saw it.
-__version__ = "0.27.0"
+__version__ = "0.27.1"
 
 __all__ = [  # noqa: RUF022 -- grouped by topic with the version each group arrived in; alphabetical order would scatter those comments away from what they name
     "__version__",
@@ -192,6 +194,9 @@ __all__ = [  # noqa: RUF022 -- grouped by topic with the version each group arri
     "rule",
     "rule_tools_data",
     "decisions",
+    # The quality numbers thresholds are tuned from, counted in the store (0.27.1)
+    "decision_stats",
+    "STATS_GROUPS",
     "review",
     "settings",
     "gate",
