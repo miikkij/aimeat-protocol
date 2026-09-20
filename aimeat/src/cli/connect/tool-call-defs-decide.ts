@@ -75,6 +75,8 @@ export const decideTools: ConnectCliToolDefinition[] = [
       decision_id: { type: 'string', description: 'Read one decision.' },
       subject: { type: 'string', description: 'Only decisions about this subject.' },
       rule: { type: 'string', description: 'Only decisions one decision rule made (its id).' },
+      principal: { type: 'string', description: 'Only decisions one principal asked for (an agent\'s full identity).' },
+      stats_by: { type: 'string', description: 'rule | principal: return the quality numbers instead, one group per rule or per principal.' },
       app_id: { type: 'string', description: 'Only decisions made for this app.' },
       limit: { type: 'number', description: 'How many (1-200, default 50).' },
       before: { type: 'string', description: 'Only decisions made before this ISO time.' },
@@ -87,9 +89,17 @@ export const decideTools: ConnectCliToolDefinition[] = [
       const appId = optionalString(input, 'app_id');
       const limit = optionalNumber(input, 'limit');
       const before = optionalString(input, 'before');
-      if (subject !== undefined) q.set('subject', subject);
       const rule = optionalString(input, 'rule');
+      const principal = optionalString(input, 'principal');
+      const statsBy = optionalString(input, 'stats_by');
       if (rule !== undefined) q.set('rule', rule);
+      if (principal !== undefined) q.set('principal', principal);
+      // → GET /v1/ai/decisions/stats: the quality numbers, counted by the node
+      if (statsBy !== undefined) {
+        q.set('group_by', statsBy);
+        return client.get(`/v1/ai/decisions/stats?${q.toString()}`);
+      }
+      if (subject !== undefined) q.set('subject', subject);
       if (appId !== undefined) q.set('app_id', appId);
       if (limit !== undefined) q.set('limit', String(limit));
       if (before !== undefined) q.set('before', before);

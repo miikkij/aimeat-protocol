@@ -29,7 +29,7 @@ import { descriptionFor } from './catalog/shape.js';
 import { parseGAII } from '../utils/gaii.js';
 import { AiCompletionError } from '../services/ai-completion.js';
 import {
-  decideForOwner, listDecisions, getDecision, reviewDecision, ruleCallerKind, DecideError, type DecideCaller,
+  decideForOwner, listDecisions, getDecision, reviewDecision, decisionStats, ruleCallerKind, DecideError, type DecideCaller,
 } from '../services/decide/service.js';
 import { getRule, useAllows, rulesRunnableBy, listRuleProposals, proposeRule } from '../services/decide/rules.js';
 import { agentNameOf } from '../services/agent-ai-keys.js';
@@ -115,6 +115,8 @@ export function registerDecideTools(
       decision_id: z.string().optional().describe('Read one decision.'),
       subject: z.string().optional().describe('Only decisions about this subject.'),
       rule: z.string().optional().describe('Only decisions one decision rule made (its id).'),
+      principal: z.string().optional().describe('Only decisions one principal asked for (an agent\'s full identity).'),
+      stats_by: z.enum(['rule', 'principal']).optional().describe('Return the quality numbers instead, one group per rule or per principal.'),
       app_id: z.string().optional().describe('Only decisions made for this app.'),
       limit: z.number().optional().describe('How many (1-200, default 50).'),
       before: z.string().optional().describe('Only decisions made before this ISO time.'),
@@ -126,9 +128,15 @@ export function registerDecideTools(
           const row = await getDecision(storage, ownerGhii, a.decision_id);
           return row ? text(row) : err('No such decision.');
         }
+        if (a.stats_by) {
+          return text({ groups: await decisionStats(storage, ownerGhii, {
+            groupBy: a.stats_by, ...(a.rule ? { rule: a.rule } : {}), ...(a.principal ? { principal: a.principal } : {}),
+          }) });
+        }
         const r = await listDecisions(storage, ownerGhii, {
           ...(a.subject !== undefined ? { subject: a.subject } : {}),
           ...(a.rule !== undefined ? { rule: a.rule } : {}),
+          ...(a.principal !== undefined ? { principal: a.principal } : {}),
           ...(a.app_id !== undefined ? { appId: a.app_id } : {}),
           ...(a.limit !== undefined ? { limit: a.limit } : {}),
           ...(a.before !== undefined ? { before: a.before } : {}),

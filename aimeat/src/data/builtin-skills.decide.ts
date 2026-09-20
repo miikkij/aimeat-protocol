@@ -187,7 +187,8 @@ the rule, its version and the outcome. A rule bound to an action that cannot be 
    can run unguarded. On: an answer under the act band answers \`proceed: false\` and becomes a task for
    the owner. Off: the agent acts, and the decision is recorded with the same outcome.
 6. **Read the decisions and tune the thresholds.** Each rule and each agent shows its decisions, gate
-   stops, overrides and cost; \`aimeat_decision_list { rule }\` reads them one by one.
+   stops, overrides and cost. \`aimeat_decision_list { stats_by: "rule" }\` gives those numbers per rule
+   (\`"principal"\` per agent), and \`aimeat_decision_list { rule }\` reads the decisions one by one.
 
 **How a rule reaches an outcome.** A threshold is a floor for one answer in that question's own units
 (a yesNo's probability, a pickOne's confidence, a scale's level counted from 0): an answer under its
