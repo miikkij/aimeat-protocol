@@ -162,13 +162,14 @@ await test('The two-step way in is closed: a parked webhook cannot be turned man
 });
 
 // ─── Phase 2: a node with an ALLOWLIST ───
-// A boot-time setting, so it needs a node of its own. The port is derived from this suite's own so
-// two suites running side by side cannot land on the same one, and the offset differs from the one
-// e2e-capabilities uses for the same reason.
+// A boot-time setting, so it needs a node of its own, on a port derived from this suite's.
+// 41100-41199 is this suite's block; e2e-capabilities holds 41000-41099. They used to take the
+// same port through offsets one apart (`+ 501` here, `+ 500` there) over lane ports that are
+// consecutive, which put lane 1 and lane 2 on the same number. See that suite for the measurement.
 console.log('\nPhase 2 — capabilityWebhooks=allowlist_only');
 
-const ALT_PORT = String(Number(new URL(BASE).port || '80') + 501);
-const ALT_BASE = `http://localhost:${ALT_PORT}`;
+const ALT_PORT = String(41100 + Number(new URL(BASE).port || '80') % 100);
+const ALT_BASE = `http://127.0.0.1:${ALT_PORT}`;
 const ALT_DB = resolve(process.cwd(), `test/.hookupd-allowlist-${ALT_PORT}.db`);
 const ALLOWED = 'https://hooks.example.test/first';
 const ALLOWED_OTHER = 'https://hooks.example.test/second';

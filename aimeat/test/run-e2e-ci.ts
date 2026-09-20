@@ -1234,7 +1234,9 @@ function listeningPorts(): Set<number> {
         const out = execSync(cmd, { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'], timeout: 10_000 });
         for (const m of out.matchAll(/[:.](\d{4,5})\b/g)) {
             const n = Number(m[1]);
-            if (n >= 40000 && n < 41000) found.add(n);
+            // Up to 42000, not 41000: the two allowlist suites put a node of their own in
+            // 41000-41199, and a lane chosen blind to those is a lane that can be handed one.
+            if (n >= 40000 && n < 42000) found.add(n);
         }
     } catch {
         // No netstat, no lsof, or it answered nothing. Say so rather than pretending to know.
