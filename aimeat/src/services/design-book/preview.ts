@@ -19,6 +19,7 @@
  * @usage
  *   const html = partPreviewHtml(part);   // a complete self-contained page, kit assets relative
  * @version-history
+ *   v1.4.1 — 2026-09-20 — partPreviewHtml takes the reader's theme for a component part.
  *   v1.4.0 — 2026-09-20 — A component previews as a page of its own (component.ts), scriptless.
  *   v1.3.1 — 2026-09-05 — Two blocks on ONE source get the plain rows both can render: the
  *     dashboard leiska binds its list and its table to the same name, and the table's own demo
@@ -290,8 +291,11 @@ function illustrationPageHtml(part: DesignBookPart): string {
  * relative paths, so it renders wherever the node's own origin serves it (the bench's headless
  * browser, the gallery's iframe). Null only for a genre whose template id no longer exists.
  */
-export function partPreviewHtml(part: DesignBookPart): string | null {
+export function partPreviewHtml(part: DesignBookPart, opts: { theme?: 'light' | 'dark' } = {}): string | null {
   if (part.kind === 'illustration') return illustrationPageHtml(part);
+  // A component wears the page it lands in, so its preview is asked for in the reader's theme.
+  // The bench keeps measuring the light page (renderableBodyFor), which is what its stamp says.
+  if (part.kind === 'component' && opts.theme) return componentPreviewHtml(part.body as unknown as ComponentBody, opts.theme);
   const renderable = renderableBodyFor(part);
   if (renderable === null) return null;
   return benchPageHtml(renderable);

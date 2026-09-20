@@ -70,6 +70,9 @@ export async function api<T = Record<string, unknown>>(baseUrl: string, path: st
     try { return { status: res.status, data: (JSON.parse(text) as { data?: T }).data ?? null }; } catch { return { status: res.status, data: null }; }
 }
 
+/** `keep-app`: which app each run's setup picked, by the run's marker, for its verify to read. */
+const keepAppTarget = new Map<string, string>();
+
 /** Every record the owner can see, their agents' included, as one searchable string per record. */
 async function ownerRecords(ctx: TaskContext): Promise<string[]> {
     const r = await api<{ items: unknown[] }>(ctx.baseUrl, '/v1/memory?owner_scope=true&limit=500', ctx.ownerToken);
@@ -202,6 +205,51 @@ export const TASKS: Task[] = [
             // level it took, in the one message the owner gets.
             const saidLevel = /\b(prototype|ordinary page|the finest|level)\b/i.test(ctx.metrics.finalText);
             return { ok, detail: ok ? 'an Atelier app that keeps the habits on the node' : `the app is published, and ${why}`, note: `${describeQuality(quality)}; level ${saidLevel ? 'named' : 'NOT named'} to the owner; Book line ${/From the Design Book I take/i.test(ctx.metrics.finalText) ? 'said' : 'NOT said'}` };
+        },
+    },
+    {
+        // THE OTHER HALF OF THE BOOK GROWING BY ITSELF. `build-tracker` measures that a builder writes
+        // down what it made by hand. This measures what happens when the owner then says the app
+        // turned out well: is that recorded, is what was made offered to the Book as components, and
+        // is each one judged general or special with a reason a person would agree with. It needs an
+        // app a measured build left behind (one with `made` rows its owner has not kept), so it runs on
+        // a sandbox that has run `build-tracker`, and each run takes the next such app.
+        // PASS: the owner's word is recorded AND at least one component from that app is proposed with
+        // a judgement. Whether the judgements are SENSIBLE is read by a person from the note.
+        // Added 2026-09-20. By name only.
+        id: 'keep-app',
+        byNameOnly: true,
+        door: 'mcp',
+        prompt: 'The habit tracker you built me, "{marker}", turned out really well. I use it every day and I am happy with it.',
+        goodTools: ['aimeat_app_list', 'aimeat_designbook_keep', 'aimeat_app_get', 'aimeat_designbook_propose'],
+        setup: async (ctx) => {
+            const q = await api<{ made?: Array<{ rows: Array<{ app: string; kept: boolean }> }> }>(ctx.baseUrl, '/v1/designbook?view=reasons', null);
+            const rows = (q.data?.made ?? []).flatMap(m => m.rows);
+            const mine = [...new Set(rows.filter(r => r.app.startsWith(`${ctx.ownerName}/ca-`)).map(r => r.app))];
+            const open = mine.find(app => rows.filter(r => r.app === app).every(r => !r.kept));
+            if (!open) throw new Error('keep-app setup: no measured build with hand-made parts is waiting for its owner\'s word. Run `--tasks build-tracker` first.');
+            const filename = open.split('/')[1];
+            const renamed = await api(ctx.baseUrl, `/v1/apps/${encodeURIComponent(filename)}`, ctx.ownerToken, { method: 'PATCH', body: { name: ctx.marker } });
+            if (renamed.status >= 300) throw new Error(`keep-app setup: renaming ${filename} answered ${renamed.status}`);
+            keepAppTarget.set(ctx.marker, filename);
+        },
+        verify: async (ctx) => {
+            const filename = keepAppTarget.get(ctx.marker) ?? '';
+            const q = await api<{ made?: Array<{ name: string; rows: Array<{ app: string; kept: boolean }> }> }>(ctx.baseUrl, '/v1/designbook?view=reasons', null);
+            const made = (q.data?.made ?? []).filter(m => m.rows.some(r => r.app === `${ctx.ownerName}/${filename}`));
+            const kept = made.length > 0 && made.every(m => m.rows.filter(r => r.app === `${ctx.ownerName}/${filename}`).every(r => r.kept));
+            const list = await api<{ parts: Array<{ id: string; status: string }> }>(ctx.baseUrl, '/v1/designbook?kind=component&limit=200', ctx.ownerToken);
+            const from: string[] = [];
+            for (const row of list.data?.parts ?? []) {
+                const one = await api<{ part: { status: string; body: { from_app?: string; judgement?: { reach: string; why: string } } } }>(ctx.baseUrl, `/v1/designbook/${row.id}`, ctx.ownerToken);
+                const b = one.data?.part.body;
+                if (b?.from_app === filename) from.push(`${row.id} [${b.judgement?.reach}, ${one.data?.part.status}] "${b.judgement?.why}"`);
+            }
+            const refused = ctx.metrics.toolCalls.filter(c => /designbook_propose/.test(c.name) && c.isError).length;
+            const ok = kept && from.length > 0;
+            const detail = ok ? `the owner's word is recorded and ${from.length} component(s) came out of ${filename}`
+                : !kept ? `the owner's word about ${filename} was not recorded (aimeat_designbook_keep)` : `kept, and nothing from ${filename} was offered to the Book`;
+            return { ok, detail, note: `made by hand: ${made.map(m => m.name).join(', ') || 'nothing'}; offered: ${from.join(' · ') || 'nothing'}; proposals the bench refused on the way: ${refused}; the owner was told what went onto the shelf: ${/shelf|Design Book|component/i.test(ctx.metrics.finalText) ? 'yes' : 'NO'}` };
         },
     },
     {

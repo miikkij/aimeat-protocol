@@ -23,6 +23,8 @@
  * @usage
  *   const part = validatePartInput(raw);   // throws DesignBookError with worded refusals
  * @version-history
+ *   v1.5.0 — 2026-09-20 — A genre's body may name the proposer's own published app instead of a
+ *     shipped template (grown-genre.ts), so the shelf of genres grows without a commit.
  *   v1.4.0 — 2026-09-20 — The COMPONENT kind, the ninth (component.ts): markup and a stylesheet an
  *     app made by hand, no script, every colour a page token. DesignBookError moved whole to
  *     errors.ts and is re-exported, because the component bench throws it and is called from here.
@@ -54,6 +56,7 @@ import { EFFECT_IDS, effectById } from '../../data/atelier-effects.js';
 
 import { DesignBookError } from './errors.js';
 import { validateComponentBody } from './component.js';
+import { isGrownGenreBody, validateGrownGenreBody } from './grown-genre.js';
 
 export { DesignBookError } from './errors.js';
 
@@ -167,11 +170,15 @@ function benchBodyFor(kind: PartKind, raw: unknown): Record<string, unknown> {
     // The Book PROVES and SHOWS it; taking one home is a FORK of the template, never a merge,
     // so adopt refuses this kind with the address (service.ts).
     if (kind === 'genre') {
+      // OR IT GREW OUT OF AN APP: the body names the proposer's own published page, whose look is
+      // its own (grown-genre.ts). Whose app it is and whether it earned the shelf needs the store,
+      // so the service asks; this is the shape.
+      if (isGrownGenreBody(o)) return validateGrownGenreBody(o) as unknown as Record<string, unknown>;
       const id = typeof o.template === 'string' ? o.template : '';
       const known = getAppTemplates().filter((t) => t.kind === 'genre').map((t) => t.id);
       if (!known.includes(id)) {
         throw new DesignBookError('BODY_INVALID',
-          `A genre part's body is { "template": "<id>" } naming a genre template this node serves. It serves: ${known.join(', ')}.`, 422);
+          `A genre part's body is { "template": "<id>" } naming a genre template this node serves, or { "app": { "owner", "filename" }, "judgement": { "reach", "why" } } naming your own published page whose look is its own (its head says aimeat-register "custom:<name>"). It serves: ${known.join(', ')}.`, 422);
       }
       return { template: id };
     }

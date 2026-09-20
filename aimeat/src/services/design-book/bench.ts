@@ -21,6 +21,7 @@
  * @usage
  *   const result = await runPartBench(storage, config, 'leiska-cover');
  * @version-history
+ *   v1.6.1 — 2026-09-20 — A genre that grew out of an app is not run here, and the answer says why.
  *   v1.6.0 — 2026-09-08 — Check 40px phone controls, clipped content and small text in both
  *     themes. JavaScript errors fail the render; old bench stamps remain historical.
  *   v1.5.0 — 2026-09-05 — Two more counts: fx_applied (elements wearing an effect, with a box)
@@ -57,6 +58,7 @@ import { withHeadlessContext, NO_HEADLESS_BROWSER } from '../screenshot-capture.
 import { DesignBookService, partKey, type DesignBookPart } from './service.js';
 import { DesignBookError } from './validate.js';
 import { renderableBodyFor, benchPageHtml } from './preview.js';
+import { isGrownGenreBody } from './grown-genre.js';
 
 export const BENCH_VIEWPORTS = [
   { id: '390x844', width: 390, height: 844 },
@@ -157,6 +159,15 @@ export async function runPartBench(
 ): Promise<DesignBookBenchResult> {
   const book = new DesignBookService(storage, config);
   const { part } = await book.get(id);
+  // A genre that grew out of an app is a stranger's page with script in it. This bench loads a
+  // page from the node's own loopback origin, so it does not run that one (grown-genre.ts).
+  if (part.kind === 'genre' && isGrownGenreBody(part.body)) {
+    return {
+      ran: false,
+      reason: 'This genre is somebody\'s published app, and the node does not run an app\'s script on its own origin. What earned it the shelf is its owner\'s word, answered when it was proposed.',
+      at: new Date().toISOString(),
+    };
+  }
   const renderable = renderableBodyFor(part);
   if (renderable === null) {
     return {

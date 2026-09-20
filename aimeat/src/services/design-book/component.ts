@@ -30,6 +30,7 @@
  * @structure COMPONENT_LIMITS · validateComponentBody(raw) · componentPreviewHtml(body) · componentSnippet(body)
  * @usage const body = validateComponentBody(raw);
  * @version-history
+ *   v1.1.1 — 2026-09-20 — componentPreviewHtml takes the theme the reader is on.
  *   v1.1.0 — 2026-09-20 — The markup and the stylesheet are read with an index, one character at a
  *     time (component-scan.ts), and no longer with patterns over the whole text. Three of those
  *     were quadratic on text that opens and never closes (CodeQL js/polynomial-redos, alerts 1646
@@ -192,10 +193,12 @@ export function componentSnippet(body: ComponentBody): { html: string; css: stri
 /**
  * The component as a page: the kit's stylesheet for the tokens, the component's own, its markup
  * on the page ground and again on a surface, so it is seen where an app would put it. No script.
+ * `theme` is the ground the reader is on: a component reads the page's tokens, so the same markup
+ * is a different picture in the dark, and the gallery asks for the one its reader is looking at.
  */
-export function componentPreviewHtml(body: ComponentBody): string {
+export function componentPreviewHtml(body: ComponentBody, theme: 'light' | 'dark' = 'light'): string {
   return [
-    '<!DOCTYPE html><html lang="en" data-theme="light"><head><meta charset="utf-8">',
+    `<!DOCTYPE html><html lang="en" data-theme="${theme === 'dark' ? 'dark' : 'light'}"><head><meta charset="utf-8">`,
     '<meta name="viewport" content="width=device-width, initial-scale=1.0">',
     '<link rel="stylesheet" href="/lib/aimeat-atelier.css">',
     '<style>body { margin: 0; background: var(--ak-bg); color: var(--ak-ink); font-family: var(--ak-font); }',

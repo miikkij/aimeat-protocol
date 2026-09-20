@@ -123,7 +123,7 @@ export class DesignBookReasons {
    * into the Book: the parts it kept, and what it had to make.
    */
   async keep(input: { ownerGhii: string; ownerName: string; filename: string; kept: boolean }): Promise<
-    { app: string; kept: boolean; version: number | null; took: BuildNotes['took']; made: BuildNotes['made'] } | null
+    { app: string; kept: boolean; version: number | null; register: string | null; took: BuildNotes['took']; made: BuildNotes['made'] } | null
   > {
     const app = `${input.ownerName}/${input.filename}`;
     const ownerKey = OWNER_NOTES_PREFIX + input.filename;
@@ -148,17 +148,17 @@ export class DesignBookReasons {
       made.rows = made.rows.map(r => (r.app === app ? { ...r, kept: input.kept } : r));
       await this.put(this.book(), MADE_KEY, made, 'public', ['designbook', 'made']);
     }
-    return { app, kept: input.kept, version: latest.version, took: latest.took, made: latest.made };
+    return { app, kept: input.kept, version: latest.version, register: latest.register ?? null, took: latest.took, made: latest.made };
   }
 
   /**
    * Whether the owner has said this app turned out well, and what its kept version made by hand.
    * What a component's publishing is earned from (service.ts): the owner's word, never a finished build.
    */
-  async keptState(ownerGhii: string, filename: string): Promise<{ kept: boolean; made: string[] }> {
+  async keptState(ownerGhii: string, filename: string): Promise<{ kept: boolean; version: number | null; made: string[] }> {
     const mine = parse<OwnerNotesRecord>(await this.storage.getMemory(ownerGhii, OWNER_NOTES_PREFIX + filename));
     const version = mine?.versions.find(v => v.version === mine.kept_version);
-    return { kept: !!version, made: version?.made.map(m => m.name) ?? [] };
+    return { kept: !!version, version: version?.version ?? null, made: version?.made.map(m => m.name) ?? [] };
   }
 
   /** One part: how often it was taken, in how many apps somebody was satisfied with, and the words. */

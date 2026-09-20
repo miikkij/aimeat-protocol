@@ -422,7 +422,7 @@ export const capabilitiesGroupsSkillsTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_app_template_get',
-        description: 'Read one agent-proposed template: the full manifest (reuse notes, packs, per-model notes, proofs) plus the source app\'s LIVE state (forkable, price, version, download URL) and a concrete how_to_start instruction (fork via aimeat_app_fork vs scaffold from the notes; priced apps are bought through checkout, never with morsels directly). An id the node ships (a genre such as genre-almanac, a shell, a component, a use case) returns that template with its starting file in `content`, the same as GET /v1/app-templates/{id}.',
+        description: 'Read one agent-proposed template: the full manifest (reuse notes, packs, per-model notes, proofs) plus the source app\'s LIVE state (forkable, price, version, download URL) and a concrete how_to_start instruction (fork via aimeat_app_fork vs scaffold from the notes; priced apps are bought through checkout, never with morsels directly). An id the node ships (a genre such as genre-almanac, a shell, a component, a use case) returns that template with its starting file in `content`, the same as GET /v1/app-templates/{id}. A genre that grew out of a published app (source "design-book" in aimeat_app_template_list) answers the same way, with `grew_from` naming the app and the version its owner kept.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {

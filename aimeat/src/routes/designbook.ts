@@ -13,6 +13,8 @@
  * @structure designbookRouter(config, storage): Router
  * @usage mounted by server-bootstrap/routes-loader.ts
  * @version-history
+ *   v1.4.1 — 2026-09-20 — The preview takes ?theme=dark|light for a component part: a reader in
+ *     the dark saw every component on a light ground.
  *   v1.4.0 — 2026-09-19 — GET /v1/designbook?view=map: the whole published shelf as one page of
  *     text, which is what the search tools answer when they are given no word. And the preview
  *     answers a served genre the shelf does not hold yet, where it answered 404.
@@ -43,6 +45,8 @@ import { DesignBookService } from '../services/design-book/service.js';
 import { DesignBookError } from '../services/design-book/validate.js';
 import { MAP_NOTE, REASONS_NOTE } from '../services/design-book/map.js';
 import { getAppTemplates } from '../data/app-templates.js';
+import { grownGenrePage, isGrownGenreBody } from '../services/design-book/grown-genre.js';
+import { resolveAppUrls } from './apps/helpers.js';
 
 export function designbookRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -167,7 +171,21 @@ export function designbookRouter(config: AimeatConfig, storage: Storage): Router
       if (!part && !served) {
         return res.status(404).json(error(config.nodeId, 'NOT_FOUND', `The Design Book holds no part "${id}", and this node serves no genre by that name.`));
       }
-      const html = part ? partPreviewHtml(part) : served!.content;
+      // A GENRE THAT GREW OUT OF AN APP is shown at the app's own address, never here: it is a
+      // stranger's page with script in it, and this origin is the node's. It answers only while
+      // the app stands (kept by its owner, open for forking, not parked or hidden).
+      if (part && part.kind === 'genre' && isGrownGenreBody(part.body)) {
+        const page = await grownGenrePage(storage, config, part.proposed_by_owner, part.body);
+        const url = page ? (await resolveAppUrls(config, storage, [{ owner: page.owner, filename: page.filename }]))[`${page.owner}/${page.filename}`] : undefined;
+        if (!url) {
+          return res.status(404).json(error(config.nodeId, 'NOT_RENDERABLE', `"${id}" grew out of an app that is no longer offered, so there is nothing to show.`));
+        }
+        res.setHeader('Cache-Control', 'no-store');
+        return res.redirect(302, url);
+      }
+      // ?theme=dark|light: the ground a COMPONENT is shown on. Anything else is the light page.
+      const theme = req.query.theme === 'dark' ? 'dark' as const : req.query.theme === 'light' ? 'light' as const : undefined;
+      const html = part ? partPreviewHtml(part, { theme }) : served!.content;
       if (html === null) {
         return res.status(404).json(error(config.nodeId, 'NOT_RENDERABLE',
           `"${id}" points at a template this node no longer carries, so there is nothing to render.`));

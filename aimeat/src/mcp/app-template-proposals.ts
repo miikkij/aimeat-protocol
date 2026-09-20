@@ -10,6 +10,7 @@
  * @structure registerAppTemplateProposalTools()
  * @usage registerAppTemplateProposalTools(mcp, storage, config, () => agentGaii);
  * @version-history
+ *   v1.3.0 — 2026-09-20 — _get and _list also answer for a genre that grew out of an app.
  *   v1.2.0 — 2026-09-19 — _get takes `part`, for a shipped template too large for one answer.
  *   v1.1.0 — 2026-09-18 — _get and _list also answer for the templates the node ships (shells,
  *     components, use cases). They read agent proposals only, so the shell every build text names
@@ -28,7 +29,7 @@ import { logger } from '../utils/logger.js';
 import {
     proposeTemplate, listTemplateProposals, getTemplateProposal, deleteTemplateProposal,
 } from '../services/app-template-proposals.js';
-import { nodeTemplateAnswer, nodeTemplateIndex, unknownTemplateMessage } from '../services/node-templates.js';
+import { templateAnswer, templateIndex, unknownTemplateMessage } from '../services/node-templates.js';
 import { toolError } from './tool-error.js';
 
 const text = (v: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(v, null, 2) }] });
@@ -83,7 +84,7 @@ export function registerAppTemplateProposalTools(
             return text({
                 // What the node ships, without content: aimeat_app_template_get { id } returns one
                 // with its file. The same index GET /v1/app-templates serves.
-                node_templates: nodeTemplateIndex(),
+                node_templates: await templateIndex(storage, config),
                 templates: proposals.map(p => ({
                     id: p.id, title: p.title, tier: p.tier, tags: p.tags,
                     model: p.model, start_mode: p.startMode,
@@ -111,7 +112,8 @@ export function registerAppTemplateProposalTools(
                 // connected over MCP cannot make that call: a cold-agent build run asked this
                 // tool for `shell-pure-client` and was told it did not exist (2026-09-18). Same
                 // registry and same fields as GET /v1/app-templates/:id (services/node-templates.ts).
-                const shipped = nodeTemplateAnswer(id, part);
+                // And a genre that grew out of an app, while that app stands (design-book/grown-genre.ts).
+                const shipped = await templateAnswer(storage, config, id, part);
                 if (!shipped) return toolError('NOT_FOUND', unknownTemplateMessage(id));
                 return typeof shipped.part_error === 'string' ? toolError('INVALID_INPUT', shipped.part_error) : text(shipped);
             }
