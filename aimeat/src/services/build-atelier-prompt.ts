@@ -436,7 +436,6 @@ function composeBody(config: AimeatConfig): string {
     + 'story-deck, guided-flow). Pick the one nearest the app, replace every <angle-bracketed> '
     + 'value with the app\'s own words and source names, and use it as the fallback — and as the '
     + 'first stored layout when the owner wants one.\n\n';
-  body += ATELIER_MOSAIC_IN_GENRE;
 
   // THE GENRES — rendered from the template registry, never hand-listed (the surface-layout
   // lesson: a hand-written menu drifts and the builder reads the refusal as a broken AI).
@@ -668,11 +667,14 @@ function composeBody(config: AimeatConfig): string {
     + 'arrangement the app already has; a `genre` (a complete page in a committed register) is '
     + 'forked from its template, never adopted. A starting shape from the '
     + 'Book plus your words beats a fresh composition, and what you had to make is written '
-    + 'down with its reason (the build notes, part `patterns`); the Book hears of it when the '
+    + 'down with its reason (the build notes, below); the Book hears of it when the '
     + 'owner is satisfied with the app, not when the build ends. WHAT THE BOOK HOLDS is listed at the end of this part when you read the '
     + 'specification in parts, every part on a line under its kind; `aimeat_designbook_search` '
     + 'called with nothing answers the same list. Read it before you compose: you cannot search '
     + 'for a part you do not know exists.\n\n';
+
+  // Its own section, in part `book` beside "The Design Book first" (build-atelier-layers.ts).
+  body += ATELIER_MOSAIC_IN_GENRE;
 
   body += '## AI inside the app\n\n';
   body += 'The `aide` block puts an AI panel on the screen whose tools are the app\'s OWN '

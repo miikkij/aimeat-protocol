@@ -24,6 +24,9 @@
  * @structure ATELIER_PROPOSAL_SECTION · ATELIER_FORK_PEOPLE_SECTION
  * @usage import { ATELIER_PROPOSAL_SECTION, ATELIER_FORK_PEOPLE_SECTION } from './build-atelier-people.js';
  * @version-history
+ *   v1.5.0 — 2026-09-20 — Components: how to take one another app made, and how to make a
+ *     hand-made piece in the shape the Book takes (one prefix, tokens for colours, no script in
+ *     the markup), so that it goes onto the shelf as it is when the owner is satisfied.
  *   v1.4.0 — 2026-09-20 — The build notes: a builder writes down WHY it took, passed over and made
  *     each thing, as it chooses. Nothing goes into the Book because a build is finished; the owner
  *     saying the app turned out well is the moment (aimeat_designbook_keep). Three places that
@@ -47,7 +50,8 @@
  * row adopted nothing, correctly. The mosaic has always mounted into any element, and it reads the
  * app's stored arrangement by itself; what was missing was the sentence saying so.
  */
-export const ATELIER_MOSAIC_IN_GENRE = 'IN A GENRE FORK, THE WORKING SCREEN IS A MOSAIC INSIDE THE GENRE. The genre is the frame: its masthead, its physics, its look. '
+export const ATELIER_MOSAIC_IN_GENRE = '## The Design Book in a genre fork: the working screen, components, and why\n\n'
+  + 'IN A GENRE FORK, THE WORKING SCREEN IS A MOSAIC INSIDE THE GENRE. The genre is the frame: its masthead, its physics, its look. '
   + 'The part of the page that is THIS APP (the list the person works through, the numbers, the form, the history) is a mosaic mounted into one element of the genre page. '
   + 'That is what lets a Design Book part land in a genre at all: adopting a layout or a fill writes the app\'s stored arrangement, only a mosaic draws a stored arrangement, and a genre page without one ignores everything the Book holds.\n\n'
   + '```html\n'
@@ -67,12 +71,17 @@ export const ATELIER_MOSAIC_IN_GENRE = 'IN A GENRE FORK, THE WORKING SCREEN IS A
   + '  });\n'
   + '</script>\n'
   + '```\n\n'
-  + 'THE FILL COMES FROM THE BOOK: pick one from the list at the end of part `libraries`, read it with `aimeat_designbook_get { id }`, '
+  + 'THE FILL COMES FROM THE BOOK: pick one from the list at the end of this part, read it with `aimeat_designbook_get { id }`, '
   + 'replace every <angle-bracketed> value with this app\'s words and source names, take its `look` line out (in a genre the genre is the look, and the bridge makes every block wear it), and put it in the `#aimeat-layout` block. '
   + 'THE PUBLISH DOES THE REST, so there is nothing to call afterwards: it counts each part the meta names as used (once per app), and on the app\'s FIRST publish it stores the `#aimeat-layout` block as the app\'s arrangement, '
   + 'so from then on the owner\'s AI rearranges the screen with `aimeat_app_ui_set` and no republish; a later publish never writes over what they arranged. The answer\'s `next_steps.design_book_parts` says what was counted, what it does not hold, and whether the layout was stored. '
   + 'Compose blocks of your own only where no fill is near.\n\n'
   + 'What stays hand-made in a genre fork is what the genre itself is made of: a figure only this page has, the masthead, a game board. Everything a mosaic block can show is a block.\n\n'
+  + 'COMPONENTS: WHAT ANOTHER APP MADE BY HAND. The list at the end of this part has a COMPONENTS group: pieces of page an earlier builder made because the Book had nothing, from apps whose owner was satisfied. '
+  + 'Take one with `aimeat_designbook_adopt { id, filename }`, before your app exists: it answers `snippet` { html, css, use, prefix }, which you build into the page as they are. A component carries NO script, so you wire its behaviour as `use` says, '
+  + 'and it reads the page\'s tokens, so inside a genre it wears the genre. Look there before you make a grid, a strip, a dial or a board of your own.\n\n'
+  + 'WHEN YOU DO MAKE SOMETHING BY HAND, MAKE IT SO IT CAN BE OFFERED LATER, which costs nothing now: give it ONE class prefix of its own (`wkgrid`, `wkgrid-cell`), take every colour from a `var(--ak-…)` token and never a literal, '
+  + 'and keep its behaviour in your script, reading `data-` attributes on the markup. That is exactly the shape the Book takes a component in, so when the owner says the app turned out well it goes onto the shelf as it is.\n\n'
   + 'WRITE DOWN WHY, AS YOU CHOOSE. A count says an AI reached for a part; it does not say the part is any good, and nobody can improve the Book from a number. So the page carries your reasons, one sentence each, in a third block beside the two above:\n\n'
   + '```html\n'
   + '<script type="application/json" id="aimeat-build-notes">\n'
@@ -95,10 +104,10 @@ export const ATELIER_PROPOSAL_SECTION = '## Then propose, and wait for the answe
   + '(3) **The finest**: a committed look forked from a genre, proven parts from the Design Book, components of its own where the book has none. It takes the longest and is the one worth showing. '
   + 'All three are built the same way underneath, in two languages, with the data kept on their node, so a prototype can be raised to the finest later without starting over: say that, because it is what makes the quick one a safe choice. '
   + 'If they do not answer, recommend one and say why; never pick a lower one silently because it is less work. '
-  + 'The page states the level: `<meta name="aimeat-level" content="proto">`, `"plain"` or `"fine"`. On `proto` and `plain` the rest of this list shrinks to the languages, who signs in and the first screen: no genre is forked, the page starts from the Atelier shell (`aimeat_app_template_get { id: "shell-atelier" }`), the publish asks for no register, and nothing is styled by hand (a publish warns when such a page carries a sheet of styles of its own). On `fine`, everything below applies, and so does writing down why you took, passed over and made each thing (the build notes, part `patterns`). A page that states no level is held to `fine`.\n'
+  + 'The page states the level: `<meta name="aimeat-level" content="proto">`, `"plain"` or `"fine"`. On `proto` and `plain` the rest of this list shrinks to the languages, who signs in and the first screen: no genre is forked, the page starts from the Atelier shell (`aimeat_app_template_get { id: "shell-atelier" }`), the publish asks for no register, and nothing is styled by hand (a publish warns when such a page carries a sheet of styles of its own). On `fine`, everything below applies, and so does writing down why you took, passed over and made each thing (the build notes, part `book`). A page that states no level is held to `fine`.\n'
   + '- **Two or three genres, named, each with one sentence on why it fits THIS app** and what the first screen would look like in it. Get them from the genre list (part `genre`, or `aimeat_designbook_search { kind: "genre" }`), and look at the owner\'s own apps first (`aimeat_app_list`): the ones already on Atelier show what they like. Say which one you would take. A look preset with components stacked in it is not on this list: that is the default page every app looks like, and it is what gets sent back.\n'
   + '- **Fixed colours or following their theme?** Ask it, or recommend one and say why. A fixed genre keeps its own colours in light and dark; a following page changes with the person\'s theme and palette. Part `genre` says which each genre is and gives an address for each (`See it`), and the whole shelf is one link: send the owner the links so they choose by looking. If they want a genre that is fixed and want it to follow the theme, say that it means moving its colours to the theme\'s tokens, and that you will show it in both modes before they decide.\n'
-  + '- **What you take from the Design Book.** Look before you make (`aimeat_designbook_search`, part `libraries`): layouts, fills, looks, motion, ambients and effects that each passed their own bench, adopted in one call. The working screen of the app is a mosaic inside the genre, and its arrangement is where a fill from the book lands (the mosaic section of part `patterns`). THIS LINE IS OWED IN EVERY PROPOSAL, word for word in its shape: "From the Design Book I take: <part ids, and what each is for here>", or "From the Design Book I take nothing, because <what you looked at and why none of it fits>". Taking nothing is allowed; taking nothing in silence is not. What you have to make because the book lacks it is written down with its reason in the page\'s build notes; it is offered to the book when the owner is satisfied with the app, and not because the build is finished.\n'
+  + '- **What you take from the Design Book.** Look before you make (`aimeat_designbook_search`, part `book`): layouts, fills, looks, motion, ambients and effects that each passed their own bench, adopted in one call. The working screen of the app is a mosaic inside the genre, and its arrangement is where a fill from the book lands (part `book` shows how). THIS LINE IS OWED IN EVERY PROPOSAL, word for word in its shape: "From the Design Book I take: <part ids, and what each is for here>", or "From the Design Book I take nothing, because <what you looked at and why none of it fits>". Taking nothing is allowed; taking nothing in silence is not. What you have to make because the book lacks it is written down with its reason in the page\'s build notes; it is offered to the book when the owner is satisfied with the app, and not because the build is finished.\n'
   + '- **The languages: English and Finnish, unless they say otherwise.** Two languages is the default on this node. The language you are talking in is not the app\'s language list. Building for one language is the owner\'s decision, so ask it as a question if you think one is right, and do not decide it.\n'
   + '- **Who signs in**, and what is kept for them. An app nobody signs in to says so here.\n'
   + '- **The first screen in one or two sentences**: what the person sees and does first. If that sentence is "a header and some cards", you have not designed it yet.\n\n'

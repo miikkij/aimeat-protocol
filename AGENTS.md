@@ -30,7 +30,7 @@ of them built the wrong thing three times in a row.
 
 - **A new app is built on the Atelier track, forked from a genre.** Load the skill
   `node:aimeat-app-builder-atelier` and read its specification: `aimeat_handbook_get { tier:
-  "build-app-atelier" }`, in parts: `genre`, `libraries` and `patterns` before any code. The Classic track is
+  "build-app-atelier" }`, in parts: `genre`, `libraries`, `book` and `patterns` before any code. The Classic track is
   for an app that is already Classic, or when Jouni asks for it by name. "Quicker to start" is not
   a reason, and a track is never changed in the middle of a build.
 - **Ask the level first.** A quick prototype (the kit as it comes, no styling), an ordinary page
@@ -57,7 +57,10 @@ of them built the wrong thing three times in a row.
   `took`, `passed` and `made`, one true sentence of why each; the publish keeps them with the
   version. Jouni rebuilt one app three times and liked the third: only an app its owner says
   turned out well teaches the Book anything. When he says so, record it with
-  `aimeat_designbook_keep { filename }`.
+  `aimeat_designbook_keep { filename }`, and then offer what the app made by hand as Design Book
+  `component` parts (markup and a stylesheet under one class prefix, colours as `var(--ak-…)`
+  tokens, no script), each with your honest judgement: `general` or `special`, and why. A general
+  one is published by itself. Build hand-made pieces in that shape from the start.
 - **The genre is the look.** A look preset with components stacked in it, under a genre's name, is
   the default page every app looks like, and it is what gets sent back.
 - **Judge what it looks like, not only that it works.** Passing tests, contrast and page width do

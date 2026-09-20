@@ -432,13 +432,13 @@ const publish = (token: string, body: Record<string, unknown>) =>
         const list = await json('/v1/prompts/build-app-atelier/sections');
         assert(list.status === 200, `parts list ${list.status}`);
         const ids = (list.body.data.parts as any[]).map(p => p.id);
-        assert(JSON.stringify(ids) === JSON.stringify(['start', 'genre', 'libraries', 'patterns', 'look']), `parts: ${JSON.stringify(ids)}`);
+        assert(JSON.stringify(ids) === JSON.stringify(['start', 'genre', 'libraries', 'book', 'patterns', 'look']), `parts: ${JSON.stringify(ids)}`);
         for (const p of list.body.data.parts as any[]) assert(p.chars > 1000 && p.chars <= 24000, `${p.id} is ${p.chars} characters`);
         const start = await json('/v1/prompts/build-app-atelier/sections/start');
         assert(start.status === 200 && start.body.data.spec_token === atelierToken, 'part start carries the Atelier token');
         assert((start.body.data.prompt as string).includes('build-app-atelier/<id>'), 'part start says how to read the others');
         const none = await json('/v1/prompts/build-app-atelier/sections/no-such-part');
-        assert(none.status === 404 && /start, genre, libraries, patterns, look/.test(none.body.error.message), `an unknown part names the ones there are: ${JSON.stringify(none.body.error)}`);
+        assert(none.status === 404 && /start, genre, libraries, book, patterns, look/.test(none.body.error.message), `an unknown part names the ones there are: ${JSON.stringify(none.body.error)}`);
     });
 
     await test('the Atelier shell is served, declares its track, and points at its own guide', async () => {

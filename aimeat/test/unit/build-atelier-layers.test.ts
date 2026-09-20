@@ -40,8 +40,8 @@ describe('the Atelier specification in parts', () => {
 
   it('the first part names the others, says which come before code, and carries the token', () => {
     const start = atelierPiece(full, 'start', config.baseUrl)!.text;
-    for (const id of ['genre', 'libraries', 'patterns', 'look']) expect(start).toContain('`' + id + '`');
-    expect(start).toMatch(/Read `genre`, `libraries` and `patterns` BEFORE you write any code/);
+    for (const id of ['genre', 'libraries', 'book', 'patterns', 'look']) expect(start).toContain('`' + id + '`');
+    expect(start).toMatch(/Read `genre`, `libraries`, `book` and `patterns` BEFORE you write any code/);
     expect(start).toMatch(/aimeat_handbook_get \{ tier: "build-app-atelier\/<id>" \}/);
     expect(start).toMatch(/spec_token: atelier-[0-9a-f]{12}/);
   });

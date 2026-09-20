@@ -164,7 +164,8 @@ const GOOD_BODY = {
     await test('an unknown kind is refused by name', async () => {
         const r = await json('/v1/designbook', {
             method: 'POST', headers: auth(op.token),
-            body: JSON.stringify({ part: { id: partId, kind: 'component', title: 'T', summary: 'S', body: GOOD_BODY } }),
+            // "component" stood here as the kind nobody had, until 2026-09-20 made it the ninth kind.
+            body: JSON.stringify({ part: { id: partId, kind: 'widget', title: 'T', summary: 'S', body: GOOD_BODY } }),
         });
         assert(r.status === 400 && r.body.error?.code === 'UNKNOWN_KIND', `UNKNOWN_KIND, got ${r.status} ${r.body.error?.code}`);
     });
@@ -431,6 +432,60 @@ const GOOD_BODY = {
         assert(del.status === 200, `delete ${del.status}: ${JSON.stringify(del.body?.error)}`);
         r = await part();
         assert(r.taken === takenBefore && !mine(r), `the deleted app's row is gone: ${JSON.stringify(r.took.map((x: any) => x.app))}`);
+    });
+
+    await test('a COMPONENT goes onto the shelf by itself on three things together: the bench, its builder judging it general, and the owner\'s word about the app it came from', async () => {
+        const f = `dbcomp${Date.now()}.html`;
+        const stamp = Date.now() % 100000;
+        const body = (patch: Record<string, unknown> = {}) => ({
+            prefix: 'wkgrid',
+            html: '<div class="wkgrid" role="grid"><button class="wkgrid-cell" type="button" aria-pressed="false" data-day="mon"></button></div>',
+            css: '.wkgrid { display: grid; gap: 8px; color: var(--ak-ink); }\n.wkgrid-cell { min-height: 40px; border: 1px solid var(--ak-line); background: var(--ak-surface); }',
+            use: 'One .wkgrid-cell button per day with data-day. The app toggles aria-pressed on click and saves.',
+            judgement: { reach: 'general', why: 'Any app where a person ticks days against rows uses it: habits, chores, attendance.' },
+            from_app: f, ...patch,
+        });
+        const propose = (id: string, b: unknown) => json('/v1/designbook', { method: 'POST', headers: auth(other.token),
+            body: JSON.stringify({ part: { id, kind: 'component', title: 'A week you tick', summary: 'Rows against seven days, every cell a button.', body: b } }) });
+
+        // The bench refuses script, in words.
+        const script = await propose(`comp-bad-${stamp}`, body({ html: '<div class="wkgrid" onclick="x()"></div>' }));
+        assert(script.status === 422 && /attribute "onclick"/.test(script.body.error?.message ?? ''), `an event handler is refused: ${script.status} ${JSON.stringify(script.body?.error)}`);
+
+        // The app exists and wrote down what it made, and its owner has NOT said it turned out well.
+        const page = APP(f).replace('</head>', `<script type="application/json" id="aimeat-build-notes">${JSON.stringify({ made: [{ name: 'week-grid', what: 'seven tappable days per row', why: 'the Book has no grid a person ticks' }] })}</` + 'script></head>');
+        const pub = await json('/v1/apps', { method: 'POST', headers: auth(other.token), body: JSON.stringify({ filename: f, mime_type: 'text/html', content: b64(page), name: 'Comp source', description: 'Made a week grid by hand.' }) });
+        assert(pub.status === 201, `publish ${pub.status}: ${JSON.stringify(pub.body?.error)}`);
+        const early = await propose(`comp-week-${stamp}`, body());
+        assert(early.status === 201 && early.body.data.status === 'proposed' && early.body.data.publishing?.earned === false && /has not said/.test(early.body.data.publishing.why),
+            `a finished build earns nothing: ${JSON.stringify(early.body?.data ?? early.body?.error)}`);
+
+        // The owner says so; the same proposal, made again, is on the shelf with no operator in between.
+        const keep = await json('/v1/designbook/keep', { method: 'POST', headers: auth(other.token), body: JSON.stringify({ filename: f }) });
+        assert(keep.status === 200 && /kind "component"/.test(keep.body.data.next), `keep says how to offer what was made: ${keep.status} ${JSON.stringify(keep.body?.data?.next ?? keep.body?.error)}`);
+        const earned = await propose(`comp-week-${stamp}`, body());
+        assert(earned.status === 200 && earned.body.data.status === 'published' && earned.body.data.publishing?.earned === true,
+            `bench + general + the owner's word publishes it: ${JSON.stringify(earned.body?.data ?? earned.body?.error)}`);
+        const anon = await json(`/v1/designbook/comp-week-${stamp}`);
+        assert(anon.status === 200 && anon.body.data.part.status === 'published', `and a reader with no session finds it: ${anon.status}`);
+        const map = await json('/v1/designbook?view=map');
+        assert(map.body.data.map.includes('### COMPONENTS') && map.body.data.map.includes(`\`comp-week-${stamp}\``), 'the map every builder reads lists it under COMPONENTS');
+
+        // Judged special, from the same kept app: listed, not published.
+        const special = await propose(`comp-flute-${stamp}`, body({ prefix: 'flute', html: '<div class="flute"></div>', css: '.flute { color: var(--ak-ink); }',
+            judgement: { reach: 'special', why: 'It draws a flute fingering chart, which only a flute practice app needs.' } }));
+        assert(special.status === 201 && special.body.data.status === 'proposed' && /judged it special/.test(special.body.data.publishing.why),
+            `a special one stays proposed: ${JSON.stringify(special.body?.data ?? special.body?.error)}`);
+
+        // Taking it answers the two texts and writes nothing, before the taker's app exists.
+        const take = await json(`/v1/designbook/comp-week-${stamp}/adopt`, { method: 'POST', headers: auth(op.token), body: JSON.stringify({ filename: 'not-built-yet.html' }) });
+        assert(take.status === 200 && take.body.data.snippet?.prefix === 'wkgrid' && /wkgrid-cell/.test(take.body.data.snippet.html) && /var\(--ak-ink\)/.test(take.body.data.snippet.css),
+            `taking a component answers its snippet: ${take.status} ${JSON.stringify(take.body?.data ?? take.body?.error)}`);
+
+        // The preview is a page with no script in it.
+        const prev = await fetch(`${BASE}/v1/designbook/comp-week-${stamp}/preview`);
+        const html = await prev.text();
+        assert(prev.status === 200 && html.includes('class="wkgrid"') && !/<script/i.test(html.replace(/<script[^>]*nonce[^>]*><\/script>/gi, '')), `the preview renders it, scriptless: ${prev.status}`);
     });
 
     await test('adoption is the heartbeat: adopting an aging part lifts it back to published', async () => {

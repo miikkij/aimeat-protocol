@@ -23,6 +23,9 @@
  * @usage
  *   const part = validatePartInput(raw);   // throws DesignBookError with worded refusals
  * @version-history
+ *   v1.4.0 — 2026-09-20 — The COMPONENT kind, the ninth (component.ts): markup and a stylesheet an
+ *     app made by hand, no script, every colour a page token. DesignBookError moved whole to
+ *     errors.ts and is re-exported, because the component bench throws it and is called from here.
  *   v1.3.0 — 2026-09-05 — The EFFECT kind (wish-atelier-post-process-effects, stage 5): a body of
  *     { effect, params?, on?, look?, tokens? } through validateEffectSpec on the target it lands
  *     on (the hero band, a figure) or validatePostChain for the layer, the target defaulting from
@@ -49,15 +52,13 @@ import { getAppTemplates } from '../../data/app-templates.js';
 import { AMBIENT_IDS, ambientById } from '../../data/atelier-ambients.js';
 import { EFFECT_IDS, effectById } from '../../data/atelier-effects.js';
 
-export class DesignBookError extends Error {
-  constructor(public code: string, message: string, public status = 400) {
-    super(message);
-    this.name = 'DesignBookError';
-  }
-}
+import { DesignBookError } from './errors.js';
+import { validateComponentBody } from './component.js';
+
+export { DesignBookError } from './errors.js';
 
 /** The kinds the node can PROVE. Growing this list means growing the bench first. */
-export const PART_KINDS = ['layout', 'fill', 'look', 'motion', 'illustration', 'genre', 'ambient', 'effect'] as const;
+export const PART_KINDS = ['layout', 'fill', 'look', 'motion', 'illustration', 'genre', 'ambient', 'effect', 'component'] as const;
 export type PartKind = (typeof PART_KINDS)[number];
 
 /** Where an effect part lands: a moment on the hero band, a picture effect on one figure, or a
@@ -125,7 +126,8 @@ export function validatePartInput(raw: unknown): PartInput {
       'illustration = art direction for the imagery pipeline; genre = one of the node\'s served page ' +
       'templates, shown and forked rather than adopted; ambient = the animated layer behind an app, ' +
       'proven on a look; effect = a post-process filter on the hero band, a figure or the ambient ' +
-      'layer, proven where it lands.)');
+      'layer, proven where it lands; component = markup and a stylesheet an app made by hand ' +
+      'because the Book had nothing for it, every colour a page token and no script.)');
   }
 
   const title = typeof p.title === 'string' ? p.title.trim() : '';
@@ -156,6 +158,10 @@ function benchBodyFor(kind: PartKind, raw: unknown): Record<string, unknown> {
     const o = raw as Record<string, unknown>;
     if (kind === 'illustration') {
       return validateImageryStyle(o) as unknown as Record<string, unknown>;
+    }
+    // A COMPONENT is markup and a stylesheet, no script, every colour a page token (component.ts).
+    if (kind === 'component') {
+      return validateComponentBody(o) as unknown as Record<string, unknown>;
     }
     // A GENRE points at one of the registry's genre templates — a complete committed page.
     // The Book PROVES and SHOWS it; taking one home is a FORK of the template, never a merge,
@@ -266,6 +272,9 @@ function bodyShapeHint(kind: PartKind): string {
   }
   if (kind === 'effect') {
     return `An effect part's body is { effect: one of ${EFFECT_IDS.join(', ')}, params?, on?: ${EFFECT_TARGETS.join(' | ')}, look?, tokens? } — a post-process filter, proven where it lands.`;
+  }
+  if (kind === 'component') {
+    return 'A component part\'s body is { prefix, html, css, use, judgement: { reach: "general" | "special", why }, from_app? }: markup and a stylesheet under one class prefix, every colour a var(--ak-…) token, no script.';
   }
   return `A ${kind} part's body is { tokens: { "--ak-…": "value" }${kind === 'look' ? ', look?' : ''} }.`;
 }

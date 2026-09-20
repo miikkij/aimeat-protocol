@@ -34,6 +34,10 @@
  *   const book = new DesignBookService(storage, config);
  *   const out = await book.propose(callerGaii, raw, provenance);
  * @version-history
+ *   v1.8.0 — 2026-09-20 — The COMPONENT kind. Taking one answers its snippet and writes nothing,
+ *     before the taker's app exists. A proposal is PUBLISHED BY ITSELF on three things together:
+ *     the bench, its builder judging it general, and the owner's word about the app it came from
+ *     (componentPublishing). Nothing here takes a part down; that stays the operator's.
  *   v1.7.0 — 2026-09-20 — The reasons (reasons.ts): get() answers what builders wrote about a part,
  *     keep() is the owner saying an app turned out well, reasonsQueue() is what the Book should
  *     grow next. A count says an AI favoured a part; only a kept app says somebody was satisfied.
@@ -77,6 +81,7 @@ import { POST_MAX } from '../../data/atelier-effects.js';
 import { getAppTemplateIndex } from '../../data/app-templates.js';
 import { buildDesignBookMap } from './map.js';
 import { DesignBookReasons } from './reasons.js';
+import { componentSnippet, type ComponentBody } from './component.js';
 
 export const PART_KEY_PREFIX = 'atelier.book.part.';
 export const USAGE_KEY_PREFIX = 'atelier.book.usage.';
@@ -91,6 +96,8 @@ function usageKey(id: string): string { return `${USAGE_KEY_PREFIX}${id}`; }
 function proposeChecksFor(input: PartInput): string[] {
   if (input.kind === 'layout' || input.kind === 'fill') return ['layout-valid'];
   if (input.kind === 'illustration') return ['style-valid'];
+  // Markup against the allowlist, the stylesheet under its own prefix, every colour a token.
+  if (input.kind === 'component') return ['markup-allowlist', 'styles-scoped', 'colours-are-tokens', 'no-script', 'judgement-given'];
   if (input.kind === 'ambient') {
     // The ambient bench always runs the matrix: the preset is proven on the part's look.
     const checks = ['ambient-valid', 'contrast-matrix'];
@@ -198,9 +205,10 @@ export class DesignBookService {
    */
   async propose(
     callerGaii: string, raw: unknown, provenance: WriteProvenance,
-  ): Promise<{ id: string; status: PartStatus; version: number; replaced_version: number | null }> {
+  ): Promise<{ id: string; status: PartStatus; version: number; replaced_version: number | null; publishing?: { earned: boolean; why: string } }> {
     const input: PartInput = validatePartInput(raw);
     const ownerGhii = await this.ownerOf(callerGaii);
+    const publishing = input.kind === 'component' ? await this.componentPublishing(ownerGhii, input.body as unknown as ComponentBody) : undefined;
 
     const existing = await this.findRecord(input.id);
     const prev = existing ? this.parsePart(existing) : null;
@@ -222,13 +230,15 @@ export class DesignBookService {
       summary: input.summary,
       body: input.body as unknown as Record<string, unknown>,
       tags: input.tags,
-      status: prev?.status ?? 'proposed',
+      // A component that earned it goes straight to the shelf; nothing here ever takes a part
+      // DOWN from published, which stays the operator's call.
+      status: prev?.status === 'published' || prev?.status === 'aging' ? prev.status : (publishing?.earned ? 'published' : (prev?.status ?? 'proposed')),
       proposed_by: provenance.principal,
       proposed_by_owner: ownerGhii,
       bench: { checks: proposeChecksFor(input), passed_at: now },
       created_at: prev?.created_at ?? now,
       updated_at: now,
-      ...(prev?.published_at ? { published_at: prev.published_at } : {}),
+      ...(prev?.published_at ? { published_at: prev.published_at } : (publishing?.earned ? { published_at: now } : {})),
     };
 
     // Titles and summaries are text people read in the gallery: stamped like every other write.
@@ -262,7 +272,34 @@ export class DesignBookService {
       id: input.id, status: part.status,
       version: existing ? existing.version + 1 : 1,
       replaced_version: existing?.version ?? null,
+      ...(publishing ? { publishing } : {}),
     };
+  }
+
+  /**
+   * Whether a component goes onto the shelf by itself. THREE THINGS, ALL OF THEM (ruled
+   * 2026-09-20): the bench passed (or this is not reached), its builder judged it GENERAL and
+   * said why, and it comes out of an app whose OWNER said the app turned out well. The bench
+   * proves it renders and wears the page; it cannot prove anybody else wants it, which is what
+   * the judgement is for, and a finished build proves nothing about the app, which is what the
+   * owner's word is for. A component that misses one stays proposed: listed in the queue, usable
+   * by whoever made it, and one operator action away from the shelf.
+   */
+  private async componentPublishing(ownerGhii: string, body: ComponentBody): Promise<{ earned: boolean; why: string }> {
+    if (body.judgement.reach !== 'general') {
+      return { earned: false, why: 'Its builder judged it special to one app, so it stays proposed: listed, and usable by whoever made it.' };
+    }
+    if (!body.from_app) {
+      return { earned: false, why: 'It names no app it came out of (from_app), so there is no owner\'s word to earn publishing from. It stays proposed.' };
+    }
+    const state = await new DesignBookReasons(this.storage, this.config).keptState(ownerGhii, body.from_app);
+    if (!state.kept) {
+      return { earned: false, why: `The owner has not said "${body.from_app}" turned out well (aimeat_designbook_keep). A finished build is not that. It stays proposed until they do; propose it again then.` };
+    }
+    if (!state.made.length) {
+      return { earned: false, why: `The kept version of "${body.from_app}" wrote down nothing it made by hand (the \`made\` list of its build notes), so nothing says this component came out of it. It stays proposed.` };
+    }
+    return { earned: true, why: `Published: the bench passed, its builder judged it general, and it comes out of "${body.from_app}", which its owner said turned out well.` };
   }
 
   /** The stored record version of one part, or null when the address is empty — the seeding
@@ -356,7 +393,11 @@ export class DesignBookService {
    */
   async adopt(
     callerGaii: string, id: string, filename: string, provenance: WriteProvenance,
-  ): Promise<{ id: string; filename: string; version: number; replaced_version: number | null; kind: PartKind }> {
+  ): Promise<{
+    id: string; filename: string; version: number; replaced_version: number | null; kind: PartKind;
+    /** A component only: the markup, the stylesheet and how to wire them. */
+    snippet?: ReturnType<typeof componentSnippet>;
+  }> {
     const record = await this.findRecord(id);
     if (!record) throw new DesignBookError('NOT_FOUND', `No Design Book part "${id}".`, 404);
     const part = this.parsePart(record);
@@ -364,6 +405,17 @@ export class DesignBookService {
     if (part.status !== 'published' && part.status !== 'aging' && part.proposed_by_owner !== ownerGhii) {
       throw new DesignBookError('NOT_PUBLISHED',
         `"${id}" is ${part.status}, and only its proposer can adopt it before it is published. The published catalogue is what everyone builds from.`, 403);
+    }
+
+    // A COMPONENT is taken BEFORE the app exists: it is two texts to build into the page, and
+    // there is no stored arrangement for it to land in. So it needs no published app, writes
+    // nothing, and is not counted here: the publish counts it when the page names it in its
+    // build notes (`took`), which is also where the builder says why it chose it.
+    if (part.kind === 'component') {
+      return {
+        id, filename, version: record.version, replaced_version: null, kind: part.kind,
+        snippet: componentSnippet(part.body as unknown as ComponentBody),
+      };
     }
 
     const apps = new AppUiService(this.storage, this.config);
@@ -519,8 +571,12 @@ export class DesignBookService {
       ? 'Taken back: this app no longer counts as one its owner was satisfied with.'
       : out.made.length
         ? `This version made ${out.made.length} thing${out.made.length === 1 ? '' : 's'} by hand because the Book had nothing for it: ${out.made.map(m => m.name).join(', ')}. `
-          + 'Now that the owner is satisfied, these are worth offering to the next builder. An ARRANGEMENT goes in as a fill (aimeat_designbook_propose, kind "fill", its own words turned back into <placeholders>); '
-          + 'the Book has no kind for a hand-made HTML component yet, so those stay listed in the Book\'s queue, with your reason, for the people who decide what the Book grows next.'
+          + 'NOW is when they are offered to the next builder, and you do it, in this conversation: for each one, take its markup and its styles out of the app (aimeat_app_get, then read the page) and propose it, '
+          + `aimeat_designbook_propose with kind "component" and body { prefix, html, css, use, judgement: { reach, why }, from_app: "${filename}" }. `
+          + 'The component carries no script (the app that takes it wires the behaviour), every class starts with its prefix, and every colour is a var(--ak-…) token so it wears whatever page it lands in. '
+          + 'JUDGE EACH ONE HONESTLY: reach "general" when another kind of app would use it (a grid a person ticks), "special" when it belongs to this app alone (a flute fingering chart), with the reason. '
+          + 'A general one from this app is published by itself; a special one stays listed and yours. An ARRANGEMENT you composed goes in as kind "fill", its own words turned back into <placeholders>. '
+          + 'Tell the owner in a line what went onto the shelf and what you judged special.'
         : 'Recorded. This version made nothing by hand, so there is nothing new to offer the Book; the parts it took now count as kept.';
     return { app: out.app, kept: out.kept, version: out.version, took: out.took, made: out.made, next };
   }
