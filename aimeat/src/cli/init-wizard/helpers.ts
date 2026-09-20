@@ -5,6 +5,8 @@
  * @description Env-file parsing, cancel handling, and input validators for the `aimeat init` wizard. Extracted from src/cli/init-wizard.ts to satisfy max-file-lines.
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from src/cli/init-wizard.ts (max-file-lines)
+ *   v1.1.0 — 2026-09-20 — checkCancel subtracts the cancel from the answer instead of matching a
+ *     `symbol` parameter, which @clack/prompts 1.8 stopped satisfying.
  */
 
 import { existsSync, readFileSync } from 'node:fs';
@@ -47,9 +49,20 @@ export function bail(t: TFunction): never {
   process.exit(0);
 }
 
-export function checkCancel<T>(value: T | symbol, t: TFunction): T {
+/**
+ * A prompt's answer, with the cancel out of the way: Ctrl-C ends the wizard here rather than
+ * returning a symbol the caller would have to remember to check.
+ *
+ * THE SIGNATURE SUBTRACTS RATHER THAN ADDS, and that is what makes it survive an upgrade. It used
+ * to read `value: T | symbol`, which asked TypeScript to match `symbol` against whatever the prompt
+ * returns. @clack/prompts 1.8 changed the cancel from the `symbol` primitive to a `unique symbol`,
+ * which matches that position no better than a string does, so `T` swallowed the whole union and
+ * every one of the 78 call sites was suddenly handed `string | unique symbol`. Taking the value as
+ * it comes and subtracting the symbol out of the result asks nothing of the library's shape.
+ */
+export function checkCancel<T>(value: T, t: TFunction): Exclude<T, symbol> {
   if (p.isCancel(value)) bail(t);
-  return value as T;
+  return value as Exclude<T, symbol>;
 }
 
 // Note: @clack/prompts calls validate() with undefined when input is empty,

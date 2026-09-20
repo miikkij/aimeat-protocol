@@ -27,14 +27,25 @@
  * @usage for await (const event of streamTaskAsAgui({ storage, auth, taskId, threadId, runId })) …
  * @version-history
  *   v1.0.0 — 2026-09-01 — Initial (Agent v2, V6d).
+ *   v1.1.0 — 2026-09-20 — @ag-ui/core 1.0.0. AGUI_PROTOCOL declares the PROTOCOL version 1.0, not
+ *     the package version it used to copy; the protocol register carries the entry.
  */
 import { randomUUID } from 'node:crypto';
 import { EventType, type BaseEvent } from '@ag-ui/core';
 import type { Storage, AgentV2TaskRecord } from '../storage/interface.js';
 import type { Principal } from './agent-v2-messaging-ops.js';
 
-/** What this door speaks, said once so the route and the stream cannot disagree. */
-export const AGUI_PROTOCOL = { name: 'ag-ui', version: '0.0.59' } as const;
+/**
+ * What this door speaks, said once so the route and the stream cannot disagree.
+ *
+ * THE VERSION IS THE PROTOCOL'S, NOT THE PACKAGE'S. Until 2026-09-20 this read `0.0.59`, which was
+ * the npm version of @ag-ui/core and not a version of AG-UI at all: a client reading it would have
+ * learned nothing about the wire. AG-UI 1.0 publishes its own `PROTOCOL_VERSION`, and that is what
+ * a client needs. The literal stays written out here because `security/protocol-versions.json`
+ * checks this line; `test/unit/agui-protocol-version.test.ts` holds it against the package, so an
+ * upgrade that moves the protocol fails at the upgrade rather than on the register's 90-day clock.
+ */
+export const AGUI_PROTOCOL = { name: 'ag-ui', version: '1.0' } as const;
 
 /** How often to look at a task that did not say. */
 const DEFAULT_POLL_MS = 1000;

@@ -37,6 +37,22 @@
       "note": "We serve 1.x through @a2a-js/sdk (A2A_PROTOCOL_VERSION) and declare 0.3 BESIDE it, deliberately: almost every client in the world still speaks 0.3, the SDK ships the compatibility layer, and the card declares both interfaces so a client reading either finds an address. The value tracked here is the legacy one, because it is the one written out by hand. Surface as of 2026-09-04: streaming on, push notifications on, extended agent card on, all eight task states produced, artifacts on the task, x402 extension declared."
     },
     {
+      "id": "ag-ui",
+      "name": "Agent-User Interaction",
+      "spec": "https://docs.ag-ui.com/concepts/events",
+      "weDeclare": "1.0",
+      "declaredIn": [
+        {
+          "file": "src/services/agui-run.ts",
+          "template": "AGUI_PROTOCOL = { name: 'ag-ui', version: '{version}' }"
+        }
+      ],
+      "current": "1.0",
+      "verifiedOn": "2026-09-20",
+      "verdict": "current",
+      "note": "The third door onto one task, beside A2A and ACP: a browser watches an agent work over SSE. Until 2026-09-20 this declared `0.0.59`, the npm version of @ag-ui/core, which is not a version of AG-UI at all and told a client nothing about the wire. @ag-ui/core 1.0.0 freezes the schema and publishes PROTOCOL_VERSION 1.0; we declare that. Surface as of 2026-09-20: RUN_STARTED, TEXT_MESSAGE_START/CONTENT/END, RUN_FINISHED and RUN_ERROR, every line of the task its own message. The events we do not emit are the ones this node has nothing to say for: no state snapshots or deltas, no tool-call or reasoning events, no activity events. One-way, because AG-UI is a run that emits until it settles and the task has the same shape. test/unit/agui-protocol-version.test.ts holds the literal against the package, so a protocol move fails at the upgrade rather than on this register's 90-day clock."
+    },
+    {
       "id": "x402",
       "name": "x402 machine payments",
       "spec": "https://x402.org",
