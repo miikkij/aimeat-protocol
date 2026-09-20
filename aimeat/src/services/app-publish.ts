@@ -623,7 +623,11 @@ export async function publishApp(
 
   // The two calls a builder is measured to forget once the app is live (app-book-parts.ts).
   const bookParts = isHtml
-    ? await recordBookParts(storage, config, { ownerName, ownerGaii: ownerGhii, filename, html, provenance: { principal: callerGaii } })
+    ? await recordBookParts(storage, config, {
+      ownerName, ownerGaii: ownerGhii, filename, html, provenance: { principal: callerGaii },
+      // An app behind an access code, or parked, keeps its reasons to its owner.
+      version: newVersion, shareable: !parked && !accessCode,
+    })
     : undefined;
   const steps = await buildPublishNextSteps(
     storage, config, ownerName, filename, data.length, track, declaredRegister, isHtml ? html : undefined);

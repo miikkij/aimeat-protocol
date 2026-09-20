@@ -34,6 +34,9 @@
  *   const book = new DesignBookService(storage, config);
  *   const out = await book.propose(callerGaii, raw, provenance);
  * @version-history
+ *   v1.7.0 — 2026-09-20 — The reasons (reasons.ts): get() answers what builders wrote about a part,
+ *     keep() is the owner saying an app turned out well, reasonsQueue() is what the Book should
+ *     grow next. A count says an AI favoured a part; only a kept app says somebody was satisfied.
  *   v1.6.0 — 2026-09-20 — recordUse(): a published app that names the parts it was built from is
  *     counted, once per app (app-book-parts.ts). The usage record remembers which apps.
  *   v1.5.0 — 2026-09-19 — map(): the published shelf as one page of text (map.ts). Three measured
@@ -73,6 +76,7 @@ import {
 import { POST_MAX } from '../../data/atelier-effects.js';
 import { getAppTemplateIndex } from '../../data/app-templates.js';
 import { buildDesignBookMap } from './map.js';
+import { DesignBookReasons } from './reasons.js';
 
 export const PART_KEY_PREFIX = 'atelier.book.part.';
 export const USAGE_KEY_PREFIX = 'atelier.book.usage.';
@@ -268,15 +272,25 @@ export class DesignBookService {
     return record ? record.version : null;
   }
 
-  /** One part, whole, with its usage count. */
-  async get(id: string): Promise<{ part: DesignBookPart; version: number; usage: number; owner: string }> {
+  /**
+   * One part, whole, with its usage count and what builders wrote about it: `taken` is how often
+   * a builder reached for it, `kept` how many of those apps an owner was satisfied with, and the
+   * rows carry the reasons, the ones for passing it over included.
+   */
+  async get(id: string): Promise<{
+    part: DesignBookPart; version: number; usage: number; owner: string;
+    reasons: Awaited<ReturnType<DesignBookReasons['forPart']>>;
+  }> {
     const record = await this.findRecord(id);
     if (!record) {
       throw new DesignBookError('NOT_FOUND',
         `No Design Book part "${id}". List what exists with the search — the Book only answers for addresses it holds.`, 404);
     }
     const part = this.parsePart(record);
-    return { part, version: record.version, usage: await this.usageOf(id), owner: part.proposed_by_owner };
+    return {
+      part, version: record.version, usage: await this.usageOf(id), owner: part.proposed_by_owner,
+      reasons: await new DesignBookReasons(this.storage, this.config).forPart(id),
+    };
   }
 
   /** The catalogue view: public parts, filtered in memory (the Book is a bounded, curated set). */
@@ -478,6 +492,42 @@ export class DesignBookService {
       updatedAt: now,
     });
     return true;
+  }
+
+  /**
+   * THE OWNER SAYS AN APP TURNED OUT WELL (or takes it back). The only moment anything is "kept":
+   * a finished build is not one, because an app is often rebuilt before anybody likes it
+   * (reasons.ts). Answers with what that version holds, which is what is worth putting into the
+   * Book now: the parts it kept using, and what it had to make by hand.
+   */
+  async keep(callerGaii: string, filename: string, kept: boolean): Promise<{
+    app: string; kept: boolean; version: number; took: Array<{ part: string; why: string }>;
+    made: Array<{ name: string; what: string; why: string }>; next: string;
+  }> {
+    const ownerName = callerGaii.includes('#')
+      ? callerGaii.slice(callerGaii.indexOf('#') + 1, callerGaii.indexOf('@'))
+      : callerGaii.slice(0, callerGaii.indexOf('@'));
+    const app = await this.storage.getAppByOwnerName(ownerName, filename);
+    if (!app) throw new DesignBookError('NOT_FOUND', `No published app "${filename}" under your owner "${ownerName}".`, 404);
+    const out = await new DesignBookReasons(this.storage, this.config).keep({ ownerGhii: app.ownerGaii, ownerName, filename, kept });
+    if (!out || out.version === null) {
+      throw new DesignBookError('NO_NOTES',
+        `"${filename}" has written down no build notes, so there is nothing to keep yet. A page carries them in <script type="application/json" id="aimeat-build-notes"> `
+        + '(what it took from the Design Book, what it passed over, what it made by hand, each with why) and the next publish stores them.', 409);
+    }
+    const next = !kept
+      ? 'Taken back: this app no longer counts as one its owner was satisfied with.'
+      : out.made.length
+        ? `This version made ${out.made.length} thing${out.made.length === 1 ? '' : 's'} by hand because the Book had nothing for it: ${out.made.map(m => m.name).join(', ')}. `
+          + 'Now that the owner is satisfied, these are worth offering to the next builder. An ARRANGEMENT goes in as a fill (aimeat_designbook_propose, kind "fill", its own words turned back into <placeholders>); '
+          + 'the Book has no kind for a hand-made HTML component yet, so those stay listed in the Book\'s queue, with your reason, for the people who decide what the Book grows next.'
+        : 'Recorded. This version made nothing by hand, so there is nothing new to offer the Book; the parts it took now count as kept.';
+    return { app: out.app, kept: out.kept, version: out.version, took: out.took, made: out.made, next };
+  }
+
+  /** What builders wrote down about the Book, turned into what it should become next (reasons.ts). */
+  async reasonsQueue(): Promise<Awaited<ReturnType<DesignBookReasons['queue']>>> {
+    return new DesignBookReasons(this.storage, this.config).queue();
   }
 
   /**

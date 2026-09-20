@@ -25865,9 +25865,9 @@ paths:
         - { name: status, in: query, schema: { type: string, enum: [proposed, published, aging, retired] } }
         - { name: q, in: query, schema: { type: string }, description: Matched against id, title, summary and tags }
         - { name: limit, in: query, schema: { type: integer, default: 50, maximum: 200 } }
-        - { name: view, in: query, schema: { type: string, enum: [map] }, description: "`map` answers the whole published shelf as one page of text, every part on a line under its kind, and ignores the other filters. It is what the search tools answer when they are given nothing." }
+        - { name: view, in: query, schema: { type: string, enum: [map, reasons] }, description: "`map` answers the whole published shelf as one page of text, every part on a line under its kind, and ignores the other filters. It is what the search tools answer when they are given nothing. `reasons` answers what builders wrote down about the Book, as what it should become next: the things made by hand because the Book had nothing for them, and the parts most often looked at and left, each with the reasons given." }
       responses:
-        '200': { description: "{ parts: [{ id, kind, title, summary, tags, status, proposed_by, updated_at, version, usage, published_at? }], count }, or with view=map { map, count, note }" }
+        '200': { description: "{ parts: [{ id, kind, title, summary, tags, status, proposed_by, updated_at, version, usage, published_at? }], count }; with view=map { map, count, note }; with view=reasons { made: [{ name, times, kept, rows }], passed_over: [{ part, times, reasons }], note }" }
         '401': { $ref: '#/components/responses/Unauthorized' }
     post:
       operationId: proposeDesignbookPart
@@ -25921,6 +25921,37 @@ paths:
         '409': { description: The id is another proposer's address, or the part is retired }
         '422': { description: The bench refusal, in the validator's words }
 
+  /v1/designbook/keep:
+    post:
+      operationId: keepDesignbookApp
+      summary: The owner is satisfied with one of their apps
+      description: >-
+        Records that an app turned out well and its owner means to keep it. It is the one moment
+        anything about the Design Book counts as KEPT: a finished build is not that moment, because
+        an app is often rebuilt before anybody likes it. Marks the reasons the app's live version
+        wrote down in its page (`<script type="application/json" id="aimeat-build-notes">`: what it
+        took from the Book, what it passed over, what it made by hand, each with why) as coming
+        from an app somebody was satisfied with, and answers with what that version made by hand,
+        which is what is now worth offering to the next builder. `kept: false` takes it back. An
+        app that has written down no build notes answers 409 NO_NOTES with how to add them.
+      tags: [Apps]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [filename]
+              properties:
+                filename: { type: string, description: One of the caller's own published apps }
+                kept: { type: boolean, default: true }
+      responses:
+        '200': { description: "{ app, kept, version, took: [{ part, why }], made: [{ name, what, why }], next }" }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { description: NO_NOTES — the app carries no build notes yet }
+
   /v1/designbook/{id}:
     delete:
       operationId: deleteDesignbookPart
@@ -25948,13 +25979,16 @@ paths:
         The part's body is exactly what an adopt writes into an app, so reading it IS the
         preview. Carries the record version (the part's evolution is its version history) and the
         adoption count. PUBLIC for a published part; one still in proposal needs a session and
-        answers 404 without one.
+        answers 404 without one. `reasons` is what builders wrote about the part: `taken` counts
+        builders who reached for it, `kept` counts the apps among them whose owner said the app
+        turned out well (the number that says more than "an AI favoured it"), `passed_over` those
+        who looked and left, and the rows carry each one's own sentence. Accounts, not measurements.
       tags: [Apps]
       security: []
       parameters:
         - { name: id, in: path, required: true, schema: { type: string } }
       responses:
-        '200': { description: "{ part, version, usage, owner }" }
+        '200': { description: "{ part, version, usage, owner, reasons: { taken, kept, passed_over, took: [{ app, version, why, at, kept }], passed: [...] } }" }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
 
