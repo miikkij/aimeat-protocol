@@ -99,16 +99,16 @@ Components AIMEAT changed rather than copied verbatim: **world-atlas (Natural Ea
 
 ## Production dependencies
 
-The 461 npm packages that travel inside the `aimeat` package. Build and test
+The 462 npm packages that travel inside the `aimeat` package. Build and test
 tools are not listed: they do not ship, so they carry no obligation for you.
 
 | Package | Version | Licence |
 |---|---|---|
-| [@a2a-js/sdk](https://github.com/a2aproject/a2a-js#readme) | 1.1.0 | Apache-2.0 |
-| [@ag-ui/core](https://github.com/ag-ui-protocol/ag-ui#readme) | 0.0.59 | MIT |
+| [@a2a-js/sdk](https://github.com/a2aproject/a2a-js#readme) | 1.2.0 | Apache-2.0 |
+| [@ag-ui/core](https://github.com/ag-ui-protocol/ag-ui#readme) | 1.0.0 | MIT |
 | [@agentclientprotocol/sdk](https://github.com/agentclientprotocol/typescript-sdk#readme) | 1.4.0 | Apache-2.0 |
-| [@clack/core](https://github.com/bombshell-dev/clack/tree/main/packages/core#readme) | 1.4.3 | MIT |
-| [@clack/prompts](https://github.com/bombshell-dev/clack/tree/main/packages/prompts#readme) | 1.7.0 | MIT |
+| [@clack/core](https://github.com/bombshell-dev/clack/tree/main/packages/core#readme) | 1.5.1 | MIT |
+| [@clack/prompts](https://github.com/bombshell-dev/clack/tree/main/packages/prompts#readme) | 1.8.1 | MIT |
 | [@colors/colors](https://github.com/DABH/colors.js) | 1.6.0 | MIT |
 | [@dabh/diagnostics](https://github.com/DABH/diagnostics) | 2.0.8 | MIT |
 | [@hexagon/base64](https://base64.56k.guru) | 1.1.28 | MIT |
@@ -133,12 +133,12 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [@noble/ciphers](https://paulmillr.com/noble/) | 1.3.0 | MIT |
 | [@noble/ed25519](https://paulmillr.com/noble/) | 3.2.0 | MIT |
 | [@noble/hashes](https://paulmillr.com/noble/) | 1.8.0 | MIT |
-| [@noble/hashes](https://paulmillr.com/noble/) | 2.2.0 | MIT |
 | [@noble/hashes](https://paulmillr.com/noble/) | 2.4.0 | MIT |
 | [@node-saml/node-saml](https://github.com/node-saml/node-saml#readme) | 5.1.0 | MIT |
 | [@opentelemetry/api](https://github.com/open-telemetry/opentelemetry-js/tree/main/api) | 1.9.1 | Apache-2.0 |
 | [@owf/identity-common](https://github.com/openwallet-foundation-labs/identity-common-ts/tree/main/packages/identity-common) | 0.3.2 | Apache-2.0 |
 | [@peculiar/asn1-android](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/android#readme) | 2.9.4 | MIT |
+| [@peculiar/asn1-asym-key](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/asym-key#readme) | 2.9.4 | MIT |
 | [@peculiar/asn1-cms](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/cms#readme) | 2.9.4 | MIT |
 | [@peculiar/asn1-csr](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/csr#readme) | 2.9.4 | MIT |
 | [@peculiar/asn1-ecc](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/ecc#readme) | 2.9.4 | MIT |
@@ -148,12 +148,13 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [@peculiar/asn1-rsa](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/rsa#readme) | 2.9.4 | MIT |
 | [@peculiar/asn1-schema](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/schema#readme) | 2.9.4 | MIT |
 | [@peculiar/asn1-x509-attr](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/x509-attr#readme) | 2.9.4 | MIT |
+| [@peculiar/asn1-x509-post-quantum](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/x509-post-quantum#readme) | 2.9.4 | MIT |
 | [@peculiar/asn1-x509](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/x509#readme) | 2.9.4 | MIT |
 | [@peculiar/utils](https://github.com/PeculiarVentures/pvtsutils#readme) | 2.0.3 | MIT |
-| [@peculiar/x509](https://github.com/PeculiarVentures/x509#readme) | 1.14.3 | MIT |
+| [@peculiar/x509](https://github.com/PeculiarVentures/x509#readme) | 2.1.0 | MIT |
 | [@prometheus-io/client](https://github.com/prometheus/client_js) | 0.16.1 | Apache-2.0 |
 | [@sd-jwt/core](https://github.com/openwallet-foundation/sd-jwt-js/wiki) | 0.20.1 | Apache-2.0 |
-| [@simplewebauthn/server](https://github.com/MasterKale/SimpleWebAuthn/tree/master/packages/server#readme) | 14.0.0 | MIT |
+| [@simplewebauthn/server](https://github.com/MasterKale/SimpleWebAuthn/tree/master/packages/server#readme) | 14.0.2 | MIT |
 | [@so-ric/colorspace](https://github.com/so-ric/colorspace) | 1.1.6 | MIT |
 | [@standard-schema/spec](https://standardschema.dev) | 1.1.0 | MIT |
 | [@swc/helpers](https://swc.rs) | 0.5.23 | Apache-2.0 |
@@ -239,7 +240,7 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [commander](https://github.com/tj/commander.js#readme) | 12.1.0 | MIT |
 | [compress-commons](https://github.com/archiverjs/node-compress-commons) | 7.0.1 | MIT |
 | [compressible](https://github.com/jshttp/compressible#readme) | 2.0.18 | MIT |
-| [compression](https://github.com/expressjs/compression#readme) | 1.8.1 | MIT |
+| [compression](https://github.com/expressjs/compression#readme) | 1.8.2 | MIT |
 | [concat-map](https://github.com/substack/node-concat-map#readme) | 0.0.1 | MIT |
 | [content-disposition](https://github.com/jshttp/content-disposition#readme) | 1.1.0 | MIT |
 | [content-type](https://github.com/jshttp/content-type#readme) | 1.0.5 | MIT |
@@ -262,6 +263,7 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [define-data-property](https://github.com/ljharb/define-data-property#readme) | 1.1.4 | MIT |
 | [define-properties](https://github.com/ljharb/define-properties#readme) | 1.2.1 | MIT |
 | [depd](https://github.com/dougwilson/nodejs-depd#readme) | 2.0.0 | MIT |
+| [destroy](https://github.com/stream-utils/destroy#readme) | 1.2.0 | MIT |
 | [detect-libc](https://github.com/lovell/detect-libc#readme) | 2.1.2 | Apache-2.0 |
 | [dfa](https://github.com/devongovett/dfa#readme) | 1.2.0 | MIT |
 | [dijkstrajs](https://github.com/tcort/dijkstrajs) | 1.0.3 | MIT |
@@ -352,9 +354,9 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [is-typed-array](https://github.com/inspect-js/is-typed-array#readme) | 1.1.15 | MIT |
 | [isarray](https://github.com/juliangruber/isarray) | 1.0.0 | MIT |
 | [isexe](https://github.com/isaacs/isexe#readme) | 2.0.0 | ISC |
-| [javascript-obfuscator](https://obfuscator.io/) | 5.6.0 | BSD-2-Clause |
+| [javascript-obfuscator](https://obfuscator.io/) | 5.7.0 | BSD-2-Clause |
 | [jose](https://github.com/panva/jose) | 5.10.0 | MIT |
-| [jose](https://github.com/panva/jose) | 6.2.10 | MIT |
+| [jose](https://github.com/panva/jose) | 6.2.12 | MIT |
 | [js-md5](https://github.com/emn178/js-md5) | 0.8.3 | MIT |
 | [js-string-escape](https://github.com/joliss/js-string-escape#readme) | 1.0.1 | MIT |
 | [jsbi](https://github.com/GoogleChromeLabs/jsbi#readme) | 4.3.2 | Apache-2.0 |
@@ -363,7 +365,7 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [jwa](https://github.com/brianloveswords/node-jwa#readme) | 2.0.1 | MIT |
 | [jws](https://github.com/brianloveswords/node-jws#readme) | 4.0.1 | MIT |
 | [kuler](https://github.com/3rd-Eden/kuler) | 2.0.0 | MIT |
-| [kysely](https://kysely.dev) | 0.29.5 | MIT |
+| [kysely](https://kysely.dev) | 0.29.6 | MIT |
 | [lazystream](https://github.com/jpommerening/node-lazystream) | 1.0.1 | MIT |
 | [levn](https://github.com/gkz/levn) | 0.3.0 | MIT |
 | [libphonenumber-js](https://gitlab.com/catamphetamine/libphonenumber-js#readme) | 1.13.12 | MIT |
@@ -392,10 +394,10 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [negotiator](https://github.com/jshttp/negotiator#readme) | 0.6.4 | MIT |
 | [negotiator](https://github.com/jshttp/negotiator#readme) | 1.1.0 | MIT |
 | [node-abi](https://github.com/electron/node-abi#readme) | 3.96.0 | MIT |
-| [nodemailer](https://nodemailer.com/) | 10.0.9 | MIT-0 |
+| [nodemailer](https://nodemailer.com/) | 10.0.10 | MIT-0 |
 | [normalize-path](https://github.com/jonschlinkert/normalize-path) | 3.0.0 | MIT |
 | [npm-run-path](https://github.com/sindresorhus/npm-run-path#readme) | 4.0.1 | MIT |
-| [oauth4webapi](https://github.com/panva/oauth4webapi) | 3.8.7 | MIT |
+| [oauth4webapi](https://github.com/panva/oauth4webapi) | 3.8.8 | MIT |
 | [object-assign](https://github.com/sindresorhus/object-assign#readme) | 4.1.1 | MIT |
 | [object-inspect](https://github.com/inspect-js/object-inspect) | 1.13.4 | MIT |
 | [object-is](https://github.com/es-shims/object-is) | 1.1.6 | MIT |
@@ -406,10 +408,10 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [once](https://github.com/isaacs/once#readme) | 1.4.0 | ISC |
 | [one-time](https://github.com/3rd-Eden/one-time#readme) | 1.0.0 | MIT |
 | [onetime](https://github.com/sindresorhus/onetime#readme) | 5.1.2 | MIT |
-| [openid-client](https://github.com/panva/openid-client) | 6.8.7 | MIT |
+| [openid-client](https://github.com/panva/openid-client) | 6.8.8 | MIT |
 | [optionator](https://github.com/gkz/optionator) | 0.8.3 | MIT |
 | [os-paths](https://github.com/rivy/js.os-paths#readme) | 4.4.0 | MIT |
-| [otpauth](https://github.com/hectorm/otpauth) | 9.5.1 | MIT |
+| [otpauth](https://github.com/hectorm/otpauth) | 9.5.2 | MIT |
 | [p-limit](https://github.com/sindresorhus/p-limit#readme) | 2.3.0 | MIT |
 | [p-locate](https://github.com/sindresorhus/p-locate#readme) | 4.1.0 | MIT |
 | [p-try](https://github.com/sindresorhus/p-try#readme) | 2.2.0 | MIT |
@@ -546,7 +548,7 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [ws](https://github.com/websockets/ws) | 8.21.3 | MIT |
 | [xdg-app-paths](https://github.com/rivy/js.xdg-app-paths#readme) | 5.5.1 | MIT |
 | [xdg-portable](https://github.com/rivy/js.xdg-portable#readme) | 7.3.0 | MIT |
-| [xml-crypto](https://github.com/node-saml/xml-crypto#readme) | 6.1.2 | MIT |
+| [xml-crypto](https://github.com/node-saml/xml-crypto#readme) | 6.3.0 | MIT |
 | [xml-encryption](https://github.com/auth0/node-xml-encryption#readme) | 3.1.0 | MIT |
 | [xml2js](https://github.com/Leonidas-from-XIV/node-xml2js) | 0.6.2 | MIT |
 | [xmlbuilder](http://github.com/oozcitak/xmlbuilder-js) | 11.0.1 | MIT |
@@ -556,22 +558,21 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [xpath](https://github.com/goto100/xpath#readme) | 0.0.34 | MIT |
 | [xtend](https://github.com/Raynos/xtend) | 4.0.2 | MIT |
 | [y18n](https://github.com/yargs/y18n) | 4.0.3 | ISC |
-| [yaml](https://eemeli.org/yaml/) | 2.9.0 | ISC |
+| [yaml](https://eemeli.org/yaml/) | 2.9.1 | ISC |
 | [yargs-parser](https://github.com/yargs/yargs-parser#readme) | 18.1.3 | ISC |
 | [yargs](https://yargs.js.org/) | 15.4.1 | MIT |
 | [yauzl](https://github.com/thejoshwolfe/yauzl) | 3.4.0 | MIT |
 | [zip-stream](https://github.com/archiverjs/node-zip-stream) | 7.0.5 | MIT |
 | [zod-to-json-schema](https://github.com/StefanTerdell/zod-to-json-schema#readme) | 3.25.2 | ISC |
-| [zod](https://zod.dev) | 3.25.76 | MIT |
 | [zod](https://zod.dev) | 4.1.11 | MIT |
-| [zod](https://zod.dev) | 4.5.4 | MIT |
+| [zod](https://zod.dev) | 4.6.5 | MIT |
 
 ## Licence texts
 
 Each text below is reproduced as the component ships it. Where several components ship
 the identical text, they share one section.
 
-### @ag-ui/core 0.0.59
+### @ag-ui/core 1.0.0
 
 ```text
 MIT License
@@ -792,7 +793,7 @@ Apache License
    limitations under the License.
 ```
 
-### @clack/core 1.4.3, @clack/prompts 1.7.0
+### @clack/core 1.5.1, @clack/prompts 1.8.1
 
 ```text
 MIT License
@@ -966,7 +967,7 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
 
-### @javascript-obfuscator/estraverse 5.4.0, estraverse 5.3.0, esutils 2.0.3, javascript-obfuscator 5.6.0
+### @javascript-obfuscator/estraverse 5.4.0, estraverse 5.3.0, esutils 2.0.3, javascript-obfuscator 5.7.0
 
 ```text
 Redistribution and use in source and binary forms, with or without
@@ -1412,7 +1413,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-### @noble/hashes 1.8.0, @noble/hashes 2.2.0, @noble/hashes 2.4.0
+### @noble/hashes 1.8.0, @noble/hashes 2.4.0
 
 ```text
 The MIT License (MIT)
@@ -1492,6 +1493,32 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
+### @peculiar/asn1-asym-key 2.9.4, @peculiar/asn1-x509-post-quantum 2.9.4
+
+```text
+MIT License
+
+Copyright (c) 2023 Peculiar Ventures, LLC
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
 ### @peculiar/asn1-cms 2.9.4, @peculiar/asn1-csr 2.9.4, @peculiar/asn1-ecc 2.9.4, @peculiar/asn1-pfx 2.9.4, @peculiar/asn1-pkcs8 2.9.4, @peculiar/asn1-rsa 2.9.4, @peculiar/asn1-schema 2.9.4, @peculiar/asn1-x509-attr 2.9.4, @peculiar/asn1-x509 2.9.4
 
 ```text
@@ -1544,7 +1571,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### @peculiar/x509 1.14.3
+### @peculiar/x509 2.1.0
 
 ```text
 MIT License
@@ -1570,7 +1597,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### @simplewebauthn/server 14.0.0
+### @simplewebauthn/server 14.0.2
 
 ```text
 MIT License
@@ -2541,7 +2568,7 @@ The above copyright notice and this permission notice shall be included in all c
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### Apache Arrow (JS) 17.0.0, @a2a-js/sdk 1.1.0, @opentelemetry/api 1.9.1, @owf/identity-common 0.3.2, @prometheus-io/client 0.16.1, @sd-jwt/core 0.20.1, b4a 1.8.1, bare-events 2.9.2, bare-fs 4.8.1, bare-path 3.1.1, bare-stream 2.13.4, bare-url 2.5.2, events-universal 1.0.1, text-decoder 1.2.7
+### Apache Arrow (JS) 17.0.0, @a2a-js/sdk 1.2.0, @opentelemetry/api 1.9.1, @owf/identity-common 0.3.2, @prometheus-io/client 0.16.1, @sd-jwt/core 0.20.1, b4a 1.8.1, bare-events 2.9.2, bare-fs 4.8.1, bare-path 3.1.1, bare-stream 2.13.4, bare-url 2.5.2, events-universal 1.0.1, text-decoder 1.2.7
 
 ```text
 Apache License
@@ -3159,7 +3186,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### body-parser 2.3.0, compression 1.8.1, type-is 2.1.0
+### body-parser 2.3.0, compression 1.8.2, type-is 2.1.0
 
 ```text
 (The MIT License)
@@ -4571,6 +4598,33 @@ IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
 CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+```
+
+### destroy 1.2.0
+
+```text
+The MIT License (MIT)
+
+Copyright (c) 2014 Jonathan Ong me@jongleberry.com
+Copyright (c) 2015-2022 Douglas Christopher Wilson doug@somethingdoug.com
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
 ```
 
 ### detect-libc 2.1.2
@@ -7357,7 +7411,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-### jose 5.10.0, jose 6.2.10
+### jose 5.10.0, jose 6.2.12
 
 ```text
 The MIT License (MIT)
@@ -7737,7 +7791,7 @@ The above copyright notice and this permission notice shall be included in all c
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### kysely 0.29.5
+### kysely 0.29.6
 
 ```text
 The MIT License (MIT)
@@ -8358,7 +8412,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### nodemailer 10.0.9
+### nodemailer 10.0.10
 
 ```text
 Copyright (c) 2011-2023 Andris Reinman
@@ -8405,7 +8459,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-### oauth4webapi 3.8.7
+### oauth4webapi 3.8.8
 
 ```text
 The MIT License (MIT)
@@ -8590,7 +8644,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### openid-client 6.8.7
+### openid-client 6.8.8
 
 ```text
 The MIT License (MIT)
@@ -8631,7 +8685,7 @@ The above copyright notice and this permission notice shall be included in all c
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### otpauth 9.5.1
+### otpauth 9.5.2
 
 ```text
 # The MIT License (MIT)
@@ -11861,7 +11915,7 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### xml-crypto 6.1.2
+### xml-crypto 6.3.0
 
 ```text
 (The MIT License)
@@ -12034,7 +12088,7 @@ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF
 THIS SOFTWARE.
 ```
 
-### yaml 2.9.0, yaml 2.9.0
+### yaml 2.9.0, yaml 2.9.1
 
 ```text
 Copyright Eemeli Aro <eemeli@gmail.com>
@@ -12124,7 +12178,7 @@ ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 ```
 
-### zod 3.25.76, zod 4.1.11, zod 4.5.4
+### zod 4.1.11, zod 4.6.5
 
 ```text
 MIT License
