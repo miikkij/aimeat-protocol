@@ -6,6 +6,29 @@ All notable changes to AIMEAT are documented in this file.
 
 ## aimeat-crewai 0.27.1 - 2026-09-20
 
+**tests/test_decide_live.py — the decide feature against a REAL node.** Everything before this was
+offline plus one live call by hand; a feature nobody can re-verify is a feature that quietly rots.
+A real node process with a real database, the real decide service, the real scrubber, the real rule
+store, the real gate and the real register, with the package's own public functions calling all of
+it over REST. 19 tests, and the interesting ones are the ones offline tests cannot reach: a minted
+tool making a recorded decision, `STATE_OUTSIDE_RULE` and `RULE_FIXES_QUESTIONS` refused by the NODE
+rather than by the client, the node's gate answering `proceed: false` AND the held decision actually
+appearing on the owner's open-items list, a person's override landing on the record, and the quality
+numbers counting a gate stop and an override.
+
+TypeSafe is the one stand-in, and it has to be: a suite that spent real money every run is a suite
+nobody runs, and assertions pinned to a live model's answers would be flaky for reasons that have
+nothing to do with this code. `JevStub` speaks Jev's wire shape on loopback. Being a SERVER rather
+than a mock is what lets the tests assert **what actually left the node** — only the fields the
+rule names, the owner's questions, the owner's key rather than the agent's, the pinned model id —
+and that the scrubber really removed an e-mail address and a phone number on the way out. A mock
+inside the process could not see any of that.
+
+The file skips itself unless `aimeat/node_modules` is installed, which test_serve_loopback.py does
+not check: without it the node exits instantly and nine tests report as ERRORs that read like
+broken code rather than missing setup.
+
+
 **The quality numbers, and the word the liaison uses for a held action.** Follow-up to 0.27.0,
 against the contract as released in node 3.18.0.
 
