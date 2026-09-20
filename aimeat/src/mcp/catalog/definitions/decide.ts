@@ -61,6 +61,8 @@ export const decideTools: AimeatToolDefinition[] = [
             decision_id: { type: 'string', description: 'Read one decision.' },
             subject: { type: 'string', description: 'Only decisions about this subject.' },
             rule: { type: 'string', description: 'Only decisions one decision rule made (its id).' },
+            principal: { type: 'string', description: 'Only decisions one principal asked for: an agent\'s full identity, e.g. "bot#alice@node-id".' },
+            stats_by: { type: 'string', description: 'Return the QUALITY NUMBERS instead of the decisions, counted by the node: "rule" gives one group per decision rule, "principal" one per asker. Each group is { key, decisions, outcomes: { act, ask, stop }, gateStops, overridden, confirmed, costUsd, lastAt }. `rule` and `principal` narrow what is counted. This is what thresholds are tuned from.', enum: ['rule', 'principal'] },
             app_id: { type: 'string', description: 'Only decisions made for this app.' },
             limit: { type: 'number', description: 'How many (1-200, default 50).' },
             before: { type: 'string', description: 'Only decisions made before this ISO time (paging cursor: the createdAt of the last one you have).' },

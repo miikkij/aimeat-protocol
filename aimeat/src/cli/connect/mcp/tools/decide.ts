@@ -60,14 +60,21 @@ export function registerDecideTools(mcp: McpServer, registry: AgentRegistry): vo
     decision_id: z.string().optional().describe('Read one decision.'),
     subject: z.string().optional().describe('Only decisions about this subject.'),
     rule: z.string().optional().describe('Only decisions one decision rule made (its id).'),
+    principal: z.string().optional().describe('Only decisions one principal asked for (an agent\'s full identity).'),
+    stats_by: z.enum(['rule', 'principal']).optional().describe('Return the quality numbers instead, one group per rule or per principal.'),
     app_id: z.string().optional().describe('Only decisions made for this app.'),
     limit: z.number().optional().describe('How many (1-200, default 50).'),
     before: z.string().optional().describe('Only decisions made before this ISO time.'),
   }, annotationsFor('aimeat_decision_list'), async (a) => {
     if (a.decision_id) return out(await client.get(`/v1/ai/decisions/${encodeURIComponent(a.decision_id)}`));
     const q = new URLSearchParams();
-    if (a.subject !== undefined) q.set('subject', a.subject);
     if (a.rule !== undefined) q.set('rule', a.rule);
+    if (a.principal !== undefined) q.set('principal', a.principal);
+    if (a.stats_by !== undefined) {
+      q.set('group_by', a.stats_by);
+      return out(await client.get(`/v1/ai/decisions/stats?${q.toString()}`));
+    }
+    if (a.subject !== undefined) q.set('subject', a.subject);
     if (a.app_id !== undefined) q.set('app_id', a.app_id);
     if (a.limit !== undefined) q.set('limit', String(a.limit));
     if (a.before !== undefined) q.set('before', a.before);
