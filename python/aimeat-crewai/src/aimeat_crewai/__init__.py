@@ -43,6 +43,32 @@ from .datapackage import (
     to_dataframe,
     to_parquet,
 )
+from .decide import (
+    DIRECT_ENV as DECIDE_DIRECT_ENV,
+)
+from .decide import (
+    DecideError,
+    DecideRefused,
+    DecideUnreachable,
+    Decision,
+    GateVerdict,
+    decide,
+    decisions,
+    direct_enabled,
+    evaluate_rule,
+    gate,
+    pick_one,
+    push_direct_log,
+    read_direct_log,
+    review,
+    rule,
+    rule_tools_data,
+    rules,
+    scale,
+    settings,
+    yes_no,
+)
+from .decide_tool import decide_tools, parse_selector, rule_tool_name, run_rule
 from .files import (
     AimeatFileError,
     attachments_of,
@@ -119,7 +145,7 @@ from .workflow_spec import (
 
 # Kept in step with pyproject BY HAND, which is why it was wrong: 0.20.0 shipped announcing
 # itself as 0.19.0, and the first crew to install it reported the mismatch before we saw it.
-__version__ = "0.25.0"
+__version__ = "0.27.0"
 
 __all__ = [  # noqa: RUF022 -- grouped by topic with the version each group arrived in; alphabetical order would scatter those comments away from what they name
     "__version__",
@@ -155,6 +181,36 @@ __all__ = [  # noqa: RUF022 -- grouped by topic with the version each group arri
     "offers_check",
     "offers_publish",
     "offers_tools",
+    # Decision rules — the owner's questions, thresholds and bands, as tools (0.27.0).
+    # The QUESTIONS, THRESHOLDS AND BANDS ARE THE OWNER'S: a caller that names a rule sends only
+    # the state, and there is deliberately no export here for overriding any of the three.
+    "yes_no",
+    "pick_one",
+    "scale",
+    "decide",
+    "rules",
+    "rule",
+    "rule_tools_data",
+    "decisions",
+    "review",
+    "settings",
+    "gate",
+    "GateVerdict",
+    "evaluate_rule",
+    "Decision",
+    "DecideError",
+    "DecideRefused",
+    "DecideUnreachable",
+    # One CrewAI tool per allowed rule; the crew JSON selects `decide` or `decide:<rule>`
+    "decide_tools",
+    "run_rule",
+    "rule_tool_name",
+    "parse_selector",
+    # Direct mode — a run with no node, behind an explicit switch, keeping a local log
+    "DECIDE_DIRECT_ENV",
+    "direct_enabled",
+    "read_direct_log",
+    "push_direct_log",
     # Files: getting a document to and from an agent (0.17.0)
     "AimeatFileError",
     "split_ref",
