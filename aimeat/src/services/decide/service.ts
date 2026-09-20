@@ -131,8 +131,9 @@ export interface DecideResult {
   rule?: { id: string; version: number };
   /** What the rule's thresholds and bands made of the answers. */
   outcome?: AiDecisionOutcome;
-  /** The weakest certainty among the thresholded answers, which the bands cut. */
-  result?: number;
+  /** The weakest certainty among the thresholded answers, which the bands cut. Null when the model
+   *  gave no certainty at all: the bands have nothing to cut, so the outcome is `ask`. */
+  result?: number | null;
   /** Per thresholded question: did its answer reach its floor. */
   passed?: Record<string, boolean>;
   bands?: { act: number; ask: number };
@@ -565,6 +566,17 @@ export async function reviewDecision(
   const ok = await storage.setAiDecisionReview(id, gaii, review);
   if (!ok) return null;
   emitChange('ai-decisions', gaii);
+  // A gate stop put this decision on the owner's open items. They have now answered it, so the row
+  // goes: here, so that the web, MCP and REST reviews all behave the same. Best-effort — the review
+  // is recorded either way, and a list that would not update must not undo it.
+  try {
+    const { closeItemsForDecision } = await import('../open-items.js');
+    if (await closeItemsForDecision(storage, gaii, id)) emitChange('open-items', gaii);
+  } catch (err) {
+    logger.warn('[decide] the review was recorded and its open item could not be closed', {
+      owner: gaii, decision: id, error: String(err),
+    });
+  }
   return getDecision(storage, gaii, id);
 }
 

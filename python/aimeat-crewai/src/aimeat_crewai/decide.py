@@ -394,7 +394,8 @@ class Decision:
 @dataclass(frozen=True)
 class RuleEvaluation:
     outcome: str
-    result: float
+    #: The weakest certainty among the thresholded answers, or None when the model gave none at all.
+    result: float | None
     passed: dict[str, bool]
 
 
@@ -408,13 +409,18 @@ def _floor_value(answer: dict[str, Any]) -> float:
     return float(v) if isinstance(v, (int, float)) else 0.0
 
 
-def _certainty(answer: dict[str, Any]) -> float:
-    """How sure the model was, 0 to 1. A yes/no's probability is its certainty."""
+def _certainty(answer: dict[str, Any]) -> float | None:
+    """How sure the model was, 0 to 1, or None when it did not say.
+
+    A yes/no's probability IS its certainty. A pick-one and a scale carry ``confidence``, and the
+    provider's contract makes it OPTIONAL -- which is why None and not 0.0. Read as zero, a rule
+    whose thresholds name only those answered 'stop' whatever the model said (node fix 2026-09-20).
+    """
     if answer.get("type") == "noul":
         v = answer.get("value")
-        return float(v) if isinstance(v, (int, float)) else 0.0
+        return float(v) if isinstance(v, (int, float)) else None
     c = answer.get("confidence")
-    return float(c) if isinstance(c, (int, float)) else 0.0
+    return float(c) if isinstance(c, (int, float)) else None
 
 
 def evaluate_rule(rule: dict[str, Any], answers: dict[str, Any]) -> RuleEvaluation:
@@ -432,18 +438,23 @@ def evaluate_rule(rule: dict[str, Any], answers: dict[str, Any]) -> RuleEvaluati
     """
     thresholds: dict[str, Any] = dict(rule.get("thresholds") or {})
     passed: dict[str, bool] = {}
-    result = 1.0
+    known: list[float] = []
     for qid, floor in thresholds.items():
         a = answers.get(qid)
         answered = isinstance(a, dict)
         passed[qid] = answered and _floor_value(a) >= float(floor)
-        result = min(result, _certainty(a) if answered else 0.0)
-    result = max(0.0, min(1.0, result))
+        c = _certainty(a) if answered else None
+        if c is not None:
+            known.append(max(0.0, min(1.0, c)))
+    result = min(known) if known else None
     bands = rule.get("bands") or {}
     act = float(bands.get("act", 1.0))
     ask = float(bands.get("ask", 0.0))
     if not all(passed.values()):
         outcome = "stop"
+    elif result is None:
+        # Nothing to cut: the model gave no certainty anywhere, so it is a person's call.
+        outcome = "ask"
     elif result >= act:
         outcome = "act"
     elif result >= ask:

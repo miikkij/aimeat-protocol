@@ -733,6 +733,16 @@ a.koti-feed-line:hover { color: var(--accent); }
 .open-items-item { font-size: 1.05rem; font-weight: 800; line-height: 1.35; overflow-wrap: anywhere; }
 .open-items-meta { font-family: var(--font-mono); font-size: 0.76rem; color: var(--muted); margin-top: 0.15rem; }
 .open-items-control { flex: none; display: flex; align-items: center; gap: 0.35rem; }
+/* The two answers on a row the decision gate opened. Both are real actions a thumb has to hit, so
+   they keep a 44 px box at every width, and they sit a thumb's width apart: pressing the wrong one
+   records the opposite verdict. The `.pf` in front is not decoration — profile-poster.css sets
+   `min-height: 0` on every .pf .btn-outline and loads after this file, so a two-class selector loses
+   the tie and the buttons measured 20 px high. */
+.open-items-decide { flex: none; display: flex; align-items: center; gap: 0.9rem; margin-right: 2rem; }
+.open-items-decide .btn-outline,
+.pf .open-items-decide .btn-outline {
+  min-height: 44px; padding: 12px 0 11px;
+}
 .open-items-hand { font-size: 0.8rem; max-width: 10rem; }
 
 /* The light. Three states, because the thing it reports has three (P5): not on the list, waiting,

@@ -3343,6 +3343,20 @@
 .pf-aitr-policy { flex-direction: column; }
 .pf-aitr-row-main { font-size: 0.85rem; font-weight: 600; overflow-wrap: anywhere; }
 .pf-aitr-row-meta { font-size: 0.78rem; color: var(--muted); overflow-wrap: anywhere; }
+/* The two verdict buttons on a decision. A 44 px box at every width, a thumb's width apart: they are
+   the one control in this card a person presses about something that already happened, and the two
+   answers are opposites. `.pf` in front because profile-poster.css sets `min-height: 0` on every
+   .pf .btn-outline and loads later; without it these measured 20 px high. */
+.pf-aitr-row-verdict { display: flex; flex-wrap: wrap; gap: 0.9rem; margin-top: 0.35rem; }
+.pf-aitr-row-verdict .btn-outline,
+.pf .pf-aitr-row-verdict .btn-outline {
+  min-height: 44px; padding: 12px 0 11px;
+}
+/* The verdict already recorded stays visible and unpressable, so a mis-tap has a way back: the other
+   button is still there and records the opposite. */
+.pf .pf-aitr-row-verdict .btn-outline[disabled] {
+  color: var(--muted); border-color: var(--muted); opacity: 1; cursor: default;
+}
 .pf-aitr-row-link { font-size: 0.78rem; color: var(--accent); }
 
 /* ── Decision rules (pf-dr-*) and one agent's AI settings (pf-aai-*) ──

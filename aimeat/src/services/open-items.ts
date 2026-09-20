@@ -36,6 +36,8 @@
  *   import { listItems, addItem } from '../services/open-items.js';
  *   const open = await listItems(storage, config, ownerGhii, owner);
  * @version-history
+ *   v1.1.0 — 2026-09-20 — closeItemsForDecision: a decision a person has confirmed or overridden
+ *     takes its own row off the list, whichever surface recorded the review.
  *   v1.0.0 — 2026-08-09 — Replaces services/intents.ts. One key (P22) instead of one record per
  *     item, a flipped state (P19) instead of open→working→done, and `by` so the surface can show
  *     that the AI flipped something rather than the person.
@@ -449,6 +451,30 @@ export async function closeItem(
             result: true,
         };
     });
+}
+
+/**
+ * Switch off the item a decision put on the list, once a person has answered it.
+ *
+ * The gate opens one item per stopped decision, carrying `object: { type: 'ai-decision', id }`. A
+ * person who confirms or overrides that decision has answered the item, so the row goes by itself:
+ * the alternative is a list that keeps asking about something already decided, and a person clearing
+ * it by hand with a control that records nothing.
+ *
+ * Called from the review, which is the one door all three surfaces (web, MCP, REST) go through.
+ */
+export async function closeItemsForDecision(
+    storage: Storage, ownerGhii: string, decisionId: string, closedBy: FlippedBy = 'person',
+): Promise<number> {
+    const { list } = await readList(storage, ownerGhii);
+    const ids = list.items
+        .filter(i => i.object?.type === 'ai-decision' && i.object.id === decisionId)
+        .map(i => i.id);
+    let closed = 0;
+    for (const id of ids) {
+        if (await closeItem(storage, ownerGhii, id, closedBy)) closed++;
+    }
+    return closed;
 }
 
 /**

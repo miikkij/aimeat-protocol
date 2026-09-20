@@ -24,6 +24,8 @@
  * @structure DECIDE_SKILL_ENTRY
  * @usage import { DECIDE_SKILL_ENTRY } from './builtin-skills.decide.js';
  * @version-history
+ *   v1.2.1 — 2026-09-20 — A missing confidence is not zero certainty: `result` null and the outcome
+ *     `ask`, which is what the node now does.
  *   v1.2.0 — 2026-09-20 — Section 3: decision rules, a key per agent and the gate, with the one
  *     order everything is set up in (the same six steps as services/decide/setup-order.ts).
  *   v1.1.0 — 2026-09-19 — A recipe for moving a statechart when text arrives: the living document's
@@ -195,7 +197,10 @@ the rule, its version and the outcome. A rule bound to an action that cannot be 
 floor is \`stop\`. Otherwise the result is the weakest certainty among the thresholded answers, and the
 bands cut it: at or over \`act\` act, at or over \`ask\` ask a person, under it stop. So word every
 thresholded question so that a high value means "go ahead". Branch on \`outcome\`, and when
-\`proceed\` is false do not take the action.
+\`proceed\` is false do not take the action. A yesNo's probability IS its certainty; a pickOne and a
+scale carry \`confidence\`, and the model may omit it. When no thresholded answer carried one,
+\`result\` is null and the outcome is \`ask\`: nothing was measured, so it is a person's call rather
+than a refusal.
 
 **What a caller may not do.** Send \`questions\`, \`thresholds\` or \`bands\` beside \`rule\`, or a state
 field the rule does not list under \`sends\`: both are refused before anything is sent. A proposal never

@@ -294,7 +294,12 @@ export function DecideRules({ available }) {
               </span>
               ${tried && tried.id === r.id && html`
                 <span class="pf-aitr-row-meta pf-dr-tried" role="status">
-                  ${t(`decideRules.outcome.${tried.outcome}`)} · ${t('decideRules.triedResult', { result: String(Math.round(Number(tried.result) * 100)) })}
+                  ${/* A null result is not 0 %: it means the model returned no certainty at all, so
+                       the bands had nothing to cut and the rule sent it to a person. Printing it as
+                       zero would read as "the model was sure it is wrong". */''}
+                  ${t(`decideRules.outcome.${tried.outcome}`)} · ${typeof tried.result === 'number'
+                    ? t('decideRules.triedResult', { result: String(Math.round(tried.result * 100)) })
+                    : t('decideRules.triedNoResult')}
                   ${' · '}${Object.entries(tried.answers || {}).map(([id, a]) =>
                     `${id}: ${a.type === 'noul' ? `${Math.round(Number(a.value) * 100)} %` : String(a.value)}`).join(' · ')}
                 </span>`}
