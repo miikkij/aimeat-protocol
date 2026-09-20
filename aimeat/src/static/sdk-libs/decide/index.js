@@ -32,6 +32,8 @@
  *   }, { subject: mail.key, gates: 'which folder the mail goes to', app_id: 'mail-sorter' });
  *   if (r.answers.urgent.value > 0.8) { ... }
  * @version-history
+ *   v1.2.0 - 2026-09-20 - rule(id) and rules(): the owner's decision rules, run by id with only the
+ *     state; decisions({ rule }). questionSet() stays as the older, app-kept form.
  *   v1.1.0 - 2026-09-19 - isAvailable() / unavailableReason(): gate a decision feature on whether this
  *     account can reach the model, the way AIMEAT.ai.isAvailable() gates a text one.
  *   v1.0.0 - 2026-09-19 - Initial (TARGET-080).
@@ -165,14 +167,46 @@ async function questionSet(key) {
 }
 
 /**
- * What was decided, newest first. `{ subject }` answers "what did an AI decide about this record".
- * @param {{ subject?: string, app_id?: string, limit?: number, before?: string, id?: string }} [q]
+ * One of the owner's DECISION RULES: a named set of questions, thresholds and bands the owner wrote
+ * once under Settings, AI, Decision model, and that an app and an agent both run by id. Resolves with
+ * the rule's own fields (`title`, `decides`, `sends`, `questions`, `thresholds`, `bands`, `version`)
+ * plus `ask(state, opts)`, which runs it. A rule the owner made for agents only is not found here.
+ *
+ * `ask` sends ONLY the state (the fields the rule lists under `sends`): the node takes the questions,
+ * thresholds and bands from the owner's record, so an app cannot loosen a rule it runs. The answer is
+ * ask()'s, plus `outcome` ("act" | "ask" | "stop"), `result`, `passed` per question and `rule`
+ * `{ id, version }`. Branch on `outcome`; record a person's verdict with review().
+ *
+ * questionSet(key) is the older form of this: a record the APP keeps and compares itself. Prefer a
+ * rule when the owner should own the thresholds and see the quality numbers.
+ * @param {string} id
+ */
+async function rule(id) {
+  const r = await call(`/v1/ai/decide/rules/${encodeURIComponent(id)}`);
+  const def = (r && r.rule) || {};
+  return {
+    ...def,
+    /**
+     * @param {any} state
+     * @param {{ subject?: string, names?: string[], public_content?: boolean, cache?: boolean, app_id?: string }} [opts]
+     */
+    ask: (state, opts) => post('/v1/ai/decide', { rule: id, state, ...(opts || {}) }),
+  };
+}
+
+/** The decision rules this app may run: `{ rules: [{ id, title, decides, sends, use, gate, version }] }`. */
+function rules() { return call('/v1/ai/decide/rules'); }
+
+/**
+ * What was decided, newest first. `{ subject }` answers "what did an AI decide about this record",
+ * `{ rule }` lists the decisions one decision rule made.
+ * @param {{ subject?: string, rule?: string, app_id?: string, limit?: number, before?: string, id?: string }} [q]
  */
 async function decisions(q) {
   const o = q || {};
   if (o.id) return call(`/v1/ai/decisions/${encodeURIComponent(o.id)}`);
   const p = new URLSearchParams();
-  for (const k of /** @type {const} */ (['subject', 'app_id', 'limit', 'before'])) {
+  for (const k of /** @type {const} */ (['subject', 'rule', 'app_id', 'limit', 'before'])) {
     if (o[k] !== undefined) p.set(k, String(o[k]));
   }
   const qs = p.toString();
@@ -245,6 +279,6 @@ async function isAvailable() {
 /** Why isAvailable() said false, in words to show the person, or null. Call after isAvailable(). */
 function unavailableReason() { return _availCache ? _availCache.reason : null; }
 
-export const decide = { yesNo, pickOne, scale, ask, gate, questionSet, decisions, review, run, settings, isAvailable, unavailableReason };
+export const decide = { yesNo, pickOne, scale, ask, gate, questionSet, rule, rules, decisions, review, run, settings, isAvailable, unavailableReason };
 
 attach('decide', decide);

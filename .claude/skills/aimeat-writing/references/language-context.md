@@ -76,6 +76,10 @@ everywhere at once, and say so in the Changes section.
 | a model that answers closed questions | yes or no, pick one, a scale, with probabilities; writes no text; beside the text model, never in its list | decision model | päätösmalli | modelo de decisión |
 | the states a document or a process moves through | a named set of states and the events that move between them; in a living document the `machine` node | state machine | tilakone | máquina de estados |
 | the bar a decision must reach | the confidence or probability under which the decision model moves nothing and a person decides | threshold | kynnys | umbral |
+| a named definition for the decision model | questions, a threshold per question that counts, and two bands, written once by the owner; an app or an agent runs it by name and sends only the content | decision rule | päätössääntö | regla de decisión |
+| one recorded answer of the decision model | what running a decision rule (or asking open questions) produces; it is kept, with the rule, its version and what came of it | decision | päätös | decisión |
+| a decision rule that guards an action | the rule is bound to something that cannot be undone; with the gate on for an agent, an unsure answer becomes a task for the owner instead of the action. Off until the owner turns it on | gate | portti | compuerta |
+| the two cuts on a decision rule's result | at or over the first the caller acts, at or over the second a person is asked, under it the caller stops | band | kaista | banda |
 | cleaning what leaves for a decision | e-mails, phones, identity codes, account numbers, street addresses and names are taken out before anything is sent, and put back into the answer | remove personal data | henkilötietojen poisto / poistaa henkilötiedot | eliminar los datos personales |
 | permission a person grants | revocable, per agent, per area | permission | oikeus | permiso |
 | sign-in from elsewhere | another AIMEAT vouching that a sign-in is really them | federation | federaatio | federación |
@@ -234,3 +238,8 @@ service, the directory, the token, the identifier and the username: the test nam
   *Keskustelu* and *conversación* are what the Messages page already shipped; *arkistoitu* and
   *archivar* were already the words on other pages (organisms, packages, the calibrator), and
   *sääntö* is what the Libraries and Capabilities pages call a rule.
+- **2026-09-20** — decision rule, decision, gate and band, with decision rules on the server.
+  *Päätössääntö* and *portti* were fixed by the developer in the build order; *kaista* is the word
+  of his own wish text. *Compuerta* over *puerta* for the gate: it is the word Spanish already uses
+  for a thing that lets through or holds back (a sluice, a logic gate), where *puerta* is a way in.
+  A cold Spanish reader has not seen it yet.

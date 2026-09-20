@@ -97,7 +97,8 @@ import { resolveAiKey, debitAllowance, type AiKeyChoice } from './ai-allowance.j
 import { appSpentToday, appQuotaFor, appAllowlisted } from './ai-app-id.js';
 import { todayKey, getTodayUsage, recordAiUsage, emptyUsage, type UsageRecord } from './ai-usage-record.js';
 import { readAgentKey, agentCapRefusal } from './agent-ai-keys.js';
-export { todayKey, getTodayUsage, recordAiUsage, type UsageRecord };
+import { DEFAULT_DAILY_BUDGET_USD, getDailyBudgetUsd } from './ai-daily-budget.js';
+export { todayKey, getTodayUsage, recordAiUsage, type UsageRecord, DEFAULT_DAILY_BUDGET_USD, getDailyBudgetUsd };
 
 /**
  * Rough cost estimate when the provider didn't report one (LM Studio, custom).
@@ -107,20 +108,14 @@ export { todayKey, getTodayUsage, recordAiUsage, type UsageRecord };
 const FALLBACK_PROMPT_COST_PER_TOKEN = 0.000005;
 const FALLBACK_COMPLETION_COST_PER_TOKEN = 0.000015;
 
-/** Default applied when the owner hasn't set an explicit daily budget. A per-app cap defaults to
- *  this same budget (an app may spend the whole "AI apps daily budget"); set app_quotas.<app> to
- *  throttle a single app below it. */
-export const DEFAULT_DAILY_BUDGET_USD = 1.0;
+// DEFAULT_DAILY_BUDGET_USD and getDailyBudgetUsd live in ai-daily-budget.ts (a leaf, so the ledger's
+// budget alert can read the number without importing this file) and are re-exported below.
 
 /** The fallback when the provider does not report a cost. Exported so the chat proxy uses the same
  *  arithmetic rather than a second guess at what a turn was worth. */
 export function estimateCostUsd(promptTokens: number, completionTokens: number): number {
   return promptTokens * FALLBACK_PROMPT_COST_PER_TOKEN
     + completionTokens * FALLBACK_COMPLETION_COST_PER_TOKEN;
-}
-
-export function getDailyBudgetUsd(prefs: Record<string, unknown>): number {
-  return typeof prefs.daily_budget_usd === 'number' ? prefs.daily_budget_usd : DEFAULT_DAILY_BUDGET_USD;
 }
 
 /** Typed error so the HTTP route can map to a status/code and the scheduler can log it. */

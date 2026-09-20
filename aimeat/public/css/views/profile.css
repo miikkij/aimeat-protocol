@@ -3345,6 +3345,35 @@
 .pf-aitr-row-meta { font-size: 0.78rem; color: var(--muted); overflow-wrap: anywhere; }
 .pf-aitr-row-link { font-size: 0.78rem; color: var(--accent); }
 
+/* ── Decision rules (pf-dr-*) and one agent's AI settings (pf-aai-*) ──
+   Both sit inside furniture that already exists (the decision-model card, the agent's config tab)
+   and reuse its rows and stats; what is here is only the editor's form and the section's spacing. */
+.pf-dr-order { margin: 0.6rem 0 0; padding-left: 1.2rem; font-size: 0.8rem; color: var(--muted); display: flex; flex-direction: column; gap: 0.15rem; }
+.pf-dr-h { margin: 1rem 0 0.3rem; font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
+.pf-dr-pre { white-space: pre-line; }
+.pf-dr .pf-aitr-row { flex-direction: column; align-items: stretch; }
+.pf-dr .pf-aitr-row .og-doors { margin-top: 0.3rem; }
+.pf-dr-tried { color: var(--text); font-weight: 600; }
+.pf-dr-editor { margin-top: 0.9rem; padding: 0.9rem; border: 1px dashed var(--text); background: var(--bg-dim); display: flex; flex-direction: column; gap: 0.7rem; min-width: 0; }
+.pf-dr-field { display: flex; flex-direction: column; gap: 0.2rem; font-size: 0.78rem; color: var(--muted); min-width: 0; }
+.pf-dr-field .og-input, .pf-dr-field .og-textarea, .pf-dr-q .og-input, .pf-dr-q .og-textarea { width: 100%; box-sizing: border-box; min-width: 0; }
+.pf-dr-check { font-size: 0.85rem; }
+.pf-dr-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.8rem; }
+.pf-dr-q { display: flex; flex-direction: column; gap: 0.4rem; padding: 0.6rem; border: 1px solid var(--border); border-radius: 8px; background: var(--card); min-width: 0; }
+.pf-dr-q-top { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr); gap: 0.6rem; }
+.pf-dr-q .og-door { align-self: flex-start; }
+.pf-aai { min-width: 0; }
+.pf-aai-model { margin-top: 1rem; padding-top: 0.8rem; border-top: 1px solid var(--border); min-width: 0; }
+.pf-aai-model-title { font-size: 0.9rem; font-weight: 700; }
+.pf-aai-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.8rem; margin-top: 0.4rem; }
+.pf-aai-row .og-input { flex: 1 1 12rem; min-width: 0; width: auto; }
+.pf-aai-row .og-door { flex: none; }
+.pf-aai .og-choice { margin-top: 0.5rem; flex-wrap: wrap; }
+.pf-aai-rules { margin-top: 0.6rem; }
+@media (max-width: 600px) {
+  .pf-dr-q-top, .pf-dr-pair { grid-template-columns: minmax(0, 1fr); }
+}
+
 /* ── The account's own compliance slice (BR-02) ──
    Deliberately the same furniture as the card above it: they answer consecutive questions about the
    same subject, and giving the second one its own visual language would read as a different feature.

@@ -135,7 +135,7 @@ export function agentAiKeysRouter(config: AimeatConfig, storage: Storage): Route
       // path a real call takes, so what it proves is what a real call will do.
       try {
         const r = await completeForOwner(storage, config, t.ownerGhii, {
-          prompt: 'Reply with the single word: ok', maxTokens: 5, appId: 'agent-key-test', agent: t.agent,
+          prompt: 'Reply with the single word: ok', appId: 'agent-key-test', agent: t.agent,
         });
         res.json(success(config.nodeId, { ok: true, key_source: r.keySource, model: r.model }));
       } catch (e) {
