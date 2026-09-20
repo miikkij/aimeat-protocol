@@ -13952,7 +13952,19 @@
         "federationOn": "sí",
         "federationOff": "no",
         "federationOnHint": "Compartido por la federación. Haz clic para dejarlo solo local",
-        "federationOffHint": "Solo local. Haz clic para compartirlo por la federación"
+        "federationOffHint": "Solo local. Haz clic para compartirlo por la federación",
+        "crew": {
+          "tools": {
+            "decide": "Hace al modelo de decisión sus propias preguntas cerradas y recibe probabilidades",
+            "decideNoKey": "Todavía no se pueden marcar: este agente no tiene clave de TypeSafe. El orden es: pon una clave, pruébala, escribe una regla de decisión y pruébala, dale la regla al agente aquí, decide sobre la compuerta y después lee las decisiones y ajusta los umbrales.",
+            "decideNoKeyLink": "Abre los ajustes del modelo de decisión",
+            "decideNoRules": "Aún no tienes ninguna regla de decisión hecha para agentes, así que solo se ofrece la herramienta de preguntas abiertas.",
+            "decideOffOperator": "No se pueden marcar: el operador ha apagado el modelo de decisión en este servidor.",
+            "decideRule": "Ejecuta tu regla de decisión «{title}»: {decides}",
+            "decideRuleGone": "Esta regla de decisión ya no existe. Desmárcala o vuelve a escribir la regla.",
+            "decisions": "Decisiones"
+          }
+        }
       },
       "board": {
         "online": "conectado",

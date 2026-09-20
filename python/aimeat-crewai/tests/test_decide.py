@@ -776,13 +776,36 @@ def test_pushing_the_direct_log_labels_it_as_made_without_the_node(_direct, monk
     s = _StubSession(_ok({"key": "agents.mailer.decide.direct-log"}))
     out = push_direct_log(agent_name="mailer", **_node_kwargs(s))
     assert out["pushed"] == 1
-    body = s.calls[0]["json"]
-    assert body["key"] == "agents.mailer.decide.direct-log"
-    assert body["value"]["count"] == 1
+    # ONE KEY PER DAY, not one key for the whole history: a memory value holds 1024 kB, and a long
+    # run used to meet that ceiling and be refused.
+    writes = [c for c in s.calls if c["method"] == "POST"]
+    day_write = writes[0]["json"]
+    assert day_write["key"].startswith("agents.mailer.decide.direct-log.20")
+    assert day_write["value"]["count"] == 1
     # It must NOT claim to be a row on the decision register: the owner's quality numbers would
     # then read as though the scrubber and the cap had been in force.
-    assert "not on the decision register" in body["value"]["note"]
-    assert s.calls[0]["url"].endswith("/v1/memory")
+    assert "not on the decision register" in day_write["value"]["note"]
+    assert writes[0]["url"].endswith("/v1/memory")
+    index_write = writes[-1]["json"]
+    assert index_write["key"] == "agents.mailer.decide.direct-log.__index"
+    assert sum(index_write["value"]["days"].values()) == 1
+
+
+def test_a_second_push_sends_only_what_is_new(_direct, monkeypatch) -> None:
+    # The log is append-only, so the lines already pushed are a cursor. Without one, every push
+    # re-sent the whole history.
+    monkeypatch.setattr("requests.post", lambda url, **kw: _typesafe_ok({"safe": {"type": "noul", "noul": 0.6}}))
+    decide({"subject": "one"}, questions={"safe": yes_no("safe")})
+    monkeypatch.delenv(DIRECT_ENV, raising=False)
+    first = push_direct_log(agent_name="mailer", **_node_kwargs(_StubSession(_ok({}))))
+    assert first["pushed"] == 1
+
+    again = _StubSession(_ok({}))
+    assert push_direct_log(agent_name="mailer", **_node_kwargs(again))["pushed"] == 0
+    assert again.calls == [], "nothing new means no call at all"
+
+    whole = _StubSession(_ok({}))
+    assert push_direct_log(agent_name="mailer", all_of_it=True, **_node_kwargs(whole))["pushed"] == 1
 
 
 def test_pushing_an_empty_log_is_not_an_error(_direct) -> None:
