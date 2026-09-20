@@ -10,6 +10,7 @@
 import { describe, it, expect } from 'vitest';
 import { validateComponentBody, componentPreviewHtml, componentSnippet } from '../../src/services/design-book/component.js';
 import { validatePartInput, PART_KINDS } from '../../src/services/design-book/validate.js';
+import { attributesOf, declarationsOf, selectorsOf, tagsOf, withoutComments, withoutVarFallbacks } from '../../src/services/design-book/component-scan.js';
 
 const WEEK_GRID = {
   prefix: 'wkgrid',
@@ -49,6 +50,41 @@ describe('the component bench', () => {
     expect(bad({ html: '<div class="wkgrid" style="color:red"></div>' })).toThrow(/attribute "style"/);
     expect(bad({ css: WEEK_GRID.css + '\n.wkgrid-x { background: url(https://evil.example/x.png); color: var(--ak-ink); }' })).toThrow(/no url\(\)/);
     expect(bad({ css: '@import "https://evil.example/a.css";\n' + WEEK_GRID.css })).toThrow(/loads nothing/);
+  });
+
+  it('agrees with a browser on where a tag ends, so nothing rides in behind a quoted ">"', () => {
+    // Read to the first ">" of any kind, this is the tag `div class="wkgrid" title="x` and some text;
+    // a browser ends the tag after the quoted value and sees the handler.
+    expect(bad({ html: '<div class="wkgrid" title="x>" onclick="steal()"></div>' })).toThrow(/quote or an angle bracket|attribute "onclick"/);
+    expect(bad({ html: '<div class="wkgrid" title=x"y><script>alert(1)</script>' })).toThrow();
+    expect(bad({ html: '<div class="wkgrid" data-x="a<b"></div>' })).toThrow(/quote or an angle bracket/);
+    expect(bad({ html: '<div class="wkgrid"' })).toThrow(/never meets its ">"/);
+    expect(bad({ html: '<div class="wkgrid" title="never closed></div>' })).toThrow(/never meets its ">"/);
+    // A browser drops tabs and newlines inside a scheme, so the bench does before it looks.
+    expect(bad({ html: '<div class="wkgrid" title="java\tscript:x()"></div>' })).toThrow(/may not carry an address/);
+    expect(bad({ html: '<svg class="wkgrid"><path class="wkgrid-p" d="java\nscript:alert(1)"></path></svg>' })).toThrow(/may not carry an address/);
+  });
+
+  it('reads text that opens and never closes in time that grows with its length and nothing else', () => {
+    // MEASURED 2026-09-20 on the patterns this replaced, 40 000 openings each: the tag pattern took
+    // 1.3 s, the comment strip 0.6 s, the at-rule strip 3.2 s and "animation … infinite" 6.3 s, and
+    // ten times less input took a hundred times less time. The bench's 12 000-character ceiling is
+    // what kept that to a tenth of a second in practice; the readers no longer depend on it.
+    const n = 40_000;
+    const timed = (name: string, run: () => unknown) => {
+      const started = performance.now();
+      run();
+      expect(performance.now() - started, name).toBeLessThan(400);
+    };
+    timed('tags', () => tagsOf('<a '.repeat(n)));
+    timed('attributes', () => attributesOf('a= '.repeat(n)));
+    timed('comments', () => withoutComments('/* '.repeat(n)));
+    timed('declarations', () => declarationsOf('animation '.repeat(n)));
+    timed('selectors', () => selectorsOf('@media '.repeat(n)));
+    timed('var fallbacks', () => withoutVarFallbacks('var(--a,('.repeat(n)));
+    // And through the bench itself, at the most it accepts.
+    timed('the bench, markup', () => { try { validateComponentBody({ ...WEEK_GRID, html: '<div class="wkgrid">' + '<a '.repeat(3900) }); } catch { /* refused is the right answer */ } });
+    timed('the bench, styles', () => { try { validateComponentBody({ ...WEEK_GRID, css: '.wkgrid { color: var(--ak-ink); }' + 'animation '.repeat(1100) }); } catch { /* refused is the right answer */ } });
   });
 
   it('cannot reach outside itself', () => {
