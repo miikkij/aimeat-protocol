@@ -62,6 +62,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, openSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { portIsFree } from './lib/port-free.js';
+import { SANDBOX_MAX_APPS } from './lib/sandbox-limits.js';
 import { fileURLToPath } from 'node:url';
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
@@ -141,6 +142,11 @@ function sandboxEnv(port: number, dbPath: string): Record<string, string> {
         AIMEAT_ENCRYPTION_KEY: '0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20',
         AIMEAT_WELCOME_BONUS: '1000',
         AIMEAT_DEFAULT_AGENT_SCOPES: '*',
+        // A sandbox KEEPS ITS HISTORY, the way a real node does: every measured build and every
+        // probe page stays, so how the apps changed over weeks can be read back. At the node's
+        // default of 50 the catalogue filled in two days and refused three finished builds at
+        // their publish (2026-09-20). SANDBOX_MAX_APPS is what the build measurement counts against.
+        AIMEAT_MAX_APPS_PER_AGENT: String(SANDBOX_MAX_APPS),
 
         // Opt-in features, on: a sandbox exists to see them.
         AIMEAT_CAPABILITY_PUBLISHING: 'self_only',

@@ -349,6 +349,16 @@ const GOOD_BODY = {
         const final = (await json('/v1/designbook/leiska-dashboard', { headers: auth(other.token) })).body.data.usage;
         assert(final === after, `the counter did not move again: ${after} → ${final}`);
 
+        // A layout with no part named is a use the Book never hears about: the publish says so.
+        const u = `dbunnamed${Date.now()}.html`;
+        const unnamed = await json('/v1/apps', { method: 'POST', headers: auth(other.token),
+            body: JSON.stringify({ filename: u, mime_type: 'text/html', name: 'Unnamed', description: 'Carries a layout and names no part.',
+                content: b64(page(layout).replaceAll(f, u).replace(/<meta name="aimeat-book-parts"[^>]*>\n/, '')) }) });
+        assert(unnamed.status === 201, `publish ${unnamed.status}: ${JSON.stringify(unnamed.body?.error)}`);
+        const told4 = unnamed.body.data.next_steps?.design_book_parts;
+        assert(told4.layout === 'stored' && told4.counted.length === 0 && told4.notes.some((n: string) => /names no Design Book part/.test(n)),
+            `the answer asks for the name or for the fill back: ${JSON.stringify(told4)}`);
+
         // A layout the validator refuses never stops the publish, and says why.
         const g = `dbbadlayout${Date.now()}.html`;
         const bad = await json('/v1/apps', { method: 'POST', headers: auth(other.token),
@@ -357,6 +367,70 @@ const GOOD_BODY = {
         assert(bad.status === 201, `a refused layout must not refuse the publish: ${bad.status} ${JSON.stringify(bad.body?.error)}`);
         const told3 = bad.body.data.next_steps?.design_book_parts;
         assert(told3.layout === 'refused' && told3.notes.some((n: string) => /no-such-component/.test(n)), `and the answer says why: ${JSON.stringify(told3)}`);
+    });
+
+    await test('the builder\'s REASONS: written down at publish, counted as taken, kept only when the owner says so, gone when the app is', async () => {
+        const f = `dbwhy${Date.now()}.html`;
+        const notes = (why: string) => ({
+            took: [{ part: 'leiska-dashboard', why }],
+            passed: [{ part: 'leiska-work-queue', why: 'a queue has states; habits have none' }],
+            made: [{ name: 'week-grid', what: 'seven tappable days per habit', why: 'the Book has no grid of days a person ticks' }],
+        });
+        const page = (why: string) => APP(f).replace('</head>', `<script type="application/json" id="aimeat-build-notes">${JSON.stringify(notes(why))}</` + 'script></head>');
+        const publish = (why: string) => json('/v1/apps', { method: 'POST', headers: auth(other.token),
+            body: JSON.stringify({ filename: f, mime_type: 'text/html', content: b64(page(why)), name: 'Why', description: 'Writes down its reasons.' }) });
+        const part = async () => (await json('/v1/designbook/leiska-dashboard')).body.data.reasons;
+        const mine = (r: any) => r.took.find((row: any) => row.app === `${other.name}/${f}`);
+        const takenBefore = (await part()).taken;
+
+        const first = await publish('numbers over one list is this app');
+        assert(first.status === 201, `publish ${first.status}: ${JSON.stringify(first.body?.error)}`);
+        const told = first.body.data.next_steps?.design_book_parts;
+        assert(JSON.stringify(told?.reasons) === JSON.stringify({ took: 1, passed: 1, made: 1, shared: true }), `the publish says what it wrote down: ${JSON.stringify(told)}`);
+        assert(told.counted.includes('leiska-dashboard'), 'a part the notes say was TAKEN is counted as named, with no meta');
+
+        // WRITING DOWN and COUNTING happened; KEEPING did not. Public, like the part.
+        let r = await part();
+        assert(r.taken === takenBefore + 1 && mine(r)?.why === 'numbers over one list is this app' && mine(r)?.kept === false,
+            `taken, with the builder's own sentence, and not kept: ${JSON.stringify(mine(r))}`);
+        const keptBefore = r.kept;
+
+        // A stranger cannot say an owner is satisfied, and neither can another owner for this app.
+        const anon = await json('/v1/designbook/keep', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ filename: f }) });
+        assert(anon.status === 401, `no session → 401, got ${anon.status}`);
+        const wrong = await json('/v1/designbook/keep', { method: 'POST', headers: auth(op.token), body: JSON.stringify({ filename: f }) });
+        assert(wrong.status === 404, `another owner's word about this app is a 404 on their own shelf, got ${wrong.status}`);
+        assert((await part()).kept === keptBefore, 'and nothing was marked');
+
+        const keep = await json('/v1/designbook/keep', { method: 'POST', headers: auth(other.token), body: JSON.stringify({ filename: f }) });
+        assert(keep.status === 200 && keep.body.data.kept === true && keep.body.data.made?.[0]?.name === 'week-grid',
+            `the owner's word is recorded and the answer lists what was made by hand: ${keep.status} ${JSON.stringify(keep.body?.data ?? keep.body?.error)}`);
+        r = await part();
+        assert(r.kept === keptBefore + 1 && mine(r)?.kept === true, `kept moved by one: ${keptBefore} → ${r.kept}`);
+
+        // The queue: what the Book should grow next, kept apps first, with the words.
+        const q = await json('/v1/designbook?view=reasons');
+        const grid = (q.body.data.made as any[]).find(m => m.name === 'week-grid');
+        assert(grid?.kept >= 1 && /no grid of days/.test(grid.rows.at(-1).why), `the hand-made piece is in the queue with its reason: ${JSON.stringify(grid)}`);
+        const left = (q.body.data.passed_over as any[]).find(p => p.part === 'leiska-work-queue');
+        assert(left && /habits have none/.test(left.reasons.at(-1).why), 'and so is the part that was looked at and left');
+
+        // A REBUILD replaces its own row and is not yet one the owner called good.
+        const second = await publish('second try, after the first was thrown away');
+        assert(second.status === 201 || second.status === 200, `republish ${second.status}`);
+        r = await part();
+        assert(r.taken === takenBefore + 1 && mine(r)?.version === 2 && mine(r)?.kept === false && r.kept === keptBefore,
+            `one row per app, the newest, and not kept until the owner says so again: ${JSON.stringify(mine(r))}`);
+
+        // An app that carries no notes cannot be kept, and is told how to carry them.
+        const none = await json('/v1/designbook/keep', { method: 'POST', headers: auth(other.token), body: JSON.stringify({ filename: otherApp }) });
+        assert(none.status === 409 && none.body.error?.code === 'NO_NOTES' && /aimeat-build-notes/.test(none.body.error.message), `no notes → 409 with the how: ${none.status}`);
+
+        // A deleted app leaves the Book's records.
+        const del = await json(`/v1/apps/${f}`, { method: 'DELETE', headers: auth(other.token) });
+        assert(del.status === 200, `delete ${del.status}: ${JSON.stringify(del.body?.error)}`);
+        r = await part();
+        assert(r.taken === takenBefore && !mine(r), `the deleted app's row is gone: ${JSON.stringify(r.took.map((x: any) => x.app))}`);
     });
 
     await test('adoption is the heartbeat: adopting an aging part lifts it back to published', async () => {

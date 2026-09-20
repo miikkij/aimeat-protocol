@@ -667,9 +667,9 @@ function composeBody(config: AimeatConfig): string {
     + 'post-process filter, proven where it lands) MERGES into the '
     + 'arrangement the app already has; a `genre` (a complete page in a committed register) is '
     + 'forked from its template, never adopted. A starting shape from the '
-    + 'Book plus your words beats a fresh composition, and when you make something worth '
-    + 'keeping, propose it back (`aimeat_designbook_propose`) so the next build starts where '
-    + 'you finished. WHAT THE BOOK HOLDS is listed at the end of this part when you read the '
+    + 'Book plus your words beats a fresh composition, and what you had to make is written '
+    + 'down with its reason (the build notes, part `patterns`); the Book hears of it when the '
+    + 'owner is satisfied with the app, not when the build ends. WHAT THE BOOK HOLDS is listed at the end of this part when you read the '
     + 'specification in parts, every part on a line under its kind; `aimeat_designbook_search` '
     + 'called with nothing answers the same list. Read it before you compose: you cannot search '
     + 'for a part you do not know exists.\n\n';

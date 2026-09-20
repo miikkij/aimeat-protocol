@@ -483,10 +483,19 @@ export const appTools: ConnectCliToolDefinition[] = [
             if (status) params.set('status', status);
             if (q) params.set('q', q);
             if (typeof input.limit === 'number') params.set('limit', String(input.limit));
-            // No word, no kind: the whole published shelf on one page, as on the two MCP doors.
-            const qs = params.toString() || 'view=map';
-            return client.get(`/v1/designbook?${qs}`);
+            // A view is always sent on, whatever it names: the ROUTE decides what a view means, and
+            // a door that forwards only the values it knows drops the next one in silence. No word,
+            // no kind and no view is the whole published shelf on one page, as on the two MCP doors.
+            const view = optionalString(input, 'view');
+            if (view) params.set('view', view);
+            return client.get(`/v1/designbook?${params.toString() || 'view=map'}`);
         },
+    },
+    {
+        name: 'aimeat_designbook_keep',
+        handler: ({ client }, input) => client.post('/v1/designbook/keep', {
+            filename: requiredString(input, 'filename'), kept: input.kept !== false,
+        }),
     },
     {
         name: 'aimeat_designbook_get',

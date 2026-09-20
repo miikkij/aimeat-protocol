@@ -41,7 +41,7 @@ import { parseDeclaredProvenanceInput } from '../mcp/ai-provenance-input.js';
 import type { WriteProvenance } from '../services/app-ui/service.js';
 import { DesignBookService } from '../services/design-book/service.js';
 import { DesignBookError } from '../services/design-book/validate.js';
-import { MAP_NOTE } from '../services/design-book/map.js';
+import { MAP_NOTE, REASONS_NOTE } from '../services/design-book/map.js';
 import { getAppTemplates } from '../data/app-templates.js';
 
 export function designbookRouter(config: AimeatConfig, storage: Storage): Router {
@@ -94,6 +94,15 @@ export function designbookRouter(config: AimeatConfig, storage: Storage): Router
         ]));
         return;
       }
+      // What builders wrote down about the Book, as the list of what it should become next: the
+      // things made by hand because it had nothing, and the parts most often looked at and left.
+      // Public, like the parts: it holds only what apps anybody may open said about them.
+      if (req.query.view === 'reasons') {
+        res.json(success(config.nodeId, { ...(await book.reasonsQueue()), note: REASONS_NOTE }, [
+          { description: 'One part, with the reasons given for taking it and for passing it over', method: 'GET', url: '/v1/designbook/{id}' },
+        ]));
+        return;
+      }
       const rows = await book.list({
         kind: req.query.kind as string | undefined,
         status: isSignedIn(req) ? (req.query.status as string | undefined) : 'published',
@@ -104,6 +113,18 @@ export function designbookRouter(config: AimeatConfig, storage: Storage): Router
         { description: 'Read one part whole', method: 'GET', url: '/v1/designbook/{id}' },
         { description: 'Propose a part (the bench runs first)', method: 'POST', url: '/v1/designbook' },
       ]));
+    } catch (err) { refuse(res, err); }
+  });
+
+  // THE OWNER SAYS AN APP TURNED OUT WELL. The one moment anything counts as kept (reasons.ts).
+  // Registered before /v1/designbook/:id/... so "keep" is never read as a part id.
+  router.post('/v1/designbook/keep', requireAuth(), requireScope('memory:write'), async (req: Request, res: Response) => {
+    try {
+      const body = (req.body ?? {}) as { filename?: unknown; kept?: unknown };
+      if (typeof body.filename !== 'string' || !body.filename.trim()) {
+        return res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Name the app: { "filename": "habits.html" }. Add "kept": false to take it back.'));
+      }
+      res.json(success(config.nodeId, await book.keep(caller(req), body.filename.trim(), body.kept !== false)));
     } catch (err) { refuse(res, err); }
   });
 

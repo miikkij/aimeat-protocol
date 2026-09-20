@@ -11,6 +11,8 @@
  * @structure registerDesignbookTools(mcp, registry)
  * @usage import { registerDesignbookTools } from './designbook.js';
  * @version-history
+ *   v1.5.0 — 2026-09-20 — aimeat_designbook_keep and the search's view "reasons" (parity with the
+ *     server MCP); get carries the reasons because the route does.
  *   v1.4.0 — 2026-09-19 — A search with no word and no kind asks the route for its map view and
  *     answers the whole published shelf as one page of text (parity with the server MCP).
  *   v1.3.0 — 2026-09-05 — effect joins the kind wording, with its body and its targets (parity
@@ -28,6 +30,7 @@ import type { AgentRegistry } from '../../agent-registry.js';
 import { aiProvenanceInputs } from '../../../../mcp/ai-provenance-input.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../mcp/catalog/shape.js';
+import { BOOK_VIEW_PARAM } from '../../../../mcp/catalog/definitions/designbook.js';
 
 export function registerDesignbookTools(mcp: McpServer, registry: AgentRegistry): void {
   const { client } = registry.resolve();
@@ -39,14 +42,17 @@ export function registerDesignbookTools(mcp: McpServer, registry: AgentRegistry)
     status: z.string().optional().describe('Only this lifecycle state: proposed, published, aging or retired.'),
     q: z.string().optional().describe('A word matched against id, title, summary and tags.'),
     limit: z.number().optional().describe('Rows to return, 1-200. Default 50.'),
-  }, annotationsFor('aimeat_designbook_search'), async ({ kind, status, q, limit }) => {
+    view: z.string().optional().describe(BOOK_VIEW_PARAM),
+  }, annotationsFor('aimeat_designbook_search'), async ({ kind, status, q, limit, view }) => {
+    // A view other than the map is sent on as it is: the route decides what a view means.
+    if (view && view !== 'map') return out(await client.get(`/v1/designbook?view=${encodeURIComponent(view)}`));
     const params = new URLSearchParams();
     if (kind) params.set('kind', kind);
     if (status) params.set('status', status);
     if (q) params.set('q', q);
     if (limit != null) params.set('limit', String(limit));
     // No word, no kind: the whole published shelf on one page (parity with the server MCP).
-    if (![...params.keys()].length) {
+    if (view === 'map' || ![...params.keys()].length) {
       const resp = await client.get('/v1/designbook?view=map') as { data?: { map?: string; note?: string }; ok?: boolean };
       if (resp.ok === false || !resp.data?.map) return out(resp);
       return { content: [{ type: 'text' as const, text: `${resp.data.map}${resp.data.note ?? ''}` }] };
@@ -59,6 +65,13 @@ export function registerDesignbookTools(mcp: McpServer, registry: AgentRegistry)
     id: z.string().describe('The part id, from the search.'),
   }, annotationsFor('aimeat_designbook_get'), async ({ id }) => {
     return out(await client.get(`/v1/designbook/${encodeURIComponent(id)}`));
+  });
+
+  mcp.tool('aimeat_designbook_keep', descriptionFor('aimeat_designbook_keep'), {
+    filename: z.string().describe('The published app the owner is satisfied with, e.g. "habits.html".'),
+    kept: z.boolean().optional().describe('false takes it back. Default true.'),
+  }, annotationsFor('aimeat_designbook_keep'), async ({ filename, kept }) => {
+    return out(await client.post('/v1/designbook/keep', { filename, kept: kept !== false }));
   });
 
   mcp.tool('aimeat_designbook_propose', descriptionFor('aimeat_designbook_propose'), {

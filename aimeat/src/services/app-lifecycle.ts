@@ -58,6 +58,7 @@ import type {
 } from '../storage/interface.js';
 import { parseGAII } from '../utils/gaii.js';
 import { resolveAppTarget, type AppDevAct } from './app-dev-grant.js';
+import { DesignBookReasons } from './design-book/reasons.js';
 import { logger } from '../utils/logger.js';
 import { emitChange } from './event-bus.js';
 import { recordPublicActivity } from './public-activity.js';
@@ -559,6 +560,15 @@ export async function deleteOwnedApp(
   });
 
   emitChange('apps');
+
+  // A deleted app leaves the Design Book's reasons: a part must not look favoured by apps that no
+  // longer exist. Whole-app deletes only (one version gone is still an app), and best-effort:
+  // commentary about the Book never gets to fail a delete.
+  if (!version) {
+    // The node's id is the part of the owner's GHII after the "@"; this function holds no config.
+    await new DesignBookReasons(storage, { nodeId: ownerGhii.slice(ownerGhii.indexOf('@') + 1) }).forget(ownerGhii, ownerName, filename)
+      .catch(err => { logger.warn('deleteApp: forgetting the Design Book reasons is best-effort', { filename, error: String(err) }); });
+  }
 
   return { filename, versionDeleted: version ?? 'all' };
 }

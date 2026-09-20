@@ -35,7 +35,7 @@ of them built the wrong thing three times in a row.
   a reason, and a track is never changed in the middle of a build.
 - **Ask the level first.** A quick prototype (the kit as it comes, no styling), an ordinary page
   (a ready layout and look from the Design Book), or the finest (a forked genre, the Book's parts,
-  components of its own, and those put into the Book afterwards). All three are Atelier and
+  components of its own, each written down with its reason). All three are Atelier and
   bilingual, so a prototype is raised later without starting over. The page states it in
   `<meta name="aimeat-level" content="proto|plain|fine">`. Never pick a lower level silently.
 - **Propose before you build, and wait.** On the finest level: two or three genres by name with why each fits, the
@@ -52,6 +52,12 @@ of them built the wrong thing three times in a row.
   data (`<script type="application/json" id="aimeat-layout">`); the publish counts the parts and
   stores the layout, so nothing is called afterwards. The proposal owes one line: "From the Design Book I take: …" or "… I take nothing,
   because …".
+- **Write down why, as you choose, and put nothing into the Design Book because a build is
+  finished.** The page carries `<script type="application/json" id="aimeat-build-notes">` with
+  `took`, `passed` and `made`, one true sentence of why each; the publish keeps them with the
+  version. Jouni rebuilt one app three times and liked the third: only an app its owner says
+  turned out well teaches the Book anything. When he says so, record it with
+  `aimeat_designbook_keep { filename }`.
 - **The genre is the look.** A look preset with components stacked in it, under a genre's name, is
   the default page every app looks like, and it is what gets sent back.
 - **Judge what it looks like, not only that it works.** Passing tests, contrast and page width do
