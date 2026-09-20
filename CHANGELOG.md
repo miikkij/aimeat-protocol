@@ -4,6 +4,33 @@ All notable changes to AIMEAT are documented in this file.
 
 ## [Unreleased]
 
+## aimeat-crewai 0.27.1 - 2026-09-20
+
+**The quality numbers, and the word the liaison uses for a held action.** Follow-up to 0.27.0,
+against the contract as released in node 3.18.0.
+
+- **`decision_stats(group_by=...)`** over `GET /v1/ai/decisions/stats` -- the sixth step of the
+  setup order and the one the other five exist for: thresholds are tuned from decisions already
+  made, not chosen in advance. Grouped by rule or by principal, optionally narrowed to one of
+  each, so an agent's share of a rule is one call. Counted IN THE STORE, which is why this is its
+  own door rather than something a caller tallies from `decisions()`: that list is paged, so a
+  tally of it is a tally of one page. `group_by` is checked here before the call, because the node
+  requires it and a typo should cost a sentence rather than a round trip.
+- **The liaison no longer calls a gate stop a task.** Both backstory templates said the owner
+  "already has a task about it". The locked ruling is that a gate stop is an OPEN ITEM on the
+  owner's list and not an agent task -- a task targets an agent, and the owner is not one -- and
+  the wording also disagreed with what `gate().report()` tells the same crew. The templates now
+  say open item, and they tell the agent to name the `decision_id`, which is what the owner has to
+  find the decision by when the item could not be written at all. A test asserts the wording of
+  both templates with the wrapping collapsed, so a reflow cannot break it and a reworded prompt
+  cannot quietly drift from the ruling again.
+- No `trial` field: the owner's Try of a rule is `POST /v1/ai/decide/rules/:id/try`, owner-only and
+  excluded from the rule's numbers. An agent that wants a rule's answer runs the rule.
+- README: the tuning section, the node/connector floor of 3.18.0, and who pays for an agent's text
+  completion now that `/v1/ai/complete`, the `/v1/llm` doors and `/v1/ai/jobs` run on the owner's
+  settings, budget and usage record. Neither this package nor crewfive writes its own
+  `openrouter.settings`, so nothing here had to stop.
+
 ## aimeat-crewai 0.27.0 - 2026-09-20
 
 **The judgement step, with a record: the node's decision rules as CrewAI tools.** A crew's weak
