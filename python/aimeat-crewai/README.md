@@ -437,6 +437,164 @@ pip install "aimeat-crewai[parquet]"
 `to_parquet()` raises a named `ImportError` when it is missing rather than quietly writing a CSV
 under a function whose name says otherwise.
 
+## Decision rules: the judgement step, with a record (0.27.0+)
+
+A crew's weak point is the judgement step — the place where it decides whether to send the reply,
+deliver the file, publish the page or pay the invoice. The decision model answers **closed
+questions** about a state and returns typed answers with probabilities. It writes no text.
+
+A **decision rule** is the owner's named set of questions, thresholds and bands, written once on
+the node and tuned from the decisions it makes. An agent that names a rule sends **only the
+state**: the questions, thresholds and bands are the owner's, and a call that tries to send its own
+beside a rule is refused before anything leaves the node. A rule somebody can override at call time
+is not a rule.
+
+**The agent sees the job, not the machinery.** At start-up the liaison reads the rules this agent
+is allowed to run and mints one CrewAI tool per rule, named after what it decides:
+
+```python
+from aimeat_crewai import decide_tools
+
+# Every rule the owner allows this agent. Add a rule on the node and the agent has it at the
+# next restart — no crew file to edit.
+tools = decide_tools("mailer")
+# -> [decide_sort_a_message, decide_send_a_reply, ...]
+```
+
+In a JSON crew definition the same two forms are tool ids:
+
+```json
+{ "tools": ["decide"] }                  // every rule this agent may run
+{ "tools": ["decide:sort-a-message"] }   // that one rule
+```
+
+A named rule the owner does **not** allow this agent is an error at start-up, not a silent
+omission: a crew that asked for a tool and was handed nothing fails later, somewhere else, for a
+reason nobody can see from there.
+
+### Asking directly
+
+```python
+from aimeat_crewai import decide, pick_one, scale, yes_no
+
+d = decide(
+    {"subject": mail.subject, "body": mail.body},
+    rule="sort-a-message",
+    subject=f"mail.{mail.id}",
+    agent_name="mailer",
+)
+if d.outcome == "act":
+    route_to(d.value("queue"))
+```
+
+Without a rule, ask your own questions — **one call, every question**. The cost is in the state and
+the answers are free, so ask everything any branch might need in a single call, including the
+questions only one branch will read:
+
+```python
+d = decide(
+    {"body": text},
+    questions={
+        "category": pick_one("Which queue?", {"bug": "Something is broken",
+                                              "billing": "About money",
+                                              "other": "None of these"}),
+        "severity": scale("How bad is it?", ["Cosmetic", "Annoying", "Blocking"]),
+        "refund":   yes_no("The sender explicitly asks for a refund."),
+    },
+    thresholds={"category": 0.7},   # recorded, so a 0.72 means something later
+    gates="which queue the message goes to",
+    agent_name="mailer",
+)
+```
+
+Questions and option names are written **in English**, whatever language the content is in.
+
+Read `d.value(qid)` and `d.confidence(qid)` rather than reaching into `d.answers`: a score level of
+`0` and a probability of `0.0` are real answers, and code that reads them with `or` turns the
+model's clearest answer into "it did not answer".
+
+### The gate
+
+Off by default, and that is the design — a comparison run needs an agent that acts unguarded, or
+there is nothing to compare the gate against. With the gate off the rule still runs and the
+decision is still recorded.
+
+```python
+from aimeat_crewai import gate
+
+v = gate("send-a-reply", {"subject": s, "body": b}, on=True, agent_name="mailer")
+if v.proceed:
+    send(reply)
+report(v.report())   # which band fired, on which decision id
+```
+
+**There are two gates and only one of them can tell the owner.** The node has its own per-agent
+gate, which the *owner* turns on; when it is on, an outcome under the act band comes back as
+`proceed: false` **and** lands on the owner's open-items list as something they can act on. This
+package's `on=` is a *local* hold: it stops the action here. It cannot raise the owner's item —
+that door is the owner's in person (`requireRole('owner')` on `/v1/open-items`) and an agent token
+is refused there by design. So a local hold with the node's gate off says exactly that, with the
+decision id, rather than pretending somebody was notified. `v.report()` is written to be put
+straight into what the crew hands back: a gate that stops an action silently is worse than no gate.
+
+When a person later confirms or overrides a decision, record it — this is what turns the register
+into something thresholds can be tuned from:
+
+```python
+from aimeat_crewai import review
+review(v.decision_id, "overridden", note="Sent it by hand instead.", agent_name="mailer")
+```
+
+### Check before you build on it
+
+```python
+from aimeat_crewai import settings
+
+s = settings(agent_name="mailer")
+if not s["available"]:
+    print(s["unavailable_reason"])   # the node's own sentence: what to set, and where
+```
+
+Refusals arrive as `DecideRefused` carrying the node's **own** code — `NO_API_KEY`,
+`AGENT_QUOTA_EXHAUSTED`, `DATAMAP_REQUIRED`, `RULE_NOT_FOR_CALLER`, `RATE_LIMITED` and the rest —
+so a caller can branch on the real reason. **Only a rate limit is retryable** (`exc.retryable`,
+with `exc.retry_after` in seconds): a quota that is used up is used up and a permission that is
+missing is a standing fact, so a retry loop around either burns the budget it is reacting to and
+buries the message that would have fixed it.
+
+### Direct mode — a run with no node
+
+Behind an explicit switch, never inferred:
+
+```bash
+export AIMEAT_DECIDE_DIRECT=1
+export AIMEAT_DECIDE_KEY_ENV=TYPESAFE_API_KEY   # the VARIABLE, the way the node names one
+```
+
+It says once, at start-up, exactly what it loses: the node does **not** scrub personal data out of
+the state, the decision is **not** on the owner's register, no daily or per-agent cap applies, and
+an identical earlier answer is **not** reused — every call is paid for. It still sends only the
+fields the rule names (pass the rule's own document as `direct_rule=`, since there is no node to
+read it from), and it writes every decision to `<AIMEAT_HOME>/decide/direct-log.jsonl`.
+
+Push that log to a node once there is one:
+
+```python
+from aimeat_crewai import push_direct_log
+push_direct_log(agent_name="mailer")
+```
+
+It lands in memory under `agents.<name>.decide.direct-log`, labelled as decisions made without the
+node — **not** on the decision register, because a row claiming to be one would make the owner's
+quality numbers read as though the scrubber and the cap had been in force.
+
+The node never sends a key. When the owner has given an agent one, `settings()` names the
+environment variable it lives in (`agent.key_env`) and never the key itself.
+
+> Our own measurements of the decision model (accuracy, speed, cost) stay unpublished: TypeSafe's
+> customer agreement forbids publishing benchmarks of it. Figures TypeSafe publishes itself may be
+> repeated as TypeSafe's claim, with the source named and linked.
+
 ## Compatibility
 
 | `aimeat-crewai` | AIMEAT node | CrewAI |
@@ -449,6 +607,7 @@ under a function whose name says otherwise.
 | 0.17.x | 2.2.0+ for file helpers (`?mode=handle` on `/v1/pub`, `resources.files` on tasks). Against an older node, reading a file the owner shared still works over plain `GET /v1/pub/{owner}/{key}` — only the handle + task-attachment helpers need 2.2.0. | 0.80+ |
 | 0.20.x | 3.3.0+ for data packages (`/v1/datapackages`). `read_package` and `to_dataframe` need only the package's public address, so they read a package from ANY node that publishes one; `publish_package` and `package_versions` need the routes. | 0.80+ |
 | 0.22.x | 3.9.0+ node AND `aimeat` connector for server-initiated invokes (`/local/invoke/next` on the serve daemon). On an older serve daemon the listener logs once that the surface is missing and the rest of the daemon is unchanged. | 0.80+ |
+| 0.27.x | A node with decision rules (`/v1/ai/decide`, `/v1/ai/decide/rules`) and an owner who has set a TypeSafe key. `settings()` says whether this owner can use it at all and why not — check it before building a path on it. Direct mode needs no node. | 0.80+ |
 
 ## License
 
