@@ -617,14 +617,22 @@ components:
 
     DecideRequest:
       type: object
-      required: [state, questions]
+      required: [state]
+      description: Give `questions`, or `rule`. A call that names a rule sends only the state.
       properties:
         state:
           description: What is being judged. A string, an object with named fields, or an array.
+        rule:
+          type: string
+          description: >
+            The id of one of the owner's decision rules. The rule holds the questions, thresholds
+            and bands; `questions`, `thresholds`, `bands` or `gates` sent beside it are refused
+            (400 RULE_FIXES_QUESTIONS), and a state field outside the rule's `sends` is refused
+            (400 STATE_OUTSIDE_RULE).
         questions:
           type: object
           additionalProperties: { $ref: '#/components/schemas/DecideQuestion' }
-          description: Your ids (`[A-Za-z0-9_.-]{1,64}`) to questions. Ask everything in one call.
+          description: Your ids (`[A-Za-z0-9_.-]{1,64}`) to questions. Ask everything in one call. Required unless `rule` is given.
         subject: { type: string, description: What the decision is about (a memory key, a record id). }
         gates: { type: string, description: What the answer decides. }
         thresholds: { type: object, description: The thresholds the caller will apply, recorded with the decision. }
@@ -632,6 +640,73 @@ components:
         public_content: { type: boolean, description: Skip scrubbing for public content; honoured per the owner's policy. }
         cache: { type: boolean, default: true, description: Reuse an identical earlier decision. }
         app_id: { type: string, description: App attribution; an app-grant token's own app always wins. }
+
+    DecisionRule:
+      type: object
+      description: >
+        A DECISION RULE: a named, reusable definition an owner writes once and both an app and an
+        agent then run by id. Stored as the owner's memory record `decide.rules.<id>` (a reserved
+        prefix: only these routes write it). Running one produces a decision, which is recorded
+        with the rule, its version and the outcome. A rule bound to an action that cannot be undone
+        is a gate.
+      required: [title, decides, questions, thresholds, bands, use]
+      properties:
+        id: { type: string, pattern: '^[a-z0-9][a-z0-9-]{0,62}$', description: The id in the path wins over one in the body. }
+        title: { type: string, maxLength: 120 }
+        decides: { type: string, maxLength: 500, description: What the rule gates, in plain words. }
+        sends:
+          type: array
+          items: { type: string }
+          description: The top-level state fields a caller may send. Empty or absent allows any state.
+        questions:
+          type: object
+          additionalProperties: { $ref: '#/components/schemas/DecideQuestion' }
+          description: The node's three question types, in English.
+        thresholds:
+          type: object
+          additionalProperties: { type: number }
+          description: >
+            Question id to the floor its answer must reach, in that question's own units: the
+            probability of a noul (0-1), the confidence of a choice (0-1), the level of a score
+            (counted from 0). At least one. An answer under its floor makes the outcome `stop`.
+            Word each thresholded question so that a high value means "go ahead".
+        bands:
+          type: object
+          required: [act, ask]
+          properties:
+            act: { type: number, minimum: 0, maximum: 1 }
+            ask: { type: number, minimum: 0, maximum: 1 }
+          description: >
+            `0 <= ask <= act <= 1`. The result is the weakest certainty among the thresholded
+            answers (a noul's probability, a choice's or a score's confidence). At or over `act`
+            the outcome is `act`, at or over `ask` it is `ask`, under it `stop`.
+        use: { type: string, enum: [agent, app, both], description: Who may run it. Enforced on every door; the owner in person may always run their own rule. }
+        gate: { type: boolean, default: false, description: What the gate switch starts at for an agent whose owner never set it. }
+        sample: { description: A state to try the rule on. }
+        version: { type: integer, readOnly: true, description: Bumped when the questions change, and only then. }
+        createdAt: { type: string, format: date-time, readOnly: true }
+        updatedAt: { type: string, format: date-time, readOnly: true }
+        proposedBy: { type: string, readOnly: true, description: The principal that proposed it, when it began as a proposal. }
+
+    AgentAiKeys:
+      type: object
+      description: One agent's AI settings as its owner set them. No field carries a key.
+      properties:
+        agent: { type: string }
+        decide: { $ref: '#/components/schemas/AgentAiKeyState' }
+        openrouter: { $ref: '#/components/schemas/AgentAiKeyState' }
+        daily_usd: { type: number, nullable: true, description: The agent's daily AI cap in USD, or null when it has none of its own. }
+        spent_today_usd: { type: number }
+        gate: { type: string, enum: ['on', 'off', 'rule'], description: "`rule` means each rule's own `gate` default applies." }
+        quality: { type: object, description: 'This agent''s decisions: { decisions, outcomes: { act, ask, stop }, gateStops, overridden, confirmed, costUsd, lastAt }.' }
+        quality_by_rule: { type: object, description: The same numbers per decision rule, for this agent only. }
+
+    AgentAiKeyState:
+      type: object
+      properties:
+        has_key: { type: boolean }
+        key_env: { type: string, nullable: true, description: The NAME of the environment variable that holds the key where the agent runs its own calls. Never the key. }
+        set_at: { type: string, format: date-time, nullable: true }
 
 
 
@@ -14858,6 +14933,19 @@ paths:
         answers. Every call is metered on the owner's budget and recorded as a decision.
 
 
+        WITH A DECISION RULE (`rule`): the questions, thresholds and bands come from the owner's
+        record and the caller sends only the state. The answer then also carries `rule`
+        `{ id, version }`, `outcome` (`act` | `ask` | `stop`), `result`, `passed` per thresholded
+        question, `bands`, `gate` `{ on, stopped, task? }` and `proceed`. For an agent whose gate is
+        on, an outcome under the act band sets `proceed: false` and puts an item on the owner's
+        open-items list (`gate.task`); with the gate off the agent may proceed and the decision is
+        recorded with the same outcome. Only agents are gated.
+
+
+        THE KEY, strongest first: the calling agent's own, the owner's own, the node's.
+        `key_source` says which one paid (`agent` | `own` | `node`).
+
+
         Requires an owner session or a token carrying `ai:use`.
       tags: [Memory]
       security:
@@ -14872,14 +14960,16 @@ paths:
         '200':
           description: >
             `data` is `{ decision_id, model, answers, cached, scrub: { removed, total, skipped },
-            usage: { input_tokens, cost_usd }, key_source, request_id }`. Each answer is
-            `{ type, value, probabilities?, confidence?, legend? }`.
+            usage: { input_tokens, cost_usd }, key_source, request_id }`, plus the rule fields above
+            when a rule ran. Each answer is `{ type, value, probabilities?, confidence?, legend? }`.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AimeatEnvelope'
         '400':
-          description: '`INVALID_REQUEST` (limits; `details.violations` lists each) or `NO_API_KEY`.'
+          description: >
+            `INVALID_REQUEST` (limits; `details.violations` lists each), `NO_API_KEY` (the message
+            says what to set and where), `RULE_FIXES_QUESTIONS` or `STATE_OUTSIDE_RULE`.
           content:
             application/json:
               schema:
@@ -14887,13 +14977,19 @@ paths:
         '401':
           $ref: '#/components/responses/AimeatError'
         '402':
-          description: '`QUOTA_EXHAUSTED` or `APP_QUOTA_EXHAUSTED` — the owner''s budget or allowance is spent.'
+          description: '`QUOTA_EXHAUSTED`, `APP_QUOTA_EXHAUSTED` or `AGENT_QUOTA_EXHAUSTED` — the owner''s budget, the app''s cap or the agent''s cap is spent.'
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AimeatEnvelope'
         '403':
-          description: '`DATAMAP_REQUIRED` — the calling app has not declared TypeSafe in its data map; or no `ai:use`.'
+          description: '`DATAMAP_REQUIRED` — the calling app has not declared TypeSafe in its data map; `RULE_NOT_FOR_CALLER` — the rule''s `use` does not admit this kind of caller; or no `ai:use`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '404':
+          description: '`RULE_NOT_FOUND` — the owner has no such decision rule.'
           content:
             application/json:
               schema:
@@ -14940,14 +15036,390 @@ paths:
       parameters:
         - { name: subject, in: query, schema: { type: string }, description: Only decisions about this subject. }
         - { name: app_id, in: query, schema: { type: string } }
+        - { name: rule, in: query, schema: { type: string }, description: Only decisions one decision rule made. }
+        - { name: principal, in: query, schema: { type: string }, description: Only decisions one principal asked for (an agent's GAII). }
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
         - { name: before, in: query, schema: { type: string }, description: 'Paging cursor: only decisions created before this ISO time.' }
+      responses:
+        '200':
+          description: >
+            `data` is `{ decisions, total }`. Each decision row carries `rule`, `ruleVersion`,
+            `outcome` and `keyScope` beside its `record`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '401':
+          $ref: '#/components/responses/AimeatError'
+        '403':
+          $ref: '#/components/responses/AimeatError'
+
+  /v1/ai/decisions/stats:
+    get:
+      operationId: decisionStats
+      summary: The quality numbers of the owner's decisions, per rule or per principal
+      description: >
+        Counted in the store, so exact whatever the list's page size is. Each group is
+        `{ key, decisions, outcomes: { act, ask, stop }, gateStops, overridden, confirmed, costUsd,
+        lastAt }`. Grouped by rule, decisions that named no rule are left out, and so is the owner's
+        try of a rule on its sample.
+
+
+        Requires an owner session or a token carrying `ai:use`.
+      tags: [Memory]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: group_by, in: query, required: true, schema: { type: string, enum: [rule, principal] } }
+        - { name: rule, in: query, schema: { type: string } }
+        - { name: principal, in: query, schema: { type: string } }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '400':
+          $ref: '#/components/responses/AimeatError'
+        '401':
+          $ref: '#/components/responses/AimeatError'
+        '403':
+          $ref: '#/components/responses/AimeatError'
+
+  /v1/ai/decide/rules:
+    get:
+      operationId: listDecisionRules
+      summary: The owner's decision rules that this caller may run
+      description: >
+        The owner in person gets every rule in full, the proposals that wait for them, and `quality`
+        (the stats per rule). An agent or an app gets only the rules its kind may run (`use`), in
+        the short form `{ id, title, decides, sends, use, gate, version }`, and its own waiting
+        proposals.
+
+
+        Requires an owner session or a token carrying `ai:use`.
+      tags: [Memory]
+      security:
+        - BearerAuth: []
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
         '401':
           $ref: '#/components/responses/AimeatError'
         '403':
+          $ref: '#/components/responses/AimeatError'
+
+  /v1/ai/decide/rules/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string } }
+    get:
+      operationId: getDecisionRule
+      summary: One decision rule in full
+      description: A rule this kind of caller may not run reads as 404. Requires an owner session or `ai:use`.
+      tags: [Memory]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: '`data` is `{ rule }`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '401':
+          $ref: '#/components/responses/AimeatError'
+        '403':
+          $ref: '#/components/responses/AimeatError'
+        '404':
+          $ref: '#/components/responses/AimeatError'
+    put:
+      operationId: putDecisionRule
+      summary: Create or replace a decision rule (the owner in person)
+      description: >
+        Validated as a whole: `400 INVALID_RULE` lists every problem in `details.problems`
+        (`{ field, code, message }`). `version` is bumped when the questions change, and not when a
+        threshold or a band is tuned. An agent or an app gets 403: a rule decides whether an agent
+        acts. An agent proposes one instead (`POST /v1/ai/decide/rule-proposals`).
+      tags: [Memory]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DecisionRule'
+      responses:
+        '200':
+          description: Replaced. `data` is `{ rule }`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '201':
+          description: Created. `data` is `{ rule }`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '400':
+          $ref: '#/components/responses/AimeatError'
+        '401':
+          $ref: '#/components/responses/AimeatError'
+        '403':
+          $ref: '#/components/responses/AimeatError'
+        '409':
+          description: '`TOO_MANY_RULES` — an account holds at most 100.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+    delete:
+      operationId: deleteDecisionRule
+      summary: Delete a decision rule (the owner in person)
+      description: The decisions the rule made stay on the register.
+      tags: [Memory]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '401':
+          $ref: '#/components/responses/AimeatError'
+        '403':
+          $ref: '#/components/responses/AimeatError'
+        '404':
+          $ref: '#/components/responses/AimeatError'
+
+  /v1/ai/decide/rules/{id}/try:
+    post:
+      operationId: tryDecisionRule
+      summary: Run a rule on its sample, or on a state given here (the owner in person)
+      description: >
+        A real, paid, recorded call. The answer has the shape of `POST /v1/ai/decide` with a rule.
+        A try is not counted among the rule's decisions, so it does not move the quality numbers.
+      tags: [Memory]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                state: { description: A state to try instead of the rule's sample. }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '400':
+          description: '`NO_SAMPLE` — the rule has no sample and none was sent.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '401':
+          $ref: '#/components/responses/AimeatError'
+        '403':
+          $ref: '#/components/responses/AimeatError'
+        '404':
+          $ref: '#/components/responses/AimeatError'
+
+  /v1/ai/decide/rule-proposals:
+    post:
+      operationId: proposeDecisionRule
+      summary: Propose a decision rule to the owner. Creates nothing.
+      description: >
+        For the owner's agents and the owner's own chat; an app gets 403. The proposed rule is
+        validated exactly as a rule is, stored as a proposal and put on the owner's open-items
+        list. The rule exists only after `POST .../{id}/approve`. Proposing the same rule id twice
+        answers `already_waiting: true`. Requires an owner session or `ai:use`.
+      tags: [Memory]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [rule, reason]
+              properties:
+                rule: { $ref: '#/components/schemas/DecisionRule' }
+                reason: { type: string, minLength: 10, maxLength: 1000, description: Why this rule should exist, in a sentence the owner can decide from. }
+      responses:
+        '202':
+          description: '`data` is `{ proposal_id, rule_id, already_waiting, next_step }`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '400':
+          $ref: '#/components/responses/AimeatError'
+        '401':
+          $ref: '#/components/responses/AimeatError'
+        '403':
+          $ref: '#/components/responses/AimeatError'
+        '409':
+          description: '`RULE_EXISTS` or `TOO_MANY_PROPOSALS`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+
+  /v1/ai/decide/rule-proposals/{id}/approve:
+    post:
+      operationId: approveDecisionRuleProposal
+      summary: The owner's press creates the proposed rule
+      tags: [Memory]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '201':
+          description: '`data` is `{ rule }`. The proposal is gone and its open item is closed.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '401':
+          $ref: '#/components/responses/AimeatError'
+        '403':
+          $ref: '#/components/responses/AimeatError'
+        '404':
+          $ref: '#/components/responses/AimeatError'
+        '409':
+          $ref: '#/components/responses/AimeatError'
+
+  /v1/ai/decide/rule-proposals/{id}/decline:
+    post:
+      operationId: declineDecisionRuleProposal
+      summary: The owner declines a proposed rule
+      tags: [Memory]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '401':
+          $ref: '#/components/responses/AimeatError'
+        '403':
+          $ref: '#/components/responses/AimeatError'
+        '404':
+          $ref: '#/components/responses/AimeatError'
+
+  /v1/agents/{name}/ai-keys:
+    parameters:
+      - { name: name, in: path, required: true, schema: { type: string }, description: The agent's bare name. }
+    get:
+      operationId: getAgentAiKeys
+      summary: One agent's AI settings. Never a key.
+      description: >
+        Readable by the owner in person and by the agent itself; a sibling agent gets 403 and
+        another owner 404. The node never sends a key to an agent: for an agent that makes its own
+        calls elsewhere, `key_env` names the environment variable that holds the key there.
+      tags: [Agents]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: '`data` is an `AgentAiKeys`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '401':
+          $ref: '#/components/responses/AimeatError'
+        '403':
+          $ref: '#/components/responses/AimeatError'
+        '404':
+          $ref: '#/components/responses/AimeatError'
+    put:
+      operationId: putAgentAiKeys
+      summary: Set an agent's own keys, its daily cap and its gate switch (the owner in person)
+      description: >
+        Every part is optional and independent. A key is stored encrypted as the owner's record
+        `decide.apikey.agent.<name>` or `openrouter.apikey.agent.<name>`, which no generic memory
+        door reads, writes, searches or exports. Key resolution, strongest first: the agent's own
+        key, the owner's own, the node's.
+      tags: [Agents]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                decide:
+                  type: object
+                  properties:
+                    api_key: { type: string, nullable: true, description: The TypeSafe key. null forgets it. }
+                    key_env: { type: string, nullable: true, pattern: '^[A-Z][A-Z0-9_]{1,63}$', description: The NAME of the variable, never the key. }
+                openrouter:
+                  type: object
+                  properties:
+                    api_key: { type: string, nullable: true }
+                    key_env: { type: string, nullable: true, pattern: '^[A-Z][A-Z0-9_]{1,63}$' }
+                daily_usd: { type: number, nullable: true, minimum: 0, maximum: 10000, description: null removes the agent's own cap. }
+                gate: { type: string, nullable: true, enum: ['on', 'off', 'rule'] }
+      responses:
+        '200':
+          description: '`data` is the updated `AgentAiKeys`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '400':
+          $ref: '#/components/responses/AimeatError'
+        '401':
+          $ref: '#/components/responses/AimeatError'
+        '403':
+          $ref: '#/components/responses/AimeatError'
+        '404':
+          $ref: '#/components/responses/AimeatError'
+
+  /v1/agents/{name}/ai-keys/{model}:
+    delete:
+      operationId: deleteAgentAiKey
+      summary: Forget one of an agent's keys and the name of its variable (the owner in person)
+      tags: [Agents]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string } }
+        - { name: model, in: path, required: true, schema: { type: string, enum: [decide, openrouter] } }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '401':
+          $ref: '#/components/responses/AimeatError'
+        '403':
+          $ref: '#/components/responses/AimeatError'
+        '404':
+          $ref: '#/components/responses/AimeatError'
+
+  /v1/agents/{name}/ai-keys/{model}/test:
+    post:
+      operationId: testAgentAiKey
+      summary: One tiny real call on the key that would pay for this agent (the owner in person)
+      description: '`data` is `{ ok, key_source, model?, code?, message? }`. `key_source` says which key in the order answered.'
+      tags: [Agents]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string } }
+        - { name: model, in: path, required: true, schema: { type: string, enum: [decide, openrouter] } }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '401':
+          $ref: '#/components/responses/AimeatError'
+        '403':
+          $ref: '#/components/responses/AimeatError'
+        '404':
           $ref: '#/components/responses/AimeatError'
 
   /v1/ai/decisions/{id}:

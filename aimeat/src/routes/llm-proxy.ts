@@ -37,6 +37,7 @@ import { rateLimit } from '../middleware/rate-limit.js';
 import { assertAiUseAllowed } from '../auth/ai-gate.js';
 import { error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
+import { agentOfPrincipal } from '../services/agent-ai-keys.js';
 import {
     prepareAiCall, settleAiCall, estimateCostUsd, AiCompletionError, type AiCallPlan,
 } from '../services/ai-completion.js';
@@ -116,7 +117,8 @@ export function llmProxyRouter(config: AimeatConfig, storage: Storage): Router {
         let plan: AiCallPlan;
         try {
             // `model` is deliberately not passed through: see the file header. The node decides.
-            plan = await prepareAiCall(storage, config, gaii, { appId: 'llm-proxy' });
+            // An agent's own key pays first and its daily cap applies (services/agent-ai-keys.ts).
+            plan = await prepareAiCall(storage, config, gaii, { appId: 'llm-proxy', ...agentOfPrincipal(gaii) });
         } catch (err) {
             sendError(res, config.nodeId, err);
             return;

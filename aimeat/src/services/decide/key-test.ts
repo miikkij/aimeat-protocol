@@ -15,6 +15,7 @@
  * @structure testDecideKey(storage, config, { gaii, which })
  * @usage const r = await testDecideKey(storage, config, { gaii, which: 'mine' });
  * @version-history
+ *   v1.1.0 — 2026-09-20 — `which: 'agent'`: the key that would pay for one agent.
  *   v1.0.0 — 2026-09-19 — Initial.
  */
 import type { AimeatConfig } from '../../config.js';
@@ -23,6 +24,7 @@ import { getTodayUsage, recordAiUsage } from '../ai-completion.js';
 import { logger } from '../../utils/logger.js';
 import { callJev, JevError } from './jev-client.js';
 import { readOwnDecideKey } from './settings.js';
+import { readAgentKey } from '../agent-ai-keys.js';
 import { DecideError } from './errors.js';
 
 const PROBE = {
@@ -32,7 +34,7 @@ const PROBE = {
 
 export interface KeyTestResult {
   ok: boolean;
-  key_source: 'own' | 'node';
+  key_source: 'agent' | 'own' | 'node';
   model?: string;
   request_id?: string | null;
   code?: string;
@@ -44,14 +46,17 @@ export interface KeyTestResult {
  * tests the node's key; the route decides who may ask for that.
  */
 export async function testDecideKey(
-  storage: Storage, config: AimeatConfig, opts: { gaii: string; which: 'mine' | 'node' },
+  storage: Storage, config: AimeatConfig, opts: { gaii: string; which: 'mine' | 'node' | 'agent'; agent?: string },
 ): Promise<KeyTestResult> {
   if (!config.decideEnabled) {
     throw new DecideError('DECIDE_DISABLED', 503, 'The operator has turned the decision model off on this node.');
   }
-  const own = opts.which === 'mine' ? await readOwnDecideKey(storage, config, opts.gaii) : null;
-  const key = own ?? config.decideInstanceKey.trim();
-  const scope: 'own' | 'node' = own ? 'own' : 'node';
+  // `agent` tests the key that would pay for THAT agent, down the same order a real call takes:
+  // its own, the owner's, the node's. The answer's key_source says which one it was.
+  const agentKey = opts.which === 'agent' && opts.agent ? await readAgentKey(storage, config, opts.gaii, opts.agent, 'decide') : null;
+  const own = !agentKey && opts.which !== 'node' ? await readOwnDecideKey(storage, config, opts.gaii) : null;
+  const key = agentKey ?? own ?? config.decideInstanceKey.trim();
+  const scope: 'agent' | 'own' | 'node' = agentKey ? 'agent' : own ? 'own' : 'node';
   if (!key) {
     return {
       ok: false, key_source: scope, code: 'NO_API_KEY',
@@ -68,7 +73,7 @@ export async function testDecideKey(
       policy: { maxRetries: 0 },
     });
     const costUsd = (res.usage.input_tokens / 1_000_000) * config.decidePricePerMtok;
-    if (opts.which === 'mine') {
+    if (opts.which !== 'node') {
       await recordAiUsage(storage, opts.gaii, await getTodayUsage(storage, opts.gaii), {
         costUsd, tokens: res.usage.input_tokens, appId: 'decide-key-test', model: res.model, provider: 'typesafe',
         promptTokens: res.usage.input_tokens, completionTokens: res.usage.output_tokens,

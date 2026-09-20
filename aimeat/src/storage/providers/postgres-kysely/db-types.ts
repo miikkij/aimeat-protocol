@@ -492,16 +492,21 @@ export interface WorkspaceRow {
   bytes: Generated<number>;
 }
 
-/** TARGET-080 (migration 0079). `record` is the aimeat.decision/v1 document. */
+/** TARGET-080 (migration 0079). `record` is the aimeat.decision/v1 document. The rule columns are
+ *  migration 0080: which decision rule ran, at which version, its outcome, and whose key paid. */
 export interface AiDecision {
   appId: string | null;
   cacheKey: string;
   createdAt: string;
   id: string;
+  keyScope: string | null;
   model: string;
+  outcome: string | null;
   ownerGhii: string;
   principal: string;
   record: Json;
+  rule: string | null;
+  ruleVersion: number | null;
   subject: string | null;
 }
 

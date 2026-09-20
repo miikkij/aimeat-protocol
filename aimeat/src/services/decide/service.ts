@@ -29,12 +29,27 @@
  *   ENGLISH. What we write for Jev (instructions, criteria) must be English; that is the app's design
  *   requirement, documented in the lib and the skill and not enforced here. Sending another language
  *   on purpose, to see what the model does, is allowed.
+ *
+ *   A DECISION RULE (services/decide/rules.ts). A call that names `rule` takes its questions,
+ *   thresholds and bands from the owner's record and sends only the state: a caller that also sends
+ *   questions, thresholds or bands is refused, because a rule somebody can override at call time is
+ *   not a rule. The `use` lock and the rule's `sends` list are checked at step 1, before anything
+ *   is read. The answers are then cut by the rule's thresholds and bands into an OUTCOME (act, ask,
+ *   stop), and for an agent whose gate is on, an outcome under `act` becomes an item on the owner's
+ *   list and `proceed: false` (services/decide/gate.ts).
+ *
+ *   THE KEY, STRONGEST FIRST: the agent's own (services/agent-ai-keys.ts), the owner's own, the
+ *   node's. `key_source` and the record's keyScope say which one paid.
  * @structure
  *   DecideInput · DecideCaller · DecideResult · decideForOwner · listDecisions · getDecision ·
- *   reviewDecision · canonicalJson
+ *   reviewDecision · decisionStats · canonicalJson
  * @usage
  *   const r = await decideForOwner(storage, config, { gaii, principal, appId, isOwner }, { state, questions });
+ *   const g = await decideForOwner(storage, config, caller, { state, rule: 'send-reply' });
  * @version-history
+ *   v1.2.0 — 2026-09-20 — Decision rules: `rule` on the input, the outcome and the gate on the
+ *     result and the record; a key per agent and a daily cap per agent; the list filters by rule and
+ *     by principal; decisionStats for the quality view.
  *   v1.1.0 — 2026-09-19 — The app is named once (services/ai-app-id.ts) before the checks, the
  *     record and the list filter: Päätöspaja was recorded as both `paatospaja` and `paatospaja.html`.
  *   v1.0.0 — 2026-09-19 — Initial (TARGET-080).
@@ -43,6 +58,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
 import type {
   Storage, AiDecisionRow, AiDecisionAnswer, AiDecisionQuestion, AiDecisionReview,
+  AiDecisionKeyScope, AiDecisionOutcome, AiDecisionStatsGroup,
 } from '../../storage/interface.js';
 import { assertAppAllowed, assertWithinBudget, getTodayUsage, recordAiUsage, AiCompletionError } from '../ai-completion.js';
 import { readAllowance, remainingOf, debitAllowance } from '../ai-allowance.js';
@@ -56,6 +72,10 @@ import { callJev, JevError, type JevAnswer } from './jev-client.js';
 import { takeSlot } from './pacer.js';
 import { readDecidePolicy, readOwnDecideKey } from './settings.js';
 import { DecideError } from './errors.js';
+import { agentNameOf, readAgentKey, agentCapRefusal } from '../agent-ai-keys.js';
+import { ruleForCaller, type RuleCallerKind } from './rules.js';
+import { evaluateRule, fieldsOutside, type DecisionRule } from './rule-validate.js';
+import { gateSettingOf, gateApplies, openGateItem } from './gate.js';
 
 export interface DecideCaller {
   /** The resolved identity whose account pays and owns the record. */
@@ -72,7 +92,18 @@ export interface DecideCaller {
 
 export interface DecideInput {
   state: unknown;
-  questions: Record<string, JevQuestion>;
+  /** The questions, unless `rule` names the owner's decision rule that holds them. */
+  questions?: Record<string, JevQuestion>;
+  /** The id of one of the owner's decision rules. With it, the caller sends only the state. */
+  rule?: string;
+  /** Set only so that a caller who sends bands beside a rule is refused rather than ignored. */
+  bands?: unknown;
+  /**
+   * The owner trying a rule on its sample. A try is a real, paid, recorded decision, but it is not
+   * one of the RULE's decisions: counted among them it would flatter or spoil the quality numbers
+   * with a state the owner wrote to get a known answer. No door takes this from a request body.
+   */
+  trial?: boolean;
   /** What the decision is about: a memory key, a record id. Lets the owner ask "what was decided about X". */
   subject?: string;
   /** What the answer gates, in the caller's words ("send the reply", "archive the thread"). */
@@ -94,8 +125,24 @@ export interface DecideResult {
   cached: boolean;
   scrub: { removed: Record<string, number>; total: number; skipped: boolean };
   usage: { input_tokens: number; cost_usd: number };
-  key_source: 'own' | 'node';
+  key_source: AiDecisionKeyScope;
   request_id: string | null;
+  /** Present when a decision rule ran. */
+  rule?: { id: string; version: number };
+  /** What the rule's thresholds and bands made of the answers. */
+  outcome?: AiDecisionOutcome;
+  /** The weakest certainty among the thresholded answers, which the bands cut. */
+  result?: number;
+  /** Per thresholded question: did its answer reach its floor. */
+  passed?: Record<string, boolean>;
+  bands?: { act: number; ask: number };
+  /** Whether the agent's gate held it to this rule, and the owner's item when it stopped the action. */
+  gate?: { on: boolean; stopped: boolean; task?: string };
+  /**
+   * May the caller go ahead with what the rule decides. False only when the gate is on and the
+   * outcome is under the act band; an ungated caller reads `outcome` and decides for itself.
+   */
+  proceed?: boolean;
 }
 
 /** JSON with object keys sorted at every depth, so equal values hash equally. */
@@ -191,16 +238,22 @@ function toRecordAnswer(a: JevAnswer, back: Map<string, string> | undefined): Ai
   };
 }
 
-/** Which key pays: the owner's own, then the node's while their allowance lasts. */
+/**
+ * Which key pays, strongest first: the agent's own, the owner's own, then the node's while the
+ * owner's allowance lasts. With none of the three, the answer is an instruction, not a bare error.
+ */
 async function resolveDecideKey(
-  storage: Storage, config: AimeatConfig, gaii: string,
-): Promise<{ key: string; scope: 'own' | 'node' }> {
+  storage: Storage, config: AimeatConfig, gaii: string, agent: string | null,
+): Promise<{ key: string; scope: AiDecisionKeyScope }> {
+  const agentKey = agent ? await readAgentKey(storage, config, gaii, agent, 'decide') : null;
+  if (agentKey) return { key: agentKey, scope: 'agent' };
   const own = await readOwnDecideKey(storage, config, gaii);
   if (own) return { key: own, scope: 'own' };
   const nodeKey = config.decideInstanceKey.trim();
   if (!nodeKey) {
-    throw new DecideError('NO_API_KEY', 400,
-      'No TypeSafe key is set. Add your own in AI settings, or ask the operator to give the node one.');
+    throw new DecideError('NO_API_KEY', 400, agent
+      ? `No TypeSafe key is set for this call. The owner sets one for the agent "${agent}" on the agent's page (Profile, Agents, ${agent}, AI keys), or their own under Settings, AI, Decision model, and tests it there. Then run this again.`
+      : 'No TypeSafe key is set. Add your own under Settings, AI, Decision model and press Test, or ask the operator to give the node one.');
   }
   if (remainingOf(await readAllowance(storage, config, gaii)) <= 0) {
     throw new DecideError('QUOTA_EXHAUSTED', 402,
@@ -209,11 +262,12 @@ async function resolveDecideKey(
   return { key: nodeKey, scope: 'node' };
 }
 
-function mapJevError(e: JevError, scope: 'own' | 'node'): DecideError {
+function mapJevError(e: JevError, scope: AiDecisionKeyScope): DecideError {
   const details = { provider_status: e.status, request_id: e.requestId, ...(e.code === 'JEV_INVALID' ? { provider_detail: e.detail } : {}) };
   switch (e.code) {
     case 'JEV_UNAUTHORIZED':
     case 'JEV_FORBIDDEN':
+      if (scope === 'agent') return new DecideError('INVALID_API_KEY', 401, "TypeSafe refused this agent's key. The owner checks it on the agent's page.", details);
       return scope === 'own'
         ? new DecideError('INVALID_API_KEY', 401, 'TypeSafe refused your key. Check it in AI settings.', details)
         : new DecideError('PROVIDER_ERROR', 502, "TypeSafe refused this node's key. The operator has been told in the log.", details);
@@ -232,7 +286,7 @@ function mapJevError(e: JevError, scope: 'own' | 'node'): DecideError {
  * shared budget checks) before anything is sent when the call may not happen.
  */
 export async function decideForOwner(
-  storage: Storage, config: AimeatConfig, callerIn: DecideCaller, input: DecideInput,
+  storage: Storage, config: AimeatConfig, callerIn: DecideCaller, inputIn: DecideInput,
 ): Promise<DecideResult> {
   // One name per app, whichever door asked (services/ai-app-id.ts): an app token's `app.html` and
   // the `app` an app names itself are the same app, with one cap and one row in the register.
@@ -246,7 +300,14 @@ export async function decideForOwner(
     maxRequestTokens: config.decideMaxRequestTokens,
     maxChoiceOptions: config.decideMaxChoiceOptions,
   };
-  const violations = checkDecideRequest(input.state, input.questions, limits);
+  // A named rule brings the questions, the thresholds and what it gates. The caller brings the state.
+  const agent = agentNameOf(caller.principal, caller.gaii);
+  const rule = inputIn.rule !== undefined ? await loadRule(storage, caller, agent, inputIn) : null;
+  const input: DecideInput = rule
+    ? { ...inputIn, questions: rule.questions, thresholds: rule.thresholds, gates: rule.decides }
+    : inputIn;
+  const questions = input.questions as Record<string, JevQuestion>;
+  const violations = checkDecideRequest(input.state, questions, limits);
   if (violations.length) {
     throw new DecideError('INVALID_REQUEST', 400, violations.map(v => v.message).join(' '), { violations });
   }
@@ -260,6 +321,8 @@ export async function decideForOwner(
   assertAppAllowed(prefs, caller.appId, caller.gaii);
   const usageToday = await getTodayUsage(storage, caller.gaii);
   assertWithinBudget(usageToday, prefs, caller.appId, caller.gaii);
+  const overCap = await agentCapRefusal(storage, caller.gaii, agent);
+  if (overCap) throw new DecideError('AGENT_QUOTA_EXHAUSTED', 402, overCap);
 
   // 4 ── scrub
   const policy = await readDecidePolicy(storage, caller.gaii);
@@ -269,7 +332,7 @@ export async function decideForOwner(
     allow: policy.allow,
   });
   const state = scrubber ? scrubber.value(input.state) : input.state;
-  const { sent, optionBack } = scrubQuestions(input.questions, scrubber);
+  const { sent, optionBack } = scrubQuestions(questions, scrubber);
   const scrubReport = scrubber ? scrubber.report() : { removed: {}, total: 0 };
 
   const model = config.decideModel;
@@ -287,32 +350,39 @@ export async function decideForOwner(
     thresholds: input.thresholds ?? null, gates: input.gates ?? null, subject: input.subject ?? null,
     stateHash, scrub: { removed: scrubReport.removed as Record<string, number>, total: scrubReport.total },
     ...(policy.storeState ? { scrubbedState: state } : {}),
+    ...(rule ? { bands: rule.bands } : {}),
   };
+  // What the rule makes of a set of answers, a cached set included: the thresholds may have been
+  // tuned since the answers were first given, and the outcome is always today's rule's.
+  const judge = (answers: Record<string, AiDecisionAnswer>) =>
+    judgeByRule(storage, caller, agent, rule, { decisionId: base.id, subject: base.subject, answers, trial: input.trial === true });
 
   // 5 ── the cache is the record table
   if (input.cache !== false && config.decideCacheHours > 0) {
     const since = new Date(Date.now() - config.decideCacheHours * 3_600_000).toISOString();
     const hit = await storage.findCachedAiDecision(caller.gaii, cacheKey, since);
     if (hit) {
+      const j = await judge(hit.record.answers);
       const row: AiDecisionRow = {
-        ...base, model: hit.model,
+        ...base, model: hit.model, ...j.columns, keyScope: hit.keyScope,
         record: {
           ...recordCommon, model: hit.model, answers: hit.record.answers,
           usage: { inputTokens: 0, costUsd: 0 }, requestId: hit.record.requestId,
-          keyScope: hit.record.keyScope, cachedFrom: hit.id,
+          keyScope: hit.keyScope, cachedFrom: hit.id, ...j.record,
         },
       };
       await writeRecord(storage, row);
       return {
         decision_id: row.id, model: hit.model, answers: hit.record.answers, cached: true,
         scrub: { ...recordCommon.scrub, skipped: skipScrub },
-        usage: { input_tokens: 0, cost_usd: 0 }, key_source: hit.record.keyScope, request_id: hit.record.requestId,
+        usage: { input_tokens: 0, cost_usd: 0 }, key_source: hit.keyScope, request_id: hit.record.requestId,
+        ...j.result,
       };
     }
   }
 
   // 6 ── the key, and the minute window for that key
-  const { key, scope } = await resolveDecideKey(storage, config, caller.gaii);
+  const { key, scope } = await resolveDecideKey(storage, config, caller.gaii, agent);
   const wait = takeSlot(sha256(key), config.decideRequestsPerMinute);
   if (wait > 0) {
     throw new DecideError('RATE_LIMITED', 429,
@@ -344,17 +414,19 @@ export async function decideForOwner(
     await recordAiUsage(storage, caller.gaii, usageToday, {
       costUsd, tokens: inputTokens, appId: caller.appId, model: res.model, provider: 'typesafe',
       promptTokens: inputTokens, completionTokens: res.usage.output_tokens, source: 'ai-decide', apiKeyScope: scope,
+      ...(agent ? { agent } : {}),
     }, config);
   } catch (err) {
     logger.warn('[decide] usage record failed; the decision was made and paid for', { gaii: caller.gaii, error: String(err) });
   }
   if (scope === 'node') await debitAllowance(storage, config, caller.gaii, costUsd);
 
+  const j = await judge(answers);
   const row: AiDecisionRow = {
-    ...base, model: res.model,
+    ...base, model: res.model, ...j.columns, keyScope: scope,
     record: {
       ...recordCommon, model: res.model, answers,
-      usage: { inputTokens, costUsd }, requestId: res.requestId, keyScope: scope,
+      usage: { inputTokens, costUsd }, requestId: res.requestId, keyScope: scope, ...j.record,
     },
   };
   await writeRecord(storage, row);
@@ -363,6 +435,71 @@ export async function decideForOwner(
     decision_id: row.id, model: res.model, answers, cached: false,
     scrub: { ...recordCommon.scrub, skipped: skipScrub },
     usage: { input_tokens: inputTokens, cost_usd: costUsd }, key_source: scope, request_id: res.requestId,
+    ...j.result,
+  };
+}
+
+/** Who is asking, for the rule's `use` lock: the owner in person, one of their agents, or an app. */
+function callerKindOf(caller: DecideCaller, agent: string | null): RuleCallerKind {
+  if (caller.isOwner) return 'owner';
+  return agent && !caller.appRef ? 'agent' : 'app';
+}
+
+/** The same answer for a door that holds only the caller (a run, the rules list). */
+export function ruleCallerKind(caller: DecideCaller): RuleCallerKind {
+  return callerKindOf(caller, agentNameOf(caller.principal, caller.gaii));
+}
+
+/**
+ * The rule a call named, after the three refusals that need nothing but the request: the rule is not
+ * there or not for this kind of caller, the caller sent what the rule fixes, the state carries a
+ * field the rule does not list.
+ */
+async function loadRule(storage: Storage, caller: DecideCaller, agent: string | null, input: DecideInput): Promise<DecisionRule> {
+  if (typeof input.rule !== 'string' || !input.rule) {
+    throw new DecideError('INVALID_REQUEST', 400, 'rule is the id of one of the owner\'s decision rules.');
+  }
+  const fixed = (['questions', 'thresholds', 'bands', 'gates'] as const).filter(f => input[f] !== undefined);
+  if (fixed.length) {
+    throw new DecideError('RULE_FIXES_QUESTIONS', 400,
+      `A call that names a rule sends only the state: the rule holds the ${fixed.join(', ')}. Leave ${fixed.length === 1 ? 'it' : 'them'} out, or ask without a rule.`);
+  }
+  const rule = await ruleForCaller(storage, caller.gaii, input.rule, callerKindOf(caller, agent));
+  const extra = fieldsOutside(rule.sends, input.state);
+  if (extra.length) {
+    throw new DecideError('STATE_OUTSIDE_RULE', 400,
+      `The rule '${rule.id}' takes a state with these fields only: ${rule.sends.join(', ')}. Not allowed: ${extra.join(', ')}.`);
+  }
+  return rule;
+}
+
+/**
+ * The rule's verdict on a set of answers, and the gate. Without a rule every part is empty, so the
+ * two call sites spread it without asking.
+ */
+async function judgeByRule(
+  storage: Storage, caller: DecideCaller, agent: string | null, rule: DecisionRule | null,
+  d: { decisionId: string; subject: string | null; answers: Record<string, AiDecisionAnswer>; trial: boolean },
+): Promise<{
+  columns: Pick<AiDecisionRow, 'rule' | 'ruleVersion' | 'outcome'>;
+  record: { gate?: { on: true; stopped: boolean; task?: string } };
+  result: Pick<DecideResult, 'rule' | 'outcome' | 'result' | 'passed' | 'bands' | 'gate' | 'proceed'>;
+}> {
+  if (!rule) return { columns: { rule: null, ruleVersion: null, outcome: null }, record: {}, result: {} };
+  const e = evaluateRule(rule, d.answers);
+  // Only an agent is gated: an app's own code reads the outcome, and the owner is who a gate asks.
+  const on = callerKindOf(caller, agent) === 'agent' && gateApplies(await gateSettingOf(storage, caller.gaii, agent as string), rule);
+  const stopped = on && e.outcome !== 'act';
+  const task = stopped
+    ? await openGateItem(storage, caller.gaii, { rule, agentGaii: caller.principal, outcome: e.outcome, decisionId: d.decisionId, subject: d.subject, answers: d.answers })
+    : undefined;
+  return {
+    columns: d.trial ? { rule: null, ruleVersion: null, outcome: null } : { rule: rule.id, ruleVersion: rule.version, outcome: e.outcome },
+    record: on ? { gate: { on: true, stopped, ...(task ? { task } : {}) } } : {},
+    result: {
+      rule: { id: rule.id, version: rule.version }, outcome: e.outcome, result: e.result, passed: e.passed,
+      bands: rule.bands, gate: { on, stopped, ...(task ? { task } : {}) }, proceed: !stopped,
+    },
   };
 }
 
@@ -381,12 +518,26 @@ async function writeRecord(storage: Storage, row: AiDecisionRow): Promise<void> 
 
 /** The owner's own decisions, newest first. */
 export async function listDecisions(
-  storage: Storage, gaii: string, q: { subject?: string; appId?: string; limit?: number; before?: string },
+  storage: Storage, gaii: string,
+  q: { subject?: string; appId?: string; rule?: string; principal?: string; limit?: number; before?: string },
 ): Promise<{ items: AiDecisionRow[]; total: number }> {
   const limit = Math.min(200, Math.max(1, Math.floor(q.limit ?? 50)));
   return storage.listAiDecisions({
     ownerGhii: gaii, subject: q.subject, appId: canonicalAiAppId(q.appId, gaii), limit, before: q.before,
+    ...(q.rule ? { rule: q.rule } : {}), ...(q.principal ? { principal: q.principal } : {}),
   });
+}
+
+/**
+ * The quality numbers, counted in the store: per rule (all of them, or one agent's share of each),
+ * or for one principal as a whole. The owner's own rows only.
+ */
+export async function decisionStats(
+  storage: Storage, gaii: string, q: { rule?: string; principal?: string; groupBy: 'rule' | 'principal' },
+): Promise<AiDecisionStatsGroup[]> {
+  return storage.aiDecisionStats({
+    ownerGhii: gaii, ...(q.rule ? { rule: q.rule } : {}), ...(q.principal ? { principal: q.principal } : {}),
+  }, q.groupBy);
 }
 
 /** One decision, or null for "absent" and "not yours" alike. */

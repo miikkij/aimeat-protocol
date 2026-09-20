@@ -11,13 +11,17 @@
  *   - findCachedAiDecision(owner, cacheKey, since)  -- newest fresh, non-cached row for a cache key
  *   - listAiDecisions(query)                        -- the owner's decisions, newest first
  *   - setAiDecisionReview(id, owner, review)        -- a person confirms or overrides
+ *   - aiDecisionStats(query, groupBy)               -- the quality counts, per rule or per principal
  *   - deleteAiDecisionsBefore(before)               -- the lifecycle: rows age out
  * @usage
  *   import type { AiDecisionRepository } from './repositories/ai-decisions.repository.js';
  * @version-history
+ *   v1.1.0 — 2026-09-20 — aiDecisionStats: the quality counts for a decision rule or an agent.
  *   v1.0.0 — 2026-09-19 — TARGET-080. Initial.
  */
-import type { AiDecisionRow, AiDecisionListQuery, AiDecisionReview } from '../types/ai-decisions.js';
+import type {
+  AiDecisionRow, AiDecisionListQuery, AiDecisionReview, AiDecisionStatsQuery, AiDecisionStatsGroup,
+} from '../types/ai-decisions.js';
 
 export interface AiDecisionRepository {
   createAiDecision(row: AiDecisionRow): Promise<void>;
@@ -47,6 +51,13 @@ export interface AiDecisionRepository {
    * another owner, so the caller can answer both the same way.
    */
   setAiDecisionReview(id: string, ownerGhii: string, review: AiDecisionReview): Promise<boolean>;
+
+  /**
+   * The quality counts over the rows the query matches, one group per rule or per principal. Rows
+   * without a rule are left out of a count grouped by rule. Counted in the store, so the numbers are
+   * exact whatever the list's page size is.
+   */
+  aiDecisionStats(query: AiDecisionStatsQuery, groupBy: 'rule' | 'principal'): Promise<AiDecisionStatsGroup[]>;
 
   /** Delete every row created before `before` (ISO). Returns the number deleted. */
   deleteAiDecisionsBefore(before: string): Promise<number>;

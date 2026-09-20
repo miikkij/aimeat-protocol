@@ -9,6 +9,8 @@
  * @structure registerDecideTools(mcp, registry)
  * @usage imported by mcp/tools/index.ts
  * @version-history
+ *   v1.1.0 -- 2026-09-20 -- Decision rules: `rule` on aimeat_decide, aimeat_decide_run and
+ *     aimeat_decision_list; aimeat_decide_rules; aimeat_decide_rule_propose.
  *   v1.0.0 -- 2026-09-19 -- Initial (TARGET-080).
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -30,7 +32,8 @@ export function registerDecideTools(mcp: McpServer, registry: AgentRegistry): vo
 
   mcp.tool('aimeat_decide', descriptionFor('aimeat_decide'), {
     state: z.unknown().describe('What is being judged: a string, an object with named fields, or an array.'),
-    questions: questionsSchema,
+    rule: z.string().optional().describe('The id of one of the owner\'s decision rules. It holds the questions, thresholds and bands: send only the state beside it.'),
+    questions: questionsSchema.optional().describe('Required unless `rule` is given. Your ids to questions, in English.'),
     subject: z.string().optional().describe('What the decision is about: a memory key or record id.'),
     gates: z.string().optional().describe('What the answer decides, in plain words.'),
     thresholds: z.record(z.string(), z.unknown()).optional().describe('The thresholds you will apply.'),
@@ -41,7 +44,8 @@ export function registerDecideTools(mcp: McpServer, registry: AgentRegistry): vo
   }, annotationsFor('aimeat_decide'), async (a) => {
     return out(await client.post('/v1/ai/decide', {
       state: a.state as never,
-      questions: a.questions as never,
+      ...(a.rule !== undefined ? { rule: a.rule } : {}),
+      ...(a.questions !== undefined ? { questions: a.questions as never } : {}),
       ...(a.subject !== undefined ? { subject: a.subject } : {}),
       ...(a.gates !== undefined ? { gates: a.gates } : {}),
       ...(a.thresholds ? { thresholds: a.thresholds as never } : {}),
@@ -55,6 +59,7 @@ export function registerDecideTools(mcp: McpServer, registry: AgentRegistry): vo
   mcp.tool('aimeat_decision_list', descriptionFor('aimeat_decision_list'), {
     decision_id: z.string().optional().describe('Read one decision.'),
     subject: z.string().optional().describe('Only decisions about this subject.'),
+    rule: z.string().optional().describe('Only decisions one decision rule made (its id).'),
     app_id: z.string().optional().describe('Only decisions made for this app.'),
     limit: z.number().optional().describe('How many (1-200, default 50).'),
     before: z.string().optional().describe('Only decisions made before this ISO time.'),
@@ -62,6 +67,7 @@ export function registerDecideTools(mcp: McpServer, registry: AgentRegistry): vo
     if (a.decision_id) return out(await client.get(`/v1/ai/decisions/${encodeURIComponent(a.decision_id)}`));
     const q = new URLSearchParams();
     if (a.subject !== undefined) q.set('subject', a.subject);
+    if (a.rule !== undefined) q.set('rule', a.rule);
     if (a.app_id !== undefined) q.set('app_id', a.app_id);
     if (a.limit !== undefined) q.set('limit', String(a.limit));
     if (a.before !== undefined) q.set('before', a.before);
@@ -85,6 +91,7 @@ export function registerDecideTools(mcp: McpServer, registry: AgentRegistry): vo
   mcp.tool('aimeat_decide_run', descriptionFor('aimeat_decide_run'), {
     action: z.enum(['start', 'get', 'list', 'resume', 'stop']).describe('start | get | list | resume | stop'),
     run_id: z.string().optional().describe('The run, for get, resume and stop.'),
+    rule: z.string().optional().describe('For start: one of the owner\'s decision rules, in place of questions, thresholds and gates.'),
     questions: questionsSchema.optional(),
     items: z.array(z.object({ subject: z.string(), state: z.unknown().optional() })).optional().describe('For start: [{ subject, state }].'),
     keys: z.array(z.string()).optional().describe('For start: owner memory keys.'),
@@ -98,6 +105,7 @@ export function registerDecideTools(mcp: McpServer, registry: AgentRegistry): vo
     if (a.action === 'list') return out(await client.get('/v1/ai/decide/runs'));
     if (a.action === 'start') {
       return out(await client.post('/v1/ai/decide/runs', {
+        ...(a.rule !== undefined ? { rule: a.rule } : {}),
         ...(a.questions ? { questions: a.questions as never } : {}),
         ...(a.items ? { items: a.items as never } : {}),
         ...(a.keys ? { keys: a.keys } : {}),
@@ -116,4 +124,18 @@ export function registerDecideTools(mcp: McpServer, registry: AgentRegistry): vo
 
   mcp.tool('aimeat_decide_settings', descriptionFor('aimeat_decide_settings'), {},
     annotationsFor('aimeat_decide_settings'), async () => out(await client.get('/v1/ai/decide/settings')));
+
+  mcp.tool('aimeat_decide_rules', descriptionFor('aimeat_decide_rules'), {
+    rule_id: z.string().optional().describe('Read one rule in full, with its questions, thresholds and bands.'),
+  }, annotationsFor('aimeat_decide_rules'), async (a) => {
+    if (a.rule_id !== undefined) return out(await client.get(`/v1/ai/decide/rules/${encodeURIComponent(a.rule_id)}`));
+    return out(await client.get('/v1/ai/decide/rules'));
+  });
+
+  mcp.tool('aimeat_decide_rule_propose', descriptionFor('aimeat_decide_rule_propose'), {
+    rule: z.record(z.string(), z.unknown()).describe('The proposed rule: { id, title, decides, sends, questions, thresholds, bands, use, gate, sample }. Questions in English.'),
+    reason: z.string().describe('Why this rule should exist, in a sentence the owner can decide from.'),
+  }, annotationsFor('aimeat_decide_rule_propose'), async (a) => {
+    return out(await client.post('/v1/ai/decide/rule-proposals', { rule: a.rule as never, reason: a.reason }));
+  });
 }
