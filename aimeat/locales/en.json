@@ -3882,7 +3882,7 @@
   "decideCard.publicOptOut": "Let my apps and agents send content they mark as public without removing personal data",
   "decideCard.recentTitle": "Latest decisions",
   "decideCard.recentNone": "No decisions yet.",
-  "decideCard.recentTotal": "{total} decisions in all.",
+  "decideCard.recentTotal": "Decisions in all: {total}.",
   "decideCard.noSubject": "No subject given",
   "decideCard.cached": "reused",
   "decideCard.review.confirmed": "confirmed by a person",

@@ -2821,7 +2821,7 @@
   "decideCard.publicOptOut": "Permitir que mis aplicaciones y agentes envíen sin limpiar el contenido que marquen como público",
   "decideCard.recentTitle": "Últimas decisiones",
   "decideCard.recentNone": "Todavía no hay decisiones.",
-  "decideCard.recentTotal": "{total} decisiones en total.",
+  "decideCard.recentTotal": "Decisiones en total: {total}.",
   "decideCard.noSubject": "Sin tema indicado",
   "decideCard.cached": "reutilizada",
   "decideCard.review.confirmed": "confirmada por una persona",
