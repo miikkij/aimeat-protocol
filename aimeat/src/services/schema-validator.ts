@@ -8,6 +8,11 @@
  *   also checked against the workspace manifest's write guards (services/write-guards.ts)
  *   here, so one call site covers the REST, MCP and publish surfaces alike.
  * @version-history
+ *   v1.3.1 — 2026-09-20 — validateValueAgainstSchema bounds nesting at 64 levels before it
+ *     validates, the same bound validateMemoryWrite has had since 2026-08-23 and for the same
+ *     reason: this validator runs with allErrors, so a deep value is walked in full and each level
+ *     can add an error (CodeQL resource-exhaustion-from-deep-object-traversal, alert 1643). Its
+ *     four callers all pass a value somebody else chose.
  *   v1.3.0 — 2026-09-13 — A violation names the property it is about (`must NOT have additional
  *     properties: "b"`, the accepted values of an enum), on both validators, and
  *     validateValueAgainstSchema also returns `violations` with path, rule and params. The batch
@@ -120,6 +125,14 @@ export function validateValueAgainstSchema(
   let validate: ValidateFunction;
   try { validate = getValidator(schema); }
   catch (err) { return { ok: false, errors: [`invalid schema: ${(err as Error).message}`] }; }
+  // The same bound validateMemoryWrite has carried since 2026-08-23, and for the same reason: this
+  // validator runs with allErrors, so a deeply nested value is walked in full and every level of it
+  // can add an error object. The four callers all pass something a caller chose — a workspace
+  // record draft, an app tool's input, an offer's prerequisites, a workflow signal — so the value
+  // is never this node's own (CodeQL resource-exhaustion-from-deep-object-traversal, alert 1643).
+  if (exceedsMaxDepth(value, 64)) {
+    return { ok: false, errors: ['/ value is nested too deeply (max 64 levels)'] };
+  }
   const ok = validate(value) as boolean;
   if (ok) return { ok: true };
   const violations = toViolations(validate.errors);

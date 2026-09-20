@@ -23,6 +23,10 @@
  * @structure HAND_ROLLED_RULES · handRolledFindings(html)
  * @usage const hints = handRolledFindings(html);
  * @version-history
+ *   v1.1.1 — 2026-09-20 — The inline scripts and their block comments are read by utils/html-blocks
+ *     in one pass. Both patterns it replaces scanned to the end of the file from every `<script`
+ *     and every `/*`, which is quadratic on a page that closes neither (CodeQL js/polynomial-redos,
+ *     alert 1641). An unterminated comment now takes the rest of the file, as a parser does.
  *   v1.1.0 — 2026-09-19 — A chart drawn in code on a page that loads the Atelier kit. NOT a genre's
  *     own drawing: the first reading of three measured builds called their bar strip hand-drawn, and
  *     it was the almanac genre's own `.bars`, kept as a fork should keep it. So the rule is quiet for
@@ -31,6 +35,7 @@
  */
 import type { AppArtifactFinding } from './app-artifact-lint.js';
 import { GENRE_BODIES } from '../data/app-templates/genres.js';
+import { elementBodies, withoutBlockComments } from '../utils/html-blocks.js';
 
 const PITFALL = 'hand-rolled';
 
@@ -66,9 +71,8 @@ export const HAND_ROLLED_RULES: Rule[] = [
 
 /** The page's inline scripts, with comments and string literals blanked, so only CODE is matched. */
 function codeOf(html: string): string {
-  const scripts = [...html.matchAll(/<script\b(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)].map(m => m[1]).join('\n');
-  return scripts
-    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+  const scripts = elementBodies(html, 'script', attrs => !/\bsrc\s*=/i.test(attrs)).join('\n');
+  return withoutBlockComments(scripts)
     .replace(/(^|[^:"'`\\])\/\/[^\n]*/g, '$1 ');
 }
 
