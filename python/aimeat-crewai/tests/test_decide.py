@@ -36,6 +36,7 @@ from aimeat_crewai.decide import (
     DecideUnreachable,
     Decision,
     decide,
+    decision_stats,
     direct_enabled,
     evaluate_rule,
     fields_outside,
@@ -437,6 +438,105 @@ def test_rule_tools_data_keeps_the_order_the_crew_asked_for() -> None:
     s = _StubSession(_ok({"rules": [_rule(), _rule(id="triage")]}))
     got = rule_tools_data(only=["triage", "send-reply"], **_node_kwargs(s))
     assert [r["id"] for r in got] == ["triage", "send-reply"]
+
+
+# ── the quality numbers (0.27.1) ──────────────────────────────────────────────────────────────
+#
+# Step six of the setup order, and what the other five exist for: thresholds are tuned from
+# decisions already made. Counted in the STORE, which is the whole reason this is its own door and
+# not something a caller tallies from `decisions()` -- that list is paged, so a tally of it is a
+# tally of one page.
+
+
+def _stats_group(key: str = "send-reply", **over: Any) -> dict[str, Any]:
+    base = {
+        "key": key,
+        "decisions": 12,
+        "outcomes": {"act": 7, "ask": 3, "stop": 2},
+        "gateStops": 2,
+        "overridden": 1,
+        "confirmed": 4,
+        "costUsd": 0.0031,
+        "lastAt": "2026-09-20T10:00:00.000Z",
+    }
+    base.update(over)
+    return base
+
+
+def test_stats_are_asked_for_by_rule_and_come_back_as_groups() -> None:
+    s = _StubSession(_ok({"groups": [_stats_group()]}))
+    groups = decision_stats(group_by="rule", **_node_kwargs(s))
+    assert s.calls[0]["url"].endswith("/v1/ai/decisions/stats")
+    assert s.calls[0]["params"] == {"group_by": "rule"}
+    assert groups[0]["key"] == "send-reply"
+    assert groups[0]["outcomes"] == {"act": 7, "ask": 3, "stop": 2}
+    assert groups[0]["gateStops"] == 2
+
+
+def test_stats_narrow_to_one_agents_share_of_one_rule() -> None:
+    s = _StubSession(_ok({"groups": [_stats_group()]}))
+    decision_stats(group_by="rule", rule_id="send-reply", principal="mailer#o@n", **_node_kwargs(s))
+    assert s.calls[0]["params"] == {"group_by": "rule", "rule": "send-reply", "principal": "mailer#o@n"}
+
+
+def test_stats_group_by_is_required_and_checked_before_the_node_is_troubled() -> None:
+    # The node requires it; checking here turns a typo into a sentence instead of a round trip.
+    s = _StubSession(_ok({"groups": []}))
+    with pytest.raises(DecideError, match="group_by"):
+        decision_stats(group_by="agent", **_node_kwargs(s))
+    assert s.calls == []
+
+
+def test_stats_of_a_rule_nobody_has_run_yet_is_an_empty_list_not_a_failure() -> None:
+    s = _StubSession(_ok({"groups": []}))
+    assert decision_stats(group_by="principal", **_node_kwargs(s)) == []
+
+
+def test_stats_keeps_the_nodes_refusal_code() -> None:
+    s = _StubSession(_refusal("ACCESS_DENIED", "not yours", status=403))
+    with pytest.raises(DecideRefused) as caught:
+        decision_stats(group_by="rule", **_node_kwargs(s))
+    assert caught.value.code == "ACCESS_DENIED"
+
+
+def test_stats_survive_a_body_without_the_groups_key() -> None:
+    s = _StubSession(_ok({}))
+    assert decision_stats(group_by="rule", **_node_kwargs(s)) == []
+
+
+# ── the liaison says the same thing the gate says ─────────────────────────────────────────────
+
+
+def _prose(template: str) -> str:
+    """A template with its wrapping collapsed, so a test asserts on the WORDS and not the column
+    a sentence happened to break at. `an OPEN\\n   ITEM` and `an OPEN ITEM` say the same thing to
+    the model that reads it, and a test that can tell them apart fails on a reflow."""
+    return " ".join(template.split())
+
+
+def test_the_liaison_calls_a_held_action_an_open_item_not_a_task() -> None:
+    # The locked ruling: "A gate stop is an open item on the owner's list, not an agent task: an
+    # agent task targets an agent, and the owner is not one." Both backstory templates instruct a
+    # live model, so a wrong word there is a wrong word in every crew's prompt -- and it disagreed
+    # with what gate().report() tells the same crew.
+    from aimeat_crewai.liaison import FULL_BACKSTORY_TEMPLATE, SLIM_BACKSTORY_TEMPLATE
+
+    for template in (FULL_BACKSTORY_TEMPLATE, SLIM_BACKSTORY_TEMPLATE):
+        prose = _prose(template)
+        assert "OPEN ITEM on their list" in prose
+        assert "a task targets an agent and your owner is not one" in prose
+        assert "already has a task about it" not in prose
+
+
+def test_the_liaison_tells_the_agent_to_name_the_decision_id() -> None:
+    from aimeat_crewai.liaison import FULL_BACKSTORY_TEMPLATE, SLIM_BACKSTORY_TEMPLATE
+
+    for template in (FULL_BACKSTORY_TEMPLATE, SLIM_BACKSTORY_TEMPLATE):
+        prose = _prose(template)
+        assert "decision_id" in prose
+        # The id is what survives when the owner's item could not be written at all.
+        assert "even if the item could not be written" in prose
+        assert "do not retry" in prose, "a refusal is passed on, not retried"
 
 
 def test_review_refuses_an_outcome_the_node_does_not_take() -> None:
