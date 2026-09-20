@@ -543,7 +543,8 @@ async function main() {
             // writes: until this text existed the two instructions excluded each other.
             const patterns = toolText((await v1('tools/call', { name: 'aimeat_handbook_get', arguments: { tier: 'build-app-atelier/patterns' } }, 412)).body);
             assert(patterns.includes('THE WORKING SCREEN IS A MOSAIC INSIDE THE GENRE'), 'part patterns says where the mosaic goes in a genre fork');
-            assert(/target: '#work'/.test(patterns) && patterns.includes('aimeat_designbook_adopt') && patterns.includes('aimeat_app_ui_set'), 'with the mount, the adopt and the write of the filled version');
+            assert(/target: '#work'/.test(patterns) && patterns.includes('name="aimeat-book-parts"') && patterns.includes('id="aimeat-layout"'),
+                'with the mount, the parts named in the head and the layout carried as data, which the publish records');
             assert(patterns.length < 24_000, `and the part still fits one tool result: ${patterns.length}`);
             const start = toolText((await v1('tools/call', { name: 'aimeat_handbook_get', arguments: { tier: 'build-app-atelier' } }, 413)).body);
             assert(start.includes('From the Design Book I take nothing, because'), 'the proposal owes the line, in both of its shapes');

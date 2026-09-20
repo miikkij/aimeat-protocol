@@ -25743,14 +25743,19 @@ paths:
       summary: One app's stored mosaic layout + the catalogue
       description: >-
         The stored layout (or null when the app has never stored one — its own code then decides),
-        its version, and the full catalogue in the same answer. Public: an app page reads its own
-        layout without a session, and an app's arrangement is as public as the app.
+        its version, and the catalogue in the same answer. Public: an app page reads its own
+        layout without a session, and an app's arrangement is as public as the app. The whole
+        catalogue is 89 kB, so a reader says how much of it it wants: `catalogue=none` for a page
+        (the layout alone), `catalogue=index` for an AI (every component with its one line and its
+        setting names, every other section by id), with `detail` naming the parts to get whole.
       tags: [Apps]
       parameters:
         - { name: owner, in: path, required: true, schema: { type: string } }
         - { name: filename, in: path, required: true, schema: { type: string } }
+        - { name: catalogue, in: query, schema: { type: string, enum: [full, index, none], default: full } }
+        - { name: detail, in: query, schema: { type: string }, description: "With catalogue=index: comma-separated component ids or section names to answer in full, e.g. table,statRow,effects." }
       responses:
-        '200': { description: "{ layout, version, source: stored|none, catalogue }" }
+        '200': { description: "{ layout, version, source: stored|none, catalogue? } — with catalogue=index the catalogue carries `detail` for the names asked and `detail_unknown` for the ones it does not hold" }
         '404': { $ref: '#/components/responses/NotFound' }
     put:
       operationId: putAppUiLayout

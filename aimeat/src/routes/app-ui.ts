@@ -20,6 +20,9 @@
  *   POST /v1/apps/:owner/:filename/ui/restore  · bring one version back (re-validated)
  * @usage app.use(appUiRouter(config, storage)) from mountRoutes.
  * @version-history
+ *   v1.1.0 — 2026-09-20 — GET …/ui takes ?catalogue=full|index|none and ?detail=<names>. The
+ *     whole 89 kB catalogue rode along on every read: past one tool result for an AI, and
+ *     downloaded on every open of every mosaic app to read a few hundred bytes of layout.
  *   v1.0.0 — 2026-08-27 — Initial (TARGET-074 phase 2).
  */
 import { Router, type Request, type Response } from 'express';
@@ -30,6 +33,7 @@ import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity, ownerGhiiOf } from '../utils/gaii.js';
 import { parseDeclaredProvenanceInput } from '../mcp/ai-provenance-input.js';
 import { buildUiCatalogue } from '../services/app-ui/catalogue.js';
+import { buildUiCatalogueView, catalogueMode } from '../services/app-ui/catalogue-index.js';
 import { validateUiLayout, AppUiError } from '../services/app-ui/validate.js';
 import { AppUiService, type WriteProvenance } from '../services/app-ui/service.js';
 
@@ -115,10 +119,15 @@ export function appUiRouter(config: AimeatConfig, storage: Storage): Router {
     if (!app) return;
     try {
       const { layout, version } = await svc.read(app.ownerGaii, app.filename);
+      // ?catalogue=none is what a page asks (it reads the layout and nothing else), =index what an
+      // AI asks, with ?detail=table,effects for the parts it wants whole. No parameter is the whole
+      // catalogue, as this route has always answered (catalogue-index.ts).
+      const detail = typeof req.query.detail === 'string' ? req.query.detail.split(',') : [];
+      const catalogue = buildUiCatalogueView(catalogueMode(req.query.catalogue) ?? 'full', detail);
       res.json(success(config.nodeId, {
         layout, version,
         source: layout ? 'stored' : 'none',
-        catalogue: buildUiCatalogue(),
+        ...(catalogue ? { catalogue } : {}),
       }, [
         { description: 'Replace the layout (whole-value, validated, versioned)', method: 'PUT', url: `/v1/apps/${req.params.owner}/${req.params.filename}/ui` },
       ]));

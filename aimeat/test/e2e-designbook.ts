@@ -314,6 +314,51 @@ const GOOD_BODY = {
         assert(seeded.every((p: any) => p.status === 'published'), 'all seeded parts are published');
     });
 
+    await test('a page that NAMES the parts it was built from is counted at publish, once per app, and its layout becomes the stored arrangement the first time only', async () => {
+        const f = `dbnamed${Date.now()}.html`;
+        const layout = { v: 1, blocks: [{ id: 'rows', component: 'list', props: { source: 'jobs.', title: 'Jobs' } }] };
+        const page = (l: unknown) => APP(f)
+            .replace('<meta name="aimeat-track"', '<meta name="aimeat-book-parts" content="leiska-dashboard no-such-part">\n<meta name="aimeat-track"')
+            .replace('</head>', `<script type="application/json" id="aimeat-layout">${JSON.stringify(l)}</` + 'script></head>');
+        const before = (await json('/v1/designbook/leiska-dashboard', { headers: auth(other.token) })).body.data.usage;
+
+        const first = await json('/v1/apps', { method: 'POST', headers: auth(other.token),
+            body: JSON.stringify({ filename: f, mime_type: 'text/html', content: b64(page(layout)), name: 'Named', description: 'Names its Design Book parts.' }) });
+        assert(first.status === 201, `publish ${first.status}: ${JSON.stringify(first.body?.error)}`);
+        const told = first.body.data.next_steps?.design_book_parts;
+        assert(JSON.stringify(told?.counted) === '["leiska-dashboard"]' && JSON.stringify(told?.unknown) === '["no-such-part"]',
+            `the publish says what it counted and what it does not hold: ${JSON.stringify(told)}`);
+        assert(told.layout === 'stored', `the page's arrangement is stored on the first publish: ${told.layout}`);
+        const after = (await json('/v1/designbook/leiska-dashboard', { headers: auth(other.token) })).body.data.usage;
+        assert(after === before + 1, `the usage counter moved by one: ${before} → ${after}`);
+        const ui = await json(`/v1/apps/${other.name}/${f}/ui?catalogue=none`);
+        assert(ui.body.data.layout?.blocks?.[0]?.id === 'rows', 'and the app serves that arrangement');
+
+        // The owner's AI rearranges it, then the builder republishes with its OLD layout in the page.
+        const moved = { v: 1, blocks: [{ id: 'moved', component: 'list', props: { source: 'jobs.', title: 'Jobs, rearranged' } }] };
+        const put = await json(`/v1/apps/${other.name}/${f}/ui`, { method: 'PUT', headers: auth(other.token), body: JSON.stringify({ layout: moved }) });
+        assert(put.status === 200, `ui set ${put.status}: ${JSON.stringify(put.body?.error)}`);
+        const again = await json('/v1/apps', { method: 'POST', headers: auth(other.token),
+            body: JSON.stringify({ filename: f, mime_type: 'text/html', content: b64(page(layout)), name: 'Named', description: 'Names its Design Book parts.' }) });
+        assert(again.status === 201 || again.status === 200, `republish ${again.status}: ${JSON.stringify(again.body?.error)}`);
+        const told2 = again.body.data.next_steps?.design_book_parts;
+        assert(told2.layout === 'kept-existing' && JSON.stringify(told2.already) === '["leiska-dashboard"]',
+            `a republish neither writes over the owner's arrangement nor counts again: ${JSON.stringify(told2)}`);
+        const kept = await json(`/v1/apps/${other.name}/${f}/ui?catalogue=none`);
+        assert(kept.body.data.layout?.blocks?.[0]?.id === 'moved', 'the owner\'s arrangement stands');
+        const final = (await json('/v1/designbook/leiska-dashboard', { headers: auth(other.token) })).body.data.usage;
+        assert(final === after, `the counter did not move again: ${after} → ${final}`);
+
+        // A layout the validator refuses never stops the publish, and says why.
+        const g = `dbbadlayout${Date.now()}.html`;
+        const bad = await json('/v1/apps', { method: 'POST', headers: auth(other.token),
+            body: JSON.stringify({ filename: g, mime_type: 'text/html', name: 'Bad layout', description: 'Carries a layout the validator refuses.',
+                content: b64(page({ v: 1, blocks: [{ id: 'x', component: 'no-such-component', props: {} }] }).replaceAll(f, g)) }) });
+        assert(bad.status === 201, `a refused layout must not refuse the publish: ${bad.status} ${JSON.stringify(bad.body?.error)}`);
+        const told3 = bad.body.data.next_steps?.design_book_parts;
+        assert(told3.layout === 'refused' && told3.notes.some((n: string) => /no-such-component/.test(n)), `and the answer says why: ${JSON.stringify(told3)}`);
+    });
+
     await test('adoption is the heartbeat: adopting an aging part lifts it back to published', async () => {
         const fade = await json('/v1/designbook/leiska-cover/status', {
             method: 'POST', headers: auth(op.token), body: JSON.stringify({ status: 'aging' }),

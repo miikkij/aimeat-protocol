@@ -7450,7 +7450,7 @@
   async function loadLayout(owner, filename) {
     try {
       const base = APEX_URL || "";
-      const res = await fetch(base + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + "/ui");
+      const res = await fetch(base + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + "/ui?catalogue=none");
       if (!res.ok) return null;
       const body = await res.json();
       return body && body.data && body.data.layout || null;
@@ -16427,7 +16427,7 @@
      * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
      * when the two drift, because a version string that never moves is worse than none.
      */
-    version: "0.53.2",
+    version: "0.53.3",
     /**
      * WHAT YOU MAY CHANGE IN THIS COMPONENT WITHOUT FORKING IT. Answers with the component's
      * named parts (every one carries `data-ak-part`, so an app's own CSS reaches it), the slots

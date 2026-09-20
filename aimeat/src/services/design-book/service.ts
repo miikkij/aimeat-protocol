@@ -34,6 +34,8 @@
  *   const book = new DesignBookService(storage, config);
  *   const out = await book.propose(callerGaii, raw, provenance);
  * @version-history
+ *   v1.6.0 — 2026-09-20 — recordUse(): a published app that names the parts it was built from is
+ *     counted, once per app (app-book-parts.ts). The usage record remembers which apps.
  *   v1.5.0 — 2026-09-19 — map(): the published shelf as one page of text (map.ts). Three measured
  *     builds searched the Book in none of them, because a search serves a builder that already
  *     knows what the Book holds.
@@ -60,7 +62,7 @@
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, MemoryRecord } from '../../storage/interface.js';
-import { resolveAppOwnerScope } from '../app-lifecycle.js';
+import { resolveAppOwnerScope } from '../app-owner-scope.js';
 import { systemGhiiFor } from '../compliance-register.js';
 import { provenanceForWrite } from '../ai-provenance.js';
 import { AppUiService, type WriteProvenance } from '../app-ui/service.js';
@@ -74,6 +76,8 @@ import { buildDesignBookMap } from './map.js';
 
 export const PART_KEY_PREFIX = 'atelier.book.part.';
 export const USAGE_KEY_PREFIX = 'atelier.book.usage.';
+/** How many apps a usage record remembers, so a republish is not counted as a new use. */
+const USAGE_APPS_KEPT = 200;
 export const PART_KEY_RE = /^atelier\.book\.part\.[a-z0-9][a-z0-9-]{2,60}$/;
 
 export function partKey(id: string): string { return `${PART_KEY_PREFIX}${id}`; }
@@ -440,13 +444,32 @@ export class DesignBookService {
 
     // The adopt is the usage signal — a read is browsing, an adopt is a build. Untracked on
     // purpose: a counter's history is noise, and it must never pollute the part's own timeline.
+    await this.countUse(id, `${callerOwnerName}/${filename}`, true);
+
+    return { id, filename, version: out.version, replaced_version: out.replaced_version, kind: part.kind };
+  }
+
+  /**
+   * One more use of a part, by one app. The record remembers the apps that used it (the last
+   * USAGE_APPS_KEPT), which is what lets a publish that NAMES its parts count each app once
+   * however often it is republished. An adopt counts every time, as it always has (`always`).
+   */
+  private async countUse(id: string, app: string, always: boolean): Promise<boolean> {
     const now = new Date().toISOString();
-    const prevUsage = await this.usageOf(id);
     const usageRec = await this.storage.getMemory(this.bookOwner(), usageKey(id));
+    let prev: { count?: number; apps?: string[] };
+    // eslint-disable-next-line aimeat/no-silent-catch -- an unreadable counter starts again from zero; it is a counter
+    try { prev = (usageRec ? (typeof usageRec.value === 'string' ? JSON.parse(usageRec.value) : usageRec.value) : {}) ?? {}; } catch { prev = {}; }
+    const apps = Array.isArray(prev.apps) ? prev.apps.filter(a => typeof a === 'string') : [];
+    const known = apps.includes(app);
+    if (known && !always) return false;
     await this.storage.setMemory({
       key: usageKey(id),
       ownerGaii: this.bookOwner(),
-      value: JSON.stringify({ spec: 'aimeat.designbook.usage/v1', id, count: prevUsage + 1, last_adopted_at: now }),
+      value: JSON.stringify({
+        spec: 'aimeat.designbook.usage/v1', id, count: (typeof prev.count === 'number' ? prev.count : 0) + 1,
+        last_adopted_at: now, apps: [...apps.filter(a => a !== app), app].slice(-USAGE_APPS_KEPT),
+      }),
       visibility: 'public',
       tags: ['designbook', 'usage'],
       ttlHours: null,
@@ -454,8 +477,25 @@ export class DesignBookService {
       createdAt: usageRec?.createdAt ?? now,
       updatedAt: now,
     });
+    return true;
+  }
 
-    return { id, filename, version: out.version, replaced_version: out.replaced_version, kind: part.kind };
+  /**
+   * A published app NAMED these parts as what it was built from (app-book-parts.ts). Counts each
+   * part once per app. Only the published shelf counts: a part still in proposal, a retired one
+   * and a genre (which is forked, and whose fork is the app's register) are answered as unknown.
+   */
+  async recordUse(app: string, ids: string[]): Promise<{ counted: string[]; already: string[]; unknown: string[] }> {
+    const out = { counted: [] as string[], already: [] as string[], unknown: [] as string[] };
+    for (const id of ids) {
+      const record = await this.findRecord(id);
+      let part: DesignBookPart | null;
+      // eslint-disable-next-line aimeat/no-silent-catch -- an unreadable part is answered as unknown, which is what the builder can act on
+      try { part = record ? this.parsePart(record) : null; } catch { part = null; }
+      if (!part || part.kind === 'genre' || (part.status !== 'published' && part.status !== 'aging')) { out.unknown.push(id); continue; }
+      ((await this.countUse(id, app, false)) ? out.counted : out.already).push(id);
+    }
+    return out;
   }
 
   /**

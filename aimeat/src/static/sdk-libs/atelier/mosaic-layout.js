@@ -9,6 +9,7 @@
  * @structure appRef() · loadLayout(owner, filename) · labelOf(block) · applyViewerOverlay(layout, o)
  * @usage  import { appRef, loadLayout, labelOf, applyViewerOverlay } from './mosaic-layout.js';
  * @version-history
+ *   v0.53.3 — 2026-09-20 — loadLayout() asks for the layout alone (?catalogue=none).
  *   v0.53.2 — 2026-09-13 — appRef() parses the block as served, because the node now writes it into
  *     the head as plain JSON (unicode escapes instead of HTML entities), and decodes entities only
  *     for a page served before that. applyViewerOverlay moved here whole from mosaic.js under the
@@ -56,7 +57,9 @@ export async function loadLayout(owner, filename) {
   try {
     const base = APEX_URL || '';
     const res = await fetch(base + '/v1/apps/' + encodeURIComponent(owner)
-      + '/' + encodeURIComponent(filename) + '/ui');
+      // The layout alone: without the parameter the route sends its whole 89 kB catalogue too,
+      // on every open of every app, and a page reads none of it.
+      + '/' + encodeURIComponent(filename) + '/ui?catalogue=none');
     if (!res.ok) return null;
     const body = await res.json();
     return (body && body.data && body.data.layout) || null;

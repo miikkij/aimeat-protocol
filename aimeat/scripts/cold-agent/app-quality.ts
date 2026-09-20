@@ -71,6 +71,10 @@ export interface AppQuality {
     level: string | null;
     /** Whether the page mounts a mosaic, the one thing that draws an adopted arrangement. */
     mountsMosaic: boolean;
+    /** The Design Book parts the page says it was built from, which a publish counts as used. */
+    bookPartsNamed: string[];
+    /** Whether the page carries its arrangement as data, which a first publish stores. */
+    carriesLayout: boolean;
     /** Whether the run was shown the Design Book's one-page map, by either road. */
     sawBookMap: boolean;
     /** `fixed` keeps its own colours, `follows` changes with the person's theme; null when not said. */
@@ -151,6 +155,9 @@ export async function appQuality(baseUrl: string, ownerName: string, filename: s
         // Only a mosaic draws the stored arrangement a Design Book adopt writes, so a genre fork
         // without one cannot use a single part of the Book.
         mountsMosaic: /\.mosaic\s*\(\s*\{/.test(html),
+        // What the publish records without a call: the parts the page names, and its layout as data.
+        bookPartsNamed: (meta('aimeat-book-parts') ?? '').split(/[\s,]+/).filter(Boolean),
+        carriesLayout: /<script\b[^>]*\bid\s*=\s*["']aimeat-layout["']/i.test(html),
         // The whole Book on one page reaches a builder two ways: part `libraries` of the
         // specification ends with it, and a search given nothing answers it.
         sawBookMap: atelierTiers.includes('build-app-atelier/libraries')
@@ -189,6 +196,7 @@ export function describeQuality(q: AppQuality): string {
         + `; level ${q.level ?? 'NOT STATED'}`
         + `; Book map ${q.sawBookMap ? 'seen' : 'NOT seen'}`
         + `; mosaic ${q.mountsMosaic ? 'MOUNTED' : 'not mounted'}`
+        + `; Book parts named ${q.bookPartsNamed.length ? q.bookPartsNamed.join(' ') : 'NONE'}; layout as data ${q.carriesLayout ? 'yes' : 'no'}`
         + `; Design Book searched ${q.book.searched}, adopted ${q.book.adopted}, proposed ${q.book.proposed}`
         + `; kit components ${q.kitComponents.length ? q.kitComponents.join(' ') : 'none'}; own styles ${q.ownStyles}`;
     return `${track}; ${Math.round(q.bytes / 1024)} kB; ${wrong.length ? wrong.join(', ') : 'nothing the lint or the head checks object to'}; ${read}; spec token ${q.sentSpecToken ? 'sent' : 'not sent'}`;

@@ -14,19 +14,31 @@
  * @structure appUiTools
  * @usage import { appUiTools } from './app-ui.js';
  * @version-history
+ *   v1.1.0 — 2026-09-20 — The read carries the catalogue's INDEX and takes `detail`: the whole
+ *     catalogue is 89 kB, and a read that answered it was a read no chat received.
  *   v1.0.0 — 2026-08-27 — Initial (TARGET-074 phase 2).
  */
 import type { AimeatToolDefinition } from './types.js';
 import { AI_PROVENANCE_TOOL_NOTE, aiProvenanceCatalogInput } from './ai-provenance-note.js';
 
+/** What the `detail` parameter says, on both MCP doors. */
+export const UI_DETAIL_PARAM = 'Names from the catalogue index to get IN FULL: component ids ("table", "statRow") or section names ("effects", "layouts", "ambients"). Omit it for the index alone.';
+
+/** The query the two proxying doors send the route: the index, and the named parts in full. */
+export function uiReadQuery(detail: unknown): string {
+    const names = Array.isArray(detail) ? detail.filter((d): d is string => typeof d === 'string' && !!d.trim()) : [];
+    return '?catalogue=index' + (names.length ? '&detail=' + encodeURIComponent(names.join(',')) : '');
+}
+
 export const appUiTools: AimeatToolDefinition[] = [
     {
         name: 'aimeat_app_ui_get',
-        description: "Read how one of your Atelier apps arranges its screen, and what it could be arranged from. You get back the stored layout (or null when the app has never stored one — its own code then decides), its version, and the CATALOGUE: every mosaic component this node knows with the settings each takes, the navigation modes (tabs, bottom-bar, canvas, deck, flow) and the look presets. Read this before writing — the catalogue is the vocabulary, and a name it does not carry is refused with the nearest real one suggested.",
+        description: "Read how one of your Atelier apps arranges its screen, and what it could be arranged from. You get back the stored layout (or null when the app has never stored one — its own code then decides), its version, and the CATALOGUE INDEX: every mosaic component this node knows with its one line and the names of its settings, the navigation modes (tabs, bottom-bar, canvas, deck, flow), the look presets and the ids of everything else. The whole catalogue is 89 kB, more than one answer carries, so ask for what you need by name with `detail` (a component's settings with their types and bounds, or a whole section) and it comes back in full beside the index. Read this before writing — the catalogue is the vocabulary, and a name it does not carry is refused with the nearest real one suggested.",
         caller: 'agent',
         visibility: { publicMcp: true, connectorMcp: true, cliFallback: true },
         input: {
             filename: { type: 'string', required: true, description: 'The published app file, e.g. "errands.html". The app must belong to your owner.' },
+            detail: { type: 'array', description: UI_DETAIL_PARAM },
         },
     },
     {

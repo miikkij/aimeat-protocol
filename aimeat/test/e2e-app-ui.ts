@@ -115,6 +115,23 @@ const GOOD_LAYOUT = {
         assert(cat.looks.includes('vivid') && cat.looks.includes('flat'), 'the looks are part of the vocabulary');
     });
 
+    await test('a reader says how much of the catalogue it wants: none for a page, the index for an AI, the named parts whole', async () => {
+        const path = `/v1/apps/${o.name}/${filename}/ui`;
+        const page = await json(`${path}?catalogue=none`);
+        assert(page.status === 200 && !('catalogue' in page.body.data) && 'layout' in page.body.data,
+            `a page gets the layout alone: ${JSON.stringify(Object.keys(page.body.data ?? {}))}`);
+        const index = await json(`${path}?catalogue=index&detail=table,no-such-thing`);
+        const cat = index.body.data.catalogue;
+        assert(typeof cat.components.hero === 'string' && /Settings: title/.test(cat.components.hero), 'the index names each component on one line, with its setting names');
+        assert(cat.detail?.table?.props && Object.keys(cat.detail.table.props).length > 0, 'a named component comes back whole');
+        assert(JSON.stringify(cat.detail_unknown) === '["no-such-thing"]', `an unknown name is said: ${JSON.stringify(cat.detail_unknown)}`);
+        // Printed the way the tool prints it, beside a layout: inside what one tool result carries.
+        const printed = JSON.stringify((await json(`${path}?catalogue=index`)).body.data, null, 2).length;
+        assert(printed < 20_000, `the index answer fits one tool result: ${printed} characters`);
+        const whole = await json(path);
+        assert(Array.isArray(whole.body.data.catalogue?.components), 'no parameter is the whole catalogue, as it always was');
+    });
+
     // ── The validator: refusals with words, and the nearest real name ─────────────────────────
 
     const validate = (layout: unknown) => json('/v1/apps/ui/validate', {
