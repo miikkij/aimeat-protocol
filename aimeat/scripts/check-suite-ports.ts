@@ -48,7 +48,11 @@ function portsPerSuite(): Map<string, Set<number>> {
         for (const line of readFileSync(join(TEST_DIR, file), 'utf-8').split(/\r?\n/)) {
             const trimmed = line.trim();
             if (trimmed.startsWith('*') || trimmed.startsWith('//') || trimmed.startsWith('/*')) continue;
-            for (const m of line.matchAll(/\b(40[0-9]{3})\b/g)) {
+            // 40000-41999, not 40xxx. The first version read only the 40s, so the two allowlist
+            // suites' 41000 and 41100 were invisible to it — and they were the pair that raced, on
+            // 2026-09-20, for a port they each derived from the lane's own. A block this gate
+            // cannot see is a block nothing checks.
+            for (const m of line.matchAll(/\b(4[01][0-9]{3})\b/g)) {
                 const port = Number(m[1]);
                 if (!NOT_A_CLAIM.has(port)) ports.add(port);
             }
