@@ -15,6 +15,11 @@
  *   import { instructionsFor } from './instructions.js';
  *   new McpServer({ name, version }, { capabilities, instructions: instructionsFor(role, { guidance }) });
  * @version-history
+ *   v1.4.0 — 2026-09-20 — One sentence on the apps ground: an owner saying an app turned out well
+ *     is recorded with aimeat_designbook_keep. Measured with the cold-agent task `keep-app`: in a
+ *     NEW conversation 0 of 3 runs recorded it (each thanked the person and called nothing),
+ *     because only the builder's skill said so and a new conversation had not loaded it. In the
+ *     conversation that built the app it worked without this line.
  *   v1.3.0 — 2026-09-19 — One sentence after the three grounds names aimeat_discover as the way to
  *     find something whose place is not known, and says its three reaches: the person's own, what
  *     their organisms share with them, what is public. Until now only the tool's own description
@@ -47,6 +52,9 @@ export const SURFACE_INTROS: Record<SurfaceRole, string> = {
     full: 'This surface carries everything the node offers, so nothing here is narrowed to one kind of work. If your work does have a shape — building apps, running the owner\'s own agent, offering a service, governing the node, selling — the surface named after it is smaller to hold and harder to misfire from. Start with aimeat_handbook_get either way.',
 };
 
+/** An owner's word about an app is what the Design Book grows from (services/design-book/reasons.ts). */
+const KEEP_SENTENCE = ' When they say one turned out well, record it: aimeat_designbook_keep.';
+
 /**
  * What an agent has to act on, in the first 1 500 characters. Several clients cut the instructions
  * at about 2 kB (measured on 2026-09-18: one stopped mid-word at character 2 052), and until then
@@ -61,7 +69,7 @@ Call aimeat_handbook_get first, with no arguments. It is this node's operating g
 
 Three grounds carry most of the work:
 - Memory holds the person's own knowledge. aimeat_memory_list takes a key prefix and an owner scope, aimeat_memory_search finds by content, and many features here live as a memory record under a key prefix plus a prompt that reads it.
-- Apps are single-file web apps published on this node. aimeat_app_list gives each one a \`url\`, which is the address to hand the person when they want to open it.
+- Apps are single-file web apps published on this node. aimeat_app_list gives each one a \`url\`, which is the address to hand the person when they want to open it.${KEEP_SENTENCE}
 - Organisms and workspaces are how the person shares knowledge with others. Skills (aimeat_skill_list, aimeat_skill_get) are the operating guide for one named capability.
 
 When you do not know where something is, or what the person can reach, aimeat_discover searches every kind of content in one call, one reach at a time: scope "own" is their own content, "shared" is what the organisms they belong to share with them, "public" is what anyone can read.
@@ -133,7 +141,9 @@ export function instructionsFor(role: SurfaceRole | 'all', opts: InstructionsOpt
     // line and belongs next to the address it explains. The surface line and DETAIL are the long
     // form. The owner's proactive guidance comes last because it is the longest part by far and
     // aimeat_handbook_get carries it as well, so an agent that reads the handbook has it anyway.
-    const parts: string[] = [CORE];
+    // The sentence about an app that turned out well names a tool, and only these surfaces carry it.
+    const hasKeep = role === 'all' || role === 'full' || role === 'agent';
+    const parts: string[] = [hasKeep ? CORE : CORE.replace(KEEP_SENTENCE, '')];
 
     // The address is unchanged and the agent does the same thing with it. What this adds is only
     // the answer to "did that actually go anywhere".
