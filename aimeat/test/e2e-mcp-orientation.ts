@@ -497,13 +497,13 @@ async function main() {
             assert(start.length < 24_000, `one tool result carries it: ${start.length} characters`);
             const full = await json('/v1/prompts/build-app-atelier');
             assert(start.includes(full.body.data.spec_token), 'it names the Atelier spec token');
-            assert(/Read `genre`, `libraries` and `patterns` BEFORE you write any code/.test(start), 'it says which parts come before code');
+            assert(/Read `genre`, `libraries`, `book` and `patterns` BEFORE you write any code/.test(start), 'it says which parts come before code');
         });
 
         await test('17c. the Atelier parts each arrive whole, and between them carry the whole specification', async () => {
             const fullTxt = await fetch(`${BASE}/v1/prompts/build-app-atelier?format=txt`).then(r => r.text());
             const list = await json('/v1/prompts/build-app-atelier/sections');
-            assert(list.body.data.parts.map((p: any) => p.id).join() === 'start,genre,libraries,patterns,look', `the parts in order: ${JSON.stringify(list.body.data.parts)}`);
+            assert(list.body.data.parts.map((p: any) => p.id).join() === 'start,genre,libraries,book,patterns,look', `the parts in order: ${JSON.stringify(list.body.data.parts)}`);
             let carried = 0;
             for (const p of list.body.data.parts) {
                 const { body } = await v1('tools/call', { name: 'aimeat_handbook_get', arguments: { tier: 'build-app-atelier/' + p.id } }, 404);
@@ -521,10 +521,10 @@ async function main() {
         });
 
         await test('17g. part libraries arrives with what the Design Book holds, and a search given nothing answers the same page', async () => {
-            const libs = toolText((await v1('tools/call', { name: 'aimeat_handbook_get', arguments: { tier: 'build-app-atelier/libraries' } }, 408)).body);
+            const libs = toolText((await v1('tools/call', { name: 'aimeat_handbook_get', arguments: { tier: 'build-app-atelier/book'} }, 408)).body);
             assert(libs.includes('## What the Design Book holds'), `the map is in the part: ${libs.slice(-200)}`);
             assert(/### GENRES[^\n]*\n- `genre-[a-z]+` \[(?:fixed colours|follows the theme)\]: /.test(libs), 'genres come first, each with its light');
-            const rest = await fetch(`${BASE}/v1/prompts/build-app-atelier/sections/libraries?format=txt`).then(r => r.text());
+            const rest = await fetch(`${BASE}/v1/prompts/build-app-atelier/sections/book?format=txt`).then(r => r.text());
             assert(libs === rest, `the MCP part equals the REST part (${libs.length} vs ${rest.length})`);
             // The map is joined when the part is served: inside the digested text it would change the
             // spec token with every published part, and refuse every build that was under way.
@@ -541,7 +541,7 @@ async function main() {
         await test('17h. the specification says how a Design Book part reaches a genre fork, and the proposal owes a line about the Book', async () => {
             // No genre mounts a mosaic, and only a mosaic draws the stored arrangement an adopt
             // writes: until this text existed the two instructions excluded each other.
-            const patterns = toolText((await v1('tools/call', { name: 'aimeat_handbook_get', arguments: { tier: 'build-app-atelier/patterns' } }, 412)).body);
+            const patterns = toolText((await v1('tools/call', { name: 'aimeat_handbook_get', arguments: { tier: 'build-app-atelier/book' } }, 412)).body);
             assert(patterns.includes('THE WORKING SCREEN IS A MOSAIC INSIDE THE GENRE'), 'part patterns says where the mosaic goes in a genre fork');
             assert(/target: '#work'/.test(patterns) && patterns.includes('name="aimeat-book-parts"') && patterns.includes('id="aimeat-layout"'),
                 'with the mount, the parts named in the head and the layout carried as data, which the publish records');
@@ -551,7 +551,7 @@ async function main() {
         });
 
         await test('17i. the reasons have an MCP door: the builder is told to write down why, the queue is one search, and keep is the owner\'s word', async () => {
-            const patterns = toolText((await v1('tools/call', { name: 'aimeat_handbook_get', arguments: { tier: 'build-app-atelier/patterns' } }, 414)).body);
+            const patterns = toolText((await v1('tools/call', { name: 'aimeat_handbook_get', arguments: { tier: 'build-app-atelier/book' } }, 414)).body);
             assert(patterns.includes('id="aimeat-build-notes"') && patterns.includes('NOTHING GOES INTO THE BOOK BECAUSE A BUILD IS FINISHED'),
                 'the specification asks for the reasons and says when the Book hears of them');
             assert(patterns.length < 24_000, `the part still fits one tool result: ${patterns.length}`);
@@ -566,7 +566,7 @@ async function main() {
         await test('17d. an Atelier part that does not exist is an error that names the four there are', async () => {
             const { body } = await v1('tools/call', { name: 'aimeat_handbook_get', arguments: { tier: 'build-app-atelier/no-such-part' } }, 406);
             assert(body.result?.isError === true, 'MCP: isError');
-            assert(/start, genre, libraries, patterns, look/.test(toolText(body)), `it names the parts: ${toolText(body).slice(0, 200)}`);
+            assert(/start, genre, libraries, book, patterns, look/.test(toolText(body)), `it names the parts: ${toolText(body).slice(0, 200)}`);
         });
 
         await test('17e. the Classic first part says it is Classic and where a new app is built', async () => {

@@ -169,7 +169,7 @@ export async function appQuality(baseUrl: string, ownerName: string, filename: s
         buildNotes: (() => { const n = buildNotesDeclared(html); return n ? { took: n.notes.took.length, passed: n.notes.passed.length, made: n.notes.made.length, problems: n.problems.length } : null; })(),
         // The whole Book on one page reaches a builder two ways: part `libraries` of the
         // specification ends with it, and a search given nothing answers it.
-        sawBookMap: atelierTiers.includes('build-app-atelier/libraries')
+        sawBookMap: atelierTiers.includes('build-app-atelier/book') || atelierTiers.includes('build-app-atelier/libraries')
             || toolCalls.some(c => c.name === 'aimeat_designbook_search' && !c.isError && Object.keys((c.input as object | null) ?? {}).length === 0),
         light: meta('aimeat-light'),
         locales: (meta('aimeat-locales') ?? '').split(/\s+/).filter(Boolean),

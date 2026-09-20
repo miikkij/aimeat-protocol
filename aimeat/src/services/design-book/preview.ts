@@ -19,6 +19,7 @@
  * @usage
  *   const html = partPreviewHtml(part);   // a complete self-contained page, kit assets relative
  * @version-history
+ *   v1.4.0 — 2026-09-20 — A component previews as a page of its own (component.ts), scriptless.
  *   v1.3.1 — 2026-09-05 — Two blocks on ONE source get the plain rows both can render: the
  *     dashboard leiska binds its list and its table to the same name, and the table's own demo
  *     shape left the list drawing four empty rows.
@@ -43,6 +44,7 @@ import { ambientById } from '../../data/atelier-ambients.js';
 import { effectById } from '../../data/atelier-effects.js';
 import { LOOKS } from '../../data/atelier-looks.js';
 import type { DesignBookPart } from './service.js';
+import { componentPreviewHtml, type ComponentBody } from './component.js';
 
 /** A representative arrangement for parts that are seasoning rather than a dish: a look or
  *  motion sheet is benched by rendering THIS demo layout wearing it, so an override that breaks
@@ -77,6 +79,11 @@ export function renderableBodyFor(part: DesignBookPart): Record<string, unknown>
     const id = (part.body as { template?: string }).template || '';
     const t = getAppTemplates().find((x) => x.id === id);
     return t ? { __page: t.content } : null;
+  }
+  // A component is a page of its own too: its markup on the page ground and on a surface, under
+  // the kit's tokens, with NO script (component.ts says why).
+  if (part.kind === 'component') {
+    return { __page: componentPreviewHtml(part.body as unknown as ComponentBody) };
   }
   if (part.kind === 'look' || part.kind === 'motion') {
     const body = part.body as { tokens?: Record<string, string>; look?: string };

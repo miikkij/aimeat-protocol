@@ -117,7 +117,7 @@ export function registerPromptsTools(
             if (tierKey === 'build-app-atelier' || tierKey.startsWith('build-app-atelier/')) {
                 const full = buildAtelierPrompt(config, { mode: 'new', lang: 'en' }).full;
                 const id = tierKey.slice('build-app-atelier/'.length) || 'start';
-                // Part `libraries` arrives with the Design Book's map in it (build-atelier-book.ts).
+                // Part `book` arrives with the Design Book's map in it (build-atelier-book.ts).
                 const piece = await atelierPieceWithBook(full, id, config, storage);
                 if (piece) return { content: [{ type: 'text' as const, text: piece.text }] };
                 return toolError('NOT_FOUND', `The Atelier build specification has no part "${id}". It has: ${atelierPieceIds().join(', ')}. Ask for "build-app-atelier" to read the first part, which lists the others.`);

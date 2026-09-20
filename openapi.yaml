@@ -11876,7 +11876,7 @@ paths:
       operationId: listBuildAppAtelierPromptParts
       summary: The parts the Atelier build specification comes in
       description: >-
-        The parts of the Atelier specification (start, genre, libraries, patterns, look) with what each
+        The parts of the Atelier specification (start, genre, libraries, book, patterns, look) with what each
         covers and its size. The whole text is larger than one MCP tool result can carry, so a chat
         reads it part by part. Public.
       tags:
@@ -11913,7 +11913,7 @@ paths:
       operationId: getBuildAppAtelierPromptPart
       summary: One part of the Atelier build specification
       description: >-
-        One of start, genre, libraries, patterns or look, byte for byte as the whole specification
+        One of start, genre, libraries, book, patterns or look, byte for byte as the whole specification
         carries it; part `start` also names the others and says which are read before any code. The MCP
         tool aimeat_handbook_get serves `start` for tier "build-app-atelier" and this route for
         "build-app-atelier/{id}". Public.
@@ -11923,7 +11923,7 @@ paths:
         - name: id
           in: path
           required: true
-          schema: { type: string, enum: [start, genre, libraries, patterns, look] }
+          schema: { type: string, enum: [start, genre, libraries, book, patterns, look] }
         - name: mode
           in: query
           schema: { type: string, enum: [new, improve], default: new }
@@ -25861,7 +25861,7 @@ paths:
       tags: [Apps]
       security: []
       parameters:
-        - { name: kind, in: query, schema: { type: string, enum: [layout, fill, look, motion, illustration, genre, ambient, effect] } }
+        - { name: kind, in: query, schema: { type: string, enum: [layout, fill, look, motion, illustration, genre, ambient, effect, component] } }
         - { name: status, in: query, schema: { type: string, enum: [proposed, published, aging, retired] } }
         - { name: q, in: query, schema: { type: string }, description: Matched against id, title, summary and tags }
         - { name: limit, in: query, schema: { type: integer, default: 50, maximum: 200 } }
@@ -25881,7 +25881,15 @@ paths:
         layer too loud for its ground refuses with numbers), the effect bench for effect (the
         knobs against the registry's bounds, the target it lands on — a picture effect never on
         words, living motion only on the layer) — and a refusal is worded, with the
-        nearest real name suggested. A new part lands as `proposed`; publishing
+        nearest real name suggested. A COMPONENT is the ninth kind, what an app made by hand
+        because the Book had nothing for it: body `{ prefix, html, css, use, judgement: { reach:
+        general|special, why }, from_app? }`, markup and a stylesheet under one class prefix, every
+        colour a `var(--ak-…)` token and NO script (its preview is served from this node). Its
+        bench reads the markup against an allowlist of elements and attributes and refuses a
+        stylesheet that loads anything, reaches outside its prefix, fixes itself over the page,
+        moves at idle or carries a literal colour. A component whose builder judged it `general`
+        and whose `from_app` is an app the owner said turned out well (POST /v1/designbook/keep) is
+        PUBLISHED BY ITSELF; the answer's `publishing: { earned, why }` says which and why. A new part lands as `proposed`; publishing
         it into the shared catalogue is the node operator's call. A part id is a node-wide
         address: once claimed, it answers the same part for everyone, forever, and updating your
         own re-runs the bench and flows as a minor. Requires memory:write.

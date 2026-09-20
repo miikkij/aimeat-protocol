@@ -30,6 +30,8 @@
  * @structure DesignBookReasons: record · keep · forPart · queue · forget
  * @usage await new DesignBookReasons(storage, config).record({ ... });
  * @version-history
+ *   v1.1.0 — 2026-09-20 — keptState(): whether the owner said an app turned out well and what its
+ *     kept version made by hand, which is what a component's publishing is earned from.
  *   v1.0.0 — 2026-09-20 — Initial (wish-atelierin-ui-kehitys-haltuun-miksi-osa-otettiin-miksi-tehtii).
  */
 import type { AimeatConfig } from '../../config.js';
@@ -147,6 +149,16 @@ export class DesignBookReasons {
       await this.put(this.book(), MADE_KEY, made, 'public', ['designbook', 'made']);
     }
     return { app, kept: input.kept, version: latest.version, took: latest.took, made: latest.made };
+  }
+
+  /**
+   * Whether the owner has said this app turned out well, and what its kept version made by hand.
+   * What a component's publishing is earned from (service.ts): the owner's word, never a finished build.
+   */
+  async keptState(ownerGhii: string, filename: string): Promise<{ kept: boolean; made: string[] }> {
+    const mine = parse<OwnerNotesRecord>(await this.storage.getMemory(ownerGhii, OWNER_NOTES_PREFIX + filename));
+    const version = mine?.versions.find(v => v.version === mine.kept_version);
+    return { kept: !!version, made: version?.made.map(m => m.name) ?? [] };
   }
 
   /** One part: how often it was taken, in how many apps somebody was satisfied with, and the words. */

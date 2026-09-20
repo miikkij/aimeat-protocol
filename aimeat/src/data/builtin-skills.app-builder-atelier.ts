@@ -13,6 +13,9 @@
  * @structure APP_BUILDER_ATELIER_SKILL_ENTRY
  * @usage import { APP_BUILDER_ATELIER_SKILL_ENTRY } from './builtin-skills.app-builder-atelier.js';
  * @version-history
+ *   v1.19.0 — 2026-09-20 — Components: step 10 says how a hand-made piece is offered when the
+ *     owner is satisfied (kind component, the builder's own judgement of its reach, published by
+ *     itself when general), and to look at the Book's COMPONENTS before making one.
  *   v1.18.0 — 2026-09-20 — Step 10 is rewritten on the developer's ruling: write down WHY as you
  *     choose (the build notes), and put nothing into the Book because a build is finished. The
  *     owner saying an app turned out well is the moment, recorded with aimeat_designbook_keep.
@@ -119,7 +122,7 @@ GET /v1/appdev/pitfalls             ← what bites app builders
 
 **Connected over MCP and cannot make HTTP calls?** Everything above comes through tools. The
 specification: \`aimeat_handbook_get { tier: "build-app-atelier" }\` returns its first part, which
-names the others (\`genre\`, \`libraries\`, \`patterns\`, \`look\`); read \`genre\`, \`libraries\` and \`patterns\` before you
+names the others (\`genre\`, \`libraries\`, \`book\`, \`patterns\`, \`look\`); read \`genre\`, \`libraries\`, \`book\` and \`patterns\` before you
 write code, each with \`aimeat_handbook_get { tier: "build-app-atelier/<id>" }\`. It comes in parts
 because one tool result cannot carry all of it. The genres: \`aimeat_designbook_search { kind:
 "genre" }\` lists them with what each is for, and \`aimeat_app_template_get { id: "genre-<id>" }\`
@@ -176,7 +179,7 @@ moved under you says so.
 2. **Research first** — \`aimeat_appdev_overview\`, existing apps and skills, the pitfalls, and
    **the Design Book** (\`aimeat_designbook_search\`): layouts, fills, looks, motion, ambients and
    effects that each passed their own bench. Called with nothing, the search answers the WHOLE
-   Book on one page, every part on a line under its kind, and part \`libraries\` of the
+   Book on one page, every part on a line under its kind, and part \`book\` of the
    specification ends with the same page: read it, because you cannot search for a part you do
    not know exists. Adopting one is one call (\`aimeat_designbook_adopt\`)
    and is faster than making it. THE PROPOSAL OWES ONE LINE ABOUT IT, every time: "From the
@@ -288,9 +291,16 @@ moved under you says so.
    must teach the Book nothing. Tell the owner in one line, when you hand the app over, that
    when they are happy with it they can say so. WHEN THE OWNER SAYS AN APP TURNED OUT WELL, in
    whatever words and in whichever conversation, record it: \`aimeat_designbook_keep { filename }\`.
-   That is the moment what the app took and made starts to count, and its answer lists what is
-   now worth offering to the next builder (an arrangement as a \`fill\`, with
-   \`aimeat_designbook_propose\`).
+   That is the moment what the app took and made starts to count, and its answer tells you to
+   offer what was made, THEN AND THERE: each hand-made piece as a \`component\`
+   (\`aimeat_designbook_propose\`: markup and a stylesheet under one class prefix, every colour a
+   \`var(--ak-…)\` token, NO script, and YOUR honest judgement of it, \`reach: "general"\` when
+   another kind of app would use it or \`"special"\` when it is this app's own, with why), and an
+   arrangement you composed as a \`fill\`. A general component from an app its owner was
+   satisfied with is published by itself, with no person in between; a special one stays listed
+   and yours. So make hand-made pieces in that shape from the start: one prefix, tokens for
+   colours, behaviour in your script. And before you make one, look at the COMPONENTS group of
+   the Book's list: \`aimeat_designbook_adopt\` on a component answers its two texts to build in.
    \`aimeat_designbook_propose\` with what it is for, when to choose it and its body, NOW, while you
    know how it works; the publish answer's \`design_book\` line names the styles this app made for
    itself. Improve a part that is already there as a new version of it, never as a copy beside it.

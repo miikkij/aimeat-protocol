@@ -26,13 +26,14 @@
  */
 import { MAX_PART_CHARS } from './build-app-layers.js';
 
-export type AtelierPartId = 'start' | 'genre' | 'libraries' | 'patterns' | 'look';
+export type AtelierPartId = 'start' | 'genre' | 'libraries' | 'book' | 'patterns' | 'look';
 
 /** In reading order. `what` is the line the first part shows for each of the others. */
 export const ATELIER_PARTS: Array<{ id: AtelierPartId; what: string }> = [
   { id: 'start', what: 'The interview, what the Atelier track is, the component kit, how a component is customised, data, how to finish and publish, and what is never done.' },
   { id: 'genre', what: 'REQUIRED before any code: an app starts from a genre, a complete page in a committed register, and the publish refuses an app without a register. Also the pattern shelf, the Design Book and the signature.' },
   { id: 'libraries', what: 'REQUIRED before any code: every library this node serves, with what it is for. Speech, audio, files, live updates, notifications, printing, calendars and decisions are already written. An address that is not in it does not exist.' },
+  { id: 'book', what: 'REQUIRED before any code: the Design Book. How a proven part reaches a page forked from a genre (the working screen is a mosaic), the components other apps made, writing down why you took, passed over and made each thing, and the whole Book on one page, every part on a line.' },
   { id: 'patterns', what: 'How the code is written: six patterns to copy, the living record, and the mosaic that arranges a screen from outside the file.' },
   { id: 'look', what: 'The look presets, the one ambient layer, effects, motion and imagery. Read it before you change anything the genre did not decide for you.' },
 ];
@@ -61,8 +62,12 @@ export const ATELIER_HEADING_PART: Record<string, AtelierPartId> = {
   'The signature: this app\'s own hand': 'genre',
 
   'The node\'s libraries: read this list before you write a mechanism': 'libraries',
-  // What already exists, in one part: the libraries, and the proven parts of the Design Book.
-  'The Design Book first': 'libraries',
+
+  // The Design Book has a part of its own since 2026-09-20: the mosaic inside a genre, the
+  // components, the build notes and the one-page map outgrew what `patterns` and `libraries`
+  // could carry beside their own text (24 179 characters against the 24 000 a result holds).
+  'The Design Book first': 'book',
+  'The Design Book in a genre fork: the working screen, components, and why': 'book',
 
   'A LIVING DOCUMENT: A SHEET WHOSE NUMBERS STAND ON EACH OTHER IS A RECORD': 'patterns',
   'Six patterns to copy': 'patterns',
@@ -101,7 +106,7 @@ export function splitAtelierSpec(full: string): AtelierSection[] {
 function partsIndex(nodeUrl: string): string {
   let out = '### This specification comes in parts\n';
   out += 'You are reading part `start`. The others belong to the same specification and carry the same authority. '
-    + 'Read `genre`, `libraries` and `patterns` BEFORE you write any code: an Atelier app is forked from a genre, the publish refuses one that names no register, and a mechanism you write by hand is usually one this node already serves. '
+    + 'Read `genre`, `libraries`, `book` and `patterns` BEFORE you write any code: an Atelier app is forked from a genre, the publish refuses one that names no register, a mechanism you write by hand is usually one this node already serves, and a piece of page you make by hand is often one the Design Book already holds. '
     + 'Over MCP: `aimeat_handbook_get { tier: "build-app-atelier/<id>" }`. Over HTTP the whole text in one piece: `GET ' + nodeUrl + '/v1/prompts/build-app-atelier?format=txt`.\n';
   for (const p of ATELIER_PARTS.filter(x => x.id !== 'start')) out += '- `' + p.id + '` — ' + p.what + '\n';
   return out;

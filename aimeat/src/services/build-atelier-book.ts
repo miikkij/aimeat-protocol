@@ -26,7 +26,9 @@ export async function atelierPieceWithBook(
   full: string, id: string, config: AimeatConfig, storage: Storage,
 ): Promise<AtelierPiece | null> {
   const piece = atelierPiece(full, id, config.baseUrl);
-  if (!piece || piece.id !== 'libraries') return piece;
+  // Part `book` since 2026-09-20; it rode in `libraries` for a day, until the Book's own text
+  // (the mosaic inside a genre, components, the build notes) needed a part of its own.
+  if (!piece || piece.id !== 'book') return piece;
   const { map, count } = await new DesignBookService(storage, config).map();
   // An empty shelf has nothing to list, and the part still says how to propose the first one.
   return count ? { id: piece.id, text: piece.text + '\n' + map } : piece;

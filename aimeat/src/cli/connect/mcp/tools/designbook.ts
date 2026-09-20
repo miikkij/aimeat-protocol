@@ -38,7 +38,7 @@ export function registerDesignbookTools(mcp: McpServer, registry: AgentRegistry)
     ({ content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) });
 
   mcp.tool('aimeat_designbook_search', descriptionFor('aimeat_designbook_search'), {
-    kind: z.string().optional().describe('Only this part kind: "layout", "fill", "look", "motion", "illustration", "genre", "ambient" or "effect".'),
+    kind: z.string().optional().describe('Only this part kind: "layout", "fill", "look", "motion", "illustration", "genre", "ambient", "effect" or "component".'),
     status: z.string().optional().describe('Only this lifecycle state: proposed, published, aging or retired.'),
     q: z.string().optional().describe('A word matched against id, title, summary and tags.'),
     limit: z.number().optional().describe('Rows to return, 1-200. Default 50.'),
@@ -75,7 +75,7 @@ export function registerDesignbookTools(mcp: McpServer, registry: AgentRegistry)
   });
 
   mcp.tool('aimeat_designbook_propose', descriptionFor('aimeat_designbook_propose'), {
-    part: z.record(z.string(), z.unknown()).describe('The part: { id, kind: "layout"|"fill"|"look"|"motion"|"illustration"|"genre"|"ambient"|"effect", title, summary, body, tags? }. The kind decides the body: a whole mosaic layout (layout/fill), { tokens, look? } (look), { tokens } of motion tokens only (motion), { style, palette_words? } (illustration), { template } naming a served genre template (genre), { ambient: waves|aurora|dust|grid|static|ink|plasma|lava|tunnel, alpha?, speed?, look?, tokens? } (ambient — "none" is an arrangement\'s choice, never a part), or { effect: scanlines|vignette|duotone|recolour|distort|glitch|vhs|ripple|kaleidoscope, params?, on?: hero|figure|layer, look?, tokens? } (effect — a post-process filter proven where it lands: a moment on the hero band, a picture effect on a figure, or a living pass over the ambient layer).'),
+    part: z.record(z.string(), z.unknown()).describe('The part: { id, kind: "layout"|"fill"|"look"|"motion"|"illustration"|"genre"|"ambient"|"effect"|"component", title, summary, body, tags? }. A COMPONENT (what an app made by hand, offered to the next one) has body { prefix, html, css, use, judgement: { reach: "general"|"special", why }, from_app? }: markup and a stylesheet under one class prefix, every colour a var(--ak-…) token, NO script; a general one from an app its owner was satisfied with is published by itself. The kind decides the body: a whole mosaic layout (layout/fill), { tokens, look? } (look), { tokens } of motion tokens only (motion), { style, palette_words? } (illustration), { template } naming a served genre template (genre), { ambient: waves|aurora|dust|grid|static|ink|plasma|lava|tunnel, alpha?, speed?, look?, tokens? } (ambient — "none" is an arrangement\'s choice, never a part), or { effect: scanlines|vignette|duotone|recolour|distort|glitch|vhs|ripple|kaleidoscope, params?, on?: hero|figure|layer, look?, tokens? } (effect — a post-process filter proven where it lands: a moment on the hero band, a picture effect on a figure, or a living pass over the ambient layer).'),
     ...aiProvenanceInputs,
   }, annotationsFor('aimeat_designbook_propose'), async ({ part, ai_provenance, ai_provenance_id }) => {
     return out(await client.post('/v1/designbook', {
