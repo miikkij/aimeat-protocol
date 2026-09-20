@@ -461,6 +461,12 @@ tools = decide_tools("mailer")
 # -> [decide_sort_a_message, decide_send_a_reply, ...]
 ```
 
+**The liaison knows the rules too.** Its standing instructions say when a step is a judgement:
+list the rules with `aimeat_decide_rules`, run one with `aimeat_decide` (`rule` and `state` only),
+read `outcome` and `proceed`, and when `proceed` is false do not take the action, because the
+owner's gate held it and the owner already has a task about it. A missing key comes back as the
+node's own instruction; the liaison passes it on and does not retry.
+
 In a JSON crew definition the same two forms are tool ids:
 
 ```json
