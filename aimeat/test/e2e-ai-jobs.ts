@@ -632,26 +632,27 @@ const SCRIPT_THROW = `export default async function(ctx, input) {
     });
 
     // The other half, so a fix cannot be "refuse everybody". An agent holding the exact word must
-    // still get IN at both, and then meet the same wall behind them: both resolve the identity that
-    // pays through resolveIdentity, so an agent with no provider settings of its own is refused for
-    // the KEY and not for the permission. The synchronous door says so in its response and the
-    // asynchronous one says so on the job, which is the whole difference between them — a start is
-    // accepted before the work begins.
-    await test('16b. An agent holding the exact `ai:use` gets IN at both, and hits the same wall behind them', async () => {
+    // still get IN at both, and then meet the SAME PAYER behind them. Until 2026-09-20 that payer was
+    // the agent itself (resolveIdentity), so an agent with no provider settings of its own was
+    // refused for the KEY at both doors, and this case asserted that refusal. The payer is the human
+    // now (services/agent-ai-keys.ts aiPayerOf): the agent runs on its OWNER's settings, which this
+    // suite aims at the stub, so both doors do the work. The synchronous door says so in its
+    // response and the asynchronous one says so on the job. A door that still paid from the agent's
+    // own namespace would answer NO_API_KEY here, which is what turns this red.
+    await test('16b. An agent holding the exact `ai:use` gets IN at both, and its owner pays behind both', async () => {
         const token = await connectAgent(a, `aijobexact${Date.now()}`, ['ai:use']);
         const { complete, jobs } = await probeBothDoors(token, 'exact');
         assert(!gateRefused(complete), `the gate must admit an exact ai:use agent, got ${complete.status}`);
-        assert(complete.body?.error?.code === 'NO_API_KEY', `refused for the key, not the permission: ${JSON.stringify(complete.body?.error)}`);
+        assert(complete.status === 200, `the owner's settings pay for the agent's call, got ${complete.status}: ${JSON.stringify(complete.body?.error)}`);
         assert(jobs.status === 202, `the gate must admit it here too, got ${jobs.status}: ${JSON.stringify(jobs.body?.error)}`);
 
         let end = await json(`/v1/ai/jobs/${jobs.body.data.job_id}`, { headers: auth(token) });
         assert(end.status === 200, `the agent can read its own job: ${end.status}`);
-        for (let i = 0; i < 100 && end.body.data.state !== 'failed'; i++) {
+        for (let i = 0; i < 100 && end.body.data.state !== 'done' && end.body.data.state !== 'failed'; i++) {
             await sleep(120);
             end = await json(`/v1/ai/jobs/${jobs.body.data.job_id}`, { headers: auth(token) });
         }
-        assert(end.body.data.state === 'failed', `the job ends failed, got ${end.body.data.state}`);
-        assert(end.body.data.error?.code === 'NO_API_KEY', `for the same reason the other door gave: ${JSON.stringify(end.body.data.error)}`);
+        assert(end.body.data.state === 'done', `the job ends done, paid the same way, got ${end.body.data.state}: ${JSON.stringify(end.body.data.error)}`);
     });
 
     // The negative point, and the one that makes the pair above load-bearing: without it, "both

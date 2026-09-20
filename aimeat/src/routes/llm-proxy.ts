@@ -27,6 +27,9 @@
  *   - llmProxyRouter(config, storage) — POST /v1/llm/chat/completions, GET /v1/llm/models
  * @usage mounted in server-bootstrap/routes-loader.ts; an agent uses <node>/v1/llm as its base URL
  * @version-history
+ *   v1.1.0 — 2026-09-20 — An agent's call is paid by its OWNER, in the agent's name (aiPayerOf): the
+ *     agent's own key first, then the owner's, then the server's, under the owner's daily budget
+ *     and the agent's cap. Until now the payer was the agent's own namespace.
  *   v1.0.0 — 2026-08-16 — Initial.
  */
 import { Router, type Request, type Response } from 'express';
@@ -37,7 +40,7 @@ import { rateLimit } from '../middleware/rate-limit.js';
 import { assertAiUseAllowed } from '../auth/ai-gate.js';
 import { error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
-import { agentOfPrincipal } from '../services/agent-ai-keys.js';
+import { aiPayerOf } from '../services/agent-ai-keys.js';
 import {
     prepareAiCall, settleAiCall, estimateCostUsd, AiCompletionError, type AiCallPlan,
 } from '../services/ai-completion.js';
@@ -74,9 +77,10 @@ export function llmProxyRouter(config: AimeatConfig, storage: Storage): Router {
      */
     router.get('/v1/llm/models', requireAuth(), requireScope('ai:use'), aiRateLimit, async (req: Request, res: Response) => {
         if (!assertAiUseAllowed(req, res, config.nodeId)) return;
-        const gaii = resolveIdentity(req.auth!, config.nodeId);
+        // The same payer the completion below resolves, so the list is of the models that key reaches.
+        const { payer: gaii, agent } = aiPayerOf(resolveIdentity(req.auth!, config.nodeId));
         try {
-            const plan = await prepareAiCall(storage, config, gaii, { appId: 'llm-proxy' });
+            const plan = await prepareAiCall(storage, config, gaii, { appId: 'llm-proxy', ...(agent ? { agent } : {}) });
             const models = await listModels(plan.key, plan.baseUrl, 'chat');
             // OpenAI's shape, because that is what a client asking this URL parses.
             res.json({
@@ -102,7 +106,8 @@ export function llmProxyRouter(config: AimeatConfig, storage: Storage): Router {
      */
     router.post('/v1/llm/chat/completions', requireAuth(), requireScope('ai:use'), aiRateLimit, async (req: Request, res: Response) => {
         if (!assertAiUseAllowed(req, res, config.nodeId)) return;
-        const gaii = resolveIdentity(req.auth!, config.nodeId);
+        // An agent's call is paid by its owner, in the agent's name (services/agent-ai-keys.ts).
+        const { payer: gaii, agent } = aiPayerOf(resolveIdentity(req.auth!, config.nodeId));
 
         const body = (req.body ?? {}) as {
             messages?: ChatMessage[]; stream?: boolean;
@@ -117,8 +122,8 @@ export function llmProxyRouter(config: AimeatConfig, storage: Storage): Router {
         let plan: AiCallPlan;
         try {
             // `model` is deliberately not passed through: see the file header. The node decides.
-            // An agent's own key pays first and its daily cap applies (services/agent-ai-keys.ts).
-            plan = await prepareAiCall(storage, config, gaii, { appId: 'llm-proxy', ...agentOfPrincipal(gaii) });
+            // The agent's own key pays first and its daily cap applies; then the owner's key, then the server's.
+            plan = await prepareAiCall(storage, config, gaii, { appId: 'llm-proxy', ...(agent ? { agent } : {}) });
         } catch (err) {
             sendError(res, config.nodeId, err);
             return;

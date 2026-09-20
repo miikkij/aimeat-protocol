@@ -216,7 +216,8 @@ const carries = (marker: string) => (r: RecordedRequest) => r.body.includes(mark
     const b = await setupOwner('b');
     await pointAtStub(a, provider);
     await pointAtStub(b, provider);
-    const aiAgent = await connectAgent(a, `aistubyes${Date.now()}`, ['ai:use', 'memory:write']);
+    const aiAgentName = `aistubyes${Date.now()}`;
+    const aiAgent = await connectAgent(a, aiAgentName, ['ai:use', 'memory:write', 'memory:read']);
     const noAiAgent = await connectAgent(a, `aistubno${Date.now()}`, ['memory:read']);
 
     // ── 1. The doors, before anything is spent ────────────────────────────────
@@ -260,22 +261,16 @@ const carries = (marker: string) => (r: RecordedRequest) => r.body.includes(mark
             `a refusal must not reach the provider: ${provider.requests.length - before} request(s) arrived`);
     });
 
-    await test('1c. The agent that DOES hold ai:use is admitted, and runs on its OWN provider settings', async () => {
+    await test('1c. The agent that DOES hold ai:use is admitted, and its OWNER pays: the owner\'s settings, budget and usage', async () => {
         // The positive control, and the reason 1b is load-bearing: without it, "everything is
         // refused" would satisfy the pair.
         //
-        // An agent session resolves to its own GAII and not to the owner's GHII, so its provider
-        // settings are its own record — pinning today's behaviour, which e2e-ai-jobs case 16b states
-        // from the other side (an agent with no settings of its own is refused for the KEY, not for
-        // the permission). Writing them here is what turns that refusal into a completion.
-        const settings = await json('/v1/memory', {
-            method: 'POST', headers: auth(aiAgent),
-            body: JSON.stringify({
-                key: 'openrouter.settings', visibility: 'private',
-                value: { provider: 'custom', baseUrl: provider.baseUrl, model: MODEL, daily_budget_usd: 50 },
-            }),
-        });
-        assert(settings.status === 201, `the agent wrote its own settings, got ${settings.status}: ${JSON.stringify(settings.body?.error)}`);
+        // THE PAYER IS THE HUMAN (ruled 2026-09-20). Until then an agent's text completion was keyed,
+        // budgeted and metered in the agent's OWN namespace, so this test had the agent write its own
+        // `openrouter.settings` first, the owner's key never paid for an agent's call, and every
+        // agent drew its own free starter allowance. The agent writes nothing here: the owner's
+        // settings (pointAtStub above) are what aim the call, and the owner's usage record is where
+        // it lands, under the agent's name.
         provider.queue('chat', chatJson('Admitted.'), carries('MARK-AGENT-ADMITTED'));
         const r = await json('/v1/ai/complete', {
             method: 'POST', headers: auth(aiAgent),
@@ -283,6 +278,48 @@ const carries = (marker: string) => (r: RecordedRequest) => r.body.includes(mark
         });
         assert(r.status === 200, `expected 200, got ${r.status}: ${JSON.stringify(r.body?.error)}`);
         assert(r.body.data.content === 'Admitted.', `the answer came back: ${JSON.stringify(r.body.data?.content)}`);
+        const mine = await json(`/v1/agents/${aiAgentName}/ai-keys`, { headers: auth(a.token) });
+        assert(mine.status === 200 && mine.body.data.spent_today_usd > 0,
+            `the spend is in the OWNER's usage, under the agent's name: ${JSON.stringify(mine.body?.data?.spent_today_usd)}`);
+        const own = await json('/v1/memory/openrouter.settings', { headers: auth(aiAgent) });
+        assert(own.status === 404, `the agent has no settings record of its own, got ${own.status}`);
+    });
+
+    await test('1d. The key order for text: the agent\'s own key, then the owner\'s; and the agent\'s cap refuses unsent', async () => {
+        const keyOf = (marker: string) => provider.requestsFor('chat').filter(carries(marker)).pop()?.headers.authorization ?? '';
+        const ask = (marker: string) => json('/v1/ai/complete', {
+            method: 'POST', headers: auth(aiAgent), body: JSON.stringify({ prompt: marker, app_id: 'e2e-ai-stub' }),
+        });
+        const putOwnerKey = await json('/v1/openrouter/settings', {
+            method: 'PUT', headers: auth(a.token),
+            body: JSON.stringify({ apiKey: 'sk-owner-key-e2e-0001', provider: 'custom', baseUrl: provider.baseUrl, model: MODEL }),
+        });
+        assert(putOwnerKey.status === 200, `the owner saved a key, got ${putOwnerKey.status}: ${JSON.stringify(putOwnerKey.body?.error)}`);
+        const first = await ask('MARK-ORDER-OWNER');
+        assert(first.status === 200, `got ${first.status}: ${JSON.stringify(first.body?.error)}`);
+        assert(keyOf('MARK-ORDER-OWNER') === 'Bearer sk-owner-key-e2e-0001', `the OWNER's key paid for the agent's call, the provider saw "${keyOf('MARK-ORDER-OWNER')}"`);
+
+        const setAgentKey = await json(`/v1/agents/${aiAgentName}/ai-keys`, {
+            method: 'PUT', headers: auth(a.token), body: JSON.stringify({ openrouter: { api_key: 'sk-agent-key-e2e-0002' } }),
+        });
+        assert(setAgentKey.status === 200, `the owner gave the agent a key, got ${setAgentKey.status}`);
+        const second = await ask('MARK-ORDER-AGENT');
+        assert(second.status === 200, `got ${second.status}: ${JSON.stringify(second.body?.error)}`);
+        assert(keyOf('MARK-ORDER-AGENT') === 'Bearer sk-agent-key-e2e-0002', `the agent's own key comes first, the provider saw "${keyOf('MARK-ORDER-AGENT')}"`);
+        const ownerCall = await json('/v1/ai/complete', { method: 'POST', headers: auth(a.token), body: JSON.stringify({ prompt: 'MARK-ORDER-SELF' }) });
+        assert(ownerCall.status === 200 && keyOf('MARK-ORDER-SELF') === 'Bearer sk-owner-key-e2e-0001', 'the owner\'s own call never uses an agent\'s key');
+
+        await json(`/v1/agents/${aiAgentName}/ai-keys`, { method: 'PUT', headers: auth(a.token), body: JSON.stringify({ daily_usd: 0 }) });
+        const before = provider.requestsFor('chat').length;
+        const capped = await ask('MARK-ORDER-CAPPED');
+        assert(capped.status === 402 && capped.body.error?.code === 'AGENT_QUOTA_EXHAUSTED', `got ${capped.status} ${JSON.stringify(capped.body?.error)}`);
+        assert(provider.requestsFor('chat').length === before, 'a capped call never reaches the provider');
+        // Left as it was found: the rest of the suite runs the agent without a key or a cap of its own.
+        await json(`/v1/agents/${aiAgentName}/ai-keys`, { method: 'PUT', headers: auth(a.token), body: JSON.stringify({ daily_usd: null }) });
+        await json(`/v1/agents/${aiAgentName}/ai-keys/openrouter`, { method: 'DELETE', headers: auth(a.token) });
+        const forget = await json('/v1/openrouter/settings', { method: 'DELETE', headers: auth(a.token) });
+        assert(forget.status === 200, `the owner's key and settings are removed again, got ${forget.status}`);
+        await pointAtStub(a, provider);
     });
 
     // ── 2. The chat proxy: the provider's own bytes ───────────────────────────

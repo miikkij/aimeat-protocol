@@ -62,7 +62,7 @@
       "watches": [
         "aimeat/src/services/ai-completion.ts"
       ],
-      "digest": "sha256:0ca3a5d0705f223f0d5db430"
+      "digest": "sha256:2e3539a88893f2f4af07a56c"
     },
     "node:aimeat-mail-to-data": {
       "reviewedOn": "2026-09-19",
@@ -246,7 +246,7 @@
       "watches": [
         "aimeat/src/routes/ai.ts"
       ],
-      "digest": "sha256:7c997b1a4687533d8b4a99ea"
+      "digest": "sha256:0df0bd3216ebc2fa5c264ec8"
     },
     "node:use-app-bound-skills": {
       "reviewedOn": "2026-09-19",
@@ -363,7 +363,7 @@
       "aimeat/public/views/chat/parts.js": "12c8246c22bf138a"
     },
     "node:aimeat-paying-for-the-ai": {
-      "aimeat/src/services/ai-completion.ts": "41f4ab43932b3c5e"
+      "aimeat/src/services/ai-completion.ts": "81e90001f1305d31"
     },
     "node:aimeat-mail-to-data": {
       "aimeat/src/mcp/catalog/definitions/connections.ts": "84591ad8fce0795b",
@@ -468,7 +468,7 @@
       "aimeat/src/services/workflow/lifecycle.ts": "a6a052a36360f00f"
     },
     "node:configure-routing": {
-      "aimeat/src/routes/ai.ts": "ea18c342099c4157"
+      "aimeat/src/routes/ai.ts": "2d7af2e57b126a83"
     },
     "node:use-app-bound-skills": {
       "aimeat/src/routes/skills.ts": "b0c9b667b1187bba"

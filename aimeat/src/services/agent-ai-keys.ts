@@ -34,6 +34,8 @@
  *   const agent = agentNameOf(caller.principal, caller.gaii);
  *   const key = agent ? await readAgentKey(storage, config, caller.gaii, agent, 'decide') : null;
  * @version-history
+ *   v1.1.0 — 2026-09-20 — aiPayerOf: an agent's text call is paid by its owner. The cap reads the
+ *     owner's usage record only, because every call in an agent's name is metered there now.
  *   v1.0.0 — 2026-09-20 — Initial: decision rules on the node, and a key per agent.
  */
 import type { AimeatConfig } from '../config.js';
@@ -67,12 +69,22 @@ export function agentNameOf(principal: string, ownerGhii: string): string | null
 }
 
 /**
- * For a text door, whose payer IS the principal: the agent's name and its owner's GHII when the
- * principal is an agent, else nothing. Spread into the completion options.
+ * WHO PAYS FOR A TEXT CALL, AND IN WHOSE NAME IT WAS ASKED. An agent's call is paid by its owner:
+ * the owner's settings, daily budget, allowance and usage record, with the agent named so that its
+ * own key comes first and its own cap applies. Every other principal pays as itself, as before.
+ *
+ * Ruled by the developer on 2026-09-20. Until then a text door took the payer to be the principal,
+ * so an agent's completion was keyed, budgeted and metered in the AGENT's own namespace: the owner's
+ * own key never paid for an agent's call, the owner's daily budget did not cap it, and each agent
+ * drew a free starter allowance of its own. The decision model (services/decide/) and the voice door
+ * (routes/ai-voice.ts, ownerGhiiOf) already paid from the owner; this makes text the same, and the
+ * order agent key, owner key, server key true on every AI door.
+ *
+ * Only an AGENT is moved. An ecosystem app (`eco:`) is not a GAII and keeps paying as itself.
  */
-export function agentOfPrincipal(principal: string): { agent?: string; agentOwner?: string } {
+export function aiPayerOf(principal: string): { payer: string; agent?: string } {
   const p = parseGAII(principal);
-  return p ? { agent: p.agent, agentOwner: `${p.owner}@${p.node}` } : {};
+  return p ? { payer: `${p.owner}@${p.node}`, agent: p.agent } : { payer: principal };
 }
 
 export function agentKeyRecord(model: AgentAiModel, agent: string): string {
@@ -154,19 +166,13 @@ export async function clearAgentKey(storage: Storage, ownerGhii: string, agent: 
 type PerAgent = Record<string, { cost_usd: number; calls: number; tokens: number }>;
 
 /**
- * Today's spend by one agent, over BOTH places a call in its name is metered. A decision is paid and
- * metered in the owner's namespace; a text completion an agent asks for is metered in the agent's
- * own (routes/ai.ts resolves the payer to the principal). One cap covers both, so both are read.
+ * Today's spend by one agent, from the OWNER's usage record: every call in an agent's name, a
+ * decision or a text completion, is paid and metered there (aiPayerOf), so one cap covers both.
  */
 async function agentSpentToday(storage: Storage, ownerGhii: string, agent: string): Promise<number> {
   const day = new Date().toISOString().slice(0, 10);
-  const agentGaii = `${agent}#${ownerGhii}`;
-  const [mine, theirs] = await Promise.all([
-    storage.getMemory(ownerGhii, `ai-usage.${ownerGhii}.${day}`),
-    storage.getMemory(agentGaii, `ai-usage.${agentGaii}.${day}`),
-  ]);
-  const of = (v: unknown): number => (v as { per_agent?: PerAgent } | undefined)?.per_agent?.[agent]?.cost_usd ?? 0;
-  return of(mine?.value) + of(theirs?.value);
+  const rec = await storage.getMemory(ownerGhii, `ai-usage.${ownerGhii}.${day}`);
+  return (rec?.value as { per_agent?: PerAgent } | undefined)?.per_agent?.[agent]?.cost_usd ?? 0;
 }
 
 /** The agent's daily cap in USD, or null when the owner set none. */

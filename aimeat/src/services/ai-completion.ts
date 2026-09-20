@@ -223,9 +223,8 @@ export interface CompleteForOwnerOptions {
   maxTokens?: number;
   /** Optional app/source attribution — enables allowlist + per-app quota. */
   appId?: string;
-  /** The owner's agent that is asking, by bare name, and its owner (see PrepareAiCallOptions). */
+  /** The owner's agent that is asking, by bare name (see PrepareAiCallOptions.agent). */
   agent?: string;
-  agentOwner?: string;
   /** Optional image attachments (data: or https URLs) for vision-capable models. */
   images?: string[];
   /**
@@ -341,11 +340,9 @@ export interface PrepareAiCallOptions {
   /** Image inputs need a vision-capable model, whatever the owner's text default is. */
   hasImages?: boolean;
   /** The bare name of the owner's agent that is asking: its own key pays first, and its daily cap
-   *  applies. The door derives it from the principal (agentNameOf), never from the body. */
+   *  applies. The door derives it from the principal (aiPayerOf), never from the body, and passes
+   *  the agent's OWNER as `gaii`: the payer is the human. */
   agent?: string;
-  /** The GHII of that agent's owner, whose records hold the agent's key and cap. Needed because a
-   *  text door resolves the payer to the principal, so `gaii` is the agent's own namespace there. */
-  agentOwner?: string;
 }
 
 /**
@@ -377,15 +374,14 @@ export async function prepareAiCall(
   // money and their provider account, which is the whole reason bringing one is recommended.
   // An agent's own key comes before both (services/agent-ai-keys.ts): the owner pinned that agent's
   // spend to it. It is the owner's money on the owner's chosen address, like their own key.
-  const agentHome = opts.agentOwner ?? gaii;
-  const agentKey = opts.agent ? await readAgentKey(storage, config, agentHome, opts.agent, 'openrouter') : null;
+  const agentKey = opts.agent ? await readAgentKey(storage, config, gaii, opts.agent, 'openrouter') : null;
   const keyChoice: Omit<AiKeyChoice, 'scope'> & { scope: 'agent' | 'own' | 'node' } = agentKey
     ? { key: agentKey, scope: 'agent', exhausted: false, remainingUsd: 0 }
     : await resolveAiKey(storage, config, gaii, provider, apiKeyRecord?.value, baseUrl);
 
   const usage = (usageRecord?.value as UsageRecord | undefined) ?? emptyUsage();
   const dailyBudgetUsd = assertWithinBudget(usage, prefs, opts.appId, gaii);
-  const overCap = await agentCapRefusal(storage, agentHome, opts.agent);
+  const overCap = await agentCapRefusal(storage, gaii, opts.agent);
   if (overCap) throw new AiCompletionError('AGENT_QUOTA_EXHAUSTED', 402, overCap);
 
   // ── Model selection ──
@@ -503,7 +499,8 @@ export async function settleAiCall(
       provenance = await mintProvenance(storage, {
         stampedBy: 'node',
         ownerGhii: gaii,
-        principal: gaii,
+        // The payer is the human; WHO ASKED is still the agent, and attribution keeps the exact caller.
+        principal: plan.agent ? `${plan.agent}#${gaii}` : gaii,
         level: 'ai-generated',
         humanInvolvement: 'none',
         method: 'fully-generated',
@@ -552,7 +549,7 @@ export async function completeForOwner(
 
   const hasImages = Array.isArray(opts.images) && opts.images.length > 0;
   const plan = await prepareAiCall(storage, config, gaii, {
-    model: opts.model, modelRole: opts.modelRole, appId: opts.appId, hasImages, agent: opts.agent, agentOwner: opts.agentOwner,
+    model: opts.model, modelRole: opts.modelRole, appId: opts.appId, hasImages, agent: opts.agent,
   });
   const { prefs } = plan;
 

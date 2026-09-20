@@ -447,6 +447,8 @@ not you:
 of its own on that agent's page (AI keys, cap and gate). That key then pays for that agent's calls
 first, a daily cap can sit beside it, and no key is ever shown to the agent: for an agent that makes
 its own calls on the owner's computer, the owner gives the NAME of the environment variable instead.
+Whatever key pays, an agent's call is paid from its OWNER's account: it counts against the owner's
+daily budget and allowance, under the agent's name, and the three steps above are then the owner's.
 
 Step 3 is the one to be honest about. The response carries \`degradedToFreeModel: true\` when it
 happens, and a person whose answers quietly got worse and was never told will conclude the system

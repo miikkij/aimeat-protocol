@@ -14595,6 +14595,13 @@ paths:
         the `ai:use` scope — an agent JWT, or an app-grant token from a sandboxed app on the isolated
         app origin. Optionally accepts `images` (data: or https URLs) for a vision-capable model.
         Long calls: clients should use a large request timeout and no retries.
+
+
+        WHO PAYS. An agent's call is paid by its OWNER, in the agent's name: the owner's provider
+        settings, daily budget, allowance and usage record. The key is chosen strongest first: the
+        agent's own key (`/v1/agents/{name}/ai-keys`), the owner's own key, the server's key. The
+        agent's daily cap, when the owner set one, refuses with 402 `AGENT_QUOTA_EXHAUSTED`. The
+        same holds for `/v1/llm/chat/completions` and `POST /v1/ai/jobs`.
       tags: [Memory]
       security:
         - BearerAuth: []

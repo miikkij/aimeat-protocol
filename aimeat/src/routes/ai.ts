@@ -21,6 +21,9 @@
  *   import { aiRouter } from './routes/ai.js';
  *   app.use(aiRouter(config, storage));
  * @version-history
+ *   v1.x — 2026-09-20 — POST /v1/ai/complete and GET /v1/ai/available resolve the payer with
+ *     aiPayerOf: an agent's call is paid by its owner, in the agent's name. Ruled by the developer;
+ *     until now an agent paid from its own namespace, and its owner's key never paid for it.
  *   v1.x — 2026-09-19 — upsertMemory is services/private-record.ts, shared with services/decide/.
  *   v1.x — 2026-09-13 — POST /v1/ai/complete answers finish_reason and truncated beside content.
  *   v1.x — 2026-08-28 — /v1/ai/image answers with the service's fetchUrl: the anonymous /v1/pub/
@@ -62,7 +65,7 @@ import { assertAiUseAllowed } from '../auth/ai-gate.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
-import { agentOfPrincipal } from '../services/agent-ai-keys.js';
+import { aiPayerOf, agentKeyRecord } from '../services/agent-ai-keys.js';
 import { recordAccountEvent } from '../services/account-events.js';
 import {
   completeForOwner, AiCompletionError, getTodayUsage, getDailyBudgetUsd,
@@ -111,7 +114,8 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
       req.setTimeout(1_800_000);
       res.setTimeout(1_800_000);
 
-      const gaii = resolve(req);
+      // An agent's call is paid by its owner, in the agent's name (services/agent-ai-keys.ts).
+      const { payer: gaii, agent } = aiPayerOf(resolve(req));
       const {
         prompt, systemPrompt, model: modelOverride, modelRole,
         temperature, top_p, max_tokens, app_id, images,
@@ -138,8 +142,8 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
         const r = await completeForOwner(storage, config, gaii, {
           prompt: prompt as string, systemPrompt, model: modelOverride, modelRole,
           temperature, topP: top_p, maxTokens: max_tokens, appId: app_id, images: imageList,
-          // An agent's own key pays first and its daily cap applies (services/agent-ai-keys.ts).
-          ...agentOfPrincipal(gaii),
+          // The agent's own key pays first and its daily cap applies; then the owner's key, then the server's.
+          ...(agent ? { agent } : {}),
         });
         // TARGET-058: the provenance of the bytes we are about to hand back, on the ONE envelope
         // carrier. `meta`, never `data` — the `data` shape is what every published app reads, and it
@@ -328,12 +332,16 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
     requireAuth(), aiRateLimit,
     async (req: Request, res: Response) => {
       if (!gateOwnerOrAiUseAgent(req, res)) return;
-      const gaii = resolve(req);
-      const [apiKeyRecord, prefsRecord] = await Promise.all([
+      // The same payer the completion door resolves, so the answer here is the answer there: for an
+      // agent, its own key or its owner's.
+      const { payer: gaii, agent } = aiPayerOf(resolve(req));
+      const [apiKeyRecord, prefsRecord, agentKeyRec] = await Promise.all([
         storage.getMemory(gaii, 'openrouter.apikey'),
         storage.getMemory(gaii, 'openrouter.settings'),
+        agent ? storage.getMemory(gaii, agentKeyRecord('openrouter', agent)) : null,
       ]);
-      const encrypted = (apiKeyRecord?.value as { encrypted?: string } | undefined)?.encrypted;
+      const encrypted = (apiKeyRecord?.value as { encrypted?: string } | undefined)?.encrypted
+        || (agentKeyRec?.value as { encrypted?: string } | undefined)?.encrypted;
       const provider = ((prefsRecord?.value as Record<string, unknown> | undefined)?.provider as string) || 'openrouter';
       // openrouter needs a key; self-hosted providers (lmstudio/custom) can run keyless.
       const available = !!encrypted || provider !== 'openrouter';
