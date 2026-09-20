@@ -39,9 +39,14 @@ function bail(t: TFunction): never {
   process.exit(0);
 }
 
-function checkCancel<T>(value: T | symbol, t: TFunction): T {
+/**
+ * As init-wizard/helpers.ts, and subtracting for the same reason: @clack/prompts 1.8 made the
+ * cancel a `unique symbol`, which no longer matches a `symbol` parameter. This copy keeps its own
+ * `bail` because joining a federation says `join.done` on the way out, not `init.cancelled`.
+ */
+function checkCancel<T>(value: T, t: TFunction): Exclude<T, symbol> {
   if (p.isCancel(value)) bail(t);
-  return value as T;
+  return value as Exclude<T, symbol>;
 }
 
 interface PendingJoin {
