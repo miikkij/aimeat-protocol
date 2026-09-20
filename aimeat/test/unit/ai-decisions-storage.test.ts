@@ -25,6 +25,10 @@ function makeRow(over: Partial<AiDecisionRow> & { id: string; createdAt: string 
     subject: 'user:alice/lead-42',
     cacheKey: 'ck-1',
     model: 'jev-2026-09-01',
+    rule: null,
+    ruleVersion: null,
+    outcome: null,
+    keyScope: 'own',
     ...over,
     record: {
       spec: 'aimeat.decision/v1',
@@ -141,6 +145,52 @@ describe('ai_decisions storage (sqlite)', () => {
     const confirm = { outcome: 'confirmed' as const, by: ALICE, at: '2026-09-19T13:00:00.000Z' };
     expect(await storage.setAiDecisionReview('d1', ALICE, confirm)).toBe(true);
     expect((await storage.getAiDecision('d1'))?.record.review).toEqual(confirm);
+  });
+
+  it('a row keeps its rule, version, outcome and key scope, and the list filters by rule and principal', async () => {
+    const row = makeRow({ id: 'r1', createdAt: '2026-09-20T10:00:00.000Z', rule: 'send-reply', ruleVersion: 3, outcome: 'ask', keyScope: 'agent' });
+    await storage.createAiDecision(row);
+    await storage.createAiDecision(makeRow({ id: 'r2', createdAt: '2026-09-20T10:01:00.000Z', rule: 'other', ruleVersion: 1, outcome: 'act', principal: `codex#${ALICE}` }));
+    await storage.createAiDecision(makeRow({ id: 'r3', createdAt: '2026-09-20T10:02:00.000Z' }));
+    expect(await storage.getAiDecision('r1')).toEqual(row);
+
+    const byRule = await storage.listAiDecisions({ ownerGhii: ALICE, rule: 'send-reply' });
+    expect(byRule.items.map(r => r.id)).toEqual(['r1']);
+    expect(byRule.total).toBe(1);
+    const byPrincipal = await storage.listAiDecisions({ ownerGhii: ALICE, principal: `codex#${ALICE}` });
+    expect(byPrincipal.items.map(r => r.id)).toEqual(['r2']);
+  });
+
+  it('aiDecisionStats counts decisions, outcomes, gate stops, reviews and cost per rule and per principal', async () => {
+    const at = (m: number) => `2026-09-20T10:0${m}:00.000Z`;
+    await storage.createAiDecision(makeRow({ id: 's1', createdAt: at(1), rule: 'send-reply', ruleVersion: 1, outcome: 'act' }));
+    const stopped = makeRow({ id: 's2', createdAt: at(2), rule: 'send-reply', ruleVersion: 1, outcome: 'ask' });
+    stopped.record.gate = { on: true, stopped: true, task: 't1' };
+    await storage.createAiDecision(stopped);
+    await storage.createAiDecision(makeRow({ id: 's3', createdAt: at(3), rule: 'send-reply', ruleVersion: 2, outcome: 'stop', principal: `codex#${ALICE}` }));
+    await storage.createAiDecision(makeRow({ id: 's4', createdAt: at(4), rule: 'triage', ruleVersion: 1, outcome: 'act' }));
+    await storage.createAiDecision(makeRow({ id: 's5', createdAt: at(5) }));
+    await storage.createAiDecision(makeRow({ id: 'sb', ownerGhii: BOB, createdAt: at(6), rule: 'send-reply', ruleVersion: 1, outcome: 'act' }));
+    await storage.setAiDecisionReview('s1', ALICE, { outcome: 'overridden', by: ALICE, at: at(7) });
+
+    const perRule = await storage.aiDecisionStats({ ownerGhii: ALICE }, 'rule');
+    // A decision that named no rule is not a rule's decision; another owner's rows are not counted.
+    expect(perRule.map(g => g.key).sort()).toEqual(['send-reply', 'triage']);
+    const send = perRule.find(g => g.key === 'send-reply')!;
+    expect(send.decisions).toBe(3);
+    expect(send.outcomes).toEqual({ act: 1, ask: 1, stop: 1 });
+    expect(send.gateStops).toBe(1);
+    expect(send.overridden).toBe(1);
+    expect(send.confirmed).toBe(0);
+    expect(send.costUsd).toBeCloseTo(0.0036, 6);
+    expect(send.lastAt).toBe(at(3));
+
+    const codex = await storage.aiDecisionStats({ ownerGhii: ALICE, principal: `codex#${ALICE}` }, 'principal');
+    expect(codex).toHaveLength(1);
+    expect(codex[0].decisions).toBe(1);
+    expect(codex[0].outcomes.stop).toBe(1);
+
+    expect(await storage.aiDecisionStats({ ownerGhii: ALICE, rule: 'nothing-here' }, 'rule')).toEqual([]);
   });
 
   it('deleteAiDecisionsBefore removes rows older than the cut across owners and returns the count', async () => {

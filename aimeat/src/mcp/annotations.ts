@@ -402,6 +402,9 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_decision_review: { title: 'Review an AI Decision', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_decide_run: { title: 'Run a Decision over Many Records', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     aimeat_decide_settings: { title: 'Read Decision Settings', readOnlyHint: true },
+  aimeat_decide_rules: { title: 'List Decision Rules', readOnlyHint: true },
+  // Proposing twice is one proposal (the node answers already_waiting), and nothing leaves the node.
+  aimeat_decide_rule_propose: { title: 'Propose a Decision Rule', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_app_draft_publish: { title: 'Publish App Draft', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     aimeat_app_draft_discard: { title: 'Discard App Draft', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     aimeat_app_fork: { title: 'Fork App', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },

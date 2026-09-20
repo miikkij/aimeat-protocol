@@ -12,6 +12,8 @@
  *   block 1), or upgrades crash with "no such column" before the ALTER runs.
  * @usage initializeSchema(db) from sqlite/index.ts constructor.
  * @version-history
+ *   2026-09-20 — ai_decisions.rule/.ruleVersion/.outcome/.keyScope and their two indexes
+ *     (migration 0080): the decision rule that ran and whose key paid.
  *   2026-09-16 — secrets.hosts (migration 0078): the hosts a vault secret may be sent to.
  *   2026-08-30 — boards.rules (migration 0057): the board's own rules as JSON.
  *   v1.12.0 — 2026-08-22 — direct_messages.ownerReadAt plus its backfill: inbound copies inherit
@@ -672,6 +674,19 @@ export function initializeSchema(db: Database.Database): void {
 
   // The hosts a vault secret may be sent to, bound at its first use. Mirrors Postgres 0078.
   safeAddColumn('secrets', 'hosts', "TEXT NOT NULL DEFAULT '[]'");
+
+  // Decision rules: which rule ran, at which version, what its bands made of the answers, and whose
+  // key paid. Columns rather than document fields, because the quality view counts by them. The
+  // index goes here and not in schema-tables-3.ts: a database made before the column would fail on
+  // an index that names it. Mirrors Postgres 0080.
+  safeAddColumn('ai_decisions', 'rule', 'TEXT');
+  safeAddColumn('ai_decisions', 'ruleVersion', 'INTEGER');
+  safeAddColumn('ai_decisions', 'outcome', 'TEXT');
+  safeAddColumn('ai_decisions', 'keyScope', 'TEXT');
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_ai_decisions_rule ON ai_decisions(ownerGhii, rule, createdAt);
+    CREATE INDEX IF NOT EXISTS idx_ai_decisions_principal ON ai_decisions(ownerGhii, principal, createdAt);
+  `);
 
   // ── Memory full-text search (Tier-1 librarian retrieval) ──
   // FTS5 is built into better-sqlite3 — no dependency. A standalone virtual table mirrors the

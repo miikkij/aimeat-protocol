@@ -21,23 +21,36 @@
  * @structure SECRET_RECORD_KEYS · isSecretRecordKey · shownMemoryValue · secretRecordWriteRefusal
  * @usage value: shownMemoryValue(record.key, record.value)
  * @version-history
+ *   v1.1.0 — 2026-09-20 — `decide.apikey` joins the list (it had been readable as ciphertext through
+ *     the generic doors since 2026-09-19), and so do the per-agent key records of both models,
+ *     matched by prefix because the agent's name is the tail of the key.
  *   v1.0.0 — 2026-09-16 — Initial.
  */
 import { PSP_RECORD_KEY, PSP_SECRET_FIELDS, pspSecretHint } from '../commerce/psp-secrets.js';
 
 export const OPENROUTER_KEY_RECORD = 'openrouter.apikey';
 
+/** The owner's own TypeSafe key (services/decide/settings.ts). Named here, not imported, so this
+ *  module stays a leaf the memory doors can import without pulling the decide service in. */
+export const DECIDE_KEY_RECORD_KEY = 'decide.apikey';
+
 /** The memory keys whose value holds a credential. Matched exactly: a key is an address. */
-export const SECRET_RECORD_KEYS: ReadonlySet<string> = new Set([OPENROUTER_KEY_RECORD, PSP_RECORD_KEY]);
+export const SECRET_RECORD_KEYS: ReadonlySet<string> = new Set([OPENROUTER_KEY_RECORD, DECIDE_KEY_RECORD_KEY, PSP_RECORD_KEY]);
+
+/**
+ * A key per agent, for both models: `openrouter.apikey.agent.<name>` and `decide.apikey.agent.<name>`
+ * (services/agent-ai-keys.ts). The agent's name is the tail, so these two are matched by prefix.
+ */
+export const AGENT_KEY_PREFIXES: readonly string[] = [`${OPENROUTER_KEY_RECORD}.agent.`, `${DECIDE_KEY_RECORD_KEY}.agent.`];
 
 export function isSecretRecordKey(key: unknown): boolean {
-  return typeof key === 'string' && SECRET_RECORD_KEYS.has(key);
+  return typeof key === 'string' && (SECRET_RECORD_KEYS.has(key) || AGENT_KEY_PREFIXES.some(p => key.startsWith(p)));
 }
 
 /** The value a generic door may show. Every other key passes through untouched. */
 export function shownMemoryValue(key: string, value: unknown): unknown {
   if (!isSecretRecordKey(key) || value === null || value === undefined) return value;
-  if (key === OPENROUTER_KEY_RECORD) return { configured: true };
+  if (key !== PSP_RECORD_KEY) return { configured: true };
   if (typeof value !== 'object' || Array.isArray(value)) return { configured: true };
   const out: Record<string, unknown> = { ...(value as Record<string, unknown>) };
   for (const field of PSP_SECRET_FIELDS) {
@@ -50,9 +63,13 @@ export function shownMemoryValue(key: string, value: unknown): unknown {
 
 /** The refusal a generic write door gives for these keys, with the door to use instead. */
 export function secretRecordWriteRefusal(key: string): { code: string; message: string } {
-  const door = key === OPENROUTER_KEY_RECORD
-    ? 'PUT /v1/openrouter/settings (the AI settings page)'
-    : 'PUT /v1/commerce/payout/stripe (Wallet, Selling and payments) or aimeat_commerce_psp_set';
+  const door = AGENT_KEY_PREFIXES.some(p => key.startsWith(p))
+    ? 'PUT /v1/agents/{name}/ai-keys (the agent\'s page)'
+    : key === OPENROUTER_KEY_RECORD
+      ? 'PUT /v1/openrouter/settings (the AI settings page)'
+      : key === DECIDE_KEY_RECORD_KEY
+        ? 'PUT /v1/ai/decide/settings (the AI settings page, Decision model)'
+        : 'PUT /v1/commerce/payout/stripe (Wallet, Selling and payments) or aimeat_commerce_psp_set';
   return {
     code: 'SECRET_RECORD',
     message: `"${key}" holds a credential, so it is not written through the general memory doors. Use ${door}.`,

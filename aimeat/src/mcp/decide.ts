@@ -16,6 +16,8 @@
  * @structure registerDecideTools(mcp, storage, config, getAgentGaii)
  * @usage registerDecideTools(mcp, storage, config, () => agentGaii);
  * @version-history
+ *   v1.1.0 — 2026-09-20 — Decision rules: `rule` on aimeat_decide, aimeat_decide_run and
+ *     aimeat_decision_list; aimeat_decide_rules; aimeat_decide_rule_propose (creates nothing).
  *   v1.0.0 — 2026-09-19 — Initial (TARGET-080).
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -27,8 +29,10 @@ import { descriptionFor } from './catalog/shape.js';
 import { parseGAII } from '../utils/gaii.js';
 import { AiCompletionError } from '../services/ai-completion.js';
 import {
-  decideForOwner, listDecisions, getDecision, reviewDecision, DecideError, type DecideCaller,
+  decideForOwner, listDecisions, getDecision, reviewDecision, ruleCallerKind, DecideError, type DecideCaller,
 } from '../services/decide/service.js';
+import { getRule, useAllows, rulesRunnableBy, listRuleProposals, proposeRule } from '../services/decide/rules.js';
+import { agentNameOf } from '../services/agent-ai-keys.js';
 import { decideSettingsView } from '../services/decide/settings.js';
 import {
   startDecideRun, getDecideRun, listDecideRuns, resumeDecideRun, stopDecideRun, runSummary, type RunItem,
@@ -70,7 +74,8 @@ export function registerDecideTools(
     descriptionFor('aimeat_decide'),
     {
       state: z.unknown().describe('What is being judged: a string, an object with named fields, or an array.'),
-      questions: questionsSchema,
+      rule: z.string().optional().describe('The id of one of the owner\'s decision rules. It holds the questions, thresholds and bands: send only the state beside it.'),
+      questions: questionsSchema.optional().describe('Required unless `rule` is given. Your ids to questions, in English.'),
       subject: z.string().optional().describe('What the decision is about: a memory key or record id.'),
       gates: z.string().optional().describe('What the answer decides, in plain words.'),
       thresholds: z.record(z.string(), z.unknown()).optional().describe('The thresholds you will apply.'),
@@ -85,7 +90,10 @@ export function registerDecideTools(
       try {
         return text(await decideForOwner(storage, config, caller(a.app_id), {
           state: a.state,
-          questions: a.questions as Record<string, JevQuestion>,
+          // Both are passed as given: a caller who sends questions BESIDE a rule is refused by the
+          // service, the same as on the REST door, rather than having them dropped here.
+          ...(a.rule !== undefined ? { rule: a.rule } : {}),
+          ...(a.questions !== undefined ? { questions: a.questions as Record<string, JevQuestion> } : {}),
           ...(a.subject !== undefined ? { subject: a.subject } : {}),
           ...(a.gates !== undefined ? { gates: a.gates } : {}),
           ...(a.thresholds ? { thresholds: a.thresholds } : {}),
@@ -106,6 +114,7 @@ export function registerDecideTools(
     {
       decision_id: z.string().optional().describe('Read one decision.'),
       subject: z.string().optional().describe('Only decisions about this subject.'),
+      rule: z.string().optional().describe('Only decisions one decision rule made (its id).'),
       app_id: z.string().optional().describe('Only decisions made for this app.'),
       limit: z.number().optional().describe('How many (1-200, default 50).'),
       before: z.string().optional().describe('Only decisions made before this ISO time.'),
@@ -119,6 +128,7 @@ export function registerDecideTools(
         }
         const r = await listDecisions(storage, ownerGhii, {
           ...(a.subject !== undefined ? { subject: a.subject } : {}),
+          ...(a.rule !== undefined ? { rule: a.rule } : {}),
           ...(a.app_id !== undefined ? { appId: a.app_id } : {}),
           ...(a.limit !== undefined ? { limit: a.limit } : {}),
           ...(a.before !== undefined ? { before: a.before } : {}),
@@ -162,6 +172,7 @@ export function registerDecideTools(
     {
       action: z.enum(['start', 'get', 'list', 'resume', 'stop']).describe('start | get | list | resume | stop'),
       run_id: z.string().optional().describe('The run, for get, resume and stop.'),
+      rule: z.string().optional().describe('For start: one of the owner\'s decision rules, in place of questions, thresholds and gates.'),
       questions: questionsSchema.optional(),
       items: z.array(z.object({ subject: z.string(), state: z.unknown().optional() })).optional().describe('For start: [{ subject, state }].'),
       keys: z.array(z.string()).optional().describe('For start: owner memory keys.'),
@@ -178,9 +189,10 @@ export function registerDecideTools(
       try {
         if (a.action === 'list') return text({ runs: await listDecideRuns(storage, ownerGhii) });
         if (a.action === 'start') {
-          if (!a.questions) return err('INVALID_BODY: start needs questions.');
+          if (!a.questions && a.rule === undefined) return err('INVALID_BODY: start needs questions, or a rule.');
           const run = await startDecideRun(storage, config, caller(a.app_id), {
-            questions: a.questions as Record<string, JevQuestion>,
+            ...(a.rule !== undefined ? { rule: a.rule } : {}),
+            ...(a.questions ? { questions: a.questions as Record<string, JevQuestion> } : {}),
             ...(a.items ? { items: a.items as RunItem[] } : {}),
             ...(a.keys ? { keys: a.keys } : {}),
             ...(a.prefix !== undefined ? { prefix: a.prefix } : {}),
@@ -212,8 +224,61 @@ export function registerDecideTools(
     async () => {
       try {
         return text({
-          ...(await decideSettingsView(storage, config, ownerGhii)),
-          change_them: 'The owner changes the key and the data policy on the AI settings page (/v1/profile?tab=ai). No tool changes them.',
+          ...(await decideSettingsView(storage, config, ownerGhii, agentNameOf(agentGaii, ownerGhii))),
+          change_them: 'The owner changes the key and the data policy on the AI settings page (/v1/profile?tab=ai), and an agent\'s own key, cap and gate on that agent\'s page. No tool changes them.',
+        });
+      } catch (e) {
+        return failed(e);
+      }
+    },
+  );
+
+  // ── aimeat_decide_rules ──
+  mcp.tool(
+    'aimeat_decide_rules',
+    descriptionFor('aimeat_decide_rules'),
+    { rule_id: z.string().optional().describe('Read one rule in full, with its questions, thresholds and bands.') },
+    annotationsFor('aimeat_decide_rules'),
+    async (a) => {
+      if (!owner) return err('Could not resolve caller owner');
+      try {
+        const kind = ruleCallerKind(caller());
+        if (a.rule_id !== undefined) {
+          const rule = await getRule(storage, ownerGhii, a.rule_id);
+          // A rule this kind of caller may not run reads as absent, as on the REST door.
+          return rule && useAllows(rule, kind) ? text({ rule }) : err('NOT_FOUND: No such decision rule.');
+        }
+        const [rules, proposals] = await Promise.all([rulesRunnableBy(storage, ownerGhii, kind), listRuleProposals(storage, ownerGhii)]);
+        return text({
+          rules,
+          proposals: proposals.filter(p => p.proposed_by === agentGaii)
+            .map(p => ({ proposal_id: p.id, rule_id: p.rule.id, title: p.rule.title, proposed_at: p.proposed_at })),
+          run_one: 'aimeat_decide { rule: "<id>", state: { …the fields under sends… } }',
+        });
+      } catch (e) {
+        return failed(e);
+      }
+    },
+  );
+
+  // ── aimeat_decide_rule_propose ──
+  mcp.tool(
+    'aimeat_decide_rule_propose',
+    descriptionFor('aimeat_decide_rule_propose'),
+    {
+      rule: z.record(z.string(), z.unknown()).describe('The proposed rule: { id, title, decides, sends, questions, thresholds, bands, use, gate, sample }. Questions in English.'),
+      reason: z.string().describe('Why this rule should exist, in a sentence the owner can decide from.'),
+    },
+    annotationsFor('aimeat_decide_rule_propose'),
+    async (a) => {
+      if (!owner) return err('Could not resolve caller owner');
+      try {
+        const out = await proposeRule(storage, config, ownerGhii, agentGaii, { rule: a.rule, reason: a.reason });
+        return text({
+          proposal_id: out.proposal.id,
+          rule_id: out.proposal.rule.id,
+          already_waiting: out.alreadyWaiting,
+          next_step: `Nothing has been created. "${out.proposal.rule.title}" is waiting for the owner to approve it: in their open items, or under Settings, AI, Decision model.`,
         });
       } catch (e) {
         return failed(e);

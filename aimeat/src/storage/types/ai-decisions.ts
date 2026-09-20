@@ -24,9 +24,13 @@
  *   - AiDecisionRecord — the aimeat.decision/v1 document
  *   - AiDecisionRow — one stored row
  *   - AiDecisionListQuery — the owner's list filter
+ *   - AiDecisionStatsQuery / AiDecisionStats / AiDecisionStatsGroup — the quality counts
  * @usage
  *   import type { AiDecisionRow } from '../storage/interface.js';
  * @version-history
+ *   v1.1.0 — 2026-09-20 — Decision rules: a row carries `rule`, `ruleVersion`, `outcome` and
+ *     `keyScope` (which now also says 'agent'), the list filters by rule and by principal, and the
+ *     quality numbers are counted in the store.
  *   v1.0.0 — 2026-09-19 — TARGET-080. Initial.
  */
 
@@ -84,11 +88,24 @@ export interface AiDecisionRecord {
   scrub: { removed: Record<string, number>; total: number };
   usage: { inputTokens: number; costUsd: number };
   requestId: string | null;
-  keyScope: 'own' | 'node';
+  keyScope: AiDecisionKeyScope;
   /** Id of the decision this answer was served from, when served from the cache. */
   cachedFrom?: string;
   review?: AiDecisionReview;
+  /** The bands of the decision rule that ran, as they stood at decision time. */
+  bands?: { act: number; ask: number };
+  /**
+   * Set when a rule ran for an agent whose gate is switched on. `stopped` is true when the outcome
+   * was under the act band, so the action became a task for the owner; `task` is that task's id.
+   */
+  gate?: { on: true; stopped: boolean; task?: string };
 }
+
+/** Whose key paid: the agent's own, the owner's own, or the node's. */
+export type AiDecisionKeyScope = 'agent' | 'own' | 'node';
+
+/** What a decision rule's bands made of the answers: act, ask a person, or stop. */
+export type AiDecisionOutcome = 'act' | 'ask' | 'stop';
 
 /** One stored decision row. */
 export interface AiDecisionRow {
@@ -102,6 +119,14 @@ export interface AiDecisionRow {
   model: string;
   /** ISO timestamp; the list cursor and the lifecycle cut both read it. */
   createdAt: string;
+  /** The decision rule that ran (`decide.rules.<id>`), or null for a call that named none. */
+  rule: string | null;
+  /** The rule's version at decision time: it is bumped on every question change. */
+  ruleVersion: number | null;
+  /** What the rule's bands made of the answers. Null without a rule. */
+  outcome: AiDecisionOutcome | null;
+  /** Whose key paid. A column as well as a record field, so the quality view can count by it. */
+  keyScope: AiDecisionKeyScope;
   record: AiDecisionRecord;
 }
 
@@ -110,7 +135,40 @@ export interface AiDecisionListQuery {
   ownerGhii: string;
   subject?: string;
   appId?: string;
+  /** Only decisions one rule made. */
+  rule?: string;
+  /** Only decisions one principal asked for (a GAII, for the agent's own page). */
+  principal?: string;
   /** Default 50, max 200. */
   limit?: number;
   before?: string;
+}
+
+/** Which decisions a quality count covers: one rule, one principal, or both. */
+export interface AiDecisionStatsQuery {
+  ownerGhii: string;
+  rule?: string;
+  principal?: string;
+}
+
+/**
+ * The quality numbers for a rule or an agent, counted in the store so they are exact however many
+ * decisions there are. Cache hits are counted as decisions and cost nothing.
+ */
+export interface AiDecisionStats {
+  decisions: number;
+  outcomes: { act: number; ask: number; stop: number };
+  /** Decisions where a switched-on gate turned the action into a task for the owner. */
+  gateStops: number;
+  /** Decisions a person reviewed and overrode. */
+  overridden: number;
+  confirmed: number;
+  costUsd: number;
+  /** createdAt of the newest decision, or null when there is none. */
+  lastAt: string | null;
+}
+
+/** One row of a grouped quality count: the numbers for one rule (or one principal). */
+export interface AiDecisionStatsGroup extends AiDecisionStats {
+  key: string;
 }
