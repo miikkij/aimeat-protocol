@@ -13,6 +13,10 @@
  *   palettes gets the faces) and linked directly by the served pages that do not read the palettes
  *   (connect, the developer page, the front-page variants). Nothing on the node links a font CDN.
  * @version-history
+ *   v1.1.0 — 2026-09-20 — Bungee. A Design Book look on production named it as its display face
+ *     and nothing served it, so the look's title fell back to the system face and read like every
+ *     other look. A face a look may name is a face the node serves (services/app-ui/
+ *     signature-tokens.ts holds the list, and the bench refuses a family that is not on it).
  *   v1.0.0 — 2026-08-29 — Extracted from aimeat-theme.css v2.3.0 (Inter, Archivo Black, Archivo,
  *     Space Grotesk, Fraunces, JetBrains Mono) and joined by Fjalla One, DM Sans and VT323, which
  *     sixteen HTML files were still fetching from fonts.googleapis.com; the CSP no longer allows it.
@@ -50,6 +54,17 @@
 @font-face {
   font-family: 'VT323'; font-style: normal; font-weight: 400; font-display: swap;
   src: url('/lib/fonts/vt323-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* Bungee: a sign-painter's display face, the shout of a loud Design Book look. One cut. */
+@font-face {
+  font-family: 'Bungee'; font-style: normal; font-weight: 400; font-display: swap;
+  src: url('/lib/fonts/bungee-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Bungee'; font-style: normal; font-weight: 400; font-display: swap;
+  src: url('/lib/fonts/bungee-latin-ext.woff2') format('woff2');
   unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
 }
 

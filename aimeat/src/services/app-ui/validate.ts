@@ -56,6 +56,7 @@
 import type { BlockPropValue } from '../surface-layout/types.js';
 import { propProblem } from '../surface-layout/validate.js';
 import { componentById, NAV_MODES, CHOREOGRAPHIES, LOOKS, BLOCK_SPANS, UI_COMPONENTS, SIGNATURE_TOKENS } from './registry.js';
+import { SERVED_FONT_FAMILIES, unservedFirstFamily } from './signature-tokens.js';
 import { runMatrix } from '../atelier-contrast.js';
 import { AMBIENT_IDS, AMBIENT_NONE, AMBIENT_BOUNDS, ambientById, isAmbientValue } from '../../data/atelier-ambients.js';
 import {
@@ -201,6 +202,14 @@ export function validateSignatureTokens(raw: unknown, look?: string): Record<str
     if (name === '--ak-accent') {
       out[name] = validateAccentPair(value, look);
       continue;
+    }
+    // A FACE NOBODY SERVES FALLS BACK IN SILENCE: the page renders, in the system face, and looks
+    // like every other page. Found on production 2026-09-20, where a look named Bungee.
+    if (name === '--ak-font' || name === '--ak-font-display') {
+      const missing = unservedFirstFamily(value);
+      if (missing) {
+        fail(`${name} starts with "${missing}", which this node does not serve, so the page would fall back to a system face without saying so. Start the stack with one it serves (${SERVED_FONT_FAMILIES.join(', ')}) or with a system face (Georgia, Courier New, system-ui, serif, monospace).`);
+      }
     }
     out[name] = value;
   }

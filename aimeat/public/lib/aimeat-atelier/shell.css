@@ -73,7 +73,12 @@
      an outer scrollbar on a frame that owns its own scrolling). Fourth real-browser finding. */
   position: relative;
 }
-.ak-root *, .ak-root *::before, .ak-root *::after { box-sizing: inherit; }
+/* SAID OUTRIGHT, NEVER INHERITED. `inherit` stops at a <details>: its children render through the
+   browser's own slot, whose box-sizing is the initial content-box, so every kit row at width 100 %
+   with padding stood its padding and border outside its container. Measured in the Design Book on
+   2026-09-20: ten demo cards leaked by exactly padding plus border (health 24 px, notices 27 px,
+   list 35 px), and any app that groups kit components inside a disclosure had the same fault. */
+.ak-root *, .ak-root *::before, .ak-root *::after { box-sizing: border-box; }
 
 /* ── The app frame ────────────────────────────────────────────────────────────────────────── */
 /* A full-frame app owns the page: the shell stamps this class on <body> so the browser's
