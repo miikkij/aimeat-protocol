@@ -3,7 +3,7 @@
   "entries": [
     {
       "date": "2026-09-20",
-      "version": "3.17.0",
+      "version": "3.18.0",
       "kind": "feature",
       "title": {
         "en": "Decision rules: write a judgement once, and let your apps and agents use it",

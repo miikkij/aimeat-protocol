@@ -134,6 +134,7 @@ let flagFiledByOwnerSession = '';
 const OWNER_MEMORY_KEY = `export.owner.note.${stamp}`;
 const AGENT_MEMORY_KEY = `export.agent.note.${stamp}`;
 const OWNER_FILE_KEY = `export-owner-file-${stamp}.txt`;
+const OWNER_PROVIDER_KEY = `sk-or-v1-export-suite-${stamp}`;
 const PUSH_ENDPOINT = `https://fcm.googleapis.com/fcm/send/e2e-export-${stamp}`;
 const PERSONAL_PUSH_ENDPOINT = `https://fcm.googleapis.com/fcm/send/e2e-export-personal-${stamp}`;
 
@@ -183,6 +184,14 @@ await test('Memory and a file under the owner\'s own GHII', async () => {
         }),
     });
     assert(file.status === 201, `owner file ${file.status}: ${JSON.stringify(file.body.error)}`);
+
+    // A credential, set through its own door, because the memory doors refuse to write one directly.
+    // The export used to hand back its ciphertext: useless to the person, a real key to anyone who
+    // also has the node's encryption key, in a file that leaves the node by design.
+    const key = await json('/v1/openrouter/settings', {
+        method: 'PUT', headers: authed(subjectToken), body: JSON.stringify({ apiKey: OWNER_PROVIDER_KEY }),
+    });
+    assert(key.status === 200, `owner key ${key.status}: ${JSON.stringify(key.body.error)}`);
 });
 
 await test('Agent memory, a board, a post and a subscription', async () => {
@@ -366,6 +375,17 @@ await test('3. The owner\'s own memory and files are in it', async () => {
     assert(JSON.stringify(mem.value).includes('the person'), `value: ${JSON.stringify(mem.value)}`);
     const files = (exported.storage_files as any[]).map(f => f.key);
     assert(files.includes(OWNER_FILE_KEY), `storage_files: ${JSON.stringify(files)}`);
+});
+
+await test('3b. A credential is in the export as "configured", never as its stored bytes', async () => {
+    const whole = JSON.stringify(exported);
+    assert(!whole.includes(OWNER_PROVIDER_KEY), 'the key itself is not in the export');
+    const rec = (exported.memories as any[]).find(m => m.key === 'openrouter.apikey');
+    assert(rec, `the record is listed: ${JSON.stringify((exported.memories as any[]).map(m => m.key))}`);
+    assert(JSON.stringify(rec.value) === JSON.stringify({ configured: true }), `redacted, got ${JSON.stringify(rec.value)}`);
+    // The ciphertext is what an export could carry out of the node's reach, so it is the thing the
+    // assertion is about, not the plaintext (which was never in a memory record).
+    assert(!whole.includes('"encrypted"'), 'no ciphertext of any credential rides along');
 });
 
 await test('4. Every agent of the owner is there, with its own memory and board posts', async () => {

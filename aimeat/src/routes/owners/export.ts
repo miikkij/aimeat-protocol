@@ -13,6 +13,11 @@
  *   import { registerOwnerExportRoute } from './owners/export.js';
  *   registerOwnerExportRoute(router, config, storage);
  * @version-history
+ *   v1.6.0 — 2026-09-20 — A credential record is redacted here too (shownMemoryValue), for the owner's
+ *     memories and their agents' alike. Every other door has answered `{ configured: true }` since
+ *     2026-09-16; this one handed out the ciphertext of the OpenRouter and TypeSafe keys and the PSP
+ *     secret, in a file that leaves the node by design. The person loses nothing: they cannot decrypt
+ *     it, and the key itself lives at the provider.
  *   v1.5.0 — 2026-09-14 — requireLocalSession. requireOwnerPrincipal admits a federated login,
  *     which carries roles ['owner'] and the local part of the visitor's HOME name, so the name
  *     comparison matched the LOCAL account and a visitor exported everything it had ever stored.
@@ -44,6 +49,7 @@ import { requireAuth, requireOwnerPrincipal, requireLocalSession } from '../../a
 import { error, success } from '../../middleware/envelope.js';
 import { calculateTrustScore } from '../../services/trust.js';
 import { getPendingConsentAudit } from '../../services/consent-audit-buffer.js';
+import { shownMemoryValue } from '../../services/secret-records.js';
 
 /** Mount GET /v1/owners/:name/export on an existing router. */
 export function registerOwnerExportRoute(router: Router, config: AimeatConfig, storage: Storage): void {
@@ -200,7 +206,8 @@ export function registerOwnerExportRoute(router: Router, config: AimeatConfig, s
         last_seen: agent.lastSeen,
         memories: memories.map(m => ({
           key: m.key,
-          value: m.value,
+          // Same as the owner's own, above: an agent's namespace holds its own keys now.
+          value: shownMemoryValue(m.key, m.value),
           visibility: m.visibility,
           tags: m.tags,
           version: m.version,
@@ -358,7 +365,12 @@ export function registerOwnerExportRoute(router: Router, config: AimeatConfig, s
       const memories = await storage.listMemory(ghii);
       ownerMemories = memories.map(m => ({
         key: m.key,
-        value: m.value,
+        // A credential comes out as `{ configured: true }`, the same as at every other door. The
+        // value here is the CIPHERTEXT of an OpenRouter or TypeSafe key, or the PSP secret: useless
+        // to the person (the node holds the decryption key, not them) and a real key to anybody who
+        // has that. An export travels: a download, a cloud backup, a mail attachment, a chat. This
+        // door was the one the redaction never reached.
+        value: shownMemoryValue(m.key, m.value),
         visibility: m.visibility,
         tags: m.tags,
         version: m.version,

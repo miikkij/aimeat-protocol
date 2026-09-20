@@ -29,12 +29,15 @@
  * @usage
  *   const on = gateApplies(await gateSettingOf(storage, ownerGhii, agent), rule);
  * @version-history
+ *   v1.1.0 — 2026-09-20 — A stop tells the owner (notify): the open item alone is silent until they
+ *     happen to look, and an agent stands still meanwhile.
  *   v1.0.0 — 2026-09-20 — Initial: decision rules on the node.
  */
 import type { Storage, AiDecisionAnswer, AiDecisionOutcome } from '../../storage/interface.js';
 import { upsertPrivateRecord } from '../private-record.js';
 import { emitChange } from '../event-bus.js';
 import { addItem } from '../open-items.js';
+import { notify } from '../notify.js';
 import { logger } from '../../utils/logger.js';
 import { DecideError } from './errors.js';
 import type { DecisionRule } from './rule-validate.js';
@@ -105,6 +108,20 @@ export async function openGateItem(
       object: { type: 'ai-decision', id: what.decisionId }, by: 'ai',
     });
     if (item) emitChange('open-items', ownerGhii);
+    // AND TELL THEM. The item alone is silent: the person finds out when they next open the home or
+    // the profile, and until then an agent is standing still waiting for an answer nobody knows is
+    // owed. That is the one moment in this feature worth interrupting somebody for. Best-effort and
+    // after the item, so a muted or failing notifier never costs the row itself.
+    if (item) {
+      await notify(storage, ownerGhii, {
+        type: 'decision_gate_stopped',
+        title: `${agentName} is waiting for you`,
+        body: `${what.rule.decides} (${read}). It has not acted.`,
+        link: '/v1/profile',
+      }).catch(err => logger.warn('[decide] the gate stopped an action and could not say so', {
+        owner: ownerGhii, decision: what.decisionId, error: String(err),
+      }));
+    }
     return item?.id;
   } catch (err) {
     logger.warn('[decide] the gate stopped an action and could not put it on the owner\'s list', {

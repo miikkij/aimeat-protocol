@@ -671,6 +671,13 @@ const QUESTIONS = {
     assert(r.body.data.gate?.on === true && r.body.data.gate?.stopped === true && typeof r.body.data.gate?.task === 'string', 'the gate stopped it and names the task');
     const items = await gateItems();
     assert(items.length === 1 && items[0].object.id === r.body.data.decision_id, `one task, about this decision, got ${items.length}`);
+    // AND THE OWNER IS TOLD. The item alone is silent: without this the person learns that an agent
+    // is standing still only when they next happen to open the home.
+    const notes = await json('/v1/notifications', { headers: auth(A.token) });
+    const said = (notes.body.data?.notifications ?? notes.body.data?.items ?? [])
+      .filter((n: any) => n.type === 'decision_gate_stopped');
+    assert(said.length === 1, `one notice about the stop, got ${said.length}: ${JSON.stringify(notes.body.data)?.slice(0, 200)}`);
+    assert(String(said[0].title).includes('deciderbot'), `it names the agent, got ${said[0].title}`);
     const low = await runRule(agentAi, 'send-reply', { draft: 'HOPELESS draft', question: 'q' });
     assert(low.body.data.outcome === 'stop' && low.body.data.proceed === false, `under its floor is stop, got ${low.body.data?.outcome}`);
     const fine = await runRule(agentAi, 'send-reply', { draft: 'A good draft', question: 'q' });
