@@ -2,7 +2,7 @@
   "about": "When each skill was last read against the code it describes, and which files that code is. pnpm check:skill-reviews fails when a watched file changes after the review, so whoever changed the code re-reads the skill. Re-stamp after reading with: pnpm check:skill-reviews --record <name>. Reasoning: aimeat/scripts/check-skill-reviews.ts.",
   "skills": {
     "node:aimeat-decide": {
-      "reviewedOn": "2026-09-19",
+      "reviewedOn": "2026-09-20",
       "watches": [
         "aimeat/src/static/sdk-libs/decide/index.js",
         "aimeat/src/services/decide/service.ts",
@@ -10,7 +10,7 @@
         "aimeat/src/services/decide/settings.ts",
         "aimeat/src/services/app-decide-posture.ts"
       ],
-      "digest": "sha256:7ecff2139085644c3faa7057"
+      "digest": "sha256:626f783b366efd1a72e2d8f8"
     },
     "node:aimeat-open-items": {
       "reviewedOn": "2026-09-19",
@@ -58,11 +58,11 @@
       "note": "The choices format is rendered by this file."
     },
     "node:aimeat-paying-for-the-ai": {
-      "reviewedOn": "2026-09-19",
+      "reviewedOn": "2026-09-20",
       "watches": [
         "aimeat/src/services/ai-completion.ts"
       ],
-      "digest": "sha256:17a53e44f811bc29aeb79ceb"
+      "digest": "sha256:0ca3a5d0705f223f0d5db430"
     },
     "node:aimeat-mail-to-data": {
       "reviewedOn": "2026-09-19",
@@ -223,7 +223,7 @@
       "digest": "sha256:184fb3a1ed1959b0032a449a"
     },
     "node:add-a-crew-agent": {
-      "reviewedOn": "2026-09-19",
+      "reviewedOn": "2026-09-20",
       "watches": [
         "aimeat/src/routes/agents/device-auth.ts",
         "aimeat/src/mcp/catalog/scopes.ts",
@@ -231,7 +231,7 @@
         "aimeat/src/routes/agents-v2/agent-proposals.ts",
         "aimeat/src/data/basic-agents.ts"
       ],
-      "digest": "sha256:bb79bf179f8090e6c2c3cd39"
+      "digest": "sha256:61d6b518ce578e0d2ac95d77"
     },
     "node:set-up-content-pipeline": {
       "reviewedOn": "2026-09-19",
@@ -242,11 +242,11 @@
       "digest": "sha256:a8528c723fc349838d9b6522"
     },
     "node:configure-routing": {
-      "reviewedOn": "2026-09-19",
+      "reviewedOn": "2026-09-20",
       "watches": [
         "aimeat/src/routes/ai.ts"
       ],
-      "digest": "sha256:1590c31aac62c0cc9d766ceb"
+      "digest": "sha256:7c997b1a4687533d8b4a99ea"
     },
     "node:use-app-bound-skills": {
       "reviewedOn": "2026-09-19",
@@ -363,7 +363,7 @@
       "aimeat/public/views/chat/parts.js": "12c8246c22bf138a"
     },
     "node:aimeat-paying-for-the-ai": {
-      "aimeat/src/services/ai-completion.ts": "87c7a1c25468def3"
+      "aimeat/src/services/ai-completion.ts": "41f4ab43932b3c5e"
     },
     "node:aimeat-mail-to-data": {
       "aimeat/src/mcp/catalog/definitions/connections.ts": "84591ad8fce0795b",
@@ -458,7 +458,7 @@
     },
     "node:add-a-crew-agent": {
       "aimeat/src/routes/agents/device-auth.ts": "7d37b0bbc2105613",
-      "aimeat/src/mcp/catalog/scopes.ts": "5cda3dcd6c70cf7d",
+      "aimeat/src/mcp/catalog/scopes.ts": "497de12c8d7b13c7",
       "aimeat/src/mcp/catalog/definitions/crew.ts": "f18f927aad1a04d6",
       "aimeat/src/routes/agents-v2/agent-proposals.ts": "1da72b752ee164bc",
       "aimeat/src/data/basic-agents.ts": "aff54b3a43cbd71d"
@@ -468,7 +468,7 @@
       "aimeat/src/services/workflow/lifecycle.ts": "a6a052a36360f00f"
     },
     "node:configure-routing": {
-      "aimeat/src/routes/ai.ts": "9b64be089ebfa0da"
+      "aimeat/src/routes/ai.ts": "ea18c342099c4157"
     },
     "node:use-app-bound-skills": {
       "aimeat/src/routes/skills.ts": "b0c9b667b1187bba"
@@ -520,10 +520,10 @@
       "aimeat/src/routes/agents-v2/agent-proposals.ts": "1da72b752ee164bc"
     },
     "node:aimeat-decide": {
-      "aimeat/src/static/sdk-libs/decide/index.js": "96ef87b8d94ac27b",
-      "aimeat/src/services/decide/service.ts": "78e40f3e17f278f9",
+      "aimeat/src/static/sdk-libs/decide/index.js": "3a53b66a8d7a8dd6",
+      "aimeat/src/services/decide/service.ts": "5f8fefee8c3a7e08",
       "aimeat/src/services/decide/limits.ts": "af13e600bdfea3ab",
-      "aimeat/src/services/decide/settings.ts": "a1b49d50eda07c3f",
+      "aimeat/src/services/decide/settings.ts": "bd52c40503174432",
       "aimeat/src/services/app-decide-posture.ts": "65d4966f4b6ff7a8"
     }
   }

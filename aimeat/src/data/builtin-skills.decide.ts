@@ -24,6 +24,8 @@
  * @structure DECIDE_SKILL_ENTRY
  * @usage import { DECIDE_SKILL_ENTRY } from './builtin-skills.decide.js';
  * @version-history
+ *   v1.2.0 — 2026-09-20 — Section 3: decision rules, a key per agent and the gate, with the one
+ *     order everything is set up in (the same six steps as services/decide/setup-order.ts).
  *   v1.1.0 — 2026-09-19 — A recipe for moving a statechart when text arrives: the living document's
  *     decide node (aimeat-living 0.8.0).
  *   v1.0.1 — 2026-09-19 — TypeSafe's own published figures may be quoted as its claim, with the
@@ -164,7 +166,46 @@ than a missed one.
 asked speculatively, plus a yesNo per argument "does the user say this?" so an argument nobody gave
 keeps its default.
 
-## 3. The wrong tool when
+## 3. Decision rules, a key per agent, and the gate
+
+A **decision rule** is a named set of questions, thresholds and two bands that the owner writes once.
+An app and an agent then run it by id and send only the state: \`aimeat_decide { rule, state }\`, or in
+an app \`(await AIMEAT.decide.rule(id)).ask(state)\`. Running one produces a **decision**, recorded with
+the rule, its version and the outcome. A rule bound to an action that cannot be undone is a **gate**.
+
+**Everything is set up in one order, and each step needs the one before it:**
+
+1. **Key.** A TypeSafe key: the owner's own (Settings, AI, Decision model), or one for a single agent
+   (the agent's page, AI keys). The order a call pays in is the agent's own key, then the owner's,
+   then the server's, and every decision records which one paid.
+2. **Test the key.** The Test button beside it makes one tiny real call and says which key paid.
+3. **Write a rule and try it.** The owner writes it and presses Try on its sample. An agent may
+   propose one with \`aimeat_decide_rule_propose\`; that creates nothing until the owner approves it.
+4. **Give the rule to an agent.** In the agent's Crew tab the tool picker has the rows \`decide\` and
+   \`decide:<rule>\`. The rule's \`use\` (agent, app, both) is enforced by the server on every door.
+5. **Decide about the gate.** A per-agent switch, off until the owner turns it on, so a comparison run
+   can run unguarded. On: an answer under the act band answers \`proceed: false\` and becomes a task for
+   the owner. Off: the agent acts, and the decision is recorded with the same outcome.
+6. **Read the decisions and tune the thresholds.** Each rule and each agent shows its decisions, gate
+   stops, overrides and cost; \`aimeat_decision_list { rule }\` reads them one by one.
+
+**How a rule reaches an outcome.** A threshold is a floor for one answer in that question's own units
+(a yesNo's probability, a pickOne's confidence, a scale's level counted from 0): an answer under its
+floor is \`stop\`. Otherwise the result is the weakest certainty among the thresholded answers, and the
+bands cut it: at or over \`act\` act, at or over \`ask\` ask a person, under it stop. So word every
+thresholded question so that a high value means "go ahead". Branch on \`outcome\`, and when
+\`proceed\` is false do not take the action.
+
+**What a caller may not do.** Send \`questions\`, \`thresholds\` or \`bands\` beside \`rule\`, or a state
+field the rule does not list under \`sends\`: both are refused before anything is sent. A proposal never
+presents numbers as measured: say they are a starting point the owner tunes from recorded decisions.
+
+**The key never leaves the server.** No tool returns one. For an agent that makes its own calls on
+the owner's machine, \`aimeat_decide_settings\` names the environment variable that holds the key there
+(\`agent.key_env\`), never the key. **When a key is missing** the refusal says what to set and where;
+pass that on to the owner as it is, and do not retry.
+
+## 4. The wrong tool when
 
 - The result is text: a reply, a summary, code, an explanation. Use a text model.
 - The options are not known: find the candidates first.
@@ -176,7 +217,7 @@ keeps its default.
 - You expect it to find what an earlier step missed.
 - An agent choosing its own next step in a loop.
 
-## 4. The record, and two licence rules
+## 5. The record, and two licence rules
 
 Every decision is recorded (model version, questions, answers with probabilities, thresholds, what it
 gated, whether a person reviewed it): pass \`subject\` and \`gates\`, and record a person's verdict with

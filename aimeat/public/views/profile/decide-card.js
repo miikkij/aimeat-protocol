@@ -19,6 +19,8 @@
  * @structure DecideCard — the collapsible card, mounted in the profile AI tab
  * @usage import { DecideCard } from './decide-card.js'; html`<${DecideCard} />`
  * @version-history
+ *   v1.2.0 — 2026-09-20 — The decision rules section (decide-rules.js), and a recent decision says
+ *     which rule made it and what the outcome was.
  *   v1.1.0 — 2026-09-19 — A key test: one tiny real call on the key that would pay.
  *   v1.0.0 — 2026-09-19 — Initial (TARGET-080).
  */
@@ -29,6 +31,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { apiGet, apiPut, apiPost, apiDelete } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
+import { DecideRules } from './decide-rules.js';
 
 const shortTime = (iso) => String(iso ?? '').slice(0, 16).replace('T', ' ');
 
@@ -199,6 +202,8 @@ export function DecideCard() {
             </ul>
           `}
 
+          ${settings && html`<${DecideRules} available=${!!settings.available} />`}
+
           ${recent && html`
             <h4 class="pf-aitr-sub">${t('decideCard.recentTitle')}</h4>
             ${recent.decisions.length === 0
@@ -211,7 +216,7 @@ export function DecideCard() {
                         ${Object.entries(d.record.answers).slice(0, 3).map(([id, a]) => `${id}: ${answerText(a)}`).join(' · ')}
                       </span>
                       <span class="pf-aitr-row-meta">
-                        ${shortTime(d.createdAt)} · ${d.model}${d.record.cachedFrom ? ` · ${t('decideCard.cached')}` : ''}
+                        ${d.rule ? `${d.rule} · ${t(`decideRules.outcome.${d.outcome}`)} · ` : ''}${shortTime(d.createdAt)} · ${d.model}${d.record.cachedFrom ? ` · ${t('decideCard.cached')}` : ''}
                         ${d.record.review ? ` · ${t(`decideCard.review.${d.record.review.outcome}`)}` : ''}
                       </span>
                     </li>`)}
