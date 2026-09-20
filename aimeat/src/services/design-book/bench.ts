@@ -138,6 +138,10 @@ const MEASURE_JS = `(() => {
     const eff = a.effect;
     const target = eff && eff.target;
     if (a.playState !== 'running' || !target || eff.pseudoElement) continue;
+    // The hero picture's slow drift is the band's own life, the same animation the mesh pseudo
+    // runs (excluded above as a pseudo-element). It was never counted while an effect collapsed
+    // the picture to 0 x 0 (effects.css, 2026-09-20); with a box it is, and it is not the effect.
+    if (a.animationName === 'ak-hero-drift') continue;
     if (target.closest && target.closest('.ak-fx')) fxRunning++;
   }
   return { overflow, units, smallControls, clippedContent, smallText, ambientLayers, ambientPainted, fxApplied, fxRunning };

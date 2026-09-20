@@ -16,6 +16,7 @@ full text: https://openfontlicense.org/open-font-license-official-text/
 | Fjalla One | v16 (400, the only cut) | `fjalla-one-latin.woff2`, `fjalla-one-latin-ext.woff2` | © Sorkin Type (https://www.sorkintype.com) | https://fonts.google.com/specimen/Fjalla+One |
 | DM Sans | v17 (variable opsz 9–40, wght 100–1000) | `dm-sans-var-latin.woff2`, `dm-sans-var-latin-ext.woff2` | © Colophon Foundry (https://www.colophon-foundry.org), Indian Type Foundry | https://fonts.google.com/specimen/DM+Sans |
 | VT323 | v18 (400) | `vt323-latin.woff2`, `vt323-latin-ext.woff2` | © Peter Hull | https://fonts.google.com/specimen/VT323 |
+| Bungee | v17 (400, the only cut) | `bungee-latin.woff2`, `bungee-latin-ext.woff2` | © The Bungee Project Authors (https://github.com/djrrb/Bungee), David Jonathan Ross | https://fonts.google.com/specimen/Bungee |
 
 Baloo 2 + Bangers vendored 2026-07-19 for the self-hosted `fonts` capability pack
 (game/display faces, loaded via `/lib/fonts.css`). Inter, Space Grotesk, Fraunces and
@@ -25,5 +26,6 @@ JetBrains Mono vendored 2026-07-25 for the AIMEAT theme system, Archivo and Arch
 VT323 (the OS front page): the last three had still been fetched from fonts.googleapis.com by
 sixteen HTML files. Every `@font-face` lives in `/lib/aimeat-fonts.css`, which
 `/lib/aimeat-theme.css` imports and the standalone pages link, so nothing on the node reaches
-an external CDN and the CSP no longer allows one. All subsets are latin + latin-ext, so
+an external CDN and the CSP no longer allows one. Bungee vendored 2026-09-20: a Design Book look
+on production named it as its display face and nothing served it. All subsets are latin + latin-ext, so
 Finnish ä/ö render.

@@ -19,6 +19,11 @@
  * @usage
  *   const html = partPreviewHtml(part);   // a complete self-contained page, kit assets relative
  * @version-history
+ *   v1.5.0 — 2026-09-20 — A part is shown on a stage that shows it (preview-stages.ts): a look on
+ *     a page whose content fits its character, an ambient or a layer effect at full strength with
+ *     nothing in front, a worn effect on its one block, a shape in a committed look. And THE
+ *     FRAME PAINTS THE LOOK'S GROUND: a mosaic in a bare element painted none, so every preview
+ *     was a look's cards on the browser's white. Any kit page takes the reader's theme.
  *   v1.4.1 — 2026-09-20 — partPreviewHtml takes the reader's theme for a component part.
  *   v1.4.0 — 2026-09-20 — A component previews as a page of its own (component.ts), scriptless.
  *   v1.3.1 — 2026-09-05 — Two blocks on ONE source get the plain rows both can render: the
@@ -46,6 +51,7 @@ import { effectById } from '../../data/atelier-effects.js';
 import { LOOKS } from '../../data/atelier-looks.js';
 import type { DesignBookPart } from './service.js';
 import { componentPreviewHtml, type ComponentBody } from './component.js';
+import { lookStage, layerStage, wornStage, lookForShape } from './preview-stages.js';
 
 /** A representative arrangement for parts that are seasoning rather than a dish: a look or
  *  motion sheet is benched by rendering THIS demo layout wearing it, so an override that breaks
@@ -86,9 +92,15 @@ export function renderableBodyFor(part: DesignBookPart): Record<string, unknown>
   if (part.kind === 'component') {
     return { __page: componentPreviewHtml(part.body as unknown as ComponentBody) };
   }
+  // A LOOK (or a motion recipe) is worn by a page whose content fits its character, chosen from
+  // the part's own words (preview-stages.ts), and no longer by one arrangement called "Bench".
   if (part.kind === 'look' || part.kind === 'motion') {
     const body = part.body as { tokens?: Record<string, string>; look?: string };
-    return { ...DEMO_LAYOUT_FOR_TOKENS, look: body.look ?? 'vivid', tokens: body.tokens ?? {} };
+    return lookStage(`${part.id} ${part.title} ${body.look ?? ''}`, body.tokens ?? {}, body.look);
+  }
+  // A SHAPE THAT NAMES NO LOOK wears a committed one, so a shelf of shapes is not one white page.
+  if ((part.kind === 'layout' || part.kind === 'fill') && !(part.body as { look?: string }).look) {
+    return { ...part.body, look: lookForShape(part.id) };
   }
   // An ambient benches and previews as the demo arrangement with the layer RUNNING behind it —
   // the mosaic mounts a stored layout's `ambient` — on the part's look, or the first look the
@@ -96,16 +108,15 @@ export function renderableBodyFor(part: DesignBookPart): Record<string, unknown>
   // honest on the ground the part was proven on.
   if (part.kind === 'ambient') {
     const body = part.body as { ambient: string; alpha?: number; speed?: number; tokens?: Record<string, string>; look?: string };
-    return {
-      ...DEMO_LAYOUT_FOR_TOKENS,
-      look: body.look ?? ambientById(body.ambient)?.fitsLooks[0] ?? 'vivid',
-      tokens: body.tokens ?? {},
-      ambient: {
-        preset: body.ambient,
-        ...(body.alpha !== undefined ? { alpha: body.alpha } : {}),
-        ...(body.speed !== undefined ? { speed: body.speed } : {}),
-      },
-    };
+    const preset = ambientById(body.ambient);
+    // THE LAYER IS THE PART, so it is shown with one title over it and nothing in front, at the
+    // strength the shelf proves it at (shelfAlpha) when the part names none. It stood behind five
+    // blocks of cards at a whisper, and nobody could see it.
+    return layerStage(part.title, firstSentence(part.summary), body.look ?? preset?.fitsLooks[0] ?? 'vivid', body.tokens ?? {}, {
+      preset: body.ambient,
+      alpha: body.alpha ?? preset?.shelfAlpha,
+      ...(body.speed !== undefined ? { speed: body.speed } : {}),
+    });
   }
   // An effect renders as the demo arrangement wearing it where it lands: on the hero band, on
   // the figure, or as a pass over the layer (the look's own ambient, or plasma at its whisper
@@ -119,16 +130,23 @@ export function renderableBodyFor(part: DesignBookPart): Record<string, unknown>
     const entry = effectById(body.effect);
     const look = body.look ?? entry?.fitsLooks[0] ?? 'vivid';
     const spec = { id: body.effect, ...(body.params ? { params: body.params } : {}) };
+    const sub = firstSentence(part.summary);
     if (body.on === 'layer') {
-      const lookAmbient = LOOKS.find((l) => l.id === look)?.tokens['--ak-ambient'];
-      return {
-        ...DEMO_LAYOUT_FOR_EFFECTS, look, tokens: body.tokens ?? {},
-        ambient: { preset: lookAmbient && lookAmbient !== 'none' ? lookAmbient : 'plasma', post: [spec] },
-      };
+      // A PASS OVER THE LAYER is shown on the layer alone, loud: the look's own ambient at the
+      // look's own strength, or plasma at its shelf strength when the look runs none.
+      const lookTokens = LOOKS.find((l) => l.id === look)?.tokens;
+      const lookAmbient = lookTokens?.['--ak-ambient'];
+      const own = lookAmbient && lookAmbient !== 'none';
+      const preset = own ? lookAmbient : 'plasma';
+      // THE STRENGTH IS SAID, never left to the preset's default: an arrangement's ambient that
+      // names no alpha runs at the preset's whisper, whatever the look's own token says, and the
+      // kaleidoscope stood at a few per cent on a night built to carry it at 0.8.
+      const lookAlpha = Number(lookTokens?.['--ak-ambient-alpha']);
+      const alpha = own && Number.isFinite(lookAlpha) && lookAlpha > 0 ? lookAlpha : ambientById(preset)?.shelfAlpha;
+      return layerStage(part.title, sub, look, body.tokens ?? {}, { preset, ...(alpha !== undefined ? { alpha } : {}), post: [spec] });
     }
     return {
-      ...DEMO_LAYOUT_FOR_EFFECTS, look, tokens: body.tokens ?? {},
-      blocks: DEMO_LAYOUT_FOR_EFFECTS.blocks.map((b) => (b.component === body.on ? { ...b, effect: spec } : b)),
+      ...wornStage(body.on, part.title, sub, look, body.tokens ?? {}, spec),
       ...(entry?.motion.includes('moment')
         ? { __fxPlay: { selector: body.on === 'hero' ? '.ak-mosaic__band .ak-hero' : '[data-ak-block="fig"]', id: body.effect } }
         : {}),
@@ -138,16 +156,46 @@ export function renderableBodyFor(part: DesignBookPart): Record<string, unknown>
   return part.body;
 }
 
+/** A part's summary down to what fits under a title: its first sentence, or the first 140 characters. */
+function firstSentence(text: string): string {
+  const cut = /^[^.!?]{12,140}[.!?]/.exec(text.trim())?.[0];
+  return cut ?? text.trim().slice(0, 140);
+}
+
+/**
+ * THE FRAME PAINTS THE LOOK'S GROUND. In an app the kit's frame (`.ak-app`) paints `--ak-bg`, the
+ * page image and the grain; a mosaic mounted into a bare element paints none of them. Every
+ * preview was therefore a look's cards on the browser's white, which is why a night look showed
+ * navy tiles on a white page and why every look read as the same page (found 2026-09-20). The
+ * frame is a stacking context, so a layer at z-index -1 paints above this ground and under the
+ * blocks; on a layer stage the arrangement fills the height, because the layer IS the picture.
+ */
+const FRAME_CSS = [
+  'html, body { margin: 0; min-height: 100%; }',
+  'body { background: var(--ak-bg); }',
+  '.dbp-frame { min-height: 100vh; position: relative; isolation: isolate;',
+  '  background-color: var(--ak-bg); background-image: var(--ak-page-grain, none), var(--ak-page-image, none); background-size: cover; }',
+  // THE GUTTER GOES UNDER THE BAND, NEVER AROUND THE FRAME. A look with a full-bleed band sizes it
+  // at 100vw and the mosaic clips what pokes past its own box, so a padded frame cut 40 px off the
+  // poster's headline (the bench counted it as clipped content, 2026-09-20).
+  '.dbp-frame .ak-mosaic__units { padding: 0 clamp(12px, 3vw, 32px) 32px; }',
+  '.dbp-frame--layer > * { min-height: 100vh; }',
+  // The one block wearing an effect is the picture: the band takes most of the first screen.
+  '.dbp-frame--worn .ak-hero { min-height: min(62vh, 560px); }',
+  // The control that plays a moment sits where a thumb and an eye both find it.
+  '.ak-fx-play { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 10; min-height: 48px; padding-inline: 28px; }',
+].join('\n');
+
 /** The bench page: the kit, the part, demo rows per component — the gallery preview, inlined. */
-export function benchPageHtml(body: Record<string, unknown>): string {
+export function benchPageHtml(body: Record<string, unknown>, theme: 'light' | 'dark' = 'light'): string {
   // A genre part IS its page — serve it as-is instead of wrapping the demo frame around it.
   if (typeof body.__page === 'string') return body.__page;
   const partJson = JSON.stringify(body).replace(/<\//g, '<\\/');
   return [
-    '<!DOCTYPE html><html lang="en" data-theme="light"><head><meta charset="utf-8">',
+    `<!DOCTYPE html><html lang="en" data-theme="${theme === 'dark' ? 'dark' : 'light'}"><head><meta charset="utf-8">`,
     '<meta name="viewport" content="width=device-width, initial-scale=1.0">',
     '<link rel="stylesheet" href="/lib/aimeat-atelier.css">',
-    '<style>.ak-fx-play { position: fixed; right: 16px; bottom: 16px; z-index: 10; }</style></head><body>',
+    `<style>${FRAME_CSS}</style></head><body>`,
     '<script src="/v1/libs/aimeat-atelier.js"></scr' + 'ipt>',
     '<script>',
     'var BODY = ' + partJson + ';',
@@ -218,12 +266,14 @@ export function benchPageHtml(body: Record<string, unknown>): string {
     '(BODY.blocks || []).forEach(function (b) {',
     '  var s = b.props && b.props.source;',
     '  if (!s) return;',
+    // A STAGE BRINGS ITS OWN ROWS (preview-stages.ts): a look is shown on content that fits it.
+    '  if (BODY.__sources && BODY.__sources[s] !== undefined) { sources[s] = (function (v) { return function () { return v; }; })(BODY.__sources[s]); return; }',
     '  if (owners[s] && owners[s] !== b.component) { sources[s] = demoFor(""); return; }',
     '  owners[s] = b.component;',
     '  sources[s] = demoFor(b.component);',
     '});',
     'var frame = document.createElement("div");',
-    'frame.className = "ak-root";',
+    'frame.className = "ak-root dbp-frame" + (BODY.__stage ? " dbp-frame--" + BODY.__stage : "");',
     'frame.setAttribute("data-ak-look", BODY.look || "vivid");',
     'document.body.appendChild(frame);',
     // A DIALOG SHAPE is benched as what it is: opened as a real modal, so the guarantees are
@@ -238,7 +288,7 @@ export function benchPageHtml(body: Record<string, unknown>): string {
     // and the effect the mosaic mounted plays once; the bench measures the page at rest.
     'if (BODY.__fxPlay) {',
     '  var play = document.createElement("button");',
-    '  play.type = "button"; play.className = "ak-btn ak-fx-play"; play.textContent = "Play";',
+    '  play.type = "button"; play.className = "ak-btn ak-btn--primary ak-fx-play"; play.textContent = "Play the effect";',
     '  play.setAttribute("data-ak-fx-play", BODY.__fxPlay.id);',
     '  play.addEventListener("click", function () {',
     '    var t = document.querySelector(BODY.__fxPlay.selector);',
@@ -298,5 +348,8 @@ export function partPreviewHtml(part: DesignBookPart, opts: { theme?: 'light' | 
   if (part.kind === 'component' && opts.theme) return componentPreviewHtml(part.body as unknown as ComponentBody, opts.theme);
   const renderable = renderableBodyFor(part);
   if (renderable === null) return null;
-  return benchPageHtml(renderable);
+  // Every kit page may be asked for in the reader's theme; the bench measures the light one.
+  // A stage whose character is a lit thing in the dark says so (`__theme`), and the reader's own
+  // choice always wins over it.
+  return benchPageHtml(renderable, opts.theme ?? (renderable.__theme === 'dark' ? 'dark' : 'light'));
 }
