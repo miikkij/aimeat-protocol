@@ -497,6 +497,16 @@ An app signs in, stores, listens for changes and talks to an AI through the plat
 
 Fourteen bundled cortexes ship out of the box: charts (a Chart.js wrapper), forms, inputs, layouts (8 responsive patterns including dashboard grid and fibonacci), navigation, dialogs, viewers (carousel, grid, DataTable, timeline), canvas, motion, flow, DAG, surface, viewport and i18n. All are MIT-licensed, carry no external dependencies, and are available to any app under the `AIMEAT.*` namespace.
 
+### Decisions, not text: the decision model
+
+Some AI work is a decision rather than a text: which folder a mail belongs in, whether a message needs an answer today, how upset a customer is, which of forty candidates fits. For that the node carries a second kind of AI beside the text model, [TypeSafe](https://typesafe.ai)'s Jev: an app or an agent asks closed questions (yes or no, pick one, a scale) and gets typed answers with probabilities back, with no prose to parse.
+
+- **Your data is cleaned before it leaves.** E-mail addresses, phone numbers, Finnish personal identity codes, bank account numbers, street addresses and the names of your contacts are removed on the way out and put back into the answer. What else an app sends is that app's responsibility, and the publish check tells its builder where it departs from the rules.
+- **Every decision is on the record.** The model version, the questions, the answers with their probabilities, the thresholds they were compared with and whether a person reviewed it, so you can later ask what an AI decided about a record and why.
+- **You choose who pays.** Your own TypeSafe key, or the server's from your AI allowance, each testable with one press. An app has to name TypeSafe in its data map before it may send anything.
+
+Apps use the [`aimeat-decide`](https://aimeat.io/v1/libs/aimeat-decide.js) library, agents the `aimeat_decide` tools over MCP, and the skill `node:aimeat-decide` holds the recipes: triage, routing by confidence, scoring, picking among candidates, checking another model's answer.
+
 ### Transparency of AI-generated content
 
 From 2 August 2026, Article 50 of the EU AI Act asks two things of anyone publishing what a model wrote: tell a person, and mark it so a machine can tell. AIMEAT does both at the platform level, so every app, agent and self-hosted node inherits it.
