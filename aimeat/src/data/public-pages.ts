@@ -442,9 +442,35 @@ const LLMS_INDEX_DOCUMENTED = new Set(['/v1/docs', '/v1/glossary']);
  */
 const LLMS_INDEX_OPTIONAL = new Set(['/v1/transparency', '/v1/privacy', '/v1/terms']);
 
-/** One llms.txt link-list line per page: `- [Title](url): description`. */
+/**
+ * One llms.txt link-list line per page: `- [Title](url): first sentence`.
+ *
+ * THE FIRST SENTENCE, not the whole description. These pages carry a search description written to
+ * sell the page to a person, 200 to 300 characters each, and the index is not the place for it: it
+ * is a map an agent fetches BEFORE it knows what it wants, and every byte here is paid by every
+ * reader. Eleven of them put the index over the 8 KiB two suites hold it to (8352 bytes, measured
+ * on the sweep of 2026-09-19, red both nights), and the index grows again with every page added.
+ * The page's own description is a fetch away, on the page.
+ */
 function llmsLine(page: PublicPage, baseUrl: string): string {
-  return `- [${page.title}](${baseUrl}${page.path}): ${page.description}`;
+  return `- [${page.title}](${baseUrl}${page.path}): ${shortDescription(page.description)}`;
+}
+
+/**
+ * The first sentence, and never past 140 characters.
+ *
+ * The TITLE is what tells one entry from another here, and it has to be, because two of these
+ * descriptions open with the same line ("You own your data and what you build.") — taking more
+ * sentences does not separate the home page from the portal, it only costs bytes. One sentence
+ * leaves the index about 470 bytes under the ceiling two suites hold it to, which is room for two
+ * more pages before this has to be looked at again.
+ */
+function shortDescription(text: string): string {
+  const stop = text.indexOf('. ');
+  const one = stop === -1 ? text : text.slice(0, stop + 1);
+  if (one.length <= 140) return one;
+  const cut = one.lastIndexOf(' ', 140);
+  return `${one.slice(0, cut === -1 ? 140 : cut)}…`;
 }
 
 /**
