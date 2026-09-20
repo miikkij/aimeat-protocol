@@ -43,6 +43,13 @@ from .datapackage import (
     to_dataframe,
     to_parquet,
 )
+
+# NOTE, because the AttributeError it causes names nothing useful: the function `decide` below
+# SHADOWS the submodule `aimeat_crewai.decide` on this package object. `from aimeat_crewai import
+# decide` and `from aimeat_crewai.decide import rules` both do what they look like; but
+# `import aimeat_crewai.decide as m` binds the FUNCTION, so `m.rules` raises. Reach the module with
+# `importlib.import_module("aimeat_crewai.decide")` when you need it by name (a test patching it,
+# say). Renaming either one would be the alternative, and both names are the right ones.
 from .decide import (
     DIRECT_ENV as DECIDE_DIRECT_ENV,
 )
