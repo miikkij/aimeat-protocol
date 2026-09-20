@@ -34,6 +34,9 @@
  *   const book = new DesignBookService(storage, config);
  *   const out = await book.propose(callerGaii, raw, provenance);
  * @version-history
+ *   v1.9.0 — 2026-09-20 — A genre may grow out of an app (grown-genre.ts): propose answers whether
+ *     it earned the shelf, the map lists the ones whose app still stands, and grownGenre() is what
+ *     the template doors and the preview ask.
  *   v1.8.0 — 2026-09-20 — The COMPONENT kind. Taking one answers its snippet and writes nothing,
  *     before the taker's app exists. A proposal is PUBLISHED BY ITSELF on three things together:
  *     the bench, its builder judging it general, and the owner's word about the app it came from
@@ -82,6 +85,7 @@ import { getAppTemplateIndex } from '../../data/app-templates.js';
 import { buildDesignBookMap } from './map.js';
 import { DesignBookReasons } from './reasons.js';
 import { componentSnippet, type ComponentBody } from './component.js';
+import { grownGenrePage, grownGenrePublishing, isGrownGenreBody, type GrownGenrePage } from './grown-genre.js';
 
 export const PART_KEY_PREFIX = 'atelier.book.part.';
 export const USAGE_KEY_PREFIX = 'atelier.book.usage.';
@@ -98,6 +102,9 @@ function proposeChecksFor(input: PartInput): string[] {
   if (input.kind === 'illustration') return ['style-valid'];
   // Markup against the allowlist, the stylesheet under its own prefix, every colour a token.
   if (input.kind === 'component') return ['markup-allowlist', 'styles-scoped', 'colours-are-tokens', 'no-script', 'judgement-given'];
+  // A genre that grew out of an app is the proposer's own page; what earns it the shelf is its
+  // owner's word, answered in `publishing`, and no bench of this node runs a stranger's script.
+  if (input.kind === 'genre' && isGrownGenreBody(input.body)) return ['own-app', 'judgement-given'];
   if (input.kind === 'ambient') {
     // The ambient bench always runs the matrix: the preset is proven on the part's look.
     const checks = ['ambient-valid', 'contrast-matrix'];
@@ -208,7 +215,19 @@ export class DesignBookService {
   ): Promise<{ id: string; status: PartStatus; version: number; replaced_version: number | null; publishing?: { earned: boolean; why: string } }> {
     const input: PartInput = validatePartInput(raw);
     const ownerGhii = await this.ownerOf(callerGaii);
-    const publishing = input.kind === 'component' ? await this.componentPublishing(ownerGhii, input.body as unknown as ComponentBody) : undefined;
+    const grown = input.kind === 'genre' && isGrownGenreBody(input.body) ? input.body : null;
+    if (grown) {
+      // Its id is the name a fork writes into its own head, so it reads like every genre's, and it
+      // may not shadow a page the node ships: the template doors answer the shipped one first.
+      if (!input.id.startsWith('genre-')) {
+        throw new DesignBookError('BODY_INVALID', `A genre's id starts with "genre-" (a fork names it in its head as its aimeat-register). Propose it as "genre-${input.id}".`, 422);
+      }
+      if (getAppTemplateIndex().some(t => t.id === input.id)) {
+        throw new DesignBookError('ID_TAKEN', `"${input.id}" is a genre this node ships. Pick a name of its own.`, 409);
+      }
+    }
+    const publishing = input.kind === 'component' ? await this.componentPublishing(ownerGhii, input.body as unknown as ComponentBody)
+      : grown ? await grownGenrePublishing(this.storage, this.config, ownerGhii, grown) : undefined;
 
     const existing = await this.findRecord(input.id);
     const prev = existing ? this.parsePart(existing) : null;
@@ -374,15 +393,45 @@ export class DesignBookService {
     // Book only names a template, and the shelf lags the templates: production held 19 of 23 on
     // 2026-09-19 and a fresh node holds none, so a map of the shelf alone hid genres that fork.
     const genres = getAppTemplateIndex().filter(t => t.kind === 'genre');
+    // AND THE ONES THAT GREW OUT OF AN APP, while the app still stands (grown-genre.ts).
+    const grown = await this.grownGenres();
     const rows = [
       ...genres.map(g => ({ id: g.id, kind: 'genre', summary: g.description })),
+      ...grown.map(g => ({ id: g.id, kind: 'genre', summary: g.summary })),
       ...shelf.filter(r => r.kind !== 'genre'),
     ];
     const map = buildDesignBookMap(rows, {
       baseUrl: this.config.baseUrl,
-      light: new Map(genres.map(g => [g.id, g.light === 'follows' ? 'follows' as const : 'fixed' as const])),
+      light: new Map([
+        ...genres.map(g => [g.id, g.light === 'follows' ? 'follows' as const : 'fixed' as const] as const),
+        ...grown.map(g => [g.id, g.page.light] as const),
+      ]),
     });
     return { map, count: rows.length };
+  }
+
+  /** Every published genre that grew out of an app and still stands, with the page a fork starts from. */
+  async grownGenres(): Promise<Array<{ id: string; title: string; summary: string; page: GrownGenrePage }>> {
+    const out: Array<{ id: string; title: string; summary: string; page: GrownGenrePage }> = [];
+    for (const row of await this.list({ kind: 'genre', status: 'published', limit: 200 })) {
+      const found = await this.grownGenre(row.id);
+      if (found) out.push(found);
+    }
+    return out;
+  }
+
+  /**
+   * One genre that grew out of an app, or null: no such part, a genre the node ships, a part not
+   * on the shelf, or an app that no longer stands. What the template doors and the preview ask.
+   */
+  async grownGenre(id: string): Promise<{ id: string; title: string; summary: string; page: GrownGenrePage } | null> {
+    const record = await this.findRecord(id);
+    if (!record) return null;
+    const part = this.parsePart(record);
+    if (part.kind !== 'genre' || !isGrownGenreBody(part.body)) return null;
+    if (part.status !== 'published' && part.status !== 'aging') return null;
+    const page = await grownGenrePage(this.storage, this.config, part.proposed_by_owner, part.body);
+    return page ? { id: part.id, title: part.title, summary: part.summary, page } : null;
   }
 
   /**
@@ -438,7 +487,8 @@ export class DesignBookService {
     // A GENRE is a whole page: taking one home is a FORK of its template, never a merge into a
     // stored arrangement — adopting it would overwrite an app with a scaffold.
     if (part.kind === 'genre') {
-      const tid = (part.body as { template?: string }).template || '';
+      // A genre that grew out of an app is handed over under its own part id.
+      const tid = (part.body as { template?: string }).template || part.id;
       throw new DesignBookError('GENRE_IS_FORKED',
         `A genre is forked, not adopted: fetch GET /v1/app-templates/${tid} , swap the words and sources for your app, and publish it as its own file. The Book shows it; the template registry hands it over.`, 409);
     }
@@ -578,7 +628,14 @@ export class DesignBookService {
           + 'A general one from this app is published by itself; a special one stays listed and yours. An ARRANGEMENT you composed goes in as kind "fill", its own words turned back into <placeholders>. '
           + 'Tell the owner in a line what went onto the shelf and what you judged special.'
         : 'Recorded. This version made nothing by hand, so there is nothing new to offer the Book; the parts it took now count as kept.';
-    return { app: out.app, kept: out.kept, version: out.version, took: out.took, made: out.made, next };
+    // A PAGE WITH A LOOK OF ITS OWN can become a genre the next builder starts from (grown-genre.ts).
+    const genre = kept && out.register?.toLowerCase().startsWith('custom:')
+      ? ` THE PAGE ITSELF has a look of its own (${out.register}), so it can be a GENRE the next builder forks. Judge it as honestly as a component: would a different kind of app start from this page ("general"), or is the look this app's own ("special")? `
+        + `Propose it, aimeat_designbook_propose with kind "genre", id "genre-<name>" and body { app: { owner: "${ownerName}", filename: "${filename}" }, judgement: { reach, why } }. `
+        + 'A general one goes onto the shelf by itself ONLY IF THE OWNER HAS OPENED THE APP FOR FORKING, because a genre hands the page\'s whole source to every builder on this node. That is theirs to allow and never yours: '
+        + 'ask them in one plain sentence whether other people\'s AIs may start from this page, and if they say yes they turn forking on for the app. The answer to the propose says what is still missing.'
+      : '';
+    return { app: out.app, kept: out.kept, version: out.version, took: out.took, made: out.made, next: next + genre };
   }
 
   /** What builders wrote down about the Book, turned into what it should become next (reasons.ts). */

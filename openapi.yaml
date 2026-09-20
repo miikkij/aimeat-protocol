@@ -13440,7 +13440,11 @@ paths:
         Curated app-building starting points (app shells T1/T2/T3, components, use-case
         scaffolds, big-app project layouts and Atelier GENRE pages — complete committed
         registers to fork) the prompt builders inject so an AI copies from a model instead of building
-        from scratch. Index without template content. Public (CORS *).
+        from scratch. Index without template content. Public (CORS *). After the ones the node
+        ships come the genres that grew out of a published app (`source: design-book`), each listed
+        only while its app stands: kept by its owner, open for forking, not parked or hidden.
+        GET /v1/app-templates/{id} answers one of those with the version its owner kept and
+        `grew_from` naming the app.
       tags:
         - Discovery
       parameters:
@@ -26388,7 +26392,11 @@ paths:
                     summary, body, tags? } — the kind decides the body: a whole mosaic layout
                     (layout/fill), { tokens, look? } (look), { tokens } of motion tokens only
                     (motion), { style, palette_words? } (illustration), { template } naming a
-                    served genre template (genre), { ambient, alpha?, speed?, look?, tokens? }
+                    served genre template, or { app: { owner, filename }, judgement: { reach:
+                    general|special, why } } naming the proposer's own published app whose
+                    look is its own (genre; id "genre-<name>"; published by itself when the
+                    judgement is general, the owner kept the app and the owner opened it for
+                    forking, and offered only while that holds), { ambient, alpha?, speed?, look?, tokens? }
                     (ambient — one of waves, aurora, dust, grid, static, ink, plasma, lava,
                     tunnel; "none" is an arrangement's choice, never a part), or { effect,
                     params?, on?: hero|figure|layer, look?, tokens? } (effect — one of
@@ -26489,11 +26497,20 @@ paths:
         demo arrangement, a genre as its template's own page, an illustration as its art
         direction set in the kit's type. Sessionless for any part that exists (the part is a
         public record already); the browsable gallery at /v1/design-book embeds this per card.
-        Answers text/html, not the JSON envelope.
+        Answers text/html, not the JSON envelope. A genre that grew out of an app answers 302 to
+        the app's own address instead: it is a published page with script in it, and it is never
+        served from the node's origin.
       tags: [Apps]
       security: []
       parameters:
         - { name: id, in: path, required: true, schema: { type: string } }
+        - name: theme
+          in: query
+          required: false
+          description: >-
+            The ground a COMPONENT part is shown on. A component reads the page's tokens, so it is a
+            different picture in the dark. Every other kind ignores it, and so does any other value.
+          schema: { type: string, enum: [light, dark] }
       responses:
         '200':
           description: The preview page

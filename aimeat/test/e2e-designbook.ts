@@ -486,6 +486,90 @@ const GOOD_BODY = {
         const prev = await fetch(`${BASE}/v1/designbook/comp-week-${stamp}/preview`);
         const html = await prev.text();
         assert(prev.status === 200 && html.includes('class="wkgrid"') && !/<script/i.test(html.replace(/<script[^>]*nonce[^>]*><\/script>/gi, '')), `the preview renders it, scriptless: ${prev.status}`);
+        // It wears the page it lands in, so the gallery asks for the ground its reader is on.
+        assert(/<html[^>]*data-theme="light"/.test(html), 'with no theme asked for, it is the light page');
+        const dark = await (await fetch(`${BASE}/v1/designbook/comp-week-${stamp}/preview?theme=dark`)).text();
+        assert(/<html[^>]*data-theme="dark"/.test(dark) && dark.includes('class="wkgrid"'), 'asked for dark, the same component on the dark ground');
+        const odd = await (await fetch(`${BASE}/v1/designbook/comp-week-${stamp}/preview?theme=%22%3E%3Cscript%3E`)).text();
+        assert(/<html[^>]*data-theme="light"/.test(odd) && !odd.includes('"><script>'), 'any other value is the light page, and none of it reaches the markup');
+    });
+
+    await test('a GENRE grows out of an app: a look of its own, judged general, kept by its owner AND opened for forking by its owner; it stops being offered when the app closes', async () => {
+        const stamp = Date.now() % 100000;
+        const f = `dbgenre${stamp}.html`;
+        const id = `genre-ledgerline-${stamp}`;
+        const notes = `<script type="application/json" id="aimeat-build-notes">${JSON.stringify({ made: [{ name: 'ledger-page', what: 'a ruled ledger page', why: 'no genre is a ruled ledger' }] })}</` + 'script>';
+        const page = (register: string) => APP(f).replace('content="genre-nightfloor"', `content="${register}"`).replace('</head>', `<meta name="aimeat-light" content="follows">${notes}</head>`).replace('<body>', '<body><main class="ledgerline-page">LEDGERLINE-MARK</main>');
+        const publish = (register: string) => json('/v1/apps', { method: 'POST', headers: auth(other.token), body: JSON.stringify({ filename: f, mime_type: 'text/html', content: b64(page(register)), name: 'Ledgerline', description: 'A ruled ledger.' }) });
+        const body = (patch: Record<string, unknown> = {}) => ({ app: { owner: other.name, filename: f }, judgement: { reach: 'general', why: 'Any app that keeps rows of entries against dates can start from a ruled ledger page.' }, ...patch });
+        const propose = (pid: string, b: unknown, token = other.token) => json('/v1/designbook', { method: 'POST', headers: auth(token),
+            body: JSON.stringify({ part: { id: pid, kind: 'genre', title: 'Ledgerline', summary: 'A ruled ledger page: rows of entries against dates, in ink on paper.', body: b } }) });
+        const why = (r: any) => String(r.body?.data?.publishing?.why ?? JSON.stringify(r.body?.error));
+
+        // No app yet, somebody else's app, a shipped genre's name, an id that is not a genre's.
+        assert((await propose(id, body())).status === 404, 'an app that does not exist is refused');
+        assert((await publish('genre-nightfloor')).status === 201, 'publish v1');
+        const theirs = await propose(id, body(), op.token);
+        assert(theirs.status === 403 && theirs.body.error?.code === 'NOT_YOUR_APP', `another owner's app cannot be offered: ${theirs.status} ${JSON.stringify(theirs.body?.error)}`);
+        assert((await propose('genre-nightfloor', body())).status === 409, 'a shipped genre\'s id is taken');
+        assert((await propose(`ledgerline-${stamp}`, body())).status === 422, 'a genre\'s id starts with genre-');
+        const noJudge = await propose(id, { app: { owner: other.name, filename: f } });
+        assert(noJudge.status === 422 && /judgement is YOURS/.test(noJudge.body.error?.message ?? ''), `the builder owes a judgement: ${noJudge.status}`);
+
+        // Each missing thing is named, in the order an owner can act on it.
+        const notKept = await propose(id, body());
+        assert(notKept.status === 201 && notKept.body.data.status === 'proposed' && /has not said/.test(why(notKept)), `a finished build earns nothing: ${why(notKept)}`);
+        const keep1 = await json('/v1/designbook/keep', { method: 'POST', headers: auth(other.token), body: JSON.stringify({ filename: f }) });
+        assert(keep1.status === 200 && !/GENRE the next builder forks/.test(keep1.body.data.next), 'a fork of a shipped genre is not told it can be a genre');
+        const closed = await propose(id, body());
+        assert(closed.body.data.status === 'proposed' && /not open for forking/.test(why(closed)) && /do not decide it for them/.test(why(closed)), `the owner's consent is the owner's: ${why(closed)}`);
+        const open = await json(`/v1/apps/${f}`, { method: 'PATCH', headers: auth(other.token), body: JSON.stringify({ forkable: true }) });
+        assert(open.status === 200, `forkable on: ${open.status}`);
+        const notOwn = await propose(id, body());
+        assert(notOwn.body.data.status === 'proposed' && /fork of an existing genre is that genre/.test(why(notOwn)), `a fork of a shipped genre is not offered back: ${why(notOwn)}`);
+
+        // The page says its look is its own; the owner keeps THAT version; the proposal is on the shelf.
+        assert([200, 201].includes((await publish('custom:ledgerline')).status), 'publish v2 with a register of its own');
+        const stale = await propose(id, body());
+        assert(stale.body.data.status === 'proposed' && /fork of an existing genre/.test(why(stale)), 'the KEPT version is what counts, and that is still v1');
+        const keep2 = await json('/v1/designbook/keep', { method: 'POST', headers: auth(other.token), body: JSON.stringify({ filename: f }) });
+        assert(keep2.status === 200 && /kind "genre"/.test(keep2.body.data.next) && /never yours/.test(keep2.body.data.next), `keep says the page can be a genre: ${keep2.body?.data?.next}`);
+        const special = await propose(`genre-ledgerspecial-${stamp}`, body({ judgement: { reach: 'special', why: 'The ruled look belongs to this one ledger and nothing else would wear it.' } }));
+        assert(special.body.data.status === 'proposed' && /judged the look special/.test(why(special)), `a special look stays proposed: ${why(special)}`);
+        const earned = await propose(id, body());
+        assert(earned.status === 200 && earned.body.data.status === 'published' && earned.body.data.publishing.earned === true, `all four together publish it: ${why(earned)}`);
+
+        // Every door a builder forks through answers it, with the version the owner kept.
+        const map = await json('/v1/designbook?view=map');
+        assert(new RegExp('`' + id + '`[^\\n]*follows the theme').test(map.body.data.map), 'the map lists it among the genres, with how it treats the theme');
+        const tpl = await json(`/v1/app-templates/${id}`);
+        assert(tpl.status === 200 && tpl.body.data.template.content.includes('LEDGERLINE-MARK') && tpl.body.data.template.grew_from?.version === 2 && tpl.body.data.template.source === 'design-book',
+            `GET /v1/app-templates/:id hands the page over: ${tpl.status} ${JSON.stringify(tpl.body?.data?.template?.grew_from ?? tpl.body?.error)}`);
+        const index = await json('/v1/app-templates?kind=genre');
+        assert(index.body.data.templates.some((t: any) => t.id === id && t.source === 'design-book') && index.body.data.templates.some((t: any) => t.id === 'genre-nightfloor'), 'the index lists it beside the shipped genres');
+        const tool = await json(`/v1/appdev/templates/${id}`, { headers: auth(op.token) });
+        assert(tool.status === 200 && tool.body.data.template.content.includes('LEDGERLINE-MARK') && /remove anything that is about the app it came from/.test(tool.body.data.template.how_to_start),
+            `the tool door answers it for ANOTHER owner, with how to start: ${tool.status}`);
+
+        // A later version does not change the genre until its owner keeps that one too.
+        assert([200, 201].includes((await json('/v1/apps', { method: 'POST', headers: auth(other.token), body: JSON.stringify({ filename: f, mime_type: 'text/html', content: b64(page('custom:ledgerline').replace('LEDGERLINE-MARK', 'THIRD-DRAFT')), name: 'Ledgerline', description: 'A ruled ledger.' }) })).status), 'publish v3');
+        const still = await json(`/v1/app-templates/${id}`);
+        assert(still.body.data.template.content.includes('LEDGERLINE-MARK') && !still.body.data.template.content.includes('THIRD-DRAFT'), 'a fork still starts from the version its owner kept');
+
+        // The preview is the app's own address and never a page of this node's.
+        const prev = await fetch(`${BASE}/v1/designbook/${id}/preview`, { redirect: 'manual' });
+        assert(prev.status === 302 && (prev.headers.get('location') ?? '').includes(f), `the preview redirects to the app: ${prev.status} ${prev.headers.get('location')}`);
+        const adopt = await json(`/v1/designbook/${id}/adopt`, { method: 'POST', headers: auth(op.token), body: JSON.stringify({ filename: opApp }) });
+        assert(adopt.status === 409 && adopt.body.error?.code === 'GENRE_IS_FORKED' && adopt.body.error.message.includes(id), `a genre is forked, under its own id: ${adopt.status}`);
+
+        // THE OWNER CLOSES IT, and every door drops it without anybody retiring the part.
+        const shut = await json(`/v1/apps/${f}`, { method: 'PATCH', headers: auth(other.token), body: JSON.stringify({ forkable: false }) });
+        assert(shut.status === 200, `forkable off: ${shut.status}`);
+        assert((await json(`/v1/app-templates/${id}`)).status === 404, 'closed for forking → the template door answers 404');
+        assert((await json(`/v1/appdev/templates/${id}`, { headers: auth(op.token) })).status === 404, '… and so does the tool door');
+        assert(!(await json('/v1/designbook?view=map')).body.data.map.includes('`' + id + '`'), '… and the map no longer lists it');
+        assert((await fetch(`${BASE}/v1/designbook/${id}/preview`, { redirect: 'manual' })).status === 404, '… and the preview has nothing to show');
+        await json(`/v1/apps/${f}`, { method: 'DELETE', headers: auth(other.token) });
     });
 
     await test('adoption is the heartbeat: adopting an aging part lifts it back to published', async () => {

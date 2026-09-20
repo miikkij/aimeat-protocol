@@ -9,6 +9,7 @@
  * @structure appdevOverviewRouter(config, storage) → Router
  * @usage app.use(appdevOverviewRouter(config, storage)) from the routes loader.
  * @version-history
+ *   v1.3.0 — 2026-09-20 — The two template routes also answer for a genre that grew out of an app.
  *   v1.2.0 — 2026-09-19 — GET /v1/appdev/templates/:id takes ?part=N for a large shipped template.
  *   v1.1.0 — 2026-09-18 — GET /v1/appdev/templates/:id answers for a template the node ships when
  *     no proposal carries the id, and the list names them (`node_templates`).
@@ -26,7 +27,7 @@ import { logger } from '../utils/logger.js';
 import {
   listTemplateProposals, getTemplateProposal, deleteTemplateProposal,
 } from '../services/app-template-proposals.js';
-import { nodeTemplateAnswer, nodeTemplateIndex, unknownTemplateMessage } from '../services/node-templates.js';
+import { templateAnswer, templateIndex, unknownTemplateMessage } from '../services/node-templates.js';
 
 export function appdevOverviewRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -54,7 +55,7 @@ export function appdevOverviewRouter(config: AimeatConfig, storage: Storage): Ro
     const templates = await listTemplateProposals(storage, config, identity);
     // `node_templates`: what the node ships, without content, beside the owner's proposals, so
     // the tool that lists templates can name the shell a build starts from.
-    res.json(success(config.nodeId, { templates, total: templates.length, node_templates: nodeTemplateIndex() }));
+    res.json(success(config.nodeId, { templates, total: templates.length, node_templates: await templateIndex(storage, config) }));
   });
 
   // GET /v1/appdev/templates/:id — one proposal + the source app's live state.
@@ -66,7 +67,7 @@ export function appdevOverviewRouter(config: AimeatConfig, storage: Storage): Ro
       // what the connector's aimeat_app_template_get calls (services/node-templates.ts).
       // ?part=N: a shipped file too large for one tool result comes one part at a time.
       const rawPart = typeof req.query.part === 'string' ? Number(req.query.part) : undefined;
-      const shipped = nodeTemplateAnswer(req.params.id as string, rawPart);
+      const shipped = await templateAnswer(storage, config, req.params.id as string, rawPart);
       if (shipped && typeof shipped.part_error === 'string') {
         res.status(400).json(error(config.nodeId, 'INVALID_INPUT', shipped.part_error));
         return;

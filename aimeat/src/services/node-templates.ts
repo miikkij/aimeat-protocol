@@ -10,14 +10,21 @@
  *   build run asked it for `shell-pure-client` and was told the template did not exist
  *   (2026-09-18). One function, read by the MCP tool and by GET /v1/appdev/templates/:id, which is
  *   what the connector's two doors call, so the three cannot answer differently.
- * @structure nodeTemplateAnswer(id) · nodeTemplateIndex() · unknownTemplateMessage(id)
- * @usage const t = nodeTemplateAnswer('shell-pure-client');   // null when the node ships none by that id
+ * @structure nodeTemplateAnswer(id) · nodeTemplateIndex() · templateAnswer(storage, config, id) ·
+ *   templateIndex(storage, config) · unknownTemplateMessage(id)
+ * @usage const t = await templateAnswer(storage, config, 'shell-pure-client');   // null when nothing answers to that id
  * @version-history
+ *   v1.2.0 — 2026-09-20 — templateAnswer() and templateIndex(): the doors also answer a genre that
+ *     grew out of an app (design-book/grown-genre.ts), so a builder forks it the way it forks a
+ *     shipped one. The cutting into parts is one helper for both.
  *   v1.1.0 — 2026-09-19 — A shipped file over 16 000 characters comes one part at a time (`part`).
  *     Five game-genre templates are 26 to 32 kB and did not reach a chat as one tool result.
  *   v1.0.0 — 2026-09-18 — Initial.
  */
 import { getAppTemplates, getAppTemplateIndex } from '../data/app-templates.js';
+import type { AimeatConfig } from '../config.js';
+import type { Storage } from '../storage/interface.js';
+import { DesignBookService } from './design-book/service.js';
 
 const HOW_TO_START = 'This is a starting file the node ships. Write your app on top of `content`: keep its head, its script tags and the way it signs the person in, and replace the body.';
 
@@ -55,21 +62,52 @@ export function splitAtLines(text: string, max: number): string[] {
 export function nodeTemplateAnswer(id: string, part?: number): Record<string, unknown> | null {
   const found = getAppTemplates().find(t => t.id === id);
   if (!found) return null;
-  const base = { ...found, source: 'node', how_to_start: HOW_TO_START };
-  if (found.content.length <= MAX_TEMPLATE_CONTENT_CHARS) return base;
-  const pieces = splitAtLines(found.content, MAX_TEMPLATE_CONTENT_CHARS);
+  return onePartOf({ ...found, source: 'node', how_to_start: HOW_TO_START }, part);
+}
+
+/** `base` whole when its `content` fits one answer, or the part asked for with how to read the rest. */
+function onePartOf(base: { id: string; source: string; content: string } & Record<string, unknown>, part?: number): Record<string, unknown> {
+  if (base.content.length <= MAX_TEMPLATE_CONTENT_CHARS) return base;
+  const pieces = splitAtLines(base.content, MAX_TEMPLATE_CONTENT_CHARS);
   const wanted = part === undefined ? 1 : part;
   if (!Number.isInteger(wanted) || wanted < 1 || wanted > pieces.length) {
-    return { id: found.id, source: 'node', parts: pieces.length, part_error: `This template has parts 1 to ${pieces.length}. Ask for one of them.` };
+    return { id: base.id, source: base.source, parts: pieces.length, part_error: `This template has parts 1 to ${pieces.length}. Ask for one of them.` };
   }
   return {
     ...base,
     content: pieces[wanted - 1],
     part: wanted,
     parts: pieces.length,
-    how_to_read: `The file is ${found.content.length} characters, more than one answer carries, so \`content\` is part ${wanted} of ${pieces.length}. `
+    how_to_read: `The file is ${base.content.length} characters, more than one answer carries, so \`content\` is part ${wanted} of ${pieces.length}. `
       + `Ask again with part: 2${pieces.length > 2 ? ` up to part: ${pieces.length}` : ''}, and join the \`content\` values in order with nothing between them: the cuts are at line ends.`,
   };
+}
+
+const HOW_TO_START_GROWN = 'This genre grew out of an app its owner said turned out well and opened for forking. Write your app on top of `content`: '
+  + 'keep its composition, its type and the way it signs the person in, and replace the words, the sources and the data keys with your own. '
+  + 'Name it in your head as your register (`aimeat-register`), and remove anything that is about the app it came from.';
+
+/**
+ * What all three doors answer for an id: a template the node ships, or a genre that grew out of
+ * an app (design-book/grown-genre.ts) while that app still stands. The shipped one wins a name,
+ * and propose refuses a grown genre under a shipped id, so the order never decides anything.
+ */
+export async function templateAnswer(storage: Storage, config: AimeatConfig, id: string, part?: number): Promise<Record<string, unknown> | null> {
+  const shipped = nodeTemplateAnswer(id, part);
+  if (shipped) return shipped;
+  const grown = await new DesignBookService(storage, config).grownGenre(id);
+  if (!grown) return null;
+  return onePartOf({
+    id: grown.id, kind: 'genre', title: grown.title, description: grown.summary, light: grown.page.light,
+    source: 'design-book', grew_from: { owner: grown.page.owner, filename: grown.page.filename, version: grown.page.version },
+    how_to_start: HOW_TO_START_GROWN, content: grown.page.html,
+  }, part);
+}
+
+/** The shipped index, and after it the genres that grew out of apps and still stand. */
+export async function templateIndex(storage: Storage, config: AimeatConfig): Promise<Array<{ id: string; kind: string; tier?: string; track?: string; title: string; source?: string }>> {
+  const grown = await new DesignBookService(storage, config).grownGenres();
+  return [...nodeTemplateIndex(), ...grown.map(g => ({ id: g.id, kind: 'genre', title: g.title, source: 'design-book' }))];
 }
 
 /**
