@@ -207,11 +207,11 @@ export function ToolMenu({ selected, onChange, idPrefix, runtimeTools, decideToo
         ${decideOff && html`
           <p class="pf-agd-help-text" role="note">
             ${decideTools && !decideTools.enabled ? t(`${K}.tools.decideOffOperator`) : t(`${K}.tools.decideNoKey`)}
-            ${' '}<a href="/v1/profile?tab=ai#decide-card">${t(`${K}.tools.decideNoKeyLink`)}</a>
+            ${' '}<a class="pf-agd-crew-link" href="/v1/profile?tab=ai&open=decide-card">${t(`${K}.tools.decideNoKeyLink`)} →</a>
           </p>`}
         ${decideIds.map(decideRow)}
         ${!decideOff && ruleIds.length === 0 && html`
-          <p class="pf-agd-help-text">${t(`${K}.tools.decideNoRules`)} <a href="/v1/profile?tab=ai#decide-card">${t(`${K}.tools.decideNoKeyLink`)}</a></p>`}
+          <p class="pf-agd-help-text">${t(`${K}.tools.decideNoRules`)} <a class="pf-agd-crew-link" href="/v1/profile?tab=ai&open=decide-card">${t(`${K}.tools.decideNoKeyLink`)} →</a></p>`}
       </div>
     </div>
   `;

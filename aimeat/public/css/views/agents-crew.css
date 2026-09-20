@@ -76,6 +76,8 @@
    line above the rows, so the row itself only has to look unavailable. */
 .pf .pf-agd-crew-tool--off,
 .pf .pf-agd-form-field label.pf-agd-crew-tool--off { cursor: not-allowed; opacity: 0.55; }
+/* The way out of a disabled group has to read as something to press: the help text around it is dim. */
+.pf .pf-agd-crew-link { color: var(--accent); font-weight: 600; text-decoration: underline; }
 .pf .pf-agd-crew-tool-id { font-family: var(--font-mono, monospace); overflow-wrap: anywhere; }
 .pf .pf-agd-crew-tool-desc { color: var(--text-dim); }
 .pf .pf-agd-crew-tools-refine { margin-top: 0.25rem; }
