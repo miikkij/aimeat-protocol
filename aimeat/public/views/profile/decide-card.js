@@ -25,7 +25,7 @@
  *   v1.0.0 — 2026-09-19 — Initial (TARGET-080).
  */
 import { h } from 'preact';
-import { useState, useEffect, useCallback } from 'preact/hooks';
+import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
@@ -46,8 +46,14 @@ function answerText(a) {
   return typeof words === 'string' ? words : Number(a.value).toFixed(1);
 }
 
+/** A link that means "take me to this card": `?open=decide-card` (it survives in-app navigation,
+ *  which drops a fragment) or `#decide-card` on a cold load. */
+function askedFor() {
+  return new URLSearchParams(window.location.search).get('open') === 'decide-card' || window.location.hash === '#decide-card';
+}
+
 export function DecideCard() {
-  const [collapsed, setCollapsed] = useState(true);
+  const [collapsed, setCollapsed] = useState(() => !askedFor());
   const [settings, setSettings] = useState(null);
   const [recent, setRecent] = useState(null);
   const [keyInput, setKeyInput] = useState('');
@@ -62,6 +68,17 @@ export function DecideCard() {
     setSettings(prev => (JSON.stringify(prev) === JSON.stringify(s?.data ?? null) ? prev : (s?.data ?? null)));
     setRecent(prev => (JSON.stringify(prev) === JSON.stringify(d?.data ?? null) ? prev : (d?.data ?? null)));
   }, []);
+
+  // Arriving by that link lands ON the card, open, not at the top of a long tab with it shut.
+  // Once, when the content first arrives: a later save must not pull the page back up.
+  // The answer is taken at mount: the profile view rewrites the address to `?tab=ai` right after.
+  const wanted = useRef(!collapsed);
+  const landed = useRef(false);
+  useEffect(() => {
+    if (landed.current || !settings || !wanted.current) return;
+    landed.current = true;
+    document.getElementById('decide-card')?.scrollIntoView({ block: 'start' });
+  }, [settings]);
 
   useEffect(() => {
     if (!collapsed && !settings) load().catch(err => setMsg({ text: err?.message || t('decideCard.loadFailed'), error: true }));
