@@ -542,6 +542,7 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_designbook_get: { title: 'Design Book: one part, whole', readOnlyHint: true },
     aimeat_designbook_propose: { title: 'Design Book: propose (benched first)', idempotentHint: true },
     aimeat_designbook_adopt: { title: 'Design Book: adopt into your app', destructiveHint: true, idempotentHint: true },
+    aimeat_designbook_keep: { title: 'Design Book: the owner is satisfied with this app', idempotentHint: true },
     aimeat_memory_hands: { title: 'Memory: who has written here', readOnlyHint: true },
     aimeat_compliance_register_read: { title: 'Compliance: Read Register', readOnlyHint: true },
     // destructiveHint: it REPLACES the document rather than merging into it, so a partial write

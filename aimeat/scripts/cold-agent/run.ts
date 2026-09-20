@@ -50,6 +50,7 @@ import { parseTranscript, type RunMetrics } from './transcript.js';
 import { compareReports, renderReport, type RunRecord } from './report.js';
 import { scriptedTranscript } from './scripted.js';
 import { skillTasks } from './skill-cases.js';
+import { SANDBOX_MAX_APPS } from '../lib/sandbox-limits.js';
 
 const AIMEAT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -212,6 +213,29 @@ async function runOne(task: Task, run: number, s: Sandbox, args: Args, outDir: s
     return { task: task.id, run, marker, ok: verdict.ok, detail: verdict.detail, ...(verdict.note ? { note: verdict.note } : {}), wandered, metrics: { ...metrics, toolCalls: metrics.toolCalls.map(c => ({ ...c, input: undefined })) } };
 }
 
+/**
+ * A build task ends in a publish, and a sandbox owner holds a bounded number of apps. Every
+ * measured build and every probe page STAYS in the sandbox, on purpose, so its history can be
+ * read back. On 2026-09-20 the node ran at its default of 50, and three Opus builds, $9.91, ran to
+ * the end and were each refused at the publish for that reason alone. The sandbox now starts with
+ * SANDBOX_MAX_APPS, and this counts against the same number before a cent is spent. (A sandbox
+ * that was already running when the ceiling was raised keeps the old one until it is restarted:
+ * `pnpm sandbox --stop`, then `pnpm sandbox`. The data stays.)
+ */
+const SANDBOX_APP_CEILING = SANDBOX_MAX_APPS;
+async function refuseAFullCatalogue(s: Sandbox, taskIds: string[], runs: number, driver: string): Promise<void> {
+    const builds = taskIds.filter(id => id.startsWith('build-')).length * runs;
+    if (!builds || driver === 'scripted') return;
+    const owner = s.owners[0];
+    const res = await fetch(`${s.baseUrl}/v1/apps?owner=${encodeURIComponent(owner.name)}&limit=200`, { headers: { Authorization: `Bearer ${owner.token}` } });
+    const held = ((await res.json()) as { data?: { apps?: unknown[] } }).data?.apps?.length ?? 0;
+    if (held + builds > SANDBOX_APP_CEILING) {
+        throw new Error(`the sandbox owner holds ${held} published apps and this run would publish ${builds} more, past the ceiling of ${SANDBOX_APP_CEILING}: `
+            + 'every build would be refused at its publish after the money is spent. Raise SANDBOX_MAX_APPS (scripts/lib/sandbox-limits.ts) and restart the sandbox; '
+            + 'a reset throws the history away, so it is the last thing to reach for.');
+    }
+}
+
 async function main(): Promise<void> {
     const args = parseArgs(process.argv.slice(2));
     if (args.compare) { console.log(compareReports(args.compare[0], args.compare[1])); return; }
@@ -221,6 +245,7 @@ async function main(): Promise<void> {
     // A task marked `byNameOnly` runs when it is asked for and never as part of "everything": the
     // ten-task baseline is compared run to run, and a three-dollar build must not join it by default.
     const tasks = suite.filter(t => (args.tasks ? args.tasks.some(want => t.id === want || t.id.startsWith(`${want}:`)) : !t.byNameOnly));
+    await refuseAFullCatalogue(s, tasks.map(t => t.id), args.runs, args.driver);
     const stamp = new Date().toISOString().replace(/[:.]/g, '-');
     const outDir = join(AIMEAT, '.cold-agent', stamp);
     mkdirSync(outDir, { recursive: true });

@@ -31,12 +31,15 @@ describe('the styles an app made for itself', () => {
 });
 
 describe('the step the publish answers with', () => {
-  it('names how many and the first few, and both tools, when there is enough to be a part', () => {
+  // The setup no longer matched the ruling (2026-09-20): it asserted a proposal at the end of a
+  // build. The step asks for the REASON now and names the moment the Book hears of it.
+  it('names how many and the first few, asks for the reason now, and says when the Book hears of it', () => {
     const step = designBookStep(withStyles(receipt, many));
     expect(step).toMatch(new RegExp(`${many.length} styles of its own`));
     expect(step).toContain('.tipdial-0');
-    expect(step).toContain('aimeat_designbook_search');
-    expect(step).toContain('aimeat_designbook_propose');
+    expect(step).toContain('id="aimeat-build-notes"');
+    expect(step).toContain('aimeat_designbook_keep');
+    expect(step).not.toContain('aimeat_designbook_propose');
   });
   it('says nothing for a fork that only changed its words', () => {
     expect(designBookStep(receipt)).toBeUndefined();

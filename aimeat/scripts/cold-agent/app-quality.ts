@@ -28,6 +28,7 @@
 import type { AimeatConfig } from '../../src/config.js';
 import { lintAppArtifact } from '../../src/services/app-artifact-lint.js';
 import { genreKeptShare, ownClassNames } from '../../src/services/app-genre-fork.js';
+import { buildNotesDeclared } from '../../src/services/app-build-notes.js';
 import { ATELIER_COMPONENTS } from '../../src/services/build-atelier-prompt.js';
 
 /** `app` is the shell every Atelier page calls, so it says nothing about what was used. */
@@ -75,6 +76,8 @@ export interface AppQuality {
     bookPartsNamed: string[];
     /** Whether the page carries its arrangement as data, which a first publish stores. */
     carriesLayout: boolean;
+    /** How many reasons the page wrote down, by list; null when it carries no build notes. */
+    buildNotes: { took: number; passed: number; made: number; problems: number } | null;
     /** Whether the run was shown the Design Book's one-page map, by either road. */
     sawBookMap: boolean;
     /** `fixed` keeps its own colours, `follows` changes with the person's theme; null when not said. */
@@ -158,6 +161,8 @@ export async function appQuality(baseUrl: string, ownerName: string, filename: s
         // What the publish records without a call: the parts the page names, and its layout as data.
         bookPartsNamed: (meta('aimeat-book-parts') ?? '').split(/[\s,]+/).filter(Boolean),
         carriesLayout: /<script\b[^>]*\bid\s*=\s*["']aimeat-layout["']/i.test(html),
+        // The reasons the builder wrote down, by list (app-build-notes.ts): null when it wrote none.
+        buildNotes: (() => { const n = buildNotesDeclared(html); return n ? { took: n.notes.took.length, passed: n.notes.passed.length, made: n.notes.made.length, problems: n.problems.length } : null; })(),
         // The whole Book on one page reaches a builder two ways: part `libraries` of the
         // specification ends with it, and a search given nothing answers it.
         sawBookMap: atelierTiers.includes('build-app-atelier/libraries')
@@ -197,6 +202,7 @@ export function describeQuality(q: AppQuality): string {
         + `; Book map ${q.sawBookMap ? 'seen' : 'NOT seen'}`
         + `; mosaic ${q.mountsMosaic ? 'MOUNTED' : 'not mounted'}`
         + `; Book parts named ${q.bookPartsNamed.length ? q.bookPartsNamed.join(' ') : 'NONE'}; layout as data ${q.carriesLayout ? 'yes' : 'no'}`
+        + `; reasons ${q.buildNotes ? `took ${q.buildNotes.took}, passed ${q.buildNotes.passed}, made ${q.buildNotes.made}${q.buildNotes.problems ? ` (${q.buildNotes.problems} malformed)` : ''}` : 'NONE WRITTEN'}`
         + `; Design Book searched ${q.book.searched}, adopted ${q.book.adopted}, proposed ${q.book.proposed}`
         + `; kit components ${q.kitComponents.length ? q.kitComponents.join(' ') : 'none'}; own styles ${q.ownStyles}`;
     return `${track}; ${Math.round(q.bytes / 1024)} kB; ${wrong.length ? wrong.join(', ') : 'nothing the lint or the head checks object to'}; ${read}; spec token ${q.sentSpecToken ? 'sent' : 'not sent'}`;

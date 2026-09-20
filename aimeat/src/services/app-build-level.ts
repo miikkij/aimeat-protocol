@@ -17,7 +17,8 @@
  *   plain  an ordinary page that works: a layout and a look taken from the Design Book, following
  *          the person's theme. Nothing made by hand.
  *   fine   the finest: a genre forked, parts from the Design Book, components of its own where
- *          the Book has none, and those put INTO the Book after the publish. An app that states no
+ *          the Book has none, each written down with its reason (app-build-notes.ts); the Book
+ *          hears of them when the owner is satisfied, never because a build ended. An app that states no
  *          level is held to this one, which is what every Atelier app was held to before.
  *
  *   ALL THREE ARE ATELIER, so raising the level is a change of look and never a rewrite: the data,

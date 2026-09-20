@@ -550,6 +550,19 @@ async function main() {
             assert(start.includes('From the Design Book I take nothing, because'), 'the proposal owes the line, in both of its shapes');
         });
 
+        await test('17i. the reasons have an MCP door: the builder is told to write down why, the queue is one search, and keep is the owner\'s word', async () => {
+            const patterns = toolText((await v1('tools/call', { name: 'aimeat_handbook_get', arguments: { tier: 'build-app-atelier/patterns' } }, 414)).body);
+            assert(patterns.includes('id="aimeat-build-notes"') && patterns.includes('NOTHING GOES INTO THE BOOK BECAUSE A BUILD IS FINISHED'),
+                'the specification asks for the reasons and says when the Book hears of them');
+            assert(patterns.length < 24_000, `the part still fits one tool result: ${patterns.length}`);
+            const queue = JSON.parse(toolText((await v1('tools/call', { name: 'aimeat_designbook_search', arguments: { view: 'reasons' } }, 415)).body));
+            assert(Array.isArray(queue.made) && Array.isArray(queue.passed_over) && /not measurements/.test(queue.note), `the queue answers, and says how to read it: ${JSON.stringify(Object.keys(queue))}`);
+            const none = await v1('tools/call', { name: 'aimeat_designbook_keep', arguments: { filename: 'no-such-app.html' } }, 416);
+            assert(none.body.result?.isError === true && /NOT_FOUND/.test(toolText(none.body)), `keeping an app that is not there is an error in words: ${toolText(none.body).slice(0, 160)}`);
+            const handbook = toolText((await v1('tools/call', { name: 'aimeat_handbook_get', arguments: {} }, 417)).body);
+            assert(handbook.includes('aimeat_designbook_keep'), 'the handbook every agent reads first says what to do when the person says an app turned out well');
+        });
+
         await test('17d. an Atelier part that does not exist is an error that names the four there are', async () => {
             const { body } = await v1('tools/call', { name: 'aimeat_handbook_get', arguments: { tier: 'build-app-atelier/no-such-part' } }, 406);
             assert(body.result?.isError === true, 'MCP: isError');
