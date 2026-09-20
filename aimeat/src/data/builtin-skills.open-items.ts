@@ -14,6 +14,8 @@
  * @usage
  *   import { OPEN_ITEMS_SKILL_ENTRY } from './builtin-skills.open-items.js';
  * @version-history
+ *   v1.1.0 — 2026-09-20 — A row the decision gate put there is answered with a review, not switched
+ *     off: the node closes it on the review, and the review is the record of a human in the loop.
  *   v1.0.1 — 2026-09-19 — Three corrections. `prompt_ref` IS fetchable over MCP and has been since
  *     aimeat_handbook_get took a managed prompt by id (mcp/prompts.ts), so the known-gap paragraph
  *     was telling every reader to give up on something that works; the owner-scoped write names the
@@ -147,6 +149,14 @@ and overwriting them silently is the one thing this list must never do. Never
 retry by dropping the version.
 
 Do not switch off anything you were not asked to.
+
+## A row the decision gate put there
+
+An item whose \`kind\` is \`decision\` carries \`object: { type: "ai-decision", id }\`: an agent's gate
+stopped an action and the person has to say whether the model was right. Do not switch it off. Read
+the decision (\`aimeat_decision_list { decision_id }\`), tell them what was decided and on what
+numbers, and record THEIR answer with \`aimeat_decision_review\`. The node takes the row off once the
+review is in, and that review is what makes the register say a human was in the loop.
 
 ## When something arrives as a task instead
 

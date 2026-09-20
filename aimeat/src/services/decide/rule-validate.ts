@@ -29,6 +29,9 @@
  *   const v = validateRule(body, limits);           // { rule } or { problems }
  *   const e = evaluateRule(rule, answers);          // { outcome, result, passed }
  * @version-history
+ *   v1.1.0 — 2026-09-20 — A missing confidence is unknown, not zero: `result` is null when the model
+ *     gave no certainty at all and the outcome is then `ask`. A rule whose thresholds name only
+ *     scale questions used to answer `stop` whatever the model said.
  *   v1.0.0 — 2026-09-20 — Initial: decision rules on the node.
  */
 import type { AiDecisionAnswer, AiDecisionOutcome } from '../../storage/interface.js';
@@ -180,8 +183,8 @@ export function fieldsOutside(sends: string[], state: unknown): string[] {
 
 export interface RuleEvaluation {
   outcome: AiDecisionOutcome;
-  /** The weakest certainty among the thresholded answers, 0 to 1. */
-  result: number;
+  /** The weakest certainty among the thresholded answers, 0 to 1, or null when the model gave none. */
+  result: number | null;
   /** Per thresholded question: did its answer reach its floor. */
   passed: Record<string, boolean>;
 }
@@ -192,10 +195,17 @@ function floorValue(a: AiDecisionAnswer): number {
   return Number(a.value);
 }
 
-/** How sure the model was of this answer, 0 to 1. A yes/no has no confidence: its probability is it. */
-function certainty(a: AiDecisionAnswer): number {
+/**
+ * How sure the model was of this answer, 0 to 1, or null when it did not say.
+ *
+ * A yes/no has no confidence field: its probability IS how sure it is. A pick-one and a scale carry
+ * `confidence`, and the provider's contract makes it OPTIONAL — which is why null and not 0. Reading
+ * a missing confidence as 0 made every rule whose thresholds name only scale questions answer `stop`
+ * whatever the model said, and no test could see it because the E2E stand-in always sends one.
+ */
+function certainty(a: AiDecisionAnswer): number | null {
   if (a.type === 'noul') return Number(a.value);
-  return typeof a.confidence === 'number' ? a.confidence : 0;
+  return typeof a.confidence === 'number' ? a.confidence : null;
 }
 
 /** Thresholds and bands applied to the answers. A thresholded question the model did not answer fails. */
@@ -203,14 +213,20 @@ export function evaluateRule(
   rule: Pick<DecisionRuleInput, 'thresholds' | 'bands'>, answers: Record<string, AiDecisionAnswer>,
 ): RuleEvaluation {
   const passed: Record<string, boolean> = {};
-  let result = 1;
+  const known: number[] = [];
   for (const [qid, floor] of Object.entries(rule.thresholds)) {
     const a = answers[qid];
     passed[qid] = !!a && floorValue(a) >= floor;
-    result = Math.min(result, a ? certainty(a) : 0);
+    const c = a ? certainty(a) : null;
+    if (typeof c === 'number' && Number.isFinite(c)) known.push(Math.max(0, Math.min(1, c)));
   }
-  result = Math.max(0, Math.min(1, Number.isFinite(result) ? result : 0));
+  const result = known.length ? Math.min(...known) : null;
   const allPassed = Object.values(passed).every(Boolean);
-  const outcome: AiDecisionOutcome = !allPassed ? 'stop' : result >= rule.bands.act ? 'act' : result >= rule.bands.ask ? 'ask' : 'stop';
+  // A thresholded question that failed decides on its own. Otherwise the bands need a number, and
+  // when the model gave none the rule cannot band: that is a person's to look at, not a refusal.
+  const outcome: AiDecisionOutcome = !allPassed
+    ? 'stop'
+    : result === null ? 'ask'
+      : result >= rule.bands.act ? 'act' : result >= rule.bands.ask ? 'ask' : 'stop';
   return { outcome, result, passed };
 }

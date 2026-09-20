@@ -32,7 +32,10 @@ import { swallowed } from '/js/swallowed.js';
 const html = htm.bind(h);
 
 /** Where the list itself renders. The button leads there; it does not duplicate the list. */
-const LIST_PATH = '/profile';
+// `/v1/profile`, the way every other component addresses it (NotificationBell.js). This said
+// `/profile`, which is not a route: pressing the count landed on the home page, and the list it
+// counts sits on the profile overview. Found when the decision gate started putting rows here.
+const LIST_PATH = '/v1/profile';
 
 export function OpenItemsButton({ t, onNavigate }) {
   const [count, setCount] = useState(0);

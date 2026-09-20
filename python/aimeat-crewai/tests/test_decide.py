@@ -248,6 +248,31 @@ def test_a_question_the_model_never_answered_fails() -> None:
     assert e.outcome == "stop"
 
 
+def test_no_certainty_anywhere_asks_a_person_rather_than_stopping() -> None:
+    # `confidence` is OPTIONAL in the provider's contract. Read as 0.0, a rule thresholding only a
+    # scale or a pick-one answered "stop" whatever the model said (node fix, 2026-09-20).
+    r = _rule(
+        questions={"harm": scale("harm", ["none", "some", "much"])},
+        thresholds={"harm": 0},
+        bands={"act": 0.85, "ask": 0.5},
+    )
+    e = evaluate_rule(r, {"harm": {"type": "score", "value": 1}})
+    assert e.passed == {"harm": True}
+    assert e.result is None, "no number is invented for an answer that carried none"
+    assert e.outcome == "ask"
+
+
+def test_a_certainty_that_is_there_is_read_and_the_rest_ignored() -> None:
+    r = _rule(
+        questions={"a": yes_no("a"), "b": scale("b", ["low", "high"])},
+        thresholds={"a": 0.1, "b": 0},
+        bands={"act": 0.6, "ask": 0.2},
+    )
+    e = evaluate_rule(r, {"a": _noul(0.9), "b": {"type": "score", "value": 1}})
+    assert e.result == pytest.approx(0.9)
+    assert e.outcome == "act"
+
+
 def test_the_result_is_the_weakest_certainty_among_the_thresholded_answers() -> None:
     r = _rule(
         questions={"a": yes_no("a"), "b": pick_one("b", {"x": None, "y": None})},

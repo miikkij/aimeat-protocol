@@ -19,6 +19,11 @@
  * @structure DecideCard — the collapsible card, mounted in the profile AI tab
  * @usage import { DecideCard } from './decide-card.js'; html`<${DecideCard} />`
  * @version-history
+ *   v1.3.0 — 2026-09-20 — Every decision carries the person's own verdict: it was right, it was
+ *     wrong. Nothing in the browser recorded a review before, so the register's "a human looked at
+ *     it" half could only be written over MCP. The verdict already recorded stays on screen and
+ *     unpressable, and the opposite stays live: that is the way back from a mis-tap, because the
+ *     gate's row is gone from the open-items list the moment the first answer lands.
  *   v1.2.0 — 2026-09-20 — The decision rules section (decide-rules.js), and a recent decision says
  *     which rule made it and what the outcome was.
  *   v1.1.0 — 2026-09-19 — A key test: one tiny real call on the key that would pay.
@@ -31,6 +36,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { apiGet, apiPut, apiPost, apiDelete } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
+import { reviewDecision } from '/js/services/decide.js';
 import { DecideRules } from './decide-rules.js';
 
 const shortTime = (iso) => String(iso ?? '').slice(0, 16).replace('T', ' ');
@@ -142,6 +148,22 @@ export function DecideCard() {
     }
   };
 
+  // The person's verdict on one decision. The node records it and, when the gate put that decision
+  // on their open items, takes that row off in the same call.
+  const review = async (id, outcome) => {
+    setBusy('review');
+    setMsg(null);
+    try {
+      await reviewDecision(id, outcome);
+      setMsg({ key: `decideCard.review.saved.${outcome}`, error: false });
+      await load();
+    } catch (err) {
+      setMsg({ text: err?.message || t('decideCard.saveFailed'), error: true });
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const toggleClass = (cls) => {
     const allow = new Set(settings.policy.allow);
     if (allow.has(cls)) allow.delete(cls); else allow.add(cls);
@@ -235,6 +257,23 @@ export function DecideCard() {
                       <span class="pf-aitr-row-meta">
                         ${d.rule ? `${d.rule} · ${t(`decideRules.outcome.${d.outcome}`)} · ` : ''}${shortTime(d.createdAt)} · ${d.model}${d.record.cachedFrom ? ` · ${t('decideCard.cached')}` : ''}
                         ${d.record.review ? ` · ${t(`decideCard.review.${d.record.review.outcome}`)}` : ''}
+                      </span>
+                      ${/* The person's own verdict, on EVERY decision, answered or not. The gate's
+                           row on the open-items list carries the same two buttons, but a decision
+                           made with the gate off never passes through that list, and it is just as
+                           much theirs to judge. This is the only place the register's "a human
+                           looked at it" half can be written from a browser — and the only way back
+                           from a mis-tap, which is why the answered one stays on screen, greyed and
+                           unpressable, with the opposite still live. */''}
+                      <span class="pf-aitr-row-verdict">
+                        <button type="button" class="btn-outline btn-sm"
+                          disabled=${!!busy || d.record.review?.outcome === 'confirmed'}
+                          title=${d.record.review?.outcome === 'confirmed' ? t('decideCard.review.already') : ''}
+                          onClick=${() => review(d.id, 'confirmed')}>${t('decideCard.review.confirmAction')}</button>
+                        <button type="button" class="btn-outline btn-sm"
+                          disabled=${!!busy || d.record.review?.outcome === 'overridden'}
+                          title=${d.record.review?.outcome === 'overridden' ? t('decideCard.review.already') : ''}
+                          onClick=${() => review(d.id, 'overridden')}>${t('decideCard.review.overrideAction')}</button>
                       </span>
                     </li>`)}
                 </ul>`}
