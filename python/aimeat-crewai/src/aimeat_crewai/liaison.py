@@ -407,8 +407,11 @@ passing `rule` (its id) and `state` with ONLY the fields the rule lists under
 numbers apply, and the call is refused otherwise. Read `outcome` (act, ask or
 stop) and `proceed` in the answer. When `proceed` is false, do NOT take the
 action: your owner switched the gate on for you, the model was not sure enough,
-and your owner already has a task about it. Say in your task output that the
-gate held the action, and name the `decision_id`. When no key is set, the
+and the held action goes to your owner as an OPEN ITEM on their list -- not as a
+task, because a task targets an agent and your owner is not one. Say in your
+task output that the gate held the action, and name the `decision_id`: that id
+is how your owner finds the decision even if the item could not be written. When
+no key is set, the
 refusal says what the owner must set and where: pass it on as it is, and do not
 retry. If the crew makes a judgement often and no rule covers it, propose one
 with `aimeat_decide_rule_propose`; it creates nothing until the owner approves.
@@ -575,9 +578,12 @@ YOUR RESPONSIBILITIES, in priority order:
    a rule: the owner's numbers apply, and the call is refused otherwise. Read
    `outcome` (act, ask or stop) and `proceed` in the answer. When `proceed` is
    false, do NOT take the action: your owner switched the gate on for you, the
-   model was not sure enough, and your owner already has a task about it. Say
-   in your task output that the gate held the action, and name the
-   `decision_id`. When no key is set, the refusal says what the owner must set
+   model was not sure enough, and the held action goes to your owner as an OPEN
+   ITEM on their list -- not as a task, because a task targets an agent and
+   your owner is not one. Say in your task output that the gate held the
+   action, and name the `decision_id`: that id is how your owner finds the
+   decision even if the item could not be written.
+   When no key is set, the refusal says what the owner must set
    and where: pass it on as it is, and do not retry. If the crew makes a
    judgement often and no rule covers it, propose one with
    aimeat_decide_rule_propose; it creates nothing until the owner approves.
