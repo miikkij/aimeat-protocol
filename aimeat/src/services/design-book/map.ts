@@ -26,6 +26,10 @@ export const MAP_BUDGET = 13_000;
 /** What a search with no word says beside the map, on every door. */
 export const MAP_NOTE = 'This is the whole published Book on one page. Give a word (q) or a kind to get rows with their tags, versions and usage instead.';
 
+/** How the reasons queue is to be read, on every door: what it is, and what it is not. */
+export const REASONS_NOTE = 'These are the builders\' OWN ACCOUNTS of why they took a part, passed one over, or made something by hand. They are leads for a person to read, not measurements. '
+  + '`times` counts builders; `kept` counts the apps among them whose owner said the app turned out well, and only that number says anybody was satisfied.';
+
 export interface MapRow { id: string; kind: string; summary: string }
 
 export interface MapOptions {

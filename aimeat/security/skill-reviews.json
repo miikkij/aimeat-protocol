@@ -91,13 +91,13 @@
       "note": "The skill points at the build specification rather than repeating it, so it watches the doors to the specification and not the specification's text."
     },
     "node:aimeat-app-builder-atelier": {
-      "reviewedOn": "2026-09-19",
+      "reviewedOn": "2026-09-20",
       "watches": [
         "aimeat/src/services/build-atelier-prompt.ts",
         "aimeat/src/services/build-atelier-layers.ts",
         "aimeat/src/static/sdk-libs/atelier/describe-data.js"
       ],
-      "digest": "sha256:970a9ce29d047ec8928d037e"
+      "digest": "sha256:e66d1874e4b48601ba4d7712"
     },
     "node:aimeat-phaser": {
       "reviewedOn": "2026-09-19",
@@ -231,7 +231,7 @@
         "aimeat/src/routes/agents-v2/agent-proposals.ts",
         "aimeat/src/data/basic-agents.ts"
       ],
-      "digest": "sha256:61d6b518ce578e0d2ac95d77"
+      "digest": "sha256:c8506e2c834cf6c0a4f21ee3"
     },
     "node:set-up-content-pipeline": {
       "reviewedOn": "2026-09-19",
@@ -297,11 +297,11 @@
       "digest": "sha256:cea992e89cb458496c30bd16"
     },
     "project:aimeat-frontend-verify": {
-      "reviewedOn": "2026-09-19",
+      "reviewedOn": "2026-09-20",
       "watches": [
         "aimeat/scripts/sandbox.ts"
       ],
-      "digest": "sha256:e70e81073fb3d11e8305806a",
+      "digest": "sha256:ff8d3e400dab93a35a281239",
       "note": "It sends the check to the sandbox node; the styling rules it states live in the frontend path rule."
     },
     "project:aimeat-imagery": {
@@ -379,7 +379,7 @@
       "aimeat/src/services/app-spec-gate.ts": "023890ba92c1090e"
     },
     "node:aimeat-app-builder-atelier": {
-      "aimeat/src/services/build-atelier-prompt.ts": "af6721d70308abfc",
+      "aimeat/src/services/build-atelier-prompt.ts": "257403fc8309d1c7",
       "aimeat/src/services/build-atelier-layers.ts": "4fce3c62daccfa86",
       "aimeat/src/static/sdk-libs/atelier/describe-data.js": "b87046c1071e4940"
     },
@@ -458,7 +458,7 @@
     },
     "node:add-a-crew-agent": {
       "aimeat/src/routes/agents/device-auth.ts": "7d37b0bbc2105613",
-      "aimeat/src/mcp/catalog/scopes.ts": "497de12c8d7b13c7",
+      "aimeat/src/mcp/catalog/scopes.ts": "07aab1f422b7a9e9",
       "aimeat/src/mcp/catalog/definitions/crew.ts": "f18f927aad1a04d6",
       "aimeat/src/routes/agents-v2/agent-proposals.ts": "1da72b752ee164bc",
       "aimeat/src/data/basic-agents.ts": "aff54b3a43cbd71d"
@@ -495,7 +495,7 @@
       "aimeat/public/lib/aimeat-fonts.css": "6754e84dc93d141f"
     },
     "project:aimeat-frontend-verify": {
-      "aimeat/scripts/sandbox.ts": "18f267eb867e21a9"
+      "aimeat/scripts/sandbox.ts": "660637f82c63edff"
     },
     "project:aimeat-imagery": {
       "scripts/gen_image.py": "e2435908849b31d3"

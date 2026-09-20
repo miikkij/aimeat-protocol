@@ -407,7 +407,10 @@ const publish = (token: string, body: Record<string, unknown>) =>
         assert(/Fixed colours or following their theme\?/.test(start), 'the proposal asks it');
     });
 
-    await test('an Atelier app that made things of its own is asked to put them in the Design Book; a plain fork is not', async () => {
+    // The setup no longer matched the ruling (2026-09-20): this asserted "propose it to the Book
+    // NOW", and a finished build is not the moment anything goes into the Book. It is asked to
+    // write down WHY, and told the Book hears of it when the owner is satisfied.
+    await test('an Atelier app that made things of its own is asked to write down why, and not to propose because it is finished; a plain fork is not', async () => {
         const genre = await json('/v1/app-templates/genre-receipt');
         const served = genre.body.data.template.content as string;
         const plainName = `gatebookplain${Date.now()}.html`;
@@ -421,7 +424,8 @@ const publish = (token: string, body: Record<string, unknown>) =>
         const r = await publish(o.token, { filename: madeName, mime_type: 'text/html', content: b64(made), name: 'Made parts', description: 'A fork that made parts of its own.', spec_token: atelierToken });
         assert(r.status === 201, `publish ${r.status}: ${JSON.stringify(r.body?.error)}`);
         const step = String(r.body.data.next_steps?.design_book ?? '');
-        assert(step.includes('24 styles of its own') && step.includes('aimeat_designbook_propose') && step.includes('aimeat_designbook_search'), `expected the Design Book step: ${JSON.stringify(r.body.data.next_steps)}`);
+        assert(step.includes('24 styles of its own') && step.includes('id="aimeat-build-notes"') && step.includes('aimeat_designbook_keep'), `expected the Design Book step: ${JSON.stringify(r.body.data.next_steps)}`);
+        assert(/DO NOT PROPOSE IT TO THE BOOK BECAUSE THE BUILD IS FINISHED/.test(step), 'and it says when the Book hears of it');
     });
 
     await test('the Atelier specification comes in parts over HTTP, each inside one tool result', async () => {

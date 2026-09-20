@@ -11,6 +11,8 @@
  * @structure designbookTools
  * @usage import { designbookTools } from './designbook.js';
  * @version-history
+ *   v1.3.0 — 2026-09-20 — aimeat_designbook_keep, the search's view "reasons", and the reasons in
+ *     what get answers: why a part was taken, why it was passed over, what was made by hand.
  *   v1.2.0 — 2026-09-19 — The search says what it answers when it is given nothing: the whole
  *     published Book on one page.
  *   v1.1.0 — 2026-09-05 — Seven kinds, said out loud (wish-atelier-ambient-visuals): the search,
@@ -23,10 +25,13 @@
 import type { AimeatToolDefinition } from './types.js';
 import { AI_PROVENANCE_TOOL_NOTE, aiProvenanceCatalogInput } from './ai-provenance-note.js';
 
+/** What the search's `view` parameter says, on both MCP doors. */
+export const BOOK_VIEW_PARAM = '"reasons": what builders wrote down about the Book, as the list of what it should become next. "map": the whole published Book on one page (also what calling with nothing answers). Omit it to search rows.';
+
 export const designbookTools: AimeatToolDefinition[] = [
     {
         name: 'aimeat_designbook_search',
-        description: "Browse the Design Book: the node's shared library of proven parts. Each row is a part — `layout` (a complete Atelier mosaic arrangement), `fill` (the same shape with <placeholder> slots, a starting shape), `look` (a signature token sheet with an optional preset), `motion` (a motion-token recipe), `illustration` (art direction for the imagery pipeline), `genre` (one of the node's served page templates, shown and forked rather than adopted) or `ambient` (the one layer allowed to move at idle: a preset with its alpha and speed, proven on a look) — with its title, what it is for, lifecycle status and how many builds have adopted it. Published parts are what everyone builds from; proposed ones are still earning it. Filter by kind, status or a word. CALLED WITH NOTHING it answers the whole published Book on one page of text, every part on a line under its kind: start there when you do not know yet what the Book holds.",
+        description: "Browse the Design Book: the node's shared library of proven parts. Each row is a part — `layout` (a complete Atelier mosaic arrangement), `fill` (the same shape with <placeholder> slots, a starting shape), `look` (a signature token sheet with an optional preset), `motion` (a motion-token recipe), `illustration` (art direction for the imagery pipeline), `genre` (one of the node's served page templates, shown and forked rather than adopted) or `ambient` (the one layer allowed to move at idle: a preset with its alpha and speed, proven on a look) — with its title, what it is for, lifecycle status and how many builds have adopted it. Published parts are what everyone builds from; proposed ones are still earning it. Filter by kind, status or a word. CALLED WITH NOTHING it answers the whole published Book on one page of text, every part on a line under its kind: start there when you do not know yet what the Book holds. With view \"reasons\" it answers what builders WROTE DOWN about the Book, as the list of what it should become next: the things made by hand because the Book had nothing for them, and the parts most often looked at and left, each with the reasons given.",
         caller: 'agent',
         visibility: { publicMcp: true, connectorMcp: true, cliFallback: true },
         input: {
@@ -34,11 +39,22 @@ export const designbookTools: AimeatToolDefinition[] = [
             status: { type: 'string', description: 'Only this lifecycle state: proposed, published, aging or retired. Omit for all.' },
             q: { type: 'string', description: 'A word matched against id, title, summary and tags.' },
             limit: { type: 'number', description: 'Rows to return, 1-200. Default 50.' },
+            view: { type: 'string', description: BOOK_VIEW_PARAM },
+        },
+    },
+    {
+        name: 'aimeat_designbook_keep',
+        description: "Record that the OWNER is satisfied with one of their apps: it turned out well and they mean to keep it. Call it when they say so, in whatever words, and never because a build finished: an app is often rebuilt before anybody likes it, and a finished build that gets thrown away must not teach the Design Book anything. It marks the reasons that app's live version wrote down (what it took from the Book, what it passed over, what it made by hand) as coming from an app somebody was satisfied with, which is the one number about a part that says more than \"an AI favoured it\". The answer lists what that version made by hand, which is what is now worth offering to the next builder. `kept: false` takes it back. The app must carry build notes (<script type=\"application/json\" id=\"aimeat-build-notes\">); one that carries none is answered with how to add them.",
+        caller: 'agent',
+        visibility: { publicMcp: true, connectorMcp: true, cliFallback: true },
+        input: {
+            filename: { type: 'string', required: true, description: 'The published app the owner is satisfied with, e.g. "habits.html". It must belong to your owner.' },
+            kept: { type: 'boolean', description: 'false takes it back. Default true.' },
         },
     },
     {
         name: 'aimeat_designbook_get',
-        description: "Read one Design Book part whole: its body is exactly what an adopt writes into an app — a layout or fill whole; a look's or motion's tokens and preset; an illustration's style; an ambient's preset, alpha, speed, the look it was proven on and its tokens; a genre's template id, which is forked rather than adopted — so reading it IS the preview. The answer carries the part, its record version (its evolution is the version history) and its adoption count.",
+        description: "Read one Design Book part whole: its body is exactly what an adopt writes into an app — a layout or fill whole; a look's or motion's tokens and preset; an illustration's style; an ambient's preset, alpha, speed, the look it was proven on and its tokens; a genre's template id, which is forked rather than adopted — so reading it IS the preview. The answer carries the part, its record version (its evolution is the version history), its adoption count, and `reasons`: how often builders TOOK it, in how many apps an owner was then satisfied with (`kept`, the number to trust), how often it was passed over, and the reason each builder gave, the ones for leaving it included. Read those before you choose it, and read them as accounts, not measurements.",
         caller: 'agent',
         visibility: { publicMcp: true, connectorMcp: true, cliFallback: true },
         input: {

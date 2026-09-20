@@ -21,6 +21,9 @@
  * @structure genreKeptShare(html, genreId) · genreForkFindings(html)
  * @usage const hints = genreForkFindings(html);
  * @version-history
+ *   v1.1.0 — 2026-09-20 — designBookStep asks for the REASON now (the `made` list of the page's
+ *     build notes) and no longer for a proposal. Ruled the same day: a finished build is not the
+ *     moment anything goes into the Book, because an app is often rebuilt before anybody likes it.
  *   v1.0.1 — 2026-09-20 — Two CodeQL findings, both about text a stranger uploaded. The `<style>`
  *     bodies are read by utils/html-blocks in one pass instead of a pattern that restarts at every
  *     `<style` (alert 1642), and a genre's class name goes into its pattern through
@@ -88,10 +91,11 @@ export function designBookStep(html: string): string | undefined {
   if (own.length < OWN_PARTS_MIN) return undefined;
   const shown = own.slice(0, 6).map(n => '.' + n).join(', ');
   return `This app carries ${own.length} styles of its own beyond the kit and the genre it forked (${shown}${own.length > 6 ? ', …' : ''}). `
-    + 'What was made here is what the next app should not have to make again. If any of it is a component, a layout or a fill another app could use, '
-    + 'put it in the Design Book NOW, while you know how it works: search first so you do not add what is there (`aimeat_designbook_search`), '
-    + 'then `aimeat_designbook_propose` with what it is for, when to choose it and its body. A part that is already in the book is adopted, and improved as a new version of it, never copied beside it. '
-    + 'On the finest level this is a STEP OF THE BUILD and not a suggestion: the build is finished when each hand-made part is either proposed or named to the owner with the reason it stays out.';
+    + 'WRITE DOWN WHY, NOW, while you know: for each thing you made by hand, one row in the page\'s build notes '
+    + '(<script type="application/json" id="aimeat-build-notes">, list `made`: { "name", "what", "why" }, where `why` is why the Design Book had nothing for it), '
+    + 'and publish again so the node keeps it with this version. DO NOT PROPOSE IT TO THE BOOK BECAUSE THE BUILD IS FINISHED: a finished build is often thrown away and rebuilt, '
+    + 'and only an app its owner is satisfied with should teach the Book anything. Tell the owner in one line that when they are happy with the app they can say so, '
+    + 'and that is when what was made here is offered to the next builder (`aimeat_designbook_keep`).';
 }
 
 /** The share of the genre's own class names the app still carries, or null when the genre is unknown. */

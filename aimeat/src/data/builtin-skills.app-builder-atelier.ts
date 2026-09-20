@@ -13,6 +13,9 @@
  * @structure APP_BUILDER_ATELIER_SKILL_ENTRY
  * @usage import { APP_BUILDER_ATELIER_SKILL_ENTRY } from './builtin-skills.app-builder-atelier.js';
  * @version-history
+ *   v1.18.0 — 2026-09-20 — Step 10 is rewritten on the developer's ruling: write down WHY as you
+ *     choose (the build notes), and put nothing into the Book because a build is finished. The
+ *     owner saying an app turned out well is the moment, recorded with aimeat_designbook_keep.
  *   v1.17.0 — 2026-09-20 — The page NAMES its Design Book parts and carries its layout as data,
  *     and the publish records both. Three measured builds used a Book fill and none made the two
  *     calls afterwards that recorded it, because a builder stops when the app is live.
@@ -273,11 +276,21 @@ moved under you says so.
    figure, the printed maths, the sentence and the state all follow it in the same paint.
 9. **Publish** — \`aimeat_app_publish\` with \`spec_token\`; report the live URL in the owner's
    words. Read \`next_steps\` in the answer: it is the node's list of what this app still owes.
-10. **Put what you made into the Design Book.** The arrangement of your working screen is a
-   layout, and the Book has a kind for it: propose it as a \`fill\`, its app-specific words turned
-   back into <placeholders>, so the next app starts from it. (The Book has no kind for a
-   hand-made HTML component yet; say to the owner which ones you made, by name, so they are not
-   lost.)
+10. **Write down why, and put nothing into the Design Book because the build is finished.** As
+   you choose, the page carries your reasons, one true sentence each, in
+   \`<script type="application/json" id="aimeat-build-notes">\`: \`took\` (a Book part in this
+   page, and what made it fit), \`passed\` (a part you looked at and left, and what made it NOT
+   fit: the only place a part's weakness is ever written down), \`made\` (what you built by hand,
+   and why the Book had nothing for it). "The name matched and I did not look further" is a true
+   reason; a good-sounding one that is not why you chose teaches the Book the wrong thing. The
+   publish keeps them with the version. A count says an AI favoured a part, never that it is
+   good, and an app is often rebuilt twice before its owner likes it, so a thrown-away version
+   must teach the Book nothing. Tell the owner in one line, when you hand the app over, that
+   when they are happy with it they can say so. WHEN THE OWNER SAYS AN APP TURNED OUT WELL, in
+   whatever words and in whichever conversation, record it: \`aimeat_designbook_keep { filename }\`.
+   That is the moment what the app took and made starts to count, and its answer lists what is
+   now worth offering to the next builder (an arrangement as a \`fill\`, with
+   \`aimeat_designbook_propose\`).
    \`aimeat_designbook_propose\` with what it is for, when to choose it and its body, NOW, while you
    know how it works; the publish answer's \`design_book\` line names the styles this app made for
    itself. Improve a part that is already there as a new version of it, never as a copy beside it.

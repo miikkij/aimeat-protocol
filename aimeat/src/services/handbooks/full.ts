@@ -8,6 +8,8 @@
  * @structure FULL_HANDBOOK — markdown, served by GET /v1/agents/me/handbook?surface=full
  * @usage import { FULL_HANDBOOK } from './full.js';
  * @version-history
+ *   v1.3.0 — 2026-09-20 — The Apps line says what to do when the person says an app turned out
+ *     well (aimeat_designbook_keep). The AI they say it to is rarely the one that built the app.
  *   v1.2.0 — 2026-09-19 — The Apps line sends a builder to the app-builder skill, which says the
  *     track first, and no longer straight to the Classic specification.
  *   v1.1.0 — 2026-09-19 — A paragraph on aimeat_discover and its three reaches. The agent handbook
@@ -34,7 +36,11 @@ Three grounds carry most of the work:
   \`url\` you hand the person. Before you build one, load the skill
   \`node:aimeat-app-builder\`: a new app is built on the Atelier track, from a genre, and its
   specification is \`aimeat_handbook_get { tier: "build-app-atelier" }\` in parts. \`{ tier:
-  "build-app" }\` is the Classic track's, for an app that is already Classic.
+  "build-app" }\` is the Classic track's, for an app that is already Classic. **When the person
+  says one of their apps turned out well** ("this one is good", "I'm keeping this"), in whatever
+  words and whoever built it, record it: \`aimeat_designbook_keep { filename }\`. It is the one
+  signal that an app was worth learning from, and nothing else gives it: a finished build is
+  often thrown away and rebuilt.
 - **Organisms and workspaces** are how the person shares knowledge with others. A **skill**
   (\`aimeat_skill_list\`, \`aimeat_skill_get\`) is the operating guide for one named capability, and
   reading the skill first is faster than deriving it.

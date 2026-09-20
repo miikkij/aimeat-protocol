@@ -10,6 +10,10 @@
  *   import { registerDesignbookTools } from './designbook.js';
  *   registerDesignbookTools(mcp, storage, config, () => agentGaii);
  * @version-history
+ *   v1.5.0 — 2026-09-20 — The reasons: search takes view "reasons" (what the Book should grow
+ *     next), get answers what builders wrote about a part, and aimeat_designbook_keep is the owner
+ *     saying an app turned out well. Its own tool because it writes the node's system records on
+ *     the owner's word, which no memory write can do.
  *   v1.4.0 — 2026-09-19 — A search with no word and no kind answers the whole published shelf as
  *     one page of text (DesignBookService.map), where it used to answer the first fifty rows.
  *   v1.3.0 — 2026-09-05 — effect joins the kind wording, with its body and its targets, and an
@@ -30,7 +34,8 @@ import { aiProvenanceInputs, toDeclaredProvenance } from './ai-provenance-input.
 import { descriptionFor } from './catalog/shape.js';
 import { DesignBookService } from '../services/design-book/service.js';
 import { DesignBookError } from '../services/design-book/validate.js';
-import { MAP_NOTE } from '../services/design-book/map.js';
+import { MAP_NOTE, REASONS_NOTE } from '../services/design-book/map.js';
+import { BOOK_VIEW_PARAM } from './catalog/definitions/designbook.js';
 
 /** One text block per answer; refusals carry the service's words verbatim. */
 function text(payload: unknown, isError = false) {
@@ -62,12 +67,17 @@ export function registerDesignbookTools(
             status: z.string().optional().describe('Only this lifecycle state: proposed, published, aging or retired.'),
             q: z.string().optional().describe('A word matched against id, title, summary and tags.'),
             limit: z.number().optional().describe('Rows to return, 1-200. Default 50.'),
+            view: z.string().optional().describe(BOOK_VIEW_PARAM),
         },
         annotationsFor('aimeat_designbook_search'),
-        async ({ kind, status, q, limit }) => {
+        async ({ kind, status, q, limit, view }) => {
+            // What builders wrote down about the Book, as what it should become next (reasons.ts).
+            if (view === 'reasons') {
+                return text({ ...(await book.reasonsQueue()), note: REASONS_NOTE });
+            }
             // No word, no kind: the caller does not know yet what the Book holds, so it gets the
             // whole shelf on one page as plain text, and not the first fifty rows of JSON.
-            if (!kind && !status && !q && limit == null) {
+            if (view === 'map' || (!kind && !status && !q && limit == null)) {
                 const out = await book.map();
                 return text(`${out.map}${MAP_NOTE}`);
             }
@@ -91,6 +101,17 @@ export function registerDesignbookTools(
         },
         annotationsFor('aimeat_designbook_get'),
         async ({ id }) => answer(() => book.get(id)),
+    );
+
+    mcp.tool(
+        'aimeat_designbook_keep',
+        descriptionFor('aimeat_designbook_keep'),
+        {
+            filename: z.string().describe('The published app the owner is satisfied with, e.g. "habits.html".'),
+            kept: z.boolean().optional().describe('false takes it back. Default true.'),
+        },
+        annotationsFor('aimeat_designbook_keep'),
+        async ({ filename, kept }) => answer(() => book.keep(getAgentGaii(), filename, kept !== false)),
     );
 
     mcp.tool(

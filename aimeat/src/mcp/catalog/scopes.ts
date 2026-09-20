@@ -461,6 +461,7 @@ export const TOOL_SCOPES: Record<string, string> = {
     aimeat_designbook_get: 'memory:read',
     aimeat_designbook_propose: 'memory:write',
     aimeat_designbook_adopt: 'memory:write',
+    aimeat_designbook_keep: 'memory:write',
     aimeat_memory_hands: 'memory:read',
 
     // NOTE on `provenance:write` (TARGET-058): it deliberately has NO entry in this map, because it
