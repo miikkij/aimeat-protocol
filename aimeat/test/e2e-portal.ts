@@ -144,7 +144,12 @@ await test('GET /v1/portal/prompt/grok-api — returns API instructions', async 
     assert(body.ok === true, 'ok');
     assert(body.data.tier === 'B', `tier: ${body.data.tier}`);
     assert(body.data.path === 'api', `path: ${body.data.path}`);
-    assert(body.data.prompt.includes('/v1/owners'), 'API prompt should reference registration');
+    // How an AI joins is device authorization, not a registration POST. The prompt was cut to a
+    // short pointer on 2026-09-18 because the long one taught a contract that does not exist: it
+    // asked the person for their private key and read a field `POST /v1/owners` never returned.
+    // This assertion named that dead route, so it is the test's own assumption that expired.
+    assert(body.data.prompt.includes('/v1/agents/device-authorize'), 'API prompt should say how an agent joins');
+    assert(!/private key/i.test(body.data.prompt), 'the API prompt must never ask for the person\'s key');
 });
 
 // ─── GET /v1/portal/prompt — Browse path ───
@@ -167,10 +172,14 @@ await test('GET /v1/portal/prompt/deepseek-chat?goal=notes — returns prompt pa
     assert(body.data.tier === 'D', `tier: ${body.data.tier}`);
     assert(body.data.path === 'prompt-package', `path: ${body.data.path}`);
     assert(body.data.goal === 'notes', `goal: ${body.data.goal}`);
-    assert(body.data.prompt.includes('AIMEAT Application Builder'), 'should contain app builder prompt');
+    // Same cut, same date: the builder prompt is a pointer at the one maintained specification
+    // rather than a second copy of it. The three assertions that used to stand here read the old
+    // copy's own words (its title, its Ed25519 signing section, its memory examples), so they
+    // asserted that the duplicate still existed. What is worth holding is that the prompt SENDS
+    // the builder to the specification and still carries the goal the person picked.
+    assert(body.data.prompt.includes('/v1/prompts/build-app'), 'should send the builder to the build specification');
     assert(body.data.prompt.includes('Note-Taking App'), 'should include notes goal description');
-    assert(body.data.prompt.includes('Ed25519'), 'should include Ed25519 signing instructions');
-    assert(body.data.prompt.includes('/v1/memory'), 'should reference memory API');
+    assert(!/private key|owner_key/i.test(body.data.prompt), 'the builder prompt must never ask for the person\'s key');
 });
 
 // ─── 404 for unknown platform ───

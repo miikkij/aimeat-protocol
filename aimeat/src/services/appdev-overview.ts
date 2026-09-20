@@ -157,9 +157,17 @@ export async function buildAppdevOverview(
 
     // ── App-shell templates (T1/T2/T3) + components ──
     if (wanted.has('app_templates')) {
+        // THE SHELLS FIRST, and the cap is why. This section is named for T1/T2/T3, and they are
+        // what a build starts from, but the index also carries every genre and component: 54
+        // entries on 2026-09-20, of which exactly three have a tier, all behind 51 that do not. A
+        // cap of 25 in the index's own order therefore returned no shell at all, and an agent
+        // asking where to start was handed components. e2e-appdev-overview has said so since
+        // 2026-09-19 ("T1 shell missing") on both backends.
         const idx = getAppTemplateIndex();
+        const tiered = (t: { tier?: string }) => Boolean(t.tier);
+        const ordered = [...idx.filter(tiered), ...idx.filter(t => !tiered(t))];
         out.app_templates = {
-            ...capped(idx.map(t => ({
+            ...capped(ordered.map(t => ({
                 id: t.id, kind: t.kind,
                 ...('tier' in t && t.tier ? { tier: t.tier } : {}),
                 title: (t as { title?: string }).title ?? t.id,
