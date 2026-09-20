@@ -104,6 +104,7 @@ import { oneLanguageFindings } from './app-language-default.js';
 import { genreForkFindings } from './app-genre-fork.js';
 import { handRolledFindings } from './app-hand-rolled.js';
 import { levelFindings } from './app-build-level.js';
+import { recordBookParts } from './app-book-parts.js';
 import { loadsAtelierKit } from './app-artifact-lint.js';
 import { buildPublishNextSteps } from './app-publish-next-steps.js';
 import { readAppDataMap } from './data-map/data-map-store.js';
@@ -620,6 +621,13 @@ export async function publishApp(
     });
   }
 
+  // The two calls a builder is measured to forget once the app is live (app-book-parts.ts).
+  const bookParts = isHtml
+    ? await recordBookParts(storage, config, { ownerName, ownerGaii: ownerGhii, filename, html, provenance: { principal: callerGaii } })
+    : undefined;
+  const steps = await buildPublishNextSteps(
+    storage, config, ownerName, filename, data.length, track, declaredRegister, isHtml ? html : undefined);
+
   return {
     ...('warning' in road ? { roadmapHint: road.warning } : {}),
     filename,
@@ -646,8 +654,7 @@ export async function publishApp(
     servedMarksRemoved,
     // Every door returns this now. It used to exist only on the MCP inline branch, so the two
     // things an app most often lacks went unmentioned on the door most apps come through.
-    nextSteps: await buildPublishNextSteps(
-      storage, config, ownerName, filename, data.length, track, declaredRegister, isHtml ? html : undefined),
+    nextSteps: bookParts ? { ...(steps ?? {}), design_book_parts: bookParts } : steps,
   };
 }
 

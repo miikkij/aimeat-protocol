@@ -12,6 +12,8 @@
  *   import { registerAppUiTools } from './app-ui.js';
  *   registerAppUiTools(mcp, storage, config, () => agentGaii);
  * @version-history
+ *   v1.1.0 — 2026-09-20 — aimeat_app_ui_get answers the catalogue's INDEX and takes `detail` for
+ *     the parts wanted whole. It answered all 89 kB every time, which no tool result carries.
  *   v1.0.0 — 2026-08-27 — Initial (TARGET-074 phase 2).
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -21,7 +23,8 @@ import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { aiProvenanceInputs, toDeclaredProvenance } from './ai-provenance-input.js';
 import { descriptionFor } from './catalog/shape.js';
-import { buildUiCatalogue } from '../services/app-ui/catalogue.js';
+import { UI_DETAIL_PARAM } from './catalog/definitions/app-ui.js';
+import { buildUiCatalogueView } from '../services/app-ui/catalogue-index.js';
 import { AppUiService } from '../services/app-ui/service.js';
 import { AppUiError } from '../services/app-ui/validate.js';
 
@@ -43,16 +46,18 @@ export function registerAppUiTools(
         descriptionFor('aimeat_app_ui_get'),
         {
             filename: z.string().describe('The published app file, e.g. "errands.html".'),
+            detail: z.array(z.string()).optional().describe(UI_DETAIL_PARAM),
         },
         annotationsFor('aimeat_app_ui_get'),
-        async ({ filename }) => {
+        async ({ filename, detail }) => {
             try {
                 const app = await svc.ownApp(getAgentGaii(), filename);
                 const { layout, version } = await svc.read(app.ownerGaii, filename);
                 return text({
                     filename, layout, version,
                     source: layout ? 'stored' : 'none',
-                    catalogue: buildUiCatalogue(),
+                    // The index, never the whole 89 kB: that was more than one tool result carries.
+                    catalogue: buildUiCatalogueView('index', detail ?? []),
                     note: layout
                         ? 'Send the WHOLE changed layout back with aimeat_app_ui_set — it replaces, never merges.'
                         : 'No stored layout yet: the app\'s own code decides. The catalogue above is the vocabulary a first layout is written in.',

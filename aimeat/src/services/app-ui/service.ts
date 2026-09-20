@@ -24,7 +24,7 @@
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
-import { resolveAppOwnerScope } from '../app-lifecycle.js';
+import { resolveAppOwnerScope } from '../app-owner-scope.js';
 import { provenanceForWrite, type DeclaredProvenance } from '../ai-provenance.js';
 import { validateUiLayout, AppUiError, type AppUiLayout } from './validate.js';
 

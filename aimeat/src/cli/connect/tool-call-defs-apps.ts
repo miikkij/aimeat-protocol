@@ -47,6 +47,7 @@ import type { LevelDef } from '../../services/iam/model.js';
 import type { CommandDef } from '../../services/iam/app-commands.js';
 import type { ContributionProof } from '../../models/contribution-proof.js';
 import { appSettingsTools } from './tool-call-defs-apps-settings.js';
+import { uiReadQuery } from '../../mcp/catalog/definitions/app-ui.js';
 import { installExtensionOverHttp, installCortexOverHttp, extensionDetailPath } from './mcp/tools/extensions.js';
 
 /** What a caller states about one run, in the connector's own wire vocabulary. */
@@ -453,7 +454,7 @@ export const appTools: ConnectCliToolDefinition[] = [
     {
         name: 'aimeat_app_ui_get',
         handler: ({ client, config }, input) => client.get(
-            `/v1/apps/${encodeURIComponent(config.owner)}/${encodeURIComponent(requiredString(input, 'filename'))}/ui`),
+            `/v1/apps/${encodeURIComponent(config.owner)}/${encodeURIComponent(requiredString(input, 'filename'))}/ui${uiReadQuery(input.detail)}`),
     },
     {
         name: 'aimeat_app_ui_set',

@@ -24,6 +24,9 @@
  * @structure ATELIER_PROPOSAL_SECTION · ATELIER_FORK_PEOPLE_SECTION
  * @usage import { ATELIER_PROPOSAL_SECTION, ATELIER_FORK_PEOPLE_SECTION } from './build-atelier-people.js';
  * @version-history
+ *   v1.3.0 — 2026-09-20 — ATELIER_MOSAIC_IN_GENRE: the working screen of a genre fork is a mosaic,
+ *     the page names its Design Book parts and carries its layout as data, and the publish records
+ *     both (app-book-parts.ts). The proposal owes one line on what it takes from the Book.
  *   v1.2.0 — 2026-09-19 — The proposal opens with THE LEVEL: a quick prototype, an ordinary page or
  *     the finest, the owner's choice, stated in `<meta name="aimeat-level">` (app-build-level.ts).
  *   v1.1.0 — 2026-09-19 — The fork section says that the kit's components wear the genre (THE
@@ -43,18 +46,27 @@
 export const ATELIER_MOSAIC_IN_GENRE = 'IN A GENRE FORK, THE WORKING SCREEN IS A MOSAIC INSIDE THE GENRE. The genre is the frame: its masthead, its physics, its look. '
   + 'The part of the page that is THIS APP (the list the person works through, the numbers, the form, the history) is a mosaic mounted into one element of the genre page. '
   + 'That is what lets a Design Book part land in a genre at all: adopting a layout or a fill writes the app\'s stored arrangement, only a mosaic draws a stored arrangement, and a genre page without one ignores everything the Book holds.\n\n'
-  + '```js\n'
-  + '// in the genre page, where its own sample content stood: <section id="work"></section>\n'
-  + 'var m = AIMEAT.atelier.mosaic({\n'
-  + "  target: '#work',                       // no app shell: the genre is the frame\n"
-  + "  sources: { 'jobs.': loadJobs, 'stats.': loadStats },\n"
-  + "  fallback: FILL                          // a Design Book fill, its <placeholders> replaced\n"
-  + '});\n'
+  + '```html\n'
+  + '<!-- head: the Design Book parts this page was built from -->\n'
+  + '<meta name="aimeat-book-parts" content="leiska-work-queue" />\n\n'
+  + '<!-- the arrangement as DATA: a Design Book fill, its <placeholders> replaced, its `look` line out -->\n'
+  + '<script type="application/json" id="aimeat-layout">\n'
+  + '{ "v": 1, "blocks": [ { "id": "jobs", "component": "queue", "props": { "source": "jobs.", "title": "Waiting" } } ] }\n'
+  + '</script>\n\n'
+  + '<!-- in the genre page, where its own sample content stood -->\n'
+  + '<section id="work"></section>\n'
+  + '<script>\n'
+  + '  var m = AIMEAT.atelier.mosaic({\n'
+  + "    target: '#work',                       // no app shell: the genre is the frame\n"
+  + "    sources: { 'jobs.': loadJobs, 'stats.': loadStats },\n"
+  + "    fallback: JSON.parse(document.getElementById('aimeat-layout').textContent)\n"
+  + '  });\n'
+  + '</script>\n'
   + '```\n\n'
   + 'THE FILL COMES FROM THE BOOK: pick one from the list at the end of part `libraries`, read it with `aimeat_designbook_get { id }`, '
-  + 'replace every <angle-bracketed> value with this app\'s words and source names, take its `look` line out (in a genre the genre is the look, and the bridge makes every block wear it), and use it as `fallback`. '
-  + 'After the publish, `aimeat_designbook_adopt { id, filename }` records that the part was used and stores it as the app\'s arrangement, '
-  + 'and `aimeat_app_ui_set` writes your filled version over it; from then on the owner\'s AI rearranges the screen without a republish. '
+  + 'replace every <angle-bracketed> value with this app\'s words and source names, take its `look` line out (in a genre the genre is the look, and the bridge makes every block wear it), and put it in the `#aimeat-layout` block. '
+  + 'THE PUBLISH DOES THE REST, so there is nothing to call afterwards: it counts each part the meta names as used (once per app), and on the app\'s FIRST publish it stores the `#aimeat-layout` block as the app\'s arrangement, '
+  + 'so from then on the owner\'s AI rearranges the screen with `aimeat_app_ui_set` and no republish; a later publish never writes over what they arranged. The answer\'s `next_steps.design_book_parts` says what was counted, what it does not hold, and whether the layout was stored. '
   + 'Compose blocks of your own only where no fill is near, and then PROPOSE the arrangement you made (`aimeat_designbook_propose`, kind `fill`, its app-specific words turned back into <placeholders>): '
   + 'it is a layout, the Book has a kind for it, and the next build starts from it.\n\n'
   + 'What stays hand-made in a genre fork is what the genre itself is made of: a figure only this page has, the masthead, a game board. Everything a mosaic block can show is a block.\n\n';

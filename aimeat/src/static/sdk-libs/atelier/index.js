@@ -55,6 +55,8 @@
  *   <script src="/v1/libs/aimeat-atelier.js"></script>
  *   const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  * @version-history
+ *   v0.53.3 — 2026-09-20 — The mosaic reads its stored arrangement with ?catalogue=none
+ *     (mosaic-layout.js): the route sent its whole 89 kB catalogue on every open of every app.
  *   v0.53.2 — 2026-09-13 — A section's fill runs with its body in the page, and a throwing fill no
  *     longer stops the render; timeline prints a string that is not a machine date as given;
  *     appRef() is readable at parse time.
@@ -374,7 +376,7 @@ const atelier = {
    * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
    * when the two drift, because a version string that never moves is worse than none.
    */
-  version: '0.53.2',
+  version: '0.53.3',
 
   /**
    * WHAT YOU MAY CHANGE IN THIS COMPONENT WITHOUT FORKING IT. Answers with the component's

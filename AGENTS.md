@@ -48,7 +48,9 @@ of them built the wrong thing three times in a row.
   Book.** The genre is the frame; the list, the numbers, the form and the history are
   `AIMEAT.atelier.mosaic({ target, sources, fallback })` mounted into one element of the genre
   page, with `fallback` taken from a Book fill. A genre page with no mosaic cannot use one part of
-  the Book. The proposal owes one line: "From the Design Book I take: …" or "… I take nothing,
+  the Book. The page names the parts (`<meta name="aimeat-book-parts">`) and carries the layout as
+  data (`<script type="application/json" id="aimeat-layout">`); the publish counts the parts and
+  stores the layout, so nothing is called afterwards. The proposal owes one line: "From the Design Book I take: …" or "… I take nothing,
   because …".
 - **The genre is the look.** A look preset with components stacked in it, under a genre's name, is
   the default page every app looks like, and it is what gets sent back.

@@ -13,6 +13,9 @@
  * @structure APP_BUILDER_ATELIER_SKILL_ENTRY
  * @usage import { APP_BUILDER_ATELIER_SKILL_ENTRY } from './builtin-skills.app-builder-atelier.js';
  * @version-history
+ *   v1.17.0 — 2026-09-20 — The page NAMES its Design Book parts and carries its layout as data,
+ *     and the publish records both. Three measured builds used a Book fill and none made the two
+ *     calls afterwards that recorded it, because a builder stops when the app is live.
  *   v1.16.0 — 2026-09-20 — The working screen of a genre fork is a MOSAIC inside the genre, and
  *     the proposal owes one line on what it takes from the Design Book. Twelve measured builds
  *     adopted nothing, correctly: no genre mounts a mosaic, and only a mosaic draws the stored
@@ -204,9 +207,12 @@ moved under you says so.
    all: adopting a layout or a fill writes the app's STORED ARRANGEMENT, only a mosaic draws
    one, and a genre page without a mosaic ignores every part the Book holds. Take the
    \`fallback\` from a Book fill (\`aimeat_designbook_get\`), its <placeholders> replaced and its
-   \`look\` line out; after the publish \`aimeat_designbook_adopt\` records the part and
-   \`aimeat_app_ui_set\` stores your filled version. The specification's part \`patterns\` has
-   the pattern. Hand-made stays what the genre itself is made of: its masthead, a figure only
+   \`look\` line out, carried in the page as data:
+   \`<script type="application/json" id="aimeat-layout">\`, with the parts it came from named in
+   \`<meta name="aimeat-book-parts" content="leiska-work-queue">\`. THE PUBLISH DOES THE REST,
+   with nothing to call afterwards: it counts each named part as used, and on the first publish
+   it stores that layout as the app's arrangement, so the owner's AI rearranges the screen later
+   without a republish. The specification's part \`patterns\` has the pattern. Hand-made stays what the genre itself is made of: its masthead, a figure only
    this page has, a game board.
    **The fork signs people in and speaks two languages, and a genre does neither.** Mount the
    node's own bar (\`AIMEAT.auth.mountLoginButton('#pill', …)\`); never write a header control or a

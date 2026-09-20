@@ -40,6 +40,9 @@
  *   const out = await forkApp(storage, config, { source, callerOwner, callerGhii, callerGaii, newFilename });
  *   if ('refusal' in out) { res.status(out.refusal.status).json(error(...)); return; }
  * @version-history
+ *   v1.0.1 — 2026-09-20 — resolveAppOwnerScope and AppOwnerScope moved whole to app-owner-scope.ts
+ *     and are re-exported from here: two services that needed only them depended, through this
+ *     file, on the publish, which became a cycle the day a publish needed the Design Book.
  *   v1.0.0 — 2026-08-11 — August 2026 audit step 8, unit "apps". Extracted from routes/apps/drafts.ts,
  *     routes/apps/fork-manage.ts, mcp/apps.ts and mcp/apps-fork.ts, which held two copies of each of
  *     these four acts.
@@ -54,7 +57,7 @@ import type {
   Storage, AppManifest, AppProtection, AppRecord, AppDraftRecord,
 } from '../storage/interface.js';
 import { parseGAII } from '../utils/gaii.js';
-import { ownAppScope, resolveAppTarget, type AppDevAct } from './app-dev-grant.js';
+import { resolveAppTarget, type AppDevAct } from './app-dev-grant.js';
 import { logger } from '../utils/logger.js';
 import { emitChange } from './event-bus.js';
 import { recordPublicActivity } from './public-activity.js';
@@ -82,24 +85,11 @@ export function appFilenameRefusal(filename: string): PublishAppRefusal | null {
   };
 }
 
-/** The owner an app write lands under: the display/URL name, and the bucket key. */
-export interface AppOwnerScope {
-  ownerName: string;
-  ownerGhii: string;
-}
+// The owner scope and its resolver live in app-owner-scope.ts, below this file and the publish,
+// so the services that only need them do not depend on publishing. Re-exported for every importer.
+import type { AppOwnerScope } from './app-owner-scope.js';
+export { resolveAppOwnerScope, type AppOwnerScope } from './app-owner-scope.js';
 
-/**
- * Resolve an MCP principal to the owner scope its app writes belong to.
- *
- * Apps are OWNER-scoped whoever publishes them, and the bucket key is the owner's canonical GHII
- * from the identity table — the same key routes/apps.ts resolves through its `canonicalOwner`
- * closure and the same key the startup `mergeForkedAppBuckets()` migration consolidates onto. The
- * MCP tools composed `owner@nodeId` by hand instead, which agrees for a locally registered owner and
- * addresses a different bucket for anyone whose GHII record says otherwise. Two doors that disagree
- * about where an app lives is how the same owner ends up with two version counters.
- *
- * Returns null when the principal is not a GAII, which is the tools' existing "Failed to parse" case.
- */
 /**
  * The same question with a TARGET owner allowed: which bucket, or the sentence to refuse with.
  *
@@ -121,17 +111,6 @@ export async function resolveAppTargetScope(
     act: input.act,
   });
   return t.ok ? { ownerName: t.ownerName, ownerGhii: t.ownerGhii } : { refusal: t.message };
-}
-
-export async function resolveAppOwnerScope(
-  storage: Storage, config: AimeatConfig, principal: string,
-): Promise<AppOwnerScope | null> {
-  const parsed = parseGAII(principal);
-  if (!parsed) return null;
-  // The parse stays here, because it is this door's own rule about what a principal may look like and
-  // the REST door's rule is a different one. Where the app LANDS is the part both doors share, and it
-  // now lives in services/app-dev-grant.ts so that opening it to a second owner is one change.
-  return ownAppScope(storage, config, parsed.owner);
 }
 
 // ── The draft slot ────────────────────────────────────────────────────────────────────────────────

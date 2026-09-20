@@ -12,6 +12,8 @@
  * @structure registerAppUiTools(mcp, registry)
  * @usage import { registerAppUiTools } from './app-ui.js';
  * @version-history
+ *   v1.1.0 — 2026-09-20 — aimeat_app_ui_get asks the route for the catalogue's index and passes
+ *     `detail` on (parity with the server MCP).
  *   v1.0.0 — 2026-08-27 — Initial (TARGET-074 phase 2).
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -20,6 +22,7 @@ import type { AgentRegistry } from '../../agent-registry.js';
 import { aiProvenanceInputs } from '../../../../mcp/ai-provenance-input.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../mcp/catalog/shape.js';
+import { UI_DETAIL_PARAM, uiReadQuery } from '../../../../mcp/catalog/definitions/app-ui.js';
 
 export function registerAppUiTools(mcp: McpServer, registry: AgentRegistry): void {
   const { client, owner } = registry.resolve();
@@ -28,9 +31,11 @@ export function registerAppUiTools(mcp: McpServer, registry: AgentRegistry): voi
 
   mcp.tool('aimeat_app_ui_get', descriptionFor('aimeat_app_ui_get'), {
     filename: z.string().describe('The published app file, e.g. "errands.html".'),
-  }, annotationsFor('aimeat_app_ui_get'), async ({ filename }) => {
-    // One read: the route answers with the layout AND the catalogue — the vocabulary rides along.
-    return out(await client.get(`/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(filename)}/ui`));
+    detail: z.array(z.string()).optional().describe(UI_DETAIL_PARAM),
+  }, annotationsFor('aimeat_app_ui_get'), async ({ filename, detail }) => {
+    // One read: the layout AND the catalogue's index, with the named parts in full (parity with
+    // the server MCP; the whole catalogue is more than one tool result carries).
+    return out(await client.get(`/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(filename)}/ui${uiReadQuery(detail)}`));
   });
 
   mcp.tool('aimeat_app_ui_set', descriptionFor('aimeat_app_ui_set'), {
