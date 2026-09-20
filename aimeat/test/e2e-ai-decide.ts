@@ -24,6 +24,9 @@
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-ai-decide.ts
  *   cd aimeat && pnpm exec node --env-file=.env.test.postgres-kysely --import tsx test/e2e-ai-decide.ts
  * @version-history
+ *   v1.3.0 — 2026-09-20 — 9d/9e: a person's review answers the gate's item and the row goes; a rule
+ *     whose answers carry no certainty asks instead of stopping (the stub can now omit one). 7b also
+ *     reads the refusal an agent gets on a rule door.
  *   v1.1.0 — 2026-09-19 — 3c/3d: one app has one name in the register, the spend and the cap.
  *   v1.0.0 — 2026-09-19 — Initial (TARGET-080).
  */
@@ -91,8 +94,17 @@ function answerFor(q: any, state: string): any {
     const probs = Object.fromEntries(opts.map((o, i) => [o, i === 0 ? 0.9 : 0.1 / (opts.length - 1)]));
     return { type: 'choice', choice: opts[0], probabilities: probs, confidence: 0.88 };
   }
-  // Levels are numbered from 0, as the live model answers (its documentation says 1).
+  // Levels are numbered from 0, as the live model answers (its documentation says 1). A state marked
+  // NOCONF comes back WITHOUT a confidence, which the provider's contract allows and which the
+  // evaluator used to read as zero certainty.
   const levels = q.criteria as unknown[];
+  if (state.includes('NOCONF')) {
+    return {
+      type: 'score', score: 2,
+      legend: Object.fromEntries(levels.map((l, i) => [String(i), l])),
+      probabilities: Object.fromEntries(levels.map((_, i) => [String(i), i === 2 ? 1 : 0])),
+    };
+  }
   return {
     type: 'score', score: 2, confidence: 0.7,
     legend: Object.fromEntries(levels.map((l, i) => [String(i), l])),
@@ -530,6 +542,12 @@ const QUESTIONS = {
   await test('7b. the owner writes a rule; an agent and another owner cannot', async () => {
     const asAgent = await put('send-reply', RULE, agentAi);
     assert(asAgent.status === 403, `an agent may not write a rule, got ${asAgent.status}`);
+    // The refusal is the agent's instruction, not the sign-in gate's sentence. It used to answer
+    // "this changes how the account is signed into" and point at the account:security permission,
+    // which describes another door and sends the agent the wrong way.
+    const said = String(asAgent.body.error?.message ?? '');
+    assert(said.includes('propose'), `it says what an agent's own way in is, got: ${said}`);
+    assert(!said.includes('signed into'), `and not the sign-in door's words, got: ${said}`);
     const r = await put('send-reply', RULE);
     assert(r.status === 201 && r.body.data.rule.version === 1, `got ${r.status} ${JSON.stringify(r.body.error ?? r.body.data)}`);
     const other = await json('/v1/ai/decide/rules/send-reply', { headers: auth(B.token) });
@@ -670,6 +688,34 @@ const QUESTIONS = {
     assert(pa.body.data.groups[0]?.gateStops === 2, `the agent's own numbers, got ${JSON.stringify(pa.body.data.groups)}`);
     const theirs = await json('/v1/ai/decisions/stats?group_by=rule', { headers: auth(B.token) });
     assert(theirs.body.data.groups.length === 0, 'another owner counts nothing of this');
+  });
+  // The gate's whole point is that a PERSON answers. Until 2026-09-20 they could only take the row
+  // off, which recorded nothing, so "overridden" could never rise above zero from the web.
+  await test('9d. a person\'s review answers the gate\'s item, and the row goes by itself', async () => {
+    const stopped = (await gateItems())[0];
+    assert(stopped, 'the gate left an item to answer');
+    const r = await json(`/v1/ai/decisions/${stopped.object.id}/review`, {
+      method: 'POST', headers: auth(A.token), body: JSON.stringify({ outcome: 'overridden', note: 'I sent it myself' }),
+    });
+    assert(r.status === 200 && r.body.data.record.review?.outcome === 'overridden', `the review is on the record, got ${r.status}`);
+    const left = (await gateItems()).filter((i: any) => i.object.id === stopped.object.id);
+    assert(left.length === 0, `the answered row is off the list, ${left.length} left`);
+  });
+  // A pick-one and a scale carry `confidence`, and the provider's contract makes it OPTIONAL. Read as
+  // zero, a rule thresholding only those answered `stop` whatever the model said.
+  await test('9e. a rule whose answers carry no certainty asks a person instead of stopping', async () => {
+    const scaleRule = {
+      title: 'How urgent is this message', decides: 'whether it goes to the urgent queue',
+      sends: ['text'], questions: { tone: { type: 'score', instructions: 'How urgent is the message?', criteria: ['Not', 'Somewhat', 'Very'] } },
+      thresholds: { tone: 1 }, bands: { act: 0.85, ask: 0.5 }, use: 'agent', gate: false,
+      sample: { text: 'NOCONF please look at this' },
+    };
+    assert((await put('urgency', scaleRule)).status === 201, 'the rule is written');
+    const r = await runRule(agentAi, 'urgency', { text: 'NOCONF please look at this' }, { subject: 'ticket.noconf' });
+    assert(r.status === 200, `got ${r.status} ${JSON.stringify(r.body.error)}`);
+    assert(r.body.data.outcome === 'ask', `no certainty is a person's call, got ${r.body.data.outcome}`);
+    assert(r.body.data.result === null, `and no number is invented, got ${JSON.stringify(r.body.data.result)}`);
+    assert(r.body.data.passed?.tone === true, 'the floor it could measure still passed');
   });
 
   console.log('\nPhase 10: a key per agent');

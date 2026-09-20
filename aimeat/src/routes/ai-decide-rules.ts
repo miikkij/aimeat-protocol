@@ -24,6 +24,8 @@
  * @structure decideRulesRouter(config, storage)
  * @usage mounted in server-bootstrap/routes-loader.ts
  * @version-history
+ *   v1.1.0 — 2026-09-20 — The five owner-only doors say what they are and what an agent's own way in
+ *     is; they were answering with the sign-in gate's sentence, which named the wrong permission.
  *   v1.0.0 — 2026-09-20 — Initial: decision rules on the node.
  */
 import { Router, type Request, type Response } from 'express';
@@ -42,6 +44,19 @@ import {
   proposeRule, listRuleProposals, approveRuleProposal, declineRuleProposal,
 } from '../services/decide/rules.js';
 import { decideOwnerOf, decideCallerOf } from './ai-decide.js';
+
+/**
+ * Why an agent is refused here, in its own terms.
+ *
+ * The gate's own sentence is written for the sign-in doors it was built for, and on a rule door it
+ * both misdescribes the door ("this changes how the account is signed into") and hands an agent the
+ * wrong instruction: ask your owner for the account:security permission. An agent's way in is to
+ * propose, which is a door it already has.
+ */
+const OWNER_WRITES_RULES =
+  'A decision rule decides whether an agent may act, so only the account holder writes one. '
+  + 'An agent proposes instead: aimeat_decide_rule_propose (POST /v1/ai/decide/rule-proposals). '
+  + 'It creates nothing, and the owner approves it from their open items or from Settings, AI, Decision model.';
 
 export function decideRulesRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -107,7 +122,7 @@ export function decideRulesRouter(config: AimeatConfig, storage: Storage): Route
   });
 
   // ── PUT /v1/ai/decide/rules/:id ── create or replace
-  router.put('/v1/ai/decide/rules/:id', requireAuth(), requireOwnerPrincipal(), async (req: Request, res: Response) => {
+  router.put('/v1/ai/decide/rules/:id', requireAuth(), requireOwnerPrincipal(OWNER_WRITES_RULES), async (req: Request, res: Response) => {
     try {
       const out = await putRule(storage, config, decideOwnerOf(req.auth!, config.nodeId), req.params.id as string, req.body);
       res.status(out.created ? 201 : 200).json(success(config.nodeId, { rule: out.rule }, [
@@ -117,7 +132,7 @@ export function decideRulesRouter(config: AimeatConfig, storage: Storage): Route
   });
 
   // ── DELETE /v1/ai/decide/rules/:id ── the decisions it made stay on the register
-  router.delete('/v1/ai/decide/rules/:id', requireAuth(), requireOwnerPrincipal(), async (req: Request, res: Response) => {
+  router.delete('/v1/ai/decide/rules/:id', requireAuth(), requireOwnerPrincipal(OWNER_WRITES_RULES), async (req: Request, res: Response) => {
     try {
       const gone = await deleteRule(storage, decideOwnerOf(req.auth!, config.nodeId), req.params.id as string);
       if (!gone) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such decision rule.'));
@@ -126,7 +141,7 @@ export function decideRulesRouter(config: AimeatConfig, storage: Storage): Route
   });
 
   // ── POST /v1/ai/decide/rules/:id/try ── run the sample (or a state given here). A real, paid call.
-  router.post('/v1/ai/decide/rules/:id/try', requireAuth(), requireOwnerPrincipal(), aiRateLimit, async (req: Request, res: Response) => {
+  router.post('/v1/ai/decide/rules/:id/try', requireAuth(), requireOwnerPrincipal(OWNER_WRITES_RULES), aiRateLimit, async (req: Request, res: Response) => {
     const gaii = decideOwnerOf(req.auth!, config.nodeId);
     const body = (req.body ?? {}) as Record<string, unknown>;
     try {
@@ -165,7 +180,7 @@ export function decideRulesRouter(config: AimeatConfig, storage: Storage): Route
   });
 
   // ── POST /v1/ai/decide/rule-proposals/:id/approve ── the owner's press creates the rule
-  router.post('/v1/ai/decide/rule-proposals/:id/approve', requireAuth(), requireOwnerPrincipal(), async (req: Request, res: Response) => {
+  router.post('/v1/ai/decide/rule-proposals/:id/approve', requireAuth(), requireOwnerPrincipal(OWNER_WRITES_RULES), async (req: Request, res: Response) => {
     try {
       const rule = await approveRuleProposal(storage, config, decideOwnerOf(req.auth!, config.nodeId), req.params.id as string);
       if (!rule) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such proposal.'));
@@ -174,7 +189,7 @@ export function decideRulesRouter(config: AimeatConfig, storage: Storage): Route
   });
 
   // ── POST /v1/ai/decide/rule-proposals/:id/decline ──
-  router.post('/v1/ai/decide/rule-proposals/:id/decline', requireAuth(), requireOwnerPrincipal(), async (req: Request, res: Response) => {
+  router.post('/v1/ai/decide/rule-proposals/:id/decline', requireAuth(), requireOwnerPrincipal(OWNER_WRITES_RULES), async (req: Request, res: Response) => {
     try {
       const ok = await declineRuleProposal(storage, decideOwnerOf(req.auth!, config.nodeId), req.params.id as string);
       if (!ok) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such proposal.'));
