@@ -120,6 +120,31 @@ describe('evaluateRule', () => {
     const r = { thresholds: { kind: 0.6 }, bands: { act: 0.8, ask: 0.6 } };
     expect(evaluateRule(r, { kind: { type: 'choice', value: 'bug', confidence: 0.88 } }).outcome).toBe('act');
     expect(evaluateRule(r, { kind: { type: 'choice', value: 'bug', confidence: 0.4 } }).outcome).toBe('stop');
-    expect(evaluateRule(r, {})).toEqual({ outcome: 'stop', result: 0, passed: { kind: false } });
+    // `result` is null rather than 0 since 2026-09-20: nothing was measured. The outcome is the same,
+    // and it comes from the floor the missing answer did not reach.
+    expect(evaluateRule(r, {})).toEqual({ outcome: 'stop', result: null, passed: { kind: false } });
+  });
+
+  // The provider's contract makes `confidence` OPTIONAL on a pick-one and a scale. Reading a missing
+  // one as 0 made a rule whose thresholds name only those answer `stop` whatever the model said, and
+  // the E2E stand-in always sends a confidence, so no suite could see it.
+  it('sends it to a person when the model gave no certainty at all, instead of stopping', () => {
+    const r = { thresholds: { tone: 1 }, bands: { act: 0.85, ask: 0.5 } };
+    const e = evaluateRule(r, { tone: { type: 'score', value: 2 } });
+    expect(e).toEqual({ outcome: 'ask', result: null, passed: { tone: true } });
+  });
+
+  it('still stops on a floor nobody reached, even with no certainty anywhere', () => {
+    const r = { thresholds: { tone: 3 }, bands: { act: 0.85, ask: 0.5 } };
+    expect(evaluateRule(r, { tone: { type: 'score', value: 1 } }).outcome).toBe('stop');
+  });
+
+  it('reads the certainties it does have, and ignores the answers that carry none', () => {
+    const r = { thresholds: { good: 0.5, tone: 1 }, bands: { act: 0.85, ask: 0.5 } };
+    const e = evaluateRule(r, {
+      good: { type: 'noul', value: 0.9 },
+      tone: { type: 'score', value: 2 },
+    });
+    expect(e).toEqual({ outcome: 'act', result: 0.9, passed: { good: true, tone: true } });
   });
 });

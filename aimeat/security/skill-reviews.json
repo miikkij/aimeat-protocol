@@ -10,14 +10,14 @@
         "aimeat/src/services/decide/settings.ts",
         "aimeat/src/services/app-decide-posture.ts"
       ],
-      "digest": "sha256:626f783b366efd1a72e2d8f8"
+      "digest": "sha256:62b6855b489652cedc8699d1"
     },
     "node:aimeat-open-items": {
-      "reviewedOn": "2026-09-19",
+      "reviewedOn": "2026-09-20",
       "watches": [
         "aimeat/src/services/open-items.ts"
       ],
-      "digest": "sha256:69a9a313edbc0a842a2f39b5"
+      "digest": "sha256:b650f2cb65a60dc8a36f8c7a"
     },
     "node:aimeat-recurring-work": {
       "reviewedOn": "2026-09-19",
@@ -350,7 +350,7 @@
   },
   "fileDigests": {
     "node:aimeat-open-items": {
-      "aimeat/src/services/open-items.ts": "471b7eab4f5ddc8d"
+      "aimeat/src/services/open-items.ts": "4e5fa428e0a80d4e"
     },
     "node:aimeat-first-conversation": {
       "aimeat/src/services/model-recommendation.ts": "bd4bb581e6178a21"
@@ -521,7 +521,7 @@
     },
     "node:aimeat-decide": {
       "aimeat/src/static/sdk-libs/decide/index.js": "3a53b66a8d7a8dd6",
-      "aimeat/src/services/decide/service.ts": "5f8fefee8c3a7e08",
+      "aimeat/src/services/decide/service.ts": "d05280eb614c2481",
       "aimeat/src/services/decide/limits.ts": "af13e600bdfea3ab",
       "aimeat/src/services/decide/settings.ts": "bd52c40503174432",
       "aimeat/src/services/app-decide-posture.ts": "65d4966f4b6ff7a8"

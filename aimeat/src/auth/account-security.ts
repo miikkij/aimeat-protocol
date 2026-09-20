@@ -7,6 +7,8 @@
  *   and their docblocks moved unchanged, and middleware.ts re-exports all three, so every existing
  *   import keeps working.
  * @version-history
+ *   v1.2.0 — 2026-09-20 — requireOwnerPrincipal(reason): a door that is not about signing in says
+ *     what it is and what the caller's own way in is.
  *   v1.1.0 — 2026-09-14 — isSignedInCaller(auth): is there anybody behind this call, on a node that
  *     hands passers-by a credential. `!req.auth` is not that question in anonymous mode, and two
  *     doors reading a setting called `authenticated` had it wrong.
@@ -114,7 +116,14 @@ export function isThirdPartyPrincipal(auth: Request['auth'] | undefined): boolea
   return auth.roles.includes('app') || auth.roles.includes('ecosystem');
 }
 
-export function requireOwnerPrincipal() {
+/**
+ * @param reason What this door is, in the person's terms, when "how the account is signed into" is
+ *   not what it changes. The default is written for the sign-in doors this gate was built for, and
+ *   on any other door it misleads: a decision rule answered it with "an agent needs the
+ *   account:security permission", which is true of the gate and the wrong instruction for an agent,
+ *   whose way in is to propose. A door that is not about signing in passes its own sentence.
+ */
+export function requireOwnerPrincipal(reason?: string) {
   return (req: Request, res: Response, next: NextFunction) => {
     // `!req.auth` alone is not the test: optionalAuth runs globally and, in anonymous mode, injects
     // a shared identity, so an unauthenticated caller arrives here truthy. Nobody signed in as
@@ -128,7 +137,8 @@ export function requireOwnerPrincipal() {
       return;
     }
     logger.warn(`[account-security-denied] ${req.auth.sub} on ${req.method} ${req.path}`);
-    deny403(req, res, 'ACCESS_DENIED', 'This changes how the account is signed into, so it is reserved to the account holder. ' +
-      `An agent needs the "${ACCOUNT_SECURITY_SCOPE}" permission, which the owner grants per agent.`);
+    deny403(req, res, 'ACCESS_DENIED', reason
+      ?? ('This changes how the account is signed into, so it is reserved to the account holder. '
+        + `An agent needs the "${ACCOUNT_SECURITY_SCOPE}" permission, which the owner grants per agent.`));
   };
 }

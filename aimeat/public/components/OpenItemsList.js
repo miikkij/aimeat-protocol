@@ -26,6 +26,9 @@
  * @structure OpenItemsList({ maxAgeDays })
  * @usage html`<${OpenItemsList} />` — or `maxAgeDays={7}` to hide rows that have gone stale
  * @version-history
+ *   v1.2.0 — 2026-09-20 — A row the decision gate opened carries the two answers a person can give:
+ *     it was right, it was wrong. Both record a review on the decision, which is what makes the
+ *     register say a human was in the loop, and the node then takes the row off.
  *   (2026-08-23) Em-dashes swept from the copied and suggestion fallbacks (banned in every surface).
  *   v1.1.0 — 2026-08-18 — `maxAgeDays`: a surface can ask for fresh items only. An eight-day-old
  *     "Haluan luoda" at the top of the home is an inbox of guilt, not a status; a row an agent is
@@ -41,6 +44,7 @@ import { escHtml, timeAgo } from '/js/utils.js';
 import { apiGet } from '/js/api.js';
 import { CopyButton } from '/components/CopyButton.js';
 import { listOpenItems, switchOff } from '/js/services/open-items.js';
+import { reviewDecision } from '/js/services/decide.js';
 import { onLiveUpdate } from '/lib/live-updates.js';
 import { CardMenu } from '/components/CardMenu.js';
 import { swallowed } from '/js/swallowed.js';
@@ -149,6 +153,23 @@ export function OpenItemsList({ maxAgeDays } = {}) {
                   <span class="open-items-byai">${tr('openItems.byAi', 'your AI put this here')}</span>`}
               </div>
             </div>
+
+            ${/* A DECISION the gate stopped is the one row a person can answer rather than only
+                 clear. Two buttons, because that is the whole question: was the model right. The
+                 answer is recorded on the decision (it is what makes the register say a human was in
+                 the loop), and the node takes this row off once it is. Without them the gate is a
+                 dead end: the only control was "Take it off", which records nothing. */''}
+            ${i.kind === 'decision' && i.object?.type === 'ai-decision' && html`
+              <div class="open-items-decide">
+                <button type="button" class="btn-outline btn-sm"
+                  onClick=${() => act(i.id, () => reviewDecision(i.object.id, 'confirmed'))}>
+                  ${tr('openItems.decision.confirm', 'It was right')}
+                </button>
+                <button type="button" class="btn-outline btn-sm"
+                  onClick=${() => act(i.id, () => reviewDecision(i.object.id, 'overridden'))}>
+                  ${tr('openItems.decision.override', 'It was wrong')}
+                </button>
+              </div>`}
 
             ${/* A suggestion gets no control: it goes away by itself when its condition is true,
                  so offering to switch it off invites a person to act on something the node is
