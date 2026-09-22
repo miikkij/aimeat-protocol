@@ -19,6 +19,7 @@
  *   renders in a sandboxed frame with its own stylesheet.
  * @usage Linked from public/spa.html after every other stylesheet.
  * @version-history
+ *   2026-09-13: Overview and shared instruction rules leave with their whole-part migration.
  *   2026-09-13 -- Let an explicitly composed poster aside own the MCP install row frame.
  *   2026-09-13 -- V2y: compose agent setup panel section headings from poster.css.
  *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
@@ -66,9 +67,9 @@
  */
 
 /* ── Faces and the tab head ─────────────────────────────────────────────────────────────── */
-.pf-content, .portfolio-container, .portfolio-viewer-full { font-family: var(--font-showroom-body); }
+.portfolio-container, .portfolio-viewer-full { font-family: var(--font-showroom-body); }
 /* The crumb precedes a page title. Markup selects the shared page or B1 section class. */
-.pf-content-head { border-bottom: 0; padding-bottom: 0; margin-bottom: 0.2rem; }
+
 .portfolio-container { --poster-page-size: 3.4rem; --poster-section-size: 1.8rem; }
 .portfolio-container .poster-page-title { margin-bottom: 0.5rem; }
 .pf .poster-section-title.section-title-spaced { margin-top: 2.6rem; }
@@ -104,7 +105,7 @@
 .pf .empty, .portfolio-not-found { border: 3px dashed var(--text); border-radius: 0; font-weight: var(--font-poster-text-weight); color: var(--text); }
 
 /* ── The loud action is an ink slab; the quiet ones are underlined words ────────────────── */
-.pf .btn-primary, .portfolio-container .btn-primary, .portfolio-viewer-full .btn-primary, .pf-mnav-toggle, .pf-account-modal .btn-primary {
+.pf .btn-primary, .portfolio-container .btn-primary, .portfolio-viewer-full .btn-primary, .pf-account-modal .btn-primary {
   background: var(--text); color: var(--bg);
   border: 0; border-radius: 0; box-shadow: 4px 4px 0 var(--sun);
   padding: 10px 16px;
@@ -116,17 +117,13 @@
 }
 .pf .btn-primary.success, .pf .btn-primary.copied { background: var(--success-fg); box-shadow: 4px 4px 0 var(--text); }
 .pf .btn-primary:disabled, .pf-account-modal .btn-primary:disabled { opacity: 0.45; transform: none; }
-.pf .btn-outline, .pf .btn-ghost, .pf .btn-danger, .pf .expand-btn, .pf .pf-back-btn,
-.portfolio-container .btn-outline, .portfolio-container .btn-ghost, .portfolio-viewer-full .btn-ghost, .portfolio-viewer-full .btn-outline,
-.pf-account-modal .btn-outline, .pf-account-modal .pf-edit-link, .pf-account-modal .pf-pw-eye {
+.pf .btn-outline, .pf .btn-ghost, .pf .btn-danger, .pf .expand-btn, .pf .pf-back-btn, .portfolio-container .btn-outline, .portfolio-container .btn-ghost, .portfolio-viewer-full .btn-ghost, .portfolio-viewer-full .btn-outline, .pf-account-modal .btn-outline, .pf-account-modal .pf-edit-link {
   background: none; border: 0; border-bottom: 2px solid var(--text); border-radius: 0; box-shadow: none;
   padding: 0 0 1px; min-height: 0;
   font-family: var(--font-showroom-body); font-weight: var(--font-poster-strong-weight); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em;
   color: var(--text); line-height: 1.5;
 }
-.pf .btn-outline:hover, .pf .btn-ghost:hover, .pf .expand-btn:hover, .pf .pf-back-btn:hover,
-.portfolio-container .btn-outline:hover, .portfolio-container .btn-ghost:hover, .portfolio-viewer-full .btn-ghost:hover,
-.pf-account-modal .btn-outline:hover, .pf-account-modal .pf-edit-link:hover, .pf-account-modal .pf-pw-eye:hover {
+.pf .btn-outline:hover, .pf .btn-ghost:hover, .pf .expand-btn:hover, .pf .pf-back-btn:hover, .portfolio-container .btn-outline:hover, .portfolio-container .btn-ghost:hover, .portfolio-viewer-full .btn-ghost:hover, .pf-account-modal .btn-outline:hover, .pf-account-modal .pf-edit-link:hover {
   background: none; color: var(--accent); border-color: var(--accent); box-shadow: none; transform: none;
 }
 .pf .btn-danger { color: var(--accent); border-color: var(--accent); }
@@ -156,9 +153,7 @@
 .portfolio-prompt-output { color: var(--text); }
 
 /* ── Badges and chips: square, ink-framed, the colour kept ──────────────────────────────── */
-.pf .badge, .pf .pill, .pf .vis-pill, .pf .pf-agd-badge, .pf .pf-agd-tag-chip, .pf .pf-agd-step-pill, .pf .pf-agd-cap-badge,
-.pf .pf-agd-change-badge, .pf .pf-agd-tab-badge, .kpkg-badge, .pj-doc-tag, .pj-tab-pill, .pj-org-tab-unseen,
-.pf .pf-psp-chip, .pf .pf-federation-badge {
+.pf .badge, .pf .pill, .pf .vis-pill, .pf .pf-agd-badge, .pf .pf-agd-tag-chip, .pf .pf-agd-step-pill, .pf .pf-agd-cap-badge, .pf .pf-agd-change-badge, .pf .pf-agd-tab-badge, .kpkg-badge, .pj-doc-tag, .pj-tab-pill, .pj-org-tab-unseen, .pf .pf-psp-chip {
   border-radius: 0; font-family: var(--font-mono); font-weight: 500; letter-spacing: 0;
 }
 .pf .badge { border: 2px solid var(--text); background: transparent; color: var(--text); padding: 1px 7px; font-size: 0.66rem; }
@@ -273,16 +268,14 @@
 /* The frame, header, X and footer of every dialog are /css/dialog.css. What stays here is how the
    account dialogs' fields look; those dialogs also open from Home, outside the profile shell. */
 .pf-account-modal .pf-edit-input { width: 100%; min-width: 0; box-sizing: border-box; }
-.pf-account-modal .pf-pw-eye { right: 0; top: 0; bottom: 3px; transform: none; margin: auto 0; height: fit-content; }
+
 .pf-account-modal .pf-edit-link { align-self: flex-start; width: fit-content; text-decoration: none; }
 .pf-account-modal .pf-edit-readonly, .pf-account-modal .pf-avatar-preview, .pf-account-modal .pf-edit-error { border-radius: 0; }
 .pf-account-modal .pf-edit-readonly { background: none; border: 0; border-bottom: 1px solid var(--border); padding-inline: 0; }
 .pf-account-modal .pf-avatar-preview { border: 2px solid var(--text); }
 
 /* ── Words on the sun stay ink in every theme ───────────────────────────────────────────── */
-.pf .pf-side-item--active, .pf .pf-next-card--primary, .pf .pf-next-card:hover, .pf .pf-mcp-badge,
-.koti-fold--on, .koti-pb .koti-fold:hover, .koti-pb .koti-fold--on, .koti-ach-chip--done .koti-ach-mark,
-.chat-thread--active, .chat-list-toggle, .chat-copy-head.copied, .chat-turn--user .chat-bubble, .chat-attach:hover, .chat-voice:hover { color: var(--on-sun); }
+.koti-fold--on, .koti-pb .koti-fold:hover, .koti-pb .koti-fold--on, .koti-ach-chip--done .koti-ach-mark, .chat-thread--active, .chat-list-toggle, .chat-copy-head.copied, .chat-turn--user .chat-bubble, .chat-attach:hover, .chat-voice:hover { color: var(--on-sun); }
 
 /* ── The portfolio builder and the viewer chrome (outside .pf) ──────────────────────────── */
 .portfolio-step { padding-top: 1.4rem; margin-bottom: 2.4rem; }
@@ -346,14 +339,7 @@
    square mono chip) so the whole machine room changes in one file. Selectors keep the .pf
    prefix the view sheets use, so the cascade order decides. */
 /* Sections: a rule on top, no frame */
-.pf .sch-form, .pf .sch-cal-freq, .pf .pf-nb-suggest, .pf .pf-nb-enrich,
-.pf .pf-nb-plan-step, .pf .pf-ld-pending, .pf .pf-ld-charter-box, .pf .pf-ld-editor,
-.pf .pf-ld-chart, .pf .pf-agd-crew-live, .pf .pf-agd-crew-problems, .pf .pf-agd-crew-tools-group,
-.pf .mem-tools-section, .pf .mem-detail, .pf .mem-browse-panel, .pf .mem-bulkbar,
-.pf .pn-card, .pf .pn-setup, .pf .agent-cta, .pf .create-form,
-.pf .platform-content, .pf .pf-agd-governance-section, .pf .agd-services-info, .pf .pf-agd-create-form,
-.pf .pf-agd-cgroup-empty, .pf .agd-msg-proposed-task, .pf .pf-agd-directives-content, .pf .stat-card,
-.pf .pf-usage-card {
+.pf .sch-form, .pf .sch-cal-freq, .pf .pf-nb-suggest, .pf .pf-nb-enrich, .pf .pf-nb-plan-step, .pf .pf-ld-pending, .pf .pf-ld-charter-box, .pf .pf-ld-editor, .pf .pf-ld-chart, .pf .pf-agd-crew-live, .pf .pf-agd-crew-problems, .pf .pf-agd-crew-tools-group, .pf .mem-tools-section, .pf .mem-detail, .pf .mem-browse-panel, .pf .mem-bulkbar, .pf .pn-card, .pf .pn-setup, .pf .agent-cta, .pf .create-form, .pf .platform-content, .pf .pf-agd-governance-section, .pf .agd-services-info, .pf .pf-agd-create-form, .pf .pf-agd-cgroup-empty, .pf .agd-msg-proposed-task, .pf .pf-agd-directives-content, .pf .stat-card {
   background: none; border-right: 0; border-bottom: 0; border-left: 0; border-radius: 0; box-shadow: none; padding: 1rem 0 1.25rem;
 }
 .pf .stat-card { padding: 0.9rem 0 1rem; }
@@ -376,10 +362,7 @@
   border: 2px solid var(--text); border-radius: 0; background: var(--bg-dim); box-shadow: none;
 }
 /* Chips: square, mono, the colour kept as the frame */
-.pf .sch-badge, .pf .sch-tag, .pf .sch-preset, .pf .of-badge, .pf .of-status, .pf .of-chip, .pf .of-group-count, .pf .wf-badge,
-.pf .pf-agd-status, .pf .agd-status, .pf .pf-agd-cap-badge, .pf .agd-cap-badge, .pf .pf-agd-cap-type, .pf .agd-cap-type, .pf .pf-agd-filter-pill,
-.pf .pf-agd-event-badge, .pf .pf-agd-role-badge, .pf .pf-agd-env-badge, .pf .agd-env-badge, .kpkg-badge, .kpkg-tag, .pf .file-tag, .pf .ext-comp-tag,
-.pf .ext-visibility-badge, .pf .ext-card-version, .pf .brd-member-tag, .pf .scope-badge, .pf .pf-ureport-btn, .pf .pf-usage-chip, .pf .pf-agd-quality-dur-chip {
+.pf .sch-badge, .pf .sch-tag, .pf .sch-preset, .pf .of-badge, .pf .of-status, .pf .of-chip, .pf .of-group-count, .pf .wf-badge, .pf .pf-agd-status, .pf .agd-status, .pf .pf-agd-cap-badge, .pf .agd-cap-badge, .pf .pf-agd-cap-type, .pf .agd-cap-type, .pf .pf-agd-filter-pill, .pf .pf-agd-event-badge, .pf .pf-agd-role-badge, .pf .pf-agd-env-badge, .pf .agd-env-badge, .kpkg-badge, .kpkg-tag, .pf .file-tag, .pf .ext-comp-tag, .pf .ext-visibility-badge, .pf .ext-card-version, .pf .brd-member-tag, .pf .scope-badge, .pf .pf-ureport-btn, .pf .pf-agd-quality-dur-chip {
   border-radius: 0; background: none; border: 2px solid currentColor;
   font-family: var(--font-mono); font-size: 0.68rem; font-weight: 500; letter-spacing: 0; text-transform: none; padding: 1px 7px; line-height: 1.5;
 }
@@ -393,25 +376,21 @@
 .pf .sch-cal-cell--today, .pf .sch-cal-weekcol--today { border-color: var(--text); }
 .pf .sch-cal-weekcol-head, .pf .sch-cal-head { background: none; border-bottom: 2px solid var(--text); font-weight: var(--font-poster-strong-weight); }
 /* Headings the view sheets set on their own */
-.pf .sch-section-title, .pf .wf-section-title, .pf .of-group-title, .pf .cap-section-title, .pf .mbr-section-title, .pf .pf-content-body h2:not([class]), .pf .pf-content-body h3:not([class]) {
+.pf .sch-section-title, .pf .wf-section-title, .pf .of-group-title, .pf .cap-section-title, .pf .mbr-section-title {
   font-family: var(--font-poster-section); font-weight: var(--font-poster-section-weight);
   font-size: 1.7rem; line-height: var(--font-poster-leading); letter-spacing: var(--font-poster-tracking); text-transform: uppercase; color: var(--text);
 }
-/* The message tab: square panes and bubbles; inbox-poster.css sets the face. */
-.inbox-body { border-radius: 0; box-shadow: none; }
-.inbox-bubble { border-radius: 0; border: 2px solid var(--border); }
-.inbox-bubble--mine { border-color: var(--text); border-bottom-right-radius: 0; }
 
 /* ── The second tour (every remaining index page): discover, ecosystem, skills, capabilities,
    libraries, extensions, packages, the AI provider settings, boards ─────────────────────── */
 /* Rows */
-.pf .dsc-item, .pf .pf-eco-card, .pf .pf-or-mrow, .pf .pf-eco-adv-item, .pf .pf-eco-auto-job, .pf .pj-app-card {
+.pf .pf-eco-card, .pf .pf-or-mrow, .pf .pf-eco-adv-item, .pf .pf-eco-auto-job, .pf .pj-app-card {
   background: none; border: 0; border-bottom: 2px solid var(--text); border-radius: 0; box-shadow: none; padding: 0.9rem 0; margin-bottom: 0;
 }
-.pf .dsc-item:hover, .pf .pf-eco-card:hover, .pf .pf-or-mrow:hover { border-color: var(--accent); background: none; box-shadow: none; transform: none; }
+.pf .pf-eco-card:hover, .pf .pf-or-mrow:hover { border-color: var(--accent); background: none; box-shadow: none; transform: none; }
 .pf .pf-or-mrow { border-bottom-width: 1px; border-bottom-color: var(--border); padding: 0.5rem 0; }
 .pf .pf-or-mrow--on { background: var(--sun); color: var(--on-sun); padding-left: 0.5rem; }
-.pf .dsc-item-title, .pf .pf-eco-name { font-weight: var(--font-poster-strong-weight); }
+.pf .pf-eco-name { font-weight: var(--font-poster-strong-weight); }
 /* Sections and panels */
 .pf .pf-or-wrapper, .pf .pf-or-section, .pf .pf-eco-section, .pf .pf-eco-auto-flow-card, .pf .pf-eco-mcp {
   background: none; border-right: 0; border-bottom: 0; border-left: 0; border-radius: 0; box-shadow: none; padding: 1rem 0 1.25rem;
@@ -424,12 +403,12 @@
   font-size: 1.7rem; line-height: var(--font-poster-leading); letter-spacing: var(--font-poster-tracking); text-transform: uppercase; color: var(--text);
 }
 /* Chips */
-.pf .dsc-facet, .pf .dsc-type-badge, .pf .dsc-tag, .pf .dsc-scope-btn, .pf .pf-eco-status, .pf .pf-eco-pill, .pf .pf-eco-chip, .pf .pf-eco-count-badge, .pf .pf-eco-rec-chip,
+.pf .pf-eco-status, .pf .pf-eco-pill, .pf .pf-eco-chip, .pf .pf-eco-count-badge, .pf .pf-eco-rec-chip,
 .pf .cap-badge, .pf .cap-tag, .pf .lib-tier-btn, .pf .vis-pill, .pf .pf-or-status, .pf .pf-skl-version, .pf .pf-eco-auto-status-chip, .pf .pf-eco-setup-progress-chip {
   border-radius: 0; background: none; border: 2px solid currentColor; color: var(--text);
   font-family: var(--font-mono); font-size: 0.68rem; font-weight: 500; letter-spacing: 0; text-transform: none; padding: 1px 7px; line-height: 1.5;
 }
-.pf .dsc-type-badge, .pf .cap-badge-callable, .pf .pf-eco-status-pending{ color: var(--accent); }
+.pf .cap-badge-callable, .pf .pf-eco-status-pending{ color: var(--accent); }
 .pf .pf-eco-status-active, .pf .pf-or-status--on { color: var(--success-fg); }
 .pf .pf-eco-status-revoked{ color: var(--danger); }
 /* The quiet actions the older tabs draw as small framed buttons */
@@ -438,11 +417,11 @@
   font-family: var(--font-showroom-body); font-weight: var(--font-poster-strong-weight); font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text);
 }
 /* Search fields the older tabs draw as boxes */
-.pf .dsc-search, .pf .cap-search-input, .pf .lib-search, .pf .pf-or-msearch {
+.pf .cap-search-input, .pf .lib-search, .pf .pf-or-msearch {
   background: transparent; border: 0; border-bottom: 3px solid var(--text); border-radius: 0; padding: 8px 0;
   font-family: var(--font-showroom-body); font-weight: var(--font-poster-text-weight); color: var(--text); box-shadow: none;
 }
-.pf .dsc-search:focus, .pf .cap-search-input:focus, .pf .lib-search:focus, .pf .pf-or-msearch:focus { border-color: var(--accent); outline: none; box-shadow: none; }
+.pf .cap-search-input:focus, .pf .lib-search:focus, .pf .pf-or-msearch:focus { border-color: var(--accent); outline: none; box-shadow: none; }
 .pf .cap-filter-select, .pf .pf-or-select { border: 2px solid var(--text); border-radius: 0; background: var(--bg); }
 
 /* ── The starter card: "begin with two agents" ──────────────────────────────────────────────

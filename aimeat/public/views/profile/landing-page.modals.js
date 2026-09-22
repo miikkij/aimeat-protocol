@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Profile edit / change-password / presence modals + presence pill. Extracted from landing-page.js to satisfy max-file-lines.
  * @version-history
+ *   2026-09-13: Presence controls use shared choices, fields and dialog.
+ *   2026-09-13: Account dialogs compose the shared poster fields, actions and surfaces.
  *   2026-09-13: The three dialogs open in the site's one dialog (components/Modal.js) instead of an
  *     overlay of their own: the same header, X, scrolling body and footer as every other dialog, the
  *     phone sheet, and Modal's guard in place of the two hand-written Escape listeners.
@@ -25,7 +27,7 @@ import { useToast } from "/components/Toast.js";
 import { DisplayPrefsFields } from "/components/DisplayPrefsFields.js";
 import { setDisplayPrefs } from "/js/display-prefs.js";
 import { swallowed } from '/js/swallowed.js';
-import { Modal } from '/components/Modal.js';
+import { Dialog, Stack, Field, Text, Action, KeyValue } from '/components/poster-parts.js';
 
 /* ───── Edit Profile Modal ───── */
 
@@ -90,90 +92,52 @@ export function EditProfileModal({ session, onClose, onSaved, onChangePassword }
   // while a save is on its way nothing closes it.
   const requestClose = () => { if (!saving) onClose(); };
 
-  const footer = loading ? null : html`
-    <button class="btn-outline" onClick=${requestClose} disabled=${saving}>
-      ${t('profile.landing.editCancel')}
-    </button>
-    <button class="btn-primary" onClick=${save} disabled=${saving}>
-      ${saving ? t('profile.landing.editSaving') : t('profile.landing.editSave')}
-    </button>`;
-  const footerStart = loading ? null : html`
-    <a href="#" class="pf-edit-link" onClick=${(e) => { e.preventDefault(); onChangePassword?.(); }}>
-      ${t('profile.landing.changePassword')}…</a>`;
 
-  return html`
-    <${Modal} open=${true} onClose=${requestClose} title=${t('profile.landing.editModalTitle')}
-      className="pf-account-modal" footer=${footer} footerStart=${footerStart}>
-        ${loading ? html`<div class="pf-edit-loading"><${Spinner} /></div>` : html`
-            <label class="pf-edit-label">
-              ${t('profile.landing.editDisplayName')}
-              <input type="text" class="pf-edit-input" value=${fields.display_name}
-                placeholder=${t('profile.landing.editDisplayNamePlaceholder')}
-                maxlength="100"
-                onInput=${(e) => set('display_name', e.target.value)} />
-            </label>
-            <label class="pf-edit-label">
-              ${t('profile.landing.editBio')}
-              <textarea class="pf-edit-textarea" value=${fields.bio}
-                placeholder=${t('profile.landing.editBioPlaceholder')}
-                maxlength="500" rows="3"
-                onInput=${(e) => set('bio', e.target.value)}></textarea>
-            </label>
-            <label class="pf-edit-label">
-              ${t('profile.landing.editAvatar')}
-              <div class="pf-avatar-row">
-                <input type="text" class="pf-edit-input" value=${fields.avatar}
-                  placeholder=${t('profile.landing.editAvatarPlaceholder')}
-                  maxlength="50"
-                  onInput=${(e) => set('avatar', e.target.value)} />
-                <span class="pf-avatar-preview" aria-hidden="true">${fields.avatar || '🙂'}</span>
-              </div>
-            </label>
-            <label class="pf-edit-label">
-              ${t('profile.landing.editLocale')}
-              <select class="pf-edit-select" value=${fields.locale}
-                onChange=${(e) => set('locale', e.target.value)}>
-                <option value="en">English</option>
-                <option value="fi">Suomi</option>
-                <option value="es">Español</option>
-              </select>
-              <div class="pf-edit-hint">${t('profile.landing.editLocaleHint') || 'Your preferred language — used for the portal UI; agents can read it from your profile to answer in it.'}</div>
-            </label>
-            ${/* Beside the language, because they are the two settings it is NOT. */''}
-            <${DisplayPrefsFields} region=${fields.region} timezone=${fields.timezone}
-              onChange=${(k, v) => set(k, v)} />
-            <div class="pf-edit-label">
-              ${t('profile.landing.editEmail')}
-              <div class="pf-edit-readonly">${currentEmail || t('profile.landing.editEmailNone')}</div>
-              <a href="/v1/profile?tab=email" class="pf-edit-link">
-                ${t('profile.landing.editEmailLink') || 'Change in the Email tab →'}</a>
-            </div>
-            <label class="pf-edit-check">
-              <input type="checkbox" checked=${fields.directory_listed}
-                onChange=${(e) => set('directory_listed', e.target.checked)} />
-              <span>
-                <span class="pf-edit-check-title">${t('profile.landing.editDirectoryListed') || 'List me in the member directory'}</span>
-                <span class="pf-edit-hint">${t('profile.landing.editDirectoryHint') || 'Off by default. When on, other signed-in members can find you (name, bio, avatar) in the directory. Anonymous visitors never see it.'}</span>
-              </span>
-            </label>
-        `}
-        <${ToastContainer} />
-    <//>
-  `;
+  const footer = loading ? null : html`
+    <${Action} onClick=${requestClose} disabled=${saving}>${t('profile.landing.editCancel')}<//>
+    <${Action} kind="primary" onClick=${save} disabled=${saving}>
+      ${saving ? t('profile.landing.editSaving') : t('profile.landing.editSave')}<//>`;
+  const footerStart = loading ? null : html`<${Action} kind="text" onClick=${() => onChangePassword?.()}>
+    ${t('profile.landing.changePassword')}…<//>`;
+  return html`<${Dialog} open=${true} onClose=${requestClose} title=${t('profile.landing.editModalTitle')}
+    actions=${footer} sideAction=${footerStart}>
+    ${loading ? html`<${Spinner} />` : html`<${Stack}>
+      <${Field} label=${t('profile.landing.editDisplayName')} value=${fields.display_name}
+        placeholder=${t('profile.landing.editDisplayNamePlaceholder')} maxLength=${100}
+        onInput=${e => set('display_name', e.target.value)} />
+      <${Field} type="textarea" label=${t('profile.landing.editBio')} value=${fields.bio}
+        placeholder=${t('profile.landing.editBioPlaceholder')} maxLength=${500} rows=${3}
+        onInput=${e => set('bio', e.target.value)} />
+      <${Field} label=${t('profile.landing.editAvatar')} value=${fields.avatar}
+        placeholder=${t('profile.landing.editAvatarPlaceholder')} maxLength=${50}
+        onInput=${e => set('avatar', e.target.value)} />
+      <${Text}>${fields.avatar || '🙂'}<//>
+      <${Field} type="select" label=${t('profile.landing.editLocale')} value=${fields.locale}
+        onChange=${e => set('locale', e.target.value)}
+        options=${[{value:'en',label:'English'},{value:'fi',label:'Suomi'},{value:'es',label:'Español'}]}
+        hint=${t('profile.landing.editLocaleHint') || 'Your preferred language — used for the portal UI; agents can read it from your profile to answer in it.'} />
+      <${DisplayPrefsFields} region=${fields.region} timezone=${fields.timezone} onChange=${set} />
+      <${KeyValue} label=${t('profile.landing.editEmail')} value=${currentEmail || t('profile.landing.editEmailNone')} />
+      <${Action} href="/v1/profile?tab=email" kind="text">${t('profile.landing.editEmailLink') || 'Change in the Email tab →'}<//>
+      <${Field} type="checkbox" label=${t('profile.landing.editDirectoryListed') || 'List me in the member directory'}
+        value=${fields.directory_listed} onChange=${e => set('directory_listed', e.target.checked)} />
+      <${Text} tone="muted">${t('profile.landing.editDirectoryHint') || 'Off by default. When on, other signed-in members can find you (name, bio, avatar) in the directory. Anonymous visitors never see it.'}<//>
+    <//>`}
+    <${ToastContainer} />
+  <//>`;
 }
 
 /* ───── Change Password Modal ───── */
 
 /* Password input with a neutral show/hide toggle (text-presentation eye, gray — red would read
  * as an error). */
-export function PwInput({ value, onInput }) {
+export function PwInput({ value, onInput, label, autoComplete }) {
   const [show, setShow] = useState(false);
-  return html`
-    <div class="pf-pw-wrap">
-      <input type=${show ? 'text' : 'password'} class="pf-edit-input" value=${value} onInput=${onInput} />
-      <button type="button" class="pf-pw-eye"
-        onClick=${() => setShow(s => !s)}>${show ? (t('profile.landing.hidePassword') || 'Hide') : (t('profile.landing.showPassword') || 'Show')}</button>
-    </div>`;
+  return html`<${Stack} density="compact">
+    <${Field} type=${show ? 'text' : 'password'} label=${label} value=${value} onInput=${onInput} autoComplete=${autoComplete} />
+    <${Stack} align="start"><${Action} onClick=${() => setShow(s => !s)}>
+      ${show ? (t('profile.landing.hidePassword') || 'Hide') : (t('profile.landing.showPassword') || 'Show')}<//><//>
+  <//>`;
 }
 
 export function ChangePasswordModal({ onClose, onChanged }) {
@@ -236,43 +200,28 @@ export function ChangePasswordModal({ onClose, onChanged }) {
   // OAuth accounts with no password set: "set a password" flow (no current field).
   const setupMode = hasPassword === false;
 
+
   const footer = html`
-    <button class="btn-outline" onClick=${requestClose} disabled=${saving}>
-      ${t('profile.landing.editCancel')}
-    </button>
-    <button class="btn-primary" onClick=${save} disabled=${saving || hasPassword === null || (!setupMode && !current) || !rulesOk || !confirm || mismatch}>
+    <${Action} onClick=${requestClose} disabled=${saving}>${t('profile.landing.editCancel')}<//>
+    <${Action} kind="primary" onClick=${save} disabled=${saving || hasPassword === null || (!setupMode && !current) || !rulesOk || !confirm || mismatch}>
       ${saving
         ? (setupMode ? (t('profile.landing.passwordSaving') || t('profile.landing.passwordChanging')) : t('profile.landing.passwordChanging'))
-        : (setupMode ? (t('profile.landing.setPasswordBtn') || 'Set password') : (t('profile.landing.changePasswordBtn') || 'Change password'))}
-    </button>`;
-
-  return html`
-    <${Modal} open=${true} onClose=${requestClose} className="pf-account-modal" size="sm" footer=${footer}
-      title=${setupMode ? (t('profile.landing.setPasswordTitle') || 'Set a password') : t('profile.landing.changePasswordTitle')}>
-          ${setupMode ? html`
-            <div class="pf-edit-hint">${t('profile.landing.setPasswordHint')
-              || 'Your account has no password yet (you signed in with Google). Choose a password to also sign in with your username.'}</div>
-          ` : html`
-            <label class="pf-edit-label">
-              ${t('profile.landing.currentPassword')}
-              <${PwInput} value=${current} onInput=${(e) => setCurrent(e.target.value)} />
-            </label>
-          `}
-          <label class="pf-edit-label">
-            ${t('profile.landing.newPassword')}
-            <${PwInput} value=${newPw} onInput=${(e) => setNewPw(e.target.value)} />
-          </label>
-          <ul class="pf-pw-rules">
-            ${rules.map(r => html`<li class=${r.ok ? 'ok' : ''} key=${r.label}>${r.ok ? '✓' : '○'} ${r.label}</li>`)}
-          </ul>
-          <label class="pf-edit-label">
-            ${t('profile.landing.confirmPassword')}
-            <${PwInput} value=${confirm} onInput=${(e) => setConfirm(e.target.value)} />
-          </label>
-          ${mismatch ? html`<div class="pf-edit-error">${t('profile.landing.passwordMismatch')}</div>` : null}
-          ${err && html`<div class="pf-edit-error">${err}</div>`}
+        : (setupMode ? (t('profile.landing.setPasswordBtn') || 'Set password') : (t('profile.landing.changePasswordBtn') || 'Change password'))}<//>`;
+  return html`<${Dialog} open=${true} onClose=${requestClose} size="small" actions=${footer}
+    title=${setupMode ? (t('profile.landing.setPasswordTitle') || 'Set a password') : t('profile.landing.changePasswordTitle')}>
+    <${Stack}>
+      ${setupMode ? html`<${Text} tone="muted">${t('profile.landing.setPasswordHint')
+        || 'Your account has no password yet (you signed in with Google). Choose a password to also sign in with your username.'}<//>`
+        : html`<${PwInput} label=${t('profile.landing.currentPassword')} autoComplete="current-password"
+            value=${current} onInput=${e => setCurrent(e.target.value)} />`}
+      <${PwInput} label=${t('profile.landing.newPassword')} autoComplete="new-password" value=${newPw} onInput=${e => setNewPw(e.target.value)} />
+      <${Stack} density="compact">${rules.map(r => html`<${Text} key=${r.label} tone=${r.ok ? 'success' : 'muted'}>
+        ${r.ok ? '✓' : '○'} ${r.label}<//>`)}<//>
+      <${PwInput} label=${t('profile.landing.confirmPassword')} autoComplete="new-password" value=${confirm} onInput=${e => setConfirm(e.target.value)} />
+      ${mismatch && html`<${Text} tone="danger">${t('profile.landing.passwordMismatch')}<//>`}
+      ${err && html`<${Text} tone="danger">${err}<//>`}
     <//>
-  `;
+  <//>`;
 }
 
 /* "Presence" — the owner's own availability control. Lives as a compact status
@@ -281,55 +230,25 @@ export function ChangePasswordModal({ onClose, onChanged }) {
  * to people everywhere else, kept live by the pill's own fetch + live-update wiring. */
 export function PresenceDialog({ cfg, status, saving, onSave, onClose }) {
   // Every choice here saves the moment it is made, so there is no half-written form to guard.
-  return html`
-    <${Modal} open=${true} onClose=${onClose} title=${t('presence.control.title')} size="sm" guard=${false}
-      className="pf-presence-modal"
-      footer=${html`<button class="btn-primary" onClick=${onClose}>${t('profile.close')}</button>`}>
-          <div class="pf-presence-head">
-            <div class="section-desc">${t('presence.control.desc')}</div>
-            <${PresenceDot} status=${status} size="md" label=${true} />
-          </div>
-
-          <div class="pf-presence-row">
-            <label class="pf-presence-label">${t('presence.control.modeLabel')}</label>
-            <div class="pf-presence-modes">
-              <button class=${'pf-presence-pill' + (cfg.mode === 'auto' ? ' pf-presence-pill--on' : '')}
-                disabled=${saving} onClick=${() => onSave({ mode: 'auto' })}>${t('presence.control.modeAuto')}</button>
-              <button class=${'pf-presence-pill' + (cfg.mode === 'manual' ? ' pf-presence-pill--on' : '')}
-                disabled=${saving} onClick=${() => onSave({ mode: 'manual' })}>${t('presence.control.modeManual')}</button>
-            </div>
-          </div>
-
-          ${cfg.mode === 'auto' ? html`
-            <div class="pf-presence-hint">${t('presence.control.modeAutoHint')}</div>
-          ` : html`
-            <div class="pf-presence-row">
-              <label class="pf-presence-label" for="pf-presence-status">${t('presence.control.statusLabel')}</label>
-              <select id="pf-presence-status" class="pf-edit-select" value=${cfg.status} disabled=${saving}
-                onChange=${(e) => onSave({ status: e.target.value })}>
-                <option value="available">${t('presence.status.available')}</option>
-                <option value="busy">${t('presence.status.busy')}</option>
-                <option value="away">${t('presence.status.away')}</option>
-                <option value="invisible">${t('presence.status.invisible')}</option>
-              </select>
-            </div>
-          `}
-
-          <div class="pf-presence-row">
-            <label class="pf-presence-label" for="pf-presence-vis">${t('presence.control.visibilityLabel')}</label>
-            <select id="pf-presence-vis" class="pf-edit-select" value=${cfg.visibility} disabled=${saving}
-              onChange=${(e) => onSave({ visibility: e.target.value })}>
-              <option value="everyone">${t('presence.control.visEveryone')}</option>
-              <option value="contacts">${t('presence.control.visContacts')}</option>
-              <option value="nobody">${t('presence.control.visNobody')}</option>
-            </select>
-          </div>
-          <div class="pf-presence-hint">
-            ${cfg.visibility === 'everyone' ? t('presence.control.visEveryoneHint')
-              : cfg.visibility === 'contacts' ? t('presence.control.visContactsHint') : ''}
-          </div>
+  return html`<${Dialog} open=${true} onClose=${onClose} title=${t('presence.control.title')} size="small" guard=${false}
+    actions=${html`<${Action} kind="primary" onClick=${onClose}>${t('profile.close')}<//>`}>
+    <${Stack}>
+      <${Text} tone="muted">${t('presence.control.desc')}<//>
+      <${PresenceDot} status=${status} size="md" label=${true} />
+      <${Stack} direction="wrap" role="radiogroup" label=${t('presence.control.modeLabel')}>
+        <${Action} kind="tab" semantics="radio" selected=${cfg.mode === 'auto'} disabled=${saving} onClick=${() => onSave({mode:'auto'})}>${t('presence.control.modeAuto')}<//>
+        <${Action} kind="tab" semantics="radio" selected=${cfg.mode === 'manual'} disabled=${saving} onClick=${() => onSave({mode:'manual'})}>${t('presence.control.modeManual')}<//>
+      <//>
+      ${cfg.mode === 'auto' ? html`<${Text} tone="muted">${t('presence.control.modeAutoHint')}<//>`
+        : html`<${Field} type="select" label=${t('presence.control.statusLabel')} value=${cfg.status} disabled=${saving}
+          onChange=${e => onSave({status:e.target.value})} options=${['available','busy','away','invisible'].map(value => ({value,label:t('presence.status.'+value)}))} />`}
+      <${Field} type="select" label=${t('presence.control.visibilityLabel')} value=${cfg.visibility} disabled=${saving}
+        onChange=${e => onSave({visibility:e.target.value})} options=${[
+          {value:'everyone',label:t('presence.control.visEveryone')},{value:'contacts',label:t('presence.control.visContacts')},{value:'nobody',label:t('presence.control.visNobody')}
+        ]} />
+      <${Text} tone="muted">${cfg.visibility === 'everyone' ? t('presence.control.visEveryoneHint') : cfg.visibility === 'contacts' ? t('presence.control.visContactsHint') : ''}<//>
     <//>
-  `;
+  <//>`;
 }
 
 export function PresencePill() {
@@ -361,12 +280,7 @@ export function PresencePill() {
   };
 
   if (!cfg) return null;
-  return html`
-    <button class="pf-presence-pill-btn" onClick=${() => setOpen(true)} title=${t('presence.control.title')}>
-      <${PresenceDot} status=${status} size="sm" label=${true} />
-      <span class="pf-presence-pill-caret" aria-hidden="true">⌄</span>
-    </button>
-    ${open ? html`<${PresenceDialog} cfg=${cfg} status=${status} saving=${saving}
-      onSave=${save} onClose=${() => setOpen(false)} />` : null}
-  `;
-}
+  return html`<${Action} onClick=${() => setOpen(true)} label=${t('presence.control.title')} expanded=${open}>
+    <${PresenceDot} status=${status} size="sm" label=${true} />
+  <//>
+  ${open && html`<${PresenceDialog} cfg=${cfg} status=${status} saving=${saving} onSave=${save} onClose=${() => setOpen(false)} />`}`;}

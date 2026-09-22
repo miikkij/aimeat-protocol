@@ -79,12 +79,30 @@ body:has(.poster-page) .page-content { background: var(--bg); }
 .poster-stack[data-align="end"] { align-items: flex-end; }
 .poster-stack[data-align="between"] { align-items: center; justify-content: space-between; }
 .poster-rail { position: sticky; top: 1.5rem; padding: 1rem 1.1rem; border: var(--rule-heavy) solid var(--text); background: var(--text); color: var(--bg); box-shadow: var(--offset-m) var(--offset-m) 0 var(--sun); }
-.poster-rail[data-kind="navigation"] { box-sizing: border-box; max-height: calc(100dvh - 8rem); overflow-y: auto; }
-.poster-rail[data-kind="navigation"] :is(.poster-action, .poster-tab, .poster-text-action, .poster-icon-action) { color: inherit; border-color: currentColor; white-space: normal; text-align: left; }
-.poster-rail[data-kind="navigation"] .poster-tab.is-on { color: var(--on-sun); }
-.poster-rail[data-kind="navigation"] .poster-list-row { gap: .5rem; padding-block: .4rem; }
+/* The site's navigation (a settings menu): the same rail, but a quiet paper list rather than the ink
+   index panel, because it is read on every page. Rows are hairline list rows, the open page sits on
+   the sun, a group heading is a coral small-caps toggle, and a row's toggle (a pin) shows on hover,
+   on focus, and whenever it is on. */
+.poster-rail[data-kind="navigation"] {
+  box-sizing: border-box; max-height: calc(100dvh - 8rem); overflow-y: auto;
+  padding: 0; border: 0; background: none; color: var(--text); box-shadow: none;
+}
+.poster-rail[data-kind="navigation"] :is(.poster-action, .poster-tab, .poster-text-action) { white-space: normal; text-align: left; }
+.poster-rail[data-kind="navigation"] .poster-tab { border-bottom: 0; text-transform: none; letter-spacing: 0; font-weight: var(--font-poster-strong-weight); font-size: .95rem; padding: .35rem .5rem; }
+.poster-rail[data-kind="navigation"] .poster-text-action[aria-expanded] {
+  margin-top: 1.1rem; font-size: .8rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--accent);
+}
+.poster-rail[data-kind="navigation"] .poster-stack { gap: .1rem; }
+.poster-rail[data-kind="navigation"] .poster-list-row { gap: .5rem; padding: .35rem .5rem; }
+.poster-rail[data-kind="navigation"] .poster-list-name .poster-text-action { font-weight: var(--font-poster-strong-weight); }
 .poster-rail[data-kind="navigation"] .poster-list-actions { grid-column: auto; }
-.poster-dialog .poster-rail[data-kind="navigation"] { position: static; max-height: none; box-shadow: none; }
+.poster-rail[data-kind="navigation"] .poster-list-actions .poster-icon-action { width: 22px; height: 22px; border: 0; opacity: 0; color: var(--accent); }
+.poster-rail[data-kind="navigation"] .poster-list-actions .poster-icon-action > svg { width: 14px; height: 14px; }
+.poster-rail[data-kind="navigation"] .poster-list-row:hover .poster-icon-action,
+.poster-rail[data-kind="navigation"] .poster-icon-action:focus-visible,
+.poster-rail[data-kind="navigation"] .poster-icon-action[aria-pressed="true"] { opacity: 1; }
+.poster-rail[data-kind="navigation"] .poster-list-row[data-selected="yes"] .poster-icon-action { color: var(--on-sun); }
+.poster-dialog .poster-rail[data-kind="navigation"] { position: static; max-height: none; }
 .poster-meter { box-sizing: border-box; height: 8px; }
 .poster-numeral-band dd .poster-text-action { font-weight: inherit; }
 .poster-rail-title { margin: 0 0 .6rem; font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: .75rem; letter-spacing: .06em; text-transform: uppercase; color: var(--sun); }
@@ -102,10 +120,25 @@ body:has(.poster-page) .page-content { background: var(--bg); }
 .poster-list-name { min-width: 0; overflow-wrap: anywhere; }
 .poster-list-name > strong { font-weight: var(--font-poster-strong-weight); }
 .poster-list-name > small { display: block; margin-top: .25rem; font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); }
-/* A preview is a person's words (a message, a note), so it reads in the body face, not mono. */
-.poster-list-row[data-preview="yes"] .poster-list-name > small { font-family: var(--font-showroom-body); font-size: .9rem; line-height: 1.5; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+/* A second line that is a sentence (detailKind text, or a preview: a message, a note) reads in the
+   body face, not mono; a preview is also clamped to two lines. */
+.poster-list-row[data-detail="text"] .poster-list-name > small { font-family: var(--font-showroom-body); font-size: .9rem; line-height: 1.5; }
+.poster-list-row[data-preview="yes"] .poster-list-name > small { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
 .poster-list-mark { display: flex; width: 36px; height: 36px; align-items: center; justify-content: center; }
 .poster-list-mark:not(.poster-list-lead) > *, .poster-list-mark:not(.poster-list-lead) svg { width: 100%; height: 100%; object-fit: cover; }
+/* The trail (Crumbs): mono, earlier steps coral links, the place you are in ink, a slash between. */
+.poster-crumbs ol { display: flex; flex-wrap: wrap; gap: .1rem .5rem; margin: 0 0 .3rem; padding: 0; list-style: none; font-family: var(--font-mono); font-size: .8rem; color: var(--text); }
+.poster-crumbs li + li::before { content: '/'; margin-right: .5rem; color: var(--text-dim); }
+.poster-crumbs .poster-text-action { font-weight: 400; color: var(--accent); overflow-wrap: normal; }
+.poster-crumbs .poster-text-action:hover { color: var(--text); }
+/* Chips (Chip): the square mono chip from poster.css in three tones. */
+.poster-chip[data-tone="sun"] { background: var(--sun); color: var(--on-sun); }
+.poster-chip[data-tone="muted"] { border-color: var(--border); color: var(--text-dim); }
+/* An index rail that also holds actions (a view switch, a door back): its words take the ink
+   ground's colours, and the chosen view sits on the sun. */
+.poster-rail[data-kind="index"] :is(.poster-action, .poster-tab, .poster-text-action) { color: inherit; border-color: currentColor; white-space: normal; text-align: left; }
+.poster-rail[data-kind="index"] .poster-tab.is-on { color: var(--on-sun); border-color: var(--on-sun); }
+.poster-rail[data-kind="index"] .poster-label { color: var(--sun); }
 /* A code block inside another surface is part of that thing: no second frame, the quiet ground. */
 .poster-surface .poster-surface.poster-code { border: 0; margin: 0; background: var(--bg-dim); }
 /* The numeral row (StatRow): the shape is poster.css .poster-stat; the light and the coral number. */

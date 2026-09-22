@@ -16,7 +16,7 @@
  *   part plus a prop. A new part is added only when no existing one can carry it, it is named by its
  *   role (never by a page), and at least two pages use it. A new prop is a named variant with a
  *   bounded set of values, never a free-form style hook.
- * @structure Page · Masthead · Section · Columns · Stack · Rail · ListRow · StatRow · CheckItem · Steps · KeyValue ·
+ * @structure Page · Masthead · Crumbs · Chip · Section · Columns · Stack · Rail · ListRow · StatRow · CheckItem · Steps · KeyValue ·
  *   Table · Toolbar · Field · NumeralBand · Dialog · Action · CopyAction · Menu · Meter · Surface · Text
  * @usage import { Page, Section, ListRow } from '/components/poster-parts.js';
  * @version-history
@@ -43,13 +43,13 @@ const collapseOf = (value) => pick(Number(value), [560, 600, 640, 900], 640);
 const toneOf = (value) => pick(value, ['plain', 'muted', 'coral', 'sun', 'ink', 'success', 'danger'], 'plain');
 
 /** The page frame: width, masthead, and an optional rail that becomes a menu dialog on a phone. */
-export function Page({ title, crumb, identity, mark, actions, masthead, rail, width = 'normal', children, id,
+export function Page({ title, crumb, crumbs, identity, mark, actions, masthead, rail, width = 'normal', children, id,
   railSide = 'trailing', railLabel, railOpen = false, onRailOpen, onRailClose }) {
   const leading = railSide === 'leading';
   const railNode = rail && html`<div class="poster-page-rail">${rail}</div>`;
   return html`<div class="poster-page" data-width=${pick(width, ['normal', 'wide', 'reading'], 'normal')} id=${id}>
-    ${masthead || ((title || crumb || identity || actions) && html`<${Masthead}
-      title=${title} crumb=${crumb} identity=${identity} mark=${mark} actions=${actions} />`)}
+    ${masthead || ((title || crumb || crumbs || identity || actions) && html`<${Masthead}
+      title=${title} crumb=${crumb} crumbs=${crumbs} identity=${identity} mark=${mark} actions=${actions} />`)}
     ${rail && railLabel && html`<div class="poster-page-menu"><${Action} onClick=${onRailOpen} expanded=${railOpen}>${railLabel}<//></div>`}
     <div class="poster-page-body" data-rail=${rail ? 'yes' : 'no'} data-rail-side=${leading ? 'leading' : 'trailing'} data-navigation=${railLabel ? 'yes' : 'no'}>
       ${leading && railNode}<div class="poster-page-main">${children}</div>${!leading && railNode}
@@ -58,17 +58,36 @@ export function Page({ title, crumb, identity, mark, actions, masthead, rail, wi
   </div>`;
 }
 
-/** The page's opening: crumb, title, identity line, and the actions at the right. */
-export function Masthead({ title, crumb, identity, mark, actions, size = 'normal' }) {
+/**
+ * The page's opening: the trail, the title, the identity line, and the actions at the right.
+ * `crumbs` is the trail to this page: [{ label, href } | { label, onClick } | { label }], the last
+ * entry being where the person is. (`crumb` takes a ready node, for a page that has one.)
+ */
+export function Masthead({ title, crumb, crumbs, identity, mark, actions, size = 'normal' }) {
   return html`<header class="poster-masthead" data-size=${pick(size, ['normal', 'large'], 'normal')}>
       ${mark && html`<span class="poster-masthead-mark">${mark}</span>`}
       <div class="poster-masthead-words">
-        ${crumb && html`<div class="poster-crumb">${crumb}</div>`}
+        ${crumbs?.length ? html`<${Crumbs} items=${crumbs} />` : crumb && html`<div class="poster-crumb">${crumb}</div>`}
         ${title && html`<h1 class="poster-page-title">${title}</h1>`}
         ${identity && html`<div class="poster-identity">${identity}</div>`}
       </div>
       ${actions && html`<div class="poster-masthead-actions">${actions}</div>`}
     </header>`;
+}
+
+/** The trail to a page: earlier steps are links, the last is where you are. */
+export function Crumbs({ items = [] }) {
+  const shown = items.filter(Boolean);
+  return html`<nav class="poster-crumbs" aria-label="Breadcrumb"><ol>${shown.map((it, i) => {
+    const last = i === shown.length - 1;
+    return html`<li key=${i} aria-current=${last ? 'page' : undefined}>${!last && (it.href || it.onClick)
+      ? html`<${Action} kind="text" href=${it.href} onClick=${it.onClick}>${it.label}<//>` : it.label}</li>`;
+  })}</ol></nav>`;
+}
+
+/** A small square mono chip for a fact about the thing: plain (framed), sun (the one to see) or muted. */
+export function Chip({ tone = 'plain', children, title }) {
+  return html`<span class="poster-chip" data-tone=${pick(tone, ['plain', 'sun', 'muted'], 'plain')} title=${title}>${children}</span>`;
 }
 
 /** A section: the B1 slab, a description, its actions, and the body (on the sun edge when it is the selected tab's). */
@@ -114,11 +133,14 @@ export function Rail({ title, entries = [], children, label, kind = 'index' }) {
  * (coral, sun, success, danger, info, muted); `live` makes the marker pulse.
  * An index row (a numbered list whose rows open) passes `number`, shown in coral mono, and `arrow`,
  * which points right, or down while the row is `selected` (open).
+ * The second line (`detail`) is mono, for a machine value (an address, a key, a time); a sentence a
+ * person reads passes `detailKind="text"`. A `preview` (a message, a note) is text and is clamped.
  */
 export function ListRow({ mark, name, detail, value, actions, children, href, onOpen, selected = false, density, id, kind = 'normal', preview = false, external = false,
-  time, timeTitle, marker, live = false, number, arrow = false }) {
+  time, timeTitle, marker, live = false, number, arrow = false, detailKind = 'mono' }) {
   const lead = time != null || marker || number != null;
-  return html`<article class="poster-list-row" data-kind=${pick(kind, ['normal', 'chronology'], 'normal')} data-density=${densityOf(density)} data-selected=${selected ? 'yes' : 'no'} data-preview=${preview ? 'yes' : undefined} id=${id}>
+  const detailFace = preview ? 'text' : pick(detailKind, ['mono', 'text'], 'mono');
+  return html`<article class="poster-list-row" data-kind=${pick(kind, ['normal', 'chronology'], 'normal')} data-density=${densityOf(density)} data-selected=${selected ? 'yes' : 'no'} data-preview=${preview ? 'yes' : undefined} data-detail=${detailFace} id=${id}>
     ${lead ? html`<div class="poster-list-mark poster-list-lead">
       ${number != null && html`<span class="poster-list-number">${number}</span>`}
       ${time != null && html`<span class="poster-list-time" title=${timeTitle}>${time}</span>`}
@@ -239,7 +261,8 @@ export function Dialog({ open, onClose, title, children, actions, sideAction, si
 /**
  * An action names what it does and picks one of five roles, never a CSS hook:
  * primary (the one loud slab), secondary (an underlined word), tab (a choice that can be on),
- * text (a link-like word inside a row) and icon (a square with an SVG in it).
+ * text (a link-like word inside a row) and icon (a square with an SVG in it; `selected` makes it a
+ * pressed toggle, such as a pin).
  * `semantics` is for a group of choices: 'tab' or 'radio' gives the button that ARIA role.
  */
 export function Action({ children, href, onClick, kind = 'secondary', size = 'normal', tone, selected = false,
@@ -256,7 +279,7 @@ export function Action({ children, href, onClick, kind = 'secondary', size = 'no
         role=${pick(semantics, ['radio', 'tab'], undefined)}
         aria-checked=${semantics === 'radio' ? selected : undefined}
         aria-selected=${semantics === 'tab' ? selected : undefined}
-        aria-pressed=${role === 'tab' && !semantics ? selected : undefined}>${children}</button>`;
+        aria-pressed=${(role === 'tab' || role === 'icon') && !semantics ? selected : undefined}>${children}</button>`;
 }
 
 /**

@@ -6,9 +6,10 @@
  *   is, a scope's name), the search desk (one field, the scope beside it with its counts), the row
  *   of one entry (when, title and a plain description with the query words marked, kind and place,
  *   a door), the crumb, the page frame with its rail, and opening an entry at its real home.
- * @structure c · kindName · kindSub · HUMAN_TYPES · desk · entryCells · entryRows · crumb · renderPage · openEntry
+ * @structure c · kindName · kindSub · HUMAN_TYPES · desk · entryRows · crumb · renderPage · openEntry
  * @usage import { renderPage, desk, entryRows, openEntry } from './frame.js';
  * @version-history
+ *   2026-09-14 -- Whole directory composes the shared set; routing and query data stay unchanged.
  *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   v1.3.0 -- 2026-09-13 -- Compose existing top rules from poster.css.
  *   v1.2.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
@@ -19,6 +20,7 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
+import { Page, Rail, Stack, Field, Toolbar, ListRow, Action, Text } from '/components/poster-parts.js';
 import { date as fmtDate, num as fmtNum } from '/js/format.js';
 import { formatRelativeTime } from '/views/profile/memory-tab/helpers.js';
 
@@ -48,65 +50,53 @@ export function hl(text, words) {
 
 export const placeOf = (e) => (e.place ? `${e.place.organism} › ${e.place.workspace}${e.segment && e.type === 'document' ? ` › ${e.segment}` : ''}` : (e.segment && e.type !== 'memory' ? e.segment : ''));
 
-/** The search desk: the field, the scope beside it with a count per scope, one hint. */
+/** The search desk retains scope counts, Enter submission and literal server copy. */
 export function desk(ctx) {
-  const count = (s) => { const f = ctx.facets[s]; if (!f) return ''; return (s === 'public' && f.types.some(x => x.count >= 50)) ? `${num(f.total)}+` : num(f.total); };
-  return html`
-    <div class="dv-desk poster-row--thing">
-      <input type="search" class="dv-field" value=${ctx.q} placeholder=${ctx.scope === 'public' ? c('askPublic') : c('ask')}
-        onInput=${(e) => ctx.setQ(e.target.value)} onKeyDown=${(e) => { if (e.key === 'Enter') ctx.submit(); }} />
-      <div class="og-choice dv-scope">
-        ${SCOPES.map(s => html`<button type="button" key=${s} class=${`og-choice-btn ${ctx.scope === s ? 'on' : ''}`} onClick=${() => ctx.setScope(s)}>${t('discover.scope.' + s)}<i>${count(s) || (s === ctx.scope ? '…' : '')}</i></button>`)}
-      </div>
-      <p class="dv-hint">${!ctx.facets[ctx.scope] ? html`<span class="dv-loading">${c('loading')}</span>` : ctx.query ? c('hintResults') : c('hint')}</p>
-    </div>`;
+  const count = s => {
+    const f = ctx.facets[s];
+    if (!f) return s === ctx.scope ? '…' : '';
+    return num(f.total) + (s === 'public' && f.types.some(x => x.count >= 50) ? '+' : '');
+  };
+  return html`<${Stack}>
+    <${Field} type='search' label=${t('discover.title')} value=${ctx.q}
+      placeholder=${ctx.scope === 'public' ? c('askPublic') : c('ask')}
+      onInput=${e => ctx.setQ(e.target.value)} onKeyDown=${e => {if(e.key === 'Enter')ctx.submit();}} />
+    <${Toolbar} filters=${SCOPES.map(s => ({id:s,label:`${t('discover.scope.'+s)} ${count(s)}`,selected:ctx.scope === s,onClick:() => ctx.setScope(s)}))}
+      actions=${html`<${Action} onClick=${ctx.submit}>${t('common.search')}<//>`} />
+    <${Text} kind='caption' tone='muted'>${!ctx.facets[ctx.scope] ? c('loading') : ctx.query ? c('hintResults') : c('hint')}<//>
+  <//>`;
 }
 
-/** The cells of entries: when, what (with the words marked), kind and place, a door. */
-export function entryCells(ctx, list, { words = [], time = true } = {}) {
-  return list.map((e, i) => html`
-      ${time ? html`<div class="dv-at poster-stat-number poster-stat-number--small" key=${'a' + i}>${hhmm(new Date(e.updatedAt))}<small>${dayLabel(new Date(e.updatedAt))}</small></div>` : null}
-      <div class="dv-nm" key=${'n' + i}><button type="button" class="og-tbl-name" onClick=${() => openEntry(ctx, e)}>${hl(e.title || e.id, words)}</button>${e.description ? html`<small>${hl(e.description, words)}</small>` : null}</div>
-      <div class="dv-where" key=${'w' + i}><b>${kindName(e.type)}</b>${placeOf(e) ? ` · ${placeOf(e)}` : ''}${!time ? ` · ${rel(e.updatedAt)}` : ''}</div>
-      <div class="og-tbl-door" key=${'d' + i}><button type="button" class="og-door" onClick=${() => openEntry(ctx, e)}>${c('open')}</button></div>`);
+/** Entry identity, place and chronology are data in one shared roster row. */
+export function entryRows(ctx, list, { words = [], time = true } = {}) {
+  return html`<${Stack} density='compact'>${list.map((e,i) => html`
+    <${ListRow} key=${e.id || i} name=${hl(e.title || e.id,words)} onOpen=${() => openEntry(ctx,e)}
+      detail=${e.description ? hl(e.description,words) : undefined}
+      value=${time ? html`<${Stack} density='compact'><${Text} kind='number' size='small'>${hhmm(new Date(e.updatedAt))}<//>
+        <${Text} kind='caption'>${dayLabel(new Date(e.updatedAt))}<//><//>` : rel(e.updatedAt)}
+      actions=${html`<${Action} onClick=${() => openEntry(ctx,e)}>${c('open')}<//>`}>
+      <${Text} kind='mono' tone='muted'>${kindName(e.type)}${placeOf(e) ? ' · '+placeOf(e) : ''}<//>
+    <//>`)}<//>`;
 }
-/** Rows of entries in their own grid. */
-export function entryRows(ctx, list, opts = {}) {
-  return html`<div class=${`dv-rows ${opts.time === false ? 'dv-rows--hits' : ''}`}>${entryCells(ctx, list, opts)}</div>`;
-}
-export const rowsHead = () => html`<div class="dv-rows dv-rows--head"><div>${c('colWhen')}</div><div>${c('colWhat')}</div><div>${c('colKindPlace')}</div><div></div></div>`;
 
-/* ── The crumb and the page frame ──────────────────────────────────────────────────────────── */
+/** The trail to a directory page, as Masthead crumbs: Settings & Controls, Discover, then the parts. */
 export function crumb(ctx, parts) {
-  return html`
-    <div class="og-crumb">
-      <span>${t('nav.profile')}</span><span>/</span>
-      ${parts.length ? html`<button type="button" class="og-crumb-link" onClick=${() => ctx.pickView({ kind: 'cover' })}>${t('discover.title')}</button>` : html`<span class="og-crumb-here">${t('discover.title')}</span>`}
-      ${parts.map((p, i) => html`<span key=${i}>/</span><span class="og-crumb-here">${p}</span>`)}
-    </div>`;
+  return [
+    { label: t('nav.profile') },
+    { label: t('discover.title'), onClick: parts.length ? () => ctx.pickView({kind:'cover'}) : undefined },
+    ...parts.map(p => ({ label: p })),
+  ];
 }
 
-export function renderPage(ctx, { crumbs, title, chips = null, doors = null, rail = null, children }) {
-  return html`
-    <div class="og og-dv og-page">
-      ${crumb(ctx, crumbs)}
-      <div class="og-mast og-mast--page">
-        <div class="og-mast-words">
-          <h1 class="og-title poster-page-title dv-title--page">${title}</h1>
-          ${chips ? html`<div class="og-chips">${chips}</div>` : null}
-        </div>
-        ${doors ? html`<div class="og-mast-actions"><div class="og-doors">${doors}</div></div>` : null}
-      </div>
-      ${desk(ctx)}
-      <div class="og-grid">
-        <div class="og-main poster-row--thing">${children}</div>
-        <nav class="og-rail" aria-label=${c('railTitle')}>
-          <span class="og-rail-label">${t('discover.title')}</span>
-          <button type="button" class="og-rail-link" onClick=${() => ctx.pickView({ kind: 'cover' })}><i>←</i>${c('backTo')}</button>
-          ${rail}
-        </nav>
-      </div>
-    </div>`;
+/** A Page owns the frame; this helper only supplies the directory's copy and actions. */
+export function renderPage(ctx, { crumbs = [], title, chips = null, doors = null, rail = null, children }) {
+  return html`<${Page} width='wide' title=${title} crumbs=${crumb(ctx,crumbs)} identity=${chips} actions=${doors}
+    rail=${html`<${Rail} kind='index' title=${t('discover.title')}><${Stack}>
+      <${Action} onClick=${() => ctx.pickView({kind:'cover'})}>← ${c('backTo')}<//>
+      ${rail}
+    <//><//>`}>
+    <${Stack}>${desk(ctx)}${children}<//>
+  <//>`;
 }
 
 /**
