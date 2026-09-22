@@ -1,9 +1,9 @@
 {
   "_note": "Per-page stylesheets, recorded as debt rather than approval: every page is composed from the shared set, so this map may only shrink. Lower a count or remove a file as its page migrates. A new sheet needs an entry in exceptions with the reason it cannot be a shared part. Only an explicit developer decision permits pnpm check:view-sheet-lines --record.",
   "_measured": {
-    "date": "2026-09-22T21:50:33Z",
-    "files": 99,
-    "lines": 23855
+    "date": "2026-09-22T23:53:59Z",
+    "files": 98,
+    "lines": 23492
   },
   "exceptions": {},
   "files": {
@@ -63,7 +63,6 @@
     "public/css/views/companies-poster.css": 93,
     "public/css/views/contacts-poster.css": 121,
     "public/css/views/data-wallet-poster.css": 129,
-    "public/css/views/discover-poster.css": 90,
     "public/css/views/email-poster.css": 83,
     "public/css/views/everything.css": 73,
     "public/css/views/extensions-poster.css": 115,
@@ -93,8 +92,8 @@
     "public/css/views/portfolio-poster.css": 90,
     "public/css/views/portfolio.css": 447,
     "public/css/views/profile-door.css": 107,
-    "public/css/views/profile-poster.css": 490,
-    "public/css/views/profile.css": 3577,
+    "public/css/views/profile-poster.css": 469,
+    "public/css/views/profile.css": 3325,
     "public/css/views/public-knowledge-viewer.css": 23,
     "public/css/views/public-workspace-viewer.css": 253,
     "public/css/views/scheduler-poster.css": 142,

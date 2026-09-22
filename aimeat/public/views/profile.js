@@ -10,6 +10,7 @@
  *   updateStats, navigate, renderTab) rendering LandingPage + a toast pill.
  * @usage Lazy-loaded route component for /v1/profile.
  * @version-history
+ *   2026-09-13: Overview uses the shared page; legacy context remains only around pending tab migrations.
  *   2026-09-13 — The toast pill shows above an open dialog (raiseAboveDialogs in /js/dialog.js)
  *     instead of under its dimmed backdrop.
  *   2026-09-06 — The signed-out wall is the door (profile/door.js): it names where the address leads
@@ -42,7 +43,6 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'preact/hooks'
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { useViewCSS } from '/components/useViewCSS.js';
 import { normalizeToastType } from '/components/Toast.js';
 import { raiseAboveDialogs } from '/js/dialog.js';
 import { getSession, onAuthChange } from '/js/services/auth.js';
@@ -255,7 +255,6 @@ export default function Profile({ navigate, locale }) {
     }
   }, []);
 
-  useViewCSS('/css/views/profile.css');
 
   // Load all stats on mount so the stats bar shows counts immediately. ONE composite call
   // (GET /v1/owner/home, HomeDashboardService) replaces the old 8-request fan-out — the server
@@ -315,7 +314,8 @@ export default function Profile({ navigate, locale }) {
   const renderTab = useCallback((tabId) => {
     const tab = TABS.find(t => t.id === tabId);
     if (!tab) return null;
-    return html`<${tab.component} ...${tabProps} />`;
+    if (['messages', 'discover'].includes(tabId)) return html`<${tab.component} ...${tabProps} />`;
+    return html`<div class="pf"><${tab.component} ...${tabProps} /></div>`;
   }, [tabProps]);
 
   // Get tab label by ID
@@ -333,8 +333,7 @@ export default function Profile({ navigate, locale }) {
   }
 
   return html`
-    <div class="pf">
-      <${LandingPage}
+    <${LandingPage}
         tier=${tier}
         stats=${stats}
         homeUsage=${homeExtras?.usage}
@@ -346,7 +345,6 @@ export default function Profile({ navigate, locale }) {
         renderTab=${renderTab}
         getTabLabel=${getTabLabel}
       />
-    </div>
 
     <!-- Toast -->
     ${toast && html`<div class="toast toast-${toast.type}" ref=${raiseAboveDialogs}>${toast.msg}</div>`}`;

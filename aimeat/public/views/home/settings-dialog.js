@@ -136,7 +136,7 @@ export function HomeSettingsDialog({ open, onClose, session, showToast }) {
         <${Section} title=${t('homeJourney.appearance')} size="small"><${Stack}>
           <${AchievementsToggle} /><${MarginPatternSetting} /><${StartPageSetting} />
         <//><//>
-        <${ListRow} href="/v1/profile" name=${tr('home.settings.allControls','All settings and controls')+' →'}
+        <${ListRow} href="/v1/profile" detailKind="text" name=${tr('home.settings.allControls','All settings and controls')+' →'}
           detail=${tr('home.settings.allControlsHint','Agents, memory, apps, access, billing: everything behind the home.')} />
       <//>
     <//>`;

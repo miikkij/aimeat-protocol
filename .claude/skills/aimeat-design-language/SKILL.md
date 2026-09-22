@@ -243,23 +243,31 @@ least two pages.
 | Part | What it is, its variants |
 |---|---|
 | `Page` | The frame: width normal (1180px), wide (1440px) or reading (900px); the masthead; a rail on the leading or trailing side that becomes a menu dialog below 900px. |
-| `Masthead` | Crumb, page title, identity line, a mark and the actions at the right; normal or large (the home's name). |
+| `Masthead` | The trail (`crumbs`), page title, identity line (put `Chip`s there), a mark and the actions at the right; normal or large (the home's name). |
+| `Crumbs` | The trail to a page: mono, earlier steps coral links, the current page in ink, a slash between. Masthead draws it from `crumbs`. |
+| `Chip` | A square mono fact: plain (framed), sun (the one to see) or muted. |
 | `Section` | The B1 slab, a description, actions and the body; small, normal or large headline; compact, normal or roomy spacing; `selected` puts the body on the sun edge. |
 | `Columns` | Equal, thirds, quarters, leading or trailing; three gaps; collapses at 560, 600, 640 or 900px of its container. |
 | `Stack` | Vertical, horizontal or wrapping; start, center, end, stretch or between; three gaps. |
 | `Rail` | The sticky ink index with numbered entries; index or navigation. |
-| `ListRow` | Mark, name, mono detail, value, actions and an open body, hairline under; three densities; selected; chronology gives the leading time a fixed column; preview clamps the detail to two lines. |
+| `ListRow` | Mark, name, detail, value, actions and an open body, hairline under; three densities; selected. The detail is mono for a machine value; `detailKind="text"` for a sentence; `preview` (a message) is text clamped to two lines. A timeline row passes `time` and a `marker` tone (`live` pulses); an index row passes `number` and `arrow`. |
+| `StatRow` | One sentence with its number set big, the whole row a link, the ink rule above; an optional status `light`; the number coral with `tone="coral"`. |
+| `CheckItem` | One item of a checklist: ticked on the sun when done, dashed and quieter when not. |
+| `Steps` | Numbered steps to follow: coral mono numbers, body text. |
 | `KeyValue` | The coral label left, the value right, hairline under. |
 | `Table` | Coral small-caps header, hairline rows, a scrolling region; three densities. |
 | `Toolbar` | A search field, tab filters with one on the sun, a count at the right, actions. |
 | `Field` | Label, native control and a hint that shows only while the field is in use; every native input type, textarea, select, checkbox; an error. |
 | `NumeralBand` | Big numbers over small-caps labels, a lead and actions; coral, sun, ink or plain; the diagonal coral cut. |
 | `Dialog` | The site's one dialog (Modal and dialog.css): small, normal or large; footer actions and a side action. |
-| `Action` | Primary (the one loud slab; normal or large; plain or danger), secondary (the underlined word), tab (can be on), text (a word in a row) or icon. Tab and radio semantics for a group of choices. |
+| `Action` | Primary (the one loud slab; normal or large; plain or danger), secondary (the underlined word), tab (can be on), text (a word in a row) or icon (`selected` makes it a pressed toggle, such as a pin). Tab and radio semantics for a group of choices. |
+| `CopyAction` | Copies a text and says so for two seconds; primary, secondary or text, like Action. |
 | `Menu` | The actions of one thing behind a button (three dots by default): a 2px ink box on the sun offset; closes on a choice, Escape or a click elsewhere. |
 | `Meter` | A filled bar for how much of a limit is used; turns to the danger colour from 90 %. |
 | `Surface` | Box, record, aside, code, editor, panel, preview or plain; three densities or flush; plain, muted, coral, sun, ink, success or danger tone; with a summary it folds. |
 | `Text` | Body, lead, label, mono, caption, heading or number; the same tones; a number is small, normal or large. |
+
+The rail has two kinds: `index` is the ink panel with numbered entries for a page's own contents (it may also hold a view switch), `navigation` is the quiet paper list of the site's menu, with a pin that shows on hover and stays when on.
 
 The breakpoints live in the parts: the frame folds its padding at 900px, row actions at 600px,
 key-value labels at 560px. A page does not write a media query.
