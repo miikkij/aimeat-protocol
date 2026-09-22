@@ -25,6 +25,7 @@
  *   const { layout, freeform, ready } = useSurfaceLayout('home');
  *   html`<${SurfaceRenderer} surface="home" layout=${layout} freeform=${freeform} ctx=${ctx} />`
  * @version-history
+ *   2026-09-13: Surface groups compose the shared Section instead of drawing their own band.
  *   v1.0.0 — 2026-08-26 — Initial.
  */
 import { h, Component } from 'preact';
@@ -36,6 +37,7 @@ import { apiGet } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
 import { onLiveUpdate } from '/lib/live-updates.js';
 import { BLOCKS } from '/views/surface/block-map.js';
+import { Section, Stack } from '/components/poster-parts.js';
 
 /** Resolved components, by block id. Identity has to be stable across renders. */
 const resolved = new Map();
@@ -164,10 +166,9 @@ export function SurfaceRenderer({ layout, ctx = {}, freeform = {}, locale = 'en'
       const kids = block.children.filter(c => !c.hidden);
       const heading = titleOf(block, locale);
       return html`
-        <section class="sf-band" key=${block.key}>
-          ${heading ? html`<h2 class="sf-band-title">${heading}</h2>` : ''}
+        <${Section} title=${heading} size="large" key=${block.key}><${Stack}>
           ${kids.map(child => html`<${Block} key=${child.key} block=${child} ctx=${ctx} freeform=${freeform} locale=${locale} />`)}
-        </section>`;
+        <//><//>`;
     }
     return html`<${Block} key=${block.key} block=${block} ctx=${ctx} freeform=${freeform} locale=${locale} />`;
   })}`;

@@ -6,6 +6,8 @@
  *   debt, never approval. Only an explicit decision permits --record; migrations shrink it.
  * @usage pnpm check:poster-shapes [--report | --record]
  * @version-history
+ *   v1.1.0 -- 2026-09-22 -- Each weight and offset also matches its shape token (var(--rule-heavy),
+ *     var(--offset-m), ...), so a copy written with the token is still a copy.
  *   v1.0.0 -- 2026-09-13 -- V0: eleven patterns, file/count baseline and read-only gate.
  */
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -14,17 +16,25 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const BASELINE = path.join(ROOT, 'security/poster-shapes-baseline.json');
+// A weight or an offset matches its literal value and its shape token (theme.css), because a copy
+// spelled with the token is the same copy.
+const W2 = '(?:2px|var\\(--rule-thing\\))';
+const W3 = '(?:3px|var\\(--rule-heavy\\))';
+const OS = '(?:4px|var\\(--offset-s\\))';
+const OM = '(?:8px|var\\(--offset-m\\))';
+const OL = '(?:12px|var\\(--offset-l\\))';
+const re = (body: string) => new RegExp(`(?:^|[;{])\\s*${body}`, 'gi');
 const PATTERNS = {
-    headline: /(?:^|[;{])\s*font-family:\s*var\(--font-poster\)/gi,
-    rule: /(?:^|[;{])\s*border-top:\s*3px\s+solid\s+var\(--text\)/gi,
-    action: /(?:^|[;{])\s*border-bottom:\s*3px\s+solid\s+var\(--text\)/gi,
-    sun: /(?:^|[;{])\s*background:\s*var\(--sun\)/gi,
-    box2: /(?:^|[;{])\s*border:\s*2px\s+solid\s+var\(--text\)/gi,
-    frame3: /(?:^|[;{])\s*border:\s*3px\s+solid\s+var\(--text\)/gi,
-    record: /(?:^|[;{])\s*box-shadow:\s*8px\s+8px\s+0\s+var\(--sun\)/gi,
-    aside: /(?:^|[;{])\s*border:\s*3px\s+dashed\s+var\(--accent\)/gi,
-    slab: /(?:^|[;{])\s*box-shadow:\s*4px\s+4px\s+0\s+var\(--sun\)/gi,
-    dialog: /(?:^|[;{])\s*box-shadow:\s*12px\s+12px\s+0\s+var\(--sun\)/gi,
+    headline: re('font-family:\\s*var\\(--font-poster\\)'),
+    rule: re(`border-top:\\s*${W3}\\s+solid\\s+var\\(--text\\)`),
+    action: re(`border-bottom:\\s*${W3}\\s+solid\\s+var\\(--text\\)`),
+    sun: re('background:\\s*var\\(--sun\\)'),
+    box2: re(`border:\\s*${W2}\\s+solid\\s+var\\(--text\\)`),
+    frame3: re(`border:\\s*${W3}\\s+solid\\s+var\\(--text\\)`),
+    record: re(`box-shadow:\\s*${OM}\\s+${OM}\\s+0\\s+var\\(--sun\\)`),
+    aside: re(`border:\\s*${W3}\\s+dashed\\s+var\\(--accent\\)`),
+    slab: re(`box-shadow:\\s*${OS}\\s+${OS}\\s+0\\s+var\\(--sun\\)`),
+    dialog: re(`box-shadow:\\s*${OL}\\s+${OL}\\s+0\\s+var\\(--sun\\)`),
 };
 type Counts = Record<string, number>;
 interface Baseline { _note: string; _measured: { date: string; files: number; declarations: number; patterns: Counts }; files: Record<string, Counts> }

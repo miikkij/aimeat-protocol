@@ -21,6 +21,7 @@
  *   import { AgentConsent } from '/components/AgentConsent.js';
  *   html`<${AgentConsent} requests=${pending} onApprove=${fn} onDeny=${fn} />`
  * @version-history
+ *   2026-09-13: Shared poster parts compose both consent presentations.
  *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
  *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
  *   2026-09-13 — V1: the profile approval heading composes the shared B1 section class.
@@ -48,6 +49,7 @@ import { h } from 'preact';
 import { useState } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
+import { Section, Surface, Stack, Text, Action, KeyValue } from '/components/poster-parts.js';
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { SCOPE_TEMPLATES, templateLabel } from '/views/profile/agents/scope-config.js';
@@ -89,84 +91,37 @@ function ConsentCard({ req, onApprove, onDeny, busy, variant }) {
     'readonly', 'standard', 'full',
   ];
 
-  return html`
-    <div class="card mt-1 p-1 agc-card ${variant === 'inline' ? 'poster-row--thing' : ''}" key=${req.user_code}>
-      <div class="flex-row mb-half">
-        <span class="badge badge-info">${t('profile.agents.pendingRequests.waiting')}</span>
-        <span class="text-caption">
-          ${t('profile.agents.pendingRequests.expiresIn')}: ${countdown(req.expires_in)}
-        </span>
-      </div>
-
-      <div class="mb-half">
-        <div class="text-caption mb-half">${t('profile.agents.pendingRequests.agentName')}</div>
-        <div class="text-bold">
-          ${escHtml(req.agent_name)}${req.display_name ? ` (${escHtml(req.display_name)})` : ''}
-        </div>
-      </div>
-
-      <div class="mb-half">
-        <div class="text-caption mb-half">${t('profile.agents.pendingRequests.code')}</div>
-        <div class="pf-device-code">${req.user_code}</div>
-      </div>
-
-      ${variant === 'step' && html`
-        <p class="text-caption agc-explain">
-          ${tr('agentConsent.explain', 'Approving lets this AI read and write things in your home on your behalf. You choose how much it may do, and you can change it or remove the agent at any time.')}
-        </p>`}
-
-      ${expanded ? html`
-        <div class="mb-half">
-          <div class="text-caption mb-half">${t('profile.agents.pendingRequests.scopeLevel')}</div>
-          <div class="flex-row pf-scope-presets">
-            ${choices.map(p => html`
-              <button type="button" key=${p}
-                class="${preset === p ? 'btn-primary' : 'btn-outline'} pf-scope-preset-btn"
-                onClick=${() => setPreset(p)}>
-                ${p === 'keep' ? t('profile.agents.pendingRequests.keepCurrent')
-                  : p === 'asked' ? t('profile.agents.pendingRequests.asRequested')
-                  : templateLabel(p)}
-              </button>`)}
-          </div>
-          <p class="text-caption agc-preset-desc">
-            ${preset === 'asked' ? askedSummary : presetSummary(preset, t)}
-          </p>
-          ${askedSummary && html`
-            <p class="text-caption agc-requested">
-              ${t('profile.agents.pendingRequests.requestedNote', { scopes: asked.join(', ') })}
-            </p>`}
-          ${returning && html`
-            <p class="text-caption agc-returning">
-              ${t('profile.agents.pendingRequests.returningAgent')}
-              ${Array.isArray(req.current_scopes) && req.current_scopes.length > 0
-                ? ` (${req.current_scopes.join(', ')})` : ''}
-            </p>`}
-          <ul class="text-caption agc-boundary">
-            ${boundaryLines(t).map(line => html`<li key=${line}>${escHtml(line)}</li>`)}
-          </ul>
-        </div>
-        <div class="flex-row mt-1">
-          <button type="button" class="btn-success" disabled=${busy}
-            onClick=${() => onApprove(req.user_code,
-              preset === 'keep' ? undefined
-                : preset === 'asked' ? asked
-                : (SCOPE_TEMPLATES[preset] || SCOPE_TEMPLATES.standard))}>
-            ${t('profile.agents.pendingRequests.confirmApprove')}
-          </button>
-          <button type="button" class="btn-outline" onClick=${() => setExpanded(false)}>
-            ${t('profile.agents.pendingRequests.cancel')}
-          </button>
-        </div>
-      ` : html`
-        <div class="flex-row mt-1">
-          <button type="button" class="btn-success" disabled=${busy} onClick=${() => setExpanded(true)}>
-            ${t('profile.agents.pendingRequests.approve')}
-          </button>
-          <button type="button" class="btn-danger-solid" disabled=${busy} onClick=${() => onDeny(req.user_code)}>
-            ${t('profile.agents.pendingRequests.deny')}
-          </button>
-        </div>`}
-    </div>`;
+  return html`<${Surface} kind="record"><${Stack}>
+    <${Stack} direction="wrap">
+      <${Text} kind="label">${t('profile.agents.pendingRequests.waiting')}<//>
+      <${Text} kind="caption">${t('profile.agents.pendingRequests.expiresIn')}: ${countdown(req.expires_in)}<//>
+    <//>
+    <${KeyValue} label=${t('profile.agents.pendingRequests.agentName')}
+      value=${escHtml(req.agent_name)+(req.display_name ? ' ('+escHtml(req.display_name)+')' : '')} />
+    <${KeyValue} label=${t('profile.agents.pendingRequests.code')} mono=${true} value=${req.user_code} />
+    ${variant === 'step' && html`<${Text} tone="muted">${tr('agentConsent.explain','Approving lets this AI read and write things in your home on your behalf. You choose how much it may do, and you can change it or remove the agent at any time.')}<//>`}
+    ${expanded ? html`<${Stack}>
+      <${Text} kind="label">${t('profile.agents.pendingRequests.scopeLevel')}<//>
+      <${Stack} direction="wrap" role="radiogroup" label=${t('profile.agents.pendingRequests.scopeLevel')}>
+        ${choices.map(p => html`<${Action} key=${p} kind="tab" semantics="radio" selected=${preset === p} onClick=${() => setPreset(p)}>
+          ${p === 'keep' ? t('profile.agents.pendingRequests.keepCurrent') : p === 'asked' ? t('profile.agents.pendingRequests.asRequested') : templateLabel(p)}<//>`)}
+      <//>
+      <${Text}>${preset === 'asked' ? askedSummary : presetSummary(preset,t)}<//>
+      ${askedSummary && html`<${Text} tone="muted">${t('profile.agents.pendingRequests.requestedNote',{scopes:asked.join(', ')})}<//>`}
+      ${returning && html`<${Text} tone="muted">${t('profile.agents.pendingRequests.returningAgent')}
+        ${Array.isArray(req.current_scopes) && req.current_scopes.length > 0 ? ' ('+req.current_scopes.join(', ')+')' : ''}<//>`}
+      <${Stack} density="compact">${boundaryLines(t).map(line => html`<${Text} key=${line}>${escHtml(line)}<//>`)}<//>
+      <${Stack} direction="wrap">
+        <${Action} kind="primary" disabled=${busy} onClick=${() => onApprove(req.user_code,
+          preset === 'keep' ? undefined : preset === 'asked' ? asked : (SCOPE_TEMPLATES[preset] || SCOPE_TEMPLATES.standard))}>
+          ${t('profile.agents.pendingRequests.confirmApprove')}<//>
+        <${Action} onClick=${() => setExpanded(false)}>${t('profile.agents.pendingRequests.cancel')}<//>
+      <//>
+    <//>` : html`<${Stack} direction="wrap">
+      <${Action} kind="primary" disabled=${busy} onClick=${() => setExpanded(true)}>${t('profile.agents.pendingRequests.approve')}<//>
+      <${Action} kind="primary" tone="danger" disabled=${busy} onClick=${() => onDeny(req.user_code)}>${t('profile.agents.pendingRequests.deny')}<//>
+    <//>`}
+  <//><//>`;
 }
 
 /**
@@ -182,19 +137,9 @@ export function AgentConsent({ requests, onApprove, onDeny, busyCode = null, var
   // whole way down. Same panel, same behaviour — only the two lines of framing differ, so the old
   // path keeps its wording untouched.
   const step = variant === 'step';
-  return html`
-    <div class=${step ? 'agc agc-step' : 'agent-cta mb-1 agc poster-row--thing'}>
-      <div class=${step ? 'section-title' : 'poster-section-title'}>
-        ${step ? tr('agentConsent.stepTitle', 'Your agent is at the door')
-               : t('profile.agents.pendingRequests.title')}
-      </div>
-      <p>
-        ${step ? tr('agentConsent.stepDesc', 'It is asking to come in. Check that the code below is the one your AI showed you, then let it in.')
-               : t('profile.agents.pendingRequests.desc')}
-      </p>
-      ${list.map(req => html`
-        <${ConsentCard} key=${req.user_code} req=${req} variant=${variant}
-          busy=${busyCode === req.user_code}
-          onApprove=${onApprove} onDeny=${onDeny} />`)}
-    </div>`;
-}
+  return html`<${Section} size="small"
+    title=${step ? tr('agentConsent.stepTitle','Your agent is at the door') : t('profile.agents.pendingRequests.title')}
+    description=${step ? tr('agentConsent.stepDesc','It is asking to come in. Check that the code below is the one your AI showed you, then let it in.') : t('profile.agents.pendingRequests.desc')}>
+    <${Stack}>${list.map(req => html`<${ConsentCard} key=${req.user_code} req=${req} variant=${variant}
+      busy=${busyCode === req.user_code} onApprove=${onApprove} onDeny=${onDeny} />`)}<//>
+  <//>`;}

@@ -80,7 +80,6 @@
   <link rel="stylesheet" href="/css/components/app-sandbox.css">
   <link rel="stylesheet" href="/css/components/voice-recorder.css">
   <link rel="stylesheet" href="/css/components/card-menu.css">
-  <link rel="stylesheet" href="/css/components/install-cta.css">
   <link rel="stylesheet" href="/css/components/own-aimeat.css">
   <link rel="stylesheet" href="/css/views/app-grant.css">
   <link rel="stylesheet" href="/css/views/invite-accept.css">
@@ -95,8 +94,6 @@
   <link rel="stylesheet" href="/css/views/portal-classic.css">
   <link rel="stylesheet" href="/css/views/portal-dev.css">
   <link rel="stylesheet" href="/css/views/profile.css">
-  <link rel="stylesheet" href="/css/views/home.css">
-  <link rel="stylesheet" href="/css/views/home-journey.css">
   <link rel="stylesheet" href="/css/views/surface.css">
   <link rel="stylesheet" href="/css/views/notebook.css">
   <link rel="stylesheet" href="/css/views/living.css">
@@ -115,7 +112,6 @@
   <link rel="stylesheet" href="/css/components/image-deliverable.css">
   <link rel="stylesheet" href="/css/components/managed-env.css">
   <link rel="stylesheet" href="/css/components/hello-mcp.css">
-  <link rel="stylesheet" href="/css/components/mcp-install.css">
   <link rel="stylesheet" href="/css/components/ai-label.css">
   <link rel="stylesheet" href="/css/components/data-map.css">
   <link rel="stylesheet" href="/css/views/help.css">
@@ -195,6 +191,9 @@
   <link rel="stylesheet" href="/css/views/agent-tasks-poster.css">
   <link rel="stylesheet" href="/css/views/memory.css">
   <link rel="stylesheet" href="/css/views/inbox-poster.css">
+  <!-- The shared parts load LAST, after every page sheet: a page sheet is migration debt, and when
+       one of its rules meets a part's rule of the same weight, the part wins. -->
+  <link rel="stylesheet" href="/css/parts.css">
   <script type="importmap">
   {
     "imports": {
@@ -290,6 +289,7 @@
       "/js/components/tag-cloud.js": "/js/components/tag-cloud.js",
       "/js/components/tag-editor.js": "/js/components/tag-editor.js",
       "/components/Modal.js": "/components/Modal.js",
+      "/components/poster-parts.js": "/components/poster-parts.js",
       "/components/StartPageSetting.js": "/components/StartPageSetting.js",
       "/components/VoiceRecorder.js": "/components/VoiceRecorder.js",
       "/components/useViewCSS.js": "/components/useViewCSS.js",

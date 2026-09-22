@@ -18,6 +18,7 @@
  *   import { HomeHeader } from '/views/home/header.js';
  *   html`<${HomeHeader} name=${name} onOpenSettings=${() => setOpen(true)} />`
  * @version-history
+ *   2026-09-13: Shared masthead and actions replace the home-only header layout.
  *   2026-09-13: Compose the existing home shapes with shared poster classes.
  *   v1.4.0 — 2026-08-28 — The poster home: the two actions are ink-underlined links (.koti-link)
  *     rather than ghost buttons, so the nameplate's masthead has one register.
@@ -37,12 +38,13 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { minidenticon } from '/lib/minidenticons.min.js';
+import { Masthead, Stack, Action, Text } from '/components/poster-parts.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 
 /** A cog, drawn rather than an icon font, so it needs nothing to load and scales cleanly. */
 const Cog = html`
-  <svg class="koti-cog" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"
+  <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"
        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <circle cx="12" cy="12" r="3" />
     <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
@@ -51,27 +53,12 @@ const Cog = html`
 export function HomeHeader({ name, owner, identity, onOpenSettings }) {
   const avatarSvg = minidenticon(typeof owner === 'string' && owner ? owner : (name || 'user'));
   return html`
-    <div class="koti-header">
-      <span class="koti-avatar poster-frame" aria-hidden="true" dangerouslySetInnerHTML=${{ __html: avatarSvg }}></span>
-      <span class="koti-nameplate">
-        <span class="koti-name">${name}</span>
-        ${identity && html`
-          <span class="koti-identity"
-            title=${tr('home.identityHint', 'GHII: your permanent address. People, homes and agents everywhere find you by it.')}>
-            ${identity}
-          </span>`}
-      </span>
-      <span class="koti-header-actions">
-        ${/* The door to everything behind the home. The header carries the same link, but a person
-              reading the nameplate is not reading the header, and the relationship (home in front,
-              controls behind) has to be visible on the page itself. */''}
-        <a class="poster-action koti-link koti-controls-link" href="/v1/profile">
-          ${tr('home.settings.allControls', 'All settings and controls')} →
-        </a>
-        <button type="button" class="poster-action koti-link koti-settings-btn" onClick=${onOpenSettings}>
-          ${Cog}
-          <span>${tr('home.settings.open', 'Home settings')}</span>
-        </button>
-      </span>
-    </div>`;
+    <${Masthead} title=${name} size="large"
+      mark=${html`<span aria-hidden="true" dangerouslySetInnerHTML=${{ __html: avatarSvg }}></span>`}
+      identity=${identity && html`<${Text} kind="mono" tone="muted"
+        title=${tr('home.identityHint', 'GHII: your permanent address. People, homes and agents everywhere find you by it.')}>${identity}<//>`}
+      actions=${html`<${Stack} direction="wrap" align="center">
+        <${Action} href="/v1/profile">${tr('home.settings.allControls', 'All settings and controls')} →<//>
+        <${Action} onClick=${onOpenSettings}>${Cog} ${tr('home.settings.open', 'Home settings')}<//>
+      <//>`} />`;
 }

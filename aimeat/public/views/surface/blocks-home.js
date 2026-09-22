@@ -17,6 +17,7 @@
  *   OwnAimeatBlock · TrustBlock · StepsBlock
  * @usage Reached through views/surface/block-map.js, never imported directly by a view.
  * @version-history
+ *   2026-09-22: Every block is composed from the shared set (components/poster-parts.js).
  *   2026-09-15: OwnAimeatBlock, a demo site's card that sends a person to the store for their own
  *     AIMEAT. The operator adds it; no built-in home has it.
  *   2026-09-14: YourTurnBlock, which lists the threads whose last word was somebody else's. The
@@ -40,6 +41,7 @@ import {
   MailboxRow, YourTurn, FleetLine, Things, FavoriteApps, Playbooks, TrustLine, Achievements,
 } from '/views/home/status-parts.js';
 import { HomeHeader } from '/views/home/header.js';
+import { Surface, Stack, Text, Action } from '/components/poster-parts.js';
 import { HomeJourney } from '../home/journey.js';
 import { HomeFeed } from '/views/home/feed.js';
 import { OpenItemsList } from '/components/OpenItemsList.js';
@@ -74,10 +76,10 @@ export function MatBlock() {
   const url = state?.mat?.standaloneUrl || state?.mat?.url;
   if (!url) return null;
   return html`
-    <p class="koti-matline">
+    <${Text} tone="muted">
       ${tr('home.webpage', 'Your webpage, made by your AI:')}${' '}
-      <a href=${url} target="_blank" rel="noopener">${url.replace('https://', '').replace('http://', '')}</a>
-    </p>`;
+      <${Action} kind="text" href=${url} target="_blank">${url.replace('https://', '').replace('http://', '')}<//>
+    <//>`;
 }
 
 export function MailboxBlock() {
@@ -285,18 +287,12 @@ export function OwnAimeatBlock() {
   const store = storeHref();
   if (!store) return null;
   return html`
-    <section class="koti-own poster-record">
-      <span class="poster-label">${tr('home.ownAimeat.label', 'Demo')}</span>
-      <h2 class="poster-record-title poster-record-title--small">
-        ${tr('home.ownAimeat.title', 'This is a demo. Get your own AIMEAT.')}
-      </h2>
-      <p class="koti-own-text">
-        ${tr('home.ownAimeat.text', 'Many people share this site to try things out. Your own AIMEAT is the same whole system, at an address with your name on it. We keep it running and up to date for a monthly fee, and everything in it belongs to you.')}
-      </p>
-      <a class="koti-own-cta poster-slab" href=${store} target="_blank" rel="noopener">
-        ${tr('home.ownAimeat.cta', 'Go to the store →')}
-      </a>
-    </section>`;
+    <${Surface} kind="record"><${Stack} align="start">
+      <${Text} kind="label">${tr('home.ownAimeat.label', 'Demo')}<//>
+      <${Text} kind="heading">${tr('home.ownAimeat.title', 'This is a demo. Get your own AIMEAT.')}<//>
+      <${Text}>${tr('home.ownAimeat.text', 'Many people share this site to try things out. Your own AIMEAT is the same whole system, at an address with your name on it. We keep it running and up to date for a monthly fee, and everything in it belongs to you.')}<//>
+      <${Action} kind="primary" href=${store} target="_blank">${tr('home.ownAimeat.cta', 'Go to the store →')}<//>
+    <//><//>`;
 }
 
 export function TrustBlock() {
