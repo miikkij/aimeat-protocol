@@ -26,6 +26,8 @@
  * @structure OpenItemsList({ maxAgeDays })
  * @usage html`<${OpenItemsList} />` — or `maxAgeDays={7}` to hide rows that have gone stale
  * @version-history
+ *   2026-09-22: The list is composed from the shared set: a Section, one ListRow per item, and the
+ *     decision's two answers as shared actions beside the row's menu.
  *   v1.2.0 — 2026-09-20 — A row the decision gate opened carries the two answers a person can give:
  *     it was right, it was wrong. Both record a review on the decision, which is what makes the
  *     register say a human was in the loop, and the node then takes the row off.
@@ -43,6 +45,7 @@ import { t } from '/js/i18n.js';
 import { escHtml, timeAgo } from '/js/utils.js';
 import { apiGet } from '/js/api.js';
 import { CopyButton } from '/components/CopyButton.js';
+import { Section, Stack, ListRow, Text, Action } from '/components/poster-parts.js';
 import { listOpenItems, switchOff } from '/js/services/open-items.js';
 import { reviewDecision } from '/js/services/decide.js';
 import { onLiveUpdate } from '/lib/live-updates.js';
@@ -118,73 +121,27 @@ export function OpenItemsList({ maxAgeDays } = {}) {
   // Nothing on the list → no block at all. See the file header.
   if (!items || items.length === 0) return null;
 
-  return html`
-    <section class="open-items">
-      <div class="open-items-head">
-        <h3 class="open-items-title">
-          ${tr('openItems.title', 'Open items')} <span class="open-items-count">${items.length}</span>
-        </h3>
-        <${CopyButton}
-          text=${prompt}
-          className="btn-primary btn-sm"
-          label=${tr('openItems.copyPrompt', 'Take these into your AI chat')}
-          copiedLabel=${tr('openItems.copied', 'Copied. Paste it in your chat')} />
-      </div>
-
-      <ul class="open-items-list">
-        ${items.map(i => html`
-          <li key=${i.id} class="open-items-row open-items-row--${i.status}">
-            ${/* No second state mark. There used to be a ring on the left AND the dots on the
-                 right, and on a working row they disagreed: coral circle, green dots, one item.
-                 One state, one place, and the place is the corner every card uses. */''}
-            <div class="open-items-main">
-              <div class="open-items-item">${escHtml(i.title)}</div>
-            ${/* WHO put this here is a separate fact from WHAT is happening to it, and it used to be
-                 the last arm of one ternary — so a row the AI switched on stopped saying so the
-                 moment an agent picked it up or it turned out to be a suggestion. Measured: one row
-                 in three said it. Two lines, two facts. */''}
-              <div class="open-items-meta">
-                ${i.closes_when
-                  ? tr('openItems.suggestion', 'Suggestion: it goes away once this is done')
-                  : i.agent
-                    ? `${escHtml(String(i.agent).split('#')[0])} ${tr('openItems.isDoing', 'is doing this')}`
-                    : `${originLabel(i.origin)} · ${timeAgo(i.createdAt)}`}
-                ${i.by === 'ai' && html`
-                  <span class="open-items-byai">${tr('openItems.byAi', 'your AI put this here')}</span>`}
-              </div>
-            </div>
-
-            ${/* A DECISION the gate stopped is the one row a person can answer rather than only
-                 clear. Two buttons, because that is the whole question: was the model right. The
-                 answer is recorded on the decision (it is what makes the register say a human was in
-                 the loop), and the node takes this row off once it is. Without them the gate is a
-                 dead end: the only control was "Take it off", which records nothing. */''}
-            ${i.kind === 'decision' && i.object?.type === 'ai-decision' && html`
-              <div class="open-items-decide">
-                <button type="button" class="btn-outline btn-sm"
-                  onClick=${() => act(i.id, () => reviewDecision(i.object.id, 'confirmed'))}>
-                  ${tr('openItems.decision.confirm', 'It was right')}
-                </button>
-                <button type="button" class="btn-outline btn-sm"
-                  onClick=${() => act(i.id, () => reviewDecision(i.object.id, 'overridden'))}>
-                  ${tr('openItems.decision.override', 'It was wrong')}
-                </button>
-              </div>`}
-
-            ${/* A suggestion gets no control: it goes away by itself when its condition is true,
-                 so offering to switch it off invites a person to act on something the node is
-                 about to withdraw anyway. */''}
-            ${!i.closes_when && html`
-              <div class="open-items-control">
-                <${CardMenu} state=${i.status === 'working' ? 'working' : 'open'} label=${i.title}
-                  actions=${[{
-                    label: tr('openItems.off', 'Take it off'),
-                    run: () => act(i.id, () => switchOff(i.id)),
-                  }]} />
-              </div>`}
-          </li>`)}
-      </ul>
-    </section>`;
+  return html`<${Section} title=${tr('openItems.title','Open items')+' '+items.length}
+    actions=${html`<${CopyButton} text=${prompt} className="poster-slab"
+      label=${tr('openItems.copyPrompt','Take these into your AI chat')}
+      copiedLabel=${tr('openItems.copied','Copied. Paste it in your chat')} />`}>
+    <${Stack} density="compact">${items.map(i => html`<${ListRow} key=${i.id} name=${escHtml(i.title)}
+      detail=${html`<${Text} kind="caption">${i.closes_when
+        ? tr('openItems.suggestion','Suggestion: it goes away once this is done')
+        : i.agent ? escHtml(String(i.agent).split('#')[0])+' '+tr('openItems.isDoing','is doing this')
+        : originLabel(i.origin)+' · '+timeAgo(i.createdAt)}<//>
+        ${i.by === 'ai' && html`<${Text} kind="caption" tone="coral">${tr('openItems.byAi','your AI put this here')}<//>`}`}
+      actions=${!i.closes_when && html`
+        ${/* A DECISION the gate stopped is the one row a person can answer rather than only clear.
+             Two answers, because that is the whole question: was the model right. The answer is
+             recorded on the decision (it is what makes the register say a human was in the loop),
+             and the node takes this row off once it is. */''}
+        ${i.kind === 'decision' && i.object?.type === 'ai-decision' && html`
+          <${Action} onClick=${() => act(i.id, () => reviewDecision(i.object.id, 'confirmed'))}>${tr('openItems.decision.confirm', 'It was right')}<//>
+          <${Action} onClick=${() => act(i.id, () => reviewDecision(i.object.id, 'overridden'))}>${tr('openItems.decision.override', 'It was wrong')}<//>`}
+        <${CardMenu} state=${i.status === 'working' ? 'working' : 'open'} label=${i.title}
+          actions=${[{label:tr('openItems.off','Take it off'),run:() => act(i.id,() => switchOff(i.id))}]} />`} />`)}<//>
+  <//>`;
 }
 
 export default OpenItemsList;

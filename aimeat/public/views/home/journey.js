@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Choose useful work, connect an AI, copy the task and see the saved note at home.
  * @version-history
+ *   2026-09-13: Compose the complete journey from shared sections, fields and content surfaces.
  *   2026-09-13: Compose the existing home shapes with shared poster classes.
  *   v1.1.0 — 2026-09-12 — The lines the chosen task governs (hint, connection, prompt, links, result)
  *     sit in one .koti-journey-panel; the optional webpage stays outside it.
@@ -18,6 +19,7 @@ import { useSession } from '/js/use-session.js';
 import { useShared, invalidateShared } from '/views/surface/shared-read.js';
 import { useHomeState } from '/views/surface/home-state.js';
 import { PromptCard } from '/components/PromptCard.js';
+import { Section, Stack, Text, Toolbar, Surface, ListRow, Action } from '/components/poster-parts.js';
 import { McpSetupGuide } from '/views/profile/ai-setup-guide.js';
 import { StepAgent } from './step-agent.js';
 import { StepMat } from './step-mat.js';
@@ -56,67 +58,64 @@ export function HomeJourney() {
   const connected = state.initialized;
   const prompt = buildJourneyPrompt(action, window.location.origin, session.owner);
   return html`
-    <section class="koti-journey" aria-labelledby="home-journey-title">
-      <h2 id="home-journey-title" class="koti-band-title">${t('homeJourney.title')}</h2>
-      <p>${t(connected ? 'homeJourney.returning' : 'homeJourney.welcome')}</p>
-      <div class="koti-journey-choices" role="group" aria-label=${t('homeJourney.title')}>
-        ${actions.map(id => html`<button type="button" key=${id} class=${'poster-action koti-link' + (action === id ? ' koti-fold--on' : '')}
-          aria-pressed=${action === id} onClick=${() => {
+
+    <${Section} title=${t('homeJourney.title')} size="large" density="compact">
+      <${Stack}>
+        <${Text}>${t(connected ? 'homeJourney.returning' : 'homeJourney.welcome')}<//>
+        <${Toolbar} label=${t('homeJourney.title')} filters=${actions.map(id => ({
+          id, label: t('homeJourney.' + id), selected: action === id,
+          onClick: () => {
             setAction(id); setCopied(false);
             try { sessionStorage.setItem(choiceKey, id); }
             catch (e) { swallowed('home journey: choice write', e); }
-          }}>
-          ${t('homeJourney.' + id)}
-        </button>`)}
-      </div>
-      <div class="koti-journey-panel">
-      <p class="koti-hint">${t('homeJourney.' + action + 'Hint')}</p>
-      <div class="koti-journey-status poster-row" role="status">
-        <span>${t(connected ? 'homeJourney.connected' : 'homeJourney.notConnected')}</span>
-        <button type="button" class="poster-action koti-link"
-          aria-expanded=${connecting} onClick=${() => setConnecting(v => !v)}>
-          ${t(connecting ? 'homeJourney.hideConnection' : connected ? 'homeJourney.anotherAi' : 'homeJourney.connect')}
-        </button>
-      </div>
-      ${connecting && html`<div class="koti-journey-connect">
-        <p>${t('homeJourney.consent')}</p>
-        <${McpSetupGuide} />
-        <h3>${t('homeJourney.prove')}</h3>
-        <p>${t('homeJourney.proveHint')}</p>
-        <${PromptCard} label=${t('homeJourney.prove')} prompt=${proof?.prompt || ''} className="poster-action koti-link"
-          copyLabel=${t('common.copyPrompt')} copiedLabel=${t('common.copied')} />
-        <button type="button" class="poster-action koti-link" onClick=${refresh}>${t('homeJourney.check')}</button>
-        <details class="koti-journey-details"><summary>${t('homeJourney.deviceFlow')}</summary>
-          <${StepAgent} onChanged=${refresh} showToast=${setMessage} />
-        </details>
-      </div>`}
-      <div class="koti-journey-task">
-        <p>${t('homeJourney.copyHint')}</p>
-        <${PromptCard} key=${action} label=${t('homeJourney.' + action)} prompt=${prompt}
-          className="poster-action koti-link"
-          copyLabel=${t('common.copyPrompt')} copiedLabel=${t('common.copied')}
-          onCopied=${() => setCopied(true)} />
-        ${copied && html`<p role="status">${t('homeJourney.copied')}</p>`}
-        <div class="koti-journey-links">
-          <button type="button" class="poster-action koti-link" onClick=${refresh}>${t('homeJourney.checkResult')}</button>
-          <a class="poster-action koti-link" href=${'/v1/profile?tab=' + targets[action]}>${t('homeJourney.open' + action)} →</a>
-          ${chat?.enabled && html`<a class="poster-action koti-link" href="/v1/chat">${t('homeJourney.localChat')} →</a>`}
-        </div>
-        ${ready && saved && html`<div class="koti-journey-result poster-box" role="status">
-          <h3>${t('homeJourney.saved')}</h3>
-          ${typeof note.title === 'string' && html`<strong>${note.title}</strong>`}
-          <p>${note.text}</p>
-          <p class="koti-hint">${t('homeJourney.noteLifecycle')}</p>
-        </div>`}
-        ${copied && action === 'note' && ready && !saved && html`<p>${t('homeJourney.waiting')}</p>`}
-      </div>
-      </div>
-      <details class="koti-journey-details"><summary>${t('homeJourney.optionalPage')}</summary>
-        <p>${t('homeJourney.optionalPageHint')}</p>
-        ${state.mat.done
-          ? html`<a class="poster-action koti-link" href=${state.mat.standaloneUrl || state.mat.url}>${t('home.mat.view')} →</a>`
-          : html`<${StepMat} onDone=${refresh} />`}
-      </details>
-      ${message && html`<p role="alert">${message}</p>`}
-    </section>`;
+          },
+        }))} />
+        <${Surface} kind="panel" density="flush">
+          <${Stack}>
+            <${Text} tone="muted">${t('homeJourney.' + action + 'Hint')}<//>
+            <${ListRow} name=${t(connected ? 'homeJourney.connected' : 'homeJourney.notConnected')}
+              actions=${html`<${Action} expanded=${connecting} onClick=${() => setConnecting(v => !v)}>
+                ${t(connecting ? 'homeJourney.hideConnection' : connected ? 'homeJourney.anotherAi' : 'homeJourney.connect')}<//>`} />
+            ${connecting && html`<${Surface}><${Stack}>
+              <${Text}>${t('homeJourney.consent')}<//>
+              <${McpSetupGuide} />
+              <${Text} kind="heading">${t('homeJourney.prove')}<//>
+              <${Text}>${t('homeJourney.proveHint')}<//>
+              <${PromptCard} label=${t('homeJourney.prove')} prompt=${proof?.prompt || ''}
+                copyLabel=${t('common.copyPrompt')} copiedLabel=${t('common.copied')} />
+              <${Action} onClick=${refresh}>${t('homeJourney.check')}<//>
+              <${Surface} kind="plain" summary=${t('homeJourney.deviceFlow')}>
+                <${StepAgent} onChanged=${refresh} showToast=${setMessage} />
+              <//>
+            <//><//>`}
+            <${Text}>${t('homeJourney.copyHint')}<//>
+            <${PromptCard} key=${action} label=${t('homeJourney.' + action)} prompt=${prompt}
+              copyLabel=${t('common.copyPrompt')} copiedLabel=${t('common.copied')}
+              onCopied=${() => setCopied(true)} />
+            ${copied && html`<${Surface} kind="plain" density="flush" role="status">${t('homeJourney.copied')}<//>`}
+            <${Stack} direction="wrap" align="start">
+              <${Action} onClick=${refresh}>${t('homeJourney.checkResult')}<//>
+              <${Action} href=${'/v1/profile?tab=' + targets[action]}>${t('homeJourney.open' + action)} →<//>
+              ${chat?.enabled && html`<${Action} href="/v1/chat">${t('homeJourney.localChat')} →<//>`}
+            <//>
+            ${ready && saved && html`<${Surface} role="status"><${Stack}>
+              <${Text} kind="heading">${t('homeJourney.saved')}<//>
+              ${typeof note.title === 'string' && html`<strong>${note.title}</strong>`}
+              <${Text}>${note.text}<//>
+              <${Text} tone="muted">${t('homeJourney.noteLifecycle')}<//>
+            <//><//>`}
+            ${copied && action === 'note' && ready && !saved && html`<${Text}>${t('homeJourney.waiting')}<//>`}
+          <//>
+        <//>
+        <${Surface} kind="plain" summary=${t('homeJourney.optionalPage')}>
+          <${Stack}>
+            <${Text}>${t('homeJourney.optionalPageHint')}<//>
+            ${state.mat.done
+              ? html`<${Action} href=${state.mat.standaloneUrl || state.mat.url}>${t('home.mat.view')} →<//>`
+              : html`<${StepMat} onDone=${refresh} />`}
+          <//>
+        <//>
+        ${message && html`<${Surface} kind="aside" tone="danger" role="alert">${message}<//>`}
+      <//>
+    <//>`;
 }

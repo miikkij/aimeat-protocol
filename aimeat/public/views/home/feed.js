@@ -11,6 +11,7 @@
  * @structure HomeFeed({ items }) · FeedRow({ item }) · line · when
  * @usage import { HomeFeed } from './feed.js';
  * @version-history
+ *   2026-09-13: Shared chronological rows and section replace all feed styling.
  *   v2.2.0 — 2026-08-23 — HomeFeed takes `band`: on the finished home it is one of the ruled
  *     bands (.koti-band), on the onboarding home it keeps its own gap. Title class is the band's.
  *   v2.1.0 — 2026-08-18 — The list becomes a timeline: kindCategory() maps every kind onto six
@@ -29,6 +30,7 @@
  *   v1.0.0 — 2026-08-07 — Initial (remake phases 6–7).
  */
 import { h } from 'preact';
+import { ListRow, Section, Stack, Surface, Action } from '/components/poster-parts.js';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
@@ -229,20 +231,14 @@ const CARD_ROWS = 6;
 export function FeedRow({ item }) {
   const text = line(item);
   if (!text) return null;
+  const tone = { made: 'coral', agent: 'success', trouble: 'danger', money: 'sun', access: 'info', system: 'muted' }[kindCategory(item.kind)];
   return html`
-    <li class="koti-feed-item koti-feed-item--${kindCategory(item.kind)} ${item.kind === 'agent_knocking' ? 'koti-feed-item-live' : ''}">
-      <span class="koti-feed-dot" aria-hidden="true"></span>
-      <div class="koti-feed-body">
-        ${item.link
-          ? html`<a class="koti-feed-line" href=${item.link}>${text}</a>`
-          : html`<span class="koti-feed-line">${text}</span>`}
-        <span class="koti-feed-when">${when(item.at)}</span>
-      </div>
-    </li>`;
+    <${ListRow} kind="chronology" name=${text} href=${item.link}
+      time=${when(item.at)} timeTitle=${item.at} marker=${tone} live=${item.kind === 'agent_knocking'} />`;
 }
 
 /** `band`: on the finished home the feed is one of the ruled bands; the onboarding home has none. */
-export function HomeFeed({ items, band }) {
+export function HomeFeed({ items }) {
   if (!items || !items.length) return null;
   // Quiet is information too. The newest event's age decides: past the threshold, the feed opens
   // with an invitation to go make an event instead of a list that ends three days ago.
@@ -250,20 +246,10 @@ export function HomeFeed({ items, band }) {
   const quiet = newestAt > 0 && (Date.now() - newestAt) > QUIET_AFTER_DAYS * 86400000;
   const shown = items.filter(it => line(it));
   return html`
-    <section class="koti-feed ${band ? 'koti-band' : ''}">
-      <h2 class="koti-band-title">${tr('home.feed.title', 'What has happened')}</h2>
-      ${quiet && html`
-        <a class="koti-feed-quiet" href="/v1/chat">
-          ${tr('home.feed.quiet', 'Quiet here lately. Shall we make something happen? Open the chat and say what you need.')}
-        </a>`}
-      <ul class="koti-feed-list">
-        ${shown.slice(0, CARD_ROWS).map((item, i) => html`<${FeedRow} item=${item} key=${i} />`)}
-      </ul>
-      ${/* The card is a glance, not an archive. The door to everything only appears when there IS
-           more than a glance — a "see all" under six rows offers a page that shows the same six. */''}
-      ${shown.length > CARD_ROWS && html`
-        <a class="koti-feed-more" href="/v1/home?history=1">
-          ${tr('home.feed.seeAll', 'See everything that has happened')}
-        </a>`}
-    </section>`;
+    <${Section} title=${tr('home.feed.title','What has happened')} size="large"><${Stack}>
+      ${quiet && html`<${Surface} kind="aside"><${Action} kind="text" href="/v1/chat">
+        ${tr('home.feed.quiet','Quiet here lately. Shall we make something happen? Open the chat and say what you need.')}<//><//>`}
+      <div>${shown.slice(0,CARD_ROWS).map((item,i)=>html`<${FeedRow} item=${item} key=${i} />`)}</div>
+      ${shown.length>CARD_ROWS && html`<${Action} href="/v1/home?history=1">${tr('home.feed.seeAll','See everything that has happened')}<//>`}
+    <//><//>`;
 }

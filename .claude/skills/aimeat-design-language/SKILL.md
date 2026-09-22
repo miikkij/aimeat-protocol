@@ -2,8 +2,8 @@
 name: aimeat-design-language
 description: "The AIMEAT design language in words and in numbers: the two faces (showroom outside, poster inside), the three type tokens every font on the site descends from, the four shapes, the colours, the wordmark, and the one place a value is changed (theme.css tokens) with the map of every surface a token reaches. Use before designing or styling anything that carries the AIMEAT name, before changing a font or a colour, and to judge whether a screen looks like this product."
 metadata:
-  version: 1.6.0
-  updated: 2026-09-13
+  version: 1.7.0
+  updated: 2026-09-22
   owner: Jouni Miikki
 ---
 
@@ -13,13 +13,16 @@ One product, two faces. The **showroom** is what a visitor sees before signing i
 how it works, for your business, help, members, the change log. The **poster** is what a person sees
 once inside: the home, every profile tab, the chat, the sign-in dialog, the app catalog. They share
 the type, the colours, the shapes and the rules; they differ in how loud they are. A third register,
-the **classic shell** (rounded controls, cards), remains under the admin dashboard and the oldest
-views and is not extended; it reads the same type tokens.
+the **classic shell** (rounded controls, cards), remains under the oldest views and is being
+retired: every signed-in page, the admin dashboard included, moves to the poster face (ruled
+2026-09-22); it reads the same type tokens meanwhile.
 
-Type and colour tokens live in `aimeat/public/css/theme.css`; the shared shapes live in
-`aimeat/public/css/poster.css`. A view composes a shape by class and owns its layout. Change the
-token or shape at its home; the maps below show which surfaces follow. Existing copies are
-recorded migration debt, not examples for a new view.
+**One place for each kind of thing.** The tokens (type, colour and shape) live in
+`aimeat/public/css/theme.css`; the shapes in `aimeat/public/css/poster.css`; the parts pages are
+built from, with their spacing, in `aimeat/public/css/parts.css`; and the components that draw
+them in `aimeat/public/components/poster-parts.js`. A page composes the components with content
+and named variants and has no stylesheet of its own. Change a value at its home; the maps below
+show which surfaces follow. The per-page sheets that remain are migration debt, not examples.
 
 ## The faces
 
@@ -81,6 +84,21 @@ Ink and paper swap in the dark theme; the sun does not, which is why `--on-sun` 
 solid shadows are drawn with `--text`, so a dark page shows a light line on dark ground rather than
 ink painted on it. A palette (`data-palette`) may replace the accent and the grounds; nothing else
 is written for a palette.
+
+## The shape tokens
+
+The shapes read tokens as the type and the colours do, so a theme (a palette block) can change the
+corners, the rule weights and the shadows of every part at once. No sheet writes these numbers.
+
+| Token | Value | Where |
+|---|---|---|
+| `--shape-radius` | `0` | every corner of every poster part; nothing is rounded |
+| `--rule-hair` | `1px` | a row inside a section, a table row |
+| `--rule-thing` | `2px` | a box, a field's many-line frame, a menu |
+| `--rule-heavy` | `3px` | a frame, a dialog, an action's underline, a row that is the thing, the dashed aside |
+| `--rule-edge` | `4px` | the sun edge of the selected tab's panel |
+| `--rule-stripe` | `6px` | the sun stripe under a section slab and a dialog header |
+| `--offset-s` / `-m` / `-l` | `4px` / `8px` / `12px` | the solid shadow under a loud action, an opened record, a dialog |
 
 ## The four shapes
 
@@ -161,9 +179,10 @@ by hand; the list here is the checklist.
 
 ### Shape to class: one CSS home
 
-`poster.css` is linked after `theme.css` in the SPA. Its current declarations are the executable
-values of these shapes. Compose them in markup; a view sheet keeps its grid, placement and
-dimensions. It does not re-declare the shape's font, rule, fill, padding or shadow.
+`poster.css` is linked after `theme.css` in the SPA, and `parts.css` after it. Their declarations
+are the executable values of these shapes and parts. A page reaches them through the components
+(below); a class from this table is written by hand only inside a component. A page never
+re-declares a shape's font, rule, fill, padding or shadow.
 
 | Shape | Class |
 |---|---|
@@ -212,6 +231,38 @@ another modifier. A view never re-declares a modifier's values.
 | Showroom band | `.showroom-band--sun` | Sun ground and ink words; the money band role. |
 | Showroom section | `.showroom-section--coral` | 8px coral shadow; the named coral room cut. |
 | Showroom slab | `.showroom-slab--hot`, `--sun`, `--ink` | Named hot, sun and ink action colours; each shares the showroom slab geometry. |
+
+### Page composition: the set
+
+Import from `aimeat/public/components/poster-parts.js`. The components take content, data and named
+variants; none takes a caller's class, style or free props bag, and an unknown variant value falls
+back to the canonical cut. First ask which existing part a new thing is: the answer is a part plus a
+prop. A new part is added only when no existing one can carry it, named by its role, used by at
+least two pages.
+
+| Part | What it is, its variants |
+|---|---|
+| `Page` | The frame: width normal (1180px), wide (1440px) or reading (900px); the masthead; a rail on the leading or trailing side that becomes a menu dialog below 900px. |
+| `Masthead` | Crumb, page title, identity line, a mark and the actions at the right; normal or large (the home's name). |
+| `Section` | The B1 slab, a description, actions and the body; small, normal or large headline; compact, normal or roomy spacing; `selected` puts the body on the sun edge. |
+| `Columns` | Equal, thirds, quarters, leading or trailing; three gaps; collapses at 560, 600, 640 or 900px of its container. |
+| `Stack` | Vertical, horizontal or wrapping; start, center, end, stretch or between; three gaps. |
+| `Rail` | The sticky ink index with numbered entries; index or navigation. |
+| `ListRow` | Mark, name, mono detail, value, actions and an open body, hairline under; three densities; selected; chronology gives the leading time a fixed column; preview clamps the detail to two lines. |
+| `KeyValue` | The coral label left, the value right, hairline under. |
+| `Table` | Coral small-caps header, hairline rows, a scrolling region; three densities. |
+| `Toolbar` | A search field, tab filters with one on the sun, a count at the right, actions. |
+| `Field` | Label, native control and a hint that shows only while the field is in use; every native input type, textarea, select, checkbox; an error. |
+| `NumeralBand` | Big numbers over small-caps labels, a lead and actions; coral, sun, ink or plain; the diagonal coral cut. |
+| `Dialog` | The site's one dialog (Modal and dialog.css): small, normal or large; footer actions and a side action. |
+| `Action` | Primary (the one loud slab; normal or large; plain or danger), secondary (the underlined word), tab (can be on), text (a word in a row) or icon. Tab and radio semantics for a group of choices. |
+| `Menu` | The actions of one thing behind a button (three dots by default): a 2px ink box on the sun offset; closes on a choice, Escape or a click elsewhere. |
+| `Meter` | A filled bar for how much of a limit is used; turns to the danger colour from 90 %. |
+| `Surface` | Box, record, aside, code, editor, panel, preview or plain; three densities or flush; plain, muted, coral, sun, ink, success or danger tone; with a summary it folds. |
+| `Text` | Body, lead, label, mono, caption, heading or number; the same tones; a number is small, normal or large. |
+
+The breakpoints live in the parts: the frame folds its padding at 900px, row actions at 600px,
+key-value labels at 560px. A page does not write a media query.
 
 Run `pnpm check:poster-shapes` from `aimeat/`. It scans view and component sheets and refuses
 any new per-file pattern count. `pnpm debt` shows the remaining copies. Lower the baseline after

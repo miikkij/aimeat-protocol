@@ -8,6 +8,8 @@
  * @structure the real theme.css · a comment is not a declaration · missing · declared twice
  * @usage pnpm test -- build-app-catalog-tokens
  * @version-history
+ *   v1.1.0 — 2026-09-22 — The catalog copies the nine shape tokens as well (22 in all); the fixture
+ *     carries them, because the copy refuses a token theme.css does not declare.
  *   v1.0.0 — 2026-09-13 — Initial.
  */
 
@@ -36,6 +38,15 @@ function fixture(edit: (lines: string[]) => string[] = (l) => l): string {
     '  --font-poster-section-weight: 400;',
     '  --sun: #FFB52E;',
     '  --on-sun: #1A1A2E;',
+    '  --shape-radius: 0;',
+    '  --rule-hair: 1px;',
+    '  --rule-thing: 2px;',
+    '  --rule-heavy: 3px;',
+    '  --rule-edge: 4px;',
+    '  --rule-stripe: 6px;',
+    '  --offset-s: 4px;',
+    '  --offset-m: 8px;',
+    '  --offset-l: 12px;',
     '}',
     '[data-theme="dark"] {',
     '  --sun: #000000;',
@@ -47,8 +58,9 @@ function fixture(edit: (lines: string[]) => string[] = (l) => l): string {
 describe('themePosterTokens', () => {
   it('finds every copied token in the real theme.css, with the headline face and its spacing', () => {
     const out = themePosterTokens(readFileSync(THEME, 'utf-8'));
-    expect(out.split('\n')).toHaveLength(13);
+    expect(out.split('\n')).toHaveLength(22);
     expect(out).toMatch(/--font-headline: 'Fjalla One'/);
+    expect(out).toMatch(/--rule-heavy: 3px;/);
     expect(out).toMatch(/--font-poster-tracking: 0\.01em;/);
     expect(out).toMatch(/--font-poster-leading: 1;/);
   });

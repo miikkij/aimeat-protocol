@@ -14,6 +14,9 @@
  *   - buildAppCatalog() → assemble + write src/static/app-catalog.html (+ a generated-file banner)
  * @usage  pnpm build:app-catalog   (also run by `pnpm build` and `pnpm dev`)
  * @version-history
+ *   v1.4.0 — 2026-09-22 — The shape tokens are copied too: dialog.css reads them since the corner,
+ *     the rule weights and the offset shadows became tokens, and without them the catalog's dialogs
+ *     would lose their frame.
  *   v1.3.0 — 2026-09-18 — styles/app-catalog-visitors.css is appended after the poster sheet: the
  *     Visitors section's own sheet, because the poster sheet is at the line ceiling.
  *   v1.2.0 — 2026-09-13 — public/css/dialog.css is appended after the poster sheet, and the bundle
@@ -50,6 +53,9 @@ const THEME_TOKENS = [
   '--font-poster-tracking', '--font-poster-leading',
   '--font-poster-section', '--font-poster-section-weight',
   '--sun', '--on-sun',
+  // The shape tokens: dialog.css (inlined below) and every shared part read them.
+  '--shape-radius', '--rule-hair', '--rule-thing', '--rule-heavy', '--rule-edge', '--rule-stripe',
+  '--offset-s', '--offset-m', '--offset-l',
 ];
 
 /**

@@ -49,6 +49,7 @@
     "check:mcp-schemas": "tsx scripts/audit-mcp-schemas.ts --check",
     "check:plain-language": "tsx scripts/check-plain-language.ts --check",
     "check:poster-shapes": "tsx scripts/check-poster-shapes.ts --check",
+    "check:view-sheet-lines": "tsx scripts/check-view-sheet-lines.ts",
     "check:dialogs": "tsx scripts/check-dialogs.ts",
     "check:packs-doc": "vitest run test/unit/library-packs-doc-truth.test.ts",
     "aeb:prove": "tsx scripts/aeb-prove.ts",

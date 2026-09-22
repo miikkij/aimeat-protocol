@@ -17,9 +17,11 @@
  * @structure default HomeHistoryView; internal: DayGroup
  * @usage routed at /v1/home?history=1 by spa.html
  * @version-history
+ *   2026-09-13: Shared page frame, date groups and archive controls replace home-only layout.
  *   v1.0.0 — 2026-08-17 — Initial: the full window, day by day, and a paged archive under it.
  */
 import { h } from 'preact';
+import { Page, Section, Stack, Text, Surface, Action } from '/components/poster-parts.js';
 import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
@@ -77,13 +79,10 @@ function dayLabel(day) {
 
 /** One day of rows, under its heading. */
 function DayGroup({ group }) {
-  return html`
-    <div class="koti-hist-day">
-      <h3 class="koti-hist-daytitle">${dayLabel(group.day)}</h3>
-      <ul class="koti-feed-list">
-        ${group.items.map((item, i) => html`<${FeedRow} item=${item} key=${i} />`)}
-      </ul>
-    </div>`;
+  return html`<${Stack}>
+    <${Text} kind="label">${dayLabel(group.day)}<//>
+    <div>${group.items.map((item,i)=>html`<${FeedRow} item=${item} key=${i} />`)}</div>
+  <//>`;
 }
 
 export default function HomeHistoryView({ navigate }) {
@@ -143,86 +142,32 @@ export default function HomeHistoryView({ navigate }) {
     }
   }, [archive.length, archiveTotal]);
 
-  if (!session) {
-    return html`
-      <div class="koti">
-        <header class="koti-welcome">
-          <h1 class="koti-h1">${tr('home.history.signInTitle', 'Your record is yours to read')}</h1>
-          <p class="koti-welcome-sub">${tr('home.signInDesc', 'Sign in to see where you left off.')}</p>
-        </header>
-        <div class="koti-actions">
-          <button type="button" class="btn-primary" onClick=${() => navigate('/v1/portal')}>
-            ${tr('home.signIn', 'Sign in')}
-          </button>
-        </div>
-      </div>`;
-  }
-
-  if (loadError && !items) {
-    return html`
-      <div class="koti">
-        <div class="koti-error" role="alert"><p class="koti-error-text">${loadError}</p></div>
-      </div>`;
-  }
-
-  if (!items) return html`<div class="koti koti-loading"><${Spinner} /></div>`;
-
-  const shown = items.filter(it => line(it));
-  const archiveShown = archive.filter(it => line(it));
-  const remaining = archiveTotal - archive.length;
-
-  return html`
-    <div class="koti koti-hist">
-      <a class="koti-hist-back" href="/v1/home"
-         onClick=${(e) => { e.preventDefault(); navigate('/v1/home'); }}>
-        ↩ ${tr('home.history.back', 'Back to your home')}
-      </a>
-
-      <header class="koti-welcome">
-        <h1 class="koti-h1">${tr('home.feed.title', 'What has happened')}</h1>
-        ${/* The count and the window size together explain WHY the list stops where it does.
-             Without them, an account past its window looks like an account that lost rows. */''}
-        <p class="koti-welcome-sub">
-          ${windowSize > 0
-            ? tr('home.history.sub', 'The last {n} things on your account, newest first.')
-                .replace('{n}', String(windowSize))
-            : tr('home.history.subPlain', 'Everything on your account, newest first.')}
-        </p>
-      </header>
-
-      ${shown.length === 0
-        ? html`<p class="koti-hist-empty">
-            ${tr('home.history.empty', 'Nothing has been recorded here yet. It fills up as you use the place.')}
-          </p>`
-        : html`<div class="koti-hist-list">
-            ${byDay(shown).map(group => html`<${DayGroup} group=${group} key=${group.day} />`)}
-          </div>`}
-
-      ${/* The archive door appears only when there IS an archive. On a young account the window
-           holds everything, and a heading over an empty list invents a place that does not
-           exist yet. */''}
-      ${archiveTotal > 0 && html`
-        <section class="koti-hist-archive">
-          <h2 class="koti-hist-archtitle">${tr('home.history.archiveTitle', 'Older than that')}</h2>
-          <p class="koti-hist-archnote">
-            ${tr('home.history.archiveNote', '{n} things have moved out of the window. They are still here, just slower to read.')
-              .replace('{n}', String(archiveTotal))}
-          </p>
-          ${archiveOpen && archiveShown.length > 0 && html`
-            <div class="koti-hist-list">
-              ${byDay(archiveShown).map(group => html`<${DayGroup} group=${group} key=${group.day} />`)}
-            </div>`}
-          ${remaining > 0 && html`
-            <button type="button" class="btn-outline koti-hist-more"
-                    disabled=${busy} onClick=${loadArchive}>
-              ${busy
-                ? tr('home.history.reading', 'Reading…')
-                : archiveOpen
-                  ? tr('home.history.showMore', 'Show {n} more').replace('{n}', String(Math.min(remaining, ARCHIVE_PAGE)))
-                  : tr('home.history.openArchive', 'Open the archive')}
-            </button>`}
-        </section>`}
-
-      ${loadError && html`<p class="koti-hist-error" role="alert">${loadError}</p>`}
-    </div>`;
+  if (!session) return html`<${Page} width="reading" title=${tr('home.history.signInTitle','Your record is yours to read')}>
+    <${Stack} align="start"><${Text} tone="muted">${tr('home.signInDesc','Sign in to see where you left off.')}<//>
+      <${Action} kind="primary" onClick=${()=>navigate('/v1/portal')}>${tr('home.signIn','Sign in')}<//>
+    <//><//>`;
+  if (loadError && !items) return html`<${Page} width="reading"><${Surface} kind="aside" tone="danger" role="alert">${loadError}<//><//>`;
+  if (!items) return html`<${Page} width="reading"><${Stack} align="center"><${Spinner} /><//><//>`;
+  const shown=items.filter(it=>line(it));
+  const archiveShown=archive.filter(it=>line(it));
+  const remaining=archiveTotal-archive.length;
+  return html`<${Page} width="reading" title=${tr('home.feed.title','What has happened')}
+    crumb=${html`<${Action} kind="text" href="/v1/home" onClick=${e=>{e.preventDefault();navigate('/v1/home');}}>
+      ↩ ${tr('home.history.back','Back to your home')}<//>`}>
+    <${Stack} density="roomy">
+      <${Text} kind="lead" tone="muted">${windowSize>0
+        ? tr('home.history.sub','The last {n} things on your account, newest first.').replace('{n}',String(windowSize))
+        : tr('home.history.subPlain','Everything on your account, newest first.')}<//>
+      ${shown.length===0 ? html`<${Text}>${tr('home.history.empty','Nothing has been recorded here yet. It fills up as you use the place.')}<//>`
+        : byDay(shown).map(group=>html`<${DayGroup} group=${group} key=${group.day} />`)}
+      ${archiveTotal>0 && html`<${Section} title=${tr('home.history.archiveTitle','Older than that')}><${Stack}>
+        <${Text} tone="muted">${tr('home.history.archiveNote','{n} things have moved out of the window. They are still here, just slower to read.').replace('{n}',String(archiveTotal))}<//>
+        ${archiveOpen && archiveShown.length>0 && byDay(archiveShown).map(group=>html`<${DayGroup} group=${group} key=${group.day} />`)}
+        ${remaining>0 && html`<${Action} disabled=${busy} onClick=${loadArchive}>${busy
+          ? tr('home.history.reading','Reading…') : archiveOpen
+            ? tr('home.history.showMore','Show {n} more').replace('{n}',String(Math.min(remaining,ARCHIVE_PAGE)))
+            : tr('home.history.openArchive','Open the archive')}<//>`}
+      <//><//>`}
+      ${loadError && html`<${Surface} kind="aside" tone="danger" role="alert">${loadError}<//>`}
+    <//><//>`;
 }

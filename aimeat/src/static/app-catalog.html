@@ -2347,6 +2347,15 @@
   --font-poster-section-weight: 400;
   --sun: #FFB52E;
   --on-sun: #1A1A2E;
+  --shape-radius: 0;
+  --rule-hair: 1px;
+  --rule-thing: 2px;
+  --rule-heavy: 3px;
+  --rule-edge: 4px;
+  --rule-stripe: 6px;
+  --offset-s: 4px;
+  --offset-m: 8px;
+  --offset-l: 12px;
   --card-bg: var(--surface);
   --bg-surface: var(--bg-subtle);
   --border: var(--border-subtle);
@@ -3186,6 +3195,7 @@ textarea.cx-code { resize: vertical; tab-size: 2; }
  *   gets this file copied into its page at build time (scripts/build-app-catalog.ts).
  * @structure frame · header and X · body · footer and its actions · sizes · phone
  * @version-history
+ *   v1.2.0 — 2026-09-22 — The frame, stripe, rules and shadows read the shape tokens in theme.css.
  *   v1.1.0 — 2026-09-13 — The footer's start holds more than one action in a row (the app catalog's
  *     source editor has two copy words there).
  *   v1.0.0 — 2026-09-13 — Initial (wish "Yksi dialogikomponentti kaikille dialogeille").
@@ -3198,9 +3208,9 @@ dialog.dlg {
   max-width: none; min-width: 0;
   max-height: calc(100dvh - 48px);
   margin: auto; padding: 0;
-  border: 3px solid var(--text); border-radius: 0;
+  border: var(--rule-heavy) solid var(--text); border-radius: var(--shape-radius);
   background: var(--bg); color: var(--text);
-  box-shadow: 12px 12px 0 var(--sun);
+  box-shadow: var(--offset-l) var(--offset-l) 0 var(--sun);
   font-family: var(--font-body);
   overflow: hidden;
 }
@@ -3212,7 +3222,7 @@ dialog.dlg .dlg-head {
   flex: none; display: flex; align-items: center; gap: 12px;
   margin: 0; padding: .55rem .55rem .5rem 1rem;
   background: var(--text); color: var(--bg);
-  border: 0; border-bottom: 6px solid var(--sun);
+  border: 0; border-bottom: var(--rule-stripe) solid var(--sun);
 }
 dialog.dlg .dlg-title {
   flex: 1 1 auto; min-width: 0; margin: 0; padding: 0; background: none; border: 0;
@@ -3225,12 +3235,12 @@ dialog.dlg .dlg-title {
 dialog.dlg .dlg-close {
   flex: none; position: relative; width: 44px; height: 44px; margin: -4px 0;
   display: inline-flex; align-items: center; justify-content: center;
-  padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none;
+  padding: 0; border: 0; border-radius: var(--shape-radius); background: none; box-shadow: none;
   color: inherit; cursor: pointer; opacity: 1;
 }
 dialog.dlg .dlg-close::before {
   content: ''; position: absolute; width: 26px; height: 26px; box-sizing: border-box;
-  border: 2px solid currentColor;
+  border: var(--rule-thing) solid currentColor;
 }
 dialog.dlg .dlg-close svg { position: relative; display: block; }
 dialog.dlg .dlg-close:hover::before, dialog.dlg .dlg-close:focus-visible::before { background: var(--bg); }
@@ -3262,7 +3272,7 @@ dialog.dlg .modal-confirm-message { color: var(--text); margin: 0; font-size: 1r
 dialog.dlg .dlg-foot {
   flex: none; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end;
   gap: .8rem 1.4rem; margin: 0; padding: .9rem 1.5rem 1rem;
-  border-top: 3px solid var(--text); background: var(--bg);
+  border-top: var(--rule-heavy) solid var(--text); background: var(--bg);
 }
 /* Something that belongs on the footer's other end (a side door like "Change password…"); two or
    more of them keep the footer's own spacing. */
@@ -3270,18 +3280,18 @@ dialog.dlg .dlg-foot .dlg-foot-start { margin-right: auto; display: flex; flex-w
 /* The site's button classes wear the poster's two words here, whichever view opened the dialog. */
 dialog.dlg .dlg-foot .btn-ghost, dialog.dlg .dlg-foot .btn-outline, dialog.dlg .dlg-foot .btn-secondary, dialog.dlg .dlg-foot .poster-action {
   display: inline-flex; align-items: center; min-height: 44px; padding: 0; background: none; box-shadow: none;
-  border: 0; border-radius: 0; color: var(--text);
+  border: 0; border-radius: var(--shape-radius); color: var(--text);
   font-family: var(--font-body); font-weight: 800; font-size: .8rem; text-transform: uppercase; letter-spacing: .04em;
   text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 5px; cursor: pointer;
 }
 dialog.dlg .dlg-foot .btn-ghost:hover, dialog.dlg .dlg-foot .btn-outline:hover, dialog.dlg .dlg-foot .btn-secondary:hover, dialog.dlg .dlg-foot .poster-action:hover { color: var(--accent); background: none; }
 dialog.dlg .dlg-foot .btn-primary, dialog.dlg .dlg-foot .btn-danger-solid, dialog.dlg .dlg-foot .poster-slab {
   display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 18px;
-  border: 0; border-radius: 0; background: var(--text); color: var(--bg); box-shadow: 4px 4px 0 var(--sun);
+  border: 0; border-radius: var(--shape-radius); background: var(--text); color: var(--bg); box-shadow: var(--offset-s) var(--offset-s) 0 var(--sun);
   font-family: var(--font-body); font-weight: var(--font-poster-strong-weight); font-size: .8rem; text-transform: uppercase; letter-spacing: .04em;
   cursor: pointer; transition: transform 120ms ease, box-shadow 120ms ease;
 }
-dialog.dlg .dlg-foot .btn-danger-solid { background: var(--accent); color: #fff; box-shadow: 4px 4px 0 var(--text); }
+dialog.dlg .dlg-foot .btn-danger-solid { background: var(--accent); color: #fff; box-shadow: var(--offset-s) var(--offset-s) 0 var(--text); }
 dialog.dlg .dlg-foot .btn-primary:hover:not(:disabled), dialog.dlg .dlg-foot .poster-slab:hover:not(:disabled) { color: var(--sun); background: var(--text); transform: translate(2px, 2px); box-shadow: 2px 2px 0 var(--sun); }
 dialog.dlg .dlg-foot .btn-danger-solid:hover:not(:disabled) { background: var(--accent); transform: translate(2px, 2px); box-shadow: 2px 2px 0 var(--text); }
 dialog.dlg .dlg-foot button:disabled { opacity: .45; cursor: default; transform: none; }
