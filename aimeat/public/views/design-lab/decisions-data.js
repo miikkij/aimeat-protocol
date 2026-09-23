@@ -14,7 +14,9 @@
  *   decision-samples.js under the same id, and a proposal that is a new composition (`variant:
  *   'proposal'`) has its picture there too; `pnpm check:ui-library` holds the files together.
  *
- *   `keptAsIs` marks a variant the proposal shows beside the others but does not replace.
+ *   `keptAsIs` marks a variant the proposal shows beside the others but does not replace; `becomes`
+ *   says which of the proposal's tones a variant's look turns into. `proposal.summary` is the one
+ *   sentence the list of decisions shows.
  *
  *   `files` is how many JS files draw a variant; it is shown only where `counted` says a search
  *   measured it (the 2026-09-23 inventory).
@@ -26,6 +28,8 @@
  *   proposal: { variant, name, tones?: [{ name, from }], text }, changes: [{ page, what }], choice }]
  * @usage import { DECISIONS } from './decisions-data.js';
  * @version-history
+ *   v2.1.0 — 2026-09-23 — `becomes` per variant and a one-sentence `summary` per proposal, for the
+ *     clearer layout Jouni asked for.
  *   v2.0.0 — 2026-09-23 — Split by job, as Jouni asked: the chip becomes tag, status and count; the
  *     filter joins tabs and filters; the home count, the work log status word and the result kind
  *     leave the decisions and stay as they are; the label, the quiet line, the box, the note and the
@@ -44,17 +48,18 @@ export const DECISIONS = [
     title: 'Tag: a small word that names a thing',
     question: 'Tags name a kind, a version, a role or a relation. Seven looks do this today; you accepted six of them. One Tag component, with tones that keep what those six say?',
     variants: [
-      { id: 'poster-chip', name: '1. .poster-chip', look: 'mono .68rem 500, 1px ink frame, square, no fill', where: 'no page yet; the shape poster.css keeps for this role', files: 0, crop: null },
-      { id: 'og-chip', name: '2. Organism chip (.og-chip)', look: 'mono .68rem 500, 2px ink frame, lowercase; "7 unread" on the sun', where: 'almost every profile tab cover and record, admin Compliance, the public knowledge viewer', files: 63, crop: { url: '/v1/profile?tab=messages', selector: '.og-chip' } },
-      { id: 'pf-mono-chip', name: '6. Schedule kind (.sch-badge)', look: 'mono .68rem 500, 2px frame in blue or orange by kind', where: 'profile Scheduler, Offers, Memory files, Organisms interests, Access apps', files: 10, crop: { url: '/v1/profile?tab=scheduler', selector: '.sch-badge' } },
-      { id: 'row-tag', name: '7. Row tag (.sk-tag)', look: 'mono .66rem 500, 1px grey frame, grey words', where: 'profile Skills, Libraries, Packages, Extensions, Capabilities', files: 5, crop: { url: '/v1/profile?tab=skills', selector: '.sk-tag' } },
-      { id: 'adm-state-chip', name: '8. Admin role chip (.adm-own-chip)', look: 'mono .66rem 500, 2px grey frame; "operator" in coral, "you" on the sun', where: 'admin Owners, Organism ownership, Realtime, CSM, Memory, Boards; the fleet page', files: 8, crop: { url: '/v1/admin?tab=owners', selector: '.adm-own-chip' } },
-      { id: 'ct-tag', name: '11. Contact tag (.ct-tag)', look: 'Archivo .68rem 700, 1px ink frame; the relation ("colleague") filled in ink', where: 'profile Contacts', files: 3, crop: { url: '/v1/profile?tab=contacts', selector: '.ct-tag' } },
-      { id: 'tag-pill', name: '12. Tag pill (.tag-pill)', look: 'mono .72rem, 2px ink frame, square; the chosen one ("music") on the sun', where: 'profile Memory tags, the portfolio builder', files: 3, crop: { url: '/v1/profile?tab=memory', selector: '.tag-pill' } },
+      { id: 'poster-chip', name: '1. .poster-chip', becomes: 'plain', look: 'mono .68rem 500, 1px ink frame, square, no fill', where: 'no page yet; the shape poster.css keeps for this role', files: 0, crop: null },
+      { id: 'og-chip', name: '2. Organism chip (.og-chip)', becomes: 'plain; its sun cut ("7 unread") → sun; its grey cut ("archived") → plain', look: 'mono .68rem 500, 2px ink frame, lowercase; "7 unread" on the sun', where: 'almost every profile tab cover and record, admin Compliance, the public knowledge viewer', files: 63, crop: { url: '/v1/profile?tab=messages', selector: '.og-chip' } },
+      { id: 'pf-mono-chip', name: '6. Schedule kind (.sch-badge)', becomes: 'plain (the blue and orange frames go)', look: 'mono .68rem 500, 2px frame in blue or orange by kind', where: 'profile Scheduler, Offers, Memory files, Organisms interests, Access apps', files: 10, crop: { url: '/v1/profile?tab=scheduler', selector: '.sch-badge' } },
+      { id: 'row-tag', name: '7. Row tag (.sk-tag)', becomes: 'plain', look: 'mono .66rem 500, 1px grey frame, grey words', where: 'profile Skills, Libraries, Packages, Extensions, Capabilities', files: 5, crop: { url: '/v1/profile?tab=skills', selector: '.sk-tag' } },
+      { id: 'adm-state-chip', name: '8. Admin role chip (.adm-own-chip)', becomes: 'plain; "operator" → coral; "you" → sun', look: 'mono .66rem 500, 2px grey frame; "operator" in coral, "you" on the sun', where: 'admin Owners, Organism ownership, Realtime, CSM, Memory, Boards; the fleet page', files: 8, crop: { url: '/v1/admin?tab=owners', selector: '.adm-own-chip' } },
+      { id: 'ct-tag', name: '11. Contact tag (.ct-tag)', becomes: 'plain; the relation ("colleague") → ink', look: 'Archivo .68rem 700, 1px ink frame; the relation ("colleague") filled in ink', where: 'profile Contacts', files: 3, crop: { url: '/v1/profile?tab=contacts', selector: '.ct-tag' } },
+      { id: 'tag-pill', name: '12. Tag pill (.tag-pill)', becomes: 'plain; the chosen one ("music") → sun', look: 'mono .72rem, 2px ink frame, square; the chosen one ("music") on the sun', where: 'profile Memory tags, the portfolio builder', files: 3, crop: { url: '/v1/profile?tab=memory', selector: '.tag-pill' } },
     ],
     proposal: {
       variant: 'proposal',
       name: 'Tag, with four tones',
+      summary: 'One Tag on the .poster-chip base, with the tones plain, sun, coral and ink.',
       tones: [
         { name: 'plain', from: '1 (.poster-chip): mono .68rem 500, 1px ink frame, .04em, no fill' },
         { name: 'sun', from: '2 ("7 unread") and 12 ("music"): the sun fill with ink words' },
@@ -78,14 +83,15 @@ export const DECISIONS = [
     title: 'Status: a word that says a state by its colour',
     question: 'A status word says whether something is fine, needs a look, is broken or is off. Four looks do this; you accepted two. One Status component with four tones?',
     variants: [
-      { id: 'pf-badge', name: '3. Profile badge (.pf .badge)', look: 'mono .66rem 500, 2px frame; the tone in the frame colour, "paused" on the sun', where: 'profile Access tokens, Organisms, Nodes, Living, the agent consent card', files: 32, crop: { url: '/v1/profile?tab=organisms', selector: '.pf .badge' } },
-      { id: 'adm-badge', name: '4. Admin badge (.adm-badge)', look: 'mono .66rem 500 caps, no frame, a tinted fill per tone', where: 'every admin roster: Agents, Apps, Actions, Hooks, SSO', files: 51, crop: { url: '/v1/admin?tab=agents', selector: '.adm-badge' } },
-      { id: 'theme-badge', name: '5. Rounded badge (.badge outside the profile)', look: 'Archivo .66rem 600 caps, a pill radius, tinted fill', where: 'admin Chat instances, KeyValueRow', files: 2, crop: { url: '/v1/admin?tab=chatInstances', selector: '.badge' } },
-      { id: 'adm-grey-tag', name: '9. Admin filled tag (.adm-st-chip)', look: 'mono .66rem, grey fill, no frame, some in caps', where: 'admin SSO, Knowledge, Subdomains, Statistics, Portal', files: 5, crop: { url: '/v1/admin?tab=stats', selector: '.adm-st-chip' } },
+      { id: 'pf-badge', name: '3. Profile badge (.pf .badge)', becomes: 'success → fine; warn ("paused") → attention; danger → danger; muted → off', look: 'mono .66rem 500, 2px frame; the tone in the frame colour, "paused" on the sun', where: 'profile Access tokens, Organisms, Nodes, Living, the agent consent card', files: 32, crop: { url: '/v1/profile?tab=organisms', selector: '.pf .badge' } },
+      { id: 'adm-badge', name: '4. Admin badge (.adm-badge)', becomes: 'healthy, success → fine; warning → attention; critical, danger → danger; muted, idle → off', look: 'mono .66rem 500 caps, no frame, a tinted fill per tone', where: 'every admin roster: Agents, Apps, Actions, Hooks, SSO', files: 51, crop: { url: '/v1/admin?tab=agents', selector: '.adm-badge' } },
+      { id: 'theme-badge', name: '5. Rounded badge (.badge outside the profile)', becomes: 'success → fine; warn → attention; danger → danger; info → off', look: 'Archivo .66rem 600 caps, a pill radius, tinted fill', where: 'admin Chat instances, KeyValueRow', files: 2, crop: { url: '/v1/admin?tab=chatInstances', selector: '.badge' } },
+      { id: 'adm-grey-tag', name: '9. Admin filled tag (.adm-st-chip)', becomes: 'ok → fine; bad → danger; muted → off', look: 'mono .66rem, grey fill, no frame, some in caps', where: 'admin SSO, Knowledge, Subdomains, Statistics, Portal', files: 5, crop: { url: '/v1/admin?tab=stats', selector: '.adm-st-chip' } },
     ],
     proposal: {
       variant: 'proposal',
       name: 'Status, with four tones',
+      summary: 'One Status on the admin badge (tinted fill, capitals), with the tones fine, attention, danger and off.',
       tones: [
         { name: 'fine', from: '4: the success tint (--success-bg, --success-fg)' },
         { name: 'attention', from: '4: the warning tint (--warn-bg, --warn-fg)' },
@@ -107,14 +113,15 @@ export const DECISIONS = [
     title: 'Count: a small number',
     question: 'A small number sits in the side menu, on the bell, in the admin menu and in the top bar\'s morsel badge. You accepted the coral counts and the admin menu count. One Count component?',
     variants: [
-      { id: 'count-coral', name: '13. Coral count (.pf-side-badge, .open-items-count)', look: 'mono .7rem, coral fill, paper words', where: 'the profile side menu, the open items button', files: 3, crop: { url: '/v1/profile', selector: '.pf-side-badge' } },
-      { id: 'count-bell', name: '14. Bell count (.notif-badge)', look: 'mono .6rem 700, coral fill, white words, 15px high', where: 'the header bell on every signed-in page', files: 1, crop: home('.notif-badge') },
+      { id: 'count-coral', name: '13. Coral count (.pf-side-badge, .open-items-count)', becomes: 'waiting', look: 'mono .7rem, coral fill, paper words', where: 'the profile side menu, the open items button', files: 3, crop: { url: '/v1/profile', selector: '.pf-side-badge' } },
+      { id: 'count-bell', name: '14. Bell count (.notif-badge)', becomes: 'waiting, at the bell\'s small size', look: 'mono .6rem 700, coral fill, white words, 15px high', where: 'the header bell on every signed-in page', files: 1, crop: home('.notif-badge') },
       { id: 'count-morsels', name: '15. Morsel count (.brand-morsels)', look: 'mono .76rem 500, sun fill, a coral heart before it', where: 'the top bar on every signed-in page (hidden below 1180px)', files: 1, keptAsIs: true, crop: home('.brand-morsels') },
-      { id: 'count-admin-nav', name: '16. Admin menu count (.adm-nav-item .cnt)', look: 'mono .66rem 500, no fill, the menu\'s dim colour', where: 'the admin side menu', files: 1, crop: { url: '/v1/admin', selector: '.adm-nav-item .cnt' } },
+      { id: 'count-admin-nav', name: '16. Admin menu count (.adm-nav-item .cnt)', becomes: 'tally', look: 'mono .66rem 500, no fill, the menu\'s dim colour', where: 'the admin side menu', files: 1, crop: { url: '/v1/admin', selector: '.adm-nav-item .cnt' } },
     ],
     proposal: {
       variant: 'proposal',
       name: 'Count, with two tones, and the morsel balance kept as it is',
+      summary: 'One Count with the tones waiting (coral fill) and tally (no fill); the morsel balance stays as it is.',
       tones: [
         { name: 'waiting', from: '13: mono .7rem, the coral fill with paper words; the bell (14) takes it at its own size' },
         { name: 'tally', from: '16: mono .7rem 500, no fill, dim words' },
@@ -138,7 +145,7 @@ export const DECISIONS = [
       { id: 'prompt-label', name: 'Prompt label (.poster-prompt-label)', look: 'the same values, in its own rule', where: 'home: the prompt card', files: 3, crop: home('.poster-prompt-label') },
       { id: 'og-label', name: 'Profile label (.og-label)', look: '.68rem 800 caps, .12em, coral', where: 'every profile poster tab', files: 57, crop: { url: '/v1/profile?tab=skills', selector: '.og-label' } },
     ],
-    proposal: { variant: 'poster-label', name: '.poster-label', text: 'The design language\'s small coral label. The prompt label is already its values in a copy; the profile label is a hair smaller and wider. One label, one rule.' },
+    proposal: { variant: 'poster-label', name: '.poster-label', summary: 'The coral .poster-label (.72rem 800 caps) for every row label.', text: 'The design language\'s small coral label. The prompt label is already its values in a copy; the profile label is a hair smaller and wider. One label, one rule.' },
     changes: [
       { page: 'Home', what: 'none: the prompt card\'s label loses its own rule, the look stays' },
       { page: 'Profile (57 files)', what: 'the label grows from .68 to .72rem and tightens from .12em to .1em' },
@@ -154,7 +161,7 @@ export const DECISIONS = [
       { id: 'worklog-head', name: 'Work log head (.poster-worklog-head)', look: '.68rem 800 caps, .1em, grey', where: 'chat: "What was done" over the work log', crop: chatThread(1, '.poster-worklog-head') },
       { id: 'conversation-label', name: 'Rail heading (.poster-conversation-label)', look: '.64rem, .12em, coral, a 2px underline', where: 'chat: "This conversation" in the rail', crop: { url: '/v1/chat', selector: '.poster-conversation-label' } },
     ],
-    proposal: { variant: 'day-title', name: 'Day title', text: 'A heading over rows is more than a label: the underline says the rows below belong to it. The day title does that at the label\'s size. The rail heading takes it (from .64rem and a 2px line); the work log head takes it in grey, because a finished answer\'s log should not call for attention.' },
+    proposal: { variant: 'day-title', name: 'Day title', summary: 'The day title (the label with a 3px ink underline) over every list of rows; grey in the work log.', text: 'A heading over rows is more than a label: the underline says the rows below belong to it. The day title does that at the label\'s size. The rail heading takes it (from .64rem and a 2px line); the work log head takes it in grey, because a finished answer\'s log should not call for attention.' },
     changes: [
       { page: 'Chat', what: 'the rail heading grows to .72rem with the 3px underline; the work log head gains the underline and .72rem, and stays grey' },
     ],
@@ -168,7 +175,7 @@ export const DECISIONS = [
       { id: 'turn-meta', name: 'Turn time (.poster-turn-meta)', look: 'mono .68rem, grey', where: 'chat: the time and model under each turn', crop: { url: '/v1/chat', selector: '.poster-turn-meta' } },
       { id: 'timeline-when', name: 'Timeline time (.poster-timeline-when)', look: 'mono .76rem, grey', where: 'home and history: the time of each event', crop: home('.poster-timeline-when') },
     ],
-    proposal: { variant: 'turn-meta', name: 'Turn time', text: 'The chat\'s .68rem is also what the rail\'s facts use, so it is the quiet mono size already. The home timeline shrinks to it. If the timeline reads too small at .68rem beside its sentences, choose it, and the chat grows instead.' },
+    proposal: { variant: 'turn-meta', name: 'Turn time', summary: 'Every time in grey mono at .68rem.', text: 'The chat\'s .68rem is also what the rail\'s facts use, so it is the quiet mono size already. The home timeline shrinks to it. If the timeline reads too small at .68rem beside its sentences, choose it, and the chat grows instead.' },
     changes: [
       { page: 'Home, history', what: 'the event times shrink from .76 to .68rem' },
     ],
@@ -183,7 +190,7 @@ export const DECISIONS = [
       { id: 'chooser-box', name: 'Box (.poster-box)', look: '2px ink frame, card ground', where: 'home: the journey\'s answer', crop: home('.poster-chooser-result') },
       { id: 'result-card', name: 'Result card (.poster-result)', look: '2px ink frame with a coloured left edge per kind', where: 'chat: what a turn produced', crop: chatThread(3, '.poster-result') },
     ],
-    proposal: { variant: 'chooser-box', name: '.poster-box', text: 'The design language\'s box: a 2px ink frame on the card ground. The prompt card keeps the frame and loses its tinted head; the result card loses its coloured edge (the kind is its own part and stays).' },
+    proposal: { variant: 'chooser-box', name: '.poster-box', summary: 'The 2px ink box on the card ground for every object; no tinted head, no coloured edge.', text: 'The design language\'s box: a 2px ink frame on the card ground. The prompt card keeps the frame and loses its tinted head; the result card loses its coloured edge (the kind is its own part and stays).' },
     changes: [
       { page: 'Home', what: 'the prompt card\'s tinted head goes' },
       { page: 'Chat', what: 'the result cards lose the coloured left edge' },
@@ -199,7 +206,7 @@ export const DECISIONS = [
       { id: 'nudge', name: 'Nudge (.poster-nudge)', look: 'a thin dashed frame, one line, the way out on the same line', where: 'chat: "Put this on your phone"', crop: null },
       { id: 'aside', name: 'Aside (.poster-aside)', look: '3px dashed coral frame, card ground', where: 'the design language\'s aside; organism settings and admin pages', crop: null },
     ],
-    proposal: { variant: 'aside', name: '.poster-aside', text: 'The design language has one note that says a thing out loud: the 3px dashed coral aside. The waiting note keeps its pulsing dot inside it; the nudge keeps its way out on the same line.' },
+    proposal: { variant: 'aside', name: '.poster-aside', summary: 'The 3px dashed coral aside for every note that asks for attention.', text: 'The design language has one note that says a thing out loud: the 3px dashed coral aside. The waiting note keeps its pulsing dot inside it; the nudge keeps its way out on the same line.' },
     changes: [
       { page: 'Home', what: 'the waiting note\'s thin dashed frame becomes the 3px dashed coral aside' },
       { page: 'Chat', what: 'the phone nudge becomes the aside' },
@@ -218,7 +225,7 @@ export const DECISIONS = [
       { id: 'btn-outline', name: 'Outline button (.btn-outline)', look: 'a rounded thin frame from the classic buttons', where: 'chat: Open on a result card', crop: chatThread(3, '.poster-result-open') },
       { id: 'btn-ghost', name: 'Ghost button (.btn-ghost)', look: 'plain words from the classic buttons', where: 'chat: Listen and Copy under a turn', crop: { url: '/v1/chat', selector: '.poster-turn-listen' } },
     ],
-    proposal: { variant: 'poster-action', name: '.poster-action', text: 'The design language: one loud action, and underlined words for the rest, a 3px ink underline under a poster action. Every quiet way on takes it; the classic outline and ghost buttons leave the poster pages.' },
+    proposal: { variant: 'poster-action', name: '.poster-action', summary: 'Ink caps with the 3px underline for every quiet way on; the classic outline and ghost buttons go.', text: 'The design language: one loud action, and underlined words for the rest, a 3px ink underline under a poster action. Every quiet way on takes it; the classic outline and ghost buttons leave the poster pages.' },
     changes: [
       { page: 'Chat', what: 'Open, Listen, Copy and the rail actions become underlined caps' },
       { page: 'Home', what: '"Show all" moves from coral mono to ink caps' },
@@ -237,7 +244,7 @@ export const DECISIONS = [
       { id: 'poster-tab', name: 'Poster tab (.poster-tab)', look: 'Archivo caps with the 3px ink underline; the chosen one on the sun', where: 'the design language\'s tab; profile Agents, the agent card, Inbox, the setup guide', files: 4, crop: { url: '/v1/profile?tab=agents', selector: '.poster-tab' } },
       { id: 'adm-filter-chip', name: '10. Admin filter chip (.adm-hook-fchip and 24 copies)', look: 'mono .72rem 500, 2px grey frame; the chosen one on the sun', where: 'about 25 admin pages, each with its own copy of the rule', files: 25, crop: { url: '/v1/admin?tab=hooks', selector: '.adm-hook-fchip' } },
     ],
-    proposal: { variant: 'poster-tab', name: '.poster-tab', text: 'The design language names this control: the tab, words with the action\'s 3px underline, the chosen one on the sun with ink words. The home switch already chooses on the sun; the mode tabs and the admin filters become tabs, and the 25 filter rules become one.' },
+    proposal: { variant: 'poster-tab', name: '.poster-tab', summary: 'The poster tab for every switch and filter, the chosen one on the sun; the 25 admin filter rules become one.', text: 'The design language names this control: the tab, words with the action\'s 3px underline, the chosen one on the sun with ink words. The home switch already chooses on the sun; the mode tabs and the admin filters become tabs, and the 25 filter rules become one.' },
     changes: [
       { page: 'Home', what: 'the switch words move from coral mono to ink caps; the agent step\'s outlined mode buttons become tabs' },
       { page: 'Admin (about 25 pages)', what: 'the framed filter chips become tabs; the chosen one stays on the sun' },
@@ -253,7 +260,7 @@ export const DECISIONS = [
       { id: 'slab-control', name: 'Control slab (.poster-slab--control)', look: 'ink slab, paper words, 4px sun shadow, 44px high', where: 'chat: Send, New conversation', crop: { url: '/v1/chat', selector: '.poster-composer-send' } },
       { id: 'slab', name: 'Slab (.poster-slab)', look: 'ink slab, paper words, 4px sun shadow', where: 'the design language\'s loud action; the demo card on the home', crop: null },
     ],
-    proposal: { variant: 'slab', name: '.poster-slab', text: 'The design language\'s loud action inside is the ink slab with the sun shadow; the coral rounded button is the classic shell. .poster-slab on every poster page, the control cut where it sits in a row of controls.' },
+    proposal: { variant: 'slab', name: '.poster-slab', summary: 'The ink slab with the sun shadow for the one loud button; the coral rounded button goes.', text: 'The design language\'s loud action inside is the ink slab with the sun shadow; the coral rounded button is the classic shell. .poster-slab on every poster page, the control cut where it sits in a row of controls.' },
     changes: [
       { page: 'Home', what: 'Copy the prompt and the step buttons become ink slabs with the sun shadow' },
     ],
@@ -268,7 +275,7 @@ export const DECISIONS = [
       { id: 'day-empty', name: 'Day empty (.poster-day-empty)', look: 'Archivo .95rem 400, grey', where: 'history: nothing has happened yet', crop: null },
       { id: 'conversation-empty', name: 'Conversation list empty (.poster-conversation-empty)', look: 'grey body text', where: 'chat: no conversations yet', crop: null },
     ],
-    proposal: { variant: 'quiet-note', name: 'QuietNote', text: 'QuietNote is already the library\'s part for this; every empty list says so with it.' },
+    proposal: { variant: 'quiet-note', name: 'QuietNote', summary: 'QuietNote for every empty list.', text: 'QuietNote is already the library\'s part for this; every empty list says so with it.' },
     changes: [
       { page: 'History', what: 'the empty record line becomes the quiet note (600 instead of 400)' },
       { page: 'Chat', what: 'the empty conversation list becomes the quiet note' },
@@ -283,7 +290,7 @@ export const DECISIONS = [
       { id: 'as-is', name: 'As it is', look: 'the label and hint in Fjalla caps, from the masthead\'s name rule', where: 'home: the agent step\'s first screen', crop: null },
       { id: 'without', name: 'Without the class', look: 'the label and hint in the body face, as the paste box\'s label is', where: 'home: the agent step\'s first screen', crop: null },
     ],
-    proposal: { variant: 'without', name: 'Without the class', text: 'The class reached the wrapper by accident: it was given to the wrapper on 2026-08-07 and, three hours later, to the header nameplate, whose rule cuts text to one line.' },
+    proposal: { variant: 'without', name: 'Without the class', summary: 'Remove the masthead class from the agent step\'s name form (in phase 3).', text: 'The class reached the wrapper by accident: it was given to the wrapper on 2026-08-07 and, three hours later, to the header nameplate, whose rule cuts text to one line.' },
     changes: [
       { page: 'Home', what: 'the agent step\'s name label and hint move from the headline face to the body face' },
     ],
