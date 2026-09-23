@@ -19,6 +19,8 @@
  * @structure decideRouter(config, storage)
  * @usage mounted in server-bootstrap/routes-loader.ts
  * @version-history
+ *   v1.3.1 — 2026-09-23 — The five owner-only doors here say what they are and what an agent's own
+ *     way in is, instead of the sign-in gate's sentence about the account:security permission.
  *   v1.3.0 — 2026-09-23 — Decision providers: `provider` on a call and a run and in the list filter;
  *     GET/PUT/DELETE /v1/ai/decide/providers; the settings door takes the owner's default provider
  *     and each agent's.
@@ -75,6 +77,18 @@ export function decideCallerOf(req: Request, nodeId: string, bodyAppId?: unknown
     isOwner: isOwnerPrincipal(auth),
   };
 }
+
+/**
+ * Why an agent is refused on the provider and settings doors, in its own terms.
+ *
+ * The gate's own sentence is written for the sign-in doors it was built for: on these it says "this
+ * changes how the account is signed into" and tells an agent to ask for the account:security
+ * permission, which describes another door. The same correction the rule doors took on 2026-09-20.
+ */
+const OWNER_SETS_THE_MODEL =
+  'Where the decision model is, what pays for it and what the scrubber lets through are the account '
+  + "holder's to set, so only they change them. An agent reads them with aimeat_decide_settings and "
+  + 'names a provider per call or per rule; it does not add one.';
 
 /** The body of a decide request, as the service takes it. Shape is checked by the service. */
 export function decideInputOf(body: Record<string, unknown>): DecideInput {
@@ -233,7 +247,7 @@ export function decideRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   // ── PUT /v1/ai/decide/settings ── own key and data policy
-  router.put('/v1/ai/decide/settings', requireAuth(), requireOwnerPrincipal(), async (req: Request, res: Response) => {
+  router.put('/v1/ai/decide/settings', requireAuth(), requireOwnerPrincipal(OWNER_SETS_THE_MODEL), async (req: Request, res: Response) => {
     const gaii = decideOwnerOf(req.auth!, config.nodeId);
     const body = (req.body ?? {}) as Record<string, unknown>;
     try {
@@ -259,7 +273,7 @@ export function decideRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   // ── POST /v1/ai/decide/settings/test ── one tiny real call on the key that would pay for this owner
-  router.post('/v1/ai/decide/settings/test', requireAuth(), requireOwnerPrincipal(), aiRateLimit, async (req: Request, res: Response) => {
+  router.post('/v1/ai/decide/settings/test', requireAuth(), requireOwnerPrincipal(OWNER_SETS_THE_MODEL), aiRateLimit, async (req: Request, res: Response) => {
     try {
       res.json(success(config.nodeId, await testDecideKey(storage, config, { gaii: decideOwnerOf(req.auth!, config.nodeId), which: 'mine' })));
     } catch (e) { fail(res, e); }
@@ -285,7 +299,7 @@ export function decideRouter(config: AimeatConfig, storage: Storage): Router {
 
   // ── PUT /v1/ai/decide/providers/:id ── the owner's own provider: their address, their key. In
   //    person only: an agent or app that could write one could send the owner's states anywhere.
-  router.put('/v1/ai/decide/providers/:id', requireAuth(), requireOwnerPrincipal(), async (req: Request, res: Response) => {
+  router.put('/v1/ai/decide/providers/:id', requireAuth(), requireOwnerPrincipal(OWNER_SETS_THE_MODEL), async (req: Request, res: Response) => {
     const gaii = decideOwnerOf(req.auth!, config.nodeId);
     try {
       const p = await putOwnerProvider(storage, config, gaii, req.params.id as string, req.body ?? {});
@@ -294,7 +308,7 @@ export function decideRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   // ── DELETE /v1/ai/decide/providers/:id ── remove it, its key, and any choice that named it
-  router.delete('/v1/ai/decide/providers/:id', requireAuth(), requireOwnerPrincipal(), async (req: Request, res: Response) => {
+  router.delete('/v1/ai/decide/providers/:id', requireAuth(), requireOwnerPrincipal(OWNER_SETS_THE_MODEL), async (req: Request, res: Response) => {
     const gaii = decideOwnerOf(req.auth!, config.nodeId);
     try {
       if (!(await deleteOwnerProvider(storage, config, gaii, req.params.id as string))) {
@@ -305,7 +319,7 @@ export function decideRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   // ── DELETE /v1/ai/decide/settings/key ── forget the owner's own key
-  router.delete('/v1/ai/decide/settings/key', requireAuth(), requireOwnerPrincipal(), async (req: Request, res: Response) => {
+  router.delete('/v1/ai/decide/settings/key', requireAuth(), requireOwnerPrincipal(OWNER_SETS_THE_MODEL), async (req: Request, res: Response) => {
     const gaii = decideOwnerOf(req.auth!, config.nodeId);
     try {
       await clearOwnDecideKey(storage, gaii);
