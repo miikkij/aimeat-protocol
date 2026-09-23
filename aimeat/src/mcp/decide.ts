@@ -16,6 +16,8 @@
  * @structure registerDecideTools(mcp, storage, config, getAgentGaii)
  * @usage registerDecideTools(mcp, storage, config, () => agentGaii);
  * @version-history
+ *   v1.2.0 — 2026-09-23 — Decision providers: `provider` on aimeat_decide, aimeat_decide_run and
+ *     aimeat_decision_list, and stats by provider.
  *   v1.1.0 — 2026-09-20 — Decision rules: `rule` on aimeat_decide, aimeat_decide_run and
  *     aimeat_decision_list; aimeat_decide_rules; aimeat_decide_rule_propose (creates nothing).
  *   v1.0.0 — 2026-09-19 — Initial (TARGET-080).
@@ -75,6 +77,7 @@ export function registerDecideTools(
     {
       state: z.unknown().describe('What is being judged: a string, an object with named fields, or an array.'),
       rule: z.string().optional().describe('The id of one of the owner\'s decision rules. It holds the questions, thresholds and bands: send only the state beside it.'),
+      provider: z.string().optional().describe('The decision provider to ask (aimeat_decide_settings lists them). Leave out to let the node pick.'),
       questions: questionsSchema.optional().describe('Required unless `rule` is given. Your ids to questions, in English.'),
       subject: z.string().optional().describe('What the decision is about: a memory key or record id.'),
       gates: z.string().optional().describe('What the answer decides, in plain words.'),
@@ -93,6 +96,7 @@ export function registerDecideTools(
           // Both are passed as given: a caller who sends questions BESIDE a rule is refused by the
           // service, the same as on the REST door, rather than having them dropped here.
           ...(a.rule !== undefined ? { rule: a.rule } : {}),
+          ...(a.provider !== undefined ? { provider: a.provider } : {}),
           ...(a.questions !== undefined ? { questions: a.questions as Record<string, JevQuestion> } : {}),
           ...(a.subject !== undefined ? { subject: a.subject } : {}),
           ...(a.gates !== undefined ? { gates: a.gates } : {}),
@@ -116,7 +120,8 @@ export function registerDecideTools(
       subject: z.string().optional().describe('Only decisions about this subject.'),
       rule: z.string().optional().describe('Only decisions one decision rule made (its id).'),
       principal: z.string().optional().describe('Only decisions one principal asked for (an agent\'s full identity).'),
-      stats_by: z.enum(['rule', 'principal']).optional().describe('Return the quality numbers instead, one group per rule or per principal.'),
+      provider: z.string().optional().describe('Only decisions one decision provider answered (its id).'),
+      stats_by: z.enum(['rule', 'principal', 'provider']).optional().describe('Return the quality numbers instead, one group per rule, per principal or per provider.'),
       app_id: z.string().optional().describe('Only decisions made for this app.'),
       limit: z.number().optional().describe('How many (1-200, default 50).'),
       before: z.string().optional().describe('Only decisions made before this ISO time.'),
@@ -131,12 +136,14 @@ export function registerDecideTools(
         if (a.stats_by) {
           return text({ groups: await decisionStats(storage, ownerGhii, {
             groupBy: a.stats_by, ...(a.rule ? { rule: a.rule } : {}), ...(a.principal ? { principal: a.principal } : {}),
+            ...(a.provider ? { provider: a.provider } : {}),
           }) });
         }
         const r = await listDecisions(storage, ownerGhii, {
           ...(a.subject !== undefined ? { subject: a.subject } : {}),
           ...(a.rule !== undefined ? { rule: a.rule } : {}),
           ...(a.principal !== undefined ? { principal: a.principal } : {}),
+          ...(a.provider !== undefined ? { provider: a.provider } : {}),
           ...(a.app_id !== undefined ? { appId: a.app_id } : {}),
           ...(a.limit !== undefined ? { limit: a.limit } : {}),
           ...(a.before !== undefined ? { before: a.before } : {}),
@@ -181,6 +188,7 @@ export function registerDecideTools(
       action: z.enum(['start', 'get', 'list', 'resume', 'stop']).describe('start | get | list | resume | stop'),
       run_id: z.string().optional().describe('The run, for get, resume and stop.'),
       rule: z.string().optional().describe('For start: one of the owner\'s decision rules, in place of questions, thresholds and gates.'),
+      provider: z.string().optional().describe('For start: the decision provider every item is asked on.'),
       questions: questionsSchema.optional(),
       items: z.array(z.object({ subject: z.string(), state: z.unknown().optional() })).optional().describe('For start: [{ subject, state }].'),
       keys: z.array(z.string()).optional().describe('For start: owner memory keys.'),
@@ -200,6 +208,7 @@ export function registerDecideTools(
           if (!a.questions && a.rule === undefined) return err('INVALID_BODY: start needs questions, or a rule.');
           const run = await startDecideRun(storage, config, caller(a.app_id), {
             ...(a.rule !== undefined ? { rule: a.rule } : {}),
+            ...(a.provider !== undefined ? { provider: a.provider } : {}),
             ...(a.questions ? { questions: a.questions as Record<string, JevQuestion> } : {}),
             ...(a.items ? { items: a.items as RunItem[] } : {}),
             ...(a.keys ? { keys: a.keys } : {}),
@@ -233,7 +242,7 @@ export function registerDecideTools(
       try {
         return text({
           ...(await decideSettingsView(storage, config, ownerGhii, agentNameOf(agentGaii, ownerGhii))),
-          change_them: 'The owner changes the key and the data policy on the AI settings page (/v1/profile?tab=ai), and an agent\'s own key, cap and gate on that agent\'s page. No tool changes them.',
+          change_them: 'The owner changes the key and the data policy on the AI settings page (/v1/profile?tab=ai), an agent\'s own key, cap and gate on that agent\'s page, and the decision providers (their own, their default, the one each agent uses) in person through PUT /v1/ai/decide/providers/{id} and PUT /v1/ai/decide/settings. No tool changes them.',
         });
       } catch (e) {
         return failed(e);

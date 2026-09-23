@@ -28,6 +28,8 @@
  * @usage
  *   import type { AiDecisionRow } from '../storage/interface.js';
  * @version-history
+ *   v1.2.0 — 2026-09-23 — Decision providers: a row carries `provider` and `providerKind`, a key
+ *     scope may be 'none', and the list filters and the quality numbers group by provider.
  *   v1.1.0 — 2026-09-20 — Decision rules: a row carries `rule`, `ruleVersion`, `outcome` and
  *     `keyScope` (which now also says 'agent'), the list filters by rule and by principal, and the
  *     quality numbers are counted in the store.
@@ -70,7 +72,10 @@ export interface AiDecisionRecord {
   spec: 'aimeat.decision/v1';
   /** The pinned, versioned model id that ANSWERED (from the response, not the request). */
   model: string;
-  provider: 'typesafe';
+  /** The decision provider's id (services/decide/providers.ts). Every record before 2026-09-23 says 'typesafe'. */
+  provider: string;
+  /** Where it ran. Absent on records written before providers existed, which were all hosted. */
+  providerKind?: AiDecisionProviderKind;
   /** As SENT (scrubbed). */
   questions: Record<string, AiDecisionQuestion>;
   /** Restored to real option names. */
@@ -101,8 +106,11 @@ export interface AiDecisionRecord {
   gate?: { on: true; stopped: boolean; task?: string };
 }
 
-/** Whose key paid: the agent's own, the owner's own, or the node's. */
-export type AiDecisionKeyScope = 'agent' | 'own' | 'node';
+/** Whose key paid: the agent's own, the owner's own, the node's, or none (a provider that takes no key). */
+export type AiDecisionKeyScope = 'agent' | 'own' | 'node' | 'none';
+
+/** Where the provider runs: elsewhere, or on this machine. */
+export type AiDecisionProviderKind = 'hosted' | 'local';
 
 /** What a decision rule's bands made of the answers: act, ask a person, or stop. */
 export type AiDecisionOutcome = 'act' | 'ask' | 'stop';
@@ -127,6 +135,10 @@ export interface AiDecisionRow {
   outcome: AiDecisionOutcome | null;
   /** Whose key paid. A column as well as a record field, so the quality view can count by it. */
   keyScope: AiDecisionKeyScope;
+  /** Which provider answered. A column, so the quality numbers group by it; 'typesafe' for older rows. */
+  provider: string;
+  /** Where that provider ran. 'hosted' for older rows. */
+  providerKind: AiDecisionProviderKind;
   record: AiDecisionRecord;
 }
 
@@ -139,17 +151,23 @@ export interface AiDecisionListQuery {
   rule?: string;
   /** Only decisions one principal asked for (a GAII, for the agent's own page). */
   principal?: string;
+  /** Only decisions one provider answered. */
+  provider?: string;
   /** Default 50, max 200. */
   limit?: number;
   before?: string;
 }
 
-/** Which decisions a quality count covers: one rule, one principal, or both. */
+/** Which decisions a quality count covers: one rule, one principal, one provider, or any mix. */
 export interface AiDecisionStatsQuery {
   ownerGhii: string;
   rule?: string;
   principal?: string;
+  provider?: string;
 }
+
+/** What a quality count is grouped by. */
+export type AiDecisionStatsGroupBy = 'rule' | 'principal' | 'provider';
 
 /**
  * The quality numbers for a rule or an agent, counted in the store so they are exact however many

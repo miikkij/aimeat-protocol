@@ -24,6 +24,10 @@
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-ai-decide.ts
  *   cd aimeat && pnpm exec node --env-file=.env.test.postgres-kysely --import tsx test/e2e-ai-decide.ts
  * @version-history
+ *   v1.4.0 — 2026-09-23 — Phase 11, decision providers: an owner's own provider is written and read
+ *     and its key never shown; an agent or app cannot write one; a local provider sends no key,
+ *     costs nothing and meters nothing; the record and the list name the provider; what a provider
+ *     cannot carry is refused by name at the call and at the rule; the choice order; stats by provider.
  *   v1.3.0 — 2026-09-20 — 9d/9e: a person's review answers the gate's item and the row goes; a rule
  *     whose answers carry no certainty asks instead of stopping (the stub can now omit one). 7b also
  *     reads the refusal an agent gets on a rule door.
@@ -792,6 +796,132 @@ const QUESTIONS = {
     assert(del.status === 200 && del.body.data.decide.has_key === false, `got ${del.status}`);
     const r = await runRule(agentAi, 'send-reply', { draft: 'Back on the node key', question: 'q' });
     assert(r.status === 200 && r.body.data.key_source === 'node', `falls back to the node's key, got ${r.body.data?.key_source}`);
+  });
+
+  console.log('\nPhase 11: decision providers');
+  // The owner's own local provider is the same stub on the same address: what arrives there says
+  // whether a key went with it. It carries three options, so four is over its limit.
+  const LOCAL = {
+    title: 'My local model', kind: 'local', url: stub.url, model: 'tiny-local-1', auth: { type: 'none' },
+    limits: { context_tokens: 4000, max_choice_options: 3 },
+  };
+  const HOSTED_KEY = 'owner-provider-key-e2e-0004';
+  const putProvider = (id: string, body: unknown, token = A.token) =>
+    json(`/v1/ai/decide/providers/${id}`, { method: 'PUT', headers: auth(token), body: JSON.stringify(body) });
+  const ask = (token: string, extra: Record<string, unknown>) =>
+    json('/v1/ai/decide', { method: 'POST', headers: auth(token), body: JSON.stringify({ state: 'Please send the March invoice.', questions: { urgent: QUESTIONS.urgent }, cache: false, ...extra }) });
+  const FOUR = { type: 'choice', instructions: 'Which team?', criteria: { billing: null, support: null, sales: null, other: null } };
+
+  await test('11a. the owner writes a provider of their own, reads it back, and its key is never shown', async () => {
+    const local = await putProvider('mine-local', LOCAL);
+    assert(local.status === 200 && local.body.data.provider.kind === 'local' && local.body.data.provider.leaves === false,
+      `got ${local.status} ${JSON.stringify(local.body.error ?? local.body.data?.provider)}`);
+    const hosted = await putProvider('mine-hosted', {
+      title: 'My hosted model', kind: 'hosted', url: 'https://decide.example.com/v1/systemone', model: 'm-1',
+      auth: { type: 'key' }, api_key: HOSTED_KEY,
+    });
+    assert(hosted.status === 200 && hosted.body.data.provider.auth.has_key === true, `got ${hosted.status} ${JSON.stringify(hosted.body.error)}`);
+    const list = await json('/v1/ai/decide/providers', { headers: auth(A.token) });
+    const ids = (list.body.data?.providers ?? []).map((p: any) => p.id);
+    assert(list.status === 200 && ids.includes('typesafe') && ids.includes('mine-local') && ids.includes('mine-hosted'), `got ${ids}`);
+    assert(list.body.data.default === 'typesafe', `an owner who chose nothing has the node's, got ${list.body.data.default}`);
+    const mem = await json('/v1/memory/decide.apikey.provider.mine-hosted', { headers: auth(A.token) });
+    for (const [i, raw] of [JSON.stringify(hosted.body), JSON.stringify(list.body), JSON.stringify(mem.body)].entries()) {
+      assert(!raw.includes(HOSTED_KEY), `door ${i} returned the key`);
+    }
+    const taken = await putProvider('typesafe', LOCAL);
+    assert(taken.status === 409 && taken.body.error?.code === 'PROVIDER_ID_TAKEN', `a node provider's id is refused, got ${taken.status}`);
+    const other = await json('/v1/ai/decide/providers', { headers: auth(B.token) });
+    assert(!(other.body.data?.providers ?? []).some((p: any) => p.id === 'mine-local'), 'another owner does not see it');
+  });
+
+  await test('11b. an agent or an app cannot write one, by the provider door or the memory door', async () => {
+    const asAgent = await putProvider('agent-made', LOCAL, agentAi);
+    assert(asAgent.status === 403, `an agent may not write a provider, got ${asAgent.status}`);
+    const asApp = await putProvider('app-made', LOCAL, appToken);
+    assert(asApp.status === 403, `an app may not write a provider, got ${asApp.status}`);
+    const record = { spec: 'aimeat.decision-provider/v1', id: 'app-made', ...LOCAL };
+    const byMemory = await json('/v1/memory/decide.providers.app-made', { method: 'PUT', headers: auth(appToken), body: JSON.stringify({ value: record }) });
+    // Refused either for want of memory:write or, with it, by the reserved `decide.` prefix.
+    assert(byMemory.status === 403 && ['RESERVED_KEY', 'SCOPE_DENIED'].includes(byMemory.body.error?.code), `the memory door refuses it, got ${byMemory.status} ${byMemory.body.error?.code}`);
+    await json('/v1/memory/decide.providers.agent-made', { method: 'PUT', headers: auth(agentAi), body: JSON.stringify({ value: record }) });
+    const list = await json('/v1/ai/decide/providers', { headers: auth(A.token) });
+    const ids = (list.body.data?.providers ?? []).map((p: any) => p.id);
+    assert(!ids.includes('agent-made') && !ids.includes('app-made'), `nothing an agent or app wrote became a provider, got ${ids}`);
+  });
+
+  let localDecision = '';
+  await test('11c. a local provider needs no key: nothing is sent as one, it costs nothing, and the ledger does not move', async () => {
+    const usage = async () => (await json('/v1/ai/usage', { headers: auth(A.token) })).body.data?.total_calls ?? 0;
+    const callsBefore = await usage();
+    const before = seen.length;
+    const r = await ask(A.token, { provider: 'mine-local' });
+    assert(r.status === 200, `got ${r.status} ${JSON.stringify(r.body.error)}`);
+    assert(r.body.data.key_source === 'none' && r.body.data.usage.cost_usd === 0, `got ${r.body.data.key_source} ${r.body.data.usage?.cost_usd}`);
+    assert(r.body.data.provider?.id === 'mine-local' && r.body.data.provider.kind === 'local' && r.body.data.provider.chosen_by === 'call',
+      `got ${JSON.stringify(r.body.data.provider)}`);
+    assert(seen.length === before + 1 && seen[seen.length - 1].auth === '', `one call and no key sent, got "${seen[seen.length - 1]?.auth}"`);
+    assert(seen[seen.length - 1].body.model === 'tiny-local-1', 'the provider\'s own model name was sent');
+    assert(await usage() === callsBefore, 'a local decision is not a metered call');
+    localDecision = r.body.data.decision_id;
+  });
+
+  await test('11d. the record carries the provider, and the list filters by it', async () => {
+    const one = await json(`/v1/ai/decisions/${localDecision}`, { headers: auth(A.token) });
+    assert(one.body.data?.provider === 'mine-local' && one.body.data.providerKind === 'local' && one.body.data.record.provider === 'mine-local',
+      `got ${one.body.data?.provider} ${one.body.data?.providerKind}`);
+    const def = await ask(A.token, {});
+    const hosted = await json(`/v1/ai/decisions/${def.body.data.decision_id}`, { headers: auth(A.token) });
+    assert(hosted.body.data?.provider === 'typesafe' && hosted.body.data.providerKind === 'hosted' && def.body.data.provider.chosen_by === 'node',
+      `a call that names nothing is the node's provider, as before: ${hosted.body.data?.provider} ${def.body.data.provider?.chosen_by}`);
+    const filtered = await json('/v1/ai/decisions?provider=mine-local', { headers: auth(A.token) });
+    assert(filtered.body.data.total === 1 && filtered.body.data.decisions[0].id === localDecision, `got ${filtered.body.data.total}`);
+  });
+
+  await test('11e. what a provider cannot carry is refused by name before anything is sent, at the call and at the rule', async () => {
+    const before = seen.length;
+    const r = await ask(A.token, { provider: 'mine-local', questions: { team: FOUR } });
+    const msg = String(r.body.error?.message ?? '');
+    assert(r.status === 400 && r.body.error?.code === 'PROVIDER_CANNOT_CARRY', `got ${r.status} ${r.body.error?.code}`);
+    assert(msg.includes("'mine-local' carries 3 options") && msg.includes('has 4'), `named in its own numbers, got: ${msg}`);
+    assert(seen.length === before, 'the stub was not called');
+    const onNode = await ask(A.token, { questions: { team: FOUR } });
+    assert(onNode.status === 200, `the node's provider carries four, got ${onNode.status}`);
+    const ruleBody = { ...RULE, sends: [], questions: { team: FOUR }, thresholds: { team: 0.5 }, provider: 'mine-local' };
+    const refused = await put('team-local', ruleBody);
+    assert(refused.status === 400 && refused.body.error?.code === 'PROVIDER_CANNOT_CARRY', `the rule is refused at write time, got ${refused.status} ${refused.body.error?.code}`);
+    const fits = await put('team-local', { ...ruleBody, questions: { team: { ...FOUR, criteria: { billing: null, support: null, other: null } } } });
+    assert(fits.status === 201, `three options fit, got ${fits.status} ${JSON.stringify(fits.body.error)}`);
+    const ran = await runRule(agentAi, 'team-local', 'Where is my invoice?');
+    assert(ran.status === 200 && ran.body.data.provider.id === 'mine-local' && ran.body.data.provider.chosen_by === 'rule', `got ${JSON.stringify(ran.body.data?.provider ?? ran.body.error)}`);
+    const override = await runRule(agentAi, 'team-local', 'Where is my invoice?', { provider: 'typesafe' });
+    assert(override.status === 400 && override.body.error?.code === 'RULE_FIXES_QUESTIONS', `a rule's provider is not overridden by the call, got ${override.status}`);
+  });
+
+  await test('11f. the agent\'s provider, then the owner\'s default, then the node\'s', async () => {
+    const setAs = (token: string, body: unknown) => json('/v1/ai/decide/settings', { method: 'PUT', headers: auth(token), body: JSON.stringify(body) });
+    const byAgent = await setAs(agentAi, { provider: 'mine-local' });
+    assert(byAgent.status === 403, `an agent does not choose, got ${byAgent.status}`);
+    const unknown = await setAs(A.token, { provider: 'no-such' });
+    assert(unknown.status === 400 && unknown.body.error?.code === 'UNKNOWN_PROVIDER', `got ${unknown.status}`);
+    await setAs(A.token, { provider: 'mine-local', agent_providers: { deciderbot: 'typesafe' } });
+    const owner = await ask(A.token, {});
+    assert(owner.body.data?.provider?.id === 'mine-local' && owner.body.data.provider.chosen_by === 'owner', `got ${JSON.stringify(owner.body.data?.provider)}`);
+    const agent = await ask(agentAi, {});
+    assert(agent.body.data?.provider?.id === 'typesafe' && agent.body.data.provider.chosen_by === 'agent', `got ${JSON.stringify(agent.body.data?.provider)}`);
+    const view = await json('/v1/ai/decide/settings', { headers: auth(agentAi) });
+    assert(view.body.data?.providers?.this_agent === 'typesafe', `the agent reads its own, got ${view.body.data?.providers?.this_agent}`);
+    await setAs(A.token, { provider: null, agent_providers: { deciderbot: null } });
+    const back = await ask(A.token, {});
+    assert(back.body.data?.provider?.chosen_by === 'node', `cleared, the node's again, got ${back.body.data?.provider?.chosen_by}`);
+  });
+
+  await test('11g. the quality numbers group by provider', async () => {
+    const r = await json('/v1/ai/decisions/stats?group_by=provider', { headers: auth(A.token) });
+    assert(r.status === 200, `got ${r.status} ${JSON.stringify(r.body.error)}`);
+    const by = Object.fromEntries((r.body.data.groups as any[]).map(g => [g.key, g]));
+    assert(by['mine-local']?.decisions >= 3 && by['mine-local'].costUsd === 0, `local: ${JSON.stringify(by['mine-local'])}`);
+    assert(by.typesafe?.decisions >= 1 && by.typesafe.costUsd > 0, `typesafe: ${JSON.stringify(by.typesafe)}`);
   });
 
   await stopServer(server);

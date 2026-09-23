@@ -45,7 +45,10 @@
       APP_QUOTA_EXHAUSTED: "This app has used its AI budget for today.",
       DATAMAP_REQUIRED: "This app must say in its data map that data goes to TypeSafe before it can ask.",
       RATE_LIMITED: "Too many decisions at once. Try again in a moment.",
-      INVALID_REQUEST: "The questions do not fit the model limits."
+      INVALID_REQUEST: "The questions do not fit the model limits.",
+      PROVIDER_CANNOT_CARRY: "The chosen decision provider cannot carry these questions. Use another provider, or ask fewer options.",
+      UNKNOWN_PROVIDER: "That decision provider is not available on this node.",
+      PRIVATE_EGRESS_REQUIRED: "The decision provider runs on this machine, and the operator has not allowed the node to reach it."
     }[code];
     const err = (
       /** @type {Error & { code?: string, details?: any }} */
@@ -125,7 +128,7 @@
     for (
       const k of
       /** @type {const} */
-      ["subject", "rule", "app_id", "limit", "before"]
+      ["subject", "rule", "provider", "app_id", "limit", "before"]
     ) {
       if (o[k] !== void 0) p.set(k, String(o[k]));
     }
@@ -176,6 +179,9 @@
   function settings() {
     return call("/v1/ai/decide/settings");
   }
+  function providers() {
+    return call("/v1/ai/decide/providers");
+  }
   var _availCache = null;
   async function isAvailable() {
     if (_availCache && Date.now() - _availCache.t < 6e4) return _availCache.v;
@@ -191,6 +197,6 @@
   function unavailableReason() {
     return _availCache ? _availCache.reason : null;
   }
-  var decide = { yesNo, pickOne, scale, ask, gate, questionSet, rule, rules, decisions, review, run, settings, isAvailable, unavailableReason };
+  var decide = { yesNo, pickOne, scale, ask, gate, questionSet, rule, rules, decisions, review, run, settings, providers, isAvailable, unavailableReason };
   attach("decide", decide);
 })();

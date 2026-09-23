@@ -11,6 +11,8 @@
  * @structure decideTools[] -- the shell handler table, registered by tool-call.ts
  * @usage import { decideTools } from './tool-call-defs-decide.js';
  * @version-history
+ *   v1.2.0 -- 2026-09-23 -- Decision providers: `provider` on aimeat_decide, aimeat_decide_run and
+ *     aimeat_decision_list, and stats by provider.
  *   v1.1.0 -- 2026-09-20 -- Decision rules: `rule` on aimeat_decide, aimeat_decide_run and
  *     aimeat_decision_list; aimeat_decide_rules; aimeat_decide_rule_propose.
  *   v1.0.0 -- 2026-09-19 -- Initial (TARGET-080).
@@ -28,7 +30,9 @@ function common(input: JsonObject, body: JsonObject): JsonObject {
   const names = optionalArray(input, 'names');
   const appId = optionalString(input, 'app_id');
   const rule = optionalString(input, 'rule');
+  const provider = optionalString(input, 'provider');
   if (rule !== undefined) body.rule = rule;
+  if (provider !== undefined) body.provider = provider;
   if (gates !== undefined) body.gates = gates;
   if (thresholds) body.thresholds = thresholds;
   if (names) body.names = names.filter((n): n is string => typeof n === 'string');
@@ -44,6 +48,7 @@ export const decideTools: ConnectCliToolDefinition[] = [
     input: {
       state: { type: 'object', required: true, description: 'What is being judged: a string, an object with named fields, or an array.' },
       rule: { type: 'string', description: 'One of the owner\'s decision rules (aimeat_decide_rules). It holds the questions, thresholds and bands: send only the state beside it.' },
+      provider: { type: 'string', description: 'The decision provider to ask (aimeat_decide_settings lists them). Leave out to let the node pick.' },
       questions: { type: 'object', description: 'Required unless rule is given. Your ids to { type, instructions, criteria }.' },
       subject: { type: 'string', description: 'What the decision is about.' },
       gates: { type: 'string', description: 'What the answer decides.' },
@@ -76,7 +81,8 @@ export const decideTools: ConnectCliToolDefinition[] = [
       subject: { type: 'string', description: 'Only decisions about this subject.' },
       rule: { type: 'string', description: 'Only decisions one decision rule made (its id).' },
       principal: { type: 'string', description: 'Only decisions one principal asked for (an agent\'s full identity).' },
-      stats_by: { type: 'string', description: 'rule | principal: return the quality numbers instead, one group per rule or per principal.' },
+      provider: { type: 'string', description: 'Only decisions one decision provider answered (its id).' },
+      stats_by: { type: 'string', description: 'rule | principal | provider: return the quality numbers instead, one group per rule, per principal or per provider.' },
       app_id: { type: 'string', description: 'Only decisions made for this app.' },
       limit: { type: 'number', description: 'How many (1-200, default 50).' },
       before: { type: 'string', description: 'Only decisions made before this ISO time.' },
@@ -92,8 +98,10 @@ export const decideTools: ConnectCliToolDefinition[] = [
       const rule = optionalString(input, 'rule');
       const principal = optionalString(input, 'principal');
       const statsBy = optionalString(input, 'stats_by');
+      const provider = optionalString(input, 'provider');
       if (rule !== undefined) q.set('rule', rule);
       if (principal !== undefined) q.set('principal', principal);
+      if (provider !== undefined) q.set('provider', provider);
       // → GET /v1/ai/decisions/stats: the quality numbers, counted by the node
       if (statsBy !== undefined) {
         q.set('group_by', statsBy);
@@ -134,6 +142,7 @@ export const decideTools: ConnectCliToolDefinition[] = [
       action: { type: 'string', required: true, description: 'start | get | list | resume | stop' },
       run_id: { type: 'string', description: 'The run, for get, resume and stop.' },
       rule: { type: 'string', description: 'For start: one of the owner\'s decision rules, in place of questions, thresholds and gates.' },
+      provider: { type: 'string', description: 'For start: the decision provider every item is asked on.' },
       questions: { type: 'object', description: 'For start: the questions.' },
       items: { type: 'array', description: 'For start: [{ subject, state }].' },
       keys: { type: 'array', description: 'For start: owner memory keys.' },

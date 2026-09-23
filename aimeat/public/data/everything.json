@@ -1378,6 +1378,15 @@
      "plain": "A gate per agent A decision rule that guards an action that cannot be undone is a gate. With the gate on for an agent, an answer the model is not sure enough about becomes a task on your list and the agent is told not to act. With the gate off the agent acts and the decision is still recorded with the same outcome. It is off until you turn it on, so that you can first compare how the agent does without it. Limit: the server tells the agent not to proceed; it does not perform or block the action itself. the agent's page (AI keys, cap and gate), PUT /v1/agents/{name}/ai-keys"
     },
     {
+     "slug": "g-9-decision-providers",
+     "cells": [
+      "<strong>Decision providers</strong>",
+      "Choose who answers your decision questions. TypeSafe's Jev is the default; a local decision model on your own machine answers the same questions with no key and no cost, and your content does not leave the machine (personal data is still removed first). You may add a provider of your own address and key, set your default, and give each agent its own; a rule may name the provider it always runs on. Each provider carries its limits, and a question it cannot carry (too many options, too long a text) is refused before anything is sent, naming the provider and its number. Every decision records which provider answered, and the quality numbers group by provider. Limits: adding your own provider and choosing a default is done in person through the settings API (no settings page yet); a local model is reachable only on a node whose operator allows it to reach its own machine, which is a development setting.",
+      "<code>GET/PUT/DELETE /v1/ai/decide/providers</code>, <code>provider</code> on <code>POST /v1/ai/decide</code> and on runs, <code>PUT /v1/ai/decide/settings</code> (<code>provider</code>, <code>agent_providers</code>), <code>group_by=provider</code> on <code>/v1/ai/decisions/stats</code>, <code>AIMEAT.decide.providers()</code>"
+     ],
+     "plain": "Decision providers Choose who answers your decision questions. TypeSafe's Jev is the default; a local decision model on your own machine answers the same questions with no key and no cost, and your content does not leave the machine (personal data is still removed first). You may add a provider of your own address and key, set your default, and give each agent its own; a rule may name the provider it always runs on. Each provider carries its limits, and a question it cannot carry (too many options, too long a text) is refused before anything is sent, naming the provider and its number. Every decision records which provider answered, and the quality numbers group by provider. Limits: adding your own provider and choosing a default is done in person through the settings API (no settings page yet); a local model is reachable only on a node whose operator allows it to reach its own machine, which is a development setting. GET/PUT/DELETE /v1/ai/decide/providers, provider on POST /v1/ai/decide and on runs, PUT /v1/ai/decide/settings (provider, agent_providers), group_by=provider on /v1/ai/decisions/stats, AIMEAT.decide.providers()"
+    },
+    {
      "slug": "g-9-a-key-per-agent",
      "cells": [
       "<strong>A key per agent</strong>",
@@ -3299,6 +3308,6 @@
  "outro": "AIMEAT Feature List, reviewed 2026-09-15 against node 3.15.0. The contract is <code>openapi.yaml</code>; the specifications are RFC v4.0 Core and Platform; later changes are at <a href=\"/v1/changelog\">the change log</a>.",
  "counts": {
   "groups": 23,
-  "rows": 326
+  "rows": 327
  }
 }

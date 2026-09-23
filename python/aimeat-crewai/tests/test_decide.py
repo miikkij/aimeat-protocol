@@ -346,6 +346,27 @@ def test_the_decision_carries_the_rule_fields_the_node_answered() -> None:
     assert d.confidence("safe") == 0.4, "a yes/no's probability IS its certainty"
 
 
+def test_a_named_provider_goes_on_the_wire_and_the_answer_says_which_one_answered() -> None:
+    # 0.28.0: decision providers. The node picks when none is named; when one is, it is sent as is.
+    s = _StubSession(_ok({
+        "decision_id": "d2", "model": "multilingual", "answers": {"urgent": _noul(0.8)},
+        "key_source": "none", "provider": {"id": "laya", "kind": "local", "chosen_by": "call"},
+    }))
+    d = decide({"body": "x"}, questions={"urgent": yes_no("urgent")}, provider="laya", **_node_kwargs(s))
+    assert s.calls[0]["json"]["provider"] == "laya"
+    assert d.provider == {"id": "laya", "kind": "local", "chosen_by": "call"}
+    assert d.key_source == "none"
+    plain = _StubSession(_ok({"decision_id": "d3", "model": "m", "answers": {}}))
+    decide({"body": "x"}, questions={"urgent": yes_no("urgent")}, **_node_kwargs(plain))
+    assert "provider" not in plain.calls[0]["json"], "left out, the node chooses"
+
+
+def test_stats_group_by_provider() -> None:
+    s = _StubSession(_ok({"groups": [_stats_group("laya", costUsd=0)]}))
+    decision_stats(group_by="provider", rule_id="send-reply", **_node_kwargs(s))
+    assert s.calls[0]["params"] == {"group_by": "provider", "rule": "send-reply"}
+
+
 def test_optional_fields_are_only_sent_when_given() -> None:
     s = _StubSession(_ok({"decision_id": "d", "model": "m", "answers": {}}))
     decide({"x": 1}, questions={"a": yes_no("a")}, subject="mail.1", names=["Anna"], cache=False, **_node_kwargs(s))

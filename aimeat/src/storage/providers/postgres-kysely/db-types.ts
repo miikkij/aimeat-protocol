@@ -504,6 +504,8 @@ export interface AiDecision {
   outcome: string | null;
   ownerGhii: string;
   principal: string;
+  provider: string | null;
+  providerKind: string | null;
   record: Json;
   rule: string | null;
   ruleVersion: number | null;

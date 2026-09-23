@@ -16,11 +16,13 @@
  * @usage
  *   import type { AiDecisionRepository } from './repositories/ai-decisions.repository.js';
  * @version-history
+ *   v1.2.0 — 2026-09-23 — The quality counts also group by provider.
  *   v1.1.0 — 2026-09-20 — aiDecisionStats: the quality counts for a decision rule or an agent.
  *   v1.0.0 — 2026-09-19 — TARGET-080. Initial.
  */
 import type {
   AiDecisionRow, AiDecisionListQuery, AiDecisionReview, AiDecisionStatsQuery, AiDecisionStatsGroup,
+  AiDecisionStatsGroupBy,
 } from '../types/ai-decisions.js';
 
 export interface AiDecisionRepository {
@@ -53,11 +55,12 @@ export interface AiDecisionRepository {
   setAiDecisionReview(id: string, ownerGhii: string, review: AiDecisionReview): Promise<boolean>;
 
   /**
-   * The quality counts over the rows the query matches, one group per rule or per principal. Rows
-   * without a rule are left out of a count grouped by rule. Counted in the store, so the numbers are
-   * exact whatever the list's page size is.
+   * The quality counts over the rows the query matches, one group per rule, per principal or per
+   * provider. Rows without a rule are left out of a count grouped by rule; a row written before the
+   * provider column counts as 'typesafe'. Counted in the store, so the numbers are exact whatever the
+   * list's page size is.
    */
-  aiDecisionStats(query: AiDecisionStatsQuery, groupBy: 'rule' | 'principal'): Promise<AiDecisionStatsGroup[]>;
+  aiDecisionStats(query: AiDecisionStatsQuery, groupBy: AiDecisionStatsGroupBy): Promise<AiDecisionStatsGroup[]>;
 
   /** Delete every row created before `before` (ISO). Returns the number deleted. */
   deleteAiDecisionsBefore(before: string): Promise<number>;

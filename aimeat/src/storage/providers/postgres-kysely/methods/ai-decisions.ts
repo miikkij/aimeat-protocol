@@ -9,6 +9,8 @@
  *   listAiDecisions · setAiDecisionReview · aiDecisionStats · deleteAiDecisionsBefore
  * @usage merged onto PostgresKyselyStorage.prototype in ../index.ts
  * @version-history
+ *   v1.2.0 — 2026-09-23 — Decision providers: the provider and providerKind columns, the list's
+ *     provider filter and the count per provider. Schema: 0081_ai_decision_providers.sql.
  *   v1.1.0 — 2026-09-20 — Decision rules: the rule, ruleVersion, outcome and keyScope columns, the
  *     list's rule and principal filters, and aiDecisionStats. Schema: 0080_ai_decision_rules.sql.
  *   v1.0.0 — 2026-09-19 — TARGET-080. Initial. Schema: migrations/0079_ai_decisions.sql.
@@ -17,6 +19,7 @@ import { sql, type Selectable } from 'kysely';
 import type {
   AiDecisionRow, AiDecisionRecord, AiDecisionListQuery, AiDecisionReview,
   AiDecisionStatsQuery, AiDecisionStatsGroup, AiDecisionOutcome, AiDecisionKeyScope,
+  AiDecisionProviderKind, AiDecisionStatsGroupBy,
 } from '../../../interface.js';
 import type { Kysely } from 'kysely';
 import type { AiDecision as AiDecisionTable, DB, Json } from '../db-types.js';
@@ -42,9 +45,15 @@ function toRow(r: Selectable<AiDecisionTable>): AiDecisionRow {
     outcome: (r.outcome as AiDecisionOutcome | null) ?? null,
     // A row written before the column existed carries its scope in the document only.
     keyScope: (r.keyScope as AiDecisionKeyScope | null) ?? record.keyScope ?? 'node',
+    // Rows from before 0081 were all TypeSafe's, hosted, and their document says so.
+    provider: r.provider ?? record.provider ?? 'typesafe',
+    providerKind: (r.providerKind as AiDecisionProviderKind | null) ?? record.providerKind ?? 'hosted',
     record,
   };
 }
+
+/** The provider column, with a pre-0081 row counted as the one provider there was. */
+const PROVIDER_EXPR = sql<string>`COALESCE("provider", 'typesafe')`;
 
 /** Same bounds on both providers: default 50, at least 1, at most 200. */
 function clampLimit(limit: number | undefined): number {
@@ -66,6 +75,8 @@ export const aiDecisionMethods = {
       ruleVersion: row.ruleVersion,
       outcome: row.outcome,
       keyScope: row.keyScope,
+      provider: row.provider,
+      providerKind: row.providerKind,
       // jsonb() yields a `<json>::jsonb` SQL fragment; kysely-codegen types the column as the
       // VALUE it reads back, so the fragment needs one narrowing cast on the way in.
       record: jsonb(row.record) as unknown as Json,
@@ -103,6 +114,7 @@ export const aiDecisionMethods = {
     if (query.appId !== undefined) base = base.where('appId', '=', query.appId);
     if (query.rule !== undefined) base = base.where('rule', '=', query.rule);
     if (query.principal !== undefined) base = base.where('principal', '=', query.principal);
+    if (query.provider !== undefined) base = base.where(PROVIDER_EXPR, '=', query.provider);
 
     const counted = await base.select(sql<string>`COUNT(*)`.as('n')).executeTakeFirst();
     let page = base.selectAll();
@@ -129,15 +141,18 @@ export const aiDecisionMethods = {
   },
 
   async aiDecisionStats(
-    this: PostgresKyselyStorage, query: AiDecisionStatsQuery, groupBy: 'rule' | 'principal',
+    this: PostgresKyselyStorage, query: AiDecisionStatsQuery, groupBy: AiDecisionStatsGroupBy,
   ): Promise<AiDecisionStatsGroup[]> {
     let base = this.db.selectFrom('AiDecision').where('ownerGhii', '=', query.ownerGhii);
     if (query.rule !== undefined) base = base.where('rule', '=', query.rule);
     if (query.principal !== undefined) base = base.where('principal', '=', query.principal);
+    if (query.provider !== undefined) base = base.where(PROVIDER_EXPR, '=', query.provider);
     if (groupBy === 'rule') base = base.where('rule', 'is not', null);
+    // groupBy is one of three literals; the provider column is read through its pre-0081 fallback.
+    const key = groupBy === 'provider' ? PROVIDER_EXPR : sql<string | null>`${sql.ref(groupBy)}`;
     const rows = await base
       .select([
-        sql<string | null>`${sql.ref(groupBy)}`.as('k'),
+        key.as('k'),
         sql<string>`COUNT(*)`.as('decisions'),
         sql<string>`COUNT(*) FILTER (WHERE "outcome" = 'act')`.as('act'),
         sql<string>`COUNT(*) FILTER (WHERE "outcome" = 'ask')`.as('ask'),
@@ -148,7 +163,7 @@ export const aiDecisionMethods = {
         sql<string>`COALESCE(SUM(("record"->'usage'->>'costUsd')::double precision), 0)`.as('costUsd'),
         sql<string | null>`MAX("createdAt")`.as('lastAt'),
       ])
-      .groupBy(groupBy)
+      .groupBy(groupBy === 'provider' ? PROVIDER_EXPR : sql.ref(groupBy))
       .execute();
     // COUNT() and SUM() come back as strings on this driver.
     return rows.map(r => ({

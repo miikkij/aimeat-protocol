@@ -80,6 +80,8 @@ everywhere at once, and say so in the Changes section.
 | one recorded answer of the decision model | what running a decision rule (or asking open questions) produces; it is kept, with the rule, its version and what came of it | decision | päätös | decisión |
 | a decision rule that guards an action | the rule is bound to something that cannot be undone; with the gate on for an agent, an unsure answer becomes a task for the owner instead of the action. Off until the owner turns it on | gate | portti | compuerta |
 | the two cuts on a decision rule's result | at or over the first the caller acts, at or over the second a person is asked, under it the caller stops | band | kaista | banda |
+| who answers the decision model's questions | one service that takes the same closed questions and answers them: TypeSafe's Jev is one, an open model on the owner's own machine is another; the owner, an agent or a rule picks which | decision provider | päätösmallin tarjoaja | proveedor del modelo de decisión |
+| a decision model on the owner's own machine | a decision provider that runs where the node runs: no key, no price, and the content does not leave the machine | local decision model | paikallinen päätösmalli | modelo de decisión local |
 | cleaning what leaves for a decision | e-mails, phones, identity codes, account numbers, street addresses and names are taken out before anything is sent, and put back into the answer | remove personal data | henkilötietojen poisto / poistaa henkilötiedot | eliminar los datos personales |
 | permission a person grants | revocable, per agent, per area | permission | oikeus | permiso |
 | sign-in from elsewhere | another AIMEAT vouching that a sign-in is really them | federation | federaatio | federación |
@@ -243,3 +245,7 @@ service, the directory, the token, the identifier and the username: the test nam
   of his own wish text. *Compuerta* over *puerta* for the gate: it is the word Spanish already uses
   for a thing that lets through or holds back (a sluice, a logic gate), where *puerta* is a way in.
   A cold Spanish reader has not seen it yet.
+- **2026-09-23** — decision provider and local decision model, with providers on the server.
+  *Päätösmallin tarjoaja* and *paikallinen päätösmalli* are the developer's own words in the ruling
+  (decision-the-decision-model-has-providers-jev-is-one-of-them-and-a-lo). *Proveedor* follows
+  *proveedor de IA*, which the Spanish AI settings already use; no screen shows the two yet.

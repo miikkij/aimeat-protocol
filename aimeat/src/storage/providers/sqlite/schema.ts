@@ -12,6 +12,7 @@
  *   block 1), or upgrades crash with "no such column" before the ALTER runs.
  * @usage initializeSchema(db) from sqlite/index.ts constructor.
  * @version-history
+ *   2026-09-23 — ai_decisions.provider/.providerKind and their index (decision providers)
  *   2026-09-20 — ai_decisions.rule/.ruleVersion/.outcome/.keyScope and their two indexes
  *     (migration 0080): the decision rule that ran and whose key paid.
  *   2026-09-16 — secrets.hosts (migration 0078): the hosts a vault secret may be sent to.
@@ -687,6 +688,11 @@ export function initializeSchema(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_ai_decisions_rule ON ai_decisions(ownerGhii, rule, createdAt);
     CREATE INDEX IF NOT EXISTS idx_ai_decisions_principal ON ai_decisions(ownerGhii, principal, createdAt);
   `);
+  // Decision providers: which one answered, and whether it ran on this machine. Older rows read as
+  // 'typesafe' and 'hosted', which is what they were. Mirrors Postgres 0081.
+  safeAddColumn('ai_decisions', 'provider', 'TEXT');
+  safeAddColumn('ai_decisions', 'providerKind', 'TEXT');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_ai_decisions_provider ON ai_decisions(ownerGhii, provider, createdAt);');
 
   // ── Memory full-text search (Tier-1 librarian retrieval) ──
   // FTS5 is built into better-sqlite3 — no dependency. A standalone virtual table mirrors the
