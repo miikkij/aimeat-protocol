@@ -12,6 +12,8 @@
  * @structure renderDetail · confirmPanel · checkPanel · stepBlock · runsTable · settingsFold
  * @usage import { renderDetail } from './detail.js';
  * @version-history
+ *   2026-09-22 -- Delete the workflow is in the danger tone; the jump to the chat prompt uses the
+ *     set's scrollToId.
  *   2026-09-22 -- Composed from the shared component set: steps are numbered ListRows, the runs a
  *     timeline, the confirmation an opened record, settings KeyValue rows; no own CSS. The delete
  *     door is an underlined word like the others (the set's danger tone is on the primary slab).
@@ -21,8 +23,7 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { Section, Fold, Stack, ListRow, KeyValue, Surface, Action, Text } from '/components/poster-parts.js';
-import { scrollTo } from '/views/profile/organisms/poster-parts.js';
+import { Section, Fold, Stack, ListRow, KeyValue, Surface, Action, Text, scrollToId } from '/components/poster-parts.js';
 import { c, loc, rel, day, durationWords, minutesWords, triggerWords, kindWords, signalWords, stepWord, stepTone, runWord, runTone, verdictOf, stepTitle, stepAgents, renderPage, chipRow, chipTone, toneOf, verdictBlock, railList } from './frame.js';
 
 export function renderDetail(ctx, item) {
@@ -52,7 +53,7 @@ export function renderDetail(ctx, item) {
     <${Action} kind="primary" onClick=${() => ctx.openConfirm(id)}>${c('run')}<//>
     <${Action} disabled=${ctx.checking === id} onClick=${() => ctx.handleCheck(id)}>${c('checkNow')}<//>
     <${Action} onClick=${() => ctx.pickView({ kind: 'edit', id })}>${t('profile.workflows.edit')}<//>
-    <${Action} onClick=${() => { ctx.setFold('prompt', true); scrollTo('wp-prompt'); }}>${c('promptToChat')}<//>`;
+    <${Action} onClick=${() => { ctx.setFold('prompt', true); scrollToId('wp-prompt'); }}>${c('promptToChat')}<//>`;
   const writes = d?.blueprint?.nodes?.length ? [...new Set(d.blueprint.nodes.flatMap(n => n.writes))].slice(0, 6) : [];
   const rail = html`
     ${railList(c('railAgents'), [...agents].map(a => { const red = last && def.steps.some(s => (Array.isArray(s.agent) ? s.agent.includes(a) : s.agent === a) && ['output-red', 'timed-out', 'agent-offline'].includes(last.steps?.[s.id]?.state)); return { key: a, label: `${a}${red ? ' !' : ''}`, tone: red ? 'danger' : undefined }; }))}
@@ -169,6 +170,6 @@ function settingsFold(ctx, item) {
     ${row(c('setOnFail'), c('onFailInspect'))}
     ${row(c('setLlm'), def.llm?.approved ? c('yes') : c('no'))}
     ${row(c('setCreated'), `${day(def.createdAt)}${def.createdBy ? ` · ${String(def.createdBy).split('@')[0]}` : ''}`)}
-    <${Stack} direction="wrap"><${Action} onClick=${() => ctx.pickView({ kind: 'edit', id: def.id })}>${t('profile.workflows.edit')}<//><${Action} onClick=${() => ctx.handleDelete(def.id)}>${c('deleteWorkflow')}<//><//>
+    <${Stack} direction="wrap"><${Action} onClick=${() => ctx.pickView({ kind: 'edit', id: def.id })}>${t('profile.workflows.edit')}<//><${Action} tone="danger" onClick=${() => ctx.handleDelete(def.id)}>${c('deleteWorkflow')}<//><//>
   <//>`;
 }

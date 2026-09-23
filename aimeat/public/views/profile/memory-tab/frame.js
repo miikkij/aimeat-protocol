@@ -10,6 +10,7 @@
  *   crumbList · PAGES · pageDoors · renderPage · formBox
  * @usage import { renderPage, classify, visChip } from './frame.js';
  * @version-history
+ *   v1.1.0 -- 2026-09-22 -- renderPage passes a mono title through, for the record page whose title is a key.
  *   v1.0.0 -- 2026-09-22 -- Extracted from cover.js when the Memory page moved onto the shared
  *     component set, so the cover, the key space and the record share one frame.
  */
@@ -82,8 +83,8 @@ export function pageDoors(ctx, current) {
 }
 
 /** A page under the cover: its trail, title, facts and actions, its own panel, then the memory index. */
-export function renderPage(ctx, { id, crumbs, title, sub = null, doors = null, rail = null, children }) {
-  return html`<${Page} title=${title} crumbs=${crumbList(ctx, crumbs)} identity=${sub} actions=${doors}
+export function renderPage(ctx, { id, crumbs, title, titleKind = undefined, sub = null, doors = null, rail = null, children }) {
+  return html`<${Page} title=${title} titleKind=${titleKind} crumbs=${crumbList(ctx, crumbs)} identity=${sub} actions=${doors}
     rail=${html`<${Stack}>
       ${rail}
       <${Rail} kind="index" title=${c('railTitle', 'In your memory')}>

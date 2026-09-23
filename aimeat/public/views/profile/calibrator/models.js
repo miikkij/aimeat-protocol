@@ -10,12 +10,14 @@
  * @structure secModels · judgeRow · candidateRow · picker · pickerRow
  * @usage import { secModels } from './models.js';
  * @version-history
+ *   2026-09-22 -- Composed from the shared set: the judge, a candidate and a model in the picker are
+ *     shared rows, as on the AI page; no page classes remain.
  *   v1.0.0 — 2026-09-04 — Initial (replaces calibrator-llm-editor.js v1.0.0).
  */
 import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
-import { Section } from '/views/profile/organisms/poster-parts.js';
+import { Section, Stack, ListRow, Surface, Field, Text, Action } from '/components/poster-parts.js';
 import { rankModels, matchesQuery, modelPageUrl, answersInText } from '/views/profile/openrouter/pricing.js';
 import { modelWords, priceWords, contextWords, findModel } from '../ai/frame.js';
 import { x, judgeOf, candidatesOf, openTab } from './frame.js';
@@ -23,25 +25,32 @@ import { x, judgeOf, candidatesOf, openTab } from './frame.js';
 const RECOMMENDED = 8;
 const CHAT_ROLE = { pool: 'chat' };
 
+/** The chosen model in a row's value column: its name, its id in mono, a quiet note. */
+const modelValue = (name, id, note) => html`<${Stack} density="compact">
+  <${Text}>${name}<//>${id ? html`<${Text} kind="mono">${id}<//>` : null}${note ? html`<${Text} kind="caption" tone="muted">${note}<//>` : null}
+<//>`;
+
 export function secModels(ctx) {
   const p = ctx.project;
   const judge = judgeOf(p, ctx.settings);
   const candidates = candidatesOf(p);
   const count = x('secModelsSub', { n: candidates.length });
   return html`
-    <${Section} id="cal-models" num="03" title=${x('secModels')} count=${count}>
-      ${!ctx.keyed ? html`<p class="cal-empty"><b>${x('noKeyLead')}</b> ${x('noKeyBody')} <button type="button" class="og-door og-door--quiet" onClick=${() => openTab('ai')}>${x('openAiPage')}</button></p>` : null}
-      <div class="cal-ml">
-        <div class="cal-mr cal-mr--head"><div>${x('colRole')}</div><div>${x('colModel')}</div><div>${x('colFacts')}</div><div></div></div>
-        ${judgeRow(ctx, judge)}
-        ${candidates.map((m, i) => candidateRow(ctx, m, i))}
-        ${ctx.pick === 'add' ? html`<div class="cal-mr is-open"><div class="cal-open">${picker(ctx, 'add', '')}</div></div>` : null}
-      </div>
-      <div class="og-doors cal-add">
-        <button type="button" class="og-door" disabled=${!ctx.keyed || !ctx.models.length} onClick=${() => ctx.setPick(ctx.pick === 'add' ? null : 'add')}>${ctx.pick === 'add' ? x('close') : x('addModel')}</button>
-        ${!candidates.length ? html`<small>${x('noCandidatesHint')}</small>` : null}
-      </div>
-      <p class="cal-hint">${x('hintModels')}</p>
+    <${Section} id="cal-models" title=${x('secModels')} count=${count}>
+      <${Stack}>
+        ${!ctx.keyed ? html`<${Stack} direction="wrap" align="center"><${Text}><strong>${x('noKeyLead')}</strong> ${x('noKeyBody')}<//><${Action} onClick=${() => openTab('ai')}>${x('openAiPage')}<//><//>` : null}
+        <div>
+          <${ListRow} density="compact" name=${html`<${Text} kind="label">${x('colRole')} · ${x('colFacts')}<//>`} value=${html`<${Text} kind="label">${x('colModel')}<//>`} />
+          ${judgeRow(ctx, judge)}
+          ${candidates.map((m, i) => candidateRow(ctx, m, i))}
+        </div>
+        ${ctx.pick === 'add' ? html`<${Surface} kind="record">${picker(ctx, 'add', '')}<//>` : null}
+        <${Stack} direction="wrap" align="center">
+          <${Action} expanded=${ctx.pick === 'add'} disabled=${!ctx.keyed || !ctx.models.length} onClick=${() => ctx.setPick(ctx.pick === 'add' ? null : 'add')}>${ctx.pick === 'add' ? x('close') : x('addModel')}<//>
+          ${!candidates.length ? html`<${Text} kind="caption" tone="muted">${x('noCandidatesHint')}<//>` : null}
+        <//>
+        <${Text} kind="caption" tone="muted">${x('hintModels')}<//>
+      <//>
     <//>`;
 }
 
@@ -52,65 +61,61 @@ function judgeRow(ctx, judge) {
   const sub = judge.own ? x('judgeOwn') : judge.source === 'reasoning' ? x('judgeFromAiReasoning') : judge.source === 'default' ? x('judgeFromAiDefault') : x('judgeFromServer');
   const facts = model ? [priceWords(model, CHAT_ROLE), contextWords(model)].filter(Boolean).join(' · ') : '';
   return html`
-    <div class=${`cal-mr ${open ? 'is-open' : ''}`} id="cal-judge">
-      <div class="cal-role">${x('judge')}<small>${x('judgeSub')}</small></div>
-      <div class="cal-model"><b>${name}</b>${judge.modelId ? html`<code>${judge.modelId}</code>` : null}<small>${sub}</small></div>
-      <div class="cal-facts">${facts}</div>
-      <div class="cal-go"><button type="button" class="og-door" disabled=${!ctx.keyed} onClick=${() => ctx.setPick(open ? null : 'judge')}>${open ? x('close') : x('change')}</button></div>
-      ${open ? html`<div class="cal-open">
-        <p class="cal-lead">${judge.own ? x('judgeLeadOwn', { name }) : x('judgeLeadAi', { name })}</p>
-        ${picker(ctx, 'judge', judge.own ? judge.modelId : '')}
-        <div class="og-doors">
-          ${judge.own ? html`<button type="button" class="og-door og-door--quiet" disabled=${ctx.busy === 'models'} onClick=${() => ctx.setJudge(null)}>${x('judgeUseAiPage')}</button>` : null}
-          ${judge.modelId && ctx.isOpenRouter ? html`<a class="og-door og-door--quiet" href=${modelPageUrl(judge.modelId)} target="_blank" rel="noopener">${x('openModelPage')}</a>` : null}
-          <button type="button" class="og-door og-door--quiet" onClick=${() => ctx.setPick(null)}>${x('close')}</button>
-        </div>
-      </div>` : null}
-    </div>`;
+    <${ListRow} id="cal-judge" name=${x('judge')} detail=${x('judgeSub')}
+      value=${modelValue(name, judge.modelId, sub)}
+      actions=${html`<${Action} expanded=${open} disabled=${!ctx.keyed} onClick=${() => ctx.setPick(open ? null : 'judge')}>${open ? x('close') : x('change')}<//>`}>
+      ${facts || open ? html`<${Stack}>
+        ${facts ? html`<${Text} kind="caption" tone="muted">${facts}<//>` : null}
+        ${open ? html`<${Surface} kind="record"><${Stack}>
+          <${Text} kind="lead">${judge.own ? x('judgeLeadOwn', { name }) : x('judgeLeadAi', { name })}<//>
+          ${picker(ctx, 'judge', judge.own ? judge.modelId : '')}
+          <${Stack} direction="wrap" align="center">
+            ${judge.own ? html`<${Action} disabled=${ctx.busy === 'models'} onClick=${() => ctx.setJudge(null)}>${x('judgeUseAiPage')}<//>` : null}
+            ${judge.modelId && ctx.isOpenRouter ? html`<${Action} href=${modelPageUrl(judge.modelId)} target="_blank">${x('openModelPage')}<//>` : null}
+            <${Action} onClick=${() => ctx.setPick(null)}>${x('close')}<//>
+          <//>
+        <//><//>` : null}
+      <//>` : null}
+    <//>`;
 }
 
 function candidateRow(ctx, m, i) {
   const model = findModel(m.modelId, ctx.models);
   const facts = model ? [priceWords(model, CHAT_ROLE), contextWords(model)].filter(Boolean).join(' · ') : (ctx.keyed && ctx.models.length ? x('modelNotInList') : '');
   return html`
-    <div class="cal-mr" key=${m.id}>
-      <div class="cal-role">${x('candidateN', { n: i + 1 })}<small>${x('candidateSub')}</small></div>
-      <div class="cal-model"><b>${modelWords(model, m.modelId)}</b><code>${m.modelId}</code></div>
-      <div class="cal-facts">${facts}</div>
-      <div class="cal-go"><button type="button" class="og-door og-door--quiet og-door--danger" disabled=${ctx.busy === 'models'} onClick=${() => ctx.removeCandidate(m.id)}>${x('remove')}</button></div>
-    </div>`;
+    <${ListRow} key=${m.id} name=${x('candidateN', { n: i + 1 })} detail=${x('candidateSub')}
+      value=${modelValue(modelWords(model, m.modelId), m.modelId)}
+      actions=${html`<${Action} tone="danger" disabled=${ctx.busy === 'models'} onClick=${() => ctx.removeCandidate(m.id)}>${x('remove')}<//>`}>
+      ${facts ? html`<${Text} kind="caption" tone="muted">${facts}<//>` : null}
+    <//>`;
 }
 
 /** The catalogue under an opened row: search, the recommended group, a row per model. */
 function picker(ctx, slot, chosenId) {
   const pool = (ctx.models || []).filter(answersInText);
-  if (!pool.length) return html`<p class="cal-empty">${ctx.keyed ? x('modelsNone') : x('noKeyBody')}</p>`;
+  if (!pool.length) return html`<${Text} tone="muted">${ctx.keyed ? x('modelsNone') : x('noKeyBody')}<//>`;
   const q = (ctx.query || '').trim().toLowerCase();
   const recommended = rankModels(pool, 'chat').slice(0, RECOMMENDED);
   const filtered = pool.filter((m) => matchesQuery(m, q));
   const visible = q ? filtered : (ctx.showAll ? filtered : recommended);
   const taken = new Set(candidatesOf(ctx.project).map((m) => m.modelId));
   return html`
-    <div class="cal-pick">
-      <input class="og-input" type="search" value=${ctx.query || ''} placeholder=${x('searchModels', { n: pool.length })} aria-label=${x('searchModels', { n: pool.length })} onInput=${(e) => ctx.setQuery(e.target.value)} />
-      ${!q && !ctx.showAll ? html`<div class="cal-pick-group">${x('recommended')}</div>` : null}
-      ${visible.length ? html`<ul class="cal-pick-list">${visible.map((m) => pickerRow(ctx, slot, m, m.id === chosenId, slot === 'add' && taken.has(m.id)))}</ul>` : html`<div class="cal-pick-empty">${x('noMatch')}</div>`}
-      <div class="cal-pick-more">
-        ${!q && !ctx.showAll && filtered.length > visible.length ? html`<button type="button" class="og-door og-door--quiet" onClick=${() => ctx.setShowAll(true)}>${x('showAll', { n: filtered.length })}</button>` : null}
-        <span>${x('poolFacts', { n: pool.length })}</span>
-      </div>
-    </div>`;
+    <${Stack} density="compact">
+      <${Field} type="search" value=${ctx.query || ''} placeholder=${x('searchModels', { n: pool.length })} ariaLabel=${x('searchModels', { n: pool.length })} onInput=${(e) => ctx.setQuery(e.target.value)} />
+      ${!q && !ctx.showAll ? html`<${Text} kind="label">${x('recommended')}<//>` : null}
+      ${visible.length ? html`<${Surface} kind="plain" density="flush" height="scroll">${visible.map((m) => pickerRow(ctx, slot, m, m.id === chosenId, slot === 'add' && taken.has(m.id)))}<//>` : html`<${Text} tone="muted">${x('noMatch')}<//>`}
+      <${Stack} direction="wrap" align="center">
+        ${!q && !ctx.showAll && filtered.length > visible.length ? html`<${Action} onClick=${() => ctx.setShowAll(true)}>${x('showAll', { n: filtered.length })}<//>` : null}
+        <${Text} kind="caption" tone="muted">${x('poolFacts', { n: pool.length })}<//>
+      <//>
+    <//>`;
 }
 
 function pickerRow(ctx, slot, m, on, taken) {
-  const act = () => (slot === 'judge' ? ctx.setJudge(m) : ctx.addCandidate(m));
+  // A model already under test, or any while one is being stored, is not taken again.
+  const act = () => { if (ctx.busy === 'models' || taken) return; if (slot === 'judge') ctx.setJudge(m); else ctx.addCandidate(m); };
   return html`
-    <li class=${`cal-pick-row ${on ? 'is-on' : ''} ${taken ? 'is-taken' : ''}`} key=${m.id}>
-      <button type="button" disabled=${ctx.busy === 'models' || taken} onClick=${act}>
-        <span><b>${modelWords(m, m.id)}</b><code>${m.id}</code></span>
-        <span class="cal-pick-note">${taken ? x('alreadyAdded') : ''}</span>
-        <span class="cal-pick-price">${priceWords(m, CHAT_ROLE)}</span>
-        <span class="cal-pick-ctx">${contextWords(m)}</span>
-      </button>
-    </li>`;
+    <${ListRow} key=${m.id} density="compact" selected=${on} muted=${taken} name=${modelWords(m, m.id)} onOpen=${taken ? undefined : act}
+      detail=${[m.id, taken ? x('alreadyAdded') : ''].filter(Boolean).join(' · ')}
+      value=${html`<${Stack} density="compact"><span>${priceWords(m, CHAT_ROLE)}</span><span>${contextWords(m)}</span><//>`} />`;
 }

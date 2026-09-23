@@ -18,6 +18,7 @@
  *   - TabCrew — load, actions (validate / try / publish / draft / restore), the header and the
  *     form-or-JSON body; sections live in ./crew-editor.js, templates in ./crew-templates.js
  * @version-history
+ *   2026-09-22 -- Discard draft carries the danger tone.
  *   2026-09-22 -- Composed from the shared parts (Section, ListRow, Chip, Action, Field, Surface, Text)
  *     instead of the agents-crew sheet's own classes, so the tab follows the one component set.
  *   2026-09-20 -- Loads what the tool picker's Decisions group needs: the rules made for agents, and
@@ -314,7 +315,7 @@ export default function TabCrew({ agentName, showToast }) {
                 ${busy === 'publish' ? t(`${K}.actions.publishing`) : t(`${K}.actions.publish`)}
               <//>
               <${Action} kind="text" disabled=${busyAny} onClick=${saveDraft}>${t(`${K}.actions.saveDraft`)}<//>
-              ${state?.draft && html`<${Action} kind="text" disabled=${busyAny} onClick=${discardDraft}>${t(`${K}.actions.discardDraft`)}<//>`}
+              ${state?.draft && html`<${Action} kind="text" tone="danger" disabled=${busyAny} onClick=${discardDraft}>${t(`${K}.actions.discardDraft`)}<//>`}
               ${!published && html`<${Action} kind="text" disabled=${busyAny} onClick=${() => { setValidation(null); setDoc(null); }}>${t(`${K}.actions.changeTemplate`)}<//>`}
             <//>
           <//>

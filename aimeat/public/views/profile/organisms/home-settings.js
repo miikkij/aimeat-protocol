@@ -17,6 +17,8 @@
  *   import { OrganismSettings } from '/views/profile/organisms/home-settings.js';
  *   <OrganismSettings org ghii isCreator isMember canEdit showToast confirm onBack onChanged onLeave onDeleted />
  * @version-history
+ *   2026-09-22 -- The irreversible act is the set's solid danger aside; the Delete opener and Leave
+ *     carry the danger tone.
  *   2026-09-22 -- Composed from the shared set: Page with an index Rail, Sections, Fields, tab-style
  *     radio choices; the reversible act is the dashed aside and the irreversible one a solid box. No
  *     class of its own.
@@ -265,12 +267,12 @@ export function OrganismSettings({ org, isCreator, isMember, canEdit, showToast,
             <//>
           <//>
           ${isCreator ? html`
-            <${Surface} kind="box">
+            <${Surface} kind="aside" tone="danger">
               <${Stack} density="compact">
                 <${Text} kind="label">${label('irreversible', 'Cannot be undone')}<//>
                 <${Stack} direction="wrap" align="between">
                   <${Text}><strong>${t('organisms.deleteOrganismTitle') || 'Delete this organism'}.</strong> ${delStatsText}<//>
-                  <${Action} kind="tab" selected=${delOpen} expanded=${delOpen} onClick=${() => { setDelOpen(o => !o); setDelName(''); }}>${t('organisms.deleteDots') || 'Delete…'}<//>
+                  <${Action} tone="danger" expanded=${delOpen} onClick=${() => { setDelOpen(o => !o); setDelName(''); }}>${t('organisms.deleteDots') || 'Delete…'}<//>
                 <//>
                 ${delOpen ? html`
                   <${Stack} direction="horizontal" align="end">
@@ -288,7 +290,7 @@ export function OrganismSettings({ org, isCreator, isMember, canEdit, showToast,
       <${Surface} kind="box">
         <${Stack} direction="wrap" align="between">
           <${Text}><strong>${t('organisms.leave') || 'Leave'}.</strong><//>
-          <${Action} onClick=${onLeave}>${t('organisms.leave') || 'Leave'}<//>
+          <${Action} tone="danger" onClick=${onLeave}>${t('organisms.leave') || 'Leave'}<//>
         <//>
       <//>` : null}
   <//>`;

@@ -11,6 +11,9 @@
  * @structure renderPackage · entryBlock
  * @usage import { renderPackage } from './package.js';
  * @version-history
+ *   v2.1.0 -- 2026-09-22 -- The set's newer props: entry text keeps its line breaks through Text
+ *     lines (the <br> helper is gone), the federated chip is coral, Delete is in the danger tone, and
+ *     a relation jumps to its entry with scrollToId, which moves the content area only.
  *   v2.0.0 -- 2026-09-22 -- Composed from the shared component set (Page, Rail, Section, Fold,
  *     NumeralBand, ListRow, KeyValue, Field, CheckItem, Action, Chip, Text): an entry is a list row
  *     that opens, a sharing switch is a check item (ticked on the sun when on; not clickable while
@@ -23,8 +26,8 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { Section, Fold, Stack, ListRow, NumeralBand, KeyValue, Field, CheckItem, Action, Chip, Text } from '/components/poster-parts.js';
-import { c, day, rel, ctWord, maturityWord, synthWord, visWord, relWord, manifestOf, statsOf, pkgId, entryText, lines, renderPage } from './frame.js';
+import { Section, Fold, Stack, ListRow, NumeralBand, KeyValue, Field, CheckItem, Action, Chip, Text, scrollToId } from '/components/poster-parts.js';
+import { c, day, rel, ctWord, maturityWord, synthWord, visWord, relWord, manifestOf, statsOf, pkgId, entryText, renderPage } from './frame.js';
 
 const VIS_CYCLE = ['private', 'owner', 'group', 'public'];
 
@@ -47,14 +50,14 @@ function entryBlock(ctx, pkg, entry, i, allEntries) {
         : html`<${Action} kind="tab" selected=${vis === 'public'} title=${`${visWord(vis)} → ${visWord(next)}`} onClick=${() => ctx.handleEntryVisibility(pkg, entry, next)}>${visWord(vis)}<//>`}
       <${Action} expanded=${open} onClick=${() => ctx.toggleEntry(key)}>${open ? c('close') : c('open')}<//>`}>
     ${open ? html`<${Stack} density="compact">
-      ${ctx.loadingEntries && !text ? html`<${Text} tone="muted">${t('common.loading')}<//>` : text ? html`<${Text}>${lines(text)}<//>` : html`<${Text} tone="muted">${c('noContent')}<//>`}
+      ${ctx.loadingEntries && !text ? html`<${Text} tone="muted">${t('common.loading')}<//>` : text ? html`<${Text} lines>${text}<//>` : html`<${Text} tone="muted">${c('noContent')}<//>`}
       ${refs.length ? html`<${Stack} density="compact">${refs.map((r, j) => html`<${Stack} key=${j} direction="wrap" align="center" density="compact">
         <${Text} kind="mono" tone=${r.verified ? 'success' : 'coral'}>${r.verified ? c('verified') : c('unverified')}<//>
         ${r.url ? html`<${Action} kind="text" href=${r.url} target="_blank">${r.title || r.url} →<//>` : html`<${Text}>${r.title || c('untitled')}<//>`}
         ${r.type ? html`<${Text} kind="mono" tone="muted">${r.type}<//>` : null}
       <//>`)}<//>` : null}
       ${rels.length ? html`<${Stack} direction="wrap" density="compact">${rels.map((r, j) => { const tg = target(r.key); const idx = tg ? allEntries.indexOf(tg) : -1; return html`
-        <${Action} key=${j} kind="text" onClick=${() => { if (idx >= 0) { ctx.openEntry(allEntries[idx].key || String(idx)); document.getElementById('kp-e-' + idx)?.scrollIntoView({ behavior: 'smooth', block: 'center' }); } }}>${relWord(r.relation)} ${tg ? (tg.title || r.key) : r.key}<//>`; })}<//>` : null}
+        <${Action} key=${j} kind="text" onClick=${() => { if (idx >= 0) { ctx.openEntry(allEntries[idx].key || String(idx)); setTimeout(() => scrollToId('kp-e-' + idx), 50); } }}>${relWord(r.relation)} ${tg ? (tg.title || r.key) : r.key}<//>`; })}<//>` : null}
     <//>` : null}
   <//>`;
 }
@@ -77,14 +80,14 @@ export function renderPackage(ctx, pkg) {
     ${m.language ? html`<${Chip} tone="muted">${String(m.language).toLowerCase()}<//>` : null}
     ${m.version ? html`<${Chip} tone="muted">v${m.version}<//>` : null}
     ${m.sharing?.license ? html`<${Chip} tone="muted">${m.sharing.license}<//>` : null}
-    ${federated ? html`<${Chip} tone="sun">${t('knowledge.federated')}<//>` : null}
+    ${federated ? html`<${Chip} tone="coral">${t('knowledge.federated')}<//>` : null}
     ${tags.slice(0, 4).map(tag => html`<${Chip} tone="muted" key=${tag}>${tag}<//>`)}
     ${tags.length > 4 ? html`<${Chip} tone="muted">+${tags.length - 4}<//>` : null}
   <//>`;
   const doors = html`
     <${Action} kind="primary" onClick=${() => ctx.handleExport(pkg)}>${t('knowledge.myKnowledge.export')}<//>
     ${listed ? html`<${Action} onClick=${() => window.open('/v1/publicknowledgeviewer?id=' + encodeURIComponent(id), '_blank', 'noopener')}>${c('showInLibrary')} →<//>` : null}
-    <${Action} disabled=${ctx.deleting === pkg.key} onClick=${() => ctx.handleDelete(pkg)}>${t('profile.delete')}<//>`;
+    <${Action} tone="danger" disabled=${ctx.deleting === pkg.key} onClick=${() => ctx.handleDelete(pkg)}>${t('profile.delete')}<//>`;
   const strip = html`<${NumeralBand} tone="plain" size="small" items=${[
     { label: c('stripEntries'), value: s.entries, note: c('stripEntriesSub', { n: s.publicN }) },
     { label: c('stripRefs'), value: `${s.verified}/${s.refs}`, note: s.refs - s.verified ? c('stripRefsSub', { n: s.refs - s.verified }) : (s.refs ? c('stripRefsAll') : c('noRefs')) },

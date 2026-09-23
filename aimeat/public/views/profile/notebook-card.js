@@ -14,6 +14,9 @@
  * @usage html`<${NoteCard} note=${note} showToast=${showToast} orgNames=${orgNames} settings=${settings}
  *                autoEnrich=${auto} onChanged=${loadInbox} onOrgsChanged=${loadOrgNames} onDelete=${handleDelete} />`
  * @version-history
+ *   2026-09-22 -- The set's newer props: done and skipped plan steps and unticked chunks are muted
+ *     rows (a chunk is a row with its tick as the mark), the enriched preview and each chunk's body
+ *     scroll inside a capped height, Delete is in the danger tone.
  *   2026-09-22 -- Composed from the shared set so notebook.css could go: a note is a roster row (its
  *     time, its actions, the note and its open flows in the body), the peek view is the shared clipped
  *     preview, each flow is a box of shared fields and actions, plan steps are rows with chips, the
@@ -340,7 +343,7 @@ export default function NoteCard({ note, showToast, orgNames, settings, autoEnri
                 const skipped = skippedStepIds.includes(step.id);
                 const running = runningStepId === step.id;
                 return html`
-                  <${ListRow} key=${step.id} name=${step.title} detailKind="text" detail=${step.description}
+                  <${ListRow} key=${step.id} name=${step.title} detailKind="text" muted=${done || skipped} detail=${step.description}
                     value=${html`<${Stack} direction="wrap" align="end" density="compact">
                       <${Chip} tone=${kindTone(step.kind)}>${t('profile.notebook.kind_' + step.kind)}<//>
                       ${done && html`<${Chip} tone="sun">✓<//>`}
@@ -365,7 +368,7 @@ export default function NoteCard({ note, showToast, orgNames, settings, autoEnri
           `}
         ${anyDone && html`
           <${Text} kind="label">${t('profile.notebook.enrichedPreview')}<//>
-          <${Markdown} text=${preview} />`}
+          <${Surface} kind="plain" height="scroll"><${Markdown} text=${preview} /><//>`}
         <${Stack} direction="wrap" align="center">
           <${Action} kind="primary" disabled=${!!runningStepId} onClick=${handleFileEnriched}>${t('profile.notebook.fileEnriched')}<//>
           <${Action} disabled=${!!runningStepId} onClick=${handleSplitEnriched}>${t('profile.notebook.splitEnriched')}<//>
@@ -382,12 +385,10 @@ export default function NoteCard({ note, showToast, orgNames, settings, autoEnri
       <${Surface} kind="box"><${Stack}>
         <${Text} tone="muted">${(t('profile.notebook.distributeIntro') || '{n} pieces').replace('{n}', String(chunks.length))}<//>
         ${chunks.map((c, i) => html`
-          <${Stack} key=${i} density="compact">
-            <${Stack} direction="wrap" align="center">
-              <${Field} type="checkbox" label=${c.title} value=${c.include} disabled=${busy} onChange=${() => toggleChunk(i)} />
-              <${Chip} tone=${orgIsNew(c) ? 'sun' : 'plain'}>${orgLabelFor(c)}${c.workspaceName ? ` / ${c.workspaceName}` : ''}<//>
-            <//>
-            <${Markdown} text=${c.markdown} />
+          <${ListRow} key=${i} name=${c.title} muted=${!c.include}
+            mark=${html`<${Field} type="checkbox" ariaLabel=${c.title} value=${c.include} disabled=${busy} onChange=${() => toggleChunk(i)} />`}
+            value=${html`<${Chip} tone=${orgIsNew(c) ? 'sun' : 'plain'}>${orgLabelFor(c)}${c.workspaceName ? ` / ${c.workspaceName}` : ''}<//>`}>
+            <${Surface} kind="plain" height="scroll"><${Markdown} text=${c.markdown} /><//>
           <//>`)}
         <${Stack} direction="wrap" align="center">
           <${Action} kind="primary" disabled=${busy || selectedCount === 0} onClick=${handleDistributeCommit}>
@@ -475,7 +476,7 @@ export default function NoteCard({ note, showToast, orgNames, settings, autoEnri
         <${Action} disabled=${distributing} onClick=${() => handleDistribute()}>
           ${distributing ? t('profile.notebook.splitting') : t('profile.notebook.splitBtn')}
         <//>
-        <${Action} onClick=${() => onDelete(note.key)}>${t('profile.notebook.deleteBtn')}<//>`}>
+        <${Action} tone="danger" onClick=${() => onDelete(note.key)}>${t('profile.notebook.deleteBtn')}<//>`}>
       <${Stack}>
         ${trackMsg && html`
           <${Surface} kind="aside"><${Stack} direction="wrap" align="between">

@@ -2,14 +2,17 @@
  * @file collaboration.js
  * @description Shared app discovery, roadmap editing and a publication change note.
  * @version-history
+ *   2026-09-22 -- Composed from the shared component set: Dialog for publishing, Field for the
+ *     controls, ListRow for a shared app and a roadmap entry; no own CSS. The publish button calls
+ *     the same handler directly instead of submitting a form by id, because the set's Action has
+ *     no form attribute (reported).
  *   v1.0.1 — 2026-09-13 — The publish dialog's submit sits in the dialog's footer and names its form.
  *   v1.0.0 - 2026-09-08 - Make collaboration usable from the Apps page.
  */
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
-import { Modal } from '/components/Modal.js';
-import { Section } from '/views/profile/organisms/poster-parts.js';
+import { Section, Stack, ListRow, Field, Action, Text, Dialog } from '/components/poster-parts.js';
 import { apiGet, apiPost, apiPatch, apiDelete } from '/js/api.js';
 import { listApps } from '/js/services/apps.js';
 import { swallowed } from '/js/swallowed.js';
@@ -19,16 +22,14 @@ const pathOf = app => `/v1/apps/${encodeURIComponent(app.owner)}/${encodeURIComp
 
 export function PublishDialog({ app, busy, onPublish, onClose }) {
   const [line, setLine] = useState('');
-  // The submit sits in the footer, outside the form, and names the form it submits.
-  return html`<${Modal} open=${true} title=${a('publishDraft')} onClose=${onClose} className="ap-publish-modal"
-    footer=${html`<button type="submit" form="ap-publish-form" class="btn-primary" disabled=${busy || (!!line.trim() && line.trim().length < 3)}>${a('publishDraft')}</button>`}>
-    <form id="ap-publish-form" class="ap-form" onSubmit=${e => { e.preventDefault(); onPublish(app, line); }}>
-      <p class="ap-hint">${a('publishConfirm', { name: nameOf(app) })}</p>
-      <label class="ap-field ap-field--wide"><span class="og-label">${a('roadPublishLabel')}</span>
-        <textarea class="og-input" rows="3" maxLength="600" value=${line} onInput=${e => setLine(e.target.value)} />
-      </label>
-      <p class="ap-hint">${a('roadPublishHint')}</p>
-    </form>
+  const blocked = busy || (!!line.trim() && line.trim().length < 3);
+  return html`<${Dialog} open=${true} title=${a('publishDraft')} onClose=${onClose}
+    actions=${html`<${Action} kind="primary" disabled=${blocked} onClick=${() => onPublish(app, line)}>${a('publishDraft')}<//>`}>
+    <${Stack}>
+      <${Text}>${a('publishConfirm', { name: nameOf(app) })}<//>
+      <${Field} type="textarea" label=${a('roadPublishLabel')} rows=${3} maxLength=${600} value=${line} onInput=${e => setLine(e.target.value)} />
+      <${Text} kind="caption" tone="muted">${a('roadPublishHint')}<//>
+    <//>
   <//>`;
 }
 
@@ -81,45 +82,45 @@ export function CollaborationSection({ ctx }) {
     finally { setBusy(false); }
   }
 
-  return html`<${Section} id="ap-collaboration" num="07" title=${a('roadTitle')}>
-    <label class="ap-hint"><input type="checkbox" checked=${showShared} onChange=${e => setShowShared(e.target.checked)} /> ${a('sharedShow')}</label>
-    ${showShared && sharedError ? html`<p role="alert" class="ap-empty">${a('sharedFailed')}</p>` : null}
-    ${showShared && !sharedError && shared === null ? html`<p class="ap-empty">${a('bldLoading')}</p>` : null}
-    ${showShared && shared?.length === 0 ? html`<p class="ap-empty">${a('sharedNone')}</p>` : null}
-    ${showShared && shared?.length ? html`<div class="ap-rows">${shared.map(x => html`<div key=${appRef(x)} class="ap-row">
-      <div class="ap-row-main"><b>${nameOf(x)}</b><small>${x.owner} · ${a('bldRung_' + x.dev_level_name)}</small></div>
-      <div class="ap-row-ctl"><button class="og-door" onClick=${() => setSelected(appRef(x))}>${a('roadOpen')}</button>
-        ${x.has_draft && x.dev_level <= 10 ? html`<button class="og-door" onClick=${() => ctx.publishDraft(x)}>${a('publishDraft')}</button>` : null}
-      </div>
-    </div>`)}</div>` : null}
-    <label class="ap-field"><span class="og-label">${a('roadApp')}</span><select class="og-input" value=${selected} onChange=${e => setSelected(e.target.value)}>
-      <option value="">${a('roadChoose')}</option>
-      ${apps.map(x => html`<option key=${appRef(x)} value=${appRef(x)}>${nameOf(x)} · ${x.owner}</option>`)}
-    </select></label>
-    ${app && failed ? html`<p class="ap-empty" role="alert">${a('roadFailed')}</p>` : null}
-    ${app && !loaded && !failed ? html`<p class="ap-empty">${a('bldLoading')}</p>` : null}
-    ${app && loaded ? html`
-      <p class="ap-hint">${a(road?.wantedVisibility === 'everyone' ? 'roadPublicHint' : 'roadPrivateHint')}</p>
-      ${owner ? html`<label class="ap-field"><span class="og-label">${a('roadVisibility')}</span><select class="og-input" disabled=${busy}
-        value=${road?.wantedVisibility || 'developers'} onChange=${e => change(() => apiPatch(`${pathOf(app)}/roadmap`, { wanted_visibility: e.target.value }))}>
-        <option value="developers">${a('roadDevelopers')}</option><option value="everyone">${a('roadEveryone')}</option>
-      </select></label>` : null}
-      ${['done', 'wanted'].map(half => html`<div key=${half}>
-        <h3>${a(half === 'done' ? 'roadDone' : 'roadWanted')}</h3>
-        ${(road?.entries || []).filter(e => e.state === half).length ? html`<div class="ap-rows">
-          ${road.entries.filter(e => e.state === half).map(e => html`<div key=${e.id} class="ap-row">
-            <div class="ap-row-main"><p class="ap-road-text">${e.what}</p><small>${e.by} · ${day(e.at)}${e.version ? ` · v${e.version}` : ''}</small></div>
-            ${owner || (e.state === 'wanted' && e.by === ctx.session.owner) ? html`<button class="og-door" disabled=${busy}
-              onClick=${() => change(() => apiDelete(`${pathOf(app)}/roadmap/${encodeURIComponent(e.id)}`))}>${a('roadRemove')}</button>` : null}
-          </div>`)}</div>` : html`<p class="ap-empty">${a('roadEmpty')}</p>`}
-      </div>`)}
-      <form class="ap-form" onSubmit=${e => { e.preventDefault(); change(() => apiPost(`${pathOf(app)}/roadmap`, { state, what })); }}>
-        <label class="ap-field"><span class="og-label">${a('roadState')}</span><select class="og-input" value=${state} onChange=${e => setState(e.target.value)}>
-          <option value="wanted">${a('roadWanted')}</option>${inside ? html`<option value="done">${a('roadDone')}</option>` : null}
-        </select></label>
-        <label class="ap-field ap-field--wide"><span class="og-label">${a('roadWhat')}</span><textarea class="og-input" rows="3" maxLength="600" required value=${what} onInput=${e => setWhat(e.target.value)} /></label>
-        <button class="btn-primary" type="submit" disabled=${busy || what.trim().length < 3}>${a('roadAdd')}</button>
-      </form>
-    ` : null}
+  return html`<${Section} id="ap-collaboration" title=${a('roadTitle')}>
+    <${Stack}>
+      <${Field} type="checkbox" label=${a('sharedShow')} value=${showShared} onChange=${e => setShowShared(e.target.checked)} />
+      ${showShared && sharedError ? html`<div role="alert"><${Text} tone="muted">${a('sharedFailed')}<//></div>` : null}
+      ${showShared && !sharedError && shared === null ? html`<${Text} tone="muted">${a('bldLoading')}<//>` : null}
+      ${showShared && shared?.length === 0 ? html`<${Text} tone="muted">${a('sharedNone')}<//>` : null}
+      ${showShared && shared?.length ? html`<${Stack} density="compact">${shared.map(x => html`<${ListRow} key=${appRef(x)} density="compact"
+        name=${nameOf(x)} detail=${`${x.owner} · ${a('bldRung_' + x.dev_level_name)}`}
+        actions=${html`<${Action} onClick=${() => setSelected(appRef(x))}>${a('roadOpen')}<//>
+          ${x.has_draft && x.dev_level <= 10 ? html`<${Action} onClick=${() => ctx.publishDraft(x)}>${a('publishDraft')}<//>` : null}`} />`)}<//>` : null}
+      <${Field} type="select" label=${a('roadApp')} value=${selected} onChange=${e => setSelected(e.target.value)}
+        options=${[{ value: '', label: a('roadChoose') }, ...apps.map(x => ({ value: appRef(x), label: `${nameOf(x)} · ${x.owner}` }))]} />
+      ${app && failed ? html`<div role="alert"><${Text} tone="muted">${a('roadFailed')}<//></div>` : null}
+      ${app && !loaded && !failed ? html`<${Text} tone="muted">${a('bldLoading')}<//>` : null}
+      ${app && loaded ? html`
+        <${Text} kind="caption" tone="muted">${a(road?.wantedVisibility === 'everyone' ? 'roadPublicHint' : 'roadPrivateHint')}<//>
+        ${owner ? html`<${Field} type="select" label=${a('roadVisibility')} disabled=${busy}
+          value=${road?.wantedVisibility || 'developers'} onChange=${e => change(() => apiPatch(`${pathOf(app)}/roadmap`, { wanted_visibility: e.target.value }))}
+          options=${[{ value: 'developers', label: a('roadDevelopers') }, { value: 'everyone', label: a('roadEveryone') }]} />` : null}
+        ${['done', 'wanted'].map(half => html`<${Stack} key=${half} density="compact">
+          <${Text} kind="heading" size="small">${a(half === 'done' ? 'roadDone' : 'roadWanted')}<//>
+          ${(road?.entries || []).filter(e => e.state === half).length ? html`<${Stack} density="compact">
+            ${road.entries.filter(e => e.state === half).map(e => html`<${ListRow} key=${e.id} density="compact"
+              name=${e.what} detail=${`${e.by} · ${day(e.at)}${e.version ? ` · v${e.version}` : ''}`}
+              actions=${owner || (e.state === 'wanted' && e.by === ctx.session.owner) ? html`<${Action} kind="text" tone="danger" disabled=${busy}
+                onClick=${() => change(() => apiDelete(`${pathOf(app)}/roadmap/${encodeURIComponent(e.id)}`))}>${a('roadRemove')}<//>` : null} />`)}<//>`
+            : html`<${Text} tone="muted">${a('roadEmpty')}<//>`}
+        <//>`)}
+        <form onSubmit=${e => { e.preventDefault(); change(() => apiPost(`${pathOf(app)}/roadmap`, { state, what })); }}>
+          <${Stack}>
+            <${Field} type="select" label=${a('roadState')} value=${state} onChange=${e => setState(e.target.value)}
+              options=${[{ value: 'wanted', label: a('roadWanted') }, ...(inside ? [{ value: 'done', label: a('roadDone') }] : [])]} />
+            <${Field} type="textarea" label=${a('roadWhat')} rows=${3} maxLength=${600} required=${true} value=${what} onInput=${e => setWhat(e.target.value)} />
+            <${Stack} direction="horizontal" align="start">
+              <${Action} type="submit" disabled=${busy || what.trim().length < 3}>${a('roadAdd')}<//>
+            <//>
+          <//>
+        </form>
+      ` : null}
+    <//>
   <//>`;
 }

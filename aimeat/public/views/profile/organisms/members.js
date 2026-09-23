@@ -10,6 +10,7 @@
  * @structure OrgMemberManager; MemberAccessEditor (inline per-member workspace-role editor)
  * @usage import { OrgMemberManager } from '/views/profile/organisms/members.js';
  * @version-history
+ *   v2.2.1 -- 2026-09-22 -- A join request's Decline carries the danger tone and Approve the success tone.
  *   v2.2.0 -- 2026-09-22 -- Composed from the shared set (ListRow, Menu, Chip, Field): no class of its
  *     own; the menu's emoji icons are gone.
  *   v2.1.0 -- 2026-09-13 -- Compose list and guide rules from poster.css; retire unused list rules.
@@ -227,8 +228,8 @@ export function OrgMemberManager({ org, ghii, canManage, isCreator, showToast, c
     ${canManage && pending.length > 0 ? html`<${Stack} density="compact">${pending.map(r => html`
       <${ListRow} key=${r.id} density="compact" selected=${true} name=${r.ghii}
         detail=${`${t('organisms.wantsToJoin') || 'wants to join'}${r.createdAt ? ` · ${relTime(r.createdAt)}` : ''}`} detailKind="text"
-        actions=${html`<${Action} disabled=${busy} onClick=${() => review(r.id, 'rejected')}>${t('organisms.decline') || 'Decline'}<//>
-          <${Action} disabled=${busy} onClick=${() => review(r.id, 'approved')}>${t('organisms.approve') || 'Approve'}<//>`}>
+        actions=${html`<${Action} tone="danger" disabled=${busy} onClick=${() => review(r.id, 'rejected')}>${t('organisms.decline') || 'Decline'}<//>
+          <${Action} tone="success" disabled=${busy} onClick=${() => review(r.id, 'approved')}>${t('organisms.approve') || 'Approve'}<//>`}>
         ${r.message ? html`<${Text}>${r.message}<//>` : null}
       <//>`)}<//>` : null}
 

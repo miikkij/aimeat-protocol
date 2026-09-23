@@ -14,18 +14,19 @@
  *   MONEY AND ACTIVITY ARE NEVER SUMMED. The stat row changes with the report: a spend report leads
  *   with cost, an activity report leads with calls and shows how many were refused. A single grand
  *   total across both would be a number with no meaning.
- *   IT BORROWS NOTHING AND INVENTS NOTHING. Stats are the canonical `.stat-grid`/`.stat-card`, the
- *   time window is the canonical `.seg`/`.seg-btn`, and only the wrapping report bar has classes of
- *   its own — eight long labels do not fit a joined segmented control on a phone. Its own classes
- *   are `pf-ureport-*` rather than `pf-usage-*`, which already belongs to the Home quota card: the
- *   first version reused that name, inherited its `background: var(--bg-surface)` over the selected
- *   button's white text, and rendered the chosen report invisible.
+ *   IT BORROWS NOTHING AND INVENTS NOTHING. The page is composed from the shared set: the stats are
+ *   a NumeralBand, the report and the time window are two wrapping groups of tab actions (eight long
+ *   labels do not fit a joined segmented control on a phone), the groups are a Table. It writes no
+ *   class of its own. (Its old pf-ureport-* classes had been named off pf-usage-*, the Home quota
+ *   card's, after reusing that name rendered the chosen report invisible.)
  * @structure
  *   - REPORTS         — button definitions: id, label key, and which stats it leads with
  *   - getRange(period) — preset key → { from, to }
  *   - UsageTab (default) — fetch + render
  * @usage Registered in views/profile.js as the `usage` tab; menu entry in landing-page.cards.js.
  * @version-history
+ *   2026-09-22 -- Composed from the shared set (Page, NumeralBand, tab actions, Table); no class or
+ *     wrapper of its own, so the page follows the one component set.
  *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
  *   2026-09-13 — V1: compose page and B1 section headings from the shared poster classes.
  *   v1.1.0 — 2026-08-15 — House styles: .stat-grid/.stat-card and .seg/.seg-btn instead of a local
@@ -38,7 +39,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { Spinner } from './shared.js';
-import { DataTable } from '/components/DataTable.js';
+import { Page, Stack, Action, Text, NumeralBand, Table } from '/components/poster-parts.js';
 import { UsageChart, colorForIndex } from '/components/UsageChart.js';
 import { apiGet } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
@@ -123,22 +124,21 @@ export default function UsageTab() {
   const groups = data?.groups ?? [];
   const series = data?.series ?? [];
 
+  // The chart sizes itself (UsageChart owns its canvas box and height).
   const chart = series.length > 1 ? html`
-    <div class="pf-ureport-chart">
-      <${UsageChart}
-        type="bar"
-        labels=${series.map(s => s.bucket)}
-        datasets=${[{
-          label: current.kind === 'spend' ? t('profile.usage.statCost') : t('profile.usage.statCalls'),
-          data: series.map(s => (current.kind === 'spend' ? s.cost_usd : s.calls)),
-          // The shared data-series palette rather than a colour typed here: Chart.js needs a
-          // concrete string, and colorForIndex is where this project keeps them.
-          backgroundColor: colorForIndex(0),
-        }]}
-        height=${200}
-        legend=${false}
-      />
-    </div>` : null;
+    <${UsageChart}
+      type="bar"
+      labels=${series.map(s => s.bucket)}
+      datasets=${[{
+        label: current.kind === 'spend' ? t('profile.usage.statCost') : t('profile.usage.statCalls'),
+        data: series.map(s => (current.kind === 'spend' ? s.cost_usd : s.calls)),
+        // The shared data-series palette rather than a colour typed here: Chart.js needs a
+        // concrete string, and colorForIndex is where this project keeps them.
+        backgroundColor: colorForIndex(0),
+      }]}
+      height=${200}
+      legend=${false}
+    />` : null;
 
   const statCards = current.kind === 'spend'
     ? [
@@ -162,47 +162,34 @@ export default function UsageTab() {
     ? [g.key, usd(g.cost_usd), compact(g.total_tokens), compact(g.calls)]
     : [g.key, compact(g.calls), compact(g.refusals), compact(g.errors), ms(g.duration_ms_avg)]));
 
-  return html`
-    <div class="pf-ureport">
-      <h2 class="poster-page-title">${t('profile.usage.title')}</h2>
-      <p class="section-desc">${t('profile.usage.intro')}</p>
+  return html`<${Page} title=${t('profile.usage.title')}
+    crumbs=${[{ label: t('nav.profile') }, { label: t('profile.landing.menuBusiness') }, { label: t('profile.usage.title') }]}>
+    <${Stack}>
+      <${Text} kind="lead" tone="muted">${t('profile.usage.intro')}<//>
 
-      <div class="pf-ureport-controls">
-        <div class="pf-ureport-bar" role="group" aria-label=${t('profile.usage.reportGroupLabel')}>
-          ${REPORTS.map(r => html`
-            <button type="button"
-              class=${`pf-ureport-btn${r.id === report ? ' active' : ''}`}
-              aria-pressed=${r.id === report}
-              onClick=${() => setReport(r.id)}>${t(r.label)}</button>`)}
-        </div>
-        <div class="seg" role="group" aria-label=${t('profile.usage.periodGroupLabel')}>
-          ${PERIODS.map(p => html`
-            <button type="button"
-              class=${`seg-btn${p === period ? ' active' : ''}`}
-              aria-pressed=${p === period}
-              onClick=${() => setPeriod(p)}>${t(`profile.usage.period${p}`)}</button>`)}
-        </div>
-      </div>
+      <${Stack} direction="wrap" align="between">
+        <${Stack} direction="wrap" role="group" label=${t('profile.usage.reportGroupLabel')}>
+          ${REPORTS.map(r => html`<${Action} key=${r.id} kind="tab" selected=${r.id === report} onClick=${() => setReport(r.id)}>${t(r.label)}<//>`)}
+        <//>
+        <${Stack} direction="horizontal" role="group" label=${t('profile.usage.periodGroupLabel')}>
+          ${PERIODS.map(p => html`<${Action} key=${p} kind="tab" selected=${p === period} onClick=${() => setPeriod(p)}>${t(`profile.usage.period${p}`)}<//>`)}
+        <//>
+      <//>
 
-      ${error ? html`<p class="pf-ureport-error">${error}</p>` : null}
+      ${error ? html`<${Text} tone="danger">${error}<//>` : null}
       ${loading && !data ? html`<${Spinner} text=${t('profile.usage.loading')} />` : null}
 
       ${data ? html`
-        <div class="stat-grid">
-          ${statCards.map(c => html`
-            <div class="stat-card poster-row--thing">
-              <div class="stat-card-value">${c.value}</div>
-              <div class="stat-card-label">${c.label}</div>
-            </div>`)}
-        </div>
+        <${NumeralBand} tone="plain" items=${statCards.map(c => ({ label: c.label, value: c.value }))} />
         ${chart}
         ${rows.length
-          ? html`<${DataTable} headers=${headers} rows=${rows} scroll=${true} />`
+          ? html`<${Table} headers=${headers} rows=${rows} label=${t(current.label)} />`
           // An empty report is a fact about this account, not a broken page — so it says which
           // question was asked and over what window, rather than showing a bare dash.
-          : html`<p class="pf-ureport-empty">${t('profile.usage.emptyFor')
+          : html`<${Text} tone="muted">${t('profile.usage.emptyFor')
               .replace('{report}', t(current.label))
-              .replace('{days}', t(`profile.usage.period${period}`))}</p>`}
+              .replace('{days}', t(`profile.usage.period${period}`))}<//>`}
       ` : null}
-    </div>`;
+    <//>
+  <//>`;
 }

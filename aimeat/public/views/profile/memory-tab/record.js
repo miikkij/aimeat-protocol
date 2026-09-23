@@ -8,6 +8,9 @@
  * @structure renderValue · renderRecord
  * @usage import { renderRecord } from './record.js';
  * @version-history
+ *   v1.1.0 -- 2026-09-22 -- The key is the page title in mono (so the identity line no longer repeats
+ *     it), typed line breaks are kept by Text lines, raw and JSON values sit in the tall code box,
+ *     Delete is in the danger tone.
  *   v1.0.0 -- 2026-09-22 -- Extracted from cover.js when the Memory page moved onto the shared
  *     component set; same content and handlers.
  */
@@ -23,21 +26,21 @@ import { formatBytes, formatRelativeTime, groupOfKey, displayRemainder, VIS_OPTI
 import { c, day, agentOf, classify, visChip, renderPage } from './frame.js';
 
 const looksLikeMarkdown = (s) => /(^|\n)#{1,6}\s|(^|\n)[-*]\s|\*\*|\[[^\]]+\]\(/.test(s);
-const lines = (s) => html`<${Stack} density="compact">${String(s).split('\n').map((line, i) => html`<${Text} key=${i}>${line || ' '}<//>`)}<//>`;
+const lines = (s) => html`<${Text} lines>${String(s)}<//>`;
 
 function renderValue(ctx, m, raw) {
   const v = ctx.valueOf(m);
   if (v === undefined) return html`<${Text} tone="muted">${t('profile.memory.loadingValue') || 'Loading value…'}<//>`;
   const im = detectImage(v, m.key);
   const image = im ? html`<${ImageView} desc=${im} />` : null;
-  if (raw) return html`<${Surface} kind="code">${typeof v === 'object' && v !== null ? JSON.stringify(v, null, 2) : String(v ?? '')}<//>`;
+  if (raw) return html`<${Surface} kind="code" height="tall">${typeof v === 'object' && v !== null ? JSON.stringify(v, null, 2) : String(v ?? '')}<//>`;
   if (typeof v === 'string') return html`${image}${looksLikeMarkdown(v) ? html`<${Markdown} text=${v} />` : lines(v)}`;
   if (v && typeof v === 'object' && !Array.isArray(v)) {
     const rows = Object.entries(v);
     const flat = rows.every(([, x]) => x === null || typeof x !== 'object');
     if (flat && rows.length) return html`${image}<div>${rows.map(([k, x]) => html`<${KeyValue} key=${k} label=${k} value=${String(x ?? '')} />`)}</div>`;
   }
-  return html`${image}<${Surface} kind="code">${JSON.stringify(v, null, 2)}<//>`;
+  return html`${image}<${Surface} kind="code" height="tall">${JSON.stringify(v, null, 2)}<//>`;
 }
 
 export function renderRecord(ctx, key) {
@@ -47,7 +50,7 @@ export function renderRecord(ctx, key) {
   const cls = classify(memories, orgNames);
   const space = cls.spaces.get(g.id);
   const crumbs = [{ label: space ? space.label : g.id, go: () => pickView({ kind: 'space', id: g.id }) }, { label: displayRemainder(key, g) }];
-  if (!m) return renderPage(ctx, { id: 'record', crumbs, title: key, children: html`<${Text} tone="muted">${t('profile.memory.empty') || 'Not found.'}<//>` });
+  if (!m) return renderPage(ctx, { id: 'record', crumbs, title: key, titleKind: 'mono', children: html`<${Text} tone="muted">${t('profile.memory.empty') || 'Not found.'}<//>` });
   const v = valueOf(m);
   const owner = m.owner_gaii || ctx.currentGhii();
   const url = `${NODE_URL}/v1/memory/${encodeURIComponent(owner)}/${encodeURIComponent(key)}`;
@@ -57,10 +60,8 @@ export function renderRecord(ctx, key) {
     ${v !== undefined ? html`<${CopyAction} text=${valueCopyText(m)} label=${t('profile.memory.copyValue') || 'Copy value'} onCopied=${() => showToast(t('profile.memory.valueCopied') || 'Value copied')} />` : null}
     <${CopyAction} text=${url} label=${t('common.copyUrl') || 'Copy URL'} onCopied=${() => showToast(t('profile.files.urlCopied') || 'URL copied')} />
     <${Action} onClick=${() => setEditModal({ key, value: typeof v === 'object' && v !== null ? JSON.stringify(v, null, 2) : String(v ?? ''), visibility: m.visibility || 'private', version: m.version, isJson: typeof v === 'object' && v !== null })}>${t('profile.memory.editBtn') || 'Edit'}<//>`;
-  // The key is a machine value and the page title is set in capitals, so the identity line carries
-  // it again exactly as written.
+  // The key is a machine value, so the page title is set in mono exactly as written.
   const sub = html`<${Stack} direction="wrap" align="center" density="compact">
-    <${Text} kind="mono">${key}<//>
     ${m.created_at ? html`<${Text} kind="mono" tone="muted">${c('created', 'created')} ${day(m.created_at)}<//>` : null}
     ${m.updated_at ? html`<${Text} kind="mono" tone="muted">${c('changed', 'changed')} ${formatRelativeTime(m.updated_at)}${agentOf(m.owner_gaii) ? ' · ' + agentOf(m.owner_gaii) : ''}<//>` : null}
     ${m.version != null ? html`<${Text} kind="mono" tone="muted">${c('version', 'version {n}').replace('{n}', String(m.version))}<//>` : null}
@@ -91,10 +92,10 @@ export function renderRecord(ctx, key) {
         ? html`<${Action} kind="text" disabled=${togglingFed === key} onClick=${() => handleStopSharing(key)}>${t('profile.memory.stopSharing') || 'Stop federation sharing'} →<//>`
         : html`<${Action} kind="text" disabled=${togglingFed === key} onClick=${() => handleShareToFederation(key)}>${c('federate', 'Share to the federation')} →<//>`}
       ${session?.federated ? html`<${Action} kind="text" onClick=${() => doPull(key)}>${t('profile.memory.pullFromHome')}<//><${Action} kind="text" onClick=${() => doPush(key)}>${t('profile.memory.pushToHome')}<//>` : null}
-      <${Action} kind="text" onClick=${() => handleDeleteMemory(key)}>${t('profile.memory.deleteBtn') || 'Delete'} …<//>
+      <${Action} kind="text" tone="danger" onClick=${() => handleDeleteMemory(key)}>${t('profile.memory.deleteBtn') || 'Delete'} …<//>
     <//><//>
   <//>`;
-  return renderPage(ctx, { id: 'record', crumbs, title: key, sub, doors, rail, children: html`
+  return renderPage(ctx, { id: 'record', crumbs, title: key, titleKind: 'mono', sub, doors, rail, children: html`
     ${renderValue(ctx, m, showRaw)}
     ${v !== undefined ? html`<${Stack} direction="wrap"><${Action} onClick=${() => setShowRaw(r => !r)}>${showRaw ? c('showPretty', 'Show readable') : c('showRaw', 'Show raw')}<//><//>` : null}` });
 }

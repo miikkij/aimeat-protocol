@@ -7,6 +7,8 @@
  *   of memory rows with per-row visibility/rules/cart/federation controls. Extracted verbatim from
  *   memory-tab.js as a ctx-consuming plain render function (all state/handlers passed in via ctx).
  * @version-history
+ *   2026-09-22 -- The set's newer props: Delete and Delete group in the danger tone, a key
+ *     space's search and delete on the fold's own row, the value's JSON in the tall code box.
  *   2026-09-22 -- Composed from the shared component set: a key space is a Fold, a key is a ListRow
  *     whose visibility badge opens a Menu, the quota is a Meter, fields are Fields. The emoji
  *     buttons (cart, shield, magnifier, bin, archive) became words or inline SVG icons.
@@ -73,7 +75,7 @@ function renderDetail(ctx, m) {
       ? html`<${Text} kind="caption" tone="muted">${t('profile.memory.loadingValue') || 'Loading value…'}<//>`
       : html`
         ${(() => { const v = valueOf(m); const im = detectImage(v, m.key); return im ? html`<${ImageView} desc=${im} />` : null; })()}
-        <${Surface} kind="code">${(() => { const v = valueOf(m); return typeof v === 'object' && v !== null ? JSON.stringify(v, null, 2) : String(v ?? ''); })()}<//>`}
+        <${Surface} kind="code" height="tall">${(() => { const v = valueOf(m); return typeof v === 'object' && v !== null ? JSON.stringify(v, null, 2) : String(v ?? ''); })()}<//>`}
     <${Field} type="select" label=${t('profile.memory.visLabel')} value=${m.visibility || 'private'}
       onChange=${(e) => handleQuickVis(m, e.target.value)}
       options=${VIS_OPTIONS.map(v => ({ value: v, label: t('knowledge.visibility.' + v) }))} />
@@ -124,7 +126,7 @@ function renderDetail(ctx, m) {
       ${session.federated && html`
         <${Action} title=${t('profile.memory.pullFromHome')} onClick=${() => doPull(m.key)}>${t('profile.memory.pullFromHome')}<//>
         <${Action} title=${t('profile.memory.pushToHome')} onClick=${() => doPush(m.key)}>${t('profile.memory.pushToHome')}<//>`}
-      <${Action} onClick=${() => handleDeleteMemory(m.key)}>${t('profile.memory.deleteBtn')}<//>
+      <${Action} tone="danger" onClick=${() => handleDeleteMemory(m.key)}>${t('profile.memory.deleteBtn')}<//>
     <//>
   <//>`;
 }
@@ -247,7 +249,7 @@ export function renderEntries(ctx) {
         options=${VIS_OPTIONS.filter(v => v !== 'group').map(v => ({ value: v, label: t('knowledge.visibility.' + v) }))} />
       <${Action} onClick=${applyBulkVis}>${t('profile.memory.bulkApply') || 'Change visibility'}<//>
       <${Action} onClick=${() => { addCartItems((memories || []).filter(m => selectedKeys.has(m.key)).map(memCartItem)); }}>${t('profile.memory.cartAddSelected') || 'Add to collection'}<//>
-      <${Action} onClick=${bulkDelete}>${t('profile.memory.deleteBtn')}<//>
+      <${Action} tone="danger" onClick=${bulkDelete}>${t('profile.memory.deleteBtn')}<//>
       <${Action} onClick=${() => setSelectedKeys(new Set())}>${t('profile.memory.bulkClear') || 'Clear selection'}<//>
     <//>`}
     ${searchResults !== null
@@ -266,11 +268,10 @@ export function renderEntries(ctx) {
             const groupPrefix = g.kind === 'organism' ? 'organism.' + g.uuid + '.' : g.kind === 'plain' ? g.id + '.' : null;
             const count = g.items.length === 1 ? (t('profile.memory.keysOne') || '1 key') : (t('profile.memory.keysCount') || '{n} keys').replace('{n}', String(g.items.length));
             return html`<${Fold} key=${g.id} title=${groupLabel(g)} open=${!collapsed} onToggle=${() => toggleGroupCollapsed(g.id)}
-              sub=${count + (g.kind === 'organism' && orgNames[g.uuid] ? ' · ' + shortTok(g.uuid) : '')}>
-              ${groupPrefix && html`<${Stack} direction="wrap" align="center">
+              sub=${count + (g.kind === 'organism' && orgNames[g.uuid] ? ' · ' + shortTok(g.uuid) : '')}
+              actions=${groupPrefix && html`
                 <${Action} onClick=${() => { setSearchInput(''); setSearchScopePrefix(groupPrefix); showToast((t('profile.memory.searchInGroupHint') || 'Type a query to search within {g}').replace('{g}', groupLabel(g))); }}>${t('profile.memory.searchInGroup') || 'Search in this group'}<//>
-                <${Action} onClick=${() => deleteGroup(g, g.items.length)}>${t('profile.memory.deleteGroup') || 'Delete group'}<//>
-              <//>`}
+                <${Action} tone="danger" onClick=${() => deleteGroup(g, g.items.length)}>${t('profile.memory.deleteGroup') || 'Delete group'}<//>`}>
               <${Stack} density="compact">${g.items.map(m => renderRow(m, g))}<//>
             <//>`;
           })}</div>`

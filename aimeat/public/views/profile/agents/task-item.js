@@ -7,6 +7,8 @@
  *   happened, details, memory entries, rating -- plus the actions row (start, request changes,
  *   triage, cancel, delete). The helpers it is built from live in ./task-item-parts.js.
  * @version-history
+ *   v3.0.1 — 2026-09-22 — A blurred title is blurred again (ListRow concealed) instead of replaced by
+ *     the task id; the opened title is the small heading; Cancel and Delete carry the danger tone.
  *   v3.0.0 — 2026-09-22 — Composed from the shared component set: the closed row is a ListRow (the
  *     eye as an icon action, progress and age as the mono detail, the status as a Chip, the arrow),
  *     the opened task is a record Surface under the row, to-dos and the event log are ListRows
@@ -358,7 +360,7 @@ export function TaskItem({ task, agentName, showToast, onRefresh, autoOpen = 0 }
       <${ListRow}
         mark=${html`<${Action} kind="icon" onClick=${handleToggleBlur} selected=${blurred}
           title=${blurred ? t('profile.agents.tasks.unblurTitle') : t('profile.agents.tasks.blurTitle')}><${EyeIcon} hidden=${blurred} /><//>`}
-        name=${blurred ? task.id : (task.title || task.id)}
+        name=${task.title || task.id} concealed=${blurred}
         onOpen=${handleExpand}
         detail=${[progress, task.createdAt ? timeAgo(task.createdAt) : ''].filter(Boolean).join(' · ')}
         value=${statusChip()}
@@ -372,7 +374,7 @@ export function TaskItem({ task, agentName, showToast, onRefresh, autoOpen = 0 }
         <${Surface} kind="record">
           <${Stack}>
           <${Stack} direction="wrap" align="between" density="compact">
-            <${Text} kind="heading">${task.title || task.id}<//>
+            <${Text} kind="heading" size="small">${task.title || task.id}<//>
             ${statusChip()}
           <//>
           ${task.description && html`<div><${Markdown} text=${task.description} /></div>`}
@@ -498,10 +500,10 @@ export function TaskItem({ task, agentName, showToast, onRefresh, autoOpen = 0 }
               <//>
             `}
             ${(isActive || task.status === 'stalled') && html`
-              <${Action} kind="text" onClick=${handleCancel}>${t('profile.agents.tasks.cancel')}<//>
+              <${Action} kind="text" tone="danger" onClick=${handleCancel}>${t('profile.agents.tasks.cancel')}<//>
             `}
             ${canDelete && html`
-              <${Action} kind="text" onClick=${handleDelete}>${t('profile.agents.tasks.delete')}<//>
+              <${Action} kind="text" tone="danger" onClick=${handleDelete}>${t('profile.agents.tasks.delete')}<//>
             `}
           <//>
           <//>

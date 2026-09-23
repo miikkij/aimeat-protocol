@@ -13,6 +13,7 @@
  *   - TaskItem + its helpers (status labels, JSON tree, memory entry, RequestChangesModal,
  *     blur preference) now live in ./agents/task-item.js (extracted for max-file-lines)
  * @version-history
+ *   v6.0.1 -- 2026-09-22 -- The runs-at-a-time number is the narrow numeric field with a hidden label.
  *   v6.0.0 -- 2026-09-22 -- Composed from the shared component set: a small compact Section with
  *     the count and the New task action, the runs-at-a-time sentence around a number Field, the
  *     buckets and the search toggle as tab actions, the search as a Toolbar with its time filters,
@@ -281,6 +282,7 @@ export default function AgentTasksSubtab({ agent, agentName, showToast, openTask
           <${Stack} direction="horizontal" align="center" density="compact" role="group" label=${t('profile.agents.tasks.concurrency.label')}>
             <${Text}>${tOr('profile.agents.tasks.concurrency.runsBefore', 'Runs')}<//>
             <${Field} type="number" min="1" max="20" value=${maxConcurrent} disabled=${savingConcurrency}
+              width="narrow" inputMode="numeric" ariaLabel=${t('profile.agents.tasks.concurrency.label')}
               onChange=${e => handleSaveConcurrency(e.target.value)} />
             <${Text}>${tOr('profile.agents.tasks.concurrency.runsAfter', 'task at a time.')}<//>
           <//>

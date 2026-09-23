@@ -5,6 +5,10 @@
  * @description Profile tab showing real-time node statistics including uptime,
  *   request counts, tunnel metrics, mailbox stats, and security counters.
  * @version-history
+ *   2026-09-22 -- Composed from the shared component set: the counts are plain numeral bands (a
+ *     count that should be zero and is not is coral), the request breakdowns key-value rows in two
+ *     columns; no own classes. NodeStatsBody is exported so the Nodes page's second tab shows the
+ *     statistics inside its own frame instead of a page inside a page.
  *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
  *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
  *   2026-09-13 — V1: compose page and B1 section headings from the shared poster classes.
@@ -20,6 +24,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { Spinner } from './shared.js';
+import { Page, Section, Stack, Columns, NumeralBand, KeyValue, Text } from '/components/poster-parts.js';
 import { getNodeStats } from '/js/services/stats.js';
 import { num, dateTime as fmtDateTime, duration } from '/js/format.js';
 
@@ -34,16 +39,25 @@ function fmtBytes(b) {
   return (b / 1048576).toFixed(1) + ' MB';
 }
 
-// tone ∈ accent | success | danger | warn | purple | blue (canonical
-// .stat-card-value modifiers) — no inline colour, so it flips in dark mode.
-function StatCard({ label, value, tone }) {
-  return html`<div class="stat-card poster-row--thing">
-    <div class="stat-card-value ${tone || ''}">${value}</div>
-    <div class="stat-card-label">${label}</div>
-  </div>`;
+/** One number of a band. `alert` sets it coral: a count that should be zero and is not. */
+const stat = (label, value, alert = false) => ({ label, value, tone: alert ? 'coral' : undefined });
+
+/** A status code's tone: 2xx fine, 4xx a look, 5xx wrong. */
+const codeTone = (code) => (code.startsWith('2') ? 'success' : code.startsWith('4') ? 'coral' : code.startsWith('5') ? 'danger' : 'plain');
+
+/** The node's page when it is opened on its own route: the frame, and the statistics in it. */
+export default function NodeStatsTab() {
+  return html`<${Page} width="wide" title=${t('profile.nodeStats.title')}
+    crumbs=${[{ label: t('nav.profile') }, { label: t('profile.landing.menuInfra') }, { label: t('profile.tabs.nodeStats') }]}>
+    <${Stack}>
+      <${Text} kind="lead">${t('profile.nodeStats.desc')}<//>
+      <${NodeStatsBody} />
+    <//>
+  <//>`;
 }
 
-export default function NodeStatsTab() {
+/** The statistics themselves, for this page and for the Nodes page's second tab. */
+export function NodeStatsBody() {
   const [data, setData] = useState(null);
   const [error, setError] = useState(false);
 
@@ -68,72 +82,61 @@ export default function NodeStatsTab() {
     } catch { setError(true); }
   }
 
-  if (error) return html`<div class="poster-page-title">${t('profile.nodeStats.title')}</div>
-    <p class="text-meta">${t('profile.nodeStats.error')}</p>`;
+  if (error) return html`<${Text} tone="muted">${t('profile.nodeStats.error')}<//>`;
   if (!data) return html`<${Spinner} text=${t('profile.nodeStats.loading')} />`;
   const s = data;
-  return html`
-    <div class="poster-page-title">${t('profile.nodeStats.title')}</div>
-    <div class="section-desc">${t('profile.nodeStats.desc')}</div>
+  return html`<${Stack}>
+    <${NumeralBand} tone="plain" items=${[
+      stat(t('profile.nodeStats.uptime'), fmtUptime(s.uptime_seconds)),
+      stat(t('profile.nodeStats.requests'), num(s.requests_total || 0)),
+      stat(t('profile.nodeStats.owners'), s.active_owners || 0),
+      stat(t('profile.nodeStats.agents'), s.active_agents || 0),
+      stat(t('profile.nodeStats.memoryWrites'), num(s.memory_writes || 0)),
+      stat(t('profile.nodeStats.memoryReads'), num(s.memory_reads || 0)),
+    ]} />
 
-    <div class="stat-grid">
-      <${StatCard} label=${t('profile.nodeStats.uptime')} value=${fmtUptime(s.uptime_seconds)} tone="accent" />
-      <${StatCard} label=${t('profile.nodeStats.requests')} value=${num(s.requests_total || 0)} tone="accent" />
-      <${StatCard} label=${t('profile.nodeStats.owners')} value=${s.active_owners || 0} tone="success" />
-      <${StatCard} label=${t('profile.nodeStats.agents')} value=${s.active_agents || 0} tone="success" />
-      <${StatCard} label=${t('profile.nodeStats.memoryWrites')} value=${num(s.memory_writes || 0)} tone="purple" />
-      <${StatCard} label=${t('profile.nodeStats.memoryReads')} value=${num(s.memory_reads || 0)} tone="purple" />
-    </div>
-
-    <div class="stat-two-col">
-      <div class="card p-1 poster-row--thing">
-        <h4 class="stat-panel-h4">${t('profile.nodeStats.requestsByMethod')}</h4>
+    <${Columns} layout="equal" collapse="640">
+      <${Stack} density="compact">
+        <${Text} kind="label">${t('profile.nodeStats.requestsByMethod')}<//>
         ${s.requests_by_method ? Object.entries(s.requests_by_method).map(([m, c]) => html`
-          <div class="stat-row">
-            <span class="stat-row-label">${m}</span>
-            <span class="stat-row-value">${num(c)}</span>
-          </div>`) : null}
-      </div>
-      <div class="card p-1 poster-row--thing">
-        <h4 class="stat-panel-h4">${t('profile.nodeStats.requestsByStatus')}</h4>
-        ${s.requests_by_status ? Object.entries(s.requests_by_status).map(([code, c]) => {
-          const tone = code.startsWith('2') ? 'success' : code.startsWith('4') ? 'warn' : code.startsWith('5') ? 'danger' : '';
-          return html`<div class="stat-row">
-            <span class="stat-row-label ${tone}">${code}</span>
-            <span class="stat-row-value">${num(c)}</span>
-          </div>`;
-        }) : null}
-      </div>
-    </div>
+          <${KeyValue} key=${m} label=${m} value=${num(c)} mono />`) : null}
+      <//>
+      <${Stack} density="compact">
+        <${Text} kind="label">${t('profile.nodeStats.requestsByStatus')}<//>
+        ${s.requests_by_status ? Object.entries(s.requests_by_status).map(([code, c]) => html`
+          <${KeyValue} key=${code} label=${html`<${Text} kind="mono" tone=${codeTone(code)}>${code}<//>`} value=${num(c)} mono />`) : null}
+      <//>
+    <//>
 
-    ${s.tunnel ? html`
-      <h3 class="stat-section-h3">${t('profile.nodeStats.tunnelTitle')}</h3>
-      <div class="stat-grid-sm">
-        <${StatCard} label=${t('profile.nodeStats.tunnelActive')} value=${s.tunnel.connections_active} tone="success" />
-        <${StatCard} label=${t('profile.nodeStats.tunnelTotal')} value=${s.tunnel.connections_total} tone="accent" />
-        <${StatCard} label=${t('profile.nodeStats.msgSent')} value=${num(s.tunnel.messages_sent_total || 0)} tone="blue" />
-        <${StatCard} label=${t('profile.nodeStats.msgReceived')} value=${num(s.tunnel.messages_received_total || 0)} tone="blue" />
-        <${StatCard} label=${t('profile.nodeStats.deliveryFails')} value=${s.tunnel.delivery_failures_total} tone=${s.tunnel.delivery_failures_total > 0 ? 'danger' : 'success'} />
-        <${StatCard} label=${t('profile.nodeStats.latencyAvg')} value=${(s.tunnel.delivery_latency_avg_ms || 0).toFixed(0) + ' ms'} tone="accent" />
-        <${StatCard} label=${t('profile.nodeStats.latencyP95')} value=${(s.tunnel.delivery_latency_p95_ms || 0).toFixed(0) + ' ms'} tone=${(s.tunnel.delivery_latency_p95_ms || 0) > 200 ? 'warn' : 'accent'} />
-      </div>` : null}
+    ${s.tunnel ? html`<${Section} size="small" title=${t('profile.nodeStats.tunnelTitle')}>
+      <${NumeralBand} tone="plain" items=${[
+        stat(t('profile.nodeStats.tunnelActive'), s.tunnel.connections_active),
+        stat(t('profile.nodeStats.tunnelTotal'), s.tunnel.connections_total),
+        stat(t('profile.nodeStats.msgSent'), num(s.tunnel.messages_sent_total || 0)),
+        stat(t('profile.nodeStats.msgReceived'), num(s.tunnel.messages_received_total || 0)),
+        stat(t('profile.nodeStats.deliveryFails'), s.tunnel.delivery_failures_total, s.tunnel.delivery_failures_total > 0),
+        stat(t('profile.nodeStats.latencyAvg'), (s.tunnel.delivery_latency_avg_ms || 0).toFixed(0) + ' ms'),
+        stat(t('profile.nodeStats.latencyP95'), (s.tunnel.delivery_latency_p95_ms || 0).toFixed(0) + ' ms', (s.tunnel.delivery_latency_p95_ms || 0) > 200),
+      ]} />
+    <//>` : null}
 
-    ${s.mailbox ? html`
-      <h3 class="stat-section-h3">${t('profile.nodeStats.mailboxTitle')}</h3>
-      <div class="stat-grid-sm">
-        <${StatCard} label=${t('profile.nodeStats.mailboxItems')} value=${s.mailbox.items_total} tone="accent" />
-        <${StatCard} label=${t('profile.nodeStats.mailboxBytes')} value=${fmtBytes(s.mailbox.bytes_total)} tone="accent" />
-        <${StatCard} label=${t('profile.nodeStats.mailboxDelivered')} value=${num(s.mailbox.delivered_total || 0)} tone="success" />
-        <${StatCard} label=${t('profile.nodeStats.mailboxExpired')} value=${s.mailbox.expired_total} tone=${s.mailbox.expired_total > 0 ? 'warn' : 'success'} />
-      </div>` : null}
+    ${s.mailbox ? html`<${Section} size="small" title=${t('profile.nodeStats.mailboxTitle')}>
+      <${NumeralBand} tone="plain" items=${[
+        stat(t('profile.nodeStats.mailboxItems'), s.mailbox.items_total),
+        stat(t('profile.nodeStats.mailboxBytes'), fmtBytes(s.mailbox.bytes_total)),
+        stat(t('profile.nodeStats.mailboxDelivered'), num(s.mailbox.delivered_total || 0)),
+        stat(t('profile.nodeStats.mailboxExpired'), s.mailbox.expired_total, s.mailbox.expired_total > 0),
+      ]} />
+    <//>` : null}
 
-    <h3 class="stat-section-h3">${t('profile.nodeStats.securityTitle')}</h3>
-    <div class="stat-grid-sm">
-      <${StatCard} label=${t('profile.nodeStats.authFailures')} value=${s.auth_failures_total || 0} tone=${(s.auth_failures_total || 0) > 0 ? 'danger' : 'success'} />
-      <${StatCard} label=${t('profile.nodeStats.rateLimitHits')} value=${s.rate_limit_hits_total || 0} tone=${(s.rate_limit_hits_total || 0) > 0 ? 'warn' : 'success'} />
-      <${StatCard} label=${t('profile.nodeStats.scopeDenials')} value=${s.scope_denials_total || 0} tone=${(s.scope_denials_total || 0) > 0 ? 'warn' : 'success'} />
-    </div>
+    <${Section} size="small" title=${t('profile.nodeStats.securityTitle')}>
+      <${NumeralBand} tone="plain" items=${[
+        stat(t('profile.nodeStats.authFailures'), s.auth_failures_total || 0, (s.auth_failures_total || 0) > 0),
+        stat(t('profile.nodeStats.rateLimitHits'), s.rate_limit_hits_total || 0, (s.rate_limit_hits_total || 0) > 0),
+        stat(t('profile.nodeStats.scopeDenials'), s.scope_denials_total || 0, (s.scope_denials_total || 0) > 0),
+      ]} />
+    <//>
 
-    <p class="stat-footer">${t('profile.nodeStats.startedAt')}: ${fmtDateTime(s.started_at)}</p>
-  `;
+    <${Text} kind="caption" tone="muted">${t('profile.nodeStats.startedAt')}: ${fmtDateTime(s.started_at)}<//>
+  <//>`;
 }

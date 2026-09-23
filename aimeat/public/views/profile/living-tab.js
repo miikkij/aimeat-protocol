@@ -11,6 +11,9 @@
  * @structure LivingTab (default export) — templates list/editor + deploy + instances list/viewer
  * @usage html`<${LivingTab} session=${session} showToast=${showToast} />`
  * @version-history
+ *   2026-09-22 -- The set's newer props: the document preview, a picked earlier version and a pending
+ *     body scroll inside a capped height; slot-id and number fields are narrow; Approve is in the
+ *     success tone, Reject, Delete and a section's ✗ in the danger tone.
  *   2026-09-22 -- Composed from the shared set (Page, Rail, Section, ListRow, Field, Toolbar, Surface,
  *     Chip, Action, Text, Stack, Columns) so the tab follows the one theme; living.css is gone. Each
  *     view has one loud action (author, save, deploy or pulse); the ✨ ↻ ⏳ ＋ glyphs are dropped and
@@ -301,7 +304,7 @@ export default function LivingTab({ session, showToast }) {
         <${Columns} collapse=${560}>
           <${Field} type="select" label=${t('profile.living.trust')} value=${editing.charter?.trust?.derive || 'auto'} onChange=${e => setTrust(e.target.value)}
             options=${[{ value: 'auto', label: t('profile.living.trustAuto') }, { value: 'gated', label: t('profile.living.trustGated') }]} />
-          <${Field} type="number" min="0" label=${t('profile.living.activityTrigger')} value=${activityThreshold(editing)} onInput=${e => setActivityTrigger(e.target.value)} />
+          <${Field} type="number" min="0" width="narrow" label=${t('profile.living.activityTrigger')} value=${activityThreshold(editing)} onInput=${e => setActivityTrigger(e.target.value)} />
         <//>
 
         <${Text} kind="label">${t('profile.living.sections')}<//>
@@ -309,8 +312,8 @@ export default function LivingTab({ session, showToast }) {
           <${Columns} key=${i} layout="quarters" density="compact">
             <${Field} placeholder=${t('profile.living.sectionName')} value=${s.section} onInput=${e => patchSlot(i, { section: e.target.value })} />
             <${Field} placeholder=${t('profile.living.sectionDesc')} value=${s.desc} onInput=${e => patchSlot(i, { desc: e.target.value })} />
-            <${Field} placeholder="slot-id" value=${s.slot} onInput=${e => patchSlot(i, { slot: e.target.value })} />
-            <${Stack} direction="horizontal"><${Action} kind="text" onClick=${() => removeSlot(i)}>✗<//><//>
+            <${Field} placeholder="slot-id" width="narrow" value=${s.slot} onInput=${e => patchSlot(i, { slot: e.target.value })} />
+            <${Stack} direction="horizontal"><${Action} kind="text" tone="danger" onClick=${() => removeSlot(i)}>✗<//><//>
           <//>`)}
         <${Stack} direction="horizontal"><${Action} onClick=${addSlot}>${t('profile.living.addSection')}<//><//>
         <${Stack} direction="wrap" align="center">
@@ -373,7 +376,7 @@ export default function LivingTab({ session, showToast }) {
               ]} />
           <//>
 
-          <${Surface} kind="box"><${Markdown} text=${md} /><//>
+          <${Surface} kind="box" height="scroll"><${Markdown} text=${md} /><//>
 
           <${Text} kind="label">${t('profile.living.sections')}<//>
           <${Stack} density="compact">
@@ -393,13 +396,13 @@ export default function LivingTab({ session, showToast }) {
                     <${Field} type="select" label=${t('profile.living.timeline')} value=${pickedVer ? String(versions.indexOf(pickedVer)) : ''} onChange=${e => pickVersion(sec.slot, e.target.value)}
                       options=${[{ value: '', label: t('profile.living.versionCurrent') },
                         ...versions.map((v, i) => ({ value: String(i), label: `${fmtDateTime(v.producedAt)} · ${escHtml(v.producedBy || '')}` }))]} />
-                    ${pickedVer && html`<${Surface} kind="box"><${Markdown} text=${pickedVer.markdown} /><//>`}`}
+                    ${pickedVer && html`<${Surface} kind="box" height="scroll"><${Markdown} text=${pickedVer.markdown} /><//>`}`}
                   ${sec.kind === 'aggregate' && html`
                     ${series.length ? renderChart(series) : html`<${Text} kind="caption" tone="muted">${t('profile.living.noData')}<//>`}
                     <${Toolbar} label=${t('profile.living.addPoint')} actions=${html`<${Action} onClick=${() => submitDp(sec.slot)}>${t('profile.living.addPoint')}<//>`}>
                       <${Field} placeholder=${t('profile.living.dpLabel')} id=${'dp-l-' + sec.slot}
                         value=${draftOf('dp-l-' + sec.slot)} onInput=${e => setDraft('dp-l-' + sec.slot, e.target.value)} />
-                      <${Field} type="number" placeholder=${t('profile.living.dpValue')} id=${'dp-v-' + sec.slot}
+                      <${Field} type="number" width="narrow" placeholder=${t('profile.living.dpValue')} id=${'dp-v-' + sec.slot}
                         value=${draftOf('dp-v-' + sec.slot)} onInput=${e => setDraft('dp-v-' + sec.slot, e.target.value)}
                         onKeyDown=${e => { if (e.key === 'Enter') submitDp(sec.slot); }} />
                     <//>`}
@@ -409,10 +412,10 @@ export default function LivingTab({ session, showToast }) {
                     <${Surface} kind="aside">
                       <${Stack} density="compact">
                         <${Text} kind="caption" tone="muted">${t('profile.living.pendingTitle')}<//>
-                        <${Markdown} text=${opened.pending[sec.slot].markdown} />
+                        <${Surface} kind="plain" height="scroll"><${Markdown} text=${opened.pending[sec.slot].markdown} /><//>
                         <${Stack} direction="wrap">
-                          <${Action} onClick=${() => approveSlot(sec.slot)}>${t('profile.living.approve')}<//>
-                          <${Action} onClick=${() => rejectSlot(sec.slot)}>${t('profile.living.reject')}<//>
+                          <${Action} tone="success" onClick=${() => approveSlot(sec.slot)}>${t('profile.living.approve')}<//>
+                          <${Action} tone="danger" onClick=${() => rejectSlot(sec.slot)}>${t('profile.living.reject')}<//>
                         <//>
                       <//>
                     <//>`}
@@ -475,7 +478,7 @@ export default function LivingTab({ session, showToast }) {
                 value=${`${(tpl.template || []).length} ${t('profile.living.sectionsShort')}`}
                 actions=${html`<${Action} onClick=${() => startDeploy(tpl)}>${t('profile.living.deploy')}<//>
                   <${Action} onClick=${() => setEditing({ ...tpl })}>${t('profile.living.edit')}<//>
-                  <${Action} onClick=${() => deleteTpl(tpl)}>${t('profile.notebook.deleteBtn')}<//>`} />`)}
+                  <${Action} tone="danger" onClick=${() => deleteTpl(tpl)}>${t('profile.notebook.deleteBtn')}<//>`} />`)}
           <//>
 
           <${Section} id="ld-instances" title=${t('profile.living.instancesTitle')} description=${t('profile.living.instancesDesc')}>

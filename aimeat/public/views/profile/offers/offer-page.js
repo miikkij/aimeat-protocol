@@ -12,6 +12,8 @@
  * @structure renderOffer · SellingEditor · askWord
  * @usage import { renderOffer } from './offer-page.js';
  * @version-history
+ *   2026-09-22 -- The money price field opens the decimal keypad on a phone (Field inputMode); the
+ *     jump to the request uses the set's scrollToId.
  *   2026-09-22 -- Composed from the shared component set (NumeralBand strip, Section, Fold,
  *     KeyValue, Field, Surface, Action); no own CSS. Behaviour and words unchanged.
  *   v1.0.0 — 2026-08-30 — Initial.
@@ -25,8 +27,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { fmtMoney, microsFromInput } from '/js/utils.js';
 import { DeliverableBody } from '/components/ImageDeliverable.js';
-import { Section, Fold, Stack, Columns, KeyValue, Field, Action, Text, Surface, NumeralBand } from '/components/poster-parts.js';
-import { scrollTo } from '/views/profile/organisms/poster-parts.js';
+import { Section, Fold, Stack, Columns, KeyValue, Field, Action, Text, Surface, NumeralBand, scrollToId } from '/components/poster-parts.js';
 import { dispatchMode } from '/js/services/offers.js';
 import { runsOf } from './model.js';
 import { c, word, agentMark, getWord, statusWord, deliveryRows, rel, chipRow, railList, renderPage } from './frame.js';
@@ -62,7 +63,7 @@ function SellingEditor({ it, ctx }) {
       <${Field} type="select" label=${c('colVisibility')} value=${vis} onChange=${(e) => setVis(e.target.value)}
         options=${['private', 'unlisted', 'public'].map(v => ({ value: v, label: t('profile.offers.visibility.' + v) }))} />
       <${Field} type="number" min="0" label=${`${t('profile.offers.morsels')} / ${t('profile.offers.perCall')}`} value=${morsels} onInput=${(e) => setMorsels(e.target.value)} />
-      <${Field} type="text" label=${c('colPrice')} value=${moneyAmt} placeholder="0.00" onInput=${(e) => setMoneyAmt(e.target.value)} />
+      <${Field} type="text" inputMode="decimal" label=${c('colPrice')} value=${moneyAmt} placeholder="0.00" onInput=${(e) => setMoneyAmt(e.target.value)} />
       <${Field} type="select" label="EUR / USD" value=${moneyCur} onChange=${(e) => setMoneyCur(e.target.value)}
         options=${[{ value: 'EUR', label: 'EUR' }, { value: 'USD', label: 'USD' }]} />
     <//>
@@ -102,7 +103,7 @@ export function renderOffer(ctx, it) {
     ...consequences.map(x => [conseqWord(x.type), 'sun']),
   ]);
   const doors = html`
-    <${Action} kind="primary" onClick=${() => scrollTo('op-what')}>${c('ask')}<//>
+    <${Action} kind="primary" onClick=${() => scrollToId('op-what')}>${c('ask')}<//>
     <${Action} onClick=${() => ctx.openTab('agents')}>${c('agentPage')}<//>
     <${Action} onClick=${() => ctx.setSellFoldOpen(v => !v)}>${c('sell')}<//>`;
   const strip = html`<${NumeralBand} tone="plain" items=${[

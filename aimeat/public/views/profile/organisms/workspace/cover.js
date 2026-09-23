@@ -15,6 +15,9 @@
  * @structure renderWorkspaceView (cover or page) · renderCover · renderPage · renderRail · renderTree
  * @usage import { renderWorkspaceView } from './workspace/cover.js';
  * @version-history
+ *   2026-09-22 -- The rail's fold entries open their fold through the set's onClick, not the hash;
+ *     Approve and Reject carry the success and danger tones; the scroll comes from the set; the
+ *     settings page's identity line carries the last-saved chip, and the template chip once.
  *   2026-09-22 -- Composed from the shared set: Page with an index Rail (the tree is the same rail
  *     with the structure as its body), Sections, ListRows for the spaces and the events, a plain
  *     NumeralBand for the figures, a search Field; no class of its own. A rail entry that names a
@@ -40,8 +43,8 @@ import { WorkspaceApps } from '/views/profile/organisms/workspace-apps.js';
 import { ParticipantsPanel } from '/views/profile/organisms/participants-panel.js';
 import { SourcesPanel } from '/views/profile/organisms/sources-panel.js';
 import { SkillsPanel } from '/views/profile/organisms/skills-panel.js';
-import { tr, scrollTo } from '/views/profile/organisms/poster-parts.js';
-import { Page, Rail, Section, Fold, Stack, ListRow, Chip, Action, Field, Text, NumeralBand } from '/components/poster-parts.js';
+import { tr } from '/views/profile/organisms/poster-parts.js';
+import { Page, Rail, Section, Fold, Stack, ListRow, Chip, Action, Field, Text, NumeralBand, scrollToId as scrollTo } from '/components/poster-parts.js';
 import { gotoEvent, ovAddNew, renderWsSearchResults, renderObjectives } from './overview.js';
 import { renderSpacesAdd, renderSettingsPanel, renderShareTab, renderReviewTab, renderActivityTab } from './panels.js';
 import { renderSpaceNotice, shortActor } from './helpers.js';
@@ -205,8 +208,8 @@ function renderCover(ctx) {
             <${Text} kind="label">${tr('organisms.ws.waiting', 'Waiting for your decision')} ${approvals.length}<//>
             <${Stack} density="compact">${approvals.map(a => html`
               <${ListRow} key=${a.id} density="compact" name=${a.prompt || a.action}
-                actions=${html`<${Action} disabled=${busy} onClick=${() => resolve(a.id, 'approve')}>${tr('organisms.approve', 'Approve')}<//>
-                  <${Action} kind="text" disabled=${busy} onClick=${() => resolve(a.id, 'reject')}>${tr('organisms.reject', 'Reject')}<//>`} />`)}<//>` : null}
+                actions=${html`<${Action} tone="success" disabled=${busy} onClick=${() => resolve(a.id, 'approve')}>${tr('organisms.approve', 'Approve')}<//>
+                  <${Action} kind="text" tone="danger" disabled=${busy} onClick=${() => resolve(a.id, 'reject')}>${tr('organisms.reject', 'Reject')}<//>`} />`)}<//>` : null}
         <//>
       <//>`);
   }
@@ -236,9 +239,9 @@ function renderCover(ctx) {
 
   const nReadme = String(entries.length + 1).padStart(2, '0'), nMap = String(entries.length + 2).padStart(2, '0'), nAi = String(entries.length + 3).padStart(2, '0');
   entries.push(
-    { id: 'ws-readme', href: '#ws-readme', label: tr('organisms.readmeFold', 'README'), count: '→' },
-    { id: 'ws-map', href: '#ws-map', label: tr('organisms.mapAndToc', 'Map and table of contents'), count: '→' },
-    { id: 'ws-ai', href: '#ws-ai', label: tr('organisms.forAi', 'For your AI'), count: '→' },
+    { id: 'ws-readme', href: '#ws-readme', label: tr('organisms.readmeFold', 'README'), count: '→', onClick: () => setOpenReadme(true) },
+    { id: 'ws-map', href: '#ws-map', label: tr('organisms.mapAndToc', 'Map and table of contents'), count: '→', onClick: () => setOpenMap(true) },
+    { id: 'ws-ai', href: '#ws-ai', label: tr('organisms.forAi', 'For your AI'), count: '→', onClick: () => setOpenAi(true) },
   );
 
   return html`<${Page} title=${ws.manifest?.name || ctx.wsName || ctx.org.name} crumbs=${crumbs(ctx, null)}
@@ -313,7 +316,9 @@ export function renderWorkspaceView(ctx) {
   const { ws, showSettings, activeTab, activeSpace, isDocSpace, unseenOf, setActiveDoc, addSection, startAdd } = ctx;
   if (showSettings) {
     return renderPage(ctx, { id: 'settings', last: tr('organisms.settings', 'Settings'), title: tr('organisms.settings', 'Settings'),
-      chips: html`<${Chip} tone="muted">${tr('organisms.template', 'Template')} ${(ws.manifest?.kind || '-')}<//>`, children: renderSettingsPanel(ctx) });
+      chips: html`<${Chip} tone="muted">${tr('organisms.template', 'Template')} ${(ws.manifest?.kind || '-')}<//>
+        ${ws.manifest?.updatedAt ? html`<${Chip} tone="muted">${tr('organisms.lastSaved', 'Last saved')} ${fmtDate(ws.manifest.updatedAt)}<//>` : null}`,
+      children: renderSettingsPanel(ctx) });
   }
   if (activeSpace) {
     const ot = activeSpace;

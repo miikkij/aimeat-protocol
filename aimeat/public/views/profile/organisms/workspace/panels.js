@@ -10,6 +10,9 @@
  * @structure renderSpacesAdd, renderSettingsPanel, renderShareTab, renderReviewTab, renderActivityTab
  * @usage import { renderSettingsPanel } from '/views/profile/organisms/workspace/panels.js';
  * @version-history
+ *   2026-09-22 -- The danger zone is the set's solid danger aside; Remove, Remove password and Reject
+ *     carry the danger tone, Approve the success tone. The template and last-saved chips moved to the
+ *     settings page's identity line (cover.js), where the template chip already stood twice.
  *   2026-09-22 -- Composed from the shared set (Section, Field, ListRow, Action, CopyAction): no class of
  *     its own. The share-access radios are tab-style radio actions (a click on the password choice
  *     without a password still points at the field instead of switching); emoji fallbacks removed.
@@ -27,7 +30,6 @@ import { t } from '/js/i18n.js';
 import { Section, Stack, Surface, ListRow, Chip, Action, CopyAction, Field, Text } from '/components/poster-parts.js';
 import { Mermaid } from '/components/Mermaid.js';
 import * as orgService from '/js/services/organisms.js';
-import { fmtDate } from '/views/profile/organisms/helpers.js';
 import { ActivityPanel } from '/views/profile/organisms/activity-panel.js';
 import { WorkspaceGenerator } from './generator.js';
 
@@ -55,11 +57,6 @@ export function renderSettingsPanel(ctx) {
     setDelConfirm, delWorkspace, orgId, wsId, showToast, load, genBusy, setGenBusy,
   } = ctx;
   return html`<${Stack}>
-    <${Stack} direction="wrap" density="compact">
-      <${Chip} tone="muted">${t('organisms.template') || 'Template'} ${(ws.manifest?.kind || '-')}<//>
-      ${ws.manifest?.updatedAt ? html`<${Chip} tone="muted">${t('organisms.lastSaved') || 'Last saved'} ${fmtDate(ws.manifest.updatedAt)}<//>` : null}
-    <//>
-
     <${Section} title=${t('organisms.formIdentity') || 'Identity'} size="small" density="compact">
       <${Stack}>
         <${Field} label=${t('organisms.wsName') || 'Name'} value=${sName} onInput=${e => setSName(e.target.value)} />
@@ -86,7 +83,7 @@ export function renderSettingsPanel(ctx) {
           ${(ws.manifest?.objectTypes || []).map(ot => html`
             <${ListRow} key=${'sp' + ot.name} density="compact" name=${ot.name}
               actions=${html`<${Chip} tone="muted">${isDocSpace(ot) ? (t('organisms.docs') || 'docs') : (t('organisms.recordsMode') || 'records')}<//>
-                <${Action} onClick=${() => removeSpaceHandler(ot.name)} disabled=${busy}>${t('organisms.remove') || 'Remove'}<//>`} />`)}
+                <${Action} tone="danger" onClick=${() => removeSpaceHandler(ot.name)} disabled=${busy}>${t('organisms.remove') || 'Remove'}<//>`} />`)}
         <//>
         <${Stack} direction="wrap" align="end">
           <${Field} placeholder=${t('organisms.docSpaceNamePlaceholder') || 'New document space name'} value=${newSpaceName} onInput=${e => setNewSpaceName(e.target.value)} />
@@ -113,7 +110,7 @@ export function renderSettingsPanel(ctx) {
     <//>
 
     <${Section} title=${t('organisms.dangerZone') || 'Danger zone'} size="small" density="compact">
-      <${Surface} kind="box">
+      <${Surface} kind="aside" tone="danger">
         <${Stack}>
           <${Text}>${t('organisms.deleteWarn') || 'Deleting the workspace removes the manifest and ALL its data — drafts, published records, version history — and its schemas. The organism stays. This cannot be undone.'}<//>
           <${Stack} direction="wrap" align="end">
@@ -192,7 +189,7 @@ export function renderShareTab(ctx) {
                   ${share.has_password ? (t('organisms.sharePasswordChange') || 'Change password') : (t('organisms.sharePasswordSave') || 'Set password')}
                 <//>
                 ${share.has_password ? html`
-                  <${Action} kind="text" disabled=${shareBusy}
+                  <${Action} kind="text" tone="danger" disabled=${shareBusy}
                     onClick=${() => { if (window.confirm(t('organisms.sharePasswordClearConfirm') || 'Remove the share password? The shared pages become link-only.')) patchShare({ access: 'open', password: null }); }}>
                     ${t('organisms.sharePasswordClear') || 'Remove password'}
                   <//>` : null}
@@ -225,8 +222,8 @@ export function renderReviewTab(ctx) {
         <${Stack} density="compact">
           ${approvals.map(a => html`
             <${ListRow} key=${a.id} density="compact" name=${a.prompt || a.action}
-              actions=${html`<${Action} onClick=${() => resolve(a.id, 'approve')} disabled=${busy}>${t('organisms.approve') || 'Approve'}<//>
-                <${Action} kind="text" onClick=${() => resolve(a.id, 'reject')} disabled=${busy}>${t('organisms.reject') || 'Reject'}<//>`} />`)}
+              actions=${html`<${Action} tone="success" onClick=${() => resolve(a.id, 'approve')} disabled=${busy}>${t('organisms.approve') || 'Approve'}<//>
+                <${Action} kind="text" tone="danger" onClick=${() => resolve(a.id, 'reject')} disabled=${busy}>${t('organisms.reject') || 'Reject'}<//>`} />`)}
         <//>`}
   <//>`;
 }

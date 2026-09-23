@@ -3,19 +3,22 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Shared "human-readable value" renderer. Renders a JSON object/array as an indented
- *   key/value TREE (type-coloured primitives) — far easier to scan than raw JSON — and renders a
- *   non-JSON string as safe Markdown. Mirrors the agent-tasks memory renderer so structured data
- *   looks the SAME everywhere. Reuses the global `pf-agd-json-*` / `pf-agd-task-memory-md` styles
- *   (loaded via css/views/agents-detail.css in spa.html), so no extra CSS is needed.
+ *   key/value TREE (primitives toned by type) — far easier to scan than raw JSON — and renders a
+ *   non-JSON string as safe Markdown. Composed from the shared set (components/poster-parts.js):
+ *   the tree is KeyValue rows whose value column holds the nested value, which indents it, the same
+ *   way the agent task memory viewer draws one; a whole value sits in a code Surface.
  * @structure parseValue · JsonNode · JsonValue
  * @usage import { JsonValue } from '/components/JsonView.js';  html`<${JsonValue} value=${v} />`
  * @version-history
+ *   2026-09-22 -- Composed from the shared component set (Surface, Stack, KeyValue, Text) instead of
+ *     the pf-agd-json-* classes, so css/views/agents-detail.css could go. Exports and props unchanged.
  *   v1.0.0 — 2026-06-15 — extracted the agents-tasks structured JSON/markdown renderer into a shared
  *     component so the Ecosystem-apps "Data this app wrote" view (and others) render values the same way.
  */
 import { h } from 'preact';
 import htm from 'htm';
 import { Markdown } from '/components/Markdown.js';
+import { Surface, Stack, KeyValue, Text } from '/components/poster-parts.js';
 
 const html = htm.bind(h);
 
@@ -36,35 +39,29 @@ export function parseValue(value) {
 }
 
 /**
- * Recursive structured renderer: objects/arrays become indented key/value rows, primitives get
- * type-coloured values. Far easier to scan than raw JSON. (Same markup the agent tasks view uses.)
+ * Recursive structured renderer: objects/arrays become key/value rows (a nested value sits in the
+ * value column, which indents it), primitives are mono words toned by type. (The same tree the agent
+ * task memory viewer draws.)
  */
 export function JsonNode({ value }) {
-  if (value === null) return html`<span class="pf-agd-json-null">null</span>`;
+  if (value === null) return html`<${Text} kind="mono" tone="muted">null<//>`;
   const ty = typeof value;
-  if (ty === 'string') return html`<span class="pf-agd-json-str">${value}</span>`;
-  if (ty === 'number') return html`<span class="pf-agd-json-num">${value}</span>`;
-  if (ty === 'boolean') return html`<span class="pf-agd-json-bool">${value ? 'true' : 'false'}</span>`;
+  if (ty === 'string') return html`<${Text} kind="mono">${value}<//>`;
+  if (ty === 'number') return html`<${Text} kind="mono" tone="info">${value}<//>`;
+  if (ty === 'boolean') return html`<${Text} kind="mono" tone="coral">${value ? 'true' : 'false'}<//>`;
   const entries = Array.isArray(value) ? value.map((v, i) => [String(i), v]) : Object.entries(value || {});
   if (entries.length === 0) {
-    return html`<span class="pf-agd-json-empty">${Array.isArray(value) ? '[ ]' : '{ }'}</span>`;
+    return html`<${Text} kind="mono" tone="muted">${Array.isArray(value) ? '[ ]' : '{ }'}<//>`;
   }
   return html`
-    <div class="pf-agd-json-block">
-      ${entries.map(([k, v]) => {
-        const nested = v !== null && typeof v === 'object';
-        return html`
-          <div class=${`pf-agd-json-row ${nested ? 'pf-agd-json-row--nested' : ''}`} key=${k}>
-            <span class="pf-agd-json-key">${k}</span>
-            <${JsonNode} value=${v} />
-          </div>`;
-      })}
-    </div>`;
+    <${Stack} density="compact">
+      ${entries.map(([k, v]) => html`<${KeyValue} key=${k} label=${k} value=${html`<${JsonNode} value=${v} />`} />`)}
+    <//>`;
 }
 
-/** Render any value readably: JSON → the key/value tree; a non-JSON string → safe Markdown. */
+/** Render any value readably: JSON → the key/value tree in a code surface; a non-JSON string → safe Markdown. */
 export function JsonValue({ value }) {
   const { json, raw } = parseValue(value);
-  if (json !== undefined) return html`<${JsonNode} value=${json} />`;
-  return html`<div class="pf-agd-task-memory-md"><${Markdown} text=${raw} /></div>`;
+  if (json !== undefined) return html`<${Surface} kind="code" density="compact" height="tall"><${JsonNode} value=${json} /><//>`;
+  return html`<${Surface} kind="plain" density="flush"><${Markdown} text=${raw} /><//>`;
 }

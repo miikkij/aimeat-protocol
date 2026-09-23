@@ -10,12 +10,14 @@
  *   aiTextFor · crumb · pageLinks
  * @usage import { x, shelfOf, statusWord, modelWord } from './frame.js';
  * @version-history
+ *   2026-09-22 -- The crumb is the shared trail's entries and the rail links are shared Actions; no own CSS.
  *   v1.0.0 — 2026-09-03 — Initial (design canvas "AIMEAT Kirjastot-sivu", direction A).
  */
 import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
+import { Stack, Action, Text } from '/components/poster-parts.js';
 
 export const x = (key, vars) => t('libspage.' + key, vars);
 
@@ -68,15 +70,18 @@ export function aiTextFor(pack, detail) {
   return lines.join('\n');
 }
 
+/** The trail to this page, as Masthead crumbs. */
 export function crumb() {
-  return html`<div class="og-crumb"><span>${t('nav.profile')}</span><span>/</span><span>${t('profile.landing.menuBuildShare')}</span><span>/</span><span class="og-crumb-here">${t('librariesTab.tabLabel')}</span></div>`;
+  return [{ label: t('nav.profile') }, { label: t('profile.landing.menuBuildShare') }, { label: t('librariesTab.tabLabel') }];
 }
 
 const openTab = (tabId) => window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId } }));
 export function pageLinks() {
-  return html`
-    <button type="button" class="og-rail-link" onClick=${() => openTab('apps')}><i>→</i>${t('profile.tabs.apps')}<em>→</em></button>
-    <button type="button" class="og-rail-link" onClick=${() => openTab('extensions')}><i>→</i>${t('profile.tabs.extensions')}<em>→</em></button>
-    <button type="button" class="og-rail-link" onClick=${() => openTab('appdev')}><i>→</i>${t('profile.tabs.appDev')}<em>→</em></button>
-    <a class="og-rail-link" href="https://design-book.apps.aimeat.io/" target="_blank" rel="noopener"><i>→</i>Design Book<em>→</em></a>`;
+  return html`<${Stack} density="compact">
+    <${Text} kind="label">${x('pages')}<//>
+    <${Action} kind="text" onClick=${() => openTab('apps')}>${t('profile.tabs.apps')} →<//>
+    <${Action} kind="text" onClick=${() => openTab('extensions')}>${t('profile.tabs.extensions')} →<//>
+    <${Action} kind="text" onClick=${() => openTab('appdev')}>${t('profile.tabs.appDev')} →<//>
+    <${Action} kind="text" href="https://design-book.apps.aimeat.io/" target="_blank">Design Book →<//>
+  <//>`;
 }

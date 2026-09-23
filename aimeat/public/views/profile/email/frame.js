@@ -7,6 +7,9 @@
  * @structure c · rel · day · providerWord · kindWord · channelWord · Switch · crumb · pageLinks
  * @usage import { c, rel, Switch, crumb, pageLinks } from './frame.js';
  * @version-history
+ *   2026-09-22 -- Composed from the shared set: the switch is a switch Action (a locked one is on
+ *     and disabled), the crumb is Masthead crumbs and the rail links are text actions; no class of
+ *     its own, so email-poster.css can go.
  *   v1.0.0 — 2026-08-30 — Initial (design canvas "AIMEAT Sähköpostin sivu", direction A).
  */
 import { h } from 'preact';
@@ -15,6 +18,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { date as fmtDate, time as fmtTime } from '/js/format.js';
 import { formatRelativeTime } from '/views/profile/memory-tab/helpers.js';
+import { Action, Stack, Text } from '/components/poster-parts.js';
 
 export const c = (key, vars) => t('emailpage.' + key, vars);
 // The locale() helper here derived the FORMAT from the LANGUAGE. They are different settings:
@@ -33,18 +37,22 @@ export const kindWord = (kind) => (MAIL_KINDS.includes(kind) ? c('kind.' + kind)
 export const channelWord = (m) => c(m?.channel === 'inbox' ? 'via.inbox' : 'via.email');
 export const statusWord = (s) => c('status.' + (['sent', 'failed', 'suppressed', 'skipped'].includes(s) ? s : 'other'));
 
-/** The poster switch: the word on the left, the box on the right. */
+/** An on/off setting: the shared tab action with switch semantics. A locked one is on and cannot be changed. */
 export function Switch({ on, label, disabled, locked, onToggle }) {
-  return html`<button type="button" class=${`nt-sw ${locked ? 'lock on' : on ? 'on' : 'off'}`} disabled=${disabled || locked} aria-pressed=${on ? 'true' : 'false'} onClick=${onToggle}>${label}<i></i></button>`;
+  return html`<${Action} kind="tab" semantics="switch" selected=${!!(on || locked)} disabled=${disabled || locked} onClick=${onToggle}>${label}<//>`;
 }
 
+/** The trail as Masthead crumbs: Settings & Controls, Activity, Email. */
 export function crumb() {
-  return html`<div class="og-crumb"><span>${t('nav.profile')}</span><span>/</span><span class="og-crumb-here">${c('title')}</span></div>`;
+  return [{ label: t('nav.profile') }, { label: t('profile.landing.menuActivity') }, { label: c('title') }];
 }
 const openTab = (tabId) => window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId } }));
+/** The doors to the pages next to this one, for the rail. */
 export function pageLinks() {
-  return html`
-    <button type="button" class="og-rail-link" onClick=${() => openTab('notifications')}><i>→</i>${t('profile.tabs.notifications')}<em>→</em></button>
-    <button type="button" class="og-rail-link" onClick=${() => openTab('contacts')}><i>→</i>${t('contacts.title')}<em>→</em></button>
-    <button type="button" class="og-rail-link" onClick=${() => openTab('access')}><i>→</i>${t('profile.tabs.access')}<em>→</em></button>`;
+  return html`<${Stack} density="compact">
+    <${Text} kind="label">${c('pages')}<//>
+    <${Action} kind="text" onClick=${() => openTab('notifications')}>→ ${t('profile.tabs.notifications')}<//>
+    <${Action} kind="text" onClick=${() => openTab('contacts')}>→ ${t('contacts.title')}<//>
+    <${Action} kind="text" onClick=${() => openTab('access')}>→ ${t('profile.tabs.access')}<//>
+  <//>`;
 }

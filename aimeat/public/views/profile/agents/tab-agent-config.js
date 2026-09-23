@@ -6,6 +6,8 @@
  *   and two-way sync. Shows files pushed by the agent (soul.md, AGENTS.md, etc).
  *   Supports edit, copy, download, and upload actions.
  * @version-history
+ *   2026-09-22 -- The two budget numbers carry hidden labels (the switch's words); the danger zone's
+ *     opener carries the danger tone.
  *   2026-09-22 -- Composed from the shared parts (Section, ListRow, Field, Action, Surface, Text); it no
  *     longer borrows the scheduler's and projects' classes. The danger zone keeps its typed-name gate.
  *   2026-09-20 -- The agent's AI section (agent-ai-section.js): its own keys, cap, gate and numbers.
@@ -70,13 +72,13 @@ function ScheduleBudgetSection({ agent, agentName, showToast }) {
         <${Columns} layout="leading" density="compact" collapse="560">
           <${Field} type="checkbox" label=${t('profile.scheduler.maxRuns')} value=${maxRuns.enabled}
             onChange=${e => setMaxRuns(s => ({ ...s, enabled: e.target.checked }))} />
-          <${Field} type="number" min="1" value=${maxRuns.limit} disabled=${!maxRuns.enabled}
+          <${Field} type="number" min="1" value=${maxRuns.limit} disabled=${!maxRuns.enabled} ariaLabel=${t('profile.scheduler.maxRuns')}
             onInput=${e => setMaxRuns(s => ({ ...s, limit: e.target.value }))} />
         <//>
         <${Columns} layout="leading" density="compact" collapse="560">
           <${Field} type="checkbox" label=${t('profile.scheduler.dailyLimit')} value=${dailyLimit.enabled}
             onChange=${e => setDailyLimit(s => ({ ...s, enabled: e.target.checked }))} />
-          <${Field} type="number" min="0" step="0.1" value=${dailyLimit.limit} disabled=${!dailyLimit.enabled}
+          <${Field} type="number" min="0" step="0.1" value=${dailyLimit.limit} disabled=${!dailyLimit.enabled} ariaLabel=${t('profile.scheduler.dailyLimit')}
             onInput=${e => setDailyLimit(s => ({ ...s, limit: e.target.value }))} />
         <//>
         <${Stack} direction="horizontal" density="compact">
@@ -100,7 +102,7 @@ function AgentDangerZone({ agent, agentName, onDeleteClick }) {
             <${Text} tone="danger"><strong>${t('profile.agents.detail.agent_config.deleteTitle') || 'Delete this agent'}</strong><//>
             <${Text} tone="muted">${t('profile.agents.detail.agent_config.deleteDesc') || 'Removes the agent, its credentials and its task history. This cannot be undone.'}<//>
           <//>
-          <${Action} expanded=${open} onClick=${() => { setOpen(o => !o); setTyped(''); }}>${t('profile.agents.deleteAgent')}…<//>
+          <${Action} tone="danger" expanded=${open} onClick=${() => { setOpen(o => !o); setTyped(''); }}>${t('profile.agents.deleteAgent')}…<//>
         <//>
         ${open && html`
           <${Stack} direction="wrap" align="end" density="compact">

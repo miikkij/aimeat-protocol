@@ -1,28 +1,23 @@
 {
   "_note": "Copied design-language declarations, recorded debt rather than approval. This files map may only shrink. After migration, lower the affected counts or remove cleared files. Only an explicit developer decision permits re-seeding with pnpm check:poster-shapes --record.",
   "_measured": {
-    "date": "2026-09-23T01:26:20Z",
-    "files": 67,
-    "declarations": 461,
+    "date": "2026-09-23T02:42:24Z",
+    "files": 52,
+    "declarations": 384,
     "patterns": {
-      "sun": 105,
-      "box2": 146,
-      "record": 28,
-      "headline": 50,
+      "sun": 85,
+      "box2": 117,
+      "record": 12,
+      "headline": 45,
       "action": 64,
-      "frame3": 43,
+      "frame3": 40,
       "slab": 7,
       "rule": 11,
       "dialog": 1,
-      "label": 6
+      "label": 2
     }
   },
   "files": {
-    "public/css/views/access-poster.css": {
-      "sun": 2,
-      "box2": 2,
-      "record": 3
-    },
     "public/css/views/admin-agent-integration.css": {
       "sun": 2
     },
@@ -209,19 +204,6 @@
       "action": 1,
       "sun": 1
     },
-    "public/css/views/ai-poster.css": {
-      "sun": 3,
-      "box2": 3,
-      "frame3": 1,
-      "record": 1
-    },
-    "public/css/views/appdev-poster.css": {
-      "sun": 1,
-      "box2": 1
-    },
-    "public/css/views/apps-poster.css": {
-      "box2": 1
-    },
     "public/css/views/build-story.css": {
       "sun": 2,
       "box2": 3,
@@ -229,18 +211,6 @@
       "record": 4,
       "slab": 1,
       "dialog": 1
-    },
-    "public/css/views/calibrator-poster.css": {
-      "headline": 2,
-      "sun": 2,
-      "box2": 5,
-      "frame3": 1,
-      "record": 2
-    },
-    "public/css/views/capabilities-poster.css": {
-      "sun": 1,
-      "box2": 2,
-      "record": 1
     },
     "public/css/views/changelog.css": {
       "rule": 1,
@@ -256,24 +226,6 @@
       "sun": 5,
       "box2": 6,
       "slab": 2
-    },
-    "public/css/views/companies-poster.css": {
-      "sun": 1,
-      "box2": 1,
-      "label": 4
-    },
-    "public/css/views/contacts-poster.css": {
-      "box2": 1
-    },
-    "public/css/views/data-wallet-poster.css": {
-      "sun": 2,
-      "box2": 1,
-      "record": 2
-    },
-    "public/css/views/extensions-poster.css": {
-      "sun": 1,
-      "box2": 2,
-      "record": 1
     },
     "public/css/views/help.css": {
       "sun": 2,
@@ -305,18 +257,13 @@
       "box2": 1,
       "frame3": 6
     },
-    "public/css/views/libraries-poster.css": {
-      "sun": 1,
-      "box2": 1,
-      "record": 1
-    },
     "public/css/views/members.css": {
       "box2": 1,
       "frame3": 2
     },
     "public/css/views/notifications-poster.css": {
       "sun": 1,
-      "box2": 3
+      "box2": 1
     },
     "public/css/views/organism.css": {
       "headline": 7,
@@ -328,22 +275,11 @@
       "record": 1,
       "slab": 2
     },
-    "public/css/views/packages-poster.css": {
-      "sun": 2,
-      "box2": 1,
-      "record": 1
-    },
     "public/css/views/portal-dev.css": {
       "action": 1,
       "sun": 6,
       "box2": 13,
       "frame3": 5
-    },
-    "public/css/views/portfolio-poster.css": {
-      "sun": 1,
-      "box2": 2,
-      "frame3": 1,
-      "record": 1
     },
     "public/css/views/profile-door.css": {
       "rule": 1,
@@ -365,19 +301,8 @@
       "sun": 2,
       "box2": 2
     },
-    "public/css/views/skills-poster.css": {
-      "sun": 2,
-      "box2": 1,
-      "record": 1
-    },
     "public/css/views/surface.css": {
       "headline": 1
-    },
-    "public/css/views/wallet-poster.css": {
-      "headline": 3,
-      "sun": 1,
-      "box2": 3,
-      "record": 2
     }
   }
 }

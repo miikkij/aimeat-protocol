@@ -6,16 +6,17 @@
  *   formatting, relative-time labels, avatar monograms, and the whole-organism ZIP export.
  *   Extracted from organisms-tab.js (no behaviour change) so every organism module shares
  *   one copy instead of re-implementing them.
- * @structure fmtDate, relTime, orgInitials, exportOrganismZip, useRailOpens
+ * @structure fmtDate, relTime, orgInitials, exportOrganismZip
  * @usage import { fmtDate, relTime, orgInitials, exportOrganismZip } from '/views/profile/organisms/helpers.js';
  * @version-history
+ *   v1.1.1 -- 2026-09-22 -- useRailOpens removed: the shared Rail's entries now take an onClick that
+ *     opens the fold, so the hash listener has no caller.
  *   v1.1.0 -- 2026-09-22 -- useRailOpens: the shared index rail's entries are anchors, so a fold
  *     that a rail entry names opens when the address moves to its anchor, as the rail's own click did.
  *   v1.0.1 — 2026-07-10 — exportOrganismZip surfaces the server's error message (e.g. the access
  *     denial reason) in the toast instead of a bare "Export failed".
  *   v1.0.0 — 2026-06-19 — Extracted from organisms-tab.js during the module split.
  */
-import { useEffect } from 'preact/hooks';
 import { date as fmtDate, ago } from '/js/format.js';
 import { swallowed } from '/js/swallowed.js';
 import { authHeaders } from '/js/services/auth.js';
@@ -63,15 +64,4 @@ export async function exportOrganismZip(org, showToast) {
     a.href = url; a.download = `organism-${String(org.name || org.id).replace(/[^a-z0-9_-]+/gi, '-').slice(0, 40)}.zip`;
     document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
   } catch (e) { showToast((e && e.message) || 'Export failed'); }
-}
-
-/** Open a folded row when an index-rail entry points at it: `openers` maps an anchor id to the
- * function that opens that fold. The rail's entries are plain anchors, so the hash says which.
- * @param {Record<string, () => void>} openers */
-export function useRailOpens(openers) {
-  useEffect(() => {
-    const onHash = () => { const id = decodeURIComponent((window.location.hash || '').slice(1)); openers[id]?.(); };
-    window.addEventListener('hashchange', onHash);
-    return () => window.removeEventListener('hashchange', onHash);
-  });
 }

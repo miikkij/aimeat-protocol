@@ -17,6 +17,7 @@
  * @structure
  *   - TabReadme ({ readme }) -> rendered Markdown, or a quiet empty state
  * @version-history
+ *   2026-09-22 -- A long README scrolls inside its surface again (Surface height="scroll").
  *   2026-09-22 -- Composed from the shared component set: the Markdown sits in a plain Surface and
  *     the empty state is muted Text. No class of its own is left.
  *   v1.0.0 -- 2026-05-31 -- Initial creation for the agent README tab
@@ -35,7 +36,7 @@ export default function TabReadme({ readme }) {
     return html`<${Text} tone="muted">${t('profile.agents.detail.empty.readme')}<//>`;
   }
   return html`
-    <${Surface} kind="plain" density="flush">
+    <${Surface} kind="plain" density="flush" height="scroll">
       <${Markdown} text=${value} />
     <//>
   `;

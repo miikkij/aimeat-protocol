@@ -16,6 +16,7 @@
  *   - CrewPart · ItemBox — a section with its error lines; one member or task
  *   - IdentitySection · CrewSection · RunSection · ContractSection
  * @version-history
+ *   2026-09-22 -- A member's or task's Remove carries the danger tone.
  *   2026-09-22 -- Composed from the shared parts (Section, Fold, Field, Surface, Action, Text) instead
  *     of the agents-crew sheet's classes. The list and JSON inputs commit on the native change event
  *     (fired when the field is left with a changed value), which is what the blur handler did.
@@ -243,7 +244,7 @@ function ItemBox({ index, problem, onRemove, lines, children }) {
     <${Stack} density="compact">
       <${Stack} direction="horizontal" align="between" density="compact">
         <${Text} kind="mono">${index}<//>
-        <${Action} kind="text" onClick=${onRemove}>${t(`${K}.actions.remove`)}<//>
+        <${Action} kind="text" tone="danger" onClick=${onRemove}>${t(`${K}.actions.remove`)}<//>
       <//>
       <${ErrorLines} lines=${lines} />
       ${children}

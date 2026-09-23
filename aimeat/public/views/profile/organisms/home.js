@@ -13,6 +13,8 @@
  * @structure OrganismHome
  * @usage import { OrganismHome } from '/views/profile/organisms/home.js';
  * @version-history
+ *   v3.2.1 -- 2026-09-22 -- The rail's fold entries open their fold through the set's own onClick
+ *     (the hash listener is gone), and the scroll comes from the set.
  *   v3.2.0 -- 2026-09-22 -- Composed from the shared set: Page with an index Rail, chips, a plain
  *     NumeralBand for the figures, the shared Section and Fold; no class of its own.
  *   v3.1.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
@@ -35,7 +37,7 @@ import { t, tOr } from '/js/i18n.js';
 import { useConfirm } from '/components/Modal.js';
 import * as orgService from '/js/services/organisms.js';
 import { recordRecent } from '/js/recents.js';
-import { fmtDate, exportOrganismZip, useRailOpens } from '/views/profile/organisms/helpers.js';
+import { fmtDate, exportOrganismZip } from '/views/profile/organisms/helpers.js';
 import { StructureOverview } from '/views/profile/organisms/widgets.js';
 import { ReadmePanel } from '/views/profile/organisms/readme-panel.js';
 import { StructureMindmap } from '/views/profile/organisms/mindmap.js';
@@ -47,8 +49,8 @@ import { BoardPreview } from '/views/profile/organisms/panels.js';
 import { InstructionBlock } from '/views/profile/instruction-block.js';
 import { OrganismSettings } from '/views/profile/organisms/home-settings.js';
 import { swallowed } from '/js/swallowed.js';
-import { tr, scrollTo } from '/views/profile/organisms/poster-parts.js';
-import { Page, Section, Fold, Rail, Stack, Chip, Action, Text, NumeralBand } from '/components/poster-parts.js';
+import { tr } from '/views/profile/organisms/poster-parts.js';
+import { Page, Section, Fold, Rail, Stack, Chip, Action, Text, NumeralBand, scrollToId as scrollTo } from '/components/poster-parts.js';
 
 export function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, onBack, onChanged, onLeave }) {
   const { confirm, ConfirmUI } = useConfirm();
@@ -127,9 +129,6 @@ export function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, 
     if (org.name) recordRecent({ type: 'organism', id: org.id, label: org.name, data: { orgId: org.id } });
   }, [org.id, org.name]);
 
-  // The rail's entries are anchors; one that names a fold opens it.
-  useRailOpens({ 'og-readme': () => setOpenReadme(true), 'og-map': () => setOpenMap(true), 'og-ai': () => setOpenAi(true) });
-
   if (view === 'settings') {
     return html`
       <${OrganismSettings} org=${org} ghii=${ghii} isCreator=${isCreator} isMember=${isMember} canEdit=${canEdit}
@@ -156,6 +155,8 @@ export function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, 
     ['og-map', tr('organisms.mapAndToc', 'Map and table of contents'), '→'],
     ['og-ai', tr('organisms.forAi', 'For your AI'), '→'],
   ];
+  // A rail entry that names a fold opens it; the set then scrolls the content area to it.
+  const opens = { 'og-readme': () => setOpenReadme(true), 'og-map': () => setOpenMap(true), 'og-ai': () => setOpenAi(true) };
 
   return html`<${Page} title=${org.name || org.id}
     crumbs=${[{ label: t('nav.profile') }, { label: t('profile.landing.menuInformation') }, { label: tr('organisms.title', 'Organisms'), onClick: onBack }, { label: org.name || org.id }]}
@@ -171,7 +172,7 @@ export function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, 
       <${Action} onClick=${() => setView('settings')}>${tr('organisms.settings', 'Settings')}<//>
       <${Action} onClick=${() => exportOrganismZip(org, showToast)}>${tr('organisms.exportBackup', 'Export backup')}<//>`}
     rail=${html`<${Rail} kind="index" title=${tr('organisms.railTitle', 'In this organism')}
-      entries=${rail.map(([id, label, count]) => ({ id, href: '#' + id, label, count }))}>
+      entries=${rail.map(([id, label, count]) => ({ id, href: '#' + id, label, count, onClick: opens[id] }))}>
       <${Action} kind="text" onClick=${() => setView('settings')}>${tr('organisms.settings', 'Settings')} →<//>
     <//>`}>
     ${org.description ? html`<${Text} kind="lead" tone="muted">${org.description}<//>` : null}

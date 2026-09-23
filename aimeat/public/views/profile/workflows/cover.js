@@ -11,6 +11,8 @@
  * @structure renderWorkflowsView · renderCover · secWorkflows · secWaiting · questionBlock · secNew · pasteBlock · howToRead
  * @usage import { renderWorkflowsView } from './workflows/cover.js';
  * @version-history
+ *   2026-09-22 -- The rail's "how to read" entry opens its fold before the jump, and the jump to a
+ *     new workflow uses the set's scrollToId.
  *   2026-09-22 -- Composed from the shared component set: Page, Rail, NumeralBand strip, Table,
  *     Surface boxes for a question and the three roads, Field, Action tabs for the answer's
  *     options, KeyValue for the words; no own CSS. Every word and handler is the one it was.
@@ -21,8 +23,7 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { Page, Rail, Section, Fold, Stack, Columns, Surface, NumeralBand, KeyValue, Field, Action, Text } from '/components/poster-parts.js';
-import { scrollTo } from '/views/profile/organisms/poster-parts.js';
+import { Page, Rail, Section, Fold, Stack, Columns, Surface, NumeralBand, KeyValue, Field, Action, Text, scrollToId } from '/components/poster-parts.js';
 import { c, loc, rel, day, triggerWords, crumb, chipRow, workflowRows, pageLinks } from './frame.js';
 import { renderDetail } from './detail.js';
 import { renderRun } from './run.js';
@@ -58,12 +59,12 @@ function renderCover(ctx) {
     partial && [c('chipPartial', { n: partial }), 'sun'],
   ]);
   const actions = html`<${Action} kind="primary" onClick=${() => ctx.pickView({ kind: 'create' })}>${c('newWorkflow')}<//>
-    <${Action} onClick=${() => scrollTo('wp-new')}>${c('promptToChat')}<//>`;
+    <${Action} onClick=${() => scrollToId('wp-new')}>${c('promptToChat')}<//>`;
   const rail = html`<${Rail} kind="index" title=${c('railTitle')} entries=${[
     { href: '#wp-list', label: t('profile.workflows.title'), count: items.length },
     { href: '#wp-waiting', label: c('secWaiting'), count: waiting },
     { href: '#wp-new', label: c('secNew') },
-    { href: '#wp-how', label: c('howTitle') },
+    { href: '#wp-how', label: c('howTitle'), onClick: () => ctx.setFold('how', true) },
   ]}>${pageLinks()}<//>`;
   return html`<${Page} width="wide" title=${t('profile.workflows.title')} crumbs=${crumb(ctx, [])} identity=${chips} actions=${actions} rail=${rail}>
     <${Stack}>

@@ -5,6 +5,8 @@
  * @description Enhanced Activity tab with governance filter and category badges.
  *   Wraps the existing activity subtab with additional filter pills.
  * @version-history
+ *   2026-09-22 -- The event log scrolls inside its own surface (Surface height="scroll"), as it did
+ *     before the rebuild, so fifty events do not push the rest of the tab away.
  *   2026-09-22 -- Composed from the shared component set: a small numeral band, a governance section
  *     of key-value rows, tab filters and timeline rows whose marker carries the old badge colour.
  *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
@@ -35,7 +37,7 @@ import { getWebhookConfig, getTelemetry } from '/js/services/agent-integration.j
 import { getLedgerUsage } from '/js/services/ledger.js';
 import { swallowed } from '/js/swallowed.js';
 import { num, time as fmtTime } from '/js/format.js';
-import { Stack, Section, ListRow, NumeralBand, KeyValue, Toolbar, Chip, Action, Text } from '/components/poster-parts.js';
+import { Stack, Section, ListRow, NumeralBand, KeyValue, Toolbar, Chip, Action, Surface, Text } from '/components/poster-parts.js';
 
 const html = htm.bind(h);
 
@@ -245,10 +247,10 @@ export default function TabActivity({ agent, agentName }) {
           label: label !== f.key ? label : f.id.charAt(0).toUpperCase() + f.id.slice(1) };
       })} />
 
-      <${Stack} density="compact">
-        ${filtered.length === 0 && html`
-          <${Text} tone="muted">${t('profile.agents.detail.empty.activity')}<//>
-        `}
+      ${filtered.length === 0 && html`
+        <${Text} tone="muted">${t('profile.agents.detail.empty.activity')}<//>
+      `}
+      ${filtered.length > 0 && html`<${Surface} kind="plain" density="flush" height="scroll"><${Stack} density="compact">
         ${filtered.map((ev, i) => {
           const cat = eventCategory(ev);
           return html`
@@ -259,7 +261,7 @@ export default function TabActivity({ agent, agentName }) {
               detail=${ev.message} />
           `;
         })}
-      <//>
+      <//><//>`}
 
       ${hasMore && html`
         <${Action} onClick=${handleLoadMore}>${t('profile.agents.detail.showAll')}<//>

@@ -120,6 +120,8 @@ body:has(.poster-page) .page-content { background: var(--bg); }
 .poster-rail[data-kind="navigation"] .poster-list-row[data-selected="yes"] .poster-icon-action { color: var(--on-sun); }
 .poster-dialog .poster-rail[data-kind="navigation"] { position: static; max-height: none; }
 .poster-meter { box-sizing: border-box; height: 8px; }
+/* The fill is an SVG: as an inline element it would sit on the text line, below the 8px box. */
+.poster-meter > svg { display: block; }
 .poster-numeral-band dd .poster-text-action { font-weight: inherit; }
 .poster-rail-title { margin: 0 0 .6rem; font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: .75rem; letter-spacing: .06em; text-transform: uppercase; color: var(--sun); }
 .poster-rail ol { list-style: none; margin: 0; padding: 0; }
@@ -168,7 +170,8 @@ body:has(.poster-page) .page-content { background: var(--bg); }
 .poster-list-row[data-muted="yes"] { opacity: .55; }
 .poster-list-row[data-concealed="yes"] .poster-list-name { filter: blur(5px); user-select: none; }
 /* A selected row sits on the sun in both themes, so everything on it takes the ink-on-sun colour. */
-.poster-list-row[data-selected="yes"] :is(small, .poster-list-value, .poster-text-action, .poster-action, .poster-icon-action, .poster-chip, .poster-copy) { color: var(--on-sun); border-color: var(--on-sun); }
+.poster-list-row[data-selected="yes"] :is(small, .poster-list-value, .poster-text-action, .poster-action, .poster-icon-action, .poster-chip, .poster-copy, .poster-list-number, .poster-list-time) { color: var(--on-sun); border-color: var(--on-sun); }
+.poster-page-title > small { margin-left: .8rem; font-family: var(--font-mono); font-size: .8rem; font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--text-dim); vertical-align: middle; }
 .poster-chip[data-tone="danger"] { border-color: var(--danger); background: var(--danger); color: var(--bg); }
 .poster-check-box[data-state="failed"] { border-style: solid; border-color: var(--danger); background: var(--danger); color: var(--bg); }
 .poster-check-box[data-state="warn"] { border-style: solid; border-color: var(--accent); }
@@ -176,9 +179,14 @@ body:has(.poster-page) .page-content { background: var(--bg); }
 .poster-fold-row { display: flex; align-items: center; gap: 1rem; }
 .poster-fold-row > .poster-fold-toggle { flex: 1 1 auto; min-width: 0; }
 .poster-field[data-width="narrow"] { max-width: 12rem; }
+.poster-field-file { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem 1rem; }
+.poster-field-file > .poster-action { cursor: pointer; }
+.poster-field-file > input:focus-visible + label { outline: 2px solid var(--accent); outline-offset: 3px; }
+.poster-field-file-name { min-width: 0; overflow-wrap: anywhere; font-family: var(--font-mono); font-size: .8rem; color: var(--text-dim); }
 /* A table's cells do not break a word or a number in the middle; a narrow table scrolls or stacks. */
 .data-table.poster-table :is(th, td) { overflow-wrap: normal; word-break: normal; }
 .data-table.poster-table td.mono { white-space: nowrap; }
+.data-table.poster-table td[data-align="end"] { text-align: right; font-variant-numeric: tabular-nums; }
 .poster-table-frame { min-width: 0; container: poster-table / inline-size; }
 @container poster-table (max-width: 640px) { .poster-table-wrap[data-collapse="640"] { --stack: 1; } }
 @container poster-table (max-width: 600px) { .poster-table-wrap[data-collapse="600"] { --stack: 1; } }
@@ -345,6 +353,10 @@ button.poster-stat { width: 100%; background: none; border-left: 0; border-right
   .poster-list-actions { grid-column: 1 / -1; justify-content: flex-start; }
   .poster-list-row:not(:has(.poster-list-mark)) { grid-template-columns: minmax(0, 1fr) auto; }
   .poster-list-value { max-width: 8rem; }
+  /* A timeline row gives its time and marker their own line above the name, so a long value does
+     not squeeze the name to a few letters. */
+  .poster-list-row:has(> .poster-list-lead .poster-list-time) { grid-template-columns: minmax(0, 1fr) auto; }
+  .poster-list-row > .poster-list-lead:has(.poster-list-time) { grid-column: 1 / -1; }
 }
 @media (max-width: 560px) {
   .poster-key-value > .kv-row { grid-template-columns: minmax(0, 1fr); gap: .35rem; }

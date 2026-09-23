@@ -16,6 +16,8 @@
  *   renderRecord (./record.js) · renderOther
  * @usage import { renderMemoryView } from './memory-tab/cover.js';
  * @version-history
+ *   2026-09-22 -- The set's newer props: the key-space tables stack on a phone, the rail's
+ *     bookkeeping entry opens its fold, the search field takes focus again, deletes in the danger tone.
  *   2026-09-22 -- Composed from the shared component set (Page, Section, Fold, Table, ListRow,
  *     NumeralBand, Rail, Chip, Action, Field, Surface, Text); the page frame and the record page moved
  *     to ./frame.js and ./record.js. No own classes, so css/views/memory.css could go.
@@ -63,7 +65,7 @@ function spaceTable(ctx, list, { id = '' } = {}) {
     html`<${Action} onClick=${() => ctx.pickView({ kind: 'space', id: s.id })}>${c('open', 'Open')}<//>`,
   ]);
   return html`
-    <${Table} density="compact" label=${c('colSpace', 'Key space')} headers=${['', c('colSpace', 'Key space'), c('colSize', 'Size'), c('colLatest', 'Latest'), '']} rows=${rows} />
+    <${Table} density="compact" collapse=${600} label=${c('colSpace', 'Key space')} headers=${['', c('colSpace', 'Key space'), c('colSize', 'Size'), c('colLatest', 'Latest'), '']} rows=${rows} />
     ${list.length > TABLE_ROWS && !open ? html`<${Action} onClick=${() => ctx.toggleMore(id)}>${c('showAll', 'show all {n}').replace('{n}', String(list.length))}<//>` : null}`;
 }
 
@@ -83,7 +85,7 @@ function fileRows(ctx, files) {
           <${Action} onClick=${() => setPreviewFile(f)}>${t('profile.files.preview') || 'Preview'}<//>
           <${CopyAction} text=${url} label=${t('common.copyUrl') || 'Copy URL'} onCopied=${() => showToast(t('profile.files.urlCopied') || 'URL copied')} />
           <${Action} onClick=${() => handleDownloadFile(f)}>${t('profile.files.download') || 'Download'}<//>
-          <${Action} onClick=${() => handleDeleteFile(key)}>${t('profile.files.delete') || 'Delete'}<//>`} />`;
+          <${Action} tone="danger" onClick=${() => handleDeleteFile(key)}>${t('profile.files.delete') || 'Delete'}<//>`} />`;
   })}<//>`;
 }
 
@@ -134,7 +136,7 @@ function renderCover(ctx) {
   const railEntries = [
     { id: 'mp-own', href: '#mp-own', label: c('own', 'Mine'), count: ownCount },
     { id: 'mp-org', href: '#mp-org', label: c('orgs', 'Organisms’'), count: orgCount },
-    { id: 'mp-sys', href: '#mp-sys', label: c('sys', 'The machine’s bookkeeping'), count: sysCount },
+    { id: 'mp-sys', href: '#mp-sys', label: c('sys', 'The machine’s bookkeeping'), count: sysCount, onClick: () => setSysOpen(true) },
     { id: 'mp-files', href: '#mp-files', label: c('files', 'Files'), count: (files || []).length },
     { id: 'mp-history', href: '#mp-history', label: c('happened', 'What has happened'), count: '→' },
     { id: 'mp-stale', href: '#mp-stale', label: c('stale', 'Stale'), count: stale.length },
@@ -143,7 +145,7 @@ function renderCover(ctx) {
 
   const searchRow = (showSearch || searchResults !== null) ? html`
     <${Stack} direction="wrap" align="end">
-      <${Field} type="search" label=${c('searchSlab', 'Search memory')} placeholder=${t('profile.memory.searchContents') || 'Search content or key…'} value=${searchInput}
+      <${Field} type="search" autoFocus label=${c('searchSlab', 'Search memory')} placeholder=${t('profile.memory.searchContents') || 'Search content or key…'} value=${searchInput}
         onInput=${e => setSearchInput(e.target.value)} onKeyDown=${e => { if (e.key === 'Enter') runServerSearch(searchInput, ctx.searchScopePrefix); }} />
       <${Action} disabled=${searchLoading} onClick=${() => runServerSearch(searchInput, ctx.searchScopePrefix)}>${searchLoading ? '…' : (t('profile.memory.searchBtn') || 'Search')}<//>
       <${Action} onClick=${() => { clearServerSearch(); setShowSearch(false); }}>${t('search.clear') || 'Clear'}<//>
@@ -224,7 +226,7 @@ function renderCover(ctx) {
         ${stale.length ? html`<${Stack} density="compact">${(staleAll ? stale : stale.slice(0, 8)).map(m => html`
           <${ListRow} key=${m.key} density="compact" name=${m.key} detail=${`${formatBytes(m.bytes)} · ${formatRelativeTime(m.updated_at || m.created_at)}`}
             actions=${html`<${Action} onClick=${() => pickView({ kind: 'record', key: m.key })}>${c('open', 'Open')}<//>
-              <${Action} onClick=${() => handleDeleteMemory(m.key)}>${t('profile.memory.deleteBtn') || 'Delete'}<//>`} />`)}
+              <${Action} tone="danger" onClick=${() => handleDeleteMemory(m.key)}>${t('profile.memory.deleteBtn') || 'Delete'}<//>`} />`)}
           ${stale.length > 8 && !staleAll ? html`<${Action} onClick=${() => setStaleAll(true)}>${c('showAll', 'show all {n}').replace('{n}', String(stale.length))}<//>` : null}<//>`
           : html`<${Text} tone="muted">${c('noStale', 'Nothing has gone stale.')}<//>`}
       <//>
@@ -258,7 +260,7 @@ function renderSpace(ctx, id) {
     ${prefix ? html`<${Action} kind="text" onClick=${() => openSharePanel(s.items[0].key)}>${c('shareGroup', 'Share with a group')} →<//>` : null}
     ${prefix ? html`<${Action} kind="text" onClick=${() => handleExport(prefix)}>${c('exportSpace', 'Export this space')} →<//>` : null}
     <${Action} kind="text" onClick=${() => addCartItems(s.items.map(memCartItem))}>${c('toCart', 'To the collection')} +${s.items.length}<//>
-    ${prefix ? html`<${Action} kind="text" onClick=${() => deleteGroup(s.g, s.items.length)}>${c('deleteSpace', 'Delete the space')} …<//>` : null}
+    ${prefix ? html`<${Action} kind="text" tone="danger" onClick=${() => deleteGroup(s.g, s.items.length)}>${c('deleteSpace', 'Delete the space')} …<//>` : null}
   <//><//>`;
   const rows = items.map(m => [
     html`<${Stack} direction="wrap" align="center" density="compact">
@@ -282,7 +284,7 @@ function renderSpace(ctx, id) {
           <${Action} onClick=${() => setSharePanelFor(null)}>${t('profile.access.shCancel') || 'Cancel'}<//>
         <//>`}
     <//><//>` : null}
-    <${Table} density="compact" label=${s.label} headers=${[c('colKey', 'Key'), c('colSize', 'Size'), c('colChanged', 'Changed'), c('colVisibility', 'Visibility'), '']} rows=${rows} />
+    <${Table} density="compact" collapse=${600} label=${s.label} headers=${[c('colKey', 'Key'), c('colSize', 'Size'), c('colChanged', 'Changed'), c('colVisibility', 'Visibility'), '']} rows=${rows} />
     <${Stack} direction="wrap" align="center" density="compact">${[['updated', c('sortUpdated', 'by change')], ['alpha', c('sortAlpha', 'alphabetical')], ['size', c('sortSize', 'largest first')]].map(([k, l]) => html`
       <${Action} key=${k} kind="tab" semantics="radio" selected=${spaceSort === k} onClick=${() => setSpaceSort(k)}>${l}<//>`)}<//>` });
 }

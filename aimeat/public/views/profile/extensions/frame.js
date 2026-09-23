@@ -9,6 +9,7 @@
  * @structure x · day · kindOf · cronWords · appName · appUrlOf · crumb · pageLinks · goTab
  * @usage import { x, day, kindOf, cronWords, crumb, pageLinks } from './frame.js';
  * @version-history
+ *   2026-09-22 -- The crumb is the shared trail's entries and the rail links are shared Actions; no own CSS.
  *   v1.0.0 — 2026-09-03 — Initial (design canvas "AIMEAT Laajennukset-sivu", third round, plus
  *     the dependency map and kept versions; brief doc-mtkr34qa1dg1).
  */
@@ -17,6 +18,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { date as fmtDate, dateTime as fmtDateTime } from '/js/format.js';
+import { Stack, Action, Text } from '/components/poster-parts.js';
 
 export const x = (key, vars) => t('extpage.' + key, vars);
 // The locale() helper here derived the FORMAT from the LANGUAGE. They are different settings:
@@ -57,16 +59,19 @@ export function cronWords(cron) {
 export const appName = (ref) => String(ref || '').split('/').pop().replace(/\.html?$/i, '');
 export const appUrlOf = (ref) => { const [owner, ...rest] = String(ref || '').split('/'); return rest.length ? `/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(rest.join('/'))}?mode=inline` : null; };
 
+/** The trail to this page, as Masthead crumbs. */
 export function crumb() {
-  return html`<div class="og-crumb"><span>${t('nav.profile')}</span><span>/</span><span>${t('profile.landing.menuBuildShare')}</span><span>/</span><span class="og-crumb-here">${t('profile.tabs.extensions')}</span></div>`;
+  return [{ label: t('nav.profile') }, { label: t('profile.landing.menuBuildShare') }, { label: t('profile.tabs.extensions') }];
 }
 
 const openTab = (tabId) => window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId } }));
 export const goTab = openTab;
 export function pageLinks() {
-  return html`
-    <button type="button" class="og-rail-link" onClick=${() => openTab('apps')}><i>→</i>${t('profile.tabs.apps')}<em>→</em></button>
-    <button type="button" class="og-rail-link" onClick=${() => openTab('scheduler')}><i>→</i>${t('profile.tabs.scheduler')}<em>→</em></button>
-    <button type="button" class="og-rail-link" onClick=${() => openTab('libraries')}><i>→</i>${t('librariesTab.tabLabel')}<em>→</em></button>
-    <button type="button" class="og-rail-link" onClick=${() => openTab('appdev')}><i>→</i>${t('profile.tabs.appDev')}<em>→</em></button>`;
+  return html`<${Stack} density="compact">
+    <${Text} kind="label">${x('pages')}<//>
+    <${Action} kind="text" onClick=${() => openTab('apps')}>${t('profile.tabs.apps')} →<//>
+    <${Action} kind="text" onClick=${() => openTab('scheduler')}>${t('profile.tabs.scheduler')} →<//>
+    <${Action} kind="text" onClick=${() => openTab('libraries')}>${t('librariesTab.tabLabel')} →<//>
+    <${Action} kind="text" onClick=${() => openTab('appdev')}>${t('profile.tabs.appDev')} →<//>
+  <//>`;
 }

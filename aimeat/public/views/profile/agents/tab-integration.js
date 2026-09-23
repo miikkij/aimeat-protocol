@@ -6,6 +6,8 @@
  *   during onboarding or production status (readiness, connection, platform, identity,
  *   what came after onboarding, and how to attach the agent elsewhere) after completion.
  * @version-history
+ *   2026-09-22 -- The Hello Integration steps use the checklist item's own states (done, failed, warn,
+ *     pending) instead of a ✗ written into the step's words.
  *   2026-09-22 -- Composed from the shared component set: sections are the small Section, the Hello
  *     Integration steps a checklist, rows key/value pairs, the delivery log the shared table, the
  *     buttons Actions and copies CopyActions. No class of its own is left, so
@@ -82,8 +84,8 @@ import {
 
 const html = htm.bind(h);
 
-/** The mark in front of a step's name. Only the glyphs the interface is allowed to print. */
-const STEP_MARK = { passed: '✓', failed: '✗', warn: '✗' };
+/** A step's status as the checklist item's state; anything else is not reached yet. */
+const STEP_STATE = { passed: 'done', failed: 'failed', warn: 'warn' };
 
 export default function TabIntegration({ agent, onboarding, showToast, agentName }) {
   const state = agentState(agent);
@@ -284,16 +286,17 @@ function dimmed(value, dim) {
 }
 
 /**
- * Every step of Hello Integration as a checklist item: ticked when it passed. A failed or warned
- * step keeps its ✗ in the words, as the chip did; a step not reached yet is the dashed square.
+ * Every step of Hello Integration as a checklist item in its own state: ticked when it passed, ✗ on
+ * the danger ground when it failed, a coral frame when it needs a look, the dashed square when the
+ * agent has not reached it yet.
  */
 function stepChecks(steps) {
   if (!steps.length) return '';
   return html`
     <${Stack} direction="wrap" density="compact">
       ${steps.map(s => html`
-        <${CheckItem} key=${s.id} done=${s.status === 'passed'}>
-          ${STEP_MARK[s.status] && s.status !== 'passed' ? STEP_MARK[s.status] + ' ' : ''}${tOr('agentOnboarding.steps.' + s.id, s.name || s.title || s.id)}
+        <${CheckItem} key=${s.id} state=${STEP_STATE[s.status] || 'pending'}>
+          ${tOr('agentOnboarding.steps.' + s.id, s.name || s.title || s.id)}
         <//>`)}
     <//>`;
 }

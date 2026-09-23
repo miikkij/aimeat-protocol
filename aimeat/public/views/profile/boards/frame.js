@@ -6,12 +6,14 @@
  *   visibility, who wrote a post, how long a notice has left, a poster's standing), which boards a
  *   person follows, a boards table, a notice as a row, the crumb and the page frame with its rail,
  *   all composed from the shared set (components/poster-parts.js).
- * @structure c · words · who · leftWords · standingWords · followedOf · choice · lines · boardRows · noticeRow · crumb · pageLinks · renderPage
+ * @structure c · words · who · leftWords · standingWords · followedOf · choice · boardRows · noticeRow · crumb · pageLinks · renderPage
  * @usage import { renderPage, boardRows, noticeRow } from './frame.js';
  * @version-history
+ *   v2.1.0 -- 2026-09-22 -- The lines() <br> helper is gone: the set's Text keeps typed line breaks.
  *   v2.0.0 -- 2026-09-22 -- Composed from the shared component set: a board is a ListRow, a
  *     notice is a ListRow with its text as the preview, the crumb is the Masthead trail and the page
- *     frame is Page with an index Rail, so Boards has no sheet of its own. Rail arrows are → and ↩. *   v1.2.0 -- 2026-09-13 -- Compose existing top rules from poster.css.
+ *     frame is Page with an index Rail, so Boards has no sheet of its own. Rail arrows are → and ↩.
+ *   v1.2.0 -- 2026-09-13 -- Compose existing top rules from poster.css.
  *   v1.1.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.0.0 — 2026-08-30 — Initial (design canvas "AIMEAT Taulujen sivu", direction A).
  */
@@ -92,11 +94,6 @@ export function boardSub(ctx, b) {
 export function choice(value, options, onPick, disabled = false) {
   return html`<${Stack} direction="wrap" density="compact" role="radiogroup">${options.map(([v, label]) => html`
     <${Action} key=${v} kind="tab" semantics="radio" selected=${value === v} disabled=${disabled} onClick=${() => onPick(v)}>${label}<//>`)}<//>`;
-}
-
-/** Text that keeps its line breaks. */
-export function lines(text) {
-  return String(text || '').split('\n').flatMap((line, i) => (i ? [html`<br key=${'b' + i} />`, line] : [line]));
 }
 
 /**

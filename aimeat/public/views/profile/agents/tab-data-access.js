@@ -5,6 +5,8 @@
  * @description Data Access tab: shared tags, memory areas, knowledge packages,
  *   and effective scope summary.
  * @version-history
+ *   2026-09-22 -- Delete, Unlink and a tag's remove carry the danger tone; the tag's remove is the ✗
+ *     glyph with a spoken label instead of the letter x.
  *   2026-09-22 -- Composed from the shared component set: sections with the add action on the title row
  *     and "none" as the title's count, list rows (a stored key opens in its row), fields, chips and a
  *     code surface for a value and the scope summary; the sort direction is an SVG icon action.
@@ -494,7 +496,7 @@ export default function TabDataAccess({ agent, agentName, showToast, allAgents }
                 value=${html`<${Text} kind="caption" tone="muted">${shared.length > 0
                   ? `${t('profile.agents.detail.data_access.with')}: ${shared.map(a => a.name).join(', ')}`
                   : t('profile.agents.detail.data_access.onlyYou')}<//>`}
-                actions=${html`<${Action} kind="text" onClick=${() => handleRemoveTag(tag)}>x<//>`} />
+                actions=${html`<${Action} kind="text" tone="danger" label=${t('common.delete')} title=${t('common.delete')} onClick=${() => handleRemoveTag(tag)}>✗<//>`} />
             `;
           })}
           ${(tags.length > 0 || addingTag) && html`<${Text} kind="caption" tone="muted">${t('profile.agents.detail.data_access.tagsHelp')}<//>`}
@@ -531,7 +533,7 @@ export default function TabDataAccess({ agent, agentName, showToast, allAgents }
                 value=${html`<${Chip} tone=${area.access === 'read' ? 'muted' : 'plain'}>${area.access === 'read' ? t('profile.agents.detail.data_access.permReadOnly') : t('profile.agents.detail.data_access.permReadWrite')}<//>`}
                 actions=${html`
                   <${Action} kind="text" onClick=${() => startEditArea(idx, area)}>${t('profile.agents.detail.data_access.edit')}<//>
-                  <${Action} kind="text" onClick=${() => handleRemoveArea(idx)}>${t('common.delete')}<//>`} />
+                  <${Action} kind="text" tone="danger" onClick=${() => handleRemoveArea(idx)}>${t('common.delete')}<//>`} />
             `
           )) : null}
         <//>
@@ -573,7 +575,7 @@ export default function TabDataAccess({ agent, agentName, showToast, allAgents }
           `}
           ${skillLinks.map(link => html`
             <${ListRow} key=${link.ref} density="compact" name=${link.name} detail=${link.description || link.ref} detailKind="text"
-              actions=${html`<${Action} kind="text" onClick=${() => handleUnlinkSkill(link.ref)}>${t('profile.agents.detail.data_access.unlinkSkill')}<//>`} />
+              actions=${html`<${Action} kind="text" tone="danger" onClick=${() => handleUnlinkSkill(link.ref)}>${t('profile.agents.detail.data_access.unlinkSkill')}<//>`} />
           `)}
           ${skillLinks.length > 0 && html`<${Text} kind="caption" tone="muted">${t('profile.agents.detail.data_access.skillsHelp')}<//>`}
         <//>
@@ -654,7 +656,7 @@ export default function TabDataAccess({ agent, agentName, showToast, allAgents }
                 <${Surface} kind="code">${expandedValue}<//>
                 <${Stack} direction="horizontal" density="compact">
                   <${Action} kind="text" onClick=${() => startEditKey(mk)}>${t('profile.agents.detail.data_access.edit')}<//>
-                  <${Action} kind="text" onClick=${() => handleDeleteKey(mk)}>${t('common.delete')}<//>
+                  <${Action} kind="text" tone="danger" onClick=${() => handleDeleteKey(mk)}>${t('common.delete')}<//>
                 <//>
               <//>
             `)}

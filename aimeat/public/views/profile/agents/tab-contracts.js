@@ -9,6 +9,7 @@
  * @structure TabContracts — offered-contracts row + Active engagements + Retired (history)
  * @usage <${TabContracts} agent=${agent} agentName=${agent.name} showToast=${showToast} />
  * @version-history
+ *   2026-09-22 -- Retire carries the danger tone.
  *   2026-09-22 -- Composed from the shared component set: the three groups are small Sections (offers
  *     and active side by side in Columns), each engagement a ListRow with its contract as a Chip and
  *     Retire / Re-adopt as text actions. The scroll emoji before an offered contract is gone. No class
@@ -101,7 +102,7 @@ export default function TabContracts({ agent, agentName, showToast }) {
                   mark=${html`<${Chip} tone="sun">${'✓ '}${label(e)}<//>`}
                   name=${e.wsName || e.ws}
                   detail=${where(e, (t('profile.agents.detail.contracts.since') || 'since {d}').replace('{d}', fmtDay(e.adoptedAt)))}
-                  actions=${html`<${Action} kind="text" disabled=${busy === engKey(e)}
+                  actions=${html`<${Action} kind="text" tone="danger" disabled=${busy === engKey(e)}
                     title=${t('organisms.retireHint') || 'Stop this agent from working in this workspace — its loop skips it and the chip becomes “retired”. Its past work stays as history.'}
                     onClick=${() => retire(e)}>${busy === engKey(e) ? '…' : (t('organisms.retire') || 'Retire')}<//>`} />`)}
             </div>`

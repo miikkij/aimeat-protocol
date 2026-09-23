@@ -10,6 +10,8 @@
  * @structure PRIMARY_FIELD (const), Workspace
  * @usage import { Workspace } from '/views/profile/organisms/workspace.js';
  * @version-history
+ *   2026-09-22 -- The hash listener that opened a fold from the rail is gone: the cover's rail entries
+ *     open their fold through the set's onClick (workspace/cover.js).
  *   2026-09-22 -- The loading and the empty-workspace states are shared Pages; a rail entry that names a
  *     fold opens it (useRailOpens); no class of its own.
  *   2026-09-13 — V1: compose page and B1 section headings from the shared poster classes.
@@ -61,7 +63,6 @@ import { onLiveUpdate } from '/lib/live-updates.js';
 const html = htm.bind(h);
 import { t, getLocale } from '/js/i18n.js';
 import { Page, Stack, Action, Text } from '/components/poster-parts.js';
-import { useRailOpens } from '/views/profile/organisms/helpers.js';
 import { useConfirm } from '/components/Modal.js';
 import * as orgService from '/js/services/organisms.js';
 import { getGhii } from '/js/services/auth.js';
@@ -647,9 +648,6 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
       showToast(t('organisms.contractPromptCopied') || 'Contract-agent prompt copied — paste it to your AI / coding agent.');
     } catch (e) { showToast((e && e.message) || 'Failed to build prompt'); }
   }, [orgId, org, wsId, ws, showToast]);
-
-  // The cover's rail entries are anchors; one that names a fold opens it.
-  useRailOpens({ 'ws-readme': () => setOpenReadme(true), 'ws-map': () => setOpenMap(true), 'ws-ai': () => setOpenAi(true) });
 
   const crumbs = buildBreadcrumb({ onBack, onBackToList, org, showSettings, guardWsDirty, setShowSettings, wsName, ws });
 
