@@ -33,6 +33,9 @@
 /* A few small parts side by side, and a box for a count that its page positions on a corner. */
 .poster-specimen-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
 .poster-specimen-anchor { position: relative; display: inline-block; width: 1.6rem; height: 1.4rem; }
+/* One tone of a proposal: the example, and the tone's name under it. */
+.poster-specimen-tone { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 0.25rem; }
+.poster-specimen-tone > small { font-family: var(--font-mono); font-size: 0.64rem; color: var(--text-dim); }
 
 /* A decision's crop from its real page, set at its own size, and the measured values under it. */
 .poster-specimen-crop { display: block; max-width: 100%; height: auto; }

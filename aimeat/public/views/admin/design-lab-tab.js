@@ -10,9 +10,11 @@
  *
  *   Jouni: "I cannot judge 71 component names without seeing them. Every decision I make needs
  *   pictures." Built only from library components (the Specimen frame is one of them).
- * @structure DesignLabTab (default: the library / decisions switch) · Library · Overview · PartDetail · WrapperPair
+ * @structure DesignLabTab (default: the library / decisions switch) · Library · Overview · PartDetail
  * @usage Mounted by the admin dashboard tab router (views/admin.js), group Design.
  * @version-history
+ *   v1.2.0 — 2026-09-23 — The agent step's wrapper is a decision in the decisions view, not a panel
+ *     under the Unused filter: the filter's count and its content agree.
  *   v1.1.0 — 2026-09-23 — The decisions view beside the library (views/admin/design-lab-decisions.js).
  *   v1.0.0 — 2026-09-23 — Initial: the library view (UI consolidation phase 2).
  */
@@ -57,20 +59,6 @@ function pageName(p) {
   return known[p] ?? p.replace(/^views\//, '').replace(/\.js$/, '');
 }
 
-/** The agent step's stray wrapper, as it is and without the class: Jouni decides. */
-function WrapperPair() {
-  return html`
-    <${Band} title=${tr('designLab.wrapper.title', 'Found, not fixed: the wrapper in the agent step')}>
-      <p>${tr('designLab.wrapper.body', 'The name form of the agent step sits in a wrapper that wears the masthead name class. The class was given to the wrapper on 2026-08-07 and, three hours later, to the header nameplate, whose rule cuts text to one line. Nothing says the wrapper was meant to get that rule. Left: as it is. Right: the same step without the class.')}</p>
-      <${Specimens}>
-        <${Specimen} label=${tr('designLab.wrapper.asIs', 'As it is')} src=${frameSrc('wrapper-as-is', 0, 'light')} />
-        <${Specimen} label=${tr('designLab.wrapper.without', 'Without the masthead name class')} src=${frameSrc('wrapper-without', 0, 'light')} />
-        <${Specimen} phone=${true} label=${tr('designLab.wrapper.asIsPhone', 'As it is, phone')} src=${frameSrc('wrapper-as-is', 0, 'light')} />
-        <${Specimen} phone=${true} label=${tr('designLab.wrapper.withoutPhone', 'Without the class, phone')} src=${frameSrc('wrapper-without', 0, 'light')} />
-      <//>
-    <//>`;
-}
-
 function Overview({ entries, onOpen }) {
   const [filter, setFilter] = useState('all');
   const [q, setQ] = useState('');
@@ -91,7 +79,6 @@ function Overview({ entries, onOpen }) {
     <//>
     <${TextInput} id="design-lab-find" maxLength="80" placeholder=${tr('designLab.find', 'Find a part')} value=${q}
       onInput=${(e) => setQ(e.target.value)} />
-    ${filter === 'unused' && html`<${WrapperPair} />`}
     ${shown.length === 0
       ? html`<${QuietNote}>${tr('designLab.none', 'No part matches.')}<//>`
       : html`

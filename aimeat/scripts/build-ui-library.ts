@@ -40,8 +40,8 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PUBLIC = path.join(ROOT, 'public');
 const OUT = path.join(ROOT, 'src', 'services', 'ui-library', 'facts.generated.ts');
 const SHEETS_DIR = path.join(PUBLIC, 'css', 'components');
-/** Demos in the design lab that are not catalogue entries: the stray wrapper's before and after. */
-const DEMO_EXTRAS = ['wrapper-as-is', 'wrapper-without'];
+/** Demos in the design lab that are not catalogue entries (none since the wrapper became a decision). */
+const DEMO_EXTRAS: string[] = [];
 
 const read = (p: string): string => readFileSync(p, 'utf8');
 const pub = (publicPath: string): string => path.join(PUBLIC, publicPath.replace(/^\//, ''));
@@ -303,7 +303,13 @@ export function decisionProblems(): string[] {
         for (const v of wanted) if (!have.includes(v)) out.push(`decision ${id}: variant "${v}" has no sample in decision-samples.js`);
         for (const v of have) if (!wanted.includes(v)) out.push(`decision ${id}: sample "${v}" is not a variant in decisions-data.js`);
         const proposed = /proposal: \{\s*variant: '([\w-]+)'/.exec(body)?.[1];
-        if (!proposed || !wanted.includes(proposed)) out.push(`decision ${id}: the proposal names "${proposed}", which is not one of its variants`);
+        if (proposed === 'proposal') {
+            // A new composition: its picture is in PROPOSALS, under the decision's id.
+            const proposals = samples.split(/^export const PROPOSALS/m)[1] ?? '';
+            if (!new RegExp(`^ {2}'?${id}'?: \\{$`, 'm').test(proposals)) out.push(`decision ${id}: the proposal is a new composition but PROPOSALS has no picture for it`);
+        } else if (!proposed || !wanted.includes(proposed)) {
+            out.push(`decision ${id}: the proposal names "${proposed}", which is not one of its variants`);
+        }
     }
     for (const id of sampleBlocks.keys()) if (!decisions.has(id)) out.push(`decision-samples.js: "${id}" is not a decision`);
     const manifestPath = path.join(PUBLIC, 'img', 'design-lab', 'crops.json');
