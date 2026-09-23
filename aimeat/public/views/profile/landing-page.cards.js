@@ -191,7 +191,7 @@ export function UsageCard({ switchTab, initialUsage }) {
         <//>
       <//><//>`}`;
   };
-  const chip = (label,value,tab) => html`<${ListRow} name=${label} value=${value} onOpen=${tab ? () => switchTab(tab) : undefined} />`;
+  const count = (label,value,tab) => ({ label, value, onClick: tab ? () => switchTab(tab) : undefined });
   const c = u.counts;
   return html`<${Section} title=${t('profile.landing.usageTitle') || 'Usage & quotas'}><${Stack}>
     ${bar(t('profile.landing.usageMemory') || 'Memory',u.memory,
@@ -199,15 +199,15 @@ export function UsageCard({ switchTab, initialUsage }) {
     ${bar(t('profile.landing.usageStorage') || 'Files',u.storage,
       u.storage.used_files+' '+(t('profile.landing.usageFilesWord') || 'files')+' · '+fmtBytes(u.storage.used_bytes)+' / '+fmtBytes(u.storage.max_bytes))}
     ${aiLine(u.ai)}
-    <${Stack} density="compact">
-      ${chip(t('profile.landing.usageAgents') || 'Agents',c.agents,'agents')}
-      ${chip(t('profile.landing.usageOrganisms') || 'Organisms',c.organisms,'organisms')}
-      ${chip(t('profile.landing.usageApps') || 'Apps',c.apps.used+'/'+c.apps.max,'apps')}
-      ${chip(t('profile.landing.usageEcoApps') || 'Connected apps',c.ecosystem_apps,'ecosystem')}
-      ${chip(t('profile.landing.usageExtensions') || 'Extensions',c.extensions.used+'/'+c.extensions.max,'extensions')}
-      ${chip(t('profile.landing.usageCortexes') || 'Cortexes',c.cortexes,'extensions')}
-      ${chip(t('profile.landing.usageServices') || 'Services',c.services.used+'/'+c.services.max,'offers')}
-    <//>
+    <${NumeralBand} tone="plain" size="small" items=${[
+      count(t('profile.landing.usageAgents') || 'Agents',c.agents,'agents'),
+      count(t('profile.landing.usageOrganisms') || 'Organisms',c.organisms,'organisms'),
+      count(t('profile.landing.usageApps') || 'Apps',c.apps.used+'/'+c.apps.max,'apps'),
+      count(t('profile.landing.usageEcoApps') || 'Connected apps',c.ecosystem_apps,'ecosystem'),
+      count(t('profile.landing.usageExtensions') || 'Extensions',c.extensions.used+'/'+c.extensions.max,'extensions'),
+      count(t('profile.landing.usageCortexes') || 'Cortexes',c.cortexes,'extensions'),
+      count(t('profile.landing.usageServices') || 'Services',c.services.used+'/'+c.services.max,'offers'),
+    ]} />
   <//><//>`;
 }
 
@@ -255,11 +255,11 @@ export function CommerceCard() {
   const morsels = t('profile.landing.commerceMorsels') || 'morsels';
   const fmtTotals = by => Object.entries(by).map(([cur,n]) => cur === 'morsel' ? n+' '+morsels : fmtMoney(n,cur)).join(' · ') || '0 '+morsels;
   return html`<${Section} title=${t('profile.landing.commerceTitle') || 'Commerce'}>
-    <${Columns} layout="thirds">
-      <${KeyValue} label=${t('profile.landing.commerceBought') || 'Purchases'}><${Text} kind="number">${stats.bought}<//><${Text}>${fmtTotals(stats.spentBy)}<//><//>
-      <${KeyValue} label=${t('profile.landing.commerceSold') || 'Sales'}><${Text} kind="number">${stats.sold}<//><${Text}>${fmtTotals(stats.earnedBy)}<//><//>
-      <${KeyValue} label=${t('profile.landing.commerceOpen') || 'Open carts'}><${Text} kind="number">${stats.open}<//><${Text}>${t('profile.landing.commerceOpenSub') || 'checkout sessions'}<//><//>
-    <//>
+    <${NumeralBand} tone="plain" items=${[
+      { label: t('profile.landing.commerceBought') || 'Purchases', value: stats.bought, note: fmtTotals(stats.spentBy), tone: 'coral' },
+      { label: t('profile.landing.commerceSold') || 'Sales', value: stats.sold, note: fmtTotals(stats.earnedBy) },
+      { label: t('profile.landing.commerceOpen') || 'Open carts', value: stats.open, note: t('profile.landing.commerceOpenSub') || 'checkout sessions' },
+    ]} />
   <//>`;
 }
 
@@ -454,13 +454,17 @@ export function NextSteps({ switchTab, hasApps }) {
 /* Onboarding promo — shown only while the user has fewer than 3 apps, and dismissable for good.
  * After that the same content lives on the Extensions page; for a seasoned user it was dead space. */
 export function CortexSection({ switchTab, onDismiss }) {
-  return html`<${Section} title=${t('profile.landing.cortexSectionTitle')}
-    actions=${html`<${Action} onClick=${() => onDismiss?.()}>${t('profile.landing.promoDismiss') || 'Hide'}<//>`}>
+  // A small promotion, not a section of the page: a box with its label and a way to hide it for good.
+  return html`<${Surface} kind="box"><${Stack} density="compact">
+    <${Stack} direction="horizontal" align="between">
+      <${Text} kind="label">${t('profile.landing.cortexSectionTitle')}<//>
+      <${Action} onClick=${() => onDismiss?.()}>${t('profile.landing.promoDismiss') || 'Hide'}<//>
+    <//>
     <${Columns}>
       <${ListRow} detailKind="text" name=${t('profile.landing.cortexCharts')} detail=${t('profile.landing.cortexChartsDesc')} onOpen=${() => switchTab('extensions')} />
       <${ListRow} detailKind="text" name=${t('profile.landing.cortexCanvas')} detail=${t('profile.landing.cortexCanvasDesc')} onOpen=${() => switchTab('extensions')} />
     <//>
-  <//>`;
+  <//><//>`;
 }
 
 /* (AppStrip removed \u2014 the cross-type "Continue" card replaced it: raw filenames in a horizontal

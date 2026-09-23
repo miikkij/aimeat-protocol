@@ -58,8 +58,24 @@ body:has(.poster-page) .page-content { background: var(--bg); }
 .poster-section-part:first-child { margin-top: 0; }
 .poster-section-part[data-density="compact"] { margin-top: 2rem; }
 .poster-section-part[data-density="roomy"] { margin-top: 5rem; }
-.poster-section-intro { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 1rem; margin-bottom: 1.4rem; }
-.poster-section-intro > p { flex: 1; margin: 0; font-size: .95rem; line-height: 1.6; color: var(--text-dim); }
+/* The section's head: the slab (and its count) left, the section's actions right, one row. */
+.poster-section-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .8rem 1.4rem; margin-bottom: 1.4rem; }
+.poster-section-head > .poster-section-title { margin: 0; }
+.poster-section-title > small { margin-left: .6rem; font-family: var(--font-mono); font-size: .8rem; letter-spacing: 0; text-transform: none; color: var(--accent); }
+.poster-section-description { max-width: 46rem; margin: -.4rem 0 1.4rem; font-size: .95rem; line-height: 1.6; color: var(--text-dim); }
+/* A fold (Fold): a row that opens in place. */
+.poster-fold { border-bottom: var(--rule-hair) solid var(--border); }
+.poster-fold-toggle {
+  display: flex; align-items: center; gap: 1rem; width: 100%; padding: .8rem 0; border: 0; background: none; cursor: pointer; text-align: left;
+  font-family: var(--font-showroom-body); font-size: 1.05rem; font-weight: var(--font-poster-strong-weight); line-height: 1.3; color: var(--text);
+}
+.poster-fold-toggle:hover .poster-fold-title { color: var(--accent); }
+.poster-fold-title { flex: 1 1 auto; min-width: 6rem; overflow-wrap: anywhere; }
+/* The note gives way to the title: it shortens with an ellipsis rather than squeezing the title. */
+.poster-fold-sub { flex: 0 1 auto; min-width: 0; max-width: 55%; overflow: hidden; text-overflow: ellipsis; font-family: var(--font-mono); font-size: .75rem; font-weight: 500; color: var(--text-dim); white-space: nowrap; }
+.poster-fold-arrow { margin-left: .6rem; font-family: var(--font-poster); font-size: 1.1rem; }
+.poster-fold[data-open="yes"] > .poster-fold-toggle { margin-bottom: .9rem; }
+.poster-fold-body { display: flex; flex-direction: column; gap: .8rem; padding-bottom: 1rem; }
 .poster-section-body { min-width: 0; }
 .poster-columns, .poster-stack { gap: 1rem; min-width: 0; }
 .poster-columns[data-density="compact"], .poster-stack[data-density="compact"] { gap: .5rem; }
@@ -230,6 +246,11 @@ button.poster-stat { width: 100%; background: none; border-left: 0; border-right
 .poster-numeral-band dl > div { display: flex; flex-direction: column; gap: .4rem; min-width: 0; }
 .poster-numeral-band dt { font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .1em; }
 .poster-numeral-band dd { order: -1; color: inherit; margin: 0; }
+.poster-numeral-band dt > small { display: block; margin-top: .3rem; font-family: var(--font-mono); font-size: .72rem; font-weight: 400; letter-spacing: 0; text-transform: none; opacity: .8; }
+.poster-numeral-band dd[data-tone="coral"] { color: var(--accent); }
+.poster-numeral-band[data-size="small"] { gap: 1rem; margin: 1rem 0; }
+.poster-numeral-band[data-size="small"] dl { gap: .8rem 1.4rem; }
+.poster-numeral-band[data-size="small"][data-tone="plain"] { padding-block: .8rem; }
 .poster-band-lead { flex: 1 1 20rem; min-width: 0; font-family: var(--font-poster); font-size: 2rem; line-height: 1.12; }
 .poster-text-action { border: 0; background: none; padding: 0; color: inherit; font: inherit; font-weight: var(--font-poster-strong-weight); text-align: left; cursor: pointer; text-decoration: none; overflow-wrap: anywhere; }
 .poster-text-action:hover { color: var(--accent); }

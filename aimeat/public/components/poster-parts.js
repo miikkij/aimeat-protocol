@@ -16,7 +16,7 @@
  *   part plus a prop. A new part is added only when no existing one can carry it, it is named by its
  *   role (never by a page), and at least two pages use it. A new prop is a named variant with a
  *   bounded set of values, never a free-form style hook.
- * @structure Page · Masthead · Crumbs · Chip · Section · Columns · Stack · Rail · ListRow · StatRow · CheckItem · Steps · KeyValue ·
+ * @structure Page · Masthead · Crumbs · Chip · Section · Fold · Columns · Stack · Rail · ListRow · StatRow · CheckItem · Steps · KeyValue ·
  *   Table · Toolbar · Field · NumeralBand · Dialog · Action · CopyAction · Menu · Meter · Surface · Text
  * @usage import { Page, Section, ListRow } from '/components/poster-parts.js';
  * @version-history
@@ -90,14 +90,33 @@ export function Chip({ tone = 'plain', children, title }) {
   return html`<span class="poster-chip" data-tone=${pick(tone, ['plain', 'sun', 'muted'], 'plain')} title=${title}>${children}</span>`;
 }
 
-/** A section: the B1 slab, a description, its actions, and the body (on the sun edge when it is the selected tab's). */
-export function Section({ title, description, actions, children, selected = false, id, density, size = 'normal' }) {
+/**
+ * A section: the B1 slab with an optional `count` after the title (a number, a short mono note),
+ * the section's actions on the same row at the right, a description under it, and the body (on
+ * the sun edge when it is the selected tab's).
+ */
+export function Section({ title, description, actions, children, selected = false, id, density, size = 'normal', count }) {
+  const hasCount = count !== undefined && count !== null && count !== '';
   return html`<section class="poster-section poster-section-part" data-density=${densityOf(density)} data-size=${pick(size, ['small', 'normal', 'large'], 'normal')} id=${id}>
-    ${title && html`<h2 class="poster-section-title">${title}</h2>`}
-    ${(description || actions) && html`<div class="poster-section-intro">
-      ${description && html`<p>${description}</p>`}${actions && html`<div class="poster-actions">${actions}</div>`}
+    ${(title || actions) && html`<div class="poster-section-head">
+      ${title && html`<h2 class="poster-section-title">${title}${hasCount && html`<small>${count}</small>`}</h2>`}
+      ${actions && html`<div class="poster-actions">${actions}</div>`}
     </div>`}
+    ${description && html`<p class="poster-section-description">${description}</p>`}
     <div class=${selected ? 'poster-panel poster-section-body' : 'poster-section-body'}>${children}</div>
+  </section>`;
+}
+
+/** A folded row that opens in place: a coral number, the title, a quiet note at the right, the arrow. */
+export function Fold({ id, number, title, sub, open = false, onToggle, children }) {
+  return html`<section class="poster-fold" data-open=${open ? 'yes' : 'no'} id=${id}>
+    <button type="button" class="poster-fold-toggle" aria-expanded=${open ? 'true' : 'false'} onClick=${onToggle}>
+      ${number && html`<span class="poster-list-number">${number}</span>`}
+      <span class="poster-fold-title">${title}</span>
+      ${sub && html`<span class="poster-fold-sub">${sub}</span>`}
+      <span class="poster-fold-arrow" aria-hidden="true">${open ? '↓' : '→'}</span>
+    </button>
+    ${open && html`<div class="poster-fold-body">${children}</div>`}
   </section>`;
 }
 
@@ -238,13 +257,20 @@ export function Field({ label, hint, error, type = 'text', value, onInput, onCha
   </div>`;
 }
 
-/** Big numbers with small-caps labels, and an optional lead and actions, in one band. */
-export function NumeralBand({ items = [], lead, actions, tone = 'coral', cut = 'straight', contained = false, children }) {
+/**
+ * Big numbers with small-caps labels, and an optional lead and actions, in one band. An item is
+ * { label, value, note?, href? | onClick?, tone? }: the note is a small mono line under the label,
+ * and tone="coral" sets that one number coral. `size="small"` uses the small numeral cut, for a
+ * row of counts that sits inside a card rather than opening a page.
+ */
+export function NumeralBand({ items = [], lead, actions, tone = 'coral', cut = 'straight', contained = false, size = 'normal', children }) {
+  const small = size === 'small';
   return html`<section class="poster-numeral-band" data-tone=${cut === 'diagonal' ? 'coral' : pick(tone, ['coral', 'sun', 'ink', 'plain'], 'coral')}
-    data-cut=${pick(cut, ['straight', 'diagonal'], 'straight')} data-contained=${contained ? 'yes' : undefined}>
+    data-cut=${pick(cut, ['straight', 'diagonal'], 'straight')} data-contained=${contained ? 'yes' : undefined} data-size=${small ? 'small' : undefined}>
     ${lead && html`<div class="poster-band-lead">${lead}</div>`}
     ${items.length > 0 && html`<dl>${items.map((item, index) => html`<div key=${item.id || index}>
-      <dt>${item.label}</dt><dd class="poster-stat-number">${item.href || item.onClick
+      <dt>${item.label}${item.note != null && html`<small>${item.note}</small>`}</dt>
+      <dd class=${'poster-stat-number' + (small ? ' poster-stat-number--small' : '')} data-tone=${item.tone === 'coral' ? 'coral' : undefined}>${item.href || item.onClick
         ? html`<${Action} kind="text" href=${item.href} onClick=${item.onClick} label=${item.label}>${item.value}<//>` : item.value}</dd>
     </div>`)}</dl>`}${children}${actions && html`<div class="poster-actions">${actions}</div>`}
   </section>`;
