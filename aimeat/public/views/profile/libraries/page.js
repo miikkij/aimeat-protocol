@@ -10,6 +10,10 @@
  * @structure renderPage · shelf · secAI
  * @usage import { renderPage } from './libraries/page.js';
  * @version-history
+ *   2026-09-22 -- Composed from the shared component set: Page, Rail, a plain NumeralBand strip,
+ *     Toolbar filters for the facets, Field for the search, a Surface box for the AI rule and
+ *     KeyValue for how an AI takes a library; no own CSS. The shelves' column heads are gone: each
+ *     row says what it is.
  *   v1.2.0 -- 2026-09-13 -- Compose the existing instruction frame from poster.css.
  *   v1.1.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.0.0 — 2026-09-03 — Initial.
@@ -18,13 +22,13 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { CopyButton } from '/components/CopyButton.js';
-import { Section, scrollTo } from '/views/profile/organisms/poster-parts.js';
+import { Page, Rail, Section, Stack, NumeralBand, Toolbar, Field, KeyValue, Action, CopyAction, Chip, Text, Surface } from '/components/poster-parts.js';
 import { x, shelfOf, isCommunity, crumb, pageLinks, aiRule } from './frame.js';
 import { packRow } from './rows.js';
 
 const PAGE = 20;
-const facet = (on, label, n, onClick, key) => html`<button type="button" key=${key} class=${`lb-facet ${on ? 'is-on' : ''}`} onClick=${onClick}>${label}<em>${n}</em></button>`;
+/** A facet: a filter tab with its count. */
+const facet = (id, on, label, n, onClick) => ({ id, selected: on, label: `${label} ${n}`, onClick });
 const matches = (q, ...fields) => !q || fields.some((f) => String(f || '').toLowerCase().includes(q));
 const used = (p) => p.used_by?.apps || 0;
 const proven = (p) => (p.proofs || []).length > 0;
@@ -39,58 +43,48 @@ export function renderPage(ctx) {
   const provenN = all.filter(proven).length;
   const deprecatedN = all.filter((p) => p.status === 'deprecated').length;
   const appsUsing = ctx.appsUsing;   // { using, total } or null
-  const chip = (text, cls = '') => html`<span class=${`og-chip ${cls}`}>${text}</span>`;
   const top = all.slice().sort((a, b) => used(b) - used(a)).slice(0, 3).filter((p) => used(p) > 0).map((p) => `${p.id} ${used(p)}`).join(' · ');
 
-  const strip = html`
-    <div class="og-strip">
-      <div><b>${packs ? base.length : '…'}</b><span>${x('stripBase')}</span><small>${x('stripBaseSub')}${deprecatedN && base.some((p) => p.status === 'deprecated') ? ` · ${x('deprecatedN', { n: base.filter((p) => p.status === 'deprecated').length })}` : ''}</small></div>
-      <div><b>${packs ? ui.length : '…'}</b><span>${x('stripUi')}</span><small>${packs ? x('stripUiSub', { node: ui.filter((p) => !isCommunity(p)).length, community: ui.filter(isCommunity).length }) : ''}</small></div>
-      <div><b>${packs ? third.length : '…'}</b><span>${x('stripThird')}</span><small>${x('stripThirdSub')}${third.some((p) => p.status === 'deprecated') ? ` · ${x('deprecatedN', { n: third.filter((p) => p.status === 'deprecated').length })}` : ''}</small></div>
-      <div><b>${appsUsing ? appsUsing.using : (packs ? inUse : '…')}</b><span>${appsUsing ? x('stripApps', { total: appsUsing.total }) : x('stripInUse')}</span><small>${top ? x('stripTop', { list: top }) : ''}</small></div>
-    </div>`;
+  const strip = html`<${NumeralBand} tone="plain" items=${[
+    { label: x('stripBase'), value: packs ? base.length : '…', note: `${x('stripBaseSub')}${deprecatedN && base.some((p) => p.status === 'deprecated') ? ` · ${x('deprecatedN', { n: base.filter((p) => p.status === 'deprecated').length })}` : ''}` },
+    { label: x('stripUi'), value: packs ? ui.length : '…', note: packs ? x('stripUiSub', { node: ui.filter((p) => !isCommunity(p)).length, community: ui.filter(isCommunity).length }) : '' },
+    { label: x('stripThird'), value: packs ? third.length : '…', note: `${x('stripThirdSub')}${third.some((p) => p.status === 'deprecated') ? ` · ${x('deprecatedN', { n: third.filter((p) => p.status === 'deprecated').length })}` : ''}` },
+    { label: appsUsing ? x('stripApps', { total: appsUsing.total }) : x('stripInUse'), value: appsUsing ? appsUsing.using : (packs ? inUse : '…'), note: top ? x('stripTop', { list: top }) : '' },
+  ]} />`;
 
-  return html`
-    <div class="og og-libs">
-      ${crumb()}
-      <div class="og-mast">
-        <div class="og-mast-words">
-          <h1 class="og-title poster-page-title">${t('librariesTab.tabLabel')}<small>${x('titleSub')}</small></h1>
-          <div class="og-chips">
-            ${packs ? chip(x('chipAll', { n: all.length }), 'og-chip--sun') : null}
-            ${packs ? chip(x('chipInUse', { n: inUse })) : null}
-            ${packs ? chip(x('chipProven', { n: provenN })) : null}
-            ${packs && deprecatedN ? chip(x('chipDeprecated', { n: deprecatedN }), 'og-chip--dim') : null}
-          </div>
-          <p class="og-desc">${x('desc')}</p>
-        </div>
-        <div class="og-mast-actions">
-          <${CopyButton} text=${aiRule(ctx.nodeUrl)} className="og-slab" label=${x('copyRule')} copiedLabel=${x('copied')} onCopied=${() => ctx.showToast?.(x('ruleCopiedToast'))} />
-          <div class="og-doors"><a class="og-door" href="https://design-book.apps.aimeat.io/" target="_blank" rel="noopener">Design Book</a></div>
-        </div>
-      </div>
+  const identity = html`<${Stack} density="compact">
+    <${Text} kind="label">${x('titleSub')}<//>
+    ${packs ? html`<${Stack} direction="wrap" density="compact">
+      <${Chip} tone="sun">${x('chipAll', { n: all.length })}<//>
+      <${Chip}>${x('chipInUse', { n: inUse })}<//>
+      <${Chip}>${x('chipProven', { n: provenN })}<//>
+      ${deprecatedN ? html`<${Chip} tone="muted">${x('chipDeprecated', { n: deprecatedN })}<//>` : null}
+    <//>` : null}
+  <//>`;
+  const actions = html`<${CopyAction} kind="primary" text=${aiRule(ctx.nodeUrl)} label=${x('copyRule')} copiedLabel=${x('copied')} onCopied=${() => ctx.showToast?.(x('ruleCopiedToast'))} />
+    <${Action} href="https://design-book.apps.aimeat.io/" target="_blank">Design Book<//>`;
+  const rail = html`<${Rail} kind="index" title=${x('railTitle')} entries=${[
+    { href: '#lb-base', label: x('secBase'), count: packs ? base.length : undefined },
+    { href: '#lb-ui', label: x('secUi'), count: packs ? ui.length : undefined },
+    { href: '#lb-third', label: x('secThird'), count: packs ? third.length : undefined },
+    { href: '#lb-ai', label: x('secAi') },
+  ]}>${pageLinks()}<//>`;
+
+  return html`<${Page} width="wide" title=${t('librariesTab.tabLabel')} crumbs=${crumb()} identity=${identity} actions=${actions} rail=${rail}>
+    <${Stack}>
+      <${Text} kind="lead">${x('desc')}<//>
       ${strip}
-      <div class="og-grid">
-        <div class="og-main">
-          ${shelf(ctx, 'base', '01', x('secBase'), x('secBaseSub'), base, true)}
-          ${shelf(ctx, 'ui', '02', x('secUi'), x('secUiSub'), ui, false)}
-          ${shelf(ctx, 'third', '03', x('secThird'), x('secThirdSub'), third, false)}
-          ${secAI(ctx, '04', all)}
-        </div>
-        <nav class="og-rail" aria-label=${x('railTitle')}>
-          <span class="og-rail-label">${x('railTitle')}</span>
-          ${[['01', 'lb-base', x('secBase'), packs ? base.length : ''], ['02', 'lb-ui', x('secUi'), packs ? ui.length : ''], ['03', 'lb-third', x('secThird'), packs ? third.length : ''], ['04', 'lb-ai', x('secAi'), '']].map(([n, id, label, count]) => html`<button type="button" class="og-rail-link" key=${id} onClick=${() => scrollTo(id)}><i>${n}</i>${label}<em>${count}</em></button>`)}
-          <hr />
-          <span class="og-rail-label">${x('pages')}</span>
-          ${pageLinks()}
-        </nav>
-      </div>
-    </div>`;
+      ${shelf(ctx, 'base', x('secBase'), x('secBaseSub'), base)}
+      ${shelf(ctx, 'ui', x('secUi'), x('secUiSub'), ui)}
+      ${shelf(ctx, 'third', x('secThird'), x('secThirdSub'), third)}
+      ${secAI(ctx, all)}
+    <//>
+  <//>`;
 }
 
 /* ── One shelf: facets, search, rows ─────────────────────────────────────────────────────────── */
 
-function shelf(ctx, key, num, title, sub, list, first) {
+function shelf(ctx, key, title, sub, list) {
   const F = ctx.filters[key];
   const q = (ctx.queries[key] || '').trim().toLowerCase();
   const count = (f) => list.filter(f).length;
@@ -108,60 +102,69 @@ function shelf(ctx, key, num, title, sub, list, first) {
   const set = (patch) => ctx.setFilter(key, patch);
   const tog = (field, value) => set({ [field]: F[field] === value ? '' : value });
   const facets = [
-    facet(!F.status && !F.model && !F.use && !F.proven && !F.who, x('facetAll'), list.length, () => set({ status: '', model: '', use: '', proven: false, who: '' }), 'all'),
+    facet('all', !F.status && !F.model && !F.use && !F.proven && !F.who, x('facetAll'), list.length, () => set({ status: '', model: '', use: '', proven: false, who: '' })),
     ...(key === 'ui' ? [
-      facet(F.who === 'node', x('facetNode'), count((p) => !isCommunity(p)), () => tog('who', 'node'), 'node'),
-      facet(F.who === 'community', x('facetCommunity'), count(isCommunity), () => tog('who', 'community'), 'community'),
+      facet('node', F.who === 'node', x('facetNode'), count((p) => !isCommunity(p)), () => tog('who', 'node')),
+      facet('community', F.who === 'community', x('facetCommunity'), count(isCommunity), () => tog('who', 'community')),
     ] : []),
     ...(key === 'third' ? [
-      facet(F.model === 'any', x('model.any'), count((p) => p.modelTier === 'any'), () => tog('model', 'any'), 'any'),
-      facet(F.model === 'frontier', x('model.frontier'), count((p) => p.modelTier === 'frontier'), () => tog('model', 'frontier'), 'frontier'),
+      facet('any', F.model === 'any', x('model.any'), count((p) => p.modelTier === 'any'), () => tog('model', 'any')),
+      facet('frontier', F.model === 'frontier', x('model.frontier'), count((p) => p.modelTier === 'frontier'), () => tog('model', 'frontier')),
     ] : []),
-    facet(F.status === 'stable', x('status.stable'), count((p) => p.status === 'stable'), () => tog('status', 'stable'), 'stable'),
-    facet(F.status === 'preview', x('status.preview'), count((p) => p.status === 'preview'), () => tog('status', 'preview'), 'preview'),
-    ...(count((p) => p.status === 'deprecated') ? [facet(F.status === 'deprecated', x('status.deprecated'), count((p) => p.status === 'deprecated'), () => tog('status', 'deprecated'), 'deprecated')] : []),
-    facet(F.use === 'used', x('facetUsed'), count((p) => used(p) > 0), () => tog('use', 'used'), 'used'),
-    facet(F.use === 'unused', x('facetUnused'), count((p) => used(p) === 0), () => tog('use', 'unused'), 'unused'),
-    ...(count(proven) ? [facet(!!F.proven, x('facetProven'), count(proven), () => set({ proven: !F.proven }), 'proven')] : []),
+    facet('stable', F.status === 'stable', x('status.stable'), count((p) => p.status === 'stable'), () => tog('status', 'stable')),
+    facet('preview', F.status === 'preview', x('status.preview'), count((p) => p.status === 'preview'), () => tog('status', 'preview')),
+    ...(count((p) => p.status === 'deprecated') ? [facet('deprecated', F.status === 'deprecated', x('status.deprecated'), count((p) => p.status === 'deprecated'), () => tog('status', 'deprecated'))] : []),
+    facet('used', F.use === 'used', x('facetUsed'), count((p) => used(p) > 0), () => tog('use', 'used')),
+    facet('unused', F.use === 'unused', x('facetUnused'), count((p) => used(p) === 0), () => tog('use', 'unused')),
+    ...(count(proven) ? [facet('proven', !!F.proven, x('facetProven'), count(proven), () => set({ proven: !F.proven }))] : []),
   ];
   const ids = { base: 'lb-base', ui: 'lb-ui', third: 'lb-third' };
   return html`
-    <${Section} id=${ids[key]} num=${num} title=${title} count=${ctx.packs ? sub : null} first=${first}>
-      ${!ctx.packs ? html`<p class="lb-empty">${t('common.loading')}</p>` : html`
-        <div class="lb-facets">${facets}</div>
-        <div class="lb-search"><input class="og-input" type="search" value=${ctx.queries[key] || ''} placeholder=${x('search.' + key)} aria-label=${x('search.' + key)} onInput=${(e) => ctx.setQuery(key, e.target.value)} /><small>${x('searchOrder')}</small></div>
-        ${!rows.length ? html`<p class="lb-empty">${key === 'ui' && F.who === 'community' && !count(isCommunity) ? x('communityEmpty') : x('noMatch')}</p>` : html`
-          <div class="lb-pl">
-            <div class="lb-p lb-p--head"><div>${x('col.' + key)}</div><div>${key === 'ui' ? x('colGives') : x('colDoes')}</div><div>${x('colInApp')}</div><div></div></div>
-            ${shown.map((p) => packRow(ctx, p))}
-          </div>`}
-        <div class="lb-more">
-          ${shown.length < rows.length ? html`<button type="button" class="og-door og-door--quiet" onClick=${() => ctx.setShown(key, ctx.shown[key] + PAGE)}>${x('showMore', { n: Math.min(PAGE, rows.length - shown.length) })}</button>` : null}
-          <small>${x('shownOf', { shown: shown.length, total: rows.length })}</small>
-        </div>
-        <p class="lb-hint">${x('hint.' + key)}</p>`}
+    <${Section} id=${ids[key]} title=${title} count=${ctx.packs ? sub : null}>
+      ${!ctx.packs ? html`<${Text} tone="muted">${t('common.loading')}<//>` : html`
+        <${Stack}>
+          <${Toolbar} filters=${facets} />
+          <${Stack} density="compact">
+            <${Field} type="search" value=${ctx.queries[key] || ''} placeholder=${x('search.' + key)} ariaLabel=${x('search.' + key)} onInput=${(e) => ctx.setQuery(key, e.target.value)} />
+            <${Text} kind="caption" tone="muted">${x('searchOrder')}<//>
+          <//>
+          ${!rows.length ? html`<${Text} tone="muted">${key === 'ui' && F.who === 'community' && !count(isCommunity) ? x('communityEmpty') : x('noMatch')}<//>` : html`
+            <${Stack} density="compact">${shown.map((p) => packRow(ctx, p))}<//>`}
+          <${Stack} direction="horizontal" align="between">
+            ${shown.length < rows.length ? html`<${Action} onClick=${() => ctx.setShown(key, ctx.shown[key] + PAGE)}>${x('showMore', { n: Math.min(PAGE, rows.length - shown.length) })}<//>` : html`<span></span>`}
+            <${Text} kind="mono" tone="muted">${x('shownOf', { shown: shown.length, total: rows.length })}<//>
+          <//>
+          <${Text} kind="caption" tone="muted">${x('hint.' + key)}<//>
+        <//>`}
     <//>`;
 }
 
 /* ── How an AI takes a library into use ──────────────────────────────────────────────────────── */
 
-function secAI(ctx, num, all) {
+function secAI(ctx, all) {
   const proofs = all.reduce((s, p) => s + (p.proofs || []).length, 0);
   const passed = all.reduce((s, p) => s + (p.proofs || []).filter((pr) => pr.verdict === 'pass').length, 0);
   const inUse = all.filter((p) => used(p) > 0).length;
   const appsUsing = ctx.appsUsing;
+  const kv = (label, body, note) => html`<${KeyValue} label=${label}>
+    <${Stack} density="compact"><span>${body}</span>${note ? html`<${Text} kind="caption" tone="muted">${note}<//>` : null}<//>
+  <//>`;
   return html`
-    <${Section} id="lb-ai" num=${num} title=${x('secAi')} count=${null}>
-      <p class="lb-para">${x('aiIntro')}</p>
-      <div class="lb-rule poster-frame">
-        <span class="og-label">${x('ruleLabel')}</span>
-        <p class="lb-para">${x('ruleBody', { base: ctx.nodeUrl })}</p>
-        <div class="og-doors"><${CopyButton} text=${aiRule(ctx.nodeUrl)} className="og-door" label=${x('copyRule')} copiedLabel=${x('copied')} /></div>
-      </div>
-      <div class="lb-kv lb-kv--wide">
-        <div class="lb-k">${x('aiModelK')}</div><div class="lb-v">${x('aiModelBody')}<small>${x('aiModelSub')}</small></div>
-        <div class="lb-k">${x('aiProvenK')}</div><div class="lb-v">${x('aiProvenBody', { n: all.filter(proven).length, runs: proofs, passed, failed: proofs - passed })}<small>${x('aiProvenSub')}</small></div>
-        <div class="lb-k">${x('aiUsedK')}</div><div class="lb-v">${appsUsing ? x('aiUsedBody', { using: appsUsing.using, total: appsUsing.total, libs: inUse, unused: all.length - inUse }) : x('aiUsedBodyShort', { libs: inUse, unused: all.length - inUse })}</div>
-      </div>
+    <${Section} id="lb-ai" title=${x('secAi')}>
+      <${Stack}>
+        <${Text}>${x('aiIntro')}<//>
+        <${Surface} kind="box">
+          <${Stack} density="compact">
+            <${Text} kind="label">${x('ruleLabel')}<//>
+            <${Text}>${x('ruleBody', { base: ctx.nodeUrl })}<//>
+            <${Stack} direction="horizontal" align="start"><${CopyAction} text=${aiRule(ctx.nodeUrl)} label=${x('copyRule')} copiedLabel=${x('copied')} /><//>
+          <//>
+        <//>
+        <div>
+          ${kv(x('aiModelK'), x('aiModelBody'), x('aiModelSub'))}
+          ${kv(x('aiProvenK'), x('aiProvenBody', { n: all.filter(proven).length, runs: proofs, passed, failed: proofs - passed }), x('aiProvenSub'))}
+          ${kv(x('aiUsedK'), appsUsing ? x('aiUsedBody', { using: appsUsing.using, total: appsUsing.total, libs: inUse, unused: all.length - inUse }) : x('aiUsedBodyShort', { libs: inUse, unused: all.length - inUse }))}
+        </div>
+      <//>
     <//>`;
 }

@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Profile tab for publishing/managing services and browsing the catalogue.
  * @version-history
+ *   2026-09-22 -- Delete a service is in the danger tone.
  *   2026-09-22 -- Composed from the shared component set: the page is a Page with the trail, the two
  *     lists are tabs, a service is a ListRow that opens in place (its details as KeyValue rows, a
  *     schema as a code Surface), the publish form is Fields. No own CSS. The price no longer
@@ -197,7 +198,7 @@ export default function ServicesTab({ session, showToast, onStats }) {
               svc=${s}
               expanded=${!!expandedMine[svcId]}
               onToggle=${() => toggleMineExpand(svcId)}
-              actions=${html`<${Action} onClick=${() => unpublishService(svcId)}>${t('profile.delete')}<//>`}
+              actions=${html`<${Action} tone="danger" onClick=${() => unpublishService(svcId)}>${t('profile.delete')}<//>`}
             />`;
           })}<//>`
       }

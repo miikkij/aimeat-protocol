@@ -5,6 +5,10 @@
  * @description Sharing Groups section — CRUD for sharing groups with expandable
  *   member lists. Extracted from access-tab.js to satisfy max-file-lines.
  * @version-history
+ *   2026-09-22 -- Composed from the shared component set: a group is a ListRow that opens, members
+ *     and shares are compact rows with chips, the forms are Fields in a box; no own classes. The
+ *     title and introduction the Access page hid are gone (its section says them); the deep-link id
+ *     stays. The triangle glyphs are gone: the group's name opens it.
  *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
  *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
  *   v1.2.0 — 2026-08-11 — Key-space shares: each group shows what it can actually reach, with add
@@ -22,6 +26,7 @@ import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { useConfirm } from '/components/Modal.js';
 import { ContactPicker } from '/components/ContactPicker.js';
+import { Stack, ListRow, KeyValue, Chip, Action, Field, Surface, Text } from '/components/poster-parts.js';
 import * as groupsApi from '/js/services/sharing-groups.js';
 import * as sharesApi from '/js/services/shares.js';
 import { swallowed } from '/js/swallowed.js';
@@ -257,30 +262,26 @@ export function SharingGroupsSection({ showToast, initial }) {
   }, [confirm, showToast, loadGroups]);
 
   const renderMemberRow = (groupId, member) => html`
-    <div class="mem-item" key=${member.identifier}>
-      <span class="mem-key">${escHtml(member.identifier)}</span>
-      <span class="badge ${member.identifierType === 'gaii' ? 'badge-info' : 'badge-muted'}">${member.identifierType}</span>
-      <span class="badge ${member.permissions?.read ? 'badge-success' : 'badge-muted'}">
-        ${t('profile.access.sgRead') || 'read'}
-      </span>
-      <span class="badge ${member.permissions?.write ? 'badge-success' : 'badge-muted'}">
-        ${t('profile.access.sgWrite') || 'write'}
-      </span>
-      <button class="btn-ghost btn-danger btn-sm" onClick=${(e) => { e.stopPropagation(); handleRemoveMember(groupId, member.identifier); }}>
-        ${t('profile.access.sgRemove') || 'Remove'}
-      </button>
-    </div>
+    <${ListRow} key=${member.identifier} density="compact" name=${escHtml(member.identifier)}
+      value=${html`<${Stack} direction="wrap" density="compact">
+        <${Chip} tone=${member.identifierType === 'gaii' ? 'plain' : 'muted'}>${member.identifierType}<//>
+        <${Chip} tone=${member.permissions?.read ? 'success' : 'muted'}>${t('profile.access.sgRead') || 'read'}<//>
+        <${Chip} tone=${member.permissions?.write ? 'success' : 'muted'}>${t('profile.access.sgWrite') || 'write'}<//>
+      <//>`}
+      actions=${html`<${Action} kind="text" tone="danger" onClick=${() => handleRemoveMember(groupId, member.identifier)}>${t('profile.access.sgRemove') || 'Remove'}<//>`} />
   `;
 
   const renderShareRow = (share) => html`
-    <div class="mem-item" key=${share.id}>
-      <span class="mem-key" title=${share.key_pattern}>${escHtml(share.key_pattern)}</span>
-      ${share.note && html`<span class="text-meta-sm">${escHtml(share.note)}</span>`}
-      <button class="btn-ghost btn-danger btn-sm" onClick=${(e) => { e.stopPropagation(); handleRevokeShare(share); }}>
-        ${t('profile.access.shRevoke')}
-      </button>
-    </div>
+    <${ListRow} key=${share.id} density="compact" name=${escHtml(share.key_pattern)} nameTitle=${share.key_pattern}
+      detail=${share.note ? escHtml(share.note) : undefined} detailKind="text"
+      actions=${html`<${Action} kind="text" tone="danger" onClick=${() => handleRevokeShare(share)}>${t('profile.access.shRevoke')}<//>`} />
   `;
+
+  /** The read and write switches of a permission pair, as the set's checkboxes. */
+  const permFields = (read, setRead, write, setWrite) => html`<${Stack} direction="wrap" density="compact">
+    <${Field} type="checkbox" label=${t('profile.access.sgRead') || 'Read'} value=${read} onChange=${() => setRead(!read)} />
+    <${Field} type="checkbox" label=${t('profile.access.sgWrite') || 'Write'} value=${write} onChange=${() => setWrite(!write)} />
+  <//>`;
 
   const renderGroupCard = (group) => {
     const isExpanded = expandedId === group.id;
@@ -288,219 +289,115 @@ export function SharingGroupsSection({ showToast, initial }) {
     const memberCount = (group.members || []).length;
     const groupShares = sharesOf(group.id);
 
+    const perms = [group.defaultPermissions?.read ? (t('profile.access.sgRead') || 'read') : '', group.defaultPermissions?.write ? (t('profile.access.sgWrite') || 'write') : ''].filter(Boolean).join(' ');
+
     return html`
-      <div class="card ${isExpanded ? 'card-expanded' : ''} poster-row--thing" key=${group.id}>
-        <div class="card-header card-clickable" onClick=${() => setExpandedId(isExpanded ? null : group.id)}>
-          <span class="expand-icon">${isExpanded ? '▼' : '▶'}</span>
-          <div class="card-title">${escHtml(group.name)}</div>
-          <span class="badge badge-muted">${memberCount} ${t('profile.access.sgMembers') || 'members'}</span>
-          ${groupShares.length > 0 && html`
-            <span class="badge badge-info">${groupShares.length} ${t('profile.access.shTitle')}</span>
-          `}
-        </div>
-        ${group.description && html`
-          <div class="card-subtitle">${escHtml(group.description)}</div>
-        `}
+      <${ListRow} key=${group.id} name=${escHtml(group.name)} onOpen=${() => setExpandedId(isExpanded ? null : group.id)}
+        detail=${group.description ? escHtml(group.description) : undefined} detailKind="text"
+        value=${html`<${Stack} direction="wrap" density="compact">
+          <${Chip} tone="muted">${memberCount} ${t('profile.access.sgMembers') || 'members'}<//>
+          ${groupShares.length > 0 && html`<${Chip}>${groupShares.length} ${t('profile.access.shTitle')}<//>`}
+        <//>`}>
 
-        ${isExpanded && !isEditing && html`
-          <div class="card-detail">
-            <div class="detail-grid">
-              <div class="detail-item">
-                <span class="detail-label">${t('profile.access.sgDefaultPerms') || 'Default permissions'}</span>
-                <span class="detail-value">
-                  ${group.defaultPermissions?.read ? (t('profile.access.sgRead') || 'read') : ''} ${group.defaultPermissions?.write ? (t('profile.access.sgWrite') || 'write') : ''}
-                </span>
-              </div>
-              ${group.createdAt && html`
-                <div class="detail-item">
-                  <span class="detail-label">${t('profile.access.sgCreatedAt') || 'Created'}</span>
-                  <span class="detail-value">${fmtDate(group.createdAt)}</span>
-                </div>
-              `}
-            </div>
+        ${isExpanded && !isEditing && html`<${Stack}>
+          <${Stack} density="compact">
+            <${KeyValue} label=${t('profile.access.sgDefaultPerms') || 'Default permissions'} value=${perms} />
+            ${group.createdAt && html`<${KeyValue} label=${t('profile.access.sgCreatedAt') || 'Created'} value=${fmtDate(group.createdAt)} />`}
+          <//>
 
-            <h4 class="card-h3 mt-section">${t('profile.access.sgMemberList') || 'Members'}</h4>
+          <${Stack} density="compact">
+            <${Text} kind="label">${t('profile.access.sgMemberList') || 'Members'}<//>
             ${memberCount === 0
-              ? html`<div class="empty">${t('profile.access.sgNoMembers') || 'No members yet'}</div>`
-              : (group.members || []).map(m => renderMemberRow(group.id, m))
-            }
+              ? html`<${Text} tone="muted">${t('profile.access.sgNoMembers') || 'No members yet'}<//>`
+              : (group.members || []).map(m => renderMemberRow(group.id, m))}
+          <//>
 
-            <h4 class="card-h3 mt-section">${t('profile.access.shTitle')}</h4>
+          <${Stack} density="compact">
+            <${Text} kind="label">${t('profile.access.shTitle')}<//>
             ${groupShares.length === 0
-              ? html`<div class="empty">${t('profile.access.shNone')}</div>`
-              : groupShares.map(renderShareRow)
-            }
-            ${sharingIn === group.id ? html`
-              <div class="create-form poster-row--thing" onClick=${(e) => e.stopPropagation()}>
-                <div class="form-row">
-                  <label>${t('profile.access.shPattern')}</label>
-                  <input type="text" class="input-field input-sm" placeholder="deliveries.abc.**"
-                    value=${sharePattern} onInput=${e => setSharePattern(e.target.value)}
-                    onKeyDown=${e => e.key === 'Enter' && handleCreateShare(group.id)} />
-                  <div class="text-meta-sm">${t('profile.access.shPatternHelp')}</div>
-                </div>
-                <div class="form-row">
-                  <label>${t('profile.access.shNote')}</label>
-                  <input type="text" class="input-field input-sm"
-                    placeholder=${t('profile.access.shNotePlaceholder')}
-                    value=${shareNote} onInput=${e => setShareNote(e.target.value)} />
-                </div>
-                <div class="form-actions">
-                  <button class="btn-primary btn-sm" onClick=${() => handleCreateShare(group.id)} disabled=${sharingBusy}>
-                    ${sharingBusy ? '...' : t('profile.access.shCreate')}
-                  </button>
-                  <button class="btn-ghost btn-sm" onClick=${() => setSharingIn(null)}>
-                    ${t('profile.access.shCancel')}
-                  </button>
-                </div>
-              </div>
-            ` : html`
-              <div class="mb-half">
-                <button class="btn-outline btn-sm" onClick=${(e) => { e.stopPropagation(); setSharingIn(group.id); setSharePattern(''); setShareNote(''); }}>
-                  ${t('profile.access.shAdd')}
-                </button>
-              </div>
-            `}
+              ? html`<${Text} tone="muted">${t('profile.access.shNone')}<//>`
+              : groupShares.map(renderShareRow)}
+          <//>
+          ${sharingIn === group.id ? html`<${Surface} kind="box"><${Stack}>
+            <${Field} label=${t('profile.access.shPattern')} placeholder="deliveries.abc.**"
+              value=${sharePattern} onInput=${e => setSharePattern(e.target.value)}
+              onKeyDown=${e => e.key === 'Enter' && handleCreateShare(group.id)} />
+            <${Text} kind="caption" tone="muted">${t('profile.access.shPatternHelp')}<//>
+            <${Field} label=${t('profile.access.shNote')} placeholder=${t('profile.access.shNotePlaceholder')}
+              value=${shareNote} onInput=${e => setShareNote(e.target.value)} />
+            <${Stack} direction="horizontal" align="start">
+              <${Action} onClick=${() => handleCreateShare(group.id)} disabled=${sharingBusy}>${sharingBusy ? '...' : t('profile.access.shCreate')}<//>
+              <${Action} kind="text" onClick=${() => setSharingIn(null)}>${t('profile.access.shCancel')}<//>
+            <//>
+          <//><//>` : html`<${Stack} direction="horizontal" align="start">
+            <${Action} onClick=${() => { setSharingIn(group.id); setSharePattern(''); setShareNote(''); }}>${t('profile.access.shAdd')}<//>
+          <//>`}
 
-            ${addingTo === group.id ? html`
-              <div class="create-form poster-row--thing">
-                <div class="form-row">
-                  <label>${t('profile.access.sgMemberIdentifier') || 'Identifier (GHII or GAII)'}</label>
-                  <${ContactPicker} value=${memberIdent} onChange=${setMemberIdent} valueMode="full"
-                    placeholder=${'alice@node-id'} onSubmit=${() => handleAddMember(group.id)} />
-                </div>
-                <div class="form-row">
-                  <label>${t('profile.access.sgMemberType') || 'Type'}</label>
-                  <select class="input-field input-sm" value=${memberType} onChange=${e => setMemberType(e.target.value)}>
-                    <option value="ghii">GHII</option>
-                    <option value="gaii">GAII</option>
-                  </select>
-                </div>
-                <div class="flex-row-wrap">
-                  <label class="flex-row">
-                    <input type="checkbox" checked=${memberRead} onChange=${() => setMemberRead(!memberRead)} />
-                    ${t('profile.access.sgRead') || 'Read'}
-                  </label>
-                  <label class="flex-row">
-                    <input type="checkbox" checked=${memberWrite} onChange=${() => setMemberWrite(!memberWrite)} />
-                    ${t('profile.access.sgWrite') || 'Write'}
-                  </label>
-                </div>
-                <div class="form-actions">
-                  <button class="btn-primary btn-sm" onClick=${() => handleAddMember(group.id)}>
-                    ${t('profile.access.sgAddMember') || 'Add'}
-                  </button>
-                  <button class="btn-ghost btn-sm" onClick=${() => setAddingTo(null)}>
-                    ${t('profile.access.sgCancel') || 'Cancel'}
-                  </button>
-                </div>
-              </div>
-            ` : html`
-              <div class="card-actions">
-                <button class="btn-outline btn-sm" onClick=${(e) => { e.stopPropagation(); setAddingTo(group.id); setMemberIdent(''); setMemberType('ghii'); setMemberRead(true); setMemberWrite(false); }}>
-                  ${t('profile.access.sgAddMember') || 'Add Member'}
-                </button>
-                <button class="btn-outline btn-sm" onClick=${(e) => { e.stopPropagation(); startEdit(group); }}>
-                  ${t('profile.access.sgEdit') || 'Edit'}
-                </button>
-                <button class="btn-danger-solid btn-sm" onClick=${(e) => { e.stopPropagation(); handleDelete(group.id, group.name); }}>
-                  ${t('profile.access.sgDelete') || 'Delete'}
-                </button>
-              </div>
-            `}
-          </div>
-        `}
+          ${addingTo === group.id ? html`<${Surface} kind="box"><${Stack}>
+            <${Stack} density="compact">
+              <${Text} kind="label">${t('profile.access.sgMemberIdentifier') || 'Identifier (GHII or GAII)'}<//>
+              <${ContactPicker} value=${memberIdent} onChange=${setMemberIdent} valueMode="full"
+                placeholder=${'alice@node-id'} onSubmit=${() => handleAddMember(group.id)} />
+            <//>
+            <${Field} type="select" label=${t('profile.access.sgMemberType') || 'Type'} value=${memberType} onChange=${e => setMemberType(e.target.value)}
+              options=${[{ value: 'ghii', label: 'GHII' }, { value: 'gaii', label: 'GAII' }]} />
+            ${permFields(memberRead, setMemberRead, memberWrite, setMemberWrite)}
+            <${Stack} direction="horizontal" align="start">
+              <${Action} onClick=${() => handleAddMember(group.id)}>${t('profile.access.sgAddMember') || 'Add'}<//>
+              <${Action} kind="text" onClick=${() => setAddingTo(null)}>${t('profile.access.sgCancel') || 'Cancel'}<//>
+            <//>
+          <//><//>` : html`<${Stack} direction="wrap" density="compact">
+            <${Action} onClick=${() => { setAddingTo(group.id); setMemberIdent(''); setMemberType('ghii'); setMemberRead(true); setMemberWrite(false); }}>${t('profile.access.sgAddMember') || 'Add Member'}<//>
+            <${Action} onClick=${() => startEdit(group)}>${t('profile.access.sgEdit') || 'Edit'}<//>
+            <${Action} tone="danger" onClick=${() => handleDelete(group.id, group.name)}>${t('profile.access.sgDelete') || 'Delete'}<//>
+          <//>`}
+        <//>`}
 
-        ${isExpanded && isEditing && html`
-          <div class="card-detail" onClick=${(e) => e.stopPropagation()}>
-            <div class="flex-col">
-              <div class="form-row">
-                <label>${t('profile.access.sgGroupName') || 'Group name'}</label>
-                <input type="text" class="input-field input-sm"
-                  value=${editName} onInput=${e => setEditName(e.target.value)} />
-              </div>
-              <div class="form-row">
-                <label>${t('profile.access.sgDescription') || 'Description'}</label>
-                <textarea class="input-field input-sm" rows="2"
-                  value=${editDesc} onInput=${e => setEditDesc(e.target.value)} />
-              </div>
-              <div class="form-row">
-                <label>${t('profile.access.sgDefaultPerms') || 'Default permissions'}</label>
-                <div class="flex-row-wrap">
-                  <label class="flex-row">
-                    <input type="checkbox" checked=${editRead} onChange=${() => setEditRead(!editRead)} />
-                    ${t('profile.access.sgRead') || 'Read'}
-                  </label>
-                  <label class="flex-row">
-                    <input type="checkbox" checked=${editWrite} onChange=${() => setEditWrite(!editWrite)} />
-                    ${t('profile.access.sgWrite') || 'Write'}
-                  </label>
-                </div>
-              </div>
-              <div class="form-actions">
-                <button class="btn-primary btn-sm" onClick=${() => handleUpdate(group.id)} disabled=${saving}>
-                  ${saving ? '...' : (t('profile.access.sgSave') || 'Save')}
-                </button>
-                <button class="btn-ghost btn-sm" onClick=${() => setEditingId(null)}>
-                  ${t('profile.access.sgCancel') || 'Cancel'}
-                </button>
-              </div>
-            </div>
-          </div>
-        `}
-      </div>
+        ${isExpanded && isEditing && html`<${Stack}>
+          <${Field} label=${t('profile.access.sgGroupName') || 'Group name'} value=${editName} onInput=${e => setEditName(e.target.value)} />
+          <${Field} type="textarea" rows="2" label=${t('profile.access.sgDescription') || 'Description'} value=${editDesc} onInput=${e => setEditDesc(e.target.value)} />
+          <${Stack} density="compact">
+            <${Text} kind="label">${t('profile.access.sgDefaultPerms') || 'Default permissions'}<//>
+            ${permFields(editRead, setEditRead, editWrite, setEditWrite)}
+          <//>
+          <${Stack} direction="horizontal" align="start">
+            <${Action} kind="primary" onClick=${() => handleUpdate(group.id)} disabled=${saving}>${saving ? '...' : (t('profile.access.sgSave') || 'Save')}<//>
+            <${Action} kind="text" onClick=${() => setEditingId(null)}>${t('profile.access.sgCancel') || 'Cancel'}<//>
+          <//>
+        <//>`}
+      <//>
     `;
   };
 
-  return html`
-    <h3 class="card-h3 access-h3 mt-section" id="access-sharing-groups">${t('profile.access.sgTitle') || 'Sharing Groups'}</h3>
-    <div class="section-desc">${t('profile.access.sgDesc')}</div>
-
+  // The Access page's section carries the title and the introduction; this is its body. The id
+  // stays: the Memory tab's "Create a group" deep link scrolls to it.
+  return html`<${Stack} id="access-sharing-groups">
     ${groups === null
-      ? html`<div class="empty">${t('profile.access.sgLoading') || 'Loading...'}</div>`
+      ? html`<${Text} tone="muted">${t('profile.access.sgLoading') || 'Loading...'}<//>`
       : groups.length === 0
-        ? (!showCreate && html`
-            <div class="access-empty-row">
-              <span class="text-meta-sm">${t('profile.access.sgEmpty') || 'No sharing groups yet.'}</span>
-              <button class="btn-outline btn-sm" onClick=${() => setShowCreate(true)}>${t('profile.access.sgCreate') || 'New Group'}</button>
-            </div>`)
-        : groups.map(renderGroupCard)
+        ? (!showCreate && html`<${Stack} direction="wrap" density="compact" align="center">
+            <${Text} kind="caption" tone="muted">${t('profile.access.sgEmpty') || 'No sharing groups yet.'}<//>
+            <${Action} onClick=${() => setShowCreate(true)}>${t('profile.access.sgCreate') || 'New Group'}<//>
+          <//>`)
+        : html`<${Stack} density="compact">${groups.map(renderGroupCard)}<//>`
     }
 
-    ${!showCreate ? ((groups?.length || 0) > 0 && html`
-      <div class="mb-1">
-        <button class="btn-outline" onClick=${() => setShowCreate(true)}>
-          ${t('profile.access.sgCreate') || 'New Group'}
-        </button>
-      </div>
-    `) : html`
-      <div class="create-form poster-row--thing">
-        <h4 class="card-h3 mb-half">${t('profile.access.sgCreateTitle') || 'Create Sharing Group'}</h4>
-        <div class="flex-col">
-          <div class="form-row">
-            <label>${t('profile.access.sgGroupName') || 'Group name'}</label>
-            <input type="text" class="input-field input-sm"
-              placeholder=${t('profile.access.sgNamePlaceholder') || 'e.g. Team Alpha'}
-              value=${formName} onInput=${e => setFormName(e.target.value)}
-              onKeyDown=${e => e.key === 'Enter' && handleCreate()} />
-          </div>
-          <div class="form-row">
-            <label>${t('profile.access.sgDescription') || 'Description (optional)'}</label>
-            <textarea class="input-field input-sm" rows="2"
-              placeholder=${t('profile.access.sgDescPlaceholder') || 'What is this group for?'}
-              value=${formDesc} onInput=${e => setFormDesc(e.target.value)} />
-          </div>
-          <div class="form-actions">
-            <button class="btn-primary btn-sm" onClick=${handleCreate} disabled=${creating}>
-              ${creating ? '...' : (t('profile.access.sgCreateBtn') || 'Create')}
-            </button>
-            <button class="btn-ghost btn-sm" onClick=${() => setShowCreate(false)}>
-              ${t('profile.access.sgCancel') || 'Cancel'}
-            </button>
-          </div>
-        </div>
-      </div>
-    `}
+    ${!showCreate ? ((groups?.length || 0) > 0 && html`<${Stack} direction="horizontal" align="start">
+      <${Action} onClick=${() => setShowCreate(true)}>${t('profile.access.sgCreate') || 'New Group'}<//>
+    <//>`) : html`<${Surface} kind="box"><${Stack}>
+      <${Text} kind="heading" size="small">${t('profile.access.sgCreateTitle') || 'Create Sharing Group'}<//>
+      <${Field} label=${t('profile.access.sgGroupName') || 'Group name'}
+        placeholder=${t('profile.access.sgNamePlaceholder') || 'e.g. Team Alpha'}
+        value=${formName} onInput=${e => setFormName(e.target.value)}
+        onKeyDown=${e => e.key === 'Enter' && handleCreate()} />
+      <${Field} type="textarea" rows="2" label=${t('profile.access.sgDescription') || 'Description (optional)'}
+        placeholder=${t('profile.access.sgDescPlaceholder') || 'What is this group for?'}
+        value=${formDesc} onInput=${e => setFormDesc(e.target.value)} />
+      <${Stack} direction="horizontal" align="start">
+        <${Action} kind="primary" onClick=${handleCreate} disabled=${creating}>${creating ? '...' : (t('profile.access.sgCreateBtn') || 'Create')}<//>
+        <${Action} kind="text" onClick=${() => setShowCreate(false)}>${t('profile.access.sgCancel') || 'Cancel'}<//>
+      <//>
+    <//><//>`}
     <${ConfirmUI} />
-  `;
+  <//>`;
 }

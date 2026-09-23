@@ -5,6 +5,7 @@
  * @description Agent Defaults section — owner-level default rules and token
  *   budget for agents. Mounted at the foot of the Your agents page.
  * @version-history
+ *   2026-09-22 -- A rule's Remove carries the danger tone.
  *   2026-09-22 -- Composed from the shared parts (Section, ListRow, KeyValue, Field, Action, Surface,
  *     Text) instead of the card, memory-row and form classes; the pencil glyph after the budget goes.
  *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
@@ -126,7 +127,7 @@ export function AgentDefaultsSection({ showToast, initial }) {
               <${Text} kind="label">${t('profile.access.adRules') || 'Rules'}<//>
               ${editRules.map((rule, i) => html`
                 <${ListRow} key=${i} density="compact" name=${escHtml(rule)}
-                  actions=${html`<${Action} kind="text" onClick=${() => removeRule(i)}>${t('profile.access.adRemoveRule') || 'Remove'}<//>`} />
+                  actions=${html`<${Action} kind="text" tone="danger" onClick=${() => removeRule(i)}>${t('profile.access.adRemoveRule') || 'Remove'}<//>`} />
               `)}
               <${Columns} layout="leading" density="compact" collapse="560">
                 <${Field} placeholder=${t('profile.access.adRulePlaceholder') || 'Add a rule...'}

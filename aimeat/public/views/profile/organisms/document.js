@@ -22,6 +22,7 @@
  *   v1.3.0 -- 2026-09-22 -- Composed from the shared set (Stack, KeyValue, Action tabs, Field, the editor
  *     Surface as the Toast UI mount): no class of its own; the pop-out glyph and the camera emoji are
  *     worded actions, the image upload is an action that opens the hidden file input.
+ *   v1.3.1 -- 2026-09-22 -- An image row's key tooltip is the row's nameTitle, not a wrapping span.
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
@@ -295,7 +296,7 @@ export function DocumentEditor({ orgId, page, busy, onSave, onCancel }) {
           <//>
           <${Text} kind="caption" tone="muted">${t('organisms.fileVisibilityNote') || 'Private files only load for you — make them public to share the document.'}<//>
           ${images.map(i => html`
-            <${ListRow} key=${i.key} density="compact" name=${html`<span title=${i.key}>${i.alt}</span>`}
+            <${ListRow} key=${i.key} density="compact" name=${i.alt} nameTitle=${i.key}
               actions=${html`<${VisibilityPill} visibility=${i.visibility} onClick=${() => { if (!imgBusy) changeImageVisibility(i.key, i.visibility === 'public' ? 'private' : 'public'); }} />`} />`)}
         <//>
       <//>` : null}

@@ -10,6 +10,8 @@
  * @structure renderDocSpace
  * @usage import { renderDocSpace } from '/views/profile/organisms/workspace/doc-space.js';
  * @version-history
+ *   2026-09-22 -- The section rename commits through the Field's onBlur instead of a listener wired
+ *     through the element ref.
  *   2026-09-22 -- Composed from the shared set: the index and the document are two Columns, a section,
  *     a series and a document are ListRows (drag and drop on plain wrappers), a row's icon buttons are
  *     one Menu; the repeated space head that the page already shows is gone. The colour-tag dot stays
@@ -91,8 +93,8 @@ export function renderDocSpace(ctx, ot) {
       <${ListRow} density="compact"
         mark=${html`<${ColorPicker} value=${sec.color} onPick=${(c) => setSectionColor(ot.name, sec.id, c)} />`}
         name=${editingSec === sec.id
-          ? html`<${Field} placeholder=${t('organisms.sectionName') || 'Section name'} inputRef=${commitOnBlur(() => commitSecName(ot.name))}
-              value=${sec.name} onInput=${e => setSecName(ot.name, sec.id, e.target.value)}
+          ? html`<${Field} placeholder=${t('organisms.sectionName') || 'Section name'} inputRef=${focusOnce}
+              onBlur=${() => commitSecName(ot.name)} value=${sec.name} onInput=${e => setSecName(ot.name, sec.id, e.target.value)}
               onKeyDown=${e => { if (e.key === 'Enter') e.target.blur(); }} />`
           : html`<span onDblClick=${() => setEditingSec(sec.id)}>${sec.name || t('organisms.unnamed') || '(unnamed)'}</span>`}
         actions=${html`<${Menu} label=${t('organisms.moreActions') || 'More actions'} items=${[
@@ -149,11 +151,10 @@ export function renderDocSpace(ctx, ot) {
     <//>`;
 }
 
-/** The section-name field takes the focus once when it opens (the old input's autofocus) and
- *  commits the name when it is left (the old input's blur), wired once per field element. */
-const commitOnBlur = (commit) => (el) => {
+/** The section-name field takes the focus once when it opens (the old input's autofocus). Preact
+ *  does not act on autofocus for an element it inserts later, so the focus is given here. */
+const focusOnce = (el) => {
   if (!el || el.dataset.focused) return;
   el.dataset.focused = 'yes';
-  el.addEventListener('blur', commit);
   el.focus();
 };

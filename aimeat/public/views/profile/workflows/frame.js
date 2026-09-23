@@ -10,6 +10,8 @@
  * @structure c · loc · words (runWord, stepWord, triggerWords, signalWords, observedWords) · verdictOf · toneOf · chipTone · workflowRows · crumb · chipRow · pageLinks · renderPage · verdictBlock · railList
  * @usage import { renderPage, verdictOf, signalWords } from './frame.js';
  * @version-history
+ *   2026-09-22 -- A bad state's chip is danger and a waiting one coral (the chip has both tones now,
+ *     so neither borrows the sun); the workflows table stacks on a phone.
  *   2026-09-22 -- Composed from the shared component set (Page, Rail, Table, Surface, Chip); no own
  *     CSS. A tone is a named Text, Chip or Surface tone; the verdict is one shared block.
  *   v1.2.0 -- 2026-09-13 -- Compose existing top rules from poster.css.
@@ -152,12 +154,12 @@ export function lastRunWords(item) {
 
 /** A tone word ('ok' | 'bad' | 'wait' | '') as a Text tone. */
 export const toneOf = (tone) => (tone === 'ok' ? 'success' : tone === 'bad' ? 'danger' : tone === 'wait' ? 'coral' : 'plain');
-/** The same tone as a Chip tone: a bad or waiting state is the one to see. */
-export const chipTone = (tone) => (tone === 'bad' || tone === 'wait' ? 'sun' : 'plain');
+/** The same tone as a Chip tone: a bad state is danger, a waiting one asks for attention in coral. */
+export const chipTone = (tone) => (tone === 'bad' ? 'danger' : tone === 'wait' ? 'coral' : 'plain');
 
 /** The workflows table: name and its line, when it runs, the last run's word, what happened, the doors. */
 export function workflowRows(ctx, items) {
-  return html`<${Table} density="compact" label=${t('profile.workflows.title')}
+  return html`<${Table} density="compact" collapse=${600} label=${t('profile.workflows.title')}
     headers=${[c('colWorkflow'), c('colTrigger'), c('colLast'), c('colWhat'), '']}
     rows=${items.map(item => {
       const def = item.def;

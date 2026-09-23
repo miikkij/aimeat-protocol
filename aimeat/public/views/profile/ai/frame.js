@@ -7,9 +7,11 @@
  *   price and context words a person can read, the money and number formats, the 30-day rollup of
  *   the usage history per app, the crumb and the cross-page rail links.
  * @structure x · ROLES · poolFor · modelWords · priceWords · contextWords · money · compact ·
- *   rollup · dateWord · crumb · pageLinks · openTab
+ *   rollup · dateWord · crumb · pageLinks · openTab · CardSection · StatusLine
  * @usage import { x, ROLES, poolFor } from './frame.js';
  * @version-history
+ *   2026-09-22 -- The crumb is the shared trail's data, the page links are shared actions, and the
+ *     three cards under the page share one opening section and one status line built from the set.
  *   v1.0.0 — 2026-09-03 — Initial (design canvas "AIMEAT Tekoäly-sivu", direction A).
  */
 import { h } from 'preact';
@@ -17,6 +19,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { date as fmtDate, money as fmtMoney } from '/js/format.js';
+import { Section, Stack, Text, Action } from '/components/poster-parts.js';
 import {
   chatPriceLabel, audioPriceLabel, contextLabel, acceptsImages, answersInText, producesImages, priceVaries, isFree,
 } from '/views/profile/openrouter/pricing.js';
@@ -128,15 +131,38 @@ export function rollup(history, usage, quotas) {
   return { days: days.length, first: days[0]?.date || '', last: days[days.length - 1]?.date || '', cost, calls, tokens, maxDay, apps };
 }
 
+/** The trail to the page, as Masthead crumbs. */
 export function crumb() {
-  return html`<div class="og-crumb"><span>${t('nav.profile')}</span><span>/</span><span>${t('profile.landing.menuBuildShare')}</span><span>/</span><span class="og-crumb-here">${t('profile.generator.openrouter.title')}</span></div>`;
+  return [{ label: t('nav.profile') }, { label: t('profile.landing.menuBuildShare') }, { label: t('profile.generator.openrouter.title') }];
 }
 
 export const openTab = (tabId) => window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId } }));
 export function pageLinks(navigate) {
-  return html`
-    <button type="button" class="og-rail-link" onClick=${() => openTab('usage')}><i>→</i>${t('profile.tabs.usage')}<em>→</em></button>
-    <button type="button" class="og-rail-link" onClick=${() => navigate('/v1/chat')}><i>→</i>${t('nav.chat')}<em>→</em></button>
-    <button type="button" class="og-rail-link" onClick=${() => openTab('agents')}><i>→</i>${t('profile.tabs.agents')}<em>→</em></button>
-    <button type="button" class="og-rail-link" onClick=${() => openTab('apps')}><i>→</i>${t('profile.tabs.apps')}<em>→</em></button>`;
+  return html`<${Stack} density="compact">
+    <${Text} kind="label">${x('pages')}<//>
+    <${Action} onClick=${() => openTab('usage')}>${t('profile.tabs.usage')} →<//>
+    <${Action} onClick=${() => navigate('/v1/chat')}>${t('nav.chat')} →<//>
+    <${Action} onClick=${() => openTab('agents')}>${t('profile.tabs.agents')} →<//>
+    <${Action} onClick=${() => openTab('apps')}>${t('profile.tabs.apps')} →<//>
+  <//>`;
+}
+
+const PLUS = html`<svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 10h12M10 4v12" /></svg>`;
+const MINUS = html`<svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 10h12" /></svg>`;
+
+/**
+ * A section that opens in place, for the three cards under the AI page (the decision model, AI
+ * transparency, compliance): the slab and the description always show, the body only when open,
+ * and a square plus or minus at the right opens and closes it. `open` and `onToggle` are the card's.
+ */
+export function CardSection({ id, title, description, open, onToggle, children }) {
+  return html`<${Section} id=${id} title=${title} description=${description}
+    actions=${html`<${Action} kind="icon" label=${title} expanded=${open} onClick=${onToggle}>${open ? MINUS : PLUS}<//>`}>
+    ${open ? html`<${Stack}>${children}<//>` : null}
+  <//>`;
+}
+
+/** A status line under a form: an error in the danger tone, a confirmation in the success tone, announced either way. */
+export function StatusLine({ error, children }) {
+  return html`<div role="status"><${Text} kind="caption" tone=${error ? 'danger' : 'success'} lines=${true}>${children}<//></div>`;
 }

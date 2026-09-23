@@ -11,6 +11,9 @@
  * @structure addBody · roads · roadName · personForm · roadChat
  * @usage import { addBody, personForm } from './add.js';
  * @version-history
+ *   2026-09-22 -- The email check and the tag commit run on the Field's onBlur, as before the rebuild
+ *     (a change event missed a field left unchanged); a link's Remove carries the danger tone; the
+ *     relation choices lose their wrapping span.
  *   2026-09-22 -- Composed from the shared set: the roads are boxes in columns (the chosen one on
  *     the sun), the form is Fields with tab-style choices; the email check and the tag commit run
  *     on the field's change event, which fires as the field is left, as the blur did.
@@ -70,29 +73,29 @@ export function personForm(ctx, { withInvite = false, editing = false } = {}) {
   const found = ctx.formResolve;
   const editRow = editing && ctx.view.id ? ctx.rowOf(ctx.view.id) : null;
   const hint = (text) => html`<${Text} kind="caption" tone="muted">${text}<//>`;
-  const choice = (on, label, onClick, disabled) => html`<${Action} kind="tab" semantics="radio" selected=${on} disabled=${disabled} onClick=${onClick}>${label}<//>`;
+  const choice = (on, label, onClick, disabled, key) => html`<${Action} key=${key} kind="tab" semantics="radio" selected=${on} disabled=${disabled} onClick=${onClick}>${label}<//>`;
   return html`<${Stack}>
     <${Field} label=${c('fName')} value=${f.name} placeholder=${t('contacts.personName')} onInput=${e => set({ name: e.target.value })} />
     <${Stack} density="compact">
-      <${Field} label=${c('fEmail')} type="email" value=${f.email} disabled=${editing && !!editRow?.email} placeholder=${t('contacts.personEmail')} onInput=${e => set({ email: e.target.value })} onChange=${() => (editing ? null : ctx.resolveForm())} />
+      <${Field} label=${c('fEmail')} type="email" value=${f.email} disabled=${editing && !!editRow?.email} placeholder=${t('contacts.personEmail')} onInput=${e => set({ email: e.target.value })} onBlur=${() => (editing ? null : ctx.resolveForm())} />
       ${editing && editRow?.kind === 'ghii' && !editRow.email ? hint(c('emailForCardHint')) : null}
       ${editing || found === null ? null : found?.found ? hint(c('emailFound', { name: found.display_name || found.owner })) : found ? hint(c('emailNotFound')) : null}
     <//>
     <${Stack} density="compact">
       <${Text} kind="label">${c('fRelation')}<//>
-      <${Stack} direction="wrap" role="radiogroup" label=${c('fRelation')}>${RELATIONS.map(k => html`<span key=${k}>${choice(f.relation === relWord(k), relWord(k), () => set({ relation: f.relation === relWord(k) ? '' : relWord(k) }))}</span>`)}${choice(!!(relOther || f.relationOther), c('rel.other'), () => set({ relationOther: true, relation: relOther ? f.relation : '' }))}<//>
+      <${Stack} direction="wrap" role="radiogroup" label=${c('fRelation')}>${RELATIONS.map(k => choice(f.relation === relWord(k), relWord(k), () => set({ relation: f.relation === relWord(k) ? '' : relWord(k) }), false, k))}${choice(!!(relOther || f.relationOther), c('rel.other'), () => set({ relationOther: true, relation: relOther ? f.relation : '' }))}<//>
       ${relOther || f.relationOther ? html`<${Field} value=${f.relation} placeholder=${t('contacts.relationPlaceholder')} onInput=${e => set({ relation: e.target.value })} />` : null}
     <//>
     <${Stack} density="compact">
       ${(f.tags || []).length ? html`<${Stack} direction="wrap" density="compact">${f.tags.map(x => html`<${Action} kind="text" key=${x} title=${c('remove')} onClick=${() => set({ tags: f.tags.filter(y => y !== x) })}><${Chip}>${x} ✗<//><//>`)}<//>` : null}
-      <${Field} label=${c('fTags')} value=${f.tagInput || ''} placeholder=${c('tagPlaceholder')} onInput=${e => set({ tagInput: e.target.value })} onKeyDown=${e => { if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addTag(); } }} onChange=${addTag} />
+      <${Field} label=${c('fTags')} value=${f.tagInput || ''} placeholder=${c('tagPlaceholder')} onInput=${e => set({ tagInput: e.target.value })} onKeyDown=${e => { if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addTag(); } }} onBlur=${addTag} />
     <//>
     <${Stack} density="compact">
       <${Text} kind="label">${c('fLinks')}<//>
       ${links.map((l, i) => html`<${Stack} key=${i} direction="horizontal" align="end">
         <${Field} value=${l.label || ''} placeholder=${c('linkLabel')} onInput=${e => setLink(i, { label: e.target.value })} />
         <${Field} value=${l.url || ''} placeholder="https://" onInput=${e => setLink(i, { url: e.target.value })} />
-        <${Action} onClick=${() => set({ links: links.filter((_, j) => j !== i) })}>${c('remove')}<//>
+        <${Action} tone="danger" onClick=${() => set({ links: links.filter((_, j) => j !== i) })}>${c('remove')}<//>
       <//>`)}
       ${links.length < 12 ? html`<${Stack} direction="wrap"><${Action} onClick=${() => set({ links: [...links, { label: '', url: '' }] })}>${c('addLink')}<//><//>` : null}
       ${hint(c('linksHint'))}

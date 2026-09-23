@@ -11,6 +11,8 @@
  *   levelWords · keyRows · crumb · pageLinks · openTab
  * @usage import { x, keyRows, rightsInWords } from './frame.js';
  * @version-history
+ *   2026-09-22 -- The crumb is the shared trail's entries and the rail's related pages are shared
+ *     text Actions; no own classes.
  *   v1.0.0 — 2026-09-05 — Initial (design canvas "AIMEAT Pääsy-sivu", direction A).
  */
 import { h } from 'preact';
@@ -18,6 +20,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { date as fmtDate, time as fmtTime, num as fmtNum } from '/js/format.js';
+import { Stack, Action, Text } from '/components/poster-parts.js';
 
 export const x = (key, vars) => t('accesspage.' + key, vars);
 
@@ -186,15 +189,19 @@ export function filterRows(rows, filter, now = Date.now()) {
 
 /* ── The crumb and the rail ───────────────────────────────────────────────────────────────── */
 
+/** The trail: Settings & Controls, Account, Access. */
 export function crumb() {
-  return html`<div class="og-crumb"><span>${t('nav.profile')}</span><span>/</span><span>${t('profile.landing.menuAccount')}</span><span>/</span><span class="og-crumb-here">${t('profile.tabs.access')}</span></div>`;
+  return [{ label: t('nav.profile') }, { label: t('profile.landing.menuAccount') }, { label: t('profile.tabs.access') }];
 }
 
 export const openTab = (tabId) => window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId } }));
+/** The rail's related pages: a label, then one text action per page. */
 export function pageLinks(isOperator) {
-  return html`
-    <button type="button" class="og-rail-link" onClick=${() => openTab('fleet')}><i>→</i>${t('profile.tabs.fleet')}<em>→</em></button>
-    <button type="button" class="og-rail-link" onClick=${() => openTab('dataWallet')}><i>→</i>${t('profile.tabs.dataWallet')}<em>→</em></button>
-    <button type="button" class="og-rail-link" onClick=${() => openTab('mcp')}><i>→</i>${t('profile.tabs.mcp')}<em>→</em></button>
-    ${isOperator ? html`<button type="button" class="og-rail-link" onClick=${() => openTab('security')}><i>→</i>${t('profile.tabs.security')}<em>${x('operatorOnly')}</em></button>` : null}`;
+  return html`<${Stack} density="compact">
+    <${Text} kind="label">${x('pages')}<//>
+    <${Action} kind="text" onClick=${() => openTab('fleet')}>${t('profile.tabs.fleet')} →<//>
+    <${Action} kind="text" onClick=${() => openTab('dataWallet')}>${t('profile.tabs.dataWallet')} →<//>
+    <${Action} kind="text" onClick=${() => openTab('mcp')}>${t('profile.tabs.mcp')} →<//>
+    ${isOperator ? html`<${Action} kind="text" onClick=${() => openTab('security')}>${t('profile.tabs.security')} · ${x('operatorOnly')}<//>` : null}
+  <//>`;
 }

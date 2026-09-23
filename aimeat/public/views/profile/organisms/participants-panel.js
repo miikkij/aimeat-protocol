@@ -8,6 +8,8 @@
  * @structure ParticipantsPanel
  * @usage import { ParticipantsPanel } from '/views/profile/organisms/participants-panel.js';
  * @version-history
+ *   v1.4.1 -- 2026-09-22 -- Deny and Remove carry the danger tone; an agent's GAII tooltip is the
+ *     row's nameTitle and the contributions count a titled Text instead of wrapping spans.
  *   v1.4.0 -- 2026-09-22 -- Composed from the shared set (Section, ListRow, Chip, Field, Action): no class
  *     of its own; the people, robot, scroll, globe and stop emoji are gone.
  *   v1.3.0 — 2026-07-16 — The access-manager grantee input is a ContactPicker (contacts + directory
@@ -194,7 +196,7 @@ export function ParticipantsPanel({ orgId, wsId, showToast }) {
             <${Text} kind="label">${t('organisms.contractAgents') || 'Your contract agents'}<//>
             <${Text} kind="caption" tone="muted">${t('organisms.contractAgentsDesc') || 'These agents of yours advertise a workspace contract — they can process a workspace like this one. Grant access (below) or attach them in the organism Agents tab.'}<//>
             ${contractAgents.map(a => html`
-              <${ListRow} key=${a.gaii} density="compact" name=${html`<span title=${a.gaii}>${a.display_name || a.name}</span>`}
+              <${ListRow} key=${a.gaii} density="compact" name=${a.display_name || a.name} nameTitle=${a.gaii}
                 actions=${agentControls(a)} />`)}
           <//>` : null}
         <${Mermaid} chart=${orgService.buildParticipantsMermaid(data)} />
@@ -202,7 +204,7 @@ export function ParticipantsPanel({ orgId, wsId, showToast }) {
           ${owners.map((o, i) => html`
             <${ListRow} key=${i} density="compact" name=${o.owner}
               detail=${!o.isLocalNode ? o.node : undefined}
-              value=${o.contributions ? html`<span title=${t('organisms.contributions') || 'contributions'}>${o.contributions}</span>` : undefined}
+              value=${o.contributions ? html`<${Text} kind="mono" title=${t('organisms.contributions') || 'contributions'}>${o.contributions}<//>` : undefined}
               actions=${o.isSelf || o.isCreator || (!o.isMember && !o.isSelf) ? html`
                 ${o.isSelf ? html`<${Chip}>${t('organisms.you') || 'you'}<//>` : null}
                 ${o.isCreator ? html`<${Chip} tone="sun">${t('organisms.creatorTag') || 'creator'}<//>` : null}
@@ -224,14 +226,14 @@ export function ParticipantsPanel({ orgId, wsId, showToast }) {
                 actions=${html`
                   <${Action} disabled=${busy} onClick=${() => doDecide(r.requester, 'contributor')}>${t('organisms.addAsContributor') || 'Add as contributor'}<//>
                   <${Action} kind="text" disabled=${busy} onClick=${() => doDecide(r.requester, 'viewer')}>${t('organisms.addAsViewer') || 'as viewer'}<//>
-                  <${Action} kind="text" disabled=${busy} onClick=${() => doDecide(r.requester, 'deny')}>${t('organisms.deny') || 'Deny'}<//>`} />`)}
+                  <${Action} kind="text" tone="danger" disabled=${busy} onClick=${() => doDecide(r.requester, 'deny')}>${t('organisms.deny') || 'Deny'}<//>`} />`)}
               ${members.map(m => html`<${ListRow} key=${'mem-' + m.owner} density="compact" name=${m.owner}
                 actions=${html`
                   <${Chip} tone=${m.role === 'contributor' ? 'sun' : 'plain'}>${m.role === 'contributor' ? (t('organisms.roleContributorShort') || 'contributor') : (t('organisms.roleViewerShort') || 'viewer')}<//>
                   ${m.role === 'viewer'
                     ? html`<${Action} kind="text" disabled=${busy} onClick=${() => doGrant(m.owner, 'contributor')}>${t('organisms.makeContributor') || '→ can write'}<//>`
                     : html`<${Action} kind="text" disabled=${busy} onClick=${() => doGrant(m.owner, 'viewer')}>${t('organisms.makeViewer') || '→ read only'}<//>`}
-                  <${Action} kind="text" disabled=${busy} onClick=${() => doRevoke(m.owner)}>${t('organisms.remove') || 'Remove'}<//>`} />`)}
+                  <${Action} kind="text" tone="danger" disabled=${busy} onClick=${() => doRevoke(m.owner)}>${t('organisms.remove') || 'Remove'}<//>`} />`)}
             <//>
             <${Stack} direction="wrap" align="end">
               <${ContactPicker} value=${grantee} onChange=${setGrantee} onSubmit=${(v) => doGrant(v, role)}

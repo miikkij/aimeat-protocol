@@ -19,6 +19,7 @@
  * @structure AgentAiSection({ agentName, showToast })
  * @usage import { AgentAiSection } from './agent-ai-section.js';
  * @version-history
+ *   2026-09-22 -- Forget (the stored key) carries the danger tone.
  *   2026-09-22 -- Composed from the shared parts (Section, Field, Action, NumeralBand, ListRow, Text);
  *     it no longer borrows the scheduler's, organism's and AI tab's classes. The key and variable
  *     fields carry a visible label now, the words that were their placeholder and aria-label.
@@ -135,7 +136,7 @@ export function AgentAiSection({ agentName, showToast }) {
               <${Action} kind="text" disabled=${!!busy} onClick=${() => test(model)}>
                 ${busy === model ? t('agentAi.testing') : t('agentAi.test')}<//>
               ${(data[model].has_key || data[model].key_env) && html`
-                <${Action} kind="text" disabled=${!!busy} onClick=${() => forget(model)}>${t('agentAi.forget')}<//>`}
+                <${Action} kind="text" tone="danger" disabled=${!!busy} onClick=${() => forget(model)}>${t('agentAi.forget')}<//>`}
             <//>
             ${tested[model] && html`
               <div role="status">

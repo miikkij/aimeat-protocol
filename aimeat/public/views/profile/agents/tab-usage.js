@@ -11,6 +11,8 @@
  *   TabUsage({ agentName }) -- fetch (by-model + runs) -> stat cards + two lists.
  * @usage rendered by agent-card.js renderTabContent for activeTab === 'usage'.
  * @version-history
+ *   2026-09-22 -- The by-model and run lists scroll inside their sections (Surface height="scroll"),
+ *     so fifty runs do not stretch the tab.
  *   2026-09-22 -- Composed from the shared component set: the totals are a small numeral band, the
  *     by-model and run lists are sections of list rows; the tab's own classes are gone.
  *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
@@ -27,7 +29,7 @@ import { t } from '/js/i18n.js';
 import { getLedgerUsage, getLedgerRuns, getLedgerUsageOverview } from '/js/services/ledger.js';
 import { swallowed } from '/js/swallowed.js';
 import { num } from '/js/format.js';
-import { Stack, Section, ListRow, NumeralBand, Text } from '/components/poster-parts.js';
+import { Stack, Section, ListRow, NumeralBand, Surface, Text } from '/components/poster-parts.js';
 
 const html = htm.bind(h);
 
@@ -110,20 +112,24 @@ export default function TabUsage({ agent, agentName }) {
       ]} />
 
       <${Section} size="small" density="compact" title=${t('profile.agents.detail.usage.byModel')}>
+        <${Surface} kind="plain" density="flush" height="scroll">
         ${byModel.map(g => html`
           <${ListRow} key=${g.key} density="compact" name=${g.key || '(unknown)'}
             value=${html`<${Text} kind="mono">${fmtUsd(g.cost_usd)}${(g.unpriced_calls || 0) > 0 ? ` · ${g.unpriced_calls} ${t('profile.agents.detail.usage.unpriced')}` : ''}<//>`}
             detail=${html`${(g.providers && g.providers.length) ? html`<strong>${g.providers.join(', ')}</strong> · ` : ''}${fmtNum(g.total_tokens)} ${t('profile.agents.detail.usage.tokensLc')} (${fmtNum(g.prompt_tokens)} + ${fmtNum(g.completion_tokens)}) · ${fmtNum(g.calls)} ${t('profile.agents.detail.usage.callsLc')}`} />
         `)}
+        <//>
       <//>
 
       ${runs.length > 0 && html`
         <${Section} size="small" density="compact" title=${t('profile.agents.detail.usage.recentRuns')}>
+          <${Surface} kind="plain" density="flush" height="scroll">
           ${runs.map(r => html`
             <${ListRow} key=${r.run_id} density="compact" name=${r.run_id}
               value=${html`<${Text} kind="mono">${fmtUsd(r.cost_usd)}<//>`}
               detail=${`${fmtNum(r.total_tokens)} ${t('profile.agents.detail.usage.tokensLc')} · ${fmtNum(r.calls)} ${t('profile.agents.detail.usage.callsLc')}${(r.models && r.models.length) ? ` · ${r.models.join(', ')}` : ''}`} />
           `)}
+          <//>
         <//>
       `}
 

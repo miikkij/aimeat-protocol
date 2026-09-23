@@ -30,6 +30,9 @@
  * @usage routed at /v1/fleet by spa.html and routes/portal.ts, and embedded as the "Your agents"
  *   section of Settings & Controls via views/profile/fleet-tab.js, which passes `embedded`.
  * @version-history
+ *   v2.1.0 -- 2026-09-22 -- The set's newer props: "all fine" and "connected now" are success chips,
+ *     the migration banner's heading is the small heading, and the agent's address is the row's
+ *     name tooltip (ListRow nameTitle) instead of a span of its own.
  *   v2.0.0 -- 2026-09-22 -- Composed from the shared component set (Page, Section, Toolbar, ListRow,
  *     Chip, Surface, Text, Action) instead of the page's own classes, so a theme or part change
  *     reaches this page too; fleet.css is gone. The standalone page is a Page; embedded, the tab
@@ -167,7 +170,7 @@ function MigrateBanner({ migration, migrating, outcome, onPress }) {
               in" and a group of 6 called "Never connected" — so the heading was wrong about a third
               of its own number, and a reader was left reconciling 18, 12, 6 and 19. The two reasons
               are the groups' to tell; this box is about the one press that fixes both. */''}
-        <${Text} kind="heading">${plural('fleet.migrate.headOne', 'fleet.migrate.head')}<//>
+        <${Text} kind="heading" size="small">${plural('fleet.migrate.headOne', 'fleet.migrate.head')}<//>
         <${Text}>${plural('fleet.migrate.whatOne', 'fleet.migrate.what')}<//>
         <${Text} tone="muted">${t('fleet.migrate.keeps')}<//>
         ${/* Directly above the button, because it is the answer to "why can I not press this".
@@ -427,7 +430,7 @@ export default function FleetView({ embedded = false, starter = null } = {}) {
                 ? t('fleet.needAttentionOne')
                 : t('fleet.needAttention').replace('{n}', String(problems.length)),
             }] : []}>
-            ${problems.length === 0 && html`<${Chip}>${t('fleet.allFine')}<//>`}
+            ${problems.length === 0 && html`<${Chip} tone="success">${t('fleet.allFine')}<//>`}
             ${/* PRESSING THE FILTER LOOKED LIKE IT DID NOTHING. On this account it hides one healthy
                   agent, 1300px down, so the visible list was byte-identical before and after and a
                   person concluded the control was broken. It says what it took away. */''}
@@ -465,7 +468,7 @@ export default function FleetView({ embedded = false, starter = null } = {}) {
                         The rest go disabled, which is true — one move at a time — and says so
                         without claiming to be busy. */''}
                   <${ListRow} key=${a.gaii} density="compact"
-                    name=${html`<span title=${a.gaii}>${a.display_name || a.name}</span>`}
+                    name=${a.display_name || a.name} nameTitle=${a.gaii}
                     href=${`/v1/profile?tab=agents&agent=${encodeURIComponent(a.name)}`}
                     onOpen=${(e) => openAgent(e, a.name, embedded)}
                     detail=${(a.platform || a.stats?.tasks?.active > 0 || a.stats?.messages?.total > 0) && html`
@@ -477,7 +480,7 @@ export default function FleetView({ embedded = false, starter = null } = {}) {
                           : t('fleet.messages').replace('{n}', String(a.stats.messages.total))) : ''}
                       <//>`}
                     value=${html`<${Stack} direction="wrap" align="end" density="compact">
-                      ${a.credential?.connected && html`<${Chip} tone="sun">${t('fleet.connectedNow')}<//>`}
+                      ${a.credential?.connected && html`<${Chip} tone="success">${t('fleet.connectedNow')}<//>`}
                       ${/* INTERACTIVE was on 16 of 19 rows: a badge on almost every row separates
                             nothing and just puts a second grey block after every name. It is the
                             default, so only a departure from it is worth a badge. */''}

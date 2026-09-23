@@ -32,6 +32,8 @@ const html = htm.bind(h);
  * server-generated markup like badges.
  *
  * @version-history
+ *   v1.2.0 — 2026-09-22 — A cell object may carry `align: 'end'` (an amount, a count), and an empty
+ *     `headers` list draws no header row.
  *   v1.1.0 — 2026-09-22 — Each cell carries its column's header text as data-label, so the shared
  *     Table can stack a row as label-value pairs on a phone (components/poster-parts.js Table collapse).
  *   v1.0.0 — 2026-06-02 — Component unification (#13): created canonical generic
@@ -41,17 +43,19 @@ const html = htm.bind(h);
 export function DataTable({ headers, rows, scroll, className }) {
   const cls = `data-table${className ? ` ${className}` : ''}`;
   const table = html`<table class=${cls}>
-    <thead><tr>${headers.map(hd => html`<th>${hd}</th>`)}</tr></thead>
+    ${headers.length > 0 && html`<thead><tr>${headers.map(hd => html`<th>${hd}</th>`)}</tr></thead>`}
     <tbody>
       ${rows.map(row => html`<tr>
         ${row.map((cell, i) => {
           const label = typeof headers[i] === 'string' ? headers[i] : undefined;
+          const align = cell && typeof cell === 'object' && cell.align === 'end' ? 'end' : undefined;
+          if (align && !cell._html && !cell.mono) return html`<td data-label=${label} data-align="end" title=${cell.title || ''}>${cell.text}</td>`;
           if (cell && typeof cell === 'object' && cell._html) {
-            return html`<td class=${cell.mono ? 'mono' : ''} title=${cell.title || ''} data-label=${label}
+            return html`<td class=${cell.mono ? 'mono' : ''} title=${cell.title || ''} data-label=${label} data-align=${align}
               dangerouslySetInnerHTML=${{ __html: cell.text }}></td>`;
           }
           if (cell && typeof cell === 'object' && cell.mono) {
-            return html`<td class="mono" title=${cell.title || ''} data-label=${label}>${cell.text}</td>`;
+            return html`<td class="mono" title=${cell.title || ''} data-label=${label} data-align=${align}>${cell.text}</td>`;
           }
           return html`<td data-label=${label}>${cell}</td>`;
         })}

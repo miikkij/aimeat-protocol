@@ -68,7 +68,7 @@ function renderCover(ctx) {
   ]} />`;
   const chips = chipRow([
     [c('chipAll', { n: m.all.length })], [c('chipWeekly', { n: m.rhythm.length })], [c('chipCont', { n: m.continuous.length })], [c('chipRare', { n: m.rare.length })],
-    [c('chipPaused', { n: m.paused.length }), 'muted'], [c('chipFailed', { n: m.failed.length }), m.failed.length ? 'sun' : 'muted'],
+    [c('chipPaused', { n: m.paused.length }), 'muted'], [c('chipFailed', { n: m.failed.length }), m.failed.length ? 'coral' : 'muted'],
     m.agentMade && [c('chipAgent', { n: m.agentMade }), 'sun'],
   ]);
   const actions = html`<${Action} kind="primary" onClick=${() => ctx.pickView({ kind: 'page', id: 'create' })}>${t('profile.scheduler.newSchedule')}<//>
@@ -79,7 +79,7 @@ function renderCover(ctx) {
     { href: '#sc-cont', label: c('secCont'), count: m.continuous.length },
     { href: '#sc-rare', label: c('secRare'), count: m.rare.length },
     { href: '#sc-all', label: c('secAll'), count: m.all.length },
-    { href: '#sc-agents', label: c('secAgents'), count: ctx.internal.length },
+    { href: '#sc-agents', label: c('secAgents'), count: ctx.internal.length, onClick: () => ctx.setAgentsOpen(true) },
   ]}>${pageLinks(ctx, null)}<//>`;
   return html`<${Page} width="wide" title=${t('profile.scheduler.title')} crumbs=${crumb(ctx, [])} identity=${chips} actions=${actions} rail=${rail}>
     <${Stack}>
@@ -176,7 +176,7 @@ export function registerTable(ctx, list, { id = 'reg' } = {}) {
   const open = ctx.moreOpen.has(id);
   const shown = open ? list : list.slice(0, TABLE_ROWS);
   return html`<${Stack}>
-    <${Table} density="compact" label=${c('secAll')}
+    <${Table} density="compact" collapse=${600} label=${c('secAll')}
       headers=${[c('colSchedule'), c('colWhen'), c('colWho'), c('colLast'), t('profile.scheduler.col.runs'), '']}
       rows=${shown.map(s => [
         nameCell(ctx, s, s.enabled === false ? html`<${Chip} tone="muted">${t('profile.scheduler.paused')}<//>` : null),

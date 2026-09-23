@@ -49,13 +49,13 @@ const collapseOf = (value) => pick(Number(value), [560, 600, 640, 900], 640);
 const toneOf = (value) => pick(value, ['plain', 'muted', 'coral', 'sun', 'ink', 'success', 'danger'], 'plain');
 
 /** The page frame: width, masthead, and an optional rail that becomes a menu dialog on a phone. */
-export function Page({ title, titleKind, crumb, crumbs, identity, mark, actions, masthead, rail, width = 'normal', children, id,
+export function Page({ title, titleKind, subtitle, crumb, crumbs, identity, mark, actions, masthead, rail, width = 'normal', children, id,
   railSide = 'trailing', railLabel, railOpen = false, onRailOpen, onRailClose }) {
   const leading = railSide === 'leading';
   const railNode = rail && html`<div class="poster-page-rail">${rail}</div>`;
   return html`<div class="poster-page" data-width=${pick(width, ['normal', 'wide', 'reading'], 'normal')} id=${id}>
     ${masthead || ((title || crumb || crumbs || identity || actions) && html`<${Masthead}
-      title=${title} titleKind=${titleKind} crumb=${crumb} crumbs=${crumbs} identity=${identity} mark=${mark} actions=${actions} />`)}
+      title=${title} titleKind=${titleKind} subtitle=${subtitle} crumb=${crumb} crumbs=${crumbs} identity=${identity} mark=${mark} actions=${actions} />`)}
     ${rail && railLabel && html`<div class="poster-page-menu"><${Action} onClick=${onRailOpen} expanded=${railOpen}>${railLabel}<//></div>`}
     <div class="poster-page-body" data-rail=${rail ? 'yes' : 'no'} data-rail-side=${leading ? 'leading' : 'trailing'} data-navigation=${railLabel ? 'yes' : 'no'}>
       ${leading && railNode}<div class="poster-page-main">${children}</div>${!leading && railNode}
@@ -69,13 +69,14 @@ export function Page({ title, titleKind, crumb, crumbs, identity, mark, actions,
  * `crumbs` is the trail to this page: [{ label, href } | { label, onClick } | { label }], the last
  * entry being where the person is. (`crumb` takes a ready node, for a page that has one.)
  * `titleKind="mono"` sets a title that is a machine value (a key, an address) as it is written.
+ * `subtitle` is the short mono line after the title ("morsels and money").
  */
-export function Masthead({ title, titleKind, crumb, crumbs, identity, mark, actions, size = 'normal' }) {
+export function Masthead({ title, titleKind, subtitle, crumb, crumbs, identity, mark, actions, size = 'normal' }) {
   return html`<header class="poster-masthead" data-size=${pick(size, ['normal', 'large'], 'normal')}>
       ${mark && html`<span class="poster-masthead-mark">${mark}</span>`}
       <div class="poster-masthead-words">
         ${crumbs?.length ? html`<${Crumbs} items=${crumbs} />` : crumb && html`<div class="poster-crumb">${crumb}</div>`}
-        ${title && html`<h1 class="poster-page-title" data-kind=${titleKind === 'mono' ? 'mono' : undefined}>${title}</h1>`}
+        ${title && html`<h1 class="poster-page-title" data-kind=${titleKind === 'mono' ? 'mono' : undefined}>${title}${subtitle && html`<small>${subtitle}</small>`}</h1>`}
         ${identity && html`<div class="poster-identity">${identity}</div>`}
       </div>
       ${actions && html`<div class="poster-masthead-actions">${actions}</div>`}
@@ -121,10 +122,10 @@ export function Section({ title, description, actions, children, selected = fals
  * A folded row that opens in place: a coral number, the title, a quiet note at the right, the arrow.
  * `actions` sit on the row, outside the toggle, so pressing one does not open or close the fold.
  */
-export function Fold({ id, number, title, sub, open = false, onToggle, actions, children }) {
+export function Fold({ id, number, title, sub, open = false, onToggle, actions, children, toggleTitle }) {
   return html`<section class="poster-fold" data-open=${open ? 'yes' : 'no'} id=${id}>
     <div class="poster-fold-row">
-      <button type="button" class="poster-fold-toggle" aria-expanded=${open ? 'true' : 'false'} onClick=${onToggle}>
+      <button type="button" class="poster-fold-toggle" aria-expanded=${open ? 'true' : 'false'} onClick=${onToggle} title=${toggleTitle}>
         ${number && html`<span class="poster-list-number">${number}</span>`}
         <span class="poster-fold-title">${title}</span>
         ${sub && html`<span class="poster-fold-sub">${sub}</span>`}
@@ -196,10 +197,11 @@ export function Rail({ title, entries = [], children, label, kind = 'index' }) {
  * The second line (`detail`) is mono, for a machine value (an address, a key, a time); a sentence a
  * person reads passes `detailKind="text"`. A `preview` (a message, a note) is text and is clamped.
  * `muted` fades a row that is done, skipped or not chosen; `nameTitle` is a tooltip on the name;
- * `concealed` blurs the name and detail of a row the person chose to hide on screen.
+ * `concealed` blurs the name and detail of a row the person chose to hide on screen. `open` marks a
+ * row whose body is showing (arrow down, aria-expanded) without the sun fill of `selected`.
  */
 export function ListRow({ mark, name, detail, value, actions, children, href, onOpen, selected = false, density, id, kind = 'normal', preview = false, external = false,
-  time, timeTitle, marker, live = false, number, arrow = false, detailKind = 'mono', muted = false, nameTitle, concealed = false }) {
+  time, timeTitle, marker, live = false, number, arrow = false, detailKind = 'mono', muted = false, nameTitle, concealed = false, open }) {
   const lead = time != null || marker || number != null;
   const detailFace = preview ? 'text' : pick(detailKind, ['mono', 'text'], 'mono');
   return html`<article class="poster-list-row" data-kind=${pick(kind, ['normal', 'chronology'], 'normal')} data-density=${densityOf(density)} data-selected=${selected ? 'yes' : 'no'} data-preview=${preview ? 'yes' : undefined} data-detail=${detailFace} data-muted=${muted ? 'yes' : undefined} data-concealed=${concealed ? 'yes' : undefined} id=${id}>
@@ -209,12 +211,12 @@ export function ListRow({ mark, name, detail, value, actions, children, href, on
       ${marker && html`<span class="poster-list-marker" data-tone=${pick(marker, ['coral', 'sun', 'success', 'danger', 'info', 'muted'], 'muted')} data-live=${live ? 'yes' : undefined} aria-hidden="true"></span>`}
     </div>` : mark && html`<div class="poster-list-mark">${mark}</div>`}
     <div class="poster-list-name" title=${nameTitle}>
-      ${href || onOpen ? html`<${Action} href=${href} onClick=${onOpen} kind="text" target=${external ? '_blank' : undefined} nofollow=${external}>${name}<//>` : html`<strong>${name}</strong>`}
+      ${href || onOpen ? html`<${Action} href=${href} onClick=${onOpen} kind="text" target=${external ? '_blank' : undefined} nofollow=${external} expanded=${open === undefined ? undefined : !!open}>${name}<//>` : html`<strong>${name}</strong>`}
       ${detail && html`<small>${detail}</small>`}
     </div>
     ${value != null && html`<div class="poster-list-value">${value}</div>`}
     ${actions && html`<div class="poster-list-actions">${actions}</div>`}
-    ${arrow && html`<span class="poster-list-arrow" aria-hidden="true">${selected ? '↓' : '→'}</span>`}
+    ${arrow && html`<span class="poster-list-arrow" aria-hidden="true">${(open ?? selected) ? '↓' : '→'}</span>`}
     ${children && html`<div class="poster-list-body">${children}</div>`}
   </article>`;
 }
@@ -275,7 +277,7 @@ export function Table({ headers = [], rows = [], label, density, collapse }) {
 /** Search, filters and a right-aligned count. */
 export function Toolbar({ search, filters = [], count, actions, children, label }) {
   return html`<div class="poster-toolbar" role="group" aria-label=${label}>
-    ${search && html`<${Field} type="search" label=${search.label} placeholder=${search.placeholder}
+    ${search && html`<${Field} type="search" label=${search.label} ariaLabel=${search.ariaLabel} placeholder=${search.placeholder}
       value=${search.value ?? ''} onInput=${search.onInput} />`}
     ${filters.length > 0 && html`<div class="poster-filters">${filters.map((filter) => html`
       <${Action} key=${filter.id} kind="tab" selected=${!!filter.selected} disabled=${filter.disabled}
@@ -285,25 +287,43 @@ export function Toolbar({ search, filters = [], count, actions, children, label 
   </div>`;
 }
 
-/** A field owns its label, its control and its hint, which shows only while the field is in use. */
+/**
+ * A field owns its label, its control and its hint, which shows only while the field is in use.
+ * `type="file"` draws an underlined word (`chooseLabel`) that opens the picker, with `accept` and
+ * `multiple`; `value` is then the chosen file's name, shown beside it. Without `chooseLabel` the
+ * label itself is the word that opens the picker. The native input stays in
+ * the page, hidden, so the keyboard and the picker work as they always do.
+ */
 export function Field({ label, hint, error, type = 'text', value, onInput, onChange, options = [], placeholder,
   id, name, disabled = false, readOnly = false, required = false, rows = 5, autoComplete, min, max, step,
-  inputRef, maxLength, spellCheck, list, onKeyDown, onPaste, onBlur, autoFocus = false, inputMode, width = 'fill', ariaLabel }) {
+  inputRef, maxLength, spellCheck, list, onKeyDown, onPaste, onBlur, autoFocus = false, inputMode, width = 'fill', ariaLabel,
+  accept, multiple = false, chooseLabel, passwordManager = true }) {
   const generated = useId();
   const inputId = id || generated;
-  const kind = pick(type, ['text', 'email', 'url', 'password', 'search', 'number', 'date', 'datetime-local', 'time', 'checkbox', 'textarea', 'select'], 'text');
+  // Preact does not focus an element it inserts after the page has loaded, so `autoFocus` does it here.
+  const ownRef = useRef(null);
+  const setRef = (el) => { ownRef.current = el; if (typeof inputRef === 'function') inputRef(el); else if (inputRef) inputRef.current = el; };
+  useEffect(() => { if (autoFocus) ownRef.current?.focus(); }, [autoFocus]);
+  const kind = pick(type, ['text', 'email', 'url', 'password', 'search', 'number', 'date', 'datetime-local', 'time', 'month', 'checkbox', 'textarea', 'select', 'file'], 'text');
   const hasValue = value !== undefined && value !== null && value !== '' && value !== false;
-  const control = { id: inputId, name, disabled, readOnly, required, onInput, onChange, ref: inputRef, maxLength, spellCheck, list, onKeyDown, onPaste, onBlur,
+  const control = { id: inputId, name, disabled, readOnly, required, onInput, onChange, ref: setRef, maxLength, spellCheck, list, onKeyDown, onPaste, onBlur,
     autoFocus, inputMode: pick(inputMode, ['text', 'decimal', 'numeric', 'email', 'url', 'search'], undefined),
+    // A key or an address that a password manager must not fill or offer to save.
+    'data-1p-ignore': passwordManager ? undefined : 'true', 'data-lpignore': passwordManager ? undefined : 'true',
     'aria-invalid': error ? 'true' : undefined,
     'aria-describedby': error || hint ? inputId + '-hint' : undefined };
   return html`<div class="poster-field" data-filled=${hasValue ? 'yes' : 'no'} data-kind=${kind} data-width=${width === 'narrow' ? 'narrow' : undefined}>
-    ${label ? html`<label for=${inputId} class="poster-label">${label}</label>`
+    ${label && !(kind === 'file' && !chooseLabel) ? html`<label for=${inputId} class="poster-label">${label}</label>`
       : ariaLabel && html`<label for=${inputId} class="visually-hidden">${ariaLabel}</label>`}
     ${kind === 'textarea' ? html`<textarea ...${control} value=${value ?? ''} rows=${rows} placeholder=${placeholder}></textarea>`
       : kind === 'select' ? html`<select ...${control} value=${value}>${options.map((option) => html`
         <option key=${option.value} value=${option.value} disabled=${option.disabled}>${option.label}</option>`)}</select>`
       : kind === 'checkbox' ? html`<input ...${control} type="checkbox" checked=${!!value} />`
+      : kind === 'file' ? html`<div class="poster-field-file">
+          <input ...${control} type="file" class="visually-hidden" accept=${accept} multiple=${multiple} />
+          <label for=${inputId} class="poster-action">${chooseLabel || label || ariaLabel}</label>
+          ${hasValue && html`<span class="poster-field-file-name">${value}</span>`}
+        </div>`
       : html`<input ...${control} type=${kind} value=${value ?? ''} placeholder=${placeholder}
           autocomplete=${autoComplete} min=${min} max=${max} step=${step} />`}
     ${(error || hint) && html`<small id=${inputId + '-hint'} class="poster-field-hint" role=${error ? 'alert' : undefined}>${error || hint}</small>`}
@@ -322,7 +342,7 @@ export function NumeralBand({ items = [], lead, actions, tone = 'coral', cut = '
     data-cut=${pick(cut, ['straight', 'diagonal'], 'straight')} data-contained=${contained ? 'yes' : undefined} data-size=${small ? 'small' : undefined}>
     ${lead && html`<div class="poster-band-lead">${lead}</div>`}
     ${items.length > 0 && html`<dl>${items.map((item, index) => html`<div key=${item.id || index}>
-      <dt>${item.label}${item.note != null && html`<small>${item.note}</small>`}</dt>
+      <dt>${item.label}${item.note != null && html`<small title=${typeof item.note === 'string' ? item.note : undefined}>${item.note}</small>`}</dt>
       <dd class=${'poster-stat-number' + (small ? ' poster-stat-number--small' : '')} data-tone=${item.tone === 'coral' ? 'coral' : undefined}>${item.href || item.onClick
         ? html`<${Action} kind="text" href=${item.href} onClick=${item.onClick} label=${item.label}>${item.value}<//>` : item.value}</dd>
     </div>`)}</dl>`}${children}${actions && html`<div class="poster-actions">${actions}</div>`}
@@ -347,7 +367,7 @@ export function Dialog({ open, onClose, title, children, actions, sideAction, si
  * makes an on/off setting (aria-checked). `tone` "danger" or "success" colours an underlined word.
  */
 export function Action({ children, href, onClick, kind = 'secondary', size = 'normal', tone, selected = false,
-  disabled = false, type = 'button', label, title, expanded, controls, download, target, semantics, nofollow = false }) {
+  disabled = false, type = 'button', label, title, expanded, controls, download, target, semantics, nofollow = false, form }) {
   const role = pick(kind, ['primary', 'secondary', 'tab', 'text', 'icon', 'choice'], 'secondary');
   const cls = role === 'primary' ? 'poster-slab' + (size === 'large' ? ' poster-slab--large' : '')
     : role === 'choice' ? 'poster-choice' + (selected ? ' on' : '')
@@ -360,7 +380,7 @@ export function Action({ children, href, onClick, kind = 'secondary', size = 'no
     'aria-expanded': expanded, 'aria-controls': controls };
   return href && !disabled ? html`<a ...${common} href=${href} download=${download} target=${target}
     rel=${target === '_blank' ? 'noopener noreferrer' + (nofollow ? ' nofollow' : '') : undefined}>${children}</a>`
-    : html`<button ...${common} type=${pick(type, ['button', 'submit', 'reset'], 'button')} disabled=${disabled}
+    : html`<button ...${common} type=${pick(type, ['button', 'submit', 'reset'], 'button')} disabled=${disabled} form=${form}
         role=${pick(semantics, ['radio', 'tab', 'switch'], undefined)}
         aria-checked=${semantics === 'radio' || semantics === 'switch' ? selected : undefined}
         aria-selected=${semantics === 'tab' ? selected : undefined}

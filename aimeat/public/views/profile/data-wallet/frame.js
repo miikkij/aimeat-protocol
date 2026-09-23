@@ -12,6 +12,8 @@
  *   groupWords · consentEvents · dateWord · timeWord · spanWord · crumb · pageLinks · openTab
  * @usage import { x, targetRows, groupWords } from './frame.js';
  * @version-history
+ *   2026-09-22 -- The crumb is the shared trail's entries and the rail's related pages are shared
+ *     text Actions; no own classes.
  *   v1.0.0 — 2026-09-04 — Initial (design canvas "AIMEAT Tietolompakko-sivu", direction A).
  */
 import { h } from 'preact';
@@ -19,6 +21,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { date as fmtDate, time as fmtTime, num as fmtNum } from '/js/format.js';
+import { Stack, Action, Text } from '/components/poster-parts.js';
 
 export const x = (key, vars) => t('dwpage.' + key, vars);
 
@@ -233,15 +236,19 @@ export function consentEvents(consents, days, names) {
 
 /* ── The crumb and the rail ───────────────────────────────────────────────────────────────────── */
 
+/** The trail: Settings & Controls, Account, Data Wallet. */
 export function crumb() {
-  return html`<div class="og-crumb"><span>${t('nav.profile')}</span><span>/</span><span>${t('profile.landing.menuAccount')}</span><span>/</span><span class="og-crumb-here">${t('profile.tabs.dataWallet')}</span></div>`;
+  return [{ label: t('nav.profile') }, { label: t('profile.landing.menuAccount') }, { label: t('profile.tabs.dataWallet') }];
 }
 
 export const openTab = (tabId) => window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId } }));
+/** The rail's related pages: a label, then one text action per page. */
 export function pageLinks() {
-  return html`
-    <button type="button" class="og-rail-link" onClick=${() => openTab('organisms')}><i>→</i>${t('profile.tabs.organisms')}<em>→</em></button>
-    <button type="button" class="og-rail-link" onClick=${() => openTab('memory')}><i>→</i>${t('profile.tabs.memory')}<em>→</em></button>
-    <button type="button" class="og-rail-link" onClick=${() => openTab('contacts')}><i>→</i>${t('contacts.tabLabel')}<em>→</em></button>
-    <button type="button" class="og-rail-link" onClick=${() => openTab('agents')}><i>→</i>${t('profile.tabs.agents')}<em>→</em></button>`;
+  return html`<${Stack} density="compact">
+    <${Text} kind="label">${x('pages')}<//>
+    <${Action} kind="text" onClick=${() => openTab('organisms')}>${t('profile.tabs.organisms')} →<//>
+    <${Action} kind="text" onClick=${() => openTab('memory')}>${t('profile.tabs.memory')} →<//>
+    <${Action} kind="text" onClick=${() => openTab('contacts')}>${t('contacts.tabLabel')} →<//>
+    <${Action} kind="text" onClick=${() => openTab('agents')}>${t('profile.tabs.agents')} →<//>
+  <//>`;
 }

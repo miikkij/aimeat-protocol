@@ -9,6 +9,7 @@
  * @structure OrgAgentsPanel
  * @usage import { OrgAgentsPanel } from '/views/profile/organisms/agents.js';
  * @version-history
+ *   v1.2.1 -- 2026-09-22 -- Detach carries the danger tone.
  *   v1.2.0 -- 2026-09-22 -- Composed from the shared set (ListRow, Chip, Field, Surface): no class of its
  *     own; the robot and scroll emoji are gone.
  *   v1.0.0 — 2026-06-19 — Extracted from organisms-tab.js during the module split.
@@ -126,7 +127,7 @@ export function OrgAgentsPanel({ org, ghii, canManage, showToast, onChanged }) {
             ${p.node ? html`<${Chip} tone="muted">${p.node}<//>` : null}
             ${own && offersWorkspaceContract(own) ? html`<${Chip} tone="sun" title=${(t('organisms.contractAgentHint') || 'Advertises a workspace contract') + (contractNamesOf(own).length ? `: ${contractNamesOf(own).join(', ')}` : '')}>${t('organisms.contractTag') || 'contract'}<//>` : null}
             ${(canManage || g.includes('#' + ghii + '@'))
-              ? html`<${Action} disabled=${busy} onClick=${() => detach(g)}>${t('organisms.detach') || 'Detach'}<//>`
+              ? html`<${Action} tone="danger" disabled=${busy} onClick=${() => detach(g)}>${t('organisms.detach') || 'Detach'}<//>`
               : null}`} />`;
     })}<//>` : null}
   <//>`;

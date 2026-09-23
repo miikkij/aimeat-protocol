@@ -14,6 +14,7 @@
  *     self-subscribing to 'organisms' events (which was the per-document comments request storm).
  *   v1.2.0 -- 2026-09-22 -- Composed from the shared set: a comment is a ListRow with its body under it,
  *     the composer is Fields; no class of its own.
+ *   v1.2.1 -- 2026-09-22 -- Delete carries the danger tone.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
@@ -90,7 +91,7 @@ export function WorkspaceComments({ orgId, ws, space, instanceId, showToast, bat
         name=${c.author || '?'}
         detail=${`${c.parentId ? `${t('organisms.inReply') || 'reply'} · ` : ''}${c.anchor?.quote ? `“${String(c.anchor.quote).slice(0, 80)}” · ` : ''}${c.anchor?.section ? `§${c.anchor.section} · ` : ''}${c.createdAt ? dt(c.createdAt) : ''}`}
         actions=${html`<${Action} kind="text" disabled=${busy} onClick=${() => setReplyTo({ id: c.id, body: c.body })}>${t('organisms.reply') || 'Reply'}<//>
-          ${mine(c.author) ? html`<${Action} kind="text" disabled=${busy} onClick=${() => remove(c)}>${t('organisms.delete') || 'Delete'}<//>` : null}`}>
+          ${mine(c.author) ? html`<${Action} kind="text" tone="danger" disabled=${busy} onClick=${() => remove(c)}>${t('organisms.delete') || 'Delete'}<//>` : null}`}>
         <${Text}>${c.body || ''}<//>
       <//>`)}
     <${Stack} density="compact">

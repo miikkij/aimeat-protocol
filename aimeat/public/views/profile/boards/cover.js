@@ -12,6 +12,8 @@
  * @structure renderBoardsView · recentOf · renderCover · secFollowed · secRecent · secPublic · ownBoardForm · secApp
  * @usage import { renderBoardsView } from './boards/cover.js';
  * @version-history
+ *   v2.1.0 -- 2026-09-22 -- The rail's two fold entries open their fold before the jump, the new
+ *     notices chip is coral, and the jump to one's own board uses the set's scrollToId.
  *   v2.0.0 -- 2026-09-22 -- Composed from the shared component set (Page, Rail, Section, Fold,
  *     NumeralBand, ListRow, Columns, Field, Surface, Action, Chip, Text) so the cover follows
  *     the one theme and boards-poster.css can go. A choice of options is a row of tabs. Content,
@@ -24,8 +26,7 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { Page, Rail, Section, Fold, Columns, Stack, NumeralBand, Field, Surface, Action, Chip, Text } from '/components/poster-parts.js';
-import { scrollTo } from '/views/profile/organisms/poster-parts.js';
+import { Page, Rail, Section, Fold, Columns, Stack, NumeralBand, Field, Surface, Action, Chip, Text, scrollToId } from '/components/poster-parts.js';
 import { c, rel, who, bid, isAgentPost, crumb, boardRows, noticeRow, pageLinks, choice } from './frame.js';
 import { renderBoard } from './board.js';
 import { renderNotice } from './notice.js';
@@ -76,15 +77,15 @@ function renderCover(ctx) {
     { href: '#bp-followed', label: c('secFollowed'), count: ctx.followed.length },
     { href: '#bp-recent', label: c('secRecent'), count: recent.length },
     { href: '#bp-public', label: c('secPublic'), count: ctx.others.length },
-    { href: '#bp-own', label: c('secOwn') },
-    { href: '#bp-app', label: c('secApp') },
+    { href: '#bp-own', label: c('secOwn'), onClick: () => ctx.setFold('own', true) },
+    { href: '#bp-app', label: c('secApp'), onClick: () => ctx.setFold('app', true) },
   ]}>${pageLinks()}<//>`;
   return html`<${Page} title=${t('profile.tabs.boards')} crumbs=${crumb(ctx, [])}
     identity=${html`<${Stack} direction="wrap" density="compact">
-      ${chip(ctx.followed.length, 'chipFollowed')}${fresh ? chip(fresh, 'chipNew', 'sun') : null}${chip(ctx.others.length, 'chipPublic')}${ownBoards ? chip(ownBoards, 'chipOwn') : null}
+      ${chip(ctx.followed.length, 'chipFollowed')}${fresh ? chip(fresh, 'chipNew', 'coral') : null}${chip(ctx.others.length, 'chipPublic')}${ownBoards ? chip(ownBoards, 'chipOwn') : null}
     <//>`}
     actions=${html`<${Action} kind="primary" onClick=${() => ctx.startNotice()}>${c('post')}<//>
-      <${Action} onClick=${() => { ctx.setFold('own', true); scrollTo('bp-own'); }}>${c('ownBoard')}<//>`}
+      <${Action} onClick=${() => { ctx.setFold('own', true); scrollToId('bp-own'); }}>${c('ownBoard')}<//>`}
     rail=${rail}>
     <${Stack}>
       <${Text} tone="muted">${c('desc')}<//>

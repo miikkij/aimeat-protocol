@@ -5,6 +5,9 @@
  * @description Agent card component with collapsed/expanded states,
  *   Two-Zone Header (identity + state-dependent status), and tab bar.
  * @version-history
+ *   v3.0.1 -- 2026-09-22 -- The onboarding bar is the progress meter (it never turns red); the new
+ *     tag's field commits on the Field's own onBlur and carries a hidden label; the unseen dot's
+ *     tooltip sits on its Text; the two wrapping spans are gone.
  *   v3.0.0 -- 2026-09-22 -- Composed from the shared set (components/poster-parts.js): the closed
  *     card is a list row (name, GAII, last seen, Open), the open card a section whose facts are
  *     chips, the access level a sun box, the status banner an aside with a meter and the steps as chips,
@@ -477,7 +480,7 @@ function renderChangeBadge(changes) {
   const title = `${t('profile.agents.detail.changes.title')} — ${parts.join(', ')}`;
   // Has-unseen indicator (a dot, not an exact count). Neutral gray; red ONLY for unseen FAILED tasks.
   const failed = (changes.tasksFailed || 0) > 0;
-  return html`<span title=${title}><${Text} kind="caption" tone=${failed ? 'danger' : 'muted'}>${DOT}<//></span>`;
+  return html`<${Text} kind="caption" tone=${failed ? 'danger' : 'muted'} title=${title}>${DOT}<//>`;
 }
 
 function renderZone2(state, agent, onboarding, setActiveTab, showToast) {
@@ -511,7 +514,7 @@ function renderZone2(state, agent, onboarding, setActiveTab, showToast) {
               <${Text} kind="label">${t('profile.agents.detail.zone2.onboardingTitle')}: ${passed} / ${total}<//>
               ${nextStep ? html`<${Text} tone="muted">${t('profile.agents.detail.state.next')}: ${tOr('agentOnboarding.steps.' + nextStep.id, nextStep.title || nextStep.id)}<//>` : ''}
             <//>
-            <${Meter} value=${passed} max=${total} label=${t('profile.agents.detail.zone2.onboardingTitle')} />
+            <${Meter} kind="progress" value=${passed} max=${total} label=${t('profile.agents.detail.zone2.onboardingTitle')} />
             <${Stack} direction="wrap" density="compact">
               ${/* Chips, not checklist rows: sixteen steps stay a few dense lines, as the pills were. */''}
               ${steps.map(s => html`
@@ -602,20 +605,20 @@ function TagStrip({ agent, showToast }) {
       ${tags.map(tag => html`
         <${Chip} key=${tag}>
           ${tag}${' '}
-          <${Action} kind="text" title=${t('profile.agents.detail.data_access.tagRemoved')}
+          <${Action} kind="text" tone="danger" title=${t('profile.agents.detail.data_access.tagRemoved')}
             label=${t('profile.agents.detail.data_access.tagRemoved')} onClick=${() => removeTag(tag)}>✗<//>
         <//>
       `)}
       ${adding
-        ? html`<span onFocusOut=${() => { if (newTag.trim()) addTag(); else setAdding(false); }}>
-            <${Field} inputRef=${inputRef} value=${newTag}
+        ? html`<${Field} inputRef=${inputRef} value=${newTag}
                  placeholder=${t('profile.agents.detail.data_access.tagPlaceholder')}
+                 ariaLabel=${t('profile.agents.detail.data_access.addTag')}
                  onInput=${(e) => setNewTag(e.target.value)}
+                 onBlur=${() => { if (newTag.trim()) addTag(); else setAdding(false); }}
                  onKeyDown=${(e) => {
                    if (e.key === 'Enter') addTag();
                    else if (e.key === 'Escape') { setAdding(false); setNewTag(''); }
-                 }} />
-          </span>`
+                 }} />`
         : html`<${Action} kind="text" onClick=${() => setAdding(true)}><${Chip} tone="muted">+ ${t('profile.agents.detail.data_access.addTag')}<//><//>`}
     <//>
   `;

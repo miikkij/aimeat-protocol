@@ -9,6 +9,7 @@
  * @structure SourcesPanel
  * @usage import { SourcesPanel } from '/views/profile/organisms/sources-panel.js';
  * @version-history
+ *   2026-09-22 -- Remove carries the danger tone; a row's tooltip is its nameTitle, not a wrapping span.
  *   2026-09-22 -- Composed from the shared set (Section, ListRow, Chip, Field, tab Actions): no class of
  *     its own; the source-kind emoji (SRC_ICON) are gone, the kind is its worded chip.
  *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
@@ -112,7 +113,7 @@ export function SourcesPanel({ orgId, wsId, showToast }) {
     else if (tab === 'storage') { label = item.key; meta = (item.mime_type || '') + ' · ' + fmtBytes(item.size || 0); }
     else { label = scope === 'mine' ? (item.value?.name || item.key) : (item.name || item.package_id); meta = (scope === 'mine' ? (item.value?.entries?.length || 0) : (item.entries_count || 0)) + ' ' + (t('organisms.entries') || 'entries'); }
     return html`
-      <${ListRow} key=${'r' + i} density="compact" name=${html`<span title=${String(label)}>${String(label)}</span>`} detail=${String(meta)}
+      <${ListRow} key=${'r' + i} density="compact" name=${String(label)} nameTitle=${String(label)} detail=${String(meta)}
         actions=${html`<${Action} disabled=${busy} onClick=${() => attach(item)}>${t('organisms.attach') || 'Attach'}<//>`} />`;
   };
 
@@ -148,11 +149,11 @@ export function SourcesPanel({ orgId, wsId, showToast }) {
         ${sources.length === 0 ? html`<${Text} tone="muted">${t('organisms.noSources') || 'No sources yet'}<//>`
           : html`<${Stack} density="compact">
             ${sources.map(s => html`
-              <${ListRow} key=${s.id} density="compact" name=${html`<span title=${s.key || s.packageId || ''}>${String(s.label || s.key || s.packageId || '')}</span>`}
+              <${ListRow} key=${s.id} density="compact" name=${String(s.label || s.key || s.packageId || '')} nameTitle=${s.key || s.packageId || ''}
                 actions=${html`
                   ${s.external ? html`<${Chip} tone="muted">${t('organisms.external') || 'external'}<//>` : null}
                   <${Chip}>${t('organisms.src_' + s.type) || s.type}<//>
-                  <${Action} kind="text" onClick=${() => removeSource(s.id)}>${t('organisms.remove') || 'Remove'}<//>`} />`)}
+                  <${Action} kind="text" tone="danger" onClick=${() => removeSource(s.id)}>${t('organisms.remove') || 'Remove'}<//>`} />`)}
           <//>`}
       <//>
     <//>`;

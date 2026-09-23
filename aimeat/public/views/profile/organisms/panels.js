@@ -9,6 +9,7 @@
  * @structure OrgSearch, IncomingInvitations, BoardPreview
  * @usage import { OrgSearch, IncomingInvitations, BoardPreview } from '/views/profile/organisms/panels.js';
  * @version-history
+ *   2026-09-22 -- An invitation's Accept carries the success tone and Decline the danger tone.
  *   2026-09-22 -- Composed from the shared set (Section, ListRow, Field, Action): no class of its own; the
  *     board's copy-ID clipboard emoji is the worded action, the invitations banner is a selected Section.
  *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
@@ -114,8 +115,8 @@ export function IncomingInvitations({ showToast, onChanged }) {
         ${invites.map(({ membership, organism }) => html`
           <${ListRow} key=${organism.id} density="compact" detailKind="text" name=${organism.name}
             detail=${membership.invitedBy ? `— ${(t('organisms.invitedByLabel') || 'invited by {who}').replace('{who}', membership.invitedBy)}` : undefined}
-            actions=${html`<${Action} disabled=${busy} onClick=${() => act(organism.id, true)}>${t('organisms.acceptInvite') || 'Accept'}<//>
-              <${Action} kind="text" disabled=${busy} onClick=${() => act(organism.id, false)}>${t('organisms.declineInvite') || 'Decline'}<//>`} />`)}
+            actions=${html`<${Action} tone="success" disabled=${busy} onClick=${() => act(organism.id, true)}>${t('organisms.acceptInvite') || 'Accept'}<//>
+              <${Action} kind="text" tone="danger" disabled=${busy} onClick=${() => act(organism.id, false)}>${t('organisms.declineInvite') || 'Decline'}<//>`} />`)}
       <//>
     <//>`;
 }

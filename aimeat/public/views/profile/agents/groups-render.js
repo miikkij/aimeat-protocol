@@ -6,6 +6,9 @@
  *   grouped agent-card renderer (none / custom groups / mode / tag). Extracted from
  *   ../agents-tab.js to satisfy max-file-lines.
  * @version-history
+ *   v3.0.1 -- 2026-09-22 -- The fleet search carries a hidden label (its placeholder's words); the
+ *     grip's tooltip sits on its Text instead of a wrapping span; the group-name field closes on the
+ *     Field's own onBlur and carries a hidden label; a group's remove carries the danger tone.
  *   v3.0.0 -- 2026-09-22 -- Composed from the shared set (components/poster-parts.js): the search and
  *     the group-by choice are Fields, the tags chips inside text actions, the running-now panel a
  *     small section of timeline rows, each group a small section with its count and actions. The
@@ -44,7 +47,7 @@ const AGENT_MODES = ['autonomous', 'interactive', 'task-runner', 'coordinator', 
 const GRIP = html`<svg viewBox="0 0 10 16" width="10" height="16" aria-hidden="true" fill="currentColor">
   <circle cx="2.5" cy="3" r="1.4" /><circle cx="7.5" cy="3" r="1.4" /><circle cx="2.5" cy="8" r="1.4" />
   <circle cx="7.5" cy="8" r="1.4" /><circle cx="2.5" cy="13" r="1.4" /><circle cx="7.5" cy="13" r="1.4" /></svg>`;
-const grip = (title) => html`<span title=${title}><${Text} kind="caption" tone="muted">${GRIP}<//></span>`;
+const grip = (title) => html`<${Text} kind="caption" tone="muted" title=${title}>${GRIP}<//>`;
 
 /**
  * The fleet search, above the board rather than above the list: it narrows both, so the status
@@ -60,6 +63,7 @@ export function AgentSearch({ query, setQuery, shown, total }) {
     <${Stack} density="compact">
       <${Field} type="search" value=${query}
              placeholder=${t('profile.agents.search.placeholder')}
+             ariaLabel=${t('profile.agents.search.placeholder')}
              onInput=${(e) => setQuery(e.target.value)} />
       ${active && html`
         <${Stack} direction="horizontal" align="center" density="compact">
@@ -287,7 +291,7 @@ export function renderAgentGroups({ agents, tagFilter, query, groupBy, onboardin
       // at the top of the group.
       const title = html`<${Action} kind="text" title=${t('profile.agents.groups.rename')} onClick=${() => setEditingGroup(g.id)}>${g.name || t('profile.agents.groups.unnamed')}<//>`;
       const actions = html`${toggle(g.id, collapsed)}
-        <${Action} kind="text" title=${t('profile.agents.groups.remove')} label=${t('profile.agents.groups.remove')} onClick=${() => removeGroup(g.id)}>✗<//>`;
+        <${Action} kind="text" tone="danger" title=${t('profile.agents.groups.remove')} label=${t('profile.agents.groups.remove')} onClick=${() => removeGroup(g.id)}>✗<//>`;
       const body = html`
         ${editingGroup === g.id && html`<${GroupNameField} value=${g.name}
             onInput=${(v) => renameGroup(g.id, v)} onDone=${() => setEditingGroup(null)} />`}
@@ -355,9 +359,8 @@ export function renderAgentGroups({ agents, tagFilter, query, groupBy, onboardin
 function GroupNameField({ value, onInput, onDone }) {
   const ref = useRef(null);
   useEffect(() => { ref.current?.focus(); }, []);
-  return html`<span onFocusOut=${onDone}>
-    <${Field} inputRef=${ref} value=${value} placeholder=${t('profile.agents.groups.namePlaceholder')}
-      onInput=${(e) => onInput(e.target.value)}
-      onKeyDown=${(e) => { if (e.key === 'Enter') onDone(); }} />
-  </span>`;
+  return html`<${Field} inputRef=${ref} value=${value} placeholder=${t('profile.agents.groups.namePlaceholder')}
+    ariaLabel=${t('profile.agents.groups.rename')}
+    onInput=${(e) => onInput(e.target.value)} onBlur=${onDone}
+    onKeyDown=${(e) => { if (e.key === 'Enter') onDone(); }} />`;
 }

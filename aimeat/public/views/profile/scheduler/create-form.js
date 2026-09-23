@@ -10,6 +10,8 @@
  * @structure CRON_PRESETS · CreateForm
  * @usage <${CreateForm} agents=${agents} showToast=${showToast} onCreated=${reload} lockedAgent=${name} />
  * @version-history
+ *   v2.2.1 -- 2026-09-22 -- The two limit numbers are narrow fields, each named for assistive
+ *     technology by the checkbox label it belongs to.
  *   v2.2.0 -- 2026-09-22 -- Composed from the shared component set (Field, ListRow for the three
  *     choices, Action tabs for the cadences, Columns, Stack); no own CSS. The request body and every
  *     label are unchanged.
@@ -155,11 +157,11 @@ export function CreateForm({ agents = [], showToast, onCreated, onCancel = null,
       <${Columns} layout="equal" collapse="600" density="compact">
         <${Stack} density="compact">
           <${Field} type="checkbox" label=${t('profile.scheduler.maxRuns')} value=${maxRuns.enabled} onChange=${e => setMaxRuns(s => ({ ...s, enabled: e.target.checked }))} />
-          <${Field} type="number" min="1" value=${maxRuns.limit} disabled=${!maxRuns.enabled} onInput=${e => setMaxRuns(s => ({ ...s, limit: e.target.value }))} />
+          <${Field} type="number" min="1" width="narrow" ariaLabel=${t('profile.scheduler.maxRuns')} value=${maxRuns.limit} disabled=${!maxRuns.enabled} onInput=${e => setMaxRuns(s => ({ ...s, limit: e.target.value }))} />
         <//>
         <${Stack} density="compact">
           <${Field} type="checkbox" label=${t('profile.scheduler.dailyLimit')} value=${dailyLimit.enabled} onChange=${e => setDailyLimit(s => ({ ...s, enabled: e.target.checked }))} />
-          <${Field} type="number" min="0" step="0.1" value=${dailyLimit.limit} disabled=${!dailyLimit.enabled} onInput=${e => setDailyLimit(s => ({ ...s, limit: e.target.value }))} />
+          <${Field} type="number" min="0" step="0.1" width="narrow" ariaLabel=${t('profile.scheduler.dailyLimit')} value=${dailyLimit.limit} disabled=${!dailyLimit.enabled} onInput=${e => setDailyLimit(s => ({ ...s, limit: e.target.value }))} />
         <//>
       <//>
     <//>

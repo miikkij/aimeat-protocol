@@ -11,6 +11,8 @@
  * @structure renderInbox · renderDeliverable · RatingRow
  * @usage import { renderInbox, renderDeliverable } from './inbox.js';
  * @version-history
+ *   2026-09-22 -- A failed or stalled delivery's status chip takes the danger tone the chip now has,
+ *     instead of the sun it borrowed.
  *   2026-09-22 -- Composed from the shared component set (Section, ListRow, Field, Action, Surface);
  *     no own CSS. The five rating stars are five numbered choices (the site's text glyphs are
  *     ✓ ✗ → ↩ only); what they save is unchanged.
@@ -80,7 +82,7 @@ export function renderDeliverable(ctx, d) {
     id: 'deliverable', crumbs: [{ label: c('inbox'), go: () => ctx.pickView({ kind: 'page', id: 'inbox' }) }, d.title || d.task_id], title: d.title || d.task_id,
     chips: chipRow([
       [d.agent, 'sun'],
-      [statusWord(d.status), statusTone(d.status) === 'danger' ? 'sun' : 'plain'],
+      [statusWord(d.status), statusTone(d.status) === 'danger' ? 'danger' : 'plain'],
       [`${dayLabel(at)} ${hhmm(at)}`, 'muted'],
       it && [it.offer.title],
     ]),

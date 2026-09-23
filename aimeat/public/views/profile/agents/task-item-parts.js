@@ -7,6 +7,8 @@
  *   request-changes dialog and the memory-entry viewer (JSON tree, image, markdown). Pure
  *   extraction from ./task-item.js so that file stays under the 800-line limit.
  * @version-history
+ *   v2.0.1 -- 2026-09-22 -- A task's status chip takes the set's success, danger and coral tones
+ *     (done, failed, waiting on the owner) besides the sun for a running task.
  *   v2.0.0 -- 2026-09-22 -- Composed from the shared component set: the request-changes dialog is
  *     a Dialog with a Field, a memory entry is a Fold, the JSON tree is KeyValue rows with toned
  *     mono values, the status and to-do helpers return part tones instead of class names, and the
@@ -56,9 +58,14 @@ export function statusLabel(status) {
   return val !== key ? val : status.charAt(0).toUpperCase() + status.slice(1);
 }
 
-/** Which Chip tone a status wears: the sun while it runs, the plain frame for everything else. */
+/** Which Chip tone a status wears: the sun while it runs, success when done, danger when it failed,
+ *  coral when it waits on the owner (stalled, changes asked for), the plain frame for the rest. */
 export function statusChipTone(status) {
-  return status === 'active' ? 'sun' : 'plain';
+  if (status === 'active') return 'sun';
+  if (status === 'done') return 'success';
+  if (status === 'failed') return 'danger';
+  if (status === 'stalled' || status === 'revision_requested') return 'coral';
+  return 'plain';
 }
 
 /** The marker tone of one to-do: success when done, danger when failed, the pulsing sun while it

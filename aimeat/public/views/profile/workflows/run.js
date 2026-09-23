@@ -9,6 +9,8 @@
  * @structure renderRun
  * @usage import { renderRun } from './run.js';
  * @version-history
+ *   2026-09-22 -- A finished run's chip is the success tone, the raw JSON sits in the tall code box,
+ *     and the jump to the open question uses the set's scrollToId (it moves the content area only).
  *   2026-09-22 -- Composed from the shared component set: a step is a numbered ListRow with its
  *     state as the value, the verdict the shared block, the raw record a code Surface; no own CSS.
  *   v1.0.0 — 2026-08-30 — Initial.
@@ -17,7 +19,7 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { Section, Fold, Stack, ListRow, Surface, Action, Text } from '/components/poster-parts.js';
+import { Section, Fold, Stack, ListRow, Surface, Action, Text, scrollToId } from '/components/poster-parts.js';
 import { collectImages, ImageStrip } from '/components/ImageDeliverable.js';
 import { c, loc, rel, day, durationWords, stepWord, stepTone, runWord, runTone, verdictOf, stepTitle, stepAgents, signalWords, renderPage, chipRow, chipTone, toneOf, verdictBlock } from './frame.js';
 import { questionBlock } from './cover.js';
@@ -40,7 +42,7 @@ export function renderRun(ctx, item, runId) {
   const title = `${wfTitle} · ${isCheck ? c('checkWord') : c('runWord')} ${day(run.startedAt)}`;
 
   const chips = chipRow([
-    [runWord(run.status), runTone(run.status) === 'ok' ? 'sun' : chipTone(runTone(run.status))],
+    [runWord(run.status), runTone(run.status) === 'ok' ? 'success' : chipTone(runTone(run.status))],
     [c('startedChip', { when: rel(run.startedAt) })],
     [c('producedChip', { n: green, total: def.steps.length })],
     took && [c('tookChip', { took }), 'muted'],
@@ -48,7 +50,7 @@ export function renderRun(ctx, item, runId) {
     ...Object.entries(run.vars || {}).filter(([k]) => k !== 'run').slice(0, 3).map(([k, val]) => [`${k} = ${val}`, 'muted']),
   ]);
   const doors = html`
-    ${waiting.length ? html`<${Action} kind="primary" onClick=${() => document.getElementById('wp-question')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>${c('answer')}<//>` : null}
+    ${waiting.length ? html`<${Action} kind="primary" onClick=${() => scrollToId('wp-question')}>${c('answer')}<//>` : null}
     ${inFlight ? html`<${Action} disabled=${ctx.cancelling} onClick=${() => ctx.handleCancel(item.def.id, run.runId)}>${t('profile.workflows.cancelRun')}<//>` : null}
     ${!inFlight && !isCheck ? html`<${Action} onClick=${() => { ctx.pickView({ kind: 'detail', id: item.def.id }); ctx.openConfirm(item.def.id); }}>${c('runAgain')}<//>` : null}`;
   const rail = html`<${Stack} density="compact">
@@ -98,7 +100,7 @@ export function renderRun(ctx, item, runId) {
           <//>`; })}
       <//>
       <${Fold} id="wp-raw" number=${waiting.length ? '03' : '02'} title=${c('rawTitle')} sub=${c('rawSub')} open=${ctx.folds.raw} onToggle=${() => ctx.setFold('raw', !ctx.folds.raw)}>
-        <${Surface} kind="code">${JSON.stringify({ runId: run.runId, mode: run.mode, status: run.status, vars: run.vars, steps: run.steps, resolved: run.resolved }, null, 2)}<//>
+        <${Surface} kind="code" height="tall">${JSON.stringify({ runId: run.runId, mode: run.mode, status: run.status, vars: run.vars, steps: run.steps, resolved: run.resolved }, null, 2)}<//>
       <//>
       <${ctx.ConfirmUI} />`,
   });

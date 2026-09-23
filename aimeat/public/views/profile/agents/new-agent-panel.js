@@ -25,6 +25,10 @@
  * @structure NewAgentPanel({ session, showToast, onCreated, agents, open, setOpen, onWaiting })
  * @usage <${NewAgentPanel} session=${session} showToast=${showToast} onCreated=${loadData} />
  * @version-history
+ *   v3.0.1 -- 2026-09-22 -- The starting shapes are the set's choice tiles (the name in bold, the
+ *     description under it, the chosen one on the sun) in four columns; a proposal's Approve and
+ *     Decline are words in the success and danger tones instead of a second slab; the bare wrapper
+ *     around the proposals is gone.
  *   v3.0.0 -- 2026-09-22 -- Composed from the shared set (components/poster-parts.js): the form is
  *     Fields, the starting shape and the reach and run choices are radio groups of the shared tab
  *     action (a shape's description stands under its name), the proposals are list rows with their
@@ -211,10 +215,8 @@ export default function NewAgentPanel({ session, showToast, onCreated, agents, o
             <${Stack} role="radiogroup" label=${t('profile.agents.new.shape')}>
               <${Columns} layout="quarters" collapse="900">
                 ${shapes.map(s => html`
-                  <${Stack} density="compact" key=${s.id}>
-                    <${Action} kind="tab" semantics="radio" selected=${form.template === s.id} onClick=${pick('template', s.id)}>${s.name}<//>
-                    <${Text} kind="caption" tone="muted">${s.desc}<//>
-                  <//>`)}
+                  <${Action} kind="choice" semantics="radio" key=${s.id} title=${s.name}
+                    selected=${form.template === s.id} onClick=${pick('template', s.id)}>${s.desc}<//>`)}
               <//>
             <//>
           <//>
@@ -248,16 +250,15 @@ export default function NewAgentPanel({ session, showToast, onCreated, agents, o
       ${waiting.length > 0 && html`
         <${Stack} density="compact">
           <${Text} kind="label">${t('profile.agents.new.waitingTitle')}<//>
-          <div>
           ${waiting.map(pr => html`
             <${ListRow} key=${pr.id} detailKind="text"
               name=${pr.display_name || pr.name}
               detail=${pr.purpose}
               actions=${html`
-                <${Action} kind="primary" disabled=${busy} onClick=${() => settle(pr, 'approve')}>
+                <${Action} tone="success" disabled=${busy} onClick=${() => settle(pr, 'approve')}>
                   ${t('profile.agents.new.approve')}
                 <//>
-                <${Action} disabled=${busy} onClick=${() => settle(pr, 'decline')}>
+                <${Action} tone="danger" disabled=${busy} onClick=${() => settle(pr, 'decline')}>
                   ${t('profile.agents.new.decline')}
                 <//>`}>
               <${Text} kind="mono" tone="muted">
@@ -266,7 +267,6 @@ export default function NewAgentPanel({ session, showToast, onCreated, agents, o
                 ${!pr.crew_def && html` · ${t('profile.agents.new.noDefinition')}`}
               <//>
             <//>`)}
-          </div>
         <//>`}
       <//>
     <//>

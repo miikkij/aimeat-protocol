@@ -11,6 +11,8 @@
  * @structure renderOffersView · renderCover · secBack · secAuto · secAsk · catalogue · aiResults · sellPage
  * @usage import { renderOffersView } from './offers/cover.js';
  * @version-history
+ *   2026-09-22 -- The set's newer props: the catalogue and selling tables stack on a phone, the rail's
+ *     two fold entries open their fold before the jump, and the jump to "ask" uses scrollToId.
  *   2026-09-22 -- Composed from the shared component set: Page, Rail, Section, Fold, NumeralBand
  *     for the strip, Table for the catalogue and the selling register, ListRow for the chains and
  *     the AI's hits. No own CSS; every word, count, door and handler is the one it was.
@@ -22,8 +24,7 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { Page, Rail, Section, Fold, Stack, ListRow, Table, NumeralBand, Field, Action, Text, Surface } from '/components/poster-parts.js';
-import { scrollTo } from '/views/profile/organisms/poster-parts.js';
+import { Page, Rail, Section, Fold, Stack, ListRow, Table, NumeralBand, Field, Action, Text, Surface, scrollToId } from '/components/poster-parts.js';
 import { groupItems } from './model.js';
 import { c, word, agentMark, getWord, costTime, statusWord, deliveryRows, rel, crumb, chipRow, pageLinks, renderPage } from './frame.js';
 import { renderOffer } from './offer-page.js';
@@ -61,15 +62,15 @@ function renderCover(ctx) {
     [c('chipAuto', { n: m.autoN })], [c('chipSteps', { n: m.stepsN })],
     [c('chipSelling', { n: m.selling.length }), m.selling.length ? 'plain' : 'muted'], [c('chipDeliveries', { n: m.latest.length }), 'sun'],
   ]);
-  const actions = html`<${Action} kind="primary" onClick=${() => scrollTo('op-ask')}>${c('ask')}<//>
+  const actions = html`<${Action} kind="primary" onClick=${() => scrollToId('op-ask')}>${c('ask')}<//>
     <${Action} onClick=${() => ctx.pickView({ kind: 'page', id: 'inbox' })}>${c('inbox')}<//>
     <${Action} onClick=${() => ctx.pickView({ kind: 'page', id: 'map' })}>${c('map')}<//>`;
   const rail = html`<${Rail} kind="index" title=${c('railTitle')} entries=${[
     { href: '#op-back', label: c('secBack'), count: m.latest.length },
     { href: '#op-auto', label: c('secAuto'), count: m.chains.length + m.autoSingles.length },
     { href: '#op-ask', label: c('secAsk'), count: m.askable.length },
-    { href: '#op-offline', label: c('secOffline'), count: m.offlineAgents.size },
-    { href: '#op-selling', label: c('secSelling'), count: m.selling.length },
+    { href: '#op-offline', label: c('secOffline'), count: m.offlineAgents.size, onClick: () => ctx.setOfflineOpen(true) },
+    { href: '#op-selling', label: c('secSelling'), count: m.selling.length, onClick: () => ctx.setSellOpen(true) },
   ]}>${pageLinks(ctx, null)}<//>`;
   return html`<${Page} width="wide" title=${t('profile.tabs.offers')} crumbs=${crumb(ctx, [])} identity=${chips} actions=${actions} rail=${rail}>
     <${Stack}>
@@ -126,7 +127,7 @@ const nameCell = (ctx, it) => html`<${Stack} density="compact">
   <${Action} kind="text" onClick=${() => openOffer(ctx, it)}>${it.offer.title}<//>
   <${Text} kind="caption" tone="muted">${agentMark(it)}<//>
 <//>`;
-const catalogueTable = (ctx, list, label) => html`<${Table} density="compact" label=${label}
+const catalogueTable = (ctx, list, label) => html`<${Table} density="compact" collapse=${600} label=${label}
   headers=${[c('colOffer'), c('colGet'), c('colCostTime'), c('colTrust'), '']}
   rows=${list.map(it => [nameCell(ctx, it), { text: getWord(it.offer), mono: true }, costTime(it.offer), { text: word('verification', it.offer.verification), mono: true },
     html`<${Action} onClick=${() => openOffer(ctx, it)}>${c('ask')}<//>`])} />`;
@@ -205,7 +206,7 @@ function sellPage(ctx) {
     chips: chipRow([[c('chipSelling', { n: m.selling.length })], [c('chipOffers', { n: m.items.length }), 'muted']]),
     children: html`
       <${Text} kind="lead">${c('sellDesc')}<//>
-      <${Table} density="compact" label=${c('sell')} headers=${[c('colOffer'), c('colVisibility'), c('colPrice'), '']}
+      <${Table} density="compact" collapse=${600} label=${c('sell')} headers=${[c('colOffer'), c('colVisibility'), c('colPrice'), '']}
         rows=${list.map(it => [nameCell(ctx, it), t('profile.offers.visibility.' + (it.offer.visibility || 'private')), { text: price(it.offer), mono: true },
           html`<${Action} onClick=${() => ctx.pickView({ kind: 'offer', key: it.key, sell: true })}>${c('setPrice')}<//>`])} />`,
   });

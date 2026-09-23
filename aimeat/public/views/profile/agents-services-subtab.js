@@ -9,6 +9,7 @@
  *   - AgentServicesSubtab (default export) -- main component
  *   - ServiceCard -- individual service display card
  * @version-history
+ *   2026-09-22 -- Unpublish carries the danger tone.
  *   2026-09-22 -- Composed from the shared component set: the info note is an aside Surface, each
  *     service a ListRow (description as its sentence, active/inactive as a Chip, Unpublish as a text
  *     action, the cost/visibility/call figures as mono words under it). The status dot is gone, the
@@ -40,7 +41,7 @@ function ServiceCard({ service, onUnpublish }) {
   return html`
     <${ListRow} density="compact" detailKind="text" name=${name} detail=${desc || undefined}
       value=${html`<${Chip} tone=${isActive ? 'sun' : 'muted'}>${isActive ? t('profile.agents.detail.services.active') : t('profile.agents.detail.services.inactive')}<//>`}
-      actions=${html`<${Action} kind="text" onClick=${() => onUnpublish(service)}>
+      actions=${html`<${Action} kind="text" tone="danger" onClick=${() => onUnpublish(service)}>
         ${t('profile.agents.services.unpublish')}
       <//>`}>
       <${Stack} direction="wrap" density="compact">

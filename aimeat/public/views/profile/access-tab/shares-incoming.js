@@ -9,6 +9,8 @@
  *   node would tell you what you had been given. Everything else on this page answers "who can see
  *   my things"; this one answers "what of other people's may I see".
  * @version-history
+ *   2026-09-22 -- Composed from the shared component set (ListRow, Chip, Text); no own classes. The
+ *     title is the list's label; the description the Access page hid stays out.
  *   v1.0.0 — 2026-08-11 — Initial, alongside key-space shares.
  */
 import { h } from 'preact';
@@ -18,6 +20,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import * as sharesApi from '/js/services/shares.js';
+import { Stack, ListRow, Chip, Text } from '/components/poster-parts.js';
 import { swallowed } from '/js/swallowed.js';
 import { date as fmtDate } from '/js/format.js';
 
@@ -49,18 +52,17 @@ export function SharesIncomingSection() {
   // Nothing shared with you is the ordinary state for most accounts, so it is not worth a card.
   if (shares !== null && shares.length === 0) return null;
 
-  return html`
-    <h3 class="card-h3 access-h3 mt-section" id="access-shares-incoming">${t('profile.access.shIncomingTitle')}</h3>
-    <div class="section-desc">${t('profile.access.shIncomingDesc')}</div>
+  // The Access page hid this list's own title and description under its section; the title stays as
+  // the list's label, because without it these rows would not say they are other people's.
+  return html`<${Stack} id="access-shares-incoming" density="compact">
+    <${Text} kind="label">${t('profile.access.shIncomingTitle')}<//>
     ${shares === null
-      ? html`<div class="empty">${t('profile.access.sgLoading') || 'Loading...'}</div>`
+      ? html`<${Text} tone="muted">${t('profile.access.sgLoading') || 'Loading...'}<//>`
       : shares.map(s => html`
-        <div class="mem-item" key=${s.id}>
-          <span class="mem-key" title=${s.key_pattern}>${escHtml(s.key_pattern)}</span>
-          <span class="text-meta-sm">${t('profile.access.shIncomingFrom')} ${escHtml(s.owner_gaii)}</span>
-          ${s.expires_at && html`<span class="badge badge-muted">${fmtDate(s.expires_at)}</span>`}
-        </div>
+        <${ListRow} key=${s.id} name=${escHtml(s.key_pattern)} nameTitle=${s.key_pattern}
+          detail=${`${t('profile.access.shIncomingFrom')} ${escHtml(s.owner_gaii)}`}
+          value=${s.expires_at ? html`<${Chip} tone="muted">${fmtDate(s.expires_at)}<//>` : null} />
       `)
     }
-  `;
+  <//>`;
 }

@@ -5,6 +5,9 @@
  * @description Messages tab with command palette, "/" autocomplete, and chat area.
  *   Wraps the existing messages subtab and adds command discovery.
  * @version-history
+ *   v2.0.1 -- 2026-09-22 -- The history scrolls inside its own frame again (Surface height="scroll"),
+ *     so the newest message stays in view and the input stays under it; the message field carries a
+ *     hidden label; the no-commands hint sits on its caption instead of a wrapping span.
  *   v2.0.0 -- 2026-09-22 -- Composed from the shared component set: the command palette is a Fold
  *     of ListRows, the threads are tab actions, a message is a box (the owner's on the sun, the
  *     agent's plain) with a caption under it, an option prompt is a row of tab actions, the
@@ -82,12 +85,10 @@ function CommandPalette({ commands, onSend }) {
   if (!commands || commands.length === 0) {
     // No registered commands → one quiet line, not an expandable empty box.
     return html`
-      <span title=${t('profile.agents.detail.messages.commands.noCommandsHint')}>
-        <${Stack} direction="wrap" align="center" density="compact">
-          <${Text} kind="label">${t('profile.agents.detail.messages.commands.title')}<//>
-          <${Text} kind="caption" tone="muted">${t('profile.agents.detail.messages.commands.noCommands')}<//>
-        <//>
-      </span>
+      <${Stack} direction="wrap" align="center" density="compact">
+        <${Text} kind="label">${t('profile.agents.detail.messages.commands.title')}<//>
+        <${Text} kind="caption" tone="muted" title=${t('profile.agents.detail.messages.commands.noCommandsHint')}>${t('profile.agents.detail.messages.commands.noCommands')}<//>
+      <//>
     `;
   }
 
@@ -372,7 +373,7 @@ export default function TabMessages({ agent, agentName, showToast }) {
       `}
 
       ${messages.length > 0 && html`
-        <${Surface} kind="plain" surfaceRef=${historyRef}><${Stack} density="compact">
+        <${Surface} kind="plain" height="scroll" surfaceRef=${historyRef}><${Stack} density="compact">
           ${(() => {
             const sorted = [...messages].sort((a, b) => +new Date(a.createdAt || 0) - +new Date(b.createdAt || 0));
             // An option-prompt is answerable only while it is the newest message
@@ -438,6 +439,7 @@ export default function TabMessages({ agent, agentName, showToast }) {
             onInput=${handleInput}
             onKeyDown=${handleKeyDown}
             placeholder=${pendingPrompt ? t('profile.agents.messages.promptOtherPlaceholder') : t('profile.agents.detail.messages.placeholder')}
+            ariaLabel=${t('profile.agents.detail.messages.placeholder')}
             rows=${1} />
         <//>
         <${Text} kind="caption" tone="muted">${t('profile.agents.detail.messages.hint')}<//>

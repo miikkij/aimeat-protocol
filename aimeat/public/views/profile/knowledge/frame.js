@@ -7,9 +7,10 @@
  *   adds up to (entries, public entries, references and how many are verified), which group a
  *   package belongs to (drafts, published, datasets), the rows of packages, the crumb and the page
  *   frame with its rail, all composed from the shared set (components/poster-parts.js).
- * @structure c · words · pkgId · statsOf · groupOf · lines · packageRows · crumb · pageLinks · renderPage · entryText
+ * @structure c · words · pkgId · statsOf · groupOf · packageRows · crumb · pageLinks · renderPage · entryText
  * @usage import { renderPage, packageRows, statsOf } from './frame.js';
  * @version-history
+ *   v2.1.0 -- 2026-09-22 -- The lines() <br> helper is gone: the set's Text keeps typed line breaks.
  *   v2.0.0 -- 2026-09-22 -- Composed from the shared component set: a package is a ListRow, the
  *     crumb is the Masthead trail, the page frame is Page with an index Rail, so the page follows
  *     the one theme and has no sheet of its own. The rail's arrows are the allowed → and ↩.
@@ -86,11 +87,6 @@ export function entryText(data) {
   if (data.open_questions?.length) parts.push(data.open_questions.map(q => '? ' + q).join('\n'));
   if (parts.length) return parts.join('\n\n');
   return JSON.stringify(data, null, 2);
-}
-
-/** Text that keeps its line breaks: a paragraph per blank line, a line break per newline. */
-export function lines(text) {
-  return String(text || '').split('\n').flatMap((line, i) => (i ? [html`<br key=${'b' + i} />`, line] : [line]));
 }
 
 /**

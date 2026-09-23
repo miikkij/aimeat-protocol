@@ -10,6 +10,7 @@
  * @structure WorkspaceList
  * @usage import { WorkspaceList } from '/views/profile/organisms/workspace-list.js';
  * @version-history
+ *   v1.2.1 -- 2026-09-22 -- Revoke and Deny carry the danger tone and Approve the success tone.
  *   v1.2.0 -- 2026-09-22 -- Composed from the shared set (ListRow, Menu, Field, Fold, Chip): no class of
  *     its own; the emoji marks are gone (the participants count is a worded toggle), the archived list is a Fold.
  *   v1.1.0 -- 2026-09-13 -- Compose list and guide rules from poster.css; retire unused list rules.
@@ -327,8 +328,8 @@ export function WorkspaceList({ org, showToast, onOpen, onCount }) {
               : reqInbox.map(r => html`<${ListRow} key=${r.requester} density="compact" name=${r.requester}
                   detail=${r.message ? `— ${r.message}` : undefined} detailKind="text"
                   actions=${r.status === 'approved'
-                    ? html`<${Text} kind="caption" tone="success">✓ ${t('organisms.approved') || 'approved'}<//><${Action} disabled=${busy} onClick=${() => decide(w, r.requester, 'deny')}>${t('organisms.revoke') || 'Revoke'}<//>`
-                    : html`<${Action} disabled=${busy} onClick=${() => decide(w, r.requester, 'approve')}>${t('organisms.approve') || 'Approve'}<//><${Action} disabled=${busy} onClick=${() => decide(w, r.requester, 'deny')}>${t('organisms.deny') || 'Deny'}<//>`} />`)}
+                    ? html`<${Text} kind="caption" tone="success">✓ ${t('organisms.approved') || 'approved'}<//><${Action} tone="danger" disabled=${busy} onClick=${() => decide(w, r.requester, 'deny')}>${t('organisms.revoke') || 'Revoke'}<//>`
+                    : html`<${Action} tone="success" disabled=${busy} onClick=${() => decide(w, r.requester, 'approve')}>${t('organisms.approve') || 'Approve'}<//><${Action} tone="danger" disabled=${busy} onClick=${() => decide(w, r.requester, 'deny')}>${t('organisms.deny') || 'Deny'}<//>`} />`)}
           <//>` : null}
         <//>
       </div>`;

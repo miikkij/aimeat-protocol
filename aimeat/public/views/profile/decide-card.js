@@ -19,6 +19,10 @@
  * @structure DecideCard — the collapsible card, mounted in the profile AI tab
  * @usage import { DecideCard } from './decide-card.js'; html`<${DecideCard} />`
  * @version-history
+ *   2026-09-22 -- The key field tells password managers to leave it alone again (passwordManager={false}).
+ *   2026-09-22 -- Composed from the shared set: the card is the AI page's opening section, the policy
+ *     switches are shared fields, a decision is a shared row with its two verdicts as actions; it no
+ *     longer uses the decide-card rules in profile.css.
  *   v1.3.0 — 2026-09-20 — Every decision carries the person's own verdict: it was right, it was
  *     wrong. Nothing in the browser recorded a review before, so the register's "a human looked at
  *     it" half could only be written over MCP. The verdict already recorded stays on screen and
@@ -38,6 +42,8 @@ import { apiGet, apiPut, apiPost, apiDelete } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
 import { reviewDecision } from '/js/services/decide.js';
 import { DecideRules } from './decide-rules.js';
+import { Stack, Columns, ListRow, Field, Text, Action } from '/components/poster-parts.js';
+import { CardSection, StatusLine } from './ai/frame.js';
 
 const shortTime = (iso) => String(iso ?? '').slice(0, 16).replace('T', ' ');
 
@@ -173,114 +179,78 @@ export function DecideCard() {
   const payer = !settings ? '' : settings.has_own_key ? t('decideCard.payerOwn')
     : settings.node_key_available ? t('decideCard.payerNode') : t('decideCard.payerNone');
 
+  // Each policy line is an on/off switch that is stored the moment it is pressed.
+  const check = (label, checked, onChange) => html`<${Action} kind="choice" semantics="switch" title=${label} selected=${!!checked} disabled=${!!busy} onClick=${onChange} />`;
+
   return html`
-    <div class="pf-card pf-aitr" id="decide-card">
-      <button type="button" class="pf-aitr-head" onClick=${() => setCollapsed(c => !c)} aria-expanded=${!collapsed}>
-        <span class="poster-section-title">${t('decideCard.title')}</span>
-        <span class="pf-aitr-chevron">${collapsed ? '+' : '−'}</span>
-      </button>
-      <p class="section-desc">${t('decideCard.desc')}</p>
+    <${CardSection} id="decide-card" title=${t('decideCard.title')} description=${t('decideCard.desc')}
+      open=${!collapsed} onToggle=${() => setCollapsed(c => !c)}>
+      ${msg && html`<${StatusLine} error=${msg.error}>${msg.key ? t(msg.key, msg.params) : msg.text}<//>`}
+      ${!settings && !msg && html`<${Text} tone="muted">${t('decideCard.loading')}<//>`}
 
-      ${!collapsed && html`
-        <div class="pf-aitr-body">
-          ${msg && html`<p class=${msg.error ? 'pf-aitr-error' : 'pf-aitr-note'} role="status">${msg.key ? t(msg.key, msg.params) : msg.text}</p>`}
-          ${!settings && !msg && html`<p class="pf-aitr-muted">${t('decideCard.loading')}</p>`}
+      ${settings && html`
+        <${Text}>
+          ${settings.enabled ? t('decideCard.statusOn', { model: settings.model }) : t('decideCard.statusOff')}
+          ${' '}${payer}
+        <//>
 
-          ${settings && html`
-            <p class="pf-aitr-note">
-              ${settings.enabled ? t('decideCard.statusOn', { model: settings.model }) : t('decideCard.statusOff')}
-              ${' '}${payer}
-            </p>
+        <${Text} kind="heading" size="small">${t('decideCard.keyTitle')}<//>
+        <${Text} tone="muted">${settings.has_own_key ? t('decideCard.keySet') : t('decideCard.keyNotSet')}<//>
+        <${Stack} direction="horizontal" align="end">
+          <${Field} type="password" autoComplete="off" passwordManager=${false} ariaLabel=${t('decideCard.keyLabel')} placeholder=${t('decideCard.keyLabel')}
+            value=${keyInput} onInput=${e => setKeyInput(e.currentTarget.value)} disabled=${!!busy} />
+          <${Action} onClick=${saveKey} disabled=${!!busy || !keyInput.trim()}>${t('decideCard.keySave')}<//>
+        <//>
+        <${Stack} direction="wrap" align="center">
+          ${(settings.has_own_key || settings.node_key_available) && html`
+            <${Action} onClick=${testKey} disabled=${!!busy}>${busy === 'test' ? t('decideCard.keyTesting') : t('decideCard.keyTest')}<//>`}
+          ${settings.has_own_key && html`<${Action} tone="danger" onClick=${removeKey} disabled=${!!busy}>${t('decideCard.keyRemove')}<//>`}
+        <//>
 
-            <h4 class="pf-aitr-sub">${t('decideCard.keyTitle')}</h4>
-            <p class="pf-aitr-note">${settings.has_own_key ? t('decideCard.keySet') : t('decideCard.keyNotSet')}</p>
-            <div class="ai-field">
-              <input class="og-input" type="password" autocomplete="off" data-1p-ignore data-lpignore="true"
-                     aria-label=${t('decideCard.keyLabel')} placeholder=${t('decideCard.keyLabel')}
-                     value=${keyInput} onInput=${e => setKeyInput(e.currentTarget.value)} disabled=${busy} />
-              <button type="button" class="og-door" onClick=${saveKey} disabled=${busy || !keyInput.trim()}>
-                ${t('decideCard.keySave')}
-              </button>
-            </div>
-            <div class="og-doors">
-              ${(settings.has_own_key || settings.node_key_available) && html`
-                <button type="button" class="og-door og-door--quiet" onClick=${testKey} disabled=${busy}>
-                  ${busy === 'test' ? t('decideCard.keyTesting') : t('decideCard.keyTest')}
-                </button>`}
-              ${settings.has_own_key && html`
-                <button type="button" class="og-door og-door--quiet" onClick=${removeKey} disabled=${busy}>
-                  ${t('decideCard.keyRemove')}
-                </button>`}
-            </div>
+        <${Text} kind="heading" size="small">${t('decideCard.policyTitle')}<//>
+        <${Text} tone="muted">${t('decideCard.policyDesc')}<//>
+        <${Columns} collapse="640" density="compact">
+          ${settings.pii_classes.map(cls => html`<div key=${cls}>${check(t(`decideCard.class.${cls}`), settings.policy.allow.includes(cls), () => toggleClass(cls))}</div>`)}
+        <//>
+        ${check(t('decideCard.storeState'), settings.policy.storeState, () => save({ policy: { store_state: !settings.policy.storeState } }, 'decideCard.policySaved'))}
+        ${check(t('decideCard.publicOptOut'), settings.policy.allowPublicOptOut, () => save({ policy: { allow_public_opt_out: !settings.policy.allowPublicOptOut } }, 'decideCard.policySaved'))}
+      `}
 
-            <h4 class="pf-aitr-sub">${t('decideCard.policyTitle')}</h4>
-            <p class="pf-aitr-note">${t('decideCard.policyDesc')}</p>
-            <ul class="pf-aitr-list">
-              ${settings.pii_classes.map(cls => html`
-                <li key=${cls} class="pf-aitr-row">
-                  <label class="pf-aitr-row-main">
-                    <input type="checkbox" class="checkbox checkbox-sm" checked=${settings.policy.allow.includes(cls)}
-                           disabled=${busy} onChange=${() => toggleClass(cls)} />
-                    ${' '}${t(`decideCard.class.${cls}`)}
-                  </label>
-                </li>`)}
-              <li class="pf-aitr-row">
-                <label class="pf-aitr-row-main">
-                  <input type="checkbox" class="checkbox checkbox-sm" checked=${settings.policy.storeState} disabled=${busy}
-                         onChange=${() => save({ policy: { store_state: !settings.policy.storeState } }, 'decideCard.policySaved')} />
-                  ${' '}${t('decideCard.storeState')}
-                </label>
-              </li>
-              <li class="pf-aitr-row">
-                <label class="pf-aitr-row-main">
-                  <input type="checkbox" class="checkbox checkbox-sm" checked=${settings.policy.allowPublicOptOut} disabled=${busy}
-                         onChange=${() => save({ policy: { allow_public_opt_out: !settings.policy.allowPublicOptOut } }, 'decideCard.policySaved')} />
-                  ${' '}${t('decideCard.publicOptOut')}
-                </label>
-              </li>
-            </ul>
-          `}
+      ${settings && html`<${DecideRules} available=${!!settings.available} />`}
 
-          ${settings && html`<${DecideRules} available=${!!settings.available} />`}
-
-          ${recent && html`
-            <h4 class="pf-aitr-sub">${t('decideCard.recentTitle')}</h4>
-            ${recent.decisions.length === 0
-              ? html`<p class="pf-aitr-muted">${t('decideCard.recentNone')}</p>`
-              : html`<ul class="pf-aitr-list">
-                  ${recent.decisions.map(d => html`
-                    <li key=${d.id} class="pf-aitr-row">
-                      <span class="pf-aitr-row-main">${d.record.gates || d.subject || t('decideCard.noSubject')}</span>
-                      <span class="pf-aitr-row-meta">
-                        ${Object.entries(d.record.answers).slice(0, 3).map(([id, a]) => `${id}: ${answerText(a)}`).join(' · ')}
-                      </span>
-                      <span class="pf-aitr-row-meta">
-                        ${d.rule ? `${d.rule} · ${t(`decideRules.outcome.${d.outcome}`)} · ` : ''}${shortTime(d.createdAt)} · ${d.model}${d.record.cachedFrom ? ` · ${t('decideCard.cached')}` : ''}
-                        ${d.record.review ? ` · ${t(`decideCard.review.${d.record.review.outcome}`)}` : ''}
-                      </span>
-                      ${/* The person's own verdict, on EVERY decision, answered or not. The gate's
-                           row on the open-items list carries the same two buttons, but a decision
-                           made with the gate off never passes through that list, and it is just as
-                           much theirs to judge. This is the only place the register's "a human
-                           looked at it" half can be written from a browser — and the only way back
-                           from a mis-tap, which is why the answered one stays on screen, greyed and
-                           unpressable, with the opposite still live. */''}
-                      <span class="pf-aitr-row-verdict">
-                        <button type="button" class="btn-outline btn-sm"
-                          disabled=${!!busy || d.record.review?.outcome === 'confirmed'}
-                          title=${d.record.review?.outcome === 'confirmed' ? t('decideCard.review.already') : ''}
-                          onClick=${() => review(d.id, 'confirmed')}>${t('decideCard.review.confirmAction')}</button>
-                        <button type="button" class="btn-outline btn-sm"
-                          disabled=${!!busy || d.record.review?.outcome === 'overridden'}
-                          title=${d.record.review?.outcome === 'overridden' ? t('decideCard.review.already') : ''}
-                          onClick=${() => review(d.id, 'overridden')}>${t('decideCard.review.overrideAction')}</button>
-                      </span>
-                    </li>`)}
-                </ul>`}
-            <p class="pf-aitr-muted">${t('decideCard.recentTotal', { total: String(recent.total) })}</p>
-          `}
-        </div>`}
-    </div>`;
+      ${recent && html`
+        <${Text} kind="heading" size="small">${t('decideCard.recentTitle')}<//>
+        ${recent.decisions.length === 0
+          ? html`<${Text} tone="muted">${t('decideCard.recentNone')}<//>`
+          : html`<div>
+              ${recent.decisions.map(d => html`
+                <${ListRow} key=${d.id} density="compact" name=${d.record.gates || d.subject || t('decideCard.noSubject')}
+                  detailKind="text" detail=${Object.entries(d.record.answers).slice(0, 3).map(([id, a]) => `${id}: ${answerText(a)}`).join(' · ')}
+                  actions=${html`
+                    ${/* The person's own verdict, on EVERY decision, answered or not. The gate's
+                         row on the open-items list carries the same two buttons, but a decision
+                         made with the gate off never passes through that list, and it is just as
+                         much theirs to judge. This is the only place the register's "a human
+                         looked at it" half can be written from a browser — and the only way back
+                         from a mis-tap, which is why the answered one stays on screen, greyed and
+                         unpressable, with the opposite still live. */''}
+                    <${Action} tone="success"
+                      disabled=${!!busy || d.record.review?.outcome === 'confirmed'}
+                      title=${d.record.review?.outcome === 'confirmed' ? t('decideCard.review.already') : ''}
+                      onClick=${() => review(d.id, 'confirmed')}>${t('decideCard.review.confirmAction')}<//>
+                    <${Action} tone="danger"
+                      disabled=${!!busy || d.record.review?.outcome === 'overridden'}
+                      title=${d.record.review?.outcome === 'overridden' ? t('decideCard.review.already') : ''}
+                      onClick=${() => review(d.id, 'overridden')}>${t('decideCard.review.overrideAction')}<//>`}>
+                  <${Text} kind="mono" tone="muted">
+                    ${d.rule ? `${d.rule} · ${t(`decideRules.outcome.${d.outcome}`)} · ` : ''}${shortTime(d.createdAt)} · ${d.model}${d.record.cachedFrom ? ` · ${t('decideCard.cached')}` : ''}
+                    ${d.record.review ? ` · ${t(`decideCard.review.${d.record.review.outcome}`)}` : ''}
+                  <//>
+                <//>`)}
+            </div>`}
+        <${Text} kind="caption" tone="muted">${t('decideCard.recentTotal', { total: String(recent.total) })}<//>
+      `}
+    <//>`;
 }
 
 export default DecideCard;

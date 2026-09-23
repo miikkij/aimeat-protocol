@@ -7,6 +7,10 @@
  *   agent picker), and <EcoAutomationSection> (the unified turnkey publish→process→deliver flow).
  *   Extracted from ecosystem-tab.js to satisfy max-file-lines.
  * @version-history
+ *   2026-09-22 -- Composed from the shared component set: the config is one box of labelled steps
+ *     (Fields, the delivery mode two choice Actions), the how-it-works and advanced blocks Folds, the
+ *     status a timeline of three ListRows whose marker is the step's state, the run log a timeline of
+ *     rows, an advisory a box; no own classes. The triangle glyphs are gone.
  *   2026-09-13 -- V2v: compose section top rules from poster.css.
  *   v1.1.1 — 2026-09-13 — The reject-advisory dialog's actions sit in its footer.
  *   v1.1.0 — 2026-07-16 — Card mount folds schedules + recipe + organisms + advisories into GET
@@ -20,7 +24,7 @@ import { onLiveUpdate } from '/lib/live-updates.js';
 const html = htm.bind(h);
 import { t, getLocale } from '/js/i18n.js';
 import { timeAgo } from '/js/utils.js';
-import { Modal } from '/components/Modal.js';
+import { Fold, Stack, ListRow, Steps, Surface, Chip, Text, Action, Field, Dialog } from '/components/poster-parts.js';
 import { JsonValue } from '/components/JsonView.js';
 import { Spinner } from './shared.js';
 import { getAutomationRecipe, getAutomationOverview, putAutomationRecipe, listPendingAdvisories, approveAdvisory, rejectAdvisory } from '/js/services/ecosystem.js';
@@ -30,6 +34,14 @@ import { listAgents } from '/js/services/agents.js';
 import { listOrganisms, currentGhii } from '/js/services/organisms.js';
 import { CADENCES, CRON_TO_CADENCE, defaultTriggerGlob, primarySchedulable, allowedCadencesFor, recommendationFor } from './ecosystem-tab.helpers.js';
 import { swallowed } from '/js/swallowed.js';
+
+/** A run result as a timeline marker tone. */
+const resultTone = (r) => (r === 'success' ? 'success' : r === 'error' ? 'danger' : r === 'skipped' ? 'sun' : 'muted');
+/** A status-step state as a tone: ok (done), error, and waiting or paused (quiet). */
+const stateTone = (s) => (s === 'ok' ? 'success' : s === 'error' ? 'danger' : 'muted');
+
+/** A spinner with the words it waits for. */
+const loadingLine = (words) => html`<${Stack} direction="horizontal" density="compact" align="center"><${Spinner} /><${Text} tone="muted">${words}<//><//>`;
 
 /**
  * The per-schedule run-history log: lazy-fetches GET /v1/schedules/:id on first
@@ -50,23 +62,16 @@ function EcoScheduleLog({ jobId, refreshKey }) {
     return () => { alive = false; };
   }, [jobId, refreshKey]);
 
-  if (runs === undefined) {
-    return html`<div class="pf-eco-dim pf-eco-auto-log-loading"><${Spinner} /> ${t('profile.ecosystem.automationLogLoading')}</div>`;
-  }
-  if (runs.length === 0) {
-    return html`<div class="pf-eco-dim pf-eco-auto-log-empty">${t('profile.ecosystem.automationLogEmpty')}</div>`;
-  }
+  if (runs === undefined) return loadingLine(t('profile.ecosystem.automationLogLoading'));
+  if (runs.length === 0) return html`<${Text} tone="muted">${t('profile.ecosystem.automationLogEmpty')}<//>`;
   return html`
-    <div class="pf-eco-auto-log">
+    <${Stack} density="compact">
       ${runs.map(r => html`
-        <div class="pf-eco-auto-log-row" key=${r.id || r.createdAt}>
-          <span class="pf-eco-dim pf-eco-auto-log-time">${r.createdAt ? timeAgo(r.createdAt) : ''}</span>
-          <span class="pf-eco-chip pf-eco-auto-result-${r.result}">${t(`profile.ecosystem.automationRunResult_${r.result}`)}</span>
-          ${r.trigger && html`<span class="pf-eco-dim pf-eco-auto-log-trigger">${r.trigger}</span>`}
-          ${typeof r.durationMs === 'number' && html`<span class="pf-eco-dim pf-eco-auto-log-dur">${t('profile.ecosystem.automationDuration', { ms: r.durationMs })}</span>`}
-          ${r.errorMessage && html`<span class="pf-eco-dim pf-eco-auto-log-reason">${r.errorMessage}</span>`}
-        </div>`)}
-    </div>`;
+        <${ListRow} key=${r.id || r.createdAt} kind="chronology" density="compact"
+          time=${r.createdAt ? timeAgo(r.createdAt) : ''} marker=${resultTone(r.result)}
+          name=${t(`profile.ecosystem.automationRunResult_${r.result}`)} detailKind="text"
+          detail=${[r.trigger, typeof r.durationMs === 'number' ? t('profile.ecosystem.automationDuration', { ms: r.durationMs }) : '', r.errorMessage].filter(Boolean).join(' · ') || undefined} />`)}
+    <//>`;
 }
 
 /**
@@ -74,7 +79,7 @@ function EcoScheduleLog({ jobId, refreshKey }) {
  * 'ok' (green), 'wait' (neutral/dimmed), 'off' (paused/dimmed), 'error' (danger).
  */
 function EcoStatusChip({ state, label }) {
-  return html`<span class="pf-eco-chip pf-eco-auto-status-chip pf-eco-auto-status-${state}">${label}</span>`;
+  return html`<${Chip} tone=${stateTone(state)}>${label}<//>`;
 }
 
 /**
@@ -99,7 +104,7 @@ function EcoAgentPicker({ app, agents, selAgents, onToggle }) {
   const declaresRecommendations = Array.isArray(recommendedAgents) && recommendedAgents.length > 0;
 
   if (agents.length === 0) {
-    return html`<div class="pf-eco-dim">${t('profile.ecosystem.recipeAgentsEmpty')}</div>`;
+    return html`<${Text} tone="muted">${t('profile.ecosystem.recipeAgentsEmpty')}<//>`;
   }
 
   // Partition the owner's agents into recommended (with why) and the rest.
@@ -111,52 +116,45 @@ function EcoAgentPicker({ app, agents, selAgents, onToggle }) {
     else rest.push(a);
   }
 
-  const agentLabel = (a) => html`
-    <label class="pf-eco-recipe-agent" key=${a.name}>
-      <input type="checkbox" checked=${selAgents.includes(a.name)} onChange=${() => onToggle(a.name)} />
-      <span>${a.name}</span>
-    </label>`;
+  const agentBox = (a) => html`<${Field} key=${a.name} type="checkbox" label=${a.name} value=${selAgents.includes(a.name)} onChange=${() => onToggle(a.name)} />`;
 
   return html`
-    <div class="pf-eco-rec-picker">
-      ${recommended.length > 0 && html`
-        <div class="pf-eco-rec-list">
-          ${recommended.map(({ agent, why }) => html`
-            <label class="pf-eco-rec-agent" key=${agent.name}>
-              <input type="checkbox" checked=${selAgents.includes(agent.name)} onChange=${() => onToggle(agent.name)} />
-              <span class="pf-eco-rec-agent-body">
-                <span class="pf-eco-rec-agent-head">
-                  <span class="pf-eco-rec-agent-name">${agent.name}</span>
-                  <span class="pf-eco-chip pf-eco-rec-chip">${t('profile.ecosystem.recommendedChip')}</span>
-                </span>
-                ${why && html`<span class="pf-eco-dim pf-eco-rec-why">${why}</span>`}
-              </span>
-            </label>`)}
-        </div>`}
+    <${Stack} density="compact">
+      ${recommended.length > 0 && html`<${Stack} density="compact">
+        ${recommended.map(({ agent, why }) => html`<${Surface} key=${agent.name} kind="box" density="compact" tone="sun"><${Stack} density="compact">
+          ${agentBox(agent)}
+          <${Stack} direction="wrap" density="compact" align="center">
+            <${Chip} tone="sun">${t('profile.ecosystem.recommendedChip')}<//>
+            ${why && html`<${Text} kind="caption">${why}<//>`}
+          <//>
+        <//><//>`)}
+      <//>`}
 
-      ${declaresRecommendations && recommended.length === 0 && html`
-        <div class="pf-eco-rec-missing">
-          ${recommendedAgents.filter(d => d?.name || d?.why).map((d, i) => html`
-            <p class="pf-eco-dim pf-eco-rec-missing-line" key=${d.name || i}>
-              ${t('profile.ecosystem.recommendedMissing', {
-                name: d.name || '—',
-                why: (d.why && (d.why[locale] || d.why.en || d.why.fi)) || '',
-              })}
-            </p>`)}
-        </div>`}
+      ${declaresRecommendations && recommended.length === 0 && html`<${Stack} density="compact">
+        ${recommendedAgents.filter(d => d?.name || d?.why).map((d, i) => html`
+          <${Text} key=${d.name || i} kind="caption" tone="muted">
+            ${t('profile.ecosystem.recommendedMissing', {
+              name: d.name || '—',
+              why: (d.why && (d.why[locale] || d.why.en || d.why.fi)) || '',
+            })}
+          <//>`)}
+      <//>`}
 
       ${rest.length > 0 && (recommended.length > 0 || declaresRecommendations
-        ? html`
-          <div class="pf-eco-rec-rest">
-            <button class="pf-eco-auto-how-toggle" aria-expanded=${showAll} onClick=${() => setShowAll(o => !o)}>
-              <span class="pf-eco-caret">${showAll ? '▼' : '▶'}</span>
-              ${showAll ? t('profile.ecosystem.hideAllAgents') : t('profile.ecosystem.showAllAgents', { n: rest.length })}
-            </button>
-            ${showAll && html`<div class="pf-eco-recipe-agents pf-eco-rec-rest-list">${rest.map(agentLabel)}</div>`}
-          </div>`
-        : html`<div class="pf-eco-recipe-agents">${rest.map(agentLabel)}</div>`)}
-    </div>`;
+        ? html`<${Stack} density="compact">
+            <${Stack} direction="horizontal" align="start">
+              <${Action} kind="text" expanded=${showAll} onClick=${() => setShowAll(o => !o)}>
+                ${showAll ? t('profile.ecosystem.hideAllAgents') : t('profile.ecosystem.showAllAgents', { n: rest.length })}
+              <//>
+            <//>
+            ${showAll && html`<${Stack} density="compact">${rest.map(agentBox)}<//>`}
+          <//>`
+        : html`<${Stack} density="compact">${rest.map(agentBox)}<//>`)}
+    <//>`;
 }
+
+/** One numbered step of the config card: its label and its controls. */
+const configStep = (label, body) => html`<${Stack} density="compact"><${Text} kind="label">${label}<//>${body}<//>`;
 
 /**
  * The unified "Automation" section of one expanded GEAI card — ONE turnkey flow.
@@ -392,21 +390,18 @@ export function EcoAutomationSection({ app, showToast }) {
     }
   }
 
+  const heading = html`<${Text} kind="label">${t('profile.ecosystem.automationTitle')}<//>`;
+
   if (revoked) {
-    return html`
-      <div class="pf-eco-section poster-row--thing">
-        <div class="pf-eco-section-title">${t('profile.ecosystem.automationTitle')}</div>
-        <div class="pf-eco-dim">${t('profile.ecosystem.autoRevoked')}</div>
-        <p class="pf-eco-dim pf-eco-reconnect-hint">${t('profile.ecosystem.revokeReconnectHint')}</p>
-      </div>`;
+    return html`<${Stack} density="compact">
+      ${heading}
+      <${Text} tone="muted">${t('profile.ecosystem.autoRevoked')}<//>
+      <${Text} kind="caption" tone="muted">${t('profile.ecosystem.revokeReconnectHint')}<//>
+    <//>`;
   }
 
   if (!loaded) {
-    return html`
-      <div class="pf-eco-section poster-row--thing">
-        <div class="pf-eco-section-title">${t('profile.ecosystem.automationTitle')}</div>
-        <div class="pf-eco-dim pf-eco-data-loading"><${Spinner} /> ${t('profile.ecosystem.automationLoading')}</div>
-      </div>`;
+    return html`<${Stack} density="compact">${heading}${loadingLine(t('profile.ecosystem.automationLoading'))}<//>`;
   }
 
   // Derived display strings.
@@ -421,237 +416,144 @@ export function EcoAutomationSection({ app, showToast }) {
   const deliverState = pendingCount > 0 ? 'wait' : 'ok';
 
   return html`
-    <div class="pf-eco-section poster-row--thing pf-eco-auto-flow" data-eco-auto=${app.app}>
-      <div class="pf-eco-section-title">${t('profile.ecosystem.automationTitle')}</div>
-      <p class="pf-eco-dim pf-eco-auto-flow-intro">${t('profile.ecosystem.autoIntro')}</p>
+    <${Stack}>
+      ${heading}
+      <${Text} tone="muted">${t('profile.ecosystem.autoIntro')}<//>
 
-      <button class="pf-eco-auto-how-toggle" aria-expanded=${showHow} onClick=${() => setShowHow(o => !o)}>
-        <span class="pf-eco-caret">${showHow ? '▼' : '▶'}</span>
-        ${t('profile.ecosystem.autoHowTitle')}
-      </button>
-      ${showHow && html`
-        <div class="pf-eco-auto-how">
-          <p class="pf-eco-dim pf-eco-auto-how-lead">${t('profile.ecosystem.autoHowLead')}</p>
-          <ol class="pf-eco-auto-how-steps">
-            <li>${t('profile.ecosystem.autoHowStep1')}</li>
-            <li>${t('profile.ecosystem.autoHowStep2')}</li>
-            <li>${t('profile.ecosystem.autoHowStep3')}</li>
-            <li>${t('profile.ecosystem.autoHowStep4')}</li>
-          </ol>
-          <p class="pf-eco-dim pf-eco-auto-how-doc">${t('profile.ecosystem.autoHowDoc')}</p>
-        </div>`}
+      <${Fold} title=${t('profile.ecosystem.autoHowTitle')} open=${showHow} onToggle=${() => setShowHow(o => !o)}>
+        <${Stack} density="compact">
+          <${Text} tone="muted">${t('profile.ecosystem.autoHowLead')}<//>
+          <${Steps} items=${[t('profile.ecosystem.autoHowStep1'), t('profile.ecosystem.autoHowStep2'), t('profile.ecosystem.autoHowStep3'), t('profile.ecosystem.autoHowStep4')]} />
+          <${Text} kind="caption" tone="muted">${t('profile.ecosystem.autoHowDoc')}<//>
+        <//>
+      <//>
 
       <!-- ── the ONE config card, read top-to-bottom ── -->
-      <div class="pf-eco-auto-flow-card poster-row--thing">
-        <!-- ① What this app produces -->
-        <div class="pf-eco-auto-flow-step">
-          <div class="pf-eco-auto-flow-num">${t('profile.ecosystem.autoStep1')}</div>
-          ${primary
-            ? html`
-              <div class="pf-eco-auto-produces">
-                <span class="pf-eco-mono pf-eco-auto-produces-cap">${primary.id}</span>
-                ${primary.produces && html`<span class="pf-eco-dim">${t('profile.ecosystem.autoProduces')}: <span class="pf-eco-mono">${primary.produces}</span></span>`}
-                ${producesKey && html`<span class="pf-eco-dim">${t('profile.ecosystem.autoDepositKey')}: <span class="pf-eco-mono">${defaultTriggerGlob(app)}</span></span>`}
-              </div>`
-            : html`<div class="pf-eco-dim">${t('profile.ecosystem.automationNoCaps')}</div>`}
-        </div>
+      <${Surface} kind="box"><${Stack}>
+        ${configStep(t('profile.ecosystem.autoStep1'), primary
+          ? html`<${Stack} density="compact">
+              <${Text} kind="mono">${primary.id}<//>
+              ${primary.produces && html`<${Text} kind="caption" tone="muted">${t('profile.ecosystem.autoProduces')}: <${Text} kind="mono">${primary.produces}<//><//>`}
+              ${producesKey && html`<${Text} kind="caption" tone="muted">${t('profile.ecosystem.autoDepositKey')}: <${Text} kind="mono">${defaultTriggerGlob(app)}<//><//>`}
+            <//>`
+          : html`<${Text} tone="muted">${t('profile.ecosystem.automationNoCaps')}<//>`)}
 
-        <!-- ② Run on a schedule -->
-        <div class="pf-eco-auto-flow-step ${primary ? '' : 'pf-eco-auto-flow-step-disabled'}">
-          <div class="pf-eco-auto-flow-num">${t('profile.ecosystem.autoStep2')}</div>
-          <div class="pf-eco-auto-flow-controls">
-            <select class="pf-eco-select" value=${cadence} disabled=${!primary}
-              onChange=${e => setCadence(e.target.value)}>
-              ${allowedCadences.map(c => html`<option value=${c.key} key=${c.key}>${t(`profile.ecosystem.automationCadence_${c.key}`)}</option>`)}
-            </select>
-            <label class="pf-eco-recipe-toggle">
-              <input type="checkbox" checked=${scheduleOn} disabled=${!primary} onChange=${e => setScheduleOn(e.target.checked)} />
-              <span>${t('profile.ecosystem.autoScheduleOn')}</span>
-            </label>
-          </div>
-        </div>
+        ${configStep(t('profile.ecosystem.autoStep2'), html`<${Stack} direction="wrap" density="compact" align="center">
+          <${Field} type="select" width="narrow" ariaLabel=${t('profile.ecosystem.autoStep2')} value=${cadence} disabled=${!primary}
+            onChange=${e => setCadence(e.target.value)}
+            options=${allowedCadences.map(c => ({ value: c.key, label: t(`profile.ecosystem.automationCadence_${c.key}`) }))} />
+          <${Field} type="checkbox" label=${t('profile.ecosystem.autoScheduleOn')} value=${scheduleOn} disabled=${!primary} onChange=${e => setScheduleOn(e.target.checked)} />
+        <//>`)}
 
-        <!-- ③ Process with agent(s) — recommended first, the rest behind a disclosure -->
-        <div class="pf-eco-auto-flow-step">
-          <div class="pf-eco-auto-flow-num">${t('profile.ecosystem.autoStep3')}</div>
-          <${EcoAgentPicker} app=${app} agents=${agents} selAgents=${selAgents} onToggle=${toggleAgent} />
-        </div>
+        ${configStep(t('profile.ecosystem.autoStep3'), html`<${EcoAgentPicker} app=${app} agents=${agents} selAgents=${selAgents} onToggle=${toggleAgent} />`)}
 
-        <!-- ④ Store results in organism -->
-        <div class="pf-eco-auto-flow-step">
-          <div class="pf-eco-auto-flow-num">${t('profile.ecosystem.autoStep4')}</div>
-          <select class="pf-eco-select" value=${organism} onChange=${e => setOrganism(e.target.value)}>
-            <option value="">${t('profile.ecosystem.recipeOrganismNone')}</option>
-            ${orgs.map(o => html`<option value=${o.id} key=${o.id}>${o.name || o.id}</option>`)}
-          </select>
-        </div>
+        ${configStep(t('profile.ecosystem.autoStep4'), html`<${Field} type="select" ariaLabel=${t('profile.ecosystem.autoStep4')} value=${organism} onChange=${e => setOrganism(e.target.value)}
+          options=${[{ value: '', label: t('profile.ecosystem.recipeOrganismNone') }, ...orgs.map(o => ({ value: o.id, label: o.name || o.id }))]} />`)}
 
-        <!-- ⑤ Deliver guidance -->
-        <div class="pf-eco-auto-flow-step">
-          <div class="pf-eco-auto-flow-num">${t('profile.ecosystem.autoStep5')}</div>
-          <div class="pf-eco-recipe-radios">
-            <label class="pf-eco-recipe-radio">
-              <input type="radio" name=${`eco-delivery-${app.app}`} checked=${requireApproval} onChange=${() => setRequireApproval(true)} />
-              <span>
-                <span class="pf-eco-recipe-radio-title">${t('profile.ecosystem.recipeDeliveryApprove')}</span>
-                <span class="pf-eco-dim pf-eco-recipe-radio-hint">${t('profile.ecosystem.recipeDeliveryApproveHint')}</span>
-              </span>
-            </label>
-            <label class="pf-eco-recipe-radio">
-              <input type="radio" name=${`eco-delivery-${app.app}`} checked=${!requireApproval} onChange=${() => setRequireApproval(false)} />
-              <span>
-                <span class="pf-eco-recipe-radio-title">${t('profile.ecosystem.recipeDeliveryPush')}</span>
-                <span class="pf-eco-dim pf-eco-recipe-radio-hint">${t('profile.ecosystem.recipeDeliveryPushHint')}</span>
-              </span>
-            </label>
-          </div>
-          <label class="pf-eco-recipe-toggle pf-eco-auto-flow-email">
-            <input type="checkbox" checked=${email} onChange=${e => setEmail(e.target.checked)} />
-            <span>${t('profile.ecosystem.recipeEmail')}</span>
-          </label>
-        </div>
+        ${configStep(t('profile.ecosystem.autoStep5'), html`
+          <${Stack} direction="wrap" density="compact" role="radiogroup" label=${t('profile.ecosystem.autoStep5')}>
+            <${Action} kind="choice" semantics="radio" selected=${requireApproval} onClick=${() => setRequireApproval(true)}
+              title=${t('profile.ecosystem.recipeDeliveryApprove')}>${t('profile.ecosystem.recipeDeliveryApproveHint')}<//>
+            <${Action} kind="choice" semantics="radio" selected=${!requireApproval} onClick=${() => setRequireApproval(false)}
+              title=${t('profile.ecosystem.recipeDeliveryPush')}>${t('profile.ecosystem.recipeDeliveryPushHint')}<//>
+          <//>
+          <${Field} type="checkbox" label=${t('profile.ecosystem.recipeEmail')} value=${email} onChange=${e => setEmail(e.target.checked)} />`)}
 
-        <!-- Advanced: trigger key -->
-        <div class="pf-eco-auto-flow-step pf-eco-auto-flow-advanced">
-          <button class="pf-eco-auto-how-toggle" aria-expanded=${showAdvanced} onClick=${() => setShowAdvanced(o => !o)}>
-            <span class="pf-eco-caret">${showAdvanced ? '▼' : '▶'}</span>
-            ${t('profile.ecosystem.autoAdvanced')}
-          </button>
-          ${showAdvanced && html`
-            <div class="pf-eco-auto-flow-advanced-body">
-              <label class="pf-eco-recipe-label">${t('profile.ecosystem.recipeTriggerLabel')}</label>
-              <input type="text" class="pf-eco-recipe-trigger-input pf-eco-mono"
-                value=${triggerGlob} placeholder=${defaultTriggerGlob(app)}
-                onInput=${e => setTriggerGlob(e.target.value)} />
-              <p class="pf-eco-dim pf-eco-recipe-trigger-help">${t('profile.ecosystem.recipeTriggerHelp')}</p>
-            </div>`}
-        </div>
+        <${Fold} title=${t('profile.ecosystem.autoAdvanced')} open=${showAdvanced} onToggle=${() => setShowAdvanced(o => !o)}>
+          <${Stack} density="compact">
+            <${Field} label=${t('profile.ecosystem.recipeTriggerLabel')} value=${triggerGlob} placeholder=${defaultTriggerGlob(app)}
+              onInput=${e => setTriggerGlob(e.target.value)} />
+            <${Text} kind="caption" tone="muted">${t('profile.ecosystem.recipeTriggerHelp')}<//>
+          <//>
+        <//>
 
-        <!-- ONE Save -->
-        <div class="pf-eco-auto-flow-save">
-          <button class="btn-primary btn-sm" disabled=${saving} onClick=${onSave}>${t('profile.ecosystem.autoSave')}</button>
-        </div>
-      </div>
+        <${Stack} direction="horizontal" align="start">
+          <${Action} kind="primary" disabled=${saving} onClick=${onSave}>${t('profile.ecosystem.autoSave')}<//>
+        <//>
+      <//><//>
 
       <!-- ── Status — latest run (publish → process → deliver) ── -->
-      <div class="pf-eco-auto-status">
-        <div class="pf-eco-recipe-head">${t('profile.ecosystem.autoStatusTitle')}</div>
-        <div class="pf-eco-auto-status-timeline">
+      <${Stack} density="compact">
+        <${Text} kind="label">${t('profile.ecosystem.autoStatusTitle')}<//>
 
-          <!-- publish -->
-          <div class="pf-eco-auto-status-step">
-            <div class="pf-eco-auto-status-head">
-              <span class="pf-eco-auto-status-dot pf-eco-auto-status-dot-${publishState}"></span>
-              <strong class="pf-eco-auto-status-label">${t('profile.ecosystem.autoStatusPublished')}</strong>
-              <${EcoStatusChip} state=${publishState} label=${primaryJob
-                ? (primaryJob.enabled ? t('profile.ecosystem.automationOn') : t('profile.ecosystem.automationPaused'))
-                : t('profile.ecosystem.autoStatusNotScheduled')} />
-            </div>
-            <div class="pf-eco-auto-status-body">
-              ${primaryJob
-                ? html`
-                  <div class="pf-eco-auto-job-meta">
-                    <span class="pf-eco-dim">
-                      ${t('profile.ecosystem.automationLastRun')}: ${primaryJob.lastRunAt
-                        ? html`${timeAgo(primaryJob.lastRunAt)}${primaryJob.lastRunResult ? html` · <span class="pf-eco-auto-result-${primaryJob.lastRunResult}">${primaryJob.lastRunResult}</span>` : ''}`
-                        : '—'}
-                    </span>
-                    <span class="pf-eco-dim">${t('profile.ecosystem.automationNextRun')}: ${primaryJob.enabled ? formatUntil(primaryJob.nextRunAt) : '—'}</span>
-                  </div>
-                  ${lastAttempt && lastAttempt.outcome === 'busy' && html`
-                    <div class="pf-eco-dim pf-eco-auto-lastattempt">
-                      ${/offline|unavailable/i.test(lastAttempt.reason)
-                        ? t('profile.ecosystem.automationRunSkippedOffline')
-                        : t('profile.ecosystem.automationRunSkipped', { reason: lastAttempt.reason })}
-                    </div>`}
-                  <div class="pf-eco-auto-job-actions">
-                    <button class="btn-ghost btn-sm" disabled=${running} onClick=${onRunNow}>${t('profile.ecosystem.automationRunNow')}</button>
-                    <button class="btn-ghost btn-sm" aria-expanded=${openLog} onClick=${() => setOpenLog(o => !o)}>
-                      ${openLog ? t('profile.ecosystem.automationHideLog') : t('profile.ecosystem.automationShowLog')}
-                    </button>
-                  </div>
-                  ${openLog && html`<${EcoScheduleLog} jobId=${primaryJob.id} refreshKey=${logRefresh} />`}`
-                : html`<div class="pf-eco-dim">${t('profile.ecosystem.autoStatusPublishedHint')}</div>`}
-            </div>
-          </div>
+        <${ListRow} kind="chronology" marker=${stateTone(publishState)} name=${t('profile.ecosystem.autoStatusPublished')}
+          value=${html`<${EcoStatusChip} state=${publishState} label=${primaryJob
+            ? (primaryJob.enabled ? t('profile.ecosystem.automationOn') : t('profile.ecosystem.automationPaused'))
+            : t('profile.ecosystem.autoStatusNotScheduled')} />`}>
+          ${primaryJob
+            ? html`<${Stack} density="compact">
+                <${Text} kind="caption" tone="muted">
+                  ${t('profile.ecosystem.automationLastRun')}: ${primaryJob.lastRunAt
+                    ? html`${timeAgo(primaryJob.lastRunAt)}${primaryJob.lastRunResult ? html` · <${Text} kind="label" tone=${resultTone(primaryJob.lastRunResult) === 'danger' ? 'danger' : resultTone(primaryJob.lastRunResult) === 'success' ? 'success' : 'plain'}>${primaryJob.lastRunResult}<//>` : ''}`
+                    : '—'}
+                <//>
+                <${Text} kind="caption" tone="muted">${t('profile.ecosystem.automationNextRun')}: ${primaryJob.enabled ? formatUntil(primaryJob.nextRunAt) : '—'}<//>
+                ${lastAttempt && lastAttempt.outcome === 'busy' && html`<${Text} kind="caption" tone="coral">
+                  ${/offline|unavailable/i.test(lastAttempt.reason)
+                    ? t('profile.ecosystem.automationRunSkippedOffline')
+                    : t('profile.ecosystem.automationRunSkipped', { reason: lastAttempt.reason })}
+                <//>`}
+                <${Stack} direction="wrap" density="compact">
+                  <${Action} kind="text" disabled=${running} onClick=${onRunNow}>${t('profile.ecosystem.automationRunNow')}<//>
+                  <${Action} kind="text" expanded=${openLog} onClick=${() => setOpenLog(o => !o)}>
+                    ${openLog ? t('profile.ecosystem.automationHideLog') : t('profile.ecosystem.automationShowLog')}
+                  <//>
+                <//>
+                ${openLog && html`<${EcoScheduleLog} jobId=${primaryJob.id} refreshKey=${logRefresh} />`}
+              <//>`
+            : html`<${Text} kind="caption" tone="muted">${t('profile.ecosystem.autoStatusPublishedHint')}<//>`}
+        <//>
 
-          <!-- process -->
-          <div class="pf-eco-auto-status-step">
-            <div class="pf-eco-auto-status-head">
-              <span class="pf-eco-auto-status-dot pf-eco-auto-status-dot-${processState}"></span>
-              <strong class="pf-eco-auto-status-label">${t('profile.ecosystem.autoStatusProcessed')}</strong>
-            </div>
-            <div class="pf-eco-auto-status-body">
-              ${selAgents.length === 0
-                ? html`<div class="pf-eco-dim">${t('profile.ecosystem.autoStatusNoAgents')}</div>`
-                : html`
-                  <div class="pf-eco-auto-status-agents">
-                    ${selAgents.map(name => html`<span class="pf-eco-chip" key=${name}>${name}</span>`)}
-                  </div>
-                  <div class="pf-eco-dim pf-eco-auto-status-note">${t('profile.ecosystem.autoStatusProcessedHint')}</div>`}
-            </div>
-          </div>
+        <${ListRow} kind="chronology" marker=${stateTone(processState)} name=${t('profile.ecosystem.autoStatusProcessed')}>
+          ${selAgents.length === 0
+            ? html`<${Text} kind="caption" tone="muted">${t('profile.ecosystem.autoStatusNoAgents')}<//>`
+            : html`<${Stack} density="compact">
+                <${Stack} direction="wrap" density="compact">${selAgents.map(name => html`<${Chip} key=${name}>${name}<//>`)}<//>
+                <${Text} kind="caption" tone="muted">${t('profile.ecosystem.autoStatusProcessedHint')}<//>
+              <//>`}
+        <//>
 
-          <!-- deliver -->
-          <div class="pf-eco-auto-status-step">
-            <div class="pf-eco-auto-status-head">
-              <span class="pf-eco-auto-status-dot pf-eco-auto-status-dot-${deliverState}"></span>
-              <strong class="pf-eco-auto-status-label">${t('profile.ecosystem.autoStatusDelivered')}</strong>
-              ${pendingCount > 0 && html`<span class="pf-eco-chip pf-eco-auto-status-pending-count">${pendingCount}</span>`}
-            </div>
-            <div class="pf-eco-auto-status-body">
-              <p class="pf-eco-dim pf-eco-auto-status-note">${t('profile.ecosystem.autoStatusDeliveredHint')}</p>
-              ${advisories === undefined
-                ? html`<div class="pf-eco-dim pf-eco-data-loading"><${Spinner} /> ${t('profile.ecosystem.advLoading')}</div>`
-                : advisories.length === 0
-                  ? html`<div class="pf-eco-dim">${t('profile.ecosystem.advPendingEmpty')}</div>`
-                  : html`
-                    <div class="pf-eco-adv-list">
-                      ${advisories.map(p => {
-                        const a = p.advisory || {};
-                        return html`
-                          <div class="pf-eco-adv-item" key=${p.id}>
-                            <div class="pf-eco-adv-head">
-                              <strong class="pf-eco-adv-title">${a.title || p.id}</strong>
-                              ${a.kind && html`<span class="pf-eco-chip pf-eco-adv-kind">${t('profile.ecosystem.advKind')}: ${a.kind}</span>`}
-                              ${a.severity && html`<span class="pf-eco-chip pf-eco-adv-sev pf-eco-adv-sev-${a.severity}">${t('profile.ecosystem.advSeverity')}: ${a.severity}</span>`}
-                              ${a.status && html`<span class="pf-eco-chip">${a.status}</span>`}
-                            </div>
-                            ${(a.effective_from || a.effective_until) && html`
-                              <div class="pf-eco-dim pf-eco-adv-meta">
-                                ${t('profile.ecosystem.advEffective')}: ${a.effective_from || '…'} → ${a.effective_until || '…'}
-                              </div>`}
-                            <div class="pf-eco-adv-body">
-                              <${JsonValue} value=${a.body !== undefined ? a.body : a} />
-                            </div>
-                            ${a.source && html`<div class="pf-eco-dim pf-eco-adv-meta">${t('profile.ecosystem.advSource')}: ${a.source}</div>`}
-                            ${a.rationale && html`
-                              <div class="pf-eco-adv-rationale">
-                                <span class="pf-eco-dim">${t('profile.ecosystem.advRationale')}:</span>
-                                <${JsonValue} value=${a.rationale} />
-                              </div>`}
-                            <div class="pf-eco-adv-actions">
-                              <button class="btn-success btn-sm" disabled=${!!advBusy[p.id]} onClick=${() => onApproveAdv(p.id)}>
-                                ${t('profile.ecosystem.advApprove')}
-                              </button>
-                              <button class="btn-ghost btn-sm pf-eco-adv-reject" disabled=${!!advBusy[p.id]} onClick=${() => setConfirmId(p.id)}>
-                                ${t('profile.ecosystem.advReject')}
-                              </button>
-                            </div>
-                          </div>`;
-                      })}
-                    </div>`}
-            </div>
-          </div>
-
-        </div>
-      </div>
-
-      <${Modal} open=${!!confirmId} onClose=${() => setConfirmId(null)} title=${t('profile.ecosystem.advReject')} size="sm"
-        footer=${html`
-          <button class="btn-ghost" onClick=${() => setConfirmId(null)}>${t('common.cancel')}</button>
-          <button class="btn-danger-solid" onClick=${() => onRejectAdv(confirmId)}>${t('profile.ecosystem.advReject')}</button>`}>
-        <p>${t('profile.ecosystem.advRejectConfirm')}</p>
+        <${ListRow} kind="chronology" marker=${stateTone(deliverState)} name=${t('profile.ecosystem.autoStatusDelivered')}
+          value=${pendingCount > 0 ? html`<${Chip} tone="sun">${pendingCount}<//>` : null}>
+          <${Stack} density="compact">
+            <${Text} kind="caption" tone="muted">${t('profile.ecosystem.autoStatusDeliveredHint')}<//>
+            ${advisories === undefined
+              ? loadingLine(t('profile.ecosystem.advLoading'))
+              : advisories.length === 0
+                ? html`<${Text} tone="muted">${t('profile.ecosystem.advPendingEmpty')}<//>`
+                : advisories.map(p => {
+                  const a = p.advisory || {};
+                  return html`<${Surface} key=${p.id} kind="box" density="compact"><${Stack} density="compact">
+                    <${Stack} direction="wrap" density="compact" align="center">
+                      <${Text}><strong>${a.title || p.id}</strong><//>
+                      ${a.kind && html`<${Chip}>${t('profile.ecosystem.advKind')}: ${a.kind}<//>`}
+                      ${a.severity && html`<${Chip} tone=${a.severity === 'high' || a.severity === 'critical' ? 'danger' : a.severity === 'medium' ? 'coral' : 'plain'}>${t('profile.ecosystem.advSeverity')}: ${a.severity}<//>`}
+                      ${a.status && html`<${Chip} tone="muted">${a.status}<//>`}
+                    <//>
+                    ${(a.effective_from || a.effective_until) && html`<${Text} kind="caption" tone="muted">
+                      ${t('profile.ecosystem.advEffective')}: ${a.effective_from || '…'} → ${a.effective_until || '…'}
+                    <//>`}
+                    <${JsonValue} value=${a.body !== undefined ? a.body : a} />
+                    ${a.source && html`<${Text} kind="caption" tone="muted">${t('profile.ecosystem.advSource')}: ${a.source}<//>`}
+                    ${a.rationale && html`<${Stack} density="compact">
+                      <${Text} kind="caption" tone="muted">${t('profile.ecosystem.advRationale')}:<//>
+                      <${JsonValue} value=${a.rationale} />
+                    <//>`}
+                    <${Stack} direction="wrap" density="compact">
+                      <${Action} tone="success" disabled=${!!advBusy[p.id]} onClick=${() => onApproveAdv(p.id)}>${t('profile.ecosystem.advApprove')}<//>
+                      <${Action} kind="text" tone="danger" disabled=${!!advBusy[p.id]} onClick=${() => setConfirmId(p.id)}>${t('profile.ecosystem.advReject')}<//>
+                    <//>
+                  <//><//>`;
+                })}
+          <//>
+        <//>
       <//>
-    </div>`;
+
+      <${Dialog} open=${!!confirmId} onClose=${() => setConfirmId(null)} title=${t('profile.ecosystem.advReject')} size="small"
+        actions=${html`
+          <${Action} onClick=${() => setConfirmId(null)}>${t('common.cancel')}<//>
+          <${Action} kind="primary" tone="danger" onClick=${() => onRejectAdv(confirmId)}>${t('profile.ecosystem.advReject')}<//>`}>
+        <${Text}>${t('profile.ecosystem.advRejectConfirm')}<//>
+      <//>
+    <//>`;
 }

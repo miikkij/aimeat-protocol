@@ -11,6 +11,8 @@
  * @structure priceWords · renderBoard · composer · rulesFold · membersBlock
  * @usage import { renderBoard } from './board.js';
  * @version-history
+ *   v2.1.0 -- 2026-09-22 -- Delete the board is in the danger tone; the jumps to the composer and
+ *     the rules use the set's scrollToId.
  *   v2.0.0 -- 2026-09-22 -- Composed from the shared component set (Section, Fold, NumeralBand,
  *     Columns, Stack, Field, Action, Chip, Text) inside the frame's Page, so a board's page
  *     has no class or sheet of its own. A category or lifetime choice is a row of tabs. Handlers,
@@ -21,8 +23,7 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { Section, Fold, Columns, Stack, NumeralBand, Field, Action, Chip, Text } from '/components/poster-parts.js';
-import { scrollTo } from '/views/profile/organisms/poster-parts.js';
+import { Section, Fold, Columns, Stack, NumeralBand, Field, Action, Chip, Text, scrollToId } from '/components/poster-parts.js';
 import { c, rel, who, bid, visWord, ownerOf, standingWords, noticeRow, renderPage, choice } from './frame.js';
 
 export function priceWords(b) {
@@ -53,9 +54,9 @@ export function renderBoard(ctx, b) {
     ${b.federate ? html`<${Chip} tone="muted">${t('profile.federated')}<//>` : null}
   <//>`;
   const doors = html`
-    <${Action} kind="primary" onClick=${() => scrollTo('bp-compose')}>${c('post')}<//>
+    <${Action} kind="primary" onClick=${() => scrollToId('bp-compose')}>${c('post')}<//>
     ${(b.visibility === 'public' || b.visibility === 'system') && !mine ? html`<${Action} onClick=${() => subscribed ? ctx.handleUnfollow(id) : ctx.handleFollow(id)}>${subscribed ? c('unfollow') : c('follow')}<//>` : null}
-    <${Action} onClick=${() => { ctx.setFold('rules', true); scrollTo('bp-rules'); }}>${c('rules')}<//>`;
+    <${Action} onClick=${() => { ctx.setFold('rules', true); scrollToId('bp-rules'); }}>${c('rules')}<//>`;
   const strip = html`<${NumeralBand} tone="plain" size="small" items=${[
     latest ? { label: c('stripLatest'), value: rel(latest.created_at), note: `${who(latest.author_gaii).label} · "${latest.title}"` } : { label: c('stripLatest'), value: '·', note: c('noneYet') },
     { label: c('stripNotices'), value: `${page.posts.length}${page.cursor ? '+' : ''}`, note: c('stripNoticesSub', { a: page.posts.filter(p => who(p.author_gaii).agent).length, h: page.posts.filter(p => !who(p.author_gaii).agent).length }) },
@@ -133,7 +134,7 @@ function rulesFold(ctx, b, mine) {
     <//>` : null}
     ${mine ? html`<div><${Action} kind="primary" disabled=${ctx.savingRules} onClick=${() => ctx.handleSaveRules(bid(b))}>${c('saveRules')}<//></div>` : null}
     ${mine && (b.visibility === 'shared' || r.visibility === 'shared') ? membersBlock(ctx, b) : null}
-    ${mine ? html`<div><${Action} onClick=${() => ctx.handleDeleteBoard(bid(b))}>${c('deleteBoard')}<//></div>` : null}
+    ${mine ? html`<div><${Action} tone="danger" onClick=${() => ctx.handleDeleteBoard(bid(b))}>${c('deleteBoard')}<//></div>` : null}
   <//>`;
 }
 

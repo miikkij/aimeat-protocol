@@ -12,6 +12,8 @@
  * @structure renderKnowledgeView · renderCover · secPackages · secMake · importPreview · secOrganisms · secLibrary
  * @usage import { renderKnowledgeView } from './knowledge/cover.js';
  * @version-history
+ *   v2.1.0 -- 2026-09-22 -- The federated and dataset chips ask for attention in coral (the chip has
+ *     that tone now), and the jump to "make a package" uses the set's scrollToId.
  *   v2.0.0 -- 2026-09-22 -- Composed from the shared component set (Page, Rail, Section, NumeralBand,
  *     ListRow, Surface, Field, Action, Chip, Text) so the cover follows the one theme and
  *     knowledge-poster.css is no longer read by it. Content, handlers and i18n keys unchanged; the
@@ -24,8 +26,7 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { Page, Rail, Section, Columns, Stack, ListRow, NumeralBand, Surface, Field, Action, Chip, Text } from '/components/poster-parts.js';
-import { scrollTo } from '/views/profile/organisms/poster-parts.js';
+import { Page, Rail, Section, Columns, Stack, ListRow, NumeralBand, Surface, Field, Action, Chip, Text, scrollToId } from '/components/poster-parts.js';
 import { c, num, rel, ctWord, synthWord, visWord, relWord, manifestOf, statsOf, groupOf, GROUP_ORDER, pkgId, authorName, crumb, packageRows, pageLinks } from './frame.js';
 import { renderPackage } from './package.js';
 
@@ -65,9 +66,9 @@ function renderCover(ctx) {
   return html`<${Page} title=${t('knowledge.tabLabel')} crumbs=${crumb(ctx, [])}
     identity=${html`<${Stack} direction="wrap" density="compact">
       ${chip(pkgs.length, 'chipPackages')}${chip(totals.entries, 'chipEntries')}${chip(listed, 'chipListed')}${chip(clonable, 'chipClonable')}
-      ${federated ? chip(federated, 'chipFederated', 'sun') : null}${drafts ? chip(drafts, 'chipDrafts', 'muted') : null}${datasets ? chip(datasets, 'chipDatasets', 'sun') : null}
+      ${federated ? chip(federated, 'chipFederated', 'coral') : null}${drafts ? chip(drafts, 'chipDrafts', 'muted') : null}${datasets ? chip(datasets, 'chipDatasets', 'coral') : null}
     <//>`}
-    actions=${html`<${Action} kind="primary" onClick=${() => scrollTo('kp-make')}>${c('make')}<//>
+    actions=${html`<${Action} kind="primary" onClick=${() => scrollToId('kp-make')}>${c('make')}<//>
       <${Action} onClick=${() => openLibrary()}>${c('library')} →<//>`}
     rail=${rail}>
     <${Stack}>

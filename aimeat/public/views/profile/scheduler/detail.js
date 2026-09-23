@@ -12,6 +12,7 @@
  * @structure renderDetail · limitsOf · runRows
  * @usage import { renderDetail } from './detail.js';
  * @version-history
+ *   2026-09-22 -- Cancel the schedule is in the danger tone.
  *   2026-09-22 -- Composed from the shared component set (NumeralBand strip, Section, Fold,
  *     KeyValue, ListRow timelines, Surface for the prompt); no own CSS. The cancel door is an
  *     underlined word like the others: the set's danger tone exists only on the primary slab.
@@ -81,7 +82,7 @@ export function renderDetail(ctx, s) {
     <${Action} kind="primary" disabled=${busy} onClick=${() => ctx.onTrigger(s)}>${t('profile.scheduler.runNow')}<//>
     <${Action} disabled=${busy} onClick=${() => ctx.onToggle(s)}>${s.enabled === false ? t('profile.scheduler.resume') : t('profile.scheduler.pause')}<//>
     <${Action} onClick=${() => ctx.setEditOpen(v => !v)}>${t('profile.scheduler.edit')}<//>
-    <${Action} disabled=${busy} onClick=${() => ctx.onCancel(s)}>${t('profile.scheduler.cancel')}<//>`;
+    <${Action} tone="danger" disabled=${busy} onClick=${() => ctx.onCancel(s)}>${t('profile.scheduler.cancel')}<//>`;
 
   const strip = html`<${NumeralBand} tone="plain" items=${[
     s.lastRunAt ? { label: c('stripLast'), value: resultWord(s.lastRunResult || 'success'), tone: 'coral',

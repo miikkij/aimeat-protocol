@@ -267,6 +267,26 @@ least two pages.
 | `Surface` | Box, record, aside, code, editor, panel, preview or plain; three densities or flush; plain, muted, coral, sun, ink, success or danger tone; with a summary it folds. |
 | `Text` | Body, lead, label, mono, caption, heading or number; the same tones; a number is small, normal or large. |
 
+### What each part also takes
+
+The components' JSDoc in `poster-parts.js` is the full reference; these are the named variants a
+page reaches for most, so a page does not settle for less or invent a local fix:
+
+- `Page`/`Masthead`: `crumbs`, `subtitle` (the mono line after the title), `titleKind="mono"` (a key as the title).
+- `Section`: `count` after the title, `actions` on the head row, `description`, `size`, `density`.
+- `Fold`: `number`, `sub` (shortens with an ellipsis), `actions` on its row, `toggleTitle`.
+- `ListRow`: `detailKind` mono or text, `preview`, `time` + `marker` (+ `live`), `number` + `arrow`,
+  `open` (body showing, arrow down), `selected` (on the sun), `muted`, `concealed`, `nameTitle`.
+- `Table`: `collapse` 560/600/640 stacks rows on a phone; a cell `{ text, align: 'end' }` for an amount; no headers = no head row.
+- `NumeralBand`: `tone`, `size="small"`, item `note` and `tone:'coral'`; the figures share one row in equal columns.
+- `Action`: `tone` danger or success on an underlined word, `semantics` tab/radio/switch, `kind="choice"` with `title`, `form`.
+- `Chip`: plain, sun, coral, success, danger, muted. `CheckItem`: `state` done, failed, warn, pending.
+- `Field`: every native type incl. `month` and `file` (`accept`, `multiple`, `chooseLabel`), `autoFocus`,
+  `inputMode`, `width="narrow"`, `onBlur`, `ariaLabel` (a hidden label), `passwordManager={false}`.
+- `Surface`: `height` scroll (24rem) or tall (code, 60vh); an aside with `tone="danger"` is the solid one
+  for an act that cannot be undone. `Meter`: `kind` quota or progress. `Dialog`: `size` up to `xl`.
+- `Rail`: entries with `#id` hrefs scroll only the content area (`scrollToId`), `onClick` opens a fold first.
+
 The rail has two kinds: `index` is the ink panel with numbered entries for a page's own contents (it may also hold a view switch), `navigation` is the quiet paper list of the site's menu, with a pin that shows on hover and stays when on.
 
 The breakpoints live in the parts: the frame folds its padding at 900px, row actions at 600px,

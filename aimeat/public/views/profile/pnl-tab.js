@@ -9,6 +9,9 @@
  *   No forecasts: only the truth of the bookings. Live: re-fetches on the
  *   aimeat-live-update event when the finance domain ticks.
  * @version-history
+ *   2026-09-22 -- Composed from the shared set: Page, the income and expense blocks are small
+ *     Sections with a Table each, the result is one box with its number, the accountants are list
+ *     rows with a Field; no class of its own. Grant is an underlined word, so Show is the one slab.
  *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
  *   2026-09-13 — V1: compose page and B1 section headings from the shared poster classes.
  *   v1.1.0 — 2026-08-07 — AccountantAccess: grant and revoke read access to your books.
@@ -20,6 +23,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { Spinner } from './shared.js';
+import { Page, Section, Columns, Stack, ListRow, Table, Field, Action, Surface, Text } from '/components/poster-parts.js';
 import { apiGet, apiPost, apiDelete } from '/js/api.js';
 
 function euros(minor) {
@@ -43,29 +47,19 @@ function sourceLabel(source) {
   return label === key ? source : label;
 }
 
+/** Income or expenses: one row per source (what, how many, how much) and the total, bold, last. */
 function LineTable({ titleKey, lines, totalMinor }) {
   return html`
-    <div class="card pf-pnl-block poster-row--thing">
-      <h3 class="poster-section-title">${t(titleKey)}</h3>
-      ${lines.length === 0 && html`<p class="pf-pnl-empty">${t('profile.pnl.empty')}</p>`}
+    <${Section} size="small" density="compact" title=${t(titleKey)}>
+      ${lines.length === 0 && html`<${Text} tone="muted">${t('profile.pnl.empty')}<//>`}
       ${lines.length > 0 && html`
-        <table class="pf-pnl-table">
-          <tbody>
-            ${lines.map(line => html`
-              <tr key=${line.source}>
-                <td>${sourceLabel(line.source)}</td>
-                <td class="pf-pnl-count">${line.count} ${t('profile.pnl.count')}</td>
-                <td class="pf-pnl-num">${euros(line.amountMinor)}</td>
-              </tr>
-            `)}
-            <tr class="pf-pnl-total">
-              <td colspan="2">${t('profile.pnl.total')}</td>
-              <td class="pf-pnl-num">${euros(totalMinor)}</td>
-            </tr>
-          </tbody>
-        </table>
+        <${Table} density="compact" label=${t(titleKey)} headers=${['', '', '']}
+          rows=${[
+            ...lines.map(line => [sourceLabel(line.source), `${line.count} ${t('profile.pnl.count')}`, { text: euros(line.amountMinor), mono: true }]),
+            [html`<strong>${t('profile.pnl.total')}</strong>`, '', { text: html`<strong>${euros(totalMinor)}</strong>`, mono: true }],
+          ]} />
       `}
-    </div>
+    <//>
   `;
 }
 
@@ -117,37 +111,23 @@ function AccountantAccess({ showToast }) {
   if (!loaded) return null;
 
   return html`
-    <div class="card pf-pnl-block poster-row--thing">
-      <h3 class="poster-section-title">${t('profile.pnl.accountantTitle')}</h3>
-      <p class="section-desc">${t('profile.pnl.accountantDesc')}</p>
-
-      ${accountants.length === 0
-        ? html`<p class="pf-pnl-note">${t('profile.pnl.accountantNone')}</p>`
-        : html`
-          <ul class="pf-acc-list">
+    <${Section} size="small" density="compact" title=${t('profile.pnl.accountantTitle')} description=${t('profile.pnl.accountantDesc')}>
+      <${Stack}>
+        ${accountants.length === 0
+          ? html`<${Text} kind="caption" tone="muted">${t('profile.pnl.accountantNone')}<//>`
+          : html`<${Stack} density="compact">
             ${accountants.map((who) => html`
-              <li key=${who}>
-                <span class="pf-acc-who">${who}</span>
-                <button class="btn-ghost" disabled=${busy} onClick=${() => revoke(who)}>
-                  ${t('profile.pnl.accountantRevoke')}
-                </button>
-              </li>
-            `)}
-          </ul>
-        `}
-
-      <div class="pf-pnl-controls">
-        <label class="pf-acc-field">
-          <span>${t('profile.pnl.accountantName')}</span>
-          <input value=${name} placeholder=${t('profile.pnl.accountantPlaceholder')}
-                 onInput=${(e) => setName(e.target.value)} />
-        </label>
-        <button class="btn-primary" disabled=${busy || !name.trim()} onClick=${grant}>
-          ${t('profile.pnl.accountantGrant')}
-        </button>
-      </div>
-      <p class="pf-pnl-note">${t('profile.pnl.accountantHint')}</p>
-    </div>
+              <${ListRow} key=${who} density="compact" name=${who}
+                actions=${html`<${Action} kind="text" tone="danger" disabled=${busy} onClick=${() => revoke(who)}>${t('profile.pnl.accountantRevoke')}<//>`} />`)}
+          <//>`}
+        <${Stack} direction="wrap" align="end">
+          <${Field} label=${t('profile.pnl.accountantName')} value=${name} placeholder=${t('profile.pnl.accountantPlaceholder')}
+            onInput=${(e) => setName(e.target.value)} />
+          <${Action} disabled=${busy || !name.trim()} onClick=${grant}>${t('profile.pnl.accountantGrant')}<//>
+        <//>
+        <${Text} kind="caption" tone="muted">${t('profile.pnl.accountantHint')}<//>
+      <//>
+    <//>
   `;
 }
 
@@ -183,58 +163,47 @@ export function PnlTab({ showToast }) {
     return () => window.removeEventListener('aimeat-live-update', handler);
   }, [from, to, load]);
 
-  return html`
-    <div class="pf-pnl">
-      <h2 class="poster-page-title">${t('profile.pnl.title')}</h2>
-      <p class="section-desc">${t('profile.pnl.desc')}</p>
+  // The month fields: Field has no month type yet, so they fall back to a text field that keeps
+  // the YYYY-MM value (see the report's MISSING PART).
+  return html`<${Page} title=${t('profile.pnl.title')}
+    crumbs=${[{ label: t('nav.profile') }, { label: t('profile.landing.menuBusiness') }, { label: t('profile.pnl.title') }]}>
+    <${Stack}>
+      <${Text} kind="lead" tone="muted">${t('profile.pnl.desc')}<//>
 
-      <div class="pf-pnl-controls">
-        <label>${t('profile.pnl.from')}
-          <input type="month" value=${from} onChange=${(e) => setFrom(e.target.value)} />
-        </label>
-        <label>${t('profile.pnl.to')}
-          <input type="month" value=${to} onChange=${(e) => setTo(e.target.value)} />
-        </label>
-        <button class="btn-primary" onClick=${() => load(from, to)}>${t('profile.pnl.show')}</button>
-      </div>
+      <${Stack} direction="wrap" align="end">
+        <${Field} type="month" width="narrow" label=${t('profile.pnl.from')} value=${from} onChange=${(e) => setFrom(e.target.value)} />
+        <${Field} type="month" width="narrow" label=${t('profile.pnl.to')} value=${to} onChange=${(e) => setTo(e.target.value)} />
+        <${Action} kind="primary" onClick=${() => load(from, to)}>${t('profile.pnl.show')}<//>
+      <//>
 
       ${loading && html`<${Spinner} />`}
-      ${error && html`<p class="pf-pnl-error">${error}</p>`}
+      ${error && html`<${Text} tone="danger">${error}<//>`}
 
       ${report && !loading && html`
-        <div class="pf-pnl-grid">
+        <${Columns} collapse=${600}>
           <${LineTable} titleKey="profile.pnl.income" lines=${report.income} totalMinor=${report.totalIncomeMinor} />
           <${LineTable} titleKey="profile.pnl.expenses" lines=${report.expenses} totalMinor=${report.totalExpenseMinor} />
-        </div>
+        <//>
 
-        <div class="card pf-pnl-result ${report.resultMinor >= 0 ? 'pos' : 'neg'} poster-row--thing">
-          <div class="pf-pnl-result-label">${t('profile.pnl.result')}</div>
-          <div class="pf-pnl-result-value">${euros(report.resultMinor)}</div>
-          <div class="pf-pnl-vat">${t('profile.pnl.vatPayable')}: ${euros(report.vatPayableMinor)}</div>
-        </div>
+        <${Surface} kind="box" density="roomy">
+          <${Stack} density="compact" align="center">
+            <${Text} kind="label">${t('profile.pnl.result')}<//>
+            <${Text} kind="number" tone=${report.resultMinor >= 0 ? 'success' : 'danger'}>${euros(report.resultMinor)}<//>
+            <${Text} tone="muted">${t('profile.pnl.vatPayable')}: ${euros(report.vatPayableMinor)}<//>
+          <//>
+        <//>
 
-        <div class="card pf-pnl-block poster-row--thing">
-          <table class="pf-pnl-table">
-            <tbody>
-              ${report.transferCount > 0 && html`
-                <tr>
-                  <td>${t('profile.pnl.transfers')}</td>
-                  <td class="pf-pnl-count">${report.transferCount} ${t('profile.pnl.count')}</td>
-                  <td class="pf-pnl-num">${euros(report.transferMinor)}</td>
-                </tr>
-              `}
-              <tr>
-                <td>${t('profile.pnl.aiCost')}</td>
-                <td class="pf-pnl-count"></td>
-                <td class="pf-pnl-num">$${report.aiCostUsd.toFixed(4)}</td>
-              </tr>
-            </tbody>
-          </table>
-          <p class="pf-pnl-note">${t('profile.pnl.aiCostNote')}</p>
-        </div>
+        <${Stack} density="compact">
+          <${Table} density="compact" label=${t('profile.pnl.aiCost')} headers=${['', '', '']}
+            rows=${[
+              ...(report.transferCount > 0 ? [[t('profile.pnl.transfers'), `${report.transferCount} ${t('profile.pnl.count')}`, { text: euros(report.transferMinor), mono: true }]] : []),
+              [t('profile.pnl.aiCost'), '', { text: `$${report.aiCostUsd.toFixed(4)}`, mono: true }],
+            ]} />
+          <${Text} kind="caption" tone="muted">${t('profile.pnl.aiCostNote')}<//>
+        <//>
       `}
 
       <${AccountantAccess} showToast=${showToast} />
-    </div>
-  `;
+    <//>
+  <//>`;
 }

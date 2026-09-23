@@ -7,6 +7,8 @@
  *   universal file preview modal, the drag-and-drop upload form, and the edit-memory modal.
  *   Extracted from memory-tab.js to satisfy max-file-lines.
  * @version-history
+ *   2026-09-22 -- The file preview is the extra-large dialog again, and a dialog title that shows a
+ *     key or a file name sets it in mono.
  *   2026-09-22 -- Composed from the shared component set: the forms are Fields and Actions, the
  *     dialogs are Dialog, the collection is ListRows, the drop zone is the dashed aside. The emoji
  *     (cart, clip, brain, clipboard, arrows) are gone. PDF, video and audio previews keep their
@@ -231,7 +233,7 @@ export function FilePreviewModal({ file, nodeUrl, onClose, onDownload, showToast
 
   const status = (text) => html`<${Text} tone="muted">${text}<//>`;
   return html`
-    <${Dialog} open=${true} onClose=${onClose} title=${fKey} size="large" guard=${false}
+    <${Dialog} open=${true} onClose=${onClose} title=${html`<${Text} kind="mono">${fKey}<//>`} size="xl" guard=${false}
       actions=${html`
         <${Action} onClick=${openInTab}>${t('profile.files.openInTab') || 'Open in new tab'} →<//>
         <${Action} onClick=${() => onDownload(file)}>${t('profile.files.download')}<//>`}>
@@ -353,7 +355,7 @@ export function EditMemoryModal({ memKey, initialValue, initialVisibility, initi
   const canSave = !jsonError;
 
   return html`
-    <${Dialog} open=${true} onClose=${onCancel} title=${`${t('profile.memory.editTitle')}: ${memKey}`} size="large"
+    <${Dialog} open=${true} onClose=${onCancel} title=${html`${t('profile.memory.editTitle')}: <${Text} kind="mono">${memKey}<//>`} size="large"
       actions=${html`
         <${Action} onClick=${onCancel}>${t('profile.cancel')}<//>
         <${Action} kind="primary" disabled=${!canSave}

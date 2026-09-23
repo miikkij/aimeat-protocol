@@ -8,6 +8,8 @@
  * @structure renderList · listRow
  * @usage import { renderList } from './list.js';
  * @version-history
+ *   2026-09-22 -- Composed from the shared set (Page, Rail, ListRow, Field, Chip): a calibration is a
+ *     shared row; calibrator-poster.css is gone.
  *   v1.1.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.0.0 — 2026-09-04 — Initial (design canvas "AIMEAT Kalibraattori-sivu", direction A).
  */
@@ -15,9 +17,11 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
+import { Page, Rail, Stack, ListRow, Field, Text, Chip, Action } from '/components/poster-parts.js';
 import { x, dateWord, judgeOf, crumb, pageLinks } from './frame.js';
 
-const chip = (text, cls = '') => html`<span class=${`og-chip ${cls}`}>${text}</span>`;
+/** A score's tone: good from 80, middling from 50, low below. */
+export const scoreTone = (score) => (score >= 80 ? 'success' : score >= 50 ? 'plain' : 'danger');
 
 export function renderList(ctx) {
   const all = ctx.projects || [];
@@ -25,44 +29,29 @@ export function renderList(ctx) {
   const archived = all.filter((p) => p.status === 'archived');
   const shown = ctx.showArchived ? all : live;
   const scored = live.filter((p) => p.latestAvgScore != null);
-  return html`
-    <div class="og og-cal og-cal-list">
-      ${crumb()}
-      <div class="og-mast">
-        <div class="og-mast-words">
-          <h1 class="og-title poster-page-title">${t('profile.calibrator.tabLabel')}<small>${x('titleSub')}</small></h1>
-          <div class="og-chips">
-            ${ctx.projects ? chip(x('chipCalibrations', { n: live.length }), 'og-chip--sun') : null}
-            ${scored.length ? chip(x('chipScored', { n: scored.length })) : null}
-            ${archived.length ? chip(x('chipArchived', { n: archived.length }), 'og-chip--dim') : null}
-          </div>
-          <p class="og-desc">${x('listDesc')}</p>
-        </div>
-        <div class="og-mast-actions">
-          <div class="cal-new">
-            <input class="og-input" type="text" value=${ctx.newName} placeholder=${x('newPlaceholder')} aria-label=${x('newName')} onInput=${(e) => ctx.setNewName(e.target.value)} onKeyDown=${(e) => e.key === 'Enter' && ctx.createProject()} />
-            <button type="button" class="og-slab" disabled=${ctx.busy === 'create' || !ctx.newName.trim()} onClick=${() => ctx.createProject()}>${x('newCalibration')}</button>
-          </div>
-          <div class="og-doors">
-            ${archived.length ? html`<button type="button" class="og-door og-door--quiet" onClick=${() => ctx.setShowArchived(!ctx.showArchived)}>${ctx.showArchived ? x('hideArchived') : x('showArchived', { n: archived.length })}</button>` : null}
-          </div>
-        </div>
-      </div>
-      <div class="og-grid">
-        <div class="og-main">
-          ${!ctx.projects ? html`<p class="cal-empty">${x('loading')}</p>` : !shown.length ? html`<p class="cal-empty"><b>${x('emptyLead')}</b> ${x('emptyBody')}</p>` : html`
-            <div class="cal-rows">
-              <div class="cal-row cal-row--head"><div>${x('colCalibration')}</div><div>${x('colScore')}</div><div>${x('colState')}</div><div></div></div>
-              ${shown.map((p) => listRow(ctx, p))}
-            </div>`}
-          <p class="cal-hint">${x('listHint')}</p>
-        </div>
-        <nav class="og-rail" aria-label=${x('railTitle')}>
-          <span class="og-rail-label">${x('pages')}</span>
-          ${pageLinks()}
-        </nav>
-      </div>
-    </div>`;
+  const identity = html`<${Stack} density="compact"><${Text} tone="muted">${x('titleSub')}<//>
+    <${Stack} direction="wrap" density="compact">
+      ${ctx.projects ? html`<${Chip} tone="sun">${x('chipCalibrations', { n: live.length })}<//>` : null}
+      ${scored.length ? html`<${Chip}>${x('chipScored', { n: scored.length })}<//>` : null}
+      ${archived.length ? html`<${Chip} tone="muted">${x('chipArchived', { n: archived.length })}<//>` : null}
+    <//><//>`;
+  return html`<${Page} crumbs=${crumb()} title=${t('profile.calibrator.tabLabel')} identity=${identity}
+    actions=${html`<${Stack} direction="wrap" align="end">
+      <${Field} value=${ctx.newName} placeholder=${x('newPlaceholder')} ariaLabel=${x('newName')} onInput=${(e) => ctx.setNewName(e.target.value)} onKeyDown=${(e) => e.key === 'Enter' && ctx.createProject()} />
+      <${Action} kind="primary" disabled=${ctx.busy === 'create' || !ctx.newName.trim()} onClick=${() => ctx.createProject()}>${x('newCalibration')}<//>
+      ${archived.length ? html`<${Action} onClick=${() => ctx.setShowArchived(!ctx.showArchived)}>${ctx.showArchived ? x('hideArchived') : x('showArchived', { n: archived.length })}<//>` : null}
+    <//>`}
+    rail=${html`<${Rail} kind="index" label=${x('railTitle')}>${pageLinks()}<//>`}>
+    <${Stack}>
+      <${Text} tone="muted">${x('listDesc')}<//>
+      ${!ctx.projects ? html`<${Text} tone="muted">${x('loading')}<//>` : !shown.length ? html`<${Text}><strong>${x('emptyLead')}</strong> ${x('emptyBody')}<//>` : html`
+        <div>
+          <${ListRow} density="compact" name=${html`<${Text} kind="label">${x('colCalibration')} · ${x('colState')}<//>`} value=${html`<${Text} kind="label">${x('colScore')}<//>`} />
+          ${shown.map((p) => listRow(ctx, p))}
+        </div>`}
+      <${Text} kind="caption" tone="muted">${x('listHint')}<//>
+    <//>
+  <//>`;
 }
 
 function listRow(ctx, p) {
@@ -74,10 +63,12 @@ function listRow(ctx, p) {
     ? x('stateNoPrompt')
     : [judge.modelId ? x('stateJudge', { name: judge.label }) : x('stateNoJudge'), x('stateCandidates', { n: models }), runs ? x('stateRuns', { n: runs }) : x('stateNoRuns')].join(' · ');
   return html`
-    <div class=${`cal-row ${p.status === 'archived' ? 'is-archived' : ''}`} key=${p.projectId}>
-      <div class="cal-nm"><button type="button" class="og-tbl-name" onClick=${() => ctx.openProject(p.projectId)}>${p.name}</button><small>${p.currentVersion ? x('versionN', { n: p.currentVersion }) + ' · ' : ''}${dateWord(p.createdAt)}${p.status === 'archived' ? ' · ' + x('archived') : ''}</small></div>
-      <div class="cal-sc">${score != null ? html`<b class=${score >= 80 ? 'is-good' : score >= 50 ? 'is-mid' : 'is-low'}>${score} %</b><small>${x('scoreSub')}</small>` : html`<span class="is-dim">${runs ? x('noScoreYet') : x('noRunsYet')}</span>`}</div>
-      <div class="cal-w">${state}</div>
-      <div class="cal-go"><button type="button" class="og-door" onClick=${() => ctx.openProject(p.projectId)}>${x('open')}</button></div>
-    </div>`;
+    <${ListRow} key=${p.projectId} muted=${p.status === 'archived'} name=${p.name} onOpen=${() => ctx.openProject(p.projectId)}
+      detail=${`${p.currentVersion ? x('versionN', { n: p.currentVersion }) + ' · ' : ''}${dateWord(p.createdAt)}${p.status === 'archived' ? ' · ' + x('archived') : ''}`}
+      value=${score != null
+        ? html`<${Stack} density="compact"><${Text} kind="number" size="small" tone=${scoreTone(score)}>${score} %<//><${Text} kind="caption" tone="muted">${x('scoreSub')}<//><//>`
+        : html`<${Text} tone="muted">${runs ? x('noScoreYet') : x('noRunsYet')}<//>`}
+      actions=${html`<${Action} onClick=${() => ctx.openProject(p.projectId)}>${x('open')}<//>`}>
+      <${Text} kind="caption" tone="muted">${state}<//>
+    <//>`;
 }

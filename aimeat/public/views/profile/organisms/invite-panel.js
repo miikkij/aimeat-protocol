@@ -12,6 +12,7 @@
  *   WsGrantList (shared workspace checkbox+role list).
  * @usage import { InvitePanel, PendingInvites } from '/views/profile/organisms/invite-panel.js';
  * @version-history
+ *   v1.2.1 -- 2026-09-22 -- Withdraw carries the danger tone.
  *   v1.2.0 -- 2026-09-22 -- Composed from the shared set (Surface, Field, ListRow, Chip, CopyAction):
  *     no class of its own; the envelope and person emoji before a pending row are gone.
  *   v1.0.0 — 2026-07-16 — Initial: unified direct-add/invite/email form + editable pending rows.
@@ -218,7 +219,7 @@ export function PendingInvites({ orgId, invitations, emailInvites, wsOptions, sh
         detail=${`${row.grants.length ? `${row.grants.length} ${t('organisms.workspacesShort') || 'ws'}` : ''}${row.grants.length && row.meta ? ' · ' : ''}${row.meta}` || undefined}
         actions=${html`<${Chip}>${row.role === 'admin' ? (t('organisms.roleAdmin') || 'Admin') : (t('organisms.roleMember') || 'Member')}<//>
           <${Action} kind="tab" selected=${!!open} disabled=${busy} onClick=${() => (open ? setEditing(null) : startEdit(row))}>${t('organisms.editInvite') || 'Edit'}<//>
-          <${Action} disabled=${busy} onClick=${() => withdraw(row)}>${t('organisms.withdraw') || 'Withdraw'}<//>`}>
+          <${Action} tone="danger" disabled=${busy} onClick=${() => withdraw(row)}>${t('organisms.withdraw') || 'Withdraw'}<//>`}>
         ${open ? html`
           <${Surface} kind="box" density="compact">
             <${Stack}>
