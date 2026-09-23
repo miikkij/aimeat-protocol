@@ -10,9 +10,10 @@
  *
  *   Jouni: "I cannot judge 71 component names without seeing them. Every decision I make needs
  *   pictures." Built only from library components (the Specimen frame is one of them).
- * @structure DesignLabTab (default) · Overview · PartDetail · WrapperPair
+ * @structure DesignLabTab (default: the library / decisions switch) · Library · Overview · PartDetail · WrapperPair
  * @usage Mounted by the admin dashboard tab router (views/admin.js), group Design.
  * @version-history
+ *   v1.1.0 — 2026-09-23 — The decisions view beside the library (views/admin/design-lab-decisions.js).
  *   v1.0.0 — 2026-09-23 — Initial: the library view (UI consolidation phase 2).
  */
 import { h } from 'preact';
@@ -32,6 +33,7 @@ import { QuietNote } from '/components/QuietNote.js';
 import { ErrorNote } from '/components/ErrorNote.js';
 import { Specimens, Specimen } from '/components/Specimen.js';
 import { DEMOS } from '/views/design-lab/demos.js';
+import DecisionsView from './design-lab-decisions.js';
 
 const html = htm.bind(h);
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
@@ -150,7 +152,7 @@ function PartDetail({ id, onBack }) {
     <//>`;
 }
 
-export default function DesignLabTab() {
+function Library() {
   const [entries, setEntries] = useState(/** @type {any[]|null} */ (null));
   const [error, setError] = useState('');
   const [open, setOpen] = useState(/** @type {string|null} */ (null));
@@ -167,4 +169,14 @@ export default function DesignLabTab() {
   return open
     ? html`<${PartDetail} id=${open} onBack=${() => setOpen(null)} />`
     : html`<${Overview} entries=${sorted} onOpen=${setOpen} />`;
+}
+
+export default function DesignLabTab() {
+  const [mode, setMode] = useState('library');
+  return html`
+    <${ModeSwitch} label=${tr('designLab.modeLabel', 'What the lab shows')}>
+      <${FoldButton} on=${mode === 'library'} onClick=${() => setMode('library')}>${tr('designLab.modeLibrary', 'The library')}<//>
+      <${FoldButton} on=${mode === 'decisions'} onClick=${() => setMode('decisions')}>${tr('designLab.modeDecisions', 'The decisions')}<//>
+    <//>
+    ${mode === 'library' ? html`<${Library} />` : html`<${DecisionsView} />`}`;
 }

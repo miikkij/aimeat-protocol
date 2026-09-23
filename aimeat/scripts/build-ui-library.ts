@@ -19,11 +19,14 @@
  *     list reads.
  *   - The generated facts equal what the files say today.
  *   - The design lab has a demo for every entry, and no demo for a part that is not one.
+ *   - Every variant of a design-lab decision has a live sample, its proposal is one of its
+ *     variants, and every crop the manifest names is a file.
  *
  *   `pnpm build:ui-library` writes, `pnpm check:ui-library` checks.
  * @structure main() · parseRules() · classesIn() · tokensIn() · importGraph() · buildFacts() · problems()
  * @usage pnpm build:ui-library · pnpm check:ui-library
  * @version-history
+ *   v1.2.0 — 2026-09-23 — The design lab's decisions are held to their samples and crops.
  *   v1.1.0 — 2026-09-23 — The design lab's demos are held to the catalogue (phase 2).
  *   v1.0.0 — 2026-09-23 — Initial (UI consolidation phase 1).
  */
@@ -261,6 +264,7 @@ export function problems(entries: UiEntrySource[], facts: Record<string, UiEntry
     for (const d of demoIds) {
         if (!ids.has(d) && !DEMO_EXTRAS.includes(d)) out.push(`views/design-lab: demo "${d}" is not a catalogue entry or a named extra`);
     }
+    out.push(...decisionProblems());
     for (const abs of walkJs(path.join(PUBLIC, 'components'))) {
         const m = /the catalogue entry is\s*`([\w-]+)`/.exec(read(abs).slice(0, 3000));
         if (!m) continue;
@@ -268,6 +272,46 @@ export function problems(entries: UiEntrySource[], facts: Record<string, UiEntry
         const mod = '/' + rel(abs);
         if (!e) out.push(`${mod}: names catalogue entry "${m[1]}", which does not exist`);
         else if (e.module !== mod) out.push(`${mod}: names catalogue entry "${m[1]}", whose module is ${e.module ?? 'none'}`);
+    }
+    return out;
+}
+
+/**
+ * The design lab's decisions: every variant in decisions-data.js has a live sample in
+ * decision-samples.js (and no sample is left without a variant), and every crop the manifest names
+ * is a file. The samples file imports browser paths, so its ids are read as text.
+ */
+export function decisionProblems(): string[] {
+    const out: string[] = [];
+    const dir = path.join(PUBLIC, 'views', 'design-lab');
+    const data = read(path.join(dir, 'decisions-data.js'));
+    const samples = read(path.join(dir, 'decision-samples.js'));
+    const blocks = (src: string, marker: RegExp): Map<string, string> => {
+        const map = new Map<string, string>();
+        const parts = src.split(marker);
+        for (let i = 1; i < parts.length; i += 2) map.set(parts[i], parts[i + 1] ?? '');
+        return map;
+    };
+    const decisions = blocks(data, /^ {4}id: '([\w-]+)',$/m);
+    const sampleBlocks = blocks(samples, /^ {2}'?([\w-]+)'?: \[$/m);
+    // By indentation: a variant is a line of its own at six spaces, a sample at four, so an id inside
+    // a sample's own data (a thread, a card) is not taken for either.
+    const ids = (src: string, indent: number) => [...src.matchAll(new RegExp(`^ {${indent}}\\{ id: '([\\w-]+)'`, 'gm'))].map(m => m[1]);
+    for (const [id, body] of decisions) {
+        const wanted = ids(body.split(/^ {4}proposal:/m)[0], 6);
+        const have = ids(sampleBlocks.get(id) ?? '', 4);
+        for (const v of wanted) if (!have.includes(v)) out.push(`decision ${id}: variant "${v}" has no sample in decision-samples.js`);
+        for (const v of have) if (!wanted.includes(v)) out.push(`decision ${id}: sample "${v}" is not a variant in decisions-data.js`);
+        const proposed = /proposal: \{\s*variant: '([\w-]+)'/.exec(body)?.[1];
+        if (!proposed || !wanted.includes(proposed)) out.push(`decision ${id}: the proposal names "${proposed}", which is not one of its variants`);
+    }
+    for (const id of sampleBlocks.keys()) if (!decisions.has(id)) out.push(`decision-samples.js: "${id}" is not a decision`);
+    const manifestPath = path.join(PUBLIC, 'img', 'design-lab', 'crops.json');
+    if (existsSync(manifestPath)) {
+        const manifest = JSON.parse(read(manifestPath)) as Record<string, Record<string, Record<string, string>>>;
+        for (const [d, vs] of Object.entries(manifest)) for (const [v, e] of Object.entries(vs)) {
+            for (const theme of ['light', 'dark']) if (e[theme] && !existsSync(pub(e[theme]))) out.push(`crop ${d}/${v} ${theme}: ${e[theme]} is not a file`);
+        }
     }
     return out;
 }

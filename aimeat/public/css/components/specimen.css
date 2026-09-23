@@ -8,6 +8,8 @@
  *   frame shape; this sheet holds only the layout.
  * @usage Linked from public/spa.html after the component block.
  * @version-history
+ *   v1.1.0 — 2026-09-23 — The decisions view: a row of small parts, a corner anchor, a crop, and
+ *     the measured values.
  *   v1.0.0 — 2026-09-23 — Initial, for the design lab's library view (UI consolidation phase 2).
  */
 
@@ -28,3 +30,10 @@
 /* Inside the preview page: the part on the page's own ground, with room around it. */
 .poster-specimen-stage { padding: 1.25rem; background: var(--bg); color: var(--text); }
 .poster-specimen-stage--flush { padding: 0; }
+/* A few small parts side by side, and a box for a count that its page positions on a corner. */
+.poster-specimen-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+.poster-specimen-anchor { position: relative; display: inline-block; width: 1.6rem; height: 1.4rem; }
+
+/* A decision's crop from its real page, set at its own size, and the measured values under it. */
+.poster-specimen-crop { display: block; max-width: 100%; height: auto; }
+.poster-specimen-values { margin: 0; font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-dim); line-height: 1.6; }
