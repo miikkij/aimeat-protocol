@@ -19,6 +19,8 @@
  * @structure DecideCard — the collapsible card, mounted in the profile AI tab
  * @usage import { DecideCard } from './decide-card.js'; html`<${DecideCard} />`
  * @version-history
+ *   v1.4.0 — 2026-09-23 — Decision providers: the providers part (decide-providers.js) between the
+ *     data policy and the rules, and each recent decision names the provider that answered.
  *   v1.3.0 — 2026-09-20 — Every decision carries the person's own verdict: it was right, it was
  *     wrong. Nothing in the browser recorded a review before, so the register's "a human looked at
  *     it" half could only be written over MCP. The verdict already recorded stays on screen and
@@ -38,6 +40,7 @@ import { apiGet, apiPut, apiPost, apiDelete } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
 import { reviewDecision } from '/js/services/decide.js';
 import { DecideRules } from './decide-rules.js';
+import { DecideProviders, providerTitle } from './decide-providers.js';
 
 const shortTime = (iso) => String(iso ?? '').slice(0, 16).replace('T', ' ');
 
@@ -241,7 +244,9 @@ export function DecideCard() {
             </ul>
           `}
 
-          ${settings && html`<${DecideRules} available=${!!settings.available} />`}
+          ${settings && settings.providers && html`<${DecideProviders} view=${settings.providers} onSaved=${load} />`}
+
+          ${settings && html`<${DecideRules} available=${!!settings.available} providers=${settings.providers || null} />`}
 
           ${recent && html`
             <h4 class="pf-aitr-sub">${t('decideCard.recentTitle')}</h4>
@@ -255,7 +260,7 @@ export function DecideCard() {
                         ${Object.entries(d.record.answers).slice(0, 3).map(([id, a]) => `${id}: ${answerText(a)}`).join(' · ')}
                       </span>
                       <span class="pf-aitr-row-meta">
-                        ${d.rule ? `${d.rule} · ${t(`decideRules.outcome.${d.outcome}`)} · ` : ''}${shortTime(d.createdAt)} · ${d.model}${d.record.cachedFrom ? ` · ${t('decideCard.cached')}` : ''}
+                        ${d.rule ? `${d.rule} · ${t(`decideRules.outcome.${d.outcome}`)} · ` : ''}${shortTime(d.createdAt)} · ${d.provider ? `${providerTitle(settings?.providers, d.provider)} · ` : ''}${d.model}${d.record.cachedFrom ? ` · ${t('decideCard.cached')}` : ''}
                         ${d.record.review ? ` · ${t(`decideCard.review.${d.record.review.outcome}`)}` : ''}
                       </span>
                       ${/* The person's own verdict, on EVERY decision, answered or not. The gate's
