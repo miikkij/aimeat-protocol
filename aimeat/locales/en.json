@@ -12758,6 +12758,7 @@
     "wallForks": "forks",
     "wallOpen1": "open",
     "wallFork1": "fork",
+    "wallShotAlt": "Screenshot of {name}",
     "wallSortLabel": "Sort by",
     "wallSortNewest": "Recently updated",
     "wallSortPopular": "Most opened",

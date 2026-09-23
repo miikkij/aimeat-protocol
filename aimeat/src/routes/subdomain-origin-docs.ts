@@ -23,6 +23,8 @@
  *     which is what keeps the import between the two files one-directional)
  * @usage registerAppOriginDocs(router, config, storage, { resolveApp, isRestricted });
  * @version-history
+ *   v1.2.0 — 2026-09-24 — The origin sitemap lists the app and its legal pages only; the agent
+ *     documents left it (Bing counted them as thin pages).
  *   v1.1.0 — 2026-08-29 — The app's own legal pages at /terms, /privacy, /imprint, /refunds,
  *     /accessibility, /cookies and /support (answered only when the app has the page), and the
  *     Legal section of llms.txt. The page carries its provenance record's headers, marks and label.
@@ -161,7 +163,12 @@ export function registerAppOriginDocs(
     if (!appSeoIndexable(app, config)) return next();
     const origin = appOriginFor(req, config);
     const now = new Date().toISOString().split('T')[0];
-    const urls = [`${origin}/`, `${origin}/llms.txt`, `${origin}/AGENTS.md`, `${origin}/sitemap.md`];
+    // Pages a person reads: the app and its own legal pages. llms.txt, AGENTS.md and sitemap.md
+    // are for agents, which find them through the Link headers and llms.txt, and they are nearly
+    // the same text on every app origin. Listed here they were 108 thin, near-duplicate URLs to
+    // Bing, whose report on aimeat.io said "too many pages with insufficient content" (2026-09-23).
+    const legal = legalLinksFor(app, origin).map((l) => l.href).filter((u) => u.startsWith(`${origin}/`));
+    const urls = [`${origin}/`, ...legal];
     res.type('application/xml').send([
       '<?xml version="1.0" encoding="UTF-8"?>',
       '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',

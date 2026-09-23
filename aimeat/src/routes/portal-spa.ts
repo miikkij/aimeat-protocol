@@ -21,6 +21,8 @@
  *   const spaPath = resolvePublicFile('spa.html');
  *   if (spaPath) serveSpa(res, spaPath, config, '/v1/glossary');
  * @version-history
+ *   v1.4.0 — 2026-09-24 — serveSpa() takes the page's live markdown (apps, change log, members, help)
+ *     and appends it to the authored body, for readers that do not run JavaScript (Bing).
  *   v1.3.0 — 2026-09-23 — stampAssets(): the build stamp reaches every first-party stylesheet, not
  *     only the view sheets, theme.css and margin-pattern.css (new markup met an old poster.css and
  *     old component sheets in a browser and broke the home).
@@ -93,6 +95,11 @@ export function serveSpa(
    * cannot hold those, so the caller composes the description and hands it over.
    */
   builtPage?: PublicPage,
+  /**
+   * Markdown from live data to append to the page's authored body: the apps, the change log, the
+   * members (services/page-body-live.ts). The caller awaits it, because this function is sync.
+   */
+  liveMarkdown?: string,
 ): void {
   const appOriginEnabled = config.appOriginEnabled && !!config.appHost;
   const v = `?v=${BUILD_ID}`;
@@ -160,7 +167,12 @@ export function serveSpa(
     // registry: two hundred defined terms from src/data/glossary.ts, the same text its .md mirror
     // serves. Its registry entry is a one-paragraph summary, which would have made the best page
     // on this node one of the thinnest.
-    markdown: page?.path === '/v1/glossary' ? buildGlossaryBody() : undefined,
+    //
+    // Live data follows the authored text on the pages that show some: without it the front page
+    // gave a crawler 130 words and the change log 105 (Bingbot, 2026-09-23).
+    markdown: page?.path === '/v1/glossary'
+      ? buildGlossaryBody()
+      : liveMarkdown ? `${page?.markdown ?? ''}\n\n${liveMarkdown}` : undefined,
   });
 
   // Make the running AIMEAT version visible from the page itself — a view-source comment plus a

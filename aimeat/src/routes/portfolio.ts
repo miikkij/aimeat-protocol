@@ -8,6 +8,8 @@
  * @structure catalog / members / config (GET+PUT) / upload / data/:username
  *   portfolioWriteGaii() / portfolioReadGaiis() — which identity a portfolio is stored under
  * @version-history
+ *   v1.7.1 — 2026-09-24 — /v1/portfolio/members reads services/portfolio-members.ts (moved there
+ *     unchanged, so the /v1/members page body can use the same list).
  *   v1.7.0 — 2026-09-03 — GET /v1/portfolio/config also says where the stored page IS: `html`
  *     carries the public-file address of portfolio/index.html, its size and when it was stored, or
  *     null when no page has been made. The Portfolio tab previews the page and reads its title from
@@ -48,6 +50,7 @@ import type { Storage, GHIIRecord, AgentRecord } from '../storage/interface.js';
 import { requireAuth, optionalAuth, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
+import { listPublishedMembers } from '../services/portfolio-members.js';
 
 /** Result of resolving a username to their published portfolio. */
 export type PortfolioResolution =
@@ -288,47 +291,10 @@ export function portfolioRouter(config: AimeatConfig, storage: Storage): Router 
    * GET /v1/portfolio/members
    * Public showcase: node members (owners) who have PUBLISHED a portfolio (portfolio.config.enabled).
    * Cached briefly — listing all owners + reading each portfolio.config is O(owners). Doubles as the
-   * node's "discover people here" list.
+   * node's "discover people here" list. The listing lives in services/portfolio-members.ts.
    */
-  let membersCache: { at: number; data: Array<Record<string, unknown>> } | null = null;
-  const MEMBERS_TTL_MS = 60_000;
   router.get('/v1/portfolio/members', optionalAuth(), async (_req, res) => {
-    if (membersCache && Date.now() - membersCache.at < MEMBERS_TTL_MS) {
-      res.json(success(config.nodeId, { members: membersCache.data, total: membersCache.data.length }));
-      return;
-    }
-    const ghiis = await storage.listGHIIs();
-    // Batch: owner→agents in one IN query, then the portfolio.config key across every identity a
-    // portfolio can live under in one IN query (was getAgentsByOwner + getMemory PER owner).
-    //
-    // The candidates mirror resolvePublishedPortfolio exactly: every agent gaii AND the owner's own
-    // GHII. Keying this listing on the first agent alone made an agentless member's portfolio
-    // published, served at /v1/portfolio/:username — and absent from the one page that exists to
-    // find them, because the mat is written under the GHII before any agent exists.
-    const agentsByOwner = await storage.getAgentsByOwners(ghiis.map(g => g.username));
-    const candidatesByOwner = new Map<string, string[]>();
-    for (const g of ghiis) {
-      candidatesByOwner.set(g.username, [...(agentsByOwner[g.username] ?? []).map(a => a.gaii), g.ghii]);
-    }
-    const cfgRows = await storage.listMemoryForOwners(
-      [...new Set([...candidatesByOwner.values()].flat())],
-      { prefix: 'portfolio.config' },
-    );
-    const enabledGaiis = new Set(
-      cfgRows
-        .filter(m => m.key === 'portfolio.config' && (m.value as Record<string, unknown> | null)?.enabled)
-        .map(m => m.ownerGaii),
-    );
-    const members: Array<Record<string, unknown>> = [];
-    for (const g of ghiis) {
-      if ((candidatesByOwner.get(g.username) ?? []).some(gaii => enabledGaiis.has(gaii))) {
-        // `ghii` is the member's full identifier (owner@node). The showcase renders each member
-        // as an ID card, and the identifier is the part that makes it one — a name is a label,
-        // an identifier is addressable: other people and their agents reach you by it.
-        members.push({ username: g.username, ghii: g.ghii, display_name: g.displayName, avatar: g.avatar, bio: g.bio });
-      }
-    }
-    membersCache = { at: Date.now(), data: members };
+    const members = await listPublishedMembers(storage);
     res.json(success(config.nodeId, { members, total: members.length }));
   });
 

@@ -62,6 +62,9 @@
  *     routes/designbook.ts, for that app to embed.
  *   v1.16.0 — 2026-09-23 — /v1/design-lab/frame serves the SPA: the design lab's preview page,
  *     one interface part in a frame of the admin's library view.
+ *   v1.17.0 — 2026-09-24 — The SPA routes hand serveSpa their live page body (services/
+ *     page-body-live.ts): the apps, the change log, the members and the help questions in the HTML
+ *     as sent, for Bing.
  */
 import { Router } from 'express';
 import { readFileSync } from 'node:fs';
@@ -84,6 +87,7 @@ import { mcpInstallLink } from '../services/mcp-install.js';
 // static-files.ts have imported them from here since before the split.
 import { BUILD_ID, serveSpa, resolvePublicFile } from './portal-spa.js';
 import { resolvePublishedPortfolio } from './portfolio.js';
+import { livePageMarkdown } from '../services/page-body-live.js';
 import { portfolioSeoIndexable, portfolioPage, type PortfolioSeoConfig } from '../services/portfolio-seo.js';
 export { serveSpa, resolvePublicFile } from './portal-spa.js';
 import { LOCALES, type Locale } from '../i18n.js';
@@ -575,7 +579,7 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   for (const path of spaRoutes) {
-    router.get(path, (req, res) => {
+    router.get(path, async (req, res) => {
       // Markdown for Agents: the SPA shell has no readable content, so a client that prefers
       // markdown gets the authored rendering of THIS page instead of an empty document.
       if (prefersMarkdown(req) || req.query.format === 'md') {
@@ -590,7 +594,7 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
       res.vary('Accept');
       const spaPath = resolvePublicFile('spa.html');
       if (spaPath) {
-        serveSpa(res, spaPath, config, path);
+        serveSpa(res, spaPath, config, path, undefined, await livePageMarkdown(path, config, storage));
       } else {
         res.redirect(302, '/spa.html');
       }
