@@ -10,6 +10,8 @@
  *   - specRouter(): mounts GET /v1/spec (locates + serves openapi.yaml) and GET /v1/docs (Swagger UI)
  *
  * @version-history
+ *   v1.2.0 — 2026-09-24 — /v1/docs carries the operation index as HTML (services/api-index.ts) until
+ *     Swagger UI has drawn; Bingbot read 25 words on this page.
  *   v1.1.0 — 2026-07-28 — The /v1/docs shell carries the head metadata every other public page has
  *     — lang, description, og:*, canonical, JSON-LD, one h1 — plus the agent-footer links. It had
  *     none of it, which made the page an agent is most likely to land on the worst-described on the
@@ -23,6 +25,7 @@ import type { AimeatConfig } from '../config.js';
 import { findPublicPage } from '../data/public-pages.js';
 import { prefersMarkdown, sendMarkdown } from '../services/markdown-negotiation.js';
 import { renderPageMarkdown } from './markdown-mirrors.js';
+import { apiIndexHtml } from '../services/api-index.js';
 
 export function specRouter(config: AimeatConfig): Router {
   const router = Router();
@@ -104,6 +107,7 @@ export function specRouter(config: AimeatConfig): Router {
 <body>
   <h1 class="visually-hidden">${title}</h1>
   <div id="swagger-ui"></div>
+  <div id="api-index">${apiIndexHtml()}</div>
   <footer class="agent-footer">
     <a href="${b}/v1/glossary">Glossary</a>
     <a href="${b}/sitemap.md">Site map</a>
@@ -113,7 +117,8 @@ export function specRouter(config: AimeatConfig): Router {
   </footer>
   <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js" crossorigin></script>
   <script nonce="${nonce}">
-    SwaggerUIBundle({ url: '/v1/spec', dom_id: '#swagger-ui', deepLinking: true });
+    SwaggerUIBundle({ url: '/v1/spec', dom_id: '#swagger-ui', deepLinking: true,
+      onComplete: function () { var i = document.getElementById('api-index'); if (i) i.remove(); } });
   </script>
 </body>
 </html>`);

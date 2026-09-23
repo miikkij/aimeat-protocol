@@ -19,6 +19,7 @@
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=agent-readiness
 
+import { readFileSync } from 'node:fs';
 import { PUBLIC_PAGES, sitemapPages, mirroredPages } from '../src/data/public-pages.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
@@ -170,6 +171,36 @@ function locs(xml: string): string[] {
         assert(!/^#{1,6}\s/m.test(seen), 'unrendered markdown heading reached the page');
         const html = shellBodies.get('/v1/members') ?? '';
         assert(/<div id="crawler-body"[^>]*>[\s\S]*?<h2>/.test(html), 'no heading in the injected body');
+    });
+
+    // Live data in the body (services/page-body-live.ts). Bingbot read 130 words on the front page
+    // and 105 on the change log on 2026-09-23, and Bing had the site at "Discovered but not crawled".
+    await test('the change log page sends every entry, not its summary', async () => {
+        const log = JSON.parse(readFileSync(new URL('../public/changelog.json', import.meta.url), 'utf-8')) as
+            { entries: Array<{ title: { en: string } }> };
+        const seen = visibleText(shellBodies.get('/v1/changelog') ?? '');
+        assert(seen.includes(log.entries[0].title.en), 'the newest entry is not in the body');
+        assert(seen.includes(log.entries[log.entries.length - 1].title.en), 'the oldest entry is not in the body');
+    });
+
+    await test('the front page sends the latest changes', async () => {
+        const seen = visibleText(shellBodies.get('/') ?? '');
+        assert(seen.includes('What changed recently'), 'no recent-changes section in the front page body');
+    });
+
+    await test('the help page sends its questions and answers', async () => {
+        const seen = visibleText(shellBodies.get('/v1/help') ?? '');
+        assert(seen.includes('What does this cost me?'), 'the first question is missing');
+        assert(seen.includes('Who can see my things?'), 'the privacy question is missing');
+    });
+
+    await test('/v1/docs sends the operation index until Swagger UI replaces it', async () => {
+        const html = (await text('/v1/docs')).body;
+        const index = html.match(/<div id="api-index">([\s\S]*?)<\/div>/)?.[1] ?? '';
+        const ops = index.match(/<li><code>(GET|POST|PUT|PATCH|DELETE) /g)?.length ?? 0;
+        assert(ops >= 500, `${ops} operations in the index, expected 500+`);
+        assert(index.includes('GET /v1/spec'), 'the index omits GET /v1/spec');
+        assert(html.includes("getElementById('api-index')"), 'nothing removes the index once Swagger has drawn');
     });
 
     // Failure mode: the injection is for the empty shell only. A route with no registry entry has

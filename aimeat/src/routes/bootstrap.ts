@@ -8,6 +8,8 @@
  *   The GET / response includes AI-facing guidance sections (for_ai_assistants, for_ai_agents)
  *   and the full endpoint catalogue grouped by capability domain.
  * @version-history
+ *   v1.4.2 — 2026-09-24 — The root's SPA shell carries the live page body: the apps whose owners
+ *     asked to be found, and the latest changes (services/page-body-live.ts), for Bing.
  *   v1.4.1 — 2026-09-18 — The instruction review's factual corrections. Gone: matches (the engine was
  *     dropped in migration 0055), /v1/feedback (the tools left on 2026-08-11; support@operators is
  *     the door), /v1/files/upload and /v1/agents/checkin (the routes are /v1/storage and
@@ -80,6 +82,7 @@ import { buildFirstSteps } from '../services/first-steps.js';
 import { apexOnly } from './agent-docs.js';
 import { mountSitemapRoutes } from './sitemaps.js';
 import { serveSpa, resolvePublicFile } from './portal.js';
+import { livePageMarkdown } from '../services/page-body-live.js';
 import { SurfaceLayoutService } from '../services/surface-layout/service.js';
 import { renderLayoutMarkdown } from '../services/surface-layout/markdown.js';
 import { logger } from '../utils/logger.js';
@@ -252,7 +255,7 @@ export function bootstrapRouter(
         }
       }
       const spaPath = resolvePublicFile('spa.html');
-      if (spaPath) { serveSpa(res, spaPath, config, '/'); return; }
+      if (spaPath) { serveSpa(res, spaPath, config, '/', undefined, await livePageMarkdown('/', config, storage)); return; }
       res.redirect('/v1/portal');
       return;
     }

@@ -941,7 +941,12 @@ async function main() {
             const sitemap = await onAppOrigin('/sitemap.xml', SUB);
             const page = await onAppOrigin('/', SUB);
             const index = await json('/sitemap-index.xml');
+            // The front page's server-rendered body names the apps a search engine may list, and
+            // only those: it exists for crawlers, so it follows the same switch.
+            const front = await (await fetch(`${BASE}/`, { headers: { Accept: 'text/html' } })).text();
+            const crawlerBody = front.match(/<div id="crawler-body"[\s\S]*?<\/div>/)?.[0] ?? '';
             return {
+                frontNamesApp: crawlerBody.includes('Origin Demo'),
                 robotsAllows: robots.body.includes('Allow: /') && !robots.body.includes('Disallow: /'),
                 sitemapStatus: sitemap.status,
                 xRobots: page.header('x-robots-tag') ?? '',
@@ -957,6 +962,7 @@ async function main() {
             assert(v.xRobots.includes('noindex'), `X-Robots-Tag was "${v.xRobots}"`);
             assert(v.metaNoindex, 'no robots meta in the served document');
             assert(!v.inSitemapIndex, 'the apex sitemap index lists a host nobody asked to have indexed');
+            assert(!v.frontNamesApp, 'the front page tells crawlers about an app nobody asked to have found');
         });
 
         await test('the owner switches it on and all four surfaces follow', async () => {
@@ -969,6 +975,17 @@ async function main() {
             assert(!v.xRobots.includes('noindex'), `X-Robots-Tag is still "${v.xRobots}"`);
             assert(!v.metaNoindex, 'the served document still says noindex');
             assert(v.inSitemapIndex, 'the apex sitemap index does not list the host');
+            assert(v.frontNamesApp, 'the front page\'s server-rendered body does not name the app');
+        });
+
+        await test('the origin sitemap lists pages, not the machine documents', async () => {
+            // llms.txt, AGENTS.md and sitemap.md are for agents and near-identical on every app
+            // origin. Listed in the sitemap, they were a hundred thin pages to Bing (2026-09-23).
+            const sitemap = await onAppOrigin('/sitemap.xml', SUB);
+            const locs = [...sitemap.body.matchAll(/<loc>([^<]*)<\/loc>/g)].map((m) => m[1]);
+            assert(locs.some((u) => u.endsWith('/')), `no root page in ${JSON.stringify(locs)}`);
+            const machine = locs.filter((u) => /\/(llms\.txt|AGENTS\.md|sitemap\.md)$/.test(u));
+            assert(machine.length === 0, `the sitemap still lists ${JSON.stringify(machine)}`);
         });
 
         await test('the owner\'s own wording reaches the page', async () => {

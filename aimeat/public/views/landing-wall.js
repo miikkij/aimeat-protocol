@@ -13,6 +13,7 @@
  * @structure EyeMark · fmtPublished · WALL_FIRST_PAGE · Gallery · StatsPanel
  * @usage import { Gallery, StatsPanel } from './landing-wall.js';
  * @version-history
+ *   v1.1.1 -- 2026-09-24 -- The screenshots carry an alt that names the app.
  *   v1.1.0 -- 2026-09-13 -- V2: compose the search field with the shared poster frame.
  *   v1.0.0 — 2026-08-26 — Pure extraction from landing.js v5.3.0. No behaviour change.
  */
@@ -29,6 +30,8 @@ import { date as fmtDate } from '/js/format.js';
 
 // t() echoes the key when a translation is missing — fall back to readable English.
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
+// The screenshot's alt names the app; Bing's site check counts an empty alt as missing.
+const shotAlt = (name) => { const v = t('landing.wallShotAlt', { name }); return v && v !== 'landing.wallShotAlt' ? v : `Screenshot of ${name}`; };
 
 // An eye, drawn rather than typed: an emoji would render as a different picture on every
 // platform and the house rule keeps emoji out of the UI. currentColor so the accent is set in CSS.
@@ -155,7 +158,7 @@ export function Gallery() {
               return html`
                 <div key=${a.owner + '/' + a.filename} class="ld-app-card" role="button" tabindex="0"
                   onClick=${open} onKeyDown=${(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } }}>
-                  ${a.screenshot_url ? html`<img class="ld-app-shot" src=${a.screenshot_url} loading="lazy" alt="" />` : ''}
+                  ${a.screenshot_url ? html`<img class="ld-app-shot" src=${a.screenshot_url} loading="lazy" alt=${shotAlt(m.name || a.filename)} />` : ''}
                   <div class="ld-app-name">${m.icon ? escHtml(m.icon) + ' ' : ''}${escHtml(m.name || a.filename)}</div>
                   ${desc && html`<div class="ld-app-desc">${escHtml(desc)}</div>`}
                   <div class="ld-app-foot">

@@ -20,6 +20,7 @@
  * @structure PROMPTS · CARDS · PromptCards · AppCard · Wall2
  * @usage import { PromptCards, Wall2 } from './landing-v2-cards.js';
  * @version-history
+ *   v0.3.1 — 2026-09-24 — The wall's screenshots carry an alt that names the app (Bing, 37 empty alts).
  *   v0.3.0 — 2026-09-15 — The four prompts were run and the cards carry the results: address,
  *     time and model, with the show's picture first and the catalogue's screenshot as fallback.
  *   v0.2.0 — 2026-09-14 — Four new prompts, written to be run: a co-op lighthouse game, receipts
@@ -38,6 +39,9 @@ import { date as fmtDate } from '/js/format.js';
 
 // t() echoes the key when a translation is missing — fall back to readable English.
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
+// The screenshot's alt names the app. An empty alt is correct for a decorative image, but Bing's
+// site check counts every empty alt as missing: 37 of them on the front page, 2026-09-23.
+const shotAlt = (name) => { const v = t('landing.wallShotAlt', { name }); return v && v !== 'landing.wallShotAlt' ? v : `Screenshot of ${name}`; };
 
 /** What every prompt opens with: read first, then build, then finish properly. */
 const PREAMBLE = `You are connected to aimeat.io over MCP as my AI. Build and publish the app below on my account.
@@ -184,7 +188,7 @@ function AppCard({ a }) {
   return html`
     <div class="ld-app-card" role="button" tabindex="0"
       onClick=${open} onKeyDown=${(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } }}>
-      ${a.screenshot_url ? html`<img class="ld-app-shot" src=${a.screenshot_url} loading="lazy" alt="" />` : ''}
+      ${a.screenshot_url ? html`<img class="ld-app-shot" src=${a.screenshot_url} loading="lazy" alt=${shotAlt(m.name || a.filename)} />` : ''}
       <div class="ld-app-name">${m.icon ? m.icon + ' ' : ''}${m.name || a.filename}</div>
       ${desc && html`<div class="ld-app-desc">${desc}</div>`}
       <div class="ld-app-foot">

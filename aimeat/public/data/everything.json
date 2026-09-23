@@ -1586,10 +1586,10 @@
      "slug": "g-10-search-engines-only-if-you-say-so",
      "cells": [
       "<strong>Search engines only if you say so</strong>",
-      "Each app has a Search section, off by default. Turned on, the app joins the sitemap, invites crawlers and notifies the engines that accept instant updates. A shared link shows a preview card with the app's screenshot.",
+      "Each app has a Search section, off by default. Turned on, the app joins the sitemap, invites crawlers and notifies the engines that accept instant updates, and its name and description appear in the text the front page and the store send to a search engine that does not run JavaScript. A shared link shows a preview card with the app's screenshot.",
       "<code>aimeat_app_seo_set</code>"
      ],
-     "plain": "Search engines only if you say so Each app has a Search section, off by default. Turned on, the app joins the sitemap, invites crawlers and notifies the engines that accept instant updates. A shared link shows a preview card with the app's screenshot. aimeat_app_seo_set"
+     "plain": "Search engines only if you say so Each app has a Search section, off by default. Turned on, the app joins the sitemap, invites crawlers and notifies the engines that accept instant updates, and its name and description appear in the text the front page and the store send to a search engine that does not run JavaScript. A shared link shows a preview card with the app's screenshot. aimeat_app_seo_set"
     },
     {
      "slug": "g-10-app-legal-pages",
@@ -2457,10 +2457,10 @@
      "slug": "g-16-sitemaps",
      "cells": [
       "<strong>Sitemaps</strong>",
-      "Generated from the node's page registry and the apps that opted in.",
+      "Generated from the node's page registry and the apps that opted in. They list pages a person reads; the documents for agents are found through <code>/llms.txt</code> and the links on each page.",
       "<code>/sitemap.xml</code>"
      ],
-     "plain": "Sitemaps Generated from the node's page registry and the apps that opted in. /sitemap.xml"
+     "plain": "Sitemaps Generated from the node's page registry and the apps that opted in. They list pages a person reads; the documents for agents are found through /llms.txt and the links on each page. /sitemap.xml"
     },
     {
      "slug": "g-16-what-shipped",
