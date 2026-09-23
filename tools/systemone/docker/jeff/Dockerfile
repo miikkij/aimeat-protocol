@@ -26,12 +26,12 @@ RUN pip install --require-hashes -r /tmp/req/hub.txt \
  && python -c "from huggingface_hub import snapshot_download; snapshot_download('knowledgator/gliformer-large-v1', local_dir='/opt/models/gliformer-large-v1')" \
  && chown -R app /opt/models
 
-# jeff's dependencies, ONNX, torch and jeff's build backend, all from the lock. jeff itself then
-# installs from its source with nothing fetched.
+# jeff's dependencies, ONNX and torch, all from the lock. jeff itself is not installed: it runs from
+# its source on PYTHONPATH, as its own Modal deployment runs it, so pip installs nothing unpinned.
 COPY requirements-${TORCH}.txt /tmp/req/requirements.txt
 RUN pip install --require-hashes -r /tmp/req/requirements.txt
 COPY --from=src /src /opt/jeff-src
-RUN pip install --no-deps --no-build-isolation /opt/jeff-src
+ENV PYTHONPATH=/opt/jeff-src/src
 # The CPU image also carries the encoder exported to ONNX, fp32 and int8.
 RUN if [ "$TORCH" = cpu ]; then \
       python /opt/jeff-src/scripts/export_onnx.py /opt/models/gliformer-large-v1 --int8 \
@@ -42,4 +42,4 @@ ENV HF_HUB_OFFLINE=1 JEFF_HOST=0.0.0.0 JEFF_PORT=8000 \
     JEFF_MODEL=/opt/models/gliformer-large-v1 JEFF_MODEL_NAME=gliformer-large-v1
 USER app
 EXPOSE 8000
-CMD ["jeff"]
+CMD ["python", "-m", "jeff.server.main"]
