@@ -168,5 +168,114 @@
     "without": {
       "missing": "no page draws it with the data this node has"
     }
+  },
+  "panel-action": {
+    "open-items-copy": {
+      "context": "/img/design-lab/panel-action/open-items-copy-context.png"
+    },
+    "install": {
+      "missing": "no page draws it with the data this node has"
+    },
+    "playbook-copy": {
+      "context": "/img/design-lab/panel-action/playbook-copy-context.png"
+    },
+    "setup-copy": {
+      "context": "/img/design-lab/panel-action/setup-copy-context.png"
+    },
+    "retry": {
+      "missing": "no page draws it with the data this node has"
+    },
+    "decide": {
+      "missing": "no page draws it with the data this node has"
+    }
+  },
+  "step-state": {
+    "name-empty": {
+      "missing": "not on its page with the data this node has"
+    },
+    "mat-waiting": {
+      "context": "/img/design-lab/step-state/mat-waiting-context.png"
+    },
+    "copy-done": {
+      "missing": "no page draws it with the data this node has"
+    },
+    "started-done": {
+      "missing": "no page draws it with the data this node has"
+    }
+  },
+  "dismiss": {
+    "nudge-dismiss": {
+      "context": "/img/design-lab/dismiss/nudge-dismiss-context.png"
+    },
+    "install-dismiss": {
+      "missing": "no page draws it with the data this node has"
+    }
+  },
+  "icon-button": {
+    "composer-tool": {
+      "context": "/img/design-lab/icon-button/composer-tool-context.png"
+    },
+    "thread-del": {
+      "context": "/img/design-lab/icon-button/thread-del-context.png"
+    },
+    "dialog-close": {
+      "context": "/img/design-lab/icon-button/dialog-close-context.png"
+    },
+    "prompt-more": {
+      "missing": "not on its page with the data this node has"
+    },
+    "card-dots": {
+      "context": "/img/design-lab/icon-button/card-dots-context.png"
+    }
+  },
+  "choice": {
+    "setup-tools": {
+      "context": "/img/design-lab/choice/setup-tools-context.png"
+    },
+    "pattern-choice": {
+      "context": "/img/design-lab/choice/pattern-choice-context.png"
+    },
+    "start-page": {
+      "context": "/img/design-lab/choice/start-page-context.png"
+    }
+  },
+  "suggestion": {
+    "sentence": {
+      "context": "/img/design-lab/suggestion/sentence-context.png"
+    },
+    "caps": {
+      "context": "/img/design-lab/suggestion/caps-context.png"
+    }
+  },
+  "menu-row": {
+    "prompt-menu": {
+      "missing": "its page did not reach the state that shows it"
+    },
+    "card-menu": {
+      "context": "/img/design-lab/menu-row/card-menu-context.png"
+    },
+    "notif-action": {
+      "missing": "no page draws it with the data this node has"
+    }
+  },
+  "small-link": {
+    "ai-more": {
+      "context": "/img/design-lab/small-link/ai-more-context.png"
+    },
+    "status-link": {
+      "context": "/img/design-lab/small-link/status-link-context.png"
+    },
+    "credit-link": {
+      "context": "/img/design-lab/small-link/credit-link-context.png"
+    },
+    "setup-docs": {
+      "context": "/img/design-lab/small-link/setup-docs-context.png"
+    },
+    "archive-more": {
+      "missing": "no page draws it with the data this node has"
+    },
+    "jump": {
+      "missing": "no page draws it with the data this node has"
+    }
   }
 }

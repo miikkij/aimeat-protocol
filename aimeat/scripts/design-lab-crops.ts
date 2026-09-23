@@ -39,8 +39,9 @@ const arg = (name: string, fallback: string): string => { const i = process.argv
 type CropEntry = { context?: string; missing?: string };
 type Manifest = Record<string, Record<string, CropEntry>>;
 /** `user`: another sandbox owner whose data shows the element (an owner without an agent sees the first steps). */
-type Crop = { url: string; selector: string; click?: string | string[]; eval?: string; user?: string };
-type Decision = { id: string; variants: Array<{ id: string; crop: Crop | null }> };
+/** `around`: the element to outline and frame when the measured one sits in a container that clips an outline. */
+type Crop = { url: string; selector: string; click?: string | string[]; eval?: string; user?: string; around?: string };
+type Decision = { id: string; choice: unknown; variants: Array<{ id: string; crop: Crop | null }> };
 type Values = Record<string, string>;
 const BASE = arg('base', 'http://localhost:40609');
 const USER = arg('user', 'sandbox');
@@ -96,8 +97,11 @@ function measure(el: Element): Values {
     padding: s.padding.split(' ').map(rem).join(' '),
     frame: s.borderTopStyle === 'none' || !width ? 'none' : `${Math.max(1, Math.round(width))}px ${s.borderTopStyle} ${colour(s.borderTopColor)}`,
     radius: s.borderRadius === '0px' ? 'none' : s.borderRadius,
-    fill: colour(s.backgroundColor),
+    fill: s.backgroundImage !== 'none' && s.backgroundImage.includes('gradient') ? 'a gradient' : colour(s.backgroundColor),
     colour: colour(s.color),
+    underline: s.textDecorationLine.includes('underline') || (parseFloat(s.borderBottomWidth) > 0 && s.borderBottomStyle !== 'none' && parseFloat(s.borderTopWidth) === 0) ? 'yes' : 'no',
+    letters: /\p{L}/u.test(el.textContent || '') ? 'yes' : 'no',
+    dimmed: parseFloat(s.opacity) < 1 ? 'yes' : 'no',
   };
 }
 
@@ -125,6 +129,9 @@ for (const theme of ['light', 'dark'] as const) {
 
   for (const d of DECISIONS) {
     if (ONLY && d.id !== ONLY) continue;
+    // A decided decision is built: its page draws the new look, and its pictures stay as they were
+    // taken before, which is what they are for.
+    if (d.choice) continue;
     manifest[d.id] ??= {};
     mkdirSync(path.join(OUT, d.id), { recursive: true });
     for (const [index, v] of d.variants.entries()) {
@@ -141,12 +148,13 @@ for (const theme of ['light', 'dark'] as const) {
         if (!(await el.count()) || !(await el.isVisible())) throw new Error('not on this page');
         real = await el.evaluate(measure);
         if (theme === 'light') {
-          await el.evaluate((node: HTMLElement, outline: string) => {
+          const shown = crop.around ? page.locator(crop.around).first() : el;
+          await shown.evaluate((node: HTMLElement, outline: string) => {
             node.scrollIntoView({ block: 'center' });
             node.style.outline = outline; node.style.outlineOffset = '4px';
           }, OUTLINE);
           await page.waitForTimeout(300);
-          const box = await el.boundingBox();
+          const box = await shown.boundingBox();
           if (!box) throw new Error('not on this page');
           const width = Math.min(VIEW.width, Math.max(AROUND.width, box.width + AROUND.x * 2));
           const x = Math.max(0, Math.min(VIEW.width - width, box.x + box.width / 2 - width / 2));
@@ -159,7 +167,9 @@ for (const theme of ['light', 'dark'] as const) {
         }
       } catch (e) {
         const message = e instanceof Error ? e.message : String(e);
-        if (theme === 'light') manifest[d.id][v.id] = { missing: message.includes('not on this page') ? 'not on its page with the data this node has' : message.slice(0, 80) };
+        // The manifest is read by a person: a reason in words, never a tool's error text.
+        if (theme === 'light') manifest[d.id][v.id] = { missing: message.includes('not on this page') ? 'not on its page with the data this node has' : 'its page did not reach the state that shows it' };
+        if (!message.includes('not on this page')) console.error(`  ${d.id}/${v.id} ${theme}: ${message.split('\n')[0].slice(0, 120)}`);
       }
       if (!real) continue;
       // The preview of the same variant, measured the same way: the crop's own selector where it

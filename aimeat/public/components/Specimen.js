@@ -15,6 +15,7 @@
  *   SpecimenImage({ label, src, missing })
  * @usage html`<${Specimens}><${Specimen} label="Light" src="/v1/design-lab/frame?id=turn&theme=light" /><//>`
  * @version-history
+ *   v1.2.0 — 2026-09-23 — `eager`, for a frame whose values the page waits for.
  *   v1.1.0 — 2026-09-23 — onValues: the measured values of a decision's variant; SpecimenImage, a
  *     crop from a real page.
  *   v1.0.0 — 2026-09-23 — Initial, for the design lab's library view (UI consolidation phase 2).
@@ -31,9 +32,11 @@ export function Specimens({ children }) {
 }
 
 /**
- * @param {{ label: any, src: string, phone?: boolean, note?: any, onValues?: (values: Record<string, string>) => void }} props
+ * `eager` loads the frame at once instead of when it scrolls into view, for a frame whose measured
+ * values something on the page waits for.
+ * @param {{ label: any, src: string, phone?: boolean, note?: any, eager?: boolean, onValues?: (values: Record<string, string>) => void }} props
  */
-export function Specimen({ label, src, phone = false, note, onValues }) {
+export function Specimen({ label, src, phone = false, note, eager = false, onValues }) {
   const ref = useRef(/** @type {HTMLIFrameElement|null} */ (null));
   const [height, setHeight] = useState(120);
 
@@ -55,7 +58,7 @@ export function Specimen({ label, src, phone = false, note, onValues }) {
       <figcaption class="poster-label">${label}</figcaption>
       <div class="poster-frame poster-specimen-box">
         <iframe ref=${ref} class="poster-specimen-frame" src=${src} title=${typeof label === 'string' ? label : ''}
-          loading="lazy" height=${height}></iframe>
+          loading=${eager ? 'eager' : 'lazy'} height=${height}></iframe>
       </div>
       ${note ? html`<p class="poster-specimen-note">${note}</p>` : ''}
     </figure>`;

@@ -47,6 +47,13 @@ import { ModeSwitch } from '/components/ModeSwitch.js';
 import { ModeTabs, ModeTab } from '/components/ModeTabs.js';
 import { BackLink } from '/components/BackLink.js';
 import { QuietNote } from '/components/QuietNote.js';
+import { Suggestions, Suggestion, Choices } from '/components/Suggestion.js';
+import { CardMenu } from '/components/CardMenu.js';
+import { SwatchPicker } from '/components/SwatchPicker.js';
+import { GooseCredit } from '/components/Credit.js';
+import { ArchiveMore } from '/components/ArchiveSection.js';
+import { ConversationJump } from '/components/ConversationFrame.js';
+import { CLOSE_ICON } from '/js/dialog.js';
 import { WrapperPair } from './demos-steps.js';
 
 const html = htm.bind(h);
@@ -65,6 +72,7 @@ const inTurn = (children) => html`<div class="poster-turn-body">${children}</div
 const tag = (tone, text) => html`<span class=${'dl-tag' + (tone ? ` dl-tag--${tone}` : '')}>${text}</span>`;
 const status = (tone, text) => html`<span class=${`dl-status dl-status--${tone}`}>${text}</span>`;
 const action = (text) => html`<a class="poster-action" href="#">${text}</a>`;
+const more = (text) => html`<a class="poster-action poster-action--more" href="#">${text}</a>`;
 const tabs = (...names) => row(names.map((n, i) => html`<button type="button" class=${'poster-tab' + (i === 0 ? ' is-on' : '')}>${n}</button> `));
 const prompt = () => html`<${PromptCard} label="Remember something" prompt="Tell me in the language I use with you…" className="poster-action" copyLabel="Copy prompt" copiedLabel="Copied" />`;
 const result = () => inTurn(html`<${ResultCards} cards=${[{ kind: 'page', title: 'Team page', url: '#' }]} />`);
@@ -181,6 +189,86 @@ export const SAMPLES = {
       after: after('.poster-paste-label', () => html`<${WrapperPair} without=${true} />`) },
     { id: 'without', measure: '.poster-paste-label', render: () => html`<${WrapperPair} without=${true} />`, after: 'same' },
   ],
+  // The home's and the chat's remaining own looks.
+  'panel-action': [
+    { id: 'open-items-copy', measure: '.btn-primary', render: () => html`<section class="open-items"><div class="open-items-head"><button type="button" class="btn-primary btn-sm">Take these into your AI chat</button></div></section>`,
+      after: after('.poster-action', () => row(action('Take these into your AI chat'))) },
+    { id: 'install', measure: '.install-cta-install', render: () => html`<div class="install-cta"><div class="install-cta-actions"><button type="button" class="btn-primary install-cta-install">Install</button></div></div>`,
+      after: after('.poster-action', () => row(action('Install'))) },
+    { id: 'playbook-copy', measure: '.btn-outline', render: () => html`<div class="poster-index-actions"><button type="button" class="btn-outline">Copy for my own AI</button></div>`,
+      after: after('.poster-action', () => row(action('Copy for my own AI'))) },
+    { id: 'setup-copy', measure: '.btn-ghost', render: () => row(html`<button type="button" class="btn-ghost btn-sm">Copy</button>`),
+      after: after('.poster-action', () => row(action('Copy'))) },
+    { id: 'retry', measure: '.btn-outline', render: () => html`<div class="poster-turn-error" role="alert"><p class="poster-turn-error-msg">The answer did not arrive.</p><button type="button" class="btn-outline">Try again</button></div>`,
+      solo: '.poster-turn-error .btn-outline', after: after('.poster-action', () => row(action('Try again'))) },
+    { id: 'decide', measure: '.btn-outline', render: () => html`<div class="open-items-decide"><button type="button" class="btn-outline btn-sm">It was right</button> <button type="button" class="btn-outline btn-sm">It was wrong</button></div>`,
+      after: after('.poster-action', () => row(html`${action('It was right')} ${action('It was wrong')}`)) },
+  ],
+  'step-state': [
+    { id: 'name-empty', measure: '.btn-outline', render: () => html`<div class="poster-actions"><button type="button" class="btn-outline" disabled>That is its name</button></div>`,
+      after: after('.poster-action', () => row(html`<button type="button" class="poster-action" disabled>That is its name</button>`)) },
+    { id: 'mat-waiting', measure: '.btn-outline', render: () => html`<div class="poster-actions"><button type="button" class="btn-outline" disabled>Here is my welcome mat</button></div>`,
+      after: after('.poster-action', () => row(html`<button type="button" class="poster-action" disabled>Here is my welcome mat</button>`)) },
+    { id: 'copy-done', measure: '.poster-prompt-actions .btn-outline', render: () => html`<${PromptCard} label="The prompt" prompt="Write me a one-page HTML welcome mat…" className="btn-outline" copyLabel="Copy the prompt" copiedLabel="Copied" />`,
+      after: after('.poster-prompt-actions .poster-action', () => html`<${PromptCard} label="The prompt" prompt="Write me a one-page HTML welcome mat…" className="poster-action" copyLabel="Copy the prompt" copiedLabel="Copied" />`) },
+    { id: 'started-done', measure: '.btn-outline', render: () => html`<div class="poster-actions"><button type="button" class="btn-outline">I have started it</button></div>`,
+      after: after('.poster-action', () => row(html`<button type="button" class="poster-action">I have started it</button>`)) },
+  ],
+  dismiss: [
+    { id: 'nudge-dismiss', measure: '.poster-nudge-dismiss', render: () => html`<${MobileNudge} onDismiss=${noop} />`,
+      after: after('.poster-action--text', () => row(html`<button type="button" class="poster-action poster-action--text">Not now</button>`)) },
+    { id: 'install-dismiss', measure: '.install-cta-dismiss', render: () => html`<div class="install-cta"><div class="install-cta-actions"><button type="button" class="btn-ghost install-cta-dismiss">Not now</button></div></div>`,
+      after: after('.poster-action--text', () => row(html`<button type="button" class="poster-action poster-action--text">Not now</button>`)) },
+  ],
+  'icon-button': [
+    { id: 'composer-tool', measure: '.poster-composer-tool', render: () => row(html`<button type="button" class="btn-outline poster-composer-tool">📎</button> <button type="button" class="vr-btn btn-outline poster-composer-tool">🎤</button>`),
+      after: after('.dl-icon', () => row(html`<button type="button" class="dl-icon">📎</button> <button type="button" class="dl-icon">🎤</button>`)) },
+    // The row alone: the list's side column hides itself at a lab frame's width (the phone rule).
+    { id: 'thread-del', measure: '.poster-thread-del', render: () => html`<ul class="poster-thread-list"><li class="poster-thread poster-thread--active"><button type="button" class="poster-thread-open"><span class="poster-thread-title">Make me a pong game</span><span class="poster-thread-sub">2 messages</span></button><button type="button" class="btn-ghost poster-thread-del" aria-label="Delete conversation">✗</button></li></ul>`,
+      after: after('.dl-icon', () => row(html`<button type="button" class="dl-icon dl-icon--small">✗</button>`)) },
+    // The close square is drawn in the dark header's colour, so the header is shown with it.
+    { id: 'dialog-close', measure: '.dlg-close', solo: '.dlg-head', render: () => html`<dialog class="dlg" open><header class="dlg-head"><h2 class="dlg-title">Settings</h2><button type="button" class="dlg-close" aria-label="Close" dangerouslySetInnerHTML=${{ __html: CLOSE_ICON }}></button></header></dialog>`,
+      after: 'same' },
+    { id: 'prompt-more', measure: '.poster-prompt-more', render: () => html`<${PromptCard} label="Remember something" prompt="Tell me in the language I use with you…" className="poster-action" copyLabel="Copy prompt" copiedLabel="Copied" saveIntent=${() => Promise.resolve()} />`,
+      after: after('.dl-icon', () => row(html`<button type="button" class="dl-icon dl-icon--small">▾</button>`)) },
+    { id: 'card-dots', measure: '.card-menu-dots', render: () => row(html`<${CardMenu} state="open" actions=${[{ label: 'Open', run: noop }]} />`),
+      after: after('.dl-icon', () => row(html`<button type="button" class="dl-icon dl-icon--small dl-icon--open">⋯</button>`)) },
+  ],
+  choice: [
+    { id: 'setup-tools', measure: '.ast-tool--active', solo: '.ast-tool', render: () => html`<div class="poster-chooser"><div class="ast-tools" role="tablist"><button type="button" class="ast-tool ast-tool--active">claude.ai <span class="ast-tool-reco">recommended</span></button><button type="button" class="ast-tool">Claude Desktop</button><button type="button" class="ast-tool">ChatGPT</button></div></div>`,
+      after: after('.poster-tab', () => row(html`<button type="button" class="poster-tab is-on">claude.ai <span class="ast-tool-reco">recommended</span></button> <button type="button" class="poster-tab">Claude Desktop</button> <button type="button" class="poster-tab">ChatGPT</button>`)) },
+    { id: 'pattern-choice', measure: '.poster-settings-pattern-choice.active', solo: '.poster-settings-pattern-choice', render: () => html`<${SwatchPicker} title="Background" choices=${[{ value: 'off', label: 'Off', active: false }, { value: 'pixels', label: 'Pixel grid', active: true }, { value: 'hearts', label: 'Hearts', active: false }]} onChoose=${noop} />`,
+      after: after('.poster-tab', () => row(html`<button type="button" class="poster-tab">Off</button> <button type="button" class="poster-tab is-on">Pixel grid</button> <button type="button" class="poster-tab">Hearts</button>`)) },
+    { id: 'start-page', measure: '.seg-btn.active', solo: '.seg-btn', render: () => html`<div class="seg start-page-seg" role="radiogroup"><button type="button" class="seg-btn active">Home</button><button type="button" class="seg-btn">Settings & controls</button></div>`,
+      after: after('.poster-tab', () => tabs('Home', 'Settings & controls')) },
+  ],
+  suggestion: [
+    { id: 'sentence', measure: '.poster-suggestion', render: () => html`<${Choices} options=${['A single column with your name large', 'Two columns: about you and your work']} onPick=${noop} />`, after: 'same' },
+    // Inside the welcome, which centres them, as the page does.
+    { id: 'caps', measure: '.poster-suggestion--caps', render: () => html`<div class="poster-conversation-welcome"><${Suggestions}><${Suggestion} caps=${true} onClick=${noop}>Make my welcome page<//><${Suggestion} caps=${true} onClick=${noop}>Take something off my plate<//><//></div>`,
+      after: after('.poster-suggestion', () => html`<div class="poster-conversation-welcome"><${Suggestions}><${Suggestion} onClick=${noop}>Make my welcome page<//><${Suggestion} onClick=${noop}>Take something off my plate<//><//></div>`) },
+  ],
+  'menu-row': [
+    { id: 'prompt-menu', measure: '.poster-prompt-menu-item', render: () => html`<div class="poster-prompt-menu"><button type="button" class="btn-ghost poster-prompt-menu-item">Save as my own</button><button type="button" class="btn-ghost poster-prompt-menu-item">Give it to my agent</button></div>`, after: 'same' },
+    { id: 'card-menu', measure: '.card-menu-item', render: () => html`<div class="card-menu"><div class="card-menu-list" role="menu"><button type="button" class="card-menu-item">Open</button><button type="button" class="card-menu-item">Add to my list</button></div></div>`,
+      after: after('.poster-prompt-menu-item', () => html`<div class="poster-prompt-menu"><button type="button" class="btn-ghost poster-prompt-menu-item">Open</button><button type="button" class="btn-ghost poster-prompt-menu-item">Add to my list</button></div>`) },
+    { id: 'notif-action', measure: '.notif-action-btn', render: () => html`<div class="notif-actions"><button type="button" class="notif-action-btn btn-primary">Approve</button> <button type="button" class="notif-action-btn btn-ghost">Open</button></div>`,
+      after: after('.poster-prompt-menu-item', () => html`<div class="poster-prompt-menu"><button type="button" class="btn-ghost poster-prompt-menu-item">Approve</button><button type="button" class="btn-ghost poster-prompt-menu-item">Open</button></div>`) },
+  ],
+  'small-link': [
+    { id: 'ai-more', measure: '.poster-ai-notice-more', render: () => row(html`<button type="button" class="btn-ghost poster-ai-notice-more">What does that mean?</button>`),
+      after: after('.poster-action--more', () => row(more('What does that mean?'))) },
+    { id: 'status-link', measure: '.poster-agent-status-link', render: () => html`<div class="poster-agent-status"><a class="poster-agent-status-link" href="#">Use your own key →</a></div>`,
+      after: after('.poster-action--more', () => row(more('Use your own key →'))) },
+    { id: 'credit-link', measure: '.poster-credit-link', render: () => html`<${GooseCredit} />`,
+      after: after('.poster-action--more', () => row(html`<a class="poster-action poster-action--more" href="#"><span aria-hidden="true">🪿</span> Powered by goose</a>`)) },
+    { id: 'setup-docs', measure: '.ast-docs', render: () => html`<div class="poster-chooser"><a class="ast-docs" href="#">Official instructions from claude.ai →</a></div>`,
+      after: after('.poster-action--more', () => row(more('Official instructions from claude.ai →'))) },
+    { id: 'archive-more', measure: '.poster-archive-more', render: () => html`<${ArchiveMore} onClick=${noop}>Show older<//>`,
+      after: after('.poster-action--more', () => row(more('Show older'))) },
+    { id: 'jump', measure: '.poster-conversation-jump', render: () => html`<${ConversationJump} onClick=${noop}>↓ Latest<//>`,
+      after: after('.poster-action--more', () => row(more('↓ Latest'))) },
+  ],
 };
 
 /** A tone of a proposal, captioned with its name under the example word. */
@@ -203,5 +291,33 @@ export const PROPOSALS = {
     render: () => row(html`${tone('waiting', html`<span class="dl-count dl-count--waiting">3</span>`)} ${tone('tally', html`<span class="dl-count dl-count--tally">4</span>`)}
       ${tone('waiting, on the bell', html`<span class="poster-specimen-anchor"><span class="dl-count dl-count--waiting dl-count--small">7</span></span>`)}
       ${tone('morsels, kept as it is', html`<span class="brand-morsels">1000</span>`)}`),
+  },
+  'panel-action': {
+    measure: '.poster-action',
+    render: () => row(html`${action('Take these into your AI chat')} ${action('Copy for my own AI')} ${action('Try again')}`),
+  },
+  'step-state': {
+    measure: '.poster-action',
+    render: () => row(html`${tone('the next thing to do', html`<button type="button" class="btn-primary poster-slab">That is its name</button>`)}
+      ${tone('not ready yet', html`<button type="button" class="poster-action" disabled>That is its name</button>`)}
+      ${tone('done', html`<button type="button" class="poster-action">Copy the prompt</button>`)}`),
+  },
+  dismiss: {
+    measure: '.poster-action--text',
+    render: () => row(html`<button type="button" class="poster-action poster-action--text">Not now</button>`),
+  },
+  'icon-button': {
+    measure: '.dl-icon',
+    render: () => row(html`${tone('large', html`<button type="button" class="dl-icon">📎</button>`)}
+      ${tone('small', html`<button type="button" class="dl-icon dl-icon--small">✗</button>`)}
+      ${tone('small, a menu with something on it', html`<button type="button" class="dl-icon dl-icon--small dl-icon--open">⋯</button>`)}`),
+  },
+  choice: {
+    measure: '.poster-tab.is-on',
+    render: () => tabs('claude.ai', 'Claude Desktop', 'ChatGPT'),
+  },
+  'small-link': {
+    measure: '.poster-action--more',
+    render: () => row(html`${more('What does that mean?')} ${more('Use your own key →')} ${more('Show older')}`),
   },
 };
