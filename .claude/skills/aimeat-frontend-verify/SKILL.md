@@ -13,24 +13,35 @@ Against your own sandbox node (`pnpm sandbox`, port 40600 upward, owners and pas
 
 If you could not drive the browser (MCP unavailable, server down, no credentials), say so. Do not report it as working.
 
-## A change that must keep the look is judged against the original
+## A change to the look is one of two kinds, and says which
 
-A refactor, a move to shared components or a style unification promises that the page looks the
-same. Its criterion is **no visible difference from the original**, and nothing weaker:
+Jouni: "ulkoasun pitää pysyä samannäköisenä, mutta meidän on alettava käyttämään samannäköisiä
+komponentteja joka puolella." Every step of UI work is one of two kinds, never both in one step:
+
+- **A move.** Code, class names and CSS change place (into a component, into a shared sheet);
+  nothing is decided about the look. Criterion: **no visible difference from the old code**.
+- **A unification.** Two or more looks of one kind of thing become one component. Criterion: every
+  page that uses it shows **the look Jouni chose in aimeat-design-lab** from the existing variants
+  shown side by side, and **every other pixel on those pages is unchanged**. Nothing is designed
+  from nothing: the look is one that exists today, or one he composed from them.
+
+How both are proven:
 
 1. Run the code from before the change beside the new code, on the same data (a second sandbox from
-   the old commit, or the old commit's screenshots taken on the data the new ones use). Prefer data
-   as full as production's: long lists, long chats, tables in answers. The sandbox's two apps hide
-   what dense rows do.
-2. Compare each page side by side at 1280x900, 390x844 and 1280x460, light and dark.
-3. **List every visible difference** with its before and after crop. The builder does not label a
-   difference as acceptable ("unification", "the part's standard look"); the list goes to Jouni, and a
-   difference stays only if he approved it by name. Everything else is fixed until it is gone.
-4. Show him **one finished page first**, on real data, before the other pages start.
+   the old commit). Prefer data as full as production's: long lists, long chats, tables in answers.
+   The sandbox's two apps hide what dense rows do.
+2. Compare each page side by side at 1280x900, 390x844 and 1280x460, light and dark. A move must
+   read 0.00 % changed pixels. A unification masks the unified component's area, reads 0.00 %
+   everywhere else, and its crop is compared with the picture of his decision.
+3. **List every visible difference no decision covers**, with its before and after crop. The builder
+   does not label a difference as acceptable ("unification", "consistent", "the part's standard
+   look"); the list goes to Jouni. A difference stays only if he chose it by name.
+4. Show him the result before it reaches `main`.
 
-Zero overflow, zero console errors, a green gate and green CI say nothing about whether a page looks
-the same; they are floors. On 2026-09-23 nine hours of work were rolled back (`cee2cbaf5`) because
-every one of those was green and the pages looked different. → `docs/pitfalls.md` §94
+Ask before the first line of work when his words, or two rules, read two ways or leave no room for
+the goal. The first attempt (rolled back in `cee2cbaf5`) changed the look without his decision; the
+second kept every pixel and unified nothing, because its plan forbade unifying. Zero overflow, zero
+console errors, a green gate and green CI are floors, not the verdict. → `docs/pitfalls.md` §94
 
 ## Measure, don't glance
 
