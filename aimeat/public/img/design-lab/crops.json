@@ -1,201 +1,172 @@
 {
   "tag": {
     "poster-chip": {
-      "missing": "no page draws it in a state a crop can reach"
+      "missing": "no page draws it with the data this node has"
     },
     "og-chip": {
-      "light": "/img/design-lab/tag/og-chip-light.png",
-      "dark": "/img/design-lab/tag/og-chip-dark.png"
+      "context": "/img/design-lab/tag/og-chip-context.png"
     },
     "pf-mono-chip": {
-      "missing": "not on the page with the data this node has"
+      "missing": "not on its page with the data this node has"
     },
     "row-tag": {
-      "light": "/img/design-lab/tag/row-tag-light.png",
-      "dark": "/img/design-lab/tag/row-tag-dark.png"
+      "context": "/img/design-lab/tag/row-tag-context.png"
     },
     "adm-state-chip": {
-      "light": "/img/design-lab/tag/adm-state-chip-light.png",
-      "dark": "/img/design-lab/tag/adm-state-chip-dark.png"
+      "context": "/img/design-lab/tag/adm-state-chip-context.png"
     },
     "ct-tag": {
-      "missing": "not on the page with the data this node has"
+      "missing": "not on its page with the data this node has"
     },
     "tag-pill": {
-      "missing": "not on the page with the data this node has"
+      "missing": "not on its page with the data this node has"
     }
   },
   "status": {
     "pf-badge": {
-      "light": "/img/design-lab/status/pf-badge-light.png",
-      "dark": "/img/design-lab/status/pf-badge-dark.png"
+      "context": "/img/design-lab/status/pf-badge-context.png"
     },
     "adm-badge": {
-      "light": "/img/design-lab/status/adm-badge-light.png",
-      "dark": "/img/design-lab/status/adm-badge-dark.png"
+      "context": "/img/design-lab/status/adm-badge-context.png"
     },
     "theme-badge": {
-      "light": "/img/design-lab/status/theme-badge-light.png",
-      "dark": "/img/design-lab/status/theme-badge-dark.png"
+      "context": "/img/design-lab/status/theme-badge-context.png"
     },
     "adm-grey-tag": {
-      "light": "/img/design-lab/status/adm-grey-tag-light.png",
-      "dark": "/img/design-lab/status/adm-grey-tag-dark.png"
+      "context": "/img/design-lab/status/adm-grey-tag-context.png"
     }
   },
   "count": {
     "count-coral": {
-      "light": "/img/design-lab/count/count-coral-light.png",
-      "dark": "/img/design-lab/count/count-coral-dark.png"
+      "context": "/img/design-lab/count/count-coral-context.png"
     },
     "count-bell": {
-      "light": "/img/design-lab/count/count-bell-light.png",
-      "dark": "/img/design-lab/count/count-bell-dark.png"
+      "context": "/img/design-lab/count/count-bell-context.png"
     },
     "count-morsels": {
-      "light": "/img/design-lab/count/count-morsels-light.png",
-      "dark": "/img/design-lab/count/count-morsels-dark.png"
+      "context": "/img/design-lab/count/count-morsels-context.png"
     },
     "count-admin-nav": {
-      "light": "/img/design-lab/count/count-admin-nav-light.png",
-      "dark": "/img/design-lab/count/count-admin-nav-dark.png"
+      "context": "/img/design-lab/count/count-admin-nav-context.png"
     }
   },
   "row-label": {
     "poster-label": {
-      "light": "/img/design-lab/row-label/poster-label-light.png",
-      "dark": "/img/design-lab/row-label/poster-label-dark.png"
+      "context": "/img/design-lab/row-label/poster-label-context.png"
     },
     "prompt-label": {
-      "light": "/img/design-lab/row-label/prompt-label-light.png",
-      "dark": "/img/design-lab/row-label/prompt-label-dark.png"
+      "context": "/img/design-lab/row-label/prompt-label-context.png"
     },
     "og-label": {
-      "light": "/img/design-lab/row-label/og-label-light.png",
-      "dark": "/img/design-lab/row-label/og-label-dark.png"
+      "context": "/img/design-lab/row-label/og-label-context.png"
     }
   },
   "group-heading": {
     "day-title": {
-      "light": "/img/design-lab/group-heading/day-title-light.png",
-      "dark": "/img/design-lab/group-heading/day-title-dark.png"
+      "context": "/img/design-lab/group-heading/day-title-context.png"
     },
     "worklog-head": {
-      "light": "/img/design-lab/group-heading/worklog-head-light.png",
-      "dark": "/img/design-lab/group-heading/worklog-head-dark.png"
+      "context": "/img/design-lab/group-heading/worklog-head-context.png"
     },
     "conversation-label": {
-      "light": "/img/design-lab/group-heading/conversation-label-light.png",
-      "dark": "/img/design-lab/group-heading/conversation-label-dark.png"
+      "context": "/img/design-lab/group-heading/conversation-label-context.png"
     }
   },
   "timestamp": {
     "turn-meta": {
-      "light": "/img/design-lab/timestamp/turn-meta-light.png",
-      "dark": "/img/design-lab/timestamp/turn-meta-dark.png"
+      "context": "/img/design-lab/timestamp/turn-meta-context.png"
     },
     "timeline-when": {
-      "light": "/img/design-lab/timestamp/timeline-when-light.png",
-      "dark": "/img/design-lab/timestamp/timeline-when-dark.png"
+      "context": "/img/design-lab/timestamp/timeline-when-context.png"
     }
   },
   "object-box": {
     "prompt-card": {
-      "light": "/img/design-lab/object-box/prompt-card-light.png",
-      "dark": "/img/design-lab/object-box/prompt-card-dark.png"
+      "context": "/img/design-lab/object-box/prompt-card-context.png"
     },
     "chooser-box": {
-      "light": "/img/design-lab/object-box/chooser-box-light.png",
-      "dark": "/img/design-lab/object-box/chooser-box-dark.png"
+      "context": "/img/design-lab/object-box/chooser-box-context.png"
     },
     "result-card": {
-      "light": "/img/design-lab/object-box/result-card-light.png",
-      "dark": "/img/design-lab/object-box/result-card-dark.png"
+      "context": "/img/design-lab/object-box/result-card-context.png"
     }
   },
   "attention-note": {
     "waiting-note": {
-      "missing": "no page draws it in a state a crop can reach"
+      "missing": "no page draws it with the data this node has"
     },
     "nudge": {
-      "missing": "no page draws it in a state a crop can reach"
+      "context": "/img/design-lab/attention-note/nudge-context.png"
     },
     "aside": {
-      "missing": "no page draws it in a state a crop can reach"
+      "missing": "no page draws it with the data this node has"
     }
   },
   "action-link": {
     "poster-action": {
-      "light": "/img/design-lab/action-link/poster-action-light.png",
-      "dark": "/img/design-lab/action-link/poster-action-dark.png"
+      "context": "/img/design-lab/action-link/poster-action-context.png"
     },
     "fold": {
-      "light": "/img/design-lab/action-link/fold-light.png",
-      "dark": "/img/design-lab/action-link/fold-dark.png"
+      "context": "/img/design-lab/action-link/fold-context.png"
     },
     "rail-action": {
-      "light": "/img/design-lab/action-link/rail-action-light.png",
-      "dark": "/img/design-lab/action-link/rail-action-dark.png"
+      "context": "/img/design-lab/action-link/rail-action-context.png"
     },
     "back": {
-      "light": "/img/design-lab/action-link/back-light.png",
-      "dark": "/img/design-lab/action-link/back-dark.png"
+      "context": "/img/design-lab/action-link/back-context.png"
     },
     "btn-outline": {
-      "light": "/img/design-lab/action-link/btn-outline-light.png",
-      "dark": "/img/design-lab/action-link/btn-outline-dark.png"
+      "context": "/img/design-lab/action-link/btn-outline-context.png"
     },
     "btn-ghost": {
-      "light": "/img/design-lab/action-link/btn-ghost-light.png",
-      "dark": "/img/design-lab/action-link/btn-ghost-dark.png"
+      "context": "/img/design-lab/action-link/btn-ghost-context.png"
     }
   },
   "tabs-filters": {
     "fold-switch": {
-      "light": "/img/design-lab/tabs-filters/fold-switch-light.png",
-      "dark": "/img/design-lab/tabs-filters/fold-switch-dark.png"
+      "context": "/img/design-lab/tabs-filters/fold-switch-context.png"
     },
     "mode-tabs": {
-      "missing": "no page draws it in a state a crop can reach"
+      "missing": "no page draws it with the data this node has"
     },
     "poster-tab": {
-      "light": "/img/design-lab/tabs-filters/poster-tab-light.png",
-      "dark": "/img/design-lab/tabs-filters/poster-tab-dark.png"
+      "context": "/img/design-lab/tabs-filters/poster-tab-context.png"
     },
     "adm-filter-chip": {
-      "light": "/img/design-lab/tabs-filters/adm-filter-chip-light.png",
-      "dark": "/img/design-lab/tabs-filters/adm-filter-chip-dark.png"
+      "context": "/img/design-lab/tabs-filters/adm-filter-chip-context.png"
+    },
+    "chooser-choice": {
+      "context": "/img/design-lab/tabs-filters/chooser-choice-context.png"
     }
   },
   "loud-action": {
     "btn-primary": {
-      "missing": "not on the page with the data this node has"
+      "context": "/img/design-lab/loud-action/btn-primary-context.png"
     },
     "slab-control": {
-      "light": "/img/design-lab/loud-action/slab-control-light.png",
-      "dark": "/img/design-lab/loud-action/slab-control-dark.png"
+      "context": "/img/design-lab/loud-action/slab-control-context.png"
     },
     "slab": {
-      "missing": "no page draws it in a state a crop can reach"
+      "missing": "no page draws it with the data this node has"
     }
   },
   "empty": {
     "quiet-note": {
-      "missing": "no page draws it in a state a crop can reach"
+      "missing": "no page draws it with the data this node has"
     },
     "day-empty": {
-      "missing": "no page draws it in a state a crop can reach"
+      "missing": "no page draws it with the data this node has"
     },
     "conversation-empty": {
-      "missing": "no page draws it in a state a crop can reach"
+      "context": "/img/design-lab/empty/conversation-empty-context.png"
     }
   },
   "agent-step-wrapper": {
     "as-is": {
-      "missing": "no page draws it in a state a crop can reach"
+      "missing": "no page draws it with the data this node has"
     },
     "without": {
-      "missing": "no page draws it in a state a crop can reach"
+      "missing": "no page draws it with the data this node has"
     }
   }
 }

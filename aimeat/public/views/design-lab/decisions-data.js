@@ -58,10 +58,10 @@ export const DECISIONS = [
     },
     variants: [
       { id: 'poster-chip', name: 'The design language\'s chip, not used by any page yet', code: '.poster-chip (poster.css)', becomes: 'plain', look: 'mono .68rem 500, 1px ink frame, square, no fill', where: 'no page yet', files: 0, crop: null },
-      { id: 'og-chip', name: 'The profile chip ("7 unread", "2 requests")', code: '.og-chip, --sun, --dim (organism.css)', becomes: 'plain; "7 unread" becomes sun; "archived" becomes plain', look: 'mono .68rem 500, 2px ink frame, lowercase; --sun fills it; --dim greys it', where: 'almost every profile page, admin Compliance, the public knowledge page', files: 63, crop: { url: '/v1/profile?tab=messages', selector: '.og-chip' } },
+      { id: 'og-chip', name: 'The profile chip ("7 unread", "2 requests")', code: '.og-chip, --sun, --dim (organism.css)', becomes: 'plain; "7 unread" becomes sun; "archived" becomes plain', look: 'mono .68rem 500, 2px ink frame, lowercase; --sun fills it; --dim greys it', where: 'almost every profile page, admin Compliance, the public knowledge page', files: 63, crop: { url: '/v1/profile?tab=messages', selector: '.og-chip.og-chip--sun' } },
       { id: 'pf-mono-chip', name: 'The schedule kind ("AI", "agent task")', code: '.sch-badge (scheduler.css, profile-poster.css)', becomes: 'plain; its blue and orange frames go', look: 'mono .68rem 500, 2px frame in blue or orange by kind', where: 'profile Scheduler, Offers, Memory files, Organisms, Access', files: 10, crop: { url: '/v1/profile?tab=scheduler', selector: '.sch-badge' } },
       { id: 'row-tag', name: 'The version tag in a list row ("v1.4.0")', code: '.sk-tag, .lb-tag, .pk-tag, .ex-tag, .cp-tag', becomes: 'plain, with dark words instead of grey', look: 'mono .66rem 500, 1px grey frame, grey words', where: 'profile Skills, Libraries, Packages, Extensions, Capabilities', files: 5, crop: { url: '/v1/profile?tab=skills', selector: '.sk-tag' } },
-      { id: 'adm-state-chip', name: 'The admin role chip ("member", "operator", "you")', code: '.adm-own-chip and kin (admin-owners.css)', becomes: 'plain; "operator" becomes coral; "you" becomes sun', look: 'mono .66rem 500, 2px grey frame; --op coral; --you on the sun', where: 'admin Owners, Organism ownership, Realtime, CSM, Memory, Boards; the fleet page', files: 8, crop: { url: '/v1/admin?tab=owners', selector: '.adm-own-chip' } },
+      { id: 'adm-state-chip', name: 'The admin role chip ("member", "operator", "you")', code: '.adm-own-chip and kin (admin-owners.css)', becomes: 'plain; "operator" becomes coral; "you" becomes sun', look: 'mono .66rem 500, 2px grey frame; --op coral; --you on the sun', where: 'admin Owners, Organism ownership, Realtime, CSM, Memory, Boards; the fleet page', files: 8, crop: { url: '/v1/admin?tab=owners', selector: '.adm-own-chip.adm-own-chip--you' } },
       { id: 'ct-tag', name: 'The contact tag ("colleague", "design")', code: '.ct-tag, --rel (contacts-poster.css)', becomes: 'plain, in the typewriter face; the relation becomes ink', look: 'Archivo .68rem 700, 1px ink frame; --rel ink fill', where: 'profile Contacts', files: 3, crop: { url: '/v1/profile?tab=contacts', selector: '.ct-tag' } },
       { id: 'tag-pill', name: 'The memory tag ("music", "notes")', code: '.tag-pill, .active (tags.css, profile-poster.css)', becomes: 'plain with a thinner frame; the chosen one becomes sun', look: 'mono .72rem, 2px ink frame, square; .active on the sun', where: 'profile Memory, the portfolio builder', files: 3, crop: { url: '/v1/profile?tab=memory', selector: '.tag-pill' } },
     ],
@@ -72,7 +72,7 @@ export const DECISIONS = [
       { page: 'Admin Owners and the other rosters', what: 'The grey role tags become plain tags; "operator" stays coral and "you" stays on the sun.' },
       { page: 'Profile Contacts', what: 'The tags change to the typewriter face; the relation keeps its dark fill.' },
     ],
-    choice: null,
+    choice: {"proposal":"accepted","options":{},"note":"Accepted the proposal: one Tag with four tones.","decidedBy":"Jouni","decidedAt":"2026-09-23"},
   },
   {
     id: 'status',
@@ -92,17 +92,17 @@ export const DECISIONS = [
       text: 'One Status on .adm-badge (4): mono .66rem 500 caps, no frame, the state in a tinted fill. A frame (3) reads as a tag; a fill reads as a state, and it keeps a status apart from a tag in the same row. 5 and 9 move onto it.',
     },
     variants: [
-      { id: 'pf-badge', name: 'The profile status ("active", "paused")', code: '.pf .badge, badge-success/warn/danger/muted (profile-poster.css)', becomes: 'active becomes fine; paused becomes attention; revoked becomes danger; archived becomes off', look: 'mono .66rem 500, 2px frame in the tone colour, warn on the sun', where: 'profile Access, Organisms, Nodes, Living, the agent approval card', files: 32, crop: { url: '/v1/profile?tab=organisms', selector: '.pf .badge' } },
+      { id: 'pf-badge', name: 'The profile status ("active", "paused")', code: '.pf .badge, badge-success/warn/danger/muted (profile-poster.css)', becomes: 'active becomes fine; paused becomes attention; revoked becomes danger; archived becomes off', look: 'mono .66rem 500, 2px frame in the tone colour, warn on the sun', where: 'profile Access, Organisms, Nodes, Living, the agent approval card (on Organisms the same look also names a kind, such as "Community", which is a tag\'s job)', files: 32, crop: { url: '/v1/profile?tab=access', selector: '.pf .badge.badge-muted' } },
       { id: 'adm-badge', name: 'The admin status ("healthy", "critical")', code: '.adm-badge-* (admin.css)', becomes: 'healthy becomes fine; warning becomes attention; critical becomes danger; idle becomes off', look: 'mono .66rem 500 caps, no frame, a tinted fill per tone', where: 'every admin roster: Agents, Apps, Actions, Hooks, SSO', files: 51, crop: { url: '/v1/admin?tab=agents', selector: '.adm-badge' } },
-      { id: 'theme-badge', name: 'The rounded status ("anon", "blocked")', code: '.badge outside .pf (theme.css)', becomes: 'active becomes fine; paused becomes attention; blocked becomes danger; anon becomes off; the round ends go', look: 'Archivo .66rem 600 caps, a pill radius, tinted fill', where: 'admin Chat instances, the key and value rows', files: 2, crop: { url: '/v1/admin?tab=chatInstances', selector: '.badge' } },
+      { id: 'theme-badge', name: 'The rounded grey word ("Active", "anon")', code: '.badge with bg-green or bg-dim (theme.css); no sheet styles bg-green or bg-dim, so both draw the same', becomes: '"Active" becomes fine; "anon" becomes off', where: 'admin Chat instances (today "Active" and "anon" look the same)', files: 1, crop: { url: '/v1/admin?tab=chatInstances', selector: '.badge' } },
       { id: 'adm-grey-tag', name: 'The admin filled word ("per day", "quiet")', code: '.adm-st-chip and kin', becomes: 'good becomes fine; bad becomes danger; quiet becomes off', look: 'mono .66rem, grey fill, no frame, some in caps', where: 'admin SSO, Knowledge, Subdomains, Statistics, Portal', files: 5, crop: { url: '/v1/admin?tab=stats', selector: '.adm-st-chip' } },
     ],
     changes: [
       { page: 'Profile Access, Organisms, Nodes, Living', what: 'The framed status words become capitals on a pale colour; "paused" moves from the sun to pale yellow.' },
-      { page: 'Admin Chat instances', what: 'The rounded status words become square.' },
+      { page: 'Admin Chat instances', what: '"Active" turns green and "anon" grey, square instead of round. Today both are the same grey word.' },
       { page: 'Admin SSO, Knowledge, Subdomains, Statistics, Portal', what: 'The grey words take the green, red or grey status colour.' },
     ],
-    choice: null,
+    choice: {"proposal":"accepted","options":{},"note":"Accepted the proposal: one Status with four tones.","decidedBy":"Jouni","decidedAt":"2026-09-23"},
   },
   {
     id: 'count',
@@ -130,7 +130,7 @@ export const DECISIONS = [
       { page: 'Profile menu, open items', what: 'Nothing changes: they are the waiting count already.' },
       { page: 'Admin menu', what: 'The counts grow a little.' },
     ],
-    choice: null,
+    choice: {"proposal":"accepted","options":{},"note":"Accepted the proposal: one Count with two tones; the morsel badge stays.","decidedBy":"Jouni","decidedAt":"2026-09-23"},
   },
   {
     id: 'row-label',
@@ -151,7 +151,7 @@ export const DECISIONS = [
       { page: 'Home', what: 'Nothing you can see.' },
       { page: 'Profile, all pages', what: 'The small coral labels grow a little and their letters sit a little closer.' },
     ],
-    choice: null,
+    choice: {"proposal":"accepted","options":{},"note":"Accepted the proposal: the home's row label everywhere.","decidedBy":"Jouni","decidedAt":"2026-09-23"},
   },
   {
     id: 'group-heading',
@@ -170,7 +170,7 @@ export const DECISIONS = [
     changes: [
       { page: 'Chat', what: 'The side column\'s heading and the work log\'s heading grow a little and get a thicker line under them.' },
     ],
-    choice: null,
+    choice: {"proposal":"accepted","options":{},"note":"Accepted the proposal: the history's day heading over every list.","decidedBy":"Jouni","decidedAt":"2026-09-23"},
   },
   {
     id: 'timestamp',
@@ -182,33 +182,33 @@ export const DECISIONS = [
       text: '.poster-turn-meta: mono .68rem, grey. The home timeline\'s .76rem shrinks to it.',
     },
     variants: [
-      { id: 'turn-meta', name: 'The time under a chat message', code: '.poster-turn-meta (turn.css)', becomes: 'this is the proposal', look: 'mono .68rem, grey', where: 'the chat', crop: { url: '/v1/chat', selector: '.poster-turn-meta' } },
+      { id: 'turn-meta', name: 'The time under a chat message', code: '.poster-turn-meta (turn.css)', becomes: 'this is the proposal', look: 'mono .68rem, grey', where: 'the chat', crop: { url: '/v1/chat', selector: '.poster-turn--agent .poster-turn-meta' } },
       { id: 'timeline-when', name: 'The time of an event on the home', code: '.poster-timeline-when (timeline.css)', becomes: 'the chat\'s time, a little smaller', look: 'mono .76rem, grey', where: 'the home and the history page', crop: home('.poster-timeline-when') },
     ],
     changes: [
       { page: 'Home, history', what: 'The event times get a little smaller.' },
     ],
-    choice: null,
+    choice: {"proposal":"accepted","options":{},"note":"Accepted the proposal: every time in the chat's size.","decidedBy":"Jouni","decidedAt":"2026-09-23"},
   },
   {
     id: 'object-box',
     title: 'Object box: the frame around one thing',
-    question: 'A prompt, the home\'s answer box and a chat result are framed in three ways. Should they share one frame?',
+    question: 'A prompt, the home\'s answer box and a chat result all sit in a dark frame. The prompt card is on a grey ground, the other two on white. Should all three be on white?',
     proposal: {
-      variant: 'chooser-box', name: 'The plain dark frame',
-      summary: 'A plain dark frame on a white card for every object; no coloured top band, no coloured side edge.',
-      text: '.poster-box: 2px ink frame, card ground. The prompt card loses its tinted head; the result card loses its coloured left edge.',
+      variant: 'chooser-box', name: 'The dark frame on white',
+      summary: 'Every object box in the dark frame on a white ground, as the home\'s answer box is today.',
+      text: '.poster-box: 2px ink frame, card ground. The prompt card moves from --bg-dim to the card ground; the result card has the frame and the ground already.',
     },
     variants: [
-      { id: 'prompt-card', name: 'The prompt card', code: '.poster-prompt (prompt-card.css)', becomes: 'the plain frame; its tinted top band goes', look: '2px ink frame, a tinted head, the prompt in a scroll box', where: 'the home: every prompt to copy', crop: home('.poster-prompt') },
-      { id: 'chooser-box', name: 'The home\'s answer box', code: '.poster-box (poster.css)', becomes: 'this is the proposal', look: '2px ink frame, card ground', where: 'the home: the task answer', crop: home('.poster-chooser-result') },
-      { id: 'result-card', name: 'The chat\'s result card', code: '.poster-result (result-card.css)', becomes: 'the plain frame; its coloured side edge goes', look: '2px ink frame, coloured left edge per kind', where: 'the chat: what an answer produced', crop: chatThread(3, '.poster-result') },
+      { id: 'prompt-card', name: 'The prompt card', code: '.poster-prompt (prompt-card.css)', becomes: 'the white ground', where: 'the home: every prompt to copy', crop: home('.poster-prompt') },
+      { id: 'chooser-box', name: 'The home\'s answer box', code: '.poster-box (poster.css)', becomes: 'this is the proposal', where: 'the home: the task answer', crop: home('.poster-chooser-result') },
+      { id: 'result-card', name: 'The chat\'s result card', code: '.poster-result (result-card.css)', becomes: 'stays as it is', where: 'the chat: what an answer produced', crop: chatThread(3, '.poster-result') },
     ],
     changes: [
-      { page: 'Home', what: 'The prompt card loses its tinted top band.' },
-      { page: 'Chat', what: 'The result cards lose their coloured side edge.' },
+      { page: 'Home', what: 'The prompt cards turn from grey to white inside their frame.' },
+      { page: 'Chat', what: 'Nothing: the result cards have the dark frame on white already.' },
     ],
-    choice: null,
+    choice: {"proposal":null,"options":{"prompt-card":"accepted","chooser-box":"accepted","result-card":"accepted"},"note":"No answer to the proposal; accepted all three options. Open: what accepting every option means.","decidedBy":"Jouni","decidedAt":"2026-09-23"},
   },
   {
     id: 'attention-note',
@@ -221,14 +221,14 @@ export const DECISIONS = [
     },
     variants: [
       { id: 'waiting-note', name: 'The waiting note ("Waiting for your agent")', code: '.poster-waiting (waiting-note.css)', becomes: 'the dashed coral note, with its pulsing dot', look: 'thin dashed frame, pulsing coral dot, bold line', where: 'the home: the agent step while it waits', crop: null },
-      { id: 'nudge', name: 'The nudge ("Put this on your phone")', code: '.poster-nudge (nudge.css)', becomes: 'the dashed coral note', look: 'thin dashed frame, one line, the way out on the same line', where: 'the chat', crop: null },
+      { id: 'nudge', name: 'The nudge ("Put this on your phone")', code: '.poster-nudge (nudge.css)', becomes: 'the dashed coral note', look: 'thin dashed frame, one line, the way out on the same line', where: 'the chat', crop: { url: '/v1/chat', selector: '.poster-nudge', user: 'second' } },
       { id: 'aside', name: 'The dashed coral note', code: '.poster-aside (poster.css)', becomes: 'this is the proposal', look: '3px dashed coral frame, card ground', where: 'organism settings and admin pages', crop: null },
     ],
     changes: [
       { page: 'Home', what: 'The waiting note gets a thick dashed coral frame.' },
       { page: 'Chat', what: 'The phone suggestion gets a thick dashed coral frame.' },
     ],
-    choice: null,
+    choice: {"proposal":null,"options":{"waiting-note":"accepted","nudge":"accepted","aside":"accepted"},"note":"No answer to the proposal; accepted all three options. Open: what accepting every option means.","decidedBy":"Jouni","decidedAt":"2026-09-23"},
   },
   {
     id: 'action-link',
@@ -252,29 +252,30 @@ export const DECISIONS = [
       { page: 'Home', what: '"Show all" becomes dark underlined capitals instead of coral.' },
       { page: 'History', what: 'The back link becomes dark underlined capitals.' },
     ],
-    choice: null,
+    choice: {"proposal":null,"options":{"poster-action":"accepted","fold":"accepted","rail-action":"accepted","back":"accepted"},"note":"No answer to the proposal; accepted four options; the rounded frame button and the plain button have no answer. Open.","decidedBy":"Jouni","decidedAt":"2026-09-23"},
   },
   {
     id: 'tabs-filters',
     counted: true,
     title: 'Tabs and filters: choosing what a list or a panel shows',
-    question: 'Choosing one of a few views is drawn as a sun switch, outlined buttons, tabs and filter chips. Should they all be tabs?',
+    question: 'Choosing one of a few views is drawn five ways: the home\'s task choice, the home\'s switch, outlined buttons, tabs and filter chips. Should they all be tabs?',
     proposal: {
       variant: 'poster-tab', name: 'Tabs, the chosen one on the sun',
       summary: 'Tabs everywhere: underlined words, the chosen one on the sun.',
       text: '.poster-tab with .is-on on the sun. The home switch already chooses on the sun; the mode tabs and the 25 admin filter rules become tabs.',
     },
     variants: [
-      { id: 'fold-switch', name: 'The home\'s switch ("Recent", "Mine")', code: '.poster-fold, .poster-fold--on (fold-button.css)', becomes: 'tabs; the chosen one stays on the sun', look: 'mono coral underlined words; the chosen one on the sun', where: 'the home: the apps switch, the task choice', files: 2, crop: home('.poster-fold--on') },
+      { id: 'chooser-choice', name: 'The home\'s task choice ("Remember something")', code: '.poster-action with .poster-fold--on (Chooser.js ChooserChoice)', becomes: 'tabs', where: 'the home: the task chooser', files: 1, crop: home('.poster-chooser-choices .poster-fold--on') },
+      { id: 'fold-switch', name: 'The home\'s switch ("Recent", "Mine")', code: '.poster-fold, .poster-fold--on (fold-button.css)', becomes: 'tabs', where: 'the home: the apps switch', files: 2, crop: home('.poster-fold.poster-fold--on') },
       { id: 'mode-tabs', name: 'The agent step\'s two ways', code: '.poster-mode--on (mode-tabs.css)', becomes: 'tabs', look: 'outlined classic buttons; the chosen one in a coral outline', where: 'the home: the agent step', files: 1, crop: null },
       { id: 'poster-tab', name: 'Tabs ("Overview", "Tasks")', code: '.poster-tab, .is-on (poster.css)', becomes: 'this is the proposal', look: 'Archivo caps, 3px ink underline; .is-on on the sun', where: 'profile Agents, the agent card, Inbox, the setup guide', files: 4, crop: { url: '/v1/profile?tab=agents', selector: '.poster-tab' } },
       { id: 'adm-filter-chip', name: 'The admin filters ("all", "failed")', code: '.adm-hook-fchip and 24 copies', becomes: 'tabs; the chosen one stays on the sun', look: 'mono .72rem 500, 2px grey frame; the chosen one on the sun', where: 'about 25 admin pages', files: 25, crop: { url: '/v1/admin?tab=hooks', selector: '.adm-hook-fchip' } },
     ],
     changes: [
-      { page: 'Home', what: 'The switch words become dark capitals; the agent step\'s two buttons become tabs.' },
+      { page: 'Home', what: 'The task choices, the apps switch and the agent step\'s two buttons become tabs.' },
       { page: 'Admin, about 25 pages', what: 'The framed filters become tabs; the chosen one stays on the sun.' },
     ],
-    choice: null,
+    choice: {"proposal":null,"options":{"fold-switch":"accepted","poster-tab":"accepted","adm-filter-chip":"accepted"},"note":"No answer to the proposal; accepted three options; the two ways have no answer, and the task choice was added after the answers. Open.","decidedBy":"Jouni","decidedAt":"2026-09-23"},
   },
   {
     id: 'loud-action',
@@ -286,14 +287,14 @@ export const DECISIONS = [
       text: '.poster-slab: ink slab, paper words, 4px sun shadow; the control cut in a row of controls. The coral .btn-primary is the classic shell.',
     },
     variants: [
-      { id: 'btn-primary', name: 'The coral rounded button ("Copy the prompt")', code: '.btn-primary (components.css)', becomes: 'the dark block', look: 'coral fill, rounded, white words', where: 'the home: Copy the prompt, the step buttons', crop: home('.poster-prompt .btn-primary') },
+      { id: 'btn-primary', name: 'The coral rounded button ("Copy the prompt")', code: '.btn-primary (components.css)', becomes: 'the dark block', look: 'coral fill, rounded, white words', where: 'the home: Copy the prompt, the step buttons', crop: home('.poster-prompt .btn-primary', { user: 'second', eval: "document.querySelector('.poster-prompt .btn-primary').closest('details').open = true;" }) },
       { id: 'slab-control', name: 'The chat\'s dark block ("Send")', code: '.poster-slab--control (poster.css)', becomes: 'the dark block, in its control size', look: 'ink slab, paper words, 4px sun shadow, 44px high', where: 'the chat: Send, New conversation', crop: { url: '/v1/chat', selector: '.poster-composer-send' } },
       { id: 'slab', name: 'The dark block', code: '.poster-slab (poster.css)', becomes: 'this is the proposal', look: 'ink slab, paper words, 4px sun shadow', where: 'the demo card on the home', crop: null },
     ],
     changes: [
       { page: 'Home', what: 'Copy the prompt and the step buttons become dark blocks with a sun-coloured shadow.' },
     ],
-    choice: null,
+    choice: {"proposal":"accepted","options":{"btn-primary":"accepted","slab-control":"accepted","slab":"accepted"},"note":"Accepted the proposal and every option: the dark block everywhere.","decidedBy":"Jouni","decidedAt":"2026-09-23"},
   },
   {
     id: 'empty',
@@ -307,13 +308,13 @@ export const DECISIONS = [
     variants: [
       { id: 'quiet-note', name: 'The home\'s empty sentence', code: '.poster-quiet (quiet-note.css)', becomes: 'this is the proposal', look: 'Archivo .9rem 600, grey', where: 'the home', crop: null },
       { id: 'day-empty', name: 'The history\'s empty sentence', code: '.poster-day-empty (day-group.css)', becomes: 'the quiet sentence, a little bolder', look: 'Archivo .95rem 400, grey', where: 'the history page', crop: null },
-      { id: 'conversation-empty', name: 'The empty conversation list', code: '.poster-conversation-empty (conversation-frame.css)', becomes: 'the quiet sentence', look: 'grey body text', where: 'the chat', crop: null },
+      { id: 'conversation-empty', name: 'The empty conversation list', code: '.poster-conversation-empty (conversation-frame.css)', becomes: 'the quiet sentence', look: 'grey body text', where: 'the chat', crop: { url: '/v1/chat', selector: '.poster-conversation-empty', user: 'second' } },
     ],
     changes: [
       { page: 'History', what: 'The "nothing here yet" sentence gets a little bolder.' },
       { page: 'Chat', what: 'The empty conversation list says so in the quiet sentence.' },
     ],
-    choice: null,
+    choice: {"proposal":"accepted","options":{},"note":"Accepted the proposal: one quiet grey sentence.","decidedBy":"Jouni","decidedAt":"2026-09-23"},
   },
   {
     id: 'agent-step-wrapper',

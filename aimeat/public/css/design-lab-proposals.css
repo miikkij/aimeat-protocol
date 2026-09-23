@@ -13,6 +13,7 @@
  *   that may never ship, and a part's sheet is catalogued and drawn by pages.
  * @usage Linked from public/spa.html after the component block.
  * @version-history
+ *   v1.1.0 — 2026-09-23 — The after-looks no class draws alone, and the solo rules.
  *   v1.0.0 — 2026-09-23 — Initial: the tag, status and count proposals (UI consolidation phase 2).
  */
 
@@ -45,6 +46,23 @@
 .dl-count--small { font-size: .6rem; padding: 0 3px; }
 /* On an icon, the count sits on its corner, where the bell's count sits (.notif-badge). */
 .poster-specimen-anchor > .dl-count { position: absolute; top: -1px; right: -1px; }
+
+/* After the proposal, for the looks no existing class draws alone. Group heading: the day heading
+   kept grey over the work log. Object box: the prompt card on the white card ground of .poster-box.
+   Attention note: the waiting note and the nudge in the dashed coral frame of .poster-aside. */
+.dl-heading--grey { color: var(--text-dim); }
+.dl-box-plain .poster-prompt { background: var(--card-bg); }
+.dl-as-aside .poster-waiting, .dl-as-aside .poster-nudge { border: 3px dashed var(--accent); background: var(--card-bg); }
+
+/* Solo: only the element a decision is about. The rest of the drawn part keeps its place, so the
+   element keeps the look its surroundings give it, but is not painted (frame.js soloLayout). */
+html.dl-solo-page, html.dl-solo-page body { overflow: hidden; }
+.dl-solo { visibility: hidden; }
+.dl-solo .dl-solo-target { visibility: visible; }
+
+/* The admin sidebar is as tall as the screen; in a preview it holds one menu item, so it takes the
+   item's height. Its ground and colours, which the count reads, stay as they are. */
+.poster-specimen-stage .adm-sidebar { position: static; height: auto; }
 
 /* The top bar hides the morsel count below 1180px, and a lab frame is narrower than that; inside a
    preview it is shown, so it can be seen beside the other counts. */
