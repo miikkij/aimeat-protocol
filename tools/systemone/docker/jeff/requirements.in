@@ -1,5 +1,5 @@
 # What the jeff image installs: jeff's own dependencies (its pyproject.toml at the pinned commit),
-# plus ONNX for its CPU arm. jeff itself is installed from its source with --no-deps.
+# plus ONNX for its CPU arm. jeff itself runs from its source on PYTHONPATH.
 # lock.sh turns this into hash-pinned requirements-cpu.txt and -cu128.txt.
 torch
 gliformer>=0.1.1
@@ -11,5 +11,3 @@ huggingface-hub>=0.24
 modal>=1.5
 onnx>=1.16
 onnxruntime>=1.18
-# jeff's build backend (its pyproject.toml), so installing jeff fetches nothing.
-uv_build>=0.11.19,<0.12.0
