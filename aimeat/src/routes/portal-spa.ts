@@ -15,11 +15,15 @@
  *   - BUILD_ID            — per-process cache-busting stamp
  *   - publicSiteLinks()   — the site-link block injected as window.__SITE
  *   - serveSpa()          — the shell, with head metadata, nonces and cache busting
+ *   - stampAssets()       — the build stamp on every importmap module and stylesheet link
  *   - resolvePublicFile() — locate a file under public/ from src/ or dist/
  * @usage
  *   const spaPath = resolvePublicFile('spa.html');
  *   if (spaPath) serveSpa(res, spaPath, config, '/v1/glossary');
  * @version-history
+ *   v1.3.0 — 2026-09-23 — stampAssets(): the build stamp reaches every first-party stylesheet, not
+ *     only the view sheets, theme.css and margin-pattern.css (new markup met an old poster.css and
+ *     old component sheets in a browser and broke the home).
  *   v1.2.0 — 2026-09-11 — serveSpa() puts the registry page's authored body into the shell
  *     (utils/page-body.ts). The head had described each page correctly since July while the body
  *     stayed the same 203 characters on all of them, which is what a reader that does not run
@@ -170,6 +174,17 @@ export function serveSpa(
     `<!-- AIMEAT v${version} · build ${BUILD_ID} -->\n</head>`,
   );
 
+  html = stampAssets(html, v);
+
+  res.setHeader('Cache-Control', 'no-cache');
+  res.type('text/html').send(html);
+}
+
+/**
+ * The build stamp on the shell's first-party assets: every importmap module and every stylesheet
+ * link, so a deploy serves new CSS together with the new markup that needs it.
+ */
+export function stampAssets(html: string, v: string): string {
   // Stamp ALL importmap values with the build version — generic regex replaces
   // any value starting with "/" (local path), so new importmap entries are
   // automatically cache-busted without touching this code.
@@ -184,19 +199,15 @@ export function serveSpa(
     },
   );
 
-  // Stamp all view CSS hrefs (preloaded in spa.html head) with the build version
+  // Stamp EVERY first-party stylesheet link: the view sheets, the shell's own sheets (theme, poster,
+  // dialog, ...), the component sheets and /lib. Until 2026-09-23 only the view sheets, theme.css and
+  // margin-pattern.css were stamped, so a browser could keep the old poster.css and component sheets
+  // beside new markup that needed the new ones. A second origin ("//...") is left alone.
   html = html.replace(
-    /(<link rel="stylesheet" href=")(\/css\/views\/[^"?]+\.css)(")/g,
+    /(<link rel="stylesheet" href=")(\/(?!\/)[^"?]+\.css)(")/g,
     `$1$2${v}$3`
   );
-  // Also stamp theme.css and the margin-pattern sheet, the two shell-level sheets that change.
-  html = html.replace(
-    /(<link rel="stylesheet" href=")(\/css\/(?:theme|margin-pattern)\.css)(")/g,
-    `$1$2${v}$3`
-  );
-
-  res.setHeader('Cache-Control', 'no-cache');
-  res.type('text/html').send(html);
+  return html;
 }
 
 /** Resolve a file from public/ directory (works from both src/ and dist/). */
