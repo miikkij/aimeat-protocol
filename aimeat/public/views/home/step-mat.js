@@ -15,6 +15,9 @@
  *   summary once the mat exists.
  * @usage import { StepMat } from './step-mat.js';
  * @version-history
+ *   2026-09-23: StepMat is composed from library components (StepCard, StepLede, PasteBox,
+ *     ErrorNote, ActionRow), which emit the markup this file wrote. StepMatDone stays as it was:
+ *     no page mounts it (UI consolidation phase 1, a move).
  *   2026-09-23: Composed from the shared parts in css/parts.css and css/parts-steps.css (class names by role, values moved from views/home.css unchanged; UI consolidation slice 1).
  *   (2026-08-23) Em-dashes swept from the copied and paste fallbacks (banned in every surface).
  *   v1.0.0 — 2026-08-07 — Initial (remake phase 3).
@@ -27,6 +30,10 @@ import { t } from '/js/i18n.js';
 import { api, apiGet } from '/js/api.js';
 import { PromptCard } from '/components/PromptCard.js';
 import { CardMenu } from '/components/CardMenu.js';
+import { StepCard, StepLede } from '/components/StepCard.js';
+import { PasteBox } from '/components/PasteBox.js';
+import { ErrorNote, ErrorNoteFallback } from '/components/ErrorNote.js';
+import { ActionRow } from '/components/ActionRow.js';
 import { listOpenItems, addOpenItem, switchOff } from '/js/services/open-items.js';
 import { swallowed } from '/js/swallowed.js';
 
@@ -95,15 +102,11 @@ export function StepMat({ onDone }) {
   const hasPaste = paste.trim().length > 0;
 
   return html`
-    <div class="poster-step poster-step--open">
-      <div class="poster-step-head">
-        <span class="poster-step-num">1</span>
-        <h2 class="poster-step-title">${tr('home.mat.title', 'Your welcome mat')}</h2>
-      </div>
+    <${StepCard} num="1" title=${tr('home.mat.title', 'Your welcome mat')}>
 
-      <p class="poster-step-lede">
+      <${StepLede}>
         ${tr('home.mat.lede', 'Every home needs a welcome mat. You are going to make yours with your own AI: copy the prompt below into your AI chat, paste what it gives back into the box, and press the button.')}
-      </p>
+      <//>
 
       <${PromptCard}
         label=${usingFallback ? tr('home.mat.promptShort', 'The shorter prompt') : tr('home.mat.promptLabel', 'The prompt')}
@@ -112,33 +115,24 @@ export function StepMat({ onDone }) {
         copyLabel=${tr('home.mat.copy', 'Copy the prompt')}
         copiedLabel=${tr('home.mat.copied', 'Copied. Paste it in your AI chat')} />
 
-      <label class="poster-paste-label" for="koti-paste">
-        ${tr('home.mat.pasteLabel', 'Paste what your AI gave you here')}
-      </label>
-      <textarea
-        id="koti-paste"
-        ref=${boxRef}
-        class="poster-paste"
-        rows="8"
-        spellcheck="false"
+      <${PasteBox} id="koti-paste" boxRef=${boxRef}
+        label=${tr('home.mat.pasteLabel', 'Paste what your AI gave you here')}
         placeholder=${tr('home.mat.pastePlaceholder', 'Everything it wrote is fine, explanation and all.')}
         value=${paste}
-        onInput=${(e) => setPaste(e.target.value)}></textarea>
+        onInput=${(e) => setPaste(e.target.value)} />
 
       ${errText && html`
-        <div class="poster-error" role="alert">
-          <p class="poster-error-text">${errText}</p>
-          <p class="poster-error-hint">
+        <${ErrorNote} text=${errText}
+          hint=${html`
             ${tr('home.mat.errKept', 'Your text is still in the box. Ask your AI for the whole HTML file in one code block, and paste again.')}
-            ${attempts > 1 ? ` ${tr('home.mat.attempts', 'Attempts so far: {n}.').replace('{n}', String(attempts))}` : ''}
-          </p>
+            ${attempts > 1 ? ` ${tr('home.mat.attempts', 'Attempts so far: {n}.').replace('{n}', String(attempts))}` : ''}`}>
           ${fallbackPrompt && !usingFallback && html`
-            <button type="button" class="btn-ghost poster-error-fallback" onClick=${() => setUsingFallback(true)}>
+            <${ErrorNoteFallback} onClick=${() => setUsingFallback(true)}>
               ${tr('home.mat.tryShorter', 'Show me a shorter prompt to try')}
-            </button>`}
-        </div>`}
+            <//>`}
+        <//>`}
 
-      <div class="poster-actions">
+      <${ActionRow}>
         <button
           type="button"
           class=${hasPaste ? 'btn-primary' : 'btn-outline'}
@@ -146,8 +140,8 @@ export function StepMat({ onDone }) {
           onClick=${submit}>
           ${busy ? tr('home.mat.sending', 'Reading it…') : tr('home.mat.submit', 'Here is my welcome mat')}
         </button>
-      </div>
-    </div>`;
+      <//>
+    <//>`;
 }
 
 /** The collapsed step, once there is a mat. Shows the thing that was made, not a tick. */

@@ -16,6 +16,8 @@
  * @structure default HomeView; shared HomeJourney and HomeSettingsDialog
  * @usage routed at /v1/home by spa.html (and portal.ts spaRoutes, or F5 is a 404)
  * @version-history
+ *   2026-09-23: The page is composed from library components (PageFrame, PageIntro, ErrorNote,
+ *     ActionRow), which emit the markup this file wrote (UI consolidation phase 1, a move).
  *   2026-09-23: Composed from the shared parts in css/parts.css and css/parts-steps.css (class names by role, values moved from views/home.css unchanged; UI consolidation slice 1).
  *   2026-09-14: The failure line is the site's shared toast (theme.css), held for its six seconds.
  *   2026-09-09: Home journey starts with a connected AI; useful prompts and account settings are within reach.
@@ -57,6 +59,10 @@ import { useSession } from '/js/use-session.js';
 import { getSession } from '/js/services/auth.js';
 import { connect, disconnect, onUpdate, offUpdate } from '/lib/live-updates.js';
 import { Spinner } from '/components/Spinner.js';
+import { PageFrame } from '/components/PageFrame.js';
+import { PageIntro } from '/components/PageIntro.js';
+import { ErrorNote } from '/components/ErrorNote.js';
+import { ActionRow } from '/components/ActionRow.js';
 import { HomeJourney } from './journey.js';
 import { HomeSettingsDialog } from '/views/home/settings-dialog.js';
 import { SurfaceRenderer, useSurfaceLayout } from '/views/surface/renderer.js';
@@ -107,30 +113,26 @@ export default function HomeView({ navigate }) {
 
   if (!session) {
     return html`
-      <div class="poster-page">
-        <header class="poster-intro">
-          <h1 class="poster-intro-title">${tr('home.signInTitle', 'Step into your home')}</h1>
-          <p class="poster-intro-sub">${tr('home.signInDesc', 'Sign in to see where you left off.')}</p>
-        </header>
-        <div class="poster-actions">
+      <${PageFrame}>
+        <${PageIntro} title=${tr('home.signInTitle', 'Step into your home')}
+          sub=${tr('home.signInDesc', 'Sign in to see where you left off.')} />
+        <${ActionRow}>
           <button type="button" class="btn-primary" onClick=${() => navigate('/v1/portal')}>
             ${tr('home.signIn', 'Sign in')}
           </button>
-        </div>
-      </div>`;
+        <//>
+      <//>`;
   }
 
   if (!stateReady || !surface.ready) {
-    return html`<div class="poster-page poster-page-loading"><${Spinner} /></div>`;
+    return html`<${PageFrame} loading=${true}><${Spinner} /><//>`;
   }
 
   if (!state) {
     return html`
-      <div class="poster-page">
-        <div class="poster-error" role="alert">
-          <p class="poster-error-text">${tr('home.loadFailed', 'Your home could not be loaded just now. Try again in a moment.')}</p>
-        </div>
-      </div>`;
+      <${PageFrame}>
+        <${ErrorNote} text=${tr('home.loadFailed', 'Your home could not be loaded just now. Try again in a moment.')} />
+      <//>`;
   }
 
   // What a block cannot fetch for itself: who is signed in, where the router goes, the way into the
@@ -143,7 +145,7 @@ export default function HomeView({ navigate }) {
   };
 
   return html`
-    <div class="poster-page">
+    <${PageFrame}>
       <${SurfaceRenderer}
         layout=${surface.layout}
         freeform=${surface.freeform}
@@ -152,5 +154,5 @@ export default function HomeView({ navigate }) {
       <${HomeSettingsDialog} open=${settingsOpen} onClose=${() => setSettingsOpen(false)}
         session=${session} showToast=${showToast} />
       ${toast && html`<div class="toast toast-error toast-hold" role="status">${toast}</div>`}
-    </div>`;
+    <//>`;
 }
