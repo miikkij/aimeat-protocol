@@ -33,10 +33,10 @@
  */
 
 /* ── The painting: the strips and the preview read the same variables ──────────────────────── */
-/* The scroll region paints the same paper as the body (parts.css says so for the home's frame);
-   with a pattern chosen it paints nothing, so the strips under it show through and the page looks
-   exactly as before everywhere else. `body` in the selector outweighs parts.css's
-   `body:has(.poster-page)` rule. */
+/* The scroll region paints the same paper as the body (components/page-frame.css says so for the
+   home's frame); with a pattern chosen it paints nothing, so the strips under it show through and
+   the page looks exactly as before everywhere else. `body` in the selector outweighs
+   page-frame.css's `body:has(.poster-page)` rule. */
 html[data-margin-pattern] body .page-content { background: transparent; }
 html[data-margin-pattern] #app::before,
 html[data-margin-pattern] #app::after,
@@ -75,7 +75,7 @@ html[data-margin-pattern] #app::after {
 }
 
 /* ── Where the strips are, page by page ────────────────────────────────────────────────────── */
-/* The home: a 1180px box in the middle (parts.css .poster-page); the strip reaches 40px into its padding. */
+/* The home: a 1180px box in the middle (components/page-frame.css); the strip reaches 40px into its padding. */
 #app:has(.poster-page) { --mp-wl: max(0px, calc((100vw - 1180px) / 2 + 40px)); --mp-wr: var(--mp-wl); }
 /* The chat: a 1440px grid plus 32px of padding a side (1504px outside); the strips stop where the
    rail begins, so the rail and the conversation sit on clean paper. */

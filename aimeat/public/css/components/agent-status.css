@@ -1,0 +1,29 @@
+/**
+ * @file agent-status.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description Who answers and on whose money, as a column of mono facts. Drawn by components/AgentStatus.js.
+ *   Reads only the tokens in theme.css and the shapes in poster.css; a page never styles it from
+ *   outside.
+ * @usage Linked from public/spa.html in the component block, whose order keeps the order these
+ *   rules had when they were one sheet.
+ * @version-history
+ *   v1.0.0 — 2026-09-23 — Moved unchanged from css/parts*.css (UI consolidation phase 1, a move).
+ */
+
+.poster-agent-status {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 0;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  line-height: 1.5;
+  color: var(--text-dim);
+  overflow-wrap: anywhere;
+}
+.poster-agent-status-who { color: var(--accent); }
+.poster-agent-status-link { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+.poster-agent-status-model { color: var(--text-dim); }
+.poster-agent-status-note { color: var(--text-dim); }

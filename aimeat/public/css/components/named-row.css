@@ -1,0 +1,22 @@
+/**
+ * @file named-row.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description A row with its category word in a fixed left column and its content on the right, under a 3px
+ *   ink rule. Drawn by components/NamedRow.js. Reads only the tokens in theme.css and the shapes in
+ *   poster.css; a page never styles it from outside.
+ * @usage Linked from public/spa.html in the component block, whose order keeps the order these
+ *   rules had when they were one sheet.
+ * @version-history
+ *   v1.0.0 — 2026-09-23 — Moved unchanged from css/parts*.css (UI consolidation phase 1, a move).
+ */
+
+/* ── Named rows: the category word in a fixed left column, the content on the right ── */
+/* The row itself wears poster.css .poster-row--thing (the 3px ink rule); the label .poster-label. */
+.poster-named-row-body { display: flex; flex-wrap: wrap; gap: 0.5rem 1.4rem; flex: 1 1 auto; min-width: 0; align-items: baseline; }
+.poster-named-row { display: flex; align-items: flex-start; gap: 0.6rem 1rem; padding-top: 0.9rem; }
+.poster-named-row-label { flex: 0 0 11rem; padding-top: 0.35rem; }
+@media (max-width: 640px) {
+  .poster-named-row { flex-direction: column; gap: 0.35rem; }
+  .poster-named-row-label { flex: none; padding-top: 0; }
+}

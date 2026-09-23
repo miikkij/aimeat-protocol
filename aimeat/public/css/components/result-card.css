@@ -1,0 +1,65 @@
+/**
+ * @file result-card.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description What a turn produced, as a thing: its kind, its name and a way to open it. Drawn by
+ *   components/ResultCard.js. Reads only the tokens in theme.css and the shapes in poster.css; a
+ *   page never styles it from outside.
+ * @usage Linked from public/spa.html in the component block, whose order keeps the order these
+ *   rules had when they were one sheet.
+ * @version-history
+ *   v1.0.0 — 2026-09-23 — Moved unchanged from css/parts*.css (UI consolidation phase 1, a move).
+ */
+
+/* What the turn produced. A card is a handover, so the open control is a real link with a real
+   address and the picture, when there is one, is the thing itself rather than an icon for it. */
+.poster-results {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+.poster-result {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 2px solid var(--text);
+  background: var(--bg-card);
+}
+.poster-result-img {
+  width: 64px;
+  height: 48px;
+  object-fit: cover;
+  flex: 0 0 auto;
+}
+.poster-result--image .poster-result-img { width: 120px; height: 90px; }
+.poster-result-body { min-width: 0; flex: 1 1 auto; }
+.poster-result-kind {
+  font-size: 0.65rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-dim);
+}
+/* One colour per kind of thing, so a page, an app and a saved record are distinguishable before
+   the words are read. Palette tokens only: they flip with the theme. */
+.poster-result--page .poster-result-kind { color: var(--accent); }
+.poster-result--app .poster-result-kind { color: var(--blue); }
+.poster-result--image .poster-result-kind { color: var(--purple); }
+.poster-result--file .poster-result-kind { color: var(--teal); }
+.poster-result--memory .poster-result-kind { color: var(--mint); }
+.poster-result--workspace .poster-result-kind { color: var(--orange); }
+.poster-result--page { border-left: 6px solid var(--accent); }
+.poster-result--app { border-left: 6px solid var(--blue); }
+.poster-result--image { border-left: 6px solid var(--purple); }
+.poster-result--file { border-left: 6px solid var(--teal); }
+.poster-result--memory { border-left: 6px solid var(--mint); }
+.poster-result--workspace { border-left: 6px solid var(--orange); }
+.poster-result-title {
+  font-size: 0.9rem;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+.poster-result-ref { font-size: 0.72rem; color: var(--text-dim); overflow-wrap: anywhere; }
+.poster-result-open { flex: 0 0 auto; font-size: 0.78rem; padding: 4px 10px; }

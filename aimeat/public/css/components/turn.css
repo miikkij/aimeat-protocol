@@ -1,0 +1,116 @@
+/**
+ * @file turn.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description One thing said: the person's words on the sun, the agent's with a coral spine, the time and
+ *   model under it, and a turn that could not run. Drawn by components/Turn.js. Reads only the
+ *   tokens in theme.css and the shapes in poster.css; a page never styles it from outside.
+ * @usage Linked from public/spa.html in the component block, whose order keeps the order these
+ *   rules had when they were one sheet.
+ * @version-history
+ *   v1.0.0 — 2026-09-23 — Moved unchanged from css/parts*.css (UI consolidation phase 1, a move).
+ */
+
+/* ── One turn ── */
+.poster-turn {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  max-width: 82%;
+}
+.poster-turn--user { align-self: flex-end; align-items: flex-end; }
+.poster-turn--agent { align-self: flex-start; }
+.poster-turn-body {
+  padding: 0;
+  border-radius: 0;
+  background: none;
+  border: 0;
+  line-height: 1.55;
+  font-size: 1rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+/* What the person said: a sun block, bold, its own words. */
+.poster-turn--user .poster-turn-body {
+  background: var(--sun);
+  color: var(--text);
+  padding: 10px 16px;
+  font-weight: 800;
+  font-size: 1.1rem;
+  letter-spacing: -0.01em;
+}
+/* The agent's side gets the accent as a spine rather than a fill: readable at any length, and it
+   makes the two speakers tellable apart at a glance instead of by position alone. */
+.poster-turn--agent .poster-turn-body { border-left: 6px solid var(--accent-border); padding-left: 18px; }
+.poster-turn--live .poster-turn-body { border-left-color: var(--accent); }
+.poster-turn-said { margin: 0; white-space: pre-wrap; }
+/* A wide table scrolls inside the bubble instead of crushing its columns until "Versio" wraps
+   mid-word. Layout containment is the view's concern (markdown.css owns typography, not where a
+   bubble puts its overflow). */
+.poster-turn-body .md-body table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+}
+.poster-turn-thinking {
+  margin: 0;
+  color: var(--text-dim);
+  font-style: italic;
+}
+.poster-turn-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--text-dim);
+  padding: 0 2px;
+}
+.poster-turn--agent .poster-turn-meta { padding-left: 24px; }
+.poster-turn-model { font-family: var(--font-mono); }
+.poster-turn-copy { padding: 0 4px; background: none; border: 0; box-shadow: none; color: var(--text-dim); cursor: pointer; }
+.poster-turn-copy:hover { color: var(--text); }
+/* ── A turn that could not run ── */
+.poster-turn-error {
+  align-self: stretch;
+  border: 2px solid var(--accent);
+  background: none;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.poster-turn-error-msg {
+  margin: 0;
+  flex: 1 1 240px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.5;
+}
+.poster-turn-images { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.poster-turn-file {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border: 2px solid var(--text);
+  background: var(--bg-surface);
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: inherit;
+  text-decoration: none;
+}
+.poster-turn-file:hover { color: var(--accent); }
+/* The read-aloud control sits with the timestamp rather than on the bubble: it is about the turn,
+   not part of what was said. */
+.poster-turn-listen { font-size: 0.7rem; padding: 0 6px; background: none; border: 0; box-shadow: none; color: var(--text-dim); cursor: pointer; }
+.poster-turn-listen:hover { color: var(--text); }
+@media (max-width: 760px) {
+
+  .poster-turn { max-width: 92%; }
+  .poster-turn--user .poster-turn-body { font-size: 1rem; padding: 9px 13px; }
+  .poster-turn--agent .poster-turn-body { border-left-width: 5px; padding-left: 11px; }
+  .poster-turn--agent .poster-turn-meta { padding-left: 16px; }
+}
+.poster-turn--user .poster-turn-body { color: var(--on-sun); }

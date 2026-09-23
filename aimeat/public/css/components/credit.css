@@ -1,0 +1,28 @@
+/**
+ * @file credit.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description Whose agent this is, quietly, as a link. Drawn by components/Credit.js. Reads only the tokens in
+ *   theme.css and the shapes in poster.css; a page never styles it from outside.
+ * @usage Linked from public/spa.html in the component block, whose order keeps the order these
+ *   rules had when they were one sheet.
+ * @version-history
+ *   v1.0.0 — 2026-09-23 — Moved unchanged from css/parts*.css (UI consolidation phase 1, a move).
+ */
+
+/* Whose agent this is. Quiet, and permanently there. */
+.poster-credit {
+  padding: 0;
+  text-align: left;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+}
+.poster-credit-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-dim);
+  text-decoration: none;
+}
+.poster-credit-link:hover { color: var(--accent); text-decoration: underline; }
+.poster-credit-mark { font-size: 0.9rem; }

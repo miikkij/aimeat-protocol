@@ -95,11 +95,67 @@
   <link rel="stylesheet" href="/css/views/portal-classic.css">
   <link rel="stylesheet" href="/css/views/portal-dev.css">
   <link rel="stylesheet" href="/css/views/profile.css">
-  <!-- The shared parts (css/parts*.css). They sit where the home's own sheets sat, so every other
-       sheet keeps its rank against these rules. -->
-  <link rel="stylesheet" href="/css/parts-steps.css">
-  <link rel="stylesheet" href="/css/parts.css">
-  <link rel="stylesheet" href="/css/parts-conversation.css">
+  <!-- The component library's sheets (css/components/, one per component, catalogued in
+       src/services/ui-library/). They sit where the home's and the chat's own sheets sat, so every
+       other sheet keeps its rank against these rules, and their order is the order the rules had
+       when they were one sheet: where two rules of one weight meet on one element, the later wins. -->
+  <link rel="stylesheet" href="/css/components/step-card.css">
+  <link rel="stylesheet" href="/css/components/prompt-card.css">
+  <link rel="stylesheet" href="/css/components/paste-box.css">
+  <link rel="stylesheet" href="/css/components/link-row.css">
+  <link rel="stylesheet" href="/css/components/text-input.css">
+  <link rel="stylesheet" href="/css/components/named-value.css">
+  <link rel="stylesheet" href="/css/components/mode-tabs.css">
+  <link rel="stylesheet" href="/css/components/step-list.css">
+  <link rel="stylesheet" href="/css/components/waiting-note.css">
+  <link rel="stylesheet" href="/css/components/agent-card.css">
+  <link rel="stylesheet" href="/css/components/app-list.css">
+  <link rel="stylesheet" href="/css/components/front-door.css">
+  <link rel="stylesheet" href="/css/components/teach-note.css">
+  <link rel="stylesheet" href="/css/components/page-frame.css">
+  <link rel="stylesheet" href="/css/components/page-intro.css">
+  <link rel="stylesheet" href="/css/components/error-note.css">
+  <link rel="stylesheet" href="/css/components/action-row.css">
+  <link rel="stylesheet" href="/css/components/hint.css">
+  <link rel="stylesheet" href="/css/components/masthead.css">
+  <link rel="stylesheet" href="/css/components/link-line.css">
+  <link rel="stylesheet" href="/css/components/stat-line.css">
+  <link rel="stylesheet" href="/css/components/diagonal-band.css">
+  <link rel="stylesheet" href="/css/components/band.css">
+  <link rel="stylesheet" href="/css/components/line-list.css">
+  <link rel="stylesheet" href="/css/components/named-row.css">
+  <link rel="stylesheet" href="/css/components/thing-link.css">
+  <link rel="stylesheet" href="/css/components/star-toggle.css">
+  <link rel="stylesheet" href="/css/components/fold-button.css">
+  <link rel="stylesheet" href="/css/components/mode-switch.css">
+  <link rel="stylesheet" href="/css/components/quiet-note.css">
+  <link rel="stylesheet" href="/css/components/numbered-index.css">
+  <link rel="stylesheet" href="/css/components/ink-foot.css">
+  <link rel="stylesheet" href="/css/components/check-item.css">
+  <link rel="stylesheet" href="/css/components/timeline.css">
+  <link rel="stylesheet" href="/css/components/back-link.css">
+  <link rel="stylesheet" href="/css/components/day-group.css">
+  <link rel="stylesheet" href="/css/components/archive.css">
+  <link rel="stylesheet" href="/css/components/settings-stack.css">
+  <link rel="stylesheet" href="/css/components/settings-switch.css">
+  <link rel="stylesheet" href="/css/components/swatch-picker.css">
+  <link rel="stylesheet" href="/css/components/settings-door.css">
+  <link rel="stylesheet" href="/css/components/open-items.css">
+  <link rel="stylesheet" href="/css/components/chooser.css">
+  <link rel="stylesheet" href="/css/components/settings-account.css">
+  <link rel="stylesheet" href="/css/components/free-text.css">
+  <link rel="stylesheet" href="/css/components/conversation-frame.css">
+  <link rel="stylesheet" href="/css/components/thread-list.css">
+  <link rel="stylesheet" href="/css/components/agent-status.css">
+  <link rel="stylesheet" href="/css/components/rail-action.css">
+  <link rel="stylesheet" href="/css/components/suggestion.css">
+  <link rel="stylesheet" href="/css/components/turn.css">
+  <link rel="stylesheet" href="/css/components/result-card.css">
+  <link rel="stylesheet" href="/css/components/work-log.css">
+  <link rel="stylesheet" href="/css/components/ai-notice.css">
+  <link rel="stylesheet" href="/css/components/nudge.css">
+  <link rel="stylesheet" href="/css/components/credit.css">
+  <link rel="stylesheet" href="/css/components/composer.css">
   <link rel="stylesheet" href="/css/views/notebook.css">
   <link rel="stylesheet" href="/css/views/living.css">
   <link rel="stylesheet" href="/css/views/offers.css">

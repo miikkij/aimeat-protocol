@@ -1,0 +1,29 @@
+/**
+ * @file swatch-picker.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description A choice among a few named looks: a preview strip and the choices, the chosen one on the sun.
+ *   Drawn by components/SwatchPicker.js. Reads only the tokens in theme.css and the shapes in
+ *   poster.css; a page never styles it from outside.
+ * @usage Linked from public/spa.html in the component block, whose order keeps the order these
+ *   rules had when they were one sheet.
+ * @version-history
+ *   v1.0.0 — 2026-09-23 — Moved unchanged from css/parts*.css (UI consolidation phase 1, a move).
+ */
+
+/* The margin pattern: nine chips, the chosen one on the sun. */
+.poster-settings-pattern { margin-top: 1.1rem; padding-top: 1.1rem; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 0.7rem; }
+.poster-settings-pattern-words { display: flex; flex-direction: column; gap: 0.2rem; }
+.poster-settings-pattern-title { font-weight: var(--font-poster-strong-weight); color: var(--text); }
+.poster-settings-pattern-hint { font-size: 0.85rem; color: var(--text-dim); line-height: 1.5; }
+/* The preview: a strip of the page's paper, 2px ink frame, the figure fading to the right. */
+.poster-settings-pattern-preview { position: relative; height: 96px; border: 2px solid var(--text); background: var(--bg); overflow: hidden; display: flex; align-items: center; justify-content: center; }
+.poster-settings-pattern-preview .mp-swatch { position: absolute; inset: 0; }
+.poster-settings-pattern-none { font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-dim); }
+.poster-settings-pattern-choices { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.poster-settings-pattern-choice {
+  background: var(--card-bg); border: 2px solid var(--text); color: var(--text); cursor: pointer;
+  padding: 0.35rem 0.7rem; font-family: var(--font-showroom-body); font-size: 0.8rem; font-weight: 700;
+}
+.poster-settings-pattern-choice:hover { box-shadow: 3px 3px 0 var(--text); }
+.poster-settings-pattern-choice.active { background: var(--sun); color: var(--on-sun); box-shadow: 3px 3px 0 var(--text); }
