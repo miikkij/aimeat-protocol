@@ -9,6 +9,7 @@
  * @structure DayGroup({ title, children }) · DayList({ children }) · DayEmpty({ children })
  * @usage html`<${DayList}><${DayGroup} title=${label}><${TimelineRow} …/><//><//>`
  * @version-history
+ *   v1.1.0 — 2026-09-23 — DayEmpty is the quiet sentence (.poster-quiet), Jouni's decision "Empty line".
  *   v1.0.0 — 2026-09-23 — Moved out of views/home/history.js with its markup unchanged (UI
  *     consolidation phase 1, a move).
  */
@@ -36,7 +37,7 @@ export function DayList({ children }) {
 }
 
 export function DayEmpty({ children }) {
-  return html`<p class="poster-day-empty">
+  return html`<p class="poster-quiet">
             ${children}
           </p>`;
 }

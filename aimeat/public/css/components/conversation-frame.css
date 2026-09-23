@@ -50,13 +50,8 @@
 .poster-conversation-rail-close { display: none; }
 /* The heading's look is the day heading's (.poster-day-title); this keeps only its place in the rail. */
 .poster-conversation-label { margin: 22px 0 0; }
-.poster-conversation-empty {
-  color: var(--text-dim);
-  font-size: 0.85rem;
-  font-weight: 600;
-  line-height: 1.5;
-  margin: 8px 0 0;
-}
+/* The look is the quiet sentence's (.poster-quiet); this keeps only its place in the list. */
+.poster-conversation-empty { margin: 8px 0 0; }
 /* This conversation: its name, the status line as a column of facts, and the two actions. */
 .poster-conversation-about { display: flex; flex-direction: column; gap: 8px; }
 .poster-conversation-about .poster-conversation-label { margin-bottom: 2px; }

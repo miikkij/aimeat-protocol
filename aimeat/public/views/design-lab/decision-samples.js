@@ -109,7 +109,7 @@ export const SAMPLES = {
   ],
   'row-label': [
     { id: 'poster-label', measure: '.poster-label', render: () => html`<${NamedRow} label="Assets"><${ThingLink} href="#" n=${30} label="Apps" /><//>`, after: 'same' },
-    { id: 'prompt-label', measure: '.poster-prompt-label', render: prompt,
+    { id: 'prompt-label', measure: '.poster-prompt-head .poster-label', render: prompt,
       after: after('.poster-label', () => row(html`<span class="poster-label">Remember something</span>`)) },
     { id: 'og-label', measure: '.og-label', render: () => row(html`<span class="og-label">Visibility</span>`),
       after: after('.poster-label', () => row(html`<span class="poster-label">Visibility</span>`)) },
@@ -171,7 +171,7 @@ export const SAMPLES = {
   ],
   empty: [
     { id: 'quiet-note', measure: '.poster-quiet', render: () => html`<${QuietNote}>You have not opened any apps yet.<//>`, after: 'same' },
-    { id: 'day-empty', measure: '.poster-day-empty', render: () => html`<${DayEmpty}>Nothing has happened here yet.<//>`,
+    { id: 'day-empty', measure: '.poster-quiet', render: () => html`<${DayEmpty}>Nothing has happened here yet.<//>`,
       after: after('.poster-quiet', () => html`<${QuietNote}>Nothing has happened here yet.<//>`) },
     { id: 'conversation-empty', measure: '.poster-conversation-empty', render: () => html`<${ThreadList} threads=${[]} onOpen=${noop} onNew=${noop} onDelete=${noop} onClose=${noop} />`,
       after: after('.poster-quiet', () => html`<${QuietNote}>Nothing here yet. Say something and this is where it will be.<//>`) },
