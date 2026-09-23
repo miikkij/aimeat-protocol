@@ -82,9 +82,11 @@ export const SHAPE_ENTRIES: UiEntrySource[] = [
         'One of a few boxed answers, the chosen one on the sun with an ink shadow.', 'A choice where each answer needs a line of explanation.'),
     shape('sticker', 'Sticker', ['poster-sticker'], '<div class="poster-sticker">…</div>',
         'A small sun-ground box with a short headline and one door.', 'The one fact about a thing that must be seen before its name.'),
-    shape('aside', 'Aside', ['poster-aside', 'poster-aside--small', 'poster-aside--large', 'poster-aside--irreversible'], '<aside class="poster-aside">…</aside>',
+    shape('aside', 'Aside', ['poster-aside', 'poster-aside--small', 'poster-aside--large', 'poster-aside--irreversible', 'poster-aside--waiting', 'poster-aside--suggestion'], '<aside class="poster-aside">…</aside>',
         'A dashed coral frame for a note beside the main flow.', 'A caution, a tip or a consequence the person should read.',
         [
+            { name: 'waiting', class: 'poster-aside--waiting', when: 'the next move is in another window: a thin dashed ink frame on grey (the waiting note)' },
+            { name: 'suggestion', class: 'poster-aside--suggestion', when: 'a line the person can wave away: a thin dashed ink frame, small bold words (the phone nudge)' },
             { name: 'small', class: 'poster-aside--small', when: 'a short note' },
             { name: 'large', class: 'poster-aside--large', when: 'a note with more room' },
             { name: 'irreversible', class: 'poster-aside--irreversible', when: 'a solid frame: this cannot be undone' },
