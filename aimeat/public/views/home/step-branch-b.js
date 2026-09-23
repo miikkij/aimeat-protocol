@@ -23,6 +23,7 @@
  *   in a toast, because the person needs them next to the thing they must change.
  * @usage import { StepBranchB } from './step-branch-b.js';
  * @version-history
+ *   2026-09-23: Composed from the shared parts in css/parts.css and css/parts-steps.css (class names by role, values moved from views/home.css unchanged; UI consolidation slice 1).
  *   (2026-08-23) Em-dashes swept from the fallback strings (banned in every surface).
  *   v1.0.0 — 2026-08-07 — Initial (remake phase 5).
  */
@@ -102,53 +103,53 @@ export function StepBranchB({ state, onChanged }) {
   const ordered = theirs ? [theirs, ...tools.filter(x => x.id !== theirs.id)] : tools;
 
   return html`
-    <div class="koti-step koti-step-open koti-b">
-      <div class="koti-step-head">
-        <span class="koti-step-num">2</span>
-        <h2 class="koti-step-title">${tr('home.branchB.title', 'Your welcome mat is done')}</h2>
+    <div class="poster-step poster-step--open poster-step--limit">
+      <div class="poster-step-head">
+        <span class="poster-step-num">2</span>
+        <h2 class="poster-step-title">${tr('home.branchB.title', 'Your welcome mat is done')}</h2>
       </div>
 
-      <p class="koti-step-lede">
+      <p class="poster-step-lede">
         ${theirs
           ? tr('home.branchB.ledePlan', '{app} made it, and {app} can open a connection to your home, but only on one of its paid plans, and you said you are not on one. So the next step needs either that plan or another app.')
               .replace(/\{app\}/g, theirs.label)
           : tr('home.branchB.lede', 'You made it with {app}. It can write, but it cannot open a connection to your home yet, so the next step needs a different app.')
               .replace('{app}', appName)}
       </p>
-      <p class="koti-step-lede">
+      <p class="poster-step-lede">
         ${tr('home.branchB.why', 'A connection means the AI can read and write things in your home itself, instead of you copying text back and forth. That is what this place is built on: everything here is done with an AI, so without a connection your home cannot be finished.')}
       </p>
 
-      <div class="koti-b-way">
-        <h3 class="koti-b-way-title">
+      <div class="poster-step-way">
+        <h3 class="poster-step-way-title">
           ${tr('home.branchB.wayTitle', 'Take up an AI app that can open a connection')}
         </h3>
-        <p class="koti-b-way-body">
+        <p class="poster-step-way-body">
           ${tr('home.branchB.wayBody', 'Some AI apps do this directly. They are paid, typically around 20 dollars a month. If you use an AI every day, this is the one you want.')}
         </p>
 
-        <ul class="koti-b-apps">
+        <ul class="poster-app-list">
           ${ordered.map(tool => html`
-            <li class="koti-b-app" key=${tool.id}>
-              <div class="koti-b-app-head">
-                <span class="koti-b-app-name">${tool.label}</span>
+            <li class="poster-app-item" key=${tool.id}>
+              <div class="poster-app-item-head">
+                <span class="poster-app-item-name">${tool.label}</span>
                 ${theirs && tool.id === theirs.id && html`
                   <span class="badge badge-info">${tr('home.branchB.yours', 'The one you already use')}</span>`}
                 ${tool.recommended && (!theirs || tool.id !== theirs.id) && html`
                   <span class="badge badge-info">${tr('home.branchB.recommended', 'A good first one')}</span>`}
               </div>
-              ${tool.mcp?.plans && html`<p class="koti-b-app-plans">${tool.mcp.plans}</p>`}
+              ${tool.mcp?.plans && html`<p class="poster-app-item-plans">${tool.mcp.plans}</p>`}
               ${tool.mcp?.docs && html`
-                <a class="koti-b-app-docs" href=${tool.mcp.docs} target="_blank" rel="noopener">
+                <a class="poster-app-item-docs" href=${tool.mcp.docs} target="_blank" rel="noopener">
                   ${tr('home.branchB.theirDocs', 'Their own instructions')}
                 </a>`}
             </li>`)}
         </ul>
       </div>
 
-      <div class="koti-b-again">
-        <h3 class="koti-b-way-title">${tr('home.branchB.againTitle', 'Then make the mat again with it')}</h3>
-        <p class="koti-b-way-body">
+      <div class="poster-step-again">
+        <h3 class="poster-step-way-title">${tr('home.branchB.againTitle', 'Then make the mat again with it')}</h3>
+        <p class="poster-step-way-body">
           ${tr('home.branchB.againBody', 'Same prompt, new app. Paste what it gives you here and we carry on from there. Your first mat stays until this one replaces it.')}
         </p>
 
@@ -159,12 +160,12 @@ export function StepBranchB({ state, onChanged }) {
           copyLabel=${tr('home.mat.copy', 'Copy the prompt')}
           copiedLabel=${tr('home.mat.copied', 'Copied. Paste it in your AI chat')} />
 
-        <label class="koti-paste-label" for="koti-b-paste">
+        <label class="poster-paste-label" for="koti-b-paste">
           ${tr('home.mat.pasteLabel', 'Paste what your AI gave you here')}
         </label>
         <textarea
           id="koti-b-paste"
-          class="koti-paste"
+          class="poster-paste"
           rows="7"
           spellcheck="false"
           placeholder=${tr('home.mat.pastePlaceholder', 'Everything it wrote is fine, explanation and all.')}
@@ -172,11 +173,11 @@ export function StepBranchB({ state, onChanged }) {
           onInput=${(e) => setPaste(e.target.value)}></textarea>
 
         ${errText && html`
-          <div class="koti-error" role="alert">
-            <p class="koti-error-text">${errText}</p>
+          <div class="poster-error" role="alert">
+            <p class="poster-error-text">${errText}</p>
           </div>`}
 
-        <div class="koti-actions">
+        <div class="poster-actions">
           <button type="button"
             class=${hasPaste ? 'btn-primary' : 'btn-outline'}
             disabled=${busy || !hasPaste}

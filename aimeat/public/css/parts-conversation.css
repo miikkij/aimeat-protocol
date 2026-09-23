@@ -1,54 +1,26 @@
 /**
- * @file chat.css
+ * @file parts-conversation.css
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Styles for the chat page: the rail (the conversation list and everything about the
- *   open conversation that is not the conversation), the turns, the work log under each one, and
- *   the one-row composer. Two panes on a desktop, one at a time on a phone.
+ * @description The parts of a conversation with an agent: the two-pane frame (the rail with the
+ *   thread list and everything about the open conversation, and the conversation itself), one
+ *   turn, the work log under it, the things a turn produced, the suggestions a person can press,
+ *   and the one-row composer. Two panes on a desktop, one at a time on a phone, where the frame
+ *   is a fixed full-screen view above the keyboard (--chat-avail, measured by views/chat.js).
  *
- *   VERTICAL SPACE FIRST (since 2026-08-28, the poster chat). The conversation runs from the site
- *   bar to the composer, and the composer is one row; the name, the status line, the actions, the
- *   AI notice and the credit live in the rail, which on a phone is the drawer. Jouni, on the
- *   design canvas: the chat space is what matters, and the input at the bottom.
- *
- *   The work log is styled to be read, not hidden. It is the evidence that what the agent said it
- *   did, it did, and folding it away by default would turn the page back into something a person has
- *   to take on trust. All colours and spacing come from theme.css so it flips with the theme.
- *
- *   NOTE: this file must be linked in spa.html (useViewCSS is a no-op).
+ *   MOVED, NOT DESIGNED. Every rule is the one views/chat.css drew, with its values (UI
+ *   consolidation slice 1, 2026-09-23). The loud control (New conversation, Send) is poster.css
+ *   .poster-slab in its control cut (.poster-slab--control); the starters and the agent's choices
+ *   are one part, .poster-suggestion, the starters in its capitals cut. The proof is the same as
+ *   parts.css: 0.00 % changed pixels against the old code on the same data, and identical computed
+ *   styles, hover included.
+ * @usage Linked from public/spa.html after parts.css.
  * @version-history
- *   2026-09-13 -- V2z: compose the welcome section heading with the shared B1 class.
- *   v2.1.0 -- 2026-09-13 -- Compose top rules from poster.css; move board colours into CSS.
- *   v2.0.3 — 2026-08-29 — body overflow: clip (was hidden) on a phone, the same reason as theme.css v1.37.0: a
- *     hidden body is still a scroll container a scrollIntoView() can move; clip is not.
- *   v2.0.2 — 2026-08-29 — The headline reads --font-poster-tracking / --font-poster-leading (theme.css) instead
- *     of the -.03em / .95 measured for Archivo Black.
- *   v2.0.1 — 2026-08-29 — Poster headlines read --font-poster-weight (theme.css) instead of a literal 400.
- *   v2.0.0 — 2026-08-28 — The poster chat. The rail carries .chat-this (name, status, actions) and
- *     .chat-rail-foot (notice, credit); .chat-head is phone-only; the composer is one 44px row with
- *     an underline field and an ink Send slab; user turns are sun blocks, agent turns carry a coral
- *     spine; --font-poster for the name, --font-showroom-body for the words. The chat area measured
- *     86% of a 1440x900 screen and 87% of a 390x844 one on the canvas this implements.
- *   v1.6.0 — 2026-08-19 — .chat-cap: the session cost cap's managed landing, standing where the
- *     composer stood (TARGET-066).
- *   v1.5.0 — 2026-08-18 — A phone could not LEAVE: the chat owns the whole screen and hides the
- *     site nav, and nothing led back out (found by Jouni on his phone). .chat-back is the door,
- *     mobile-only. Plus air: roomier scroll padding and turn gap, the long model id ellipsized to
- *     40vw (full string stays in the tooltip), the thread title ellipsized so the head keeps one
- *     row.
- *   v1.4.0 — 2026-08-17 — .chat-status-ownkey (the own-key door on the payer line) and
- *     .chat-welcome-trust (the one boundary sentence under the welcome). The status agent label is
- *     now a plain word, so it drops the monospace styling.
- *   v1.3.0 — 2026-08-17 — Phones: the composer wraps into two rows (the textarea was the smallest
- *     thing on its own row), the GAII line yields its row, and a wide markdown table scrolls inside
- *     the bubble instead of crushing its columns.
- *   v1.2.0 — 2026-08-16 — .chat-status-model: which model answered, beside the payer line.
- *   v1.1.0 — 2026-08-16 — The recorder beside the send button, and the read-aloud control on a turn.
- *   v1.0.0 — 2026-08-16 — Initial.
+ *   v1.0.0 — 2026-09-23 — Initial: moved value for value out of views/chat.css.
  */
 
 /* ── Layout ── */
-.chat-view {
+.poster-conversation {
   display: grid;
   grid-template-columns: 236px minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr);
@@ -63,14 +35,14 @@
   color: var(--text);
 }
 
-.chat-view--signin {
+.poster-conversation--signin {
   display: block;
   height: auto;
   padding: 2rem 32px;
 }
 
 /* ── The rail: the list, then everything about the open conversation ── */
-.chat-threads {
+.poster-conversation-rail {
   display: flex;
   flex-direction: column;
   gap: 0;
@@ -80,30 +52,21 @@
   border-right: 3px solid var(--text);
 }
 
-/* The ink slab: the one loud control on the page. Shared by New conversation and Send. */
-.chat-new, .chat-send {
-  display: inline-flex; align-items: center; justify-content: center;
-  min-height: 44px; padding: 0 16px;
-  background: var(--text); color: var(--bg);
-  border: 0; border-radius: 0; box-shadow: 4px 4px 0 var(--sun);
-  font-family: inherit; font-weight: 800; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em;
-  cursor: pointer; transition: transform 120ms ease, box-shadow 120ms ease;
-}
-.chat-new:hover, .chat-send:hover { color: var(--sun); transform: translate(2px, 2px); box-shadow: 2px 2px 0 var(--sun); }
-.chat-send:disabled { opacity: 0.45; cursor: default; transform: none; }
-.chat-new { width: 100%; }
+/* The ink slab, the one loud control on the page, is poster.css .poster-slab in its control cut
+   (.poster-slab--control), shared by New conversation and Send. */
+.poster-conversation-new { width: 100%; }
 
 /* The way back out of the list. Only a phone needs it: on a desktop the list and the conversation
    are both on screen, so there is nothing to go back from. */
-.chat-threads-close { display: none; }
+.poster-conversation-rail-close { display: none; }
 
-.chat-rail-h {
+.poster-conversation-label {
   margin: 22px 0 0;
   font-size: 0.64rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase;
   color: var(--accent);
   padding-bottom: 5px; border-bottom: 2px solid var(--text);
 }
-.chat-threads-empty {
+.poster-conversation-empty {
   color: var(--text-dim);
   font-size: 0.85rem;
   font-weight: 600;
@@ -111,7 +74,7 @@
   margin: 8px 0 0;
 }
 
-.chat-thread-list {
+.poster-thread-list {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -120,16 +83,16 @@
   gap: 0;
 }
 
-.chat-thread {
+.poster-thread {
   display: flex;
   align-items: center;
   gap: 4px;
   border-bottom: 1px solid var(--border);
 }
 
-.chat-thread--active { background: var(--sun); border-bottom: 2px solid var(--text); }
+.poster-thread--active { background: var(--sun); border-bottom: 2px solid var(--text); }
 
-.chat-thread-open {
+.poster-thread-open {
   flex: 1 1 auto;
   min-width: 0;
   text-align: left;
@@ -144,7 +107,7 @@
   font: inherit;
 }
 
-.chat-thread-title {
+.poster-thread-title {
   font-size: 0.86rem;
   font-weight: 800;
   white-space: nowrap;
@@ -152,13 +115,13 @@
   text-overflow: ellipsis;
 }
 
-.chat-thread-sub {
+.poster-thread-sub {
   font-family: var(--font-mono);
   font-size: 0.68rem;
   color: var(--text-dim);
 }
 
-.chat-thread-del {
+.poster-thread-del {
   flex: 0 0 auto;
   padding: 4px 8px;
   opacity: 0;
@@ -166,19 +129,19 @@
   background: none; border: 0; box-shadow: none; color: var(--text); font-weight: 800; cursor: pointer;
 }
 
-.chat-thread:hover .chat-thread-del,
-.chat-thread--active .chat-thread-del { opacity: 1; }
+.poster-thread:hover .poster-thread-del,
+.poster-thread--active .poster-thread-del { opacity: 1; }
 
 /* This conversation: its name, the status line as a column of facts, and the two actions. */
-.chat-this { display: flex; flex-direction: column; gap: 8px; }
-.chat-this .chat-rail-h { margin-bottom: 2px; }
-.chat-rail-title {
+.poster-conversation-about { display: flex; flex-direction: column; gap: 8px; }
+.poster-conversation-about .poster-conversation-label { margin-bottom: 2px; }
+.poster-conversation-name {
   margin: 0;
   font-family: var(--font-poster); font-weight: var(--font-poster-weight);
   font-size: 0.95rem; line-height: 1.15; letter-spacing: -0.01em; text-transform: uppercase;
   overflow-wrap: anywhere;
 }
-.chat-status {
+.poster-agent-status {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -190,12 +153,12 @@
   color: var(--text-dim);
   overflow-wrap: anywhere;
 }
-.chat-status-agent { color: var(--accent); }
-.chat-status-ownkey { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
-.chat-status-model { color: var(--text-dim); }
-.chat-status-elsewhere { color: var(--text-dim); }
+.poster-agent-status-who { color: var(--accent); }
+.poster-agent-status-link { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+.poster-agent-status-model { color: var(--text-dim); }
+.poster-agent-status-note { color: var(--text-dim); }
 /* The actions: ink-underlined words, never buttons competing with the conversation. */
-.chat-act, .chat-status-reset {
+.poster-rail-action {
   align-self: flex-start;
   margin-top: 4px;
   background: none; border: 0; border-bottom: 2px solid var(--text); border-radius: 0; box-shadow: none;
@@ -203,14 +166,14 @@
   font-family: var(--font-showroom-body); font-weight: 800; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em;
   color: var(--text);
 }
-.chat-act:hover, .chat-status-reset:hover { color: var(--accent); border-color: var(--accent); }
-.chat-act.copied { color: var(--success-fg); border-color: var(--success-fg); }
+.poster-rail-action:hover { color: var(--accent); border-color: var(--accent); }
+.poster-rail-action.copied { color: var(--success-fg); border-color: var(--success-fg); }
 
 /* The foot of the rail: that a machine answers, and whose agent it is. */
-.chat-rail-foot { margin-top: auto; padding-top: 16px; display: flex; flex-direction: column; gap: 8px; }
+.poster-conversation-foot { margin-top: auto; padding-top: 16px; display: flex; flex-direction: column; gap: 8px; }
 
 /* ── The conversation ── */
-.chat-main {
+.poster-conversation-main {
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -218,9 +181,9 @@
 }
 
 /* The head row is the phone's: on a desktop the rail carries the name and the actions. */
-.chat-head { display: none; }
+.poster-conversation-head { display: none; }
 
-.chat-scroll {
+.poster-conversation-scroll {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
@@ -230,7 +193,7 @@
   gap: 20px;
 }
 
-.chat-welcome {
+.poster-conversation-welcome {
   color: var(--text-dim);
   max-width: 46ch;
   margin: auto;
@@ -238,40 +201,42 @@
   font-weight: 600;
 }
 
-.chat-welcome { --poster-section-size: 2rem; }
+.poster-conversation-welcome { --poster-section-size: 2rem; }
 
-.chat-welcome p { margin: 0; line-height: 1.6; font-size: 0.95rem; }
-.chat-welcome .chat-welcome-trust { color: var(--text-dim); margin-top: 6px; }
+.poster-conversation-welcome p { margin: 0; line-height: 1.6; font-size: 0.95rem; }
+.poster-conversation-welcome .poster-conversation-welcome-trust { color: var(--text-dim); margin-top: 6px; }
 
 /* One concrete opening each, wrapping on a phone. Underlined words: they are suggestions, and the
    composer stays the primary way in. */
-.chat-starters {
+.poster-suggestions {
   display: flex;
   flex-wrap: wrap;
   gap: 10px 22px;
   justify-content: center;
   margin-top: 18px;
 }
-.chat-starter {
+/* A suggestion: underlined words a person can press instead of typing. The agent's choices wear it
+   as it is; the starters on an empty conversation wear its capitals cut. */
+.poster-suggestion {
   background: none; border: 0; border-bottom: 3px solid var(--text); border-radius: 0; box-shadow: none;
   padding: 0 0 2px; cursor: pointer;
-  font-family: inherit; font-weight: 800; font-size: 0.88rem; text-transform: uppercase; letter-spacing: 0.04em;
-  color: var(--text);
+  font-family: inherit; font-weight: 800; font-size: 0.88rem; color: var(--text);
 }
-.chat-starter:hover { color: var(--accent); border-color: var(--accent); }
+.poster-suggestion--caps { text-transform: uppercase; letter-spacing: 0.04em; }
+.poster-suggestion:hover { color: var(--accent); border-color: var(--accent); }
 
 /* ── One turn ── */
-.chat-turn {
+.poster-turn {
   display: flex;
   flex-direction: column;
   gap: 5px;
   max-width: 82%;
 }
 
-.chat-turn--user { align-self: flex-end; align-items: flex-end; }
-.chat-turn--agent { align-self: flex-start; }
+.poster-turn--user { align-self: flex-end; align-items: flex-end; }
+.poster-turn--agent { align-self: flex-start; }
 
-.chat-bubble {
+.poster-turn-body {
   padding: 0;
   border-radius: 0;
   background: none;
@@ -283,7 +248,7 @@
 }
 
 /* What the person said: a sun block, bold, its own words. */
-.chat-turn--user .chat-bubble {
+.poster-turn--user .poster-turn-body {
   background: var(--sun);
   color: var(--text);
   padding: 10px 16px;
@@ -294,27 +259,27 @@
 
 /* The agent's side gets the accent as a spine rather than a fill: readable at any length, and it
    makes the two speakers tellable apart at a glance instead of by position alone. */
-.chat-turn--agent .chat-bubble { border-left: 6px solid var(--accent-border); padding-left: 18px; }
-.chat-turn--live .chat-bubble { border-left-color: var(--accent); }
+.poster-turn--agent .poster-turn-body { border-left: 6px solid var(--accent-border); padding-left: 18px; }
+.poster-turn--live .poster-turn-body { border-left-color: var(--accent); }
 
-.chat-said { margin: 0; white-space: pre-wrap; }
+.poster-turn-said { margin: 0; white-space: pre-wrap; }
 
 /* A wide table scrolls inside the bubble instead of crushing its columns until "Versio" wraps
    mid-word. Layout containment is the view's concern (markdown.css owns typography, not where a
    bubble puts its overflow). */
-.chat-bubble .md-body table {
+.poster-turn-body .md-body table {
   display: block;
   max-width: 100%;
   overflow-x: auto;
 }
 
-.chat-thinking {
+.poster-turn-thinking {
   margin: 0;
   color: var(--text-dim);
   font-style: italic;
 }
 
-.chat-meta {
+.poster-turn-meta {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -323,19 +288,19 @@
   color: var(--text-dim);
   padding: 0 2px;
 }
-.chat-turn--agent .chat-meta { padding-left: 24px; }
+.poster-turn--agent .poster-turn-meta { padding-left: 24px; }
 
-.chat-model { font-family: var(--font-mono); }
+.poster-turn-model { font-family: var(--font-mono); }
 
 /* What the turn produced. A card is a handover, so the open control is a real link with a real
    address and the picture, when there is one, is the thing itself rather than an icon for it. */
-.chat-cards {
+.poster-results {
   display: flex;
   flex-direction: column;
   gap: 8px;
   margin-top: 12px;
 }
-.chat-card {
+.poster-result {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -343,15 +308,15 @@
   border: 2px solid var(--text);
   background: var(--bg-card);
 }
-.chat-card-img {
+.poster-result-img {
   width: 64px;
   height: 48px;
   object-fit: cover;
   flex: 0 0 auto;
 }
-.chat-card--image .chat-card-img { width: 120px; height: 90px; }
-.chat-card-body { min-width: 0; flex: 1 1 auto; }
-.chat-card-kind {
+.poster-result--image .poster-result-img { width: 120px; height: 90px; }
+.poster-result-body { min-width: 0; flex: 1 1 auto; }
+.poster-result-kind {
   font-size: 0.65rem;
   font-weight: 800;
   text-transform: uppercase;
@@ -360,34 +325,34 @@
 }
 /* One colour per kind of thing, so a page, an app and a saved record are distinguishable before
    the words are read. Palette tokens only: they flip with the theme. */
-.chat-card--page .chat-card-kind { color: var(--accent); }
-.chat-card--app .chat-card-kind { color: var(--blue); }
-.chat-card--image .chat-card-kind { color: var(--purple); }
-.chat-card--file .chat-card-kind { color: var(--teal); }
-.chat-card--memory .chat-card-kind { color: var(--mint); }
-.chat-card--workspace .chat-card-kind { color: var(--orange); }
-.chat-card--page { border-left: 6px solid var(--accent); }
-.chat-card--app { border-left: 6px solid var(--blue); }
-.chat-card--image { border-left: 6px solid var(--purple); }
-.chat-card--file { border-left: 6px solid var(--teal); }
-.chat-card--memory { border-left: 6px solid var(--mint); }
-.chat-card--workspace { border-left: 6px solid var(--orange); }
-.chat-card-title {
+.poster-result--page .poster-result-kind { color: var(--accent); }
+.poster-result--app .poster-result-kind { color: var(--blue); }
+.poster-result--image .poster-result-kind { color: var(--purple); }
+.poster-result--file .poster-result-kind { color: var(--teal); }
+.poster-result--memory .poster-result-kind { color: var(--mint); }
+.poster-result--workspace .poster-result-kind { color: var(--orange); }
+.poster-result--page { border-left: 6px solid var(--accent); }
+.poster-result--app { border-left: 6px solid var(--blue); }
+.poster-result--image { border-left: 6px solid var(--purple); }
+.poster-result--file { border-left: 6px solid var(--teal); }
+.poster-result--memory { border-left: 6px solid var(--mint); }
+.poster-result--workspace { border-left: 6px solid var(--orange); }
+.poster-result-title {
   font-size: 0.9rem;
   font-weight: 800;
   overflow-wrap: anywhere;
 }
-.chat-card-ref { font-size: 0.72rem; color: var(--text-dim); overflow-wrap: anywhere; }
-.chat-card-open { flex: 0 0 auto; font-size: 0.78rem; padding: 4px 10px; }
+.poster-result-ref { font-size: 0.72rem; color: var(--text-dim); overflow-wrap: anywhere; }
+.poster-result-open { flex: 0 0 auto; font-size: 0.78rem; padding: 4px 10px; }
 
 /* ── The work log ── */
-.chat-work {
+.poster-worklog {
   margin-top: 12px;
   border-top: 2px dashed var(--border);
   padding-top: 8px;
 }
 
-.chat-work-head {
+.poster-worklog-head {
   font-size: 0.68rem;
   font-weight: 800;
   text-transform: uppercase;
@@ -396,7 +361,7 @@
   margin-bottom: 4px;
 }
 
-.chat-work-list {
+.poster-worklog-list {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -405,7 +370,7 @@
   gap: 2px;
 }
 
-.chat-work-line {
+.poster-worklog-line {
   display: flex;
   gap: 8px;
   align-items: baseline;
@@ -414,16 +379,16 @@
   font-weight: 400;
 }
 
-.chat-work-status {
+.poster-worklog-status {
   flex: 0 0 auto;
   min-width: 68px;
   color: var(--text-dim);
 }
 
-.chat-work-line--completed .chat-work-status { color: var(--success); }
-.chat-work-line--failed .chat-work-status { color: var(--danger); }
+.poster-worklog-line--completed .poster-worklog-status { color: var(--success); }
+.poster-worklog-line--failed .poster-worklog-status { color: var(--danger); }
 
-.chat-work-title {
+.poster-worklog-title {
   min-width: 0;
   overflow-wrap: anywhere;
 }
@@ -431,7 +396,7 @@
 /* What the agent is doing right now. The dot moves so a still screen is never the only signal;
    `prefers-reduced-motion` gets the dot without the pulse, because the words and the clock carry
    the meaning on their own. */
-.chat-live-status {
+.poster-live-status {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -440,21 +405,21 @@
   font-size: 0.72rem;
   color: var(--text-dim);
 }
-.chat-live-dot {
+.poster-live-dot {
   width: 9px;
   height: 9px;
   background: var(--accent);
-  animation: chat-live-pulse 1.4s ease-in-out infinite;
+  animation: poster-live-pulse 1.4s ease-in-out infinite;
 }
-.chat-live-clock { font-family: var(--font-mono); }
-@keyframes chat-live-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
+.poster-live-clock { font-family: var(--font-mono); }
+@keyframes poster-live-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
 @media (prefers-reduced-motion: reduce) {
-  .chat-live-dot { animation: none; }
+  .poster-live-dot { animation: none; }
 }
 
 /* The way back to the live edge while auto-follow is suspended. Floats over the conversation
    rather than pushing it, so its appearance never moves the text you are reading. */
-.chat-jump-latest {
+.poster-conversation-jump {
   position: absolute;
   right: 8px;
   bottom: 84px;
@@ -471,21 +436,21 @@
 
 /* The session cap's managed landing: stands where the composer stood, so the conversation ends
    in a door rather than a dead input. */
-.chat-cap {
+.poster-conversation-cap {
   border-top: 3px solid var(--text);
   background: none;
   padding: 1rem 0 1.2rem;
   margin-top: 0.5rem;
 }
-.chat-cap-title { margin: 0 0 0.4rem; font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.2rem; text-transform: uppercase; }
-.chat-cap-body { margin: 0 0 0.8rem; font-size: 0.95rem; font-weight: 600; color: var(--text-dim); line-height: 1.55; }
-.chat-cap-actions { display: flex; gap: 0.7rem; flex-wrap: wrap; }
+.poster-conversation-cap-title { margin: 0 0 0.4rem; font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.2rem; text-transform: uppercase; }
+.poster-conversation-cap-body { margin: 0 0 0.8rem; font-size: 0.95rem; font-weight: 600; color: var(--text-dim); line-height: 1.55; }
+.poster-conversation-cap-actions { display: flex; gap: 0.7rem; flex-wrap: wrap; }
 
-.chat-copy { padding: 0 4px; background: none; border: 0; box-shadow: none; color: var(--text-dim); cursor: pointer; }
-.chat-copy:hover { color: var(--text); }
+.poster-turn-copy { padding: 0 4px; background: none; border: 0; box-shadow: none; color: var(--text-dim); cursor: pointer; }
+.poster-turn-copy:hover { color: var(--text); }
 
 /* That a machine is on the other end. In the rail on a desktop; on a phone the main copy shows. */
-.chat-ai-notice {
+.poster-ai-notice {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -496,18 +461,18 @@
   color: var(--text-dim);
   line-height: 1.45;
 }
-.chat-ai-notice-line { flex: 1 1 100%; }
-.chat-ai-notice--compact { padding: 0; }
-.chat-ai-notice-short { font-size: 0.74rem; color: var(--text-dim); }
-.chat-ai-more {
+.poster-ai-notice-line { flex: 1 1 100%; }
+.poster-ai-notice--compact { padding: 0; }
+.poster-ai-notice-short { font-size: 0.74rem; color: var(--text-dim); }
+.poster-ai-notice-more {
   background: none; border: 0; box-shadow: none; padding: 0; cursor: pointer;
   font-family: var(--font-mono); font-weight: 400; font-size: 0.7rem; color: var(--accent);
   text-decoration: underline; text-underline-offset: 3px;
 }
-.chat-ai-notice--main { display: none; }
+.poster-ai-notice--main { display: none; }
 
 /* One suggestion, once, with the way out on the same line as the ask. */
-.chat-nudge {
+.poster-nudge {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -520,29 +485,29 @@
   font-weight: 600;
   line-height: 1.5;
 }
-.chat-nudge-text { flex: 1 1 260px; }
-.chat-nudge-dismiss { flex: 0 0 auto; font-size: 0.75rem; padding: 2px 8px; }
+.poster-nudge-text { flex: 1 1 260px; }
+.poster-nudge-dismiss { flex: 0 0 auto; font-size: 0.75rem; padding: 2px 8px; }
 
 /* Whose agent this is. Quiet, and permanently there. */
-.chat-credit {
+.poster-credit {
   padding: 0;
   text-align: left;
   font-family: var(--font-mono);
   font-size: 0.68rem;
 }
-.chat-credit-link {
+.poster-credit-link {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   color: var(--text-dim);
   text-decoration: none;
 }
-.chat-credit-link:hover { color: var(--accent); text-decoration: underline; }
-.chat-credit-mark { font-size: 0.9rem; }
+.poster-credit-link:hover { color: var(--accent); text-decoration: underline; }
+.poster-credit-mark { font-size: 0.9rem; }
 
 /* The fork an agent named, as buttons. The note keeps the box in play: three options are never the
    whole space, and a row of buttons with no way past them is a form. */
-.chat-choices {
+.poster-choices {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -550,16 +515,11 @@
   align-self: flex-start;
   max-width: 82%;
 }
-.chat-choice {
-  background: none; border: 0; border-bottom: 3px solid var(--text); border-radius: 0; box-shadow: none;
-  padding: 0 0 2px; cursor: pointer;
-  font-family: inherit; font-weight: 800; font-size: 0.88rem; color: var(--text);
-}
-.chat-choice:hover { color: var(--accent); border-color: var(--accent); }
-.chat-choices-note { font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-dim); }
+/* The choices are .poster-suggestion (above). */
+.poster-choices-note { font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-dim); }
 
 /* ── A turn that could not run ── */
-.chat-error {
+.poster-turn-error {
   align-self: stretch;
   border: 2px solid var(--accent);
   background: none;
@@ -570,7 +530,7 @@
   flex-wrap: wrap;
 }
 
-.chat-error-msg {
+.poster-turn-error-msg {
   margin: 0;
   flex: 1 1 240px;
   font-size: 0.9rem;
@@ -579,8 +539,8 @@
 }
 
 /* Pictures attached but not yet sent, and the ones already in the conversation. */
-.chat-attachments { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
-.chat-attachment {
+.poster-attachments { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+.poster-attachment {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -591,15 +551,15 @@
   font-weight: 600;
   max-width: 220px;
 }
-.chat-attachment--error { border-color: var(--danger); color: var(--danger); }
-.chat-attachment-thumb { width: 28px; height: 28px; object-fit: cover; }
-.chat-attachment-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.chat-attachment-state { color: var(--text-dim); }
-.chat-attachment-drop { padding: 0 4px; line-height: 1; }
-.chat-file-input { display: none; }
+.poster-attachment--error { border-color: var(--danger); color: var(--danger); }
+.poster-attachment-thumb { width: 28px; height: 28px; object-fit: cover; }
+.poster-attachment-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.poster-attachment-state { color: var(--text-dim); }
+.poster-attachment-drop { padding: 0 4px; line-height: 1; }
+.poster-composer-file { display: none; }
 
-.chat-turn-images { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
-.chat-turn-file {
+.poster-turn-images { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.poster-turn-file {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -611,21 +571,16 @@
   color: inherit;
   text-decoration: none;
 }
-.chat-turn-file:hover { color: var(--accent); }
-.chat-turn-image {
-  max-width: 220px;
-  max-height: 180px;
-  border: 2px solid var(--text);
-}
+.poster-turn-file:hover { color: var(--accent); }
 
 /* ── The composer: one row ── */
-.chat-composer {
+.poster-composer {
   flex: none;
   padding: 10px 0 12px;
   background: var(--bg);
 }
 
-.chat-composer-note {
+.poster-composer-note {
   margin: 0 0 6px;
   font-size: 0.78rem;
   font-weight: 600;
@@ -633,13 +588,13 @@
   line-height: 1.5;
 }
 
-.chat-composer-row {
+.poster-composer-row {
   display: flex;
   gap: 12px;
   align-items: center;
 }
 
-.chat-input {
+.poster-composer-input {
   flex: 1 1 auto;
   min-width: 0;
   resize: none;
@@ -656,34 +611,34 @@
   font-size: 1.05rem;
   line-height: 1.5;
 }
-.chat-input::placeholder { color: var(--text-dim); font-weight: 600; }
-.chat-input:focus {
+.poster-composer-input::placeholder { color: var(--text-dim); font-weight: 600; }
+.poster-composer-input:focus {
   outline: none;
   border-color: var(--accent);
 }
-.chat-input:disabled { opacity: 0.6; }
+.poster-composer-input:disabled { opacity: 0.6; }
 
 /* The two tools beside the field: square, ink-framed, 44px. */
-.chat-attach, .chat-voice {
+.poster-composer-tool {
   flex: 0 0 auto;
   width: 44px; height: 44px; padding: 0;
   display: inline-flex; align-items: center; justify-content: center;
   border: 2px solid var(--text); border-radius: 0; box-shadow: none;
   background: var(--bg); color: var(--text); cursor: pointer; font-size: 1rem;
 }
-.chat-attach:hover, .chat-voice:hover { background: var(--sun); }
+.poster-composer-tool:hover { background: var(--sun); }
 
-.chat-send { flex: 0 0 auto; }
+.poster-composer-send { flex: 0 0 auto; }
 
 /* The way OUT of the full-screen phone chat, and the icon buttons of the phone's head row.
    Desktop has the rail, so all of it hides there. */
-.chat-back { display: none; }
-.chat-ico { display: none; }
+.poster-conversation-back { display: none; }
+.poster-conversation-icon { display: none; }
 
 /* The read-aloud control sits with the timestamp rather than on the bubble: it is about the turn,
    not part of what was said. */
-.chat-listen { font-size: 0.7rem; padding: 0 6px; background: none; border: 0; box-shadow: none; color: var(--text-dim); cursor: pointer; }
-.chat-listen:hover { color: var(--text); }
+.poster-turn-listen { font-size: 0.7rem; padding: 0 6px; background: none; border: 0; box-shadow: none; color: var(--text-dim); cursor: pointer; }
+.poster-turn-listen:hover { color: var(--text); }
 
 /* ── Phones ──
    One pane at a time. The page takes the whole viewport, the shell's sticky nav is hidden (it lives
@@ -692,7 +647,7 @@
    viewport meta's interactive-widget=resizes-content already provides. Same pattern as the inbox,
    which is the surface this one is modelled on. One row above the conversation, one row below. */
 @media (max-width: 760px) {
-  .chat-view {
+  .poster-conversation {
     position: fixed;
     inset: 0;
     z-index: 1000;
@@ -706,67 +661,71 @@
     background: var(--bg);
   }
 
-  body:has(.chat-view) { overflow: clip; }
-  body:has(.chat-view) .topnav { display: none; }
+  body:has(.poster-conversation) { overflow: clip; }
+  body:has(.poster-conversation) .topnav { display: none; }
 
   /* The list is a place you go to, not a column that would leave neither pane readable. */
-  .chat-threads { display: none; }
-  .chat-view--list .chat-threads {
+  .poster-conversation-rail { display: none; }
+  .poster-conversation--list .poster-conversation-rail {
     display: flex;
     padding: 12px 12px calc(12px + env(safe-area-inset-bottom, 0px));
     border-right: 0;
     background: var(--bg);
   }
-  .chat-view--list .chat-main { display: none; }
-  .chat-threads-close {
+  .poster-conversation--list .poster-conversation-main { display: none; }
+  .poster-conversation-rail-close {
     display: inline-flex; align-items: center; align-self: flex-start; min-height: 44px; margin-bottom: 4px;
     background: none; border: 0; box-shadow: none; padding: 0;
     font-family: var(--font-mono); font-size: 0.8rem; color: var(--accent); cursor: pointer;
   }
 
-  .chat-main { height: 100%; }
+  .poster-conversation-main { height: 100%; }
 
   /* The one row above: back, the name, copy, the drawer. 48px, and nothing else above the words. */
-  .chat-head {
+  .poster-conversation-head {
     display: flex; align-items: center; gap: 8px;
     flex: none; height: 48px; padding: 0 8px 0 12px;
     border-bottom: 3px solid var(--text);
   }
-  .chat-back {
+  .poster-conversation-back {
     display: inline-flex; align-items: center; min-width: 44px; min-height: 44px;
     font-family: var(--font-mono); font-size: 0.78rem; color: var(--accent); text-decoration: none; white-space: nowrap;
   }
-  .chat-title {
+  .poster-conversation-title {
     flex: 1 1 auto; min-width: 0; margin: 0;
     font-family: var(--font-poster); font-weight: var(--font-poster-weight);
     font-size: 0.9rem; line-height: 1.1; letter-spacing: -0.01em; text-transform: uppercase;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
-  .chat-ico {
+  .poster-conversation-icon {
     display: inline-flex; align-items: center; justify-content: center; flex: none;
     width: 44px; height: 40px;
     border: 2px solid var(--text); border-radius: 0; box-shadow: none; background: var(--bg);
     color: var(--text); font-weight: 800; font-size: 1rem; cursor: pointer; padding: 0;
   }
-  .chat-list-toggle { background: var(--sun); }
-  .chat-copy-head.copied { background: var(--sun); }
+  .poster-conversation-toggle { background: var(--sun); }
+  .poster-conversation-copy.copied { background: var(--sun); }
 
   /* The notice where the person is looking, one line, above the words. */
-  .chat-ai-notice--main { display: flex; flex-wrap: nowrap; padding: 6px 12px 0; }
-  .chat-ai-notice--main .chat-ai-notice-line { flex: 1 1 auto; min-width: 0; }
-  .chat-ai-notice--main .chat-ai-more { flex: none; white-space: nowrap; }
+  .poster-ai-notice--main { display: flex; flex-wrap: nowrap; padding: 6px 12px 0; }
+  .poster-ai-notice--main .poster-ai-notice-line { flex: 1 1 auto; min-width: 0; }
+  .poster-ai-notice--main .poster-ai-notice-more { flex: none; white-space: nowrap; }
 
-  .chat-turn { max-width: 92%; }
-  .chat-scroll { padding: 12px 12px 8px; gap: 16px; }
-  .chat-turn--user .chat-bubble { font-size: 1rem; padding: 9px 13px; }
-  .chat-turn--agent .chat-bubble { border-left-width: 5px; padding-left: 11px; }
-  .chat-turn--agent .chat-meta { padding-left: 16px; }
-  .chat-composer {
+  .poster-turn { max-width: 92%; }
+  .poster-conversation-scroll { padding: 12px 12px 8px; gap: 16px; }
+  .poster-turn--user .poster-turn-body { font-size: 1rem; padding: 9px 13px; }
+  .poster-turn--agent .poster-turn-body { border-left-width: 5px; padding-left: 11px; }
+  .poster-turn--agent .poster-turn-meta { padding-left: 16px; }
+  .poster-composer {
     padding: 8px 8px calc(10px + env(safe-area-inset-bottom, 0px)) 12px;
   }
-  .chat-composer-row { gap: 8px; }
-  .chat-attach, .chat-voice { width: 40px; }
-  .chat-send { min-width: 60px; padding: 0 14px; }
-  .chat-jump-latest { right: 12px; bottom: 80px; }
-  .chat-nudge { margin: 8px 12px 0; }
+  .poster-composer-row { gap: 8px; }
+  .poster-composer-tool { width: 40px; }
+  .poster-composer-send { min-width: 60px; padding: 0 14px; }
+  .poster-conversation-jump { right: 12px; bottom: 80px; }
+  .poster-nudge { margin: 8px 12px 0; }
 }
+
+/* ── Words on the sun stay ink in every theme (moved from profile-poster.css, same selectors) ── */
+.poster-thread--active, .poster-conversation-toggle, .poster-conversation-copy.copied,
+.poster-turn--user .poster-turn-body, .poster-composer-tool:hover { color: var(--on-sun); }

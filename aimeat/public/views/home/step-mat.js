@@ -15,6 +15,7 @@
  *   summary once the mat exists.
  * @usage import { StepMat } from './step-mat.js';
  * @version-history
+ *   2026-09-23: Composed from the shared parts in css/parts.css and css/parts-steps.css (class names by role, values moved from views/home.css unchanged; UI consolidation slice 1).
  *   (2026-08-23) Em-dashes swept from the copied and paste fallbacks (banned in every surface).
  *   v1.0.0 — 2026-08-07 — Initial (remake phase 3).
  */
@@ -94,13 +95,13 @@ export function StepMat({ onDone }) {
   const hasPaste = paste.trim().length > 0;
 
   return html`
-    <div class="koti-step koti-step-open">
-      <div class="koti-step-head">
-        <span class="koti-step-num">1</span>
-        <h2 class="koti-step-title">${tr('home.mat.title', 'Your welcome mat')}</h2>
+    <div class="poster-step poster-step--open">
+      <div class="poster-step-head">
+        <span class="poster-step-num">1</span>
+        <h2 class="poster-step-title">${tr('home.mat.title', 'Your welcome mat')}</h2>
       </div>
 
-      <p class="koti-step-lede">
+      <p class="poster-step-lede">
         ${tr('home.mat.lede', 'Every home needs a welcome mat. You are going to make yours with your own AI: copy the prompt below into your AI chat, paste what it gives back into the box, and press the button.')}
       </p>
 
@@ -111,13 +112,13 @@ export function StepMat({ onDone }) {
         copyLabel=${tr('home.mat.copy', 'Copy the prompt')}
         copiedLabel=${tr('home.mat.copied', 'Copied. Paste it in your AI chat')} />
 
-      <label class="koti-paste-label" for="koti-paste">
+      <label class="poster-paste-label" for="koti-paste">
         ${tr('home.mat.pasteLabel', 'Paste what your AI gave you here')}
       </label>
       <textarea
         id="koti-paste"
         ref=${boxRef}
-        class="koti-paste"
+        class="poster-paste"
         rows="8"
         spellcheck="false"
         placeholder=${tr('home.mat.pastePlaceholder', 'Everything it wrote is fine, explanation and all.')}
@@ -125,19 +126,19 @@ export function StepMat({ onDone }) {
         onInput=${(e) => setPaste(e.target.value)}></textarea>
 
       ${errText && html`
-        <div class="koti-error" role="alert">
-          <p class="koti-error-text">${errText}</p>
-          <p class="koti-error-hint">
+        <div class="poster-error" role="alert">
+          <p class="poster-error-text">${errText}</p>
+          <p class="poster-error-hint">
             ${tr('home.mat.errKept', 'Your text is still in the box. Ask your AI for the whole HTML file in one code block, and paste again.')}
             ${attempts > 1 ? ` ${tr('home.mat.attempts', 'Attempts so far: {n}.').replace('{n}', String(attempts))}` : ''}
           </p>
           ${fallbackPrompt && !usingFallback && html`
-            <button type="button" class="btn-ghost koti-fallback-btn" onClick=${() => setUsingFallback(true)}>
+            <button type="button" class="btn-ghost poster-error-fallback" onClick=${() => setUsingFallback(true)}>
               ${tr('home.mat.tryShorter', 'Show me a shorter prompt to try')}
             </button>`}
         </div>`}
 
-      <div class="koti-actions">
+      <div class="poster-actions">
         <button
           type="button"
           class=${hasPaste ? 'btn-primary' : 'btn-outline'}
@@ -197,7 +198,7 @@ export function StepMatDone({ state }) {
   const state3 = item?.status === 'working' ? 'working' : item ? 'open' : 'off';
 
   return html`
-    <div class="koti-step koti-step-done">
+    <div class="poster-step poster-step--done">
       <${CardMenu} state=${state3} label=${tr('home.mat.titleDone', 'Your welcome mat is up')}
         onOpened=${learned}
         actions=${[{
@@ -209,22 +210,22 @@ export function StepMatDone({ state }) {
             else { setItem(await addOpenItem({ title, kind: 'document', origin })); }
           },
         }]} />
-      <div class="koti-step-head">
-        <span class="koti-step-num koti-step-num-done">✓</span>
-        <h2 class="koti-step-title">${tr('home.mat.titleDone', 'Your welcome mat is up')}</h2>
+      <div class="poster-step-head">
+        <span class="poster-step-num poster-step-num--done">✓</span>
+        <h2 class="poster-step-title">${tr('home.mat.titleDone', 'Your welcome mat is up')}</h2>
       </div>
-      <p class="koti-step-lede">
+      <p class="poster-step-lede">
         ${tr('home.mat.doneLede', 'This is the first thing you made here, and it is a real page with its own address.')}
       </p>
-      <div class="koti-mat-links">
+      <div class="poster-link-row">
         <a class="btn-outline" href=${state.mat.url}>${tr('home.mat.view', 'Look at it')}</a>
         ${state.mat.standaloneUrl && html`
-          <a class="koti-mat-url" href=${state.mat.standaloneUrl} target="_blank" rel="noopener">
+          <a class="poster-link-row-url" href=${state.mat.standaloneUrl} target="_blank" rel="noopener">
             ${state.mat.standaloneUrl}
           </a>`}
       </div>
       ${!taught && html`
-        <p class="koti-teach">
+        <p class="poster-teach">
           ${tr('home.mat.teachDots', 'The three dots in the corner are how you act on anything here. Every card has them, always in that same corner.')}
         </p>`}
     </div>`;

@@ -17,6 +17,7 @@
  *   OwnAimeatBlock · TrustBlock · StepsBlock
  * @usage Reached through views/surface/block-map.js, never imported directly by a view.
  * @version-history
+ *   2026-09-23: Composed from the shared parts in css/parts.css and css/parts-steps.css (class names by role, values moved from views/home.css unchanged; UI consolidation slice 1).
  *   2026-09-15: OwnAimeatBlock, a demo site's card that sends a person to the store for their own
  *     AIMEAT. The operator adds it; no built-in home has it.
  *   2026-09-14: YourTurnBlock, which lists the threads whose last word was somebody else's. The
@@ -74,7 +75,7 @@ export function MatBlock() {
   const url = state?.mat?.standaloneUrl || state?.mat?.url;
   if (!url) return null;
   return html`
-    <p class="koti-matline">
+    <p class="poster-link-line">
       ${tr('home.webpage', 'Your webpage, made by your AI:')}${' '}
       <a href=${url} target="_blank" rel="noopener">${url.replace('https://', '').replace('http://', '')}</a>
     </p>`;

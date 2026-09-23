@@ -28,6 +28,7 @@
  * @structure WelcomeDoor({ onNavigate })
  * @usage import { WelcomeDoor } from '/views/home/welcome-door.js';
  * @version-history
+ *   2026-09-23: Composed from the shared parts in css/parts.css and css/parts-steps.css (class names by role, values moved from views/home.css unchanged; UI consolidation slice 1).
  *   (2026-08-27) Comments follow the arrival rule: the path decides, not a per-tab flag.
  *   (2026-08-23) Em-dashes swept from the fallback strings (banned in every surface).
  *   v1.0.0 — 2026-08-07 — Initial (remake phase 8).
@@ -51,7 +52,7 @@ const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fa
 
 /** The keyhole. Drawn rather than an icon font, so it needs nothing to load and scales cleanly. */
 const Keyhole = html`
-  <svg class="koti-keyhole" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"
+  <svg class="poster-door-keyhole" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"
        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
     <circle cx="12" cy="9" r="4" />
     <path d="M12 13 L10.5 20 L13.5 20 Z" fill="currentColor" stroke="none" />
@@ -101,18 +102,18 @@ export function WelcomeDoor({ onNavigate }) {
   };
 
   return html`
-    <section class="koti-door">
-      <h1 class="koti-door-title">
+    <section class="poster-door">
+      <h1 class="poster-door-title">
         ${tr('landing.homeWelcome', 'Welcome to your digital AI home.')}
       </h1>
 
       ${/* The agent door, first. No mention of MCP on the button — that word belongs inside the
             prompt and the details, not on the thing a stranger reads first. */''}
-      <div class="koti-door-agent">
-        <div class="koti-door-agent-head">
+      <div class="poster-door-agent">
+        <div class="poster-door-agent-head">
           <div>
-            <p class="koti-door-agent-title">${tr('landing.agentDoorTitle', 'Let your AI do this')}</p>
-            <p class="koti-door-agent-sub">
+            <p class="poster-door-agent-title">${tr('landing.agentDoorTitle', 'Let your AI do this')}</p>
+            <p class="poster-door-agent-sub">
               ${tr('landing.agentDoorSub', 'Copy the prompt into your own AI chat. If it can, a link arrives in your email and your account is done.')}
             </p>
           </div>
@@ -125,21 +126,21 @@ export function WelcomeDoor({ onNavigate }) {
         </div>
 
         ${open && html`
-          <div class="koti-door-after">
+          <div class="poster-door-after">
             <p>${tr('landing.agentDoorAfter', 'It will ask you for your email address and nothing else. You choose your own username afterwards, from the link.')}</p>
             <p>${tr('landing.agentDoorMcp', 'Be ready to set up a connector for it later; that is the step that lets it reach your home directly.')}</p>
             <p>${tr('landing.agentDoorCannot', 'If it says it cannot, that is a fine answer. Register below instead.')}</p>
           </div>`}
       </div>
 
-      <div class="koti-door-entrances">
-        <a class="koti-door-register" href="/v1/portal" onClick=${(e) => enter(e, 'register')}>
-          <span class="koti-door-register-title">${tr('landing.registerHome', 'Register your home')}</span>
-          <span class="koti-door-register-sub">${tr('landing.registerHomeSub', 'If you do not have a way in yet.')}</span>
+      <div class="poster-door-entrances">
+        <a class="poster-door-register" href="/v1/portal" onClick=${(e) => enter(e, 'register')}>
+          <span class="poster-door-register-title">${tr('landing.registerHome', 'Register your home')}</span>
+          <span class="poster-door-register-sub">${tr('landing.registerHomeSub', 'If you do not have a way in yet.')}</span>
         </a>
 
         ${/* Sign-in as a keyhole: coming back here is stepping into somewhere of your own. */''}
-        <a class="koti-door-signin" href="/v1/portal" onClick=${(e) => enter(e, 'signin')}>
+        <a class="poster-door-signin" href="/v1/portal" onClick=${(e) => enter(e, 'signin')}>
           ${Keyhole}
           <span>${tr('landing.signInHome', 'Sign in to your home')}</span>
         </a>

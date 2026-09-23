@@ -16,6 +16,7 @@
  *   - StatusBar — which agent, what is left to spend, and what is wrong when something is
  * @usage import { ThreadList, Turn, Composer, StatusBar } from './chat/parts.js';
  * @version-history
+ *   2026-09-23: Composed from the shared parts in css/parts-conversation.css (class names by role, values moved from views/chat.css unchanged; UI consolidation slice 1).
  *   v1.4.0 -- 2026-09-13 -- Compose top rules from poster.css; move board colours into CSS.
  *   v1.3.1 — 2026-09-03 — The "use your own key" link goes to ?tab=ai, the AI page's route id.
  *   v1.3.0 — 2026-08-28 — ThreadList takes children, rendered under the list: the rail now carries
@@ -61,9 +62,9 @@ export function WorkLine({ tool }) {
     const status = String(tool.status || 'pending');
     const label = tr(`chat.work.${status}`, status);
     return html`
-        <li class="chat-work-line chat-work-line--${status}">
-            <span class="chat-work-status">${label}</span>
-            <span class="chat-work-title">${tool.title || tr('chat.work.untitled', 'a tool call')}</span>
+        <li class="poster-worklog-line poster-worklog-line--${status}">
+            <span class="poster-worklog-status">${label}</span>
+            <span class="poster-worklog-title">${tool.title || tr('chat.work.untitled', 'a tool call')}</span>
         </li>
     `;
 }
@@ -72,9 +73,9 @@ export function WorkLine({ tool }) {
 export function WorkLog({ tools }) {
     if (!tools || tools.length === 0) return null;
     return html`
-        <div class="chat-work">
-            <div class="chat-work-head">${tr('chat.work.title', 'What was done')}</div>
-            <ul class="chat-work-list">
+        <div class="poster-worklog">
+            <div class="poster-worklog-head">${tr('chat.work.title', 'What was done')}</div>
+            <ul class="poster-worklog-list">
                 ${tools.map((tool, i) => html`<${WorkLine} key=${i} tool=${tool} />`)}
             </ul>
         </div>
@@ -92,18 +93,18 @@ export function WorkLog({ tools }) {
 export function ResultCards({ cards }) {
     if (!cards || cards.length === 0) return null;
     return html`
-        <div class="chat-cards">
+        <div class="poster-results">
             ${cards.map((card, i) => html`
-                <div class=${'chat-card chat-card--' + (card.kind || 'page')} key=${card.url || card.ref || i}>
+                <div class=${'poster-result poster-result--' + (card.kind || 'page')} key=${card.url || card.ref || i}>
                     ${card.image && html`
-                        <img class="chat-card-img" src=${card.image} alt=${card.title || ''} loading="lazy" />`}
-                    <div class="chat-card-body">
-                        <div class="chat-card-kind">${tr('chat.card.' + (card.kind || 'page'), card.kind || '')}</div>
-                        <div class="chat-card-title">${card.title}</div>
-                        ${card.ref && !card.url && html`<code class="chat-card-ref">${card.ref}</code>`}
+                        <img class="poster-result-img" src=${card.image} alt=${card.title || ''} loading="lazy" />`}
+                    <div class="poster-result-body">
+                        <div class="poster-result-kind">${tr('chat.card.' + (card.kind || 'page'), card.kind || '')}</div>
+                        <div class="poster-result-title">${card.title}</div>
+                        ${card.ref && !card.url && html`<code class="poster-result-ref">${card.ref}</code>`}
                     </div>
                     ${card.url && html`
-                        <a class="btn-outline chat-card-open" href=${card.url} target="_blank" rel="noopener noreferrer">
+                        <a class="btn-outline poster-result-open" href=${card.url} target="_blank" rel="noopener noreferrer">
                             ${tr('chat.card.open', 'Open')}
                         </a>`}
                 </div>`)}
@@ -131,8 +132,8 @@ export function Turn({ turn, id }) {
     };
 
     return html`
-        <div class="chat-turn chat-turn--${mine ? 'user' : 'agent'}">
-            <div class="chat-bubble">
+        <div class="poster-turn poster-turn--${mine ? 'user' : 'agent'}">
+            <div class="poster-turn-body">
                 ${/* An attachment is PRIVATE, and a private file is not something an <img src> can
                       fetch: the tag carries no Authorization header, so the picture the person just
                       sent renders as a broken frame in their own conversation. ImageView is the
@@ -146,31 +147,31 @@ export function Turn({ turn, id }) {
                     if (keys.length === 0) return null;
                     const isPicture = (k) => /\.(png|jpe?g|gif|webp|avif|svg)$/i.test(k);
                     return html`
-                        <div class="chat-turn-images">
+                        <div class="poster-turn-images">
                             ${keys.map((key) => (isPicture(key)
                                 ? html`<${ImageView} key=${key}
                                     desc=${{ url: `/v1/storage/${encodeURIComponent(key)}`, alt: key }} />`
-                                : html`<a class="chat-turn-file" key=${key} target="_blank" rel="noopener noreferrer"
+                                : html`<a class="poster-turn-file" key=${key} target="_blank" rel="noopener noreferrer"
                                     href=${`/v1/storage/${encodeURIComponent(key)}`}>📄 ${key.split('/').pop()}</a>`))}
                         </div>`;
                 })()}
                 ${mine
-                    ? html`<p class="chat-said">${turn.text}</p>`
+                    ? html`<p class="poster-turn-said">${turn.text}</p>`
                     : html`<${Markdown} text=${stripChoices(turn.text)} />`}
                 <${ResultCards} cards=${turn.cards} />
                 <${WorkLog} tools=${turn.tools} />
             </div>
-            <div class="chat-meta">
+            <div class="poster-turn-meta">
                 <span>${timeShort(turn.at)}</span>
-                ${turn.model ? html`<span class="chat-model" title=${tr('chat.modelTitle', 'The model that answered this turn')}>${turn.model}</span>` : ''}
+                ${turn.model ? html`<span class="poster-turn-model" title=${tr('chat.modelTitle', 'The model that answered this turn')}>${turn.model}</span>` : ''}
                 <!-- The RAW markdown, which is what pastes usefully into an editor or another chat.
                      Same control and same behaviour as the message bubbles in the inbox. -->
-                ${turn.text ? html`<${CopyButton} text=${String(turn.text)} className="btn-ghost chat-copy"
+                ${turn.text ? html`<${CopyButton} text=${String(turn.text)} className="btn-ghost poster-turn-copy"
                     label="⧉" copiedLabel="✓"
                     title=${tr('chat.copyTurn', 'Copy this message')} copiedTitle=${t('common.copied')}
                     ariaLabel=${tr('chat.copyTurn', 'Copy this message')} />` : ''}
                 ${!mine && turn.text && isSpeechSupported() ? html`
-                    <button type="button" class="btn-ghost chat-listen" onClick=${listen}>
+                    <button type="button" class="btn-ghost poster-turn-listen" onClick=${listen}>
                         ${reading ? tr('chat.stopListening', 'Stop') : tr('chat.listen', 'Listen')}
                     </button>` : ''}
             </div>
@@ -187,11 +188,11 @@ export function Turn({ turn, id }) {
 export function LiveTurn({ text, thought, tools, cards, busy }) {
     if (!busy && !text && (!tools || tools.length === 0)) return null;
     return html`
-        <div class="chat-turn chat-turn--agent chat-turn--live">
-            <div class="chat-bubble">
+        <div class="poster-turn poster-turn--agent poster-turn--live">
+            <div class="poster-turn-body">
                 ${text ? html`<${Markdown} text=${stripChoices(text)} />` : ''}
-                ${!text && thought ? html`<p class="chat-thinking">${thought}</p>` : ''}
-                ${!text && !thought && busy ? html`<p class="chat-thinking">${tr('chat.working', 'Working…')}</p>` : ''}
+                ${!text && thought ? html`<p class="poster-turn-thinking">${thought}</p>` : ''}
+                ${!text && !thought && busy ? html`<p class="poster-turn-thinking">${tr('chat.working', 'Working…')}</p>` : ''}
                 <${ResultCards} cards=${cards} />
                 <${WorkLog} tools=${tools} />
                 ${busy && html`<${LiveStatus} tools=${tools} hasText=${!!text} />`}
@@ -227,10 +228,10 @@ function LiveStatus({ tools, hasText }) {
     const clock = seconds < 60 ? `${seconds}s` : `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
 
     return html`
-        <div class="chat-live-status" role="status" aria-live="polite">
-            <span class="chat-live-dot" aria-hidden="true"></span>
+        <div class="poster-live-status" role="status" aria-live="polite">
+            <span class="poster-live-dot" aria-hidden="true"></span>
             <span>${what}</span>
-            <span class="chat-live-clock">${clock}</span>
+            <span class="poster-live-clock">${clock}</span>
         </div>
     `;
 }
@@ -246,9 +247,9 @@ function LiveStatus({ tools, hasText }) {
  */
 export function GooseCredit() {
     return html`
-        <div class="chat-credit">
-            <a class="chat-credit-link" href="https://github.com/block/goose" target="_blank" rel="noopener noreferrer">
-                <span class="chat-credit-mark" aria-hidden="true">🪿</span>
+        <div class="poster-credit">
+            <a class="poster-credit-link" href="https://github.com/block/goose" target="_blank" rel="noopener noreferrer">
+                <span class="poster-credit-mark" aria-hidden="true">🪿</span>
                 <span>${tr('chat.poweredBy', 'Powered by goose')}</span>
             </a>
         </div>
@@ -296,11 +297,11 @@ export function stripChoices(text) {
 export function Choices({ options, onPick, disabled }) {
     if (!options || options.length === 0) return null;
     return html`
-        <div class="chat-choices">
+        <div class="poster-choices">
             ${options.map((opt, i) => html`
-                <button type="button" class="btn-outline chat-choice" key=${i}
+                <button type="button" class="btn-outline poster-suggestion" key=${i}
                     disabled=${disabled} onClick=${() => onPick(opt)}>${opt}</button>`)}
-            <span class="chat-choices-note">${tr('chat.choicesNote', 'or say something else')}</span>
+            <span class="poster-choices-note">${tr('chat.choicesNote', 'or say something else')}</span>
         </div>
     `;
 }
@@ -322,7 +323,7 @@ export function Choices({ options, onPick, disabled }) {
 export function AiNotice({ compact = false, className = '' }) {
     const [open, setOpen] = useState(false);
     return html`
-        <div class=${'chat-ai-notice' + (compact ? ' chat-ai-notice--compact' : '') + (className ? ' ' + className : '')}>
+        <div class=${'poster-ai-notice' + (compact ? ' poster-ai-notice--compact' : '') + (className ? ' ' + className : '')}>
             ${/* FULL the first time, one line after that. The duty is to make sure a person knows a
                   machine is on the other end, and somebody twenty messages into their fourth
                   conversation knows. Two lines and a button at the top of every screen from then on
@@ -332,12 +333,12 @@ export function AiNotice({ compact = false, className = '' }) {
                   It is never removed, and it stays a control: the sentence still says what this is,
                   and the whole explanation is one press away wherever you are. */''}
             ${compact
-                ? html`<span class="chat-ai-notice-line chat-ai-notice-short">${t('aiLabel.interactionTitle')}</span>`
+                ? html`<span class="poster-ai-notice-line poster-ai-notice-short">${t('aiLabel.interactionTitle')}</span>`
                 : html`<!-- The shared wording says "on your own API key", which is the app SDK's case
                              and not this one: here the node's own key pays. A true sentence in the
                              person's own context beats a shared one that is nearly right. -->
-                       <${AiInteractionNotice} class="chat-ai-notice-line" bodyKey="chat.aiNoticeBody" />`}
-            <button type="button" class="btn-ghost chat-ai-more" onClick=${() => setOpen(true)}>
+                       <${AiInteractionNotice} class="poster-ai-notice-line" bodyKey="chat.aiNoticeBody" />`}
+            <button type="button" class="btn-ghost poster-ai-notice-more" onClick=${() => setOpen(true)}>
                 ${tr('chat.aiMore', 'What does that mean?')}
             </button>
             <${Modal} open=${open} onClose=${() => setOpen(false)}
@@ -364,13 +365,13 @@ export function AiNotice({ compact = false, className = '' }) {
  */
 export function MobileNudge({ onDismiss }) {
     return html`
-        <div class="chat-nudge" role="note">
-            <span class="chat-nudge-text">
+        <div class="poster-nudge" role="note">
+            <span class="poster-nudge-text">
                 <strong>${tr('chat.nudgeMobileTitle', 'Put this on your phone')}</strong>
                 ${' '}
                 ${tr('chat.nudgeMobileBody', 'It installs as an app, and with notifications on I can tell you when something finishes instead of you coming back to check.')}
             </span>
-            <button type="button" class="btn-ghost chat-nudge-dismiss" onClick=${onDismiss}>
+            <button type="button" class="btn-ghost poster-nudge-dismiss" onClick=${onDismiss}>
                 ${tr('chat.nudgeDismiss', 'Not now')}
             </button>
         </div>
@@ -381,10 +382,10 @@ export function MobileNudge({ onDismiss }) {
 export function TurnError({ message, onRetry }) {
     if (!message) return null;
     return html`
-        <div class="chat-error" role="alert">
-            <p class="chat-error-msg">${message}</p>
+        <div class="poster-turn-error" role="alert">
+            <p class="poster-turn-error-msg">${message}</p>
             ${onRetry && html`
-                <button type="button" class="btn-outline chat-error-retry" onClick=${onRetry}>
+                <button type="button" class="btn-outline" onClick=${onRetry}>
                     ${tr('chat.retry', 'Try again')}
                 </button>`}
         </div>
@@ -400,24 +401,24 @@ export function TurnError({ message, onRetry }) {
  */
 export function ThreadList({ threads, activeId, onOpen, onNew, onDelete, onClose, children }) {
     return html`
-        <aside class="chat-threads">
-            <button type="button" class="btn-ghost chat-threads-close" onClick=${onClose}>
+        <aside class="poster-conversation-rail">
+            <button type="button" class="btn-ghost poster-conversation-rail-close" onClick=${onClose}>
                 ↩ ${tr('chat.backToChat', 'Back to the conversation')}
             </button>
-            <button type="button" class="btn-primary chat-new" onClick=${onNew}>
+            <button type="button" class="btn-primary poster-slab poster-slab--control poster-conversation-new" onClick=${onNew}>
                 ${tr('chat.new', 'New conversation')}
             </button>
             ${threads.length === 0
-                ? html`<p class="chat-threads-empty">${tr('chat.noThreads', 'Nothing here yet. Say something and this is where it will be.')}</p>`
+                ? html`<p class="poster-conversation-empty">${tr('chat.noThreads', 'Nothing here yet. Say something and this is where it will be.')}</p>`
                 : html`
-                    <ul class="chat-thread-list">
+                    <ul class="poster-thread-list">
                         ${threads.map((thread) => html`
-                            <li key=${thread.id} class="chat-thread ${thread.id === activeId ? 'chat-thread--active' : ''}">
-                                <button type="button" class="chat-thread-open" onClick=${() => onOpen(thread.id)}>
-                                    <span class="chat-thread-title">${thread.title}</span>
-                                    <span class="chat-thread-sub">${tr('chat.turnCount', '{n} messages').replace('{n}', String(thread.turns ?? 0))}</span>
+                            <li key=${thread.id} class="poster-thread ${thread.id === activeId ? 'poster-thread--active' : ''}">
+                                <button type="button" class="poster-thread-open" onClick=${() => onOpen(thread.id)}>
+                                    <span class="poster-thread-title">${thread.title}</span>
+                                    <span class="poster-thread-sub">${tr('chat.turnCount', '{n} messages').replace('{n}', String(thread.turns ?? 0))}</span>
                                 </button>
-                                <button type="button" class="btn-ghost chat-thread-del"
+                                <button type="button" class="btn-ghost poster-thread-del"
                                     aria-label=${tr('chat.delete', 'Delete conversation')}
                                     onClick=${() => onDelete(thread.id)}>✗</button>
                             </li>
@@ -463,26 +464,26 @@ export function Composer({ value, onInput, onSend, onStop, onSpeak, onAttach, at
     };
 
     return html`
-        <div class="chat-composer poster-row--thing">
-            ${note ? html`<p class="chat-composer-note">${note}</p>` : ''}
-            ${listening ? html`<p class="chat-composer-note">${tr('chat.hearing', 'Working out what you said…')}</p>` : ''}
+        <div class="poster-composer poster-row--thing">
+            ${note ? html`<p class="poster-composer-note">${note}</p>` : ''}
+            ${listening ? html`<p class="poster-composer-note">${tr('chat.hearing', 'Working out what you said…')}</p>` : ''}
             ${/* Attached and not yet sent. Each one is removable: a picture picked by mistake should
                   cost one press, not a reload. */''}
             ${attachments.length > 0 && html`
-                <div class="chat-attachments">
+                <div class="poster-attachments">
                     ${attachments.map((att) => html`
-                        <span class=${'chat-attachment' + (att.state === 'error' ? ' chat-attachment--error' : '')} key=${att.id}>
-                            ${att.preview && html`<img class="chat-attachment-thumb" src=${att.preview} alt="" />`}
-                            <span class="chat-attachment-name">${att.name}</span>
-                            ${att.state === 'uploading' && html`<span class="chat-attachment-state">${tr('chat.attachUploading', 'uploading…')}</span>`}
-                            ${att.state === 'error' && html`<span class="chat-attachment-state">${att.error || tr('chat.attachFailed', 'failed')}</span>`}
-                            <button type="button" class="btn-ghost chat-attachment-drop"
+                        <span class=${'poster-attachment' + (att.state === 'error' ? ' poster-attachment--error' : '')} key=${att.id}>
+                            ${att.preview && html`<img class="poster-attachment-thumb" src=${att.preview} alt="" />`}
+                            <span class="poster-attachment-name">${att.name}</span>
+                            ${att.state === 'uploading' && html`<span class="poster-attachment-state">${tr('chat.attachUploading', 'uploading…')}</span>`}
+                            ${att.state === 'error' && html`<span class="poster-attachment-state">${att.error || tr('chat.attachFailed', 'failed')}</span>`}
+                            <button type="button" class="btn-ghost poster-attachment-drop"
                                 title=${tr('chat.attachRemove', 'Remove')}
                                 onClick=${() => onDropAttachment(att.id)}>×</button>
                         </span>`)}
                 </div>`}
-            <div class="chat-composer-row">
-                <textarea ref=${ref} class="chat-input" rows="1"
+            <div class="poster-composer-row">
+                <textarea ref=${ref} class="poster-composer-input" rows="1"
                     value=${value}
                     disabled=${disabled}
                     placeholder=${disabled
@@ -491,17 +492,17 @@ export function Composer({ value, onInput, onSend, onStop, onSpeak, onAttach, at
                     onInput=${(e) => onInput(e.target.value)}
                     onKeyDown=${keydown}></textarea>
                 ${onAttach && !busy ? html`
-                    <input type="file" multiple ref=${fileRef} class="chat-file-input"
+                    <input type="file" multiple ref=${fileRef} class="poster-composer-file"
                         onChange=${(e) => { onAttach([...e.target.files]); e.target.value = ''; }} />
-                    <button type="button" class="btn-outline chat-attach" disabled=${disabled}
+                    <button type="button" class="btn-outline poster-composer-tool" disabled=${disabled}
                         title=${tr('chat.attachTitle', 'Attach a file')}
                         onClick=${() => fileRef.current?.click()}>📎</button>` : ''}
                 ${onSpeak && !busy ? html`
                     <${VoiceRecorder} maxSeconds=${voiceMaxSeconds} disabled=${disabled || listening}
-                        className="btn-outline chat-voice" onRecorded=${(file) => onSpeak(file)} />` : ''}
+                        className="btn-outline poster-composer-tool" onRecorded=${(file) => onSpeak(file)} />` : ''}
                 ${busy
-                    ? html`<button type="button" class="btn-outline chat-send" onClick=${onStop}>${tr('chat.stop', 'Stop')}</button>`
-                    : html`<button type="button" class="btn-primary chat-send"
+                    ? html`<button type="button" class="btn-outline poster-slab poster-slab--control poster-composer-send" onClick=${onStop}>${tr('chat.stop', 'Stop')}</button>`
+                    : html`<button type="button" class="btn-primary poster-slab poster-slab--control poster-composer-send"
                         disabled=${disabled || !value.trim()}
                         onClick=${onSend}>${tr('chat.send', 'Send')}</button>`}
             </div>
@@ -543,15 +544,15 @@ export function StatusBar({ status, onReset }) {
         ? tr('chat.useOwnKeyLink', 'Use your own key')
         : null;
     return html`
-        <div class="chat-status">
-            <span class="chat-status-agent" title=${status.agent_name}>${tr('chat.statusYourAgent', 'Your agent')}</span>
-            ${payer && html`<span class="chat-status-key">${payer()}</span>`}
-            ${elsewhere && html`<span class="chat-status-elsewhere">${elsewhere}</span>`}
-            ${ownKeyLink && html`<a class="chat-status-ownkey" href="/v1/profile?tab=ai">${ownKeyLink} →</a>`}
-            ${status.model && html`<span class="chat-model chat-status-model"
+        <div class="poster-agent-status">
+            <span class="poster-agent-status-who" title=${status.agent_name}>${tr('chat.statusYourAgent', 'Your agent')}</span>
+            ${payer && html`<span>${payer()}</span>`}
+            ${elsewhere && html`<span class="poster-agent-status-note">${elsewhere}</span>`}
+            ${ownKeyLink && html`<a class="poster-agent-status-link" href="/v1/profile?tab=ai">${ownKeyLink} →</a>`}
+            ${status.model && html`<span class="poster-turn-model poster-agent-status-model"
                 title=${tr('chat.modelTitle', 'The model that answered this turn')}>${status.model}</span>`}
             ${onReset && html`
-                <button type="button" class="btn-ghost chat-status-reset"
+                <button type="button" class="btn-ghost poster-rail-action"
                     title=${tr('chat.resetTitle', 'Start a fresh agent session for this conversation. Needed after changing what the agent may do.')}
                     onClick=${onReset}>${tr('chat.reset', 'Reset session')}</button>`}
         </div>
