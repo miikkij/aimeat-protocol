@@ -84,6 +84,8 @@ export const SHAPE_ENTRIES: UiEntrySource[] = [
         'A small mono tag in a thin ink frame.', 'A tag or a kind beside a name.'),
     shape('crumb', 'Crumb', ['poster-crumb'], '<span class="poster-crumb">…</span>',
         'A mono coral path step followed by a slash.', 'Where a page sits, above its headline.'),
+    shape('time', 'Time', ['poster-time'], '<span class="poster-time">10:42</span>',
+        'When a thing happened, in small grey typewriter letters.', 'The time under a chat message and beside an event on the home.'),
     shape('stat', 'Stat', ['poster-stat', 'poster-stat-number', 'poster-stat-number--small', 'poster-stat-number--large', 'poster-stat-number--step', 'poster-stat-number--band'],
         '<a class="poster-stat" href="…"><span class="poster-stat-number">3</span>…</a>',
         'A line over a 3px ink rule with its number set big in the poster face.', 'A count a person reads at a glance.',

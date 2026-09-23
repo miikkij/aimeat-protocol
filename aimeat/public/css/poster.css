@@ -133,6 +133,8 @@
 }
 .poster-crumb { font-family: var(--font-mono); font-weight: 400; font-size: .8rem; letter-spacing: 0; text-transform: none; color: var(--accent); }
 .poster-crumb::after { content: ' /'; }
+/* When a thing happened: small grey typewriter letters, the chat's cut (Jouni's decision "Timestamp"). */
+.poster-time { font-family: var(--font-mono); font-size: .68rem; color: var(--text-dim); }
 .poster-stat {
   display: flex; align-items: baseline; gap: 1rem; margin: 0; padding: .8rem 0;
   border-top: 3px solid var(--text); color: var(--text); text-decoration: none; font-size: 1.05rem; font-weight: 800;

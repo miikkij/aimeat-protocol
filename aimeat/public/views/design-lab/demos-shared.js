@@ -140,6 +140,7 @@ export const SHAPE_DEMOS = {
   ] },
   'chip': { variants: [{ name: 'default (kept for the chip decision)', render: () => el('span', 'poster-chip', 'music') }] },
   'crumb': { variants: [{ name: 'default', render: () => el('span', 'poster-crumb', 'Profile') }] },
+  'time': { variants: [{ name: 'default', render: () => el('span', 'poster-time', '10:42') }] },
   'stat': { variants: [
     { name: 'default', render: () => html`<a class="poster-stat" href="#"><span class="poster-stat-number">3</span>messages wait for you</a>` },
     { name: 'small number', render: () => html`<p>Row <span class="poster-stat-number poster-stat-number--small">12</span></p>` },
