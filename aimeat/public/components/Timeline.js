@@ -58,7 +58,7 @@ export function TimelineRow({ category, live = false, href, text, when }) {
         ${href
           ? html`<a class="poster-timeline-line" href=${href}>${text}</a>`
           : html`<span class="poster-timeline-line">${text}</span>`}
-        <span class="poster-timeline-when">${when}</span>
+        <span class="poster-time poster-timeline-when">${when}</span>
       </div>
     </li>`;
 }

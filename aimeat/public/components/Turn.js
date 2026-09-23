@@ -84,7 +84,7 @@ export function Turn({ turn, id }) {
                 <${ResultCards} cards=${turn.cards} />
                 <${WorkLog} tools=${turn.tools} />
             </div>
-            <div class="poster-turn-meta">
+            <div class="poster-time poster-turn-meta">
                 <span>${timeShort(turn.at)}</span>
                 ${turn.model ? html`<span class="poster-turn-model" title=${tr('chat.modelTitle', 'The model that answered this turn')}>${turn.model}</span>` : ''}
                 <!-- The RAW markdown, which is what pastes usefully into an editor or another chat.

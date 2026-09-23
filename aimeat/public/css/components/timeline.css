@@ -28,7 +28,8 @@
   padding: 0.75rem 0; border-bottom: 1px solid var(--border);
 }
 .poster-timeline-body { display: contents; }
-.poster-timeline-when { order: -1; font-family: var(--font-mono); font-size: 0.76rem; color: var(--text-dim); }
+/* The look is the shared time (.poster-time); this keeps only its place in the row. */
+.poster-timeline-when { order: -1; }
 .poster-timeline-dot { width: 14px; height: 14px; background: var(--border); }
 .poster-timeline-item--made .poster-timeline-dot { background: var(--accent); }
 .poster-timeline-item--agent .poster-timeline-dot { background: var(--success); }

@@ -61,9 +61,6 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-family: var(--font-mono);
-  font-size: 0.68rem;
-  color: var(--text-dim);
   padding: 0 2px;
 }
 .poster-turn--agent .poster-turn-meta { padding-left: 24px; }
