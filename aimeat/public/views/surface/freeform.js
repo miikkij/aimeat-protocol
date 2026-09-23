@@ -23,6 +23,7 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { Markdown } from '/components/Markdown.js';
+import { FreeText } from '/components/FreeText.js';
 
 /** Nothing to say, nothing rendered — the rule every block on these pages follows. */
 export function FreeformBlock(/** @type {{ ctx?: any, props?: Record<string, any>, title?: string, text?: string, blockKey?: string }} */ { text, props = {}, title = '' }) {
@@ -30,10 +31,9 @@ export function FreeformBlock(/** @type {{ ctx?: any, props?: Record<string, any
   if (!body) return null;
   const tone = props.tone === 'plain' || props.tone === 'band' ? props.tone : 'card';
   return html`
-    <section class=${`poster-free poster-free--${tone}`}>
-      ${title ? html`<h2 class="poster-free-title">${title}</h2>` : ''}
+    <${FreeText} tone=${tone} title=${title}>
       <${Markdown} text=${body} />
-    </section>`;
+    <//>`;
 }
 
 export default FreeformBlock;

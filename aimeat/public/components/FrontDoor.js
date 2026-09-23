@@ -1,5 +1,5 @@
 /**
- * @file public/views/home/welcome-door.js
+ * @file public/components/FrontDoor.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The front door (aimeat_remake/01-speksi.md §1 and 12-ai-rekisteroi.md): the first
@@ -25,9 +25,12 @@
  *   `/v1/portal` IS this page — so the router dutifully re-rendered the landing page and nothing
  *   observable happened. A route that resolves to the view you are already looking at is not
  *   navigation.
- * @structure WelcomeDoor({ onNavigate })
- * @usage import { WelcomeDoor } from '/views/home/welcome-door.js';
+ * @structure FrontDoor({ onNavigate })
+ * @usage import { FrontDoor } from '/components/FrontDoor.js';
  * @version-history
+ *   2026-09-23: Moved whole from views/home/welcome-door.js into the component library as
+ *     FrontDoor (it was WelcomeDoor), markup unchanged; its look is css/components/front-door.css,
+ *     its catalogue entry `front-door` (UI consolidation phase 1, a move).
  *   2026-09-23: Composed from the shared parts in css/parts.css and css/parts-steps.css (class names by role, values moved from views/home.css unchanged; UI consolidation slice 1).
  *   (2026-08-27) Comments follow the arrival rule: the path decides, not a per-tab flag.
  *   (2026-08-23) Em-dashes swept from the fallback strings (banned in every surface).
@@ -72,7 +75,7 @@ function openAuth(tab) {
   });
 }
 
-export function WelcomeDoor({ onNavigate }) {
+export function FrontDoor({ onNavigate }) {
   const session = useSession();
   const [prompt, setPrompt] = useState('');
   const [open, setOpen] = useState(false);

@@ -5,16 +5,22 @@
  * @description The finished home's status pieces: the mailbox row, the fleet line, the chat door,
  *   what you have made (with stars and a fold), your apps, and the achievements strip. Split out of
  *   index.js when the status view grew past what one file should hold; index.js stays the
- *   orchestrator and this file owns what each piece looks like.
+ *   orchestrator. Since 2026-09-23 this file composes: what each piece LOOKS like is the component
+ *   library's (public/components/, catalogued in src/services/ui-library/), and this file decides
+ *   only what goes into each piece.
  *
  *   Two rules run through every piece. Nothing here renders when it has nothing to say — an empty
  *   inventory reads as broken. And at a real account's scale (30 shared spaces, 141 apps) nothing
  *   spills: the person stars what matters, the rest folds away, and the fold says how much it
  *   holds. The first version showed every chip it had, which on the developer's own account was
  *   the wall of noise this file exists to prevent.
- * @structure MailboxRow · YourTurn · FleetLine · ChatDoor · NamedRow · Things · FavoriteApps · Playbooks · TrustLine · Achievements
+ * @structure MailboxRow · YourTurn · FleetLine · ChatDoor · Things · FavoriteApps · Playbooks · TrustLine · Achievements
  * @usage import { MailboxRow, FleetLine, ChatDoor, Things, FavoriteApps, Achievements } from '/views/home/status-parts.js';
  * @version-history
+ *   2026-09-23: Each piece is composed from library components (StatLine, Band, LineList, NamedRow,
+ *     ThingLink, ThingChip, FoldButton, ModeSwitch, QuietNote, NumberedIndex, IndexPanel, InkFoot,
+ *     CheckItem) that emit the markup this file wrote; NamedRow moved to public/components/.
+ *     ChatDoor stays here: no page mounts it (UI consolidation phase 1, a move).
  *   2026-09-23: Composed from the shared parts in css/parts.css and css/parts-steps.css (class names by role, values moved from views/home.css unchanged; UI consolidation slice 1).
  *   2026-09-14: YourTurn — the threads whose last word was somebody else's. The mailbox row gives
  *     the unread count and that is a different question: unread is "you have not looked", this is
@@ -55,21 +61,22 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { listRecents } from '/js/recents.js';
 import { swallowed } from '/js/swallowed.js';
+import { StatLine, statSentence as bigNumber } from '/components/StatLine.js';
+import { Band, BandNote } from '/components/Band.js';
+import { LineList } from '/components/LineList.js';
+import { NamedRow } from '/components/NamedRow.js';
+import { ThingLink, ThingChip } from '/components/ThingLink.js';
+import { FoldButton } from '/components/FoldButton.js';
+import { ModeSwitch } from '/components/ModeSwitch.js';
+import { QuietNote } from '/components/QuietNote.js';
+import { NumberedIndex, IndexPanel } from '/components/NumberedIndex.js';
+import { InkFoot } from '/components/InkFoot.js';
+import { CheckItem } from '/components/CheckItem.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 
 /** How many unstarred rows a folded list shows before the fold. */
 const FOLD_AFTER = 3;
-
-/**
- * A sentence with its number set big. The translated string keeps its placeholder until here, so
- * the numeral lands where that language puts it; a string without the placeholder renders as it is.
- */
-function bigNumber(sentence, placeholder, value) {
-  const at = sentence.indexOf(placeholder);
-  if (at < 0) return sentence;
-  return html`${sentence.slice(0, at)}<b class="poster-stat-number">${String(value)}</b>${sentence.slice(at + placeholder.length)}`;
-}
 
 /**
  * The mailbox on the wall: flag up when something unread waits, and one line saying how much.
@@ -79,14 +86,11 @@ export function MailboxRow({ mail }) {
   if (!mail) return null;
   const unread = mail.unread ?? 0;
   return html`
-    <a class="poster-stat ${unread > 0 ? 'poster-stat--alert' : ''}" href="/v1/profile?tab=messages">
-      <span class="poster-stat-icon" aria-hidden="true">${unread > 0 ? '📬' : '📪'}</span>
-      <span>
-        ${unread > 0
-          ? bigNumber(tr('home.mail.unread', '{n} unread, go have a look'), '{n}', unread)
-          : tr('home.mail.empty', 'Mailbox: nothing new')}
-      </span>
-    </a>`;
+    <${StatLine} href="/v1/profile?tab=messages" tone=${unread > 0 ? 'alert' : undefined} icon=${unread > 0 ? '📬' : '📪'}>
+      ${unread > 0
+        ? bigNumber(tr('home.mail.unread', '{n} unread, go have a look'), '{n}', unread)
+        : tr('home.mail.empty', 'Mailbox: nothing new')}
+    <//>`;
 }
 
 /**
@@ -107,22 +111,11 @@ export function YourTurn({ threads, max }) {
   if (!rows.length) return null;
   const hidden = (threads ?? []).length - rows.length;
   return html`
-    <section class="poster-band">
-      <h2 class="poster-section-title poster-section-title--large">${tr('home.turn.title', 'Waiting for your answer')}</h2>
-      <ul class="poster-line-list">
-        ${rows.map((r) => html`
-          <li class="poster-line-row" key=${r.id}>
-            <a class="poster-line-link" href="/v1/profile?tab=messages">
-              <span class="poster-line-name">${r.who}</span>
-              <span class="poster-line-text">${r.said}</span>
-            </a>
-          </li>`)}
-      </ul>
-      ${hidden > 0 && html`
-        <p class="poster-line-more">
-          ${bigNumber(tr('home.turn.more', '{n} more are waiting'), '{n}', hidden)}
-        </p>`}
-    </section>`;
+    <${Band} title=${tr('home.turn.title', 'Waiting for your answer')}>
+      <${LineList}
+        rows=${rows.map((r) => ({ id: r.id, name: r.who, text: r.said, href: '/v1/profile?tab=messages' }))}
+        more=${hidden > 0 ? bigNumber(tr('home.turn.more', '{n} more are waiting'), '{n}', hidden) : null} />
+    <//>`;
 }
 
 /**
@@ -136,18 +129,15 @@ export function FleetLine({ agent }) {
   const problems = agent.problems ?? 0;
   const ok = problems === 0;
   return html`
-    <a class="poster-stat ${ok ? 'poster-stat--ok' : 'poster-stat--trouble'}" href="/v1/profile?tab=agents">
-      <span class="poster-stat-dot" aria-hidden="true"></span>
-      <span>
-        ${total === 1
-          ? (ok
-            ? tr('home.fleet.oneOk', 'Your agent is home and well.')
-            : tr('home.fleet.oneTrouble', 'Your agent {name} needs a look.').replace('{name}', agent.name || ''))
-          : (ok
-            ? bigNumber(tr('home.fleet.allOk', '{total} agents home, all well.'), '{total}', total)
-            : bigNumber(tr('home.fleet.trouble', '{total} agents home · {n} need a look').replace('{n}', String(problems)), '{total}', total))}
-      </span>
-    </a>`;
+    <${StatLine} href="/v1/profile?tab=agents" tone=${ok ? 'ok' : 'trouble'} dot=${true}>
+      ${total === 1
+        ? (ok
+          ? tr('home.fleet.oneOk', 'Your agent is home and well.')
+          : tr('home.fleet.oneTrouble', 'Your agent {name} needs a look.').replace('{name}', agent.name || ''))
+        : (ok
+          ? bigNumber(tr('home.fleet.allOk', '{total} agents home, all well.'), '{total}', total)
+          : bigNumber(tr('home.fleet.trouble', '{total} agents home · {n} need a look').replace('{n}', String(problems)), '{total}', total))}
+    <//>`;
 }
 
 /**
@@ -186,20 +176,6 @@ export function ChatDoor({ chatStatus, mcpNames }) {
 }
 
 /**
- * One named row: the category word in a fixed left column, the content on the right. Every row
- * under a band title goes through this frame (spaces, knowledge, apps, tried so far), which is
- * what makes them line up as a list instead of reading as separate clouds. `title` is the
- * explainer that rides on the label as a tooltip, when the word alone is not enough.
- */
-export function NamedRow({ label, title, className, children }) {
-  return html`
-    <div class="poster-row--thing poster-named-row ${className || ''}">
-      <span class="poster-label poster-named-row-label" title=${title || undefined}>${label}</span>
-      <div class="poster-named-row-body">${children}</div>
-    </div>`;
-}
-
-/**
  * One starrable, foldable chip list. Starred rows always show, then the newest unstarred up to the
  * fold; the fold names how many it hides. The star is the person's own mark, kept in home.prefs —
  * starring is how "always show this one" is said without a settings page.
@@ -215,24 +191,18 @@ function ChipRow({ label, title, rows, starred, onStar, fold }) {
   return html`
     <${NamedRow} label=${label} title=${title}>
       ${shown.map((r) => html`
-        <span class="poster-thing poster-thing--named" key=${r.id}>
-          <a class="poster-thing-door" href=${r.href}>
-            <span class="poster-thing-label">${r.name}</span>
-            ${typeof r.n === 'number' && r.n > 0 && html`<span class="poster-thing-n">${r.n}</span>`}
-          </a>
-          <button type="button" class="poster-star ${isStar(r.id) ? 'poster-star--on' : ''}"
-            aria-pressed=${isStar(r.id)}
-            title=${tr('home.things.star', 'Keep this one always visible')}
-            onClick=${() => onStar(r.id)}>${isStar(r.id) ? '★' : '☆'}</button>
-        </span>`)}
+        <${ThingChip} key=${r.id} href=${r.href} label=${r.name} n=${r.n}
+          starred=${isStar(r.id)}
+          starTitle=${tr('home.things.star', 'Keep this one always visible')}
+          onStar=${() => onStar(r.id)} />`)}
       ${hidden > 0 && html`
-        <button type="button" class="poster-fold" onClick=${() => setOpen(true)}>
+        <${FoldButton} onClick=${() => setOpen(true)}>
           ${tr('home.things.showAll', 'Show all ({n})').replace('{n}', String(rows.length))}
-        </button>`}
+        <//>`}
       ${open && rows.length > fold && html`
-        <button type="button" class="poster-fold" onClick=${() => setOpen(false)}>
+        <${FoldButton} onClick=${() => setOpen(false)}>
           ${tr('home.things.showLess', 'Show less')}
-        </button>`}
+        <//>`}
     <//>`;
 }
 
@@ -266,23 +236,19 @@ export function Things({ usage, orgs, packages, prefs, onStar, children }) {
   const starred = prefs?.stars ?? [];
   const explain = tr('home.things.knowledgeExplain', 'Structured knowledge: what you have organised out of your AI chats, for your AIs, your apps and, when you choose, other people to use.');
   return html`
-    <section class="poster-band">
-      <h2 class="poster-section-title poster-section-title--large">${tr('home.things.title', 'What you have made')}</h2>
+    <${Band} title=${tr('home.things.title', 'What you have made')}>
       ${rows.length > 0 && html`
         <${NamedRow} label=${tr('home.things.assets', 'Assets')}>
           ${rows.map((r) => html`
-            <a class="poster-thing" key=${r.key} href=${r.href}>
-              <span class="poster-thing-n">${r.n}</span>
-              <span class="poster-thing-label">${tr(r.key, r.fallback)}</span>
-            </a>`)}
+            <${ThingLink} key=${r.key} href=${r.href} n=${r.n} label=${tr(r.key, r.fallback)} />`)}
         <//>`}
       <${ChipRow} label=${tr('home.things.organisms', 'Shared spaces')} rows=${orgRows}
         starred=${starred} onStar=${onStar} fold=${FOLD_AFTER} />
       <${ChipRow} label=${tr('home.things.knowledge', 'Structured knowledge')} title=${explain} rows=${pkgRows}
         starred=${starred} onStar=${onStar} fold=${FOLD_AFTER} />
       ${children}
-      ${pkgRows.length > 0 && html`<p class="poster-band-note">${explain}</p>`}
-    </section>`;
+      ${pkgRows.length > 0 && html`<${BandNote}>${explain}<//>`}
+    <//>`;
 }
 
 /**
@@ -327,18 +293,16 @@ export function FavoriteApps({ apps, favorites, owner, prefs, onMode }) {
   // with the spaces and the knowledge above it rather than a section of its own.
   return html`
     <${NamedRow} label=${title}>
-      ${noneOpened && html`<span class="poster-quiet">${tr('home.apps.noneOpened', 'Nothing opened on this device yet.')}</span>`}
+      ${noneOpened && html`<${QuietNote}>${tr('home.apps.noneOpened', 'Nothing opened on this device yet.')}<//>`}
       ${rows.map((r) => html`
-        <a class="poster-thing poster-thing--named" key=${r.id} href=${r.href} target="_blank" rel="noopener">
-          <span class="poster-thing-label">${r.name}</span>
-        </a>`)}
+        <${ThingLink} key=${r.id} href=${r.href} label=${r.name} named=${true} newTab=${true} />`)}
       ${favRefs.length === 0 && html`
-        <span class="poster-mode-switch" role="group" aria-label=${tr('home.apps.modeLabel', 'Which apps to show')}>
-          <button type="button" class="poster-fold ${mode === 'saved' ? 'poster-fold--on' : ''}"
-            onClick=${() => onMode('saved')}>${tr('home.apps.saved', 'Last saved')}</button>
-          <button type="button" class="poster-fold ${mode === 'used' ? 'poster-fold--on' : ''}"
-            onClick=${() => onMode('used')}>${tr('home.apps.used', 'Last opened')}</button>
-        </span>`}
+        <${ModeSwitch} label=${tr('home.apps.modeLabel', 'Which apps to show')}>
+          <${FoldButton} on=${mode === 'saved'}
+            onClick=${() => onMode('saved')}>${tr('home.apps.saved', 'Last saved')}<//>
+          <${FoldButton} on=${mode === 'used'}
+            onClick=${() => onMode('used')}>${tr('home.apps.used', 'Last opened')}<//>
+        <//>`}
     <//>`;
 }
 
@@ -375,49 +339,39 @@ export function Playbooks({ playbooks, tour }) {
   // The band title ("What would you like to set up?") is the band's, drawn by index.js, so the
   // tried-so-far row beside this one sits under the same heading.
   return html`
-    <div class="poster-index">
-      <p class="poster-index-lead">${tr('home.playbooks.lead', 'Each one is a real thing you can do here, with the steps and the prompt that gets it done.')}</p>
-      <${NamedRow} label=${tr('home.playbooks.row', 'To set up')}>
-        ${playbooks.map((pb) => html`
-          <button type="button" key=${pb.id}
-            class="poster-fold ${open === pb.id ? 'poster-fold--on' : ''}"
-            aria-expanded=${open === pb.id}
-            onClick=${() => setOpen(open === pb.id ? null : pb.id)}>
-            ${tr(`home.playbooks.${pb.id}.title`, pb.id)}
-          </button>`)}
-        ${tour && html`<a class="poster-index-tour" href=${tour} target="_blank" rel="noopener">
-          ${tr('home.playbooks.tour', 'Not sure what this can do? Take the tour →')}</a>`}
-      <//>
-      ${playbooks.filter((pb) => pb.id === open).map((pb) => html`
-        <div class="poster-record poster-index-open" key=${pb.id}>
-          <p class="poster-index-what">${tr(`home.playbooks.${pb.id}.lead`, '')}</p>
-          <ol class="poster-index-steps">
-            ${Array.from({ length: pb.steps }, (_, i) => tr(`home.playbooks.${pb.id}.step${i + 1}`, ''))
-              .filter(Boolean)
-              .map((step, i) => html`<li key=${i}>${step}</li>`)}
-          </ol>
-          ${pb.proof?.length > 0 && html`
-            <p class="poster-index-proof">
-              ${tr('home.playbooks.proof', 'Already running here:')}${' '}
-              ${pb.proof.map((pr, i) => html`
-                <${'span'} key=${pr.name}>${i > 0 ? ' · ' : ''}<a href=${pr.url} target="_blank" rel="noopener">${pr.name}</a><//>`)}
-            </p>`}
-          <div class="poster-index-actions">
-            ${/* The wish rail the landing page already uses (sessionStorage 'aimeat.wish'): the chat
-                  drains it INTO THE COMPOSER and the person presses send themselves. A ?ask= query
-                  param would have been a second contract, and the chat reads no such thing — a
-                  button that navigates somewhere unprepared is the defect this avoids. */''}
-            <button type="button" class="btn-primary" onClick=${() => askAgent(pb)}>
-              ${tr('home.playbooks.ask', 'Ask my agent')}
-            </button>
-            <button type="button" class="btn-outline" onClick=${() => copyPrompt(pb)}>
-              ${copied === pb.id
-                ? tr('home.playbooks.copied', 'Copied. Paste it in your AI chat')
-                : tr('home.playbooks.copy', 'Copy for my own AI')}
-            </button>
-          </div>
-        </div>`)}
-    </div>`;
+    <${NumberedIndex}
+      lead=${tr('home.playbooks.lead', 'Each one is a real thing you can do here, with the steps and the prompt that gets it done.')}
+      label=${tr('home.playbooks.row', 'To set up')}
+      tour=${tour ? { href: tour, label: tr('home.playbooks.tour', 'Not sure what this can do? Take the tour →') } : null}
+      panel=${playbooks.filter((pb) => pb.id === open).map((pb) => html`
+        <${IndexPanel} key=${pb.id}
+          what=${tr(`home.playbooks.${pb.id}.lead`, '')}
+          steps=${Array.from({ length: pb.steps }, (_, i) => tr(`home.playbooks.${pb.id}.step${i + 1}`, '')).filter(Boolean)}
+          proof=${pb.proof?.length > 0 && html`
+            ${tr('home.playbooks.proof', 'Already running here:')}${' '}
+            ${pb.proof.map((pr, i) => html`
+              <${'span'} key=${pr.name}>${i > 0 ? ' · ' : ''}<a href=${pr.url} target="_blank" rel="noopener">${pr.name}</a><//>`)}`}>
+          ${/* The wish rail the landing page already uses (sessionStorage 'aimeat.wish'): the chat
+                drains it INTO THE COMPOSER and the person presses send themselves. A ?ask= query
+                param would have been a second contract, and the chat reads no such thing — a
+                button that navigates somewhere unprepared is the defect this avoids. */''}
+          <button type="button" class="btn-primary" onClick=${() => askAgent(pb)}>
+            ${tr('home.playbooks.ask', 'Ask my agent')}
+          </button>
+          <button type="button" class="btn-outline" onClick=${() => copyPrompt(pb)}>
+            ${copied === pb.id
+              ? tr('home.playbooks.copied', 'Copied. Paste it in your AI chat')
+              : tr('home.playbooks.copy', 'Copy for my own AI')}
+          </button>
+        <//>`)}>
+      ${playbooks.map((pb) => html`
+        <${FoldButton} key=${pb.id}
+          on=${open === pb.id}
+          expanded=${open === pb.id}
+          onClick=${() => setOpen(open === pb.id ? null : pb.id)}>
+          ${tr(`home.playbooks.${pb.id}.title`, pb.id)}
+        <//>`)}
+    <//>`;
 }
 
 /**
@@ -428,13 +382,13 @@ export function Playbooks({ playbooks, tour }) {
  */
 export function TrustLine() {
   return html`
-    <section class="poster-foot">
+    <${InkFoot}>
       ${/* The explicit space matters: HTM collapses the line break, and the link sat glued to the
             sentence's full stop ("...asks.How this works"). */''}
       <p>${tr('home.trust.ai', 'AI-made content carries its label here, as the EU AI Act asks.')}${' '}
         <a href="/v1/transparency">${tr('home.trust.more', 'How this works →')}</a></p>
       <p>${tr('home.trust.data', 'Your data is yours: export it or delete it, and nothing is shared until you share it.')}</p>
-    </section>`;
+    <//>`;
 }
 
 /**
@@ -466,11 +420,9 @@ export function Achievements({ state, usage, markers, chatStatus, orgs, packages
   return html`
     <${NamedRow} label=${tr('home.ach.title', 'Tried so far')}>
       ${list.map((a) => html`
-        <a class="poster-check ${a.done ? 'poster-check--done' : ''}" key=${a.id} href=${a.href}
-           target=${a.external ? '_blank' : undefined} rel=${a.external ? 'noopener' : undefined}
+        <${CheckItem} key=${a.id} done=${a.done} href=${a.href} external=${!!a.external}
            onClick=${a.id === 'experience' && !a.done ? () => onTried('experience') : undefined}>
-          <span class="poster-check-mark" aria-hidden="true">${a.done ? '✓' : '·'}</span>
           ${tr(a.key, a.fallback)}
-        </a>`)}
+        <//>`)}
     <//>`;
 }

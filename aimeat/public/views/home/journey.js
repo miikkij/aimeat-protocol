@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Choose useful work, connect an AI, copy the task and see the saved note at home.
  * @version-history
+ *   2026-09-23: Composed from components/Chooser.js and Hint.js, which emit the markup this file
+ *     wrote; what the chooser holds stays here (UI consolidation phase 1, a move).
  *   2026-09-23: Composed from the shared parts in css/parts.css and css/parts-steps.css (class names by role, values moved from views/home.css unchanged; UI consolidation slice 1).
  *   2026-09-13: Compose the existing home shapes with shared poster classes.
  *   v1.1.0 — 2026-09-12 — The lines the chosen task governs (hint, connection, prompt, links, result)
@@ -19,6 +21,11 @@ import { useSession } from '/js/use-session.js';
 import { useShared, invalidateShared } from '/views/surface/shared-read.js';
 import { useHomeState } from '/views/surface/home-state.js';
 import { PromptCard } from '/components/PromptCard.js';
+import { Hint } from '/components/Hint.js';
+import {
+  Chooser, ChooserChoices, ChooserChoice, ChooserPanel, ChooserStatus, ChooserBox, ChooserFold,
+  ChooserLinks, ChooserResult,
+} from '/components/Chooser.js';
 import { McpSetupGuide } from '/views/profile/ai-setup-guide.js';
 import { StepAgent } from './step-agent.js';
 import { StepMat } from './step-mat.js';
@@ -57,29 +64,27 @@ export function HomeJourney() {
   const connected = state.initialized;
   const prompt = buildJourneyPrompt(action, window.location.origin, session.owner);
   return html`
-    <section class="poster-chooser" aria-labelledby="home-journey-title">
-      <h2 id="home-journey-title" class="poster-section-title poster-section-title--large">${t('homeJourney.title')}</h2>
-      <p>${t(connected ? 'homeJourney.returning' : 'homeJourney.welcome')}</p>
-      <div class="poster-chooser-choices" role="group" aria-label=${t('homeJourney.title')}>
-        ${actions.map(id => html`<button type="button" key=${id} class=${'poster-action' + (action === id ? ' poster-fold--on' : '')}
-          aria-pressed=${action === id} onClick=${() => {
+    <${Chooser} titleId="home-journey-title" title=${t('homeJourney.title')}
+      lead=${t(connected ? 'homeJourney.returning' : 'homeJourney.welcome')}>
+      <${ChooserChoices} label=${t('homeJourney.title')}>
+        ${actions.map(id => html`<${ChooserChoice} key=${id} on=${action === id} onClick=${() => {
             setAction(id); setCopied(false);
             try { sessionStorage.setItem(choiceKey, id); }
             catch (e) { swallowed('home journey: choice write', e); }
           }}>
           ${t('homeJourney.' + id)}
-        </button>`)}
-      </div>
-      <div class="poster-chooser-panel">
-      <p class="poster-hint">${t('homeJourney.' + action + 'Hint')}</p>
-      <div class="poster-chooser-status poster-row" role="status">
+        <//>`)}
+      <//>
+      <${ChooserPanel}>
+      <${Hint}>${t('homeJourney.' + action + 'Hint')}<//>
+      <${ChooserStatus}>
         <span>${t(connected ? 'homeJourney.connected' : 'homeJourney.notConnected')}</span>
         <button type="button" class="poster-action"
           aria-expanded=${connecting} onClick=${() => setConnecting(v => !v)}>
           ${t(connecting ? 'homeJourney.hideConnection' : connected ? 'homeJourney.anotherAi' : 'homeJourney.connect')}
         </button>
-      </div>
-      ${connecting && html`<div class="poster-chooser-connect">
+      <//>
+      ${connecting && html`<${ChooserBox}>
         <p>${t('homeJourney.consent')}</p>
         <${McpSetupGuide} />
         <h3>${t('homeJourney.prove')}</h3>
@@ -87,10 +92,10 @@ export function HomeJourney() {
         <${PromptCard} label=${t('homeJourney.prove')} prompt=${proof?.prompt || ''} className="poster-action"
           copyLabel=${t('common.copyPrompt')} copiedLabel=${t('common.copied')} />
         <button type="button" class="poster-action" onClick=${refresh}>${t('homeJourney.check')}</button>
-        <details class="poster-chooser-details"><summary>${t('homeJourney.deviceFlow')}</summary>
+        <${ChooserFold} summary=${t('homeJourney.deviceFlow')}>
           <${StepAgent} onChanged=${refresh} showToast=${setMessage} />
-        </details>
-      </div>`}
+        <//>
+      <//>`}
       <div>
         <p>${t('homeJourney.copyHint')}</p>
         <${PromptCard} key=${action} label=${t('homeJourney.' + action)} prompt=${prompt}
@@ -98,26 +103,26 @@ export function HomeJourney() {
           copyLabel=${t('common.copyPrompt')} copiedLabel=${t('common.copied')}
           onCopied=${() => setCopied(true)} />
         ${copied && html`<p role="status">${t('homeJourney.copied')}</p>`}
-        <div class="poster-chooser-links">
+        <${ChooserLinks}>
           <button type="button" class="poster-action" onClick=${refresh}>${t('homeJourney.checkResult')}</button>
           <a class="poster-action" href=${'/v1/profile?tab=' + targets[action]}>${t('homeJourney.open' + action)} →</a>
           ${chat?.enabled && html`<a class="poster-action" href="/v1/chat">${t('homeJourney.localChat')} →</a>`}
-        </div>
-        ${ready && saved && html`<div class="poster-chooser-result poster-box" role="status">
+        <//>
+        ${ready && saved && html`<${ChooserResult}>
           <h3>${t('homeJourney.saved')}</h3>
           ${typeof note.title === 'string' && html`<strong>${note.title}</strong>`}
           <p>${note.text}</p>
-          <p class="poster-hint">${t('homeJourney.noteLifecycle')}</p>
-        </div>`}
+          <${Hint}>${t('homeJourney.noteLifecycle')}<//>
+        <//>`}
         ${copied && action === 'note' && ready && !saved && html`<p>${t('homeJourney.waiting')}</p>`}
       </div>
-      </div>
-      <details class="poster-chooser-details"><summary>${t('homeJourney.optionalPage')}</summary>
+      <//>
+      <${ChooserFold} summary=${t('homeJourney.optionalPage')}>
         <p>${t('homeJourney.optionalPageHint')}</p>
         ${state.mat.done
           ? html`<a class="poster-action" href=${state.mat.standaloneUrl || state.mat.url}>${t('home.mat.view')} →</a>`
           : html`<${StepMat} onDone=${refresh} />`}
-      </details>
+      <//>
       ${message && html`<p role="alert">${message}</p>`}
-    </section>`;
+    <//>`;
 }

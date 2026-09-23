@@ -49,6 +49,7 @@ import { McpQuickConnect } from '/components/McpInstall.js';
 import { listApps } from '/js/services/apps.js';
 import { swallowed } from '/js/swallowed.js';
 import { storeHref } from '/js/site.js';
+import { LinkLine } from '/components/LinkLine.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 
@@ -75,10 +76,8 @@ export function MatBlock() {
   const url = state?.mat?.standaloneUrl || state?.mat?.url;
   if (!url) return null;
   return html`
-    <p class="poster-link-line">
-      ${tr('home.webpage', 'Your webpage, made by your AI:')}${' '}
-      <a href=${url} target="_blank" rel="noopener">${url.replace('https://', '').replace('http://', '')}</a>
-    </p>`;
+    <${LinkLine} label=${tr('home.webpage', 'Your webpage, made by your AI:')}
+      href=${url} text=${url.replace('https://', '').replace('http://', '')} />`;
 }
 
 export function MailboxBlock() {

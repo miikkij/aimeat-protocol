@@ -37,6 +37,7 @@ import { apiGet } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
 import { onLiveUpdate } from '/lib/live-updates.js';
 import { BLOCKS } from '/views/surface/block-map.js';
+import { Band } from '/components/Band.js';
 
 /** Resolved components, by block id. Identity has to be stable across renders. */
 const resolved = new Map();
@@ -165,10 +166,9 @@ export function SurfaceRenderer({ layout, ctx = {}, freeform = {}, locale = 'en'
       const kids = block.children.filter(c => !c.hidden);
       const heading = titleOf(block, locale);
       return html`
-        <section class="poster-band poster-band--tight" key=${block.key}>
-          ${heading ? html`<h2 class="poster-section-title poster-section-title--large">${heading}</h2>` : ''}
+        <${Band} tight=${true} title=${heading} key=${block.key}>
           ${kids.map(child => html`<${Block} key=${child.key} block=${child} ctx=${ctx} freeform=${freeform} locale=${locale} />`)}
-        </section>`;
+        <//>`;
     }
     return html`<${Block} key=${block.key} block=${block} ctx=${ctx} freeform=${freeform} locale=${locale} />`;
   })}`;
