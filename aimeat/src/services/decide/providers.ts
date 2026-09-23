@@ -36,6 +36,10 @@
  *   const { provider, chosenBy } = await selectProvider(storage, config, { ownerGhii, agent, named });
  *   const problems = providerViolations(provider, state, questions);
  * @version-history
+ *   v1.1.0 — 2026-09-23 — `local` is checked, not taken on trust: a provider calling itself local
+ *     must be on this machine, because `leaves: false` skips an app's data-map row, tells the person
+ *     nothing left, and leaves the call out of the budget and the ledger. An operator provider may
+ *     not take the node's key chain at an address of its own either.
  *   v1.0.0 — 2026-09-23 — Initial: decision providers (wish decision-providers-laya-locally-beside-jev).
  */
 import type { AimeatConfig } from '../../config.js';
@@ -163,6 +167,9 @@ function configuredProvider(config: AimeatConfig): DecisionProvider {
   };
 }
 
+/** This machine, for the one word that decides whether the data leaves it. */
+const LOOPBACK = (host: string): boolean => host === 'localhost' || host === '::1' || host === '[::1]' || /^127\./.test(host);
+
 /**
  * Read one provider record from untrusted input: the operator's JSON or an owner's request body.
  * Returns the record or the list of what is wrong with it. `allowEnv` is the operator's privilege:
@@ -182,6 +189,13 @@ export function parseProvider(
   const url = u && (u.protocol === 'https:' || u.protocol === 'http:') && !u.username && !u.password ? u.toString() : '';
   if (!url) problems.push('url: the full http(s) address of the /v1/systemone endpoint, with no credentials in it.');
   if (url && kind === 'hosted' && url.startsWith('http:')) problems.push('url: a hosted provider is reached over https.');
+  // LOCAL MEANS THIS MACHINE, and the word is load-bearing rather than descriptive: `leaves` is
+  // taken from it, and `leaves: false` is what skips an app's data-map row, states to the person
+  // that nothing left the machine, and leaves the call out of the budget and the ledger. Declared
+  // and not checked, `kind: 'local'` with a remote address made all four of those untrue at once.
+  if (url && kind === 'local' && u && !LOOPBACK(u.hostname.toLowerCase())) {
+    problems.push(`url: a local provider is on this machine (127.0.0.1, localhost or ::1); ${u.hostname} is somewhere else, so it is 'hosted'.`);
+  }
   const model = typeof raw.model === 'string' ? raw.model.trim() : '';
   if (!MODEL_RE.test(model)) problems.push('model: the model or checkpoint name the provider expects, up to 128 characters.');
 
@@ -251,6 +265,18 @@ export function nodeProviders(config: AimeatConfig): DecisionProvider[] {
     for (const raw of Array.isArray(list) ? list : []) {
       const p = parseProvider(raw, 'node', { allowEnv: true });
       if (!p.provider) { logger.error('[decide] an operator provider was refused', { problems: p.problems }); continue; }
+      // THE KEY CHAIN BELONGS TO ONE ADDRESS. `auth: { type: 'key' }` means the agent's key, then
+      // the owner's, then the NODE's, and config-decide.ts has promised since it was written that
+      // the node's key goes to `decideBaseUrl`'s host and nowhere else. An extra provider naming
+      // `key` with an address of its own would quietly break that promise, so it is refused here
+      // and the operator is told to name a variable instead (`auth: { type: 'env', env: … }`).
+      if (p.provider.auth.type === 'key' && p.provider.url !== config.decideBaseUrl) {
+        logger.error('[decide] an operator provider asked for the node key chain at another address', {
+          provider: p.provider.id,
+          fix: "give it auth { type: 'env', env: 'ITS_OWN_VARIABLE' }, or point AIMEAT_DECIDE_BASE_URL at it",
+        });
+        continue;
+      }
       if (seen.has(p.provider.id)) continue;
       seen.add(p.provider.id);
       out.push(p.provider);
@@ -397,7 +423,6 @@ export function providerViolations(provider: DecisionProvider, state: unknown, q
   return out;
 }
 
-const LOOPBACK = (host: string): boolean => host === 'localhost' || host === '::1' || host === '[::1]' || /^127\./.test(host);
 
 /**
  * A provider on loopback is reachable only when the operator allowed private egress. Said here, by
