@@ -139,11 +139,11 @@ export const SHARED_ENTRIES: UiEntrySource[] = [
     {
         id: 'own-aimeat', name: 'OwnAimeat', kind: 'component', status: 'active',
         summary: 'The home\'s "get your own AIMEAT" card on a demo site, stacked from the poster box, label, headline and slab.',
-        module: null, sheet: '/css/components/own-aimeat.css', classes: ['koti-own'],
-        data: { shape: 'markup: .koti-own (OwnAimeatBlock in views/surface/blocks-home.js)', fields: { headline: 'the card headline', href: 'where to get one' } },
+        module: null, sheet: '/css/components/own-aimeat.css', classes: ['poster-own-aimeat'],
+        data: { shape: 'markup: .poster-own-aimeat (OwnAimeatBlock in views/surface/blocks-home.js)', fields: { headline: 'the card headline', href: 'where to get one' } },
         use: ['The home of a demo node, as a layout block.'],
         variants: [],
         example: { headline: 'Get your own', href: '/v1/store' },
-        note: 'Its markup sits in OwnAimeatBlock (views/surface/blocks-home.js). Its class is still koti-own, from before the library.',
+        note: 'Its markup sits in OwnAimeatBlock (views/surface/blocks-home.js), which a node draws only when it has a store address and its operator added the block.',
     },
 ];

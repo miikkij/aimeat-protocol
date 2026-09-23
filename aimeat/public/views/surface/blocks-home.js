@@ -17,6 +17,8 @@
  *   OwnAimeatBlock · TrustBlock · StepsBlock
  * @usage Reached through views/surface/block-map.js, never imported directly by a view.
  * @version-history
+ *   2026-09-23: OwnAimeatBlock's classes named by role, koti-own* to poster-own-aimeat* (UI
+ *     consolidation phase 1, a move).
  *   2026-09-23: Composed from the shared parts in css/parts.css and css/parts-steps.css (class names by role, values moved from views/home.css unchanged; UI consolidation slice 1).
  *   2026-09-15: OwnAimeatBlock, a demo site's card that sends a person to the store for their own
  *     AIMEAT. The operator adds it; no built-in home has it.
@@ -285,15 +287,15 @@ export function OwnAimeatBlock() {
   const store = storeHref();
   if (!store) return null;
   return html`
-    <section class="koti-own poster-record">
+    <section class="poster-own-aimeat poster-record">
       <span class="poster-label">${tr('home.ownAimeat.label', 'Demo')}</span>
       <h2 class="poster-record-title poster-record-title--small">
         ${tr('home.ownAimeat.title', 'This is a demo. Get your own AIMEAT.')}
       </h2>
-      <p class="koti-own-text">
+      <p class="poster-own-aimeat-text">
         ${tr('home.ownAimeat.text', 'Many people share this site to try things out. Your own AIMEAT is the same whole system, at an address with your name on it. We keep it running and up to date for a monthly fee, and everything in it belongs to you.')}
       </p>
-      <a class="koti-own-cta poster-slab" href=${store} target="_blank" rel="noopener">
+      <a class="poster-own-aimeat-cta poster-slab" href=${store} target="_blank" rel="noopener">
         ${tr('home.ownAimeat.cta', 'Go to the store →')}
       </a>
     </section>`;
