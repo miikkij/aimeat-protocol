@@ -15,6 +15,18 @@
       }
     },
     {
+      "date": "2026-09-24",
+      "kind": "fix",
+      "title": {
+        "en": "Search engines that do not run JavaScript now see what the pages say",
+        "fi": "Hakukone, joka ei aja JavaScriptiä, näkee nyt, mitä sivuilla lukee"
+      },
+      "body": {
+        "en": "Bing reads a page mostly as the server sends it, and our public pages drew their content only in the browser. Bing found 100 to 230 words on each of them, judged the site thin and did not list it. The front page, the store, the change log, the members page, the help page and the API documentation now send their content ready in the page: the apps whose owners allowed search engines, every change, the help questions and every API endpoint. A visitor sees the same page as before. The pages name only what their owner allowed: an app appears only when its owner has let search engines find it, and a person only when their portfolio allows it. An app's sitemap now lists the app and its legal pages, and no longer the documents written for AI agents. The screenshots on the front page carry the app's name as their alternative text.",
+        "fi": "Bing lukee sivun pääosin sellaisena kuin palvelin sen lähettää, mutta julkiset sivumme piirsivät sisältönsä vasta selaimessa. Bing löysi jokaiselta niistä 100–230 sanaa, piti sivustoa ohuena eikä listannut sitä. Nyt etusivu, kauppa, muutosloki, jäsensivu, ohjesivu ja API-dokumentaatio lähettävät sisältönsä valmiina: sovellukset, joiden omistaja on sallinut hakukoneet, kaikki muutokset, ohjeen kysymykset ja kaikki rajapinnat. Kävijä näkee saman sivun kuin ennenkin. Sivuilla mainitaan vain se, minkä omistaja on sallinut: sovellus näkyy vain, jos sen omistaja on antanut hakukoneiden löytää sen, ja ihminen vain, jos hänen portfolionsa sallii sen. Sovelluksen sivukartassa ovat nyt sovellus ja sen juridiset sivut, eivät enää tekoälyagenteille kirjoitetut dokumentit. Etusivun kuvakaappauksissa on vaihtoehtoisena tekstinä sovelluksen nimi."
+      }
+    },
+    {
       "date": "2026-09-20",
       "version": "3.18.0",
       "kind": "feature",
