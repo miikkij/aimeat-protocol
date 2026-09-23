@@ -1,0 +1,14 @@
+/**
+ * @file back-link.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description A mono coral link back to where a person came from. Drawn by components/BackLink.js. Reads only
+ *   the tokens in theme.css and the shapes in poster.css; a page never styles it from outside.
+ * @usage Linked from public/spa.html in the component block, whose order keeps the order these
+ *   rules had when they were one sheet.
+ * @version-history
+ *   v1.0.0 — 2026-09-23 — Moved unchanged from css/parts*.css (UI consolidation phase 1, a move).
+ */
+
+/* The look is the back tone of the action link (poster.css .poster-action--back); this keeps its place. */
+.poster-back { margin-bottom: 1.2rem; }

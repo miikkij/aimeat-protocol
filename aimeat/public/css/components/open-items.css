@@ -1,0 +1,68 @@
+/**
+ * @file open-items.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description What a person is going to do here: the list, its one prompt at the top, and the header button
+ *   with the count. Drawn by components/OpenItemsList.js. Reads only the tokens in theme.css and the
+ *   shapes in poster.css; a page never styles it from outside.
+ * @usage Linked from public/spa.html in the component block, whose order keeps the order these
+ *   rules had when they were one sheet.
+ * @version-history
+ *   v1.0.0 — 2026-09-23 — Moved unchanged from css/parts*.css (UI consolidation phase 1, a move).
+ */
+
+/* ── Open items. One list of what you are going to do here; the prompt that takes the whole list
+   into a chat sits at the TOP, not on every row (P16). Rows carry the state control and nothing
+   else, because on and off are the only two things an item can be (P19). Shared by the home and
+   the settings overview, so it wears the poster face in both. ── */
+.open-items { margin: 1.5rem 0 0; }
+.open-items-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 0.75rem; flex-wrap: wrap; margin: 0 0 0.8rem;
+}
+.open-items-title {
+  font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.4rem; letter-spacing: var(--font-poster-tracking);
+  text-transform: uppercase; color: var(--text); margin: 0;
+}
+/* The look is the shared waiting count (.poster-count--waiting); this keeps only its place. */
+.open-items-count { margin-left: 0.5rem; vertical-align: middle; }
+.open-items-list { list-style: none; margin: 0; padding: 0; border-top: 3px solid var(--text); }
+.open-items-row {
+  display: flex; align-items: flex-start; gap: 0.7rem;
+  padding: 0.8rem 0;
+  border-bottom: 2px solid var(--text);
+}
+.open-items-main { flex: 1 1 auto; min-width: 0; }
+.open-items-item { font-size: 1.05rem; font-weight: 800; line-height: 1.35; overflow-wrap: anywhere; }
+.open-items-meta { font-family: var(--font-mono); font-size: 0.76rem; color: var(--muted); margin-top: 0.15rem; }
+.open-items-control { flex: none; display: flex; align-items: center; gap: 0.35rem; }
+/* The two answers on a row the decision gate opened. Both are real actions a thumb has to hit, so
+   they keep a 44 px box at every width, and they sit a thumb's width apart: pressing the wrong one
+   records the opposite verdict. The `.pf` in front is not decoration — profile-poster.css sets
+   `min-height: 0` on every .pf .btn-outline and loads after this file, so a two-class selector loses
+   the tie and the buttons measured 20 px high. */
+.open-items-decide { flex: none; display: flex; align-items: center; gap: 0.9rem; margin-right: 2rem; }
+.open-items-decide .btn-outline, .pf .open-items-decide .btn-outline {
+  min-height: 44px; padding: 12px 0 11px;
+}
+/* The header button. Hidden at zero, so it never shows a badge that has to be explained. */
+.open-items-btn {
+  display: inline-flex; align-items: center; gap: 0.25rem;
+  background: none; border: 0; cursor: pointer; padding: 0.25rem 0.4rem;
+  color: var(--muted); font-size: 0.85rem;
+}
+.open-items-btn:hover { color: var(--text); }
+.open-items-btn-count { font-weight: 700; color: var(--text); }
+@media (max-width: 640px) {
+  /* The row wraps rather than squeezing the title into a column two words wide, and the title
+     stops short of the corner so it never runs under the dots. The one rule this whole design
+     rests on is that the control is in the same place every time, so it does not get a mobile
+     exception. */
+  .open-items-row { flex-wrap: wrap; }
+  .open-items-main { padding-right: 2rem; }
+}
+/* A list row owns its corner too, same as a card — at every width. */
+.open-items-row { position: relative; }
+.open-items-row .card-menu { top: 0.5rem; right: 0; }
+/* Who put it here is a second fact, on its own line, so it survives whatever else the row says. */
+.open-items-byai { display: block; margin-top: 0.1rem; color: var(--accent); }

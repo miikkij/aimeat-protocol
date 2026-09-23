@@ -2,6 +2,7 @@
  * @file check-registry.mjs
  * @description Canonical read-only checks for check:fast, audit reports and SARIF.
  * @version-history
+ *  - 1.5.0 (2026-09-23): check:ui-library, the component catalogue held to the sheets and modules.
  *  - 1.4.0 (2026-09-18): check:prompt-refs, agent-facing text held to the catalogue and the routes.
  *  - 1.3.0 (2026-09-14): check:field-reach, the REST-only record field ratchet.
  *  - 1.2.1 (2026-09-13): check:viewport also holds the library-packs registry to the manifests.
@@ -31,6 +32,7 @@ export const FAST_CHECKS = [
     { script: 'check:mcp-schemas', label: 'MCP tool input-schema parity' },
     { script: 'check:plain-language', label: 'Plain language for the messages a person hears' },
     { script: 'check:poster-shapes', label: 'Design-language shapes live in poster.css, not in view sheets' },
+    { script: 'check:ui-library', label: 'Every interface part is in the component catalogue, and its facts are fresh' },
     { script: 'check:dialogs', label: 'One dialog for the site: no hand-rolled overlay, backdrop or role="dialog" box' },
     { script: 'check:viewport', label: 'Cortex pack integrity: embed + VERSION constants + registry versions' },
     { script: 'check:ai-disclosure', label: 'AI disclosure gates: one LLM path, one publish path, labels intact' },

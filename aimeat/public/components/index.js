@@ -7,6 +7,8 @@
  *   `import { Modal, ConfirmDialog, Markdown } from '/components/index.js'`)
  *   over deep-importing the individual component files.
  * @version-history
+ *   v1.11.0 — 2026-09-23 — The data map's two pieces are gone (Jouni's decision): no page had
+ *     drawn them since 8fde4f329 (2026-09-02); the app launcher has its own data map.
  *   v1.10.0 — 2026-08-25 — export the data map's two pieces: the one line a list shows and the
  *     panel it opens into. It describes an APP; it is not a shape other surfaces borrow. Six surfaces
  *     were about to grow six vocabularies for the same thing, three of them already live.
@@ -51,7 +53,6 @@ export { Pagination, LoadMore } from './Pagination.js';
 export { KeyValueRow } from './KeyValueRow.js';
 export { SearchBar } from './SearchBar.js';
 export { DataTable } from './DataTable.js';
-export { DataMapLine, DataMapPanel } from './DataMap.js';
 export { Collapsible } from './Collapsible.js';
 export { Markdown, sanitizeHref } from './Markdown.js';
 export { useViewCSS } from './useViewCSS.js';

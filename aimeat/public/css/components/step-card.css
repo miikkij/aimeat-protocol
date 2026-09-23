@@ -1,0 +1,50 @@
+/**
+ * @file step-card.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description One step of a numbered setup path: its number, title and lead; the open one in an ink
+ *   frame with the sun shadow, the rest waiting. Drawn by components/StepCard.js. Reads only the tokens in theme.css and the shapes in poster.css; a page
+ *   never styles it from outside.
+ * @usage Linked from public/spa.html in the component block, whose order keeps the order these
+ *   rules had when they were one sheet.
+ * @version-history
+ *   v1.1.0 — 2026-09-23 — The done and limit looks and branch B's "way" block deleted (Jouni's
+ *     decision): only StepMatDone and StepBranchB drew them, and neither had been drawn since
+ *     07f7040c5 (2026-09-09).
+ *   v1.0.0 — 2026-09-23 — Moved unchanged from css/parts*.css (UI consolidation phase 1, a move).
+ */
+
+/* ── The step list ── */
+.poster-step {
+  border: 3px solid var(--border);
+  background: var(--card);
+  padding: 1.25rem 1.35rem;
+}
+/* The open step is the only thing on the page with an accent edge. */
+.poster-step--open { border-color: var(--text); box-shadow: 8px 8px 0 var(--sun); }
+.poster-step-head { display: flex; align-items: center; gap: 0.7rem; margin-bottom: 0.6rem; }
+.poster-step-num {
+  flex: none;
+  width: 1.75rem; height: 1.75rem;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 2px solid var(--border);
+  background: var(--bg-dim);
+  font-family: var(--font-mono); font-size: 0.8rem; font-weight: 700;
+  color: var(--text-dim);
+}
+.poster-step--open .poster-step-num { border-color: var(--text); background: var(--sun); color: var(--text); }
+.poster-step-title { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.15rem; text-transform: uppercase; margin: 0; }
+.poster-step-lede { color: var(--text-dim); font-size: 0.98rem; line-height: 1.55; margin: 0 0 1.1rem; }
+.poster-step .agc-step { margin-top: 1.25rem; }
+.poster-step .agc-explain { margin: 0.5rem 0 0 0.8rem; line-height: 1.5; }
+/* The badge + countdown row is one line at tab width and two on a phone. Without this it broke
+   between "Expires in:" and the clock, which reads as a rendering fault rather than a wrap.
+   Scoped to the step variant so the profile tab keeps the row it has always had. */
+.poster-step .agc-step .agc-card > .flex-row:first-child { flex-wrap: wrap; row-gap: 0.35rem; }
+.poster-step .agc-step .agc-card > .flex-row:first-child .text-caption { white-space: nowrap; }
+@media (max-width: 560px) {
+  .poster-step { padding: 1rem 1rem; }
+}
+/* Every card that carries the dots needs to be their containing block, or they escape upward to
+   whatever ancestor is positioned. Measured once at 263px above the card it belonged to. */
+.poster-step { position: relative; }

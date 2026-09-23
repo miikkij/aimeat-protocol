@@ -9918,6 +9918,8 @@
     "navServices": "Services",
     "navIntegrations": "Integrations",
     "navFederation": "Federation",
+    "navDesign": "Design",
+    "designLab": "aimeat-design-lab",
     "csmManagement": "CSM Management",
     "msmManagement": "MSM Management",
     "portal": "Portal",
@@ -11546,10 +11548,6 @@
     "matCompact": "Your welcome mat:",
     "webpage": "Your webpage, made by your AI:",
     "identityHint": "GHII: your permanent address. People, homes and agents everywhere find you by it.",
-    "chatDoor": {
-      "lede": "Your agent is in the chat. Say what you need, and it gets to work.",
-      "cta": "Continue in the chat"
-    },
     "things": {
       "title": "What you have made",
       "apps": "Apps",
@@ -11562,12 +11560,6 @@
       "star": "Keep this one always visible",
       "showAll": "Show all ({n})",
       "showLess": "Show less"
-    },
-    "ai": {
-      "viaMcp": "{names} is connected as your agent over MCP.",
-      "viaMcpMany": "{names} are connected as your agents over MCP.",
-      "andMore": "{names} and {n} more",
-      "houseModel": "The chat here answers with {model}."
     },
     "mail": {
       "unread": "{n} unread, go have a look",
@@ -11686,9 +11678,7 @@
     "step3Dim": "Opens once you have an app that can connect.",
     "mat": {
       "title": "Your welcome mat",
-      "titleDone": "Your welcome mat is up",
       "lede": "Every home needs a welcome mat. You are going to make yours with your own AI: copy the prompt below into your AI chat, paste what it gives back into the box, and press the button.",
-      "doneLede": "This is the first thing you made here, and it is a real page with its own address.",
       "promptLabel": "The prompt",
       "promptShort": "The shorter prompt",
       "copy": "Copy the prompt",
@@ -11729,36 +11719,7 @@
       "doneManual": "I have started it",
       "waitTitle": "Waiting for your agent to knock.",
       "waitBody": "The next move is in your AI chat: it has to run the prompt and show you a code. When it does, its request appears here and you approve it.",
-      "cardSub": "Connected and at home.",
-      "showDetails": "Details",
-      "hideDetails": "Hide details",
-      "dtId": "Its identifier",
-      "dtSince": "Connected",
-      "manage": "Manage what it may do",
-      "stateProduction": "Connected and at home.",
-      "stateIdle": "Here, but quiet just now.",
-      "stateOnboarding": "Settling in.",
-      "stateNew": "Just arrived, it has not started yet.",
-      "stateProblem": "It has hit a snag. Shall we take a look?",
-      "stateSystem": "Part of the system.",
-      "othersProblem": "Shall we see how the other {count} are doing?",
-      "othersOk": "{count} more, all fine."
-    },
-    "branchB": {
-      "title": "Your welcome mat is done",
-      "lede": "You made it with {app}. It can write, but it cannot open a connection to your home yet, so the next step needs a different app.",
-      "why": "A connection means the AI can read and write things in your home itself, instead of you copying text back and forth. That is what this place is built on: everything here is done with an AI, so without a connection your home cannot be finished.",
-      "thatApp": "the app you used",
-      "wayTitle": "Take up an AI app that can open a connection",
-      "wayBody": "Some AI apps do this directly. They are paid, typically around 20 dollars a month. If you use an AI every day, this is the one you want.",
-      "recommended": "A good first one",
-      "theirDocs": "Their own instructions",
-      "againTitle": "Then make the mat again with it",
-      "againBody": "Same prompt, new app. Paste what it gives you here and we carry on from there. Your first mat stays until this one replaces it.",
-      "submit": "Here is the new one",
-      "stillB": "That one cannot open a connection either. The list above is the checked one; the app has to be from it.",
-      "ledePlan": "{app} made it, and {app} can open a connection to your home, but only on one of its paid plans, and you said you are not on one. So the next step needs either that plan or another app.",
-      "yours": "The one you already use"
+      "cardSub": "Connected and at home."
     },
     "feed": {
       "quiet": "Quiet here lately. Shall we make something happen? Open the chat and say what you need.",
@@ -11894,8 +11855,6 @@
       "more": "{n} more are waiting"
     }
   },
-  "home.mat.improve": "Make my welcome page better",
-  "home.mat.teachDots": "The three dots in the corner are how you act on anything here. Every card has them, always in that same corner.",
   "home.rooms.copyPrompt": "Copy this into your AI chat",
   "imageDeliverable.failed": "Image failed to load",
   "imageDeliverable.loading": "Loading image…",
@@ -13415,7 +13374,6 @@
   "openItems.origin.home.rooms.organise": "from organising",
   "openItems.suggestion": "Suggestion — it goes away once this is done",
   "openItems.title": "Open items",
-  "openItems.toggleOff": "Take it off your open items",
   "openItems.toggleOn": "Put it on your open items",
   "openItems.working": "Being worked on",
   "openItems.yours": "Yours",
@@ -19926,5 +19884,62 @@
     "doorSignedIn": "You are signed in, so the guided path is one click away.",
     "doorCreate": "Create your account →",
     "doorSignIn": "I already have one, sign me in →"
+  },
+  "designLab": {
+    "intro": "Every part of this AIMEAT's own interface, drawn live by its real component with its example data. Open a part to see every variant in light and dark, at a phone width, and what it is for.",
+    "filterLabel": "Which parts",
+    "filter": {
+      "all": "All",
+      "component": "Components",
+      "shape": "Shapes",
+      "unused": "Unused"
+    },
+    "find": "Find a part",
+    "none": "No part matches.",
+    "unused": "unused",
+    "back": "All parts",
+    "light": "Light",
+    "dark": "Dark",
+    "phone": "On a phone",
+    "facts": "What it is",
+    "use": "Use",
+    "data": "Data",
+    "variants": "Variants",
+    "pages": "Pages",
+    "noPages": "no page draws it",
+    "tokens": "Theme tokens",
+    "code": "Code",
+    "noDemo": "No demo for this part.",
+    "modeLabel": "What the lab shows",
+    "modeLibrary": "The library",
+    "modeDecisions": "The decisions",
+    "decisionsIntro": "One decision per job the pages do in more than one way. Open one to see the proposal, what it covers and what would change, and answer the proposal and every option. You can change an answer at any time; nothing changes on the pages before you say so in chat.",
+    "open": "Open the decision",
+    "allDecisions": "All decisions",
+    "proposal": "The proposal",
+    "changes": "What would change",
+    "files": "files",
+    "cropLight": "On its page, light",
+    "cropDark": "On its page, dark",
+    "measuring": "measuring…",
+    "decisionsCount": "{n} decisions, {w} waiting for you",
+    "lightWord": "light",
+    "darkWord": "dark",
+    "decided": "Decided",
+    "accept": "Accept the proposal",
+    "answer": {
+      "none": "none",
+      "accepted": "accepted",
+      "rejected": "rejected"
+    },
+    "summary": "The decisions and your answers",
+    "ifAccept": "If you accept, these become one component:",
+    "noThanks": "No thanks",
+    "acceptOne": "Accept",
+    "reject": "Reject",
+    "answerLabel": "Your answer",
+    "details": "Details",
+    "everyOption": "Every option on its own",
+    "optionsCount": "Options: {a} accepted, {r} rejected, {n} without an answer."
   }
 }

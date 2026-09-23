@@ -13,6 +13,7 @@
  *   v2.0.0 -- 2026-05-29 -- Multi-agent: tool modules now take AgentRegistry
  *   v2.1.0 -- 2026-09-06 -- Register the secrets-vault tools, so a desktop client can store the key
  *     an integration needs instead of the person pasting it into the chat.
+ *   v2.2.0 -- 2026-09-23 -- Register the component catalogue tools (aimeat_ui_component_list/get).
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { AgentRegistry } from '../../agent-registry.js';
@@ -62,6 +63,7 @@ import { registerPortfolioTools } from './portfolio.js';
 import { registerSurfaceLayoutTools } from './surface-layout.js';
 import { registerAppUiTools } from './app-ui.js';
 import { registerDesignbookTools } from './designbook.js';
+import { registerUiLibraryTools } from './ui-library.js';
 import { registerOperatorTools } from './operator.js';
 import { registerComplianceTools } from './compliance.js';
 import { registerDataMapTools } from './data-map.js';
@@ -112,6 +114,7 @@ export function registerAllTools(mcp: McpServer, registry: AgentRegistry): void 
   registerSurfaceLayoutTools(mcp, registry);
   registerAppUiTools(mcp, registry);
   registerDesignbookTools(mcp, registry);
+  registerUiLibraryTools(mcp, registry);
   registerOperatorTools(mcp, registry);
   registerComplianceTools(mcp, registry);
   registerDataMapTools(mcp, registry);

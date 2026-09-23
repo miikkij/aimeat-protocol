@@ -16,12 +16,14 @@
  * @structure FreeformBlock({ text, props, title })
  * @usage html`<${FreeformBlock} text=${passage} props=${block.props} title=${heading} />`
  * @version-history
+ *   2026-09-23: Composed from the shared parts in css/parts.css and css/parts-steps.css (class names by role, values moved from views/home.css unchanged; UI consolidation slice 1).
  *   v1.0.0 — 2026-08-26 — Initial.
  */
 import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { Markdown } from '/components/Markdown.js';
+import { FreeText } from '/components/FreeText.js';
 
 /** Nothing to say, nothing rendered — the rule every block on these pages follows. */
 export function FreeformBlock(/** @type {{ ctx?: any, props?: Record<string, any>, title?: string, text?: string, blockKey?: string }} */ { text, props = {}, title = '' }) {
@@ -29,10 +31,9 @@ export function FreeformBlock(/** @type {{ ctx?: any, props?: Record<string, any
   if (!body) return null;
   const tone = props.tone === 'plain' || props.tone === 'band' ? props.tone : 'card';
   return html`
-    <section class=${`sf-free sf-free-${tone}`}>
-      ${title ? html`<h2 class="sf-free-title">${title}</h2>` : ''}
+    <${FreeText} tone=${tone} title=${title}>
       <${Markdown} text=${body} />
-    </section>`;
+    <//>`;
 }
 
 export default FreeformBlock;

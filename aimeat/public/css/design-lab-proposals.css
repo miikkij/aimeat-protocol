@@ -1,0 +1,69 @@
+/**
+ * @file design-lab-proposals.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The pictures of the design lab's proposals: how ONE component with its tones would
+ *   look, before anything is unified. No page uses these classes; only the lab's preview page
+ *   (views/design-lab/frame.js) draws them. Every value is copied from the variant the tone names in
+ *   views/design-lab/decisions-data.js, so a proposal shows existing looks put together, never a new
+ *   one. When Jouni chooses, the chosen component is built as a library part with its own sheet in
+ *   css/components/, and its rules here are removed.
+ *
+ *   Why this sheet sits in css/ and not in css/components/: it is not a part. It holds proposals
+ *   that may never ship, and a part's sheet is catalogued and drawn by pages.
+ * @usage Linked from public/spa.html after the component block.
+ * @version-history
+ *   v1.1.0 — 2026-09-23 — The after-looks no class draws alone, and the solo rules.
+ *   v1.0.0 — 2026-09-23 — Initial: the tag, status and count proposals (UI consolidation phase 2).
+ */
+
+/* Tag. Plain from .poster-chip (poster.css); sun from .og-chip--sun; coral from .adm-own-chip--op;
+   ink from .ct-tag--rel. */
+.dl-tag {
+  display: inline-block; padding: .1rem .45rem; border: 1px solid var(--text); border-radius: 0;
+  font-family: var(--font-mono); font-size: .68rem; font-weight: 500; letter-spacing: .04em;
+  color: var(--text); background: transparent;
+}
+.dl-tag--sun { background: var(--sun); color: var(--on-sun); }
+.dl-tag--coral { border-color: var(--accent); color: var(--accent); }
+.dl-tag--ink { background: var(--text); color: var(--card-bg); }
+
+/* Status. All from .adm-badge and its tints (views/admin.css). */
+.dl-status {
+  display: inline-block; padding: 1px 7px; border-radius: 0;
+  font-family: var(--font-mono); font-size: .66rem; font-weight: 500; text-transform: uppercase;
+}
+.dl-status--fine { background: var(--success-bg); color: var(--success-fg); }
+.dl-status--attention { background: var(--warn-bg); color: var(--warn-fg); }
+.dl-status--danger { background: var(--danger-bg); color: var(--danger-fg); }
+.dl-status--off { background: var(--bg-surface); color: var(--text-dim); }
+
+/* Count. Waiting from .pf-side-badge (views/profile.css); tally from .adm-nav-item .cnt, at the
+   waiting tone's size; the bell's cut is the waiting tone at the bell's .6rem. */
+.dl-count { display: inline-block; padding: .05rem .45rem; font-family: var(--font-mono); font-size: .7rem; font-weight: 500; }
+.dl-count--waiting { background: var(--accent); color: var(--bg); }
+.dl-count--tally { background: none; color: var(--text-dim); }
+.dl-count--small { font-size: .6rem; padding: 0 3px; }
+/* On an icon, the count sits on its corner, where the bell's count sits (.notif-badge). */
+.poster-specimen-anchor > .dl-count { position: absolute; top: -1px; right: -1px; }
+
+/* After the proposal, for the looks no existing class draws alone. Group heading: the day heading
+   kept grey over the work log. Object box: the prompt card on the white card ground of .poster-box.
+   Attention note: the waiting note and the nudge in the dashed coral frame of .poster-aside. */
+.dl-heading--grey { color: var(--text-dim); }
+.dl-box-plain .poster-prompt { background: var(--card-bg); }
+.dl-as-aside .poster-waiting, .dl-as-aside .poster-nudge { border: 3px dashed var(--accent); background: var(--card-bg); }
+
+/* Solo: only the element a decision is about. The rest of the drawn part keeps its place, so the
+   element keeps the look its surroundings give it, but is not painted (frame.js soloLayout). */
+html.dl-solo-page, html.dl-solo-page body { overflow: hidden; }
+.dl-solo { visibility: hidden; }
+.dl-solo .dl-solo-target { visibility: visible; }
+
+/* The admin sidebar is as tall as the screen; in a preview it holds one menu item, so it takes the
+   item's height. Its ground and colours, which the count reads, stay as they are. */
+.poster-specimen-stage .adm-sidebar { position: static; height: auto; }
+
+/* The top bar hides the morsel count below 1180px, and a lab frame is narrower than that; inside a
+   preview it is shown, so it can be seen beside the other counts. */
+.poster-specimen-stage .brand-morsels { display: inline-block !important; }

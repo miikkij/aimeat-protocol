@@ -1,0 +1,58 @@
+/**
+ * @file prompt-card.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description A prompt a person copies into their own AI: a coral label, the copy action, an optional corner
+ *   menu, and the prompt text in a scroll box. Drawn by components/PromptCard.js. Reads only the
+ *   tokens in theme.css and the shapes in poster.css; a page never styles it from outside.
+ * @usage Linked from public/spa.html in the component block, whose order keeps the order these
+ *   rules had when they were one sheet.
+ * @version-history
+ *   v1.1.0 — 2026-09-23 — The label is the shared row label (.poster-label); its own copy of the
+ *     rule is gone (Jouni's decision "Row label", a unification).
+ *   v1.0.0 — 2026-09-23 — Moved unchanged from css/parts*.css (UI consolidation phase 1, a move).
+ */
+
+/* ── The prompt block ── */
+/* The look is the box's copy tone (poster.css .poster-box--copy); this keeps its place. */
+.poster-prompt { margin: 0 0 1.25rem; }
+.poster-prompt-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;
+  flex-wrap: wrap;
+  padding: 0.6rem 0.85rem;
+  border-bottom: 2px solid var(--text);
+}
+/* Copy stays the button; the chevron is a small sibling, never a chooser in front of it. */
+.poster-prompt-actions { display: flex; align-items: center; gap: 0.4rem; }
+.poster-prompt-actions > :first-child { flex: 1 1 auto; }
+.poster-prompt-more {
+  flex: none; padding: 0.35rem 0.5rem; line-height: 1;
+  font-size: 0.9rem; color: var(--muted);
+}
+.poster-prompt-menu {
+  display: flex; flex-direction: column; align-items: stretch;
+  border-bottom: 2px solid var(--text);
+  background: var(--card);
+}
+.poster-prompt-menu-item {
+  text-align: left; padding: 0.55rem 0.85rem; font-size: 0.85rem;
+  border-radius: 0;
+}
+.poster-prompt-menu-item + .poster-prompt-menu-item { border-top: 1px solid var(--border); }
+.poster-prompt-body {
+  margin: 0;
+  padding: 0.85rem;
+  /* The prompt is long on purpose; a scroll box keeps the paste box on screen. */
+  max-height: 14rem;
+  overflow: auto;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--text-dim);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+@media (max-width: 560px) {
+  .poster-prompt-body { max-height: 10rem; font-size: 0.78rem; }
+  .poster-prompt-head > * { width: 100%; }
+}

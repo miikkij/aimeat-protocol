@@ -255,7 +255,7 @@ export function NotificationBell({ t, onNavigate }) {
   return html`
     <div class="notif-bell" ref=${ref}>
       <button class="notif-bell-btn" aria-label=${tr('notif.title', 'Notifications')} title=${tr('notif.title', 'Notifications')} onClick=${toggle}>
-        ${'🔔'}${unread > 0 ? html`<span class="notif-badge">${unread > 99 ? '99+' : unread}</span>` : null}
+        ${'🔔'}${unread > 0 ? html`<span class="poster-count poster-count--waiting poster-count--small notif-badge">${unread > 99 ? '99+' : unread}</span>` : null}
       </button>
       ${open ? html`
         <div class="notif-dropdown">

@@ -16,6 +16,11 @@
  *   - ChatView — the page: status, conversations, one live turn
  * @usage import ChatView from '/views/chat.js'
  * @version-history
+ *   2026-09-23: Composed from library components in /components/ (ConversationFrame and its
+ *     parts, ThreadList, Turn, Composer, StatusBar, Suggestion, AiNotice, Nudge, Credit), which emit
+ *     the markup this file and views/chat/parts.js wrote; chat/parts.js is gone (UI consolidation
+ *     phase 1, a move).
+ *   2026-09-23: Composed from the shared parts in css/parts-conversation.css (class names by role, values moved from views/chat.css unchanged; UI consolidation slice 1).
  *   v2.1.0 — 2026-09-15 — A wish that arrived from the front page's GO also puts the cursor in
  *     the box, at the end of the sentence. Jouni: the sentence was there but the focus was not.
  *   2026-09-13 -- V2z: compose the welcome section heading with the shared B1 class.
@@ -62,7 +67,18 @@ import { Spinner } from '/components/Spinner.js';
 import * as chat from '/js/services/chat.js';
 import { primeSpeech } from '/js/services/speech-reader.js';
 import { readIntake, clearIntake, intakeText } from '/js/intake.js';
-import { ThreadList, Turn, LiveTurn, TurnError, Composer, StatusBar, GooseCredit, Choices, choicesIn, AiNotice, MobileNudge } from './chat/parts.js';
+import { ThreadList } from '/components/ThreadList.js';
+import { Turn, LiveTurn, TurnError } from '/components/Turn.js';
+import { Composer } from '/components/Composer.js';
+import { StatusBar } from '/components/AgentStatus.js';
+import { GooseCredit } from '/components/Credit.js';
+import { Suggestions, Suggestion, Choices, choicesIn } from '/components/Suggestion.js';
+import { AiNotice } from '/components/AiNotice.js';
+import { MobileNudge } from '/components/Nudge.js';
+import {
+    ConversationFrame, ConversationAbout, ConversationFoot, ConversationMain, ConversationHead,
+    ConversationIcon, ConversationScroll, ConversationWelcome, ConversationJump, ConversationCap,
+} from '/components/ConversationFrame.js';
 import { CopyButton } from '/components/CopyButton.js';
 import { InstallCta } from '/components/InstallCta.js';
 import { storeHref } from '/js/site.js';
@@ -497,7 +513,7 @@ export default function ChatView() {
         let tries = 0;
         let timer = 0;
         const focusComposer = () => {
-            const box = /** @type {HTMLTextAreaElement|null} */ (document.querySelector('.chat-input'));
+            const box = /** @type {HTMLTextAreaElement|null} */ (document.querySelector('.poster-composer-input'));
             if (box && box.value && !box.disabled) {
                 box.focus();
                 const end = box.value.length;
@@ -551,13 +567,13 @@ export default function ChatView() {
 
     if (!hasSession()) {
         return html`
-            <div class="chat-view chat-view--signin">
+            <${ConversationFrame} signin=${true}>
                 <h1>${tr('chat.title', 'Chat')}</h1>
                 <p>${tr('chat.signIn', 'Sign in and your first agent is waiting here.')}</p>
-            </div>`;
+            <//>`;
     }
 
-    if (loading) return html`<div class="chat-view"><${Spinner} /></div>`;
+    if (loading) return html`<${ConversationFrame}><${Spinner} /><//>`;
 
     const turns = thread?.turns ?? [];
     // Capped only when the NODE pays: a person on their own key spends their own money, and this
@@ -570,7 +586,7 @@ export default function ChatView() {
     const disabled = status ? !status.enabled : false;
 
     return html`
-        <div class="chat-view ${listOpen ? 'chat-view--list' : ''}">
+        <${ConversationFrame} list=${listOpen}>
             <${ThreadList}
                 threads=${threads}
                 activeId=${thread?.id}
@@ -581,74 +597,67 @@ export default function ChatView() {
                 ${/* Everything about THIS conversation that is not the conversation: its name, who
                       answers and on whose money, and the two actions. In the rail on a desktop, in
                       the drawer on a phone, so the column keeps its height for the words. */''}
-                <div class="chat-this">
-                    <h2 class="chat-rail-h">${tr('chat.thisConversation', 'This conversation')}</h2>
-                    <p class="chat-rail-title">${thread?.title ?? tr('chat.title', 'Chat')}</p>
+                <${ConversationAbout} label=${tr('chat.thisConversation', 'This conversation')}
+                    name=${thread?.title ?? tr('chat.title', 'Chat')}>
                     <${StatusBar} status=${status} onReset=${thread ? resetSession : null} />
                     ${turns.length > 0 && html`<${CopyButton}
                         text=${conversationAsText(thread?.title, turns)}
-                        className="chat-act chat-copy-all"
+                        className="poster-action poster-action--quiet poster-rail-action"
                         label=${tr('chat.copyAll', 'Copy conversation')}
                         copiedLabel=${'✓ ' + t('common.copied')}
                         title=${tr('chat.copyAllTitle', 'Copy the whole conversation as text')}
                         ariaLabel=${tr('chat.copyAll', 'Copy conversation')} />`}
-                </div>
-                <div class="chat-rail-foot">
+                <//>
+                <${ConversationFoot}>
                     <${AiNotice} compact=${true} />
                     <${GooseCredit} />
-                </div>
+                <//>
             <//>
 
-            <section class="chat-main">
-                <header class="chat-head">
-                    <!-- On a phone this page owns the whole screen and the site nav is hidden, so
-                         without this there is NO way back to anything. The whole row is phone-only
-                         via CSS: on a desktop the rail carries the name and the actions. -->
-                    <a class="chat-back" href=${exitHref}
-                        aria-label=${tr('chat.back', 'Back')}>← ${tr('chat.back', 'Back')}</a>
-                    <h1 class="chat-title">${thread?.title ?? tr('chat.title', 'Chat')}</h1>
+            <${ConversationMain}>
+                <${ConversationHead} backHref=${exitHref} backLabel=${tr('chat.back', 'Back')}
+                    title=${thread?.title ?? tr('chat.title', 'Chat')}>
                     <!-- The whole conversation as plain text: what you paste into a document, an
                          issue or another AI. Both sides, in order, with the work log left out —
                          it is a record of the conversation, not of the machinery. -->
                     ${turns.length > 0 && html`<${CopyButton}
                         text=${conversationAsText(thread?.title, turns)}
-                        className="chat-ico chat-copy-head"
+                        className="poster-conversation-icon poster-conversation-copy"
                         label="⧉"
                         copiedLabel="✓"
                         title=${tr('chat.copyAllTitle', 'Copy the whole conversation as text')}
                         ariaLabel=${tr('chat.copyAll', 'Copy conversation')} />`}
-                    <button type="button" class="chat-ico chat-list-toggle"
-                        aria-label=${listOpen ? tr('chat.closeList', 'Close') : tr('chat.openList', 'Conversations')}
-                        title=${listOpen ? tr('chat.closeList', 'Close') : tr('chat.openList', 'Conversations')}
-                        onClick=${() => setListOpen((o) => !o)}>${listOpen ? '✕' : '≡'}</button>
-                </header>
+                    <${ConversationIcon}
+                        label=${listOpen ? tr('chat.closeList', 'Close') : tr('chat.openList', 'Conversations')}
+                        onClick=${() => setListOpen((o) => !o)}>${listOpen ? '✕' : '≡'}<//>
+                <//>
 
                 ${/* The phone keeps the notice where the person is looking: full on the first
                       conversation, one line from the first answer onwards. The desktop reads it in
                       the rail, so this copy is phone-only via CSS. */''}
-                <${AiNotice} compact=${turns.length > 0 || threads.length > 1} className="chat-ai-notice--main" />
+                <${AiNotice} compact=${turns.length > 0 || threads.length > 1} className="poster-ai-notice--main" />
                 ${showMobileNudge && html`<${MobileNudge} onDismiss=${dismissNudge} />`}
                 ${!showMobileNudge && html`<${InstallCta} compact=${true} />`}
 
-                <div class="chat-scroll" onScroll=${onScrollArea}>
+                <${ConversationScroll} onScroll=${onScrollArea}>
                     ${turns.length === 0 && !busy ? html`
-                        <div class="chat-welcome">
-                            <h2 class="poster-section-title">${tr('chat.welcomeTitle', 'Your first agent')}</h2>
-                            <p>${tr('chat.welcomeBody', 'It works here the way your own AI tool would, with the same permissions and the same record of what it did. Ask it for something.')}</p>
-                            <p class="chat-welcome-trust">${tr('chat.welcomeTrust', 'Everything you make here lands in your own account, and nothing becomes public until you publish it yourself.')}</p>
+                        <${ConversationWelcome}
+                            title=${tr('chat.welcomeTitle', 'Your first agent')}
+                            body=${tr('chat.welcomeBody', 'It works here the way your own AI tool would, with the same permissions and the same record of what it did. Ask it for something.')}
+                            trust=${tr('chat.welcomeTrust', 'Everything you make here lands in your own account, and nothing becomes public until you publish it yourself.')}>
                             <!-- One concrete thing to ask for, not a menu. An empty box asks a person
                                  to invent a task for a system they have not used; a first request
                                  that ends in a real address they can open answers "what is this for"
                                  better than any paragraph on this screen could. -->
-                            <div class="chat-starters">
+                            <${Suggestions}>
                                 ${STARTERS.map((st) => html`
-                                    <button type="button" class="btn-outline chat-starter" key=${st.key}
+                                    <${Suggestion} caps=${true} key=${st.key}
                                         disabled=${disabled}
                                         onClick=${() => send(tr(st.key, st.fallback), st.id)}>
                                         ${tr(st.label, st.labelFallback)}
-                                    </button>`)}
-                            </div>
-                        </div>` : ''}
+                                    <//>`)}
+                            <//>
+                        <//>` : ''}
 
                     ${turns.map((turn, i) => html`<${Turn} key=${i} id=${`${thread?.id}-${i}`} turn=${turn} />`)}
                     <${LiveTurn} text=${live.text} thought=${live.thought} tools=${live.tools} cards=${live.cards} busy=${busy} />
@@ -657,24 +666,22 @@ export default function ChatView() {
                     <${TurnError} message=${failure}
                         onRetry=${lastAskRef.current && !busy ? () => send(lastAskRef.current) : null} />
                     <div ref=${bottomRef}></div>
-                </div>
+                <//>
 
                 ${!pinned && html`
-                    <button type="button" class="btn-outline chat-jump-latest"
+                    <${ConversationJump}
                         onClick=${() => { releaseRef.current = 0; setPinned(true); bottomRef.current?.scrollIntoView({ block: 'end', behavior: 'smooth' }); }}>
                         ${tr('chat.jumpLatest', 'Jump to the latest')}
-                    </button>`}
+                    <//>`}
 
                 ${capped ? html`
-                    <div class="chat-cap">
-                        <p class="chat-cap-title">${tr('chat.capTitle', 'This conversation has used up its free ride.')}</p>
-                        <p class="chat-cap-body">${tr('chat.capBody', "Chat here runs on the house's own AI budget, and this session has reached its share (about 50,000 tokens). The conversation stays right here — nothing is lost. Two ways to keep going:")}</p>
-                        <div class="chat-cap-actions">
-                            <a class="btn-primary" href="/v1/profile?tab=ai">${tr('chat.capOwnKey', 'Bring your own key →')}</a>
+                    <${ConversationCap}
+                        title=${tr('chat.capTitle', 'This conversation has used up its free ride.')}
+                        body=${tr('chat.capBody', "Chat here runs on the house's own AI budget, and this session has reached its share (about 50,000 tokens). The conversation stays right here — nothing is lost. Two ways to keep going:")}>
+                            <a class="btn-primary poster-slab" href="/v1/profile?tab=ai">${tr('chat.capOwnKey', 'Bring your own key →')}</a>
                             ${/* The store is the one price door; a node without one offers only the key. */''}
                             ${storeHref() ? html`<a class="btn-outline" href=${storeHref()} target="_blank" rel="noopener">${tr('chat.capOwnPlace', 'Get your own place →')}</a>` : ''}
-                        </div>
-                    </div>` : html`
+                    <//>` : html`
                 <${Composer}
                     value=${draft}
                     onInput=${setDraft}
@@ -688,7 +695,7 @@ export default function ChatView() {
                     busy=${busy}
                     disabled=${disabled}
                     note=${disabled ? (status?.note ?? '') : ''} />`}
-            </section>
-        </div>
+            <//>
+        <//>
     `;
 }

@@ -11,8 +11,12 @@
  * @structure HomeFeed({ items }) · FeedRow({ item }) · line · when
  * @usage import { HomeFeed } from './feed.js';
  * @version-history
+ *   2026-09-23: Composed from components/Timeline.js (Timeline, TimelineRow), which emits the
+ *     markup this file wrote; the sentence and the category of each row stay here (UI
+ *     consolidation phase 1, a move).
+ *   2026-09-23: Composed from the shared parts in css/parts.css and css/parts-steps.css (class names by role, values moved from views/home.css unchanged; UI consolidation slice 1).
  *   v2.2.0 — 2026-08-23 — HomeFeed takes `band`: on the finished home it is one of the ruled
- *     bands (.koti-band), on the onboarding home it keeps its own gap. Title class is the band's.
+ *     bands (.poster-band), on the onboarding home it keeps its own gap. Title class is the band's.
  *   v2.1.0 — 2026-08-18 — The list becomes a timeline: kindCategory() maps every kind onto six
  *     colours (made / agent work / trouble / money / access / system) and the row carries its
  *     category as a class, so the home card and the history page colour their dots from one rule.
@@ -33,6 +37,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { ago } from '/js/format.js';
+import { Timeline, TimelineRow } from '/components/Timeline.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 
@@ -230,15 +235,8 @@ export function FeedRow({ item }) {
   const text = line(item);
   if (!text) return null;
   return html`
-    <li class="koti-feed-item koti-feed-item--${kindCategory(item.kind)} ${item.kind === 'agent_knocking' ? 'koti-feed-item-live' : ''}">
-      <span class="koti-feed-dot" aria-hidden="true"></span>
-      <div class="koti-feed-body">
-        ${item.link
-          ? html`<a class="koti-feed-line" href=${item.link}>${text}</a>`
-          : html`<span class="koti-feed-line">${text}</span>`}
-        <span class="koti-feed-when">${when(item.at)}</span>
-      </div>
-    </li>`;
+    <${TimelineRow} category=${kindCategory(item.kind)} live=${item.kind === 'agent_knocking'}
+      href=${item.link} text=${text} when=${when(item.at)} />`;
 }
 
 /** `band`: on the finished home the feed is one of the ruled bands; the onboarding home has none. */
@@ -249,21 +247,12 @@ export function HomeFeed({ items, band }) {
   const newestAt = items.reduce((m, it) => Math.max(m, Date.parse(it.at) || 0), 0);
   const quiet = newestAt > 0 && (Date.now() - newestAt) > QUIET_AFTER_DAYS * 86400000;
   const shown = items.filter(it => line(it));
+  // The card is a glance, not an archive. The door to everything only appears when there IS more
+  // than a glance: a "see all" under six rows offers a page that shows the same six.
   return html`
-    <section class="koti-feed ${band ? 'koti-band' : ''}">
-      <h2 class="koti-band-title">${tr('home.feed.title', 'What has happened')}</h2>
-      ${quiet && html`
-        <a class="koti-feed-quiet" href="/v1/chat">
-          ${tr('home.feed.quiet', 'Quiet here lately. Shall we make something happen? Open the chat and say what you need.')}
-        </a>`}
-      <ul class="koti-feed-list">
-        ${shown.slice(0, CARD_ROWS).map((item, i) => html`<${FeedRow} item=${item} key=${i} />`)}
-      </ul>
-      ${/* The card is a glance, not an archive. The door to everything only appears when there IS
-           more than a glance — a "see all" under six rows offers a page that shows the same six. */''}
-      ${shown.length > CARD_ROWS && html`
-        <a class="koti-feed-more" href="/v1/home?history=1">
-          ${tr('home.feed.seeAll', 'See everything that has happened')}
-        </a>`}
-    </section>`;
+    <${Timeline} title=${tr('home.feed.title', 'What has happened')} band=${!!band}
+      quiet=${quiet ? { href: '/v1/chat', text: tr('home.feed.quiet', 'Quiet here lately. Shall we make something happen? Open the chat and say what you need.') } : null}
+      more=${shown.length > CARD_ROWS ? { href: '/v1/home?history=1', text: tr('home.feed.seeAll', 'See everything that has happened') } : null}>
+      ${shown.slice(0, CARD_ROWS).map((item, i) => html`<${FeedRow} item=${item} key=${i} />`)}
+    <//>`;
 }

@@ -1,0 +1,92 @@
+/**
+ * @file composer.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The box a person types into: one row with the field, the tool buttons and the send slab, and the
+ *   attachments waiting to go. Drawn by components/Composer.js. Reads only the tokens in theme.css
+ *   and the shapes in poster.css; a page never styles it from outside.
+ * @usage Linked from public/spa.html in the component block, whose order keeps the order these
+ *   rules had when they were one sheet.
+ * @version-history
+ *   v1.0.0 — 2026-09-23 — Moved unchanged from css/parts*.css (UI consolidation phase 1, a move).
+ */
+
+/* Pictures attached but not yet sent, and the ones already in the conversation. */
+.poster-attachments { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+.poster-attachment {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 6px;
+  border: 2px solid var(--text);
+  background: var(--bg-surface);
+  font-size: 0.75rem;
+  font-weight: 600;
+  max-width: 220px;
+}
+.poster-attachment--error { border-color: var(--danger); color: var(--danger); }
+.poster-attachment-thumb { width: 28px; height: 28px; object-fit: cover; }
+.poster-attachment-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.poster-attachment-state { color: var(--text-dim); }
+.poster-attachment-drop { padding: 0 4px; line-height: 1; }
+.poster-composer-file { display: none; }
+/* ── The composer: one row ── */
+.poster-composer {
+  flex: none;
+  padding: 10px 0 12px;
+  background: var(--bg);
+}
+.poster-composer-note {
+  margin: 0 0 6px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+.poster-composer-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.poster-composer-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  resize: none;
+  height: 44px;
+  max-height: 200px;
+  padding: 8px 0;
+  border: 0;
+  border-bottom: 3px solid var(--text);
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  font-size: 1.05rem;
+  line-height: 1.5;
+}
+.poster-composer-input::placeholder { color: var(--text-dim); font-weight: 600; }
+.poster-composer-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.poster-composer-input:disabled { opacity: 0.6; }
+/* The two tools beside the field: square, ink-framed, 44px. */
+.poster-composer-tool {
+  flex: 0 0 auto;
+  width: 44px; height: 44px; padding: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 2px solid var(--text); border-radius: 0; box-shadow: none;
+  background: var(--bg); color: var(--text); cursor: pointer; font-size: 1rem;
+}
+.poster-composer-tool:hover { background: var(--sun); }
+.poster-composer-send { flex: 0 0 auto; }
+@media (max-width: 760px) {
+  .poster-composer {
+    padding: 8px 8px calc(10px + env(safe-area-inset-bottom, 0px)) 12px;
+  }
+  .poster-composer-row { gap: 8px; }
+  .poster-composer-tool { width: 40px; }
+  .poster-composer-send { min-width: 60px; padding: 0 14px; }
+}
+.poster-composer-tool:hover { color: var(--on-sun); }

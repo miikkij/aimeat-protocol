@@ -1,0 +1,72 @@
+/**
+ * @file work-log.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description What was actually done, one line per tool call, and the live status while a turn runs. Drawn by
+ *   components/WorkLog.js. Reads only the tokens in theme.css and the shapes in poster.css; a page
+ *   never styles it from outside.
+ * @usage Linked from public/spa.html in the component block, whose order keeps the order these
+ *   rules had when they were one sheet.
+ * @version-history
+ *   v1.0.0 — 2026-09-23 — Moved unchanged from css/parts*.css (UI consolidation phase 1, a move).
+ */
+
+/* ── The work log ── */
+.poster-worklog {
+  margin-top: 12px;
+  border-top: 2px dashed var(--border);
+  padding-top: 8px;
+}
+/* The heading's look is the quiet day heading's (.poster-day-title--quiet); this keeps its place. */
+.poster-worklog-head { margin: 0 0 4px; }
+.poster-worklog-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.poster-worklog-line {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  font-size: 0.74rem;
+  font-family: var(--font-mono);
+  font-weight: 400;
+}
+.poster-worklog-status {
+  flex: 0 0 auto;
+  min-width: 68px;
+  color: var(--text-dim);
+}
+.poster-worklog-line--completed .poster-worklog-status { color: var(--success); }
+.poster-worklog-line--failed .poster-worklog-status { color: var(--danger); }
+.poster-worklog-title {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+/* What the agent is doing right now. The dot moves so a still screen is never the only signal;
+   `prefers-reduced-motion` gets the dot without the pulse, because the words and the clock carry
+   the meaning on their own. */
+.poster-live-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--text-dim);
+}
+.poster-live-dot {
+  width: 9px;
+  height: 9px;
+  background: var(--accent);
+  animation: poster-live-pulse 1.4s ease-in-out infinite;
+}
+.poster-live-clock { font-family: var(--font-mono); }
+@media (prefers-reduced-motion: reduce) {
+  .poster-live-dot { animation: none; }
+}
+
+@keyframes poster-live-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }

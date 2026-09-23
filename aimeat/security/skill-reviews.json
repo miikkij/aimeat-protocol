@@ -50,12 +50,12 @@
       "note": "How to talk; nothing in the code decides it."
     },
     "node:aimeat-offering-choices": {
-      "reviewedOn": "2026-09-19",
+      "reviewedOn": "2026-09-23",
       "watches": [
-        "aimeat/public/views/chat/parts.js"
+        "aimeat/public/components/Suggestion.js"
       ],
-      "digest": "sha256:3aae77ae48bec81917e28635",
-      "note": "The choices format is rendered by this file."
+      "digest": "sha256:20fd9d70c5ffcd40d470a074",
+      "note": "The choices format is parsed and drawn by this file (moved from views/chat/parts.js on 2026-09-23)."
     },
     "node:aimeat-paying-for-the-ai": {
       "reviewedOn": "2026-09-20",
@@ -288,13 +288,13 @@
       "digest": "sha256:94d689cc97e4d19539d2730b"
     },
     "project:aimeat-design-language": {
-      "reviewedOn": "2026-09-20",
+      "reviewedOn": "2026-09-23",
       "watches": [
         "aimeat/public/css/theme.css",
         "aimeat/public/css/poster.css",
         "aimeat/public/lib/aimeat-fonts.css"
       ],
-      "digest": "sha256:cbd15f94a7d60d82e85dd4da"
+      "digest": "sha256:1c0387494884e8646e83d21c"
     },
     "project:aimeat-frontend-verify": {
       "reviewedOn": "2026-09-20",
@@ -360,7 +360,7 @@
     },
     "node:aimeat-activating-a-person": {},
     "node:aimeat-offering-choices": {
-      "aimeat/public/views/chat/parts.js": "12c8246c22bf138a"
+      "aimeat/public/components/Suggestion.js": "bb8a748aaf7b0bc3"
     },
     "node:aimeat-paying-for-the-ai": {
       "aimeat/src/services/ai-completion.ts": "81e90001f1305d31"
@@ -490,8 +490,8 @@
       "aimeat/src/routes/app-templates.ts": "130c67847ddadf85"
     },
     "project:aimeat-design-language": {
-      "aimeat/public/css/theme.css": "658d30b66d70540f",
-      "aimeat/public/css/poster.css": "a8aa3f1f18f33385",
+      "aimeat/public/css/theme.css": "5d54fa7e471508ff",
+      "aimeat/public/css/poster.css": "f03e39d81c3da62d",
       "aimeat/public/lib/aimeat-fonts.css": "213a6ac05c5b8cce"
     },
     "project:aimeat-frontend-verify": {
