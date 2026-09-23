@@ -19,6 +19,8 @@
  * @structure DecideCard — the collapsible card, mounted in the profile AI tab
  * @usage import { DecideCard } from './decide-card.js'; html`<${DecideCard} />`
  * @version-history
+ *   v1.4.1 — 2026-09-23 — The header speaks of the chosen provider: its name and model, and for a
+ *     local one that no key is needed, instead of the key fields alone.
  *   v1.4.0 — 2026-09-23 — Decision providers: the providers part (decide-providers.js) between the
  *     data policy and the rules, and each recent decision names the provider that answered.
  *   v1.3.0 — 2026-09-20 — Every decision carries the person's own verdict: it was right, it was
@@ -173,8 +175,19 @@ export function DecideCard() {
     return save({ policy: { allow: [...allow] } }, 'decideCard.policySaved');
   };
 
-  const payer = !settings ? '' : settings.has_own_key ? t('decideCard.payerOwn')
-    : settings.node_key_available ? t('decideCard.payerNode') : t('decideCard.payerNone');
+  // The header speaks of the provider the owner's decisions go to, not of the key fields alone: with
+  // a local default the key fields are empty and the model answers all the same.
+  const chosen = (settings?.providers?.providers || []).find(p => p.id === settings.providers.default) || null;
+  const payer = !settings ? ''
+    : chosen && chosen.kind === 'local' ? t('decideCard.payerLocal', { provider: chosen.title })
+      : chosen && chosen.source === 'owner' ? (chosen.auth?.has_key || chosen.auth?.type === 'none'
+        ? t('decideCard.payerOwnProvider', { provider: chosen.title }) : t('decideCard.payerOwnProviderNoKey', { provider: chosen.title }))
+        : settings.has_own_key ? t('decideCard.payerOwn')
+          : settings.node_key_available ? t('decideCard.payerNode')
+            : settings.available ? '' : t('decideCard.payerNone');
+  const statusLine = !settings ? '' : !settings.enabled ? t('decideCard.statusOff')
+    : chosen ? t('decideCard.statusOnProvider', { provider: chosen.title, model: chosen.model })
+      : t('decideCard.statusOn', { model: settings.model });
 
   return html`
     <div class="pf-card pf-aitr" id="decide-card">
@@ -191,8 +204,8 @@ export function DecideCard() {
 
           ${settings && html`
             <p class="pf-aitr-note">
-              ${settings.enabled ? t('decideCard.statusOn', { model: settings.model }) : t('decideCard.statusOff')}
-              ${' '}${payer}
+              ${statusLine}
+              ${payer ? ` ${payer}` : ''}
             </p>
 
             <h4 class="pf-aitr-sub">${t('decideCard.keyTitle')}</h4>

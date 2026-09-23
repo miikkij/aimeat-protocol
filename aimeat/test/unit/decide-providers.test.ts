@@ -5,6 +5,8 @@
  * @description The pure half of the decision providers (services/decide/providers.ts): what a
  *   provider record may say, what it cannot carry, and when a provider on this machine is reachable.
  * @version-history
+ *   v1.1.0 — 2026-09-23 — A refusal names the provider as the page does, says a length in
+ *     characters, and carries the fields a page writes it from in its own language.
  *   v1.0.0 — 2026-09-23 — Initial.
  */
 import { afterEach, describe, expect, it } from 'vitest';
@@ -65,13 +67,16 @@ describe('providerViolations', () => {
   it('names the provider and its own number', () => {
     const v = providerViolations(p, 'x', { team: { type: 'choice', instructions: 'Which?', criteria: { a: null, b: null, c: null, d: null } } });
     expect(v).toHaveLength(1);
-    expect(v[0]).toMatchObject({ code: 'PROVIDER_CANNOT_CARRY', question: 'team' });
-    expect(v[0].message).toContain("'mine' carries 3 options");
+    // The page writes the refusal in its own language from these fields, with the name it shows.
+    expect(v[0]).toMatchObject({ code: 'PROVIDER_CANNOT_CARRY', question: 'team', what: 'options', limit: 3, count: 4, provider: 'mine', providerTitle: 'mine' });
+    expect(v[0].message).toContain('"mine" carries 3 options');
     expect(v[0].message).toContain('has 4');
   });
 
-  it('refuses a state longer than the provider reads, and passes one that fits', () => {
-    expect(providerViolations(p, 'x'.repeat(8000), { q: { type: 'noul', instructions: 'Yes?' } })[0]?.message).toContain('reads about 1024 tokens');
+  it('refuses a state longer than the provider reads, in characters as the page says it, and passes one that fits', () => {
+    const long = providerViolations(p, 'x'.repeat(8000), { q: { type: 'noul', instructions: 'Yes?' } })[0];
+    expect(long?.message).toContain('reads about 4096 characters');
+    expect(long).toMatchObject({ what: 'length', limit: 4096 });
     expect(providerViolations(p, 'short', { q: { type: 'noul', instructions: 'Yes?' } })).toEqual([]);
   });
 });

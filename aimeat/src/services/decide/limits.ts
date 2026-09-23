@@ -68,6 +68,16 @@ export interface LimitViolation {
   question?: string;
   code: string;
   message: string;
+  /**
+   * For PROVIDER_CANNOT_CARRY: what did not fit, the provider's number and the request's, and the
+   * provider's id and name. The message is English; these let a page say it in its own language,
+   * with the names it shows.
+   */
+  what?: 'options' | 'levels' | 'length';
+  limit?: number;
+  count?: number;
+  provider?: string;
+  providerTitle?: string;
 }
 
 const ID_RE = /^[A-Za-z0-9_.-]{1,64}$/;

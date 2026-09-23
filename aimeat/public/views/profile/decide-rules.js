@@ -20,6 +20,9 @@
  * @structure DecideRules({ available, providers }) · toRule / fromRule (the editor's draft ↔ the record)
  * @usage import { DecideRules } from './decide-rules.js'; html`<${DecideRules} available=${true} providers=${view} />`
  * @version-history
+ *   v1.2.0 — 2026-09-23 — A message is drawn beside the control that caused it (the editor, the rule,
+ *     the proposal), Cancel takes the editor's message with it, and what a provider cannot carry is
+ *     said in the page's language from the fields the node sends.
  *   v1.1.0 — 2026-09-23 — A rule may name the decision provider it always runs on: a field in the
  *     editor, and the provider in the rule's line.
  *   v1.0.0 — 2026-09-20 — Initial: decision rules on the node.
@@ -29,6 +32,7 @@ import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
+import { num } from '/js/format.js';
 import { apiGet, apiPut, apiPost, apiDelete } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
 import { providerTitle } from './decide-providers.js';
@@ -97,7 +101,20 @@ export function toRule(d) {
   };
 }
 
-function RuleEditor({ draft, isNew, busy, providers, onChange, onSave, onCancel }) {
+/** One PROVIDER_CANNOT_CARRY violation in the page's language, with the provider's own name. */
+export function cannotCarryText(v) {
+  return t(`decideRules.cannotCarry.${v.what}`, {
+    provider: v.providerTitle || v.provider || '', limit: num(v.limit ?? 0), count: num(v.count ?? 0), question: v.question || '',
+  });
+}
+
+/** A message where it was caused: `at` names the place, and only that place draws it. */
+function Note({ msg, at }) {
+  if (!msg || msg.at !== at) return null;
+  return html`<p class=${msg.error ? 'pf-aitr-error pf-dr-pre' : 'pf-aitr-note'} role="status">${msg.key ? t(msg.key, msg.params) : msg.text}</p>`;
+}
+
+function RuleEditor({ draft, isNew, busy, providers, msg, onChange, onSave, onCancel }) {
   const set = (k, v) => onChange({ ...draft, [k]: v });
   const setQ = (i, k, v) => onChange({ ...draft, questions: draft.questions.map((q, n) => (n === i ? { ...q, [k]: v } : q)) });
   return html`
@@ -179,6 +196,7 @@ function RuleEditor({ draft, isNew, busy, providers, onChange, onSave, onCancel 
                   placeholder='{ "draft": "…", "question": "…" }'
                   onInput=${e => set('sampleText', e.currentTarget.value)}></textarea></label>
 
+      <${Note} msg=${msg} at="editor" />
       <div class="og-doors">
         <button type="button" class="og-door" onClick=${onSave} disabled=${busy}>${t('decideRules.save')}</button>
         <button type="button" class="og-door og-door--quiet" onClick=${onCancel} disabled=${busy}>${t('decideRules.cancel')}</button>
@@ -207,19 +225,27 @@ export function DecideRules({ available, providers }) {
     return () => window.removeEventListener('aimeat-live-update', handler);
   }, [load]);
 
-  const act = async (fn, okKey, params) => {
+  // `at` is where the press happened and where its message is drawn: a refusal drawn at the top of
+  // the part, a screen above the Save that caused it, read as nothing happening. `okAt` is where a
+  // success lands when the place pressed is gone afterwards (a closed editor, a deleted row).
+  /** @param {() => Promise<unknown>} fn @param {string} [okKey] @param {{ params?: object, at?: string, okAt?: string }} [where] */
+  const act = async (fn, okKey, { params, at = 'top', okAt = at } = {}) => {
     setBusy(true);
     setMsg(null);
     let done = false;
     try {
       await fn();
-      if (okKey) setMsg({ key: okKey, params, error: false });
+      if (okKey) setMsg({ key: okKey, params, error: false, at: okAt });
       await load();
       done = true;
     } catch (err) {
-      // The node names every problem of a refused rule; show all of them, one per line.
-      const problems = err?.response?.error?.details?.problems;
-      setMsg({ text: Array.isArray(problems) ? problems.map(p => p.message).join('\n') : (err?.message || t('decideRules.saveFailed')), error: true });
+      // The node names every problem of a refused rule; show all of them, one per line. What a
+      // provider cannot carry is written here in the page's language, from the fields the node sends.
+      const details = err?.response?.error?.details;
+      const problems = details?.problems;
+      const cannot = Array.isArray(details?.violations) && details.violations.every(v => v.what)
+        ? details.violations.map(cannotCarryText) : null;
+      setMsg({ text: cannot ? cannot.join('\n') : Array.isArray(problems) ? problems.map(p => p.message).join('\n') : (err?.message || t('decideRules.saveFailed')), error: true, at });
     } finally {
       setBusy(false);
     }
@@ -230,19 +256,21 @@ export function DecideRules({ available, providers }) {
     let body;
     try { body = toRule(draft); } catch (err) {
       swallowed('decide-rules: the sample is not JSON', err);
-      setMsg({ key: 'decideRules.sampleNotJson', error: true });
+      setMsg({ key: 'decideRules.sampleNotJson', error: true, at: 'editor' });
       return;
     }
     const id = draft.id.trim();
-    if (!id) { setMsg({ key: 'decideRules.idMissing', error: true }); return; }
-    if (await act(() => apiPut(`/v1/ai/decide/rules/${encodeURIComponent(id)}`, body), 'decideRules.saved')) setDraft(null);
+    if (!id) { setMsg({ key: 'decideRules.idMissing', error: true, at: 'editor' }); return; }
+    if (await act(() => apiPut(`/v1/ai/decide/rules/${encodeURIComponent(id)}`, body), 'decideRules.saved', { at: 'editor', okAt: `rule:${id}` })) setDraft(null);
   };
+  const openEditor = (d, fresh) => { setMsg(null); setIsNew(fresh); setTried(null); setDraft(d); };
+  const closeEditor = () => { setDraft(null); setMsg(m => (m && m.at === 'editor' ? null : m)); };
 
   const tryRule = (id) => act(async () => {
     setTried(null);
     const r = await apiPost(`/v1/ai/decide/rules/${encodeURIComponent(id)}/try`, {});
     setTried({ id, ...(r?.data ?? {}) });
-  });
+  }, undefined, { at: `rule:${id}` });
 
   if (!data) return html`<p class="pf-aitr-muted">${msg?.error ? msg.text : t('decideRules.loading')}</p>`;
   const quality = data.quality || {};
@@ -254,7 +282,7 @@ export function DecideRules({ available, providers }) {
       <ol class="pf-dr-order">
         ${[1, 2, 3, 4, 5, 6].map(n => html`<li key=${n}>${t(`decideRules.order.${n}`)}</li>`)}
       </ol>
-      ${msg && html`<p class=${msg.error ? 'pf-aitr-error pf-dr-pre' : 'pf-aitr-note'} role="status">${msg.key ? t(msg.key, msg.params) : msg.text}</p>`}
+      <${Note} msg=${msg} at="top" />
 
       ${(data.proposals || []).length > 0 && html`
         <h5 class="pf-dr-h">${t('decideRules.proposals')}</h5>
@@ -266,15 +294,16 @@ export function DecideRules({ available, providers }) {
               <span class="pf-aitr-row-meta">${t('decideRules.decidesLine', { what: p.rule.decides })}</span>
               <span class="og-doors">
                 <button type="button" class="og-door" disabled=${busy}
-                        onClick=${() => act(() => apiPost(`/v1/ai/decide/rule-proposals/${p.id}/approve`, {}), 'decideRules.approved')}>
+                        onClick=${() => act(() => apiPost(`/v1/ai/decide/rule-proposals/${p.id}/approve`, {}), 'decideRules.approved', { at: `prop:${p.id}`, okAt: `rule:${p.rule.id}` })}>
                   ${t('decideRules.approve')}</button>
                 <button type="button" class="og-door og-door--quiet" disabled=${busy}
-                        onClick=${() => { setIsNew(true); setDraft(fromRule(p.rule)); }}>
+                        onClick=${() => openEditor(fromRule(p.rule), true)}>
                   ${t('decideRules.readFirst')}</button>
                 <button type="button" class="og-door og-door--quiet" disabled=${busy}
-                        onClick=${() => act(() => apiPost(`/v1/ai/decide/rule-proposals/${p.id}/decline`, {}), 'decideRules.declined')}>
+                        onClick=${() => act(() => apiPost(`/v1/ai/decide/rule-proposals/${p.id}/decline`, {}), 'decideRules.declined', { at: `prop:${p.id}`, okAt: 'top' })}>
                   ${t('decideRules.decline')}</button>
               </span>
+              <${Note} msg=${msg} at=${`prop:${p.id}`} />
             </li>`)}
         </ul>`}
 
@@ -297,14 +326,15 @@ export function DecideRules({ available, providers }) {
               </span>
               <span class="og-doors">
                 <button type="button" class="og-door og-door--quiet" disabled=${busy}
-                        onClick=${() => { setIsNew(false); setTried(null); setDraft(fromRule(r)); }}>${t('decideRules.edit')}</button>
+                        onClick=${() => openEditor(fromRule(r), false)}>${t('decideRules.edit')}</button>
                 <button type="button" class="og-door og-door--quiet" disabled=${busy || !available || r.sample === null}
                         title=${!available ? t('decideRules.tryNeedsKey') : r.sample === null ? t('decideRules.tryNeedsSample') : ''}
                         onClick=${() => tryRule(r.id)}>${t('decideRules.try')}</button>
                 <button type="button" class="og-door og-door--quiet" disabled=${busy}
-                        onClick=${() => act(() => apiDelete(`/v1/ai/decide/rules/${encodeURIComponent(r.id)}`), 'decideRules.deleted')}>
+                        onClick=${() => act(() => apiDelete(`/v1/ai/decide/rules/${encodeURIComponent(r.id)}`), 'decideRules.deleted', { at: `rule:${r.id}`, okAt: 'list' })}>
                   ${t('decideRules.delete')}</button>
               </span>
+              <${Note} msg=${msg} at=${`rule:${r.id}`} />
               ${tried && tried.id === r.id && html`
                 <span class="pf-aitr-row-meta pf-dr-tried" role="status">
                   ${/* A null result is not 0 %: it means the model returned no certainty at all, so
@@ -319,13 +349,14 @@ export function DecideRules({ available, providers }) {
             </li>`;
         })}
       </ul>
+      <${Note} msg=${msg} at="list" />
 
       ${!draft && html`
         <div class="og-doors">
-          <button type="button" class="og-door" disabled=${busy} onClick=${() => { setIsNew(true); setDraft({ ...EMPTY, questions: [{ ...EMPTY_Q }] }); }}>
+          <button type="button" class="og-door" disabled=${busy} onClick=${() => openEditor({ ...EMPTY, questions: [{ ...EMPTY_Q }] }, true)}>
             ${t('decideRules.new')}</button>
         </div>`}
-      ${draft && html`<${RuleEditor} draft=${draft} isNew=${isNew} busy=${busy} providers=${providers} onChange=${setDraft} onSave=${save} onCancel=${() => setDraft(null)} />`}
+      ${draft && html`<${RuleEditor} draft=${draft} isNew=${isNew} busy=${busy} providers=${providers} msg=${msg} onChange=${setDraft} onSave=${save} onCancel=${closeEditor} />`}
     </div>`;
 }
 

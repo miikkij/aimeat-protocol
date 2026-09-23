@@ -19,6 +19,7 @@
  * @structure AgentAiSection({ agentName, showToast })
  * @usage import { AgentAiSection } from './agent-ai-section.js';
  * @version-history
+ *   v1.1.1 — 2026-09-23 — The provider choice is confirmed beside the select, naming what answers now.
  *   v1.1.0 — 2026-09-23 — The decision provider this agent uses: the owner's default, or one the
  *     owner picks for this agent alone.
  *   v1.0.0 — 2026-09-20 — Initial: a key per agent.
@@ -43,6 +44,7 @@ export function AgentAiSection({ agentName, showToast }) {
   const [busy, setBusy] = useState(false);
   const [tested, setTested] = useState({});
   const [providers, setProviders] = useState(null);
+  const [provSaved, setProvSaved] = useState(null);
 
   // The decision providers the owner may use, with the one set for each agent. Read beside the keys;
   // a node without providers answers without the door, and then the block is not shown.
@@ -122,11 +124,15 @@ export function AgentAiSection({ agentName, showToast }) {
   // `null` gives the agent back to the owner's default.
   const setProvider = async (id) => {
     setBusy(true);
+    setProvSaved(null);
     try {
       await apiPut('/v1/ai/decide/settings', { agent_providers: { [agentName]: id || null } });
       await loadProviders();
       showToast?.(t('agentAi.saved'));
-    } catch (e) { showToast?.(e.message, true); }
+      // Said beside the select as well: a toast can be missed, and this choice moves where the
+      // agent's content goes.
+      setProvSaved({ error: false, id: id || null });
+    } catch (e) { showToast?.(e.message, true); setProvSaved({ error: true, text: e.message }); }
     finally { setBusy(false); }
   };
 
@@ -180,6 +186,10 @@ export function AgentAiSection({ agentName, showToast }) {
               ${provList.map(p => html`<option key=${p.id} value=${p.id}>${p.title}</option>`)}
             </select>
           </div>
+          ${provSaved && html`<p class=${provSaved.error ? 'pf-aitr-error' : 'pf-aitr-note'} role="status">
+            ${provSaved.error ? provSaved.text : t('agentAi.providerSaved', {
+              provider: (provList.find(p => p.id === (provSaved.id || providers.default)) || {}).title || String(provSaved.id || providers.default || ''),
+            })}</p>`}
         </div>`}
 
       <div class="pf-aai-model">

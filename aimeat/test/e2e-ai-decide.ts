@@ -24,6 +24,8 @@
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-ai-decide.ts
  *   cd aimeat && pnpm exec node --env-file=.env.test.postgres-kysely --import tsx test/e2e-ai-decide.ts
  * @version-history
+ *   v1.4.1 — 2026-09-23 — 11e: the refusal names the provider as the page does, and carries the
+ *     fields a page writes it from in its own language.
  *   v1.4.0 — 2026-09-23 — Phase 11, decision providers: an owner's own provider is written and read
  *     and its key never shown; an agent or app cannot write one; a local provider sends no key,
  *     costs nothing and meters nothing; the record and the list name the provider; what a provider
@@ -883,7 +885,10 @@ const QUESTIONS = {
     const r = await ask(A.token, { provider: 'mine-local', questions: { team: FOUR } });
     const msg = String(r.body.error?.message ?? '');
     assert(r.status === 400 && r.body.error?.code === 'PROVIDER_CANNOT_CARRY', `got ${r.status} ${r.body.error?.code}`);
-    assert(msg.includes("'mine-local' carries 3 options") && msg.includes('has 4'), `named in its own numbers, got: ${msg}`);
+    assert(msg.includes('"My local model" carries 3 options') && msg.includes('has 4'), `named as the page names it, in its own numbers, got: ${msg}`);
+    const v = r.body.error?.details?.violations?.[0];
+    assert(v?.what === 'options' && v.limit === 3 && v.count === 4 && v.provider === 'mine-local' && v.providerTitle === 'My local model',
+      `the fields a page writes it from in its own language, got: ${JSON.stringify(v)}`);
     assert(seen.length === before, 'the stub was not called');
     const onNode = await ask(A.token, { questions: { team: FOUR } });
     assert(onNode.status === 200, `the node's provider carries four, got ${onNode.status}`);
