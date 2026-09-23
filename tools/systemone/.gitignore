@@ -1,0 +1,4 @@
+# systemone.ps1 keeps the virtual environments, the weights and the logs here (several GB).
+.runtime/
+# measure.mjs output
+results/
