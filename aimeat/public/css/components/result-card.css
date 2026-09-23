@@ -19,13 +19,13 @@
   gap: 8px;
   margin-top: 12px;
 }
+/* The look is the box's row tone (poster.css .poster-box--row); this keeps its layout and place,
+   and the kind's edge below stays the result's own. */
 .poster-result {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 10px;
-  border: 2px solid var(--text);
-  background: var(--bg-card);
+  margin: 0;
 }
 .poster-result-img {
   width: 64px;
