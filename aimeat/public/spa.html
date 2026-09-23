@@ -156,6 +156,7 @@
   <link rel="stylesheet" href="/css/components/nudge.css">
   <link rel="stylesheet" href="/css/components/credit.css">
   <link rel="stylesheet" href="/css/components/composer.css">
+  <link rel="stylesheet" href="/css/components/specimen.css">
   <link rel="stylesheet" href="/css/views/notebook.css">
   <link rel="stylesheet" href="/css/views/living.css">
   <link rel="stylesheet" href="/css/views/offers.css">
@@ -469,6 +470,9 @@
       "/components/Turn.js": "/components/Turn.js",
       "/components/WaitingNote.js": "/components/WaitingNote.js",
       "/components/WorkLog.js": "/components/WorkLog.js",
+      "/components/Specimen.js": "/components/Specimen.js",
+      "/views/design-lab/demos.js": "/views/design-lab/demos.js",
+      "/views/home/journey.js": "/views/home/journey.js",
       "/components/AgentConsent.js": "/components/AgentConsent.js",
       "/views/profile/agents/scope-config.js": "/views/profile/agents/scope-config.js",
       "/views/profile/shared.js": "/views/profile/shared.js",
@@ -678,6 +682,8 @@
       '/v1/help':        () => import('/views/help.js' + B),
       '/v1/publicknowledgeviewer': () => import('/views/public-knowledge-viewer.js' + B),
       '/v1/publicworkspaceviewer': () => import('/views/public-workspace-viewer.js' + B),
+      // The design lab's preview page: one interface part in a frame, drawn with no header or footer.
+      '/v1/design-lab/frame': () => import('/views/design-lab/frame.js' + B),
     };
 
     // Match route, handling query params for special views
@@ -848,6 +854,14 @@
       const retryView = useCallback(() => {
         navigate(location.pathname + location.search, true);
       }, [navigate]);
+
+      // The design lab's preview page is drawn inside a frame of the lab, so it carries no chrome.
+      const bare = window.location.pathname === '/v1/design-lab/frame';
+      if (bare) {
+        return View
+          ? html`<${ErrorBoundary} onRetry=${retryView}><${View} navigate=${navigate} locale=${locale} /></${ErrorBoundary}>`
+          : html`<div class="empty"><div class="spinner"></div></div>`;
+      }
 
       return html`
         <${Header} navigate=${navigate} locale=${locale} />

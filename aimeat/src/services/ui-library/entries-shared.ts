@@ -116,7 +116,7 @@ export const SHARED_ENTRIES: UiEntrySource[] = [
         use: ['Showing what an app does with a person\'s data, before and after they use it. No page draws it today.'],
         variants: [],
         example: { stamp: 'Reads your notes, writes nothing' },
-        note: 'Only the barrel file components/index.js imports it, and nothing imports the barrel. Keep or delete is Jouni\'s call.',
+        note: 'Its only page use was the Apps tab (views/profile/apps-tab.datamap.js), deleted in 8fde4f329 (2026-09-02) when per-app management moved to the app launcher, which has its own data map (src/static/app-catalog/js/data-map.js). Only the barrel file components/index.js imports it now, and nothing imports the barrel. Keep or delete is Jouni\'s call.',
     },
     {
         id: 'tags', name: 'TagList', kind: 'component', status: 'active',

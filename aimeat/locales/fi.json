@@ -9861,6 +9861,8 @@
     "navServices": "Palvelut",
     "navIntegrations": "Integraatiot",
     "navFederation": "Federaatio",
+    "navDesign": "Ulkoasu",
+    "designLab": "aimeat-design-lab",
     "csmManagement": "CSM-hallinta",
     "msmManagement": "MSM-hallinta",
     "portal": "Portaali",
@@ -19839,5 +19841,39 @@
     "doorSignedIn": "Sä olet kirjautuneena, joten ohjattu polku on yhden klikkauksen päässä.",
     "doorCreate": "Luo tili →",
     "doorSignIn": "Mulla on jo tili, kirjaa mut sisään →"
+  },
+  "designLab": {
+    "intro": "Jokainen tämän AIMEATin oman käyttöliittymän osa piirrettynä sen omalla komponentilla ja esimerkkitiedoilla. Avaa osa, niin näet sen jokaisen muunnelman vaaleana ja tummana, puhelimen leveydellä, ja mihin se on tarkoitettu.",
+    "filterLabel": "Mitkä osat",
+    "filter": {
+      "all": "Kaikki",
+      "component": "Komponentit",
+      "shape": "Muodot",
+      "unused": "Käyttämättömät"
+    },
+    "find": "Etsi osa",
+    "none": "Yksikään osa ei vastaa hakua.",
+    "unused": "käyttämätön",
+    "back": "Kaikki osat",
+    "light": "Vaalea",
+    "dark": "Tumma",
+    "phone": "Puhelimessa",
+    "facts": "Mikä se on",
+    "use": "Käyttö",
+    "data": "Tiedot",
+    "variants": "Muunnelmat",
+    "pages": "Sivut",
+    "noPages": "mikään sivu ei piirrä sitä",
+    "tokens": "Teeman arvot",
+    "code": "Koodi",
+    "noDemo": "Tälle osalle ei ole esimerkkiä.",
+    "wrapper": {
+      "title": "Löydetty, ei korjattu: kääre agenttiaskeleessa",
+      "body": "Agenttiaskeleen nimilomake on kääreen sisällä, jolla on mastheadin nimen luokka (poster-masthead-name). Kääre sai luokan 2026-08-07, ja kolme tuntia myöhemmin sama luokka annettiin yläosan nimikyltille. Nimikyltin sääntö katkaisee tekstin yhdelle riville. Mikään ei kerro, että kääreen oli tarkoitus saada tämä sääntö. Vasemmalla: nykyinen. Oikealla: sama askel ilman luokkaa.",
+      "asIs": "Nykyinen",
+      "without": "Ilman mastheadin nimen luokkaa",
+      "asIsPhone": "Nykyinen, puhelin",
+      "withoutPhone": "Ilman luokkaa, puhelin"
+    }
   }
 }

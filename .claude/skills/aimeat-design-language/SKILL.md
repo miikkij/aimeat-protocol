@@ -228,7 +228,10 @@ pages that draw it; the shapes of `poster.css` are in it too. Read it before bui
 reuse the part that exists. A new component gets an entry in `aimeat/src/services/ui-library/`
 (the purpose half, written by hand), then `pnpm build:ui-library` reads the rest from the files.
 `pnpm check:ui-library` refuses a sheet with no entry, a variant class its sheet does not carry, an
-"active" part no page draws and stale facts. This catalogue is the node's own interface only;
+"active" part no page draws and stale facts. **To see the parts**, open aimeat-design-lab in the
+admin pages (group Design): every entry drawn live by its real component with its example, every
+variant in light and dark and at a phone width. Its demos live in `public/views/design-lab/`, and
+the check refuses an entry without one. This catalogue is the node's own interface only;
 Atelier's catalogue of app parts is a different thing and shares nothing with it.
 
 Run `pnpm check:poster-shapes` from `aimeat/`. It scans view and component sheets and refuses

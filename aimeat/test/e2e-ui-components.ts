@@ -12,6 +12,7 @@
  *   and a signed-in one must read the same thing.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=ui-components
  * @version-history
+ *   v1.1.0 — 2026-09-23 — The design lab's preview page is served as the app (phase 2).
  *   v1.0.0 — 2026-09-23 — Initial (UI consolidation phase 1).
  */
 import * as ed from '@noble/ed25519';
@@ -132,6 +133,16 @@ await test('Every sheet and module the catalogue names is served by this node', 
         if (res.status !== 200) missing.push(`${f} → ${res.status}`);
     }
     assert(missing.length === 0, `not served: ${missing.join(', ')}`);
+});
+
+await test("The design lab's preview page is served as the app", async () => {
+    // A refresh or a frame loads this address from the server, which answered 404 before it was
+    // registered beside the other app addresses.
+    const res = await fetch(`${BASE}/v1/design-lab/frame?id=turn&v=0&theme=dark`);
+    const body = await res.text();
+    assert(res.status === 200, `preview page: ${res.status}`);
+    // The server stamps a nonce on the tag, so the attribute order is not fixed.
+    assert(/<script[^>]*type="importmap"/.test(body), 'it is the app shell');
 });
 
 let mcpToken = '';

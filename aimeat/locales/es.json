@@ -8397,6 +8397,8 @@
     "navServices": "Servicios",
     "navIntegrations": "Integraciones",
     "navFederation": "Federación",
+    "navDesign": "Diseño",
+    "designLab": "aimeat-design-lab",
     "csmManagement": "Gestión de CSM",
     "msmManagement": "Gestión de MSM",
     "portal": "Portal",
@@ -10899,8 +10901,6 @@
     }
   },
   "landing": {
-    "storeLi2": "Tus datos y las aplicaciones que creas siguen siendo tuyos. Tú decides a quién dar acceso.",
-    "trust4Text": "Tu cuenta incluye funciones para exportar y eliminar datos. El lugar donde se guardan y donde la IA los procesa depende del alojamiento y del modelo que elijas.",
     "heroTitle": "Dueño o inquilino. ¿Cuál quieres ser?",
     "heroSub": "Tu memoria, tus agentes, tu balance. En una plataforma alquilada construyes una herramienta y la pagas. Aquí la herramienta puede cobrarle a otro, y además es tuya.",
     "askAiTitle": "Deja que tu propia IA te cuente qué es AIMEAT para ti",
@@ -11049,7 +11049,9 @@
     "agentDoorCannot": "Si te dice que no puede, es una respuesta perfectamente válida. Regístrate abajo.",
     "registerHome": "Registra tu hogar",
     "registerHomeSub": "Si todavía no tienes forma de entrar.",
-    "signInHome": "Entra a tu hogar"
+    "signInHome": "Entra a tu hogar",
+    "storeLi2": "Tus datos y las aplicaciones que creas siguen siendo tuyos. Tú decides a quién dar acceso.",
+    "trust4Text": "Tu cuenta incluye funciones para exportar y eliminar datos. El lugar donde se guardan y donde la IA los procesa depende del alojamiento y del modelo que elijas."
   },
   "everything": {
     "title": "Todo lo que hay en AIMEAT",
@@ -13618,6 +13620,18 @@
         "changes": {
           "title": "Novedades desde la última vez que miraste"
         },
+        "crew": {
+          "tools": {
+            "decisions": "Decisiones",
+            "decide": "Hace al modelo de decisión sus propias preguntas cerradas y recibe probabilidades",
+            "decideRule": "Ejecuta tu regla de decisión «{title}»: {decides}",
+            "decideRuleGone": "Esta regla de decisión ya no existe. Desmárcala o vuelve a escribir la regla.",
+            "decideNoKey": "Todavía no se pueden marcar: este agente no tiene clave de TypeSafe. El orden es: pon una clave, pruébala, escribe una regla de decisión y pruébala, dale la regla al agente aquí, decide sobre la compuerta y después lee las decisiones y ajusta los umbrales.",
+            "decideOffOperator": "No se pueden marcar: el operador ha apagado el modelo de decisión en este servidor.",
+            "decideNoKeyLink": "Abre los ajustes del modelo de decisión",
+            "decideNoRules": "Aún no tienes ninguna regla de decisión hecha para agentes, así que solo se ofrece la herramienta de preguntas abiertas."
+          }
+        },
         "usage": {
           "cost": "Coste (30 d)",
           "tokens": "Tokens (30 d)",
@@ -13952,19 +13966,7 @@
         "federationOn": "sí",
         "federationOff": "no",
         "federationOnHint": "Compartido por la federación. Haz clic para dejarlo solo local",
-        "federationOffHint": "Solo local. Haz clic para compartirlo por la federación",
-        "crew": {
-          "tools": {
-            "decide": "Hace al modelo de decisión sus propias preguntas cerradas y recibe probabilidades",
-            "decideNoKey": "Todavía no se pueden marcar: este agente no tiene clave de TypeSafe. El orden es: pon una clave, pruébala, escribe una regla de decisión y pruébala, dale la regla al agente aquí, decide sobre la compuerta y después lee las decisiones y ajusta los umbrales.",
-            "decideNoKeyLink": "Abre los ajustes del modelo de decisión",
-            "decideNoRules": "Aún no tienes ninguna regla de decisión hecha para agentes, así que solo se ofrece la herramienta de preguntas abiertas.",
-            "decideOffOperator": "No se pueden marcar: el operador ha apagado el modelo de decisión en este servidor.",
-            "decideRule": "Ejecuta tu regla de decisión «{title}»: {decides}",
-            "decideRuleGone": "Esta regla de decisión ya no existe. Desmárcala o vuelve a escribir la regla.",
-            "decisions": "Decisiones"
-          }
-        }
+        "federationOffHint": "Solo local. Haz clic para compartirlo por la federación"
       },
       "board": {
         "online": "conectado",
@@ -17635,6 +17637,40 @@
           "label": "Palabras finales"
         }
       }
+    }
+  },
+  "designLab": {
+    "intro": "Cada parte de la interfaz propia de este AIMEAT, dibujada en vivo por su componente real con sus datos de ejemplo. Abre una parte para ver cada variante en claro y en oscuro, en el ancho de un teléfono, y para qué sirve.",
+    "filterLabel": "Qué partes",
+    "filter": {
+      "all": "Todas",
+      "component": "Componentes",
+      "shape": "Formas",
+      "unused": "Sin uso"
+    },
+    "find": "Buscar una parte",
+    "none": "Ninguna parte coincide.",
+    "unused": "sin uso",
+    "back": "Todas las partes",
+    "light": "Claro",
+    "dark": "Oscuro",
+    "phone": "En un teléfono",
+    "facts": "Qué es",
+    "use": "Uso",
+    "data": "Datos",
+    "variants": "Variantes",
+    "pages": "Páginas",
+    "noPages": "ninguna página la dibuja",
+    "tokens": "Valores del tema",
+    "code": "Código",
+    "noDemo": "Esta parte no tiene ejemplo.",
+    "wrapper": {
+      "title": "Encontrado, no corregido: el contenedor del paso del agente",
+      "body": "El formulario del nombre en el paso del agente está dentro de un contenedor que lleva la clase del nombre de la cabecera (poster-masthead-name). El contenedor recibió la clase el 2026-08-07 y, tres horas después, la recibió también la placa del nombre de la cabecera, cuya regla corta el texto a una línea. Nada indica que el contenedor debiera recibir esa regla. A la izquierda: como está. A la derecha: el mismo paso sin la clase.",
+      "asIs": "Como está",
+      "without": "Sin la clase del nombre de la cabecera",
+      "asIsPhone": "Como está, teléfono",
+      "withoutPhone": "Sin la clase, teléfono"
     }
   }
 }

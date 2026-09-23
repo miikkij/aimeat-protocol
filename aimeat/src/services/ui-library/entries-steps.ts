@@ -28,7 +28,7 @@ export const STEP_ENTRIES: UiEntrySource[] = [
             { name: 'limit', class: 'poster-step--limit', when: 'the warm cut for an app that has reached a limit' },
         ],
         example: { num: '1', title: 'Your welcome mat', children: 'Copy the prompt below into your AI chat.' },
-        note: 'The component draws the open step. The done and limit cuts are in the sheet; no page draws them today.',
+        note: 'The component draws the open step. Only StepMatDone ever drew the done look and only StepBranchB the limit look; both stopped being drawn in 07f7040c5 (2026-09-09, "connect first, the welcome page is optional"). The cuts stay in the sheet until Jouni decides.',
     },
     {
         id: 'prompt-card', name: 'PromptCard', kind: 'component', status: 'active',
@@ -125,7 +125,7 @@ export const STEP_ENTRIES: UiEntrySource[] = [
             { name: 'onboarding', class: 'poster-agent-card-dot--onboarding', when: 'still setting up' },
         ],
         example: { agent: { name: 'claude', state: 'idle', detail: 'Last seen an hour ago' } },
-        note: 'Its code sits in views/home/step-agent.js, which no page mounts in this part. Keep or delete is Jouni\'s call.',
+        note: 'Not drawn since eaf81e18c (2026-08-18), which replaced it with the one-line FleetLine: "It deliberately surfaced the WORST agent by name, which made a snag the home\'s first sentence on an 86-agent fleet." Its code still sits in views/home/step-agent.js. Keep or delete is Jouni\'s call.',
     },
     {
         id: 'link-row', name: 'LinkRow', kind: 'component', status: 'unused',
@@ -135,7 +135,7 @@ export const STEP_ENTRIES: UiEntrySource[] = [
         use: ['No page draws it today.'],
         variants: [],
         example: { url: '/v1/pages/mat', standaloneUrl: 'https://alice.aimeat.io/mat' },
-        note: 'Its markup sits in StepMatDone (views/home/step-mat.js), which no page mounts. Keep or delete is Jouni\'s call.',
+        note: 'Its markup sits in StepMatDone (views/home/step-mat.js). 24fa11a2e (2026-08-18) took StepMatDone off the finished home (one line with the address under the greeting); 07f7040c5 (2026-09-09) removed the onboarding steps, so nothing draws it. The optional page is now a fold in the home journey with one link. Keep or delete is Jouni\'s call.',
     },
     {
         id: 'app-list', name: 'AppList', kind: 'component', status: 'unused',
@@ -145,7 +145,7 @@ export const STEP_ENTRIES: UiEntrySource[] = [
         use: ['No page draws it today.'],
         variants: [],
         example: { apps: [{ name: 'AI Music Charts', plans: 'Free and Pro', docs: '/v1/apps/charts/docs' }] },
-        note: 'Its markup sits in StepBranchB (views/home/step-agent.js), which no page mounts. Keep or delete is Jouni\'s call.',
+        note: 'Its markup sits in StepBranchB (views/home/step-branch-b.js): branch B of the home journey, for an AI app that cannot open a connection (step 2 became "get an app that can connect"). Removed on purpose in 07f7040c5 (2026-09-09, "connect first, the welcome page is optional"): with the welcome page optional, the detour after it had nowhere to sit. No commit message names branch B; the code, the file header and the renamed tests show it. The server still computes needsBetterApp for the prompt-driven road. Keep or delete is Jouni\'s call.',
     },
     {
         id: 'teach-note', name: 'TeachNote', kind: 'component', status: 'unused',
@@ -155,7 +155,7 @@ export const STEP_ENTRIES: UiEntrySource[] = [
         use: ['No page draws it today.'],
         variants: [],
         example: { children: 'The three dots in the corner are how you act on anything here.' },
-        note: 'Its markup sits in StepMatDone (views/home/step-mat.js), which no page mounts. Keep or delete is Jouni\'s call.',
+        note: 'Its markup sits in StepMatDone (views/home/step-mat.js), not drawn since 07f7040c5 (2026-09-09). It has no successor. Keep or delete is Jouni\'s call.',
     },
     {
         id: 'front-door', name: 'FrontDoor', kind: 'component', status: 'active',
