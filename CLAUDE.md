@@ -163,7 +163,7 @@ A new rule goes into this file only when it holds in every session, whatever the
 
 Name the pass-criterion before accepting a checkpoint, then verify against that criterion rather than overall impression. Alignment is proven with an asymmetric anchor element, size with a known reference dimension, behaviour with the real interaction. If you cannot state a criterion, the requirement is unclear: resolve it or ask before iterating, because iterating on a guessed target produces confident wrong fixes. **A source named in the request (a URL, file or spec) is the requirement: open it before implementing.** A verdict reached on weak evidence stays suspect until re-verified.
 
-**Quote Jouni's words, never paraphrase; ask when they read two ways.** A look-keeping change passes only with no visible difference from the original; differences go to him, not graded by the builder. Show one page first; keep visual work off `main` until he saw it. → `docs/pitfalls.md` §94
+**Quote Jouni's words, never paraphrase; ask when they, or two rules, read two ways or leave no room for the goal.** A UI step is one of two kinds, never mixed: a **move** (code, names and CSS change place) passes only with no visible difference from the old code on the same data; a **unification** (one look for one kind of thing) takes the look Jouni chose in aimeat-design-lab, and nothing else changes. The builder never grades a difference. Visual work stays off `main` until he saw it. → `docs/pitfalls.md` §94
 
 ## Identity: GHII / GAII / GEAI
 
