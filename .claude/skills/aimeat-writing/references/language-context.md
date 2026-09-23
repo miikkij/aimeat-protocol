@@ -87,6 +87,10 @@ everywhere at once, and say so in the Changes section.
 | sign-in from elsewhere | another AIMEAT vouching that a sign-in is really them | federation | federaatio | federación |
 | the account holder | the human who owns everything here | owner | omistaja | propietario |
 | this product's settings area | where a person changes their own things | Settings & Controls | Asetukset ja hallinta | Configuración y controles |
+| one piece of this AIMEAT's own screens | a component or a shape of the interface library, as the design lab lists it; never an app | part | osa | parte |
+| a part no page draws today | kept until the developer says keep or delete | unused | käyttämätön | sin uso |
+| the values a theme sets | colours, faces and sizes that a part reads from the theme | theme tokens | teeman arvot | valores del tema |
+| the admin view that shows the parts | its name, on the Design group of the admin pages | aimeat-design-lab | aimeat-design-lab | aimeat-design-lab |
 | the service the person is on | the AIMEAT they are reading this screen on, which is a thing with a name | this service, or its name | tämä palvelu, tai sen nimi | este servicio, o su nombre |
 | the list of public systems | where a public AIMEAT can be found by others | the federation directory | AIMEAT-palvelimien luettelo | el directorio de la federación |
 | a machine credential | what a program presents to prove it may connect | token | token | token |

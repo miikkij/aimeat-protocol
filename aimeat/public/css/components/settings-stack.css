@@ -1,0 +1,21 @@
+/**
+ * @file settings-stack.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The inside of a settings dialog: its sections in one column. Drawn by
+ *   components/SettingsStack.js. Reads only the tokens in theme.css and the shapes in poster.css; a
+ *   page never styles it from outside.
+ * @usage Linked from public/spa.html in the component block, whose order keeps the order these
+ *   rules had when they were one sheet.
+ * @version-history
+ *   v1.0.0 — 2026-09-23 — Moved unchanged from css/parts*.css (UI consolidation phase 1, a move).
+ */
+
+/* ── The settings dialog ──
+   Two sections and the door to settings and controls, inside the site's one dialog (/css/dialog.css),
+   which sizes it and scrolls its body. */
+.poster-settings { display: flex; flex-direction: column; width: 100%; }
+.poster-settings-startpage {
+  margin-top: 1.1rem; padding-top: 1.1rem;
+  border-top: 1px solid var(--border);
+}

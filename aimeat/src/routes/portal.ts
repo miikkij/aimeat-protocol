@@ -60,6 +60,8 @@
  *     evening: the Design Book's browsing surface is the design-book app on the node, and a
  *     second door to the same shelf was a duplicate. The per-part preview stayed, in
  *     routes/designbook.ts, for that app to embed.
+ *   v1.16.0 — 2026-09-23 — /v1/design-lab/frame serves the SPA: the design lab's preview page,
+ *     one interface part in a frame of the admin's library view.
  */
 import { Router } from 'express';
 import { readFileSync } from 'node:fs';
@@ -523,6 +525,9 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
     '/v1/fleet',
     '/v1/members',
     '/v1/admin',
+    // The design lab's preview page, which the lab shows in frames. Registered here AND in
+    // spa.html's ROUTES.
+    '/v1/design-lab/frame',
     '/v1/help',
     '/v1/publicknowledgeviewer',
     '/v1/publicworkspaceviewer',

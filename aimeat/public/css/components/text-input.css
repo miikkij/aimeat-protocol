@@ -1,0 +1,25 @@
+/**
+ * @file text-input.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description A one-line text field in an ink frame, sun outline on focus. Drawn by components/TextInput.js.
+ *   Reads only the tokens in theme.css and the shapes in poster.css; a page never styles it from
+ *   outside.
+ * @usage Linked from public/spa.html in the component block, whose order keeps the order these
+ *   rules had when they were one sheet.
+ * @version-history
+ *   v1.0.0 — 2026-09-23 — Moved unchanged from css/parts*.css (UI consolidation phase 1, a move).
+ */
+
+/* ── Step 2: naming, the two ways of doing it, and the wait ── */
+.poster-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.65rem 0.8rem;
+  border: 2px solid var(--text);
+  background: var(--bg-card);
+  color: var(--text);
+  font-size: 1rem;
+  font-family: inherit;
+}
+.poster-input:focus { outline: 3px solid var(--sun); outline-offset: 0; }

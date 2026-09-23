@@ -22,6 +22,8 @@
  * @usage
  *   html`<${PromptCard} label=${t('...')} prompt=${text} copyLabel=${t('...')} />`
  * @version-history
+ *   2026-09-23: The label is the shared row label, .poster-label (Jouni's decision "Row label").
+ *   2026-09-23: Composed from the shared parts in css/parts.css and css/parts-steps.css (class names by role, values moved from views/home.css unchanged; UI consolidation slice 1).
  *   v1.0.0 — 2026-08-09 — Extracted from four call sites in views/home (intent pool, phase 2).
  */
 import { h } from 'preact';
@@ -79,10 +81,10 @@ export function PromptCard({
   }
 
   return html`
-    <div class="koti-prompt" onClick=${hasMenu ? stop : undefined}>
-      <div class="koti-prompt-head">
-        <span class="koti-prompt-label">${label}</span>
-        <div class="koti-prompt-actions">
+    <div class="poster-box poster-box--copy poster-prompt" onClick=${hasMenu ? stop : undefined}>
+      <div class="poster-prompt-head">
+        <span class="poster-label">${label}</span>
+        <div class="poster-prompt-actions">
           <${CopyButton}
             text=${prompt}
             className=${className}
@@ -90,7 +92,7 @@ export function PromptCard({
             copiedLabel=${copiedLabel}
             onCopied=${onCopied} />
           ${hasMenu && html`
-            <button type="button" class="btn-ghost koti-prompt-more"
+            <button type="button" class="btn-ghost poster-prompt-more"
               aria-expanded=${open}
               aria-label=${tr('prompt.more', 'More')}
               onClick=${(e) => { stop(e); setOpen(v => !v); }}>▾</button>`}
@@ -98,24 +100,24 @@ export function PromptCard({
       </div>
 
       ${open && html`
-        <div class="koti-prompt-menu">
-          <button type="button" class="btn-ghost koti-prompt-menu-item"
+        <div class="poster-prompt-menu">
+          <button type="button" class="btn-ghost poster-prompt-menu-item"
             onClick=${(e) => { stop(e); setBodyShown(v => !v); setOpen(false); }}>
             ${bodyShown ? tr('prompt.hideText', 'Hide the prompt') : tr('prompt.showText', 'Show the prompt')}
           </button>
           ${saveIntent && html`
-            <button type="button" class="btn-ghost koti-prompt-menu-item" disabled=${busy || saved}
+            <button type="button" class="btn-ghost poster-prompt-menu-item" disabled=${busy || saved}
               onClick=${(e) => { stop(e); run(saveIntent, () => setSaved(true)); }}>
               ${saved ? tr('prompt.saved', 'Waiting on your list') : tr('prompt.save', 'Leave it waiting')}
             </button>`}
           ${canGive && agents.map(a => html`
-            <button type="button" key=${a.gaii || a.name} class="btn-ghost koti-prompt-menu-item"
+            <button type="button" key=${a.gaii || a.name} class="btn-ghost poster-prompt-menu-item"
               disabled=${busy}
               onClick=${(e) => { stop(e); run(() => onGiveToAgent(a)); }}>
               ${tr('prompt.giveTo', 'Give it to')} ${a.display_name || a.name}
             </button>`)}
           ${extraActions.map((a, idx) => html`
-            <button type="button" key=${'x' + idx} class="btn-ghost koti-prompt-menu-item"
+            <button type="button" key=${'x' + idx} class="btn-ghost poster-prompt-menu-item"
               disabled=${busy || a.disabled}
               onClick=${(e) => { stop(e); run(a.run); }}>
               ${a.label}
@@ -123,7 +125,7 @@ export function PromptCard({
         </div>`}
 
       ${bodyShown && html`
-        <pre class="koti-prompt-body">${prompt || loadingLabel || tr('home.mat.loading', 'Loading…')}</pre>`}
+        <pre class="poster-prompt-body">${prompt || loadingLabel || tr('home.mat.loading', 'Loading…')}</pre>`}
     </div>`;
 }
 

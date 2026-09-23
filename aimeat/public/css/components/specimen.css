@@ -1,0 +1,42 @@
+/**
+ * @file specimen.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description A live preview of an interface part in its own frame, with a caption, and the row
+ *   that puts several side by side. Drawn by components/Specimen.js and by the design lab's preview
+ *   page (views/design-lab/frame.js), which draws the stage. The frame's border is the poster.css
+ *   frame shape; this sheet holds only the layout.
+ * @usage Linked from public/spa.html after the component block.
+ * @version-history
+ *   v1.1.0 — 2026-09-23 — The decisions view: a row of small parts, a corner anchor, a crop, and
+ *     the measured values.
+ *   v1.0.0 — 2026-09-23 — Initial, for the design lab's library view (UI consolidation phase 2).
+ */
+
+.poster-specimens {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 26rem), 1fr));
+  gap: 1.25rem;
+  align-items: start;
+  margin: 0 0 1.5rem;
+}
+
+.poster-specimen { margin: 0; min-width: 0; display: flex; flex-direction: column; gap: 0.4rem; }
+.poster-specimen--phone { max-width: calc(390px + 6px); }
+.poster-specimen-box { overflow: hidden; }
+.poster-specimen-frame { display: block; width: 100%; border: 0; background: transparent; }
+.poster-specimen-note { margin: 0; font-size: 0.85rem; color: var(--text-dim); }
+
+/* Inside the preview page: the part on the page's own ground, with room around it. */
+.poster-specimen-stage { padding: 1.25rem; background: var(--bg); color: var(--text); }
+.poster-specimen-stage--flush { padding: 0; }
+/* A few small parts side by side, and a box for a count that its page positions on a corner. */
+.poster-specimen-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+.poster-specimen-anchor { position: relative; display: inline-block; width: 1.6rem; height: 1.4rem; }
+/* One tone of a proposal: the example, and the tone's name under it. */
+.poster-specimen-tone { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 0.25rem; }
+.poster-specimen-tone > small { font-family: var(--font-mono); font-size: 0.64rem; color: var(--text-dim); }
+
+/* A decision's crop from its real page, set at its own size, and the measured values under it. */
+.poster-specimen-crop { display: block; max-width: 100%; height: auto; }
+.poster-specimen-values { margin: 0; font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-dim); line-height: 1.6; }

@@ -18,6 +18,7 @@
  *   StatsBlock · TransparencyBlock · PortalTextBlock · PortalBoardBlock
  * @usage Reached through views/surface/block-map.js, never imported directly by a view.
  * @version-history
+ *   2026-09-23: Composed from the shared parts in css/parts.css and css/parts-steps.css (class names by role, values moved from views/home.css unchanged; UI consolidation slice 1).
  *   v1.3.0 — 2026-09-14 — Seven V2* blocks: the front page as the message frame says it (TARGET-075).
  *   v1.2.0 — 2026-08-30 — portal.board shows a notice's category and its poster's name beside the
  *     date, now that a board is the notice board people and agents publish to (RFC §27).
@@ -36,7 +37,8 @@ import { WishBox, ConnectInvite, BuildHero } from '/views/landing-doors.js';
 import { BuildAgentPrompt, AskYourAI } from '/views/landing-prompts.js';
 import NodeTotals from '/views/landing-node-totals.js';
 import NodeChangeLog from '/views/landing-changelog.js';
-import { WelcomeDoor } from '/views/home/welcome-door.js';
+import { FrontDoor } from '/components/FrontDoor.js';
+import { TextBlock, NoticeBlock } from '/components/FreeText.js';
 import { ShowroomHero, WallIntro, ShowroomClose } from '/views/landing-showroom.js';
 import { StoreSection, TrustList, Rooms } from '/views/landing-showroom-rooms.js';
 import { Hero2, TenSeconds, LinuxLine, Close2 } from '/views/landing-v2.js';
@@ -49,7 +51,7 @@ const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fa
 const nav = (ctx) => ctx?.navigate ?? (() => { });
 
 export function WelcomeDoorBlock(/** @type {{ ctx?: any, props?: Record<string, any>, title?: string, text?: string, blockKey?: string }} */ { ctx }) {
-  return html`<${WelcomeDoor} onNavigate=${nav(ctx)} />`;
+  return html`<${FrontDoor} onNavigate=${nav(ctx)} />`;
 }
 
 // The pitch line and the wish box were ONE section until the front page became a layout, where each
@@ -133,10 +135,9 @@ export function PortalTextBlock(/** @type {{ ctx?: any, props?: Record<string, a
     ['site'], (d) => (typeof d?.value === 'string' ? d.value : ''));
   if (!data) return null;
   return html`
-    <section class="sf-portal-text">
-      ${title ? html`<h2 class="sf-band-title">${title}</h2>` : ''}
+    <${TextBlock} title=${title}>
       <${Markdown} text=${data} />
-    </section>`;
+    <//>`;
 }
 
 // ── The showroom (2026-08-28) ──────────────────────────────────────────────────────────────
@@ -217,8 +218,7 @@ export function PortalBoardBlock(/** @type {{ ctx?: any, props?: Record<string, 
   // "alice" out of "alice@env", "scout · alice" out of "scout#alice@env": the name, never the identifier.
   const who = (g) => { const s = String(g || ''); const hash = s.indexOf('#'); const at = s.indexOf('@'); if (hash >= 0 && at > hash) return `${s.slice(0, hash)} · ${s.slice(hash + 1, at)}`; return at >= 0 ? s.slice(0, at) : s; };
   return html`
-    <section class="sf-portal-board">
-      ${title ? html`<h2 class="sf-band-title">${title}</h2>` : ''}
+    <${NoticeBlock} title=${title}>
       <div class="board-posts">
         ${data.slice(0, limit).map((p) => html`
           <article class="board-post" key=${p.id}>
@@ -231,5 +231,5 @@ export function PortalBoardBlock(/** @type {{ ctx?: any, props?: Record<string, 
             <p>${p.body}</p>
           </article>`)}
       </div>
-    </section>`;
+    <//>`;
 }

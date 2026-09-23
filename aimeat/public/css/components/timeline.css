@@ -1,0 +1,49 @@
+/**
+ * @file timeline.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description What has happened: time first, a category dot, one line, one rule per row. Drawn by
+ *   components/Timeline.js. Reads only the tokens in theme.css and the shapes in poster.css; a page
+ *   never styles it from outside.
+ * @usage Linked from public/spa.html in the component block, whose order keeps the order these
+ *   rules had when they were one sheet.
+ * @version-history
+ *   v1.0.0 — 2026-09-23 — Moved unchanged from css/parts*.css (UI consolidation phase 1, a move).
+ */
+
+/* ── The feed: what has happened, time first, one rule per row ── */
+.poster-timeline:not(.poster-band) { margin-top: 3rem; }
+/* The quiet nudge: when nothing has happened for days, the feed opens with the next move
+   instead of a list that ends in the past. A door, not an alarm. */
+.poster-timeline-quiet {
+  display: block; margin: 0 0 1rem; padding: 0.8rem 1rem;
+  border: 2px dashed var(--text);
+  font-size: 0.95rem; font-weight: 600; color: var(--text); text-decoration: none;
+  background: var(--surface);
+}
+.poster-timeline-quiet:hover { border-color: var(--accent); }
+.poster-timeline-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; border-top: 3px solid var(--text); }
+.poster-timeline-item {
+  display: grid; grid-template-columns: 7rem 14px minmax(0, 1fr); align-items: center; gap: 1.1rem;
+  padding: 0.75rem 0; border-bottom: 1px solid var(--border);
+}
+.poster-timeline-body { display: contents; }
+/* The look is the shared time (.poster-time); this keeps only its place in the row. */
+.poster-timeline-when { order: -1; }
+.poster-timeline-dot { width: 14px; height: 14px; background: var(--border); }
+.poster-timeline-item--made .poster-timeline-dot { background: var(--accent); }
+.poster-timeline-item--agent .poster-timeline-dot { background: var(--success); }
+.poster-timeline-item--trouble .poster-timeline-dot { background: var(--danger); }
+.poster-timeline-item--money .poster-timeline-dot { background: var(--sun); }
+.poster-timeline-item--access .poster-timeline-dot { background: var(--info-fg); }
+.poster-timeline-item--system .poster-timeline-dot { background: var(--muted); }
+/* The one row that is happening NOW pulses on top of its category colour — it is the one to act on. */
+.poster-timeline-item--live .poster-timeline-dot { animation: poster-pulse 1.4s ease-in-out infinite; }
+.poster-timeline-line { font-size: 1.05rem; font-weight: 700; color: var(--text); text-decoration: none; }
+a.poster-timeline-line:hover { color: var(--accent); }
+/* The door to the whole record. A link, not a button: it goes somewhere, it does nothing. */
+.poster-timeline-more { display: inline-block; margin-top: 1.2rem; }
+@media (max-width: 640px) {
+  .poster-timeline-item { grid-template-columns: 14px minmax(0, 1fr); gap: 0.4rem 0.8rem; }
+  .poster-timeline-when { order: 0; grid-column: 2; }
+}

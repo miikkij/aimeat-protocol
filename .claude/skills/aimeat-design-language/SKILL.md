@@ -2,8 +2,8 @@
 name: aimeat-design-language
 description: "The AIMEAT design language in words and in numbers: the two faces (showroom outside, poster inside), the three type tokens every font on the site descends from, the four shapes, the colours, the wordmark, and the one place a value is changed (theme.css tokens) with the map of every surface a token reaches. Use before designing or styling anything that carries the AIMEAT name, before changing a font or a colour, and to judge whether a screen looks like this product."
 metadata:
-  version: 1.6.0
-  updated: 2026-09-13
+  version: 1.7.0
+  updated: 2026-09-23
   owner: Jouni Miikki
 ---
 
@@ -172,13 +172,16 @@ dimensions. It does not re-declare the shape's font, rule, fill, padding or shad
 | Section and B1 headline | `.poster-section`, `.poster-section-title` |
 | Area governed by the selected tab | `.poster-panel` |
 | Hairline row; row that is the thing | `.poster-row`; `.poster-row--thing` |
-| Small coral label | `.poster-label` |
-| Underlined action | `.poster-action` |
-| Tab and selected tab | `.poster-tab`, `.poster-tab.is-on` |
-| Loud action and the home's large door | `.poster-slab`, `.poster-slab--large` |
-| Box; frame; dialog; opened record | `.poster-box`; `.poster-frame`; `.poster-dialog`; `.poster-record` |
-| Dashed coral aside | `.poster-aside` |
-| Mono chip; crumb | `.poster-chip`; `.poster-crumb` |
+| Small coral label | `.poster-label` (also the prompt card's label; Jouni's decision "Row label") |
+| Underlined action, and its tones | `.poster-action`; `--more` ("Show all"), `--quiet` (a side column action), `--back` (the way back), `--text` (Listen, Copy under a message) (Jouni's decision "Action link") |
+| Tab and selected tab, and the fold tab | `.poster-tab`, `.poster-tab.is-on`; `.poster-tab--fold` (a small switch in a row, "Recent / Mine") (Jouni's decision "Tabs and filters") |
+| Loud action and the home's large door | `.poster-slab`, `.poster-slab--large`; composed over `.btn-primary` for the one big button on the home and the chat (Jouni's decision "Loud action") |
+| Box; frame; opened record | `.poster-box` with the tones `--copy` (a text to copy, on grey: the prompt card) and `--row` (one result in a list) (Jouni's decision "Object box"); `.poster-frame`; `.poster-record` (the dialog is the site's own Modal; `.poster-dialog` was deleted on 2026-09-23) |
+| Dashed coral aside | `.poster-aside` with the tones `--waiting` (the next move is elsewhere) and `--suggestion` (a line to wave away) (Jouni's decision "Attention note") |
+| Mono chip; crumb | `.poster-chip` (a candidate in the design lab's chip decision; not in use until Jouni decides); `.poster-crumb` |
+| Small number: waiting (on coral), tally (no ground), small (on an icon) | `.poster-count`, `--waiting`, `--tally`, `--small` (Jouni's decision "Count"; the bell and the open items use it; the morsel badge stays its own) |
+| When a thing happened | `.poster-time` (Jouni's decision "Timestamp"; the chat's message time and the home timeline) |
+| Heading over a list; quiet over a record | `.poster-day-title`, `.poster-day-title--quiet` (Jouni's decision "Group heading"; the history, the chat's side column, the chat's work log) |
 | Numeral row and its number | `.poster-stat`, `.poster-stat-number` |
 | Showroom ink band and sun band | `.showroom-band`, `.showroom-band--sun` |
 | Showroom section and coral shadow | `.showroom-section`, `.showroom-section--coral` |
@@ -197,6 +200,8 @@ another modifier. A view never re-declares a modifier's values.
 | Shape | Shared variant | Values and reason |
 |---|---|---|
 | Loud action | `.poster-slab--large` | 1.02rem, 8px sun shadow; the named big door role (brief 10.3). Base stays .8rem, 600, 4px sun shadow. |
+| Loud action | `.poster-slab--control` | A 44px control in a row of controls: inline-flex, centred, `0 16px` padding, weight 800, the parent's face; the chat's New conversation and Send (formerly chat.css). Dimmed to .45 when disabled. |
+| Section headline | `.poster-section-title--large` | 2.4rem, and 1.7rem with `.45rem .8rem .4rem` padding at 560px; the home's bands and the layout engine's band (formerly home.css and surface.css). |
 | Box | `.poster-box--avatar` | Square initials mark, .95rem poster face, no padding or margin, transparent ground; Contacts, Email and Notifications share this cut. Dimensions remain layout. |
 | Box initials mark | `.poster-box--avatar.poster-box--small` | .85rem; Apps, Companies and MCP share the smaller initials cut. |
 | Box | `.poster-box--meter` | Paper ground, no padding or margin, sun fill for SVG data geometry; the filled numerical meter role. |
@@ -212,6 +217,25 @@ another modifier. A view never re-declares a modifier's values.
 | Showroom band | `.showroom-band--sun` | Sun ground and ink words; the money band role. |
 | Showroom section | `.showroom-section--coral` | 8px coral shadow; the named coral room cut. |
 | Showroom slab | `.showroom-slab--hot`, `--sun`, `--ink` | Named hot, sun and ink action colours; each shares the showroom slab geometry. |
+
+The parts a page is composed of are components: one module in `public/components/` (the markup)
+and one sheet in `public/css/components/` (the look, composing the shapes above), named by role:
+`StepCard` and `step-card.css`, `Turn` and `turn.css`. The home and the chat are built from them and
+have no sheet of their own since 2026-09-23; the values moved unchanged. Page compositions stay in
+the page files and use only library components.
+
+**The component catalogue says what exists.** `GET /v1/ui/components` and
+`aimeat_ui_component_list` / `aimeat_ui_component_get` give each part's data shape, when to use it,
+its variants (the class or prop for each), one example, the theme tokens its sheet reads and the
+pages that draw it; the shapes of `poster.css` are in it too. Read it before building a page and
+reuse the part that exists. A new component gets an entry in `aimeat/src/services/ui-library/`
+(the purpose half, written by hand), then `pnpm build:ui-library` reads the rest from the files.
+`pnpm check:ui-library` refuses a sheet with no entry, a variant class its sheet does not carry, an
+"active" part no page draws and stale facts. **To see the parts**, open aimeat-design-lab in the
+admin pages (group Design): every entry drawn live by its real component with its example, every
+variant in light and dark and at a phone width. Its demos live in `public/views/design-lab/`, and
+the check refuses an entry without one. This catalogue is the node's own interface only;
+Atelier's catalogue of app parts is a different thing and shares nothing with it.
 
 Run `pnpm check:poster-shapes` from `aimeat/`. It scans view and component sheets and refuses
 any new per-file pattern count. `pnpm debt` shows the remaining copies. Lower the baseline after

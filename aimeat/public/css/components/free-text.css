@@ -1,0 +1,44 @@
+/**
+ * @file free-text.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description A passage an operator wrote into a layout (plain, card or band), and the front page's text and
+ *   notice blocks. Drawn by components/FreeText.js. Reads only the tokens in theme.css and the
+ *   shapes in poster.css; a page never styles it from outside.
+ * @usage Linked from public/spa.html in the component block, whose order keeps the order these
+ *   rules had when they were one sheet.
+ * @version-history
+ *   v1.0.0 — 2026-09-23 — Moved unchanged from css/parts*.css (UI consolidation phase 1, a move).
+ */
+
+/* A passage the operator wrote. Three framings, because an aside and a section of the page are
+   not the same thing and an operator can tell which one they meant. */
+.poster-free {
+  margin: 1.25rem 0;
+}
+.poster-free--card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem 1.25rem;
+}
+.poster-free--band {
+  border-left: 3px solid var(--accent);
+  padding-left: 1rem;
+}
+.poster-free-title {
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--text-bright);
+  margin: 0 0 0.5rem;
+}
+/* The passage keeps the shared markdown body's own rules; only its outer spacing is set here. */
+.poster-free .md-body {
+  color: var(--text);
+}
+.poster-text-block, .poster-notice-block {
+  margin: 1.5rem 0;
+}
+/* A notice on the front page: its category as a label, the poster's name beside the date. */
+.poster-notice-block .board-post-cat { display: inline-block; margin-bottom: .2rem; font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+.poster-notice-block .board-post-meta { display: flex; gap: .8rem; font-family: var(--font-mono); font-size: .75rem; color: var(--text-dim); }

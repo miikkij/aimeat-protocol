@@ -95,9 +95,64 @@
   <link rel="stylesheet" href="/css/views/portal-classic.css">
   <link rel="stylesheet" href="/css/views/portal-dev.css">
   <link rel="stylesheet" href="/css/views/profile.css">
-  <link rel="stylesheet" href="/css/views/home.css">
-  <link rel="stylesheet" href="/css/views/home-journey.css">
-  <link rel="stylesheet" href="/css/views/surface.css">
+  <!-- The component library's sheets (css/components/, one per component, catalogued in
+       src/services/ui-library/). They sit where the home's and the chat's own sheets sat, so every
+       other sheet keeps its rank against these rules, and their order is the order the rules had
+       when they were one sheet: where two rules of one weight meet on one element, the later wins. -->
+  <link rel="stylesheet" href="/css/components/step-card.css">
+  <link rel="stylesheet" href="/css/components/prompt-card.css">
+  <link rel="stylesheet" href="/css/components/paste-box.css">
+  <link rel="stylesheet" href="/css/components/text-input.css">
+  <link rel="stylesheet" href="/css/components/named-value.css">
+  <link rel="stylesheet" href="/css/components/mode-tabs.css">
+  <link rel="stylesheet" href="/css/components/step-list.css">
+  <link rel="stylesheet" href="/css/components/waiting-note.css">
+  <link rel="stylesheet" href="/css/components/front-door.css">
+  <link rel="stylesheet" href="/css/components/page-frame.css">
+  <link rel="stylesheet" href="/css/components/page-intro.css">
+  <link rel="stylesheet" href="/css/components/error-note.css">
+  <link rel="stylesheet" href="/css/components/action-row.css">
+  <link rel="stylesheet" href="/css/components/hint.css">
+  <link rel="stylesheet" href="/css/components/masthead.css">
+  <link rel="stylesheet" href="/css/components/link-line.css">
+  <link rel="stylesheet" href="/css/components/stat-line.css">
+  <link rel="stylesheet" href="/css/components/band.css">
+  <link rel="stylesheet" href="/css/components/line-list.css">
+  <link rel="stylesheet" href="/css/components/named-row.css">
+  <link rel="stylesheet" href="/css/components/thing-link.css">
+  <link rel="stylesheet" href="/css/components/star-toggle.css">
+  <link rel="stylesheet" href="/css/components/fold-button.css">
+  <link rel="stylesheet" href="/css/components/mode-switch.css">
+  <link rel="stylesheet" href="/css/components/quiet-note.css">
+  <link rel="stylesheet" href="/css/components/numbered-index.css">
+  <link rel="stylesheet" href="/css/components/ink-foot.css">
+  <link rel="stylesheet" href="/css/components/check-item.css">
+  <link rel="stylesheet" href="/css/components/timeline.css">
+  <link rel="stylesheet" href="/css/components/back-link.css">
+  <link rel="stylesheet" href="/css/components/day-group.css">
+  <link rel="stylesheet" href="/css/components/archive.css">
+  <link rel="stylesheet" href="/css/components/settings-stack.css">
+  <link rel="stylesheet" href="/css/components/settings-switch.css">
+  <link rel="stylesheet" href="/css/components/swatch-picker.css">
+  <link rel="stylesheet" href="/css/components/settings-door.css">
+  <link rel="stylesheet" href="/css/components/open-items.css">
+  <link rel="stylesheet" href="/css/components/chooser.css">
+  <link rel="stylesheet" href="/css/components/settings-account.css">
+  <link rel="stylesheet" href="/css/components/free-text.css">
+  <link rel="stylesheet" href="/css/components/conversation-frame.css">
+  <link rel="stylesheet" href="/css/components/thread-list.css">
+  <link rel="stylesheet" href="/css/components/agent-status.css">
+  <link rel="stylesheet" href="/css/components/rail-action.css">
+  <link rel="stylesheet" href="/css/components/suggestion.css">
+  <link rel="stylesheet" href="/css/components/turn.css">
+  <link rel="stylesheet" href="/css/components/result-card.css">
+  <link rel="stylesheet" href="/css/components/work-log.css">
+  <link rel="stylesheet" href="/css/components/ai-notice.css">
+  <link rel="stylesheet" href="/css/components/nudge.css">
+  <link rel="stylesheet" href="/css/components/credit.css">
+  <link rel="stylesheet" href="/css/components/composer.css">
+  <link rel="stylesheet" href="/css/components/specimen.css">
+  <link rel="stylesheet" href="/css/design-lab-proposals.css">
   <link rel="stylesheet" href="/css/views/notebook.css">
   <link rel="stylesheet" href="/css/views/living.css">
   <link rel="stylesheet" href="/css/views/offers.css">
@@ -109,7 +164,6 @@
   <link rel="stylesheet" href="/css/views/portfolio.css">
   <link rel="stylesheet" href="/css/views/members.css">
   <link rel="stylesheet" href="/css/views/inbox.css">
-  <link rel="stylesheet" href="/css/views/chat.css">
   <link rel="stylesheet" href="/css/views/glossary.css">
   <link rel="stylesheet" href="/css/components/tags.css">
   <link rel="stylesheet" href="/css/components/image-deliverable.css">
@@ -117,7 +171,6 @@
   <link rel="stylesheet" href="/css/components/hello-mcp.css">
   <link rel="stylesheet" href="/css/components/mcp-install.css">
   <link rel="stylesheet" href="/css/components/ai-label.css">
-  <link rel="stylesheet" href="/css/components/data-map.css">
   <link rel="stylesheet" href="/css/views/help.css">
   <link rel="stylesheet" href="/css/views/capabilities-poster.css">
   <link rel="stylesheet" href="/css/views/skills-poster.css">
@@ -322,7 +375,6 @@
       "/components/KeyValueRow.js": "/components/KeyValueRow.js",
       "/components/SearchBar.js": "/components/SearchBar.js",
       "/components/DataTable.js": "/components/DataTable.js",
-      "/components/DataMap.js": "/components/DataMap.js",
       "/components/data-map/model.js": "/components/data-map/model.js",
       "/components/Collapsible.js": "/components/Collapsible.js",
       "/components/ManagedEnvNote.js": "/components/ManagedEnvNote.js",
@@ -352,7 +404,6 @@
       "/views/home/index.js": "/views/home/index.js",
       "/views/home/step-mat.js": "/views/home/step-mat.js",
       "/views/home/step-agent.js": "/views/home/step-agent.js",
-      "/views/home/step-branch-b.js": "/views/home/step-branch-b.js",
       "/views/home/feed.js": "/views/home/feed.js",
       "/views/home/history.js": "/views/home/history.js",
       "/views/home/header.js": "/views/home/header.js",
@@ -363,7 +414,60 @@
       "/views/profile/access-tab/sharing-groups.js": "/views/profile/access-tab/sharing-groups.js",
       "/views/profile/notifications-tab.js": "/views/profile/notifications-tab.js",
       "/views/profile/wallet-tab.js": "/views/profile/wallet-tab.js",
-      "/views/home/welcome-door.js": "/views/home/welcome-door.js",
+      "/components/ActionRow.js": "/components/ActionRow.js",
+      "/components/AgentStatus.js": "/components/AgentStatus.js",
+      "/components/AiNotice.js": "/components/AiNotice.js",
+      "/components/ArchiveSection.js": "/components/ArchiveSection.js",
+      "/components/BackLink.js": "/components/BackLink.js",
+      "/components/Band.js": "/components/Band.js",
+      "/components/CheckItem.js": "/components/CheckItem.js",
+      "/components/Chooser.js": "/components/Chooser.js",
+      "/components/Composer.js": "/components/Composer.js",
+      "/components/ConversationFrame.js": "/components/ConversationFrame.js",
+      "/components/Credit.js": "/components/Credit.js",
+      "/components/DayGroup.js": "/components/DayGroup.js",
+      "/components/ErrorNote.js": "/components/ErrorNote.js",
+      "/components/FoldButton.js": "/components/FoldButton.js",
+      "/components/FreeText.js": "/components/FreeText.js",
+      "/components/FrontDoor.js": "/components/FrontDoor.js",
+      "/components/Hint.js": "/components/Hint.js",
+      "/components/InkFoot.js": "/components/InkFoot.js",
+      "/components/LineList.js": "/components/LineList.js",
+      "/components/LinkLine.js": "/components/LinkLine.js",
+      "/components/Masthead.js": "/components/Masthead.js",
+      "/components/ModeSwitch.js": "/components/ModeSwitch.js",
+      "/components/ModeTabs.js": "/components/ModeTabs.js",
+      "/components/NamedRow.js": "/components/NamedRow.js",
+      "/components/NamedValue.js": "/components/NamedValue.js",
+      "/components/Nudge.js": "/components/Nudge.js",
+      "/components/NumberedIndex.js": "/components/NumberedIndex.js",
+      "/components/PageFrame.js": "/components/PageFrame.js",
+      "/components/PageIntro.js": "/components/PageIntro.js",
+      "/components/PasteBox.js": "/components/PasteBox.js",
+      "/components/QuietNote.js": "/components/QuietNote.js",
+      "/components/ResultCard.js": "/components/ResultCard.js",
+      "/components/SettingsAccount.js": "/components/SettingsAccount.js",
+      "/components/SettingsDoor.js": "/components/SettingsDoor.js",
+      "/components/SettingsStack.js": "/components/SettingsStack.js",
+      "/components/SettingsSwitch.js": "/components/SettingsSwitch.js",
+      "/components/StarToggle.js": "/components/StarToggle.js",
+      "/components/StatLine.js": "/components/StatLine.js",
+      "/components/StepCard.js": "/components/StepCard.js",
+      "/components/StepList.js": "/components/StepList.js",
+      "/components/Suggestion.js": "/components/Suggestion.js",
+      "/components/SwatchPicker.js": "/components/SwatchPicker.js",
+      "/components/TextInput.js": "/components/TextInput.js",
+      "/components/ThingLink.js": "/components/ThingLink.js",
+      "/components/ThreadList.js": "/components/ThreadList.js",
+      "/components/Timeline.js": "/components/Timeline.js",
+      "/components/Turn.js": "/components/Turn.js",
+      "/components/WaitingNote.js": "/components/WaitingNote.js",
+      "/components/WorkLog.js": "/components/WorkLog.js",
+      "/components/Specimen.js": "/components/Specimen.js",
+      "/views/design-lab/demos.js": "/views/design-lab/demos.js",
+      "/views/design-lab/decisions-data.js": "/views/design-lab/decisions-data.js",
+      "/views/design-lab/plain-diff.js": "/views/design-lab/plain-diff.js",
+      "/views/home/journey.js": "/views/home/journey.js",
       "/components/AgentConsent.js": "/components/AgentConsent.js",
       "/views/profile/agents/scope-config.js": "/views/profile/agents/scope-config.js",
       "/views/profile/shared.js": "/views/profile/shared.js",
@@ -573,6 +677,8 @@
       '/v1/help':        () => import('/views/help.js' + B),
       '/v1/publicknowledgeviewer': () => import('/views/public-knowledge-viewer.js' + B),
       '/v1/publicworkspaceviewer': () => import('/views/public-workspace-viewer.js' + B),
+      // The design lab's preview page: one interface part in a frame, drawn with no header or footer.
+      '/v1/design-lab/frame': () => import('/views/design-lab/frame.js' + B),
     };
 
     // Match route, handling query params for special views
@@ -743,6 +849,14 @@
       const retryView = useCallback(() => {
         navigate(location.pathname + location.search, true);
       }, [navigate]);
+
+      // The design lab's preview page is drawn inside a frame of the lab, so it carries no chrome.
+      const bare = window.location.pathname === '/v1/design-lab/frame';
+      if (bare) {
+        return View
+          ? html`<${ErrorBoundary} onRetry=${retryView}><${View} navigate=${navigate} locale=${locale} /></${ErrorBoundary}>`
+          : html`<div class="empty"><div class="spinner"></div></div>`;
+      }
 
       return html`
         <${Header} navigate=${navigate} locale=${locale} />

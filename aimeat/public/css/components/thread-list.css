@@ -1,0 +1,64 @@
+/**
+ * @file thread-list.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The person's conversations: one row each, the open one on the sun, a way to delete. Drawn by
+ *   components/ThreadList.js. Reads only the tokens in theme.css and the shapes in poster.css; a
+ *   page never styles it from outside.
+ * @usage Linked from public/spa.html in the component block, whose order keeps the order these
+ *   rules had when they were one sheet.
+ * @version-history
+ *   v1.0.0 — 2026-09-23 — Moved unchanged from css/parts*.css (UI consolidation phase 1, a move).
+ */
+
+.poster-thread-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.poster-thread {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+}
+.poster-thread--active { background: var(--sun); border-bottom: 2px solid var(--text); }
+.poster-thread-open {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 9px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: inherit;
+  font: inherit;
+}
+.poster-thread-title {
+  font-size: 0.86rem;
+  font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.poster-thread-sub {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--text-dim);
+}
+.poster-thread-del {
+  flex: 0 0 auto;
+  padding: 4px 8px;
+  opacity: 0;
+  transition: opacity 0.15s;
+  background: none; border: 0; box-shadow: none; color: var(--text); font-weight: 800; cursor: pointer;
+}
+.poster-thread:hover .poster-thread-del, .poster-thread--active .poster-thread-del { opacity: 1; }
+/* ── Words on the sun stay ink in every theme (moved from profile-poster.css, same selectors) ── */
+.poster-thread--active { color: var(--on-sun); }

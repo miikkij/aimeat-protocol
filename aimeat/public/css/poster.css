@@ -3,12 +3,22 @@
  * @description Shared poster and showroom shapes. Views compose these classes and own their layout.
  * @usage Linked immediately after theme.css in spa.html.
  * @version-history
+ *   v1.7.0 -- 2026-09-23 -- .poster-dialog deleted (Jouni's decision): no page ever put it on markup
+ *     outside the rolled-back unification, and the site has its own dialog.
+ *   v1.6.0 -- 2026-09-23 -- The pulse two components share (the waiting note's dot and a live
+ *     timeline row), moved unchanged from css/parts-steps.css (UI consolidation phase 1, a move).
+ *   v1.5.0 -- 2026-09-23 -- The section title's large cut (.poster-section-title--large), moved from the
+ *     home's band title with its values (UI consolidation slice 1).
  *   v1.4.0 -- 2026-09-14 -- The choice tile (.poster-choice) and the sun sticker (.poster-sticker).
  *   v1.3.0 -- 2026-09-13 -- Share numeral cuts, record titles and the quota meter role.
  *   v1.2.0 -- 2026-09-13 -- Share recurring initials boxes and the compact, large and irreversible asides.
  *   v1.1.0 -- 2026-09-13 -- V2: source band phone padding and the named coral section shadow cut.
  *   v1.0.0 -- 2026-09-13 -- V0: lift the existing shapes; section titles and panels use the locked B1 design.
  */
+
+/* The slow pulse of something waiting or happening now (components/waiting-note.css,
+   components/timeline.css). */
+@keyframes poster-pulse { 0%, 100% { opacity: 0.35; } 50% { opacity: 1; } }
 
 /* Profile page title. The two headline sizes are the only per-view shape properties. */
 .poster-page-title {
@@ -28,9 +38,15 @@
   padding: .55rem 1rem .5rem; border-bottom: 6px solid var(--sun);
   margin: 0 0 1.4rem;
 }
+/* The large cut: the home's bands (formerly home.css .koti-band-title and surface.css
+   .sf-band-title, which carried exactly these values). */
+.poster-section-title--large { font-size: 2.4rem; }
+@media (max-width: 560px) {
+  .poster-section-title--large { font-size: 1.7rem; padding: .45rem .8rem .4rem; }
+}
 .poster-panel { border-left: 4px solid var(--sun); padding-left: 1.25rem; margin: 0 0 1.5rem; }
 
-/* home-journey.css .koti-journey-status; home.css .koti-mailbox / .koti-fleet. */
+/* Lifted from the home's connection row and status lines (formerly home-journey.css and home.css). */
 .poster-row { border-block: 1px solid var(--border); padding-block: 1rem; }
 .poster-row--thing { border-top: 3px solid var(--text); }
 .poster-label {
@@ -38,7 +54,7 @@
   letter-spacing: .1em; font-weight: 800; line-height: 1.3;
 }
 
-/* home.css .koti-link, including the unselected tab. */
+/* Lifted from the home's ink-underlined action (formerly home.css .koti-link), including the unselected tab. */
 .poster-action, .poster-tab {
   display: inline-flex; align-items: center; gap: .4rem;
   background: none; border: 0; border-bottom: 3px solid var(--text); border-radius: 0;
@@ -49,6 +65,37 @@
 .poster-action:hover, .poster-tab:hover { border-color: var(--accent); color: var(--accent); }
 /* The source's later on-sun correction keeps selected words ink in both themes. */
 .poster-tab.is-on { background: var(--sun); color: var(--on-sun); text-decoration: none; padding: .2rem .5rem; }
+/* The action link's tones (Jouni's decision "Action link"): the looks he kept, each in its own
+   values, so one component carries every quiet way on. A tone sets back what the base above sets
+   and the look does not have. more: "Show all" under a list (formerly .poster-fold); quiet: the
+   chat's side column actions (formerly .poster-rail-action's look); back: the back link (formerly
+   .poster-back's look); text: a plain word under a chat message (Listen, Copy; formerly .btn-ghost). */
+.poster-action--more {
+  display: inline-block; padding: .2rem 0; border: 0;
+  font-family: var(--font-mono); font-weight: 400; font-size: .8rem; line-height: normal; text-transform: none; letter-spacing: normal;
+  color: var(--accent); text-decoration: underline; text-underline-offset: 4px; white-space: normal;
+}
+.poster-action--more:hover { color: var(--text); }
+.poster-action--quiet { border-bottom-width: 2px; padding: 0 0 1px; font-family: var(--font-showroom-body); font-size: .78rem; line-height: normal; white-space: normal; }
+.poster-action--quiet.copied { color: var(--success-fg); border-color: var(--success-fg); }
+.poster-action--back {
+  display: inline-block; padding: 0; border: 0;
+  font-family: var(--font-mono); font-weight: 400; font-size: .85rem; text-transform: none; letter-spacing: normal;
+  color: var(--accent); white-space: normal;
+}
+.poster-action--back:hover { color: var(--text); }
+.poster-action--text { padding: 0 6px; border: 0; gap: .35rem; font-family: var(--font-body); font-weight: 500; font-size: .7rem; line-height: normal; text-transform: none; letter-spacing: normal; color: var(--text-dim); }
+.poster-action--text:hover { color: var(--text); }
+.poster-action--text.copied { color: var(--success-fg); }
+/* The tab's fold tone (Jouni's decision "Tabs and filters"): the home's switch ("Recent", "Mine";
+   formerly .poster-fold), coral typewriter words underlined; the chosen one is on the sun by
+   .poster-tab.is-on above. */
+.poster-tab--fold {
+  display: inline-block; padding: .2rem 0; border: 0;
+  font-family: var(--font-mono); font-weight: 400; font-size: .8rem; line-height: normal; text-transform: none; letter-spacing: normal;
+  color: var(--accent); text-decoration: underline; text-underline-offset: 4px; white-space: normal;
+}
+.poster-tab--fold:hover { color: var(--text); }
 
 /* The profile slab and the home's large door are the two cuts named in brief 10.3. */
 .poster-slab {
@@ -62,10 +109,23 @@
 .poster-slab:hover { transform: translate(2px, 2px); box-shadow: 2px 2px 0 var(--sun); color: var(--sun); }
 .poster-slab--large { padding: 1.2rem 1.7rem; font-size: 1.02rem; font-weight: 800; box-shadow: 8px 8px 0 var(--sun); }
 .poster-slab--large:hover { box-shadow: 4px 4px 0 var(--sun); }
+/* The control cut: a 44px button in a row of controls (the chat's New conversation and Send,
+   formerly chat.css .chat-new/.chat-send, which carried the base's values and these). */
+.poster-slab--control {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: 44px; padding: 0 16px;
+  font-family: inherit; font-weight: 800; cursor: pointer;
+}
+.poster-slab--control:disabled { opacity: 0.45; cursor: default; transform: none; }
 
 /* Boxes carry the object; dimensions, grids and placement belong to the view. */
 .poster-box, .poster-box.poster-box--avatar { border: 2px solid var(--text); }
 .poster-box { background: var(--card-bg); padding: 1rem; margin-block: 1rem; }
+/* The box's tones (Jouni's decision "Object box", every look kept): copy, a text a person copies,
+   on the grey ground with its parts padding themselves (the prompt card); row, one result in a list,
+   with small padding (the chat's result card, whose kind edge is its own). */
+.poster-box--copy { background: var(--bg-dim); padding: 0; overflow: hidden; }
+.poster-box--row { background: var(--bg-card); padding: 8px 10px; }
 .poster-box.poster-box--avatar {
   display: flex; align-items: center; justify-content: center; box-sizing: border-box;
   padding: 0; margin: 0; background: transparent;
@@ -79,7 +139,6 @@
 .poster-box--quota rect { fill: var(--accent); transition: width .3s; }
 .poster-box--quota.is-full rect { fill: var(--danger); }
 .poster-frame { border: 3px solid var(--text); background: var(--card); }
-.poster-dialog { border: 3px solid var(--text); border-radius: 0; box-shadow: 12px 12px 0 var(--sun); font-family: var(--font-showroom-body); }
 .poster-record { padding: 1.2rem 1.4rem; border: 3px solid var(--text); box-shadow: 8px 8px 0 var(--sun); background: var(--card); }
 /* A choice tile: one of a few boxed answers, the chosen one on the sun with an ink shadow
    (scheduler-poster.css .sc-choice is the source cut). A sticker: a small sun-ground box with a
@@ -102,6 +161,11 @@
 .poster-aside--small { padding: .9rem 1.1rem; font-family: inherit; font-size: .92rem; line-height: 1.55; color: inherit; }
 .poster-aside--large { padding: 1.25rem 1.5rem; font-size: inherit; line-height: inherit; color: inherit; }
 .poster-aside--irreversible { border-style: solid; }
+/* The aside's tones (Jouni's decision "Attention note", every look kept): waiting, the next move is
+   in another window (the waiting note, a thin dashed ink frame on grey); suggestion, a line the
+   person can wave away (the phone nudge, a thin dashed ink frame, small bold words). */
+.poster-aside--waiting { padding: .9rem 1rem; border: 2px dashed var(--text); background: var(--bg-dim); font-family: inherit; font-size: inherit; line-height: inherit; color: inherit; }
+.poster-aside--suggestion { padding: 8px 12px; border: 2px dashed var(--text); background: none; font-family: inherit; font-size: .82rem; font-weight: 600; line-height: 1.5; color: inherit; }
 /* contacts-poster.css .ct-tag, with the brief's explicit mono / 500 typography. */
 .poster-chip {
   display: inline-block; padding: .1rem .45rem; border: 1px solid var(--text); border-radius: 0;
@@ -110,6 +174,15 @@
 }
 .poster-crumb { font-family: var(--font-mono); font-weight: 400; font-size: .8rem; letter-spacing: 0; text-transform: none; color: var(--accent); }
 .poster-crumb::after { content: ' /'; }
+/* A small number (Jouni's decision "Count"): on coral when something waits for the person, without a
+   ground when it only says how many. The values are the profile menu's count (.pf-side-badge); the
+   small cut is the bell's size, for a count that sits on an icon. */
+.poster-count { display: inline-block; padding: .05rem .45rem; font-family: var(--font-mono); font-size: .7rem; font-weight: 500; letter-spacing: 0; }
+.poster-count--waiting { background: var(--accent); color: var(--bg); }
+.poster-count--tally { background: none; color: var(--text-dim); }
+.poster-count--small { font-size: .6rem; padding: 0 3px; }
+/* When a thing happened: small grey typewriter letters, the chat's cut (Jouni's decision "Timestamp"). */
+.poster-time { font-family: var(--font-mono); font-size: .68rem; color: var(--text-dim); }
 .poster-stat {
   display: flex; align-items: baseline; gap: 1rem; margin: 0; padding: .8rem 0;
   border-top: 3px solid var(--text); color: var(--text); text-decoration: none; font-size: 1.05rem; font-weight: 800;
@@ -130,7 +203,7 @@
   text-transform: uppercase; color: var(--text);
 }
 .poster-record-title--small { font-size: 1.8rem; line-height: var(--font-poster-leading); }
-/* The source numeral's phone cut is home.css .koti-big at 560px. */
+/* The numeral's phone cut, from the home's big numeral at 560px (formerly home.css .koti-big). */
 @media (max-width: 560px) {
   .poster-stat-number:where(:not(.poster-stat-number--small)) { font-size: 2.2rem; }
 }

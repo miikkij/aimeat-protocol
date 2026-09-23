@@ -1,0 +1,32 @@
+/**
+ * @file band.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description A section of a page: the ink headline slab (poster.css .poster-section-title--large) and the
+ *   rows under it. Drawn by components/Band.js. Reads only the tokens in theme.css and the shapes in
+ *   poster.css; a page never styles it from outside.
+ * @usage Linked from public/spa.html in the component block, whose order keeps the order these
+ *   rules had when they were one sheet.
+ * @version-history
+ *   v1.0.0 — 2026-09-23 — Moved unchanged from css/parts*.css (UI consolidation phase 1, a move).
+ */
+
+/* ── The bands: a headline on an ink slab, a sun stripe under it, the space between bands doing
+   the grouping. Paper words on ink (light words on a light slab in the dark theme), so a section
+   starts where the ink is; the 3px rule below is a row's and only a row's. ── */
+.poster-band { margin-top: 4.5rem; }
+/* The headline is poster.css .poster-section-title in its large cut (.poster-section-title--large). */
+.poster-band > * + * { margin-top: 1.5rem; }
+.poster-band > .poster-section-title--large + * { margin-top: 0; }
+/* The knowledge explainer closes the band as one quiet line. */
+.poster-band > .poster-band-note { margin-top: 1.2rem; font-size: 0.88rem; color: var(--text-dim); line-height: 1.5; font-weight: 600; }
+@media (max-width: 560px) {
+  .poster-band { margin-top: 3rem; }
+}
+/* ── What the surface layout engine draws itself (moved from views/surface.css) ── */
+/* The engine's band (a group of blocks with a heading) is the home's band in its tight variant:
+   the same margins and headline, and 1.3rem between rows where the home's own bands have 1.5rem.
+   Inside it, successive rows keep one rhythm: more air between rows than between the chips inside
+   one, so the categories read apart instead of as one lump. */
+.poster-band--tight > * + * { margin-top: 1.3rem; }
+.poster-band--tight > .poster-section-title--large + * { margin-top: 0; }

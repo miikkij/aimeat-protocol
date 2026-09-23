@@ -1,0 +1,37 @@
+/**
+ * @file chooser.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description Pick a task and get what it needs: the choices row, the panel with the sun bar that the choice
+ *   governs, the status row, a framed box, a fold, the result and the links. Drawn by
+ *   components/Chooser.js. Reads only the tokens in theme.css and the shapes in poster.css; a page
+ *   never styles it from outside.
+ * @usage Linked from public/spa.html in the component block, whose order keeps the order these
+ *   rules had when they were one sheet.
+ * @version-history
+ *   v1.0.0 — 2026-09-23 — Moved unchanged from css/parts*.css (UI consolidation phase 1, a move).
+ */
+
+/* ── The task chooser (moved from views/home-journey.css): useful work and account settings ── */
+.poster-chooser { margin-block: 1.5rem; min-width: 0; }
+.poster-chooser p { line-height: 1.6; }
+.poster-chooser-choices, .poster-chooser-status, .poster-chooser-links { display: flex; flex-wrap: wrap; gap: .8rem; align-items: center; margin-block: 1rem; }
+.poster-chooser-choices { margin-block: 1rem .6rem; }
+.poster-chooser-choices button { min-height: 44px; }
+/* The sun bar starts under the chosen tab and ends with the last line the choice governs. */
+.poster-chooser-panel { border-left: 4px solid var(--sun); padding-left: 1.25rem; margin-block: 0 1.5rem; min-width: 0; }
+.poster-chooser-status { justify-content: space-between; }
+.poster-chooser-connect { border: 2px solid var(--text); padding: 1rem; margin-block: 1rem; min-width: 0; }
+.poster-chooser-connect .ast-tools { flex-wrap: wrap; }
+.poster-chooser-connect .ast-code, .poster-chooser-connect pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+.poster-chooser-details { border-top: 1px solid var(--border); padding-block: 1rem; }
+.poster-chooser-details summary { cursor: pointer; min-height: 44px; font-weight: var(--font-poster-strong-weight); }
+.poster-chooser-result { overflow-wrap: anywhere; }
+.poster-chooser-result p { white-space: pre-wrap; }
+@media (max-width: 600px) {
+  .poster-chooser .poster-action, .poster-chooser .poster-tab { white-space: normal; text-align: left; }
+  .poster-chooser-connect { padding: .75rem; }
+  .poster-chooser-panel { padding-left: .9rem; }
+  .poster-chooser .poster-prompt-head { flex-wrap: wrap; gap: .75rem; }
+  .poster-chooser-links { align-items: flex-start; flex-direction: column; }
+}

@@ -13,6 +13,7 @@
  * @usage
  *   import { CLI_FALLBACK_TOOL_DEFINITIONS } from '../../mcp/catalog/definitions.js';
  * @version-history
+ *   2026-09-23 -- definitions/ui-library.ts: aimeat_ui_component_list and aimeat_ui_component_get.
  *   v1.x -- 2026-08-28 -- definitions/crew.ts: the five aimeat_crew_* tools (read, validate, try,
  *     draft, publish a JSON crew definition on one of the caller's agents).
  *   v1.x -- 2026-07-13 -- aimeat_cortex_install description states the CREATE-ONLY contract:
@@ -61,6 +62,7 @@ import { dataMapTools } from './definitions/data-map.js';
 import { surfaceLayoutTools } from './definitions/surface-layout.js';
 import { appUiTools } from './definitions/app-ui.js';
 import { designbookTools } from './definitions/designbook.js';
+import { uiLibraryTools } from './definitions/ui-library.js';
 import { connectionTools } from './definitions/connections.js';
 import { mcpProxyTools } from './definitions/mcp-proxy.js';
 
@@ -90,6 +92,7 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
     ...surfaceLayoutTools,
     ...appUiTools,
     ...designbookTools,
+    ...uiLibraryTools,
     ...connectionTools,
     ...mcpProxyTools,
 ];

@@ -122,7 +122,7 @@ export function OpenItemsList({ maxAgeDays } = {}) {
     <section class="open-items">
       <div class="open-items-head">
         <h3 class="open-items-title">
-          ${tr('openItems.title', 'Open items')} <span class="open-items-count">${items.length}</span>
+          ${tr('openItems.title', 'Open items')} <span class="poster-count poster-count--waiting open-items-count">${items.length}</span>
         </h3>
         <${CopyButton}
           text=${prompt}

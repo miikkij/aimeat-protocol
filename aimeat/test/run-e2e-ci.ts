@@ -254,6 +254,7 @@ const ALL_SUITES = [
     'test/e2e-app-playtest.ts',
     'test/e2e-app-ui.ts',
     'test/e2e-designbook.ts',
+    'test/e2e-ui-components.ts',
     'test/e2e-app-fork.ts',
     'test/e2e-app-marks.ts',
     'test/e2e-app-legal.ts',

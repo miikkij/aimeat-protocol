@@ -1,0 +1,27 @@
+/**
+ * @file nudge.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description One suggestion, once, in a dashed frame, with the way out on the same line. Drawn by
+ *   components/Nudge.js. Reads only the tokens in theme.css and the shapes in poster.css; a page
+ *   never styles it from outside.
+ * @usage Linked from public/spa.html in the component block, whose order keeps the order these
+ *   rules had when they were one sheet.
+ * @version-history
+ *   v1.0.0 — 2026-09-23 — Moved unchanged from css/parts*.css (UI consolidation phase 1, a move).
+ */
+
+/* One suggestion, once, with the way out on the same line as the ask. */
+/* The look is the aside's suggestion tone (poster.css .poster-aside--suggestion); this keeps its layout. */
+.poster-nudge {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 12px 0 0;
+}
+.poster-nudge-text { flex: 1 1 260px; }
+.poster-nudge-dismiss { flex: 0 0 auto; font-size: 0.75rem; padding: 2px 8px; }
+@media (max-width: 760px) {
+  .poster-nudge { margin: 8px 12px 0; }
+}

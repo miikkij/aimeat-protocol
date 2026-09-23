@@ -2,19 +2,28 @@
  * @file public/views/home/status-parts.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The finished home's status pieces: the mailbox row, the fleet line, the chat door,
+ * @description The finished home's status pieces: the mailbox row, the fleet line,
  *   what you have made (with stars and a fold), your apps, and the achievements strip. Split out of
  *   index.js when the status view grew past what one file should hold; index.js stays the
- *   orchestrator and this file owns what each piece looks like.
+ *   orchestrator. Since 2026-09-23 this file composes: what each piece LOOKS like is the component
+ *   library's (public/components/, catalogued in src/services/ui-library/), and this file decides
+ *   only what goes into each piece.
  *
  *   Two rules run through every piece. Nothing here renders when it has nothing to say — an empty
  *   inventory reads as broken. And at a real account's scale (30 shared spaces, 141 apps) nothing
  *   spills: the person stars what matters, the rest folds away, and the fold says how much it
  *   holds. The first version showed every chip it had, which on the developer's own account was
  *   the wall of noise this file exists to prevent.
- * @structure MailboxRow · YourTurn · FleetLine · ChatDoor · NamedRow · Things · FavoriteApps · Playbooks · TrustLine · Achievements
- * @usage import { MailboxRow, FleetLine, ChatDoor, Things, FavoriteApps, Achievements } from '/views/home/status-parts.js';
+ * @structure MailboxRow · YourTurn · FleetLine · Things · FavoriteApps · Playbooks · TrustLine · Achievements
+ * @usage import { MailboxRow, FleetLine, Things, FavoriteApps, Achievements } from '/views/home/status-parts.js';
  * @version-history
+ *   2026-09-23: ChatDoor deleted (Jouni's decision): no page had drawn it since 07f7040c5
+ *     (2026-09-09), when the home journey took its place.
+ *   2026-09-23: Each piece is composed from library components (StatLine, Band, LineList, NamedRow,
+ *     ThingLink, ThingChip, FoldButton, ModeSwitch, QuietNote, NumberedIndex, IndexPanel, InkFoot,
+ *     CheckItem) that emit the markup this file wrote; NamedRow moved to public/components/.
+ *     ChatDoor stays here: no page mounts it (UI consolidation phase 1, a move).
+ *   2026-09-23: Composed from the shared parts in css/parts.css and css/parts-steps.css (class names by role, values moved from views/home.css unchanged; UI consolidation slice 1).
  *   2026-09-14: YourTurn — the threads whose last word was somebody else's. The mailbox row gives
  *     the unread count and that is a different question: unread is "you have not looked", this is
  *     "you looked and they are still waiting".
@@ -54,21 +63,22 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { listRecents } from '/js/recents.js';
 import { swallowed } from '/js/swallowed.js';
+import { StatLine, statSentence as bigNumber } from '/components/StatLine.js';
+import { Band, BandNote } from '/components/Band.js';
+import { LineList } from '/components/LineList.js';
+import { NamedRow } from '/components/NamedRow.js';
+import { ThingLink, ThingChip } from '/components/ThingLink.js';
+import { FoldButton } from '/components/FoldButton.js';
+import { ModeSwitch } from '/components/ModeSwitch.js';
+import { QuietNote } from '/components/QuietNote.js';
+import { NumberedIndex, IndexItem, IndexPanel } from '/components/NumberedIndex.js';
+import { InkFoot } from '/components/InkFoot.js';
+import { CheckItem } from '/components/CheckItem.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 
 /** How many unstarred rows a folded list shows before the fold. */
 const FOLD_AFTER = 3;
-
-/**
- * A sentence with its number set big. The translated string keeps its placeholder until here, so
- * the numeral lands where that language puts it; a string without the placeholder renders as it is.
- */
-function bigNumber(sentence, placeholder, value) {
-  const at = sentence.indexOf(placeholder);
-  if (at < 0) return sentence;
-  return html`${sentence.slice(0, at)}<b class="koti-big">${String(value)}</b>${sentence.slice(at + placeholder.length)}`;
-}
 
 /**
  * The mailbox on the wall: flag up when something unread waits, and one line saying how much.
@@ -78,14 +88,11 @@ export function MailboxRow({ mail }) {
   if (!mail) return null;
   const unread = mail.unread ?? 0;
   return html`
-    <a class="poster-stat koti-mailbox ${unread > 0 ? 'koti-mailbox--full' : ''}" href="/v1/profile?tab=messages">
-      <span class="koti-mailbox-icon" aria-hidden="true">${unread > 0 ? '📬' : '📪'}</span>
-      <span class="koti-mailbox-text">
-        ${unread > 0
-          ? bigNumber(tr('home.mail.unread', '{n} unread, go have a look'), '{n}', unread)
-          : tr('home.mail.empty', 'Mailbox: nothing new')}
-      </span>
-    </a>`;
+    <${StatLine} href="/v1/profile?tab=messages" tone=${unread > 0 ? 'alert' : undefined} icon=${unread > 0 ? '📬' : '📪'}>
+      ${unread > 0
+        ? bigNumber(tr('home.mail.unread', '{n} unread, go have a look'), '{n}', unread)
+        : tr('home.mail.empty', 'Mailbox: nothing new')}
+    <//>`;
 }
 
 /**
@@ -106,22 +113,11 @@ export function YourTurn({ threads, max }) {
   if (!rows.length) return null;
   const hidden = (threads ?? []).length - rows.length;
   return html`
-    <section class="koti-band koti-turn">
-      <h2 class="koti-band-title">${tr('home.turn.title', 'Waiting for your answer')}</h2>
-      <ul class="koti-turn-list">
-        ${rows.map((r) => html`
-          <li class="koti-turn-row" key=${r.id}>
-            <a class="koti-turn-link" href="/v1/profile?tab=messages">
-              <span class="koti-turn-who">${r.who}</span>
-              <span class="koti-turn-said">${r.said}</span>
-            </a>
-          </li>`)}
-      </ul>
-      ${hidden > 0 && html`
-        <p class="koti-turn-more">
-          ${bigNumber(tr('home.turn.more', '{n} more are waiting'), '{n}', hidden)}
-        </p>`}
-    </section>`;
+    <${Band} title=${tr('home.turn.title', 'Waiting for your answer')}>
+      <${LineList}
+        rows=${rows.map((r) => ({ id: r.id, name: r.who, text: r.said, href: '/v1/profile?tab=messages' }))}
+        more=${hidden > 0 ? bigNumber(tr('home.turn.more', '{n} more are waiting'), '{n}', hidden) : null} />
+    <//>`;
 }
 
 /**
@@ -135,67 +131,15 @@ export function FleetLine({ agent }) {
   const problems = agent.problems ?? 0;
   const ok = problems === 0;
   return html`
-    <a class="poster-stat koti-fleet ${ok ? 'koti-fleet--ok' : 'koti-fleet--trouble'}" href="/v1/profile?tab=agents">
-      <span class="koti-fleet-dot" aria-hidden="true"></span>
-      <span class="koti-fleet-text">
-        ${total === 1
-          ? (ok
-            ? tr('home.fleet.oneOk', 'Your agent is home and well.')
-            : tr('home.fleet.oneTrouble', 'Your agent {name} needs a look.').replace('{name}', agent.name || ''))
-          : (ok
-            ? bigNumber(tr('home.fleet.allOk', '{total} agents home, all well.'), '{total}', total)
-            : bigNumber(tr('home.fleet.trouble', '{total} agents home · {n} need a look').replace('{n}', String(problems)), '{total}', total))}
-      </span>
-    </a>`;
-}
-
-/**
- * One clear door to where the work actually happens, and WHICH MIND answers there. A person whose
- * own AI (Claude, ChatGPT...) is connected over MCP is told that; otherwise the house chat's model
- * is named, because "some AI" is exactly the vagueness people distrust. At most two platforms are
- * named — a five-name list with "Unknown" in it answered nothing.
- */
-export function ChatDoor({ chatStatus, mcpNames }) {
-  const names = (mcpNames ?? []).filter((n) => n && !/^unknown$/i.test(n));
-  let ai = '';
-  if (names.length === 1) {
-    ai = tr('home.ai.viaMcp', '{names} is connected as your agent over MCP.').replace('{names}', names[0]);
-  } else if (names.length > 1) {
-    const shown = names.slice(0, 2).join(', ');
-    const extra = names.length - 2;
-    const list = extra > 0
-      ? tr('home.ai.andMore', '{names} and {n} more').replace('{names}', shown).replace('{n}', String(extra))
-      : shown;
-    ai = tr('home.ai.viaMcpMany', '{names} are connected as your agents over MCP.').replace('{names}', list);
-  } else if (chatStatus?.enabled && chatStatus?.model) {
-    ai = tr('home.ai.houseModel', 'The house chat answers with {model}.').replace('{model}', chatStatus.model);
-  }
-  return html`
-    <section class="koti-chatdoor">
-      <div class="koti-chatdoor-text">
-        <p class="koti-chatdoor-lede">
-          ${tr('home.chatDoor.lede', 'Your agent is in the chat. Say what you need, and it gets to work.')}
-        </p>
-        ${ai && html`<p class="koti-chatdoor-ai">${ai}</p>`}
-      </div>
-      <a class="btn-primary poster-slab poster-slab--large koti-chatdoor-cta" href="/v1/chat">
-        ${tr('home.chatDoor.cta', 'Continue in the chat')}
-      </a>
-    </section>`;
-}
-
-/**
- * One named row: the category word in a fixed left column, the content on the right. Every row
- * under a band title goes through this frame (spaces, knowledge, apps, tried so far), which is
- * what makes them line up as a list instead of reading as separate clouds. `title` is the
- * explainer that rides on the label as a tooltip, when the word alone is not enough.
- */
-export function NamedRow({ label, title, className, children }) {
-  return html`
-    <div class="poster-row--thing koti-row ${className || ''}">
-      <span class="poster-label koti-things-cat koti-row-label" title=${title || undefined}>${label}</span>
-      <div class="koti-things-row koti-row-body">${children}</div>
-    </div>`;
+    <${StatLine} href="/v1/profile?tab=agents" tone=${ok ? 'ok' : 'trouble'} dot=${true}>
+      ${total === 1
+        ? (ok
+          ? tr('home.fleet.oneOk', 'Your agent is home and well.')
+          : tr('home.fleet.oneTrouble', 'Your agent {name} needs a look.').replace('{name}', agent.name || ''))
+        : (ok
+          ? bigNumber(tr('home.fleet.allOk', '{total} agents home, all well.'), '{total}', total)
+          : bigNumber(tr('home.fleet.trouble', '{total} agents home · {n} need a look').replace('{n}', String(problems)), '{total}', total))}
+    <//>`;
 }
 
 /**
@@ -214,24 +158,18 @@ function ChipRow({ label, title, rows, starred, onStar, fold }) {
   return html`
     <${NamedRow} label=${label} title=${title}>
       ${shown.map((r) => html`
-        <span class="koti-thing koti-thing--named" key=${r.id}>
-          <a class="koti-thing-door" href=${r.href}>
-            <span class="koti-thing-label">${r.name}</span>
-            ${typeof r.n === 'number' && r.n > 0 && html`<span class="koti-thing-n">${r.n}</span>`}
-          </a>
-          <button type="button" class="koti-star ${isStar(r.id) ? 'koti-star--on' : ''}"
-            aria-pressed=${isStar(r.id)}
-            title=${tr('home.things.star', 'Keep this one always visible')}
-            onClick=${() => onStar(r.id)}>${isStar(r.id) ? '★' : '☆'}</button>
-        </span>`)}
+        <${ThingChip} key=${r.id} href=${r.href} label=${r.name} n=${r.n}
+          starred=${isStar(r.id)}
+          starTitle=${tr('home.things.star', 'Keep this one always visible')}
+          onStar=${() => onStar(r.id)} />`)}
       ${hidden > 0 && html`
-        <button type="button" class="koti-fold" onClick=${() => setOpen(true)}>
+        <${FoldButton} onClick=${() => setOpen(true)}>
           ${tr('home.things.showAll', 'Show all ({n})').replace('{n}', String(rows.length))}
-        </button>`}
+        <//>`}
       ${open && rows.length > fold && html`
-        <button type="button" class="koti-fold" onClick=${() => setOpen(false)}>
+        <${FoldButton} onClick=${() => setOpen(false)}>
           ${tr('home.things.showLess', 'Show less')}
-        </button>`}
+        <//>`}
     <//>`;
 }
 
@@ -265,23 +203,19 @@ export function Things({ usage, orgs, packages, prefs, onStar, children }) {
   const starred = prefs?.stars ?? [];
   const explain = tr('home.things.knowledgeExplain', 'Structured knowledge: what you have organised out of your AI chats, for your AIs, your apps and, when you choose, other people to use.');
   return html`
-    <section class="koti-band koti-things">
-      <h2 class="koti-band-title">${tr('home.things.title', 'What you have made')}</h2>
+    <${Band} title=${tr('home.things.title', 'What you have made')}>
       ${rows.length > 0 && html`
         <${NamedRow} label=${tr('home.things.assets', 'Assets')}>
           ${rows.map((r) => html`
-            <a class="koti-thing" key=${r.key} href=${r.href}>
-              <span class="koti-thing-n">${r.n}</span>
-              <span class="koti-thing-label">${tr(r.key, r.fallback)}</span>
-            </a>`)}
+            <${ThingLink} key=${r.key} href=${r.href} n=${r.n} label=${tr(r.key, r.fallback)} />`)}
         <//>`}
       <${ChipRow} label=${tr('home.things.organisms', 'Shared spaces')} rows=${orgRows}
         starred=${starred} onStar=${onStar} fold=${FOLD_AFTER} />
       <${ChipRow} label=${tr('home.things.knowledge', 'Structured knowledge')} title=${explain} rows=${pkgRows}
         starred=${starred} onStar=${onStar} fold=${FOLD_AFTER} />
       ${children}
-      ${pkgRows.length > 0 && html`<p class="koti-things-explain">${explain}</p>`}
-    </section>`;
+      ${pkgRows.length > 0 && html`<${BandNote}>${explain}<//>`}
+    <//>`;
 }
 
 /**
@@ -326,18 +260,16 @@ export function FavoriteApps({ apps, favorites, owner, prefs, onMode }) {
   // with the spaces and the knowledge above it rather than a section of its own.
   return html`
     <${NamedRow} label=${title}>
-      ${noneOpened && html`<span class="koti-apps-none">${tr('home.apps.noneOpened', 'Nothing opened on this device yet.')}</span>`}
+      ${noneOpened && html`<${QuietNote}>${tr('home.apps.noneOpened', 'Nothing opened on this device yet.')}<//>`}
       ${rows.map((r) => html`
-        <a class="koti-thing koti-thing--named" key=${r.id} href=${r.href} target="_blank" rel="noopener">
-          <span class="koti-thing-label">${r.name}</span>
-        </a>`)}
+        <${ThingLink} key=${r.id} href=${r.href} label=${r.name} named=${true} newTab=${true} />`)}
       ${favRefs.length === 0 && html`
-        <span class="koti-apps-mode" role="group" aria-label=${tr('home.apps.modeLabel', 'Which apps to show')}>
-          <button type="button" class="koti-fold ${mode === 'saved' ? 'koti-fold--on' : ''}"
-            onClick=${() => onMode('saved')}>${tr('home.apps.saved', 'Last saved')}</button>
-          <button type="button" class="koti-fold ${mode === 'used' ? 'koti-fold--on' : ''}"
-            onClick=${() => onMode('used')}>${tr('home.apps.used', 'Last opened')}</button>
-        </span>`}
+        <${ModeSwitch} label=${tr('home.apps.modeLabel', 'Which apps to show')}>
+          <${FoldButton} on=${mode === 'saved'}
+            onClick=${() => onMode('saved')}>${tr('home.apps.saved', 'Last saved')}<//>
+          <${FoldButton} on=${mode === 'used'}
+            onClick=${() => onMode('used')}>${tr('home.apps.used', 'Last opened')}<//>
+        <//>`}
     <//>`;
 }
 
@@ -374,49 +306,39 @@ export function Playbooks({ playbooks, tour }) {
   // The band title ("What would you like to set up?") is the band's, drawn by index.js, so the
   // tried-so-far row beside this one sits under the same heading.
   return html`
-    <div class="koti-pb">
-      <p class="koti-pb-lead">${tr('home.playbooks.lead', 'Each one is a real thing you can do here, with the steps and the prompt that gets it done.')}</p>
-      <${NamedRow} label=${tr('home.playbooks.row', 'To set up')}>
-        ${playbooks.map((pb) => html`
-          <button type="button" key=${pb.id}
-            class="koti-fold ${open === pb.id ? 'koti-fold--on' : ''}"
-            aria-expanded=${open === pb.id}
-            onClick=${() => setOpen(open === pb.id ? null : pb.id)}>
-            ${tr(`home.playbooks.${pb.id}.title`, pb.id)}
-          </button>`)}
-        ${tour && html`<a class="koti-pb-tour" href=${tour} target="_blank" rel="noopener">
-          ${tr('home.playbooks.tour', 'Not sure what this can do? Take the tour →')}</a>`}
-      <//>
-      ${playbooks.filter((pb) => pb.id === open).map((pb) => html`
-        <div class="koti-pb-open" key=${pb.id}>
-          <p class="koti-pb-what">${tr(`home.playbooks.${pb.id}.lead`, '')}</p>
-          <ol class="koti-pb-steps">
-            ${Array.from({ length: pb.steps }, (_, i) => tr(`home.playbooks.${pb.id}.step${i + 1}`, ''))
-              .filter(Boolean)
-              .map((step, i) => html`<li key=${i}>${step}</li>`)}
-          </ol>
-          ${pb.proof?.length > 0 && html`
-            <p class="koti-pb-proof">
-              ${tr('home.playbooks.proof', 'Already running here:')}${' '}
-              ${pb.proof.map((pr, i) => html`
-                <${'span'} key=${pr.name}>${i > 0 ? ' · ' : ''}<a href=${pr.url} target="_blank" rel="noopener">${pr.name}</a><//>`)}
-            </p>`}
-          <div class="koti-pb-actions">
-            ${/* The wish rail the landing page already uses (sessionStorage 'aimeat.wish'): the chat
-                  drains it INTO THE COMPOSER and the person presses send themselves. A ?ask= query
-                  param would have been a second contract, and the chat reads no such thing — a
-                  button that navigates somewhere unprepared is the defect this avoids. */''}
-            <button type="button" class="btn-primary" onClick=${() => askAgent(pb)}>
-              ${tr('home.playbooks.ask', 'Ask my agent')}
-            </button>
-            <button type="button" class="btn-outline" onClick=${() => copyPrompt(pb)}>
-              ${copied === pb.id
-                ? tr('home.playbooks.copied', 'Copied. Paste it in your AI chat')
-                : tr('home.playbooks.copy', 'Copy for my own AI')}
-            </button>
-          </div>
-        </div>`)}
-    </div>`;
+    <${NumberedIndex}
+      lead=${tr('home.playbooks.lead', 'Each one is a real thing you can do here, with the steps and the prompt that gets it done.')}
+      label=${tr('home.playbooks.row', 'To set up')}
+      tour=${tour ? { href: tour, label: tr('home.playbooks.tour', 'Not sure what this can do? Take the tour →') } : null}
+      panel=${playbooks.filter((pb) => pb.id === open).map((pb) => html`
+        <${IndexPanel} key=${pb.id}
+          what=${tr(`home.playbooks.${pb.id}.lead`, '')}
+          steps=${Array.from({ length: pb.steps }, (_, i) => tr(`home.playbooks.${pb.id}.step${i + 1}`, '')).filter(Boolean)}
+          proof=${pb.proof?.length > 0 && html`
+            ${tr('home.playbooks.proof', 'Already running here:')}${' '}
+            ${pb.proof.map((pr, i) => html`
+              <${'span'} key=${pr.name}>${i > 0 ? ' · ' : ''}<a href=${pr.url} target="_blank" rel="noopener">${pr.name}</a><//>`)}`}>
+          ${/* The wish rail the landing page already uses (sessionStorage 'aimeat.wish'): the chat
+                drains it INTO THE COMPOSER and the person presses send themselves. A ?ask= query
+                param would have been a second contract, and the chat reads no such thing — a
+                button that navigates somewhere unprepared is the defect this avoids. */''}
+          <button type="button" class="btn-primary poster-slab" onClick=${() => askAgent(pb)}>
+            ${tr('home.playbooks.ask', 'Ask my agent')}
+          </button>
+          <button type="button" class="btn-outline" onClick=${() => copyPrompt(pb)}>
+            ${copied === pb.id
+              ? tr('home.playbooks.copied', 'Copied. Paste it in your AI chat')
+              : tr('home.playbooks.copy', 'Copy for my own AI')}
+          </button>
+        <//>`)}>
+      ${playbooks.map((pb) => html`
+        <${IndexItem} key=${pb.id}
+          on=${open === pb.id}
+          expanded=${open === pb.id}
+          onClick=${() => setOpen(open === pb.id ? null : pb.id)}>
+          ${tr(`home.playbooks.${pb.id}.title`, pb.id)}
+        <//>`)}
+    <//>`;
 }
 
 /**
@@ -427,13 +349,13 @@ export function Playbooks({ playbooks, tour }) {
  */
 export function TrustLine() {
   return html`
-    <section class="koti-trust">
+    <${InkFoot}>
       ${/* The explicit space matters: HTM collapses the line break, and the link sat glued to the
             sentence's full stop ("...asks.How this works"). */''}
       <p>${tr('home.trust.ai', 'AI-made content carries its label here, as the EU AI Act asks.')}${' '}
         <a href="/v1/transparency">${tr('home.trust.more', 'How this works →')}</a></p>
       <p>${tr('home.trust.data', 'Your data is yours: export it or delete it, and nothing is shared until you share it.')}</p>
-    </section>`;
+    <//>`;
 }
 
 /**
@@ -463,13 +385,11 @@ export function Achievements({ state, usage, markers, chatStatus, orgs, packages
       href: 'https://experience-center.apps.aimeat.io', external: true },
   ];
   return html`
-    <${NamedRow} label=${tr('home.ach.title', 'Tried so far')} className="koti-ach">
+    <${NamedRow} label=${tr('home.ach.title', 'Tried so far')}>
       ${list.map((a) => html`
-        <a class="koti-ach-chip ${a.done ? 'koti-ach-chip--done' : ''}" key=${a.id} href=${a.href}
-           target=${a.external ? '_blank' : undefined} rel=${a.external ? 'noopener' : undefined}
+        <${CheckItem} key=${a.id} done=${a.done} href=${a.href} external=${!!a.external}
            onClick=${a.id === 'experience' && !a.done ? () => onTried('experience') : undefined}>
-          <span class="koti-ach-mark" aria-hidden="true">${a.done ? '✓' : '·'}</span>
           ${tr(a.key, a.fallback)}
-        </a>`)}
+        <//>`)}
     <//>`;
 }

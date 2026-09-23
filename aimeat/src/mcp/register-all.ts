@@ -24,6 +24,7 @@
  * @usage
  *   registerAllServerTools(mcp, { storage, config, agentGaii: () => gaii, ... });
  * @version-history
+ *   v1.3.0 — 2026-09-23 — registerUiLibraryTools: the component catalogue of the node's own interface.
  *   v1.2.0 — 2026-09-13 — registerDmOrganizeTools: archiving and the list rules on the chat path.
  *   v1.1.0 — 2026-09-06 — registerSecretTools: the owner's secrets vault on the chat path.
  *   v1.0.0 — 2026-09-03 — Extracted from index.ts so the schema audit registers what the server
@@ -88,6 +89,7 @@ import { registerPortfolioTools } from './portfolio.js';
 import { registerSurfaceLayoutTools } from './surface-layout.js';
 import { registerAppUiTools } from './app-ui.js';
 import { registerDesignbookTools } from './designbook.js';
+import { registerUiLibraryTools } from './ui-library.js';
 import { registerAgentOnboardingTools } from './agent-onboarding.js';
 import { registerAgentTelemetryTools } from './agent-telemetry.js';
 import { registerAgentManagementTools } from './agent-management.js';
@@ -197,6 +199,7 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     registerSurfaceLayoutTools(mcp, storage, config, agentGaii);
     registerAppUiTools(mcp, storage, config, agentGaii);
     registerDesignbookTools(mcp, storage, config, agentGaii);
+    registerUiLibraryTools(mcp);
     registerAgentTelemetryTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);
     registerAgentOnboardingTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);
     registerAgentManagementTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
