@@ -316,7 +316,7 @@ export function decisionProblems(): string[] {
     if (existsSync(manifestPath)) {
         const manifest = JSON.parse(read(manifestPath)) as Record<string, Record<string, Record<string, string>>>;
         for (const [d, vs] of Object.entries(manifest)) for (const [v, e] of Object.entries(vs)) {
-            for (const theme of ['light', 'dark']) if (e[theme] && !existsSync(pub(e[theme]))) out.push(`crop ${d}/${v} ${theme}: ${e[theme]} is not a file`);
+            if (e.context && !existsSync(pub(e.context))) out.push(`crop ${d}/${v}: ${e.context} is not a file`);
         }
     }
     return out;

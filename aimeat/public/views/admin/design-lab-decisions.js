@@ -49,10 +49,12 @@ import { ActionRow } from '/components/ActionRow.js';
 import { ChooserFold } from '/components/Chooser.js';
 import { Specimens, Specimen, SpecimenImage } from '/components/Specimen.js';
 import { DECISIONS } from '/views/design-lab/decisions-data.js';
+import { plainDiff } from '/views/design-lab/plain-diff.js';
 
 const html = htm.bind(h);
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
-const variantSrc = (id, v, theme) => `/v1/design-lab/frame?id=decision:${encodeURIComponent(id)}&v=${v}&theme=${theme}`;
+const variantSrc = (id, v, theme, solo = false) => `/v1/design-lab/frame?id=decision:${encodeURIComponent(id)}&v=${v}&theme=${theme}${solo ? '&solo=1' : ''}`;
+const afterSrc = (id, v, theme) => `/v1/design-lab/frame?id=after:${encodeURIComponent(id)}&v=${v}&theme=${theme}&solo=1`;
 const choiceKey = (id) => `design-lab.choice.${id}`;
 /** A decision's short name: its title up to the colon. */
 const shortTitle = (d) => d.title.split(':')[0];
@@ -62,7 +64,14 @@ const themeWord = (theme) => (theme === 'light' ? tr('designLab.lightWord', 'lig
 /** The proposal's picture: its own composition, or the proposed option's sample. */
 function proposalSrc(decision, theme) {
   if (decision.proposal.variant === 'proposal') return `/v1/design-lab/frame?id=proposal:${encodeURIComponent(decision.id)}&v=0&theme=${theme}`;
-  return variantSrc(decision.id, decision.variants.findIndex((v) => v.id === decision.proposal.variant), theme);
+  return variantSrc(decision.id, decision.variants.findIndex((v) => v.id === decision.proposal.variant), theme, true);
+}
+
+/** One stable setter per key, so a frame's listener is not re-made on every render. */
+function useValues(keys) {
+  const [values, setValues] = useState(/** @type {Record<string, Record<string, string>>} */ ({}));
+  const [setters] = useState(() => Object.fromEntries(keys.map((k) => [k, (vals) => setValues((prev) => ({ ...prev, [k]: vals }))])));
+  return { values, setters };
 }
 
 async function readChoice(id) {
@@ -117,7 +126,7 @@ function ProposalPart({ decision, state, onSet }) {
       <p><strong>${tr('designLab.ifAccept', 'If you accept, these become one component:')}</strong></p>
       <${Specimens}>
         ${decision.variants.map((v, i) => html`
-          <${Specimen} key=${v.id} label=${v.name} src=${variantSrc(decision.id, i, 'light')} note=${`→ ${v.becomes}`} />`)}
+          <${Specimen} key=${v.id} label=${v.name} src=${variantSrc(decision.id, i, 'light', true)} note=${`→ ${v.becomes}`} />`)}
       <//>
     <//>
     <${Band} title=${tr('designLab.changes', 'What would change')} tight=${true}>
@@ -130,17 +139,28 @@ function ProposalPart({ decision, state, onSet }) {
           rejectLabel=${tr('designLab.noThanks', 'No thanks')} onSet=${onSet} />`}`;
 }
 
-/** Part 2: one option on its own, with its pictures, its pages and its answer. */
+/**
+ * Part 2: one option on its own: the element alone as it looks today and as the proposal would
+ * draw it, in light and dark; what changes, computed from the two; where it sits on its real page,
+ * outlined; the pages that use it; and its answer.
+ */
 function OptionPart({ decision, variant, index, crops, state, onSet }) {
   const crop = crops?.[decision.id]?.[variant.id] ?? {};
-  const fromPage = crop.light && crop.dark;
+  const { values, setters } = useValues(['today', 'after']);
+  const changes = plainDiff(values.today, values.after);
   return html`
     <${Band} title=${variant.name} tight=${true}>
       <${Specimens}>
-        ${THEMES.map((theme) => (fromPage
-          ? html`<${SpecimenImage} key=${theme} label=${theme === 'light' ? tr('designLab.cropLight', 'On its page, light') : tr('designLab.cropDark', 'On its page, dark')} src=${crop[theme]} />`
-          : html`<${Specimen} key=${theme} label=${themeWord(theme)} src=${variantSrc(decision.id, index, theme)} />`))}
+        ${THEMES.map((theme) => html`
+          <${Specimen} key=${`t-${theme}`} label=${`${tr('designLab.today', 'Today')}, ${themeWord(theme)}`}
+            src=${variantSrc(decision.id, index, theme, true)} onValues=${theme === 'light' ? setters.today : undefined} />
+          <${Specimen} key=${`a-${theme}`} label=${`${tr('designLab.afterProposal', 'After the proposal')}, ${themeWord(theme)}`}
+            src=${afterSrc(decision.id, index, theme)} onValues=${theme === 'light' ? setters.after : undefined} />`)}
       <//>
+      <${NamedRow} label=${tr('designLab.whatChanges', 'What changes')}>${changes ? changes.join(' ') : tr('designLab.measuring', 'measuring…')}<//>
+      ${crop.context
+        ? html`<${Specimens}><${SpecimenImage} label=${tr('designLab.onItsPage', 'Where it is on its page (outlined)')} src=${crop.context} /><//>`
+        : html`<${Hint}>${tr('designLab.noContext', 'No picture from a real page')}: ${crop.missing || tr('designLab.noContextYet', 'not taken yet')}.<//>`}
       <${NamedRow} label=${tr('designLab.pages', 'Pages')}>${variant.where}<//>
       ${!decision.choice && html`<${Answer} state=${state} acceptLabel=${tr('designLab.acceptOne', 'Accept')}
         rejectLabel=${tr('designLab.reject', 'Reject')} onSet=${onSet} />`}
@@ -164,7 +184,7 @@ function DetailsPart({ decision }) {
       ${(decision.proposal.tones ?? []).map((tn) => html`<${NamedRow} key=${tn.name} label=${tn.name}>${tn.from}<//>`)}
       ${decision.variants.map((v, i) => html`
         <${NamedRow} key=${v.id} label=${v.name}>
-          ${v.code}. ${v.look}.${decision.counted && v.files ? ` ${v.files} ${tr('designLab.files', 'files')}.` : ''}
+          ${v.code}.${decision.counted && v.files ? ` ${v.files} ${tr('designLab.files', 'files')}.` : ''}
         <//>
         <${Specimens}>
           ${THEMES.map((theme) => html`<${Specimen} key=${theme} label=${themeWord(theme)} src=${variantSrc(decision.id, i, theme)}
