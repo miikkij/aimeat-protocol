@@ -715,7 +715,10 @@ a { color: inherit; text-decoration: none; }
 .notif-bell { position: relative; display: inline-flex; }
 .notif-bell-btn { position: relative; background: none; border: none; cursor: pointer; font-size: 1.15rem; line-height: 1; padding: 4px 6px; border-radius: 8px; }
 .notif-bell-btn:hover { background: var(--bg-dim); }
-.notif-badge { position: absolute; top: -1px; right: -1px; background: var(--accent); color: #fff; border-radius: 10px; font-size: 0.6rem; font-weight: 700; min-width: 15px; height: 15px; padding: 0 3px; display: flex; align-items: center; justify-content: center; }
+/* The bell's count: its look is the shared count (.poster-count, waiting and small, in poster.css);
+   this keeps only its place on the bell's corner. Two classes, so its flex box outranks the count's
+   inline-block from the later sheet. */
+.notif-badge.poster-count, .notif-badge { position: absolute; top: -1px; right: -1px; min-width: 15px; height: 15px; display: flex; align-items: center; justify-content: center; }
 .notif-dropdown { position: absolute; right: 0; top: calc(100% + 6px); width: 320px; max-height: 60vh; overflow-y: auto; background: var(--card); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,0.18); z-index: 1200; }
 .notif-dropdown-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; font-weight: 700; font-size: 0.9rem; color: var(--text); padding: 0.6rem 0.85rem; border-bottom: 1px solid var(--border-subtle); position: sticky; top: 0; background: var(--card); z-index: 1; }
 .notif-clear-all { font-weight: 600; font-size: 0.78rem; color: var(--muted); background: none; border: none; padding: 0.15rem 0.35rem; border-radius: 6px; cursor: pointer; }
@@ -817,7 +820,6 @@ a { color: inherit; text-decoration: none; }
 }
 .notif-bell-btn { border-radius: 0; }
 .notif-bell-btn:hover { background: var(--sun); }
-.notif-badge { border-radius: 0; font-family: var(--font-mono); }
 .notif-dropdown { border: 3px solid var(--text); border-radius: 0; box-shadow: 8px 8px 0 var(--sun); }
 
 /* Collapse the header to a hamburger the moment the inline nav stops fitting.

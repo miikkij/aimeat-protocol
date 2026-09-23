@@ -84,6 +84,13 @@ export const SHAPE_ENTRIES: UiEntrySource[] = [
         'A small mono tag in a thin ink frame.', 'A tag or a kind beside a name.'),
     shape('crumb', 'Crumb', ['poster-crumb'], '<span class="poster-crumb">…</span>',
         'A mono coral path step followed by a slash.', 'Where a page sits, above its headline.'),
+    shape('count', 'Count', ['poster-count', 'poster-count--waiting', 'poster-count--tally', 'poster-count--small'], '<span class="poster-count poster-count--waiting">3</span>',
+        'A small number in the typewriter face.', 'How many things wait for the person, or how many there are.',
+        [
+            { name: 'waiting', class: 'poster-count--waiting', when: 'something waits for the person: on coral' },
+            { name: 'tally', class: 'poster-count--tally', when: 'it only says how many: no ground' },
+            { name: 'small', class: 'poster-count--small', when: 'a count on an icon, such as the bell' },
+        ]),
     shape('time', 'Time', ['poster-time'], '<span class="poster-time">10:42</span>',
         'When a thing happened, in small grey typewriter letters.', 'The time under a chat message and beside an event on the home.'),
     shape('stat', 'Stat', ['poster-stat', 'poster-stat-number', 'poster-stat-number--small', 'poster-stat-number--large', 'poster-stat-number--step', 'poster-stat-number--band'],
