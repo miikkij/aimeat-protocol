@@ -16,6 +16,7 @@
  * @structure default HomeView; shared HomeJourney and HomeSettingsDialog
  * @usage routed at /v1/home by spa.html (and portal.ts spaRoutes, or F5 is a 404)
  * @version-history
+ *   2026-09-23: Composed from the shared parts in css/parts.css and css/parts-steps.css (class names by role, values moved from views/home.css unchanged; UI consolidation slice 1).
  *   2026-09-14: The failure line is the site's shared toast (theme.css), held for its six seconds.
  *   2026-09-09: Home journey starts with a connected AI; useful prompts and account settings are within reach.
  *   v3.0.0 — 2026-08-26 — The finished home renders through the surface layout engine. The eleven
@@ -106,12 +107,12 @@ export default function HomeView({ navigate }) {
 
   if (!session) {
     return html`
-      <div class="koti">
-        <header class="koti-welcome">
-          <h1 class="koti-h1">${tr('home.signInTitle', 'Step into your home')}</h1>
-          <p class="koti-welcome-sub">${tr('home.signInDesc', 'Sign in to see where you left off.')}</p>
+      <div class="poster-page">
+        <header class="poster-intro">
+          <h1 class="poster-intro-title">${tr('home.signInTitle', 'Step into your home')}</h1>
+          <p class="poster-intro-sub">${tr('home.signInDesc', 'Sign in to see where you left off.')}</p>
         </header>
-        <div class="koti-actions">
+        <div class="poster-actions">
           <button type="button" class="btn-primary" onClick=${() => navigate('/v1/portal')}>
             ${tr('home.signIn', 'Sign in')}
           </button>
@@ -120,14 +121,14 @@ export default function HomeView({ navigate }) {
   }
 
   if (!stateReady || !surface.ready) {
-    return html`<div class="koti koti-loading"><${Spinner} /></div>`;
+    return html`<div class="poster-page poster-page-loading"><${Spinner} /></div>`;
   }
 
   if (!state) {
     return html`
-      <div class="koti">
-        <div class="koti-error" role="alert">
-          <p class="koti-error-text">${tr('home.loadFailed', 'Your home could not be loaded just now. Try again in a moment.')}</p>
+      <div class="poster-page">
+        <div class="poster-error" role="alert">
+          <p class="poster-error-text">${tr('home.loadFailed', 'Your home could not be loaded just now. Try again in a moment.')}</p>
         </div>
       </div>`;
   }
@@ -142,7 +143,7 @@ export default function HomeView({ navigate }) {
   };
 
   return html`
-    <div class="koti">
+    <div class="poster-page">
       <${SurfaceRenderer}
         layout=${surface.layout}
         freeform=${surface.freeform}

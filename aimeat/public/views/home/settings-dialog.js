@@ -20,6 +20,7 @@
  *   import { HomeSettingsDialog } from '/views/home/settings-dialog.js';
  *   html`<${HomeSettingsDialog} open=${open} onClose=${close} />`
  * @version-history
+ *   2026-09-23: Composed from the shared parts in css/parts.css and css/parts-steps.css (class names by role, values moved from views/home.css unchanged; UI consolidation slice 1).
  *   2026-09-13: Compose the existing home shapes with shared poster classes.
  *   2026-09-13: The dialog is the site's one dialog at its medium size; its two sections open on the
  *     page's own slab (poster-section-title) and the door out is a row under an ink rule.
@@ -73,23 +74,23 @@ function MarginPatternSetting() {
       .catch((e) => swallowed('home settings: prefs write', e));
   };
   return html`
-    <div class="koti-settings-pattern">
-      <div class="koti-settings-pattern-words">
-        <span class="koti-settings-pattern-title">${tr('home.settings.pattern', 'Margin pattern')}</span>
-        <span class="koti-settings-pattern-hint">${tr('home.settings.patternHint', 'A figure on the empty margins, fading toward the middle.')}</span>
+    <div class="poster-settings-pattern">
+      <div class="poster-settings-pattern-words">
+        <span class="poster-settings-pattern-title">${tr('home.settings.pattern', 'Margin pattern')}</span>
+        <span class="poster-settings-pattern-hint">${tr('home.settings.patternHint', 'A figure on the empty margins, fading toward the middle.')}</span>
       </div>
       ${/* The preview: the same variables the page's strips read, so it shows what the margin
             will show, fading to the right the way the left strip fades toward the middle. */''}
-      <div class="koti-settings-pattern-preview" aria-hidden="true">
-        ${current ? html`<div class=${`mp-swatch mp-swatch--${current}`}></div>` : html`<span class="koti-settings-pattern-none">${tr('home.settings.patternOff', 'Off')}</span>`}
+      <div class="poster-settings-pattern-preview" aria-hidden="true">
+        ${current ? html`<div class=${`mp-swatch mp-swatch--${current}`}></div>` : html`<span class="poster-settings-pattern-none">${tr('home.settings.patternOff', 'Off')}</span>`}
       </div>
-      <div class="koti-settings-pattern-choices" role="radiogroup" aria-label=${tr('home.settings.pattern', 'Margin pattern')}>
-        <button type="button" class=${`koti-settings-pattern-choice ${current === '' ? 'active' : ''}`}
+      <div class="poster-settings-pattern-choices" role="radiogroup" aria-label=${tr('home.settings.pattern', 'Margin pattern')}>
+        <button type="button" class=${`poster-settings-pattern-choice ${current === '' ? 'active' : ''}`}
           role="radio" aria-checked=${current === '' ? 'true' : 'false'} onClick=${() => choose('')}>
           ${tr('home.settings.patternOff', 'Off')}
         </button>
         ${MARGIN_PATTERNS.map((p) => html`
-          <button type="button" key=${p} class=${`koti-settings-pattern-choice ${current === p ? 'active' : ''}`}
+          <button type="button" key=${p} class=${`poster-settings-pattern-choice ${current === p ? 'active' : ''}`}
             role="radio" aria-checked=${current === p ? 'true' : 'false'} onClick=${() => choose(p)}>
             ${tr('home.settings.patterns.' + p, p.toUpperCase())}
           </button>
@@ -119,7 +120,7 @@ function AchievementsToggle() {
     window.dispatchEvent(new Event('aimeat-live-update'));
   };
   return html`
-    <label class="koti-settings-switch koti-ach-toggle">
+    <label class="poster-settings-switch">
       <input type="checkbox" checked=${!hidden} onChange=${flip} />
       ${tr('home.settings.showAch', 'Show achievements on the home')}
     </label>`;
@@ -137,29 +138,28 @@ export function HomeSettingsDialog({ open, onClose, session, showToast }) {
     onChanged=${() => { setPanel('settings'); showToast?.(t('profile.landing.passwordChanged')); }} />`;
   return html`
     <${Modal} open=${open} onClose=${onClose} size="md"
-      title=${tr('home.settings.title', 'Home settings')}
-      className="koti-settings-modal">
-      <div class="koti-settings">
+      title=${tr('home.settings.title', 'Home settings')}>
+      <div class="poster-settings">
         ${/* Inside a dialog a section starts the way it does on the page: the slab, a size smaller. */''}
-        <section class="poster-section koti-account-settings">
+        <section class="poster-section poster-settings-account">
           <h3 class="poster-section-title">${t('homeJourney.account')}</h3>
-          <button type="button" class="poster-action koti-link" onClick=${() => setPanel('password')}>${t('profile.landing.changePasswordBtn')}</button>
-          <button type="button" class="poster-action koti-link" onClick=${() => setPanel('profile')}>${t('homeJourney.profileLanguage')}</button>
-          <a class="poster-action koti-link" href="/v1/profile?tab=access">${t('homeJourney.security')} →</a>
-          <p class="koti-hint">${t('homeJourney.securityHint')}</p>
+          <button type="button" class="poster-action" onClick=${() => setPanel('password')}>${t('profile.landing.changePasswordBtn')}</button>
+          <button type="button" class="poster-action" onClick=${() => setPanel('profile')}>${t('homeJourney.profileLanguage')}</button>
+          <a class="poster-action" href="/v1/profile?tab=access">${t('homeJourney.security')} →</a>
+          <p class="poster-hint">${t('homeJourney.securityHint')}</p>
         </section>
         <section class="poster-section">
           <h3 class="poster-section-title">${t('homeJourney.appearance')}</h3>
           <${AchievementsToggle} />
           <${MarginPatternSetting} />
-          <${StartPageSetting} className="koti-settings-startpage" />
+          <${StartPageSetting} className="poster-settings-startpage" />
         </section>
         ${/* Everything that is not the home's own. A full page load rather than a router call: the
               dialog is open over the home, and the cleanest way out of a modal into another shell
               is to leave. */''}
-        <a class="koti-settings-door poster-row--thing" href="/v1/profile">
-          <span class="koti-settings-door-title">${tr('home.settings.allControls', 'All settings and controls')} →</span>
-          <span class="koti-settings-door-hint">
+        <a class="poster-settings-door poster-row--thing" href="/v1/profile">
+          <span class="poster-settings-door-title">${tr('home.settings.allControls', 'All settings and controls')} →</span>
+          <span class="poster-settings-door-hint">
             ${tr('home.settings.allControlsHint', 'Agents, memory, apps, access, billing: everything behind the home.')}
           </span>
         </a>

@@ -11,8 +11,9 @@
  * @structure HomeFeed({ items }) · FeedRow({ item }) · line · when
  * @usage import { HomeFeed } from './feed.js';
  * @version-history
+ *   2026-09-23: Composed from the shared parts in css/parts.css and css/parts-steps.css (class names by role, values moved from views/home.css unchanged; UI consolidation slice 1).
  *   v2.2.0 — 2026-08-23 — HomeFeed takes `band`: on the finished home it is one of the ruled
- *     bands (.koti-band), on the onboarding home it keeps its own gap. Title class is the band's.
+ *     bands (.poster-band), on the onboarding home it keeps its own gap. Title class is the band's.
  *   v2.1.0 — 2026-08-18 — The list becomes a timeline: kindCategory() maps every kind onto six
  *     colours (made / agent work / trouble / money / access / system) and the row carries its
  *     category as a class, so the home card and the history page colour their dots from one rule.
@@ -230,13 +231,13 @@ export function FeedRow({ item }) {
   const text = line(item);
   if (!text) return null;
   return html`
-    <li class="koti-feed-item koti-feed-item--${kindCategory(item.kind)} ${item.kind === 'agent_knocking' ? 'koti-feed-item-live' : ''}">
-      <span class="koti-feed-dot" aria-hidden="true"></span>
-      <div class="koti-feed-body">
+    <li class="poster-timeline-item poster-timeline-item--${kindCategory(item.kind)} ${item.kind === 'agent_knocking' ? 'poster-timeline-item--live' : ''}">
+      <span class="poster-timeline-dot" aria-hidden="true"></span>
+      <div class="poster-timeline-body">
         ${item.link
-          ? html`<a class="koti-feed-line" href=${item.link}>${text}</a>`
-          : html`<span class="koti-feed-line">${text}</span>`}
-        <span class="koti-feed-when">${when(item.at)}</span>
+          ? html`<a class="poster-timeline-line" href=${item.link}>${text}</a>`
+          : html`<span class="poster-timeline-line">${text}</span>`}
+        <span class="poster-timeline-when">${when(item.at)}</span>
       </div>
     </li>`;
 }
@@ -250,19 +251,19 @@ export function HomeFeed({ items, band }) {
   const quiet = newestAt > 0 && (Date.now() - newestAt) > QUIET_AFTER_DAYS * 86400000;
   const shown = items.filter(it => line(it));
   return html`
-    <section class="koti-feed ${band ? 'koti-band' : ''}">
-      <h2 class="koti-band-title">${tr('home.feed.title', 'What has happened')}</h2>
+    <section class="poster-timeline ${band ? 'poster-band' : ''}">
+      <h2 class="poster-section-title poster-section-title--large">${tr('home.feed.title', 'What has happened')}</h2>
       ${quiet && html`
-        <a class="koti-feed-quiet" href="/v1/chat">
+        <a class="poster-timeline-quiet" href="/v1/chat">
           ${tr('home.feed.quiet', 'Quiet here lately. Shall we make something happen? Open the chat and say what you need.')}
         </a>`}
-      <ul class="koti-feed-list">
+      <ul class="poster-timeline-list">
         ${shown.slice(0, CARD_ROWS).map((item, i) => html`<${FeedRow} item=${item} key=${i} />`)}
       </ul>
       ${/* The card is a glance, not an archive. The door to everything only appears when there IS
            more than a glance — a "see all" under six rows offers a page that shows the same six. */''}
       ${shown.length > CARD_ROWS && html`
-        <a class="koti-feed-more" href="/v1/home?history=1">
+        <a class="poster-timeline-more" href="/v1/home?history=1">
           ${tr('home.feed.seeAll', 'See everything that has happened')}
         </a>`}
     </section>`;

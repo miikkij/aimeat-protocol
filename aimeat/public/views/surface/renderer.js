@@ -25,6 +25,7 @@
  *   const { layout, freeform, ready } = useSurfaceLayout('home');
  *   html`<${SurfaceRenderer} surface="home" layout=${layout} freeform=${freeform} ctx=${ctx} />`
  * @version-history
+ *   2026-09-23: Composed from the shared parts in css/parts.css and css/parts-steps.css (class names by role, values moved from views/home.css unchanged; UI consolidation slice 1).
  *   v1.0.0 — 2026-08-26 — Initial.
  */
 import { h, Component } from 'preact';
@@ -164,8 +165,8 @@ export function SurfaceRenderer({ layout, ctx = {}, freeform = {}, locale = 'en'
       const kids = block.children.filter(c => !c.hidden);
       const heading = titleOf(block, locale);
       return html`
-        <section class="sf-band" key=${block.key}>
-          ${heading ? html`<h2 class="sf-band-title">${heading}</h2>` : ''}
+        <section class="poster-band poster-band--tight" key=${block.key}>
+          ${heading ? html`<h2 class="poster-section-title poster-section-title--large">${heading}</h2>` : ''}
           ${kids.map(child => html`<${Block} key=${child.key} block=${child} ctx=${ctx} freeform=${freeform} locale=${locale} />`)}
         </section>`;
     }

@@ -197,6 +197,8 @@ another modifier. A view never re-declares a modifier's values.
 | Shape | Shared variant | Values and reason |
 |---|---|---|
 | Loud action | `.poster-slab--large` | 1.02rem, 8px sun shadow; the named big door role (brief 10.3). Base stays .8rem, 600, 4px sun shadow. |
+| Loud action | `.poster-slab--control` | A 44px control in a row of controls: inline-flex, centred, `0 16px` padding, weight 800, the parent's face; the chat's New conversation and Send (formerly chat.css). Dimmed to .45 when disabled. |
+| Section headline | `.poster-section-title--large` | 2.4rem, and 1.7rem with `.45rem .8rem .4rem` padding at 560px; the home's bands and the layout engine's band (formerly home.css and surface.css). |
 | Box | `.poster-box--avatar` | Square initials mark, .95rem poster face, no padding or margin, transparent ground; Contacts, Email and Notifications share this cut. Dimensions remain layout. |
 | Box initials mark | `.poster-box--avatar.poster-box--small` | .85rem; Apps, Companies and MCP share the smaller initials cut. |
 | Box | `.poster-box--meter` | Paper ground, no padding or margin, sun fill for SVG data geometry; the filled numerical meter role. |
@@ -212,6 +214,12 @@ another modifier. A view never re-declares a modifier's values.
 | Showroom band | `.showroom-band--sun` | Sun ground and ink words; the money band role. |
 | Showroom section | `.showroom-section--coral` | 8px coral shadow; the named coral room cut. |
 | Showroom slab | `.showroom-slab--hot`, `--sun`, `--ink` | Named hot, sun and ink action colours; each shares the showroom slab geometry. |
+
+The parts a page is composed of, with their spacing, live beside the shapes: `parts.css` (page
+frame, masthead, band, named row, index, timeline, foot, task chooser, settings dialog, open items),
+`parts-steps.css` (setup steps, prompt block, paste box, front door) and `parts-conversation.css`
+(the chat's frame, turns, work log, suggestions, composer). The home and the chat have no sheet of
+their own since 2026-09-23; their values moved there unchanged.
 
 Run `pnpm check:poster-shapes` from `aimeat/`. It scans view and component sheets and refuses
 any new per-file pattern count. `pnpm debt` shows the remaining copies. Lower the baseline after

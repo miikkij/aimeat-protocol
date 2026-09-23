@@ -19,6 +19,7 @@
  *   renders in a sandboxed frame with its own stylesheet.
  * @usage Linked from public/spa.html after every other stylesheet.
  * @version-history
+ *   2026-09-23: The home's and the chat's words-on-the-sun selectors moved to css/parts.css and css/parts-conversation.css with the parts they belong to.
  *   2026-09-13 -- Let an explicitly composed poster aside own the MCP install row frame.
  *   2026-09-13 -- V2y: compose agent setup panel section headings from poster.css.
  *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
@@ -280,9 +281,7 @@
 .pf-account-modal .pf-avatar-preview { border: 2px solid var(--text); }
 
 /* ── Words on the sun stay ink in every theme ───────────────────────────────────────────── */
-.pf .pf-side-item--active, .pf .pf-next-card--primary, .pf .pf-next-card:hover, .pf .pf-mcp-badge,
-.koti-fold--on, .koti-pb .koti-fold:hover, .koti-pb .koti-fold--on, .koti-ach-chip--done .koti-ach-mark,
-.chat-thread--active, .chat-list-toggle, .chat-copy-head.copied, .chat-turn--user .chat-bubble, .chat-attach:hover, .chat-voice:hover { color: var(--on-sun); }
+.pf .pf-side-item--active, .pf .pf-next-card--primary, .pf .pf-next-card:hover, .pf .pf-mcp-badge { color: var(--on-sun); }
 
 /* ── The portfolio builder and the viewer chrome (outside .pf) ──────────────────────────── */
 .portfolio-step { padding-top: 1.4rem; margin-bottom: 2.4rem; }

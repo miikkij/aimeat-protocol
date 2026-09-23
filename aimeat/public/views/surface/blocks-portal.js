@@ -18,6 +18,7 @@
  *   StatsBlock · TransparencyBlock · PortalTextBlock · PortalBoardBlock
  * @usage Reached through views/surface/block-map.js, never imported directly by a view.
  * @version-history
+ *   2026-09-23: Composed from the shared parts in css/parts.css and css/parts-steps.css (class names by role, values moved from views/home.css unchanged; UI consolidation slice 1).
  *   v1.3.0 — 2026-09-14 — Seven V2* blocks: the front page as the message frame says it (TARGET-075).
  *   v1.2.0 — 2026-08-30 — portal.board shows a notice's category and its poster's name beside the
  *     date, now that a board is the notice board people and agents publish to (RFC §27).
@@ -133,8 +134,8 @@ export function PortalTextBlock(/** @type {{ ctx?: any, props?: Record<string, a
     ['site'], (d) => (typeof d?.value === 'string' ? d.value : ''));
   if (!data) return null;
   return html`
-    <section class="sf-portal-text">
-      ${title ? html`<h2 class="sf-band-title">${title}</h2>` : ''}
+    <section class="poster-text-block">
+      ${title ? html`<h2 class="poster-section-title poster-section-title--large">${title}</h2>` : ''}
       <${Markdown} text=${data} />
     </section>`;
 }
@@ -217,8 +218,8 @@ export function PortalBoardBlock(/** @type {{ ctx?: any, props?: Record<string, 
   // "alice" out of "alice@env", "scout · alice" out of "scout#alice@env": the name, never the identifier.
   const who = (g) => { const s = String(g || ''); const hash = s.indexOf('#'); const at = s.indexOf('@'); if (hash >= 0 && at > hash) return `${s.slice(0, hash)} · ${s.slice(hash + 1, at)}`; return at >= 0 ? s.slice(0, at) : s; };
   return html`
-    <section class="sf-portal-board">
-      ${title ? html`<h2 class="sf-band-title">${title}</h2>` : ''}
+    <section class="poster-notice-block">
+      ${title ? html`<h2 class="poster-section-title poster-section-title--large">${title}</h2>` : ''}
       <div class="board-posts">
         ${data.slice(0, limit).map((p) => html`
           <article class="board-post" key=${p.id}>
