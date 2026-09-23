@@ -19,6 +19,8 @@
  * @structure AgentAiSection({ agentName, showToast })
  * @usage import { AgentAiSection } from './agent-ai-section.js';
  * @version-history
+ *   v1.1.0 — 2026-09-23 — The decision provider this agent uses: the owner's default, or one the
+ *     owner picks for this agent alone.
  *   v1.0.0 — 2026-09-20 — Initial: a key per agent.
  */
 import { h } from 'preact';
@@ -40,13 +42,23 @@ export function AgentAiSection({ agentName, showToast }) {
   const [cap, setCap] = useState('');
   const [busy, setBusy] = useState(false);
   const [tested, setTested] = useState({});
+  const [providers, setProviders] = useState(null);
+
+  // The decision providers the owner may use, with the one set for each agent. Read beside the keys;
+  // a node without providers answers without the door, and then the block is not shown.
+  const loadProviders = useCallback(async () => {
+    const r = await apiGet('/v1/ai/decide/providers');
+    const p = r?.data ?? null;
+    setProviders(prev => (JSON.stringify(prev) === JSON.stringify(p) ? prev : p));
+  }, []);
 
   const load = useCallback(async () => {
     const r = await apiGet(base);
     const d = r?.data ?? null;
     setData(prev => (JSON.stringify(prev) === JSON.stringify(d) ? prev : d));
+    loadProviders().catch(err => swallowed('agent-ai-section: providers', err));
     return d;
-  }, [base]);
+  }, [base, loadProviders]);
 
   useEffect(() => {
     load().then(d => {
@@ -107,8 +119,21 @@ export function AgentAiSection({ agentName, showToast }) {
     finally { setBusy(false); }
   };
 
+  // `null` gives the agent back to the owner's default.
+  const setProvider = async (id) => {
+    setBusy(true);
+    try {
+      await apiPut('/v1/ai/decide/settings', { agent_providers: { [agentName]: id || null } });
+      await loadProviders();
+      showToast?.(t('agentAi.saved'));
+    } catch (e) { showToast?.(e.message, true); }
+    finally { setBusy(false); }
+  };
+
   if (!data) return null;
   const q = data.quality || {};
+  const provList = providers?.providers || [];
+  const ownDefault = provList.find(p => p.id === providers?.default);
 
   return html`
     <div class="sch-form poster-row--thing pf-aai" id="agent-ai-section">
@@ -143,6 +168,19 @@ export function AgentAiSection({ agentName, showToast }) {
                 : (tested[model].message || t('agentAi.testFailed'))}
             </p>`}
         </div>`)}
+
+      ${provList.length > 0 && html`
+        <div class="pf-aai-model">
+          <div class="pf-aai-model-title">${t('agentAi.providerTitle')}</div>
+          <p class="pf-aitr-note">${t('agentAi.providerDesc')}</p>
+          <div class="pf-aai-row">
+            <select class="og-input" aria-label=${t('agentAi.providerTitle')} disabled=${!!busy}
+                    value=${providers.agents?.[agentName] || ''} onChange=${e => setProvider(e.currentTarget.value)}>
+              <option value="">${t('agentAi.providerDefault', { provider: ownDefault ? ownDefault.title : String(providers.default || '') })}</option>
+              ${provList.map(p => html`<option key=${p.id} value=${p.id}>${p.title}</option>`)}
+            </select>
+          </div>
+        </div>`}
 
       <div class="pf-aai-model">
         <div class="pf-aai-model-title">${t('agentAi.capTitle')}</div>

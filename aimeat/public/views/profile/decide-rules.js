@@ -17,9 +17,11 @@
  *   THE NUMBERS BESIDE A RULE are counted by the node (GET /v1/ai/decide/rules → quality): decisions,
  *   how many a gate stopped, how many a person overrode, what they cost, and when the rule last
  *   changed. They are what the thresholds are tuned from.
- * @structure DecideRules({ available }) · toRule / fromRule (the editor's draft ↔ the record)
- * @usage import { DecideRules } from './decide-rules.js'; html`<${DecideRules} available=${true} />`
+ * @structure DecideRules({ available, providers }) · toRule / fromRule (the editor's draft ↔ the record)
+ * @usage import { DecideRules } from './decide-rules.js'; html`<${DecideRules} available=${true} providers=${view} />`
  * @version-history
+ *   v1.1.0 — 2026-09-23 — A rule may name the decision provider it always runs on: a field in the
+ *     editor, and the provider in the rule's line.
  *   v1.0.0 — 2026-09-20 — Initial: decision rules on the node.
  */
 import { h } from 'preact';
@@ -29,11 +31,12 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { apiGet, apiPut, apiPost, apiDelete } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
+import { providerTitle } from './decide-providers.js';
 
 const shortDay = (iso) => String(iso ?? '').slice(0, 10);
 const money = (usd) => `$${Number(usd || 0) < 1 ? Number(usd || 0).toFixed(4) : Number(usd || 0).toFixed(2)}`;
 const EMPTY_Q = { id: '', type: 'noul', instructions: '', criteriaText: '', threshold: '' };
-const EMPTY = { id: '', title: '', decides: '', sendsText: '', use: 'both', gate: false, questions: [{ ...EMPTY_Q }], act: '', ask: '', sampleText: '' };
+const EMPTY = { id: '', title: '', decides: '', sendsText: '', use: 'both', gate: false, questions: [{ ...EMPTY_Q }], act: '', ask: '', sampleText: '', provider: '' };
 
 /** Options or levels as the editor shows them: one per line, `option: meaning` for a choice. */
 function criteriaToText(q) {
@@ -68,6 +71,7 @@ export function fromRule(rule) {
     })),
     act: String(rule.bands?.act ?? ''), ask: String(rule.bands?.ask ?? ''),
     sampleText: rule.sample === null || rule.sample === undefined ? '' : JSON.stringify(rule.sample, null, 2),
+    provider: rule.provider || '',
   };
 }
 
@@ -88,10 +92,12 @@ export function toRule(d) {
     sends: d.sendsText.split(',').map(s => s.trim()).filter(Boolean),
     questions, thresholds, bands: { act: Number(d.act), ask: Number(d.ask) },
     use: d.use, gate: !!d.gate, sample,
+    // Empty is "whoever the caller would get": the agent's, the owner's default, the server's.
+    ...(d.provider ? { provider: d.provider } : {}),
   };
 }
 
-function RuleEditor({ draft, isNew, busy, onChange, onSave, onCancel }) {
+function RuleEditor({ draft, isNew, busy, providers, onChange, onSave, onCancel }) {
   const set = (k, v) => onChange({ ...draft, [k]: v });
   const setQ = (i, k, v) => onChange({ ...draft, questions: draft.questions.map((q, n) => (n === i ? { ...q, [k]: v } : q)) });
   return html`
@@ -156,6 +162,13 @@ function RuleEditor({ draft, isNew, busy, onChange, onSave, onCancel }) {
           <option value="agent">${t('decideRules.use.agent')}</option>
           <option value="app">${t('decideRules.use.app')}</option>
         </select></label>
+      ${providers && (providers.providers || []).length > 0 && html`
+        <label class="pf-dr-field"><span>${t('decideRules.f.provider')}</span>
+          <select class="og-input" value=${draft.provider} disabled=${busy} onChange=${e => set('provider', e.currentTarget.value)}>
+            <option value="">${t('decideRules.provider.any')}</option>
+            ${providers.providers.map(p => html`<option key=${p.id} value=${p.id}>${p.title}</option>`)}
+          </select></label>
+        <p class="pf-aitr-note">${t('decideRules.providerHelp')}</p>`}
       <label class="pf-dr-check">
         <input type="checkbox" class="checkbox checkbox-sm" checked=${draft.gate} disabled=${busy}
                onChange=${() => set('gate', !draft.gate)} />
@@ -173,7 +186,7 @@ function RuleEditor({ draft, isNew, busy, onChange, onSave, onCancel }) {
     </div>`;
 }
 
-export function DecideRules({ available }) {
+export function DecideRules({ available, providers }) {
   const [data, setData] = useState(null);
   const [draft, setDraft] = useState(null);
   const [isNew, setIsNew] = useState(false);
@@ -274,7 +287,7 @@ export function DecideRules({ available }) {
               <span class="pf-aitr-row-main">${r.title}</span>
               <span class="pf-aitr-row-meta">${t('decideRules.decidesLine', { what: r.decides })}</span>
               <span class="pf-aitr-row-meta">
-                ${t(`decideRules.use.${r.use}`)} · ${r.gate ? t('decideRules.isGate') : t('decideRules.notGate')} · v${r.version}
+                ${t(`decideRules.use.${r.use}`)} · ${r.gate ? t('decideRules.isGate') : t('decideRules.notGate')} · v${r.version}${r.provider ? ` · ${t('decideRules.runsOn', { provider: providerTitle(providers, r.provider) })}` : ''}
               </span>
               <span class="pf-aitr-row-meta">
                 ${t('decideRules.quality', {
@@ -312,7 +325,7 @@ export function DecideRules({ available }) {
           <button type="button" class="og-door" disabled=${busy} onClick=${() => { setIsNew(true); setDraft({ ...EMPTY, questions: [{ ...EMPTY_Q }] }); }}>
             ${t('decideRules.new')}</button>
         </div>`}
-      ${draft && html`<${RuleEditor} draft=${draft} isNew=${isNew} busy=${busy} onChange=${setDraft} onSave=${save} onCancel=${() => setDraft(null)} />`}
+      ${draft && html`<${RuleEditor} draft=${draft} isNew=${isNew} busy=${busy} providers=${providers} onChange=${setDraft} onSave=${save} onCancel=${() => setDraft(null)} />`}
     </div>`;
 }
 
