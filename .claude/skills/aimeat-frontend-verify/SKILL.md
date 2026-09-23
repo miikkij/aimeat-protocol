@@ -13,6 +13,25 @@ Against your own sandbox node (`pnpm sandbox`, port 40600 upward, owners and pas
 
 If you could not drive the browser (MCP unavailable, server down, no credentials), say so. Do not report it as working.
 
+## A change that must keep the look is judged against the original
+
+A refactor, a move to shared components or a style unification promises that the page looks the
+same. Its criterion is **no visible difference from the original**, and nothing weaker:
+
+1. Run the code from before the change beside the new code, on the same data (a second sandbox from
+   the old commit, or the old commit's screenshots taken on the data the new ones use). Prefer data
+   as full as production's: long lists, long chats, tables in answers. The sandbox's two apps hide
+   what dense rows do.
+2. Compare each page side by side at 1280x900, 390x844 and 1280x460, light and dark.
+3. **List every visible difference** with its before and after crop. The builder does not label a
+   difference as acceptable ("unification", "the part's standard look"); the list goes to Jouni, and a
+   difference stays only if he approved it by name. Everything else is fixed until it is gone.
+4. Show him **one finished page first**, on real data, before the other pages start.
+
+Zero overflow, zero console errors, a green gate and green CI say nothing about whether a page looks
+the same; they are floors. On 2026-09-23 nine hours of work were rolled back (`cee2cbaf5`) because
+every one of those was green and the pages looked different. → `docs/pitfalls.md` §94
+
 ## Measure, don't glance
 
 Mandatory when the surface has a dialog or overlay, or reads live data. A clean console, compiling JS and one screenshot at one size are proxies, and proxies generalise badly: an overlay verified only at 390px shipped rendering below the footer on desktop, and an app reported as "0 console errors" was repainting its open dialog every second.

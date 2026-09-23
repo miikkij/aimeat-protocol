@@ -187,9 +187,9 @@ dimensions. It does not re-declare the shape's font, rule, fill, padding or shad
 
 Only page and section headline sizes take per-view properties: `--poster-page-size` and
 `--poster-section-size`, set on the view root. A deviating cut becomes a shared modifier only
-when at least two pages use it or the design language can name its role. A one-page cut folds
-into the canonical value. Record that normalization in the wish's notes with the page, old
-value, new value and before/after screenshots. This visual change is permitted by brief 10.7.
+when at least two pages use it or the design language can name its role. A one-page cut stays
+as it is unless Jouni approves folding it into the canonical value by name; a shared part is
+extracted from the pages as they look now, with their values, never designed anew.
 Modifiers name a role or size, never a page. Each shape has at most two size modifiers,
 `--small` and `--large`; a third size raises a shape question in the notes and does not create
 another modifier. A view never re-declares a modifier's values.
@@ -217,8 +217,9 @@ Run `pnpm check:poster-shapes` from `aimeat/`. It scans view and component sheet
 any new per-file pattern count. `pnpm debt` shows the remaining copies. Lower the baseline after
 a migration; `--record` requires an explicit decision to forgive debt. A green gate proves no
 new copies, not that the remaining baseline is zero. Verify migrations at all three viewports
-in both themes; permitted differences are B1 headline/panel reflow and documented single-page
-normalizations under brief 10.7.
+in both themes against the original page, side by side on the same data: a migration passes only
+with no visible difference, and any difference goes on a list for Jouni's approval before it stays
+(rolled back 2026-09-23 when "unification" was allowed to excuse differences; `docs/pitfalls.md` §94).
 
 ### The kit an app is built from has its own contract
 
