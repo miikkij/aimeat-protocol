@@ -551,8 +551,16 @@ def test_a_direct_log_can_be_pushed_to_a_node_afterwards(live: Live, answers, tm
     out = decide_mod.push_direct_log(**live.kw)
     assert out["pushed"] == 1
 
-    r = requests.get(f"{live.base}/v1/memory/agents.{AGENT}.decide.direct-log",
-                     headers={"Authorization": f"Bearer {live.agent_token}"}, timeout=20).json()
+    # ONE KEY PER DAY since 2026-09-20, with an index beside them: a memory value holds 1024 kB, and
+    # one key for the whole history met that ceiling on a long run. The index names the days held.
+    head = {"Authorization": f"Bearer {live.agent_token}"}
+    idx = requests.get(f"{live.base}/v1/memory/agents.{AGENT}.decide.direct-log.__index",
+                       headers=head, timeout=20).json()
+    days = list((idx["data"]["value"]["days"] or {}).keys())
+    assert len(days) == 1, f"one day was pushed, the index holds {days}"
+
+    r = requests.get(f"{live.base}/v1/memory/agents.{AGENT}.decide.direct-log.{days[0]}",
+                     headers=head, timeout=20).json()
     value = json.dumps(r["data"])
     assert "aimeat.decision-log/v1-direct" in value
     # It must NOT read as a row on the decision register: the owner's quality numbers would then
