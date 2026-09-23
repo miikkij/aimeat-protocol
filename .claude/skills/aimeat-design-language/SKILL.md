@@ -173,11 +173,11 @@ dimensions. It does not re-declare the shape's font, rule, fill, padding or shad
 | Area governed by the selected tab | `.poster-panel` |
 | Hairline row; row that is the thing | `.poster-row`; `.poster-row--thing` |
 | Small coral label | `.poster-label` (also the prompt card's label; Jouni's decision "Row label") |
-| Underlined action | `.poster-action` |
-| Tab and selected tab | `.poster-tab`, `.poster-tab.is-on` |
+| Underlined action, and its tones | `.poster-action`; `--more` ("Show all"), `--quiet` (a side column action), `--back` (the way back), `--text` (Listen, Copy under a message) (Jouni's decision "Action link") |
+| Tab and selected tab, and the fold tab | `.poster-tab`, `.poster-tab.is-on`; `.poster-tab--fold` (a small switch in a row, "Recent / Mine") (Jouni's decision "Tabs and filters") |
 | Loud action and the home's large door | `.poster-slab`, `.poster-slab--large`; composed over `.btn-primary` for the one big button on the home and the chat (Jouni's decision "Loud action") |
-| Box; frame; opened record | `.poster-box`; `.poster-frame`; `.poster-record` (the dialog is the site's own Modal; `.poster-dialog` was deleted on 2026-09-23) |
-| Dashed coral aside | `.poster-aside` |
+| Box; frame; opened record | `.poster-box` with the tones `--copy` (a text to copy, on grey: the prompt card) and `--row` (one result in a list) (Jouni's decision "Object box"); `.poster-frame`; `.poster-record` (the dialog is the site's own Modal; `.poster-dialog` was deleted on 2026-09-23) |
+| Dashed coral aside | `.poster-aside` with the tones `--waiting` (the next move is elsewhere) and `--suggestion` (a line to wave away) (Jouni's decision "Attention note") |
 | Mono chip; crumb | `.poster-chip` (a candidate in the design lab's chip decision; not in use until Jouni decides); `.poster-crumb` |
 | Small number: waiting (on coral), tally (no ground), small (on an icon) | `.poster-count`, `--waiting`, `--tally`, `--small` (Jouni's decision "Count"; the bell and the open items use it; the morsel badge stays its own) |
 | When a thing happened | `.poster-time` (Jouni's decision "Timestamp"; the chat's message time and the home timeline) |
