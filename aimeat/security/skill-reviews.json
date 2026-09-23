@@ -52,10 +52,10 @@
     "node:aimeat-offering-choices": {
       "reviewedOn": "2026-09-23",
       "watches": [
-        "aimeat/public/views/chat/parts.js"
+        "aimeat/public/components/Suggestion.js"
       ],
-      "digest": "sha256:6f07955da3df7d543f5e3b5b",
-      "note": "The choices format is rendered by this file."
+      "digest": "sha256:20fd9d70c5ffcd40d470a074",
+      "note": "The choices format is parsed and drawn by this file (moved from views/chat/parts.js on 2026-09-23)."
     },
     "node:aimeat-paying-for-the-ai": {
       "reviewedOn": "2026-09-20",
@@ -294,7 +294,7 @@
         "aimeat/public/css/poster.css",
         "aimeat/public/lib/aimeat-fonts.css"
       ],
-      "digest": "sha256:5e47fe55cd796d495a06d115"
+      "digest": "sha256:d4a1f90a279a1ab71b6c1ea3"
     },
     "project:aimeat-frontend-verify": {
       "reviewedOn": "2026-09-20",
@@ -360,7 +360,7 @@
     },
     "node:aimeat-activating-a-person": {},
     "node:aimeat-offering-choices": {
-      "aimeat/public/views/chat/parts.js": "e8d4e68f2798bc9e"
+      "aimeat/public/components/Suggestion.js": "bb8a748aaf7b0bc3"
     },
     "node:aimeat-paying-for-the-ai": {
       "aimeat/src/services/ai-completion.ts": "81e90001f1305d31"
@@ -491,7 +491,7 @@
     },
     "project:aimeat-design-language": {
       "aimeat/public/css/theme.css": "658d30b66d70540f",
-      "aimeat/public/css/poster.css": "57f80125b37cd641",
+      "aimeat/public/css/poster.css": "73a8c35e4067bbb9",
       "aimeat/public/lib/aimeat-fonts.css": "213a6ac05c5b8cce"
     },
     "project:aimeat-frontend-verify": {

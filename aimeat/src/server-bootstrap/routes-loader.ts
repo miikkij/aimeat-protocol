@@ -9,6 +9,7 @@
  *   - mountRoutes(): async entrypoint that registers routers + middleware in the correct order
  *
  * @version-history
+ *   v1.18.0 — 2026-09-23 — Mounts uiComponentsRouter (/v1/ui/components, public and read-only).
  *   v1.17.1 — 2026-09-16 — stripePaymentHandler(config): the handler opens the sealed Stripe key.
  *   v1.17.0 — 2026-09-16 — Mounts mcpServersRouter (/v1/mcp-servers: the remote MCP servers this
  *     node connects OUT to). To make room, pure extraction of the node robots.txt handler to
@@ -158,6 +159,7 @@ import { libsRouter } from '../routes/libs.js';
 import { appTemplatesRouter } from '../routes/app-templates.js';
 import { appUiRouter } from '../routes/app-ui.js';
 import { designbookRouter } from '../routes/designbook.js';
+import { uiComponentsRouter } from '../routes/ui-components.js';
 import { appdevPitfallsRouter } from '../routes/appdev-pitfalls.js';
 import { appdevOverviewRouter } from '../routes/appdev-overview.js';
 import { dependenciesRouter } from '../routes/dependencies.js';
@@ -704,6 +706,7 @@ export async function mountRoutes(
   app.use(appTemplatesRouter(config, storage));
   app.use(appUiRouter(config, storage));
   app.use(designbookRouter(config, storage));
+  app.use(uiComponentsRouter(config));
   app.use(appdevPitfallsRouter(config, storage));
   app.use(appdevOverviewRouter(config, storage));
   app.use(dependenciesRouter(config, storage));

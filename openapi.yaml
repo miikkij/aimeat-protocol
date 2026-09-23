@@ -26445,6 +26445,122 @@ paths:
         '404': { description: No such stored version }
         '422': { description: The archived layout no longer validates against the registry }
 
+  /v1/ui/components:
+    get:
+      operationId: listUiComponents
+      summary: The parts this node's own interface is built from
+      description: >-
+        The component catalogue of this node's own web interface. Each row is a component (a module
+        in /components/ with its own stylesheet in /css/components/) or a shape of the design
+        language (a class in /css/poster.css), with its data shape and the pages that draw it.
+        `unused` marks a part whose sheet no page draws today. PUBLIC and read-only: it describes
+        code the node ships to every browser. The same catalogue answers aimeat_ui_component_list.
+      tags: [Bootstrap]
+      security: []
+      parameters:
+        - name: kind
+          in: query
+          schema: { type: string, enum: [component, shape] }
+        - name: status
+          in: query
+          schema: { type: string, enum: [active, unused] }
+        - name: q
+          in: query
+          description: Words to find in the name, summary, use or classes; every word must match.
+          schema: { type: string, maxLength: 200 }
+      responses:
+        '200':
+          description: The catalogue rows
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          components:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id: { type: string }
+                                name: { type: string }
+                                kind: { type: string, enum: [component, shape] }
+                                status: { type: string, enum: [active, unused] }
+                                summary: { type: string }
+                                module: { type: string, nullable: true }
+                                sheet: { type: string }
+                                shape: { type: string, description: The call, as a person would write it }
+                                pages: { type: array, items: { type: string } }
+                          total: { type: integer }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /v1/ui/components/{id}:
+    get:
+      operationId: getUiComponent
+      summary: One part of this node's own interface, whole
+      description: >-
+        One catalogue entry: its data shape and fields, when to use it, its variants and the class
+        or prop that selects each, one example data set, the theme tokens its stylesheet reads, the
+        names its module exports, and the files and pages that use it. `id` is the entry id
+        (`step-card`) or the component name (`StepCard`). PUBLIC and read-only. The same entry
+        answers aimeat_ui_component_get.
+      tags: [Bootstrap]
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: The entry
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          id: { type: string }
+                          name: { type: string }
+                          kind: { type: string, enum: [component, shape] }
+                          status: { type: string, enum: [active, unused] }
+                          summary: { type: string }
+                          module: { type: string, nullable: true }
+                          sheet: { type: string }
+                          data:
+                            type: object
+                            properties:
+                              shape: { type: string }
+                              fields: { type: object, additionalProperties: { type: string } }
+                          use: { type: array, items: { type: string } }
+                          variants:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                name: { type: string }
+                                class: { type: string }
+                                prop: { type: string }
+                                when: { type: string }
+                          example: { type: object, additionalProperties: true }
+                          note: { type: string }
+                          classes: { type: array, items: { type: string } }
+                          tokens: { type: array, items: { type: string } }
+                          exports: { type: array, items: { type: string } }
+                          usedBy: { type: array, items: { type: string } }
+                          pages: { type: array, items: { type: string } }
+        '404':
+          $ref: '#/components/responses/NotFound'
+
   /v1/designbook:
     get:
       operationId: listDesignbookParts

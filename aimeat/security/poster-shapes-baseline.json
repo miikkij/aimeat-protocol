@@ -18,6 +18,31 @@
     }
   },
   "files": {
+    "public/css/components/agent-card.css": { "headline": 1 },
+    "public/css/components/archive.css": { "headline": 1, "rule": 1 },
+    "public/css/components/check-item.css": { "sun": 1, "box2": 1 },
+    "public/css/components/chooser.css": { "box2": 1 },
+    "public/css/components/composer.css": { "action": 1, "sun": 1, "box2": 2 },
+    "public/css/components/conversation-frame.css": { "headline": 3, "rule": 1, "action": 1, "sun": 2, "box2": 1, "slab": 1 },
+    "public/css/components/day-group.css": { "action": 1, "label": 1 },
+    "public/css/components/diagonal-band.css": { "headline": 1, "sun": 1 },
+    "public/css/components/fold-button.css": { "sun": 1 },
+    "public/css/components/masthead.css": { "headline": 1 },
+    "public/css/components/numbered-index.css": { "headline": 1, "rule": 1, "sun": 1 },
+    "public/css/components/open-items.css": { "headline": 1, "rule": 1 },
+    "public/css/components/page-intro.css": { "headline": 1 },
+    "public/css/components/paste-box.css": { "box2": 1 },
+    "public/css/components/prompt-card.css": { "box2": 1, "label": 1 },
+    "public/css/components/result-card.css": { "box2": 1 },
+    "public/css/components/stat-line.css": { "box2": 1 },
+    "public/css/components/step-card.css": { "headline": 1, "sun": 2, "record": 1 },
+    "public/css/components/suggestion.css": { "action": 1 },
+    "public/css/components/swatch-picker.css": { "sun": 1, "box2": 2 },
+    "public/css/components/text-input.css": { "box2": 1 },
+    "public/css/components/thing-link.css": { "headline": 1 },
+    "public/css/components/thread-list.css": { "sun": 1 },
+    "public/css/components/timeline.css": { "rule": 1, "sun": 1 },
+    "public/css/components/turn.css": { "sun": 1, "box2": 1 },
     "public/css/views/access-poster.css": {
       "sun": 2,
       "box2": 2,
@@ -252,14 +277,6 @@
       "box2": 2,
       "frame3": 2
     },
-    "public/css/views/chat.css": {
-      "headline": 3,
-      "rule": 1,
-      "action": 4,
-      "sun": 5,
-      "box2": 6,
-      "slab": 2
-    },
     "public/css/views/companies-poster.css": {
       "sun": 1,
       "box2": 1,
@@ -292,19 +309,6 @@
     "public/css/views/help.css": {
       "sun": 2,
       "frame3": 2
-    },
-    "public/css/views/home-journey.css": {
-      "box2": 1
-    },
-    "public/css/views/home.css": {
-      "headline": 11,
-      "rule": 4,
-      "action": 1,
-      "sun": 8,
-      "box2": 7,
-      "frame3": 1,
-      "record": 2,
-      "label": 2
     },
     "public/css/views/inbox-poster.css": {
       "headline": 1,
@@ -420,9 +424,6 @@
       "sun": 2,
       "box2": 1,
       "record": 1
-    },
-    "public/css/views/surface.css": {
-      "headline": 1
     },
     "public/css/views/wallet-poster.css": {
       "headline": 3,

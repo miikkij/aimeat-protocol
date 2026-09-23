@@ -8,6 +8,8 @@
  * @usage
  *   import { appTools } from './tool-call-defs-apps.js';
  * @version-history
+ *   v1.10.0 -- 2026-09-23 -- aimeat_ui_component_list and aimeat_ui_component_get: the component
+ *     catalogue of the node's own interface, the third door beside the two MCP ones.
  *   v1.9.0 -- 2026-09-19 -- aimeat_designbook_search given nothing asks the route for its map view,
  *     as the two MCP doors do.
  *   v1.8.0 -- 2026-09-13 -- aimeat_extension_install and aimeat_cortex_install take the YAML manifest
@@ -516,6 +518,17 @@ export const appTools: ConnectCliToolDefinition[] = [
             ...(input.ai_provenance ? { ai_provenance: input.ai_provenance } : {}),
             ...(input.ai_provenance_id ? { ai_provenance_id: input.ai_provenance_id } : {}),
         }),
+    },
+    // ── The component catalogue of the node's own interface. Public and read-only. ──
+    {
+        name: 'aimeat_ui_component_list',
+        handler: ({ client }, input) => client.get(`/v1/ui/components${query({
+            kind: optionalString(input, 'kind'), status: optionalString(input, 'status'), q: optionalString(input, 'q'),
+        })}`),
+    },
+    {
+        name: 'aimeat_ui_component_get',
+        handler: ({ client }, input) => client.get(`/v1/ui/components/${encodeURIComponent(requiredString(input, 'id'))}`),
     },
     // ── App drafts (staging): edit + test the next version without touching the live app ──
     {
