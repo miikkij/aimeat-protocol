@@ -42,14 +42,14 @@
 }
 .poster-thread-title {
   font-size: 0.86rem;
-  font-weight: 800;
+  font-weight: var(--weight-heavy);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .poster-thread-sub {
   font-family: var(--font-mono);
-  font-size: 0.68rem;
+  font-size: var(--text-2xs);
   color: var(--text-dim);
 }
 .poster-thread-del {
@@ -57,7 +57,7 @@
   padding: 4px 8px;
   opacity: 0;
   transition: opacity 0.15s;
-  background: none; border: 0; box-shadow: none; color: var(--text); font-weight: 800; cursor: pointer;
+  background: none; border: 0; box-shadow: none; color: var(--text); font-weight: var(--weight-heavy); cursor: pointer;
 }
 .poster-thread:hover .poster-thread-del, .poster-thread--active .poster-thread-del { opacity: 1; }
 /* ── Words on the sun stay ink in every theme (moved from profile-poster.css, same selectors) ── */

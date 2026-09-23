@@ -43,7 +43,7 @@
 
 .vr-time {
   font-variant-numeric: tabular-nums;
-  font-size: 13px; font-weight: 600; min-width: 3.2em;
+  font-size: 13px; font-weight: var(--weight-semibold); min-width: 3.2em;
 }
 .vr-time--near { color: var(--danger); }
 

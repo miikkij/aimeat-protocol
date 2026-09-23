@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The margin pattern's one switch: reads the person's choice from their home.prefs
- *   record and writes it onto <html data-margin-pattern="a".."h">, which css/margin-pattern.css
+ *   record and writes it onto <html data-margin-pattern="a".."h">, which css/components/margin-pattern.css
  *   turns into the strips on the home, the chat and the settings pages. No attribute, no strips.
  *   The shell calls load() once the session is known and again on every sign-in change; the home
  *   settings dialog calls apply() the moment a choice is made, so the page answers before the

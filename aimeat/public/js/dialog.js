@@ -5,7 +5,7 @@
  * @description How every dialog on the site behaves, on the browser's own <dialog> element. One
  *   module for the SPA (components/Modal.js wraps it) and for the app catalog (bundled into its
  *   page), so a dialog closes, keeps a half-written form and returns focus the same way everywhere.
- *   The look is public/css/dialog.css; this file is only behaviour and has no framework in it.
+ *   The look is public/css/components/dialog.css; this file is only behaviour and has no framework in it.
  *
  *   What the browser gives by opening with showModal(): the top layer (no z-index or stacking
  *   context can put a dialog under the site bar), an inert page behind it, focus moved in and

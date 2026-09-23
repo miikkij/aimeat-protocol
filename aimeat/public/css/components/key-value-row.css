@@ -1,0 +1,47 @@
+/**
+ * @file key-value-row.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The key and value row: one named fact on a line.
+ *   Reads only the tokens in theme.css. The rules are theme.css's, moved unchanged and in order.
+ * @usage Linked from public/spa.html right after theme.css, in the order theme.css held these rules
+ *   (the shell block), and from every standalone page that links theme.css.
+ * @version-history
+ *   v1.0.0 — 2026-09-24 — Moved unchanged from css/theme.css (lines 1354-1387), so theme.css
+ *     holds tokens only (UI consolidation, a move).
+ */
+
+/* ── Key/value detail row (canonical) ──
+   Backed by /components/KeyValueRow.js. A label/value pair laid out flex
+   space-between: muted label on the left, emphasized value on the right,
+   separated by a subtle bottom border (none on the last row). Consolidates the
+   common label+value-pair shape (admin .adm-erow / .adm-hrow, profile
+   .pf-agd-info-row). All colors are theme tokens so it flips correctly in dark
+   mode. `.kv-value.mono` renders the value in the monospace font (ids, hashes,
+   amounts). The existing per-view classes are intentionally left in place where
+   their look differs. */
+.kv-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: 0.84rem;
+}
+.kv-row:last-child { border-bottom: none; }
+.kv-label {
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+.kv-value {
+  color: var(--text);
+  font-weight: var(--weight-semibold);
+  text-align: right;
+  word-break: break-word;
+}
+.kv-value.mono {
+  font-family: var(--font-mono);
+  font-size: 0.81rem;
+}
+

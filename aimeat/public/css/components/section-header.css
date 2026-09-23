@@ -1,0 +1,28 @@
+/**
+ * @file section-header.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The classic section and page headers: a title with its supporting line.
+ *   Reads only the tokens in theme.css. The rules are theme.css's, moved unchanged and in order.
+ * @usage Linked from public/spa.html right after theme.css, in the order theme.css held these rules
+ *   (the shell block), and from every standalone page that links theme.css.
+ * @version-history
+ *   v1.0.0 — 2026-09-24 — Moved unchanged from css/theme.css (lines 1766-1780), so theme.css
+ *     holds tokens only (UI consolidation, a move).
+ */
+
+/* ── Section & page headers (canonical title + subtitle pairs) ──
+   Single source of truth for the "title + supporting copy" header that every
+   view re-implements. Use .section-title/.section-desc for in-page section
+   headers (accent title) and .page-title/.page-subtitle for top-of-view page
+   headers (gradient title). All values are theme tokens so they flip with
+   dark/light mode. Per-view clones (mk-/hb-/cl-/adm-page-title) are
+   token-equivalent and should converge onto these over time. */
+.section-title { font-size: 1.15rem; font-weight: var(--weight-bold); margin-bottom: 0.4rem; color: var(--accent); }
+.section-desc { color: var(--text-dim); font-size: var(--text-note); margin-bottom: 1.25rem; line-height: 1.5; max-width: 700px; }
+.page-title {
+  font-size: 1.8rem; font-weight: var(--weight-bold); margin-bottom: 8px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-deep));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+}
+.page-subtitle { color: var(--text-dim); font-size: var(--text-md); margin-bottom: 32px; }

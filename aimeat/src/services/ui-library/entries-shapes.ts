@@ -13,7 +13,7 @@
  *     the chip kept as a candidate for the design lab's first decision.
  *   v1.0.0 — 2026-09-23 — Initial (UI consolidation phase 1).
  */
-import type { UiEntrySource, UiVariant } from './types.js';
+import type { UiEntryWritten, UiVariant } from './types.js';
 
 /**
  * In poster.css, put on nothing by any page today (checked 2026-09-23). On Jouni's keep-or-delete
@@ -23,17 +23,17 @@ const UNUSED_SHAPES = new Set(['chip']);
 const UNUSED_NOTE = 'Added to poster.css in e543a9d61 (2026-09-13) with no page using it; only the rolled-back unification of 2026-09-22/23 put it on markup. Kept by Jouni on 2026-09-23 as a candidate in the design lab\'s first decision: the one chip for a small tag, badge, count or status word. Not to be put into use before that decision.';
 
 /** Every shape has the same frame; only what it is and how it is cut differ. */
-function shape(id: string, name: string, classes: string[], markup: string, summary: string, use: string, variants: UiVariant[] = []): UiEntrySource {
+function shape(id: string, name: string, classes: string[], markup: string, summary: string, useFor: string, variants: UiVariant[] = []): UiEntryWritten {
     return {
         id, name, kind: 'shape', status: UNUSED_SHAPES.has(id) ? 'unused' : 'active', summary,
         module: null, sheet: '/css/poster.css', classes,
         data: { shape: markup, fields: { children: 'what the element holds' } },
-        use: [use], variants, example: { markup },
+        useFor: [useFor], variants, example: { markup },
         ...(UNUSED_SHAPES.has(id) ? { note: UNUSED_NOTE } : {}),
     };
 }
 
-export const SHAPE_ENTRIES: UiEntrySource[] = [
+export const SHAPE_ENTRIES: UiEntryWritten[] = [
     shape('page-title', 'Page title', ['poster-page-title'], '<h1 class="poster-page-title">…</h1>',
         'A page\'s own headline in the poster face, in capitals.', 'The one headline of a profile or admin page.'),
     shape('section', 'Section title', ['poster-section', 'poster-section-title', 'poster-section-title--large'],

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description The site's one dialog component (Preact + HTM), on the browser's own <dialog>:
  *   a header with the title and, unless turned off, the X; a body that is the only part to scroll;
- *   a footer for the actions. The look is /css/dialog.css, the closing rules /js/dialog.js, and the
+ *   a footer for the actions. The look is /css/components/dialog.css, the closing rules /js/dialog.js, and the
  *   app catalog uses those same two files, so a dialog reads and behaves the same on every page.
  * @structure
  *   - Modal: a dialog with header, body and optional footer

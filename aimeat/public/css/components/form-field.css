@@ -1,0 +1,45 @@
+/**
+ * @file form-field.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description Form fields of the classic shell: the input, the textarea and the select, the form group, its label and its hint.
+ *   Reads only the tokens in theme.css. The rules are theme.css's, moved unchanged and in order.
+ * @usage Linked from public/spa.html right after theme.css, in the order theme.css held these rules
+ *   (the shell block), and from every standalone page that links theme.css.
+ * @version-history
+ *   v1.0.0 — 2026-09-24 — Moved unchanged from css/theme.css (lines 1507-1533, 1758-1761), so theme.css
+ *     holds tokens only (UI consolidation, a move).
+ */
+
+/* ── Inputs ── */
+.input-field {
+  width: 100%;
+  padding: 11px 14px;
+  background: var(--control-bg);
+  border: 1.5px solid var(--control-border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 0.94rem;
+  outline: none;
+  transition: all 0.15s;
+}
+
+.input-field::placeholder { color: var(--text-muted); }
+
+.input-field:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-subtle);
+  background: var(--bg-input-focus);
+}
+
+/* Textarea + select behavior so .input-field works on all field types (lets views
+   drop per-view form-input/textarea/select clones). */
+textarea.input-field { resize: vertical; min-height: 80px; }
+select.input-field { cursor: pointer; }
+
+
+/* ── Form Group ── */
+.form-group { margin-bottom: 1rem; }
+.form-label { display: block; font-size: var(--text-caption); font-weight: var(--weight-semibold); color: var(--text-dim); margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.5px; }
+.form-hint { display: block; font-size: var(--text-xs); color: var(--text-muted); margin-top: 0.25rem; }

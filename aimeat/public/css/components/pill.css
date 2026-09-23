@@ -1,0 +1,37 @@
+/**
+ * @file pill.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The pill: the rounded shape primitive of the classic shell.
+ *   Reads only the tokens in theme.css. The rules are theme.css's, moved unchanged and in order.
+ * @usage Linked from public/spa.html right after theme.css, in the order theme.css held these rules
+ *   (the shell block), and from every standalone page that links theme.css.
+ * @version-history
+ *   v1.0.0 — 2026-09-24 — Moved unchanged from css/theme.css (lines 1240-1263), so theme.css
+ *     holds tokens only (UI consolidation, a move).
+ */
+
+/* ── Pill (canonical shape primitive) ──
+   The common pill-chip *shape* only — no colors. Small inline-flex chip with
+   pill radius, compact padding, small bold text, pointer cursor and a soft
+   opacity hover. Colors are supplied by the caller's own tint classes (e.g.
+   .vis-public / .vis-private) so this base stays theme-neutral. Matches the
+   shape the profile visibility pill (.vis-pill) already used. New pill-shaped
+   chips should build on this base + a tint class instead of re-declaring the
+   shape. Note: the profile pills are styled via the higher-specificity
+   `.pf .vis-pill`, which keeps its own shape declaration to avoid the
+   scoped-override specificity trap; it now references the same --radius-full
+   token so the two stay in lockstep. */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  border: none;
+  cursor: pointer;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  font-size: 0.7rem;
+  font-weight: var(--weight-semibold);
+  transition: opacity 0.15s;
+}
+.pill:hover { opacity: 0.8; }
+

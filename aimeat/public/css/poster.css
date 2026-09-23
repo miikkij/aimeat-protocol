@@ -50,8 +50,8 @@
 .poster-row { border-block: 1px solid var(--border); padding-block: 1rem; }
 .poster-row--thing { border-top: 3px solid var(--text); }
 .poster-label {
-  font-size: .72rem; color: var(--accent); text-transform: uppercase;
-  letter-spacing: .1em; font-weight: 800; line-height: 1.3;
+  font-size: var(--text-xs); color: var(--accent); text-transform: uppercase;
+  letter-spacing: .1em; font-weight: var(--weight-heavy); line-height: 1.3;
 }
 
 /* Lifted from the home's ink-underlined action (formerly home.css .koti-link), including the unselected tab. */
@@ -59,7 +59,7 @@
   display: inline-flex; align-items: center; gap: .4rem;
   background: none; border: 0; border-bottom: 3px solid var(--text); border-radius: 0;
   padding: 0 0 2px; cursor: pointer;
-  font: inherit; font-weight: 800; font-size: .9rem; text-transform: uppercase; letter-spacing: .04em;
+  font: inherit; font-weight: var(--weight-heavy); font-size: var(--text-body-sm); text-transform: uppercase; letter-spacing: .04em;
   color: var(--text); text-decoration: none; white-space: nowrap;
 }
 .poster-action:hover, .poster-tab:hover { border-color: var(--accent); color: var(--accent); }
@@ -72,7 +72,7 @@
    .poster-back's look); text: a plain word under a chat message (Listen, Copy; formerly .btn-ghost). */
 .poster-action--more {
   display: inline-block; padding: .2rem 0; border: 0;
-  font-family: var(--font-mono); font-weight: 400; font-size: .8rem; line-height: normal; text-transform: none; letter-spacing: normal;
+  font-family: var(--font-mono); font-weight: var(--weight-regular); font-size: var(--text-small); line-height: normal; text-transform: none; letter-spacing: normal;
   color: var(--accent); text-decoration: underline; text-underline-offset: 4px; white-space: normal;
 }
 .poster-action--more:hover { color: var(--text); }
@@ -80,11 +80,11 @@
 .poster-action--quiet.copied { color: var(--success-fg); border-color: var(--success-fg); }
 .poster-action--back {
   display: inline-block; padding: 0; border: 0;
-  font-family: var(--font-mono); font-weight: 400; font-size: .85rem; text-transform: none; letter-spacing: normal;
+  font-family: var(--font-mono); font-weight: var(--weight-regular); font-size: var(--text-note); text-transform: none; letter-spacing: normal;
   color: var(--accent); white-space: normal;
 }
 .poster-action--back:hover { color: var(--text); }
-.poster-action--text { padding: 0 6px; border: 0; gap: .35rem; font-family: var(--font-body); font-weight: 500; font-size: .7rem; line-height: normal; text-transform: none; letter-spacing: normal; color: var(--text-dim); }
+.poster-action--text { padding: 0 6px; border: 0; gap: .35rem; font-family: var(--font-body); font-weight: var(--weight-medium); font-size: .7rem; line-height: normal; text-transform: none; letter-spacing: normal; color: var(--text-dim); }
 .poster-action--text:hover { color: var(--text); }
 .poster-action--text.copied { color: var(--success-fg); }
 /* The tab's fold tone (Jouni's decision "Tabs and filters"): the home's switch ("Recent", "Mine";
@@ -92,7 +92,7 @@
    .poster-tab.is-on above. */
 .poster-tab--fold {
   display: inline-block; padding: .2rem 0; border: 0;
-  font-family: var(--font-mono); font-weight: 400; font-size: .8rem; line-height: normal; text-transform: none; letter-spacing: normal;
+  font-family: var(--font-mono); font-weight: var(--weight-regular); font-size: var(--text-small); line-height: normal; text-transform: none; letter-spacing: normal;
   color: var(--accent); text-decoration: underline; text-underline-offset: 4px; white-space: normal;
 }
 .poster-tab--fold:hover { color: var(--text); }
@@ -102,19 +102,22 @@
   background: var(--text); color: var(--bg);
   border: 0; border-radius: 0; box-shadow: 4px 4px 0 var(--sun);
   padding: 10px 16px;
-  font-family: var(--font-showroom-body); font-weight: var(--font-poster-strong-weight); font-size: .8rem;
-  text-transform: uppercase; letter-spacing: .04em; text-decoration: none;
+  font-family: var(--font-showroom-body); font-weight: var(--font-poster-strong-weight); font-size: var(--text-small);
+  text-transform: uppercase; letter-spacing: .04em; text-decoration: none; cursor: pointer;
   transition: transform 120ms ease, box-shadow 120ms ease;
 }
 .poster-slab:hover { transform: translate(2px, 2px); box-shadow: 2px 2px 0 var(--sun); color: var(--sun); }
-.poster-slab--large { padding: 1.2rem 1.7rem; font-size: 1.02rem; font-weight: 800; box-shadow: 8px 8px 0 var(--sun); }
+/* A copy made from a slab says so in green for a moment (the values .btn-primary.copied gave it
+   while slabs also wore .btn-primary). */
+.poster-slab.copied, .poster-slab.success { background: var(--success-gradient); box-shadow: var(--success-glow); }
+.poster-slab--large { padding: 1.2rem 1.7rem; font-size: 1.02rem; font-weight: var(--weight-heavy); box-shadow: 8px 8px 0 var(--sun); }
 .poster-slab--large:hover { box-shadow: 4px 4px 0 var(--sun); }
 /* The control cut: a 44px button in a row of controls (the chat's New conversation and Send,
    formerly chat.css .chat-new/.chat-send, which carried the base's values and these). */
 .poster-slab--control {
   display: inline-flex; align-items: center; justify-content: center;
   min-height: 44px; padding: 0 16px;
-  font-family: inherit; font-weight: 800; cursor: pointer;
+  font-family: inherit; font-weight: var(--weight-heavy); cursor: pointer;
 }
 .poster-slab--control:disabled { opacity: 0.45; cursor: default; transform: none; }
 
@@ -129,10 +132,10 @@
 .poster-box.poster-box--avatar {
   display: flex; align-items: center; justify-content: center; box-sizing: border-box;
   padding: 0; margin: 0; background: transparent;
-  font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: .95rem;
+  font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: var(--text-body);
   color: var(--text);
 }
-.poster-box--avatar.poster-box--small { font-size: .85rem; }
+.poster-box--avatar.poster-box--small { font-size: var(--text-note); }
 .poster-box--meter { margin: 0; padding: 0; background: var(--bg); }
 .poster-box--meter rect { fill: var(--sun); shape-rendering: crispEdges; }
 .poster-box--meter.poster-box--quota { background: var(--card); }
@@ -144,8 +147,8 @@
    (scheduler-poster.css .sc-choice is the source cut). A sticker: a small sun-ground box with a
    short headline and one door, for the one fact about a thing that must be seen before its name
    is read (the agent's access level, design canvas "Your Agents" header B). */
-.poster-choice { padding: .7rem .8rem; border: 2px solid var(--text); border-radius: 0; background: var(--card-bg); cursor: pointer; text-align: left; font-family: var(--font-showroom-body); font-size: .8rem; line-height: 1.45; color: var(--text-dim); }
-.poster-choice b { display: block; font-weight: 800; font-size: .88rem; color: var(--text); margin-bottom: .2rem; }
+.poster-choice { padding: .7rem .8rem; border: 2px solid var(--text); border-radius: 0; background: var(--card-bg); cursor: pointer; text-align: left; font-family: var(--font-showroom-body); font-size: var(--text-small); line-height: 1.45; color: var(--text-dim); }
+.poster-choice b { display: block; font-weight: var(--weight-heavy); font-size: .88rem; color: var(--text); margin-bottom: .2rem; }
 .poster-choice:hover { border-color: var(--accent); }
 .poster-choice.on { background: var(--sun); color: var(--on-sun); box-shadow: 4px 4px 0 var(--text); }
 .poster-choice.on b { color: var(--on-sun); }
@@ -156,36 +159,36 @@
 /* profile-poster.css has no coral aside. The existing .ld-sh-box supplies this shape. */
 .poster-aside {
   padding: 1rem 1.25rem; border: 3px dashed var(--accent); border-radius: 0; background: var(--card-bg);
-  font-family: var(--font-showroom-body); font-size: .95rem; line-height: 1.6; color: var(--text);
+  font-family: var(--font-showroom-body); font-size: var(--text-body); line-height: 1.6; color: var(--text);
 }
-.poster-aside--small { padding: .9rem 1.1rem; font-family: inherit; font-size: .92rem; line-height: 1.55; color: inherit; }
+.poster-aside--small { padding: .9rem 1.1rem; font-family: inherit; font-size: var(--text-base); line-height: 1.55; color: inherit; }
 .poster-aside--large { padding: 1.25rem 1.5rem; font-size: inherit; line-height: inherit; color: inherit; }
 .poster-aside--irreversible { border-style: solid; }
 /* The aside's tones (Jouni's decision "Attention note", every look kept): waiting, the next move is
    in another window (the waiting note, a thin dashed ink frame on grey); suggestion, a line the
    person can wave away (the phone nudge, a thin dashed ink frame, small bold words). */
 .poster-aside--waiting { padding: .9rem 1rem; border: 2px dashed var(--text); background: var(--bg-dim); font-family: inherit; font-size: inherit; line-height: inherit; color: inherit; }
-.poster-aside--suggestion { padding: 8px 12px; border: 2px dashed var(--text); background: none; font-family: inherit; font-size: .82rem; font-weight: 600; line-height: 1.5; color: inherit; }
+.poster-aside--suggestion { padding: 8px 12px; border: 2px dashed var(--text); background: none; font-family: inherit; font-size: var(--text-sm); font-weight: var(--weight-semibold); line-height: 1.5; color: inherit; }
 /* contacts-poster.css .ct-tag, with the brief's explicit mono / 500 typography. */
 .poster-chip {
   display: inline-block; padding: .1rem .45rem; border: 1px solid var(--text); border-radius: 0;
-  font-family: var(--font-mono); font-size: .68rem; font-weight: 500; letter-spacing: .04em;
+  font-family: var(--font-mono); font-size: var(--text-2xs); font-weight: var(--weight-medium); letter-spacing: .04em;
   color: var(--text); background: transparent;
 }
-.poster-crumb { font-family: var(--font-mono); font-weight: 400; font-size: .8rem; letter-spacing: 0; text-transform: none; color: var(--accent); }
+.poster-crumb { font-family: var(--font-mono); font-weight: var(--weight-regular); font-size: var(--text-small); letter-spacing: 0; text-transform: none; color: var(--accent); }
 .poster-crumb::after { content: ' /'; }
 /* A small number (Jouni's decision "Count"): on coral when something waits for the person, without a
    ground when it only says how many. The values are the profile menu's count (.pf-side-badge); the
    small cut is the bell's size, for a count that sits on an icon. */
-.poster-count { display: inline-block; padding: .05rem .45rem; font-family: var(--font-mono); font-size: .7rem; font-weight: 500; letter-spacing: 0; }
+.poster-count { display: inline-block; padding: .05rem .45rem; font-family: var(--font-mono); font-size: .7rem; font-weight: var(--weight-medium); letter-spacing: 0; }
 .poster-count--waiting { background: var(--accent); color: var(--bg); }
 .poster-count--tally { background: none; color: var(--text-dim); }
 .poster-count--small { font-size: .6rem; padding: 0 3px; }
 /* When a thing happened: small grey typewriter letters, the chat's cut (Jouni's decision "Timestamp"). */
-.poster-time { font-family: var(--font-mono); font-size: .68rem; color: var(--text-dim); }
+.poster-time { font-family: var(--font-mono); font-size: var(--text-2xs); color: var(--text-dim); }
 .poster-stat {
   display: flex; align-items: baseline; gap: 1rem; margin: 0; padding: .8rem 0;
-  border-top: 3px solid var(--text); color: var(--text); text-decoration: none; font-size: 1.05rem; font-weight: 800;
+  border-top: 3px solid var(--text); color: var(--text); text-decoration: none; font-size: var(--text-md-plus); font-weight: var(--weight-heavy);
 }
 .poster-stat:hover { color: var(--accent); }
 .poster-stat-number {
@@ -193,7 +196,7 @@
   font-size: 3rem; line-height: var(--font-poster-leading); letter-spacing: var(--font-poster-tracking);
   color: var(--text); margin-right: .6rem;
 }
-.poster-stat-number--small { font-size: 1.35rem; line-height: 1; letter-spacing: normal; }
+.poster-stat-number--small { font-size: var(--text-xl); line-height: 1; letter-spacing: normal; }
 .poster-stat-number--large { font-size: 3.4rem; }
 .poster-stat-number--step { color: var(--accent); }
 .poster-stat-number--band { color: var(--bg); }
@@ -216,10 +219,10 @@
 .showroom-section { padding: 1.75rem; background: var(--card-bg); border: 3px solid var(--text); box-shadow: 8px 8px 0 var(--sun); }
 /* The design skill names sun, coral and ink shadows; the source rooms use the first two. */
 .showroom-section--coral { box-shadow: 8px 8px 0 var(--accent); }
-.showroom-door { font-family: var(--font-showroom-body); font-size: .95rem; font-weight: 800; color: var(--text); text-decoration: none; border-bottom: 3px solid var(--accent); }
+.showroom-door { font-family: var(--font-showroom-body); font-size: var(--text-body); font-weight: var(--weight-heavy); color: var(--text); text-decoration: none; border-bottom: 3px solid var(--accent); }
 .showroom-door:hover { color: var(--accent); }
 .showroom-slab {
-  display: inline-block; font-family: var(--font-showroom); text-transform: uppercase; font-size: 1rem;
+  display: inline-block; font-family: var(--font-showroom); text-transform: uppercase; font-size: var(--text-md);
   padding: 1rem 1.75rem; border: 3px solid var(--text); box-shadow: 6px 6px 0 var(--text);
   text-decoration: none; transition: transform 120ms ease, box-shadow 120ms ease; text-align: center;
 }

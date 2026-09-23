@@ -103,8 +103,26 @@ const walkJs = (dir: string): string[] => walkFiles(dir, '.js');
  */
 function sourceFiles(): string[] {
     return ['views', 'components', 'js'].flatMap(d => walkJs(path.join(PUBLIC, d)))
-        .filter(f => !rel(f).startsWith('views/design-lab/'));
+        .filter(f => !rel(f).startsWith('views/design-lab/') && !/^views\/admin\/design-lab-/.test(rel(f)));
 }
+
+/** The shell: spa.html draws the top bar, the page base and the footer on every page itself. */
+const SHELL = 'spa.html';
+
+/**
+ * Modules under /components that are not interface parts, each with what it is instead. Every other
+ * module there is a part and has a catalogue entry.
+ */
+export const NOT_PARTS: Record<string, string> = {
+    '/components/index.js': 'The barrel that re-exports the parts for older imports; it draws nothing itself.',
+    '/components/useViewCSS.js': 'A hook that loads a view\'s stylesheet; it draws nothing.',
+    '/components/data-map/model.js': 'The data model of the data map (what is where), no markup.',
+    '/components/ai-label-icons.js': 'The icon data the AI label draws; the part is ai-label.',
+};
+
+/** What a person does with a part: the fixed words `use` takes (08-component-rules.md). */
+export const USE_WORDS = ['view', 'edit', 'list', 'pick', 'compare', 'status', 'navigate', 'converse',
+    'act', 'copy', 'explain', 'count', 'search', 'notify', 'wait', 'layout', 'open', 'confirm'] as const;
 
 /** importer lists, keyed by the imported file (public-relative). */
 function importGraph(files: string[]): Map<string, Set<string>> {
@@ -153,7 +171,8 @@ function pagesFrom(start: string[], importers: Map<string, Set<string>>, routes:
         const f = queue.shift()!;
         if (seen.has(f) || f === BLOCK_MAP) continue;
         seen.add(f);
-        if (routes.has(f)) pages.add(f);
+        // The shell is a page of its own: what it draws is on every page.
+        if (routes.has(f) || f === SHELL) pages.add(f);
         for (const p of BLOCK_SURFACES[f] ?? []) pages.add(p);
         for (const up of importers.get(f) ?? []) queue.push(up);
     }
@@ -173,7 +192,8 @@ const usesClass = (src: string, cls: string): boolean =>
 export function buildFacts(entries: UiEntrySource[]): Record<string, UiEntryFacts> {
     const files = sourceFiles();
     const texts = new Map(files.map(f => [rel(f), read(f)]));
-    const importers = importGraph(files);
+    texts.set(SHELL, read(path.join(PUBLIC, SHELL)));
+    const importers = importGraph([...files, path.join(PUBLIC, SHELL)]);
     const routes = routeModules();
     // Which stylesheets name each class. A sheet OWNS a class no other sheet names; a class it
     // shares (another part's, styled in context) says nothing about who draws this part.
@@ -188,7 +208,10 @@ export function buildFacts(entries: UiEntrySource[]): Record<string, UiEntryFact
 
     for (const e of entries) {
         const rules = parseRules(read(pub(e.sheet)));
-        const own = e.kind === 'shape'
+        // A shape, and a part that shares a sheet with others, is the rules naming its own classes;
+        // a part that owns its sheet is the whole sheet.
+        const owns = e.kind === 'component' && e.sheet === `/css/components/${e.id}.css`;
+        const own = e.classes && !owns
             ? rules.filter(r => classesIn(r.selector).some(c => e.classes!.includes(c)))
             : rules;
         const classes = e.kind === 'shape' ? uniqSorted(e.classes!) : uniqSorted(own.flatMap(r => classesIn(r.selector)));
@@ -254,15 +277,30 @@ export function problems(entries: UiEntrySource[], facts: Record<string, UiEntry
     const spa = read(path.join(PUBLIC, 'spa.html'));
     for (const name of sheets) {
         const p = `/css/components/${name}`;
-        const n = entries.filter(e => e.sheet === p).length;
-        if (n !== 1) out.push(`${p}: ${n} catalogue entries (exactly one expected)`);
+        // One entry OWNS a sheet (its id is the sheet's name); a part with no look of its own (a copy
+        // button wears the button's) may name another part's sheet as where its look lives.
+        const owners = entries.filter(e => e.sheet === p && e.id === name.replace(/\.css$/, '')).length;
+        if (owners !== 1) out.push(`${p}: ${owners} owning catalogue entries (exactly one expected, its id "${name.replace(/\.css$/, '')}")`);
         if (!spa.includes(`href="${p}"`)) out.push(`${p}: not linked in spa.html`);
+    }
+    // Every module under /components is a part with an entry, or named in NOT_PARTS with what it is.
+    const modules = new Set(entries.map(e => e.module).filter(Boolean));
+    for (const abs of walkJs(path.join(PUBLIC, 'components'))) {
+        const mod = '/' + rel(abs);
+        if (!modules.has(mod) && !NOT_PARTS[mod]) out.push(`${mod}: a component module with no catalogue entry (add one, or name it in NOT_PARTS with what it is)`);
+    }
+    for (const mod of Object.keys(NOT_PARTS)) if (!existsSync(pub(mod))) out.push(`NOT_PARTS: ${mod} does not exist`);
+    // `use` is what a person does with the part, from the fixed words; `useFor` says it in a sentence.
+    for (const e of entries) {
+        if (!e.use.length) out.push(`${e.id}: use names at least one word (${USE_WORDS.join(', ')})`);
+        for (const w of e.use) if (!(USE_WORDS as readonly string[]).includes(w)) out.push(`${e.id}: use "${w}" is not one of the words (${USE_WORDS.join(', ')})`);
     }
     // The design lab draws every entry: each has a demo, and each demo is an entry or a named extra.
     const demoDir = path.join(PUBLIC, 'views', 'design-lab');
     const demoIds = new Set<string>();
     for (const name of readdirSync(demoDir).filter(n => /^demos-.*\.js$/.test(n))) {
-        for (const m of read(path.join(demoDir, name)).matchAll(/^ {2}'([\w-]+)': \{/gm)) demoIds.add(m[1]);
+        // A demo is a top-level key (two spaces in): `'id': {` or `id: one(…)`.
+        for (const m of read(path.join(demoDir, name)).matchAll(/^ {2}'?([\w-]+)'?: (?:\{|one\()/gm)) demoIds.add(m[1]);
     }
     for (const e of entries) if (!demoIds.has(e.id)) out.push(`${e.id}: no demo in views/design-lab/demos-*.js, so the design lab cannot draw it`);
     for (const d of demoIds) {

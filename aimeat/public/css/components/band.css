@@ -19,7 +19,7 @@
 .poster-band > * + * { margin-top: 1.5rem; }
 .poster-band > .poster-section-title--large + * { margin-top: 0; }
 /* The knowledge explainer closes the band as one quiet line. */
-.poster-band > .poster-band-note { margin-top: 1.2rem; font-size: 0.88rem; color: var(--text-dim); line-height: 1.5; font-weight: 600; }
+.poster-band > .poster-band-note { margin-top: 1.2rem; font-size: 0.88rem; color: var(--text-dim); line-height: 1.5; font-weight: var(--weight-semibold); }
 @media (max-width: 560px) {
   .poster-band { margin-top: 3rem; }
 }

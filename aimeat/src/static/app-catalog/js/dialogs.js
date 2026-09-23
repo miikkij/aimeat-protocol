@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The catalog's dialogs on the site's one dialog: public/js/dialog.js for the closing
- *   rules and public/css/dialog.css for the look, both built into this page, so a dialog here has
+ *   rules and public/css/components/dialog.css for the look, both built into this page, so a dialog here has
  *   the same header, body, footer, phone sheet and ways out as one in the SPA. Every
  *   <dialog class="dlg"> in the template, and the one server-io.js builds for an app's permissions,
  *   opens and closes through this module.

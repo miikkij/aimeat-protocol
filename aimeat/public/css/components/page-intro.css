@@ -21,7 +21,7 @@
   margin: 0 0 0.6rem;
   line-height: var(--font-poster-leading);
 }
-.poster-intro-sub { color: var(--text-dim); font-size: 1.05rem; margin: 0; font-weight: 600; }
+.poster-intro-sub { color: var(--text-dim); font-size: var(--text-md-plus); margin: 0; font-weight: var(--weight-semibold); }
 @media (max-width: 560px) {
   .poster-intro-title { font-size: 1.7rem; }
 }

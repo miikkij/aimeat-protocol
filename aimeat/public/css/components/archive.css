@@ -16,6 +16,6 @@
   font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.4rem; text-transform: uppercase;
   color: var(--text); margin: 0 0 0.4rem;
 }
-.poster-archive-note { margin: 0 0 1rem; font-size: 0.9rem; color: var(--text-dim); line-height: 1.6; }
+.poster-archive-note { margin: 0 0 1rem; font-size: var(--text-body-sm); color: var(--text-dim); line-height: 1.6; }
 .poster-archive-more { margin-top: 1.2rem; }
-.poster-archive-error { margin-top: 1rem; font-size: 0.9rem; color: var(--danger); }
+.poster-archive-error { margin-top: 1rem; font-size: var(--text-body-sm); color: var(--danger); }

@@ -1,0 +1,62 @@
+/**
+ * @file collapsible.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The collapsible: a section that opens and closes under its heading.
+ *   Reads only the tokens in theme.css. The rules are theme.css's, moved unchanged and in order.
+ * @usage Linked from public/spa.html right after theme.css, in the order theme.css held these rules
+ *   (the shell block), and from every standalone page that links theme.css.
+ * @version-history
+ *   v1.0.0 — 2026-09-24 — Moved unchanged from css/theme.css (lines 1411-1459), so theme.css
+ *     holds tokens only (UI consolidation, a move).
+ */
+
+/* ── Collapsible (canonical) ──
+   Backed by /components/Collapsible.js. A clickable header (title + a chevron
+   that rotates 180° when open) with the body shown only while open. This is the
+   canonical shape for the hand-rolled expand/collapse toggles scattered across
+   views (.expand-btn + .pf-chevron, .scope-advanced-toggle, .pkv-entry-arrow).
+   All colors are theme tokens so it flips correctly in dark mode. Callers own
+   the open state (controlled component). The bespoke per-view toggles are left
+   in place where their expanded markup is wired into view state; this block is
+   the target for new collapsible sections. */
+.collapsible {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  margin-bottom: 0.75rem;
+}
+.collapsible-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.6rem 0.85rem;
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: var(--text-note);
+  font-weight: var(--weight-semibold);
+  text-align: left;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+.collapsible-header:hover {
+  color: var(--accent);
+}
+.collapsible-chevron {
+  display: inline-block;
+  flex-shrink: 0;
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  transition: transform 0.2s;
+}
+.collapsible-chevron.open {
+  transform: rotate(180deg);
+}
+.collapsible-body {
+  padding: 0 0.85rem 0.75rem;
+}
+

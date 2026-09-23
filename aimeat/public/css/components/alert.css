@@ -1,0 +1,28 @@
+/**
+ * @file alert.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The alert: a line that says something went right or wrong, in its tone.
+ *   Reads only the tokens in theme.css. The rules are theme.css's, moved unchanged and in order.
+ * @usage Linked from public/spa.html right after theme.css, in the order theme.css held these rules
+ *   (the shell block), and from every standalone page that links theme.css.
+ * @version-history
+ *   v1.0.0 — 2026-09-24 — Moved unchanged from css/theme.css (lines 1696-1710), so theme.css
+ *     holds tokens only (UI consolidation, a move).
+ */
+
+/* ── Alert ── */
+.alert {
+  display: flex; align-items: center; gap: 0.5rem;
+  padding: 0.75rem 1rem; border-radius: var(--radius-xs);
+  font-size: var(--text-note); margin-bottom: 1rem;
+}
+.alert-icon { font-weight: var(--weight-bold); flex-shrink: 0; }
+.alert-msg { flex: 1; }
+.alert-close { background: none; border: none; color: inherit; cursor: pointer; font-size: var(--text-md); padding: 0 0.25rem; opacity: 0.7; }
+.alert-close:hover { opacity: 1; }
+.alert-success { background: var(--success-bg); color: var(--success-fg); border: 1px solid var(--success-border); }
+.alert-error { background: var(--danger-bg); color: var(--danger-fg); border: 1px solid var(--danger-border); }
+.alert-warn { background: var(--warn-bg); color: var(--warn-fg); border: 1px solid var(--warn-border); }
+.alert-info { background: var(--info-bg); color: var(--info-fg); border: 1px solid var(--info-border); }
+

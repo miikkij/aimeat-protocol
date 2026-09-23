@@ -26541,7 +26541,11 @@ paths:
                             properties:
                               shape: { type: string }
                               fields: { type: object, additionalProperties: { type: string } }
-                          use: { type: array, items: { type: string } }
+                          use:
+                            type: array
+                            description: What a person does with the part, in fixed words.
+                            items: { type: string, enum: [view, edit, list, pick, compare, status, navigate, converse, act, copy, explain, count, search, notify, wait, layout, open, confirm] }
+                          useFor: { type: array, items: { type: string }, description: When to reach for the part, in a sentence. }
                           variants:
                             type: array
                             items:

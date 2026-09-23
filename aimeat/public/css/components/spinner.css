@@ -1,0 +1,27 @@
+/**
+ * @file spinner.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The spinner and the loading line beside it.
+ *   Reads only the tokens in theme.css. The rules are theme.css's, moved unchanged and in order.
+ * @usage Linked from public/spa.html right after theme.css, in the order theme.css held these rules
+ *   (the shell block), and from every standalone page that links theme.css.
+ * @version-history
+ *   v1.0.0 — 2026-09-24 — Moved unchanged from css/theme.css (lines 1573-1583, 1763-1764), so theme.css
+ *     holds tokens only (UI consolidation, a move).
+ */
+
+/* ── Spinner ── */
+.spinner {
+  display: inline-block;
+  width: 1.25em;
+  height: 1.25em;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+
+/* ── Loading text ── */
+.loading-text { margin-left: 0.5rem; color: var(--text-dim); font-size: var(--text-note); }

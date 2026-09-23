@@ -32,7 +32,7 @@ export function ThreadList({ threads, activeId, onOpen, onNew, onDelete, onClose
             <button type="button" class="btn-ghost poster-conversation-rail-close" onClick=${onClose}>
                 ↩ ${tr('chat.backToChat', 'Back to the conversation')}
             </button>
-            <button type="button" class="btn-primary poster-slab poster-slab--control poster-conversation-new" onClick=${onNew}>
+            <button type="button" class="poster-slab poster-slab--control poster-conversation-new" onClick=${onNew}>
                 ${tr('chat.new', 'New conversation')}
             </button>
             ${threads.length === 0

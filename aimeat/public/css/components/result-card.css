@@ -37,7 +37,7 @@
 .poster-result-body { min-width: 0; flex: 1 1 auto; }
 .poster-result-kind {
   font-size: 0.65rem;
-  font-weight: 800;
+  font-weight: var(--weight-heavy);
   text-transform: uppercase;
   letter-spacing: 0.1em;
   color: var(--text-dim);
@@ -57,10 +57,10 @@
 .poster-result--memory { border-left: 6px solid var(--mint); }
 .poster-result--workspace { border-left: 6px solid var(--orange); }
 .poster-result-title {
-  font-size: 0.9rem;
-  font-weight: 800;
+  font-size: var(--text-body-sm);
+  font-weight: var(--weight-heavy);
   overflow-wrap: anywhere;
 }
-.poster-result-ref { font-size: 0.72rem; color: var(--text-dim); overflow-wrap: anywhere; }
+.poster-result-ref { font-size: var(--text-xs); color: var(--text-dim); overflow-wrap: anywhere; }
 /* Open is the underlined action link (poster.css .poster-action); this keeps its place in the card. */
 .poster-result-open { flex: 0 0 auto; }

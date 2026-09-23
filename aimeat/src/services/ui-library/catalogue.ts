@@ -12,6 +12,7 @@
  * @structure listUiComponents(filter) · getUiComponent(id) · UiComponentFilter
  * @usage import { listUiComponents } from '../services/ui-library/catalogue.js';
  * @version-history
+ *   v1.1.0 — 2026-09-24 — The search reads `useFor` too (`use` is now fixed words).
  *   v1.0.0 — 2026-09-23 — Initial (UI consolidation phase 1).
  */
 import type { UiEntry, UiEntryKind, UiEntryStatus } from './types.js';
@@ -49,7 +50,7 @@ export function listUiComponents(filter: UiComponentFilter = {}): UiComponentRow
         .filter(e => !filter.status || e.status === filter.status)
         .filter(e => {
             if (!words.length) return true;
-            const hay = [e.id, e.name, e.summary, ...e.use, ...e.classes].join(' ').toLowerCase();
+            const hay = [e.id, e.name, e.summary, ...e.use, ...e.useFor, ...e.classes].join(' ').toLowerCase();
             return words.every(w => hay.includes(w));
         })
         .map(e => ({

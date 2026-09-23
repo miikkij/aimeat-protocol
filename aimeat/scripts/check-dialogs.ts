@@ -2,7 +2,7 @@
  * @file check-dialogs.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The site has one dialog: public/css/dialog.css for the look, public/js/dialog.js for
+ * @description The site has one dialog: public/css/components/dialog.css for the look, public/js/dialog.js for
  *   the closing rules, components/Modal.js for the SPA and src/static/app-catalog/js/dialogs.js for
  *   the catalog. Until 2026-09-13 the SPA and the catalog carried more than twenty hand-rolled
  *   overlays, each with its own frame, X, width, phone behaviour and way of scrolling, and every
@@ -28,7 +28,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 /** Where a dialog is made. Everything these files do is the component itself. */
 const HOMES = new Set([
-  'public/css/dialog.css',
+  'public/css/components/dialog.css',
   'public/js/dialog.js',
   'public/components/Modal.js',
   'src/static/app-catalog/js/dialogs.js',

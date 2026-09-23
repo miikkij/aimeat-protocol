@@ -15,7 +15,7 @@
   padding: 0;
   text-align: left;
   font-family: var(--font-mono);
-  font-size: 0.68rem;
+  font-size: var(--text-2xs);
 }
 .poster-credit-link {
   display: inline-flex;
@@ -25,4 +25,4 @@
   text-decoration: none;
 }
 .poster-credit-link:hover { color: var(--accent); text-decoration: underline; }
-.poster-credit-mark { font-size: 0.9rem; }
+.poster-credit-mark { font-size: var(--text-body-sm); }

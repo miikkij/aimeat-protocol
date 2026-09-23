@@ -18,7 +18,7 @@
 .poster-timeline-quiet {
   display: block; margin: 0 0 1rem; padding: 0.8rem 1rem;
   border: 2px dashed var(--text);
-  font-size: 0.95rem; font-weight: 600; color: var(--text); text-decoration: none;
+  font-size: var(--text-body); font-weight: var(--weight-semibold); color: var(--text); text-decoration: none;
   background: var(--surface);
 }
 .poster-timeline-quiet:hover { border-color: var(--accent); }
@@ -39,7 +39,7 @@
 .poster-timeline-item--system .poster-timeline-dot { background: var(--muted); }
 /* The one row that is happening NOW pulses on top of its category colour — it is the one to act on. */
 .poster-timeline-item--live .poster-timeline-dot { animation: poster-pulse 1.4s ease-in-out infinite; }
-.poster-timeline-line { font-size: 1.05rem; font-weight: 700; color: var(--text); text-decoration: none; }
+.poster-timeline-line { font-size: var(--text-md-plus); font-weight: var(--weight-bold); color: var(--text); text-decoration: none; }
 a.poster-timeline-line:hover { color: var(--accent); }
 /* The door to the whole record. A link, not a button: it goes somewhere, it does nothing. */
 .poster-timeline-more { display: inline-block; margin-top: 1.2rem; }

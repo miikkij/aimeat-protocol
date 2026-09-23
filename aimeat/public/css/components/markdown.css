@@ -18,7 +18,7 @@
  */
 
 .md-body {
-  font-size: 0.95rem;
+  font-size: var(--text-body);
   line-height: 1.7;
   color: var(--text);
   overflow-wrap: break-word;
@@ -32,13 +32,13 @@
 .md-body h3,
 .md-body h4,
 .md-body h5,
-.md-body h6 { font-weight: 700; line-height: 1.3; color: var(--text); margin: 1.8em 0 0.6em; }
+.md-body h6 { font-weight: var(--weight-bold); line-height: 1.3; color: var(--text); margin: 1.8em 0 0.6em; }
 .md-body h1 { font-size: 1.7rem; letter-spacing: -0.01em; padding-bottom: 0.3em; border-bottom: 2px solid var(--border); margin-top: 0.2em; }
 .md-body h2 { font-size: 1.32rem; padding-bottom: 0.25em; border-bottom: 1px solid var(--border); }
 .md-body h3 { font-size: 1.13rem; }
-.md-body h4 { font-size: 1rem; }
-.md-body h5 { font-size: 0.9rem; }
-.md-body h6 { font-size: 0.85rem; color: var(--muted); }
+.md-body h4 { font-size: var(--text-md); }
+.md-body h5 { font-size: var(--text-body-sm); }
+.md-body h6 { font-size: var(--text-note); color: var(--muted); }
 
 .md-body p { margin: 0.85em 0; }
 .md-body ul,
@@ -53,7 +53,7 @@
 .md-body .md-wikilink { color: var(--accent); text-decoration: none; }
 .md-body a:hover,
 .md-body .md-wikilink:hover { text-decoration: underline; }
-.md-body strong { font-weight: 700; color: var(--text); }
+.md-body strong { font-weight: var(--weight-bold); color: var(--text); }
 .md-body em { font-style: italic; }
 
 .md-body .md-code { font-family: var(--font-mono, ui-monospace, "SF Mono", Menlo, Consolas, monospace); font-size: 0.85em; background: var(--bg-dim); padding: 0.12em 0.42em; border-radius: 4px; border: 1px solid var(--border-subtle, var(--border)); }
@@ -63,10 +63,10 @@
 .md-body blockquote { margin: 1em 0; padding: 0.3em 1.1em; border-left: 3px solid var(--accent); background: var(--bg-dim); border-radius: 0 6px 6px 0; color: var(--muted); }
 .md-body blockquote p { margin: 0.4em 0; }
 
-.md-body table { border-collapse: collapse; margin: 1em 0; width: 100%; font-size: 0.9rem; display: block; overflow-x: auto; }
+.md-body table { border-collapse: collapse; margin: 1em 0; width: 100%; font-size: var(--text-body-sm); display: block; overflow-x: auto; }
 .md-body th,
 .md-body td { border: 1px solid var(--border); padding: 0.45em 0.75em; text-align: left; vertical-align: top; }
-.md-body th { background: var(--bg-dim); font-weight: 600; }
+.md-body th { background: var(--bg-dim); font-weight: var(--weight-semibold); }
 .md-body tbody tr:nth-child(even) { background: var(--bg-dim); }
 
 .md-body .md-img { max-width: 100%; height: auto; border-radius: 6px; margin: 0.6em 0; }
@@ -78,13 +78,13 @@
 .md-body .md-mem-head { display: flex; align-items: center; gap: 0.6em; font-size: 0.78rem; color: var(--muted); margin-bottom: 0.35em; }
 .md-body .md-mem-title { font-family: var(--font-mono, ui-monospace, Menlo, Consolas, monospace); overflow-wrap: anywhere; flex: 1; }
 .md-body .md-mem-upd { white-space: nowrap; }
-.md-body .md-mem-refresh { border: none; background: transparent; color: var(--muted); cursor: pointer; border-radius: 4px; padding: 0 0.3em; font-size: 0.9rem; line-height: 1.4; }
+.md-body .md-mem-refresh { border: none; background: transparent; color: var(--muted); cursor: pointer; border-radius: 4px; padding: 0 0.3em; font-size: var(--text-body-sm); line-height: 1.4; }
 .md-body .md-mem-refresh:hover { color: var(--text); background: var(--surface, var(--card)); }
 .md-body .md-mem table { margin: 0.3em 0 0; background: transparent; }
 .md-body .md-mem-note { color: var(--muted); font-size: 0.88rem; padding: 0.2em 0; }
 .md-body .md-mem-err { color: var(--warning, var(--muted)); }
 .md-body .md-mem-more { color: var(--muted); font-size: 0.78rem; margin-top: 0.3em; }
-.md-body .md-mem-value { font-size: 0.95rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+.md-body .md-mem-value { font-size: var(--text-body); white-space: pre-wrap; overflow-wrap: anywhere; }
 
 /* ── The server-rendered page body (utils/page-body.ts → #crawler-body) ──────────────────────
    What a reader that does not run JavaScript gets: the page's own text, in the document as

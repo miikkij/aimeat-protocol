@@ -19,7 +19,7 @@
   border: 2px solid var(--text);
   background: var(--bg-card);
   color: var(--text);
-  font-size: 1rem;
+  font-size: var(--text-md);
   font-family: inherit;
 }
 .poster-input:focus { outline: 3px solid var(--sun); outline-offset: 0; }

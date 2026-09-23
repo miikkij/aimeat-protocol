@@ -1,0 +1,18 @@
+/**
+ * @file usage-chart.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The usage chart's canvas wrapper.
+ *   Reads only the tokens in theme.css. The rules are theme.css's, moved unchanged and in order.
+ * @usage Linked from public/spa.html right after theme.css, in the order theme.css held these rules
+ *   (the shell block), and from every standalone page that links theme.css.
+ * @version-history
+ *   v1.0.0 — 2026-09-24 — Moved unchanged from css/theme.css (lines 1492-1496), so theme.css
+ *     holds tokens only (UI consolidation, a move).
+ */
+
+/* ── Chart canvas wrapper (components/UsageChart.js) ──
+   Chart.js runs with maintainAspectRatio:false, so it needs a sized relative box.
+   Height is supplied per-instance via the --usage-chart-h custom property. */
+.usage-chart { position: relative; width: 100%; height: var(--usage-chart-h, 220px); }
+

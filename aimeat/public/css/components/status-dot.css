@@ -1,0 +1,51 @@
+/**
+ * @file status-dot.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The status dot: a small coloured dot that says a state.
+ *   Reads only the tokens in theme.css. The rules are theme.css's, moved unchanged and in order.
+ * @usage Linked from public/spa.html right after theme.css, in the order theme.css held these rules
+ *   (the shell block), and from every standalone page that links theme.css.
+ * @version-history
+ *   v1.0.0 — 2026-09-24 — Moved unchanged from css/theme.css (lines 1286-1323), so theme.css
+ *     holds tokens only (UI consolidation, a move).
+ */
+
+/* ── Status dot (canonical) ──
+   Small circle whose color is driven by a semantic status token. Consolidates
+   the bespoke per-view dots (.live-dot, .peer-dot, .pn-status-dot,
+   .ext-status-dot, .dv-dot). Component: /components/StatusDot.js.
+   All colors are theme tokens so the dot flips correctly in dark mode. */
+.status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--text-muted);
+}
+.status-dot--online,
+.status-dot--active,
+.status-dot--healthy,
+.status-dot--alive,
+.status-dot--live { background: var(--success); }
+.status-dot--warn,
+.status-dot--degraded,
+.status-dot--syncing,
+.status-dot--pending { background: var(--warn); }
+.status-dot--error,
+.status-dot--offline,
+.status-dot--dead,
+.status-dot--down { background: var(--danger); }
+.status-dot--idle,
+.status-dot--inactive,
+.status-dot--detached,
+.status-dot--muted { background: var(--text-muted); }
+/* Online keeps the soft glow the former .pn-status-dot.online had */
+.status-dot--online { box-shadow: 0 0 6px rgba(34, 197, 94, 0.4); }
+/* Live additionally pulses (matches former .live-dot behaviour) */
+.status-dot--live {
+  box-shadow: 0 0 8px rgba(34, 197, 94, 0.6);
+  animation: livePulse 1.5s ease-in-out infinite;
+}
+

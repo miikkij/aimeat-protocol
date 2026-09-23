@@ -16,8 +16,8 @@
 /* The day heading is the structure of this page. It is quiet, but it is the thing being scanned,
    so it sits apart from its rows rather than on top of them. */
 .poster-day-title {
-  font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.1em;
-  color: var(--accent); font-weight: 800; margin: 0 0 0.3rem;
+  font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.1em;
+  color: var(--accent); font-weight: var(--weight-heavy); margin: 0 0 0.3rem;
   padding-bottom: 0.35rem; border-bottom: 3px solid var(--text);
 }
 /* The quiet heading: the same heading in grey, over a list that is a record rather than the page's

@@ -27,7 +27,7 @@
 .poster-prompt-actions > :first-child { flex: 1 1 auto; }
 .poster-prompt-more {
   flex: none; padding: 0.35rem 0.5rem; line-height: 1;
-  font-size: 0.9rem; color: var(--muted);
+  font-size: var(--text-body-sm); color: var(--muted);
 }
 .poster-prompt-menu {
   display: flex; flex-direction: column; align-items: stretch;
@@ -35,7 +35,7 @@
   background: var(--card);
 }
 .poster-prompt-menu-item {
-  text-align: left; padding: 0.55rem 0.85rem; font-size: 0.85rem;
+  text-align: left; padding: 0.55rem 0.85rem; font-size: var(--text-note);
   border-radius: 0;
 }
 .poster-prompt-menu-item + .poster-prompt-menu-item { border-top: 1px solid var(--border); }
@@ -46,7 +46,7 @@
   max-height: 14rem;
   overflow: auto;
   font-family: var(--font-mono);
-  font-size: 0.82rem;
+  font-size: var(--text-sm);
   line-height: 1.5;
   color: var(--text-dim);
   white-space: pre-wrap;

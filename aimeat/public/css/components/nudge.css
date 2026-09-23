@@ -21,7 +21,7 @@
   margin: 12px 0 0;
 }
 .poster-nudge-text { flex: 1 1 260px; }
-.poster-nudge-dismiss { flex: 0 0 auto; font-size: 0.75rem; padding: 2px 8px; }
+.poster-nudge-dismiss { flex: 0 0 auto; font-size: var(--text-caption); padding: 2px 8px; }
 @media (max-width: 760px) {
   .poster-nudge { margin: 8px 12px 0; }
 }

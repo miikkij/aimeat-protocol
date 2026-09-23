@@ -17,9 +17,10 @@ import { STEP_DEMOS } from './demos-steps.js';
 import { PAGE_DEMOS } from './demos-page.js';
 import { CONVERSATION_DEMOS } from './demos-conversation.js';
 import { SHARED_DEMOS, SHAPE_DEMOS } from './demos-shared.js';
+import { SHELL_DEMOS } from './demos-shell.js';
 import { SAMPLES, PROPOSALS } from './decision-samples.js';
 
-export const DEMOS = { ...STEP_DEMOS, ...PAGE_DEMOS, ...CONVERSATION_DEMOS, ...SHARED_DEMOS, ...SHAPE_DEMOS };
+export const DEMOS = { ...STEP_DEMOS, ...PAGE_DEMOS, ...CONVERSATION_DEMOS, ...SHARED_DEMOS, ...SHELL_DEMOS, ...SHAPE_DEMOS };
 
 /**
  * A decision's variants as a demo: `decision:<id>`, one variant per sample, each measured. `solo`

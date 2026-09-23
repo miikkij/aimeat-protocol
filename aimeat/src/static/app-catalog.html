@@ -1,4 +1,4 @@
-<!-- GENERATED FILE — do not edit directly. Source: src/static/app-catalog/ (js/*.js + styles/*.css + _template.html), the type tokens of public/css/theme.css, and public/css/dialog.css + public/js/dialog.js. Rebuild: pnpm build:app-catalog -->
+<!-- GENERATED FILE — do not edit directly. Source: src/static/app-catalog/ (js/*.js + styles/*.css + _template.html), the type tokens of public/css/theme.css, and public/css/components/dialog.css + public/js/dialog.js. Rebuild: pnpm build:app-catalog -->
 <!DOCTYPE html>
 <!--
   @file src/static/app-catalog.html
@@ -2347,6 +2347,9 @@
   --font-poster-section-weight: 400;
   --sun: #FFB52E;
   --on-sun: #1A1A2E;
+  --text-md: 1rem;
+  --text-small: 0.8rem;
+  --weight-heavy: 800;
   --card-bg: var(--surface);
   --bg-surface: var(--bg-subtle);
   --border: var(--border-subtle);
@@ -3186,10 +3189,15 @@ textarea.cx-code { resize: vertical; tab-size: 2; }
  *   gets this file copied into its page at build time (scripts/build-app-catalog.ts).
  * @structure frame · header and X · body · footer and its actions · sizes · phone
  * @version-history
+ *   v1.2.0 — 2026-09-24 — Moved from css/dialog.css to css/components/ (it is a catalogued part now),
+ *     with the confirm question's text from theme.css (UI consolidation, a move).
  *   v1.1.0 — 2026-09-13 — The footer's start holds more than one action in a row (the app catalog's
  *     source editor has two copy words there).
  *   v1.0.0 — 2026-09-13 — Initial (wish "Yksi dialogikomponentti kaikille dialogeille").
  */
+
+/* The confirm question's text (ConfirmDialog in components/Modal.js), formerly in theme.css. */
+.modal-confirm-message { color: var(--text-dim); margin: 0 0 1.25rem; line-height: 1.5; }
 
 /* ── The frame ─────────────────────────────────────────────────────────────────────────────── */
 dialog.dlg {
@@ -3256,7 +3264,7 @@ dialog.dlg .dlg-body .poster-section-title { margin-bottom: 1rem; }
 dialog.dlg .dlg-body .poster-section + .poster-section { margin-top: 2rem; }
 dialog.dlg .dlg-body .poster-section { margin-top: 0; }
 /* The question a confirm dialog asks is running text, in ink. */
-dialog.dlg .modal-confirm-message { color: var(--text); margin: 0; font-size: 1rem; line-height: 1.55; }
+dialog.dlg .modal-confirm-message { color: var(--text); margin: 0; font-size: var(--text-md); line-height: 1.55; }
 
 /* ── The footer: the actions ───────────────────────────────────────────────────────────────── */
 dialog.dlg .dlg-foot {
@@ -3271,14 +3279,14 @@ dialog.dlg .dlg-foot .dlg-foot-start { margin-right: auto; display: flex; flex-w
 dialog.dlg .dlg-foot .btn-ghost, dialog.dlg .dlg-foot .btn-outline, dialog.dlg .dlg-foot .btn-secondary, dialog.dlg .dlg-foot .poster-action {
   display: inline-flex; align-items: center; min-height: 44px; padding: 0; background: none; box-shadow: none;
   border: 0; border-radius: 0; color: var(--text);
-  font-family: var(--font-body); font-weight: 800; font-size: .8rem; text-transform: uppercase; letter-spacing: .04em;
+  font-family: var(--font-body); font-weight: var(--weight-heavy); font-size: var(--text-small); text-transform: uppercase; letter-spacing: .04em;
   text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 5px; cursor: pointer;
 }
 dialog.dlg .dlg-foot .btn-ghost:hover, dialog.dlg .dlg-foot .btn-outline:hover, dialog.dlg .dlg-foot .btn-secondary:hover, dialog.dlg .dlg-foot .poster-action:hover { color: var(--accent); background: none; }
 dialog.dlg .dlg-foot .btn-primary, dialog.dlg .dlg-foot .btn-danger-solid, dialog.dlg .dlg-foot .poster-slab {
   display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 18px;
   border: 0; border-radius: 0; background: var(--text); color: var(--bg); box-shadow: 4px 4px 0 var(--sun);
-  font-family: var(--font-body); font-weight: var(--font-poster-strong-weight); font-size: .8rem; text-transform: uppercase; letter-spacing: .04em;
+  font-family: var(--font-body); font-weight: var(--font-poster-strong-weight); font-size: var(--text-small); text-transform: uppercase; letter-spacing: .04em;
   cursor: pointer; transition: transform 120ms ease, box-shadow 120ms ease;
 }
 dialog.dlg .dlg-foot .btn-danger-solid { background: var(--accent); color: #fff; box-shadow: 4px 4px 0 var(--text); }
@@ -3470,7 +3478,7 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
   </div><!-- .cat-main -->
   </div><!-- .cat-body -->
 
-  <!-- The dialogs. Every one is the site's one dialog (public/css/dialog.css, public/js/dialog.js,
+  <!-- The dialogs. Every one is the site's one dialog (public/css/components/dialog.css, public/js/dialog.js,
        both built into this page; js/dialogs.js opens and closes them): a header with the title and
        the X, a body that is the only part to scroll, a footer with the actions, quiet words first
        and the loud action last. On a phone each is a sheet at the bottom edge. A button marked

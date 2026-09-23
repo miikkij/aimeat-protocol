@@ -1,0 +1,45 @@
+/**
+ * @file data-table.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The data table: rows and columns of records.
+ *   Reads only the tokens in theme.css. The rules are theme.css's, moved unchanged and in order.
+ * @usage Linked from public/spa.html right after theme.css, in the order theme.css held these rules
+ *   (the shell block), and from every standalone page that links theme.css.
+ * @version-history
+ *   v1.0.0 — 2026-09-24 — Moved unchanged from css/theme.css (lines 1460-1491), so theme.css
+ *     holds tokens only (UI consolidation, a move).
+ */
+
+/* ── Data table (canonical) ──
+   Generic table look backed by /components/DataTable.js. Extracted as the common
+   denominator of the admin `.adm table` and profile `.pf .consent-table` /
+   `.audit-table` shapes: full-width collapsed borders, an uppercase muted header
+   row divided by `--border`, cells divided by `--border-subtle`, a subtle hover,
+   and a `.mono` cell modifier. All colors are theme tokens so the table flips
+   correctly in dark mode. The `.scrollable` wrapper caps height (admin reuses its
+   own `.adm .scrollable`; this generic one applies outside `.adm`). Callers supply
+   their own container (`.card` / `.adm-card`); this block adds none. */
+.data-table { width: 100%; border-collapse: collapse; font-size: .81rem; }
+.data-table th {
+  text-align: left;
+  color: var(--text-muted);
+  font-weight: var(--weight-semibold);
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+  font-size: .69rem;
+  text-transform: uppercase;
+  letter-spacing: .3px;
+}
+.data-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-dim);
+}
+.data-table tr:hover td { background: var(--bg-surface); }
+.data-table .mono { font-family: var(--font-mono); font-size: .78rem; }
+/* Generic scrollable wrapper (the admin-scoped `.adm .scrollable` already exists
+   for admin tables; this one covers DataTable used outside `.adm`). */
+.scrollable { max-height: 600px; overflow-y: auto; }
+
