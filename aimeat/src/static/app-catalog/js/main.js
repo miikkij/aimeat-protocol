@@ -25,6 +25,10 @@
  *     and keeps a half-written form; the page's own keys stand aside while a dialog is open.
  *   v2.9.0 — 2026-09-18 — Visitors: expose visitorsSetDays / visitorsApplyDays / visitorsToggle /
  *     visitorsSetGeo / visitorsCountry / visitorsZoom.
+ *   v2.10.0 — 2026-09-22 — The page is the site's one set: the phone's menu dialog carries the rail
+ *     (the set's Page below 900px); the icon picks, the Add dialog's tabs and the drop zone are found
+ *     by data hooks and marked the way the set marks them (is-on and aria-pressed, a sun tone while a
+ *     file is dragged over); the copied mark is ✓; closing the backups menu resets its aria-expanded.
  */
 import { t, getLang, setLang, applyI18n } from './i18n.js';
 import { escapeHtml, jsArg, sourceLabel, sourceLabelText, bareOwnerName, sameOwner, filterAttr, isSameOriginUrl, currentOwnerName, generateId, readFileAsText } from './util.js';
@@ -45,11 +49,13 @@ import { initSettings, applyTheme, updateThemeToggle, toggleTheme, getThemePref,
 import { initAppsIo, setEditingAppId, showModal, requireSignInThen, prefillFromHtml, closeModal, switchTab, handleFileDrop, handleSave } from './apps-io.js';
 import { initServerIo, isOperatorSession, showPublishModal, submitPublish, toggleCommunity, switchView, showSubdomainModal, submitSubdomainAssign, unassignSubdomain, closeConsents, openConsents, revokeConsent, toggleBackupMenu, toggleCreateMenu, closeCreateMenu, toggleCortexBar, exportBackupZip, importBackupPick, importBackupFile, backupUpdateSummary, backupSelectAll, submitBackupRestore, loadPublishedApps, refreshFavoritesUI, applyServerFilter, unpublishApp, toggleParkApp, toggleForkApp, deleteServerApp, getServerAppRow } from './server-io.js';
 import { toggleRow } from './rows.js';
-import { initRender, filterByState, KUNTO_KEYS, setBoundSkillApps, setSort, toggleAllTags, getSortMode, setListingLoaded, isListingLoaded, setServerManifests, setOwnServerApps, setIframeUrl, serverStateByFilename, serverAppManifests, ownAppProtection, ownServerApps, currentIframeUrl, renderTags, filterByTag, launchApp, launchInTab, viewPublished, launchInIframe, renderApps, closeIframe, openExternal, showContextMenu, hideContextMenu, handleContextAction, viewSource, generateSharePrompt, generateHomepagePrompt } from './render.js';
+import { initRender, filterByState, KUNTO_KEYS, setBoundSkillApps, setSort, toggleAllTags, getSortMode, setListingLoaded, isListingLoaded, setServerManifests, setOwnServerApps, setIframeUrl, serverStateByFilename, serverAppManifests, ownAppProtection, ownServerApps, currentIframeUrl, renderTags, filterByTag, launchApp, launchInTab, viewPublished, launchInIframe, renderApps, closeIframe, openExternal } from './render.js';
+import { showContextMenu, hideContextMenu, handleContextAction, viewSource, generateSharePrompt, generateHomepagePrompt } from './render-menu.js';
+import { initGrantsIo } from './grants-io.js';
 import { initAppAgents, showAppAgentsModal, agentsDeploy, agentsUndeploy } from './app-agents.js';
 import { checkLegacyLocalApps } from './migrate.js';
 import { toggleFavorite } from './favorites.js';
-import { initDialogs, closeDlg, anyDlgOpen, onDlgClose } from './dialogs.js';
+import { initDialogs, openDlg, closeDlg, anyDlgOpen, onDlgClose } from './dialogs.js';
 
 
   // ── i18n (en / fi) ─────────────────────────────────
@@ -290,6 +296,7 @@ import { initDialogs, closeDlg, anyDlgOpen, onDlgClose } from './dialogs.js';
     });
     initAppAgents({ getServerManifests: function () { return serverAppManifests; } });
     initSettings({ generateId: generateId, renderApps: renderApps, loadPublishedApps: loadPublishedApps });
+    initGrantsIo({ loadPublishedApps: loadPublishedApps });
     initAppsIo({ generateId: generateId, readFileAsText: readFileAsText, renderApps: renderApps, getMainApps: function () { return allApps; }, showPublishModal: showPublishModal });
     initServerIo({
       getMainApps: function () { return allApps; },
@@ -335,6 +342,28 @@ import { initDialogs, closeDlg, anyDlgOpen, onDlgClose } from './dialogs.js';
     onDlgClose('settings-overlay', closeSettings);
     onDlgClose('cortex-editor-overlay', closeCortexEditor);
     onDlgClose('prompt-builder-overlay', closePbPanel);
+    // The menu on a phone: the set's Page shows its navigation rail in a dialog below 900px. The
+    // rail moves into the dialog while it is open and back to its column when it closes, so there
+    // is one rail with one set of ids. A choice in it closes it, as the set's navigation does.
+    var railNav = document.getElementById('cat-rail');
+    var railHome = document.getElementById('cat-rail-home');
+    var menuBtn = document.getElementById('cat-menu-btn');
+    var closeCatMenu = function () {
+      if (railNav && railHome && railNav.parentNode !== railHome) railHome.appendChild(railNav);
+      if (menuBtn) menuBtn.setAttribute('aria-expanded', 'false');
+      closeDlg('cat-menu-overlay');
+    };
+    onDlgClose('cat-menu-overlay', closeCatMenu);
+    if (menuBtn) menuBtn.addEventListener('click', function () {
+      var menuBody = document.getElementById('cat-menu-body');
+      if (railNav && menuBody) menuBody.appendChild(railNav);
+      menuBtn.setAttribute('aria-expanded', 'true');
+      openDlg('cat-menu-overlay');
+    });
+    var catMenu = document.getElementById('cat-menu-overlay');
+    if (catMenu) catMenu.addEventListener('click', function (e) {
+      if (e.target && e.target.closest && e.target.closest('[data-rail-pick]')) closeCatMenu();
+    });
     // A ?filter= from the profile's Apps page opens the library on one state or condition row:
     // the number a person clicked there is exactly the rows they get here. Set before the listing
     // loads; the first render reads it like a rail click.
@@ -427,13 +456,15 @@ import { initDialogs, closeDlg, anyDlgOpen, onDlgClose } from './dialogs.js';
     // The icon picks: press one and it lands in the field.
     var iconPicks = document.getElementById('icon-picks');
     if (iconPicks) iconPicks.addEventListener('click', function (e) {
-      var b = e.target.closest('.icon-pick');
+      var b = e.target.closest('[data-icon-pick]');
       if (!b) return;
       var field = document.getElementById('app-icon');
       if (field) field.value = b.textContent;
-      var on = iconPicks.querySelectorAll('.icon-pick.is-on');
-      for (var i = 0; i < on.length; i++) on[i].classList.remove('is-on');
+      // The picks are the set's tab actions: the chosen one is on and pressed.
+      var on = iconPicks.querySelectorAll('[data-icon-pick].is-on');
+      for (var i = 0; i < on.length; i++) { on[i].classList.remove('is-on'); on[i].setAttribute('aria-pressed', 'false'); }
       b.classList.add('is-on');
+      b.setAttribute('aria-pressed', 'true');
     });
 
     // ── Settings button ─────────────────────────────
@@ -459,6 +490,8 @@ import { initDialogs, closeDlg, anyDlgOpen, onDlgClose } from './dialogs.js';
       var menu = document.getElementById('backup-menu');
       if (!menu.hidden && !menu.contains(e.target) && e.target.id !== 'backup-btn') {
         menu.hidden = true;
+        var trigger = document.getElementById('backup-btn');
+        if (trigger) trigger.setAttribute('aria-expanded', 'false');
       }
       var cmenu = document.getElementById('create-menu');
       if (cmenu && !cmenu.hidden && !cmenu.contains(e.target) && e.target.id !== 'create-btn') {
@@ -467,7 +500,7 @@ import { initDialogs, closeDlg, anyDlgOpen, onDlgClose } from './dialogs.js';
     });
 
     // ── Tab switching ───────────────────────────────
-    var tabBtns = document.querySelectorAll('#add-app-modal .modal-tab');
+    var tabBtns = document.querySelectorAll('#add-app-modal [data-tab]');
     tabBtns.forEach(function (btn) {
       btn.addEventListener('click', function () {
         switchTab(btn.getAttribute('data-tab'));
@@ -491,19 +524,19 @@ import { initDialogs, closeDlg, anyDlgOpen, onDlgClose } from './dialogs.js';
     dropZone.addEventListener('dragover', function (e) {
       e.preventDefault();
       e.stopPropagation();
-      dropZone.classList.add('dragover');
+      dropZone.setAttribute('data-tone', 'sun');
     });
 
     dropZone.addEventListener('dragleave', function (e) {
       e.preventDefault();
       e.stopPropagation();
-      dropZone.classList.remove('dragover');
+      dropZone.setAttribute('data-tone', 'plain');
     });
 
     dropZone.addEventListener('drop', function (e) {
       e.preventDefault();
       e.stopPropagation();
-      dropZone.classList.remove('dragover');
+      dropZone.setAttribute('data-tone', 'plain');
       if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
         handleFileDrop(e.dataTransfer.files[0]);
       }
@@ -708,7 +741,7 @@ import { initDialogs, closeDlg, anyDlgOpen, onDlgClose } from './dialogs.js';
       // Keep the dialog OPEN after copying so the user can read Step 3 (add & publish).
       var revert = function () { setTimeout(function () { btn.textContent = t('pb.copy'); }, 1400); };
       if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(prompt).then(function() { btn.textContent = '✔ ' + (t('pb.copied') || 'Copied!'); revert(); });
+        navigator.clipboard.writeText(prompt).then(function() { btn.textContent = '✓ ' + (t('pb.copied') || 'Copied!'); revert(); });
       } else {
         var ta = document.createElement('textarea');
         ta.value = prompt;
@@ -716,7 +749,7 @@ import { initDialogs, closeDlg, anyDlgOpen, onDlgClose } from './dialogs.js';
         ta.select();
         document.execCommand('copy');
         document.body.removeChild(ta);
-        btn.textContent = '✔ ' + (t('pb.copied') || 'Copied!');
+        btn.textContent = '✓ ' + (t('pb.copied') || 'Copied!');
         revert();
       }
     });

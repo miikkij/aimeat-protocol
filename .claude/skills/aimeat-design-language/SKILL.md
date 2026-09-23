@@ -2,7 +2,7 @@
 name: aimeat-design-language
 description: "The AIMEAT design language in words and in numbers: the two faces (showroom outside, poster inside), the three type tokens every font on the site descends from, the four shapes, the colours, the wordmark, and the one place a value is changed (theme.css tokens) with the map of every surface a token reaches. Use before designing or styling anything that carries the AIMEAT name, before changing a font or a colour, and to judge whether a screen looks like this product."
 metadata:
-  version: 1.7.0
+  version: 1.8.0
   updated: 2026-09-22
   owner: Jouni Miikki
 ---
@@ -12,10 +12,10 @@ metadata:
 One product, two faces. The **showroom** is what a visitor sees before signing in: the front page,
 how it works, for your business, help, members, the change log. The **poster** is what a person sees
 once inside: the home, every profile tab, the chat, the sign-in dialog, the app catalog. They share
-the type, the colours, the shapes and the rules; they differ in how loud they are. A third register,
-the **classic shell** (rounded controls, cards), remains under the oldest views and is being
-retired: every signed-in page, the admin dashboard included, moves to the poster face (ruled
-2026-09-22); it reads the same type tokens meanwhile.
+the type, the colours, the shapes and the rules; they differ in how loud they are. The third
+register, the **classic shell** (rounded controls, cards), is retired: every signed-in page, the
+admin dashboard included, moved to the poster face (ruled 2026-09-22, done the same week). Its
+leftovers are the public showroom pages' own sheets, which are out of that ruling's scope.
 
 **One place for each kind of thing.** The tokens (type, colour and shape) live in
 `aimeat/public/css/theme.css`; the shapes in `aimeat/public/css/poster.css`; the parts pages are
@@ -23,6 +23,15 @@ built from, with their spacing, in `aimeat/public/css/parts.css`; and the compon
 them in `aimeat/public/components/poster-parts.js`. A page composes the components with content
 and named variants and has no stylesheet of its own. Change a value at its home; the maps below
 show which surfaces follow. The per-page sheets that remain are migration debt, not examples.
+
+Since 2026-09-22 every signed-in page is composed this way: the home, every Settings & Controls
+tab, every admin page (the classic admin shell is gone), organism, contacts, messages and the chat.
+The app catalog builds its screens as HTML strings, so it has the same set as string helpers in
+`aimeat/src/static/app-catalog/js/parts-html.js`, which emit exactly the classes the components
+do; `scripts/build-app-catalog.ts` inlines the tokens, `poster.css` and `parts.css` (last) into the
+catalog page. A part changed in `parts.css` therefore reaches the catalog on its next build.
+A new variant is added to the component, to `parts.css` and, when the catalog needs it, to
+`parts-html.js` in the same change.
 
 ## The faces
 
@@ -171,7 +180,7 @@ by hand; the list here is the checklist.
 
 | Token | Read by |
 |---|---|
-| `--font-headline` | through `--font-showroom`: `landing-showroom.css`, `landing.css`, `help.css`, `members.css`, `changelog.css`, `build-story.css`, `static-page.css`, `portal-dev.css`; through `--font-poster`: `home.css`, `chat.css`, `profile.css`, `profile-poster.css`, `surface.css`, `app-catalog-poster.css`, the sign-in dialog (`sdk-libs/auth/modal-styles.js`), the top bar in `theme.css` |
+| `--font-headline` | through `--font-showroom`: `landing-showroom.css`, `landing.css`, `help.css`, `members.css`, `changelog.css`, `build-story.css`, `static-page.css`, `portal-dev.css`; through `--font-poster`: `poster.css` and `parts.css` (every signed-in page: home, settings, admin, organism, contacts, messages, chat), the remaining `profile.css`, `profile-poster.css` and `surface.css`, the app catalog (the build inlines `theme.css`'s tokens with `poster.css` and `parts.css`), the sign-in dialog (`sdk-libs/auth/modal-styles.js`), the top bar in `theme.css` |
 | `--font-body` | all of the above through `--font-showroom-body` and `--font-poster-section`, and every classic-shell sheet (admin, the older tabs, form controls) through `--font` |
 | `--font-mono` | every sheet that shows an address, a command, an id or a key; no sheet spells a monospace family |
 | `--font-headline` again, through the palette bridge | `lib/aimeat-theme.css` gives every `h1`-`h6` the palette's display face, and the house palette's display face is `var(--font-headline, 'Archivo Black', …)`: on the node the classic shell's headings follow the token; a published app without `theme.css` keeps the vendored Archivo Black; a chosen palette (paper, circuit, …) keeps its own face on purpose |
@@ -242,7 +251,7 @@ least two pages.
 
 | Part | What it is, its variants |
 |---|---|
-| `Page` | The frame: width normal (1180px), wide (1440px) or reading (900px); the masthead; a rail on the leading or trailing side that becomes a menu dialog below 900px. |
+| `Page` | The frame: width normal (1180px), wide (1440px) or reading (900px); the masthead; a rail on the leading or trailing side that becomes a menu dialog below 900px. `layout="workspace"` is a page that is its work (a conversation, a thread): it fills the window under the bar and, below 760px, the whole screen above the keyboard. |
 | `Masthead` | The trail (`crumbs`), page title, identity line (put `Chip`s there), a mark and the actions at the right; normal or large (the home's name). |
 | `Crumbs` | The trail to a page: mono, earlier steps coral links, the current page in ink, a slash between. Masthead draws it from `crumbs`. |
 | `Chip` | A square mono fact: plain (framed), sun (the one to see) or muted. |
@@ -266,6 +275,8 @@ least two pages.
 | `Meter` | A filled bar for how much of a limit is used; turns to the danger colour from 90 %. |
 | `Surface` | Box, record, aside, code, editor, panel, preview or plain; three densities or flush; plain, muted, coral, sun, ink, success or danger tone; with a summary it folds. |
 | `Text` | Body, lead, label, mono, caption, heading or number; the same tones; a number is small, normal or large. |
+| `Fold` | A row that opens in place: coral number, title, a quiet note, the arrow, actions on the row. |
+| `Thread`, `DayDivider`, `Message` | A conversation: the column, the date between days, one message (mine on the sun at the right, theirs in the ink frame at the left; draft dashed, a reply still being written on the coral edge). |
 
 ### What each part also takes
 
@@ -275,17 +286,31 @@ page reaches for most, so a page does not settle for less or invent a local fix:
 - `Page`/`Masthead`: `crumbs`, `subtitle` (the mono line after the title), `titleKind="mono"` (a key as the title).
 - `Section`: `count` after the title, `actions` on the head row, `description`, `size`, `density`.
 - `Fold`: `number`, `sub` (shortens with an ellipsis), `actions` on its row, `toggleTitle`.
-- `ListRow`: `detailKind` mono or text, `preview`, `time` + `marker` (+ `live`), `number` + `arrow`,
-  `open` (body showing, arrow down), `selected` (on the sun), `muted`, `concealed`, `nameTitle`.
-- `Table`: `collapse` 560/600/640 stacks rows on a phone; a cell `{ text, align: 'end' }` for an amount; no headers = no head row.
-- `NumeralBand`: `tone`, `size="small"`, item `note` and `tone:'coral'`; the figures share one row in equal columns.
-- `Action`: `tone` danger or success on an underlined word, `semantics` tab/radio/switch, `kind="choice"` with `title`, `form`.
-- `Chip`: plain, sun, coral, success, danger, muted. `CheckItem`: `state` done, failed, warn, pending.
+- `ListRow`: `detailKind` mono or text, `preview` (+ `previewLines={1}` for a dense mail list), `time` +
+  `marker` (+ `live`), `number` + `arrow`, `open` (body showing, arrow down), `selected` (on the sun),
+  `muted`, `concealed`, `nameTitle`, `nameKind="mono"` (a key as the name), `actionsReveal="hover"`.
+  A `Chip` may be the `mark` (a kind word); the mark then sizes to the chip, at least 6.5rem.
+- `Table`: `collapse` 560/600/640/900 stacks rows below that width; headers `{ label, sortKey }` with
+  `sort` and `onSort` sort and keep their label when stacked; `rowTones` muted, coral or danger; a
+  cell `{ text, align: 'end' }` for an amount, `{ text, clamp: true }` for one line with a tooltip.
+- `NumeralBand`: `tone`, `size="small"`, item `note` (wraps) and `tone` coral or muted; equal columns.
+- `Action`: `tone` danger or success on an underlined word, coral on a tab (a filter that warns),
+  `semantics` tab/radio/switch (an icon switch shows on as the sun), `kind="choice"` with `title`, `form`.
+- `Chip`: plain, sun, coral, success, danger, muted; never breaks inside a short word.
+  `CheckItem`: `state` done, failed, warn, pending.
 - `Field`: every native type incl. `month` and `file` (`accept`, `multiple`, `chooseLabel`), `autoFocus`,
-  `inputMode`, `width="narrow"`, `onBlur`, `ariaLabel` (a hidden label), `passwordManager={false}`.
-- `Surface`: `height` scroll (24rem) or tall (code, 60vh); an aside with `tone="danger"` is the solid one
-  for an act that cannot be undone. `Meter`: `kind` quota or progress. `Dialog`: `size` up to `xl`.
-- `Rail`: entries with `#id` hrefs scroll only the content area (`scrollToId`), `onClick` opens a fold first.
+  `inputMode`, `width="narrow"`, `onBlur`, `onFocus`, `ariaLabel` (a hidden label),
+  `passwordManager={false}`, `suffix` (mono text after the input), `mono` (code, a manifest).
+- `Surface`: `height` scroll (24rem), tall (code, 60vh) or fill (the rest of a workspace column);
+  `kind="stage"` (an iframe on a light ground in every theme, `width="phone"` at 390px),
+  `kind="picture"`, `sticky`; an aside with `tone="danger"` is the solid one for an act that cannot
+  be undone. `Meter`: `kind` quota or progress, `tone` sun, coral, ink or muted. `Dialog`: `size` up to `xl`.
+- `Columns`: `fill` inside a workspace page, each pane scrolling on its own (a list beside its thread).
+- `Toolbar`: a filter's `tone: 'coral'`, `sticky`. `Text`: heading `face="mono"` (a key as a title).
+- `Rail`: entries with `#id` hrefs scroll only the content area (`scrollToId`), `onClick` opens a fold
+  first, an entry's `group` label, `density="compact"` for a long index.
+- `UsageChart` (the charts) reads its axis, grid and face from the tokens and redraws on a theme
+  change; `type="spark"` is a small trend line beside a figure.
 
 The rail has two kinds: `index` is the ink panel with numbered entries for a page's own contents (it may also hold a view switch), `navigation` is the quiet paper list of the site's menu, with a pin that shows on hover and stays when on.
 

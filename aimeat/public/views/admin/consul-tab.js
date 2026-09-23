@@ -10,6 +10,9 @@
  *   - handleExport/handleImport: call consulExport/consulImport and reload dashboard data
  *
  * @version-history
+ *   v1.1.0 — 2026-09-22 — Composed from the shared component set: the explanation is the section's
+ *     description, the connection is one list row with its status chip and the two actions, the
+ *     result is the success or danger aside. No inline style and no card of its own any more.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { h } from 'preact';
@@ -19,6 +22,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { Badge, StatsGrid, ExpandableHelp, Empty, DataTable } from './shared.js';
+import { Section, Stack, ListRow, Surface, Action, Text } from '/components/poster-parts.js';
 import { consulExport, consulImport } from '/js/services/admin.js';
 
 export default function ConsulTab({ data, reload }) {
@@ -30,13 +34,14 @@ export default function ConsulTab({ data, reload }) {
 
   if (!consul.enabled) {
     return html`
-      <p style="color:var(--text-dim);font-size:.85rem;margin-bottom:12px">${t('dashboard.consulExplain')}</p>
-      <div class="adm-card">
-        <p>${t('dashboard.consulDisabled')}</p>
-        <${ExpandableHelp} title=${t('dashboard.consulSetupGuide')}>
-          <p>${t('dashboard.consulSetupDetail')}</p>
-        </${ExpandableHelp}>
-      </div>
+      <${Section} description=${t('dashboard.consulExplain')}>
+        <${Stack}>
+          <${Text}>${t('dashboard.consulDisabled')}<//>
+          <${ExpandableHelp} title=${t('dashboard.consulSetupGuide')}>
+            <${Text}>${t('dashboard.consulSetupDetail')}<//>
+          <//>
+        <//>
+      <//>
     `;
   }
 
@@ -61,31 +66,30 @@ export default function ConsulTab({ data, reload }) {
   };
 
   return html`
-    <p style="color:var(--text-dim);font-size:.85rem;margin-bottom:12px">${t('dashboard.consulExplain')}</p>
-    <${ExpandableHelp} title=${t('dashboard.consulSetupGuide')}>
-      <p>${t('dashboard.consulSetupDetail')}</p>
-    </${ExpandableHelp}>
+    <${Section} description=${t('dashboard.consulExplain')}>
+      <${Stack}>
+        <${ExpandableHelp} title=${t('dashboard.consulSetupGuide')}>
+          <${Text}>${t('dashboard.consulSetupDetail')}<//>
+        <//>
 
-    <${StatsGrid} items=${[
-      { label: t('dashboard.consulStatus'), value: consul.healthy ? '\u2713' : '\u2717', color: consul.healthy ? '#22c55e' : '#ef4444' },
-      { label: t('dashboard.consulKeysLoaded'), value: consul.key_count },
-    ]} />
+        <${StatsGrid} items=${[
+          { label: t('dashboard.consulStatus'), value: consul.healthy ? '✓' : '✗', tone: consul.healthy ? undefined : 'red' },
+          { label: t('dashboard.consulKeysLoaded'), value: consul.key_count },
+        ]} />
 
-    ${result && html`<div style="margin:12px 0;padding:8px 12px;border-radius:6px;background:${result.ok ? '#16a34a22' : '#dc262622'};color:${result.ok ? '#22c55e' : '#ef4444'};font-size:.85rem">${escHtml(result.msg)}</div>`}
+        ${result && html`<${Surface} kind="aside" tone=${result.ok ? 'success' : 'danger'} role="status"><${Text}>${escHtml(result.msg)}<//><//>`}
 
-    <div class="adm-card" style="margin-top:12px">
-      <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center">
-        <span style="color:var(--text-dim);font-size:.85rem">${escHtml(consul.url)} \u2014 ${escHtml(consul.prefix)}</span>
-        <span style="margin-left:auto"><${Badge} type=${consul.healthy ? 'healthy' : 'critical'} /></span>
-      </div>
-      <div style="display:flex;gap:8px;margin-bottom:12px">
-        <button class="adm-btn" onClick=${handleExport} disabled=${loading}>${t('dashboard.consulExport')}</button>
-        <button class="adm-btn-action" onClick=${handleImport} disabled=${loading}>${t('dashboard.consulImport')}</button>
-      </div>
-      ${consul.keys?.length > 0
-        ? html`<${DataTable} headers=${['Key']} rows=${consul.keys.map(k => [escHtml(k)])} />`
-        : html`<${Empty} text=${t('dashboard.consulNoKeys')} />`
-      }
-    </div>
+        <${ListRow} name=${escHtml(consul.url)} detail=${escHtml(consul.prefix)}
+          value=${html`<${Badge} type=${consul.healthy ? 'healthy' : 'critical'} />`}
+          actions=${html`
+            <${Action} onClick=${handleExport} disabled=${loading}>${t('dashboard.consulExport')}<//>
+            <${Action} onClick=${handleImport} disabled=${loading}>${t('dashboard.consulImport')}<//>`} />
+
+        ${consul.keys?.length > 0
+          ? html`<${DataTable} headers=${['Key']} rows=${consul.keys.map(k => [{ text: escHtml(k), mono: true }])} />`
+          : html`<${Empty} text=${t('dashboard.consulNoKeys')} />`
+        }
+      <//>
+    <//>
   `;
 }

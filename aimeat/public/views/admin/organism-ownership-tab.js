@@ -24,6 +24,8 @@
  *   - the opened organism is organism-ownership-tab.detail.js
  * @usage registered in views/admin.js under the Identity group
  * @version-history
+ *   2026-09-22 -- Composed from the shared component set (Section, NumeralBand, Toolbar, Table,
+ *     Surface asides): no page sheet and no class of its own, so a theme change reaches it.
  *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v2.1.0 — 2026-09-13 — Compose shared poster headings and externalize column alignment.
@@ -39,22 +41,20 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { date as fmtDate } from '/js/format.js';
-import { useViewCSS } from '/components/useViewCSS.js';
 import { num, Row, Badge, Empty, Spinner, ErrorBox, useToast, Toast } from './shared.js';
+import { Section, Columns, Stack, NumeralBand, Toolbar, Table, Chip, Action, Surface, KeyValue, Text, scrollToId } from '/components/poster-parts.js';
 import { useConfirm } from '/components/Modal.js';
 import { getAdminOrganisms, getOrganismOwnership, addOrganismOwner } from '/js/services/admin.js';
 import { decorate, summarise, counts, search, FILTERS, PAGE } from './organism-ownership-tab.model.js';
 import OrganismDetail from './organism-ownership-tab.detail.js';
 
 const O = (key, params) => t('admin.orgOwnership.' + key, params);
-const DLG = 'adm-oo-dlg';
 const day = (iso) => (iso ? fmtDate(iso) : '—');
 
 /** The five chips, keyed by the filter ids FILTERS orders and counts() counts. */
 const FILTER_LABEL = { all: 'fAll', stuck: 'fStuck', single: 'fSingle', archived: 'fArchived' };
 
 export default function OrganismOwnershipTab({ data, reload }) {
-  useViewCSS('/css/views/admin-organism-ownership.css');
   const [toast, showErr, showOk, clearToast] = useToast();
   const { confirm, ConfirmUI } = useConfirm();
 
@@ -135,25 +135,44 @@ export default function OrganismOwnershipTab({ data, reload }) {
   /** The one question. A cross-account write used to happen on a single press. */
   function askAdd(name) {
     const holding = ownership?.owners || [];
-    const body = html`<span class="adm-oo-ask">
-      <span>${holding.length
+    const body = html`<${Stack} density="compact">
+      <${Text}>${holding.length
     ? O('askBody', { name, owners: holding.join(', ') })
-    : O('askBodyAlone', { name })}</span>
-      <span class="adm-oo-ask-rows">
-        ${holding.length ? html`<span class="adm-oo-ask-row">${O('askRowKeeps')}<em>${O('askRowKeepsVal')}</em></span>` : null}
-        <span class="adm-oo-ask-row">${O('askRowNew', { name })}<em>${O('askRowNewVal')}</em></span>
-        <span class="adm-oo-ask-row">${O('askRowTold')}<em>${O('askRowToldVal')}</em></span>
-        <span class="adm-oo-ask-row">${O('askRowLog')}<em>${O('askRowLogVal')}</em></span>
-      </span>
-      <span class="adm-oo-ask-note">${O('askNote')}</span>
-    </span>`;
+    : O('askBodyAlone', { name })}<//>
+      <${Surface} kind="box" density="compact">
+        ${holding.length ? html`<${KeyValue} mono label=${O('askRowKeeps')} value=${O('askRowKeepsVal')} />` : null}
+        <${KeyValue} mono label=${O('askRowNew', { name })} value=${O('askRowNewVal')} />
+        <${KeyValue} mono label=${O('askRowTold')} value=${O('askRowToldVal')} />
+        <${KeyValue} mono label=${O('askRowLog')} value=${O('askRowLogVal')} />
+      <//>
+      <${Text} kind="caption" tone="muted">${O('askNote')}<//>
+    <//>`;
     confirm(body, () => doAdd(name),
-      { title: O('askTitle'), confirmLabel: O('makeOwner', { name }), className: DLG });
+      { title: O('askTitle'), confirmLabel: O('makeOwner', { name }) });
   }
 
-  const chip = (id, label) => html`
-    <button type="button" class="adm-oo-fchip ${filter === id ? 'on' : ''}"
-      onClick=${() => { setFilter(id); setAll(false); }}>${label}</button>`;
+  const filters = FILTERS.map(id => ({ id, label: O(FILTER_LABEL[id], { count: num(chips[id]) }),
+    selected: filter === id, onClick: () => { setFilter(id); setAll(false); } }));
+
+  /** The way in: "Put an owner back" on a stuck one, "Open" on the rest. */
+  const door = (r) => (r.stuck
+    ? html`<${Action} kind="text" tone="danger" onClick=${() => open(r.id)}>${O('putBack')}<//>`
+    : html`<${Action} kind="text" onClick=${() => open(r.id)}>${O('open')}<//>`);
+
+  /** One row of the table: the numeral, the name and its id, who holds it, how many, when, the way in. */
+  const cells = (r, i) => [
+    html`<${Text} kind="number" size="small">${String(oldestFirst ? found.length - i : i + 1).padStart(2, '0')}<//>`,
+    html`<${Stack} density="compact">
+      <${Action} kind="text" onClick=${() => open(r.id)} expanded=${r.id === openId}>${r.name}<//>
+      <${Text} kind="mono" tone="muted">${r.id.split('-')[0]}<//>
+    <//>`,
+    html`<${Stack} direction="wrap" density="compact">
+      ${r.ownerStates.map(o => html`<${Chip} key=${o.name} tone=${o.state === 'ok' ? 'plain' : 'coral'}>${o.name}<//>`)}
+    <//>`,
+    { text: html`<${Text} kind="mono">${r.members}<//>`, align: 'end' },
+    html`<${Text} kind="mono" tone="muted">${day(r.createdAt)}<//>`,
+    door(r),
+  ];
 
   /** Why this organism is stuck, in the words of what is actually wrong with it. */
   const stuckWhy = (r) => {
@@ -168,117 +187,68 @@ export default function OrganismOwnershipTab({ data, reload }) {
   };
 
   return html`
-    <div class="og adm-oo">
+    <${Stack}>
       ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
 
-      <section class="og-sec og-sec--first">
-        <div class="og-sec-h">
-          <h2 class="poster-section-title">${O('stuckQ')}<small>01</small></h2>
-          <div class="og-doors">
-            <button type="button" class="og-door og-door--quiet" onClick=${() => {
-    document.querySelector('.adm-oo-acts-sec')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }}>${O('whatDoor')}</button>
-          </div>
-        </div>
-        <div class="adm-ov-grid">
-          <div>
-            <div class="adm-ov-status ${figures.stuck ? 'danger' : ''}">${figures.stuck === 0
+      <${Section} title=${O('stuckQ')} count="01"
+        actions=${html`<${Action} onClick=${() => scrollToId('adm-oo-acts')}>${O('whatDoor')}<//>`}>
+        <${Columns} collapse=${900}>
+          <${Stack} density="compact">
+            <${Text} kind="heading" tone=${figures.stuck ? 'danger' : 'plain'}>${figures.stuck === 0
     ? O('stuckWordNone')
-    : figures.stuck === 1 ? O('stuckWordOne') : O('stuckWord', { count: figures.stuck })}</div>
-            <p class="adm-alert-line">${O('lead')}</p>
-            <div class="adm-ov-up">
-              ${O('leadCount', { total: num(figures.total) })}<br />
-              ${O('leadOff', { count: rows.filter(r => r.stuck && r.ownerStates.some(o => o.state === 'off')).length })}<br />
-              ${O('leadGone', { count: rows.filter(r => r.ownerStates.some(o => o.state === 'gone')).length })}
-            </div>
-          </div>
+    : figures.stuck === 1 ? O('stuckWordOne') : O('stuckWord', { count: figures.stuck })}<//>
+            <${Text}>${O('lead')}<//>
+            <${Text} kind="mono" tone="muted">${O('leadCount', { total: num(figures.total) })}<//>
+            <${Text} kind="mono" tone="muted">${O('leadOff', { count: rows.filter(r => r.stuck && r.ownerStates.some(o => o.state === 'off')).length })}<//>
+            <${Text} kind="mono" tone="muted">${O('leadGone', { count: rows.filter(r => r.ownerStates.some(o => o.state === 'gone')).length })}<//>
+          <//>
           <div>
-            ${figures.stuckRows.map((r, i) => html`
-              <${Row}
+            ${figures.stuckRows.map((r) => html`
+              <${Row} key=${r.id}
                 title=${r.name}
                 why=${stuckWhy(r)}
                 chip=${html`<${Badge} type="danger" label=${O('stuckBadge')} />`}
-                value=${html`<button type="button" class="adm-oo-act adm-oo-act--hot" onClick=${() => open(r.id)}>${O('putBack')}</button>`}
-                last=${i === figures.stuckRows.length - 1 && figures.stuck === figures.total} />`)}
+                value=${html`<${Action} kind="text" tone="danger" onClick=${() => open(r.id)}>${O('putBack')}<//>`} />`)}
             ${figures.stuck < figures.total && html`
               <${Row}
                 title=${figures.stuck ? O('allFine') : O('nothingStuck')}
                 why=${figures.stuck
     ? O('allFineWhy', { count: num(figures.total - figures.stuck) })
     : O('nothingStuckWhy')}
-                value=${num(figures.total - figures.stuck) + ' / ' + num(figures.total)}
-                last=${true} />`}
+                value=${num(figures.total - figures.stuck) + ' / ' + num(figures.total)} />`}
           </div>
-        </div>
-      </section>
+        <//>
+      <//>
 
-      <div class="og-strip">
-        <div><b>${num(figures.total)}</b><span>${O('stripOrganisms')}</span><small>${O('stripOrganismsSub')}</small></div>
-        <div><b class=${figures.stuck ? 'og-coral-num' : ''}>${num(figures.stuck)}</b><span>${O('stripStuck')}</span><small>${O('stripStuckSub')}</small></div>
-        <div><b>${num(figures.seats)}</b><span>${O('stripSeats')}</span><small>${O('stripSeatsSub')}</small></div>
-        <div><b>${num(figures.single)}</b><span>${O('stripSingle')}</span><small>${O('stripSingleSub')}</small></div>
-      </div>
+      <${NumeralBand} tone="plain" items=${[
+    { label: O('stripOrganisms'), value: num(figures.total), note: O('stripOrganismsSub') },
+    { label: O('stripStuck'), value: num(figures.stuck), note: O('stripStuckSub'), tone: figures.stuck ? 'coral' : undefined },
+    { label: O('stripSeats'), value: num(figures.seats), note: O('stripSeatsSub') },
+    { label: O('stripSingle'), value: num(figures.single), note: O('stripSingleSub') },
+  ]} />
 
-      <section class="og-sec">
-        <div class="og-sec-h">
-          <h2 class="poster-section-title">${O('every')}<small>02</small></h2>
-          <div class="og-doors">
-            <button type="button" class="og-door og-door--quiet" onClick=${() => setOldestFirst(v => !v)}>
-              ${oldestFirst ? O('orderNewest') : O('orderOldest')}</button>
-          </div>
-        </div>
+      <${Section} title=${O('every')} count="02"
+        actions=${html`<${Action} onClick=${() => setOldestFirst(v => !v)}>${oldestFirst ? O('orderNewest') : O('orderOldest')}<//>`}>
+        <${Stack}>
+          ${listing && listing.complete === false && html`
+            <${Surface} kind="aside" density="compact"><${Text}>${O('partial', { count: num(listing.count) })}<//><//>`}
 
-        ${listing && listing.complete === false && html`
-          <p class="adm-oo-warn poster-aside">${O('partial', { count: num(listing.count) })}</p>`}
+          <${Toolbar} label=${O('every')} filters=${filters}
+            search=${{ label: O('find'), placeholder: O('findPlaceholder'), value: query, onInput: e => { setQuery(e.target.value); setAll(false); } }} />
 
-        <div class="adm-oo-find">
-          <div class="adm-oo-fld">
-            <div class="adm-oo-lbl">${O('find')}</div>
-            <input type="search" class="adm-oo-input" value=${query} placeholder=${O('findPlaceholder')}
-              onInput=${e => { setQuery(e.target.value); setAll(false); }} />
-          </div>
-          <div class="adm-oo-chips">
-            ${FILTERS.map(id => chip(id, O(FILTER_LABEL[id], { count: num(chips[id]) })))}
-          </div>
-        </div>
-
-        <div class="adm-oo-row adm-oo-row--head">
-          <div class="adm-oo-n poster-stat-number poster-stat-number--small">#</div>
-          <div>${O('colOrganism')}</div>
-          <div>${O('colHeld')}</div>
-          <div class="adm-oo-people-head">${O('colPeople')}</div>
-          <div>${O('colCreated')}</div>
-          <div></div>
-        </div>
-
-        ${shown.length === 0
+          ${shown.length === 0
     ? html`<${Empty} text=${O('none')} />`
-    : shown.map((r, i) => html`
-          <div class="adm-oo-row ${r.stuck ? 'is-stuck' : ''} ${r.id === openId ? 'is-open' : ''}">
-            <div class="adm-oo-n poster-stat-number poster-stat-number--small">${String(oldestFirst ? found.length - i : i + 1).padStart(2, '0')}</div>
-            <div class="adm-oo-nm">
-              <button type="button" class="adm-oo-name" onClick=${() => open(r.id)}>${r.name}</button>
-              <em>${r.id.split('-')[0]}</em>
-            </div>
-            <div class="adm-oo-held">
-              ${r.ownerStates.map(o => html`
-                <span class="adm-oo-chip ${o.state === 'ok' ? '' : 'adm-oo-chip--bad'}">${o.name}</span>`)}
-            </div>
-            <div class="adm-oo-num">${r.members}</div>
-            <div class="adm-oo-day">${day(r.createdAt)}</div>
-            <div class="adm-oo-acts-cell">
-              ${r.stuck
-    ? html`<button type="button" class="adm-oo-act adm-oo-act--hot" onClick=${() => open(r.id)}>${O('putBack')}</button>`
-    : html`<button type="button" class="adm-oo-act" onClick=${() => open(r.id)}>${O('open')}</button>`}
-            </div>
-          </div>`)}
+    : html`<${Table} density="compact" collapse=${600} label=${O('every')}
+              headers=${['#', O('colOrganism'), O('colHeld'), O('colPeople'), O('colCreated'), '']}
+              rows=${shown.map(cells)} />`}
 
-        ${found.length > PAGE && html`
-          <div class="adm-oo-more">
-            <span>${O('shown', { shown: num(shown.length), total: num(found.length) })}</span>
-            ${!all && html`<button type="button" class="og-door" onClick=${() => setAll(true)}>${O('showRest')}</button>`}
-          </div>`}
-      </section>
+          ${found.length > PAGE && html`
+            <${Stack} direction="horizontal" align="between">
+              <${Text} kind="caption" tone="muted">${O('shown', { shown: num(shown.length), total: num(found.length) })}<//>
+              ${!all && html`<${Action} onClick=${() => setAll(true)}>${O('showRest')}<//>`}
+            <//>`}
+        <//>
+      <//>
 
       ${openRow && html`
         <${OrganismDetail}
@@ -289,22 +259,21 @@ export default function OrganismOwnershipTab({ data, reload }) {
           onClose=${() => { setOpenId(null); setOwnership(null); }}
           onAdd=${askAdd} />`}
 
-      <section class="og-sec adm-oo-acts-sec">
-        <div class="og-sec-h"><h2 class="poster-section-title">${O('actsTitle')}<small>${openRow ? '04' : '03'}</small></h2></div>
-        <div class="adm-oo-two">
-          <div class="og-box poster-aside poster-aside--small">
-            <span class="og-box-label">${O('crossLabel')}</span>
-            <p>${O('crossBody')}</p>
-            <p class="adm-oo-rule">${O('crossRule')}</p>
-          </div>
-          <div class="og-box og-box--solid poster-aside poster-aside--small poster-aside--irreversible">
-            <span class="og-box-label">${O('addsLabel')}</span>
-            <p>${O('addsBody')}</p>
-            <p class="adm-oo-rule">${O('addsRule')}</p>
-          </div>
-        </div>
-      </section>
+      <${Section} id="adm-oo-acts" title=${O('actsTitle')} count=${openRow ? '04' : '03'}>
+        <${Columns} collapse=${640}>
+          <${Surface} kind="aside" density="compact"><${Stack} density="compact">
+            <${Text} kind="label">${O('crossLabel')}<//>
+            <${Text}>${O('crossBody')}<//>
+            <${Text}><strong>${O('crossRule')}</strong><//>
+          <//><//>
+          <${Surface} kind="aside" tone="danger" density="compact"><${Stack} density="compact">
+            <${Text} kind="label">${O('addsLabel')}<//>
+            <${Text}>${O('addsBody')}<//>
+            <${Text}><strong>${O('addsRule')}</strong><//>
+          <//><//>
+        <//>
+      <//>
 
       <${ConfirmUI} />
-    </div>`;
+    <//>`;
 }

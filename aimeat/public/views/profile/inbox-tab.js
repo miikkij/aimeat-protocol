@@ -14,6 +14,16 @@
  *   (./inbox-tab/use-thread-ux.js)
  * @usage Lazy-loaded profile tab; registered in profile.js TABS as id `messages`.
  * @version-history
+ *   v3.1.0 -- 2026-09-22 -- A workspace page again, as the inbox sheet made it: on a desktop the list
+ *     and the open conversation fill the window under the shell's header (measured into
+ *     --workspace-height) in filling columns that each scroll, the composer at the bottom; on a phone
+ *     an open conversation is the whole screen, the way back at the top, the thread filling the
+ *     middle and the composer at the bottom, sized to the space above the keyboard.
+ *   v3.0.0 -- 2026-09-22 -- Composed from the shared component set: the page is a Page (the trail,
+ *     Messages with its figures as chips, the actions at the right; broadcast, tracked responses,
+ *     results and list rules are pages with an index rail back), the two panes are Columns, and on a
+ *     phone one pane at a time as before (useNarrowScreen instead of a sheet rule). The inbox sheets
+ *     are gone. Every loader, handler and live-update listener is unchanged.
  *   v2.4.0 -- 2026-09-13 -- Compose inbox top rules from poster.css.
  *   v2.3.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v2.2.0 -- 2026-09-13 -- The list is in sections the server places (people, own agents, a rule's
@@ -170,7 +180,8 @@ import { ListPanel } from './inbox-tab/list-panel.js';
 import { OrganizePage } from './inbox-tab/organize-page.js';
 import { useInboxOrganize } from './inbox-tab/use-organize.js';
 import { broadcastSend } from './inbox-tab/broadcast-send.js';
-import { useThreadAutoScroll, useMobileComposerKeyboard, useLinkPreviewToggle, useAttachmentUrlRefresh, useRecentBroadcasts } from './inbox-tab/use-thread-ux.js';
+import { useThreadAutoScroll, useMobileComposerKeyboard, useLinkPreviewToggle, useAttachmentUrlRefresh, useRecentBroadcasts, useNarrowScreen } from './inbox-tab/use-thread-ux.js';
+import { Page, Rail, Columns, Stack, Action, Chip, Field, Text } from '/components/poster-parts.js';
 import { useVoiceMessages } from './inbox-tab/use-voice.js';
 import { ContactPicker } from '/components/ContactPicker.js';
 import { useConfirm } from '/components/Modal.js';
@@ -471,7 +482,10 @@ export default function InboxTab({ showToast }) {
   // Auto-scroll (open / near-bottom follow / one-time jump on a NEW message) + mobile keyboard
   // ergonomics (--inbox-kb + composer focus scroll) — extracted to ./inbox-tab/use-thread-ux.js.
   useThreadAutoScroll(msgsRef, mode, thread, activeConv);
-  useMobileComposerKeyboard(mode);
+  const narrow = useNarrowScreen();
+  // The page root, where the phone keyboard handler publishes the space above the keyboard.
+  const pageRef = useRef(null);
+  useMobileComposerKeyboard(mode, pageRef, msgsRef);
 
   const openConversation = async (conv) => {
     setActiveConv(conv); setMode('thread');
@@ -671,74 +685,53 @@ export default function InboxTab({ showToast }) {
     addBcRecipient, myGroups, bcGroupId, setBcGroupId, isOperator, bcAudience, setBcAudience, sending, doBroadcast,
   });
 
-  return html`
-    <div class=${`inbox og og-ib${mode !== 'idle' ? ' inbox--panel' : ''}`}>
-      <div class="og-crumb">
-        <span>${t('nav.profile') || 'Settings'}</span><span>/</span>
-        ${isPage ? html`<button type="button" class="og-crumb-link" onClick=${goIdle}>${t('inbox.title')}</button><span>/</span><span class="og-crumb-here">${pageTitle}</span>`
-          : html`<span class="og-crumb-here">${t('inbox.title')}</span>`}
-      </div>
-      <div class="og-mast og-mast--page">
-        <div class="og-mast-words">
-          <h1 class="og-title poster-page-title">${isPage ? pageTitle : t('inbox.title')}${!isPage ? html`<small>
-            <span>${(t('inbox.cover.figConvs') || '{n} conversations').replace('{n}', String(convTotal))}</span>
-            ${unreadTotal ? html`<span class="og-chip og-chip--sun">${(t('inbox.cover.figUnread') || '{n} unread').replace('{n}', String(unreadTotal))}</span>` : null}
-            ${requests.length ? html`<span class="og-chip">${(t('inbox.cover.figRequests') || '{n} requests').replace('{n}', String(requests.length))}</span>` : null}
-            ${archivedTotal ? html`<span class="og-chip">${t('inbox.org.figArchived', { n: String(archivedTotal) })}</span>` : null}
-          </small>` : null}</h1>
-        </div>
-        ${!isPage ? html`<div class="og-mast-actions"><div class="og-doors og-ib-actions">
-          <button type="button" class="og-slab" onClick=${startCompose}>${t('inbox.new')}</button>
-          <button type="button" class="og-door" onClick=${startBroadcast}>${t('inbox.broadcast')}</button>
-          <button type="button" class=${`og-door${awaitingCount ? '' : ' og-door--quiet'}`} onClick=${() => { setMode('tracked'); setActiveConv(null); }} title=${awaitingCount ? t('inbox.trackReady') : ''}>${t('inbox.trackedTitle')}${activeTracked.length ? ` ${activeTracked.length}` : ''}</button>
-          ${recentBroadcasts.length ? html`<button type="button" class="og-door og-door--quiet" onClick=${() => { setMode('results'); setResultsId(null); setActiveConv(null); }}>${t('inbox.results')}</button>` : null}
-          <button type="button" class="og-door og-door--quiet" onClick=${openOrganize}>${t('inbox.org.door')}</button>
-        </div></div>` : null}
-      </div>
-      <datalist id="inbox-contact-suggest">
-        ${contactOptions.map(c => html`<option value=${c.id} key=${c.id}>${c.label}</option>`)}
-      </datalist>
+  // A phone with a conversation or a new message open: one pane, the whole screen.
+  const phoneOpen = narrow && !isPage && mode !== 'idle';
+  // The list and what is open fill the window under the shell's header and each scroll on their own
+  // (a workspace page); on a phone that is only while something is open, and the list scrolls with
+  // the page as it always has.
+  const workspace = !isPage && (!narrow || phoneOpen);
+  const openTrackedPage = () => { setMode('tracked'); setActiveConv(null); };
+  const openResultsPage = () => { setMode('results'); setResultsId(null); setActiveConv(null); };
+  const crumbs = [{ label: t('nav.profile') || 'Settings' },
+    isPage ? { label: t('inbox.title'), onClick: goIdle } : { label: t('inbox.title') },
+    isPage ? { label: pageTitle } : null].filter(Boolean);
+  const figures = !isPage && (unreadTotal || requests.length || archivedTotal) ? html`<${Stack} direction="wrap" density="compact">
+    ${unreadTotal ? html`<${Chip} tone="sun">${(t('inbox.cover.figUnread') || '{n} unread').replace('{n}', String(unreadTotal))}<//>` : null}
+    ${requests.length ? html`<${Chip}>${(t('inbox.cover.figRequests') || '{n} requests').replace('{n}', String(requests.length))}<//>` : null}
+    ${archivedTotal ? html`<${Chip} tone="muted">${t('inbox.org.figArchived', { n: String(archivedTotal) })}<//>` : null}
+  <//>` : null;
+  // One loud action on the screen: New message while the list is all there is, Send once a
+  // conversation or a new message is open beside it.
+  const doors = isPage ? null : html`
+    <${Action} kind=${mode === 'idle' ? 'primary' : 'secondary'} onClick=${startCompose}>${t('inbox.new')}<//>
+    <${Action} onClick=${startBroadcast}>${t('inbox.broadcast')}<//>
+    <${Action} onClick=${openTrackedPage} title=${awaitingCount ? t('inbox.trackReady') : ''}>${t('inbox.trackedTitle')}${activeTracked.length ? ` ${activeTracked.length}` : ''}<//>
+    ${recentBroadcasts.length ? html`<${Action} onClick=${openResultsPage}>${t('inbox.results')}<//>` : null}
+    <${Action} onClick=${openOrganize}>${t('inbox.org.door')}<//>`;
+  const rail = isPage ? html`<${Rail} kind="index" title=${t('inbox.title')} entries=${[
+    { id: 'back', label: `↩ ${t('inbox.cover.backToMessages') || 'Back to messages'}`, onClick: goIdle },
+    { id: 'broadcast', label: t('inbox.broadcast'), onClick: startBroadcast, current: mode === 'broadcast' },
+    { id: 'tracked', label: t('inbox.trackedTitle'), onClick: openTrackedPage, current: mode === 'tracked', count: activeTracked.length || undefined },
+    recentBroadcasts.length ? { id: 'results', label: t('inbox.results'), onClick: openResultsPage, current: mode === 'results', count: recentBroadcasts.length } : null,
+    { id: 'organize', label: t('inbox.org.door'), onClick: openOrganize, current: mode === 'organize' },
+  ].filter(Boolean)} />` : null;
 
-      ${isPage ? html`
-        <div class="og-grid og-ib-page">
-          <div class="og-main poster-row--thing">
-            ${broadcastForm}
-            ${mode === 'results' ? html`<${ResultsPanel} resultsId=${resultsId} recentBroadcasts=${recentBroadcasts}
-              results=${results} openResults=${openResults} setResultsId=${setResultsId} setResults=${setResults} />` : null}
-            ${mode === 'tracked' ? html`<${TrackedPanel} activeTracked=${activeTracked} doneCount=${doneCount}
-              openRecord=${openRecord} openTracked=${openTracked} cancelTracked=${cancelTracked} />` : null}
-            ${mode === 'organize' ? html`<${OrganizePage} org=${org} showToast=${showToast} />` : null}
-          </div>
-          <nav class="og-rail" aria-label=${t('inbox.title')}>
-            <span class="og-rail-label">${t('inbox.title')}</span>
-            <button type="button" class="og-rail-link" onClick=${goIdle}><i>←</i>${t('inbox.cover.backToMessages') || 'Back to messages'}</button>
-            <hr />
-            <button type="button" class=${`og-rail-link ${mode === 'broadcast' ? 'on' : ''}`} onClick=${startBroadcast}><i>·</i>${t('inbox.broadcast')}<em>→</em></button>
-            <button type="button" class=${`og-rail-link ${mode === 'tracked' ? 'on' : ''}`} onClick=${() => { setMode('tracked'); setActiveConv(null); }}><i>·</i>${t('inbox.trackedTitle')}<em>${activeTracked.length || '→'}</em></button>
-            ${recentBroadcasts.length ? html`<button type="button" class=${`og-rail-link ${mode === 'results' ? 'on' : ''}`} onClick=${() => { setMode('results'); setResultsId(null); setActiveConv(null); }}><i>·</i>${t('inbox.results')}<em>${recentBroadcasts.length}</em></button>` : null}
-            <button type="button" class=${`og-rail-link ${mode === 'organize' ? 'on' : ''}`} onClick=${openOrganize}><i>·</i>${t('inbox.org.door')}<em>→</em></button>
-          </nav>
-        </div>` : html`
-      <div class=${`inbox-body poster-row--thing${mode !== 'idle' ? ' inbox-body--panel' : ''}`}>
-        <button class="inbox-back" onClick=${goIdle}>← ${t('inbox.back')}</button>
-        <${ListPanel} requests=${requests} conversations=${conversations} activeConv=${activeConv}
-          peerDisplay=${peerDisplay} accept=${accept} block=${block} openConversation=${openConversation}
-          openFolds=${openFolds} toggleFold=${toggleFold} org=${org} />
+  const listPane = html`<${ListPanel} requests=${requests} conversations=${conversations} activeConv=${activeConv}
+    peerDisplay=${peerDisplay} accept=${accept} block=${block} openConversation=${openConversation}
+    openFolds=${openFolds} toggleFold=${toggleFold} org=${org} narrow=${narrow} />`;
+  const openPane = html`
+    ${mode === 'compose' ? html`
+      <${Stack}>
+        <${Text} kind="heading" size="small">${t('inbox.new')}<//>
+        <${ContactPicker} value=${to} onChange=${setTo} valueMode="full" placeholder=${t('inbox.toPlaceholder')} />
+        <${Field} ariaLabel=${t('inbox.subjectPlaceholder')} placeholder=${t('inbox.subjectPlaceholder')}
+          value=${composeSubject} onInput=${(e) => setComposeSubject(e.target.value)} />
+        <${Composer} key="c-new" recipient=${to.trim()} sendLabel=${t('inbox.send')}
+          sending=${sending} onSend=${doSend} draftKey="aimeat.inbox.draft.new" />
+      <//>` : null}
 
-        ${mode === 'compose' ? html`
-          <div class="inbox-panel">
-            <div class="inbox-thread-head"><div class="inbox-name">${t('inbox.new')}</div></div>
-            <div class="inbox-compose-fields">
-              <${ContactPicker} value=${to} onChange=${setTo} valueMode="full"
-                placeholder=${t('inbox.toPlaceholder')} />
-              <input class="inbox-input" type="text" placeholder=${t('inbox.subjectPlaceholder')}
-                value=${composeSubject} onInput=${(e) => setComposeSubject(e.target.value)} />
-            </div>
-            <${Composer} key="c-new" recipient=${to.trim()} sendLabel=${t('inbox.send')}
-              sending=${sending} onSend=${doSend} draftKey="aimeat.inbox.draft.new" />
-          </div>` : null}
-
-        ${mode === 'thread' && activeConv ? html`<${ThreadPanel}
+    ${mode === 'thread' && activeConv ? html`<${ThreadPanel}
           activeConv=${activeConv} thread=${thread} urlMap=${urlMap} important=${important} trackedByMsg=${trackedByMsg}
           awaitingForConv=${awaitingForConv} awaitingDrafts=${awaitingDrafts} schedOpen=${schedOpen} setSchedOpen=${setSchedOpen}
           cmdFill=${cmdFill} agentCommands=${agentCommands} sending=${sending} draftPrefill=${draftPrefill} prefillNonce=${prefillNonce}
@@ -748,15 +741,36 @@ export default function InboxTab({ showToast }) {
           setMdViewer=${setMdViewer} openConversationAi=${openConversationAi} openConversationNotebook=${openConversationNotebook} insertCommand=${insertCommand} setCmdFill=${setCmdFill}
           cancelTracked=${cancelTracked} openRecord=${openRecord} startSuggestedReply=${startSuggestedReply} doSend=${doSend} showLinkPreviews=${showLinkPreviews} toggleLinkPreviews=${toggleLinkPreviews}
           threadAll=${threadAll} toggleThreadAll=${toggleThreadAll} archiveItem=${org.menuItemFor(activeConv, conversations)}
-          onTranscribe=${transcribeVoice} canTranscribe=${canTranscribe} voiceMaxSeconds=${voiceMaxSeconds} />` : null}
+          onTranscribe=${transcribeVoice} canTranscribe=${canTranscribe} voiceMaxSeconds=${voiceMaxSeconds} fill=${workspace} />` : null}
 
-        ${mode === 'idle' ? html`
-          <div class="inbox-panel inbox-panel--empty">
-            <div class="inbox-empty">
-              <div>${t('inbox.selectConversation')}</div>
-            </div>
-          </div>` : null}
-      </div>`}
+    ${mode === 'idle' ? html`<${Stack} align="center"><${Text} tone="muted">${t('inbox.selectConversation')}<//><//>` : null}`;
+
+  // Two panes: the list at the left, what is open at the right. On a phone one pane at a time — the
+  // list, or the open conversation with a way back to it.
+  const body = isPage ? html`
+      ${broadcastForm}
+      ${mode === 'results' ? html`<${ResultsPanel} resultsId=${resultsId} recentBroadcasts=${recentBroadcasts}
+        results=${results} openResults=${openResults} setResultsId=${setResultsId} setResults=${setResults} />` : null}
+      ${mode === 'tracked' ? html`<${TrackedPanel} activeTracked=${activeTracked} doneCount=${doneCount}
+        openRecord=${openRecord} openTracked=${openTracked} cancelTracked=${cancelTracked} />` : null}
+      ${mode === 'organize' ? html`<${OrganizePage} org=${org} showToast=${showToast} />` : null}`
+    : phoneOpen ? html`
+        <${Stack} direction="horizontal"><${Action} kind="text" onClick=${goIdle}>↩ ${t('inbox.back')}<//><//>
+        ${openPane}`
+    : narrow ? listPane
+    : html`<${Columns} layout="equal" collapse=${640} fill=${true}>${listPane}<${Stack}>${openPane}<//><//>`;
+
+  // An open conversation on a phone is the whole screen, as it always was here: no masthead, the way
+  // back at the top, the thread in between and the composer at the bottom.
+  return html`
+    <${Page} layout=${workspace ? 'workspace' : undefined} pageRef=${pageRef}
+      crumbs=${phoneOpen ? undefined : crumbs} title=${phoneOpen ? undefined : (isPage ? pageTitle : t('inbox.title'))}
+      subtitle=${isPage || phoneOpen ? undefined : (t('inbox.cover.figConvs') || '{n} conversations').replace('{n}', String(convTotal))}
+      identity=${phoneOpen ? null : figures} actions=${phoneOpen ? null : doors} rail=${rail}>
+      <datalist id="inbox-contact-suggest">
+        ${contactOptions.map(c => html`<option value=${c.id} key=${c.id}>${c.label}</option>`)}
+      </datalist>
+      ${body}
 
       <${ConfirmUI} />
       <${TrackResponseModal} open=${!!trackMsg} msg=${trackMsg}
@@ -766,5 +780,5 @@ export default function InboxTab({ showToast }) {
       ${nbConv && html`<${ConversationToNotebookPopover} title=${nbConv.title} promptText=${nbConv.promptText}
         runServerSummary=${nbConv.runServerSummary} parkConversation=${nbConv.parkConversation}
         showToast=${showToast} onClose=${() => setNbConv(null)} />`}
-    </div>`;
+    <//>`;
 }

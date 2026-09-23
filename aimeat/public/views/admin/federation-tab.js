@@ -23,6 +23,9 @@
  *   - FederationTab (default) — one read, six sections, and the actions
  * @usage Mounted by the admin dashboard tab router.
  * @version-history
+ *   v3.0.0 -- 2026-09-22 -- Composed from the shared component set: sections, the metric row, the
+ *     shared copy action and the paste in a code surface. A section door scrolls only the content
+ *     area. The page's own sheet is gone.
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v2.1.0 — 2026-09-13 — Compose section headings from the shared poster B1 shape.
  *   v2.0.0 — 2026-09-12 — The poster face. One read (GET /v1/admin/federation/overview) that carries
@@ -47,10 +50,9 @@ import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { useViewCSS } from '/components/useViewCSS.js';
 import { onLiveUpdate } from '/lib/live-updates.js';
 import { Spinner, ErrorBox, useToast, Toast, Row } from './shared.js';
-import { CopyButton } from '/components/CopyButton.js';
+import { Section, Columns, Stack, CopyAction, Surface, Text, scrollToId } from '/components/poster-parts.js';
 import { getNodeUrl } from '/js/services/auth.js';
 import { useConfirm } from '/components/Modal.js';
 import { swallowed } from '/js/swallowed.js';
@@ -67,29 +69,22 @@ function AskAi({ overview }) {
   const paste = buildFederationPrompt({
     url: getNodeUrl(), peers: overview.peers.total, standing: overview.standing,
   });
-  return html`
-    <section class="og-sec" id="adm-fed-07">
-      <div class="og-sec-h">
-        <h2 class="poster-section-title">${S('ai.title')}<small>07</small></h2>
-        <div class="og-doors">
-          <${CopyButton} text=${paste} label=${S('ai.copy')} className="og-door og-door--quiet" />
-        </div>
-      </div>
-      <div class="adm-two">
-        <div class="adm-half">
-          <p class="adm-fed-lead">${S('ai.lead')}</p>
-          ${Row({ title: S('ai.tool'), why: S('ai.toolWhy'), chip: null, value: 'aimeat_admin_federation', last: true })}
-        </div>
-        <div class="og-box poster-aside poster-aside--small">
-          <span class="og-box-label">${S('ai.label')}</span>
-          <div class="adm-fed-paste">${paste}</div>
-        </div>
-      </div>
-    </section>`;
+  return html`<${Section} id="adm-fed-07" title=${S('ai.title')} count="07"
+    actions=${html`<${CopyAction} text=${paste} label=${S('ai.copy')} />`}>
+    <${Columns} collapse=${900}>
+      <${Stack}>
+        <${Text} kind="lead">${S('ai.lead')}<//>
+        <div>${Row({ title: S('ai.tool'), why: S('ai.toolWhy'), chip: null, value: 'aimeat_admin_federation' })}</div>
+      <//>
+      <${Surface} kind="aside"><${Stack} density="compact">
+        <${Text} kind="label">${S('ai.label')}<//>
+        <${Surface} kind="code" height="scroll">${paste}<//>
+      <//><//>
+    <//>
+  <//>`;
 }
 
 export default function FederationTab({ data, reload }) {
-  useViewCSS('/css/views/admin-federation.css');
   const livePeers = data.livePeers || [];
   const requests = data.federation || [];
 
@@ -233,7 +228,7 @@ export default function FederationTab({ data, reload }) {
   const onMirrorBook = useCallback(() =>
     run(() => api.pullFederationBook(), S('done.bookMirrored')), [run]);
 
-  const goTo = (id) => () => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const goTo = (id) => () => scrollToId(id);
 
   if (failed && !overview) return html`<${ErrorBox} message=${failed} />`;
   if (!overview) return html`<${Spinner} text=${S('loading')} />`;
@@ -245,7 +240,7 @@ export default function FederationTab({ data, reload }) {
   const peers = livePeers.map(p => ({ ...p, versions_behind: byId.get(p.node_id)?.versions_behind ?? null }));
   const history = requests.filter(r => r.status !== 'pending');
 
-  return html`<div class="adm-fed">
+  return html`<${Stack}>
     ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
 
     <${WhereWeStand} data=${overview}
@@ -275,5 +270,5 @@ export default function FederationTab({ data, reload }) {
     <${AskAi} overview=${overview} />
     <${Reference} />
     <${ConfirmUI} />
-  </div>`;
+  <//>`;
 }

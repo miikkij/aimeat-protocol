@@ -15,13 +15,17 @@
  *   "what is the money going on" is a ranking, never a time series.
  *
  *   THE ONE CHART THAT STAYS answers the question the page exists for, over time, with the only
- *   split that changes what an operator does: your key, and everybody else's. Two series, its own
- *   axis, and a legend because there are two.
+ *   split that changes what an operator does: your key, and everybody else's. Two series, so the
+ *   shared chart's palette never cycles; its tooltip carries the day's reading that the hand-drawn
+ *   chart showed above the plot.
  * @structure
- *   - WhereItWent (02) — the models ranked, with the tail folded and the unpriced calls explained
- *   - ByDay (03) — one chart, two series, with a hover readout and the numbers behind a door
+ *   - WhereItWent (02) — the models ranked in a table, a meter per row for the share
+ *   - ByDay (03) — one chart, two series, with the numbers behind a door
  * @usage Imported by views/admin/usage-tab.js.
  * @version-history
+ *   v1.2.0 -- 2026-09-22 -- Composed from the shared component set: the models are a shared table
+ *     with a progress meter for the share, and the by-day chart is the shared UsageChart with two
+ *     series, so the page needs no sheet of its own.
  *   v1.1.0 -- 2026-09-13 -- Compose shared B1 headings; SVG data carries chart ratios and readings.
  *   v1.0.0 — 2026-09-12 — Initial (the Usage page in the poster face).
  */
@@ -30,7 +34,9 @@ import { useState } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { num } from './shared.js';
+import { num, Empty } from './shared.js';
+import { Section, Stack, Text, Action, Table, Meter } from '/components/poster-parts.js';
+import { UsageChart, colorForIndex } from '/components/UsageChart.js';
 
 const S = (key, params) => t('admin.usage.' + key, params);
 
@@ -52,24 +58,27 @@ export function compact(n) {
 
 const pct = (share) => Math.round((Number(share) || 0) * 100);
 
-/** One model, or the folded tail. `tail` greys the bar: it is many models, not one. */
-function ModelRow({ name, why, cost, calls, unpriced, share, widest, tail, last }) {
+/**
+ * One model, or the folded tail, as a table row. `tail` sets the name in bold: it is many models, not one.
+ * @param {{ name: any, why: any, cost: any, calls: any, unpriced: any, share: any, widest: any, tail?: boolean }} row
+ */
+function modelRow({ name, why, cost, calls, unpriced, share, widest, tail = false }) {
   // A floor, but only above zero: `Math.max(2, …)` on its own drew a visible bar for a row that
   // spent nothing, which is the same lie as a chart drawing axes over no data.
   const width = cost > 0 && widest > 0 ? Math.max(2, Math.round((cost / widest) * 100)) : 0;
-  return html`
-    <div class="adm-us-brow ${last ? 'adm-us-brow--last' : ''}">
-      <span>${tail ? html`<b>${name}</b>` : html`<span class="adm-us-mono">${name}</span>`}
-        ${why ? html`<span class="adm-why">${why}</span>` : null}</span>
-      <span class="adm-us-num adm-us-num--strong">${usd(cost)}</span>
-      <span class="adm-us-num">${num(calls)}</span>
-      <span class="adm-us-num">${unpriced ? num(unpriced) : '—'}</span>
-      <span class="adm-us-bar">
-        <svg class=${tail ? 'adm-us-bar-fill adm-us-bar-fill--tail' : 'adm-us-bar-fill'}
-           width=${width + '%'} aria-hidden="true"></svg>
-        <span>${pct(share)}%</span>
-      </span>
-    </div>`;
+  return [
+    html`<${Stack} density="compact">
+      ${tail ? html`<strong>${name}</strong>` : html`<${Text} kind="mono">${name}<//>`}
+      ${why ? html`<${Text} kind="caption" tone="muted">${why}<//>` : null}
+    <//>`,
+    { text: usd(cost), align: 'end' },
+    { text: num(calls), align: 'end' },
+    { text: unpriced ? num(unpriced) : '—', align: 'end' },
+    html`<${Stack} density="compact">
+      <${Meter} kind="progress" value=${width} max=${100} label=${pct(share) + '%'} />
+      <${Text} kind="caption" tone="muted">${pct(share)}%<//>
+    <//>`,
+  ];
 }
 
 /** Section 02: where the money went. */
@@ -81,41 +90,31 @@ export function WhereItWent({ models }) {
 
   if (!rows.length) {
     return html`
-      <section class="og-sec" id="adm-us-02">
-        <div class="og-sec-h"><h2 class="poster-section-title">${S('went.title')}<small>02</small></h2></div>
-        <div class="adm-us-empty">${S('went.empty')}</div>
-      </section>`;
+      <${Section} id="adm-us-02" title=${S('went.title')} count="02">
+        <${Empty} text=${S('went.empty')} />
+      <//>`;
   }
 
   return html`
-    <section class="og-sec" id="adm-us-02">
-      <div class="og-sec-h">
-        <h2 class="poster-section-title">${S('went.title')}<small>02</small></h2>
-      </div>
-      <p class="adm-us-lead">${S('went.lead', { n: rows.length })}</p>
-
-      <div class="adm-us-brow adm-us-brow--head">
-        <span>${S('went.model')}</span>
-        <span class="adm-us-num">${S('went.cost')}</span>
-        <span class="adm-us-num">${S('went.calls')}</span>
-        <span class="adm-us-num">${S('went.noPrice')}</span>
-        <span>${S('went.share')}</span>
-      </div>
-
-      ${rows.map((m, i) => html`<${ModelRow}
-        name=${m.model}
-        why=${m.providers?.length ? m.providers.join(' · ') : null}
-        cost=${m.cost_usd} calls=${m.calls} unpriced=${m.unpriced_calls} share=${m.share}
-        widest=${widest} last=${!other && i === rows.length - 1} />`)}
-
-      ${other ? html`<${ModelRow}
-        name=${S('went.otherTitle', { n: other.models })}
-        why=${other.names.slice(0, 6).join(' · ')}
-        cost=${other.cost_usd} calls=${other.calls} unpriced=${other.unpriced_calls}
-        share=${other.share} widest=${widest} tail=${true} last=${true} />` : null}
-
-      ${unpriced.calls
-    ? html`<p class="adm-us-note">${
+    <${Section} id="adm-us-02" title=${S('went.title')} count="02" description=${S('went.lead', { n: rows.length })}>
+      <${Stack}>
+        <${Table} density="compact" label=${S('went.title')}
+          headers=${[S('went.model'), S('went.cost'), S('went.calls'), S('went.noPrice'), S('went.share')]}
+          rows=${[
+    ...rows.map((m) => modelRow({
+      name: m.model,
+      why: m.providers?.length ? m.providers.join(' · ') : null,
+      cost: m.cost_usd, calls: m.calls, unpriced: m.unpriced_calls, share: m.share, widest,
+    })),
+    ...(other ? [modelRow({
+      name: S('went.otherTitle', { n: other.models }),
+      why: other.names.slice(0, 6).join(' · '),
+      cost: other.cost_usd, calls: other.calls, unpriced: other.unpriced_calls,
+      share: other.share, widest, tail: true,
+    })] : []),
+  ]} />
+        ${unpriced.calls
+    ? html`<${Text} kind="caption" tone="muted">${
       unpriced.on_models_that_charge
         ? S('went.unpricedSome', {
           n: num(unpriced.calls),
@@ -123,82 +122,42 @@ export function WhereItWent({ models }) {
           missing: usd(unpriced.estimated_missing_usd),
         })
         : S('went.unpricedFree', { n: num(unpriced.calls), tail: num(unpriced.in_the_tail) })
-    }</p>`
+    }<//>`
     : null}
-    </section>`;
+      <//>
+    <//>`;
 }
 
 /** Section 03: one chart, two series, its own axis. */
 export function ByDay({ days }) {
-  const [hover, setHover] = useState(null);
   const [numbers, setNumbers] = useState(false);
   const list = days || [];
   const peak = list.reduce((m, d) => Math.max(m, d.house_usd + d.own_usd), 0);
   const anything = peak > 0;
 
-  const reading = hover === null || !list[hover]
-    ? S('day.axis', { n: usd(peak) })
-    : S('day.reading', {
-      day: list[hover].date,
-      house: usd(list[hover].house_usd),
-      own: usd(list[hover].own_usd),
-    });
-
-  const height = (v) => (!v || !peak ? 0 : Math.max(3, Math.round((v / peak) * 100)));
+  const datasets = [
+    { label: S('day.house'), data: list.map(d => d.house_usd || 0), backgroundColor: colorForIndex(0) },
+    { label: S('day.own'), data: list.map(d => d.own_usd || 0), backgroundColor: colorForIndex(1) },
+  ];
 
   return html`
-    <section class="og-sec" id="adm-us-03">
-      <div class="og-sec-h">
-        <h2 class="poster-section-title">${S('day.title')}<small>03</small></h2>
-        <div class="og-doors">
-          <button type="button" class="og-door og-door--quiet" onClick=${() => setNumbers(v => !v)}>
-            ${numbers ? S('day.showChart') : S('day.showNumbers')}
-          </button>
-        </div>
-      </div>
-      <p class="adm-us-lead">${S('day.lead')}</p>
-
-      ${!anything ? html`<div class="adm-us-empty">${S('day.empty')}</div>`
+    <${Section} id="adm-us-03" title=${S('day.title')} count="03" description=${S('day.lead')}
+      actions=${html`<${Action} onClick=${() => setNumbers(v => !v)} expanded=${numbers}>
+        ${numbers ? S('day.showChart') : S('day.showNumbers')}
+      <//>`}>
+      ${!anything ? html`<${Empty} text=${S('day.empty')} />`
     : numbers ? html`
-      <div class="adm-us-scroll">
-        <table class="adm-us-tbl">
-          <thead><tr>
-            <th>${S('day.day')}</th>
-            <th class="num">${S('day.house')}</th>
-            <th class="num">${S('day.own')}</th>
-          </tr></thead>
-          <tbody>
-            ${list.map(d => html`<tr>
-              <td><b>${d.date}</b></td>
-              <td class="num">${usd(d.house_usd)}</td>
-              <td class="num">${usd(d.own_usd)}</td>
-            </tr>`)}
-          </tbody>
-        </table>
-      </div>`
+      <${Table} density="compact" label=${S('day.title')}
+        headers=${[S('day.day'), S('day.house'), S('day.own')]}
+        rows=${list.map(d => [html`<strong>${d.date}</strong>`, { text: usd(d.house_usd), align: 'end' }, { text: usd(d.own_usd), align: 'end' }])} />`
     : html`
-      <div class="adm-us-chart">
-        <div class="adm-us-chart-h">
-          <span class="adm-us-chart-t">${S('day.chartTitle')}</span>
-          <span class="adm-us-legend">
-            <span><i class="adm-us-key adm-us-key--house"></i>${S('day.house')}</span>
-            <span><i class="adm-us-key adm-us-key--own"></i>${S('day.own')}</span>
-          </span>
-        </div>
-        <span class="adm-us-yhint ${hover === null ? '' : 'adm-us-yhint--on'}">${reading}</span>
-        <div class="adm-us-plot">
-          ${list.map((d, i) => html`
-            <div class="adm-us-day" onMouseEnter=${() => setHover(i)} onMouseLeave=${() => setHover(null)}>
-              <div class="adm-us-pair">
-                <svg class="adm-us-bar-house" height=${height(d.house_usd) + '%'}><title>${`${d.date} · ${S('day.house')} ${usd(d.house_usd)}`}</title></svg>
-                <svg class="adm-us-bar-own" height=${height(d.own_usd) + '%'}><title>${`${d.date} · ${S('day.own')} ${usd(d.own_usd)}`}</title></svg>
-              </div>
-            </div>`)}
-        </div>
-        <div class="adm-us-xaxis">
-          ${list.map(d => html`<span>${String(d.date).slice(5)}</span>`)}
-        </div>
-        <p class="adm-us-note">${S('day.note')}</p>
-      </div>`}
-    </section>`;
+      <${Stack}>
+        <${Stack} direction="wrap" align="between">
+          <${Text} kind="label">${S('day.chartTitle')}<//>
+          <${Text} kind="mono" tone="muted">${S('day.axis', { n: usd(peak) })}<//>
+        <//>
+        <${UsageChart} labels=${list.map(d => String(d.date).slice(5))} datasets=${datasets} height=${180} yFormat=${usd} />
+        <${Text} kind="caption" tone="muted">${S('day.note')}<//>
+      <//>`}
+    <//>`;
 }

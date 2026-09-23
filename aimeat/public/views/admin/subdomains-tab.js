@@ -15,6 +15,10 @@
  *   - Refusals: the four things the route answers no to, in its own words
  * @usage Mounted by the admin dashboard tab router (views/admin.js).
  * @version-history
+ *   v2.3.0 -- 2026-09-22 -- Composed from the shared component set: a section with a numeral band,
+ *     the toolbar for the search and the four filters, each mapping a shared list row with its
+ *     switch and a danger word, the form from shared fields (the domain as the address field's
+ *     suffix), and the delete in the shared dialog; the page's own sheet is gone.
  *   v2.2.0 -- 2026-09-13 -- Compose ink row boundaries from the shared poster class.
  *   v2.1.0 -- 2026-09-13 -- Compose list and add-form headings from the shared B1 shape.
  *   v2.0.1 — 2026-09-13 — The delete dialog's actions sit in the dialog's footer.
@@ -32,10 +36,9 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { date as fmtDate } from '/js/format.js';
-import { useViewCSS } from '/components/useViewCSS.js';
 import { dt, num, Spinner, ErrorBox } from './shared.js';
 import { swallowed } from '/js/swallowed.js';
-import { Modal } from '/components/Modal.js';
+import { Section, Columns, Stack, Text, Action, Chip, ListRow, NumeralBand, Toolbar, Field, Surface, Dialog } from '/components/poster-parts.js';
 import * as adminService from '/js/services/admin.js';
 
 const S = (key, params) => t('admin.subdomains.' + key, params);
@@ -52,11 +55,7 @@ function day(iso) {
   catch (err) { swallowed('subdomains: day', err); return ''; }
 }
 
-/** The magnifier, drawn rather than imported: the page has no icon set of its own. */
-const FindIcon = () => html`<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"></circle><path d="M16 16 L21 21"></path></svg>`;
-
 export default function SubdomainsAdminTab() {
-  useViewCSS('/css/views/admin-subdomains.css');
   const [sites, setSites] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -154,175 +153,145 @@ export default function SubdomainsAdminTab() {
     });
   }, [sites, find, filter]);
 
-  const chip = (id, label) => html`
-    <button type="button" class="adm-subs-chip ${filter === id ? 'on' : ''}" onClick=${() => setFilter(id)}>${label}</button>`;
-
   const row = (s) => {
     // Who mapped it is worth a line only when it is not the owner of the app it serves: on a node
     // where one person publishes everything, that column was the same 45 characters on every row.
     const mappedBy = ownerOf(s.createdBy);
     const foreign = s.kind === 'app' && mappedBy && targetOwnerOf(s.target) !== mappedBy;
-    return html`
-      <div class="adm-subs-row ${s.enabled ? '' : 'is-off'}" key=${s.subdomain}>
-        <a class="adm-subs-name" href=${siteUrl(s.subdomain)} target="_blank" rel="noopener">
-          ${s.subdomain}<em>${apex}</em>${s.kind === 'redirect' ? html`<span class="adm-subs-kind">${S('markRedirect')}</span>` : null}
-        </a>
-        <span class="adm-subs-target">
-          ${s.kind === 'app'
-    ? html`<i>${targetOwnerOf(s.target)}/</i>${String(s.target).slice(targetOwnerOf(s.target).length + 1)}`
-    : s.target}
-          ${foreign ? html`<span class="adm-subs-who">${S('mappedBy', { who: mappedBy })}</span>` : null}
-        </span>
-        <span class="adm-subs-made">${day(s.createdAt)}</span>
-        <span class="adm-subs-acts">
-          <button type="button" class="adm-subs-state ${s.enabled ? '' : 'is-off'}"
-            onClick=${() => toggleEnabled(s)}>${s.enabled ? S('stateOn') : S('stateOff')}</button>
-          <button type="button" class="adm-subs-kill"
-            onClick=${() => setDeleting({ subdomain: s.subdomain, target: s.target, kind: s.kind, createdAt: s.createdAt, typed: '' })}>${S('delete')}</button>
-        </span>
-      </div>`;
+    return html`<${ListRow} key=${s.subdomain} density="compact" muted=${!s.enabled}
+      name=${`${s.subdomain}${apex}`} href=${siteUrl(s.subdomain)} external
+      detail=${s.target + (foreign ? ' · ' + S('mappedBy', { who: mappedBy }) : '')}
+      value=${html`<${Stack} direction="horizontal" align="center" density="compact">
+        ${s.kind === 'redirect' ? html`<${Chip} tone="muted">${S('markRedirect')}<//>` : null}
+        <span>${day(s.createdAt)}</span>
+      <//>`}
+      actions=${html`
+        <${Action} kind="tab" semantics="switch" selected=${!!s.enabled}
+          onClick=${() => toggleEnabled(s)}>${s.enabled ? S('stateOn') : S('stateOff')}<//>
+        <${Action} kind="text" tone="danger"
+          onClick=${() => setDeleting({ subdomain: s.subdomain, target: s.target, kind: s.kind, createdAt: s.createdAt, typed: '' })}>${S('delete')}<//>`} />`;
   };
 
+  const rule = (title, why) => html`<${ListRow} density="compact" name=${title} detail=${why} detailKind="text" />`;
+
   return html`
-    <div class="og adm-subs">
+    <div>
 
-      <section class="og-sec og-sec--first">
-        <div class="og-sec-h"><h2 class="poster-section-title">${S('listTitle')}<small>01</small></h2>
-          <div class="og-doors">
-            <button type="button"
-              class=${!showCreate && sites.length > 0 ? 'adm-btn' : 'og-door og-door--quiet'}
-              onClick=${() => { setShowCreate(!showCreate); setFormError(null); }}>
-              ${showCreate ? t('common.cancel') : S('add')}
-            </button>
-          </div></div>
-        <p class="adm-subs-lead">${S('lead')}</p>
+      <${Section} title=${S('listTitle')} count="01" description=${S('lead')}
+        actions=${html`<${Action} kind=${!showCreate && sites.length > 0 ? 'primary' : 'secondary'}
+          onClick=${() => { setShowCreate(!showCreate); setFormError(null); }}>
+          ${showCreate ? t('common.cancel') : S('add')}
+        <//>`}>
 
-        <div class="og-strip">
-          <div><b>${num(counts.total)}</b><span>${S('stripAddresses')}</span><small>${S('stripAddressesSub')}</small></div>
-          <div><b>${num(counts.apps)}</b><span>${S('stripApps')}</span><small>${S('stripAppsSub')}</small></div>
-          <div><b>${num(counts.redirects)}</b><span>${S('stripRedirects')}</span><small>${S('stripRedirectsSub')}</small></div>
-          <div><b>${num(counts.off)}</b><span>${S('stripOff')}</span><small>${S('stripOffSub')}</small></div>
-        </div>
+        <${NumeralBand} tone="plain" size="small" items=${[
+    { label: S('stripAddresses'), value: num(counts.total), note: S('stripAddressesSub') },
+    { label: S('stripApps'), value: num(counts.apps), note: S('stripAppsSub') },
+    { label: S('stripRedirects'), value: num(counts.redirects), note: S('stripRedirectsSub') },
+    { label: S('stripOff'), value: num(counts.off), note: S('stripOffSub') },
+  ]} />
 
         ${error && html`<${ErrorBox} message=${error} />`}
 
         ${loading ? html`<${Spinner} />` : sites.length === 0 ? html`
-          <div class="adm-subs-empty poster-row--thing">
-            <h3>${S('emptyTitle')}</h3>
-            <p>${S('emptyBody')} <code>sanomat${apex}</code></p>
-            <button class="adm-btn" onClick=${() => setShowCreate(true)}>${S('emptyAdd')}</button>
-          </div>
-          <p class="adm-subs-note">${S('dnsNote')}</p>
+          <${Stack}>
+            <${Text} kind="heading">${S('emptyTitle')}<//>
+            <${Text} tone="muted">${S('emptyBody')} <${Text} kind="mono">sanomat${apex}<//><//>
+            <${Stack} direction="wrap" align="center">
+              <${Action} kind=${showCreate ? 'secondary' : 'primary'} onClick=${() => setShowCreate(true)}>${S('emptyAdd')}<//>
+            <//>
+            <${Text} kind="caption" tone="muted">${S('dnsNote')}<//>
+          <//>
         ` : html`
-          <div class="adm-subs-tools">
-            <div class="adm-subs-find">
-              <${FindIcon} />
-              <input type="text" value=${find} onInput=${e => setFind(e.target.value)} placeholder=${S('findPlaceholder')} />
-            </div>
-            <div class="adm-subs-chips">
-              ${chip('all', S('filterAll'))}
-              ${chip('apps', S('filterApps'))}
-              ${chip('redirects', S('filterRedirects'))}
-              ${chip('off', S('filterOff'))}
-            </div>
-          </div>
+          <${Toolbar} label=${S('listTitle')}
+            search=${{ ariaLabel: S('findPlaceholder'), placeholder: S('findPlaceholder'), value: find, onInput: e => setFind(e.target.value) }}
+            filters=${[
+    { id: 'all', label: S('filterAll'), selected: filter === 'all', onClick: () => setFilter('all') },
+    { id: 'apps', label: S('filterApps'), selected: filter === 'apps', onClick: () => setFilter('apps') },
+    { id: 'redirects', label: S('filterRedirects'), selected: filter === 'redirects', onClick: () => setFilter('redirects') },
+    { id: 'off', label: S('filterOff'), selected: filter === 'off', onClick: () => setFilter('off') },
+  ]} />
 
-          <div class="adm-subs-rows">
-            ${shown.map(row)}
-          </div>
+          <div>${shown.map(row)}</div>
 
-          <div class="adm-subs-foot">
-            <span>${S('shown', { n: num(shown.length), total: num(counts.total) })}</span>
-            <span class="adm-subs-sort">${S('sortNote')}</span>
-          </div>
+          <${Stack} direction="wrap" align="between">
+            <${Text} kind="caption" tone="muted">${S('shown', { n: num(shown.length), total: num(counts.total) })}<//>
+            <${Text} kind="mono" tone="muted">${S('sortNote')}<//>
+          <//>
         `}
-      </section>
+      <//>
 
       ${showCreate && html`
-        <section class="og-sec">
-          <div class="og-sec-h"><h2 class="poster-section-title">${S('add')}<small>02</small></h2></div>
-          <div class="adm-subs-two">
-            <div>
-              <div class="adm-subs-field">
-                <div class="adm-subs-lbl">${S('fieldAddress')}</div>
-                <div class="adm-subs-fld">
-                  <input type="text" value=${form.subdomain} placeholder="sanomat"
-                    onInput=${e => setForm({ ...form, subdomain: e.target.value })} />
-                  <span class="adm-subs-suffix">${apex}</span>
-                </div>
-                <p class="adm-subs-hint">${S('addressHint')}</p>
-              </div>
+        <${Section} title=${S('add')} count="02">
+          <${Columns} layout="leading" collapse=${900} density="roomy">
+            <${Stack} density="roomy">
+              <${Field} label=${S('fieldAddress')} value=${form.subdomain} placeholder="sanomat" hint=${S('addressHint')}
+                suffix=${apex} passwordManager=${false} onInput=${e => setForm({ ...form, subdomain: e.target.value })} />
 
-              <div class="adm-subs-field">
-                <div class="adm-subs-lbl">${S('fieldKind')}</div>
-                <div class="adm-subs-chips">
-                  <button type="button" class="adm-subs-chip ${form.kind === 'app' ? 'on' : ''}"
-                    onClick=${() => setForm({ ...form, kind: 'app' })}>${S('kindApp')}</button>
-                  <button type="button" class="adm-subs-chip ${form.kind === 'redirect' ? 'on' : ''}"
-                    onClick=${() => setForm({ ...form, kind: 'redirect' })}>${S('kindRedirect')}</button>
-                </div>
-                <p class="adm-subs-hint">${S('kindHint')}</p>
-              </div>
+              <${Stack} density="compact">
+                <${Text} kind="label">${S('fieldKind')}<//>
+                <${Stack} direction="wrap" align="center" density="compact" role="radiogroup" label=${S('fieldKind')}>
+                  <${Action} kind="tab" semantics="radio" selected=${form.kind === 'app'}
+                    onClick=${() => setForm({ ...form, kind: 'app' })}>${S('kindApp')}<//>
+                  <${Action} kind="tab" semantics="radio" selected=${form.kind === 'redirect'}
+                    onClick=${() => setForm({ ...form, kind: 'redirect' })}>${S('kindRedirect')}<//>
+                <//>
+                <${Text} kind="caption" tone="muted">${S('kindHint')}<//>
+              <//>
 
-              <div class="adm-subs-field">
-                <div class="adm-subs-lbl">${S('target')}</div>
-                <div class="adm-subs-fld">
-                  <input type="text" value=${form.target}
-                    placeholder=${form.kind === 'app' ? S('targetHintApp') : S('targetHintRedirect')}
-                    onInput=${e => setForm({ ...form, target: e.target.value })} />
-                </div>
-                <p class="adm-subs-hint">${form.kind === 'app' ? S('targetHintAppLong') : S('targetHintRedirectLong')}</p>
-                ${formError && html`<p class="adm-subs-err">${formError}</p>`}
-              </div>
+              <${Field} label=${S('target')} value=${form.target} passwordManager=${false}
+                placeholder=${form.kind === 'app' ? S('targetHintApp') : S('targetHintRedirect')}
+                hint=${form.kind === 'app' ? S('targetHintAppLong') : S('targetHintRedirectLong')}
+                error=${formError || undefined}
+                onInput=${e => setForm({ ...form, target: e.target.value })} />
 
               ${form.subdomain.trim() && form.target.trim() ? html`
-                <div class="adm-subs-prev">
-                  <div class="adm-subs-prev-l">${S('previewLabel')}</div>
-                  <span class="adm-subs-prev-u">${form.subdomain.trim().toLowerCase()}${apex}</span>
-                  <span class="adm-subs-prev-a">${form.kind === 'app'
+                <${Surface} kind="box">
+                  <${Stack} density="compact">
+                    <${Text} kind="label">${S('previewLabel')}<//>
+                    <${Text} kind="mono">${form.subdomain.trim().toLowerCase()}${apex}<//>
+                    <${Text} kind="mono" tone="muted">${form.kind === 'app'
     ? S('previewServes', { target: form.target.trim() })
-    : S('previewRedirects', { target: form.target.trim() })}</span>
-                </div>` : null}
+    : S('previewRedirects', { target: form.target.trim() })}<//>
+                  <//>
+                <//>` : null}
 
-              <div class="adm-subs-act">
-                <button class="adm-btn" disabled=${saving || !form.subdomain.trim() || !form.target.trim()}
-                  onClick=${create}>${S('mapIt')}</button>
-                <button type="button" class="og-door og-door--quiet" onClick=${() => setShowCreate(false)}>${t('common.cancel')}</button>
-              </div>
-            </div>
+              <${Stack} direction="wrap" align="center">
+                <${Action} kind="primary" disabled=${saving || !form.subdomain.trim() || !form.target.trim()}
+                  onClick=${create}>${S('mapIt')}<//>
+                <${Action} onClick=${() => setShowCreate(false)}>${t('common.cancel')}<//>
+              <//>
+            <//>
 
             <div>
-              <div class="adm-subs-lbl">${S('refusesTitle')}</div>
-              <div class="adm-subs-rule">
-                <b>${S('refuseReserved')}</b>
-                <span class="adm-subs-kept">www · mail · api · admin · static · cdn · portal · app · apps · docs · status · mcp · portfolio · co</span>
-              </div>
-              <div class="adm-subs-rule"><b>${S('refuseTaken')}</b>${S('refuseTakenWhy')}</div>
-              <div class="adm-subs-rule"><b>${S('refuseNoApp')}</b>${S('refuseNoAppWhy')}</div>
-              <div class="adm-subs-rule"><b>${S('refuseRestricted')}</b>${S('refuseRestrictedWhy')}</div>
+              <${Text} kind="label">${S('refusesTitle')}<//>
+              <${ListRow} density="compact" name=${S('refuseReserved')}
+                detail="www · mail · api · admin · static · cdn · portal · app · apps · docs · status · mcp · portfolio · co" />
+              ${rule(S('refuseTaken'), S('refuseTakenWhy'))}
+              ${rule(S('refuseNoApp'), S('refuseNoAppWhy'))}
+              ${rule(S('refuseRestricted'), S('refuseRestrictedWhy'))}
             </div>
-          </div>
-        </section>
+          <//>
+        <//>
       `}
 
-      <${Modal} open=${!!deleting} onClose=${() => setDeleting(null)} title=${S('deleteTitle')}
-        footer=${deleting && html`
-          <button type="button" class="og-door og-door--quiet" onClick=${() => setDeleting(null)}>${t('common.cancel')}</button>
-          <button class="adm-btn" disabled=${deleting.typed !== deleting.subdomain} onClick=${doDelete}>${S('delete')}</button>`}>
+      <${Dialog} open=${!!deleting} onClose=${() => setDeleting(null)} title=${S('deleteTitle')}
+        actions=${deleting && html`
+          <${Action} onClick=${() => setDeleting(null)}>${t('common.cancel')}<//>
+          <${Action} kind="primary" tone="danger" disabled=${deleting.typed !== deleting.subdomain} onClick=${doDelete}>${S('delete')}<//>`}>
         ${deleting && html`
-          <div class="adm-subs-ask">
-            <p>${S('deleteLead')}</p>
-            ${deleting.kind === 'app' ? html`<p>${S('deleteAppNote')}</p>` : null}
-            <span class="adm-subs-ask-what">${deleting.subdomain}${apex}
-              <em>${deleting.kind === 'app' ? S('previewServes', { target: deleting.target }) : S('previewRedirects', { target: deleting.target })} · ${dt(deleting.createdAt)}</em>
-            </span>
-            <div class="adm-subs-lbl">${S('deleteTypeLabel')}</div>
-            <div class="adm-subs-fld">
-              <input type="text" value=${deleting.typed} placeholder=${deleting.subdomain}
-                onInput=${e => setDeleting({ ...deleting, typed: e.target.value })} />
-            </div>
-            <p class="adm-subs-hint">${S('deleteHint')}</p>
-          </div>
+          <${Stack}>
+            <${Text}>${S('deleteLead')}<//>
+            ${deleting.kind === 'app' ? html`<${Text}>${S('deleteAppNote')}<//>` : null}
+            <${Surface} kind="box" density="compact">
+              <${Stack} density="compact">
+                <${Text} kind="mono">${deleting.subdomain}${apex}<//>
+                <${Text} kind="mono" tone="muted">${deleting.kind === 'app' ? S('previewServes', { target: deleting.target }) : S('previewRedirects', { target: deleting.target })} · ${dt(deleting.createdAt)}<//>
+              <//>
+            <//>
+            <${Field} label=${S('deleteTypeLabel')} value=${deleting.typed} placeholder=${deleting.subdomain}
+              hint=${S('deleteHint')} passwordManager=${false}
+              onInput=${e => setDeleting({ ...deleting, typed: e.target.value })} />
+          <//>
         `}
       <//>
     </div>

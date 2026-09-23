@@ -10,14 +10,17 @@
  *   the pair renders and validates exactly as before, and it never touched the composer's state.
  * @usage import { InteractiveForm, InteractiveAnswered } from './interactive-form.js';
  * @version-history
+ *   v1.1.0 -- 2026-09-22 -- Composed from the shared set: each option is a boxed choice (radio
+ *     semantics for a single answer, a pressed toggle for many), the "other" box a Field, the
+ *     header a Chip. Validation and the answers payload are unchanged.
  *   v1.0.0 — 2026-08-18 — Extracted verbatim from components.js (max-file-lines).
  */
 import { h } from 'preact';
 import { useState } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
-import { escHtml } from '/js/utils.js';
 import { IFORM_OTHER } from './helpers.js';
+import { Action, Chip, Field, Stack, Text } from '/components/poster-parts.js';
 
 const html = htm.bind(h);
 
@@ -62,49 +65,47 @@ export function InteractiveForm({ spec, submitting, onSubmit }) {
 
   const renderOpt = (q, optId, label) => {
     const multi = !!q.multiSelect;
-    const on = sel[q.id]?.picks.has(optId);
-    return html`
-      <label class=${`inbox-iform-opt${on ? ' inbox-iform-opt--on' : ''}`} key=${optId}>
-        <input type=${multi ? 'checkbox' : 'radio'} name=${`q-${q.id}`} checked=${!!on}
-          onChange=${() => multi ? toggleMulti(q.id, optId) : pickSingle(q.id, optId)} />
-        <span class="inbox-iform-opt-label">${escHtml(label)}</span>
-      </label>`;
+    const on = !!sel[q.id]?.picks.has(optId);
+    return html`<${Action} key=${optId} kind="choice" selected=${on} semantics=${multi ? undefined : 'radio'}
+      onClick=${() => (multi ? toggleMulti(q.id, optId) : pickSingle(q.id, optId))}>${label}<//>`;
   };
 
   return html`
-    <div class="inbox-iform">
+    <${Stack} density="compact">
       ${questions.map(q => html`
-        <div class="inbox-iform-q" key=${q.id}>
-          ${q.header ? html`<span class="inbox-iform-chip">${escHtml(q.header)}</span>` : null}
-          <div class="inbox-iform-prompt">${escHtml(q.prompt)}${q.required ? html`<span class="inbox-iform-req"> *</span>` : null}</div>
-          <div class="inbox-iform-opts" role=${q.multiSelect ? 'group' : 'radiogroup'}>
+        <${Stack} density="compact" key=${q.id}>
+          ${q.header ? html`<span><${Chip}>${q.header}<//></span>` : null}
+          <${Text}>${q.prompt}${q.required ? ' *' : ''}<//>
+          <${Stack} density="compact" role=${q.multiSelect ? 'group' : 'radiogroup'} label=${q.prompt}>
             ${(q.options || []).map(o => renderOpt(q, o.id, o.label))}
             ${q.allowOther !== false ? html`
               ${renderOpt(q, IFORM_OTHER, t('inbox.answer.other'))}
               ${sel[q.id]?.picks.has(IFORM_OTHER) ? html`
-                <input class="inbox-iform-other" type="text" value=${sel[q.id]?.other || ''}
+                <${Field} value=${sel[q.id]?.other || ''} ariaLabel=${t('inbox.answer.otherPlaceholder')}
                   placeholder=${t('inbox.answer.otherPlaceholder')} onInput=${e => setOther(q.id, e.target.value)} />` : null}` : null}
-          </div>
-        </div>`)}
-      <button class="btn-primary btn-sm inbox-iform-submit" disabled=${!canSubmit || submitting} onClick=${submit}>
-        ${submitting ? t('inbox.sending') : (spec?.submitLabel || t('inbox.answer.send'))}
-      </button>
-    </div>`;
+          <//>
+        <//>`)}
+      <${Stack} direction="horizontal">
+        <${Action} disabled=${!canSubmit || submitting} onClick=${submit}>
+          ${submitting ? t('inbox.sending') : (spec?.submitLabel || t('inbox.answer.send'))}
+        <//>
+      <//>
+    <//>`;
 }
 
 /** Read-only summary shown on a question bubble once it has been answered. */
 export function InteractiveAnswered({ spec, answers }) {
   return html`
-    <div class="inbox-iform inbox-iform--done">
+    <${Stack} density="compact">
       ${(spec?.questions || []).map(q => {
         const a = answers[q.id] || { selected: [], other: null };
         const labels = (q.options || []).filter(o => a.selected.includes(o.id)).map(o => o.label);
         if (a.other) labels.push(`${t('inbox.answer.other')}: ${a.other}`);
         return html`
-          <div class="inbox-iform-q" key=${q.id}>
-            <span class="inbox-iform-chip">${escHtml(q.header || q.prompt)}</span>
-            <div class="inbox-iform-answered">✓ ${labels.length ? escHtml(labels.join(', ')) : '—'}</div>
-          </div>`;
+          <${Stack} density="compact" key=${q.id}>
+            <span><${Chip}>${q.header || q.prompt}<//></span>
+            <${Text}>✓ ${labels.length ? labels.join(', ') : '—'}<//>
+          <//>`;
       })}
-    </div>`;
+    <//>`;
 }

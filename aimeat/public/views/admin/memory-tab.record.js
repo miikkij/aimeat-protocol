@@ -14,9 +14,13 @@
  * @structure
  *   - Record({ rec, onBack, onDelete, onRestore, busy }): the value, every field, the two writes
  *   - Reach({ counts, rows, onPick, onOpen }): the six audiences, widest first
- *   - Field / readWord / openJson: the pieces both views share
+ *   - FieldRow / Head / openJson: the pieces both views share
  * @usage Imported by memory-tab.js; not mounted on its own.
  * @version-history
+ *   v2.0.0 -- 2026-09-22 -- Composed from the shared set: the trail is Crumbs, the key the title in the
+ *     mono heading face (as written, not in capitals), the value a code
+ *     Surface, the history the shared Table, every field a KeyValue, the six audiences list rows
+ *     with their count as the mark, the delete the page's one loud action in the danger tone.
  *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v1.1.0 -- 2026-09-13 -- Compose record and audience row boundaries from poster.css.
@@ -27,7 +31,8 @@ import { useMemo } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { dt } from './shared.js';
+import { dt, DataTable } from './shared.js';
+import { Section, Columns, Stack, KeyValue, ListRow, Crumbs, Surface, Action, Text } from '/components/poster-parts.js';
 
 const S = (key, params) => t('admin.mem.' + key, params);
 
@@ -58,18 +63,22 @@ export function openJson(value) {
 }
 
 /** One field of the record. `empty` is what an absent value says, and it is never blank. */
-function Field({ name, value, empty, note }) {
+function FieldRow({ name, value, empty, note }) {
   const bare = value === null || value === undefined || value === '';
   return html`
-    <div class="adm-mem-f">
-      <dt>${name}</dt>
-      <dd>
-        ${bare
-          ? html`<i class="adm-mem-f-none">${empty || S('notSet')}</i>`
-          : value}
-        ${note && html`<em>${note}</em>`}
-      </dd>
-    </div>`;
+    <${KeyValue} label=${name} value=${html`<${Stack} density="compact">
+      ${bare
+        ? html`<${Text} tone="muted">${empty || S('notSet')}<//>`
+        : value}
+      ${note && html`<${Text} kind="caption" tone="muted">${note}<//>`}
+    <//>`} />`;
+}
+
+/** A small heading over a block, with a quiet reading at its right. */
+function Head({ label, note }) {
+  return html`<${Stack} direction="horizontal" align="between">
+    <${Text} kind="label">${label}<//>${note && html`<${Text} kind="mono" tone="muted">${note}<//>`}
+  <//>`;
 }
 
 /** ONE RECORD, whole. */
@@ -78,122 +87,101 @@ export function Record({ rec, onBack, onDelete, onRestore, busy, graceDays }) {
   const origins = rec.allowed_origins && rec.allowed_origins.length ? rec.allowed_origins.join(' · ') : null;
 
   return html`
-    <div class="adm-mem-page">
-      <div class="adm-mem-crumb">
-        <button type="button" onClick=${onBack}>${S('crumbAll')}</button>
-        <span>&#8201;/&#8201; ${rec.owner_gaii}</span>
-      </div>
+    <${Stack}>
+      <${Crumbs} items=${[{ label: S('crumbAll'), onClick: onBack }, { label: rec.owner_gaii }]} />
 
-      <div class="adm-mem-rhead poster-row--thing">
-        <div class="adm-mem-lbl">${S('recordEyebrow')}</div>
-        <div class="adm-mem-rkey">${rec.key}</div>
-        <p class="adm-mem-rlead">${S('recordLead')}</p>
-      </div>
+      <${Stack} density="compact">
+        <${Text} kind="label">${S('recordEyebrow')}<//>
+        <${Text} kind="heading" face="mono" size=${rec.key.length > 40 ? 'small' : 'normal'}>${rec.key}<//>
+        <${Text} tone="muted">${S('recordLead')}<//>
+      <//>
 
-      <div class="adm-mem-two">
-        <div>
-          <div class="adm-mem-vhead">
-            <span>${S('valueLabel')}</span>
-            <span>${size(rec.byte_size)}${typeof rec.value === 'string' ? ' · ' + S('valueIsString') : ''}</span>
-          </div>
-          <pre class="adm-mem-value">${pretty}</pre>
+      <${Columns} collapse=${900}>
+        <${Stack}>
+          <${Head} label=${S('valueLabel')}
+            note=${size(rec.byte_size) + (typeof rec.value === 'string' ? ' · ' + S('valueIsString') : '')} />
+          <${Surface} kind="code" height="tall">${pretty}<//>
 
           ${rec.history?.length > 0 && html`
-            <div class="adm-mem-vhead adm-mem-vhead--hist">
-              <span>${S('historyLabel')}</span>
-              <span>${S('historyCount', { n: rec.history.length })}</span>
-            </div>
-            <div class="adm-mem-hist">
-              ${rec.history.map(v => html`
-                <div class="adm-mem-hrow" key=${v.version}>
-                  <b>v${v.version}</b>
-                  <span>${dt(v.recorded_at)}</span>
-                  <span>${v.actor || S('noActor')}</span>
-                  <span class="r">${size(v.byte_size)}</span>
-                </div>`)}
-            </div>`}
-        </div>
+            <${Head} label=${S('historyLabel')} note=${S('historyCount', { n: rec.history.length })} />
+            <${DataTable} headers=${[]} rows=${rec.history.map(v => [
+              { text: 'v' + v.version, mono: true },
+              { text: dt(v.recorded_at), mono: true },
+              v.actor || S('noActor'),
+              { text: size(v.byte_size), align: 'end' },
+            ])} />`}
+        <//>
 
-        <div>
-          <div class="adm-mem-vhead"><span>${S('everyField')}</span></div>
-          <dl class="adm-mem-fields">
-            <${Field} name="ownerGaii" value=${rec.owner_gaii} />
-            <${Field} name="visibility" value=${rec.visibility} note=${S('vis_' + rec.visibility)} />
-            <${Field} name="groupId" value=${rec.group_id} />
-            <${Field} name="workspaceRef" value=${rec.workspace_ref} />
-            <${Field} name="allowedOrigins" value=${origins} note=${origins ? null : S('noOriginLimit')} />
-            <${Field} name="tags" value=${rec.tags?.length ? rec.tags.join(' · ') : null} empty=${S('noTags')} />
-            <${Field} name="version" value=${String(rec.version)} />
-            <${Field} name="trackable" value=${String(!!rec.trackable)} note=${rec.trackable ? S('trackableYes') : S('trackableNo')} />
-            <${Field} name="byteSize" value=${size(rec.byte_size)} />
-            <${Field} name="ttlHours" value=${rec.ttl_hours} note=${rec.ttl_hours ? null : S('neverExpires')} />
-            <${Field} name="flagCount" value=${String(rec.flag_count ?? 0)} />
-            <${Field} name="aiProvenanceId" value=${rec.ai_provenance_id} empty=${S('notStated')} />
-            <${Field} name="archived" value=${String(!!rec.archived)} />
-            <${Field} name="archivedAt" value=${rec.archived_at} empty="—" />
-            <${Field} name="archivedBy" value=${rec.archived_by} empty="—" />
-            <${Field} name="archivedRoot" value=${rec.archived_root} empty="—" />
-            <${Field} name="createdAt" value=${rec.created_at} />
-            <${Field} name="updatedAt" value=${rec.updated_at} />
-          </dl>
+        <${Stack}>
+          <${Head} label=${S('everyField')} />
+          <div>
+            <${FieldRow} name="ownerGaii" value=${rec.owner_gaii} />
+            <${FieldRow} name="visibility" value=${rec.visibility} note=${S('vis_' + rec.visibility)} />
+            <${FieldRow} name="groupId" value=${rec.group_id} />
+            <${FieldRow} name="workspaceRef" value=${rec.workspace_ref} />
+            <${FieldRow} name="allowedOrigins" value=${origins} note=${origins ? null : S('noOriginLimit')} />
+            <${FieldRow} name="tags" value=${rec.tags?.length ? rec.tags.join(' · ') : null} empty=${S('noTags')} />
+            <${FieldRow} name="version" value=${String(rec.version)} />
+            <${FieldRow} name="trackable" value=${String(!!rec.trackable)} note=${rec.trackable ? S('trackableYes') : S('trackableNo')} />
+            <${FieldRow} name="byteSize" value=${size(rec.byte_size)} />
+            <${FieldRow} name="ttlHours" value=${rec.ttl_hours} note=${rec.ttl_hours ? null : S('neverExpires')} />
+            <${FieldRow} name="flagCount" value=${String(rec.flag_count ?? 0)} />
+            <${FieldRow} name="aiProvenanceId" value=${rec.ai_provenance_id} empty=${S('notStated')} />
+            <${FieldRow} name="archived" value=${String(!!rec.archived)} />
+            <${FieldRow} name="archivedAt" value=${rec.archived_at} empty="—" />
+            <${FieldRow} name="archivedBy" value=${rec.archived_by} empty="—" />
+            <${FieldRow} name="archivedRoot" value=${rec.archived_root} empty="—" />
+            <${FieldRow} name="createdAt" value=${rec.created_at} />
+            <${FieldRow} name="updatedAt" value=${rec.updated_at} />
+          </div>
 
           ${!rec.ai_provenance_id && html`
-            <div class="adm-mem-say poster-aside">
-              <p><b>${S('provenanceHeading')}</b> ${S('provenanceBody')}</p>
-            </div>`}
+            <${Surface} kind="aside">
+              <${Text}><strong>${S('provenanceHeading')}</strong> ${S('provenanceBody')}<//>
+            <//>`}
 
-          <div class="adm-mem-acts">
-            <button type="button" class="adm-btn" disabled=${busy} onClick=${onDelete}>${S('deleteBtn')}</button>
-          </div>
-          <p class="adm-mem-actnote">${S('deleteNote', { days: graceDays ?? 7 })}</p>
+          <${Stack} direction="horizontal">
+            <${Action} kind="primary" tone="danger" disabled=${busy} onClick=${onDelete}>${S('deleteBtn')}<//>
+          <//>
+          <${Text} kind="caption" tone="muted">${S('deleteNote', { days: graceDays ?? 7 })}<//>
           ${onRestore && html`
-            <div class="adm-mem-acts">
-              <button type="button" class="adm-mem-door" disabled=${busy} onClick=${onRestore}>${S('restoreBtn')}</button>
-            </div>`}
-        </div>
-      </div>
-    </div>`;
+            <${Stack} direction="horizontal">
+              <${Action} disabled=${busy} onClick=${onRestore}>${S('restoreBtn')}<//>
+            <//>`}
+        <//>
+      <//>
+    <//>`;
 }
 
 /** WHO CAN READ WHAT — every record sorted by how far it reaches, widest first. */
 export function Reach({ counts, total, originCount, onPick, onBack }) {
   return html`
-    <div class="adm-mem-page">
-      <div class="adm-mem-crumb">
-        <button type="button" onClick=${onBack}>${S('crumbAll')}</button>
-        <span>&#8201;/&#8201; ${S('reachCrumb')}</span>
-      </div>
+    <${Stack}>
+      <${Crumbs} items=${[{ label: S('crumbAll'), onClick: onBack }, { label: S('reachCrumb') }]} />
 
-      <div class="adm-mem-rhead poster-row--thing">
-        <div class="adm-mem-lbl">${S('reachEyebrow')}</div>
-        <h2 class="adm-mem-rtitle">${S('reachTitle')}</h2>
-        <p class="adm-mem-rlead">${S('reachLead')}</p>
-      </div>
+      <${Text} kind="label">${S('reachEyebrow')}<//>
+      <${Section} title=${S('reachTitle')} description=${S('reachLead')}>
+        <div>
+          ${REACH.map(v => {
+            const n = counts?.[v] ?? 0;
+            return html`
+              <${ListRow} key=${v} muted=${n === 0} name=${S('vis_' + v)} detail=${S('visNote_' + v)} detailKind="text"
+                mark=${html`<${Text} kind="number" size="small">${n}<//>`}
+                value=${v}
+                actions=${n > 0
+                  ? html`<${Action} kind="text" onClick=${() => onPick(v)}>${S('listThem')}<//>`
+                  : html`<${Text} kind="caption" tone="muted">${S('none')}<//>`} />`;
+          })}
+        </div>
 
-      <div class="adm-mem-ladder poster-row--thing">
-        ${REACH.map(v => {
-          const n = counts?.[v] ?? 0;
-          return html`
-            <div class=${'adm-mem-rung' + (n > 0 ? '' : ' is-none')} key=${v}>
-              <div class="adm-mem-rung-n">${v}</div>
-              <div class="adm-mem-rung-c poster-stat-number poster-stat-number--small">${n}</div>
-              <div>
-                <div class="adm-mem-rung-w">${S('vis_' + v)}</div>
-                <div class="adm-mem-rung-note">${S('visNote_' + v)}</div>
-              </div>
-              <div class="r">
-                ${n > 0
-                  ? html`<button type="button" class="adm-mem-door" onClick=${() => onPick(v)}>${S('listThem')}</button>`
-                  : html`<span class="adm-mem-door is-quiet">${S('none')}</span>`}
-              </div>
-            </div>`;
-        })}
-      </div>
-
-      <div class="adm-mem-origins">
-        <div class="adm-mem-vhead"><span>${S('originsLabel')}</span></div>
-        <div class="adm-mem-origins-n"><b>${originCount ?? 0}</b> <span>${S('ofTotal', { n: total ?? 0 })}</span></div>
-        <p class="adm-mem-rlead">${S('originsBody')}</p>
-      </div>
-    </div>`;
+        <${Stack} density="compact">
+          <${Text} kind="label">${S('originsLabel')}<//>
+          <${Stack} direction="horizontal" align="center" density="compact">
+            <${Text} kind="number" size="small">${originCount ?? 0}<//>
+            <${Text} kind="mono" tone="muted">${S('ofTotal', { n: total ?? 0 })}<//>
+          <//>
+          <${Text} tone="muted">${S('originsBody')}<//>
+        <//>
+      <//>
+    <//>`;
 }

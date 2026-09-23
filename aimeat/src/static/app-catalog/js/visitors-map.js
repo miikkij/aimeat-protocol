@@ -18,14 +18,21 @@
  *   THE MAP IS THE PICTURE, THE LIST IS THE ANSWER. The 110m atlas cannot draw Singapore or Malta,
  *   and a shade is no number. Every country with a visitor is in the list beside the map with its
  *   count, and the list is what a keyboard or a screen reader reaches.
+ *
+ *   THE WORDS ARE THE SHARED SET, THE DRAWING IS ITS OWN. Controls, legend words, the frame and both
+ *   tables are parts from parts-html.js; the country paths, the city dots and the legend swatches
+ *   keep their SVG drawing classes (vis-land, vis-shade-N, vis-dot) because the set has no map part.
  * @structure loadAtlas · mapReset/mapZoom/mapFocus · countryName · mapHtml
  * @usage import { loadAtlas, mapHtml, mapFocus, mapZoom, mapReset } from './visitors-map.js'
  * @version-history
+ *   v1.1.0 — 2026-09-22 — Composed from the shared set: zoom controls as underlined words, the map
+ *     in the set's box, the country and place lists as the set's table, the two in the set's
+ *     columns. Only the SVG drawing keeps its own classes.
  *   v1.0.0 — 2026-09-18 — Initial.
  */
 import { escapeHtml, jsArg } from './util.js';
-import { dtlBtn } from './ui.js';
 import { loadConfig } from './config.js';
+import { action, stack, columns, surface, table, text } from './parts-html.js';
 import { t, getLang } from './i18n.js';
 import { numericOf, alpha2Of, shadeStep, projectPoint, zoomBox, placesOfCountry } from './visitors-model.js';
 
@@ -123,7 +130,7 @@ function fill(key, n) { return t(key).replace('{n}', String(n)); }
 export function mapHtml(visitors) {
   var countries = visitors.countries || [];
   var unknown = visitors.unknown_country;
-  if (!countries.length) return '<p class="vis-note">' + escapeHtml(t('visitors.mapEmpty')) + '</p>';
+  if (!countries.length) return note('visitors.mapEmpty');
 
   var byCode = {};
   var max = 0;
@@ -134,9 +141,9 @@ export function mapHtml(visitors) {
 
   var svg;
   if (atlasState === 'error') {
-    svg = '<p class="vis-note">' + escapeHtml(t('visitors.mapFailed')) + '</p>';
+    svg = note('visitors.mapFailed');
   } else if (atlasState !== 'ready') {
-    svg = '<div class="vis-map-wait">' + escapeHtml(t('visitors.mapLoading')) + '</div>';
+    svg = note('visitors.mapLoading');
   } else {
     var vb = view || { x: 0, y: 0, w: atlas.w, h: atlas.h };
     var paths = '';
@@ -163,40 +170,45 @@ export function mapHtml(visitors) {
       + '" role="img" aria-label="' + escapeHtml(t('visitors.mapLabel')) + '">' + paths + dots + '</svg>';
   }
 
-  var controls = '<div class="vis-map-controls">'
-    + dtlBtn(escapeHtml(t('visitors.zoomIn')), 'window._launcher.visitorsZoom(0.6)', { title: t('visitors.zoomInTitle') })
-    + dtlBtn(escapeHtml(t('visitors.zoomOut')), 'window._launcher.visitorsZoom(1.6)', { title: t('visitors.zoomOutTitle'), disabled: !view })
-    + dtlBtn(escapeHtml(t('visitors.zoomReset')), 'window._launcher.visitorsCountry(\'\')', { disabled: !view && !focus })
-    + '</div>';
+  var controls = stack({ direction: 'wrap', align: 'center' },
+    action({ kind: 'secondary', title: t('visitors.zoomInTitle'), onclick: 'window._launcher.visitorsZoom(0.6)' }, escapeHtml(t('visitors.zoomIn')))
+    + action({ kind: 'secondary', title: t('visitors.zoomOutTitle'), disabled: !view, onclick: 'window._launcher.visitorsZoom(1.6)' }, escapeHtml(t('visitors.zoomOut')))
+    + action({ kind: 'secondary', disabled: !view && !focus, onclick: 'window._launcher.visitorsCountry(\'\')' }, escapeHtml(t('visitors.zoomReset'))));
 
-  var legend = '<div class="vis-legend"><span>' + escapeHtml(t('visitors.legendFew')) + '</span>'
-    + [1, 2, 3, 4, 5].map(function (s) { return '<i class="vis-legend-step vis-shade-' + s + '"></i>'; }).join('')
-    + '<span>' + escapeHtml(t('visitors.legendMany')) + '</span></div>';
+  // The legend's steps are the map's own shades, drawn by the same SVG rule as the countries.
+  var legend = stack({ direction: 'horizontal', density: 'compact', align: 'center' },
+    text({ kind: 'mono', tone: 'muted' }, escapeHtml(t('visitors.legendFew')))
+    + [1, 2, 3, 4, 5].map(function (s) {
+      return '<svg width="22" height="10" viewBox="0 0 22 10" aria-hidden="true"><rect class="vis-shade-' + s + '" width="22" height="10"></rect></svg>';
+    }).join('')
+    + text({ kind: 'mono', tone: 'muted' }, escapeHtml(t('visitors.legendMany'))));
 
   var rows = countries.map(function (c) {
     var drawn = c.country !== unknown && !!shapeOf(c.country);
     var name = escapeHtml(countryName(c.country, unknown));
-    var cell = c.country === unknown
-      ? '<span class="vis-country-name">' + name + '</span>'
-      : '<button type="button" class="vis-country-btn' + (c.country === focus ? ' is-focus' : '') + '" onclick="window._launcher.visitorsCountry(\'' + jsArg(c.country) + '\')">' + name + '</button>';
-    return '<tr><td>' + cell + (!drawn && c.country !== unknown && atlasState === 'ready' ? ' <span class="vis-dim">' + escapeHtml(t('visitors.notDrawn')) + '</span>' : '')
-      + '</td><td class="vis-num">' + c.people + '</td></tr>';
-  }).join('');
-  var list = '<table class="vis-table"><thead><tr><th>' + escapeHtml(t('visitors.colCountry')) + '</th><th class="vis-num">'
-    + escapeHtml(t('visitors.colPeople')) + '</th></tr></thead><tbody>' + rows + '</tbody></table>';
+    // The country the map shows is the open one: its word says so to a screen reader too.
+    var cell = c.country === unknown ? name
+      : action({ kind: 'text', expanded: c.country === focus, onclick: 'window._launcher.visitorsCountry(\'' + jsArg(c.country) + '\')' }, name);
+    return [cell + (!drawn && c.country !== unknown && atlasState === 'ready' ? ' ' + text({ kind: 'caption', tone: 'muted' }, escapeHtml(t('visitors.notDrawn'))) : ''),
+      { html: escapeHtml(String(c.people)), end: true }];
+  });
+  var list = table({ label: t('visitors.colCountry'), headers: [escapeHtml(t('visitors.colCountry')), escapeHtml(t('visitors.colPeople'))], rows: rows });
 
   var detail = '';
   if (focus) {
     var places = placesOfCountry(visitors.places, focus);
-    detail = '<div class="vis-places"><h4 class="vis-h">' + escapeHtml(countryName(focus, unknown)) + '</h4>'
+    detail = stack({ density: 'compact' }, text({ kind: 'label' }, escapeHtml(countryName(focus, unknown)))
       + (places.length
-        ? '<table class="vis-table"><tbody>' + places.map(function (p) {
-          return '<tr><td>' + escapeHtml([p.city, p.region].filter(Boolean).join(', ')) + '</td><td class="vis-num">' + p.people + '</td></tr>';
-        }).join('') + '</tbody></table>'
-        : '<p class="vis-note">' + escapeHtml(t('visitors.noPlaces')) + '</p>')
-      + '</div>';
+        ? table({ label: countryName(focus, unknown), rows: places.map(function (p) {
+          return [escapeHtml([p.city, p.region].filter(Boolean).join(', ')), { html: escapeHtml(String(p.people)), end: true }];
+        }) })
+        : note('visitors.noPlaces')));
   }
 
-  return '<div class="vis-geo"><div class="vis-map">' + controls + '<div class="vis-map-frame">' + svg + '</div>' + legend + '</div>'
-    + '<div class="vis-map-side">' + list + detail + '</div></div>';
+  return columns({ layout: 'leading', collapse: 640, density: 'roomy' },
+    stack({ density: 'compact' }, controls + surface({ kind: 'box', density: 'flush' }, svg) + legend)
+    + stack({ density: 'roomy' }, list + detail));
 }
+
+/** A quiet sentence. */
+function note(key) { return text({ kind: 'caption', tone: 'muted' }, escapeHtml(t(key))); }

@@ -20,6 +20,10 @@
  *   - WorkTab({ data, switchPage }) — the three sections
  *   - dur / deadlineWords — the countdown a row prints instead of a timestamp
  * @version-history
+ *   v3.0.0 -- 2026-09-22 -- Composed from the shared set and admin-work.css deleted: Sections, the
+ *     waiting word a heading, the strip a NumeralBand, the search and five filters a Toolbar, the
+ *     items the shared Table with the status as a Chip in its tone and a late item's row and deadline
+ *     in the danger tone (rowTones), the two explanations asides.
  *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v2.2.0 — 2026-09-13 — Compose shared poster headings in the populated view.
@@ -36,19 +40,22 @@ import { useState, useMemo } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { useViewCSS } from '/components/useViewCSS.js';
 import { num, dt, Row, Badge, Empty } from './shared.js';
 import { decorate, summarise, counts, search, FILTERS, PAGE } from './work-tab.model.js';
+import { Section, Columns, Stack, Toolbar, NumeralBand, Table, Surface, Action, Chip, Text, scrollToId } from '/components/poster-parts.js';
+
+/** The id of the third section, which the first section's door scrolls to. */
+const ACTS_ID = 'adm-work-acts';
 
 const W = (key, params) => t('dashboard.workPage.' + key, params);
 
 /** The five chips, keyed by the filter ids FILTERS orders and counts() counts. */
 const FILTER_LABEL = { all: 'fAll', open: 'fOpen', delivered: 'fDelivered', failed: 'fFailed', expired: 'fExpired' };
 
-/** The status word's tone. The words themselves are the machine's and are never translated. */
+/** The status chip's tone. The words themselves are the machine's and are never translated. */
 const TONE = {
-  pending: 'open', accepted: 'open', in_progress: 'open',
-  delivered: 'done', failed: 'bad', expired: 'gone',
+  pending: 'sun', accepted: 'sun', in_progress: 'sun',
+  delivered: 'success', failed: 'danger', expired: 'muted',
 };
 
 /**
@@ -77,7 +84,6 @@ function deadlineWords(row) {
 }
 
 export default function WorkTab({ data, switchPage }) {
-  useViewCSS('/css/views/admin-work.css');
   const [filter, setFilter] = useState('all');
   const [query, setQuery] = useState('');
   const [oldestFirst, setOldestFirst] = useState(false);
@@ -97,48 +103,57 @@ export default function WorkTab({ data, switchPage }) {
 
   if (!rows.length) {
     return html`
-      <div class="og adm-work">
-        <div class="adm-work-empty poster-frame">
-          <h3 class="poster-section-title">${W('emptyTitle')}</h3>
-          <p>${W('emptyWhy')}</p>
-        </div>
-      </div>`;
+      <${Section} title=${W('emptyTitle')}>
+        <${Text}>${W('emptyWhy')}<//>
+      <//>`;
   }
 
   const shown = all ? found : found.slice(0, PAGE);
   const pending = figures.openRows.filter(r => r.status === 'pending' && !r.overdue);
   const working = figures.openRows.filter(r => r.status !== 'pending');
 
-  const chip = (id, label) => html`
-    <button type="button" class="adm-work-fchip ${filter === id ? 'on' : ''}"
-      onClick=${() => { setFilter(id); setAll(false); }}>${label}</button>`;
-
   const held = (list) => W('heldVal', { count: num(list.reduce((n, r) => n + r.held, 0)) });
 
-  return html`
-    <div class="og adm-work">
+  const filters = FILTERS.map(id => ({
+    id, label: W(FILTER_LABEL[id], { count: num(chips[id]) }), selected: filter === id,
+    onClick: () => { setFilter(id); setAll(false); },
+  }));
 
-      <section class="og-sec og-sec--first">
-        <div class="og-sec-h">
-          <h2 class="poster-section-title">${W('waitingQ')}<small>01</small></h2>
-          <div class="og-doors">
-            <button type="button" class="og-door og-door--quiet" onClick=${() => {
-    document.querySelector('.adm-work-acts-sec')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }}>${W('whatIsDoor')}</button>
-          </div>
-        </div>
-        <div class="adm-ov-grid">
-          <div>
-            <div class="adm-ov-status ${figures.overdue ? 'danger' : ''}">${figures.open === 0
+  const tableRows = shown.map((r, i) => {
+    const when = deadlineWords(r);
+    return [
+      { text: String(oldestFirst ? found.length - i : i + 1).padStart(2, '0'), mono: true },
+      { text: r.trackingCode, mono: true, title: r.trackingCode },
+      html`<${Chip} tone=${TONE[r.status] || 'muted'}>${r.status}<//>`,
+      { text: r.action, mono: true },
+      html`<${Stack} direction="wrap" density="compact" align="center">
+        <${Text} kind="mono" title=${r.requester.foreign ? W('elsewhere') : null}>${r.requester.name}<//>
+        <!-- The character itself: htm renders text as text, so an HTML entity here would
+             print as "&rarr;". One of the four glyphs the design language allows. -->
+        <${Text} kind="mono" tone="muted">→<//>
+        <${Text} kind="mono" tone=${r.provider.foreign ? 'muted' : 'plain'} title=${r.provider.foreign ? W('elsewhere') : null}>${r.provider.name}<//>
+      <//>`,
+      { text: html`<${Text} kind="mono" tone=${r.held ? 'coral' : 'plain'}>${num(r.total)}<//>`, align: 'end' },
+      html`<${Text} kind="mono" tone=${when.over ? 'danger' : 'plain'} title=${dt(r.createdAt)}>${when.text}<//>`,
+    ];
+  });
+
+  return html`
+    <${Stack}>
+      <${Section} title=${W('waitingQ')} count="01"
+        actions=${html`<${Action} onClick=${() => scrollToId(ACTS_ID)}>${W('whatIsDoor')}<//>`}>
+        <${Columns} layout="trailing" collapse=${900}>
+          <${Stack} density="compact">
+            <${Text} kind="heading" tone=${figures.overdue ? 'coral' : 'plain'}>${figures.open === 0
     ? W('waitingNone')
-    : figures.open === 1 ? W('waitingOne') : W('waitingWord', { count: figures.open })}</div>
-            <p class="adm-alert-line">${W('lead')}</p>
-            <div class="adm-ov-up">
-              ${W('leadItems', { count: num(figures.total) })}<br />
-              ${W('leadHeld', { count: num(figures.held) })}<br />
-              ${figures.overdue ? W('leadOverdue', { count: num(figures.overdue) }) : W('leadNoOverdue')}
-            </div>
-          </div>
+    : figures.open === 1 ? W('waitingOne') : W('waitingWord', { count: figures.open })}<//>
+            <${Text}>${W('lead')}<//>
+            <${Stack} density="compact">
+              <${Text} kind="mono" tone="muted">${W('leadItems', { count: num(figures.total) })}<//>
+              <${Text} kind="mono" tone="muted">${W('leadHeld', { count: num(figures.held) })}<//>
+              <${Text} kind="mono" tone="muted">${figures.overdue ? W('leadOverdue', { count: num(figures.overdue) }) : W('leadNoOverdue')}<//>
+            <//>
+          <//>
           <div>
             ${figures.overdue > 0 && html`
               <${Row}
@@ -162,98 +177,55 @@ export default function WorkTab({ data, switchPage }) {
             ${figures.open === 0 && html`
               <${Row} title=${W('quietTitle')} why=${W('quietWhy')} value=${num(figures.total)} last=${true} />`}
           </div>
-        </div>
-      </section>
+        <//>
+      <//>
 
-      <div class="og-strip">
-        <div><b>${num(figures.total)}</b><span>${W('stripItems')}</span><small>${W('stripItemsSub')}</small></div>
-        <div><b>${num(figures.open)}</b><span>${W('stripWaiting')}</span><small>${W('stripWaitingSub')}</small></div>
-        <div><b>${num(figures.held)}</b><span>${W('stripHeld')}</span><small>${W('stripHeldSub')}</small></div>
-        <div><b class=${figures.overdue ? 'og-coral-num' : ''}>${num(figures.overdue)}</b><span>${W('stripOverdue')}</span><small>${W('stripOverdueSub')}</small></div>
-      </div>
+      <${NumeralBand} tone="plain" items=${[
+        { label: W('stripItems'), value: num(figures.total), note: W('stripItemsSub') },
+        { label: W('stripWaiting'), value: num(figures.open), note: W('stripWaitingSub') },
+        { label: W('stripHeld'), value: num(figures.held), note: W('stripHeldSub') },
+        { label: W('stripOverdue'), value: num(figures.overdue), note: W('stripOverdueSub'), tone: figures.overdue ? 'coral' : undefined },
+      ]} />
 
-      <section class="og-sec">
-        <div class="og-sec-h">
-          <h2 class="poster-section-title">${W('every')}<small>02</small></h2>
-          <div class="og-doors">
-            <button type="button" class="og-door og-door--quiet" onClick=${() => setOldestFirst(v => !v)}>
-              ${oldestFirst ? W('orderNewest') : W('orderOldest')}</button>
-          </div>
-        </div>
-
-        <div class="adm-work-find">
-          <div class="adm-work-fld">
-            <div class="adm-work-lbl">${W('find')}</div>
-            <input type="search" class="adm-work-input" value=${query} placeholder=${W('findPlaceholder')}
-              onInput=${e => { setQuery(e.target.value); setAll(false); }} />
-          </div>
-          <div class="adm-work-chips">
-            ${FILTERS.map(id => chip(id, W(FILTER_LABEL[id], { count: num(chips[id]) })))}
-          </div>
-        </div>
-
-        <div class="adm-work-row adm-work-row--head">
-          <div class="adm-work-n poster-stat-number poster-stat-number--small">#</div>
-          <div>${W('colCode')}</div>
-          <div>${W('colStatus')}</div>
-          <div>${W('colAction')}</div>
-          <div>${W('colWho')}</div>
-          <div class="adm-work-cost">${W('colCost')}</div>
-          <div>${W('colDeadline')}</div>
-        </div>
+      <${Section} title=${W('every')} count="02"
+        actions=${html`<${Action} onClick=${() => setOldestFirst(v => !v)}>${oldestFirst ? W('orderNewest') : W('orderOldest')}<//>`}>
+        <${Toolbar} label=${W('every')} filters=${filters}
+          search=${{ label: W('find'), placeholder: W('findPlaceholder'), value: query, onInput: e => { setQuery(e.target.value); setAll(false); } }} />
 
         ${shown.length === 0
     ? html`<${Empty} text=${W('none')} />`
-    : shown.map((r, i) => {
-      const when = deadlineWords(r);
-      return html`
-          <div class="adm-work-row ${r.overdue ? 'is-over' : ''}">
-            <div class="adm-work-n poster-stat-number poster-stat-number--small">${String(oldestFirst ? found.length - i : i + 1).padStart(2, '0')}</div>
-            <div class="adm-work-tc" title=${r.trackingCode}>${r.trackingCode}</div>
-            <div class="adm-work-st adm-work-st--${TONE[r.status] || 'gone'}">${r.status}</div>
-            <div class="adm-work-act">${r.action}</div>
-            <div class="adm-work-who">
-              <b title=${r.requester.foreign ? W('elsewhere') : null}>${r.requester.name}</b>
-              <!-- The character itself: htm renders text as text, so an HTML entity here would
-                   print as "&rarr;". One of the four glyphs the design language allows. -->
-              <span>→</span>
-              <b title=${r.provider.foreign ? W('elsewhere') : null} class=${r.provider.foreign ? 'is-far' : ''}>${r.provider.name}</b>
-            </div>
-            <div class="adm-work-cost ${r.held ? 'is-held' : ''}">${num(r.total)}</div>
-            <div class="adm-work-left ${when.over ? 'is-over' : ''}" title=${dt(r.createdAt)}>${when.text}</div>
-          </div>`;
-    })}
+    : html`<${Table} collapse=${600} headers=${['#', W('colCode'), W('colStatus'), W('colAction'), W('colWho'), W('colCost'), W('colDeadline')]}
+        rows=${tableRows} rowTones=${shown.map(r => (r.overdue ? 'danger' : undefined))} />`}
 
         ${found.length > PAGE && html`
-          <div class="adm-work-more">
-            <span>${W('shown', { shown: num(shown.length), total: num(found.length) })}</span>
-            ${!all && html`<button type="button" class="og-door" onClick=${() => setAll(true)}>${W('showRest')}</button>`}
-          </div>`}
-      </section>
+          <${Stack} direction="horizontal" align="between">
+            <${Text} kind="mono" tone="muted">${W('shown', { shown: num(shown.length), total: num(found.length) })}<//>
+            ${!all && html`<${Action} onClick=${() => setAll(true)}>${W('showRest')}<//>`}
+          <//>`}
+      <//>
 
-      <section class="og-sec adm-work-acts-sec">
-        <div class="og-sec-h">
-          <h2 class="poster-section-title">${W('actsTitle')}<small>03</small></h2>
-          <div class="og-doors">
-            <button type="button" class="og-door og-door--quiet" onClick=${() => switchPage('actions')}>${t('dashboard.actions')}</button>
-          </div>
-        </div>
-        <div class="adm-work-two">
-          <div class="og-box poster-aside poster-aside--small">
-            <span class="og-box-label">${W('jobLabel')}</span>
-            <div class="adm-work-flow">
-              <i class="on">pending</i><s>→</s><i class="on">accepted</i><s>→</s><i class="on">in_progress</i><s>→</s><i class="on">delivered</i>
-            </div>
-            <p>${W('jobBody')}</p>
-            <p class="adm-work-rule">${W('jobRule')}</p>
-          </div>
-          <div class="og-box og-box--solid poster-aside poster-aside--small poster-aside--irreversible">
-            <span class="og-box-label">${W('moneyLabel')}</span>
-            <p>${W('moneyBody')}</p>
-            <p class="adm-work-rule">${W('moneyRule')}</p>
-          </div>
-        </div>
-      </section>
-
-    </div>`;
+      <${Section} id=${ACTS_ID} title=${W('actsTitle')} count="03"
+        actions=${html`<${Action} onClick=${() => switchPage('actions')}>${t('dashboard.actions')}<//>`}>
+        <${Columns} collapse=${900}>
+          <${Surface} kind="aside">
+            <${Stack} density="compact">
+              <${Text} kind="label">${W('jobLabel')}<//>
+              <${Stack} direction="wrap" density="compact" align="center">
+                <${Chip} tone="sun">pending<//><${Text} kind="mono">→<//><${Chip} tone="sun">accepted<//><${Text} kind="mono">→<//>
+                <${Chip} tone="sun">in_progress<//><${Text} kind="mono">→<//><${Chip} tone="sun">delivered<//>
+              <//>
+              <${Text}>${W('jobBody')}<//>
+              <${Text} kind="caption" tone="muted">${W('jobRule')}<//>
+            <//>
+          <//>
+          <${Surface} kind="aside" tone="danger">
+            <${Stack} density="compact">
+              <${Text} kind="label">${W('moneyLabel')}<//>
+              <${Text}>${W('moneyBody')}<//>
+              <${Text} kind="caption" tone="muted">${W('moneyRule')}<//>
+            <//>
+          <//>
+        <//>
+      <//>
+    <//>`;
 }

@@ -7,6 +7,9 @@
  *   pixel defense), tracked-state labels, attachment classification, the interactive-answer summary +
  *   poll tally, and the lazy Toast UI editor loader. Extracted from inbox-tab.js to satisfy max-file-lines.
  * @version-history
+ *   v1.7.0 -- 2026-09-22 -- The delivery ticks carry no emoji (queued is an arrow, failed a cross) and
+ *     the attachment icon table is gone: the rebuilt thread names an attachment in words. A quoted
+ *     picture reads as its alt text instead of an emoji.
  *   v1.x — 2026-08-18 — stampShort/stampFull: the list-row stamp that answers WHEN, not just what
  *     time of day. timeShort stays for rows inside an open thread, under their day separators.
  *   v1.6.0 — 2026-08-04 — resolveThreadAttachmentUrls(): cache entries carry a mint timestamp and are
@@ -206,8 +209,8 @@ export function groupConversations(conversations) {
 
 // WhatsApp-style ticks: sent = one ✓; delivered (reached the recipient's mailbox, incl. an agent's) =
 // two ✓✓ (grey); read (read receipt — humans send one, agents don't yet) = two ✓✓ coloured via
-// inbox-tick--read; queued (cross-node, peer unreachable) = a clock.
-const TICK = { sent: '✓', delivered: '✓✓', read: '✓✓', queued: '🕒', failed: '⚠', undeliverable: '⚠' };
+// set in bold; queued (cross-node, peer unreachable) = an arrow still on its way; failed = a cross.
+const TICK = { sent: '✓', delivered: '✓✓', read: '✓✓', queued: '→', failed: '✗', undeliverable: '✗' };
 export function statusTick(status) { return TICK[status] || ''; }
 
 export function timeShort(s) {
@@ -270,7 +273,7 @@ export function prepareBody(body, urlMap, expiredIds) {
 /** One-line plain-text excerpt of a message body for a reply-quote (images/code/markdown marks stripped). */
 export function quoteSnippet(body, max = 140) {
   const s = String(body || '')
-    .replace(/!\[[^\]]*\]\([^)]*\)/g, '🖼')
+    .replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')
     .replace(/```[\s\S]*?```/g, ' ')
     .replace(/[*_`>#]+/g, '')
     .replace(/\s+/g, ' ')
@@ -291,7 +294,6 @@ export function trackStateLabel(state) {
 }
 
 /** Classify an attachment for rendering: how to view it (thumbnail / native tab / markdown viewer). */
-export const ATTACH_ICO = { image: '🖼', pdf: '📄', markdown: '📄', audio: '🎵', video: '🎬', file: '📎' };
 export function attachKind(a) {
   const mime = a.mime || '';
   const name = a.name || a.storageKey || '';

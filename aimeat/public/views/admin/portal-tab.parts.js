@@ -16,6 +16,10 @@
  * @structure SettingField · PartRow · PartsList · AddPart
  * @usage html`<${PartsList} blocks=${blocks} catalog=${catalog} ... />`
  * @version-history
+ *   v1.1.0 -- 2026-09-22 -- Composed from the shared component set: each part a shared list row
+ *     with its number, icon actions for the arrows and text actions for the rest; the settings as
+ *     shared fields; the picker's list a scrolling box of rows. The chevrons carry their own stroke
+ *     and are exported for the menu rows.
  *   v1.0.0 — 2026-09-12 — Initial, with the page's editor rewritten around it.
  */
 import { h } from 'preact';
@@ -23,13 +27,14 @@ import { useState } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { Badge } from './shared.js';
+import { Stack, Text, Action, ListRow, Field, Surface } from '/components/poster-parts.js';
 
 const html = htm.bind(h);
 const P = (key, params) => t('admin.portal.' + key, params);
 
 /** The two arrows are drawn, not typed: an arrow glyph in a button is not an icon. */
-const CHEVRON_UP = html`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6" /></svg>`;
-const CHEVRON_DOWN = html`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>`;
+export const CHEVRON_UP = html`<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square"><path d="M6 15l6-6 6 6" /></svg>`;
+export const CHEVRON_DOWN = html`<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square"><path d="M6 9l6 6 6-6" /></svg>`;
 
 /** A part's own name within the page. The id unless that is taken, and then id-2, id-3… */
 export function freeKey(blocks, id) {
@@ -59,56 +64,46 @@ export function partSummary(def) {
   return words !== key ? words : (def.summary ?? P('parts.unknown'));
 }
 
-/** One setting, drawn from what the part declared it to be. */
+/** One setting, drawn from what the part declared it to be. The description stays on screen. */
 function SettingField({ name, def, value, onChange }) {
-  const label = html`<span class="adm-elabel">${name}</span>`;
-  const help = html`<p class="adm-pt-note">${def.description}</p>`;
+  const help = def.description ? html`<${Text} kind="caption" tone="muted">${def.description}<//>` : null;
 
   if (def.type === 'boolean') {
-    return html`<div class="adm-mb-sm">
-      <label class="adm-flex-center">
-        <input type="checkbox" checked=${value === undefined ? def.default === true : !!value}
-          onChange=${(e) => onChange(e.target.checked)} />
-        ${label}
-      </label>${help}</div>`;
+    return html`<${Stack} density="compact">
+      <${Field} type="checkbox" label=${name} value=${value === undefined ? def.default === true : !!value}
+        onChange=${(e) => onChange(e.target.checked)} />${help}<//>`;
   }
   if (def.type === 'enum') {
-    return html`<div class="adm-mb-sm">${label}
-      <select class="adm-input" value=${value ?? def.default ?? ''} onChange=${(e) => onChange(e.target.value)}>
-        ${def.values.map(v => html`<option value=${v} key=${v}>${v}</option>`)}
-      </select>${help}</div>`;
+    return html`<${Stack} density="compact">
+      <${Field} type="select" label=${name} value=${value ?? def.default ?? ''}
+        options=${def.values.map(v => ({ value: v, label: v }))} onChange=${(e) => onChange(e.target.value)} />${help}<//>`;
   }
   if (def.type === 'number') {
-    return html`<div class="adm-mb-sm">${label}
-      <input class="adm-input" type="number" min=${def.min} max=${def.max}
+    return html`<${Stack} density="compact">
+      <${Field} type="number" label=${name} min=${def.min} max=${def.max} width="narrow"
         value=${value ?? def.default ?? ''}
-        onInput=${(e) => onChange(e.target.value === '' ? undefined : Number(e.target.value))} />
-      ${help}</div>`;
+        onInput=${(e) => onChange(e.target.value === '' ? undefined : Number(e.target.value))} />${help}<//>`;
   }
   if (def.type === 'string[]') {
     // A closed list is a set of checkboxes, because the order and the membership are the whole
     // setting and a free-text field would only let the operator get it wrong.
     const current = Array.isArray(value) ? value : [...(def.default ?? [])];
     if (def.values) {
-      return html`<div class="adm-mb-sm">${label}
-        <div class="adm-flex adm-flex-wrap">
+      return html`<${Stack} density="compact">
+        <${Text} kind="label">${name}<//>
+        <${Stack} direction="wrap" density="compact">
           ${def.values.map(v => html`
-            <label class="adm-flex-center" key=${v}>
-              <input type="checkbox" checked=${current.includes(v)}
-                onChange=${(e) => onChange(e.target.checked ? [...current, v] : current.filter(x => x !== v))} />
-              <span>${v}</span>
-            </label>`)}
-        </div>${help}</div>`;
+            <${Field} key=${v} type="checkbox" label=${v} value=${current.includes(v)}
+              onChange=${(e) => onChange(e.target.checked ? [...current, v] : current.filter(x => x !== v))} />`)}
+        <//>${help}<//>`;
     }
-    return html`<div class="adm-mb-sm">${label}
-      <input class="adm-input" value=${current.join(', ')}
-        onInput=${(e) => onChange(e.target.value.split(',').map(s => s.trim()).filter(Boolean))} />
-      ${help}</div>`;
+    return html`<${Stack} density="compact">
+      <${Field} label=${name} value=${current.join(', ')}
+        onInput=${(e) => onChange(e.target.value.split(',').map(s => s.trim()).filter(Boolean))} />${help}<//>`;
   }
-  return html`<div class="adm-mb-sm">${label}
-    <input class="adm-input" value=${value ?? def.default ?? ''} maxLength=${def.maxLength}
-      onInput=${(e) => onChange(e.target.value || undefined)} />
-    ${help}</div>`;
+  return html`<${Stack} density="compact">
+    <${Field} label=${name} value=${value ?? def.default ?? ''} maxLength=${def.maxLength}
+      onInput=${(e) => onChange(e.target.value || undefined)} />${help}<//>`;
 }
 
 /** The chips over a row: what is set on this part, and whether it is shown at all. */
@@ -130,46 +125,39 @@ function partChips({ block, settings, passage }) {
 }
 
 /** One part: its number, the arrows, what it is, its chips, and what you can do to it. */
-function PartRow({ block, def, idx, number, total, open, passage, onMove, onToggle, onRemove, onOpen, onProp, onPassage, last }) {
+function PartRow({ block, def, idx, number, total, open, passage, onMove, onToggle, onRemove, onOpen, onProp, onPassage }) {
   const settings = def ? Object.entries(def.props ?? {}) : [];
   const editable = settings.length > 0 || block.id === 'common.freeform';
-  const cls = ['adm-pt-row', block.hidden ? 'adm-pt-row--hidden' : '', last && !open ? 'adm-pt-row--last' : ''].filter(Boolean).join(' ');
-  return html`
-    <div class=${cls}>
-      <span class=${'adm-pt-num' + (block.hidden ? ' adm-pt-num--off' : '')}>${block.hidden ? '' : number}</span>
-      <span class="adm-pt-move">
-        <button type="button" disabled=${idx === 0} onClick=${() => onMove(idx, -1)} title=${P('parts.moveUp')}
-          aria-label=${P('parts.moveUp')}>${CHEVRON_UP}</button>
-        <button type="button" disabled=${idx === total - 1} onClick=${() => onMove(idx, 1)} title=${P('parts.moveDown')}
-          aria-label=${P('parts.moveDown')}>${CHEVRON_DOWN}</button>
-      </span>
-      <span>
-        <span class="adm-pt-name">${partName(def, block.id)}</span>
-        <span class="adm-why">${partSummary(def)}</span>
-        <span class="adm-pt-chips">${partChips({ block, settings, passage })}</span>
-      </span>
-      <span class="adm-pt-acts">
-        ${editable && html`<button type="button" class="og-door og-door--quiet" onClick=${() => onOpen(open ? null : block.key)}>
-          ${open ? P('parts.close') : (block.id === 'common.freeform' ? P('parts.write') : P('parts.settings'))}
-        </button>`}
-        <button type="button" class="og-door og-door--quiet" onClick=${() => onToggle(idx)}>
-          ${block.hidden ? P('parts.show') : P('parts.hide')}
-        </button>
-        <button type="button" class="og-door og-door--quiet og-door--danger" onClick=${() => onRemove(idx)}>${P('parts.remove')}</button>
-      </span>
+  const chips = partChips({ block, settings, passage });
+  return html`<${ListRow} density="compact" muted=${!!block.hidden} number=${block.hidden ? '' : number}
+    name=${partName(def, block.id)} detail=${partSummary(def)} detailKind="text"
+    actions=${html`
+      <${Action} kind="icon" disabled=${idx === 0} onClick=${() => onMove(idx, -1)} title=${P('parts.moveUp')}
+        label=${P('parts.moveUp')}>${CHEVRON_UP}<//>
+      <${Action} kind="icon" disabled=${idx === total - 1} onClick=${() => onMove(idx, 1)} title=${P('parts.moveDown')}
+        label=${P('parts.moveDown')}>${CHEVRON_DOWN}<//>
+      ${editable && html`<${Action} kind="text" expanded=${!!open} onClick=${() => onOpen(open ? null : block.key)}>
+        ${open ? P('parts.close') : (block.id === 'common.freeform' ? P('parts.write') : P('parts.settings'))}
+      <//>`}
+      <${Action} kind="text" onClick=${() => onToggle(idx)}>${block.hidden ? P('parts.show') : P('parts.hide')}<//>
+      <${Action} kind="text" tone="danger" onClick=${() => onRemove(idx)}>${P('parts.remove')}<//>`}>
+    ${(chips.length > 0 || open) && html`<${Stack} density="compact">
+      ${chips.length > 0 && html`<${Stack} direction="wrap" density="compact">${chips}<//>`}
       ${open && html`
-        <div class="adm-pt-editor">
-          ${block.id === 'common.freeform' && html`
-            <label class="adm-elabel">${P('parts.yourWords')}</label>
-            <textarea class="adm-pt-textarea" rows="8"
-              placeholder=${P('parts.yourWordsPh')}
-              value=${passage ?? ''}
-              onInput=${(e) => onPassage(block.key, e.target.value)}></textarea>`}
-          ${settings.map(([name, sdef]) => html`
-            <${SettingField} key=${name} name=${name} def=${sdef}
-              value=${block.props?.[name]} onChange=${(v) => onProp(idx, name, v)} />`)}
-        </div>`}
-    </div>`;
+        <${Surface} kind="box" density="compact">
+          <${Stack}>
+            ${block.id === 'common.freeform' && html`
+              <${Field} type="textarea" rows=${8} label=${P('parts.yourWords')}
+                placeholder=${P('parts.yourWordsPh')}
+                value=${passage ?? ''}
+                onInput=${(e) => onPassage(block.key, e.target.value)} />`}
+            ${settings.map(([name, sdef]) => html`
+              <${SettingField} key=${name} name=${name} def=${sdef}
+                value=${block.props?.[name]} onChange=${(v) => onProp(idx, name, v)} />`)}
+          <//>
+        <//>`}
+    <//>`}
+  <//>`;
 }
 
 /** The parts of this page, in the order they appear on it. */
@@ -180,19 +168,19 @@ export function PartsList({ blocks, catalog, passages, open, onOpen, onMove, onT
     <div>
       ${blocks.map((b, idx) => {
         if (!b.hidden) shown += 1;
-        return html`<${PartRow} key=${b.key} block=${b} def=${defOf(b.id)} idx=${idx} number=${shown}
+        return html`<${PartRow} key=${b.key} block=${b} def=${defOf(b.id)} idx=${idx} number=${String(shown)}
           total=${blocks.length} open=${open === b.key} passage=${passages[b.key]}
           onMove=${onMove} onToggle=${onToggle} onRemove=${onRemove} onOpen=${onOpen}
-          onProp=${onProp} onPassage=${onPassage} last=${idx === blocks.length - 1} />`;
+          onProp=${onProp} onPassage=${onPassage} />`;
       })}
-      ${blocks.length === 0 && html`<p class="adm-pt-empty">${P('parts.none')}</p>`}
+      ${blocks.length === 0 && html`<${Text} tone="muted">${P('parts.none')}<//>`}
     </div>`;
 }
 
 /**
  * Add a part. A field that narrows as you type rather than a dropdown: the catalogue is thirty
  * entries long and a native select shows one line of each, with no room for the sentence that says
- * what the part is.
+ * what the part is. The list opens under the field when the field is in use.
  */
 export function AddPart({ catalog, blocks, onAdd }) {
   const [q, setQ] = useState('');
@@ -216,27 +204,22 @@ export function AddPart({ catalog, blocks, onAdd }) {
   const add = (c) => { if (full(c)) return; onAdd(c.id); setQ(''); setOpenList(false); };
 
   return html`
-    <div class="adm-pt-pick">
-      <div class="adm-pt-fld">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M20 20l-4-4" /></svg>
-        <input type="text" value=${q} placeholder=${P('parts.addPh')}
-          onInput=${(e) => { setQ(e.target.value); setOpenList(true); }}
-          onFocus=${() => setOpenList(true)}
-          onBlur=${() => setTimeout(() => setOpenList(false), 150)} />
-      </div>
+    <${Stack}>
+      <${Field} type="search" value=${q} placeholder=${P('parts.addPh')} ariaLabel=${P('parts.addPh')}
+        onInput=${(e) => { setQ(e.target.value); setOpenList(true); }}
+        onFocus=${() => setOpenList(true)}
+        onBlur=${() => setTimeout(() => setOpenList(false), 150)} />
       ${openList && html`
-        <div class="adm-pt-pick-list">
-          ${matches.length === 0 && html`<div class="adm-pt-pick-none">${P('parts.addNone')}</div>`}
-          ${matches.map(c => html`
-            <button type="button" key=${c.id} disabled=${full(c)} onClick=${() => add(c)}>
-              <b>${partName(c, c.id)}</b>
-              <small>${full(c) ? P('parts.addFull', { n: c.max_per_surface }) : partSummary(c)}</small>
-            </button>`)}
-        </div>`}
-      <div class="adm-pt-quick">
-        <span>${P('parts.addQuick')}</span>
+        <${Surface} kind="box" density="compact" height="scroll">
+          ${matches.length === 0 && html`<${Text} tone="muted">${P('parts.addNone')}<//>`}
+          ${matches.map(c => html`<${ListRow} key=${c.id} density="compact" muted=${full(c)}
+            name=${partName(c, c.id)} onOpen=${full(c) ? undefined : () => add(c)}
+            detail=${full(c) ? P('parts.addFull', { n: c.max_per_surface }) : partSummary(c)} detailKind="text" />`)}
+        <//>`}
+      <${Stack} direction="wrap" align="center" density="compact">
+        <${Text} kind="caption" tone="muted">${P('parts.addQuick')}<//>
         ${quick.map(c => html`
-          <button type="button" key=${c.id} class="adm-pt-chip" onClick=${() => add(c)}>${partName(c, c.id)}</button>`)}
-      </div>
-    </div>`;
+          <${Action} key=${c.id} kind="tab" onClick=${() => add(c)}>${partName(c, c.id)}<//>`)}
+      <//>
+    <//>`;
 }

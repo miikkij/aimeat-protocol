@@ -13,6 +13,8 @@
  * @structure OrganismDetail({ row, ownership, owners, busy, onClose, onAdd })
  * @usage imported by organism-ownership-tab.js
  * @version-history
+ *   v1.2.0 — 2026-09-22 — Composed from the shared component set (Section, KeyValue, Table, Field,
+ *     choice Actions for the picker): no class of its own, so a theme change reaches it.
  *   v1.1.0 — 2026-09-13 — Compose the shared poster detail heading.
  *   v1.0.0 — 2026-09-12 — Initial (the Organism ownership page in the poster face).
  */
@@ -23,6 +25,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { date as fmtDate } from '/js/format.js';
 import { dt } from './shared.js';
+import { Section, Columns, Stack, Table, KeyValue, Field, Chip, Action, Text } from '/components/poster-parts.js';
 import { candidates } from './organism-ownership-tab.model.js';
 
 const O = (key, params) => t('admin.orgOwnership.' + key, params);
@@ -59,81 +62,69 @@ export default function OrganismDetail({ row, ownership, owners, busy, onClose, 
     return O('stateMember', { role: m?.role || 'member' });
   };
 
+  /** A value with its quiet reason under it. */
+  const said = (value, note) => html`<${Stack} density="compact"><span>${value}</span>${note && html`<${Text} kind="caption" tone="muted">${note}<//>`}<//>`;
+
   return html`
-    <section class="og-sec adm-oo-detail">
-      <div class="og-sec-h">
-        <h2 class="poster-section-title">${row.name}<small>03</small></h2>
-        <div class="og-doors">
-          <button type="button" class="og-door og-door--quiet" onClick=${onClose}>${O('close')}</button>
-        </div>
-      </div>
-      <p class="adm-oo-id">${row.id}</p>
+    <${Section} title=${row.name} count="03"
+      actions=${html`<${Action} onClick=${onClose}>${O('close')}<//>`}>
+      <${Stack}>
+        <${Text} kind="mono" tone="muted">${row.id}<//>
 
-      <div class="adm-oo-two">
-        <div>
-          <div class="adm-oo-sub">${O('whoHolds')}</div>
-          <dl class="adm-oo-kv">
-            <dt>${O('heldBy')}</dt>
-            <dd>
-              ${row.ownerStates.map(o => html`
-                <span class="adm-oo-chip ${o.state === 'ok' ? '' : 'adm-oo-chip--bad'}">${o.name}</span>`)}
-              ${row.stuck && html`<em>${O('stripStuckSub')}</em>`}
-            </dd>
-            <dt>${O('madeBy')}</dt>
-            <dd>${row.createdBy || '—'}<em>${O('madeByWhy')}</em></dd>
-            <dt>${O('created')}</dt>
-            <dd>${day(row.createdAt)}<em>${O('changed', { date: day(ownership?.updated_at) })}</em></dd>
-            <dt>${O('inside')}</dt>
-            <dd>${members.length === 1 ? O('insideOne') : O('insidePeople', { count: members.length })}
-              <em>${canSignIn ? O('insideWhy', { count: canSignIn }) : O('insideWhyNone')}</em></dd>
-          </dl>
-        </div>
+        <${Stack}>
+          <${Stack} density="compact">
+            <${Text} kind="heading" size="small">${O('whoHolds')}<//>
+            <div>
+              <${KeyValue} label=${O('heldBy')} value=${said(html`<${Stack} direction="wrap" density="compact">
+                ${row.ownerStates.map(o => html`<${Chip} key=${o.name} tone=${o.state === 'ok' ? 'plain' : 'coral'}>${o.name}<//>`)}<//>`,
+    row.stuck ? O('stripStuckSub') : null)} />
+              <${KeyValue} label=${O('madeBy')} value=${said(row.createdBy || '—', O('madeByWhy'))} />
+              <${KeyValue} label=${O('created')} value=${said(day(row.createdAt), O('changed', { date: day(ownership?.updated_at) }))} />
+              <${KeyValue} label=${O('inside')} value=${said(
+    members.length === 1 ? O('insideOne') : O('insidePeople', { count: members.length }),
+    canSignIn ? O('insideWhy', { count: canSignIn }) : O('insideWhyNone'))} />
+            </div>
+          <//>
 
-        <div>
-          <div class="adm-oo-sub">${O('whoInside')}</div>
-          <div class="adm-oo-tr adm-oo-tr--head">
-            <div>${O('member')}</div>
-            <div>${O('role')}</div>
-            <div>${O('canSignIn')}</div>
-            <div>${O('joined')}</div>
-          </div>
-          ${members.length === 0
-    ? html`<p class="adm-oo-note">${O('noMembers')}</p>`
-    : members.map(m => html`
-            <div class="adm-oo-tr ${reach(m.ghii) ? '' : 'is-off'}">
-              <div><b>${m.ghii}</b>${holding.includes(m.ghii)
-    ? html` <span class="adm-oo-chip adm-oo-chip--bad">${O('owner')}</span>` : null}</div>
-              <div class="adm-oo-role">${m.role}</div>
-              <div class="adm-oo-can ${reach(m.ghii) ? '' : 'no'}">${reach(m.ghii) ? O('yes') : O('no')}</div>
-              <div class="adm-oo-day" title=${dt(m.joined_at)}>${day(m.joined_at)}</div>
-            </div>`)}
-          <p class="adm-oo-note">${O('adminNote')}</p>
-        </div>
-      </div>
+          <${Stack} density="compact">
+            <${Text} kind="heading" size="small">${O('whoInside')}<//>
+            ${members.length === 0
+    ? html`<${Text} kind="caption" tone="muted">${O('noMembers')}<//>`
+    : html`<${Table} density="compact" collapse=${560} label=${O('whoInside')}
+              headers=${[O('member'), O('role'), O('canSignIn'), O('joined')]}
+              rows=${members.map(m => [
+    html`<${Stack} direction="wrap" density="compact">
+      ${reach(m.ghii) ? html`<strong>${m.ghii}</strong>` : html`<${Text} tone="muted">${m.ghii}<//>`}
+      ${holding.includes(m.ghii) ? html`<${Chip} tone="coral">${O('owner')}<//>` : null}<//>`,
+    html`<${Text} kind="mono">${m.role}<//>`,
+    html`<${Text} kind="mono" tone=${reach(m.ghii) ? 'plain' : 'danger'}>${reach(m.ghii) ? O('yes') : O('no')}<//>`,
+    html`<${Text} kind="mono" tone="muted" title=${dt(m.joined_at)}>${day(m.joined_at)}<//>`,
+  ])} />`}
+            <${Text} kind="caption" tone="muted">${O('adminNote')}<//>
+          <//>
+        <//>
 
-      <div class="adm-oo-put">
-        <div class="adm-oo-sub">${O('putBack')}</div>
-        <div class="adm-oo-lbl">${O('whoTakes')}</div>
-        <input type="search" class="adm-oo-input" value=${typed} placeholder=${O('pickPlaceholder')}
-          onInput=${e => setTyped(e.target.value)} />
-        ${shown.length === 0
-    ? html`<p class="adm-oo-note adm-oo-note--bad">${O('noCandidate')}</p>`
-    : html`<div class="adm-oo-pick">
-            ${shown.map(c => html`
-              <button type="button" class="adm-oo-pick-row ${c.state === 'ok' ? '' : 'is-no'} ${chosen && c.name === chosen.name ? 'is-on' : ''}"
-                disabled=${c.state !== 'ok'} onClick=${() => setTyped(c.name)}>
-                <b>${c.name}</b><em>${why(c)}</em>
-              </button>`)}
-          </div>`}
-        <div class="adm-oo-acts">
-          <button class="adm-btn" disabled=${busy || !chosen} onClick=${() => chosen && onAdd(chosen.name)}>
-            ${chosen ? O('makeOwner', { name: chosen.name }) : O('add')}
-          </button>
-          <p>${holding.length === 1
+        <${Stack} density="compact">
+          <${Text} kind="heading" size="small">${O('putBack')}<//>
+          <${Field} type="search" label=${O('whoTakes')} value=${typed} placeholder=${O('pickPlaceholder')}
+            onInput=${e => setTyped(e.target.value)} />
+          ${shown.length === 0
+    ? html`<${Text} tone="danger">${O('noCandidate')}<//>`
+    : html`<${Columns} layout="thirds" collapse=${640} density="compact">
+              ${shown.map(c => html`
+                <${Action} key=${c.name} kind="choice" title=${c.name} selected=${!!chosen && c.name === chosen.name}
+                  disabled=${c.state !== 'ok'} onClick=${() => setTyped(c.name)}>${why(c)}<//>`)}
+            <//>`}
+          <${Stack} direction="wrap" align="center">
+            <${Action} kind="primary" disabled=${busy || !chosen} onClick=${() => chosen && onAdd(chosen.name)}>
+              ${chosen ? O('makeOwner', { name: chosen.name }) : O('add')}
+            <//>
+            <${Text} kind="caption" tone="muted">${holding.length === 1
     ? O('keepsOne', { names: holding.join(', ') })
-    : O('keeps', { names: holding.join(', ') })}</p>
-        </div>
-        <p class="adm-oo-note">${O('pickNote')}</p>
-      </div>
-    </section>`;
+    : O('keeps', { names: holding.join(', ') })}<//>
+          <//>
+          <${Text} kind="caption" tone="muted">${O('pickNote')}<//>
+        <//>
+      <//>
+    <//>`;
 }

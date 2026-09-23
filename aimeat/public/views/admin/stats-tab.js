@@ -24,6 +24,9 @@
  *   - StatsTab (default) — the reads, and the six sections
  * @usage Mounted by the admin dashboard tab router (views/admin.js).
  * @version-history
+ *   v3.2.0 -- 2026-09-22 -- Composed from the shared component set: sections, the period as tab
+ *     actions and date fields, the strip as a numeral band, the paste in an aside; the page's own
+ *     sheet is gone, so a theme or a part now reaches this page like every other.
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v3.1.0 — 2026-09-13 — Compose existing section headings from shared poster B1.
  *   v3.0.0 — 2026-09-12 — The poster face and six numbered sections. Counted-over-a-period and
@@ -44,10 +47,9 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { time as fmtTime } from '/js/format.js';
-import { useViewCSS } from '/components/useViewCSS.js';
 import { onLiveUpdate } from '/lib/live-updates.js';
 import { num, fmtUp, Badge, Row, Spinner, ErrorBox } from './shared.js';
-import { CopyButton } from '/components/CopyButton.js';
+import { Section, Columns, Stack, Text, Action, CopyAction, Field, NumeralBand, Surface } from '/components/poster-parts.js';
 import { getNodeUrl } from '/js/services/auth.js';
 import * as api from '/js/services/admin.js';
 import { swallowed } from '/js/swallowed.js';
@@ -70,23 +72,23 @@ const PRESETS = ['today', '7d', '30d', 'all'];
 function Period({ period, custom, onPick, onCustom, onApply }) {
   const [open, setOpen] = useState(false);
   return html`
-    <div class="adm-st-period">
-      <span class="adm-st-period-l">${S('period.label')}</span>
+    <${Stack} direction="wrap" align="center" density="compact" role="group" label=${S('period.label')}>
+      <${Text} kind="caption" tone="muted">${S('period.label')}<//>
       ${PRESETS.map(p => html`
-        <button type="button" class="adm-st-fchip ${period === p ? 'on' : ''}"
-          onClick=${() => { setOpen(false); onPick(p); }}>${S('period.' + p)}</button>`)}
+        <${Action} key=${p} kind="tab" selected=${period === p}
+          onClick=${() => { setOpen(false); onPick(p); }}>${S('period.' + p)}<//>`)}
       ${open ? html`
-        <span class="adm-st-dates">
-          <input type="date" value=${custom.from} aria-label=${S('period.from')}
+        <${Stack} direction="wrap" align="center" density="compact">
+          <${Field} type="date" width="narrow" value=${custom.from} ariaLabel=${S('period.from')}
             onInput=${e => onCustom({ ...custom, from: e.target.value })} />
-          <span class="adm-st-dash">–</span>
-          <input type="date" value=${custom.to} aria-label=${S('period.to')}
+          <${Text} tone="muted">–<//>
+          <${Field} type="date" width="narrow" value=${custom.to} ariaLabel=${S('period.to')}
             onInput=${e => onCustom({ ...custom, to: e.target.value })} />
-          <button type="button" class="adm-st-fchip" disabled=${!custom.from || !custom.to}
-            onClick=${onApply}>${S('period.apply')}</button>
-        </span>`
-    : html`<button type="button" class="og-door og-door--quiet" onClick=${() => setOpen(true)}>${S('period.pick')}</button>`}
-    </div>`;
+          <${Action} kind="tab" disabled=${!custom.from || !custom.to}
+            onClick=${onApply}>${S('period.apply')}<//>
+        <//>`
+    : html`<${Action} onClick=${() => setOpen(true)}>${S('period.pick')}<//>`}
+    <//>`;
 }
 
 /**
@@ -125,28 +127,23 @@ function RightNow({ rows, live, days, from, to, control }) {
   ].join(' · ');
 
   return html`
-    <section class="og-sec og-sec--first" id="adm-st-01">
-      <div class="og-sec-h">
-        <h2 class="poster-section-title">${S('now.title')}<small>01</small></h2>
-        ${control}
-      </div>
-
-      <div class="adm-ov-grid">
-        <div>
-          <div class="adm-ov-status ${alarming ? 'danger' : ''}">
+    <${Section} id="adm-st-01" title=${S('now.title')} count="01" actions=${control}>
+      <${Columns} layout="trailing" collapse=${900} density="roomy">
+        <${Stack}>
+          <${Text} kind="heading" tone=${alarming ? 'danger' : 'plain'}>
             ${lead ? S('now.word', { n: num(lead.total), what: S('word.' + lead.name) }) : S('now.wordNothing')}
-          </div>
-          <p class="adm-alert-line">
+          <//>
+          <${Text}>
             ${!lead ? S('now.lineNothing')
     : alarming ? S('now.lineRefused', { n: num(perDay) })
       : S('now.lineOrdinary', { what: S('counter.' + lead.name).toLowerCase(), n: num(perDay) })}
-          </p>
-          <div class="adm-ov-up">${stamp}</div>
+          <//>
+          <${Text} kind="mono" tone="muted">${stamp}<//>
           ${alarming ? html`
-            <div class="adm-st-acts">
-              <a class="og-door og-door--danger" href="#/admin/security">${S('now.seeWho')}</a>
-            </div>` : null}
-        </div>
+            <${Stack} direction="wrap" align="center">
+              <${Action} tone="danger" href="#/admin/security">${S('now.seeWho')}<//>
+            <//>` : null}
+        <//>
 
         <div>
           ${Row({
@@ -183,58 +180,44 @@ function RightNow({ rows, live, days, from, to, control }) {
     value: S('now.inPeriod', { n: num(consentOps) }),
   })}
         </div>
-      </div>
+      <//>
 
-      <div class="og-strip">
-        <div>
-          <b class=${alarming ? 'adm-st-coral' : ''}>${lead ? num(lead.total) : '0'}</b>
-          <span>${lead ? S('word.' + lead.name) : S('strip.nothing')}</span>
-          <small>${lead ? S('strip.aDay', { n: num(perDay) }) : S('strip.nothingSub')}</small>
-        </div>
-        <div>
-          <b>${num(memoryOps)}</b><span>${S('strip.memory')}</span>
-          <small>${S('strip.memorySub', { r: num(reads.total), w: num(writes.total) })}</small>
-        </div>
-        <div>
-          <b>${num(schema.total)}</b><span>${S('strip.schema')}</span>
-          <small>${S('strip.schemaSub', { n: num(schema.failed) })}</small>
-        </div>
-        <div>
-          <b>${fmtUp(live.uptime_seconds || 0)}</b><span>${S('strip.up')}</span>
-          <small>${S('strip.upSub', { at: (live.started_at || '').slice(0, 16).replace('T', ' ') })}</small>
-        </div>
-      </div>
-    </section>`;
+      <${NumeralBand} tone="plain" size="small" items=${[
+    { label: lead ? S('word.' + lead.name) : S('strip.nothing'), value: lead ? num(lead.total) : '0',
+      tone: alarming ? 'coral' : undefined,
+      note: lead ? S('strip.aDay', { n: num(perDay) }) : S('strip.nothingSub') },
+    { label: S('strip.memory'), value: num(memoryOps), note: S('strip.memorySub', { r: num(reads.total), w: num(writes.total) }) },
+    { label: S('strip.schema'), value: num(schema.total), note: S('strip.schemaSub', { n: num(schema.failed) }) },
+    { label: S('strip.up'), value: fmtUp(live.uptime_seconds || 0),
+      note: S('strip.upSub', { at: (live.started_at || '').slice(0, 16).replace('T', ' ') }) },
+  ]} />
+    <//>`;
 }
 
 /** Section 06: what an agent can do with these numbers, and the paste. */
 function AskAi({ from, to }) {
   const paste = buildStatsPrompt({ url: getNodeUrl(), from, to });
   return html`
-    <section class="og-sec" id="adm-st-06">
-      <div class="og-sec-h">
-        <h2 class="poster-section-title">${S('ai.title')}<small>06</small></h2>
-        <div class="og-doors">
-          <${CopyButton} text=${paste} label=${S('ai.copy')} className="og-door og-door--quiet" />
-        </div>
-      </div>
-      <div class="adm-st-ai">
+    <${Section} id="adm-st-06" title=${S('ai.title')} count="06"
+      actions=${html`<${CopyAction} text=${paste} label=${S('ai.copy')} />`}>
+      <${Columns} layout="equal" collapse=${900} density="roomy">
         <div>
-          <p class="adm-st-lead">${S('ai.lead')}</p>
+          <${Text}>${S('ai.lead')}<//>
           ${Row({ title: S('ai.read'), why: S('ai.readWhy'), chip: null, value: 'aimeat_admin_statistics' })}
           ${Row({ title: S('ai.who'), why: S('ai.whoWhy'), chip: null, value: 'aimeat_admin_security_overview' })}
           ${Row({ title: S('ai.raw'), why: S('ai.rawWhy'), chip: null, value: '/v1/metrics', last: true })}
         </div>
-        <div class="og-box poster-aside poster-aside--small">
-          <span class="og-box-label">${S('ai.label')}</span>
-          <div class="adm-st-paste">${paste}</div>
-        </div>
-      </div>
-    </section>`;
+        <${Surface} kind="aside">
+          <${Stack} density="compact">
+            <${Text} kind="label">${S('ai.label')}<//>
+            <${Text} lines>${paste}<//>
+          <//>
+        <//>
+      <//>
+    <//>`;
 }
 
 export default function StatsTab({ data }) {
-  useViewCSS('/css/views/admin-stats.css');
   const [period, setPeriod] = useState('7d');
   const [custom, setCustom] = useState({ from: '', to: '' });
   const [applied, setApplied] = useState(null);
@@ -276,7 +259,7 @@ export default function StatsTab({ data }) {
     onCustom=${setCustom}
     onApply=${() => { setApplied({ ...custom }); setPeriod('custom'); }} />`;
 
-  return html`<div class="adm-st">
+  return html`<div>
     <${RightNow} rows=${rows} live=${sd} days=${days} from=${from} to=${to} control=${control} />
     <${WhatMoved} rows=${rows} days=${days} onShowNumbers=${() => {
     setNumbers(true);

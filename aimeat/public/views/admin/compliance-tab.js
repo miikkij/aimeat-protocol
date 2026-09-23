@@ -31,6 +31,11 @@
  *     door and the empty state's slab reach it), save, draft, keep, the CSV
  * @usage Registered in views/admin.js NAV_GROUPS; rendered with the shared admin tab props.
  * @version-history
+ *   v3.0.0 -- 2026-09-22 -- Composed from the shared component set: the toolbar, the status word,
+ *     gap rows as list rows with their door, the numeral band, the limits in the shared aside, the
+ *     derived rows as the shared metric row. The page's own sheet (admin-compliance.css) is gone.
+ *     Two wrapper classes stay on purpose, adm-cmp-print-area and adm-cmp-screen-only: the printed
+ *     document (compliance-tab.print.js, unchanged) depends on them through admin.css's print rules.
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v2.1.0 — 2026-09-13 — Compose section headings from the shared poster B1 shape.
  *   v2.0.0 — 2026-09-05 — The poster face: the gaps grouped by kind with a door each, the limits in
@@ -54,7 +59,8 @@ import htm from 'htm';
 import { onLiveUpdate } from '/lib/live-updates.js';
 import { t, tOr } from '/js/i18n.js';
 import { downloadBlob, toCsvBlob } from '/js/utils.js';
-import { num, Spinner, useToast, Toast } from './shared.js';
+import { num, Spinner, useToast, Toast, Row } from './shared.js';
+import { Section, Columns, Stack, ListRow, Toolbar, NumeralBand, Action, Chip, Surface, Text, scrollToId } from '/components/poster-parts.js';
 import { apiGet, apiPut, apiPost } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
 import { groupGaps, answerStats, classCounts } from './compliance-tab.gaps.js';
@@ -73,9 +79,9 @@ const PERIODS = [
 ];
 
 /** Scroll a section into view; the strip's cells and the doors use it. */
-const go = (id) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+const go = (id) => scrollToId(id);
 const money = (v) => `$${(Number(v) || 0).toFixed(2)}`;
-const code = (s) => html`<span class="adm-cmp-code">${s}</span>`;
+const code = (s) => html`<${Text} kind="mono">${s}<//>`;
 const codes = (list) => list.map((m, i) => html`${i > 0 ? ' ' : ''}${code(m)}`);
 
 /**
@@ -107,21 +113,16 @@ export function gapsLine(g, registerEmpty) {
 }
 
 /** A row in words with a door or a chip on the right. */
-function GapRow({ title, why, right, last }) {
-  return html`
-    <div class="adm-mrow adm-mrow--two ${last ? 'adm-mrow--last' : ''}">
-      <span><b>${title}</b><span class="adm-why">${why}</span></span>
-      <span class="adm-cmp-right">${right}</span>
-    </div>`;
+function GapRow({ title, why, right }) {
+  return html`<${ListRow} name=${title} detail=${why} detailKind="text" actions=${right} />`;
 }
 
 /** Section 01: the word, its sentence, the line under it, and one row per kind of gap. */
 function NeedsALook({ report, g, stats, questions, drafting, onDraft, onAnswer, switchPage }) {
   const empty = report.register.usecases.length === 0;
   const tr = report.derived?.ai_transparency || {};
-  const clear = html`<span class="og-chip adm-cmp-chip--ok">${C('clear')}</span>`;
-  const door = (label, onClick, disabled) => html`
-    <button type="button" class="og-door og-door--quiet" disabled=${disabled} onClick=${onClick}>${label}</button>`;
+  const clear = html`<${Chip} tone="success">${C('clear')}<//>`;
+  const door = (label, onClick, disabled) => html`<${Action} disabled=${disabled} onClick=${onClick}>${label}<//>`;
   const n = g.models.length;
   const undocWhy = n === 0 ? C('gap.undocumentedClear')
     : empty ? C('gap.undocumentedEmpty', { n: num(n) })
@@ -137,26 +138,23 @@ function NeedsALook({ report, g, stats, questions, drafting, onDraft, onAnswer, 
   const under = empty ? C('under.empty', { questions: num(questions.length) })
     : C('under.filled', { entries: num(stats.entries), questions: num(questions.length), ai: num(stats.ai), human: num(stats.human), evidence: num(stats.evidence) });
   const toApps = () => switchPage('apps');
-  return html`
-    <section class="og-sec og-sec--first" id="adm-cmp-01">
-      <div class="og-sec-h"><h2 class="poster-section-title">${C('gapsTitle')}<small>01</small></h2>
-        <div class="og-doors">${door(C('toApps'), toApps)}</div></div>
-      <div class="adm-ov-grid">
-        <div>
-          <div class="adm-ov-status ${g.total > 0 ? 'danger' : ''}">${word}</div>
-          <p class="adm-alert-line">${gapsLine(g, empty)}</p>
-          <div class="adm-ov-up">${under}</div>
-        </div>
-        <div>
-          <${GapRow} title=${C('gapUndocumented')} why=${undocWhy}
-            right=${n === 0 ? clear : door(drafting ? C('drafting') : C('draftAction'), onDraft, drafting)} />
-          <${GapRow} title=${C('gapAppGap')} why=${appsWhy} right=${g.apps.length === 0 ? clear : door(C('toApps'), toApps)} />
-          <${GapRow} title=${C('gapUnclassified')} why=${ucWhy}
-            right=${g.usecases.length === 0 ? clear : door(C('answer'), () => onAnswer(g.usecases[0].id))} />
-          <${GapRow} title=${C('gapUnlabelled')} why=${unlWhy} right=${g.unlabelled === 0 ? clear : door(C('toApps'), toApps)} last />
-        </div>
+  return html`<${Section} id="adm-cmp-01" title=${C('gapsTitle')} count="01" actions=${door(C('toApps'), toApps)}>
+    <${Columns} layout="trailing" collapse=${900}>
+      <${Stack} density="compact">
+        <${Text} kind="number" size="large" tone=${g.total > 0 ? 'danger' : 'plain'}>${word}<//>
+        <${Text}>${gapsLine(g, empty)}<//>
+        <${Text} kind="mono" tone="muted">${under}<//>
+      <//>
+      <div>
+        <${GapRow} title=${C('gapUndocumented')} why=${undocWhy}
+          right=${n === 0 ? clear : door(drafting ? C('drafting') : C('draftAction'), onDraft, drafting)} />
+        <${GapRow} title=${C('gapAppGap')} why=${appsWhy} right=${g.apps.length === 0 ? clear : door(C('toApps'), toApps)} />
+        <${GapRow} title=${C('gapUnclassified')} why=${ucWhy}
+          right=${g.usecases.length === 0 ? clear : door(C('answer'), () => onAnswer(g.usecases[0].id))} />
+        <${GapRow} title=${C('gapUnlabelled')} why=${unlWhy} right=${g.unlabelled === 0 ? clear : door(C('toApps'), toApps)} />
       </div>
-    </section>`;
+    <//>
+  <//>`;
 }
 
 /** The numeral strip: five cells, each a door to the section that explains it. */
@@ -166,22 +164,21 @@ function Strip({ report, g, classes }) {
   const usage = d.ai_usage || {};
   const consent = d.consent || {};
   const entries = report.register.usecases.length;
-  const cell = (onClick, value, label, sub, hot) => html`
-    <button type="button" onClick=${onClick}><b class=${hot ? 'og-coral-num' : ''}>${value}</b><span>${label}</span>${sub ? html`<small>${sub}</small>` : null}</button>`;
+  const cell = (id, onClick, value, label, sub, hot) => ({ id, onClick, value, label, note: sub || undefined, tone: hot ? 'coral' : undefined });
   const entriesSub = entries === 0 ? C('strip.entriesEmpty') : classes.map(c => `${classWord(c.cls)} ${num(c.n)}`).join(' · ');
   const publicSub = (tr.unlabelled ?? 0) === 0 && (tr.public_total ?? 0) > 0
     ? C('strip.publicSubAll')
     : C('strip.publicSub', { labelled: num(tr.labelled ?? 0), unlabelled: num(tr.unlabelled ?? 0) });
-  return html`<div class="og-strip">
-    ${cell(() => go('adm-cmp-01'), num(g.total), C('strip.gaps'),
-      C('strip.gapsSub', { models: num(g.models.length), apps: num(g.apps.length), unanswered: num(g.usecases.length) }), g.total > 0)}
-    ${cell(() => go('adm-cmp-03'), num(usage.calls ?? 0), C('strip.calls'),
-      C('strip.callsSub', { cost: money(usage.cost_usd), unpriced: num(usage.unpriced_calls ?? 0), models: num((usage.models || []).length) }))}
-    ${cell(() => go('adm-cmp-03'), num(tr.public_total ?? 0), C('strip.public'), publicSub)}
-    ${cell(() => go('adm-cmp-04'), num(entries), C('strip.entries'), entriesSub)}
-    ${cell(() => go('adm-cmp-03'), num(consent.active ?? 0), C('strip.consent'),
-      C('strip.consentSub', { revoked: num(consent.revoked ?? 0), days: num(consent.audit_retention_days ?? 0) }))}
-  </div>`;
+  return html`<${NumeralBand} tone="plain" items=${[
+    cell('gaps', () => go('adm-cmp-01'), num(g.total), C('strip.gaps'),
+      C('strip.gapsSub', { models: num(g.models.length), apps: num(g.apps.length), unanswered: num(g.usecases.length) }), g.total > 0),
+    cell('calls', () => go('adm-cmp-03'), num(usage.calls ?? 0), C('strip.calls'),
+      C('strip.callsSub', { cost: money(usage.cost_usd), unpriced: num(usage.unpriced_calls ?? 0), models: num((usage.models || []).length) })),
+    cell('public', () => go('adm-cmp-03'), num(tr.public_total ?? 0), C('strip.public'), publicSub),
+    cell('entries', () => go('adm-cmp-04'), num(entries), C('strip.entries'), entriesSub),
+    cell('consent', () => go('adm-cmp-03'), num(consent.active ?? 0), C('strip.consent'),
+      C('strip.consentSub', { revoked: num(consent.revoked ?? 0), days: num(consent.audit_retention_days ?? 0) })),
+  ]} />`;
 }
 
 /**
@@ -193,18 +190,16 @@ function Strip({ report, g, classes }) {
  */
 function Limits({ items }) {
   const list = items || [];
-  return html`
-    <section class="og-sec" id="adm-cmp-02">
-      <div class="og-sec-h"><h2 class="poster-section-title">${C('limitsTitle')}<small>02</small></h2></div>
-      <div class="og-box poster-aside poster-aside--small">
-        <span class="og-box-label">${C('limitsLabel')}</span>
-        <p class="adm-cmp-box-p">${C('limitsNote')}</p>
-        ${list.map((s, i) => html`
-          <div class="adm-cmp-limit ${i === list.length - 1 ? 'adm-cmp-limit--last' : ''}" key=${s.code || i}>
-            <i>${s.code || ''}</i><span>${limitText(s)}</span>
-          </div>`)}
+  return html`<${Section} id="adm-cmp-02" title=${C('limitsTitle')} count="02">
+    <${Surface} kind="aside"><${Stack} density="compact">
+      <${Text} kind="label">${C('limitsLabel')}<//>
+      <${Text} tone="muted">${C('limitsNote')}<//>
+      <div>
+        ${list.map((s, i) => html`<${ListRow} key=${s.code || i} density="compact"
+          name=${html`<${Text} kind="mono" tone="coral">${s.code || ''}<//>`} detail=${limitText(s)} detailKind="text" />`)}
       </div>
-    </section>`;
+    <//><//>
+  <//>`;
 }
 
 /** Section 03: what the node derived by itself, one row per number with the sentence behind it. */
@@ -218,35 +213,28 @@ function Happened({ derived, switchPage }) {
   const models = usage.models || [];
   const appsGap = tr.apps_declaring_generation_with_gap;
   const appsGapCount = Array.isArray(appsGap) ? appsGap.length : Number(appsGap) || 0;
-  const row = (title, why, value, last) => html`
-    <div class="adm-mrow adm-mrow--two ${last ? 'adm-mrow--last' : ''}">
-      <span><b>${title}</b><span class="adm-why">${why}</span></span>
-      <span class="adm-mval">${value}</span>
-    </div>`;
-  return html`
-    <section class="og-sec" id="adm-cmp-03">
-      <div class="og-sec-h"><h2 class="poster-section-title">${C('derivedTitle')}<small>03</small></h2>
-        <div class="og-doors"><button type="button" class="og-door og-door--quiet" onClick=${() => switchPage('usage')}>${C('toUsage')}</button></div></div>
-      <p class="adm-cmp-lead">${C('derivedNote')}</p>
-      <div class="adm-two">
-        <div>
-          ${row(C('row.public'), C('row.publicWhy', { labelled: num(tr.labelled ?? 0), unlabelled: num(tr.unlabelled ?? 0) }), num(tr.public_total ?? 0))}
-          ${row(C('row.level'), C('row.levelWhy'), breakdown(tr.public_by_level, 'level'))}
-          ${row(C('row.involvement'), C('row.involvementWhy'), breakdown(tr.public_by_human_involvement, 'involvement'))}
-          ${row(C('row.appsGap'), C('row.appsGapWhy'), num(appsGapCount), true)}
-        </div>
-        <div>
-          ${row(C('row.calls'), C('row.callsWhy', {
-            prompt: num(usage.prompt_tokens ?? 0), completion: num(usage.completion_tokens ?? 0),
-            cost: money(usage.cost_usd), unpriced: num(usage.unpriced_calls ?? 0),
-          }), num(usage.calls ?? 0))}
-          ${row(C('row.models'), models.length > 0 ? codes(models) : C('row.modelsNone'), num(models.length))}
-          ${row(C('row.consent'), C('row.consentWhy', {
-            scopes, revoked: num(consent.revoked ?? 0), expired: num(consent.expired ?? 0), days: num(consent.audit_retention_days ?? 0),
-          }), num(consent.active ?? 0), true)}
-        </div>
+  const row = (title, why, value) => html`<${Row} title=${title} why=${why} value=${html`<${Text} kind="mono">${value}<//>`} />`;
+  return html`<${Section} id="adm-cmp-03" title=${C('derivedTitle')} count="03" description=${C('derivedNote')}
+    actions=${html`<${Action} onClick=${() => switchPage('usage')}>${C('toUsage')}<//>`}>
+    <${Columns} layout="equal" collapse=${900}>
+      <div>
+        ${row(C('row.public'), C('row.publicWhy', { labelled: num(tr.labelled ?? 0), unlabelled: num(tr.unlabelled ?? 0) }), num(tr.public_total ?? 0))}
+        ${row(C('row.level'), C('row.levelWhy'), breakdown(tr.public_by_level, 'level'))}
+        ${row(C('row.involvement'), C('row.involvementWhy'), breakdown(tr.public_by_human_involvement, 'involvement'))}
+        ${row(C('row.appsGap'), C('row.appsGapWhy'), num(appsGapCount))}
       </div>
-    </section>`;
+      <div>
+        ${row(C('row.calls'), C('row.callsWhy', {
+          prompt: num(usage.prompt_tokens ?? 0), completion: num(usage.completion_tokens ?? 0),
+          cost: money(usage.cost_usd), unpriced: num(usage.unpriced_calls ?? 0),
+        }), num(usage.calls ?? 0))}
+        ${row(C('row.models'), models.length > 0 ? codes(models) : C('row.modelsNone'), num(models.length))}
+        ${row(C('row.consent'), C('row.consentWhy', {
+          scopes, revoked: num(consent.revoked ?? 0), expired: num(consent.expired ?? 0), days: num(consent.audit_retention_days ?? 0),
+        }), num(consent.active ?? 0))}
+      </div>
+    <//>
+  <//>`;
 }
 
 export default function ComplianceTab(props) {
@@ -379,10 +367,10 @@ export default function ComplianceTab(props) {
   };
 
   if (!report) {
-    return html`<div class="og adm-cmp">
+    return html`<${Stack}>
       ${toastMsg && html`<${Toast} type=${toastMsg.type} text=${toastMsg.text} onDismiss=${clearToast} />`}
-      ${failed ? html`<div class="adm-cmp-empty adm-cmp-empty--last">${C('loadFailed')}</div>` : html`<${Spinner} text=${C('loading')} />`}
-    </div>`;
+      ${failed ? html`<${Text} tone="muted">${C('loadFailed')}<//>` : html`<${Spinner} text=${C('loading')} />`}
+    <//>`;
   }
 
   const scope = report.scope || {};
@@ -393,25 +381,24 @@ export default function ComplianceTab(props) {
   const stats = answerStats(usecases, questions);
   const classes = classCounts(usecases);
 
+  // The two wrapper classes are the print contract with admin.css (@media print, scoped to
+  // body.adm-compliance-active): the screen hides and the printed document shows. The set has no
+  // print variant, so they stay; they carry no look of their own on screen.
   return html`
-    <div class="og adm-cmp adm-cmp-print-area">
+    <div class="adm-cmp-print-area">
       ${toastMsg && html`<${Toast} type=${toastMsg.type} text=${toastMsg.text} onDismiss=${clearToast} />`}
-      <div class="adm-cmp-screen-only">
-        <p class="adm-intro">${C('intro')}</p>
-        <div class="adm-cmp-bar">
-          <div class="adm-cmp-bar-left">
-            ${PERIODS.map(p => html`
-              <button key=${p.key} type="button" class="adm-cmp-fchip ${period === p.key ? 'on' : ''}" onClick=${() => setPeriod(p.key)}>${C('period' + p.key)}</button>`)}
-            <span class="adm-cmp-scope">${C('scope', {
-              id: scope.node_id || '', from: (period0.from || '').slice(0, 10), to: (period0.to || '').slice(0, 10), v: questionnaire?.version || '',
-            })}</span>
-          </div>
-          <div class="og-doors">
-            <button type="button" class="og-door og-door--quiet" onClick=${() => window.print()}>${C('print')}</button>
-            <button type="button" class="og-door og-door--quiet" onClick=${exportCsv}>${C('csv')}</button>
-            <button type="button" class="og-door og-door--quiet" disabled=${keeping} onClick=${keepNow}>${keeping ? C('savedSaving') : C('savedNow')}</button>
-          </div>
-        </div>
+      <div class="adm-cmp-screen-only"><${Stack}>
+        <${Text}>${C('intro')}<//>
+        <${Toolbar} label=${C('title')}
+          filters=${PERIODS.map(p => ({ id: p.key, label: C('period' + p.key), selected: period === p.key, onClick: () => setPeriod(p.key) }))}
+          actions=${html`
+            <${Action} onClick=${() => window.print()}>${C('print')}<//>
+            <${Action} onClick=${exportCsv}>${C('csv')}<//>
+            <${Action} disabled=${keeping} onClick=${keepNow}>${keeping ? C('savedSaving') : C('savedNow')}<//>`}>
+          <${Text} kind="mono" tone="muted">${C('scope', {
+            id: scope.node_id || '', from: (period0.from || '').slice(0, 10), to: (period0.to || '').slice(0, 10), v: questionnaire?.version || '',
+          })}<//>
+        <//>
         <${NeedsALook} report=${report} g=${g} stats=${stats} questions=${questions}
           drafting=${drafting} onDraft=${loadDraft} onAnswer=${answerEntry} switchPage=${switchPage} />
         <${Strip} report=${report} g=${g} classes=${classes} />
@@ -421,11 +408,11 @@ export default function ComplianceTab(props) {
           draft=${draft} setDraft=${setDraft} openId=${openId} setOpenId=${setOpenId}
           saving=${saving} drafting=${drafting} onSave=${saveRegister} onDraft=${loadDraft} />
         <${QuestionnaireSection} questionnaire=${questionnaire} />
-        <div class="adm-two">
-          <${SavedReports} refresh=${kept} keeping=${keeping} onKeep=${keepNow} onError=${showError} />
-          <${CompliancePromptSection} nodeId=${scope.node_id} days=${days} />
-        </div>
-      </div>
+        <${Section}><${Columns} layout="equal" collapse=${900}>
+          <${Stack}><${SavedReports} refresh=${kept} keeping=${keeping} onKeep=${keepNow} onError=${showError} /><//>
+          <${Stack}><${CompliancePromptSection} nodeId=${scope.node_id} days=${days} /><//>
+        <//><//>
+      <//></div>
       <${PrintableReport} report=${report} questionnaire=${questionnaire} />
     </div>
   `;

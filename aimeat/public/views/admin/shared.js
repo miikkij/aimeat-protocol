@@ -2,12 +2,15 @@
  * @file shared.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Admin Dashboard shared UI helpers — the admin design system's own
- *   primitives (Badge, StatCard, StatsGrid, Spinner, Empty, ErrorBox, DataTable,
- *   ExpandableHelp, useToast/Toast, EconRow/HealthRow) + formatters. Admin is a
- *   self-contained design system (adm-* scoped); these are intentionally separate
- *   from the main /components primitives.
+ * @description Admin Dashboard shared UI helpers (Row, Badge, StatCard, StatsGrid, EconRow,
+ *   HealthRow, Spinner, Empty, ErrorBox, ExpandableHelp, DataTable, useToast/Toast) and formatters.
+ *   Since 2026-09-22 every visual helper here draws the site's one component set
+ *   (components/poster-parts.js): the admin is no longer a design system of its own, so a theme or
+ *   a part reaches it like every other page. The props are unchanged, so no caller changes.
  * @version-history
+ *   v2.0.0 -- 2026-09-22 -- The helpers forward to the shared set: Row is a ListRow, Badge a Chip,
+ *     StatsGrid and StatCard a NumeralBand, EconRow and HealthRow KeyValues, ErrorBox and Toast an
+ *     aside, ExpandableHelp a folding surface, DataTable the shared Table (stacking on a phone).
  *   v1.5.0 -- 2026-09-13 -- Stable toast callbacks keep consumer read effects from restarting.
  *   v1.4.0 — 2026-09-12 — Row and when(): the metric row and the machine-readable stamp every
  *     operator page in the poster face uses, moved here from the Discovery page's own file when the
@@ -26,12 +29,9 @@ import { h } from 'preact';
 import { useState, useCallback } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
-import { escHtml } from '/js/utils.js';
 import { t } from '/js/i18n.js';
-import { EmptyState } from '/components/EmptyState.js';
-// Import (not bare re-export) so we hold a local binding to wrap below — a
-// `export { DataTable } from ...` would NOT create a usable local reference.
-import { DataTable as GenericDataTable } from '/components/DataTable.js';
+import { Spinner as SharedSpinner } from '/components/Spinner.js';
+import { ListRow, Chip, NumeralBand, KeyValue, Stack, Text, Surface, Table, Action } from '/components/poster-parts.js';
 
 // Display formatters now live in the shared /js/format.js. Import them into local
 // scope (StatCard etc. call num() directly) AND re-export so the existing admin
@@ -69,117 +69,89 @@ export function when(iso) {
 }
 
 /**
- * One metric row in the poster face: the name and why it matters, a chip, and the value.
- *
- * The shape every operator page in this face uses under its status word (Overview, CORS, Discovery,
- * Hooks). Here rather than in one page's own file because the second copy of it was already being
- * written when this moved.
+ * One metric row: the name and why it matters, a chip, and the value (Overview, CORS, Discovery,
+ * Hooks and the other operator pages). A shared list row; the chip sits before the value.
  * @param {{ title: any, why: any, chip?: any, value: any, last?: boolean }} props
  */
-export function Row({ title, why, chip, value, last }) {
-  return html`
-    <div class="adm-mrow ${last ? 'adm-mrow--last' : ''}">
-      <span><b>${title}</b><span class="adm-why">${why}</span></span>
-      <span>${chip}</span>
-      <span class="adm-mval">${value}</span>
-    </div>`;
+export function Row({ title, why, chip, value }) {
+  return html`<${ListRow} name=${title} detail=${why} detailKind="text"
+    value=${chip || (value !== undefined && value !== null && value !== '')
+      ? html`<${Stack} direction="horizontal" align="center" density="compact">${chip}${value !== undefined && value !== null && value !== '' ? html`<span>${value}</span>` : null}<//>`
+      : null} />`;
 }
 
+/** The chip tone each badge type reads as: fine, needs a look, broken, or plain information. */
+const BADGE_TONE = {
+  success: 'success', healthy: 'success', active: 'success', ok: 'success', online: 'success', enabled: 'success', verified: 'success',
+  error: 'danger', critical: 'danger', danger: 'danger', failed: 'danger', offline: 'danger', blocked: 'danger', revoked: 'danger',
+  warning: 'coral', watch: 'coral', pending: 'coral', stale: 'coral', degraded: 'coral',
+  idle: 'muted', disabled: 'muted', hidden: 'muted', inactive: 'muted', archived: 'muted',
+  public: 'sun', featured: 'sun',
+};
+
 /**
- * Render a badge. `type` picks the tone class (adm-badge-${type}); the visible
- * text is `label` when given, else the type word itself (so `<Badge type="public" />`
- * still reads "public"). Previously `label` was silently dropped — 13 call sites
- * that pass a human label + a semantic tone (e.g. type="success" label="Active")
- * showed the tone word instead of the label.
+ * A badge: a shared Chip whose tone comes from `type`; the visible text is `label` when given,
+ * else the translated type word (dashboard.badge<Type>), else the type word itself.
  */
 export function Badge({ type, label }) {
-  // A badge with no label used to print its type word as it was ("healthy", "critical"), which is
-  // the one English word on an otherwise translated page. The type is a CSS class, so it stays; the
-  // text comes from dashboard.badge<Type> when a translation exists and is the type word otherwise
-  // (a category or a visibility value that has no entry still reads as before).
   const key = `dashboard.badge${String(type).charAt(0).toUpperCase()}${String(type).slice(1)}`;
   const auto = t(key);
-  return html`<span class="adm-badge adm-badge-${type}">${label != null ? label : (auto === key ? type : auto)}</span>`;
+  return html`<${Chip} tone=${BADGE_TONE[String(type).toLowerCase()] || 'plain'}>${label != null ? label : (auto === key ? type : auto)}<//>`;
 }
 
 /**
- * Render a stat card.
+ * One figure: a shared NumeralBand with a single item.
  * @param {{ label: string, value: any, sub?: string, tone?: string, color?: string }} props
- *   tone — theme-aware modifier class (indigo|mint|green|cyan|amber|purple|blue|red). Preferred.
- *   color — legacy inline color (still honored if no tone); migrate callers to `tone`.
+ *   tone "red" sets the number coral; the other old tones and `color` are the band's plain ink now.
  */
-export function StatCard({ label, value, sub, tone, color }) {
-  const toneClass = tone ? ` ${tone}` : '';
-  const style = !tone && color ? `color:${color}` : '';
-  return html`<div class="adm-card">
-    <h2>${label}</h2>
-    <div class="adm-stat${toneClass}" style=${style}>${num(value)}</div>
-    ${sub && html`<div class="adm-stat-label">${sub}</div>`}
-  </div>`;
+export function StatCard({ label, value, sub, tone }) {
+  return html`<${NumeralBand} tone="plain" size="small" items=${[{ label, value: num(value), note: sub, tone: tone === 'red' ? 'coral' : undefined }]} />`;
 }
 
-/** Render a stats grid (4-column) */
+/** A row of figures: one shared NumeralBand, the figures in equal columns. */
 export function StatsGrid({ items }) {
-  return html`<div class="adm-grid adm-grid-4">
-    ${items.map(i => html`<${StatCard} label=${i.label} value=${i.value} sub=${i.sub} tone=${i.tone} color=${i.color} />`)}
-  </div>`;
+  return html`<${NumeralBand} tone="plain" size="small" items=${items.map((i) => ({ label: i.label, value: num(i.value), note: i.sub, tone: i.tone === 'red' ? 'coral' : undefined }))} />`;
 }
 
-/** Render an economy-style key-value row */
+/** An economy-style key-value row. */
 export function EconRow({ label, value }) {
-  return html`<div class="adm-erow">
-    <span class="adm-elabel">${label}</span>
-    <span class="adm-eval">${value}</span>
-  </div>`;
+  return html`<${KeyValue} label=${label} value=${value} />`;
 }
 
-/** Render a health-metric row */
+/** A health-metric row: the metric, its zone as a chip, and the value. */
 export function HealthRow({ label, obj }) {
-  return html`<div class="adm-hrow">
-    <span class="adm-hmetric">${label}</span>
-    <span><${Badge} type=${obj.zone} /> <span class="adm-hval">${obj.value}</span></span>
-  </div>`;
+  return html`<${KeyValue} label=${label}><${Stack} direction="horizontal" align="center" density="compact"><${Badge} type=${obj.zone} /><span>${obj.value}</span><//><//>`;
 }
 
-/** Loading spinner */
+/** Loading. */
 export function Spinner({ text }) {
-  return html`<div class="empty"><div class="spinner"></div> ${text || t('common.loading')}</div>`;
+  return html`<${Stack} direction="horizontal" align="center"><${SharedSpinner} /><${Text} tone="muted">${text || t('common.loading')}<//><//>`;
 }
 
-/** Empty state — delegates to the canonical /components/EmptyState.js. */
+/** Nothing to show: one quiet line, never a dashed box. */
 export function Empty({ text }) {
-  return html`<${EmptyState} text=${text} />`;
+  return html`<${Text} tone="muted">${text}<//>`;
 }
 
-/** Error box */
+/** A failure: the solid danger aside. */
 export function ErrorBox({ message }) {
-  return html`<div class="error-box"><strong>${t('common.error')}</strong><br/>${escHtml(message)}</div>`;
+  return html`<${Surface} kind="aside" tone="danger" role="alert"><${Stack} density="compact">
+    <${Text} kind="label">${t('common.error')}<//><${Text}>${String(message ?? '')}<//>
+  <//><//>`;
 }
 
-/** Expandable/collapsible help section — reusable across all tabs and portal pages */
-/** `open` starts it expanded — for a first-run explanation nobody would think to click. */
+/** Help that folds away; `open` starts it expanded, for a first-run explanation nobody would think to click. */
 export function ExpandableHelp({ title, children, open }) {
-  return html`<details class="adm-help" open=${open || null}>
-    <summary class="adm-help-summary">${title}</summary>
-    <div class="adm-help-body">${children}</div>
-  </details>`;
+  return html`<${Surface} kind="plain" summary=${title} open=${open || null}><${Stack}>${children}<//><//>`;
 }
 
 /**
- * DataTable (admin) — thin wrapper around the canonical
- * /components/DataTable.js that adds admin's `.adm-card` container. The 36
- * admin importers keep the same `{ headers, rows, scroll }` signature and the
- * same admin appearance (the `.adm table` / `.adm .scrollable` / `.adm .mono`
- * scoped CSS still wins over the generic `.data-table` inside `.adm`).
- *
- * SECURITY: cell objects with `_html: true` render `cell.text` as raw HTML;
- * callers MUST sanitize (escHtml()) any user-generated content. See the
- * generic DataTable for the full cell protocol.
+ * A table: the shared Table, which keeps the canonical renderer's cell protocol and stacks its rows
+ * on a phone. SECURITY: cell objects with `_html: true` render `cell.text` as raw HTML; callers MUST
+ * sanitize (escHtml()) any user-generated content.
  */
-export function DataTable({ headers, rows, scroll }) {
-  return html`<div class="adm-card">
-    <${GenericDataTable} headers=${headers} rows=${rows} scroll=${scroll} />
-  </div>`;
+export function DataTable({ headers, rows, sort, onSort, rowTones, label, density }) {
+  return html`<${Table} headers=${headers} rows=${rows} collapse=${600} sort=${sort} onSort=${onSort} rowTones=${rowTones} label=${label} density=${density} />`;
 }
 
 /**
@@ -199,9 +171,11 @@ export function useToast() {
   return [msg, showError, showSuccess, clear];
 }
 
+/** A message that stays until dismissed: the aside in the failure or success tone, with its ✗. */
 export function Toast({ type, text, onDismiss }) {
-  return html`<div class="adm-toast adm-toast-${type}">
-    <span>${text}</span>
-    <button class="adm-toast-dismiss" onClick=${onDismiss}>\u00d7</button>
-  </div>`;
+  return html`<${Surface} kind="aside" tone=${type === 'error' ? 'danger' : 'success'} role="status">
+    <${Stack} direction="horizontal" align="between"><${Text}>${text}<//>
+      <${Action} kind="icon" label=${t('common.close') || 'Close'} onClick=${onDismiss}>✗<//>
+    <//>
+  <//>`;
 }

@@ -19,6 +19,7 @@
  *   renders in a sandboxed frame with its own stylesheet.
  * @usage Linked from public/spa.html after every other stylesheet.
  * @version-history
+ *   2026-09-22 -- Rules no markup uses any more are removed: every signed-in page is composed from the shared set (css/parts.css), so the page copies here stopped matching anything.
  *   2026-09-13: Overview and shared instruction rules leave with their whole-part migration.
  *   2026-09-13 -- Let an explicitly composed poster aside own the MCP install row frame.
  *   2026-09-13 -- V2y: compose agent setup panel section headings from poster.css.
@@ -74,9 +75,8 @@
 .portfolio-container .poster-page-title { margin-bottom: 0.5rem; }
 .pf .poster-section-title.section-title-spaced { margin-top: 2.6rem; }
 .pf .section-desc, .portfolio-subtitle-text { font-weight: 600; color: var(--text-dim); font-size: 0.92rem; }
-.pf .card-h3, .pf .card-title, .pf .pf-agd-section-label, .pf .pf-agd-section-title, .pf .pj-section-title,
-.pf .form-row label, .pf .detail-label, .pf .tx-detail-label, .pf .pj-field > span, .pf .pj-rec-field-label,
-.pf .pj-form-group, .portfolio-source-group summary {
+.pf .card-h3, .pf .card-title,
+.pf .form-row label, .pf .detail-label, .pf .tx-detail-label, .portfolio-source-group summary {
   font-family: var(--font-showroom-body);
   font-size: 0.72rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
   color: var(--accent); margin-bottom: 0.4rem;
@@ -86,44 +86,42 @@
 .pf .card-subtitle { font-weight: 600; }
 
 /* ── Cards become sections: a rule on top, the page behind them ────────────────────────── */
-.pf .card, .pf .card.card-glass, .pf .pf-agd-card, .pj-section, .pf .key-rules-box,
-.portfolio-step, .portfolio-instructions, .pf .pf-agd-webhook-form {
+.pf .card, .pf .card.card-glass,
+.portfolio-step, .portfolio-instructions {
   background: none; border-radius: 0; box-shadow: none;
   padding: 1.1rem 0 1.5rem; margin-bottom: 2rem;
 }
-.pf .card, .pf .card.card-glass, .pf .pf-agd-card, .pj-section, .pf .key-rules-box, .pf .pf-agd-webhook-form {
+.pf .card, .pf .card.card-glass {
   border-right: 0; border-bottom: 0; border-left: 0;
 }
 .pf .card:hover, .pf .card.card-glass:hover { border-color: var(--text); box-shadow: none; transform: none; }
 .pf .card-expanded { border-top-color: var(--accent); }
 .pf .card-detail { border-top: 2px dashed var(--border); }
-.pf .pf-agd-card + .pf-agd-card { margin-top: 0; }
-.pf .pf-agd-card-grid { gap: 0 2rem; }
 .pf .detail-grid { gap: 0 2rem; }
 .pf .detail-item { background: none; border-radius: 0; border-top: 2px solid var(--text); padding: 0.55rem 0; }
 .pf .detail-value { font-weight: var(--font-poster-text-weight); font-size: 0.92rem; }
 .pf .empty, .portfolio-not-found { border: 3px dashed var(--text); border-radius: 0; font-weight: var(--font-poster-text-weight); color: var(--text); }
 
 /* ── The loud action is an ink slab; the quiet ones are underlined words ────────────────── */
-.pf .btn-primary, .portfolio-container .btn-primary, .portfolio-viewer-full .btn-primary, .pf-account-modal .btn-primary {
+.pf .btn-primary, .portfolio-container .btn-primary, .portfolio-viewer-full .btn-primary {
   background: var(--text); color: var(--bg);
   border: 0; border-radius: 0; box-shadow: 4px 4px 0 var(--sun);
   padding: 10px 16px;
   font-family: var(--font-showroom-body); font-weight: var(--font-poster-strong-weight); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em;
   transition: transform 120ms ease, box-shadow 120ms ease;
 }
-.pf .btn-primary:hover, .portfolio-container .btn-primary:hover, .portfolio-viewer-full .btn-primary:hover, .pf-account-modal .btn-primary:hover {
+.pf .btn-primary:hover, .portfolio-container .btn-primary:hover, .portfolio-viewer-full .btn-primary:hover {
   color: var(--sun); transform: translate(2px, 2px); box-shadow: 2px 2px 0 var(--sun);
 }
 .pf .btn-primary.success, .pf .btn-primary.copied { background: var(--success-fg); box-shadow: 4px 4px 0 var(--text); }
-.pf .btn-primary:disabled, .pf-account-modal .btn-primary:disabled { opacity: 0.45; transform: none; }
-.pf .btn-outline, .pf .btn-ghost, .pf .btn-danger, .pf .expand-btn, .pf .pf-back-btn, .portfolio-container .btn-outline, .portfolio-container .btn-ghost, .portfolio-viewer-full .btn-ghost, .portfolio-viewer-full .btn-outline, .pf-account-modal .btn-outline, .pf-account-modal .pf-edit-link {
+.pf .btn-primary:disabled { opacity: 0.45; transform: none; }
+.pf .btn-outline, .pf .btn-ghost, .pf .btn-danger, .portfolio-container .btn-outline, .portfolio-container .btn-ghost, .portfolio-viewer-full .btn-ghost, .portfolio-viewer-full .btn-outline {
   background: none; border: 0; border-bottom: 2px solid var(--text); border-radius: 0; box-shadow: none;
   padding: 0 0 1px; min-height: 0;
   font-family: var(--font-showroom-body); font-weight: var(--font-poster-strong-weight); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em;
   color: var(--text); line-height: 1.5;
 }
-.pf .btn-outline:hover, .pf .btn-ghost:hover, .pf .expand-btn:hover, .pf .pf-back-btn:hover, .portfolio-container .btn-outline:hover, .portfolio-container .btn-ghost:hover, .portfolio-viewer-full .btn-ghost:hover, .pf-account-modal .btn-outline:hover, .pf-account-modal .pf-edit-link:hover {
+.pf .btn-outline:hover, .pf .btn-ghost:hover, .portfolio-container .btn-outline:hover, .portfolio-container .btn-ghost:hover, .portfolio-viewer-full .btn-ghost:hover {
   background: none; color: var(--accent); border-color: var(--accent); box-shadow: none; transform: none;
 }
 .pf .btn-danger { color: var(--accent); border-color: var(--accent); }
@@ -131,29 +129,25 @@
 .pf .btn-outline.copied, .pf .btn-ghost.copied { color: var(--success-fg); border-color: var(--success-fg); }
 .pf .btn-sm { padding: 0 0 1px; font-size: 0.74rem; }
 .pf .btn-primary.btn-sm { padding: 7px 12px; }
-.pf .card-actions, .pf .form-actions, .pf .pf-agd-form-actions, .portfolio-prompt-actions, .portfolio-paste-actions { gap: 0.6rem 1.6rem; align-items: center; }
+.pf .card-actions, .pf .form-actions, .portfolio-prompt-actions, .portfolio-paste-actions { gap: 0.6rem 1.6rem; align-items: center; }
 
 /* ── Fields: an underline for one line, an ink box for many ────────────────────────────── */
-.pf .input-field, .portfolio-container .input-field, .pf .input-sm, .pf .pf-agd-tag-add-input,
-.pf-account-modal .pf-edit-input, .pf-account-modal .pf-edit-textarea, .pf-account-modal .pf-edit-select {
+.pf .input-field, .portfolio-container .input-field, .pf .input-sm {
   background: transparent; border: 0; border-bottom: 3px solid var(--text); border-radius: 0;
   padding: 8px 0; font-family: var(--font-showroom-body); font-weight: var(--font-poster-text-weight); color: var(--text);
 }
-.pf .input-field:focus, .portfolio-container .input-field:focus,
-.pf-account-modal .pf-edit-input:focus, .pf-account-modal .pf-edit-textarea:focus, .pf-account-modal .pf-edit-select:focus { border-color: var(--accent); box-shadow: none; background: transparent; }
-.pf .input-field::placeholder, .portfolio-container .input-field::placeholder,
-.pf-account-modal .pf-edit-input::placeholder, .pf-account-modal .pf-edit-textarea::placeholder { color: var(--text-dim); font-weight: 600; }
+.pf .input-field:focus, .portfolio-container .input-field:focus { border-color: var(--accent); box-shadow: none; background: transparent; }
+.pf .input-field::placeholder, .portfolio-container .input-field::placeholder { color: var(--text-dim); font-weight: 600; }
 .pf textarea.input-field, .portfolio-container textarea.input-field, .portfolio-paste-area, .portfolio-custom-desc,
-.pf select.input-field, .pf .agent-prompt-box, .pf .access-pat-token, .pf .pj-rec-json, .portfolio-prompt-output, .pf .pf-agd-tag-add-input,
-.pf-account-modal .pf-edit-textarea, .pf-account-modal .pf-edit-select {
+.pf select.input-field, .pf .agent-prompt-box, .pf .access-pat-token, .portfolio-prompt-output {
   border: 2px solid var(--text); border-radius: 0; padding: 10px 12px; background: var(--bg-dim);
 }
-.pf select.input-field, .pf-account-modal .pf-edit-select { background: var(--bg); padding: 8px 10px; }
+.pf select.input-field { background: var(--bg); padding: 8px 10px; }
 .portfolio-paste-area, .portfolio-prompt-output { border-width: 3px; }
 .portfolio-prompt-output { color: var(--text); }
 
 /* ── Badges and chips: square, ink-framed, the colour kept ──────────────────────────────── */
-.pf .badge, .pf .pill, .pf .vis-pill, .pf .pf-agd-badge, .pf .pf-agd-tag-chip, .pf .pf-agd-step-pill, .pf .pf-agd-cap-badge, .pf .pf-agd-change-badge, .pf .pf-agd-tab-badge, .kpkg-badge, .pj-doc-tag, .pj-tab-pill, .pj-org-tab-unseen, .pf .pf-psp-chip {
+.pf .badge, .pf .pill, .pf .vis-pill, .pf .pf-agd-badge {
   border-radius: 0; font-family: var(--font-mono); font-weight: 500; letter-spacing: 0;
 }
 .pf .badge { border: 2px solid var(--text); background: transparent; color: var(--text); padding: 1px 7px; font-size: 0.66rem; }
@@ -164,66 +158,47 @@
 .pf .badge-muted { border-color: var(--border); color: var(--text-dim); }
 
 /* ── Tabs inside a tab: underlined words, the open one on the sun ───────────────────────── */
-.pf .sub-tabs, .pf .platform-tabs, .pf .pf-agd-tabs { gap: 0; border-bottom: 0; padding: 0; margin-bottom: 1.2rem; }
-.pf .tab, .pf .sub-tab, .pf .platform-tab, .pf .pf-agd-tab, .pj-org-tab {
+.pf .sub-tabs { gap: 0; border-bottom: 0; padding: 0; margin-bottom: 1.2rem; }
+.pf .tab, .pf .sub-tab {
   background: none; border: 0; border-bottom: 2px solid transparent; border-radius: 0;
   padding: 0.55rem 0.8rem; margin: 0;
   font-family: var(--font-showroom-body); font-weight: var(--font-poster-strong-weight); font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.04em;
   color: var(--text-dim);
 }
-.pf .tab:hover, .pf .sub-tab:hover, .pf .platform-tab:hover, .pf .pf-agd-tab:hover, .pj-org-tab:hover { color: var(--text); background: none; border-color: transparent; }
-.pf .tab.active, .pf .sub-tab.active, .pf .platform-tab.active, .pf .pf-agd-tab--active, .pj-org-tab.active {
+.pf .tab:hover, .pf .sub-tab:hover { color: var(--text); background: none; border-color: transparent; }
+.pf .tab.active, .pf .sub-tab.active {
   background: var(--sun); color: var(--on-sun); border-bottom-color: var(--text); font-weight: var(--font-poster-strong-weight);
 }
-.pf .pf-agd-tab-content { padding: 1rem 0; }
 
 /* ── Lists: one rule per row, the row's own words in bold ───────────────────────────────── */
-.pf .mem-item, .pf .tx-item, .pj-org-row, .pj-ws-card, .pf .pf-agd-collapsed, .pj-search-hit, .pf .mem-group-header,
-.pf .pf-agd-info-row, .pf .kv-row, .pf .access-empty-row, .pj-doc-row, .pf .mem-search-summary {
+.pf .mem-item, .pf .tx-item, .pf .mem-group-header, .pf .kv-row, .pf .access-empty-row, .pf .mem-search-summary {
   background: none; border: 0; border-bottom: 1px solid var(--border); border-radius: 0; box-shadow: none;
   padding: 0.75rem 0; font-weight: var(--font-poster-text-weight);
 }
-.pf .mem-item:hover, .pf .tx-item:hover, .pf .mem-group-header:hover, .pf .pf-agd-collapsed:hover, .pj-search-hit:hover { background: none; color: var(--accent); }
-.pj-org-list { gap: 0; }
-.pj-org-row, .pj-ws-card, .pf .pf-agd-collapsed { border-bottom: 2px solid var(--text); padding: 0.75rem 0; }
-.pf .pf-agd-collapsed-name, .pf .pf-agd-zone1-name, .pj-ws-card-name, .pj-search-hit-title { font-weight: var(--font-poster-strong-weight); font-size: 1.02rem; }
+.pf .mem-item:hover, .pf .tx-item:hover, .pf .mem-group-header:hover { background: none; color: var(--accent); }
 .pf .mem-key, .pf .mem-group-name, .pf .tx-amount, .pf .access-mono, .pf .tx-detail-value { font-family: var(--font-mono); }
 .pf .mem-group-header { border-bottom: 2px solid var(--text); }
-.pf .kv-value, .pf .pf-agd-info-value { font-weight: var(--font-poster-text-weight); }
-.pf .kv-label, .pf .pf-agd-info-label { font-family: var(--font-mono); font-size: 0.76rem; font-weight: 400; color: var(--text-dim); }
+.pf .kv-value { font-weight: var(--font-poster-text-weight); }
+.pf .kv-label { font-family: var(--font-mono); font-size: 0.76rem; font-weight: 400; color: var(--text-dim); }
 .pf .data-table th { font-weight: var(--font-poster-strong-weight); letter-spacing: 0.1em; color: var(--accent); border-bottom: 3px solid var(--text); font-size: 0.7rem; }
 .pf .data-table td { color: var(--text); font-weight: 600; border-bottom: 1px solid var(--border); }
 .pf .data-table tr:hover td { background: none; color: var(--accent); }
 
 /* ── An agent, opened: an ink frame with a sun shadow, its zones ruled inside ───────────── */
-.pf .pf-agd-expanded { border: 3px solid var(--text); border-radius: 0; box-shadow: 8px 8px 0 var(--sun); background: var(--bg); }
-.pf .pf-agd-zone2--new { border-left: 6px solid var(--sun); background: none; }
-.pf .pf-agd-zone2--onboarding { border-left: 6px solid var(--text); background: none; }
-.pf .pf-agd-zone2--problem { border-left: 6px solid var(--accent); background: none; }
-.pf .pf-agd-zone2-title { font-weight: var(--font-poster-strong-weight); letter-spacing: 0.08em; }
-.pf .pf-agd-card-footer { border-top: 2px solid var(--text); }
 .pf .agent-prompt-box { font-family: var(--font-mono); }
 
 /* ── The fleet board above the agent list: a ruled grid of names, the state as a left stripe ── */
-.pf .pf-agd-board, .pf .pf-agd-active { background: none; border-radius: 0; padding: 0.9rem 0 0.5rem; }
+.pf .pf-agd-board { background: none; border-radius: 0; padding: 0.9rem 0 0.5rem; }
 .pf .pf-agd-board-card { background: none; border: 0; border-left: 6px solid var(--agd-state, var(--text-muted)); border-bottom: 2px solid var(--text); border-radius: 0; padding: 0.5rem 0.75rem; }
 .pf .pf-agd-board-card:hover, .pf .pf-agd-board-card:focus-visible { background: var(--sun); color: var(--on-sun); box-shadow: none; }
 .pf .pf-agd-board-card:hover .pf-agd-board-card-name, .pf .pf-agd-board-card:focus-visible .pf-agd-board-card-name { color: var(--on-sun); }
 .pf .pf-agd-board-card-name { font-weight: var(--font-poster-strong-weight); }
 .pf .pf-agd-idcard { border: 3px solid var(--text); border-radius: 0; box-shadow: 8px 8px 0 var(--sun); }
-.pf .pf-agd-legend-pill, .pf .pf-agd-tag-pill, .tag-pill, .pf .pf-agd-filter-tags .pf-agd-tag-chip {
+.pf .pf-agd-legend-pill, .pf .pf-agd-tag-pill, .tag-pill {
   border-radius: 0; border: 2px solid var(--text); background: none; color: var(--text);
   font-family: var(--font-mono); font-size: 0.72rem; font-weight: 500; padding: 1px 8px;
 }
 .pf .pf-agd-legend-pill--active, .tag-pill--active, .tag-pill.active { background: var(--sun); color: var(--on-sun); }
-.pf .pf-agd-filter-bar, .pf .pf-agd-group-header, .pf .pf-agd-filter-tags { border-bottom: 2px solid var(--text); font-weight: var(--font-poster-strong-weight); }
-/* The GAII on a row: square, and the sun under the pointer, the same answer the board tiles give. */
-.pf .pf-agd-gaii { border-radius: 0; }
-.pf .pf-agd-gaii:hover, .pf .pf-agd-gaii:focus-visible { background: var(--sun); color: var(--on-sun); }
-.pf .pf-agd-active-row { border-radius: 0; border-bottom: 1px solid var(--border); }
-/* The attach-this-agent box (components/McpInstall) inside an agent: an ink frame, a mono command. */
-.pf .mcpi--quick, .mcpi--tool:where(:not(.poster-aside)) { border: 2px solid var(--text); border-radius: 0; background: var(--bg-dim); }
-.mcpi-cmd-text { border: 2px solid var(--text); border-radius: 0; }
 
 /* ── Raw fields the older tabs still use ───────────────────────────────────────────────── */
 .pf .btn-danger-solid { background: none; border: 0; border-bottom: 2px solid var(--accent); border-radius: 0; box-shadow: none; padding: 0 0 1px; color: var(--accent); font-weight: var(--font-poster-strong-weight); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; }
@@ -236,13 +211,6 @@
 .pf input[type="text"]:focus, .pf input[type="search"]:focus, .pf input[type="url"]:focus, .pf input[type="email"]:focus, .pf input[type="number"]:focus, .pf input[type="password"]:focus { border-color: var(--accent); box-shadow: none; }
 .pf select, .pf textarea { border: 2px solid var(--text); border-radius: 0; background: var(--bg); color: var(--text); font-family: var(--font-showroom-body); font-weight: 600; }
 .pf input[type="checkbox"], .pf input[type="radio"] { accent-color: var(--text); }
-
-/* ── Organisms and workspaces ───────────────────────────────────────────────────────────── */
-.pj-doc-view { border: 3px solid var(--text); border-radius: 0; box-shadow: 8px 8px 0 var(--sun); }
-.pj-rec-fields, .pj-rec-edit { border-radius: 0; background: none; border-top: 2px dashed var(--border); }
-.pj-danger-box { border: 3px solid var(--accent); border-radius: 0; }
-.pj-doc-link, .pj-rec-title, .pj-org-crumb-link { font-weight: var(--font-poster-text-weight); }
-.pj-org-openbtn { white-space: nowrap; }
 
 /* ── Money: the amounts as numerals ─────────────────────────────────────────────────────── */
 .pf .stat-card { text-align: left; }
@@ -258,24 +226,13 @@
 
 /* ── Controls that keep a box ──────────────────────────────────────────────────────────── */
 .pf .seg { border: 2px solid var(--text); border-radius: 0; background: none; }
-.pf .seg-btn { font-weight: var(--font-poster-strong-weight); padding: 0.35rem 0.9rem; color: var(--text); }
-.pf .seg-btn + .seg-btn { border-left: 2px solid var(--text); }
-.pf .seg-btn.active { background: var(--text); color: var(--bg); }
 .pf .alert { border-radius: 0; border-width: 2px; border-left-width: 6px; font-weight: 600; }
 .pf .pagination { font-family: var(--font-mono); }
 
 /* ── Dialogs ────────────────────────────────────────────────────────────────────────────── */
-/* The frame, header, X and footer of every dialog are /css/dialog.css. What stays here is how the
-   account dialogs' fields look; those dialogs also open from Home, outside the profile shell. */
-.pf-account-modal .pf-edit-input { width: 100%; min-width: 0; box-sizing: border-box; }
-
-.pf-account-modal .pf-edit-link { align-self: flex-start; width: fit-content; text-decoration: none; }
-.pf-account-modal .pf-edit-readonly, .pf-account-modal .pf-avatar-preview, .pf-account-modal .pf-edit-error { border-radius: 0; }
-.pf-account-modal .pf-edit-readonly { background: none; border: 0; border-bottom: 1px solid var(--border); padding-inline: 0; }
-.pf-account-modal .pf-avatar-preview { border: 2px solid var(--text); }
 
 /* ── Words on the sun stay ink in every theme ───────────────────────────────────────────── */
-.koti-fold--on, .koti-pb .koti-fold:hover, .koti-pb .koti-fold--on, .koti-ach-chip--done .koti-ach-mark, .chat-thread--active, .chat-list-toggle, .chat-copy-head.copied, .chat-turn--user .chat-bubble, .chat-attach:hover, .chat-voice:hover { color: var(--on-sun); }
+.chat-thread--active, .chat-list-toggle, .chat-copy-head.copied, .chat-turn--user .chat-bubble, .chat-attach:hover, .chat-voice:hover { color: var(--on-sun); }
 
 /* ── The portfolio builder and the viewer chrome (outside .pf) ──────────────────────────── */
 .portfolio-step { padding-top: 1.4rem; margin-bottom: 2.4rem; }
@@ -321,12 +278,8 @@
 
 /* ── What the browser tour of 2026-08-29 added: the agents tab's details ────────────────── */
 .pf .pf-agd-board-card-name { color: var(--text); }
-.pf .pf-agd-badge, .pf .pf-agd-tag-chip, .pf .pf-agd-tag-name { background: none; border: 2px solid currentColor; color: var(--text); padding: 1px 7px; }
+.pf .pf-agd-badge { background: none; border: 2px solid currentColor; color: var(--text); padding: 1px 7px; }
 .pf .pf-agd-badge--mode-interactive, .pf .pf-agd-badge--mode-autonomous { color: var(--text); }
-.pf .pf-agd-group-header { border-bottom: 0; padding-bottom: 0.3rem; }
-.pf .pf-agd-collapsed-meta { font-family: var(--font-mono); font-size: 0.76rem; font-weight: 400; color: var(--text-dim); }
-.pf .pf-agd-tab-content { padding-top: 0.5rem; }
-.pf .pf-agd-tab-content > :first-child { margin-top: 0; }
 .pf input:not([type]) {
   background: transparent; border: 0; border-bottom: 3px solid var(--text); border-radius: 0;
   padding: 8px 0; font-family: var(--font-showroom-body); font-weight: var(--font-poster-text-weight); color: var(--text); outline: none;
@@ -339,126 +292,66 @@
    square mono chip) so the whole machine room changes in one file. Selectors keep the .pf
    prefix the view sheets use, so the cascade order decides. */
 /* Sections: a rule on top, no frame */
-.pf .sch-form, .pf .sch-cal-freq, .pf .pf-nb-suggest, .pf .pf-nb-enrich, .pf .pf-nb-plan-step, .pf .pf-ld-pending, .pf .pf-ld-charter-box, .pf .pf-ld-editor, .pf .pf-ld-chart, .pf .pf-agd-crew-live, .pf .pf-agd-crew-problems, .pf .pf-agd-crew-tools-group, .pf .mem-tools-section, .pf .mem-detail, .pf .mem-browse-panel, .pf .mem-bulkbar, .pf .pn-card, .pf .pn-setup, .pf .agent-cta, .pf .create-form, .pf .platform-content, .pf .pf-agd-governance-section, .pf .agd-services-info, .pf .pf-agd-create-form, .pf .pf-agd-cgroup-empty, .pf .agd-msg-proposed-task, .pf .pf-agd-directives-content, .pf .stat-card {
+.pf .mem-tools-section, .pf .mem-detail, .pf .mem-browse-panel, .pf .mem-bulkbar, .pf .agent-cta, .pf .create-form, .pf .agd-msg-proposed-task, .pf .stat-card {
   background: none; border-right: 0; border-bottom: 0; border-left: 0; border-radius: 0; box-shadow: none; padding: 1rem 0 1.25rem;
 }
 .pf .stat-card { padding: 0.9rem 0 1rem; }
 /* Rows: one rule under each, the row's own words in bold */
-.pf .sch-card, .pf .of-card, .pf .wf-card, .pf .cap-item, .pf .pf-nb-note, .pf .pf-nb-hit, .pf .mem-browse-item, .pf .mem-discover-item,
-.pf .app-card, .pf .file-card, .pf .post-card, .pf .ext-card, .pf .ext-bundled-card, .pf .pf-agd-task-item, .pf .agd-task-item,
-.pf .pf-agd-log-entry, .pf .agd-log-entry, .pf .pf-agd-todo-item, .pf .agd-todo-item, .pf .pf-agd-service-card, .pf .agd-service-card,
-.pf .pf-agd-crew-template, .pf .pf-agd-crew-card, .pf .mbr-card, .pf .pf-agd-config-item, .pf .pf-agd-quality-review-row,
-.pf .pf-agd-step, .pf .pf-ld-card, .pf .lib-proof-row {
+.pf .sch-card, .pf .of-card, .pf .mem-browse-item, .pf .mem-discover-item,
+.pf .app-card, .pf .file-card, .pf .post-card, .pf .agd-log-entry, .pf .mbr-card {
   background: none; border: 0; border-bottom: 2px solid var(--text); border-radius: 0; box-shadow: none; padding: 0.9rem 0;
 }
-.pf .sch-card:hover, .pf .of-card:hover, .pf .wf-card:hover, .pf .cap-item:hover, .pf .app-card:hover, .pf .ext-card:hover, .pf .pf-agd-crew-template:hover, .pf .mbr-card:hover {
+.pf .sch-card:hover, .pf .of-card:hover, .pf .app-card:hover, .pf .mbr-card:hover {
   transform: none; box-shadow: none; border-color: var(--accent); background: none;
 }
-.pf .of-card--open, .pf .pf-agd-crew-template.selected, .pf .pf-agd-crew-template--on { border-bottom-color: var(--accent); }
-.pf .sch-card-title, .pf .wf-card-title, .pf .of-card-title, .pf .of-offer-title, .pf .cap-item-name, .pf .pf-agd-crew-template-name, .pf .mbr-card-name { font-weight: var(--font-poster-strong-weight); font-size: 1.02rem; }
+.pf .of-card--open { border-bottom-color: var(--accent); }
+.pf .sch-card-title, .pf .of-card-title, .pf .of-offer-title { font-weight: var(--font-poster-strong-weight); font-size: 1.02rem; }
 /* Boxes: the ink frame for a thing that must read as one object (a preview, a sample, a schema) */
-.pf .of-req, .pf .of-conseq, .pf .of-sample, .pf .of-result, .pf .of-md, .pf .of-prereq, .pf .pf-nb-enrich-preview-body, .pf .pf-agd-memory-preview,
-.pf .pf-agd-rule-source, .pf .agd-rule-source, .pf .cap-schema-pre, .pf .pf-agd-crew-try-output, .pf .pf-agd-config-preview, .pf .sch-card-dispatch {
+.pf .of-req, .pf .of-md, .pf .sch-card-dispatch {
   border: 2px solid var(--text); border-radius: 0; background: var(--bg-dim); box-shadow: none;
 }
 /* Chips: square, mono, the colour kept as the frame */
-.pf .sch-badge, .pf .sch-tag, .pf .sch-preset, .pf .of-badge, .pf .of-status, .pf .of-chip, .pf .of-group-count, .pf .wf-badge, .pf .pf-agd-status, .pf .agd-status, .pf .pf-agd-cap-badge, .pf .agd-cap-badge, .pf .pf-agd-cap-type, .pf .agd-cap-type, .pf .pf-agd-filter-pill, .pf .pf-agd-event-badge, .pf .pf-agd-role-badge, .pf .pf-agd-env-badge, .pf .agd-env-badge, .kpkg-badge, .kpkg-tag, .pf .file-tag, .pf .ext-comp-tag, .pf .ext-visibility-badge, .pf .ext-card-version, .pf .brd-member-tag, .pf .scope-badge, .pf .pf-ureport-btn, .pf .pf-agd-quality-dur-chip {
+.pf .sch-badge, .pf .sch-tag, .pf .of-badge, .pf .agd-cap-badge, .pf .agd-cap-type, .pf .file-tag, .pf .brd-member-tag {
   border-radius: 0; background: none; border: 2px solid currentColor;
   font-family: var(--font-mono); font-size: 0.68rem; font-weight: 500; letter-spacing: 0; text-transform: none; padding: 1px 7px; line-height: 1.5;
-}
-.pf .sch-preset--on, .pf .of-chip--on, .pf .pf-ureport-btn.active, .pf .pf-agd-filter-pill--active, .pf .pf-agd-filter-pill.active {
-  background: var(--sun); color: var(--on-sun); border-color: var(--text);
-}
-.pf .pf-ureport-btn { color: var(--text); font-weight: var(--font-poster-text-weight); font-family: var(--font-showroom-body); font-size: 0.78rem; padding: 4px 10px; }
-.pf .pf-ureport-btn:hover:not(.active) { border-color: var(--accent); color: var(--accent); }
-/* The calendar */
-.pf .sch-cal-cell, .pf .sch-cal-weekcol { border-radius: 0; border: 2px solid var(--border); background: none; }
-.pf .sch-cal-cell--today, .pf .sch-cal-weekcol--today { border-color: var(--text); }
-.pf .sch-cal-weekcol-head, .pf .sch-cal-head { background: none; border-bottom: 2px solid var(--text); font-weight: var(--font-poster-strong-weight); }
-/* Headings the view sheets set on their own */
-.pf .sch-section-title, .pf .wf-section-title, .pf .of-group-title, .pf .cap-section-title, .pf .mbr-section-title {
-  font-family: var(--font-poster-section); font-weight: var(--font-poster-section-weight);
-  font-size: 1.7rem; line-height: var(--font-poster-leading); letter-spacing: var(--font-poster-tracking); text-transform: uppercase; color: var(--text);
 }
 
 /* ── The second tour (every remaining index page): discover, ecosystem, skills, capabilities,
    libraries, extensions, packages, the AI provider settings, boards ─────────────────────── */
 /* Rows */
-.pf .pf-eco-card, .pf .pf-or-mrow, .pf .pf-eco-adv-item, .pf .pf-eco-auto-job, .pf .pj-app-card {
+.pf .pf-or-mrow {
   background: none; border: 0; border-bottom: 2px solid var(--text); border-radius: 0; box-shadow: none; padding: 0.9rem 0; margin-bottom: 0;
 }
-.pf .pf-eco-card:hover, .pf .pf-or-mrow:hover { border-color: var(--accent); background: none; box-shadow: none; transform: none; }
+.pf .pf-or-mrow:hover { border-color: var(--accent); background: none; box-shadow: none; transform: none; }
 .pf .pf-or-mrow { border-bottom-width: 1px; border-bottom-color: var(--border); padding: 0.5rem 0; }
 .pf .pf-or-mrow--on { background: var(--sun); color: var(--on-sun); padding-left: 0.5rem; }
-.pf .pf-eco-name { font-weight: var(--font-poster-strong-weight); }
 /* Sections and panels */
-.pf .pf-or-wrapper, .pf .pf-or-section, .pf .pf-eco-section, .pf .pf-eco-auto-flow-card, .pf .pf-eco-mcp {
+.pf .pf-or-wrapper, .pf .pf-or-section {
   background: none; border-right: 0; border-bottom: 0; border-left: 0; border-radius: 0; box-shadow: none; padding: 1rem 0 1.25rem;
 }
-.pf .pf-or-panel, .pf .pf-or-picker, .pf .pf-eco-data-pre, .pf .pf-eco-mcp-sample-prompt, .pf .pf-skl-body-md, .pf .pf-skl-editor-md, .pf .pf-eco-cmd {
+.pf .pf-or-panel, .pf .pf-or-picker {
   border: 2px solid var(--text); border-radius: 0; background: var(--bg-dim); box-shadow: none;
 }
-.pf .pf-or-section-title, .pf .pf-eco-section-title, .pf .pf-skl-section-title, .pf .cap-info-title {
+.pf .pf-or-section-title {
   font-family: var(--font-poster-section); font-weight: var(--font-poster-section-weight);
   font-size: 1.7rem; line-height: var(--font-poster-leading); letter-spacing: var(--font-poster-tracking); text-transform: uppercase; color: var(--text);
 }
 /* Chips */
-.pf .pf-eco-status, .pf .pf-eco-pill, .pf .pf-eco-chip, .pf .pf-eco-count-badge, .pf .pf-eco-rec-chip,
-.pf .cap-badge, .pf .cap-tag, .pf .lib-tier-btn, .pf .vis-pill, .pf .pf-or-status, .pf .pf-skl-version, .pf .pf-eco-auto-status-chip, .pf .pf-eco-setup-progress-chip {
+.pf .vis-pill, .pf .pf-or-status {
   border-radius: 0; background: none; border: 2px solid currentColor; color: var(--text);
   font-family: var(--font-mono); font-size: 0.68rem; font-weight: 500; letter-spacing: 0; text-transform: none; padding: 1px 7px; line-height: 1.5;
 }
-.pf .cap-badge-callable, .pf .pf-eco-status-pending{ color: var(--accent); }
-.pf .pf-eco-status-active, .pf .pf-or-status--on { color: var(--success-fg); }
-.pf .pf-eco-status-revoked{ color: var(--danger); }
-/* The quiet actions the older tabs draw as small framed buttons */
-.pf .ext-card-actions button, .pf .pf-eco-adv-actions button {
-  background: none; border: 0; border-bottom: 2px solid var(--text); border-radius: 0; box-shadow: none; padding: 0 0 1px;
-  font-family: var(--font-showroom-body); font-weight: var(--font-poster-strong-weight); font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text);
-}
+.pf .pf-or-status--on { color: var(--success-fg); }
 /* Search fields the older tabs draw as boxes */
-.pf .cap-search-input, .pf .lib-search, .pf .pf-or-msearch {
+.pf .pf-or-msearch {
   background: transparent; border: 0; border-bottom: 3px solid var(--text); border-radius: 0; padding: 8px 0;
   font-family: var(--font-showroom-body); font-weight: var(--font-poster-text-weight); color: var(--text); box-shadow: none;
 }
-.pf .cap-search-input:focus, .pf .lib-search:focus, .pf .pf-or-msearch:focus { border-color: var(--accent); outline: none; box-shadow: none; }
-.pf .cap-filter-select, .pf .pf-or-select { border: 2px solid var(--text); border-radius: 0; background: var(--bg); }
+.pf .pf-or-msearch:focus { border-color: var(--accent); outline: none; box-shadow: none; }
+.pf .pf-or-select { border: 2px solid var(--text); border-radius: 0; background: var(--bg); }
 
-/* ── The starter card: "begin with two agents" ──────────────────────────────────────────────
-   It was written in the classic shell in September, after this skin, and named nothing this file
-   already reached: a 16px radius on --card, a pill for the warning, a rounded chip strip. It sits
-   on the Agents tab and in the Agents section, so it was the one rounded object on two poster
-   pages. Shape 2, the box for a thing that must read as one object, and shape 4 for its chips. */
-.pf .pf-agd-basic {
-  border: 2px solid var(--text); border-radius: 0; background: var(--bg-dim);
-  padding: 1.1rem 1.2rem; margin-bottom: 1.6rem; box-shadow: none;
-}
-.pf .pf-agd-basic, .pf .pf-agd-new { --poster-section-size: 1.25rem; }
-.pf .pf-agd-basic-desc, .pf .pf-agd-basic-item-desc, .pf .pf-agd-basic-hint,
-.pf .pf-agd-basic-item-gets { font-weight: var(--font-poster-text-weight); color: var(--text-dim); font-family: var(--font-showroom-body); }
-.pf .pf-agd-basic-name { font-weight: var(--font-poster-strong-weight); font-size: 0.95rem; }
-/* Mono NAMES A MACHINE THING and nothing else. The first cut of this block put the hint and the
-   reaches line in it too, and turned two ordinary sentences — "these agents run on your own
-   machine", "your saved data, your messages" — into something that reads as a config dump. What
-   is left is the three status labels, which do name a state the software is in. */
-.pf .pf-agd-basic-state, .pf .pf-agd-basic-status, .pf .pf-agd-basic-have {
-  font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0;
-}
-.pf .pf-agd-basic-gets-label { font-weight: var(--font-poster-strong-weight); color: var(--text); }
-.pf .pf-agd-basic-have, .pf .pf-agd-basic-status.is-connected { color: var(--success-fg); }
-.pf .pf-agd-basic-status.is-offline { color: var(--accent); }
 /* The pill that says an agent starts work without being asked. It is the one thing in this card a
    person is agreeing to, so it is a square framed chip in the accent rather than a rounded aside. */
-.pf .pf-agd-basic-alone {
-  border-radius: 0; border: 2px solid var(--accent); color: var(--accent);
-  font-family: var(--font-mono); font-size: 0.66rem; padding: 1px 7px;
-}
-.pf .pf-agd-basic-notice {
-  border-left: 6px solid var(--sun); background: none; color: var(--text-dim);
-  font-weight: var(--font-poster-text-weight); font-size: 0.85rem;
-}
-.pf .pf-agd-basic-list { gap: 0; border-top: 2px solid var(--text); margin-top: 0.8rem; }
-.pf .pf-agd-basic-item { border-bottom: 1px solid var(--border); padding: 0.7rem 0; }
 
 @media (max-width: 700px) {
   .pf { --poster-page-size: 2rem; }

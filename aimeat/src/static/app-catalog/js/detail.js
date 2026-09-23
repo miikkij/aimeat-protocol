@@ -8,6 +8,12 @@
  *   injected once via initDetail(deps) — so there is no import cycle back through the entry module.
  * @usage import { initDetail, openDetailView, mountLoginPill, ... } from './detail.js'; initDetail({...})
  * @version-history
+ *   2026-09-22 — Drawn from the site's shared set (parts-html.js) instead of local classes and inline
+ *     styles: the page frame, masthead, numeral band, sections (each in a sectionSlot marked
+ *     data-dtl-section, the rail's hook), list rows for versions, checkpoints and skills, fields,
+ *     and actions (Launch is the page's one slab; every other button is an underlined word). The
+ *     emoji in the head's edit pencil, the access-code and protection buttons and the chips are gone.
+ *     The version helpers moved to detail-versions.js (pure extraction) to stay under the ceiling.
  *   2026-09-18 — The Visitors section (visitors.js) for the owner's own published app, after the
  *     versions: who opened it, when and from where.
  *   2026-09-13 — Lineage, copy protection and versions open and close through dialogs.js (the
@@ -67,9 +73,11 @@
  *     setSkillBinding frontmatter rewrite so the standalone bundle needs no SPA service layer).
  *   v1.0.0 — 2026-07-10 — Initial extraction (TARGET-021 Aalto 3 modularization, phase 7).
  */
-import { escapeHtml, jsArg, sourceLabel, sourceLabelText, currentOwnerName, gapMs, durationLabel } from './util.js';
+import { escapeHtml, jsArg, sourceLabelText, currentOwnerName } from './util.js';
 import { saveApp, deleteApp } from './db.js';
-import { dtlBtn, showConfirm, showNotice } from './ui.js';
+import { showConfirm, showNotice } from './ui.js';
+import { section, sectionSlot, listRow, chip, action, numeralBand, stack, columns, surface, text, field, crumbs, masthead } from './parts-html.js';
+import { versionSinceText, versionSpanText, versionSpanHtml } from './detail-versions.js';
 import { dataMapSectionHtml, loadDataMapInto } from './data-map.js';
 import { loadConfig } from './config.js';
 import { t, getLang } from './i18n.js';
@@ -165,6 +173,21 @@ function htmlToBlob(html) {
   return btoa(unescape(encodeURIComponent(html)));
 }
 
+// A button of this view: an underlined word by default (the page's one slab is Launch). `label` is
+// trusted HTML; opts: { kind, tone: 'danger'|'success', id, title, disabled }.
+function btn(label, onclick, opts) {
+  opts = opts || {};
+  return action({ kind: opts.kind || 'secondary', tone: opts.tone, onclick: onclick, title: opts.title, disabled: opts.disabled,
+    attrs: opts.id ? ' id="' + escapeHtml(opts.id) + '"' : '' }, label);
+}
+function btnRow(content) { return stack({ direction: 'wrap', align: 'center' }, content); }
+// One section of the page, in the slot the rail reads (data-dtl-section) and keeps the set's gap.
+function dtlSection(o) { return sectionSlot({ id: o.slotId, attrs: ' data-dtl-section' }, section(o)); }
+// A quiet one-line state under a section: loading, none yet, not possible here.
+function quiet(content) { return text({ kind: 'caption', tone: 'muted' }, content); }
+// The status line a handler writes into by id (its colour is set by the handler).
+function statusLine(id, content) { return text({ kind: 'caption', id: id }, content || ''); }
+
 // The "Manage on server" buttons as inner HTML (empty when the app isn't an own server app).
 // Kept separate so a park/fork toggle can re-render JUST these buttons in place — no full detail
 // re-render (which would rebuild the whole version list and jump the scroll).
@@ -177,44 +200,39 @@ function serverMgmtInner(app) {
   var ownerArg2 = jsArg(svrState.owner || '');
   var p = svrState.protection || {};
   var anyProt = p.obfuscate || p.domainLock || p.watermark || p.noRawDownload;
-  var acLabel = (svrState.accessCode ? '🔒 ' : '') + t('detail.editAccess');
+  // A set access code and an active protection are marked with ✓ after the word (they were emoji).
+  var acLabel = t('detail.editAccess') + (svrState.accessCode ? ' ✓' : '');
   // Inline access-code editor (opened by the button below). Empty on Save removes protection;
   // a 4–64 char value sets it. Mirrors the About editor pattern used elsewhere in this view.
   var acEditor = detailEditingAccessCode
-    ? '<div class="dtl-ac-editor" style="margin-top:10px">' +
-        '<label class="dtl-stat-label" for="detail-ac-input">' + t('detail.accessCodeLabel') + '</label>' +
-        '<input id="detail-ac-input" class="modal-input" maxlength="64" placeholder="' + escapeHtml(t('detail.accessCodePh')) + '" style="margin:4px 0 6px" />' +
-        '<div class="dtl-sync none" style="margin:0 0 8px">' + t('detail.accessCodeRemoveHint') + '</div>' +
-        '<div class="dtl-btn-row">' +
-          dtlBtn(t('detail.saveDetails'), 'window._launcher.detailAccessCodeSave()', {variant:'primary'}) +
-          dtlBtn(t('detail.cancelEdit'), 'window._launcher.detailAccessCodeCancel()') +
-        '</div>' +
-        '<div class="dtl-ai-status" id="detail-ac-status"></div>' +
-      '</div>'
+    ? stack({ density: 'compact' },
+        field({ id: 'detail-ac-input', label: t('detail.accessCodeLabel'), maxLength: 64, placeholder: t('detail.accessCodePh') }) +
+        quiet(t('detail.accessCodeRemoveHint')) +
+        btnRow(
+          btn(t('detail.saveDetails'), 'window._launcher.detailAccessCodeSave()') +
+          btn(t('detail.cancelEdit'), 'window._launcher.detailAccessCodeCancel()')) +
+        statusLine('detail-ac-status'))
     : '';
-  return '<div class="dtl-section">' +
-      '<h3>' + t('detail.serverMgmt') + '</h3>' +
-      '<div class="dtl-btn-row">' +
+  return section({ title: t('detail.serverMgmt'), body: stack({},
+      btnRow(
         (svrState.parked
-          ? dtlBtn(t('card.unpark'), 'window._launcher.toggleParkApp(\'' + fnArg + '\', false)', {title: t('card.unparkHint')})
-          : dtlBtn(t('card.park'), 'window._launcher.toggleParkApp(\'' + fnArg + '\', true)', {title: t('card.parkHint')})) +
-        dtlBtn(t(svrState.forkable ? 'card.forkableOn' : 'card.forkableOff'), 'window._launcher.toggleForkApp(\'' + fnArg + '\', ' + (svrState.forkable ? 'false' : 'true') + ')', {title: t(svrState.forkable ? 'card.forkableOnHint' : 'card.forkableOffHint')}) +
-        dtlBtn(acLabel, 'window._launcher.detailAccessCodeEdit()', {title: t('detail.accessCodeHint')}) +
-        dtlBtn((anyProt ? '🛡✓ ' + t('card.protect') : t('card.protect')), 'window._launcher.showProtectionModal(\'' + fnArg + '\')', {title: t('card.protectHint')}) +
-        dtlBtn(t('card.versions'), 'window._launcher.showVersionsModal(\'' + ownerArg2 + '\', \'' + fnArg + '\')') +
+          ? btn(t('card.unpark'), 'window._launcher.toggleParkApp(\'' + fnArg + '\', false)', {title: t('card.unparkHint')})
+          : btn(t('card.park'), 'window._launcher.toggleParkApp(\'' + fnArg + '\', true)', {title: t('card.parkHint')})) +
+        btn(t(svrState.forkable ? 'card.forkableOn' : 'card.forkableOff'), 'window._launcher.toggleForkApp(\'' + fnArg + '\', ' + (svrState.forkable ? 'false' : 'true') + ')', {title: t(svrState.forkable ? 'card.forkableOnHint' : 'card.forkableOffHint')}) +
+        btn(acLabel, 'window._launcher.detailAccessCodeEdit()', {title: t('detail.accessCodeHint')}) +
+        btn(t('card.protect') + (anyProt ? ' ✓' : ''), 'window._launcher.showProtectionModal(\'' + fnArg + '\')', {title: t('card.protectHint')}) +
+        btn(t('card.versions'), 'window._launcher.showVersionsModal(\'' + ownerArg2 + '\', \'' + fnArg + '\')') +
         // Who did I grant access to this app (H-2 app-grant consents): owner-level, any owner.
-        dtlBtn(t('card.consents'), 'window._launcher.openConsents(\'' + ownerArg2 + '\', \'' + fnArg + '\', \'' + jsArg(app.name || app.publishedFilename) + '\')', {title: t('card.consentsHint')}) +
+        btn(t('card.consents'), 'window._launcher.openConsents(\'' + ownerArg2 + '\', \'' + fnArg + '\', \'' + jsArg(app.name || app.publishedFilename) + '\')', {title: t('card.consentsHint')}) +
         // Manual subdomain assignment is operator-only (/v1/admin/subdomains); auto-assign covers
         // everyone else, so only show this to operators.
         ((isOperatorSession && isOperatorSession())
-          ? dtlBtn(t('card.subdomain'), 'window._launcher.showSubdomainModal(\'' + ownerArg2 + '\', \'' + fnArg + '\')', {title: t('card.subdomainHint')})
-          : '') +
+          ? btn(t('card.subdomain'), 'window._launcher.showSubdomainModal(\'' + ownerArg2 + '\', \'' + fnArg + '\')', {title: t('card.subdomainHint')})
+          : '')) +
         // "Remove from server" used to sit here next to a local-only Delete in Actions. Since the
         // server-only cutover both mean the same thing, so this row keeps the park/protect/versions
         // controls and Delete under Actions is the single door out.
-      '</div>' +
-      acEditor +
-    '</div>';
+      acEditor) });
 }
 
 // Re-render ONLY the "Manage on server" buttons in place after a park/fork toggle — the rest of
@@ -337,7 +355,7 @@ function onAuthChanged() {
   var st = document.getElementById('publish-status');
   if (sub && isDlgOpen('publish-overlay')) {
     if (getCortexOwnerToken()) { sub.disabled = false; if (st) st.textContent = ''; }
-    else { sub.disabled = true; if (st) { st.textContent = t('publish.loginRequired'); st.style.color = 'var(--accent)'; } }
+    else { sub.disabled = true; if (st) { st.textContent = t('publish.loginRequired'); st.dataset.tone = 'coral'; } }
   }
 }
 
@@ -380,9 +398,11 @@ function renderDetailView() {
   // next to the title opens that editor right where the name is shown.
   var canEditAbout = !!app.id && !isUrlApp;
 
+  // The pencil is an inline SVG on the 16 grid (it was an emoji).
   document.getElementById('detail-title').innerHTML =
-    '<span style="font-size:1.3rem">' + escapeHtml(icon) + '</span> ' + escapeHtml(app.name || 'App') +
-    ((canEditAbout && !detailEditingAbout) ? ' <button class="rename-pencil" style="font-size:1rem" title="' + escapeHtml(t('detail.editDetails')) + '" onclick="window._launcher.detailAboutEdit()">✏️</button>' : '');
+    escapeHtml(icon) + ' ' + escapeHtml(app.name || 'App') +
+    ((canEditAbout && !detailEditingAbout) ? ' ' + action({ kind: 'icon', label: t('detail.editDetails'), title: t('detail.editDetails'), onclick: 'window._launcher.detailAboutEdit()' },
+      '<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M11 2.5l2.5 2.5L6 12.5H3.5V10z"/></svg>') : '');
 
   // ── LIFECYCLE (TARGET-048) ──
   // Replaces the old two-number STATUS card. One band answers the question the old card never did:
@@ -417,41 +437,31 @@ function renderDetailView() {
   var shotUrl = (app.published && shotOwner && shotFile && aimeatBase)
     ? (aimeatBase + '/v1/apps/' + encodeURIComponent(shotOwner) + '/' + encodeURIComponent(shotFile) + '/screenshot?t=' + Date.now())
     : '';
+  // The width attribute bounds the thumbnail; the picture hides itself when the node has none.
   var shotImg = shotUrl
-    ? '<img src="' + escapeHtml(shotUrl) + '" alt="App screenshot" loading="lazy" onerror="this.style.display=\'none\'" style="max-width:260px;max-height:160px;border-radius:8px;border:1px solid var(--border-subtle);object-fit:cover;object-position:top center;flex:none" />'
+    ? '<img src="' + escapeHtml(shotUrl) + '" alt="App screenshot" loading="lazy" width="260" onerror="this.hidden=true" />'
     : '';
 
-  var statusHtml =
-    '<div class="dtl-section">' +
-      '<h3>' + t('wc.lifecycle') + '</h3>' +
-      '<div class="wc-row">' +
-        '<div class="wc-band">' +
-          '<div class="wc-stop ' + (wcState === 'clean' ? 'is-idle' : 'is-active') + '">' +
-            '<span class="wc-stop-label">' + t('wc.title') + '</span>' +
-            '<span class="wc-stop-val">' + escapeHtml(wcValue) + '</span>' +
-            '<span class="wc-stop-note">' + t('wc.privateNote') + '</span>' +
-          '</div>' +
-          '<span class="wc-arrow" aria-hidden="true">→</span>' +
-          '<div class="wc-stop ' + (app.published ? 'is-live' : 'is-idle') + '">' +
-            '<span class="wc-stop-label">' + t('wc.published') + '</span>' +
-            '<span class="wc-stop-val">' + escapeHtml(app.published ? (publishedV || 'v?') : t('wc.notPublishedYet')) + '</span>' +
-            '<span class="wc-stop-note">' + (app.published ? t('wc.visibleToOthers') : t('wc.notVisibleYet')) + '</span>' +
-          '</div>' +
-        '</div>' +
-        shotImg +
-      '</div>' +
-      '<p class="wc-explain">' + escapeHtml(wcExplain) + '</p>' +
+  // The two stops of the work: where the working copy is, and what is published. The value in the
+  // stop that holds the work sits on the sun.
+  var stop = function (label, value, on, note) {
+    return listRow({ name: escapeHtml(label), detail: escapeHtml(note), detailKind: 'text', value: chip(escapeHtml(value), on ? 'sun' : 'plain') });
+  };
+  var stops = stop(t('wc.title'), wcValue, wcState !== 'clean', t('wc.privateNote')) +
+    stop(t('wc.published'), app.published ? (publishedV || 'v?') : t('wc.notPublishedYet'), app.published,
+      app.published ? t('wc.visibleToOthers') : t('wc.notVisibleYet'));
+  var statusHtml = dtlSection({ title: t('wc.lifecycle'), body: stack({},
+      (shotImg ? columns({ layout: 'leading', collapse: 640 }, '<div>' + stops + '</div><div>' + shotImg + '</div>') : stops) +
+      text({ kind: 'body' }, escapeHtml(wcExplain)) +
       // A saved working copy must never be a dead end: the same three verbs are available right
       // here, so you can try it, publish it, or throw it away without hunting through other menus.
       (wcState === 'saved' && app.published && !isUrlApp
-        ? '<div class="dtl-btn-row">' +
-            dtlBtn(t('wc.try'), 'window._launcher.detailWorkTry()') +
-            dtlBtn(t('wc.publishAs').replace('{v}', String((app.publishedVersionNumber || 0) + 1)), 'window._launcher.detailWorkPublish()', {variant:'success'}) +
-            dtlBtn(t('wc.discardWork'), 'window._launcher.detailWorkDiscard()') +
-          '</div>'
+        ? btnRow(
+            btn(t('wc.try'), 'window._launcher.detailWorkTry()') +
+            btn(t('wc.publishAs').replace('{v}', String((app.publishedVersionNumber || 0) + 1)), 'window._launcher.detailWorkPublish()', {tone:'success'}) +
+            btn(t('wc.discardWork'), 'window._launcher.detailWorkDiscard()'))
         : '') +
-      (app.blob && !isUrlApp ? '<p class="wc-size">' + escapeHtml(t('detail.size') + ': ' + fmtSize(localBytes)) + '</p>' : '') +
-    '</div>';
+      (app.blob && !isUrlApp ? text({ kind: 'mono', tone: 'muted' }, escapeHtml(t('detail.size') + ': ' + fmtSize(localBytes))) : '')) });
 
   // ── ABOUT ──
   // The display name + description are editable in place here (inline editor) —
@@ -463,15 +473,7 @@ function renderDetailView() {
   var created = app.addedAt ? new Date(app.addedAt).toLocaleString() : '—';
   // Favourites are a Phase-2 (server-backed) feature; the old local-only star was dropped with the
   // server-only cutover so it isn't shown here anymore.
-  var favBtn = '';
-  var aboutHeader =
-    '<h3>' +
-      '<span>' + t('detail.about') + '</span>' +
-      '<span class="dtl-h3-doors">' +
-        favBtn +
-        ((canEditAbout && !detailEditingAbout) ? dtlBtn(t('detail.editDetails'), 'window._launcher.detailAboutEdit()') : '') +
-      '</span>' +
-    '</h3>';
+  var aboutActions = (canEditAbout && !detailEditingAbout) ? btn(t('detail.editDetails'), 'window._launcher.detailAboutEdit()') : '';
   // Per-locale descriptions: EN + FI (extensible). Seed from the manifest's descriptions map,
   // falling back to the canonical description for the default language so an app that only ever had
   // a single description pre-fills English.
@@ -480,33 +482,26 @@ function renderDetailView() {
   var descFiVal = descs.fi || '';
   var aboutBody;
   if (detailEditingAbout) {
-    aboutBody =
-      '<label class="dtl-stat-label" for="detail-name-input">' + t('detail.nameLabel') + '</label>' +
-      '<input id="detail-name-input" class="modal-input" maxlength="120" value="' + escapeHtml(app.name || '') + '" style="margin:4px 0 10px" />' +
-      '<label class="dtl-stat-label" for="detail-desc-en">' + t('detail.descEn') + '</label>' +
-      '<textarea id="detail-desc-en" class="modal-input" rows="3" maxlength="2000" style="margin:4px 0 6px;resize:vertical">' + escapeHtml(descEnVal) + '</textarea>' +
-      '<label class="dtl-stat-label" for="detail-desc-fi">' + t('detail.descFi') + '</label>' +
-      '<textarea id="detail-desc-fi" class="modal-input" rows="3" maxlength="2000" style="margin:4px 0 6px;resize:vertical">' + escapeHtml(descFiVal) + '</textarea>' +
-      '<div class="dtl-btn-row" style="margin:0 0 4px">' +
-        dtlBtn(t('detail.translateEnFi'), 'window._launcher.detailTranslateDesc(\'en\',\'fi\')', {id:'detail-tr-enfi'}) +
-        dtlBtn(t('detail.translateFiEn'), 'window._launcher.detailTranslateDesc(\'fi\',\'en\')', {id:'detail-tr-fien'}) +
-      '</div>' +
-      '<div class="dtl-ai-status" id="detail-tr-status" style="margin:0 0 8px"></div>' +
-      '<label class="dtl-stat-label" for="detail-icon-input">' + t('detail.iconLabel') + '</label>' +
-      '<input id="detail-icon-input" class="modal-input" maxlength="4" value="' + escapeHtml(app.icon || '') + '" style="margin:4px 0 10px;text-align:center;font-size:1.2rem" />' +
-      '<label class="dtl-stat-label" for="detail-tags-input">' + t('detail.tagsLabel') + '</label>' +
-      '<input id="detail-tags-input" class="modal-input" value="' + escapeHtml((app.tags || []).join(', ')) + '" placeholder="tools, productivity" style="margin:4px 0 8px" />' +
-      '<div class="dtl-sync none" style="margin:0 0 10px">' + t('detail.renameHint') + '</div>' +
-      '<div class="dtl-btn-row">' +
-        dtlBtn(t('detail.saveDetails'), 'window._launcher.detailAboutSave()', {variant:'primary'}) +
-        dtlBtn(t('detail.cancelEdit'), 'window._launcher.detailAboutCancel()') +
-      '</div>';
+    aboutBody = stack({},
+      field({ id: 'detail-name-input', label: t('detail.nameLabel'), maxLength: 120, value: app.name || '' }) +
+      field({ id: 'detail-desc-en', type: 'textarea', label: t('detail.descEn'), rows: 3, maxLength: 2000, value: descEnVal }) +
+      field({ id: 'detail-desc-fi', type: 'textarea', label: t('detail.descFi'), rows: 3, maxLength: 2000, value: descFiVal }) +
+      btnRow(
+        btn(t('detail.translateEnFi'), 'window._launcher.detailTranslateDesc(\'en\',\'fi\')', {id:'detail-tr-enfi'}) +
+        btn(t('detail.translateFiEn'), 'window._launcher.detailTranslateDesc(\'fi\',\'en\')', {id:'detail-tr-fien'})) +
+      statusLine('detail-tr-status') +
+      field({ id: 'detail-icon-input', label: t('detail.iconLabel'), maxLength: 4, value: app.icon || '', width: 'narrow' }) +
+      field({ id: 'detail-tags-input', label: t('detail.tagsLabel'), value: (app.tags || []).join(', '), placeholder: 'tools, productivity' }) +
+      quiet(t('detail.renameHint')) +
+      btnRow(
+        btn(t('detail.saveDetails'), 'window._launcher.detailAboutSave()') +
+        btn(t('detail.cancelEdit'), 'window._launcher.detailAboutCancel()')));
   } else {
     // Show the description in the current UI language, falling back to the canonical one.
     var shownDesc = (app.descriptions && app.descriptions[getLang()]) || app.description || '';
     aboutBody =
-      (shownDesc ? '<p class="dtl-desc">' + escapeHtml(shownDesc) + '</p>' : '') +
-      '<div class="dtl-meta-grid">' +
+      (shownDesc ? text({ kind: 'body' }, escapeHtml(shownDesc)) : '') +
+      columns({ layout: 'quarters', density: 'compact', collapse: 560 },
         metaItem(t('detail.category'), app.category || 'utility') +
         metaItem(t('detail.tags'), tags) +
         metaItem(t('detail.sourceLabel'), sourceLabelText(app.source)) +
@@ -517,18 +512,14 @@ function renderDetailView() {
         (app.forkedFrom && app.forkedFrom.owner && app.forkedFrom.filename
           ? metaItem(t('detail.forkedFrom'), app.forkedFrom.owner + '/' + app.forkedFrom.filename
               + (app.forkedFrom.version ? ' v' + app.forkedFrom.version : ''))
-          : '') +
-      '</div>';
+          : ''));
   }
-  var aboutHtml = '<div class="dtl-section">' + aboutHeader + aboutBody + '</div>';
+  var aboutHtml = dtlSection({ title: t('detail.about'), actions: aboutActions, body: stack({}, aboutBody) });
 
   // ── EDIT WITH AI ──
-  var aiHtml =
-    '<div class="dtl-section">' +
-      '<h3>' + t('detail.editAi') + '</h3>' +
-      '<p class="dtl-desc">' + t('detail.editAiHint') + '</p>';
+  var aiHtml;
   if (isUrlApp) {
-    aiHtml += '<span class="dtl-sync none">' + t('detail.urlCantEdit') + '</span>';
+    aiHtml = quiet(t('detail.urlCantEdit'));
   } else {
     // Art. 50(1), EU AI Act: this panel is a two-way exchange with a language model, so the person
     // is told BEFORE the first exchange rather than after it. It is not the Art. 50(4) content
@@ -536,33 +527,32 @@ function renderDetailView() {
     // it carries no EU icon, because the official icon set is for labelling content, not for
     // disclosing a conversation. It shows whether or not a key is configured: the statement is
     // about what this panel IS.
-    aiHtml +=
-      '<div class="dtl-ai-notice" role="note">' +
+    aiHtml =
+      surface({ kind: 'aside', role: 'note', density: 'compact' },
         '<strong>' + escapeHtml(t('detail.aiInteractionTitle')) + '</strong> ' +
-        escapeHtml(t('detail.aiInteractionBody')) +
-      '</div>' +
-      '<div class="dtl-ai-row">' +
-        '<textarea id="detail-ai-input" placeholder="' + escapeHtml(t('detail.editAiPh')) + '"' + (detailAiAvailable ? '' : ' disabled') + '></textarea>' +
-        dtlBtn(t('detail.run'), 'window._launcher.detailAiRun()', {variant:'primary', id:'detail-ai-run', disabled: !detailAiAvailable}) +
-      '</div>' +
-      '<div class="dtl-ai-status" id="detail-ai-status">' + (detailAiAvailable ? '' : escapeHtml(detailAiUnavailableMsg())) + '</div>' +
-      '<div class="dtl-ai-draft" id="detail-ai-draft"' + (detailDraftBlob ? '' : ' hidden') + '>' +
-        '<div class="dtl-ai-status wc-proposal-head">' + t('detail.draftReady') + '</div>' +
-        // The SAME three verbs the source editor uses, in the order you actually move through them:
-        // save (private, reversible) → try (real origin, live untouched) → publish (others see it).
-        '<div class="dtl-btn-row">' +
-          dtlBtn(t('wc.save'), 'window._launcher.detailAiKeep()', {variant:'primary'}) +
-          (app.published
-            ? dtlBtn(t('wc.try'), 'window._launcher.detailTestDraftLive()') +
-              dtlBtn(t('wc.publishAs').replace('{v}', String((app.publishedVersionNumber || 0) + 1)), 'window._launcher.detailPublishTestedDraft()', {variant:'success'})
-            // No published app yet → no server slot to stage into; keep the quick sandbox preview.
-            : dtlBtn(t('wc.tryLocal'), 'window._launcher.detailAiTest()')) +
-          dtlBtn(t('wc.discardProposal'), 'window._launcher.detailAiDiscard()') +
-        '</div>' +
-        '<p class="wc-verbs-hint">' + t('wc.verbsHint') + '</p>' +
-      '</div>';
+        escapeHtml(t('detail.aiInteractionBody'))) +
+      field({ id: 'detail-ai-input', type: 'textarea', rows: 3, placeholder: t('detail.editAiPh'), disabled: !detailAiAvailable,
+        inputAttrs: ' aria-label="' + escapeHtml(t('detail.editAiPh')) + '"' }) +
+      btnRow(btn(t('detail.run'), 'window._launcher.detailAiRun()', {id:'detail-ai-run', disabled: !detailAiAvailable})) +
+      statusLine('detail-ai-status', detailAiAvailable ? '' : escapeHtml(detailAiUnavailableMsg())) +
+      // The proposal block exists only while a proposal waits (it was a hidden block before).
+      (detailDraftBlob
+        ? surface({ kind: 'box', id: 'detail-ai-draft' }, stack({},
+            text({ kind: 'label' }, t('detail.draftReady')) +
+            // The SAME three verbs the source editor uses, in the order you actually move through them:
+            // save (private, reversible) → try (real origin, live untouched) → publish (others see it).
+            btnRow(
+              btn(t('wc.save'), 'window._launcher.detailAiKeep()') +
+              (app.published
+                ? btn(t('wc.try'), 'window._launcher.detailTestDraftLive()') +
+                  btn(t('wc.publishAs').replace('{v}', String((app.publishedVersionNumber || 0) + 1)), 'window._launcher.detailPublishTestedDraft()', {tone:'success'})
+                // No published app yet → no server slot to stage into; keep the quick sandbox preview.
+                : btn(t('wc.tryLocal'), 'window._launcher.detailAiTest()')) +
+              btn(t('wc.discardProposal'), 'window._launcher.detailAiDiscard()')) +
+            quiet(t('wc.verbsHint'))))
+        : '');
   }
-  aiHtml += '</div>';
+  aiHtml = dtlSection({ title: t('detail.editAi'), description: t('detail.editAiHint'), body: stack({}, aiHtml) });
 
   // ── WORKING-COPY HISTORY (checkpoints, TARGET-048) ──
   // Every save leaves the bytes it replaced here, so iterating can never lose earlier work. Kept
@@ -570,14 +560,8 @@ function renderDetailView() {
   // lists was itself a source of the confusion, so each one states who can see it.
   var historyHtml = '';
   if (!isUrlApp && app.published) {
-    historyHtml =
-      '<div class="dtl-section">' +
-        '<h3>' + t('wc.history') + '</h3>' +
-        '<p class="dtl-desc">' + t('wc.historyHint') + '</p>' +
-        '<div id="detail-checkpoints">' +
-          (detailCheckpointsHtml !== null ? detailCheckpointsHtml : '<span class="wc-muted">…</span>') +
-        '</div>' +
-      '</div>';
+    historyHtml = dtlSection({ title: t('wc.history'), description: t('wc.historyHint'),
+      body: stack({ id: 'detail-checkpoints', density: 'compact' }, detailCheckpointsHtml !== null ? detailCheckpointsHtml : quiet('…')) });
   }
 
   // ── NEEDS: the cortexes this app loads and the extensions it calls, from the dependency map the
@@ -591,51 +575,35 @@ function renderDetailView() {
       (req.cortex || []).forEach(function (d) { reqNames.push(escapeHtml(d.pinned ? d.name + '@' + d.pinned : d.name)); });
       (req.extensions || []).forEach(function (d) { reqNames.push(escapeHtml(d.pinned ? d.name + '@' + d.pinned : d.name)); });
     }
-    requiresHtml =
-      '<div class="dtl-section">' +
-        '<h3>' + t('detail.requires') + '</h3>' +
-        '<p class="dtl-desc">' + t('detail.requiresHint') + '</p>' +
-        (reqNames.length
-          ? '<div class="dtl-chips">' + reqNames.map(function (n) { return '<span class="dtl-chip">' + n + '</span>'; }).join('') + '</div>'
-          : '<span style="color:var(--text-muted);font-size:.85rem">' + t('detail.requiresNone') + '</span>') +
-      '</div>';
+    requiresHtml = dtlSection({ title: t('detail.requires'), description: t('detail.requiresHint'),
+      body: reqNames.length
+        ? stack({ direction: 'wrap', density: 'compact' }, reqNames.map(function (n) { return chip(n); }).join(''))
+        : quiet(t('detail.requiresNone')) });
   }
 
   // ── VERSIONS ──
-  var versionsHtml =
-    '<div class="dtl-section">' +
-      '<h3>' + t('detail.versions') + '</h3>' +
-      '<p class="dtl-desc">' + t('versions.publishedHint') + '</p>' +
-      '<div id="detail-versions-list">' +
-        (detailVersionsHtml !== null ? detailVersionsHtml :
-          (!hasServer ? '<span class="dtl-sync none">' + t('detail.needServerVersions') + '</span>'
-           : (app.published ? '<span style="color:var(--text-muted);font-size:.85rem">' + t('detail.loadingVersions') + '</span>'
-              : '<span style="color:var(--text-muted);font-size:.85rem">' + t('detail.noVersions') + '</span>'))) +
-      '</div>' +
-    '</div>';
+  var versionsHtml = dtlSection({ title: t('detail.versions'), description: t('versions.publishedHint'),
+    body: stack({ id: 'detail-versions-list' },
+      detailVersionsHtml !== null ? detailVersionsHtml :
+        quiet(!hasServer ? t('detail.needServerVersions') : (app.published ? t('detail.loadingVersions') : t('detail.noVersions')))) });
 
   // ── ACTIONS ──
   var publishLabel = (app.published && app.publishedVersionNumber)
     ? (t('detail.publishAs') + ' v' + (app.publishedVersionNumber + 1))
     : t('detail.publish');
-  var actionsHtml =
-    '<div class="dtl-section">' +
-      '<h3>' + t('detail.actions') + '</h3>' +
-      '<div class="dtl-btn-row">' +
-        (isUrlApp ? '' : dtlBtn(t('ctx.viewSource'), 'window._launcher.detailEditSource()')) +
-        (isUrlApp ? '' : dtlBtn(t('ctx.improveAi'), 'window._launcher.detailImproveExternal()')) +
-        dtlBtn(t('ctx.sharePrompt'), 'window._launcher.detailSharePrompt()') +
-        (isUrlApp ? '' : dtlBtn(escapeHtml(publishLabel), 'window._launcher.detailPublish()', {variant:'primary'})) +
-        (app.published && !isUrlApp ? dtlBtn(t('detail.setScreenshot'), 'window._launcher.detailSetScreenshot()', {title:'Upload a custom thumbnail for this app'}) : '') +
-        (app.published && !isUrlApp ? dtlBtn(t('detail.refreshScreenshot'), 'window._launcher.detailRefreshScreenshot()', {title:'Clear the screenshot; the node re-takes it on its next scheduled run'}) : '') +
+  var actionsHtml = dtlSection({ title: t('detail.actions'), body: btnRow(
+        (isUrlApp ? '' : btn(t('ctx.viewSource'), 'window._launcher.detailEditSource()')) +
+        (isUrlApp ? '' : btn(t('ctx.improveAi'), 'window._launcher.detailImproveExternal()')) +
+        btn(t('ctx.sharePrompt'), 'window._launcher.detailSharePrompt()') +
+        (isUrlApp ? '' : btn(escapeHtml(publishLabel), 'window._launcher.detailPublish()')) +
+        (app.published && !isUrlApp ? btn(t('detail.setScreenshot'), 'window._launcher.detailSetScreenshot()', {title:'Upload a custom thumbnail for this app'}) : '') +
+        (app.published && !isUrlApp ? btn(t('detail.refreshScreenshot'), 'window._launcher.detailRefreshScreenshot()', {title:'Clear the screenshot; the node re-takes it on its next scheduled run'}) : '') +
         // Offered only where it can do something: our own published app (deleted on the node) or a
         // record that was never published. Someone else's published app is not ours to delete, and
         // the button used to appear there and close the view having changed nothing.
         ((detailIsOwnPublished(app) || !app.published)
-          ? dtlBtn(t('ctx.delete'), 'window._launcher.detailDelete()', {variant:'danger', title: t('detail.deleteHint')})
-          : '') +
-      '</div>' +
-    '</div>';
+          ? btn(t('ctx.delete'), 'window._launcher.detailDelete()', {tone:'danger', title: t('detail.deleteHint')})
+          : '')) });
 
   // ── SERVER MANAGEMENT (own published/parked apps) ──
   // Park/Unpark, fork permission, copy-protection, versions and remove-from-server used to
@@ -644,72 +612,59 @@ function renderDetailView() {
   // buildLibraryEntries from the authoritative server list.
   // Stable container so a park/fork toggle can re-render JUST these buttons (refreshServerMgmt)
   // instead of rebuilding the whole detail.
-  var mgmtHtml = '<div id="detail-server-mgmt">' + serverMgmtInner(app) + '</div>';
+  // Drawn only when there is something to manage, so an empty slot adds no gap.
+  var mgmtInner = serverMgmtInner(app);
+  var mgmtHtml = mgmtInner ? sectionSlot({ id: 'detail-server-mgmt', attrs: ' data-dtl-section' }, mgmtInner) : '';
 
   // ── SKILLS (skills registry, 2d) — expertise that teaches agents this app ──
   var skillsHtml = '';
   if (app.published) {
     var ownPub = detailIsOwnPublished(app);
-    skillsHtml =
-      '<div class="dtl-section">' +
-        '<h3>' + (t('detail.skills') || 'Skills for this app') + '</h3>' +
-        '<div id="detail-skills-list">' +
-          (detailSkillsHtml !== null ? detailSkillsHtml
-            : '<span style="color:var(--text-muted);font-size:.85rem">…</span>') +
-        '</div>' +
-        // Own published app → offer attach/detach (a skill teaches agents this app). The detach ×
+    skillsHtml = dtlSection({ title: t('detail.skills') || 'Skills for this app', body: stack({},
+        stack({ id: 'detail-skills-list', density: 'compact' }, detailSkillsHtml !== null ? detailSkillsHtml : quiet('…')) +
+        // Own published app → offer attach/detach (a skill teaches agents this app). The detach ✗
         // on each user-scope skill is rendered by detailLoadSkills into the list above.
-        (ownPub ? '<div id="detail-skill-attach" style="margin-top:8px">' + detailSkillAttachInner() + '</div>' : '') +
-      '</div>';
+        (ownPub ? stack({ id: 'detail-skill-attach', density: 'compact' }, detailSkillAttachInner()) : '')) });
   }
+
+  // The sections other modules draw (each draws its own section() inside the slot and re-renders
+  // the slot by its id in place): a plain slot with the id, marked for the rail. Own published
+  // apps only.
+  var own = app.published && detailIsOwnPublished(app);
+  var slot = function (id, inner) { return own ? sectionSlot({ id: id, attrs: ' data-dtl-section' }, inner()) : ''; };
 
   // ── EXCHANGE & ODPS — is this app on the marketplace, and the ODPS defaults every tool inherits.
   // Sits above Monetize because it frames it: the app-level answer to "is this product for sale".
   // Stable container: monetize.js re-renders #detail-odps in place alongside #detail-monetize.
-  var odpsHtml = (app.published && detailIsOwnPublished(app))
-    ? '<div class="dtl-section" id="detail-odps">' + odpsSectionInner() + '</div>'
-    : '';
+  var odpsHtml = slot('detail-odps', odpsSectionInner);
 
   // ── MONETIZE (TARGET-034) — sell tool calls on this app (own published apps only) ──
   // Stable container: monetize.js re-renders #detail-monetize in place after loads/saves.
-  var monetizeHtml = (app.published && detailIsOwnPublished(app))
-    ? '<div class="dtl-section" id="detail-monetize">' + monetizeSectionInner() + '</div>'
-    : '';
+  var monetizeHtml = slot('detail-monetize', monetizeSectionInner);
 
   // ── SEARCH — can this app be found in a search engine, and what does it say about itself.
   //   Off until its owner asks: publishing makes an app shareable, not findable.
   //   Stable container: seo.js re-renders #detail-seo in place after a save.
-  var seoHtml = (app.published && detailIsOwnPublished(app))
-    ? '<div class="dtl-section" id="detail-seo">' + seoSectionInner() + '</div>'
-    : '';
+  var seoHtml = slot('detail-seo', seoSectionInner);
 
   // ── VISITORS — who opened this app, when and from where. For the owner's own published app.
   //   Stable container: visitors.js re-renders #detail-visitors in place as the report arrives,
   //   the window changes or measurement is switched.
-  var visitorsHtml = (app.published && detailIsOwnPublished(app))
-    ? '<div class="dtl-section" id="detail-visitors">' + visitorsSectionInner() + '</div>'
-    : '';
+  var visitorsHtml = slot('detail-visitors', visitorsSectionInner);
 
   // ── MARKS AND AUTHORSHIP — the badge and install-offer switches, the named reviewer who
   //   answers for the app (which lifts the visible AI-generated label), what the node sees of
   //   the app's AI use, and the log. Stable container: marks.js re-renders #detail-marks in place.
-  var marksHtml = (app.published && detailIsOwnPublished(app))
-    ? '<div class="dtl-section" id="detail-marks">' + marksSectionInner() + '</div>'
-    : '';
+  var marksHtml = slot('detail-marks', marksSectionInner);
 
   // ── LEGAL PAGES and AUDIT LOG — the app's own terms, privacy notice, imprint and the rest (the
   //   app answers for what it does, not the node), and every change to how the app is offered.
   //   Stable containers: legal.js re-renders both in place after a save or a load.
-  var legalHtml = (app.published && detailIsOwnPublished(app))
-    ? '<div class="dtl-section" id="detail-legal">' + legalSectionInner() + '</div>'
-      + '<div class="dtl-section" id="detail-audit">' + auditSectionInner() + '</div>'
-    : '';
+  var legalHtml = slot('detail-legal', legalSectionInner) + slot('detail-audit', auditSectionInner);
 
   // ── COST & CONTRACTS (EXCHANGE G3 / TARGET-045) — what this app SOURCES (own published apps only) ──
   // Stable container: cost.js re-renders #detail-cost in place after the async load.
-  var costHtml = (app.published && detailIsOwnPublished(app))
-    ? '<div class="dtl-section" id="detail-cost">' + costSectionInner() + '</div>'
-    : '';
+  var costHtml = slot('detail-cost', costSectionInner);
 
   // ── PROMOTE (Phase 2c) — showcase this app on your public profile with EN/FI pitch copy.
   //    Own published apps only; persists to the PUBLIC app-catalog.promoted memory doc.
@@ -725,16 +680,10 @@ function renderDetailView() {
     var agFile = app.publishedFilename || '';
     var agDefs = appManifestAgents(agOwner, agFile);
     if (agDefs.length) {
-      agentsHtml =
-        '<div class="dtl-section">' +
-          '<h3>' + (t('agents.title') || 'Bundled agents') + '</h3>' +
-          '<div style="font-size:.85rem;color:var(--text-muted);margin-bottom:6px">' + (t('agents.declares') || '') + '</div>' +
-          '<div style="margin-bottom:8px">' + agDefs.map(function(d) {
-            return '<span class="aga-chip">' + escapeHtml(d.agent_name || '') + '</span>';
-          }).join(' ') + '</div>' +
-          dtlBtn((t('agents.manage') || 'Inspect & deploy'),
-            'window._launcher.showAppAgentsModal(\'' + jsArg(agOwner) + '\', \'' + jsArg(agFile) + '\')') +
-        '</div>';
+      agentsHtml = dtlSection({ title: t('agents.title') || 'Bundled agents', description: t('agents.declares') || '', body: stack({},
+          stack({ direction: 'wrap', density: 'compact' }, agDefs.map(function(d) { return chip(escapeHtml(d.agent_name || '')); }).join('')) +
+          btnRow(btn((t('agents.manage') || 'Inspect & deploy'),
+            'window._launcher.showAppAgentsModal(\'' + jsArg(agOwner) + '\', \'' + jsArg(agFile) + '\')'))) });
     }
   }
 
@@ -753,73 +702,61 @@ function renderDetailView() {
   var heroDesc = (app.descriptions && app.descriptions[getLang()]) || app.description || '';
   var heroOwner = detailServerOwner(app);
   var favRef = (heroOwner && app.publishedFilename) ? (heroOwner + '/' + app.publishedFilename) : '';
-  var chips = '';
-  if (app.published && svrFacts && svrFacts.parked) chips += '<span class="dtl-chip">■ ' + escapeHtml(t('status.parked')) + '</span>';
-  else if (app.published) chips += '<span class="dtl-chip dtl-chip--sun">■ ' + escapeHtml(t('status.published') + (publishedV ? ' · ' + publishedV : '')) + '</span>';
-  else chips += '<span class="dtl-chip">■ ' + escapeHtml(t('status.local')) + '</span>';
+  var chips = [];
+  if (app.published && svrFacts && svrFacts.parked) chips.push(chip(escapeHtml(t('status.parked'))));
+  else if (app.published) chips.push(chip(escapeHtml(t('status.published') + (publishedV ? ' · ' + publishedV : '')), 'sun'));
+  else chips.push(chip(escapeHtml(t('status.local'))));
   var draftWaits = !!(svrFacts && svrFacts.hasDraft) || wcState !== 'clean';
-  if (draftWaits) chips += '<span class="dtl-chip dtl-chip--hot">■ ' + escapeHtml(t('detail.draftWaiting')) + '</span>';
-  if (favRef && isFavorite(favRef)) chips += '<span class="dtl-chip">★ ' + escapeHtml(t('detail.favBadge')) + '</span>';
-  // "N legal pages still to write" — legal.js knows; empty until its load has answered.
-  chips += legalChipHtml();
+  if (draftWaits) chips.push(chip(escapeHtml(t('detail.draftWaiting')), 'coral'));
+  if (favRef && isFavorite(favRef)) chips.push(chip(escapeHtml(t('detail.favBadge'))));
+  // "N legal pages still to write" — legal.js knows; empty until its load has answered. The row
+  // carries data-dtl-chips so legal.js can add the chip when its load answers after this render.
+  chips.push(legalChipHtml());
   var mastParts = [];
   if (heroOwner && app.publishedFilename) mastParts.push(heroOwner + ' / ' + app.publishedFilename);
   if (svrFacts && svrFacts.category) mastParts.push(svrFacts.category);
   if (app.tags && app.tags.length) mastParts.push(app.tags.join(', '));
   var draftWord = (svrFacts && svrFacts.hasDraft && heroOwner && app.publishedFilename)
-    ? '<button type="button" class="cat-word" onclick="window._launcher.openStagingPreview(\'' + jsArg(heroOwner) + '\', \'' + jsArg(app.publishedFilename) + '\')" title="' + escapeHtml(t('card.openStagingHint')) + '">' + escapeHtml(t('detail.openDraft')) + '</button>'
+    ? btn(escapeHtml(t('detail.openDraft')), 'window._launcher.openStagingPreview(\'' + jsArg(heroOwner) + '\', \'' + jsArg(app.publishedFilename) + '\')', { title: t('card.openStagingHint') })
     : '';
-  var heroHtml =
-    '<button type="button" class="dtl-back" onclick="window._launcher.closeDetailView()">← ' + escapeHtml(t('view.library')) + '</button>' +
-    '<div class="dtl-mast">' +
-      '<div class="dtl-mast-main">' +
-        // The node takes a screenshot of every published app, so the picture stands where the icon
-        // would; the icon is the fallback while the shot is missing (the img removes itself on error).
-        '<div class="dtl-mast-icon' + (shotUrl ? ' dtl-mast-icon--shot' : '') + '">' +
-          (shotUrl ? '<img src="' + escapeHtml(shotUrl) + '" alt="" loading="lazy" onerror="this.parentNode.classList.remove(\'dtl-mast-icon--shot\'); this.remove()" />' : '') +
-          '<span class="dtl-mast-glyph">' + escapeHtml(icon) + '</span>' +
-        '</div>' +
-        '<div class="dtl-mast-copy">' +
-          '<div class="dtl-mast-name">' + escapeHtml(app.name || 'App') + '</div>' +
-          (mastParts.length ? '<div class="dtl-mast-line">' + escapeHtml(mastParts.join(' · ')) + '</div>' : '') +
-          (heroDesc ? '<div class="dtl-mast-desc">' + escapeHtml(heroDesc) + '</div>' : '') +
-          '<div class="dtl-chips">' + chips + '</div>' +
-        '</div>' +
-      '</div>' +
-      '<div class="dtl-mast-side">' +
-        '<button type="button" class="cat-slab" onclick="window._launcher.detailLaunch()">' + escapeHtml(t('detail.launch')) + '</button>' +
-        draftWord +
-        (app.published ? '<div class="dtl-mast-hint">' + escapeHtml(t(draftWord ? 'detail.heroHint' : 'detail.heroHintClean')) + '</div>' : '') +
-      '</div>' +
-    '</div>';
-  var bandItem = function (n, label) {
-    return '<div class="cat-band-item"><div class="cat-band-n">' + escapeHtml(n) + '</div><div class="cat-band-l">' + escapeHtml(label) + '</div></div>';
-  };
-  var bandItems = '';
+  // The node takes a screenshot of every published app, so the picture stands where the icon would;
+  // the icon is the fallback while the shot is missing (the picture hides itself and shows the icon).
+  var glyph = text({ kind: 'number' }, escapeHtml(icon));
+  var mark = shotUrl
+    ? '<img src="' + escapeHtml(shotUrl) + '" alt="" loading="lazy" onerror="this.nextElementSibling.hidden=false; this.remove()" /><span hidden>' + glyph + '</span>'
+    : glyph;
+  var headHtml = masthead({
+    crumbs: crumbs([{ label: escapeHtml(t('view.library')), onclick: 'window._launcher.closeDetailView()' }, { label: escapeHtml(app.name || 'App') }]),
+    mark: mark,
+    title: escapeHtml(app.name || 'App'),
+    subtitle: mastParts.length ? escapeHtml(mastParts.join(' · ')) : '',
+    identity: '<span data-dtl-chips>' + chips.join(' ') + '</span>',
+    actions: stack({ align: 'end', density: 'compact' },
+      btnRow(btn(escapeHtml(t('detail.launch')), 'window._launcher.detailLaunch()', { kind: 'primary' }) + draftWord) +
+      (app.published ? quiet(escapeHtml(t(draftWord ? 'detail.heroHint' : 'detail.heroHintClean'))) : '')),
+  });
+  var bandItems = [];
+  var bandItem = function (n, label) { bandItems.push({ value: escapeHtml(n), label: escapeHtml(label) }); };
   if (svrFacts) {
     var updated = svrFacts.createdAt ? new Date(svrFacts.createdAt).toLocaleDateString() : '';
-    bandItems += bandItem(String(svrFacts.downloads || 0), t('detail.opens'));
-    if (app.publishedVersionNumber) bandItems += bandItem(String(app.publishedVersionNumber), t('detail.versions'));
-    if (svrFacts.size) bandItems += bandItem(fmtSize(svrFacts.size), t('detail.size'));
-    if (updated) bandItems += bandItem(updated, t('detail.updated'));
-    bandItems += bandItem(String(svrFacts.forks || 0), t('detail.forks'));
+    bandItem(String(svrFacts.downloads || 0), t('detail.opens'));
+    if (app.publishedVersionNumber) bandItem(String(app.publishedVersionNumber), t('detail.versions'));
+    if (svrFacts.size) bandItem(fmtSize(svrFacts.size), t('detail.size'));
+    if (updated) bandItem(updated, t('detail.updated'));
+    bandItem(String(svrFacts.forks || 0), t('detail.forks'));
   } else if (localBytes) {
-    bandItems += bandItem(fmtSize(localBytes), t('detail.size'));
+    bandItem(fmtSize(localBytes), t('detail.size'));
   }
-  var bandHtml = bandItems ? '<div class="cat-band dtl-band"><div class="cat-band-in">' + bandItems + '</div></div>' : '';
+  var bandHtml = (heroDesc ? text({ kind: 'lead' }, escapeHtml(heroDesc)) : '') +
+    (bandItems.length ? numeralBand({ cut: 'diagonal', contained: true, items: bandItems }) : '');
 
-  // One column of bands, the way the home page reads: where the work is, edit it, what it is,
+  // One column of sections, the way the home page reads: where the work is, edit it, what it is,
   // its versions, then the switches on the server, and the rest.
   var bodyEl = document.getElementById('detail-body');
-  bodyEl.innerHTML = detailRailPage(
-    heroHtml + bandHtml +
+  bodyEl.innerHTML = detailRailPage(headHtml,
+    bandHtml +
     statusHtml + aiHtml + aboutHtml + dataMapHtml + requiresHtml + historyHtml + versionsHtml +
     visitorsHtml + mgmtHtml + skillsHtml + seoHtml + marksHtml + legalHtml + promoteHtml + odpsHtml + monetizeHtml + costHtml + agentsHtml + actionsHtml);
-  // The chapter number over every headline ("03 / 09") is a CSS counter; only the total needs
-  // counting here, and it goes on the body as a string so the stylesheet can print it. Counted
-  // AFTER the assembly so a section a later load re-renders in place keeps its number.
-  var chapters = bodyEl.querySelectorAll('.dtl-section').length;
-  bodyEl.style.setProperty('--dtl-chapters', '"' + (chapters < 10 ? '0' : '') + chapters + '"');
   renderDetailRail(bodyEl);
 
   var dmOwner = detailServerOwner(app);
@@ -837,25 +774,18 @@ function renderDetailView() {
 function detailCheckpointRows(app) {
   var owner = detailServerOwner(app);
   var list = getCheckpoints(owner, app.publishedFilename || '');
-  if (!list.length) return '<span class="wc-muted">' + t('wc.none') + '</span>';
+  if (!list.length) return quiet(t('wc.none'));
   var out = '';
   for (var i = 0; i < list.length; i++) {
     var c = list[i];
     var when = c.at ? new Date(c.at).toLocaleString() : '';
     var kb = c.size ? (Math.round(c.size / 102.4) / 10) + ' KB' : '';
     var note = c.note ? t('wc.before').replace('{note}', c.note) : t('wc.beforeUnnamed');
-    out +=
-      '<div class="dtl-version-row">' +
-        '<div class="version-meta">' +
-          '<span class="wc-ckpt-when">' + escapeHtml(when) + '</span>' +
-          '<span class="wc-ckpt-note">' + escapeHtml(note) + (kb ? ' · ' + kb : '') + '</span>' +
-        '</div>' +
-        '<div class="dtl-btn-row">' +
-          dtlBtn(t('wc.preview'), 'window._launcher.detailCheckpointPreview(\'' + jsArg(c.id) + '\')') +
-          dtlBtn(t('wc.restore'), 'window._launcher.detailCheckpointRestore(\'' + jsArg(c.id) + '\')', {variant:'primary', disabled: detailCheckpointBusy}) +
-          dtlBtn(t('wc.delete'), 'window._launcher.detailCheckpointDelete(\'' + jsArg(c.id) + '\')', {disabled: detailCheckpointBusy}) +
-        '</div>' +
-      '</div>';
+    out += listRow({ density: 'compact', name: escapeHtml(when), detail: escapeHtml(note) + (kb ? ' · ' + kb : ''), detailKind: 'text',
+      actions:
+        btn(t('wc.preview'), 'window._launcher.detailCheckpointPreview(\'' + jsArg(c.id) + '\')', {kind:'text'}) +
+        btn(t('wc.restore'), 'window._launcher.detailCheckpointRestore(\'' + jsArg(c.id) + '\')', {kind:'text', disabled: detailCheckpointBusy}) +
+        btn(t('wc.delete'), 'window._launcher.detailCheckpointDelete(\'' + jsArg(c.id) + '\')', {kind:'text', tone:'danger', disabled: detailCheckpointBusy}) });
   }
   return out;
 }
@@ -960,25 +890,18 @@ function buildPromoteSection(app) {
   var ref = promoteRef(app);
   var cur = getPromotion(ref) || {};
   var on = !!(cur.en || cur.fi);
-  return '<div class="dtl-section" id="detail-promote">' +
-      '<h3>' + t('promote.title') +
-        (on ? ' <span class="dtl-badge-on">' + t('promote.on') + '</span>' : '') + '</h3>' +
-      '<p class="dtl-desc">' + t('promote.hint') + '</p>' +
-      '<label class="dtl-stat-label" for="detail-promo-en">' + t('promote.en') + '</label>' +
-      '<textarea id="detail-promo-en" class="modal-input" rows="2" maxlength="500" style="margin:4px 0 6px;resize:vertical">' + escapeHtml(cur.en || '') + '</textarea>' +
-      '<label class="dtl-stat-label" for="detail-promo-fi">' + t('promote.fi') + '</label>' +
-      '<textarea id="detail-promo-fi" class="modal-input" rows="2" maxlength="500" style="margin:4px 0 6px;resize:vertical">' + escapeHtml(cur.fi || '') + '</textarea>' +
-      '<div class="dtl-btn-row" style="margin:0 0 4px">' +
-        dtlBtn(t('detail.translateEnFi'), 'window._launcher.detailTranslateDesc(\'en\',\'fi\',\'detail-promo-\',\'detail-promo-tr-status\')') +
-        dtlBtn(t('detail.translateFiEn'), 'window._launcher.detailTranslateDesc(\'fi\',\'en\',\'detail-promo-\',\'detail-promo-tr-status\')') +
-      '</div>' +
-      '<div class="dtl-ai-status" id="detail-promo-tr-status" style="margin:0 0 8px"></div>' +
-      '<div class="dtl-btn-row">' +
-        dtlBtn(t('promote.save'), 'window._launcher.detailPromoteSave()', {variant:'primary'}) +
-        (on ? dtlBtn(t('promote.remove'), 'window._launcher.detailPromoteClear()') : '') +
-      '</div>' +
-      '<div class="dtl-ai-status" id="detail-promo-status"></div>' +
-    '</div>';
+  return dtlSection({ slotId: 'detail-promote', title: t('promote.title'), count: on ? chip(t('promote.on'), 'sun') : '', description: t('promote.hint'),
+    body: stack({},
+      field({ id: 'detail-promo-en', type: 'textarea', label: t('promote.en'), rows: 2, maxLength: 500, value: cur.en || '' }) +
+      field({ id: 'detail-promo-fi', type: 'textarea', label: t('promote.fi'), rows: 2, maxLength: 500, value: cur.fi || '' }) +
+      btnRow(
+        btn(t('detail.translateEnFi'), 'window._launcher.detailTranslateDesc(\'en\',\'fi\',\'detail-promo-\',\'detail-promo-tr-status\')') +
+        btn(t('detail.translateFiEn'), 'window._launcher.detailTranslateDesc(\'fi\',\'en\',\'detail-promo-\',\'detail-promo-tr-status\')')) +
+      statusLine('detail-promo-tr-status') +
+      btnRow(
+        btn(t('promote.save'), 'window._launcher.detailPromoteSave()') +
+        (on ? btn(t('promote.remove'), 'window._launcher.detailPromoteClear()', {tone:'danger'}) : '')) +
+      statusLine('detail-promo-status')) });
 }
 
 function detailPromoteSave() {
@@ -987,12 +910,12 @@ function detailPromoteSave() {
   var en = (document.getElementById('detail-promo-en') || {}).value || '';
   var fi = (document.getElementById('detail-promo-fi') || {}).value || '';
   var statusEl = document.getElementById('detail-promo-status');
-  if (statusEl) { statusEl.style.color = 'var(--text-muted)'; statusEl.textContent = t('promote.saving'); }
+  if (statusEl) { statusEl.dataset.tone = 'muted'; statusEl.textContent = t('promote.saving'); }
   setPromotion(promoteRef(app), { en: en, fi: fi }).then(function (nowOn) {
     renderApps();
     renderDetailView();
     var s2 = document.getElementById('detail-promo-status');
-    if (s2) { s2.style.color = '#34d399'; s2.textContent = nowOn ? '✔ ' + t('promote.saved') : '✔ ' + t('promote.removed'); }
+    if (s2) { s2.dataset.tone = 'success'; s2.textContent = nowOn ? '✓ ' + t('promote.saved') : '✓ ' + t('promote.removed'); }
   });
 }
 
@@ -1010,7 +933,7 @@ function detailLoadSkills(owner, filename) {
   var config = loadConfig();
   if (!config.aimeatUrl) return;
   var aimeatUrl = config.aimeatUrl.replace(/\/+$/, '');
-  var noneHtml = '<span style="color:var(--text-muted);font-size:.85rem">' + (t('detail.noSkills') || 'No skills bound to this app yet. A skill teaches agents how to use the app — bind one from your profile Apps tab.') + '</span>';
+  var noneHtml = quiet(t('detail.noSkills') || 'No skills bound to this app yet. A skill teaches agents how to use the app — bind one from your profile Apps tab.');
   var skillHeaders = {};
   try {
     var jwt = (window.AIMEAT && window.AIMEAT.auth && window.AIMEAT.auth.getSession() && window.AIMEAT.auth.getSession().jwt)
@@ -1032,13 +955,11 @@ function detailLoadSkills(owner, filename) {
       for (var i = 0; i < skills.length; i++) {
         var s = skills[i];
         var detach = (ownPub && s.scope === 'user')
-          ? ' <button class="rename-pencil" title="' + escapeHtml(t('detail.skillDetach')) + '" onclick="window._launcher.detailSkillDetach(\'' + jsArg(s.name) + '\')">×</button>'
+          ? action({ kind: 'text', tone: 'danger', title: t('detail.skillDetach'), label: t('detail.skillDetach'),
+              onclick: 'window._launcher.detailSkillDetach(\'' + jsArg(s.name) + '\')' }, '✗')
           : '';
-        out += '<div class="dtl-skill">' +
-          '<div class="dtl-skill-head"><code class="dtl-skill-ref">' + escapeHtml(s.ref || s.name) + '</code>' +
-          ' <span class="dtl-skill-ver">v' + escapeHtml(String(s.version || '')) + '</span>' + detach + '</div>' +
-          '<div class="dtl-skill-desc">' + escapeHtml(s.description || '') + '</div>' +
-        '</div>';
+        out += listRow({ density: 'compact', name: escapeHtml(s.ref || s.name), detail: escapeHtml(s.description || ''), detailKind: 'text',
+          value: text({ kind: 'mono', tone: 'muted' }, 'v' + escapeHtml(String(s.version || ''))), actions: detach });
       }
       detailSkillsHtml = out;
       if (listEl) listEl.innerHTML = detailSkillsHtml;
@@ -1078,13 +999,13 @@ function detailAccessCodeSave() {
   var statusEl = document.getElementById('detail-ac-status');
   var code = input ? input.value.trim() : '';
   if (code && (code.length < 4 || code.length > 64)) {
-    if (statusEl) { statusEl.style.color = 'var(--accent)'; statusEl.textContent = '✘ ' + t('detail.accessCodeLen'); }
+    if (statusEl) { statusEl.dataset.tone = 'coral'; statusEl.textContent = '✗ ' + t('detail.accessCodeLen'); }
     return;
   }
   var config = loadConfig();
   var aimeatUrl = (config.aimeatUrl || '').replace(/\/+$/, '');
   var filename = app.publishedFilename;
-  if (statusEl) { statusEl.style.color = 'var(--text-muted)'; statusEl.textContent = t('detail.savingAccess'); }
+  if (statusEl) { statusEl.dataset.tone = 'muted'; statusEl.textContent = t('detail.savingAccess'); }
   fetch(aimeatUrl + '/v1/apps/' + encodeURIComponent(filename), {
     method: 'PATCH',
     headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
@@ -1101,10 +1022,10 @@ function detailAccessCodeSave() {
         refreshServerMgmt();
         showNotice(code ? t('detail.accessCodeSet') : t('detail.accessCodeCleared'));
       } else {
-        if (statusEl) { statusEl.style.color = 'var(--accent)'; statusEl.textContent = '✘ ' + ((res.j && res.j.error && res.j.error.message) || 'Failed'); }
+        if (statusEl) { statusEl.dataset.tone = 'coral'; statusEl.textContent = '✗ ' + ((res.j && res.j.error && res.j.error.message) || 'Failed'); }
       }
     })
-    .catch(function(err) { if (statusEl) { statusEl.style.color = 'var(--accent)'; statusEl.textContent = '✘ ' + (err.message || 'Error'); } });
+    .catch(function(err) { if (statusEl) { statusEl.dataset.tone = 'coral'; statusEl.textContent = '✗ ' + (err.message || 'Error'); } });
 }
 
 // ── Attach skill (own published apps): bind one of the user's own skills to this app ──────
@@ -1112,25 +1033,24 @@ function detailAccessCodeSave() {
 // the owner's own published app. Binding lives in the SKILL's frontmatter (metadata.binding:
 // app:{owner}/{filename}); attach/detach rewrites it and republishes (skillSetBinding).
 function detailSkillAttachInner() {
-  var toggleBtn = dtlBtn('+ ' + t('detail.skillAttach'), 'window._launcher.detailSkillAttachToggle()');
-  if (!detailSkillPickerOpen) return toggleBtn;
+  var toggleBtn = btn('+ ' + t('detail.skillAttach'), 'window._launcher.detailSkillAttachToggle()');
+  if (!detailSkillPickerOpen) return btnRow(toggleBtn);
   var picker;
   if (detailMySkills === null) {
-    picker = '<span style="color:var(--text-muted);font-size:.85rem">…</span>';
+    picker = quiet('…');
   } else if (detailMySkills.length === 0) {
-    picker = '<span style="color:var(--text-muted);font-size:.85rem">' + t('detail.skillNoneToAttach') + '</span>';
+    picker = quiet(t('detail.skillNoneToAttach'));
   } else {
-    var opts = '';
+    var opts = [];
     for (var i = 0; i < detailMySkills.length; i++) {
       var s = detailMySkills[i];
       var desc = (s.description || '').slice(0, 50);
-      opts += '<option value="' + escapeHtml(s.name) + '">' + escapeHtml(s.name) + (desc ? ' — ' + escapeHtml(desc) : '') + '</option>';
+      opts.push({ value: s.name, label: escapeHtml(s.name) + (desc ? ' — ' + escapeHtml(desc) : '') });
     }
-    picker = '<select id="detail-skill-select" class="modal-input" style="max-width:340px;margin:0">' + opts + '</select>' +
-      dtlBtn(t('detail.skillAttachConfirm'), 'window._launcher.detailSkillAttach()', {variant:'primary', disabled: detailSkillBusy});
+    picker = field({ id: 'detail-skill-select', type: 'select', options: opts, value: opts[0].value, inputAttrs: ' aria-label="' + escapeHtml(t('detail.skillAttach')) + '"' }) +
+      btn(t('detail.skillAttachConfirm'), 'window._launcher.detailSkillAttach()', {disabled: detailSkillBusy});
   }
-  return '<div class="dtl-btn-row" style="align-items:center;flex-wrap:wrap;gap:8px">' + toggleBtn + picker + '</div>' +
-    '<div class="dtl-ai-status" id="detail-skill-status"></div>';
+  return btnRow(toggleBtn + picker) + statusLine('detail-skill-status');
 }
 
 // Re-render ONLY the attach picker container (button + select) — leaves the bound list untouched.
@@ -1169,7 +1089,7 @@ function detailSkillAttach() {
   var filename = app.publishedFilename;
   var binding = 'app:' + owner + '/' + filename;
   detailSkillBusy = true;
-  if (statusEl) { statusEl.style.color = 'var(--text-muted)'; statusEl.textContent = t('detail.skillAttaching'); }
+  if (statusEl) { statusEl.dataset.tone = 'muted'; statusEl.textContent = t('detail.skillAttaching'); }
   skillSetBinding(name, binding)
     .then(function() {
       detailSkillBusy = false;
@@ -1181,7 +1101,7 @@ function detailSkillAttach() {
     })
     .catch(function(err) {
       detailSkillBusy = false;
-      if (statusEl) { statusEl.style.color = 'var(--accent)'; statusEl.textContent = '✘ ' + t('detail.skillAttachError') + ': ' + (err.message || err); }
+      if (statusEl) { statusEl.dataset.tone = 'coral'; statusEl.textContent = '✗ ' + t('detail.skillAttachError') + ': ' + (err.message || err); }
     });
 }
 
@@ -1389,7 +1309,7 @@ function detailTranslateDesc(srcLang, dstLang, prefix, statusId) {
   var aimeatUrl = (config.aimeatUrl || '').replace(/\/+$/, '');
   if (!aimeatUrl) { if (statusEl) statusEl.textContent = t('detail.aiUnavailable'); return; }
   var langName = { en: 'English', fi: 'Finnish' };
-  if (statusEl) { statusEl.style.color = 'var(--text-muted)'; statusEl.textContent = t('detail.translating'); }
+  if (statusEl) { statusEl.dataset.tone = 'muted'; statusEl.textContent = t('detail.translating'); }
   var systemPrompt = 'You are a professional translator for short app-store copy. '
     + 'Translate the text from ' + (langName[srcLang] || srcLang) + ' to ' + (langName[dstLang] || dstLang) + '. '
     + 'Return ONLY the translated text — no quotes, no notes, no explanation. Keep it concise and natural.';
@@ -1402,16 +1322,16 @@ function detailTranslateDesc(srcLang, dstLang, prefix, statusId) {
     .then(function(json) {
       if (!json || !json.ok) {
         var msg = (json && json.error && json.error.message) || 'Translation failed';
-        if (statusEl) { statusEl.style.color = 'var(--accent)'; statusEl.textContent = '✘ ' + msg; }
+        if (statusEl) { statusEl.dataset.tone = 'coral'; statusEl.textContent = '✗ ' + msg; }
         return;
       }
       var out = (json.data && json.data.content ? json.data.content : '').trim();
-      if (!out) { if (statusEl) { statusEl.style.color = 'var(--accent)'; statusEl.textContent = '✘ ' + t('detail.trEmpty'); } return; }
+      if (!out) { if (statusEl) { statusEl.dataset.tone = 'coral'; statusEl.textContent = '✗ ' + t('detail.trEmpty'); } return; }
       dstEl.value = out;
-      if (statusEl) { statusEl.style.color = '#34d399'; statusEl.textContent = '✔ ' + t('detail.trDone'); }
+      if (statusEl) { statusEl.dataset.tone = 'success'; statusEl.textContent = '✓ ' + t('detail.trDone'); }
     })
     .catch(function(err) {
-      if (statusEl) { statusEl.style.color = 'var(--accent)'; statusEl.textContent = '✘ ' + (err.message || 'Translation failed'); }
+      if (statusEl) { statusEl.dataset.tone = 'coral'; statusEl.textContent = '✗ ' + (err.message || 'Translation failed'); }
     });
 }
 
@@ -1494,8 +1414,7 @@ async function detailRefreshScreenshot() {
 }
 
 function metaItem(label, val) {
-  return '<div class="dtl-meta-item"><div class="dtl-meta-label">' + escapeHtml(label) + '</div>' +
-    '<div class="dtl-meta-val">' + escapeHtml(val || '—') + '</div></div>';
+  return stack({ density: 'compact' }, text({ kind: 'label' }, escapeHtml(label)) + text({ kind: 'body' }, escapeHtml(val || '—')));
 }
 
 
@@ -1519,168 +1438,10 @@ function detailCheckAiAvailability() {
     .catch(function() { detailAiAvailable = false; if (detailAppId) renderDetailView(); });
 }
 
-/** The duration units in the language the catalogue is showing. */
-function durationUnits() {
-  return { s: t('dur.s'), min: t('dur.min'), h: t('dur.h'), d: t('dur.d') };
-}
-
-/**
- * " · since the previous one 1 min 53 s" for one row of a newest-first version list, or '' for
- * the oldest row and for anything the stamps cannot answer.
- *
- * WHY THIS IS WORTH THE LINE. The node has stamped every publish since June and never pruned one
- * — 415 versions of one app on this node — and the list rendered each stamp beside the next
- * without ever subtracting them. So the shape of the work (which round was quick, which one was
- * the same bug three times) was on disk for every app here and readable in none of them.
- *
- * @param {Array<{ created_at?: string }>} versions newest first
- * @param {number} i
- */
-function versionSinceText(versions, i) {
-  var prev = versions[i + 1];
-  if (!prev) return '';
-  var label = durationLabel(gapMs(versions[i].created_at, prev.created_at), durationUnits());
-  return label ? ' · ' + t('versions.sincePrev') + ' ' + label : '';
-}
-
-/**
- * The one line above the list: how many versions, the day or the span of days they cover, and how
- * long the first is from the last.
- *
- * It says "first to last" and not "took", and the distinction is the whole point. Between two
- * publishes in one sitting the number is the length of a round; between June and August it is a
- * summer. The stamps cannot tell those apart and neither can this line, so it states the distance
- * and leaves the reading to the person.
- *
- * @param {Array<{ created_at?: string }>} versions newest first
- */
-function versionSpanText(versions) {
-  if (versions.length < 2) return '';
-  var newest = versions[0].created_at;
-  var oldest = versions[versions.length - 1].created_at;
-  if (!newest || !oldest) return '';
-  var first = new Date(oldest).toLocaleDateString();
-  var last = new Date(newest).toLocaleDateString();
-  var when = first === last ? first : first + ' – ' + last;
-  var span = durationLabel(gapMs(newest, oldest), durationUnits());
-  return ' · ' + when + (span ? ' · ' + t('versions.span') + ' ' + span : '');
-}
-
-/**
- * Publishes grouped into sittings. A gap of two hours or more ends a sitting: publishes usually
- * come inside two hours of each other while someone is at it, and a longer gap means they went to
- * do something else, or came back another day. The time a sitting took is the time between its
- * first and last publish, which is what the stamps can honestly say; what happened before the
- * first publish is not on record and is not counted.
- *
- * @param {Array<{ created_at?: string }>} versions newest first
- * @returns {Array<{ start: number, end: number, n: number }>} oldest first
- */
-var SITTING_GAP_MS = 2 * 60 * 60 * 1000;
-function versionSittings(versions) {
-  var stamps = [];
-  for (var i = versions.length - 1; i >= 0; i--) {
-    var ms = versions[i].created_at ? Date.parse(versions[i].created_at) : NaN;
-    if (isFinite(ms)) stamps.push(ms);
-  }
-  var out = [], cur = null;
-  for (var j = 0; j < stamps.length; j++) {
-    if (!cur || stamps[j] - cur.end > SITTING_GAP_MS) { cur = { start: stamps[j], end: stamps[j], n: 1 }; out.push(cur); }
-    else { cur.end = stamps[j]; cur.n++; }
-  }
-  return out;
-}
-
-/**
- * Publishes per day from the first day to the last, as one small bar chart: the rhythm of the
- * work at a glance, before the list of every version. Days with nothing stay empty so a pause
- * reads as a pause. Past four months the days are folded into weeks, so the bars stay readable.
- *
- * One series, so the bar colour is the accent and the text wears the text tokens; every bar carries
- * its day and its count as a title for the hover.
- */
-function versionChartHtml(sittings) {
-  if (!sittings.length) return '';
-  var DAY = 24 * 60 * 60 * 1000;
-  var dayOf = function (ms) { var d = new Date(ms); return Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()); };
-  var counts = {};
-  var first = Infinity, last = -Infinity;
-  // Every publish counted on its own day; the sittings already hold the stamps in order.
-  for (var s = 0; s < sittings.length; s++) {
-    var st = sittings[s];
-    for (var k = 0; k < st.stamps.length; k++) {
-      var d = dayOf(st.stamps[k]);
-      counts[d] = (counts[d] || 0) + 1;
-      if (d < first) first = d; if (d > last) last = d;
-    }
-  }
-  var days = Math.round((last - first) / DAY) + 1;
-  var bucket = days > 120 ? 7 : 1;
-  var bars = [];
-  var max = 0;
-  for (var day = first; day <= last; day += DAY * bucket) {
-    var n = 0;
-    for (var b = 0; b < bucket; b++) n += counts[day + b * DAY] || 0;
-    bars.push({ day: day, n: n });
-    if (n > max) max = n;
-  }
-  if (!max) return '';
-  // Bars are drawn in CSS pixels and never stretched: two days are two narrow bars, not two slabs.
-  var W = 720, H = 96, PAD = 2, BASE = H - 1;
-  var bw = Math.min(28, Math.max(2, Math.floor((W - PAD * (bars.length - 1)) / bars.length)));
-  var svgW = bars.length * bw + PAD * (bars.length - 1);
-  var rects = '';
-  for (var i = 0; i < bars.length; i++) {
-    var h = bars[i].n ? Math.max(4, Math.round((bars[i].n / max) * (H - 14))) : 0;
-    var x = i * (bw + PAD);
-    var when = new Date(bars[i].day).toLocaleDateString();
-    var label = when + (bucket > 1 ? ' +' + (bucket - 1) : '') + ' · ' + t('versions.perDay').replace('{n}', String(bars[i].n));
-    rects += '<g class="version-bar"><title>' + escapeHtml(label) + '</title>' +
-      '<rect class="version-bar-hit" x="' + x + '" y="0" width="' + bw + '" height="' + H + '" fill="transparent"></rect>' +
-      (h ? '<rect class="version-bar-mark" x="' + x + '" y="' + (BASE - h) + '" width="' + bw + '" height="' + h + '" rx="' + Math.min(2, bw / 2) + '"></rect>' : '') +
-      '</g>';
-  }
-  return '<div class="version-chart">' +
-      '<div class="version-chart-head"><span class="version-chart-title">' + escapeHtml(t('versions.chartTitle')) + '</span>' +
-        '<span class="version-chart-max">' + escapeHtml(t('versions.chartMax').replace('{n}', String(max))) + '</span></div>' +
-      '<svg class="version-chart-svg" width="' + svgW + '" height="' + H + '" viewBox="0 0 ' + svgW + ' ' + H + '" role="img" aria-label="' + escapeHtml(t('versions.chartTitle')) + '">' +
-        '<line class="version-chart-base" x1="0" y1="' + BASE + '" x2="' + svgW + '" y2="' + BASE + '"></line>' + rects +
-      '</svg>' +
-      // A short chart (a few days) cannot hold a date at each end, so it says the span in one line.
-      (svgW < 240
-        ? '<div class="version-chart-axis"><span>' + escapeHtml(new Date(first).toLocaleDateString() + (first === last ? '' : ' – ' + new Date(last).toLocaleDateString())) + '</span></div>'
-        : '<div class="version-chart-axis" style="max-width:' + svgW + 'px"><span>' + escapeHtml(new Date(first).toLocaleDateString()) + '</span><span>' + escapeHtml(new Date(last).toLocaleDateString()) + '</span></div>') +
-    '</div>';
-}
-
-/**
- * The block above the detail view's list: the count, the days it covers, the sittings and the
- * time worked between publishes, then the chart. "first to last" is gone from here: a summer
- * between two publishes is not time spent, and the sittings say what is.
- */
-function versionSpanHtml(versions) {
-  if (!versions.length) return '';
-  var sittings = versionSittings(versions);
-  // Keep the stamps on each sitting for the chart.
-  var asc = [];
-  for (var i = versions.length - 1; i >= 0; i--) { var ms = Date.parse(versions[i].created_at || ''); if (isFinite(ms)) asc.push(ms); }
-  var idx = 0;
-  for (var s = 0; s < sittings.length; s++) { sittings[s].stamps = asc.slice(idx, idx + sittings[s].n); idx += sittings[s].n; }
-  var worked = 0;
-  for (var w = 0; w < sittings.length; w++) worked += sittings[w].end - sittings[w].start;
-  var parts = [versions.length + ' ' + t('versions.stored')];
-  if (asc.length) {
-    var firstDay = new Date(asc[0]).toLocaleDateString(), lastDay = new Date(asc[asc.length - 1]).toLocaleDateString();
-    parts.push(firstDay === lastDay ? firstDay : firstDay + ' – ' + lastDay);
-  }
-  if (sittings.length) {
-    var sit = t('versions.sittings').replace('{n}', String(sittings.length));
-    var lab = durationLabel(worked, durationUnits());
-    parts.push(lab ? sit + ', ' + t('versions.worked').replace('{t}', lab) : sit);
-  }
-  return '<div class="version-span">' + escapeHtml(parts.join(' · ')) + '</div>' +
-    versionChartHtml(sittings) +
-    '<div class="version-span-hint">' + escapeHtml(t('versions.chartHint')) + '</div>';
+// One published version as a row: the number (the newest one carries the "current" chip), the
+// size, time and gap as its mono line, and its actions. Shared by the detail list and the dialog.
+function versionRow(v, isLatest, meta, actions) {
+  return listRow({ density: 'compact', name: 'v' + v.version_number + (isLatest ? ' ' + chip(t('versions.current'), 'sun') : ''), detail: meta, actions: actions });
 }
 
 function detailLoadVersions(owner, filename) {
@@ -1712,7 +1473,7 @@ function detailLoadVersions(owner, filename) {
       // on the first open of any app whose published number this browser had not seen. Re-resolve
       // it, every time, rather than reason about which branch ran.
       listEl = document.getElementById('detail-versions-list') || listEl;
-      if (versions.length === 0) { detailVersionsHtml = '<span style="color:var(--text-muted);font-size:.85rem">' + t('detail.noVersions') + '</span>'; listEl.innerHTML = detailVersionsHtml; return; }
+      if (versions.length === 0) { detailVersionsHtml = quiet(t('detail.noVersions')); listEl.innerHTML = detailVersionsHtml; return; }
       var ownerArg = "'" + jsArg(owner) + "'";
       var fileArg = "'" + jsArg(filename) + "'";
       var html = versionSpanHtml(versions);
@@ -1724,22 +1485,16 @@ function detailLoadVersions(owner, filename) {
         // The list is newest-first, so the row after this one is the publish before it.
         var since = versionSinceText(versions, i);
         var viewU = aimeatUrl + '/v1/apps/' + encodeURIComponent(owner) + '/' + encodeURIComponent(filename) + '?version=' + v.version_number + '&mode=inline';
-        html +=
-          '<div class="dtl-version-row">' +
-            '<div class="version-meta"><span class="version-num">v' + v.version_number + (isLatest ? ' <span class="version-current">' + t('versions.current') + '</span>' : '') + '</span> ' +
-              '<span class="version-sub" style="color:var(--text-muted);font-size:.8rem">' + (kb ? kb : '') + (when ? ' · ' + when : '') + since + '</span></div>' +
-            '<div class="dtl-btn-row">' +
-              dtlBtn(t('card.view'), 'window._launcher.viewPublished(\'' + escapeHtml(viewU) + '\', \'' + jsArg(filename) + '\')') +
-              (isLatest ? '' : dtlBtn(t('card.restore'), 'window._launcher.restoreVersion(' + ownerArg + ', ' + fileArg + ', ' + v.version_number + ')')) +
-              dtlBtn(t('card.fork'), 'window._launcher.forkVersion(' + ownerArg + ', ' + fileArg + ', ' + v.version_number + ')') +
-            '</div>' +
-          '</div>';
+        html += versionRow(v, isLatest, (kb ? kb : '') + (when ? ' · ' + when : '') + since,
+          btn(t('card.view'), 'window._launcher.viewPublished(\'' + escapeHtml(viewU) + '\',\'' + jsArg(filename) + '\')', {kind:'text'}) +
+          (isLatest ? '' : btn(t('card.restore'), 'window._launcher.restoreVersion(' + ownerArg + ', ' + fileArg + ', ' + v.version_number + ')', {kind:'text'})) +
+          btn(t('card.fork'), 'window._launcher.forkVersion(' + ownerArg + ', ' + fileArg + ', ' + v.version_number + ')', {kind:'text'}));
       }
       detailVersionsHtml = html;
       listEl.innerHTML = html;
     })
     .catch(function() {
-      detailVersionsHtml = '<span style="color:var(--text-muted);font-size:.85rem">' + t('detail.noVersions') + '</span>';
+      detailVersionsHtml = quiet(t('detail.noVersions'));
       var listEl = document.getElementById('detail-versions-list');
       if (listEl) listEl.innerHTML = detailVersionsHtml;
     });
@@ -1795,7 +1550,7 @@ function detailAiRun() {
   var userPrompt = 'Change request:\n' + change + '\n\nCurrent HTML source:\n' + html;
 
   runBtn.disabled = true;
-  statusEl.style.color = 'var(--text-muted)';
+  statusEl.dataset.tone = 'muted';
   statusEl.textContent = t('detail.running');
 
   fetch(aimeatUrl + '/v1/ai/complete', {
@@ -1813,32 +1568,32 @@ function detailAiRun() {
       if (!json || !json.ok) {
         var code = (json && json.error && json.error.code) || '';
         var msg = (json && json.error && json.error.message) || 'AI request failed';
-        statusEl.style.color = 'var(--accent)';
-        statusEl.textContent = '✘ ' + (code ? '[' + code + '] ' : '') + msg;
+        statusEl.dataset.tone = 'coral';
+        statusEl.textContent = '✗ ' + (code ? '[' + code + '] ' : '') + msg;
         return;
       }
       var content = json.data && json.data.content ? json.data.content : '';
       var newHtml = extractHtmlFromAi(content);
       if (!newHtml) {
-        statusEl.style.color = 'var(--accent)';
-        statusEl.textContent = '✘ ' + t('detail.aiNoHtml');
+        statusEl.dataset.tone = 'coral';
+        statusEl.textContent = '✗ ' + t('detail.aiNoHtml');
         return;
       }
       detailDraftBlob = htmlToBlob(newHtml);
       detailLastChangeNote = change;
-      statusEl.style.color = '#34d399';
+      statusEl.dataset.tone = 'success';
       var usage = json.data && json.data.budget && typeof json.data.budget.spent_today_usd !== 'undefined'
         ? (' · ' + t('detail.aiUsage') + ': $' + Number(json.data.budget.spent_today_usd).toFixed(3)) : '';
-      statusEl.textContent = '✔ ' + t('detail.draftReady') + usage;
+      statusEl.textContent = '✓ ' + t('detail.draftReady') + usage;
       renderDetailView();
       // renderDetailView rebuilds the status line; restore the success message after.
       var s2 = document.getElementById('detail-ai-status');
-      if (s2) { s2.style.color = '#34d399'; s2.textContent = '✔ ' + t('detail.draftReady') + usage; }
+      if (s2) { s2.dataset.tone = 'success'; s2.textContent = '✓ ' + t('detail.draftReady') + usage; }
     })
     .catch(function(err) {
       runBtn.disabled = false;
-      statusEl.style.color = 'var(--accent)';
-      statusEl.textContent = '✘ ' + (err.message || 'AI request failed');
+      statusEl.dataset.tone = 'coral';
+      statusEl.textContent = '✗ ' + (err.message || 'AI request failed');
     });
 }
 
@@ -1882,12 +1637,12 @@ function detailAiKeep() {
   if (!app.published || !app.publishedFilename || !getCortexOwnerToken()) {
     finishLocal().then(function () {
       var s2 = document.getElementById('detail-ai-status');
-      if (s2) { s2.style.color = 'var(--text-muted)'; s2.textContent = t('wc.keptLocalOnly'); }
+      if (s2) { s2.dataset.tone = 'muted'; s2.textContent = t('wc.keptLocalOnly'); }
     });
     return;
   }
 
-  if (statusEl) { statusEl.style.color = 'var(--text-muted)'; statusEl.textContent = t('wc.saving'); }
+  if (statusEl) { statusEl.dataset.tone = 'muted'; statusEl.textContent = t('wc.saving'); }
   saveWorkingCopy({
     owner: detailServerOwner(app),
     filename: app.publishedFilename,
@@ -1903,11 +1658,11 @@ function detailAiKeep() {
     .then(function () {
       refreshCheckpoints();
       var s2 = document.getElementById('detail-ai-status');
-      if (s2) { s2.style.color = '#34d399'; s2.textContent = '✔ ' + t('wc.saved'); }
+      if (s2) { s2.dataset.tone = 'success'; s2.textContent = '✓ ' + t('wc.saved'); }
     })
     .catch(function (err) {
       var s2 = document.getElementById('detail-ai-status');
-      if (s2) { s2.style.color = 'var(--accent)'; s2.textContent = '✘ ' + ((err && err.message) || t('wc.saveFailed')); }
+      if (s2) { s2.dataset.tone = 'coral'; s2.textContent = '✗ ' + ((err && err.message) || t('wc.saveFailed')); }
     });
 }
 
@@ -1947,12 +1702,12 @@ function draftApi(method, owner, filename, sub, body) {
 // signed-in owner. Returns { owner, filename } or null (with a notice) if not eligible.
 function draftStageTarget(app, statusEl) {
   if (!app || !app.published || !app.publishedFilename) {
-    if (statusEl) { statusEl.style.color = 'var(--accent)'; statusEl.textContent = t('detail.draftNeedsPublished'); }
+    if (statusEl) { statusEl.dataset.tone = 'coral'; statusEl.textContent = t('detail.draftNeedsPublished'); }
     else showNotice(t('detail.draftNeedsPublished'));
     return null;
   }
   if (!getCortexOwnerToken()) {
-    if (statusEl) { statusEl.style.color = 'var(--accent)'; statusEl.textContent = t('detail.draftNeedsSignin'); }
+    if (statusEl) { statusEl.dataset.tone = 'coral'; statusEl.textContent = t('detail.draftNeedsSignin'); }
     else showNotice(t('detail.draftNeedsSignin'));
     return null;
   }
@@ -1965,16 +1720,16 @@ function draftStageTarget(app, statusEl) {
 function stageDraftAndPreview(app, contentB64, statusEl) {
   var tgt = draftStageTarget(app, statusEl);
   if (!tgt) return Promise.resolve(false);
-  if (statusEl) { statusEl.style.color = 'var(--text-muted)'; statusEl.textContent = t('detail.draftUploading'); }
+  if (statusEl) { statusEl.dataset.tone = 'muted'; statusEl.textContent = t('detail.draftUploading'); }
   return draftApi('PUT', tgt.owner, tgt.filename, 'draft', { content: contentB64 })
     .then(function () { return draftApi('POST', tgt.owner, tgt.filename, 'draft/preview-token'); })
     .then(function (data) {
       window.open(data.preview_url, '_blank', 'noopener');
-      if (statusEl) { statusEl.style.color = '#34d399'; statusEl.textContent = '✔ ' + t('detail.draftOpened'); }
+      if (statusEl) { statusEl.dataset.tone = 'success'; statusEl.textContent = '✓ ' + t('detail.draftOpened'); }
       return true;
     })
     .catch(function (err) {
-      if (statusEl) { statusEl.style.color = 'var(--accent)'; statusEl.textContent = '✘ ' + (err.message || 'Draft preview failed'); }
+      if (statusEl) { statusEl.dataset.tone = 'coral'; statusEl.textContent = '✗ ' + (err.message || 'Draft preview failed'); }
       return false;
     });
 }
@@ -1999,15 +1754,15 @@ function publishDraftBytes(app, contentB64, statusEl, onDone) {
   if (!tgt) return;
   Promise.resolve(showConfirm(t('detail.draftPublishConfirm'))).then(function (ok) {
     if (!ok) return;
-    if (statusEl) { statusEl.style.color = 'var(--text-muted)'; statusEl.textContent = t('detail.draftUploading'); }
+    if (statusEl) { statusEl.dataset.tone = 'muted'; statusEl.textContent = t('detail.draftUploading'); }
     draftApi('PUT', tgt.owner, tgt.filename, 'draft', { content: contentB64 })
       .then(function () { return draftApi('POST', tgt.owner, tgt.filename, 'publish-draft'); })
       .then(function (data) {
-        if (statusEl) { statusEl.style.color = '#34d399'; statusEl.textContent = t('detail.draftPublished').replace('{v}', data.version_number); }
+        if (statusEl) { statusEl.dataset.tone = 'success'; statusEl.textContent = t('detail.draftPublished').replace('{v}', data.version_number); }
         if (onDone) onDone(data);
       })
       .catch(function (err) {
-        if (statusEl) { statusEl.style.color = 'var(--accent)'; statusEl.textContent = '✘ ' + (err.message || 'Publish failed'); }
+        if (statusEl) { statusEl.dataset.tone = 'coral'; statusEl.textContent = '✗ ' + (err.message || 'Publish failed'); }
       });
   });
 }
@@ -2043,7 +1798,7 @@ async function detailWorkPublish() {
       detailLoadVersions(owner, app.publishedFilename);
       refreshAll();
     })
-    .catch(function (err) { showNotice('✘ ' + ((err && err.message) || 'Publish failed')); });
+    .catch(function (err) { showNotice('✗ ' + ((err && err.message) || 'Publish failed')); });
 }
 
 // Throw the working copy away and pull the live bytes back in, so what you see afterwards really
@@ -2129,12 +1884,12 @@ function saveSourceAsWorkingCopy() {
   // say plainly that it will not survive a reload.
   if (!app.published || !app.publishedFilename || !getCortexOwnerToken()) {
     return localOnly().then(function () {
-      if (statusEl) { statusEl.style.color = 'var(--text-muted)'; statusEl.textContent = t('wc.keptLocalOnly'); }
+      if (statusEl) { statusEl.dataset.tone = 'muted'; statusEl.textContent = t('wc.keptLocalOnly'); }
       return { persisted: false };
     });
   }
 
-  if (statusEl) { statusEl.style.color = 'var(--text-muted)'; statusEl.textContent = t('wc.saving'); }
+  if (statusEl) { statusEl.dataset.tone = 'muted'; statusEl.textContent = t('wc.saving'); }
   return saveWorkingCopy({
     owner: detailServerOwner(app),
     filename: app.publishedFilename,
@@ -2150,11 +1905,11 @@ function saveSourceAsWorkingCopy() {
         renderDetailView();
         refreshCheckpoints();
       }
-      if (statusEl) { statusEl.style.color = '#34d399'; statusEl.textContent = '✔ ' + t('wc.saved'); }
+      if (statusEl) { statusEl.dataset.tone = 'success'; statusEl.textContent = '✓ ' + t('wc.saved'); }
       return { persisted: true };
     })
     .catch(function (err) {
-      if (statusEl) { statusEl.style.color = 'var(--accent)'; statusEl.textContent = '✘ ' + ((err && err.message) || t('wc.saveFailed')); }
+      if (statusEl) { statusEl.dataset.tone = 'coral'; statusEl.textContent = '✗ ' + ((err && err.message) || t('wc.saveFailed')); }
       throw err;
     });
 }
@@ -2293,7 +2048,7 @@ function showLineageModal(owner, filename) {
   var treeEl = document.getElementById('lineage-tree');
   summaryEl.textContent = '';
   statusEl.textContent = t('lineage.loading') || 'Loading lineage…';
-  statusEl.style.color = 'var(--text-muted)';
+  statusEl.dataset.tone = 'muted';
   treeEl.innerHTML = '';
   openDlg('lineage-overlay');
 
@@ -2306,12 +2061,12 @@ function showLineageModal(owner, filename) {
       summaryEl.textContent = (t('lineage.direct') || 'Direct forks') + ': ' + (d.directForkCount || 0)
         + ' · ' + (t('lineage.total') || 'total descendants') + ': ' + (d.descendantCount || 0);
       if (nodes.length <= 1 && edges.length === 0) {
-        treeEl.innerHTML = '<div style="color:var(--text-muted)">' + (t('lineage.none') || 'No forks yet — this app has not been forked.') + '</div>';
+        treeEl.innerHTML = quiet(t('lineage.none') || 'No forks yet — this app has not been forked.');
         return;
       }
       treeEl.innerHTML = renderLineageTree(d);
     })
-    .catch(function(err) { statusEl.textContent = '✘ ' + (err.message || 'Failed to load lineage'); statusEl.style.color = 'var(--accent)'; });
+    .catch(function(err) { statusEl.textContent = '✗ ' + (err.message || 'Failed to load lineage'); statusEl.dataset.tone = 'coral'; });
 }
 
 function renderLineageTree(d) {
@@ -2325,12 +2080,12 @@ function renderLineageTree(d) {
     if (seen[id]) return ''; seen[id] = true;
     var n = byId[id]; if (!n) return '';
     var isSelf = (id === d.self);
-    var when = n.forkedAt ? '<span class="lineage-when">' + escapeHtml(new Date(n.forkedAt).toLocaleDateString()) + '</span>' : '';
+    var when = n.forkedAt ? escapeHtml(new Date(n.forkedAt).toLocaleDateString()) : '';
     var statusTxt = t('lineage.status.' + n.status) || n.status;
-    var line = '<div class="lineage-node' + (isSelf ? ' self' : '') + '" style="margin-left:' + (depth * 16) + 'px">'
-      + (depth > 0 ? '↳ ' : '') + escapeHtml(n.owner + '/' + n.filename) + (isSelf ? ' ●' : '')
-      + '<span class="lineage-status ' + escapeHtml(n.status) + '">' + escapeHtml(statusTxt) + '</span>' + when
-      + '</div>';
+    // Depth reads as one arrow per generation; this app is the row on the sun.
+    var line = listRow({ density: 'compact', selected: isSelf,
+      name: (depth > 0 ? new Array(depth + 1).join('→ ') : '') + escapeHtml(n.owner + '/' + n.filename),
+      detail: when, value: chip(escapeHtml(statusTxt), ({ public: 'success', hidden: 'sun', deleted: 'danger' })[n.status] || 'muted') });
     var kids = children[id] || [];
     for (var i = 0; i < kids.length; i++) line += renderNode(kids[i], depth + 1);
     return line;
@@ -2370,7 +2125,7 @@ function saveProtection() {
   var aimeatUrl = config.aimeatUrl.replace(/\/+$/, '');
   var statusEl = document.getElementById('protection-status');
   statusEl.textContent = t('protect.saving') || 'Saving…';
-  statusEl.style.color = 'var(--text-muted)';
+  statusEl.dataset.tone = 'muted';
   fetch(aimeatUrl + '/v1/apps/' + encodeURIComponent(protectionTarget.filename), {
     method: 'PATCH',
     headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
@@ -2379,16 +2134,16 @@ function saveProtection() {
     .then(function(resp) { return resp.json(); })
     .then(function(json) {
       if (json.ok) {
-        statusEl.textContent = '✔ ' + (t('protect.saved') || 'Saved');
-        statusEl.style.color = '#34d399';
+        statusEl.textContent = '✓ ' + (t('protect.saved') || 'Saved');
+        statusEl.dataset.tone = 'success';
         loadPublishedApps();
         setTimeout(function() { closeDlg('protection-overlay'); }, 800);
       } else {
-        statusEl.textContent = '✘ ' + ((json.error && json.error.message) || 'Failed');
-        statusEl.style.color = 'var(--accent)';
+        statusEl.textContent = '✗ ' + ((json.error && json.error.message) || 'Failed');
+        statusEl.dataset.tone = 'coral';
       }
     })
-    .catch(function(err) { statusEl.textContent = '✘ ' + (err.message || 'Error'); statusEl.style.color = 'var(--accent)'; });
+    .catch(function(err) { statusEl.textContent = '✗ ' + (err.message || 'Error'); statusEl.dataset.tone = 'coral'; });
 }
 
 function showVersionsModal(owner, filename) {
@@ -2400,7 +2155,7 @@ function showVersionsModal(owner, filename) {
   var statusEl = document.getElementById('versions-status');
   var listEl = document.getElementById('versions-list');
   statusEl.textContent = 'Loading versions…';
-  statusEl.style.color = 'var(--text-muted)';
+  statusEl.dataset.tone = 'muted';
   listEl.innerHTML = '';
   openDlg('versions-overlay');
 
@@ -2413,7 +2168,7 @@ function showVersionsModal(owner, filename) {
       var versions = json.data && json.data.versions ? json.data.versions : [];
       if (versions.length === 0) { statusEl.textContent = 'No versions found.'; return; }
       statusEl.textContent = versions.length + ' ' + t('versions.stored') + versionSpanText(versions);
-      statusEl.style.color = 'var(--text-muted)';
+      statusEl.dataset.tone = 'muted';
 
       var ownerArg = "'" + jsArg(owner) + "'";
       var fileArg = "'" + jsArg(filename) + "'";
@@ -2425,24 +2180,16 @@ function showVersionsModal(owner, filename) {
         var when = v.created_at ? new Date(v.created_at).toLocaleString() : '';
         var since = versionSinceText(versions, i);
         var viewU = aimeatUrl + '/v1/apps/' + encodeURIComponent(owner) + '/' + encodeURIComponent(filename) + '?version=' + v.version_number + '&mode=inline';
-        html +=
-          '<div class="version-row">' +
-            '<div class="version-meta">' +
-              '<span class="version-num">v' + v.version_number + (isLatest ? ' <span class="version-current">' + t('versions.current') + '</span>' : '') + '</span>' +
-              '<span class="version-sub">' + escapeHtml(v.version || '') + (kb ? ' · ' + kb : '') + (when ? ' · ' + when : '') + since + '</span>' +
-            '</div>' +
-            '<div class="version-actions">' +
-              '<button onclick="window._launcher.viewPublished(\'' + escapeHtml(viewU) + '\', \'' + jsArg(filename) + '\')">' + t('card.view') + '</button>' +
-              (isLatest ? '' : '<button onclick="window._launcher.restoreVersion(' + ownerArg + ', ' + fileArg + ', ' + v.version_number + ')" title="Re-publish this version as the new latest">' + t('card.restore') + '</button>') +
-              '<button onclick="window._launcher.forkVersion(' + ownerArg + ', ' + fileArg + ', ' + v.version_number + ')" title="Copy this version into a new app">' + t('card.fork') + '</button>' +
-            '</div>' +
-          '</div>';
+        html += versionRow(v, isLatest, escapeHtml(v.version || '') + (kb ? ' · ' + kb : '') + (when ? ' · ' + when : '') + since,
+          btn(t('card.view'), 'window._launcher.viewPublished(\'' + escapeHtml(viewU) + '\', \'' + jsArg(filename) + '\')', {kind:'text'}) +
+          (isLatest ? '' : btn(t('card.restore'), 'window._launcher.restoreVersion(' + ownerArg + ', ' + fileArg + ', ' + v.version_number + ')', {kind:'text', title:'Re-publish this version as the new latest'})) +
+          btn(t('card.fork'), 'window._launcher.forkVersion(' + ownerArg + ', ' + fileArg + ', ' + v.version_number + ')', {kind:'text', title:'Copy this version into a new app'}));
       }
       listEl.innerHTML = html;
     })
     .catch(function(err) {
-      statusEl.textContent = '✘ ' + (err.message || 'Failed to load versions');
-      statusEl.style.color = 'var(--accent)';
+      statusEl.textContent = '✗ ' + (err.message || 'Failed to load versions');
+      statusEl.dataset.tone = 'coral';
     });
 }
 
@@ -2454,7 +2201,7 @@ async function restoreVersion(owner, filename, version) {
   var aimeatUrl = config.aimeatUrl.replace(/\/+$/, '');
   var statusEl = document.getElementById('versions-status');
   statusEl.textContent = 'Restoring version ' + version + '…';
-  statusEl.style.color = '#34d399';
+  statusEl.dataset.tone = 'success';
 
   var meta = getServerManifests()[owner + '\n' + filename] || {};
   fetchAppContentBase64(aimeatUrl, owner, filename, version)
@@ -2480,18 +2227,18 @@ async function restoreVersion(owner, filename, version) {
     .then(function(resp) { return resp.json(); })
     .then(function(json) {
       if (json.ok) {
-        statusEl.textContent = '✔ Restored — now published as v' + (json.data.version_number || '?');
-        statusEl.style.color = '#34d399';
+        statusEl.textContent = '✓ Restored — now published as v' + (json.data.version_number || '?');
+        statusEl.dataset.tone = 'success';
         loadPublishedApps();
         setTimeout(function() { showVersionsModal(owner, filename); }, 500);
       } else {
-        statusEl.textContent = '✘ ' + ((json.error && json.error.message) || 'Restore failed');
-        statusEl.style.color = 'var(--accent)';
+        statusEl.textContent = '✗ ' + ((json.error && json.error.message) || 'Restore failed');
+        statusEl.dataset.tone = 'coral';
       }
     })
     .catch(function(err) {
-      statusEl.textContent = '✘ ' + (err.message || 'Restore failed');
-      statusEl.style.color = 'var(--accent)';
+      statusEl.textContent = '✗ ' + (err.message || 'Restore failed');
+      statusEl.dataset.tone = 'coral';
     });
 }
 
@@ -2511,7 +2258,7 @@ function forkVersion(owner, filename, version) {
   var aimeatUrl = config.aimeatUrl.replace(/\/+$/, '');
   var statusEl = document.getElementById('versions-status');
   var inVersionsModal = isDlgOpen('versions-overlay');
-  if (inVersionsModal) { statusEl.textContent = 'Forking…'; statusEl.style.color = '#34d399'; }
+  if (inVersionsModal) { statusEl.textContent = 'Forking…'; statusEl.dataset.tone = 'success'; }
 
   // Server-side fork: the server copies the source bytes + manifest, enforces the
   // forkable / paid-license gates, and records provenance (manifest.forkedFrom + a
@@ -2526,19 +2273,19 @@ function forkVersion(owner, filename, version) {
     .then(function(resp) { return resp.json(); })
     .then(function(json) {
       if (json.ok) {
-        var msg = '✔ ' + (t('fork.success') || 'Forked to') + ' "' + newName + '"';
-        if (inVersionsModal) { statusEl.textContent = msg; statusEl.style.color = '#34d399'; }
+        var msg = '✓ ' + (t('fork.success') || 'Forked to') + ' "' + newName + '"';
+        if (inVersionsModal) { statusEl.textContent = msg; statusEl.dataset.tone = 'success'; }
         else showNotice(msg);
         loadPublishedApps();
       } else {
         var err = (json.error && json.error.message) || 'Fork failed';
-        if (inVersionsModal) { statusEl.textContent = '✘ ' + err; statusEl.style.color = 'var(--accent)'; }
+        if (inVersionsModal) { statusEl.textContent = '✗ ' + err; statusEl.dataset.tone = 'coral'; }
         else showNotice((t('fork.failed') || 'Fork failed') + ': ' + err);
       }
     })
     .catch(function(err) {
       var m = err.message || 'Fork failed';
-      if (inVersionsModal) { statusEl.textContent = '✘ ' + m; statusEl.style.color = 'var(--accent)'; }
+      if (inVersionsModal) { statusEl.textContent = '✗ ' + m; statusEl.dataset.tone = 'coral'; }
       else showNotice('Error: ' + m);
     });
 }

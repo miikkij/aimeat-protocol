@@ -15,6 +15,9 @@
  *   - frontmatterOf / bumpPatch: reading a name and a version out of the text being edited
  * @usage registered in views/admin.js NAV_GROUPS
  * @version-history
+ *   v3.0.0 -- 2026-09-22 -- Composed from the shared component set: the numeral band, the toolbar
+ *     with its five filters, skills as list rows, facts as key-value rows, the trail as shared
+ *     crumbs, warnings as asides and who-may-read as boxed radio choices. The page's sheet is gone.
  *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v2.2.0 -- 2026-09-13 -- Compose remaining section headings and record rules from poster.css.
@@ -35,11 +38,11 @@ import htm from 'htm';
 import { onLiveUpdate } from '/lib/live-updates.js';
 import { t } from '/js/i18n.js';
 import { date as fmtDate } from '/js/format.js';
-import { useViewCSS } from '/components/useViewCSS.js';
 import { num, Spinner, useToast, Toast } from './shared.js';
 import { Markdown } from '/components/Markdown.js';
 import { splitSkillMd, bindingFile } from '/views/profile/skills/frame.js';
 import { useConfirm } from '/components/Modal.js';
+import { Section, Columns, Stack, ListRow, KeyValue, Toolbar, Field, NumeralBand, Crumbs, Chip, Action, Surface, Text } from '/components/poster-parts.js';
 import * as skillsService from '/js/services/skills.js';
 
 const html = htm.bind(h);
@@ -135,7 +138,6 @@ function fileNames(skill) {
 }
 
 export default function SkillsAdminTab() {
-  useViewCSS('/css/views/admin-skills.css');
   const [msg, showErr, showOk, clearToast] = useToast();
   const { confirm, ConfirmUI } = useConfirm();
   const [skills, setSkills] = useState([]);
@@ -252,101 +254,90 @@ export default function SkillsAdminTab() {
   const toast = msg && html`<${Toast} type=${msg.type} text=${msg.text} onDismiss=${clearToast} />`;
 
   if (editing) {
-    return html`<div class="og adm-sk">${toast}
+    return html`<${Stack}>${toast}
       <${Write} editing=${editing} setEditing=${setEditing} skills=${skills}
         onPublish=${publish} busy=${busy} />
-      <${ConfirmUI} /></div>`;
+      <${ConfirmUI} /><//>`;
   }
 
   if (open) {
-    return html`<div class="og adm-sk">${toast}
+    return html`<${Stack}>${toast}
       <${Open} skill=${open} onBack=${() => setOpen(null)} onEdit=${() => startEdit(open)}
         onDownload=${() => download(open)} onDelete=${() => remove(open)}
         onVisibility=${(v) => setVisibility(open, v)} busy=${busy} />
-      <${ConfirmUI} /></div>`;
+      <${ConfirmUI} /><//>`;
   }
 
-  const chip = (key, label) => html`
-    <button type="button" class="adm-sk-chip ${filter === key ? 'on' : ''}"
-      onClick=${() => setFilter(key)}>${label}</button>`;
+  const chip = (key, label) => ({ id: key, label, selected: filter === key, onClick: () => setFilter(key) });
 
-  return html`
-    <div class="og adm-sk">
-      ${toast}
+  return html`<${Stack}>
+    ${toast}
 
-      <div class="og-strip">
-        <div><b>${num(m.total)}</b><span>${S('cntAll')}</span><small>${S('cntAllSub')}</small></div>
-        <div><b>${num(m.here)}</b><span>${S('cntHere')}</span><small>${S('cntHereSub')}</small></div>
-        <div><b>${num(m.fromBuild)}</b><span>${S('cntBuild')}</span><small>${S('cntBuildSub')}</small></div>
-        <div><b>${num(m.open)}</b><span>${S('cntOpen')}</span><small>${S('cntOpenSub')}</small></div>
-      </div>
+    <${NumeralBand} tone="plain" items=${[
+      { label: S('cntAll'), value: num(m.total), note: S('cntAllSub') },
+      { label: S('cntHere'), value: num(m.here), note: S('cntHereSub') },
+      { label: S('cntBuild'), value: num(m.fromBuild), note: S('cntBuildSub') },
+      { label: S('cntOpen'), value: num(m.open), note: S('cntOpenSub') },
+    ]} />
 
-      <section class="og-sec og-sec--first">
-        <div class="og-sec-h">
-          <h2 class="poster-section-title">${S('title')}<small>01</small></h2>
-          <button type="button" class="adm-btn" onClick=${startNew}>${S('write')}</button>
-        </div>
-
-        <div class="adm-sk-top">
-          <div>
-            <div class="adm-sk-lbl">${S('heroLabel')}</div>
-            <div class="adm-sk-hero poster-stat-number">${S('hero', { n: num(m.open), total: num(m.total) })}</div>
-            <p class="adm-sk-hero-sub">${S('heroSub', { total: num(m.total) })}</p>
-          </div>
-          <div><p class="adm-sk-lead">${m.here === 0
-    ? S('leadAllBuild', { build: num(m.fromBuild) })
-    : S('lead', { build: num(m.fromBuild), here: num(m.here) })}</p></div>
-        </div>
+    <${Section} title=${S('title')} count="01"
+      actions=${html`<${Action} kind="primary" onClick=${startNew}>${S('write')}<//>`}>
+      <${Stack}>
+        <${Columns} collapse=${900}>
+          <${Stack} density="compact">
+            <${Text} kind="label">${S('heroLabel')}<//>
+            <${Text} kind="number">${S('hero', { n: num(m.open), total: num(m.total) })}<//>
+            <${Text} kind="caption" tone="muted">${S('heroSub', { total: num(m.total) })}<//>
+          <//>
+          <${Text} kind="lead">${m.here === 0
+            ? S('leadAllBuild', { build: num(m.fromBuild) })
+            : S('lead', { build: num(m.fromBuild), here: num(m.here) })}<//>
+        <//>
 
         ${loading ? html`<${Spinner} />` : skills.length === 0
-    ? html`<p class="adm-sk-note">${S('empty')}</p>`
-    : html`
-          <div class="adm-sk-tools">
-            <div class="adm-sk-find">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"></circle><path d="M16 16 L21 21"></path></svg>
-              <input type="text" value=${find} onInput=${e => setFind(e.target.value)} placeholder=${S('findPlaceholder')} />
+          ? html`<${Text} tone="muted">${S('empty')}<//>`
+          : html`
+            <${Toolbar}
+              search=${{ ariaLabel: S('findPlaceholder'), placeholder: S('findPlaceholder'), value: find, onInput: e => setFind(e.target.value) }}
+              filters=${[
+                chip('all', S('chipAll', { n: num(m.total) })),
+                chip('here', S('chipHere', { n: num(m.here) })),
+                chip('build', S('chipBuild', { n: num(m.fromBuild) })),
+                chip('open', S('chipOpen', { n: num(m.open) })),
+                chip('stale', S('chipStale', { n: num(m.stale), days: STALE_DAYS })),
+              ]} />
+
+            <div>
+              ${shown.map(s => html`<${ListRow} key=${s.ref} name=${s.name} onOpen=${() => openSkill(s)}
+                detail=${s.description} preview=${true}
+                value=${html`<${Stack} direction="wrap" align="end" density="compact">
+                  <${Text} kind="mono" tone="muted">v${s.version} · ${day(s.updatedAt)}<//>
+                  <${Chip} tone="muted">${s.builtin ? S('markBuild') : S('markHere')}<//>
+                  ${s.visibility === 'public' && html`<${Chip} tone="sun">${S('markPublic')}<//>`}
+                  ${bindingFile(s) && html`<${Chip}>${S('markTeaches', { app: bindingFile(s).replace(/\.html$/, '') })}<//>`}
+                  ${s.supersededBy && html`<${Chip} tone="coral">${S('markRetired')}<//>`}
+                <//>`}
+                actions=${html`
+                  <${Action} onClick=${() => openSkill(s)}>${S('openIt')}<//>
+                  <${Action} onClick=${() => startEdit(s)}>${S('edit')}<//>
+                  <${Action} tone="danger" onClick=${() => remove(s)}>${S('delete')}<//>`} />`)}
             </div>
-            <div class="adm-sk-chips">
-              ${chip('all', S('chipAll', { n: num(m.total) }))}
-              ${chip('here', S('chipHere', { n: num(m.here) }))}
-              ${chip('build', S('chipBuild', { n: num(m.fromBuild) }))}
-              ${chip('open', S('chipOpen', { n: num(m.open) }))}
-              ${chip('stale', S('chipStale', { n: num(m.stale), days: STALE_DAYS }))}
-            </div>
-          </div>
 
-          <div class="adm-sk-rows">
-            ${shown.map(s => html`
-              <div class="adm-sk-row" key=${s.ref}>
-                <div class="adm-sk-rtop">
-                  <span class="adm-sk-name">${s.name}<i>v${s.version}</i></span>
-                  <span class="adm-sk-marks">
-                    <span class="adm-sk-mark">${s.builtin ? S('markBuild') : S('markHere')}</span>
-                    ${s.visibility === 'public' && html`<span class="adm-sk-mark is-open">${S('markPublic')}</span>`}
-                    ${bindingFile(s) && html`<span class="adm-sk-mark is-app">${S('markTeaches', { app: bindingFile(s).replace(/\.html$/, '') })}</span>`}
-                    ${s.supersededBy && html`<span class="adm-sk-mark is-open">${S('markRetired')}</span>`}
-                  </span>
-                  <span class="adm-sk-when">${day(s.updatedAt)}</span>
-                  <span class="adm-sk-doors">
-                    <button type="button" class="adm-sk-door" onClick=${() => openSkill(s)}>${S('openIt')}</button>
-                    <button type="button" class="adm-sk-door" onClick=${() => startEdit(s)}>${S('edit')}</button>
-                    <button type="button" class="adm-sk-door is-quiet" onClick=${() => remove(s)}>${S('delete')}</button>
-                  </span>
-                </div>
-                <p class="adm-sk-desc">${s.description}</p>
-              </div>`)}
-          </div>
+            <${Stack} direction="wrap" align="between">
+              <${Text} kind="mono" tone="muted">${S('shown', { n: num(shown.length), total: num(m.total) })}<//>
+              ${m.stale > 0 && html`<${Text} kind="caption" tone="muted">${S('staleNote', { n: num(m.stale), days: STALE_DAYS })}<//>`}
+            <//>
+          `}
+      <//>
+    <//>
 
-          <div class="adm-sk-foot">
-            <span>${S('shown', { n: num(shown.length), total: num(m.total) })}</span>
-            ${m.stale > 0 && html`<span>${S('staleNote', { n: num(m.stale), days: STALE_DAYS })}</span>`}
-          </div>
-        `}
-      </section>
-
-      <${ConfirmUI} />
-    </div>`;
+    <${ConfirmUI} />
+  <//>`;
 }
+
+/** One fact about a skill: the label, the value, and a quiet line under it. */
+const fact = (label, value, note) => html`<${KeyValue} label=${label}><${Stack} density="compact">
+  <span>${value}</span>${note && html`<${Text} kind="caption" tone="muted">${note}<//>`}<//><//>`;
 
 /* ── One skill open ──────────────────────────────────────────────────────────────────────────── */
 
@@ -356,68 +347,45 @@ function Open({ skill, onBack, onEdit, onDownload, onDelete, onVisibility, busy 
   const files = fileNames(skill);
   const isPublic = skill.visibility === 'public';
 
-  return html`
-    <div class="adm-sk-page">
-      <div class="adm-sk-crumb">
-        <button type="button" onClick=${onBack}>${S('title')}</button> · ${skill.name}
-      </div>
+  return html`<${Stack}>
+    <${Crumbs} items=${[{ label: S('title'), onClick: onBack }, { label: skill.name }]} />
 
-      <div class="adm-sk-head poster-row--thing">
-        <h2 class="poster-record-title">${skill.name}<i>v${skill.version} · ${skill.ref}</i></h2>
-        <div class="adm-sk-doors">
-          <button type="button" class="adm-sk-door" onClick=${onEdit}>${S('edit')}</button>
-          <button type="button" class="adm-sk-door" onClick=${onDownload}>${S('download')}</button>
-          <button type="button" class="adm-sk-door is-quiet" onClick=${onDelete}>${S('delete')}</button>
-        </div>
-      </div>
+    <${Stack} direction="wrap" align="between">
+      <${Stack} density="compact">
+        <${Text} kind="heading">${skill.name}<//>
+        <${Text} kind="mono" tone="muted">v${skill.version} · ${skill.ref}<//>
+      <//>
+      <${Stack} direction="wrap">
+        <${Action} onClick=${onEdit}>${S('edit')}<//>
+        <${Action} onClick=${onDownload}>${S('download')}<//>
+        <${Action} tone="danger" onClick=${onDelete}>${S('delete')}<//>
+      <//>
+    <//>
 
-      <div class="adm-sk-two">
+    <${Columns} layout="leading" collapse=${900}>
+      <${Stack}>
+        <${Text} kind="lead">${skill.description}<//>
+        <${Text} kind="label">${S('whatItReads')}<//>
+        <${Surface} kind="box"><${Markdown} text=${body} /><//>
+      <//>
+
+      <${Stack}>
         <div>
-          <p class="adm-sk-what">${skill.description}</p>
-          <div class="adm-sk-bodyhead">${S('whatItReads')}</div>
-          <div class="adm-sk-md"><${Markdown} text=${body} /></div>
+          ${fact(S('factFrom'), skill.builtin ? S('markBuild') : S('markHere'), skill.builtin ? S('factFromBuildWhy') : S('factFromHereWhy'))}
+          ${fact(S('factWhoReads'), html`<${Stack} direction="wrap" align="center" density="compact">
+            <strong>${isPublic ? S('visPublic') : S('visMembers')}</strong>
+            <${Action} kind="text" disabled=${busy} onClick=${() => onVisibility(isPublic ? 'members' : 'public')}>
+              ${isPublic ? S('makeMembers') : S('makePublic')}<//>
+          <//>`, S('factWhoReadsWhy'))}
+          ${fact(S('factChanged'), fullDay(skill.updatedAt), sinceWords(skill.updatedAt))}
+          ${fact(S('factTeaches'), app ? app : S('factTeachesNothing'), app ? S('factTeachesWhy') : S('factTeachesNothingWhy'))}
+          ${fact(S('factFiles'), html`<${Text} kind="mono">${files.join(', ')}<//>`, files.length === 1 ? S('factFilesOneWhy') : '')}
+          ${skill.license && fact(S('factLicence'), skill.license)}
         </div>
-
-        <div>
-          <dl class="adm-sk-facts">
-            <div class="adm-sk-fact">
-              <dt>${S('factFrom')}</dt>
-              <dd>${skill.builtin ? S('markBuild') : S('markHere')}
-                <em>${skill.builtin ? S('factFromBuildWhy') : S('factFromHereWhy')}</em></dd>
-            </div>
-            <div class="adm-sk-fact">
-              <dt>${S('factWhoReads')}</dt>
-              <dd>
-                <span class="adm-sk-vis">
-                  <span class="adm-sk-visnow">${isPublic ? S('visPublic') : S('visMembers')}</span>
-                  <button type="button" class="adm-sk-visgo" disabled=${busy}
-                    onClick=${() => onVisibility(isPublic ? 'members' : 'public')}>
-                    ${isPublic ? S('makeMembers') : S('makePublic')}
-                  </button>
-                </span>
-                <em>${S('factWhoReadsWhy')}</em></dd>
-            </div>
-            <div class="adm-sk-fact">
-              <dt>${S('factChanged')}</dt>
-              <dd>${fullDay(skill.updatedAt)}<em>${sinceWords(skill.updatedAt)}</em></dd>
-            </div>
-            <div class="adm-sk-fact">
-              <dt>${S('factTeaches')}</dt>
-              <dd>${app ? app : S('factTeachesNothing')}
-                <em>${app ? S('factTeachesWhy') : S('factTeachesNothingWhy')}</em></dd>
-            </div>
-            <div class="adm-sk-fact">
-              <dt>${S('factFiles')}</dt>
-              <dd><code>${files.join(', ')}</code>
-                ${files.length === 1 && html`<em>${S('factFilesOneWhy')}</em>`}</dd>
-            </div>
-            ${skill.license && html`
-              <div class="adm-sk-fact"><dt>${S('factLicence')}</dt><dd>${skill.license}</dd></div>`}
-          </dl>
-          <p class="adm-sk-note">${S('editNote')}</p>
-        </div>
-      </div>
-    </div>`;
+        <${Text} kind="caption" tone="muted">${S('editNote')}<//>
+      <//>
+    <//>
+  <//>`;
 }
 
 /* ── Writing one ─────────────────────────────────────────────────────────────────────────────── */
@@ -427,60 +395,49 @@ function Write({ editing, setEditing, skills, onPublish, busy }) {
   const existing = skills.find(s => s.name === fm.name);
   const replaces = editing.was && editing.was.name === fm.name;
   const forks = editing.was && editing.was.name !== fm.name;
+  const warn = (title, text) => html`<${Surface} kind="aside"><${Stack} density="compact">
+    <${Text} kind="label">${title}<//><${Text}>${text}<//>
+  <//><//>`;
 
-  return html`
-    <div class="adm-sk-page">
-      <div class="adm-sk-head">
-        <h2 class="poster-section-title">${editing.was ? S('editTitle', { name: editing.was.name }) : S('writeTitle')}<small>02</small></h2>
-        <button type="button" class="adm-sk-door" onClick=${() => setEditing(null)}>${t('common.cancel')}</button>
-      </div>
-      <p class="adm-sk-lead">${S('writeLead')}</p>
+  return html`<${Section} title=${editing.was ? S('editTitle', { name: editing.was.name }) : S('writeTitle')} count="02"
+    description=${S('writeLead')} actions=${html`<${Action} onClick=${() => setEditing(null)}>${t('common.cancel')}<//>`}>
+    <${Columns} layout="leading" collapse=${900}>
+      <${Stack}>
+        <${Field} type="textarea" rows=${22} label=${S('theFile')} value=${editing.md} spellCheck=${false}
+          onInput=${e => setEditing({ ...editing, md: e.target.value })} />
+        <${Stack} direction="wrap" align="center">
+          <${Action} kind="primary" disabled=${busy || !fm.name} onClick=${onPublish}>
+            ${busy ? t('common.loading') : S('publishIt')}<//>
+          <${Text} kind="caption" tone="muted">${S('publishHint')}<//>
+        <//>
+      <//>
 
-      <div class="adm-sk-two adm-sk-two--write">
-        <div>
-          <div class="adm-sk-lbl">${S('theFile')}</div>
-          <textarea class="adm-sk-editor" rows="22" value=${editing.md}
-            onInput=${e => setEditing({ ...editing, md: e.target.value })}></textarea>
-          <div class="adm-sk-act">
-            <button class="adm-btn" disabled=${busy || !fm.name} onClick=${onPublish}>
-              ${busy ? t('common.loading') : S('publishIt')}
-            </button>
-            <span class="adm-sk-hint">${S('publishHint')}</span>
+      <${Stack}>
+        <${Surface} kind="box"><${Stack} density="compact">
+          <${Text} kind="label">${S('saysItIs')}<//>
+          <div>
+            <${KeyValue} label=${S('prevName')}><strong>${fm.name || S('prevNoName')}</strong><//>
+            <${KeyValue} label=${S('prevVersion')}><span><strong>v${nextVersion(existing?.version)}</strong>${existing ? ' · ' + S('prevWas', { v: existing.version }) : ' · ' + S('prevFirst')}</span><//>
+            <${KeyValue} label=${S('factTeaches')} value=${fm.binding ? fm.binding.split('/').pop() : S('factTeachesNothing')} />
+            <${KeyValue} label=${S('prevBody')} value=${S('prevBodyIs', { headings: num(fm.headings), words: num(fm.words) })} />
           </div>
-        </div>
+        <//><//>
 
-        <div>
-          <div class="adm-sk-prev">
-            <div class="adm-sk-prev-l">${S('saysItIs')}</div>
-            <dl>
-              <div class="adm-sk-prow"><dt>${S('prevName')}</dt>
-                <dd><b>${fm.name || S('prevNoName')}</b></dd></div>
-              <div class="adm-sk-prow"><dt>${S('prevVersion')}</dt>
-                <dd><b>v${nextVersion(existing?.version)}</b>${existing ? ' · ' + S('prevWas', { v: existing.version }) : ' · ' + S('prevFirst')}</dd></div>
-              <div class="adm-sk-prow"><dt>${S('factTeaches')}</dt>
-                <dd>${fm.binding ? fm.binding.split('/').pop() : S('factTeachesNothing')}</dd></div>
-              <div class="adm-sk-prow"><dt>${S('prevBody')}</dt>
-                <dd>${S('prevBodyIs', { headings: num(fm.headings), words: num(fm.words) })}</dd></div>
-            </dl>
-          </div>
+        ${!fm.name && warn(S('warnNoNameTitle'), S('warnNoName'))}
+        ${replaces && warn(S('warnReplaceTitle'), S('warnReplace', { name: fm.name }))}
+        ${forks && warn(S('warnForkTitle'), S('warnFork', { was: editing.was.name, now: fm.name }))}
+        ${!editing.was && fm.name && existing && warn(S('warnTakenTitle'), S('warnTaken', { name: fm.name }))}
 
-          ${!fm.name && html`<div class="adm-sk-warn poster-aside"><b>${S('warnNoNameTitle')}</b>${S('warnNoName')}</div>`}
-          ${replaces && html`<div class="adm-sk-warn poster-aside"><b>${S('warnReplaceTitle')}</b>${S('warnReplace', { name: fm.name })}</div>`}
-          ${forks && html`<div class="adm-sk-warn poster-aside"><b>${S('warnForkTitle')}</b>${S('warnFork', { was: editing.was.name, now: fm.name })}</div>`}
-          ${!editing.was && fm.name && existing && html`<div class="adm-sk-warn poster-aside"><b>${S('warnTakenTitle')}</b>${S('warnTaken', { name: fm.name })}</div>`}
-
-          <div class="adm-sk-field">
-            <div class="adm-sk-lbl">${S('whoMayRead')}</div>
-            <div class="adm-sk-choice">
-              <button type="button" class="adm-sk-opt ${editing.visibility === 'members' ? 'on' : ''}"
-                onClick=${() => setEditing({ ...editing, visibility: 'members' })}>
-                <b>${S('visMembers')}</b>${S('visMembersWhy')}</button>
-              <button type="button" class="adm-sk-opt ${editing.visibility === 'public' ? 'on' : ''}"
-                onClick=${() => setEditing({ ...editing, visibility: 'public' })}>
-                <b>${S('visPublic')}</b>${S('visPublicWhy')}</button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>`;
+        <${Stack} density="compact">
+          <${Text} kind="label">${S('whoMayRead')}<//>
+          <${Stack} role="radiogroup" label=${S('whoMayRead')} density="compact">
+            <${Action} kind="choice" semantics="radio" selected=${editing.visibility === 'members'} title=${S('visMembers')}
+              onClick=${() => setEditing({ ...editing, visibility: 'members' })}>${S('visMembersWhy')}<//>
+            <${Action} kind="choice" semantics="radio" selected=${editing.visibility === 'public'} title=${S('visPublic')}
+              onClick=${() => setEditing({ ...editing, visibility: 'public' })}>${S('visPublicWhy')}<//>
+          <//>
+        <//>
+      <//>
+    <//>
+  <//>`;
 }

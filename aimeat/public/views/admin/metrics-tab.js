@@ -14,9 +14,13 @@
  *   - parseProm(text)        -- Prometheus text exposition → Map(name → [{labels, value}])
  *   - sum/firstValue         -- read helpers over the parsed map
  *   - fmtBytes/fmtUptime     -- the two number formats this page speaks
- *   - Line                   -- the session-history chart with a reading under the cursor
+ *   - Line                   -- the session-history chart (the shared chart; its tooltip reads a point)
  *   - MetricsTab (default)   -- the five sections
  * @version-history
+ *   v2.2.0 -- 2026-09-22 -- Composed from the shared component set: sections, a numeral band, the
+ *     ledger as a shared table, the routes, refusals and raw samples as shared list rows with
+ *     progress meters, the filter as the toolbar, and the line drawn by the shared chart; the
+ *     page's own sheet is gone.
  *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   v2.1.0 — 2026-09-13 — Compose shared B1 headings; measured shares use SVG width data.
  *   v2.0.0 — 2026-09-12 — The poster face. Three blue sparklines with no scale become one line of
@@ -37,8 +41,9 @@ import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { useViewCSS } from '/components/useViewCSS.js';
 import { num, Spinner, useToast, Toast } from './shared.js';
+import { Section, Columns, Stack, Text, Action, Chip, NumeralBand, Toolbar, Table, ListRow, Meter, Surface } from '/components/poster-parts.js';
+import { UsageChart, colorForIndex } from '/components/UsageChart.js';
 import * as api from '/js/services/admin.js';
 
 const M = (key, params) => t('admin.metrics.' + key, params);
@@ -99,47 +104,27 @@ function fmtUptime(seconds) {
   return `${mm} min`;
 }
 
-const W = 720, H = 150;
-
 /**
- * The session's own readings of one number: a sun ground under an ink line, the newest reading
- * marked. The cursor reads the point nearest to it. No time axis: the poll stops while the tab is
- * hidden, so readings times ten seconds is not elapsed time and the ends say oldest and now.
+ * The session's own readings of one number, drawn by the shared chart; its tooltip reads the point
+ * under the cursor. No time axis: the poll stops while the tab is hidden, so readings times ten
+ * seconds is not elapsed time and the ends say oldest and now.
  */
-function Line({ points, at, onPick }) {
-  const lo = Math.min(...points), hi = Math.max(...points);
-  const span = Math.max(1, hi - lo);
-  const x = i => (points.length < 2 ? W - 2 : (i / (points.length - 1)) * (W - 2));
-  const y = v => H - 12 - ((v - lo) / span) * (H - 26);
-  const line = points.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
-  const area = `0,${H} ${line} ${x(points.length - 1).toFixed(1)},${H}`;
-  const pick = (e) => {
-    const box = e.currentTarget.getBoundingClientRect();
-    const rel = (e.clientX - box.left) / Math.max(1, box.width);
-    onPick(Math.min(points.length - 1, Math.max(0, Math.round(rel * (points.length - 1)))));
-  };
-  return html`
-    <div class="adm-mx-chart">
-      <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label=${M('chartLabel')}>
-        <polygon class="adm-mx-area" points=${area} />
-        <polyline class="adm-mx-line" points=${line} vector-effect="non-scaling-stroke" />
-        ${at != null ? html`<line class="adm-mx-cursor" x1=${x(at)} y1="0" x2=${x(at)} y2=${H} vector-effect="non-scaling-stroke" />` : null}
-        ${/* The box is scaled to its column, so a circle would draw as an ellipse: the newest
-              reading is a tick whose stroke does not scale. */ ''}
-        <line class="adm-mx-now" x1=${x(points.length - 1)} y1=${y(points[points.length - 1]) - 7}
-          x2=${x(points.length - 1)} y2=${y(points[points.length - 1]) + 7} vector-effect="non-scaling-stroke" />
-        <rect class="adm-mx-hit" x="0" y="0" width=${W} height=${H}
-          onMouseMove=${pick} onMouseLeave=${() => onPick(null)} />
-      </svg>
-      ${at != null ? html`<span class="adm-mx-read">${fmtBytes(points[at])}</span>` : null}
-    </div>`;
+function Line({ points }) {
+  const datasets = [{
+    label: M('realUse'),
+    data: points,
+    borderColor: colorForIndex(0),
+    backgroundColor: colorForIndex(0),
+    pointRadius: 0,
+    borderWidth: 2,
+  }];
+  return html`<${UsageChart} type="line" labels=${points.map(() => '')} datasets=${datasets}
+    height=${150} legend=${false} yFormat=${fmtBytes} />`;
 }
 
 export default function MetricsTab() {
-  useViewCSS('/css/views/admin-metrics-poster.css');
   const [state, setState] = useState({ status: 'loading' });   // loading | disabled | denied | ok | error
   const [filter, setFilter] = useState('');
-  const [at, setAt] = useState(null);
   const [toast, showErr, , clearToast] = useToast();
   // Last two samples for rate math + memory history for the line.
   const samplesRef = useRef({ prev: null, curr: null });
@@ -195,15 +180,14 @@ export default function MetricsTab() {
   if (state.status === 'loading') return html`<${Spinner} text=${M('loading')} />`;
 
   if (state.status === 'disabled' || state.status === 'denied') {
-    return html`<div class="og adm-mx">
-      <section class="og-sec og-sec--first">
-        <div class="og-sec-h"><h2 class="poster-section-title">${M('nowTitle')}<small>01</small></h2></div>
-        <div class="adm-mx-wait">
-          <p>${state.status === 'disabled' ? M('disabled') : M('denied')}</p>
-          ${state.status === 'disabled' && html`<p>${M('disabledHint')} <code>AIMEAT_METRICS_ENABLED=true</code></p>`}
-        </div>
-      </section>
-    </div>`;
+    return html`<${Section} title=${M('nowTitle')} count="01">
+      <${Surface} kind="aside">
+        <${Stack} density="compact">
+          <${Text}>${state.status === 'disabled' ? M('disabled') : M('denied')}<//>
+          ${state.status === 'disabled' && html`<${Text}>${M('disabledHint')} <${Text} kind="mono">AIMEAT_METRICS_ENABLED=true<//><//>`}
+        <//>
+      <//>
+    <//>`;
   }
 
   const { prev, curr } = samplesRef.current;
@@ -299,133 +283,95 @@ export default function MetricsTab() {
   const sampleTotal = [...m.values()].reduce((a, s) => a + s.length, 0);
 
   const hist = historyRef.current.real;
-  const cell = (value, label, sub) => html`<div><b>${value}</b><span>${label}</span><small>${sub}</small></div>`;
+  const cell = (value, label, sub) => ({ label, value, note: sub });
+  const bar = (pct) => html`<${Meter} kind="progress" value=${pct} max=${100} label=${pct.toFixed(1) + ' %'} />`;
 
   return html`
-    <div class="og adm-mx">
+    <div>
       ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
 
-      <section class="og-sec og-sec--first">
-        <div class="og-sec-h"><h2 class="poster-section-title">${M('nowTitle')}<small>01</small></h2>
-          <span class="adm-mx-live"><i></i>${M('pollNote')}</span></div>
-
-        <div class="adm-mx-top">
-          <div>
-            <div class="adm-mx-lbl">${M('realUse')}</div>
-            <div class="adm-mx-hero poster-stat-number poster-stat-number--large">${fmtBytes(realUse)}</div>
-            <p class="adm-mx-hero-sub">
-              <b>${fmtBytes(heapUsed)}</b> ${M('heroJs')}<br />
-              <b>${fmtBytes(external)}</b> ${M('heroBuffers')}<br />
-              <b>${fmtBytes(rss)}</b> ${M('heroReserve')}
-            </p>
-          </div>
+      <${Section} title=${M('nowTitle')} count="01" actions=${html`<${Chip} tone="coral">${M('pollNote')}<//>`}>
+        <${Columns} layout="trailing" collapse=${900} density="roomy">
+          <${Stack} density="compact">
+            <${Text} kind="label">${M('realUse')}<//>
+            <${Text} kind="number" size="large">${fmtBytes(realUse)}<//>
+            <${Text} kind="mono" tone="muted">${fmtBytes(heapUsed)} ${M('heroJs')}<//>
+            <${Text} kind="mono" tone="muted">${fmtBytes(external)} ${M('heroBuffers')}<//>
+            <${Text} kind="mono" tone="muted">${fmtBytes(rss)} ${M('heroReserve')}<//>
+          <//>
 
           ${hist.length > 1 ? html`
-            <div>
-              <div class="adm-mx-chart-h">
-                <span class="adm-mx-lbl">${M('chartLabel')}</span>
-                <small>${M('chartNote')}</small>
-              </div>
-              <${Line} points=${hist} at=${at} onPick=${setAt} />
-              <div class="adm-mx-x">
-                <span>${fmtBytes(hist[0])} · ${M('chartOldest')}</span>
-                <span>${fmtBytes(hist[hist.length - 1])} · ${M('chartNow')}</span>
-              </div>
-            </div>
-          ` : html`<div class="adm-mx-wait"><p>${M('chartWait')}</p></div>`}
-        </div>
+            <${Stack} density="compact">
+              <${Stack} direction="wrap" align="between">
+                <${Text} kind="label">${M('chartLabel')}<//>
+                <${Text} kind="mono" tone="muted">${M('chartNote')}<//>
+              <//>
+              <${Line} points=${hist} />
+              <${Stack} direction="wrap" align="between">
+                <${Text} kind="mono" tone="muted">${fmtBytes(hist[0])} · ${M('chartOldest')}<//>
+                <${Text} kind="mono" tone="muted">${fmtBytes(hist[hist.length - 1])} · ${M('chartNow')}<//>
+              <//>
+            <//>
+          ` : html`<${Surface} kind="box"><${Text}>${M('chartWait')}<//><//>`}
+        <//>
 
-        <div class="og-strip">
-          ${cell(cpuPct === null ? '—' : cpuPct.toFixed(1) + ' %', M('cpu'), cpuPct === null ? M('needsTwoSamples') : M('betweenReadings'))}
-          ${cell(lagP50 === null ? '—' : (lagP50 * 1000).toFixed(1) + ' ms', M('eventloop'), lagP99 === null ? '' : `p99 ${(lagP99 * 1000).toFixed(1)} ms`)}
-          ${cell(reqPerSec === null ? '—' : reqPerSec.toFixed(1) + '/s', M('reqRate'), httpTotal === null ? M('needsTwoSamples') : M('sinceBootN', { n: num(Math.round(httpTotal)) }))}
-          ${cell(fmtUptime(uptime), M('uptime'), M('sinceStart'))}
-        </div>
-      </section>
+        <${NumeralBand} tone="plain" size="small" items=${[
+    cell(cpuPct === null ? '—' : cpuPct.toFixed(1) + ' %', M('cpu'), cpuPct === null ? M('needsTwoSamples') : M('betweenReadings')),
+    cell(lagP50 === null ? '—' : (lagP50 * 1000).toFixed(1) + ' ms', M('eventloop'), lagP99 === null ? '' : `p99 ${(lagP99 * 1000).toFixed(1)} ms`),
+    cell(reqPerSec === null ? '—' : reqPerSec.toFixed(1) + '/s', M('reqRate'), httpTotal === null ? M('needsTwoSamples') : M('sinceBootN', { n: num(Math.round(httpTotal)) })),
+    cell(fmtUptime(uptime), M('uptime'), M('sinceStart')),
+  ]} />
+      <//>
 
-      <section class="og-sec">
-        <div class="og-sec-h"><h2 class="poster-section-title">${M('ledgerTitle')}<small>02</small></h2></div>
-        <p class="adm-mx-lead">${M('ledgerIntro')}</p>
-        <div class="adm-mx-rows adm-mx-ledger">
-          <div class="adm-mx-hrow">
-            <span>${M('ledgerPart')}</span><span class="r">${M('value')}</span>
-            <span>${M('shareOf', { max: fmtBytes(rss) })}</span><span>${M('ledgerMeaning')}</span>
-          </div>
-          ${ledgerRows.map(r => html`
-            <div class="adm-mx-row" key=${r.key}>
-              <span class="adm-mx-part">${r.label}</span>
-              <span class="adm-mx-val r">${fmtBytes(r.value)}</span>
-              <span class="adm-mx-bar"><svg width=${r.pct.toFixed(1) + '%'} aria-hidden="true"></svg></span>
-              <span class="adm-mx-what">${r.hint}</span>
-            </div>`)}
-          <div class="adm-mx-row adm-mx-row--sum">
-            <span class="adm-mx-part">${M('rss')}</span>
-            <span class="adm-mx-val r">${fmtBytes(rss)}</span>
-            <span class="adm-mx-bar"><svg width="100%" aria-hidden="true"></svg></span>
-            <span class="adm-mx-what">${M('ledgerRssHint')}</span>
-          </div>
-        </div>
-      </section>
+      <${Section} title=${M('ledgerTitle')} count="02" description=${M('ledgerIntro')}>
+        <${Table} density="compact" collapse=${600} label=${M('ledgerTitle')}
+          headers=${[M('ledgerPart'), M('value'), M('shareOf', { max: fmtBytes(rss) }), M('ledgerMeaning')]}
+          rows=${[
+    ...ledgerRows.map(r => [html`<strong>${r.label}</strong>`, { text: fmtBytes(r.value), align: 'end', mono: true }, bar(r.pct), r.hint]),
+    [html`<strong>${M('rss')}</strong>`, { text: fmtBytes(rss), align: 'end', mono: true }, bar(100), M('ledgerRssHint')],
+  ]} />
+      <//>
 
-      <section class="og-sec">
-        <div class="og-sec-h"><h2 class="poster-section-title">${M('routesTitle')}<small>03</small></h2></div>
-        <p class="adm-mx-lead">${M('routesLead')}</p>
-        <div class="adm-mx-rows adm-mx-routes">
-          <div class="adm-mx-hrow">
-            <span>${M('route')}</span><span class="r">${M('requests')}</span>
-            <span class="r">${M('perSec')}</span><span>${M('shareOf', { max: num(Math.round(httpTotal ?? 0)) })}</span>
-          </div>
-          ${routeRows.map(r => html`
-            <div class="adm-mx-row" key=${r.route}>
-              <span class="adm-mx-route">${r.route}</span>
-              <span class="adm-mx-val r">${num(Math.round(r.n))}</span>
-              <span class="adm-mx-rate r">${r.rate === null ? '—' : r.rate.toFixed(2)}</span>
-              <span class="adm-mx-bar"><svg width=${r.pct.toFixed(1) + '%'} aria-hidden="true"></svg></span>
-            </div>`)}
-        </div>
-        <div class="adm-mx-foot">
-          <span>${M('routesShown', { n: num(routeRows.length), calls: num(Math.round(shownCalls)), total: num(Math.round(httpTotal ?? 0)) })}</span>
-          <span class="adm-mx-note">${M('routesNote')}</span>
-        </div>
-      </section>
+      <${Section} title=${M('routesTitle')} count="03" description=${M('routesLead')}>
+        <${Stack}>
+          <${Table} density="compact" label=${M('routesTitle')}
+            headers=${[M('route'), M('requests'), M('perSec'), M('shareOf', { max: num(Math.round(httpTotal ?? 0)) })]}
+            rows=${routeRows.map(r => [
+    { text: r.route, mono: true },
+    { text: num(Math.round(r.n)), align: 'end' },
+    { text: r.rate === null ? '—' : r.rate.toFixed(2), align: 'end' },
+    bar(r.pct),
+  ])} />
+          <${Stack} direction="wrap" align="between">
+            <${Text} kind="caption" tone="muted">${M('routesShown', { n: num(routeRows.length), calls: num(Math.round(shownCalls)), total: num(Math.round(httpTotal ?? 0)) })}<//>
+            <${Text} kind="mono" tone="muted">${M('routesNote')}<//>
+          <//>
+        <//>
+      <//>
 
-      <section class="og-sec">
-        <div class="og-sec-h"><h2 class="poster-section-title">${M('refusedTitle')}<small>04</small></h2></div>
-        <p class="adm-mx-lead">${M('refusedLead')}</p>
-        <div class="adm-mx-refusals">
-          ${refusals.map(r => html`
-            <div class="adm-mx-rrow" key=${r.key}>
-              <span><b>${num(r.n)}</b><span class="adm-mx-rname">${r.name}</span></span>
-              <span class="adm-mx-rwhy">${r.why}</span>
-              <span class="adm-mx-rmetric">${r.metric}</span>
-            </div>`)}
+      <${Section} title=${M('refusedTitle')} count="04" description=${M('refusedLead')}>
+        <div>
+          ${refusals.map(r => html`<${ListRow} key=${r.key} name=${r.name} detail=${r.why} detailKind="text"
+            value=${html`<${Stack} density="compact" align="end">
+              <${Text} kind="number" size="small">${num(r.n)}<//>
+              <${Text} kind="mono" tone="muted">${r.metric}<//>
+            <//>`} />`)}
         </div>
-      </section>
+      <//>
 
-      <section class="og-sec">
-        <div class="og-sec-h"><h2 class="poster-section-title">${M('allMetrics')}<small>05</small></h2>
-          <div class="og-doors"><a class="og-door" href="/v1/metrics" target="_blank" rel="noopener">${M('openScrape')}</a></div></div>
-        <p class="adm-mx-lead">${M('allLead')}</p>
-        <div class="adm-mx-find">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"></circle><path d="M16 16 L21 21"></path></svg>
-          <input type="search" value=${filter} onInput=${e => setFilter(e.target.value)} placeholder=${M('filterPh')} />
+      <${Section} title=${M('allMetrics')} count="05" description=${M('allLead')}
+        actions=${html`<${Action} href="/v1/metrics" target="_blank">${M('openScrape')}<//>`}>
+        <${Toolbar} label=${M('allMetrics')}
+          search=${{ ariaLabel: M('filterPh'), placeholder: M('filterPh'), value: filter, onInput: e => setFilter(e.target.value) }} />
+        <div>
+          ${allRows.map((r, i) => html`<${ListRow} key=${r.name + i} density="compact" name=${r.name}
+            detail=${r.labelText || null} value=${r.value % 1 === 0 ? num(r.value) : r.value.toFixed(3)} />`)}
         </div>
-        <div class="adm-mx-rows adm-mx-raw">
-          <div class="adm-mx-hrow">
-            <span>${M('metric')}</span><span>${M('labels')}</span><span class="r">${M('value')}</span>
-          </div>
-          ${allRows.map((r, i) => html`
-            <div class="adm-mx-row" key=${r.name + i}>
-              <span class="adm-mx-name">${r.name}</span>
-              <span class="adm-mx-labels">${r.labelText}</span>
-              <span class="adm-mx-val r">${r.value % 1 === 0 ? num(r.value) : r.value.toFixed(3)}</span>
-            </div>`)}
-        </div>
-        <div class="adm-mx-foot">
-          <span>${M('allShown', { n: num(allRows.length), total: num(sampleTotal) })}</span>
-          <span class="adm-mx-note">${M('allNote')}</span>
-        </div>
-      </section>
+        <${Stack} direction="wrap" align="between">
+          <${Text} kind="caption" tone="muted">${M('allShown', { n: num(allRows.length), total: num(sampleTotal) })}<//>
+          <${Text} kind="mono" tone="muted">${M('allNote')}<//>
+        <//>
+      <//>
     </div>
   `;
 }

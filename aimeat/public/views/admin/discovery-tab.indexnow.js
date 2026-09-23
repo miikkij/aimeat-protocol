@@ -16,6 +16,9 @@
  *   the plan dialog
  * @usage <${DiscoveryInstant} status=${status} onChanged=${load} />
  * @version-history
+ *   v1.2.0 -- 2026-09-22 -- Composed from the shared component set: rows, the send box as an aside,
+ *     the last notices as timeline rows, the plan in the shared dialog with the addresses in a
+ *     scrolling code surface; no sheet of its own.
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v1.1.0 — 2026-09-13 — Compose section headings from the shared poster B1 shape.
  *   v1.0.1 — 2026-09-13 — The plan dialog is the large size and its actions sit in its footer.
@@ -27,7 +30,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { Badge, useToast, Toast, Row, when } from './shared.js';
-import { Modal } from '/components/Modal.js';
+import { Section, Columns, Stack, Text, Action, Chip, ListRow, Surface, Dialog } from '/components/poster-parts.js';
 import * as adminService from '/js/services/admin.js';
 import { swallowed } from '/js/swallowed.js';
 
@@ -57,14 +60,13 @@ function runChip(run) {
 /** One line of the log: when, how many, on how many hosts, the answer, what it covered, who sent it. */
 function RunLine({ run }) {
   const who = run.by ? S('instant.runBy', { who: run.by }) : S('instant.runAuto');
-  return html`
-    <div class="adm-disc-run">
-      <span>${when(run.at)}</span>
-      <b>${S('instant.runCount', { n: run.urlCount, hosts: run.hosts })}</b>
-      <span>${run.status ?? S('instant.noAnswer')}${run.failed.length ? ` · ${S('instant.runFailed', { n: run.failed.length })}` : ''}</span>
-      <span>${S('now.scope_' + (run.scope || 'app'))}</span>
-      <span>${who}</span>
-    </div>`;
+  return html`<${ListRow} density="compact" time=${when(run.at)}
+    name=${S('instant.runCount', { n: run.urlCount, hosts: run.hosts })}
+    detail=${[
+      `${run.status ?? S('instant.noAnswer')}${run.failed.length ? ` · ${S('instant.runFailed', { n: run.failed.length })}` : ''}`,
+      S('now.scope_' + (run.scope || 'app')),
+      who,
+    ].join(' · ')} />`;
 }
 
 export function DiscoveryInstant({ status, onChanged }) {
@@ -120,18 +122,14 @@ export function DiscoveryInstant({ status, onChanged }) {
   const wholeSent = !!everything.last_sent_at;
 
   return html`
-    <section class="og-sec" id="adm-disc-03">
+    <${Section} id="adm-disc-03" title=${S('instant.title')} count="03" description=${S('instant.lead')}
+      actions=${can ? html`<${Action} disabled=${!!sending} onClick=${() => announce('pages')}>${S('instant.onlyPages', { n: status.sitemap.page_count })}<//>` : null}>
       ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
-      <div class="og-sec-h"><h2 class="poster-section-title">${S('instant.title')}<small>03</small></h2>
-        <div class="og-doors">
-          ${can ? html`<button type="button" class="og-door og-door--quiet" disabled=${!!sending} onClick=${() => announce('pages')}>${S('instant.onlyPages', { n: status.sitemap.page_count })}</button>` : null}
-        </div></div>
-      <p class="adm-disc-lead">${S('instant.lead')}</p>
 
-      <div class="adm-disc-two">
+      <${Columns} layout="leading" collapse=${900} density="roomy">
         <div>
           ${Row({ title: S('instant.keyFile'), why: keyWhy, chip: keyChip,
-            value: ix.key_url ? html`<a class="og-door og-door--quiet" href=${ix.key_url} target="_blank" rel="noopener">${shortKeyPath(ix.key_url)}</a>` : '—' })}
+            value: ix.key_url ? html`<${Action} kind="text" href=${ix.key_url} target="_blank">${shortKeyPath(ix.key_url)}<//>` : '—' })}
           ${Row({ title: S('instant.onPublish'), why: S('instant.onPublishWhy'),
             chip: html`<${Badge} type=${ix.auto ? 'healthy' : 'muted'} label=${ix.auto ? S('instant.on') : S('instant.off')} />`,
             value: 'AIMEAT_SEO_INDEXNOW_AUTO' })}
@@ -141,40 +139,44 @@ export function DiscoveryInstant({ status, onChanged }) {
             chip: html`<${Badge} type=${wholeSent ? 'healthy' : 'watch'} label=${wholeSent ? S('instant.sent') : S('instant.neverSent')} />`,
             value: S('instant.wholeVal', { n: everything.url_count, hosts: everything.host_count }), last: true })}
         </div>
-        <div>
-          <div class="og-box poster-aside poster-aside--small">
-            <span class="og-box-label">${S('instant.boxLabel')}</span>
-            ${!ix.key_configured ? html`
-              <div class="adm-disc-box-body">${S('instant.noKeyBox')}</div>
-              <div class="adm-disc-box-acts"><a class="og-door og-door--quiet" href="https://www.bing.com/indexnow" target="_blank" rel="noopener">${S('instant.getKey')}</a></div>`
-            : off ? html`<div class="adm-disc-box-body">${S('instant.offBox')}</div>`
-            : html`
-              <div class="adm-disc-box-body">${S('instant.boxBody', { n: everything.url_count, pages: status.sitemap.page_count })}</div>
-              <div class="adm-disc-box-acts">
-                <button type="button" class="og-slab" disabled=${!!sending || everything.url_count === 0} onClick=${() => announce('all')}>
-                  ${sending === 'all' ? S('instant.sending') : S('instant.send', { n: everything.url_count })}
-                </button>
-                <button type="button" class="og-door og-door--quiet" onClick=${openPlan}>${S('instant.seeList')}</button>
-              </div>
-              <p class="adm-disc-note">${S('instant.boxNote')}</p>`}
-          </div>
+        <${Stack}>
+          <${Surface} kind="aside">
+            <${Stack}>
+              <${Text} kind="label">${S('instant.boxLabel')}<//>
+              ${!ix.key_configured ? html`
+                <${Text}>${S('instant.noKeyBox')}<//>
+                <${Stack} direction="wrap" align="center"><${Action} href="https://www.bing.com/indexnow" target="_blank">${S('instant.getKey')}<//><//>`
+              : off ? html`<${Text}>${S('instant.offBox')}<//>`
+              : html`
+                <${Text}>${S('instant.boxBody', { n: everything.url_count, pages: status.sitemap.page_count })}<//>
+                <${Stack} direction="wrap" align="center">
+                  <${Action} kind="primary" disabled=${!!sending || everything.url_count === 0} onClick=${() => announce('all')}>
+                    ${sending === 'all' ? S('instant.sending') : S('instant.send', { n: everything.url_count })}
+                  <//>
+                  <${Action} onClick=${openPlan}>${S('instant.seeList')}<//>
+                <//>
+                <${Text} kind="caption" tone="muted">${S('instant.boxNote')}<//>`}
+            <//>
+          <//>
           ${ix.runs.length > 0 ? html`
-            <div class="adm-disc-runs">
-              <div class="adm-disc-lbl">${S('instant.runs')}</div>
+            <div>
+              <${Text} kind="label">${S('instant.runs')}<//>
               ${ix.runs.map((run) => html`<${RunLine} key=${run.at} run=${run} />`)}
             </div>` : null}
-        </div>
-      </div>
-
-      <${Modal} open=${planOpen} onClose=${() => setPlanOpen(false)} title=${S('instant.planTitle')} size="lg"
-        footer=${plan && html`
-          <button type="button" class="og-door og-door--quiet" onClick=${() => setPlanOpen(false)}>${S('instant.planClose')}</button>
-          <button type="button" class="og-slab" disabled=${!!sending || !can} onClick=${() => announce('all')}>${S('instant.planSend', { n: plan.url_count })}</button>`}>
-        ${plan && html`
-          <div class="adm-disc-plan-hosts">
-            ${plan.hosts.map((h_) => html`<span key=${h_.host} class="adm-disc-fchip">${h_.host.replace(/^https?:\/\//, '')} · ${h_.url_count}</span>`)}
-          </div>
-          <div class="adm-disc-plan-urls">${plan.urls.map((u) => html`<div key=${u}>${u}</div>`)}</div>`}
+        <//>
       <//>
-    </section>`;
+
+      <${Dialog} open=${planOpen} onClose=${() => setPlanOpen(false)} title=${S('instant.planTitle')} size="large"
+        actions=${plan && html`
+          <${Action} onClick=${() => setPlanOpen(false)}>${S('instant.planClose')}<//>
+          <${Action} kind="primary" disabled=${!!sending || !can} onClick=${() => announce('all')}>${S('instant.planSend', { n: plan.url_count })}<//>`}>
+        ${plan && html`
+          <${Stack}>
+            <${Stack} direction="wrap" density="compact">
+              ${plan.hosts.map((h_) => html`<${Chip} key=${h_.host}>${h_.host.replace(/^https?:\/\//, '')} · ${h_.url_count}<//>`)}
+            <//>
+            <${Surface} kind="code" height="scroll">${plan.urls.join('\n')}<//>
+          <//>`}
+      <//>
+    <//>`;
 }

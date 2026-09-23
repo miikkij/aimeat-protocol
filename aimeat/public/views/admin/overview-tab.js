@@ -10,6 +10,9 @@
  *   config side by side with the words that take you to their pages.
  * @structure OverviewTab({ data, switchPage }) — status section · numeral strip · economy + config
  * @version-history
+ *   v3.0.0 -- 2026-09-22 -- Composed from the shared component set: sections, the metric rows, the
+ *     numeral band and the key-value rows are the set's parts, so the page follows the theme and has
+ *     no classes of its own. The status word takes the chip tones (danger red, watch coral).
  *   v2.2.0 -- 2026-09-13 -- Compose the three section headings from the shared B1 shape.
  *   v2.1.0 — 2026-08-31 — The numbers explain themselves (canvas "AIMEAT Hallinnan kolme sivua"):
  *     a meaning sentence under every health metric, the alarm count said in words, the strip
@@ -23,8 +26,12 @@ import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { num, fmtUp, Badge, EconRow } from './shared.js';
+import { num, fmtUp, Badge, EconRow, Row, Empty } from './shared.js';
+import { Section, Columns, Stack, Text, NumeralBand, Action } from '/components/poster-parts.js';
 import { apiGet } from '/js/api.js';
+
+/** The tone of the big status word: the same reading the zone chips use. */
+const STATUS_TONE = { danger: 'danger', critical: 'danger', watch: 'coral' };
 
 export default function OverviewTab(props) {
   const { data, switchPage } = props;
@@ -49,7 +56,7 @@ export default function OverviewTab(props) {
   }, []);
 
   const d = data.dash;
-  if (!d) return html`<div class="empty">${t('dashboard.loading')}</div>`;
+  if (!d) return html`<${Empty} text=${t('dashboard.loading')} />`;
 
   const h_ = d.health;
   const c = d.counts;
@@ -60,68 +67,56 @@ export default function OverviewTab(props) {
   // follows, its zone, and the value with the crossed threshold when it is over the line.
   const thresholdOf = (metric) => w.find(x => x.metric === metric)?.threshold || null;
   const metricRow = (metric, labelKey, whyKey, obj) => html`
-    <div class="adm-mrow" key=${metric}>
-      <span><b>${t('dashboard.' + labelKey)}</b><span class="adm-why">${t('dashboard.' + whyKey)}</span></span>
-      <span><${Badge} type=${obj.zone} /></span>
-      <span class="adm-mval">${obj.value}${thresholdOf(metric) ? ' · ' + thresholdOf(metric) : ''}</span>
-    </div>`;
+    <${Row} key=${metric} title=${t('dashboard.' + labelKey)} why=${t('dashboard.' + whyKey)}
+      chip=${html`<${Badge} type=${obj.zone} />`}
+      value=${html`<${Text} kind="mono">${obj.value}${thresholdOf(metric) ? ' · ' + thresholdOf(metric) : ''}<//>`} />`;
 
   const alertLine = w.length === 0 ? t('dashboard.ovAlertsNone')
     : w.length === 1 ? t('dashboard.ovAlertsOne')
       : t('dashboard.ovAlertsMany', { n: w.length });
 
-  const cell = (page, value, label, sub) => html`
-    <button type="button" onClick=${() => switchPage(page)}>
-      <b>${value}</b><span>${label}</span>${sub ? html`<small>${sub}</small>` : null}
-    </button>`;
+  const cell = (page, value, label, sub) => ({ id: page, value, label, note: sub || undefined, onClick: () => switchPage(page) });
+  const door = (page, key) => html`<${Action} onClick=${() => switchPage(page)}>${t(key)}<//>`;
 
-  return html`
-    <div class="og">
-      <section class="og-sec">
-        <div class="og-sec-h"><h2 class="poster-section-title">${t('dashboard.nodeHealth')}<small>01</small></h2>
-          <div class="og-doors"><button type="button" class="og-door og-door--quiet" onClick=${() => switchPage('economy')}>${t('dashboard.ovToEconomy')}</button></div></div>
-        <div class="adm-ov-grid">
-          <div>
-            <div class="adm-ov-status ${h_.status}">${h_.status}</div>
-            <p class="adm-alert-line">${alertLine}</p>
-            <div class="adm-ov-up">${t('dashboard.uptime')}: ${fmtUp(d.uptime_seconds)} · ${t('dashboard.storage')}: ${d.storage_type}</div>
-          </div>
-          <div>
-            ${metricRow('burn_mint_ratio', 'healthBurnMintRatio', 'ovWhyBurnMint', h_.burn_mint_ratio)}
-            ${metricRow('agent_churn_rate_30d', 'healthAgentChurn', 'ovWhyChurn', h_.agent_churn_rate_30d)}
-            ${metricRow('work_expiry_rate_30d', 'healthWorkExpiry', 'ovWhyExpiry', h_.work_expiry_rate_30d)}
-            ${metricRow('dispute_rate_30d', 'healthDisputeRate', 'ovWhyDispute', h_.dispute_rate_30d)}
-          </div>
+  return html`<${Stack}>
+    <${Section} title=${t('dashboard.nodeHealth')} count="01" actions=${door('economy', 'dashboard.ovToEconomy')}>
+      <${Columns} layout="trailing" collapse=${900}>
+        <${Stack} density="compact">
+          <${Text} kind="number" size="large" tone=${STATUS_TONE[h_.status] || 'plain'}>${h_.status}<//>
+          <${Text}>${alertLine}<//>
+          <${Text} kind="mono" tone="muted">${t('dashboard.uptime')}: ${fmtUp(d.uptime_seconds)} · ${t('dashboard.storage')}: ${d.storage_type}<//>
+        <//>
+        <div>
+          ${metricRow('burn_mint_ratio', 'healthBurnMintRatio', 'ovWhyBurnMint', h_.burn_mint_ratio)}
+          ${metricRow('agent_churn_rate_30d', 'healthAgentChurn', 'ovWhyChurn', h_.agent_churn_rate_30d)}
+          ${metricRow('work_expiry_rate_30d', 'healthWorkExpiry', 'ovWhyExpiry', h_.work_expiry_rate_30d)}
+          ${metricRow('dispute_rate_30d', 'healthDisputeRate', 'ovWhyDispute', h_.dispute_rate_30d)}
         </div>
-      </section>
+      <//>
+    <//>
 
-      <div class="og-strip">
-        ${cell('owners', num(c.owners), t('dashboard.registeredOwners'))}
-        ${cell('agents', num(c.agents), t('dashboard.registeredAgents'), c.active_agents_24h + ' ' + t('dashboard.active24h'))}
-        ${cell('boards', num(c.boards), t('dashboard.activeBoards'), t('dashboard.publishedActions') + ': ' + num(c.actions))}
-        ${cell('chatInstances', num(c.chat_instances || 0), t('dashboard.activeChatSessions'))}
-        ${cell('agent-tasks', activeTaskCount != null ? num(activeTaskCount) : '–', t('dashboard.agentTasksActiveTasks'))}
-        ${cell('sharing-groups', sharingGroupCount != null ? num(sharingGroupCount) : '–', t('dashboard.sharingGroupsTotalCount'))}
-      </div>
+    <${NumeralBand} tone="plain" items=${[
+      cell('owners', num(c.owners), t('dashboard.registeredOwners')),
+      cell('agents', num(c.agents), t('dashboard.registeredAgents'), c.active_agents_24h + ' ' + t('dashboard.active24h')),
+      cell('boards', num(c.boards), t('dashboard.activeBoards'), t('dashboard.publishedActions') + ': ' + num(c.actions)),
+      cell('chatInstances', num(c.chat_instances || 0), t('dashboard.activeChatSessions')),
+      cell('agent-tasks', activeTaskCount != null ? num(activeTaskCount) : '–', t('dashboard.agentTasksActiveTasks')),
+      cell('sharing-groups', sharingGroupCount != null ? num(sharingGroupCount) : '–', t('dashboard.sharingGroupsTotalCount')),
+    ]} />
 
-      <div class="adm-two">
-        <section class="og-sec">
-          <div class="og-sec-h"><h2 class="poster-section-title">${t('dashboard.economyToday')}<small>02</small></h2>
-            <div class="og-doors"><button type="button" class="og-door og-door--quiet" onClick=${() => switchPage('economy')}>${t('dashboard.ovToEconomy')}</button></div></div>
-          <${EconRow} label=${t('dashboard.transactionsToday')} value=${num(e.transactions_today)} />
-          <${EconRow} label=${t('dashboard.morselsMovedToday')} value=${num(e.morsels_transacted_today)} />
-          <${EconRow} label=${t('dashboard.inCirculation')} value=${num(e.total_morsels_in_circulation)} />
-          <${EconRow} label=${t('dashboard.burnedToday')} value=${num(e.burned_today)} />
-        <//>
-        <section class="og-sec">
-          <div class="og-sec-h"><h2 class="poster-section-title">${t('dashboard.quickConfig')}<small>03</small></h2>
-            <div class="og-doors"><button type="button" class="og-door og-door--quiet" onClick=${() => switchPage('config')}>${t('dashboard.ovToConfig')}</button></div></div>
-          <${EconRow} label=${t('dashboard.port')} value=${d.config.port} />
-          <${EconRow} label=${t('dashboard.jwtTtl')} value=${d.config.jwt_ttl_seconds + 's'} />
-          <${EconRow} label=${t('dashboard.keyedBrowse')} value=${d.config.keyed_browse_enabled ? t('dashboard.enabled') : t('dashboard.disabled')} />
-          <${EconRow} label=${t('dashboard.welcomeBonus')} value=${num(e.welcome_bonus)} />
-        <//>
-      </div>
-    </div>
-  `;
+    <${Columns} layout="equal" collapse=${900}>
+      <${Stack}><${Section} title=${t('dashboard.economyToday')} count="02" actions=${door('economy', 'dashboard.ovToEconomy')}>
+        <${EconRow} label=${t('dashboard.transactionsToday')} value=${num(e.transactions_today)} />
+        <${EconRow} label=${t('dashboard.morselsMovedToday')} value=${num(e.morsels_transacted_today)} />
+        <${EconRow} label=${t('dashboard.inCirculation')} value=${num(e.total_morsels_in_circulation)} />
+        <${EconRow} label=${t('dashboard.burnedToday')} value=${num(e.burned_today)} />
+      <//><//>
+      <${Stack}><${Section} title=${t('dashboard.quickConfig')} count="03" actions=${door('config', 'dashboard.ovToConfig')}>
+        <${EconRow} label=${t('dashboard.port')} value=${d.config.port} />
+        <${EconRow} label=${t('dashboard.jwtTtl')} value=${d.config.jwt_ttl_seconds + 's'} />
+        <${EconRow} label=${t('dashboard.keyedBrowse')} value=${d.config.keyed_browse_enabled ? t('dashboard.enabled') : t('dashboard.disabled')} />
+        <${EconRow} label=${t('dashboard.welcomeBonus')} value=${num(e.welcome_bonus)} />
+      <//><//>
+    <//>
+  <//>`;
 }

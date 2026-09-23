@@ -50,11 +50,11 @@
       "note": "How to talk; nothing in the code decides it."
     },
     "node:aimeat-offering-choices": {
-      "reviewedOn": "2026-09-19",
+      "reviewedOn": "2026-09-23",
       "watches": [
         "aimeat/public/views/chat/parts.js"
       ],
-      "digest": "sha256:3aae77ae48bec81917e28635",
+      "digest": "sha256:8963d4413959937616b0a369",
       "note": "The choices format is rendered by this file."
     },
     "node:aimeat-paying-for-the-ai": {
@@ -360,7 +360,7 @@
     },
     "node:aimeat-activating-a-person": {},
     "node:aimeat-offering-choices": {
-      "aimeat/public/views/chat/parts.js": "12c8246c22bf138a"
+      "aimeat/public/views/chat/parts.js": "c85f747c67e1ad38"
     },
     "node:aimeat-paying-for-the-ai": {
       "aimeat/src/services/ai-completion.ts": "81e90001f1305d31"

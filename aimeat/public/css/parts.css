@@ -8,6 +8,10 @@
  * @usage Linked in spa.html after every other stylesheet, so a part wins over a page sheet rule of
  *   the same weight.
  * @version-history
+ *   v1.1.0 -- 2026-09-22 -- What the admin pages and the app catalog asked for: sortable, toned and
+ *     clamped table cells and a stacked table that keeps chips and numbers to the left; chips that
+ *     keep a short word whole; notes in a band that wrap; toned meters; a coral filter; mono row
+ *     names and headings for machine keys; the conversation; a section held in a slot keeps its gap.
  *   v1.0.0 -- 2026-09-22 -- Split out of poster.css as the stage-two branch wrote it
  *     (cc-jouni-codex-styles-0912, fee2e0f17), so the shapes and the parts each have one file; the
  *     menu part added (one menu for the site's three).
@@ -47,6 +51,58 @@ body:has(.poster-page) .page-content { background: var(--bg); }
 .poster-page-body[data-rail="yes"][data-rail-side="leading"] { grid-template-columns: 240px minmax(0, 1fr); }
 .poster-page-menu { display: none; margin-bottom: 1rem; }
 .poster-page-main, .poster-page-rail { min-width: 0; }
+/* The workspace page: the window under the top bar is the page; the rail and the main column each
+   scroll on their own, and a Surface height="fill" takes what the column has left. */
+.poster-page[data-layout="workspace"] {
+  display: flex; flex-direction: column; height: var(--workspace-height, calc(100dvh - var(--nav-height, 56px)));
+  min-height: 320px; padding-top: 1.25rem; padding-bottom: 0;
+}
+.poster-page[data-layout="workspace"] > .poster-masthead { flex: none; margin-bottom: 1rem; }
+.poster-page[data-layout="workspace"] > .poster-page-body { flex: 1 1 auto; min-height: 0; grid-template-rows: minmax(0, 1fr); }
+.poster-page[data-layout="workspace"] :is(.poster-page-main, .poster-page-rail) { display: flex; flex-direction: column; min-height: 0; }
+.poster-page[data-layout="workspace"] .poster-page-rail { overflow-y: auto; }
+.poster-page[data-layout="workspace"] .poster-page-main > * { flex: none; }
+/* Columns that fill a workspace column: each pane scrolls on its own (a list beside its thread). */
+.poster-columns-frame[data-fill="yes"],
+.poster-page[data-layout="workspace"] .poster-page-main > .poster-columns-frame[data-fill="yes"] { flex: 1 1 auto; min-height: 0; }
+.poster-columns-frame[data-fill="yes"] > .poster-columns { height: 100%; grid-template-rows: minmax(0, 1fr); align-items: stretch; }
+.poster-columns-frame[data-fill="yes"] > .poster-columns > * { display: flex; flex-direction: column; min-height: 0; overflow-y: auto; }
+.poster-columns-frame[data-fill="yes"] > .poster-columns > * > * { flex: none; }
+.poster-columns-frame[data-fill="yes"] > .poster-columns > * > .poster-surface[data-height="fill"] { flex: 1 1 auto; }
+/* A floor, so a short window still shows some of the thread; the column around it scrolls instead. */
+.poster-page[data-layout="workspace"] .poster-page-main > .poster-surface[data-height="fill"],
+.poster-surface[data-height="fill"] { flex: 1 1 auto; min-height: 8rem; overflow-y: auto; }
+/* A rendered page or email on its own light ground, whatever the theme (it was written for paper). */
+.poster-surface.poster-stage[data-density] { color-scheme: light; background: Canvas; padding: 0; overflow: hidden; box-sizing: border-box; }
+.poster-stage > iframe { display: block; width: 100%; height: 32rem; border: 0; }
+.poster-stage[data-height="scroll"] > iframe { height: 26rem; }
+/* The phone stage is 390px inside its frame (border-box), centred, and full width in a flex column too. */
+.poster-stage[data-width="phone"] { width: 100%; max-width: calc(390px + 2 * var(--rule-thing)); margin-inline: auto; align-self: center; }
+.poster-surface.poster-picture[data-density] { padding: 0; overflow: hidden; }
+.poster-picture > img { display: block; width: 100%; height: auto; }
+/* A surface that stays under the top of its scroller (a save row over a long form). */
+.poster-surface[data-sticky="yes"] { position: sticky; top: 0; z-index: 5; }
+/* Printing a page prints its content: the rail, the phone menu and the site bar stay on screen. */
+@media print {
+  .poster-page-rail, .poster-page-menu, .topnav { display: none !important; }
+  .poster-page-body[data-rail="yes"] { grid-template-columns: minmax(0, 1fr) !important; }
+}
+/* A meter inside a table cell keeps a readable length. */
+.data-table.poster-table td .poster-meter { min-width: 8rem; }
+/* A short mono text after a one-line input: the input takes the room, the suffix sits on its line. */
+.poster-field-suffixed { display: flex; align-items: baseline; gap: .4rem; min-width: 0; }
+.poster-field-suffixed > input { flex: 1 1 auto; min-width: 0; }
+.poster-field-suffix { flex: none; font-family: var(--font-mono); font-size: .85rem; color: var(--text-dim); }
+/* On a phone the workspace is the whole screen above the keyboard, and the site's bar steps aside. */
+@media (max-width: 760px) {
+  .poster-page[data-layout="workspace"] {
+    position: fixed; inset: 0; z-index: 1000; max-width: none; height: var(--workspace-avail, 100dvh);
+    padding: .75rem .75rem calc(.5rem + env(safe-area-inset-bottom, 0px)); background: var(--bg);
+  }
+  .poster-page[data-layout="workspace"] > .poster-masthead { margin-bottom: .6rem; }
+  body:has(.poster-page[data-layout="workspace"]) { overflow: clip; }
+  body:has(.poster-page[data-layout="workspace"]) .topnav { display: none; }
+}
 .poster-masthead { display: flex; align-items: center; gap: 1.5rem; margin-bottom: 2rem; }
 .poster-masthead-words { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .poster-masthead .poster-page-title { margin: 0 0 .6rem; }
@@ -58,6 +114,11 @@ body:has(.poster-page) .page-content { background: var(--bg); }
 .poster-section-part:first-child { margin-top: 0; }
 .poster-section-part[data-density="compact"] { margin-top: 2rem; }
 .poster-section-part[data-density="roomy"] { margin-top: 5rem; }
+/* A section held alone in a wrapper (a mount point a script fills, a slot with an id) is first
+   child of that wrapper, not of the page: the slot marks it, and the gap between sections stays. */
+[data-section-slot]:not(:first-child) > .poster-section-part:first-child { margin-top: 4.5rem; }
+[data-section-slot]:not(:first-child) > .poster-section-part[data-density="compact"]:first-child { margin-top: 2rem; }
+[data-section-slot]:not(:first-child) > .poster-section-part[data-density="roomy"]:first-child { margin-top: 5rem; }
 /* The section's head: the slab (and its count) left, the section's actions right, one row. */
 .poster-section-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .8rem 1.4rem; margin-bottom: 1.4rem; }
 .poster-section-head > .poster-section-title { margin: 0; }
@@ -122,6 +183,12 @@ body:has(.poster-page) .page-content { background: var(--bg); }
 .poster-meter { box-sizing: border-box; height: 8px; }
 /* The fill is an SVG: as an inline element it would sit on the text line, below the 8px box. */
 .poster-meter > svg { display: block; }
+/* A meter's tone names a level (the readiness bands): sun is the default fill. */
+.poster-meter[data-tone="coral"] rect { fill: var(--accent); }
+.poster-meter[data-tone="ink"] rect { fill: var(--text); }
+.poster-meter[data-tone="muted"] rect { fill: var(--text-dim); }
+/* A number that is off or zero on purpose, quieter than its neighbours. */
+.poster-numeral-band dd[data-tone="muted"] { opacity: .45; }
 .poster-numeral-band dd .poster-text-action { font-weight: inherit; }
 .poster-rail-title { margin: 0 0 .6rem; font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: .75rem; letter-spacing: .06em; text-transform: uppercase; color: var(--sun); }
 .poster-rail ol { list-style: none; margin: 0; padding: 0; }
@@ -130,20 +197,41 @@ body:has(.poster-page) .page-content { background: var(--bg); }
 .poster-rail a:hover, .poster-rail a[aria-current] { color: var(--sun); }
 .poster-rail a > span:nth-child(2) { flex: 1; min-width: 0; }
 .poster-rail-number, .poster-rail small { font-family: var(--font-mono); font-size: .7rem; }
+/* A group label inside an index: the small sun label, once above its entries. */
+.poster-rail li.poster-rail-group { margin: .9rem 0 .2rem; font-family: var(--font-mono); font-size: .66rem; letter-spacing: .08em; text-transform: uppercase; color: var(--sun); }
+.poster-rail li.poster-rail-group:first-child { margin-top: 0; }
+.poster-rail[data-density="compact"] a { padding: .15rem 0; font-size: .8rem; }
 .poster-list-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; gap: .6rem 1rem; align-items: center; padding: 1rem 0; border-bottom: var(--rule-hair) solid var(--border); }
-.poster-list-row:not(:has(.poster-list-mark)) { grid-template-columns: minmax(0, 1fr) auto auto; }
+.poster-list-row:not(:has(> .poster-list-mark)) { grid-template-columns: minmax(0, 1fr) auto auto; }
 .poster-list-row[data-density="compact"] { padding-block: .6rem; }
 .poster-list-row[data-density="roomy"] { padding-block: 1.4rem; }
 .poster-list-row[data-selected="yes"] { background: var(--sun); color: var(--on-sun); }
 .poster-list-name { min-width: 0; overflow-wrap: anywhere; }
 .poster-list-name > strong { font-weight: var(--font-poster-strong-weight); }
+/* A heading that is a machine key: mono, as written. */
+.poster-copy[data-kind="heading"][data-face="mono"] { font-family: var(--font-mono); text-transform: none; letter-spacing: 0; font-size: 1.4rem; overflow-wrap: anywhere; }
+/* A dense list clamps its preview to one line. */
+.poster-list-row[data-preview="yes"][data-preview-lines="1"] .poster-list-name > small { -webkit-line-clamp: 1; }
+/* Actions that show while the row is hovered or focused; always on a touch screen. */
+@media (hover: hover) {
+  .poster-list-row[data-actions="hover"] > .poster-list-actions { opacity: 0; transition: opacity .12s; }
+  .poster-list-row[data-actions="hover"]:is(:hover, :focus-within) > .poster-list-actions { opacity: 1; }
+}
+/* An icon action that is a switch shows its state: on is the sun. */
+.poster-icon-action[role="switch"][aria-checked="true"] { background: var(--sun); color: var(--on-sun); border-color: var(--text); }
+/* A name that is a machine key (a memory key, a room id) is written as it is, in mono. */
+.poster-list-row[data-name="mono"] .poster-list-name > :is(strong, .poster-text-action) { font-family: var(--font-mono); font-size: .9rem; overflow-wrap: anywhere; }
+/* A filter that warns (failing, under a threshold) says so in coral until it is chosen. */
+.poster-tab[data-tone="coral"]:not(.is-on) { color: var(--accent); border-color: var(--accent); }
 .poster-list-name > small { display: block; margin-top: .25rem; font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); }
 /* A second line that is a sentence (detailKind text, or a preview: a message, a note) reads in the
    body face, not mono; a preview is also clamped to two lines. */
 .poster-list-row[data-detail="text"] .poster-list-name > small { font-family: var(--font-showroom-body); font-size: .9rem; line-height: 1.5; }
 .poster-list-row[data-preview="yes"] .poster-list-name > small { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
 .poster-list-mark { display: flex; width: 36px; height: 36px; align-items: center; justify-content: center; }
-.poster-list-mark:not(.poster-list-lead) > *, .poster-list-mark:not(.poster-list-lead) svg { width: 100%; height: 100%; object-fit: cover; }
+.poster-list-mark:not(.poster-list-lead) > :not(.poster-chip), .poster-list-mark:not(.poster-list-lead) svg { width: 100%; height: 100%; object-fit: cover; }
+/* A chip as the mark (a kind word such as Instruction): the mark sizes to it instead of the square. */
+.poster-list-mark:has(> .poster-chip) { width: auto; min-width: 36px; height: auto; justify-content: flex-start; }
 /* The trail (Crumbs): mono, earlier steps coral links, the place you are in ink, a slash between. */
 .poster-crumbs ol { display: flex; flex-wrap: wrap; gap: .1rem .5rem; margin: 0 0 .3rem; padding: 0; list-style: none; font-family: var(--font-mono); font-size: .8rem; color: var(--text); }
 .poster-crumbs li + li::before { content: '/'; margin-right: .5rem; color: var(--text-dim); }
@@ -152,6 +240,10 @@ body:has(.poster-page) .page-content { background: var(--bg); }
 /* Chips (Chip): the square mono chip from poster.css in three tones. */
 .poster-chip[data-tone="sun"] { background: var(--sun); color: var(--on-sun); }
 .poster-chip[data-tone="muted"] { border-color: var(--border); color: var(--text-dim); }
+/* A chip keeps a short word whole in a narrow value column ("None" never becomes "No/ne"); a word
+   longer than the column (a scope such as exchange:beneficiary) breaks only when it cannot fit.
+   break-word, unlike anywhere, does not shrink the column to single letters. */
+.poster-chip { flex-shrink: 0; max-width: 100%; overflow-wrap: break-word; }
 /* An index rail that also holds actions (a view switch, a door back): its words take the ink
    ground's colours, and the chosen view sits on the sun. */
 .poster-rail[data-kind="index"] :is(.poster-action, .poster-tab, .poster-text-action) { color: inherit; border-color: currentColor; white-space: normal; text-align: left; }
@@ -188,6 +280,7 @@ body:has(.poster-page) .page-content { background: var(--bg); }
 .data-table.poster-table td.mono { white-space: nowrap; }
 .data-table.poster-table td[data-align="end"] { text-align: right; font-variant-numeric: tabular-nums; }
 .poster-table-frame { min-width: 0; container: poster-table / inline-size; }
+@container poster-table (max-width: 900px) { .poster-table-wrap[data-collapse="900"] { --stack: 1; } }
 @container poster-table (max-width: 640px) { .poster-table-wrap[data-collapse="640"] { --stack: 1; } }
 @container poster-table (max-width: 600px) { .poster-table-wrap[data-collapse="600"] { --stack: 1; } }
 @container poster-table (max-width: 560px) { .poster-table-wrap[data-collapse="560"] { --stack: 1; } }
@@ -197,6 +290,19 @@ body:has(.poster-page) .page-content { background: var(--bg); }
   .poster-table-wrap[data-collapse="640"] tr { padding: .6rem 0; border-bottom: var(--rule-hair) solid var(--border); }
   .poster-table-wrap[data-collapse="640"] .data-table.poster-table td { display: grid; grid-template-columns: 8rem minmax(0, 1fr); gap: .8rem; padding: .2rem 0; border: 0; white-space: normal; overflow-wrap: anywhere; }
   .poster-table-wrap[data-collapse="640"] td[data-label]::before { content: attr(data-label); color: var(--accent); font-family: var(--font-showroom-body); font-size: .72rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+  .poster-table-wrap[data-collapse="640"] .data-table.poster-table td[data-align="end"] { text-align: left; }
+  .poster-table-wrap[data-collapse="640"] td > :is(.poster-chip, .poster-action, .poster-text-action, .poster-slab) { justify-self: start; }
+  .poster-table-wrap[data-collapse="640"] .data-table.poster-table td:not([data-label]) { grid-template-columns: minmax(0, 1fr); }
+}
+@container poster-table (max-width: 900px) {
+  .poster-table-wrap[data-collapse="900"] :is(table, thead, tbody, tr, td) { display: block; }
+  .poster-table-wrap[data-collapse="900"] thead { display: none; }
+  .poster-table-wrap[data-collapse="900"] tr { padding: .6rem 0; border-bottom: var(--rule-hair) solid var(--border); }
+  .poster-table-wrap[data-collapse="900"] .data-table.poster-table td { display: grid; grid-template-columns: 8rem minmax(0, 1fr); gap: .8rem; padding: .2rem 0; border: 0; white-space: normal; overflow-wrap: anywhere; }
+  .poster-table-wrap[data-collapse="900"] td[data-label]::before { content: attr(data-label); color: var(--accent); font-family: var(--font-showroom-body); font-size: .72rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+  .poster-table-wrap[data-collapse="900"] .data-table.poster-table td[data-align="end"] { text-align: left; }
+  .poster-table-wrap[data-collapse="900"] td > :is(.poster-chip, .poster-action, .poster-text-action, .poster-slab) { justify-self: start; }
+  .poster-table-wrap[data-collapse="900"] .data-table.poster-table td:not([data-label]) { grid-template-columns: minmax(0, 1fr); }
 }
 @container poster-table (max-width: 600px) {
   .poster-table-wrap[data-collapse="600"] :is(table, thead, tbody, tr, td) { display: block; }
@@ -204,6 +310,9 @@ body:has(.poster-page) .page-content { background: var(--bg); }
   .poster-table-wrap[data-collapse="600"] tr { padding: .6rem 0; border-bottom: var(--rule-hair) solid var(--border); }
   .poster-table-wrap[data-collapse="600"] .data-table.poster-table td { display: grid; grid-template-columns: 8rem minmax(0, 1fr); gap: .8rem; padding: .2rem 0; border: 0; white-space: normal; overflow-wrap: anywhere; }
   .poster-table-wrap[data-collapse="600"] td[data-label]::before { content: attr(data-label); color: var(--accent); font-family: var(--font-showroom-body); font-size: .72rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+  .poster-table-wrap[data-collapse="600"] .data-table.poster-table td[data-align="end"] { text-align: left; }
+  .poster-table-wrap[data-collapse="600"] td > :is(.poster-chip, .poster-action, .poster-text-action, .poster-slab) { justify-self: start; }
+  .poster-table-wrap[data-collapse="600"] .data-table.poster-table td:not([data-label]) { grid-template-columns: minmax(0, 1fr); }
 }
 @container poster-table (max-width: 560px) {
   .poster-table-wrap[data-collapse="560"] :is(table, thead, tbody, tr, td) { display: block; }
@@ -211,7 +320,42 @@ body:has(.poster-page) .page-content { background: var(--bg); }
   .poster-table-wrap[data-collapse="560"] tr { padding: .6rem 0; border-bottom: var(--rule-hair) solid var(--border); }
   .poster-table-wrap[data-collapse="560"] .data-table.poster-table td { display: grid; grid-template-columns: 8rem minmax(0, 1fr); gap: .8rem; padding: .2rem 0; border: 0; white-space: normal; overflow-wrap: anywhere; }
   .poster-table-wrap[data-collapse="560"] td[data-label]::before { content: attr(data-label); color: var(--accent); font-family: var(--font-showroom-body); font-size: .72rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+  .poster-table-wrap[data-collapse="560"] .data-table.poster-table td[data-align="end"] { text-align: left; }
+  .poster-table-wrap[data-collapse="560"] td > :is(.poster-chip, .poster-action, .poster-text-action, .poster-slab) { justify-self: start; }
+  .poster-table-wrap[data-collapse="560"] .data-table.poster-table td:not([data-label]) { grid-template-columns: minmax(0, 1fr); }
 }
+/* A conversation (Thread, Message, DayDivider): theirs in the ink frame at the left, mine on the sun
+   at the right, square like every other box; a draft is dashed, a reply still being written has the
+   coral edge. */
+.poster-thread { display: flex; flex-direction: column; gap: .9rem; min-width: 0; }
+.poster-day { align-self: center; margin: .3rem 0; font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); }
+.poster-message { display: flex; flex-direction: column; gap: .3rem; align-self: flex-start; align-items: flex-start; max-width: 85%; min-width: 0; }
+.poster-message[data-side="mine"] { align-self: flex-end; align-items: flex-end; }
+.poster-message-bubble {
+  box-sizing: border-box; max-width: 100%; min-width: 0; padding: .7rem .9rem;
+  border: var(--rule-thing) solid var(--text); border-radius: var(--shape-radius); background: var(--card-bg);
+  font-size: .95rem; line-height: 1.5; overflow-wrap: anywhere;
+}
+.poster-message[data-side="mine"] .poster-message-bubble { background: var(--sun); border-color: var(--sun); color: var(--on-sun); }
+.poster-message[data-side="mine"] .poster-message-bubble :is(a, p, li, strong, em, h1, h2, h3, h4, h5, h6, code, .poster-copy, small) { color: var(--on-sun); }
+.poster-message[data-state="draft"] .poster-message-bubble { border-style: dashed; border-color: var(--text); }
+.poster-message[data-state="live"] .poster-message-bubble { border-left: var(--rule-edge) solid var(--accent); }
+.poster-message[data-flash="yes"] .poster-message-bubble { box-shadow: var(--offset-s) var(--offset-s) 0 var(--accent); }
+.poster-message-who { display: block; margin-bottom: .2rem; font-size: .64rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+.poster-message[data-side="mine"] .poster-message-who { color: var(--on-sun); }
+.poster-message-quote { margin: 0 0 .5rem; padding-left: .6rem; border-left: var(--rule-thing) solid currentColor; font-size: .85rem; opacity: .8; }
+.poster-message-body { min-width: 0; }
+.poster-message-body .md-body > :first-child { margin-top: 0; }
+.poster-message-body .md-body > :last-child { margin-bottom: 0; }
+.poster-message-body img { max-width: 100%; }
+/* A table or code block in a reply scrolls sideways inside the bubble rather than breaking words. */
+.poster-message-body :is(table, pre) { display: block; max-width: 100%; overflow-x: auto; }
+.poster-message-body table :is(th, td) { overflow-wrap: normal; word-break: normal; }
+.poster-message-meta { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin-top: .4rem; font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); }
+.poster-message[data-side="mine"] .poster-message-meta { color: var(--on-sun); }
+.poster-message-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem .9rem; font-size: .8rem; }
+.poster-message-actions :is(.poster-action, .poster-text-action) { font-size: .75rem; }
+@media (max-width: 600px) { .poster-message { max-width: 92%; } }
 /* A code block inside another surface is part of that thing: no second frame, the quiet ground. */
 .poster-surface .poster-surface.poster-code { border: 0; margin: 0; background: var(--bg-dim); }
 /* The numeral row (StatRow): the shape is poster.css .poster-stat; the light and the coral number. */
@@ -261,18 +405,35 @@ button.poster-stat { width: 100%; background: none; border-left: 0; border-right
 @media (prefers-reduced-motion: reduce) { .poster-list-marker[data-live="yes"] { animation: none; } }
 .poster-list-value { font-family: var(--font-mono); font-size: .85rem; text-align: right; overflow-wrap: anywhere; }
 .poster-list-actions { display: flex; gap: 1rem; flex-wrap: wrap; justify-content: flex-end; }
-.poster-list-body { grid-column: 1 / -1; min-width: 0; }
+/* The open body spans the row; width 0 with min-width 100 % keeps it out of the column sizing, so a
+   wide record inside does not squeeze the value column. */
+.poster-list-body { grid-column: 1 / -1; width: 0; min-width: 100%; }
 .poster-key-value > .kv-row { display: grid; grid-template-columns: 12rem minmax(0, 1fr); gap: 1rem; padding: .8rem 0; border-bottom: var(--rule-hair) solid var(--border); align-items: baseline; font-size: 1rem; }
 .poster-key-value .kv-label { font-family: var(--font-showroom-body); color: var(--accent); font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .1em; }
 .poster-key-value .kv-value { min-width: 0; text-align: left; overflow-wrap: anywhere; font-weight: var(--font-poster-strong-weight); }
+/* In a narrow place (a side panel, a phone) the label sits above its value instead of squeezing it. */
+.poster-key-value { container: poster-kv / inline-size; }
+@container poster-kv (max-width: 26rem) {
+  .poster-key-value > .kv-row { grid-template-columns: minmax(0, 1fr); gap: .25rem; }
+}
 .poster-table-wrap { max-width: 100%; overflow-x: auto; }
 .poster-table-wrap:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .data-table.poster-table { width: 100%; border-collapse: collapse; background: transparent; font-size: .9rem; }
 .data-table.poster-table :is(th, td) { padding: .8rem 1rem .8rem 0; text-align: left; border-bottom: var(--rule-hair) solid var(--border); vertical-align: top; }
 .data-table.poster-table th { font-family: var(--font-showroom-body); color: var(--accent); font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .1em; }
+/* A sortable column head: the head's own words as a button, the sorted one underlined in ink. */
+.data-table.poster-table .data-table-sort { all: unset; cursor: pointer; font: inherit; color: inherit; letter-spacing: inherit; text-transform: inherit; border-bottom: var(--rule-thing) solid transparent; }
+.data-table.poster-table .data-table-sort[data-on="yes"] { color: var(--text); border-bottom-color: var(--text); }
+.data-table.poster-table .data-table-sort:hover { color: var(--text); }
+.data-table.poster-table .data-table-sort:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.data-table.poster-table tr[data-tone="muted"] { opacity: .55; }
+.data-table.poster-table tr[data-tone="coral"] td { color: var(--accent); }
+.data-table.poster-table tr[data-tone="danger"] td { color: var(--danger); }
+.data-table.poster-table td[data-clamp="yes"] { max-width: 22rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .poster-table-wrap[data-density="compact"] .poster-table :is(th, td) { padding-block: .5rem; }
 .poster-table-wrap[data-density="roomy"] .poster-table :is(th, td) { padding-block: 1.1rem; }
 .poster-toolbar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 1rem; margin: 1.2rem 0; }
+.poster-toolbar[data-sticky="yes"] { position: sticky; top: 0; z-index: 5; padding: .6rem 0; background: var(--bg); border-bottom: var(--rule-hair) solid var(--border); }
 .poster-toolbar > .poster-field { flex: 1 1 16rem; min-width: 0; }
 .poster-filters { display: flex; flex-wrap: wrap; gap: .8rem; }
 .poster-toolbar-count { margin-left: auto; font-family: var(--font-mono); font-size: .8rem; white-space: nowrap; }
@@ -281,6 +442,8 @@ button.poster-stat { width: 100%; background: none; border-left: 0; border-right
   box-sizing: border-box; width: 100%; margin: 0; border: 0; border-bottom: var(--rule-heavy) solid var(--text); border-radius: var(--shape-radius);
   background: transparent; padding: .45rem 0; font-family: var(--font-showroom-body); font-size: 1rem; font-weight: 600; color: var(--text); box-shadow: none;
 }
+/* A field that holds code or a key is written in the mono face. */
+.poster-field[data-mono="yes"] :is(input, textarea) { font-family: var(--font-mono); font-size: .85rem; }
 .poster-field > textarea { border: var(--rule-thing) solid var(--text); padding: .6rem .75rem; background: var(--card-bg); font-size: .95rem; line-height: 1.5; resize: vertical; }
 .poster-field > :is(input, select, textarea):focus { border-color: var(--accent); outline: none; }
 .poster-field > :is(input, textarea)::placeholder { color: var(--text-dim); font-weight: 600; }
@@ -305,7 +468,7 @@ button.poster-stat { width: 100%; background: none; border-left: 0; border-right
 .poster-numeral-band dl > div { display: flex; flex-direction: column; gap: .4rem; min-width: 0; }
 .poster-numeral-band dt { font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .1em; }
 .poster-numeral-band dd { order: -1; color: inherit; margin: 0; }
-.poster-numeral-band dt > small { display: block; margin-top: .3rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-mono); font-size: .72rem; font-weight: 400; letter-spacing: 0; text-transform: none; opacity: .8; }
+.poster-numeral-band dt > small { display: block; margin-top: .3rem; overflow-wrap: break-word; font-family: var(--font-mono); font-size: .72rem; font-weight: 400; letter-spacing: 0; text-transform: none; opacity: .8; }
 .poster-numeral-band dd[data-tone="coral"] { color: var(--accent); }
 .poster-numeral-band[data-size="small"] { gap: 1rem; margin: 1rem 0; }
 .poster-numeral-band[data-size="small"] dl { gap: .8rem 1.4rem; }
@@ -351,7 +514,7 @@ button.poster-stat { width: 100%; background: none; border-left: 0; border-right
 @media (max-width: 600px) {
   .poster-list-row { grid-template-columns: auto minmax(0, 1fr) auto; }
   .poster-list-actions { grid-column: 1 / -1; justify-content: flex-start; }
-  .poster-list-row:not(:has(.poster-list-mark)) { grid-template-columns: minmax(0, 1fr) auto; }
+  .poster-list-row:not(:has(> .poster-list-mark)) { grid-template-columns: minmax(0, 1fr) auto; }
   .poster-list-value { max-width: 8rem; }
   /* A timeline row gives its time and marker their own line above the name, so a long value does
      not squeeze the name to a few letters. */

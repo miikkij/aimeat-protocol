@@ -24,6 +24,8 @@
  *   - SsoTab (default) — the read, the empty/connected branch, and the per-company detail
  * @usage Mounted by the admin dashboard tab router (views/admin.js).
  * @version-history
+ *   2026-09-22 -- Composed from the shared component set (Section, Columns, Surface, CopyAction):
+ *     no page sheet and no class of its own, so a theme change reaches it.
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v2.1.0 — 2026-09-13 — Compose existing section headings from shared poster B1.
  *   v2.0.0 — 2026-09-12 — The poster face. One read that says whether anybody can sign in, an
@@ -36,10 +38,9 @@ import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { useViewCSS } from '/components/useViewCSS.js';
 import { onLiveUpdate } from '/lib/live-updates.js';
 import { Spinner, ErrorBox, useToast, Toast, Row } from './shared.js';
-import { CopyButton } from '/components/CopyButton.js';
+import { Section, Columns, Stack, Surface, CopyAction, Text, scrollToId } from '/components/poster-parts.js';
 import { useConfirm } from '/components/Modal.js';
 import { getNodeUrl } from '/js/services/auth.js';
 import { getSsoConnections, createSsoConnection } from '/js/services/admin.js';
@@ -61,31 +62,27 @@ const S = (key, params) => t('admin.sso.' + key, params);
 function AskAi({ node, count }) {
   const paste = buildSsoPrompt({ url: getNodeUrl(), enabled: node.enabled, count });
   return html`
-    <section class="og-sec" id="adm-sso-03">
-      <div class="og-sec-h">
-        <h2 class="poster-section-title">${S('ai.title')}<small>03</small></h2>
-        <div class="og-doors">
-          <${CopyButton} text=${paste} label=${S('ai.copy')} className="og-door og-door--quiet" />
-        </div>
-      </div>
-      <div class="adm-sso-ai">
-        <div>
-          <p class="adm-sso-lead">${S('ai.lead')}</p>
-          ${Row({ title: S('ai.see'), why: S('ai.seeWhy'), chip: null, value: 'aimeat_admin_sso_list' })}
-          ${Row({ title: S('ai.connect'), why: S('ai.connectWhy'), chip: null, value: 'aimeat_admin_sso_create' })}
-          ${Row({ title: S('ai.metadata'), why: S('ai.metadataWhy'), chip: null, value: 'aimeat_admin_sso_idp_metadata' })}
-          ${Row({ title: S('ai.token'), why: S('ai.tokenWhy'), chip: null, value: 'aimeat_admin_sso_scim_token', last: true })}
-        </div>
-        <div class="og-box poster-aside poster-aside--small">
-          <span class="og-box-label">${S('ai.label')}</span>
-          <div class="adm-sso-paste">${paste}</div>
-        </div>
-      </div>
-    </section>`;
+    <${Section} id="adm-sso-03" title=${S('ai.title')} count="03"
+      actions=${html`<${CopyAction} text=${paste} label=${S('ai.copy')} />`}>
+      <${Columns} collapse=${900}>
+        <${Stack} density="compact">
+          <${Text}>${S('ai.lead')}<//>
+          <div>
+            ${Row({ title: S('ai.see'), why: S('ai.seeWhy'), chip: null, value: 'aimeat_admin_sso_list' })}
+            ${Row({ title: S('ai.connect'), why: S('ai.connectWhy'), chip: null, value: 'aimeat_admin_sso_create' })}
+            ${Row({ title: S('ai.metadata'), why: S('ai.metadataWhy'), chip: null, value: 'aimeat_admin_sso_idp_metadata' })}
+            ${Row({ title: S('ai.token'), why: S('ai.tokenWhy'), chip: null, value: 'aimeat_admin_sso_scim_token' })}
+          </div>
+        <//>
+        <${Surface} kind="aside" density="compact"><${Stack} density="compact">
+          <${Text} kind="label">${S('ai.label')}<//>
+          <${Text} lines>${paste}<//>
+        <//><//>
+      <//>
+    <//>`;
 }
 
 export default function SsoTab() {
-  useViewCSS('/css/views/admin-sso.css');
   const [data, setData] = useState(null);
   const [failed, setFailed] = useState(null);
   const [selected, setSelected] = useState(null);
@@ -126,7 +123,7 @@ export default function SsoTab() {
     } finally { setBusy(false); }
   }, [load, showErr]);
 
-  const toSection = (n) => document.getElementById('adm-sso-' + n)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const toSection = (n) => scrollToId('adm-sso-' + n);
 
   if (failed && !data) return html`<${ErrorBox} message=${failed} />`;
   if (!data) return html`<${Spinner} text=${S('loading')} />`;
@@ -134,32 +131,32 @@ export default function SsoTab() {
   const { node, connections } = data;
 
   if (selected) {
-    return html`<div class="adm-sso">
+    return html`<${Stack}>
       ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
       <${ConnectionDetail} id=${selected} node=${node} onBack=${() => setSelected(null)}
         onChanged=${load} showErr=${showErr} confirm=${confirm} />
       <${ConfirmUI} />
-    </div>`;
+    <//>`;
   }
 
   // Nothing connected: the offer, what to gather, and the paste. No numbered rows and no strip of
   // zeros — there is nothing to report yet, and a row of noughts is what made the old page read as
   // a dead end rather than an invitation.
   if (connections.length === 0) {
-    return html`<div class="adm-sso">
+    return html`<${Stack}>
       ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
       <${Nothing} node=${node} onConnect=${() => toSection('02')} />
       <${BeforeYouStart} node=${node} onCreate=${create} busy=${busy} />
       <${AskAi} node=${node} count=${0} />
       <${ConfirmUI} />
-    </div>`;
+    <//>`;
   }
 
-  return html`<div class="adm-sso">
+  return html`<${Stack}>
     ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
     <${RightNow} data=${data} onConnect=${() => toSection('02')} toSection=${toSection} />
     <${Organisations} data=${data} onOpen=${setSelected} onCreate=${create} busy=${busy} />
     <${AskAi} node=${node} count=${connections.length} />
     <${ConfirmUI} />
-  </div>`;
+  <//>`;
 }
