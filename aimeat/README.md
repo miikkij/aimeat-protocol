@@ -504,6 +504,27 @@ Some AI work is a decision rather than a text: which folder a mail belongs in, w
 - **Your data is cleaned before it leaves.** E-mail addresses, phone numbers, Finnish personal identity codes, bank account numbers, street addresses and the names of your contacts are removed on the way out and put back into the answer. What else an app sends is that app's responsibility, and the publish check tells its builder where it departs from the rules.
 - **Every decision is on the record.** The model version, the questions, the answers with their probabilities, the thresholds they were compared with and whether a person reviewed it, so you can later ask what an AI decided about a record and why.
 - **You choose who pays.** Your own TypeSafe key, or the server's from your AI allowance, each testable with one press. An app has to name TypeSafe in its data map before it may send anything.
+- **You choose who answers.** Jev is the default decision provider, not the only one. Any service that answers the same System One request can be a provider: yours, with your own address and key, or one the node's operator runs. You pick a default, give an agent its own, or fix the provider in a rule. Each provider carries its own limits (how many options, how much text), and a question it cannot carry is refused by name before anything is sent. Every decision records which provider answered.
+
+#### Local decision models
+
+Three open models answer the same questions on your own machine: **Laya** (Apache 2.0, reads Finnish content), **von** (Apache 2.0) and **jeff** (MIT, GLiFormer). A local model needs no key and costs nothing, and the content does not leave the machine; personal data is still removed first. [`tools/systemone/`](tools/systemone/) runs all three with one command, on a CPU or a GPU:
+
+```bash
+cd tools/systemone/docker
+JEFF_API_KEYS=devkey docker compose up -d --build                                  # CPU
+JEFF_API_KEYS=devkey docker compose -f compose.yaml -f compose.gpu.yaml up -d --build  # GPU
+```
+
+Then the node needs three settings, and a restart:
+
+```bash
+AIMEAT_DECIDE_BUILTIN_PROVIDERS=laya,von,jeff
+AIMEAT_DECIDE_PROVIDER_EGRESS=http://127.0.0.1:8801,http://127.0.0.1:8802,http://127.0.0.1:8803
+AIMEAT_DECIDE_JEFF_KEY=devkey
+```
+
+`AIMEAT_DECIDE_PROVIDER_EGRESS` lets the decision call, and nothing else, reach exactly those addresses on the node's own machine, so a public node can run local models safely. The weights are inside the images, and a container starts with no network. On four CPU cores Laya and jeff answer in well under a second; on a GPU every model answers in tens of milliseconds. The [tools/systemone README](tools/systemone/README.md) covers Windows without Docker, a node on the same Docker network, and measuring a model's limits.
 
 Apps use the [`aimeat-decide`](https://aimeat.io/v1/libs/aimeat-decide.js) library, agents the `aimeat_decide` tools over MCP, and the skill `node:aimeat-decide` holds the recipes: triage, routing by confidence, scoring, picking among candidates, checking another model's answer.
 
@@ -704,6 +725,7 @@ aimeat-protocol/
 ├── python/aimeat-crewai/     ★ pip-installable CrewAI liaison/connector (own PyPI line)
 ├── aimeat-desktop/           ★ Tauri desktop app, the AIMEAT Personal Node installer
 ├── tools/aimeat-openhands/   preconfigured OpenHands app-builder (fetches /v1/prompts/build-app)
+├── tools/systemone/          local decision models (Laya, von, jeff): Docker Compose, Windows script
 ├── packages/                 hosted app source (agent-kanban, digital-signage and others) + build scripts
 ├── assets/                   brand/design assets, logos, screenshots, README videos
 └── docs/                     spec + guides: v4.0 Core/Platform, coding-guidelines/, known_gaps and more

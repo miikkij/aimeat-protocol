@@ -2,6 +2,19 @@
   "_format": "Node change log, newest entry FIRST. Served at /changelog.json, rendered by public/views/landing-changelog.js. Add an entry in the same change that ships the thing. Fields: date (YYYY-MM-DD), version (optional, the node version it shipped in), kind (feature|fix|security|notice), title and body. title/body are either a plain string (shown to everyone) or { en, fi } when the wording deserves both languages. Write what a person gets, not what the code does.",
   "entries": [
     {
+      "date": "2026-09-24",
+      "version": "3.19.0",
+      "kind": "feature",
+      "title": {
+        "en": "Decision providers: choose who answers your decisions, and run a decision model on your own machine",
+        "fi": "Päätösmallin tarjoajat: valitse, kuka vastaa päätöksiisi, ja aja päätösmallia omalla koneellasi"
+      },
+      "body": {
+        "en": "TypeSafe's Jev is no longer the only model that can answer your decision questions. Any service that answers the same request can be a decision provider: one the server's operator runs, or your own with its own address and key. You choose a default, give an agent its own, or fix the provider in a rule, and every decision records which provider answered. Each provider says what it can carry (how many options, how much text), and a question it cannot carry is refused by name before anything is sent. Three open models now run as local decision models on your own machine: Laya, which also reads Finnish content, von and jeff. A local model needs no key and costs nothing, and your content does not leave the machine; personal data is still removed first. The repository starts all three with one Docker command, on a processor or a graphics card, with the model inside the image. The server's operator lists the exact addresses of these models, and the server may reach those addresses for decisions and nothing else, so a public server can run them safely.",
+        "fi": "TypeSafen Jev ei ole enää ainoa malli, joka vastaa päätöskysymyksiisi. Päätösmallin tarjoaja voi olla mikä tahansa palvelu, joka vastaa samaan pyyntöön: palvelimen ylläpitäjän ajama tai oma tarjoajasi omalla osoitteella ja avaimella. Valitset oletuksen, annat agentille oman tarjoajan tai kiinnität tarjoajan sääntöön. Jokaiseen päätökseen tallentuu, mikä tarjoaja vastasi. Jokainen tarjoaja kertoo, mitä se pystyy käsittelemään: montako vaihtoehtoa ja kuinka paljon tekstiä. Jos kysymys ylittää rajan, palvelin hylkää sen nimeltä ennen kuin mitään lähtee. Kolme avointa mallia toimii nyt paikallisena päätösmallina omalla koneellasi: Laya, joka lukee myös suomenkielistä sisältöä, von ja jeff. Paikallinen malli ei tarvitse avainta eikä maksa mitään, eikä sisältösi lähde koneelta. Henkilötiedot poistetaan silti ensin. Repossa on valmis Docker-komento, joka käynnistää kaikki kolme prosessorilla tai näytönohjaimella, ja malli on kuvan sisällä. Palvelimen ylläpitäjä luettelee näiden mallien tarkat osoitteet, ja palvelin saa ottaa yhteyden niihin vain päätöksiä varten. Siksi myös julkinen palvelin voi ajaa niitä turvallisesti."
+      }
+    },
+    {
       "date": "2026-09-20",
       "version": "3.18.0",
       "kind": "feature",

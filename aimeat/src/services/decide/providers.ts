@@ -123,7 +123,7 @@ const LOCAL_STATEMENT = 'The scrubbed state goes to a decision model on this mac
  * The local examples an operator may switch on. The numbers are MEASURED, not taken from the
  * projects' pages: RTX 4090, 2026-09-23, 12 support tickets with a known topic per option count,
  * a known fact placed after growing filler for the context. The ports are the ones
- * docs/internal/systemone/systemone.ps1 gives them. `contextTokens` is in the node's own estimate
+ * tools/systemone gives them (docker/compose.yaml and systemone.ps1; its README says how to run them). `contextTokens` is in the node's own estimate
  * (a quarter of the JSON length), which counts more tokens than any of these models' tokenizers do.
  */
 export const BUILTIN_PROVIDERS: Readonly<Record<string, Omit<DecisionProvider, 'source'>>> = Object.freeze({

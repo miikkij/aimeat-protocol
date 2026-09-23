@@ -1,0 +1,40 @@
+# The three open System One decision models, on the ports the node's built-in providers expect
+# (laya 8801, von 8802, jeff 8803), bound to 127.0.0.1 only.
+#
+#   CPU:  JEFF_API_KEYS=devkey docker compose up -d --build
+#   GPU:  JEFF_API_KEYS=devkey docker compose -f compose.yaml -f compose.gpu.yaml up -d --build
+#   One:  JEFF_API_KEYS=devkey docker compose up -d --build laya
+#   Stop: docker compose down
+#
+# See ../README.md for connecting a node to them.
+name: aimeat-systemone
+
+services:
+  laya:
+    build: { context: ./laya, args: { TORCH: "${SYSTEMONE_TORCH:-cpu}" } }
+    image: "aimeat-systemone/laya:0.3.11-${SYSTEMONE_TORCH:-cpu}"
+    environment:
+      LAYA_DEVICE: "${SYSTEMONE_DEVICE:-cpu}"
+    ports: ["127.0.0.1:${LAYA_PORT:-8801}:8000"]
+    restart: unless-stopped
+
+  von:
+    build: { context: ./von, args: { TORCH: "${SYSTEMONE_TORCH:-cpu}" } }
+    image: "aimeat-systemone/von:1.1.1-${SYSTEMONE_TORCH:-cpu}"
+    environment:
+      VON_DEVICE: "${SYSTEMONE_DEVICE:-cpu}"
+    ports: ["127.0.0.1:${VON_PORT:-8802}:8000"]
+    restart: unless-stopped
+
+  jeff:
+    build: { context: ./jeff, args: { TORCH: "${SYSTEMONE_TORCH:-cpu}" } }
+    image: "aimeat-systemone/jeff:0.1.0-${SYSTEMONE_TORCH:-cpu}"
+    environment:
+      # The bearer the node sends as AIMEAT_DECIDE_JEFF_KEY. Required: no key is built in.
+      JEFF_API_KEYS: "${JEFF_API_KEYS:?set JEFF_API_KEYS, the key the node sends as AIMEAT_DECIDE_JEFF_KEY}"
+      JEFF_DEVICE: "${SYSTEMONE_DEVICE:-cpu}"
+      # On a CPU, onnx + int8 is jeff's own fast arm. The CUDA image uses torch.
+      JEFF_BACKEND: "${JEFF_BACKEND:-onnx}"
+      JEFF_QUANT: "${JEFF_QUANT:-int8}"
+    ports: ["127.0.0.1:${JEFF_PORT:-8803}:8000"]
+    restart: unless-stopped

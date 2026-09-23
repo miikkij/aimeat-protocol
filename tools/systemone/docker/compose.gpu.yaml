@@ -1,0 +1,27 @@
+# GPU override: CUDA images and an NVIDIA GPU for each model. Needs the NVIDIA container runtime.
+#
+#   JEFF_API_KEYS=devkey docker compose -f compose.yaml -f compose.gpu.yaml up -d --build
+#
+# It sets the variables compose.yaml reads, so nothing else needs to be exported.
+x-gpu: &gpu
+  deploy:
+    resources:
+      reservations:
+        devices: [{ driver: nvidia, count: all, capabilities: [gpu] }]
+
+services:
+  laya:
+    <<: *gpu
+    build: { context: ./laya, args: { TORCH: cu128 } }
+    image: aimeat-systemone/laya:0.3.11-cu128
+    environment: { LAYA_DEVICE: cuda }
+  von:
+    <<: *gpu
+    build: { context: ./von, args: { TORCH: cu128 } }
+    image: aimeat-systemone/von:1.1.1-cu128
+    environment: { VON_DEVICE: cuda }
+  jeff:
+    <<: *gpu
+    build: { context: ./jeff, args: { TORCH: cu128 } }
+    image: aimeat-systemone/jeff:0.1.0-cu128
+    environment: { JEFF_DEVICE: cuda, JEFF_BACKEND: torch, JEFF_QUANT: fp32 }
