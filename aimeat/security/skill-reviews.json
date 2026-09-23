@@ -10,7 +10,7 @@
         "aimeat/src/services/decide/settings.ts",
         "aimeat/src/services/app-decide-posture.ts"
       ],
-      "digest": "sha256:b4768bdff02efe51b0e0a2a4"
+      "digest": "sha256:121a6e2eb23326b66fd59df0"
     },
     "node:aimeat-open-items": {
       "reviewedOn": "2026-09-20",
@@ -521,7 +521,7 @@
     },
     "node:aimeat-decide": {
       "aimeat/src/static/sdk-libs/decide/index.js": "ce7328b35b4223c6",
-      "aimeat/src/services/decide/service.ts": "c6c277f35aba855a",
+      "aimeat/src/services/decide/service.ts": "cfb0f0215bb13b7d",
       "aimeat/src/services/decide/limits.ts": "65c3e881405e3685",
       "aimeat/src/services/decide/settings.ts": "81c5fa8defcab692",
       "aimeat/src/services/app-decide-posture.ts": "65d4966f4b6ff7a8"

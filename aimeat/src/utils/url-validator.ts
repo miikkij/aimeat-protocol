@@ -10,6 +10,11 @@
  *   the request to an internal target.
  * @usage const resp = await safeFetch(url, { method, headers, body });
  * @version-history
+ *   v2.6.0 — 2026-09-23 — `allowOrigins`: the exact origins (scheme, host, port) ONE caller may reach
+ *     although they are private, named by the operator. The decision provider call passes the
+ *     origins in AIMEAT_DECIDE_PROVIDER_EGRESS, so a public node can reach its own model containers
+ *     without AIMEAT_ALLOW_PRIVATE_EGRESS, which opens loopback to every fetch the server makes. A
+ *     redirect to any other origin is checked as before, and link-local is never allowed.
  *   v1.0.0 — pre-2026-06 — Initial single-hop validator.
  *   v2.0.0 — 2026-06-20 — Security (H-3): block-all-resolved-records, CGNAT +
  *     IPv4-mapped-IPv6 + alt-encoding coverage, and add redirect-revalidating
@@ -85,7 +90,18 @@ function blockedIpReason(ipRaw: string): string | null {
   return null;
 }
 
-export async function validateOutboundUrl(urlStr: string): Promise<{ valid: boolean; reason?: string }> {
+/**
+ * Whether an address is link-local (169.254/16, fe80::/10). The cloud metadata service lives there,
+ * so no allowlist opens it: an origin naming one is refused where the list is read and here.
+ */
+export function isLinkLocalHost(host: string): boolean {
+  const h = host.toLowerCase().replace(/^\[|\]$/g, '');
+  return /^169\.254\./.test(h) || /^fe[89ab][0-9a-f]:/.test(h) || /^::ffff:169\.254\./.test(h);
+}
+
+export async function validateOutboundUrl(
+  urlStr: string, opts: { allowOrigins?: readonly string[] } = {},
+): Promise<{ valid: boolean; reason?: string }> {
   let parsed: URL;
   try {
     parsed = new URL(urlStr);
@@ -99,6 +115,12 @@ export async function validateOutboundUrl(urlStr: string): Promise<{ valid: bool
   }
 
   const hostname = parsed.hostname.toLowerCase();
+
+  // An origin the operator named for this one caller: exact scheme, host and port, never a range.
+  // The host is the operator's own word, so neither the private-range check nor DNS applies to it.
+  if (opts.allowOrigins?.includes(parsed.origin) && !isLinkLocalHost(hostname)) {
+    return { valid: true };
+  }
 
   // Loopback egress is allowed only when private egress is permitted. config.ts normalises
   // AIMEAT_ALLOW_PRIVATE_EGRESS from the security profile at boot (`local` default true so a dev
@@ -166,6 +188,12 @@ export interface SafeFetchInit extends RequestInit {
    * Compared case-insensitively; the origin is scheme + host + port.
    */
   sensitiveHeaders?: string[];
+  /**
+   * Exact origins (`http://127.0.0.1:8811`, `http://laya:8000`) this call may reach although they are
+   * private. Named by the operator, never by a user. Each hop is compared on its own, so a redirect
+   * out of the list is checked like any other address.
+   */
+  allowOrigins?: readonly string[];
 }
 
 /**
@@ -195,7 +223,7 @@ export function setOutboundRequestSigner(signer: OutboundRequestSigner | null): 
  * vector — the practically exploitable one — is closed.
  */
 export async function safeFetch(urlStr: string, init: SafeFetchInit = {}): Promise<Response> {
-  const { maxRedirects = 5, sensitiveHeaders = [], ...fetchInit } = init;
+  const { maxRedirects = 5, sensitiveHeaders = [], allowOrigins, ...fetchInit } = init;
   let target = urlStr;
   // The origin the caller's headers were meant for. Once a redirect leaves it, anything the caller
   // named as sensitive is dropped: the SSRF re-validation below proves the new host is not
@@ -220,7 +248,7 @@ export async function safeFetch(urlStr: string, init: SafeFetchInit = {}): Promi
   let body = fetchInit.body;
   let headers = fetchInit.headers;
   for (let hop = 0; hop <= maxRedirects; hop++) {
-    const check = await validateOutboundUrl(target);
+    const check = await validateOutboundUrl(target, allowOrigins ? { allowOrigins } : {});
     if (!check.valid) throw new Error(`Fetch blocked: ${check.reason}`);
     let hopHeaders = headers;
     if (originOf(target) !== firstOrigin) {

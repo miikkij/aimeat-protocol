@@ -5,6 +5,8 @@
  *   redirect re-validation (an allowed host must not be able to 3xx-bounce to an
  *   internal target).
  * @version-history
+ *   v1.2.0 — 2026-09-23 — allowOrigins: exactly the listed origins pass, nothing near them, never
+ *     link-local, and a redirect out of the list is refused.
  *   v1.1.0 — 2026-09-06 — stripTrailingSlashes, including the input that made the regex it replaces
  *     quadratic: a long run of slashes with one character after it, which can never match.
  *   v1.0.0 — 2026-06-20 — Initial creation alongside the H-3 SSRF hardening.
@@ -55,6 +57,40 @@ describe('validateOutboundUrl — blocked literal addresses', () => {
         expect((await validateOutboundUrl('http://127.0.0.1/')).valid).toBe(false);
         process.env.AIMEAT_DEV_MODE = 'true';
         expect((await validateOutboundUrl('http://127.0.0.1/')).valid).toBe(true);
+    });
+});
+
+// The operator's own local decision models: the exact origin one caller may reach, and nothing near it.
+describe('validateOutboundUrl — allowOrigins', () => {
+    const allowOrigins = ['http://127.0.0.1:8811', 'http://172.18.0.5:8000'];
+
+    it('lets through exactly the listed origins, loopback and a Docker network address alike', async () => {
+        expect((await validateOutboundUrl('http://127.0.0.1:8811/v1/systemone', { allowOrigins })).valid).toBe(true);
+        expect((await validateOutboundUrl('http://172.18.0.5:8000/v1/systemone', { allowOrigins })).valid).toBe(true);
+    });
+
+    it('refuses another port, another scheme and another host name for the same machine', async () => {
+        for (const url of ['http://127.0.0.1:8812/', 'https://127.0.0.1:8811/', 'http://localhost:8811/', 'http://127.0.0.2:8811/']) {
+            expect((await validateOutboundUrl(url, { allowOrigins })).valid, url).toBe(false);
+        }
+    });
+
+    it('never opens a link-local address, even when it is listed', async () => {
+        const r = await validateOutboundUrl('http://169.254.169.254/latest/meta-data/', { allowOrigins: ['http://169.254.169.254'] });
+        expect(r.valid).toBe(false);
+    });
+
+    it('is the one call\'s: a call without the list is refused as before', async () => {
+        expect((await validateOutboundUrl('http://127.0.0.1:8811/v1/systemone')).valid).toBe(false);
+    });
+
+    it('checks a redirect out of the list like any other address', async () => {
+        const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+            new Response(null, { status: 307, headers: { location: 'http://127.0.0.1:5432/' } }),
+        );
+        await expect(safeFetch('http://127.0.0.1:8811/v1/systemone', { method: 'GET', allowOrigins })).rejects.toThrow(/Fetch blocked/);
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        expect(fetchMock.mock.calls[0][1]).not.toHaveProperty('allowOrigins');
     });
 });
 

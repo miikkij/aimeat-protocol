@@ -44,6 +44,8 @@
  *   const res = await callSystemOne({ url: 'https://api.typesafe.ai/v1/systemone', key, request, providerName: 'TypeSafe' });
  *   res.answers.topic.choice; // 'billing'
  * @version-history
+ *   v2.1.0 — 2026-09-23 — allowOrigins: the private origins the operator listed for this provider go
+ *     to safeFetch for this call only.
  *   v2.0.0 — 2026-09-23 — The generic System One client (was jev-client.ts): any provider, a null key
  *     for a local one, the provider's name in every message, and an adapter hook for the answer.
  *   v1.0.0 — 2026-09-19 — Initial: the Jev client for AIMEAT.decide (TARGET-080).
@@ -138,7 +140,7 @@ export class SystemOneError extends Error {
 }
 
 /** The fetch seam: safeFetch's signature, narrowed to what this module passes. */
-export type SystemOneFetch = (url: string, init: RequestInit & { sensitiveHeaders?: string[] }) => Promise<Response>;
+export type SystemOneFetch = (url: string, init: RequestInit & { sensitiveHeaders?: string[]; allowOrigins?: readonly string[] }) => Promise<Response>;
 
 /** Arguments to callSystemOne. */
 export interface CallSystemOneArgs {
@@ -150,6 +152,8 @@ export interface CallSystemOneArgs {
   providerName?: string;
   /** The name of an entry in SYSTEMONE_ADAPTERS, for a provider whose answer deviates. */
   adapter?: string;
+  /** Private origins the operator listed for this provider (providers.ts providerAllowOrigins). */
+  allowOrigins?: readonly string[];
   policy?: Partial<SystemOneRetryPolicy>;
   signal?: AbortSignal;
   /** Injection seams for tests. Default: safeFetch from ../../utils/url-validator.js and a real sleep/random/now. */
@@ -305,6 +309,7 @@ export const SYSTEMONE_ADAPTERS: Readonly<Record<string, (body: Record<string, u
 async function attempt(a: {
   url: string; key: string | null; body: string; request: SystemOneRequest; timeoutMs: number; name: string;
   adapter?: (body: Record<string, unknown>) => Record<string, unknown>;
+  allowOrigins?: readonly string[];
   signal?: AbortSignal; fetchImpl: SystemOneFetch; now: () => number; attempts: number;
 }): Promise<SystemOneResponse> {
   const ctl = new AbortController();
@@ -323,6 +328,7 @@ async function attempt(a: {
       body: a.body,
       signal: ctl.signal,
       sensitiveHeaders: ['authorization'],
+      ...(a.allowOrigins?.length ? { allowOrigins: a.allowOrigins } : {}),
     });
     text = await res.text();
   } catch (err) {
@@ -407,7 +413,8 @@ export async function callSystemOne(args: CallSystemOneArgs): Promise<SystemOneR
     try {
       return await attempt({
         url: args.url, key: args.key, body, request: args.request, timeoutMs: policy.attemptTimeoutMs,
-        name, ...(adapter ? { adapter } : {}), signal: args.signal, fetchImpl, now, attempts,
+        name, ...(adapter ? { adapter } : {}), ...(args.allowOrigins ? { allowOrigins: args.allowOrigins } : {}),
+        signal: args.signal, fetchImpl, now, attempts,
       });
     } catch (err) {
       if (!(err instanceof SystemOneError)) throw err;

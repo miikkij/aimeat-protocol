@@ -21,6 +21,8 @@
  *   import { decideDefaults } from './config-decide.js';
  *   const config = { ...decideDefaults(), ... };
  * @version-history
+ *   v1.2.0 — 2026-09-23 — decideProviderEgress: the exact addresses of the operator's own local
+ *     models, reachable without AIMEAT_ALLOW_PRIVATE_EGRESS.
  *   v1.1.0 — 2026-09-23 — Decision providers: the configured provider has an id and a kind, and the
  *     operator may add providers of their own, switch on the built-in examples and name the default.
  *   v1.0.0 — 2026-09-19 — Initial (TARGET-080).
@@ -74,6 +76,13 @@ export interface DecideConfig {
   decideBuiltinProviders: string;
   /** The provider an owner who chose none gets. Empty means `decideProviderId`. */
   decideDefaultProvider: string;
+  /**
+   * The exact origins (`http://127.0.0.1:8801`, `http://laya:8000`) of the operator's own local
+   * models, comma separated. The decision call, and nothing else, may reach them although they are
+   * private, so a public node runs its models without AIMEAT_ALLOW_PRIVATE_EGRESS. Only the node's
+   * providers use it; an owner's own address never does.
+   */
+  decideProviderEgress: string;
 }
 
 /** The decision provider's settings, from the environment. */
@@ -95,5 +104,6 @@ export function decideDefaults(): DecideConfig {
     decideProviders: process.env.AIMEAT_DECIDE_PROVIDERS ?? '',
     decideBuiltinProviders: process.env.AIMEAT_DECIDE_BUILTIN_PROVIDERS ?? '',
     decideDefaultProvider: process.env.AIMEAT_DECIDE_DEFAULT_PROVIDER ?? '',
+    decideProviderEgress: process.env.AIMEAT_DECIDE_PROVIDER_EGRESS ?? '',
   };
 }
