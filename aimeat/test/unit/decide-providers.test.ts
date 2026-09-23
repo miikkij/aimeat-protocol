@@ -5,13 +5,17 @@
  * @description The pure half of the decision providers (services/decide/providers.ts): what a
  *   provider record may say, what it cannot carry, and when a provider on this machine is reachable.
  * @version-history
+ *   v1.2.0 — 2026-09-23 — The operator's egress list: exact origins only, the node's providers only,
+ *     and a listed container address may be local.
  *   v1.1.0 — 2026-09-23 — A refusal names the provider as the page does, says a length in
  *     characters, and carries the fields a page writes it from in its own language.
  *   v1.0.0 — 2026-09-23 — Initial.
  */
 import { afterEach, describe, expect, it } from 'vitest';
+import type { AimeatConfig } from '../../src/config.js';
 import {
-  parseProvider, providerViolations, assertProviderReachable, BUILTIN_PROVIDERS, type DecisionProvider,
+  parseProvider, providerViolations, assertProviderReachable, providerAllowOrigins, providerEgressOrigins,
+  BUILTIN_PROVIDERS, type DecisionProvider,
 } from '../../src/services/decide/providers.js';
 
 const local = (over: Record<string, unknown> = {}) => ({
@@ -88,12 +92,50 @@ describe('assertProviderReachable', () => {
     if (saved.dev === undefined) delete process.env.AIMEAT_DEV_MODE; else process.env.AIMEAT_DEV_MODE = saved.dev;
   });
 
-  it('refuses a provider on this machine by name until private egress is allowed', () => {
-    const laya = { ...BUILTIN_PROVIDERS.laya, source: 'builtin' } as DecisionProvider;
+  const laya = { ...BUILTIN_PROVIDERS.laya, source: 'builtin' } as DecisionProvider;
+  const cfg = (egress: string) => ({ decideProviderEgress: egress }) as AimeatConfig;
+
+  // Changed 2026-09-23 on purpose: the node's own provider is now told the narrow fix (its origin in
+  // AIMEAT_DECIDE_PROVIDER_EGRESS), not the wide one that opens loopback to every fetch.
+  it('refuses a provider on this machine by name, naming the address to list', () => {
     process.env.AIMEAT_ALLOW_PRIVATE_EGRESS = 'false';
     delete process.env.AIMEAT_DEV_MODE;
-    expect(() => assertProviderReachable(laya)).toThrow(/AIMEAT_ALLOW_PRIVATE_EGRESS/);
+    expect(() => assertProviderReachable(laya, cfg(''))).toThrow(/adding http:\/\/127\.0\.0\.1:8801 to AIMEAT_DECIDE_PROVIDER_EGRESS/);
     process.env.AIMEAT_ALLOW_PRIVATE_EGRESS = 'true';
     expect(() => assertProviderReachable(laya)).not.toThrow();
+  });
+
+  it('reaches the node\'s own provider at a listed origin with private egress off', () => {
+    process.env.AIMEAT_ALLOW_PRIVATE_EGRESS = 'false';
+    delete process.env.AIMEAT_DEV_MODE;
+    expect(() => assertProviderReachable(laya, cfg('http://127.0.0.1:8801'))).not.toThrow();
+    expect(providerAllowOrigins(laya, cfg('http://127.0.0.1:8801'))).toEqual(['http://127.0.0.1:8801']);
+    // Another port of the same machine is not the same origin.
+    expect(() => assertProviderReachable(laya, cfg('http://127.0.0.1:8802'))).toThrow(/PROVIDER_EGRESS|on this machine/);
+  });
+
+  it('never lets an owner\'s provider use the list, whatever it names', () => {
+    process.env.AIMEAT_ALLOW_PRIVATE_EGRESS = 'false';
+    delete process.env.AIMEAT_DEV_MODE;
+    const mine = parseProvider(local(), 'owner', { allowEnv: false, egress: ['http://127.0.0.1:8801'] }).provider as DecisionProvider;
+    expect(providerAllowOrigins(mine, cfg('http://127.0.0.1:8801'))).toEqual([]);
+    expect(() => assertProviderReachable(mine, cfg('http://127.0.0.1:8801'))).toThrow(/operator runs/);
+  });
+});
+
+describe('the operator\'s egress list', () => {
+  it('keeps exact origins and drops what could widen it: a path, credentials, link-local, not a URL', () => {
+    const list = providerEgressOrigins({
+      decideProviderEgress: ' http://127.0.0.1:8801 , http://laya:8000/, http://laya:8000/v1, http://u:p@127.0.0.1:8802, http://169.254.169.254, nonsense, https://[::1]:8803',
+    } as AimeatConfig);
+    expect(list).toEqual(['http://127.0.0.1:8801', 'http://laya:8000', 'https://[::1]:8803']);
+  });
+
+  it('lets an operator record name a listed container address as local, and nobody else', () => {
+    const inDocker = local({ url: 'http://laya:8000/v1/systemone' });
+    const op = parseProvider(inDocker, 'node', { allowEnv: true, egress: ['http://laya:8000'] });
+    expect(op.provider).toMatchObject({ kind: 'local', leaves: false });
+    expect(parseProvider(inDocker, 'node', { allowEnv: true }).provider).toBeNull();
+    expect(parseProvider(inDocker, 'owner', { allowEnv: false, egress: ['http://laya:8000'] }).provider).toBeNull();
   });
 });

@@ -22,9 +22,11 @@
  *   CAPABILITY IS CHECKED BEFORE THE CALL. A rule needing 40 options on a provider that carries 20 is
  *   refused by name, in the provider's own numbers, rather than answered badly.
  *
- *   A LOCAL PROVIDER needs no key, costs nothing and touches no allowance. It sits on loopback, which
- *   safeFetch refuses unless the operator allowed private egress; the refusal says so here rather
- *   than surfacing as a connection error. The scrubber stays on: "the data does not leave the
+ *   A LOCAL PROVIDER needs no key, costs nothing and touches no allowance. It sits on loopback, or,
+ *   for the operator's own, at an address the operator named in AIMEAT_DECIDE_PROVIDER_EGRESS (a
+ *   container on the node's Docker network). safeFetch refuses a private address unless it is on that
+ *   list or the operator allowed private egress everywhere; the refusal says so here rather than
+ *   surfacing as a connection error. The scrubber stays on: "the data does not leave the
  *   machine" is a different sentence from "the data goes to TypeSafe in the USA", and each provider
  *   carries its own.
  * @structure
@@ -36,6 +38,10 @@
  *   const { provider, chosenBy } = await selectProvider(storage, config, { ownerGhii, agent, named });
  *   const problems = providerViolations(provider, state, questions);
  * @version-history
+ *   v1.2.0 — 2026-09-23 — The operator's egress list (AIMEAT_DECIDE_PROVIDER_EGRESS): the node's own
+ *     providers at a listed origin are reached without AIMEAT_ALLOW_PRIVATE_EGRESS, and a listed
+ *     origin that is not loopback (a container name) may still be `local`. An owner's provider never
+ *     uses the list, so no person can point the node at an internal port.
  *   v1.1.0 — 2026-09-23 — `local` is checked, not taken on trust: a provider calling itself local
  *     must be on this machine, because `leaves: false` skips an app's data-map row, tells the person
  *     nothing left, and leaves the call out of the budget and the ledger. An operator provider may
@@ -48,6 +54,7 @@ import { encrypt, decrypt, getEncryptionKey } from '../encryption.js';
 import { upsertPrivateRecord } from '../private-record.js';
 import { emitChange } from '../event-bus.js';
 import { logger } from '../../utils/logger.js';
+import { isLinkLocalHost } from '../../utils/url-validator.js';
 import { DecideError } from './errors.js';
 import { estimateTokens, type JevQuestion, type LimitViolation } from './limits.js';
 import { SYSTEMONE_ADAPTERS } from './systemone-client.js';
@@ -171,12 +178,44 @@ function configuredProvider(config: AimeatConfig): DecisionProvider {
 const LOOPBACK = (host: string): boolean => host === 'localhost' || host === '::1' || host === '[::1]' || /^127\./.test(host);
 
 /**
+ * The operator's egress list, as origins. An entry that is not an http(s) address, carries a path or
+ * credentials, or names a link-local address is left out and logged, so a typo cannot widen the list.
+ */
+export function providerEgressOrigins(config: AimeatConfig): string[] {
+  const out: string[] = [];
+  for (const entry of (config.decideProviderEgress ?? '').split(',').map(s => s.trim()).filter(Boolean)) {
+    const u = URL.canParse(entry) ? new URL(entry) : null;
+    const ok = u && (u.protocol === 'http:' || u.protocol === 'https:') && !u.username && !u.password
+      && (u.pathname === '/' || u.pathname === '') && !u.search && !isLinkLocalHost(u.hostname);
+    if (!ok) {
+      logger.error('[decide] an AIMEAT_DECIDE_PROVIDER_EGRESS entry was refused', {
+        entry, fix: 'scheme, host and port only, e.g. http://127.0.0.1:8801 or http://laya:8000; never a link-local address',
+      });
+      continue;
+    }
+    if (!out.includes(u.origin)) out.push(u.origin);
+  }
+  return out;
+}
+
+/**
+ * The origins this one provider's call may reach although they are private: its own, when the
+ * operator listed it and the provider is the node's. Never an owner's, whatever the list says.
+ */
+export function providerAllowOrigins(provider: DecisionProvider, config: AimeatConfig): string[] {
+  if (provider.source === 'owner' || !URL.canParse(provider.url)) return [];
+  const origin = new URL(provider.url).origin;
+  return providerEgressOrigins(config).includes(origin) ? [origin] : [];
+}
+
+/**
  * Read one provider record from untrusted input: the operator's JSON or an owner's request body.
  * Returns the record or the list of what is wrong with it. `allowEnv` is the operator's privilege:
  * an owner naming a variable of this node would have the node send its secret to the owner's address.
+ * `egress` is the operator's list, passed for the operator's own records only.
  */
 export function parseProvider(
-  raw: unknown, source: ProviderSource, opts: { allowEnv: boolean },
+  raw: unknown, source: ProviderSource, opts: { allowEnv: boolean; egress?: readonly string[] },
 ): { provider: DecisionProvider; problems: [] } | { provider: null; problems: string[] } {
   const problems: string[] = [];
   if (!isObj(raw)) return { provider: null, problems: ['A provider is an object.'] };
@@ -193,7 +232,11 @@ export function parseProvider(
   // taken from it, and `leaves: false` is what skips an app's data-map row, states to the person
   // that nothing left the machine, and leaves the call out of the budget and the ledger. Declared
   // and not checked, `kind: 'local'` with a remote address made all four of those untrue at once.
-  if (url && kind === 'local' && u && !LOOPBACK(u.hostname.toLowerCase())) {
+  // The one exception is the operator's own: an origin they listed in AIMEAT_DECIDE_PROVIDER_EGRESS,
+  // which is how a container on the node's own Docker network (http://laya:8000) is named. The
+  // operator runs that container, so the operator answers for the word.
+  const listed = source !== 'owner' && !!u && !!opts.egress?.includes(u.origin);
+  if (url && kind === 'local' && u && !LOOPBACK(u.hostname.toLowerCase()) && !listed) {
     problems.push(`url: a local provider is on this machine (127.0.0.1, localhost or ::1); ${u.hostname} is somewhere else, so it is 'hosted'.`);
   }
   const model = typeof raw.model === 'string' ? raw.model.trim() : '';
@@ -262,8 +305,9 @@ export function nodeProviders(config: AimeatConfig): DecisionProvider[] {
       logger.error('[decide] AIMEAT_DECIDE_PROVIDERS is not JSON; no extra providers are offered', { error: String(err) });
       list = [];
     }
+    const egress = providerEgressOrigins(config);
     for (const raw of Array.isArray(list) ? list : []) {
-      const p = parseProvider(raw, 'node', { allowEnv: true });
+      const p = parseProvider(raw, 'node', { allowEnv: true, egress });
       if (!p.provider) { logger.error('[decide] an operator provider was refused', { problems: p.problems }); continue; }
       // THE KEY CHAIN BELONGS TO ONE ADDRESS. `auth: { type: 'key' }` means the agent's key, then
       // the owner's, then the NODE's, and config-decide.ts has promised since it was written that
@@ -429,16 +473,19 @@ export function providerViolations(provider: DecisionProvider, state: unknown, q
 
 
 /**
- * A provider on loopback is reachable only when the operator allowed private egress. Said here, by
- * name, rather than left to safeFetch's refusal, which reads as a network fault.
+ * A provider on loopback is reachable when the operator listed its address (the node's own providers
+ * only) or allowed private egress everywhere. Said here, by name, rather than left to safeFetch's
+ * refusal, which reads as a network fault.
  */
-export function assertProviderReachable(provider: DecisionProvider): void {
+export function assertProviderReachable(provider: DecisionProvider, config?: AimeatConfig): void {
   if (!URL.canParse(provider.url)) return;
+  if (config && providerAllowOrigins(provider, config).length) return;
   const host = new URL(provider.url).hostname.toLowerCase();
   if (!LOOPBACK(host)) return;
   if (process.env.AIMEAT_ALLOW_PRIVATE_EGRESS === 'true' || process.env.AIMEAT_DEV_MODE === 'true') return;
-  throw new DecideError('PRIVATE_EGRESS_REQUIRED', 503,
-    `The decision provider '${provider.id}' is at ${host}, on this machine. This node does not send to its own machine unless the operator sets AIMEAT_ALLOW_PRIVATE_EGRESS=true, which belongs on a development machine, not on a public node.`);
+  throw new DecideError('PRIVATE_EGRESS_REQUIRED', 503, provider.source === 'owner'
+    ? `The decision provider '${provider.id}' is at ${host}, on the node's own machine. This node does not send an owner's provider there; a public node reaches only the local models its operator runs.`
+    : `The decision provider '${provider.id}' is at ${host}, on this machine. The operator lets the node reach it by adding ${new URL(provider.url).origin} to AIMEAT_DECIDE_PROVIDER_EGRESS.`);
 }
 
 /** The key of an owner's own provider, decrypted, or null. Never logged, never returned by a door. */

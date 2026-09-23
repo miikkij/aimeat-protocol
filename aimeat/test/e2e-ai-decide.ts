@@ -24,6 +24,8 @@
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-ai-decide.ts
  *   cd aimeat && pnpm exec node --env-file=.env.test.postgres-kysely --import tsx test/e2e-ai-decide.ts
  * @version-history
+ *   v1.5.0 — 2026-09-23 — Phase 12: with private egress off, the operator's listed local model
+ *     answers; an unlisted origin and an owner's provider at the listed address are refused unsent.
  *   v1.4.1 — 2026-09-23 — 11e: the refusal names the provider as the page does, and carries the
  *     fields a page writes it from in its own language.
  *   v1.4.0 — 2026-09-23 — Phase 11, decision providers: an owner's own provider is written and read
@@ -148,7 +150,7 @@ const DB_PATH = join(dbDir, 'decide.db');
 // jsonb review update and cache lookup run), a temporary SQLite file otherwise.
 const PG_URL = process.env.AIMEAT_DB === 'postgres-kysely' ? (process.env.DATABASE_URL ?? '') : '';
 
-async function startServer(stubUrl: string): Promise<ChildProcess> {
+async function startServer(stubUrl: string, extra: Record<string, string> = {}): Promise<ChildProcess> {
   const target = PG_URL
     ? { port: PORT, baseUrl: BASE, dbType: 'postgres-kysely', dbPath: '', dbUrl: PG_URL, external: false }
     : { port: PORT, baseUrl: BASE, dbType: 'sqlite', dbPath: DB_PATH, dbUrl: '', external: false };
@@ -165,6 +167,7 @@ async function startServer(stubUrl: string): Promise<ChildProcess> {
     AIMEAT_DECIDE_BASE_URL: stubUrl,
     AIMEAT_TYPESAFE_INSTANCE_KEY: NODE_KEY,
     AIMEAT_CHAT_FREE_ALLOWANCE_USD: '5',
+    ...extra,
   };
   const dbArgs = PG_URL ? ['--db', 'postgres-kysely', '--db-url', PG_URL] : ['--db', 'sqlite', '--db-path', DB_PATH];
   const child = spawn('node', [...nodeEntryArgs(), 'start', ...dbArgs],
@@ -251,7 +254,7 @@ const QUESTIONS = {
 
 (async () => {
   const stub = await startStub();
-  const server = await startServer(stub.url);
+  let server = await startServer(stub.url);
   const A = await setupOwner('a');
   const B = await setupOwner('b');
   const agentAi = await connectAgent(A, 'deciderbot', ['ai:use', 'memory:read']);
@@ -927,6 +930,59 @@ const QUESTIONS = {
     const by = Object.fromEntries((r.body.data.groups as any[]).map(g => [g.key, g]));
     assert(by['mine-local']?.decisions >= 3 && by['mine-local'].costUsd === 0, `local: ${JSON.stringify(by['mine-local'])}`);
     assert(by.typesafe?.decisions >= 1 && by.typesafe.costUsd > 0, `typesafe: ${JSON.stringify(by.typesafe)}`);
+  });
+
+  // ── Phase 12: a public node reaches its own local models by the operator's list, and nothing else ──
+  // The node restarts as a public one would run: private egress OFF. The stub stands in for a model
+  // container. `listed` is at the stub's origin, which the operator listed; `unlisted` is the same
+  // stub under another name (localhost), so another origin, which they did not.
+  await stopServer(server);
+  const stubOrigin = new URL(stub.url).origin;
+  const port = new URL(stub.url).port;
+  const localRecord = (id: string, url: string) => ({
+    id, title: id, kind: 'local', url, model: 'tiny-local-1', auth: { type: 'none' },
+    limits: { context_tokens: 4000, max_choice_options: 10 },
+  });
+  server = await startServer(stub.url, {
+    AIMEAT_DEV_MODE: 'false',
+    AIMEAT_ALLOW_PRIVATE_EGRESS: 'false',
+    AIMEAT_DECIDE_PROVIDER_EGRESS: stubOrigin,
+    AIMEAT_DECIDE_PROVIDERS: JSON.stringify([
+      localRecord('listed', stub.url),
+      localRecord('unlisted', `http://localhost:${port}/v1/systemone`),
+    ]),
+  });
+  const C = await setupOwner('c');
+  const askC = (extra: Record<string, unknown>) => json('/v1/ai/decide', {
+    method: 'POST', headers: auth(C.token),
+    body: JSON.stringify({ state: 'Please send the March invoice.', questions: { urgent: QUESTIONS.urgent }, cache: false, ...extra }),
+  });
+
+  await test('12a. with private egress off, the operator\'s listed local model answers', async () => {
+    const before = seen.length;
+    const r = await askC({ provider: 'listed' });
+    assert(r.status === 200 && r.body.data.provider?.id === 'listed' && r.body.data.provider.kind === 'local',
+      `got ${r.status} ${JSON.stringify(r.body.error ?? r.body.data?.provider)}`);
+    assert(seen.length === before + 1, 'the model was called once');
+  });
+
+  await test('12b. an operator provider at an origin not on the list is refused by name, and nothing is sent', async () => {
+    const before = seen.length;
+    const r = await askC({ provider: 'unlisted' });
+    assert(r.status === 503 && r.body.error?.code === 'PRIVATE_EGRESS_REQUIRED', `got ${r.status} ${r.body.error?.code}`);
+    assert(String(r.body.error?.message).includes('AIMEAT_DECIDE_PROVIDER_EGRESS'), `the refusal names the setting: ${r.body.error?.message}`);
+    assert(seen.length === before, 'the stub was not called');
+  });
+
+  await test('12c. an owner\'s own provider at the very same listed address is refused: the list is the operator\'s', async () => {
+    const put = await json('/v1/ai/decide/providers/mine-near', {
+      method: 'PUT', headers: auth(C.token), body: JSON.stringify(localRecord('mine-near', stub.url)),
+    });
+    assert(put.status === 200, `the owner may keep the record, got ${put.status} ${JSON.stringify(put.body.error)}`);
+    const before = seen.length;
+    const r = await askC({ provider: 'mine-near' });
+    assert(r.status === 503 && r.body.error?.code === 'PRIVATE_EGRESS_REQUIRED', `got ${r.status} ${r.body.error?.code}`);
+    assert(seen.length === before, 'the stub was not called');
   });
 
   await stopServer(server);

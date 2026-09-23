@@ -55,6 +55,8 @@
  *   const r = await decideForOwner(storage, config, { gaii, principal, appId, isOwner }, { state, questions });
  *   const g = await decideForOwner(storage, config, caller, { state, rule: 'send-reply' });
  * @version-history
+ *   v1.3.1 — 2026-09-23 — The call carries the operator's listed origin for this provider, so a node's
+ *     own local model is reached without opening private egress to every fetch.
  *   v1.3.0 — 2026-09-23 — Decision providers: the provider is chosen per call and checked for what
  *     it can carry before anything is read; the record, the result and the stats name it; a local
  *     provider needs no key and touches no money.
@@ -81,7 +83,7 @@ import { createScrubber } from './scrub.js';
 import { checkDecideRequest, DEFAULT_DECIDE_LIMITS, type JevQuestion } from './limits.js';
 import { callSystemOne, SystemOneError, type SystemOneAnswer } from './systemone-client.js';
 import {
-  selectProvider, providerViolations, assertProviderReachable, readOwnerProviderKey,
+  selectProvider, providerViolations, assertProviderReachable, providerAllowOrigins, readOwnerProviderKey,
   type DecisionProvider, type ProviderChosenBy,
 } from './providers.js';
 import { takeSlot } from './pacer.js';
@@ -460,7 +462,7 @@ export async function decideForOwner(
   }
 
   // 6 ── the key, and the minute window for that key (a keyless provider's window is its address)
-  assertProviderReachable(provider);
+  assertProviderReachable(provider, config);
   const { key, scope } = await resolveProviderKey(storage, config, caller.gaii, agent, provider);
   const wait = takeSlot(sha256(key ?? `${provider.id}\n${provider.url}`), config.decideRequestsPerMinute);
   if (wait > 0) {
@@ -474,6 +476,7 @@ export async function decideForOwner(
   try {
     res = await callSystemOne({
       url: provider.url, key, request: { model, state, questions: sent },
+      allowOrigins: providerAllowOrigins(provider, config),
       providerName: provider.id === 'typesafe' ? 'TypeSafe' : provider.title,
       ...(provider.adapter ? { adapter: provider.adapter } : {}),
     });
