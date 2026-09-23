@@ -9,6 +9,8 @@
  * @structure SHAPE_ENTRIES
  * @usage import { SHAPE_ENTRIES } from './entries-shapes.js';
  * @version-history
+ *   v1.1.0 — 2026-09-23 — The dialog shape deleted (Jouni's decision: the site has its own dialog);
+ *     the chip kept as a candidate for the design lab's first decision.
  *   v1.0.0 — 2026-09-23 — Initial (UI consolidation phase 1).
  */
 import type { UiEntrySource, UiVariant } from './types.js';
@@ -17,8 +19,8 @@ import type { UiEntrySource, UiVariant } from './types.js';
  * In poster.css, put on nothing by any page today (checked 2026-09-23). On Jouni's keep-or-delete
  * list.
  */
-const UNUSED_SHAPES = new Set(['dialog', 'chip']);
-const UNUSED_NOTE = 'Added to poster.css in e543a9d61 (2026-09-13) with no page using it. Only the style unification of 2026-09-22/23 put it on markup, and that was rolled back in cee2cbaf5. No page puts this class on anything today. Keep or delete is Jouni\'s call.';
+const UNUSED_SHAPES = new Set(['chip']);
+const UNUSED_NOTE = 'Added to poster.css in e543a9d61 (2026-09-13) with no page using it; only the rolled-back unification of 2026-09-22/23 put it on markup. Kept by Jouni on 2026-09-23 as a candidate in the design lab\'s first decision: the one chip for a small tag, badge, count or status word. Not to be put into use before that decision.';
 
 /** Every shape has the same frame; only what it is and how it is cut differ. */
 function shape(id: string, name: string, classes: string[], markup: string, summary: string, use: string, variants: UiVariant[] = []): UiEntrySource {
@@ -64,8 +66,6 @@ export const SHAPE_ENTRIES: UiEntrySource[] = [
         ]),
     shape('frame', 'Frame', ['poster-frame'], '<span class="poster-frame">…</span>',
         'A 3px ink frame on the card ground.', 'An avatar or a picture that needs an edge.'),
-    shape('dialog', 'Dialog', ['poster-dialog'], '<div class="poster-dialog">…</div>',
-        'A 3px ink frame with a large sun shadow.', 'The site\'s one dialog (Modal) in the poster look.'),
     shape('record', 'Record', ['poster-record', 'poster-record-title', 'poster-record-title--small'], '<div class="poster-record"><h3 class="poster-record-title">…</h3>…</div>',
         'A card in an ink frame with a sun shadow, and its headline.', 'One thing opened up: an index entry, a record, a detail.',
         [{ name: 'small title', class: 'poster-record-title--small', when: 'a record inside a narrow column' }]),

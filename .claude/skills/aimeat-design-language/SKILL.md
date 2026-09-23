@@ -176,9 +176,9 @@ dimensions. It does not re-declare the shape's font, rule, fill, padding or shad
 | Underlined action | `.poster-action` |
 | Tab and selected tab | `.poster-tab`, `.poster-tab.is-on` |
 | Loud action and the home's large door | `.poster-slab`, `.poster-slab--large` |
-| Box; frame; dialog; opened record | `.poster-box`; `.poster-frame`; `.poster-dialog`; `.poster-record` |
+| Box; frame; opened record | `.poster-box`; `.poster-frame`; `.poster-record` (the dialog is the site's own Modal; `.poster-dialog` was deleted on 2026-09-23) |
 | Dashed coral aside | `.poster-aside` |
-| Mono chip; crumb | `.poster-chip`; `.poster-crumb` |
+| Mono chip; crumb | `.poster-chip` (a candidate in the design lab's chip decision; not in use until Jouni decides); `.poster-crumb` |
 | Numeral row and its number | `.poster-stat`, `.poster-stat-number` |
 | Showroom ink band and sun band | `.showroom-band`, `.showroom-band--sun` |
 | Showroom section and coral shadow | `.showroom-section`, `.showroom-section--coral` |

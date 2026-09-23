@@ -2,7 +2,7 @@
  * @file public/views/home/status-parts.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The finished home's status pieces: the mailbox row, the fleet line, the chat door,
+ * @description The finished home's status pieces: the mailbox row, the fleet line,
  *   what you have made (with stars and a fold), your apps, and the achievements strip. Split out of
  *   index.js when the status view grew past what one file should hold; index.js stays the
  *   orchestrator. Since 2026-09-23 this file composes: what each piece LOOKS like is the component
@@ -14,9 +14,11 @@
  *   spills: the person stars what matters, the rest folds away, and the fold says how much it
  *   holds. The first version showed every chip it had, which on the developer's own account was
  *   the wall of noise this file exists to prevent.
- * @structure MailboxRow · YourTurn · FleetLine · ChatDoor · Things · FavoriteApps · Playbooks · TrustLine · Achievements
- * @usage import { MailboxRow, FleetLine, ChatDoor, Things, FavoriteApps, Achievements } from '/views/home/status-parts.js';
+ * @structure MailboxRow · YourTurn · FleetLine · Things · FavoriteApps · Playbooks · TrustLine · Achievements
+ * @usage import { MailboxRow, FleetLine, Things, FavoriteApps, Achievements } from '/views/home/status-parts.js';
  * @version-history
+ *   2026-09-23: ChatDoor deleted (Jouni's decision): no page had drawn it since 07f7040c5
+ *     (2026-09-09), when the home journey took its place.
  *   2026-09-23: Each piece is composed from library components (StatLine, Band, LineList, NamedRow,
  *     ThingLink, ThingChip, FoldButton, ModeSwitch, QuietNote, NumberedIndex, IndexPanel, InkFoot,
  *     CheckItem) that emit the markup this file wrote; NamedRow moved to public/components/.
@@ -138,41 +140,6 @@ export function FleetLine({ agent }) {
           ? bigNumber(tr('home.fleet.allOk', '{total} agents home, all well.'), '{total}', total)
           : bigNumber(tr('home.fleet.trouble', '{total} agents home · {n} need a look').replace('{n}', String(problems)), '{total}', total))}
     <//>`;
-}
-
-/**
- * One clear door to where the work actually happens, and WHICH MIND answers there. A person whose
- * own AI (Claude, ChatGPT...) is connected over MCP is told that; otherwise the house chat's model
- * is named, because "some AI" is exactly the vagueness people distrust. At most two platforms are
- * named — a five-name list with "Unknown" in it answered nothing.
- */
-export function ChatDoor({ chatStatus, mcpNames }) {
-  const names = (mcpNames ?? []).filter((n) => n && !/^unknown$/i.test(n));
-  let ai = '';
-  if (names.length === 1) {
-    ai = tr('home.ai.viaMcp', '{names} is connected as your agent over MCP.').replace('{names}', names[0]);
-  } else if (names.length > 1) {
-    const shown = names.slice(0, 2).join(', ');
-    const extra = names.length - 2;
-    const list = extra > 0
-      ? tr('home.ai.andMore', '{names} and {n} more').replace('{names}', shown).replace('{n}', String(extra))
-      : shown;
-    ai = tr('home.ai.viaMcpMany', '{names} are connected as your agents over MCP.').replace('{names}', list);
-  } else if (chatStatus?.enabled && chatStatus?.model) {
-    ai = tr('home.ai.houseModel', 'The house chat answers with {model}.').replace('{model}', chatStatus.model);
-  }
-  return html`
-    <section class="poster-diagonal">
-      <div class="poster-diagonal-text">
-        <p class="poster-diagonal-lede">
-          ${tr('home.chatDoor.lede', 'Your agent is in the chat. Say what you need, and it gets to work.')}
-        </p>
-        ${ai && html`<p class="poster-diagonal-note">${ai}</p>`}
-      </div>
-      <a class="btn-primary poster-slab poster-slab--large poster-diagonal-cta" href="/v1/chat">
-        ${tr('home.chatDoor.cta', 'Continue in the chat')}
-      </a>
-    </section>`;
 }
 
 /**

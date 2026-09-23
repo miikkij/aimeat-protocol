@@ -8,6 +8,8 @@
  * @structure STEP_ENTRIES
  * @usage import { STEP_ENTRIES } from './entries-steps.js';
  * @version-history
+ *   v1.1.0 — 2026-09-23 — AgentCard, LinkRow, AppList, TeachNote and the step card's done and limit
+ *     looks deleted with their code (Jouni's decision).
  *   v1.0.0 — 2026-09-23 — Initial (UI consolidation phase 1).
  */
 import type { UiEntrySource } from './types.js';
@@ -24,11 +26,9 @@ export const STEP_ENTRIES: UiEntrySource[] = [
         use: ['A step a person does once, in order, on the way to something working.'],
         variants: [
             { name: 'open', class: 'poster-step--open', when: 'the step in progress; the others stay closed' },
-            { name: 'done', class: 'poster-step--done', when: 'a finished step, with a tick for its number (poster-step-num--done)' },
-            { name: 'limit', class: 'poster-step--limit', when: 'the warm cut for an app that has reached a limit' },
         ],
         example: { num: '1', title: 'Your welcome mat', children: 'Copy the prompt below into your AI chat.' },
-        note: 'The component draws the open step. Only StepMatDone ever drew the done look and only StepBranchB the limit look; both stopped being drawn in 07f7040c5 (2026-09-09, "connect first, the welcome page is optional"). The cuts stay in the sheet until Jouni decides.',
+        note: 'The done and limit looks were deleted on 2026-09-23 (Jouni\'s decision): only StepMatDone and StepBranchB drew them, and neither had been drawn since 07f7040c5 (2026-09-09).',
     },
     {
         id: 'prompt-card', name: 'PromptCard', kind: 'component', status: 'active',
@@ -111,51 +111,6 @@ export const STEP_ENTRIES: UiEntrySource[] = [
         use: ['The page waits for something the person does elsewhere, and updates on its own.'],
         variants: [],
         example: { title: 'Waiting for your agent', children: 'This page moves on by itself when it connects.' },
-    },
-    {
-        id: 'agent-card', name: 'AgentCard', kind: 'component', status: 'unused',
-        summary: 'A connected agent: its state dot, name, a detail line, and its details on demand.',
-        module: null, sheet: '/css/components/agent-card.css',
-        data: { shape: 'AgentCard({ agent })', fields: { agent: 'the agent record: name, state, detail' } },
-        use: ['No page draws it today.'],
-        variants: [
-            { name: 'problem', class: 'poster-agent-card-dot--problem', when: 'the agent has a problem' },
-            { name: 'idle', class: 'poster-agent-card-dot--idle', when: 'the agent is quiet' },
-            { name: 'new', class: 'poster-agent-card-dot--new', when: 'just connected' },
-            { name: 'onboarding', class: 'poster-agent-card-dot--onboarding', when: 'still setting up' },
-        ],
-        example: { agent: { name: 'claude', state: 'idle', detail: 'Last seen an hour ago' } },
-        note: 'Not drawn since eaf81e18c (2026-08-18), which replaced it with the one-line FleetLine: "It deliberately surfaced the WORST agent by name, which made a snag the home\'s first sentence on an 86-agent fleet." Its code still sits in views/home/step-agent.js. Keep or delete is Jouni\'s call.',
-    },
-    {
-        id: 'link-row', name: 'LinkRow', kind: 'component', status: 'unused',
-        summary: 'A row of links with an address beside them, for a finished thing a person can open.',
-        module: null, sheet: '/css/components/link-row.css',
-        data: { shape: 'markup: .poster-link-row > a.btn-outline + a.poster-link-row-url', fields: { url: 'the page address', standaloneUrl: 'its own address, shown in full' } },
-        use: ['No page draws it today.'],
-        variants: [],
-        example: { url: '/v1/pages/mat', standaloneUrl: 'https://alice.aimeat.io/mat' },
-        note: 'Its markup sits in StepMatDone (views/home/step-mat.js). 24fa11a2e (2026-08-18) took StepMatDone off the finished home (one line with the address under the greeting); 07f7040c5 (2026-09-09) removed the onboarding steps, so nothing draws it. The optional page is now a fold in the home journey with one link. Keep or delete is Jouni\'s call.',
-    },
-    {
-        id: 'app-list', name: 'AppList', kind: 'component', status: 'unused',
-        summary: 'A list of apps a person could use, each with its name, its plans line and a link to its documentation.',
-        module: null, sheet: '/css/components/app-list.css',
-        data: { shape: 'markup: .poster-app-list > li', fields: { apps: 'name, plans line, documentation link' } },
-        use: ['No page draws it today.'],
-        variants: [],
-        example: { apps: [{ name: 'AI Music Charts', plans: 'Free and Pro', docs: '/v1/apps/charts/docs' }] },
-        note: 'Its markup sits in StepBranchB (views/home/step-branch-b.js): branch B of the home journey, for an AI app that cannot open a connection (step 2 became "get an app that can connect"). Removed on purpose in 07f7040c5 (2026-09-09, "connect first, the welcome page is optional"): with the welcome page optional, the detour after it had nowhere to sit. No commit message names branch B; the code, the file header and the renamed tests show it. The server still computes needsBetterApp for the prompt-driven road. Keep or delete is Jouni\'s call.',
-    },
-    {
-        id: 'teach-note', name: 'TeachNote', kind: 'component', status: 'unused',
-        summary: 'A one-time line that teaches where a control is.',
-        module: null, sheet: '/css/components/teach-note.css',
-        data: { shape: 'markup: p.poster-teach', fields: { children: 'the one sentence' } },
-        use: ['No page draws it today.'],
-        variants: [],
-        example: { children: 'The three dots in the corner are how you act on anything here.' },
-        note: 'Its markup sits in StepMatDone (views/home/step-mat.js), not drawn since 07f7040c5 (2026-09-09). It has no successor. Keep or delete is Jouni\'s call.',
     },
     {
         id: 'front-door', name: 'FrontDoor', kind: 'component', status: 'active',

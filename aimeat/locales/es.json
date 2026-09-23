@@ -9779,10 +9779,6 @@
     "matCompact": "Tu felpudo de bienvenida:",
     "webpage": "Tu página web, hecha por tu IA:",
     "identityHint": "GHII: tu dirección permanente. Personas, casas y agentes de todas partes te encuentran con ella.",
-    "chatDoor": {
-      "lede": "Tu agente está en el chat. Di qué necesitas y se pone a trabajar.",
-      "cta": "Continuar en el chat"
-    },
     "things": {
       "title": "Lo que has hecho",
       "apps": "Aplicaciones",
@@ -9795,12 +9791,6 @@
       "star": "Mantener este siempre visible",
       "showAll": "Mostrar todo ({n})",
       "showLess": "Mostrar menos"
-    },
-    "ai": {
-      "viaMcp": "{names} está conectado como tu agente por MCP.",
-      "viaMcpMany": "{names} están conectados como tus agentes por MCP.",
-      "andMore": "{names} y {n} más",
-      "houseModel": "El chat de aquí responde con {model}."
     },
     "mail": {
       "unread": "{n} sin leer, ve a mirar",
@@ -9919,9 +9909,7 @@
     "step3Dim": "Se abre cuando tengas una aplicación que sepa conectarse.",
     "mat": {
       "title": "Tu felpudo de bienvenida",
-      "titleDone": "Tu felpudo ya está puesto",
       "lede": "Todo hogar necesita un felpudo. El tuyo lo vas a hacer con tu propia IA: copia el prompt de abajo en tu chat con IA, pega en la caja lo que te devuelva, y presiona el botón.",
-      "doneLede": "Esto es lo primero que hiciste aquí, y es una página de verdad con su propia dirección.",
       "promptLabel": "El prompt",
       "promptShort": "El prompt más corto",
       "copy": "Copiar el prompt",
@@ -9962,36 +9950,7 @@
       "doneManual": "Ya lo puse en marcha",
       "waitTitle": "Esperando a que tu agente llame a la puerta.",
       "waitBody": "El siguiente movimiento está en tu chat con IA: tiene que ejecutar el prompt y enseñarte un código. Cuando lo haga, su solicitud aparece aquí y tú la apruebas.",
-      "cardSub": "Conectado y en casa.",
-      "showDetails": "Detalles",
-      "hideDetails": "Ocultar los detalles",
-      "dtId": "Su identificador",
-      "dtSince": "Conectado",
-      "manage": "Gestiona lo que puede hacer",
-      "stateProduction": "Conectado y en casa.",
-      "stateIdle": "Está aquí, pero ahora mismo callado.",
-      "stateOnboarding": "Acomodándose.",
-      "stateNew": "Recién llegado: todavía no ha empezado.",
-      "stateProblem": "Se topó con algo. ¿Le echamos un vistazo?",
-      "stateSystem": "Forma parte del sistema.",
-      "othersProblem": "¿Vemos cómo están los otros {count}?",
-      "othersOk": "{count} más, todos bien."
-    },
-    "branchB": {
-      "title": "Tu felpudo está listo",
-      "lede": "Lo hiciste con {app}. Sabe escribir, pero todavía no sabe abrir una conexión a tu hogar, así que el siguiente paso necesita otra aplicación.",
-      "why": "Una conexión quiere decir que la IA lee y escribe cosas en tu hogar por sí misma, en vez de que tú copies texto de un lado a otro. Sobre eso está construido este sitio: aquí todo se hace con una IA, así que sin conexión tu hogar no se puede terminar.",
-      "thatApp": "la aplicación que usaste",
-      "wayTitle": "Consigue una aplicación de IA que sepa abrir una conexión",
-      "wayBody": "Algunas aplicaciones de IA lo hacen directamente. Son de pago, normalmente unos 20 dólares al mes. Si usas una IA a diario, esta es la que quieres.",
-      "recommended": "Una buena para empezar",
-      "theirDocs": "Sus propias instrucciones",
-      "againTitle": "Y después vuelve a hacer el felpudo con ella",
-      "againBody": "El mismo prompt, otra aplicación. Pega aquí lo que te dé y seguimos desde ahí. Tu primer felpudo se queda hasta que este lo reemplace.",
-      "submit": "Aquí está el nuevo",
-      "stillB": "Esa tampoco sabe abrir una conexión. La lista de arriba es la comprobada: la aplicación tiene que salir de ahí.",
-      "ledePlan": "Lo hizo {app}, y {app} sí sabe abrir una conexión a tu hogar, pero solo en uno de sus planes de pago, y dijiste que no tienes ninguno. Así que el siguiente paso necesita ese plan u otra aplicación.",
-      "yours": "La que ya usas"
+      "cardSub": "Conectado y en casa."
     },
     "feed": {
       "quiet": "Ha estado tranquilo por aquí. ¿Hacemos que pase algo? Abre el chat y di qué necesitas.",
@@ -10126,8 +10085,6 @@
       "more": "{n} más están esperando"
     }
   },
-  "home.mat.improve": "Mejorar mi página de bienvenida",
-  "home.mat.teachDots": "Los tres puntos de la esquina son la forma de actuar sobre cualquier cosa de aquí. Todas las tarjetas los tienen, siempre en esa misma esquina.",
   "home.rooms.copyPrompt": "Copia esto en tu chat con IA",
   "imageDeliverable.failed": "La imagen no se pudo cargar",
   "imageDeliverable.loading": "Cargando la imagen…",
@@ -11576,7 +11533,6 @@
   "openItems.origin.home.rooms.organise": "de organizarte",
   "openItems.suggestion": "Sugerencia: desaparece cuando esto esté hecho",
   "openItems.title": "Pendientes",
-  "openItems.toggleOff": "Quitarlo de tus pendientes",
   "openItems.toggleOn": "Ponerlo en tus pendientes",
   "openItems.working": "En marcha",
   "openItems.yours": "Tuyo",

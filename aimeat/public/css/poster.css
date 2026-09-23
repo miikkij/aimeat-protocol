@@ -3,6 +3,8 @@
  * @description Shared poster and showroom shapes. Views compose these classes and own their layout.
  * @usage Linked immediately after theme.css in spa.html.
  * @version-history
+ *   v1.7.0 -- 2026-09-23 -- .poster-dialog deleted (Jouni's decision): no page ever put it on markup
+ *     outside the rolled-back unification, and the site has its own dialog.
  *   v1.6.0 -- 2026-09-23 -- The pulse two components share (the waiting note's dot and a live
  *     timeline row), moved unchanged from css/parts-steps.css (UI consolidation phase 1, a move).
  *   v1.5.0 -- 2026-09-23 -- The section title's large cut (.poster-section-title--large), moved from the
@@ -101,7 +103,6 @@
 .poster-box--quota rect { fill: var(--accent); transition: width .3s; }
 .poster-box--quota.is-full rect { fill: var(--danger); }
 .poster-frame { border: 3px solid var(--text); background: var(--card); }
-.poster-dialog { border: 3px solid var(--text); border-radius: 0; box-shadow: 12px 12px 0 var(--sun); font-family: var(--font-showroom-body); }
 .poster-record { padding: 1.2rem 1.4rem; border: 3px solid var(--text); box-shadow: 8px 8px 0 var(--sun); background: var(--card); }
 /* A choice tile: one of a few boxed answers, the chosen one on the sun with an ink shadow
    (scheduler-poster.css .sc-choice is the source cut). A sticker: a small sun-ground box with a

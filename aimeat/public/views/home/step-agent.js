@@ -14,10 +14,11 @@
  *       them;
  *     - there is a WAITING STATE. Between pasting the prompt and the agent knocking, the ball is
  *       in the person's chat window, and a blank screen does not say so.
- * @structure StepAgent({ state, onChanged }) — the open step 2; AgentCard({ agent }) — the
- *   connected agent, shown on an initialised home with its details in a details/summary section.
+ * @structure StepAgent({ state, onChanged }) — the open step 2.
  * @usage import { StepAgent } from './step-agent.js';
  * @version-history
+ *   2026-09-23: AgentCard deleted (Jouni's decision): no page had drawn it since eaf81e18c
+ *     (2026-08-18), when the one-line fleet summary took its place.
  *   2026-09-23: StepAgent is composed from library components (StepCard, StepLede, PasteLabel, Hint,
  *     TextInput, ActionRow, NamedValue, ModeTabs, StepList, WaitingNote), which emit the markup this
  *     file wrote. AgentCard stays as it was: no page mounts it (UI consolidation phase 1, a move).
@@ -58,7 +59,6 @@ import { StepList } from '/components/StepList.js';
 import { WaitingNote } from '/components/WaitingNote.js';
 import { swallowed } from '/js/swallowed.js';
 import { useSession } from '/js/use-session.js';
-import { dateTime as fmtDateTime } from '/js/format.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 
@@ -230,66 +230,4 @@ export function StepAgent({ onChanged, showToast }) {
           busyCode=${busyCode} variant="step" />
       `}
     <//>`;
-}
-
-/**
- * How the home describes an agent's state. The same six states the Agents tab uses, in words that
- * fit a home rather than a dashboard.
- *
- * This card used to print "Connected and at home." unconditionally, next to a dot that was green in
- * CSS — about an agent the Agents tab was calling a problem, one click away. It now renders the
- * verdict the server computed (services/agent-health.ts), which is the same one that tab renders.
- */
-const STATE_TEXT = {
-  production: ['home.agent.stateProduction', 'Connected and at home.'],
-  idle: ['home.agent.stateIdle', 'Here, but quiet just now.'],
-  onboarding: ['home.agent.stateOnboarding', 'Settling in.'],
-  new: ['home.agent.stateNew', 'Just arrived, it has not started yet.'],
-  problem: ['home.agent.stateProblem', 'It has hit a snag. Shall we take a look?'],
-  system: ['home.agent.stateSystem', 'Part of the house.'],
-};
-
-/** The connected agent on an initialised home: a card, with its details below it. */
-export function AgentCard({ agent }) {
-  const [open, setOpen] = useState(false);
-  if (!agent) return null;
-  const state = agent.health?.state ?? 'production';
-  const [subKey, subFallback] = STATE_TEXT[state] ?? STATE_TEXT.production;
-  const others = (agent.total ?? 1) - 1;
-  return html`
-    <div class="poster-agent-card">
-      <div class="poster-agent-card-head">
-        <span class="poster-agent-card-dot poster-agent-card-dot--${state}" aria-hidden="true"></span>
-        <div>
-          <div class="poster-agent-card-name">${agent.name}</div>
-          <div class="poster-agent-card-sub">${tr(subKey, subFallback)}</div>
-          ${/* V2.3 named a fleet and led nowhere; V2.4 stopped reading out the damage. "81 more,
-                7 needing attention" is a count of worries, and a count is not what anyone comes
-                home for — the invitation to go and look is. The number of problems still exists
-                one click away, on the page that can act on it. */''}
-          ${others > 0 && html`
-            <a class="poster-agent-card-sub poster-agent-card-others" href="/v1/profile?tab=agents">
-              ${agent.problems > 0
-                ? tr('home.agent.othersProblem', 'Shall we see how the other {count} are doing?')
-                    .replace('{count}', String(others))
-                : tr('home.agent.othersOk', '{count} more, all fine.').replace('{count}', String(others))}
-            </a>`}
-        </div>
-      </div>
-      <button type="button" class="btn-ghost poster-agent-card-toggle" aria-expanded=${open}
-        onClick=${() => setOpen(v => !v)}>
-        ${open ? tr('home.agent.hideDetails', 'Hide details') : tr('home.agent.showDetails', 'Details')}
-      </button>
-      ${open && html`
-        <dl class="poster-agent-card-details">
-          <dt>${tr('home.agent.dtId', 'Its identifier')}</dt>
-          <dd class="poster-agent-card-gaii">${agent.gaii}</dd>
-          ${agent.connectedAt && html`
-            <dt>${tr('home.agent.dtSince', 'Connected')}</dt>
-            <dd>${fmtDateTime(agent.connectedAt)}</dd>`}
-        </dl>
-        <a class="btn-outline poster-agent-card-manage" href="/v1/profile?tab=agents">
-          ${tr('home.agent.manage', 'Manage what it may do')}
-        </a>`}
-    </div>`;
 }

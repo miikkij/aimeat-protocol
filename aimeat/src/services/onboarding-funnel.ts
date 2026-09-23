@@ -25,6 +25,8 @@
  *   import { recordFirstMcpCall } from '../services/onboarding-funnel.js';
  *   void recordFirstMcpCall(storage, config, owner, platform);   // fire-and-forget at MCP init
  * @version-history
+ *   v1.4.2 — 2026-09-23 — The return email's "better-app" text is gone (Jouni's decision): the home
+ *     state has not returned that step since 07f7040c5 (2026-09-09). needsBetterApp stays.
  *   v1.4.1 — 2026-09-18 — An asked answer naming a different app replaces an earlier asked answer
  *     ("Gemini", then "gemini-app"). It was dropped, which left the state on the name that raised
  *     the question. The replaced reading stays in `superseded`.
@@ -605,7 +607,7 @@ export async function readOnboardingFunnel(
  * its screens are the ones it will actually see.
  */
 function rescueEmailContent(
-    config: AimeatConfig, locale: string, step: 'welcome-mat' | 'better-app' | 'first-agent' | null,
+    config: AimeatConfig, locale: string, step: 'welcome-mat' | 'first-agent' | null,
 ): { subject: string; heading: string; paragraphs: string[]; checklist: string[]; closing: string } {
     const link = `${config.baseUrl}/v1/profile?tab=mcp`;
 
@@ -618,11 +620,6 @@ function rescueEmailContent(
                     subject: 'Kotisi odottaa tervetuloamattoa',
                     heading: 'Yksi asia kesken',
                     body: 'Aloitit kodin tekemisen mutta tervetuloamatto jäi tekemättä. Se on se yksi kehote jonka viet omaan tekoälychattiisi ja liität vastauksen takaisin. Sen jälkeen sinulla on oikea sivu omalla osoitteellaan.',
-                },
-                'better-app': {
-                    subject: 'Kotisi odottaa sovellusta joka osaa avata yhteyden',
-                    heading: 'Yksi asia kesken',
-                    body: 'Tervetuloamattosi on valmis. Seuraava askel tarvitsee tekoälysovelluksen joka osaa avata yhteyden kotiisi — lista tarkistetuista sovelluksista odottaa sinua kotona.',
                 },
                 'first-agent': {
                     subject: 'Kotisi odottaa ensimmäistä agenttiasi',
@@ -644,11 +641,6 @@ function rescueEmailContent(
                 subject: 'Your home is waiting for its welcome mat',
                 heading: 'One thing left',
                 body: 'You started making a home and the welcome mat is still to do. It is one prompt you take to your own AI chat, and you paste the answer back. After that you have a real page with its own address.',
-            },
-            'better-app': {
-                subject: 'Your home is waiting for an app that can connect',
-                heading: 'One thing left',
-                body: 'Your welcome mat is done. The next step needs an AI app that can open a connection to your home — the checked list is waiting for you there.',
             },
             'first-agent': {
                 subject: 'Your home is waiting for your first agent',
@@ -746,7 +738,7 @@ export async function runMcpOnboardingRescueJob(
         // A remake account gets the message that continues its actual step; a legacy one keeps the
         // wording written for the screens it will actually see.
         const trackVal = (await storage.getMemory(g.ghii, ONBOARDING_KEYS.track))?.value as { track?: string } | undefined;
-        let step: 'welcome-mat' | 'better-app' | 'first-agent' | null = null;
+        let step: 'welcome-mat' | 'first-agent' | null = null;
         if (trackVal?.track === 'remake') {
             const { readHomeState } = await import('./home-state.js');
             const st = await readHomeState(storage, config, g.ownerName);
