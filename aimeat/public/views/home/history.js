@@ -157,7 +157,7 @@ export default function HomeHistoryView({ navigate }) {
         <${PageIntro} title=${tr('home.history.signInTitle', 'Your record is yours to read')}
           sub=${tr('home.signInDesc', 'Sign in to see where you left off.')} />
         <${ActionRow}>
-          <button type="button" class="btn-primary" onClick=${() => navigate('/v1/portal')}>
+          <button type="button" class="btn-primary poster-slab" onClick=${() => navigate('/v1/portal')}>
             ${tr('home.signIn', 'Sign in')}
           </button>
         <//>
