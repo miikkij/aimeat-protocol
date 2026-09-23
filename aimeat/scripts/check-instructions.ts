@@ -44,8 +44,11 @@ const SKILLS_DIR = join(REPO, '.claude', 'skills');
  * this is the part the repository decides.
  * Raised to 39,000 on 2026-09-14, at Jouni's request, for the two reply-language rules (STE100 and
  * selkeä kieli), which hold in every session.
+ * Raised to 39,500 on 2026-09-23, at Jouni's request, for the rule under "Accepting a result" that a
+ * look-keeping change passes only with no visible difference and his words are never paraphrased
+ * (docs/pitfalls.md §94), which holds in every session.
  */
-const CEILING_BYTES = 39_000;
+const CEILING_BYTES = 39_500;
 
 function trackedFiles(): string[] {
     return execFileSync('git', ['-C', REPO, 'ls-files'], { encoding: 'utf-8', maxBuffer: 64 * 1024 * 1024 })
