@@ -11479,10 +11479,6 @@
     "matCompact": "Tervetuloamattosi:",
     "webpage": "Verkkosivusi, tekoälysi tekemä:",
     "identityHint": "GHII: pysyvä osoitteesi. Ihmiset, kodit ja agentit kaikkialla löytävät sinut sillä.",
-    "chatDoor": {
-      "lede": "Agenttisi on chatissa. Sano mitä tarvitset, niin se ryhtyy töihin.",
-      "cta": "Jatka keskustelua"
-    },
     "things": {
       "title": "Mitä olet tehnyt",
       "apps": "Appit",
@@ -11495,12 +11491,6 @@
       "star": "Pidä tämä aina näkyvissä",
       "showAll": "Näytä kaikki ({n})",
       "showLess": "Näytä vähemmän"
-    },
-    "ai": {
-      "viaMcp": "{names} on kytketty agenttinasi MCP:n yli.",
-      "viaMcpMany": "{names} on kytketty agenteiksesi MCP:n yli.",
-      "andMore": "{names} ja {n} muuta",
-      "houseModel": "Chat vastaa täällä mallilla {model}."
     },
     "mail": {
       "unread": "{n} lukematonta, käy katsomassa",
@@ -11619,9 +11609,7 @@
     "step3Dim": "Aukeaa kun sinulla on sovellus joka osaa avata yhteyden.",
     "mat": {
       "title": "Tervetuloamattosi",
-      "titleDone": "Tervetuloamattosi on paikallaan",
       "lede": "Jokainen koti tarvitsee tervetuloamaton. Nyt teet omasi omalla tekoälylläsi: kopioi alla oleva kehote tekoälychattiisi, liitä sen vastaus laatikkoon ja paina nappia.",
-      "doneLede": "Tämä on ensimmäinen asia jonka teit tänne, ja se on oikea sivu omalla osoitteellaan.",
       "promptLabel": "Kehote",
       "promptShort": "Lyhyempi kehote",
       "copy": "Kopioi kehote",
@@ -11662,36 +11650,7 @@
       "doneManual": "Olen aloittanut",
       "waitTitle": "Odotetaan että agenttisi koputtaa ovelle.",
       "waitBody": "Seuraava siirto on tekoälychatissasi: sen pitää ajaa kehote ja näyttää sinulle koodi. Kun se tekee niin, pyyntö ilmestyy tähän ja sinä hyväksyt sen.",
-      "cardSub": "Kytketty ja kotona.",
-      "showDetails": "Tiedot",
-      "hideDetails": "Piilota tiedot",
-      "dtId": "Tunniste",
-      "dtSince": "Kytketty",
-      "manage": "Hallitse mitä se saa tehdä",
-      "stateProduction": "Yhdistetty ja kotona.",
-      "stateIdle": "Täällä, mutta hiljaa juuri nyt.",
-      "stateOnboarding": "Asettuu taloksi.",
-      "stateNew": "Juuri saapunut, ei ole vielä aloittanut.",
-      "stateProblem": "Se on törmännyt johonkin. Katsotaanko yhdessä?",
-      "stateSystem": "Osa järjestelmää.",
-      "othersProblem": "Katsotaanko, mitä muille {count} apurille kuuluu?",
-      "othersOk": "{count} muuta, kaikki kunnossa."
-    },
-    "branchB": {
-      "title": "Tervetuloamattosi on valmis",
-      "lede": "Teit sen {app}-sovelluksella. Se osaa kirjoittaa, mutta se ei osaa vielä avata yhteyttä kotiisi, joten seuraava askel tarvitsee toisen sovelluksen.",
-      "why": "Yhteys tarkoittaa sitä, että tekoäly voi lukea ja kirjoittaa asioita kotiisi itse, eikä sinun tarvitse kopioida tekstiä edestakaisin. Se on tämän paikan perusta: kaikki mitä täällä tehdään tehdään tekoälyllä, joten ilman yhteyttä kotisi ei valmistu.",
-      "thatApp": "sovellus jota käytit",
-      "wayTitle": "Ota käyttöön tekoälysovellus joka osaa avata yhteyden",
-      "wayBody": "Osa tekoälysovelluksista osaa tämän suoraan. Ne ovat maksullisia, tyypillisesti noin 20 dollaria kuussa. Jos käytät tekoälyä joka päivä, tämä on se mitä tarvitset.",
-      "recommended": "Hyvä ensimmäiseksi",
-      "theirDocs": "Heidän omat ohjeensa",
-      "againTitle": "Tee sitten matto uudestaan sillä",
-      "againBody": "Sama kehote, uusi sovellus. Liitä sen vastaus tähän, niin jatketaan siitä. Ensimmäinen mattosi säilyy kunnes tämä korvaa sen.",
-      "submit": "Tässä on uusi",
-      "stillB": "Sekään ei osaa avata yhteyttä. Yllä oleva lista on se tarkistettu; sovelluksen pitää olla siitä.",
-      "ledePlan": "{app} teki sen, ja {app} osaa avata yhteyden kotiisi, mutta vain maksullisilla tasoillaan, etkä sinun mukaasi ole niillä. Seuraava askel tarvitsee siis joko sen tason tai toisen sovelluksen.",
-      "yours": "Se jota jo käytät"
+      "cardSub": "Kytketty ja kotona."
     },
     "feed": {
       "quiet": "Täällä on ollut hiljaista. Laitetaanko jotain tapahtumaan? Avaa chat ja sano, mitä tarvitset.",
@@ -11827,8 +11786,6 @@
       "more": "{n} muuta odottaa"
     }
   },
-  "home.mat.improve": "Tee tervetulosivustani parempi",
-  "home.mat.teachDots": "Kortin nurkassa olevat kolme pistettä ovat se, mistä asioita tehdään. Ne ovat joka kortissa, aina samassa nurkassa.",
   "home.rooms.copyPrompt": "Kopioi tämä tekoälychattiisi",
   "imageDeliverable.failed": "Kuvan lataus epäonnistui",
   "imageDeliverable.loading": "Ladataan kuvaa…",
@@ -13348,7 +13305,6 @@
   "openItems.origin.home.rooms.organise": "kohdasta Haluan järjestää",
   "openItems.suggestion": "Ehdotus, katoaa itsestään kun tämä on tehty",
   "openItems.title": "Avoimet asiat",
-  "openItems.toggleOff": "Ota pois avoimista asioista",
   "openItems.toggleOn": "Lisää avoimiin asioihin",
   "openItems.working": "Työn alla",
   "openItems.yours": "Sinun",

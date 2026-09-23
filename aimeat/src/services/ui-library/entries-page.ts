@@ -9,6 +9,7 @@
  * @structure PAGE_ENTRIES
  * @usage import { PAGE_ENTRIES } from './entries-page.js';
  * @version-history
+ *   v1.1.0 — 2026-09-23 — DiagonalBand deleted with ChatDoor (Jouni's decision); Specimen added.
  *   v1.0.0 — 2026-09-23 — Initial (UI consolidation phase 1).
  */
 import type { UiEntrySource } from './types.js';
@@ -97,16 +98,6 @@ export const PAGE_ENTRIES: UiEntrySource[] = [
             { name: 'trouble', class: 'poster-stat--trouble', prop: "tone='trouble'", when: 'something is broken' },
         ],
         example: { href: '/v1/inbox', tone: 'alert', children: '3 messages wait for you' },
-    },
-    {
-        id: 'diagonal-band', name: 'DiagonalBand', kind: 'component', status: 'unused',
-        summary: 'A diagonal coral band with a sun stripe, a large lead and one door.',
-        module: null, sheet: '/css/components/diagonal-band.css',
-        data: { shape: 'markup: .poster-diagonal', fields: { lead: 'the large line', href: 'the one door' } },
-        use: ['No page draws it today.'],
-        variants: [],
-        example: { lead: 'Talk to your agent', href: '/v1/chat' },
-        note: 'Its markup sits in ChatDoor (views/home/status-parts.js). From b3fc99288 (2026-08-26) the home.chat-door block drew it on both homes; 07f7040c5 (2026-09-09) made that block draw the home journey instead, where the way into the chat is one link, shown when the chat is on. Keep or delete is Jouni\'s call.',
     },
     {
         id: 'band', name: 'Band', kind: 'component', status: 'active',

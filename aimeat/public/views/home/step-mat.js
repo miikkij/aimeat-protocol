@@ -11,10 +11,12 @@
  *   something in it — so the screen never asks the person to choose what to do next.
  *
  *   There is no skip control here, and there is no code path that could render one.
- * @structure StepMat({ state, onDone }) — the open step; StepMatDone({ state }) — the collapsed
- *   summary once the mat exists.
+ * @structure StepMat({ state, onDone }) — the open step.
  * @usage import { StepMat } from './step-mat.js';
  * @version-history
+ *   2026-09-23: StepMatDone deleted with its link row and one-time teach note (Jouni's decision):
+ *     no page had drawn it since 07f7040c5 (2026-09-09); the optional page is a fold in the home
+ *     journey.
  *   2026-09-23: StepMat is composed from library components (StepCard, StepLede, PasteBox,
  *     ErrorNote, ActionRow), which emit the markup this file wrote. StepMatDone stays as it was:
  *     no page mounts it (UI consolidation phase 1, a move).
@@ -29,13 +31,10 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { api, apiGet } from '/js/api.js';
 import { PromptCard } from '/components/PromptCard.js';
-import { CardMenu } from '/components/CardMenu.js';
 import { StepCard, StepLede } from '/components/StepCard.js';
 import { PasteBox } from '/components/PasteBox.js';
 import { ErrorNote, ErrorNoteFallback } from '/components/ErrorNote.js';
 import { ActionRow } from '/components/ActionRow.js';
-import { listOpenItems, addOpenItem, switchOff } from '/js/services/open-items.js';
-import { swallowed } from '/js/swallowed.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 
@@ -142,85 +141,4 @@ export function StepMat({ onDone }) {
         </button>
       <//>
     <//>`;
-}
-
-/** The collapsed step, once there is a mat. Shows the thing that was made, not a tick. */
-/**
- * The mat, once it exists — and the first place a person ever meets the corner menu.
- *
- * THIS CARD TEACHES THE DOTS. It is the first thing anybody finishes here, so it is the moment they
- * are looking at a card of their own with something like pride rather than confusion. A new mark in
- * the corner is interesting there; on the step before it, it would have been one more obstacle
- * between them and their first success.
- *
- * The hint under it appears ONCE and never again after the menu has been opened. A control nobody
- * has seen needs one sentence the first time; the same sentence on the fiftieth visit is noise, and
- * a product that keeps explaining itself is one that never taught anything.
- */
-export function StepMatDone({ state }) {
-  const [item, setItem] = useState(null);
-  const [taught, setTaught] = useState(true);
-  const origin = 'home.mat';
-  const title = tr('home.mat.improve', 'Make my welcome page better');
-
-  useEffect(() => {
-    try { setTaught(localStorage.getItem('aimeat.cardmenu.seen') === '1'); }
-    // eslint-disable-next-line aimeat/no-silent-catch -- a browser refusing storage just means the hint shows again
-    catch { /* show the hint */ }
-  }, []);
-
-  const find = useCallback(async () => {
-    try {
-      const list = await listOpenItems();
-      setItem(list.find(i => i.origin === origin) ?? null);
-    } catch (e) { swallowed('home/mat: open items', e); }
-  }, []);
-
-  useEffect(() => { find(); }, [find]);
-  useEffect(() => {
-    const handler = () => find();
-    window.addEventListener('aimeat-live-update', handler);
-    return () => window.removeEventListener('aimeat-live-update', handler);
-  }, [find]);
-
-  const learned = () => {
-    setTaught(true);
-    // eslint-disable-next-line aimeat/no-silent-catch -- the hint reappearing is the whole cost
-    try { localStorage.setItem('aimeat.cardmenu.seen', '1'); } catch { /* noop */ }
-  };
-
-  const state3 = item?.status === 'working' ? 'working' : item ? 'open' : 'off';
-
-  return html`
-    <div class="poster-step poster-step--done">
-      <${CardMenu} state=${state3} label=${tr('home.mat.titleDone', 'Your welcome mat is up')}
-        onOpened=${learned}
-        actions=${[{
-          label: item
-            ? tr('openItems.toggleOff', 'Take it off your open items')
-            : title,
-          run: async () => {
-            if (item) { await switchOff(item.id); setItem(null); }
-            else { setItem(await addOpenItem({ title, kind: 'document', origin })); }
-          },
-        }]} />
-      <div class="poster-step-head">
-        <span class="poster-step-num poster-step-num--done">✓</span>
-        <h2 class="poster-step-title">${tr('home.mat.titleDone', 'Your welcome mat is up')}</h2>
-      </div>
-      <p class="poster-step-lede">
-        ${tr('home.mat.doneLede', 'This is the first thing you made here, and it is a real page with its own address.')}
-      </p>
-      <div class="poster-link-row">
-        <a class="btn-outline" href=${state.mat.url}>${tr('home.mat.view', 'Look at it')}</a>
-        ${state.mat.standaloneUrl && html`
-          <a class="poster-link-row-url" href=${state.mat.standaloneUrl} target="_blank" rel="noopener">
-            ${state.mat.standaloneUrl}
-          </a>`}
-      </div>
-      ${!taught && html`
-        <p class="poster-teach">
-          ${tr('home.mat.teachDots', 'The three dots in the corner are how you act on anything here. Every card has them, always in that same corner.')}
-        </p>`}
-    </div>`;
 }

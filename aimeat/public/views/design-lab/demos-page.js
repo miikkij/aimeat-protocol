@@ -9,6 +9,7 @@
  * @structure PAGE_DEMOS — { [id]: { variants: [{ name, render(ex) }] } }
  * @usage import { PAGE_DEMOS } from './demos-page.js';
  * @version-history
+ *   v1.1.0 — 2026-09-23 — The diagonal band's demo goes with ChatDoor (Jouni's decision).
  *   v1.0.0 — 2026-09-23 — Initial (UI consolidation phase 2, the library view).
  */
 import { h } from 'preact';
@@ -48,7 +49,6 @@ import {
 import { SettingsAccount } from '/components/SettingsAccount.js';
 import { FreeText, TextBlock, NoticeBlock } from '/components/FreeText.js';
 import { Specimens, Specimen } from '/components/Specimen.js';
-import { ChatDoor } from '/views/home/status-parts.js';
 import { HomeJourney } from '/views/home/journey.js';
 
 const html = htm.bind(h);
@@ -91,9 +91,6 @@ export const PAGE_DEMOS = {
     { name: 'alert', render: (ex) => html`<${StatLine} href=${ex.href} tone="alert">${ex.children}<//>` },
     { name: 'ok (dot)', render: () => html`<${StatLine} href="/v1/profile?tab=agents" tone="ok" dot=${true}>Your agent is home and well.<//>` },
     { name: 'trouble (dot)', render: () => html`<${StatLine} href="/v1/profile?tab=agents" tone="trouble" dot=${true}>Your agent has hit a snag.<//>` },
-  ] },
-  'diagonal-band': { variants: [
-    { name: 'ChatDoor (unused)', render: () => html`<${ChatDoor} chatStatus=${{ enabled: true, model: 'claude-sonnet-5' }} mcpNames=${['claude']} />` },
   ] },
   'band': { variants: [
     { name: 'default', render: (ex) => html`<${Band} title=${ex.title}><${NamedRow} label="Apps"><${ThingLink} href="/v1/apps" n=${12} label="apps" /><//>

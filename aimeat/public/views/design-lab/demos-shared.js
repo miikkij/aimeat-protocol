@@ -9,6 +9,8 @@
  * @structure SHARED_DEMOS · SHAPE_DEMOS — { [id]: { variants: [{ name, render(ex) }], height?, emptyNote? } }
  * @usage import { SHARED_DEMOS, SHAPE_DEMOS } from './demos-shared.js';
  * @version-history
+ *   v1.1.0 — 2026-09-23 — The data map's and the dialog shape's demos go with them (Jouni's
+ *     decision).
  *   v1.0.0 — 2026-09-23 — Initial (UI consolidation phase 2, the library view).
  */
 import { h } from 'preact';
@@ -23,8 +25,6 @@ import { InstallCta } from '/components/InstallCta.js';
 import { ManagedEnvNote } from '/components/ManagedEnvNote.js';
 import { McpQuickConnect } from '/components/McpInstall.js';
 import { ContactPicker } from '/components/ContactPicker.js';
-import { DataMapLine, DataMapPanel } from '/components/DataMap.js';
-import { DATA_MAP_SPEC } from '/components/data-map/model.js';
 import { TagList } from '/components/TagList.js';
 import { openAppSandboxed } from '/js/app-sandbox.js';
 import { McpSetupGuide } from '/views/profile/ai-setup-guide.js';
@@ -35,12 +35,6 @@ const noop = () => {};
 
 const MARKDOWN = '## A heading\n\nA paragraph with **bold**, *italic*, `code` and [a link](https://aimeat.io).\n\n- one\n- two\n\n> A quote.\n\n| Name | Value |\n|---|---|\n| a | 1 |\n\n```\nconst x = 1;\n```';
 const AI_RECORD = { level: 'ai-generated', disclosure: { required: true, strength: 'full' } };
-const DATA_MAP = {
-  spec: DATA_MAP_SPEC, source: 'declared', form: 'one-person',
-  what: 'A notebook that keeps your notes and nothing else.', usedFor: 'Your own notes.',
-  arrangement: 'One record per notebook.',
-  held: [{ what: 'notebook.main', holds: 'Your notes', where: 'owner-memory-private', kind: 'content', usedFor: 'feature', readers: 'owner', lossRisk: 'low', keptFor: 'until-deleted', why: 'The notes themselves.' }],
-};
 
 /** The sandbox overlay opens itself when this demo is drawn, so its look can be seen. */
 function SandboxOpen() {
@@ -92,10 +86,6 @@ export const SHARED_DEMOS = {
   'contact-picker': { height: 320, variants: [
     { name: 'default', render: (ex) => html`<${ContactPicker} value=${ex.value} placeholder=${ex.placeholder} onChange=${noop} onSubmit=${noop} />` },
   ] },
-  'data-map': { variants: [
-    { name: 'the line (unused)', render: () => html`<${DataMapLine} stamp=${{ spec: DATA_MAP_SPEC, summary: 'Your notes stay in your own memory.' }} onOpen=${noop} />` },
-    { name: 'the panel (unused)', render: () => html`<${DataMapPanel} map=${DATA_MAP} findings=${[]} appLabel="Notebook" />` },
-  ] },
   'tags': { variants: [{ name: 'default', render: (ex) => html`<${TagList} tags=${ex.tags} max=${ex.max} onTag=${noop} />` }] },
   'app-sandbox': { height: 420, variants: [{ name: 'open', render: () => html`<${SandboxOpen} />` }] },
   'own-aimeat': { variants: [{ name: 'on a demo node', render: () => html`<${OwnAimeatDemo} />` }] },
@@ -133,7 +123,6 @@ export const SHAPE_DEMOS = {
     { name: 'quota', render: () => html`<svg class="poster-box poster-box--meter poster-box--quota" width="200" height="12"><rect width="80" height="12"></rect></svg>` },
   ] },
   'frame': { variants: [{ name: 'default', render: () => el('div', 'poster-frame', 'Something with an edge.') }] },
-  'dialog': { variants: [{ name: 'default (unused)', render: () => el('div', 'poster-dialog', 'A dialog box.') }] },
   'record': { variants: [
     { name: 'default', render: () => html`<div class="poster-record"><h3 class="poster-record-title">A record</h3><p>Its details.</p></div>` },
     { name: 'small title', render: () => html`<div class="poster-record"><h3 class="poster-record-title poster-record-title--small">A record</h3></div>` },
@@ -149,7 +138,7 @@ export const SHAPE_DEMOS = {
     { name: 'large', render: () => el('aside', 'poster-aside poster-aside--large', 'A note with more room.') },
     { name: 'irreversible', render: () => el('aside', 'poster-aside poster-aside--irreversible', 'This cannot be undone.') },
   ] },
-  'chip': { variants: [{ name: 'default (unused)', render: () => el('span', 'poster-chip', 'music') }] },
+  'chip': { variants: [{ name: 'default (kept for the chip decision)', render: () => el('span', 'poster-chip', 'music') }] },
   'crumb': { variants: [{ name: 'default', render: () => el('span', 'poster-crumb', 'Profile') }] },
   'stat': { variants: [
     { name: 'default', render: () => html`<a class="poster-stat" href="#"><span class="poster-stat-number">3</span>messages wait for you</a>` },

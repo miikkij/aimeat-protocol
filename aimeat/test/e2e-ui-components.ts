@@ -87,7 +87,7 @@ await test('kind, status and q narrow the list', async () => {
     const shapes = (await json('/v1/ui/components?kind=shape')).body.data.components;
     assert(shapes.length > 0 && shapes.every((c: any) => c.kind === 'shape' && c.module === null), 'only shapes, none with a module');
     const unused = (await json('/v1/ui/components?status=unused')).body.data.components;
-    assert(unused.some((c: any) => c.id === 'agent-card'), 'the unused home agent card is listed as unused');
+    assert(unused.some((c: any) => c.id === 'chip'), 'the chip, kept for the design lab\'s decision, is listed as unused');
     assert(unused.every((c: any) => c.status === 'unused' && c.pages.length === 0), 'unused parts name no page');
     const found = (await json('/v1/ui/components?q=' + encodeURIComponent('tool call'))).body.data.components;
     assert(found.some((c: any) => c.id === 'work-log'), `q finds the work log: ${found.map((c: any) => c.id)}`);

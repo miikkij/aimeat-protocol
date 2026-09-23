@@ -294,7 +294,7 @@
         "aimeat/public/css/poster.css",
         "aimeat/public/lib/aimeat-fonts.css"
       ],
-      "digest": "sha256:d4a1f90a279a1ab71b6c1ea3"
+      "digest": "sha256:ebae23f81e59778513be592c"
     },
     "project:aimeat-frontend-verify": {
       "reviewedOn": "2026-09-20",
@@ -491,7 +491,7 @@
     },
     "project:aimeat-design-language": {
       "aimeat/public/css/theme.css": "658d30b66d70540f",
-      "aimeat/public/css/poster.css": "73a8c35e4067bbb9",
+      "aimeat/public/css/poster.css": "06f11025977b322f",
       "aimeat/public/lib/aimeat-fonts.css": "213a6ac05c5b8cce"
     },
     "project:aimeat-frontend-verify": {

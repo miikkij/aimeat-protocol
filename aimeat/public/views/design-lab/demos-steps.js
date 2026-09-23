@@ -4,12 +4,11 @@
  * SPDX-License-Identifier: MIT
  * @description The design lab's live demos for the parts of a setup path: each drawn by its real
  *   component with the catalogue entry's example data (`ex`), one render per variant or state. The
- *   parts no page draws today are drawn by the code that still holds them (StepMatDone,
- *   StepBranchB, the home AgentCard), and the stray wrapper of the agent step is drawn as it is and
- *   without the masthead's name class.
+ *   stray wrapper of the agent step is drawn as it is and without the masthead's name class.
  * @structure STEP_DEMOS · EXTRA_DEMOS — { [id]: { variants: [{ name, render(ex) }], height?, flush? } }
  * @usage import { STEP_DEMOS } from './demos-steps.js';
  * @version-history
+ *   v1.1.0 — 2026-09-23 — The demos of the deleted parts go with them (Jouni's decision).
  *   v1.0.0 — 2026-09-23 — Initial (UI consolidation phase 2, the library view).
  */
 import { h } from 'preact';
@@ -24,17 +23,10 @@ import { ModeTabs, ModeTab } from '/components/ModeTabs.js';
 import { StepList } from '/components/StepList.js';
 import { WaitingNote } from '/components/WaitingNote.js';
 import { FrontDoor } from '/components/FrontDoor.js';
-import { StepMatDone } from '/views/home/step-mat.js';
-import { StepBranchB } from '/views/home/step-branch-b.js';
-import { StepAgent, AgentCard } from '/views/home/step-agent.js';
+import { StepAgent } from '/views/home/step-agent.js';
 
 const html = htm.bind(h);
 const noop = () => {};
-
-/** StepMatDone and StepBranchB read the home's state; this is the smallest one they accept. */
-const MAT_STATE = { mat: { url: '/v1/portfolio/sandbox', standaloneUrl: 'https://sandbox.aimeat.io/' }, ai: { client: 'ChatGPT' } };
-
-const agent = (state) => ({ name: 'claude', gaii: 'claude#sandbox@aimeat-local-001-dev', health: { state }, total: 1 });
 
 /**
  * The agent step as the home draws it, and the same with the wrapper's class taken off in this
@@ -57,8 +49,6 @@ function WrapperPair({ without }) {
 export const STEP_DEMOS = {
   'step-card': { variants: [
     { name: 'open', render: (ex) => html`<${StepCard} num=${ex.num} title=${ex.title}><${StepLede}>${ex.children}<//><//>` },
-    { name: 'done (StepMatDone, unused)', render: () => html`<${StepMatDone} state=${MAT_STATE} />` },
-    { name: 'limit (StepBranchB, unused)', render: () => html`<${StepBranchB} state=${MAT_STATE} onChanged=${noop} />` },
   ] },
   'prompt-card': { variants: [
     { name: 'default', render: (ex) => html`<${PromptCard} label=${ex.label} prompt=${ex.prompt} className=${ex.className}
@@ -87,22 +77,6 @@ export const STEP_DEMOS = {
   ] },
   'waiting-note': { variants: [
     { name: 'default', render: (ex) => html`<${WaitingNote} title=${ex.title}>${ex.children}<//>` },
-  ] },
-  'agent-card': { variants: [
-    { name: 'at home', render: () => html`<${AgentCard} agent=${agent('production')} />` },
-    { name: 'idle', render: () => html`<${AgentCard} agent=${agent('idle')} />` },
-    { name: 'new', render: () => html`<${AgentCard} agent=${agent('new')} />` },
-    { name: 'onboarding', render: () => html`<${AgentCard} agent=${agent('onboarding')} />` },
-    { name: 'problem', render: () => html`<${AgentCard} agent=${{ ...agent('problem'), total: 12, problems: 2 }} />` },
-  ] },
-  'link-row': { variants: [
-    { name: 'in StepMatDone', render: () => html`<${StepMatDone} state=${MAT_STATE} />` },
-  ] },
-  'app-list': { variants: [
-    { name: 'in StepBranchB', render: () => html`<${StepBranchB} state=${MAT_STATE} onChanged=${noop} />` },
-  ] },
-  'teach-note': { variants: [
-    { name: 'in StepMatDone (shows until the corner menu was opened once)', render: () => html`<${StepMatDone} state=${MAT_STATE} />` },
   ] },
   'front-door': { emptyNote: 'Draws only for a visitor who is not signed in. Open the front page in a private window to see it.', variants: [
     { name: 'default', render: () => html`<${FrontDoor} onNavigate=${noop} />` },

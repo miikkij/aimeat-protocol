@@ -9,6 +9,7 @@
  * @structure SHARED_ENTRIES
  * @usage import { SHARED_ENTRIES } from './entries-shared.js';
  * @version-history
+ *   v1.1.0 — 2026-09-23 — DataMap deleted with its code (Jouni's decision).
  *   v1.0.0 — 2026-09-23 — Initial (UI consolidation phase 1).
  */
 import type { UiEntrySource } from './types.js';
@@ -107,16 +108,6 @@ export const SHARED_ENTRIES: UiEntrySource[] = [
         use: ['Choosing who to send to, invite or share with.'],
         variants: [],
         example: { value: '', placeholder: 'Name or email' },
-    },
-    {
-        id: 'data-map', name: 'DataMap', kind: 'component', status: 'unused',
-        summary: 'The data map: one line on an app card, and the panel it opens into.',
-        module: '/components/DataMap.js', sheet: '/css/components/data-map.css',
-        data: { shape: 'DataMapLine({ stamp, onOpen }) · DataMapPanel({ map, findings, appLabel })', fields: { stamp: 'the one-line summary', onOpen: 'opens the panel', map: 'what the app reads and writes', findings: 'what the check found', appLabel: 'the app name' } },
-        use: ['Showing what an app does with a person\'s data, before and after they use it. No page draws it today.'],
-        variants: [],
-        example: { stamp: 'Reads your notes, writes nothing' },
-        note: 'Its only page use was the Apps tab (views/profile/apps-tab.datamap.js), deleted in 8fde4f329 (2026-09-02) when per-app management moved to the app launcher, which has its own data map (src/static/app-catalog/js/data-map.js). Only the barrel file components/index.js imports it now, and nothing imports the barrel. Keep or delete is Jouni\'s call.',
     },
     {
         id: 'tags', name: 'TagList', kind: 'component', status: 'active',
