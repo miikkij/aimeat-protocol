@@ -15,7 +15,6 @@
  * @structure InstructionBlock({ orgId }) — format tabs + block + copy + placement line
  * @usage import { InstructionBlock } from '/views/profile/instruction-block.js';
  * @version-history
- *   2026-09-13: Shared choices, text and prompt surface own instruction presentation.
  *   v1.0.0 — 2026-07-31 — Initial.
  *   v1.1.0 — 2026-08-08 — Copy labels now resolve from the shared common.copy / common.copied / common.copyPrompt /
  *       common.copyLink / common.copyUrl keys; the per-view copy label keys this file used were
@@ -25,8 +24,7 @@ import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
 import { t, getLocale } from '/js/i18n.js';
-import { PromptCard } from '/components/PromptCard.js';
-import { Stack, Text, Action } from '/components/poster-parts.js';
+import { CopyButton } from '/components/CopyButton.js';
 import { fetchInstructionBlock } from '/js/services/hello-mcp.js';
 import { swallowed } from '/js/swallowed.js';
 
@@ -65,21 +63,32 @@ export function InstructionBlock({ orgId }) {
     return () => { cancelled = true; };
   }, [orgId, lang]);
 
-  if (failed) return html`<${Text} tone="muted">${tr('instrBlock.failed', 'Could not read this organism’s structure just now. Try again shortly.')}<//>`;
-  if (!data) return html`<${Text} tone="muted">${tr('instrBlock.loading', 'Reading the structure…')}<//>`;
+  if (failed) return html`<p class="ib-note">${tr('instrBlock.failed', 'Could not read this organism’s structure just now. Try again shortly.')}</p>`;
+  if (!data) return html`<p class="ib-note">${tr('instrBlock.loading', 'Reading the structure…')}</p>`;
 
   const text = (data.blocks && data.blocks[fmt]) || '';
   const active = FORMATS.find(f => f.id === fmt) || FORMATS[0];
   const placement = (data.placement && data.placement[active.place]) || '';
 
-  return html`<${Stack}>
-    <${Stack} direction="wrap">${FORMATS.map(f => html`<${Action} key=${f.id} kind="tab" selected=${f.id === fmt}
-      onClick=${() => setFmt(f.id)}>${tr(f.labelKey,f.labelFallback)}<//>`)}<//>
-    <${Text}>${placement}<//>
-    <${PromptCard} prompt=${text} copyLabel=${tr('instrBlock.copy','Copy the block')} copiedLabel=${tr('common.copied','Copied')} />
-    <${Text} kind="caption">${tr('instrBlock.from','Generated from')} ${data.organism_name || data.organism_id}${
-      Array.isArray(data.workspaces) && data.workspaces.length ? ', '+data.workspaces.length+' '+tr('instrBlock.workspaces','workspaces') : ''}<//>
-  <//>`;
+  return html`
+    <div class="ib">
+      <div class="ib-tabs">
+        ${FORMATS.map(f => html`
+          <button key=${f.id} type="button"
+            class=${'ib-tab' + (f.id === fmt ? ' ib-tab--active' : '')}
+            onClick=${() => setFmt(f.id)}>${tr(f.labelKey, f.labelFallback)}</button>`)}
+      </div>
+      <p class="ib-place">${placement}</p>
+      <pre class="ib-block">${text}</pre>
+      <div class="ib-actions">
+        <${CopyButton} text=${text} className="btn-primary"
+          label=${tr('instrBlock.copy', 'Copy the block')}
+          copiedLabel=${tr('common.copied', 'Copied')} />
+        <span class="ib-meta">${tr('instrBlock.from', 'Generated from')} ${data.organism_name || data.organism_id}${
+          Array.isArray(data.workspaces) && data.workspaces.length
+            ? `, ${data.workspaces.length} ${tr('instrBlock.workspaces', 'workspaces')}` : ''}</span>
+      </div>
+    </div>`;
 }
 
 export default InstructionBlock;

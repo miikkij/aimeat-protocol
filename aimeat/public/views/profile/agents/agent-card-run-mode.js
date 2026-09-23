@@ -12,8 +12,6 @@
  * @structure renderRunModeBadge(agent) · RunModeSwitch({ agent, showToast })
  * @usage import { RunModeSwitch, renderRunModeBadge } from './agent-card-run-mode.js';
  * @version-history
- *   v2.0.0 -- 2026-09-22 -- Composed from the shared set: the badge is a Chip, the three choices the
- *     shared tab action as a radio-like pressed group, the note a muted Text. No class of its own.
  *   v1.1.0 — 2026-09-14 — The three buttons are the shared choice group (og-choice), the pressed one on
  *     the sun, so the switch looks like the same control everywhere on the poster face.
  *   v1.0.0 — 2026-09-01 — Extracted with the switch (Agent v2, post-audit item 5).
@@ -25,7 +23,6 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { apiPatch } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
-import { Stack, Chip, Action, Text } from '/components/poster-parts.js';
 
 /**
  * How the agent is meant to be RUN, when anyone has said. Absent on every agent that predates the
@@ -35,7 +32,7 @@ import { Stack, Chip, Action, Text } from '/components/poster-parts.js';
 export function renderRunModeBadge(agent) {
   const runMode = agent.run_mode;
   if (!runMode) return '';
-  return html`<${Chip} tone="muted" title=${t('profile.agents.runMode.tooltip') || ''}>${t(`profile.agents.runMode.${runMode}`) || runMode}<//>`;
+  return html`<span class="pf-agd-badge pf-agd-badge--run pf-agd-badge--run-${runMode}" title=${t('profile.agents.runMode.tooltip') || ''}>${t(`profile.agents.runMode.${runMode}`) || runMode}</span>`;
 }
 
 /**
@@ -80,23 +77,26 @@ export function RunModeSwitch({ agent, showToast }) {
   }
 
   return html`
-    <${Stack} density="compact">
-      <${Text} kind="label">${t('profile.agents.runMode.label')}<//>
+    <div class="pf-agd-runmode">
+      <span class="pf-agd-runmode-label">${t('profile.agents.runMode.label')}</span>
       ${/* THREE CHOICES, NOT TWO, AND EVERY ONE OF THEM REACHABLE FROM EVERY OTHER. `unset` is on
             screen because it is a real state and the one an agent starts in: nobody has said, so a
             spawner leaves it alone. With two buttons a person could enter a decision and never
             leave it — a mistaken `spawn` put an agent on the roster for good, and the only way back
             was an API call nobody would find. crewaimeat-dev hit exactly that on 2026-09-03 and
             could not undo a test agent. `null` on the wire; the button is the third choice here. */''}
-      <${Stack} direction="wrap" role="group" label=${t('profile.agents.runMode.label')}>
+      <div class="pf-agd-runmode-choice og-choice" role="group" aria-label=${t('profile.agents.runMode.label')}>
         ${[['spawn', 'spawn'], ['resident', 'resident'], [null, 'unset']].map(([value, key]) => html`
-          <${Action} kind="tab" key=${key} selected=${runMode === value} disabled=${saving}
+          <button type="button"
+            class="og-choice-btn ${runMode === value ? 'on' : ''}"
+            aria-pressed=${runMode === value ? 'true' : 'false'}
+            disabled=${saving}
             onClick=${() => choose(value)}>
             ${t(`profile.agents.runMode.${key}`)}
-          <//>
+          </button>
         `)}
-      <//>
-      <${Text} kind="caption" tone="muted">${t('profile.agents.runMode.tooltip')}<//>
-    <//>
+      </div>
+      <p class="pf-agd-runmode-note">${t('profile.agents.runMode.tooltip')}</p>
+    </div>
   `;
 }

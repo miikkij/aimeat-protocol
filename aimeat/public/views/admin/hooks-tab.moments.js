@@ -15,9 +15,6 @@
  * @structure HookMoments({ data, onBind, busy, toSection }) — the filters, the groups, the rows
  * @usage <${HookMoments} data=${data} onBind=${bind} busy=${busy} toSection=${toSection} />
  * @version-history
- *   v2.0.0 -- 2026-09-22 -- Composed from the shared component set: each moment is a list row (what
- *     it is, why, its name, the gate chip and what is bound at the right, the doors), the filters
- *     are tab actions, the gate's loud chip is the shared danger chip. No classes of its own.
  *   v1.1.0 — 2026-09-13 — Compose the shared poster section heading.
  *   v1.0.0 — 2026-09-12 — Initial (the Hooks page in the poster face).
  */
@@ -28,7 +25,6 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { Badge, when } from './shared.js';
 import { useConfirm } from '/components/Modal.js';
-import { Section, Stack, ListRow, Chip, Action, Text } from '/components/poster-parts.js';
 
 const S = (key, params) => t('admin.hooks.' + key, params);
 
@@ -40,20 +36,21 @@ function Bound({ hook }) {
   if (hook.actions.length === 0) {
     return html`<${Badge} type="muted" label=${S('moments.nothingBound')} />`;
   }
-  return html`<${Stack} density="compact" align="end">
-    ${hook.actions.map(a => html`<${Text} key=${a.ref} kind="mono">
-      ${a.name || a.ref}
-      ${!a.published
-        ? html` <${Text} kind="mono" tone="muted">${S('moments.notPublished')}<//>`
-        : !a.has_address
-          ? html` <${Text} kind="mono" tone="muted">${S('moments.noAddress')}<//>`
-          : html` <${Text} kind="mono" tone="muted">· ${a.host}<//>`}
-    <//>`)}
+  return html`<div class="adm-hook-bound">
+    ${hook.actions.map(a => html`
+      <span key=${a.ref} class="adm-hook-bound-a">
+        ${a.name || a.ref}
+        ${!a.published
+          ? html` <i>${S('moments.notPublished')}</i>`
+          : !a.has_address
+            ? html` <i>${S('moments.noAddress')}</i>`
+            : html` <i>· ${a.host}</i>`}
+      </span>`)}
     ${hook.last
-      ? html`<${Badge} type=${hook.last.allowed ? (hook.last.answer === 'ok' ? 'healthy' : 'watch') : 'danger'}
-                       label=${S('runs.answer_' + hook.last.answer)} />`
-      : html`<${Text} kind="mono" tone="muted">${S('moments.notCalledYet')}<//>`}
-  <//>`;
+      ? html`<span><${Badge} type=${hook.last.allowed ? (hook.last.answer === 'ok' ? 'healthy' : 'watch') : 'danger'}
+                             label=${S('runs.answer_' + hook.last.answer)} /></span>`
+      : html`<span class="adm-hook-mono">${S('moments.notCalledYet')}</span>`}
+  </div>`;
 }
 
 export function HookMoments({ data, onBind, busy, toSection }) {
@@ -65,36 +62,45 @@ export function HookMoments({ data, onBind, busy, toSection }) {
 
   const clear = (hook) => confirm(S('moments.clearConfirm', { hook: hook.name }), () => onBind(hook.name, []), { danger: true });
 
-  return html`<${Section} id="adm-hook-02" title=${S('moments.title')} count="02" description=${S('moments.lead')}
-    actions=${[['all', S('moments.filterAll')], ['gates', S('moments.filterGates')], ['bound', S('moments.filterBound')]]
-      .map(([id, label]) => html`<${Action} key=${id} kind="tab" selected=${only === id} onClick=${() => setOnly(id)}>${label}<//>`)}>
-    <${Stack}>
+  return html`
+    <section class="og-sec" id="adm-hook-02">
+      <div class="og-sec-h"><h2 class="poster-section-title">${S('moments.title')}<small>02</small></h2>
+        <div class="adm-hook-filters">
+          ${[['all', S('moments.filterAll')], ['gates', S('moments.filterGates')], ['bound', S('moments.filterBound')]]
+            .map(([id, label]) => html`
+              <button type="button" key=${id} class=${'adm-hook-fchip' + (only === id ? ' on' : '')}
+                      onClick=${() => setOnly(id)}>${label}</button>`)}
+        </div>
+      </div>
+      <p class="adm-hook-lead">${S('moments.lead')}</p>
+
       ${GROUPS.map(group => {
         const rows = shown.filter(h_ => h_.guards === group);
         if (rows.length === 0) return null;
-        return html`<${Stack} key=${group} density="compact">
-          <${Text} kind="label">${S('moments.group_' + group)}<//>
-          <div>
-            ${rows.map((hook) => html`<${ListRow} key=${hook.name}
-              name=${S('moments.h_' + hook.name)} detail=${S('moments.w_' + hook.name)} detailKind="text"
-              value=${html`<${Stack} density="compact" align="end">
-                <${Text} kind="mono">${hook.name}<//>
-                ${hook.kind === 'gate'
-                  ? html`<${Chip} tone="danger">${S('moments.canRefuse')}<//>`
-                  : html`<${Badge} type="info" label=${S('moments.toldAfter')} />`}
-                <${Bound} hook=${hook} />
-              <//>`}
-              actions=${html`
-                <${Action} disabled=${busy} onClick=${() => toSection('03')}>${S('moments.bind')}<//>
+        return html`<div key=${group}>
+          <div class="adm-hook-group">${S('moments.group_' + group)}</div>
+          ${rows.map((hook, i) => html`
+            <div key=${hook.name} class=${'adm-hook-row' + (i === rows.length - 1 ? ' adm-hook-row--last' : '')}>
+              <span class="adm-hook-name">${hook.name}</span>
+              <span>
+                <b>${S('moments.h_' + hook.name)}</b>
+                <span class="adm-why">${S('moments.w_' + hook.name)}</span>
+              </span>
+              <span>${hook.kind === 'gate'
+                ? html`<span class="adm-hook-gate">${S('moments.canRefuse')}</span>`
+                : html`<${Badge} type="info" label=${S('moments.toldAfter')} />`}</span>
+              <span><${Bound} hook=${hook} /></span>
+              <span class="adm-hook-rowacts">
+                <button type="button" class="og-door og-door--quiet" disabled=${busy} onClick=${() => toSection('03')}>${S('moments.bind')}</button>
                 ${hook.actions.length > 0
-                  ? html`<${Action} tone="danger" disabled=${busy} onClick=${() => clear(hook)}>${S('moments.clear')}<//>`
-                  : null}`} />`)}
-          </div>
-        <//>`;
+                  ? html`<button type="button" class="og-door og-door--danger" disabled=${busy} onClick=${() => clear(hook)}>${S('moments.clear')}</button>`
+                  : null}
+              </span>
+            </div>`)}
+        </div>`;
       })}
-      ${shown.length === 0 ? html`<${Text} tone="muted">${S('moments.noneMatch')}<//>` : null}
-      ${data.runs.length > 0 ? html`<${Text} kind="caption" tone="muted">${S('moments.lastCall', { at: when(data.runs[0].at) })}<//>` : null}
-    <//>
-    <${ConfirmUI} />
-  <//>`;
+      ${shown.length === 0 ? html`<div class="adm-hook-empty">${S('moments.noneMatch')}</div>` : null}
+      ${data.runs.length > 0 ? html`<p class="adm-hook-note">${S('moments.lastCall', { at: when(data.runs[0].at) })}</p>` : null}
+      <${ConfirmUI} />
+    </section>`;
 }

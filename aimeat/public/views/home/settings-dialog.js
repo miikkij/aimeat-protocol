@@ -20,7 +20,6 @@
  *   import { HomeSettingsDialog } from '/views/home/settings-dialog.js';
  *   html`<${HomeSettingsDialog} open=${open} onClose=${close} />`
  * @version-history
- *   2026-09-13: Shared dialog, sections and fields own all home-settings appearance.
  *   2026-09-13: Compose the existing home shapes with shared poster classes.
  *   2026-09-13: The dialog is the site's one dialog at its medium size; its two sections open on the
  *     page's own slab (poster-section-title) and the door out is a row under an ink rule.
@@ -45,7 +44,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { api, apiGet } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
-import { Dialog, Section, Stack, Surface, Text, Field, Action, ListRow } from '/components/poster-parts.js';
+import { Modal } from '/components/Modal.js';
 import { StartPageSetting } from '/components/StartPageSetting.js';
 import { EditProfileModal, ChangePasswordModal } from '../profile/landing-page.modals.js';
 import { MARGIN_PATTERNS, applyMarginPattern, marginPatternOf } from '/js/margin-pattern.js';
@@ -74,19 +73,29 @@ function MarginPatternSetting() {
       .catch((e) => swallowed('home settings: prefs write', e));
   };
   return html`
-    <${Stack}>
-      <${Text} kind="label">${tr('home.settings.pattern', 'Margin pattern')}<//>
-      <${Text} tone="muted">${tr('home.settings.patternHint', 'A figure on the empty margins, fading toward the middle.')}<//>
-      <${Surface} kind="preview">
-        ${current ? html`<div class=${'mp-swatch mp-swatch--'+current} aria-hidden="true"></div>`
-          : html`<${Text} tone="muted">${tr('home.settings.patternOff','Off')}<//>`}
-      <//>
-      <${Stack} direction="wrap" role="radiogroup" label=${tr('home.settings.pattern','Margin pattern')}>
-        <${Action} kind="tab" semantics="radio" selected=${current===''} onClick=${()=>choose('')}>${tr('home.settings.patternOff','Off')}<//>
-        ${MARGIN_PATTERNS.map(p=>html`<${Action} key=${p} kind="tab" semantics="radio" selected=${current===p} onClick=${()=>choose(p)}>
-          ${tr('home.settings.patterns.'+p,p.toUpperCase())}<//>`)}
-      <//>
-    <//>`;
+    <div class="koti-settings-pattern">
+      <div class="koti-settings-pattern-words">
+        <span class="koti-settings-pattern-title">${tr('home.settings.pattern', 'Margin pattern')}</span>
+        <span class="koti-settings-pattern-hint">${tr('home.settings.patternHint', 'A figure on the empty margins, fading toward the middle.')}</span>
+      </div>
+      ${/* The preview: the same variables the page's strips read, so it shows what the margin
+            will show, fading to the right the way the left strip fades toward the middle. */''}
+      <div class="koti-settings-pattern-preview" aria-hidden="true">
+        ${current ? html`<div class=${`mp-swatch mp-swatch--${current}`}></div>` : html`<span class="koti-settings-pattern-none">${tr('home.settings.patternOff', 'Off')}</span>`}
+      </div>
+      <div class="koti-settings-pattern-choices" role="radiogroup" aria-label=${tr('home.settings.pattern', 'Margin pattern')}>
+        <button type="button" class=${`koti-settings-pattern-choice ${current === '' ? 'active' : ''}`}
+          role="radio" aria-checked=${current === '' ? 'true' : 'false'} onClick=${() => choose('')}>
+          ${tr('home.settings.patternOff', 'Off')}
+        </button>
+        ${MARGIN_PATTERNS.map((p) => html`
+          <button type="button" key=${p} class=${`koti-settings-pattern-choice ${current === p ? 'active' : ''}`}
+            role="radio" aria-checked=${current === p ? 'true' : 'false'} onClick=${() => choose(p)}>
+            ${tr('home.settings.patterns.' + p, p.toUpperCase())}
+          </button>
+        `)}
+      </div>
+    </div>`;
 }
 
 /**
@@ -110,8 +119,10 @@ function AchievementsToggle() {
     window.dispatchEvent(new Event('aimeat-live-update'));
   };
   return html`
-    <${Field} type="checkbox" value=${!hidden} onChange=${flip}
-      label=${tr('home.settings.showAch','Show achievements on the home')} />`;
+    <label class="koti-settings-switch koti-ach-toggle">
+      <input type="checkbox" checked=${!hidden} onChange=${flip} />
+      ${tr('home.settings.showAch', 'Show achievements on the home')}
+    </label>`;
 }
 
 export function HomeSettingsDialog({ open, onClose, session, showToast }) {
@@ -125,19 +136,33 @@ export function HomeSettingsDialog({ open, onClose, session, showToast }) {
     onClose=${() => setPanel('settings')}
     onChanged=${() => { setPanel('settings'); showToast?.(t('profile.landing.passwordChanged')); }} />`;
   return html`
-    <${Dialog} open=${open} onClose=${onClose} title=${tr('home.settings.title','Home settings')}>
-      <${Stack}>
-        <${Section} title=${t('homeJourney.account')} size="small"><${Stack} align="start">
-          <${Action} onClick=${()=>setPanel('password')}>${t('profile.landing.changePasswordBtn')}<//>
-          <${Action} onClick=${()=>setPanel('profile')}>${t('homeJourney.profileLanguage')}<//>
-          <${Action} href="/v1/profile?tab=access">${t('homeJourney.security')} →<//>
-          <${Text} tone="muted">${t('homeJourney.securityHint')}<//>
-        <//><//>
-        <${Section} title=${t('homeJourney.appearance')} size="small"><${Stack}>
-          <${AchievementsToggle} /><${MarginPatternSetting} /><${StartPageSetting} />
-        <//><//>
-        <${ListRow} href="/v1/profile" detailKind="text" name=${tr('home.settings.allControls','All settings and controls')+' →'}
-          detail=${tr('home.settings.allControlsHint','Agents, memory, apps, access, billing: everything behind the home.')} />
-      <//>
+    <${Modal} open=${open} onClose=${onClose} size="md"
+      title=${tr('home.settings.title', 'Home settings')}
+      className="koti-settings-modal">
+      <div class="koti-settings">
+        ${/* Inside a dialog a section starts the way it does on the page: the slab, a size smaller. */''}
+        <section class="poster-section koti-account-settings">
+          <h3 class="poster-section-title">${t('homeJourney.account')}</h3>
+          <button type="button" class="poster-action koti-link" onClick=${() => setPanel('password')}>${t('profile.landing.changePasswordBtn')}</button>
+          <button type="button" class="poster-action koti-link" onClick=${() => setPanel('profile')}>${t('homeJourney.profileLanguage')}</button>
+          <a class="poster-action koti-link" href="/v1/profile?tab=access">${t('homeJourney.security')} →</a>
+          <p class="koti-hint">${t('homeJourney.securityHint')}</p>
+        </section>
+        <section class="poster-section">
+          <h3 class="poster-section-title">${t('homeJourney.appearance')}</h3>
+          <${AchievementsToggle} />
+          <${MarginPatternSetting} />
+          <${StartPageSetting} className="koti-settings-startpage" />
+        </section>
+        ${/* Everything that is not the home's own. A full page load rather than a router call: the
+              dialog is open over the home, and the cleanest way out of a modal into another shell
+              is to leave. */''}
+        <a class="koti-settings-door poster-row--thing" href="/v1/profile">
+          <span class="koti-settings-door-title">${tr('home.settings.allControls', 'All settings and controls')} →</span>
+          <span class="koti-settings-door-hint">
+            ${tr('home.settings.allControlsHint', 'Agents, memory, apps, access, billing: everything behind the home.')}
+          </span>
+        </a>
+      </div>
     <//>`;
 }

@@ -8,14 +8,11 @@
  * @usage import { loadFavorites, toggleFavorite, isFavorite, getFavoriteRefs, favStarHtml } from './favorites.js'
  * @version-history
  *   v1.0.0 — 2026-07-20 — initial (Phase 2b server-backed favourites).
- *   v1.1.0 — 2026-09-22 — The star is the set's icon action (parts-html.js) with a drawn star,
- *     pressed while on, instead of a catalog button with an emoji.
  */
 import { loadConfig } from './config.js';
 import { getCortexOwnerToken } from './cortex.js';
 import { t } from './i18n.js';
 import { jsArg } from './util.js';
-import { action } from './parts-html.js';
 
 const KEY = 'app-catalog.favorites';
 let favSet = new Set();
@@ -64,15 +61,12 @@ export function toggleFavorite(ref) {
   return persist().then(function () { return now; });
 }
 
-// The star toggle for a row: the set's icon action, pressed while the app is a favourite, the star
-// drawn filled then and outlined otherwise. `ref` is "owner/filename". Stops propagation so a click
-// on the star never opens the row.
+// The ⭐/☆ toggle button for a card. `ref` is "owner/filename". Stops propagation so a click on the
+// star never opens the card's detail view.
 export function favStarHtml(ref) {
   var on = favSet.has(ref);
   var title = on ? (t('fav.remove') || 'Remove from favourites') : (t('fav.add') || 'Add to favourites');
-  return action({
-    kind: 'icon', selected: on, label: title, title: title,
-    onclick: 'event.stopPropagation(); window._launcher.toggleFavorite(\'' + jsArg(ref) + '\')'
-  }, '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M12 3l2.7 5.6 6.1.8-4.5 4.2 1.1 6.1L12 16.8l-5.4 2.9 1.1-6.1-4.5-4.2 6.1-.8Z" fill="' +
-    (on ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>');
+  return '<button class="fav-toggle' + (on ? ' on' : '') + '"'
+    + ' onclick="event.stopPropagation(); window._launcher.toggleFavorite(\'' + jsArg(ref) + '\')"'
+    + ' title="' + title + '">' + (on ? '⭐' : '☆') + '</button>';
 }

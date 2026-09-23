@@ -4,19 +4,16 @@
  * SPDX-License-Identifier: MIT
  * @description Section 02 of the Agents page (design canvas "AIMEAT Admin Agents"): the search
  *   field, the five filter chips that are the numeral strip's counts made pressable, and the table
- *   that says for the first time what each agent may do. An agent's name opens its record directly
- *   above the table (the pattern admin Capabilities uses), so the table keeps its column heads.
+ *   that says for the first time what each agent may do. A row opens into its record in place.
  *   Everything here runs on the agent list the page already fetched; there is no second read, no
  *   sort parameter and no page number to ask the node for.
  *
  * @structure
- *   - AgentsList(props) — the toolbar, the opened record, the table, the footer
+ *   - AgentsList(props) — the find row, the head, the rows, the opened record, the footer
+ *   - Chip: one filter chip carrying its count
  *   - trustCell / scopeCell: the two columns whose reading is not the raw value
  *
  * @version-history
- *   2026-09-22 -- Composed from the shared component set (Section, Toolbar, Table, Chip, Text):
- *     the hand-made grid, chips and field leave. The list is the shared table with its five column
- *     heads, stacking on a phone, and the opened record sits above it with its close word.
  *   v1.1.0 — 2026-09-13 — Compose the shared poster list heading.
  *   v1.0.0 — 2026-09-12 — Initial, with the Agents page in the poster face.
  */
@@ -24,9 +21,8 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { Section, Stack, Toolbar, Table, Chip, Action, Text, scrollToId } from '/components/poster-parts.js';
 import { trustKind, trustText, isAwake } from './agents-tab.derive.js';
-import AgentRecord, { seenWords, RECORD_ID } from './agents-tab.record.js';
+import AgentRecord, { seenWords } from './agents-tab.record.js';
 
 const A = (key, params) => t('dashboard.agentsTab.' + key, params);
 
@@ -35,14 +31,17 @@ export const PAGE = 40;
 /** How many scope words fit the column before the rest become a count. */
 const SCOPES_SHOWN = 2;
 
-/** The five filters, in the order the strip counts them. */
-const FILTERS = [
-  ['all', 'chipAll', 'total'], ['awake', 'chipAwake', 'awake'], ['silent', 'chipSilent', 'silent'],
-  ['node', 'chipNode', 'nodeMade'], ['low', 'chipLow', 'low'],
-];
+/** One filter chip: the word and the count it stands for. */
+function Chip({ id, label, count, on, coral, onPick }) {
+  return html`
+    <button type="button"
+      class="adm-ag-chip ${on ? 'on' : ''} ${coral ? 'adm-ag-chip--coral' : ''}"
+      aria-pressed=${on ? 'true' : 'false'}
+      onClick=${() => onPick(id)}>${label}<b>${count}</b></button>`;
+}
 
 /**
- * The trust reading.
+ * The trust column.
  *
  * 50.0 is what an agent is registered with and it only moves when somebody reads that agent's
  * profile, so the page dims it rather than letting a wall of identical numbers read as a measured
@@ -50,20 +49,20 @@ const FILTERS = [
  */
 function trustCell(agent) {
   const kind = trustKind(agent.trust_score);
-  if (kind === 'unknown') return html`<${Text} kind="mono" tone="muted">${A('trustUnknown')}<//>`;
-  const tone = kind === 'low' ? 'danger' : kind === 'registered' ? 'muted' : 'plain';
-  return html`<${Text} kind="mono" tone=${tone}>${trustText(agent.trust_score)}<//>`;
+  if (kind === 'unknown') return html`<span class="adm-ag-tr adm-ag-tr--none">${A('trustUnknown')}</span>`;
+  const cls = kind === 'low' ? 'adm-ag-tr--low' : kind === 'registered' ? 'adm-ag-tr--none' : '';
+  return html`<span class="adm-ag-tr ${cls}">${trustText(agent.trust_score)}</span>`;
 }
 
 /** The scopes column: the first two words, then how many more there are. */
 function scopeCell(agent) {
   const scopes = agent.default_scopes;
-  if (!scopes?.length) return html`<${Chip} tone="muted">${A('scopesNone')}<//>`;
+  if (!scopes?.length) return html`<span>${A('scopesNone')}</span>`;
   const shown = scopes.slice(0, SCOPES_SHOWN);
   const rest = scopes.length - shown.length;
   return html`
-    ${shown.map(s => html`<${Chip} key=${s}>${s}<//>`)}
-    ${rest > 0 && html`<${Text} kind="mono" tone="muted">+${rest}<//>`}`;
+    ${shown.map(s => html`<span>${s}</span>`)}
+    ${rest > 0 && html`<span class="adm-ag-scp-more">+${rest}</span>`}`;
 }
 
 export default function AgentsList({
@@ -72,52 +71,76 @@ export default function AgentsList({
 }) {
   const shown = rows.slice(0, limit);
   const oldestFirst = filter === 'silent';
-  const openAgent = openGaii ? rows.find(a => a.gaii === openGaii) || null : null;
-  /** Open or close a record; an opened one is brought to the top of the content area. */
-  const toggle = (gaii) => {
-    const opening = openGaii !== gaii;
-    onToggle(gaii);
-    if (opening) setTimeout(() => scrollToId(RECORD_ID), 0);
-  };
 
   return html`
-    <${Section} title=${A('listTitle')} count="02"
-      actions=${html`<${Text} kind="caption" tone="muted">${oldestFirst ? A('sortOldest') : A('sortNewest')}<//>`}>
-      <${Stack}>
-        <${Toolbar} label=${A('listTitle')}
-          search=${{ label: A('findLabel'), placeholder: A('findPlaceholder'), value: query, onInput: e => onQuery(e.target.value) }}
-          filters=${FILTERS.map(([id, label, count]) => ({ id, label: `${A(label)} ${counts[count]}`, selected: filter === id,
-    tone: id === 'low' ? 'coral' : undefined, onClick: () => onFilter(id) }))} />
+    <section class="og-sec">
+      <div class="og-sec-h">
+        <h2 class="poster-section-title">${A('listTitle')}<small>02</small></h2>
+        <div class="og-doors"><span class="og-door og-door--quiet">${oldestFirst ? A('sortOldest') : A('sortNewest')}</span></div>
+      </div>
 
-        ${openAgent && html`<${AgentRecord} agent=${openAgent} detail=${detail} loading=${detailLoading} now=${now}
-          onClose=${() => onToggle(openAgent.gaii)} onOwner=${() => onOwner(openAgent.owner)} onOrigins=${onOrigins} />`}
+      <div class="adm-ag-find">
+        <div class="og-field">
+          <label class="og-label" for="adm-ag-q">${A('findLabel')}</label>
+          <input id="adm-ag-q" class="og-input" type="search" value=${query}
+            placeholder=${A('findPlaceholder')} onInput=${e => onQuery(e.target.value)} />
+        </div>
+        <div class="adm-ag-chips">
+          <${Chip} id="all" label=${A('chipAll')} count=${counts.total} on=${filter === 'all'} onPick=${onFilter} />
+          <${Chip} id="awake" label=${A('chipAwake')} count=${counts.awake} on=${filter === 'awake'} onPick=${onFilter} />
+          <${Chip} id="silent" label=${A('chipSilent')} count=${counts.silent} on=${filter === 'silent'} onPick=${onFilter} />
+          <${Chip} id="node" label=${A('chipNode')} count=${counts.nodeMade} on=${filter === 'node'} onPick=${onFilter} />
+          <${Chip} id="low" label=${A('chipLow')} count=${counts.low} on=${filter === 'low'} coral=${true} onPick=${onFilter} />
+        </div>
+      </div>
 
-        ${shown.length === 0
-    ? html`<${Text} tone="muted">${A('nothingMatches')}<//>`
-    : html`<${Table} density="compact" collapse=${600} label=${A('listTitle')}
-            headers=${[A('colAgent'), A('colOwner'), A('colMayDo'), A('colTrust'), A('colSeen'), '']}
-            rows=${shown.map(a => {
+      <div class="adm-ag-row adm-ag-row--head">
+        <div class="adm-ag-c-name">${A('colAgent')}</div>
+        <div class="adm-ag-c-own">${A('colOwner')}</div>
+        <div class="adm-ag-scp adm-ag-c-scp">${A('colMayDo')}</div>
+        <div class="adm-ag-c-tr">${A('colTrust')}</div>
+        <div class="adm-ag-c-seen">${A('colSeen')}</div>
+        <div class="adm-ag-go"></div>
+      </div>
+
+      ${shown.length === 0 && html`<p class="adm-ag-note">${A('nothingMatches')}</p>`}
+
+      ${shown.map(a => {
     const open = openGaii === a.gaii;
-    return [
-      html`<${Stack} density="compact">
-        <${Action} kind="text" expanded=${open} onClick=${() => toggle(a.gaii)}>${a.display_name || a.gaii.split('#')[0]}<//>
-        <${Text} kind="mono" tone="muted">${a.gaii}<//>
-      <//>`,
-      html`<${Action} kind="text" onClick=${() => onOwner(a.owner)}>${a.owner}<//>`,
-      html`<${Stack} direction="wrap" align="center" density="compact">${scopeCell(a)}<//>`,
-      trustCell(a),
-      html`<${Text} kind="mono" tone=${isAwake(a, now) ? 'success' : 'muted'}>${seenWords(a.last_seen, now)}<//>`,
-      html`<${Action} onClick=${() => toggle(a.gaii)} expanded=${open}>${open ? A('close') : A('open')}<//>`,
-    ];
-  })} />`}
+    return html`
+      <div class="adm-ag-row ${open ? 'adm-ag-row--open' : ''}">
+        <div class="adm-ag-c-name">
+          <button type="button" class="adm-ag-nm ${open ? 'is-open' : ''}" onClick=${() => onToggle(a.gaii)}>
+            ${a.display_name || a.gaii.split('#')[0]}
+          </button>
+          <span class="adm-ag-addr">${a.gaii}</span>
+        </div>
+        <div class="adm-ag-c-own">
+          <button type="button" class="adm-ag-own" onClick=${() => onOwner(a.owner)}>${a.owner}</button>
+        </div>
+        <div class="adm-ag-scp adm-ag-c-scp">${scopeCell(a)}</div>
+        <div class="adm-ag-c-tr">${trustCell(a)}</div>
+        <div class="adm-ag-c-seen">
+          <span class="adm-ag-seen ${isAwake(a, now) ? 'adm-ag-seen--now' : ''}">${seenWords(a.last_seen, now)}</span>
+        </div>
+        <div class="adm-ag-go">
+          <button type="button" class="og-door og-door--quiet" onClick=${() => onToggle(a.gaii)}>
+            ${open ? A('close') : A('open')}
+          </button>
+        </div>
+      </div>
+      ${open && html`<${AgentRecord} agent=${a} detail=${detail} loading=${detailLoading} now=${now}
+        onClose=${() => onToggle(a.gaii)} onOwner=${() => onOwner(a.owner)} onOrigins=${onOrigins} />`}`;
+  })}
 
-        <${Stack} direction="horizontal" align="between">
-          <${Text} kind="caption" tone="muted">${A('footShown', { shown: Math.min(shown.length, rows.length), total: rows.length })}${
-  rows.length !== total ? A('footOf', { total }) : ''}<//>
-          ${rows.length > shown.length && html`
-            <${Action} onClick=${onMore}>${A('showMore', { n: Math.min(PAGE, rows.length - shown.length) })}<//>`}
-        <//>
-        <${Text} kind="caption" tone="muted">${A('trustLegend')}<//>
-      <//>
-    <//>`;
+      <div class="adm-ag-foot">
+        <span>${A('footShown', { shown: Math.min(shown.length, rows.length), total: rows.length })}${
+  rows.length !== total ? A('footOf', { total }) : ''}</span>
+        ${rows.length > shown.length && html`
+          <button type="button" class="og-door og-door--quiet" onClick=${onMore}>
+            ${A('showMore', { n: Math.min(PAGE, rows.length - shown.length) })}
+          </button>`}
+      </div>
+      <p class="adm-ag-note">${A('trustLegend')}</p>
+    </section>`;
 }

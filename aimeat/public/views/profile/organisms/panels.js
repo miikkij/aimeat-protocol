@@ -9,9 +9,6 @@
  * @structure OrgSearch, IncomingInvitations, BoardPreview
  * @usage import { OrgSearch, IncomingInvitations, BoardPreview } from '/views/profile/organisms/panels.js';
  * @version-history
- *   2026-09-22 -- An invitation's Accept carries the success tone and Decline the danger tone.
- *   2026-09-22 -- Composed from the shared set (Section, ListRow, Field, Action): no class of its own; the
- *     board's copy-ID clipboard emoji is the worded action, the invitations banner is a selected Section.
  *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
  *   2026-09-13 — V1: compose page and B1 section headings from the shared poster classes.
  *   v1.0.0 — 2026-06-19 — Extracted from organisms-tab.js during the module split.
@@ -27,7 +24,8 @@ import htm from 'htm';
 import { onLiveUpdate } from '/lib/live-updates.js';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { Section, Stack, ListRow, Action, Field, Text, Toolbar } from '/components/poster-parts.js';
+import { Spinner } from '/views/profile/shared.js';
+import { EmptyState } from '/components/EmptyState.js';
 import * as orgService from '/js/services/organisms.js';
 import { listPosts, createPost } from '/js/services/boards.js';
 import { copyToClipboard } from '/js/utils.js';
@@ -69,20 +67,28 @@ export function OrgSearch({ orgId, onOpenWorkspace }) {
   const byWs = {};
   for (const r of (results || [])) (byWs[r.ws] = byWs[r.ws] || { name: r.wsName || r.ws, hits: [] }).hits.push(r);
 
-  return html`<${Stack} density="compact">
-    <${Toolbar} label=${t('organisms.searchPlaceholder') || 'Find records & documents…'}
-      search=${{ label: t('organisms.searchPlaceholder') || 'Find records & documents…', value: q, onInput: (e) => setQ(e.target.value) }}
-      count=${busy ? (t('search.searching') || 'Searching…') : null}
-      actions=${results !== null ? html`<${Action} onClick=${() => setQ('')}>${t('search.clear') || 'Clear'}<//>` : null} />
-    ${results !== null && results.length === 0 && !busy ? html`<${Text} kind="caption" tone="muted">${t('search.noMatches') || 'No matches.'}<//>` : null}
-    ${Object.entries(byWs).map(([ws, grp]) => html`
-      <${Stack} key=${ws} density="compact">
-        <${Text} kind="label">${grp.name} ${grp.hits.length}<//>
-        ${grp.hits.map(r => html`<${ListRow} key=${r.space + '/' + r.id} density="compact" preview=${true} onOpen=${() => openHit(r)}
-          name=${`${r.title} · ${r.space}`} detail=${r.snippet} />`)}
-      <//>`)}
-  <//>`;
+  return html`
+    <div class="pj-orgsearch">
+      <div class="flex-row-wrap">
+        <input class="input-field input-sm pj-orgsearch-input" placeholder=${t('organisms.searchPlaceholder') || 'Find records & documents…'} value=${q}
+          onInput=${(e) => setQ(e.target.value)} />
+        ${busy ? html`<${Spinner} />` : null}
+        ${results !== null ? html`<button class="btn-ghost btn-sm" onClick=${() => setQ('')}>${t('search.clear') || 'Clear'}</button>` : null}
+      </div>
+      ${results !== null && results.length === 0 && !busy ? html`<div class="section-desc">${t('search.noMatches') || 'No matches.'}</div>` : null}
+      ${Object.entries(byWs).map(([ws, grp]) => html`
+        <div class="pj-search-group" key=${ws}>
+          <div class="pj-search-group-head">${(grp.name)}<span class="pj-org-tab-count">${grp.hits.length}</span></div>
+          ${grp.hits.map(r => html`
+            <button class="pj-search-hit" key=${r.space + '/' + r.id} onClick=${() => openHit(r)}>
+              <span class="pj-search-hit-title">${(r.title)} <span class="pj-mini">· ${(r.space)}</span></span>
+              <span class="pj-search-hit-snippet">${(r.snippet)}</span>
+            </button>`)}
+        </div>`)}
+    </div>
+  `;
 }
+
 /**
  * Banner listing the caller's pending organism invitations (status `invited`) across all
  * organisms, with Accept / Decline. Invited organisms are not in the member's active list, so
@@ -110,16 +116,21 @@ export function IncomingInvitations({ showToast, onChanged }) {
   };
   if (!invites.length) return null;
   return html`
-    <${Section} title=${t('organisms.youAreInvited') || 'You’re invited'} count=${invites.length} selected=${true} density="compact">
-      <${Stack} density="compact">
-        ${invites.map(({ membership, organism }) => html`
-          <${ListRow} key=${organism.id} density="compact" detailKind="text" name=${organism.name}
-            detail=${membership.invitedBy ? `— ${(t('organisms.invitedByLabel') || 'invited by {who}').replace('{who}', membership.invitedBy)}` : undefined}
-            actions=${html`<${Action} tone="success" disabled=${busy} onClick=${() => act(organism.id, true)}>${t('organisms.acceptInvite') || 'Accept'}<//>
-              <${Action} kind="text" tone="danger" disabled=${busy} onClick=${() => act(organism.id, false)}>${t('organisms.declineInvite') || 'Decline'}<//>`} />`)}
-      <//>
-    <//>`;
+    <div class="card poster-row--thing">
+      <div class="poster-section-title">${t('organisms.youAreInvited') || 'You’re invited'}</div>
+      ${invites.map(({ membership, organism }) => html`
+        <div class="pj-access-row" key=${organism.id}>
+          <span><b>${(organism.name)}</b>${membership.invitedBy ? html` <span class="pj-mini">— ${(t('organisms.invitedByLabel') || 'invited by {who}').replace('{who}', (membership.invitedBy))}</span>` : null}</span>
+          <span class="flex-row-wrap">
+            <button class="btn-success btn-sm" disabled=${busy} onClick=${() => act(organism.id, true)}>${t('organisms.acceptInvite') || 'Accept'}</button>
+            <button class="btn-ghost btn-sm" disabled=${busy} onClick=${() => act(organism.id, false)}>${t('organisms.declineInvite') || 'Decline'}</button>
+          </span>
+        </div>
+      `)}
+    </div>
+  `;
 }
+
 /* Board tab — embedded preview of the organism's discussion board: latest posts + a composer,
  * with "Open in Boards" for the full view. The raw board UUID hides behind a copy icon. */
 export function BoardPreview({ boardId, showToast }) {
@@ -153,25 +164,28 @@ export function BoardPreview({ boardId, showToast }) {
   const ts = (p) => p.created_at || p.createdAt || p.at || '';
   const latest = [...(posts || [])].sort((a, b) => String(ts(b)).localeCompare(String(ts(a)))).slice(0, 5);
 
-  return html`<${Stack}>
-    <${Stack} direction="wrap" align="between">
-      <${Text} tone="muted">${t('organisms.boardPreviewDesc') || 'Latest messages on this organism’s board.'}<//>
-      <${Stack} direction="wrap" align="center">
-        <${Action} kind="text" title=${(t('organisms.copyId') || 'Copy ID') + ': ' + boardId} onClick=${copyId}>${t('organisms.copyId') || 'Copy ID'}<//>
-        <${Action} onClick=${() => window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId: 'boards' } }))}>
-          ${t('organisms.openBoardsTab') || 'Open in Boards'}<//>
-      <//>
-    <//>
-    ${posts === null ? html`<${Text} tone="muted">${t('profile.loading')}<//>`
-      : latest.length === 0 ? html`<${Text} tone="muted">${t('organisms.boardEmpty') || 'No messages yet — write the first one.'}<//>`
-      : html`<${Stack} density="compact">${latest.map(p => html`
-        <${ListRow} key=${p.id || ts(p)} density="compact" preview=${true}
-          name=${p.author_gaii || p.author || '?'} value=${ts(p) ? relTime(ts(p)) : undefined}
-          detail=${String(p.body || p.content || '').slice(0, 400)} />`)}<//>`}
-    <${Toolbar} label=${t('organisms.writePost') || 'Write a message…'}
-      actions=${html`<${Action} disabled=${busy || !text.trim()} onClick=${send}>${t('organisms.send') || 'Send'}<//>`}>
-      <${Field} placeholder=${t('organisms.writePost') || 'Write a message…'} value=${text}
-        onInput=${(e) => setText(e.target.value)} onKeyDown=${(e) => { if (e.key === 'Enter') send(); }} />
-    <//>
-  <//>`;
+  return html`
+    <div class="card-detail">
+      <div class="pj-tabhead">
+        <div class="section-desc pj-tabhead-desc">${t('organisms.boardPreviewDesc') || 'Latest messages on this organism’s board.'}</div>
+        <button class="pj-icon-btn" title=${(t('organisms.copyId') || 'Copy ID') + ': ' + boardId} onClick=${copyId}>${'📋'}</button>
+        <button class="btn-outline btn-sm" onClick=${() => window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId: 'boards' } }))}>
+          ${t('organisms.openBoardsTab') || 'Open in Boards'}</button>
+      </div>
+      ${posts === null ? html`<${Spinner} />`
+        : latest.length === 0 ? html`<${EmptyState} icon="💬" text=${t('organisms.boardEmpty') || 'No messages yet — write the first one.'} />`
+        : latest.map(p => html`
+          <div class="pj-board-post" key=${p.id || ts(p)}>
+            <div class="pj-board-post-head">
+              <span class="pj-board-author">${(p.author_gaii || p.author || '?')}</span>
+              ${ts(p) ? html`<span class="pj-board-time">${relTime(ts(p))}</span>` : null}
+            </div>
+            <div class="pj-board-body">${(String(p.body || p.content || '').slice(0, 400))}</div>
+          </div>`)}
+      <div class="flex-row-wrap pj-board-composer">
+        <input class="input-field input-sm pj-board-input" placeholder=${t('organisms.writePost') || 'Write a message…'} value=${text}
+          onInput=${(e) => setText(e.target.value)} onKeyDown=${(e) => { if (e.key === 'Enter') send(); }} />
+        <button class="btn-outline btn-sm" disabled=${busy || !text.trim()} onClick=${send}>${t('organisms.send') || 'Send'}</button>
+      </div>
+    </div>`;
 }

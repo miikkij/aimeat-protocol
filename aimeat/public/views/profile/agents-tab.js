@@ -7,11 +7,6 @@
  *   the agents as a table that opens into a card), the ink rail, the device-auth approvals, the
  *   scope modal.
  * @version-history
- *   v5.0.0 -- 2026-09-22 -- Composed from the shared set (components/poster-parts.js): the Page with
- *     its trail, title, chips, actions and the index rail; the strip of figures a plain numeral band;
- *     the sections, folds, fields, code blocks and copy actions of the set. The rail's entries are
- *     in-page links now, as on every other page with an index. No class or style of its own, so
- *     agents-poster.css no longer draws this page.
  *   v4.0.3 -- 2026-09-18 -- The connect prompt's model names come from the node
  *     (GET /v1/ai-tools, model_recommendation); without them it names no model.
  *   v4.0.2 -- 2026-09-18 -- The Hello Integration instruction is fetched from the node
@@ -103,6 +98,7 @@ import { useState, useEffect, useRef } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
+import { CopyButton } from '/components/CopyButton.js';
 import { Spinner } from './shared.js';
 import { apiGet, apiPost, apiPatch } from '/js/api.js';
 import { listAgents, updateAgentScopes, deleteAgent, getAgentGroups, saveAgentGroups } from '/js/services/agents.js';
@@ -111,8 +107,7 @@ import { timeAgo } from '/js/utils.js';
 import { useConfirm } from '/components/Modal.js';
 import { AgentConsent } from '/components/AgentConsent.js';
 import { McpSetupGuide } from './ai-setup-guide.js';
-import { scrollTo } from '/views/profile/organisms/poster-parts.js';
-import { Page, Rail, Section, Fold, Stack, Chip, NumeralBand, Surface, Field, Action, CopyAction, Text } from '/components/poster-parts.js';
+import { Section, Fold, scrollTo } from '/views/profile/organisms/poster-parts.js';
 import { buildAgentPrompt, buildTaskRunnerPrompt, PLATFORMS, PLATFORM_KEYS, PLATFORM_LABELS } from './agents/connect-prompts.js';
 import { loadAgentOrder, saveAgentOrder, UNGROUPED_ID, loadCollapsedGroups, saveCollapsedGroups, loadSeen, saveSeen, markTabSeen, effectiveOrderedNames, matchesAgentQuery, popOutAgent, loadFold, saveFold } from './agents/tab-helpers.js';
 import { AgentSearch, FilterBar, ActiveTasksPanel, renderAgentGroups } from './agents/groups-render.js';
@@ -125,7 +120,7 @@ import { swallowed } from '/js/swallowed.js';
 const p = (key, vars) => t('profile.agents.page.' + key, vars);
 
 // The familiar GitHub "Octocat" mark. fill=currentColor so it inherits the link's themed color.
-const GhMark = html`<svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path></svg>`;
+const GhMark = html`<svg class="gh-mark" viewBox="0 0 16 16" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path></svg>`;
 
 /** The other pages the rail points at, opened the way the sidebar opens them. */
 const RAIL_PAGES = [['scheduler', 'profile.tabs.scheduler'], ['access', 'profile.tabs.access'], ['offers', 'profile.tabs.offers']];
@@ -557,185 +552,212 @@ export default function AgentsTab({ session, showToast, onStats }) {
   const openNew = () => { setNewOpen(true); requestAnimationFrame(() => scrollTo('agp-new')); };
   const openConnect = () => { setConnectOpen(true); saveFold(session?.owner, 'connect', true); requestAnimationFrame(() => scrollTo('agp-connect')); };
   const toggleConnect = () => { const next = !connectOpen; setConnectOpen(next); saveFold(session?.owner, 'connect', next); };
-  const connectDoor = html`<${Action} expanded=${connectOpen} onClick=${toggleConnect}>${connectOpen ? p('close') : p('open')}<//>`;
-
-  // A command or prompt to copy: the text in the code surface, the copy action under it.
-  const copyBlock = (text, shown, label) => html`
-    <${Surface} kind="code">${shown ?? text}<//>
-    <${Stack} direction="wrap"><${CopyAction} text=${text} label=${label} /><//>`;
-  const connectCmd = `npx aimeat connect --url ${getNodeUrl()} --owner ${session.owner}`;
-
-  const figures = [
-    { label: p('stripAgents'), value: agents.length, note: p('stripAgentsSub', { ready, never }) },
-    { label: p('stripWaiting'), value: waiting, note: p('stripWaitingSub') },
-    latest
-      ? { label: p('stripSeen'), value: timeAgo(latest.last_seen), tone: 'coral',
-        note: `${latest.display_name || latest.name} · ${t('profile.agents.mode.' + (latest.mode || 'interactive'))}` }
-      : { label: p('stripSeen'), value: '·', note: p('stripSeenNone') },
-    { label: p('stripProblems'), value: problems.length,
-      note: problems.length ? problems.slice(0, 3).map(a => a.display_name || a.name).join(' · ') : p('stripProblemsSub') },
-  ];
-
-  const rail = html`
-    <${Rail} kind="index" title=${p('railTitle')} entries=${[
-      { href: '#agp-basic', label: t('profile.agents.basic.title') },
-      { href: '#agp-new', label: t('profile.agents.new.title'), count: waitingCount || null },
-      { href: '#agp-connect', label: p('secConnect') },
-      { href: '#agp-list', label: p('secAgents'), count: agents.length },
-    ]}>
-      <${Stack} density="compact">
-        <${Text} kind="label">${p('pages')}<//>
-        ${RAIL_PAGES.map(([id, key]) => html`
-          <${Action} kind="text" key=${id} onClick=${() => openTab(id)}>${t(key)} →<//>`)}
-      <//>
-    <//>`;
+  const connectDoor = html`<button type="button" class="og-door og-door--quiet" onClick=${toggleConnect}>${connectOpen ? p('close') : p('open')}</button>`;
 
   return html`
-    <${Page} title=${html`${t('profile.agents.title')} <${Text} kind="caption" tone="muted">${agents.length}<//>`}
-      crumbs=${[{ label: t('nav.profile') }, { label: t('profile.landing.menuAutomation') }, { label: t('profile.tabs.agents') }]}
-      identity=${html`<${Stack} direction="wrap" density="compact">
-        <${Chip}>${p('chipAgents', { n: agents.length })}<//>
-        <${Chip}>${p('chipReady', { n: ready })}<//>
-        <${Chip} tone=${waiting ? 'sun' : 'muted'}>${p('chipWaiting', { n: waiting })}<//>
-        ${problems.length > 0 ? html`<${Chip} tone="sun">${p('chipProblems', { n: problems.length })}<//>` : null}
-        ${federated > 0 ? html`<${Chip} tone="muted">${p('chipFederated', { n: federated })}<//>` : null}
-        ${tools > 0 ? html`<${Chip} tone="muted">${p('chipTools', { n: tools })}<//>` : null}
-      <//>`}
-      actions=${html`
-        <${Action} kind="primary" onClick=${openNew}>${t('profile.agents.new.button')}<//>
-        <${Action} onClick=${openConnect}>${p('connectDoor')}<//>`}
-      rail=${rail}>
-      <${Stack}>
-        <${Text} kind="lead">${p('lede')}<//>
+    <div class="og og-agp">
+      <div class="og-crumb"><span>${t('nav.profile')}</span><span>/</span><span class="og-crumb-here">${t('profile.tabs.agents')}</span></div>
+      <div class="og-mast">
+        <div class="og-mast-words">
+          <h1 class="og-title poster-page-title">${t('profile.agents.title')} <small>${agents.length}</small></h1>
+          <div class="og-chips">
+            <span class="og-chip">${p('chipAgents', { n: agents.length })}</span>
+            <span class="og-chip">${p('chipReady', { n: ready })}</span>
+            <span class=${`og-chip ${waiting ? 'og-chip--coral' : 'og-chip--dim'}`}>${p('chipWaiting', { n: waiting })}</span>
+            ${problems.length > 0 ? html`<span class="og-chip og-chip--coral">${p('chipProblems', { n: problems.length })}</span>` : null}
+            ${federated > 0 ? html`<span class="og-chip og-chip--dim">${p('chipFederated', { n: federated })}</span>` : null}
+            ${tools > 0 ? html`<span class="og-chip og-chip--dim">${p('chipTools', { n: tools })}</span>` : null}
+          </div>
+          <p class="og-desc">${p('lede')}</p>
+        </div>
+        <div class="og-mast-actions">
+          <button type="button" class="og-slab" onClick=${openNew}>${t('profile.agents.new.button')}</button>
+          <div class="og-doors"><button type="button" class="og-door" onClick=${openConnect}>${p('connectDoor')}</button></div>
+        </div>
+      </div>
 
-        ${/* The approval panel is a SHARED component (components/AgentConsent.js): the remake's home
-              shows the same panel for the person's FIRST agent, and a copy here would drift from it.
-              Behaviour is unchanged — same requests, same scope presets, same verify calls. */''}
-        <${AgentConsent} requests=${pendingRequests} onApprove=${handleApprove} onDeny=${handleDeny} />
+      ${/* The approval panel is a SHARED component (components/AgentConsent.js): the remake's home
+            shows the same panel for the person's FIRST agent, and a copy here would drift from it.
+            Behaviour is unchanged — same requests, same scope presets, same verify calls. */''}
+      <${AgentConsent} requests=${pendingRequests} onApprove=${handleApprove} onDeny=${handleDeny} />
 
-        <${NumeralBand} tone="plain" size="small" items=${figures} />
+      <div class="og-strip">
+        <div><b>${agents.length}</b><span>${p('stripAgents')}</span><small>${p('stripAgentsSub', { ready, never })}</small></div>
+        <div><b>${waiting}</b><span>${p('stripWaiting')}</span><small>${p('stripWaitingSub')}</small></div>
+        <div>${latest
+          ? html`<b class="og-strip-coral">${timeAgo(latest.last_seen)}</b><span>${p('stripSeen')}</span><small>${latest.display_name || latest.name} · ${t('profile.agents.mode.' + (latest.mode || 'interactive'))}</small>`
+          : html`<b>·</b><span>${p('stripSeen')}</span><small>${p('stripSeenNone')}</small>`}</div>
+        <div><b>${problems.length}</b><span>${p('stripProblems')}</span><small>${problems.length ? problems.slice(0, 3).map(a => a.display_name || a.name).join(' · ') : p('stripProblemsSub')}</small></div>
+      </div>
 
-        ${/* The one-press road in. Above the connect guide on purpose: for somebody whose connector
-              is already running, this is the whole job, and the guide below is the long way round. */''}
-        <${BasicAgentsPanel} session=${session} showToast=${showToast} onCreated=${loadData} first=${true} />
+      <div class="og-grid">
+        <div class="og-main">
+          ${/* The one-press road in. Above the connect guide on purpose: for somebody whose connector
+                is already running, this is the whole job, and the guide below is the long way round. */''}
+          <${BasicAgentsPanel} session=${session} showToast=${showToast} onCreated=${loadData} first=${true} />
 
-        ${/* An agent of the person's own, and what their agents have proposed. Below the two fixed
-              names on purpose: those are what a new account should take first, and this is the door
-              for the job they do not cover. */''}
-        <${NewAgentPanel} session=${session} showToast=${showToast} onCreated=${loadData} agents=${agents}
-          open=${newOpen} setOpen=${setNewOpen} onWaiting=${setWaitingCount} />
+          ${/* An agent of the person's own, and what their agents have proposed. Below the two fixed
+                names on purpose: those are what a new account should take first, and this is the door
+                for the job they do not cover. */''}
+          <${NewAgentPanel} session=${session} showToast=${showToast} onCreated=${loadData} agents=${agents}
+            open=${newOpen} setOpen=${setNewOpen} onWaiting=${setWaitingCount} />
 
-        <${Section} id="agp-connect" density="compact" title=${p('secConnect')} count=${p('secConnectSub')} actions=${connectDoor}>
-          ${!connectOpen ? html`<${Text} tone="muted">${p('connectLede')}<//>` : html`<${Stack}>
-            <${Text} kind="lead">${p('connectLede')}<//>
-            ${/* The recommended road comes first and OPEN: the tool the person already pays for,
-                  connected through their own app's connector settings. ai-tool-setup.ts has ranked
-                  claude.ai first for months while this panel led with a terminal command; the panel
-                  now agrees with its own data. */''}
-            <${McpSetupGuide} />
+          <${Section} id="agp-connect" num="03" title=${p('secConnect')} count=${p('secConnectSub')} doors=${connectDoor}>
+            ${!connectOpen ? html`<p class="agp-folded">${p('connectLede')}</p>` : html`
+              <p class="agp-lead">${p('connectLede')}</p>
+              ${/* The recommended road comes first and OPEN: the tool the person already pays for,
+                    connected through their own app's connector settings. ai-tool-setup.ts has ranked
+                    claude.ai first for months while this panel led with a terminal command; the panel
+                    now agrees with its own data. */''}
+              <div class="agp-connect"><${McpSetupGuide} tabClass="poster-tab" activeClass="is-on" /></div>
 
-            <div>
-              <${Fold} id="agp-connect-cli" title=${t('profile.agents.connectDeveloperTitle')} open=${cliExpanded} onToggle=${() => setCliExpanded(v => !v)}>
-                <${Text} kind="caption"><strong>${t('profile.agents.connectOptionConnectorTitle')}</strong> ${t('profile.agents.connectOptionConnectorDesc')}<//>
-                <${Text} kind="caption"><strong>${t('profile.agents.connectOptionFallbackTitle')}</strong> ${t('profile.agents.connectOptionFallbackDesc')}<//>
+              <div class="agp-connect-folds poster-row--thing">
+                <${Fold} id="agp-connect-cli" num="" title=${t('profile.agents.connectDeveloperTitle')} open=${cliExpanded} onToggle=${() => setCliExpanded(v => !v)}>
+                  <p class="text-caption mb-half"><strong>${t('profile.agents.connectOptionConnectorTitle')}</strong> ${t('profile.agents.connectOptionConnectorDesc')}</p>
+                  <p class="text-caption mb-1"><strong>${t('profile.agents.connectOptionFallbackTitle')}</strong> ${t('profile.agents.connectOptionFallbackDesc')}</p>
 
-                <${Text} kind="label">${t('profile.agents.cliInstall')}<//>
-                ${copyBlock(connectCmd, null, t('profile.agents.copyCommand'))}
+                  <p class="mb-half text-bold">${t('profile.agents.cliInstall')}</p>
+                  <div class="agent-prompt-box"><code>npx aimeat connect --url ${getNodeUrl()} --owner ${session.owner}</code></div>
+                  <${CopyButton}
+                    text=${`npx aimeat connect --url ${getNodeUrl()} --owner ${session.owner}`}
+                    className="btn-primary"
+                    label=${t('profile.agents.copyCommand')}
+                    />
 
-                <${Text} kind="label">${t('profile.agents.cliServe')}<//>
-                <${Surface} kind="code">npx aimeat connect serve<//>
+                  <p class="mt-1 mb-half text-bold">${t('profile.agents.cliServe')}</p>
+                  <div class="agent-prompt-box"><code>npx aimeat connect serve</code></div>
 
-                <${Text} kind="caption">${t('profile.agents.cliDesc')}<//>
+                  <p class="mt-1 text-caption">${t('profile.agents.cliDesc')}</p>
 
-                <${Text} kind="label">${t('profile.agents.agentInstructionTitle')}<//>
-                <${Text} kind="caption">${t('profile.agents.agentInstructionDesc')}<//>
-                ${copyBlock(helloPrompt, helloPrompt || (helloFailed ? t('profile.agents.agentInstructionLoadFailed') : t('common.loading')), t('profile.agents.copyAgentInstruction'))}
+                  <p class="mt-1 mb-half text-bold">${t('profile.agents.agentInstructionTitle')}</p>
+                  <p class="text-caption mb-half">${t('profile.agents.agentInstructionDesc')}</p>
+                  <div class="agent-prompt-box">${helloPrompt || (helloFailed ? t('profile.agents.agentInstructionLoadFailed') : t('common.loading'))}</div>
+                  <${CopyButton}
+                    text=${helloPrompt}
+                    className="btn-primary"
+                    label=${t('profile.agents.copyAgentInstruction')}
+                    />
 
-                <${Fold} title=${t('profile.agents.noNodejs')} open=${platExpand} onToggle=${() => setPlatExpand(!platExpand)}>
-                  <${Stack} direction="wrap" role="tablist" label=${t('profile.agents.noNodejs')}>
-                    ${PLATFORM_KEYS.map(k => html`
-                      <${Action} kind="tab" semantics="tab" key=${k} selected=${k === activePlat} onClick=${() => setActivePlat(k)}>${t(PLATFORM_LABELS[k])}<//>
-                    `)}
-                  <//>
-                  ${/* SAFE: PLATFORMS is hardcoded developer constant, not user input */''}
-                  <${Surface} kind="box"><div dangerouslySetInnerHTML=${{ __html: PLATFORMS[activePlat] }}></div><//>
+                  <div class="pf-agent-divider poster-row--thing mt-1">
+                    <button class="expand-btn" onClick=${() => setPlatExpand(!platExpand)}>
+                      <span>${t('profile.agents.noNodejs')}</span>
+                      <span class="pf-chevron ${platExpand ? 'pf-chevron-open' : ''}">▼</span>
+                    </button>
+                    ${platExpand && html`
+                      <div class="platform-instructions expanded">
+                        <div class="platform-tabs poster-row--thing">
+                          ${PLATFORM_KEYS.map(k => html`
+                            <button class="platform-tab ${k === activePlat ? 'active' : ''}" onClick=${() => setActivePlat(k)}>${t(PLATFORM_LABELS[k])}</button>
+                          `)}
+                        </div>
+                        ${/* SAFE: PLATFORMS is hardcoded developer constant, not user input */''}
+                        <div class="platform-content poster-row--thing" dangerouslySetInnerHTML=${{ __html: PLATFORMS[activePlat] }}></div>
+                      </div>
+                    `}
+                  </div>
                 <//>
-              <//>
 
-              <${Fold} id="agp-connect-paste" title=${t('profile.agents.pasteAlt')} open=${pasteExpanded} onToggle=${() => setPasteExpanded(v => !v)}>
-                <${Text} kind="caption">${t('profile.agents.pasteDesc')}<//>
-                ${copyBlock(buildAgentPrompt(session, modelRec), null, t('common.copyPrompt'))}
-              <//>
-
-              <${Fold} id="agp-connect-crew" title=${t('profile.agents.taskRunner.title')} open=${taskRunnerExpanded} onToggle=${() => setTaskRunnerExpanded(v => !v)}>
-                <${Text} kind="caption">${t('profile.agents.taskRunner.whatIs')}<//>
-                <${Text} kind="caption">${t('profile.agents.taskRunner.whenToUse')}<//>
-                <${Stack} direction="wrap">
-                  <${Action} kind="text" href="https://github.com/miikkij/crewaimeat" target="_blank">
-                    ${GhMark} ${t('profile.agents.taskRunner.repoLink')}
-                  <//>
+                <${Fold} id="agp-connect-paste" num="" title=${t('profile.agents.pasteAlt')} open=${pasteExpanded} onToggle=${() => setPasteExpanded(v => !v)}>
+                  <p class="text-caption mb-half">${t('profile.agents.pasteDesc')}</p>
+                  <div class="agent-prompt-box">${buildAgentPrompt(session, modelRec)}</div>
+                  <${CopyButton}
+                    text=${buildAgentPrompt(session, modelRec)}
+                    className="btn-primary"
+                    label=${t('common.copyPrompt')}
+                    />
                 <//>
-                <${Text} kind="caption"><strong>${t('profile.agents.taskRunner.exampleLabel')}</strong> ${t('profile.agents.taskRunner.exampleDesc')}<//>
-                <${Field} id="pf-task-runner-name" label=${t('profile.agents.taskRunner.nameLabel')}
-                  placeholder="marketing-crew" value=${taskRunnerName}
-                  onInput=${(e) => setTaskRunnerName(e.target.value)} />
-                ${copyBlock(buildTaskRunnerPrompt(session, taskRunnerName), null, t('profile.agents.taskRunner.copyButton'))}
-              <//>
-            </div>
-          <//>`}
-        <//>
 
-        <${Section} id="agp-list" density="compact" title=${p('secAgents')} count=${agents.length}>
-          ${agents.length === 0
-            ? html`<${Text} tone="muted">${t('profile.agents.empty')}<//>`
-            : html`<${Stack}>
-              <${AgentSearch}
-                query=${query}
-                setQuery=${setQuery}
-                shown=${agents.filter(a => matchesAgentQuery(a, query)).length}
-                total=${agents.length}
-              />
-              <${FilterBar} agents=${agents} tagFilter=${tagFilter} setTagFilter=${setTagFilter} groupBy=${groupBy} setGroupBy=${pickGroupBy} />
-              ${running > 0 ? html`<${ActiveTasksPanel}
-                activeTasksMap=${activeTasksMap}
-                agents=${agents}
-                onOpen=${openAgentTask}
-              />` : null}
-              <div>
-              ${renderAgentGroups({
-                agents,
-                tagFilter,
-                query,
-                groupBy,
-                onboardings,
-                taskStatsMap,
-                changesMap,
-                onTabSeen: handleTabSeen,
-                expandedAgent,
-                toggleAgent,
-                session,
-                showToast,
-                setScopesModal,
-                handleDeleteAgent,
-                toggleFederate,
-                onPopOut: popOutAgent,
-                dnd,
-                agentOrder,
-                deepLink,
-                agentGroups,
-                collapsedGroups,
-                editingGroup,
-                setEditingGroup,
-                addGroup,
-                renameGroup,
-                removeGroup,
-                toggleGroupCollapsed,
-                groupDnd,
-              })}
+                <${Fold} id="agp-connect-crew" num="" title=${t('profile.agents.taskRunner.title')} open=${taskRunnerExpanded} onToggle=${() => setTaskRunnerExpanded(v => !v)}>
+                  <p class="text-caption mb-half">${t('profile.agents.taskRunner.whatIs')}</p>
+                  <p class="text-caption mb-half">${t('profile.agents.taskRunner.whenToUse')}</p>
+                  <p class="mb-half">
+                    <a class="pf-gh-link" href="https://github.com/miikkij/crewaimeat" target="_blank" rel="noopener">
+                      ${GhMark}${t('profile.agents.taskRunner.repoLink')}
+                    </a>
+                  </p>
+                  <p class="text-caption mb-half"><strong>${t('profile.agents.taskRunner.exampleLabel')}</strong> ${t('profile.agents.taskRunner.exampleDesc')}</p>
+                  <div class="mb-half mt-1">
+                    <label class="text-caption mb-half" for="pf-task-runner-name">${t('profile.agents.taskRunner.nameLabel')}</label>
+                    <input id="pf-task-runner-name" type="text"
+                           class="og-input"
+                           placeholder="marketing-crew"
+                           value=${taskRunnerName}
+                           onInput=${(e) => setTaskRunnerName(e.target.value)} />
+                  </div>
+                  <div class="agent-prompt-box">${buildTaskRunnerPrompt(session, taskRunnerName)}</div>
+                  <${CopyButton}
+                    text=${buildTaskRunnerPrompt(session, taskRunnerName)}
+                    className="btn-primary"
+                    label=${t('profile.agents.taskRunner.copyButton')}
+                    />
+                <//>
               </div>
-            <//>`}
-        <//>
-      <//>
+            `}
+          <//>
+
+          <${Section} id="agp-list" num="04" title=${p('secAgents')} count=${agents.length}>
+            ${agents.length === 0
+              ? html`<p class="agp-folded">${t('profile.agents.empty')}</p>`
+              : html`
+                <${AgentSearch}
+                  query=${query}
+                  setQuery=${setQuery}
+                  shown=${agents.filter(a => matchesAgentQuery(a, query)).length}
+                  total=${agents.length}
+                />
+                <${FilterBar} agents=${agents} tagFilter=${tagFilter} setTagFilter=${setTagFilter} groupBy=${groupBy} setGroupBy=${pickGroupBy} />
+                ${running > 0 ? html`<${ActiveTasksPanel}
+                  activeTasksMap=${activeTasksMap}
+                  agents=${agents}
+                  onOpen=${openAgentTask}
+                />` : null}
+                ${renderAgentGroups({
+                  agents,
+                  tagFilter,
+                  query,
+                  groupBy,
+                  onboardings,
+                  taskStatsMap,
+                  changesMap,
+                  onTabSeen: handleTabSeen,
+                  expandedAgent,
+                  toggleAgent,
+                  session,
+                  showToast,
+                  setScopesModal,
+                  handleDeleteAgent,
+                  toggleFederate,
+                  onPopOut: popOutAgent,
+                  dnd,
+                  agentOrder,
+                  deepLink,
+                  agentGroups,
+                  collapsedGroups,
+                  editingGroup,
+                  setEditingGroup,
+                  addGroup,
+                  renameGroup,
+                  removeGroup,
+                  toggleGroupCollapsed,
+                  groupDnd,
+                })}
+              `}
+          <//>
+        </div>
+
+        <nav class="og-rail" aria-label=${p('railTitle')}>
+          <span class="og-rail-label">${p('railTitle')}</span>
+          ${[['01', 'agp-basic', t('profile.agents.basic.title'), null],
+            ['02', 'agp-new', t('profile.agents.new.title'), waitingCount || null],
+            ['03', 'agp-connect', p('secConnect'), null],
+            ['04', 'agp-list', p('secAgents'), agents.length]]
+            .map(([num, id, label, n]) => html`<button type="button" class="og-rail-link" key=${id} onClick=${() => scrollTo(id)}><i>${num}</i>${label}${n !== null ? html`<em>${n}</em>` : null}</button>`)}
+          <hr />
+          <span class="og-rail-label">${p('pages')}</span>
+          ${RAIL_PAGES.map(([id, key]) => html`
+            <button type="button" class="og-rail-link" key=${id} onClick=${() => openTab(id)}><i>→</i>${t(key)}<em>→</em></button>`)}
+        </nav>
+      </div>
 
       ${scopesModal && html`<${ScopesModal}
         agent=${scopesModal}
@@ -743,6 +765,6 @@ export default function AgentsTab({ session, showToast, onStats }) {
         onSave=${handleSaveScopes}
         onCancel=${() => setScopesModal(null)} />`}
       <${ConfirmUI} />
-    <//>
+    </div>
   `;
 }

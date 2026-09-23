@@ -10,11 +10,6 @@
  * @structure renderCover · secAddress · secMailboxes · secSent · lettersFold · chatFold
  * @usage import { renderCover } from './email/cover.js';
  * @version-history
- *   2026-09-22 -- Composed from the shared set: Page with an index Rail, the strip is a plain
- *     NumeralBand, the uses and the letters are list rows, the sent log is a Table, the address
- *     form is KeyValue rows with Fields, the roads are the notifications page's boxes; no class of
- *     its own. The address form's buttons and the chat fold's copy are underlined words, so the
- *     mast keeps the one slab.
  *   2026-09-13 -- Compose the shared initials-box role and its measured size cut.
  *   v1.1.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.0.0 — 2026-08-30 — Initial. Replaces a page that verified one address and said nothing else.
@@ -23,8 +18,7 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { Page, Rail, Section, Fold, Columns, Stack, Chip, Action, Field, Text, NumeralBand, KeyValue, ListRow, Table, scrollToId } from '/components/poster-parts.js';
-import { road } from '/views/profile/notifications/frame.js';
+import { Section, Fold, scrollTo } from '/views/profile/organisms/poster-parts.js';
 import { c, rel, day, clock, providerWord, isSender, stateWord, kindWord, channelWord, statusWord, Switch, crumb, pageLinks } from './frame.js';
 
 const PAGE = 12;
@@ -37,88 +31,102 @@ export function renderCover(ctx) {
   const sent30 = ctx.outbound.filter(m => new Date(m.createdAt).getTime() >= since).length;
   const lastMail = ctx.mailLog[0] || null;
   const mailboxes = ctx.connections.length;
-  const strip = html`<${NumeralBand} tone="plain" size="small" items=${[
-    { label: c('stripAddress'), value: address || '·', note: verified ? c('verifiedOn', { when: day(me.email_verified_at) }) : address ? c('notVerified') : c('noAddress') },
-    { label: c('stripMailboxes'), value: mailboxes, note: mailboxes ? ctx.connections.map(x => `${providerWord(ctx.providerOf(x.provider))} · ${x.accountLabel || ''}`).join(' · ') : c('stripMailboxesNone') },
-    { label: c('stripSent'), value: sent30, note: ctx.outbound.length ? c('stripSentSub', { total: ctx.outboundTotal }) : c('stripSentNone') },
-    { label: c('stripLastMail'), value: lastMail ? rel(lastMail.at) : '·', note: lastMail ? `${kindWord(lastMail.kind)}${lastMail.subject ? ' · ' + lastMail.subject : ''}` : c('stripLastMailNone') },
-  ]} />`;
-  const entries = [['em-address', c('secAddress')], ['em-mailboxes', c('secMailboxes'), mailboxes], ['em-sent', c('secSent'), ctx.outboundTotal], ['em-letters', c('lettersTitle')], ['em-chat', c('chatTitle')]]
-    .map(([id, label, count]) => ({ id, href: '#' + id, label, count }));
-  return html`<${Page} title=${c('title')} crumbs=${crumb()}
-    identity=${html`<${Stack} direction="wrap" density="compact">
-      ${verified ? html`<${Chip}>${c('chipVerified')}<//>` : html`<${Chip} tone="coral">${c('chipUnverified')}<//>`}
-      ${mailboxes ? html`<${Chip}>${c('chipMailboxes', { n: mailboxes })}<//>` : null}
-      <${Chip} tone=${sent30 ? 'plain' : 'muted'}>${c('chipSent', { n: sent30 })}<//>
-    <//>`}
-    actions=${html`<${Action} kind="primary" onClick=${() => scrollToId('em-mailboxes')}>${c('connectMailbox')}<//>
-      <${Action} onClick=${() => ctx.copyPrompt()}>${c('promptToChat')}<//>`}
-    rail=${html`<${Rail} kind="index" title=${c('railTitle')} entries=${entries}>${pageLinks()}<//>`}>
-    <${Text} kind="lead" tone="muted">${c('desc')}<//>
-    ${strip}
-    ${secAddress(ctx, me, verified, address)}
-    ${secMailboxes(ctx)}
-    ${secSent(ctx)}
-    <${Fold} id="em-letters" number="04" title=${c('lettersTitle')} sub=${c('lettersSub')} open=${ctx.folds.letters} onToggle=${() => ctx.setFold('letters', !ctx.folds.letters)}>${lettersFold(ctx)}<//>
-    <${Fold} id="em-chat" number="05" title=${c('chatTitle')} sub=${c('chatSub')} open=${ctx.folds.chat} onToggle=${() => ctx.setFold('chat', !ctx.folds.chat)}>${chatFold(ctx)}<//>
-    <${ctx.ConfirmUI} />
-  <//>`;
+  const chip = (text, cls = '') => html`<span class=${`og-chip ${cls}`}>${text}</span>`;
+  const strip = html`
+    <div class="og-strip">
+      <div><b class="em-strip-addr">${address || '·'}</b><span>${c('stripAddress')}</span><small>${verified ? c('verifiedOn', { when: day(me.email_verified_at) }) : address ? c('notVerified') : c('noAddress')}</small></div>
+      <div><b>${mailboxes}</b><span>${c('stripMailboxes')}</span><small>${mailboxes ? ctx.connections.map(x => `${providerWord(ctx.providerOf(x.provider))} · ${x.accountLabel || ''}`).join(' · ') : c('stripMailboxesNone')}</small></div>
+      <div><b>${sent30}</b><span>${c('stripSent')}</span><small>${ctx.outbound.length ? c('stripSentSub', { total: ctx.outboundTotal }) : c('stripSentNone')}</small></div>
+      <div>${lastMail ? html`<b>${rel(lastMail.at)}</b><span>${c('stripLastMail')}</span><small>${kindWord(lastMail.kind)}${lastMail.subject ? ' · ' + lastMail.subject : ''}</small>` : html`<b>·</b><span>${c('stripLastMail')}</span><small>${c('stripLastMailNone')}</small>`}</div>
+    </div>`;
+  return html`
+    <div class="og og-em">
+      ${crumb()}
+      <div class="og-mast">
+        <div class="og-mast-words">
+          <h1 class="og-title poster-page-title">${c('title')}</h1>
+          <div class="og-chips">
+            ${verified ? chip(c('chipVerified')) : chip(c('chipUnverified'), 'og-chip--coral')}${mailboxes ? chip(c('chipMailboxes', { n: mailboxes })) : null}${chip(c('chipSent', { n: sent30 }), sent30 ? '' : 'og-chip--dim')}
+          </div>
+          <p class="og-desc">${c('desc')}</p>
+        </div>
+        <div class="og-mast-actions">
+          <button type="button" class="og-slab" onClick=${() => scrollTo('em-mailboxes')}>${c('connectMailbox')}</button>
+          <div class="og-doors"><button type="button" class="og-door" onClick=${() => ctx.copyPrompt()}>${c('promptToChat')}</button></div>
+        </div>
+      </div>
+      ${strip}
+      <div class="og-grid">
+        <div class="og-main">
+          ${secAddress(ctx, me, verified, address)}
+          ${secMailboxes(ctx)}
+          ${secSent(ctx)}
+          <${Fold} id="em-letters" num="04" title=${c('lettersTitle')} sub=${c('lettersSub')} open=${ctx.folds.letters} onToggle=${() => ctx.setFold('letters', !ctx.folds.letters)}>${lettersFold(ctx)}<//>
+          <${Fold} id="em-chat" num="05" title=${c('chatTitle')} sub=${c('chatSub')} open=${ctx.folds.chat} onToggle=${() => ctx.setFold('chat', !ctx.folds.chat)}>${chatFold(ctx)}<//>
+        </div>
+        <nav class="og-rail" aria-label=${c('railTitle')}>
+          <span class="og-rail-label">${c('railTitle')}</span>
+          ${[['01', 'em-address', c('secAddress'), ''], ['02', 'em-mailboxes', c('secMailboxes'), mailboxes], ['03', 'em-sent', c('secSent'), ctx.outboundTotal], ['04', 'em-letters', c('lettersTitle'), ''], ['05', 'em-chat', c('chatTitle'), '']]
+            .map(([n, id, label, count]) => html`<button type="button" class="og-rail-link" key=${id} onClick=${() => scrollTo(id)}><i>${n}</i>${label}<em>${count}</em></button>`)}
+          <hr />
+          <span class="og-rail-label">${c('pages')}</span>
+          ${pageLinks()}
+        </nav>
+      </div>
+      <${ctx.ConfirmUI} />
+    </div>`;
 }
 
 function secAddress(ctx, me, verified, address) {
-  const doors = ctx.changing ? null : html`<${Action} onClick=${() => ctx.startChange()}>${address ? c('changeAddress') : c('addAddress')}<//>`;
+  const doors = ctx.changing ? null : html`<button type="button" class="og-door og-door--quiet" onClick=${() => ctx.startChange()}>${address ? c('changeAddress') : c('addAddress')}</button>`;
   const uses = ['recovery', 'magic', 'invites', 'contact', 'letters'];
-  // A use of the address: a success marker while the address is verified, a quiet one when not.
-  const purposeRow = (k, on) => html`<${ListRow} key=${k} density="compact" marker=${on ? 'success' : 'muted'} name=${c('use.' + k + 'T')} detail=${c('use.' + k + 'D')} detailKind="text" />`;
   return html`
-    <${Section} id="em-address" title=${c('secAddress')} count=${c('secAddressSub')} actions=${doors} density="compact">
-      ${ctx.changing ? html`<${Stack}>
-        <${KeyValue} label=${c('fAddress')} value=${html`<${Field} type="email" ariaLabel=${c('fAddress')} value=${ctx.form.email} disabled=${ctx.busy || ctx.form.codeSent}
-          placeholder=${t('profile.email.enterEmail')} onInput=${e => ctx.setForm({ ...ctx.form, email: e.target.value })}
-          hint=${verified && address && ctx.form.email.trim() && ctx.form.email.trim() !== address ? c('changeWarning') : c('codeHint')} />`} />
-        ${ctx.form.codeSent ? html`<${KeyValue} label=${c('fCode')} value=${html`<${Field} width="narrow" inputMode="numeric" ariaLabel=${c('fCode')} value=${ctx.form.code}
-          placeholder="123456" onInput=${e => ctx.setForm({ ...ctx.form, code: e.target.value })} hint=${c('codeSentTo', { email: ctx.form.email.trim() })} />`} />` : null}
-        <${Stack} direction="wrap" align="center">
+    <${Section} id="em-address" num="01" title=${c('secAddress')} count=${c('secAddressSub')} doors=${doors} first>
+      ${ctx.changing ? html`
+        <div class="ct-kv em-form">
+          <div class="k">${c('fAddress')}</div><div class="v">
+            <input class="og-input" type="email" value=${ctx.form.email} disabled=${ctx.busy || ctx.form.codeSent} placeholder=${t('profile.email.enterEmail')} onInput=${e => ctx.setForm({ ...ctx.form, email: e.target.value })} />
+            <small class="em-hint">${verified && address && ctx.form.email.trim() && ctx.form.email.trim() !== address ? c('changeWarning') : c('codeHint')}</small>
+          </div>
+          ${ctx.form.codeSent ? html`
+            <div class="k">${c('fCode')}</div><div class="v">
+              <input class="og-input em-code" inputmode="numeric" value=${ctx.form.code} placeholder="123456" onInput=${e => ctx.setForm({ ...ctx.form, code: e.target.value })} />
+              <small class="em-hint">${c('codeSentTo', { email: ctx.form.email.trim() })}</small>
+            </div>` : null}
+        </div>
+        <div class="og-doors em-form-doors">
           ${ctx.form.codeSent
-            ? html`<${Action} disabled=${ctx.busy || ctx.form.code.trim().length < 4} onClick=${() => ctx.confirmCode()}>${c('confirm')}<//>`
-            : html`<${Action} disabled=${ctx.busy || !ctx.form.email.trim()} onClick=${() => ctx.sendCode()}>${c('sendCode')}<//>`}
-          <${Action} kind="text" onClick=${() => ctx.cancelChange()}>${t('common.cancel')}<//>
-        <//>
-      <//>` : html`<${Stack}>
-        <${Columns} collapse=${560} density="compact">
-          ${uses.map(k => purposeRow(k, verified))}
-          ${purposeRow('never', false)}
-        <//>
-        <${Text} kind="caption" tone="muted">${verified ? c('addressHint') : address ? c('unverifiedHint') : c('noAddressHint')}<//>
-      <//>`}
+            ? html`<button type="button" class="og-slab" disabled=${ctx.busy || ctx.form.code.trim().length < 4} onClick=${() => ctx.confirmCode()}>${c('confirm')}</button>`
+            : html`<button type="button" class="og-slab" disabled=${ctx.busy || !ctx.form.email.trim()} onClick=${() => ctx.sendCode()}>${c('sendCode')}</button>`}
+          <button type="button" class="og-door og-door--quiet" onClick=${() => ctx.cancelChange()}>${t('common.cancel')}</button>
+        </div>`
+      : html`
+        <div class="em-uses">
+          ${uses.map(k => html`<div key=${k}><i class=${verified ? '' : 'no'}>${verified ? '✓' : '·'}</i><span><b>${c('use.' + k + 'T')}</b><small>${c('use.' + k + 'D')}</small></span></div>`)}
+          <div><i class="no">·</i><span><b>${c('use.neverT')}</b><small>${c('use.neverD')}</small></span></div>
+        </div>
+        <p class="em-hint">${verified ? c('addressHint') : address ? c('unverifiedHint') : c('noAddressHint')}</p>`}
     <//>`;
 }
 
 function secMailboxes(ctx) {
-  const doors = html`${ctx.providers.filter(p => !isSender(p)).map(p => html`<${Action} key=${p.id} disabled=${!!ctx.connecting} onClick=${() => ctx.connect(p)}>${providerWord(p)}<//>`)}`;
+  const doors = html`${ctx.providers.filter(p => !isSender(p)).map(p => html`<button type="button" key=${p.id} class="og-door" disabled=${!!ctx.connecting} onClick=${() => ctx.connect(p)}>${providerWord(p)}</button>`)}`;
   const rows = ctx.providers.map(p => ({ p, conn: ctx.connections.find(x => x.provider === p.id) || null }));
   return html`
-    <${Section} id="em-mailboxes" title=${c('secMailboxes')} count=${c('secMailboxesSub')} actions=${doors} density="compact">
-      <${Stack}>
-        ${!ctx.providers.length ? html`<${Text} tone="muted">${c('noProviders')}<//>` : html`<${Stack} density="compact">
-          ${rows.map(({ p, conn }) => { const dels = conn ? (ctx.delegations[conn.id] || []) : []; return html`
-            <${ListRow} key=${p.id} density="compact"
-              mark=${html`<${Chip} tone=${conn ? 'plain' : 'muted'}>${providerWord(p).slice(0, 1)}<//>`}
-              name=${providerWord(p)}
-              detail=${conn ? [conn.accountLabel, ctx.aliases[conn.id]?.length ? c('aliases', { list: ctx.aliases[conn.id].join(', ') }) : null].filter(Boolean).join(' · ') : c('notConnected')}
-              actions=${conn ? html`<${Chip} tone=${conn.status === 'active' ? 'plain' : 'coral'}>${stateWord(conn)}<//><${Action} kind="text" tone="danger" disabled=${ctx.busy} onClick=${() => ctx.remove(conn, p)}>${c('remove')}<//>`
-                : html`<${Action} disabled=${!!ctx.connecting} onClick=${() => ctx.connect(p)}>${ctx.connecting === p.id ? c('connecting') : c('connect')}<//>`}>
-              <${Stack} density="compact">
-                <${Text} kind="caption" tone="muted">${c(isSender(p) ? 'sendWhat' : 'readWhat')}<//>
-                ${dels.length ? html`<${Text} kind="mono" tone="muted">${c('delegationsN', { n: dels.filter(d => d.enabled !== false).length })}<//>` : null}
-                ${dels.map(d => html`<${ListRow} key=${d.id} density="compact" name=${d.appId || d.app_id || d.app || '?'}
-                  detail=${`${d.action || ''}${d.enabled === false ? ' · ' + c('stopped') : ''}`} muted=${d.enabled === false}
-                  actions=${d.enabled === false ? null : html`<${Action} kind="text" disabled=${ctx.busy} onClick=${() => ctx.stopDelegation(conn, d)}>${c('stop')}<//>`} />`)}
-              <//>
-            <//>`; })}
-        <//>`}
-        <${Text} kind="caption" tone="muted">${c('mailboxesHint')}<//>
-      <//>
+    <${Section} id="em-mailboxes" num="02" title=${c('secMailboxes')} count=${c('secMailboxesSub')} doors=${doors}>
+      ${!ctx.providers.length ? html`<p class="og-empty">${c('noProviders')}</p>` : html`
+        <div class="em-mb">
+          ${rows.map(({ p, conn }) => html`
+            <div class=${`ct-av nt-av poster-box poster-box--avatar ${conn ? '' : 'ct-av--agent'}`} key=${'a' + p.id} aria-hidden="true">${providerWord(p).slice(0, 1)}</div>
+            <div class="em-nm" key=${'n' + p.id}>${providerWord(p)}<small>${conn ? [conn.accountLabel, ctx.aliases[conn.id]?.length ? c('aliases', { list: ctx.aliases[conn.id].join(', ') }) : null].filter(Boolean).join(' · ') : c('notConnected')}</small></div>
+            <div class="em-w" key=${'w' + p.id}>${c(isSender(p) ? 'sendWhat' : 'readWhat')}${conn && (ctx.delegations[conn.id] || []).length ? html`<small>${c('delegationsN', { n: ctx.delegations[conn.id].filter(d => d.enabled !== false).length })}</small>` : null}</div>
+            <div class="em-ctl" key=${'c' + p.id}>
+              ${conn ? html`<span class=${`og-chip ${conn.status === 'active' ? '' : 'og-chip--coral'}`}>${stateWord(conn)}</span><button type="button" class="og-door og-door--quiet" disabled=${ctx.busy} onClick=${() => ctx.remove(conn, p)}>${c('remove')}</button>`
+                : html`<button type="button" class="og-door" disabled=${!!ctx.connecting} onClick=${() => ctx.connect(p)}>${ctx.connecting === p.id ? c('connecting') : c('connect')}</button>`}
+            </div>
+            ${conn && (ctx.delegations[conn.id] || []).length ? html`<div class="em-deleg" key=${'d' + p.id}>${ctx.delegations[conn.id].map(d => html`<div key=${d.id}><b>${d.appId || d.app_id || d.app || '?'}</b><small>${d.action || ''}${d.enabled === false ? ' · ' + c('stopped') : ''}</small>${d.enabled === false ? null : html`<button type="button" class="og-door og-door--quiet" disabled=${ctx.busy} onClick=${() => ctx.stopDelegation(conn, d)}>${c('stop')}</button>`}</div>`)}</div>` : null}`)}
+        </div>`}
+      <p class="em-hint">${c('mailboxesHint')}</p>
     <//>`;
 }
 
@@ -128,24 +136,21 @@ function secSent(ctx) {
   if (f === 'email') list = list.filter(m => m.channel !== 'inbox');
   if (f === 'inbox') list = list.filter(m => m.channel === 'inbox');
   const shown = ctx.showAll ? list : list.slice(0, PAGE);
-  const door = (key, label) => html`<${Action} key=${key} kind="tab" selected=${f === key} onClick=${() => ctx.setSentFilter(key)}>${label}<//>`;
+  const door = (key, label) => html`<button type="button" key=${key} class=${`og-door og-door--quiet ${f === key ? 'on' : ''}`} onClick=${() => ctx.setSentFilter(key)}>${label}</button>`;
   const doors = html`${door('all', c('all'))}${door('email', c('via.email'))}${door('inbox', c('via.inbox'))}`;
   return html`
-    <${Section} id="em-sent" title=${c('secSent')} count=${`${ctx.outboundTotal} · ${c('secSentSub')}`} actions=${doors} density="compact">
-      <${Stack}>
-        ${!shown.length ? html`<${Text} tone="muted">${ctx.outbound.length ? c('emptyFiltered') : c('emptySent')}<//>` : html`
-          <${Table} collapse=${600} density="compact" label=${c('secSent')} headers=${[c('colWhen'), c('colWhat'), c('colVia'), '']}
-            rows=${shown.map(m => [
-              // One span per plain cell, so a stacked row on a phone keeps its lines together.
-              html`<span>${rel(m.createdAt)}<br />${clock(m.createdAt)}</span>`,
-              html`<${Stack} density="compact"><${Text}><strong>${m.subject || c('noSubject')}</strong><//>
-                <${Text} kind="caption" tone="muted">${ctx.contactName(m.contactId)} · ${c('kind.' + (m.kind || 'transactional'))} · ${statusWord(m.status)}<//><//>`,
-              html`<span>${channelWord(m)}${m.organismId ? html`<br />${c('asOrganism')}` : null}</span>`,
-              m.contactId ? html`<${Action} kind="text" onClick=${() => ctx.openContact(m.contactId)}>${c('openContact')}<//>` : '',
-            ])} />`}
-        ${list.length > shown.length ? html`<${Stack} direction="wrap"><${Action} onClick=${() => ctx.setShowAll(true)}>${c('showRest', { n: list.length - shown.length })}<//><//>` : null}
-        <${Text} kind="caption" tone="muted">${c('sentHint')}<//>
-      <//>
+    <${Section} id="em-sent" num="03" title=${c('secSent')} count=${`${ctx.outboundTotal} · ${c('secSentSub')}`} doors=${doors}>
+      ${!shown.length ? html`<p class="og-empty">${ctx.outbound.length ? c('emptyFiltered') : c('emptySent')}</p>` : html`
+        <div class="em-log em-log--head"><div>${c('colWhen')}</div><div>${c('colWhat')}</div><div>${c('colVia')}</div><div></div></div>
+        <div class="em-log">
+          ${shown.map(m => html`
+            <div class="em-m" key=${'w' + m.id}><b>${rel(m.createdAt)}</b>${clock(m.createdAt)}</div>
+            <div class="em-what" key=${'t' + m.id}><b>${m.subject || c('noSubject')}</b><small>${ctx.contactName(m.contactId)} · ${c('kind.' + (m.kind || 'transactional'))} · ${statusWord(m.status)}</small></div>
+            <div class="em-m" key=${'v' + m.id}>${channelWord(m)}${m.organismId ? html`<br />${c('asOrganism')}` : null}</div>
+            <div class="og-tbl-door" key=${'d' + m.id}>${m.contactId ? html`<button type="button" class="og-door og-door--quiet" onClick=${() => ctx.openContact(m.contactId)}>${c('openContact')}</button>` : null}</div>`)}
+        </div>`}
+      ${list.length > shown.length ? html`<div class="og-doors em-more"><button type="button" class="og-door og-door--quiet" onClick=${() => ctx.setShowAll(true)}>${c('showRest', { n: list.length - shown.length })}</button></div>` : null}
+      <p class="em-hint">${c('sentHint')}</p>
     <//>`;
 }
 
@@ -154,36 +159,34 @@ function lettersFold(ctx) {
   const em = s.email || { workflowEnd: true };
   const digest = s.emailDigest || { enabled: false, afterHours: 8 };
   const verified = !!ctx.me?.email_verified_at;
-  const row = (key, ctl) => html`<${ListRow} key=${key} density="compact" mark=${html`<${Chip}>A<//>`}
-    name=${c('letter.' + key + 'T')} detail=${c('letter.' + key + 'S')} actions=${ctl}>
-    <${Text} kind="caption" tone="muted">${c('letter.' + key + 'D')}<//>
-  <//>`;
+  const row = (key, on, ctl) => html`
+    <div class="ct-av nt-av poster-box poster-box--avatar" key=${'a' + key} aria-hidden="true">A</div>
+    <div class="em-nm" key=${'n' + key}>${c('letter.' + key + 'T')}<small>${c('letter.' + key + 'S')}</small></div>
+    <div class="em-w" key=${'w' + key}>${c('letter.' + key + 'D')}</div>
+    <div class="em-ctl" key=${'c' + key}>${ctl}</div>`;
   return html`
-    <${Stack} density="compact">
-      ${row('security', html`<${Switch} on locked label=${c('always')} />`)}
-      ${row('invites', html`<${Switch} on locked label=${c('always')} />`)}
-      ${row('workflow', html`<${Switch} on=${em.workflowEnd !== false} label=${c('emailWord')} disabled=${ctx.busy || !verified} onToggle=${() => ctx.saveSettings({ ...s, email: { ...em, workflowEnd: em.workflowEnd === false } })} />`)}
-      ${row('digest', html`${digest.enabled ? html`<${Field} type="select" width="narrow" ariaLabel=${c('letter.digestT')} value=${String(digest.afterHours)}
-          options=${[2, 4, 8, 24, 72].map(h => ({ value: String(h), label: c('afterHours', { h }) }))}
-          onChange=${e => ctx.saveSettings({ ...s, emailDigest: { ...digest, afterHours: Number(e.target.value) } })} />` : null}
-        <${Switch} on=${digest.enabled} label=${c('emailWord')} disabled=${ctx.busy || !verified} onToggle=${() => ctx.saveSettings({ ...s, emailDigest: { ...digest, enabled: !digest.enabled } })} />`)}
-      ${row('nudge', html`<${Switch} on=${em.nudge === true} label=${c('emailWord')} disabled=${ctx.busy || !verified} onToggle=${() => ctx.saveSettings({ ...s, email: { ...em, nudge: em.nudge !== true } })} />`)}
-    <//>
-    <${Text} kind="caption" tone="muted">${verified ? c('lettersHint') : c('lettersNeedVerified')}<//>
+    <div class="em-mb em-letters">
+      ${row('security', true, html`<${Switch} on locked label=${c('always')} />`)}
+      ${row('invites', true, html`<${Switch} on locked label=${c('always')} />`)}
+      ${row('workflow', em.workflowEnd !== false, html`<${Switch} on=${em.workflowEnd !== false} label=${c('emailWord')} disabled=${ctx.busy || !verified} onToggle=${() => ctx.saveSettings({ ...s, email: { ...em, workflowEnd: em.workflowEnd === false } })} />`)}
+      ${row('digest', digest.enabled, html`${digest.enabled ? html`<select class="og-input em-select" value=${String(digest.afterHours)} onChange=${e => ctx.saveSettings({ ...s, emailDigest: { ...digest, afterHours: Number(e.target.value) } })}>${[2, 4, 8, 24, 72].map(h => html`<option key=${h} value=${String(h)}>${c('afterHours', { h })}</option>`)}</select>` : null}<${Switch} on=${digest.enabled} label=${c('emailWord')} disabled=${ctx.busy || !verified} onToggle=${() => ctx.saveSettings({ ...s, emailDigest: { ...digest, enabled: !digest.enabled } })} />`)}
+      ${row('nudge', em.nudge === true, html`<${Switch} on=${em.nudge === true} label=${c('emailWord')} disabled=${ctx.busy || !verified} onToggle=${() => ctx.saveSettings({ ...s, email: { ...em, nudge: em.nudge !== true } })} />`)}
+    </div>
+    <p class="em-hint">${verified ? c('lettersHint') : c('lettersNeedVerified')}</p>
     ${ctx.mailLog.length ? html`
-      <${Text} kind="label">${c('lastLetters')}<//>
-      <${Columns} collapse=${560} density="compact">${ctx.mailLog.slice(0, 8).map((e, i) => html`<${ListRow} key=${i} density="compact"
-        name=${kindWord(e.kind)} detail=${`${rel(e.at)}${e.subject ? ' · ' + e.subject : ''}`} />`)}<//>` : null}`;
+      <div class="og-label em-label">${c('lastLetters')}</div>
+      <div class="em-maillog">${ctx.mailLog.slice(0, 8).map((e, i) => html`<div key=${i}><b>${kindWord(e.kind)}</b><small>${rel(e.at)}${e.subject ? ' · ' + e.subject : ''}</small></div>`)}</div>` : null}`;
 }
 
 function chatFold(ctx) {
-  const r = (k, code) => road(k, c('road.' + k + 'K'), c('road.' + k + 'T'), c('road.' + k + 'D'), code);
+  const road = (k, code) => html`
+    <div class="nt-road" key=${k}><span class="nt-road-k">${c('road.' + k + 'K')}</span><b>${c('road.' + k + 'T')}</b><p>${c('road.' + k + 'D')}</p><code>${code}</code></div>`;
   return html`
-    <${Columns} layout="thirds" collapse=${560}>
-      ${r('read', 'aimeat_mail_search · aimeat_mail_read')}
-      ${r('send', 'aimeat_mail_send · aimeat_mail_aliases')}
-      ${r('app', 'POST /v1/connections/:id/delegations')}
-    <//>
-    <${Stack} direction="wrap"><${Action} onClick=${() => ctx.copyPrompt()}>${c('copyPrompt')}<//><//>
-    <${Text} kind="caption" tone="muted">${c('chatHint')}<//>`;
+    <div class="nt-roads">
+      ${road('read', 'aimeat_mail_search · aimeat_mail_read')}
+      ${road('send', 'aimeat_mail_send · aimeat_mail_aliases')}
+      ${road('app', 'POST /v1/connections/:id/delegations')}
+    </div>
+    <div class="og-doors em-more"><button type="button" class="og-slab" onClick=${() => ctx.copyPrompt()}>${c('copyPrompt')}</button></div>
+    <p class="em-hint">${c('chatHint')}</p>`;
 }

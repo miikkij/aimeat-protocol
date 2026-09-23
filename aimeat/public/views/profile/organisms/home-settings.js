@@ -17,11 +17,6 @@
  *   import { OrganismSettings } from '/views/profile/organisms/home-settings.js';
  *   <OrganismSettings org ghii isCreator isMember canEdit showToast confirm onBack onChanged onLeave onDeleted />
  * @version-history
- *   2026-09-22 -- The irreversible act is the set's solid danger aside; the Delete opener and Leave
- *     carry the danger tone.
- *   2026-09-22 -- Composed from the shared set: Page with an index Rail, Sections, Fields, tab-style
- *     radio choices; the reversible act is the dashed aside and the irreversible one a solid box. No
- *     class of its own.
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v1.2.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.1.0 -- 2026-09-13 -- Compose section headlines with poster-section-title.
@@ -34,7 +29,7 @@ import { useState, useEffect, useMemo, useRef } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { Page, Rail, Section, Columns, Stack, Surface, Field, Chip, Action, Text } from '/components/poster-parts.js';
+import { scrollTo } from '/views/profile/organisms/poster-parts.js';
 import { TagInput } from '/views/profile/shared.js';
 import * as orgService from '/js/services/organisms.js';
 import { copyToClipboard } from '/js/utils.js';
@@ -49,10 +44,11 @@ const MEMBER_VIS = ['authenticated', 'members', 'admins', 'public'];
 /** A row of choices, the chosen one on the sun. */
 function Choice({ options, value, onPick, label }) {
   return html`
-    <${Stack} direction="wrap" role="radiogroup" label=${label}>
+    <div class="og-choice" role="radiogroup" aria-label=${label}>
       ${options.map(o => html`
-        <${Action} key=${o.id} kind="tab" semantics="radio" selected=${value === o.id} onClick=${() => onPick(o.id)}>${o.label}<//>`)}
-    <//>`;
+        <button type="button" key=${o.id} class=${`og-choice-btn ${value === o.id ? 'on' : ''}`}
+          role="radio" aria-checked=${value === o.id ? 'true' : 'false'} onClick=${() => onPick(o.id)}>${o.label}</button>`)}
+    </div>`;
 }
 
 export function OrganismSettings({ org, isCreator, isMember, canEdit, showToast, confirm, onBack, onChanged, onLeave, onDeleted }) {
@@ -183,115 +179,125 @@ export function OrganismSettings({ org, isCreator, isMember, canEdit, showToast,
   };
   const label = (k, fb) => t(`organisms.${k}`) || fb;
 
-  const hint = (text) => html`<${Text} kind="caption" tone="muted">${text}<//>`;
-  const railEntries = canEdit ? [
-    { id: 'og-set-name', href: '#og-set-name', label: label('setNameDesc', 'Name and description'), current: true },
-    { id: 'og-set-access', href: '#og-set-access', label: label('setAccess', 'Who gets in') },
-    { id: 'og-set-vis', href: '#og-set-vis', label: label('setVisibility', 'Who sees') },
-    { id: 'og-set-danger', href: '#og-set-danger', label: label('setDanger', 'Archive and delete') },
-  ] : [];
+  return html`
+    <div class="og og-settings">
+      <div class="og-crumb">
+        <button type="button" class="og-crumb-link" onClick=${() => { leave(); }}>${t('organisms.title') || 'Organisms'}</button>
+        <span>/</span>
+        <button type="button" class="og-crumb-link" onClick=${leave}>${org.name || org.id}</button>
+        <span>/</span>
+        <span class="og-crumb-here">${t('organisms.settings') || 'Settings'}</span>
+      </div>
+      <h1 class="og-title poster-page-title">${t('organisms.settings') || 'Settings'}
+        <small>
+          ${org.createdAt ? html`<span>${t('organisms.createdAt') || 'Created'} ${fmtDate(org.createdAt)}</span>` : null}
+          <span>${t('organisms.creator') || 'Creator'} ${org.creatorGhii || '-'}</span>
+          ${extraAdmins.length > 0 ? html`<span>${t('organisms.admins') || 'Admins'} ${extraAdmins.join(', ')}</span>` : null}
+          ${org.boardId ? html`<button type="button" class="og-crumb-link" title=${t('organisms.copyId') || 'Copy ID'} onClick=${copyBoardId}>${t('organisms.board') || 'Board'} ${boardIdShort}</button>` : null}
+        </small>
+      </h1>
 
-  return html`<${Page} title=${t('organisms.settings') || 'Settings'}
-    crumbs=${[{ label: t('nav.profile') }, { label: t('profile.landing.menuInformation') }, { label: t('organisms.title') || 'Organisms', onClick: leave }, { label: org.name || org.id, onClick: leave }, { label: t('organisms.settings') || 'Settings' }]}
-    identity=${html`<${Stack} direction="wrap" density="compact" align="center">
-      ${org.createdAt ? html`<${Chip} tone="muted">${t('organisms.createdAt') || 'Created'} ${fmtDate(org.createdAt)}<//>` : null}
-      <${Chip} tone="muted">${t('organisms.creator') || 'Creator'} ${org.creatorGhii || '-'}<//>
-      ${extraAdmins.length > 0 ? html`<${Chip} tone="muted">${t('organisms.admins') || 'Admins'} ${extraAdmins.join(', ')}<//>` : null}
-      ${org.boardId ? html`<${Action} kind="text" title=${t('organisms.copyId') || 'Copy ID'} onClick=${copyBoardId}>${t('organisms.board') || 'Board'} ${boardIdShort}<//>` : null}
-    <//>`}
-    rail=${html`<${Rail} kind="index" title=${t('organisms.settings') || 'Settings'} entries=${railEntries}>
-      <${Action} kind="text" onClick=${leave}>← ${label('backToOrganism', 'Back to the organism')}<//>
-    <//>`}>
-    ${canEdit ? html`
-      <${Section} id="og-set-name" title=${label('setNameDesc', 'Name and description')} count="01" density="compact">
-        <${Stack}>
-          <${Field} label=${label('fieldName', 'Name')} value=${form.name} onInput=${(e) => setForm(f => ({ ...f, name: e.target.value }))} />
-          <${Field} type="textarea" rows=${3} label=${label('fieldDescription', 'Description')} value=${form.description} onInput=${(e) => setForm(f => ({ ...f, description: e.target.value }))} />
-          <${Stack} density="compact">
-            <${Text} kind="label">${label('fieldInterests', 'Interests')}<//>
-            <${TagInput} tags=${form.interests} onChange=${(tags) => setForm(f => ({ ...f, interests: tags }))} placeholder=${t('organisms.addTag') || 'Add…'} />
-          <//>
-          <${Stack} density="compact">
-            <${Text} kind="label">${label('fieldType', 'Type')}<//>
-            <${Choice} label=${label('fieldType', 'Type')} options=${typeOptions} value=${customType ? '__custom' : form.type} onPick=${pickType} />
-            ${customType ? html`<${Field} maxLength=${40} value=${form.type} placeholder=${t('organisms.typeCustomPlaceholder') || 'Your own word'}
-              onInput=${(e) => setForm(f => ({ ...f, type: e.target.value }))} />` : null}
-          <//>
-        <//>
-      <//>
+      <div class="og-grid">
+        <div class="og-main">
+          ${canEdit ? html`
+            <section class="og-sec og-sec--first" id="og-set-name">
+              <div class="og-sec-h"><h2 class="poster-section-title">${label('setNameDesc', 'Name and description')}<small>01</small></h2></div>
+              <div class="og-fields">
+                <label class="og-field"><span class="og-label">${label('fieldName', 'Name')}</span>
+                  <input type="text" class="og-input" value=${form.name} onInput=${(e) => setForm(f => ({ ...f, name: e.target.value }))} /></label>
+                <label class="og-field"><span class="og-label">${label('fieldDescription', 'Description')}</span>
+                  <textarea class="og-textarea" rows="3" value=${form.description} onInput=${(e) => setForm(f => ({ ...f, description: e.target.value }))}></textarea></label>
+                <div class="og-field"><span class="og-label">${label('fieldInterests', 'Interests')}</span>
+                  <${TagInput} tags=${form.interests} onChange=${(tags) => setForm(f => ({ ...f, interests: tags }))} placeholder=${t('organisms.addTag') || 'Add…'} /></div>
+                <div class="og-field"><span class="og-label">${label('fieldType', 'Type')}</span>
+                  <${Choice} label=${label('fieldType', 'Type')} options=${typeOptions} value=${customType ? '__custom' : form.type} onPick=${pickType} />
+                  ${customType ? html`<input type="text" class="og-input" maxlength="40" value=${form.type} placeholder=${t('organisms.typeCustomPlaceholder') || 'Your own word'}
+                    onInput=${(e) => setForm(f => ({ ...f, type: e.target.value }))} />` : null}
+                </div>
+              </div>
+            </section>
 
-      <${Section} id="og-set-access" title=${label('setAccess', 'Who gets in')} count="02" density="compact">
-        <${Stack} density="compact">
-          <${Text} kind="label">${label('setJoin', 'Joining')}<//>
-          <${Choice} label=${label('setJoin', 'Joining')} value=${form.join_policy} onPick=${(id) => setForm(f => ({ ...f, join_policy: id }))}
-            options=${JOIN.map(id => ({ id, label: t(`organisms.policyShort.${id}`) || id }))} />
-          ${policyHint && !policyHint.startsWith('organisms.') ? hint(policyHint) : null}
-        <//>
-      <//>
+            <section class="og-sec" id="og-set-access">
+              <div class="og-sec-h"><h2 class="poster-section-title">${label('setAccess', 'Who gets in')}<small>02</small></h2></div>
+              <div class="og-field"><span class="og-label">${label('setJoin', 'Joining')}</span>
+                <${Choice} label=${label('setJoin', 'Joining')} value=${form.join_policy} onPick=${(id) => setForm(f => ({ ...f, join_policy: id }))}
+                  options=${JOIN.map(id => ({ id, label: t(`organisms.policyShort.${id}`) || id }))} />
+                ${policyHint && !policyHint.startsWith('organisms.') ? html`<span class="og-hint">${policyHint}</span>` : null}
+              </div>
+            </section>
 
-      <${Section} id="og-set-vis" title=${label('setVisibility', 'Who sees')} count="03" density="compact">
-        <${Columns} collapse="640">
-          <${Stack} density="compact">
-            <${Text} kind="label">${label('setOrganismVis', 'Organism')}<//>
-            <${Choice} label=${label('setOrganismVis', 'Organism')} value=${form.visibility} onPick=${(id) => setForm(f => ({ ...f, visibility: id }))}
-              options=${VIS.map(id => ({ id, label: t(`organisms.vis${id[0].toUpperCase()}${id.slice(1)}`) || id }))} />
-            ${visHint && !visHint.startsWith('organisms.') ? hint(visHint) : null}
-          <//>
-          <${Stack} density="compact">
-            <${Text} kind="label">${label('memberVisLabel', 'Member list')}<//>
-            <${Choice} label=${label('memberVisLabel', 'Member list')} value=${form.member_visibility} onPick=${(id) => setForm(f => ({ ...f, member_visibility: id }))}
-              options=${MEMBER_VIS.map(id => ({ id, label: t(`organisms.memberVis.${id}`) || id }))} />
-            ${hint(t('organisms.memberVisHint') || 'Who can see who belongs here. Hides the member list only; content authorship stays visible.')}
-          <//>
-        <//>
-      <//>
+            <section class="og-sec" id="og-set-vis">
+              <div class="og-sec-h"><h2 class="poster-section-title">${label('setVisibility', 'Who sees')}<small>03</small></h2></div>
+              <div class="og-fields og-fields--2">
+                <div class="og-field"><span class="og-label">${label('setOrganismVis', 'Organism')}</span>
+                  <${Choice} label=${label('setOrganismVis', 'Organism')} value=${form.visibility} onPick=${(id) => setForm(f => ({ ...f, visibility: id }))}
+                    options=${VIS.map(id => ({ id, label: t(`organisms.vis${id[0].toUpperCase()}${id.slice(1)}`) || id }))} />
+                  ${visHint && !visHint.startsWith('organisms.') ? html`<span class="og-hint">${visHint}</span>` : null}
+                </div>
+                <div class="og-field"><span class="og-label">${label('memberVisLabel', 'Member list')}</span>
+                  <${Choice} label=${label('memberVisLabel', 'Member list')} value=${form.member_visibility} onPick=${(id) => setForm(f => ({ ...f, member_visibility: id }))}
+                    options=${MEMBER_VIS.map(id => ({ id, label: t(`organisms.memberVis.${id}`) || id }))} />
+                  <span class="og-hint">${t('organisms.memberVisHint') || 'Who can see who belongs here. Hides the member list only; content authorship stays visible.'}</span>
+                </div>
+              </div>
+            </section>
 
-      <${Stack} direction="wrap" align="center">
-        <${Action} kind="primary" onClick=${saveEdit} disabled=${saving || !dirty || !form.name.trim()}>
-          ${saving ? '...' : (t('organisms.saveChanges') || 'Save changes')}<//>
-        <${Action} onClick=${leave}>${t('organisms.cancel') || 'Cancel'}<//>
-        ${hint(label('savesNote', 'Changes apply at once.'))}
-      <//>
+            <div class="og-actions">
+              <button type="button" class="og-slab" onClick=${saveEdit} disabled=${saving || !dirty || !form.name.trim()}>
+                ${saving ? '...' : (t('organisms.saveChanges') || 'Save changes')}</button>
+              <button type="button" class="og-door og-door--quiet" onClick=${leave}>${t('organisms.cancel') || 'Cancel'}</button>
+              <span class="og-hint">${label('savesNote', 'Changes apply at once.')}</span>
+            </div>
 
-      <${Section} id="og-set-danger" title=${label('setDanger', 'Archive and delete')} count="04" density="compact">
-        <${Stack}>
-          <${Surface} kind="aside">
-            <${Stack} density="compact">
-              <${Text} kind="label">${label('reversible', 'Reversible')}<//>
-              <${Stack} direction="wrap" align="between">
-                <${Text}><strong>${org.archived ? (t('organisms.unarchiveOrganismTitle') || 'Unarchive this organism') : (t('organisms.archiveOrganismTitle') || 'Archive this organism')}.</strong> ${org.archived
-                  ? (t('organisms.unarchiveOrganismSub') || 'Make it active again. Workspaces archived together with it are restored.')
-                  : (t('organisms.archiveOrganismSub') || 'Make it read-only and hide it (and its workspaces) from AI operations. Nothing is deleted.')}<//>
-                <${Action} onClick=${() => doArchive(!org.archived)}>${org.archived ? (t('organisms.unarchive') || 'Unarchive') : (t('organisms.archive') || 'Archive')}<//>
-              <//>
-            <//>
-          <//>
-          ${isCreator ? html`
-            <${Surface} kind="aside" tone="danger">
-              <${Stack} density="compact">
-                <${Text} kind="label">${label('irreversible', 'Cannot be undone')}<//>
-                <${Stack} direction="wrap" align="between">
-                  <${Text}><strong>${t('organisms.deleteOrganismTitle') || 'Delete this organism'}.</strong> ${delStatsText}<//>
-                  <${Action} tone="danger" expanded=${delOpen} onClick=${() => { setDelOpen(o => !o); setDelName(''); }}>${t('organisms.deleteDots') || 'Delete…'}<//>
-                <//>
-                ${delOpen ? html`
-                  <${Stack} direction="horizontal" align="end">
-                    <${Field} label=${(t('organisms.confirmTypeName') || 'Type the organism’s name to confirm') + ': ' + (org.name || '')}
-                      value=${delName} onInput=${(e) => setDelName(e.target.value)} placeholder=${org.name || ''} />
-                    <${Action} kind="primary" tone="danger" disabled=${delName.trim() !== (org.name || '').trim()} onClick=${doDelete}>${t('organisms.delete') || 'Delete'}<//>
-                  <//>` : null}
-              <//>
-            <//>` : null}
-        <//>
-      <//>
-    ` : null}
+            <section class="og-sec" id="og-set-danger">
+              <div class="og-sec-h"><h2 class="poster-section-title">${label('setDanger', 'Archive and delete')}<small>04</small></h2></div>
+              <div class="og-box poster-aside poster-aside--small">
+                <span class="og-box-label">${label('reversible', 'Reversible')}</span>
+                <div class="og-box-row">
+                  <span><b>${org.archived ? (t('organisms.unarchiveOrganismTitle') || 'Unarchive this organism') : (t('organisms.archiveOrganismTitle') || 'Archive this organism')}.</b> ${org.archived
+                    ? (t('organisms.unarchiveOrganismSub') || 'Make it active again. Workspaces archived together with it are restored.')
+                    : (t('organisms.archiveOrganismSub') || 'Make it read-only and hide it (and its workspaces) from AI operations. Nothing is deleted.')}</span>
+                  <button type="button" class="og-door" onClick=${() => doArchive(!org.archived)}>${org.archived ? (t('organisms.unarchive') || 'Unarchive') : (t('organisms.archive') || 'Archive')}</button>
+                </div>
+              </div>
+              ${isCreator ? html`
+                <div class="og-box og-box--solid poster-aside poster-aside--small poster-aside--irreversible">
+                  <span class="og-box-label">${label('irreversible', 'Cannot be undone')}</span>
+                  <div class="og-box-row">
+                    <span><b>${t('organisms.deleteOrganismTitle') || 'Delete this organism'}.</b> ${delStatsText}</span>
+                    <button type="button" class="og-door og-door--danger" onClick=${() => { setDelOpen(o => !o); setDelName(''); }}>${t('organisms.deleteDots') || 'Delete…'}</button>
+                  </div>
+                  ${delOpen ? html`
+                    <div class="og-box-confirm">
+                      <label class="og-field"><span class="og-label">${(t('organisms.confirmTypeName') || 'Type the organism’s name to confirm') + ': ' + (org.name || '')}</span>
+                        <input type="text" class="og-input" value=${delName} onInput=${(e) => setDelName(e.target.value)} placeholder=${org.name || ''} /></label>
+                      <button type="button" class="og-slab og-slab--danger" disabled=${delName.trim() !== (org.name || '').trim()} onClick=${doDelete}>${t('organisms.delete') || 'Delete'}</button>
+                    </div>` : null}
+                </div>` : null}
+            </section>
+          ` : null}
 
-    ${isMember && !isCreator ? html`
-      <${Surface} kind="box">
-        <${Stack} direction="wrap" align="between">
-          <${Text}><strong>${t('organisms.leave') || 'Leave'}.</strong><//>
-          <${Action} tone="danger" onClick=${onLeave}>${t('organisms.leave') || 'Leave'}<//>
-        <//>
-      <//>` : null}
-  <//>`;
+          ${isMember && !isCreator ? html`
+            <section class="og-sec ${canEdit ? '' : 'og-sec--first'}">
+              <div class="og-box og-box--solid poster-aside poster-aside--small poster-aside--irreversible">
+                <div class="og-box-row">
+                  <span><b>${t('organisms.leave') || 'Leave'}.</b></span>
+                  <button type="button" class="og-door og-door--danger" onClick=${onLeave}>${t('organisms.leave') || 'Leave'}</button>
+                </div>
+              </div>
+            </section>` : null}
+        </div>
+
+        <nav class="og-rail" aria-label=${t('organisms.settings') || 'Settings'}>
+          <span class="og-rail-label">${t('organisms.settings') || 'Settings'}</span>
+          ${canEdit ? html`
+            <a class="og-rail-link on" href="#og-set-name" onClick=${(e) => { e.preventDefault(); scrollTo('og-set-name'); }}><i>01</i>${label('setNameDesc', 'Name and description')}</a>
+            <a class="og-rail-link" href="#og-set-access" onClick=${(e) => { e.preventDefault(); scrollTo('og-set-access'); }}><i>02</i>${label('setAccess', 'Who gets in')}</a>
+            <a class="og-rail-link" href="#og-set-vis" onClick=${(e) => { e.preventDefault(); scrollTo('og-set-vis'); }}><i>03</i>${label('setVisibility', 'Who sees')}</a>
+            <a class="og-rail-link" href="#og-set-danger" onClick=${(e) => { e.preventDefault(); scrollTo('og-set-danger'); }}><i>04</i>${label('setDanger', 'Archive and delete')}</a>
+            <hr />` : null}
+          <button type="button" class="og-rail-link" onClick=${leave}><i>←</i>${label('backToOrganism', 'Back to the organism')}</button>
+        </nav>
+      </div>
+    </div>`;
 }

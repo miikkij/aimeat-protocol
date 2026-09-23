@@ -13,8 +13,6 @@
  *   - Instances: create, pause, delete, edit config and translations for a multi-instance extension
  *
  * @version-history
- *   v2.0.0 -- 2026-09-22 -- Composed from the shared component set: the record surface, chips, the
- *     actions and instances as list rows, the facts as key-value rows, underlined actions.
  *   2026-09-13 -- Compose the shared compact record title.
  *   v1.1.0 -- 2026-09-13 -- Compose the action rule and replace inline instance layout with classes.
  *   v1.0.0 — 2026-09-12 — Initial. What an extension exposes and what calls it were both invisible
@@ -27,7 +25,6 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { num, dt, shortDate, useToast, Toast } from './shared.js';
 import { useConfirm } from '/components/Modal.js';
-import { Surface, Stack, Columns, ListRow, KeyValue, Field, Action, Chip, Text } from '/components/poster-parts.js';
 import {
   getExtensionInstances, createExtensionInstance, updateExtensionInstance, deleteExtensionInstance,
   activateExtension, deactivateExtension, reinstallExtension,
@@ -91,40 +88,46 @@ function Instances({ ext, schema, onError }) {
     load();
   }
 
-  return html`<${Stack}>
-    <${Text} kind="label">${X('inst.title')}<//>
-    ${loading && html`<${Text} kind="caption" tone="muted">${t('dashboard.loading')}<//>`}
-    ${!loading && list.length === 0 && html`<${Text} kind="caption" tone="muted">${X('inst.none')}<//>`}
-    ${list.length > 0 && html`<div>${list.map(inst => html`<${ListRow} key=${inst.id} density="compact" name=${inst.id}
-      detail=${X('inst.madeBy', { who: inst.createdBy || inst.created_by || '—', when: dt(inst.createdAt || inst.created_at) })}
-      value=${html`<${Chip} tone=${inst.status === 'active' ? 'success' : 'muted'}>${inst.status === 'active' ? X('inst.running') : X('inst.paused')}<//>`}
-      actions=${html`
-        ${schema && html`<${Action} expanded=${editCfg === inst.id}
-          onClick=${() => { setEditCfg(editCfg === inst.id ? null : inst.id); setCfgData({ ...(inst.config || {}) }); }}>${X('inst.config')}<//>`}
-        <${Action} expanded=${editTl === inst.id} onClick=${() => setEditTl(editTl === inst.id ? null : inst.id)}>${X('inst.words')}<//>
-        <${Action} onClick=${() => toggle(inst)}>${inst.status === 'active' ? X('inst.pause') : X('inst.start')}<//>
-        <${Action} tone="danger" onClick=${() => remove(inst)}>${X('inst.remove')}<//>`}>
-      ${(editCfg === inst.id || editTl === inst.id) && html`<${Stack}>
-        ${editCfg === inst.id && html`<${Stack}>
+  return html`
+    <div class="adm-ex-panel">
+      <div class="adm-ex-lbl">${X('inst.title')}</div>
+      ${loading && html`<p class="adm-ex-hint">${t('dashboard.loading')}</p>`}
+      ${!loading && list.length === 0 && html`<p class="adm-ex-hint">${X('inst.none')}</p>`}
+      ${list.map(inst => html`
+        <div class="adm-ex-frow">
+          <b>${inst.id}</b>
+          <span class="adm-ex-box-row adm-ex-inst-row">
+            <em>${inst.status === 'active' ? X('inst.running') : X('inst.paused')}<small>${X('inst.madeBy', { who: inst.createdBy || inst.created_by || '—', when: dt(inst.createdAt || inst.created_at) })}</small></em>
+            <span>
+              ${schema && html`<button type="button" class="og-door og-door--quiet"
+                onClick=${() => { setEditCfg(editCfg === inst.id ? null : inst.id); setCfgData({ ...(inst.config || {}) }); }}>${X('inst.config')}</button>`}
+              <button type="button" class="og-door og-door--quiet" onClick=${() => setEditTl(editTl === inst.id ? null : inst.id)}>${X('inst.words')}</button>
+              <button type="button" class="og-door og-door--quiet" onClick=${() => toggle(inst)}>${inst.status === 'active' ? X('inst.pause') : X('inst.start')}</button>
+              <button type="button" class="og-door og-door--quiet og-door--danger" onClick=${() => remove(inst)}>${X('inst.remove')}</button>
+            </span>
+          </span>
+        </div>
+        ${editCfg === inst.id && html`<div class="adm-ex-panel">
           <${ConfigForm} schema=${schema} config=${cfgData} onChange=${setCfgData} />
-          <${Stack} direction="horizontal" align="center">
-            <${Action} onClick=${() => saveConfig(inst)}>${X('inst.save')}<//>
-            <${Action} kind="text" onClick=${() => setEditCfg(null)}>${X('inst.cancel')}<//>
-          <//>
-        <//>`}
-        ${editTl === inst.id && html`<${TranslationEditor} extName=${ext.name} inst=${inst} onSave=${saveTranslations} />`}
-      <//>`}
-    <//>`)}</div>`}
+          <div class="adm-ex-acts adm-ex-inst-actions">
+            <button class="adm-btn" onClick=${() => saveConfig(inst)}>${X('inst.save')}</button>
+            <button type="button" class="og-door og-door--quiet" onClick=${() => setEditCfg(null)}>${X('inst.cancel')}</button>
+          </div>
+        </div>`}
+        ${editTl === inst.id && html`<${TranslationEditor} extName=${ext.name} inst=${inst} onSave=${saveTranslations} />`}`)}
 
-    <${Stack} direction="wrap" align="end">
-      <${Field} label=${X('inst.newId')} value=${newId} width="narrow"
-        placeholder="my-instance-01" onInput=${e => setNewId(e.target.value)} />
-      <${Action} onClick=${create} disabled=${!newId.trim()}>${X('inst.create')}<//>
-    <//>
-    <${Text} kind="caption" tone="muted">${X('inst.createWhy')}<//>
-    ${schema && newId.trim() && html`<${ConfigForm} schema=${schema} config=${newConfig} onChange=${setNewConfig} />`}
-    <${ConfirmUI} />
-  <//>`;
+      <div class="adm-ex-acts">
+        <div class="og-field adm-ex-inst-field">
+          <label class="og-label" for=${'ex-inst-' + ext.name}>${X('inst.newId')}</label>
+          <input id=${'ex-inst-' + ext.name} class="og-input" type="text" value=${newId}
+            placeholder="my-instance-01" onInput=${e => setNewId(e.target.value)} />
+        </div>
+        <button class="adm-btn" onClick=${create} disabled=${!newId.trim()}>${X('inst.create')}</button>
+        <p>${X('inst.createWhy')}</p>
+      </div>
+      ${schema && newId.trim() && html`<${ConfigForm} schema=${schema} config=${newConfig} onChange=${setNewConfig} />`}
+      <${ConfirmUI} />
+    </div>`;
 }
 
 export default function ExtensionRecord({ ext, onClose, onUninstall, onReload }) {
@@ -159,76 +162,73 @@ export default function ExtensionRecord({ ext, onClose, onUninstall, onReload })
     setBusy(false);
   }
 
-  const fact = (label, value, note) => html`<${KeyValue} label=${label}><${Stack} density="compact">
-    <span>${value}</span>${note && html`<${Text} kind="caption" tone="muted">${note}<//>`}<//><//>`;
-
-  return html`<${Surface} kind="record">
-    <${Stack}>
+  return html`
+    <div class="adm-ex-rec">
       ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
-      <${Stack} direction="wrap" align="between">
-        <${Stack} density="compact">
-          <${Text} kind="heading" size="small">${ext.name}<//>
-          <${Text} tone="muted">${ext.description || X('noDescription')}<//>
-          <${Stack} direction="wrap" density="compact">
-            <${Chip} tone=${active ? 'success' : 'muted'}>${active ? X('active') : X('switchedOff')}<//>
-            <${Chip}>${ext.version || '—'}<//>
-            ${ext.author && html`<${Chip}>${X('by', { who: ext.author })}<//>`}
-            <${Chip} tone=${ext.federation?.enabled ? 'plain' : 'muted'}>${ext.federation?.enabled ? X('federating') : X('notFederating')}<//>
-            ${ext.instances && html`<${Chip}>${X('supportsInstances')}<//>`}
-          <//>
-        <//>
-        <${Action} onClick=${onClose}>${X('close')} ↩<//>
-      <//>
-
-      <${Columns} layout="leading" collapse=${900}>
-        <${Stack}>
-          <${Stack} density="compact">
-            <${Text} kind="label">${X('actionsTitle', { n: num((ext.actions || []).length) })}<//>
-            ${(ext.actions || []).length > 0 && html`<div>${(ext.actions || []).map(a => html`<${ListRow} key=${a.id} density="compact"
-              mark=${html`<${Chip}>${a.method || 'POST'}<//>`} name=${a.id} detail=${`/v1/ext/${ext.name}/${a.id}`} />`)}</div>`}
-            ${(ext.actions || []).length === 0 && html`<${Text} kind="caption" tone="muted">${X('noActions')}<//>`}
-          <//>
-
-          <${Stack} density="compact">
-            <${Text} kind="label">${X('installedTitle')}<//>
-            <div>
-              ${fact(X('f.when'), shortDate(ext.installedAt), active ? X('f.activatedAt', { when: shortDate(ext.activatedAt) }) : X('f.notActive'))}
-              ${fact(X('f.by'), who, who === ext.installedBy ? '' : (ext.installedBy || ''))}
-              ${fact(X('f.asks'), asks.length ? asks.join(', ') : X('f.asksNone'), X('f.asksWhy'))}
-              ${fact(X('f.storage'), `ext:${ext.name}`, X('f.storageWhy'))}
-              ${schedules.length > 0 && fact(X('f.clock'), schedules.map(s => s.cron).join(', '),
-                X('f.clockWhy', { actions: schedules.map(s => s.action).join(', ') }))}
-            </div>
-          <//>
-        <//>
-
-        <${Stack} density="compact">
-          <${Text} kind="label">${X('calledByTitle')}<//>
-          <div>
-            ${callers.map(c => html`<${ListRow} key=${c.name} density="compact" name=${c.name} value=${html`<${Text} kind="mono">${c.kind}<//>`} />`)}
-            ${callers.length === 0 && html`<${ListRow} density="compact" name=${X('calledByNothing')} value=${html`<${Text} kind="mono">—<//>`} />`}
+      <div class="adm-ex-rec-h">
+        <div>
+          <h3 class="poster-record-title poster-record-title--small">${ext.name}</h3>
+          <span class="adm-ex-rec-sub">${ext.description || X('noDescription')}</span>
+          <div class="adm-ex-rec-chips">
+            <span class=${active ? 'is-live' : 'is-off'}>${active ? X('active') : X('switchedOff')}</span>
+            <span>${ext.version || '—'}</span>
+            ${ext.author && html`<span>${X('by', { who: ext.author })}</span>`}
+            <span class=${ext.federation?.enabled ? '' : 'is-off'}>${ext.federation?.enabled ? X('federating') : X('notFederating')}</span>
+            ${ext.instances && html`<span>${X('supportsInstances')}</span>`}
           </div>
-          <${Text} kind="caption" tone="muted">${callers.length ? X('calledByWhy') : X('calledByNothingWhy')}<//>
-        <//>
-      <//>
+        </div>
+        <button type="button" class="og-door og-door--quiet" onClick=${onClose}>${X('close')} ↩</button>
+      </div>
 
-      ${(ext.actions || []).length > 0 && html`<${Stack}>
-        <${Stack} direction="horizontal">
-          <${Action} expanded=${scripts} onClick=${() => setScripts(!scripts)}>
-            ${scripts ? X('hideScripts') : X('showScripts')}<//>
-        <//>
-        ${scripts && html`<${ActionScriptEditor} extName=${ext.name} actions=${ext.actions || []} />`}
-      <//>`}
+      <div class="adm-ex-grid">
+        <div>
+          <div class="adm-ex-lbl">${X('actionsTitle', { n: num((ext.actions || []).length) })}</div>
+          ${(ext.actions || []).map(a => html`
+            <div class="adm-ex-act">
+              <i>${a.method || 'POST'}</i>
+              <code>/v1/ext/${ext.name}/${a.id}</code>
+              <em>${a.id}</em>
+            </div>`)}
+          ${(ext.actions || []).length === 0 && html`<p class="adm-ex-hint">${X('noActions')}</p>`}
+
+          <div class="adm-ex-lbl adm-ex-lbl--gap">${X('installedTitle')}</div>
+          <div class="adm-ex-frow"><b>${X('f.when')}</b><span>${shortDate(ext.installedAt)}<small>${
+  active ? X('f.activatedAt', { when: shortDate(ext.activatedAt) }) : X('f.notActive')}</small></span></div>
+          <div class="adm-ex-frow"><b>${X('f.by')}</b><span>${who}<small>${who === ext.installedBy ? '' : (ext.installedBy || '')}</small></span></div>
+          <div class="adm-ex-frow"><b>${X('f.asks')}</b><span>${asks.length ? asks.join(', ') : X('f.asksNone')}<small>${X('f.asksWhy')}</small></span></div>
+          <div class="adm-ex-frow"><b>${X('f.storage')}</b><span>ext:${ext.name}<small>${X('f.storageWhy')}</small></span></div>
+          ${schedules.length > 0 && html`
+            <div class="adm-ex-frow"><b>${X('f.clock')}</b><span>${schedules.map(s => s.cron).join(', ')}<small>${
+  X('f.clockWhy', { actions: schedules.map(s => s.action).join(', ') })}</small></span></div>`}
+        </div>
+
+        <div>
+          <div class="adm-ex-lbl">${X('calledByTitle')}</div>
+          <div class="adm-ex-box">
+            ${callers.map(c => html`<div class="adm-ex-box-row"><em>${c.name}</em><span>${c.kind}</span></div>`)}
+            ${callers.length === 0 && html`<div class="adm-ex-box-row"><em>${X('calledByNothing')}</em><span>—</span></div>`}
+          </div>
+          <p class="adm-ex-hint">${callers.length ? X('calledByWhy') : X('calledByNothingWhy')}</p>
+        </div>
+      </div>
+
+      ${(ext.actions || []).length > 0 && html`
+        <div class="adm-ex-panel">
+          <button type="button" class="og-door og-door--quiet" onClick=${() => setScripts(!scripts)}>
+            ${scripts ? X('hideScripts') : X('showScripts')}
+          </button>
+          ${scripts && html`<${ActionScriptEditor} extName=${ext.name} actions=${ext.actions || []} />`}
+        </div>`}
 
       ${ext.instances && html`<${Instances} ext=${ext} schema=${schema} onError=${showErr} />`}
 
-      <${Stack} direction="wrap" align="center">
-        <${Action} kind="primary" onClick=${() => setActive(!active)} disabled=${busy}>
-          ${active ? X('switchOff') : X('switchOn')}<//>
-        <${Action} onClick=${reinstall} disabled=${busy}>${X('reinstall')}<//>
-        <${Action} tone="danger" onClick=${() => onUninstall(ext)}>${X('uninstall')}<//>
-      <//>
-      <${Text} kind="caption" tone="muted">${active ? X('switchOffWhy') : X('switchOnWhy')}<//>
-    <//>
-  <//>`;
+      <div class="adm-ex-acts poster-row--thing">
+        <button class="adm-btn" onClick=${() => setActive(!active)} disabled=${busy}>
+          ${active ? X('switchOff') : X('switchOn')}
+        </button>
+        <button type="button" class="og-door og-door--quiet" onClick=${reinstall} disabled=${busy}>${X('reinstall')}</button>
+        <button type="button" class="og-door og-door--quiet og-door--danger" onClick=${() => onUninstall(ext)}>${X('uninstall')}</button>
+        <p>${active ? X('switchOffWhy') : X('switchOnWhy')}</p>
+      </div>
+    </div>`;
 }

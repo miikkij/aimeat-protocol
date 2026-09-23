@@ -23,12 +23,10 @@
  *   in a toast, because the person needs them next to the thing they must change.
  * @usage import { StepBranchB } from './step-branch-b.js';
  * @version-history
- *   2026-09-13: Shared records, roster rows and fields own the alternative setup path.
  *   (2026-08-23) Em-dashes swept from the fallback strings (banned in every surface).
  *   v1.0.0 — 2026-08-07 — Initial (remake phase 5).
  */
 import { h } from 'preact';
-import { Surface, Stack, Text, Field, Action, ListRow } from '/components/poster-parts.js';
 import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
@@ -103,26 +101,89 @@ export function StepBranchB({ state, onChanged }) {
   // Their own app first: upgrading the thing they already use is the cheapest move available.
   const ordered = theirs ? [theirs, ...tools.filter(x => x.id !== theirs.id)] : tools;
 
-  return html`<${Surface} kind="record"><${Stack}>
-    <${Text} kind="heading">2 ${tr('home.branchB.title','Your welcome mat is done')}<//>
-    <${Text} tone="muted">${theirs
-      ? tr('home.branchB.ledePlan','{app} made it, and {app} can open a connection to your home, but only on one of its paid plans, and you said you are not on one. So the next step needs either that plan or another app.').replace(/\{app\}/g,theirs.label)
-      : tr('home.branchB.lede','You made it with {app}. It can write, but it cannot open a connection to your home yet, so the next step needs a different app.').replace('{app}',appName)}<//>
-    <${Text} tone="muted">${tr('home.branchB.why','A connection means the AI can read and write things in your home itself, instead of you copying text back and forth. That is what this place is built on: everything here is done with an AI, so without a connection your home cannot be finished.')}<//>
-    <${Text} kind="heading">${tr('home.branchB.wayTitle','Take up an AI app that can open a connection')}<//>
-    <${Text}>${tr('home.branchB.wayBody','Some AI apps do this directly. They are paid, typically around 20 dollars a month. If you use an AI every day, this is the one you want.')}<//>
-    <div>${ordered.map(tool=>html`<${ListRow} key=${tool.id} name=${tool.label} detail=${tool.mcp?.plans}
-      value=${theirs&&tool.id===theirs.id ? tr('home.branchB.yours','The one you already use') : tool.recommended ? tr('home.branchB.recommended','A good first one') : ''}
-      actions=${tool.mcp?.docs && html`<${Action} href=${tool.mcp.docs} target="_blank">${tr('home.branchB.theirDocs','Their own instructions')}<//>`} />`)}</div>
-    <${Text} kind="heading">${tr('home.branchB.againTitle','Then make the mat again with it')}<//>
-    <${Text}>${tr('home.branchB.againBody','Same prompt, new app. Paste what it gives you here and we carry on from there. Your first mat stays until this one replaces it.')}<//>
-    <${PromptCard} label=${tr('home.mat.promptLabel','The prompt')} prompt=${prompt} kind=${hasPaste?'secondary':'primary'}
-      copyLabel=${tr('home.mat.copy','Copy the prompt')} copiedLabel=${tr('home.mat.copied','Copied. Paste it in your AI chat')} />
-    <${Field} type="textarea" id="koti-b-paste" rows=${7} spellCheck=${false}
-      label=${tr('home.mat.pasteLabel','Paste what your AI gave you here')}
-      placeholder=${tr('home.mat.pastePlaceholder','Everything it wrote is fine, explanation and all.')}
-      value=${paste} onInput=${e=>setPaste(e.target.value)} error=${errText} />
-    <${Action} kind=${hasPaste?'primary':'secondary'} disabled=${busy||!hasPaste} onClick=${submit}>
-      ${busy ? tr('home.mat.sending','Reading it…') : tr('home.branchB.submit','Here is the new one')}<//>
-  <//><//>`;
+  return html`
+    <div class="koti-step koti-step-open koti-b">
+      <div class="koti-step-head">
+        <span class="koti-step-num">2</span>
+        <h2 class="koti-step-title">${tr('home.branchB.title', 'Your welcome mat is done')}</h2>
+      </div>
+
+      <p class="koti-step-lede">
+        ${theirs
+          ? tr('home.branchB.ledePlan', '{app} made it, and {app} can open a connection to your home, but only on one of its paid plans, and you said you are not on one. So the next step needs either that plan or another app.')
+              .replace(/\{app\}/g, theirs.label)
+          : tr('home.branchB.lede', 'You made it with {app}. It can write, but it cannot open a connection to your home yet, so the next step needs a different app.')
+              .replace('{app}', appName)}
+      </p>
+      <p class="koti-step-lede">
+        ${tr('home.branchB.why', 'A connection means the AI can read and write things in your home itself, instead of you copying text back and forth. That is what this place is built on: everything here is done with an AI, so without a connection your home cannot be finished.')}
+      </p>
+
+      <div class="koti-b-way">
+        <h3 class="koti-b-way-title">
+          ${tr('home.branchB.wayTitle', 'Take up an AI app that can open a connection')}
+        </h3>
+        <p class="koti-b-way-body">
+          ${tr('home.branchB.wayBody', 'Some AI apps do this directly. They are paid, typically around 20 dollars a month. If you use an AI every day, this is the one you want.')}
+        </p>
+
+        <ul class="koti-b-apps">
+          ${ordered.map(tool => html`
+            <li class="koti-b-app" key=${tool.id}>
+              <div class="koti-b-app-head">
+                <span class="koti-b-app-name">${tool.label}</span>
+                ${theirs && tool.id === theirs.id && html`
+                  <span class="badge badge-info">${tr('home.branchB.yours', 'The one you already use')}</span>`}
+                ${tool.recommended && (!theirs || tool.id !== theirs.id) && html`
+                  <span class="badge badge-info">${tr('home.branchB.recommended', 'A good first one')}</span>`}
+              </div>
+              ${tool.mcp?.plans && html`<p class="koti-b-app-plans">${tool.mcp.plans}</p>`}
+              ${tool.mcp?.docs && html`
+                <a class="koti-b-app-docs" href=${tool.mcp.docs} target="_blank" rel="noopener">
+                  ${tr('home.branchB.theirDocs', 'Their own instructions')}
+                </a>`}
+            </li>`)}
+        </ul>
+      </div>
+
+      <div class="koti-b-again">
+        <h3 class="koti-b-way-title">${tr('home.branchB.againTitle', 'Then make the mat again with it')}</h3>
+        <p class="koti-b-way-body">
+          ${tr('home.branchB.againBody', 'Same prompt, new app. Paste what it gives you here and we carry on from there. Your first mat stays until this one replaces it.')}
+        </p>
+
+        <${PromptCard}
+          label=${tr('home.mat.promptLabel', 'The prompt')}
+          prompt=${prompt}
+          className=${hasPaste ? 'btn-outline' : 'btn-primary'}
+          copyLabel=${tr('home.mat.copy', 'Copy the prompt')}
+          copiedLabel=${tr('home.mat.copied', 'Copied. Paste it in your AI chat')} />
+
+        <label class="koti-paste-label" for="koti-b-paste">
+          ${tr('home.mat.pasteLabel', 'Paste what your AI gave you here')}
+        </label>
+        <textarea
+          id="koti-b-paste"
+          class="koti-paste"
+          rows="7"
+          spellcheck="false"
+          placeholder=${tr('home.mat.pastePlaceholder', 'Everything it wrote is fine, explanation and all.')}
+          value=${paste}
+          onInput=${(e) => setPaste(e.target.value)}></textarea>
+
+        ${errText && html`
+          <div class="koti-error" role="alert">
+            <p class="koti-error-text">${errText}</p>
+          </div>`}
+
+        <div class="koti-actions">
+          <button type="button"
+            class=${hasPaste ? 'btn-primary' : 'btn-outline'}
+            disabled=${busy || !hasPaste}
+            onClick=${submit}>
+            ${busy ? tr('home.mat.sending', 'Reading it…') : tr('home.branchB.submit', 'Here is the new one')}
+          </button>
+        </div>
+      </div>
+    </div>`;
 }

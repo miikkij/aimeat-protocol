@@ -19,9 +19,6 @@
  *   import OrganismsTab from '/views/profile/organisms-tab.js';
  *   <OrganismsTab session={session} showToast={showToast} onStats={onStats} />
  * @version-history
- *   2026-09-22 -- The list is composed from the shared set (Page, Section, ListRow, Menu, Field,
- *     Fold, Surface): no class of its own; the row's counts are words instead of emoji, the "..."
- *     menu is the shared Menu, the archived list is a Fold, the create form uses Fields.
  *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
  *   v2.8.0 -- 2026-09-13 -- Compose list and guide rules from poster.css; retire unused list rules.
  *   2026-09-13 — V1: compose page and B1 section headings from the shared poster classes.
@@ -60,8 +57,10 @@ import htm from 'htm';
 import { onLiveUpdate } from '/lib/live-updates.js';
 const html = htm.bind(h);
 import { t, tOr } from '/js/i18n.js';
+import { Spinner, KebabMenu } from './shared.js';
+import { SearchBar } from '/components/SearchBar.js';
+import { EmptyState } from '/components/EmptyState.js';
 import { useConfirm } from '/components/Modal.js';
-import { Page, Section, Fold, Stack, ListRow, Chip, Action, Menu, Field, Surface, Text, KeyValue, Toolbar } from '/components/poster-parts.js';
 import * as orgService from '/js/services/organisms.js';
 import * as memoryService from '/js/services/memory.js';
 import { fmtDate, orgInitials, exportOrganismZip } from '/views/profile/organisms/helpers.js';
@@ -75,9 +74,6 @@ import { authHeaders } from '/js/services/auth.js';
 const LockMark = html`<svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor"
   stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.2" y="7"
   width="9.6" height="7" rx="1.4" /><path d="M5.5 7V5.1a2.5 2.5 0 0 1 5 0V7" /></svg>`;
-
-/** The trail to the organisms list (Settings & Controls / Information / Organisms). */
-const listCrumbs = () => [{ label: t('nav.profile') }, { label: t('profile.landing.menuInformation') }, { label: t('organisms.title') || 'Organisms' }];
 
 export default function OrganismsTab({ session, showToast, onStats }) {
   const { confirm, ConfirmUI } = useConfirm();
@@ -383,18 +379,37 @@ export default function OrganismsTab({ session, showToast, onStats }) {
       approval_required: t('organisms.policyApproval') || 'Approval',
       invite_only: t('organisms.policyInvite') || 'Invite Only',
     }[org.joinPolicy] || org.joinPolicy;
-    return html`<${Stack} density="compact">
-      <${KeyValue} label=${t('organisms.creator') || 'Creator'} value=${org.creatorGhii} mono=${true} />
-      <${KeyValue} label=${t('organisms.memberCount') || 'Members'} value=${`${(org.members || []).length} / ${org.maxMembers || 500}`} />
-      <${KeyValue} label=${t('organisms.policyLabel') || 'Join policy'} value=${policyLabel} />
-      ${org.createdAt ? html`<${KeyValue} label=${t('organisms.createdAt') || 'Created'} value=${fmtDate(org.createdAt)} />` : null}
-      ${(org.interests || []).length > 0 ? html`<${Stack} direction="wrap" density="compact">
-        ${org.interests.map(tag => html`<${Chip} key=${tag}>${tag}<//>`)}<//>` : null}
-    <//>`;
+    return html`
+      <div class="pj-org-detail" onClick=${(e) => e.stopPropagation()}>
+        <div class="detail-grid">
+          <div class="detail-item">
+            <span class="detail-label">${t('organisms.creator') || 'Creator'}</span>
+            <span class="detail-value">${(org.creatorGhii)}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">${t('organisms.memberCount') || 'Members'}</span>
+            <span class="detail-value">${(org.members || []).length} / ${org.maxMembers || 500}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">${t('organisms.policyLabel') || 'Join policy'}</span>
+            <span class="detail-value">${policyLabel}</span>
+          </div>
+          ${org.createdAt ? html`
+            <div class="detail-item">
+              <span class="detail-label">${t('organisms.createdAt') || 'Created'}</span>
+              <span class="detail-value">${fmtDate(org.createdAt)}</span>
+            </div>
+          ` : null}
+        </div>
+        ${(org.interests || []).length > 0 ? html`
+          <div class="flex-row-wrap">
+            ${org.interests.map(tag => html`<span class="file-tag" key=${tag}>${(tag)}</span>`)}
+          </div>` : null}
+      </div>`;
   };
 
-  // Compact one-line row: initials · name + description · marks (type + lock + archived) ·
-  // workspaces/members/agents/date · primary action · "…" menu.
+  // Compact one-line row: avatar · name + description · marks (type + lock + archived, their own
+  // fixed column so they line up down the list) · members/agents/date · primary action · "…" menu.
   // Management (settings, leave, delete) lives in the menu / home page.
   const renderOrgRow = (org, isMine) => {
     const isCreator = org.creatorGhii === ghii;
@@ -408,47 +423,61 @@ export default function OrganismsTab({ session, showToast, onStats }) {
     const activate = () => (isMine || isMember) ? openHome(false) : toggleExpand(org.id);
 
     const menuItems = isMine ? [
-      canEdit && { label: t('organisms.settings') || 'Settings', onClick: () => openHome(true) },
-      { label: t('organisms.exportOrg') || 'Export organism', onClick: () => exportOrganismZip(org, showToast) },
+      canEdit && { label: t('organisms.settings') || 'Settings', icon: '⚙', onClick: () => openHome(true) },
+      { label: t('organisms.exportOrg') || 'Export organism', icon: '⬇', onClick: () => exportOrganismZip(org, showToast) },
       canEdit && (org.archived
-        ? { label: t('organisms.unarchive') || 'Unarchive', onClick: () => handleArchive(org.id, org.name, false) }
-        : { label: t('organisms.archive') || 'Archive', onClick: () => handleArchive(org.id, org.name, true) }),
+        ? { label: t('organisms.unarchive') || 'Unarchive', icon: '♻️', onClick: () => handleArchive(org.id, org.name, false) }
+        : { label: t('organisms.archive') || 'Archive', icon: '🗄️', onClick: () => handleArchive(org.id, org.name, true) }),
       !isCreator && { label: t('organisms.leave') || 'Leave', danger: true, onClick: () => handleLeave(org.id, org.name) },
       isCreator && { label: t('organisms.delete') || 'Delete', danger: true, onClick: () => handleDelete(org.id, org.name) },
     ] : [];
-    const counts = [
-      isMine && wsCounts[org.id] !== undefined ? `${t('organisms.tabWorkspaces') || 'Workspaces'} ${wsCounts[org.id]}` : null,
-      `${t('organisms.members') || 'Members'} ${org.member_count ?? (org.members || []).length}`,
-      `${t('organisms.attachedAgents') || 'Attached agents'} ${(org.agentGaiis || []).length}`,
-      org.createdAt ? fmtDate(org.createdAt) : null,
-    ].filter(Boolean).join(' · ');
 
-    // The row is dragged by a plain wrapper, because a list row takes no drag handlers.
     return html`
-      <div key=${org.id}
+      <div class="pj-org-row ${dragOverId === org.id ? 'pj-org-drag-over' : ''}" key=${org.id}
         draggable=${isMine}
         onDragStart=${isMine ? ((e) => { dragIdRef.current = org.id; e.dataTransfer.effectAllowed = 'move'; }) : undefined}
         onDragOver=${isMine ? ((e) => { e.preventDefault(); setDragOverId(org.id); }) : undefined}
         onDragLeave=${isMine ? (() => setDragOverId(d => (d === org.id ? null : d))) : undefined}
         onDrop=${isMine ? (() => onDropRow(org.id)) : undefined}
         onDragEnd=${isMine ? (() => { dragIdRef.current = null; setDragOverId(null); }) : undefined}>
-        <${ListRow} density="compact" selected=${dragOverId === org.id || isExpanded} detailKind="text"
-          mark=${html`<${Chip}>${orgInitials(org.name)}<//>`}
-          name=${org.name} onOpen=${activate} detail=${org.description || undefined}
-          value=${counts}
-          actions=${html`
-            <${Stack} direction="wrap" density="compact" align="center">
-              <${Chip} title=${typeLabel}>${typeLabel}<//>
-              ${org.visibility !== 'public' ? html`<${Text} kind="caption" title=${visLabel}>${LockMark}<//>` : null}
-              ${org.archived ? html`<${Chip} tone="muted" title=${t('organisms.archivedHint') || 'Archived — read-only, hidden from AI operations'}>${t('organisms.archived') || 'archived'}<//>` : null}
-            <//>
-            ${(isMine || isMember)
-              ? html`<${Action} onClick=${() => openHome(false)}>${t('organisms.open') || 'Open'}<//>`
-              : html`<${Action} onClick=${() => handleJoin(org.id)}>${t('organisms.join') || 'Join'}<//>`}
-            ${isMine ? html`<${Menu} label=${t('organisms.moreActions') || 'More actions'} items=${menuItems} />` : null}`}>
-          ${isExpanded ? renderDiscoverDetail(org) : null}
-        <//>
-      </div>`;
+        <div class="pj-org-avatar" aria-hidden="true">${orgInitials(org.name)}</div>
+        <div class="pj-org-main" role="button" tabindex="0" onClick=${activate}
+          onKeyDown=${(e) => { if (e.key === 'Enter') activate(); }}>
+          <div class="pj-org-titlerow">
+            <span class="pj-org-name">${(org.name)}</span>
+          </div>
+          ${org.description ? html`<div class="pj-org-desc">${(org.description)}</div>` : null}
+        </div>
+        <div class="pj-org-marks">
+          <span class="badge badge-info pj-org-type" title=${typeLabel}>${typeLabel}</span>
+          ${org.visibility !== 'public' ? html`<span class="pj-org-lock" title=${visLabel}>${LockMark}</span>` : null}
+          ${org.archived ? html`<span class="badge badge-warn pj-org-arch" title=${t('organisms.archivedHint') || 'Archived — read-only, hidden from AI operations'}>${t('organisms.archived') || 'archived'}</span>` : null}
+        </div>
+        ${/* Four cells, always four: the grid's tracks are what hold the row still, and a cell left
+              out would slide the ones after it into the wrong track. An absent count shows nothing
+              and still holds its place. */ ''}
+        <div class="pj-org-stats">
+          ${isMine && wsCounts[org.id] !== undefined
+            ? html`<span class="pj-org-stat" title=${t('organisms.tabWorkspaces') || 'Workspaces'}>${'📁'} ${wsCounts[org.id]}</span>`
+            : html`<span class="pj-org-stat"></span>`}
+          <span class="pj-org-stat" title=${t('organisms.members') || 'Members'}>${'👥'} ${org.member_count ?? (org.members || []).length}</span>
+          <span class="pj-org-stat" title=${t('organisms.attachedAgents') || 'Attached agents'}>${'🤖'} ${(org.agentGaiis || []).length}</span>
+          ${org.createdAt
+            ? html`<span class="pj-org-stat pj-org-date" title=${t('organisms.createdAt') || 'Created'}>${fmtDate(org.createdAt)}</span>`
+            : html`<span class="pj-org-stat pj-org-date"></span>`}
+        </div>
+        ${/* The door sits in a cell of its own so that Open on one row and Join on the next, or
+              UNIRSE in Spanish, cannot drag the columns to their left. The button keeps its own
+              width, and with it the rule under exactly as many letters as the word has. */ ''}
+        <span class="pj-org-door">
+          ${(isMine || isMember)
+            ? html`<button class="btn-outline btn-sm pj-org-openbtn" onClick=${() => openHome(false)}>${t('organisms.open') || 'Open'}</button>`
+            : html`<button class="btn-outline btn-sm pj-org-openbtn" onClick=${() => handleJoin(org.id)}>${t('organisms.join') || 'Join'}</button>`}
+        </span>
+        ${isMine ? html`<${KebabMenu} label=${t('organisms.moreActions') || 'More actions'} items=${menuItems} />` : null}
+        ${isExpanded ? renderDiscoverDetail(org) : null}
+      </div>
+    `;
   };
 
   if (openId) {
@@ -462,18 +491,16 @@ export default function OrganismsTab({ session, showToast, onStats }) {
     }
     return html`
       ${justJoinedOrg === openId ? html`
-        <${Surface} kind="box" tone="sun">
-          <${Stack} direction="wrap" align="between">
-            <${Stack} density="compact">
-              <${Text} kind="heading">${(tOr('organisms.joinedBanner.title', 'You are now a member of {name}.')).replace('{name}', org.name || '')}<//>
-              <${Text}>${tOr('organisms.joinedBanner.body', 'Connect your own AI to this team and you can use everything here straight from the chat you already use.')}<//>
-            <//>
-            <${Stack} direction="wrap" align="center">
-              <${Action} kind="primary" href="/v1/profile?tab=mcp">${tOr('organisms.joinedBanner.connect', 'Connect your AI')}<//>
-              <${Action} onClick=${() => setJustJoinedOrg(null)}>${tOr('organisms.joinedBanner.dismiss', 'Browse first')}<//>
-            <//>
-          <//>
-        <//>` : null}
+        <div class="pj-joined-banner">
+          <div>
+            <strong>${(tOr('organisms.joinedBanner.title', 'You are now a member of {name}.')).replace('{name}', org.name || '')}</strong>
+            <div class="text-meta-sm">${tOr('organisms.joinedBanner.body', 'Connect your own AI to this team and you can use everything here straight from the chat you already use.')}</div>
+          </div>
+          <div class="pj-joined-actions">
+            <a class="btn-primary btn-sm pf-no-underline" href="/v1/profile?tab=mcp">${tOr('organisms.joinedBanner.connect', 'Connect your AI')}</a>
+            <button class="btn-ghost btn-sm" onClick=${() => setJustJoinedOrg(null)}>${tOr('organisms.joinedBanner.dismiss', 'Browse first')}</button>
+          </div>
+        </div>` : null}
       <${OrganismHome} org=${org} ghii=${ghii} showToast=${showToast}
         initialSettings=${openSettings}
         onOpenWs=${(wsId, space) => { setOpenSpace(space || null); setOpenWs(wsId); }}
@@ -483,8 +510,7 @@ export default function OrganismsTab({ session, showToast, onStats }) {
       <${ConfirmUI} />`;
   }
 
-  if (!myOrganisms) return html`<${Page} title=${t('organisms.title') || 'Organisms'} crumbs=${listCrumbs()}>
-    <${Text} tone="muted">${t('organisms.loading') || 'Loading organisms...'}<//><//>`;
+  if (!myOrganisms) return html`<${Spinner} text=${t('organisms.loading') || 'Loading organisms...'} />`;
 
   // Open a cross-organism search hit: jump to its organism + workspace, pre-filling the in-workspace
   // search with the query so you land on the filtered result list (reuses Kerros 1).
@@ -501,124 +527,151 @@ export default function OrganismsTab({ session, showToast, onStats }) {
   const gGroups = {};
   for (const hh of (gHits || [])) { if (!hh.organismId) continue; (gGroups[hh.organismId] = gGroups[hh.organismId] || []).push(hh); }
 
-  const onTypeChange = (e) => {
-    // The type sets SAFE defaults (UX-remake v3, P12): a team's internal space must
-    // not be born open + public because nobody read three unexplained dropdowns.
-    // The user can still change both after picking the type.
-    const v = e.target.value;
-    setFormType(v);
-    if (v === 'team' || v === 'cooperative' || v === 'project') {
-      setFormPolicy('invite_only');
-      setFormVisibility('private');
-    } else {
-      setFormPolicy('open');
-      setFormVisibility('public');
-    }
-  };
-  const createForm = html`
-    <${Surface} kind="box">
-      <${Stack}>
-        <${Text} kind="heading">${t('organisms.createTitle') || 'Create New Organism'}<//>
-        <${Field} placeholder=${t('organisms.namePlaceholder') || 'Name'} value=${formName} onInput=${(e) => setFormName(e.target.value)} />
-        <${Field} type="textarea" rows=${2} placeholder=${t('organisms.descPlaceholder') || 'Description'} value=${formDesc} onInput=${(e) => setFormDesc(e.target.value)} />
-        <${Field} placeholder=${t('organisms.interestsPlaceholder') || 'Interests (comma separated)'} value=${formInterests} onInput=${(e) => setFormInterests(e.target.value)} />
-        <${Stack} direction="wrap">
-          <${Field} type="select" value=${formType} onChange=${onTypeChange} options=${[
-            { value: 'community', label: t('organisms.types.community') || 'Community' },
-            { value: 'team', label: t('organisms.types.team') || 'Team' },
-            { value: 'club', label: t('organisms.types.club') || 'Club' },
-            { value: 'cooperative', label: t('organisms.types.cooperative') || 'Cooperative' },
-            { value: 'project', label: t('organisms.types.project') || 'Project' },
-            { value: '__custom', label: t('organisms.typeCustom') || 'Other' },
-          ]} />
-          ${formType === '__custom' ? html`
-            <${Field} maxLength=${40} value=${formTypeCustom}
-              placeholder=${t('organisms.typeCustomPlaceholder') || 'Type, in your own words'}
-              onInput=${(e) => setFormTypeCustom(e.target.value)} />` : null}
-          <${Field} type="select" value=${formPolicy} onChange=${(e) => setFormPolicy(e.target.value)} options=${[
-            { value: 'open', label: t('organisms.policyOpen') || 'Open (anyone can join)' },
-            { value: 'approval_required', label: t('organisms.policyApproval') || 'Approval required' },
-            { value: 'invite_only', label: t('organisms.policyInvite') || 'Invite only' },
-          ]} />
-          <${Field} type="select" value=${formVisibility} onChange=${(e) => setFormVisibility(e.target.value)} options=${[
-            { value: 'public', label: t('organisms.visPublic') || 'Public' },
-            { value: 'listed', label: t('organisms.visListed') || 'Listed' },
-            { value: 'private', label: t('organisms.visPrivate') || 'Private' },
-          ]} />
-        <//>
-        <${Text} kind="caption" tone="muted">
-          ${tOr('organisms.policyHint.' + formPolicy, '')}${' '}
-          ${tOr('organisms.visHint.' + formVisibility, '')}
-        <//>
-        <${Stack} direction="wrap" align="center">
-          <${Action} kind="primary" onClick=${handleCreate} disabled=${creating}>
-            ${creating ? '...' : (t('organisms.create') || 'Create')}
-          <//>
-          <${Action} onClick=${() => setShowCreate(false)}>${t('organisms.cancel') || 'Cancel'}<//>
-        <//>
-      <//>
-    <//>`;
+  return html`
+    <div class="poster-page-title">${t('organisms.title') || 'Organisms'}</div>
+    <div class="section-desc">${t('organisms.desc') || 'Organisms are groups — communities, teams, clubs, or projects. Create one or join existing ones to share knowledge, coordinate work, and build together.'}</div>
 
-  const searchResults = () => html`<${Stack}>
-    ${gBusy && !gHits.length ? html`<${Text} tone="muted">${t('search.searching') || 'Searching…'}<//>` : null}
-    ${!gHits.length && !gBusy ? html`<${Text} tone="muted">${t('search.noMatches') || 'No matches'}<//>` : null}
-    ${Object.entries(gGroups).map(([orgId, hits]) => html`
-      <${Section} key=${orgId} title=${orgNameOf(orgId)} count=${hits.length} size="small" density="compact">
-        ${hits.map(hh => html`<${ListRow} key=${hh.key} density="compact" preview=${true} onOpen=${() => openGHit(hh)}
-          name=${html`${hh.title || hh.key}${hh.workspaceId ? ` · ${hh.workspaceId}` : ''}`} detail=${hh.snippet || ''} />`)}
-      <//>`)}
-  <//>`;
-
-  // Active organisms drive the working list; archived ones move into a folded "Archived"
-  // row below (read-only/retired — out of the way, but restorable from there).
-  const activeMine = sortedMine.filter(o => !o.archived);
-  const archivedMine = sortedMine.filter(o => o.archived);
-  const mySection = html`
-    <${Section} title=${t('organisms.myOrganisms') || 'My Organisms'} density="compact"
-      actions=${myOrganisms.length > 1 ? html`
-        <${Field} type="select" label=${t('organisms.sortTitle') || 'Sort'} value=${sortMode}
-          onChange=${(e) => { const m = e.target.value; setSortMode(m); savePrefs(customOrder, m); }} options=${[
-            { value: 'custom', label: t('organisms.sortCustom') || 'My order' },
-            { value: 'name', label: t('organisms.sortName') || 'Name A–Z' },
-            { value: 'newest', label: t('organisms.sortNewest') || 'Newest first' },
-          ]} />` : null}>
-      ${activeMine.length === 0 && archivedMine.length === 0
-        ? html`<${Text} tone="muted">${t('organisms.empty') || 'You are not part of any organisms yet.'}<//>`
-        : html`
-          ${activeMine.length === 0
-            ? html`<${Text} tone="muted">${t('organisms.allArchived') || 'All your organisms are archived.'}<//>`
-            : html`
-              <${Stack} density="compact">${activeMine.map(org => renderOrgRow(org, true))}<//>
-              ${sortMode === 'custom' && activeMine.length > 1 ? html`
-                <${Text} kind="caption" tone="muted">${t('organisms.reorderHint') || 'Drag rows to reorder — the order is saved to your profile.'}<//>` : null}`}
-          ${archivedMine.length > 0 ? html`
-            <${Fold} title=${(t('organisms.archivedSection') || 'Archived ({n})').replace('{n}', String(archivedMine.length))}
-              open=${archivedOpen} onToggle=${() => setArchivedOpen(o => !o)}>
-              <${Stack} density="compact">${archivedMine.map(org => renderOrgRow(org, true))}<//>
-            <//>` : null}
-        `}
-    <//>`;
-
-  return html`<${Page} title=${t('organisms.title') || 'Organisms'} crumbs=${listCrumbs()}
-    actions=${html`
-      <${Action} disabled=${importingOrg} title=${t('organisms.importOrgHint') || 'Restore an organism from a .zip backup'} onClick=${() => orgFileRef.current && orgFileRef.current.click()}>${t('organisms.importOrg') || 'Import'}<//>
-      <${Action} kind="primary" onClick=${() => setShowCreate(true)}>${t('organisms.createNew') || 'Create Organism'}<//>`}>
-    <${Stack}>
-      <${Text} kind="lead" tone="muted">${t('organisms.desc') || 'Organisms are groups — communities, teams, clubs, or projects. Create one or join existing ones to share knowledge, coordinate work, and build together.'}<//>
-      ${showCreate ? createForm : null}
-      <${Toolbar} label=${t('search.allOrgsPlaceholder') || 'Search across all organisms'}
-        search=${{ label: t('search.allOrgsPlaceholder') || 'Search across all organisms', value: gQuery, onInput: e => setGQuery(e.target.value) }}
-        actions=${gHits !== null ? html`<${Action} onClick=${() => setGQuery('')}>${t('search.clear') || 'Clear'}<//>` : null} />
-      ${gHits !== null ? searchResults() : html`
-        <${IncomingInvitations} showToast=${showToast} onChanged=${loadData} />
-        <input type="file" accept=".zip,application/zip" ref=${orgFileRef} hidden onChange=${(e) => { const f = e.target.files && e.target.files[0]; e.target.value = ''; doImportOrg(f); }} />
-        ${mySection}
-        ${publicOrganisms.length > 0 && html`
-          <${Section} title=${t('organisms.discover') || 'Discover'} density="compact">
-            <${Stack} density="compact">${publicOrganisms.map(org => renderOrgRow(org, false))}<//>
-          <//>`}
+    <!-- Create form (opened from the topbar button) -->
+    <div class="mb-1">
+      ${!showCreate ? null : html`
+        <div class="create-form poster-row--thing">
+          <h4 class="card-h3 mb-half">${t('organisms.createTitle') || 'Create New Organism'}</h4>
+          <div class="flex-col">
+            <input type="text" placeholder=${t('organisms.namePlaceholder') || 'Name'} value=${formName} onInput=${(e) => setFormName(e.target.value)}
+              class="input-field input-sm" />
+            <textarea placeholder=${t('organisms.descPlaceholder') || 'Description'} value=${formDesc} onInput=${(e) => setFormDesc(e.target.value)} rows="2"
+              class="input-field input-sm" />
+            <input type="text" placeholder=${t('organisms.interestsPlaceholder') || 'Interests (comma separated)'} value=${formInterests} onInput=${(e) => setFormInterests(e.target.value)}
+              class="input-field input-sm" />
+            <div class="flex-row-wrap">
+              <select value=${formType} onChange=${(e) => {
+                // The type sets SAFE defaults (UX-remake v3, P12): a team's internal space must
+                // not be born open + public because nobody read three unexplained dropdowns.
+                // The user can still change both after picking the type.
+                const v = e.target.value;
+                setFormType(v);
+                if (v === 'team' || v === 'cooperative' || v === 'project') {
+                  setFormPolicy('invite_only');
+                  setFormVisibility('private');
+                } else {
+                  setFormPolicy('open');
+                  setFormVisibility('public');
+                }
+              }}
+                class="input-field input-sm">
+                <option value="community">${t('organisms.types.community') || 'Community'}</option>
+                <option value="team">${t('organisms.types.team') || 'Team'}</option>
+                <option value="club">${t('organisms.types.club') || 'Club'}</option>
+                <option value="cooperative">${t('organisms.types.cooperative') || 'Cooperative'}</option>
+                <option value="project">${t('organisms.types.project') || 'Project'}</option>
+                <option value="__custom">${t('organisms.typeCustom') || 'Other'}</option>
+              </select>
+              ${formType === '__custom' ? html`
+                <input type="text" maxlength="40" class="input-field input-sm" value=${formTypeCustom}
+                  placeholder=${t('organisms.typeCustomPlaceholder') || 'Type, in your own words'}
+                  onInput=${(e) => setFormTypeCustom(e.target.value)} />` : null}
+              <select value=${formPolicy} onChange=${(e) => setFormPolicy(e.target.value)}
+                class="input-field input-sm">
+                <option value="open">${t('organisms.policyOpen') || 'Open (anyone can join)'}</option>
+                <option value="approval_required">${t('organisms.policyApproval') || 'Approval required'}</option>
+                <option value="invite_only">${t('organisms.policyInvite') || 'Invite only'}</option>
+              </select>
+              <select value=${formVisibility} onChange=${(e) => setFormVisibility(e.target.value)}
+                class="input-field input-sm">
+                <option value="public">${t('organisms.visPublic') || 'Public'}</option>
+                <option value="listed">${t('organisms.visListed') || 'Listed'}</option>
+                <option value="private">${t('organisms.visPrivate') || 'Private'}</option>
+              </select>
+            </div>
+            <div class="text-meta-sm">
+              ${tOr('organisms.policyHint.' + formPolicy, '')}${' '}
+              ${tOr('organisms.visHint.' + formVisibility, '')}
+            </div>
+            <div class="form-actions">
+              <button class="btn-primary btn-sm" onClick=${handleCreate} disabled=${creating}>
+                ${creating ? '...' : (t('organisms.create') || 'Create')}
+              </button>
+              <button class="btn-ghost btn-sm" onClick=${() => setShowCreate(false)}>
+                ${t('organisms.cancel') || 'Cancel'}
+              </button>
+            </div>
+          </div>
+        </div>
       `}
-    <//>
+    </div>
+
+    <!-- Cross-organism content search: one box over ALL my organisms, results grouped per organism -->
+    <div class="pj-org-globalsearch">
+      <${SearchBar} value=${gQuery} onInput=${e => setGQuery(e.target.value)}
+        placeholder=${t('search.allOrgsPlaceholder') || 'Search across all organisms…'} ariaLabel=${t('search.allOrgsPlaceholder') || 'Search across all organisms'} />
+      ${gHits !== null ? html`<button class="btn-ghost btn-sm" onClick=${() => setGQuery('')}>${t('search.clear') || 'Clear'}</button>` : null}
+    </div>
+
+    ${gHits !== null ? html`
+      <div class="pj-search-results">
+        ${gBusy && !gHits.length ? html`<${Spinner} text=${t('search.searching') || 'Searching…'} />` : null}
+        ${!gHits.length && !gBusy ? html`<${EmptyState} text=${t('search.noMatches') || 'No matches'} />` : null}
+        ${Object.entries(gGroups).map(([orgId, hits]) => html`
+          <div class="pj-search-group" key=${orgId}>
+            <div class="pj-search-group-head">${orgNameOf(orgId)}<span class="pj-org-tab-count">${hits.length}</span></div>
+            ${hits.map(hh => html`
+              <button class="pj-search-hit" key=${hh.key} onClick=${() => openGHit(hh)}>
+                <span class="pj-search-hit-title">${hh.title || hh.key}${hh.workspaceId ? html` <span class="pj-mini">· ${hh.workspaceId}</span>` : null}</span>
+                <span class="pj-search-hit-snippet">${hh.snippet || ''}</span>
+              </button>`)}
+          </div>`)}
+      </div>
+    ` : html`
+    <!-- Incoming invitations -->
+    <${IncomingInvitations} showToast=${showToast} onChanged=${loadData} />
+
+    <!-- My Organisms -->
+    <input type="file" accept=".zip,application/zip" ref=${orgFileRef} class="pj-hidden-input" onChange=${(e) => { const f = e.target.files && e.target.files[0]; e.target.value = ''; doImportOrg(f); }} />
+    <div class="pj-ws-topbar">
+      <div class="poster-section-title">${t('organisms.myOrganisms') || 'My Organisms'}</div>
+      <div class="pj-org-topbar-actions">
+        ${myOrganisms.length > 1 ? html`
+          <select class="input-field input-sm pj-org-sort" title=${t('organisms.sortTitle') || 'Sort'} value=${sortMode}
+            onChange=${(e) => { const m = e.target.value; setSortMode(m); savePrefs(customOrder, m); }}>
+            <option value="custom">${t('organisms.sortCustom') || 'My order'}</option>
+            <option value="name">${t('organisms.sortName') || 'Name A–Z'}</option>
+            <option value="newest">${t('organisms.sortNewest') || 'Newest first'}</option>
+          </select>` : null}
+        <button class="btn-outline btn-sm" disabled=${importingOrg} title=${t('organisms.importOrgHint') || 'Restore an organism from a .zip backup'} onClick=${() => orgFileRef.current && orgFileRef.current.click()}>${'⬆ '}${t('organisms.importOrg') || 'Import'}</button>
+        <button class="btn-primary btn-sm" onClick=${() => setShowCreate(true)}>${'+ '}${t('organisms.createNew') || 'Create Organism'}</button>
+      </div>
+    </div>
+    ${(() => {
+      // Active organisms drive the working list; archived ones move into a collapsed "Archived"
+      // section below (read-only/retired — out of the way, but restorable from there).
+      const activeMine = sortedMine.filter(o => !o.archived);
+      const archivedMine = sortedMine.filter(o => o.archived);
+      return html`
+        ${activeMine.length === 0 && archivedMine.length === 0
+          ? html`<div class="empty">${t('organisms.empty') || 'You are not part of any organisms yet.'}</div>`
+          : html`
+            ${activeMine.length === 0
+              ? html`<div class="empty">${t('organisms.allArchived') || 'All your organisms are archived.'}</div>`
+              : html`
+                <div class="pj-org-list poster-row--thing">${activeMine.map(org => renderOrgRow(org, true))}</div>
+                ${sortMode === 'custom' && activeMine.length > 1 ? html`
+                  <div class="pj-org-hint">${t('organisms.reorderHint') || 'Drag rows to reorder — the order is saved to your profile.'}</div>` : null}`}
+            ${archivedMine.length > 0 ? html`
+              <button class="pj-struct-toggle section-title-spaced" aria-expanded=${archivedOpen} onClick=${() => setArchivedOpen(o => !o)}>
+                <span class="pj-struct-caret">${archivedOpen ? '▾' : '▸'}</span>
+                <span>${'🗄️ '}${(t('organisms.archivedSection') || 'Archived ({n})').replace('{n}', String(archivedMine.length))}</span>
+              </button>
+              ${archivedOpen ? html`<div class="pj-org-list poster-row--thing">${archivedMine.map(org => renderOrgRow(org, true))}</div>` : null}` : null}
+          `}
+      `;
+    })()}
+
+    <!-- Discover -->
+    ${publicOrganisms.length > 0 && html`
+      <div class="poster-section-title section-title-spaced">${t('organisms.discover') || 'Discover'}</div>
+      <div class="pj-org-list poster-row--thing">${publicOrganisms.map(org => renderOrgRow(org, false))}</div>
+    `}
+    `}
     <${ConfirmUI} />
-  <//>`;
+  `;
 }

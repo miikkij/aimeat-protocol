@@ -32,51 +32,25 @@ const html = htm.bind(h);
  * server-generated markup like badges.
  *
  * @version-history
- *   v1.3.0 — 2026-09-22 — A header may be { label, sortKey }: with `sort` ({ key, dir }) and `onSort`
- *     it is a sort button and aria-sort, and its label still names the column when rows stack on a
- *     phone. `rowTones` mutes a row (taken down, disabled) or marks it coral or danger (late); a cell with `clamp: true` keeps to one
- *     line and shows its whole text as a tooltip. A plain { text } cell renders its text.
- *   v1.2.0 — 2026-09-22 — A cell object may carry `align: 'end'` (an amount, a count), and an empty
- *     `headers` list draws no header row.
- *   v1.1.0 — 2026-09-22 — Each cell carries its column's header text as data-label, so the shared
- *     Table can stack a row as label-value pairs on a phone (components/poster-parts.js Table collapse).
  *   v1.0.0 — 2026-06-02 — Component unification (#13): created canonical generic
  *     DataTable (same _html/mono cell protocol as admin's), backing the shared
  *     .data-table CSS. The admin shared.js DataTable now wraps this in .adm-card.
  */
-/** A header given as { label, sortKey } is a column the person can sort by. */
-const isSortHeader = (hd) => hd && typeof hd === 'object' && !('props' in hd) && 'label' in hd;
-/** A cell object ({ text, ... }), as opposed to a primitive or a VNode. */
-const isCellObject = (cell) => cell && typeof cell === 'object' && !('props' in cell) && 'text' in cell;
-
-export function DataTable({ headers, rows, scroll, className, sort, onSort, rowTones }) {
+export function DataTable({ headers, rows, scroll, className }) {
   const cls = `data-table${className ? ` ${className}` : ''}`;
-  const th = (hd) => {
-    if (!isSortHeader(hd)) return html`<th>${hd}</th>`;
-    if (!hd.sortKey || !onSort) return html`<th>${hd.label}</th>`;
-    const on = sort && sort.key === hd.sortKey;
-    const dir = on ? (sort.dir === 'desc' ? 'desc' : 'asc') : undefined;
-    return html`<th aria-sort=${on ? (dir === 'desc' ? 'descending' : 'ascending') : 'none'}>
-      <button type="button" class="data-table-sort" data-on=${on ? 'yes' : 'no'} onClick=${() => onSort(hd.sortKey)}>
-        ${hd.label}<span aria-hidden="true">${on ? (dir === 'desc' ? ' ↓' : ' ↑') : ''}</span></button></th>`;
-  };
   const table = html`<table class=${cls}>
-    ${headers.length > 0 && html`<thead><tr>${headers.map(th)}</tr></thead>`}
+    <thead><tr>${headers.map(hd => html`<th>${hd}</th>`)}</tr></thead>
     <tbody>
-      ${rows.map((row, r) => html`<tr data-tone=${rowTones && ['muted', 'coral', 'danger'].includes(rowTones[r]) ? rowTones[r] : undefined}>
-        ${row.map((cell, i) => {
-          const hd = headers[i];
-          const label = typeof hd === 'string' ? hd : isSortHeader(hd) && typeof hd.label === 'string' ? hd.label : undefined;
-          if (!isCellObject(cell)) return html`<td data-label=${label}>${cell}</td>`;
-          const align = cell.align === 'end' ? 'end' : undefined;
-          // A clamped cell keeps to one line and shows the whole text as its tooltip.
-          const clamp = cell.clamp ? 'yes' : undefined;
-          const title = cell.title || (clamp && typeof cell.text === 'string' && !cell._html ? cell.text : '');
-          if (cell._html) {
-            return html`<td class=${cell.mono ? 'mono' : ''} title=${title} data-label=${label} data-align=${align} data-clamp=${clamp}
+      ${rows.map(row => html`<tr>
+        ${row.map(cell => {
+          if (cell && typeof cell === 'object' && cell._html) {
+            return html`<td class=${cell.mono ? 'mono' : ''} title=${cell.title || ''}
               dangerouslySetInnerHTML=${{ __html: cell.text }}></td>`;
           }
-          return html`<td class=${cell.mono ? 'mono' : undefined} title=${title} data-label=${label} data-align=${align} data-clamp=${clamp}>${cell.text}</td>`;
+          if (cell && typeof cell === 'object' && cell.mono) {
+            return html`<td class="mono" title=${cell.title || ''}>${cell.text}</td>`;
+          }
+          return html`<td>${cell}</td>`;
         })}
       </tr>`)}
     </tbody>

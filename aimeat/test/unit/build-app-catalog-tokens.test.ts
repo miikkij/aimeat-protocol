@@ -8,18 +8,13 @@
  * @structure the real theme.css · a comment is not a declaration · missing · declared twice
  * @usage pnpm test -- build-app-catalog-tokens
  * @version-history
- *   v1.2.0 — 2026-09-22 — The build inlines the whole light and dark token blocks, poster.css and
- *     parts.css: themeTokenBlocks is held to the fixture, and the assembled page must carry the
- *     shared rules inside its <style>, not inside the template's header comment.
- *   v1.1.0 — 2026-09-22 — The catalog copies the nine shape tokens as well (22 in all); the fixture
- *     carries them, because the copy refuses a token theme.css does not declare.
  *   v1.0.0 — 2026-09-13 — Initial.
  */
 
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { themePosterTokens, themeTokenBlocks, renderAppCatalog } from '../../scripts/build-app-catalog.js';
+import { themePosterTokens } from '../../scripts/build-app-catalog.js';
 
 const THEME = fileURLToPath(new URL('../../public/css/theme.css', import.meta.url));
 
@@ -41,15 +36,6 @@ function fixture(edit: (lines: string[]) => string[] = (l) => l): string {
     '  --font-poster-section-weight: 400;',
     '  --sun: #FFB52E;',
     '  --on-sun: #1A1A2E;',
-    '  --shape-radius: 0;',
-    '  --rule-hair: 1px;',
-    '  --rule-thing: 2px;',
-    '  --rule-heavy: 3px;',
-    '  --rule-edge: 4px;',
-    '  --rule-stripe: 6px;',
-    '  --offset-s: 4px;',
-    '  --offset-m: 8px;',
-    '  --offset-l: 12px;',
     '}',
     '[data-theme="dark"] {',
     '  --sun: #000000;',
@@ -61,9 +47,8 @@ function fixture(edit: (lines: string[]) => string[] = (l) => l): string {
 describe('themePosterTokens', () => {
   it('finds every copied token in the real theme.css, with the headline face and its spacing', () => {
     const out = themePosterTokens(readFileSync(THEME, 'utf-8'));
-    expect(out.split('\n')).toHaveLength(22);
+    expect(out.split('\n')).toHaveLength(13);
     expect(out).toMatch(/--font-headline: 'Fjalla One'/);
-    expect(out).toMatch(/--rule-heavy: 3px;/);
     expect(out).toMatch(/--font-poster-tracking: 0\.01em;/);
     expect(out).toMatch(/--font-poster-leading: 1;/);
   });
@@ -84,36 +69,4 @@ describe('themePosterTokens', () => {
     const css = fixture((l) => [...l.slice(0, 3), '  --sun: #EEEEEE;', ...l.slice(3)]);
     expect(() => themePosterTokens(css)).toThrow(/--sun 2 times/);
   });
-});
-
-describe('themeTokenBlocks', () => {
-  it('copies the whole light and dark token blocks, dark after light', () => {
-    const out = themeTokenBlocks(fixture());
-    expect(out.startsWith(':root {')).toBe(true);
-    expect(out).toContain('--offset-l: 12px;');
-    expect(out.indexOf('[data-theme="dark"] {')).toBeGreaterThan(out.indexOf('--offset-l'));
-    expect(out).toContain('--sun: #000000;');
-  });
-});
-
-describe('renderAppCatalog', () => {
-  // On 2026-09-22 the build put the tokens and poster.css before app-catalog.css, whose first lines
-  // are the end of the template's header comment: the shared shapes landed inside an HTML comment,
-  // and the whole catalog drew native buttons. The shared rules must sit inside the real <style>.
-  it('puts the house tokens, the shapes and the parts inside the page style, after the header comment', async () => {
-    const html = await renderAppCatalog();
-    // The header comment itself names "<style>" (the marker line), so the real tag is the one after <head>.
-    const head = html.indexOf('<head>');
-    const style = html.indexOf('<style>', head);
-    expect(head).toBeGreaterThan(-1);
-    expect(style).toBeGreaterThan(head);
-    // Nothing of the shared set may sit before <head>, where it would be inside the header comment.
-    expect(html.slice(0, head)).not.toContain('.poster-slab {');
-    expect(html.slice(0, head)).not.toContain('--rule-heavy:');
-    for (const rule of ['--rule-heavy:', '.poster-slab {', '.poster-list-row {', '.poster-section-head {']) {
-      expect(html.indexOf(rule), rule).toBeGreaterThan(style);
-    }
-    // The parts come last, so a part wins over a leftover catalog rule of the same weight.
-    expect(html.lastIndexOf('.poster-section-head {')).toBeGreaterThan(html.lastIndexOf('.dlg-foot'));
-  }, 60_000);
 });

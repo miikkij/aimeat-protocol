@@ -17,9 +17,6 @@
  *   - Bundles: one row per bundle that an agent actually asks for
  * @usage Mounted by the admin dashboard tab router (views/admin.js).
  * @version-history
- *   2026-09-22 -- Composed from the shared component set (Section, Columns, NumeralBand, Table,
- *     Meter, Action): no page sheet and no class of its own, so a theme change reaches it. The
- *     four readiness bands keep their colours through the meter's tone.
  *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   v2.1.0 — 2026-09-13 — Compose shared B1 headings; bar ratios are SVG data with CSS appearance.
  *   v2.0.0 — 2026-09-12 — The poster face, and three things the old screen showed as if they
@@ -47,15 +44,12 @@ import { onLiveUpdate } from '/lib/live-updates.js';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { date as fmtDate } from '/js/format.js';
+import { useViewCSS } from '/components/useViewCSS.js';
 import { num, dt, Spinner } from './shared.js';
-import { Section, Columns, Stack, NumeralBand, Table, Meter, ListRow, Action, Text } from '/components/poster-parts.js';
 import * as api from '/js/services/admin-agent-integration.js';
 import { swallowed } from '/js/swallowed.js';
 
 const S = (key, params) => t('admin.agi.' + key, params);
-
-/** The four readiness bands run from the loudest to the quietest, so the rows read as a ladder. */
-const LEVEL_TONE = { expert: 'coral', full: 'sun', standard: 'ink', basic: 'muted' };
 
 /** A share of the whole, to one decimal, for a column that names its own maximum. */
 function share(n, total) {
@@ -70,6 +64,7 @@ function day(iso) {
 }
 
 export default function AgentIntegrationTab({ session }) {
+  useViewCSS('/css/views/admin-agent-integration.css');
   const [platforms, setPlatforms] = useState([]);
   const [totalAgents, setTotalAgents] = useState(0);
   const [onboarding, setOnboarding] = useState(null);
@@ -97,26 +92,17 @@ export default function AgentIntegrationTab({ session }) {
   useEffect(() => { loadData(); }, [loadData]);
   useEffect(() => onLiveUpdate(['agents', 'agent-onboarding'], () => loadData()), [loadData]);
 
-  if (loading) return html`<${Spinner} />`;
+  if (loading) return html`<div class="og adm-agi"><${Spinner} /></div>`;
 
   return html`
-    <${Stack}>
+    <div class="og adm-agi">
       <${PlatformRegistry} platforms=${platforms} totalAgents=${totalAgents} />
       <${GettingSetUp} onboarding=${onboarding} session=${session} onAction=${loadData} />
       <${Readiness} readiness=${readiness} />
       <${Bundles} platforms=${platforms} totalAgents=${totalAgents} />
-    <//>
+    </div>
   `;
 }
-
-/** A name over its id: the two lines of a row's first cell. */
-const named = (name, id, muted) => html`<${Stack} density="compact">
-  ${muted ? html`<${Text} tone="muted">${name}<//>` : html`<strong>${name}</strong>`}
-  <${Text} kind="mono" tone="muted">${id}<//>
-<//>`;
-
-/** A count in its column, read at the right edge. */
-const count = (n, muted) => ({ text: html`<${Text} kind="mono" tone=${muted ? 'muted' : 'plain'}>${num(n)}<//>`, align: 'end' });
 
 /* ── 01 · Which tool each agent came from ────────────────────────────────────────────────────── */
 
@@ -130,38 +116,53 @@ function PlatformRegistry({ platforms, totalAgents }) {
   const withAgents = platforms.filter(p => (p.agent_count || 0) > 0).length;
 
   if (platforms.length === 0) {
-    return html`<${Section} title=${S('regTitle')} count="01"><${Text}>${S('regEmpty')}<//><//>`;
+    return html`<section class="og-sec og-sec--first">
+      <div class="og-sec-h"><h2 class="poster-section-title">${S('regTitle')}<small>01</small></h2></div>
+      <p class="adm-agi-lead">${S('regEmpty')}</p>
+    </section>`;
   }
 
   return html`
-    <${Section} title=${S('regTitle')} count="01">
-      <${Stack}>
-        <${Columns} layout="trailing" collapse=${900}>
-          <${Stack} density="compact">
-            <${Text} kind="label">${S('regHeroLabel')}<//>
-            <${Text} kind="number">${S('regHero', { n: num(unrecognised), total: num(totalAgents) })}<//>
-            <${Text} kind="caption" tone="muted">${S('regHeroSub')}<//>
-          <//>
-          <${Text}>${S('regLead')}<//>
-        <//>
+    <section class="og-sec og-sec--first">
+      <div class="og-sec-h"><h2 class="poster-section-title">${S('regTitle')}<small>01</small></h2></div>
 
-        <${Table} density="compact" collapse=${640} label=${S('regTitle')}
-          headers=${[S('colPlatform'), S('colAgents'), S('colBundle'), S('colRecognisedBy'), S('colShare', { total: num(totalAgents) })]}
-          rows=${platforms.map(p => {
-    const n = p.agent_count || 0;
-    return [
-      named(p.display_name, p.id, n === 0),
-      count(n, n === 0),
-      html`<${Text} kind="mono" tone="muted">${p.bundle_name}<//>`,
-      html`<${Text} kind="mono" tone="muted">${p.self_reported
-        ? S('recSelfReported')
-        : p.id === 'other' ? S('recNothing') : p.detect_pattern}<//>`,
-      n > 0 ? html`<${Meter} kind="progress" value=${Math.min(n / (totalAgents || 1) * 100, 100)} label=${p.display_name} />` : '',
-    ];
-  })} />
-        <${Text} kind="caption" tone="muted">${S('regFoot', { agents: num(totalAgents), used: num(withAgents), rows: num(platforms.length) })}<//>
-      <//>
-    <//>
+      <div class="adm-agi-top">
+        <div>
+          <div class="adm-agi-lbl">${S('regHeroLabel')}</div>
+          <div class="adm-agi-hero poster-stat-number">${S('regHero', { n: num(unrecognised), total: num(totalAgents) })}</div>
+          <p class="adm-agi-hero-sub">${S('regHeroSub')}</p>
+        </div>
+        <div><p class="adm-agi-lead">${S('regLead')}</p></div>
+      </div>
+
+      <div class="adm-agi-rows">
+        <div class="adm-agi-hrow">
+          <span>${S('colPlatform')}</span>
+          <span class="r">${S('colAgents')}</span>
+          <span>${S('colBundle')}</span>
+          <span>${S('colRecognisedBy')}</span>
+          <span>${S('colShare', { total: num(totalAgents) })}</span>
+        </div>
+        ${platforms.map(p => {
+    const count = p.agent_count || 0;
+    return html`
+          <div class="adm-agi-row ${count === 0 ? 'is-none' : ''}" key=${p.id}>
+            <span class="adm-agi-name">${p.display_name}<em>${p.id}</em></span>
+            <span class="adm-agi-n r">${num(count)}</span>
+            <span class="adm-agi-mono">${p.bundle_name}</span>
+            <span class="adm-agi-mono">${p.self_reported
+    ? S('recSelfReported')
+    : p.id === 'other' ? S('recNothing') : p.detect_pattern}</span>
+            <span class="adm-agi-bar">${count > 0
+    ? html`<svg width=${Math.min(count / (totalAgents || 1) * 100, 100) + '%'} aria-hidden="true"></svg>`
+    : null}</span>
+          </div>`;
+  })}
+      </div>
+      <div class="adm-agi-foot">
+        <span>${S('regFoot', { agents: num(totalAgents), used: num(withAgents), rows: num(platforms.length) })}</span>
+      </div>
+    </section>
   `;
 }
 
@@ -177,25 +178,24 @@ function GettingSetUp({ onboarding, session, onAction }) {
   const waiting = onboarding.pending || 0;
 
   return html`
-    <${Section} title=${S('setupTitle')} count="02">
-      <${Stack}>
-        <${NumeralBand} tone="plain" items=${[
-    { label: S('cntFinished'), value: num(completed), note: S('cntFinishedSub') },
-    { label: S('cntPartway'), value: num(inProgress), note: S('cntPartwaySub') },
-    { label: S('cntWaiting'), value: num(waiting), note: S('cntWaitingSub') },
-    // Stuck is a subset of partway, not a fourth peer: it is counted in coral, not in ink.
-    { label: S('cntStuck'), value: num(stuck.length), note: S('cntStuckSub'), tone: 'coral' },
-  ]} />
+    <section class="og-sec">
+      <div class="og-sec-h"><h2 class="poster-section-title">${S('setupTitle')}<small>02</small></h2></div>
 
-        <${Text}>${S('setupLead')}<//>
+      <div class="og-strip">
+        <div><b>${num(completed)}</b><span>${S('cntFinished')}</span><small>${S('cntFinishedSub')}</small></div>
+        <div><b>${num(inProgress)}</b><span>${S('cntPartway')}</span><small>${S('cntPartwaySub')}</small></div>
+        <div><b>${num(waiting)}</b><span>${S('cntWaiting')}</span><small>${S('cntWaitingSub')}</small></div>
+        <div class="adm-agi-cnt-stuck"><b>${num(stuck.length)}</b><span>${S('cntStuck')}</span><small>${S('cntStuckSub')}</small></div>
+      </div>
 
-        ${stuck.length === 0
-    ? html`<${Text} kind="caption" tone="muted">${S('setupNoneStuck')}<//>`
-    : html`<div>
-            ${stuck.map(s => html`<${StuckRun} run=${s} session=${session} onAction=${onAction} key=${s.agent_gaii} />`)}
-          </div>`}
-      <//>
-    <//>
+      <p class="adm-agi-lead">${S('setupLead')}</p>
+
+      ${stuck.length === 0
+    ? html`<p class="adm-agi-note">${S('setupNoneStuck')}</p>`
+    : html`<div class="adm-agi-stuck">
+          ${stuck.map(s => html`<${StuckRun} run=${s} session=${session} onAction=${onAction} key=${s.agent_gaii} />`)}
+        </div>`}
+    </section>
   `;
 }
 
@@ -217,20 +217,24 @@ function StuckRun({ run, session, onAction }) {
   };
 
   return html`
-    <${ListRow} name=${run.agent_gaii} detailKind="text" detail=${S('waitingAt', { step: run.current_step })}
-      value=${html`<${Stack} density="compact">
-        <${Text}>${meaningOf(run.current_step_id)}<//>
-        <${Text} kind="mono" tone="muted">${run.never_moved
+    <div class="adm-agi-srow">
+      <span class="adm-agi-sname">${run.agent_gaii}
+        <span class="adm-agi-sstep">${S('waitingAt', { step: run.current_step })}</span>
+      </span>
+      <span class="adm-agi-swhy">${meaningOf(run.current_step_id)}
+        <span class="adm-agi-swhen">${run.never_moved
     ? S('startedNoStep', { day: day(run.stuck_since) })
-    : S('lastStep', { when: dt(run.stuck_since) })}<//>
-        ${failed && html`<${Text} tone="danger">${failed}<//>`}
-      <//>`}
-      actions=${html`
-        <${Action} disabled=${acting}
-          onClick=${() => act(() => api.sendReminder(session, run.agent_gaii), 'remind')}>${S('remind')}<//>
+    : S('lastStep', { when: dt(run.stuck_since) })}</span>
+        ${failed && html`<span class="adm-agi-serr">${failed}</span>`}
+      </span>
+      <span class="adm-agi-sacts">
+        <button type="button" class="adm-agi-sdoor" disabled=${acting}
+          onClick=${() => act(() => api.sendReminder(session, run.agent_gaii), 'remind')}>${S('remind')}</button>
         ${run.current_step_id && html`
-          <${Action} disabled=${acting}
-            onClick=${() => act(() => api.skipOnboardingStep(session, run.agent_gaii, run.current_step_id), 'skip')}>${S('skip')}<//>`}`} />
+          <button type="button" class="adm-agi-sdoor" disabled=${acting}
+            onClick=${() => act(() => api.skipOnboardingStep(session, run.agent_gaii, run.current_step_id), 'skip')}>${S('skip')}</button>`}
+      </span>
+    </div>
   `;
 }
 
@@ -251,24 +255,35 @@ function Readiness({ readiness }) {
   const levels = ['expert', 'full', 'standard', 'basic'];
 
   return html`
-    <${Section} title=${S('readyTitle')} count="03" description=${S('readyLead')}>
+    <section class="og-sec">
+      <div class="og-sec-h"><h2 class="poster-section-title">${S('readyTitle')}<small>03</small></h2></div>
+      <p class="adm-agi-lead">${S('readyLead')}</p>
       ${total === 0
-    ? html`<${Text} kind="caption" tone="muted">${S('readyEmpty')}<//>`
-    : html`<${Stack}>
-        <${Table} density="compact" collapse=${600} label=${S('readyTitle')}
-          headers=${[S('colLevel'), S('colAgents'), S('colShareShort'), S('colShareOfFinished', { total: num(total) })]}
-          rows=${levels.map(level => {
-    const n = dist[level] || 0;
-    return [
-      named(t('agentOnboarding.readiness.' + level), S('band.' + level), n === 0),
-      count(n, n === 0),
-      { text: html`<${Text} kind="mono" tone="muted">${share(n, total)}<//>`, align: 'end' },
-      n > 0 ? html`<${Meter} kind="progress" tone=${LEVEL_TONE[level]} value=${n / total * 100} label=${t('agentOnboarding.readiness.' + level)} />` : '',
-    ];
-  })} />
-        <${Text} kind="caption" tone="muted">${S('readyFoot', { total: num(total) })}<//>
-      <//>`}
-    <//>
+    ? html`<p class="adm-agi-note">${S('readyEmpty')}</p>`
+    : html`
+        <div class="adm-agi-rows adm-agi-rows--ready">
+          <div class="adm-agi-hrow">
+            <span>${S('colLevel')}</span>
+            <span class="r">${S('colAgents')}</span>
+            <span class="r">${S('colShareShort')}</span>
+            <span>${S('colShareOfFinished', { total: num(total) })}</span>
+          </div>
+          ${levels.map(level => {
+    const count = dist[level] || 0;
+    return html`
+            <div class="adm-agi-row ${count === 0 ? 'is-none' : ''}" key=${level}>
+              <span class="adm-agi-name">${t('agentOnboarding.readiness.' + level)}<em>${S('band.' + level)}</em></span>
+              <span class="adm-agi-n r">${num(count)}</span>
+              <span class="adm-agi-pct r">${share(count, total)}</span>
+              <span class="adm-agi-bar" data-level=${level}>${count > 0
+    ? html`<svg width=${count / total * 100 + '%'} aria-hidden="true"></svg>`
+    : null}</span>
+            </div>`;
+  })}
+        </div>
+        <p class="adm-agi-foot-note">${S('readyFoot', { total: num(total) })}</p>
+      `}
+    </section>
   `;
 }
 
@@ -293,19 +308,27 @@ function Bundles({ platforms, totalAgents }) {
   }, [platforms]);
 
   return html`
-    <${Section} title=${S('bundlesTitle')} count="04" description=${S('bundlesLead')}>
+    <section class="og-sec">
+      <div class="og-sec-h"><h2 class="poster-section-title">${S('bundlesTitle')}<small>04</small></h2></div>
+      <p class="adm-agi-lead">${S('bundlesLead')}</p>
       ${rows.length === 0
-    ? html`<${Text} kind="caption" tone="muted">${S('bundlesEmpty')}<//>`
-    : html`<${Stack}>
-        <${Table} density="compact" collapse=${600} label=${S('bundlesTitle')}
-          headers=${[S('colBundle'), S('colAgents'), S('colWhoGetsIt')]}
-          rows=${rows.map(r => [
-    html`<${Text} kind="mono">${r.bundle}<//>`,
-    count(r.agents),
-    html`<${Text} tone="muted">${r.generic ? S('bundleGeneric') : S('bundleFor', { name: r.from[0] })}<//>`,
-  ])} />
-        <${Text} kind="caption" tone="muted">${S('bundlesFoot', { total: num(totalAgents) })}<//>
-      <//>`}
-    <//>
+    ? html`<p class="adm-agi-note">${S('bundlesEmpty')}</p>`
+    : html`
+        <div class="adm-agi-brows">
+          <div class="adm-agi-bhrow">
+            <span>${S('colBundle')}</span>
+            <span class="r">${S('colAgents')}</span>
+            <span>${S('colWhoGetsIt')}</span>
+          </div>
+          ${rows.map(r => html`
+            <div class="adm-agi-brow" key=${r.bundle}>
+              <span class="adm-agi-bname">${r.bundle}</span>
+              <span class="adm-agi-n r">${num(r.agents)}</span>
+              <span class="adm-agi-bwhat">${r.generic ? S('bundleGeneric') : S('bundleFor', { name: r.from[0] })}</span>
+            </div>`)}
+        </div>
+        <p class="adm-agi-foot-note">${S('bundlesFoot', { total: num(totalAgents) })}</p>
+      `}
+    </section>
   `;
 }

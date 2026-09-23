@@ -14,14 +14,8 @@
  * @version-history
  *   v1.0.0 — 2026-07-17 — Initial creation (Agent-Bundled Apps Slice 2: catalog surface)
  *   v1.1.0 — 2026-09-13 — The modal opens through dialogs.js (the site's one dialog).
- *   v1.2.0 — 2026-09-22 — The modal's content is drawn from the shared set (parts-html.js): each
- *     crew-def in a box, crew members as list rows with their tools and skills as chips, the tasks
- *     as numbered steps, each hosted instance as a row with an online marker and its offers as
- *     label-value lines, the runner and organism pickers as fields and Deploy as the dialog's slab.
- *     The robot and morsel emoji are gone (a price says "morsels", as the cost section does).
  */
 import { escapeHtml, jsArg } from './util.js';
-import { listRow, chip, action, keyValue, stack, columns, surface, text, field, steps } from './parts-html.js';
 import { openDlg } from './dialogs.js';
 import { showNotice } from './ui.js';
 import { loadConfig } from './config.js';
@@ -52,8 +46,7 @@ export function appHasAgents(manifest) {
 function fmtOfferPrice(o) {
   var parts = [];
   if (o.price && typeof o.price.morsels === 'number') {
-    // The unit is the word the cost section uses (it was an emoji).
-    parts.push(o.price.morsels + ' morsels' + (o.price.unit ? '/' + escapeHtml(o.price.unit) : ''));
+    parts.push(o.price.morsels + ' \u{1F969}' + (o.price.unit ? '/' + escapeHtml(o.price.unit) : ''));
   }
   if (o.price_money && typeof o.price_money.amount === 'number') {
     parts.push((o.price_money.amount / 1e6).toFixed(2) + ' ' + escapeHtml(o.price_money.currency || 'EUR'));
@@ -62,41 +55,46 @@ function fmtOfferPrice(o) {
 }
 
 /** One crew-def's inspector block: who's in the crew, what it does, which tools/skills it needs. */
-function chipRow(content) { return content ? stack({ direction: 'wrap', density: 'compact' }, content) : ''; }
-function quiet(content) { return text({ kind: 'caption', tone: 'muted' }, content); }
-
 function inspectorHtml(def) {
   var crew = (def.agents || []).map(function(a) {
-    var tools = (a.tools || []).map(function(x) { return chip(escapeHtml(x)); }).join('');
-    var skills = (a.skills || []).map(function(x) { return chip(escapeHtml(x), 'sun'); }).join('');
-    return listRow({ density: 'compact', name: escapeHtml(a.role || ''), detail: a.goal ? escapeHtml(a.goal) : '', detailKind: 'text',
-      body: chipRow(tools + skills) });
+    var tools = (a.tools || []).map(function(x) { return '<span class="aga-chip">' + escapeHtml(x) + '</span>'; }).join('');
+    var skills = (a.skills || []).map(function(x) { return '<span class="aga-chip aga-chip-skill">' + escapeHtml(x) + '</span>'; }).join('');
+    return '<div class="aga-crew-row"><strong>' + escapeHtml(a.role || '') + '</strong>' +
+      (a.goal ? ' — <span class="aga-goal">' + escapeHtml(a.goal) + '</span>' : '') +
+      ((tools || skills) ? '<div class="aga-chips">' + tools + skills + '</div>' : '') +
+      '</div>';
   }).join('');
   var tasks = (def.tasks || []).map(function(tk) {
     var desc = String(tk.description || '');
     if (desc.length > 140) desc = desc.slice(0, 140) + '…';
-    return escapeHtml(desc) + (tk.expected_output ? ' → ' + escapeHtml(String(tk.expected_output).slice(0, 80)) : '');
-  });
-  return stack({ density: 'compact' },
-    stack({ direction: 'wrap', align: 'center', density: 'compact' }, text({ kind: 'label' }, t('agents.crew')) +
-      (def.llm_profile ? chip(escapeHtml(def.llm_profile)) : '') + (def.process ? chip(escapeHtml(def.process)) : '')) +
+    return '<li>' + escapeHtml(desc) + (tk.expected_output ? ' <span class="aga-goal">→ ' + escapeHtml(String(tk.expected_output).slice(0, 80)) + '</span>' : '') + '</li>';
+  }).join('');
+  return '<div class="aga-inspector">' +
+    '<div class="aga-label">' + t('agents.crew') + (def.llm_profile ? ' <span class="aga-chip">' + escapeHtml(def.llm_profile) + '</span>' : '') +
+      (def.process ? ' <span class="aga-chip">' + escapeHtml(def.process) + '</span>' : '') + '</div>' +
     crew +
-    text({ kind: 'label' }, t('agents.tasks')) + steps(tasks));
+    '<div class="aga-label">' + t('agents.tasks') + '</div><ul class="aga-tasks">' + tasks + '</ul>' +
+    '</div>';
 }
 
 function instanceHtml(inst, appOwner, appFilename, agentName) {
-  var who = escapeHtml(inst.owner) + (inst.is_yours ? ' ' + chip(t('agents.you')) : '') +
-    (inst.source === 'author' ? ' ' + chip(t('agents.author')) : '');
+  var dot = inst.online ? '<span class="aga-dot aga-dot-on"></span>' : '<span class="aga-dot"></span>';
+  var who = escapeHtml(inst.owner) + (inst.is_yours ? ' <span class="aga-chip">' + t('agents.you') + '</span>' : '') +
+    (inst.source === 'author' ? ' <span class="aga-chip">' + t('agents.author') + '</span>' : '');
   var offers = (inst.offers || []).map(function(o) {
-    return keyValue(escapeHtml(o.title || o.id), fmtOfferPrice(o) + (o.callable ? ' · ' + t('agents.instant') : ''));
+    return '<div class="aga-offer">' +
+      '<span class="aga-offer-title">' + escapeHtml(o.title || o.id) + '</span>' +
+      '<span class="aga-price">' + fmtOfferPrice(o) + (o.callable ? ' · ' + t('agents.instant') : '') + '</span>' +
+      '</div>';
   }).join('');
   var undeploy = (inst.is_yours && inst.source === 'deployed')
-    ? action({ kind: 'text', tone: 'danger', onclick: 'window._launcher.agentsUndeploy(\'' + jsArg(appOwner) + '\', \'' + jsArg(appFilename) + '\', \'' + jsArg(agentName) + '\')' }, t('agents.undeploy'))
+    ? '<button class="modal-btn secondary aga-btn-sm" onclick="window._launcher.agentsUndeploy(\'' + jsArg(appOwner) + '\', \'' + jsArg(appFilename) + '\', \'' + jsArg(agentName) + '\')">' + t('agents.undeploy') + '</button>'
     : '';
-  // The marker is the online light: success while the instance is online, muted otherwise.
-  return listRow({ marker: inst.online ? 'success' : 'muted', name: who,
-    detail: t('agents.trust') + ' ' + (inst.trust_score != null ? inst.trust_score : '—'),
-    actions: undeploy, body: offers || quiet(t('agents.noOffers')) });
+  return '<div class="aga-inst">' +
+    '<div class="aga-inst-head">' + dot + '<strong>' + who + '</strong>' +
+      '<span class="aga-goal">' + t('agents.trust') + ' ' + (inst.trust_score != null ? inst.trust_score : '—') + '</span>' + undeploy + '</div>' +
+    (offers || '<div class="aga-goal">' + t('agents.noOffers') + '</div>') +
+    '</div>';
 }
 
 /**
@@ -112,26 +110,26 @@ export function showAppAgentsModal(owner, filename) {
 
   document.getElementById('agents-modal-app').textContent = owner + '/' + filename;
   var body = document.getElementById('agents-modal-body');
-  var html = text({ kind: 'body' }, t('agents.declares'));
+  var html = '<div class="aga-intro">' + t('agents.declares') + '</div>';
   for (var i = 0; i < defs.length; i++) {
     var def = defs[i];
-    html += surface({ kind: 'box' }, stack({},
-      text({ kind: 'heading', size: 'small' }, escapeHtml(def.agent_name || '')) +
+    html += '<div class="aga-def">' +
+      '<h3>\u{1F916} ' + escapeHtml(def.agent_name || '') + '</h3>' +
       inspectorHtml(def) +
-      text({ kind: 'label' }, t('agents.hostedTitle')) +
-      // The shelf fills itself in when the instances answer (by this id).
-      '<div id="aga-instances-' + i + '">' + quiet(t('agents.loading')) + '</div>' +
-      text({ kind: 'label' }, t('agents.deployTitle')) +
+      '<div class="aga-label">' + t('agents.hostedTitle') + '</div>' +
+      '<div id="aga-instances-' + i + '" class="aga-goal">' + t('agents.loading') + '</div>' +
+      '<div class="aga-label">' + t('agents.deployTitle') + '</div>' +
       (token
-        ? columns({ layout: 'equal', density: 'compact', collapse: 560 },
-            field({ id: 'aga-runner-' + i, type: 'select', label: t('agents.runner'), options: [{ value: '', label: t('agents.loading') }] }) +
-            field({ id: 'aga-organism-' + i, type: 'select', label: t('agents.organism'), options: [{ value: '', label: '—' }] })) +
-          stack({ direction: 'wrap', align: 'center' },
-            action({ kind: 'primary', onclick: 'window._launcher.agentsDeploy(\'' + jsArg(owner) + '\', \'' + jsArg(filename) + '\', \'' + jsArg(def.agent_name) + '\', ' + i + ')' }, t('agents.deployBtn'))) +
-          quiet(t('agents.deployDesc'))
-        : quiet(t('agents.needLogin')))));
+        ? '<div class="aga-deploy-row">' +
+            '<label>' + t('agents.runner') + ' <select id="aga-runner-' + i + '" class="modal-input aga-select"><option value="">' + t('agents.loading') + '</option></select></label>' +
+            '<label>' + t('agents.organism') + ' <select id="aga-organism-' + i + '" class="modal-input aga-select"><option value="">—</option></select></label>' +
+            '<button class="modal-btn aga-deploy-btn" onclick="window._launcher.agentsDeploy(\'' + jsArg(owner) + '\', \'' + jsArg(filename) + '\', \'' + jsArg(def.agent_name) + '\', ' + i + ')">' + t('agents.deployBtn') + '</button>' +
+          '</div>' +
+          '<div class="aga-goal">' + t('agents.deployDesc') + '</div>'
+        : '<div class="aga-goal">' + t('agents.needLogin') + '</div>') +
+      '</div>';
   }
-  body.innerHTML = stack({}, html);
+  body.innerHTML = html;
   openDlg('agents-overlay');
 
   // Hosted instances per def (public endpoint — works signed out too).
@@ -144,9 +142,10 @@ export function showAppAgentsModal(owner, filename) {
         var el = document.getElementById('aga-instances-' + i);
         if (!el) return;
         var list = (json.data && json.data.instances) || [];
+        el.className = '';
         el.innerHTML = list.length
           ? list.map(function(inst) { return instanceHtml(inst, owner, filename, def.agent_name); }).join('')
-          : quiet(t('agents.hostedNone'));
+          : '<div class="aga-goal">' + t('agents.hostedNone') + '</div>';
       })
       .catch(function() {
         var el = document.getElementById('aga-instances-' + i);

@@ -10,8 +10,6 @@
  *   crumb · pageLinks · openTab
  * @usage import { x, rowWords, sourcesOf } from './frame.js';
  * @version-history
- *   2026-09-22 -- The crumb is the shared trail's entries and the rail's related pages are shared
- *     text Actions; no own classes.
  *   v1.0.0 — 2026-09-04 — Initial (design canvas "AIMEAT Lompakko-sivu", direction A).
  */
 import { h } from 'preact';
@@ -19,7 +17,6 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { date as fmtDate, time as fmtTime, money as fmtMoney } from '/js/format.js';
-import { Stack, Action, Text } from '/components/poster-parts.js';
 
 export const x = (key, vars) => t('walpage.' + key, vars);
 
@@ -144,19 +141,15 @@ export function sourcesOf(rows, self, agents, top = 4) {
   return { in: group(real.filter((tx) => Number(tx.amount) > 0)), out: group(real.filter((tx) => Number(tx.amount) < 0)) };
 }
 
-/** The trail: Settings & Controls, Account, Wallet. */
 export function crumb() {
-  return [{ label: t('nav.profile') }, { label: t('profile.landing.menuAccount') }, { label: t('profile.tabs.wallet') }];
+  return html`<div class="og-crumb"><span>${t('nav.profile')}</span><span>/</span><span>${t('profile.landing.menuAccount')}</span><span>/</span><span class="og-crumb-here">${t('profile.tabs.wallet')}</span></div>`;
 }
 
 export const openTab = (tabId) => window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId } }));
-/** The rail's related pages: a label, then one text action per page. */
 export function pageLinks() {
-  return html`<${Stack} density="compact">
-    <${Text} kind="label">${x('pages')}<//>
-    <${Action} kind="text" onClick=${() => openTab('usage')}>${t('profile.tabs.usage')} →<//>
-    <${Action} kind="text" onClick=${() => openTab('pnl')}>${t('profile.tabs.pnl')} →<//>
-    <${Action} kind="text" onClick=${() => openTab('offers')}>${t('profile.tabs.offers')} →<//>
-    <${Action} kind="text" onClick=${() => openTab('agents')}>${t('profile.tabs.agents')} →<//>
-  <//>`;
+  return html`
+    <button type="button" class="og-rail-link" onClick=${() => openTab('usage')}><i>→</i>${t('profile.tabs.usage')}<em>→</em></button>
+    <button type="button" class="og-rail-link" onClick=${() => openTab('pnl')}><i>→</i>${t('profile.tabs.pnl')}<em>→</em></button>
+    <button type="button" class="og-rail-link" onClick=${() => openTab('offers')}><i>→</i>${t('profile.tabs.offers')}<em>→</em></button>
+    <button type="button" class="og-rail-link" onClick=${() => openTab('agents')}><i>→</i>${t('profile.tabs.agents')}<em>→</em></button>`;
 }

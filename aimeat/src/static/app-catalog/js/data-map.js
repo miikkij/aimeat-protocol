@@ -8,17 +8,13 @@
  *   THE CATALOGUE HAS ITS OWN RENDERER because it is an esbuild bundle with no Preact and no live
  *   channel. The VOCABULARY is shared: `data-map-model.js` beside this file is a verbatim copy of
  *   `public/components/data-map/model.js`, and test/unit/data-map-model.test.ts fails when the two
- *   drift. The LOOK is shared too: every piece is a part of the site's set (parts-html.js).
+ *   drift.
  *
  *   It reads `/v1/datamap/apps/{owner}/{filename}` rather than the memory record, because assembling
  *   an owner identity out of a name and a server id is not a browser's job.
  * @structure dataMapSectionHtml · loadDataMapInto
  * @usage import { dataMapSectionHtml, loadDataMapInto } from './data-map.js'
  * @version-history
- *   v2.1.0 — 2026-09-22 — Composed from the shared set: the section and its slot, the two labelled
- *     facts as key-value rows, the sub-headings, one list row per data row, the contradiction as the
- *     solid aside. The body is found by `data-dm-body` and the map's state is `data-dm-state` on the
- *     slot, so no styling class carries a hook any more.
  *   v2.0.0 — 2026-08-25 — Rewritten for aimeat.datamap/2: the paragraph first, then the rows.
  *   v1.0.0 — 2026-08-25 — Initial.
  */
@@ -27,7 +23,6 @@ import { escapeHtml as esc } from './util.js';
 import {
   labelKeyFor, orderRows, contradictionOf, placesOf, stateOf, DATA_MAP_SPEC,
 } from './data-map-model.js';
-import { section, sectionSlot, listRow, keyValue, stack, surface, text } from './parts-html.js';
 
 /** An axis value in the reader's language, or the raw word when this build does not know it. */
 function label(axis, value) {
@@ -35,19 +30,14 @@ function label(axis, value) {
   return esc(key ? t(key) : String(value || ''));
 }
 
-function body(words) { return text({ kind: 'body' }, words); }
-function subHead(key) { return text({ kind: 'label' }, esc(t(key))); }
-
 /** The section shell, rendered before the fetch so the detail view has a stable anchor. */
 export function dataMapSectionHtml() {
-  return sectionSlot({ id: 'detail-data-map', attrs: ' data-dtl-section' },
-    section({
-      title: esc(t('dataMap.title')),
-      body: '<div data-dm-body>' + text({ kind: 'body', tone: 'muted' }, esc(t('common.loading'))) + '</div>',
-    }));
+  return '<div class="dtl-section" id="detail-data-map">'
+    + '<h3>' + esc(t('dataMap.title')) + '</h3>'
+    + '<div class="dtl-dm-body"><p class="dtl-desc">' + esc(t('common.loading')) + '</p></div>'
+    + '</div>';
 }
 
-/** One held row: what it is (mono), what it holds, where it lives, its facts, and why it is kept. */
 function rowHtml(row) {
   const facts = [
     label('kind', row.kind),
@@ -57,75 +47,84 @@ function rowHtml(row) {
     label('kept', row.keptFor),
   ];
   if (row.personalData === 'yes') {
-    facts.push(text({ kind: 'mono', tone: 'coral' }, esc(t('dataMap.personal.yes'))));
+    facts.push('<span class="dtl-dm-personal">' + esc(t('dataMap.personal.yes')) + '</span>');
   }
   const why = String(row.why || '').trim();
-  return listRow({
-    name: text({ kind: 'mono' }, esc(row.what)),
-    detail: esc(row.holds || ''),
-    detailKind: 'text',
-    value: label('where', row.where) + (row.whereExactly ? '<br>' + text({ kind: 'caption', tone: 'muted' }, esc(row.whereExactly)) : ''),
-    body: stack({ density: 'compact' },
-      text({ kind: 'mono', tone: 'muted' }, facts.join(' · '))
-      + text({ kind: 'body', tone: why ? 'muted' : 'coral' }, esc(why || t('dataMap.row.noWhy')))),
-  });
+  return '<div class="dtl-dm-row' + (why ? '' : ' dtl-dm-row-unexplained') + '">'
+    + '<div class="dtl-dm-head">'
+    + '<span class="dtl-dm-what">' + esc(row.what) + '</span>'
+    + '<span class="dtl-dm-holds">' + esc(row.holds || '') + '</span>'
+    + '<span class="dtl-dm-where">' + label('where', row.where)
+    + (row.whereExactly ? ' <span class="dtl-dm-where-exact">' + esc(row.whereExactly) + '</span>' : '')
+    + '</span></div>'
+    + '<div class="dtl-dm-facts">' + facts.join(' · ') + '</div>'
+    + '<div class="dtl-dm-why' + (why ? '' : ' dtl-dm-why-missing') + '">'
+    + esc(why || t('dataMap.row.noWhy')) + '</div>'
+    + '</div>';
 }
 
 function elsewhereHtml(row) {
-  return listRow({
-    name: text({ kind: 'mono' }, esc(row.what)),
-    detail: esc(t('dataMap.elsewhere.' + row.status)),
-    detailKind: 'text',
-    body: stack({ density: 'compact' },
-      text({ kind: 'mono', tone: 'muted' },
-        esc(t('dataMap.elsewhere.whereLabel')) + ' ' + esc(row.where) + ' · '
-        + esc(t('dataMap.elsewhere.controlledByLabel')) + ' ' + esc(row.controlledBy))
-      + text({ kind: 'body', tone: 'muted' }, esc(row.deletion || ''))),
-  });
+  return '<div class="dtl-dm-row">'
+    + '<div class="dtl-dm-head">'
+    + '<span class="dtl-dm-what">' + esc(row.what) + '</span>'
+    + '<span class="dtl-dm-holds">' + esc(t('dataMap.elsewhere.' + row.status)) + '</span>'
+    + '</div>'
+    + '<div class="dtl-dm-facts">'
+    + esc(t('dataMap.elsewhere.whereLabel')) + ' ' + esc(row.where) + ' · '
+    + esc(t('dataMap.elsewhere.controlledByLabel')) + ' ' + esc(row.controlledBy)
+    + '</div>'
+    + '<div class="dtl-dm-why">' + esc(row.deletion || '') + '</div>'
+    + '</div>';
 }
-
-/** A titled block of the panel: the sub-heading and what goes under it. */
-function block(key, content) { return stack({ density: 'compact' }, subHead(key) + content); }
 
 function panelHtml(map) {
   if (!map || map.spec !== DATA_MAP_SPEC || map.source === 'none') {
-    return body(esc(t('dataMap.panel.missing')));
+    return '<p class="dtl-desc">' + esc(t('dataMap.panel.missing')) + '</p>';
   }
 
   var out = '';
   var contradiction = contradictionOf(map);
   if (contradiction) {
-    out += surface({ kind: 'aside', tone: 'danger' }, text({ kind: 'body' }, esc(t(contradiction))));
+    out += '<p class="dtl-dm-contradiction">' + esc(t(contradiction)) + '</p>';
   }
 
-  out += text({ kind: 'lead' }, esc(map.what || t('dataMap.panel.noWhat')));
-  out += '<div>'
-    + keyValue(esc(t('dataMap.usedForLabel')), esc(map.usedFor || t('dataMap.panel.noUsedFor')))
-    + keyValue(esc(t('dataMap.formLabel')), label('form', map.form))
-    + '</div>';
+  out += '<p class="dtl-dm-what">'
+    + esc(map.what || t('dataMap.panel.noWhat')) + '</p>';
+  out += '<p class="dtl-dm-usedfor"><b>' + esc(t('dataMap.usedForLabel')) + '</b> '
+    + esc(map.usedFor || t('dataMap.panel.noUsedFor')) + '</p>';
+  out += '<p class="dtl-dm-form"><b>' + esc(t('dataMap.formLabel')) + '</b> '
+    + label('form', map.form) + '</p>';
 
+  out += '<h4>' + esc(t('dataMap.arrangementLabel')) + '</h4>';
+  out += '<p class="dtl-desc">' + esc(map.arrangement || t('dataMap.panel.noArrangement')) + '</p>';
   var places = placesOf(map);
-  out += block('dataMap.arrangementLabel',
-    body(esc(map.arrangement || t('dataMap.panel.noArrangement')))
-    + (places.length
-      ? stack({ direction: 'wrap', density: 'compact' }, places.map(function (p) {
-        return text({ kind: 'mono', tone: 'muted' }, label('where', p.where) + ' · ' + p.n);
-      }).join(''))
-      : ''));
+  if (places.length) {
+    out += '<ul class="dtl-dm-places">'
+      + places.map(function (p) { return '<li>' + label('where', p.where) + ' · ' + p.n + '</li>'; }).join('')
+      + '</ul>';
+  }
 
   var rows = orderRows(map.held || []);
-  if (rows.length) out += block('dataMap.rowsLabel', '<div>' + rows.map(rowHtml).join('') + '</div>');
-  if ((map.machinery || []).length) out += block('dataMap.machineryLabel', body(esc(map.machinery.join(' · '))));
+  if (rows.length) {
+    out += '<h4>' + esc(t('dataMap.rowsLabel')) + '</h4>' + rows.map(rowHtml).join('');
+  }
+  if ((map.machinery || []).length) {
+    out += '<h4>' + esc(t('dataMap.machineryLabel')) + '</h4>'
+      + '<p class="dtl-desc">' + esc(map.machinery.join(' · ')) + '</p>';
+  }
   if ((map.leaves || []).length) {
-    out += block('dataMap.leavesLabel', map.leaves.map(function (l) {
-      return body(esc(l.what) + ' → ' + esc(l.to)
-        + (l.recallable ? '' : ' ' + text({ kind: 'caption', tone: 'danger' }, esc(t('dataMap.leaves.noRecall')))));
-    }).join(''));
+    out += '<h4>' + esc(t('dataMap.leavesLabel')) + '</h4><ul class="dtl-dm-leaves">'
+      + map.leaves.map(function (l) {
+        return '<li>' + esc(l.what) + ' → ' + esc(l.to)
+          + (l.recallable ? '' : ' <span class="dtl-dm-norecall">' + esc(t('dataMap.leaves.noRecall')) + '</span>')
+          + '</li>';
+      }).join('') + '</ul>';
   }
   if ((map.elsewhere || []).length) {
-    out += block('dataMap.elsewhereLabel', '<div>' + map.elsewhere.map(elsewhereHtml).join('') + '</div>');
+    out += '<h4>' + esc(t('dataMap.elsewhereLabel')) + '</h4>'
+      + map.elsewhere.map(elsewhereHtml).join('');
   }
-  return stack({ density: 'roomy' }, out);
+  return out;
 }
 
 /**
@@ -134,10 +133,10 @@ function panelHtml(map) {
  * Findings are owner-only and the route decides that, so this simply renders what comes back.
  */
 export async function loadDataMapInto(owner, filename) {
-  const slot = document.getElementById('detail-data-map');
-  if (!slot) return;
-  const target = slot.querySelector('[data-dm-body]');
-  if (!target) return;
+  const section = document.getElementById('detail-data-map');
+  if (!section) return;
+  const body = section.querySelector('.dtl-dm-body');
+  if (!body) return;
 
   try {
     const res = await fetch('/v1/datamap/apps/' + encodeURIComponent(owner)
@@ -148,11 +147,13 @@ export async function loadDataMapInto(owner, filename) {
 
     let html = panelHtml(map);
     if (findings.length) {
-      html += block('dataMap.findingsLabel', findings.map(function (f) { return body(esc(f.message)); }).join(''));
+      html += '<h4>' + esc(t('dataMap.findingsLabel')) + '</h4><ul class="dtl-dm-findings">'
+        + findings.map(function (f) { return '<li>' + esc(f.message) + '</li>'; }).join('')
+        + '</ul>';
     }
-    target.innerHTML = stack({ density: 'roomy' }, html);
-    slot.setAttribute('data-dm-state', stateOf(map));
+    body.innerHTML = html;
+    section.className = 'dtl-section dtl-dm-' + stateOf(map);
   } catch (err) {
-    target.innerHTML = body(esc(t('dataMap.panel.missing')));
+    body.innerHTML = '<p class="dtl-desc">' + esc(t('dataMap.panel.missing')) + '</p>';
   }
 }

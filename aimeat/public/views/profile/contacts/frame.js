@@ -4,15 +4,12 @@
  * SPDX-License-Identifier: MIT
  * @description What the Contacts cover and a person's page share: the words (a kind, a relation,
  *   "saved" and "messaged", a state of the message gate), the name to show and the initials, the
- *   parts of an id, the rows of the three lists (people, people without an account, agents and
+ *   parts of an id, the rows of the three tables (people, people without an account, agents and
  *   apps), the crumb and the page frame with its rail. Every machine word (ghii, gaii, accepted,
  *   origin) is turned into the reader's language here and nowhere else.
- * @structure c · rel · day · parts · nameOf · initials · kindWord · stateWord · sortPeople · tagChips · peopleRows · noAccountRows · agentRows · crumb · pageLinks · renderPage
+ * @structure c · rel · day · parts · nameOf · initials · kindWord · stateWord · sortPeople · peopleRows · noAccountRows · agentRows · crumb · pageLinks · renderPage
  * @usage import { c, renderPage, peopleRows } from './frame.js';
  * @version-history
- *   2026-09-22 -- Composed from the shared set (Page, Rail, ListRow, Chip, Action): the three
- *     lists are roster rows, the page frame is Page, and no class of its own is left, so the
- *     contacts sheet can go.
  *   2026-09-13 -- Compose the shared initials-box role and its measured size cut.
  *   v1.2.0 -- 2026-09-13 -- Compose existing top rules from poster.css.
  *   v1.1.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
@@ -25,7 +22,6 @@ import { t } from '/js/i18n.js';
 import { date as fmtDate, compare as fmtCompare } from '/js/format.js';
 import { formatRelativeTime } from '/views/profile/memory-tab/helpers.js';
 import { PresenceDot } from '/components/PresenceDot.js';
-import { Page, Rail, ListRow, Chip, Action, Stack, Text } from '/components/poster-parts.js';
 
 export const c = (key, vars) => t('contacts.cover.' + key, vars);
 // The locale() helper here derived the FORMAT from the LANGUAGE. They are different settings:
@@ -65,84 +61,89 @@ export function sortPeople(rows) {
   });
 }
 
-/** The initials mark of a row: a square mono chip. */
-const av = (r, agent) => html`<${Chip} tone=${agent ? 'muted' : 'plain'}>${initials(r)}<//>`;
-/** The relation (on the sun, the one to see) and the tags, as chips. */
-export const tagChips = (r) => (r.relation || (r.tags || []).length ? html`<${Stack} direction="wrap" density="compact">
-  ${r.relation ? html`<${Chip} tone="sun">${r.relation}<//>` : null}${(r.tags || []).map(x => html`<${Chip} key=${x}>${x}<//>`)}<//>` : null);
-const lastMsg = (r) => (r.last_message_at
-  ? html`<${Text} kind="caption">${rel(r.last_message_at)} · ${r.last_sender === r.contact_id ? '' : c('youWrote') + ' '}${r.last_message || ''}<//>`
-  : html`<${Text} kind="caption" tone="muted">${c('noMessagesYet')}<//>`);
+const av = (r, agent) => html`<div class=${`ct-av poster-box poster-box--avatar ${agent ? 'ct-av--agent' : ''}`} aria-hidden="true">${initials(r)}</div>`;
+const tags = (r) => html`<span class="ct-tags">${r.relation ? html`<span class="ct-tag ct-tag--rel">${r.relation}</span>` : null}${(r.tags || []).map(x => html`<span class="ct-tag" key=${x}>${x}</span>`)}</span>`;
+const lastMsg = (r) => (r.last_message_at ? html`<b>${rel(r.last_message_at)}</b><small>${r.last_sender === r.contact_id ? '' : c('youWrote') + ' '}${r.last_message || ''}</small>` : html`<small>${c('noMessagesYet')}</small>`);
 
-/** Rows of the people list: who, relation and tags, shared organisms, last message, the doors. */
+/** Rows of the people table: who, relation and tags, shared organisms, last message, the doors. */
 export function peopleRows(ctx, rows) {
-  return html`<${Stack} density="compact">${rows.map(r => html`
-    <${ListRow} key=${r.contact_id} density="compact" mark=${av(r)}
-      name=${html`${nameOf(r)}${isPerson(r) ? html` <${PresenceDot} ghii=${r.contact_id} />` : null}`}
-      onOpen=${() => ctx.openPerson(r.contact_id)}
-      detail=${`${parts(r.contact_id).owner} · ${originWords(r)}`}
-      actions=${html`<${Action} kind="text" onClick=${() => ctx.message(r.contact_id)}>${c('message')}<//><${Action} onClick=${() => ctx.openPerson(r.contact_id)}>${c('open')}<//>`}>
-      <${Stack} density="compact">
-        ${tagChips(r)}
-        ${(r.shared_organisms || []).length ? html`<${Text} kind="mono" tone="muted">${c('colShared')}: ${r.shared_organisms.map(o => o.name).join(' · ')}<//>` : null}
-        ${lastMsg(r)}
-      <//>
-    <//>`)}<//>`;
+  return html`<div class="ct-rows">
+    ${rows.map(r => html`
+      ${av(r)}
+      <div class="ct-nm" key=${'n' + r.contact_id}><button type="button" class="og-tbl-name" onClick=${() => ctx.openPerson(r.contact_id)}>${nameOf(r)}</button>${isPerson(r) ? html` <${PresenceDot} ghii=${r.contact_id} />` : null}<small>${parts(r.contact_id).owner} · ${originWords(r)}</small></div>
+      <div class="ct-w" key=${'t' + r.contact_id}>${tags(r)}</div>
+      <div class="ct-w ct-m" key=${'o' + r.contact_id}>${(r.shared_organisms || []).length ? r.shared_organisms.map(o => o.name).join(' · ') : '·'}</div>
+      <div class="ct-w ct-last" key=${'l' + r.contact_id}>${lastMsg(r)}</div>
+      <div class="og-tbl-door ct-doors" key=${'d' + r.contact_id}><button type="button" class="og-door og-door--quiet" onClick=${() => ctx.message(r.contact_id)}>${c('message')}</button><button type="button" class="og-door" onClick=${() => ctx.openPerson(r.contact_id)}>${c('open')}</button></div>`)}
+  </div>`;
 }
+export const peopleHead = () => html`<div class="ct-rows ct-rows--head"><div></div><div>${c('colName')}</div><div>${c('colRelation')}</div><div>${c('colShared')}</div><div>${c('colLast')}</div><div></div></div>`;
 
 /** Rows of the people without an account: who, tags, the note, the invitation, the doors. */
 export function noAccountRows(ctx, rows) {
-  return html`<${Stack} density="compact">${rows.map(r => html`
-    <${ListRow} key=${r.contact_id} density="compact" mark=${av(r)} name=${nameOf(r)} onOpen=${() => ctx.openPerson(r.contact_id)}
-      detail=${r.email || ''}
-      value=${r.invitation ? c('inviteSent', { when: day(r.invitation.created_at) }) : c('notInvited')}
-      actions=${html`${r.invitation ? null : html`<${Action} disabled=${ctx.busy} onClick=${() => ctx.invite(r)}>${c('invite')}<//>`}<${Action} kind="text" onClick=${() => ctx.openPerson(r.contact_id)}>${c('open')}<//>`}>
-      ${tagChips(r) || r.note ? html`<${Stack} density="compact">${tagChips(r)}${r.note ? html`<${Text} kind="caption">${r.note}<//>` : null}<//>` : null}
-    <//>`)}<//>`;
+  return html`<div class="ct-rows ct-rows--mail">
+    ${rows.map(r => html`
+      ${av(r)}
+      <div class="ct-nm" key=${'n' + r.contact_id}><button type="button" class="og-tbl-name" onClick=${() => ctx.openPerson(r.contact_id)}>${nameOf(r)}</button><small>${r.email || ''}</small></div>
+      <div class="ct-w" key=${'t' + r.contact_id}>${tags(r)}</div>
+      <div class="ct-w ct-note" key=${'o' + r.contact_id}>${r.note || ''}</div>
+      <div class="ct-w ct-m" key=${'i' + r.contact_id}>${r.invitation ? c('inviteSent', { when: day(r.invitation.created_at) }) : c('notInvited')}</div>
+      <div class="og-tbl-door ct-doors" key=${'d' + r.contact_id}>${r.invitation ? null : html`<button type="button" class="og-door" disabled=${ctx.busy} onClick=${() => ctx.invite(r)}>${c('invite')}</button>`}<button type="button" class="og-door og-door--quiet" onClick=${() => ctx.openPerson(r.contact_id)}>${c('open')}</button></div>`)}
+  </div>`;
 }
 
 /** Rows of the agents and apps: who, whose, last message, the doors. */
 export function agentRows(ctx, rows) {
-  return html`<${Stack} density="compact">${rows.map(r => { const owner = ctx.personOf(r.owner); return html`
-    <${ListRow} key=${r.contact_id} density="compact" mark=${av(r, true)} name=${nameOf(r)} detail=${r.contact_id}
-      value=${html`${r.owner === ctx.me ? c('yours') : owner ? html`<${Action} kind="text" onClick=${() => ctx.openPerson(owner.contact_id)}>${nameOf(owner)}<//>` : parts(r.contact_id).owner} · ${kindWord(r.kind)}`}
-      actions=${html`<${Action} kind="text" onClick=${() => ctx.message(r.contact_id)}>${c('message')}<//>${r.owner === ctx.me ? html`<${Action} onClick=${() => ctx.openTab('agents')}>${c('open')}<//>` : owner ? html`<${Action} onClick=${() => ctx.openPerson(owner.contact_id)}>${c('open')}<//>` : null}`}>
-      ${lastMsg(r)}
-    <//>`; })}<//>`;
+  return html`<div class="ct-rows ct-rows--agents">
+    ${rows.map(r => { const owner = ctx.personOf(r.owner); return html`
+      ${av(r, true)}
+      <div class="ct-nm" key=${'n' + r.contact_id}><span class="ct-nm-plain">${nameOf(r)}</span><small>${r.contact_id}</small></div>
+      <div class="ct-w" key=${'w' + r.contact_id}>${r.owner === ctx.me ? c('yours') : owner ? html`<button type="button" class="og-tbl-go" onClick=${() => ctx.openPerson(owner.contact_id)}>${nameOf(owner)}</button>` : parts(r.contact_id).owner}<small class="ct-kind">${kindWord(r.kind)}</small></div>
+      <div class="ct-w ct-last" key=${'l' + r.contact_id}>${lastMsg(r)}</div>
+      <div class="og-tbl-door ct-doors" key=${'d' + r.contact_id}><button type="button" class="og-door og-door--quiet" onClick=${() => ctx.message(r.contact_id)}>${c('message')}</button>${r.owner === ctx.me ? html`<button type="button" class="og-door" onClick=${() => ctx.openTab('agents')}>${c('open')}</button>` : owner ? html`<button type="button" class="og-door" onClick=${() => ctx.openPerson(owner.contact_id)}>${c('open')}</button>` : null}</div>`; })}
+  </div>`;
 }
 
 /* ── The crumb and the page frame ──────────────────────────────────────────────────────────── */
-/** The trail as Masthead crumbs: Settings & Controls, Contacts, then the parts. */
 export function crumb(ctx, parts) {
-  return [
-    { label: t('nav.profile') },
-    { label: t('profile.landing.menuActivity') },
-    { label: t('contacts.title'), onClick: parts.length ? () => ctx.pickView({ kind: 'cover' }) : undefined },
-    ...parts.map(p => ({ label: p })),
-  ];
+  return html`
+    <div class="og-crumb">
+      <span>${t('nav.profile')}</span><span>/</span>
+      ${parts.length ? html`<button type="button" class="og-crumb-link" onClick=${() => ctx.pickView({ kind: 'cover' })}>${t('contacts.title')}</button>` : html`<span class="og-crumb-here">${t('contacts.title')}</span>`}
+      ${parts.map((p, i) => html`<span key=${i}>/</span><span class="og-crumb-here">${p}</span>`)}
+    </div>`;
 }
 
-/** The doors to the pages next to this one, for the rail. */
 export function pageLinks(ctx) {
-  return html`<${Stack} density="compact">
-    <${Text} kind="label">${c('pages')}<//>
-    <${Action} kind="text" onClick=${() => ctx.openTab('messages')}>→ ${t('profile.tabs.inbox')}<//>
-    <${Action} kind="text" onClick=${() => ctx.openTab('organisms')}>→ ${t('profile.tabs.organisms')}<//>
-    <${Action} kind="text" onClick=${() => ctx.openTab('agents')}>→ ${t('profile.tabs.agents')}<//>
-  <//>`;
+  return html`
+    <button type="button" class="og-rail-link" onClick=${() => ctx.openTab('messages')}><i>→</i>${t('profile.tabs.inbox')}<em>→</em></button>
+    <button type="button" class="og-rail-link" onClick=${() => ctx.openTab('organisms')}><i>→</i>${t('profile.tabs.organisms')}<em>→</em></button>
+    <button type="button" class="og-rail-link" onClick=${() => ctx.openTab('agents')}><i>→</i>${t('profile.tabs.agents')}<em>→</em></button>`;
 }
 
-/** A person's page frame: the trail, the mast, the band, the body and the rail with the doors back. */
 export function renderPage(ctx, { crumbs, label = null, title, chips = null, doors = null, strip = null, rail = null, children }) {
-  return html`<${Page} title=${title} crumbs=${crumb(ctx, crumbs)}
-    identity=${html`<${Stack} density="compact">${label ? html`<${Text} kind="label">${label}<//>` : null}${chips ? html`<${Stack} direction="wrap" density="compact">${chips}<//>` : null}<//>`}
-    actions=${doors}
-    rail=${html`<${Rail} kind="index" title=${t('contacts.title')} label=${c('railTitle')}><${Stack}>
-      <${Action} kind="text" onClick=${() => ctx.pickView({ kind: 'cover' })}>← ${c('backTo')}<//>
-      ${rail}
-      ${pageLinks(ctx)}
-    <//><//>`}>
-    ${strip}
-    <${Stack}>${children}<//>
-  <//>`;
+  return html`
+    <div class="og og-ct og-page">
+      ${crumb(ctx, crumbs)}
+      <div class="og-mast og-mast--page">
+        <div class="og-mast-words">
+          ${label ? html`<div class="og-label">${label}</div>` : null}
+          <h1 class="og-title poster-page-title ct-title--page">${title}</h1>
+          ${chips ? html`<div class="og-chips">${chips}</div>` : null}
+        </div>
+        ${doors ? html`<div class="og-mast-actions"><div class="og-doors">${doors}</div></div>` : null}
+      </div>
+      ${strip}
+      <div class="og-grid">
+        <div class="og-main poster-row--thing">${children}</div>
+        <nav class="og-rail" aria-label=${c('railTitle')}>
+          <span class="og-rail-label">${t('contacts.title')}</span>
+          <button type="button" class="og-rail-link" onClick=${() => ctx.pickView({ kind: 'cover' })}><i>←</i>${c('backTo')}</button>
+          ${rail}
+          <hr />
+          <span class="og-rail-label">${c('pages')}</span>
+          ${pageLinks(ctx)}
+        </nav>
+      </div>
+    </div>`;
 }

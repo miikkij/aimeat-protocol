@@ -11,10 +11,6 @@
  *   TabUsage({ agentName }) -- fetch (by-model + runs) -> stat cards + two lists.
  * @usage rendered by agent-card.js renderTabContent for activeTab === 'usage'.
  * @version-history
- *   2026-09-22 -- The by-model and run lists scroll inside their sections (Surface height="scroll"),
- *     so fifty runs do not stretch the tab.
- *   2026-09-22 -- Composed from the shared component set: the totals are a small numeral band, the
- *     by-model and run lists are sections of list rows; the tab's own classes are gone.
  *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
  *   v1.0.0 -- 2026-07-11 -- Initial: first consumer of the ledger, closes the "recorded
  *     but nowhere to see it" gap for agent LLM usage.
@@ -29,7 +25,6 @@ import { t } from '/js/i18n.js';
 import { getLedgerUsage, getLedgerRuns, getLedgerUsageOverview } from '/js/services/ledger.js';
 import { swallowed } from '/js/swallowed.js';
 import { num } from '/js/format.js';
-import { Stack, Section, ListRow, NumeralBand, Surface, Text } from '/components/poster-parts.js';
 
 const html = htm.bind(h);
 
@@ -95,45 +90,66 @@ export default function TabUsage({ agent, agentName }) {
   }, []);
 
   if (loading) {
-    return html`<${Text} tone="muted">${t('profile.loading')}<//>`;
+    return html`<div class="pf-agd-empty">${t('profile.loading')}</div>`;
   }
 
   const hasData = (totals?.calls || 0) > 0 || byModel.length > 0;
   if (!hasData) {
-    return html`<${Text} tone="muted">${t('profile.agents.detail.usage.empty')}<//>`;
+    return html`<div class="pf-agd-empty">${t('profile.agents.detail.usage.empty')}</div>`;
   }
 
   return html`
-    <${Stack}>
-      <${NumeralBand} size="small" tone="plain" items=${[
-        { id: 'cost', label: t('profile.agents.detail.usage.cost'), value: fmtUsd(totals?.cost_usd) },
-        { id: 'tokens', label: t('profile.agents.detail.usage.tokens'), value: fmtNum(totals?.total_tokens) },
-        { id: 'calls', label: t('profile.agents.detail.usage.calls'), value: fmtNum(totals?.calls) },
-      ]} />
+    <div>
+      <div class="stat-grid">
+        <div class="stat-card poster-row--thing">
+          <div class="stat-card-value">${fmtUsd(totals?.cost_usd)}</div>
+          <div class="stat-card-label">${t('profile.agents.detail.usage.cost')}</div>
+        </div>
+        <div class="stat-card poster-row--thing">
+          <div class="stat-card-value">${fmtNum(totals?.total_tokens)}</div>
+          <div class="stat-card-label">${t('profile.agents.detail.usage.tokens')}</div>
+        </div>
+        <div class="stat-card poster-row--thing">
+          <div class="stat-card-value">${fmtNum(totals?.calls)}</div>
+          <div class="stat-card-label">${t('profile.agents.detail.usage.calls')}</div>
+        </div>
+      </div>
 
-      <${Section} size="small" density="compact" title=${t('profile.agents.detail.usage.byModel')}>
-        <${Surface} kind="plain" density="flush" height="scroll">
+      <div class="pf-agd-section-title">${t('profile.agents.detail.usage.byModel')}</div>
+      <div class="pf-agd-event-log-scroll">
         ${byModel.map(g => html`
-          <${ListRow} key=${g.key} density="compact" name=${g.key || '(unknown)'}
-            value=${html`<${Text} kind="mono">${fmtUsd(g.cost_usd)}${(g.unpriced_calls || 0) > 0 ? ` · ${g.unpriced_calls} ${t('profile.agents.detail.usage.unpriced')}` : ''}<//>`}
-            detail=${html`${(g.providers && g.providers.length) ? html`<strong>${g.providers.join(', ')}</strong> · ` : ''}${fmtNum(g.total_tokens)} ${t('profile.agents.detail.usage.tokensLc')} (${fmtNum(g.prompt_tokens)} + ${fmtNum(g.completion_tokens)}) · ${fmtNum(g.calls)} ${t('profile.agents.detail.usage.callsLc')}`} />
+          <div key=${g.key} class="pf-agd-log-entry pf-agd-log-entry--two-line">
+            <div class="pf-agd-log-entry-primary">
+              <span class="pf-agd-log-type">${g.key || '(unknown)'}</span>
+              <span class="pf-agd-log-time">
+                ${fmtUsd(g.cost_usd)}${(g.unpriced_calls || 0) > 0 ? ` · ${g.unpriced_calls} ${t('profile.agents.detail.usage.unpriced')}` : ''}
+              </span>
+            </div>
+            <div class="pf-agd-log-entry-detail">
+              ${(g.providers && g.providers.length) ? html`<strong>${g.providers.join(', ')}</strong> · ` : ''}${fmtNum(g.total_tokens)} ${t('profile.agents.detail.usage.tokensLc')} (${fmtNum(g.prompt_tokens)} + ${fmtNum(g.completion_tokens)}) · ${fmtNum(g.calls)} ${t('profile.agents.detail.usage.callsLc')}
+            </div>
+          </div>
         `)}
-        <//>
-      <//>
+      </div>
 
       ${runs.length > 0 && html`
-        <${Section} size="small" density="compact" title=${t('profile.agents.detail.usage.recentRuns')}>
-          <${Surface} kind="plain" density="flush" height="scroll">
+        <div class="pf-agd-section-title">${t('profile.agents.detail.usage.recentRuns')}</div>
+        <div class="pf-agd-event-log-scroll">
           ${runs.map(r => html`
-            <${ListRow} key=${r.run_id} density="compact" name=${r.run_id}
-              value=${html`<${Text} kind="mono">${fmtUsd(r.cost_usd)}<//>`}
-              detail=${`${fmtNum(r.total_tokens)} ${t('profile.agents.detail.usage.tokensLc')} · ${fmtNum(r.calls)} ${t('profile.agents.detail.usage.callsLc')}${(r.models && r.models.length) ? ` · ${r.models.join(', ')}` : ''}`} />
+            <div key=${r.run_id} class="pf-agd-log-entry pf-agd-log-entry--two-line">
+              <div class="pf-agd-log-entry-primary">
+                <span class="pf-agd-log-type">${r.run_id}</span>
+                <span class="pf-agd-log-time">${fmtUsd(r.cost_usd)}</span>
+              </div>
+              <div class="pf-agd-log-entry-detail">
+                ${fmtNum(r.total_tokens)} ${t('profile.agents.detail.usage.tokensLc')} · ${fmtNum(r.calls)} ${t('profile.agents.detail.usage.callsLc')}${(r.models && r.models.length) ? ` · ${r.models.join(', ')}` : ''}
+              </div>
+            </div>
           `)}
-          <//>
-        <//>
+        </div>
       `}
 
-      <${Text} kind="caption" tone="muted">${t('profile.agents.detail.usage.help')}<//>
-    <//>
+      <div class="pf-agd-help-text">${t('profile.agents.detail.usage.help')}</div>
+    </div>
   `;
 }

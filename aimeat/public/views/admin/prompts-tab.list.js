@@ -16,16 +16,12 @@
  * @structure GROUP_NAMES · groupLabel · promptChips · PromptList
  * @usage html`<${PromptList} prompts=${prompts} openId=${id} onOpen=${fn} ... />`
  * @version-history
- *   v1.1.0 -- 2026-09-22 -- Composed from the shared component set: the search and the four
- *     filters as the shared toolbar, the groups in a scrolling box, each prompt a shared list row
- *     that sits on the sun while it is open; no sheet of its own.
  *   v1.0.0 — 2026-09-12 — Initial, with the page in the poster face.
  */
 import { h } from 'preact';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { num, Badge } from './shared.js';
-import { Stack, Text, Action, ListRow, Toolbar, Surface } from '/components/poster-parts.js';
 
 const html = htm.bind(h);
 const P = (key, params) => t('admin.prompts.' + key, params);
@@ -83,34 +79,45 @@ export function PromptList({ prompts, counts, query, filter, openId, onQuery, on
     else groups.push({ id: p.group, items: [p] });
   }
 
-  const filterOf = (key, n) => ({ id: key, label: P('filter.' + key, { n: num(n) }), selected: filter === key, onClick: () => onFilter(key) });
+  const filterButton = (key, n) => html`
+    <button type="button" class=${'adm-pr-filter' + (filter === key ? ' on' : '')}
+      onClick=${() => onFilter(key)}>${P('filter.' + key, { n: num(n) })}</button>`;
 
   return html`
-    <${Stack}>
-      <${Toolbar} label=${P('find.title')}
-        search=${{ ariaLabel: P('searchPh', { n: num(counts.all) }), placeholder: P('searchPh', { n: num(counts.all) }), value: query, onInput: (e) => onQuery(e.target.value) }}
-        filters=${[filterOf('all', counts.all), filterOf('changed', counts.changed), filterOf('off', counts.off), filterOf('orphan', counts.orphan)]} />
-      <${Surface} kind="box" density="compact" height="scroll">
+    <div class="adm-pr-list">
+      <div class="adm-pr-find">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M20 20l-4-4" /></svg>
+        <input type="text" value=${query} placeholder=${P('searchPh', { n: num(counts.all) })}
+          onInput=${(e) => onQuery(e.target.value)} />
+      </div>
+      <div class="adm-pr-filters">
+        ${filterButton('all', counts.all)}
+        ${filterButton('changed', counts.changed)}
+        ${filterButton('off', counts.off)}
+        ${filterButton('orphan', counts.orphan)}
+      </div>
+      <div class="adm-pr-rows">
         ${groups.map(g => html`
           <div key=${g.id}>
-            <${Stack} direction="wrap" align="between">
-              <${Stack} direction="horizontal" align="center" density="compact">
-                <${Text} kind="label">${groupLabel(g.id)}<//>
-                <${Text} kind="mono" tone="muted">${P('ghead', { n: num(g.items.length), changed: num(g.items.filter(p => p.differs_from_default).length) })}<//>
-              <//>
+            <div class="adm-pr-ghead">
+              <span>
+                <b>${groupLabel(g.id)}</b>${' '}
+                <small>${P('ghead', { n: num(g.items.length), changed: num(g.items.filter(p => p.differs_from_default).length) })}</small>
+              </span>
               ${g.items.some(p => p.source_kind !== 'orphan') && html`
-                <${Action} kind="text" onClick=${() => onResetGroup(g.id, g.items.length)}>${P('takeGroup', { n: num(g.items.length) })}<//>`}
-            <//>
-            ${g.items.map(p => {
-              const chips = promptChips(p);
-              return html`<${ListRow} key=${p.id} density="compact" selected=${openId === p.id} muted=${!p.active}
-                name=${p.name} onOpen=${() => onOpen(p.id)} open=${openId === p.id}
-                detail=${(p.usedIn && p.usedIn[0]) || p.id}>
-                ${chips.length > 0 ? html`<${Stack} direction="wrap" density="compact">${chips}<//>` : null}
-              <//>`;
-            })}
+                <button type="button" class="og-door og-door--quiet"
+                  onClick=${() => onResetGroup(g.id, g.items.length)}>${P('takeGroup', { n: num(g.items.length) })}</button>`}
+            </div>
+            ${g.items.map(p => html`
+              <button type="button" key=${p.id}
+                class=${'adm-pr-row' + (openId === p.id ? ' on' : '') + (p.active ? '' : ' off')}
+                onClick=${() => onOpen(p.id)}>
+                <span class="adm-pr-name">${p.name}</span>
+                <span class="adm-pr-addr">${(p.usedIn && p.usedIn[0]) || p.id}</span>
+                <span class="adm-pr-chips">${promptChips(p)}</span>
+              </button>`)}
           </div>`)}
-        ${prompts.length === 0 && html`<${Text} tone="muted">${P('noMatch')}<//>`}
-      <//>
-    <//>`;
+        ${prompts.length === 0 && html`<p class="adm-pr-none">${P('noMatch')}</p>`}
+      </div>
+    </div>`;
 }

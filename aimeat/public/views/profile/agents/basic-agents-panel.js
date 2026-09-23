@@ -20,9 +20,6 @@
  * @structure BasicAgentsPanel({ session, showToast, onCreated, first })
  * @usage <${BasicAgentsPanel} session=${session} showToast=${showToast} onCreated=${loadData} />
  * @version-history
- *   v3.0.0 -- 2026-09-22 -- Composed from the shared set (components/poster-parts.js): the section,
- *     the connector state as a toned text, the two agents as numbered list rows with their chips,
- *     the create press as the one primary action. No class of its own.
  *   v2.0.0 — 2026-09-14 — The poster face (design canvas "Your Agents"): a numbered B1 section with
  *     an Open/Close door the browser remembers, the two agents as numbered rows, one slab.
  *   2026-09-13 -- V2y: compose the section headline with the shared B1 class.
@@ -38,14 +35,12 @@ import { t } from '/js/i18n.js';
 import { apiGet, apiPost } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
 import { areaLine } from '/js/consent-vocab.js';
-import { Section, Stack, ListRow, Chip, Action, Text } from '/components/poster-parts.js';
+import { Section } from '/views/profile/organisms/poster-parts.js';
 import { loadFold, saveFold } from './tab-helpers.js';
 
 const p = (key, vars) => t('profile.agents.page.' + key, vars);
 
-// `first` is still accepted from the callers that pass it; the shared section needs no flag to
-// take no top margin when it opens the page.
-export default function BasicAgentsPanel({ session, showToast, onCreated }) {
+export default function BasicAgentsPanel({ session, showToast, onCreated, first = false }) {
   const [state, setState] = useState(null);
   const [busy, setBusy] = useState(false);
   // null until the person chooses: open while there is still something to press, closed once
@@ -109,51 +104,52 @@ export default function BasicAgentsPanel({ session, showToast, onCreated }) {
   const actsAlone = list.filter(a => a.mode === 'task-runner');
   const names = list.map(a => a.display_name || a.name).join(', ');
   const connectorWord = connected
-    ? html`<${Text} kind="mono" tone="success">✓ ${t('profile.agents.basic.connected')}<//>`
-    : html`<${Text} kind="mono" tone="danger">✗ ${t('profile.agents.basic.notConnected')}<//>`;
-  const door = html`<${Action} expanded=${open} onClick=${toggle}>${open ? p('close') : p('open')}<//>`;
+    ? html`<span class="agp-ok">✓ ${t('profile.agents.basic.connected')}</span>`
+    : html`<span class="agp-warn">✗ ${t('profile.agents.basic.notConnected')}</span>`;
+  const door = html`<button type="button" class="og-door og-door--quiet" onClick=${toggle}>${open ? p('close') : p('open')}</button>`;
 
   return html`
-    <${Section} id="agp-basic" density="compact" title=${t('profile.agents.basic.title')}
-      count=${allThere ? t('profile.agents.basic.allThere') : '01'} actions=${door}>
+    <${Section} id="agp-basic" num="01" title=${t('profile.agents.basic.title')}
+      count=${allThere ? t('profile.agents.basic.allThere') : null} doors=${door} first=${first}>
       ${!open ? html`
-        <${Stack} direction="wrap" align="center" density="compact">
-          <${Text} tone="muted">${allThere ? p('basicHaveLine', { names }) : p('basicMissingLine', { n: missing.length })}<//>
-          ${connectorWord}
-        <//>` : html`<${Stack}>
-        <${Text} kind="lead">${t('profile.agents.basic.desc')}<//>
-        ${connectorWord}
-        ${!connected && html`<${Text} tone="muted">${t('profile.agents.basic.notConnectedHint')}<//>`}
-        <div>
+        <p class="agp-folded">
+          ${allThere ? p('basicHaveLine', { names }) : p('basicMissingLine', { n: missing.length })}
+          ${' '}${connectorWord}
+        </p>` : html`
+        <p class="agp-lead">${t('profile.agents.basic.desc')}</p>
+        <div>${connectorWord}</div>
+        ${!connected && html`<p class="agp-hint">${t('profile.agents.basic.notConnectedHint')}</p>`}
+        <ul class="agp-basic-list">
           ${list.map((a, i) => html`
-            <${ListRow} key=${a.name} number=${String(i + 1).padStart(2, '0')}
-              name=${a.display_name || a.name}
-              detail=${a.description} detailKind="text"
-              value=${a.enrolled ? t('profile.agents.basic.have') : null}>
-              <${Stack} density="compact">
-                <${Stack} direction="wrap" density="compact">
-                  <${Chip} tone="muted">${t(`profile.agents.runMode.${a.run_mode}`)}<//>
-                  ${a.mode === 'task-runner' && html`<${Chip} tone="sun" title=${t('profile.agents.basic.actsAloneWhy')}>${t('profile.agents.basic.actsAlone')}<//>`}
-                <//>
-                ${(a.scopes ?? []).length > 0 && html`<${Text} kind="caption" tone="muted">${t('profile.agents.basic.reaches')} ${areaLine(a.scopes, t)}<//>`}
-              <//>
-            <//>
+            <li class="agp-basic-row" key=${a.name}>
+              <i>${String(i + 1).padStart(2, '0')}</i>
+              <span class="agp-basic-who">
+                <span class="agp-basic-name">${a.display_name || a.name}</span>
+                <span class="og-chip og-chip--dim">${t(`profile.agents.runMode.${a.run_mode}`)}</span>
+                ${a.mode === 'task-runner' && html`<span class="og-chip og-chip--coral" title=${t('profile.agents.basic.actsAloneWhy')}>${t('profile.agents.basic.actsAlone')}</span>`}
+              </span>
+              <span class="agp-basic-desc">
+                ${a.description}
+                ${(a.scopes ?? []).length > 0 && html`<small>${t('profile.agents.basic.reaches')} ${areaLine(a.scopes, t)}</small>`}
+              </span>
+              <span class="og-fold-r">${a.enrolled ? t('profile.agents.basic.have') : ''}</span>
+            </li>
           `)}
-        </div>
+        </ul>
         ${actsAlone.length > 0 && html`
-          <${Text}>
+          <p class="agp-basic-notice">
             ${/* One name took the plural verb: "Workflow manager start work as soon as it
                   arrives". The template was written for a list and there is usually one. */''}
             ${t(actsAlone.length === 1 ? 'profile.agents.basic.actsAloneNoticeOne' : 'profile.agents.basic.actsAloneNotice')
               .replace('{names}', actsAlone.map(a => a.display_name || a.name).join(', '))}
-          <//>`}
+          </p>`}
         ${!allThere && html`
-          <${Stack} direction="wrap">
-            <${Action} kind="primary" disabled=${!connected || busy} onClick=${create}>
+          <div class="agp-basic-actions">
+            <button type="button" class="og-slab" disabled=${!connected || busy} onClick=${create}>
               ${busy ? t('profile.agents.basic.working') : t('profile.agents.basic.button')}
-            <//>
-          <//>`}
-      <//>`}
+            </button>
+          </div>`}
+      `}
     <//>
   `;
 }

@@ -12,9 +12,6 @@
  *   WsGrantList (shared workspace checkbox+role list).
  * @usage import { InvitePanel, PendingInvites } from '/views/profile/organisms/invite-panel.js';
  * @version-history
- *   v1.2.1 -- 2026-09-22 -- Withdraw carries the danger tone.
- *   v1.2.0 -- 2026-09-22 -- Composed from the shared set (Surface, Field, ListRow, Chip, CopyAction):
- *     no class of its own; the envelope and person emoji before a pending row are gone.
  *   v1.0.0 — 2026-07-16 — Initial: unified direct-add/invite/email form + editable pending rows.
  *   v1.1.0 — 2026-08-08 — The accept-link copy is a shared <CopyButton> with an onCopied toast, replacing the
  *       copyAcceptUrl handler; label is the shared common.copyLink.
@@ -27,13 +24,9 @@ import { t } from '/js/i18n.js';
 import * as orgService from '/js/services/organisms.js';
 import { fmtDate } from '/views/profile/organisms/helpers.js';
 import { ContactPicker } from '/components/ContactPicker.js';
-import { Stack, Columns, Surface, Field, ListRow, Chip, Action, CopyAction, Text } from '/components/poster-parts.js';
+import { CopyButton } from '/components/CopyButton.js';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const ROLE_OPTIONS = () => [
-  { value: 'member', label: t('organisms.roleMember') || 'Member' },
-  { value: 'admin', label: t('organisms.roleAdmin') || 'Admin' },
-];
 
 /** Shared workspace grant list: checkbox per workspace + viewer/contributor select when ticked.
  *  `sel` is { [wsId]: 'viewer'|'contributor' }; onChange receives the next sel object. */
@@ -45,18 +38,22 @@ export function WsGrantList({ wsOptions, sel, onChange }) {
     onChange(next);
   };
   const setRole = (wsId, role) => onChange({ ...sel, [wsId]: role });
-  return html`<${Stack} density="compact">
-    <${Text} kind="label">${t('organisms.inviteWorkspacesLabel') || 'Grant workspace access (optional)'}<//>
-    ${wsOptions.map(w => html`
-      <${Columns} key=${w.id} density="compact" collapse="560">
-        <${Field} type="checkbox" label=${w.name} value=${!!sel[w.id]} onChange=${(e) => toggle(w.id, e.target.checked)} />
-        ${sel[w.id] ? html`
-          <${Field} type="select" value=${sel[w.id]} onChange=${(e) => setRole(w.id, e.target.value)} options=${[
-            { value: 'viewer', label: t('organisms.roleViewer') || 'Viewer' },
-            { value: 'contributor', label: t('organisms.roleContributor') || 'Contributor' },
-          ]} />` : null}
-      <//>`)}
-  <//>`;
+  return html`
+    <div class="pj-eminvite-wslabel">${t('organisms.inviteWorkspacesLabel') || 'Grant workspace access (optional)'}</div>
+    <div class="pj-eminvite-wslist">
+      ${wsOptions.map(w => html`
+        <div class="pj-eminvite-wsrow" key=${w.id}>
+          <label>
+            <input type="checkbox" checked=${!!sel[w.id]} onChange=${(e) => toggle(w.id, e.target.checked)} />
+            ${w.name}
+          </label>
+          ${sel[w.id] ? html`
+            <select class="input-field input-sm" value=${sel[w.id]} onChange=${(e) => setRole(w.id, e.target.value)}>
+              <option value="viewer">${t('organisms.roleViewer') || 'Viewer'}</option>
+              <option value="contributor">${t('organisms.roleContributor') || 'Contributor'}</option>
+            </select>` : null}
+        </div>`)}
+    </div>`;
 }
 
 const selToGrants = (sel) => Object.entries(sel).map(([ws, role]) => ({ ws, role }));
@@ -117,54 +114,67 @@ export function InvitePanel({ orgId, wsOptions, showToast, onChanged, onClose })
     : requireAccept ? (t('organisms.sendInvite') || 'Send invitation') : (t('organisms.addMember') || 'Add member');
 
   return html`
-    <${Surface} kind="box">
-      <${Stack}>
-        <${Columns} layout=${isEmail ? 'thirds' : 'leading'} density="compact" collapse="640">
-          <${Stack} density="compact">
-            <${Text} kind="label">${t('organisms.whoLabel') || 'Owner name or email'}<//>
-            <${ContactPicker} value=${who} onChange=${setWho} onSubmit=${submit} autofocus=${true}
-              kinds=${['ghii']}
-              placeholder=${t('organisms.whoPlaceholder') || 'owner name or name@example.com'} disabled=${busy} />
-          <//>
-          <${Field} type="select" label=${t('organisms.inviteRoleLabel') || 'Role'} value=${role} onChange=${(e) => setRole(e.target.value)} options=${ROLE_OPTIONS()} />
-          ${isEmail ? html`
-            <${Field} type="select" label=${t('organisms.inviteExpiryLabel') || 'Expires in'} value=${String(expiresInDays)} onChange=${(e) => setExpiresInDays(Number(e.target.value))} options=${[
-              { value: '1', label: t('organisms.expiry1d') || '1 day' },
-              { value: '7', label: t('organisms.expiry7d') || '7 days' },
-              { value: '30', label: t('organisms.expiry30d') || '30 days' },
-            ]} />` : null}
-        <//>
-
-        <${WsGrantList} wsOptions=${wsOptions} sel=${wsSel} onChange=${setWsSel} />
-
+    <div class="pj-eminvite">
+      <div class="pj-eminvite-grid">
+        <div class="pj-eminvite-field">
+          <label>${t('organisms.whoLabel') || 'Owner name or email'}</label>
+          <${ContactPicker} value=${who} onChange=${setWho} onSubmit=${submit} autofocus=${true}
+            kinds=${['ghii']}
+            placeholder=${t('organisms.whoPlaceholder') || 'owner name or name@example.com'} disabled=${busy} />
+        </div>
+        <div class="pj-eminvite-field">
+          <label>${t('organisms.inviteRoleLabel') || 'Role'}</label>
+          <select class="input-field input-sm" value=${role} onChange=${(e) => setRole(e.target.value)}>
+            <option value="member">${t('organisms.roleMember') || 'Member'}</option>
+            <option value="admin">${t('organisms.roleAdmin') || 'Admin'}</option>
+          </select>
+        </div>
         ${isEmail ? html`
-          <${Field} type="textarea" rows=${2} label=${t('organisms.inviteMessageLabel') || 'Personal message (optional)'} value=${message} onInput=${(e) => setMessage(e.target.value)} />
-          <${Text} kind="caption" tone="muted">${t('organisms.emailInviteHint') || 'This looks like an email address — a registration invitation will be emailed.'}<//>
-        ` : html`
-          <${Field} type="checkbox" label=${t('organisms.requireAcceptance') || 'Require acceptance — send an invitation instead of adding directly'}
-            value=${requireAccept} onChange=${(e) => setRequireAccept(e.target.checked)} />
-          ${!requireAccept ? html`<${Text} kind="caption" tone="muted">${t('organisms.directAddHint') || 'The member is added immediately with the selected rights. They are notified and can leave at any time.'}<//>` : null}
-        `}
+          <div class="pj-eminvite-field">
+            <label>${t('organisms.inviteExpiryLabel') || 'Expires in'}</label>
+            <select class="input-field input-sm" value=${String(expiresInDays)} onChange=${(e) => setExpiresInDays(Number(e.target.value))}>
+              <option value="1">${t('organisms.expiry1d') || '1 day'}</option>
+              <option value="7">${t('organisms.expiry7d') || '7 days'}</option>
+              <option value="30">${t('organisms.expiry30d') || '30 days'}</option>
+            </select>
+          </div>` : null}
+      </div>
 
-        <${Stack} direction="wrap" align="center">
-          <${Action} kind="primary" disabled=${busy || !who.trim()} onClick=${submit}>${submitLabel}<//>
-          <${Action} onClick=${() => onClose?.()}>${t('organisms.cancel') || 'Cancel'}<//>
-        <//>
+      <${WsGrantList} wsOptions=${wsOptions} sel=${wsSel} onChange=${setWsSel} />
 
-        ${emResult ? html`
-          <${Stack} density="compact" align="start">
-            <${Text} kind="caption" tone="muted">${emResult.email_sent ? (t('organisms.inviteEmailSentHint') || 'Email sent. You can also share this link:') : (t('organisms.inviteLinkHint') || 'Share this link with the invitee:')}<//>
-            <${Text} kind="mono">${emResult.accept_url}<//>
-            <${CopyAction} text=${emResult.accept_url} label=${t('common.copyLink') || 'Copy link'}
-              onCopied=${() => showToast(t('organisms.linkCopied') || 'Link copied')} />
-          <//>` : null}
-      <//>
-    <//>`;
+      ${isEmail ? html`
+        <div class="pj-eminvite-field">
+          <label>${t('organisms.inviteMessageLabel') || 'Personal message (optional)'}</label>
+          <textarea class="input-field input-sm" rows="2" value=${message} onInput=${(e) => setMessage(e.target.value)}></textarea>
+        </div>
+        <div class="section-desc">${t('organisms.emailInviteHint') || 'This looks like an email address — a registration invitation will be emailed.'}</div>
+      ` : html`
+        <label class="pj-invpanel-accept">
+          <input type="checkbox" checked=${requireAccept} onChange=${(e) => setRequireAccept(e.target.checked)} />
+          ${t('organisms.requireAcceptance') || 'Require acceptance — send an invitation instead of adding directly'}
+        </label>
+        ${!requireAccept ? html`<div class="section-desc">${t('organisms.directAddHint') || 'The member is added immediately with the selected rights. They are notified and can leave at any time.'}</div>` : null}
+      `}
+
+      <div class="pj-eminvite-actions">
+        <button class="btn-primary btn-sm" disabled=${busy || !who.trim()} onClick=${submit}>${submitLabel}</button>
+        <button class="btn-ghost btn-sm" onClick=${() => onClose?.()}>${t('organisms.cancel') || 'Cancel'}</button>
+      </div>
+
+      ${emResult ? html`
+        <div class="pj-eminvite-url">
+          <div class="section-desc">${emResult.email_sent ? (t('organisms.inviteEmailSentHint') || 'Email sent. You can also share this link:') : (t('organisms.inviteLinkHint') || 'Share this link with the invitee:')}</div>
+          ${emResult.accept_url}
+          <div><${CopyButton} text=${emResult.accept_url} className="btn-outline btn-sm"
+            label=${t('common.copyLink') || 'Copy link'}
+            onCopied=${() => showToast(t('organisms.linkCopied') || 'Link copied')} /></div>
+        </div>` : null}
+    </div>`;
 }
 
 /**
  * Pending invitations — name invites + email invites merged into uniform manageable rows:
- * identity, role chip, workspace-grant count, inviter/expiry meta, an inline rights editor
+ * identity, role badge, workspace-grant count, inviter/expiry meta, an inline rights editor
  * (role + workspace grants → PATCH), and withdraw/cancel.
  */
 export function PendingInvites({ orgId, invitations, emailInvites, wsOptions, showToast, onChanged }) {
@@ -210,27 +220,38 @@ export function PendingInvites({ orgId, invitations, emailInvites, wsOptions, sh
     finally { setBusy(false); }
   };
 
-  return html`<${Stack} density="compact">
-    <${Text} kind="label">${t('organisms.pendingInvites') || 'Pending invitations'}<//>
-    ${rows.map(row => {
-      const open = editing && editing.id === row.id && editing.kind === row.kind;
-      return html`
-      <${ListRow} key=${`${row.kind}-${row.id}`} density="compact" name=${row.label}
-        detail=${`${row.grants.length ? `${row.grants.length} ${t('organisms.workspacesShort') || 'ws'}` : ''}${row.grants.length && row.meta ? ' · ' : ''}${row.meta}` || undefined}
-        actions=${html`<${Chip}>${row.role === 'admin' ? (t('organisms.roleAdmin') || 'Admin') : (t('organisms.roleMember') || 'Member')}<//>
-          <${Action} kind="tab" selected=${!!open} disabled=${busy} onClick=${() => (open ? setEditing(null) : startEdit(row))}>${t('organisms.editInvite') || 'Edit'}<//>
-          <${Action} tone="danger" disabled=${busy} onClick=${() => withdraw(row)}>${t('organisms.withdraw') || 'Withdraw'}<//>`}>
-        ${open ? html`
-          <${Surface} kind="box" density="compact">
-            <${Stack}>
-              <${Field} type="select" label=${t('organisms.inviteRoleLabel') || 'Role'} value=${editing.role} onChange=${(e) => setEditing(ed => ({ ...ed, role: e.target.value }))} options=${ROLE_OPTIONS()} />
-              <${WsGrantList} wsOptions=${wsOptions} sel=${editing.wsSel} onChange=${(sel) => setEditing(ed => ({ ...ed, wsSel: sel }))} />
-              <${Stack} direction="wrap" align="center">
-                <${Action} kind="primary" disabled=${busy} onClick=${saveEdit}>${t('organisms.saveChanges') || 'Save'}<//>
-                <${Action} onClick=${() => setEditing(null)}>${t('organisms.cancel') || 'Cancel'}<//>
-              <//>
-            <//>
-          <//>` : null}
-      <//>`; })}
-  <//>`;
+  return html`
+    <div class="detail-label">${t('organisms.pendingInvites') || 'Pending invitations'}</div>
+    ${rows.map(row => html`
+      <div key=${`${row.kind}-${row.id}`}>
+        <div class="pj-eminvite-pending-row">
+          <span>${row.kind === 'email' ? '✉ ' : '👤 '}${row.label}</span>
+          <span class="badge badge-info">${row.role === 'admin' ? (t('organisms.roleAdmin') || 'Admin') : (t('organisms.roleMember') || 'Member')}</span>
+          <span class="pj-eminvite-pending-meta">
+            ${row.grants.length ? `${row.grants.length} ${t('organisms.workspacesShort') || 'ws'}` : ''}${row.grants.length && row.meta ? ' · ' : ''}${row.meta}
+          </span>
+          <button class="btn-ghost btn-sm pj-eminvite-pending-cancel" disabled=${busy}
+            onClick=${() => (editing && editing.id === row.id && editing.kind === row.kind) ? setEditing(null) : startEdit(row)}>
+            ${t('organisms.editInvite') || 'Edit'}</button>
+          <button class="btn-ghost btn-sm" disabled=${busy} onClick=${() => withdraw(row)}>${t('organisms.withdraw') || 'Withdraw'}</button>
+        </div>
+        ${editing && editing.id === row.id && editing.kind === row.kind ? html`
+          <div class="pj-eminvite pj-pinv-editor">
+            <div class="pj-eminvite-grid">
+              <div class="pj-eminvite-field">
+                <label>${t('organisms.inviteRoleLabel') || 'Role'}</label>
+                <select class="input-field input-sm" value=${editing.role} onChange=${(e) => setEditing(ed => ({ ...ed, role: e.target.value }))}>
+                  <option value="member">${t('organisms.roleMember') || 'Member'}</option>
+                  <option value="admin">${t('organisms.roleAdmin') || 'Admin'}</option>
+                </select>
+              </div>
+            </div>
+            <${WsGrantList} wsOptions=${wsOptions} sel=${editing.wsSel} onChange=${(sel) => setEditing(ed => ({ ...ed, wsSel: sel }))} />
+            <div class="pj-eminvite-actions">
+              <button class="btn-primary btn-sm" disabled=${busy} onClick=${saveEdit}>${t('organisms.saveChanges') || 'Save'}</button>
+              <button class="btn-ghost btn-sm" onClick=${() => setEditing(null)}>${t('organisms.cancel') || 'Cancel'}</button>
+            </div>
+          </div>` : null}
+      </div>`)}
+  `;
 }

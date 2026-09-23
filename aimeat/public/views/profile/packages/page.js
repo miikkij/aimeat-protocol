@@ -8,12 +8,9 @@
  *   roads to a new package (ask your AI with the package-builder request, or import a zip); and the
  *   section that says how an agent installs. What opens under a row is rows.js. Pure render over the
  *   ctx bag.
- * @structure renderPage · secInstalled · secOffers · secOwn · secNew · composeForm · secAgent
+ * @structure renderPage · secInstalled · secOffers · secOwn · secNew · secAgent
  * @usage import { renderPage } from './packages/page.js';
  * @version-history
- *   2026-09-22 -- Composed from the shared component set (Page, Rail, Section, NumeralBand, Toolbar,
- *     ListRow, Field, Surface, KeyValue), so the page follows the theme and the parts in one edit;
- *     packages-poster.css is gone.
  *   v1.3.0 -- 2026-09-13 -- Compose the existing instruction frame from poster.css.
  *   v1.2.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.1.0 — 2026-09-05 — A third road, leading: make a package out of apps you already have. Each
@@ -25,16 +22,14 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { Page, Rail, Section, Stack, Columns, NumeralBand, Toolbar, Field, ListRow, Surface, KeyValue,
-  Text, Chip, Action, CopyAction } from '/components/poster-parts.js';
+import { CopyButton } from '/components/CopyButton.js';
+import { Section, scrollTo } from '/views/profile/organisms/poster-parts.js';
 import { x, crumb, pageLinks, agentRule, categoryWord } from './frame.js';
 import { instanceRow, offerRow, ownRow, loadingRow } from './rows.js';
 
 const PAGE = 20;
-const facet = (on, label, n, onClick, id) => ({ id, label: `${label} ${n}`, selected: on, onClick });
+const facet = (on, label, n, onClick, key) => html`<button type="button" key=${key} class=${`pk-facet ${on ? 'is-on' : ''}`} onClick=${onClick}>${label}<em>${n}</em></button>`;
 const matches = (q, ...fields) => !q || fields.some((f) => String(f || '').toLowerCase().includes(q));
-/** The column words over a list of rows, on a row of their own. */
-const headRow = (a, b, c) => html`<${ListRow} density="compact" name=${html`<${Text} kind="label">${a} · ${b}<//>`} value=${html`<${Text} kind="label">${c}<//>`} />`;
 
 export function renderPage(ctx) {
   const d = ctx.data;   // null while loading
@@ -44,57 +39,66 @@ export function renderPage(ctx) {
   const remote = offers.filter((o) => o.remote);
   const parts = instances.reduce((s, i) => s + (i.installedComponents || []).length, 0);
   const none = d && instances.length === 0;
+  const chip = (text, cls = '') => html`<span class=${`og-chip ${cls}`}>${text}</span>`;
 
-  const strip = html`<${NumeralBand} tone="plain" size="small" items=${[
-    { id: 'inst', label: x('stripInstalled'), value: d ? instances.length : '…', note: d ? (instances.length ? x('stripInstalledSub', { parts, running: instances.filter((i) => i.status === 'installed').length === instances.length ? x('allRunning') : x('someStopped') }) : x('stripInstalledNone')) : '' },
-    { id: 'offers', label: x('stripOffers'), value: d ? offers.length : '…', note: d ? x('stripOffersSub', { system: offers.filter((o) => o.system).length, others: offers.filter((o) => !o.system && !o.remote).length }) : '' },
-    { id: 'own', label: x('stripOwn'), value: d ? own.length : '…', note: d ? (own.length ? x('stripOwnSub', { pub: own.filter((p) => p.visibility === 'public').length, listed: own.filter((p) => ctx.listingByGroup[p.packageGroupId]).length }) : x('stripOwnNone')) : '' },
-    { id: 'remote', label: x('stripRemote'), value: d ? remote.length : '…', note: d ? (remote.length ? x('stripRemoteSub', { n: new Set(remote.map((r) => r.sourceNode)).size }) : x('stripRemoteNone')) : '' },
-  ]} />`;
+  const strip = html`
+    <div class="og-strip">
+      <div><b>${d ? instances.length : '…'}</b><span>${x('stripInstalled')}</span><small>${d ? (instances.length ? x('stripInstalledSub', { parts, running: instances.filter((i) => i.status === 'installed').length === instances.length ? x('allRunning') : x('someStopped') }) : x('stripInstalledNone')) : ''}</small></div>
+      <div><b>${d ? offers.length : '…'}</b><span>${x('stripOffers')}</span><small>${d ? x('stripOffersSub', { system: offers.filter((o) => o.system).length, others: offers.filter((o) => !o.system && !o.remote).length }) : ''}</small></div>
+      <div><b>${d ? own.length : '…'}</b><span>${x('stripOwn')}</span><small>${d ? (own.length ? x('stripOwnSub', { pub: own.filter((p) => p.visibility === 'public').length, listed: own.filter((p) => ctx.listingByGroup[p.packageGroupId]).length }) : x('stripOwnNone')) : ''}</small></div>
+      <div><b>${d ? remote.length : '…'}</b><span>${x('stripRemote')}</span><small>${d ? (remote.length ? x('stripRemoteSub', { n: new Set(remote.map((r) => r.sourceNode)).size }) : x('stripRemoteNone')) : ''}</small></div>
+    </div>`;
 
-  const identity = html`<${Stack} density="compact"><${Text} tone="muted">${x('titleSub')}<//>${d ? html`<${Stack} direction="wrap" density="compact">
-    <${Chip} tone=${none ? 'coral' : 'sun'}>${none ? x('chipNone') : x('chipInstalled', { n: instances.length })}<//>
-    <${Chip}>${x('chipOffers', { n: offers.length })}<//>
-    <${Chip} tone=${own.length ? 'plain' : 'muted'}>${x('chipOwn', { n: own.length })}<//>
-    <${Chip} tone=${remote.length ? 'plain' : 'muted'}>${x('chipRemote', { n: remote.length })}<//>
-  <//>` : null}<//>`;
-
-  const rail = html`<${Rail} kind="index" title=${x('railTitle')} entries=${[
-    { href: '#pk-installed', label: x('secInstalled'), count: d ? instances.length : undefined },
-    { href: '#pk-offers', label: x('secOffers'), count: d ? offers.length : undefined },
-    { href: '#pk-own', label: x('secOwn'), count: d ? own.length : undefined },
-    { href: '#pk-new', label: x('secNew') },
-    { href: '#pk-ai', label: x('secAi') },
-  ]}>${pageLinks()}<//>`;
-
-  return html`<${Page} crumbs=${crumb()} title=${t('profile.tabs.packages')} identity=${identity}
-    actions=${html`<${Action} kind="primary" disabled=${ctx.busy === 'prompt'} onClick=${() => ctx.copyPrompt()}>${x('copyRequest')}<//>
-      <${Action} onClick=${() => ctx.pickZip()}>${x('importZip')}<//>`}
-    rail=${rail}>
-    <${Stack}>
-      <${Text} tone="muted">${none ? x('descEmpty', { n: offers.length }) : x('desc')}<//>
+  return html`
+    <div class="og og-packages">
+      ${crumb()}
+      <div class="og-mast">
+        <div class="og-mast-words">
+          <h1 class="og-title poster-page-title">${t('profile.tabs.packages')}<small>${x('titleSub')}</small></h1>
+          <div class="og-chips">
+            ${d ? chip(none ? x('chipNone') : x('chipInstalled', { n: instances.length }), none ? 'og-chip--coral' : 'og-chip--sun') : null}
+            ${d ? chip(x('chipOffers', { n: offers.length })) : null}
+            ${d ? chip(x('chipOwn', { n: own.length }), own.length ? '' : 'og-chip--dim') : null}
+            ${d ? chip(x('chipRemote', { n: remote.length }), remote.length ? '' : 'og-chip--dim') : null}
+          </div>
+          <p class="og-desc">${none ? x('descEmpty', { n: offers.length }) : x('desc')}</p>
+        </div>
+        <div class="og-mast-actions">
+          <button type="button" class="og-slab" disabled=${ctx.busy === 'prompt'} onClick=${() => ctx.copyPrompt()}>${x('copyRequest')}</button>
+          <div class="og-doors"><button type="button" class="og-door" onClick=${() => ctx.pickZip()}>${x('importZip')}</button></div>
+        </div>
+      </div>
       ${strip}
-      ${secInstalled(ctx, instances)}
-      ${secOffers(ctx, offers)}
-      ${secOwn(ctx, own)}
-      ${secNew(ctx)}
-      ${secAgent(ctx)}
-    <//>
-    <input type="file" accept=".zip" hidden ref=${ctx.fileRef} onChange=${(e) => ctx.importZip(e)} />
-    <${ctx.ConfirmUI} />
-  <//>`;
+      <div class="og-grid">
+        <div class="og-main">
+          ${secInstalled(ctx, instances)}
+          ${secOffers(ctx, offers)}
+          ${secOwn(ctx, own)}
+          ${secNew(ctx)}
+          ${secAgent(ctx)}
+        </div>
+        <nav class="og-rail" aria-label=${x('railTitle')}>
+          <span class="og-rail-label">${x('railTitle')}</span>
+          ${[['01', 'pk-installed', x('secInstalled'), d ? instances.length : ''], ['02', 'pk-offers', x('secOffers'), d ? offers.length : ''], ['03', 'pk-own', x('secOwn'), d ? own.length : ''], ['04', 'pk-new', x('secNew'), ''], ['05', 'pk-ai', x('secAi'), '']].map(([n, id, label, count]) => html`<button type="button" class="og-rail-link" key=${id} onClick=${() => scrollTo(id)}><i>${n}</i>${label}<em>${count}</em></button>`)}
+          <hr />
+          <span class="og-rail-label">${x('pages')}</span>
+          ${pageLinks()}
+        </nav>
+      </div>
+      <input type="file" accept=".zip" class="pk-file" ref=${ctx.fileRef} onChange=${(e) => ctx.importZip(e)} />
+      <${ctx.ConfirmUI} />
+    </div>`;
 }
 
 function secInstalled(ctx, instances) {
   return html`
-    <${Section} id="pk-installed" title=${x('secInstalled')} count=${ctx.data ? (instances.length ? x('secInstalledSub', { n: instances.length, parts: instances.reduce((s, i) => s + (i.installedComponents || []).length, 0) }) : x('secNone')) : null}>
-      ${!ctx.data ? loadingRow() : instances.length ? html`<${Stack}>
-        <div>
-          ${headRow(x('colPackage'), x('colBrought'), x('colFrom'))}
+    <${Section} id="pk-installed" num="01" title=${x('secInstalled')} count=${ctx.data ? (instances.length ? x('secInstalledSub', { n: instances.length, parts: instances.reduce((s, i) => s + (i.installedComponents || []).length, 0) }) : x('secNone')) : null} first=${true}>
+      ${!ctx.data ? loadingRow() : instances.length ? html`
+        <div class="pk-pl">
+          <div class="pk-p pk-p--head"><div>${x('colPackage')}</div><div>${x('colBrought')}</div><div>${x('colFrom')}</div><div></div></div>
           ${instances.map((i) => instanceRow(ctx, i))}
         </div>
-        <${Text} kind="caption" tone="muted">${x('hintInstalled')}<//>
-      <//>` : html`<${Text}><strong>${x('emptyInstalled')}</strong> ${x('emptyInstalledSub')}<//>`}
+        <p class="pk-hint">${x('hintInstalled')}</p>` : html`<p class="pk-empty"><b>${x('emptyInstalled')}</b> ${x('emptyInstalledSub')}</p>`}
     <//>`;
 }
 
@@ -111,65 +115,65 @@ function secOffers(ctx, offers) {
   const shown = rows.slice(0, ctx.shown);
   const set = (patch) => ctx.setFilter(patch);
   const tog = (field, value) => set({ [field]: F[field] === value ? '' : value });
-  const filters = [
-    facet(!F.who && !F.cat, x('facetAll'), offers.length, () => set({ who: '', cat: '' }), 'all'),
-    facet(F.who === 'system', x('facetSystem'), offers.filter((o) => o.system).length, () => tog('who', 'system'), 'system'),
-    offers.some((o) => !o.system && !o.remote) ? facet(F.who === 'others', x('facetOthers'), offers.filter((o) => !o.system && !o.remote).length, () => tog('who', 'others'), 'others') : null,
-    offers.some((o) => o.remote) ? facet(F.who === 'remote', x('facetRemote'), offers.filter((o) => o.remote).length, () => tog('who', 'remote'), 'remote') : null,
-    ...cats.map((c) => facet(F.cat === c, categoryWord(c), offers.filter((o) => o.category === c).length, () => tog('cat', c), 'c:' + c)),
-  ].filter(Boolean);
   return html`
-    <${Section} id="pk-offers" title=${x('secOffers')} count=${ctx.data ? x('secOffersSub', { n: offers.length, system: offers.filter((o) => o.system).length }) : null}>
-      ${!ctx.data ? loadingRow() : !offers.length ? html`<${Text} tone="muted">${x('emptyOffers')}<//>` : html`<${Stack}>
-        <${Toolbar} filters=${filters} />
-        <${Stack} density="compact">
-          <${Field} type="search" value=${ctx.query || ''} placeholder=${x('search')} ariaLabel=${x('search')} onInput=${(e) => ctx.setQuery(e.target.value)} />
-          <${Text} kind="caption" tone="muted">${x('searchOrder')}<//>
-        <//>
-        ${!rows.length ? html`<${Text} tone="muted">${x('noMatch')}<//>` : html`
-          <div>
-            ${headRow(x('colPackage'), x('colDoes'), x('colInstall'))}
+    <${Section} id="pk-offers" num="02" title=${x('secOffers')} count=${ctx.data ? x('secOffersSub', { n: offers.length, system: offers.filter((o) => o.system).length }) : null}>
+      ${!ctx.data ? loadingRow() : !offers.length ? html`<p class="pk-empty">${x('emptyOffers')}</p>` : html`
+        <div class="pk-facets">
+          ${facet(!F.who && !F.cat, x('facetAll'), offers.length, () => set({ who: '', cat: '' }), 'all')}
+          ${facet(F.who === 'system', x('facetSystem'), offers.filter((o) => o.system).length, () => tog('who', 'system'), 'system')}
+          ${offers.some((o) => !o.system && !o.remote) ? facet(F.who === 'others', x('facetOthers'), offers.filter((o) => !o.system && !o.remote).length, () => tog('who', 'others'), 'others') : null}
+          ${offers.some((o) => o.remote) ? facet(F.who === 'remote', x('facetRemote'), offers.filter((o) => o.remote).length, () => tog('who', 'remote'), 'remote') : null}
+          ${cats.map((c) => facet(F.cat === c, categoryWord(c), offers.filter((o) => o.category === c).length, () => tog('cat', c), 'c:' + c))}
+        </div>
+        <div class="pk-search"><input class="og-input" type="search" value=${ctx.query || ''} placeholder=${x('search')} aria-label=${x('search')} onInput=${(e) => ctx.setQuery(e.target.value)} /><small>${x('searchOrder')}</small></div>
+        ${!rows.length ? html`<p class="pk-empty">${x('noMatch')}</p>` : html`
+          <div class="pk-pl">
+            <div class="pk-p pk-p--head"><div>${x('colPackage')}</div><div>${x('colDoes')}</div><div>${x('colInstall')}</div><div></div></div>
             ${shown.map((o) => offerRow(ctx, o))}
           </div>`}
-        <${Stack} direction="wrap" align="center">
-          ${shown.length < rows.length ? html`<${Action} onClick=${() => ctx.setShown(ctx.shown + PAGE)}>${x('showMore', { n: Math.min(PAGE, rows.length - shown.length) })}<//>` : null}
-          <${Text} kind="caption" tone="muted">${x('shownOf', { shown: shown.length, total: rows.length })}<//>
-          ${ctx.isOperator && offers.some((o) => o.remote) ? html`<${Action} disabled=${ctx.busy === 'sync'} onClick=${() => ctx.syncRemote()}>${ctx.busy === 'sync' ? x('syncing') : x('syncRemote')}<//>` : null}
-        <//>
-        <${Text} kind="caption" tone="muted">${x('hintOffers')}<//>
-      <//>`}
+        <div class="pk-more">
+          ${shown.length < rows.length ? html`<button type="button" class="og-door og-door--quiet" onClick=${() => ctx.setShown(ctx.shown + PAGE)}>${x('showMore', { n: Math.min(PAGE, rows.length - shown.length) })}</button>` : null}
+          <small>${x('shownOf', { shown: shown.length, total: rows.length })}</small>
+          ${ctx.isOperator && offers.some((o) => o.remote) ? html`<button type="button" class="og-door og-door--quiet" disabled=${ctx.busy === 'sync'} onClick=${() => ctx.syncRemote()}>${ctx.busy === 'sync' ? x('syncing') : x('syncRemote')}</button>` : null}
+        </div>
+        <p class="pk-hint">${x('hintOffers')}</p>`}
     <//>`;
 }
 
 function secOwn(ctx, own) {
   return html`
-    <${Section} id="pk-own" title=${x('secOwn')} count=${ctx.data ? (own.length ? x('secOwnSub', { n: own.length, pub: own.filter((p) => p.visibility === 'public').length }) : x('secNone')) : null}>
-      ${!ctx.data ? loadingRow() : own.length ? html`<${Stack}>
-        <div>
-          ${headRow(x('colPackage'), x('colDoes'), x('vis.k'))}
+    <${Section} id="pk-own" num="03" title=${x('secOwn')} count=${ctx.data ? (own.length ? x('secOwnSub', { n: own.length, pub: own.filter((p) => p.visibility === 'public').length }) : x('secNone')) : null}>
+      ${!ctx.data ? loadingRow() : own.length ? html`
+        <div class="pk-pl">
+          <div class="pk-p pk-p--head"><div>${x('colPackage')}</div><div>${x('colDoes')}</div><div>${x('vis.k')}</div><div></div></div>
           ${own.map((p) => ownRow(ctx, p))}
         </div>
-        <${Text} kind="caption" tone="muted">${x('hintOwn')}<//>
-      <//>` : html`<${Text} tone="muted">${x('emptyOwn')}<//>`}
+        <p class="pk-hint">${x('hintOwn')}</p>` : html`<p class="pk-empty">${x('emptyOwn')}</p>`}
     <//>`;
 }
 
 function secNew(ctx) {
-  const road = (title, body, children) => html`<${Stack}>
-    <${Text} kind="heading" size="small">${title}<//>
-    <${Text}>${body}<//>
-    ${children}
-  <//>`;
   return html`
-    <${Section} id="pk-new" title=${x('secNew')} description=${x('newIntro')}>
-      <${Stack}>
-        <${Surface} kind="box">${road(x('roadApps'), x('roadAppsBody'), ctx.compose.open ? composeForm(ctx) : html`
-          <${Stack} direction="wrap" align="center"><${Action} onClick=${() => ctx.openCompose()}>${x('pickApps')}<//><${Text} kind="caption" tone="muted">${x('roadAppsSub')}<//><//>`)}<//>
-        <${Columns} collapse="640" density="roomy">
-          ${road(x('roadAsk'), x('roadAskBody'), html`<${Stack} direction="wrap" align="center"><${Action} disabled=${ctx.busy === 'prompt'} onClick=${() => ctx.copyPrompt()}>${x('copyRequest')}<//><${Text} kind="caption" tone="muted">${x('roadAskSub')}<//><//>`)}
-          ${road(x('roadZip'), x('roadZipBody'), html`<div><${Action} disabled=${ctx.busy === 'import'} onClick=${() => ctx.pickZip()}>${ctx.busy === 'import' ? x('importing') : x('pickFile')}<//></div>`)}
-        <//>
-      <//>
+    <${Section} id="pk-new" num="04" title=${x('secNew')} count=${null}>
+      <p class="pk-para">${x('newIntro')}</p>
+      <div class="pk-roads">
+        <div class="pk-road pk-road--lead">
+          <span class="pk-road-t">${x('roadApps')}</span>
+          <p class="pk-para">${x('roadAppsBody')}</p>
+          ${ctx.compose.open ? composeForm(ctx) : html`
+            <div class="og-doors"><button type="button" class="og-door" onClick=${() => ctx.openCompose()}>${x('pickApps')}</button><span class="pk-hint">${x('roadAppsSub')}</span></div>`}
+        </div>
+        <div class="pk-road">
+          <span class="pk-road-t">${x('roadAsk')}</span>
+          <p class="pk-para">${x('roadAskBody')}</p>
+          <div class="og-doors"><button type="button" class="og-door" disabled=${ctx.busy === 'prompt'} onClick=${() => ctx.copyPrompt()}>${x('copyRequest')}</button><span class="pk-hint">${x('roadAskSub')}</span></div>
+        </div>
+        <div class="pk-road">
+          <span class="pk-road-t">${x('roadZip')}</span>
+          <p class="pk-para">${x('roadZipBody')}</p>
+          <div class="og-doors"><button type="button" class="og-door" disabled=${ctx.busy === 'import'} onClick=${() => ctx.pickZip()}>${ctx.busy === 'import' ? x('importing') : x('pickFile')}</button></div>
+        </div>
+      </div>
     <//>`;
 }
 
@@ -199,44 +203,45 @@ function composeForm(ctx) {
   };
 
   return html`
-    <${Stack}>
-      <${Field} label=${x('composeNameK')} value=${ctx.compose.name} placeholder=${x('composeNamePlaceholder')}
-        onInput=${(e) => ctx.setComposeName(e.target.value)} />
-      ${apps === null ? html`<${Text} kind="caption" tone="muted">${x('loadingApps')}<//>`
-      : apps.length === 0 ? html`<${Text} tone="muted">${x('noAppsYet')}<//>` : html`
-        <${Columns} collapse="640" density="compact">
+    <div class="pk-compose">
+      <label class="pk-compose-name">
+        <span class="og-label">${x('composeNameK')}</span>
+        <input type="text" value=${ctx.compose.name} placeholder=${x('composeNamePlaceholder')}
+          onInput=${(e) => ctx.setComposeName(e.target.value)} />
+      </label>
+      ${apps === null ? html`<p class="pk-hint">${x('loadingApps')}</p>`
+      : apps.length === 0 ? html`<p class="pk-empty">${x('noAppsYet')}</p>` : html`
+        <div class="pk-compose-list">
           ${apps.map((a) => html`
-            <${Action} key=${a.filename} kind="choice" semantics="switch" title=${a.manifest?.name || a.name || a.filename}
-              selected=${picked.includes(a.filename)} onClick=${() => ctx.togglePick(a.filename)}>
-              ${a.filename} · ${needsOf(a)}
-            <//>`)}
-        <//>`}
-      <${Text} kind="caption" tone="muted">${x('composeCarries')}<//>
-      <${Stack} direction="wrap" align="center">
-        <${Action} disabled=${!ready || ctx.busy === 'compose'} onClick=${() => ctx.doCompose()}>
+            <label class="pk-compose-app" key=${a.filename}>
+              <input type="checkbox" checked=${picked.includes(a.filename)} onChange=${() => ctx.togglePick(a.filename)} />
+              <span class="pk-compose-app-nm">${a.manifest?.name || a.name || a.filename}<small>${a.filename}</small></span>
+              <small class="pk-compose-app-needs">${needsOf(a)}</small>
+            </label>`)}
+        </div>`}
+      <p class="pk-hint">${x('composeCarries')}</p>
+      <div class="og-doors">
+        <button type="button" class="og-door" disabled=${!ready || ctx.busy === 'compose'} onClick=${() => ctx.doCompose()}>
           ${ctx.busy === 'compose' ? x('composing') : x('composeN', { n: picked.length })}
-        <//>
-        <${Action} onClick=${() => ctx.closeCompose()}>${x('cancel')}<//>
-      <//>
-    <//>`;
+        </button>
+        <button type="button" class="og-door og-door--quiet" onClick=${() => ctx.closeCompose()}>${x('cancel')}</button>
+      </div>
+    </div>`;
 }
 
 function secAgent(ctx) {
   return html`
-    <${Section} id="pk-ai" title=${x('secAi')} description=${x('aiIntro')}>
-      <${Stack}>
-        <${Surface} kind="box">
-          <${Stack}>
-            <${Text} kind="label">${x('ruleLabel')}<//>
-            <${Text}>${x('ruleBody')}<//>
-            <div><${CopyAction} text=${agentRule(ctx.nodeUrl)} label=${x('copyRule')} copiedLabel=${x('copied')} /></div>
-          <//>
-        <//>
-        <div>
-          <${KeyValue} label=${x('aiInstallK')}><${Stack} density="compact"><span>${x('aiInstallBody')}</span><${Text} kind="caption" tone="muted">${x('aiInstallSub')}<//><//><//>
-          <${KeyValue} label=${x('aiUpdateK')} value=${x('aiUpdateBody')} />
-          <${KeyValue} label=${x('aiPublishK')} value=${x('aiPublishBody')} />
-        </div>
-      <//>
+    <${Section} id="pk-ai" num="05" title=${x('secAi')} count=${null}>
+      <p class="pk-para">${x('aiIntro')}</p>
+      <div class="pk-rule poster-frame">
+        <span class="og-label">${x('ruleLabel')}</span>
+        <p class="pk-para">${x('ruleBody')}</p>
+        <div class="og-doors"><${CopyButton} text=${agentRule(ctx.nodeUrl)} className="og-door" label=${x('copyRule')} copiedLabel=${x('copied')} /></div>
+      </div>
+      <div class="pk-kv pk-kv--wide">
+        <div class="pk-k">${x('aiInstallK')}</div><div class="pk-v">${x('aiInstallBody')}<small>${x('aiInstallSub')}</small></div>
+        <div class="pk-k">${x('aiUpdateK')}</div><div class="pk-v">${x('aiUpdateBody')}</div>
+        <div class="pk-k">${x('aiPublishK')}</div><div class="pk-v">${x('aiPublishBody')}</div>
+      </div>
     <//>`;
 }

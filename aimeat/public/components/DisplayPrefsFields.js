@@ -26,14 +26,12 @@
  *   import { DisplayPrefsFields } from '/components/DisplayPrefsFields.js';
  *   html`<${DisplayPrefsFields} region=${r} timezone=${z} onChange=${(k, v) => set(k, v)} />`
  * @version-history
- *   2026-09-13: Compose account preferences from shared fields and key/value parts.
  *   v1.0.0 — 2026-09-12 — Initial, with the profile's region and timezone fields.
  */
 import { h } from 'preact';
 import { useMemo, useState } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
-import { Field, KeyValue, Stack } from '/components/poster-parts.js';
 import { t } from '/js/i18n.js';
 import { swallowed } from '/js/swallowed.js';
 
@@ -159,20 +157,35 @@ export function DisplayPrefsFields({ region, timezone, onChange }) {
     return timezone && !found.includes(timezone) ? [timezone, ...found] : found;
   }, [zones, zoneQuery, timezone]);
 
-  return html`<${Stack}>
-    <${Field} type="select" label=${tr('profile.prefs.region', 'How your dates and numbers are written')}
-      value=${region || ''} onChange=${e => onChange('region', e.target.value)}
-      options=${[{ value: '', label: tr('profile.prefs.followBrowser', 'Follow my browser ({what})', { what: browserRegion }) },
-        ...REGIONS.map(([tag, name]) => ({ value: tag, label: name+' ('+tag+')' }))]}
-      hint=${tr('profile.prefs.regionHint', 'Separate from the language above. The language decides which words you read; this decides whether a date is 9/12/2026 or 12.9.2026.')} />
-    <${Field} type="search" label=${tr('profile.prefs.zoneSearch', 'Search for a city: Helsinki, Madrid, Tokyo…')}
-      value=${zoneQuery} onInput=${e => setZoneQuery(e.target.value)} />
-    <${Field} type="select" label=${tr('profile.prefs.timezone', 'Your time zone')}
-      value=${timezone || ''} onChange=${e => onChange('timezone', e.target.value)}
-      options=${[{ value: '', label: tr('profile.prefs.followBrowserZone', 'Follow my browser ({what})',
-        { what: cityOf(browserZone)+' '+offsetOf(browserZone) }) },
-        ...matches.map(z => ({ value: z, label: cityOf(z)+' — '+z+' ('+offsetOf(z)+')' }))]}
-      hint=${tr('profile.prefs.timezoneHint', 'Times are shown in this clock everywhere, including in email this site sends you, where your browser cannot be asked.')} />
-    <${KeyValue} label=${tr('profile.prefs.sample', 'Right now, that reads')} value=${sample(region, timezone)} />
-  <//>`;
+  return html`
+    <label class="pf-edit-label">
+      ${tr('profile.prefs.region', 'How your dates and numbers are written')}
+      <select class="pf-edit-select" value=${region || ''}
+        onChange=${(e) => onChange('region', e.target.value)}>
+        <option value="">${tr('profile.prefs.followBrowser', 'Follow my browser ({what})', { what: browserRegion })}</option>
+        ${REGIONS.map(([tag, name]) => html`<option key=${tag} value=${tag}>${name} (${tag})</option>`)}
+      </select>
+      <div class="pf-edit-hint">${tr('profile.prefs.regionHint',
+    'Separate from the language above. The language decides which words you read; this decides whether a date is 9/12/2026 or 12.9.2026.')}</div>
+    </label>
+
+    <label class="pf-edit-label">
+      ${tr('profile.prefs.timezone', 'Your time zone')}
+      <input type="search" class="pf-edit-input" value=${zoneQuery}
+        placeholder=${tr('profile.prefs.zoneSearch', 'Search for a city: Helsinki, Madrid, Tokyo…')}
+        onInput=${(e) => setZoneQuery(e.target.value)} />
+      <select class="pf-edit-select" value=${timezone || ''} size="1"
+        onChange=${(e) => onChange('timezone', e.target.value)}>
+        <option value="">${tr('profile.prefs.followBrowserZone', 'Follow my browser ({what})',
+    { what: `${cityOf(browserZone)} ${offsetOf(browserZone)}` })}</option>
+        ${matches.map(z => html`<option key=${z} value=${z}>${cityOf(z)} — ${z} (${offsetOf(z)})</option>`)}
+      </select>
+      <div class="pf-edit-hint">${tr('profile.prefs.timezoneHint',
+    'Times are shown in this clock everywhere, including in email this site sends you, where your browser cannot be asked.')}</div>
+    </label>
+
+    <div class="pf-edit-label">
+      ${tr('profile.prefs.sample', 'Right now, that reads')}
+      <div class="pf-edit-readonly">${sample(region, timezone)}</div>
+    </div>`;
 }

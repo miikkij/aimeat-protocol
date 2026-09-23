@@ -15,16 +15,14 @@
  *
  *   Choosing is stored on the ACCOUNT, so it follows to another device, and it changes the page
  *   you are on not at all. The chat is offered only where this node has one.
- * @structure StartPageSetting()
+ * @structure StartPageSetting({ className })
  * @usage
  *   import { StartPageSetting } from '/components/StartPageSetting.js';
  *   html`<${StartPageSetting} />`
  * @version-history
- *   2026-09-13: Shared fields and choices own the start-page selector.
  *   v1.0.0 — 2026-08-27 — Initial, in place of HomeUiSwitch.js.
  */
 import { h } from 'preact';
-import { Stack, Text, Action } from '/components/poster-parts.js';
 import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
@@ -40,7 +38,7 @@ const OPTIONS = [
   { id: 'profile', key: 'home.startPage.controls', fallback: 'Settings & controls' },
 ];
 
-export function StartPageSetting() {
+export function StartPageSetting({ className = '' }) {
   const [ui, setUi] = useState(null);           // 'home' | 'chat' | 'profile'
   const [chatHere, setChatHere] = useState(true); // whether this node has a chat to land in
   const [busy, setBusy] = useState(false);
@@ -74,11 +72,21 @@ export function StartPageSetting() {
   if (!ui) return null;
 
   const options = OPTIONS.filter(o => o.id !== 'chat' || chatHere || ui === 'chat');
-  return html`<${Stack}>
-    <${Text} kind="label">${tr('home.startPage.title','Start page')}<//>
-    <${Text} tone="muted">${tr('home.startPage.hint','Where you land when you sign in or arrive at the front page.')}<//>
-    <${Stack} direction="wrap" role="radiogroup" label=${tr('home.startPage.title','Start page')}>
-      ${options.map(o=>html`<${Action} key=${o.id} kind="tab" semantics="radio" selected=${ui===o.id} disabled=${busy} onClick=${()=>choose(o.id)}>
-        ${tr(o.key,o.fallback)}<//>`)}
-    <//><//>`;
+  return html`
+    <div class="start-page ${className}">
+      <div class="start-page-words">
+        <span class="start-page-title">${tr('home.startPage.title', 'Start page')}</span>
+        <span class="start-page-hint">
+          ${tr('home.startPage.hint', 'Where you land when you sign in or arrive at the front page.')}
+        </span>
+      </div>
+      <div class="seg start-page-seg" role="radiogroup" aria-label=${tr('home.startPage.title', 'Start page')}>
+        ${options.map(o => html`
+          <button type="button" key=${o.id} role="radio" aria-checked=${ui === o.id}
+            class="seg-btn ${ui === o.id ? 'active' : ''}" disabled=${busy}
+            onClick=${() => choose(o.id)}>
+            ${tr(o.key, o.fallback)}
+          </button>`)}
+      </div>
+    </div>`;
 }

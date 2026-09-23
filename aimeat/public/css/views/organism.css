@@ -11,7 +11,6 @@
  *   views/profile/organisms/home.js and read by home-settings.js. The inner panels (workspace list,
  *   roster, agents, board, map, timeline) keep their own pj- rules; a few are quieted here.
  * @version-history
- *   2026-09-22 -- Rules no markup uses any more are removed: every signed-in page is composed from the shared set (css/parts.css), so the page copies here stopped matching anything.
  *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   2026-09-13 -- Compose shared aside cuts; normalize one-off geometry under brief 10.7.
  *   v1.6.0 -- 2026-09-13 -- Compose the workspace document index rule from poster.css.
@@ -47,9 +46,11 @@
 .og-door { background: none; border: 0; border-bottom: 2px solid var(--text); padding: 0 0 1px; cursor: pointer; font-family: var(--font-showroom-body); font-weight: 800; font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; color: var(--text); text-decoration: none; }
 .og-door:hover { color: var(--accent); border-bottom-color: var(--accent); }
 .og-door--quiet { text-transform: none; letter-spacing: 0; font-size: .88rem; }
+.og-door--danger { color: var(--accent); border-bottom-color: var(--accent); }
 .og-slab { display: inline-block; background: var(--text); color: var(--bg); border: 0; cursor: pointer; box-shadow: 4px 4px 0 var(--sun); padding: .7rem 1rem; font-family: var(--font-showroom-body); font-weight: var(--font-poster-strong-weight); font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; transition: transform 120ms ease, box-shadow 120ms ease; }
 .og-slab:hover { transform: translate(2px, 2px); box-shadow: 2px 2px 0 var(--sun); }
 .og-slab:disabled { opacity: .5; cursor: default; transform: none; box-shadow: 4px 4px 0 var(--sun); }
+.og-slab--danger { background: var(--accent); color: #FFFFFF; box-shadow: 4px 4px 0 var(--text); }
 
 /* ── The strip of figures ──────────────────────────────────────────────────────────────────── */
 .og-strip { display: flex; margin-top: 1.5rem; border-top: 3px solid var(--text); border-bottom: 3px solid var(--text); }
@@ -72,6 +73,26 @@
 .pf .og .og-sec h2 small { font-family: var(--font-mono); font-size: .8rem; letter-spacing: 0; text-transform: none; color: var(--accent); margin-left: .6rem; }
 /* The shell prints "Organisms /" above every tab; the organism's own crumb carries that word, so
    the shell's line goes while an organism is open. */
+.pf-content:has(.og) .pf-content-head { display: none; }
+.og-hint { margin: .6rem 0 0; font-size: .85rem; line-height: 1.5; font-weight: 600; color: var(--text-dim); }
+.og-lead { margin: 0 0 .9rem; font-size: .95rem; line-height: 1.6; }
+.og-folds { display: flex; flex-direction: column; }
+.og-fold { display: flex; align-items: center; gap: 1rem; padding: .8rem 0; border-bottom: 1px solid var(--border); font-size: 1rem; font-weight: 600; line-height: 1.3; color: var(--text); }
+.og-folds .og-fold:last-child { border-bottom: 0; }
+.og-fold i { font-family: var(--font-mono); font-size: .78rem; font-style: normal; color: var(--accent); flex: 0 0 4.2rem; }
+.og-fold-r { margin-left: auto; font-family: var(--font-mono); font-size: .75rem; font-weight: 500; color: var(--text-dim); white-space: nowrap; }
+.og-fold-arrow { font-family: var(--font-poster); font-size: 1.1rem; color: var(--text); margin-left: .6rem; }
+.og-fold--toggle { width: 100%; background: none; border: 0; border-bottom: 0; padding: 0; cursor: pointer; text-align: left; font-family: inherit; font-size: 1.05rem; }
+.og-fold--toggle i { flex-basis: 2rem; }
+.og-fold--toggle:hover span:first-of-type { color: var(--accent); }
+.og-fold-sec.is-open .og-fold--toggle { margin-bottom: .9rem; }
+.og-fold-body { display: flex; flex-direction: column; gap: .8rem; }
+.og-box + .og-box { margin-top: .9rem; }
+.og-box-label { display: block; margin-bottom: .3rem; font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: .75rem; letter-spacing: .05em; text-transform: uppercase; color: var(--accent); }
+.og-box-row { display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; }
+.og-box-row > button { flex: none; }
+.og-box-confirm { display: flex; align-items: flex-end; gap: 1rem; margin-top: .9rem; }
+.og-box-confirm .og-field { flex: 1 1 auto; }
 .og-rail { position: sticky; top: 1rem; max-height: calc(100vh - 6rem); overflow-y: auto; display: flex; flex-direction: column; gap: .4rem; padding: 1rem 1.1rem; background: var(--text); color: var(--bg); border: 3px solid var(--text); box-shadow: 8px 8px 0 var(--sun); }
 .og-rail-label { font-family: var(--font-poster); font-weight: var(--font-poster-weight); text-transform: uppercase; font-size: .75rem; letter-spacing: .06em; color: var(--sun); margin-bottom: .25rem; }
 .og-rail-link { display: flex; align-items: baseline; gap: .6rem; width: 100%; background: none; border: 0; padding: 0; cursor: pointer; text-align: left; font-family: var(--font-showroom-body); font-size: .8rem; font-weight: 800; line-height: 1.4; color: var(--bg); text-decoration: none; opacity: .65; }
@@ -81,29 +102,104 @@
 .og-rail hr { border: 0; border-top: 1px solid color-mix(in srgb, var(--bg) 25%, transparent); margin: .3rem 0; width: 100%; }
 
 /* ── The settings page ─────────────────────────────────────────────────────────────────────── */
+.og-fields { display: flex; flex-direction: column; gap: 1.1rem; }
+.og-fields--2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.6rem; }
+.og-field { display: flex; flex-direction: column; gap: .4rem; }
+.og-label { font-size: .68rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+.og-input { width: 100%; box-sizing: border-box; background: transparent; border: 0; border-bottom: 3px solid var(--text); padding: .45rem 0; font-family: var(--font-showroom-body); font-size: 1rem; font-weight: 600; color: var(--text); outline: none; }
+.og-input:focus { border-bottom-color: var(--accent); }
+.og-textarea { width: 100%; box-sizing: border-box; background: var(--card-bg); border: 2px solid var(--text); padding: .6rem .75rem; font-family: var(--font-showroom-body); font-size: .95rem; line-height: 1.5; color: var(--text); outline: none; resize: vertical; }
+.og-textarea:focus { border-color: var(--accent); }
 .og-choice { display: inline-flex; flex-wrap: wrap; border: 2px solid var(--text); }
 .og-choice-btn { background: transparent; border: 0; border-right: 2px solid var(--text); padding: .45rem .8rem; cursor: pointer; font-family: var(--font-showroom-body); font-size: .8rem; font-weight: 700; color: var(--text-dim); }
 .og-choice-btn:last-child { border-right: 0; }
 .og-choice-btn:hover { color: var(--text); }
 .og-choice-btn.on { background: var(--sun); color: var(--on-sun); }
+.og-actions { display: flex; align-items: center; gap: 1.4rem; flex-wrap: wrap; }
+.og-actions .og-hint { margin: 0; }
 
+/* The inner panels keep their shapes but lose the parts the section already carries. */
+.og .pj-ws-bar { margin-bottom: .6rem; }
+.og .pj-struct-toggle, .og .pj-timeline > .pj-struct-toggle { font-weight: 800; }
+
+/* ── The workspace cover: the tables of spaces ─────────────────────────────────────────────── */
+.og-tbl { display: grid; grid-template-columns: 2.6rem minmax(0, 1fr) auto minmax(0, 18rem) auto; gap: 0 1.1rem; align-items: center; }
+.og-tbl > div { padding: .55rem 0; border-bottom: 1px solid var(--border); min-width: 0; }
+.og-tbl--head > div { padding: 0 0 .35rem; border-bottom: 0; font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+.og-tbl-n { text-align: right; margin-right: 0; }
+.og-tbl-nm { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
 /* The visibility chips sit at the far end of the name cell, so they stand in one line down the
    table against the size column instead of trailing each name wherever it happens to end. */
+.og-tbl-marks { margin-left: auto; flex: none; display: flex; align-items: center; gap: .4rem; }
 .og-tbl-name { background: none; border: 0; padding: 0; cursor: pointer; font-family: inherit; font-size: .97rem; font-weight: 800; color: var(--text); text-align: left; }
 .og-tbl-name:hover { color: var(--accent); }
+.og-tbl-last { font-family: var(--font-mono); font-size: .75rem; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.og-tbl-go { background: none; border: 0; padding: 0; cursor: pointer; font: inherit; color: var(--text-dim); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.og-tbl-go:hover { color: var(--accent); }
+.og-tbl-dot { color: var(--border); }
 .og-tbl-door { text-align: right; }
 .og-tbl-door .og-door { font-size: .72rem; }
+.og-chip--xs { font-size: .6rem; padding: 0 5px; }
+.og-hint--label { margin-top: 1.1rem; font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: .8rem; letter-spacing: .05em; text-transform: uppercase; color: var(--text); }
+.og-hint--label small { font-family: var(--font-mono); font-size: .75rem; color: var(--accent); margin-left: .4rem; }
+.og-fold-name { font-weight: 700; min-width: 0; }
+.og-fold-door { font-size: .72rem; flex: none; }
+.og-fold--event { width: 100%; background: none; border-left: 0; border-right: 0; border-top: 0; cursor: pointer; text-align: left; font-family: inherit; font-size: .95rem; }
+.og-fold--event:hover b { color: var(--accent); }
+.og-fold--event b { font-weight: 800; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.og-fold-who { color: var(--text-dim); font-weight: 600; white-space: nowrap; }
+.og-search { display: flex; align-items: center; gap: 1.2rem; margin-top: 1.2rem; }
+.og-search > :first-child { flex: 1 1 auto; }
+.og-apps { margin-top: 1.2rem; }
+
+/* ── The tree, when the rail is asked to show the whole structure ─────────────────────────── */
+.og-tree { position: sticky; top: 1rem; max-height: calc(100vh - 6rem); overflow-y: auto; display: flex; flex-direction: column; gap: .2rem; padding: .2rem 0 0; }
+.og-tree-group { display: flex; flex-direction: column; margin-bottom: .8rem; }
+.og-tree-label { display: flex; align-items: baseline; gap: .6rem; padding: .6rem 0 .35rem; font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: .78rem; letter-spacing: .05em; text-transform: uppercase; color: var(--text); }
+.og-tree-label em { margin-left: auto; font-family: var(--font-mono); font-size: .7rem; font-style: normal; color: var(--text-dim); }
+.og-tree-space { display: flex; flex-direction: column; }
+.og-tree-link { display: flex; align-items: baseline; gap: .6rem; width: 100%; background: none; border: 0; border-bottom: 1px solid var(--border); padding: .35rem 0; cursor: pointer; text-align: left; font-family: inherit; font-size: .82rem; font-weight: 700; color: var(--text); }
+.og-tree-link.on { background: var(--sun); color: var(--on-sun); margin: 0 -.4rem; padding: .35rem .4rem; }
+.og-tree-link:hover span { color: var(--accent); }
+.og-tree-link em { margin-left: auto; font-family: var(--font-mono); font-size: .7rem; font-style: normal; color: var(--text-dim); white-space: nowrap; }
+.og-tree-link em b { color: var(--accent); }
+.og-tree-doc { display: flex; align-items: center; gap: .4rem; width: 100%; background: none; border: 0; border-left: 3px solid transparent; padding: .3rem .4rem .3rem .7rem; cursor: pointer; text-align: left; font-family: inherit; font-size: .78rem; font-weight: 600; line-height: 1.3; color: var(--text-dim); }
+.og-tree-doc:hover { color: var(--text); }
+.og-tree-doc.on { background: var(--sun); border-left-color: var(--text); color: var(--on-sun); font-weight: 800; }
+.og-tree-more { font-weight: 400; }
+.og-tree hr { border: 0; border-top: 1px solid var(--border); margin: .2rem 0; width: 100%; }
+.og-tree .og-rail-toggle { color: var(--text); opacity: 1; padding: .4rem 0; }
+.og-tree .og-rail-toggle i { color: var(--accent); }
 
 /* ── A page of the workspace: a space, a panel, the settings ───────────────────────────────── */
 .og-mast--page { align-items: flex-end; }
 .og-mast--page .og-mast-actions { padding-top: 0; }
+.og-desc--page { margin-top: .6rem; }
+.og-page .og-main { padding-top: .9rem; }
+/* The space panels carry their own head (title + buttons); the page head already says both. */
+.og-page .pj-section > .pj-section-head { display: none; }
+.og-page .pj-section > .section-desc:first-of-type { display: none; }
 /* The document index and the document lose the card: paper, an ink rule, the sun on the open one. */
+.og-page .pj-doc-index { flex: 0 0 250px; border-radius: 0; background: transparent; padding: .4rem 0 0; max-height: none; }
+.og-page .pj-doc-item { border-radius: 0; border-left: 3px solid transparent; padding: .3rem .4rem .3rem .6rem; }
+.og-page .pj-doc-item.active { background: var(--sun); border-left-color: var(--text); }
+.og-page .pj-doc-item.active .pj-doc-link { color: var(--on-sun); font-weight: 800; }
+.og-page .pj-doc-item .pj-doc-link { font-size: .88rem; font-weight: 600; }
+.og-page .pj-sec-name-text { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: .8rem; letter-spacing: .05em; text-transform: uppercase; }
+.og-page .pj-docspace { gap: 2.75rem; }
+.og-page .pj-doc-view { border: 0; border-radius: 0; box-shadow: none; background: transparent; padding: 0; margin: 0; }
+.og-page .pj-rec { border-radius: 0; border: 0; border-bottom: 1px solid var(--border); box-shadow: none; background: transparent; }
 
 @media (max-width: 1100px) {
   .og-grid { grid-template-columns: 1fr; }
   .og-rail { position: static; box-shadow: 6px 6px 0 var(--sun); }
+  .og-tree { position: static; }
+  .og-tbl { grid-template-columns: 2.6rem minmax(0, 1fr) auto; }
+  .og-tbl-last { display: none; }
+  .og-tbl--head { display: none; }
   .og-mast { flex-direction: column; }
   .og-mast-actions { align-items: flex-start; }
   .og-strip { flex-wrap: wrap; }
   .og-strip > div { flex-basis: 50%; border-right: 0; }
+  .og-fields--2 { grid-template-columns: 1fr; }
 }

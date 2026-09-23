@@ -16,9 +16,6 @@
  * @structure PromptEditor
  * @usage html`<${PromptEditor} prompt=${p} versions=${v} onSave=${fn} ... />`
  * @version-history
- *   v1.1.0 -- 2026-09-22 -- Composed from the shared component set: the open prompt in a shared box,
- *     its facts as key-value rows, the texts as shared fields, the versions as list rows; no sheet
- *     of its own.
  *   v1.0.0 — 2026-09-12 — Initial, with the page in the poster face.
  */
 import { h } from 'preact';
@@ -26,7 +23,6 @@ import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { dt, num, Spinner } from './shared.js';
 import { promptChips } from './prompts-tab.list.js';
-import { Stack, Text, Action, ListRow, KeyValue, Field, Surface } from '/components/poster-parts.js';
 
 const html = htm.bind(h);
 const P = (key, params) => t('admin.prompts.' + key, params);
@@ -46,68 +42,79 @@ export function PromptEditor({
   prompt, draft, versions, saving, loading,
   onDraft, onLocale, onSave, onTakeCurrent, onToggleActive, onVersions, onRestore,
 }) {
-  if (loading) return html`<${Surface} kind="box"><${Spinner} text=${t('dashboard.loading')} /><//>`;
-  if (!prompt) return html`<${Surface} kind="box" density="roomy"><${Text} tone="muted">${P('pickOne')}<//><//>`;
+  if (loading) return html`<div class="adm-pr-editor"><${Spinner} text=${t('dashboard.loading')} /></div>`;
+  if (!prompt) return html`<div class="adm-pr-editor"><p class="adm-pr-empty">${P('pickOne')}</p></div>`;
 
   const orphan = prompt.source_kind === 'orphan';
-  const chips = promptChips(prompt);
 
   return html`
-    <${Surface} kind="box">
-      <${Stack}>
-        <${Stack} density="compact">
-          <${Text} kind="heading" size="small">${prompt.name}<//>
-          <${Text} tone="muted">${prompt.description}<//>
-          <${Stack} direction="wrap" align="between">
-            <${Stack} direction="wrap" density="compact">${chips}<//>
-            <${Stack} direction="wrap" align="center">
-              ${!orphan && html`
-                <${Action} disabled=${saving} onClick=${onTakeCurrent}>${P('takeOne')}<//>`}
-              <${Action} disabled=${saving} onClick=${onToggleActive}>${prompt.active ? P('switchOff') : P('switchOn')}<//>
-              <${Action} onClick=${onVersions}>${P('versions')}<//>
-            <//>
-          <//>
-        <//>
-
-        <div>
-          <${KeyValue} label=${P('fact.handedAt')} value=${html`<${Text} kind="mono">${(prompt.usedIn || []).join(' · ') || prompt.id}<//>`} />
-          <${KeyValue} label=${P('fact.filledWith')} value=${html`<${Text} kind="mono">${(prompt.variables || []).join(' · ') || P('fact.noVariables')}<//>`} />
-          <${KeyValue} label=${P('fact.onUpdate')} value=${updateLine(prompt.source_kind)} />
-          <${KeyValue} label=${P('fact.lastChange')} value=${P('fact.lastChangeValue', { when: dt(prompt.updatedAt), who: prompt.updatedBy || '-', v: num(prompt.version) })} />
+    <div class="adm-pr-editor">
+      <div class="adm-pr-head">
+        <span class="adm-pr-title">${prompt.name}</span>
+        <span class="adm-pr-desc">${prompt.description}</span>
+        <div class="adm-pr-headrow">
+          <span class="adm-pr-chips">${promptChips(prompt)}</span>
+          <span class="og-doors">
+            ${!orphan && html`
+              <button type="button" class="og-door og-door--quiet" disabled=${saving}
+                onClick=${onTakeCurrent}>${P('takeOne')}</button>`}
+            <button type="button" class="og-door og-door--quiet" disabled=${saving}
+              onClick=${onToggleActive}>${prompt.active ? P('switchOff') : P('switchOn')}</button>
+            <button type="button" class="og-door og-door--quiet" onClick=${onVersions}>${P('versions')}</button>
+          </span>
         </div>
+      </div>
 
-        <${Stack} density="compact">
-          <${Field} type="textarea" id="adm-pr-en" rows=${16} label=${P('textLabel')} value=${draft.content} spellCheck=${false}
-            onInput=${(e) => onDraft('content', e.target.value)} />
-          <${Text} kind="caption" tone="muted">${P('textHint')}<//>
-        <//>
+      <div class="adm-pr-facts">
+        <span class="k">${P('fact.handedAt')}</span>
+        <span class="adm-pr-mono">${(prompt.usedIn || []).join(' · ') || prompt.id}</span>
+        <span class="k">${P('fact.filledWith')}</span>
+        <span class="adm-pr-mono">${(prompt.variables || []).join(' · ') || P('fact.noVariables')}</span>
+        <span class="k">${P('fact.onUpdate')}</span>
+        <span>${updateLine(prompt.source_kind)}</span>
+        <span class="k">${P('fact.lastChange')}</span>
+        <span>${P('fact.lastChangeValue', { when: dt(prompt.updatedAt), who: prompt.updatedBy || '-', v: num(prompt.version) })}</span>
+      </div>
+
+      <div class="adm-pr-body">
+        <label class="adm-pr-label" for="adm-pr-en">${P('textLabel')}</label>
+        <textarea id="adm-pr-en" class="adm-pr-text" rows="16" value=${draft.content}
+          onInput=${(e) => onDraft('content', e.target.value)}></textarea>
+        <p class="adm-pr-hint">${P('textHint')}</p>
 
         ${LANGUAGES.map(l => html`
-          <${Field} key=${l.tag} type="textarea" id=${'adm-pr-' + l.tag} rows=${6}
-            label=${P('langLabel', { language: P(l.key) })}
-            placeholder=${P('langPh', { language: P(l.key) })}
-            value=${(draft.locales && draft.locales[l.tag]) || ''}
-            onInput=${(e) => onLocale(l.tag, e.target.value)} />`)}
-        <${Text} kind="caption" tone="muted">${P('langHint')}<//>
+          <div class="adm-pr-lang" key=${l.tag}>
+            <label class="adm-pr-label" for=${'adm-pr-' + l.tag}>${P('langLabel', { language: P(l.key) })}</label>
+            <textarea id=${'adm-pr-' + l.tag} class="adm-pr-text" rows="6"
+              placeholder=${P('langPh', { language: P(l.key) })}
+              value=${(draft.locales && draft.locales[l.tag]) || ''}
+              onInput=${(e) => onLocale(l.tag, e.target.value)}></textarea>
+          </div>`)}
+        <p class="adm-pr-hint">${P('langHint')}</p>
 
-        <${Stack} direction="wrap" align="end">
-          <${Action} kind="primary" disabled=${saving} onClick=${onSave}>
+        <div class="adm-pr-foot">
+          <button type="button" class="adm-btn" disabled=${saving} onClick=${onSave}>
             ${saving ? P('saving') : P('save')}
-          <//>
-          <${Field} value=${draft.changeNote || ''} placeholder=${P('notePh')} ariaLabel=${P('notePh')}
-            onInput=${(e) => onDraft('changeNote', e.target.value)} />
-        <//>
+          </button>
+          <label class="adm-pr-notefield">
+            <input type="text" value=${draft.changeNote || ''} placeholder=${P('notePh')}
+              onInput=${(e) => onDraft('changeNote', e.target.value)} />
+          </label>
+        </div>
 
         ${versions !== null && html`
-          <${Stack} density="compact">
-            <${Text} kind="caption" tone="muted">${P('versionsLead')}<//>
+          <div class="adm-pr-versions">
+            <p class="adm-pr-note">${P('versionsLead')}</p>
             ${versions.length === 0
-              ? html`<${Text} kind="caption" tone="muted">${P('versionsNone')}<//>`
-              : html`<div>${versions.map(v => html`<${ListRow} key=${v.version} density="compact"
-                  name=${`v${num(v.version)}`} detail=${v.changeNote || null} detailKind="text"
-                  value=${`${dt(v.changedAt)} · ${v.changedBy}`}
-                  actions=${html`<${Action} kind="text" disabled=${saving} onClick=${() => onRestore(v.version)}>${P('restore')}<//>`} />`)}</div>`}
-          <//>`}
-      <//>
-    <//>`;
+              ? html`<p class="adm-pr-note">${P('versionsNone')}</p>`
+              : versions.map(v => html`
+                <div class="adm-pr-vrow" key=${v.version}>
+                  <span><b>v${num(v.version)}</b> ${v.changeNote ? html`<span class="adm-pr-note">${v.changeNote}</span>` : ''}</span>
+                  <span class="adm-pr-vwhen">${dt(v.changedAt)} · ${v.changedBy}</span>
+                  <button type="button" class="og-door og-door--quiet" disabled=${saving}
+                    onClick=${() => onRestore(v.version)}>${P('restore')}</button>
+                </div>`)}
+          </div>`}
+      </div>
+    </div>`;
 }

@@ -10,8 +10,6 @@
  *   agentRequest · installLine · crumb · pageLinks · openTab
  * @usage import { x, whoOf, agentRule } from './frame.js';
  * @version-history
- *   2026-09-22 -- The crumb is the shared trail's data and the page links are shared actions, so the
- *     page is composed from the one component set and needs no sheet of its own.
  *   v1.0.0 — 2026-09-03 — Initial (design canvas "AIMEAT Taidot-sivu", direction A with the
  *     Kenelle column; the registry now says linkedBy, versions, supersededBy and builtin).
  */
@@ -20,7 +18,6 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { date as fmtDate, num as fmtNum } from '/js/format.js';
-import { Stack, Text, Action } from '/components/poster-parts.js';
 
 export const x = (key, vars) => t('skpage.' + key, vars);
 
@@ -84,18 +81,15 @@ export function agentRequest(ownerName) {
 
 export const installLine = (ref) => `aimeat skill install ${ref}`;
 
-/** The trail to the page, as Masthead crumbs. */
 export function crumb() {
-  return [{ label: t('nav.profile') }, { label: t('profile.landing.menuBuildShare') }, { label: t('skills.tabLabel') }];
+  return html`<div class="og-crumb"><span>${t('nav.profile')}</span><span>/</span><span>${t('profile.landing.menuBuildShare')}</span><span>/</span><span class="og-crumb-here">${t('skills.tabLabel')}</span></div>`;
 }
 
 export const openTab = (tabId) => window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId } }));
 export function pageLinks() {
-  return html`<${Stack} density="compact">
-    <${Text} kind="label">${x('pages')}<//>
-    <${Action} onClick=${() => openTab('agents')}>${t('profile.tabs.agents')} →<//>
-    <${Action} onClick=${() => openTab('apps')}>${t('profile.tabs.apps')} →<//>
-    <${Action} onClick=${() => openTab('capabilities')}>${t('capabilities.tabLabel')} →<//>
-    <${Action} onClick=${() => openTab('organisms')}>${t('profile.tabs.organisms')} →<//>
-  <//>`;
+  return html`
+    <button type="button" class="og-rail-link" onClick=${() => openTab('agents')}><i>→</i>${t('profile.tabs.agents')}<em>→</em></button>
+    <button type="button" class="og-rail-link" onClick=${() => openTab('apps')}><i>→</i>${t('profile.tabs.apps')}<em>→</em></button>
+    <button type="button" class="og-rail-link" onClick=${() => openTab('capabilities')}><i>→</i>${t('capabilities.tabLabel')}<em>→</em></button>
+    <button type="button" class="og-rail-link" onClick=${() => openTab('organisms')}><i>→</i>${t('profile.tabs.organisms')}<em>→</em></button>`;
 }

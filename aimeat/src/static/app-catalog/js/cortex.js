@@ -7,12 +7,6 @@
  *   modules, holds its own module state, has no back-dependency on the entry module. Carved from main.js.
  * @usage import { loadCortexExtensions, openCortexEditor, openPromptBuilder, getCortexOwnerToken } from './cortex.js'
  * @version-history
- *   v1.4.0 — 2026-09-22 — The markup this module writes is the shared set (parts-html.js): an
- *     extension in the bar is a boxed choice (the parcel emoji is gone), the popup's parts are text,
- *     code surfaces and underlined copy words, a library file in the editor is a box with the set's
- *     fields, the editor status line takes the set's data-tone, and a capability pack is the set's
- *     checkbox field with its tier as a muted chip (found by data-pb-pack, not by a class). The star
- *     before a use-case template and the warning glyph in a tier's title are gone.
  *   v1.3.0 — 2026-09-13 — The popup, the editor and the prompt builder are the site's one dialog
  *     (dialogs.js): the extension's name is the popup's title, its owner's edit door stands at the
  *     footer's start, and the prompt builder opens and closes like every other dialog instead of
@@ -32,7 +26,6 @@ import { showNotice } from './ui.js';
 import { loadConfig } from './config.js';
 import { t, getLang } from './i18n.js';
 import { openDlg, closeDlg } from './dialogs.js';
-import { action, chip, columns, field, stack, surface, text } from './parts-html.js';
 
 // ── Cortex Extensions Bar ─────────────────────────
 
@@ -90,22 +83,19 @@ function loadCortexExtensions() {
         var types = ext.component_types || [];
         var libCount = types.filter(function(t) { return t === 'lib'; }).length;
         var schemaCount = types.filter(function(t) { return t === 'schema'; }).length;
-        // One extension as a boxed answer: its name in bold, its parts counted under it.
-        return action({ kind: 'choice', title: cortexEsc(ext.short_name || ext.name), onclick: 'showCortexPopup(\'' + encodeURIComponent(ext.name) + '\')' },
-          text({ kind: 'mono', tone: 'muted' }, libCount + ' lib &middot; ' + schemaCount + ' schema'));
+        return '<div class="cortex-mini-card" onclick="showCortexPopup(\'' + encodeURIComponent(ext.name) + '\')">'
+          + '<div class="cortex-mini-name">&#x1F4E6; ' + cortexEsc(ext.short_name || ext.name) + '</div>'
+          + '<div class="cortex-mini-meta">' + libCount + ' lib &middot; ' + schemaCount + ' schema</div>'
+          + '</div>';
       }).join('');
     })
     .catch(function(e) { console.warn('Cortex bar load failed:', e); });
 }
 
 /** A copy word for a block of text: the underlined action every dialog uses. */
-function cortexCopyBtn(content, labelKey) {
-  return stack({ direction: 'horizontal', align: 'start' },
-    action({ kind: 'secondary', onclick: 'cortexCopy(\'' + cortexArg(content) + '\',this)' }, cortexEsc(t(labelKey))));
+function cortexCopyBtn(text, labelKey) {
+  return '<button type="button" class="modal-btn secondary cx-copy" onclick="cortexCopy(\'' + cortexArg(text) + '\',this)">' + cortexEsc(t(labelKey)) + '</button>';
 }
-
-/** A quiet line in the popup. */
-function cxNote(words) { return text({ kind: 'caption', tone: 'muted' }, cortexEsc(words)); }
 
 function showCortexPopup(encodedName) {
   var config = loadConfig();
@@ -117,10 +107,10 @@ function showCortexPopup(encodedName) {
   try { shownName = decodeURIComponent(encodedName); } catch (e) { /* a malformed name is shown as it came */ }
   titleEl.textContent = shownName;
   ownerEl.innerHTML = '';
-  el.innerHTML = cxNote(t('cortex.loading'));
+  el.innerHTML = '<p class="cx-sub">' + cortexEsc(t('cortex.loading')) + '</p>';
   openDlg('cortex-popup-overlay');
 
-  if (!cortexToken) { el.innerHTML = cxNote(t('cortex.noToken')); return; }
+  if (!cortexToken) { el.innerHTML = '<p class="cx-sub">' + cortexEsc(t('cortex.noToken')) + '</p>'; return; }
 
   fetch(url + '/v1/cortex/' + encodedName, {
     headers: { 'Authorization': 'Bearer ' + cortexToken }
@@ -131,38 +121,39 @@ function showCortexPopup(encodedName) {
       var comps = ext.components || [];
       titleEl.textContent = ext.name;
       var html = '';
-      if (ext.description) html += text({ kind: 'body' }, cortexEsc(ext.description));
-      html += text({ kind: 'label' }, cortexEsc(t('cortex.forApps')));
+      if (ext.description) html += '<p class="cx-desc">' + cortexEsc(ext.description) + '</p>';
+      html += '<div class="cx-label">' + cortexEsc(t('cortex.forApps')) + '</div>';
 
       // Libs: the script tag an app loads, and what the library offers once loaded.
       comps.filter(function(c) { return c.type === 'lib'; }).forEach(function(lib) {
         var scriptUrl = url + '/v1/cortex/' + encodedName + '/libs/' + encodeURIComponent(lib.filename);
         var tag = '<script src="' + scriptUrl + '"><\/script>';
-        var part = text({ kind: 'body' }, '<strong>' + cortexEsc(t('cortex.lib')) + '</strong> <code>' + cortexEsc(lib.filename) + '</code>')
-          + surface({ kind: 'code' }, cortexEsc(tag))
+        html += '<div class="cx-part">'
+          + '<div class="cx-part-name">' + cortexEsc(t('cortex.lib')) + ' <code>' + cortexEsc(lib.filename) + '</code></div>'
+          + '<pre class="cx-code">' + cortexEsc(tag) + '</pre>'
           + cortexCopyBtn(tag, 'cortex.copy');
         if (lib.api_surface) {
-          part += text({ kind: 'body' }, '<strong>' + cortexEsc(t('cortex.apiSurface')) + '</strong>')
-            + surface({ kind: 'code', height: 'scroll' }, cortexEsc(lib.api_surface))
+          html += '<div class="cx-part-name">' + cortexEsc(t('cortex.apiSurface')) + '</div>'
+            + '<pre class="cx-code cx-code--api">' + cortexEsc(lib.api_surface) + '</pre>'
             + cortexCopyBtn(lib.api_surface, 'cortex.copyApi');
         }
-        html += stack({ density: 'compact' }, part);
+        html += '</div>';
       });
 
       // Schemas
       comps.filter(function(c) { return c.type === 'schema'; }).forEach(function(s) {
-        html += text({ kind: 'body' }, cortexEsc(t('cortex.schema')) + ' <code>' + cortexEsc(s.key_pattern) + '</code>: ' + cortexEsc(t('cortex.schemaNote')));
+        html += '<div class="cx-part cx-part--line">' + cortexEsc(t('cortex.schema')) + ' <code>' + cortexEsc(s.key_pattern) + '</code>: ' + cortexEsc(t('cortex.schemaNote')) + '</div>';
       });
 
       // Prompts
       comps.filter(function(c) { return c.type === 'prompt'; }).forEach(function(p) {
         var preview = (p.content || '').substring(0, 150);
-        html += stack({ density: 'compact' },
-          text({ kind: 'body' }, '<strong>' + cortexEsc(t('cortex.prompt')) + ' ' + cortexEsc(p.name) + '</strong>')
-          + text({ kind: 'caption', tone: 'muted' }, '&ldquo;' + cortexEsc(preview) + '&hellip;&rdquo;')
-          + cortexCopyBtn(p.content, 'cortex.copyPrompt'));
+        html += '<div class="cx-part">'
+          + '<div class="cx-part-name">' + cortexEsc(t('cortex.prompt')) + ' ' + cortexEsc(p.name) + '</div>'
+          + '<div class="cx-sub">&ldquo;' + cortexEsc(preview) + '&hellip;&rdquo;</div>'
+          + cortexCopyBtn(p.content, 'cortex.copyPrompt')
+          + '</div>';
       });
-      html = stack({}, html);
 
       // Edit button — only for the OWNER of this extension. The backend export/DELETE/PUT
       // routes enforce ownership too; this just hides a button that would 403 for everyone else.
@@ -170,13 +161,13 @@ function showCortexPopup(encodedName) {
       var isOwner = false;
       try { var _me = currentOwnerName(); isOwner = !!_me && ext.installed_by === _me; } catch(e) {}
       if (isOwner) {
-        ownerEl.innerHTML = action({ kind: 'secondary', onclick: 'window._launcher.openCortexEditor(\'' + encodedName + '\')' }, cortexEsc(t('cortex.edit')));
+        ownerEl.innerHTML = '<button type="button" class="modal-btn secondary" onclick="window._launcher.openCortexEditor(\'' + encodedName + '\')">' + cortexEsc(t('cortex.edit')) + '</button>';
       }
 
       el.innerHTML = html;
     })
     .catch(function(e) {
-      el.innerHTML = text({ kind: 'body', tone: 'danger' }, cortexEsc(t('cortex.loadFailed').replace('{msg}', e.message)));
+      el.innerHTML = '<p class="cx-status cx-status--err">' + cortexEsc(t('cortex.loadFailed').replace('{msg}', e.message)) + '</p>';
     });
 }
 
@@ -192,8 +183,7 @@ function cortexCopy(text, btn) {
 function cortexEditorStatus(text, isError) {
   var el = document.getElementById('cortex-editor-status');
   el.textContent = text;
-  // The tone is the set's data-tone (Text), so the line turns to the danger colour on an error.
-  el.setAttribute('data-tone', isError ? 'danger' : 'muted');
+  el.className = 'cx-status' + (isError ? ' cx-status--err' : '');
 }
 
 // ── Cortex Extension Editor ───────────────────────
@@ -267,12 +257,13 @@ function openCortexEditor(encodedName) {
 
 /** One library file in the editor: its name as a field, its source as the code box, and Remove. */
 function cortexEditorLibSection(id, filename, content) {
-  return stack({ id: 'cortex-lib-' + id, density: 'compact' },
-    columns({ layout: 'leading', collapse: 560 },
-      field({ id: 'cortex-lib-name-' + id, label: cortexEsc(t('cortex.libName')), value: filename, inputAttrs: ' data-lib-name="' + id + '"' })
-      + stack({ direction: 'horizontal', align: 'end' },
-        action({ kind: 'secondary', tone: 'danger', onclick: 'document.getElementById(\'cortex-lib-' + id + '\').remove()' }, cortexEsc(t('cortex.remove')))))
-    + field({ id: 'cortex-lib-content-' + id, type: 'textarea', mono: true, rows: 12, value: content || '', inputAttrs: ' data-lib-content="' + id + '" spellcheck="false"' }));
+  return '<div id="cortex-lib-' + id + '" class="cx-lib">'
+    + '<div class="cx-lib-head">'
+    + '<label class="cx-lib-name">' + cortexEsc(t('cortex.libName')) + ' <input type="text" class="modal-input" value="' + cortexEsc(filename) + '" data-lib-name="' + id + '" /></label>'
+    + '<button type="button" class="modal-btn danger" onclick="document.getElementById(\'cortex-lib-' + id + '\').remove()">' + cortexEsc(t('cortex.remove')) + '</button>'
+    + '</div>'
+    + '<textarea data-lib-content="' + id + '" class="cx-code cx-code--lib" spellcheck="false">' + cortexEsc(content || '') + '</textarea>'
+    + '</div>';
 }
 
 function cortexEditorAddLib() {
@@ -388,9 +379,8 @@ function pbApplyTrackUi() {
   if (classicExtras) classicExtras.style.display = pbTrack === 'atelier' ? 'none' : '';
   var cardC = document.getElementById('pb-track-classic');
   var cardA = document.getElementById('pb-track-atelier');
-  // The track cards are the set's boxed choice, whose chosen state is `on`; the radio inside carries it for assistive tech.
-  if (cardC) cardC.classList.toggle('on', pbTrack === 'classic');
-  if (cardA) cardA.classList.toggle('on', pbTrack === 'atelier');
+  if (cardC) cardC.classList.toggle('is-on', pbTrack === 'classic');
+  if (cardA) cardA.classList.toggle('is-on', pbTrack === 'atelier');
 }
 
 function openPromptBuilder(app) {
@@ -499,10 +489,11 @@ function loadPbTemplates() {
       list.forEach(function (t) {
         var o = document.createElement('option');
         o.value = t.id;
+        var prefix = t.kind === 'use-case' ? '★ ' : '';
         // Use-case titles are short ("Marketplace") so append a snippet of their description;
         // app-shell titles are now self-describing ("Standard app — login + saves your data"),
-        // so don't tack on a second em-dash clause. Use cases are listed first (sorted above).
-        o.textContent = t.title + (t.kind === 'use-case' && t.description ? ' — ' + t.description.slice(0, 70) : '');
+        // so don't tack on a second em-dash clause.
+        o.textContent = prefix + t.title + (t.kind === 'use-case' && t.description ? ' — ' + t.description.slice(0, 70) : '');
         sel.appendChild(o);
       });
       sel.onchange = function () {
@@ -527,30 +518,8 @@ var pbPackTouched = {};        // id -> true once the user manually (un)checks i
 var PB_PACK_CATEGORIES = ['visualization', 'diagrams', 'canvas', 'game', '3d', 'realtime'];
 
 function pbSelectedPackIds() {
-  return Array.prototype.slice.call(document.querySelectorAll('input[data-pb-pack]:checked'))
+  return Array.prototype.slice.call(document.querySelectorAll('.pb-pack-cb:checked'))
     .map(function (cb) { return cb.value; });
-}
-
-/**
- * One pack as the set's checkbox field: the pack's title as the label, its reliability tier as a
- * muted chip beside it (the tier's proof ledger in the chip's title), the id as the box's value.
- */
-function pbPackFieldHtml(p) {
-  var tier = '';
-  if (p.modelTier) {
-    // The label is the INSTRUCTION, not the raw key: `needs-doc` reads as "documentation missing"
-    // when it means "no priors — the AI must read the doc".
-    var proven = (p.proofs || []).map(function (pr) { return pr.model + '→' + pr.verdict; }).join(', ');
-    var tierTitle = 'AEB reliability tier: ' + p.modelTier
-      + (proven ? ' · proven on ' + proven : ' · not yet AEB-run')
-      + (p.apiCaveat ? ' · ' + p.apiCaveat : '');
-    // A version trap is the one tier to notice, so it keeps its warm colour.
-    tier = ' ' + chip(cortexEsc(t('pb.tier.' + p.modelTier) || p.modelTier), p.modelTier === 'frontier' ? 'coral' : 'muted', tierTitle);
-  }
-  return field({
-    id: 'pb-pack-' + p.id, type: 'checkbox', label: cortexEsc(p.title) + tier,
-    inputAttrs: ' value="' + cortexEsc(p.id) + '" data-pb-pack' + (p.description ? ' title="' + cortexEsc(p.description) + '"' : ''),
-  });
 }
 
 function loadPbPacks() {
@@ -569,15 +538,13 @@ function loadPbPacks() {
         if (p.kind === 'cortex') return PB_PACK_CATEGORIES.indexOf(p.category) !== -1 && p.id !== 'aimeat-charts';
         return false;
       });
-      // The packs as the set's checkbox fields in a wrapping row; the handlers are wired after the
-      // markup is in, on each box (found by data-pb-pack) and on the field that holds it.
-      // AEB reliability tier + per-model proof ledger ride on each field, so a human picking a pack
-      // sees which model strength it is proven on (not just left in the API).
-      wrap.innerHTML = stack({ direction: 'wrap', density: 'compact' }, pbPacks.map(pbPackFieldHtml).join(''));
+      wrap.innerHTML = '';
       pbPacks.forEach(function (p) {
-        var cb = wrap.querySelector('input[data-pb-pack][value="' + p.id + '"]');
-        if (!cb) return;
-        var holder = cb.parentElement;
+        var label = document.createElement('label');
+        label.className = 'pb-pack-item';
+        label.title = p.description || '';
+        var cb = document.createElement('input');
+        cb.type = 'checkbox'; cb.className = 'pb-pack-cb'; cb.value = p.id;
         cb.onchange = function () {
           pbPackTouched[p.id] = true;
           renderPbPackInfo();
@@ -585,10 +552,28 @@ function loadPbPacks() {
         };
         // Pointing at a pack asks "what is this one?" right now, so answer that one; otherwise
         // the panel below describes whatever is ticked, which is what the prompt will carry.
-        holder.onmouseenter = function () { renderPbPackInfo(p.id); };
-        holder.onmouseleave = function () { renderPbPackInfo(); };
+        label.onmouseenter = function () { renderPbPackInfo(p.id); };
+        label.onmouseleave = function () { renderPbPackInfo(); };
         cb.onfocus = function () { renderPbPackInfo(p.id); };
         cb.onblur = function () { renderPbPackInfo(); };
+        var span = document.createElement('span');
+        span.textContent = p.title;
+        label.appendChild(cb); label.appendChild(span);
+        // AEB reliability tier + per-model proof ledger, so a human picking a pack sees
+        // which model strength it is proven on (not just left in the API).
+        if (p.modelTier) {
+          var badge = document.createElement('span');
+          badge.className = 'pb-pack-tier pb-tier-' + p.modelTier;
+          // The label is the INSTRUCTION, not the raw key: `needs-doc` reads as
+          // "documentation missing" when it means "no priors — the AI must read the doc".
+          badge.textContent = t('pb.tier.' + p.modelTier) || p.modelTier;
+          var proven = (p.proofs || []).map(function (pr) { return pr.model + '→' + pr.verdict; }).join(', ');
+          badge.title = 'AEB reliability tier: ' + p.modelTier
+            + (proven ? ' · proven on ' + proven : ' · not yet AEB-run')
+            + (p.apiCaveat ? ' · ⚠ ' + p.apiCaveat : '');
+          label.appendChild(badge);
+        }
+        wrap.appendChild(label);
       });
       renderPbPackInfo();
       // Pre-select from the idea text as the user types (never override a manual choice).
@@ -611,9 +596,18 @@ function renderPbPackInfo(focusId) {
   if (!box) return;
   var ids = focusId ? [focusId] : pbSelectedPackIds();
   var shown = pbPacks.filter(function (p) { return ids.indexOf(p.id) !== -1; });
-  box.innerHTML = shown.filter(function (p) { return !!p.description; }).map(function (p) {
-    return text({ kind: 'caption', tone: 'muted' }, '<strong>' + cortexEsc((p.title || p.id) + ':') + '</strong> ' + cortexEsc(p.description));
-  }).join('');
+  box.innerHTML = '';
+  shown.forEach(function (p) {
+    if (!p.description) return;
+    var line = document.createElement('p');
+    line.className = 'pb-packinfo-line';
+    var name = document.createElement('span');
+    name.className = 'pb-packinfo-name';
+    name.textContent = (p.title || p.id) + ':';
+    line.appendChild(name);
+    line.appendChild(document.createTextNode(' ' + p.description));
+    box.appendChild(line);
+  });
 }
 
 function pbMatchPacksToIdea(base) {
@@ -621,7 +615,7 @@ function pbMatchPacksToIdea(base) {
   var text = ((desc && desc.value) || '').toLowerCase();
   pbPacks.forEach(function (p) {
     if (pbPackTouched[p.id]) return;
-    var cb = document.querySelector('input[data-pb-pack][value="' + p.id + '"]');
+    var cb = document.querySelector('.pb-pack-cb[value="' + p.id + '"]');
     if (!cb) return;
     // Word-start matching: a trigger must begin at a word boundary ('flow' matches
     // "flowchart", but 'art' would not match "chart"). Suffixes are allowed on purpose

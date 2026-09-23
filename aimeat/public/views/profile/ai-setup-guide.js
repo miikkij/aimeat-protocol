@@ -11,13 +11,11 @@
  *   something else or keeps it behind a switch you have not turned on. Every tool carries a link
  *   to its vendor's own documentation, so a reader who does not believe the steps can check them
  *   rather than take our word.
- * @structure McpSetupGuide() · InstructionsDialog({ open, onClose })
+ * @structure McpSetupGuide({ installClassName }) · InstructionsDialog({ open, onClose })
  * @usage import { McpSetupGuide, InstructionsDialog } from '/views/profile/ai-setup-guide.js';
  * @version-history
- *   2026-09-22 -- Composed from the shared set; the tool tabs are the shared tab part, so the
- *     tabClass / activeClass props main added on 2026-09-14 are no longer needed and are ignored.
- *   2026-09-13: Instructions dialog composes shared fields, sections and prompt content.
- *   2026-09-13: Shared parts compose the complete connection guide.
+ *   2026-09-14 -- McpSetupGuide takes tabClass / activeClass for its tool tabs, so the agents page
+ *     can hand in the shared poster tab instead of restyling .ast-tool from outside.
  *   2026-09-13 -- Pass the caller's shared install-row shape to McpInstallRow.
  *   v2.2.0 — 2026-08-27 — The short way in (McpInstallRow) renders above the steps for the three
  *     clients that have one, and the module-level table cache moved to ai-tool-setup.js so the
@@ -33,8 +31,8 @@ import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
-import { PromptCard } from '/components/PromptCard.js';
-import { Dialog, Section, Field, Stack, Surface, Text, Action, KeyValue, CopyAction, Steps } from '/components/poster-parts.js';
+import { Modal } from '/components/Modal.js';
+import { CopyButton } from '/components/CopyButton.js';
 import { useAiTools } from '/views/profile/ai-tool-setup.js';
 import { InstructionBlock } from '/views/profile/instruction-block.js';
 import { McpInstallRow } from '/components/McpInstall.js';
@@ -52,39 +50,48 @@ const rememberedTool = () => {
 
 const pickTool = (tools, id) => tools.find(x => x.id === id) || tools[0];
 
-function ToolPicker({ tools, value, onPick }) {
-  return html`<${Stack} direction="wrap" role="tablist" label=${tr('setup.pickTool','Which AI tool are you connecting? The steps differ enough that the general version is not usable.')}>
-    ${tools.map(tool => html`<${Action} key=${tool.id} kind="tab" semantics="tab" selected=${tool.id === value}
-      onClick=${() => onPick(tool.id)}>${tool.label}${tool.recommended
-        ? html` <${Text} kind="caption">${tr('setup.recommendedBadge','recommended')}<//>` : null}<//>`)}
-  <//>`;
+function ToolPicker({ tools, value, onPick, tabClass = 'ast-tool', activeClass = 'ast-tool--active' }) {
+  return html`
+    <div class="ast-tools" role="tablist">
+      ${tools.map(tool => html`
+        <button key=${tool.id} type="button" role="tab" aria-selected=${tool.id === value}
+          class=${tabClass + (tool.id === value ? ' ' + activeClass : '')}
+          onClick=${() => onPick(tool.id)}>${tool.label}${tool.recommended
+            ? html` <span class="ast-tool-reco">${tr('setup.recommendedBadge', 'recommended')}</span>` : null}</button>`)}
+    </div>`;
 }
 
-/** Every field requested by the selected tool, including deliberately empty values. */
+/** The parameter table: every field the tool's form asks for, and what to put in it. */
 function Params({ params }) {
   if (!params?.length) return null;
-  // One key-value row per field: the field's name, then the value in mono with its copy word, and
-  // the note under it. A field left empty says so in words rather than showing an empty box.
-  return html`<${Stack} density="compact">
-    <${Text} kind="label">${tr('setup.paramsTitle','What to put in each field')}<//>
-    <div>${params.map((prm,i) => html`<${KeyValue} key=${i} label=${prm.label}>
-      <${Stack} density="compact">
-        ${prm.value ? html`<${Stack} direction="wrap" align="center" density="compact">
-            <${Text} kind="mono">${prm.value}<//>
-            <${CopyAction} text=${prm.value} label=${tr('common.copy','Copy')} copiedLabel=${tr('common.copied','Copied')} />
-          <//>`
-          : html`<${Text} tone="muted">${tr('setup.leaveEmpty','leave empty')}<//>`}
-        ${prm.note && html`<${Text} kind="caption" tone="muted">${prm.note}<//>`}
-      <//>
-    <//>`)}</div>
-  <//>`;
+  return html`
+    <div class="ast-params">
+      <div class="ast-params-head">${tr('setup.paramsTitle', 'What to put in each field')}</div>
+      ${params.map((prm, i) => {
+        const v = prm.value;
+        return html`
+          <div class="ast-param" key=${i}>
+            <div class="ast-param-label">${prm.label}</div>
+            <div class="ast-param-value">
+              ${v
+                ? html`<code class="ast-code">${v}</code><${CopyButton} text=${v} className="btn-ghost btn-sm"
+                    label=${tr('common.copy', 'Copy')} copiedLabel=${tr('common.copied', 'Copied')} />`
+                : html`<span class="ast-param-empty">${tr('setup.leaveEmpty', 'leave empty')}</span>`}
+            </div>
+            ${prm.note ? html`<div class="ast-param-note">${prm.note}</div>` : null}
+          </div>`;
+      })}
+    </div>`;
 }
 
 /**
  * How to attach this node to one AI tool: the steps as things to click or type, every field value,
- * and the vendor's own page.
+ * and the vendor's own page. `tabClass` / `activeClass`: the tool tabs' classes, so a poster-face
+ * page can hand in its own shared tab (poster-tab / is-on) instead of restyling .ast-tool from
+ * outside.
+ * @param {{ installClassName?: string, tabClass?: string, activeClass?: string }} [props]
  */
-export function McpSetupGuide() {
+export function McpSetupGuide({ installClassName = '', tabClass, activeClass } = {}) {
   const tools = useAiTools();
   const [toolId, setToolId] = useState(rememberedTool);
   const pick = (id) => {
@@ -92,24 +99,42 @@ export function McpSetupGuide() {
     // eslint-disable-next-line aimeat/no-silent-catch -- storage blocked only costs the remembered choice
     try { localStorage.setItem(LAST_TOOL_KEY, id); } catch { /* the choice just does not persist */ }
   };
-  if (!tools) return html`<${Text} tone="muted">${tr('setup.loadingTools', 'Reading the setup instructions from this node…')}<//>`;
-  if (!tools.length) return html`<${Text} tone="muted">${tr('setup.toolsFailed', 'Could not read the setup instructions just now. The connect page has the same steps.')}<//>`;
+  if (!tools) return html`<p class="ast-note">${tr('setup.loadingTools', 'Reading the setup instructions from this node…')}</p>`;
+  if (!tools.length) return html`<p class="ast-note">${tr('setup.toolsFailed', 'Could not read the setup instructions just now. The connect page has the same steps.')}</p>`;
   const tool = pickTool(tools, toolId);
   const cmd = tool.mcp.command || null;
 
-  return html`<${Stack}>
-    <${Text} tone="muted">${tr('setup.pickTool','Which AI tool are you connecting? The steps differ enough that the general version is not usable.')}<//>
-    <${ToolPicker} tools=${tools} value=${tool.id} onPick=${pick} />
-    <${McpInstallRow} tool=${tool} />
-    ${tool.mcp.plans && html`<${Text} tone="muted">${tool.mcp.plans}<//>`}
-    ${tool.mcp.warn && html`<${Surface} kind="aside"><${Text}>${tool.mcp.warn}<//><//>`}
-    <${Steps} items=${tool.mcp.steps} />
-    ${cmd && html`<${PromptCard} prompt=${cmd} copyLabel=${tr('setup.copyCmd','Copy the command')} copiedLabel=${tr('common.copied','Copied')} />`}
-    <${Params} params=${tool.mcp.params} />
-    ${tool.mcp.note && html`<${Text} tone="muted">${tool.mcp.note}<//>`}
-    <${Action} kind="text" href=${tool.mcp.docs} target="_blank">
-      ${tr('setup.officialDocs','Official instructions from')} ${tool.label} →<//>
-  <//>`;
+  return html`
+    <div class="ast">
+      <p class="ast-lead">${tr('setup.pickTool', 'Which AI tool are you connecting? The steps differ enough that the general version is not usable.')}</p>
+      <${ToolPicker} tools=${tools} value=${tool.id} onPick=${pick} tabClass=${tabClass} activeClass=${activeClass} />
+
+      <!-- The short way in comes first, and removes none of the steps below it: a one-click link is
+           blocked on a managed machine and does nothing where the client is not installed. -->
+      <${McpInstallRow} tool=${tool} className=${installClassName} />
+
+      ${tool.mcp.plans ? html`<p class="ast-plans">${tool.mcp.plans}</p>` : null}
+      ${tool.mcp.warn ? html`<p class="ast-warn">${tool.mcp.warn}</p>` : null}
+
+      <ol class="ast-steps">
+        ${tool.mcp.steps.map((step, i) => html`<li key=${i}>${step}</li>`)}
+      </ol>
+
+      ${cmd ? html`
+        <div class="ast-cmd">
+          <pre class="ast-cmd-text">${cmd}</pre>
+          <${CopyButton} text=${cmd} className="btn-primary btn-sm"
+            label=${tr('setup.copyCmd', 'Copy the command')} copiedLabel=${tr('common.copied', 'Copied')} />
+        </div>` : null}
+
+      <${Params} params=${tool.mcp.params} />
+
+      ${tool.mcp.note ? html`<p class="ast-note">${tool.mcp.note}</p>` : null}
+
+      <a class="ast-docs" href=${tool.mcp.docs} target="_blank" rel="noopener">
+        ${tr('setup.officialDocs', 'Official instructions from')} ${tool.label} →
+      </a>
+    </div>`;
 }
 
 /**
@@ -143,17 +168,30 @@ export function InstructionsDialog({ open, onClose }) {
   };
   const tool = tools && tools.length ? pickTool(tools, toolId) : null;
 
-  return html`<${Dialog} open=${open} onClose=${onClose} title=${tr('setup.instrTitle','AI chat instructions')}><${Stack}>
-    <${Text} kind="lead">${tr('setup.instrLead','Paste this into your AI’s instructions and every conversation starts already knowing your structure. You stop re-explaining it, the AI stops guessing where things go, your agents write into the same places so they can build on each other’s work, and the same context stops being re-sent as tokens in every chat.')}<//>
-    ${orgs === null ? html`<${Text} tone="muted">${tr('setup.loadingOrgs','Reading your organisms…')}<//>`
-      : orgs.length === 0 ? html`<${Text} tone="muted">${tr('setup.noOrgs','You have no organism yet, and the block is generated from one. Create it first: the Hello MCP step on the MCP tab has a ready prompt for it.')}<//>`
-      : html`${orgs.length > 1 && html`<${Field} type="select" label=${tr('setup.whichOrg','Which organism?')} value=${orgId}
-          onChange=${e => setOrgId(e.target.value)} options=${orgs.map(o => ({value:o.id,label:o.name || o.id}))} />`}
-        <${InstructionBlock} orgId=${orgId} />`}
-    ${tool && html`<${Section} size="small" title=${tr('setup.whereTitle','Where it goes in your tool')}><${Stack}>
-      <${ToolPicker} tools=${tools} value=${tool.id} onPick=${pick} />
-      <${Text}>${tool.instructions.where}<//>
-      ${tool.instructions.docs && html`<${Action} kind="text" href=${tool.instructions.docs} target="_blank">
-        ${tr('setup.officialDocs','Official instructions from')} ${tool.label} →<//>`}
-    <//><//>`}
-  <//><//>`;}
+  return html`
+    <${Modal} open=${open} onClose=${onClose} className="ast-modal"
+      title=${tr('setup.instrTitle', 'AI chat instructions')}>
+      <p class="ast-lead">${tr('setup.instrLead', 'Paste this into your AI’s instructions and every conversation starts already knowing your structure. You stop re-explaining it, the AI stops guessing where things go, your agents write into the same places so they can build on each other’s work, and the same context stops being re-sent as tokens in every chat.')}</p>
+
+      ${orgs === null ? html`<p class="ast-note">${tr('setup.loadingOrgs', 'Reading your organisms…')}</p>`
+        : orgs.length === 0 ? html`<p class="ast-note">${tr('setup.noOrgs', 'You have no organism yet, and the block is generated from one. Create it first: the Hello MCP step on the MCP tab has a ready prompt for it.')}</p>`
+        : html`
+          ${orgs.length > 1 ? html`
+            <label class="ast-label" for="ast-org">${tr('setup.whichOrg', 'Which organism?')}</label>
+            <select id="ast-org" class="input-field ast-select" value=${orgId} onChange=${(e) => setOrgId(e.target.value)}>
+              ${orgs.map(o => html`<option value=${o.id} key=${o.id}>${o.name || o.id}</option>`)}
+            </select>` : null}
+          <${InstructionBlock} orgId=${orgId} />`}
+
+      ${tool ? html`
+        <div class="ast-where">
+          <div class="ast-where-head">${tr('setup.whereTitle', 'Where it goes in your tool')}</div>
+          <${ToolPicker} tools=${tools} value=${tool.id} onPick=${pick} />
+          <p class="ast-where-path">${tool.instructions.where}</p>
+          ${tool.instructions.docs ? html`
+            <a class="ast-docs" href=${tool.instructions.docs} target="_blank" rel="noopener">
+              ${tr('setup.officialDocs', 'Official instructions from')} ${tool.label} →
+            </a>` : null}
+        </div>` : null}
+    <//>`;
+}

@@ -7,8 +7,6 @@
  *   public memories to copy. Extracted verbatim from memory-tab.js; handlers and the render function
  *   take the shared ctx so all state/handlers still live in the MemoryTab component.
  * @version-history
- *   2026-09-22 -- The panel is composed from the shared component set (Field, ListRow, Chip, Action,
- *     Surface, Text); the loaders and handlers are unchanged.
  *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
  *   v1.0.0 — 2026-07-13 — Extracted from public/views/profile/memory-tab.js (max-file-lines)
  *   v1.1.0 — 2026-08-08 — Copy labels now resolve from the shared common.copy / common.copied / common.copyPrompt /
@@ -19,9 +17,10 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
+import { escHtml } from '/js/utils.js';
+import { Spinner, VisibilityPill } from '../shared.js';
 import * as memoryService from '/js/services/memory.js';
 import { listPeers } from '/js/services/federation.js';
-import { ListRow, Chip, Action, Field, Surface, Text, Stack } from '/components/poster-parts.js';
 import { formatRelativeTime } from './helpers.js';
 import { DiscoverPreview } from './components.js';
 import { swallowed } from '/js/swallowed.js';
@@ -159,8 +158,6 @@ export function closeBrowse(ctx) {
   ctx.setExpandedDiscover(null);
 }
 
-const warning = (message) => html`<${Surface} kind="aside" density="compact" tone="danger"><${Text}>${message}<//><//>`;
-
 export function renderBrowsePanel(ctx) {
   const {
     browseMode, discoverSearch, setDiscoverSearch, discoverLoading, discoverError, discoverEntries,
@@ -171,60 +168,128 @@ export function renderBrowsePanel(ctx) {
   if (!browseMode) return null;
 
   if (browseMode === 'discover') {
-    return html`<${Stack}>
-      <${Text} tone="muted">${t('profile.memory.discoverDesc')}<//>
-      <${Stack} direction="wrap" align="end">
-        <${Field} type="search" placeholder=${t('profile.memory.discoverSearchPlaceholder')} value=${discoverSearch}
-          onInput=${e => setDiscoverSearch(e.target.value)}
-          onKeyDown=${e => e.key === 'Enter' && loadDiscoverEntries(ctx, discoverSearch)} />
-        <${Action} onClick=${() => loadDiscoverEntries(ctx, discoverSearch)}>${t('profile.memory.searchBtn')}<//>
-      <//>
-      ${discoverLoading && html`<${Text} tone="muted">${t('profile.memory.discoverLoading')}<//>`}
-      ${discoverError && !discoverLoading && warning(discoverError)}
-      ${discoverEntries && !discoverLoading && !discoverError && html`
-        <${Text} kind="caption" tone="muted">${t('profile.memory.discoverCount').replace('{count}', discoverEntries.length)}<//>
-        ${discoverEntries.length === 0
-          ? html`<${Text} tone="muted">${t('profile.memory.discoverEmpty')}<//>`
-          : html`<${Stack} density="compact">${discoverEntries.map(entry => {
-              const ownerShort = entry.owner_gaii?.split('@')[0] || entry.owner_gaii;
-              const id = entry.owner_gaii + '/' + entry.key;
-              const isExpanded = expandedDiscover === id;
-              return html`<${ListRow} key=${id} density="compact" name=${entry.key} detail=${ownerShort}
-                onOpen=${() => setExpandedDiscover(isExpanded ? null : id)}
-                value=${`${entry.tags?.length > 0 ? entry.tags.join(', ') + ' · ' : ''}${formatRelativeTime(entry.updated_at || entry.created_at)}`}
-                actions=${html`<${Action} disabled=${copyingKeys.has(entry.key)} onClick=${() => handleCopyEntry(ctx, entry.owner_gaii, entry.key)}>
-                  ${copyingKeys.has(entry.key) ? '...' : t('common.copy')}<//>`}>
-                ${isExpanded ? html`<${DiscoverPreview} ownerGaii=${entry.owner_gaii} memKey=${entry.key} />` : null}
-              <//>`;
-            })}<//>`}`}
-    <//>`;
+    return html`
+      <div class="mem-browse-panel poster-row--thing">
+        <div class="mem-browse-header">
+          <div>
+            <div class="section-desc">${t('profile.memory.discoverDesc')}</div>
+          </div>
+        </div>
+        <div class="mem-discover-search mb-half">
+          <input type="text" class="input-field" placeholder=${t('profile.memory.discoverSearchPlaceholder')}
+            value=${discoverSearch}
+            onInput=${e => setDiscoverSearch(e.target.value)}
+            onKeyDown=${e => e.key === 'Enter' && loadDiscoverEntries(ctx, discoverSearch)} />
+          <button class="btn-sm" onClick=${() => loadDiscoverEntries(ctx, discoverSearch)}>${t('profile.memory.searchBtn')}</button>
+        </div>
+
+        ${discoverLoading && html`<${Spinner} text=${t('profile.memory.discoverLoading')} />`}
+
+        ${discoverError && !discoverLoading && html`
+          <div class="alert alert-warning"><span class="alert-msg">${discoverError}</span></div>
+        `}
+
+        ${discoverEntries && !discoverLoading && !discoverError && html`
+          <div class="mb-half text-meta">
+            ${t('profile.memory.discoverCount').replace('{count}', discoverEntries.length)}
+          </div>
+          ${discoverEntries.length === 0
+            ? html`<div class="empty">${t('profile.memory.discoverEmpty')}</div>`
+            : html`<div class="mem-browse-list">
+                ${discoverEntries.map(entry => {
+                  const ownerShort = entry.owner_gaii?.split('@')[0] || entry.owner_gaii;
+                  const isExpanded = expandedDiscover === entry.owner_gaii + '/' + entry.key;
+                  return html`
+                    <div key=${entry.owner_gaii + '/' + entry.key} class="mem-discover-item">
+                      <div class="mem-discover-row" onClick=${() => setExpandedDiscover(isExpanded ? null : entry.owner_gaii + '/' + entry.key)}>
+                        <div class="mem-discover-info">
+                          <div class="mem-browse-key" title=${entry.key}>${escHtml(entry.key)}</div>
+                          <div class="mem-discover-owner">${escHtml(ownerShort)}</div>
+                        </div>
+                        <div class="mem-browse-meta">
+                          ${entry.tags?.length > 0 && html`<span class="text-meta-sm mem-browse-tags" title=${entry.tags.join(', ')}>${entry.tags.join(', ')}</span>`}
+                          <span class="mem-time">${formatRelativeTime(entry.updated_at || entry.created_at)}</span>
+                        </div>
+                        <button class="btn-outline btn-sm"
+                          disabled=${copyingKeys.has(entry.key)}
+                          onClick=${(e) => { e.stopPropagation(); handleCopyEntry(ctx, entry.owner_gaii, entry.key); }}>
+                          ${copyingKeys.has(entry.key) ? '...' : t('common.copy')}
+                        </button>
+                      </div>
+                      ${isExpanded && html`
+                        <${DiscoverPreview} ownerGaii=${entry.owner_gaii} memKey=${entry.key} />
+                      `}
+                    </div>
+                  `;
+                })}
+              </div>`
+          }
+        `}
+      </div>
+    `;
   }
 
   const isHome = browseMode === 'home';
   const desc = isHome ? t('profile.memory.browseHomeDesc') : t('profile.memory.browseRemoteDesc');
 
-  return html`<${Stack}>
-    <${Text} tone="muted">${desc}<//>
-    ${!isHome && !selectedPeer && (remotePeers.length === 0
-      ? html`<${Text} tone="muted">${t('profile.memory.noPeers')}<//>`
-      : html`<${Field} type="select" value="" onChange=${e => loadBrowseRemote(ctx, e.target.value)}
-          options=${[{ value: '', label: t('profile.memory.browseRemoteSelect') }, ...remotePeers.map(p => ({ value: p.node_id, label: `${p.node_id} (${p.url || ''})` }))]} />`)}
-    ${browseLoading && html`<${Text} tone="muted">${isHome ? t('profile.memory.loadingHome') : t('profile.memory.loadingRemote')}<//>`}
-    ${browseError && !browseLoading && warning(browseError)}
-    ${remoteEntries && !browseLoading && !browseError && html`
-      <${Stack} direction="wrap" align="center">
-        <${Text} kind="caption" tone="muted">${isHome
-          ? t('profile.memory.homeEntries').replace('{count}', remoteEntries.length)
-          : t('profile.memory.remoteEntries').replace('{count}', remoteEntries.length).replace('{node}', selectedPeer)}<//>
-        ${remoteEntries.length > 0 && html`<${Action} onClick=${() => handlePullAll(ctx)}>${t('profile.memory.pullAllBtn')}<//>`}
-      <//>
-      ${remoteEntries.length === 0
-        ? html`<${Text} tone="muted">${isHome ? t('profile.memory.noHomeEntries') : t('profile.memory.noRemoteEntries')}<//>`
-        : html`<${Stack} density="compact">${remoteEntries.map(entry => html`
-            <${ListRow} key=${entry.key} density="compact" name=${entry.key}
-              detail=${entry.tags?.length > 0 ? entry.tags.join(', ') : undefined}
-              value=${html`<${Chip} tone=${entry.visibility === 'public' ? 'sun' : 'plain'}>${t('profile.visibility.' + entry.visibility)}<//>`}
-              actions=${html`<${Action} disabled=${pullingKeys.has(entry.key)} onClick=${() => handlePullRemoteEntry(ctx, entry.key)}>
-                ${pullingKeys.has(entry.key) ? '...' : t('profile.memory.pullEntry')}<//>`} />`)}<//>`}`}
-  <//>`;
+  return html`
+    <div class="mem-browse-panel poster-row--thing">
+      <div class="mem-browse-header">
+        <div>
+          <div class="section-desc">${desc}</div>
+        </div>
+      </div>
+
+      ${!isHome && !selectedPeer && html`
+        <div class="mb-1">
+          ${remotePeers.length === 0
+            ? html`<div class="empty">${t('profile.memory.noPeers')}</div>`
+            : html`
+              <select class="input-field" onChange=${e => loadBrowseRemote(ctx, e.target.value)}>
+                <option value="">${t('profile.memory.browseRemoteSelect')}</option>
+                ${remotePeers.map(p => html`<option key=${p.node_id} value=${p.node_id}>${escHtml(p.node_id)} (${escHtml(p.url || '')})</option>`)}
+              </select>
+            `}
+        </div>
+      `}
+
+      ${browseLoading && html`<${Spinner} text=${isHome ? t('profile.memory.loadingHome') : t('profile.memory.loadingRemote')} />`}
+
+      ${browseError && !browseLoading && html`
+        <div class="alert alert-warning">
+          <span class="alert-msg">${browseError}</span>
+        </div>
+      `}
+
+      ${remoteEntries && !browseLoading && !browseError && html`
+        <div class="mb-half text-meta">
+          ${isHome
+            ? t('profile.memory.homeEntries').replace('{count}', remoteEntries.length)
+            : t('profile.memory.remoteEntries').replace('{count}', remoteEntries.length).replace('{node}', selectedPeer)}
+          ${remoteEntries.length > 0 && html`
+            <button class="btn-ghost btn-sm pf-ml-half" onClick=${() => handlePullAll(ctx)}>${t('profile.memory.pullAllBtn')}</button>
+          `}
+        </div>
+        ${remoteEntries.length === 0
+          ? html`<div class="empty">${isHome ? t('profile.memory.noHomeEntries') : t('profile.memory.noRemoteEntries')}</div>`
+          : html`<div class="mem-browse-list">
+              ${remoteEntries.map(entry => html`
+                <div key=${entry.key} class="mem-browse-item">
+                  <div class="mem-browse-key" title=${entry.key}>${escHtml(entry.key)}</div>
+                  <div class="mem-browse-meta">
+                    <${VisibilityPill} visibility=${entry.visibility} />
+                    ${entry.tags?.length > 0 && html`<span class="text-meta-sm mem-browse-tags" title=${entry.tags.join(', ')}>${entry.tags.join(', ')}</span>`}
+                  </div>
+                  <button class="btn-outline btn-sm"
+                    disabled=${pullingKeys.has(entry.key)}
+                    onClick=${() => handlePullRemoteEntry(ctx, entry.key)}>
+                    ${pullingKeys.has(entry.key) ? '...' : t('profile.memory.pullEntry')}
+                  </button>
+                </div>
+              `)}
+            </div>`
+        }
+      `}
+    </div>
+  `;
 }

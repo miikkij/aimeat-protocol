@@ -1,0 +1,287 @@
+/**
+ * @file notebook.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description Styles for the profile Notebook tab (pf-nb-* prefix): capture box, librarian hits,
+ *   and inbox notes. Dark-theme only — all colors/spacing via theme.css variables.
+ * @version-history
+ *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
+ *   v1.0.0 — 2026-06-19 — Initial: capture + librarian + inbox (slice A).
+ *   v1.1.0 — 2026-06-21 — Enrich (plan) panel: plan steps, run controls, enriched preview.
+ *   v1.2.0 — 2026-06-21 — Phase 3: trust-toggle settings strip + distribute (chunk) panel.
+ */
+
+.pf-nb-capture {
+  margin-bottom: var(--space-lg, 1.5rem);
+}
+.pf-nb-textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 5rem;
+  font-family: inherit;
+}
+.pf-nb-capture-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm, 0.75rem);
+  margin-top: var(--space-sm, 0.75rem);
+  flex-wrap: wrap;
+}
+
+.pf-nb-section {
+  margin-top: var(--space-lg, 1.5rem);
+}
+
+.pf-nb-search {
+  flex: 1;
+}
+
+.pf-nb-scope { margin-bottom: var(--space-sm, 0.75rem); }
+.pf-nb-hit-producer {
+  margin-top: var(--space-xs, 0.4rem);
+  color: var(--text-dim, var(--text));
+}
+
+.pf-nb-hits {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm, 0.75rem);
+}
+.pf-nb-hit {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius, 8px);
+  padding: var(--space-sm, 0.75rem) var(--space-md, 1rem);
+}
+.pf-nb-hit-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm, 0.75rem);
+}
+.pf-nb-hit-title {
+  font-weight: 600;
+  color: var(--text);
+}
+.pf-nb-hit-snippet {
+  margin-top: var(--space-xs, 0.4rem);
+  color: var(--text-dim, var(--text));
+  font-size: 0.9em;
+  line-height: 1.4;
+}
+.pf-nb-hit-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm, 0.75rem);
+  margin-top: var(--space-xs, 0.4rem);
+}
+.pf-nb-hit-key {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono, monospace);
+}
+
+.pf-nb-inbox {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm, 0.75rem);
+}
+.pf-nb-note {
+  background: var(--bg-dim, var(--card));
+  border: 1px solid var(--border);
+  border-radius: var(--radius, 8px);
+  padding: var(--space-sm, 0.75rem) var(--space-md, 1rem);
+}
+.pf-nb-note-text {
+  color: var(--text);
+  word-break: break-word;
+}
+.pf-nb-note-line {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text-dim, var(--text));
+}
+.pf-nb-note-text--peek {
+  max-height: 9rem;
+  overflow: hidden;
+  position: relative;
+}
+.pf-nb-note-text--peek::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2.5rem;
+  background: linear-gradient(transparent, var(--bg-dim, var(--card)));
+  pointer-events: none;
+}
+
+.pf-nb-inbox-bar { margin-bottom: var(--space-sm, 0.75rem); }
+.pf-nb-sort { max-width: 12rem; }
+.pf-nb-note-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs, 0.4rem);
+}
+.pf-nb-view-btn {
+  padding: 0.05rem 0.45rem;
+  line-height: 1.2;
+}
+.pf-nb-note-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm, 0.75rem);
+  margin-top: var(--space-xs, 0.4rem);
+}
+.pf-nb-note-btns {
+  display: flex;
+  gap: var(--space-xs, 0.4rem);
+}
+
+.pf-nb-suggest {
+  margin-top: var(--space-sm, 0.75rem);
+  padding: var(--space-md, 1rem);
+  background: var(--surface, var(--card));
+
+  border-radius: var(--radius, 8px);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs, 0.4rem);
+}
+.pf-nb-suggest-reason {
+  font-style: italic;
+  margin-bottom: var(--space-xs, 0.4rem);
+}
+.pf-nb-suggest-label {
+  font-size: 0.8em;
+  color: var(--text-dim, var(--text));
+  margin-top: var(--space-xs, 0.4rem);
+}
+.pf-nb-suggest-body {
+  width: 100%;
+  resize: vertical;
+  font-family: inherit;
+}
+.pf-nb-suggest-alts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs, 0.4rem);
+  margin-top: var(--space-xs, 0.4rem);
+}
+.pf-nb-suggest-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm, 0.75rem);
+  margin-top: var(--space-sm, 0.75rem);
+}
+
+.pf-nb-progress { gap: var(--space-sm, 0.75rem); }
+.pf-nb-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+.pf-nb-step {
+  font-size: 0.85em;
+  color: var(--text-dim, var(--text));
+  opacity: 0.6;
+}
+.pf-nb-step.active { opacity: 1; color: var(--text); font-weight: 600; }
+.pf-nb-step.done { opacity: 0.85; color: var(--success, var(--text)); }
+
+/* ── Enrich (plan) panel ── */
+.pf-nb-enrich {
+  margin-top: var(--space-sm, 0.75rem);
+  padding: var(--space-md, 1rem);
+  background: var(--surface, var(--card));
+
+  border-radius: var(--radius, 8px);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm, 0.75rem);
+}
+.pf-nb-enrich-summary { font-style: italic; }
+.pf-nb-plan-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm, 0.75rem);
+}
+.pf-nb-plan-step {
+  background: var(--card);
+
+  border-radius: var(--radius, 8px);
+  padding: var(--space-sm, 0.75rem) var(--space-md, 1rem);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs, 0.4rem);
+}
+.pf-nb-plan-step.done { opacity: 0.75; }
+.pf-nb-plan-step.skipped { opacity: 0.5; }
+.pf-nb-plan-step-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs, 0.4rem);
+  flex-wrap: wrap;
+}
+.pf-nb-plan-step-title { font-weight: 600; color: var(--text); }
+.pf-nb-plan-tag { color: var(--success, var(--text)); font-size: 0.85em; }
+.pf-nb-plan-why { font-style: italic; }
+.pf-nb-plan-step-btns {
+  display: flex;
+  gap: var(--space-xs, 0.4rem);
+  margin-top: var(--space-xs, 0.4rem);
+}
+.pf-nb-enrich-preview {
+  border-top: 1px solid var(--border);
+  padding-top: var(--space-sm, 0.75rem);
+}
+.pf-nb-enrich-preview-body {
+  max-height: 24rem;
+  overflow: auto;
+  background: var(--bg-dim, var(--card));
+  border: 1px solid var(--border);
+  border-radius: var(--radius, 8px);
+  padding: var(--space-sm, 0.75rem) var(--space-md, 1rem);
+}
+
+/* ── Trust toggles (settings strip) ── */
+.pf-nb-settings {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm, 0.75rem);
+  margin-top: var(--space-sm, 0.75rem);
+}
+.pf-nb-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.85em;
+  color: var(--text-dim, var(--text));
+  cursor: pointer;
+}
+
+/* ── Distribute (chunk) panel ── */
+.pf-nb-chunk-pick {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: pointer;
+}
+.pf-nb-chunk-body {
+  max-height: 14rem;
+  margin-top: var(--space-xs, 0.4rem);
+}

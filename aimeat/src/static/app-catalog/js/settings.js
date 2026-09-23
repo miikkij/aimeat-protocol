@@ -9,8 +9,6 @@
  *   v2.0.0 — 2026-07-20 — Server-only cutover: drop the local-catalog JSON export/import, the
  *     duplicate-cleanup, and Clear-all (all local-store features); initSettings is now a no-op.
  *   v2.1.0 — 2026-09-13 — Settings and Help open and close through dialogs.js (the site's one dialog).
- *   v2.2.0 — 2026-09-22 — The theme switch is the set's icon action with a drawn moon or sun
- *     instead of the two emoji.
  */
 import { showConfirm, closeConfirm, showNotice, dismissNotice } from './ui.js';
 import { openDlg, closeDlg } from './dialogs.js';
@@ -35,16 +33,11 @@ function applyTheme(theme) {
   updateThemeToggle();
 }
 
-// The two drawn icons of the theme switch (the set's icon action draws an SVG, never an emoji).
-var MOON_SVG = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>';
-var SUN_SVG = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="2"/>' +
-  '<path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1" stroke="currentColor" stroke-width="2"/></svg>';
-
 function updateThemeToggle() {
   // Show the icon for the mode you'd switch TO: moon while light, sun while dark.
   var dark = document.documentElement.getAttribute('data-theme') === 'dark';
   var btn = document.getElementById('theme-btn');
-  if (btn) btn.innerHTML = dark ? SUN_SVG : MOON_SVG;
+  if (btn) btn.textContent = dark ? '☀️' : '🌙';
 }
 
 // Quick light/dark switch from the header. Flips from the LIVE data-theme so it agrees with the

@@ -11,12 +11,8 @@
  * @structure
  *   - TestSend({ locale, sent }) — section 02, one address, three message types
  *   - GroupSend({ recipients }) — section 04, operators or everyone, subject and message
- *   - Choice — the row of tab words a radio choice is made from
  *
  * @version-history
- *   v2.0.0 — 2026-09-22 — Composed from the shared component set: shared sections, fields, tab
- *     words with radio semantics for the choices, and the answer box as a box of key-value rows.
- *     No class of the page's own any more.
  *   v1.1.0 — 2026-09-13 — Compose shared poster send-section headings.
  *   v1.0.0 — 2026-09-12 — Initial, with the Email page in the poster face.
  */
@@ -27,23 +23,12 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { time as fmtTime } from '/js/format.js';
 import { num } from './shared.js';
-import { Section, Columns, Stack, KeyValue, Field, Surface, Action, Text } from '/components/poster-parts.js';
 import { sendTestEmail, sendGroupEmail } from '/js/services/admin.js';
 
 const E = (key, params) => t('admin.email.' + key, params);
 
 /** The three message types a test can be sent as; the node has a template for each. */
 const TEST_TYPES = ['notification', 'verification', 'magic_link'];
-
-/** A labelled row of choices, one of them on. */
-function Choice({ label, options, value, onChange }) {
-  return html`<${Stack} density="compact">
-    <${Text} kind="label">${label}<//>
-    <${Stack} direction="wrap" role="radiogroup" label=${label}>
-      ${options.map(o => html`<${Action} key=${o.id} kind="tab" semantics="radio" selected=${value === o.id} onClick=${() => onChange(o.id)}>${o.label}<//>`)}
-    <//>
-  <//>`;
-}
 
 /** Section 02: one real message through the configured server. */
 export function TestSend({ locale }) {
@@ -73,33 +58,45 @@ export function TestSend({ locale }) {
   }
 
   return html`
-    <${Section} title=${E('test.title')} count="02" description=${E('test.lead')}>
-      <${Columns} layout="equal" collapse=${640}>
-        <${Stack}>
-          <${Field} type="email" label=${E('test.to')} value=${to} placeholder=${E('test.toPlaceholder')}
-            onInput=${e => setTo(e.target.value)} />
-          <${Choice} label=${E('test.type')} value=${type} onChange=${setType}
-            options=${TEST_TYPES.map(id => ({ id, label: E('kind.' + id) }))} />
-          <${Stack} direction="wrap" align="center">
-            <${Action} onClick=${send} disabled=${sending || !to}>${sending ? E('test.sending') : E('test.send')}<//>
-            <${Text} kind="caption" tone="muted">${E('test.note')}<//>
-          <//>
-        <//>
-        <${Stack} density="compact">
-          <${Text} kind="label">${E('test.lastTitle')}<//>
+    <section class="og-sec">
+      <div class="og-sec-h"><h2 class="poster-section-title">${E('test.title')}<small>02</small></h2></div>
+      <p class="adm-em-lead">${E('test.lead')}</p>
+      <div class="adm-em-two">
+        <div>
+          <div class="adm-em-lbl">${E('test.to')}</div>
+          <div class="adm-em-fld">
+            <input type="email" value=${to} placeholder=${E('test.toPlaceholder')}
+              onInput=${e => setTo(e.target.value)} />
+          </div>
+          <div class="adm-em-lbl">${E('test.type')}</div>
+          <div class="adm-em-pick">
+            ${TEST_TYPES.map(id => html`
+              <button type="button" class=${type === id ? 'on' : ''} onClick=${() => setType(id)}>
+                ${E('kind.' + id)}
+              </button>`)}
+          </div>
+          <div class="adm-em-act">
+            <button class="adm-btn" onClick=${send} disabled=${sending || !to}>
+              ${sending ? E('test.sending') : E('test.send')}
+            </button>
+            <p>${E('test.note')}</p>
+          </div>
+        </div>
+        <div>
+          <div class="adm-em-lbl">${E('test.lastTitle')}</div>
           ${result
-    ? html`<${Surface} kind="box">
-            <${KeyValue} label=${result.at} value=${result.ok ? '250 OK' : E('test.failed')} mono=${true} />
-            <${KeyValue} label=${result.ok ? E('test.accepted') : E('test.notAccepted')} value=${E('test.byServer')} />
-            <${KeyValue} label=${E('test.took')} value=${E('test.seconds', { n: result.seconds ?? 0 })} />
-            <${KeyValue} label=${E('test.typeRow')} value=${result.type} mono=${true} />
-          <//>
-          <${Text} kind="caption" tone=${result.ok ? 'muted' : 'danger'}>${result.ok ? E('test.hintOk') : E('test.hintBad')}<//>`
-    : html`<${Surface} kind="box"><${KeyValue} label=${E('test.none')} value="—" /><//>
-          <${Text} kind="caption" tone="muted">${E('test.hintIdle')}<//>`}
-        <//>
-      <//>
-    <//>`;
+    ? html`<div class="adm-em-box">
+            <div class="adm-em-box-t"><span>${result.at}</span><span>${result.ok ? '250 OK' : E('test.failed')}</span></div>
+            <div class="adm-em-box-row">${result.ok ? E('test.accepted') : E('test.notAccepted')}<span>${E('test.byServer')}</span></div>
+            <div class="adm-em-box-row">${E('test.took')}<span>${E('test.seconds', { n: result.seconds ?? 0 })}</span></div>
+            <div class="adm-em-box-row">${E('test.typeRow')}<span>${result.type}</span></div>
+          </div>
+          <p class="adm-em-hint">${result.ok ? E('test.hintOk') : E('test.hintBad')}</p>`
+    : html`<div class="adm-em-box"><div class="adm-em-box-row">${E('test.none')}<span>—</span></div></div>
+          <p class="adm-em-hint">${E('test.hintIdle')}</p>`}
+        </div>
+      </div>
+    </section>`;
 }
 
 /** Section 04: one message to everyone in the group who has an address. */
@@ -129,31 +126,42 @@ export function GroupSend({ recipients }) {
   }
 
   return html`
-    <${Section} title=${E('group.title')} count="04" description=${E('group.lead')}>
-      <${Columns} layout="equal" collapse=${640}>
-        <${Stack}>
-          <${Choice} label=${E('group.group')} value=${group} onChange=${setGroup}
-            options=${[{ id: 'operators', label: E('group.operators') }, { id: 'all', label: E('group.everyone') }]} />
-          <${Field} label=${E('group.subject')} value=${subject} placeholder=${E('group.subjectPlaceholder')}
-            onInput=${e => setSubject(e.target.value)} />
-          <${Field} type="textarea" rows=${4} label=${E('group.body')} value=${body} placeholder=${E('group.bodyPlaceholder')}
-            onInput=${e => setBody(e.target.value)} />
-          <${Stack} direction="wrap" align="center">
-            <${Action} onClick=${send} disabled=${sending || !subject || !body || !reach}>
+    <section class="og-sec">
+      <div class="og-sec-h"><h2 class="poster-section-title">${E('group.title')}<small>04</small></h2></div>
+      <p class="adm-em-lead">${E('group.lead')}</p>
+      <div class="adm-em-two">
+        <div>
+          <div class="adm-em-lbl">${E('group.group')}</div>
+          <div class="adm-em-pick">
+            <button type="button" class=${group === 'operators' ? 'on' : ''} onClick=${() => setGroup('operators')}>${E('group.operators')}</button>
+            <button type="button" class=${group === 'all' ? 'on' : ''} onClick=${() => setGroup('all')}>${E('group.everyone')}</button>
+          </div>
+          <div class="adm-em-lbl">${E('group.subject')}</div>
+          <div class="adm-em-fld">
+            <input type="text" value=${subject} placeholder=${E('group.subjectPlaceholder')}
+              onInput=${e => setSubject(e.target.value)} />
+          </div>
+          <div class="adm-em-lbl">${E('group.body')}</div>
+          <div class="adm-em-fld">
+            <textarea rows="4" value=${body} placeholder=${E('group.bodyPlaceholder')}
+              onInput=${e => setBody(e.target.value)}></textarea>
+          </div>
+          <div class="adm-em-act">
+            <button class="adm-btn" onClick=${send} disabled=${sending || !subject || !body || !reach}>
               ${sending ? E('group.sending') : reach ? E('group.send', { n: num(reach) }) : E('group.nobody')}
-            <//>
-            <${Text} kind="caption" tone="muted">${E('group.note')}<//>
-          <//>
-          ${result && html`<${Text} tone=${result.ok ? 'success' : 'danger'}>${result.text}<//>`}
-        <//>
-        <${Stack} density="compact">
-          <${Text} kind="label">${E('group.whoTitle')}<//>
-          <${Surface} kind="box">
-            <${KeyValue} label=${E('group.operators')} value=${E('group.ofN', { n: num(r.operators_with_address ?? 0), total: num(r.operators ?? 0) })} />
-            <${KeyValue} label=${E('group.everyone')} value=${E('group.ofN', { n: num(r.with_address ?? 0), total: num(r.accounts ?? 0) })} />
-          <//>
-          <${Text} kind="caption" tone="muted">${E('group.whoHint')}<//>
-        <//>
-      <//>
-    <//>`;
+            </button>
+            <p>${E('group.note')}</p>
+            ${result && html`<span class="adm-em-said ${result.ok ? 'is-ok' : 'is-bad'}">${result.text}</span>`}
+          </div>
+        </div>
+        <div>
+          <div class="adm-em-lbl">${E('group.whoTitle')}</div>
+          <div class="adm-em-box">
+            <div class="adm-em-box-row">${E('group.operators')}<span>${E('group.ofN', { n: num(r.operators_with_address ?? 0), total: num(r.operators ?? 0) })}</span></div>
+            <div class="adm-em-box-row">${E('group.everyone')}<span>${E('group.ofN', { n: num(r.with_address ?? 0), total: num(r.accounts ?? 0) })}</span></div>
+          </div>
+          <p class="adm-em-hint">${E('group.whoHint')}</p>
+        </div>
+      </div>
+    </section>`;
 }

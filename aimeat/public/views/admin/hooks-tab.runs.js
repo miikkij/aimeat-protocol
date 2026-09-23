@@ -12,9 +12,6 @@
  * @structure HookRuns({ data }) — the filter, the table, the empty state
  * @usage <${HookRuns} data=${data} />
  * @version-history
- *   v2.0.0 -- 2026-09-22 -- Composed from the shared component set: the filters are tab actions on
- *     the section's row, the calls the shared table that stacks on a phone, the empty state a quiet
- *     line. No classes of its own.
  *   v1.1.0 — 2026-09-13 — Compose the shared poster section heading.
  *   v1.0.0 — 2026-09-12 — Initial (the Hooks page in the poster face).
  */
@@ -24,7 +21,6 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { Badge, when } from './shared.js';
-import { Section, Stack, Table, Action, Text } from '/components/poster-parts.js';
 
 const S = (key, params) => t('admin.hooks.' + key, params);
 
@@ -43,36 +39,46 @@ export function HookRuns({ data }) {
     [data.runs, refusedOnly]);
   const shown = all ? rows : rows.slice(0, PAGE);
 
-  const tableRows = shown.map((r) => [
-    { text: when(r.at), mono: true },
-    { text: r.hook, mono: true },
-    { text: r.actionName || r.actionRef, mono: true },
-    html`<${Stack} direction="horizontal" align="center" density="compact">
-      <${Badge} type=${TONE[r.answer] || 'muted'} label=${S('runs.answer_' + r.answer)} />
-      ${r.status ? html`<${Text} kind="mono" tone="muted">${r.status}<//>` : null}
-    <//>`,
-    { text: S('runs.ms', { n: r.ms }), mono: true, align: 'end' },
-    html`<${Stack} density="compact">
-      <${Text} kind="mono">${r.subject || '—'}<//>
-      ${!r.allowed ? html`<${Text} kind="caption" tone="muted">${S('runs.stopped')}${r.reason ? `: ${r.reason}` : ''}<//>`
-        : r.reason ? html`<${Text} kind="caption" tone="muted">${r.reason}<//>` : null}
-    <//>`,
-  ]);
+  return html`
+    <section class="og-sec" id="adm-hook-04">
+      <div class="og-sec-h"><h2 class="poster-section-title">${S('runs.title')}<small>04</small></h2>
+        <div class="adm-hook-filters">
+          <button type="button" class=${'adm-hook-fchip' + (refusedOnly ? '' : ' on')} onClick=${() => { setRefusedOnly(false); setAll(false); }}>${S('runs.filterAll')}</button>
+          <button type="button" class=${'adm-hook-fchip' + (refusedOnly ? ' on' : '')} onClick=${() => { setRefusedOnly(true); setAll(false); }}>${S('runs.filterRefused')}</button>
+        </div>
+      </div>
+      <p class="adm-hook-lead">${S('runs.lead')}</p>
 
-  return html`<${Section} id="adm-hook-04" title=${S('runs.title')} count="04" description=${S('runs.lead')}
-    actions=${html`
-      <${Action} kind="tab" selected=${!refusedOnly} onClick=${() => { setRefusedOnly(false); setAll(false); }}>${S('runs.filterAll')}<//>
-      <${Action} kind="tab" selected=${refusedOnly} onClick=${() => { setRefusedOnly(true); setAll(false); }}>${S('runs.filterRefused')}<//>`}>
-    <${Stack}>
       ${rows.length === 0
-        ? html`<${Text} tone="muted">${(data.runs || []).length === 0 ? S('runs.none') : S('runs.noneMatch')}<//>`
-        : html`<${Table} label=${S('runs.title')} collapse=${600} density="compact" rows=${tableRows}
-            headers=${[S('runs.colWhen'), S('runs.colMoment'), S('runs.colCalled'), S('runs.colAnswer'), S('runs.colTook'), S('runs.colWhat')]} />`}
+        ? html`<div class="adm-hook-empty">${(data.runs || []).length === 0 ? S('runs.none') : S('runs.noneMatch')}</div>`
+        : html`<div class="adm-table-scroll"><table class="adm-table adm-hook-tbl">
+            <thead><tr>
+              <th>${S('runs.colWhen')}</th><th>${S('runs.colMoment')}</th><th>${S('runs.colCalled')}</th>
+              <th>${S('runs.colAnswer')}</th><th>${S('runs.colTook')}</th><th>${S('runs.colWhat')}</th>
+            </tr></thead>
+            <tbody>
+              ${shown.map((r, i) => html`<tr key=${r.at + i}>
+                <td class="adm-hook-when">${when(r.at)}</td>
+                <td class="adm-hook-when">${r.hook}</td>
+                <td class="adm-hook-when">${r.actionName || r.actionRef}</td>
+                <td>
+                  <${Badge} type=${TONE[r.answer] || 'muted'} label=${S('runs.answer_' + r.answer)} />
+                  ${r.status ? html` <span class="adm-hook-mono">${r.status}</span>` : null}
+                </td>
+                <td class="adm-hook-num">${S('runs.ms', { n: r.ms })}</td>
+                <td class="adm-hook-what">
+                  ${r.subject || '—'}
+                  ${!r.allowed ? html`<span class="adm-why">${S('runs.stopped')}${r.reason ? `: ${r.reason}` : ''}</span>`
+                    : r.reason ? html`<span class="adm-why">${r.reason}</span>` : null}
+                </td>
+              </tr>`)}
+            </tbody>
+          </table></div>`}
 
-      ${rows.length > 0 ? html`<${Stack} direction="wrap" align="between">
-        <${Text} kind="mono" tone="muted">${S('runs.shown', { n: shown.length, total: rows.length, kept: data.summary.runs_kept })}<//>
-        ${rows.length > PAGE ? html`<${Action} onClick=${() => setAll(!all)}>${all ? S('runs.showFewer') : S('runs.showAll', { n: rows.length })}<//>` : null}
-      <//>` : null}
-    <//>
-  <//>`;
+      ${rows.length > 0 ? html`
+        <div class="adm-hook-foot">
+          <span class="adm-hook-mono">${S('runs.shown', { n: shown.length, total: rows.length, kept: data.summary.runs_kept })}</span>
+          ${rows.length > PAGE ? html`<button type="button" class="og-door og-door--quiet" onClick=${() => setAll(!all)}>${all ? S('runs.showFewer') : S('runs.showAll', { n: rows.length })}</button>` : null}
+        </div>` : null}
+    </section>`;
 }

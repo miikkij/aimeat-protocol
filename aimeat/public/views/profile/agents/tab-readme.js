@@ -17,27 +17,23 @@
  * @structure
  *   - TabReadme ({ readme }) -> rendered Markdown, or a quiet empty state
  * @version-history
- *   2026-09-22 -- A long README scrolls inside its surface again (Surface height="scroll").
- *   2026-09-22 -- Composed from the shared component set: the Markdown sits in a plain Surface and
- *     the empty state is muted Text. No class of its own is left.
  *   v1.0.0 -- 2026-05-31 -- Initial creation for the agent README tab
  */
 import { h } from 'preact';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { Markdown } from '/components/Markdown.js';
-import { Surface, Text } from '/components/poster-parts.js';
 
 const html = htm.bind(h);
 
 export default function TabReadme({ readme }) {
   const value = typeof readme === 'string' ? readme.trim() : '';
   if (!value) {
-    return html`<${Text} tone="muted">${t('profile.agents.detail.empty.readme')}<//>`;
+    return html`<div class="pf-agd-empty">${t('profile.agents.detail.empty.readme')}</div>`;
   }
   return html`
-    <${Surface} kind="plain" density="flush" height="scroll">
+    <div class="pf-agd-readme">
       <${Markdown} text=${value} />
-    <//>
+    </div>
   `;
 }

@@ -12,9 +12,6 @@
  * @structure fmtClock · stopOtherAudio · AudioAttachment · TranscriptPanel
  * @usage import { AudioAttachment } from './voice-parts.js';
  * @version-history
- *   v1.1.0 -- 2026-09-22 -- Composed from the shared set (Stack, Action, Text, Chip): the transcript
- *     toggle and the transcribe button are the set's actions. The one-player rule now finds the
- *     players as audio elements, because the inbox sheet and its class are gone.
  *   v1.0.0 — 2026-08-01 — Extracted from components.js (voice messages).
  */
 import { h } from 'preact';
@@ -22,8 +19,8 @@ import { useState } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
+import { escHtml } from '/js/utils.js';
 import { stop as stopSpeech } from '/js/services/speech-reader.js';
-import { Action, Chip, Stack, Text } from '/components/poster-parts.js';
 
 /** Seconds → "0:14". */
 export function fmtClock(seconds) {
@@ -34,7 +31,7 @@ export function fmtClock(seconds) {
 /** One voice message at a time. Two playing at once is noise, and a screen reader talking over a
  *  recording is worse — so starting one stops every other player AND the read-aloud engine. */
 export function stopOtherAudio(current) {
-  document.querySelectorAll('audio').forEach((el) => {
+  document.querySelectorAll('audio.inbox-audio').forEach((el) => {
     const player = /** @type {HTMLAudioElement} */ (el);
     if (player !== current && !player.paused) player.pause();
   });
@@ -70,26 +67,29 @@ export function TranscriptPanel({ att, msgId, onTranscribe, canTranscribe }) {
 
   if (tr?.text) {
     return html`
-      <${Stack} density="compact">
-        <${Stack} direction="wrap" align="center" density="compact">
-          <${Action} kind="text" onClick=${() => setOpen((v) => !v)} expanded=${open}>${open ? '↩' : '→'} ${t('inbox.transcript')}<//>
-          <${Text} kind="caption" tone="muted">
+      <div class="inbox-transcript">
+        <button class="inbox-transcript-toggle" onClick=${() => setOpen((v) => !v)} aria-expanded=${open}>
+          ${open ? '▾' : '▸'} ${t('inbox.transcript')}
+          <span class="inbox-transcript-src">
             ${tr.by === 'sender' ? t('inbox.transcriptBySender') : t('inbox.transcriptByYou', { model: tr.model || '' })}
-          <//>
-        <//>
-        ${open ? html`<${Text} lines=${true}>${tr.text}<//>` : null}
-      <//>`;
+          </span>
+        </button>
+        ${open ? html`<div class="inbox-transcript-text">${escHtml(tr.text)}</div>` : null}
+      </div>`;
   }
 
   if (!onTranscribe) return null;
 
   return html`
-    <${Stack} direction="wrap" align="center" density="compact">
+    <div class="inbox-transcript">
       ${canTranscribe === false
-        ? html`<${Text} kind="caption" tone="muted">${t('inbox.transcribeNoModel')}<//>`
-        : html`<${Action} kind="text" onClick=${run} disabled=${busy}>${busy ? t('inbox.transcribing') : t('inbox.transcribe')}<//>`}
-      ${error ? html`<${Text} kind="caption" tone="danger">${error}<//>` : null}
-    <//>`;
+        ? html`<span class="inbox-transcript-hint">${t('inbox.transcribeNoModel')}</span>`
+        : html`
+          <button class="inbox-transcript-btn" onClick=${run} disabled=${busy}>
+            ${busy ? t('inbox.transcribing') : t('inbox.transcribe')}
+          </button>`}
+      ${error ? html`<span class="inbox-transcript-err">${error}</span>` : null}
+    </div>`;
 }
 
 /**
@@ -100,13 +100,14 @@ export function TranscriptPanel({ att, msgId, onTranscribe, canTranscribe }) {
  * open. The duration is all that is needed until someone presses play.
  */
 export function AudioAttachment({ a, url, name, download, msgId, onTranscribe, canTranscribe }) {
-  return html`<${Stack} density="compact">
-    <audio controls preload="metadata" src=${url} onPlay=${(e) => stopOtherAudio(e.currentTarget)}></audio>
-    <${Stack} direction="wrap" align="center" density="compact">
-      <${Text} kind="caption">${name}<//>
-      ${a.durationSeconds ? html`<${Chip}>${fmtClock(a.durationSeconds)}<//>` : null}
+  return html`<div class="inbox-attach-audio">
+    <audio class="inbox-audio" controls preload="metadata" src=${url}
+           onPlay=${(e) => stopOtherAudio(e.currentTarget)}></audio>
+    <div class="inbox-attach-cap">
+      <span class="inbox-attach-name">${escHtml(name)}</span>
+      ${a.durationSeconds ? html`<span class="inbox-audio-dur">${fmtClock(a.durationSeconds)}</span>` : null}
       ${download}
-    <//>
+    </div>
     <${TranscriptPanel} att=${a} msgId=${msgId} onTranscribe=${onTranscribe} canTranscribe=${canTranscribe} />
-  <//>`;
+  </div>`;
 }

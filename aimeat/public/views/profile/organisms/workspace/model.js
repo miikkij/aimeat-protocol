@@ -11,7 +11,6 @@
  * @structure buildBreadcrumb, buildWorkspaceModel
  * @usage import { buildWorkspaceModel } from '/views/profile/organisms/workspace/model.js';
  * @version-history
- *   v1.3.0 -- 2026-09-22 -- buildBreadcrumb returns the shared Page's crumb entries instead of markup.
  *   v1.2.0 — 2026-08-29 — openGroup and scrollToSpace removed with the tab block (cover.js opens a space
  *     as a page; a group is a table on the cover).
  *   v1.0.0 — 2026-07-13 — Extracted from workspace.js (max-file-lines)
@@ -19,25 +18,29 @@
  *       is not a loss: it only fired when navigator.clipboard rejected, exactly the case the shared
  *       helper handles by falling back to execCommand and succeeding.
  */
+import { h } from 'preact';
+import htm from 'htm';
+const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import * as orgService from '/js/services/organisms.js';
 import { cap, PRIMARY_FIELD } from './helpers.js';
 
 // Same breadcrumb pattern as the organism home: Organisms / {org} / {workspace} — both ancestors
-// are links, so the list is one click away from inside a workspace too. Returned as the shared
-// Page's `crumbs` entries.
+// are links, so the list is one click away from inside a workspace too.
 export function buildBreadcrumb(ctx) {
   const { onBack, onBackToList, org, showSettings, guardWsDirty, setShowSettings, wsName, ws } = ctx;
-  const name = wsName || ws?.manifest?.name || '…';
-  return [
-    { label: t('nav.profile') },
-    { label: t('profile.landing.menuInformation') },
-    { label: t('organisms.title') || 'Organisms', onClick: onBackToList || onBack },
-    { label: org.name || org.id || '', onClick: onBack },
-    ...(showSettings
-      ? [{ label: name, onClick: () => guardWsDirty(() => setShowSettings(false)) }, { label: t('organisms.settings') || 'Settings' }]
-      : [{ label: name }]),
-  ];
+  return html`
+    <div class="pj-org-breadcrumb">
+      <button class="pj-org-crumb-link" onClick=${onBackToList || onBack}>${t('organisms.title') || 'Organisms'}</button>
+      <span class="pj-org-crumb-sep">/</span>
+      <button class="pj-org-crumb-link" onClick=${onBack}>${(org.name || org.id || '')}</button>
+      <span class="pj-org-crumb-sep">/</span>
+      ${showSettings ? html`
+        <button class="pj-org-crumb-link" onClick=${() => guardWsDirty(() => setShowSettings(false))}>${(wsName || ws?.manifest?.name || '…')}</button>
+        <span class="pj-org-crumb-sep">/</span>
+        <span>${t('organisms.settings') || 'Settings'}</span>
+      ` : html`<span>${(wsName || ws?.manifest?.name || '…')}</span>`}
+    </div>`;
 }
 
 // Build the whole derived view-model for a loaded workspace. `loadShare` stays in the parent (it is

@@ -6,10 +6,6 @@
  * @structure Single `loadAll` fetches all dashboard data; tabs render slices of it. SSE
  *            live-updates trigger a debounced, silent background refresh.
  * @version-history
- *   v2.0.0 -- 2026-09-22 -- The frame is the shared set's: a Page whose menu is the navigation rail
- *     (the same quiet list as Settings & Controls, a menu dialog on a phone), the page title and the
- *     refresh in the masthead, and the sign-in, access-denied, error and loading states as shared
- *     parts. admin.css no longer draws the shell.
  *   v1.8.0 -- 2026-09-13 -- Compose the existing page title with poster-page-title.
  *   v1.9.0 — 2026-09-09 — The marketplace stats fetch goes: its route was deleted, and nothing here
  *     ever rendered the value it loaded.
@@ -33,9 +29,8 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { time as fmtTime } from '/js/format.js';
+import { escHtml } from '/js/utils.js';
 import { useViewCSS } from '/components/useViewCSS.js';
-import { Page, Rail, Stack, ListRow, Text, Action, Surface } from '/components/poster-parts.js';
-import { Spinner } from '/components/Spinner.js';
 import { getSession, onAuthChange } from '/js/services/auth.js';
 import * as api from '/js/services/admin.js';
 import { connect, disconnect, onUpdate, offUpdate } from '/lib/live-updates.js';
@@ -169,7 +164,6 @@ export default function Admin({ navigate, locale }) {
 
   const [session, setSession] = useState(null);
   const [activePage, setActivePage] = useState('overview');
-  const [menuOpen, setMenuOpen] = useState(false);
   const [data, setData] = useState(null);
   const [counts, setCounts] = useState({});
   const [loading, setLoading] = useState(false);
@@ -394,19 +388,27 @@ export default function Admin({ navigate, locale }) {
 
   // ── Not logged in ──
   if (!session) {
-    return html`<${Page} width="reading" title=${t('dashboard.loginTitle')}>
-      <${Stack}>
-        <${Text} kind="lead">${t('dashboard.loginDesc')}<//>
-        <${Text} tone="muted">${t('dashboard.loginNeedOperator') || 'You need to sign in with an operator account from the header.'}<//>
-      <//>
-    <//>`;
+    return html`<div class="adm">
+      <div class="adm-login">
+        <div class="adm-card" style="text-align:center">
+          <h2>${t('dashboard.loginTitle')}</h2>
+          <p>${t('dashboard.loginDesc')}</p>
+          <p style="color:var(--text-dim);font-size:.85rem">${t('dashboard.loginNeedOperator') || 'You need to sign in with an operator account from the header.'}</p>
+        </div>
+      </div>
+    </div>`;
   }
 
   // ── Access denied (server returned 403) ──
   if (accessDenied) {
-    return html`<${Page} width="reading" title=${t('dashboard.accessDenied') || 'Access Denied'}>
-      <${Text} kind="lead">${t('dashboard.operatorRequired') || 'You need the operator role to access the admin dashboard.'}<//>
-    <//>`;
+    return html`<div class="adm">
+      <div class="adm-login">
+        <div class="adm-card" style="text-align:center">
+          <h2>${t('dashboard.accessDenied') || 'Access Denied'}</h2>
+          <p>${t('dashboard.operatorRequired') || 'You need the operator role to access the admin dashboard.'}</p>
+        </div>
+      </div>
+    </div>`;
   }
 
   // Find active component
@@ -417,27 +419,48 @@ export default function Admin({ navigate, locale }) {
 
   const tabProps = { data, reload: loadAll, session, navigate, locale, switchPage };
 
-  // The menu: the same quiet navigation list as Settings & Controls. The node's id heads it, each
-  // group is a small label, each page a row with its count; the open page sits on the sun.
-  const rail = html`<${Rail} kind="navigation" label=${t('nav.admin')}><${Stack} density="compact">
-    ${data?.dash?.node_id && html`<${Text} kind="mono" tone="muted">${data.dash.node_id}<//>`}
-    ${NAV_GROUPS.map(group => html`<${Stack} key=${group.key} density="compact">
-      <${Text} kind="label">${t(group.key)}<//>
-      ${group.items.map(item => html`<${ListRow} key=${item.id} density="compact" name=${t(item.key)}
-        selected=${activePage === item.id} onOpen=${() => { switchPage(item.id); setMenuOpen(false); }}
-        value=${item.count != null && counts[item.count] != null ? counts[item.count] : null} />`)}
-    <//>`)}
-  <//><//>`;
+  return html`
+    <div class="adm">
+      <!-- Sidebar -->
+      <nav class="adm-sidebar">
+        <div class="node-id">${data?.dash?.node_id || ''}</div>
 
-  return html`<${Page} width="wide" rail=${rail} railSide="leading" railLabel=${t('nav.admin')}
-    railOpen=${menuOpen} onRailOpen=${() => setMenuOpen(true)} onRailClose=${() => setMenuOpen(false)}
-    title=${t(pageInfo.key)}
-    actions=${html`<${Action} onClick=${loadAll} disabled=${loading}>${loading ? t('dashboard.loading') : t('dashboard.refresh')}<//>
-      ${lastUpdate && html`<${Text} kind="mono" tone="muted">${fmtTime(lastUpdate)}<//>`}`}>
-    ${error && html`<${Surface} kind="aside" tone="danger" role="alert"><${Stack} density="compact">
-      <${Text} kind="label">${t('dashboard.failedToLoad')}<//><${Text}>${error}<//>
-    <//><//>`}
-    ${!data && !error && html`<${Stack} direction="horizontal" align="center"><${Spinner} /><${Text} tone="muted">${t('dashboard.loading')}<//><//>`}
-    ${data && html`<${ActiveComponent} ...${tabProps} />`}
-  <//>`;
+        ${NAV_GROUPS.map(group => html`
+          <div class="adm-nav-group">${t(group.key)}</div>
+          ${group.items.map(item => html`
+            <button
+              class="adm-nav-item ${activePage === item.id ? 'active' : ''}"
+              onClick=${() => switchPage(item.id)}
+            >
+              <span class="label">${t(item.key)}</span>
+              ${item.count != null && counts[item.count] != null
+                ? html`<span class="cnt">${counts[item.count]}</span>`
+                : null}
+            </button>
+          `)}
+        `)}
+      </nav>
+
+      <!-- Main content -->
+      <div class="adm-main">
+        <div class="adm-topbar">
+          <div class="adm-page-title poster-page-title">
+            ${t(pageInfo.key)}
+          </div>
+          <div class="adm-topbar-right">
+            <button class="adm-refresh" onClick=${loadAll} disabled=${loading}>
+              ${loading ? t('dashboard.loading') : t('dashboard.refresh')}
+            </button>
+            ${lastUpdate && html`<span class="adm-time">${fmtTime(lastUpdate)}</span>`}
+          </div>
+        </div>
+
+        ${error && html`<div class="error-box"><strong>${t('dashboard.failedToLoad')}</strong><br/>${escHtml(error)}</div>`}
+
+        ${!data && !error && html`<div class="empty"><div class="spinner"></div> ${t('dashboard.loading')}</div>`}
+
+        ${data && html`<${ActiveComponent} ...${tabProps} />`}
+      </div>
+    </div>
+  `;
 }

@@ -22,9 +22,6 @@
  * @structure CortexTab (default) · RightNow · WhatOffDoes · WhoCanRead
  * @usage Mounted by the admin dashboard tab router (views/admin.js).
  * @version-history
- *   v3.0.0 -- 2026-09-22 -- Composed from the shared component set: sections, the numeral band whose
- *     figures scroll to their section, the shared table (stacking on a phone), groups as list rows,
- *     the shared dialog with its aside and field. The page's own sheet is gone.
  *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v2.1.0 — 2026-09-13 — Compose shared B1 headings; move existing layout values to the view sheet.
@@ -42,8 +39,8 @@ import { useState, useEffect, useCallback, useMemo } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { onLiveUpdate } from '/lib/live-updates.js';
-import { num, day, Badge, Row, Spinner, ErrorBox, useToast, Toast } from './shared.js';
-import { Section, Stack, ListRow, NumeralBand, Table, Toolbar, Field, Dialog, Action, Surface, Text, scrollToId } from '/components/poster-parts.js';
+import { num, day, Badge, Spinner, ErrorBox, useToast, Toast } from './shared.js';
+import { Modal } from '/components/Modal.js';
 import { swallowed } from '/js/swallowed.js';
 import * as cortexService from '/js/services/cortex.js';
 import { groupUnused, isSiteOwn } from './cortex-tab.groups.js';
@@ -55,48 +52,68 @@ const C = (key, params) => t('admin.cortex.' + key, params);
 /** How many apps load this one, which is the number every arrangement on this page turns on. */
 const appsOf = (e) => e?.used_by?.apps ?? 0;
 
+/** Scroll a section into view from a numeral in the strip. */
+function goTo(id) {
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
 /** Section 01: the four numbers, and the sentence that says which of them needs a decision. */
 function RightNow({ facts, number, onBusiest }) {
-    return html`<${Section} id="adm-cx-now" title=${C('now.title')} count=${number}>
-      <${Stack}>
-        <${NumeralBand} tone="plain" items=${[
-          { label: C('strip.installed'), value: num(facts.all), note: C('strip.installedSub') },
-          { label: C('strip.carrying'), value: num(facts.carrying), note: C('strip.carryingSub'), onClick: () => scrollToId('adm-cx-loaded') },
-          { label: C('strip.unused'), value: num(facts.unused), note: C('strip.unusedSub'), tone: 'coral', onClick: () => scrollToId('adm-cx-unused') },
-          { label: C('strip.busiest'), value: num(facts.busiest), note: facts.busiestName || C('strip.busiestNone'), onClick: onBusiest },
-        ]} />
-        <${Text} kind="lead">${facts.off > 0
-          ? C('now.lineOff', { off: num(facts.off), breaking: num(facts.offButLoaded) })
-          : C('now.line', { n: num(facts.all), unused: num(facts.unused) })}<//>
-      <//>
-    <//>`;
+    return html`
+    <section class="og-sec og-sec--first" id="adm-cx-now">
+      <div class="og-sec-h"><h2 class="poster-section-title">${C('now.title')}<small>${number}</small></h2></div>
+      <div class="og-strip">
+        <div><b>${num(facts.all)}</b><span>${C('strip.installed')}</span><small>${C('strip.installedSub')}</small></div>
+        <button type="button" onClick=${() => goTo('adm-cx-loaded')}>
+          <b>${num(facts.carrying)}</b><span>${C('strip.carrying')}</span><small>${C('strip.carryingSub')}</small></button>
+        <button type="button" onClick=${() => goTo('adm-cx-unused')}>
+          <b class="og-coral-num">${num(facts.unused)}</b>
+          <span>${C('strip.unused')}</span><small>${C('strip.unusedSub')}</small></button>
+        <button type="button" onClick=${onBusiest}>
+          <b>${num(facts.busiest)}</b><span>${C('strip.busiest')}</span>
+          <small>${facts.busiestName || C('strip.busiestNone')}</small></button>
+      </div>
+      <p class="adm-alert-line">${facts.off > 0
+        ? C('now.lineOff', { off: num(facts.off), breaking: num(facts.offButLoaded) })
+        : C('now.line', { n: num(facts.all), unused: num(facts.unused) })}</p>
+    </section>`;
 }
 
 /** Section 04: what off actually does, and why removing is the one that cannot be taken back. */
 function WhatOffDoes({ number }) {
-    const step = (i, key) => html`<${ListRow} number=${String(i).padStart(2, '0')}
-      name=${C('off.' + key)} detail=${C('off.' + key + 'Why')} detailKind="text" />`;
-    return html`<${Section} id="adm-cx-off" title=${C('off.title')} count=${number}>
-      <div>${step(1, 'goes')}${step(2, 'stays')}${step(3, 'remove')}</div>
-    <//>`;
+    const step = (i, key, last) => html`
+    <div class=${'adm-cx-step' + (last ? ' adm-cx-step--last' : '')}>
+      <span class="adm-cx-stepn poster-stat-number poster-stat-number--small poster-stat-number--step">${String(i).padStart(2, '0')}</span>
+      <span><b>${C('off.' + key)}</b><span class="adm-why">${C('off.' + key + 'Why')}</span></span>
+    </div>`;
+    return html`
+    <section class="og-sec" id="adm-cx-off">
+      <div class="og-sec-h"><h2 class="poster-section-title">${C('off.title')}<small>${number}</small></h2></div>
+      ${step(1, 'goes')}
+      ${step(2, 'stays')}
+      ${step(3, 'remove', true)}
+    </section>`;
 }
 
 /** Section 05: the visibility word, which decides who may read the insides and nothing else. */
 function WhoCanRead({ facts, number }) {
-    const row = (key, value) => html`<${Row} title=${C('read.' + key)} why=${C('read.' + key + 'Why')} value=${value} />`;
-    return html`<${Section} id="adm-cx-read" title=${C('read.title')} count=${number} description=${C('read.lead')}>
-      <${Stack}>
-        <div>
-          ${row('public', num(facts.publicCount))}
-          ${row('private', num(facts.privateCount))}
-          ${row('site', num(facts.siteCount))}
-        </div>
-        <${Surface} kind="aside"><${Stack} density="compact">
-          <${Text} kind="label">${C('read.boxLabel')}<//>
-          <${Text}>${C('read.box', { n: num(facts.all) })}<//>
-        <//><//>
-      <//>
-    <//>`;
+    const row = (key, value, last) => html`
+    <div class=${'adm-mrow adm-mrow--two' + (last ? ' adm-mrow--last' : '')}>
+      <span><b>${C('read.' + key)}</b><span class="adm-why">${C('read.' + key + 'Why')}</span></span>
+      <span class="adm-mval">${value}</span>
+    </div>`;
+    return html`
+    <section class="og-sec" id="adm-cx-read">
+      <div class="og-sec-h"><h2 class="poster-section-title">${C('read.title')}<small>${number}</small></h2></div>
+      <p class="adm-cx-lead">${C('read.lead')}</p>
+      ${row('public', num(facts.publicCount))}
+      ${row('private', num(facts.privateCount))}
+      ${row('site', num(facts.siteCount), true)}
+      <div class="og-box adm-cx-read-note poster-aside poster-aside--small">
+        <span class="og-box-label">${C('read.boxLabel')}</span>
+        ${C('read.box', { n: num(facts.all) })}
+      </div>
+    </section>`;
 }
 
 export default function CortexTab() {
@@ -249,55 +266,59 @@ export default function CortexTab() {
         const apps = appsOf(e);
         const names = e?.used_by?.app_names ?? [];
         return html`
-      <${Dialog} open=${!!e} onClose=${() => setTurningOff(null)} title=${e ? C('dialog.offTitle', { name: e.name }) : ''}
-        actions=${e && html`
-          <${Action} kind="text" onClick=${() => setTurningOff(null)}>${t('common.cancel')}<//>
-          <${Action} kind="primary" disabled=${busy} onClick=${doTurnOff}>
+      <${Modal} open=${!!e} onClose=${() => setTurningOff(null)} title=${e ? C('dialog.offTitle', { name: e.name }) : ''}
+        footer=${e && html`
+          <button type="button" class="og-door og-door--quiet" onClick=${() => setTurningOff(null)}>${t('common.cancel')}</button>
+          <button type="button" class="adm-btn" disabled=${busy} onClick=${doTurnOff}>
             ${apps === 0 ? C('dialog.offDo')
               : apps === 1 ? C('dialog.offDoForOne')
-                : C('dialog.offDoFor', { n: num(apps) })}<//>`}>
-        ${e && html`<${Stack}>
+                : C('dialog.offDoFor', { n: num(apps) })}</button>`}>
+        ${e && html`
           ${apps > 0
             ? html`
-              <${Text} kind="heading" size="small">${apps === 1 ? C('dialog.offLoadedOne') : C('dialog.offLoaded', { n: num(apps) })}<//>
-              <${Text} kind="mono">${names.map((a, i) => html`${i > 0 ? ' · ' : ''}${a}`)}
-                ${apps > names.length ? html` ${C('detail.andMore', { n: num(apps - names.length) })}` : ''}<//>
-              <${Text} tone="coral">${C('dialog.offBreaks')}<//>`
-            : html`<${Text}>${C('dialog.offNobody')}<//>`}
-          <div>
-            <${Row} title=${C('dialog.goes')} why=${C('dialog.goesWhy')} />
-            <${Row} title=${C('dialog.stays')} why=${C('dialog.staysWhy')} />
+              <p class="adm-cx-big">${apps === 1 ? C('dialog.offLoadedOne') : C('dialog.offLoaded', { n: num(apps) })}</p>
+              <p class="adm-cx-applist">${names.map((a, i) => html`${i > 0 ? ' · ' : ''}${a}`)}
+                ${apps > names.length ? html` ${C('detail.andMore', { n: num(apps - names.length) })}` : ''}</p>
+              <p class="adm-cx-lead adm-cx-off-breaks">${C('dialog.offBreaks')}</p>`
+            : html`<p class="adm-cx-lead adm-cx-off-nobody">${C('dialog.offNobody')}</p>`}
+          <div class="adm-mrow adm-mrow--two">
+            <span><b>${C('dialog.goes')}</b><span class="adm-why">${C('dialog.goesWhy')}</span></span>
+            <span class="adm-mval"></span>
           </div>
-        <//>`}
+          <div class="adm-mrow adm-mrow--two adm-mrow--last">
+            <span><b>${C('dialog.stays')}</b><span class="adm-why">${C('dialog.staysWhy')}</span></span>
+            <span class="adm-mval"></span>
+          </div>`}
       <//>`;
     };
 
     const removeDialog = () => html`
-      <${Dialog} open=${!!removing} onClose=${() => setRemoving(null)}
+      <${Modal} open=${!!removing} onClose=${() => setRemoving(null)}
         title=${removing ? C('dialog.removeTitle', { name: removing.name }) : ''}
-        actions=${removing && html`
-          <${Action} kind="text" onClick=${() => setRemoving(null)}>${t('common.cancel')}<//>
-          <${Action} kind="primary" tone="danger"
-            disabled=${busy || removing.typed !== removing.name} onClick=${doRemove}>${C('removeForGood')}<//>`}>
-        ${removing && html`<${Stack}>
-          <${Surface} kind="aside" tone="danger"><${Stack} density="compact">
-            <${Text} kind="label">${C('dialog.removeWarnLabel')}<//>
-            <${Text}>${C('dialog.removeWarn')}<//>
-          <//><//>
-          <${Field} label=${C('dialog.removeTypeLabel', { name: removing.name })} value=${removing.typed} placeholder=${removing.name}
-            passwordManager=${false} onInput=${ev => setRemoving({ ...removing, typed: ev.target.value })} />
-        <//>`}
+        footer=${removing && html`
+          <button type="button" class="og-door og-door--quiet" onClick=${() => setRemoving(null)}>${t('common.cancel')}</button>
+          <button type="button" class="og-door og-door--quiet og-door--danger"
+            disabled=${busy || removing.typed !== removing.name} onClick=${doRemove}>${C('removeForGood')}</button>`}>
+        ${removing && html`
+          <div class="og-box poster-aside poster-aside--small">
+            <span class="og-box-label">${C('dialog.removeWarnLabel')}</span>
+            ${C('dialog.removeWarn')}
+          </div>
+          <label class="adm-cx-field">
+            <span>${C('dialog.removeTypeLabel', { name: removing.name })}</span>
+            <input class="adm-input mono" type="text" value=${removing.typed} placeholder=${removing.name}
+              onInput=${ev => setRemoving({ ...removing, typed: ev.target.value })} />
+          </label>`}
       <//>`;
 
     if (list === null) {
-        return html`<${Stack}>
+        return html`
       ${msg && html`<${Toast} type=${msg.type} text=${msg.text} onDismiss=${clearMsg} />`}
-      <${Spinner} text=${t('dashboard.loading')} />
-    <//>`;
+      <${Spinner} text=${t('dashboard.loading')} />`;
     }
 
     if (detail) {
-        return html`<${Stack}>
+        return html`
       ${msg && html`<${Toast} type=${msg.type} text=${msg.text} onDismiss=${clearMsg} />`}
       <${CortexDetail} ext=${detail.ext} row=${detail.row} busy=${busy}
         onBack=${() => setDetail(null)}
@@ -306,8 +327,7 @@ export default function CortexTab() {
         onVisibility=${() => doVisibility(detail.ext)}
         onRemove=${() => setRemoving({ name: detail.ext.name, typed: '' })} />
       ${offDialog()}
-      ${removeDialog()}
-    <//>`;
+      ${removeDialog()}`;
     }
 
     let counter = 0;
@@ -318,35 +338,54 @@ export default function CortexTab() {
         const on = e.status === 'active';
         const apps = appsOf(e);
         const names = e.used_by?.app_names ?? [];
-        return [
-          html`<${Stack} density="compact">
-            <${Stack} direction="wrap" align="center" density="compact">
-              <${Action} kind="text" onClick=${() => openDetail(e)}>${e.name}<//>
+        return html`
+      <tr class=${on ? '' : 'adm-cx-row--off'} key=${e.name}>
+        <td data-label=${C('col.name')}>
+          <span class="adm-cx-name">
+            <button type="button" onClick=${() => openDetail(e)}>${e.name}</button>
+            <span class="adm-cx-chips">
               ${isSiteOwn(e) && html`<${Badge} type="muted" label=${C('thisSite')} />`}
               ${e.visibility === 'public' && html`<${Badge} type="public" label=${C('read.public')} />`}
               ${!on && html`<${Badge} type="warning" label=${C('state.off')} />`}
-            <//>
-            ${names.length > 0 && html`<${Text} kind="caption" tone="muted">${names.map((a, i) => html`${i > 0 ? ' · ' : ''}${a}`)}${apps > names.length ? html` ${C('detail.andMore', { n: num(apps - names.length) })}` : ''}<//>`}
-          <//>`,
-          { text: e.version || '?', mono: true },
-          isSiteOwn(e) ? C('thisSite') : (e.installed_by || '?'),
-          html`<${Text} kind="number" size="small" tone=${apps > 0 ? 'plain' : 'muted'}>${num(apps)}<//>`,
-          (e.component_types ?? []).join(', ') || '—',
-          html`<${Stack} direction="horizontal" density="compact">
+            </span>
+          </span>
+          ${names.length > 0 && html`<span class="adm-cx-apps">${names.map((a, i) => html`${i > 0 ? ' · ' : ''}${a}`)}${apps > names.length ? html` ${C('detail.andMore', { n: num(apps - names.length) })}` : ''}</span>`}
+        </td>
+        <td class="r" data-label=${C('col.version')}>${e.version || '?'}</td>
+        <td class="r" data-label=${C('col.by')}>${isSiteOwn(e) ? C('thisSite') : (e.installed_by || '?')}</td>
+        <td class="r" data-label=${C('col.apps')}>
+          <span class=${apps > 0 ? 'adm-cx-n' : 'adm-cx-n--zero'}>${num(apps)}</span></td>
+        <td class="r" data-label=${C('col.pieces')}>${(e.component_types ?? []).join(', ') || '—'}</td>
+        <td>
+          <div class="adm-cx-acts">
             ${on
-              ? html`<${Action} disabled=${busy} onClick=${() => setTurningOff(e)}>${C('turnOff')}<//>`
-              : html`<${Action} disabled=${busy} onClick=${() => doTurnOn(e)}>${C('turnOn')}<//>`}
-            <${Action} onClick=${() => openDetail(e)}>${C('look')}<//>
-          <//>`,
-        ];
+              ? html`<button type="button" class="og-door og-door--quiet" disabled=${busy}
+                  onClick=${() => setTurningOff(e)}>${C('turnOff')}</button>`
+              : html`<button type="button" class="og-door og-door--quiet" disabled=${busy}
+                  onClick=${() => doTurnOn(e)}>${C('turnOn')}</button>`}
+            <button type="button" class="og-door og-door--quiet" onClick=${() => openDetail(e)}>${C('look')}</button>
+          </div>
+        </td>
+      </tr>`;
     };
 
-    const table = (rows) => html`<${Table} collapse=${900} label=${C('col.name')}
-      headers=${[C('col.name'), C('col.version'), C('col.by'), C('col.apps'), C('col.pieces'), '']}
-      rows=${rows.map(row)} />`;
+    const table = (rows) => html`
+    <div class="adm-cx-scroll">
+      <table class="adm-cx-tbl">
+        <thead><tr>
+          <th class="adm-cx-name-column">${C('col.name')}</th>
+          <th class="r">${C('col.version')}</th>
+          <th class="r">${C('col.by')}</th>
+          <th class="r">${C('col.apps')}</th>
+          <th class="r">${C('col.pieces')}</th>
+          <th></th>
+        </tr></thead>
+        <tbody>${rows.map(row)}</tbody>
+      </table>
+    </div>`;
 
     /** A group in section 03: the fact that made it, the names in it, and the way in. */
-    const groupBlock = (g) => {
+    const groupBlock = (g, last) => {
         const title = g.kind === 'lookalike' ? C('group.lookalike', { n: num(g.items.length) })
             : g.kind === 'batch' ? C('group.batch', { n: num(g.items.length), who: g.by || '?', day: day(g.day) })
                 : g.kind === 'site' ? C('group.site', { n: num(g.items.length) })
@@ -356,42 +395,57 @@ export default function CortexTab() {
                 : g.kind === 'site' ? C('group.siteWhy')
                     : C('group.oneWhy', { when: day(g.items[0].installed_at), who: g.items[0].installed_by || '?' });
         const open = openGroup === g.key;
-        return html`<${ListRow} key=${g.key} name=${title} open=${open}
-          detail=${g.items.map(e => e.name).join(' · ')}
-          actions=${html`
-            <${Action} expanded=${open} onClick=${() => setOpenGroup(open ? '' : g.key)}>${open ? C('group.close') : C('group.show')}<//>
-            ${g.kind === 'batch' && html`<${Action} tone="danger" disabled=${busy}
-              onClick=${() => setRemovingBatch({ ...g, typed: '' })}>${C('group.removeAll', { n: num(g.items.length) })}<//>`}`}>
-          <${Stack}>
-            <${Text} kind="caption" tone="muted">${why}<//>
-            ${open && table(g.items)}
-          <//>
-        <//>`;
+        return html`
+      <div class=${'adm-cx-grp' + (last ? ' adm-cx-grp--last' : '')} key=${g.key}>
+        <div class="adm-cx-grph">
+          <b>${title}</b>
+          <span class="adm-cx-grpacts">
+            <button type="button" class="og-door og-door--quiet"
+              onClick=${() => setOpenGroup(open ? '' : g.key)}>${open ? C('group.close') : C('group.show')}</button>
+            ${g.kind === 'batch' && html`<button type="button" class="og-door og-door--quiet og-door--danger"
+              disabled=${busy}
+              onClick=${() => setRemovingBatch({ ...g, typed: '' })}>${C('group.removeAll', { n: num(g.items.length) })}</button>`}
+          </span>
+        </div>
+        <span class="adm-cx-names">${g.items.map((e, i) => html`${i > 0 ? ' · ' : ''}${e.name}`)}</span>
+        <span class="adm-cx-grpwhy">${why}</span>
+        ${open && html`<div class="adm-cx-open">${table(g.items)}</div>`}
+      </div>`;
     };
 
-    return html`<${Stack}>
+    return html`
+    <div class="adm-cx">
       ${msg && html`<${Toast} type=${msg.type} text=${msg.text} onDismiss=${clearMsg} />`}
-      <${Text} kind="lead">${C('intro')}<//>
+      <p class="adm-cx-intro">${C('intro')}</p>
       ${error && html`<${ErrorBox} message=${error} />`}
 
       <${RightNow} facts=${facts} number=${n()} onBusiest=${() => setQuery(facts.busiestName)} />
 
-      <${Section} id="adm-cx-loaded" title=${C('loaded.title')} count=${n()}
-        actions=${html`<${Text} kind="caption" tone="muted">${C('loaded.count', { n: num(loaded.length), total: num(facts.all) })}<//>`}>
-        <${Stack}>
-          <${Toolbar} search=${{ ariaLabel: C('find.placeholder'), placeholder: C('find.placeholder'), value: query, onInput: ev => setQuery(ev.target.value) }} />
-          ${loaded.length === 0
-            ? html`<${Text} kind="caption" tone="muted">${query ? C('loaded.noMatch') : C('loaded.none')}<//>`
-            : table(loaded)}
-        <//>
-      <//>
+      <section class="og-sec" id="adm-cx-loaded">
+        <div class="og-sec-h"><h2 class="poster-section-title">${C('loaded.title')}<small>${n()}</small></h2>
+          <div class="og-doors"><span class="adm-cx-note">${C('loaded.count', { n: num(loaded.length), total: num(facts.all) })}</span></div></div>
 
-      <${Section} id="adm-cx-unused" title=${C('unused.title')} count=${n()} description=${C('unused.lead')}
-        actions=${html`<${Text} kind="caption" tone="muted">${C('unused.count', { n: num(unusedShown), total: num(facts.all) })}<//>`}>
+        <div class="adm-cx-tools">
+          <span class="adm-cx-find">
+            <svg viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.5" /><path d="M10.5 10.5 14 14" /></svg>
+            <input type="text" value=${query} placeholder=${C('find.placeholder')}
+              onInput=${ev => setQuery(ev.target.value)} />
+          </span>
+        </div>
+
+        ${loaded.length === 0
+          ? html`<p class="adm-cx-note">${query ? C('loaded.noMatch') : C('loaded.none')}</p>`
+          : table(loaded)}
+      </section>
+
+      <section class="og-sec" id="adm-cx-unused">
+        <div class="og-sec-h"><h2 class="poster-section-title">${C('unused.title')}<small>${n()}</small></h2>
+          <div class="og-doors"><span class="adm-cx-note">${C('unused.count', { n: num(unusedShown), total: num(facts.all) })}</span></div></div>
+        <p class="adm-cx-lead">${C('unused.lead')}</p>
         ${groups.length === 0
-          ? html`<${Text} kind="caption" tone="muted">${query ? C('loaded.noMatch') : C('unused.none')}<//>`
-          : html`<div>${groups.map((g) => groupBlock(g))}</div>`}
-      <//>
+          ? html`<p class="adm-cx-note">${query ? C('loaded.noMatch') : C('unused.none')}</p>`
+          : groups.map((g, i) => groupBlock(g, i === groups.length - 1))}
+      </section>
 
       <${WhatOffDoes} number=${n()} />
       <${WhoCanRead} facts=${facts} number=${n()} />
@@ -399,23 +453,24 @@ export default function CortexTab() {
       ${offDialog()}
       ${removeDialog()}
 
-      <${Dialog} open=${!!removingBatch} onClose=${() => setRemovingBatch(null)} title=${C('dialog.batchTitle')}
-        actions=${removingBatch && html`
-          <${Action} kind="text" onClick=${() => setRemovingBatch(null)}>${t('common.cancel')}<//>
-          <${Action} kind="primary" tone="danger"
+      <${Modal} open=${!!removingBatch} onClose=${() => setRemovingBatch(null)} title=${C('dialog.batchTitle')}
+        footer=${removingBatch && html`
+          <button type="button" class="og-door og-door--quiet" onClick=${() => setRemovingBatch(null)}>${t('common.cancel')}</button>
+          <button type="button" class="og-door og-door--quiet og-door--danger"
             disabled=${busy || removingBatch.typed !== C('dialog.removeWord')}
-            onClick=${doRemoveBatch}>${C('group.removeAll', { n: num(removingBatch.items.length) })}<//>`}>
-        ${removingBatch && html`<${Stack}>
-          <${Text}>${C('dialog.batchAsk', { n: num(removingBatch.items.length) })}<//>
-          <${Text} kind="mono">${removingBatch.items.map((e, i) => html`${i > 0 ? ' · ' : ''}${e.name}`)}<//>
-          <${Surface} kind="aside" tone="danger"><${Stack} density="compact">
-            <${Text} kind="label">${C('dialog.removeWarnLabel')}<//>
-            <${Text}>${C('dialog.batchWarn')}<//>
-          <//><//>
-          <${Field} label=${C('dialog.batchTypeLabel', { word: C('dialog.removeWord') })} value=${removingBatch.typed}
-            placeholder=${C('dialog.removeWord')} passwordManager=${false}
-            onInput=${ev => setRemovingBatch({ ...removingBatch, typed: ev.target.value })} />
-        <//>`}
+            onClick=${doRemoveBatch}>${C('group.removeAll', { n: num(removingBatch.items.length) })}</button>`}>
+        ${removingBatch && html`
+          <p>${C('dialog.batchAsk', { n: num(removingBatch.items.length) })}</p>
+          <p class="adm-cx-applist">${removingBatch.items.map((e, i) => html`${i > 0 ? ' · ' : ''}${e.name}`)}</p>
+          <div class="og-box adm-cx-batch-warning poster-aside poster-aside--small">
+            <span class="og-box-label">${C('dialog.removeWarnLabel')}</span>
+            ${C('dialog.batchWarn')}
+          </div>
+          <label class="adm-cx-field">
+            <span>${C('dialog.batchTypeLabel', { word: C('dialog.removeWord') })}</span>
+            <input class="adm-input mono" type="text" value=${removingBatch.typed} placeholder=${C('dialog.removeWord')}
+              onInput=${ev => setRemovingBatch({ ...removingBatch, typed: ev.target.value })} />
+          </label>`}
       <//>
-    <//>`;
+    </div>`;
 }

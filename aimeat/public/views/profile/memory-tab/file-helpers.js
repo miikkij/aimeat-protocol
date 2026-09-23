@@ -2,17 +2,22 @@
  * @file public/views/profile/memory-tab/file-helpers.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Pure file helpers for the Memory tab — mime/extension categorization, authenticated blob
- *   fetch, and owner_gaii-aware byte-URL builders. Extracted from memory-tab.js to satisfy max-file-lines.
+ * @description Pure file helpers for the Memory tab — mime/extension categorization, category
+ *   icons, authenticated blob fetch, and owner_gaii-aware byte-URL builders. Extracted from
+ *   memory-tab.js to satisfy max-file-lines.
  * @version-history
- *   v1.2.0 -- 2026-09-22 -- fileIcon() and categoryIcon() removed: they returned emoji, and the
- *     rebuilt Memory screens name a file's kind in words.
  *   v1.1.0 — 2026-07-31 — uploadFilesPresigned(): the Files tab's upload loop, moved here whole.
  *   v1.0.0 — 2026-07-13 — Extracted from public/views/profile/memory-tab.js (max-file-lines)
  */
 import * as memoryService from '/js/services/memory.js';
 import { swallowed } from '/js/swallowed.js';
 import { authHeaders } from '/js/services/auth.js';
+
+export function fileIcon(type) {
+  if (type?.startsWith('image')) return '\u{1F5BC}️';
+  if (type?.includes('pdf')) return '\u{1F4C4}';
+  return '\u{1F4CE}';
+}
 
 // Extensions treated as text when the upload's mime is a generic octet-stream.
 const TEXT_EXT = new Set(['txt', 'md', 'markdown', 'json', 'csv', 'tsv', 'log', 'xml', 'yml', 'yaml',
@@ -38,6 +43,17 @@ export function fileCategory(mime, key) {
   if (AUDIO_EXT.has(ext)) return 'audio';
   if (TEXT_EXT.has(ext)) return 'text';
   return 'other';
+}
+
+export function categoryIcon(cat) {
+  switch (cat) {
+    case 'image': return '\u{1F5BC}️';
+    case 'pdf': return '\u{1F4C4}';
+    case 'video': return '\u{1F3AC}';
+    case 'audio': return '\u{1F3B5}';
+    case 'text': return '\u{1F4DD}';
+    default: return '\u{1F4CE}';
+  }
 }
 
 // Authenticated blob fetch — browser <img>/<video>/<a> can't attach the JWT, so private files

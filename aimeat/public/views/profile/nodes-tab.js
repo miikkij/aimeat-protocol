@@ -5,9 +5,6 @@
  * @description Profile tab for managing personal node registrations, visibility,
  *   agent assignments, tunnel URLs, and mailbox status.
  * @version-history
- *   2026-09-22 -- Composed from the shared component set (Page, tab Actions, Section, ListRow that
- *     opens, KeyValue, Fold, Steps, Field); no own classes. The status dot is a chip, visibility a
- *     pair of radio tabs, the setup guide a fold; the stats tab shows NodeStatsBody inside this frame.
  *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
  *   2026-09-13 -- V2u: compose the tab strip top rule from poster.css.
  *   2026-09-13 — V1: compose page and B1 section headings from the shared poster classes.
@@ -28,11 +25,12 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml, timeAgo } from '/js/utils.js';
 import { Spinner } from './shared.js';
-import { Page, Section, Fold, Stack, ListRow, KeyValue, Steps, Chip, Action, CopyAction, Field, Surface, Text } from '/components/poster-parts.js';
+import { CopyButton } from '/components/CopyButton.js';
+import { StatusDot } from '/components/StatusDot.js';
 import { useConfirm } from '/components/Modal.js';
 import * as nodesService from '/js/services/nodes.js';
 import { getNodeUrl } from '/js/services/auth.js';
-import { NodeStatsBody } from './node-stats-tab.js';
+import NodeStatsTab from './node-stats-tab.js';
 import { swallowed } from '/js/swallowed.js';
 
 /* Default export below wraps the node list and Node stats into one page with
@@ -96,20 +94,14 @@ function NodesList({ session, showToast, onStats }) {
     loadData();
   }
 
-  const toggle = (set, setter, idx) => {
-    const s = new Set(set);
-    if (s.has(idx)) s.delete(idx); else s.add(idx);
-    setter(s);
-  };
-  const statusTone = (st) => (st === 'online' ? 'success' : st === 'degraded' ? 'coral' : 'danger');
-
-  return html`<${Section} title=${t('profile.nodes.title')} description=${t('profile.nodes.desc')}
-    actions=${html`<${Action} kind="primary" onClick=${() => setShowNodeForm(!showNodeForm)}>${t('profile.nodes.addBtn')}<//>`}>
-    <${Stack}>
-      ${showNodeForm && html`<${NodeForm} onRegister=${handleRegister} onCancel=${() => setShowNodeForm(false)} />`}
-      ${!nodes ? html`<${Spinner} text=${t('profile.nodes.loading')} />`
-        : nodes.length === 0 ? html`<${Surface} kind="aside"><${Text} tone="muted">${t('profile.nodes.empty')}<//><//>`
-        : html`<${Stack} density="compact">${nodes.map((node, idx) => {
+  return html`
+    <div class="poster-section-title">${t('profile.nodes.title')}</div>
+    <div class="section-desc">${t('profile.nodes.desc')}</div>
+    <button class="btn-primary mb-1" onClick=${() => setShowNodeForm(!showNodeForm)}>${t('profile.nodes.addBtn')}</button>
+    ${showNodeForm && html`<${NodeForm} onRegister=${handleRegister} onCancel=${() => setShowNodeForm(false)} />`}
+    ${!nodes ? html`<${Spinner} text=${t('profile.nodes.loading')} />`
+      : nodes.length === 0 ? html`<div class="empty">${t('profile.nodes.empty')}</div>`
+      : nodes.map((node, idx) => {
           const statusClass = node.status || 'offline';
           const statusLabel = t('profile.nodes.' + statusClass) || statusClass;
           const isPublic = node.visibility === 'public';
@@ -121,80 +113,118 @@ function NodesList({ session, showToast, onStats }) {
           const mbUsedMB = ((node.mailbox?.used_bytes || 0) / 1024 / 1024).toFixed(1);
           const mbQuotaMB = ((node.mailbox?.quota_bytes || 0) / 1024 / 1024).toFixed(0);
 
-          return html`<${ListRow} key=${node.node_id || idx} name=${escHtml(node.node_id)} nameTitle=${statusLabel}
-            detail=${`${agentCount} ${agentWord} · ${t('profile.nodes.mailboxItems')}: ${mailboxCount} ${t('profile.nodes.items')}`}
-            value=${html`<${Stack} direction="wrap" density="compact">
-              <${Chip} tone=${isPublic ? 'success' : 'muted'}>${isPublic ? t('profile.nodes.public') : t('profile.nodes.private')}<//>
-              <${Chip} tone=${statusTone(statusClass)}>${statusLabel}<//>
-            <//>`}
-            onOpen=${() => toggle(expandedNodes, setExpandedNodes, idx)}>
-            ${isOpen && html`<${Stack}>
-              <${KeyValue} label=${t('profile.nodes.tunnelUrl')} value=${html`<${Stack} direction="wrap" density="compact" align="center">
-                <${Text} kind="mono">${tunnelUrl}<//>
-                <${CopyAction} kind="text" text=${tunnelUrl} onCopied=${() => showToast(t('common.copied'))} />
-              <//>`} />
-              <${KeyValue} label=${t('profile.nodes.agentList')} value=${node.agent_gaiis?.length > 0
-                ? html`<${Stack} density="compact">${node.agent_gaiis.map(g => html`<${Text} key=${g} kind="mono">${escHtml(g)}<//>`)}<//>`
-                : html`<${Text} kind="caption" tone="muted">${t('profile.nodes.noAgents')}<//>`} />
-              <${KeyValue} label=${t('profile.nodes.mailbox')} value=${`${mailboxCount} ${t('profile.nodes.items')} (${mbUsedMB} ${t('profile.nodes.mailboxOf')} ${mbQuotaMB} MB)`} />
-              <${KeyValue} label=${t('profile.nodes.lastSeen')} value=${node.last_seen ? timeAgo(node.last_seen) : '-'} />
-              <${KeyValue} label=${t('profile.nodes.visibility')} value=${html`<${Stack} direction="horizontal" density="compact" role="radiogroup" label=${t('profile.nodes.visibility')}>
-                <${Action} kind="tab" semantics="radio" selected=${!isPublic} onClick=${() => handleSetVis(node.node_id, 'private')}>${t('profile.nodes.private')}<//>
-                <${Action} kind="tab" semantics="radio" selected=${isPublic} onClick=${() => handleSetVis(node.node_id, 'public')}>${t('profile.nodes.public')}<//>
-              <//>`} />
-              <${Fold} title=${t('profile.nodes.setupTitle')} open=${setupOpen} onToggle=${() => toggle(expandedSetups, setExpandedSetups, idx)}>
-                <${Stack}>
-                  <${Steps} items=${[t('profile.nodes.setupStep1'), t('profile.nodes.setupStep2'), t('profile.nodes.setupStep3'), t('profile.nodes.setupStep4')]} />
-                  <${Stack} direction="horizontal" align="start">
-                    <${Action} href="/docs/personal-node-setup-guide.md" target="_blank">${t('profile.nodes.setupDocs')} →<//>
-                  <//>
-                <//>
-              <//>
-              <${Stack} direction="horizontal" align="start">
-                <${Action} tone="danger" onClick=${() => handleDetach(node.node_id)}>${t('profile.nodes.detachBtn')}<//>
-              <//>
-            <//>`}
-          <//>`;
-        })}<//>`}
-    <//>
-    <${ConfirmUI} />
-  <//>`;
+          return html`
+            <div class="pn-card poster-row--thing">
+              <div class="pn-header" onClick=${() => {
+                const s = new Set(expandedNodes);
+                if (s.has(idx)) s.delete(idx); else s.add(idx);
+                setExpandedNodes(s);
+              }}>
+                <div class="pn-header-left">
+                  <${StatusDot} status=${statusClass} title=${statusLabel} />
+                  <span class="pn-name">${escHtml(node.node_id)}</span>
+                </div>
+                <div class="pn-badges">
+                  ${isPublic
+                    ? html`<span class="badge badge-success">${t('profile.nodes.public')}</span>`
+                    : html`<span class="badge badge-muted">${t('profile.nodes.private')}</span>`}
+                  <span class="badge badge-${statusClass === 'online' ? 'success' : statusClass === 'degraded' ? 'warn' : 'danger'}">${statusLabel}</span>
+                  <span class="pn-arrow ${isOpen ? 'open' : ''}">\u25BC</span>
+                </div>
+              </div>
+              <div class="pn-quick">${agentCount} ${agentWord} \u2502 ${t('profile.nodes.mailboxItems')}: ${mailboxCount} ${t('profile.nodes.items')}</div>
+              ${isOpen && html`
+                <div class="pn-details open">
+                  <div class="pn-detail-row">
+                    <span class="pn-detail-label">${t('profile.nodes.tunnelUrl')}</span>
+                    <span class="pn-detail-value flex-row">
+                      <code class="text-meta-sm">${tunnelUrl}</code>
+                      <${CopyButton} text=${tunnelUrl} className="btn-ghost btn-sm btn-copy-inline"
+                        onCopied=${() => showToast(t('common.copied'))} />
+                    </span>
+                  </div>
+                  <div class="pn-padding-half">
+                    <span class="pn-detail-label">${t('profile.nodes.agentList')}</span>
+                    ${node.agent_gaiis?.length > 0
+                      ? html`<div class="pn-agent-list">${node.agent_gaiis.map(g => html`<div class="pn-agent-item">${escHtml(g)}</div>`)}</div>`
+                      : html`<div class="pn-no-agents">${t('profile.nodes.noAgents')}</div>`}
+                  </div>
+                  <div class="pn-detail-row">
+                    <span class="pn-detail-label">${t('profile.nodes.mailbox')}</span>
+                    <span class="pn-detail-value">${mailboxCount} ${t('profile.nodes.items')} (${mbUsedMB} ${t('profile.nodes.mailboxOf')} ${mbQuotaMB} MB)</span>
+                  </div>
+                  <div class="pn-detail-row">
+                    <span class="pn-detail-label">${t('profile.nodes.lastSeen')}</span>
+                    <span class="pn-detail-value">${node.last_seen ? timeAgo(node.last_seen) : '-'}</span>
+                  </div>
+                  <div class="pn-detail-row">
+                    <span class="pn-detail-label">${t('profile.nodes.visibility')}</span>
+                    <div class="pn-vis-toggle">
+                      <button class="pn-vis-btn ${!isPublic ? 'active' : ''}" onClick=${() => handleSetVis(node.node_id, 'private')}>${t('profile.nodes.private')}</button>
+                      <button class="pn-vis-btn ${isPublic ? 'active' : ''}" onClick=${() => handleSetVis(node.node_id, 'public')}>${t('profile.nodes.public')}</button>
+                    </div>
+                  </div>
+                  <div class="flex-actions">
+                    <button class="expand-btn btn-sm" onClick=${() => {
+                      const s = new Set(expandedSetups);
+                      if (s.has(idx)) s.delete(idx); else s.add(idx);
+                      setExpandedSetups(s);
+                    }}>${t('profile.nodes.setupTitle')} <span class="pn-setup-arrow ${setupOpen ? 'open' : ''}">\u25BC</span></button>
+                    ${setupOpen && html`
+                      <div class="pn-setup open poster-row--thing">
+                        <ol>
+                          <li>${t('profile.nodes.setupStep1')}</li>
+                          <li>${t('profile.nodes.setupStep2')}</li>
+                          <li>${t('profile.nodes.setupStep3')}</li>
+                          <li>${t('profile.nodes.setupStep4')}</li>
+                        </ol>
+                        <a href="/docs/personal-node-setup-guide.md" target="_blank" class="pn-setup-link">${t('profile.nodes.setupDocs')} \u2192</a>
+                      </div>
+                    `}
+                  </div>
+                  <button class="pn-detach-btn" onClick=${() => handleDetach(node.node_id)}>${t('profile.nodes.detachBtn')}</button>
+                </div>
+              `}
+            </div>`;
+        })
+    }
+    <${ConfirmUI} />`;
 }
 
 function NodeForm({ onRegister, onCancel }) {
   const [nodeId, setNodeId] = useState('');
   const [vis, setVis] = useState('private');
   const [gaiis, setGaiis] = useState('');
-  return html`<${Surface} kind="box"><${Stack}>
-    <${Text} kind="heading" size="small">${t('profile.nodes.addTitle')}<//>
-    <${Field} label=${t('profile.nodes.nodeIdLabel')} placeholder=${t('profile.nodes.nodeIdPlaceholder')} value=${nodeId} onInput=${e => setNodeId(e.target.value)} />
-    <${Stack} density="compact">
-      <${Text} kind="label">${t('profile.nodes.visLabel')}<//>
-      <${Stack} direction="horizontal" density="compact" role="radiogroup" label=${t('profile.nodes.visLabel')}>
-        <${Action} kind="tab" semantics="radio" selected=${vis === 'private'} onClick=${() => setVis('private')}>${t('profile.nodes.private')}<//>
-        <${Action} kind="tab" semantics="radio" selected=${vis === 'public'} onClick=${() => setVis('public')}>${t('profile.nodes.public')}<//>
-      <//>
-    <//>
-    <${Field} label=${t('profile.nodes.agentGaiisLabel')} placeholder=${t('profile.nodes.agentGaiisPlaceholder')} value=${gaiis} onInput=${e => setGaiis(e.target.value)} />
-    <${Stack} direction="horizontal" align="start">
-      <${Action} kind="primary" onClick=${() => onRegister(nodeId, vis, gaiis)}>${t('profile.nodes.registerBtn')}<//>
-      <${Action} onClick=${onCancel}>${t('profile.nodes.cancelBtn')}<//>
-    <//>
-  <//><//>`;
+  return html`
+    <div class="create-form poster-row--thing">
+      <div class="poster-section-title">${t('profile.nodes.addTitle')}</div>
+      <div class="form-row"><label>${t('profile.nodes.nodeIdLabel')}</label><input class="input-field" placeholder=${t('profile.nodes.nodeIdPlaceholder')} value=${nodeId} onInput=${e => setNodeId(e.target.value)} /></div>
+      <div class="form-row"><label>${t('profile.nodes.visLabel')}</label>
+        <div class="radio-row">
+          <label class="radio-label">
+            <input type="radio" name="nodeVis" value="private" checked=${vis === 'private'} onChange=${() => setVis('private')} /> ${t('profile.nodes.private')}
+          </label>
+          <label class="radio-label">
+            <input type="radio" name="nodeVis" value="public" checked=${vis === 'public'} onChange=${() => setVis('public')} /> ${t('profile.nodes.public')}
+          </label>
+        </div>
+      </div>
+      <div class="form-row"><label>${t('profile.nodes.agentGaiisLabel')}</label><input class="input-field" placeholder=${t('profile.nodes.agentGaiisPlaceholder')} value=${gaiis} onInput=${e => setGaiis(e.target.value)} /></div>
+      <div class="form-actions">
+        <button class="btn-primary" onClick=${() => onRegister(nodeId, vis, gaiis)}>${t('profile.nodes.registerBtn')}</button>
+        <button class="btn-outline" onClick=${onCancel}>${t('profile.nodes.cancelBtn')}</button>
+      </div>
+    </div>`;
 }
 
 /* ── Page wrapper: Nodes | Node stats sub-tabs (Node stats merged here from the menu) ── */
 export default function NodesTab(props) {
   const [sub, setSub] = useState('nodes');
-  return html`<${Page} width="wide" title=${t('profile.tabs.nodes')}
-    crumbs=${[{ label: t('nav.profile') }, { label: t('profile.landing.menuInfra') }, { label: t('profile.tabs.nodes') }]}>
-    <${Stack}>
-      <${Stack} direction="wrap" density="compact" role="tablist" label=${t('profile.tabs.nodes')}>
-        <${Action} kind="tab" semantics="tab" selected=${sub === 'nodes'} onClick=${() => setSub('nodes')}>${t('profile.tabs.nodes')}<//>
-        <${Action} kind="tab" semantics="tab" selected=${sub === 'stats'} onClick=${() => setSub('stats')}>${t('profile.tabs.nodeStats')}<//>
-      <//>
-      ${sub === 'nodes' ? html`<${NodesList} ...${props} />`
-        : html`<${Text} kind="heading" size="small">${t('profile.nodeStats.title')}<//><${Text} kind="lead">${t('profile.nodeStats.desc')}<//><${NodeStatsBody} />`}
-    <//>
-  <//>`;
+  return html`
+    <div class="sub-tabs poster-row--thing">
+      <button class="sub-tab ${sub === 'nodes' ? 'active' : ''}" onClick=${() => setSub('nodes')}>${t('profile.tabs.nodes')}</button>
+      <button class="sub-tab ${sub === 'stats' ? 'active' : ''}" onClick=${() => setSub('stats')}>${t('profile.tabs.nodeStats')}</button>
+    </div>
+    ${sub === 'nodes' ? html`<${NodesList} ...${props} />` : html`<${NodeStatsTab} ...${props} />`}
+  `;
 }

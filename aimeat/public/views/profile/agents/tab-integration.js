@@ -6,12 +6,6 @@
  *   during onboarding or production status (readiness, connection, platform, identity,
  *   what came after onboarding, and how to attach the agent elsewhere) after completion.
  * @version-history
- *   2026-09-22 -- The Hello Integration steps use the checklist item's own states (done, failed, warn,
- *     pending) instead of a ✗ written into the step's words.
- *   2026-09-22 -- Composed from the shared component set: sections are the small Section, the Hello
- *     Integration steps a checklist, rows key/value pairs, the delivery log the shared table, the
- *     buttons Actions and copies CopyActions. No class of its own is left, so
- *     agent-integration-poster.css is no longer read by this file. Same words, data and handlers.
  *   2026-09-14 -- The poster face (agent-integration-poster.css). Readiness leads, and its steps are
  *     chips instead of a pill row plus two name lists that said the same thing; the delivery log moves
  *     inside Connection under its rows; every row is a key/value pair, every action an underlined door
@@ -68,9 +62,7 @@ import htm from 'htm';
 import { onLiveUpdate } from '/lib/live-updates.js';
 import { t, tOr } from '/js/i18n.js';
 import { timeAgo } from '/js/utils.js';
-import {
-  Section, Columns, Stack, KeyValue, Table, Field, Action, CopyAction, CheckItem, Chip, Text,
-} from '/components/poster-parts.js';
+import { CopyButton } from '/components/CopyButton.js';
 import { McpQuickConnect } from '/components/McpInstall.js';
 import { agentState } from './state-detector.js';
 import { swallowed } from '/js/swallowed.js';
@@ -84,8 +76,8 @@ import {
 
 const html = htm.bind(h);
 
-/** A step's status as the checklist item's state; anything else is not reached yet. */
-const STEP_STATE = { passed: 'done', failed: 'failed', warn: 'warn' };
+/** The mark in front of a step's name. Only the glyphs the interface is allowed to print. */
+const STEP_MARK = { passed: '✓', failed: '✗', warn: '✗' };
 
 export default function TabIntegration({ agent, onboarding, showToast, agentName }) {
   const state = agentState(agent);
@@ -243,13 +235,13 @@ curl -H "Authorization: Bearer <jwt>" -o skill-bundle.zip "${skillBundleUrl}" &&
   }
 
   if (loading) {
-    return html`<${Text} tone="muted">${t('profile.loading')}<//>`;
+    return html`<p class="agi-empty">${t('profile.loading')}</p>`;
   }
 
   // System agents (Secretary / company Secretary / specialists) are auto-provisioned and never run the
   // device-auth "Hello Integration" onboarding — show a short note instead of the 0/11 checklist.
   if (state === 'system') {
-    return html`<${Text} tone="muted">${t('profile.agents.detail.internalAgentNote')}<//>`;
+    return html`<p class="agi-empty">${t('profile.agents.detail.internalAgentNote')}</p>`;
   }
 
   const isOnboarding = state === 'new' || state === 'onboarding';
@@ -280,72 +272,85 @@ curl -H "Authorization: Bearer <jwt>" -o skill-bundle.zip "${skillBundleUrl}" &&
 
 /* ── The pieces every section is built from ────────────────────────────────────────────────── */
 
-/** A value that is absent or not yet reached reads quieter than one that is there. */
-function dimmed(value, dim) {
-  return dim ? html`<${Text} kind="caption" tone="muted">${value}<//>` : value;
+/** A section's first line: the coral label, and on the right whatever dates it. */
+function sectionHead(label, aside) {
+  return html`
+    <div class="agi-sec-h">
+      <span class="og-label">${label}</span>
+      ${aside ? html`<span class="agi-mono">${aside}</span>` : ''}
+    </div>`;
 }
 
-/**
- * Every step of Hello Integration as a checklist item in its own state: ticked when it passed, ✗ on
- * the danger ground when it failed, a coral frame when it needs a look, the dashed square when the
- * agent has not reached it yet.
- */
-function stepChecks(steps) {
+/** One key/value pair. Both cells are direct children of the .agi-kv grid, so this is a fragment. */
+function kv(key, value, { dim = false, mono = false } = {}) {
+  const cls = `agi-v${dim ? ' is-dim' : ''}${mono ? ' is-mono' : ''}`;
+  return html`
+    <div class="agi-k">${key}</div>
+    <div class=${cls}>${value}</div>`;
+}
+
+/** Every step of Hello Integration as a chip. The chip's frame carries the result. */
+function stepChips(steps) {
   if (!steps.length) return '';
   return html`
-    <${Stack} direction="wrap" density="compact">
+    <div class="og-chips agi-steps">
       ${steps.map(s => html`
-        <${CheckItem} key=${s.id} state=${STEP_STATE[s.status] || 'pending'}>
-          ${tOr('agentOnboarding.steps.' + s.id, s.name || s.title || s.id)}
-        <//>`)}
-    <//>`;
+        <span key=${s.id} class="og-chip agi-step agi-step--${s.status}">
+          ${STEP_MARK[s.status] || '·'} ${tOr('agentOnboarding.steps.' + s.id, s.name || s.title || s.id)}
+        </span>`)}
+    </div>`;
 }
 
 /**
- * The bundle actions, in one row: the prompt is the loud one, the rest are underlined words.
- * Before the first install the middle one says what it does ("Copy install command"); after it,
+ * The bundle actions, in one row: the prompt is the loud one, the rest are doors.
+ * Before the first install the middle door says what it does ("Copy install command"); after it,
  * the same payload is the way to install the bundle again.
+ */
+/**
  * @param {{ agentName: string, curlText: string, installCmdText: string, agentPromptText: string,
  *   handleUpdateBundle?: () => void, updatingBundle?: boolean, installLabel?: string }} props
  */
 function bundleDoors({ agentName, curlText, installCmdText, agentPromptText, handleUpdateBundle, updatingBundle, installLabel }) {
   return html`
-    <${Stack} direction="wrap" align="center">
-      <${CopyAction} kind="primary" text=${agentPromptText}
+    <div class="og-doors agi-doors">
+      <${CopyButton} text=${agentPromptText} className="og-slab"
         label=${t('profile.agents.detail.integration.copyAgentPrompt')}
         copiedLabel=${'✓ ' + t('profile.agents.detail.integration.promptCopied')} />
-      <${CopyAction} text=${installCmdText}
+      <${CopyButton} text=${installCmdText} className="og-door"
         label=${installLabel || t('profile.agents.skillBundle.reinstall')}
         copiedLabel=${'✓ ' + t('profile.agents.detail.integration.installCommandCopied')} />
       ${handleUpdateBundle ? html`
-        <${Action} onClick=${handleUpdateBundle} disabled=${updatingBundle}>
+        <button type="button" class="og-door" onClick=${handleUpdateBundle} disabled=${updatingBundle}>
           ${updatingBundle ? '...' : t('profile.agents.detail.integration.update')}
-        <//>` : ''}
-      <${Action} href=${getSkillBundleUrl(agentName)} download=${true}>
+        </button>` : ''}
+      <a class="og-door" href=${getSkillBundleUrl(agentName)} download>
         ${t('profile.agents.skillBundle.downloadZip')}
-      <//>
-      <${CopyAction} text=${curlText} label=${t('profile.agents.skillBundle.copyCurl')} />
-    <//>`;
+      </a>
+      <${CopyButton} text=${curlText} className="og-door"
+        label=${t('profile.agents.skillBundle.copyCurl')} />
+    </div>`;
 }
 
-/** The webhook address while it is being typed. Same handlers as before. */
+/** The webhook address while it is being typed. Same handlers as before, poster shapes. */
 function webhookForm({ webhookDraft, setWebhookDraft, handleSaveWebhook, handleCancelWebhook, savingWebhook }) {
   return html`
-    <${Stack} density="compact">
-      <${Field} type="url" value=${webhookDraft}
+    <div class="agi-form">
+      <input class="og-input" type="url" value=${webhookDraft}
         onInput=${e => setWebhookDraft(e.target.value)} placeholder="https://..." />
-      <${Stack} direction="wrap" align="center">
-        <${Action} onClick=${handleSaveWebhook} disabled=${savingWebhook}>
+      <div class="og-doors">
+        <button type="button" class="og-door" onClick=${handleSaveWebhook} disabled=${savingWebhook}>
           ${savingWebhook ? '...' : t('common.save')}
-        <//>
-        <${Action} kind="text" onClick=${handleCancelWebhook}>${t('common.cancel')}<//>
-      <//>
-    <//>`;
+        </button>
+        <button type="button" class="og-door og-door--quiet" onClick=${handleCancelWebhook}>
+          ${t('common.cancel')}
+        </button>
+      </div>
+    </div>`;
 }
 
 /* ── The sections themselves ───────────────────────────────────────────────────────────────── */
 
-/** How far the agent got through Hello Integration, and the action that runs it again. */
+/** How far the agent got through Hello Integration, and the door that runs it again. */
 function readinessSection({ steps, onboarding, handleRerun, rerunning }) {
   const level = onboarding?.readinessLevel;
   const score = onboarding?.readinessScore;
@@ -371,17 +376,16 @@ function readinessSection({ steps, onboarding, handleRerun, rerunning }) {
       'Every step of Hello Integration passed, and nothing is missing. Run it again after the agent code or its platform changes.');
 
   return html`
-    <${Section} size="small" density="compact" title=${label} count=${aside || undefined}>
-      <${Stack} density="compact">
-        ${stepChecks(steps)}
-        <${Text} tone="muted">${hint}<//>
-        <${Stack} direction="wrap">
-          <${Action} onClick=${handleRerun} disabled=${rerunning}>
-            ${rerunning ? '...' : t('profile.agents.detail.integration.rerun')}
-          <//>
-        <//>
-      <//>
-    <//>`;
+    <section class="agi-sec agi-sec--full poster-row--thing">
+      ${sectionHead(label, aside)}
+      ${stepChips(steps)}
+      <p class="agi-hint">${hint}</p>
+      <div class="og-doors agi-doors">
+        <button type="button" class="og-door" onClick=${handleRerun} disabled=${rerunning}>
+          ${rerunning ? '...' : t('profile.agents.detail.integration.rerun')}
+        </button>
+      </div>
+    </section>`;
 }
 
 /** How work reaches the agent, and what has been delivered over that road. */
@@ -394,67 +398,71 @@ function connectionSection(p) {
     : tOr('profile.agents.detail.integration.pollingEvery', 'Polling, every {interval}').replace('{interval}', interval);
 
   const webhookValue = hasWebhook ? webhook.url : html`
-    <${Stack} direction="wrap" align="center" density="compact">
-      ${dimmed(t('profile.agents.detail.integration.webhookNotConfigured'), true)}
-      <${Action} kind="text" onClick=${p.handleEditWebhook}>
-        ${t('profile.agents.detail.integration.setupWebhook')}
-      <//>
-    <//>`;
+    ${t('profile.agents.detail.integration.webhookNotConfigured')} ·${' '}
+    <button type="button" class="og-door og-door--quiet" onClick=${p.handleEditWebhook}>
+      ${t('profile.agents.detail.integration.setupWebhook')}
+    </button>`;
 
   return html`
-    <${Section} size="small" density="compact" title=${t('profile.agents.detail.connection')}>
-      <${Stack} density="compact">
-        <div>
-          <${KeyValue} label=${t('profile.agents.detail.integration.deliveryMethod')} value=${delivery} />
-          <${KeyValue} label=${t('profile.agents.webhook.url')} value=${webhookValue} mono=${hasWebhook} />
-          ${hasWebhook ? html`<${KeyValue} label=${t('profile.agents.webhook.failCount')} value=${webhook.failCount ?? 0} />` : ''}
-          ${hasWebhook ? html`<${KeyValue} label=${t('profile.agents.webhook.lastSuccess')}
-            value=${webhook.lastSuccessAt ? timeAgo(webhook.lastSuccessAt) : '--'} />` : ''}
-          <${KeyValue} label=${t('profile.agents.detail.lastSeen')} value=${agent.last_seen ? timeAgo(agent.last_seen) : '--'} />
-          <${KeyValue} label=${tOr('profile.agents.detail.integration.deliveries', 'Deliveries')}
-            value=${dimmed(displayDeliveries.length || t('profile.agents.detail.integration.noDeliveries'), displayDeliveries.length === 0)} />
-        </div>
-        ${p.editingWebhook ? webhookForm(p) : (hasWebhook ? html`
-          <${Stack} direction="wrap" align="center">
-            <${Action} onClick=${p.handleTestWebhook} disabled=${p.testing}>
-              ${p.testing ? '...' : t('profile.agents.webhook.test')}
-            <//>
-            <${Action} kind="text" onClick=${p.handleEditWebhook}>
-              ${t('profile.agents.detail.integration.editWebhook')}
-            <//>
-          <//>` : '')}
-        ${deliveryLog(p)}
-      <//>
-    <//>`;
+    <section class="agi-sec poster-row--thing">
+      ${sectionHead(t('profile.agents.detail.connection'))}
+      <div class="agi-kv">
+        ${kv(t('profile.agents.detail.integration.deliveryMethod'), delivery)}
+        ${kv(t('profile.agents.webhook.url'), webhookValue, { dim: !hasWebhook })}
+        ${hasWebhook ? kv(t('profile.agents.webhook.failCount'), webhook.failCount ?? 0) : ''}
+        ${hasWebhook ? kv(t('profile.agents.webhook.lastSuccess'), webhook.lastSuccessAt ? timeAgo(webhook.lastSuccessAt) : '--') : ''}
+        ${kv(t('profile.agents.detail.lastSeen'), agent.last_seen ? timeAgo(agent.last_seen) : '--')}
+        ${kv(
+          tOr('profile.agents.detail.integration.deliveries', 'Deliveries'),
+          displayDeliveries.length || t('profile.agents.detail.integration.noDeliveries'),
+          { dim: displayDeliveries.length === 0 },
+        )}
+      </div>
+      ${p.editingWebhook ? webhookForm(p) : (hasWebhook ? html`
+        <div class="og-doors agi-doors">
+          <button type="button" class="og-door" onClick=${p.handleTestWebhook} disabled=${p.testing}>
+            ${p.testing ? '...' : t('profile.agents.webhook.test')}
+          </button>
+          <button type="button" class="og-door og-door--quiet" onClick=${p.handleEditWebhook}>
+            ${t('profile.agents.detail.integration.editWebhook')}
+          </button>
+        </div>` : '')}
+      ${deliveryLog(p)}
+    </section>`;
 }
 
-/** The delivery log, under the connection rows. The action lengthens the list, as it always did. */
+/** The delivery log, under the connection rows. The door lengthens the list, as it always did. */
 function deliveryLog({ displayDeliveries, handleShowAll, showAllDeliveries }) {
   if (!displayDeliveries.length) return '';
-  const headers = [
-    t('profile.agents.detail.integration.time'),
-    t('profile.agents.detail.integration.event'),
-    t('profile.agents.detail.integration.channel'),
-    t('profile.agents.detail.integration.result'),
-    t('profile.agents.detail.integration.latency'),
-  ];
-  const rows = displayDeliveries.map(d => [
-    d.timestamp ? timeAgo(d.timestamp) : '--',
-    d.eventType || d.event || '--',
-    d.channel || '--',
-    html`<${Text} kind="mono" tone=${d.success ? 'success' : 'danger'}>${d.success ? '✓' : '✗'}<//>`,
-    d.latencyMs ? `${(d.latencyMs / 1000).toFixed(1)}s` : '--',
-  ]);
   return html`
-    <${Stack} density="compact">
-      <${Table} headers=${headers} rows=${rows} density="compact"
-        label=${tOr('profile.agents.detail.integration.deliveries', 'Deliveries')} />
-      <${Stack} direction="wrap">
-        <${Action} kind="text" onClick=${handleShowAll}>
+    <div>
+      <table class="agi-log">
+        <thead>
+          <tr>
+            <th>${t('profile.agents.detail.integration.time')}</th>
+            <th>${t('profile.agents.detail.integration.event')}</th>
+            <th>${t('profile.agents.detail.integration.channel')}</th>
+            <th>${t('profile.agents.detail.integration.result')}</th>
+            <th>${t('profile.agents.detail.integration.latency')}</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${displayDeliveries.map((d, i) => html`
+            <tr key=${d.id || i}>
+              <td>${d.timestamp ? timeAgo(d.timestamp) : '--'}</td>
+              <td>${d.eventType || d.event || '--'}</td>
+              <td>${d.channel || '--'}</td>
+              <td class=${d.success ? 'is-ok' : 'is-bad'}>${d.success ? '✓' : '✗'}</td>
+              <td>${d.latencyMs ? `${(d.latencyMs / 1000).toFixed(1)}s` : '--'}</td>
+            </tr>`)}
+        </tbody>
+      </table>
+      <div class="og-doors agi-doors">
+        <button type="button" class="og-door og-door--quiet" onClick=${handleShowAll}>
           ${showAllDeliveries ? t('profile.agents.detail.showLess') : t('profile.agents.detail.showAll')}
-        <//>
-      <//>
-    <//>`;
+        </button>
+      </div>
+    </div>`;
 }
 
 /** What the agent runs on, and the bundle it was given. */
@@ -468,33 +476,40 @@ function bundleSection(p) {
   const notReported = tOr('profile.agents.detail.integration.notReported', 'Not reported');
 
   return html`
-    <${Section} size="small" density="compact" title=${tOr('profile.agents.detail.integration.platformAndBundle', 'Platform and skill bundle')}>
-      <${Stack} density="compact">
-        <div>
-          <${KeyValue} label=${t('profile.agents.detail.platform')}
-            value=${dimmed(platformName ? `${platformName} · ${detection}` : notReported, !platformName)} />
-          <${KeyValue} label=${t('profile.agents.detail.integration.platformVersion')}
-            value=${dimmed(platformVersion || notReported, !platformVersion)} />
-          <${KeyValue} label=${t('profile.agents.skillBundle.bundleVersionLabel')}
-            value=${dimmed(bundleVersion?.version || notReported, !bundleVersion?.version)} mono=${!!bundleVersion?.version} />
-        </div>
-        ${bundleDoors({ ...p, agentName: agent.name })}
-      <//>
-    <//>`;
+    <section class="agi-sec poster-row--thing">
+      ${sectionHead(tOr('profile.agents.detail.integration.platformAndBundle', 'Platform and skill bundle'))}
+      <div class="agi-kv">
+        ${kv(
+          t('profile.agents.detail.platform'),
+          platformName ? `${platformName} · ${detection}` : notReported,
+          { dim: !platformName },
+        )}
+        ${kv(t('profile.agents.detail.integration.platformVersion'), platformVersion || notReported, { dim: !platformVersion })}
+        ${kv(
+          t('profile.agents.skillBundle.bundleVersionLabel'),
+          bundleVersion?.version || notReported,
+          { dim: !bundleVersion?.version, mono: !!bundleVersion?.version },
+        )}
+      </div>
+      ${bundleDoors({ ...p, agentName: agent.name })}
+    </section>`;
 }
 
 /** Who the agent is, in the words the node uses about it everywhere else. */
 function identitySection(agent) {
   return html`
-    <${Section} size="small" density="compact" title=${t('profile.agents.detail.identity')}>
-      <div>
-        <${KeyValue} label="GAII" value=${dimmed(agent.gaii || '--', !agent.gaii)} mono=${!!agent.gaii} />
-        ${agent.public_key ? html`<${KeyValue} label=${t('profile.agents.publicKey')} value=${truncateKey(agent.public_key)} mono=${true} />` : ''}
-        <${KeyValue} label=${t('profile.agents.created')} value=${agent.created_at ? fmtDate(agent.created_at) : '--'} />
-        ${agent.roles?.length ? html`<${KeyValue} label=${t('profile.agents.detail.integration.roles')}
-          value=${html`<${Stack} direction="wrap" density="compact">${agent.roles.map(r => html`<${Chip} key=${r}>${r}<//>`)}<//>`} />` : ''}
+    <section class="agi-sec poster-row--thing">
+      ${sectionHead(t('profile.agents.detail.identity'))}
+      <div class="agi-kv">
+        ${kv('GAII', agent.gaii || '--', { mono: !!agent.gaii, dim: !agent.gaii })}
+        ${agent.public_key ? kv(t('profile.agents.publicKey'), truncateKey(agent.public_key), { mono: true }) : ''}
+        ${kv(t('profile.agents.created'), agent.created_at ? fmtDate(agent.created_at) : '--')}
+        ${agent.roles?.length ? kv(
+          t('profile.agents.detail.integration.roles'),
+          html`<span class="agi-roles">${agent.roles.map(r => html`<span key=${r} class="og-chip">${r}</span>`)}</span>`,
+        ) : ''}
       </div>
-    <//>`;
+    </section>`;
 }
 
 /** The four things an agent does for itself once Hello Integration is behind it. */
@@ -502,31 +517,46 @@ function afterOnboardingSection(pc) {
   const yes = (key, fallback) => tOr(`profile.agents.detail.integration.${key}`, fallback);
   const tagsUnknown = pc.shared_tags_in_use === null;
   return html`
-    <${Section} size="small" density="compact" title=${t('profile.agents.detail.integration.postOnboardingSetup')}>
-      <div>
-        <${KeyValue} label=${t('profile.agents.detail.integration.commandsRegistered')}
-          value=${dimmed(pc.commands_registered ? yes('valueRegistered', 'Registered') : yes('valueNoneRegistered', 'None registered'), !pc.commands_registered)} />
-        <${KeyValue} label=${t('profile.agents.detail.integration.configPublished')}
-          value=${dimmed(pc.config_published ? yes('valuePublished', 'Published') : yes('valueNotPublished', 'Not published'), !pc.config_published)} />
-        <${KeyValue} label=${t('profile.agents.detail.integration.sharedTagsInUse')}
-          value=${dimmed(tagsUnknown
+    <section class="agi-sec poster-row--thing">
+      ${sectionHead(t('profile.agents.detail.integration.postOnboardingSetup'))}
+      <div class="agi-kv">
+        ${kv(
+          t('profile.agents.detail.integration.commandsRegistered'),
+          pc.commands_registered ? yes('valueRegistered', 'Registered') : yes('valueNoneRegistered', 'None registered'),
+          { dim: !pc.commands_registered },
+        )}
+        ${kv(
+          t('profile.agents.detail.integration.configPublished'),
+          pc.config_published ? yes('valuePublished', 'Published') : yes('valueNotPublished', 'Not published'),
+          { dim: !pc.config_published },
+        )}
+        ${kv(
+          t('profile.agents.detail.integration.sharedTagsInUse'),
+          tagsUnknown
             ? t('profile.agents.detail.integration.notApplicable')
-            : (pc.shared_tags_in_use ? yes('valueInUse', 'In use') : yes('valueNotInUse', 'Not in use')), tagsUnknown || !pc.shared_tags_in_use)} />
-        <${KeyValue} label=${t('profile.agents.detail.integration.knowledgePackages')}
-          value=${dimmed(pc.knowledge_packages_published ? yes('valuePublished', 'Published') : yes('valueNoPackages', 'No packages'), !pc.knowledge_packages_published)} />
+            : (pc.shared_tags_in_use ? yes('valueInUse', 'In use') : yes('valueNotInUse', 'Not in use')),
+          { dim: tagsUnknown || !pc.shared_tags_in_use },
+        )}
+        ${kv(
+          t('profile.agents.detail.integration.knowledgePackages'),
+          pc.knowledge_packages_published ? yes('valuePublished', 'Published') : yes('valueNoPackages', 'No packages'),
+          { dim: !pc.knowledge_packages_published },
+        )}
       </div>
-    <//>`;
+    </section>`;
 }
 
 /**
  * The same agent in a second tool, or on a second machine, is this attachment made again.
- * McpQuickConnect is itself composed from the shared set.
+ * McpQuickConnect owns the markup; agent-integration-poster.css puts the poster skin on it.
  */
 function attachSection(serverName, label, lead) {
   return html`
-    <${Section} size="small" density="compact" title=${label} description=${lead || undefined}>
+    <section class="agi-sec agi-sec--full poster-row--thing agi-attach">
+      ${sectionHead(label)}
+      ${lead ? html`<p class="agi-hint agi-lead">${lead}</p>` : ''}
       <${McpQuickConnect} serverName=${serverName} />
-    <//>`;
+    </section>`;
 }
 
 /* ── The two views ─────────────────────────────────────────────────────────────────────────── */
@@ -540,73 +570,68 @@ function renderOnboardingView({ onboarding, agentName, handleRerun, rerunning, c
   const notReported = tOr('profile.agents.detail.integration.notReported', 'Not reported');
   const bundleUrl = `${location.origin}${getSkillBundleUrl(agentName)}`;
 
-  // The attachment comes before the checklist, because none of it can be ticked from a browser: the
-  // agent has to reach this node from the tool it runs in first. The server is named after the agent,
-  // so a person running several of them can tell the entries apart in their own client.
   return html`
-    <${Stack}>
+    <div class="agi-grid">
+      <!-- Before the checklist, because none of it can be ticked from a browser: the agent has to
+           reach this node from the tool it runs in first. The server is named after the agent, so
+           a person running several of them can tell the entries apart in their own client. -->
       ${attachSection(
         agentName,
         tOr('mcpInstall.agentTitle', 'Attach this agent to the tool it runs in'),
         tOr('mcpInstall.agentLead', 'The steps below are things the agent does over that connection, so it comes first.'),
       )}
 
-      <${Section} size="small" density="compact"
-        title=${`${t('profile.agents.detail.integration.checklistTitle')} · ${passed}/${total}`}
-        count=${`${t('profile.agents.detail.integration.readinessScore')} ${pct}/100`}>
-        <${Stack} density="compact">
-          ${stepChecks(steps)}
-          <${Text} tone="muted">
-            ${passed > 0
-              ? tOr('profile.agents.detail.integration.readinessHintGaps',
-                'Some steps have not passed yet. Run Hello Integration again once the agent can complete them.')
-              : tOr('profile.agents.detail.integration.onboardingHint',
-                'Nothing is ticked yet. The agent does these steps itself, over the connection above, once it can reach this node.')}
-          <//>
-          <${Stack} direction="wrap">
-            <${Action} onClick=${handleRerun} disabled=${rerunning}>
-              ${rerunning ? '...' : (passed > 0
-                ? t('profile.agents.detail.integration.rerun')
-                : t('profile.agents.detail.integration.startOnboarding'))}
-            <//>
-          <//>
-        <//>
-      <//>
+      <section class="agi-sec agi-sec--full poster-row--thing">
+        ${sectionHead(
+          `${t('profile.agents.detail.integration.checklistTitle')} · ${passed}/${total}`,
+          `${t('profile.agents.detail.integration.readinessScore')} ${pct}/100`,
+        )}
+        ${stepChips(steps)}
+        <p class="agi-hint">
+          ${passed > 0
+            ? tOr('profile.agents.detail.integration.readinessHintGaps',
+              'Some steps have not passed yet. Run Hello Integration again once the agent can complete them.')
+            : tOr('profile.agents.detail.integration.onboardingHint',
+              'Nothing is ticked yet. The agent does these steps itself, over the connection above, once it can reach this node.')}
+        </p>
+        <div class="og-doors agi-doors">
+          <button type="button" class="og-door" onClick=${handleRerun} disabled=${rerunning}>
+            ${rerunning ? '...' : (passed > 0
+              ? t('profile.agents.detail.integration.rerun')
+              : t('profile.agents.detail.integration.startOnboarding'))}
+          </button>
+        </div>
+      </section>
 
-      <${Section} size="small" density="compact" title=${t('profile.agents.skillBundle.title')}>
-        <${Stack} density="compact">
-          <div>
-            <${KeyValue} label=${t('profile.agents.detail.platform')} value=${dimmed(platformName || notReported, !platformName)} />
-            <${KeyValue} label=${tOr('profile.agents.detail.integration.bundleAddress', 'Bundle address')} value=${bundleUrl} mono=${true} />
-          </div>
-          ${bundleDoors({
-            agentName, curlText, installCmdText, agentPromptText,
-            installLabel: t('profile.agents.detail.integration.copyInstallCommand'),
-          })}
-        <//>
-      <//>
-    <//>`;
+      <section class="agi-sec agi-sec--full poster-row--thing">
+        ${sectionHead(t('profile.agents.skillBundle.title'))}
+        <div class="agi-kv">
+          ${kv(t('profile.agents.detail.platform'), platformName || notReported, { dim: !platformName })}
+          ${kv(tOr('profile.agents.detail.integration.bundleAddress', 'Bundle address'), bundleUrl, { mono: true })}
+        </div>
+        ${bundleDoors({
+          agentName, curlText, installCmdText, agentPromptText,
+          installLabel: t('profile.agents.detail.integration.copyInstallCommand'),
+        })}
+      </section>
+    </div>`;
 }
 
 function renderProductionView(p) {
   const steps = p.onboarding?.steps || [];
 
   return html`
-    <${Stack}>
+    <div class="agi-grid">
       ${readinessSection({ steps, onboarding: p.onboarding, handleRerun: p.handleRerun, rerunning: p.rerunning })}
-      <${Columns} collapse=${900}>
-        ${connectionSection(p)}
-        ${bundleSection(p)}
-      <//>
-      <${Columns} collapse=${900}>
-        ${identitySection(p.agent)}
-        ${p.postChecklist ? afterOnboardingSection(p.postChecklist) : ''}
-      <//>
+      ${connectionSection(p)}
+      ${bundleSection(p)}
+      ${identitySection(p.agent)}
+      ${p.postChecklist ? afterOnboardingSection(p.postChecklist) : ''}
       ${attachSection(
         p.agent.name,
         tOr('profile.agents.detail.integration.attachTitle', 'Attach this agent in another tool, or on another machine'),
       )}
-    <//>`;
+    </div>`;
 }
 
 function truncateKey(key) {

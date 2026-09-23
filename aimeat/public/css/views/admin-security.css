@@ -1,0 +1,95 @@
+/* ── Admin Security page, in the poster face ──
+ * @file admin-security.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The operator's Security page (design canvas "AIMEAT Admin Security", direction A):
+ *   the groupings of the refusal log as mono rows with an ink bar, the filter chips and the
+ *   underline search, the refusal table's cells, the refused-and-kept rows with their actions, and
+ *   the paste box. The frame, the sections, the metric rows, the numeral strip and the buttons
+ *   come from admin.css and organism.css; only what this page adds lives here. Every value is a
+ *   theme.css token, so the page flips with the theme.
+ * @version-history
+ *   v1.0.0 — 2026-09-05 — Initial.
+ */
+
+/* The last row of a section carries no rule under it; the section's own rule is the next one. */
+.adm-sec .adm-mrow--last { border-bottom: 0; }
+/* A strip cell's second line wraps rather than truncates: at 1280 the five cells are narrow. */
+.adm-sec .og-strip small { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.4; }
+
+/* The three groupings under section 02. */
+.adm-sec-cols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 44px; align-items: start; }
+.adm-sec-lbl { font-size: .66rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin-bottom: 6px; }
+.adm-sec-krow { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--border-subtle); font-family: var(--font-mono); font-size: .78rem; color: var(--text); min-width: 0; }
+.adm-sec-krow--last { border-bottom: 0; }
+.adm-sec-krow > .adm-sec-key { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.adm-sec-krow > .adm-sec-key--words { font-family: var(--font); color: var(--text-dim); }
+.adm-sec-bar { height: 6px; background: var(--text); flex: 0 0 auto; }
+.adm-sec-bar--hot { background: var(--accent); }
+.adm-sec-n { margin-left: auto; color: var(--text-dim); font-size: .75rem; white-space: nowrap; }
+.adm-sec-note { margin: 10px 0 0; font-size: .78rem; line-height: 1.5; color: var(--text-dim); }
+.adm-sec-code { display: inline-block; padding: 1px 6px; font-family: var(--font-mono); font-size: .75rem; background: var(--code-bg); color: var(--text); }
+
+/* The filters over the table: square mono chips, the selected one on the sun, and an underline field. */
+.adm-sec-filters { display: flex; align-items: center; gap: 8px; margin: 20px 0 10px; flex-wrap: wrap; }
+.adm-sec-fchip { font-family: var(--font-mono); font-size: .72rem; font-weight: 500; padding: 3px 9px; border: 2px solid var(--border); background: none; color: var(--text-dim); cursor: pointer; border-radius: 0; }
+.adm-sec-fchip:hover { border-color: var(--text); color: var(--text); }
+.adm-sec-fchip.on { border-color: var(--text); background: var(--sun); color: var(--on-sun); }
+.adm-sec-sep { width: 1px; height: 22px; background: var(--border); margin: 0 6px; }
+.adm input.adm-sec-search { flex: 1 1 12rem; border: 0; border-bottom: 3px solid var(--text); border-radius: 0; background: none; padding: 0 0 3px; font: inherit; font-size: .88rem; font-weight: 600; color: var(--text); outline: none; box-shadow: none; }
+.adm input.adm-sec-search::placeholder { color: var(--text-dim); font-weight: 600; }
+.adm input.adm-sec-search:focus { border-bottom-color: var(--accent); box-shadow: none; }
+
+/* The table's own cells; the table itself is admin.css's. */
+.adm-sec-tbl td.adm-sec-when { font-family: var(--font-mono); font-size: .75rem; white-space: nowrap; }
+.adm-sec-tbl td.adm-sec-answer { white-space: nowrap; }
+/* The door keeps room to read as one path and an address never breaks in the middle; the reason
+   column is the one that gives. */
+.adm-sec-tbl th:nth-child(3), .adm-sec-tbl td:nth-child(3) { min-width: 15rem; }
+.adm-sec-tbl td.adm-sec-source { white-space: nowrap; }
+.adm-sec-route { font-family: var(--font-mono); font-size: .8rem; color: var(--text); overflow-wrap: anywhere; }
+.adm-sec-tbl td.adm-sec-reason { color: var(--text-dim); }
+.adm-sec-foot { display: flex; align-items: baseline; justify-content: space-between; gap: 20px; margin-top: 14px; flex-wrap: wrap; }
+.adm-sec-mono { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); }
+.adm-sec-empty { padding: 10px 0; border-bottom: 1px solid var(--border); font-size: .88rem; color: var(--text-dim); }
+.adm-sec-empty--last { border-bottom: 0; }
+
+/* Refused and kept: one incident is a row with its chip, what, who, when and the actions. */
+.adm-sec-irow { display: grid; grid-template-columns: 96px minmax(0, 1fr) 220px 190px 300px; gap: 0 19px; align-items: start; padding: 13px 0; border-bottom: 1px solid var(--border); font-size: .9rem; color: var(--text); }
+.adm-sec-irow--last { border-bottom: 0; }
+.adm-sec-irow b { font-weight: 700; }
+.adm-sec-irow .adm-sec-when { font-family: var(--font-mono); font-size: .75rem; color: var(--text-dim); white-space: nowrap; }
+.adm-sec-who { font-size: .82rem; }
+.adm-sec-actions { display: flex; gap: 12px; align-items: center; justify-content: flex-end; flex-wrap: wrap; }
+
+/* Ask your AI: the paste in the dashed coral box. */
+.adm-sec .og-box { max-width: 960px; }
+.adm-sec-paste { white-space: pre-wrap; font-size: .85rem; line-height: 1.55; color: var(--text); }
+.adm-sec-lead { margin: 0 0 14px; font-size: .95rem; line-height: 1.6; color: var(--text); max-width: 90ch; }
+
+@media (max-width: 1100px) {
+  /* The strip's cells are buttons here, and organism.css folds only its div cells to two a row. */
+  .adm-sec .og-strip { flex-wrap: wrap; }
+  .adm-sec .og-strip > button { flex: 1 1 50%; border-right: 0; border-bottom: 1px solid var(--border); }
+  .adm-sec-cols { grid-template-columns: 1fr; gap: 14px 0; }
+  .adm-sec-irow { grid-template-columns: 96px minmax(0, 1fr); gap: 6px 19px; }
+  .adm-sec-irow .adm-sec-actions { grid-column: 1 / -1; justify-content: flex-start; }
+}
+
+/* A phone: a metric row keeps its name readable and puts the chip and the value under each other on
+   the right; a refusal is two lines, not six columns; an incident stacks. */
+@media (max-width: 768px) {
+  .adm-sec .adm-mrow { grid-template-columns: minmax(0, 1fr) auto; gap: 4px 14px; }
+  .adm-sec .adm-mrow > :nth-child(1) { grid-column: 1; grid-row: 1 / span 2; }
+  .adm-sec .adm-mrow > :nth-child(2) { grid-column: 2; grid-row: 1; justify-self: end; }
+  .adm-sec .adm-mrow > :nth-child(3) { grid-column: 2; grid-row: 2; max-width: 11rem; white-space: normal; }
+  .adm-sec .adm-mrow.adm-mrow--two > :nth-child(1) { grid-row: 1; }
+  .adm-sec .adm-mrow.adm-mrow--two > :nth-child(2) { grid-row: 1; }
+  .adm-sec-tbl thead { display: none; }
+  .adm-sec-tbl tr { display: flex; flex-wrap: wrap; gap: 4px 8px; padding: 9px 0; border-bottom: 1px solid var(--border-subtle); }
+  .adm-sec-tbl td { display: inline; padding: 0; border: 0; min-width: 0; }
+  .adm-sec-tbl td.adm-sec-source { flex-basis: 100%; }
+  .adm-sec-tbl tr:hover td { background: none; }
+  .adm-sec-irow { grid-template-columns: 1fr; gap: 4px 0; }
+  .adm-sec-irow .adm-sec-actions { justify-content: flex-start; margin-top: 6px; }
+}

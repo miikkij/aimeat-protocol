@@ -18,10 +18,6 @@
  *   - the two code-gated actions (regenerate, disable) ask for the code inline
  * @usage html`<${TwoFactorSection} twoFactor=${ov.two_factor} managed=${!!managedBy} ... />`
  * @version-history
- *   2026-09-22 -- Composed from the shared component set (Surface, Field, Action, CopyAction, Chip,
- *     Text); no own classes. The backup codes sit in a code surface; the setup card is a box; the
- *     title and description the Access page hid are gone (its sign-in row names the panel). The QR
- *     image keeps a plain img: the set has no image part yet.
  *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
  *   v1.0.0 — 2026-09-04 — Initial. Closes the half-built TOTP feature: backend complete, no UI.
  */
@@ -30,8 +26,8 @@ import { useState } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
+import { CopyButton } from '/components/CopyButton.js';
 import { useConfirm } from '/components/Modal.js';
-import { Stack, Surface, Text, Chip, Action, CopyAction, Field } from '/components/poster-parts.js';
 import * as securityService from '/js/services/security.js';
 
 /** A six-digit field's value, kept to digits so a pasted "123 456" still submits. */
@@ -118,112 +114,136 @@ export function TwoFactorSection({ twoFactor, managed, showToast, onChanged }) {
   // ── The setup card: everything the person must keep, on one screen ──
   if (setupData) {
     const codes = setupData.backup_codes || [];
-    return html`<${Surface} kind="box"><${Stack}>
-      <${Text}><strong>${t('profile.security.twoFactor.setupStep1')}</strong><//>
-      ${setupData.qr_data_url && html`
-        <img src=${setupData.qr_data_url} alt=${t('profile.security.twoFactor.qrAlt')} width="200" height="200" />
-      `}
-      <${Text} kind="caption" tone="muted">${t('profile.security.twoFactor.manualEntry')}<//>
-      <${Stack} direction="wrap" density="compact" align="center">
-        <${Text} kind="mono">${setupData.totp_secret}<//>
-        <${CopyAction} kind="text" text=${setupData.totp_secret || ''} />
-      <//>
+    return html`
+      <h3 class="card-h3 mt-section">${t('profile.security.twoFactor.title')}</h3>
+      <div class="card poster-row--thing">
+        <p class="pf-bold mb-half">${t('profile.security.twoFactor.setupStep1')}</p>
+        ${setupData.qr_data_url && html`
+          <img class="pf-2fa-qr" src=${setupData.qr_data_url}
+            alt=${t('profile.security.twoFactor.qrAlt')} width="200" height="200" />
+        `}
+        <p class="text-caption mb-half">${t('profile.security.twoFactor.manualEntry')}</p>
+        <div class="flex-row mb-1">
+          <code class="text-code pf-code-break">${setupData.totp_secret}</code>
+          <${CopyButton} text=${setupData.totp_secret || ''} className="btn-ghost btn-sm" />
+        </div>
 
-      <${Text}><strong>${t('profile.security.twoFactor.setupStep2')}</strong><//>
-      <${Text} kind="caption" tone="muted">${t('profile.security.twoFactor.backupCodesOnce')}<//>
-      ${codeList(codes)}
-      <${Stack} direction="horizontal" align="start">
-        <${CopyAction} text=${codes.join('\n')} label=${t('profile.security.twoFactor.copyCodes')} />
-      <//>
+        <p class="pf-bold mb-half">${t('profile.security.twoFactor.setupStep2')}</p>
+        <p class="text-caption mb-half">${t('profile.security.twoFactor.backupCodesOnce')}</p>
+        <div class="pf-2fa-codes mb-half">
+          ${codes.map(c => html`<code class="text-code" key=${c}>${c}</code>`)}
+        </div>
+        <${CopyButton} text=${codes.join('\n')} className="btn-outline btn-sm"
+          label=${t('profile.security.twoFactor.copyCodes')} />
 
-      <${Text}><strong>${t('profile.security.twoFactor.setupStep3')}</strong><//>
-      <${Stack} direction="wrap" density="compact" align="end">
-        ${sixDigits(confirmCode, e => setConfirmCode(onlyDigits(e.target.value)), e => { if (e.key === 'Enter' && !busy) confirmSetup(); })}
-        <${Action} disabled=${busy} onClick=${confirmSetup}>
-          ${busy ? t('profile.security.twoFactor.working') : t('profile.security.twoFactor.turnOn')}
-        <//>
-        <${Action} kind="text" disabled=${busy} onClick=${reset}>${t('profile.cancel')}<//>
-      <//>
-      <${Text} kind="caption" tone="muted">${t('profile.security.twoFactor.notOnYet')}<//>
-    <//><//>`;
+        <p class="pf-bold mt-1 mb-half">${t('profile.security.twoFactor.setupStep3')}</p>
+        <div class="flex-row">
+          <input class="input-field text-code pf-2fa-code-input" inputmode="numeric" maxlength="6"
+            autocomplete="one-time-code" placeholder="123456" value=${confirmCode}
+            onInput=${e => setConfirmCode(onlyDigits(e.target.value))}
+            onKeyDown=${e => { if (e.key === 'Enter' && !busy) confirmSetup(); }} />
+          <button class="btn-primary" disabled=${busy} onClick=${confirmSetup}>
+            ${busy ? t('profile.security.twoFactor.working') : t('profile.security.twoFactor.turnOn')}
+          </button>
+          <button class="btn-ghost" disabled=${busy} onClick=${reset}>${t('profile.cancel')}</button>
+        </div>
+        <p class="text-caption mt-xs">${t('profile.security.twoFactor.notOnYet')}</p>
+      </div>
+    `;
   }
 
-  // ── The resting state ── (the Access page's sign-in row names the panel)
-  return html`<${Stack}>
-    <${Stack} direction="horizontal" align="between">
-      <${Text}><strong>${t('profile.security.twoFactor.authenticatorApp')}</strong><//>
-      <${Chip} tone=${tf.enabled ? 'success' : 'muted'}>${tf.enabled ? t('profile.security.twoFactor.on') : t('profile.security.twoFactor.off')}<//>
-    <//>
+  // ── The resting state ──
+  return html`
+    <h3 class="card-h3 mt-section">${t('profile.security.twoFactor.title')}</h3>
+    <p class="text-caption mb-1">${t('profile.security.twoFactor.desc')}</p>
+    <div class="card poster-row--thing">
+      <div class="flex-between mb-half">
+        <span class="pf-bold">${t('profile.security.twoFactor.authenticatorApp')}</span>
+        <span class="badge ${tf.enabled ? 'badge-success' : 'badge-muted'}">
+          ${tf.enabled ? t('profile.security.twoFactor.on') : t('profile.security.twoFactor.off')}
+        </span>
+      </div>
 
-    ${!tf.enabled && html`
-      <${Text} kind="caption" tone="muted">${tf.pending ? t('profile.security.twoFactor.unfinished') : t('profile.security.twoFactor.offDesc')}<//>
-      <${Stack} direction="horizontal" align="start">
-        <${Action} disabled=${busy} onClick=${startSetup}>
+      ${!tf.enabled && html`
+        <p class="text-caption mb-half">
+          ${tf.pending
+            ? t('profile.security.twoFactor.unfinished')
+            : t('profile.security.twoFactor.offDesc')}
+        </p>
+        <button class="btn-primary" disabled=${busy} onClick=${startSetup}>
           ${busy ? t('profile.security.twoFactor.working') : t('profile.security.twoFactor.setUp')}
-        <//>
-      <//>
-    `}
-
-    ${tf.enabled && html`
-      <${Text} kind="caption" tone="muted">${t('profile.security.twoFactor.codesLeft').replace('{n}', String(tf.backup_codes_left))}<//>
-      ${tf.backup_codes_left === 0 && html`<${Text} kind="caption" tone="coral"><strong>${t('profile.security.twoFactor.noCodesLeft')}</strong><//>`}
-
-      ${newCodes && html`
-        ${codeList(newCodes)}
-        <${Stack} direction="wrap" density="compact">
-          <${CopyAction} text=${newCodes.join('\n')} label=${t('profile.security.twoFactor.copyCodes')} />
-          <${Action} kind="text" onClick=${() => setNewCodes(null)}>${t('profile.security.twoFactor.savedThem')}<//>
-        <//>
-        <${Text} kind="caption" tone="muted">${t('profile.security.twoFactor.backupCodesOnce')}<//>
+        </button>
       `}
 
-      ${action === null && html`<${Stack} direction="wrap" density="compact">
-        <${Action} onClick=${() => { setAction('regenerate'); setActionCode(''); setNewCodes(null); }}>${t('profile.security.twoFactor.newCodes')}<//>
-        <${Action} tone="danger" onClick=${() => { setAction('disable'); setActionCode(''); setBackupCodeInput(''); setUseBackupCode(false); }}>${t('profile.security.twoFactor.turnOff')}<//>
-      <//>`}
+      ${tf.enabled && html`
+        <p class="text-caption mb-half">
+          ${t('profile.security.twoFactor.codesLeft').replace('{n}', String(tf.backup_codes_left))}
+        </p>
+        ${tf.backup_codes_left === 0 && html`
+          <p class="text-caption pf-bold mb-half">${t('profile.security.twoFactor.noCodesLeft')}</p>
+        `}
 
-      ${action === 'regenerate' && html`
-        <${Text} kind="caption" tone="muted">${t('profile.security.twoFactor.newCodesAsk')}<//>
-        <${Stack} direction="wrap" density="compact" align="end">
-          ${sixDigits(actionCode, e => setActionCode(onlyDigits(e.target.value)), e => { if (e.key === 'Enter' && !busy && actionCode.length === 6) doRegenerate(); })}
-          <${Action} disabled=${busy || actionCode.length !== 6} onClick=${doRegenerate}>
-            ${busy ? t('profile.security.twoFactor.working') : t('profile.security.twoFactor.newCodes')}
-          <//>
-          <${Action} kind="text" onClick=${() => setAction(null)}>${t('profile.cancel')}<//>
-        <//>
-      `}
+        ${newCodes && html`
+          <div class="pf-2fa-codes mb-half">
+            ${newCodes.map(c => html`<code class="text-code" key=${c}>${c}</code>`)}
+          </div>
+          <div class="flex-row mb-1">
+            <${CopyButton} text=${newCodes.join('\n')} className="btn-outline btn-sm"
+              label=${t('profile.security.twoFactor.copyCodes')} />
+            <button class="btn-ghost btn-sm" onClick=${() => setNewCodes(null)}>
+              ${t('profile.security.twoFactor.savedThem')}
+            </button>
+          </div>
+          <p class="text-caption mb-1">${t('profile.security.twoFactor.backupCodesOnce')}</p>
+        `}
 
-      ${action === 'disable' && html`
-        <${Text} kind="caption" tone="muted">${t('profile.security.twoFactor.turnOffAsk')}<//>
-        ${useBackupCode
-          ? html`<${Field} width="narrow" maxLength=${16} ariaLabel=${t('profile.security.twoFactor.backupCodePlaceholder')}
-              placeholder=${t('profile.security.twoFactor.backupCodePlaceholder')} value=${backupCodeInput}
-              onInput=${e => setBackupCodeInput(e.target.value)} />`
-          : sixDigits(actionCode, e => setActionCode(onlyDigits(e.target.value)))}
-        <${Stack} direction="wrap" density="compact">
-          <${Action} tone="danger" disabled=${busy || (useBackupCode ? !backupCodeInput.trim() : actionCode.length !== 6)} onClick=${askDisable}>
-            ${busy ? t('profile.security.twoFactor.working') : t('profile.security.twoFactor.turnOff')}
-          <//>
-          <${Action} kind="text" onClick=${() => { setUseBackupCode(!useBackupCode); setActionCode(''); setBackupCodeInput(''); }}>
-            ${useBackupCode ? t('profile.security.twoFactor.useAppCode') : t('profile.security.twoFactor.useBackupCode')}
-          <//>
-          <${Action} kind="text" onClick=${() => setAction(null)}>${t('profile.cancel')}<//>
-        <//>
+        ${action === null && html`
+          <div class="flex-row">
+            <button class="btn-outline" onClick=${() => { setAction('regenerate'); setActionCode(''); setNewCodes(null); }}>
+              ${t('profile.security.twoFactor.newCodes')}
+            </button>
+            <button class="btn-danger-solid" onClick=${() => { setAction('disable'); setActionCode(''); setBackupCodeInput(''); setUseBackupCode(false); }}>
+              ${t('profile.security.twoFactor.turnOff')}
+            </button>
+          </div>
+        `}
+
+        ${action === 'regenerate' && html`
+          <p class="text-caption mb-half">${t('profile.security.twoFactor.newCodesAsk')}</p>
+          <div class="flex-row">
+            <input class="input-field text-code pf-2fa-code-input" inputmode="numeric" maxlength="6"
+              autocomplete="one-time-code" placeholder="123456" value=${actionCode}
+              onInput=${e => setActionCode(onlyDigits(e.target.value))}
+              onKeyDown=${e => { if (e.key === 'Enter' && !busy && actionCode.length === 6) doRegenerate(); }} />
+            <button class="btn-primary" disabled=${busy || actionCode.length !== 6} onClick=${doRegenerate}>
+              ${busy ? t('profile.security.twoFactor.working') : t('profile.security.twoFactor.newCodes')}
+            </button>
+            <button class="btn-ghost" onClick=${() => setAction(null)}>${t('profile.cancel')}</button>
+          </div>
+        `}
+
+        ${action === 'disable' && html`
+          <p class="text-caption mb-half">${t('profile.security.twoFactor.turnOffAsk')}</p>
+          ${useBackupCode
+            ? html`<input class="input-field text-code pf-2fa-code-input" maxlength="16"
+                placeholder=${t('profile.security.twoFactor.backupCodePlaceholder')} value=${backupCodeInput}
+                onInput=${e => setBackupCodeInput(e.target.value)} />`
+            : html`<input class="input-field text-code pf-2fa-code-input" inputmode="numeric" maxlength="6"
+                autocomplete="one-time-code" placeholder="123456" value=${actionCode}
+                onInput=${e => setActionCode(onlyDigits(e.target.value))} />`}
+          <div class="flex-row mt-xs">
+            <button class="btn-danger-solid" disabled=${busy || (useBackupCode ? !backupCodeInput.trim() : actionCode.length !== 6)}
+              onClick=${askDisable}>
+              ${busy ? t('profile.security.twoFactor.working') : t('profile.security.twoFactor.turnOff')}
+            </button>
+            <button class="btn-ghost" onClick=${() => { setUseBackupCode(!useBackupCode); setActionCode(''); setBackupCodeInput(''); }}>
+              ${useBackupCode ? t('profile.security.twoFactor.useAppCode') : t('profile.security.twoFactor.useBackupCode')}
+            </button>
+            <button class="btn-ghost" onClick=${() => setAction(null)}>${t('profile.cancel')}</button>
+          </div>
+        `}
       `}
-    `}
+    </div>
     <${ConfirmUI} />
-  <//>`;
-}
-
-/** The backup codes, one per line in a code surface, to copy or write down. */
-function codeList(codes) {
-  return html`<${Surface} kind="code"><${Stack} direction="wrap" density="compact">
-    ${codes.map(c => html`<${Text} kind="mono" key=${c}>${c}<//>`)}
-  <//><//>`;
-}
-
-/** The six-digit field every code step uses: numeric, the one-time-code autofill, narrow. */
-function sixDigits(value, onInput, onKeyDown) {
-  return html`<${Field} width="narrow" inputMode="numeric" maxLength=${6} autoComplete="one-time-code"
-    ariaLabel=${t('profile.security.twoFactor.title')} placeholder="123456" value=${value} onInput=${onInput} onKeyDown=${onKeyDown} />`;
+  `;
 }

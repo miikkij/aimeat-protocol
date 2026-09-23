@@ -16,15 +16,13 @@
  *   v1.2.0 — 2026-08-29 — loadTimelineRows() and TimelineRecent (the latest few changes as plain rows) for
  *     the organism home's "what has happened" section; the panel takes `defaultOpen` so the home's
  *     "full timeline" door opens it already loaded and without its own toggle. The toggle lost its emoji.
- *   v1.3.0 -- 2026-09-22 -- Composed from the shared set: the recent changes are timeline ListRows, the
- *     panel's toggle is a Fold, its snapshot list is ListRows; no class of its own, the person emoji gone.
  */
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { Stack, Columns, ListRow, Fold, Text } from '/components/poster-parts.js';
+import { Spinner } from '/views/profile/shared.js';
 import { Mermaid } from '/components/Mermaid.js';
 import { getStructureHistory } from '/js/services/organisms.js';
 import { buildOrganismMindmap } from '/views/profile/organisms/mindmap.js';
@@ -87,15 +85,19 @@ export async function loadTimelineRows(orgId) {
 /** The latest few changes as plain rows: date, what changed, the shape's counts. */
 export function TimelineRecent({ rows, limit = 5 }) {
   const list = (rows || []).slice(0, limit);
-  if (!list.length) return html`<${Text} kind="caption" tone="muted">${t('timeline.empty') || 'No structural history yet.'}<//>`;
-  return html`<${Stack} density="compact">
-    ${list.map(r => {
-      const tt = totals(r.fingerprint);
-      return html`<${ListRow} key=${r.fingerprint + r.at} density="compact" kind="chronology"
-        time=${r.isCurrent ? (t('timeline.now') || 'now') : String(r.at).slice(0, 10)} marker=${r.isCurrent ? 'coral' : 'muted'}
-        name=${r.event} value=${tt ? `${tt.workspaces} ws · ${tt.documents}d · ${tt.records}r · ${tt.members}` : undefined} />`;
-    })}
-  <//>`;
+  if (!list.length) return html`<p class="og-hint">${t('timeline.empty') || 'No structural history yet.'}</p>`;
+  return html`
+    <div class="og-folds">
+      ${list.map(r => {
+        const tt = totals(r.fingerprint);
+        return html`
+          <div class="og-fold" key=${r.fingerprint + r.at}>
+            <i>${r.isCurrent ? (t('timeline.now') || 'now') : String(r.at).slice(0, 10)}</i>
+            <span>${r.event}</span>
+            ${tt ? html`<span class="og-fold-r">${tt.workspaces} ws · ${tt.documents}d · ${tt.records}r · ${tt.members}</span>` : null}
+          </div>`;
+      })}
+    </div>`;
 }
 
 export function TimelinePanel({ orgId, defaultOpen = false }) {
@@ -123,28 +125,41 @@ export function TimelinePanel({ orgId, defaultOpen = false }) {
     if (next && !loaded && !busy) await load();
   };
 
-  const body = busy ? html`<${Text} tone="muted">${t('organisms.loading') || 'Loading...'}<//>`
-    : (!rows.length
-      ? html`<${Text} kind="caption" tone="muted">${t('timeline.empty') || 'No structural history yet.'}<//>`
-      : html`<${Stack}>
-        <${Mermaid} chart=${buildTimelineDiagram(rows)} />
-        <${Columns} layout="trailing" collapse="640">
-          <${Stack} density="compact">
-            ${rows.map(r => {
-              const tt = totals(r.fingerprint);
-              return html`<${ListRow} key=${r.fingerprint + r.at} density="compact" selected=${selected === r.fingerprint}
-                onOpen=${() => setSelected(r.fingerprint)}
-                name=${r.event} detail=${`${String(r.at).slice(0, 10) || '—'}${r.isCurrent ? ` · ${t('timeline.now') || 'now'}` : ''}${tt ? ` · ${tt.workspaces} ws · ${tt.documents}d · ${tt.records}r · ${tt.members}` : ''}`} />`;
-            })}
-          <//>
-          <div>
-            ${selected
-              ? html`<${Mermaid} chart=${buildOrganismMindmap({ name: t('timeline.snapshot') || 'Snapshot', workspaces: selected.workspaces || [], members: [], agents: [] }, { chartType: readChartType(orgId), level: 'counts', showUsers: false, showActivity: true, heatmap: true })} />`
-              : html`<${Text} kind="caption" tone="muted">${t('timeline.pick') || 'Pick a point to see the structure then.'}<//>`}
-          </div>
-        <//>
-      <//>`);
-
-  return defaultOpen ? body : html`
-    <${Fold} title=${t('timeline.title') || 'Development timeline'} open=${open} onToggle=${toggle}>${body}<//>`;
+  return html`
+    <div class="pj-timeline">
+      ${defaultOpen ? null : html`<button class="pj-struct-toggle" aria-expanded=${open} onClick=${toggle}>
+        <span class="pj-struct-caret">${open ? '▾' : '▸'}</span>
+        <span>${t('timeline.title') || 'Development timeline'}</span>
+      </button>`}
+      ${open ? html`
+        <div class="pj-timeline-body card-detail">
+          ${busy ? html`<${Spinner} text=${t('organisms.loading') || 'Loading...'} />`
+            : (!rows.length
+              ? html`<div class="section-desc">${t('timeline.empty') || 'No structural history yet.'}</div>`
+              : html`
+                <div class="pj-timeline-diagram">
+                  <${Mermaid} chart=${buildTimelineDiagram(rows)} />
+                </div>
+                <div class="pj-timeline-grid">
+                  <ul class="pj-timeline-list">
+                    ${rows.map(r => {
+                      const tt = totals(r.fingerprint);
+                      return html`
+                        <li class=${'pj-timeline-item' + (selected === r.fingerprint ? ' is-active' : '')}>
+                          <button class="pj-timeline-entry" onClick=${() => setSelected(r.fingerprint)}>
+                            <span class="pj-timeline-date">${String(r.at).slice(0, 10) || '—'}${r.isCurrent ? ` · ${t('timeline.now') || 'now'}` : ''}</span>
+                            <span class="pj-timeline-event">${r.event}</span>
+                            ${tt ? html`<span class="pj-timeline-counts section-desc">${tt.workspaces} ws · ${tt.documents}d · ${tt.records}r · ${tt.members}👤</span>` : null}
+                          </button>
+                        </li>`;
+                    })}
+                  </ul>
+                  <div class="pj-timeline-map">
+                    ${selected
+                      ? html`<${Mermaid} chart=${buildOrganismMindmap({ name: t('timeline.snapshot') || 'Snapshot', workspaces: selected.workspaces || [], members: [], agents: [] }, { chartType: readChartType(orgId), level: 'counts', showUsers: false, showActivity: true, heatmap: true })} />`
+                      : html`<div class="section-desc">${t('timeline.pick') || 'Pick a point to see the structure then.'}</div>`}
+                  </div>
+                </div>`)}
+        </div>` : null}
+    </div>`;
 }

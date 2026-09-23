@@ -10,11 +10,6 @@
  *   this module re-renders #detail-monetize in place after loads/saves.
  * @usage import { monetizeSectionInner, monetizeOnOpen, monetizeAddTool, ... } from './monetize.js'
  * @version-history
- *   v1.5.0 — 2026-09-22 — Composed from the shared set (parts-html.js): this module draws the whole
- *     section; a tool is the set's list row with its two facts under the name and Delete as a danger
- *     word (the ✕ glyph is ✗, the warning glyph on a blocked tool is gone), the editor is a record
- *     whose four questions are numbered list rows of the set's fields, the second price folds in the
- *     set's folding surface, and Add tool is an underlined word. Every input keeps its id.
  *   v1.4.0 — 2026-08-29 — The poster face: a tool is one row (name and description as prose, price and
  *     delivery as two labelled facts, the doors on the right), and the editor asks four questions in
  *     order — what, cost, market, delivery — with the second currency and the pacing burn folded.
@@ -31,8 +26,7 @@
  *   v1.0.0 — 2026-07-14 — Initial Monetize tool editor (TARGET-034 phase B)
  */
 import { escapeHtml } from './util.js';
-import { showConfirm, showNotice } from './ui.js';
-import { section, listRow, action, chip, stack, columns, surface, text, field } from './parts-html.js';
+import { dtlBtn, showConfirm, showNotice } from './ui.js';
 import { loadConfig } from './config.js';
 import { t } from './i18n.js';
 import { getCortexOwnerToken } from './cortex.js';
@@ -139,42 +133,38 @@ function priceLabel(tool) {
   return parts.length ? parts.join(' · ') : t('monetize.notForSale');
 }
 
-/** A labelled fact inside a tool row: the coral label, then the value. */
-function fact(label, value, mono) {
-  return stack({ direction: 'horizontal', density: 'compact', align: 'center' },
-    text({ kind: 'label' }, label) + (mono ? text({ kind: 'mono' }, value) : text({ kind: 'body' }, value)));
-}
-
 function toolRow(tool, i) {
   var mode = tool.action_id ? t('monetize.fulfillCall') : t('monetize.fulfillTask');
   var binding = tool.action_id
     ? escapeHtml(tool.action_id)
     : (tool.agent ? ('→ ' + escapeHtml(tool.agent)) : t('monetize.taskToOwner'));
-  // One tool, one row: the name and what it does, the price and the delivery as two labelled facts
-  // under it, the two doors on the right. The description is prose, not a label.
-  var blocked = odpsBlockedReason(tool);
-  return listRow({
-    name: escapeHtml(tool.name),
-    detail: tool.description ? escapeHtml(tool.description) : '',
-    detailKind: 'text',
-    actions: action({ kind: 'secondary', onclick: 'window._launcher.monetizeEditTool(' + i + ')' }, t('detail.editDetails'))
-      + action({ kind: 'text', tone: 'danger', title: t('monetize.deleteHint'), label: t('monetize.deleteHint'), onclick: 'window._launcher.monetizeDeleteTool(' + i + ')' }, '✗'),
-    body: stack({ density: 'compact' },
-      stack({ direction: 'wrap', align: 'center' },
-        fact(t('monetize.priceCol'), escapeHtml(priceLabel(tool)) + (tool.exchange ? ' ' + chip(t('monetize.exchangeOn'), 'success') : ''))
-        + fact(mode, binding, true))
+  // One tool, one row: the name and what it does on the left, the price and the delivery as two
+  // labelled facts, the two doors on the right. The description is prose, not a label.
+  return '<div class="mz-tool">' +
+      '<div class="mz-tool-main">' +
+        '<div class="mz-tool-name">' + escapeHtml(tool.name) + '</div>' +
+        (tool.description ? '<div class="mz-desc">' + escapeHtml(tool.description) + '</div>' : '') +
+      '</div>' +
+      '<div class="mz-fact"><span class="mz-fact-label">' + t('monetize.priceCol') + '</span><span class="mz-fact-val">' + escapeHtml(priceLabel(tool)) +
+        (tool.exchange ? ' <span class="dtl-sync ok">' + t('monetize.exchangeOn') + '</span>' : '') + '</span></div>' +
+      '<div class="mz-fact"><span class="mz-fact-label">' + mode + '</span><span class="mz-fact-val mz-fact-val--small">' + binding + '</span></div>' +
+      '<div class="mz-tool-doors">' +
+        dtlBtn(t('detail.editDetails'), 'window._launcher.monetizeEditTool(' + i + ')') +
+        dtlBtn('✕', 'window._launcher.monetizeDeleteTool(' + i + ')', { variant: 'danger', title: t('monetize.deleteHint') }) +
+      '</div>' +
       // A tool flagged for EXCHANGE that the projection will skip: say so here instead of leaving the
       // owner with a ticked box and an empty marketplace.
-      + (blocked ? text({ kind: 'caption', tone: 'coral' }, escapeHtml(blocked)) : '')),
-  });
+      (odpsBlockedReason(tool) ? '<div class="od-blocked mz-tool-blocked">⚠ ' + escapeHtml(odpsBlockedReason(tool)) + '</div>' : '') +
+    '</div>';
 }
 
 /** A currency picker over the node's supported money currencies. */
-function currencyField(id, label, selected) {
-  return field({
-    id: id, type: 'select', label: escapeHtml(label), value: selected,
-    options: CURRENCIES.map(function (c) { return { value: c, label: c }; }),
-  });
+function currencySelect(id, selected) {
+  var html = '<select id="' + id + '" class="modal-input" style="margin:4px 0 8px">';
+  for (var i = 0; i < CURRENCIES.length; i++) {
+    html += '<option value="' + CURRENCIES[i] + '"' + (selected === CURRENCIES[i] ? ' selected' : '') + '>' + CURRENCIES[i] + '</option>';
+  }
+  return html + '</select>';
 }
 
 function editorHtml(tool) {
@@ -188,76 +178,79 @@ function editorHtml(tool) {
   // whether it goes on the market, and how a bought call is delivered — with the pacing burn and the
   // ODPS description folded under the question they belong to. Every field keeps its id, so the
   // save path below reads the same inputs it always did.
-  // The set's field, labelled, with its hint; `attrs` carries inputmode where a keyboard helps.
-  var input = function (id, label, value, placeholder, hint, extra) {
-    return field(Object.assign({ id: id, label: escapeHtml(label), value: value, placeholder: placeholder, hint: hint ? escapeHtml(hint) : '' }, extra || {}));
+  var field = function (id, label, control, hint) {
+    return '<div class="mz-field"><label class="mz-label" for="' + id + '">' + escapeHtml(label) + '</label>' + control +
+      (hint ? '<div class="mz-hint">' + escapeHtml(hint) + '</div>' : '') + '</div>';
   };
-  // One of the four questions: its number, its title, the sentence that frames it, and its fields.
   var group = function (n, title, lede, body) {
-    return listRow({ number: n, name: escapeHtml(title), detail: lede ? escapeHtml(lede) : '', detailKind: 'text', body: stack({}, body) });
+    return '<div class="mz-group"><div class="mz-group-head"><span class="mz-group-n">' + n + '</span><span class="mz-group-title">' + escapeHtml(title) + '</span></div>' +
+      (lede ? '<div class="mz-group-lede">' + escapeHtml(lede) + '</div>' : '') + body + '</div>';
   };
-  return surface({ kind: 'record' }, stack({},
-      '<div>' +
+  return '<div class="dtl-ac-editor mz-form">' +
       group(1, t('mz.group.what'), '',
-        input('mz-name', t('monetize.name'), tool.name || '', 'summarize', '', { maxLength: 80 }) +
-        input('mz-desc', t('monetize.desc'), tool.description || '', '', t('mz.descHint'), { maxLength: 500 })) +
+        field('mz-name', t('monetize.name'), '<input id="mz-name" class="modal-input" maxlength="80" value="' + escapeHtml(tool.name || '') + '" placeholder="summarize" />', '') +
+        field('mz-desc', t('monetize.desc'), '<input id="mz-desc" class="modal-input" maxlength="500" value="' + escapeHtml(tool.description || '') + '" />', t('mz.descHint'))) +
       group(2, t('mz.group.price'), t('mz.priceLede'),
-        columns({ layout: 'thirds', collapse: 600 },
-          input('mz-morsels', t('monetize.priceMorsels'), (tool.price && tool.price.morsels) || '', '0', '', { type: 'number', min: 0, step: 1 }) +
-          input('mz-money', t('monetize.priceMoney'), moneyMajor, '0.002', '', { inputAttrs: ' inputmode="decimal"' }) +
-          currencyField('mz-currency', t('monetize.currency'), cur)) +
-        surface({ kind: 'plain', summary: escapeHtml(t('mz.more.price')) }, stack({},
-          columns({ layout: 'thirds', collapse: 600 },
-            input('mz-money2', t('monetize.money2'), money2Major, '0.002', '', { inputAttrs: ' inputmode="decimal"' }) +
-            currencyField('mz-currency2', t('monetize.currency2'), cur2)) +
-          text({ kind: 'caption', tone: 'muted' }, escapeHtml(t('monetize.money2Hint'))) +
+        '<div class="mz-grid mz-grid--price">' +
+          field('mz-morsels', t('monetize.priceMorsels'), '<input id="mz-morsels" class="modal-input" type="number" min="0" step="1" value="' + ((tool.price && tool.price.morsels) || '') + '" placeholder="0" />', '') +
+          field('mz-money', t('monetize.priceMoney'), '<input id="mz-money" class="modal-input" inputmode="decimal" value="' + escapeHtml(moneyMajor) + '" placeholder="0.002" />', '') +
+          field('mz-currency', t('monetize.currency'), currencySelect('mz-currency', cur), '') +
+        '</div>' +
+        '<details class="mz-more"><summary class="mz-more-head">' + escapeHtml(t('mz.more.price')) + '</summary>' +
+          '<div class="mz-grid mz-grid--price">' +
+            field('mz-money2', t('monetize.money2'), '<input id="mz-money2" class="modal-input" inputmode="decimal" value="' + escapeHtml(money2Major) + '" placeholder="0.002" />', '') +
+            field('mz-currency2', t('monetize.currency2'), currencySelect('mz-currency2', cur2), '') +
+          '</div>' +
+          '<div class="mz-hint">' + escapeHtml(t('monetize.money2Hint')) + '</div>' +
           // Pacing, not price: this is what a call BURNS to bound how fast the tool can be consumed. It is
           // separate from every price above precisely because it is not revenue — nobody is credited it.
-          input('mz-toll', t('monetize.toll'), typeof tool.tollMorsels === 'number' ? String(tool.tollMorsels) : '', '0', t('monetize.tollHint'),
-            { type: 'number', min: 0, max: 100, step: 1 })))) +
+          field('mz-toll', t('monetize.toll'), '<input id="mz-toll" class="modal-input" type="number" min="0" max="100" step="1" value="'
+            + (typeof tool.tollMorsels === 'number' ? tool.tollMorsels : '') + '" placeholder="0" />', t('monetize.tollHint')) +
+        '</details>') +
       group(3, t('mz.group.market'), t('mz.marketLede'),
-        field({ id: 'mz-exchange', type: 'checkbox', label: escapeHtml(t('monetize.exchange')), value: !!tool.exchange }) +
-        text({ kind: 'caption', tone: 'muted' }, escapeHtml(t('monetize.exchangeHint'))) +
+        '<label class="mz-check"><input id="mz-exchange" type="checkbox"' + (tool.exchange ? ' checked' : '') + ' /><span>' + escapeHtml(t('monetize.exchange')) + '</span></label>' +
+        '<div class="mz-hint">' + escapeHtml(t('monetize.exchangeHint')) + '</div>' +
         odpsToolFieldsHtml(tool, mzOfferings[tool.name || ''] || '', {
           appId: mzAppId, ownerGhii: mzOwnerGhiiOf(), toolName: tool.name || '', actionId: tool.action_id || '',
           appProvenance: (mzDoc && mzDoc.provenance) || null, timing: mzTiming[tool.name || ''] || null,
         })) +
       group(4, t('mz.group.delivery'), t('mz.deliveryLede'),
-        columns({ layout: 'equal', collapse: 600 },
-          input('mz-action', t('monetize.actionId'), tool.action_id || '', 'ext:my-extension:summarize', t('monetize.actionIdHint'), { maxLength: 200 }) +
-          input('mz-agent', t('monetize.agent'), tool.agent || '', 'assistant', t('monetize.agentHint'), { maxLength: 100 }))) +
+        '<div class="mz-grid">' +
+          field('mz-action', t('monetize.actionId'), '<input id="mz-action" class="modal-input" maxlength="200" value="' + escapeHtml(tool.action_id || '') + '" placeholder="ext:my-extension:summarize" />', t('monetize.actionIdHint')) +
+          field('mz-agent', t('monetize.agent'), '<input id="mz-agent" class="modal-input" maxlength="100" value="' + escapeHtml(tool.agent || '') + '" placeholder="assistant" />', t('monetize.agentHint')) +
+        '</div>') +
+      '<div class="dtl-btn-row mz-actions">' +
+        dtlBtn(t('detail.saveDetails'), 'window._launcher.monetizeSaveTool()', { variant: 'primary', disabled: mzBusy }) +
+        dtlBtn(t('detail.cancelEdit'), 'window._launcher.monetizeCancelEdit()') +
       '</div>' +
-      stack({ direction: 'wrap', align: 'center' },
-        action({ kind: 'primary', disabled: mzBusy, onclick: 'window._launcher.monetizeSaveTool()' }, t('detail.saveDetails')) +
-        action({ kind: 'secondary', onclick: 'window._launcher.monetizeCancelEdit()' }, t('detail.cancelEdit'))) +
-      text({ kind: 'caption', tone: 'muted', id: 'mz-status' }, '')));
+      '<div class="dtl-ai-status" id="mz-status"></div>' +
+    '</div>';
 }
 
-/** The Monetize section; detail.js holds its slot (#detail-monetize) and this fills it. */
+/** Inner HTML of the Monetize section — detail.js wraps it in <div class="dtl-section" id="detail-monetize">. */
 export function monetizeSectionInner() {
   if (mzState === 'off') return '';
-  var wrap = function (body) {
-    return section({ title: t('monetize.title'), description: t('monetize.hint'), body: stack({}, body) });
-  };
-  if (mzState === 'loading') return wrap(text({ kind: 'caption', tone: 'muted' }, '…'));
-  var html = '';
+  var html = '<h3>' + t('monetize.title') + '</h3>' +
+    '<p class="dtl-desc">' + t('monetize.hint') + '</p>';
+  if (mzState === 'loading') {
+    return html + '<span style="color:var(--text-muted);font-size:.85rem">…</span>';
+  }
   var tools = (mzDoc && mzDoc.tools) || [];
   if (!tools.length && mzEditing === -1) {
-    html += text({ kind: 'caption', tone: 'muted' }, t('monetize.empty'));
+    html += '<span class="dtl-sync none">' + t('monetize.empty') + '</span>';
   } else {
-    var rows = '';
     for (var i = 0; i < tools.length; i++) {
-      rows += (mzEditing === i) ? editorHtml(tools[i]) : toolRow(tools[i], i);
+      html += (mzEditing === i) ? editorHtml(tools[i]) : toolRow(tools[i], i);
     }
-    html += '<div>' + rows + '</div>';
   }
   if (mzEditing === -2) {
     html += editorHtml({});
   } else if (mzEditing === -1) {
-    html += stack({ direction: 'horizontal', align: 'start' },
-      action({ kind: 'secondary', onclick: 'window._launcher.monetizeAddTool()' }, t('monetize.addTool')));
+    html += '<div class="dtl-btn-row" style="margin-top:10px">' +
+      dtlBtn(t('monetize.addTool'), 'window._launcher.monetizeAddTool()', { variant: 'primary' }) +
+    '</div>';
   }
-  return wrap(html);
+  return html;
 }
 
 /** Inner HTML of the app-level EXCHANGE & ODPS section — detail.js wraps it in #detail-odps. */

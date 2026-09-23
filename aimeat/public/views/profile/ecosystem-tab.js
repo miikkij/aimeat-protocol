@@ -10,9 +10,6 @@
  * @structure EcosystemTab(default) — loadData, pending poll, connect panel, app cards, revoke modal
  * @usage Registered as a TABS entry in views/profile.js (id 'ecosystem').
  * @version-history
- *   2026-09-22 -- Composed from the shared component set (Page, Section, ListRow that opens, Toolbar,
- *     Field, Chip, Dialog); no own classes. The plug emoji and the triangle glyphs are gone (the
- *     app's name opens its card); the app count is a chip beside the title.
  *   2026-09-13 -- V2v: compose section top rules from poster.css.
  *   2026-09-13 — The revoke dialog's actions sit in its footer.
  *   2026-09-13 — V1: compose page and B1 section headings from the shared poster classes.
@@ -126,7 +123,7 @@ import { onLiveUpdate } from '/lib/live-updates.js';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { timeAgo } from '/js/utils.js';
-import { Page, Section, Stack, ListRow, Toolbar, Chip, Action, Field, Dialog, Surface, Text } from '/components/poster-parts.js';
+import { Modal } from '/components/Modal.js';
 import { Spinner } from './shared.js';
 import { listEcosystemApps, listAppData, listPending, approve, revoke, listSubscriptions, subscribe, unsubscribe } from '/js/services/ecosystem.js';
 import { ECO_PRESETS } from './ecosystem-tab.helpers.js';
@@ -232,97 +229,119 @@ export default function EcosystemTab({ onStats, showToast }) {
     catch (err) { swallowed('ecosystem-tab', err); showToast?.(t('profile.ecosystem.subError'), 'error'); }
   }
 
-  const crumbs = [{ label: t('nav.profile') }, { label: t('profile.landing.menuAutomation') }, { label: t('profile.tabs.ecosystem') }];
-  if (loading) return html`<${Page} width="wide" title=${t('profile.ecosystem.title')} crumbs=${crumbs}><${Spinner} /><//>`;
+  if (loading) return html`<div class="pf-eco"><${Spinner} /></div>`;
 
-  /** A validation outcome as a chip tone: passed, warned, failed. */
-  const validTone = (v) => (v === 'validated' ? 'success' : v === 'failed' ? 'danger' : 'coral');
-
-  return html`<${Page} width="wide" title=${t('profile.ecosystem.title')} crumbs=${crumbs}
-    identity=${html`<${Chip} tone="sun">${apps.length}<//>`}>
-    <${Stack}>
-      <${Text} kind="lead">${t('profile.ecosystem.desc')}<//>
+  return html`
+    <div class="pf-eco">
+      <div class="pf-eco-head">
+        <h3 class="poster-page-title">
+          ${t('profile.ecosystem.title')} <span class="pf-eco-count-badge">${apps.length}</span>
+        </h3>
+      </div>
+      <p class="section-desc">${t('profile.ecosystem.desc')}</p>
 
       ${pending.length > 0 && html`
-        <${Section} title=${t('profile.ecosystem.pendingTitle')} description=${t('profile.ecosystem.pendingHint')} count=${pending.length}>
-          <${Stack} density="compact">${pending.map(r => html`
-            <${ListRow} key=${r.user_code} name=${r.display_name || r.app} detail=${`eco:${r.app}`}
-              value=${html`<${Stack} direction="wrap" density="compact" align="center">
-                ${r.user_code && html`<${Chip} tone="sun">${t('profile.ecosystem.pendingCode')} ${r.user_code}<//>`}
-                <${Chip} tone="muted">${t('profile.ecosystem.waiting')}<//>
-                ${r.validation && r.validation !== 'none' && html`<${Chip} tone=${validTone(r.validation)}
-                  title=${(r.validation_checks || []).filter(c => !c.ok).map(c => `${c.name}: ${c.detail || ''}`).join('; ')}>${t(`profile.ecosystem.validation.${r.validation}`)}<//>`}
-                <${Text} kind="caption" tone="muted">${t('profile.ecosystem.expiresIn', { n: Math.max(0, Math.round((r.expires_in || 0) / 60)) })}<//>
-              <//>`}>
-              <${Toolbar} label=${t('profile.ecosystem.grantLevel')} actions=${html`
-                <${Action} tone="success" disabled=${r.validation === 'failed'} onClick=${() => onApprove(r.user_code)}>${t('profile.ecosystem.approve')}<//>
-                <${Action} kind="text" onClick=${() => onDeny(r.user_code)}>${t('profile.ecosystem.deny')}<//>`}>
-                <${Field} type="select" label=${t('profile.ecosystem.grantLevel')} value=${presetByCode[r.user_code] || 'standard'}
-                  onChange=${e => setPresetByCode(p => ({ ...p, [r.user_code]: e.target.value }))}
-                  options=${[{ value: 'standard', label: t('profile.ecosystem.presetStandard') }, { value: 'readonly', label: t('profile.ecosystem.presetReadonly') }, { value: 'full', label: t('profile.ecosystem.presetFull') }]} />
-              <//>
-            <//>`)}
-          <//>
-        <//>`}
+        <div class="pf-eco-pending">
+          <div class="pf-eco-pending-title">${t('profile.ecosystem.pendingTitle')}</div>
+          <p class="pf-eco-dim pf-eco-pending-hint">${t('profile.ecosystem.pendingHint')}</p>
+          ${pending.map(r => html`
+            <div class="pf-eco-pending-row" key=${r.user_code}>
+              <div class="pf-eco-pending-info">
+                <strong>${r.display_name || r.app}</strong>
+                ${r.user_code && html`<span class="pf-eco-pending-code">${t('profile.ecosystem.pendingCode')} <strong>${r.user_code}</strong></span>`}
+                <span class="pf-eco-mono">eco:${r.app}</span>
+                <span class="pf-eco-pill">${t('profile.ecosystem.waiting')}</span>
+                ${r.validation && r.validation !== 'none' && html`
+                  <span class="pf-eco-valid pf-eco-valid-${r.validation}"
+                    title=${(r.validation_checks || []).filter(c => !c.ok).map(c => `${c.name}: ${c.detail || ''}`).join('; ')}>
+                    ${t(`profile.ecosystem.validation.${r.validation}`)}
+                  </span>`}
+                <span class="pf-eco-dim">${t('profile.ecosystem.expiresIn', { n: Math.max(0, Math.round((r.expires_in || 0) / 60)) })}</span>
+              </div>
+              <div class="pf-eco-pending-grant">
+                <label class="pf-eco-dim">${t('profile.ecosystem.grantLevel')}</label>
+                <select class="pf-eco-select" onChange=${e => setPresetByCode(p => ({ ...p, [r.user_code]: e.target.value }))}>
+                  <option value="standard" selected>${t('profile.ecosystem.presetStandard')}</option>
+                  <option value="readonly">${t('profile.ecosystem.presetReadonly')}</option>
+                  <option value="full">${t('profile.ecosystem.presetFull')}</option>
+                </select>
+                <button class="btn-success btn-sm" disabled=${r.validation === 'failed'} onClick=${() => onApprove(r.user_code)}>${t('profile.ecosystem.approve')}</button>
+                <button class="btn-ghost btn-sm" onClick=${() => onDeny(r.user_code)}>${t('profile.ecosystem.deny')}</button>
+              </div>
+            </div>`)}
+        </div>`}
 
       ${apps.length === 0
-        ? html`<${Surface} kind="aside"><${Stack} density="compact">
-            <${Text}>${t('profile.ecosystem.empty')}<//>
-            <${Text} kind="caption" tone="muted">${t('profile.ecosystem.connectNote')}<//>
-          <//><//>`
-        : html`<${Stack} density="compact">${apps.map(app => {
+        ? html`<div class="pf-eco-empty">
+            <p>${t('profile.ecosystem.empty')}</p>
+            <p class="pf-eco-empty-note">${t('profile.ecosystem.connectNote')}</p>
+          </div>`
+        : apps.map(app => {
           const isOpen = expanded === app.geai;
           const appSubs = subs.filter(s => s.geai === app.geai);
           return html`
-            <${ListRow} key=${app.geai} name=${app.display_name || app.app} onOpen=${() => toggleCard(app)}
-              muted=${app.status === 'revoked'} detailKind="text"
-              detail=${app.owner ? t('profile.ecosystem.connectedAsYou', { owner: app.owner }) : undefined}
-              value=${html`<${Stack} density="compact" align="end">
-                <${Chip} tone=${app.status === 'active' ? 'success' : app.status === 'revoked' ? 'danger' : 'muted'}>${t(`profile.ecosystem.status.${app.status}`)}<//>
-                ${app.last_seen ? html`<${Text} kind="caption" tone="muted">${timeAgo(app.last_seen)}<//>` : null}
-              <//>`}>
-              ${isOpen && html`<${Stack} density="roomy">
-                <${Text} kind="lead">${t('profile.ecosystem.appValueLine')}<//>
+            <div class="pf-eco-card ${app.status === 'revoked' ? 'pf-eco-card-revoked' : ''}" key=${app.geai}>
+              <div class="pf-eco-card-head" onClick=${() => toggleCard(app)}>
+                <span class="pf-eco-caret">${isOpen ? '▼' : '▶'}</span>
+                <span class="pf-eco-icon">🔌</span>
+                <span class="pf-eco-head-title">
+                  <strong class="pf-eco-name">${app.display_name || app.app}</strong>
+                  ${app.owner && html`<span class="pf-eco-dim pf-eco-head-owner">${t('profile.ecosystem.connectedAsYou', { owner: app.owner })}</span>`}
+                </span>
+                <span class="pf-eco-status pf-eco-status-${app.status}">${t(`profile.ecosystem.status.${app.status}`)}</span>
+                <span class="pf-eco-dim pf-eco-lastseen">${app.last_seen ? timeAgo(app.last_seen) : ''}</span>
+              </div>
+              ${isOpen && html`
+                <div class="pf-eco-card-body">
+                  <p class="pf-eco-value-line">${t('profile.ecosystem.appValueLine')}</p>
 
-                ${app.status !== 'revoked' && html`<${EcoSetupGuide} app=${app} />`}
+                  ${app.status !== 'revoked' && html`<${EcoSetupGuide} app=${app} />`}
 
-                <${EcoAutomationSection} app=${app} showToast=${showToast} />
+                  <${EcoAutomationSection} app=${app} showToast=${showToast} />
 
-                ${app.status !== 'revoked' && html`<${EcoAskInClaude} app=${app} />`}
+                  ${app.status !== 'revoked' && html`<${EcoAskInClaude} app=${app} />`}
 
-                <${Stack} density="compact">
-                  <${Text} kind="label">${t('profile.ecosystem.dataTitle')}<//>
-                  ${appData[app.geai] === undefined
-                    ? html`<${Stack} direction="horizontal" density="compact" align="center"><${Spinner} /><${Text} tone="muted">${t('profile.ecosystem.dataLoading')}<//><//>`
-                    : appData[app.geai].length === 0
-                      ? html`<${Text} tone="muted">${t('profile.ecosystem.dataEmpty')}<//>`
-                      : appData[app.geai].map(entry => html`<${EcoDataEntry} entry=${entry} key=${entry.key} />`)}
-                <//>
+                  <div class="pf-eco-section poster-row--thing">
+                  </div>
 
-                ${app.status !== 'revoked' && html`<${Stack} density="compact">
-                  <${Text} kind="label">${t('profile.ecosystem.disconnectTitle')}<//>
-                  <${Text} tone="muted">${t('profile.ecosystem.disconnectHint')}<//>
-                  <${Stack} direction="horizontal" align="start">
-                    <${Action} tone="danger" onClick=${() => { setRevokeApp(app.app); setRevokeInput(''); }}>${t('profile.ecosystem.disconnect')}<//>
-                  <//>
-                <//>`}
+                  <div class="pf-eco-section poster-row--thing">
+                    <div class="pf-eco-section-title">${t('profile.ecosystem.dataTitle')}</div>
+                    ${appData[app.geai] === undefined
+                      ? html`<div class="pf-eco-dim pf-eco-data-loading"><${Spinner} /> ${t('profile.ecosystem.dataLoading')}</div>`
+                      : appData[app.geai].length === 0
+                        ? html`<div class="pf-eco-dim">${t('profile.ecosystem.dataEmpty')}</div>`
+                        : html`
+                          <div class="pf-eco-data">
+                            ${appData[app.geai].map(entry => html`
+                              <${EcoDataEntry} entry=${entry} key=${entry.key} />`)}
+                          </div>`}
+                  </div>
 
-                <${EcoTechDetails} app=${app} appSubs=${appSubs}
-                  onUnsubscribe=${onUnsubscribe} onSubscribe=${onSubscribe}
-                  subForm=${subForm} setSubForm=${setSubForm} />
-              <//>`}
-            <//>`;
-        })}<//>`}
-    <//>
+                  ${app.status !== 'revoked' && html`
+                    <div class="pf-eco-section poster-row--thing pf-eco-disconnect">
+                      <div class="pf-eco-section-title">${t('profile.ecosystem.disconnectTitle')}</div>
+                      <p class="pf-eco-dim pf-eco-disconnect-hint">${t('profile.ecosystem.disconnectHint')}</p>
+                      <button class="btn-danger-solid btn-sm" onClick=${() => { setRevokeApp(app.app); setRevokeInput(''); }}>
+                        ${t('profile.ecosystem.disconnect')}
+                      </button>
+                    </div>`}
 
-    <${Dialog} open=${!!revokeApp} onClose=${() => setRevokeApp(null)} title=${t('profile.ecosystem.revokeTitle', { app: revokeApp || '' })}
-      actions=${html`
-        <${Action} onClick=${() => setRevokeApp(null)}>${t('common.cancel')}<//>
-        <${Action} kind="primary" tone="danger" disabled=${revokeInput !== revokeApp} onClick=${onRevokeConfirm}>${t('profile.ecosystem.revoke')}<//>`}>
-      <${Stack}>
-        <${Text}>${t('profile.ecosystem.revokeWarn', { app: revokeApp })}<//>
-        <${Field} ariaLabel=${t('profile.ecosystem.revoke')} value=${revokeInput} placeholder=${revokeApp || ''} onInput=${e => setRevokeInput(e.target.value)} />
+                  <${EcoTechDetails} app=${app} appSubs=${appSubs}
+                    onUnsubscribe=${onUnsubscribe} onSubscribe=${onSubscribe}
+                    subForm=${subForm} setSubForm=${setSubForm} />
+                </div>`}
+            </div>`;
+        })}
+
+      <${Modal} open=${!!revokeApp} onClose=${() => setRevokeApp(null)} title=${t('profile.ecosystem.revokeTitle', { app: revokeApp || '' })}
+        footer=${html`
+          <button class="btn-ghost" onClick=${() => setRevokeApp(null)}>${t('common.cancel')}</button>
+          <button class="btn-danger-solid" disabled=${revokeInput !== revokeApp} onClick=${onRevokeConfirm}>
+            ${t('profile.ecosystem.revoke')}
+          </button>`}>
+        <p>${t('profile.ecosystem.revokeWarn', { app: revokeApp })}</p>
+        <input class="pf-eco-revoke-input" type="text" value=${revokeInput}
+          placeholder=${revokeApp || ''} onInput=${e => setRevokeInput(e.target.value)} />
       <//>
-    <//>
-  <//>`;
+    </div>`;
 }

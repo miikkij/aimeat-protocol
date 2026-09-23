@@ -20,12 +20,8 @@
  * @structure
  *   - BeforeYouStart — section 02 when nothing is connected
  *   - Organisations — section 02 with connections, and the create form
- *   - Domains — a company's email domains as chips (also used by the detail view)
  * @usage Imported by views/admin/sso-tab.js.
  * @version-history
- *   v1.2.0 — 2026-09-22 — Composed from the shared component set (Section, Steps, ListRow, Field,
- *     Surface): no class of its own, so a theme change reaches it. A field's reason shows while the
- *     field is in use, as on every other form.
  *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v1.1.0 — 2026-09-13 — Compose existing section headings from shared poster B1.
@@ -37,7 +33,6 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { Badge, when } from './shared.js';
-import { Section, Stack, Steps, ListRow, Field, Chip, Action, Surface, Text } from '/components/poster-parts.js';
 
 const S = (key, params) => t('admin.sso.' + key, params);
 
@@ -53,28 +48,34 @@ const GATHER = ['shortName', 'domains', 'someone', 'visibility'];
 export function BeforeYouStart({ node, onCreate, busy }) {
   const [creating, setCreating] = useState(false);
   return html`
-    <${Section} id="adm-sso-02" title=${S('before.title')} count="02" description=${S('before.lead')}
-      actions=${!creating ? html`<${Action} disabled=${node.locked} onClick=${() => setCreating(true)}>${S('now.connect')}<//>` : null}>
-      <${Stack}>
-        <${Steps} items=${GATHER.map(k => html`<${Stack} density="compact">
-          <strong>${S('before.' + k)}</strong>
-          <${Text} tone="muted">${S('before.' + k + 'Why')}<//>
-        <//>`)} />
-        <${Text} kind="caption" tone="muted">${S('before.note')}<//>
+    <section class="og-sec" id="adm-sso-02">
+      <div class="og-sec-h">
+        <h2 class="poster-section-title">${S('before.title')}<small>02</small></h2>
+        <div class="og-doors">
+          ${!creating ? html`
+            <button type="button" class="og-door og-door--danger" disabled=${node.locked}
+              onClick=${() => setCreating(true)}>${S('now.connect')}</button>` : null}
+        </div>
+      </div>
+      <p class="adm-sso-lead">${S('before.lead')}</p>
+      ${GATHER.map((k, i) => html`
+        <div class="adm-sso-step ${i === GATHER.length - 1 ? 'adm-sso-step--last' : ''}">
+          <span class="adm-sso-step-n poster-stat-number poster-stat-number--small">${i + 1}</span>
+          <span>
+            <b>${S('before.' + k)}</b>
+            <p>${S('before.' + k + 'Why')}</p>
+          </span>
+          <span></span>
+        </div>`)}
+      <p class="adm-sso-note">${S('before.note')}</p>
 
-        ${creating ? html`<${NewConnection} busy=${busy} onCancel=${() => setCreating(false)} onCreate=${onCreate} />` : null}
-      <//>
-    <//>`;
-}
-
-/** The form in its aside, with the label that names it. */
-function NewConnection({ busy, onCancel, onCreate }) {
-  return html`
-    <${Surface} kind="aside"><${Stack}>
-      <${Text} kind="label">${S('form.title')}<//>
-      <${CreateForm} busy=${busy} onCancel=${onCancel}
-        onCreate=${async (body) => { const ok = await onCreate(body); if (ok) onCancel(); }} />
-    <//><//>`;
+      ${creating ? html`
+        <div class="adm-sso-newbox poster-aside">
+          <span class="adm-sso-newlabel">${S('form.title')}</span>
+          <${CreateForm} busy=${busy} onCancel=${() => setCreating(false)}
+            onCreate=${async (body) => { const ok = await onCreate(body); if (ok) setCreating(false); }} />
+        </div>` : null}
+    </section>`;
 }
 
 /** The one write this section makes. Refused outright while the page is frozen. */
@@ -84,64 +85,86 @@ function CreateForm({ onCreate, onCancel, busy }) {
   const ready = form.id.trim() && form.name.trim();
 
   return html`
-    <${Stack}>
-      <${Field} label=${S('form.id')} value=${form.id} placeholder="contoso" hint=${S('form.idWhy')}
-        onInput=${e => set({ id: e.target.value })} />
-      <${Field} label=${S('form.name')} value=${form.name} placeholder="Contoso Oy" hint=${S('form.nameWhy')}
-        onInput=${e => set({ name: e.target.value })} />
-      <${Field} label=${S('form.domains')} value=${form.domains} placeholder="contoso.com, contoso.fi" hint=${S('form.domainsWhy')}
-        onInput=${e => set({ domains: e.target.value })} />
-      <${Field} label=${S('form.organism')} value=${form.organism_id} placeholder="org-…" hint=${S('form.organismWhy')}
-        onInput=${e => set({ organism_id: e.target.value })} />
-      <${Field} type="checkbox" label=${S('form.listed')} value=${form.listed} hint=${S('form.listedWhy')}
-        onChange=${e => set({ listed: e.target.checked })} />
-      <${Stack} direction="wrap" align="center">
-        <${Action} disabled=${!ready || busy}
+    <div class="adm-sso-form">
+      <div class="adm-sso-fld">
+        <label>${S('form.id')}</label>
+        <input type="text" value=${form.id} placeholder="contoso"
+          onInput=${e => set({ id: e.target.value })} />
+        <span class="adm-why">${S('form.idWhy')}</span>
+      </div>
+      <div class="adm-sso-fld">
+        <label>${S('form.name')}</label>
+        <input type="text" value=${form.name} placeholder="Contoso Oy"
+          onInput=${e => set({ name: e.target.value })} />
+        <span class="adm-why">${S('form.nameWhy')}</span>
+      </div>
+      <div class="adm-sso-fld">
+        <label>${S('form.domains')}</label>
+        <input type="text" value=${form.domains} placeholder="contoso.com, contoso.fi"
+          onInput=${e => set({ domains: e.target.value })} />
+        <span class="adm-why">${S('form.domainsWhy')}</span>
+      </div>
+      <div class="adm-sso-fld">
+        <label>${S('form.organism')}</label>
+        <input type="text" value=${form.organism_id} placeholder="org-…"
+          onInput=${e => set({ organism_id: e.target.value })} />
+        <span class="adm-why">${S('form.organismWhy')}</span>
+      </div>
+      <label class="adm-sso-check">
+        <input type="checkbox" checked=${form.listed}
+          onChange=${e => set({ listed: e.target.checked })} />
+        <span><b>${S('form.listed')}</b><span class="adm-why">${S('form.listedWhy')}</span></span>
+      </label>
+      <div class="adm-sso-acts">
+        <button type="button" class="og-door" disabled=${!ready || busy}
           onClick=${() => onCreate({
     id: form.id.trim(),
     name: form.name.trim(),
     domains: form.domains.split(',').map(s => s.trim()).filter(Boolean),
     login_visibility: form.listed ? 'listed' : 'hidden',
     ...(form.organism_id.trim() ? { organism_id: form.organism_id.trim() } : {}),
-  })}>${S('form.submit')}<//>
-        <${Action} kind="text" onClick=${onCancel}>${S('form.cancel')}<//>
-      <//>
-    <//>`;
-}
-
-/** The email domains a company may claim, or the chip that says it has none. */
-export function Domains({ domains }) {
-  return html`<${Stack} direction="wrap" density="compact">
-    ${(domains || []).length
-    ? domains.map(d => html`<${Chip} key=${d} tone="muted">${d}<//>`)
-    : html`<${Chip} tone="muted">${S('org.noDomains')}<//>`}
-  <//>`;
+  })}>${S('form.submit')}</button>
+        <button type="button" class="og-door og-door--quiet" onClick=${onCancel}>${S('form.cancel')}</button>
+      </div>
+    </div>`;
 }
 
 /** One company: who, what it can do right now, and the one thing in its way. */
-function OrgRow({ c, onOpen }) {
+function OrgRow({ c, onOpen, last }) {
   const tone = c.state === 'live' || c.state === 'live_hidden' ? 'success'
     : c.state === 'blocked_by_switch' ? 'danger' : 'warning';
   const chip = c.can_sign_in ? S('org.canSignIn') : S('org.cannotSignIn');
 
   return html`
-    <${ListRow} name=${c.name} detail=${c.id} onOpen=${() => onOpen(c.id)}
-      value=${html`<${Stack} density="compact" align="end">
+    <div class="adm-sso-org ${last ? 'adm-sso-org--last' : ''}">
+      <span>
+        <b>${c.name}</b>
+        <span class="adm-sso-org-id">${c.id}</span>
+        <span class="adm-sso-doms">
+          ${(c.domains || []).length
+    ? c.domains.map(d => html`<span class="adm-sso-chip">${d}</span>`)
+    : html`<span class="adm-sso-chip">${S('org.noDomains')}</span>`}
+        </span>
+      </span>
+      <span>
+        <b class="adm-sso-verdict">${S('org.state.' + c.state)}</b>
+        <span class="adm-why">${S('org.why.' + c.state, { name: c.name })}</span>
+      </span>
+      <span>
         <${Badge} type=${tone} label=${chip} />
-        <${Text} kind="mono" tone="muted">${c.last_login_at ? S('org.lastLogin', { at: when(c.last_login_at) }) : S('org.noLoginYet')}<//>
-        <${Text} kind="mono" tone="muted">${c.last_scim_request_at ? S('org.lastScim', { at: when(c.last_scim_request_at) }) : S('org.noScimYet')}<//>
-      <//>`}
-      actions=${html`
-        <${Action} onClick=${() => onOpen(c.id)}>${S('org.open')}<//>
+        <div class="adm-sso-org-when">
+          ${c.last_login_at ? S('org.lastLogin', { at: when(c.last_login_at) }) : S('org.noLoginYet')}<br />
+          ${c.last_scim_request_at ? S('org.lastScim', { at: when(c.last_scim_request_at) }) : S('org.noScimYet')}
+        </div>
+      </span>
+      <span class="adm-sso-org-acts">
+        <button type="button" class="og-door og-door--quiet" onClick=${() => onOpen(c.id)}>${S('org.open')}</button>
         ${c.can_sign_in
-    ? html`<${Action} target="_blank" href=${'/v1/ghii/login/saml/' + encodeURIComponent(c.id)}>${S('org.test')}<//>`
-    : html`<${Action} disabled title=${S('org.testOffWhy')}>${S('org.test')}<//>`}`}>
-      <${Stack} density="compact">
-        <${Domains} domains=${c.domains} />
-        <strong>${S('org.state.' + c.state)}</strong>
-        <${Text} tone="muted">${S('org.why.' + c.state, { name: c.name })}<//>
-      <//>
-    <//>`;
+    ? html`<a class="og-door og-door--quiet" target="_blank" rel="noopener"
+        href=${'/v1/ghii/login/saml/' + encodeURIComponent(c.id)}>${S('org.test')}</a>`
+    : html`<span class="og-door og-door--off" title=${S('org.testOffWhy')}>${S('org.test')}</span>`}
+      </span>
+    </div>`;
 }
 
 /** Section 02 with connections. */
@@ -152,14 +175,27 @@ export function Organisations({ data, onOpen, onCreate, busy }) {
   const anyBlocked = list.some(c => c.state === 'blocked_by_switch');
 
   return html`
-    <${Section} id="adm-sso-02" title=${S('orgs.title')} count="02" description=${S('orgs.lead')}
-      actions=${!creating ? html`<${Action} disabled=${node.locked} onClick=${() => setCreating(true)}>${S('orgs.another')}<//>` : null}>
-      <${Stack}>
-        <div>${list.map((c) => html`<${OrgRow} key=${c.id} c=${c} onOpen=${onOpen} />`)}</div>
+    <section class="og-sec" id="adm-sso-02">
+      <div class="og-sec-h">
+        <h2 class="poster-section-title">${S('orgs.title')}<small>02</small></h2>
+        <div class="og-doors">
+          ${!creating ? html`
+            <button type="button" class="og-door og-door--quiet" disabled=${node.locked}
+              onClick=${() => setCreating(true)}>${S('orgs.another')}</button>` : null}
+        </div>
+      </div>
+      <p class="adm-sso-lead">${S('orgs.lead')}</p>
 
-        ${anyBlocked ? html`<${Text} kind="caption" tone="muted">${S('orgs.testOffNote')}<//>` : null}
+      ${list.map((c, i) => html`<${OrgRow} c=${c} onOpen=${onOpen}
+        last=${i === list.length - 1} />`)}
 
-        ${creating ? html`<${NewConnection} busy=${busy} onCancel=${() => setCreating(false)} onCreate=${onCreate} />` : null}
-      <//>
-    <//>`;
+      ${anyBlocked ? html`<p class="adm-sso-note">${S('orgs.testOffNote')}</p>` : null}
+
+      ${creating ? html`
+        <div class="adm-sso-newbox poster-aside">
+          <span class="adm-sso-newlabel">${S('form.title')}</span>
+          <${CreateForm} busy=${busy} onCancel=${() => setCreating(false)}
+            onCreate=${async (body) => { const ok = await onCreate(body); if (ok) setCreating(false); }} />
+        </div>` : null}
+    </section>`;
 }

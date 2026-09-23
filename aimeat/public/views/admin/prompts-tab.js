@@ -24,9 +24,6 @@
  * @structure PromptsTab (default) · RightNow · TakingCurrent · WhatChanged
  * @usage Mounted by the admin dashboard tab router.
  * @version-history
- *   v2.2.0 -- 2026-09-22 -- Composed from the shared component set: sections, rows, a numeral band,
- *     the list above the open prompt, the whole-site reset in the solid danger aside; the page's
- *     own sheet is gone.
  *   2026-09-15 -- Header describes 'yours' as it now behaves: unchanged prompts follow updates.
  *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
@@ -41,9 +38,9 @@ import { h } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
+import { useViewCSS } from '/components/useViewCSS.js';
 import { onLiveUpdate } from '/lib/live-updates.js';
-import { num, dt, Badge, Row, Spinner, useToast, Toast } from './shared.js';
-import { Section, Columns, Stack, Text, Action, ListRow, NumeralBand, Surface } from '/components/poster-parts.js';
+import { num, dt, Badge, Spinner, useToast, Toast } from './shared.js';
 import { useConfirm } from '/components/Modal.js';
 import { swallowed } from '/js/swallowed.js';
 import {
@@ -62,19 +59,24 @@ function RightNow({ facts, number, onShowChanged }) {
   const line = facts.changed === 0
     ? P('now.lineFactory', { n: num(facts.all) })
     : P('now.lineEdited', { n: num(facts.all), changed: num(facts.changed), code: num(facts.changedCode) });
-  const row = (title, why, chip, value) => Row({ title, why, chip, value });
+  const row = (title, why, chip, value, last) => html`
+    <div class=${'adm-mrow' + (last ? ' adm-mrow--last' : '')}>
+      <span><b>${title}</b><span class="adm-why">${why}</span></span>
+      <span>${chip}</span>
+      <span class="adm-mval">${value}</span>
+    </div>`;
   return html`
-    <${Section} id="adm-pr-now" title=${P('now.title')} count=${number}
-      actions=${html`<${Action} onClick=${onShowChanged}>${P('now.showChanged')}<//>`}>
-      <${Columns} layout="trailing" collapse=${900} density="roomy">
-        <${Stack}>
-          <${Text} kind="heading">${word}<//>
-          <${Text}>${line}<//>
-          <${Stack} density="compact">
-            <${Text} kind="mono" tone="muted">${P('now.groups', { n: num(facts.groups) })}<//>
-            <${Text} kind="mono" tone="muted">${facts.lastChange}<//>
-          <//>
-        <//>
+    <section class="og-sec og-sec--first" id="adm-pr-now">
+      <div class="og-sec-h"><h2 class="poster-section-title">${P('now.title')}<small>${number}</small></h2>
+        <div class="og-doors">
+          <button type="button" class="og-door og-door--quiet" onClick=${onShowChanged}>${P('now.showChanged')}</button>
+        </div></div>
+      <div class="adm-ov-grid">
+        <div>
+          <div class="adm-ov-status">${word}</div>
+          <p class="adm-alert-line">${line}</p>
+          <div class="adm-ov-up">${P('now.groups', { n: num(facts.groups) })}<br />${facts.lastChange}</div>
+        </div>
         <div>
           ${row(P('now.yoursRow'), P('now.yoursWhy'),
             html`<${Badge} type=${facts.changedYours > 0 ? 'watch' : 'muted'}
@@ -95,42 +97,42 @@ function RightNow({ facts, number, onShowChanged }) {
           ${row(P('now.langRow'), P('now.langWhy'),
             html`<${Badge} type=${facts.translated > 0 ? 'info' : 'muted'}
               label=${P('now.ofValue', { n: num(facts.translated), total: num(facts.all) })} />`,
-            'Accept-Language')}
+            'Accept-Language', true)}
         </div>
-      <//>
-      <${NumeralBand} tone="plain" size="small" items=${[
-    { label: P('strip.prompts'), value: num(facts.all), note: P('strip.promptsSub') },
-    { label: P('strip.changed'), value: num(facts.changed), note: P('strip.changedSub'), tone: 'coral' },
-    { label: P('strip.code'), value: num(facts.code), note: P('strip.codeSub') },
-    { label: P('strip.orphan'), value: num(facts.orphan), note: P('strip.orphanSub') },
-  ]} />
-    <//>`;
+      </div>
+      <div class="og-strip">
+        <div><b>${num(facts.all)}</b><span>${P('strip.prompts')}</span><small>${P('strip.promptsSub')}</small></div>
+        <div><b class="adm-pr-coral">${num(facts.changed)}</b><span>${P('strip.changed')}</span><small>${P('strip.changedSub')}</small></div>
+        <div><b>${num(facts.code)}</b><span>${P('strip.code')}</span><small>${P('strip.codeSub')}</small></div>
+        <div><b>${num(facts.orphan)}</b><span>${P('strip.orphan')}</span><small>${P('strip.orphanSub')}</small></div>
+      </div>
+    </section>`;
 }
 
 /** Section 03: what the everyday button does, and the one that is not safe. */
 function TakingCurrent({ facts, number, onResetAll }) {
-  const step = (n, key, value) => html`<${ListRow} number=${String(n)}
-    name=${P('taking.' + key)} detail=${P('taking.' + key + 'Why')} detailKind="text" value=${value} />`;
+  const step = (n, key, value, last) => html`
+    <div class=${'adm-pr-step' + (last ? ' adm-pr-step--last' : '')}>
+      <span class="adm-pr-stepn poster-stat-number poster-stat-number--small poster-stat-number--step">${n}</span>
+      <span><b>${P('taking.' + key)}</b><span class="adm-why">${P('taking.' + key + 'Why')}</span></span>
+      <span class="adm-mval">${value}</span>
+    </div>`;
   return html`
-    <${Section} id="adm-pr-taking" title=${P('taking.title')} count=${number} description=${P('taking.lead')}>
-      <${Stack}>
-        <div>
-          ${step(1, 'writes', P('taking.keepsHistory'))}
-          ${step(2, 'languages', P('taking.worthAWarning'))}
-          ${step(3, 'group', P('taking.wholeGroup'))}
-          ${step(4, 'orphan', P('taking.orphanValue', { n: num(facts.orphan) }))}
+    <section class="og-sec" id="adm-pr-taking">
+      <div class="og-sec-h"><h2 class="poster-section-title">${P('taking.title')}<small>${number}</small></h2></div>
+      <p class="adm-pr-lead">${P('taking.lead')}</p>
+      ${step(1, 'writes', P('taking.keepsHistory'))}
+      ${step(2, 'languages', P('taking.worthAWarning'))}
+      ${step(3, 'group', P('taking.wholeGroup'))}
+      ${step(4, 'orphan', P('taking.orphanValue', { n: num(facts.orphan) }), true)}
+      <div class="og-box adm-pr-reset-note poster-aside poster-aside--small">
+        <span class="og-box-label">${P('taking.dangerLabel')}</span>
+        ${P('taking.danger')}
+        <div class="og-doors adm-pr-reset-doors">
+          <button type="button" class="og-door og-door--quiet og-door--danger" onClick=${onResetAll}>${P('taking.takeAll')}</button>
         </div>
-        <${Surface} kind="aside" tone="danger">
-          <${Stack} density="compact">
-            <${Text} kind="label">${P('taking.dangerLabel')}<//>
-            <${Text}>${P('taking.danger')}<//>
-            <${Stack} direction="wrap" align="center">
-              <${Action} tone="danger" onClick=${onResetAll}>${P('taking.takeAll')}<//>
-            <//>
-          <//>
-        <//>
-      <//>
-    <//>`;
+      </div>
+    </section>`;
 }
 
 /** Section 04: what changed lately, across every group. */
@@ -140,18 +142,24 @@ function WhatChanged({ prompts, number, onOpen }) {
     .sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)))
     .slice(0, 8);
   return html`
-    <${Section} id="adm-pr-log" title=${P('log.title')} count=${number}>
+    <section class="og-sec" id="adm-pr-log">
+      <div class="og-sec-h"><h2 class="poster-section-title">${P('log.title')}<small>${number}</small></h2></div>
       ${recent.length === 0
-        ? html`<${Text} kind="caption" tone="muted">${P('log.none')}<//>`
-        : html`<div>${recent.map((p) => html`<${Row} key=${p.id}
-            title=${p.name}
-            why=${`${groupLabel(p.group)} · ${p.differs_from_default ? P('log.differs') : P('log.matches')}`}
-            chip=${html`<${Action} kind="text" onClick=${() => onOpen(p.id)}>${P('log.open')}<//>`}
-            value=${`v${num(p.version)} · ${dt(p.updatedAt)} · ${p.updatedBy || '-'}`} />`)}</div>`}
-    <//>`;
+        ? html`<p class="adm-pr-note">${P('log.none')}</p>`
+        : recent.map((p, i) => html`
+          <div class=${'adm-mrow' + (i === recent.length - 1 ? ' adm-mrow--last' : '')} key=${p.id}>
+            <span>
+              <b>${p.name}</b>
+              <span class="adm-why">${groupLabel(p.group)} · ${p.differs_from_default ? P('log.differs') : P('log.matches')}</span>
+            </span>
+            <span><button type="button" class="og-door og-door--quiet" onClick=${() => onOpen(p.id)}>${P('log.open')}</button></span>
+            <span class="adm-mval">v${num(p.version)} · ${dt(p.updatedAt)} · ${p.updatedBy || '-'}</span>
+          </div>`)}
+    </section>`;
 }
 
 export default function PromptsTab({ data }) {
+  useViewCSS('/css/views/admin-prompts.css');
   const [toast, showErr, showOk, clearToast] = useToast();
   const { confirm, ConfirmUI } = useConfirm();
 
@@ -327,25 +335,24 @@ export default function PromptsTab({ data }) {
   const n = () => String(++counter).padStart(2, '0');
 
   return html`
-    <div>
+    <div class="adm-pr">
       ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
-      <${Text} tone="muted">${P('intro')}<//>
+      <p class="adm-pr-intro">${P('intro')}</p>
 
       <${RightNow} facts=${facts} number=${n()} onShowChanged=${() => { setFilter('changed'); setQuery(''); }} />
 
-      <${Section} id="adm-pr-find" title=${P('find.title')} count=${n()}
-        actions=${html`<${Text} kind="caption" tone="muted">${P('find.count', { n: num(shown.length), total: num(facts.all) })}<//>`}>
-        ${/* The list above the open prompt at every width: beside it, the prompt text had about sixty
-              characters a line. The list scrolls in its own box so opening one keeps your place. */ ''}
-        <${Stack} density="roomy">
+      <section class="og-sec" id="adm-pr-find">
+        <div class="og-sec-h"><h2 class="poster-section-title">${P('find.title')}<small>${n()}</small></h2>
+          <div class="og-doors"><span class="adm-pr-note">${P('find.count', { n: num(shown.length), total: num(facts.all) })}</span></div></div>
+        <div class="adm-pr-bench">
           <${PromptList} prompts=${shown} counts=${{ all: facts.all, changed: facts.changed, off: facts.off, orphan: facts.orphan }}
             query=${query} filter=${filter} openId=${openId}
             onQuery=${setQuery} onFilter=${setFilter} onOpen=${openPrompt} onResetGroup=${takeGroup} />
           <${PromptEditor} prompt=${open} draft=${draft} versions=${versions} saving=${saving} loading=${loading}
             onDraft=${setDraftField} onLocale=${setLocale} onSave=${save} onTakeCurrent=${takeCurrent}
             onToggleActive=${toggleActive} onVersions=${showVersions} onRestore=${restore} />
-        <//>
-      <//>
+        </div>
+      </section>
 
       <${TakingCurrent} facts=${facts} number=${n()} onResetAll=${takeAll} />
       <${WhatChanged} prompts=${prompts} number=${n()} onOpen=${openPrompt} />

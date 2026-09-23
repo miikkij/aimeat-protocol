@@ -13,9 +13,6 @@
  * @structure TrackResponseModal({ open, msg, onClose, onDone, showToast, defaultMode, allowPark })
  * @usage import { TrackResponseModal } from '/views/profile/track-response-modal.js';
  * @version-history
- *   v1.1.0 -- 2026-09-22 -- Composed from the shared set: the site's Dialog with its actions, the
- *     choices and the draft as Fields, the thinking step as Text. The emoji left the park button.
- *     The triage, the fill and the publish flow are unchanged.
  *   v1.0.1 — 2026-09-13 — Each phase's actions sit in the dialog's footer.
  *   v1.0.0 — 2026-06-21 — Extracted from inbox-tab.js so the Notebook can reuse it; + park-to-notebook.
  */
@@ -24,7 +21,8 @@ import { useState, useEffect, useRef, useMemo } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { Dialog, Action, Field, Stack, Text } from '/components/poster-parts.js';
+import { escHtml } from '/js/utils.js';
+import { Modal } from '/components/Modal.js';
 import { Spinner } from './shared.js';
 import * as tracked from '/js/services/tracked-responses.js';
 import { parkMessageToNotebook } from '/js/services/notebook.js';
@@ -147,51 +145,74 @@ export function TrackResponseModal({ open, msg, onClose, onDone, showToast, defa
     setBusy(false);
   };
 
-  const parkBtn = allowPark ? html`<${Action} disabled=${busy} onClick=${park}>${t('inbox.trackPark')}<//>` : null;
+  const parkBtn = allowPark ? html`<button class="btn-outline" disabled=${busy} onClick=${park}>📓 ${t('inbox.trackPark')}</button>` : null;
 
   const footer = phase === 'error' ? html`
-      <${Action} kind="text" disabled=${busy} onClick=${onClose}>${t('common.cancel')}<//>
+      <button class="btn-ghost" disabled=${busy} onClick=${onClose}>${t('common.cancel')}</button>
       ${parkBtn}
-      <${Action} disabled=${busy} onClick=${() => { window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId: 'mcp' } })); onClose?.(); }}>${t('inbox.trackConfigureAi')}<//>`
+      <button class="btn-outline" disabled=${busy} onClick=${() => { window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId: 'mcp' } })); onClose?.(); }}>${t('inbox.trackConfigureAi')}</button>`
     : phase === 'review' ? html`
-      <${Action} kind="text" disabled=${busy} onClick=${close}>${t('common.cancel')}<//>
+      <button class="btn-ghost" disabled=${busy} onClick=${close}>${t('common.cancel')}</button>
       ${parkBtn}
-      <${Action} kind="primary" disabled=${busy || !namespace} onClick=${submit}>
-        ${busy ? t('inbox.trackCreating') : t('inbox.trackCreate')}
-      <//>`
+      <button class="btn-primary" disabled=${busy || !namespace} onClick=${submit}>
+        ${busy ? html`<span class="inbox-spinner"></span> ${t('inbox.trackCreating')}` : t('inbox.trackCreate')}
+      </button>`
     : null;
-  const opts = (list, value, label) => list.map(x => ({ value: x[value], label: x[label] || x[value] }));
 
   return html`
-    <${Dialog} open=${open} onClose=${close} title=${t('inbox.trackResponse')} actions=${footer}>
+    <${Modal} open=${open} onClose=${close} title=${t('inbox.trackResponse')} className="inbox-track-modal" footer=${footer}>
       ${phase === 'classify' ? html`
-        <${Stack} align="center">
+        <div class="inbox-track-classify">
           <${Spinner} />
-          <${Text}>${t('inbox.trackAiThinking')}<//>
-          <${Text} kind="caption" tone="muted">${t(NB_STEPS[step]) || ''}<//>
-        <//>` : null}
+          <div class="inbox-track-classify-step">${t('inbox.trackAiThinking')}</div>
+          <div class="inbox-track-classify-sub">${t(NB_STEPS[step]) || ''}</div>
+        </div>` : null}
 
       ${phase === 'error' ? html`
-        <${Stack}>
-          <${Text}>${t('inbox.trackNeedsAi')}<//>
-          ${aiErr?.message ? html`<${Text} tone="danger">${aiErr.message}<//>` : null}
-        <//>` : null}
+        <div class="inbox-track-form">
+          <p class="inbox-track-hint">${t('inbox.trackNeedsAi')}</p>
+          ${aiErr?.message ? html`<p class="inbox-tracked-err">${escHtml(aiErr.message)}</p>` : null}
+        </div>` : null}
 
       ${phase === 'review' ? html`
-        <${Stack}>
-          <${Text} tone="muted">${t('inbox.trackHintAi')}<//>
-          <${Field} type="select" label=${t('inbox.trackOrganism')} value=${orgId}
-            options=${opts(orgs, 'id', 'name')} onChange=${(e) => { setOrgId(e.target.value); setWsId(''); }} />
-          <${Field} type="select" label=${t('inbox.trackWorkspace')} value=${wsId} disabled=${!orgId}
-            options=${[{ value: '', label: t('inbox.trackChoose') }, ...opts(workspaces, 'id', 'name')]} onChange=${(e) => setWsId(e.target.value)} />
-          <${Field} type="select" label=${t('inbox.trackType')} value=${namespace} disabled=${!recTypes.length}
-            options=${recTypes.length === 0 ? [{ value: '', label: t('inbox.trackNoTypes') }] : opts(recTypes, 'namespace', 'name')}
-            onChange=${(e) => setNamespace(e.target.value)} />
-          <${Field} label=${t('inbox.trackTitle')} value=${title} onInput=${(e) => setTitle(e.target.value)} />
-          <${Field} type="textarea" rows=${4} label=${t('inbox.trackContent')} value=${content} onInput=${(e) => setContent(e.target.value)} />
-          <${Field} type="select" label=${t('inbox.trackReplyMode')} value=${replyMode} onChange=${(e) => setReplyMode(e.target.value)}
-            options=${[{ value: 'approve', label: t('inbox.trackModeApprove') }, { value: 'auto', label: t('inbox.trackModeAuto') }]} />
-          <${Text} kind="caption" tone="muted">${t('inbox.trackFillNote')}<//>
-        <//>` : null}
-    <//>`;
+        <div class="inbox-track-form">
+          <p class="inbox-track-hint">${t('inbox.trackHintAi')}</p>
+          <label class="inbox-form-row">
+            <span class="inbox-form-label">${t('inbox.trackOrganism')}</span>
+            <select class="inbox-input" value=${orgId} onChange=${(e) => { setOrgId(e.target.value); setWsId(''); }}>
+              ${orgs.map(o => html`<option key=${o.id} value=${o.id}>${escHtml(o.name || o.id)}</option>`)}
+            </select>
+          </label>
+          <label class="inbox-form-row">
+            <span class="inbox-form-label">${t('inbox.trackWorkspace')}</span>
+            <select class="inbox-input" value=${wsId} onChange=${(e) => setWsId(e.target.value)} disabled=${!orgId}>
+              <option value="">${t('inbox.trackChoose')}</option>
+              ${workspaces.map(w => html`<option key=${w.id} value=${w.id}>${escHtml(w.name || w.id)}</option>`)}
+            </select>
+          </label>
+          <label class="inbox-form-row">
+            <span class="inbox-form-label">${t('inbox.trackType')}</span>
+            <select class="inbox-input" value=${namespace} onChange=${(e) => setNamespace(e.target.value)} disabled=${!recTypes.length}>
+              ${recTypes.length === 0 ? html`<option value="">${t('inbox.trackNoTypes')}</option>` : null}
+              ${recTypes.map(tp => html`<option key=${tp.namespace} value=${tp.namespace}>${escHtml(tp.name)}</option>`)}
+            </select>
+          </label>
+          <label class="inbox-form-row">
+            <span class="inbox-form-label">${t('inbox.trackTitle')}</span>
+            <input class="inbox-input" type="text" value=${title} onInput=${(e) => setTitle(e.target.value)} />
+          </label>
+          <label class="inbox-form-row">
+            <span class="inbox-form-label">${t('inbox.trackContent')}</span>
+            <textarea class="inbox-input inbox-track-content" rows="4" value=${content} onInput=${(e) => setContent(e.target.value)}></textarea>
+          </label>
+          <label class="inbox-form-row">
+            <span class="inbox-form-label">${t('inbox.trackReplyMode')}</span>
+            <select class="inbox-input" value=${replyMode} onChange=${(e) => setReplyMode(e.target.value)}>
+              <option value="approve">${t('inbox.trackModeApprove')}</option>
+              <option value="auto">${t('inbox.trackModeAuto')}</option>
+            </select>
+          </label>
+          <p class="inbox-track-hint">${t('inbox.trackFillNote')}</p>
+        </div>` : null}
+    </${Modal}>`;
 }

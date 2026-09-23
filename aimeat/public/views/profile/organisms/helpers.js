@@ -9,10 +9,6 @@
  * @structure fmtDate, relTime, orgInitials, exportOrganismZip
  * @usage import { fmtDate, relTime, orgInitials, exportOrganismZip } from '/views/profile/organisms/helpers.js';
  * @version-history
- *   v1.1.1 -- 2026-09-22 -- useRailOpens removed: the shared Rail's entries now take an onClick that
- *     opens the fold, so the hash listener has no caller.
- *   v1.1.0 -- 2026-09-22 -- useRailOpens: the shared index rail's entries are anchors, so a fold
- *     that a rail entry names opens when the address moves to its anchor, as the rail's own click did.
  *   v1.0.1 — 2026-07-10 — exportOrganismZip surfaces the server's error message (e.g. the access
  *     denial reason) in the toast instead of a bare "Export failed".
  *   v1.0.0 — 2026-06-19 — Extracted from organisms-tab.js during the module split.

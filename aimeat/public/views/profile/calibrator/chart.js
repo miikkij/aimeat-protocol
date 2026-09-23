@@ -9,8 +9,6 @@
  * @structure ScoreChart
  * @usage import { ScoreChart } from './chart.js';
  * @version-history
- *   2026-09-22 -- The plot and its legend sit in shared columns; a legend swatch is an SVG square
- *     in the line's colour instead of a styled element, so the file writes no class or style.
  *   v1.0.1 — 2026-09-04 — Legend labels through labelWords.
  *   v1.0.0 — 2026-09-04 — Initial (replaces calibrator-chart.js v3.0.0 in the poster face).
  */
@@ -18,7 +16,6 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { colorForIndex } from '/components/UsageChart.js';
-import { Columns, Stack, Text } from '/components/poster-parts.js';
 import { x, labelWords } from './frame.js';
 
 const INK = ['var(--text)', 'var(--accent)', 'var(--sun)'];
@@ -54,8 +51,8 @@ export function ScoreChart({ runs }) {
   }).filter((l) => l.points.length);
 
   return html`
-    <${Columns} layout="leading" collapse="640">
-      <svg viewBox=${`0 0 ${W} ${H}`} width="100%" role="img" aria-label=${x('chartTitle')}>
+    <div class="cal-chart">
+      <svg viewBox=${`0 0 ${W} ${H}`} role="img" aria-label=${x('chartTitle')}>
         ${[0, 25, 50, 75, 100].map((p) => html`
           <line key=${'g' + p} x1=${PAD.left} y1=${yAt(p)} x2=${W - PAD.right} y2=${yAt(p)} stroke="var(--border)" stroke-width="1" />
           <text key=${'t' + p} x=${PAD.left - 6} y=${yAt(p) + 4} text-anchor="end" fill="var(--text-dim)" font-size="10" font-family="var(--font-mono)">${p} %</text>`)}
@@ -66,12 +63,9 @@ export function ScoreChart({ runs }) {
           ${l.points.length > 1 ? html`<polyline key=${'l' + l.id} fill="none" stroke=${l.color} stroke-width="3" stroke-linecap="round" stroke-linejoin="round" points=${l.points.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')} />` : null}
           ${l.points.map((p) => html`<circle key=${l.id + p.run.batchId} cx=${p.x} cy=${p.y} r="5" fill=${l.color} stroke="var(--card-bg)" stroke-width="2"><title>${l.label}: ${p.v} % (${x('runN', { n: p.run.number })}, v${p.run.promptVersion})</title></circle>`)}`)}
       </svg>
-      <${Stack} density="compact">
-        <${Text} kind="label">${x('chartTitle')}<//>
-        ${lines.map((l) => html`<${Stack} key=${l.id} direction="horizontal" align="center" density="compact">
-          <svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true"><rect width="12" height="12" fill=${l.color} /></svg>
-          <${Text} kind="caption">${l.label}<//><${Text} kind="mono">${l.last} %<//>
-        <//>`)}
-      <//>
-    <//>`;
+      <div class="cal-legend">
+        <small>${x('chartTitle')}</small>
+        ${lines.map((l) => html`<div key=${l.id}><i style=${`background:${l.color}`}></i><span>${l.label}</span><b>${l.last} %</b></div>`)}
+      </div>
+    </div>`;
 }

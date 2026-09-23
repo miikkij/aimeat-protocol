@@ -19,18 +19,13 @@
  *   readOdpsToolFields · readOdpsAppDefaults · odpsSuggestForTool · odpsToggleDefaults · odpsToggleTool
  * @usage import { odpsStatusInner, odpsToolFieldsHtml, readOdpsToolFields } from './odps.js'
  * @version-history
- *   v1.1.0 — 2026-09-22 — Composed from the shared set (parts-html.js): the app-level block draws its
- *     own section, the market line is a box, every input is the set's field in the set's columns, the
- *     per-tool block is a fold (the triangle glyphs are gone) with the odps.yaml link on its row, and
- *     a status line takes its tone from data-tone (the check and cross are the allowed ✓ ✗).
  *   v1.0.1 — 2026-08-31 — The odps.yaml link escapes the node address before it goes in the href.
  *     It comes from the Settings field, so it was DOM text reinterpreted as markup, and it reached
  *     the page through the Monetize editor and the whole detail view (CodeQL js/xss-through-dom).
  *   v1.0.0 — 2026-07-25 — Initial ODPS authoring surface (app-level defaults + per-tool block + AI draft).
  */
 import { escapeHtml } from './util.js';
-import { showNotice } from './ui.js';
-import { section, surface, stack, columns, text, field, action, fold } from './parts-html.js';
+import { dtlBtn, showNotice } from './ui.js';
 import { loadConfig } from './config.js';
 import { t } from './i18n.js';
 import { getCortexOwnerToken } from './cortex.js';
@@ -71,36 +66,27 @@ function listOf(id) {
   return val(id).split(',').map(function (x) { return x.trim(); }).filter(Boolean);
 }
 
-/** The set's field, labelled; `narrow` for a two-letter code. */
-function input(id, label, value, placeholder, type, narrow) {
-  return field({ id: id, type: type || 'text', label: escapeHtml(label), value: value || '', placeholder: placeholder || '', width: narrow ? 'narrow' : undefined });
+function input(id, label, value, placeholder, type) {
+  return '<label class="dtl-stat-label" for="' + id + '">' + escapeHtml(label) + '</label>' +
+    '<input id="' + id + '" class="modal-input od-input" ' + (type ? 'type="' + type + '" ' : '') +
+    'value="' + escapeHtml(value || '') + '" placeholder="' + escapeHtml(placeholder || '') + '" />';
 }
 
 function textarea(id, label, value, placeholder, rows) {
-  return field({ id: id, type: 'textarea', rows: rows || 2, label: escapeHtml(label), value: value || '', placeholder: placeholder || '' });
+  return '<label class="dtl-stat-label" for="' + id + '">' + escapeHtml(label) + '</label>' +
+    '<textarea id="' + id + '" class="modal-input od-input" rows="' + (rows || 2) + '" placeholder="' +
+    escapeHtml(placeholder || '') + '">' + escapeHtml(value || '') + '</textarea>';
 }
 
 function select(id, label, options, selected) {
-  return field({
-    id: id, type: 'select', label: escapeHtml(label), value: selected,
-    options: options.map(function (o) { return { value: o, label: escapeHtml(o || '—') }; }),
-  });
-}
-
-/** A row of fields side by side that stack on a phone. */
-function fieldRow(content, three) { return columns({ layout: three ? 'thirds' : 'equal', collapse: 600 }, content); }
-
-/** A quiet note under a block. */
-function note(words) { return text({ kind: 'caption', tone: 'muted' }, escapeHtml(words)); }
-
-/** A status line the scripts below fill in place; its tone says whether it went right. */
-function statusLine(id) { return text({ kind: 'caption', tone: 'muted', id: id }, ''); }
-
-/** Set a status line's words and tone: 'muted' while running, 'success' or 'danger' when done. */
-function setStatus(el, tone, words) {
-  if (!el) return;
-  el.setAttribute('data-tone', tone);
-  el.textContent = words;
+  var html = '<label class="dtl-stat-label" for="' + id + '">' + escapeHtml(label) + '</label>' +
+    '<select id="' + id + '" class="modal-input od-input">';
+  for (var i = 0; i < options.length; i++) {
+    var o = options[i];
+    html += '<option value="' + escapeHtml(o) + '"' + (selected === o ? ' selected' : '') + '>' +
+      escapeHtml(o || '—') + '</option>';
+  }
+  return html + '</select>';
 }
 
 // ── Commitment lines: "uptime 99.5 percent — Monthly availability" ─────────────
@@ -150,20 +136,24 @@ export function odpsBlockedReason(tool) {
 }
 
 /** The app-level EXCHANGE line: how many of this app's tools are actually on the market, and what blocks the rest. */
-function marketLine(doc) {
+function statusLine(doc) {
   var tools = (doc && doc.tools) || [];
   var flagged = tools.filter(function (x) { return x.exchange; });
   var blocked = flagged.filter(function (x) { return !!odpsBlockedReason(x); });
   var live = flagged.length - blocked.length;
   if (!tools.length) {
-    return surface({ kind: 'box', density: 'compact' }, text({ kind: 'body', tone: 'muted' }, escapeHtml(t('odps.noTools'))));
+    return '<div class="od-status od-status-none">' + escapeHtml(t('odps.noTools')) + '</div>';
   }
+  var cls = live > 0 ? 'od-status-on' : 'od-status-none';
   var label = live > 0
     ? t('odps.statusOn').replace('{live}', String(live)).replace('{total}', String(tools.length))
     : t('odps.statusOff').replace('{total}', String(tools.length));
-  return surface({ kind: 'box', density: 'compact' },
-    text({ kind: 'body', tone: live > 0 ? 'success' : 'muted' }, escapeHtml(label))
-    + (blocked.length ? text({ kind: 'caption', tone: 'coral' }, escapeHtml(t('odps.statusBlocked').replace('{n}', String(blocked.length)))) : ''));
+  var html = '<div class="od-status ' + cls + '">' + escapeHtml(label) + '</div>';
+  if (blocked.length) {
+    html += '<div class="dtl-sync none od-note">' +
+      escapeHtml(t('odps.statusBlocked').replace('{n}', String(blocked.length))) + '</div>';
+  }
+  return html;
 }
 
 /** The app-level ODPS defaults form (company + brand + governance + provenance), collapsed by default. */
@@ -172,53 +162,62 @@ function defaultsForm(doc) {
   var h = (o.dataHolder) || {};
   var lic = (o.license) || {};
   var p = (doc && doc.provenance) || {};
-  return surface({ kind: 'record' }, stack({},
-    note(t('odps.defaultsHint')) +
-    fieldRow(
-      input('od-legalname', t('odps.legalName'), h.legalName, 'Overscale Solutions Oy') +
-      input('od-businessid', t('odps.businessId'), h.businessID, '3312345-6')) +
-    fieldRow(
-      input('od-holderemail', t('odps.holderEmail'), h.email, 'sales@example.org', 'email') +
-      input('od-holderurl', t('odps.holderUrl'), h.URL, 'https://example.org', 'url') +
-      input('od-country', t('odps.country'), h.addressCountry, 'FI', '', true), true) +
-    fieldRow(
-      input('od-logo', t('odps.logoUrl'), o.logoURL, 'https://example.org/logo.png', 'url') +
-      input('od-slogan', t('odps.brandSlogan'), o.brandSlogan, '')) +
-    fieldRow(
-      select('od-governance', t('odps.governance'), GOVERNANCE, o.governanceProfile || '') +
-      select('od-priority', t('odps.priority'), PRIORITIES, o.portfolioPriority || '') +
-      input('od-language', t('odps.language'), o.language || 'en', 'en', '', true), true) +
-    fieldRow(
-      input('od-geo', t('odps.geoArea'), (lic.geographicalArea || []).join(', '), 'EU, EEA') +
-      input('od-laws', t('odps.applicableLaws'), lic.applicableLaws, 'Finnish law')) +
-    stack({},
-      text({ kind: 'label' }, escapeHtml(t('odps.attestation'))) +
-      note(t('odps.attestationHint')) +
-      fieldRow(
-        input('od-source', t('odps.source'), p.source, 'PRH open company register (YTJ v3)') +
-        input('od-legalbasis', t('odps.legalBasis'), p.legalBasis, 'Public register')) +
-      fieldRow(
-        input('od-consent', t('odps.consentStatus'), p.consentStatus, 'not applicable') +
-        input('od-retention', t('odps.retention'), p.retention, '30 days'))) +
-    stack({ direction: 'wrap', align: 'center' },
-      action({ kind: 'primary', onclick: 'window._launcher.odpsSaveDefaults()' }, escapeHtml(t('odps.saveDefaults'))) +
-      action({ kind: 'secondary', onclick: 'window._launcher.odpsToggleDefaults()' }, escapeHtml(t('odps.close')))) +
-    statusLine('od-status')));
+  return '<div class="od-form">' +
+    '<div class="dtl-sync none od-note">' + escapeHtml(t('odps.defaultsHint')) + '</div>' +
+    '<div class="od-grid">' +
+      '<div class="od-col">' + input('od-legalname', t('odps.legalName'), h.legalName, 'Overscale Solutions Oy') + '</div>' +
+      '<div class="od-col">' + input('od-businessid', t('odps.businessId'), h.businessID, '3312345-6') + '</div>' +
+    '</div>' +
+    '<div class="od-grid">' +
+      '<div class="od-col">' + input('od-holderemail', t('odps.holderEmail'), h.email, 'sales@example.org', 'email') + '</div>' +
+      '<div class="od-col">' + input('od-holderurl', t('odps.holderUrl'), h.URL, 'https://example.org', 'url') + '</div>' +
+      '<div class="od-col od-col-narrow">' + input('od-country', t('odps.country'), h.addressCountry, 'FI') + '</div>' +
+    '</div>' +
+    '<div class="od-grid">' +
+      '<div class="od-col">' + input('od-logo', t('odps.logoUrl'), o.logoURL, 'https://example.org/logo.png', 'url') + '</div>' +
+      '<div class="od-col">' + input('od-slogan', t('odps.brandSlogan'), o.brandSlogan, '') + '</div>' +
+    '</div>' +
+    '<div class="od-grid">' +
+      '<div class="od-col">' + select('od-governance', t('odps.governance'), GOVERNANCE, o.governanceProfile || '') + '</div>' +
+      '<div class="od-col">' + select('od-priority', t('odps.priority'), PRIORITIES, o.portfolioPriority || '') + '</div>' +
+      '<div class="od-col od-col-narrow">' + input('od-language', t('odps.language'), o.language || 'en', 'en') + '</div>' +
+    '</div>' +
+    '<div class="od-grid">' +
+      '<div class="od-col">' + input('od-geo', t('odps.geoArea'), (lic.geographicalArea || []).join(', '), 'EU, EEA') + '</div>' +
+      '<div class="od-col">' + input('od-laws', t('odps.applicableLaws'), lic.applicableLaws, 'Finnish law') + '</div>' +
+    '</div>' +
+    '<div class="od-attest">' +
+      '<div class="dtl-stat-label od-attest-head">' + escapeHtml(t('odps.attestation')) + '</div>' +
+      '<div class="dtl-sync none od-note">' + escapeHtml(t('odps.attestationHint')) + '</div>' +
+      '<div class="od-grid">' +
+        '<div class="od-col">' + input('od-source', t('odps.source'), p.source, 'PRH open company register (YTJ v3)') + '</div>' +
+        '<div class="od-col">' + input('od-legalbasis', t('odps.legalBasis'), p.legalBasis, 'Public register') + '</div>' +
+      '</div>' +
+      '<div class="od-grid">' +
+        '<div class="od-col">' + input('od-consent', t('odps.consentStatus'), p.consentStatus, 'not applicable') + '</div>' +
+        '<div class="od-col">' + input('od-retention', t('odps.retention'), p.retention, '30 days') + '</div>' +
+      '</div>' +
+    '</div>' +
+    '<div class="dtl-btn-row od-actions">' +
+      dtlBtn(t('odps.saveDefaults'), 'window._launcher.odpsSaveDefaults()', { variant: 'primary' }) +
+      dtlBtn(t('odps.close'), 'window._launcher.odpsToggleDefaults()') +
+    '</div>' +
+    '<div class="dtl-ai-status" id="od-status"></div>' +
+  '</div>';
 }
 
-/** The EXCHANGE & ODPS section; detail.js holds its slot (#detail-odps) and this fills it. */
+/** Section body: the app-level EXCHANGE status plus the (collapsible) ODPS defaults. */
 export function odpsStatusInner(doc, state) {
   if (state === 'off') return '';
-  var wrap = function (content) {
-    return section({ title: escapeHtml(t('odps.title')), description: escapeHtml(t('odps.hint')), body: stack({}, content) });
-  };
-  if (state === 'loading') return wrap(text({ kind: 'caption', tone: 'muted' }, '…'));
-  var html = marketLine(doc);
-  html += stack({ direction: 'horizontal', align: 'start' },
-    action({ kind: 'secondary', expanded: odDefaultsOpen, onclick: 'window._launcher.odpsToggleDefaults()' },
-      escapeHtml(odDefaultsOpen ? t('odps.close') : t('odps.editDefaults'))));
+  var html = '<h3>' + escapeHtml(t('odps.title')) + '</h3>' +
+    '<p class="dtl-desc">' + escapeHtml(t('odps.hint')) + '</p>';
+  if (state === 'loading') return html + '<span class="od-muted">…</span>';
+  html += statusLine(doc);
+  html += '<div class="dtl-btn-row od-actions">' +
+    dtlBtn(odDefaultsOpen ? t('odps.close') : t('odps.editDefaults'), 'window._launcher.odpsToggleDefaults()') +
+  '</div>';
   if (odDefaultsOpen) html += defaultsForm(doc);
-  return wrap(html);
+  return html;
 }
 
 /** Read the app-level defaults form into { odps, provenance } (empty objects become undefined). */
@@ -260,26 +259,29 @@ export function odpsToolFieldsHtml(tool, offeringId, ctx) {
   var p = (tool && tool.provenance) || {};
   var inherited = ctx.appProvenance || {};      // what the app-level attestation would supply
   var timing = ctx.timing || null;              // observed delivery time, if this capability has served calls
-  // The node address is whatever the person typed in Settings, so it is escaped like any other value
-  // on its way into an attribute (action() escapes the href): unescaped, a `"` in it closed the href
-  // and the rest of the string became markup (CodeQL js/xss-through-dom 1577/1578).
-  var yaml = offeringId
-    ? action({ kind: 'secondary', href: apiBase() + '/v1/exchange/offerings/' + encodeURIComponent(offeringId) + '/odps.yaml', target: '_blank' },
-      escapeHtml(t('odps.viewYaml')))
-    : '';
-  if (!odToolOpen) {
-    return fold({ title: escapeHtml(t('odps.toolTitle')), open: false, onToggle: 'window._launcher.odpsToggleTool()', actions: yaml });
-  }
-  var body = stack({},
-    note(t('odps.toolHint')) +
-    stack({ direction: 'horizontal', align: 'start' },
-      action({ kind: 'secondary', disabled: odBusy, onclick: 'window._launcher.odpsSuggest()' }, escapeHtml(t('odps.suggest')))) +
-    statusLine('od-tool-status') +
+  var head = '<div class="od-tool-head">' +
+    dtlBtn((odToolOpen ? '▾ ' : '▸ ') + t('odps.toolTitle'), 'window._launcher.odpsToggleTool()') +
+    (offeringId
+      // The node address is whatever the person typed in Settings, so it is escaped like any other
+      // value on its way into an attribute: unescaped, a `"` in it closed the href and the rest of
+      // the string became markup (CodeQL js/xss-through-dom 1577/1578).
+      ? '<a class="od-link" href="' + escapeHtml(apiBase()) + '/v1/exchange/offerings/' + encodeURIComponent(offeringId) +
+        '/odps.yaml" target="_blank" rel="noopener">' + escapeHtml(t('odps.viewYaml')) + '</a>'
+      : '') +
+  '</div>';
+  if (!odToolOpen) return head;
+  return head + '<div class="od-form">' +
+    '<div class="dtl-sync none od-note">' + escapeHtml(t('odps.toolHint')) + '</div>' +
+    '<div class="dtl-btn-row od-actions">' +
+      dtlBtn(t('odps.suggest'), 'window._launcher.odpsSuggest()', { variant: 'primary', disabled: odBusy }) +
+    '</div>' +
+    '<div class="dtl-ai-status" id="od-tool-status"></div>' +
     select('odt-type', t('odps.productType'), PRODUCT_TYPES, o.productType || '') +
     textarea('odt-value', t('odps.valueProposition'), o.valueProposition, t('odps.valuePlaceholder'), 2) +
-    fieldRow(
-      input('odt-categories', t('odps.categories'), (o.categories || []).join(', '), 'company data, finland') +
-      input('odt-standards', t('odps.standards'), (o.standards || []).join(', '), 'ISO 8000')) +
+    '<div class="od-grid">' +
+      '<div class="od-col">' + input('odt-categories', t('odps.categories'), (o.categories || []).join(', '), 'company data, finland') + '</div>' +
+      '<div class="od-col">' + input('odt-standards', t('odps.standards'), (o.standards || []).join(', '), 'ISO 8000') + '</div>' +
+    '</div>' +
     textarea('odt-usecases', t('odps.useCases'), (o.useCases || []).map(function (u) {
       return u.title + (u.description ? ' | ' + u.description : '') + (u.url ? ' | ' + u.url : '');
     }).join('\n'), t('odps.useCasesPlaceholder'), 2) +
@@ -287,33 +289,38 @@ export function odpsToolFieldsHtml(tool, offeringId, ctx) {
     // A sample a buyer can open beats a sentence claiming one exists. Run the capability once, store the
     // answer as a public file, put its URL here. Nothing is invented: it IS the output.
     (ctx.actionId
-      ? stack({ direction: 'horizontal', align: 'start' },
-          action({ kind: 'secondary', disabled: odBusy, onclick: 'window._launcher.odpsGenerateSample()' }, escapeHtml(t('odps.genSample'))))
-        + note(t('odps.genSampleHint'))
-        + field({ id: 'odt-sample-input', type: 'textarea', rows: 2, placeholder: t('odps.genSampleInput'), value: ctx.sampleInput || '' })
-        + statusLine('od-sample-status')
+      ? '<div class="dtl-btn-row od-actions">'
+        + dtlBtn(t('odps.genSample'), 'window._launcher.odpsGenerateSample()', { disabled: odBusy })
+        + '</div>'
+        + '<div class="dtl-sync none od-note">' + escapeHtml(t('odps.genSampleHint')) + '</div>'
+        + '<textarea id="odt-sample-input" class="modal-input od-input" rows="2" placeholder="'
+        + escapeHtml(t('odps.genSampleInput')) + '">' + escapeHtml(ctx.sampleInput || '') + '</textarea>'
+        + '<div class="dtl-ai-status" id="od-sample-status"></div>'
       : '') +
     textarea('odt-sla', t('odps.sla'), dimsToText(o.sla), t('odps.slaPlaceholder'), 2) +
     // Measured, then committed — in that order. The node reports what this capability actually does;
     // the number that becomes a promise is still chosen by a person.
     (timing && timing.count > 0
-      ? stack({ direction: 'wrap', align: 'center' },
-        text({ kind: 'body' }, escapeHtml(t('odps.measured')
+      ? '<div class="od-measured">'
+        + escapeHtml(t('odps.measured')
             .replace('{n}', String(timing.count))
             .replace('{p50}', String(timing.p50Ms))
-            .replace('{p95}', String(timing.p95Ms))))
-        + action({ kind: 'secondary', onclick: 'window._launcher.odpsUseMeasured(' + Math.ceil(timing.p95Ms * 1.3) + ')' }, escapeHtml(t('odps.useMeasured'))))
-      : note(t('odps.noMeasurement'))) +
+            .replace('{p95}', String(timing.p95Ms)))
+        + ' ' + dtlBtn(t('odps.useMeasured'), 'window._launcher.odpsUseMeasured(' + Math.ceil(timing.p95Ms * 1.3) + ')')
+        + '</div>'
+      : '<div class="dtl-sync none od-note">' + escapeHtml(t('odps.noMeasurement')) + '</div>') +
     textarea('odt-quality', t('odps.quality'), dimsToText(o.dataQuality), t('odps.qualityPlaceholder'), 2) +
-    stack({},
-      text({ kind: 'label' }, escapeHtml(t('odps.toolAttestation'))) +
-      note(t('odps.toolAttestationHint')) +
+    '<div class="od-attest">' +
+      '<div class="dtl-stat-label od-attest-head">' + escapeHtml(t('odps.toolAttestation')) + '</div>' +
+      '<div class="dtl-sync none od-note">' + escapeHtml(t('odps.toolAttestationHint')) + '</div>' +
       input('odt-source', t('odps.source'), p.source,
         inherited.source ? (t('odps.inheritedIs') + ' ' + inherited.source) : t('odps.inheritedNone')) +
       textarea('odt-transformations', t('odps.transformations'), p.transformations, t('odps.transformationsPlaceholder'), 2) +
-      stack({ direction: 'horizontal', align: 'start' },
-        action({ kind: 'secondary', onclick: 'window._launcher.odpsToggleDefaults()' }, escapeHtml(t('odps.openAppDefaults'))))));
-  return fold({ title: escapeHtml(t('odps.toolTitle')), open: true, onToggle: 'window._launcher.odpsToggleTool()', actions: yaml, body: body });
+      '<div class="dtl-btn-row od-actions">'
+        + dtlBtn(t('odps.openAppDefaults'), 'window._launcher.odpsToggleDefaults()')
+        + '</div>' +
+    '</div>' +
+  '</div>';
 }
 
 /** Read the tool ODPS block, MERGED over the tool being edited so unsurfaced fields survive a save. */
@@ -372,11 +379,11 @@ export function odpsGenerateSample(ctx, rerender) {
   var raw = (document.getElementById('odt-sample-input') || {}).value || '{}';
   var input;
   try { input = JSON.parse(raw); }
-  catch (e) { setStatus(statusEl, 'danger', t('odps.genSampleBadJson')); return; }
+  catch (e) { if (statusEl) { statusEl.className = 'dtl-ai-status od-err'; statusEl.textContent = t('odps.genSampleBadJson'); } return; }
   var m = /^ext:([^:]+):(.+)$/.exec(ctx.actionId || '');
   if (!m) { if (statusEl) statusEl.textContent = t('odps.genSampleNoBinding'); return; }
   odBusy = true;
-  setStatus(statusEl, 'muted', t('odps.genSampleRunning'));
+  if (statusEl) { statusEl.className = 'dtl-ai-status'; statusEl.textContent = t('odps.genSampleRunning'); }
   fetch(base + '/v1/ext/' + encodeURIComponent(m[1]) + '/' + encodeURIComponent(m[2]), {
     method: 'POST', headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
     body: JSON.stringify(input),
@@ -401,14 +408,14 @@ export function odpsGenerateSample(ctx, rerender) {
         var field = document.getElementById('odt-sample');
         if (field) field.value = url;
         var st = document.getElementById('od-sample-status');
-        setStatus(st, 'success', '✓ ' + t('odps.genSampleDone'));
+        if (st) { st.className = 'dtl-ai-status od-ok'; st.textContent = '✔ ' + t('odps.genSampleDone'); }
         odBusy = false;
       });
     })
     .catch(function (e) {
       odBusy = false;
       var st = document.getElementById('od-sample-status');
-      setStatus(st, 'danger', '✗ ' + (e.message || t('odps.genSampleFailed')));
+      if (st) { st.className = 'dtl-ai-status od-err'; st.textContent = '✘ ' + (e.message || t('odps.genSampleFailed')); }
     });
 }
 
@@ -429,7 +436,7 @@ export function odpsSuggestForTool(ctx, rerender) {
   var base = apiBase();
   if (!base) { if (statusEl) statusEl.textContent = t('odps.aiUnavailable'); return; }
   odBusy = true;
-  setStatus(statusEl, 'muted', t('odps.suggesting'));
+  if (statusEl) { statusEl.className = 'dtl-ai-status'; statusEl.textContent = t('odps.suggesting'); }
   var system = 'You write the descriptive half of an Open Data Product Specification (ODPS v4.1) entry for '
     + 'a capability sold on a marketplace. Return ONLY a JSON object with these keys: '
     + '"productType" (one of: raw data, derived data, dataset, reports, analytic view, algorithm, decision support, '
@@ -459,14 +466,14 @@ export function odpsSuggestForTool(ctx, rerender) {
       var st = document.getElementById('od-tool-status');
       if (!json || !json.ok) {
         var msg = (json && json.error && json.error.message) || t('odps.suggestFailed');
-        setStatus(st, 'danger', '✗ ' + msg);
+        if (st) { st.className = 'dtl-ai-status od-err'; st.textContent = '✘ ' + msg; }
         return;
       }
       var raw = (json.data && json.data.content) || '';
       var m = raw.match(/\{[\s\S]*\}/);
       var parsed = null;
       try { parsed = m ? JSON.parse(m[0]) : null; } catch (e) { parsed = null; }
-      if (!parsed) { setStatus(st, 'danger', '✗ ' + t('odps.suggestUnparseable')); return; }
+      if (!parsed) { if (st) { st.className = 'dtl-ai-status od-err'; st.textContent = '✘ ' + t('odps.suggestUnparseable'); } return; }
       if (PRODUCT_TYPES.indexOf(parsed.productType) !== -1) setVal('odt-type', parsed.productType);
       if (parsed.valueProposition) setVal('odt-value', String(parsed.valueProposition).slice(0, 512));
       if (Array.isArray(parsed.categories)) setVal('odt-categories', parsed.categories.join(', '));
@@ -476,13 +483,13 @@ export function odpsSuggestForTool(ctx, rerender) {
           return (u.title || '') + (u.description ? ' | ' + u.description : '');
         }).filter(Boolean).join('\n'));
       }
-      setStatus(st, 'success', '✓ ' + t('odps.suggestDone'));
+      if (st) { st.className = 'dtl-ai-status od-ok'; st.textContent = '✔ ' + t('odps.suggestDone'); }
       showNotice(t('odps.suggestDone'), 'success');
       if (rerender) { /* fields are filled in place — no re-render, it would wipe them */ }
     })
     .catch(function (e) {
       odBusy = false;
       var st = document.getElementById('od-tool-status');
-      setStatus(st, 'danger', '✗ ' + (e.message || t('odps.suggestFailed')));
+      if (st) { st.className = 'dtl-ai-status od-err'; st.textContent = '✘ ' + (e.message || t('odps.suggestFailed')); }
     });
 }

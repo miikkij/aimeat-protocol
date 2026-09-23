@@ -9,9 +9,6 @@
  * @structure buildHeatmap, hmCell (internal helpers), ActivityPanel
  * @usage import { ActivityPanel } from '/views/profile/organisms/activity-panel.js';
  * @version-history
- *   v1.1.0 -- 2026-09-22 -- The panel and its log are composed from the shared set (a small Section,
- *     timeline ListRows); the heatmap keeps its own profile.css classes, because the set has no part
- *     for it yet (reported as a missing part). The chart and document emoji are gone.
  *   v1.0.0 — 2026-06-19 — Extracted from organisms-tab.js during the module split.
  */
 import { h } from 'preact';
@@ -24,7 +21,6 @@ import { dt } from '/js/format.js';
 import * as orgService from '/js/services/organisms.js';
 import { swallowed } from '/js/swallowed.js';
 import { calendar } from '/js/format.js';
-import { Section, Stack, ListRow, Action } from '/components/poster-parts.js';
 
 /* Build a GitHub-style contribution calendar from activity events. Each day holds FOUR counters —
  * documents draft/published and records (schema'd) draft/published — so a cell can be drawn as a 2×2
@@ -95,50 +91,50 @@ export function ActivityPanel({ orgId, wsId }) {
   const { cols, monthLabels } = buildHeatmap(byDay, today);
 
   return html`
-    <${Section} title=${t('organisms.activity') || 'Activity'} count=${`${data.total} ${t('organisms.events') || 'events'}`} size="small" density="compact"
-      actions=${html`<${Action} kind="tab" selected=${show} onClick=${() => setShow(s => !s)}>${show ? (t('organisms.hide') || 'Hide') : (t('organisms.show') || 'Show')}<//>`}>
-      ${show ? html`<${Stack}>
-        ${heatmap(cols, monthLabels)}
-        <${Stack} density="compact">
-          ${events.slice(0, 20).map((e, i) => html`
-            <${ListRow} key=${i} density="compact" kind="chronology" time=${dt(e.at)} marker=${e.action === 'publish' ? 'coral' : 'muted'}
-              name=${`${e.type} / ${e.instance}`}
-              detail=${`${e.actor}${e.agent ? ` · ${e.agent}` : ''} · ${e.action === 'publish' ? (t('organisms.publishedVerb') || 'published') : (t('organisms.editedVerb') || 'edited')}`}
-              value=${e.mode === 'document' ? (t('organisms.docs') || 'docs') : (t('organisms.recordsMode') || 'records')} />`)}
-        <//>
-      <//>` : null}
-    <//>`;
-}
-
-/* The contribution heatmap is a data picture the shared set has no part for (reported as a missing
- * part): its cells, quadrants and legend keep their own classes from profile.css until it gets one. */
-function heatmap(cols, monthLabels) {
-  return html`
-    <div class="pj-hm">
-      <div class="pj-hm-monthrow">${monthLabels.map((m, i) => html`<span class="pj-hm-month" key=${i}>${m}</span>`)}</div>
-      <div class="pj-hm-body">
-        <div class="pj-hm-daycol"><span></span><span>${t('organisms.mon') || 'Mon'}</span><span></span><span>${t('organisms.wed') || 'Wed'}</span><span></span><span>${t('organisms.fri') || 'Fri'}</span><span></span></div>
-        <div class="pj-hm-cols">
-          ${cols.map((col, ci) => html`<div class="pj-hm-col" key=${ci}>
-            ${col.map((cell, ri) => cell === null
-              ? html`<span class="pj-hm-cell future" key=${ri}></span>`
-              : hmCell(cell.date, cell.b, ri))}
-          </div>`)}
-        </div>
+    <div class="pj-chart">
+      <div class="pj-chart-head">
+        <span class="pj-chart-title">${'📊 '}${t('organisms.activity') || 'Activity'}<span class="pj-act-count">${data.total} ${t('organisms.events') || 'events'}</span></span>
+        <button class="btn-ghost btn-sm" onClick=${() => setShow(s => !s)}>${show ? (t('organisms.hide') || 'Hide') : (t('organisms.show') || 'Show')}</button>
       </div>
-    </div>
-    <div class="pj-hm-legend">
-      <div class="pj-hm-quadkey">
-        <span class="pj-hm-cell"><i class="q lvl1"></i><i class="q lvl3"></i><i class="q lvl2"></i><i class="q lvl4"></i></span>
-        <div class="pj-hm-quadlabels">
-          <span>${'↖ '}${t('organisms.docsDraft') || 'Docs draft'}</span><span>${'↗ '}${t('organisms.docsPublished') || 'Docs published'}</span>
-          <span>${'↙ '}${t('organisms.recordsDraft') || 'Records draft'}</span><span>${'↘ '}${t('organisms.recordsPublished') || 'Records published'}</span>
-        </div>
-      </div>
-      <div class="pj-hm-intensity">
-        <span>${t('organisms.less') || 'Less'}</span>
-        <i class="q lvl0"></i><i class="q lvl1"></i><i class="q lvl2"></i><i class="q lvl3"></i><i class="q lvl4"></i>
-        <span>${t('organisms.more') || 'More'}</span>
-      </div>
+      ${show ? html`
+        <div class="pj-act">
+          <div class="pj-hm">
+            <div class="pj-hm-monthrow">${monthLabels.map((m, i) => html`<span class="pj-hm-month" key=${i}>${m}</span>`)}</div>
+            <div class="pj-hm-body">
+              <div class="pj-hm-daycol"><span></span><span>${t('organisms.mon') || 'Mon'}</span><span></span><span>${t('organisms.wed') || 'Wed'}</span><span></span><span>${t('organisms.fri') || 'Fri'}</span><span></span></div>
+              <div class="pj-hm-cols">
+                ${cols.map((col, ci) => html`<div class="pj-hm-col" key=${ci}>
+                  ${col.map((cell, ri) => cell === null
+                    ? html`<span class="pj-hm-cell future" key=${ri}></span>`
+                    : hmCell(cell.date, cell.b, ri))}
+                </div>`)}
+              </div>
+            </div>
+          </div>
+          <div class="pj-hm-legend">
+            <div class="pj-hm-quadkey">
+              <span class="pj-hm-cell"><i class="q lvl1"></i><i class="q lvl3"></i><i class="q lvl2"></i><i class="q lvl4"></i></span>
+              <div class="pj-hm-quadlabels">
+                <span>${'↖ '}${t('organisms.docsDraft') || 'Docs draft'}</span><span>${'↗ '}${t('organisms.docsPublished') || 'Docs published'}</span>
+                <span>${'↙ '}${t('organisms.recordsDraft') || 'Records draft'}</span><span>${'↘ '}${t('organisms.recordsPublished') || 'Records published'}</span>
+              </div>
+            </div>
+            <div class="pj-hm-intensity">
+              <span>${t('organisms.less') || 'Less'}</span>
+              <i class="q lvl0"></i><i class="q lvl1"></i><i class="q lvl2"></i><i class="q lvl3"></i><i class="q lvl4"></i>
+              <span>${t('organisms.more') || 'More'}</span>
+            </div>
+          </div>
+          <div class="pj-act-list">
+            ${events.slice(0, 20).map((e, i) => html`<div class="pj-act-item" key=${i}>
+              <span class="pj-act-dot ${e.action}"></span>
+              <span class="pj-act-time">${dt(e.at)}</span>
+              <span class="pj-act-who">${(e.actor)}</span>
+              ${e.agent ? html`<span class="pj-act-agent" title=${t('organisms.viaAgent') || 'via this agent'}>${'🤖 '}${(e.agent)}</span>` : null}
+              <span class="pj-act-act">${e.action === 'publish' ? (t('organisms.publishedVerb') || 'published') : (t('organisms.editedVerb') || 'edited')}</span>
+              <span class="pj-act-what">${(e.mode === 'document' ? '📄' : '🗂')} ${(e.type)}${' / '}${(e.instance)}</span>
+            </div>`)}
+          </div>
+        </div>` : null}
     </div>`;
 }

@@ -2,19 +2,14 @@
  * @file public/views/profile/scheduler/create-form.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The new-schedule form in the poster face: who does it (three choices in words), a
- *   name, when (ready-made cadences, a time field, the time zone, and the cron beside them as
- *   evidence, with the cadence read back in words), then the fields the chosen kind needs, the
+ * @description The new-schedule form in the poster face: who does it (three framed choices in words),
+ *   a name, when (ready-made cadences as chips, a time field, the time zone, and the cron beside them
+ *   as evidence, with the cadence read back in words), then the fields the chosen kind needs, the
  *   purpose and the optional limits. Submits exactly what the old form submitted. Used by the
  *   scheduler's own "New schedule" page and by an agent's Schedules sub-tab (with the agent locked).
  * @structure CRON_PRESETS · CreateForm
  * @usage <${CreateForm} agents=${agents} showToast=${showToast} onCreated=${reload} lockedAgent=${name} />
  * @version-history
- *   v2.2.1 -- 2026-09-22 -- The two limit numbers are narrow fields, each named for assistive
- *     technology by the checkbox label it belongs to.
- *   v2.2.0 -- 2026-09-22 -- Composed from the shared component set (Field, ListRow for the three
- *     choices, Action tabs for the cadences, Columns, Stack); no own CSS. The request body and every
- *     label are unchanged.
  *   v2.1.0 -- 2026-09-13 -- V2: use the shared ink rule on the form action row.
  *   v2.0.0 — 2026-08-30 — Moved out of scheduler-tab.js and laid out on the poster face; three new
  *     cadences (weekdays, Mondays, the 1st of the month), a time field that rewrites the cron, and
@@ -26,7 +21,6 @@ import { useState } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { createSchedule } from '/js/services/schedules.js';
-import { Stack, Columns, Field, ListRow, Action, Text } from '/components/poster-parts.js';
 import { cronWords, timeOfCron, withTime } from './cron-words.js';
 import { resolvedTimeZone } from '/js/display-prefs.js';
 
@@ -108,67 +102,65 @@ export function CreateForm({ agents = [], showToast, onCreated, onCancel = null,
     finally { setSaving(false); }
   };
 
-  const field = (key, label, extra = {}) => html`<${Field} label=${label} value=${form[key]} onInput=${e => set(key, e.target.value)} ...${extra} />`;
+  const row = (label, sub, body) => html`<div class="sc-form-k">${label}${sub ? html`<small>${sub}</small>` : null}</div><div class="sc-form-v">${body}</div>`;
 
-  return html`<${Stack} density="roomy">
-    <${Stack} density="compact">
-      <${Text} kind="label">${c('kWho')}<//>
-      ${KINDS.map(k => html`<${ListRow} key=${k} density="compact" selected=${kind === k} onOpen=${() => setKind(k)}
-        name=${t('profile.scheduler.kind.' + k)} detail=${t('profile.scheduler.kindHint.' + k)} detailKind="text" />`)}
-    <//>
+  return html`
+    <div class="sc-form sch-form-fields">
+      ${row(c('kWho'), null, html`<div class="sc-choices">
+        ${KINDS.map(k => html`<button type="button" key=${k} class=${`sc-choice ${kind === k ? 'on' : ''}`} onClick=${() => setKind(k)}>
+          <b>${t('profile.scheduler.kind.' + k)}</b>${t('profile.scheduler.kindHint.' + k)}</button>`)}
+      </div>`)}
 
-    ${field('display_name', t('profile.scheduler.field.displayName'), { placeholder: t('profile.scheduler.ph.displayName') })}
+      ${row(t('profile.scheduler.field.displayName'), null, html`<input type="text" value=${form.display_name} onInput=${e => set('display_name', e.target.value)} placeholder=${t('profile.scheduler.ph.displayName')} />`)}
 
-    <${Stack} density="compact">
-      <${Text} kind="label">${c('kWhen')}<//>
-      <${Text} kind="caption" tone="muted">${c('kWhenSub')}<//>
-      <${Stack} direction="wrap" density="compact">
-        ${CRON_PRESETS.map(p => html`<${Action} key=${p.key} kind="tab" selected=${preset === p.key} onClick=${() => onPreset(p.key)}>${t('profile.scheduler.preset.' + p.key)}<//>`)}
-      <//>
-      <${Columns} layout="thirds" collapse="600" density="compact">
-        <${Field} type="time" label=${c('kTime')} value=${time} disabled=${!time} onInput=${e => onTime(e.target.value)} />
-        ${field('timezone', c('kZone'), { placeholder: t('profile.scheduler.ph.timezone') })}
-        <${Field} label=${c('kCron')} value=${form.cron} onInput=${e => { set('cron', e.target.value); setPreset('custom'); }} placeholder="0 7 * * *" />
-      <//>
-      ${words && words !== form.cron ? html`<${Text} kind="caption" tone="muted">${words}${form.timezone ? ` · ${form.timezone}` : ''}<//>` : null}
-    <//>
+      ${row(c('kWhen'), c('kWhenSub'), html`
+        <div class="og-chips sc-cad">
+          ${CRON_PRESETS.map(p => html`<button type="button" key=${p.key} class=${`og-chip sc-cad-chip ${preset === p.key ? 'og-chip--sun' : ''}`} onClick=${() => onPreset(p.key)}>${t('profile.scheduler.preset.' + p.key)}</button>`)}
+        </div>
+        <div class="sc-when">
+          <label><span class="sc-label">${c('kTime')}</span><input type="time" value=${time} disabled=${!time} onInput=${e => onTime(e.target.value)} /></label>
+          <label><span class="sc-label">${c('kZone')}</span><input type="text" value=${form.timezone} onInput=${e => set('timezone', e.target.value)} placeholder=${t('profile.scheduler.ph.timezone')} /></label>
+          <label><span class="sc-label">${c('kCron')}</span><input type="text" class="sch-cron-input" value=${form.cron} onInput=${e => { set('cron', e.target.value); setPreset('custom'); }} placeholder="0 7 * * *" /></label>
+        </div>
+        ${words && words !== form.cron ? html`<div class="sc-hint">${words}${form.timezone ? ` · ${form.timezone}` : ''}</div>` : null}`)}
 
-    ${kind === 'ai' && html`
-      ${field('prompt', t('profile.scheduler.field.prompt'), { type: 'textarea', rows: 4, placeholder: t('profile.scheduler.ph.prompt') })}
-      ${field('input_keys', t('profile.scheduler.reads'), { hint: t('profile.scheduler.field.inputKeys'), placeholder: t('profile.scheduler.ph.inputKeys') })}
-      ${field('output_key', t('profile.scheduler.writes'), { hint: t('profile.scheduler.field.outputKey'), placeholder: t('profile.scheduler.ph.outputKey') })}`}
+      ${kind === 'ai' && html`
+        ${row(t('profile.scheduler.field.prompt'), null, html`<textarea rows="4" value=${form.prompt} onInput=${e => set('prompt', e.target.value)} placeholder=${t('profile.scheduler.ph.prompt')}></textarea>`)}
+        ${row(t('profile.scheduler.reads'), t('profile.scheduler.field.inputKeys'), html`<input type="text" class="sch-cron-input" value=${form.input_keys} onInput=${e => set('input_keys', e.target.value)} placeholder=${t('profile.scheduler.ph.inputKeys')} />`)}
+        ${row(t('profile.scheduler.writes'), t('profile.scheduler.field.outputKey'), html`<input type="text" class="sch-cron-input" value=${form.output_key} onInput=${e => set('output_key', e.target.value)} placeholder=${t('profile.scheduler.ph.outputKey')} />`)}`}
 
-    ${kind === 'agent_task' && html`
-      ${lockedAgent
-        ? html`<${Field} label=${t('profile.scheduler.field.agent')} value=${lockedAgent} disabled=${true} />`
-        : html`<${Field} type="select" label=${t('profile.scheduler.field.agent')} value=${form.agent_name} onChange=${e => set('agent_name', e.target.value)}
-            options=${[{ value: '', label: t('profile.scheduler.ph.agent') }, ...agents.map(a => ({ value: a.name, label: a.name }))]} />`}
-      ${field('task_title', t('profile.scheduler.field.taskTitle'))}
-      ${field('task_description', t('profile.scheduler.field.taskDescription'), { type: 'textarea', rows: 4 })}`}
+      ${kind === 'agent_task' && html`
+        ${row(t('profile.scheduler.field.agent'), null, lockedAgent
+          ? html`<input type="text" value=${lockedAgent} disabled />`
+          : html`<select value=${form.agent_name} onChange=${e => set('agent_name', e.target.value)}>
+              <option value="">${t('profile.scheduler.ph.agent')}</option>
+              ${agents.map(a => html`<option value=${a.name} key=${a.name}>${a.name}</option>`)}
+            </select>`)}
+        ${row(t('profile.scheduler.field.taskTitle'), null, html`<input type="text" value=${form.task_title} onInput=${e => set('task_title', e.target.value)} />`)}
+        ${row(t('profile.scheduler.field.taskDescription'), null, html`<textarea rows="4" value=${form.task_description} onInput=${e => set('task_description', e.target.value)}></textarea>`)}`}
 
-    ${kind === 'extension' && html`
-      ${field('extension_name', t('profile.scheduler.field.extensionName'))}
-      ${field('action_id', t('profile.scheduler.field.actionId'))}`}
+      ${kind === 'extension' && html`
+        ${row(t('profile.scheduler.field.extensionName'), null, html`<input type="text" value=${form.extension_name} onInput=${e => set('extension_name', e.target.value)} />`)}
+        ${row(t('profile.scheduler.field.actionId'), null, html`<input type="text" value=${form.action_id} onInput=${e => set('action_id', e.target.value)} />`)}`}
 
-    ${field('purpose', t('profile.scheduler.field.purpose'), { placeholder: t('profile.scheduler.ph.purpose') })}
+      ${row(t('profile.scheduler.field.purpose'), null, html`<input type="text" value=${form.purpose} onInput=${e => set('purpose', e.target.value)} placeholder=${t('profile.scheduler.ph.purpose')} />`)}
 
-    <${Stack} density="compact">
-      <${Text} kind="label">${t('profile.scheduler.constraints')}<//>
-      <${Columns} layout="equal" collapse="600" density="compact">
-        <${Stack} density="compact">
-          <${Field} type="checkbox" label=${t('profile.scheduler.maxRuns')} value=${maxRuns.enabled} onChange=${e => setMaxRuns(s => ({ ...s, enabled: e.target.checked }))} />
-          <${Field} type="number" min="1" width="narrow" ariaLabel=${t('profile.scheduler.maxRuns')} value=${maxRuns.limit} disabled=${!maxRuns.enabled} onInput=${e => setMaxRuns(s => ({ ...s, limit: e.target.value }))} />
-        <//>
-        <${Stack} density="compact">
-          <${Field} type="checkbox" label=${t('profile.scheduler.dailyLimit')} value=${dailyLimit.enabled} onChange=${e => setDailyLimit(s => ({ ...s, enabled: e.target.checked }))} />
-          <${Field} type="number" min="0" step="0.1" width="narrow" ariaLabel=${t('profile.scheduler.dailyLimit')} value=${dailyLimit.limit} disabled=${!dailyLimit.enabled} onInput=${e => setDailyLimit(s => ({ ...s, limit: e.target.value }))} />
-        <//>
-      <//>
-    <//>
+      ${row(t('profile.scheduler.constraints'), null, html`<div class="sc-limits">
+        <label class="sch-check">
+          <input type="checkbox" checked=${maxRuns.enabled} onChange=${e => setMaxRuns(s => ({ ...s, enabled: e.target.checked }))} />
+          ${t('profile.scheduler.maxRuns')}
+          <input type="number" min="1" value=${maxRuns.limit} disabled=${!maxRuns.enabled} onInput=${e => setMaxRuns(s => ({ ...s, limit: e.target.value }))} class="sch-num" />
+        </label>
+        <label class="sch-check">
+          <input type="checkbox" checked=${dailyLimit.enabled} onChange=${e => setDailyLimit(s => ({ ...s, enabled: e.target.checked }))} />
+          ${t('profile.scheduler.dailyLimit')}
+          <input type="number" min="0" step="0.1" value=${dailyLimit.limit} disabled=${!dailyLimit.enabled} onInput=${e => setDailyLimit(s => ({ ...s, limit: e.target.value }))} class="sch-num" />
+        </label>
+      </div>`)}
 
-    <${Stack} direction="horizontal" align="start">
-      <${Action} kind="primary" disabled=${saving} onClick=${submit}>${saving ? t('profile.scheduler.saving') : t('profile.scheduler.create')}<//>
-      ${onCancel ? html`<${Action} onClick=${onCancel}>${t('profile.scheduler.close')}<//>` : null}
-    <//>
-  <//>`;
+      <div class="sc-form-actions poster-row--thing">
+        <button type="button" class="og-slab" disabled=${saving} onClick=${submit}>${saving ? t('profile.scheduler.saving') : t('profile.scheduler.create')}</button>
+        ${onCancel ? html`<button type="button" class="og-door og-door--quiet" onClick=${onCancel}>${t('profile.scheduler.close')}</button>` : null}
+      </div>
+    </div>`;
 }
