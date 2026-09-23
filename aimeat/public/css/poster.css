@@ -3,6 +3,8 @@
  * @description Shared poster and showroom shapes. Views compose these classes and own their layout.
  * @usage Linked immediately after theme.css in spa.html.
  * @version-history
+ *   v1.6.0 -- 2026-09-23 -- The pulse two components share (the waiting note's dot and a live
+ *     timeline row), moved unchanged from css/parts-steps.css (UI consolidation phase 1, a move).
  *   v1.5.0 -- 2026-09-23 -- The section title's large cut (.poster-section-title--large), moved from the
  *     home's band title with its values (UI consolidation slice 1).
  *   v1.4.0 -- 2026-09-14 -- The choice tile (.poster-choice) and the sun sticker (.poster-sticker).
@@ -11,6 +13,10 @@
  *   v1.1.0 -- 2026-09-13 -- V2: source band phone padding and the named coral section shadow cut.
  *   v1.0.0 -- 2026-09-13 -- V0: lift the existing shapes; section titles and panels use the locked B1 design.
  */
+
+/* The slow pulse of something waiting or happening now (components/waiting-note.css,
+   components/timeline.css). */
+@keyframes poster-pulse { 0%, 100% { opacity: 0.35; } 50% { opacity: 1; } }
 
 /* Profile page title. The two headline sizes are the only per-view shape properties. */
 .poster-page-title {

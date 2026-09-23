@@ -1,0 +1,40 @@
+/**
+ * @file agent-card.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description A connected agent: its state dot, name, a detail line, and its details on demand. Drawn by
+ *   components/AgentCard.js. Reads only the tokens in theme.css and the shapes in poster.css; a page
+ *   never styles it from outside.
+ * @usage Linked from public/spa.html in the component block, whose order keeps the order these
+ *   rules had when they were one sheet.
+ * @version-history
+ *   v1.0.0 — 2026-09-23 — Moved unchanged from css/parts*.css (UI consolidation phase 1, a move).
+ */
+
+/* ── The connected agent ── */
+.poster-agent-card {
+  border: 3px solid var(--success);
+  background: var(--card);
+  padding: 1.25rem 1.35rem;
+  margin-bottom: 1rem;
+}
+.poster-agent-card-head { display: flex; align-items: center; gap: 0.7rem; }
+/* The dot carries the state. It was green in CSS regardless of what the agent was actually doing. */
+.poster-agent-card-dot {
+  flex: none; width: 0.6rem; height: 0.6rem;
+  background: var(--success);
+}
+.poster-agent-card-dot--problem { background: var(--danger); }
+.poster-agent-card-dot--idle { background: var(--text-muted); }
+.poster-agent-card-dot--new, .poster-agent-card-dot--onboarding { background: var(--warning); }
+.poster-agent-card-name { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.15rem; text-transform: uppercase; }
+.poster-agent-card-sub { font-size: 0.9rem; color: var(--text-dim); }
+.poster-agent-card-toggle { margin-top: 0.7rem; font-size: 0.88rem; }
+.poster-agent-card-details { margin: 0.8rem 0 0; display: grid; grid-template-columns: auto 1fr; gap: 0.35rem 1rem; }
+.poster-agent-card-details dt { font-size: 0.85rem; color: var(--muted); }
+.poster-agent-card-details dd { margin: 0; font-size: 0.9rem; }
+.poster-agent-card-gaii { font-family: var(--font-mono); word-break: break-all; }
+.poster-agent-card-manage { display: inline-block; margin-top: 0.9rem; }
+/* The fleet line on the agent card is a link: it names a number you can do something about. */
+.poster-agent-card-others { display: inline-block; text-decoration: underline; text-underline-offset: 2px; }
+.poster-agent-card-others:hover { color: var(--text); }

@@ -1,0 +1,32 @@
+/**
+ * @file paste-box.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The box a person pastes their AI's answer into, with its label. Drawn by components/PasteBox.js.
+ *   Reads only the tokens in theme.css and the shapes in poster.css; a page never styles it from
+ *   outside.
+ * @usage Linked from public/spa.html in the component block, whose order keeps the order these
+ *   rules had when they were one sheet.
+ * @version-history
+ *   v1.0.0 — 2026-09-23 — Moved unchanged from css/parts*.css (UI consolidation phase 1, a move).
+ */
+
+/* ── The paste box ── */
+.poster-paste-label {
+  display: block;
+  font-size: 0.9rem; font-weight: 800;
+  margin-bottom: 0.4rem;
+}
+.poster-paste {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.75rem 0.85rem;
+  border: 2px solid var(--text);
+  background: var(--bg-card);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  line-height: 1.5;
+  resize: vertical;
+}
+.poster-paste:focus { outline: 3px solid var(--sun); outline-offset: 0; }

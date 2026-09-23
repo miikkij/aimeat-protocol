@@ -1,0 +1,16 @@
+/**
+ * @file link-line.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description One sentence with a coral link in it. Drawn by components/LinkLine.js. Reads only the tokens in
+ *   theme.css and the shapes in poster.css; a page never styles it from outside.
+ * @usage Linked from public/spa.html in the component block, whose order keeps the order these
+ *   rules had when they were one sheet.
+ * @version-history
+ *   v1.0.0 — 2026-09-23 — Moved unchanged from css/parts*.css (UI consolidation phase 1, a move).
+ */
+
+/* ── The mat address ── */
+.poster-link-line { margin: 0 0 1.6rem; font-size: 1rem; font-weight: 600; color: var(--text); }
+.poster-link-line a { color: var(--accent); font-weight: 800; text-decoration: none; }
+.poster-link-line a:hover { text-decoration: underline; }

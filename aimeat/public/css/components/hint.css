@@ -1,0 +1,13 @@
+/**
+ * @file hint.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description A quiet line of help under a control. Drawn by components/Hint.js. Reads only the tokens in
+ *   theme.css and the shapes in poster.css; a page never styles it from outside.
+ * @usage Linked from public/spa.html in the component block, whose order keeps the order these
+ *   rules had when they were one sheet.
+ * @version-history
+ *   v1.0.0 — 2026-09-23 — Moved unchanged from css/parts*.css (UI consolidation phase 1, a move).
+ */
+
+.poster-hint { font-size: 0.88rem; color: var(--text-dim); margin: 0 0 0.6rem; }

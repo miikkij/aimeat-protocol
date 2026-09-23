@@ -1,0 +1,202 @@
+/**
+ * @file conversation-frame.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description A conversation with an agent: the rail with the threads and everything about the open one, the
+ *   conversation, and on a phone one pane at a time, fixed full-screen above the keyboard. Drawn by
+ *   components/ConversationFrame.js. Reads only the tokens in theme.css and the shapes in
+ *   poster.css; a page never styles it from outside.
+ * @usage Linked from public/spa.html in the component block, whose order keeps the order these
+ *   rules had when they were one sheet.
+ * @version-history
+ *   v1.0.0 — 2026-09-23 — Moved unchanged from css/parts*.css (UI consolidation phase 1, a move).
+ */
+
+/* ── Layout ── */
+.poster-conversation {
+  display: grid;
+  grid-template-columns: 236px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  gap: 0 28px;
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 0 32px;
+  /* The whole region under the bar: the conversation is the page. */
+  height: calc(100dvh - var(--nav-height, 56px));
+  min-height: 320px;
+  font-family: var(--font-showroom-body);
+  color: var(--text);
+}
+.poster-conversation--signin {
+  display: block;
+  height: auto;
+  padding: 2rem 32px;
+}
+/* ── The rail: the list, then everything about the open conversation ── */
+.poster-conversation-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px 20px 12px 0;
+  border-right: 3px solid var(--text);
+}
+/* The ink slab, the one loud control on the page, is poster.css .poster-slab in its control cut
+   (.poster-slab--control), shared by New conversation and Send. */
+.poster-conversation-new { width: 100%; }
+/* The way back out of the list. Only a phone needs it: on a desktop the list and the conversation
+   are both on screen, so there is nothing to go back from. */
+.poster-conversation-rail-close { display: none; }
+.poster-conversation-label {
+  margin: 22px 0 0;
+  font-size: 0.64rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--accent);
+  padding-bottom: 5px; border-bottom: 2px solid var(--text);
+}
+.poster-conversation-empty {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  font-weight: 600;
+  line-height: 1.5;
+  margin: 8px 0 0;
+}
+/* This conversation: its name, the status line as a column of facts, and the two actions. */
+.poster-conversation-about { display: flex; flex-direction: column; gap: 8px; }
+.poster-conversation-about .poster-conversation-label { margin-bottom: 2px; }
+.poster-conversation-name {
+  margin: 0;
+  font-family: var(--font-poster); font-weight: var(--font-poster-weight);
+  font-size: 0.95rem; line-height: 1.15; letter-spacing: -0.01em; text-transform: uppercase;
+  overflow-wrap: anywhere;
+}
+/* The foot of the rail: that a machine answers, and whose agent it is. */
+.poster-conversation-foot { margin-top: auto; padding-top: 16px; display: flex; flex-direction: column; gap: 8px; }
+/* ── The conversation ── */
+.poster-conversation-main {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  position: relative;
+}
+/* The head row is the phone's: on a desktop the rail carries the name and the actions. */
+.poster-conversation-head { display: none; }
+.poster-conversation-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px 0 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.poster-conversation-welcome {
+  color: var(--text-dim);
+  max-width: 46ch;
+  margin: auto;
+  text-align: center;
+  font-weight: 600;
+}
+.poster-conversation-welcome { --poster-section-size: 2rem; }
+.poster-conversation-welcome p { margin: 0; line-height: 1.6; font-size: 0.95rem; }
+.poster-conversation-welcome .poster-conversation-welcome-trust { color: var(--text-dim); margin-top: 6px; }
+/* The way back to the live edge while auto-follow is suspended. Floats over the conversation
+   rather than pushing it, so its appearance never moves the text you are reading. */
+.poster-conversation-jump {
+  position: absolute;
+  right: 8px;
+  bottom: 84px;
+  z-index: 4;
+  font-size: 0.74rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 6px 12px;
+  background: var(--text); color: var(--bg);
+  border: 0; border-radius: 0; box-shadow: 4px 4px 0 var(--sun);
+  cursor: pointer;
+}
+/* The session cap's managed landing: stands where the composer stood, so the conversation ends
+   in a door rather than a dead input. */
+.poster-conversation-cap {
+  border-top: 3px solid var(--text);
+  background: none;
+  padding: 1rem 0 1.2rem;
+  margin-top: 0.5rem;
+}
+.poster-conversation-cap-title { margin: 0 0 0.4rem; font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.2rem; text-transform: uppercase; }
+.poster-conversation-cap-body { margin: 0 0 0.8rem; font-size: 0.95rem; font-weight: 600; color: var(--text-dim); line-height: 1.55; }
+.poster-conversation-cap-actions { display: flex; gap: 0.7rem; flex-wrap: wrap; }
+/* The way OUT of the full-screen phone chat, and the icon buttons of the phone's head row.
+   Desktop has the rail, so all of it hides there. */
+.poster-conversation-back { display: none; }
+.poster-conversation-icon { display: none; }
+/* ── Phones ──
+   One pane at a time. The page takes the whole viewport, the shell's sticky nav is hidden (it lives
+   in a higher stacking context, so a z-index here cannot cover it), and the composer sits on the
+   keyboard: --chat-avail is the measured visual-viewport height, with 100dvh as the fallback the
+   viewport meta's interactive-widget=resizes-content already provides. Same pattern as the inbox,
+   which is the surface this one is modelled on. One row above the conversation, one row below. */
+@media (max-width: 760px) {
+  .poster-conversation {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    /* minmax(0, …), not a bare 1fr: a bare 1fr floors at the column's min-content width, and a
+       long unbroken line in a turn then pushed the whole column to 752px on a 390px phone. */
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+    padding: 0;
+    max-width: none;
+    height: var(--chat-avail, 100dvh);
+    background: var(--bg);
+  }
+
+  body:has(.poster-conversation) { overflow: clip; }
+  body:has(.poster-conversation) .topnav { display: none; }
+
+  /* The list is a place you go to, not a column that would leave neither pane readable. */
+  .poster-conversation-rail { display: none; }
+  .poster-conversation--list .poster-conversation-rail {
+    display: flex;
+    padding: 12px 12px calc(12px + env(safe-area-inset-bottom, 0px));
+    border-right: 0;
+    background: var(--bg);
+  }
+  .poster-conversation--list .poster-conversation-main { display: none; }
+  .poster-conversation-rail-close {
+    display: inline-flex; align-items: center; align-self: flex-start; min-height: 44px; margin-bottom: 4px;
+    background: none; border: 0; box-shadow: none; padding: 0;
+    font-family: var(--font-mono); font-size: 0.8rem; color: var(--accent); cursor: pointer;
+  }
+
+  .poster-conversation-main { height: 100%; }
+
+  /* The one row above: back, the name, copy, the drawer. 48px, and nothing else above the words. */
+  .poster-conversation-head {
+    display: flex; align-items: center; gap: 8px;
+    flex: none; height: 48px; padding: 0 8px 0 12px;
+    border-bottom: 3px solid var(--text);
+  }
+  .poster-conversation-back {
+    display: inline-flex; align-items: center; min-width: 44px; min-height: 44px;
+    font-family: var(--font-mono); font-size: 0.78rem; color: var(--accent); text-decoration: none; white-space: nowrap;
+  }
+  .poster-conversation-title {
+    flex: 1 1 auto; min-width: 0; margin: 0;
+    font-family: var(--font-poster); font-weight: var(--font-poster-weight);
+    font-size: 0.9rem; line-height: 1.1; letter-spacing: -0.01em; text-transform: uppercase;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .poster-conversation-icon {
+    display: inline-flex; align-items: center; justify-content: center; flex: none;
+    width: 44px; height: 40px;
+    border: 2px solid var(--text); border-radius: 0; box-shadow: none; background: var(--bg);
+    color: var(--text); font-weight: 800; font-size: 1rem; cursor: pointer; padding: 0;
+  }
+  .poster-conversation-toggle { background: var(--sun); }
+  .poster-conversation-copy.copied { background: var(--sun); }
+  .poster-conversation-scroll { padding: 12px 12px 8px; gap: 16px; }
+  .poster-conversation-jump { right: 12px; bottom: 80px; }
+}
+.poster-conversation-toggle, .poster-conversation-copy.copied { color: var(--on-sun); }
