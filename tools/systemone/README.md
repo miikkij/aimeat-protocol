@@ -44,6 +44,12 @@ Use a real secret anywhere but your own machine. Compose refuses to start withou
 Other ports: `LAYA_PORT=9801 VON_PORT=9802 JEFF_PORT=9803 docker compose up -d`. The containers
 listen on `127.0.0.1` only.
 
+**Versions are pinned.** The base image is pinned by digest, and every Python package installs from
+a lock file with hashes (`<model>/requirements-cpu.txt`, `-cu128.txt`, `hub.txt`), so a build gets
+exactly what was measured and a changed package fails it. To move a version, edit the model's
+`requirements.in` (or the torch builds at the top of `lock.sh`), run `bash lock.sh` (needs
+[uv](https://docs.astral.sh/uv/)), rebuild, and commit the lock files.
+
 ### Check that one answers
 
 ```bash

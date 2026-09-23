@@ -1,0 +1,4 @@
+# What the Laya image installs. lock.sh turns it into hash-pinned requirements-cpu.txt and -cu128.txt.
+torch
+laya[serve]==0.3.11
+huggingface_hub>=1.0
