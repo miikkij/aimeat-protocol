@@ -334,4 +334,170 @@ export const DECISIONS = [
     ],
     choice: { variant: 'without', decidedBy: 'Jouni', decidedAt: '2026-09-23', note: 'Remove the class (the right-hand version), as a unification step of phase 3 with a before/after picture.' },
   },
+  // ── The home's and the chat's remaining own looks (Jouni, 2026-09-23: the next batch before Themes
+  //    & Styles). Found by a scan of every captured state for buttons and links no library shape draws.
+  {
+    id: 'panel-action',
+    title: 'Panel action: the button of a small panel',
+    question: 'A small panel has its own button: "Take these into your AI chat", "Install", "Copy for my own AI", "Copy", "Try again", "It was right". They are drawn as the old rounded buttons, coral or framed. Should they become one?',
+    proposal: {
+      variant: 'proposal', name: 'The underlined action link',
+      summary: 'Every panel button becomes the underlined action link in capitals; the dark block stays for the page\'s one big action.',
+      text: '.poster-action. The classic .btn-primary / .btn-outline / .btn-ghost with .btn-sm go from these places.',
+    },
+    variants: [
+      { id: 'open-items-copy', name: 'The open items\' button ("Take these into your AI chat")', code: '.btn-primary.btn-sm (CopyButton in OpenItemsList.js)', becomes: 'the underlined action link', where: 'the home: the open items panel', crop: home('.open-items-head .btn-primary') },
+      { id: 'install', name: 'The install banner\'s button ("Install")', code: '.btn-primary.install-cta-install (InstallCta.js)', becomes: 'the underlined action link', where: 'the home and the chat, on a browser that offers to install the app', crop: null },
+      { id: 'playbook-copy', name: 'The playbook\'s copy button ("Copy for my own AI")', code: '.btn-outline (status-parts.js)', becomes: 'the underlined action link', where: 'the home: an opened playbook', crop: home('.poster-index-actions .btn-outline', { click: '.poster-index-item' }) },
+      { id: 'setup-copy', name: 'The setup guide\'s copy button ("Copy")', code: '.btn-ghost.btn-sm (CopyButton in McpInstall.js)', becomes: 'the underlined action link', where: 'the home: connecting your AI', crop: home('.btn-ghost.btn-sm', { click: '.poster-chooser-status button' }) },
+      { id: 'retry', name: 'Try again, under a failed answer', code: '.btn-outline (Turn.js)', becomes: 'the underlined action link', where: 'the chat, when an answer failed', crop: null },
+      { id: 'decide', name: 'The open items\' review buttons ("It was right", "It was wrong")', code: '.btn-outline.btn-sm (OpenItemsList.js)', becomes: 'the underlined action link', where: 'the home: an AI decision waiting for your review', crop: null },
+    ],
+    changes: [
+      { page: 'Home', what: 'The open items button, the review buttons, the playbook\'s copy button and the setup guide\'s copy button become underlined capitals instead of rounded buttons.' },
+      { page: 'Chat', what: 'Try again becomes underlined capitals.' },
+      { page: 'Home and chat', what: 'The install banner\'s Install becomes underlined capitals.' },
+    ],
+    choice: null,
+  },
+  {
+    id: 'step-state',
+    title: 'Step button: before it is ready and after it is done',
+    question: 'In the first steps, a button is the dark block while it is the next thing to do. Before that (nothing typed yet) and after it (already pressed) it turns into the old framed rounded button. Which look should those states have?',
+    proposal: {
+      variant: 'proposal', name: 'The underlined action link',
+      summary: 'Before and after, the step\'s button is the underlined action link; only the next thing to do is the dark block.',
+      text: '.poster-action for the waiting and done states (disabled keeps the browser\'s dimmed state); .poster-slab only when it is the next move. .btn-outline goes.',
+    },
+    variants: [
+      { id: 'name-empty', name: '"That is its name" before a name is typed', code: '.btn-outline[disabled] (step-agent.js)', becomes: 'the underlined action link, dimmed', where: 'the home: the agent step, before an agent is connected', crop: home('button:has-text("That is its name")', { user: 'second', eval: "document.querySelectorAll('details').forEach(d => d.open = true);" }) },
+      { id: 'mat-waiting', name: '"Here is my welcome mat" before anything is pasted', code: '.btn-outline[disabled] (step-mat.js)', becomes: 'the underlined action link, dimmed', where: 'the home: the welcome mat step', crop: home('button:has-text("Here is my welcome mat")', { user: 'second', eval: "document.querySelectorAll('details').forEach(d => d.open = true);" }) },
+      { id: 'copy-done', name: '"Copy the prompt" after it was copied', code: '.btn-outline (PromptCard className, step-agent.js, step-mat.js)', becomes: 'the underlined action link', where: 'the home: the first steps, after copying', crop: null },
+      { id: 'started-done', name: '"I have started it" after it was pressed', code: '.btn-outline (step-agent.js)', becomes: 'the underlined action link', where: 'the home: the agent step, step by step', crop: null },
+    ],
+    changes: [
+      { page: 'Home', what: 'In the first steps, a button that is not the next thing to do reads as underlined capitals instead of a framed rounded button.' },
+    ],
+    choice: null,
+  },
+  {
+    id: 'dismiss',
+    title: 'Dismiss: waving a note away',
+    question: '"Not now" on the phone suggestion and on the install banner is the old framed rounded button. Should it be one quiet word?',
+    proposal: {
+      variant: 'proposal', name: 'A plain grey word',
+      summary: '"Not now" becomes a plain grey word, as Listen and Copy under a message are.',
+      text: '.poster-action.poster-action--text. .btn-ghost goes from both.',
+    },
+    variants: [
+      { id: 'nudge-dismiss', name: 'The phone suggestion\'s "Not now"', code: '.btn-ghost.poster-nudge-dismiss (Nudge.js)', becomes: 'a plain grey word', where: 'the chat', crop: { url: '/v1/chat', selector: '.poster-nudge-dismiss', user: 'second' } },
+      { id: 'install-dismiss', name: 'The install banner\'s "Not now"', code: '.btn-ghost.install-cta-dismiss (InstallCta.js)', becomes: 'a plain grey word', where: 'the home and the chat, on a browser that offers to install the app', crop: null },
+    ],
+    changes: [
+      { page: 'Chat', what: '"Not now" on the phone suggestion becomes a plain grey word without a frame.' },
+    ],
+    choice: null,
+  },
+  {
+    id: 'icon-button',
+    title: 'Icon button: a button that is a mark, not a word',
+    question: 'Six buttons are a mark: the composer\'s attach and microphone, delete a conversation (✗), the dialog\'s close, the prompt card\'s more (⌄) and a card\'s menu (⋯). Each is drawn its own way. Should they share one?',
+    proposal: {
+      variant: 'proposal', name: 'A square in a thin dark frame',
+      summary: 'One square in a thin dark frame that turns yellow under the pointer: large in the composer, small everywhere else. A card\'s menu keeps its coloured fill, which says that something is on it.',
+      text: 'A new shape (lab-only .dl-icon now): 2px ink frame, square, the sun on hover; 44px (the composer\'s control size) and --small 28px. The card menu keeps its fill, which says a state.',
+    },
+    variants: [
+      { id: 'composer-tool', name: 'The composer\'s attach and microphone', code: '.btn-outline.poster-composer-tool (Composer.js)', becomes: 'the large square', where: 'the chat: next to Send', crop: { url: '/v1/chat', selector: '.poster-composer-tool' } },
+      { id: 'thread-del', name: 'Delete a conversation (✗)', code: '.btn-ghost.poster-thread-del (ThreadList.js)', becomes: 'the small square', where: 'the chat: the conversation list', crop: chatThread(0, '.poster-thread--active .poster-thread-del') },
+      { id: 'dialog-close', name: 'The dialog\'s close', code: 'dialog.dlg .dlg-close (dialog.css, Modal.js)', becomes: 'stays as it is: it already is a framed square, drawn in the dark header\'s colour', where: 'the home: the settings dialog (and every dialog)', crop: home('dialog.dlg .dlg-close', { click: '.poster-masthead-button' }) },
+      { id: 'prompt-more', name: 'The prompt card\'s more (⌄)', code: '.btn-ghost.poster-prompt-more (PromptCard.js)', becomes: 'the small square', where: 'the home: a prompt card with more ways to send it', crop: home('.poster-prompt-more') },
+      { id: 'card-dots', name: 'A card\'s menu (⋯)', code: '.card-menu-dots (CardMenu.js)', becomes: 'the small square, keeping its coloured fill', where: 'the home: a card with actions', crop: home('.card-menu-dots') },
+    ],
+    changes: [
+      { page: 'Chat', what: 'The attach and microphone buttons keep their square; delete becomes a small square.' },
+      { page: 'Home', what: 'The prompt card\'s more and a card\'s menu become small squares in a thin dark frame. The dialog\'s close already is one and stays.' },
+    ],
+    choice: null,
+  },
+  {
+    id: 'choice',
+    title: 'Choice: picking one of a few settings',
+    question: 'Picking one of a few is drawn three more ways: the setup guide\'s tools (rounded buttons), the settings dialog\'s background patterns (framed tiles) and its start page (a coral switch in plain system letters). Should they be tabs, as you decided for the rest?',
+    proposal: {
+      variant: 'proposal', name: 'Tabs, the chosen one on yellow',
+      summary: 'Each of these becomes tabs: underlined capitals, the chosen one on a yellow ground.',
+      text: '.poster-tab with .is-on. The setup guide already takes a tabClass (ai-setup-guide.js ToolPicker); the home passes nothing and gets .ast-tool.',
+    },
+    variants: [
+      { id: 'setup-tools', name: 'The setup guide\'s tools ("Claude Desktop", "ChatGPT")', code: '.ast-tool, .ast-tool--active (hello-mcp.css, chooser.css)', becomes: 'tabs; "recommended" stays beside the name, in the tab\'s own text colour', where: 'the home: connecting your AI', crop: home('.ast-tool--active', { click: '.poster-chooser-status button' }) },
+      { id: 'pattern-choice', name: 'The background pattern tiles ("Off", "Pixel grid")', code: '.poster-settings-pattern-choice, .active (SwatchPicker.js)', becomes: 'tabs', where: 'the home: the settings dialog', crop: home('.poster-settings-pattern-choice.active', { click: '.poster-masthead-button' }) },
+      { id: 'start-page', name: 'The start page switch ("Home", "Settings & controls")', code: '.seg-btn, .active (StartPageSetting.js; the .pf rules do not reach the home)', becomes: 'tabs', where: 'the home: the settings dialog', crop: home('.seg-btn.active', { click: '.poster-masthead-button', around: '.start-page-seg' }) },
+    ],
+    changes: [
+      { page: 'Home', what: 'The setup guide\'s tools, the pattern tiles and the start page switch become tabs.' },
+    ],
+    choice: null,
+  },
+  {
+    id: 'suggestion',
+    title: 'Suggestion: a message sent with one press',
+    question: 'A suggestion is drawn in two ways: in capitals when the chat welcomes a new person, as a sentence when it follows an answer. Should they be one?',
+    proposal: {
+      variant: 'sentence', name: 'The sentence',
+      summary: 'Every suggestion reads as a sentence, as the ones after an answer do.',
+      text: '.poster-suggestion without --caps.',
+    },
+    variants: [
+      { id: 'sentence', name: 'The suggestion after an answer ("A single column with your name large")', code: '.poster-suggestion (Suggestion.js Choices)', becomes: 'this is the proposal', where: 'the chat: under an answer that offers choices', crop: chatThread(2, '.poster-suggestion') },
+      { id: 'caps', name: 'The welcome\'s suggestion ("Make my welcome page")', code: '.poster-suggestion--caps (Suggestion.js)', becomes: 'the sentence', where: 'the chat: the welcome for a new person', crop: { url: '/v1/chat', selector: '.poster-suggestion--caps', user: 'member' } },
+    ],
+    changes: [
+      { page: 'Chat', what: 'The welcome\'s suggestions read as sentences instead of capitals.' },
+    ],
+    choice: null,
+  },
+  {
+    id: 'menu-row',
+    title: 'Menu row: one choice in an opened menu',
+    question: 'An opened menu lists its choices in rows: the prompt card\'s other ways to send, a card\'s actions, a notification\'s actions. Each draws its rows its own way. Should they be one?',
+    proposal: {
+      variant: 'prompt-menu', name: 'The prompt card\'s menu row',
+      summary: 'Every menu row as the prompt card\'s: plain words on a row with a thin line between rows.',
+      text: '.poster-prompt-menu-item: left-aligned, .55rem .85rem, .85rem, a 1px --border line between rows. Moves to a shared part when accepted.',
+    },
+    variants: [
+      { id: 'prompt-menu', name: 'The prompt card\'s menu rows ("Save as my own")', code: '.btn-ghost.poster-prompt-menu-item (PromptCard.js)', becomes: 'this is the proposal', where: 'the home: a prompt card\'s more menu', crop: home('.poster-prompt-menu-item', { click: '.poster-prompt-more' }) },
+      { id: 'card-menu', name: 'A card\'s menu rows', code: '.card-menu-item (CardMenu.js)', becomes: 'the prompt card\'s row', where: 'the home: a card\'s menu', crop: home('.card-menu-item', { click: '.card-menu-dots', around: '.card-menu-list' }) },
+      { id: 'notif-action', name: 'A notification\'s actions', code: '.notif-action-btn with .btn-primary/.btn-outline/.btn-ghost (NotificationBell.js)', becomes: 'the prompt card\'s row; "Approve" loses its coral, so every action reads the same', where: 'every signed-in page: the bell\'s list', crop: null },
+    ],
+    changes: [
+      { page: 'Home', what: 'A card\'s menu rows read as the prompt card\'s menu rows.' },
+      { page: 'Every page', what: 'A notification\'s actions read as menu rows instead of rounded buttons; "Approve" loses its coral.' },
+    ],
+    choice: null,
+  },
+  {
+    id: 'small-link',
+    title: 'Small link: a quiet way on inside a part',
+    question: 'Six small ways on are each drawn their own way: "What does that mean?", "Use your own key →", "Powered by goose", "Official instructions →", "Show older" and the jump to the latest message. Should they share one?',
+    proposal: {
+      variant: 'proposal', name: 'Small coral underlined words',
+      summary: 'Each becomes small coral words in typewriter letters with an underline, as "Show all" under a list is.',
+      text: '.poster-action.poster-action--more. The framed .btn-outline and .btn-ghost go from "Show older", the jump and "What does that mean?".',
+    },
+    variants: [
+      { id: 'ai-more', name: '"What does that mean?" under the AI notice', code: '.btn-ghost.poster-ai-notice-more (AiNotice.js)', becomes: 'small coral underlined words', where: 'the chat: the side column', crop: { url: '/v1/chat', selector: '.poster-ai-notice-more' } },
+      { id: 'status-link', name: '"Use your own key →"', code: '.poster-agent-status-link (AgentStatus.js)', becomes: 'small coral underlined words', where: 'the chat: the side column', crop: { url: '/v1/chat', selector: '.poster-agent-status-link' } },
+      { id: 'credit-link', name: '"Powered by goose"', code: '.poster-credit-link (Credit.js)', becomes: 'small coral underlined words; the goose stays', where: 'the chat: the foot of the side column', crop: { url: '/v1/chat', selector: '.poster-credit-link' } },
+      { id: 'setup-docs', name: '"Official instructions →"', code: '.ast-docs (ai-setup-guide.js)', becomes: 'small coral underlined words', where: 'the home: connecting your AI', crop: home('.ast-docs', { click: '.poster-chooser-status button' }) },
+      { id: 'archive-more', name: '"Show older" under a record', code: '.btn-outline.poster-archive-more (ArchiveSection.js)', becomes: 'small coral underlined words', where: 'the history page', crop: null },
+      { id: 'jump', name: 'The jump to the latest message', code: '.btn-outline.poster-conversation-jump (ConversationFrame.js)', becomes: 'small coral underlined words', where: 'the chat: when you have scrolled up', crop: null },
+    ],
+    changes: [
+      { page: 'Chat', what: 'The side column\'s small links and the jump to the latest message read as small coral underlined words.' },
+      { page: 'Home, history', what: '"Official instructions →" and "Show older" read the same way.' },
+    ],
+    choice: null,
+  },
 ];

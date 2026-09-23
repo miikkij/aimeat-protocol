@@ -54,6 +54,23 @@
 .dl-box-plain .poster-prompt { background: var(--card-bg); }
 .dl-as-aside .poster-waiting, .dl-as-aside .poster-nudge { border: 3px dashed var(--accent); background: var(--card-bg); }
 
+/* Icon button (proposal): one square in a thin ink frame, the sun under the pointer. 44px is the
+   composer's control size; the small cut is the size of the dialog's close square. */
+.dl-icon {
+  display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box;
+  width: 44px; height: 44px; padding: 0; border: 2px solid var(--text); border-radius: 0;
+  background: var(--bg); color: var(--text); font: inherit; font-size: 1rem; line-height: 1; cursor: pointer;
+}
+.dl-icon:hover { background: var(--sun); color: var(--on-sun); }
+.dl-icon--small { width: 28px; height: 28px; font-size: .85rem; }
+/* A card's menu keeps the fill that says a state; the values are .card-menu-dots--open's. */
+.dl-icon--open { background: #FEF3C7; border-color: #B45309; color: #78350F; }
+/* Choice: "recommended" beside a tab's name takes the tab's own text colour, which stays readable on
+   the yellow of the chosen tab (coral on yellow is not). */
+.poster-specimen-stage .poster-tab .ast-tool-reco { color: inherit; }
+/* A step's button that cannot be pressed yet: dimmed as the chat's Send is (.poster-slab--control). */
+.poster-specimen-stage .poster-action:disabled { opacity: .45; cursor: default; }
+
 /* Solo: only the element a decision is about. The rest of the drawn part keeps its place, so the
    element keeps the look its surroundings give it, but is not painted (frame.js soloLayout). */
 html.dl-solo-page, html.dl-solo-page body { overflow: hidden; }
@@ -63,6 +80,10 @@ html.dl-solo-page, html.dl-solo-page body { overflow: hidden; }
 /* The admin sidebar is as tall as the screen; in a preview it holds one menu item, so it takes the
    item's height. Its ground and colours, which the count reads, stay as they are. */
 .poster-specimen-stage .adm-sidebar { position: static; height: auto; }
+/* A dialog sits in the middle of the screen and the jump floats over the conversation; in a preview
+   both stand in place. Their place is layout; their look is unchanged. */
+.poster-specimen-stage dialog.dlg { position: static; margin: 0; }
+.poster-specimen-stage .poster-conversation-jump { position: static; }
 
 /* The top bar hides the morsel count below 1180px, and a lab frame is narrower than that; inside a
    preview it is shown, so it can be seen beside the other counts. */

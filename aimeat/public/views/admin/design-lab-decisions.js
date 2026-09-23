@@ -63,7 +63,7 @@ const themeWord = (theme) => (theme === 'light' ? tr('designLab.lightWord', 'lig
 
 /** The proposal's picture: its own composition, or the proposed option's sample. */
 function proposalSrc(decision, theme) {
-  if (decision.proposal.variant === 'proposal') return `/v1/design-lab/frame?id=proposal:${encodeURIComponent(decision.id)}&v=0&theme=${theme}`;
+  if (decision.proposal.variant === 'proposal') return `/v1/design-lab/frame?id=proposal:${encodeURIComponent(decision.id)}&v=0&theme=${theme}&solo=1`;
   return variantSrc(decision.id, decision.variants.findIndex((v) => v.id === decision.proposal.variant), theme, true);
 }
 
@@ -153,9 +153,9 @@ function OptionPart({ decision, variant, index, crops, state, onSet }) {
       <${Specimens}>
         ${THEMES.map((theme) => html`
           <${Specimen} key=${`t-${theme}`} label=${`${tr('designLab.today', 'Today')}, ${themeWord(theme)}`}
-            src=${variantSrc(decision.id, index, theme, true)} onValues=${theme === 'light' ? setters.today : undefined} />
+            src=${variantSrc(decision.id, index, theme, true)} eager=${theme === 'light'} onValues=${theme === 'light' ? setters.today : undefined} />
           <${Specimen} key=${`a-${theme}`} label=${`${tr('designLab.afterProposal', 'After the proposal')}, ${themeWord(theme)}`}
-            src=${afterSrc(decision.id, index, theme)} onValues=${theme === 'light' ? setters.after : undefined} />`)}
+            src=${afterSrc(decision.id, index, theme)} eager=${theme === 'light'} onValues=${theme === 'light' ? setters.after : undefined} />`)}
       <//>
       <${NamedRow} label=${tr('designLab.whatChanges', 'What changes')}>${changes ? changes.join(' ') : tr('designLab.measuring', 'measuring…')}<//>
       ${crop.context

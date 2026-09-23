@@ -78,8 +78,13 @@ function measureValues(el) {
     padding: s.padding.split(' ').map(rem).join(' '),
     frame: border,
     radius: s.borderRadius === '0px' ? 'none' : s.borderRadius,
-    fill: colourName(s.backgroundColor),
+    fill: s.backgroundImage !== 'none' && s.backgroundImage.includes('gradient') ? 'a gradient' : colourName(s.backgroundColor),
     colour: colourName(s.color),
+    // An underline drawn as text decoration or as a bottom rule reads the same to a person.
+    underline: s.textDecorationLine.includes('underline') || (parseFloat(s.borderBottomWidth) > 0 && s.borderBottomStyle !== 'none' && parseFloat(s.borderTopWidth) === 0) ? 'yes' : 'no',
+    // A mark (📎, ✗, ⋯) has no letters, so what the font does to it is not a change a person reads.
+    letters: /\p{L}/u.test(el.textContent || '') ? 'yes' : 'no',
+    dimmed: parseFloat(s.opacity) < 1 ? 'yes' : 'no',
   };
 }
 
@@ -89,6 +94,7 @@ function params() {
 }
 
 const SOLO_PAD = 12;
+const SOLO_SCALE = 1.5;
 
 /**
  * What of an element can be seen: its box when it draws a frame or a ground, otherwise its text,
@@ -98,7 +104,10 @@ const SOLO_PAD = 12;
 function seenRect(el) {
   const s = getComputedStyle(el);
   const drawsBox = parseFloat(s.borderTopWidth) > 0 || parseFloat(s.borderBottomWidth) > 0
-    || (s.backgroundColor !== 'rgba(0, 0, 0, 0)' && s.backgroundColor !== 'transparent');
+    || (s.backgroundColor !== 'rgba(0, 0, 0, 0)' && s.backgroundColor !== 'transparent')
+    || s.backgroundImage !== 'none' || s.boxShadow !== 'none'
+    // A box drawn by a pseudo-element, as the dialog's close square is.
+    || parseFloat(getComputedStyle(el, '::before').borderTopWidth) > 0;
   if (drawsBox) return el.getBoundingClientRect();
   const range = document.createRange();
   range.selectNodeContents(el);
@@ -127,7 +136,11 @@ function soloLayout(stage, selector) {
     x1 = Math.max(x1, r.right - base.left); y1 = Math.max(y1, r.bottom - base.top);
   }
   const w = x1 - x0 + SOLO_PAD * 2;
-  const scale = Math.min(2, Math.max(0.5, (window.innerWidth - 2) / w));
+  // One fixed scale, not a fit: today and after are drawn in separate frames, and a size difference
+  // between them must be the element's, never the frame's. Only an element wider than the frame at
+  // that scale is drawn smaller, and then its width says so.
+  const room = window.innerWidth - 2;
+  const scale = Math.max(0.5, Math.min(SOLO_SCALE, room / w));
   // Geometry measured at run time, like the frame's own height: it cannot be a class.
   stage.style.transformOrigin = '0 0';
   stage.style.transform = `scale(${scale}) translate(${SOLO_PAD - x0}px, ${SOLO_PAD - y0}px)`;

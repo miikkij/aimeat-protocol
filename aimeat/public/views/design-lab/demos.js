@@ -46,7 +46,8 @@ function afterDemo(id) {
 /** A decision's proposal picture as a demo: `proposal:<id>`. */
 function proposalDemo(id) {
   const p = PROPOSALS[id];
-  return p ? { variants: [{ name: 'proposal', measure: p.measure, render: p.render }] } : null;
+  // Solo on the whole composition, so a small proposal is drawn as large as the options beside it.
+  return p ? { variants: [{ name: 'proposal', measure: p.measure, solo: '.poster-specimen-drawn > *', render: p.render }] } : null;
 }
 
 /** The demo for a catalogue id, a decision (`decision:<id>`) or a proposal (`proposal:<id>`), or null. */
