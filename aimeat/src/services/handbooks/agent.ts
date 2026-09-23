@@ -7,6 +7,7 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/mcp/catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
+ *   v1.10.1 -- 2026-09-23 -- The setup order starts with a provider; the key is the TypeSafe branch.
  *   v1.10.0 -- 2026-09-23 -- Decision providers: how the node picks one, and naming one.
  *   v1.9.0 -- 2026-09-20 -- Decision rules: aimeat_decide_rules, aimeat_decide_rule_propose, `rule`
  *     on aimeat_decide, `proceed`, and the one setup order. The Decisions section named a skill
@@ -136,7 +137,8 @@ beside a rule are refused. The answer carries \`outcome\` (act | ask | stop) and
 \`proceed\` is false your owner has switched the gate on for you and the model was not sure enough:
 do NOT take the action, your owner has a task about it. \`aimeat_decide_rule_propose\` proposes a new
 rule and creates nothing until your owner approves it. Everything is set up in one order: (1) a
-TypeSafe key, the owner's own or one for you alone; (2) test the key; (3) write a rule and try it;
+decision provider (a local one needs no key; for TypeSafe, a key: the owner's own or one for you
+alone); (2) test it when it takes a key; (3) write a rule and try it;
 (4) give the rule to an agent (the Crew tab rows \`decide\` and \`decide:<rule>\`); (5) decide about the
 gate, which is off until the owner turns it on; (6) read the decisions and tune the thresholds. When
 a key is missing, the refusal says what to set and where: pass it to your owner as it is. No tool

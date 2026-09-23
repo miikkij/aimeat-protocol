@@ -9,21 +9,24 @@
  *   (Markdown, a handbook section, a locale string); test/unit/decide-setup-order.test.ts holds them
  *   to the same six verbs in the same order.
  *
- *   WHY AN ORDER AT ALL. Each step needs the one before it: a rule cannot be tried without a key, an
+ *   WHY AN ORDER AT ALL. Each step needs the one before it: a rule cannot be tried without a provider, an
  *   agent cannot be given a rule that does not exist, and a gate on a rule nobody tried stops an
  *   agent on numbers nobody looked at. An owner told only "set a key" sets a key and is no nearer.
  * @structure DECIDE_SETUP_ORDER · decideSetupOrderText
  * @usage import { DECIDE_SETUP_ORDER } from './setup-order.js';
  * @version-history
+ *   v1.1.0 — 2026-09-23 — Step 1 is choosing a decision provider, with the key as the TypeSafe
+ *     branch; step 2 tests only a provider that takes a key. Ids `provider` and `test` (were `key`
+ *     and `test-key`; nothing read them).
  *   v1.0.0 — 2026-09-20 — Initial.
  */
 
 export interface SetupStep { step: number; id: string; what: string; where: string }
 
 export const DECIDE_SETUP_ORDER: readonly SetupStep[] = Object.freeze([
-  { step: 1, id: 'key', what: 'Set a TypeSafe key: the owner\'s own, or one for a single agent.',
-    where: 'Settings, AI, Decision model; or Profile, Agents, the agent, AI keys.' },
-  { step: 2, id: 'test-key', what: 'Test the key: one tiny real call that says which key paid.',
+  { step: 1, id: 'provider', what: 'Choose a decision provider. A local decision model on this machine needs no key; for TypeSafe, set a key: the owner\'s own, or one for a single agent.',
+    where: 'Settings, AI, Decision model, Decision providers; the key under the same card, or Profile, Agents, the agent, AI keys.' },
+  { step: 2, id: 'test', what: 'Test it when it takes a key: one tiny real call that says which key paid. A provider without a key needs no test.',
     where: 'The Test button beside the key.' },
   { step: 3, id: 'rule', what: 'Write a decision rule and try it on its sample.',
     where: 'Settings, AI, Decision model, Rules. An agent may propose one with aimeat_decide_rule_propose; the owner approves it.' },

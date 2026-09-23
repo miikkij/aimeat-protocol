@@ -24,6 +24,7 @@
  * @structure DECIDE_SKILL_ENTRY
  * @usage import { DECIDE_SKILL_ENTRY } from './builtin-skills.decide.js';
  * @version-history
+ *   v1.3.1 — 2026-09-23 — The setup order starts with choosing a provider; the key is the TypeSafe branch.
  *   v1.3.0 — 2026-09-23 — "Providers: who answers": the decision provider, the local decision model,
  *     providers() and sizing a question to the provider.
  *   v1.2.1 — 2026-09-20 — A missing confidence is not zero certainty: `result` null and the outcome
@@ -192,10 +193,12 @@ the rule, its version and the outcome. A rule bound to an action that cannot be 
 
 **Everything is set up in one order, and each step needs the one before it:**
 
-1. **Key.** A TypeSafe key: the owner's own (Settings, AI, Decision model), or one for a single agent
-   (the agent's page, AI keys). The order a call pays in is the agent's own key, then the owner's,
-   then the server's, and every decision records which one paid.
-2. **Test the key.** The Test button beside it makes one tiny real call and says which key paid.
+1. **Provider.** Choose a decision provider (Settings, AI, Decision model, Decision providers). A
+   local decision model on this machine needs no key. For TypeSafe, set a key: the owner's own (the
+   same card), or one for a single agent (the agent's page, AI keys). The order a call pays in is the
+   agent's own key, then the owner's, then the server's, and every decision records which one paid.
+2. **Test it, when it takes a key.** The Test button beside the key makes one tiny real call and says
+   which key paid. A provider without a key needs no test.
 3. **Write a rule and try it.** The owner writes it and presses Try on its sample. An agent may
    propose one with \`aimeat_decide_rule_propose\`; that creates nothing until the owner approves it.
 4. **Give the rule to an agent.** In the agent's Crew tab the tool picker has the rows \`decide\` and

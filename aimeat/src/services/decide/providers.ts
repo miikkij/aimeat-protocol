@@ -397,12 +397,15 @@ export async function selectProvider(
  */
 export function providerViolations(provider: DecisionProvider, state: unknown, questions: Record<string, JevQuestion>): LimitViolation[] {
   const out: LimitViolation[] = [];
-  const name = `The provider '${provider.id}'`;
+  // The name the settings page shows, so the refusal and the screen say the same thing; the id is on
+  // the violation for a program.
+  const name = `The provider "${provider.title}"`;
+  const who = { provider: provider.id, providerTitle: provider.title };
   for (const [id, q] of Object.entries(questions ?? {})) {
     if (q.type === 'choice' && isObj(q.criteria)) {
       const n = Object.keys(q.criteria).length;
       if (n > provider.limits.maxChoiceOptions) {
-        out.push({ question: id, code: 'PROVIDER_CANNOT_CARRY',
+        out.push({ question: id, code: 'PROVIDER_CANNOT_CARRY', what: 'options', limit: provider.limits.maxChoiceOptions, count: n, ...who,
           message: `${name} carries ${provider.limits.maxChoiceOptions} options; choice question '${id}' has ${n}. Use a provider that carries more, or walk the options in stages.` });
       }
     }
@@ -410,15 +413,16 @@ export function providerViolations(provider: DecisionProvider, state: unknown, q
       const n = q.criteria.length;
       const { min, max } = provider.limits.scoreLevels;
       if (n < min || n > max) {
-        out.push({ question: id, code: 'PROVIDER_CANNOT_CARRY',
+        out.push({ question: id, code: 'PROVIDER_CANNOT_CARRY', what: 'levels', limit: max, count: n, ...who,
           message: `${name} carries score questions of ${min} to ${max} levels; '${id}' has ${n}.` });
       }
     }
   }
+  // Said in characters, as the settings page says it: the node's token estimate is a quarter of the length.
   const tokens = estimateTokens({ state, questions });
   if (Number.isFinite(tokens) && tokens > provider.limits.contextTokens) {
-    out.push({ code: 'PROVIDER_CANNOT_CARRY',
-      message: `${name} reads about ${provider.limits.contextTokens} tokens; this request is about ${tokens}. Send the fields the questions need, or use a provider with a longer context.` });
+    out.push({ code: 'PROVIDER_CANNOT_CARRY', what: 'length', limit: provider.limits.contextTokens * 4, count: tokens * 4, ...who,
+      message: `${name} reads about ${provider.limits.contextTokens * 4} characters; this request is about ${tokens * 4}. Send the fields the questions need, or use a provider that reads more.` });
   }
   return out;
 }

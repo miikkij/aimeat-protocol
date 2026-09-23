@@ -11,6 +11,8 @@
  *   plain (key, test, rule, agent, gate, threshold), so a rewording that keeps the meaning passes and
  *   one that drops or reorders a step does not.
  * @version-history
+ *   v1.1.0 — 2026-09-23 — Step 1 is choosing a decision provider (ids `provider`, `test`); the four
+ *     wordings are held to say so.
  *   v1.0.0 — 2026-09-20 — Initial.
  */
 import { describe, it, expect } from 'vitest';
@@ -40,7 +42,10 @@ function expectInOrder(name: string, text: string): void {
 describe('the one order the decision model is set up in', () => {
   it('the constant has six steps, numbered 1 to 6, whose ids are fixed', () => {
     expect(DECIDE_SETUP_ORDER.map(s => s.step)).toEqual([1, 2, 3, 4, 5, 6]);
-    expect(DECIDE_SETUP_ORDER.map(s => s.id)).toEqual(['key', 'test-key', 'rule', 'give', 'gate', 'tune']);
+    expect(DECIDE_SETUP_ORDER.map(s => s.id)).toEqual(['provider', 'test', 'rule', 'give', 'gate', 'tune']);
+    // Step 1 is the provider, and a key is its TypeSafe branch, never the first thing asked of everyone.
+    expect(DECIDE_SETUP_ORDER[0].what).toMatch(/decision provider/i);
+    expect(DECIDE_SETUP_ORDER[0].what).toMatch(/needs no key/i);
     expectInOrder('the settings answer', decideSetupOrderText());
   });
 
