@@ -87,6 +87,15 @@
 .poster-action--text { padding: 0 6px; border: 0; gap: .35rem; font-family: var(--font-body); font-weight: 500; font-size: .7rem; line-height: normal; text-transform: none; letter-spacing: normal; color: var(--text-dim); }
 .poster-action--text:hover { color: var(--text); }
 .poster-action--text.copied { color: var(--success-fg); }
+/* The tab's fold tone (Jouni's decision "Tabs and filters"): the home's switch ("Recent", "Mine";
+   formerly .poster-fold), coral typewriter words underlined; the chosen one is on the sun by
+   .poster-tab.is-on above. */
+.poster-tab--fold {
+  display: inline-block; padding: .2rem 0; border: 0;
+  font-family: var(--font-mono); font-weight: 400; font-size: .8rem; line-height: normal; text-transform: none; letter-spacing: normal;
+  color: var(--accent); text-decoration: underline; text-underline-offset: 4px; white-space: normal;
+}
+.poster-tab--fold:hover { color: var(--text); }
 
 /* The profile slab and the home's large door are the two cuts named in brief 10.3. */
 .poster-slab {

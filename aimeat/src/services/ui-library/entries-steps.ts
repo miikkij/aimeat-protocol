@@ -91,7 +91,7 @@ export const STEP_ENTRIES: UiEntrySource[] = [
             fields: { on: 'the chosen way', onClick: 'choose it', children: 'the way\'s name' },
         },
         use: ['A step that can be done in more than one way, where the person picks the way first.'],
-        variants: [{ name: 'chosen', class: 'poster-mode--on', prop: 'on', when: 'the selected way' }],
+        variants: [{ name: 'chosen', prop: 'on', when: 'the selected way, the chosen tab (poster.css .poster-tab.is-on)' }],
         example: { tabs: [{ on: true, children: 'Connect over MCP' }, { on: false, children: 'Paste a prompt' }] },
     },
     {
