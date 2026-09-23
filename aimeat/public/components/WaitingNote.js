@@ -20,7 +20,7 @@ const html = htm.bind(h);
 /** @param {{ title: any, children?: any }} props */
 export function WaitingNote({ title, children }) {
   return html`
-          <div class="poster-waiting" role="status">
+          <div class="poster-aside poster-aside--waiting poster-waiting" role="status">
             <div class="poster-waiting-dot" aria-hidden="true"></div>
             <div>
               <p class="poster-waiting-title">${title}</p>

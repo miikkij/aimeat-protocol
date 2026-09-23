@@ -144,6 +144,8 @@ export const SHAPE_DEMOS = {
     { name: 'small', render: () => el('aside', 'poster-aside poster-aside--small', 'A short note.') },
     { name: 'large', render: () => el('aside', 'poster-aside poster-aside--large', 'A note with more room.') },
     { name: 'irreversible', render: () => el('aside', 'poster-aside poster-aside--irreversible', 'This cannot be undone.') },
+    { name: 'waiting', render: () => el('div', 'poster-aside poster-aside--waiting', 'The next move is in your AI chat.') },
+    { name: 'suggestion', render: () => el('div', 'poster-aside poster-aside--suggestion', 'Put this on your phone.') },
   ] },
   'chip': { variants: [{ name: 'default (kept for the chip decision)', render: () => el('span', 'poster-chip', 'music') }] },
   'crumb': { variants: [{ name: 'default', render: () => el('span', 'poster-crumb', 'Profile') }] },

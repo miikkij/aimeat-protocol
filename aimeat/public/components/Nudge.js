@@ -31,7 +31,7 @@ const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fa
  */
 export function MobileNudge({ onDismiss }) {
     return html`
-        <div class="poster-nudge" role="note">
+        <div class="poster-aside poster-aside--suggestion poster-nudge" role="note">
             <span class="poster-nudge-text">
                 <strong>${tr('chat.nudgeMobileTitle', 'Put this on your phone')}</strong>
                 ${' '}

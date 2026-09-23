@@ -12,18 +12,13 @@
  */
 
 /* One suggestion, once, with the way out on the same line as the ask. */
+/* The look is the aside's suggestion tone (poster.css .poster-aside--suggestion); this keeps its layout. */
 .poster-nudge {
   display: flex;
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
   margin: 12px 0 0;
-  padding: 8px 12px;
-  border: 2px dashed var(--text);
-  background: none;
-  font-size: 0.82rem;
-  font-weight: 600;
-  line-height: 1.5;
 }
 .poster-nudge-text { flex: 1 1 260px; }
 .poster-nudge-dismiss { flex: 0 0 auto; font-size: 0.75rem; padding: 2px 8px; }

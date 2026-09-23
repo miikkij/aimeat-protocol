@@ -161,6 +161,11 @@
 .poster-aside--small { padding: .9rem 1.1rem; font-family: inherit; font-size: .92rem; line-height: 1.55; color: inherit; }
 .poster-aside--large { padding: 1.25rem 1.5rem; font-size: inherit; line-height: inherit; color: inherit; }
 .poster-aside--irreversible { border-style: solid; }
+/* The aside's tones (Jouni's decision "Attention note", every look kept): waiting, the next move is
+   in another window (the waiting note, a thin dashed ink frame on grey); suggestion, a line the
+   person can wave away (the phone nudge, a thin dashed ink frame, small bold words). */
+.poster-aside--waiting { padding: .9rem 1rem; border: 2px dashed var(--text); background: var(--bg-dim); font-family: inherit; font-size: inherit; line-height: inherit; color: inherit; }
+.poster-aside--suggestion { padding: 8px 12px; border: 2px dashed var(--text); background: none; font-family: inherit; font-size: .82rem; font-weight: 600; line-height: 1.5; color: inherit; }
 /* contacts-poster.css .ct-tag, with the brief's explicit mono / 500 typography. */
 .poster-chip {
   display: inline-block; padding: .1rem .45rem; border: 1px solid var(--text); border-radius: 0;

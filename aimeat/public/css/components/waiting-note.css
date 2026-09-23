@@ -12,12 +12,10 @@
  */
 
 /* The waiting state. Its whole job is to say the ball is in the other window. */
+/* The look is the aside's waiting tone (poster.css .poster-aside--waiting); this keeps its layout. */
 .poster-waiting {
   display: flex; align-items: flex-start; gap: 0.8rem;
   margin-top: 1.25rem;
-  padding: 0.9rem 1rem;
-  border: 2px dashed var(--text);
-  background: var(--bg-dim);
 }
 .poster-waiting-dot {
   flex: none;
