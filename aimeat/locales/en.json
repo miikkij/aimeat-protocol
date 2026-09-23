@@ -9862,6 +9862,8 @@
     "navServices": "Services",
     "navIntegrations": "Integrations",
     "navFederation": "Federation",
+    "navDesign": "Design",
+    "designLab": "aimeat-design-lab",
     "csmManagement": "CSM Management",
     "msmManagement": "MSM Management",
     "portal": "Portal",
@@ -19870,5 +19872,39 @@
     "doorSignedIn": "You are signed in, so the guided path is one click away.",
     "doorCreate": "Create your account →",
     "doorSignIn": "I already have one, sign me in →"
+  },
+  "designLab": {
+    "intro": "Every part of this AIMEAT's own interface, drawn live by its real component with its example data. Open a part to see every variant in light and dark, at a phone width, and what it is for.",
+    "filterLabel": "Which parts",
+    "filter": {
+      "all": "All",
+      "component": "Components",
+      "shape": "Shapes",
+      "unused": "Unused"
+    },
+    "find": "Find a part",
+    "none": "No part matches.",
+    "unused": "unused",
+    "back": "All parts",
+    "light": "Light",
+    "dark": "Dark",
+    "phone": "On a phone",
+    "facts": "What it is",
+    "use": "Use",
+    "data": "Data",
+    "variants": "Variants",
+    "pages": "Pages",
+    "noPages": "no page draws it",
+    "tokens": "Theme tokens",
+    "code": "Code",
+    "noDemo": "No demo for this part.",
+    "wrapper": {
+      "title": "Found, not fixed: the wrapper in the agent step",
+      "body": "The name form of the agent step sits in a wrapper that wears the masthead name class (poster-masthead-name). The class was given to the wrapper on 2026-08-07 and, three hours later, to the header nameplate, whose rule cuts text to one line. Nothing says the wrapper was meant to get that rule. Left: as it is. Right: the same step without the class.",
+      "asIs": "As it is",
+      "without": "Without the masthead name class",
+      "asIsPhone": "As it is, phone",
+      "withoutPhone": "Without the class, phone"
+    }
   }
 }

@@ -18,6 +18,7 @@ import type { UiEntrySource, UiVariant } from './types.js';
  * list.
  */
 const UNUSED_SHAPES = new Set(['dialog', 'chip']);
+const UNUSED_NOTE = 'Added to poster.css in e543a9d61 (2026-09-13) with no page using it. Only the style unification of 2026-09-22/23 put it on markup, and that was rolled back in cee2cbaf5. No page puts this class on anything today. Keep or delete is Jouni\'s call.';
 
 /** Every shape has the same frame; only what it is and how it is cut differ. */
 function shape(id: string, name: string, classes: string[], markup: string, summary: string, use: string, variants: UiVariant[] = []): UiEntrySource {
@@ -26,7 +27,7 @@ function shape(id: string, name: string, classes: string[], markup: string, summ
         module: null, sheet: '/css/poster.css', classes,
         data: { shape: markup, fields: { children: 'what the element holds' } },
         use: [use], variants, example: { markup },
-        ...(UNUSED_SHAPES.has(id) ? { note: 'In poster.css; no page puts this class on anything today. Keep or delete is Jouni\'s call.' } : {}),
+        ...(UNUSED_SHAPES.has(id) ? { note: UNUSED_NOTE } : {}),
     };
 }
 

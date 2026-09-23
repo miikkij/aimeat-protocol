@@ -18,11 +18,13 @@
  *     its code sits. "Active" is checked, not believed; "unused" is what Jouni's keep-or-delete
  *     list reads.
  *   - The generated facts equal what the files say today.
+ *   - The design lab has a demo for every entry, and no demo for a part that is not one.
  *
  *   `pnpm build:ui-library` writes, `pnpm check:ui-library` checks.
  * @structure main() · parseRules() · classesIn() · tokensIn() · importGraph() · buildFacts() · problems()
  * @usage pnpm build:ui-library · pnpm check:ui-library
  * @version-history
+ *   v1.1.0 — 2026-09-23 — The design lab's demos are held to the catalogue (phase 2).
  *   v1.0.0 — 2026-09-23 — Initial (UI consolidation phase 1).
  */
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
@@ -35,6 +37,8 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PUBLIC = path.join(ROOT, 'public');
 const OUT = path.join(ROOT, 'src', 'services', 'ui-library', 'facts.generated.ts');
 const SHEETS_DIR = path.join(PUBLIC, 'css', 'components');
+/** Demos in the design lab that are not catalogue entries: the stray wrapper's before and after. */
+const DEMO_EXTRAS = ['wrapper-as-is', 'wrapper-without'];
 
 const read = (p: string): string => readFileSync(p, 'utf8');
 const pub = (publicPath: string): string => path.join(PUBLIC, publicPath.replace(/^\//, ''));
@@ -88,9 +92,14 @@ function walkFiles(dir: string, ext: string, out: string[] = []): string[] {
 }
 const walkJs = (dir: string): string[] => walkFiles(dir, '.js');
 
-/** The files the SPA is made of: views, components and the shared scripts. */
+/**
+ * The files the SPA is made of: views, components and the shared scripts. The design lab's own
+ * files are left out: the lab draws every part to show it, and counting it as a user would make
+ * every part look used by the admin page.
+ */
 function sourceFiles(): string[] {
-    return ['views', 'components', 'js'].flatMap(d => walkJs(path.join(PUBLIC, d)));
+    return ['views', 'components', 'js'].flatMap(d => walkJs(path.join(PUBLIC, d)))
+        .filter(f => !rel(f).startsWith('views/design-lab/'));
 }
 
 /** importer lists, keyed by the imported file (public-relative). */
@@ -241,6 +250,16 @@ export function problems(entries: UiEntrySource[], facts: Record<string, UiEntry
         const n = entries.filter(e => e.sheet === p).length;
         if (n !== 1) out.push(`${p}: ${n} catalogue entries (exactly one expected)`);
         if (!spa.includes(`href="${p}"`)) out.push(`${p}: not linked in spa.html`);
+    }
+    // The design lab draws every entry: each has a demo, and each demo is an entry or a named extra.
+    const demoDir = path.join(PUBLIC, 'views', 'design-lab');
+    const demoIds = new Set<string>();
+    for (const name of readdirSync(demoDir).filter(n => /^demos-.*\.js$/.test(n))) {
+        for (const m of read(path.join(demoDir, name)).matchAll(/^ {2}'([\w-]+)': \{/gm)) demoIds.add(m[1]);
+    }
+    for (const e of entries) if (!demoIds.has(e.id)) out.push(`${e.id}: no demo in views/design-lab/demos-*.js, so the design lab cannot draw it`);
+    for (const d of demoIds) {
+        if (!ids.has(d) && !DEMO_EXTRAS.includes(d)) out.push(`views/design-lab: demo "${d}" is not a catalogue entry or a named extra`);
     }
     for (const abs of walkJs(path.join(PUBLIC, 'components'))) {
         const m = /the catalogue entry is\s*`([\w-]+)`/.exec(read(abs).slice(0, 3000));

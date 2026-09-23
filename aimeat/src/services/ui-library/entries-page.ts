@@ -106,7 +106,7 @@ export const PAGE_ENTRIES: UiEntrySource[] = [
         use: ['No page draws it today.'],
         variants: [],
         example: { lead: 'Talk to your agent', href: '/v1/chat' },
-        note: 'Its markup sits in ChatDoor (views/home/status-parts.js), which no page mounts. Keep or delete is Jouni\'s call.',
+        note: 'Its markup sits in ChatDoor (views/home/status-parts.js). From b3fc99288 (2026-08-26) the home.chat-door block drew it on both homes; 07f7040c5 (2026-09-09) made that block draw the home journey instead, where the way into the chat is one link, shown when the chat is on. Keep or delete is Jouni\'s call.',
     },
     {
         id: 'band', name: 'Band', kind: 'component', status: 'active',
@@ -341,5 +341,17 @@ export const PAGE_ENTRIES: UiEntrySource[] = [
             { name: 'band', class: 'poster-free--band', prop: "tone='band'", when: 'a passage on a band' },
         ],
         example: { tone: 'card', title: 'Opening hours', children: 'We answer on weekdays.' },
+    },
+    {
+        id: 'specimen', name: 'Specimen', kind: 'component', status: 'active',
+        summary: 'One live preview of an interface part in its own frame, with a caption; a row of them shows one part in several looks side by side.',
+        module: '/components/Specimen.js', sheet: '/css/components/specimen.css',
+        data: {
+            shape: 'Specimens({ children }) · Specimen({ label, src, phone, note })',
+            fields: { label: 'the caption', src: 'the preview page address (/v1/design-lab/frame?id=&v=&theme=)', phone: 'a 390-pixel frame', note: 'a line under the frame' },
+        },
+        use: ['The design lab: every part drawn live, light and dark side by side, and at a phone width.'],
+        variants: [{ name: 'phone', class: 'poster-specimen--phone', prop: 'phone', when: 'the phone-width frame' }],
+        example: { label: 'Light', src: '/v1/design-lab/frame?id=turn&v=0&theme=light' },
     },
 ];
