@@ -3,11 +3,13 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The design lab's live demos for the parts of a setup path: each drawn by its real
- *   component with the catalogue entry's example data (`ex`), one render per variant or state. The
- *   stray wrapper of the agent step is drawn as it is and without the masthead's name class.
- * @structure STEP_DEMOS · EXTRA_DEMOS — { [id]: { variants: [{ name, render(ex) }], height?, flush? } }
+ *   component with the catalogue entry's example data (`ex`), one render per variant or state.
+ *   WrapperPair draws the agent step as it is and without the masthead's name class, for the
+ *   decision about that wrapper (decision-samples.js).
+ * @structure STEP_DEMOS — { [id]: { variants: [{ name, render(ex) }], height?, flush? } } · WrapperPair({ without })
  * @usage import { STEP_DEMOS } from './demos-steps.js';
  * @version-history
+ *   v1.2.0 — 2026-09-23 — The wrapper pair is a decision now, not an extra of the library.
  *   v1.1.0 — 2026-09-23 — The demos of the deleted parts go with them (Jouni's decision).
  *   v1.0.0 — 2026-09-23 — Initial (UI consolidation phase 2, the library view).
  */
@@ -32,7 +34,7 @@ const noop = () => {};
  * The agent step as the home draws it, and the same with the wrapper's class taken off in this
  * copy only. The component is not changed: the class is removed from the drawn element here.
  */
-function WrapperPair({ without }) {
+export function WrapperPair({ without }) {
   const ref = useRef(/** @type {HTMLDivElement|null} */ (null));
   useEffect(() => {
     if (!without || !ref.current) return undefined;
@@ -81,10 +83,4 @@ export const STEP_DEMOS = {
   'front-door': { emptyNote: 'Draws only for a visitor who is not signed in. Open the front page in a private window to see it.', variants: [
     { name: 'default', render: () => html`<${FrontDoor} onNavigate=${noop} />` },
   ] },
-};
-
-/** Not catalogue entries: the pair Jouni decides on. */
-export const EXTRA_DEMOS = {
-  'wrapper-as-is': { variants: [{ name: 'as it is', render: () => html`<${WrapperPair} without=${false} />` }] },
-  'wrapper-without': { variants: [{ name: 'without the masthead name class', render: () => html`<${WrapperPair} without=${true} />` }] },
 };

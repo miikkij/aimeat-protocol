@@ -23,7 +23,7 @@ import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { apiGet } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
-import { demoFor, EXTRA_DEMOS } from './demos.js';
+import { demoFor, isLabOnly } from './demos.js';
 
 const html = htm.bind(h);
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
@@ -97,7 +97,7 @@ export default function DesignLabFrame() {
 
   useEffect(() => {
     let alive = true;
-    if (EXTRA_DEMOS[id] || id.startsWith('decision:')) { setExample({}); return undefined; }
+    if (isLabOnly(id)) { setExample({}); return undefined; }
     apiGet(`/v1/ui/components/${encodeURIComponent(id)}`)
       .then((r) => { if (alive) setExample(r?.data?.example ?? {}); })
       .catch((e) => { swallowed('design-lab frame: entry', e); if (alive) setExample({}); });
