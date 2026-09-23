@@ -140,6 +140,11 @@ export const SHAPE_DEMOS = {
   ] },
   'chip': { variants: [{ name: 'default (kept for the chip decision)', render: () => el('span', 'poster-chip', 'music') }] },
   'crumb': { variants: [{ name: 'default', render: () => el('span', 'poster-crumb', 'Profile') }] },
+  'count': { variants: [
+    { name: 'waiting', render: () => el('span', 'poster-count poster-count--waiting', '3') },
+    { name: 'tally', render: () => el('span', 'poster-count poster-count--tally', '4') },
+    { name: 'small', render: () => el('span', 'poster-count poster-count--waiting poster-count--small', '7') },
+  ] },
   'time': { variants: [{ name: 'default', render: () => el('span', 'poster-time', '10:42') }] },
   'stat': { variants: [
     { name: 'default', render: () => html`<a class="poster-stat" href="#"><span class="poster-stat-number">3</span>messages wait for you</a>` },

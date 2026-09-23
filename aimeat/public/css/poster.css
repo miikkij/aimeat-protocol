@@ -133,6 +133,13 @@
 }
 .poster-crumb { font-family: var(--font-mono); font-weight: 400; font-size: .8rem; letter-spacing: 0; text-transform: none; color: var(--accent); }
 .poster-crumb::after { content: ' /'; }
+/* A small number (Jouni's decision "Count"): on coral when something waits for the person, without a
+   ground when it only says how many. The values are the profile menu's count (.pf-side-badge); the
+   small cut is the bell's size, for a count that sits on an icon. */
+.poster-count { display: inline-block; padding: .05rem .45rem; font-family: var(--font-mono); font-size: .7rem; font-weight: 500; letter-spacing: 0; }
+.poster-count--waiting { background: var(--accent); color: var(--bg); }
+.poster-count--tally { background: none; color: var(--text-dim); }
+.poster-count--small { font-size: .6rem; padding: 0 3px; }
 /* When a thing happened: small grey typewriter letters, the chat's cut (Jouni's decision "Timestamp"). */
 .poster-time { font-family: var(--font-mono); font-size: .68rem; color: var(--text-dim); }
 .poster-stat {
