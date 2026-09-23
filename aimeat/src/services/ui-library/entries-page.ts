@@ -238,8 +238,8 @@ export const PAGE_ENTRIES: UiEntrySource[] = [
         summary: 'One day of a record: the day as a small coral heading over its rows.',
         module: '/components/DayGroup.js', sheet: '/css/components/day-group.css',
         data: { shape: 'DayGroup({ title, children }) · DayList({ children }) · DayEmpty({ children })', fields: { title: 'the day', children: 'TimelineRows; DayEmpty says a record has nothing' } },
-        use: ['A long record, grouped by day.'],
-        variants: [],
+        use: ['A long record, grouped by day.', 'The heading alone (.poster-day-title) over any list: the chat\'s side column, and quiet over its work log.'],
+        variants: [{ name: 'quiet', class: 'poster-day-title--quiet', prop: 'class', when: 'a heading over a record rather than over the page\'s structure (the chat\'s work log)' }],
         example: { title: 'Today', children: 'TimelineRow × n' },
     },
     {

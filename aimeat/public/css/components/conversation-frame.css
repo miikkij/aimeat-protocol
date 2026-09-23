@@ -48,12 +48,8 @@
 /* The way back out of the list. Only a phone needs it: on a desktop the list and the conversation
    are both on screen, so there is nothing to go back from. */
 .poster-conversation-rail-close { display: none; }
-.poster-conversation-label {
-  margin: 22px 0 0;
-  font-size: 0.64rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase;
-  color: var(--accent);
-  padding-bottom: 5px; border-bottom: 2px solid var(--text);
-}
+/* The heading's look is the day heading's (.poster-day-title); this keeps only its place in the rail. */
+.poster-conversation-label { margin: 22px 0 0; }
 .poster-conversation-empty {
   color: var(--text-dim);
   font-size: 0.85rem;

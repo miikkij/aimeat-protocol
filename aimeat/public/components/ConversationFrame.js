@@ -37,7 +37,7 @@ export function ConversationFrame({ list = false, signin = false, children }) {
 export function ConversationAbout({ label, name, children }) {
     return html`
                 <div class="poster-conversation-about">
-                    <h2 class="poster-conversation-label">${label}</h2>
+                    <h2 class="poster-day-title poster-conversation-label">${label}</h2>
                     <p class="poster-conversation-name">${name}</p>
                     ${children}
                 </div>`;
