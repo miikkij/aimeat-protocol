@@ -172,13 +172,16 @@ dimensions. It does not re-declare the shape's font, rule, fill, padding or shad
 | Section and B1 headline | `.poster-section`, `.poster-section-title` |
 | Area governed by the selected tab | `.poster-panel` |
 | Hairline row; row that is the thing | `.poster-row`; `.poster-row--thing` |
-| Small coral label | `.poster-label` |
+| Small coral label | `.poster-label` (also the prompt card's label; Jouni's decision "Row label") |
 | Underlined action | `.poster-action` |
 | Tab and selected tab | `.poster-tab`, `.poster-tab.is-on` |
-| Loud action and the home's large door | `.poster-slab`, `.poster-slab--large` |
+| Loud action and the home's large door | `.poster-slab`, `.poster-slab--large`; composed over `.btn-primary` for the one big button on the home and the chat (Jouni's decision "Loud action") |
 | Box; frame; opened record | `.poster-box`; `.poster-frame`; `.poster-record` (the dialog is the site's own Modal; `.poster-dialog` was deleted on 2026-09-23) |
 | Dashed coral aside | `.poster-aside` |
 | Mono chip; crumb | `.poster-chip` (a candidate in the design lab's chip decision; not in use until Jouni decides); `.poster-crumb` |
+| Small number: waiting (on coral), tally (no ground), small (on an icon) | `.poster-count`, `--waiting`, `--tally`, `--small` (Jouni's decision "Count"; the bell and the open items use it; the morsel badge stays its own) |
+| When a thing happened | `.poster-time` (Jouni's decision "Timestamp"; the chat's message time and the home timeline) |
+| Heading over a list; quiet over a record | `.poster-day-title`, `.poster-day-title--quiet` (Jouni's decision "Group heading"; the history, the chat's side column, the chat's work log) |
 | Numeral row and its number | `.poster-stat`, `.poster-stat-number` |
 | Showroom ink band and sun band | `.showroom-band`, `.showroom-band--sun` |
 | Showroom section and coral shadow | `.showroom-section`, `.showroom-section--coral` |
