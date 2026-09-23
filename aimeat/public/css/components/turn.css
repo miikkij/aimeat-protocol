@@ -65,8 +65,7 @@
 }
 .poster-turn--agent .poster-turn-meta { padding-left: 24px; }
 .poster-turn-model { font-family: var(--font-mono); }
-.poster-turn-copy { padding: 0 4px; background: none; border: 0; box-shadow: none; color: var(--text-dim); cursor: pointer; }
-.poster-turn-copy:hover { color: var(--text); }
+/* Copy and Listen are the text tone of the action link (poster.css .poster-action--text). */
 /* ── A turn that could not run ── */
 .poster-turn-error {
   align-self: stretch;
@@ -101,8 +100,6 @@
 .poster-turn-file:hover { color: var(--accent); }
 /* The read-aloud control sits with the timestamp rather than on the bubble: it is about the turn,
    not part of what was said. */
-.poster-turn-listen { font-size: 0.7rem; padding: 0 6px; background: none; border: 0; box-shadow: none; color: var(--text-dim); cursor: pointer; }
-.poster-turn-listen:hover { color: var(--text); }
 @media (max-width: 760px) {
 
   .poster-turn { max-width: 92%; }
