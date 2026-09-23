@@ -21,6 +21,8 @@
  *   - PackageTable (03) — the rows, and the footer that says how many there are
  * @usage Imported by views/admin/knowledge-tab.js.
  * @version-history
+ *   v2.0.0 -- 2026-09-22 -- Composed from the shared component set: the toolbar with the questions as
+ *     filters, applied filters as tabs that remove themselves, the shared table, pages as tabs.
  *   v1.1.0 — 2026-09-13 — Compose existing section headings from shared poster B1.
  *   v1.0.0 — 2026-09-12 — Initial (the Knowledge page in the poster face).
  */
@@ -29,12 +31,9 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { num, when, Badge } from './shared.js';
+import { Section, Stack, Table, Toolbar, Chip, Action, Text } from '/components/poster-parts.js';
 
 const S = (key, params) => t('admin.knowledge.' + key, params);
-
-/** A stroke icon on a 24px grid. Never an emoji: it scales and recolours. */
-const SEARCH_ICON = html`
-  <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M20 20l-4.3-4.3" /></svg>`;
 
 /** The word a maturity gets: ours translated, anything else printed as it came, and marked. */
 function maturityLabel(pkg) {
@@ -67,37 +66,27 @@ export function Filters({ q, onQ, filters, onFilter, onClear, facets, summary })
   const applied = Object.entries(filters).filter(([, v]) => v !== undefined && v !== false);
   const clean = applied.length === 0;
 
-  return html`
-    <div class="adm-kn-filters">
-      <span class="adm-kn-search">
-        ${SEARCH_ICON}
-        <input type="search" value=${q} placeholder=${S('list.searchPlaceholder')}
-          onInput=${e => onQ(e.target.value)} />
-      </span>
-      <div class="adm-kn-chips">
-        <button type="button" class="adm-kn-fchip ${clean ? 'on' : ''}"
-          onClick=${onClear}>${S('list.all', { n: num(summary.total) })}</button>
-        <button type="button" class="adm-kn-fchip ${filters.flagged ? 'on' : ''}"
-          onClick=${() => onFilter({ flagged: !filters.flagged })}>${S('list.flagged', { n: num(summary.flagged) })}</button>
-        ${kinds.map(k => html`
-          <button type="button" class="adm-kn-fchip ${filters.content_type === k.name ? 'on' : ''}"
-            onClick=${() => onFilter({ content_type: filters.content_type === k.name ? undefined : k.name })}>
-            ${t('knowledge.contentType.' + k.name) === 'knowledge.contentType.' + k.name ? k.name : t('knowledge.contentType.' + k.name)}
-            ${' '}${k.packages}
-          </button>`)}
-      </div>
+  return html`<${Stack}>
+    <${Toolbar}
+      search=${{ ariaLabel: S('list.searchPlaceholder'), placeholder: S('list.searchPlaceholder'), value: q, onInput: e => onQ(e.target.value) }}
+      filters=${[
+        { id: 'all', label: S('list.all', { n: num(summary.total) }), selected: clean, onClick: onClear },
+        { id: 'flagged', label: S('list.flagged', { n: num(summary.flagged) }), selected: !!filters.flagged, onClick: () => onFilter({ flagged: !filters.flagged }) },
+        ...kinds.map(k => ({
+          id: 'kind-' + k.name,
+          label: `${t('knowledge.contentType.' + k.name) === 'knowledge.contentType.' + k.name ? k.name : t('knowledge.contentType.' + k.name)} ${k.packages}`,
+          selected: filters.content_type === k.name,
+          onClick: () => onFilter({ content_type: filters.content_type === k.name ? undefined : k.name }),
+        })),
+      ]} />
 
-      ${clean ? null : html`
-        <div class="adm-kn-applied">
-          <span class="adm-kn-applied-l">${S('list.narrowedBy')}</span>
-          ${applied.map(([key, value]) => html`
-            <button type="button" class="adm-kn-drop" onClick=${() => onFilter({ [key]: undefined })}>
-              <span>${filterLabel(key, value)}</span>
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
-            </button>`)}
-          <button type="button" class="og-door og-door--up" onClick=${onClear}>${S('list.clearAll')}</button>
-        </div>`}
-    </div>`;
+    ${clean ? null : html`<${Stack} direction="wrap" align="center" density="compact">
+      <${Text} kind="label">${S('list.narrowedBy')}<//>
+      ${applied.map(([key, value]) => html`<${Action} key=${key} kind="tab" selected=${true}
+        label=${filterLabel(key, value)} onClick=${() => onFilter({ [key]: undefined })}>${filterLabel(key, value)} ✗<//>`)}
+      <${Action} kind="text" onClick=${onClear}>${S('list.clearAll')}<//>
+    <//>`}
+  <//>`;
 }
 
 export function PackageTable({ data, q, onQ, filters, onFilter, onClear, onPage, onOpen }) {
@@ -105,94 +94,61 @@ export function PackageTable({ data, q, onQ, filters, onFilter, onClear, onPage,
   const list = data.packages;
   const first = (paging.number - 1) * paging.per_page + 1;
   const last = Math.min(paging.total, paging.number * paging.per_page);
+  const kindOf = (p) => (t('knowledge.contentType.' + p.content_type) === 'knowledge.contentType.' + p.content_type
+    ? p.content_type : t('knowledge.contentType.' + p.content_type));
+  const seenOf = (p) => (t('knowledge.visibility.' + p.visibility) === 'knowledge.visibility.' + p.visibility
+    ? p.visibility : t('knowledge.visibility.' + p.visibility));
 
-  return html`
-    <section class="og-sec" id="adm-kn-03">
-      <div class="og-sec-h">
-        <h2 class="poster-section-title">${S('list.title')}<small>03</small></h2>
-      </div>
-
+  return html`<${Section} id="adm-kn-03" title=${S('list.title')} count="03">
+    <${Stack}>
       <${Filters} q=${q} onQ=${onQ} filters=${filters} onFilter=${onFilter} onClear=${onClear}
         facets=${data.facets} summary=${data.summary} />
 
       ${list.length === 0 ? html`
-        <div class="adm-kn-empty">${S('list.none')}</div>
-        <div class="adm-kn-foot">
-          <span class="adm-kn-count">${S('list.showingNone', { total: num(data.summary.total) })}</span>
-        </div>` : html`
-        <div class="adm-kn-scroll">
-          <table class="adm-kn-tbl">
-            <thead>
-              <tr>
-                <th>${S('list.name')}</th>
-                <th>${S('list.author')}</th>
-                <th>${S('list.kind')}</th>
-                <th class="num">${S('list.entries')}</th>
-                <th>${S('list.seenBy')}</th>
-                <th>${S('list.reviewed')}</th>
-                <th>${S('list.added')}</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              ${list.map(p => html`
-                <tr class=${p.flag_count > 0 ? 'adm-kn-row--flagged' : ''}>
-                  <td>
-                    <b>${p.name}</b>
-                    ${p.flag_count > 0
-    ? html`<span class="adm-kn-flags"><${Badge} type="danger"
-        label=${S('list.flagsN', { n: num(p.flag_count) })} /></span>`
-    : null}
-                    ${(p.tags || []).length ? html`
-                      <span class="adm-kn-tags">
-                        ${p.tags.slice(0, 3).map(tag => html`<span class="adm-kn-tag">${tag}</span>`)}
-                      </span>` : null}
-                  </td>
-                  <td class="mono">${p.author || '—'}</td>
-                  <td>
-                    ${t('knowledge.contentType.' + p.content_type) === 'knowledge.contentType.' + p.content_type
-    ? p.content_type : t('knowledge.contentType.' + p.content_type)}
-                    ${p.is_system ? html`<span class="adm-kn-sys">${S('list.system')}</span>` : null}
-                    <span class="adm-kn-mat ${p.maturity_declared ? '' : 'adm-kn-mat--odd'}">
-                      ${maturityLabel(p)}
-                    </span>
-                  </td>
-                  <td class="num">${num(p.entries_count)}</td>
-                  <td>${t('knowledge.visibility.' + p.visibility) === 'knowledge.visibility.' + p.visibility
-    ? p.visibility : t('knowledge.visibility.' + p.visibility)}</td>
-                  <td>
-                    ${p.last_review
-    ? html`<${Badge} type=${p.last_review.action === 'approve' ? 'success' : 'warning'}
-        label=${S('review.action.' + p.last_review.action)} />
-      <span class="adm-kn-when">${when(p.last_review.at)}</span>`
-    : html`<span class="adm-kn-when">${S('list.notReviewed')}</span>`}
-                  </td>
-                  <td class="mono">${String(p.created || '').slice(0, 10)}</td>
-                  <td class="acts">
-                    <button type="button" class="og-door og-door--up" onClick=${() => onOpen(p)}>${S('list.open')}</button>
-                  </td>
-                </tr>`)}
-            </tbody>
-          </table>
-        </div>
+        <${Text} tone="muted">${S('list.none')}<//>
+        <${Text} kind="mono" tone="muted">${S('list.showingNone', { total: num(data.summary.total) })}<//>` : html`
+        <${Table} collapse=${900} label=${S('list.title')}
+          headers=${[S('list.name'), S('list.author'), S('list.kind'), S('list.entries'), S('list.seenBy'), S('list.reviewed'), S('list.added'), '']}
+          rows=${list.map(p => [
+            html`<${Stack} density="compact">
+              <${Stack} direction="wrap" align="center" density="compact">
+                <strong>${p.name}</strong>
+                ${p.flag_count > 0 ? html`<${Badge} type="danger" label=${S('list.flagsN', { n: num(p.flag_count) })} />` : null}
+              <//>
+              ${(p.tags || []).length ? html`<${Stack} direction="wrap" density="compact">
+                ${p.tags.slice(0, 3).map(tag => html`<${Chip} key=${tag} tone="muted">${tag}<//>`)}
+              <//>` : null}
+            <//>`,
+            { text: p.author || '—', mono: true },
+            html`<${Stack} direction="wrap" align="center" density="compact">
+              <span>${kindOf(p)}</span>
+              ${p.is_system ? html`<${Chip}>${S('list.system')}<//>` : null}
+              <${Chip} tone=${p.maturity_declared ? 'muted' : 'coral'}>${maturityLabel(p)}<//>
+            <//>`,
+            { text: num(p.entries_count), align: 'end' },
+            seenOf(p),
+            p.last_review
+              ? html`<${Stack} density="compact"><${Badge} type=${p.last_review.action === 'approve' ? 'success' : 'warning'}
+                  label=${S('review.action.' + p.last_review.action)} /><${Text} kind="mono" tone="muted">${when(p.last_review.at)}<//><//>`
+              : html`<${Text} kind="caption" tone="muted">${S('list.notReviewed')}<//>`,
+            { text: String(p.created || '').slice(0, 10), mono: true },
+            html`<${Action} onClick=${() => onOpen(p)}>${S('list.open')}<//>`,
+          ])} />
 
-        <div class="adm-kn-foot">
-          <span class="adm-kn-count">
+        <${Stack} direction="wrap" align="between">
+          <${Text} kind="mono" tone="muted">
             ${S('list.showing', { first: num(first), last: num(last), total: num(paging.total) })}
             ${paging.total !== data.summary.total
-    ? ' · ' + S('list.filteredFrom', { n: num(data.summary.total) })
-    : ''}
-            ${' · '}${S('list.sorted')}
-          </span>
-          ${paging.pages > 1 ? html`
-            <span class="adm-kn-pages">
-              ${Array.from({ length: paging.pages }, (_, i) => i + 1).slice(0, 8).map(n => html`
-                <button type="button" class="adm-kn-fchip ${n === paging.number ? 'on' : ''}"
-                  onClick=${() => onPage(n)}>${n}</button>`)}
-              ${paging.number < paging.pages ? html`
-                <button type="button" class="og-door og-door--up adm-kn-next"
-                  onClick=${() => onPage(paging.number + 1)}>${S('list.next')}</button>` : null}
-            </span>` : null}
-        </div>`}
-    </section>`;
+              ? ' · ' + S('list.filteredFrom', { n: num(data.summary.total) })
+              : ''}
+            ${' · '}${S('list.sorted')}<//>
+          ${paging.pages > 1 ? html`<${Stack} direction="wrap" align="center" density="compact">
+            ${Array.from({ length: paging.pages }, (_, i) => i + 1).slice(0, 8).map(n => html`
+              <${Action} key=${n} kind="tab" selected=${n === paging.number} onClick=${() => onPage(n)}>${n}<//>`)}
+            ${paging.number < paging.pages ? html`
+              <${Action} onClick=${() => onPage(paging.number + 1)}>${S('list.next')}<//>` : null}
+          <//>` : null}
+        <//>`}
+    <//>
+  <//>`;
 }

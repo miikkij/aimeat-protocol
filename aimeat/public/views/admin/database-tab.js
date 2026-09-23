@@ -10,9 +10,12 @@
  * @structure
  *   - snapshotAt(snaps, hoursAgo) -- newest snapshot at or before now-hoursAgo (baseline for a delta)
  *   - signed(n)                   -- +N / -N / 0 as text
- *   - Line({ points, onPick })    -- the seven-day line with a reading under the cursor
+ *   - Line({ series })            -- the seven-day line, the shared chart; its tooltip reads a point
  *   - DatabaseTab (default)       -- the two sections, and the wait state before the second snapshot
  * @version-history
+ *   v2.2.0 -- 2026-09-22 -- Composed from the shared component set: sections, a numeral band, the
+ *     toolbar for the search and the three orders, the tables as a shared table with a progress
+ *     meter, and the line drawn by the shared chart; the page's own sheet is gone.
  *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   v2.1.0 -- 2026-09-13 -- Compose shared B1 headings; table ratios use SVG width data.
  *   v2.0.0 -- 2026-09-12 -- The poster face. The cards become two sections; the 168 hourly
@@ -35,8 +38,9 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'preact/hooks'
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { useViewCSS } from '/components/useViewCSS.js';
 import { num, dt, Spinner, Empty, useToast, Toast } from './shared.js';
+import { Section, Columns, Stack, Text, Action, NumeralBand, Toolbar, Table, Meter, Surface } from '/components/poster-parts.js';
+import { UsageChart, colorForIndex } from '/components/UsageChart.js';
 import * as api from '/js/services/admin.js';
 
 const D = (key, params) => t('admin.database.' + key, params);
@@ -54,55 +58,31 @@ function signed(n) {
   return (n > 0 ? '+' : '') + num(n);
 }
 
-const W = 720, H = 160;
-
 /**
- * The row count over the snapshots the page holds: one series, one hue, one recessive midline.
- * The cursor reads the point nearest to it; the newest point is marked, because "where we are now"
- * is the one value a person looks for first.
+ * The row count over the snapshots the page holds: one series, drawn by the shared chart. Its
+ * tooltip reads the point under the cursor (the time and the count), which the hand-drawn line
+ * showed in a box of its own.
  */
-function Line({ series, at, onPick }) {
-  const lo = Math.min(...series.map(p => p.v));
-  const hi = Math.max(...series.map(p => p.v));
-  const span = Math.max(1, hi - lo);
-  // The newest point carries a 3px tick, so the series stops two units short of the right edge
-  // and the tick is not sliced in half by the viewBox.
-  const x = i => (series.length < 2 ? W - 2 : (i / (series.length - 1)) * (W - 2));
-  const y = v => H - 12 - ((v - lo) / span) * (H - 24);
-  const points = series.map((p, i) => `${x(i).toFixed(1)},${y(p.v).toFixed(1)}`).join(' ');
-  const pick = (e) => {
-    const box = e.currentTarget.getBoundingClientRect();
-    const rel = (e.clientX - box.left) / Math.max(1, box.width);
-    onPick(Math.min(series.length - 1, Math.max(0, Math.round(rel * (series.length - 1)))));
-  };
-  const cur = at != null ? series[at] : null;
-  return html`
-    <div class="adm-db-chart">
-      <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label=${D('chartLabel')}>
-        <line class="adm-db-mid" x1="0" y1=${H / 2} x2=${W} y2=${H / 2} vector-effect="non-scaling-stroke" />
-        <text class="adm-db-midlabel" x="4" y=${H / 2 - 5}>${num(Math.round(lo + span / 2))}</text>
-        <polyline class="adm-db-line" points=${points} vector-effect="non-scaling-stroke" />
-        ${cur ? html`<line class="adm-db-cursor" x1=${x(at)} y1="0" x2=${x(at)} y2=${H} vector-effect="non-scaling-stroke" />` : null}
-        ${/* The box scales to its column, so a circle would draw as an ellipse: the newest point
-              is a tick whose stroke does not scale. */ ''}
-        <line class="adm-db-dot" x1=${x(series.length - 1)} y1=${y(series[series.length - 1].v) - 7}
-          x2=${x(series.length - 1)} y2=${y(series[series.length - 1].v) + 7} vector-effect="non-scaling-stroke" />
-        <rect class="adm-db-hit" x="0" y="0" width=${W} height=${H}
-          onMouseMove=${pick} onMouseLeave=${() => onPick(null)} />
-      </svg>
-      ${cur ? html`<span class="adm-db-read">${dt(cur.at)} · ${num(cur.v)}</span>` : null}
-    </div>`;
+function Line({ series }) {
+  const datasets = [{
+    label: D('chartLabel'),
+    data: series.map(p => p.v),
+    borderColor: colorForIndex(0),
+    backgroundColor: colorForIndex(0),
+    pointRadius: 0,
+    borderWidth: 2,
+  }];
+  return html`<${UsageChart} type="line" labels=${series.map(p => dt(p.at))} datasets=${datasets}
+    height=${160} legend=${false} yFormat=${(v) => num(Math.round(v))} />`;
 }
 
 export default function DatabaseTab() {
-  useViewCSS('/css/views/admin-database.css');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [capturing, setCapturing] = useState(false);
   const [toast, showErr, showOk, clearToast] = useToast();
   const [find, setFind] = useState('');
   const [order, setOrder] = useState('biggest');
-  const [at, setAt] = useState(null);
 
   // This ref kept `load` stable before useToast memoized its callbacks. Previously every
   // completed fetch rebuilt `load` and re-ran the effect, measured at about 25 requests/s.
@@ -189,112 +169,94 @@ export default function DatabaseTab() {
   };
   const stillCount = rows.filter(r => !r.delta).length;
 
-  const cell = (value, label, sub, dim) => html`
-    <div class=${dim ? 'adm-db-strip-dim' : ''}><b>${value}</b><span>${label}</span><small>${sub}</small></div>`;
-  const chip = (id, label) => html`
-    <button type="button" class="adm-db-chip ${order === id ? 'on' : ''}" onClick=${() => setOrder(id)}>${label}</button>`;
+  const cell = (value, label, sub) => ({ label, value, note: sub });
 
   return html`
-    <div class="og adm-db">
+    <div>
       ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
 
-      <section class="og-sec og-sec--first">
-        <div class="og-sec-h"><h2 class="poster-section-title">${D('sizeTitle')}<small>01</small></h2>
-          <div class="og-doors">
-            <button type="button" class="og-door" onClick=${capture} disabled=${capturing}>
-              ${capturing ? D('capturing') : D('captureNow')}
-            </button>
-          </div></div>
-
-        <div class="adm-db-top">
-          <div>
-            <div class="adm-db-lbl">${D('heroLabel')}</div>
-            <div class="adm-db-hero poster-stat-number poster-stat-number--large">${num(current.totalRows)}</div>
+      <${Section} title=${D('sizeTitle')} count="01"
+        actions=${html`<${Action} onClick=${capture} disabled=${capturing}>${capturing ? D('capturing') : D('captureNow')}<//>`}>
+        <${Columns} layout="trailing" collapse=${900} density="roomy">
+          <${Stack} density="compact">
+            <${Text} kind="label">${D('heroLabel')}<//>
+            <${Text} kind="number" size="large">${num(current.totalRows)}<//>
             ${/* The two memory numbers count rows INSIDE the Memory table, so they say so: printed
                   bare under "rows, all tables" they read as counts of the whole database. */ ''}
-            <p class="adm-db-hero-sub">
-              <b>${num(current.tableCount)}</b> ${D('tables')}<br />
-              ${current.memoryVersionRows !== undefined && current.memoryArchivedRows !== undefined
-    ? D('memoryComposition', { v: num(current.memoryVersionRows), a: num(current.memoryArchivedRows) })
+            <${Text} kind="mono" tone="muted">${num(current.tableCount)} ${D('tables')}<//>
+            ${current.memoryVersionRows !== undefined && current.memoryArchivedRows !== undefined
+    ? html`<${Text} kind="mono" tone="muted">${D('memoryComposition', { v: num(current.memoryVersionRows), a: num(current.memoryArchivedRows) })}<//>`
     : null}
-            </p>
-          </div>
+          <//>
 
           ${series.length > 1 ? html`
-            <div>
-              <div class="adm-db-chart-h">
-                <span class="adm-db-lbl">${D('chartLabel')}</span>
-                <small>${D('chartRange', { n: num(snapshots.length) })}</small>
-              </div>
-              <${Line} series=${series} at=${at} onPick=${setAt} />
-              <div class="adm-db-x">
-                <span>${num(series[0].v)} · ${dt(series[0].at)}</span>
-                <span>${num(current.totalRows)} · ${D('chartNow')}</span>
-              </div>
-            </div>
+            <${Stack} density="compact">
+              <${Stack} direction="wrap" align="between">
+                <${Text} kind="label">${D('chartLabel')}<//>
+                <${Text} kind="mono" tone="muted">${D('chartRange', { n: num(snapshots.length) })}<//>
+              <//>
+              <${Line} series=${series} />
+              <${Stack} direction="wrap" align="between">
+                <${Text} kind="mono" tone="muted">${num(series[0].v)} · ${dt(series[0].at)}<//>
+                <${Text} kind="mono" tone="muted">${num(current.totalRows)} · ${D('chartNow')}<//>
+              <//>
+            <//>
           ` : html`
-            <div class="adm-db-wait">
-              <h3>${D('waitTitle')}</h3>
-              <p>${D('waitBody')}</p>
-              <button class="adm-btn" onClick=${capture} disabled=${capturing}>
-                ${capturing ? D('capturing') : D('captureNow')}
-              </button>
-              <small>${D('waitHourly')}</small>
-            </div>
+            <${Surface} kind="box" density="roomy">
+              <${Stack}>
+                <${Text} kind="heading" size="small">${D('waitTitle')}<//>
+                <${Text}>${D('waitBody')}<//>
+                <${Stack} direction="wrap" align="center">
+                  <${Action} onClick=${capture} disabled=${capturing}>
+                    ${capturing ? D('capturing') : D('captureNow')}
+                  <//>
+                <//>
+                <${Text} kind="mono" tone="muted">${D('waitHourly')}<//>
+              <//>
+            <//>
           `}
-        </div>
+        <//>
 
-        <div class="og-strip">
-          ${cell(signed(totalDelta(base1h)), D('lastHour'), base1h ? D('subHour') : D('noBaseline'), !base1h)}
-          ${cell(signed(totalDelta(base24h)), D('lastDay'), base24h ? D('subDay') : D('noBaseline'), !base24h)}
-          ${cell(signed(week),
-    weekBase ? D('lastWeek') : D('sinceFirst'),
-    weekPct !== null ? D('subWeek', { pct: weekPct })
-      : base7d ? D('subSinceFirst', { when: dt(base7d.capturedAt) }) : D('noBaseline'),
-    week === null)}
-          ${/* The count is what this page ASKED for (a week of hourly readings), not what the
-                store holds: the job keeps thirty days. The label says which. */ ''}
-          ${cell(num(snapshots.length), D('snapshots'), D('subSnapshots'))}
-        </div>
-      </section>
+        ${/* The snapshot count is what this page ASKED for (a week of hourly readings), not what the
+              store holds: the job keeps thirty days. The label says which. */ ''}
+        <${NumeralBand} tone="plain" size="small" items=${[
+    cell(signed(totalDelta(base1h)), D('lastHour'), base1h ? D('subHour') : D('noBaseline')),
+    cell(signed(totalDelta(base24h)), D('lastDay'), base24h ? D('subDay') : D('noBaseline')),
+    cell(signed(week),
+      weekBase ? D('lastWeek') : D('sinceFirst'),
+      weekPct !== null ? D('subWeek', { pct: weekPct })
+        : base7d ? D('subSinceFirst', { when: dt(base7d.capturedAt) }) : D('noBaseline')),
+    cell(num(snapshots.length), D('snapshots'), D('subSnapshots')),
+  ]} />
+      <//>
 
-      <section class="og-sec">
-        <div class="og-sec-h"><h2 class="poster-section-title">${D('whereTitle')}<small>02</small></h2></div>
-        <p class="adm-db-lead">${byGrowth ? D('leadGrowth') : D('leadSize')}</p>
+      <${Section} title=${D('whereTitle')} count="02" description=${byGrowth ? D('leadGrowth') : D('leadSize')}>
+        <${Toolbar} label=${D('whereTitle')}
+          search=${{ ariaLabel: D('findPlaceholder'), placeholder: D('findPlaceholder'), value: find, onInput: e => setFind(e.target.value) }}
+          filters=${[
+    { id: 'biggest', label: D('orderBiggest'), selected: order === 'biggest', onClick: () => setOrder('biggest') },
+    { id: 'growth', label: D('orderGrowth'), selected: order === 'growth', onClick: () => setOrder('growth') },
+    { id: 'az', label: D('orderAz'), selected: order === 'az', onClick: () => setOrder('az') },
+  ]} />
 
-        <div class="adm-db-tools">
-          <div class="adm-db-find">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"></circle><path d="M16 16 L21 21"></path></svg>
-            <input type="text" value=${find} onInput=${e => setFind(e.target.value)} placeholder=${D('findPlaceholder')} />
-          </div>
-          <div class="adm-db-chips">
-            ${chip('biggest', D('orderBiggest'))}
-            ${chip('growth', D('orderGrowth'))}
-            ${chip('az', D('orderAz'))}
-          </div>
-        </div>
+        ${/* A table that scrolls on a phone rather than stacking: stacked, each of 150 tables took
+              five lines. */ ''}
+        <${Table} density="compact" label=${D('whereTitle')}
+          headers=${[D('table'), D('rows'), D('colDay'), D('colShare'), '']}
+          rows=${rows.map(r => [
+    { text: r.table, mono: true },
+    { text: num(r.n), align: 'end' },
+    { text: signed(r.delta), align: 'end' },
+    { text: shareOf(r), align: 'end' },
+    html`<${Meter} kind="progress" value=${barOf(r)} max=${100} label=${shareOf(r)} />`,
+  ])} />
 
-        <div class="adm-db-rows">
-          <div class="adm-db-hrow">
-            <span>${D('table')}</span><span class="r">${D('rows')}</span>
-            <span class="r">${D('colDay')}</span><span class="r">${D('colShare')}</span><span></span>
-          </div>
-          ${rows.map(r => html`
-            <div class="adm-db-row" key=${r.table}>
-              <span class="adm-db-name">${r.table}</span>
-              <span class="adm-db-n r">${num(r.n)}</span>
-              <span class="adm-db-d r">${signed(r.delta)}</span>
-              <span class="adm-db-pct r">${shareOf(r)}</span>
-              <span class="adm-db-share"><svg width=${barOf(r).toFixed(1) + '%'} aria-hidden="true"></svg></span>
-            </div>`)}
-        </div>
-
-        <div class="adm-db-foot">
-          <span>${D('shown', { n: num(rows.length), total: num(current.tableCount) })}${
-  byGrowth && stillCount > 0 ? ' ' + D('stillCount', { n: num(stillCount) }) : ''}</span>
-          <span class="adm-db-note">${byGrowth ? D('noteGrowth') : D('noteSize')}</span>
-        </div>
-      </section>
+        <${Stack} direction="wrap" align="between">
+          <${Text} kind="caption" tone="muted">${D('shown', { n: num(rows.length), total: num(current.tableCount) })}${
+  byGrowth && stillCount > 0 ? ' ' + D('stillCount', { n: num(stillCount) }) : ''}<//>
+          <${Text} kind="mono" tone="muted">${byGrowth ? D('noteGrowth') : D('noteSize')}<//>
+        <//>
+      <//>
     </div>
   `;
 }

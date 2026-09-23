@@ -5,9 +5,18 @@
     creating, publishing, and managing the owner's server apps. Creating an app publishes it to the
     server (unlisted); nothing is stored in the browser. Runs published app HTML only inside a
     sandboxed, opaque-origin iframe — never as a top-level document on the apex origin (H-2).
+    The page is composed from the site's one component set: this static markup writes the classes
+    public/components/poster-parts.js emits (Page, Masthead, Rail kind="navigation", NumeralBand,
+    Toolbar, Section, Field, Action, Surface, Text, Steps), and js/parts-html.js emits the same for
+    everything the scripts draw. A part changed at its one home reaches the catalog on the next build.
   @structure Inline <style>__APP_CATALOG_STYLES__</style>
 </head>
 <body data-active-view="library">
+
+  <!-- @version-history (of this template; the head above is shared with styles/app-catalog.css)
+    2026-09-22 — The frame, masthead, menu, band, search and order bar, lists, foot and the inner
+      content of every dialog here are the shared parts instead of the catalog's own copies; the
+      phone gets the set's menu dialog; the emoji in the interface text leave. -->
 
   <!-- The site bar, as on every page of the house: the node's name, the three doors, the
        language, the theme, the shared login pill. The catalog's own controls sit in the masthead. -->
@@ -25,317 +34,381 @@
         <button class="lang-btn" data-lang="en" onclick="window._launcher.setLanguage('en')">EN</button>
         <button class="lang-btn" data-lang="fi" onclick="window._launcher.setLanguage('fi')">FI</button>
       </div>
-      <button class="icon-btn" id="theme-btn" onclick="window._launcher.toggleTheme()" data-i18n-title="action.theme" title="Toggle theme">&#x1F319;</button>
+      <!-- settings.js draws the moon or the sun into it (updateThemeToggle). -->
+      <button type="button" class="poster-icon-action" data-tone="plain" aria-pressed="false" id="theme-btn" onclick="window._launcher.toggleTheme()" data-i18n-title="action.theme" title="Toggle theme"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg></button>
       <span id="headerAuth" class="header-auth-pill"></span>
     </div>
   </header>
 
-  <!-- Three views: your apps, the community, your favourites. Sections carry data-view and
-       body[data-active-view] hides the other two via CSS. The rail on the left holds the view
-       switch, the state filter (library only), the tags with their counts, and the one-paragraph
-       explanation of how listing works. -->
-  <div class="cat-body">
-  <aside class="cat-rail" id="cat-rail">
-    <a class="cat-rail-home" href="/v1/home">← <span data-i18n="rail.home">Home</span></a>
-    <div class="cat-rail-id"><div class="cat-rail-avatar">&#x1F4DA;</div><div class="cat-rail-idname" data-i18n="header.title">My Apps</div></div>
-    <nav id="view-tabs" class="cat-rail-group" role="tablist">
-      <button type="button" id="view-tab-library" class="cat-rail-item active" role="tab" onclick="window._launcher.switchView('library')"><span data-i18n="view.library">Your apps</span><span class="cat-rail-count" id="rail-count-library"></span></button>
-      <button type="button" id="view-tab-community" class="cat-rail-item" role="tab" onclick="window._launcher.switchView('community')"><span data-i18n="view.community">Community</span><span class="cat-rail-count" id="rail-count-community"></span></button>
-      <button type="button" id="view-tab-favorites" class="cat-rail-item" role="tab" onclick="window._launcher.switchView('favorites')"><span data-i18n="view.favorites">Favourites</span><span class="cat-rail-count" id="rail-count-favorites"></span></button>
-    </nav>
-    <nav id="state-bar" class="cat-rail-group" data-view="library"></nav>
-    <nav id="tag-bar" class="cat-rail-group"></nav>
-  </aside>
-  <div class="cat-main">
-
-  <!-- The masthead: the page's name, one mono line, the one loud control and the quiet words. -->
-  <div class="cat-masthead">
-    <div class="cat-masthead-main">
-      <h1 class="cat-title" data-i18n="header.title">My Apps</h1>
-      <div id="cat-mastline" class="cat-mastline"></div>
-    </div>
-    <div class="cat-masthead-actions">
-      <!-- The one loud control opens the generate-with-AI flow straight away: that is how an app
-           gets made here. Adding a finished file, and the portfolio page, are the quiet words. -->
-      <button type="button" class="cat-slab" id="generate-btn" data-i18n-title="action.generate" title="Generate with AI">+ <span data-i18n="action.createApp">Create an app</span></button>
-      <div class="cat-masthead-links cat-masthead-links--create">
-        <button type="button" class="cat-word" id="add-btn" data-i18n="action.haveApp">I have a finished app, add it</button>
-        <button type="button" class="cat-word" id="homepage-btn" data-i18n="action.portfolio">A portfolio page of your apps</button>
+  <!-- The page: the set's Page with a leading navigation rail. The masthead spans the top; the
+       rail holds the view switch, the state and condition filters and the tags, each row with its
+       count; below 900px the rail folds behind the Menu word into the set's menu dialog. Sections
+       carry data-view and body[data-active-view] hides the other two views. -->
+  <div class="poster-page" data-width="wide">
+    <header class="poster-masthead" data-size="normal">
+      <div class="poster-masthead-words">
+        <nav class="poster-crumbs" aria-label="Breadcrumb"><ol>
+          <li><a class="poster-text-action" data-tone="plain" href="/v1/home" data-i18n="rail.home">Home</a></li>
+          <li aria-current="page"><span data-i18n="header.title">My Apps</span></li>
+        </ol></nav>
+        <h1 class="poster-page-title" data-i18n="header.title">My Apps</h1>
+        <div class="poster-identity" id="cat-mastline"></div>
       </div>
-      <div class="cat-masthead-links">
-        <!-- Data menu: backups + imports -->
-        <div class="backup-menu-wrap">
-          <button type="button" class="cat-word" id="backup-btn" data-i18n="action.backups" data-i18n-title="backup.menu" title="Backup" onclick="window._launcher.toggleBackupMenu(event)">Backups and imports</button>
-          <div id="backup-menu" class="backup-menu" hidden>
-            <button onclick="window._launcher.exportBackupZip()" data-i18n="backup.exportAll">&#x1F4E6; Export all (.zip)</button>
-            <button onclick="window._launcher.importBackupPick()" data-i18n="backup.importFrom">&#x1F4E5; Import from backup...</button>
+      <div class="poster-masthead-actions">
+        <!-- The one loud control opens the generate-with-AI flow straight away: that is how an app
+             gets made here. Adding a finished file, and the portfolio page, are the quiet words. -->
+        <!-- Three rows at the right, so the title keeps its room: the slab, the two ways to add,
+             then backups, help and settings. -->
+        <div class="poster-stack" data-direction="vertical" data-align="end" data-density="normal">
+        <button type="button" class="poster-slab" data-tone="plain" id="generate-btn" data-i18n-title="action.generate" title="Generate with AI">+ <span data-i18n="action.createApp">Create an app</span></button>
+        <div class="poster-stack" data-direction="wrap" data-align="center" data-density="normal">
+        <button type="button" class="poster-action" data-tone="plain" id="add-btn" data-i18n="action.haveApp">I have a finished app, add it</button>
+        <button type="button" class="poster-action" data-tone="plain" id="homepage-btn" data-i18n="action.portfolio">A portfolio page of your apps</button>
+        </div>
+        <div class="poster-stack" data-direction="wrap" data-align="center" data-density="normal">
+        <!-- Data menu: backups + imports (the set's Menu, with a word as its trigger). -->
+        <div class="poster-menu">
+          <button type="button" class="poster-action" data-tone="plain" id="backup-btn" aria-haspopup="menu" aria-expanded="false" data-i18n="action.backups" data-i18n-title="backup.menu" title="Backup" onclick="window._launcher.toggleBackupMenu(event)">Backups and imports</button>
+          <div id="backup-menu" hidden>
+            <div class="poster-menu-pop" role="menu">
+              <button type="button" class="poster-menu-item" data-tone="plain" role="menuitem" onclick="window._launcher.exportBackupZip()" data-i18n="backup.exportAll">Export all (.zip)</button>
+              <button type="button" class="poster-menu-item" data-tone="plain" role="menuitem" onclick="window._launcher.importBackupPick()" data-i18n="backup.importFrom">Import from backup...</button>
+            </div>
           </div>
         </div>
         <input type="file" id="backup-file-input" accept=".zip,application/zip,application/x-zip-compressed" hidden />
-        <button type="button" class="cat-word" id="help-btn" onclick="window._launcher.openHelp()" data-i18n="action.help">Help</button>
-        <button type="button" class="cat-word" id="settings-btn" data-i18n="action.settings">Settings</button>
+        <button type="button" class="poster-action" data-tone="plain" id="help-btn" onclick="window._launcher.openHelp()" data-i18n="action.help">Help</button>
+        <button type="button" class="poster-action" data-tone="plain" id="settings-btn" data-i18n="action.settings">Settings</button>
+        </div>
+        </div>
+      </div>
+    </header>
+    <div class="poster-page-menu"><button type="button" class="poster-action" data-tone="plain" id="cat-menu-btn" aria-expanded="false" aria-controls="cat-menu-overlay" data-i18n="common.menu">Menu</button></div>
+    <div class="poster-page-body" data-rail="yes" data-rail-side="leading" data-navigation="yes">
+      <div class="poster-page-rail" id="cat-rail-home">
+        <nav class="poster-rail" data-kind="navigation" id="cat-rail" aria-label="My Apps">
+          <div class="poster-stack" data-direction="vertical" data-align="stretch" data-density="normal">
+            <div class="poster-stack" data-direction="vertical" data-align="stretch" data-density="compact" id="view-tabs" role="tablist">
+              <article class="poster-list-row" data-kind="normal" data-density="compact" data-selected="yes" data-detail="mono">
+                <div class="poster-list-name"><button type="button" class="poster-text-action" data-tone="plain" id="view-tab-library" role="tab" aria-selected="true" data-rail-pick onclick="window._launcher.switchView('library')"><span data-i18n="view.library">Your apps</span></button></div>
+                <div class="poster-list-value" id="rail-count-library"></div>
+              </article>
+              <article class="poster-list-row" data-kind="normal" data-density="compact" data-selected="no" data-detail="mono">
+                <div class="poster-list-name"><button type="button" class="poster-text-action" data-tone="plain" id="view-tab-community" role="tab" aria-selected="false" data-rail-pick onclick="window._launcher.switchView('community')"><span data-i18n="view.community">Community</span></button></div>
+                <div class="poster-list-value" id="rail-count-community"></div>
+              </article>
+              <article class="poster-list-row" data-kind="normal" data-density="compact" data-selected="no" data-detail="mono">
+                <div class="poster-list-name"><button type="button" class="poster-text-action" data-tone="plain" id="view-tab-favorites" role="tab" aria-selected="false" data-rail-pick onclick="window._launcher.switchView('favorites')"><span data-i18n="view.favorites">Favourites</span></button></div>
+                <div class="poster-list-value" id="rail-count-favorites"></div>
+              </article>
+            </div>
+            <div class="poster-stack" data-direction="vertical" data-align="stretch" data-density="compact" id="state-bar" data-view="library"></div>
+            <div class="poster-stack" data-direction="vertical" data-align="stretch" data-density="compact" id="tag-bar"></div>
+          </div>
+        </nav>
+      </div>
+      <div class="poster-page-main">
+
+        <!-- The band: the four numbers on the diagonal coral cut. Filled by renderApps. -->
+        <div id="cat-band" data-view="library" hidden>
+          <section class="poster-numeral-band" data-tone="coral" data-cut="diagonal" data-contained="yes"><dl>
+            <div><dt data-i18n="band.apps">Apps</dt><dd class="poster-stat-number" id="cat-band-apps">0</dd></div>
+            <div><dt data-i18n="band.listed">Listed</dt><dd class="poster-stat-number" id="cat-band-listed">0</dd></div>
+            <div><dt data-i18n="band.drafts">Draft waiting</dt><dd class="poster-stat-number" id="cat-band-drafts">0</dd></div>
+            <div><dt data-i18n="band.opens">Opens, all time</dt><dd class="poster-stat-number" id="cat-band-opens">0</dd></div>
+          </dl></section>
+        </div>
+
+        <!-- Search and order: the set's Toolbar, a field and tab words. -->
+        <div class="poster-toolbar" role="group">
+          <div class="poster-field" data-filled="no" data-kind="text">
+            <input type="text" id="search-input" placeholder="Search apps..." data-i18n-ph="search.ph" autocomplete="off" spellcheck="false"/>
+          </div>
+          <div class="poster-filters" id="cat-sort" role="group">
+            <span class="poster-copy poster-label" data-kind="label" data-tone="plain" data-i18n="sort.label">Order</span>
+            <button type="button" class="poster-tab is-on" data-tone="plain" aria-pressed="true" data-sort="newest" onclick="window._launcher.setSort('newest')" data-i18n="sort.newest">Newest</button>
+            <button type="button" class="poster-tab" data-tone="plain" aria-pressed="false" data-sort="opens" onclick="window._launcher.setSort('opens')" data-i18n="sort.opens">Most opened</button>
+            <button type="button" class="poster-tab" data-tone="plain" aria-pressed="false" data-sort="name" onclick="window._launcher.setSort('name')" data-i18n="sort.name">A → Z</button>
+          </div>
+        </div>
+
+        <!-- Active extensions: a fold, closed by default (declutters the library). cortex.js shows
+             the wrapper when the node has any and fills the grid. -->
+        <div id="cortex-bar" data-view="library" hidden>
+          <section class="poster-fold" data-open="no" id="cortex-bar-fold">
+            <div class="poster-fold-row">
+              <button type="button" class="poster-fold-toggle" aria-expanded="false" aria-controls="cortex-bar-body" id="cortex-bar-toggle" onclick="window._launcher.toggleCortexBar()">
+                <span class="poster-fold-title" data-i18n="cortex.active">Active Extensions</span>
+                <span class="poster-fold-sub" data-i18n="common.toggle">toggle</span>
+                <span class="poster-fold-arrow" id="cortex-bar-arrow" aria-hidden="true">→</span>
+              </button>
+            </div>
+            <div id="cortex-bar-body" hidden><div class="poster-fold-body"><div id="cortex-bar-grid"></div></div></div>
+          </section>
+        </div>
+
+        <!-- Community apps (other people's), a section of its own that folds. -->
+        <section class="poster-section poster-section-part" data-density="normal" data-size="normal" id="community-section" data-view="community" hidden>
+          <div class="poster-section-head">
+            <h2 class="poster-section-title"><span data-i18n="sec.community">Community apps</span><small id="community-count"></small></h2>
+            <div class="poster-actions"><button type="button" class="poster-text-action" data-tone="plain" id="community-arrow" aria-expanded="true" aria-controls="community-grid" onclick="window._launcher.toggleCommunity()">↓</button></div>
+          </div>
+          <div class="poster-section-body"><div id="community-grid"></div></div>
+        </section>
+
+        <!-- The wait, for the Community view. Without it the empty state below claims "no community apps
+             on this node yet" for the whole fetch, which is an answer rather than a wait. -->
+        <div id="community-loading" data-view="community" hidden>
+          <div class="poster-stack" data-direction="vertical" data-align="start" data-density="compact" role="status" aria-live="polite">
+            <p class="poster-copy poster-text" data-kind="lead" data-tone="plain" data-i18n="loading.apps">Loading apps…</p>
+            <p class="poster-copy poster-text" data-kind="body" data-tone="muted" data-i18n="loading.appsHint">Fetching the catalogue from this node.</p>
+          </div>
+        </div>
+
+        <!-- Empty state for the Community view (shown only when the community view is active and has no apps) -->
+        <div id="community-empty" data-view="community" hidden>
+          <div class="poster-stack" data-direction="vertical" data-align="start" data-density="compact">
+            <p class="poster-copy poster-text" data-kind="lead" data-tone="plain" data-i18n="view.communityEmpty">No community apps on this node yet.</p>
+            <p class="poster-copy poster-text" data-kind="body" data-tone="muted" data-i18n="view.communityHint">Community apps are apps other people on this node have published. When someone publishes one, it shows up here.</p>
+          </div>
+        </div>
+
+        <!-- Favourites: its own view. Apps the owner starred, own and community alike. -->
+        <section class="poster-section poster-section-part" data-density="normal" data-size="normal" id="favorites-section" data-view="favorites">
+          <div class="poster-section-head">
+            <h2 class="poster-section-title"><span data-i18n="fav.title">Favourites</span><small id="favorites-count"></small></h2>
+          </div>
+          <div class="poster-section-body">
+            <div id="favorites-grid"></div>
+            <div id="favorites-empty" hidden>
+              <div class="poster-stack" data-direction="vertical" data-align="start" data-density="compact">
+                <p class="poster-copy poster-text" data-kind="lead" data-tone="plain" data-i18n="fav.empty">No favourites yet.</p>
+                <p class="poster-copy poster-text" data-kind="body" data-tone="muted" data-i18n="fav.emptyHint">Star an app in your library or in the community and it lands here.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Your apps: one numbered row per app. The slab waits until there is a list to head. -->
+        <section class="poster-section poster-section-part" data-density="normal" data-size="normal" id="local-apps-block" data-view="library">
+          <div id="local-apps-header" hidden>
+            <div class="poster-section-head">
+              <h2 class="poster-section-title"><span data-i18n="sec.local">Your apps</span><small id="local-apps-count"></small></h2>
+            </div>
+          </div>
+          <div class="poster-section-body">
+            <main id="app-grid"></main>
+            <small class="poster-copy poster-text" data-kind="caption" data-tone="muted" data-i18n="list.foot">One row per app. The number is its place in the order above; press a row for its doors and a line about where the work is.</small>
+          </div>
+        </section>
+
+        <!-- The foot, on ink: two facts. The first carries the count. -->
+        <section class="poster-section poster-section-part" data-density="normal" data-size="normal">
+          <div class="poster-section-body">
+            <div class="poster-surface" data-density="roomy" data-tone="ink" data-height="auto" role="contentinfo">
+              <div class="poster-stack" data-direction="vertical" data-align="stretch" data-density="roomy">
+                <div class="poster-columns-frame"><div class="poster-columns" data-layout="equal" data-density="roomy" data-collapse="640">
+                  <p id="stats" class="poster-copy poster-text" data-kind="body" data-tone="plain"></p>
+                  <p class="poster-copy poster-text" data-kind="body" data-tone="plain" data-i18n="foot.p2">An app that generates content with an AI model says so on its own page.</p>
+                </div></div>
+                <span class="poster-copy poster-label" data-kind="label" data-tone="sun">AIMEAT</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
       </div>
     </div>
   </div>
 
-  <!-- The band: the four numbers on the diagonal stripe, as on the profile. Filled by renderApps. -->
-  <div id="cat-band" class="cat-band" data-view="library" hidden>
-    <div class="cat-band-in">
-      <div class="cat-band-item"><div class="cat-band-n" id="cat-band-apps">0</div><div class="cat-band-l" data-i18n="band.apps">Apps</div></div>
-      <div class="cat-band-item"><div class="cat-band-n" id="cat-band-listed">0</div><div class="cat-band-l" data-i18n="band.listed">Listed</div></div>
-      <div class="cat-band-item"><div class="cat-band-n" id="cat-band-drafts">0</div><div class="cat-band-l" data-i18n="band.drafts">Draft waiting</div></div>
-      <div class="cat-band-item"><div class="cat-band-n" id="cat-band-opens">0</div><div class="cat-band-l" data-i18n="band.opens">Opens, all time</div></div>
-    </div>
-  </div>
-
-  <!-- Search and order: an underline field and underlined words -->
-  <div class="cat-tools">
-    <input type="text" id="search-input" class="cat-search" placeholder="Search apps..." data-i18n-ph="search.ph" autocomplete="off" spellcheck="false"/>
-    <div id="cat-sort" class="cat-sort" role="group">
-      <span class="cat-sort-label" data-i18n="sort.label">Order</span>
-      <button type="button" class="cat-sort-btn is-on" data-sort="newest" onclick="window._launcher.setSort('newest')" data-i18n="sort.newest">Newest</button>
-      <button type="button" class="cat-sort-btn" data-sort="opens" onclick="window._launcher.setSort('opens')" data-i18n="sort.opens">Most opened</button>
-      <button type="button" class="cat-sort-btn" data-sort="name" onclick="window._launcher.setSort('name')" data-i18n="sort.name">A → Z</button>
-    </div>
-  </div>
-
-  <!-- Active Extensions Bar -->
-  <div id="cortex-bar" data-view="library" style="display:none;margin:0 24px 1.5rem;position:relative;z-index:1">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
-      <h3 style="margin:0;font-size:.95rem;color:var(--text-muted)" data-i18n="cortex.active">&#x1F50C; Active Extensions</h3>
-      <button id="cortex-bar-toggle" onclick="window._launcher.toggleCortexBar()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:.8rem"><span id="cortex-bar-arrow">&#x25B6;</span> <span data-i18n="common.toggle">toggle</span></button>
-    </div>
-    <!-- Collapsed by default (declutters the Library) — expand via the toggle. -->
-    <div id="cortex-bar-grid" style="display:none;gap:.75rem;overflow-x:auto;padding-bottom:.5rem"></div>
-  </div>
-
-  <!-- Published + Parked apps are now merged into the unified #app-grid below (status badges);
-       their standalone sections were removed with the old renderers (TARGET-021 Aalto 3). -->
-
-  <!-- Community Apps Section (other users) -->
-  <div id="community-section" data-view="community" style="display:none">
-    <div class="published-header" onclick="window._launcher.toggleCommunity()">
-      <h2><span data-i18n="sec.community">Community apps</span> <span id="community-count"></span></h2>
-      <span class="arrow open" id="community-arrow">&#x25BC;</span>
-    </div>
-    <div id="community-grid" class="published-grid cat-list"></div>
-  </div>
-
-  <!-- The wait, for the Community view. Without it the empty state below claims "no community apps
-       on this node yet" for the whole fetch, which is an answer rather than a wait. -->
-  <div id="community-loading" data-view="community" class="view-empty" style="display:none">
-    <div class="cat-spinner" role="status" aria-live="polite" style="margin:0 auto 16px"></div>
-    <p data-i18n="loading.apps">Loading apps…</p>
-    <p class="view-empty-hint" data-i18n="loading.appsHint">Fetching the catalogue from this node.</p>
-  </div>
-
-  <!-- Empty state for the Community view (shown only when the community view is active and has no apps) -->
-  <div id="community-empty" data-view="community" class="view-empty" style="display:none">
-    <p data-i18n="view.communityEmpty">No community apps on this node yet.</p>
-    <p class="view-empty-hint" data-i18n="view.communityHint">Community apps are apps other people on this node have published. When someone publishes one, it shows up here.</p>
-  </div>
-
-  <!-- Favourites: its own view. Apps the owner starred, own and community alike. -->
-  <div id="favorites-section" data-view="favorites">
-    <div class="cat-list-title">
-      <h2 class="fav-section-title"><span data-i18n="fav.title">Favourites</span> <span id="favorites-count" class="fav-section-count"></span></h2>
-    </div>
-    <div id="favorites-grid" class="published-grid cat-list"></div>
-    <div id="favorites-empty" class="view-empty" style="display:none">
-      <p data-i18n="fav.empty">No favourites yet.</p>
-      <p class="view-empty-hint" data-i18n="fav.emptyHint">Star an app in your library or in the community and it lands here.</p>
-    </div>
-  </div>
-
-  <div id="local-apps-block" class="local-apps-block" data-view="library">
-    <div id="local-apps-header" class="cat-list-title" style="display:none">
-      <h2><span data-i18n="sec.local">Your apps</span> <span id="local-apps-count" class="cat-count"></span></h2>
-    </div>
-    <main id="app-grid"></main>
-    <p class="cat-list-foot" data-i18n="list.foot">One row per app. The number is its place in the order above; press a row for its doors and a line about where the work is.</p>
-  </div>
-
-  <!-- The foot, on ink: two facts. The first carries the count. -->
-  <footer>
-    <p id="stats" class="cat-foot-p"></p>
-    <p class="cat-foot-p" data-i18n="foot.p2">An app that generates content with an AI model says so on its own page.</p>
-    <span class="footer-brand">AIMEAT</span>
-  </footer>
-  </div><!-- .cat-main -->
-  </div><!-- .cat-body -->
-
   <!-- The dialogs. Every one is the site's one dialog (public/css/dialog.css, public/js/dialog.js,
-       both built into this page; js/dialogs.js opens and closes them): a header with the title and
-       the X, a body that is the only part to scroll, a footer with the actions, quiet words first
-       and the loud action last. On a phone each is a sheet at the bottom edge. A button marked
-       data-dlg-close closes its dialog the way the X does. -->
+       both built into this page; js/dialogs.js opens and closes them) with the set's Dialog frame
+       (poster-dialog): a header with the title and the X, a body that is the only part to scroll,
+       a footer with the actions, quiet words first and the loud action last. On a phone each is a
+       sheet at the bottom edge. A button marked data-dlg-close closes its dialog the way the X
+       does. Their content is the set's parts, written by hand here as poster-parts.js emits them. -->
+
+  <!-- The menu on a phone: main.js moves the rail in while it is open and back when it closes,
+       exactly as the set's Page shows its rail in a dialog below 900px. -->
+  <dialog id="cat-menu-overlay" class="dlg modal dlg--md poster-dialog" data-dlg-guard="off">
+    <header class="dlg-head"><h2 class="dlg-title" data-i18n="common.menu">Menu</h2><button type="button" class="dlg-close"></button></header>
+    <div class="dlg-body" id="cat-menu-body"></div>
+  </dialog>
 
   <!-- Extension popup: what one active extension offers an app; cortex.js fills the title, the
        body and, for the extension's owner, the edit door at the footer's start. -->
-  <dialog id="cortex-popup-overlay" class="dlg modal dlg--md cx-modal">
+  <dialog id="cortex-popup-overlay" class="dlg modal dlg--md poster-dialog cx-modal">
     <header class="dlg-head"><h2 class="dlg-title" id="cortex-popup-title"></h2><button type="button" class="dlg-close"></button></header>
     <div class="dlg-body" id="cortex-popup-content"></div>
     <footer class="dlg-foot">
       <div class="dlg-foot-start" id="cortex-popup-owner"></div>
-      <button type="button" class="modal-btn secondary" data-dlg-close data-i18n="common.close">Close</button>
+      <button type="button" class="poster-action" data-tone="plain" data-dlg-close data-i18n="common.close">Close</button>
     </footer>
   </dialog>
 
   <!-- Extension editor: the manifest and its library files, for the extension's owner. -->
-  <dialog id="cortex-editor-overlay" class="dlg modal dlg--lg cx-modal">
+  <dialog id="cortex-editor-overlay" class="dlg modal dlg--lg poster-dialog cx-modal">
     <header class="dlg-head"><h2 class="dlg-title" data-i18n="cortex.editorTitle">Extension Editor</h2><button type="button" class="dlg-close"></button></header>
     <div class="dlg-body">
-      <p id="cortex-editor-name" class="cx-sub"></p>
-      <div id="cortex-editor-status" class="cx-status" role="status" aria-live="polite"></div>
-      <label class="modal-label" for="cortex-editor-manifest" data-i18n="cortex.manifest">Manifest (YAML)</label>
-      <textarea id="cortex-editor-manifest" class="cx-code cx-code--manifest" spellcheck="false"></textarea>
-      <div id="cortex-editor-libs"></div>
-      <button type="button" class="modal-btn secondary cx-add" onclick="window._launcher.cortexEditorAddLib()" data-i18n="cortex.addLib">+ Add Lib File</button>
+      <div class="poster-stack" data-direction="vertical" data-align="stretch" data-density="normal">
+        <p id="cortex-editor-name" class="poster-copy poster-text" data-kind="mono" data-tone="muted"></p>
+        <small id="cortex-editor-status" class="poster-copy poster-text" data-kind="caption" data-tone="plain" role="status" aria-live="polite"></small>
+        <div class="poster-field" data-filled="no" data-kind="textarea" data-mono="yes">
+          <label for="cortex-editor-manifest" class="poster-label" data-i18n="cortex.manifest">Manifest (YAML)</label>
+          <textarea id="cortex-editor-manifest" rows="12" spellcheck="false"></textarea>
+        </div>
+        <div id="cortex-editor-libs"></div>
+        <div><button type="button" class="poster-action" data-tone="plain" onclick="window._launcher.cortexEditorAddLib()" data-i18n="cortex.addLib">+ Add Lib File</button></div>
+      </div>
     </div>
     <footer class="dlg-foot">
-      <div class="dlg-foot-start"><button type="button" class="modal-btn secondary" onclick="window._launcher.cortexEditorExport()" data-i18n="cortex.exportFiles">Export Files</button></div>
-      <button type="button" class="modal-btn secondary" data-dlg-close data-i18n="common.cancel">Cancel</button>
-      <button type="button" class="modal-btn primary" onclick="window._launcher.cortexEditorSave()" id="cortex-editor-save-btn" data-i18n="cortex.saveReinstall">Save &amp; Re-install</button>
+      <div class="dlg-foot-start"><button type="button" class="poster-action" data-tone="plain" onclick="window._launcher.cortexEditorExport()" data-i18n="cortex.exportFiles">Export Files</button></div>
+      <button type="button" class="poster-action" data-tone="plain" data-dlg-close data-i18n="common.cancel">Cancel</button>
+      <button type="button" class="poster-slab" data-tone="plain" onclick="window._launcher.cortexEditorSave()" id="cortex-editor-save-btn" data-i18n="cortex.saveReinstall">Save &amp; Re-install</button>
     </footer>
   </dialog>
 
-  <dialog id="modal-overlay" class="dlg modal dlg--md">
+  <dialog id="modal-overlay" class="dlg modal dlg--md poster-dialog">
     <header class="dlg-head"><h2 class="dlg-title" id="modal-title" data-i18n="addModal.title">Add App</h2><button type="button" class="dlg-close"></button></header>
     <div class="dlg-body" id="add-app-modal">
+      <div class="poster-stack" data-direction="vertical" data-align="stretch" data-density="roomy">
 
-      <!-- Source tabs — server-only: paste HTML or upload an HTML/ZIP file; it publishes to your account. -->
-      <div class="modal-tabs">
-        <button class="modal-tab active" data-tab="paste" data-i18n="tab.paste">Paste</button>
-        <button class="modal-tab" data-tab="file" data-i18n="tab.file">File</button>
-      </div>
-
-      <!-- File tab content -->
-      <div class="tab-content" id="tab-file">
-        <label class="modal-label" data-i18n="addModal.htmlFile">HTML File</label>
-        <div class="drop-zone" id="drop-zone">
-          <div class="drop-zone-icon">&#x1F4C4;</div>
-          <p class="drop-zone-text" data-i18n="addModal.drop">Drag &amp; drop an HTML file here</p>
-          <p class="drop-zone-hint" data-i18n="common.or">or</p>
-          <button type="button" class="browse-btn" id="browse-btn" data-i18n="addModal.browse">Browse files</button>
-          <input type="file" id="file-input" accept=".html,.htm,.zip" hidden/>
-          <p class="drop-zone-selected" id="selected-file-name"></p>
+        <!-- Source tabs — server-only: paste HTML or upload an HTML/ZIP file; it publishes to your account. -->
+        <div class="poster-filters" role="group">
+          <button type="button" class="poster-tab is-on" data-tone="plain" aria-pressed="true" data-tab="paste" data-i18n="tab.paste">Paste</button>
+          <button type="button" class="poster-tab" data-tone="plain" aria-pressed="false" data-tab="file" data-i18n="tab.file">File</button>
         </div>
-      </div>
 
-      <!-- Paste tab content (default) -->
-      <div class="tab-content active" id="tab-paste">
-        <!-- "generated" is a door: pressing it opens the generate-with-AI flow, which is where the
-             code comes from. Three pieces so each language can order the words its own way. -->
-        <label class="modal-label" for="app-paste-code"><span data-i18n="addModal.pasteBefore">Paste the </span><button type="button" class="cat-dashed" id="paste-generate-link" data-i18n="addModal.pasteWord">generated</button><span data-i18n="addModal.pasteAfter"> HTML source</span></label>
-        <textarea id="app-paste-code" class="modal-input" rows="10" placeholder="Paste your HTML source code here..." data-i18n-ph="addModal.pastePh" style="font-family:'Consolas','Monaco','Courier New',monospace;font-size:.8rem;resize:vertical;min-height:160px;line-height:1.4"></textarea>
-      </div>
-
-      <!-- Common fields -->
-      <div class="modal-fields">
-        <div class="modal-row">
-          <div class="modal-field" style="flex:1">
-            <label class="modal-label" for="app-name" data-i18n="addModal.name">App Name</label>
-            <input type="text" id="app-name" class="modal-input" placeholder="My App" data-i18n-ph="addModal.namePh" autocomplete="off"/>
-          </div>
-        </div>
-        <!-- The icon: a row of ready ones to press, the field for any other, and the line that says
-             how to type one (nobody knew what to put here). -->
-        <div class="modal-field">
-          <label class="modal-label" for="app-icon" data-i18n="addModal.icon">Icon</label>
-          <div class="icon-field">
-            <input type="text" id="app-icon" class="modal-input" maxlength="4" placeholder="&#x1F4DD;"/>
-            <div class="icon-picks" id="icon-picks" role="group">
-              <button type="button" class="icon-pick">&#x1F4DD;</button><button type="button" class="icon-pick">&#x1F4CA;</button><button type="button" class="icon-pick">&#x1F4C7;</button><button type="button" class="icon-pick">&#x1F4C8;</button><button type="button" class="icon-pick">&#x1F5C2;</button><button type="button" class="icon-pick">&#x1F4CB;</button><button type="button" class="icon-pick">&#x1F4D6;</button><button type="button" class="icon-pick">&#x1F4EE;</button><button type="button" class="icon-pick">&#x1F5FA;</button><button type="button" class="icon-pick">&#x1F9ED;</button><button type="button" class="icon-pick">&#x1F3AE;</button><button type="button" class="icon-pick">&#x1F3A8;</button><button type="button" class="icon-pick">&#x1F3B5;</button><button type="button" class="icon-pick">&#x1F4F7;</button><button type="button" class="icon-pick">&#x1F6D2;</button><button type="button" class="icon-pick">&#x1F3E0;</button><button type="button" class="icon-pick">&#x1F48A;</button><button type="button" class="icon-pick">&#x1F527;</button><button type="button" class="icon-pick">&#x1F9EA;</button><button type="button" class="icon-pick">&#x1F30D;</button><button type="button" class="icon-pick">&#x20AC;</button><button type="button" class="icon-pick">&#x2696;</button><button type="button" class="icon-pick">&#x1F3DB;</button><button type="button" class="icon-pick">&#x1F9F1;</button>
+        <!-- File tab content -->
+        <div id="tab-file" data-tab-panel hidden>
+          <div class="poster-stack" data-direction="vertical" data-align="stretch" data-density="compact">
+            <span class="poster-copy poster-label" data-kind="label" data-tone="plain" data-i18n="addModal.htmlFile">HTML File</span>
+            <div class="poster-surface poster-box" data-density="roomy" data-tone="plain" data-height="auto" id="drop-zone">
+              <div class="poster-stack" data-direction="vertical" data-align="center" data-density="compact">
+                <p class="poster-copy poster-text" data-kind="body" data-tone="plain" data-i18n="addModal.drop">Drag &amp; drop an HTML file here</p>
+                <small class="poster-copy poster-text" data-kind="caption" data-tone="muted" data-i18n="common.or">or</small>
+                <button type="button" class="poster-action" data-tone="plain" id="browse-btn" data-i18n="addModal.browse">Browse files</button>
+                <input type="file" id="file-input" accept=".html,.htm,.zip" hidden/>
+                <span class="poster-copy poster-text" data-kind="mono" data-tone="plain" id="selected-file-name"></span>
+              </div>
             </div>
           </div>
-          <div class="icon-hint" data-i18n="addModal.iconHint">Press one above, or type any emoji into the box: on Windows Win + . opens the emoji keyboard, on a Mac Ctrl + Cmd + Space.</div>
         </div>
-        <div class="modal-field">
-          <label class="modal-label" for="app-tags"><span data-i18n="addModal.tags">Tags</span> <span class="label-hint" data-i18n="addModal.tagsHint">(comma separated)</span></label>
-          <input type="text" id="app-tags" class="modal-input" placeholder="tools, productivity" data-i18n-ph="addModal.tagsPh" autocomplete="off"/>
+
+        <!-- Paste tab content (default) -->
+        <div id="tab-paste" data-tab-panel>
+          <!-- "generated" is a door: pressing it opens the generate-with-AI flow, which is where the
+               code comes from. Three pieces so each language can order the words its own way. -->
+          <div class="poster-field" data-filled="no" data-kind="textarea">
+            <label class="poster-label" for="app-paste-code"><span data-i18n="addModal.pasteBefore">Paste the </span><button type="button" class="poster-text-action" data-tone="plain" id="paste-generate-link" data-i18n="addModal.pasteWord">generated</button><span data-i18n="addModal.pasteAfter"> HTML source</span></label>
+            <textarea id="app-paste-code" rows="10" spellcheck="false" placeholder="Paste your HTML source code here..." data-i18n-ph="addModal.pastePh"></textarea>
+          </div>
+        </div>
+
+        <!-- Common fields -->
+        <div class="poster-field" data-filled="no" data-kind="text">
+          <label class="poster-label" for="app-name" data-i18n="addModal.name">App Name</label>
+          <input type="text" id="app-name" placeholder="My App" data-i18n-ph="addModal.namePh" autocomplete="off"/>
+        </div>
+        <!-- The icon: a row of ready ones to press, the field for any other, and the line that says
+             how to type one (nobody knew what to put here). The picks are icons a person chooses for
+             their own app, so they are data, not interface emoji. -->
+        <div class="poster-field" data-filled="no" data-kind="text">
+          <label class="poster-label" for="app-icon" data-i18n="addModal.icon">Icon</label>
+          <div class="poster-stack" data-direction="wrap" data-align="start" data-density="compact" id="icon-picks" role="group">
+            <button type="button" class="poster-tab" data-tone="plain" aria-pressed="false" data-icon-pick>&#x1F4DD;</button><button type="button" class="poster-tab" data-tone="plain" aria-pressed="false" data-icon-pick>&#x1F4CA;</button><button type="button" class="poster-tab" data-tone="plain" aria-pressed="false" data-icon-pick>&#x1F4C7;</button><button type="button" class="poster-tab" data-tone="plain" aria-pressed="false" data-icon-pick>&#x1F4C8;</button><button type="button" class="poster-tab" data-tone="plain" aria-pressed="false" data-icon-pick>&#x1F5C2;</button><button type="button" class="poster-tab" data-tone="plain" aria-pressed="false" data-icon-pick>&#x1F4CB;</button><button type="button" class="poster-tab" data-tone="plain" aria-pressed="false" data-icon-pick>&#x1F4D6;</button><button type="button" class="poster-tab" data-tone="plain" aria-pressed="false" data-icon-pick>&#x1F4EE;</button><button type="button" class="poster-tab" data-tone="plain" aria-pressed="false" data-icon-pick>&#x1F5FA;</button><button type="button" class="poster-tab" data-tone="plain" aria-pressed="false" data-icon-pick>&#x1F9ED;</button><button type="button" class="poster-tab" data-tone="plain" aria-pressed="false" data-icon-pick>&#x1F3AE;</button><button type="button" class="poster-tab" data-tone="plain" aria-pressed="false" data-icon-pick>&#x1F3A8;</button><button type="button" class="poster-tab" data-tone="plain" aria-pressed="false" data-icon-pick>&#x1F3B5;</button><button type="button" class="poster-tab" data-tone="plain" aria-pressed="false" data-icon-pick>&#x1F4F7;</button><button type="button" class="poster-tab" data-tone="plain" aria-pressed="false" data-icon-pick>&#x1F6D2;</button><button type="button" class="poster-tab" data-tone="plain" aria-pressed="false" data-icon-pick>&#x1F3E0;</button><button type="button" class="poster-tab" data-tone="plain" aria-pressed="false" data-icon-pick>&#x1F48A;</button><button type="button" class="poster-tab" data-tone="plain" aria-pressed="false" data-icon-pick>&#x1F527;</button><button type="button" class="poster-tab" data-tone="plain" aria-pressed="false" data-icon-pick>&#x1F9EA;</button><button type="button" class="poster-tab" data-tone="plain" aria-pressed="false" data-icon-pick>&#x1F30D;</button><button type="button" class="poster-tab" data-tone="plain" aria-pressed="false" data-icon-pick>&#x20AC;</button><button type="button" class="poster-tab" data-tone="plain" aria-pressed="false" data-icon-pick>&#x2696;</button><button type="button" class="poster-tab" data-tone="plain" aria-pressed="false" data-icon-pick>&#x1F3DB;</button><button type="button" class="poster-tab" data-tone="plain" aria-pressed="false" data-icon-pick>&#x1F9F1;</button>
+          </div>
+          <input type="text" id="app-icon" maxlength="4" placeholder="&#x1F4DD;" aria-describedby="app-icon-hint"/>
+          <small id="app-icon-hint" class="poster-field-hint" data-i18n="addModal.iconHint">Press one above, or type any emoji into the box: on Windows Win + . opens the emoji keyboard, on a Mac Ctrl + Cmd + Space.</small>
+        </div>
+        <div class="poster-field" data-filled="no" data-kind="text">
+          <label class="poster-label" for="app-tags"><span data-i18n="addModal.tags">Tags</span> <span data-i18n="addModal.tagsHint">(comma separated)</span></label>
+          <input type="text" id="app-tags" placeholder="tools, productivity" data-i18n-ph="addModal.tagsPh" autocomplete="off"/>
         </div>
       </div>
     </div>
     <footer class="dlg-foot">
-      <button type="button" class="modal-btn secondary" id="modal-cancel-btn" data-i18n="common.cancel">Cancel</button>
-      <button type="button" class="modal-btn primary" id="modal-save-btn" data-i18n="common.save">Save</button>
+      <button type="button" class="poster-action" data-tone="plain" id="modal-cancel-btn" data-i18n="common.cancel">Cancel</button>
+      <button type="button" class="poster-slab" data-tone="plain" id="modal-save-btn" data-i18n="common.save">Save</button>
     </footer>
   </dialog>
 
   <div id="iframe-view" hidden>
     <div class="iframe-toolbar">
-      <button class="icon-btn" onclick="window._launcher.closeIframe()" title="Close">&#x2715;</button>
-      <span class="iframe-title" id="iframe-title"></span>
-      <a class="aimeat-cta" href="/" target="_blank" rel="noopener" data-i18n-title="cta.publishOwn" title="Publish your own app — free"><span class="aimeat-cta-spark">⚡</span><span data-i18n="cta.publishOwn">Publish your own app</span></a>
-      <button class="icon-btn" id="iframe-external-btn" onclick="window._launcher.openExternal()" title="Open in new tab" style="display:none">&#x2197;</button>
+      <button type="button" class="poster-icon-action" data-tone="plain" aria-pressed="false" onclick="window._launcher.closeIframe()" title="Close" data-i18n-title="common.close"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.5"/></svg></button>
+      <span class="poster-copy poster-text" data-kind="body" data-tone="plain" id="iframe-title"></span>
+      <a class="poster-action" data-tone="plain" href="/" target="_blank" rel="noopener noreferrer" data-i18n-title="cta.publishOwn" title="Publish your own app — free"><span data-i18n="cta.publishOwn">Publish your own app</span></a>
+      <span id="iframe-external-btn" hidden><button type="button" class="poster-icon-action" data-tone="plain" aria-pressed="false" onclick="window._launcher.openExternal()" title="Open in new tab"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M9 5h10v10M19 5L6 18" fill="none" stroke="currentColor" stroke-width="2.5"/></svg></button></span>
     </div>
     <iframe id="app-iframe" sandbox="allow-scripts allow-forms allow-popups"></iframe>
   </div>
 
-  <!-- App Detail View — unified single-app overlay -->
+  <!-- App Detail View — unified single-app overlay (detail.js fills it). -->
   <div id="detail-view" hidden>
     <div class="dtl-toolbar">
-      <button class="icon-btn" onclick="window._launcher.closeDetailView()" title="Close">&#x2715;</button>
+      <button type="button" class="poster-icon-action" data-tone="plain" aria-pressed="false" onclick="window._launcher.closeDetailView()" title="Close" data-i18n-title="common.close"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.5"/></svg></button>
       <span class="dtl-toolbar-title" id="detail-title"></span>
-      <button class="dtl-btn primary" id="detail-launch-btn" onclick="window._launcher.detailLaunch()" data-i18n="detail.launch">&#x25B6; Launch</button>
+      <button type="button" class="poster-slab" data-tone="plain" id="detail-launch-btn" onclick="window._launcher.detailLaunch()" data-i18n="detail.launch">Launch</button>
     </div>
     <div class="dtl-body" id="detail-body"></div>
   </div>
 
-  <div id="context-menu" hidden>
-    <button data-action="details" data-i18n="ctx.details">&#x1F50E; Details</button>
-    <button data-action="edit" data-i18n="ctx.edit">&#x270F;&#xFE0F; Edit</button>
-    <button data-action="favorite" data-i18n="ctx.favorite">&#x2B50; Toggle favorite</button>
-    <button data-action="view-source" data-i18n="ctx.viewSource">&#x1F441; View / Edit Source</button>
-    <button data-action="improve-ai" data-i18n="ctx.improveAi">&#x2728; Improve with AI</button>
-    <button data-action="share-prompt" data-i18n="ctx.sharePrompt">&#x1F4E4; Share as Prompt</button>
-    <hr>
-    <button data-action="publish" data-i18n="ctx.publish">&#x1F680; Publish to server</button>
-    <hr>
-    <button data-action="delete" class="danger" data-i18n="ctx.delete">&#x1F5D1;&#xFE0F; Delete</button>
+  <!-- The menu of a browser-local app (none exist since the server-only cutover; kept with its
+       handlers). Its items are the set's menu items. -->
+  <div id="context-menu" role="menu" hidden>
+    <button type="button" class="poster-menu-item" data-tone="plain" role="menuitem" data-action="details" data-i18n="ctx.details">Details</button>
+    <button type="button" class="poster-menu-item" data-tone="plain" role="menuitem" data-action="edit" data-i18n="ctx.edit">Edit</button>
+    <button type="button" class="poster-menu-item" data-tone="plain" role="menuitem" data-action="favorite" data-i18n="ctx.favorite">Toggle favorite</button>
+    <button type="button" class="poster-menu-item" data-tone="plain" role="menuitem" data-action="view-source" data-i18n="ctx.viewSource">View / Edit Source</button>
+    <button type="button" class="poster-menu-item" data-tone="plain" role="menuitem" data-action="improve-ai" data-i18n="ctx.improveAi">Improve with AI</button>
+    <button type="button" class="poster-menu-item" data-tone="plain" role="menuitem" data-action="share-prompt" data-i18n="ctx.sharePrompt">Share as Prompt</button>
+    <div class="poster-menu-sep" role="separator"></div>
+    <button type="button" class="poster-menu-item" data-tone="plain" role="menuitem" data-action="publish" data-i18n="ctx.publish">Publish to server</button>
+    <div class="poster-menu-sep" role="separator"></div>
+    <button type="button" class="poster-menu-item" data-tone="danger" role="menuitem" data-action="delete" data-i18n="ctx.delete">Delete</button>
   </div>
 
   <!-- How the catalog works: five short sections, each under the section slab at the dialog's size. -->
-  <dialog id="help-overlay" class="dlg modal dlg--md" data-dlg-guard="off">
+  <dialog id="help-overlay" class="dlg modal dlg--md poster-dialog" data-dlg-guard="off">
     <header class="dlg-head"><h2 class="dlg-title" data-i18n="help.title">How this catalog works</h2><button type="button" class="dlg-close"></button></header>
     <div class="dlg-body">
-      <section class="poster-section">
-        <h3 class="poster-section-title" data-i18n="help.modesTitle">Global vs Personal</h3>
-        <p class="help-p" data-i18n="help.modes">Both are on THIS browser. Global apps are shared across every account signed in on this browser; Personal apps are private to your account. Personal needs you to be signed in.</p>
+      <section class="poster-section poster-section-part" data-density="compact" data-size="small">
+        <div class="poster-section-head"><h2 class="poster-section-title" data-i18n="help.modesTitle">Global vs Personal</h2></div>
+        <div class="poster-section-body"><p class="poster-copy poster-text" data-kind="body" data-tone="plain" data-i18n="help.modes">Both are on THIS browser. Global apps are shared across every account signed in on this browser; Personal apps are private to your account. Personal needs you to be signed in.</p></div>
       </section>
-      <section class="poster-section">
-        <h3 class="poster-section-title" data-i18n="help.whereTitle">Where your apps live</h3>
-        <p class="help-p" data-i18n="help.where">"Local Apps" live only in this browser (IndexedDB) — they don't follow you to another browser or device. Publish an app to put it on the server, and then you can manage it from anywhere. Keeping an app local-only is a valid choice; it just stays here.</p>
+      <section class="poster-section poster-section-part" data-density="compact" data-size="small">
+        <div class="poster-section-head"><h2 class="poster-section-title" data-i18n="help.whereTitle">Where your apps live</h2></div>
+        <div class="poster-section-body"><p class="poster-copy poster-text" data-kind="body" data-tone="plain" data-i18n="help.where">"Local Apps" live only in this browser (IndexedDB) — they don't follow you to another browser or device. Publish an app to put it on the server, and then you can manage it from anywhere. Keeping an app local-only is a valid choice; it just stays here.</p></div>
       </section>
-      <section class="poster-section">
-        <h3 class="poster-section-title" data-i18n="help.sectionsTitle">The sections</h3>
-        <p class="help-p" data-i18n="help.sections">Published = your apps on the server. Parked = your server apps hidden from the public catalogue but still usable by you. Community = other people's published apps. Local = apps only in this browser.</p>
+      <section class="poster-section poster-section-part" data-density="compact" data-size="small">
+        <div class="poster-section-head"><h2 class="poster-section-title" data-i18n="help.sectionsTitle">The sections</h2></div>
+        <div class="poster-section-body"><p class="poster-copy poster-text" data-kind="body" data-tone="plain" data-i18n="help.sections">Published = your apps on the server. Parked = your server apps hidden from the public catalogue but still usable by you. Community = other people's published apps. Local = apps only in this browser.</p></div>
       </section>
-      <section class="poster-section">
-        <h3 class="poster-section-title" data-i18n="help.backupTitle">"Backup" means two different things</h3>
-        <p class="help-p" data-i18n="help.backup">The 💾 menu (top bar) exports/imports your SERVER apps + extensions as a .zip. Settings → Export/Import JSON backs up this browser's LOCAL catalog. They are separate.</p>
+      <section class="poster-section poster-section-part" data-density="compact" data-size="small">
+        <div class="poster-section-head"><h2 class="poster-section-title" data-i18n="help.backupTitle">"Backup" means two different things</h2></div>
+        <div class="poster-section-body"><p class="poster-copy poster-text" data-kind="body" data-tone="plain" data-i18n="help.backup">The backups menu exports/imports your SERVER apps + extensions as a .zip. Settings → Export/Import JSON backs up this browser's LOCAL catalog. They are separate.</p></div>
       </section>
-      <section class="poster-section">
-        <h3 class="poster-section-title" data-i18n="help.standaloneTitle">Run it against your own node</h3>
-        <p class="help-p" data-i18n="help.standalone">Set Settings → Server URL to point the catalog at any AIMEAT node (e.g. your own localhost or a federated node). This page is meant to be usable standalone against the node you choose.</p>
+      <section class="poster-section poster-section-part" data-density="compact" data-size="small">
+        <div class="poster-section-head"><h2 class="poster-section-title" data-i18n="help.standaloneTitle">Run it against your own node</h2></div>
+        <div class="poster-section-body"><p class="poster-copy poster-text" data-kind="body" data-tone="plain" data-i18n="help.standalone">Set Settings → Server URL to point the catalog at any AIMEAT node (e.g. your own localhost or a federated node). This page is meant to be usable standalone against the node you choose.</p></div>
       </section>
     </div>
     <footer class="dlg-foot">
-      <button type="button" class="modal-btn secondary" data-dlg-close data-i18n="common.close">Close</button>
+      <button type="button" class="poster-action" data-tone="plain" data-dlg-close data-i18n="common.close">Close</button>
     </footer>
   </dialog>
 
   <!-- Generic in-page confirm dialog — replaces native confirm() so every destructive action
        uses a real modal (wired in bootstrap; showConfirm(message, onConfirm)). A question with no
        title: its X sits in the corner over the body. -->
-  <dialog id="confirm-overlay" class="dlg modal dlg--sm" data-dlg-guard="off">
+  <dialog id="confirm-overlay" class="dlg modal dlg--sm poster-dialog" data-dlg-guard="off">
     <button type="button" class="dlg-close"></button>
     <div class="dlg-body">
-      <p id="confirm-message" class="confirm-message"></p>
+      <p id="confirm-message" class="poster-copy poster-text" data-kind="body" data-tone="plain"></p>
     </div>
     <footer class="dlg-foot">
-      <button type="button" class="modal-btn secondary" id="confirm-cancel-btn" data-i18n="common.cancel">Cancel</button>
-      <button type="button" class="modal-btn primary" id="confirm-ok-btn" autofocus data-i18n="common.confirm">OK</button>
+      <button type="button" class="poster-action" data-tone="plain" id="confirm-cancel-btn" data-i18n="common.cancel">Cancel</button>
+      <button type="button" class="poster-slab" data-tone="plain" id="confirm-ok-btn" autofocus data-i18n="common.confirm">OK</button>
     </footer>
   </dialog>
 
@@ -343,239 +416,284 @@
        so a notice raised while a dialog is open shows above it (raiseAboveDialogs). -->
   <div id="notice-stack" class="notice-stack" popover="manual" aria-live="polite"></div>
 
-  <dialog id="settings-overlay" class="dlg modal dlg--md">
+  <dialog id="settings-overlay" class="dlg modal dlg--md poster-dialog">
     <header class="dlg-head"><h2 class="dlg-title" data-i18n="settings.title">Settings</h2><button type="button" class="dlg-close"></button></header>
     <div class="dlg-body" id="settings-modal">
 
-      <section class="poster-section">
-        <h3 class="poster-section-title" data-i18n="settings.appearance">Appearance</h3>
-        <div class="settings-row">
-          <label for="setting-theme" data-i18n="settings.theme">Theme</label>
-          <select id="setting-theme" class="modal-input">
-            <option value="dark" data-i18n="theme.dark">Dark</option>
-            <option value="light" data-i18n="theme.light">Light</option>
-          </select>
-        </div>
-        <div class="settings-row">
-          <label for="setting-language" data-i18n="settings.language">Language</label>
-          <select id="setting-language" class="modal-input" onchange="window._launcher.setLanguage(this.value)">
-            <option value="en">English</option>
-            <option value="fi">Suomi</option>
-          </select>
+      <section class="poster-section poster-section-part" data-density="compact" data-size="small">
+        <div class="poster-section-head"><h2 class="poster-section-title" data-i18n="settings.appearance">Appearance</h2></div>
+        <div class="poster-section-body">
+          <div class="poster-stack" data-direction="vertical" data-align="stretch" data-density="normal">
+            <div class="poster-field" data-filled="yes" data-kind="select">
+              <label for="setting-theme" class="poster-label" data-i18n="settings.theme">Theme</label>
+              <select id="setting-theme">
+                <option value="dark" data-i18n="theme.dark">Dark</option>
+                <option value="light" data-i18n="theme.light">Light</option>
+              </select>
+            </div>
+            <div class="poster-field" data-filled="yes" data-kind="select">
+              <label for="setting-language" class="poster-label" data-i18n="settings.language">Language</label>
+              <select id="setting-language" onchange="window._launcher.setLanguage(this.value)">
+                <option value="en">English</option>
+                <option value="fi">Suomi</option>
+              </select>
+            </div>
+          </div>
         </div>
       </section>
 
-      <section class="poster-section">
-        <h3 class="poster-section-title" data-i18n="settings.server">AIMEAT Server</h3>
-        <div class="settings-row">
-          <label for="setting-aimeat-url" data-i18n="settings.serverUrl">Server URL</label>
-          <input type="url" id="setting-aimeat-url" class="modal-input" readonly autocomplete="off" data-i18n-title="settings.serverUrlHint" title="This catalog talks to the node that served it (same-origin)."/>
+      <section class="poster-section poster-section-part" data-density="compact" data-size="small">
+        <div class="poster-section-head"><h2 class="poster-section-title" data-i18n="settings.server">AIMEAT Server</h2></div>
+        <div class="poster-section-body">
+          <div class="poster-field" data-filled="yes" data-kind="url">
+            <label for="setting-aimeat-url" class="poster-label" data-i18n="settings.serverUrl">Server URL</label>
+            <input type="url" id="setting-aimeat-url" readonly autocomplete="off" data-i18n-title="settings.serverUrlHint" title="This catalog talks to the node that served it (same-origin)."/>
+          </div>
         </div>
       </section>
     </div>
     <footer class="dlg-foot">
-      <button type="button" class="modal-btn secondary" id="settings-cancel-btn" data-i18n="common.cancel">Cancel</button>
-      <button type="button" class="modal-btn primary" id="settings-save-btn" data-i18n="common.save">Save</button>
+      <button type="button" class="poster-action" data-tone="plain" id="settings-cancel-btn" data-i18n="common.cancel">Cancel</button>
+      <button type="button" class="poster-slab" data-tone="plain" id="settings-save-btn" data-i18n="common.save">Save</button>
     </footer>
   </dialog>
 
   <!-- View Source Modal. Its closer asks before unsaved edits are lost, so it needs no guard. -->
-  <dialog id="source-overlay" class="dlg modal dlg--lg source-modal" data-dlg-guard="off">
+  <dialog id="source-overlay" class="dlg modal dlg--lg poster-dialog" data-dlg-guard="off">
     <header class="dlg-head"><h2 class="dlg-title" id="source-title">View Source</h2><button type="button" class="dlg-close"></button></header>
     <div class="dlg-body">
-      <textarea id="source-code"></textarea>
-      <div class="dtl-ai-status" id="source-draft-status"></div>
-      <p class="wc-verbs-hint" data-i18n="wc.verbsHint">Save keeps it for you only. Try opens it on its real address without changing the live app. Publish is what other people see.</p>
+      <div class="poster-stack" data-direction="vertical" data-align="stretch" data-density="normal">
+        <div class="poster-field" data-filled="no" data-kind="textarea">
+          <textarea id="source-code" rows="18" spellcheck="false" aria-labelledby="source-title"></textarea>
+        </div>
+        <p class="poster-copy poster-text" data-kind="body" data-tone="plain" id="source-draft-status" role="status"></p>
+        <small class="poster-copy poster-text" data-kind="caption" data-tone="muted" data-i18n="wc.verbsHint">Save keeps it for you only. Try opens it on its real address without changing the live app. Publish is what other people see.</small>
+      </div>
     </div>
     <footer class="dlg-foot">
       <div class="dlg-foot-start">
-        <button type="button" class="modal-btn secondary" id="copy-source-btn" data-i18n="source.copy">Copy Source</button>
-        <button type="button" class="modal-btn secondary" id="copy-prompt-btn" data-i18n="source.copyPrompt">Copy with AI Prompt</button>
+        <button type="button" class="poster-action" data-tone="plain" id="copy-source-btn" data-i18n="source.copy">Copy Source</button>
+        <button type="button" class="poster-action" data-tone="plain" id="copy-prompt-btn" data-i18n="source.copyPrompt">Copy with AI Prompt</button>
       </div>
-      <button type="button" class="modal-btn secondary" id="close-source-btn" data-i18n="common.close">Close</button>
+      <button type="button" class="poster-action" data-tone="plain" id="close-source-btn" data-i18n="common.close">Close</button>
       <!-- The three canonical verbs, identical to the detail view's AI loop (TARGET-048):
            save (private, checkpointed) → try (real origin, live untouched) → publish (public). -->
-      <button type="button" class="modal-btn secondary" id="source-test-live-btn" hidden data-i18n="wc.try">Try it safely</button>
-      <button type="button" class="modal-btn primary" id="save-source-btn" disabled data-i18n="source.save">Save working copy</button>
-      <button type="button" class="modal-btn success" id="source-publish-tested-btn" hidden data-i18n="wc.publishNew">Publish as a new version</button>
+      <button type="button" class="poster-action" data-tone="plain" id="source-test-live-btn" hidden data-i18n="wc.try">Try it safely</button>
+      <button type="button" class="poster-slab" data-tone="plain" id="save-source-btn" disabled data-i18n="source.save">Save working copy</button>
+      <button type="button" class="poster-action" data-tone="success" id="source-publish-tested-btn" hidden data-i18n="wc.publishNew">Publish as a new version</button>
     </footer>
   </dialog>
 
   <!-- Publish Modal -->
-  <dialog id="publish-overlay" class="dlg modal dlg--md">
+  <dialog id="publish-overlay" class="dlg modal dlg--md poster-dialog">
     <header class="dlg-head"><h2 class="dlg-title" data-i18n="publish.title">Publish App</h2><button type="button" class="dlg-close"></button></header>
     <div class="dlg-body" id="publish-modal">
-      <div class="form-group">
-        <label for="publish-filename" data-i18n="publish.filename">Filename</label>
-        <input type="text" id="publish-filename" class="modal-input" placeholder="my-app.html" autocomplete="off"/>
-        <div style="font-size:.75rem;color:var(--text-muted);margin-top:4px" data-i18n="publish.filenameHint">Letters, numbers, dots, hyphens, underscores. Must end in .html</div>
+      <div class="poster-stack" data-direction="vertical" data-align="stretch" data-density="roomy">
+        <div class="poster-field" data-filled="no" data-kind="text">
+          <label for="publish-filename" class="poster-label" data-i18n="publish.filename">Filename</label>
+          <input type="text" id="publish-filename" placeholder="my-app.html" autocomplete="off" aria-describedby="publish-filename-hint"/>
+          <small id="publish-filename-hint" class="poster-field-hint" data-i18n="publish.filenameHint">Letters, numbers, dots, hyphens, underscores. Must end in .html</small>
+        </div>
+        <div class="poster-field" data-filled="no" data-kind="textarea">
+          <label for="publish-description" class="poster-label" data-i18n="publish.description">Description</label>
+          <textarea id="publish-description" rows="2" placeholder="What does this app do? 1-2 sentences (your AI can write it)" data-i18n-ph="publish.descriptionPh" autocomplete="off" aria-describedby="publish-description-hint"></textarea>
+          <small id="publish-description-hint" class="poster-field-hint" data-i18n="publish.descriptionHint">Shown in the catalogue and on the landing wall. Required for a new app.</small>
+        </div>
+        <div class="poster-field" data-filled="no" data-kind="text">
+          <label for="publish-access-code" class="poster-label" data-i18n="publish.accessCode">Access Code (optional)</label>
+          <input type="text" id="publish-access-code" placeholder="Leave empty for public" data-i18n-ph="publish.accessCodePh" autocomplete="off" aria-describedby="publish-access-code-hint"/>
+          <small id="publish-access-code-hint" class="poster-field-hint" data-i18n="publish.accessCodeHint">4-64 chars. If set, only people with the code can download.</small>
+        </div>
+        <p id="publish-status" class="poster-copy poster-text" data-kind="body" data-tone="plain" role="status"></p>
       </div>
-      <div class="form-group">
-        <label for="publish-description" data-i18n="publish.description">Description</label>
-        <textarea id="publish-description" class="modal-input" rows="2" placeholder="What does this app do? 1-2 sentences (your AI can write it)" data-i18n-ph="publish.descriptionPh" autocomplete="off"></textarea>
-        <div style="font-size:.75rem;color:var(--text-muted);margin-top:4px" data-i18n="publish.descriptionHint">Shown in the catalogue and on the landing wall. Required for a new app.</div>
-      </div>
-      <div class="form-group">
-        <label for="publish-access-code" data-i18n="publish.accessCode">Access Code (optional)</label>
-        <input type="text" id="publish-access-code" class="modal-input" placeholder="Leave empty for public" data-i18n-ph="publish.accessCodePh" autocomplete="off"/>
-        <div style="font-size:.75rem;color:var(--text-muted);margin-top:4px" data-i18n="publish.accessCodeHint">4-64 chars. If set, only people with the code can download.</div>
-      </div>
-      <div id="publish-status" style="margin-top:8px;font-size:.85rem"></div>
     </div>
     <footer class="dlg-foot">
-      <button type="button" class="modal-btn secondary" data-dlg-close data-i18n="common.cancel">Cancel</button>
-      <button type="button" class="modal-btn primary" id="publish-submit-btn" onclick="window._launcher.submitPublish()" data-i18n="publish.submit">Publish</button>
+      <button type="button" class="poster-action" data-tone="plain" data-dlg-close data-i18n="common.cancel">Cancel</button>
+      <button type="button" class="poster-slab" data-tone="plain" id="publish-submit-btn" onclick="window._launcher.submitPublish()" data-i18n="publish.submit">Publish</button>
     </footer>
   </dialog>
 
   <!-- Backup Import Modal -->
-  <dialog id="backup-overlay" class="dlg modal dlg--lg">
+  <dialog id="backup-overlay" class="dlg modal dlg--lg poster-dialog">
     <header class="dlg-head"><h2 class="dlg-title" data-i18n="backup.title">Import from backup</h2><button type="button" class="dlg-close"></button></header>
     <div class="dlg-body" id="backup-modal">
-      <div id="backup-status" style="margin:4px 0;font-size:.85rem;min-height:1.1em"></div>
-      <div id="backup-import-body"></div>
+      <div class="poster-stack" data-direction="vertical" data-align="stretch" data-density="normal">
+        <p id="backup-status" class="poster-copy poster-text" data-kind="body" data-tone="plain" role="status"></p>
+        <div id="backup-import-body"></div>
+      </div>
     </div>
     <footer class="dlg-foot">
-      <button type="button" class="modal-btn secondary" data-dlg-close data-i18n="common.close">Close</button>
-      <button type="button" class="modal-btn primary" id="backup-restore-btn" onclick="window._launcher.submitBackupRestore()" data-i18n="backup.restore" style="display:none">Restore selected</button>
+      <button type="button" class="poster-action" data-tone="plain" data-dlg-close data-i18n="common.close">Close</button>
+      <button type="button" class="poster-slab" data-tone="plain" id="backup-restore-btn" onclick="window._launcher.submitBackupRestore()" data-i18n="backup.restore" hidden>Restore selected</button>
     </footer>
   </dialog>
 
   <!-- Subdomain Assign Modal (operator only) -->
-  <dialog id="subdomain-overlay" class="dlg modal dlg--md">
+  <dialog id="subdomain-overlay" class="dlg modal dlg--md poster-dialog">
     <header class="dlg-head"><h2 class="dlg-title" data-i18n="subModal.title">Assign Subdomain</h2><button type="button" class="dlg-close"></button></header>
     <div class="dlg-body" id="subdomain-modal">
-      <div style="font-size:.8rem;color:var(--text-muted);margin-bottom:8px" id="subdomain-app-label"></div>
-      <div class="form-group">
-        <label for="subdomain-input" data-i18n="subModal.label">Subdomain</label>
-        <input type="text" id="subdomain-input" class="modal-input" placeholder="e.g. sanomat" data-i18n-ph="subModal.ph" autocomplete="off"/>
-        <div style="font-size:.75rem;color:var(--text-muted);margin-top:4px" data-i18n="subModal.hint">Lowercase letters, numbers and hyphens (2-63 chars). The app is served at the subdomain root.</div>
+      <div class="poster-stack" data-direction="vertical" data-align="stretch" data-density="normal">
+        <span class="poster-copy poster-text" data-kind="mono" data-tone="muted" id="subdomain-app-label"></span>
+        <div class="poster-field" data-filled="no" data-kind="text">
+          <label for="subdomain-input" class="poster-label" data-i18n="subModal.label">Subdomain</label>
+          <input type="text" id="subdomain-input" placeholder="e.g. sanomat" data-i18n-ph="subModal.ph" autocomplete="off" aria-describedby="subdomain-input-hint"/>
+          <small id="subdomain-input-hint" class="poster-field-hint" data-i18n="subModal.hint">Lowercase letters, numbers and hyphens (2-63 chars). The app is served at the subdomain root.</small>
+        </div>
+        <p id="subdomain-status" class="poster-copy poster-text" data-kind="body" data-tone="plain" role="status"></p>
       </div>
-      <div id="subdomain-status" style="margin-top:8px;font-size:.85rem;min-height:1.1em"></div>
     </div>
     <footer class="dlg-foot">
-      <div class="dlg-foot-start"><button type="button" class="modal-btn secondary" id="subdomain-unassign-btn" onclick="window._launcher.unassignSubdomain()" data-i18n="subModal.unassign">Unassign</button></div>
-      <button type="button" class="modal-btn secondary" data-dlg-close data-i18n="common.cancel">Cancel</button>
-      <button type="button" class="modal-btn primary" id="subdomain-save-btn" onclick="window._launcher.submitSubdomainAssign()" data-i18n="common.save">Save</button>
+      <div class="dlg-foot-start"><button type="button" class="poster-action" data-tone="danger" id="subdomain-unassign-btn" onclick="window._launcher.unassignSubdomain()" data-i18n="subModal.unassign">Unassign</button></div>
+      <button type="button" class="poster-action" data-tone="plain" data-dlg-close data-i18n="common.cancel">Cancel</button>
+      <button type="button" class="poster-slab" data-tone="plain" id="subdomain-save-btn" onclick="window._launcher.submitSubdomainAssign()" data-i18n="common.save">Save</button>
     </footer>
   </dialog>
 
   <!-- Versions Modal: the title names the app the versions belong to. -->
-  <dialog id="versions-overlay" class="dlg modal dlg--lg" data-dlg-guard="off">
-    <header class="dlg-head"><h2 class="dlg-title"><span data-i18n="versions.title">App Versions</span> <span id="versions-title" class="aga-app-ref"></span></h2><button type="button" class="dlg-close"></button></header>
+  <dialog id="versions-overlay" class="dlg modal dlg--lg poster-dialog" data-dlg-guard="off">
+    <header class="dlg-head"><h2 class="dlg-title"><span data-i18n="versions.title">App Versions</span> <span id="versions-title" class="poster-copy poster-text" data-kind="mono" data-tone="plain"></span></h2><button type="button" class="dlg-close"></button></header>
     <div class="dlg-body" id="versions-modal">
-      <div style="font-size:.78rem;color:var(--text-muted);margin-bottom:8px" data-i18n="versions.help">Every publish is kept. Restore re-publishes an older version as the new latest; Fork copies it into a new app. Older versions are never lost.</div>
-      <div id="versions-status" style="margin:6px 0;font-size:.85rem;min-height:1.1em"></div>
-      <div id="versions-list"></div>
+      <div class="poster-stack" data-direction="vertical" data-align="stretch" data-density="normal">
+        <small class="poster-copy poster-text" data-kind="caption" data-tone="muted" data-i18n="versions.help">Every publish is kept. Restore re-publishes an older version as the new latest; Fork copies it into a new app. Older versions are never lost.</small>
+        <p id="versions-status" class="poster-copy poster-text" data-kind="body" data-tone="plain" role="status"></p>
+        <div id="versions-list"></div>
+      </div>
     </div>
     <footer class="dlg-foot">
-      <button type="button" class="modal-btn secondary" data-dlg-close data-i18n="common.close">Close</button>
+      <button type="button" class="poster-action" data-tone="plain" data-dlg-close data-i18n="common.close">Close</button>
     </footer>
   </dialog>
 
   <!-- Fork lineage modal: cross-owner tree of forks (ancestry + descendants) with each node's live status -->
-  <dialog id="lineage-overlay" class="dlg modal dlg--lg" data-dlg-guard="off">
-    <header class="dlg-head"><h2 class="dlg-title"><span data-i18n="lineage.title">Fork lineage</span> <span id="lineage-title" class="aga-app-ref"></span></h2><button type="button" class="dlg-close"></button></header>
+  <dialog id="lineage-overlay" class="dlg modal dlg--lg poster-dialog" data-dlg-guard="off">
+    <header class="dlg-head"><h2 class="dlg-title"><span data-i18n="lineage.title">Fork lineage</span> <span id="lineage-title" class="poster-copy poster-text" data-kind="mono" data-tone="plain"></span></h2><button type="button" class="dlg-close"></button></header>
     <div class="dlg-body" id="lineage-modal">
-      <div style="font-size:.78rem;color:var(--text-muted);margin-bottom:6px" data-i18n="lineage.help">Every app that was forked from this one (and where this one came from), with each fork's current status. The chain survives a fork being parked or deleted.</div>
-      <div id="lineage-summary" style="font-size:.82rem;color:var(--text-muted);margin-bottom:8px"></div>
-      <div id="lineage-status" style="margin:6px 0;font-size:.85rem;min-height:1.1em"></div>
-      <div id="lineage-tree" style="font-size:.85rem"></div>
+      <div class="poster-stack" data-direction="vertical" data-align="stretch" data-density="normal">
+        <small class="poster-copy poster-text" data-kind="caption" data-tone="muted" data-i18n="lineage.help">Every app that was forked from this one (and where this one came from), with each fork's current status. The chain survives a fork being parked or deleted.</small>
+        <p id="lineage-summary" class="poster-copy poster-text" data-kind="body" data-tone="muted"></p>
+        <p id="lineage-status" class="poster-copy poster-text" data-kind="body" data-tone="plain" role="status"></p>
+        <div id="lineage-tree"></div>
+      </div>
     </div>
     <footer class="dlg-foot">
-      <button type="button" class="modal-btn secondary" data-dlg-close data-i18n="common.close">Close</button>
+      <button type="button" class="poster-action" data-tone="plain" data-dlg-close data-i18n="common.close">Close</button>
     </footer>
   </dialog>
 
   <!-- Bundled-agents modal (Agent-Bundled Apps): crew-def inspector + hosted instances with
        public offer prices + "deploy your own" (runner/organism pickers) onto the owner's fleet -->
-  <dialog id="agents-overlay" class="dlg modal dlg--lg" data-dlg-guard="off">
-    <header class="dlg-head"><h2 class="dlg-title"><span data-i18n="agents.title">Bundled agents</span> <span id="agents-modal-app" class="aga-app-ref"></span></h2><button type="button" class="dlg-close"></button></header>
+  <dialog id="agents-overlay" class="dlg modal dlg--lg poster-dialog" data-dlg-guard="off">
+    <header class="dlg-head"><h2 class="dlg-title"><span data-i18n="agents.title">Bundled agents</span> <span id="agents-modal-app" class="poster-copy poster-text" data-kind="mono" data-tone="plain"></span></h2><button type="button" class="dlg-close"></button></header>
     <div class="dlg-body" id="agents-modal">
-      <div id="agents-modal-body" class="aga-body"></div>
+      <div id="agents-modal-body"></div>
     </div>
     <footer class="dlg-foot">
-      <button type="button" class="modal-btn secondary" data-dlg-close data-i18n="common.close">Close</button>
+      <button type="button" class="poster-action" data-tone="plain" data-dlg-close data-i18n="common.close">Close</button>
     </footer>
   </dialog>
 
-  <!-- Copy-protection modal: opt-in per-app flags applied to the runnable HTML at serve time -->
-  <dialog id="protection-overlay" class="dlg modal dlg--md">
-    <header class="dlg-head"><h2 class="dlg-title"><span data-i18n="protect.title">Copy protection</span> <span id="protection-title" class="aga-app-ref"></span></h2><button type="button" class="dlg-close"></button></header>
+  <!-- Copy-protection modal: opt-in per-app flags applied to the runnable HTML at serve time.
+       Each flag is a row: its name (the label that ticks the box), what it does, the box. -->
+  <dialog id="protection-overlay" class="dlg modal dlg--md poster-dialog">
+    <header class="dlg-head"><h2 class="dlg-title"><span data-i18n="protect.title">Copy protection</span> <span id="protection-title" class="poster-copy poster-text" data-kind="mono" data-tone="plain"></span></h2><button type="button" class="dlg-close"></button></header>
     <div class="dlg-body" id="protection-modal">
-      <div style="font-size:.78rem;color:var(--text-muted);margin-bottom:10px" data-i18n="protect.help">Optional, per-app. These raise the cost of casual copying and make leaks traceable — they cannot stop someone who can view the app from copying its HTML. To truly protect logic or data, put it in a server-side extension.</div>
-      <label class="protect-row"><input type="checkbox" id="protect-obfuscate"> <span><b data-i18n="protect.obfuscate">Obfuscate</b> — <span data-i18n="protect.obfuscateHint">mangle the app's inline scripts so the source is hard to read.</span></span></label>
-      <label class="protect-row"><input type="checkbox" id="protect-domainLock"> <span><b data-i18n="protect.domainLock">Domain-lock</b> — <span data-i18n="protect.domainLockHint">only run on this node's app origin; a rehosted copy is sent home.</span></span></label>
-      <label class="protect-row"><input type="checkbox" id="protect-watermark"> <span><b data-i18n="protect.watermark">Watermark</b> — <span data-i18n="protect.watermarkHint">embed an invisible fingerprint so a leaked copy traces back to who was served it.</span></span></label>
-      <label class="protect-row"><input type="checkbox" id="protect-noRawDownload"> <span><b data-i18n="protect.noRawDownload">No raw download</b> — <span data-i18n="protect.noRawDownloadHint">block the raw source download; deliver the runnable app only.</span></span></label>
-      <div id="protection-status" style="margin:8px 0 0;font-size:.85rem;min-height:1.1em"></div>
+      <div class="poster-stack" data-direction="vertical" data-align="stretch" data-density="normal">
+        <small class="poster-copy poster-text" data-kind="caption" data-tone="muted" data-i18n="protect.help">Optional, per-app. These raise the cost of casual copying and make leaks traceable — they cannot stop someone who can view the app from copying its HTML. To truly protect logic or data, put it in a server-side extension.</small>
+        <div>
+          <article class="poster-list-row" data-kind="normal" data-density="normal" data-selected="no" data-detail="text">
+            <div class="poster-list-name"><strong><label for="protect-obfuscate" data-i18n="protect.obfuscate">Obfuscate</label></strong><small data-i18n="protect.obfuscateHint">mangle the app's inline scripts so the source is hard to read.</small></div>
+            <div class="poster-list-actions"><div class="poster-field" data-filled="no" data-kind="checkbox"><input type="checkbox" id="protect-obfuscate"></div></div>
+          </article>
+          <article class="poster-list-row" data-kind="normal" data-density="normal" data-selected="no" data-detail="text">
+            <div class="poster-list-name"><strong><label for="protect-domainLock" data-i18n="protect.domainLock">Domain-lock</label></strong><small data-i18n="protect.domainLockHint">only run on this node's app origin; a rehosted copy is sent home.</small></div>
+            <div class="poster-list-actions"><div class="poster-field" data-filled="no" data-kind="checkbox"><input type="checkbox" id="protect-domainLock"></div></div>
+          </article>
+          <article class="poster-list-row" data-kind="normal" data-density="normal" data-selected="no" data-detail="text">
+            <div class="poster-list-name"><strong><label for="protect-watermark" data-i18n="protect.watermark">Watermark</label></strong><small data-i18n="protect.watermarkHint">embed an invisible fingerprint so a leaked copy traces back to who was served it.</small></div>
+            <div class="poster-list-actions"><div class="poster-field" data-filled="no" data-kind="checkbox"><input type="checkbox" id="protect-watermark"></div></div>
+          </article>
+          <article class="poster-list-row" data-kind="normal" data-density="normal" data-selected="no" data-detail="text">
+            <div class="poster-list-name"><strong><label for="protect-noRawDownload" data-i18n="protect.noRawDownload">No raw download</label></strong><small data-i18n="protect.noRawDownloadHint">block the raw source download; deliver the runnable app only.</small></div>
+            <div class="poster-list-actions"><div class="poster-field" data-filled="no" data-kind="checkbox"><input type="checkbox" id="protect-noRawDownload"></div></div>
+          </article>
+        </div>
+        <p id="protection-status" class="poster-copy poster-text" data-kind="body" data-tone="plain" role="status"></p>
+      </div>
     </div>
     <footer class="dlg-foot">
-      <button type="button" class="modal-btn secondary" data-dlg-close data-i18n="common.close">Close</button>
-      <button type="button" class="modal-btn primary" onclick="window._launcher.saveProtection()" data-i18n="protect.save">Save</button>
+      <button type="button" class="poster-action" data-tone="plain" data-dlg-close data-i18n="common.close">Close</button>
+      <button type="button" class="poster-slab" data-tone="plain" onclick="window._launcher.saveProtection()" data-i18n="protect.save">Save</button>
     </footer>
   </dialog>
 
-  <!-- Generate App with AI — guided steps -->
-  <dialog id="prompt-builder-overlay" class="dlg modal dlg--lg prompt-builder-modal">
+  <!-- Generate App with AI — three numbered steps (the set's Steps). -->
+  <dialog id="prompt-builder-overlay" class="dlg modal dlg--lg poster-dialog">
     <header class="dlg-head"><h2 class="dlg-title" id="pb-title" data-i18n="pb.title">Generate App with AI</h2><button type="button" class="dlg-close"></button></header>
     <div class="dlg-body">
-      <p class="pb-intro" data-i18n="pb.intro">No coding. Describe your idea, copy the prompt, and paste it into any AI chat (Claude, ChatGPT…). The AI asks a few questions, builds a ready-to-use app, and gives you one HTML file — then add it here to put it live.</p>
+      <div class="poster-stack" data-direction="vertical" data-align="stretch" data-density="roomy">
+        <p class="poster-copy poster-text" data-kind="body" data-tone="plain" data-i18n="pb.intro">No coding. Describe your idea, copy the prompt, and paste it into any AI chat (Claude, ChatGPT…). The AI asks a few questions, builds a ready-to-use app, and gives you one HTML file — then add it here to put it live.</p>
 
-      <div class="pb-step">
-        <div class="pb-step-head"><span class="pb-step-num">1</span><span data-i18n="pb.step1">Describe your app</span></div>
-        <!-- Mode is implicit (new vs improve) — radios kept hidden for state; an "Improving:" note shows instead. -->
-        <div class="pb-mode-row" id="pb-mode-row" style="display:none">
-          <label class="pb-mode-radio"><input type="radio" name="pb-mode" value="new" checked> <span data-i18n="pb.new">New App</span></label>
-          <label class="pb-mode-radio"><input type="radio" name="pb-mode" value="improve"> <span data-i18n="pb.improve">Improve This App</span></label>
-        </div>
-        <div id="pb-improving" class="pb-improving" style="display:none"></div>
-        <!-- The TRACK is the first decision, and the two guides never mix (TARGET-074). -->
-        <div class="pb-track" id="pb-track" role="radiogroup">
-          <label class="pb-trackcard is-on" id="pb-track-classic">
-            <input type="radio" name="pb-track" value="classic" checked>
-            <span class="pb-trackname" data-i18n="pb.trackClassic">Classic</span>
-            <span class="pb-trackdesc" data-i18n="pb.trackClassicDesc">The proven way: templates, capability packs, the familiar clean style.</span>
-          </label>
-          <label class="pb-trackcard" id="pb-track-atelier">
-            <input type="radio" name="pb-track" value="atelier">
-            <span class="pb-trackname" data-i18n="pb.trackAtelier">Atelier</span>
-            <span class="pb-tracknew" data-i18n="pb.trackNew">new</span>
-            <span class="pb-trackdesc" data-i18n="pb.trackAtelierDesc">The new track: living looks, layouts your AI can rearrange later, motion built in.</span>
-          </label>
-        </div>
-        <textarea class="pb-desc-area" id="pb-description" placeholder="Describe what the app should do..." data-i18n-ph="pb.descPh"></textarea>
-        <div id="pb-classic-extras">
-        <label class="pb-ext-toggle" for="pb-template"><span>&#x2728; <span data-i18n="pb.template">Start from a template (optional)</span></span></label>
-        <select id="pb-template" class="modal-input pb-template-select"><option value="">(none &#x2014; build from scratch)</option></select>
-        <div class="pb-ext-toggle"><span>&#x1F9F0; <span data-i18n="pb.packs">Capability packs (optional)</span></span></div>
-        <p class="pb-step-hint" data-i18n="pb.packsHint">Charts, editable flow diagrams, games, 3D… — self-hosted libraries with AI instructions baked into the prompt. Your idea text pre-selects matching packs.</p>
-        <div class="pb-packs" id="pb-packs"></div>
-        <div class="pb-packinfo" id="pb-packinfo"></div>
-        <p class="pb-legend" data-i18n="pb.tierLegend">ANY MODEL = any model can build with it &#183; READ THE DOC = the model has no priors for it, so the usage doc travels in the prompt &#183; VERSION TRAP = the model remembers an older version, so follow the version in the doc</p>
-        </div>
-      </div>
+        <ol class="poster-steps">
+          <li><div class="poster-stack" data-direction="vertical" data-align="stretch" data-density="normal">
+            <h3 class="poster-copy poster-record-title poster-record-title--small" data-kind="heading" data-tone="plain" data-i18n="pb.step1">Describe your app</h3>
+            <!-- Mode is implicit (new vs improve) — radios kept hidden for state; an "Improving:" note shows instead. -->
+            <div id="pb-mode-row" hidden>
+              <label><input type="radio" name="pb-mode" value="new" checked> <span data-i18n="pb.new">New App</span></label>
+              <label><input type="radio" name="pb-mode" value="improve"> <span data-i18n="pb.improve">Improve This App</span></label>
+            </div>
+            <p id="pb-improving" class="poster-copy poster-text" data-kind="body" data-tone="coral"></p>
+            <!-- The TRACK is the first decision, and the two guides never mix (TARGET-074). Two
+                 boxed answers (the set's choice); the radio inside each is the answer. -->
+            <div id="pb-track" role="radiogroup">
+              <div class="poster-columns-frame"><div class="poster-columns" data-layout="equal" data-density="normal" data-collapse="560">
+                <label class="poster-choice" id="pb-track-classic">
+                  <b><input type="radio" name="pb-track" value="classic" checked> <span data-i18n="pb.trackClassic">Classic</span></b>
+                  <span data-i18n="pb.trackClassicDesc">The proven way: templates, capability packs, the familiar clean style.</span>
+                </label>
+                <label class="poster-choice" id="pb-track-atelier">
+                  <b><input type="radio" name="pb-track" value="atelier"> <span data-i18n="pb.trackAtelier">Atelier</span> <span class="poster-chip" data-tone="coral" data-i18n="pb.trackNew">new</span></b>
+                  <span data-i18n="pb.trackAtelierDesc">The new track: living looks, layouts your AI can rearrange later, motion built in.</span>
+                </label>
+              </div></div>
+            </div>
+            <div class="poster-field" data-filled="no" data-kind="textarea">
+              <textarea id="pb-description" rows="4" placeholder="Describe what the app should do..." data-i18n-ph="pb.descPh"></textarea>
+            </div>
+            <div id="pb-classic-extras">
+              <div class="poster-stack" data-direction="vertical" data-align="stretch" data-density="normal">
+                <div class="poster-field" data-filled="no" data-kind="select">
+                  <label class="poster-label" for="pb-template" data-i18n="pb.template">Start from a template (optional)</label>
+                  <select id="pb-template"><option value="">(none &#x2014; build from scratch)</option></select>
+                </div>
+                <span class="poster-copy poster-label" data-kind="label" data-tone="plain" data-i18n="pb.packs">Capability packs (optional)</span>
+                <p class="poster-copy poster-text" data-kind="body" data-tone="muted" data-i18n="pb.packsHint">Charts, editable flow diagrams, games, 3D… — self-hosted libraries with AI instructions baked into the prompt. Your idea text pre-selects matching packs.</p>
+                <div class="poster-stack" data-direction="wrap" data-align="start" data-density="compact" id="pb-packs"></div>
+                <div id="pb-packinfo"></div>
+                <small class="poster-copy poster-text" data-kind="caption" data-tone="muted" data-i18n="pb.tierLegend">ANY MODEL = any model can build with it &#183; READ THE DOC = the model has no priors for it, so the usage doc travels in the prompt &#183; VERSION TRAP = the model remembers an older version, so follow the version in the doc</small>
+              </div>
+            </div>
+          </div></li>
 
-      <div class="pb-step">
-        <div class="pb-step-head"><span class="pb-step-num">2</span><span data-i18n="pb.step2">Copy the prompt &amp; paste it into your AI</span></div>
-        <p class="pb-step-hint" data-i18n="pb.step2hint">Open Claude, ChatGPT or any AI chat, paste this in, and answer its questions. It will build your app and hand you a single HTML file.</p>
-        <div class="pb-preview-label" data-i18n="pb.promptPreview">Prompt preview</div>
-        <div class="pb-preview" id="pb-preview"></div>
-        <button class="modal-btn primary pb-step-btn" id="pb-copy-btn" data-i18n="pb.copy">&#x1F4CB; Copy Prompt</button>
-      </div>
+          <li><div class="poster-stack" data-direction="vertical" data-align="stretch" data-density="normal">
+            <h3 class="poster-copy poster-record-title poster-record-title--small" data-kind="heading" data-tone="plain" data-i18n="pb.step2">Copy the prompt &amp; paste it into your AI</h3>
+            <p class="poster-copy poster-text" data-kind="body" data-tone="muted" data-i18n="pb.step2hint">Open Claude, ChatGPT or any AI chat, paste this in, and answer its questions. It will build your app and hand you a single HTML file.</p>
+            <span class="poster-copy poster-label" data-kind="label" data-tone="plain" data-i18n="pb.promptPreview">Prompt preview</span>
+            <div class="poster-surface poster-box poster-code" data-density="normal" data-tone="plain" data-height="auto" id="pb-preview"></div>
+            <div><button type="button" class="poster-slab" data-tone="plain" id="pb-copy-btn" data-i18n="pb.copy">Copy Prompt</button></div>
+          </div></li>
 
-      <div class="pb-step">
-        <div class="pb-step-head"><span class="pb-step-num">3</span><span data-i18n="pb.step3">Add &amp; publish your app</span></div>
-        <p class="pb-step-hint" data-i18n="pb.step3hint">Got the HTML file from the AI? Add it here — it goes live on your node and you get a link to share.</p>
-        <button class="modal-btn pb-step-btn" id="pb-add-btn" data-i18n="pb.addBtn">&#x2795; I have my app file — add it</button>
+          <li><div class="poster-stack" data-direction="vertical" data-align="stretch" data-density="normal">
+            <h3 class="poster-copy poster-record-title poster-record-title--small" data-kind="heading" data-tone="plain" data-i18n="pb.step3">Add &amp; publish your app</h3>
+            <p class="poster-copy poster-text" data-kind="body" data-tone="muted" data-i18n="pb.step3hint">Got the HTML file from the AI? Add it here — it goes live on your node and you get a link to share.</p>
+            <div><button type="button" class="poster-action" data-tone="plain" id="pb-add-btn" data-i18n="pb.addBtn">I have my app file — add it</button></div>
+          </div></li>
+        </ol>
       </div>
     </div>
     <footer class="dlg-foot">
-      <button type="button" class="modal-btn secondary" id="pb-cancel-btn" data-i18n="common.close">Close</button>
+      <button type="button" class="poster-action" data-tone="plain" id="pb-cancel-btn" data-i18n="common.close">Close</button>
     </footer>
   </dialog>
-
-  <!-- Published Apps Section (inserted before grid, toggled) -->
 
 <script>__APP_CATALOG_BUNDLE__</script>
 </body>

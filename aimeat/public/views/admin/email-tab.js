@@ -13,12 +13,16 @@
  *
  * @structure
  *   - EmailTab({ data, locale }) — the sections, or the not-configured page when there is no host
+ *   - Status: the word, the sentence and the log line that open section 01
  *   - RightNow: section 01, the settings and the numeral strip
  *   - Automatic: section 03, the six messages the node sends by itself plus the group send
  *   - NotConfigured: the whole page when no SMTP host is set: what stops working, and what to set
  *   - Sections 02 and 04 are in email-tab.send.js, section 05 in email-tab.templates.js
  *
  * @version-history
+ *   v3.0.0 — 2026-09-22 — Composed from the shared component set (components/poster-parts.js):
+ *     shared sections, the numeral band for the strip, the shared table for the automatic messages,
+ *     a code surface for the settings to set. The page's own sheet (admin-email.css) is gone.
  *   v2.1.0 — 2026-09-13 — Compose shared poster section headings.
  *   v2.0.0 — 2026-09-12 — The poster face. The page now shows the setting that decides whether a
  *     new account must confirm its address (the status route has always returned it and no screen
@@ -32,8 +36,8 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { useViewCSS } from '/components/useViewCSS.js';
 import { num, Empty, Badge, Row } from './shared.js';
+import { Section, Columns, Stack, Table, NumeralBand, Surface, Text } from '/components/poster-parts.js';
 import { TestSend, GroupSend } from './email-tab.send.js';
 import Templates from './email-tab.templates.js';
 
@@ -58,6 +62,15 @@ function fromParts(fromHeader) {
   return { address, domain: at > 0 ? address.slice(at + 1) : '' };
 }
 
+/** The status word, the sentence under it and the one mono log line. */
+function Status({ word, line, log, danger }) {
+  return html`<${Stack} density="compact">
+    <${Text} kind="number" tone=${danger ? 'danger' : 'plain'}>${word}<//>
+    <${Text}>${line}<//>
+    <${Text} kind="mono" tone="muted">${log}<//>
+  <//>`;
+}
+
 /** Section 01: every setting, what it does, and the numeral strip under it. */
 function RightNow({ email }) {
   const from = fromParts(email.smtp_from);
@@ -70,18 +83,10 @@ function RightNow({ email }) {
   const secure = email.smtp_secure === true;
 
   return html`
-    <section class="og-sec og-sec--first">
-      <div class="og-sec-h">
-        <h2 class="poster-section-title">${E('now.title')}<small>01</small></h2>
-      </div>
-      <div class="adm-ov-grid">
-        <div>
-          <div class="adm-ov-status">${E('now.word')}</div>
-          <p class="adm-alert-line">${E('now.line', { host })}</p>
-          <div class="adm-ov-up">${E('now.log', {
-    host, port: email.smtp_port, mode: secure ? 'TLS' : 'STARTTLS', from: from.address,
-  })}</div>
-        </div>
+    <${Section} title=${E('now.title')} count="01">
+      <${Columns} layout="trailing" collapse=${900}>
+        <${Status} word=${E('now.word')} line=${E('now.line', { host })}
+          log=${E('now.log', { host, port: email.smtp_port, mode: secure ? 'TLS' : 'STARTTLS', from: from.address })} />
         <div>
           <${Row} title=${E('now.server')} why=${E('now.serverWhy')}
             chip=${html`<${Badge} type="healthy" label=${E('now.configured')} />`}
@@ -101,23 +106,19 @@ function RightNow({ email }) {
             chip=${html`<${Badge} type=${email.smtp_user_configured && email.smtp_pass_configured ? 'healthy' : 'warning'}
               label=${email.smtp_user_configured && email.smtp_pass_configured ? E('now.bothSet') : E('now.missing')} />`}
             value="AIMEAT_SMTP_USER / _PASS" />
-          <${Row} title=${E('now.verification')} why=${E('now.verificationWhy')} last=${true}
+          <${Row} title=${E('now.verification')} why=${E('now.verificationWhy')}
             chip=${html`<${Badge} type=${email.confirmation_required ? 'healthy' : 'muted'}
               label=${email.confirmation_required ? E('now.required') : E('now.notRequired')} />`}
             value="AIMEAT_EMAIL_CONFIRMATION_REQUIRED" />
         </div>
-      </div>
-      <div class="og-strip">
-        <div><b>${sent.counted ? num(sent.total ?? 0) : '—'}</b><span>${E('strip.sent')}</span>
-          <small>${sent.counted ? E('strip.sentSub') : E('strip.notCounted')}</small></div>
-        <div><b>${sent.counted ? num(sent.last_7_days ?? 0) : '—'}</b><span>${E('strip.week')}</span>
-          <small>${E('strip.weekSub')}</small></div>
-        <div><b class=${sent.failed ? 'og-coral-num' : ''}>${sent.counted ? num(sent.failed ?? 0) : '—'}</b><span>${E('strip.failed')}</span>
-          <small>${E('strip.failedSub')}</small></div>
-        <div><b>${num(rec.with_address ?? 0)}</b><span>${E('strip.reach')}</span>
-          <small>${E('strip.reachSub', { total: num(rec.accounts ?? 0) })}</small></div>
-      </div>
-    </section>`;
+      <//>
+      <${NumeralBand} tone="plain" items=${[
+        { label: E('strip.sent'), value: sent.counted ? num(sent.total ?? 0) : '—', note: sent.counted ? E('strip.sentSub') : E('strip.notCounted') },
+        { label: E('strip.week'), value: sent.counted ? num(sent.last_7_days ?? 0) : '—', note: E('strip.weekSub') },
+        { label: E('strip.failed'), value: sent.counted ? num(sent.failed ?? 0) : '—', note: E('strip.failedSub'), tone: sent.failed ? 'coral' : undefined },
+        { label: E('strip.reach'), value: num(rec.with_address ?? 0), note: E('strip.reachSub', { total: num(rec.accounts ?? 0) }) },
+      ]} />
+    <//>`;
 }
 
 /** Section 03: what leaves the node without anyone pressing anything, and how much has. */
@@ -125,47 +126,32 @@ function Automatic({ email }) {
   const sent = email.sent || {};
   const byType = sent.by_type || {};
   const count = key => (sent.counted ? (byType[key] ?? 0) : null);
-  const cell = n => n === null
-    ? html`<div class="adm-em-count adm-em-count--none">—</div>`
-    : html`<div class="adm-em-count ${n ? '' : 'adm-em-count--none'}">${num(n)}</div>`;
+  const cell = n => (n === null || !n
+    ? html`<${Text} kind="mono" tone="muted">${n === null ? '—' : num(n)}<//>`
+    : { text: num(n), align: 'end' });
+  const template = (name) => (name
+    ? { text: name, mono: true }
+    : html`<${Text} kind="caption" tone="muted">${E('auto.hardCoded')}<//>`);
 
   return html`
-    <section class="og-sec">
-      <div class="og-sec-h"><h2 class="poster-section-title">${E('auto.title')}<small>03</small></h2></div>
-      <p class="adm-em-lead">${E('auto.lead')}</p>
-      <div class="adm-em-row adm-em-row--head">
-        <div>${E('auto.colMessage')}</div><div class="adm-em-when">${E('auto.colWhen')}</div>
-        <div>${E('auto.colTemplate')}</div><div class="adm-em-count">${E('auto.colSent')}</div>
-      </div>
-      ${AUTOMATIC.map(m => html`
-        <div class="adm-em-row">
-          <div class="adm-em-nm">${E('kind.' + m.id)}</div>
-          <div class="adm-em-when">${E('auto.when.' + m.id)}</div>
-          <div class="adm-em-code ${m.template ? '' : 'adm-em-code--fixed'}">${m.template || E('auto.hardCoded')}</div>
-          ${cell(count(m.counter))}
-        </div>`)}
-      <div class="adm-em-row adm-em-row--last">
-        <div class="adm-em-nm">${E('kind.group_send')}</div>
-        <div class="adm-em-when">${E('auto.when.group_send')}</div>
-        <div class="adm-em-code adm-em-code--fixed">${E('auto.hardCoded')}</div>
-        ${cell(count('group_send'))}
-      </div>
-      <p class="adm-em-note">${E('auto.note')}</p>
-    </section>`;
+    <${Section} title=${E('auto.title')} count="03" description=${E('auto.lead')}>
+      <${Table} collapse=${640}
+        headers=${[E('auto.colMessage'), E('auto.colWhen'), E('auto.colTemplate'), E('auto.colSent')]}
+        rows=${[
+          ...AUTOMATIC.map(m => [html`<strong>${E('kind.' + m.id)}</strong>`, E('auto.when.' + m.id), template(m.template), cell(count(m.counter))]),
+          [html`<strong>${E('kind.group_send')}</strong>`, E('auto.when.group_send'), template(null), cell(count('group_send'))],
+        ]} />
+      <${Text} kind="caption" tone="muted">${E('auto.note')}<//>
+    <//>`;
 }
 
 /** The whole page when no SMTP host is set: what stops working, and what to set. */
 function NotConfigured() {
   return html`
-    <div class="og adm-em">
-      <section class="og-sec og-sec--first">
-        <div class="og-sec-h"><h2 class="poster-section-title">${E('now.title')}<small>01</small></h2></div>
-        <div class="adm-ov-grid">
-          <div>
-            <div class="adm-ov-status danger">${E('off.word')}</div>
-            <p class="adm-alert-line">${E('off.line')}</p>
-            <div class="adm-ov-up">${E('off.log')}</div>
-          </div>
+    <${Stack}>
+      <${Section} title=${E('now.title')} count="01">
+        <${Columns} layout="trailing" collapse=${900}>
+          <${Status} word=${E('off.word')} line=${E('off.line')} log=${E('off.log')} danger=${true} />
           <div>
             <${Row} title=${E('kind.verification')} why=${E('off.verificationWhy')}
               chip=${html`<${Badge} type="warning" label=${E('off.notSent')} />`} value=${E('off.atSignUp')} />
@@ -173,18 +159,17 @@ function NotConfigured() {
               chip=${html`<${Badge} type="warning" label=${E('off.notSent')} />`} value=${E('off.atSignIn')} />
             <${Row} title=${E('kind.notification')} why=${E('off.notificationWhy')}
               chip=${html`<${Badge} type="warning" label=${E('off.notSent')} />`} value=${E('off.inAppOnly')} />
-            <${Row} title=${E('off.invites')} why=${E('off.invitesWhy')} last=${true}
+            <${Row} title=${E('off.invites')} why=${E('off.invitesWhy')}
               chip=${html`<${Badge} type="muted" label=${E('off.linkOnly')} />`} value=${E('off.noEmail')} />
           </div>
-        </div>
-      </section>
+        <//>
+      <//>
 
-      <section class="og-sec">
-        <div class="og-sec-h"><h2 class="poster-section-title">${E('off.setTitle')}<small>02</small></h2></div>
-        <p class="adm-em-lead">${E('off.setLead')}</p>
-        <div class="adm-em-envbox">
-          <div class="adm-em-envbox-t">${E('off.envLabel')}</div>
-          <pre class="adm-em-env">${[
+      <${Section} title=${E('off.setTitle')} count="02" description=${E('off.setLead')}>
+        <${Stack}>
+          <${Stack} density="compact">
+            <${Text} kind="label">${E('off.envLabel')}<//>
+            <${Surface} kind="code">${[
     'AIMEAT_SMTP_HOST=mail.example.com',
     'AIMEAT_SMTP_PORT=587',
     'AIMEAT_SMTP_USER=notifications@example.com',
@@ -192,26 +177,26 @@ function NotConfigured() {
     'AIMEAT_SMTP_FROM=Example <notifications@example.com>',
     'AIMEAT_SMTP_SECURE=false',
     'AIMEAT_SMTP_REJECT_UNAUTHORIZED=true',
-  ].join('\n')}</pre>
-        </div>
-        <p class="adm-em-note">${E('off.setNote')}</p>
-        <p class="adm-em-note">${E('off.dnsNote')}</p>
-      </section>
-    </div>`;
+  ].join('\n')}<//>
+          <//>
+          <${Text} kind="caption" tone="muted">${E('off.setNote')}<//>
+          <${Text} kind="caption" tone="muted">${E('off.dnsNote')}<//>
+        <//>
+      <//>
+    <//>`;
 }
 
 export default function EmailTab({ data, locale }) {
-  useViewCSS('/css/views/admin-email.css');
   const email = data.email;
   if (!email) return html`<${Empty} text=${t('dashboard.emailNotAvailable')} />`;
   if (!email.enabled) return html`<${NotConfigured} />`;
 
   return html`
-    <div class="og adm-em">
+    <${Stack}>
       <${RightNow} email=${email} />
       <${TestSend} locale=${locale || 'en'} />
       <${Automatic} email=${email} />
       <${GroupSend} recipients=${email.recipients} />
       <${Templates} locale=${locale || 'en'} />
-    </div>`;
+    <//>`;
 }

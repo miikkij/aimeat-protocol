@@ -16,14 +16,18 @@
  *   have saved". Someone who runs a node once a month should not have to work out what a sentence
  *   means (Jouni, 2026-09-12: "miksei toi voi puhua normaalia").
  *
- *   ONE DARK BUTTON, AND IT FOLLOWS YOU. The arrangement waits for Save, and the pinned row keeps
- *   the count of unsaved changes and the button itself under the topbar wherever you have scrolled.
+ *   ONE DARK BUTTON, AND IT FOLLOWS YOU. The arrangement waits for Save, and the sticky row keeps
+ *   the count of unsaved changes and the button itself in sight wherever you have scrolled.
  *   Every other save on this page belongs to something else and says so: a text is written the
  *   moment you press Add, and the menu has its own button.
  * @structure PortalTab (default) · RightNow · Strip · the section components from
  *   portal-tab.sections.js · PartsList/AddPart from portal-tab.parts.js · PagePreview
  * @usage Mounted by the admin dashboard tab router.
  * @version-history
+ *   v2.2.0 -- 2026-09-22 -- Composed from the shared component set: sections, rows, a numeral band,
+ *     tab actions for the three pages, the save row as a sticky box that stays in sight while
+ *     the page scrolls, the preview above the parts at every width; the page's own
+ *     sheet is gone.
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v2.1.0 — 2026-09-13 — Compose shared poster headings and external note spacing.
  *   v2.0.0 — 2026-09-12 — The poster face: eight numbered sections in the order an operator asks,
@@ -41,9 +45,9 @@ import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { escHtml, copyToClipboard } from '/js/utils.js';
-import { useViewCSS } from '/components/useViewCSS.js';
 import { onLiveUpdate } from '/lib/live-updates.js';
-import { num, dt, Badge, Spinner, useToast, Toast } from './shared.js';
+import { num, dt, Badge, Row, Spinner, useToast, Toast } from './shared.js';
+import { Section, Columns, Stack, Text, Action, NumeralBand, Surface } from '/components/poster-parts.js';
 import { useConfirm } from '/components/Modal.js';
 import { swallowed } from '/js/swallowed.js';
 import {
@@ -89,25 +93,21 @@ function RightNow({ facts, number, onOpenPage, onClearCache }) {
   const suffix = hidden === 0 ? 'None' : hidden === 1 ? 'One' : '';
   const key = (hasCustom ? 'lineHtml' : source === 'stored' ? 'lineYours' : 'lineDefault') + suffix;
   const line = P('now.' + key, { n: num(parts), hidden: num(hidden) });
-  const row = (title, why, chip, value, last) => html`
-    <div class=${'adm-mrow' + (last ? ' adm-mrow--last' : '')}>
-      <span><b>${title}</b><span class="adm-why">${why}</span></span>
-      <span>${chip}</span>
-      <span class="adm-mval">${value}</span>
-    </div>`;
+  const row = (title, why, chip, value) => Row({ title, why, chip, value });
   return html`
-    <section class="og-sec og-sec--first" id="adm-pt-now">
-      <div class="og-sec-h"><h2 class="poster-section-title">${P('now.title')}<small>${number}</small></h2>
-        <div class="og-doors">
-          <button type="button" class="og-door og-door--quiet" onClick=${onOpenPage}>${P('now.openPage')}</button>
-          <button type="button" class="og-door og-door--quiet" onClick=${onClearCache}>${P('now.clearCache')}</button>
-        </div></div>
-      <div class="adm-ov-grid">
-        <div>
-          <div class="adm-ov-status">${word}</div>
-          <p class="adm-alert-line">${line}</p>
-          <div class="adm-ov-up">${baseUrl}<br />${lastChange}</div>
-        </div>
+    <${Section} id="adm-pt-now" title=${P('now.title')} count=${number}
+      actions=${html`
+        <${Action} onClick=${onOpenPage}>${P('now.openPage')}<//>
+        <${Action} onClick=${onClearCache}>${P('now.clearCache')}<//>`}>
+      <${Columns} layout="trailing" collapse=${900} density="roomy">
+        <${Stack}>
+          <${Text} kind="heading">${word}<//>
+          <${Text}>${line}<//>
+          <${Stack} density="compact">
+            <${Text} kind="mono" tone="muted">${baseUrl}<//>
+            <${Text} kind="mono" tone="muted">${lastChange}<//>
+          <//>
+        <//>
         <div>
           ${row(P('now.pageRow'), P('now.pageWhy'),
             hasCustom
@@ -135,20 +135,19 @@ function RightNow({ facts, number, onOpenPage, onClearCache }) {
             texts > 0
               ? html`<${Badge} type="info" label=${P('now.badgeTexts', { n: num(texts) })} />`
               : html`<${Badge} type="muted" label=${P('now.badgeNone')} />`,
-            'portal/*', true)}
+            'portal/*')}
         </div>
-      </div>
-      <div class="og-strip">
-        <div><b>${num(parts)}</b><span>${P('strip.parts')}</span><small>${P('strip.partsSub')}</small></div>
-        <div><b>${num(hidden)}</b><span>${P('strip.hidden')}</span><small>${P('strip.hiddenSub')}</small></div>
-        <div><b>${num(texts)}</b><span>${P('strip.texts')}</span><small>${P('strip.textsSub')}</small></div>
-        <div><b>${cacheTtl} s</b><span>${P('strip.delay')}</span><small>${P('strip.delaySub')}</small></div>
-      </div>
-    </section>`;
+      <//>
+      <${NumeralBand} tone="plain" size="small" items=${[
+    { label: P('strip.parts'), value: num(parts), note: P('strip.partsSub') },
+    { label: P('strip.hidden'), value: num(hidden), note: P('strip.hiddenSub') },
+    { label: P('strip.texts'), value: num(texts), note: P('strip.textsSub') },
+    { label: P('strip.delay'), value: `${cacheTtl} s`, note: P('strip.delaySub') },
+  ]} />
+    <//>`;
 }
 
 export default function PortalTab({ data, reload }) {
-  useViewCSS('/css/views/admin-portal.css');
   const [surface, setSurface] = useState('portal');
   const [toast, showErr, showOk, clearToast] = useToast();
   const { confirm, ConfirmUI } = useConfirm();
@@ -443,80 +442,82 @@ export default function PortalTab({ data, reload }) {
   const openPage = () => window.open(hasCustom ? '/' : '/v1/portal', '_blank', 'noopener');
 
   return html`
-    <div class="adm-pt">
+    <div>
       ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
-      <p class="adm-pt-intro">${P('intro', { url: meta.base_url || '/' })}</p>
+      <${Stack}>
+        <${Text} tone="muted">${P('intro', { url: meta.base_url || '/' })}<//>
 
-      ${isLb && html`
-        <div class="og-box adm-pt-lb-note poster-aside poster-aside--small">
-          <span class="og-box-label">${P('lb.title')}</span>
-          ${P('lb.lead', { origin: escHtml(meta.lb_mode.origin_url || '-') })}
-          <div class="og-doors adm-pt-lb-doors">
-            <button type="button" class="og-door og-door--quiet" onClick=${doLbSync}>${P('lb.sync')}</button>
-            <span class="adm-pt-note">${meta.lb_mode.last_sync ? P('lb.lastSync', { when: dt(meta.lb_mode.last_sync) }) : P('lb.never')}</span>
-          </div>
-        </div>`}
+        ${isLb && html`
+          <${Surface} kind="aside">
+            <${Stack} density="compact">
+              <${Text} kind="label">${P('lb.title')}<//>
+              <${Text}>${P('lb.lead', { origin: escHtml(meta.lb_mode.origin_url || '-') })}<//>
+              <${Stack} direction="wrap" align="center">
+                <${Action} onClick=${doLbSync}>${P('lb.sync')}<//>
+                <${Text} kind="caption" tone="muted">${meta.lb_mode.last_sync ? P('lb.lastSync', { when: dt(meta.lb_mode.last_sync) }) : P('lb.never')}<//>
+              <//>
+            <//>
+          <//>`}
 
-      <div class="adm-pt-pin">
-        <button type="button" class="adm-btn" disabled=${saving || !dirty} onClick=${saveLayout}>
-          ${saving ? P('saving') : P('save')}
-        </button>
-        ${dirty
-          ? html`
-            <span class="adm-pt-pin-count">${unsaved === 1 ? P('unsavedOne') : P('unsaved', { n: num(unsaved) })}</span>
-            <button type="button" class="og-door og-door--quiet" onClick=${() => setShowPending(s => !s)}>
-              ${showPending ? P('hideWhat') : P('seeWhat')}
-            </button>
-            <button type="button" class="og-door og-door--quiet" onClick=${undoAll}>${P('undo')}</button>`
-          : html`<span class="adm-pt-pin-note">${P('nothingUnsaved')}</span>`}
-        ${dirty && html`<span class="adm-pt-pin-note">${P('unsavedNote')}</span>`}
-      </div>
+        ${/* The page's one loud button and the count of what waits for it, kept under the top of the
+              scrolling area wherever you have scrolled. */ ''}
+        <${Surface} kind="box" density="compact" sticky>
+          <${Stack} direction="wrap" align="center">
+            <${Action} kind="primary" disabled=${saving || !dirty} onClick=${saveLayout}>
+              ${saving ? P('saving') : P('save')}
+            <//>
+            ${dirty
+              ? html`
+                <${Text} kind="label">${unsaved === 1 ? P('unsavedOne') : P('unsaved', { n: num(unsaved) })}<//>
+                <${Action} onClick=${() => setShowPending(s => !s)} expanded=${showPending}>
+                  ${showPending ? P('hideWhat') : P('seeWhat')}
+                <//>
+                <${Action} onClick=${undoAll}>${P('undo')}<//>`
+              : html`<${Text} kind="caption" tone="muted">${P('nothingUnsaved')}<//>`}
+            ${dirty && html`<${Text} kind="caption" tone="muted">${P('unsavedNote')}<//>`}
+          <//>
+        <//>
 
-      ${showPending && dirty && html`
-        <div class="adm-pt-pin-list poster-aside">
-          <ul>
-            ${blocks.map((b, i) => html`<li key=${b.key}>${i + 1}. ${b.id}${b.hidden ? ` · ${P('parts.chipHidden')}` : ''}</li>`)}
-          </ul>
-        </div>`}
+        ${showPending && dirty && html`
+          <${Surface} kind="aside" height="scroll">
+            <${Stack} density="compact">
+              ${blocks.map((b, i) => html`<${Text} key=${b.key} kind="mono">${i + 1}. ${b.id}${b.hidden ? ` · ${P('parts.chipHidden')}` : ''}<//>`)}
+            <//>
+          <//>`}
+      <//>
 
       <${RightNow} facts=${facts} number=${n()} onOpenPage=${openPage} onClearCache=${doClearCache} />
 
-      <section class="og-sec" id="adm-pt-parts">
-        <div class="og-sec-h"><h2 class="poster-section-title">${P('parts.title')}<small>${n()}</small></h2>
-          <div class="og-doors">
-            <button type="button" class="og-door og-door--quiet" onClick=${startFromDefault}>${P('parts.startDefault')}</button>
-            ${source === 'stored' && html`
-              <button type="button" class="og-door og-door--quiet og-door--danger" onClick=${backToDefault}>${P('parts.backDefault')}</button>`}
-          </div></div>
+      <${Section} id="adm-pt-parts" title=${P('parts.title')} count=${n()}
+        actions=${html`
+          <${Action} onClick=${startFromDefault}>${P('parts.startDefault')}<//>
+          ${source === 'stored' && html`<${Action} tone="danger" onClick=${backToDefault}>${P('parts.backDefault')}<//>`}`}>
+        <${Stack}>
+          <${Stack} direction="wrap" density="compact" role="tablist" label=${P('parts.title')}>
+            ${SURFACES.map(s => html`
+              <${Action} key=${s} kind="tab" semantics="tab" selected=${surface === s}
+                onClick=${() => { setSurface(s); setOpenPart(null); }}>${P('surface.' + s)}<//>`)}
+          <//>
+          <${Text} kind="caption" tone="muted">${P('surface.' + surface + 'Note')}<//>
 
-        <div class="adm-pt-tabs">
-          ${SURFACES.map(s => html`
-            <button type="button" key=${s} class=${'adm-pt-tab' + (surface === s ? ' on' : '')}
-              onClick=${() => { setSurface(s); setOpenPart(null); }}>${P('surface.' + s)}</button>`)}
-        </div>
-        <p class="adm-pt-tabnote">${P('surface.' + surface + 'Note')}</p>
+          ${problems.length > 0 && html`
+            <${Surface} kind="aside">
+              <${Stack} density="compact">
+                <${Text} kind="label">${P('parts.leftOut')}<//>
+                ${problems.map((pr, i) => html`<${Text} key=${i}>${pr}<//>`)}
+              <//>
+            <//>`}
 
-        ${problems.length > 0 && html`
-          <div class="og-box adm-pt-problems poster-aside poster-aside--small">
-            <span class="og-box-label">${P('parts.leftOut')}</span>
-            <ul class="adm-pt-problems-list">
-              ${problems.map((pr, i) => html`<li key=${i}>${pr}</li>`)}
-            </ul>
-          </div>`}
-
-        <div class="adm-pt-bench">
-          <div>
-            <${PartsList} blocks=${blocks} catalog=${catalog} passages=${passages} open=${openPart}
-              onOpen=${setOpenPart} onMove=${move} onToggle=${toggleHidden} onRemove=${removePart}
-              onProp=${setProp} onPassage=${setPassage} />
-            <${AddPart} catalog=${catalog} blocks=${blocks} onAdd=${addPart} />
-          </div>
-          <div class="adm-pt-side">
-            <${PagePreview} surface=${surface} hasCustom=${hasCustom} nonce=${previewNonce}
-              unsaved=${unsaved} shown=${blocks.filter(b => !b.hidden).length} />
-          </div>
-        </div>
-      </section>
+          ${/* The page above the list at every width: beside it, the list's actions had no room to
+                sit on one line. */ ''}
+          <${PagePreview} surface=${surface} hasCustom=${hasCustom} nonce=${previewNonce}
+            unsaved=${unsaved} shown=${blocks.filter(b => !b.hidden).length} />
+          <${PartsList} blocks=${blocks} catalog=${catalog} passages=${passages} open=${openPart}
+            onOpen=${setOpenPart} onMove=${move} onToggle=${toggleHidden} onRemove=${removePart}
+            onProp=${setProp} onPassage=${setPassage} />
+          <${AddPart} catalog=${catalog} blocks=${blocks} onAdd=${addPart} />
+        <//>
+      <//>
 
       ${isPortal && html`
         <${WhichVersion} hasCustom=${hasCustom} source=${source} parts=${blocks.length} number=${n()} />

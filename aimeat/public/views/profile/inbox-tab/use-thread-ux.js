@@ -4,12 +4,19 @@
  * SPDX-License-Identifier: MIT
  * @description Thread-pane UX hooks for the profile Inbox tab: useThreadAutoScroll (jump to the
  *   latest message on open / near-bottom follow / a single one-time jump when a NEW message arrives —
- *   never a sticky pin), useMobileComposerKeyboard (≤760px: publishes the on-screen keyboard's
- *   height as --inbox-kb from visualViewport and scrolls the composer into view on focus) and
- *   useAttachmentUrlRefresh (re-mints expiring presigned attachment URLs while a thread is open).
+ *   never a sticky pin), useMobileComposerKeyboard (≤760px: publishes the space above the on-screen
+ *   keyboard as --workspace-avail on the page root and keeps the newest messages in view on focus),
+ *   useNarrowScreen (one pane at a time on a phone) and useAttachmentUrlRefresh (re-mints expiring
+ *   presigned attachment URLs while a thread is open).
  *   Extracted from inbox-tab.js to satisfy max-file-lines.
  * @usage import { useThreadAutoScroll, useMobileComposerKeyboard } from './inbox-tab/use-thread-ux.js';
  * @version-history
+ *   v1.8.0 -- 2026-09-22 -- The thread's auto-scroll tells typing from reading by the focused field
+ *     (a textarea or an editable area) instead of the composer's class, which went with the inbox
+ *     sheet. useMobileComposerKeyboard publishes the visual viewport's height as --workspace-avail on
+ *     the page root (the phone's workspace page reads it) instead of --inbox-avail and
+ *     --inbox-desk-avail on the document, which only the deleted sheet read, and on a desktop the
+ *     measured space under the settings shell's header as --workspace-height. useNarrowScreen added.
  *   v1.7.0 — 2026-08-29 — --inbox-desk-avail is published on every width, so the phone's list view is
  *     measured too instead of assuming a header height.
  *   v1.6.1 — 2026-08-29 — The desktop pane is measured against .page-content's bottom edge minus the
@@ -55,6 +62,22 @@ export function useRecentBroadcasts() {
     return next;
   });
   return { recentBroadcasts, trackBroadcast };
+}
+
+/** Whether the window is phone-narrow (760px, the width at which the Messages page has always shown one
+ *  pane at a time: the list, or the open conversation with a way back). Follows the window as it
+ *  changes. */
+export function useNarrowScreen(query = '(max-width: 760px)') {
+  const [narrow, setNarrow] = useState(() => typeof window !== 'undefined' && !!window.matchMedia?.(query).matches);
+  useEffect(() => {
+    const mq = window.matchMedia?.(query);
+    if (!mq) return undefined;
+    const on = () => setNarrow(mq.matches);
+    on();
+    mq.addEventListener('change', on);
+    return () => mq.removeEventListener('change', on);
+  }, [query]);
+  return narrow;
 }
 
 /** Presigned attachment URLs carry a 1 h token. While a thread stays open (no reload, no SSE
@@ -116,7 +139,8 @@ export function useThreadAutoScroll(msgsRef, mode, thread, activeConv) {
     // scroll out from under the caret — so suppress the one-time new-message jump when the composer is
     // focused (near-bottom follow still applies: if you were already at the bottom you keep following).
     const ae = typeof document !== 'undefined' ? document.activeElement : null;
-    const composing = ae instanceof HTMLElement && !!ae.closest('.inbox-composer');
+    // The composer is the one text field on the thread pane (a textarea, or Toast UI's editable area).
+    const composing = ae instanceof HTMLElement && (ae.tagName === 'TEXTAREA' || ae.isContentEditable);
     lastScrolledConvRef.current = convKey;
     lastMsgIdRef.current = lastId;
 
@@ -150,58 +174,53 @@ export function useThreadAutoScroll(msgsRef, mode, thread, activeConv) {
 
 /** Mobile keyboard ergonomics — the reliable version. Rather than the fragile `dvh − keyboard` math (which
  *  double-counted on Android Chrome, where dvh ALSO shrinks for the keyboard → the messenger collapsed and
- *  left a big dead gap above the keyboard), we MEASURE the real space: from the top of `.inbox-body` down to
- *  the bottom of the visual viewport (which excludes the keyboard on every platform), and publish it as
- *  `--inbox-avail`. The ≤760px open-panel body height uses that, so the composer sits right on the keyboard
- *  with the thread filling the rest — no void, no page-scroll jump. We deliberately do NOT scrollIntoView the
- *  composer (that centered it and created the gap); instead we keep the message list pinned to the bottom.
- *  Only active on mobile with a thread/compose panel open; otherwise the var is cleared and CSS falls back. */
-export function useMobileComposerKeyboard(mode) {
+ *  left a big dead gap above the keyboard), we MEASURE the real space, the visual viewport's height (which
+ *  excludes the keyboard on every platform), and publish it on the page root as `--workspace-avail`. The
+ *  phone's workspace page takes that height, so the composer sits right on the keyboard with the thread
+ *  filling the rest — no void, no page-scroll jump. We deliberately do NOT scrollIntoView the composer
+ *  (that centered it and created the gap); instead we keep the message list pinned to the bottom.
+ *  Only on a phone; elsewhere the var is cleared and the page's own height applies. */
+export function useMobileComposerKeyboard(mode, pageRef, msgsRef) {
   const syncRef = useRef(() => {});
   useEffect(() => {
     const vv = window.visualViewport;
-    const root = document.documentElement;
     const isNarrow = () => window.matchMedia('(max-width: 760px)').matches;
+    // On a phone an open conversation is a workspace page: the whole screen, fixed. Its height is the
+    // visual viewport's, which excludes the keyboard on every platform, published on the page root as
+    // --workspace-avail so the composer sits on the keyboard with the thread filling the rest.
+    let lastPage = null;   // the root last measured, so the cleanup clears the one it set
     const sync = () => {
-      const body = document.querySelector('.inbox-body');
-      if (!body) { root.style.removeProperty('--inbox-avail'); root.style.removeProperty('--inbox-desk-avail'); return; }
-
-      // DESKTOP: the messenger used to be `100vh - 300px`, a guess at how much shell sits above it.
-      // Measured on a 1280x900 window it left 94px of dead space below the pane AND still scrolled the
-      // page, while the conversation itself got 229px. The distance to the top edge is a thing the
-      // browser knows, so ask it instead of guessing: everything below the pane is the pane's.
-      // The pane ends where its SCROLL REGION ends, not where the window does: .page-content is the
-      // only thing that scrolls and the profile shell pads its bottom, so a pane measured against
-      // the window overshot by that padding and the page scrolled by exactly that much (33px on a
-      // 1440x900 window, the messenger sliding under the crumb). Ask the region and its padding.
-      // The same number serves the phone's list view, where a fixed "100dvh - 168px" assumed a
-      // header the poster mast no longer matches.
-      const top = body.getBoundingClientRect().top;
-      const region = body.closest('.page-content');
-      const shell = body.closest('.pf-content') || body.closest('.pf');
-      const bottom = region ? region.getBoundingClientRect().bottom : window.innerHeight;
-      const pad = shell ? (parseFloat(getComputedStyle(shell).paddingBottom) || 0) : 20;
-      const deskAvail = Math.max(isNarrow() ? 240 : 320, Math.round(bottom - top - pad - 8));
-      root.style.setProperty('--inbox-desk-avail', `${deskAvail}px`);
-      if (!isNarrow()) { root.style.removeProperty('--inbox-avail'); return; }
-      if (!vv || !body.classList.contains('inbox-body--panel')) {
-        root.style.removeProperty('--inbox-avail');
-        return;
+      const page = pageRef?.current;
+      if (!page) return;
+      lastPage = page;
+      // DESKTOP: the page sits under the settings shell's own header, lower than the bar the workspace
+      // height assumes, so the space is measured: from the page's top to the bottom of the shell's
+      // scroll region (.page-content, the only thing that scrolls), less the shell's bottom padding.
+      // A window measure overshot by that padding and the page scrolled (33px on 1440x900, 2026-08-29).
+      if (!isNarrow() && page.getAttribute('data-layout') === 'workspace') {
+        const region = page.closest('.page-content');
+        const shell = page.parentElement?.closest('.pf-content') || page.parentElement?.closest('.pf');
+        const regionTop = region ? region.getBoundingClientRect().top : 0;
+        const offset = page.getBoundingClientRect().top - regionTop + (region ? region.scrollTop : 0);
+        const room = region ? region.clientHeight : window.innerHeight;
+        const pad = shell ? (parseFloat(getComputedStyle(shell).paddingBottom) || 0) : 0;
+        page.style.setProperty('--workspace-height', `${Math.max(320, Math.round(room - offset - pad))}px`);
+      } else {
+        page.style.removeProperty('--workspace-height');
       }
-      // Distance from the body's top edge to the top of the visible (keyboard-excluded) area, then the
-      // remaining height below it. Clamp so a mid-animation reading can't collapse the pane.
-      const vvTop = top - (vv.offsetTop || 0);
-      const avail = Math.max(220, Math.round(vv.height - vvTop));
-      root.style.setProperty('--inbox-avail', `${avail}px`);
+      if (!vv || !isNarrow()) { page.style.removeProperty('--workspace-avail'); return; }
+      // Clamp so a mid-animation reading can't collapse the pane.
+      page.style.setProperty('--workspace-avail', `${Math.max(220, Math.round(vv.height))}px`);
     };
     syncRef.current = sync;
     const onFocusIn = (e) => {
       if (!isNarrow()) return;
       const el = e.target;
-      if (!(el instanceof HTMLElement) || !el.closest('.inbox-composer')) return;
+      // The composer is the one text field on the thread pane (a textarea, or Toast UI's editable area).
+      if (!(el instanceof HTMLElement) || !(el.tagName === 'TEXTAREA' || el.isContentEditable)) return;
       // The keyboard animates in — re-measure as the viewport settles, then keep the latest messages in view.
       setTimeout(sync, 120); setTimeout(sync, 360);
-      setTimeout(() => { const m = document.querySelector('.inbox-msgs'); if (m) m.scrollTop = m.scrollHeight; }, 380);
+      setTimeout(() => { const m = msgsRef?.current; if (m) m.scrollTop = m.scrollHeight; }, 380);
     };
     if (vv) { vv.addEventListener('resize', sync); vv.addEventListener('scroll', sync); }
     window.addEventListener('resize', sync);
@@ -211,8 +230,11 @@ export function useMobileComposerKeyboard(mode) {
       if (vv) { vv.removeEventListener('resize', sync); vv.removeEventListener('scroll', sync); }
       window.removeEventListener('resize', sync);
       window.removeEventListener('focusin', onFocusIn);
-      root.style.removeProperty('--inbox-avail');
+      lastPage?.style.removeProperty('--workspace-avail');
+      lastPage?.style.removeProperty('--workspace-height');
     };
+    // The refs are stable objects; the page root they point at is re-read on every measure.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   // Re-measure when the panel opens/closes (mode change) — no viewport event fires on a pure route switch.
   useEffect(() => {

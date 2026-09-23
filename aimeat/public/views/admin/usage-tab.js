@@ -27,6 +27,9 @@
  *   - UsageTab (default) — the reads, and the six sections
  * @usage Mounted by the admin dashboard tab router (views/admin.js).
  * @version-history
+ *   v2.2.0 -- 2026-09-22 -- Composed from the shared component set: sections, the period as tab
+ *     actions, the strip as a numeral band, the paste in an aside; the page's own sheet is gone, so a
+ *     theme or a part now reaches this page like every other.
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v2.1.0 — 2026-09-13 — Compose existing section headings from shared poster B1.
  *   v2.0.0 — 2026-09-12 — The poster face and six numbered sections, over one read that says whose
@@ -45,10 +48,9 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { time as fmtTime } from '/js/format.js';
-import { useViewCSS } from '/components/useViewCSS.js';
 import { onLiveUpdate } from '/lib/live-updates.js';
 import { num, Badge, Row, Spinner, ErrorBox } from './shared.js';
-import { CopyButton } from '/components/CopyButton.js';
+import { Section, Columns, Stack, Text, Action, CopyAction, NumeralBand, Surface } from '/components/poster-parts.js';
 import { getNodeUrl } from '/js/services/auth.js';
 import * as api from '/js/services/admin.js';
 import { swallowed } from '/js/swallowed.js';
@@ -82,12 +84,12 @@ function rangeFor(period) {
  */
 function Period({ period, onPick }) {
   return html`
-    <div class="adm-us-period">
-      <span class="adm-us-period-l">${S('period.label')}</span>
+    <${Stack} direction="wrap" align="center" density="compact" role="group" label=${S('period.label')}>
+      <${Text} kind="caption" tone="muted">${S('period.label')}<//>
       ${PRESETS.map(p => html`
-        <button type="button" class="adm-us-fchip ${period === p ? 'on' : ''}"
-          onClick=${() => onPick(p)}>${S('period.' + p)}</button>`)}
-    </div>`;
+        <${Action} key=${p} kind="tab" selected=${period === p}
+          onClick=${() => onPick(p)}>${S('period.' + p)}<//>`)}
+    <//>`;
 }
 
 /**
@@ -117,28 +119,22 @@ function WhatItCostsYou({ data, control, onAskProvider, asking }) {
   };
 
   return html`
-    <section class="og-sec og-sec--first" id="adm-us-01">
-      <div class="og-sec-h">
-        <h2 class="poster-section-title">${S('now.title')}<small>01</small></h2>
-        ${control}
-      </div>
-
-      <div class="adm-ov-grid">
-        <div>
-          <div class="adm-ov-status ${blind ? 'danger' : ''}">
+    <${Section} id="adm-us-01" title=${S('now.title')} count="01" actions=${control}>
+      <${Columns} layout="trailing" collapse=${900} density="roomy">
+        <${Stack}>
+          <${Text} kind="heading" tone=${blind ? 'danger' : 'plain'}>
             ${blind ? S('now.wordBlind') : S('now.wordBill', { n: usd(money.house?.cost_usd) })}
-          </div>
-          <p class="adm-alert-line">
+          <//>
+          <${Text}>
             ${blind ? S('now.lineBlind') : S('now.lineClear', { n: usd(money.own?.cost_usd) })}
-          </p>
-          <div class="adm-ov-up">${stamp}</div>
-          <div class="adm-us-acts">
-            <button type="button" class="og-door og-door--danger" disabled=${asking}
-              onClick=${onAskProvider}>
+          <//>
+          <${Text} kind="mono" tone="muted">${stamp}<//>
+          <${Stack} direction="wrap" align="center">
+            <${Action} tone="danger" disabled=${asking} onClick=${onAskProvider}>
               ${asking ? S('now.asking') : S('now.askProvider')}
-            </button>
-          </div>
-        </div>
+            <//>
+          <//>
+        <//>
 
         <div>
           ${Row({
@@ -178,58 +174,43 @@ function WhatItCostsYou({ data, control, onAskProvider, asking }) {
     last: true,
   })}
         </div>
-      </div>
+      <//>
 
-      <div class="og-strip">
-        <div>
-          <b>${usd(money.house?.cost_usd)}</b><span>${S('strip.yourBill')}</span>
-          <small>${S('strip.yourBillSub')}</small>
-        </div>
-        <div>
-          <b class=${blind ? 'adm-us-coral' : ''}>${blind ? '1' : '0'}</b>
-          <span>${S('strip.unmeasured')}</span>
-          <small>${blind ? S('strip.unmeasuredSub') : S('strip.unmeasuredNone')}</small>
-        </div>
-        <div>
-          <b>${usd(money.ceiling_usd)}</b><span>${S('strip.ceiling')}</span>
-          <small>${S('strip.ceilingSub', { n: num(money.accounts || 0), grant: usd(money.grant_usd) })}</small>
-        </div>
-        <div>
-          <b class="adm-us-dim">${usd(money.ledger?.cost_usd)}</b><span>${S('strip.allKeys')}</span>
-          <small>${S('strip.allKeysSub')}</small>
-        </div>
-      </div>
-    </section>`;
+      <${NumeralBand} tone="plain" size="small" items=${[
+    { label: S('strip.yourBill'), value: usd(money.house?.cost_usd), note: S('strip.yourBillSub') },
+    { label: S('strip.unmeasured'), value: blind ? '1' : '0', tone: blind ? 'coral' : undefined,
+      note: blind ? S('strip.unmeasuredSub') : S('strip.unmeasuredNone') },
+    { label: S('strip.ceiling'), value: usd(money.ceiling_usd),
+      note: S('strip.ceilingSub', { n: num(money.accounts || 0), grant: usd(money.grant_usd) }) },
+    { label: S('strip.allKeys'), value: usd(money.ledger?.cost_usd), note: S('strip.allKeysSub') },
+  ]} />
+    <//>`;
 }
 
 /** Section 06: what an agent can do with this, and the paste. */
 function AskAi({ from, to }) {
   const paste = buildUsagePrompt({ url: getNodeUrl(), from, to });
   return html`
-    <section class="og-sec" id="adm-us-06">
-      <div class="og-sec-h">
-        <h2 class="poster-section-title">${S('ai.title')}<small>06</small></h2>
-        <div class="og-doors">
-          <${CopyButton} text=${paste} label=${S('ai.copy')} className="og-door og-door--quiet" />
-        </div>
-      </div>
-      <div class="adm-us-ai">
+    <${Section} id="adm-us-06" title=${S('ai.title')} count="06"
+      actions=${html`<${CopyAction} text=${paste} label=${S('ai.copy')} />`}>
+      <${Columns} layout="equal" collapse=${900} density="roomy">
         <div>
-          <p class="adm-us-lead">${S('ai.lead')}</p>
+          <${Text}>${S('ai.lead')}<//>
           ${Row({ title: S('ai.read'), why: S('ai.readWhy'), chip: null, value: 'aimeat_admin_usage' })}
           ${Row({ title: S('ai.provider'), why: S('ai.providerWhy'), chip: null, value: 'ask_provider: true' })}
           ${Row({ title: S('ai.own'), why: S('ai.ownWhy'), chip: null, value: 'aimeat_usage_report', last: true })}
         </div>
-        <div class="og-box poster-aside poster-aside--small">
-          <span class="og-box-label">${S('ai.label')}</span>
-          <div class="adm-us-paste">${paste}</div>
-        </div>
-      </div>
-    </section>`;
+        <${Surface} kind="aside">
+          <${Stack} density="compact">
+            <${Text} kind="label">${S('ai.label')}<//>
+            <${Text} lines>${paste}<//>
+          <//>
+        <//>
+      <//>
+    <//>`;
 }
 
 export default function UsageTab() {
-  useViewCSS('/css/views/admin-usage.css');
   const [period, setPeriod] = useState('30d');
   const [data, setData] = useState(null);
   const [calls, setCalls] = useState(null);
@@ -279,7 +260,7 @@ export default function UsageTab() {
 
   const control = html`<${Period} period=${period} onPick=${setPeriod} />`;
 
-  return html`<div class="adm-us">
+  return html`<div>
     <${WhatItCostsYou} data=${data} control=${control} onAskProvider=${askProvider} asking=${asking} />
     <${WhereItWent} models=${data.models} />
     <${ByDay} days=${data.days} />

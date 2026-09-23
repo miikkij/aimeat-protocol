@@ -21,6 +21,9 @@
  *   - RealtimeTab({ data, reload }) — the three sections, the four empty states, the close question
  *   - dur / heard — the durations a row prints instead of a timestamp
  * @version-history
+ *   v3.0.0 -- 2026-09-22 -- Composed from the shared set and admin-realtime.css deleted: Sections,
+ *     the status word a heading, the strip and the counters NumeralBands, the rooms the shared Table,
+ *     the explanations asides; the close question is the shared confirm without a class of its own, the room named in mono.
  *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v2.1.0 — 2026-09-13 — Compose section headings from the shared poster B1 shape.
@@ -34,17 +37,17 @@ import { useState, useMemo } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { useViewCSS } from '/components/useViewCSS.js';
-import { num, fmtBytes, Row, Badge, Empty, useToast, Toast } from './shared.js';
+import { num, fmtBytes, Row, Badge, Empty, useToast, Toast, DataTable } from './shared.js';
 import { closeRoom } from '/js/services/admin.js';
 import { useConfirm } from '/components/Modal.js';
+import { Section, Columns, Stack, NumeralBand, KeyValue, ListRow, Surface, Action, Chip, Text, scrollToId } from '/components/poster-parts.js';
 import { decorate, summarise, order, split } from './realtime-tab.model.js';
 import RoomDetail from './realtime-tab.detail.js';
 
 const R = (key, params) => t('dashboard.realtimePage.' + key, params);
 
-/** The poster dialog this page asks its one question in. */
-const DLG = 'adm-rt-dlg';
+/** The id of the third section, which the first section's door scrolls to. */
+const SINCE_ID = 'adm-realtime-since';
 
 /** "2 d", "20 h", "35 min", "4 s" — the model picks the unit, the locale writes the words. */
 function dur(ms) {
@@ -65,8 +68,17 @@ function heard(ms) {
   return ms === null ? '' : R('ago', { time: dur(ms) });
 }
 
+/** A value with the sentence that says why, as the page's key-value rows read. */
+const fact = (value, why) => html`<${Stack} density="compact">${value}<${Text} kind="caption" tone="muted">${why}<//><//>`;
+
+/** An explanation beside the counters: its label, its body, and the rule it follows. */
+function Aside({ tone, label, body, rule }) {
+  return html`<${Surface} kind="aside" tone=${tone}><${Stack} density="compact">
+    <${Text} kind="label">${label}<//><${Text}>${body}<//>${rule && html`<${Text} kind="caption" tone="muted">${rule}<//>`}
+  <//><//>`;
+}
+
 export default function RealtimeTab({ data, reload }) {
-  useViewCSS('/css/views/admin-realtime.css');
   const [toast, showErr, showOk, clearToast] = useToast();
   const { confirm, ConfirmUI } = useConfirm();
   const [busiest, setBusiest] = useState(false);
@@ -90,196 +102,147 @@ export default function RealtimeTab({ data, reload }) {
   /** The one question. It is felt by other people the instant it is answered. */
   function askClose(room) {
     const names = room.peers.map(p => p.nick).filter(Boolean).join(', ');
-    const body = html`<span class="adm-rt-ask">
-      <span>${room.peerCount === 0
+    const body = html`<${Stack} density="compact">
+      <${Text}>${room.peerCount === 0
     ? R('askEmpty')
-    : room.peerCount === 1 ? R('askOne', { name: names || R('someone') }) : R('askMany', { count: room.peerCount })}</span>
-      <span class="adm-rt-ask-rows">
-        ${room.peerCount > 0 && html`<span class="adm-rt-ask-row">${names || R('someone')}<em>${R('askRowPeers')}</em></span>`}
-        ${room.docs > 0 && html`<span class="adm-rt-ask-row">${room.docs === 1
+    : room.peerCount === 1 ? R('askOne', { name: names || R('someone') }) : R('askMany', { count: room.peerCount })}<//>
+      <div>
+        ${room.peerCount > 0 && html`<${ListRow} density="compact" name=${names || R('someone')} detail=${R('askRowPeers')} detailKind="text" />`}
+        ${room.docs > 0 && html`<${ListRow} density="compact" name=${room.docs === 1
     ? R('askRowDocsOne', { size: fmtBytes(room.docBytes) })
-    : R('askRowDocs', { count: room.docs, size: fmtBytes(room.docBytes) })}<em>${R('askRowDocsVal')}</em></span>`}
-        <span class="adm-rt-ask-row">${room.name}<em>${R('askRowRoomVal')}</em></span>
-      </span>
-      <span class="adm-rt-ask-note">${f.idleMs
+    : R('askRowDocs', { count: room.docs, size: fmtBytes(room.docBytes) })} detail=${R('askRowDocsVal')} detailKind="text" />`}
+        <${ListRow} density="compact" nameKind="mono" name=${room.name} detail=${R('askRowRoomVal')} detailKind="text" />
+      </div>
+      <${Text} kind="caption" tone="muted">${f.idleMs
     ? R('askNote', { time: dur(f.idleMs) })
-    : R('askNoteNoIdle')}</span>
-    </span>`;
+    : R('askNoteNoIdle')}<//>
+    <//>`;
     confirm(body, () => doClose(room),
-      { title: R('askTitle'), confirmLabel: R('closeIt'), danger: true, className: DLG });
+      { title: R('askTitle'), confirmLabel: R('closeIt'), danger: true });
   }
 
   // The read itself failed. Not one of the three empties: nothing here was measured, so nothing
   // here is printed as a zero.
   if (f.state === 'unreachable') {
     return html`
-      <div class="og adm-rt">
-        <div class="adm-rt-empty">
-          <h3>${R('noReadTitle')}</h3>
-          <p>${R('noReadWhy')}</p>
-          <button type="button" class="og-door" onClick=${() => reload()}>${R('tryAgain')}</button>
-        </div>
-      </div>`;
+      <${Section} title=${R('noReadTitle')} description=${R('noReadWhy')}>
+        <${Stack} direction="horizontal"><${Action} onClick=${() => reload()}>${R('tryAgain')}<//><//>
+      <//>`;
   }
 
   // Switched off. There is nothing to count, so nothing is counted: the page says which setting did
   // it and what apps get instead. It used to arrive as grey italic "Realtime unavailable".
   if (f.state === 'off') {
     return html`
-      <div class="og adm-rt">
-        <section class="og-sec og-sec--first">
-          <div class="og-sec-h"><h2 class="poster-section-title">${R('who')}<small>01</small></h2></div>
-          <div class="adm-ov-grid">
-            <div>
-              <div class="adm-ov-status quiet">${R('statusOff')}</div>
-              <p class="adm-alert-line">${R('offLead')}</p>
-            </div>
-            <div>
-              <dl class="adm-rt-kv">
-                <dt>${R('theSwitch')}</dt>
-                <dd><code>AIMEAT_REALTIME_ENABLED=false</code><em>${R('theSwitchWhy')}</em></dd>
-              </dl>
-              <div class="og-box og-box--solid adm-rt-offbox poster-aside poster-aside--small poster-aside--irreversible">
-                <span class="og-box-label">${R('offLabel')}</span>
-                <p>${R('offBody')}</p>
-              </div>
-            </div>
-          </div>
-        </section>
-      </div>`;
+      <${Section} title=${R('who')} count="01">
+        <${Columns} layout="trailing" collapse=${900}>
+          <${Stack} density="compact">
+            <${Text} kind="heading" tone="muted">${R('statusOff')}<//>
+            <${Text}>${R('offLead')}<//>
+          <//>
+          <${Stack}>
+            <${KeyValue} label=${R('theSwitch')} value=${fact(html`<${Text} kind="mono">AIMEAT_REALTIME_ENABLED=false<//>`, R('theSwitchWhy'))} />
+            <${Aside} tone="danger" label=${R('offLabel')} body=${R('offBody')} />
+          <//>
+        <//>
+      <//>`;
   }
 
   const statusWord = f.state === 'live'
     ? R('statusLive', { people: statusPeople(f.peers), rooms: statusRooms(f.rooms) })
     : f.state === 'never' ? R('statusNever') : R('statusQuiet');
 
+  const roomRows = shown.map((r, i) => [
+    { text: String(i + 1).padStart(2, '0'), mono: true },
+    html`<${Stack} density="compact">
+      <${Action} kind="text" expanded=${r.id === openId} onClick=${() => setOpenId(r.id === openId ? null : r.id)}>${r.name}<//>
+      <${Text} kind="mono" tone="muted">${[r.appType, r.createdBy, r.isPublic ? R('public') : R('private')].filter(Boolean).join(' · ')}<//>
+    <//>`,
+    html`<${Stack} direction="wrap" density="compact">
+      ${r.peers.length === 0
+    ? html`<${Text} kind="caption" tone="muted">${R('nobodyInIt')}<//>`
+    : r.peers.slice(0, 4).map(p => html`<${Chip} tone="success">${p.nick || p.peerId}<//>`)}
+      ${r.peers.length > 4 && html`<${Chip} tone="muted">${R('morePeers', { count: r.peers.length - 4 })}<//>`}
+    <//>`,
+    { text: `${num(r.docs)} ${r.docs ? fmtBytes(r.docBytes) : '—'}`, mono: true },
+    { text: heard(r.heardMs), mono: true },
+    html`<${Action} kind="text" tone="danger" onClick=${() => askClose(r)}>${R('close')}<//>`,
+  ]);
+
   return html`
-    <div class="og adm-rt">
+    <${Stack}>
       ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
 
-      <section class="og-sec og-sec--first">
-        <div class="og-sec-h">
-          <h2 class="poster-section-title">${R('who')}<small>01</small></h2>
-          <div class="og-doors">
-            <button type="button" class="og-door og-door--quiet" onClick=${() => {
-    document.querySelector('.adm-rt-since')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }}>${R('whatIsDoor')}</button>
-          </div>
-        </div>
-        <div class="adm-ov-grid">
-          <div>
-            <div class="adm-ov-status ${f.state === 'live' ? '' : 'quiet'}">${statusWord}</div>
-            <p class="adm-alert-line">${R('lead')}</p>
-            <div class="adm-ov-up">
-              ${f.uptimeSeconds !== null ? R('upFor', { time: dur(f.uptimeSeconds * 1000) }) : ''}<br />
-              ${f.opened === 1 ? R('upOpenedOne') : R('upOpened', { count: num(f.opened) })}<br />
-              ${R('upPeak', { people: people(f.peak) })}
-            </div>
-          </div>
-          <div>
+      <${Section} title=${R('who')} count="01"
+        actions=${html`<${Action} onClick=${() => scrollToId(SINCE_ID)}>${R('whatIsDoor')}<//>`}>
+        <${Columns} layout="trailing" collapse=${900}>
+          <${Stack} density="compact">
+            <${Text} kind="heading" tone=${f.state === 'live' ? 'plain' : 'muted'}>${statusWord}<//>
+            <${Text}>${R('lead')}<//>
+            <${Stack} density="compact">
+              ${f.uptimeSeconds !== null && html`<${Text} kind="mono" tone="muted">${R('upFor', { time: dur(f.uptimeSeconds * 1000) })}<//>`}
+              <${Text} kind="mono" tone="muted">${f.opened === 1 ? R('upOpenedOne') : R('upOpened', { count: num(f.opened) })}<//>
+              <${Text} kind="mono" tone="muted">${R('upPeak', { people: people(f.peak) })}<//>
+            <//>
+          <//>
+          <${Stack}>
             ${f.state === 'never' && html`
-              <dl class="adm-rt-kv">
-                <dt>${R('theAddress')}</dt>
-                <dd><code>${f.wsUrl || R('noAddress')}</code><em>${R('theAddressWhy')}</em></dd>
-                <dt>${R('theWindow')}</dt>
-                <dd>${f.uptimeSeconds !== null ? dur(f.uptimeSeconds * 1000) : '—'}<em>${R('theWindowWhy')}</em></dd>
-              </dl>
-              <p class="adm-rt-note">${R('neverWhy')}</p>`}
+              <div>
+                <${KeyValue} label=${R('theAddress')} value=${fact(html`<${Text} kind="mono">${f.wsUrl || R('noAddress')}<//>`, R('theAddressWhy'))} />
+                <${KeyValue} label=${R('theWindow')} value=${fact(f.uptimeSeconds !== null ? dur(f.uptimeSeconds * 1000) : '—', R('theWindowWhy'))} />
+              </div>
+              <${Text} tone="muted">${R('neverWhy')}<//>`}
 
             ${f.state !== 'never' && shown.length === 0 && html`
               <${Row} title=${R('quietTitle')} why=${R('quietWhy')} value=${R('roomsOpenedVal', { count: num(f.opened) })} last=${true} />`}
 
-            ${shown.slice(0, 4).map((r, i) => html`
+            ${shown.length > 0 && html`<div>${shown.slice(0, 4).map((r, i) => html`
               <${Row}
                 title=${r.name}
                 why=${roomWhy(r, f)}
                 chip=${r.empty ? html`<${Badge} type="neutral" label=${R('badgeEmpty')} />` : html`<${Badge} type="healthy" label=${R('badgeLive')} />`}
                 value=${people(r.peerCount)}
-                last=${i === Math.min(shown.length, 4) - 1} />`)}
-          </div>
-        </div>
-      </section>
+                last=${i === Math.min(shown.length, 4) - 1} />`)}</div>`}
+          <//>
+        <//>
+      <//>
 
-      <div class="og-strip">
-        <div><b>${num(f.rooms)}</b><span>${R('stripRooms')}</span><small>${R('stripRoomsSub')}</small></div>
-        <div><b>${num(f.peers)}</b><span>${R('stripPeople')}</span><small>${R('stripPeopleSub')}</small></div>
-        <div><b>${num(f.opened)}</b><span>${R('stripOpened')}</span><small>${R('stripOpenedSub')}</small></div>
-        <div><b class=${f.refused ? 'og-coral-num' : ''}>${num(f.refused)}</b><span>${R('stripRefused')}</span><small>${R('stripRefusedSub')}</small></div>
-      </div>
+      <${NumeralBand} tone="plain" items=${[
+        { label: R('stripRooms'), value: num(f.rooms), note: R('stripRoomsSub') },
+        { label: R('stripPeople'), value: num(f.peers), note: R('stripPeopleSub') },
+        { label: R('stripOpened'), value: num(f.opened), note: R('stripOpenedSub') },
+        { label: R('stripRefused'), value: num(f.refused), note: R('stripRefusedSub'), tone: f.refused ? 'coral' : undefined },
+      ]} />
 
-      <section class="og-sec">
-        <div class="og-sec-h">
-          <h2 class="poster-section-title">${R('theRooms')}<small>02</small></h2>
-          <div class="og-doors">
-            <button type="button" class="og-door og-door--quiet" onClick=${() => setBusiest(v => !v)}>
-              ${busiest ? R('orderNewest') : R('orderBusiest')}</button>
-          </div>
-        </div>
-
+      <${Section} title=${R('theRooms')} count="02"
+        actions=${html`<${Action} onClick=${() => setBusiest(v => !v)}>${busiest ? R('orderNewest') : R('orderBusiest')}<//>`}>
         ${shown.length === 0
     ? html`<${Empty} text=${f.state === 'never' ? R('noneEver') : R('noneNow')} />`
-    : html`
-          <div class="adm-rt-row adm-rt-row--head">
-            <div class="adm-rt-n poster-stat-number poster-stat-number--small">#</div>
-            <div>${R('colRoom')}</div>
-            <div>${R('colWho')}</div>
-            <div>${R('colDocs')}</div>
-            <div>${R('colHeard')}</div>
-            <div></div>
-          </div>
-          ${shown.map((r, i) => html`
-            <div class="adm-rt-row ${r.id === openId ? 'is-open' : ''}">
-              <div class="adm-rt-n poster-stat-number poster-stat-number--small">${String(i + 1).padStart(2, '0')}</div>
-              <div class="adm-rt-nm">
-                <button type="button" class="adm-rt-open" onClick=${() => setOpenId(r.id === openId ? null : r.id)}>${r.name}</button>
-                <em>${[r.appType, r.createdBy, r.isPublic ? R('public') : R('private')].filter(Boolean).join(' · ')}</em>
-              </div>
-              <div class="adm-rt-who">
-                ${r.peers.length === 0
-    ? html`<span class="adm-rt-nobody">${R('nobodyInIt')}</span>`
-    : r.peers.slice(0, 4).map(p => html`<span class="adm-rt-pip"><i></i>${p.nick || p.peerId}</span>`)}
-                ${r.peers.length > 4 && html`<span class="adm-rt-pip adm-rt-pip--more">${R('morePeers', { count: r.peers.length - 4 })}</span>`}
-              </div>
-              <div class="adm-rt-docs">${num(r.docs)} <em>${r.docs ? fmtBytes(r.docBytes) : '—'}</em></div>
-              <div class="adm-rt-when">${heard(r.heardMs)}</div>
-              <div class="adm-rt-acts">
-                <button type="button" class="adm-rt-act" onClick=${() => askClose(r)}>${R('close')}</button>
-              </div>
-            </div>`)}
-        `}
+    : html`<${DataTable} headers=${['#', R('colRoom'), R('colWho'), R('colDocs'), R('colHeard'), '']} rows=${roomRows} />`}
 
         ${open && html`<${RoomDetail} room=${open} idleMs=${f.idleMs}
           onClose=${() => setOpenId(null)} onCloseRoom=${() => askClose(open)} />`}
-      </section>
+      <//>
 
-      <section class="og-sec adm-rt-since">
-        <div class="og-sec-h">
-          <h2 class="poster-section-title">${R('since')}<small>03</small></h2>
-        </div>
-        <div class="adm-rt-counts">
-          <div class="adm-rt-cnt"><span>${R('cntIn')}</span><b>${num(f.messagesIn)}</b></div>
-          <div class="adm-rt-cnt"><span>${R('cntOpened')}</span><b>${num(f.opened)}</b></div>
-          <div class="adm-rt-cnt"><span>${R('cntPeak')}</span><b>${people(f.peak)}</b></div>
-          <div class="adm-rt-cnt"><span>${R('cntOut')}</span><b>${num(f.messagesOut)}</b></div>
-          <div class="adm-rt-cnt"><span>${R('cntClosed')}</span><b>${num(f.closed)}</b></div>
-          <div class="adm-rt-cnt"><span>${R('cntRefused')}</span><b class=${f.refused ? 'is-bad' : ''}>${num(f.refused)}</b></div>
-        </div>
-        <div class="adm-rt-two">
-          <div class="og-box poster-aside poster-aside--small">
-            <span class="og-box-label">${R('memLabel')}</span>
-            <p>${f.uptimeSeconds !== null ? R('memBody', { time: dur(f.uptimeSeconds * 1000) }) : R('memBodyNoUptime')}</p>
-            <p class="adm-rt-rule">${R('memRule')}</p>
-          </div>
-          <div class="og-box og-box--solid poster-aside poster-aside--small poster-aside--irreversible">
-            <span class="og-box-label">${R('gonLabel')}</span>
-            <p>${f.idleMs ? R('gonBody', { time: dur(f.idleMs) }) : R('gonBodyNoIdle')}</p>
-            <p class="adm-rt-rule">${R('gonRule')}</p>
-          </div>
-        </div>
-      </section>
+      <${Section} id=${SINCE_ID} title=${R('since')} count="03">
+        <${NumeralBand} tone="plain" size="small" items=${[
+          { label: R('cntIn'), value: num(f.messagesIn) },
+          { label: R('cntOpened'), value: num(f.opened) },
+          { label: R('cntPeak'), value: people(f.peak) },
+          { label: R('cntOut'), value: num(f.messagesOut) },
+          { label: R('cntClosed'), value: num(f.closed) },
+          { label: R('cntRefused'), value: num(f.refused), tone: f.refused ? 'coral' : undefined },
+        ]} />
+        <${Columns} collapse=${900}>
+          <${Aside} label=${R('memLabel')} rule=${R('memRule')}
+            body=${f.uptimeSeconds !== null ? R('memBody', { time: dur(f.uptimeSeconds * 1000) }) : R('memBodyNoUptime')} />
+          <${Aside} tone="danger" label=${R('gonLabel')} rule=${R('gonRule')}
+            body=${f.idleMs ? R('gonBody', { time: dur(f.idleMs) }) : R('gonBodyNoIdle')} />
+        <//>
+      <//>
 
       <${ConfirmUI} />
-    </div>`;
+    <//>`;
 }
 
 /** What the sentence under a room's name says, which is different for a room nobody is left in. */

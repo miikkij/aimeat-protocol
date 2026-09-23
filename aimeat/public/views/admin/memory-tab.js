@@ -19,6 +19,10 @@
  *   - Record / Reach: imported from memory-tab.record.js
  * @usage Mounted by the admin dashboard tab router (views/admin.js).
  * @version-history
+ *   v3.0.0 -- 2026-09-22 -- Composed from the shared set and admin-memory.css deleted: the finder is
+ *     a Section with a NumeralBand for the audiences, a shared Field for the search, a Toolbar for
+ *     the two narrowing fields and the filters, an aside for the questions, and each record a
+ *     ListRow with its chips and its key in mono (nameKind); the results are a Section with the shared pager actions.
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v2.1.0 -- 2026-09-13 -- Compose the results heading and audience row from poster.css.
  *   v2.0.0 — 2026-09-12 — Rebuilt around the question. The node-wide content search the FTS
@@ -42,8 +46,8 @@ const html = htm.bind(h);
 import { onLiveUpdate } from '/lib/live-updates.js';
 import { t } from '/js/i18n.js';
 import { date as fmtDate } from '/js/format.js';
-import { useViewCSS } from '/components/useViewCSS.js';
 import { dt, Empty, useToast, Toast } from './shared.js';
+import { Section, Stack, Toolbar, Field, NumeralBand, ListRow, Surface, Action, Chip, Text } from '/components/poster-parts.js';
 import { useConfirm } from '/components/Modal.js';
 import {
   getAdminMemory, searchAdminMemory, getAdminMemoryRecord, deleteAdminMemory, restoreAdminMemory,
@@ -86,43 +90,36 @@ function audience(r) {
 function Row({ r, onOpen, binView, onRestore }) {
   const who = audience(r);
   return html`
-    <div class="adm-mem-row">
-      <div class="adm-mem-row-top">
-        <div class="adm-mem-key">${r.key}</div>
-        <div class="adm-mem-owner">${r.owner_gaii}</div>
-        <div class="adm-mem-doors">
+    <${ListRow} name=${r.key} nameKind="mono" detail=${r.owner_gaii}
+      actions=${binView
+        ? html`<${Action} kind="text" onClick=${() => onRestore(r)}>${S('putBack')}<//>`
+        : html`<${Action} kind="text" onClick=${() => onOpen(r)}>${S('open')}<//>`}>
+      <${Stack} density="compact">
+        ${r.excerpt && html`
+          <${Text}>${r.excerpt.before}<strong>${r.excerpt.hit}</strong>${r.excerpt.after}<//>`}
+
+        <${Stack} direction="wrap" density="compact" align="center">
           ${binView
-            ? html`<button type="button" class="adm-mem-door" onClick=${() => onRestore(r)}>${S('putBack')}</button>`
-            : html`<button type="button" class="adm-mem-door" onClick=${() => onOpen(r)}>${S('open')}</button>`}
-        </div>
-      </div>
-
-      ${r.excerpt && html`
-        <div class="adm-mem-cut">${r.excerpt.before}<b>${r.excerpt.hit}</b>${r.excerpt.after}</div>`}
-
-      <div class="adm-mem-facts">
-        ${binView
-          ? html`
-            <span class="adm-mem-tag">${S('inBinTag')}</span>
-            <span>${S('deletedBy', { who: r.deleted_by || S('noActor') })}</span>
-            <span>${r.restorable_until ? S('backUntil', { when: dt(r.restorable_until) }) : S('noWindow')}</span>
-            <span>${size(r.byte_size)}</span>`
-          : html`
-            <span class="adm-mem-tag">${r.visibility}</span>
-            ${who && html`<span class="adm-mem-who">${who}</span>`}
-            ${r.archived && html`<span class="adm-mem-tag is-hot">${S('archivedTag')}</span>`}
-            ${r.flag_count > 0 && html`<span class="adm-mem-tag is-hot">${S('flagsTag', { n: r.flag_count })}</span>`}
-            ${r.allowed_origins?.length > 0 && html`<span class="adm-mem-tag">${S('originsTag', { n: r.allowed_origins.length })}</span>`}
-            <span>${size(r.byte_size)}</span>
-            <span>v${r.version}</span>
-            <span>${when(r.updated_at)}</span>`}
-      </div>
-    </div>`;
+            ? html`
+              <${Chip} tone="coral">${S('inBinTag')}<//>
+              <${Text} kind="mono" tone="muted">${S('deletedBy', { who: r.deleted_by || S('noActor') })}<//>
+              <${Text} kind="mono" tone="muted">${r.restorable_until ? S('backUntil', { when: dt(r.restorable_until) }) : S('noWindow')}<//>
+              <${Text} kind="mono" tone="muted">${size(r.byte_size)}<//>`
+            : html`
+              <${Chip}>${r.visibility}<//>
+              ${who && html`<${Text} kind="mono">${who}<//>`}
+              ${r.archived && html`<${Chip} tone="coral">${S('archivedTag')}<//>`}
+              ${r.flag_count > 0 && html`<${Chip} tone="coral">${S('flagsTag', { n: r.flag_count })}<//>`}
+              ${r.allowed_origins?.length > 0 && html`<${Chip}>${S('originsTag', { n: r.allowed_origins.length })}<//>`}
+              <${Text} kind="mono" tone="muted">${size(r.byte_size)}<//>
+              <${Text} kind="mono" tone="muted">v${r.version}<//>
+              <${Text} kind="mono" tone="muted">${when(r.updated_at)}<//>`}
+        <//>
+      <//>
+    <//>`;
 }
 
 export default function MemoryTab() {
-  useViewCSS('/css/views/admin-memory.css');
-
   // What is being asked
   const [draft, setDraft]   = useState('');
   const [q, setQ]           = useState('');
@@ -289,86 +286,66 @@ export default function MemoryTab() {
   const searching = !!q.trim();
   const narrowed = !!(owner || prefix || vis || flagged || bin || archived !== 'exclude' || searching);
 
+  const filters = [
+    { id: 'any', label: S('whoAny'), selected: !vis, onClick: () => setVis('') },
+    ...REACH.slice().reverse().map(v => ({
+      id: 'vis-' + v, label: `${v}${counts?.[v] !== undefined ? ' ' + counts[v] : ''}`, selected: vis === v,
+      onClick: () => setVis(vis === v ? '' : v),
+    })),
+    { id: 'flagged', label: S('flaggedOnly'), selected: flagged, onClick: () => setFlag(!flagged) },
+    { id: 'archived', label: S('archivedOnly'), selected: archived === 'only', onClick: () => setArch(archived === 'only' ? 'exclude' : 'only') },
+    { id: 'bin', label: S('binChip'), selected: bin, onClick: () => setBin(!bin) },
+  ];
+
   return html`
-    <div class="adm-mem adm-mem-page">
+    <${Stack}>
       ${toast && html`<${Toast} type=${toast.type} text=${toast.text} onDismiss=${clearToast} />`}
       <${ConfirmUI} />
 
-      <div class="adm-mem-top">
-        <div>
-          <div class="adm-mem-lbl">${S('eyebrow')}</div>
-          <div class="adm-mem-hero">${S('title')}</div>
-        </div>
-        <p class="adm-mem-lead">${S('lead')}</p>
-      </div>
+      <${Text} kind="label">${S('eyebrow')}<//>
+      <${Section} title=${S('title')} description=${S('lead')}>
+        <!-- who can read what, before anything is asked -->
+        <${NumeralBand} tone="plain" size="small" items=${[
+          { label: S('records'), value: total },
+          { label: S('stripPublic'), value: counts?.public ?? 0, tone: 'coral' },
+          { label: S('stripMembers'), value: counts?.members ?? 0 },
+          { label: S('stripPrivate'), value: counts?.private ?? 0 },
+          { label: S('stripArchived'), value: counts?.archived ?? 0 },
+        ]} actions=${html`<${Action} onClick=${openReach}>${S('reachDoor')}<//>`} />
 
-      <!-- who can read what, before anything is asked -->
-      <div class="adm-mem-strip poster-row--thing">
-        <div><b>${total}</b><span>${S('records')}</span></div>
-        <div><b class="hot">${counts?.public ?? 0}</b><span>${S('stripPublic')}</span></div>
-        <div><b>${counts?.members ?? 0}</b><span>${S('stripMembers')}</span></div>
-        <div><b>${counts?.private ?? 0}</b><span>${S('stripPrivate')}</span></div>
-        <div><b>${counts?.archived ?? 0}</b><span>${S('stripArchived')}</span></div>
-        <div>
-          <button type="button" class="adm-mem-door" onClick=${openReach}>${S('reachDoor')}</button>
-        </div>
-      </div>
+        <!-- the search: this is the page -->
+        <form onSubmit=${e => { e.preventDefault(); setQ(draft); setBin(false); }}>
+          <${Toolbar} label=${S('searchLabel')} count=${S('ranked')}>
+            <${Field} type="search" label=${S('searchLabel')} value=${draft} placeholder=${S('searchPlaceholder')}
+              hint=${S('searchHint')} onInput=${e => setDraft(e.target.value)} />
+          <//>
+        </form>
 
-      <!-- the search: this is the page -->
-      <form class="adm-mem-find" onSubmit=${e => { e.preventDefault(); setQ(draft); setBin(false); }}>
-        <div class="adm-mem-lbl">${S('searchLabel')}</div>
-        <div class="adm-mem-findbar">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" /><line x1="16.5" y1="16.5" x2="21" y2="21" /></svg>
-          <input type="text" value=${draft} placeholder=${S('searchPlaceholder')}
-            onInput=${e => setDraft(e.target.value)} />
-          <span class="adm-mem-ranked">${S('ranked')}</span>
-        </div>
-        <p class="adm-mem-findhint">${S('searchHint')}</p>
-      </form>
+        <!-- narrow it -->
+        <${Toolbar} label=${S('ownerLabel')} filters=${filters}>
+          <${Field} label=${S('ownerLabel')} value=${owner} placeholder=${S('ownerAny')} onInput=${e => setOwner(e.target.value)} />
+          <${Field} label=${S('prefixLabel')} value=${prefix} placeholder=${S('prefixAny')} onInput=${e => setPrefix(e.target.value)} />
+        <//>
 
-      <!-- narrow it -->
-      <div class="adm-mem-narrow">
-        <label>
-          <span class="adm-mem-lbl">${S('ownerLabel')}</span>
-          <input type="text" value=${owner} placeholder=${S('ownerAny')} onInput=${e => setOwner(e.target.value)} />
-        </label>
-        <label>
-          <span class="adm-mem-lbl">${S('prefixLabel')}</span>
-          <input type="text" value=${prefix} placeholder=${S('prefixAny')} onInput=${e => setPrefix(e.target.value)} />
-        </label>
-        <div class="adm-mem-chips">
-          <button type="button" class=${'adm-mem-chip' + (vis ? '' : ' on')} onClick=${() => setVis('')}>${S('whoAny')}</button>
-          ${REACH.slice().reverse().map(v => html`
-            <button type="button" key=${v} class=${'adm-mem-chip' + (vis === v ? ' on' : '')}
-              onClick=${() => setVis(vis === v ? '' : v)}>${v}${counts?.[v] !== undefined ? ' ' + counts[v] : ''}</button>`)}
-          <span class="adm-mem-sep"></span>
-          <button type="button" class=${'adm-mem-chip' + (flagged ? ' on' : '')} onClick=${() => setFlag(!flagged)}>${S('flaggedOnly')}</button>
-          <button type="button" class=${'adm-mem-chip' + (archived === 'only' ? ' on' : '')}
-            onClick=${() => setArch(archived === 'only' ? 'exclude' : 'only')}>${S('archivedOnly')}</button>
-          <button type="button" class=${'adm-mem-chip' + (bin ? ' on' : '')} onClick=${() => setBin(!bin)}>${S('binChip')}</button>
-        </div>
-      </div>
-
-      <!-- the questions -->
-      <div class="adm-mem-say poster-aside">
-        <div class="adm-mem-lbl">${S('startFrom')}</div>
-        <div class="adm-mem-qs">
-          ${QUESTIONS.map(x => html`
-            <button type="button" key=${x.id} class="adm-mem-door" onClick=${() => ask(x.id)}>${S('q_' + x.id)}</button>`)}
-          <button type="button" class="adm-mem-door" onClick=${openReach}>${S('q_reach')}</button>
-          ${narrowed && html`<button type="button" class="adm-mem-door is-quiet" onClick=${clearAll}>${S('clear')}</button>`}
-        </div>
-      </div>
+        <!-- the questions -->
+        <${Surface} kind="aside">
+          <${Stack} density="compact">
+            <${Text} kind="label">${S('startFrom')}<//>
+            <${Stack} direction="wrap">
+              ${QUESTIONS.map(x => html`
+                <${Action} key=${x.id} onClick=${() => ask(x.id)}>${S('q_' + x.id)}<//>`)}
+              <${Action} onClick=${openReach}>${S('q_reach')}<//>
+              ${narrowed && html`<${Action} kind="text" onClick=${clearAll}>${S('clear')}<//>`}
+            <//>
+          <//>
+        <//>
+      <//>
 
       <!-- results -->
-      <div class="adm-mem-results">
-        <div class="adm-mem-rhead2">
-          <h2 class="poster-section-title">${bin ? S('binTitle') : searching ? S('matches') : S('theRecords')}<small>${total}</small></h2>
-          <span>${bin ? S('binNote', { days: grace })
-            : searching ? S('searchedNote')
-            : oldest ? S('byKey') : S('newestFirst')}</span>
-        </div>
-
+      <${Section} title=${bin ? S('binTitle') : searching ? S('matches') : S('theRecords')} count=${total}
+        description=${bin ? S('binNote', { days: grace })
+          : searching ? S('searchedNote')
+          : oldest ? S('byKey') : S('newestFirst')}>
         ${loading && rows.length === 0 && html`<${Empty} text=${S('loading')} />`}
         ${!loading && rows.length === 0 && html`
           <${Empty} text=${bin ? S('binEmpty') : searching ? S('noMatches') : S('noRecords')} />`}
@@ -378,16 +355,16 @@ export default function MemoryTab() {
             onOpen=${openRecord} onRestore=${putBack} />`)}
 
         ${!searching && pages > 1 && html`
-          <div class="adm-mem-foot">
-            <span>${S('showing', { from: offset + 1, to: Math.min(offset + PAGE, total), total })}</span>
-            <div class="adm-mem-pager">
-              <button type="button" class="adm-mem-door" disabled=${offset === 0}
-                onClick=${() => load(Math.max(0, offset - PAGE))}>${S('back')}</button>
-              <span class="adm-mem-pageno">${page} / ${pages}</span>
-              <button type="button" class="adm-mem-door" disabled=${offset + PAGE >= total}
-                onClick=${() => load(offset + PAGE)}>${S('onward')}</button>
-            </div>
-          </div>`}
-      </div>
-    </div>`;
+          <${Stack} direction="wrap" align="between">
+            <${Text} kind="mono" tone="muted">${S('showing', { from: offset + 1, to: Math.min(offset + PAGE, total), total })}<//>
+            <${Stack} direction="horizontal" align="center">
+              <${Action} disabled=${offset === 0}
+                onClick=${() => load(Math.max(0, offset - PAGE))}>${S('back')}<//>
+              <${Text} kind="mono">${page} / ${pages}<//>
+              <${Action} disabled=${offset + PAGE >= total}
+                onClick=${() => load(offset + PAGE)}>${S('onward')}<//>
+            <//>
+          <//>`}
+      <//>
+    <//>`;
 }

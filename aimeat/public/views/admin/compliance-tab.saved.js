@@ -27,6 +27,8 @@
  *   - SavedReports (default) — the rows
  * @usage imported by compliance-tab.js, rendered beside the paste
  * @version-history
+ *   v3.0.0 -- 2026-09-22 -- Composed from the shared component set: one list row per kept report
+ *     with its stamp and kind chip, the opened facts in the row's body. No classes of its own.
  *   v2.1.0 — 2026-09-13 — Compose section headings from the shared poster B1 shape.
  *   v2.0.0 — 2026-09-05 — The poster face: rows with a mono stamp and a chip, Open and Download as
  *     doors, the keep action lifted to the tab and offered in the section's header.
@@ -43,6 +45,7 @@ import { swallowed } from '/js/swallowed.js';
 import { num, Spinner } from './shared.js';
 import { classCounts } from './compliance-tab.gaps.js';
 import { classWord } from './compliance-tab.register.js';
+import { Section, Stack, ListRow, Action, Chip, Text } from '/components/poster-parts.js';
 
 const C = (key, params) => t('admin.compliance.' + key, params);
 
@@ -59,14 +62,13 @@ function OpenedReport({ report }) {
   const tr = report?.derived?.ai_transparency || {};
   const usage = report?.derived?.ai_usage || {};
   const classes = classCounts(usecases).map(c => `${classWord(c.cls)} ${num(c.n)}`).join(', ');
-  return html`
-    <div class="adm-cmp-open">
-      <span class="adm-cmp-mono">${scope.node_id || ''} · ${(scope.period?.from || '').slice(0, 10)} → ${(scope.period?.to || '').slice(0, 10)} · ${C('printGenerated', { at: (scope.generated_at || '').replace('T', ' ').slice(0, 16) })}</span>
-      ${C('savedFacts', {
-        entries: num(usecases.length), gaps: num((report?.gaps || []).length), calls: num(usage.calls ?? 0),
-        public: num(tr.public_total ?? 0), unlabelled: num(tr.unlabelled ?? 0), v: report?.register?.questionnaire?.version || '',
-      })}${classes ? ` · ${classes}` : ''}
-    </div>`;
+  return html`<${Stack} density="compact">
+    <${Text} kind="mono" tone="muted">${scope.node_id || ''} · ${(scope.period?.from || '').slice(0, 10)} → ${(scope.period?.to || '').slice(0, 10)} · ${C('printGenerated', { at: (scope.generated_at || '').replace('T', ' ').slice(0, 16) })}<//>
+    <${Text}>${C('savedFacts', {
+      entries: num(usecases.length), gaps: num((report?.gaps || []).length), calls: num(usage.calls ?? 0),
+      public: num(tr.public_total ?? 0), unlabelled: num(tr.unlabelled ?? 0), v: report?.register?.questionnaire?.version || '',
+    })}${classes ? ` · ${classes}` : ''}<//>
+  <//>`;
 }
 
 export default function SavedReports({ refresh, keeping, onKeep, onError }) {
@@ -116,25 +118,20 @@ export default function SavedReports({ refresh, keeping, onKeep, onError }) {
     }
   };
 
-  return html`
-    <section class="og-sec adm-cmp-no-print" id="adm-cmp-06">
-      <div class="og-sec-h"><h2 class="poster-section-title">${C('savedTitle')}<small>06</small></h2>
-        <div class="og-doors"><button type="button" class="og-door og-door--quiet" disabled=${keeping} onClick=${onKeep}>${keeping ? C('savedSaving') : C('savedNow')}</button></div></div>
-      <p class="adm-cmp-lead">${C('savedNote')}</p>
-      ${reports === null ? html`<${Spinner} text=${C('loading')} />` : null}
-      ${reports?.length === 0 ? html`<div class="adm-cmp-empty adm-cmp-empty--last">${C('savedEmpty')}</div>` : null}
-      ${(reports || []).map((r, i) => html`
-        <div class="adm-mrow adm-mrow--two ${i === reports.length - 1 ? 'adm-mrow--last' : ''}" key=${r.id}>
-          <span>
-            <span class="adm-cmp-stamp">${readableId(r.id)}</span>
-            <span class="og-chip adm-cmp-chip--dim">${t(r.kind === 'monthly' ? 'admin.compliance.savedKindMonthly' : 'admin.compliance.savedKindManual')}</span>
-            <span class="adm-why">${r.generated_at ? C('printGenerated', { at: String(r.generated_at).replace('T', ' ').slice(0, 16) }) : ''}</span>
-            ${openId === r.id ? (opened ? html`<${OpenedReport} report=${opened} />` : html`<${Spinner} text=${C('loading')} />`) : null}
-          </span>
-          <span class="adm-cmp-right">
-            <button type="button" class="og-door og-door--quiet" onClick=${() => open(r.id)}>${openId === r.id ? C('close') : C('edit')}</button>
-            <button type="button" class="og-door og-door--quiet" onClick=${() => download(r.id)}>${C('savedDownload')}</button>
-          </span>
-        </div>`)}
-    </section>`;
+  return html`<${Section} id="adm-cmp-06" title=${C('savedTitle')} count="06" description=${C('savedNote')}
+    actions=${html`<${Action} disabled=${keeping} onClick=${onKeep}>${keeping ? C('savedSaving') : C('savedNow')}<//>`}>
+    ${reports === null ? html`<${Spinner} text=${C('loading')} />` : null}
+    ${reports?.length === 0 ? html`<${Text} tone="muted">${C('savedEmpty')}<//>` : null}
+    ${(reports || []).map((r) => html`<${ListRow} key=${r.id}
+      name=${html`<${Stack} direction="horizontal" align="center" density="compact">
+        <${Text} kind="mono">${readableId(r.id)}<//>
+        <${Chip} tone="muted">${t(r.kind === 'monthly' ? 'admin.compliance.savedKindMonthly' : 'admin.compliance.savedKindManual')}<//>
+      <//>`}
+      detail=${r.generated_at ? C('printGenerated', { at: String(r.generated_at).replace('T', ' ').slice(0, 16) }) : null}
+      actions=${html`
+        <${Action} expanded=${openId === r.id} onClick=${() => open(r.id)}>${openId === r.id ? C('close') : C('edit')}<//>
+        <${Action} onClick=${() => download(r.id)}>${C('savedDownload')}<//>`}>
+      ${openId === r.id ? (opened ? html`<${OpenedReport} report=${opened} />` : html`<${Spinner} text=${C('loading')} />`) : null}
+    <//>`)}
+  <//>`;
 }

@@ -6,6 +6,7 @@
  *   wallet, memory, agents, extensions, packages, knowledge, generator, and
  *   edit panels. Consumes theme.css tokens so it flips with dark/light mode.
  * @version-history
+ *   2026-09-22 -- Rules no markup uses any more are removed: every signed-in page is composed from the shared set (css/parts.css), so the page copies here stopped matching anything.
  *   2026-09-22 -- The overview's and the shared instruction's rules leave: those pages are composed
  *     from the shared set.
  *   2026-09-14 -- .pj-doc-solo-toast leaves; the document window uses the shared .toast in theme.css.
@@ -234,27 +235,20 @@
  *   v1.14.1 — 2026-06-23 — Optional color tags: .pj-tag-{red…gray} (→ --pj-tag theme tokens),
  *     .pj-colored left-rail accent, and the .pj-cp/.pj-cp-dot/-pop/-sw/-none swatch picker.
  */
-.pf-hero{background:var(--pf-hero-gradient);border-bottom:1px solid var(--border,#E5E7EB)}
-.pf-hero-inner{max-width:1000px;margin:0 auto;padding:2rem 1.5rem 0}
 /* Full-bleed dashboard shell (like the admin dashboard): the sidebar+content
    flex fills the viewport instead of being capped to a narrow centered column.
    The old 1000px cap squeezed tab content (organisms, etc.) into ~760px. The
    home dashboard / tab content get breathing room via .pf-content padding. The
    signed-out door has its own sheet (profile-door.css). */
 .pf{max-width:none;margin:0;padding:0;position:relative;z-index:1}
-.pf-hero-inner .profile-header,.pf .profile-header{display:flex;align-items:center;gap:1.25rem;margin-bottom:1.5rem;flex-wrap:wrap}
-.pf-hero-inner .avatar,.pf .avatar{width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,#E8564A,#8B5CF6);display:flex;align-items:center;justify-content:center;font-size:1.75rem;color:#fff;font-weight:700;flex-shrink:0;border:3px solid #fff;box-shadow:0 4px 12px rgba(0,0,0,.1)}
-.pf-hero-inner .profile-info h1,.pf .profile-info h1{font-size:1.5rem;font-weight:800;margin-bottom:.2rem}
-.pf-hero-inner .profile-info .ghii,.pf .profile-info .ghii{color:var(--accent,#E8564A);font-family:var(--font-mono,monospace);font-size:.81rem;font-weight:500}
-.pf-hero-inner .profile-info .meta,.pf .profile-info .meta{color:var(--text-dim,#9CA3AF);font-size:.78rem;margin-top:2px}
-.pf-hero-inner .stats-bar,.pf .stats-bar{display:flex;gap:10px;margin-bottom:1.5rem;flex-wrap:wrap}
+.pf .avatar {width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,#E8564A,#8B5CF6);display:flex;align-items:center;justify-content:center;font-size:1.75rem;color:#fff;font-weight:700;flex-shrink:0;border:3px solid #fff;box-shadow:0 4px 12px rgba(0,0,0,.1)}
 /* .pf .stat-card box override + dead .pf-hero-inner .stat-card .num/.label (0 sites)
    removed — profile stat cards (node-stats, wallet) use canonical theme.css
    .stat-card / .stat-card-value / .stat-card-label. Unified 2026-06-02 (#6). */
-.pf-hero-inner .tabs,.pf .tabs{display:flex;gap:6px 8px;margin-bottom:0;flex-wrap:wrap;padding:0 0 1.5rem}
-.pf-hero-inner .tab,.pf .tab{padding:.45rem .9rem;cursor:pointer;color:var(--text-dim,#6B7280);font-weight:500;font-size:.8rem;border:1px solid var(--border,#E5E7EB);border-radius:999px;transition:all .15s;background:var(--bg-card);white-space:nowrap}
-.pf-hero-inner .tab:hover,.pf .tab:hover{color:var(--text,#1A1A2E);border-color:var(--text-muted);background:var(--bg-surface)}
-.pf-hero-inner .tab.active,.pf .tab.active{color:#fff;background:var(--accent,#E8564A);border-color:var(--accent,#E8564A);font-weight:600}
+.pf .tabs {display:flex;gap:6px 8px;margin-bottom:0;flex-wrap:wrap;padding:0 0 1.5rem}
+.pf .tab {padding:.45rem .9rem;cursor:pointer;color:var(--text-dim,#6B7280);font-weight:500;font-size:.8rem;border:1px solid var(--border,#E5E7EB);border-radius:999px;transition:all .15s;background:var(--bg-card);white-space:nowrap}
+.pf .tab:hover {color:var(--text,#1A1A2E);border-color:var(--text-muted);background:var(--bg-surface)}
+.pf .tab.active {color:#fff;background:var(--accent,#E8564A);border-color:var(--accent,#E8564A);font-weight:600}
 .pf .section-desc{color:var(--text-dim,#6B7280);font-size:.85rem;margin-bottom:1.25rem;line-height:1.5;max-width:700px}
 .pf .card{background:var(--bg-card);border-radius:12px;padding:1.25rem;margin-bottom:.75rem;transition:border-color .2s}
 .pf .card:hover{border-color:var(--accent,#E8564A)}
@@ -327,25 +321,12 @@
 /* ── Access tab polish (2026-06-10): neutral headers, compact empties, fed coupling ── */
 .pf .card-h3.access-h3{color:var(--text)}
 .pf .access-empty-row{display:flex;align-items:center;gap:.75rem;padding:.4rem 0;margin-bottom:1rem}
-.pf .access-fed-allowall{padding:.4rem 0;border-bottom:1px solid var(--border-subtle,var(--border))}
-.pf .access-fed-warn-caption{font-size:.78rem;color:var(--warn-fg,#B45309);margin:.25rem 0 .1rem 1.6rem}
-.pf .access-fed-list--inactive{opacity:.45;pointer-events:none}
-.pf .access-copy-val{display:inline-flex;align-items:center;gap:.25rem;min-width:0;overflow-wrap:anywhere}
 /* ── Sidebar reorg (2026-06-10): collapsible groups + pin-on-hover ── */
 
 .pf .mem-time{font-size:.7rem;color:var(--text-dim,#6B7280);white-space:nowrap;flex-shrink:0}
 .pf .mem-sort-bar{display:flex;align-items:center;gap:.35rem}
 .pf .mem-sort-select{font-size:.75rem;padding:2px 6px;min-width:auto;width:auto}
 .pf .mem-vis{font-size:.7rem}
-.pf .shield-icon{font-size:.85rem;cursor:pointer;opacity:.6;transition:opacity .2s}
-.pf .shield-icon:hover{opacity:1}
-/* ── Scalable Memory tab (2026-06-22): storage bar, size column, tools bar, group actions ── */
-.pf .pf-mem-quota{margin:.25rem 0 .6rem}
-.pf .pf-mem-quota-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:.25rem}
-.pf .pf-mem-quota-bar{height:6px;border-radius:999px;background:var(--bg-dim);overflow:hidden}
-.pf .pf-mem-quota-fill{height:100%;background:var(--accent);border-radius:999px;transition:width .3s}
-.pf .pf-mem-quota-fill--danger{background:var(--danger)}
-.pf .pf-mem-size{font-size:.68rem;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap;flex-shrink:0}
 /* Data-management tools grouped in their own bordered panel, above the search/sort rows */
 .pf .mem-tools-section{display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;padding:.5rem .75rem;margin:.25rem 0 .6rem;background:var(--bg-surface,var(--bg-dim));border-radius:8px}
 .pf .mem-tools-label{font-size:.68rem;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--text-dim)}
@@ -356,7 +337,6 @@
 .pf .mem-group-actions{margin-left:auto;display:inline-flex;align-items:center;gap:.15rem;opacity:0;transition:opacity .15s}
 .pf .mem-group-header:hover .mem-group-actions{opacity:1}
 .pf .mem-search-summary{display:flex;justify-content:space-between;align-items:center;padding:.35rem .2rem;border-bottom:1px solid var(--border);margin-bottom:.25rem}
-.pf .key-rules-box{background:var(--bg-surface);border-radius:8px;padding:.75rem;margin-top:.75rem;margin-bottom:.5rem}
 .pf .mem-detail{background:rgba(0,0,0,.04);border-radius:8px;padding:1rem;margin-top:.5rem;font-size:.85rem}
 .pf .mem-detail pre{white-space:pre-wrap;word-break:break-all;font-family: var(--font-mono);color:var(--text,#1A1A2E);font-size:.8rem}
 .pf .mem-detail .mem-actions{display:flex;gap:.5rem;margin-top:.75rem;flex-wrap:wrap}
@@ -377,53 +357,11 @@
 .pf .mem-discover-owner{font-size:.7rem;color:var(--text-dim,#6B7280);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pf .mem-discover-preview{padding:.5rem .75rem;border-top:1px solid var(--border,#E5E7EB);background:var(--bg-dim,#F3F4F6)}
 .pf .mem-discover-preview pre{white-space:pre-wrap;word-break:break-all;font-family: var(--font-mono);font-size:.75rem;color:var(--text,#1A1A2E);max-height:300px;overflow-y:auto;margin:0}
-.pf .peer-card{display:flex;justify-content:space-between;align-items:center}
-.pf .peer-status{display:flex;align-items:center;gap:.4rem}
-/* .peer-dot removed — peer status uses canonical <StatusDot>. Unified 2026-06-02 (#11). */
-.pf .pn-card{background:var(--bg-card,#FFFFFF);border-radius:var(--radius,12px);margin-bottom:.75rem;transition:border-color .2s;overflow:hidden}
-.pf .pn-card:hover{border-color:var(--accent,#E8564A)}
-.pf .pn-header{display:flex;justify-content:space-between;align-items:center;padding:1rem 1.25rem;cursor:pointer;user-select:none}
-.pf .pn-header-left{display:flex;align-items:center;gap:.75rem}
 /* .pn-status-dot removed — node status uses canonical <StatusDot>. Unified 2026-06-02 (#11). */
-.pf .pn-name{font-weight:600;font-family: var(--font-mono);font-size:.9rem}
-.pf .pn-badges{display:flex;gap:.4rem;align-items:center}
-.pf .pn-quick{font-size:.8rem;color:var(--text-dim,#6B7280);padding:0 1.25rem .75rem}
-.pf .pn-arrow{color:var(--text-dim,#6B7280);font-size:.8rem;transition:transform .2s;display:inline-block}
-.pf .pn-arrow.open{transform:rotate(180deg)}
-.pf .pn-details{display:none;padding:0 1.25rem 1.25rem;border-top:1px solid rgba(232,86,74,.08)}
-.pf .pn-details.open{display:block}
-.pf .pn-detail-row{display:flex;justify-content:space-between;align-items:center;padding:.5rem 0;border-bottom:1px solid rgba(232,86,74,.06);font-size:.85rem}
-.pf .pn-detail-row:last-child{border-bottom:none}
-.pf .pn-detail-label{color:var(--text-dim,#6B7280);font-size:.8rem}
-.pf .pn-detail-value{font-family: var(--font-mono);font-size:.8rem;color:var(--text,#1A1A2E);word-break:break-all}
-.pf .pn-agent-list{display:flex;flex-direction:column;gap:.3rem;margin:.5rem 0}
-.pf .pn-agent-item{font-family: var(--font-mono);font-size:.8rem;color:var(--accent,#E8564A);padding:.2rem .5rem;background:rgba(232,86,74,.08);border-radius:4px}
-.pf .pn-vis-toggle{display:flex;gap:2px;border-radius:6px;overflow:hidden;border:1px solid var(--border,#E5E7EB)}
-.pf .pn-vis-btn{padding:4px 12px;border:none;cursor:pointer;font-size:.75rem;font-weight:600;background:transparent;color:var(--text-dim,#6B7280);transition:all .2s}
-.pf .pn-vis-btn.active{background:var(--accent,#E8564A);color:#fff}
-.pf .pn-vis-btn:hover:not(.active){color:var(--text,#1A1A2E)}
-.pf .pn-setup{display:none;margin-top:.75rem;background:rgba(0,0,0,.04);border-radius:8px;padding:1rem;font-size:.85rem;line-height:1.7}
-.pf .pn-setup.open{display:block}
-.pf .pn-setup ol{margin-left:1.5rem;margin-bottom:.5rem}
-.pf .pn-setup li{margin-bottom:.3rem;color:var(--text-dim,#6B7280)}
-.pf .pn-detach-btn{margin-top:.75rem;padding:6px 16px;background:transparent;color:var(--danger,#ef4444);border:1px solid var(--danger,#ef4444);border-radius:6px;cursor:pointer;font-size:.8rem;font-weight:600;transition:all .2s}
-.pf .pn-detach-btn:hover{background:rgba(239,68,68,.15)}
 .pf .agent-cta{background:var(--pf-cta-gradient);border-radius:var(--radius,12px);padding:1.5rem;margin-bottom:1.5rem}
 .pf .agent-cta h3{color:var(--accent,#E8564A);margin-bottom:.5rem;font-size:1.05rem}
 .pf .agent-cta p{font-size:.9rem;color:var(--text-dim,#6B7280);margin-bottom:.75rem}
 .pf .agent-prompt-box{position:relative;background:var(--bg-surface);border:1.5px solid var(--border,#E5E7EB);border-radius:10px;padding:1rem;font-family: var(--font-mono);font-size:.8rem;color:var(--text-dim);white-space:pre-wrap;word-break:break-all;line-height:1.5;margin-bottom:1rem;max-height:300px;overflow-y:auto}
-.pf .expand-btn{background:none;border:1px solid var(--border);color:var(--accent);border-radius:8px;padding:8px 16px;cursor:pointer;font-size:.85rem;font-weight:600;transition:all .2s;display:inline-flex;align-items:center;gap:6px}
-.pf .expand-btn:hover{border-color:var(--accent);color:var(--accent)}
-.pf .platform-instructions{display:none;margin-top:1rem}
-.pf .platform-instructions.expanded{display:block}
-.pf .platform-tabs{display:flex;gap:.25rem;flex-wrap:wrap;margin-bottom:1rem}
-.pf .platform-tab{padding:.5rem 1rem;background:var(--bg-card,#FFFFFF);border:1px solid var(--border,#E5E7EB);border-radius:8px;cursor:pointer;color:var(--text-dim,#6B7280);font-size:.8rem;font-weight:600;transition:all .2s}
-.pf .platform-tab:hover{color:var(--text,#1A1A2E);border-color:var(--accent,#E8564A)}
-.pf .platform-tab.active{color:var(--accent,#E8564A);border-color:var(--accent,#E8564A);background:rgba(232,86,74,.1)}
-.pf .platform-content{background:rgba(0,0,0,.04);border-radius:8px;padding:1.25rem;font-size:.85rem;line-height:1.7}
-.pf .platform-content ol{margin-left:1.5rem;margin-bottom:.75rem}
-.pf .platform-content li{margin-bottom:.4rem}
-.pf .platform-content code{background:rgba(232,86,74,.1);padding:1px 5px;border-radius:3px;font-size:.8rem;color:var(--accent,#E8564A)}
 .pf .empty{text-align:center;padding:2rem;color:var(--text-dim,#6B7280);font-size:.9rem}
 .pf .spinner{display:inline-block;width:18px;height:18px;border:2px solid var(--border,#E5E7EB);border-top-color:var(--accent,#E8564A);border-radius:50%;animation:pfSpin .6s linear infinite;margin-right:.5rem;vertical-align:middle}
 @keyframes pfSpin{to{transform:rotate(360deg)}}
@@ -432,7 +370,6 @@
 .pf .sub-tab{padding:.4rem .8rem;cursor:pointer;color:var(--text-dim,#6B7280);font-weight:600;font-size:.8rem;background:var(--bg-card,#FFFFFF);border:1px solid var(--border,#E5E7EB);border-radius:6px;transition:all .2s}
 .pf .sub-tab:hover{color:var(--text,#1A1A2E)}
 .pf .sub-tab.active{color:var(--accent,#E8564A);border-color:var(--accent,#E8564A);background:rgba(232,86,74,.1)}
-.pf .action-bar{display:flex;justify-content:space-between;align-items:center;gap:.75rem;margin-bottom:1rem;flex-wrap:wrap}
 .pf .search-bar{display:flex;gap:.5rem;flex:1;max-width:500px}
 /* .pf .input-field base+focus override removed — profile inputs use canonical
    theme.css .input-field (tokenized focus ring, theme-flips). Unified 2026-06-02 (#5).
@@ -456,7 +393,6 @@
 .pf .card-expanded{border-color:var(--accent,#E8564A)}
 .pf .card-clickable{cursor:pointer;user-select:none}
 .pf .card-clickable:hover{opacity:.9}
-.pf .expand-icon{font-size:.65rem;color:var(--text-dim,#6B7280);width:1rem;flex-shrink:0;display:inline-block}
 .pf .card-detail{margin-top:.75rem;padding-top:.75rem;border-top:1px solid rgba(232,86,74,.1)}
 .pf .card-actions{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.5rem}
 .pf .detail-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:.5rem}
@@ -482,18 +418,10 @@
 .pf .file-tag-clear{color:var(--text-dim,#6B7280);font-style:italic}
 /* Files: name/type search + click-to-preview affordances */
 .pf .mem-file-search{max-width:500px}
-.pf .pf-clickable{cursor:pointer}
-.pf .file-thumb.pf-clickable:hover{border-color:var(--accent,#E8564A)}
-.pf .file-icon.pf-clickable:hover{opacity:.7}
 /* In-browser file preview lightbox (image/pdf/video/audio/text) */
-.pf .pf-file-preview-modal{max-width:920px;width:92vw}
-.pf .pf-file-preview-body{display:flex;justify-content:center;align-items:center;min-height:200px;max-height:72vh;overflow:auto;background:var(--bg-dim,#F3F4F6);border:1px solid var(--border,#E5E7EB);border-radius:8px;padding:.5rem}
-.pf .pf-file-preview-img{max-width:100%;max-height:70vh;object-fit:contain;border-radius:6px}
 .pf .pf-file-preview-frame{width:100%;height:70vh;border:none;border-radius:6px}
 .pf video.pf-file-preview-media{max-width:100%;max-height:70vh;border-radius:6px}
 .pf audio.pf-file-preview-media{width:100%}
-.pf .pf-file-preview-text{width:100%;max-height:70vh;overflow:auto;white-space:pre-wrap;word-break:break-word;font-family: var(--font-mono);font-size:.8rem;line-height:1.5;margin:0;padding:.75rem;text-align:left;color:var(--text,#1F2937)}
-.pf .pf-file-preview-status{color:var(--text-dim,#6B7280);font-size:.9rem;padding:2rem;text-align:center}
 /* Collection cart — per-row toggle + the tray */
 .pf .mem-cart-btn{background:transparent;border:1px solid transparent;border-radius:6px;cursor:pointer;font-size:.8rem;line-height:1;padding:2px 5px;opacity:.45;transition:opacity .15s,background .15s}
 .pf .mem-cart-btn:hover{opacity:1;background:var(--accent-subtle,rgba(232,86,74,.1))}
@@ -514,8 +442,6 @@
 .pf .post-content{font-size:.9rem;margin-bottom:.5rem;line-height:1.5}
 .pf .post-meta{font-size:.75rem;color:var(--text-dim,#6B7280);display:flex;justify-content:space-between;align-items:center}
 .pf .post-reactions{display:flex;gap:.4rem;margin-top:.5rem}
-.pf .reaction-btn{padding:2px 8px;border-radius:12px;border:1px solid var(--border,#E5E7EB);background:transparent;cursor:pointer;font-size:.8rem;transition:all .2s}
-.pf .reaction-btn:hover{border-color:var(--accent,#E8564A);background:rgba(232,86,74,.1)}
 /* Board member management */
 .pf .brd-members{padding:1rem}
 .pf .brd-member-tags{display:flex;flex-wrap:wrap;gap:.4rem}
@@ -526,463 +452,16 @@
 .pf .brd-member-add .input-field{flex:1}
 /* The dialog itself (frame, header, X, body, footer) is /css/dialog.css, for every dialog on the
    site. Width modifiers (.pf .scope-modal, .pf .ext-modal-narrow) still layer on top of it. */
-.pf .star-rating{display:flex;gap:.25rem}
 .pf .star{font-size:1.5rem;cursor:pointer;color:var(--text-dim,#6B7280);transition:color .15s}
 .pf .star:hover,.pf .star.active{color:var(--warn,#f59e0b)}
-.pf .audit-day-btn{padding:.4rem .8rem;cursor:pointer;color:var(--text-dim,#6B7280);font-weight:600;font-size:.8rem;background:var(--bg-card,#FFFFFF);border:1px solid var(--border,#E5E7EB);border-radius:6px;transition:all .2s}
-.pf .audit-day-btn:hover{color:var(--text,#1A1A2E)}
-.pf .audit-day-btn.active{color:var(--accent,#E8564A);border-color:var(--accent,#E8564A);background:rgba(232,86,74,.1)}
-.pf .consent-table,.pf .audit-table{width:100%;border-collapse:collapse;font-size:.85rem}
-.pf .consent-table th,.pf .audit-table th{text-align:left;padding:.5rem .6rem;color:var(--text-dim,#6B7280);font-size:.75rem;text-transform:uppercase;letter-spacing:.03em;border-bottom:1px solid var(--border,#E5E7EB)}
-.pf .consent-table td,.pf .audit-table td{padding:.5rem .6rem;border-bottom:1px solid var(--accent-subtle)}
-.pf .consent-table tr:hover,.pf .audit-table tr:hover{background:var(--accent-subtle)}
-.pf .revoke-btn{padding:4px 10px;border-radius:6px;border:1px solid var(--danger,#ef4444);background:transparent;color:var(--danger,#ef4444);cursor:pointer;font-size:.75rem;font-weight:600;transition:all .2s}
-.pf .revoke-btn:hover{background:rgba(239,68,68,.15)}
 @media(max-width:600px){
-  .pf .profile-header{flex-direction:column;text-align:center}
-  .pf .stats-bar{grid-template-columns:repeat(2,1fr)}
-  .pf .action-bar{flex-direction:column;align-items:stretch}
   .pf .search-bar{max-width:100%}
-  .pf .consent-table,.pf .audit-table{font-size:.75rem}
-  .pf .consent-table th,.pf .consent-table td,.pf .audit-table th,.pf .audit-table td{padding:.4rem}
 }
-/* === Scope Management UI: the permission dialog in the poster face (2026-08-29). The three
-   presets are one segmented row with the chosen one on the sun; the advanced editor opens from an
-   underlined word; each domain is a section under a 3px ink rule, its rows over hairlines; the
-   machine name of a permission and the small notes are mono chips. No fill, no radius. === */
-.pf .scope-summary {display:flex;align-items:center;gap:.5rem;margin-top:.65rem;padding-top:.5rem;border-top:1px solid var(--border);font-size:.8rem}
-.pf .scope-summary .scope-badge {border:2px solid var(--accent);color:var(--accent);padding:.1rem .45rem;font-family:var(--font-mono);font-weight:500;font-size:.68rem}
-.pf .scope-summary .scope-count {color:var(--text-dim);font-size:.78rem}
-.pf .scope-summary .scope-manage-btn {margin-left:auto;background:none;border:0;border-bottom:2px solid var(--text);color:var(--text);padding:0;cursor:pointer;font-size:.78rem;font-weight:800}
-.pf .scope-summary .scope-manage-btn:hover {color:var(--accent);border-bottom-color:var(--accent)}
-.pf .scope-readonly-list {display:flex;flex-wrap:wrap;gap:.35rem;margin-top:.5rem}
-.pf .scope-readonly-list .scope-tag {font-family:var(--font-mono);font-weight:500;font-size:.68rem;border:2px solid var(--text);color:var(--text);padding:1px 7px}
-.pf .scope-modal {max-width:620px}
-.pf .scope-modal h3 {margin-bottom:.25rem}
-.pf .scope-modal .scope-agent-info {display:flex;align-items:center;gap:.6rem;color:var(--text-dim);font-size:.8rem;margin-bottom:1.25rem;font-family:var(--font-mono);overflow-wrap:anywhere}
-.pf .scope-agent-msg {display:inline-flex;color:var(--text);text-decoration:none;flex:none}
-.pf .scope-agent-msg:hover {color:var(--accent)}
-.pf .scope-agent-msg svg {width:16px;height:16px;stroke:currentColor;stroke-width:2;fill:none}
-.pf .scope-templates {display:flex;border:2px solid var(--text);margin-bottom:1.25rem}
-.pf .scope-tpl-btn {flex:1;min-width:0;padding:.6rem .5rem;background:transparent;border:0;border-right:2px solid var(--text);cursor:pointer;color:var(--text-dim);font-family:var(--font-showroom-body);font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;text-align:center}
-.pf .scope-tpl-btn:last-child {border-right:0}
-.pf .scope-tpl-btn:hover {color:var(--text)}
-.pf .scope-tpl-btn.active {color:var(--on-sun);background:var(--sun)}
-.pf .scope-advanced-toggle {background:none;border:0;border-bottom:2px solid var(--text);color:var(--text);padding:0 0 1px;cursor:pointer;font-size:.85rem;font-weight:800;display:inline-flex;align-items:center;gap:6px;margin-bottom:1rem}
-.pf .scope-advanced-toggle:hover {color:var(--accent);border-bottom-color:var(--accent)}
-.pf .scope-advanced-toggle .pf-chevron {font-size:.6rem}
-.pf .scope-domain {border-top:3px solid var(--text);padding:.75rem 0 .5rem;margin:0}
-.pf .scope-domain-header {display:flex;align-items:center;justify-content:space-between;gap:.5rem;margin-bottom:.35rem;cursor:pointer}
-.pf .scope-domain-header .domain-label {font-weight:800;font-size:.8rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text)}
-.pf .scope-domain-header .domain-toggle {font-family:var(--font-mono);font-weight:500;font-size:.66rem;color:var(--text-dim);border:2px solid var(--border);padding:0 6px;line-height:1.5}
-.pf .scope-domain-header:hover .domain-toggle {border-color:var(--text);color:var(--text)}
-.pf .scope-domain-header .domain-toggle.on {background:var(--sun);color:var(--on-sun);border-color:var(--text)}
-.pf .scope-row {display:flex;align-items:center;gap:.6rem;padding:.45rem 0;border-top:1px solid var(--border)}
-.pf .scope-row label {display:flex;align-items:center;gap:.6rem;cursor:pointer;flex:1;flex-wrap:wrap}
-.pf .scope-row input[type="checkbox"] {accent-color:var(--accent);width:16px;height:16px;margin:0;cursor:pointer;flex:none}
-.pf .scope-row .scope-friendly {font-size:.85rem;font-weight:600;color:var(--text);flex:1 1 20rem}
-.pf .scope-row .scope-technical {font-size:.66rem;color:var(--text-dim);font-family:var(--font-mono);font-weight:500}
-.pf .scope-row.disabled {opacity:.45;pointer-events:none}
-.pf .scope-row .scope-lock {font-size:.62rem;color:var(--text-dim);font-family:var(--font-mono);font-weight:500;border:2px solid var(--border);padding:0 5px;line-height:1.5}
-/* A scope the "Full access" template does not carry — says so where the tick is made. */
-.pf .scope-row .scope-extra-note {font-family:var(--font-mono);font-weight:500;font-size:.62rem;color:var(--accent);border:2px solid var(--accent);padding:0 5px;line-height:1.5}
-.pf .scope-domain-desc {font-size:.8rem;color:var(--text-dim);font-weight:600;margin:0 0 .4rem}
-/* Scopes take effect on the next connection — said where the Save button is, not after the fact. */
-.pf .scope-reconnect-note {font-size:.8rem;font-weight:600;color:var(--text-dim);margin:1rem 0 0;padding-top:.75rem;border-top:3px solid var(--text)}
-/* === Extensions === */
-.pf .ext-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1rem}
-.pf .ext-card{background:var(--card,#FFFFFF);border:1px solid var(--border,#E5E7EB);border-radius:12px;padding:1.25rem;cursor:pointer;transition:all .2s;box-shadow:0 2px 8px rgba(0,0,0,0.08)}
-.pf .ext-card:hover{border-color:var(--accent,#E8564A);transform:translateY(-2px);box-shadow:0 4px 16px rgba(0,0,0,0.12)}
-.pf .ext-card-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:.5rem}
-.pf .ext-card-name{font-weight:600;font-size:.95rem}
-.pf .ext-card-version{font-size:.75rem;color:var(--text-dim,#6B7280);background:var(--bg-dim,#F3F4F6);padding:2px 8px;border-radius:6px}
-.pf .ext-card-desc{font-size:.85rem;color:var(--text-dim,#6B7280);margin-bottom:.75rem;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.pf .ext-card-tags{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:.75rem}
-.pf .ext-comp-tag{font-size:.7rem;padding:2px 8px;border-radius:6px;background:var(--bg-dim,#F3F4F6)}
-.pf .ext-card-footer{display:flex;justify-content:space-between;align-items:center}
-.pf .ext-status{font-size:.8rem;display:flex;align-items:center;gap:6px}
-/* .ext-status-dot removed — extension status uses canonical <StatusDot> (was hardcoded #4ade80/#9ca3af). Unified 2026-06-02 (#11). */
-.pf .ext-card-actions{display:flex;gap:.5rem}
-.pf .ext-card-actions button{font-size:.75rem;padding:4px 10px;border-radius:6px;border:1px solid var(--border,#E5E7EB);background:transparent;color:var(--text-dim,#6B7280);cursor:pointer;transition:all .15s}
-.pf .ext-card-actions button:hover{background:var(--bg-dim,#F3F4F6)}
-.pf .ext-card-actions button.danger{border-color:rgba(239,68,68,0.3);color:#f87171}
-.pf .ext-card-actions button.danger:hover{background:rgba(239,68,68,0.15)}
-.pf .ext-detail-section{background:var(--surface,#F9FAFB);border:1px solid var(--border,#E5E7EB);border-radius:10px;padding:1rem;margin-bottom:1rem}
-.pf .ext-detail-section-title{font-weight:700;font-size:.95rem;margin-bottom:.75rem;display:flex;align-items:center;gap:8px;color:var(--accent,#E8564A)}
-.pf .ext-detail-code{font-family: var(--font-mono);font-size:.8rem;background:var(--bg-dim,#F3F4F6);padding:10px;border-radius:6px;overflow-x:auto;white-space:pre-wrap;word-break:break-all;margin-top:.5rem}
-/* Extensions hero */
-.pf .ext-hero{margin-bottom:1.5rem}
-.pf .ext-hero-desc{font-size:.95rem;color:var(--muted);line-height:1.7;margin-bottom:1.25rem;max-width:600px}
-.pf .ext-hero-actions{display:flex;gap:.75rem;flex-wrap:wrap;margin-bottom:1.5rem}
-/* Bundled extension cards */
-.pf .ext-bundled-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:1rem;margin-top:.75rem}
-.pf .ext-bundled-card{background:var(--card,#FFFFFF);border:1px solid var(--border,#E5E7EB);border-radius:12px;padding:1.25rem;transition:all .2s;box-shadow:0 2px 8px rgba(0,0,0,0.08)}
-.pf .ext-bundled-card:hover{border-color:var(--accent,#E8564A);box-shadow:0 4px 16px rgba(0,0,0,0.12)}
-.pf .ext-bundled-icon{font-size:2rem;margin-bottom:.75rem}
-.pf .ext-bundled-name{font-weight:700;font-size:1rem;margin-bottom:.5rem}
-.pf .ext-bundled-desc{font-size:.85rem;color:var(--muted);line-height:1.5;margin-bottom:1rem}
-/* Visibility badge */
-.pf .ext-visibility-badge{font-size:.7rem;padding:2px 8px;border-radius:6px;background:var(--bg-dim,#F3F4F6);margin-left:.5rem}
-.pf .ext-visibility-badge.public{color:#22c55e}
-.pf .ext-visibility-badge.private{color:var(--muted)}
-/* AI-acceleration maturity tier badge on library cards (tools/aeb/acceleration-tiers.md). */
-.pf .ext-tier{font-size:.68rem;font-weight:600;text-transform:uppercase;letter-spacing:.03em;padding:2px 7px;border-radius:999px;background:color-mix(in srgb, var(--muted, #9ca3af) 18%, transparent);color:var(--muted, #9ca3af);cursor:help;white-space:nowrap}
-.pf .ext-tier.ext-tier-frontier{background:color-mix(in srgb, var(--primary, #E8564A) 20%, transparent);color:var(--primary, #E8564A)}
-.pf .ext-tier.ext-tier-measured{background:color-mix(in srgb, #22c55e 18%, transparent);color:#16a34a}
-.pf .ext-tier.ext-tier-frontier.ext-tier-measured{background:color-mix(in srgb, var(--primary, #E8564A) 20%, transparent);color:var(--primary, #E8564A)}
-/* Libraries tab — cards reuse the ext-card family; only the lib-specific bits live here. */
-@media(max-width:600px){
-  .pf .ext-grid{grid-template-columns:1fr}
-  .pf .ext-bundled-grid{grid-template-columns:1fr}
-}
-/* Session management — revoke all sessions */
-.pf .sec-revoke-btn{padding:8px 20px;border:1px solid var(--danger,#ef4444);border-radius:8px;background:transparent;color:var(--danger,#ef4444);font-size:.85rem;font-weight:600;cursor:pointer;transition:all .2s;margin-top:8px}
-.pf .sec-revoke-btn:hover:not(:disabled){background:var(--danger,#ef4444);color:#fff}
-.pf .sec-revoke-btn:disabled{opacity:.5;cursor:not-allowed}
-
-/* ── Knowledge Tab (kpkg-*) ── */
-.kpkg-tab{display:flex;flex-direction:column;gap:1.5rem}
-.kpkg-action-bar{background:var(--bg-card,#FFFFFF);border:1px solid var(--border,#E5E7EB);border-radius:12px;padding:1.25rem}
-.kpkg-action-buttons{display:flex;gap:.75rem;flex-wrap:wrap;margin-bottom:.75rem}
-.kpkg-action-desc{color:var(--muted,#888);font-size:.85rem;margin:0}
-/* .kpkg-btn* removed — dead CSS (0 call sites); knowledge tab uses canonical
-   btn-outline / btn-danger-solid. Unified 2026-06-02. */
-.kpkg-import-box{background:var(--bg-card,#FFFFFF);border:1px solid var(--border,#E5E7EB);border-radius:12px;padding:1.25rem}
-.kpkg-import-box h3{margin:0 0 .75rem}
-.kpkg-import-textarea{width:100%;min-height:80px;background:var(--bg,#F9FAFB);color:var(--text,#e0e0e0);border:1px solid var(--border,#E5E7EB);border-radius:8px;padding:.75rem;font-family: var(--font-mono);font-size:.8rem;resize:vertical;box-sizing:border-box}
-.kpkg-import-note{color:var(--muted,#888);font-size:.8rem;margin:.5rem 0 0}
-.kpkg-error{color:var(--danger,#e74c3c);background:rgba(231,76,60,.1);border:1px solid rgba(231,76,60,.3);border-radius:8px;padding:.75rem;margin-top:.75rem;font-size:.85rem}
-.kpkg-preview{margin-top:1rem;padding:1rem;background:var(--bg,#F9FAFB);border-radius:8px;border:1px solid var(--border,#E5E7EB)}
-.kpkg-preview h4{margin:0 0 .75rem}
-.kpkg-preview-meta{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-bottom:.75rem}
-.kpkg-preview-entries{display:flex;flex-direction:column;gap:.35rem;margin:.75rem 0}
-.kpkg-preview-entry{display:flex;flex-wrap:wrap;align-items:baseline;gap:.35rem .5rem;font-size:.85rem;padding:.4rem 0;border-bottom:1px solid var(--border,#eee)}
-.kpkg-preview-entry:last-child{border-bottom:none}
-.kpkg-entry-key{flex-shrink:0}
-.kpkg-entry-value{width:100%;margin:0;padding-left:1rem;color:var(--text-muted,#888);font-size:.8rem;line-height:1.3;word-break:break-word}
-.kpkg-preview-refs{margin:.75rem 0;font-size:.85rem}
-.kpkg-ref{padding:.15rem 0}
-.kpkg-ref-verified{color:var(--success,#2ecc71)}
-.kpkg-ref-unverified{color:var(--warn,#f39c12)}
-.kpkg-ghii-ok{color:var(--success,#2ecc71);font-size:.85rem}
-.kpkg-ghii-warn{color:var(--warn,#f39c12);font-size:.85rem}
-.kpkg-preview-summary{color:var(--muted,#888);font-size:.85rem;margin:.75rem 0}
-.kpkg-toggle{display:flex;align-items:center;gap:.5rem;font-size:.85rem;cursor:pointer;margin:.5rem 0}
-.kpkg-badge{display:inline-block;padding:.15rem .5rem;border-radius:4px;font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
-.kpkg-badge-type{background:var(--purple-bg);color:var(--purple-fg)}
-.kpkg-badge-synthesis{background:var(--info-bg);color:var(--info-fg)}
-.kpkg-badge-public{background:var(--success-bg);color:var(--success-fg)}
-.kpkg-badge-private{background:var(--danger-bg);color:var(--danger-fg)}
-.kpkg-badge-owner{background:var(--warn-bg);color:var(--warn-fg)}
-.kpkg-badge-draft{background:var(--bg-surface);color:var(--text-dim)}
-.kpkg-badge-review{background:var(--warn-bg);color:var(--warn-fg)}
-.kpkg-badge-published{background:var(--success-bg);color:var(--success-fg)}
-.kpkg-section{background:var(--bg-card,#FFFFFF);border:1px solid var(--border,#E5E7EB);border-radius:12px;padding:1.25rem}
-.kpkg-section h3{margin:0 0 .75rem}
-.kpkg-card{background:var(--bg,#F9FAFB);border:1px solid var(--border,#E5E7EB);border-radius:8px;padding:1rem;margin-bottom:.75rem;transition:border-color .15s}
-.kpkg-card-expanded{border-color:var(--accent,#6366F1)}
-.kpkg-card-header{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-bottom:.5rem}
-.kpkg-card-clickable{cursor:pointer;user-select:none}
-.kpkg-card-clickable:hover{opacity:.85}
-.kpkg-expand-icon{font-size:.65rem;color:var(--muted,#888);width:1rem;flex-shrink:0}
-.kpkg-card-meta{display:flex;align-items:center;gap:1rem;font-size:.8rem;color:var(--muted,#888);margin-bottom:.5rem}
-.kpkg-card-info{display:flex;align-items:center;gap:1rem;font-size:.8rem;color:var(--muted,#888);margin-bottom:.5rem}
-.kpkg-card-author{font-style:italic}
-.kpkg-card-tags{display:flex;gap:.35rem;flex-wrap:wrap;margin-bottom:.5rem}
-.kpkg-tag{display:inline-block;padding:.1rem .4rem;background:var(--bg-surface);border-radius:3px;font-size:.7rem;color:var(--muted,#888)}
-.kpkg-card-stats{font-size:.8rem;color:var(--muted,#888)}
-.kpkg-card-actions{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.5rem}
-/* .kpkg-btn-sm / .kpkg-btn-danger removed — dead CSS (0 call sites). Unified 2026-06-02. */
-.kpkg-detail{margin-top:.75rem;padding-top:.75rem;border-top:1px solid var(--border,#E5E7EB)}
-.kpkg-detail-synthesis{color:var(--muted,#888);font-size:.85rem;font-style:italic;margin:0 0 .75rem}
-.kpkg-detail-entries h4{margin:0 0 .5rem;font-size:.85rem;color:var(--accent,#E8564A)}
-.kpkg-detail-entry{background:var(--bg-surface);border:1px solid var(--border,#E5E7EB);border-radius:6px;padding:.6rem;margin-bottom:.5rem}
-.kpkg-detail-entry-header{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-bottom:.25rem}
-.kpkg-vis-pill{border:1px solid;border-radius:4px;padding:2px 8px;font-size:.7rem;font-weight:600;cursor:pointer;transition:opacity .15s;line-height:1.3}
-.kpkg-vis-pill:hover{opacity:.75}
-.kpkg-detail-key{font-size:.7rem;color:var(--muted,#888);font-family: var(--font-mono)}
-.kpkg-detail-value{margin:.35rem 0 0;padding:.5rem;background:rgba(0,0,0,.04);border-radius:4px;font-size:.78rem;color:var(--text,#e0e0e0);white-space:pre-wrap;word-break:break-word;max-height:300px;overflow-y:auto;font-family: var(--font-mono);line-height:1.4}
-.kpkg-detail-refs{margin-top:.75rem}
-.kpkg-detail-refs h4{margin:0 0 .5rem;font-size:.85rem;color:var(--accent,#E8564A)}
-.kpkg-ref-link{color:var(--accent,#6366F1);text-decoration:none;font-size:.8rem}
-/* Per-entry references */
-.kpkg-entry-refs{margin-top:.35rem;padding:.3rem .5rem;background:rgba(0,0,0,.04);border-radius:4px;border-left:2px solid var(--accent,#6366F1)}
-.kpkg-entry-refs .kpkg-ref-link{color:var(--accent,#6366F1);text-decoration:none;font-size:.78rem}
-.kpkg-entry-refs .kpkg-ref-link:hover{text-decoration:underline}
-/* Per-entry relationships */
-.kpkg-entry-relations{display:flex;flex-wrap:wrap;gap:.35rem;margin-top:.35rem}
-.kpkg-relation-chip{display:inline-flex;align-items:center;gap:.3rem;padding:.15rem .5rem;background:rgba(108,92,231,.1);border:1px solid rgba(108,92,231,.25);border-radius:12px;font-size:.72rem;color:var(--text,#e0e0e0);cursor:pointer;transition:all .15s;line-height:1.3}
-.kpkg-relation-chip:hover{background:rgba(108,92,231,.2);border-color:rgba(108,92,231,.5)}
-.kpkg-relation-type{font-weight:600;color:var(--accent,#6366F1);font-size:.65rem;text-transform:uppercase;letter-spacing:.3px}
-/* Entry highlight animation on scroll-to */
-.kpkg-entry-highlight{outline:2px solid var(--accent,#6366F1);outline-offset:2px;transition:outline-color .3s}
-/* Import preview: per-entry ref/rel chips */
-.kpkg-preview-entry-refs,.kpkg-preview-entry-rels{display:flex;flex-wrap:wrap;gap:.25rem;width:100%;margin-top:.25rem;padding-left:1rem}
-.kpkg-ref-chip{display:inline-block;padding:.1rem .4rem;border-radius:3px;font-size:.7rem}
-.kpkg-ref-chip.kpkg-ref-verified{background:rgba(46,204,113,.1);color:var(--success,#2ecc71)}
-.kpkg-ref-chip.kpkg-ref-unverified{background:rgba(243,156,18,.1);color:var(--warn,#f39c12)}
-.kpkg-relation-chip-preview{cursor:default;font-size:.68rem;padding:.1rem .4rem}
-.kpkg-detail-meta{display:flex;gap:1rem;flex-wrap:wrap;margin-top:.75rem;padding-top:.5rem;border-top:1px solid var(--border,#E5E7EB);font-size:.7rem;color:var(--muted,#888);font-family: var(--font-mono)}
-.kpkg-trust-advisory{color:var(--warn,#f39c12);font-size:.75rem;font-style:italic;margin:.35rem 0 0}
 
 /* Service card expand/collapse */
-.pf .svc-card-expanded{border-color:var(--accent,#E8564A)}
-.pf .svc-expand-icon{font-size:.65rem;color:var(--text-dim,#6B7280);width:1rem;flex-shrink:0;transition:color .2s}
-.pf .svc-card-expanded .svc-expand-icon{color:var(--accent,#E8564A)}
-.pf .svc-detail{margin-top:.75rem;padding-top:.75rem;border-top:1px solid rgba(232,86,74,.1)}
-.pf .svc-detail-row{display:flex;justify-content:space-between;align-items:flex-start;padding:.4rem 0;border-bottom:1px solid rgba(232,86,74,.06);font-size:.85rem;gap:1rem}
-.pf .svc-detail-row:last-child{border-bottom:none}
-.pf .svc-detail-label{color:var(--text-dim,#6B7280);font-size:.8rem;flex-shrink:0;min-width:100px}
-.pf .svc-detail-value{font-size:.85rem;color:var(--text,#1A1A2E);word-break:break-all;text-align:right}
-.pf .svc-detail-value.mono{font-family: var(--font-mono);font-size:.8rem}
-.pf .svc-detail-code{font-family: var(--font-mono);font-size:.75rem;background:rgba(0,0,0,.05);padding:.6rem;border-radius:6px;overflow-x:auto;white-space:pre-wrap;word-break:break-all;margin-top:.35rem;color:var(--text,#1A1A2E);max-height:200px;overflow-y:auto;width:100%}
-.pf .svc-detail-tags{display:flex;flex-wrap:wrap;gap:.35rem;justify-content:flex-end}
-.pf .svc-detail-actions{margin-top:.75rem;padding-top:.5rem;border-top:1px solid rgba(232,86,74,.08);display:flex;gap:.5rem}
-.pf .svc-detail-error{color:var(--danger,#ef4444);font-size:.85rem}
 .pf .badge-outline{background:transparent;border:1px solid var(--border,rgba(232,86,74,.3));color:var(--accent,#E8564A);font-size:.7rem;padding:2px 8px;border-radius:4px}
 
-/* ── Service Generator (pf-gen-*) ─────────────────────── */
-
-.pf-gen-loading { text-align: center; padding: 2rem; color: var(--muted); }
-.pf-gen-disabled { text-align: center; padding: 2rem; color: var(--muted); font-style: italic; }
-.pf-gen-empty { text-align: center; padding: 2rem; color: var(--muted); }
-
-.pf-gen-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
-.pf-gen-header h3 { margin: 0; }
-
-.pf-gen-project-card {
-  background: var(--card); border: 1px solid var(--border); border-radius: 8px;
-  padding: 12px 16px; margin-bottom: 8px; cursor: pointer; transition: border-color 0.2s;
-}
-.pf-gen-project-card:hover { border-color: var(--accent,#E8564A); }
-.pf-gen-project-name { font-weight: 600; margin-bottom: 4px; }
-.pf-gen-project-meta { display: flex; gap: 12px; font-size: 0.85em; color: var(--muted); }
-
-.pf-gen-new-project { max-width: 700px; }
-.pf-gen-subtitle { color: var(--muted); margin-bottom: 1rem; }
-.pf-gen-hint { color: var(--warn-fg); font-size: 0.85em; margin: 0 0 8px; padding: 8px 12px; background: var(--warn-bg); border: 1px solid var(--warn-border); border-radius: 6px; }
-.pf-gen-description {
-  width: 100%; background: var(--bg-card); border: 1px solid var(--border,#E5E7EB); border-radius: 8px;
-  color: var(--text); padding: 12px; font-family: inherit; font-size: 0.95em; resize: vertical;
-}
-.pf-gen-actions { display: flex; gap: 8px; margin-top: 14px; padding-top: 10px; }
-
-/* Dashboard layout */
-.pf-gen-dashboard { display: flex; flex-direction: column; gap: 0; }
-.pf-gen-dash-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
-.pf-gen-dash-header h3 { margin: 0; flex: 1; }
-.pf-gen-delete-btn { color: var(--danger,#ef4444); margin-left: auto; }
-.pf-gen-delete-btn:hover { background: rgba(239,68,68,0.08); }
-.pf-gen-dash-body { display: flex; gap: 16px; min-height: 400px; }
-
-/* Sidebar */
-.pf-gen-sidebar { width: 220px; flex-shrink: 0; }
-.pf-gen-phase-group { margin-bottom: 12px; }
-.pf-gen-phase-label { font-size: 0.75em; text-transform: uppercase; color: var(--muted); font-weight: 600; margin-bottom: 4px; padding-left: 8px; }
-
-.pf-gen-comp-item {
-  padding: 6px 10px; font-size: 0.85em; border-left: 3px solid var(--border);
-  margin-bottom: 2px; cursor: pointer; display: flex; justify-content: space-between; align-items: center;
-  border-radius: 0 4px 4px 0; transition: all 0.15s;
-}
-.pf-gen-comp-item:hover { background: rgba(0,0,0,0.03); }
-.pf-gen-comp-item.active { background: rgba(232,86,74,0.06); border-left-color: var(--accent,#E8564A); }
-.pf-gen-comp-item.status-not_started { border-left-color: #D1D5DB; }
-.pf-gen-comp-item.status-prompt_ready { border-left-color: #60a5fa; }
-.pf-gen-comp-item.status-waiting_user,
-.pf-gen-comp-item.status-waiting_agent { border-left-color: #fbbf24; }
-.pf-gen-comp-item.status-errors { border-left-color: #ef4444; }
-.pf-gen-comp-item.status-done { border-left-color: #22c55e; }
-.pf-gen-comp-item.status-validating { border-left-color: #c084fc; }
-
-.pf-gen-comp-indicators { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
-.pf-gen-test-icon { font-size: 0.8em; font-weight: 700; width: 16px; text-align: center; line-height: 1; }
-.pf-gen-test-icon-passed { color: var(--success, #22c55e); }
-.pf-gen-test-icon-failed { color: var(--danger, #ef4444); }
-.pf-gen-test-icon-skipped { color: var(--text-muted, #9ca3af); }
-.pf-gen-test-icon-planned { color: var(--info, #3b82f6); opacity: 0.6; }
-
-.pf-gen-type-badge {
-  font-size: 0.7em; padding: 1px 6px; border-radius: 3px; font-weight: 600; text-transform: uppercase;
-}
-.pf-gen-type-badge.type-csm { background: var(--success-bg); color: var(--success-fg); }
-.pf-gen-type-badge.type-msm { background: var(--warn-bg); color: var(--warn-fg); }
-.pf-gen-type-badge.type-extension { background: var(--purple-bg); color: var(--purple-fg); }
-.pf-gen-type-badge.type-app { background: var(--info-bg); color: var(--info-fg); }
-.pf-gen-type-badge.type-memory { background: var(--bg-surface); color: var(--text-dim); }
-.pf-gen-type-badge.type-translation { background: var(--info-bg); color: var(--info-fg); }
-.pf-gen-type-badge.type-cortex { background: var(--purple-bg); color: var(--purple-fg); }
-
-/* Editable project name */
-.pf-gen-name-editable { margin: 0; flex: 1; cursor: pointer; border-bottom: 1px dashed transparent; transition: border-color 0.2s; }
-.pf-gen-name-editable:hover { border-bottom-color: var(--accent,#E8564A); }
-.pf-gen-name-input {
-  flex: 1; font-size: 1.17em; font-weight: 700; padding: 2px 6px;
-  border: 1px solid var(--accent,#E8564A); border-radius: 4px; outline: none;
-  font-family: inherit; background: var(--card,#fff);
-}
-
-/* Remove toggle button */
-.pf-gen-remove-toggle { color: var(--error,#ef4444); border-color: var(--error,#ef4444); }
-.pf-gen-remove-toggle:hover { background: rgba(239,68,68,0.08); color: var(--error,#ef4444); }
-
-/* Detail panel */
-.pf-gen-detail {
-  flex: 1; min-width: 0;
-  padding: 16px 20px;
-  background: rgba(232,86,74,0.03);
-  border: 1px solid rgba(232,86,74,0.08);
-  border-radius: 8px;
-}
-.pf-gen-detail-empty { display: flex; align-items: center; justify-content: center; height: 200px; color: var(--muted); background: transparent; border: none; }
-
-.pf-gen-comp-header { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid rgba(0,0,0,0.06); }
-.pf-gen-comp-header h4 { margin: 0; }
-
-.pf-gen-status-badge {
-  font-size: 0.75em; padding: 2px 8px; border-radius: 10px; font-weight: 500;
-}
-.pf-gen-status-badge.status-done { background: var(--success-bg); color: var(--success-fg); }
-.pf-gen-status-badge.status-errors { background: var(--danger-bg); color: var(--danger-fg); }
-.pf-gen-status-badge.status-waiting_user,
-.pf-gen-status-badge.status-waiting_agent { background: var(--warn-bg); color: var(--warn-fg); }
-.pf-gen-status-badge.status-prompt_ready { background: var(--info-bg); color: var(--info-fg); }
-
-.pf-gen-mode-toggle { display: flex; gap: 4px; margin-bottom: 16px; }
-
-.pf-gen-section { margin-bottom: 20px; }
-.pf-gen-section label { display: block; font-size: 0.8em; color: var(--muted); text-transform: uppercase; margin-bottom: 4px; }
-
-.pf-gen-prompt-box {
-  background: var(--bg-surface); border: 1px solid var(--border,#E5E7EB); border-radius: 6px;
-  padding: 10px; font-size: 0.82em; color: var(--text-dim,#4B5563); white-space: pre-wrap;
-  max-height: 200px; overflow-y: auto; margin-bottom: 8px; font-family: var(--font-mono);
-}
-
-.pf-gen-result-area {
-  width: 100%; background: var(--bg-card); border: 1px solid var(--border,#E5E7EB); border-radius: 6px;
-  color: var(--text); padding: 10px; font-family: var(--font-mono); font-size: 0.85em; resize: vertical;
-}
-
-/* ── Two-pane workspace: prompt (copy) | response (paste) ──────────────
-   On wide screens the copy-prompt and the paste-response sit side-by-side so
-   the generator uses the full width; below 1024px they stack. The generator
-   dashboard escapes the profile's 1360px cap (via :has) to give the panes room. */
-
-.pf-gen-workspace {
-  display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
-  align-items: stretch; margin-bottom: 20px;
-}
-.pf-gen-workspace .pf-gen-section { margin-bottom: 0; }
-.pf-gen-ws-pane { display: flex; flex-direction: column; min-width: 0; }
-.pf-gen-ws-pane .pf-gen-prompt-box { max-height: none; height: clamp(240px, 44vh, 520px); margin-bottom: 10px; }
-.pf-gen-ws-pane .pf-gen-result-area { flex: 1 1 auto; min-height: clamp(240px, 44vh, 520px); }
-.pf-gen-ws-pane .pf-gen-actions,
-.pf-gen-ws-pane .flex-row-wrap { margin-top: 10px; flex-wrap: wrap; }
-@media (max-width: 1024px) {
-  .pf-gen-workspace { grid-template-columns: 1fr; gap: 12px; }
-  .pf-gen-ws-pane .pf-gen-prompt-box { height: auto; max-height: 280px; }
-  .pf-gen-ws-pane .pf-gen-result-area { min-height: 220px; }
-}
-
-.pf-gen-errors {
-  background: var(--danger-bg); border: 1px solid var(--danger-border); border-radius: 6px;
-  padding: 12px; margin-top: 12px;
-}
-.pf-gen-errors label { color: var(--danger-fg); }
-.pf-gen-errors ul { margin: 8px 0; padding-left: 20px; font-size: 0.85em; }
-.pf-gen-errors li { margin-bottom: 4px; color: var(--danger-fg); }
-.pf-gen-error-line { color: var(--danger-fg); font-size: 0.85em; margin: 2px 0; }
-
-.pf-gen-settings-collection { max-width: 700px; }
-.pf-gen-settings-collection input { width: 100%; padding: 8px 10px; border: 1px solid var(--border,#E5E7EB); border-radius: 6px; background: var(--card,#fff); color: var(--text); font-size: 0.9em; }
-.pf-gen-required { color: var(--danger-fg); font-weight: 700; }
-.pf-gen-notice { color: var(--muted); font-style: italic; padding: 12px 0; }
-
-.pf-gen-agent-status { margin-top: 8px; color: var(--muted); font-style: italic; }
-
-/* Pagination */
-.pf-gen-pagination { display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 12px; color: var(--muted); font-size: 0.85em; }
-
-/* Archive toggle */
-.pf-gen-header-actions { display: flex; align-items: center; gap: 12px; }
-.pf-gen-archive-toggle { font-size: 0.85em; color: var(--muted); cursor: pointer; display: flex; align-items: center; gap: 4px; }
-.pf-gen-project-card.archived { opacity: 0.5; }
-
-/* Agent Listener Bar */
-.pf-gen-listener-bar { display: flex; justify-content: space-between; align-items: center; padding: 10px 16px; margin-bottom: 2rem; background: var(--card, #FFFFFF); border: 1px solid var(--border, #E5E7EB); border-radius: 8px; font-size: 0.85em; }
-.pf-gen-listener-status { display: flex; align-items: center; gap: 8px; }
-.pf-gen-listener-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-.pf-gen-listener-dot.online { background: #22c55e; box-shadow: 0 0 6px rgba(34,197,94,0.4); }
-.pf-gen-listener-dot.offline { background: #ef4444; }
-.pf-gen-listener-count { color: var(--text, #1A1A2E); }
-.pf-gen-listener-sync { color: var(--text-dim, #6B7280); font-size: 0.9em; }
-.pf-gen-listener-actions { display: flex; gap: 4px; }
-.pf-gen-agent-prompt-panel { margin-bottom: 12px; padding: 14px; background: var(--bg-surface); border: 1px solid var(--border, #E5E7EB); border-radius: 8px; }
-.pf-gen-agent-prompt-panel .pf-gen-subtitle { color: var(--text-dim, #6B7280); font-size: 0.85em; margin: 0 0 10px; }
-.pf-gen-agent-prompt-panel .btn { background: var(--accent, #E8564A); color: #fff; border: none; font-weight: 600; }
-.pf-gen-agent-prompt-panel .btn:hover { opacity: 0.9; }
-
-/* Activity Log */
-.pf-gen-activity-log { margin-top: 16px; border-top: 1px solid var(--border); padding-top: 12px; }
-.pf-gen-log-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-.pf-gen-log-header label { font-size: 0.8em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
-.pf-gen-log-filter { background: var(--bg-card); border: 1px solid var(--border,#E5E7EB); border-radius: 6px; color: var(--text); font-size: 0.8em; padding: 4px 8px; }
-.pf-gen-log-entries { max-height: 150px; overflow-y: auto; font-family: var(--font-mono); font-size: 0.8em; }
-.pf-gen-log-empty { color: var(--muted); font-style: italic; padding: 8px 0; }
-.pf-gen-log-entry { padding: 2px 0; display: flex; gap: 8px; }
-.pf-gen-log-time { color: var(--text-dim,#6B7280); flex-shrink: 0; }
-.pf-gen-log-comp { color: var(--purple-fg); flex-shrink: 0; }
-.pf-gen-log-msg { color: var(--muted); }
-
-/* Lifecycle Toolbar (Phase 5) */
-.pf-gen-lifecycle-toolbar {
-  display: flex; justify-content: space-between; align-items: center;
-  padding: 8px 12px; margin-bottom: 12px;
-  background: var(--card, #FFFFFF); border: 1px solid var(--border, #E5E7EB); border-radius: 8px;
-}
-.pf-gen-lifecycle-status { font-size: 0.85em; color: var(--muted); display: flex; gap: 4px; align-items: center; }
-.pf-gen-lifecycle-sep { color: var(--border); }
-.pf-gen-lifecycle-actions { display: flex; gap: 6px; flex-wrap: wrap; }
-
-/* Remove Panel (Phase 5) */
-.pf-gen-remove-panel {
-  padding: 12px 16px; margin-bottom: 12px;
-  background: var(--danger-bg); border: 1px solid var(--danger-border); border-radius: 8px;
-}
-.pf-gen-remove-list { display: flex; flex-direction: column; gap: 4px; }
-.pf-gen-remove-item { display: flex; align-items: center; gap: 8px; font-size: 0.85em; cursor: pointer; padding: 4px 0; }
-.pf-gen-remove-name { color: var(--muted); font-size: 0.9em; margin-left: auto; }
-
-/* Edit Service Panel (Phase 6) */
-.pf-gen-edit-panel {
-  padding: 12px 16px; margin-bottom: 12px;
-  background: var(--info-bg); border: 1px solid var(--info-border); border-radius: 8px;
-}
-.pf-gen-edit-panel h4 { margin: 0 0 8px; }
-
-.pf-gen-impact-list { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
-.pf-gen-impact-item { padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border, #E5E7EB); background: var(--bg-card); }
-.pf-gen-impact-item.impact-root { border-left: 3px solid #ef4444; }
-.pf-gen-impact-item.impact-update { border-left: 3px solid #f59e0b; }
-.pf-gen-impact-item.impact-none { border-left: 3px solid #d1d5db; opacity: 0.7; }
-
-.pf-gen-impact-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
-.pf-gen-impact-badge { font-size: 0.7em; padding: 1px 6px; border-radius: 3px; font-weight: 700; text-transform: uppercase; }
-.pf-gen-impact-badge.impact-root { background: var(--danger-bg); color: var(--danger-fg); }
-.pf-gen-impact-badge.impact-update { background: var(--warn-bg); color: var(--warn-fg); }
-.pf-gen-impact-badge.impact-none { background: var(--bg-surface); color: var(--text-dim); }
-.pf-gen-impact-label { font-weight: 600; font-size: 0.9em; }
-.pf-gen-impact-reason { font-size: 0.82em; color: var(--muted); }
-
 /* Step Arrow — inline pointer next to the current action */
-.pf-gen-step-arrow {
-  flex-shrink: 0;
-  animation: pf-gen-nudge-right 1.2s ease-in-out infinite;
-}
-.pf-gen-step-arrow--down {
-  animation: pf-gen-nudge-down 1.2s ease-in-out infinite;
-}
 @keyframes pf-gen-nudge-right {
   0%, 100% { transform: translateX(0); }
   50% { transform: translateX(3px); }
@@ -990,49 +469,6 @@
 @keyframes pf-gen-nudge-down {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(3px); }
-}
-
-/* Diagnostics Panel (Phase 7) */
-.pf-gen-diagnostics-panel {
-  padding: 12px 16px; margin-bottom: 12px;
-  background: var(--card, #FFFFFF); border: 1px solid var(--border, #E5E7EB); border-radius: 8px;
-  overflow-x: auto;
-}
-.pf-gen-diagnostics-panel h4 { margin: 0 0 8px; }
-
-.pf-gen-diag-table { width: 100%; border-collapse: collapse; font-size: 0.82em; }
-.pf-gen-diag-table th { text-align: left; font-size: 0.75em; text-transform: uppercase; color: var(--muted); padding: 4px 8px; border-bottom: 1px solid var(--border); }
-.pf-gen-diag-table td { padding: 5px 8px; border-bottom: 1px solid rgba(0,0,0,0.04); }
-.pf-gen-diag-table tr.diag-active td:first-child { font-weight: 600; }
-
-.pf-gen-live-active { color: var(--success-fg); font-weight: 500; }
-.pf-gen-live-installed { color: var(--warn-fg); }
-.pf-gen-live-missing { color: var(--text-muted); }
-.pf-gen-diag-action { color: var(--muted); font-size: 0.9em; }
-
-@media(max-width:700px) {
-  .pf-gen-dash-body { flex-direction: column; }
-  /* Sidebar becomes a horizontal, swipeable rail of component chips so it never
-     eats vertical space or wraps into a tall stack on a phone. */
-  .pf-gen-sidebar {
-    width: 100%; display: flex; gap: 8px; flex-wrap: nowrap;
-    overflow-x: auto; -webkit-overflow-scrolling: touch;
-    padding-bottom: 6px; margin-bottom: 8px;
-    scrollbar-width: thin;
-  }
-  .pf-gen-phase-group { margin-bottom: 0; flex-shrink: 0; }
-  .pf-gen-phase-label { padding-left: 2px; }
-  .pf-gen-comp-item { white-space: nowrap; border-radius: 6px; border-left-width: 4px; }
-  .pf-gen-header-actions { flex-wrap: wrap; }
-  .pf-gen-dash-header { flex-wrap: wrap; }
-  .pf-gen-lifecycle-toolbar { flex-direction: column; gap: 8px; align-items: stretch; }
-  .pf-gen-lifecycle-actions { justify-content: flex-start; }
-  .pf-gen-detail { padding: 12px 12px; }
-  /* Prompt/response panes already stack (workspace collapses at 1024px); give the
-     textareas a comfortable touch height and let the prompt box scroll. */
-  .pf-gen-ws-pane .pf-gen-prompt-box { max-height: 220px; }
-  .pf-gen-ws-pane .pf-gen-result-area { min-height: 200px; }
-  .pf-or-run-all-bar { flex-direction: column; align-items: stretch; gap: 8px; }
 }
 
 /* ══ Shared Profile Utilities (2026-03-17) ══════════════ */
@@ -1043,19 +479,12 @@
 .pf .flex-between     { display: flex; justify-content: space-between; align-items: center; }
 .pf .flex-col         { display: flex; flex-direction: column; gap: .5rem; }
 .pf .flex-actions     { display: flex; gap: 8px; margin-top: 12px; }
-.pf .scroll-x         { overflow-x: auto; }
 
 /* ── Text Utilities ── */
-.pf .text-meta        { font-size: .8rem; color: var(--text-dim, #6B7280); }
 .pf .text-meta-sm     { font-size: .75rem; color: var(--text-dim, #6B7280); }
-.pf .text-caption     { font-size: .85rem; color: var(--text-dim, #6B7280); }
-.pf .text-code        { font-family: var(--font-mono, monospace); font-size: .8rem; }
-.pf .text-accent      { color: var(--accent, #E8564A); }
-.pf .text-readable    { line-height: 1.6; }
 
 /* ── Spacing Utilities ── */
 .pf .mt-section       { margin-top: 1.5rem; }
-.pf .mt-xs            { margin-top: 4px; }
 .pf .mb-1             { margin-bottom: 1rem; }
 .pf .mb-half          { margin-bottom: .5rem; }
 .pf .p-1              { padding: 1rem; }
@@ -1115,54 +544,8 @@
 /* Glass Card removed (#22): GlassCard now delegates to the canonical
    /components/Card.js (variant="glass" → .card-glass in theme.css). */
 
-/* ── Generator: live status on type badge (replaces dots) ── */
-.pf-gen-type-badge.live-active    { border-right: 3px solid var(--success, #22c55e); padding-right: 6px; }
-.pf-gen-type-badge.live-installed { border-right: 3px solid var(--warn, #f59e0b); padding-right: 6px; }
-.pf-gen-type-badge.live-missing   { border-right: 3px solid var(--danger, #ef4444); padding-right: 6px; }
-
-/* ── Generator: package changes diff colors ── */
-.pf-gen-change-added     { color: var(--success, #22c55e); }
-.pf-gen-change-modified  { color: var(--warn, #f59e0b); }
-.pf-gen-change-removed   { color: var(--danger, #ef4444); }
-.pf-gen-change-unchanged { color: var(--text-muted, #9CA3AF); }
-.pf-gen-changes-list     { margin: 4px 0; padding-left: 18px; }
-
-/* ── Generator: remove panel helpers ── */
-.pf-gen-remove-heading   { margin: 0 0 8px; font-weight: 600; }
-.pf-gen-checkbox-label   { display: flex; align-items: center; gap: 4px; font-size: .85em; }
-
 /* ── Agent-driven generator UI ──────────────────────── */
-.pf-gen-agent-banner {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
-  background: var(--warning-subtle, var(--surface));
-  border: 1px solid var(--warning-border, var(--border));
-  border-radius: var(--radius);
-  margin-bottom: 16px;
-}
-.pf-gen-agent-banner.stale {
-  background: var(--error-subtle, var(--surface));
-  border-color: var(--error-border, var(--border));
-}
-.pf-gen-agent-banner-info { flex: 1; }
-.pf-gen-agent-banner-phase { display: block; font-size: 0.85em; color: var(--text-dim); margin-top: 4px; }
-.pf-gen-step-indicators { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
-.pf-gen-step-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--border); display: inline-block; }
-.pf-gen-step-dot.done { background: var(--success); }
-.pf-gen-step-dot.active { background: var(--accent); animation: pf-gen-pulse 1.5s infinite; }
 @keyframes pf-gen-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
-.pf-gen-agent-selector { padding: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 16px; }
-.pf-gen-agent-selector-subtitle { color: var(--text-dim); margin-bottom: 12px; }
-.pf-gen-agent-selector-empty { color: var(--text-dim); font-style: italic; }
-.pf-gen-agent-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
-.pf-gen-agent-option { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius); cursor: pointer; }
-.pf-gen-agent-option.selected { border-color: var(--accent); background: var(--bg-dim); }
-.pf-gen-agent-name { font-weight: 600; }
-.pf-gen-agent-gaii { font-size: 0.8em; color: var(--text-dim); }
-.pf-gen-agent-actions { display: flex; gap: 8px; }
-.pf-gen-stop-btn { margin-left: auto; }
 
 /* ── OpenRouter Settings (pf-or-*) ──────────────── */
 .pf-or-wrapper {
@@ -1187,13 +570,6 @@
 }
 .pf-or-toggle:hover { background: var(--bg-dim, #F3F4F6); }
 .pf-or-toggle-icon { font-size: 0.65em; color: var(--text-dim, #6B7280); width: 1rem; flex-shrink: 0; }
-.pf-or-status-dot {
-  width: 8px; height: 8px; border-radius: 50%;
-  background: var(--success, #22c55e);
-  box-shadow: 0 0 6px rgba(34, 197, 94, 0.4);
-  flex-shrink: 0;
-  margin-left: auto;
-}
 .pf-or-panel {
   padding: 0 14px 14px;
 }
@@ -1222,11 +598,7 @@
 .pf-or-input:focus { outline: none; border-color: var(--accent, #E8564A); box-shadow: 0 0 0 3px rgba(232, 86, 74, 0.1); }
 .pf-or-input-sm { max-width: 100px; }
 .pf-or-param-row { display: flex; align-items: center; gap: 10px; }
-.pf-or-param-hint { font-size: 0.8em; color: var(--text-dim, #888); white-space: nowrap; }
 /* Model refresh row: sits below the model <select>; let the hint/error wrap on narrow widths. */
-.pf-or-model-row { margin-top: 8px; flex-wrap: wrap; }
-.pf-or-model-row .pf-or-param-hint { white-space: normal; }
-.pf-or-model-error { color: var(--danger, #ef4444); }
 .pf-or-select {
   width: 100%;
   padding: 8px 12px;
@@ -1403,118 +775,24 @@
 }
 
 /* ── OpenRouter Autopilot (pf-or-*) ──────────────── */
-.pf-or-btn-row {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  flex-wrap: wrap;
-}
-.pf-or-run-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-.pf-or-run-btn.pf-or-running {
-  opacity: 0.8;
-  cursor: wait;
-}
-.pf-or-spinner {
-  display: inline-block;
-  width: 14px;
-  height: 14px;
-  border: 2px solid var(--border, #E5E7EB);
-  border-top-color: var(--accent, #E8564A);
-  border-radius: 50%;
-  animation: pf-or-spin 0.7s linear infinite;
-}
 @keyframes pf-or-spin {
   to { transform: rotate(360deg); }
 }
-.pf-gen-data-viewer {
-  border: 1px solid var(--border, #E5E7EB);
-  border-radius: 8px;
-  padding: 8px 12px;
-  background: var(--card, #FFFFFF);
-}
-.pf-gen-data-viewer summary {
-  color: var(--text-dim, #6B7280);
-  font-size: 13px;
-}
-.pf-gen-data-pre {
-  max-height: 400px;
-  overflow: auto;
-  font-size: 11px;
-  line-height: 1.4;
-  margin: 8px 0 0 0;
-  padding: 8px;
-  background: var(--bg-dim, #F9FAFB);
-  border-radius: 4px;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-.pf-or-run-all-bar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 14px;
-  margin-bottom: 10px;
-  background: var(--card, #FFFFFF);
-  border: 1px solid var(--border, #E5E7EB);
-  border-radius: 8px;
-}
-.pf-or-run-all-status {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: 1;
-  font-size: 0.85rem;
-  color: var(--text, #1A1A2E);
-}
 
 /* ── Input for verification codes (email-tab) ── */
-.pf .input-verification-code {
-  font-size: 1.5rem; letter-spacing: 6px; text-align: center;
-  padding: .75rem 1rem;
-}
 
 .pf .w-full            { width: 100%; }
 
 /* ── Knowledge tab references ── */
-.pf .pf-ref-row      { display: flex; align-items: center; gap: .4rem; padding: .15rem 0; }
-.pf .pf-ref-icon     { font-size: .75rem; }
-.pf .pf-external-icon { font-size: .65rem; opacity: .6; }
-.pf .pf-ref-title    { font-size: .8rem; }
-.pf .pf-badge-xs     { font-size: .6rem; }
-.pf .pf-sharing-box  { margin-bottom: .75rem; padding: .5rem .75rem; border: 1px solid rgba(232,86,74,.15); border-radius: 8px; background: rgba(232,86,74,.04); }
-.pf .pf-sharing-heading { margin: 0 0 .5rem; font-size: .8rem; }
 .pf .vis-owner       { background: var(--bg-surface); color: var(--text-dim); }
 
 /* ══ Refactored inline styles (2026-03-17) ══════════════ */
 
 /* ── Node Stats tab ── */
 .pf .stat-grid       { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: .75rem; margin-bottom: 1.5rem; }
-.pf .stat-grid-sm    { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: .75rem; margin-bottom: 1rem; }
-/* .pf .stat-card/.stat-value/.stat-label removed — node-stats uses canonical
-   .stat-card / .stat-card-value / .stat-card-label. Unified 2026-06-02 (#6). */
-.pf .stat-two-col    { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem; }
-.pf .stat-section-h3 { color: var(--love1); margin: 1.5rem 0 .75rem; font-size: 1rem; }
-.pf .stat-panel-h4   { color: var(--love1); margin: 0 0 .75rem; font-size: .9rem; }
-.pf .stat-row        { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid var(--border); }
-.pf .stat-row-label  { font-weight: 600; font-size: .85rem; }
-.pf .stat-row-label.success { color: var(--success-fg); }
-.pf .stat-row-label.warn    { color: var(--warn); }
-.pf .stat-row-label.danger  { color: var(--danger-fg); }
-.pf .stat-row-value  { color: var(--muted); font-size: .85rem; }
-.pf .stat-footer     { color: var(--muted); font-size: .8rem; margin-top: 1rem; }
 
 /* ── Nodes tab ── */
-.pf .radio-row       { display: flex; gap: 1rem; }
 .pf .radio-label     { display: flex; align-items: center; gap: .4rem; cursor: pointer; }
-.pf .pn-setup-arrow  { transition: transform .2s; display: inline-block; }
-.pf .pn-setup-arrow.open { transform: rotate(180deg); }
-.pf .pn-setup-link   { color: var(--love1); font-size: .8rem; }
-.pf .pn-padding-half { padding: .5rem 0; }
-.pf .pn-no-agents    { font-size: .8rem; color: var(--muted); margin-top: .3rem; }
 
 /* The Email tab lives in css/views/email-poster.css (the poster face, 2026-08-30). */
 
@@ -1531,13 +809,8 @@
 
 .pf .ag-scope-toggle { border: 0; font-family: inherit; font-size: .66rem; font-weight: 600; cursor: pointer; }
 .pf .ag-scope-toggle:hover { filter: brightness(1.1); }
-.pf .access-key-blur { filter: blur(4px); transition: filter .2s; }
-.pf .access-key-blur.revealed { filter: none; }
 .pf .access-card-warn { border-color: var(--warn); cursor: pointer; }
 .pf .access-warn-text { font-size: .75rem; color: var(--warn); margin-top: .5rem; }
-.pf .access-mcp-url  { font-family: var(--font-mono); font-size: .85rem; color: var(--love3); }
-.pf .access-mcp-desc { font-size: .75rem; color: var(--muted); margin-top: .3rem; }
-.pf .access-fed-add  { margin-top: .5rem; }
 .pf .access-pat-token { font-family: var(--font-mono); font-size: .8rem; word-break: break-all; background: var(--bg-dim); padding: .4rem .6rem; border-radius: 6px; flex: 1; }
 .pf .access-pat-prompt-row { margin-top: .5rem; }
 .pf .access-pat-scope-row { align-items: center; gap: .5rem; margin: .2rem 0; }
@@ -1546,137 +819,21 @@
 /* ── Wallet tab ── */
 /* .wl-val-success/-danger removed — wallet uses canonical .stat-card-value.success/.danger. (#6) */
 
-/* ── Chat sessions tab ── */
-.pf .cs-create-body  { padding: .75rem 1rem .5rem; }
-.pf .cs-create-desc  { margin: 0 0 .5rem; font-size: .85rem; color: var(--muted, #6B7280); }
-.pf .cs-create-hint  { margin: 0; font-size: .75rem; color: var(--muted, #6B7280); font-style: italic; }
-.pf .cs-section-sub  { margin-top: 1rem; }
-
-/* ── Federation tab ── */
-.pf .fed-status-text { font-size: .8rem; }
-.pf .fed-status-text.online  { color: var(--success); }
-.pf .fed-status-text.offline { color: var(--danger); }
-
-/* ── Portfolio tab ── */
-.pf .portfolio-center { text-align: center; padding: 2rem; }
-.pf .portfolio-subtitle { color: var(--text-dim); margin-bottom: 1.5rem; }
-
-/* ── Shared: text color accent on expand icon ── */
-.pf .expand-arrow    { font-size: .7rem; opacity: .5; }
-
 /* ── Work tab ── */
 .pf .work-desc-text  { font-size: .8rem; }
 .pf .work-tx-right   { text-align: right; display: flex; align-items: center; gap: .5rem; }
 .pf .work-grid-span  { grid-column: 1 / -1; }
 
 /* ── Utility classes added during inline-style refactor (2026-03-17) ── */
-.pf .mb-0             { margin-bottom: 0; }
 .pf .mt-1             { margin-top: 1rem; }
-.pf .pf-bold          { font-weight: 600; }
-.pf .pf-italic        { font-style: italic; }
-.pf .pf-nowrap        { white-space: nowrap; }
-.pf .pf-shrink-0      { flex-shrink: 0; }
-.pf .pf-flex-fill     { flex: 1; min-width: 0; }
-.pf .pf-ml-auto       { margin-left: auto; }
-.pf .pf-mr-half       { margin-right: .5rem; }
-.pf .pf-hidden         { display: none; }
-.pf .pf-no-underline  { text-decoration: none; }
-.pf .pf-inline-block  { display: inline-block; }
-.pf .pf-badge-gap     { margin-right: .3rem; }
-.pf .pf-code-break    { word-break: break-all; }
-.pf .pf-label-inline  { margin: 0; }
-.pf .pf-select-inline { display: inline-block; width: auto; min-width: 12rem; }
-.pf .pf-select-narrow { max-width: 200px; }
-.pf .pf-upload-icon   { font-size: 2rem; opacity: .5; }
-.pf .pf-file-icon     { font-size: 1.2rem; flex-shrink: 0; }
-.pf .pf-rotate-90     { transform: rotate(90deg); }
-.pf .pf-btn-xs        { font-size: .75rem; padding: 2px 8px; }
-.pf .pf-textarea-sm   { width: 200px; min-height: 40px; }
-
-/* Chevron animation (expand/collapse) */
-.pf .pf-chevron       { transition: transform .2s; display: inline-block; }
-.pf .pf-chevron-open  { transform: rotate(180deg); }
 
 /* Agent tab: device auth layout */
-.pf .pf-device-auth-row   { align-items: flex-end; gap: .75rem; }
-.pf .pf-device-auth-field { flex: 1; }
-.pf .pf-device-code       { font-size: 2rem; font-weight: 700; font-family: var(--font-mono); letter-spacing: .15em; }
-.pf .pf-agent-divider     { margin-top: 1.25rem; padding-top: 1.25rem; }
-.pf .pf-task-runner-input { width: 100%; max-width: 320px; padding: 0.4rem 0.6rem; font-family: var(--font-mono); font-size: 0.85rem; border: 1px solid var(--border); border-radius: 4px; background: var(--card); color: var(--text); }
-.pf .pf-gh-link { display: inline-flex; align-items: center; gap: .4rem; color: var(--accent); text-decoration: none; font-size: .85rem; }
-.pf .pf-gh-link:hover { text-decoration: underline; }
 .pf .gh-mark { flex: none; }
-
-/* Memory tab: sharing rules row */
-.pf .pf-rule-row { display: flex; gap: .5rem; align-items: center; padding: 4px 0; border-bottom: 1px solid var(--border); }
-
-/* A settings row: a label and its explanation on the left, the control on the right. (The
-   notifications tab moved to css/views/notifications-poster.css on 2026-08-30; pf-setting-* stays
-   for the other tabs that use the row.) */
-.pf .pf-setting-heading { font-weight: 600; margin-bottom: 4px; }
-.pf .pf-setting-text    { flex: 1; }
-
-/* Apps tab: inline edit panel */
-.pf .pf-edit-panel { margin-top: .75rem; padding: .75rem; background: var(--bg2, #f5f5f5); border-radius: 8px; }
-
-/* Security tab: two-step sign-in. The QR sits on white whatever the theme, because a scanner
-   reads dark-on-light and the code the library draws is black. The backup codes wrap as a grid so
-   ten of them stay countable at a glance instead of running as one line. */
-.pf .pf-2fa-qr {
-  display: block; width: 200px; height: 200px; margin-bottom: .75rem;
-  background: #fff; padding: .5rem; border: 1px solid var(--border); border-radius: 8px;
-}
-.pf .pf-2fa-codes {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(7rem, 1fr)); gap: .35rem;
-  padding: .6rem; background: var(--bg2, #f5f5f5); border-radius: 8px;
-}
-.pf .pf-2fa-codes code { font-family: var(--font-mono); font-size: .9rem; letter-spacing: .05em; }
-.pf .pf-2fa-code-input { width: 8rem; letter-spacing: .25em; text-align: center; }
-
-/* Security tab: one registered device per row, its name and what it is on the left, its two
-   controls on the right. Wraps rather than squeezing on a phone. */
-.pf .pf-2fa-devices { display: flex; flex-direction: column; gap: .5rem; }
-.pf .pf-2fa-device {
-  display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; justify-content: space-between;
-  padding: .6rem; border: 1px solid var(--border); border-radius: 8px;
-}
 
 /* ========================================================================
    LANDING PAGE — Adaptive profile dashboard (new / active / experienced)
    Mobile-first: base styles for phones, scale up via min-width queries.
    ======================================================================== */
-
-/* Back navigation (shown when in a specific tab) */
-.pf .pf-back-nav {
-  display: flex; align-items: center; gap: 12px; margin-bottom: 1rem;
-}
-.pf .pf-back-btn {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 8px 16px; border-radius: 10px; border: 1px solid var(--border, #E5E7EB);
-  background: var(--card, #fff); color: var(--accent, #E8564A);
-  font-size: .85rem; font-weight: 500; cursor: pointer; transition: all .15s;
-  font-family: inherit; min-height: 44px;
-}
-.pf .pf-back-btn:hover { background: var(--accent-soft, #FFF0EE); border-color: var(--accent, #E8564A); }
-
-/* Inline view — full tab content opened within the landing page */
-.pf .pf-inline-view {
-  background: var(--card, #fff); border-radius: 16px;
-  box-shadow: 0 4px 12px rgba(0,0,0,.06); overflow: hidden;
-  animation: pf-panel-in .3s ease;
-}
-.pf .pf-inline-view-header {
-  display: flex; align-items: center; gap: 12px;
-  padding: 14px 24px; border-bottom: 1px solid var(--border-soft, #f0f0ec);
-  background: var(--card, #FAFAF8); position: sticky; top: 0; z-index: 10;
-}
-.pf .pf-inline-view-body { padding: 24px 28px; }
-/* Give tab content inside inline views more breathing room */
-.pf .pf-inline-view-body .poster-section-title { margin-top: .5rem; }
-.pf .pf-inline-view-body .card { border-radius: 14px; }
-
-/* Container */
-.pf .pf-landing { display: flex; flex-direction: column; gap: 16px; }
 
 /* --- Profile Card (landing variant): the masthead, then the numbers on the band --- */
 
@@ -1691,120 +848,7 @@
 
 /* --- Header actions + presence pill (ProfileCard header) --- */
 
-/* --- Suggested next steps (home dashboard): a numbered index under a headline --- */
-
-.pf-overview { --poster-section-size: 2.1rem; }
-
 /* --- Cortex Extensions (new user) --- */
-
-/* --- App Strip (active/experienced) --- */
-.pf .pf-app-strip {
-  background: var(--card, #fff); border-radius: 16px;
-  padding: 14px 20px; box-shadow: 0 1px 3px rgba(0,0,0,.04);
-}
-.pf .pf-app-strip-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
-.pf .pf-app-strip-link { font-size: .75rem; color: var(--accent, #E8564A); text-decoration: none; font-weight: 500; }
-.pf .pf-app-strip-link:hover { text-decoration: underline; }
-.pf .pf-app-row {
-  display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px;
-  scrollbar-width: thin; -webkit-overflow-scrolling: touch;
-}
-.pf .pf-app-chip {
-  display: flex; align-items: center; gap: 6px;
-  padding: 8px 14px; border-radius: 10px;
-  background: var(--card, #FAFAF8); border: 1.5px solid var(--border-soft, #f0f0ec);
-  cursor: pointer; transition: all .15s; white-space: nowrap; flex-shrink: 0;
-  font-size: .81rem; font-weight: 500; min-height: 44px;
-}
-.pf .pf-app-chip:hover { border-color: var(--accent, #E8564A); background: var(--accent-soft, #FFF0EE); transform: translateY(-1px); box-shadow: 0 1px 3px rgba(0,0,0,.04); }
-.pf .pf-chip-icon { font-size: 18px; }
-.pf .pf-app-chip-expanded { border-color: var(--accent, #E8564A); background: var(--accent-soft, #FFF0EE); }
-.pf .pf-chip-launch {
-  display: inline-flex; align-items: center; justify-content: center;
-  width: 28px; height: 28px; border-radius: 6px; border: none;
-  background: var(--accent, #E8564A); color: #fff; cursor: pointer;
-  font-size: 14px; margin-left: 4px; padding: 0; flex-shrink: 0;
-  transition: background .15s;
-}
-.pf .pf-chip-launch:hover { background: var(--accent-hover, #d04a3f); }
-.pf .pf-app-chip-ghost { border-style: dashed; border-color: var(--border, #e5e5e0); color: var(--text-dim, #9CA3AF); }
-.pf .pf-app-chip-ghost:hover { border-color: var(--accent, #E8564A); color: var(--accent, #E8564A); }
-
-/* --- Menu Sections --- */
-.pf .pf-landing-section {
-  background: var(--card, #fff); border-radius: 16px;
-  padding: 16px 20px; box-shadow: 0 1px 3px rgba(0,0,0,.04);
-}
-.pf .pf-menu-title {
-  font-size: .68rem; font-weight: 600; text-transform: uppercase;
-  letter-spacing: .7px; color: var(--text-dim, #9CA3AF); margin-bottom: 10px;
-}
-.pf .pf-menu-annotation {
-  font-size: .62rem; font-weight: 600; color: var(--accent, #E8564A);
-  background: var(--accent-soft, #FFF0EE); padding: 2px 8px; border-radius: 4px;
-  margin-left: 8px; text-transform: uppercase; letter-spacing: .3px;
-}
-.pf .pf-menu-grid { display: flex; flex-wrap: wrap; gap: 6px; }
-.pf .pf-menu-grid-expanded { margin-top: .5rem; }
-.pf .pf-menu-item {
-  display: flex; align-items: center; gap: 6px;
-  padding: 10px 14px; border-radius: 8px;
-  font-size: .81rem; font-weight: 500; color: var(--text, #1a1a1a);
-  background: var(--card, #FAFAF8); border: 1px solid var(--border-soft, #f0f0ec);
-  cursor: pointer; transition: all .15s; text-decoration: none;
-  min-height: 44px;
-}
-.pf .pf-menu-item:hover { border-color: var(--accent, #E8564A); background: var(--accent-soft, #FFF0EE); }
-.pf .pf-menu-item.pf-menu-active { border-color: var(--accent, #E8564A); background: var(--accent-soft, #FFF0EE); box-shadow: 0 0 0 1px var(--accent, #E8564A); }
-.pf .pf-menu-item.pf-primary { background: var(--accent, #E8564A); color: #fff; border-color: var(--accent, #E8564A); }
-.pf .pf-menu-item.pf-primary:hover { background: #D44A3F; }
-.pf .pf-menu-item.pf-indigo { background: #6366F1; color: #fff; border-color: #6366F1; }
-.pf .pf-menu-item.pf-indigo:hover { background: #5558E6; }
-.pf .pf-menu-badge {
-  font-size: .62rem; font-weight: 600; padding: 1px 6px; border-radius: 8px;
-  background: var(--accent, #E8564A); color: #fff; margin-left: 2px;
-}
-.pf .pf-menu-badge.pf-badge-muted { background: var(--border, #e5e5e0); color: var(--text-dim, #6B7280); }
-.pf .pf-menu-subgroup { margin-bottom: 10px; }
-.pf .pf-menu-subgroup:last-child { margin-bottom: 0; }
-.pf .pf-menu-subgroup-title { font-size: .68rem; font-weight: 500; color: var(--text-dim, #9CA3AF); margin-bottom: 6px; padding-left: 2px; }
-.pf .pf-expand-trigger {
-  display: flex; align-items: center; gap: 6px;
-  font-size: .75rem; color: var(--text-dim, #9CA3AF); cursor: pointer; padding: 6px 0; transition: color .15s;
-}
-.pf .pf-expand-trigger:hover { color: var(--accent, #E8564A); }
-
-/* --- Edit Profile, Change Password and Presence dialogs ---
-   The frame, header, X and footer are the site's one dialog (/css/dialog.css); these are the fields. */
-.pf-edit-loading { padding: 40px 22px; text-align: center; }
-.pf-account-modal .dlg-body { display: flex; flex-direction: column; gap: 14px; }
-.pf-edit-label {
-  display: flex; flex-direction: column; gap: 5px;
-  font-size: .81rem; font-weight: 600; color: var(--text, #1a1a1a);
-}
-.pf-edit-input, .pf-edit-textarea, .pf-edit-select {
-  font-family: inherit; font-size: .88rem; padding: 9px 12px;
-  border: 1px solid var(--border, #e5e5e0); border-radius: 10px;
-  background: var(--bg, #fff); color: var(--text, #1a1a1a);
-  transition: border-color .15s;
-}
-.pf-edit-input:focus, .pf-edit-textarea:focus, .pf-edit-select:focus {
-  outline: none; border-color: var(--accent, #E8564A); box-shadow: 0 0 0 2px var(--accent-soft, #FFF0EE);
-}
-.pf-edit-textarea { resize: vertical; min-height: 72px; }
-.pf-edit-select { cursor: pointer; }
-.pf-edit-readonly {
-  font-size: .88rem; padding: 9px 12px; border-radius: 10px;
-  background: var(--bg-dim, #f5f5f3); color: var(--text-dim, #6B7280);
-  border: 1px solid var(--border-soft, #f0f0ec);
-}
-.pf-edit-hint { font-size: .75rem; color: var(--text-dim, #9CA3AF); }
-/* Directory opt-in checkbox row (member "phone book"). */
-.pf-edit-check { display: flex; align-items: flex-start; gap: .6rem; cursor: pointer; }
-.pf-edit-check input { margin-top: .2rem; flex-shrink: 0; }
-.pf-edit-check > span { display: flex; flex-direction: column; gap: .15rem; }
-.pf-edit-check-title { font-size: .9rem; }
-.pf-edit-error { font-size: .81rem; color: var(--danger, #ef4444); padding: 8px 12px; background: var(--danger-soft, #FEF2F2); border-radius: 8px; }
 
 /* --- Inline Preview Panels --- */
 .pf .pf-inline-panel {
@@ -1860,193 +904,6 @@
 .pf .pf-panel-subheading { font-size: .68rem; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; color: var(--text-dim, #9CA3AF); padding: 0; margin-bottom: 4px; }
 .pf .pf-panel-sub-available { margin-top: 12px; }
 
-/* ── Test scope selector ─────────────── */
-.pf-gen-test-scope {
-  margin: 1rem 0;
-}
-.pf-gen-test-scope-compact {
-  display: flex; gap: 8px; align-items: center; margin: 0; font-size: 0.85em;
-}
-.pf-gen-test-scope-compact .pf-or-radio-label { margin: 0; white-space: nowrap; }
-.pf-or-run-all-controls {
-  display: flex; align-items: center; gap: 12px; width: 100%;
-}
-
-/* ── Test results ─────────────────────── */
-.pf-gen-test-results {
-  margin: 1rem 0;
-}
-
-.pf-gen-test-overall {
-  padding: 0.75rem 1rem;
-  border-radius: var(--radius-md, 8px);
-  font-weight: 600;
-  margin-bottom: 1rem;
-}
-
-.pf-gen-test-passed {
-  background: var(--bg-success, rgba(34, 197, 94, 0.1));
-  color: var(--success, #22c55e);
-}
-
-.pf-gen-test-failed {
-  background: var(--bg-danger, rgba(239, 68, 68, 0.1));
-  color: var(--danger, #ef4444);
-}
-
-.pf-gen-test-component {
-  padding: 0.75rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md, 8px);
-  margin-bottom: 0.5rem;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.pf-gen-test-badge {
-  font-size: 0.75rem;
-  padding: 0.125rem 0.5rem;
-  border-radius: var(--radius-sm, 4px);
-  font-weight: 500;
-}
-
-.pf-gen-test-component.pf-gen-test-passed .pf-gen-test-badge {
-  background: var(--bg-success, rgba(34, 197, 94, 0.1));
-  color: var(--success, #22c55e);
-}
-
-.pf-gen-test-component.pf-gen-test-failed .pf-gen-test-badge {
-  background: var(--bg-danger, rgba(239, 68, 68, 0.1));
-  color: var(--danger, #ef4444);
-}
-
-/* --- Federation toggle (knowledge-tab) --- */
-.pf .kpkg-fed-toggle {
-  cursor: pointer;
-  border: none;
-  font-size: .7rem;
-  padding: .15rem .5rem;
-  border-radius: 6px;
-  font-weight: 700;
-  letter-spacing: .03em;
-}
-.pf .kpkg-fed-toggle:disabled { opacity: .5; cursor: wait; }
-
-/* --- Memory federation badge --- */
-.pf .pf-fed-badge {
-  font-size: .65rem;
-  padding: .1rem .4rem;
-  margin-left: 4px;
-}
-
-/* --- Federation standalone variant --- */
-
-.pf-gen-test-component.pf-gen-test-skipped .pf-gen-test-badge {
-  background: var(--bg-dim);
-  color: var(--text-muted);
-}
-
-.pf-gen-test-errors {
-  width: 100%;
-  margin: 0.5rem 0 0;
-  padding-left: 1.5rem;
-  color: var(--danger, #ef4444);
-  font-size: 0.875rem;
-}
-
-.pf-gen-test-screenshots {
-  width: 100%;
-  margin-top: 0.5rem;
-}
-
-.pf-gen-screenshot-grid {
-  display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-  margin-top: 0.25rem;
-}
-
-.pf-gen-screenshot {
-  width: 200px;
-  height: auto;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm, 4px);
-  cursor: pointer;
-  transition: opacity 0.2s;
-}
-
-.pf-gen-screenshot:hover {
-  opacity: 0.8;
-}
-
-.pf-gen-test-fix-actions {
-  width: 100%;
-  display: flex;
-  gap: 0.5rem;
-  margin-top: 0.5rem;
-}
-
-/* ─── Component Detail: Test Section ─── */
-.pf-gen-test-section {
-  margin-top: 1rem;
-  padding-top: 1rem;
-  border-top: 1px solid var(--border, #e5e7eb);
-}
-.pf-gen-test-result-detail {
-  padding: 0.5rem;
-  border-radius: 4px;
-  border: 1px solid var(--border, #e5e7eb);
-}
-.pf-gen-test-result-detail.pf-gen-test-passed {
-  border-color: var(--success, #22c55e);
-  background: color-mix(in srgb, var(--success, #22c55e) 5%, transparent);
-}
-.pf-gen-test-result-detail.pf-gen-test-failed {
-  border-color: var(--danger, #ef4444);
-  background: color-mix(in srgb, var(--danger, #ef4444) 5%, transparent);
-}
-.pf-gen-test-trace { margin-top: 0.5rem; }
-.pf-gen-test-trace summary { cursor: pointer; font-size: 0.85rem; color: var(--muted); }
-.pf-gen-trace-pre {
-  margin-top: 0.25rem; padding: 0.5rem; font-size: 0.75rem; line-height: 1.4;
-  background: var(--surface, #f8fafc); color: var(--text, #1e293b); border: 1px solid var(--border, #e2e8f0); border-radius: 6px;
-  overflow-x: auto; white-space: pre-wrap; word-break: break-word;
-}
-
-/* ─── Responsive: tablet ─── */
-
-@media (min-width: 900px) {
-  .pf .pf-landing { max-width: 820px; margin: 0 auto; }
-}
-
-/* ── Generator Debug Panel ──────────────────────────── */
-.pf-gen-debug-panel { margin: var(--sp-3) 0; border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); padding: var(--sp-3); }
-.pf-gen-debug-header { display: flex; align-items: center; gap: var(--sp-2); margin-bottom: var(--sp-2); flex-wrap: wrap; }
-.pf-gen-debug-header h4 { margin: 0; flex: 1; }
-.pf-gen-debug-count { font-size: 0.8rem; color: var(--text-dim); }
-.pf-gen-debug-delete { color: var(--danger) !important; }
-.pf-gen-debug-empty { color: var(--text-dim); font-style: italic; }
-.pf-gen-debug-body { display: grid; grid-template-columns: 240px 1fr; gap: var(--sp-2); min-height: 300px; }
-.pf-gen-debug-tree { border-right: 1px solid var(--border); padding-right: var(--sp-2); overflow-y: auto; max-height: 500px; }
-.pf-gen-debug-group { margin-bottom: var(--sp-2); }
-.pf-gen-debug-group-label { font-size: 0.75rem; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: var(--sp-1); padding: 2px 4px; }
-.pf-gen-debug-file { display: flex; align-items: center; gap: 4px; padding: 3px 6px; border-radius: 3px; cursor: pointer; font-size: 0.82rem; }
-.pf-gen-debug-file:hover { background: var(--bg-dim); }
-.pf-gen-debug-file.active { background: var(--accent-bg, rgba(49,130,206,0.1)); color: var(--accent); }
-.pf-gen-debug-icon { font-size: 0.9rem; }
-.pf-gen-debug-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pf-gen-debug-content { overflow: auto; }
-.pf-gen-debug-content-header { display: flex; align-items: center; gap: var(--sp-2); margin-bottom: var(--sp-1); padding-bottom: var(--sp-1); border-bottom: 1px solid var(--border); }
-.pf-gen-debug-path { font-family: var(--font-mono); font-size: 0.8rem; color: var(--text-dim); }
-.pf-gen-debug-pre { background: var(--bg-dim); border: 1px solid var(--border); border-radius: 0; padding: var(--sp-2); font-family: var(--font-mono); font-size: 0.78rem; white-space: pre-wrap; word-break: break-word; overflow: auto; max-height: 500px; line-height: 1.4; }
-.pf-gen-debug-hint { color: var(--text-dim); font-style: italic; padding: var(--sp-4); text-align: center; }
-@media (max-width: 700px) {
-  .pf-gen-debug-body { grid-template-columns: 1fr; }
-  .pf-gen-debug-tree { border-right: none; border-bottom: 1px solid var(--border); padding-right: 0; padding-bottom: var(--sp-2); max-height: 200px; }
-}
-
 /* ───── Persistent profile sidebar nav (replaces the tier-adaptive menu) ─────
  * Theme-token driven (no hardcoded colors). Desktop = sticky left sidebar +
  * content column; mobile (<=900px) = off-canvas drawer toggled by .pf-mnav-toggle. */
@@ -2065,9 +922,6 @@
 
 /* The overview wears the poster face; a tab opened from the index keeps its own. */
 
-.pf-back-btn { background: none; border: 1px solid var(--border); color: var(--text-dim); border-radius: var(--radius-sm, 8px); padding: 0.3rem 0.7rem; cursor: pointer; font: inherit; font-size: 0.85rem; }
-.pf-back-btn:hover { background: var(--bg-hover, var(--bg-dim)); }
-
 @media (max-width: 900px) {
 
   /* Screen space is valuable on mobile — minimal side margins. */
@@ -2075,124 +929,11 @@
 
 }
 
-/* ── Projects tab (pj-) ── */
-.pj-ws { display: flex; flex-direction: column; gap: 0.5rem; }
-
 /* Workspace breadcrumb — keeps the parent organism visible so you always know
    which organism this workspace belongs to. */
 
-/* Title row — workspace name + status badge sit on one line. */
-.pj-ws-titlerow { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
-.pj-ws-title { margin: 0; }
-
-/* Workspace action toolbar — a tinted bar so the (otherwise transparent) buttons
-   read as real buttons rather than blending into the page. Consistent gap +
-   vertical separators group the Settings/Add, AI-prompt, and review-gate controls. */
-.pj-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; padding: 0.45rem 0.55rem; background: var(--bg-dim); border: 1px solid var(--border); border-radius: 10px; margin: 0.1rem 0 0.4rem; }
-.pj-toolbar .btn-ghost, .pj-toolbar .btn-outline { background: var(--card); box-shadow: var(--shadow-sm); }
-.pj-toolbar .btn-ghost:hover, .pj-toolbar .btn-outline:hover { background: var(--bg-surface); border-color: var(--text-muted); }
-.pj-toolbar-sep { width: 1px; align-self: stretch; min-height: 1.4rem; background: var(--border); margin: 0 0.15rem; }
-/* Publish-gate toggle: a chip grouped with the toolbar (after a separator) so it doesn't float alone */
-.pj-toolbar-gate { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 0.3rem 0.6rem; box-shadow: var(--shadow-sm); }
-.pj-toolbar-gate:hover { border-color: var(--text-muted); }
-.pj-gate-label { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; color: var(--muted); cursor: pointer; }
-.pj-inbox { border: 1px solid var(--border); border-radius: 10px; padding: 0.75rem; background: var(--bg-dim); margin-bottom: 0.5rem; }
-.pj-approval { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; padding: 0.4rem 0; border-top: 1px solid var(--border); }
-.pj-approval:first-of-type { border-top: none; }
-.pj-approval-text { flex: 1; font-size: 0.88rem; }
-.pj-section { border-radius: 10px; padding: 0.6rem 0.75rem; background: var(--card); }
 /* Action buttons sit right after the title (not pushed to the far edge) so they
    stay visually tied to the panel they act on. */
-/* Fresh-join welcome banner (invite-accept redirect, UX-remake v3 P8): says whose team the
-   person just joined and points at the chat connection as the next step. */
-.pj-joined-banner {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  flex-wrap: wrap;
-  background: var(--card);
-  border: 1px solid var(--accent);
-  border-radius: var(--radius-sm);
-  padding: 0.75rem 1rem;
-  margin-bottom: 0.75rem;
-}
-.pj-joined-actions { display: flex; gap: 0.5rem; align-items: center; }
-
-.pj-section-head { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.4rem; }
-.pj-section-title { font-weight: 600; text-transform: capitalize; margin-right: 0.25rem; }
-/* Lift the add-actions off the panel background so they read as buttons. */
-.pj-section-head .btn-outline, .pj-section-head .btn-ghost { background: var(--card); box-shadow: var(--shadow-sm); }
-.pj-section-head .btn-outline:hover, .pj-section-head .btn-ghost:hover { background: var(--bg-surface); border-color: var(--text-muted); }
-/* A declared space whose data does not live in workspace records (backing 'tasks', or a legacy
-   unsupported backing) — shown as a notice instead of silently dropped from the view. */
-.pj-space-notice { font-size: 0.88rem; color: var(--muted); padding: 0.2rem 0 0.3rem; }
-/* The viewer's own contract-advertising agents (tag 'workspace-contract'), surfaced in the
-   workspace People panel so the user sees which of their agents can serve this workspace. */
-.pj-contract-agents { border: 1px solid var(--border); border-radius: 10px; padding: 0.5rem 0.75rem; margin-bottom: 0.6rem; background: var(--card); }
-/* The per-contract one-click adopt action inside a contract-agent chip. */
-.pj-adopt-btn { margin-left: 0.4rem; padding: 0.1rem 0.5rem; font-size: 0.78rem; }
-/* A per-contract engagement group (state badge + its adopt/retire action). */
-.pj-eng { display: inline-flex; align-items: center; gap: 0.2rem; }
-/* Retire an active contract engagement — quiet, so it reads as secondary to the green "active" badge. */
-.pj-retire-btn { margin-left: 0.25rem; padding: 0.1rem 0.5rem; font-size: 0.78rem; color: var(--text-dim); }
-.pj-draft-form { margin: 0.4rem 0; }
-.pj-drafts { display: flex; flex-direction: column; gap: 0.3rem; margin-bottom: 0.3rem; }
-.pj-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.35rem 0; }
-/* Draft rows get a warn-coloured rail + a bordered, bolder DRAFT chip so the
-   draft state actually reads (the pale badge alone was nearly invisible). */
-.pj-item-draft { border-left: 3px solid var(--warn); padding-left: 0.5rem; }
-.pj-item-draft .badge-warn { border: 1px solid var(--warn-border); font-weight: 700; }
-/* Lift the inline Edit button off the panel so it stops blending in (same
-   card-fill treatment as the section/toolbar actions). */
-.pj-item .btn-ghost { background: var(--card); box-shadow: var(--shadow-sm); }
-.pj-item .btn-ghost:hover { background: var(--bg-surface); border-color: var(--text-muted); }
-.pj-item-text { flex: 1; font-size: 0.9rem; }
-/* Each record is its own card with air around it, so stacked records read as separate units. */
-.pj-rec { border: 1px solid var(--border); background: var(--card); border-radius: 8px; padding: 0.4rem 0.7rem; margin: 0.5rem 0; }
-.pj-rec-title { flex: 1; text-align: left; background: none; border: none; cursor: pointer; font-size: 0.9rem; color: var(--text); padding: 0; }
-.pj-rec-title:hover { color: var(--accent); }
-.pj-rec-fields { margin: 0.4rem 0 0.2rem; padding: 0.5rem 0.7rem; border-top: 1px solid var(--border); background: var(--bg-dim); border-radius: 6px; }
-/* Inline editor — replaces the field view in the SAME card while editing (one editor at a time). */
-.pj-rec-edit { margin: 0.4rem 0 0.2rem; padding: 0.5rem 0.7rem; border-top: 1px solid var(--border); background: var(--bg-dim); border-radius: 6px; }
-.pj-rec-edit-new { border-top: none; }
-/* Comment thread on a workspace object (record/document) */
-.pj-comments { margin: 0.5rem 0 0.25rem; padding-top: 0.5rem; border-top: 1px solid var(--border); }
-.pj-comment { padding: 0.4rem 0.5rem; margin: 0.3rem 0; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; }
-.pj-comment-reply { margin-left: 1.2rem; border-left: 2px solid var(--accent, var(--border)); }
-.pj-comment-head { font-size: 0.85rem; color: var(--muted); }
-.pj-comment-body { white-space: pre-wrap; margin: 0.2rem 0; }
-.pj-comment-actions { display: flex; gap: 0.3rem; }
-.pj-comment-compose { display: flex; flex-direction: column; gap: 0.35rem; margin-top: 0.5rem; }
-.pj-comment-compose textarea { resize: vertical; }
-/* Record fields: label ON TOP (small, muted), value below at full width, LEFT-aligned and wrapping
-   — natural left-to-right reading (was a right-aligned single line that ran off and didn't wrap). */
-.pj-rec-field { margin: 0 0 0.6rem; }
-.pj-rec-field:last-child { margin-bottom: 0; }
-.pj-rec-field-label { font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.02em; color: var(--muted); margin-bottom: 0.12rem; }
-.pj-rec-field-val { font-size: 0.88rem; color: var(--text); text-align: left; overflow-wrap: anywhere; }
-.pj-rec-field-text { white-space: pre-wrap; }
-.pj-rec-field-list { margin: 0.1rem 0 0; padding-left: 1.1rem; }
-.pj-rec-field-list li { margin: 0.1rem 0; }
-.pj-rec-json { margin: 0.1rem 0 0; padding: 0.4rem 0.55rem; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; font-size: 0.78rem; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 18rem; overflow: auto; }
-/* Markdown inside a record field — tighten the first/last margins so it sits flush in the field. */
-.pj-rec-md .md-body { font-size: 0.88rem; line-height: 1.5; }
-.pj-rec-md .md-body > :first-child { margin-top: 0; }
-.pj-rec-md .md-body > :last-child { margin-bottom: 0; }
-.pj-rec-empty { font-size: 0.82rem; padding: 0.2rem 0; }
-.pj-empty { color: var(--muted); font-size: 0.85rem; padding: 0.2rem 0; }
-
-/* ── In-context content search (Kerros 1): filter tabs to matches + grouped result list ── */
-.pj-ws-searchbar, .pj-org-globalsearch { display: flex; align-items: center; gap: 0.5rem; margin: 0.4rem 0 0.6rem; }
-.pj-ws-searchbar .search-bar, .pj-org-globalsearch .search-bar { flex: 1; }
-.pj-org-tab-match { background: var(--accent); color: #fff; }
-.pj-search-results { margin-top: 0.4rem; }
-.pj-search-group { margin: 0 0 0.9rem; }
-.pj-search-group-head { display: flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em; color: var(--text-dim); margin: 0 0 0.35rem; padding-bottom: 0.25rem; border-bottom: 1px solid var(--border); }
-.pj-search-hit { display: flex; flex-direction: column; gap: 0.15rem; width: 100%; text-align: left; background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 0.5rem 0.7rem; margin: 0.35rem 0; cursor: pointer; }
-.pj-search-hit:hover { border-color: var(--accent); background: var(--bg-dim); }
-.pj-search-hit-title { font-size: 0.9rem; font-weight: 600; color: var(--text); }
-.pj-search-hit-snippet { font-size: 0.8rem; color: var(--muted); overflow-wrap: anywhere; }
 
 /* ── Global command palette (Cmd-K, Kerros 2) ── */
 .cmdk { display: flex; flex-direction: column; gap: 0.4rem; min-width: min(92vw, 40rem); }
@@ -2204,132 +945,11 @@
 .cmdk-item-label { font-size: 0.9rem; font-weight: 600; }
 .cmdk-item-sub { font-size: 0.75rem; color: var(--muted); }
 .cmdk-item-snippet { font-size: 0.76rem; color: var(--text-dim); overflow-wrap: anywhere; max-height: 2.6em; overflow: hidden; }
-.pj-decision { font-size: 0.85rem; color: var(--muted); }
-.pj-field { display: flex; flex-direction: column; gap: 0.2rem; margin-bottom: 0.35rem; }
-.pj-field > span { font-size: 0.75rem; color: var(--muted); }
-.pj-field-inline { flex-direction: row; align-items: center; gap: 0.4rem; }
-/* SchemaForm: per-field hint text + missing-required highlight after a Save attempt. */
-.pj-field-hint { font-size: 0.72rem; color: var(--muted); margin-top: -0.1rem; }
-.pj-field-invalid > span:first-child { color: var(--danger); }
-.pj-field-invalid .input-field { border-color: var(--danger); }
-.pj-form-error { font-size: 0.82rem; color: var(--danger); padding: 0.3rem 0; }
-.pj-errors { border: 1px solid var(--danger); border-radius: 10px; padding: 0.6rem 0.75rem; margin: 0.5rem 0; background: var(--bg-dim); }
-.pj-errors-title { font-weight: 600; margin-bottom: 0.3rem; color: var(--danger); }
-.pj-error-line { font-size: 0.82rem; color: var(--text); padding: 0.1rem 0; }
-.pj-doc-tag { font-size: 0.68rem; font-weight: 600; color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--bg-dim)); border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border)); border-radius: 6px; padding: 0.05rem 0.4rem; margin-left: 0.4rem; vertical-align: middle; }
-.pj-doc-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0; }
-.pj-doc-link { background: none; border: none; color: var(--accent); cursor: pointer; font-size: 0.9rem; text-align: left; flex: 1; padding: 0; }
-.pj-doc-link:hover { text-decoration: underline; }
 
-/* Public-sharing panel: per-space and per-doc public toggles + the viewer link. */
-.pj-share-space { padding: 0.35rem 0; border-bottom: 1px solid var(--border); }
-.pj-share-space:last-of-type { border-bottom: none; }
-.pj-share-row { display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-weight: 600; }
-.pj-share-row input, .pj-share-doc input { cursor: pointer; }
-.pj-share-docs { display: flex; flex-direction: column; gap: 0.2rem; margin: 0.3rem 0 0.4rem 1.6rem; }
-.pj-share-doc { display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.9rem; color: var(--text); }
-.pj-share-doc-title { flex: 1; }
-.pj-share-link { color: var(--accent); font-size: 0.82rem; text-decoration: none; }
-.pj-share-link:hover { text-decoration: underline; }
-.pj-share-empty { margin: 0.2rem 0 0.4rem 1.6rem; }
-/* "Publish to public feed" banner at the top of the Share tab. */
-.pj-share-feed { margin: 0 0 1rem; }
-.pj-share-feed-on { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; padding: 0.6rem 0.9rem; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-surface); font-size: 0.9rem; color: var(--text); }
-.pj-share-feed-on span { flex: 1; }
-/* Access-mode picker (open / password / account) + the share-password controls (TARGET-025). */
-.pj-share-access { margin: 1rem 0; padding: 0.7rem 0.9rem; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-surface); display: flex; flex-direction: column; gap: 0.45rem; }
-.pj-share-access .card-h3 { margin: 0 0 0.2rem; }
-.pj-share-pw { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin: 0 0 0.2rem 1.6rem; }
-.pj-share-pw-state { font-size: 0.82rem; color: var(--text-muted); }
-.pj-share-pw-input { flex: 1; min-width: 12rem; max-width: 18rem; padding: 0.3rem 0.55rem; border: 1px solid var(--border); border-radius: 8px; background: var(--card); color: var(--text); font-size: 0.85rem; }
-.pj-share-access-note { font-size: 0.8rem; color: var(--text-muted); }
-.pj-share-actions { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
-/* Card fill + shadow so the action buttons stop blending into the tinted panel — matches .pj-toolbar. */
-.pj-share-actions .btn-outline, .pj-share-actions .btn-ghost { background: var(--card); box-shadow: var(--shadow-sm); }
-.pj-share-actions .btn-outline:hover, .pj-share-actions .btn-ghost:hover { background: var(--bg-surface); border-color: var(--text-muted); }
-/* The detail / reading pane — a white, slightly elevated card so it reads as the focused content,
-   distinct from the flat tree panel beside it. */
-.pj-doc-view { border: 1px solid var(--border); border-radius: 10px; padding: 1.4rem 1.8rem; margin: 0.4rem 0; background: var(--card); box-shadow: var(--shadow-sm); }
-.pj-doc-meta { margin: 0 0 0.5rem; }
-/* Popped-out single-document window (doc-solo.js) */
-.pj-doc-solo { max-width: 920px; margin: 0 auto; padding: 1rem 1.2rem 3rem; }
-.pj-doc-solo-empty { color: var(--muted); text-align: center; padding: 3rem 1rem; }
-
-/* Document typography — make rendered markdown read like a real document.
-   Generous line-height, clear space above headings, comfortable list + code styling. */
-.pj-doc-view .md-body { font-size: 0.95rem; line-height: 1.7; color: var(--text); max-width: 78ch; overflow-wrap: break-word; }
-.pj-doc-view .md-body > :first-child { margin-top: 0; }
-.pj-doc-view .md-body > :last-child { margin-bottom: 0; }
-.pj-doc-view .md-body h1,
-.pj-doc-view .md-body h2,
-.pj-doc-view .md-body h3,
-.pj-doc-view .md-body h4,
-.pj-doc-view .md-body h5,
-.pj-doc-view .md-body h6 { font-weight: 700; line-height: 1.3; color: var(--text); margin: 1.8em 0 0.6em; }
-.pj-doc-view .md-body h1 { font-size: 1.7rem; letter-spacing: -0.01em; padding-bottom: 0.3em; border-bottom: 2px solid var(--border); margin-top: 0.2em; }
-.pj-doc-view .md-body h2 { font-size: 1.32rem; padding-bottom: 0.25em; border-bottom: 1px solid var(--border); }
-.pj-doc-view .md-body h3 { font-size: 1.13rem; }
-.pj-doc-view .md-body h4 { font-size: 1rem; }
-.pj-doc-view .md-body h5 { font-size: 0.9rem; }
-.pj-doc-view .md-body h6 { font-size: 0.85rem; color: var(--muted); }
-.pj-doc-view .md-body p { margin: 0.85em 0; }
-.pj-doc-view .md-body ul,
-.pj-doc-view .md-body ol { margin: 0.7em 0; padding-left: 1.7em; }
-.pj-doc-view .md-body ul { list-style: disc; }
-.pj-doc-view .md-body ol { list-style: decimal; }
-.pj-doc-view .md-body li { margin: 0.32em 0; padding-left: 0.2em; }
-.pj-doc-view .md-body li > ul,
-.pj-doc-view .md-body li > ol { margin: 0.32em 0; }
-.pj-doc-view .md-body a { color: var(--accent); text-decoration: none; }
-.pj-doc-view .md-body a:hover { text-decoration: underline; }
-.pj-doc-view .md-body strong { font-weight: 700; color: var(--text); }
-.pj-doc-view .md-body .md-code { font-family: var(--font-mono, ui-monospace, "SF Mono", Menlo, Consolas, monospace); font-size: 0.85em; background: var(--bg-dim); padding: 0.12em 0.42em; border-radius: 4px; border: 1px solid var(--border-subtle, var(--border)); }
-.pj-doc-view .md-body .md-pre { background: var(--bg-dim); border: 1px solid var(--border); border-radius: 8px; padding: 0.9em 1.1em; overflow-x: auto; margin: 1em 0; line-height: 1.5; }
-.pj-doc-view .md-body .md-pre .md-code { background: none; border: none; padding: 0; font-size: 0.84rem; }
-.pj-doc-view .md-body blockquote { margin: 1em 0; padding: 0.3em 1.1em; border-left: 3px solid var(--accent); background: var(--bg-dim); border-radius: 0 6px 6px 0; color: var(--muted); }
-.pj-doc-view .md-body blockquote p { margin: 0.4em 0; }
-.pj-doc-view .md-body table { border-collapse: collapse; margin: 1em 0; width: 100%; font-size: 0.9rem; }
-.pj-doc-view .md-body th,
-.pj-doc-view .md-body td { border: 1px solid var(--border); padding: 0.45em 0.75em; text-align: left; vertical-align: top; }
-.pj-doc-view .md-body th { background: var(--bg-dim); font-weight: 600; }
-.pj-doc-view .md-body tbody tr:nth-child(even) { background: var(--bg-dim); }
-.pj-doc-view .md-body .md-img { max-width: 100%; height: auto; border-radius: 6px; margin: 0.6em 0; }
-.pj-doc-view .md-body hr { border: none; border-top: 1px solid var(--border); margin: 1.6em 0; }
 /* Deterministic Mermaid charts (organism overview, workspace edit-flow) */
-.pj-chart { border: 1px solid var(--border); border-radius: 10px; background: var(--card); padding: 0.5rem 0.75rem; margin-bottom: 0.6rem; box-shadow: var(--shadow-sm); }
-.pj-chart-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.3rem; }
-.pj-chart-title { font-weight: 600; font-size: 0.9rem; color: var(--text); }
 .mmd { overflow-x: auto; text-align: center; }
 .mmd svg { max-width: 100%; height: auto; }
 .mmd-fallback { font-size: 0.74rem; white-space: pre-wrap; color: var(--text-dim); background: var(--bg-dim); padding: 0.5rem; border-radius: 6px; overflow: auto; }
-/* Participants panel — node → owner → agents listing */
-.pj-parts { padding: 0.1rem; }
-.pj-parts-list { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.7rem; }
-.pj-part-owner { border: 1px solid var(--border); border-radius: 8px; padding: 0.5rem 0.7rem; background: var(--card); }
-.pj-part-human { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; font-size: 0.88rem; }
-.pj-part-node { font-size: 0.74rem; color: var(--muted); }
-.pj-part-count { font-size: 0.72rem; color: var(--muted); background: var(--bg-dim); border-radius: 10px; padding: 0.05rem 0.45rem; }
-.pj-part-agents { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.45rem; padding-left: 1.4rem; }
-.pj-part-agent { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.8rem; border: 1px solid var(--border); border-radius: 6px; padding: 0.12rem 0.5rem; }
-.pj-part-agent.own { border-color: var(--success); }
-.pj-part-agent.ghost { color: var(--muted); border-style: dashed; opacity: 0.65; }
-/* Manage access — creator adds/roles/removes members in the participants panel */
-.pj-access { margin-top: 0.8rem; padding-top: 0.7rem; border-top: 1px dashed var(--border); display: flex; flex-direction: column; gap: 0.45rem; }
-.pj-access-title { font-size: 0.82rem; font-weight: 600; color: var(--muted); }
-.pj-access-row { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; flex-wrap: wrap; border: 1px solid var(--border); border-radius: 8px; padding: 0.4rem 0.6rem; background: var(--card); }
-.pj-access-who { display: flex; align-items: center; gap: 0.4rem; font-size: 0.86rem; }
-.pj-access-note { font-size: 0.78rem; color: var(--muted); }
-.pj-access-actions { display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap; }
-.pj-access-add { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; margin-top: 0.2rem; }
-.pj-access-input { flex: 1 1 14rem; min-width: 10rem; border: 1px solid var(--border); border-radius: 7px; padding: 0.4rem 0.6rem; background: var(--surface); color: var(--text); font-size: 0.86rem; }
-.pj-access-role { border: 1px solid var(--border); border-radius: 7px; padding: 0.4rem 0.5rem; background: var(--surface); color: var(--text); font-size: 0.84rem; }
-.pj-access-hint { font-size: 0.76rem; color: var(--muted); }
-/* Activity panel — GitHub-style contribution heatmap + audit-log feed */
-.pj-act { padding: 0.1rem; }
-.pj-act-count { font-size: 0.72rem; font-weight: 500; color: var(--muted); margin-left: 0.5rem; }
-.pj-act-dot { width: 9px; height: 9px; border-radius: 3px; display: inline-block; flex-shrink: 0; }
-.pj-act-dot.draft { background: var(--orange); }
-.pj-act-dot.publish { background: var(--success); }
 /* Heatmap — bigger cells, each split 2×2 (docs draft/pub · records draft/pub) */
 .pj-hm { overflow-x: auto; padding-bottom: 0.2rem; }
 .pj-hm-monthrow { display: flex; padding-left: 28px; }
@@ -2355,70 +975,9 @@
 .pj-hm-quadlabels { display: grid; grid-template-columns: auto auto; gap: 0.12rem 0.9rem; }
 .pj-hm-intensity { display: flex; align-items: center; gap: 3px; }
 .pj-hm-intensity .q { width: 13px; height: 13px; border-radius: 2px; }
-.pj-act-list { display: flex; flex-direction: column; gap: 0.25rem; }
-.pj-act-item { display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; }
-.pj-act-time { color: var(--muted); font-size: 0.72rem; min-width: 130px; }
-.pj-act-who { font-weight: 600; color: var(--text); }
-.pj-act-agent { font-size: 0.73rem; color: var(--accent); background: var(--bg-dim); border-radius: 5px; padding: 0.02rem 0.35rem; white-space: nowrap; }
-.pj-act-act { color: var(--muted); }
-.pj-act-what { color: var(--text); }
-/* Workspace list (an organism's many workspaces) */
-.pj-ws-bar { display: flex; align-items: center; gap: 0.5rem; margin: 0.5rem 0 0.75rem; }
-.pj-ws-name-input { flex: 0 1 260px; }
-.pj-ws-topbar { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; flex-wrap: wrap; }
-.pj-ws-list-label { font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted); margin: 0.5rem 0.1rem 0.35rem; }
-.pj-ws-list { display: flex; flex-direction: column; gap: 0.4rem; }
-.pj-ws-card { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; border: 1px solid var(--border); border-radius: 10px; background: var(--card); padding: 0.1rem 0.5rem 0.1rem 0.1rem; box-shadow: var(--shadow-sm); }
-.pj-ws-locked { cursor: default; }
-.pj-ws-locked:hover { background: none; }
-.pj-ws-inbox { flex-basis: 100%; width: 100%; border-top: 1px solid var(--border-subtle); margin: 0.1rem 0.3rem 0.4rem; padding-top: 0.45rem; display: flex; flex-direction: column; gap: 0.35rem; }
-.pj-ws-inbox-empty { font-size: 0.8rem; color: var(--muted); padding-left: 0.3rem; }
-.pj-ws-req { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; padding-left: 0.3rem; }
-.pj-ws-req-who { flex: 1; color: var(--text); }
-.pj-ws-req-msg { color: var(--muted); }
-.pj-ws-req-ok { color: var(--accent); font-size: 0.8rem; }
-.pj-ws-open { flex: 1; display: flex; align-items: baseline; gap: 0.6rem; background: none; border: none; cursor: pointer; text-align: left; padding: 0.7rem 0.85rem; border-radius: 10px; }
-.pj-ws-open:hover { background: var(--bg-surface); }
-.pj-ws-card-name { font-weight: 600; font-size: 0.95rem; color: var(--text); }
-.pj-ws-card-meta { font-size: 0.74rem; color: var(--muted); }
-.pj-ai-prompt { display: inline-flex; align-items: center; gap: 0.2rem; flex-wrap: wrap; }
-.pj-ai-prompt-label { font-size: 0.78rem; color: var(--muted); }
-.pj-spaces-add { margin-bottom: 0.6rem; }
-.pj-space-row { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.4rem; }
-.pj-space-row .input-field { flex: 0 1 220px; }
-.pj-doc-editor { margin: 0.4rem 0; }
-.pj-doc-editor > input { margin-bottom: 0.4rem; }
-.pj-doc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
-.pj-doc-md { font-family: var(--font-mono); font-size: 0.82rem; line-height: 1.4; }
-.pj-doc-preview { border: 1px solid var(--border); border-radius: 10px; padding: 0.4rem 0.8rem; background: var(--bg-dim); overflow: auto; max-height: 360px; }
-@media (max-width: 640px) { .pj-doc-grid { grid-template-columns: 1fr; } }
-.pj-divider { border-top: 1px solid var(--border); margin: 0.8rem 0; }
-.pj-danger { border: 1px solid var(--danger); border-radius: 10px; padding: 0.6rem 0.75rem; margin-top: 0.8rem; }
-.pj-danger-title { font-weight: 600; color: var(--danger); margin-bottom: 0.3rem; }
-.pj-space-name { flex: 1; color: var(--text); font-size: 0.9rem; }
-.pj-docspace { display: flex; gap: 0.75rem; align-items: flex-start; }
 /* The left index/tree — white so a selected item's accent tint actually stands out against it. */
-.pj-doc-index { flex: 0 0 240px; min-width: 200px; border-radius: 10px; padding: 0.5rem; background: var(--card); max-height: 460px; overflow: auto; }
-.pj-doc-main { flex: 1; min-width: 0; }
-.pj-sec { margin-bottom: 0.25rem; }
-.pj-sec .pj-sec { margin-left: 0.85rem; border-left: 1px solid var(--border); padding-left: 0.4rem; }
-.pj-sec-head { display: flex; align-items: center; gap: 0.2rem; }
-.pj-sec-name { flex: 1; font-weight: 600; font-size: 0.82rem; }
-.pj-sec-name.pj-muted { color: var(--muted); font-weight: 500; padding: 0.15rem 0; }
-.pj-sec-name-text { flex: 1; font-weight: 600; font-size: 0.82rem; cursor: text; }
-.pj-grip { cursor: grab; color: var(--muted); font-size: 0.8rem; user-select: none; }
-.pj-doc-item[draggable="true"] { cursor: grab; }
 .pj-icon-btn { background: none; border: none; cursor: pointer; color: var(--muted); font-size: 0.85rem; padding: 0 0.2rem; line-height: 1; }
 .pj-icon-btn:hover { color: var(--accent); }
-.pj-doc-item { display: flex; align-items: center; gap: 0.3rem; padding: 0.15rem 0.3rem; border-radius: 6px; }
-.pj-doc-item:hover { background: var(--bg-surface); }
-.pj-doc-item.active { background: var(--accent-subtle); box-shadow: inset 3px 0 0 var(--accent); }
-.pj-doc-item .pj-doc-link { flex: 1; font-size: 0.85rem; color: var(--text); }
-/* Multi-part document series collapsed under one row (niputus) — in the doc index. */
-.pj-doc-series-head { display: flex; align-items: center; gap: 0.3rem; width: 100%; padding: 0.15rem 0.3rem; border: 0; background: none; border-radius: 6px; cursor: pointer; text-align: left; font-size: 0.85rem; font-weight: 600; color: var(--text); }
-.pj-doc-series-head:hover { background: var(--bg-surface); }
-.pj-doc-series-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pj-doc-series-parts { margin-left: 0.85rem; border-left: 1px solid var(--border); padding-left: 0.4rem; }
 /* ── Optional color tags (preset palette → theme tokens; never a free hex). A .pj-tag-{key} class
  *    sets --pj-tag; structural classes consume it, so colors flip correctly with the theme. ── */
 .pj-tag-red    { --pj-tag: var(--danger); }
@@ -2438,138 +997,13 @@
 .pj-cp-sw { width: 16px; height: 16px; border-radius: 50%; border: 0; padding: 0; cursor: pointer; }
 .pj-cp-sw.pj-colored { border-left: 0; padding-left: 0; background: var(--pj-tag); }
 .pj-cp-none { background: var(--bg-dim); color: var(--muted); border: 1px solid var(--border); font-size: 0.7rem; line-height: 14px; text-align: center; }
-.input-xs { padding: 0.15rem 0.35rem; font-size: 0.78rem; height: auto; }
-.pj-mini { font-size: 0.6rem; padding: 0 0.25rem; vertical-align: middle; }
-.pj-doc-toolbar { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.4rem; }
-.pj-doc-vtitle { flex: 1; font-weight: 700; font-size: 1.05rem; color: var(--text); }
-.pj-tui { margin: 0.3rem 0 0.5rem; }
-.pj-doc-imgbar { margin: 0.3rem 0; display: flex; align-items: center; flex-wrap: wrap; gap: 0.4rem; }
-.pj-file-btn { cursor: pointer; }
-.pj-file-btn input { display: none; }
 /* Visually-hidden file input (organism / workspace ZIP import) — replaces inline style="display:none". */
-.pj-hidden-input { display: none; }
-.pj-file-btn-icon { margin-right: 0.15rem; }
-.pj-imgbar-hint { font-size: 0.78rem; color: var(--muted); }
-.pj-img-vis { margin: 0.2rem 0 0.5rem; padding: 0.55rem 0.65rem; border: 1px solid var(--border); border-radius: 8px; background: var(--card); }
-.pj-img-vis-head { display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.35rem; }
-.pj-img-vis-title { font-size: 0.85rem; font-weight: 600; color: var(--text); }
-.pj-img-vis-note { font-size: 0.74rem; color: var(--muted); flex: 1; }
-.pj-img-vis-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.18rem 0; border-top: 1px solid var(--border-subtle); }
-.pj-img-vis-name { flex: 1; font-size: 0.8rem; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pj-sources-desc { margin: 0.1rem 0 0.5rem; }
-.pj-src-picker { border: 1px solid var(--border); border-radius: 8px; padding: 0.6rem; margin-bottom: 0.6rem; background: var(--card); }
-.pj-src-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin: 0.5rem 0; }
-.pj-src-search { flex: 1; min-width: 140px; }
-.pj-src-results { max-height: 240px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.15rem; }
-.pj-src-result { display: flex; align-items: center; gap: 0.5rem; padding: 0.2rem 0.3rem; border-radius: 6px; }
-.pj-src-result:hover { background: var(--surface); }
-.pj-src-result-label { flex: 1; font-size: 0.82rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pj-src-result-meta { font-size: 0.72rem; color: var(--muted); white-space: nowrap; }
-.pj-src-list { display: flex; flex-direction: column; gap: 0.2rem; }
-.pj-src-item { display: flex; align-items: center; gap: 0.45rem; padding: 0.25rem 0.3rem; border-radius: 6px; border: 1px solid var(--border); }
-.pj-src-icon { flex: 0 0 auto; }
-.pj-src-label { flex: 1; font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .md-wikilink { color: var(--accent); cursor: pointer; text-decoration: none; border-bottom: 1px dashed var(--accent); }
 .md-wikilink:hover { border-bottom-style: solid; }
 .md-img { max-width: 100%; height: auto; border-radius: 6px; }
-@media (max-width: 640px) { .pj-docspace { flex-direction: column; } .pj-doc-index { flex: none; width: 100%; } }
-
-/* ───────────────── Workspace Overview tab ─────────────────
- * The landing view: a "what happened here" strip + every space stacked on one vertical scroll.
- * Sections collapse as accordions on mobile; documents expand inline there (no popups). */
-.pj-ov { display: flex; flex-direction: column; gap: 0.6rem; }
-.pj-ov-strip { border: 1px solid var(--border); border-radius: 10px; padding: 0.5rem 0.6rem; background: var(--card); }
-.pj-ov-strip-title { font-weight: 600; font-size: 0.85rem; color: var(--muted); margin-bottom: 0.3rem; }
-
-/* ── Measurability objectives card (workspace header) ── */
-.pj-obj { display: flex; flex-direction: column; gap: 0.5rem; margin: 0.75rem 0; }
-.pj-obj-title { font-weight: 700; font-size: 0.9rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
-.pj-obj-card { border: 1px solid var(--border); border-radius: 10px; background: var(--card); padding: 0.6rem 0.75rem; }
-.pj-obj-statement { font-weight: 600; color: var(--text); display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
-.pj-obj-status { font-size: 0.7rem; }
-.pj-obj-why { color: var(--muted); font-size: 0.85rem; margin-top: 0.2rem; }
-.pj-obj-kpis { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.5rem; }
-.pj-obj-kpi { display: flex; align-items: baseline; gap: 0.4rem; padding: 0.3rem 0.55rem; border: 1px solid var(--border); border-left: 3px solid var(--border); border-radius: 8px; background: var(--bg-dim); font-size: 0.85rem; }
-.pj-obj-kpi.met { border-left-color: var(--success); }
-.pj-obj-kpi.off { border-left-color: var(--warn); }
-.pj-obj-kpi-name { font-weight: 600; color: var(--text); }
-.pj-obj-kpi-val { color: var(--text); font-variant-numeric: tabular-nums; }
-.pj-obj-kpi-target { color: var(--muted); font-size: 0.78rem; }
-.pj-obj-kpi-declared { color: var(--muted); font-size: 0.72rem; font-style: italic; }
-.pj-ov-event { display: flex; align-items: center; gap: 0.45rem; width: 100%; padding: 0.2rem 0.25rem; border: 0; background: none; border-radius: 6px; cursor: pointer; text-align: left; font-size: 0.85rem; color: var(--text); }
-.pj-ov-event:hover { background: var(--bg-dim); }
-.pj-ov-event-who { font-weight: 600; flex-shrink: 0; }
-.pj-ov-event-act { color: var(--muted); flex-shrink: 0; }
-.pj-ov-event-what { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-.pj-ov-event-time { margin-left: auto; color: var(--muted); font-size: 0.75rem; flex-shrink: 0; }
-.pj-ov-sec { border: 1px solid var(--border); border-radius: 10px; background: var(--card); }
-.pj-ov-sec-head { display: flex; align-items: center; gap: 0.4rem; padding: 0.45rem 0.6rem; cursor: pointer; }
-.pj-ov-chevron { color: var(--muted); font-size: 0.8rem; width: 1em; flex-shrink: 0; }
-.pj-ov-name { font-weight: 600; color: var(--text); font-size: 0.95rem; }
-.pj-ov-name-link { border: 0; background: none; cursor: pointer; padding: 0; text-align: left; }
-.pj-ov-spacer { flex: 1; }
-.pj-ov-items { display: flex; flex-direction: column; gap: 0.1rem; padding: 0 0.6rem 0.5rem 1.5rem; }
-.pj-ov-row { display: flex; align-items: center; gap: 0.5rem; border: 1px solid var(--border); border-radius: 10px; background: var(--card); padding: 0.35rem 0.6rem; }
-.pj-ov-row .pj-ov-name { flex-shrink: 0; }
-.pj-ov-item { display: flex; align-items: center; gap: 0.45rem; width: 100%; padding: 0.25rem 0.3rem; border: 0; background: none; border-radius: 6px; cursor: pointer; text-align: left; font-size: 0.88rem; color: var(--text); min-width: 0; }
-.pj-ov-item:hover { background: var(--bg-dim); }
-.pj-ov-item-title { flex-shrink: 0; max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pj-ov-preview { color: var(--muted); font-size: 0.8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-.pj-ov-more { border: 0; background: none; color: var(--accent); cursor: pointer; text-align: left; padding: 0.25rem 0.3rem; font-size: 0.85rem; }
-.pj-ov-more:hover { text-decoration: underline; }
-.pj-ov-doc-inline { border-top: 1px solid var(--border); margin: 0.2rem 0 0.4rem; padding-top: 0.4rem; }
-/* Unseen-changes badge on workspace tabs — neutral gray pill (red is reserved for errors). */
-.pj-org-tab-unseen { background: var(--bg-dim); color: var(--muted); border: 1px solid var(--border); border-radius: 999px; font-size: 0.68rem; padding: 0 0.35rem; margin-left: 0.3rem; line-height: 1.3; }
-@media (max-width: 640px) {
-  .pj-ov-event { flex-wrap: wrap; }                                       /* "what/where" wraps to its own line — never hidden */
-  .pj-ov-event-what { flex-basis: 100%; padding-left: calc(9px + 0.45rem); }
-  .pj-ov-item { flex-wrap: wrap; }
-  .pj-ov-item-title { max-width: none; flex-shrink: 1; white-space: normal; }
-  .pj-ov-preview { flex-basis: 100%; }
-}
 
 /* ───────────────── Organisms list renew (phase 1) ─────────────────
  * Compact list rows + kebab menu + organism home page. All colors via theme tokens. */
-
-/* Topbar action cluster (sort select + Import + Create) */
-.pj-org-topbar-actions { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
-.pj-org-sort { width: auto; }
-
-/* Compact rows */
-.pj-org-list { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 0.75rem; }
-.pj-org-row { display: flex; align-items: center; flex-wrap: wrap; gap: 0.65rem; border: 1px solid var(--border); border-radius: 10px; background: var(--card); padding: 0.5rem 0.65rem; box-shadow: var(--shadow-sm); }
-.pj-org-row[draggable="true"] { cursor: grab; }
-.pj-org-row.pj-org-drag-over { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
-.pj-org-avatar { width: 36px; height: 36px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.85rem; background: var(--bg-dim); color: var(--text-dim); border: 1px solid var(--border); flex: none; user-select: none; }
-.pj-org-avatar-lg { width: 46px; height: 46px; font-size: 1.05rem; border-radius: 11px; }
-.pj-org-main { flex: 1; min-width: 220px; cursor: pointer; }
-.pj-org-titlerow { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; min-width: 0; }
-.pj-org-name { font-weight: 600; font-size: 0.95rem; color: var(--text); }
-/* The marks (type · lock · archived) hold a column of their own between the name and the counts,
-   so they read as one line down the list instead of trailing each name wherever it happens to end.
-   The type badge carries a min-width, which is what puts every lock at the same x. */
-.pj-org-marks { flex: 0 0 8rem; min-width: 0; display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
-/* A type is free text up to 40 chars, so the badge is capped and ellipsised: one long name must not
-   push this row's lock out of the line every other row keeps. The full word is on the title. */
-.pj-org-type { min-width: 6rem; max-width: 100%; box-sizing: border-box; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.pj-org-lock { flex: none; display: inline-flex; align-items: center; color: var(--text-dim); }
-.pj-org-arch { flex: none; }
-.pj-org-desc { font-size: 0.78rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 48ch; }
-/* Fixed tracks, not content widths. The counts and the date sit to the RIGHT of the marks, so
-   anything that changes their width moves the marks column with it: 12 workspaces instead of 1 is
-   6.5px, a date of 11.6. instead of 9.6. is another 12, and in a proportional face even 1 against 3
-   is a fraction. Tracks sized from the measured worst case (three digits 41px, a ten-character date
-   64px) plus tabular figures, so every icon stands under its own down the list and nothing the data
-   says can push the badge beside it. A count wider than its track overflows into the gap; a grid
-   track does not grow, which is the whole point. */
-.pj-org-stats { display: grid; grid-template-columns: 2.4rem 2.4rem 2.4rem 4.1rem; align-items: center; gap: 0 0.8rem; font-size: 0.78rem; color: var(--muted); flex: none; font-variant-numeric: tabular-nums; }
-.pj-org-stat { display: inline-flex; align-items: center; gap: 0.25rem; white-space: nowrap; min-width: 0; }
-.pj-org-date { justify-content: flex-end; }
-/* 3.2rem holds the longest of the four words the door ever says (UNIRSE, measured at 47.8px). */
-.pj-org-door { flex: 0 0 3.2rem; display: flex; justify-content: flex-end; }
-.pj-org-openbtn { flex: none; white-space: nowrap; }
-.pj-org-detail { flex-basis: 100%; border-top: 1px solid var(--border); margin-top: 0.35rem; padding-top: 0.5rem; cursor: default; }
-.pj-org-hint { font-size: 0.74rem; color: var(--muted); margin: -0.35rem 0 0.75rem; }
 
 /* Kebab ("…") menu */
 .pj-menu { position: relative; flex: none; }
@@ -2580,187 +1014,15 @@
 .pj-menu-item:hover { background: var(--bg-surface); }
 .pj-menu-item-danger { color: var(--danger-fg); }
 
-/* Organism home page */
-.pj-org-breadcrumb { font-size: 0.8rem; color: var(--muted); margin-bottom: 0.6rem; display: flex; align-items: center; gap: 0.35rem; }
-.pj-org-crumb-link { background: none; border: none; padding: 0; font-size: inherit; color: var(--accent); cursor: pointer; }
-.pj-org-crumb-link:hover { text-decoration: underline; }
-.pj-org-home-head { display: flex; align-items: flex-start; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
-.pj-org-home-title { flex: 1; min-width: 220px; }
-.pj-org-home-name { font-weight: 700; font-size: 1.25rem; color: var(--text); }
-.pj-org-home-desc { margin-top: 0.15rem; }
-.pj-org-home-actions { display: flex; gap: 0.4rem; flex: none; align-items: flex-start; }
-.pj-org-btn-active { border-color: var(--accent); color: var(--accent); }
-.pj-org-settings { margin-bottom: 0.75rem; }
-.pj-org-tabs { display: flex; gap: 1.1rem; border-bottom: 1px solid var(--border); margin: 0.6rem 0 1rem; flex-wrap: wrap; }
-.pj-org-tab { background: none; border: none; padding: 0.45rem 0.1rem; font-size: 0.88rem; color: var(--text-dim); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
-.pj-org-tab:hover { color: var(--text); }
-.pj-org-tab.active { color: var(--text); border-bottom-color: var(--accent); font-weight: 600; }
-.pj-org-tab-count { color: var(--muted); font-size: 0.75rem; margin-left: 0.3rem; }
-.pj-org-boardrow { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
-
-/* ── Grouped workspace nav: clusters (Workspace related / Records / Document spaces / one per
-   contract), each a small caption above its member tabs, separated by a wider column gap. ── */
-.pj-org-groups { display: flex; flex-wrap: wrap; align-items: stretch; gap: 0.5rem 0; border-bottom: 1px solid var(--border); margin: 0.6rem 0 1rem; }
-.pj-org-group { display: flex; flex-direction: column; gap: 0.2rem; padding: 0 1.4rem; }
-.pj-org-group:first-child { padding-left: 0; }
-/* vertical divider between groups so the clusters read as separated at a glance */
-.pj-org-group + .pj-org-group { border-left: 1px solid var(--border); }
-.pj-org-group-cap { display: inline-flex; align-items: center; gap: 0.3rem; background: none; border: none; padding: 0 0.1rem; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); cursor: pointer; text-align: left; }
-.pj-org-group-cap:hover { color: var(--text); }
-.pj-org-group-cap.active { color: var(--accent); font-weight: 700; }
-.pj-org-group-cap-static { cursor: default; }
-.pj-org-group-cap-static:hover { color: var(--muted); }
-.pj-org-group-tabs { display: flex; flex-wrap: wrap; gap: 0.1rem 0.9rem; align-items: flex-end; }
-.pj-org-groups > .pj-ws-tab-add { align-self: flex-end; margin-bottom: 0.1rem; padding-left: 1.4rem; border-left: 1px solid var(--border); }
-.pj-group-head { margin-bottom: 0.6rem; }
-.pj-group-sec { scroll-margin-top: 0.6rem; }
-.pj-ov-desc { margin: 0 0 0.45rem; }
-.pj-tab-desc { margin: 0 0 0.6rem; }
-
-/* ── OKF-style structure overview (collapsible Markdown map of an organism / workspace) ── */
-.pj-struct-overview { margin: 0.4rem 0 0.8rem; }
-.pj-struct-toggle { display: inline-flex; align-items: center; gap: 0.4rem; background: none; border: none; padding: 0.3rem 0; font-size: 0.85rem; color: var(--text-dim); cursor: pointer; }
-.pj-struct-toggle:hover { color: var(--text); }
-.pj-struct-caret { color: var(--muted); font-size: 0.8rem; width: 0.8rem; }
-.pj-struct-body { margin-top: 0.4rem; max-height: 32rem; overflow: auto; padding: 0.75rem 0.9rem; background: var(--card); border: 1px solid var(--border); border-radius: 10px; }
-/* Compact, on-theme typography so the rendered map reads as part of the dashboard, not a raw doc. */
-.pj-struct-body .md-body { font-size: 0.85rem; color: var(--text); line-height: 1.5; }
-.pj-struct-body .md-body > :first-child { margin-top: 0; }
-.pj-struct-body .md-body h1 { font-size: 1rem; font-weight: 700; margin: 0 0 0.3rem; color: var(--text); }
-.pj-struct-body .md-body h2 { font-size: 0.92rem; font-weight: 700; margin: 0.95rem 0 0.35rem; padding-top: 0.55rem; border-top: 1px solid var(--border); color: var(--text); }
-.pj-struct-body .md-body h3 { font-size: 0.83rem; font-weight: 600; margin: 0.55rem 0 0.2rem; color: var(--text-dim); text-transform: none; }
-.pj-struct-body .md-body p { margin: 0.2rem 0; }
-.pj-struct-body .md-body blockquote { margin: 0.2rem 0; padding: 0 0 0 0.6rem; border-left: 2px solid var(--border); color: var(--muted); font-size: 0.8rem; }
-.pj-struct-body .md-body blockquote p { margin: 0.1rem 0; }
-.pj-struct-body .md-body ul { margin: 0.2rem 0 0.4rem; padding-left: 1.15rem; }
-.pj-struct-body .md-body li { margin: 0.12rem 0; }
-.pj-struct-body .md-body code { background: var(--bg-dim); border: 1px solid var(--border); border-radius: 4px; padding: 0.02rem 0.32rem; font-size: 0.78rem; }
-.pj-struct-body .md-body strong { font-weight: 600; }
-.pj-struct-body .md-body em { color: var(--muted); font-style: normal; }
-
-/* ── README panel (free-form description, Osa A) ── */
-.pj-readme { margin: 0.4rem 0 0.9rem; padding: 0.85rem 1rem; background: var(--card); border: 1px solid var(--border); border-radius: 10px; }
-.pj-readme-empty { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; justify-content: space-between; }
-.pj-readme-bar { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.5rem; }
-.pj-readme-actions { display: inline-flex; gap: 0.4rem; flex-wrap: wrap; }
-.pj-readme-body .md-body { font-size: 0.9rem; color: var(--text); line-height: 1.55; }
-.pj-readme-body .md-body > :first-child { margin-top: 0; }
-.pj-readme-textarea { width: 100%; font-family: var(--font-mono, monospace); font-size: 0.82rem; line-height: 1.5; resize: vertical; }
-
-/* ── Interactive mindmap (Osa C) — reuses .of-mapwrap--clickable cursor/hover from offers.css ── */
-.pj-mindmap { margin: 0.4rem 0 0.9rem; }
-.pj-mindmap-body { margin-top: 0.4rem; padding: 0.75rem 0.9rem; background: var(--card); border: 1px solid var(--border); border-radius: 10px; }
-.pj-mindmap-opts { display: flex; flex-wrap: wrap; align-items: center; gap: 0.9rem; margin-bottom: 0.6rem; }
-.pj-mm-opt { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; color: var(--text-dim); }
-.pj-mm-opt select { width: auto; }
-.pj-mm-check { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.8rem; color: var(--text-dim); cursor: pointer; }
-.pj-mindmap-canvas { overflow: auto; max-height: 36rem; }
-.pj-mindmap-canvas .node, .pj-mindmap-canvas .mindmap-node { cursor: pointer; }
-.pj-mindmap-canvas .node:hover, .pj-mindmap-canvas .mindmap-node:hover { opacity: 0.82; }
-.pj-mindmap-hint { margin-top: 0.4rem; }
-/* Mindmap heatmap: `:::heatN` attaches the class to the node; colour its shape from theme vars
-   (flowchart modes colour via Mermaid classDef with the same theme-derived values). */
-.pj-mindmap-canvas .heat1 rect, .pj-mindmap-canvas .heat1 path, .pj-mindmap-canvas .heat1 circle { fill: var(--success-bg); stroke: var(--success-fg); }
-.pj-mindmap-canvas .heat2 rect, .pj-mindmap-canvas .heat2 path, .pj-mindmap-canvas .heat2 circle { fill: var(--warn-bg); stroke: var(--warn-fg); }
-.pj-mindmap-canvas .heat3 rect, .pj-mindmap-canvas .heat3 path, .pj-mindmap-canvas .heat3 circle { fill: var(--danger-bg); stroke: var(--danger-fg); }
-
-/* ── Structure timeline / development (Osa D) ── */
-.pj-timeline { margin: 0.4rem 0 0.9rem; }
-.pj-timeline-body { margin-top: 0.4rem; padding: 0.75rem 0.9rem; background: var(--card); border: 1px solid var(--border); border-radius: 10px; }
-.pj-timeline-diagram { overflow: auto; max-height: 22rem; margin-bottom: 0.8rem; padding-bottom: 0.6rem; border-bottom: 1px solid var(--border); }
-.pj-timeline-grid { display: grid; grid-template-columns: minmax(14rem, 22rem) 1fr; gap: 1rem; align-items: start; }
-.pj-timeline-list { list-style: none; margin: 0; padding: 0; max-height: 30rem; overflow: auto; }
-.pj-timeline-item { margin: 0; }
-.pj-timeline-entry { display: flex; flex-direction: column; gap: 0.1rem; width: 100%; text-align: left; background: none; border: none; border-left: 2px solid var(--border); padding: 0.4rem 0.6rem; cursor: pointer; color: var(--text); }
-.pj-timeline-entry:hover { background: var(--bg-dim); }
-.pj-timeline-item.is-active .pj-timeline-entry { border-left-color: var(--accent); background: var(--bg-dim); }
-.pj-timeline-date { font-size: 0.75rem; color: var(--muted); }
-.pj-timeline-event { font-size: 0.84rem; }
-.pj-timeline-counts { font-size: 0.72rem; }
-.pj-timeline-map { overflow: auto; max-height: 30rem; }
-@media (max-width: 720px) { .pj-timeline-grid { grid-template-columns: 1fr; } }
-
-/* ── Workspace renew (phase 2): header actions, review banner, add-space tab ── */
-.pj-ws-head-actions { margin-left: auto; display: flex; gap: 0.4rem; align-items: center; }
-.pj-ws-banner { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; border: 1px solid var(--border); border-left: 3px solid var(--warn, var(--accent)); border-radius: 10px; background: var(--card); padding: 0.55rem 0.75rem; margin: 0.6rem 0 0.2rem; }
-.pj-ws-banner-text { flex: 1; min-width: 200px; font-size: 0.85rem; color: var(--text); }
-.pj-ws-banner-sub { display: block; font-size: 0.76rem; color: var(--muted); }
-.pj-ws-tab-add { font-weight: 700; padding: 0.45rem 0.45rem; }
-
-/* ── Organism home tab contents (feedback round): tab headers, pills, agent picker, board preview ── */
-.pj-tabhead { display: flex; align-items: flex-start; gap: 0.6rem; margin-bottom: 0.6rem; }
-.pj-tabhead-desc { flex: 1; margin: 0.2rem 0 0; }
-.pj-tab-pill { display: inline-block; background: var(--warn-bg, var(--bg-dim)); color: var(--warn-fg, var(--text)); border: 1px solid var(--warn-border, var(--border)); border-radius: 999px; font-size: 0.7rem; padding: 0.05rem 0.5rem; margin-left: 0.35rem; white-space: nowrap; }
-.pj-org-main-static { cursor: default; }
-.pj-linklike { background: none; border: none; padding: 0.2rem 0; font-size: 0.78rem; color: var(--accent); cursor: pointer; text-align: left; }
-.pj-linklike:hover { text-decoration: underline; }
-.pj-attach { border: 1px solid var(--border); border-radius: 10px; background: var(--bg-dim); padding: 0.6rem 0.75rem; margin-bottom: 0.6rem; display: flex; flex-direction: column; gap: 0.4rem; }
-.pj-invite-row { margin-bottom: 0.6rem; }
-.pj-req-row { border-left: 3px solid var(--warn, var(--accent)); margin-bottom: 0.5rem; }
-
-/* ── Email invitations (invite people not yet on the node) ── */
-.pj-invite-btns { display: flex; gap: 0.4rem; }
-.pj-eminvite { border: 1px solid var(--border); border-radius: 10px; background: var(--card); padding: 0.7rem 0.8rem; margin-bottom: 0.7rem; }
-.pj-eminvite-grid { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: flex-end; }
-.pj-eminvite-field { display: flex; flex-direction: column; gap: 0.2rem; }
-.pj-eminvite-field label { font-size: 0.74rem; color: var(--muted); }
-.pj-eminvite-email { min-width: 220px; }
-.pj-eminvite-wslabel { font-size: 0.74rem; color: var(--muted); margin: 0.5rem 0 0.2rem; }
-.pj-eminvite-wslist { display: flex; flex-direction: column; gap: 0.3rem; margin-bottom: 0.3rem; }
-.pj-eminvite-wsrow { display: flex; align-items: center; gap: 0.5rem; font-size: 0.83rem; color: var(--text); }
-.pj-eminvite-wsrow label { display: flex; align-items: center; gap: 0.4rem; cursor: pointer; }
-.pj-eminvite-wsrow select { margin-left: auto; }
-.pj-eminvite-actions { display: flex; gap: 0.4rem; margin-top: 0.5rem; }
-.pj-eminvite-url { margin-top: 0.5rem; padding: 0.5rem 0.6rem; border: 1px dashed var(--border); border-radius: 8px; background: var(--bg-dim); font-family: var(--font-mono, monospace); font-size: 0.76rem; color: var(--text); word-break: break-all; }
-.pj-eminvite-pending-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.35rem 0; font-size: 0.83rem; color: var(--text); border-bottom: 1px solid var(--border); }
-.pj-eminvite-pending-meta { color: var(--muted); font-size: 0.76rem; }
-.pj-eminvite-pending-cancel { margin-left: auto; }
-/* Unified add/invite panel + pending-invite inline editor + per-member access editor */
-.pj-invpanel-accept { display: flex; align-items: center; gap: 0.4rem; font-size: 0.83rem; color: var(--text); margin-top: 0.5rem; cursor: pointer; }
-.pj-pinv-editor { margin: 0.3rem 0 0.5rem 1.2rem; }
-.pj-member-access { margin: 0.2rem 0 0.6rem 2.6rem; }
-
-/* The Contacts tab lives in css/views/contacts-poster.css (the poster face, 2026-08-30). */
-.pj-orgsearch { margin: 0 0 0.6rem; }
-.pj-orgsearch-input { min-width: 220px; }
-.pj-board-post { border: 1px solid var(--border); border-radius: 10px; background: var(--card); padding: 0.5rem 0.7rem; margin-bottom: 0.5rem; }
-.pj-board-post-head { display: flex; align-items: baseline; gap: 0.5rem; margin-bottom: 0.2rem; }
-.pj-board-author { font-weight: 600; font-size: 0.82rem; color: var(--text); }
-.pj-board-time { font-size: 0.74rem; color: var(--muted); }
-.pj-board-body { font-size: 0.85rem; color: var(--text); white-space: pre-wrap; word-break: break-word; }
-.pj-board-composer { margin-top: 0.6rem; }
-.pj-board-input { flex: 1; min-width: 220px; }
-
 /* ── Organism settings form (labels, groups, hints, tag input, separated danger zone) ── */
-.pj-meta-line { display: flex; flex-wrap: wrap; gap: 0.25rem 0; font-size: 0.78rem; color: var(--muted); margin-bottom: 0.8rem; align-items: center; }
-.pj-meta-line > span + span::before { content: '·'; margin: 0 0.45rem; color: var(--muted); }
-.pj-form-group { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin: 0.9rem 0 0.45rem; }
-.pj-form-row { display: flex; gap: 0.75rem; flex-wrap: wrap; }
-.pj-form-row > .pj-field { flex: 1; min-width: 160px; }
-.pj-form-hint { font-size: 0.76rem; color: var(--muted); margin: 0.1rem 0 0.5rem; }
 .pj-taginput { display: flex; flex-wrap: wrap; gap: 0.3rem; align-items: center; border: 1.5px solid var(--control-border); border-radius: var(--radius); background: var(--control-bg); padding: 0.3rem 0.45rem; }
 .pj-tag { display: inline-flex; align-items: center; gap: 0.25rem; }
 .pj-tag-x { background: none; border: none; cursor: pointer; color: var(--muted); font-size: 0.85rem; padding: 0 0.1rem; line-height: 1; }
 .pj-tag-x:hover { color: var(--danger); }
 .pj-taginput-field { flex: 1; min-width: 90px; border: none; background: transparent; color: var(--text); font-size: 0.82rem; outline: none; padding: 0.15rem 0; }
-.pj-danger-box { margin-top: 1.1rem; margin-bottom: 0.75rem; }
-.pj-danger-row { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
-.pj-danger-text { flex: 1; min-width: 220px; }
-.pj-danger-sub { font-size: 0.78rem; color: var(--muted); }
-.pj-danger-confirm { margin-top: 0.6rem; display: flex; gap: 0.5rem; align-items: flex-end; flex-wrap: wrap; }
-.pj-members-cap { font-size: 0.74rem; color: var(--muted); }
-
-/* ── Workspace row: clickable participants counter + inline people list ── */
-.pj-stat-btn { background: none; border: none; cursor: pointer; padding: 0.1rem 0.3rem; border-radius: 6px; font-size: 0.78rem; color: var(--muted); }
-.pj-stat-btn:hover { background: var(--bg-surface); color: var(--text); }
-.pj-stat-btn.active { background: var(--bg-dim); color: var(--text); }
-.pj-ws-person { display: flex; align-items: center; gap: 0.4rem; padding: 0.2rem 0; font-size: 0.83rem; color: var(--text); }
-.pj-ws-person-agents { font-size: 0.76rem; color: var(--muted); }
 
 /* ── Settings polish: menu divider, bounded form card ── */
 .pj-menu-sep { height: 1px; background: var(--border); margin: 0.25rem 0.3rem; }
-.pj-form-card { border: 1px solid var(--border); border-radius: 10px; background: var(--card); padding: 0.75rem 0.9rem 0.6rem; margin-bottom: 0.25rem; }
-.pj-form-card .pj-form-group:first-child { margin-top: 0; }
 
 /* ── Home dashboard: waiting-for-you box, continue/agents cards, clickable stats, promo dismiss ── */
 
@@ -2774,9 +1036,6 @@
 
 /* Home "Usage & quotas" card — thick quota bars + the counts as a row of numerals */
 
-/* Home "AI apps spend" card — 24h/7d/30d as big numerals + per-app stacked bar + top apps */
-.pf-ai-card { grid-column: 1 / -1; }
-
 /* min-width:0 lets the flex:1 item actually shrink so the ellipsis engages on a long app name
    (a bare flex:1 keeps min-width:auto and would overflow the card on a narrow screen instead). */
 
@@ -2785,485 +1044,11 @@
 
 /* A very long quota value wraps under its label instead of forcing the row wider than the screen. */
 
-/* Edit profile / password dialogs */
-.pf-avatar-row { display: flex; align-items: center; gap: 0.6rem; }
-.pf-avatar-preview { width: 42px; height: 42px; border-radius: 50%; border: 1px solid var(--border); background: var(--bg-dim); display: inline-flex; align-items: center; justify-content: center; font-size: 1.3rem; flex: none; }
-.pf-edit-link { font-size: 0.82rem; color: var(--accent); cursor: pointer; text-decoration: none; }
-.pf-edit-link:hover { text-decoration: underline; }
-
-/* ── Ecosystem apps tab (pf-eco-*) — sibling of the agents tab ── */
-.pf-eco-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
-.pf-eco-count-badge { display: inline-block; min-width: 1.4rem; text-align: center; padding: 0 .4rem; margin-left: .4rem; border-radius: 999px; background: var(--bg-dim); color: var(--text-dim); font-size: .8rem; font-weight: 600; }
-.pf-eco-mono { font-family: var(--font-mono, monospace); font-size: .8rem; color: var(--text-dim); }
-.pf-eco-dim { color: var(--text-dim); font-size: .82rem; }
-.pf-eco-connect { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; margin-bottom: 1rem; }
-.pf-eco-connect-note { color: var(--text-dim); font-size: .85rem; margin: 0 0 .6rem; }
-.pf-eco-cmd-row { display: flex; align-items: center; gap: .5rem; }
-.pf-eco-cmd { flex: 1; background: var(--bg-dim); border: 1px solid var(--border); border-radius: 6px; padding: .5rem .7rem; font-family: var(--font-mono, monospace); font-size: .85rem; overflow-x: auto; }
-.pf-eco-pending { background: var(--surface); border: 1px solid var(--accent); border-radius: 8px; padding: 1rem; margin-bottom: 1rem; }
-.pf-eco-pending-title { font-weight: 700; margin-bottom: .15rem; color: var(--accent); }
-.pf-eco-pending-hint { font-size: .82rem; margin: 0 0 .6rem; }
-.pf-eco-pending-code { display: inline-flex; align-items: baseline; gap: .35rem; font-size: .82rem; color: var(--text-dim); }
-.pf-eco-pending-code strong { font-family: var(--font-mono); font-size: 1rem; letter-spacing: .08em; color: var(--text); background: var(--bg-dim); border: 1px solid var(--border); border-radius: 6px; padding: .1rem .4rem; }
-.pf-eco-pending-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .6rem; padding: .5rem 0; border-top: 1px solid var(--border); }
-.pf-eco-pending-row:first-of-type { border-top: none; }
-.pf-eco-pending-info { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
-.pf-eco-pending-grant { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; }
-.pf-eco-pill { background: var(--bg-dim); color: var(--text-dim); border-radius: 999px; padding: 0 .5rem; font-size: .75rem; }
-.pf-eco-valid { border-radius: 999px; padding: 0 .5rem; font-size: .72rem; font-weight: 600; cursor: help; }
-.pf-eco-valid-validated { background: var(--success-bg, var(--bg-dim)); color: var(--success-fg, var(--text)); }
-.pf-eco-valid-failed { background: var(--danger-bg, var(--bg-dim)); color: var(--danger-fg, var(--text-dim)); }
-.pf-eco-select { background: var(--card); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: .3rem .5rem; font-size: .82rem; }
-.pf-eco-empty { color: var(--text-dim); padding: 1.5rem; text-align: center; border: 1px dashed var(--border); border-radius: 8px; }
-.pf-eco-card { border: 1px solid var(--border); border-radius: 8px; margin-bottom: .6rem; background: var(--card); overflow: hidden; }
-.pf-eco-card-revoked { opacity: .6; }
-.pf-eco-card-head { display: flex; align-items: center; gap: .5rem; padding: .7rem .9rem; cursor: pointer; }
-.pf-eco-card-head:hover { background: var(--bg-dim); }
-.pf-eco-caret { color: var(--text-dim); width: 1rem; }
-.pf-eco-name { color: var(--text); }
-.pf-eco-lastseen { margin-left: auto; }
-.pf-eco-status { border-radius: 999px; padding: 0 .55rem; font-size: .72rem; font-weight: 600; }
-.pf-eco-status-active, .pf-eco-status-approved { background: var(--success-bg, var(--bg-dim)); color: var(--success-fg, var(--text)); }
-.pf-eco-status-pending, .pf-eco-status-validating { background: var(--bg-dim); color: var(--text-dim); }
-.pf-eco-status-revoked { background: var(--danger-bg, var(--bg-dim)); color: var(--danger-fg, var(--text-dim)); }
-.pf-eco-card-body { padding: .8rem .9rem; border-top: 1px solid var(--border); }
-.pf-eco-section { padding: .6rem 0; }
-.pf-eco-section:first-child { padding-top: 0; }
-.pf-eco-section-title { font-weight: 700; font-size: .9rem; margin-bottom: .5rem; color: var(--accent); }
-.pf-eco-chips { display: flex; flex-wrap: wrap; gap: .35rem; }
-.pf-eco-chip { background: var(--bg-dim); border: 1px solid var(--border); border-radius: 6px; padding: .1rem .45rem; font-size: .78rem; font-family: var(--font-mono, monospace); }
-.pf-eco-areas { margin-top: .5rem; }
-.pf-eco-area { font-size: .8rem; color: var(--text-dim); padding: .1rem 0; }
-.pf-eco-sub-row { display: flex; align-items: center; gap: .5rem; padding: .25rem 0; }
-.pf-eco-sub-add { display: flex; align-items: center; gap: .4rem; margin-top: .5rem; }
-.pf-eco-binding > div { font-size: .85rem; padding: .12rem 0; }
-.pf-eco-data { display: flex; flex-direction: column; gap: .3rem; }
-.pf-eco-data-loading { display: flex; align-items: center; gap: .4rem; }
-.pf-eco-data-entry { border-top: 1px solid var(--border); }
-.pf-eco-data-entry:first-child { border-top: none; }
-.pf-eco-data-row { display: flex; align-items: center; gap: .5rem; width: 100%; font-size: .8rem; padding: .35rem 0; background: none; border: none; text-align: left; color: inherit; cursor: pointer; }
-.pf-eco-data-row:hover { color: var(--accent); }
-.pf-eco-data-key { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pf-eco-data-vis { flex: 0 0 auto; }
-.pf-eco-data-time { flex: 0 0 auto; margin-left: auto; white-space: nowrap; }
-.pf-eco-data-body { padding: 0 0 .5rem 1.2rem; font-size: .78rem; line-height: 1.5; }
-.pf-eco-data-pre { margin: 0; padding: .6rem .7rem; background: var(--bg-dim); border: 1px solid var(--border); border-radius: 6px; font-family: var(--font-mono, monospace); font-size: .78rem; color: var(--text); white-space: pre-wrap; word-break: break-word; max-height: 22rem; overflow: auto; }
-.pf-eco-data-md { padding: .4rem .6rem; background: var(--bg-dim); border: 1px solid var(--border); border-radius: 6px; font-size: .82rem; color: var(--text); max-height: 22rem; overflow: auto; }
-.pf-eco-sub-direction { margin: -.25rem 0 .5rem; }
-/* Automation section */
-.pf-eco-auto-intro { margin: -.25rem 0 .6rem; }
-.pf-eco-auto-caps { display: flex; flex-direction: column; gap: .35rem; margin-bottom: .6rem; }
-.pf-eco-auto-cap { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; padding: .25rem 0; }
-.pf-eco-auto-cap-id { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pf-eco-auto-cadence { flex: 0 0 auto; }
-.pf-eco-auto-list { display: flex; flex-direction: column; gap: .4rem; }
-.pf-eco-auto-job { border: 1px solid var(--border); border-radius: 8px; padding: .5rem .6rem; background: var(--bg-dim); display: flex; flex-direction: column; gap: .3rem; }
-.pf-eco-auto-job-off { opacity: .65; }
-.pf-eco-auto-job-main { display: flex; align-items: center; gap: .45rem; flex-wrap: wrap; }
-.pf-eco-auto-job-cap { font-weight: 600; }
-.pf-eco-auto-cadence-chip { background: var(--surface); }
-.pf-eco-auto-on { background: var(--success-bg, var(--bg-dim)); color: var(--success, var(--accent)); border-color: var(--success, var(--border)); }
-.pf-eco-auto-paused { color: var(--text-dim); }
-.pf-eco-auto-job-meta { display: flex; flex-wrap: wrap; gap: .75rem; font-size: .78rem; }
-.pf-eco-auto-result-ok, .pf-eco-auto-result-success { color: var(--success, var(--accent)); }
-.pf-eco-auto-result-error { color: var(--danger, var(--accent)); }
-.pf-eco-auto-result-skipped { color: var(--text-dim); }
-.pf-eco-auto-job-actions { display: flex; align-items: center; gap: .35rem; flex-wrap: wrap; }
-.pf-eco-auto-del { color: var(--danger, var(--text-dim)); }
-/* Editable cadence select on an existing schedule row */
-.pf-eco-auto-cadence-sel { flex: 0 0 auto; }
-/* Per-row last Run-now attempt note (a skip stays visible until the next load) */
-.pf-eco-auto-lastattempt { font-size: .78rem; font-style: italic; }
-/* Per-schedule run-history log expander */
-.pf-eco-auto-log-loading, .pf-eco-auto-log-empty { font-size: .78rem; margin-top: .3rem; }
-.pf-eco-auto-log { display: flex; flex-direction: column; gap: .3rem; margin-top: .4rem; padding-top: .4rem; border-top: 1px dashed var(--border); }
-.pf-eco-auto-log-row { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; font-size: .78rem; }
-.pf-eco-auto-log-time { flex: 0 0 auto; }
-.pf-eco-auto-log-trigger { font-size: .72rem; opacity: .85; }
-.pf-eco-auto-log-dur { font-size: .72rem; opacity: .85; }
-.pf-eco-auto-log-reason { flex: 1 1 100%; word-break: break-word; }
-/* Automation recipe (B4) */
-.pf-eco-recipe { margin-top: .9rem; padding-top: .7rem; border-top: 1px dashed var(--border); display: flex; flex-direction: column; gap: .6rem; }
-.pf-eco-recipe-head { font-weight: 700; font-size: .88rem; color: var(--text); }
-.pf-eco-recipe-intro { margin: -.3rem 0 0; }
-.pf-eco-recipe-trigger { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; font-size: .8rem; }
-.pf-eco-recipe-trigger-input { background: var(--card); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: .3rem .5rem; width: 100%; box-sizing: border-box; }
-.pf-eco-recipe-trigger-help { margin: 0; font-size: .78rem; }
-.pf-eco-recipe-row { display: flex; flex-direction: column; gap: .35rem; }
-.pf-eco-recipe-label { font-weight: 600; font-size: .82rem; color: var(--text-dim); }
-.pf-eco-recipe-agents { display: flex; flex-wrap: wrap; gap: .4rem .9rem; }
-.pf-eco-recipe-agent { display: flex; align-items: center; gap: .35rem; font-size: .82rem; cursor: pointer; }
-
-/* Recommended-agent picker: recommended first (subtle highlight), the rest behind a disclosure. */
-.pf-eco-rec-picker { display: flex; flex-direction: column; gap: .55rem; }
-.pf-eco-rec-list { display: flex; flex-direction: column; gap: .4rem; }
-.pf-eco-rec-agent {
-  display: flex; align-items: flex-start; gap: .5rem; cursor: pointer;
-  padding: .5rem .6rem; border-radius: 8px;
-  background: var(--bg-dim); border: 1px solid var(--border);
-}
-.pf-eco-rec-agent-body { display: flex; flex-direction: column; gap: .2rem; }
-.pf-eco-rec-agent-head { display: flex; align-items: center; gap: .45rem; flex-wrap: wrap; }
-.pf-eco-rec-agent-name { font-weight: 600; font-size: .85rem; color: var(--text); }
-.pf-eco-rec-chip { background: var(--accent-subtle); color: var(--accent); border-color: var(--accent-border); }
-.pf-eco-rec-why { font-size: .78rem; line-height: 1.35; }
-.pf-eco-rec-missing { display: flex; flex-direction: column; gap: .3rem; }
-.pf-eco-rec-missing-line { margin: 0; font-size: .8rem; line-height: 1.4; }
-.pf-eco-rec-rest { display: flex; flex-direction: column; gap: .4rem; }
-.pf-eco-rec-rest-list { margin-top: .2rem; }
-.pf-eco-recipe-toggle { display: flex; align-items: center; gap: .45rem; font-size: .85rem; cursor: pointer; }
-.pf-eco-recipe-radios { display: flex; flex-direction: column; gap: .45rem; }
-.pf-eco-recipe-radio { display: flex; align-items: flex-start; gap: .45rem; font-size: .85rem; cursor: pointer; }
-.pf-eco-recipe-radio-title { display: block; }
-.pf-eco-recipe-radio-hint { display: block; font-size: .76rem; }
-.pf-eco-recipe-foot { flex-direction: row; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .5rem; }
-.pf-eco-recipe-note { margin: 0; font-size: .76rem; }
-.pf-eco-revoke-input { width: 100%; box-sizing: border-box; margin: .6rem 0; background: var(--card); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: .5rem .7rem; }
-/* Pending advisories approval surface (B7/B8) */
-.pf-eco-adv { margin-top: .9rem; padding-top: .7rem; border-top: 1px dashed var(--border); display: flex; flex-direction: column; gap: .6rem; }
-.pf-eco-adv-list { display: flex; flex-direction: column; gap: .6rem; }
-.pf-eco-adv-item { border: 1px solid var(--border); border-radius: 8px; padding: .6rem .7rem; background: var(--bg-dim); display: flex; flex-direction: column; gap: .4rem; }
-.pf-eco-adv-head { display: flex; align-items: center; gap: .45rem; flex-wrap: wrap; }
-.pf-eco-adv-title { font-size: .92rem; }
-.pf-eco-adv-kind { background: var(--surface); }
-.pf-eco-adv-sev { background: var(--surface); }
-.pf-eco-adv-sev-high, .pf-eco-adv-sev-critical { color: var(--danger, var(--text)); border-color: var(--danger, var(--border)); }
-.pf-eco-adv-sev-medium { color: var(--accent); }
-.pf-eco-adv-meta { font-size: .78rem; }
-.pf-eco-adv-body { font-size: .82rem; }
-.pf-eco-adv-rationale { display: flex; flex-direction: column; gap: .2rem; font-size: .82rem; }
-.pf-eco-adv-actions { display: flex; align-items: center; gap: .45rem; flex-wrap: wrap; margin-top: .15rem; }
-.pf-eco-adv-reject { color: var(--danger, var(--text-dim)); }
-
-/* ── Ecosystem Automation — one turnkey flow (pf-eco-auto-flow-*) ── */
-.pf-eco-auto-flow-intro { margin: -.25rem 0 .5rem; }
-.pf-eco-auto-how-toggle { display: flex; align-items: center; gap: .4rem; background: none; border: none; padding: .15rem 0; font-size: .85rem; font-weight: 600; color: var(--text); cursor: pointer; }
-.pf-eco-auto-how-toggle:hover { color: var(--accent); }
-.pf-eco-auto-how { background: var(--bg-dim); border: 1px solid var(--border); border-radius: 8px; padding: .7rem .8rem; margin: .3rem 0 .6rem; }
-.pf-eco-auto-how-lead { margin: 0 0 .4rem; }
-.pf-eco-auto-how-steps { margin: 0; padding-left: 1.2rem; display: flex; flex-direction: column; gap: .25rem; font-size: .85rem; color: var(--text); }
-.pf-eco-auto-how-doc { margin: .5rem 0 0; font-size: .78rem; }
-.pf-eco-auto-flow-card { border-radius: 10px; background: var(--card); padding: .4rem .9rem; margin: .3rem 0 .9rem; }
-.pf-eco-auto-flow-step { padding: .7rem 0; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: .5rem; }
-.pf-eco-auto-flow-step:first-child { border-top: none; }
-.pf-eco-auto-flow-step-disabled { opacity: .6; }
-.pf-eco-auto-flow-num { font-weight: 700; font-size: .85rem; color: var(--accent); }
-.pf-eco-auto-flow-controls { display: flex; align-items: center; gap: .9rem; flex-wrap: wrap; }
-.pf-eco-auto-produces { display: flex; flex-direction: column; gap: .3rem; }
-.pf-eco-auto-produces-cap { font-weight: 600; }
-.pf-eco-auto-flow-email { margin-top: .2rem; }
-.pf-eco-auto-flow-advanced { gap: .35rem; }
-.pf-eco-auto-flow-advanced-body { display: flex; flex-direction: column; gap: .35rem; padding-left: 1.2rem; }
-.pf-eco-auto-flow-save { padding: .7rem 0; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; }
-
-/* ── Ecosystem Automation — status timeline (pf-eco-auto-status-*) ── */
-.pf-eco-auto-status { margin-top: .4rem; }
-.pf-eco-auto-status-timeline { display: flex; flex-direction: column; gap: 0; margin-top: .5rem; }
-.pf-eco-auto-status-step { position: relative; padding: 0 0 1rem 1.4rem; border-left: 2px solid var(--border); }
-.pf-eco-auto-status-step:last-child { border-left-color: transparent; padding-bottom: 0; }
-.pf-eco-auto-status-head { display: flex; align-items: center; gap: .45rem; flex-wrap: wrap; margin-bottom: .35rem; }
-.pf-eco-auto-status-dot { position: absolute; left: -7px; top: .15rem; width: 12px; height: 12px; border-radius: 50%; background: var(--bg-dim); border: 2px solid var(--border); }
-.pf-eco-auto-status-dot-ok { background: var(--success, var(--accent)); border-color: var(--success, var(--accent)); }
-.pf-eco-auto-status-dot-wait { background: var(--bg-dim); border-color: var(--accent); }
-.pf-eco-auto-status-dot-off { background: var(--bg-dim); border-color: var(--border); }
-.pf-eco-auto-status-dot-error { background: var(--danger, var(--accent)); border-color: var(--danger, var(--accent)); }
-.pf-eco-auto-status-label { font-size: .88rem; color: var(--text); }
-.pf-eco-auto-status-chip { font-family: inherit; }
-.pf-eco-auto-status-ok { background: var(--success-bg, var(--bg-dim)); color: var(--success, var(--accent)); border-color: var(--success, var(--border)); }
-.pf-eco-auto-status-wait { background: var(--bg-dim); color: var(--text-dim); }
-.pf-eco-auto-status-off { background: var(--bg-dim); color: var(--text-dim); }
-.pf-eco-auto-status-error { background: var(--danger-bg, var(--bg-dim)); color: var(--danger-fg, var(--danger, var(--text-dim))); }
-.pf-eco-auto-status-pending-count { background: var(--accent); color: var(--bg, var(--card)); font-family: inherit; font-weight: 600; }
-.pf-eco-auto-status-body { display: flex; flex-direction: column; gap: .4rem; }
-.pf-eco-auto-status-agents { display: flex; flex-wrap: wrap; gap: .35rem; }
-.pf-eco-auto-status-note { margin: 0; font-size: .78rem; }
-
-/* ── Ecosystem app's OWN setup guide (pf-eco-setup-guide-*) — rendered Markdown from the manifest ── */
-.pf-eco-setup-guide-md { font-size: .88rem; line-height: 1.6; color: var(--text); max-width: 74ch; }
-.pf-eco-setup-guide-md .md-body > :first-child { margin-top: 0; }
-.pf-eco-setup-guide-md .md-body > :last-child { margin-bottom: 0; }
-.pf-eco-setup-guide-md .md-body h1 { font-size: 1.25rem; font-weight: 700; line-height: 1.25; margin: 1.5rem 0 .5rem; }
-.pf-eco-setup-guide-md .md-body h2 { font-size: 1.08rem; font-weight: 700; line-height: 1.3; margin: 1.4rem 0 .45rem; padding-top: .2rem; }
-.pf-eco-setup-guide-md .md-body h3 { font-size: .98rem; font-weight: 700; margin: 1.15rem 0 .4rem; }
-.pf-eco-setup-guide-md .md-body h4 { font-size: .9rem; font-weight: 700; margin: 1rem 0 .35rem; }
-.pf-eco-setup-guide-md .md-body p { margin: .5rem 0; }
-.pf-eco-setup-guide-md .md-body ul,
-.pf-eco-setup-guide-md .md-body ol { margin: .5rem 0; padding-left: 1.7rem; }
-.pf-eco-setup-guide-md .md-body li { margin: .35rem 0; }
-.pf-eco-setup-guide-md .md-body li::marker { color: var(--text-dim); }
-.pf-eco-setup-guide-md .md-body hr { border: none; border-top: 1px solid var(--border); margin: 1.3rem 0; }
-.pf-eco-setup-guide-md .md-body strong { font-weight: 700; }
-.pf-eco-setup-guide-md .md-body a { color: var(--accent); text-decoration: none; }
-.pf-eco-setup-guide-md .md-body a:hover { text-decoration: underline; }
-.pf-eco-setup-guide-md .md-body .md-code { font-family: var(--font-mono); font-size: .85em; background: var(--bg-dim); border: 1px solid var(--border); border-radius: 4px; padding: .05rem .32rem; overflow-wrap: anywhere; }
-.pf-eco-setup-guide-md .md-body .md-pre { background: var(--bg-dim); border: 1px solid var(--border); border-radius: 8px; padding: .7rem .9rem; overflow-x: auto; margin: .6rem 0; }
-.pf-eco-setup-guide-md .md-body .md-pre .md-code { background: none; border: none; padding: 0; font-size: .82rem; white-space: pre; overflow-wrap: normal; }
-.pf-eco-setup-guide-md .md-body blockquote { margin: .7rem 0; padding: .45rem .9rem; border-left: 3px solid var(--accent); color: var(--text-dim); background: var(--bg-dim); border-radius: 0 6px 6px 0; }
-.pf-eco-setup-guide-md .md-body blockquote p { margin: .2rem 0; }
-.pf-eco-setup-guide-missing { margin: 0; font-size: .82rem; line-height: 1.45; }
-
-/* ── Ecosystem Setup playbook + MCP promo (pf-eco-setup-* / pf-eco-mcp-*) ── */
-.pf-eco-setup-lead { margin: -.25rem 0 .6rem; line-height: 1.5; }
-.pf-eco-setup-progress { margin-bottom: .6rem; }
-.pf-eco-setup-progress-chip { font-family: inherit; font-weight: 600; background: var(--surface); }
-.pf-eco-setup-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .5rem; }
-.pf-eco-setup-step { display: flex; align-items: flex-start; gap: .6rem; }
-.pf-eco-setup-dot { flex: 0 0 auto; width: 1.25rem; height: 1.25rem; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: .72rem; font-weight: 700; margin-top: .1rem; }
-.pf-eco-setup-dot-done { background: var(--success, var(--accent)); color: var(--bg, var(--card)); border: 2px solid var(--success, var(--accent)); }
-.pf-eco-setup-dot-wait { background: var(--bg-dim); border: 2px solid var(--border); }
-.pf-eco-setup-step-body { display: flex; flex-direction: column; gap: .2rem; min-width: 0; }
-.pf-eco-setup-step-title { font-weight: 600; font-size: .88rem; color: var(--text); }
-.pf-eco-setup-step-done .pf-eco-setup-step-title { color: var(--text-dim); }
-.pf-eco-setup-step-why { font-size: .8rem; line-height: 1.45; }
-.pf-eco-setup-step-note { font-size: .78rem; font-style: italic; }
-.pf-eco-setup-cta { align-self: flex-start; margin-top: .25rem; }
-.pf-eco-mcp { margin-top: .9rem; padding: .8rem .9rem; border-radius: 10px; background: var(--bg-dim); display: flex; flex-direction: column; gap: .4rem; }
-.pf-eco-mcp-head { display: flex; align-items: center; gap: .5rem; }
-.pf-eco-mcp-icon { font-size: 1.1rem; }
-.pf-eco-mcp-title { font-size: .92rem; color: var(--text); }
-.pf-eco-mcp-sub { margin: 0; font-size: .82rem; line-height: 1.45; }
-.pf-eco-mcp-connect { margin: 0; font-size: .8rem; line-height: 1.45; }
-.pf-eco-mcp-sample { margin-top: .35rem; display: flex; flex-direction: column; gap: .35rem; }
-.pf-eco-mcp-sample-label { font-weight: 600; font-size: .82rem; color: var(--text-dim); }
-.pf-eco-mcp-sample-row { display: flex; align-items: flex-start; gap: .5rem; }
-.pf-eco-mcp-sample-prompt { flex: 1 1 auto; min-width: 0; background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: .5rem .6rem; font-family: var(--font-mono, monospace); font-size: .78rem; color: var(--text); line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
-.pf-eco-mcp-sample-note { margin: 0; font-size: .76rem; }
-.pf-eco-mcp-no-organism { margin: 0; font-size: .8rem; line-height: 1.45; }
-
-/* ── Ecosystem card — value-first human header + one-liner + disconnect (pf-eco-value-*/-head-*/-disconnect) ── */
-.pf-eco-head-title { display: flex; flex-direction: column; gap: .1rem; min-width: 0; }
-.pf-eco-head-owner { font-size: .76rem; }
-.pf-eco-value-line { margin: 0 0 .2rem; font-size: .92rem; line-height: 1.5; color: var(--text); }
-.pf-eco-disconnect-hint { margin: -.25rem 0 .55rem; }
-
-/* ── Ecosystem card — collapsed "Technical details" disclosure (pf-eco-tech-*) ── */
-.pf-eco-tech { margin-top: .6rem; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-dim); overflow: hidden; }
-.pf-eco-tech-toggle { display: flex; align-items: center; gap: .45rem; width: 100%; background: none; border: none; padding: .55rem .75rem; font-size: .82rem; font-weight: 600; color: var(--text-dim); cursor: pointer; text-align: left; }
-.pf-eco-tech-toggle:hover { color: var(--text); }
-.pf-eco-tech-icon { font-size: .95rem; }
-.pf-eco-tech-toggle-label { flex: 1 1 auto; }
-.pf-eco-tech-body { padding: .2rem .75rem .7rem; border-top: 1px solid var(--border); }
-.pf-eco-tech-hint { margin: .5rem 0 .4rem; font-size: .78rem; line-height: 1.45; }
-.pf-eco-tech-section { padding: .6rem 0; border-top: 1px solid var(--border); }
-.pf-eco-tech-section:first-of-type { border-top: none; }
-.pf-eco-tech-section-title { font-weight: 700; font-size: .82rem; margin-bottom: .4rem; color: var(--text-dim); }
-.pf-eco-tech-principal { display: inline-block; background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: .3rem .5rem; word-break: break-all; }
-.pf-eco-tech-access { margin: -.15rem 0 .4rem; }
-
 /* ── Presence settings dialog — backed by PresenceDialog in landing-page.js, opened
    from the <PresencePill> in the ProfileCard header; previews the same <PresenceDot>
    shown next to people. ── */
 
-
-/* ── Workspace Apps strip (pinned apps on the workspace Overview) ── */
-.pj-apps-strip { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: .75rem .9rem; margin-bottom: 1rem; }
-.pj-apps-head { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; margin-bottom: .5rem; }
-.pj-apps-title { font-weight: 600; font-size: .95rem; }
-.pj-apps-hint { flex: 1; font-size: .78rem; color: var(--muted); }
-.pj-apps-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: .6rem; }
-.pj-app-card { background: var(--bg-dim); border: 1px solid var(--border); border-radius: var(--radius); padding: .6rem .75rem; cursor: pointer; transition: border-color .12s; }
-.pj-app-card:hover, .pj-app-card:focus-visible { border-color: var(--accent-border); box-shadow: var(--shadow-sm); }
-.pj-app-name { font-weight: 600; font-size: .9rem; }
-.pj-app-desc { margin-top: .25rem; font-size: .78rem; color: var(--text-dim); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-.pj-app-meta { margin-top: .35rem; font-size: .72rem; color: var(--muted); }
-.pj-app-missing { color: var(--warning, var(--muted)); }
-.pj-apps-empty { font-size: .82rem; color: var(--muted); padding: .25rem 0; }
-.pj-apps-picker { margin-top: .75rem; border-top: 1px solid var(--border); padding-top: .6rem; display: flex; flex-direction: column; gap: .45rem; }
-.pj-apps-picker-row { display: flex; align-items: center; gap: .6rem; padding: .35rem .5rem; background: var(--bg-dim); border: 1px solid var(--border); border-radius: var(--radius); }
-.pj-apps-picker-name { font-size: .87rem; }
-.pj-apps-picker-owner { flex: 1; font-size: .74rem; color: var(--muted); font-family: var(--font-mono); }
-
 /* ── App-bound skills (2d) on My Apps cards ── */
-
-/* ── AI transparency card (pf-aitr-*) — TARGET-058 Phase 8 ──
-   The owner's own view of what they published with a model in it. The one visual decision here is
-   that the "public and unlabelled" tile changes colour only when the number is ABOVE zero: a
-   compliance surface that is always red teaches people to stop looking at it. */
-.pf-aitr-head { display: flex; align-items: center; justify-content: space-between; gap: 0.8rem; width: 100%; background: none; border: 0; padding: 0; cursor: pointer; text-align: left; color: inherit; font: inherit; }
-.pf-aitr-chevron { color: var(--muted); font-size: 1.1rem; line-height: 1; flex-shrink: 0; }
-.pf-aitr-body { margin-top: 0.9rem; border-top: 1px solid var(--border); padding-top: 0.9rem; }
-/* auto-fit, so four tiles become two rows on a phone instead of overflowing the card. */
-.pf-aitr-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr)); gap: 0.6rem; }
-.pf-aitr-stat { display: flex; flex-direction: column; gap: 0.15rem; padding: 0.7rem 0.8rem; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-dim); min-width: 0; }
-.pf-aitr-stat-warn { border-color: var(--warn); }
-.pf-aitr-stat-warn .pf-aitr-num { color: var(--warn); }
-.pf-aitr-num { font-size: 1.5rem; font-weight: 700; line-height: 1.1; }
-.pf-aitr-lbl { font-size: 0.75rem; color: var(--muted); overflow-wrap: anywhere; }
-.pf-aitr-note { margin: 0.8rem 0 0; font-size: 0.82rem; color: var(--muted); }
-.pf-aitr-warn-line { margin: 0.9rem 0 0.4rem; font-size: 0.85rem; color: var(--fg); }
-.pf-aitr-error { margin: 0; font-size: 0.85rem; color: var(--danger); }
-.pf-aitr-muted { margin: 0.5rem 0 0; font-size: 0.8rem; color: var(--muted); }
-.pf-aitr-sub { margin: 1.2rem 0 0.4rem; font-size: 0.9rem; font-weight: 600; }
-/* The decision card's "remove my key" door sits under the dashed key field, not against it. */
-.pf-aitr .og-doors { margin-top: 0.6rem; }
-.pf-aitr-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.4rem; }
-.pf-aitr-row, .pf-aitr-policy { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.3rem 0.7rem; padding: 0.55rem 0.7rem; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-dim); min-width: 0; }
-.pf-aitr-policy { flex-direction: column; }
-.pf-aitr-row-main { font-size: 0.85rem; font-weight: 600; overflow-wrap: anywhere; }
-.pf-aitr-row-meta { font-size: 0.78rem; color: var(--muted); overflow-wrap: anywhere; }
-/* The two verdict buttons on a decision. A 44 px box at every width, a thumb's width apart: they are
-   the one control in this card a person presses about something that already happened, and the two
-   answers are opposites. `.pf` in front because profile-poster.css sets `min-height: 0` on every
-   .pf .btn-outline and loads later; without it these measured 20 px high. */
-.pf-aitr-row-verdict { display: flex; flex-wrap: wrap; gap: 0.9rem; margin-top: 0.35rem; }
-.pf-aitr-row-verdict .btn-outline,
-.pf .pf-aitr-row-verdict .btn-outline {
-  min-height: 44px; padding: 12px 0 11px;
-}
-/* EVERY control in the decision-model card and the rules screen is a real tap target, 44 px at every
-   width. The house's poster buttons are text with an underline and `min-height: 0`, which reads well
-   and measures 15 to 18 px high: on a phone, the key, the test, the delete and the eight policy
-   checkboxes were all under the 40 px floor this repo holds itself to. The look is kept — the box
-   around the words grows, the words do not. `.pf` in front because profile-poster.css sets that
-   `min-height: 0` and loads after this file.
-   A checkbox is its LABEL: the whole row is the target, and the box itself grows to 20 px so it can
-   be hit on its own. */
-.pf .pf-aitr .og-door,
-.pf .pf-aitr .btn-outline,
-.pf .pf-aitr .btn-primary,
-.pf .pf-dr .og-door,
-.pf .pf-dr .btn-outline {
-  min-height: 44px; min-width: 44px;
-}
-/* Both dimensions: "Edit" measured 26.8 px wide and "Test" 28.8, which are as easy to miss as a
-   short button is. A field is a target too, and the card's key field sat at 36 px under a 44 px
-   Save, which read as a mismatch as well as measuring short. */
-.pf .pf-aitr .og-input,
-.pf .pf-aitr select,
-.pf .pf-aitr input[type="number"],
-.pf .pf-dr .og-input,
-.pf .pf-dr select,
-.pf .pf-dr input[type="number"] {
-  min-height: 44px;
-}
-.pf .pf-aitr .pf-aitr-row > label.pf-aitr-row-main,
-.pf .pf-dr .pf-dr-check {
-  display: flex; align-items: center; gap: 0.5rem; min-height: 44px; margin: 0;
-}
-.pf .pf-aitr .checkbox, .pf .pf-dr .checkbox { width: 20px; height: 20px; flex: none; }
-/* The verdict already recorded stays visible and unpressable, so a mis-tap has a way back: the other
-   button is still there and records the opposite. */
-.pf .pf-aitr-row-verdict .btn-outline[disabled] {
-  color: var(--muted); border-color: var(--muted); opacity: 1; cursor: default;
-}
-.pf-aitr-row-link { font-size: 0.78rem; color: var(--accent); }
-
-/* ── Decision rules (pf-dr-*) and one agent's AI settings (pf-aai-*) ──
-   Both sit inside furniture that already exists (the decision-model card, the agent's config tab)
-   and reuse its rows and stats; what is here is only the editor's form and the section's spacing. */
-.pf-dr-order { margin: 0.6rem 0 0; padding-left: 1.2rem; font-size: 0.8rem; color: var(--muted); display: flex; flex-direction: column; gap: 0.15rem; }
-.pf-dr-h { margin: 1rem 0 0.3rem; font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
-.pf-dr-pre { white-space: pre-line; }
-.pf-dr .pf-aitr-row { flex-direction: column; align-items: stretch; }
-.pf-dr .pf-aitr-row .og-doors { margin-top: 0.3rem; }
-.pf-dr-tried { color: var(--text); font-weight: 600; }
-.pf-dr-editor { margin-top: 0.9rem; padding: 0.9rem; border: 1px dashed var(--text); background: var(--bg-dim); display: flex; flex-direction: column; gap: 0.7rem; min-width: 0; }
-.pf-dr-field { display: flex; flex-direction: column; gap: 0.2rem; font-size: 0.78rem; color: var(--muted); min-width: 0; }
-.pf-dr-field .og-input, .pf-dr-field .og-textarea, .pf-dr-q .og-input, .pf-dr-q .og-textarea { width: 100%; box-sizing: border-box; min-width: 0; }
-.pf-dr-check { font-size: 0.85rem; }
-.pf-dr-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.8rem; }
-.pf-dr-q { display: flex; flex-direction: column; gap: 0.4rem; padding: 0.6rem; border: 1px solid var(--border); border-radius: 8px; background: var(--card); min-width: 0; }
-.pf-dr-q-top { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr); gap: 0.6rem; }
-.pf-dr-q .og-door { align-self: flex-start; }
-.pf-aai { min-width: 0; }
-.pf-aai-model { margin-top: 1rem; padding-top: 0.8rem; border-top: 1px solid var(--border); min-width: 0; }
-.pf-aai-model-title { font-size: 0.9rem; font-weight: 700; }
-.pf-aai-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.8rem; margin-top: 0.4rem; }
-.pf-aai-row .og-input { flex: 1 1 12rem; min-width: 0; width: auto; }
-.pf-aai-row .og-door { flex: none; }
-.pf-aai .og-choice { margin-top: 0.5rem; flex-wrap: wrap; }
-/* The agent's keys, its cap and its gate: every control a thumb has to hit, 44 px at every width.
-   Measured at 390 before this: the three SAVE buttons 16 px, the two tests 18, the gate's three
-   positions 28, the four fields 36. Same reason and same shape as the decision-model card above. */
-.pf .pf-aai .og-door,
-.pf .pf-aai .og-input,
-.pf .pf-aai .og-choice-btn {
-  min-height: 44px;
-}
-/* The three SAVE buttons measured 37.2 px wide and the two tests 28.8: short in the other
-   dimension is just as easy to miss. */
-.pf .pf-aai .og-door, .pf .pf-aai .og-choice-btn { min-width: 44px; }
-.pf-aai-rules { margin-top: 0.6rem; }
-@media (max-width: 600px) {
-  .pf-dr-q-top, .pf-dr-pair { grid-template-columns: minmax(0, 1fr); }
-}
-
-/* ── The account's own compliance slice (BR-02) ──
-   Deliberately the same furniture as the card above it: they answer consecutive questions about the
-   same subject, and giving the second one its own visual language would read as a different feature.
-   Only the "not written down" tile changes colour, and only above zero, for the reason the sibling
-   states — a surface that is always red teaches people to stop looking at it. */
-.pf-cmp-head { display: flex; align-items: center; justify-content: space-between; gap: 0.8rem; width: 100%; background: none; border: 0; padding: 0; cursor: pointer; text-align: left; color: inherit; font: inherit; }
-.pf-cmp-chevron { color: var(--muted); font-size: 1.1rem; line-height: 1; flex-shrink: 0; }
-.pf-cmp-body { margin-top: 0.9rem; border-top: 1px solid var(--border); padding-top: 0.9rem; }
-.pf-cmp-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr)); gap: 0.6rem; }
-.pf-cmp-stat { display: flex; flex-direction: column; gap: 0.15rem; padding: 0.7rem 0.8rem; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-dim); min-width: 0; }
-.pf-cmp-stat-warn { border-color: var(--warn); }
-.pf-cmp-stat-warn .pf-cmp-num { color: var(--warn); }
-.pf-cmp-num { font-size: 1.5rem; font-weight: 700; line-height: 1.1; }
-.pf-cmp-lbl { font-size: 0.75rem; color: var(--muted); overflow-wrap: anywhere; }
-.pf-cmp-note { margin: 0.8rem 0 0.3rem; font-size: 0.82rem; color: var(--muted); }
-.pf-cmp-note-warn { color: var(--fg); }
-.pf-cmp-error { margin: 0; font-size: 0.85rem; color: var(--danger); }
-.pf-cmp-muted { margin: 0.5rem 0 0; font-size: 0.8rem; color: var(--muted); }
-.pf-cmp-sub { margin: 1.2rem 0 0.4rem; font-size: 0.9rem; font-weight: 600; }
-.pf-cmp-models, .pf-cmp-limits { margin: 0.3rem 0 0; padding-left: 1.1rem; font-size: 0.82rem; color: var(--muted); }
-.pf-cmp-models li, .pf-cmp-limits li { margin: 0.3rem 0; overflow-wrap: anywhere; }
-.pf-cmp-entries { list-style: none; margin: 0.3rem 0 0; padding: 0; display: flex; flex-direction: column; gap: 0.4rem; }
-.pf-cmp-entries li { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0.3rem 0.7rem; padding: 0.55rem 0.7rem; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-dim); min-width: 0; }
-.pf-cmp-entry-title { font-size: 0.85rem; font-weight: 600; overflow-wrap: anywhere; }
-.pf-cmp-entry-risk { font-size: 0.78rem; color: var(--muted); flex-shrink: 0; }
-
-/* Bring-your-own-app, under each service. Indented and quiet on purpose: it is the advanced door,
-   and it must not compete with the Connect button that almost everyone wants instead. */
-.access-cx-own {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2, 0.5rem);
-  padding-left: var(--space-3, 0.75rem);
-  border-left: 2px solid var(--border);
-  margin: var(--space-2, 0.5rem) 0 var(--space-3, 0.75rem);
-}
-.access-cx-own-form {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2, 0.5rem);
-  width: 100%;
-}
-
-/* One service per block, and the eye has to be able to tell where one ends.
-   MEASURED before this existed: the "use your own app" control sat 52-83px below the Connect button
-   it belongs to and 16px above the NEXT service's, so proximity said it belonged to the wrong one
-   in every single case. Grouping is not decoration; it was reading as a different feature. */
-.access-cx-add + .access-cx-add {
-  border-top: 1px solid var(--border);
-  padding-top: var(--space-4, 1rem);
-  margin-top: var(--space-4, 1rem);
-}
-
-/* ── P&L tab (pf-pnl) — company-in-a-box phase 7 ─────────────────────────── */
-.pf-pnl-controls { display: flex; gap: var(--space-3, 0.75rem); align-items: flex-end; flex-wrap: wrap; margin-bottom: var(--space-4, 1rem); }
-.pf-pnl-controls label { display: flex; flex-direction: column; gap: 4px; font-size: 0.85rem; color: var(--text-dim); }
-.pf-pnl-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: var(--space-4, 1rem); }
-.pf-pnl-block { margin-bottom: var(--space-4, 1rem); }
-.pf-pnl-table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
-.pf-pnl-table td { padding: 6px 8px; border-bottom: 1px solid var(--border); }
-.pf-pnl-num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.pf-pnl-count { color: var(--text-dim); font-size: 0.85rem; white-space: nowrap; }
-.pf-pnl-total td { font-weight: 700; border-bottom: 0; border-top: 2px solid var(--text); }
-.pf-pnl-result { text-align: center; padding: var(--space-5, 1.25rem); margin-bottom: var(--space-4, 1rem); }
-.pf-pnl-result-label { font-size: 0.85rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; }
-.pf-pnl-result-value { font-size: 2rem; font-weight: 700; margin: 4px 0; }
-.pf-pnl-result.pos .pf-pnl-result-value { color: var(--success, #1e7d45); }
-.pf-pnl-result.neg .pf-pnl-result-value { color: var(--danger, #b3372c); }
-.pf-pnl-vat { color: var(--text-dim); font-size: 0.9rem; }
-.pf-pnl-note, .pf-pnl-empty { color: var(--text-dim); font-size: 0.85rem; margin: var(--space-2, 0.5rem) 0 0; }
-.pf-pnl-error { color: var(--danger, #b3372c); }
-.pf-acc-list { list-style: none; padding: 0; margin: var(--space-3, 0.75rem) 0; display: flex; flex-direction: column; gap: var(--space-2, 0.5rem); }
-.pf-acc-list li { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3, 0.75rem); padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem); background: var(--bg-dim); border-radius: var(--radius-sm, 10px); flex-wrap: wrap; }
-.pf-acc-who { font-family: var(--font-mono, monospace); font-size: 0.9rem; word-break: break-all; }
-.pf-acc-field { display: flex; flex-direction: column; gap: 4px; font-size: 0.85rem; color: var(--text-dim); flex: 1; min-width: 200px; }
 
 /* The Companies tab's pf-co rules left for css/views/companies-poster.css (co- prefix) when the
    tab moved to the poster face. */
@@ -3275,49 +1060,6 @@
    clothes, so it lines up with the buttons under it. */
 
 /* The prompt card owns its corner, like every other card. */
-/* The card owns its corner, and the head stops short of it. Measured before this: the dots
-   overlapped the primary button by 18x18px and hung 12px outside the head, where the card edge
-   clipped them into a smudge. */
-.pf-adk-prompt-card { position: relative; }
-.pf-adk-prompt-head { padding-right: 2.4rem; }
-
-/* ── Usage reports tab (pf-ureport-*) ──────────────────────────────────────
-   NOT pf-usage-*, which is the Home quota card. Reusing that prefix made
-   .pf-usage-chip's surface background win over the selected button's white
-   text, so the chosen report rendered white on white.
-
-   Stats use the canonical .stat-grid/.stat-card and the time window uses the
-   canonical .seg/.seg-btn, so nothing is defined here twice. What is left is
-   the one shape the house set has no member for: a WRAPPING button bar. Eight
-   report labels do not fit a joined segmented control on a phone, and a
-   horizontal scroller would hide the questions this page exists to offer. */
-.pf-ureport-controls {
-  display: flex; flex-wrap: wrap; justify-content: space-between;
-  align-items: flex-start; gap: var(--space-3, 0.75rem);
-  margin-bottom: var(--space-4, 1rem);
-}
-.pf-ureport-bar { display: flex; flex-wrap: wrap; gap: 4px; }
-/* Same tokens and the same accent-fill-when-active as the agents range bar, so
-   the two read as one control language rather than two. */
-.pf-ureport-btn {
-  padding: 4px 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm, 4px);
-  background: none;
-  color: var(--text-dim);
-  font-family: var(--font);
-  font-size: 0.78rem;
-  cursor: pointer;
-}
-.pf-ureport-btn:hover:not(.active) { border-color: var(--accent); color: var(--text); }
-.pf-ureport-btn.active { background: var(--accent); color: #FFFFFF; border-color: var(--accent); }
-
-/* A fixed height so the canvas has something to be 100 % of, and so switching
-   report does not make the table below it jump. */
-.pf-ureport-chart { height: 200px; margin-bottom: var(--space-4, 1rem); }
-
-.pf-ureport-empty { color: var(--text-dim); font-size: 0.9rem; padding: var(--space-4, 1rem) 0; }
-.pf-ureport-error { color: var(--danger, #b3372c); font-size: 0.9rem; }
 
 /* AgentConsent (both mounts: .pf Agents tab and the home's koti-step, so unscoped) */
 .agc-preset-desc { margin: 0.35rem 0 0; line-height: 1.45; }

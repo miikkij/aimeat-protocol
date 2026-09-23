@@ -33,6 +33,10 @@
  *   - QuestionnaireSection — section 05
  * @usage imported by compliance-tab.js
  * @version-history
+ *   v3.0.0 -- 2026-09-22 -- Composed from the shared component set: the register is the shared
+ *     table under a toolbar, the opened entry a record surface with shared fields, a yes/no two tab
+ *     actions, the questions compact list rows, the class a shared chip (prohibited on the danger
+ *     ground, high coral, limited plain, minimal green, unclassified muted). No classes of its own.
  *   v2.1.0 — 2026-09-13 — Compose section headings from the shared poster B1 shape.
  *   v2.0.0 — 2026-09-05 — The poster face: the table with filters, the framed sheet, the segmented
  *     choice, the who-answered column, the three ways to start in the empty state.
@@ -47,20 +51,21 @@ import { useConfirm } from '/components/Modal.js';
 import {
   PAGE, CLASS_ORDER, answersOf, answerStats, classCounts, orderUsecases, filterUsecases, impliesSummary, modelsShort,
 } from './compliance-tab.gaps.js';
+import { Section, Columns, Stack, ListRow, Toolbar, Table, Field, Action, Chip, Surface, Text, scrollToId } from '/components/poster-parts.js';
 
 const html = htm.bind(h);
 const C = (key, params) => t('admin.compliance.' + key, params);
-const go = (id) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+const go = (id) => scrollToId(id);
 
-/** Class id → the chip's tone. Unclassified is dim on purpose: nobody has looked, and a calm colour
+/** Class id → the chip's tone. Unclassified is muted on purpose: nobody has looked, and a calm colour
  *  there would read as a pass. */
-const TONE = { prohibited: 'bad', high: 'bad', limited: 'warn', minimal: 'ok', unclassified: 'dim' };
+const TONE = { prohibited: 'danger', high: 'coral', limited: 'plain', minimal: 'success', unclassified: 'muted' };
 
 export const classWord = (cls) => tOr('admin.compliance.class.' + cls, cls);
 
 export function ClassChip({ cls }) {
   const c = cls || 'unclassified';
-  return html`<span class="og-chip adm-cmp-chip--${TONE[c] || 'dim'}">${classWord(c)}</span>`;
+  return html`<${Chip} tone=${TONE[c] || 'muted'}>${classWord(c)}<//>`;
 }
 
 /** The list of strings behind a comma-separated input, empty entries dropped. */
@@ -85,39 +90,34 @@ function answeredText(u, questions) {
   return [head, ...parts].join(' · ');
 }
 
-/** A yes/no as the segmented choice; a question with options as an underline select. Pressing the
- *  lit half again clears the answer, so an answer given by mistake can be taken back. */
+/** A yes/no as two tab actions; a question with options as a select. Pressing the lit half again
+ *  clears the answer, so an answer given by mistake can be taken back. */
 function Choice({ q, value, onChange }) {
   if (q.type === 'boolean') {
     const pick = (v) => onChange(value === v ? undefined : v);
-    return html`<span class="og-choice">
-      <button type="button" class="og-choice-btn ${value === true ? 'on' : ''}" onClick=${() => pick(true)}>${C('yes')}</button>
-      <button type="button" class="og-choice-btn ${value === false ? 'on' : ''}" onClick=${() => pick(false)}>${C('no')}</button>
-    </span>`;
+    return html`<${Stack} direction="horizontal" align="center" density="compact" role="group" label=${q.text}>
+      <${Action} kind="tab" selected=${value === true} onClick=${() => pick(true)}>${C('yes')}<//>
+      <${Action} kind="tab" selected=${value === false} onClick=${() => pick(false)}>${C('no')}<//>
+    <//>`;
   }
-  return html`<select class="adm-cmp-qsel" value=${isBlank(value) ? '' : String(value)}
-    onChange=${(e) => { const raw = e.currentTarget.value; onChange(raw === '' ? undefined : raw); }}>
-    <option value="">${C('pickAnswer')}</option>
-    ${(q.options || []).map(o => html`<option key=${o.value} value=${o.value}>${o.label}</option>`)}
-  </select>`;
+  return html`<${Field} type="select" ariaLabel=${q.text} value=${isBlank(value) ? '' : String(value)}
+    onChange=${(e) => { const raw = e.currentTarget.value; onChange(raw === '' ? undefined : raw); }}
+    options=${[{ value: '', label: C('pickAnswer') }, ...(q.options || []).map(o => ({ value: o.value, label: o.label }))]} />`;
 }
 
-function QuestionRow({ q, value, source, onChange, last }) {
+function QuestionRow({ q, value, source, onChange }) {
   const blank = isBlank(value);
   const src = blank ? C('waitsForYou')
     : source === 'evidence' ? C('answerFromEvidence')
     : source === 'ai' ? C('answerFromAi')
     : C('answerFromHuman');
-  return html`
-    <div class="adm-cmp-qrow ${last ? 'adm-cmp-qrow--last' : ''}">
-      <span>${q.text}${q.help ? html`<span class="adm-why">${q.help}</span>` : null}</span>
-      <${Choice} q=${q} value=${value} onChange=${onChange} />
-      <span class="adm-cmp-src ${blank ? 'adm-cmp-src--waits' : ''}">${src}</span>
-    </div>`;
+  return html`<${ListRow} density="compact" name=${q.text} detail=${q.help || null} detailKind="text"
+    value=${html`<${Choice} q=${q} value=${value} onChange=${onChange} />`}
+    actions=${html`<${Text} kind="mono" tone=${blank ? 'coral' : 'muted'}>${src}<//>`} />`;
 }
 
 /**
- * One opened entry: the fields on underlines, what decided its class, and the questions.
+ * One opened entry: the fields, what decided its class, and the questions.
  *
  * The models and apps fields keep their own text while being typed: the entry holds them as
  * lists, and re-rendering a list joined with ", " on every keystroke eats the comma the person
@@ -126,41 +126,47 @@ function QuestionRow({ q, value, source, onChange, last }) {
 function EntrySheet({ u, questions, onPatch, onAnswer, onRemove, onClose }) {
   const [modelsText, setModelsText] = useState((u.models || []).join(', '));
   const [appsText, setAppsText] = useState((u.apps || []).join(', '));
-  const field = (label, control, wide) => html`
-    <div class="og-field ${wide ? 'adm-cmp-field--wide' : ''}"><span class="og-label">${label}</span>${control}</div>`;
-  const text = (key, mono) => html`
-    <input type="text" class="og-input ${mono ? 'og-input--mono' : ''}" value=${u[key] || ''} onInput=${(e) => onPatch({ [key]: e.currentTarget.value })} />`;
+  const text = (key, label) => html`<${Field} label=${label} value=${u[key] || ''} onInput=${(e) => onPatch({ [key]: e.currentTarget.value })} />`;
   const reasons = (u.risk && u.risk.reasons) || [];
   const open = answersOf(u, questions).unanswered;
-  return html`
-    <div class="adm-cmp-sheet" id="adm-cmp-sheet">
-      <div class="adm-cmp-sheet-h">
-        <div class="adm-cmp-sheet-title">${u.title || u.id}<${ClassChip} cls=${u.risk && u.risk.class} /></div>
-        <div class="og-doors">
-          <button type="button" class="og-door og-door--danger" onClick=${onRemove}>${C('ucRemove')}</button>
-          <button type="button" class="og-door og-door--quiet" onClick=${onClose}>${C('close')}</button>
-        </div>
-      </div>
-      <div class="adm-cmp-fields">
-        ${field(C('ucTitle'), text('title'))}
-        ${field(C('ucId'), text('id', true))}
-        ${field(C('ucPurpose'), html`<textarea class="adm-cmp-fbox" rows="3" value=${u.purpose || ''} onInput=${(e) => onPatch({ purpose: e.currentTarget.value })}></textarea>`, true)}
-        ${field(C('ucModels'), html`
-          <input type="text" class="og-input og-input--mono" placeholder="anthropic/claude-opus-5, google/gemini-3-pro" value=${modelsText}
+  return html`<${Surface} kind="record" id="adm-cmp-sheet">
+    <${Stack}>
+      <${Stack} direction="wrap" align="between">
+        <${Stack} direction="horizontal" align="center" density="compact">
+          <${Text} kind="heading" size="small">${u.title || u.id}<//><${ClassChip} cls=${u.risk && u.risk.class} />
+        <//>
+        <${Stack} direction="horizontal" align="center">
+          <${Action} tone="danger" onClick=${onRemove}>${C('ucRemove')}<//>
+          <${Action} onClick=${onClose}>${C('close')}<//>
+        <//>
+      <//>
+      <${Columns} layout="equal" collapse=${600}>
+        ${text('title', C('ucTitle'))}
+        ${text('id', C('ucId'))}
+      <//>
+      <${Field} type="textarea" label=${C('ucPurpose')} rows=${3} value=${u.purpose || ''} onInput=${(e) => onPatch({ purpose: e.currentTarget.value })} />
+      <${Columns} layout="equal" collapse=${600}>
+        <${Stack} density="compact">
+          <${Field} label=${C('ucModels')} placeholder="anthropic/claude-opus-5, google/gemini-3-pro" value=${modelsText} passwordManager=${false}
             onInput=${(e) => { setModelsText(e.currentTarget.value); onPatch({ models: splitList(e.currentTarget.value) }); }} />
-          <span class="adm-why">${C('ucModelsHint')}</span>`)}
-        ${field(C('ucApps'), html`
-          <input type="text" class="og-input og-input--mono" placeholder="alice/newsroom.html" value=${appsText}
-            onInput=${(e) => { setAppsText(e.currentTarget.value); onPatch({ apps: splitList(e.currentTarget.value) }); }} />`)}
-        ${field(C('ucSubjects'), text('dataSubjects'), true)}
-      </div>
-      ${reasons.length > 0 ? html`<p class="adm-cmp-why-line"><b>${C('printWhy')}</b> ${reasons.map(reasonText).join(' · ')}</p>` : null}
-      <div class="adm-cmp-qlbl">${C('answersTitle')}</div>
-      ${open > 0 ? html`<p class="adm-cmp-why-line adm-cmp-q-waits">${open === 1 ? C('unansweredOne') : C('unansweredMany', { n: num(open) })}</p>` : null}
-      ${questions.map((q, i) => html`
-        <${QuestionRow} key=${q.id} q=${q} value=${(u.answers || {})[q.id]} source=${(u.answerSources || {})[q.id]}
-          onChange=${(v) => onAnswer(q.id, v)} last=${i === questions.length - 1} />`)}
-    </div>`;
+          <${Text} kind="caption" tone="muted">${C('ucModelsHint')}<//>
+        <//>
+        <${Field} label=${C('ucApps')} placeholder="alice/newsroom.html" value=${appsText} passwordManager=${false}
+          onInput=${(e) => { setAppsText(e.currentTarget.value); onPatch({ apps: splitList(e.currentTarget.value) }); }} />
+      <//>
+      ${text('dataSubjects', C('ucSubjects'))}
+      ${reasons.length > 0 ? html`<${Text} tone="muted"><strong>${C('printWhy')}</strong> ${reasons.map(reasonText).join(' · ')}<//>` : null}
+      <${Stack} density="compact">
+        <${Text} kind="label">${C('answersTitle')}<//>
+        ${open > 0 ? html`<${Text} tone="coral"><strong>${open === 1 ? C('unansweredOne') : C('unansweredMany', { n: num(open) })}</strong><//>` : null}
+        <div>
+          ${questions.map((q) => html`
+            <${QuestionRow} key=${q.id} q=${q} value=${(u.answers || {})[q.id]} source=${(u.answerSources || {})[q.id]}
+              onChange=${(v) => onAnswer(q.id, v)} />`)}
+        </div>
+      <//>
+    <//>
+  <//>`;
 }
 
 export function RegisterSection({ usecases, questions, draft, setDraft, openId, setOpenId, saving, drafting, onSave, onDraft }) {
@@ -204,114 +210,93 @@ export function RegisterSection({ usecases, questions, draft, setDraft, openId, 
 
   const open = list.find(u => u.id === openId) || null;
   const openIndex = open ? list.indexOf(open) : -1;
-  const draftDoor = (klass) => html`
-    <button type="button" class=${klass} disabled=${drafting} onClick=${onDraft}>${drafting ? C('drafting') : C('draftAction')}</button>`;
+  const draftDoor = (kind) => html`
+    <${Action} kind=${kind} disabled=${drafting} onClick=${onDraft}>${drafting ? C('drafting') : C('draftAction')}<//>`;
 
-  const empty = html`
-    <p class="adm-cmp-lead">${C('registerEmptyLead')}</p>
-    <div class="adm-mrow adm-mrow--two">
-      <span><b>${C('way.one')}</b><span class="adm-why">${C('way.oneWhy')}</span></span>
-      <span class="adm-cmp-right">${draftDoor('og-slab')}</span>
-    </div>
-    <div class="adm-mrow adm-mrow--two">
-      <span><b>${C('way.two')}</b><span class="adm-why">${C('way.twoWhy')}</span></span>
-      <span class="adm-cmp-right"><button type="button" class="og-door og-door--quiet" onClick=${() => go('adm-cmp-07')}>${C('toPaste')}</button></span>
-    </div>
-    <div class="adm-mrow adm-mrow--two adm-mrow--last">
-      <span><b>${C('way.three')}</b><span class="adm-why">${C('way.threeWhy')}</span></span>
-      <span class="adm-cmp-right"><button type="button" class="og-door og-door--quiet" onClick=${addOne}>${C('ucAdd')}</button></span>
-    </div>`;
+  const empty = html`<div>
+    <${ListRow} name=${C('way.one')} detail=${C('way.oneWhy')} detailKind="text" actions=${draftDoor('primary')} />
+    <${ListRow} name=${C('way.two')} detail=${C('way.twoWhy')} detailKind="text"
+      actions=${html`<${Action} onClick=${() => go('adm-cmp-07')}>${C('toPaste')}<//>`} />
+    <${ListRow} name=${C('way.three')} detail=${C('way.threeWhy')} detailKind="text"
+      actions=${html`<${Action} onClick=${addOne}>${C('ucAdd')}<//>`} />
+  </div>`;
 
-  const filled = html`
-    <p class="adm-cmp-lead">${C('registerNote')}</p>
-    <div class="adm-cmp-filters">
-      <button type="button" class="adm-cmp-fchip ${cls === 'all' ? 'on' : ''}" onClick=${() => pickClass('all')}>${C('filterAll', { n: num(list.length) })}</button>
-      ${CLASS_ORDER.map(c => html`
-        <button key=${c} type="button" class="adm-cmp-fchip ${cls === c ? 'on' : ''}" onClick=${() => pickClass(c)}>${classWord(c)} ${num(countOf(c))}</button>`)}
-      <span class="adm-cmp-sep"></span>
-      <input type="search" class="adm-cmp-search" placeholder=${C('search')} value=${query}
-        onInput=${(e) => { setQuery(e.currentTarget.value); setShown(PAGE); }} />
-    </div>
-    ${filtered.length === 0 ? html`<div class="adm-cmp-empty adm-cmp-empty--last">${C('noneMatch')}</div>` : html`
-      <table class="adm-cmp-tbl">
-        <thead><tr><th>${C('col.what')}</th><th>${C('col.class')}</th><th>${C('col.models')}</th><th>${C('col.answered')}</th><th></th></tr></thead>
-        <tbody>
-          ${visible.map(u => {
-            const unclassified = ((u.risk && u.risk.class) || 'unclassified') === 'unclassified';
-            const isOpen = openId === u.id;
-            return html`
-              <tr key=${u.id}>
-                <td class="adm-cmp-name"><b>${u.title || u.id}</b>${u.purpose ? html`<span class="adm-why">${u.purpose}</span>` : null}</td>
-                <td class="adm-cmp-cell-class"><${ClassChip} cls=${u.risk && u.risk.class} /></td>
-                <td class="adm-cmp-cell-mono">${modelsShort(u.models) || C('none')}</td>
-                <td class="adm-cmp-cell-mono">${answeredText(u, questions)}</td>
-                <td class="og-tbl-door"><button type="button" class="og-door og-door--quiet" onClick=${() => setOpenId(isOpen ? null : u.id)}>
-                  ${isOpen ? C('close') : unclassified ? C('answer') : C('edit')}</button></td>
-              </tr>`;
-          })}
-        </tbody>
-      </table>`}
-    <div class="adm-cmp-foot">
-      <div class="og-doors">
-        ${filtered.length > shown ? html`
-          <button type="button" class="og-door" onClick=${() => setShown(s => s + PAGE)}>${C('showNext', { n: num(Math.min(PAGE, filtered.length - shown)) })}</button>` : null}
-      </div>
-      <span class="adm-cmp-mono">${C('foot', {
+  const rows = visible.map(u => {
+    const unclassified = ((u.risk && u.risk.class) || 'unclassified') === 'unclassified';
+    const isOpen = openId === u.id;
+    return [
+      html`<${Stack} density="compact"><strong>${u.title || u.id}</strong>${u.purpose ? html`<${Text} kind="caption" tone="muted">${u.purpose}<//>` : null}<//>`,
+      html`<${ClassChip} cls=${u.risk && u.risk.class} />`,
+      { text: modelsShort(u.models) || C('none'), mono: true },
+      { text: answeredText(u, questions), mono: true },
+      html`<${Action} expanded=${isOpen} onClick=${() => setOpenId(isOpen ? null : u.id)}>
+        ${isOpen ? C('close') : unclassified ? C('answer') : C('edit')}<//>`,
+    ];
+  });
+
+  const filled = html`<${Stack}>
+    <${Toolbar} label=${C('search')}
+      filters=${[
+        { id: 'all', label: C('filterAll', { n: num(list.length) }), selected: cls === 'all', onClick: () => pickClass('all') },
+        ...CLASS_ORDER.map(c => ({ id: c, label: `${classWord(c)} ${num(countOf(c))}`, selected: cls === c, onClick: () => pickClass(c) })),
+      ]}
+      search=${{ ariaLabel: C('search'), placeholder: C('search'), value: query, onInput: (e) => { setQuery(e.currentTarget.value); setShown(PAGE); } }} />
+    ${filtered.length === 0 ? html`<${Text} tone="muted">${C('noneMatch')}<//>` : html`
+      <${Table} label=${C('registerTitle')} collapse=${600} density="compact" rows=${rows}
+        headers=${[C('col.what'), C('col.class'), C('col.models'), C('col.answered'), '']} />`}
+    <${Stack} direction="wrap" align="between">
+      ${filtered.length > shown
+        ? html`<${Action} onClick=${() => setShown(s => s + PAGE)}>${C('showNext', { n: num(Math.min(PAGE, filtered.length - shown)) })}<//>`
+        : html`<span></span>`}
+      <${Text} kind="mono" tone="muted">${C('foot', {
         shown: num(Math.min(shown, filtered.length)), total: num(list.length),
         ai: num(stats.ai), human: num(stats.human), evidence: num(stats.evidence), unanswered: num(stats.unanswered),
-      })}</span>
-    </div>
+      })}<//>
+    <//>
     ${open ? html`
       <${EntrySheet} key=${openIndex} u=${open} questions=${questions}
         onPatch=${(p) => patch(open.id, p)} onAnswer=${(qid, v) => answer(open.id, qid, v)}
-        onRemove=${() => remove(open.id)} onClose=${() => setOpenId(null)} />` : null}`;
+        onRemove=${() => remove(open.id)} onClose=${() => setOpenId(null)} />` : null}
+  <//>`;
 
-  return html`
-    <section class="og-sec adm-cmp-no-print" id="adm-cmp-04">
-      <${ConfirmUI} />
-      <div class="og-sec-h"><h2 class="poster-section-title">${C('registerTitle')}<small>04</small></h2>
-        ${list.length > 0 ? html`<div class="og-doors">
-          ${draftDoor('og-door og-door--quiet')}
-          <button type="button" class="og-door og-door--quiet" onClick=${addOne}>${C('ucAdd')}</button>
-        </div>` : null}
-      </div>
+  return html`<${Section} id="adm-cmp-04" title=${C('registerTitle')} count="04"
+    description=${list.length === 0 ? C('registerEmptyLead') : C('registerNote')}
+    actions=${list.length > 0 ? html`${draftDoor('secondary')}<${Action} onClick=${addOne}>${C('ucAdd')}<//>` : null}>
+    <${ConfirmUI} />
+    <${Stack}>
       ${list.length === 0 ? empty : filled}
-      ${list.length > 0 || dirty ? html`
-        <div class="adm-cmp-save">
-          <button type="button" class="og-slab" disabled=${!dirty || saving} onClick=${() => onSave(list)}>${saving ? C('saving') : C('save')}</button>
-          ${dirty ? html`<button type="button" class="og-door og-door--quiet" onClick=${() => { setDraft(null); setOpenId(null); }}>${C('discard')}</button>` : null}
-          <span class="adm-cmp-mono">${C('saveNote')}</span>
-        </div>` : null}
-    </section>`;
+      ${list.length > 0 || dirty ? html`<${Stack} direction="wrap" align="center">
+        <${Action} kind="primary" disabled=${!dirty || saving} onClick=${() => onSave(list)}>${saving ? C('saving') : C('save')}<//>
+        ${dirty ? html`<${Action} onClick=${() => { setDraft(null); setOpenId(null); }}>${C('discard')}<//>` : null}
+        <${Text} kind="mono" tone="muted">${C('saveNote')}<//>
+      <//>` : null}
+    <//>
+  <//>`;
 }
 
 /** What a question's answers imply, as chips beside it. */
 function impliesChips(q) {
   const s = impliesSummary(q);
-  if (s.length === 0) return html`<span class="og-chip adm-cmp-chip--dim">${C('qs.impliesNone')}</span>`;
+  if (s.length === 0) return html`<${Chip} tone="muted">${C('qs.impliesNone')}<//>`;
   return s.map(({ answer, cls }) => html`
-    <span key=${answer + cls} class="og-chip adm-cmp-chip--${TONE[cls] || 'dim'}">
+    <${Chip} key=${answer + cls} tone=${TONE[cls] || 'muted'}>
       ${answer === 'choice' ? C('qs.impliesChoice', { cls: classWord(cls) }) : C('qs.implies', { answer: answer === 'yes' ? C('yes') : C('no'), cls: classWord(cls) })}
-    </span>`);
+    <//>`);
 }
 
 export function QuestionnaireSection({ questionnaire }) {
   if (!questionnaire) return null;
   const qs = questionnaire.questions || [];
   const half = Math.ceil(qs.length / 2);
-  const col = (items) => items.map((q, i) => html`
-    <div class="adm-cmp-limit ${i === items.length - 1 ? 'adm-cmp-limit--last' : ''}" key=${q.id}>
-      <i>${q.id}</i>
-      <span>${q.text} ${impliesChips(q)}</span>
-    </div>`);
-  return html`
-    <section class="og-sec adm-cmp-no-print" id="adm-cmp-05">
-      <div class="og-sec-h"><h2 class="poster-section-title">${C('qsTitle')}<small>05</small></h2>
-        <div class="og-doors"><span class="adm-cmp-mono">${C('qsVersion', { v: questionnaire.version || '' })}</span></div></div>
-      <p class="adm-cmp-lead">${C('qsNote')}</p>
-      <div class="adm-two">
-        <div>${col(qs.slice(0, half))}</div>
-        <div>${col(qs.slice(half))}</div>
-      </div>
-    </section>`;
+  const col = (items) => html`<div>${items.map((q) => html`<${ListRow} key=${q.id} density="compact"
+    name=${html`<${Text} kind="mono" tone="coral">${q.id}<//>`} detail=${q.text} detailKind="text">
+    <${Stack} direction="wrap" align="center" density="compact">${impliesChips(q)}<//>
+  <//>`)}</div>`;
+  return html`<${Section} id="adm-cmp-05" title=${C('qsTitle')} count="05" description=${C('qsNote')}
+    actions=${html`<${Text} kind="mono" tone="muted">${C('qsVersion', { v: questionnaire.version || '' })}<//>`}>
+    <${Columns} layout="equal" collapse=${900}>
+      ${col(qs.slice(0, half))}
+      ${col(qs.slice(half))}
+    <//>
+  <//>`;
 }

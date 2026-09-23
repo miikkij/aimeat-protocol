@@ -9,9 +9,13 @@
  * @structure costOnOpen · costSectionInner
  * @usage import { costSectionInner, costOnOpen } from './cost.js'
  * @version-history
+ *   v1.1.0 — 2026-09-22 — Drawn from the shared set (parts-html.js): the section returns its own
+ *     section() for the slot detail.js draws, each contract is a list row with its state as a chip
+ *     and price, rake and budget as labelled columns, and the inline styles are gone.
  *   v1.0.0 — 2026-07-20 — Initial per-app cost & contracts surface (EXCHANGE G3).
  */
 import { escapeHtml } from './util.js';
+import { section, listRow, chip, columns, stack, text } from './parts-html.js';
 import { loadConfig } from './config.js';
 import { t } from './i18n.js';
 import { getCortexOwnerToken } from './cortex.js';
@@ -51,50 +55,50 @@ export function costOnOpen(owner, appId, isOwn) {
     .catch(function () { cState = 'error'; cData = null; rerender(); });
 }
 
-function stateBadge(state) {
-  // Reuse the sync-chip colours: ok (active), diff (paused), none (revoked/exhausted).
-  var cls = state === 'active' ? 'ok' : (state === 'paused' ? 'diff' : 'none');
-  return '<span class="dtl-sync ' + cls + '" style="margin:0">' + escapeHtml(state) + '</span>';
+function stateChip(state) {
+  // Active reads as fine, paused as the one to see, revoked or exhausted as done.
+  return chip(escapeHtml(state), state === 'active' ? 'success' : (state === 'paused' ? 'sun' : 'muted'));
 }
 
 function contractRow(c) {
   var b = c.budget || {};
   var cap = (b.cap_units === null || b.cap_units === undefined) ? t('cost.uncapped') : (b.spent_units + ' / ' + b.cap_units);
   var remaining = (b.remaining_units === null || b.remaining_units === undefined) ? ''
-    : ' <span class="dtl-stat-label">(' + t('cost.remaining').replace('{n}', b.remaining_units) + ')</span>';
+    : ' (' + t('cost.remaining').replace('{n}', b.remaining_units) + ')';
   var providerShort = String(c.provider || '').split('@')[0];
-  return '<div class="dtl-status-row" style="align-items:center;gap:10px;flex-wrap:wrap">' +
-      '<div class="dtl-stat" style="flex:1;min-width:150px">' +
-        '<span class="dtl-stat-val">' + escapeHtml(c.capability || '') + '</span>' +
-        '<span class="dtl-stat-label">' + escapeHtml(t('cost.providerCol')) + ': ' + escapeHtml(providerShort) + '</span>' +
-      '</div>' +
-      '<div class="dtl-stat"><span class="dtl-stat-label">' + t('cost.priceCol') + '</span><span class="dtl-stat-val">' + escapeHtml(String(c.price_per_call)) + ' morsels</span></div>' +
-      '<div class="dtl-stat"><span class="dtl-stat-label">' + t('cost.rakeCol') + '</span><span class="dtl-stat-val">' + escapeHtml(String(c.rake_per_call)) + ' morsels (' + escapeHtml(String(c.rake_percent)) + '%)</span></div>' +
-      '<div class="dtl-stat"><span class="dtl-stat-label">' + t('cost.budgetCol') + '</span><span class="dtl-stat-val">' + escapeHtml(cap) + remaining + '</span></div>' +
-      '<div class="dtl-stat">' + stateBadge(c.state) + '</div>' +
-    '</div>';
+  return listRow({
+    name: escapeHtml(c.capability || ''),
+    detail: escapeHtml(t('cost.providerCol')) + ': ' + escapeHtml(providerShort),
+    value: stateChip(c.state),
+    body: columns({ layout: 'thirds', density: 'compact', collapse: 560 },
+      stack({ density: 'compact' }, text({ kind: 'label' }, t('cost.priceCol')) + text({ kind: 'body' }, escapeHtml(String(c.price_per_call)) + ' morsels')) +
+      stack({ density: 'compact' }, text({ kind: 'label' }, t('cost.rakeCol')) + text({ kind: 'body' }, escapeHtml(String(c.rake_per_call)) + ' morsels (' + escapeHtml(String(c.rake_percent)) + '%)')) +
+      stack({ density: 'compact' }, text({ kind: 'label' }, t('cost.budgetCol')) + text({ kind: 'body' }, escapeHtml(cap) + escapeHtml(remaining)))),
+  });
 }
 
-/** Inner HTML of the section — detail.js wraps it in <div class="dtl-section" id="detail-cost">. */
+/**
+ * The whole section — detail.js draws the slot (<div id="detail-cost" data-dtl-section>) and this
+ * fills it, at the first render and again in place after the load.
+ */
 export function costSectionInner() {
   if (cState === 'off') return '';
-  var html = '<h3>' + t('cost.title') + '</h3>' +
-    '<p class="dtl-desc">' + t('cost.hint') + '</p>';
+  var body;
   if (cState === 'loading') {
-    return html + '<span style="color:var(--text-muted);font-size:.85rem">…</span>';
-  }
-  if (cState === 'error') {
+    body = text({ kind: 'caption', tone: 'muted' }, '…');
+  } else if (cState === 'error') {
     var msg = (cData && cData._needLogin) ? t('cost.needLogin') : t('cost.loadFailed');
-    return html + '<span class="dtl-sync none">' + escapeHtml(msg) + '</span>';
+    body = text({ kind: 'caption', tone: 'danger' }, escapeHtml(msg));
+  } else {
+    var contracts = (cData && cData.contracts) || [];
+    if (!contracts.length) {
+      body = text({ kind: 'caption', tone: 'muted' }, t('cost.empty'));
+    } else {
+      var m = (cData.totals && cData.totals.morsels) || { spent_units: 0, calls: 0 };
+      body = text({ kind: 'body', tone: 'success' },
+        t('cost.summary').replace('{n}', cData.total_contracts).replace('{spent}', m.spent_units).replace('{calls}', m.calls));
+      for (var i = 0; i < contracts.length; i++) body += contractRow(contracts[i]);
+    }
   }
-  var contracts = (cData && cData.contracts) || [];
-  if (!contracts.length) {
-    return html + '<span class="dtl-sync none">' + t('cost.empty') + '</span>';
-  }
-  var m = (cData.totals && cData.totals.morsels) || { spent_units: 0, calls: 0 };
-  html += '<div class="dtl-sync ok" style="margin:0 0 10px">' +
-    t('cost.summary').replace('{n}', cData.total_contracts).replace('{spent}', m.spent_units).replace('{calls}', m.calls) +
-    '</div>';
-  for (var i = 0; i < contracts.length; i++) html += contractRow(contracts[i]);
-  return html;
+  return section({ title: t('cost.title'), description: t('cost.hint'), body: body });
 }

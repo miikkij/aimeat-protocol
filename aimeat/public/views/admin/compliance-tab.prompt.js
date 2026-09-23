@@ -24,6 +24,8 @@
  *   - CompliancePromptSection — section 07, the paste in the dashed box with a door that copies it
  * @usage imported by compliance-tab.js, rendered beside the kept reports
  * @version-history
+ *   v1.3.0 -- 2026-09-22 -- The section is composed from the shared component set: the shared
+ *     copy action on the section row and the paste in the shared aside. The paste is unchanged.
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v1.2.0 — 2026-09-13 — Compose section headings from the shared poster B1 shape.
  *   v1.1.0 — 2026-09-05 — The section in the poster face: the whole paste sits in the dashed coral
@@ -36,7 +38,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { getNodeUrl } from '/js/services/auth.js';
-import { CopyButton } from '/components/CopyButton.js';
+import { Section, Stack, CopyAction, Surface, Text } from '/components/poster-parts.js';
 
 /**
  * The paste.
@@ -99,15 +101,11 @@ A write replaces the whole register, so send every entry you want kept. Afterwar
  */
 export function CompliancePromptSection({ nodeId, days }) {
   const prompt = buildCompliancePrompt({ nodeId, days });
-  return html`
-    <section class="og-sec adm-cmp-no-print" id="adm-cmp-07">
-      <div class="og-sec-h"><h2 class="poster-section-title">${t('admin.compliance.promptTitle')}<small>07</small></h2>
-        <div class="og-doors"><${CopyButton} text=${prompt} label=${t('admin.compliance.promptCopy')} className="og-door og-door--quiet" /></div></div>
-      <p class="adm-cmp-lead">${t('admin.compliance.promptNote')}</p>
-      <div class="og-box poster-aside poster-aside--small">
-        <span class="og-box-label">${t('admin.compliance.promptLabel')}</span>
-        <div class="adm-cmp-paste">${prompt}</div>
-      </div>
-    </section>
-  `;
+  return html`<${Section} id="adm-cmp-07" title=${t('admin.compliance.promptTitle')} count="07" description=${t('admin.compliance.promptNote')}
+    actions=${html`<${CopyAction} text=${prompt} label=${t('admin.compliance.promptCopy')} />`}>
+    <${Surface} kind="aside"><${Stack} density="compact">
+      <${Text} kind="label">${t('admin.compliance.promptLabel')}<//>
+      <${Text} lines>${prompt}<//>
+    <//><//>
+  <//>`;
 }

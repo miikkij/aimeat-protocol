@@ -15,10 +15,15 @@
  *   person, and the note it returns is what the person is told.
  * @usage import { marksOnOpen, marksSectionInner, marksToggle, marksDeclare, marksWithdraw } from './marks.js';
  * @version-history
+ *   v1.1.0 — 2026-09-22 — Composed from the shared set (parts-html.js): this module draws the whole
+ *     section; the two switches are list rows with a switch word, the reviewer field is the set's
+ *     field, the record note the set's aside, what the node sees key-value rows, and the log a
+ *     timeline of list rows.
  *   v1.0.0 — 2026-08-29 — Initial.
  */
 import { escapeHtml } from './util.js';
-import { dtlBtn, showNotice } from './ui.js';
+import { showNotice } from './ui.js';
+import { section, listRow, action, keyValue, stack, surface, text, field } from './parts-html.js';
 import { loadConfig } from './config.js';
 import { t } from './i18n.js';
 import { getCortexOwnerToken } from './cortex.js';
@@ -129,16 +134,21 @@ function patch(body) {
     });
 }
 
+/** One of the two switches: the mark's name, what it means now, and the switch word. */
 function switchRow(key, on) {
-  return '<div class="mk-row">'
-    + '<div class="mk-row-name">' + escapeHtml(t('marks.' + key)) + '</div>'
-    + '<div class="mk-row-meaning">' + escapeHtml(t(on ? 'marks.' + key + 'On' : 'marks.' + key + 'Off')) + '</div>'
-    + '<div class="mk-row-action">'
-    + dtlBtn(t(on ? 'marks.turnOff' : 'marks.turnOn'), 'window._launcher.marksToggle(\'' + key + '\')', { disabled: mkBusy })
-    + '</div></div>';
+  return listRow({
+    name: escapeHtml(t('marks.' + key)),
+    detail: escapeHtml(t(on ? 'marks.' + key + 'On' : 'marks.' + key + 'Off')),
+    detailKind: 'text',
+    actions: action({ kind: 'secondary', semantics: 'switch', selected: on, disabled: mkBusy, onclick: 'window._launcher.marksToggle(\'' + key + '\')' },
+      escapeHtml(t(on ? 'marks.turnOff' : 'marks.turnOn'))),
+  });
 }
 
 function yesNo(v) { return t(v ? 'marks.yes' : 'marks.no'); }
+
+function subHead(key) { return text({ kind: 'label' }, escapeHtml(t(key))); }
+function quiet(key) { return text({ kind: 'caption', tone: 'muted' }, escapeHtml(t(key))); }
 
 function seesHtml(d) {
   var p = d.posture;
@@ -149,54 +159,55 @@ function seesHtml(d) {
   rows.push([t('marks.seesDiscloses'), yesNo(!!(p && (p.discloses || p.disclosureCallFound)))]);
   rows.push([t('marks.seesAgents'), String(d.agents)]);
   rows.push([t('marks.seesCortex'), d.cortex.length ? d.cortex.join(', ') : t('marks.no')]);
-  var html = '<h4>' + escapeHtml(t('marks.seesTitle')) + '</h4><dl class="mk-sees">';
-  for (var i = 0; i < rows.length; i++) {
-    html += '<dt>' + escapeHtml(rows[i][0]) + '</dt><dd>' + escapeHtml(rows[i][1]) + '</dd>';
-  }
-  return html + '</dl>';
+  var html = '';
+  for (var i = 0; i < rows.length; i++) html += keyValue(escapeHtml(rows[i][0]), escapeHtml(rows[i][1]));
+  return stack({ density: 'compact' }, subHead('marks.seesTitle') + '<div>' + html + '</div>');
 }
 
 function logHtml(log) {
-  var html = '<h4>' + escapeHtml(t('marks.logTitle')) + '</h4>';
-  if (!log.length) return html + '<p class="dtl-ai-status">' + escapeHtml(t('marks.logEmpty')) + '</p>';
-  html += '<ol class="mk-log">';
+  if (!log.length) return stack({ density: 'compact' }, subHead('marks.logTitle') + quiet('marks.logEmpty'));
+  var html = '';
   for (var i = log.length - 1; i >= 0; i--) {
     var e = log[i];
-    html += '<li><span class="mk-log-when">' + escapeHtml(fmtDate(e.at)) + '</span> '
-      + '<span class="mk-log-action">' + escapeHtml(t(e.action === 'cleared' ? 'marks.logCleared' : 'marks.logDeclared')) + '</span> '
-      + '<span class="mk-log-name">' + escapeHtml(e.name) + '</span> '
-      + '<span class="mk-log-by">' + escapeHtml(fill(t('marks.by'), { by: e.by })) + '</span></li>';
+    html += listRow({
+      density: 'compact',
+      time: escapeHtml(fmtDate(e.at)),
+      name: escapeHtml(t(e.action === 'cleared' ? 'marks.logCleared' : 'marks.logDeclared')) + ' ' + escapeHtml(e.name),
+      detail: escapeHtml(fill(t('marks.by'), { by: e.by })),
+    });
   }
-  return html + '</ol>';
+  return stack({ density: 'compact' }, subHead('marks.logTitle') + '<div>' + html + '</div>');
 }
 
+/** The whole section; detail.js holds its slot (#detail-marks) and this fills it. */
 export function marksSectionInner() {
   if (mkState === 'off') return '';
-  var head = '<h3>' + escapeHtml(t('marks.title')) + '</h3>';
-  if (mkState === 'loading') return head + '<p class="dtl-ai-status">' + escapeHtml(t('marks.loading')) + '</p>';
-  if (mkState === 'error' || !mkData) return head + '<p class="dtl-ai-status">' + escapeHtml(t('marks.loadFailed')) + '</p>';
+  var wrap = function (description, body) {
+    return section({ title: escapeHtml(t('marks.title')), description: description, body: stack({ density: 'roomy' }, body) });
+  };
+  if (mkState === 'loading') return wrap('', quiet('marks.loading'));
+  if (mkState === 'error' || !mkData) return wrap('', quiet('marks.loadFailed'));
 
   var d = mkData;
-  var html = head + '<p class="dtl-ai-status">' + escapeHtml(t('marks.intro')) + '</p>'
-    + '<div class="mk-rows">' + switchRow('badge', d.marks.badge) + switchRow('install', d.marks.install) + '</div>';
+  var html = '<div>' + switchRow('badge', d.marks.badge) + switchRow('install', d.marks.install) + '</div>';
 
-  html += '<h4>' + escapeHtml(t('marks.authorTitle')) + '</h4>';
+  var author;
   if (d.authorship) {
-    html += '<p class="mk-author-is">' + escapeHtml(fill(t('marks.authorIs'), { name: d.authorship.name, when: fmtDate(d.authorship.declaredAt) })) + '</p>'
-      + '<div class="dtl-btn-row">' + dtlBtn(t('marks.withdraw'), 'window._launcher.marksWithdraw()', { disabled: mkBusy }) + '</div>';
+    author = text({ kind: 'body' }, escapeHtml(fill(t('marks.authorIs'), { name: d.authorship.name, when: fmtDate(d.authorship.declaredAt) })))
+      + stack({ direction: 'horizontal', align: 'start' },
+        action({ kind: 'secondary', disabled: mkBusy, onclick: 'window._launcher.marksWithdraw()' }, escapeHtml(t('marks.withdraw'))));
   } else {
-    html += '<p class="dtl-ai-status">' + escapeHtml(t('marks.authorNone')) + '</p>'
-      + '<div class="mk-author-form">'
-      + '<label class="mz-label" for="mk-author">' + escapeHtml(t('marks.authorLabel')) + '</label>'
-      + '<input id="mk-author" type="text" class="modal-input" maxlength="120" placeholder="' + escapeHtml(t('marks.authorPh')) + '">'
-      + '<div class="dtl-btn-row">' + dtlBtn(t('marks.declare'), 'window._launcher.marksDeclare()', { variant: 'primary', disabled: mkBusy }) + '</div>'
-      + '</div>';
+    author = quiet('marks.authorNone')
+      + field({ id: 'mk-author', label: escapeHtml(t('marks.authorLabel')), maxLength: 120, placeholder: t('marks.authorPh') })
+      + stack({ direction: 'horizontal', align: 'start' },
+        action({ kind: 'primary', disabled: mkBusy, onclick: 'window._launcher.marksDeclare()' }, escapeHtml(t('marks.declare'))));
   }
-  html += '<div class="mk-aside">' + escapeHtml(t('marks.audited')) + '</div>'
-    + '<p class="mk-legal">' + escapeHtml(t('marks.legal')) + ' '
-    + '<a class="mk-legal-link" href="' + LAW_URL + '" target="_blank" rel="noopener">' + escapeHtml(t('marks.legalLink')) + ' →</a></p>';
+  html += stack({}, subHead('marks.authorTitle') + author
+    + surface({ kind: 'aside' }, text({ kind: 'body' }, escapeHtml(t('marks.audited'))))
+    + text({ kind: 'caption', tone: 'muted' }, escapeHtml(t('marks.legal')) + ' '
+      + action({ kind: 'secondary', href: LAW_URL, target: '_blank' }, escapeHtml(t('marks.legalLink')) + ' →')));
 
   html += seesHtml(d);
   html += logHtml(d.log);
-  return html;
+  return wrap(escapeHtml(t('marks.intro')), html);
 }

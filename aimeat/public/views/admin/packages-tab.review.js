@@ -11,6 +11,8 @@
  *   - sinceWords(iso) — "2 days", "5 hours", in the operator's language
  *
  * @version-history
+ *   v2.0.0 -- 2026-09-22 -- Composed from the shared component set: the queue and the decisions as list
+ *     rows (a waiting one opens in place), the panel as a shared box of key-value rows and fields.
  *   v1.0.0 — 2026-09-12 — Initial, from the moderation sub-tab's three cards. The queue and the
  *     history are one section now, the panel is the poster's 2px box, and the review actions read
  *     as one loud Approve with a reason field beside it instead of two competing buttons.
@@ -21,6 +23,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { when, Badge, Spinner } from './shared.js';
+import { Stack, ListRow, KeyValue, Field, Action, Surface, Text } from '/components/poster-parts.js';
 import { reviewTemplate, approveTemplate, rejectTemplate } from '/js/services/admin.js';
 import { swallowed } from '/js/swallowed.js';
 
@@ -91,37 +94,32 @@ function Panel({ item, onDone }) {
     setActing(false);
   }
 
-  if (loading) return html`<div class="adm-pk-panel"><${Spinner} text=${t('dashboard.loading')} /></div>`;
+  if (loading) return html`<${Spinner} text=${t('dashboard.loading')} />`;
 
   const d = detail || item;
   const chips = partChips(d.components || d.manifest?.components);
 
-  return html`
-    <div class="adm-pk-panel">
-      <div class="adm-pk-kv">
-        <div><span>${P('colPackage')}</span><em>${d.packageGroupId || d.packageName || '–'}</em></div>
-        <div><span>${P('colVersion')}</span><em>${d.version || '–'}</em></div>
-        <div><span>${P('colCategory')}</span><em>${d.category || '–'}</em></div>
-        <div><span>${P('colBy')}</span><em>${d.author || '–'}</em></div>
-        <div><span>${P('colWaiting')}</span><em>${when(d.proposedAt || d.createdAt)}</em></div>
-        <div><span>${P('colInside')}</span><em>${chips.length ? chips.join(', ') : '–'}</em></div>
+  return html`<${Surface} kind="box">
+    <${Stack}>
+      <div>
+        <${KeyValue} label=${P('colPackage')} value=${d.packageGroupId || d.packageName || '–'} mono=${true} />
+        <${KeyValue} label=${P('colVersion')} value=${d.version || '–'} mono=${true} />
+        <${KeyValue} label=${P('colCategory')} value=${d.category || '–'} mono=${true} />
+        <${KeyValue} label=${P('colBy')} value=${d.author || '–'} mono=${true} />
+        <${KeyValue} label=${P('colWaiting')} value=${when(d.proposedAt || d.createdAt)} mono=${true} />
+        <${KeyValue} label=${P('colInside')} value=${chips.length ? chips.join(', ') : '–'} mono=${true} />
       </div>
-      ${d.description ? html`<p class="adm-pk-paneldesc">${d.description}</p>` : null}
-      <div class="adm-pk-fld">
-        <div class="adm-pk-fldl">${P('noteLabel')}</div>
-        <input type="text" value=${note} onInput=${(e) => setNote(e.target.value)} placeholder=${P('notePlaceholder')} />
-      </div>
-      <div class="adm-pk-fld">
-        <div class="adm-pk-fldl">${P('reasonLabel')}</div>
-        <input type="text" value=${reason} onInput=${(e) => setReason(e.target.value)} placeholder=${P('reasonPlaceholder')} />
-      </div>
-      <div class="adm-pk-acts">
-        <button class="adm-btn" disabled=${acting} onClick=${approve}>${P('approveBtn')}</button>
-        <button type="button" class="og-door og-door--quiet og-door--danger" disabled=${acting} onClick=${reject}>${P('rejectBtn')}</button>
-      </div>
-      ${said && html`<p class="adm-pk-said ${said.ok ? 'is-ok' : 'is-bad'}">${said.msg}</p>`}
-      <p class="adm-pk-note">${P('verdictNote')}</p>
-    </div>`;
+      ${d.description ? html`<${Text}>${d.description}<//>` : null}
+      <${Field} label=${P('noteLabel')} value=${note} onInput=${(e) => setNote(e.target.value)} placeholder=${P('notePlaceholder')} />
+      <${Field} label=${P('reasonLabel')} value=${reason} onInput=${(e) => setReason(e.target.value)} placeholder=${P('reasonPlaceholder')} />
+      <${Stack} direction="wrap" align="center">
+        <${Action} kind="primary" disabled=${acting} onClick=${approve}>${P('approveBtn')}<//>
+        <${Action} tone="danger" disabled=${acting} onClick=${reject}>${P('rejectBtn')}<//>
+      <//>
+      ${said && html`<${Text} tone=${said.ok ? 'success' : 'danger'}>${said.msg}<//>`}
+      <${Text} kind="caption" tone="muted">${P('verdictNote')}<//>
+    <//>
+  <//>`;
 }
 
 export function ReviewBoard({ pending, history, onReload }) {
@@ -129,37 +127,30 @@ export function ReviewBoard({ pending, history, onReload }) {
   const waiting = pending || [];
   const decided = history || [];
 
-  return html`
-    <div>
-      ${!waiting.length
-    ? html`<p class="adm-pk-quiet">${P('nothingWaiting')}</p>`
-    : html`
-      <p class="adm-pk-lead">${P('reviewLead')}</p>
-      <div class="adm-pk-qhead">
-        <span>${P('colListing')}</span><span>${P('colPackage')}</span><span>${P('colBy')}</span><span>${P('colWaitingFor')}</span><span></span>
-      </div>
-      ${waiting.map((item) => html`
-        <div key=${item.id}>
-          <button type="button" class="adm-pk-qrow ${openId === item.id ? 'is-open' : ''}"
-            onClick=${() => setOpenId(openId === item.id ? null : item.id)}>
-            <span><b>${item.name || item.title || '–'}</b></span>
-            <span class="adm-pk-mono" data-l=${P('colPackage')}>${item.packageGroupId || item.packageName || '–'}</span>
-            <span class="adm-pk-mono" data-l=${P('colBy')}>${item.author || '–'}</span>
-            <span class="adm-pk-mono" data-l=${P('colWaitingFor')}>${sinceWords(item.proposedAt || item.createdAt)}</span>
-            <span class="adm-pk-caret">${openId === item.id ? '↑' : '↓'}</span>
-          </button>
-          ${openId === item.id && html`<${Panel} item=${item} onDone=${() => { setOpenId(null); onReload(); }} />`}
-        </div>`)}`}
+  return html`<${Stack}>
+    ${!waiting.length
+      ? html`<${Text} tone="muted">${P('nothingWaiting')}<//>`
+      : html`
+        <${Text} kind="lead">${P('reviewLead')}<//>
+        <div>
+          ${waiting.map((item) => {
+            const isOpen = openId === item.id;
+            const toggle = () => setOpenId(isOpen ? null : item.id);
+            return html`<${ListRow} key=${item.id} name=${item.name || item.title || '–'} onOpen=${toggle} open=${isOpen} arrow=${true}
+              detail=${`${item.packageGroupId || item.packageName || '–'} · ${item.author || '–'}`}
+              value=${html`<${Text} kind="mono">${sinceWords(item.proposedAt || item.createdAt)}<//>`}>
+              ${isOpen && html`<${Panel} item=${item} onDone=${() => { setOpenId(null); onReload(); }} />`}
+            <//>`;
+          })}
+        </div>`}
 
-      ${decided.length > 0 && html`
-        <p class="adm-pk-lead" style="margin-top: 18px">${P('decidedLead')}</p>
-        ${decided.map((d, i) => html`
-          <div class="adm-pk-hrow" key=${i}>
-            <span><b>${d.templateName || d.name || '–'}</b></span>
-            <span><${Badge} type=${d.decision || d.action || 'muted'} /></span>
-            <span class="adm-pk-mono" data-l=${P('colReason')}>${d.reason || d.comment || '–'}</span>
-            <span class="adm-pk-mono" data-l=${P('colWhen')}>${when(d.reviewedAt || d.date)}</span>
-          </div>`)}
-        <p class="adm-pk-note">${P('decidedNote')}</p>`}
-    </div>`;
+    ${decided.length > 0 && html`
+      <${Text} kind="lead">${P('decidedLead')}<//>
+      <div>
+        ${decided.map((d, i) => html`<${ListRow} key=${i} density="compact" name=${d.templateName || d.name || '–'}
+          detail=${`${d.reason || d.comment || '–'} · ${when(d.reviewedAt || d.date)}`}
+          value=${html`<${Badge} type=${d.decision || d.action || 'muted'} />`} />`)}
+      </div>
+      <${Text} kind="caption" tone="muted">${P('decidedNote')}<//>`}
+  <//>`;
 }

@@ -12,6 +12,14 @@
  * @structure ListPanel · rowIds
  * @usage <ListPanel requests conversations activeConv peerDisplay accept block openConversation openFolds toggleFold org />
  * @version-history
+ *   v2.1.0 -- 2026-09-22 -- The last line is clamped to one line and a row's archive menu shows on
+ *     hover or focus, so a row is as dense as the old mail list's; on a phone (`narrow`) the menu
+ *     sits beside the time, where it does not add a line to the row.
+ *   v2.0.0 -- 2026-09-22 -- Composed from the shared set and kept dense: one compact ListRow per
+ *     conversation (avatar, name, subject and the last line clamped, the time at the right), the
+ *     section and group headings small folds with a count chip, not section slabs; a row's and a
+ *     group's archive sit in their Menu instead of a framed button on every row. The selection,
+ *     the folds and every handler are unchanged.
  *   v1.0.0 — 2026-09-13 — Moved out of panels.js and rebuilt around sections, closable groups, the
  *     archive and selection. The person group, the row and the broadcast fold are the ones panels.js
  *     had, with the fold generalised to the subject and rule folds.
@@ -20,8 +28,8 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { escHtml } from '/js/utils.js';
 import { PresenceDot } from '/components/PresenceDot.js';
+import { Fold, ListRow, Action, Menu, Chip, CheckItem, Stack, Surface, Text } from '/components/poster-parts.js';
 import { Avatar } from './components.js';
 import { peerName, isAgentPeer, subThreadLabel, groupConversations, stampShort, stampFull } from './helpers.js';
 
@@ -32,14 +40,10 @@ export function rowIds(c) {
   return [c.conversationId, ...(c.folded || []).map(f => f.conversationId)];
 }
 
-const Chevron = ({ open }) => html`<svg class=${`inbox-chev${open ? ' is-open' : ''}`} viewBox="0 0 10 10" width="10" height="10" aria-hidden="true">
-  <path d="M3.2 1.6 6.6 5 3.2 8.4" fill="none" stroke="currentColor" stroke-width="1.8" /></svg>`;
-/** A box with the lid on (archive) or an arrow leaving it (restore). */
-const BoxIcon = ({ restore }) => html`<svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6">
-  <rect x="1.8" y="2.2" width="12.4" height="3.4" /><path d="M3 5.6v8.2h10V5.6" />
-  ${restore ? html`<path d="M8 12V7.6M5.9 9.5 8 7.4l2.1 2.1" />` : html`<path d="M6.2 8.4h3.6" />`}</svg>`;
+/** Rows side by side with no gap of their own: each row carries its own hairline. */
+const Rows = ({ children }) => html`<${Surface} kind="plain" density="flush">${children}<//>`;
 
-export function ListPanel({ requests, conversations, activeConv, peerDisplay, accept, block, openConversation, openFolds = {}, toggleFold, org }) {
+export function ListPanel({ requests, conversations, activeConv, peerDisplay, accept, block, openConversation, openFolds = {}, toggleFold, org, narrow = false }) {
   const selecting = !!org?.selecting;
   const selected = org?.selected || new Set();
   const isSelected = (c) => rowIds(c).every(id => selected.has(id));
@@ -61,8 +65,8 @@ export function ListPanel({ requests, conversations, activeConv, peerDisplay, ac
 
   /** One conversation row. `nested` = inside a person or agent group; `labelPeer` = inside an opened fold. */
   const convRow = (c, nested, labelPeer) => {
-    const active = !selecting && activeConv?.conversationId === c.conversationId ? ' inbox-conv--active' : '';
-    const picked = selecting && isSelected(c) ? ' inbox-conv--selected' : '';
+    const active = !selecting && activeConv?.conversationId === c.conversationId;
+    const picked = selecting && isSelected(c);
     const sub = subThreadLabel(c.peerGhii);
     // An agent-owned conversation the owner aggregates (a DM the agent sent from its own inbox) — labelled
     // "via <agent>" and read-only. The `viaAgent` tag comes from the conversation list aggregation.
@@ -78,38 +82,30 @@ export function ListPanel({ requests, conversations, activeConv, peerDisplay, ac
     // A nested row's mark is a word, not an emoji: an agent thread, a subject thread, or the direct one.
     const icon = (via || sub) ? t('inbox.cover.markAgent') || 'ag' : (c.subject ? '#' : '·');
     const onClick = () => (selecting ? org.toggleSelected(rowIds(c)) : openConversation(c));
-    const button = html`
-      <button type="button" class=${`inbox-conv${active}${picked}${nested ? ' inbox-conv--nested' : ''}`} key=${c.conversationId}
-        aria-pressed=${selecting ? (isSelected(c) ? 'true' : 'false') : undefined} onClick=${onClick}>
-        ${selecting ? html`<span class="inbox-conv-check" aria-hidden="true">${isSelected(c) ? '✓' : ''}</span>` : null}
-        ${nested ? html`<span class="inbox-conv-subico">${icon}</span>` : html`<${Avatar} seed=${labelPeer ? foldedWho(c) : whoOf(c)} size=${40} />`}
-        <div class="inbox-conv-main">
-          <div class="inbox-conv-line1">
-            <span class="inbox-name">${escHtml(label)} ${(!c.groupAlias && (!nested || c.peerGhii?.includes('#'))) ? html`<${PresenceDot} ghii=${c.peerGhii} />` : ''}</span>
-            ${!nested && via ? html`<span class="inbox-via-chip">${t('inbox.viaAgent')} ${escHtml(via)}</span>` : ''}
-            ${c.broadcastCount ? html`<span class="inbox-via-chip">${t('inbox.broadcastRecipients', { count: String(c.broadcastCount) })}</span>` : ''}
-            ${c.fold ? html`<span class="inbox-via-chip">${t('inbox.org.foldCount', { count: String(c.fold.count) })}</span>` : ''}
-            <span class="inbox-conv-time" title=${c.updatedAt ? stampFull(c.updatedAt) : ''}>${c.updatedAt ? stampShort(c.updatedAt) : ''}</span>
-          </div>
-          <div class="inbox-conv-line2">
-            ${(!nested && c.subject) ? html`<span class="inbox-conv-subject">${escHtml(c.subject)}</span>` : ''}
-            <span class="inbox-conv-preview">${byAgent ? `${t('inbox.viaAgent')} ${byAgent}: ` : (c.lastDirection === 'outbound' ? `${t('inbox.youPrefix')} ` : '')}${escHtml(c.lastMessage || '')}</span>
-            ${c.unread > 0 ? html`<span class="inbox-conv-badge">${c.unread}</span>` : null}
-          </div>
-          ${c.archived && !labelPeer ? html`<div class="inbox-conv-why">${whyArchived(c)}</div>` : null}
-        </div>
-      </button>`;
-    if (selecting || labelPeer) return button;
-    // The row's own archive control is a sibling of the row, never inside it: a button in a button is
-    // not a control a keyboard or a screen reader can reach.
     const back = c.section === 'archive';
     const word = back ? t('inbox.org.restoreConv') : t('inbox.org.archiveConv');
-    return html`
-      <div class="inbox-conv-wrap" key=${'w' + c.conversationId}>
-        ${button}
-        <button type="button" class="inbox-conv-act" title=${word} aria-label=${`${word}: ${label}`}
-          onClick=${() => org.archive(rowIds(c), back)}><${BoxIcon} restore=${back} /></button>
-      </div>`;
+    const mark = selecting ? html`<${CheckItem} done=${isSelected(c)} />`
+      : nested ? html`<${Text} kind="mono" tone="coral">${icon}<//>`
+      : html`<${Avatar} seed=${labelPeer ? foldedWho(c) : whoOf(c)} size=${36} />`;
+    const name = html`${label}${(!c.groupAlias && (!nested || c.peerGhii?.includes('#'))) ? html` <${PresenceDot} ghii=${c.peerGhii} />` : ''}
+      ${!nested && via ? html` <${Chip} tone="muted">${t('inbox.viaAgent')} ${via}<//>` : ''}
+      ${c.broadcastCount ? html` <${Chip} tone="muted">${t('inbox.broadcastRecipients', { count: String(c.broadcastCount) })}<//>` : ''}
+      ${c.fold ? html` <${Chip} tone="muted">${t('inbox.org.foldCount', { count: String(c.fold.count) })}<//>` : ''}
+      ${c.unread > 0 ? html` <${Chip} tone="sun">${c.unread}<//>` : null}`;
+    const detail = html`${(!nested && c.subject) ? html`<${Text} kind="mono" tone="coral">${c.subject}<//> ` : ''}${byAgent ? `${t('inbox.viaAgent')} ${byAgent}: ` : (c.lastDirection === 'outbound' ? `${t('inbox.youPrefix')} ` : '')}${c.lastMessage || ''}`;
+    const stamp = html`<span title=${c.updatedAt ? stampFull(c.updatedAt) : ''}>${c.updatedAt ? stampShort(c.updatedAt) : ''}</span>`;
+    // The row's own archive is in its menu, a control on the row (never inside the button that opens
+    // it) that shows while the row is hovered or focused, as the old archive button did. On a phone
+    // the menu is always there, and a row's actions would take a line of their own, so it sits
+    // beside the time instead.
+    const menu = selecting || labelPeer ? null
+      : html`<${Menu} label=${`${word}: ${label}`} items=${[{ label: word, onClick: () => org.archive(rowIds(c), back) }]} />`;
+    const value = narrow && menu ? html`<${Stack} direction="horizontal" align="center" density="compact">${stamp}${menu}<//>` : stamp;
+    const actions = narrow ? null : menu;
+    return html`<${ListRow} key=${c.conversationId} density="compact" preview=${true} previewLines=${1} mark=${mark}
+      name=${name} detail=${detail} value=${value} actions=${actions} actionsReveal="hover" onOpen=${onClick} selected=${active || picked}>
+      ${c.archived && !labelPeer ? html`<${Text} kind="caption" tone="muted">${whyArchived(c)}<//>` : null}
+    <//>`;
   };
 
   /**
@@ -121,44 +117,37 @@ export function ListPanel({ requests, conversations, activeConv, peerDisplay, ac
     const key = c.broadcastId ? `b:${c.broadcastId}:${c.viaAgent || ''}` : `f:${c.conversationId}`;
     const open = !!openFolds[key];
     return html`
-      <div class="inbox-conv-fold" key=${key}>
+      <${Rows} key=${key}>
         ${convRow(c, nested)}
-        ${selecting ? null : html`<button type="button" class="inbox-fold-toggle" aria-expanded=${open ? 'true' : 'false'}
-          onClick=${() => toggleFold?.(key)}>
-          ${open ? `↩ ${t('inbox.broadcastHide')}` : `→ ${t('inbox.broadcastShowAll', { count: String(c.folded.length) })}`}
-        </button>`}
+        ${selecting ? null : html`<${Action} kind="text" expanded=${open} onClick=${() => toggleFold?.(key)}>
+          ${open ? `↩ ${t('inbox.broadcastHide')}` : `→ ${t('inbox.broadcastShowAll', { count: String(c.folded.length) })}`}<//>`}
         ${open && !selecting ? c.folded.map(f => convRow(f, true, true)) : null}
-      </div>`;
+      <//>`;
   };
   const anyRow = (c, nested) => (c.folded?.length ? foldRow(c, nested) : convRow(c, nested));
 
   const unreadOf = (rows) => rows.reduce((n, c) => n + (c.unread || 0), 0);
   const countOf = (rows) => rows.reduce((n, c) => n + 1 + (c.folded?.length || 0), 0);
+  /** The count and the unread figure that follow a heading. */
+  const counts = (rows) => {
+    const unread = unreadOf(rows);
+    return html` <${Chip}>${countOf(rows)}<//>${unread > 0 ? html` <${Chip} tone="sun">${unread}<//>` : null}`;
+  };
 
   /** A person's or an agent's rows under a heading that closes. A single thread renders flat. */
   const groupBlock = (key, seed, name, rows, presenceId) => {
     const open = !org.isCollapsed(key);
-    const unread = unreadOf(rows);
     const ids = rows.flatMap(rowIds);
     const inArchive = rows[0]?.section === 'archive';
+    const word = t(inArchive ? 'inbox.org.restoreGroup' : 'inbox.org.archiveGroup', { count: String(ids.length) });
     return html`
-      <div class="inbox-conv-group" key=${key}>
-        <div class="inbox-conv-group-bar">
-          <button type="button" class="inbox-conv-group-head" aria-expanded=${open ? 'true' : 'false'} onClick=${() => org.toggleCollapsed(key)}>
-            <${Chevron} open=${open} />
-            <${Avatar} seed=${seed} size=${28} />
-            <span class="inbox-name">${escHtml(name)} ${presenceId ? html`<${PresenceDot} ghii=${presenceId} />` : null}</span>
-            <span class="inbox-sec-count">${countOf(rows)}</span>
-            ${unread > 0 ? html`<span class="inbox-conv-badge">${unread}</span>` : null}
-          </button>
-          ${selecting
-            ? html`<button type="button" class="inbox-group-act inbox-group-act--pick" onClick=${() => org.toggleSelected(ids)}>${t('inbox.org.selectAll')}</button>`
-            : html`<button type="button" class="inbox-group-act" title=${t(inArchive ? 'inbox.org.restoreGroup' : 'inbox.org.archiveGroup', { count: String(ids.length) })}
-                aria-label=${`${t(inArchive ? 'inbox.org.restoreGroup' : 'inbox.org.archiveGroup', { count: String(ids.length) })}: ${name}`}
-                onClick=${() => org.archive(ids, inArchive)}><${BoxIcon} restore=${inArchive} /></button>`}
-        </div>
-        ${open ? rows.map(c => anyRow(c, true)) : null}
-      </div>`;
+      <${Fold} key=${key} open=${open} onToggle=${() => org.toggleCollapsed(key)}
+        title=${html`<${Avatar} seed=${seed} size=${28} /> ${name}${presenceId ? html` <${PresenceDot} ghii=${presenceId} />` : null}${counts(rows)}`}
+        actions=${selecting
+          ? html`<${Action} kind="text" onClick=${() => org.toggleSelected(ids)}>${t('inbox.org.selectAll')}<//>`
+          : html`<${Menu} label=${`${word}: ${name}`} items=${[{ label: word, onClick: () => org.archive(ids, inArchive) }]} />`}>
+        <${Rows}>${rows.map(c => anyRow(c, true))}<//>
+      <//>`;
   };
 
   /** People: a person and their agents under the person, as the list has always grouped them. */
@@ -180,20 +169,16 @@ export function ListPanel({ requests, conversations, activeConv, peerDisplay, ac
       : groupBlock(`a:${agent}`, agent, peerDisplay(agent), convs, agent)));
   };
 
+  /** A section of the list: a small coral label that folds, its count, and its rows. Not a slab: the
+   *  list is a dense mail list, and a heading here names a group, it does not open a page part. */
   const section = (key, label, rows, body, closedByDefault = false) => {
     if (!rows.length) return null;
     const open = !org.isCollapsed(key, closedByDefault);
-    const unread = unreadOf(rows);
     return html`
-      <div class=${`inbox-sec inbox-sec--${key.split(':')[0]}`} key=${key}>
-        <button type="button" class="inbox-list-section inbox-sec-head" aria-expanded=${open ? 'true' : 'false'} onClick=${() => org.toggleCollapsed(key, closedByDefault)}>
-          <${Chevron} open=${open} />
-          <span class="inbox-sec-name">${label}</span>
-          <span class="inbox-sec-count">${countOf(rows)}</span>
-          ${unread > 0 ? html`<span class="inbox-conv-badge">${unread}</span>` : null}
-        </button>
-        ${open ? body(rows) : null}
-      </div>`;
+      <${Fold} key=${key} open=${open} onToggle=${() => org.toggleCollapsed(key, closedByDefault)}
+        title=${html`<${Text} kind="label">${label}<//>${counts(rows)}`}>
+        <${Rows}>${body(rows)}<//>
+      <//>`;
   };
 
   const people = [], agents = [], archive = [];
@@ -214,38 +199,33 @@ export function ListPanel({ requests, conversations, activeConv, peerDisplay, ac
   const toRestore = [...selected].filter(id => sectionOf.get(id) === 'archive');
 
   return html`
-    <div class=${`inbox-list${selecting ? ' inbox-list--selecting' : ''}`}>
+    <${Stack} density="compact">
       ${requests.length > 0 ? html`
-        <div class="inbox-list-section">${t('inbox.requests')} <span class="inbox-count">${requests.length}</span></div>
-        ${requests.map(r => html`
-          <div class="inbox-request" key=${r.contactId}>
-            <div class="inbox-request-top">
-              <${Avatar} seed=${r.contactId} size=${36} />
-              <div class="inbox-request-id">
-                <div class="inbox-name">${escHtml(peerDisplay(r.contactId))} <${PresenceDot} ghii=${r.contactId} /></div>
-                <div class="inbox-sub">${escHtml(r.contactId)}</div>
-              </div>
-            </div>
-            <div class="inbox-request-preview">${escHtml(r.preview || '')}</div>
-            <div class="inbox-request-actions">
-              <button class="btn-success btn-sm" onClick=${() => accept(r.contactId)}>${t('inbox.accept')}</button>
-              <button class="btn-outline btn-sm" onClick=${() => block(r.contactId)}>${t('inbox.block')}</button>
-            </div>
-          </div>`)}` : null}
+        <${Stack} direction="horizontal" align="center" density="compact"><${Text} kind="label">${t('inbox.requests')}<//><${Chip}>${requests.length}<//><//>
+        <${Rows}>${requests.map(r => html`
+          <${ListRow} key=${r.contactId} density="compact" mark=${html`<${Avatar} seed=${r.contactId} size=${36} />`}
+            name=${html`${peerDisplay(r.contactId)} <${PresenceDot} ghii=${r.contactId} />`} detail=${r.contactId}
+            actions=${html`
+              <${Action} kind="text" tone="success" onClick=${() => accept(r.contactId)}>${t('inbox.accept')}<//>
+              <${Action} kind="text" tone="danger" onClick=${() => block(r.contactId)}>${t('inbox.block')}<//>`}>
+            ${r.preview ? html`<${Text} kind="caption">${r.preview}<//>` : null}
+          <//>`)}<//>` : null}
 
       ${conversations.length ? html`
-        <div class="inbox-list-tools">
+        <${Stack} direction="wrap" align="center" density="compact">
           ${selecting ? html`
-            <span class="inbox-list-tools-count">${t('inbox.org.selectedCount', { count: String(selected.size) })}</span>
-            <button type="button" class="og-door" disabled=${!toArchive.length} onClick=${() => org.archive(toArchive, false, true)}>${t('inbox.org.archiveSelected', { count: String(toArchive.length) })}</button>
-            ${toRestore.length ? html`<button type="button" class="og-door" onClick=${() => org.archive(toRestore, true, true)}>${t('inbox.org.restoreSelected', { count: String(toRestore.length) })}</button>` : null}
-            <button type="button" class="og-door og-door--quiet" onClick=${() => org.endSelecting()}>${t('inbox.org.selectDone')}</button>`
-          : html`<button type="button" class="og-door og-door--quiet" onClick=${() => org.startSelecting()}>${t('inbox.org.select')}</button>`}
-        </div>` : html`<div class="inbox-empty-sm">${t('inbox.noConversations')}</div>`}
+            <${Text} kind="mono">${t('inbox.org.selectedCount', { count: String(selected.size) })}<//>
+            <${Action} disabled=${!toArchive.length} onClick=${() => org.archive(toArchive, false, true)}>${t('inbox.org.archiveSelected', { count: String(toArchive.length) })}<//>
+            ${toRestore.length ? html`<${Action} onClick=${() => org.archive(toRestore, true, true)}>${t('inbox.org.restoreSelected', { count: String(toRestore.length) })}<//>` : null}
+            <${Action} kind="text" onClick=${() => org.endSelecting()}>${t('inbox.org.selectDone')}<//>`
+          : html`<${Action} kind="text" onClick=${() => org.startSelecting()}>${t('inbox.org.select')}<//>`}
+        <//>` : html`<${Text} tone="muted">${t('inbox.noConversations')}<//>`}
 
-      ${section('people', t('inbox.org.sectionPeople'), people, peopleBody)}
-      ${section('agents', t('inbox.org.sectionAgents'), agents, agentsBody)}
-      ${[...groups.entries()].map(([name, rows]) => section(`g:${name}`, name, rows, (r) => r.map(c => anyRow(c, false))))}
-      ${section('archive', t('inbox.org.sectionArchive'), archive, (r) => r.map(c => anyRow(c, false)), true)}
-    </div>`;
+      <${Rows}>
+        ${section('people', t('inbox.org.sectionPeople'), people, peopleBody)}
+        ${section('agents', t('inbox.org.sectionAgents'), agents, agentsBody)}
+        ${[...groups.entries()].map(([name, rows]) => section(`g:${name}`, name, rows, (r) => r.map(c => anyRow(c, false))))}
+        ${section('archive', t('inbox.org.sectionArchive'), archive, (r) => r.map(c => anyRow(c, false)), true)}
+      <//>
+    <//>`;
 }

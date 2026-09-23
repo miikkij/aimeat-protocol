@@ -9,6 +9,9 @@
  * @structure MessagesTab (default) — fetches GET /v1/admin/messages/stats, re-fetches on live updates.
  * @usage Registered in admin.js NAV_GROUPS (Data group).
  * @version-history
+ *   v2.0.0 -- 2026-09-22 -- Composed from the shared set: three Sections (the counts, the target
+ *     nodes, the recent attempts), the tables the shared Table, the status words in their tone; the
+ *     error and loading states are the admin's shared ErrorBox and Spinner.
  *   v1.0.0 -- 2026-06-16 -- Initial: delivery stats + target nodes + recent attempts.
  */
 import { h } from 'preact';
@@ -19,7 +22,8 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { date as fmtDate } from '/js/format.js';
 import { escHtml } from '/js/utils.js';
-import { StatsGrid } from './shared.js';
+import { StatsGrid, DataTable, Empty, ErrorBox, Spinner } from './shared.js';
+import { Section, Text } from '/components/poster-parts.js';
 import * as api from '/js/services/admin.js';
 import { swallowed } from '/js/swallowed.js';
 
@@ -50,8 +54,8 @@ export default function MessagesTab() {
   useEffect(() => { load(); }, [load]);
   useEffect(() => onLiveUpdate(['messages', 'agent-messages'], () => load()), [load]);
 
-  if (err) return html`<div class="adm-section"><div class="adm-error">${escHtml(err)}</div></div>`;
-  if (!data) return html`<div class="adm-section">${t('common.loading') || 'Loading…'}</div>`;
+  if (err) return html`<${ErrorBox} message=${escHtml(err)} />`;
+  if (!data) return html`<${Spinner} text=${t('common.loading') || 'Loading…'} />`;
 
   const s = data.stats || { total: 0, total24h: 0, byStatus: {}, byStatus24h: {}, topTargetNodes: [] };
   const recent = data.recent || [];
@@ -66,51 +70,40 @@ export default function MessagesTab() {
     })),
   ];
 
+  const none = t('admin.messages.none') || 'No deliveries yet.';
+  const nodes = s.topTargetNodes || [];
+  const statusTone = (st) => (st === 'failed' || st === 'undeliverable') ? 'danger' : (st === 'queued' ? 'coral' : 'success');
+
   return html`
-    <div class="adm-section">
-      <div class="section-title">${t('admin.messages.title') || 'Direct messages'}</div>
-      <div class="section-desc">${t('admin.messages.desc') || 'Delivery telemetry for user-to-user messages. No message content or participant identities are shown.'}</div>
-
+    <${Section} title=${t('admin.messages.title') || 'Direct messages'}
+      description=${t('admin.messages.desc') || 'Delivery telemetry for user-to-user messages. No message content or participant identities are shown.'}>
       <${StatsGrid} items=${cards} />
+    <//>
 
-      <div class="adm-subhead">${t('admin.messages.targetNodes') || 'Top target nodes'}</div>
-      ${(s.topTargetNodes || []).length === 0
-        ? html`<div class="adm-muted">${t('admin.messages.none') || 'No deliveries yet.'}</div>`
-        : html`<table class="data-table">
-            <thead><tr>
-              <th>${t('admin.messages.node') || 'Node'}</th>
-              <th>${t('admin.messages.totalCol') || 'Total'}</th>
-              <th>${t('admin.messages.failedCol') || 'Failed'}</th>
-            </tr></thead>
-            <tbody>
-              ${s.topTargetNodes.map(n => html`<tr key=${n.nodeId}>
-                <td class="mono">${escHtml(n.nodeId)}</td>
-                <td>${n.total}</td>
-                <td class=${n.failed > 0 ? 'adm-bad' : ''}>${n.failed}</td>
-              </tr>`)}
-            </tbody>
-          </table>`}
+    <${Section} title=${t('admin.messages.targetNodes') || 'Top target nodes'} size="small">
+      ${nodes.length === 0
+        ? html`<${Empty} text=${none} />`
+        : html`<${DataTable}
+            headers=${[t('admin.messages.node') || 'Node', t('admin.messages.totalCol') || 'Total', t('admin.messages.failedCol') || 'Failed']}
+            rows=${nodes.map(n => [
+              { text: escHtml(n.nodeId), mono: true },
+              { text: n.total, align: 'end' },
+              { text: n.failed > 0 ? html`<${Text} kind="mono" tone="danger">${n.failed}<//>` : n.failed, align: 'end' },
+            ])} />`}
+    <//>
 
-      <div class="adm-subhead">${t('admin.messages.recent') || 'Recent attempts'}</div>
+    <${Section} title=${t('admin.messages.recent') || 'Recent attempts'} size="small">
       ${recent.length === 0
-        ? html`<div class="adm-muted">${t('admin.messages.none') || 'No deliveries yet.'}</div>`
-        : html`<table class="data-table">
-            <thead><tr>
-              <th>${t('admin.messages.when') || 'When'}</th>
-              <th>${t('admin.messages.origin') || 'Origin'}</th>
-              <th>${t('admin.messages.node') || 'Node'}</th>
-              <th>${t('admin.messages.statusCol') || 'Status'}</th>
-              <th>${t('admin.messages.detail') || 'Detail'}</th>
-            </tr></thead>
-            <tbody>
-              ${recent.map(r => html`<tr key=${r.id}>
-                <td>${relTime(r.createdAt)}</td>
-                <td>${escHtml(r.origin)}</td>
-                <td class="mono">${escHtml(r.targetNodeId)}</td>
-                <td class=${(r.status === 'failed' || r.status === 'undeliverable') ? 'adm-bad' : (r.status === 'queued' ? 'adm-warn' : 'adm-good')}>${escHtml(r.status)}</td>
-                <td class="mono">${escHtml([r.httpStatus ? `http ${r.httpStatus}` : '', r.errorMessage || '', `${r.latencyMs}ms`].filter(Boolean).join(' · '))}</td>
-              </tr>`)}
-            </tbody>
-          </table>`}
-    </div>`;
+        ? html`<${Empty} text=${none} />`
+        : html`<${DataTable}
+            headers=${[t('admin.messages.when') || 'When', t('admin.messages.origin') || 'Origin', t('admin.messages.node') || 'Node',
+              t('admin.messages.statusCol') || 'Status', t('admin.messages.detail') || 'Detail']}
+            rows=${recent.map(r => [
+              relTime(r.createdAt),
+              escHtml(r.origin),
+              { text: escHtml(r.targetNodeId), mono: true },
+              html`<${Text} kind="mono" tone=${statusTone(r.status)}>${escHtml(r.status)}<//>`,
+              { text: escHtml([r.httpStatus ? `http ${r.httpStatus}` : '', r.errorMessage || '', `${r.latencyMs}ms`].filter(Boolean).join(' · ')), mono: true },
+            ])} />`}
+    <//>`;
 }

@@ -26,6 +26,8 @@
  *   - WhoMaySignIn (02) — the policy, the scopes, and what this node offers
  * @usage Imported by views/admin/federation-tab.js.
  * @version-history
+ *   v2.0.0 -- 2026-09-22 -- Composed from the shared component set: sections, the metric rows, the
+ *     numeral band, the policy as boxed radio choices, scopes as tabs, open join as a switch.
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v1.1.0 — 2026-09-13 — Compose section headings from the shared poster B1 shape.
  *   v1.0.0 — 2026-09-12 — Initial (the Federation page in the poster face).
@@ -36,6 +38,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { time as fmtTime } from '/js/format.js';
 import { num, Badge, Row } from './shared.js';
+import { Section, Columns, Stack, NumeralBand, Action, Surface, Text } from '/components/poster-parts.js';
 
 const S = (key, params) => t('admin.fed.' + key, params);
 
@@ -69,137 +72,112 @@ export function WhereWeStand({ data, onGoPeers, onGoRequests }) {
       title: S('now.need_' + n.kind),
       why: S('now.needWhy_' + n.kind, { nodes: names }),
       chip: html`<${Badge} type=${n.kind === 'key' ? 'danger' : 'warning'} label=${num(n.count)} />`,
-      value: html`<button type="button" class="og-door og-door--quiet og-door--danger"
-        onClick=${n.kind === 'request' ? onGoRequests : onGoPeers}>${S('now.needDoor_' + n.kind)}</button>`,
+      value: html`<${Action} tone="danger" onClick=${n.kind === 'request' ? onGoRequests : onGoPeers}>${S('now.needDoor_' + n.kind)}<//>`,
     });
   };
 
-  return html`
-    <section class="og-sec og-sec--first" id="adm-fed-01">
-      <div class="og-sec-h">
-        <h2 class="poster-section-title">${S('now.title')}<small>01</small></h2>
-      </div>
+  // The line says `waiting`, the same number the strip prints. It used to be needs.length, so a
+  // page with one request and two peers to switch on said "2 things" beside a strip saying 3.
+  // "Nobody" is true two ways and only one of them is a fault: the policy being off is a decision,
+  // the policy being set and reaching nobody is a mistake. Same word, two sentences under it, and
+  // only the second one wears the coral.
+  const signinWord = signin.policy === 'disabled' ? S('strip.signinOff')
+    : signin.reaches_nobody ? S('strip.signinNobody')
+      : signin.policy === 'all_peers' ? S('strip.signinAll')
+        : S('strip.signinNamed', { n: num(signin.reaches) });
+  const signinWhy = signin.policy === 'disabled'
+    ? S('strip.signinWhyOff')
+    : signin.reaches_nobody
+      ? S('strip.signinWhyNobody')
+      : S('strip.signinWhy', { n: num(signin.reaches) });
 
-      <div class="adm-ov-grid">
-        <div>
-          <div class="adm-ov-status ${tone}">${S('now.word_' + standing)}</div>
-          <!-- The same number the strip prints. It used to be needs.length, so a page with one
-               request and two peers to switch on said "2 things" beside a strip saying 3. -->
-          <p class="adm-alert-line">${S('now.line_' + standing, { n: num(waiting) })}</p>
-          <div class="adm-ov-up">${stamp}</div>
-        </div>
+  return html`<${Section} id="adm-fed-01" title=${S('now.title')} count="01">
+    <${Stack}>
+      <${Columns} layout="trailing" collapse=${900}>
+        <${Stack} density="compact">
+          <${Text} kind="number" size="large" tone=${tone === 'danger' ? 'danger' : tone === 'watch' ? 'coral' : 'plain'}>${S('now.word_' + standing)}<//>
+          <${Text} kind="lead">${S('now.line_' + standing, { n: num(waiting) })}<//>
+          <${Text} kind="mono" tone="muted">${stamp}<//>
+        <//>
 
         <div>
           ${needs.map(need)}
           ${Row({
-    title: S('now.running'),
-    why: S('now.runningWhy'),
-    chip: peers.active > 0
-      ? html`<${Badge} type="success" label=${num(peers.active)} />`
-      : html`<${Badge} type="muted" label=${S('now.none')} />`,
-    value: S('now.runningVal', { active: num(peers.active), degraded: num(peers.degraded), offline: num(peers.offline) }),
-    last: true,
-  })}
+            title: S('now.running'),
+            why: S('now.runningWhy'),
+            chip: peers.active > 0
+              ? html`<${Badge} type="success" label=${num(peers.active)} />`
+              : html`<${Badge} type="muted" label=${S('now.none')} />`,
+            value: S('now.runningVal', { active: num(peers.active), degraded: num(peers.degraded), offline: num(peers.offline) }),
+          })}
         </div>
-      </div>
+      <//>
 
-      <div class="og-strip">
-        <div>
-          <b>${num(peers.total)}</b><span>${S('strip.peers')}</span>
-          <small>${S('strip.peersWhy', { active: num(peers.active), degraded: num(peers.degraded), offline: num(peers.offline) })}</small>
-        </div>
-        <div>
-          <b class=${waiting ? 'adm-fed-coral' : ''}>${num(waiting)}</b>
-          <span>${S('strip.needYou')}</span>
-          <small>${S('strip.needYouWhy', {
-    requests: num(data.requests.pending.length), awaiting: num(peers.awaiting), keyless: num(peers.keyless),
-  })}</small>
-        </div>
-        <div>
-          <b class="adm-fed-word ${signin.reaches_nobody ? 'adm-fed-coral' : ''}">
-            ${signin.policy === 'disabled' ? S('strip.signinOff')
-    : signin.reaches_nobody ? S('strip.signinNobody')
-      : signin.policy === 'all_peers' ? S('strip.signinAll')
-        : S('strip.signinNamed', { n: num(signin.reaches) })}
-          </b>
-          <span>${S('strip.maySignIn')}</span>
-          <!-- "Nobody" is true two ways and only one of them is a fault: the policy being off is a
-               decision, the policy being set and reaching nobody is a mistake. Same word, two
-               sentences under it, and only the second one wears the coral. -->
-          <small>${signin.policy === 'disabled'
-    ? S('strip.signinWhyOff')
-    : signin.reaches_nobody
-      ? S('strip.signinWhyNobody')
-      : S('strip.signinWhy', { n: num(signin.reaches) })}</small>
-        </div>
-        <div>
-          ${book.present
-    ? html`<b>${book.age_days === null ? '—' : num(book.age_days)}</b><span>${S('strip.bookAge')}</span>`
-    : html`<b class="adm-fed-word">${S('strip.bookNone')}</b><span>${S('strip.book')}</span>`}
-          <small>${book.present
-    ? S('strip.bookWhy', { by: book.issued_by ?? '—', edition: num(book.edition ?? 0) })
-    : S('strip.bookNoneWhy')}</small>
-        </div>
-      </div>
-    </section>`;
+      <${NumeralBand} tone="plain" items=${[
+        { label: S('strip.peers'), value: num(peers.total),
+          note: S('strip.peersWhy', { active: num(peers.active), degraded: num(peers.degraded), offline: num(peers.offline) }) },
+        { label: S('strip.needYou'), value: num(waiting), tone: waiting ? 'coral' : undefined,
+          note: S('strip.needYouWhy', { requests: num(data.requests.pending.length), awaiting: num(peers.awaiting), keyless: num(peers.keyless) }) },
+        { label: S('strip.maySignIn'), value: signinWord, note: signinWhy, tone: signin.reaches_nobody ? 'coral' : undefined },
+        book.present
+          ? { label: S('strip.bookAge'), value: book.age_days === null ? '—' : num(book.age_days),
+            note: S('strip.bookWhy', { by: book.issued_by ?? '—', edition: num(book.edition ?? 0) }) }
+          : { label: S('strip.book'), value: S('strip.bookNone'), note: S('strip.bookNoneWhy') },
+      ]} />
+    <//>
+  <//>`;
 }
 
 /** Section 02: who may sign in here, and what this node gives back. */
 export function WhoMaySignIn({ data, saving, onPolicy, onScope, onOpenJoin, onGoBoards }) {
   const { signin, offer } = data;
 
-  const choice = (value, disabled) => html`
-    <label class="adm-fed-pick ${value === 'specific_peers' ? 'adm-fed-pick--last' : ''}">
-      <input type="radio" name="adm-fed-policy" checked=${signin.policy === value}
-        disabled=${!!saving} onChange=${() => onPolicy(value)} />
-      <span><b>${S('signin.policy_' + value)}</b><span>${disabled}</span></span>
-    </label>`;
+  const choice = (value, why) => html`<${Action} key=${value} kind="choice" semantics="radio"
+    selected=${signin.policy === value} disabled=${!!saving} title=${S('signin.policy_' + value)}
+    onClick=${() => onPolicy(value)}>${why}<//>`;
 
-  return html`
-    <section class="og-sec" id="adm-fed-02">
-      <div class="og-sec-h">
-        <h2 class="poster-section-title">${S('signin.title')}<small>02</small></h2>
-      </div>
-      <p class="adm-intro">${S('signin.lead')}</p>
+  return html`<${Section} id="adm-fed-02" title=${S('signin.title')} count="02" description=${S('signin.lead')}>
+    <${Columns} collapse=${900}>
+      <${Stack}>
+        <${Stack} density="compact">
+          <${Text} kind="label">${S('signin.accepts')}<//>
+          <${Stack} role="radiogroup" label=${S('signin.accepts')} density="compact">
+            ${choice('disabled', S('signin.policyWhy_disabled'))}
+            ${choice('all_peers', S('signin.policyWhy_all_peers', { n: num(data.peers.active) }))}
+            ${choice('specific_peers', S('signin.policyWhy_specific_peers', { n: num(signin.named), total: num(data.peers.active) }))}
+          <//>
+        <//>
 
-      <div class="adm-two">
-        <div class="adm-half">
-          <div class="adm-fed-lbl">${S('signin.accepts')}</div>
-          ${choice('disabled', S('signin.policyWhy_disabled'))}
-          ${choice('all_peers', S('signin.policyWhy_all_peers', { n: num(data.peers.active) }))}
-          ${choice('specific_peers', S('signin.policyWhy_specific_peers', { n: num(signin.named), total: num(data.peers.active) }))}
+        <${Stack} density="compact">
+          <${Text} kind="label">${S('signin.scopes')}<//>
+          <${Stack} direction="wrap" density="compact">
+            ${SCOPES.map(sc => html`<${Action} key=${sc} kind="tab" selected=${signin.scopes.includes(sc)}
+              disabled=${!!saving} onClick=${() => onScope(sc)}>${sc}<//>`)}
+          <//>
+        <//>
 
-          <div class="adm-fed-lbl adm-fed-lbl--gap">${S('signin.scopes')}</div>
-          <div class="adm-fed-scopes">
-            ${SCOPES.map(s => html`
-              <button type="button" class="adm-fed-scope ${signin.scopes.includes(s) ? 'on' : ''}"
-                disabled=${!!saving} onClick=${() => onScope(s)}>${s}</button>`)}
-          </div>
+        <${Action} kind="choice" semantics="switch" selected=${!!signin.open_join} disabled=${!!saving}
+          title=${S('signin.openJoin')} onClick=${() => onOpenJoin(!signin.open_join)}>${S('signin.openJoinWhy')}<//>
+      <//>
 
-          <label class="adm-fed-switch">
-            <input type="checkbox" checked=${signin.open_join} disabled=${!!saving}
-              onChange=${(e) => onOpenJoin(e.target.checked)} />
-            <span><b>${S('signin.openJoin')}</b><span>${S('signin.openJoinWhy')}</span></span>
-          </label>
-        </div>
-
-        <div class="adm-half">
-          <div class="adm-fed-lbl">${S('offer.title')}</div>
+      <${Stack}>
+        <${Text} kind="label">${S('offer.title')}<//>
+        <div>
           ${Row({ title: S('offer.actions'), why: null, chip: null, value: S('offer.of', { n: num(offer.actions), total: num(offer.actions_total) }) })}
           ${Row({ title: S('offer.agents'), why: null, chip: null, value: S('offer.of', { n: num(offer.agents), total: num(offer.agents_total) }) })}
           ${Row({ title: S('offer.boards'), why: null, chip: null, value: S('offer.of', { n: num(offer.boards), total: num(offer.boards_total) }) })}
-          ${Row({ title: S('offer.csms'), why: null, chip: null, value: S('offer.of', { n: num(offer.csms), total: num(offer.csms_total) }), last: true })}
-
-          ${offer.gives_nothing && html`
-            <div class="og-box adm-fed-box--afterRows poster-aside poster-aside--small">
-              <span class="og-box-label">${S('offer.nothingLabel')}</span>
-              ${S('offer.nothingBody')}
-              <div class="adm-fed-acts">
-                <a class="og-door og-door--quiet" href="/v1/admin?tab=boards" onClick=${onGoBoards}>${S('offer.goBoards')}</a>
-                <a class="og-door og-door--quiet" href="/v1/admin?tab=capabilities">${S('offer.goCapabilities')}</a>
-              </div>
-            </div>`}
+          ${Row({ title: S('offer.csms'), why: null, chip: null, value: S('offer.of', { n: num(offer.csms), total: num(offer.csms_total) }) })}
         </div>
-      </div>
-    </section>`;
+
+        ${offer.gives_nothing && html`<${Surface} kind="aside"><${Stack} density="compact">
+          <${Text} kind="label">${S('offer.nothingLabel')}<//>
+          <${Text}>${S('offer.nothingBody')}<//>
+          <${Stack} direction="wrap">
+            <${Action} href="/v1/admin?tab=boards" onClick=${onGoBoards}>${S('offer.goBoards')}<//>
+            <${Action} href="/v1/admin?tab=capabilities">${S('offer.goCapabilities')}<//>
+          <//>
+        <//><//>`}
+      <//>
+    <//>
+  <//>`;
 }

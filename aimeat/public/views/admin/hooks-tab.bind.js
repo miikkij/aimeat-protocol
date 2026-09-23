@@ -17,6 +17,9 @@
  * @structure HookBind({ data, onBind, busy }) — the moment, the picker, the order, the contract
  * @usage <${HookBind} data=${data} onBind=${bind} busy=${busy} />
  * @version-history
+ *   v2.0.0 -- 2026-09-22 -- Composed from the shared component set: the two pickers are shared
+ *     select fields, the picked actions chips with a remove icon, the contract two code surfaces and
+ *     the warning the shared aside. No classes of its own.
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v1.1.0 — 2026-09-13 — Compose the shared heading and externalize spacing.
  *   v1.0.0 — 2026-09-12 — Initial (the Hooks page in the poster face).
@@ -26,6 +29,7 @@ import { useState, useMemo } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
+import { Section, Columns, Stack, Field, Action, Chip, Surface, Text } from '/components/poster-parts.js';
 
 const S = (key, params) => t('admin.hooks.' + key, params);
 
@@ -56,80 +60,64 @@ export function HookBind({ data, onBind, busy }) {
   const gate = row?.kind === 'gate';
   const seconds = Math.round(data.summary.timeout_ms / 1000);
 
-  return html`
-    <section class="og-sec" id="adm-hook-03">
-      <div class="og-sec-h"><h2 class="poster-section-title">${S('bind.title')}<small>03</small></h2></div>
-      <p class="adm-hook-lead">${S('bind.lead')}</p>
+  return html`<${Section} id="adm-hook-03" title=${S('bind.title')} count="03" description=${S('bind.lead')}>
+    <${Columns} layout="equal" collapse=${900}>
+      <${Stack} density="roomy">
+        <${Stack} density="compact">
+          <${Field} type="select" label=${S('bind.theMoment')} value=${hook} onChange=${e => choose(e.target.value)}
+            options=${data.hooks.map(h_ => ({ value: h_.name, label: h_.name }))} />
+          <${Text} kind="mono" tone="muted">${gate ? S('moments.canRefuse') : S('moments.toldAfter')}<//>
+          <${Text} kind="caption" tone="muted">${S('moments.w_' + (row?.name ?? ''))}<//>
+        <//>
 
-      <div class="adm-hook-two">
-        <div class="adm-hook-form">
-          <div>
-            <div class="adm-hook-lbl">${S('bind.theMoment')}</div>
-            <div class="adm-hook-fld">
-              <select value=${hook} onChange=${e => choose(e.target.value)}>
-                ${data.hooks.map(h_ => html`<option key=${h_.name} value=${h_.name}>${h_.name}</option>`)}
-              </select>
-              <span class="adm-hook-mono">${gate ? S('moments.canRefuse') : S('moments.toldAfter')}</span>
-            </div>
-            <p class="adm-hook-note">${S('moments.w_' + (row?.name ?? ''))}</p>
-          </div>
+        <${Stack} density="compact">
+          <${Text} kind="label">${S('bind.whatItCalls')}<//>
+          ${refs.length > 0 ? html`<${Stack} direction="wrap" align="center" density="compact">
+            ${refs.map((ref, i) => html`<${Stack} key=${ref} direction="horizontal" align="center" density="compact">
+              <${Chip}>${i + 1}. ${nameOf(ref)}<//>
+              <${Action} kind="icon" label=${S('bind.remove')} onClick=${() => drop(ref)}>✗<//>
+            <//>`)}
+          <//>` : null}
+          ${data.bindable_actions.length === 0
+            ? html`<${Text} kind="caption" tone="muted">${S('bind.noActions')}<//>`
+            : available.length === 0
+              ? html`<${Text} kind="caption" tone="muted">${S('bind.allPicked')}<//>`
+              : html`<${Field} type="select" ariaLabel=${S('bind.pickAction')} value="" onChange=${e => { if (e.target.value) add(e.target.value); }}
+                  options=${[{ value: '', label: S('bind.pickAction') }, ...available.map(a => ({
+                    value: a.ref, label: `${a.name}${a.has_address ? ` · ${a.host}` : ` · ${S('bind.optionNoAddress')}`}`,
+                  }))]} />`}
+          <${Text} kind="caption" tone="muted">${S('bind.actionsWhy')}<//>
+        <//>
 
-          <div>
-            <div class="adm-hook-lbl">${S('bind.whatItCalls')}</div>
-            ${refs.length > 0 ? html`
-              <div class="adm-hook-picked">
-                ${refs.map((ref, i) => html`
-                  <span key=${ref} class="adm-hook-chip">
-                    <span>${i + 1}. ${nameOf(ref)}</span>
-                    <button type="button" aria-label=${S('bind.remove')} onClick=${() => drop(ref)}>✗</button>
-                  </span>`)}
-              </div>` : null}
-            ${data.bindable_actions.length === 0
-              ? html`<p class="adm-hook-note">${S('bind.noActions')}</p>`
-              : available.length === 0
-                ? html`<p class="adm-hook-note">${S('bind.allPicked')}</p>`
-                : html`
-                  <div class="adm-hook-fld">
-                    <select value="" onChange=${e => { if (e.target.value) add(e.target.value); }}>
-                      <option value="">${S('bind.pickAction')}</option>
-                      ${available.map(a => html`
-                        <option key=${a.ref} value=${a.ref}>
-                          ${a.name}${a.has_address ? ` · ${a.host}` : ` · ${S('bind.optionNoAddress')}`}
-                        </option>`)}
-                    </select>
-                  </div>`}
-            <p class="adm-hook-note">${S('bind.actionsWhy')}</p>
-          </div>
+        <${Stack} density="compact">
+          <${Text} kind="label">${S('bind.order')}<//>
+          <${Text} kind="caption" tone="muted">
+            ${refs.length === 0 ? S('bind.orderNone') : gate ? S('bind.orderGate') : S('bind.orderNotify')}
+          <//>
+        <//>
 
-          <div>
-            <div class="adm-hook-lbl">${S('bind.order')}</div>
-            <p class="adm-hook-note adm-hook-note--flush">
-              ${refs.length === 0 ? S('bind.orderNone') : gate ? S('bind.orderGate') : S('bind.orderNotify')}
-            </p>
-          </div>
+        <${Stack} direction="wrap" align="center">
+          <${Action} kind="primary" disabled=${busy || !touched} onClick=${save}>
+            ${refs.length === 0 ? S('bind.clearIt') : S('bind.bindIt')}
+          <//>
+          ${touched ? html`<${Action} onClick=${() => setTouched(false)}>${S('bind.cancel')}<//>` : null}
+        <//>
+      <//>
 
-          <div class="adm-hook-acts">
-            <button type="button" class="og-slab" disabled=${busy || !touched} onClick=${save}>
-              ${refs.length === 0 ? S('bind.clearIt') : S('bind.bindIt')}
-            </button>
-            ${touched ? html`<button type="button" class="og-door og-door--quiet" onClick=${() => setTouched(false)}>${S('bind.cancel')}</button>` : null}
-          </div>
-        </div>
-
-        <div>
-          <div class="adm-hook-lbl">${S('bind.whatIsSent')}</div>
-          <div class="adm-hook-frame adm-hook-frame--request">
-            <pre class="adm-hook-pre">${sentExample(hook, data.node_id ?? '')}</pre>
-          </div>
-          <div class="adm-hook-lbl">${S('bind.whatItAnswers')}</div>
-          <div class="adm-hook-frame">
-            <pre class="adm-hook-pre">${S('bind.contract', { s: seconds })}</pre>
-          </div>
-          <div class="og-box adm-hook-contract-warning poster-aside poster-aside--small">
-            <span class="og-box-label">${S('bind.warnLabel')}</span>
-            <div class="adm-hook-box-body">${S('bind.warnBody', { s: seconds })}</div>
-          </div>
-        </div>
-      </div>
-    </section>`;
+      <${Stack}>
+        <${Stack} density="compact">
+          <${Text} kind="label">${S('bind.whatIsSent')}<//>
+          <${Surface} kind="code">${sentExample(hook, data.node_id ?? '')}<//>
+        <//>
+        <${Stack} density="compact">
+          <${Text} kind="label">${S('bind.whatItAnswers')}<//>
+          <${Surface} kind="code">${S('bind.contract', { s: seconds })}<//>
+        <//>
+        <${Surface} kind="aside"><${Stack} density="compact">
+          <${Text} kind="label">${S('bind.warnLabel')}<//>
+          <${Text}>${S('bind.warnBody', { s: seconds })}<//>
+        <//><//>
+      <//>
+    <//>
+  <//>`;
 }

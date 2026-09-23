@@ -20,6 +20,8 @@
  *   - WhatWasCalled (05) — the surfaces, and what was refused
  * @usage Imported by views/admin/usage-tab.js.
  * @version-history
+ *   v1.2.0 -- 2026-09-22 -- Composed from the shared component set: sections, the people as a
+ *     shared table, the two call lists in columns; the page's own sheet is gone.
  *   v1.1.0 — 2026-09-13 — Compose existing section headings from shared poster B1.
  *   v1.0.0 — 2026-09-12 — Initial (the Usage page in the poster face).
  */
@@ -28,7 +30,8 @@ import { useState } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { num, Badge, Row } from './shared.js';
+import { num, Badge, Row, Empty } from './shared.js';
+import { Section, Stack, Columns, Text, Action, Table } from '/components/poster-parts.js';
 import { usd, compact } from './usage-tab.models.js';
 
 const S = (key, params) => t('admin.usage.' + key, params);
@@ -54,10 +57,9 @@ export function WhoSpent({ people, houseSpenders }) {
   const list = people || [];
   if (!list.length) {
     return html`
-      <section class="og-sec" id="adm-us-04">
-        <div class="og-sec-h"><h2 class="poster-section-title">${S('who.title')}<small>04</small></h2></div>
-        <div class="adm-us-empty">${S('who.empty')}</div>
-      </section>`;
+      <${Section} id="adm-us-04" title=${S('who.title')} count="04">
+        <${Empty} text=${S('who.empty')} />
+      <//>`;
   }
 
   const shown = all ? list : list.slice(0, TOP_PEOPLE);
@@ -77,56 +79,42 @@ export function WhoSpent({ people, houseSpenders }) {
   // their own, which is the ordinary case and the one that costs the operator nothing.
   const onHouse = new Set((houseSpenders || []).map(u => u.owner_ghii));
 
+  const end = (text) => ({ text, align: 'end' });
+  const rows = shown.map(u => [
+    html`<strong>${u.owner_ghii}</strong>`,
+    end(num(u.agents || 0)),
+    end(usd(u.cost_usd)),
+    end(compact(u.total_tokens)),
+    end(num(u.calls || 0)),
+    end(u.unpriced_calls ? num(u.unpriced_calls) : '—'),
+    onHouse.has(u.owner_ghii)
+      ? html`<${Badge} type="warning" label=${S('who.house')} />`
+      : html`<${Badge} type="info" label=${S('who.own')} />`,
+  ]);
+  if (tail) {
+    rows.push([
+      html`<strong>${S('who.othersTitle', { n: tail.people })}</strong>`,
+      end(num(tail.agents)),
+      end(usd(tail.cost_usd)),
+      end(compact(tail.total_tokens)),
+      end(num(tail.calls)),
+      end(tail.unpriced_calls ? num(tail.unpriced_calls) : '—'),
+      '',
+    ]);
+  }
+
   return html`
-    <section class="og-sec" id="adm-us-04">
-      <div class="og-sec-h">
-        <h2 class="poster-section-title">${S('who.title')}<small>04</small></h2>
-        ${rest.length ? html`<div class="og-doors">
-          <button type="button" class="og-door og-door--quiet" onClick=${() => setAll(true)}>
-            ${S('who.showAll', { n: list.length })}
-          </button>
-        </div>` : null}
-      </div>
-      <p class="adm-us-lead">${S('who.lead')}</p>
-      <div class="adm-us-scroll">
-        <table class="adm-us-tbl">
-          <thead><tr>
-            <th>${S('who.person')}</th>
-            <th class="num">${S('who.agents')}</th>
-            <th class="num">${S('went.cost')}</th>
-            <th class="num">${S('who.tokens')}</th>
-            <th class="num">${S('went.calls')}</th>
-            <th class="num">${S('went.noPrice')}</th>
-            <th>${S('who.whoseKey')}</th>
-          </tr></thead>
-          <tbody>
-            ${shown.map(u => html`<tr>
-              <td><b>${u.owner_ghii}</b></td>
-              <td class="num">${num(u.agents || 0)}</td>
-              <td class="num">${usd(u.cost_usd)}</td>
-              <td class="num">${compact(u.total_tokens)}</td>
-              <td class="num">${num(u.calls || 0)}</td>
-              <td class="num">${u.unpriced_calls ? num(u.unpriced_calls) : '—'}</td>
-              <td>${onHouse.has(u.owner_ghii)
-    ? html`<${Badge} type="warning" label=${S('who.house')} />`
-    : html`<${Badge} type="info" label=${S('who.own')} />`}</td>
-            </tr>`)}
-            ${tail ? html`<tr>
-              <td><b>${S('who.othersTitle', { n: tail.people })}</b></td>
-              <td class="num">${num(tail.agents)}</td>
-              <td class="num">${usd(tail.cost_usd)}</td>
-              <td class="num">${compact(tail.total_tokens)}</td>
-              <td class="num">${num(tail.calls)}</td>
-              <td class="num">${tail.unpriced_calls ? num(tail.unpriced_calls) : '—'}</td>
-              <td></td>
-            </tr>` : null}
-          </tbody>
-        </table>
-      </div>
-      <p class="adm-us-note">${onHouse.size
+    <${Section} id="adm-us-04" title=${S('who.title')} count="04" description=${S('who.lead')}
+      actions=${rest.length ? html`<${Action} onClick=${() => setAll(true)}>${S('who.showAll', { n: list.length })}<//>` : null}>
+      <${Stack}>
+        <${Table} density="compact" label=${S('who.title')}
+          headers=${[S('who.person'), S('who.agents'), S('went.cost'), S('who.tokens'), S('went.calls'), S('went.noPrice'), S('who.whoseKey')]}
+          rows=${rows} />
+        <${Text} kind="caption" tone="muted">${onHouse.size
     ? S('who.noteHouse', { n: onHouse.size })
-    : S('who.noteAllOwn')}</p>
-    </section>`;
+    : S('who.noteAllOwn')}<//>
+      <//>
+    <//>`;
 }
 
 /** Section 05: what was called, and what was turned away. */
@@ -137,10 +125,9 @@ export function WhatWasCalled({ calls }) {
 
   if (!totals || (totals.calls || 0) === 0) {
     return html`
-      <section class="og-sec" id="adm-us-05">
-        <div class="og-sec-h"><h2 class="poster-section-title">${S('called.title')}<small>05</small></h2></div>
-        <div class="adm-us-empty">${S('called.empty')}</div>
-      </section>`;
+      <${Section} id="adm-us-05" title=${S('called.title')} count="05">
+        <${Empty} text=${S('called.empty')} />
+      <//>`;
   }
 
   const surfaces = (surface.groups || []).slice(0, 6);
@@ -154,15 +141,10 @@ export function WhatWasCalled({ calls }) {
     .reduce((m, g) => ((g.duration_ms_max || 0) > (m?.duration_ms_max || 0) ? g : m), null);
 
   return html`
-    <section class="og-sec" id="adm-us-05">
-      <div class="og-sec-h">
-        <h2 class="poster-section-title">${S('called.title')}<small>05</small></h2>
-      </div>
-      <p class="adm-us-lead">${S('called.lead')}</p>
-
-      <div class="adm-us-two">
+    <${Section} id="adm-us-05" title=${S('called.title')} count="05" description=${S('called.lead')}>
+      <${Columns} layout="equal" collapse=${900} density="roomy">
         <div>
-          <div class="adm-us-lbl">${S('called.byWayIn')}</div>
+          <${Text} kind="label">${S('called.byWayIn')}<//>
           ${surfaces.map((g, i) => Row({
     title: g.key,
     why: S('called.surfaceWhy', { errors: num(g.errors || 0) }),
@@ -174,7 +156,7 @@ export function WhatWasCalled({ calls }) {
   }))}
         </div>
         <div>
-          <div class="adm-us-lbl">${S('called.mostRefused')}</div>
+          <${Text} kind="label">${S('called.mostRefused')}<//>
           ${refused.length ? refused.map(g => Row({
     title: g.key,
     why: S('called.refusedWhy'),
@@ -194,6 +176,6 @@ export function WhatWasCalled({ calls }) {
     last: true,
   }) : null}
         </div>
-      </div>
-    </section>`;
+      <//>
+    <//>`;
 }

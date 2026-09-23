@@ -21,6 +21,8 @@
  *   - WhatIsHere (02) — the facets, each part with a bar
  * @usage Imported by views/admin/knowledge-tab.js.
  * @version-history
+ *   v2.0.0 -- 2026-09-22 -- Composed from the shared component set: sections, the metric rows, the
+ *     numeral band, each cut a list row and each part a shared progress meter.
  *   v1.1.0 -- 2026-09-13 -- Compose shared B1 headings; facet ratios use SVG width data.
  *   v1.0.0 — 2026-09-12 — Initial (the Knowledge page in the poster face).
  */
@@ -30,36 +32,30 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { time as fmtTime } from '/js/format.js';
 import { num, Badge, Row } from './shared.js';
+import { Section, Columns, Stack, ListRow, NumeralBand, Meter, Action, Text } from '/components/poster-parts.js';
 
 const S = (key, params) => t('admin.knowledge.' + key, params);
 
 /** One part of a facet: its name, a bar whose length is the encoding, and the count. */
-function Part({ name, note, packages, widest, tone, onPick }) {
-  const width = widest > 0 ? Math.max(2, Math.round((packages / widest) * 100)) : 0;
-  return html`
-    <span class="adm-kn-part">
-      <span class="adm-kn-part-l">
-        ${onPick
-    ? html`<button type="button" class="adm-kn-pick" onClick=${onPick}>${name}</button>`
-    : html`<span>${name}</span>`}
-        ${note ? html`<b class="adm-kn-flagword">${note}</b>` : null}
-      </span>
-      <span class="adm-kn-track"><svg class=${tone ? 'adm-kn-fill adm-kn-fill--' + tone : 'adm-kn-fill'}
-        width=${width + '%'} aria-hidden="true"></svg></span>
-      <span class="adm-kn-part-n">${num(packages)}</span>
-    </span>`;
+function Part({ name, note, packages, widest, onPick }) {
+  return html`<${Stack} density="compact">
+    <${Stack} direction="horizontal" align="between" density="compact">
+      <${Stack} direction="wrap" align="center" density="compact">
+        ${onPick ? html`<${Action} kind="text" onClick=${onPick}>${name}<//>` : html`<span>${name}</span>`}
+        ${note ? html`<${Text} kind="mono" tone="coral">${note}<//>` : null}
+      <//>
+      <${Text} kind="mono">${num(packages)}<//>
+    <//>
+    <${Meter} kind="progress" value=${packages} max=${widest || 1} label=${name} />
+  <//>`;
 }
 
 /** One cut of the collection: what it groups by, and its parts. */
-function Cut({ title, why, parts, last }) {
+function Cut({ title, why, parts }) {
   const widest = parts.reduce((m, p) => Math.max(m, p.packages), 0);
-  return html`
-    <div class="adm-kn-cut ${last ? 'adm-kn-cut--last' : ''}">
-      <span><b>${title}</b><span class="adm-why">${why}</span></span>
-      <span class="adm-kn-parts">
-        ${parts.map(p => html`<${Part} ...${p} widest=${widest} />`)}
-      </span>
-    </div>`;
+  return html`<${ListRow} name=${title} detail=${why} detailKind="text">
+    <${Stack}>${parts.map((p, i) => html`<${Part} key=${i} ...${p} widest=${widest} />`)}<//>
+  <//>`;
 }
 
 /**
@@ -80,23 +76,16 @@ export function RightNow({ data, onShowFlagged }) {
     S('now.readAt', { at: fmtTime(new Date()) }),
   ].join(' · ');
 
-  return html`
-    <section class="og-sec og-sec--first" id="adm-kn-01">
-      <div class="og-sec-h">
-        <h2 class="poster-section-title">${S('now.title')}<small>01</small></h2>
-        <div class="og-doors">
-          <button type="button" class="og-door og-door--quiet" onClick=${() => onShowFlagged()}>${S('now.addOwn')}</button>
-        </div>
-      </div>
-
-      <div class="adm-ov-grid">
-        <div>
-          <div class="adm-ov-status ${flagged ? 'danger' : ''}">
-            ${flagged ? S('now.wordFlagged', { n: num(s.flagged) }) : S('now.wordQuiet')}
-          </div>
-          <p class="adm-alert-line">${flagged ? S('now.lineFlagged') : S('now.lineQuiet')}</p>
-          <div class="adm-ov-up">${stamp}</div>
-        </div>
+  return html`<${Section} id="adm-kn-01" title=${S('now.title')} count="01"
+    actions=${html`<${Action} onClick=${() => onShowFlagged()}>${S('now.addOwn')}<//>`}>
+    <${Stack}>
+      <${Columns} layout="trailing" collapse=${900}>
+        <${Stack} density="compact">
+          <${Text} kind="number" size="large" tone=${flagged ? 'danger' : 'plain'}>
+            ${flagged ? S('now.wordFlagged', { n: num(s.flagged) }) : S('now.wordQuiet')}<//>
+          <${Text} kind="lead">${flagged ? S('now.lineFlagged') : S('now.lineQuiet')}<//>
+          <${Text} kind="mono" tone="muted">${stamp}<//>
+        <//>
 
         <div>
           ${Row({
@@ -138,31 +127,19 @@ export function RightNow({ data, onShowFlagged }) {
     why: S('now.seenByWhy'),
     chip: html`<${Badge} type="info" label=${S('now.publicN', { n: num(s.public) })} />`,
     value: S('now.notPublic', { n: num(s.total - s.public) }),
-    last: true,
   })}
         </div>
-      </div>
 
-      <div class="og-strip">
-        <div>
-          <b class=${flagged ? 'adm-kn-coral' : ''}>${num(s.flagged)}</b>
-          <span>${S('strip.flagged')}</span>
-          <small>${flagged ? S('strip.flaggedSub') : S('strip.flaggedNone')}</small>
-        </div>
-        <div>
-          <b>${num(s.total)}</b><span>${S('strip.packages')}</span>
-          <small>${S('strip.packagesSub', { n: num(s.system) })}</small>
-        </div>
-        <div>
-          <b class="adm-kn-dim">${num(s.authors)}</b><span>${S('strip.authors')}</span>
-          <small>${split.length ? S('strip.authorsSplit') : S('strip.authorsSub')}</small>
-        </div>
-        <div>
-          <b>${num(s.one_entry)}</b><span>${S('strip.oneEntry')}</span>
-          <small>${S('strip.oneEntrySub')}</small>
-        </div>
-      </div>
-    </section>`;
+      <//>
+
+      <${NumeralBand} tone="plain" items=${[
+        { label: S('strip.flagged'), value: num(s.flagged), note: flagged ? S('strip.flaggedSub') : S('strip.flaggedNone'), tone: flagged ? 'coral' : undefined },
+        { label: S('strip.packages'), value: num(s.total), note: S('strip.packagesSub', { n: num(s.system) }) },
+        { label: S('strip.authors'), value: num(s.authors), note: split.length ? S('strip.authorsSplit') : S('strip.authorsSub') },
+        { label: S('strip.oneEntry'), value: num(s.one_entry), note: S('strip.oneEntrySub') },
+      ]} />
+    <//>
+  <//>`;
 }
 
 /** Section 02: the shape of the collection. */
@@ -175,7 +152,6 @@ export function WhatIsHere({ data, onPickAuthor, onPickKind }) {
     name: a.spellings[0],
     note: a.spellings.length > 1 ? S('shape.samePerson', { n: a.spellings.length }) : null,
     packages: a.packages,
-    tone: a.spellings.length > 1 ? 'warn' : null,
     onPick: () => onPickAuthor(a.key),
   }));
 
@@ -189,7 +165,6 @@ export function WhatIsHere({ data, onPickAuthor, onPickKind }) {
     name: m.declared ? t('knowledge.maturity.' + m.name) : m.name,
     note: m.declared ? null : S('shape.notOurs'),
     packages: m.packages,
-    tone: m.declared ? null : 'warn',
   }));
 
   const seenParts = f.visibility.map(v => ({
@@ -197,23 +172,20 @@ export function WhatIsHere({ data, onPickAuthor, onPickKind }) {
     packages: v.packages,
   }));
 
-  return html`
-    <section class="og-sec" id="adm-kn-02">
-      <div class="og-sec-h">
-        <h2 class="poster-section-title">${S('shape.title')}<small>02</small></h2>
+  return html`<${Section} id="adm-kn-02" title=${S('shape.title')} count="02" description=${S('shape.lead')}>
+    <${Stack}>
+      <div>
+        <${Cut} title=${S('shape.byAuthor')} why=${S('shape.byAuthorWhy')} parts=${authorParts} />
+        <${Cut} title=${S('shape.byKind')} why=${S('shape.byKindWhy')} parts=${kindParts} />
+        <${Cut} title=${S('shape.byMaturity')} why=${S('shape.byMaturityWhy')} parts=${maturityParts} />
+        <${Cut} title=${S('shape.bySeen')} why=${S('shape.bySeenWhy')} parts=${seenParts} />
       </div>
-      <p class="adm-kn-lead">${S('shape.lead')}</p>
 
-      <${Cut} title=${S('shape.byAuthor')} why=${S('shape.byAuthorWhy')} parts=${authorParts} />
-      <${Cut} title=${S('shape.byKind')} why=${S('shape.byKindWhy')} parts=${kindParts} />
-      <${Cut} title=${S('shape.byMaturity')} why=${S('shape.byMaturityWhy')} parts=${maturityParts} />
-      <${Cut} title=${S('shape.bySeen')} why=${S('shape.bySeenWhy')} parts=${seenParts} last=${true} />
-
-      ${undeclared.length ? html`
-        <p class="adm-kn-note">${S('shape.undeclaredNote', {
-    word: undeclared.map(m => m.name).join(', '),
-    n: num(s.undeclared_maturity),
-    ours: ['draft', 'review', 'published'].map(k => t('knowledge.maturity.' + k)).join(', '),
-  })}</p>` : null}
-    </section>`;
+      ${undeclared.length ? html`<${Text} kind="caption" tone="muted">${S('shape.undeclaredNote', {
+        word: undeclared.map(m => m.name).join(', '),
+        n: num(s.undeclared_maturity),
+        ours: ['draft', 'review', 'published'].map(k => t('knowledge.maturity.' + k)).join(', '),
+      })}<//>` : null}
+    <//>
+  <//>`;
 }

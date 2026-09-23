@@ -10,6 +10,10 @@
  *   admin shell's lists, which already carry every person and agent.
  * @structure parseOrigins · QuickAdd · OriginsField · PickField · InlineEditor · GiveForm · ListSection
  * @version-history
+ *   v2.0.0 -- 2026-09-22 -- Composed from the shared component set: list rows with the origins as
+ *     chips, shared fields, quick-add origins as text actions, the picker's matches as compact list
+ *     rows under its field. The set has no floating suggestion list, so the matches open in place
+ *     under the field instead of over the page; the page's own sheet (admin-cors.css) is gone.
  *   v1.1.0 -- 2026-09-13 -- Compose each list section heading from the shared B1 shape.
  *   v1.0.0 — 2026-09-08 — Initial (the CORS page in the poster face).
  */
@@ -17,6 +21,7 @@ import { h } from 'preact';
 import { useState, useMemo } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
+import { Section, Columns, Stack, ListRow, Field, Action, Chip, Text } from '/components/poster-parts.js';
 
 const html = htm.bind(h);
 const C = (key, params) => t('admin.cors.' + key, params);
@@ -37,20 +42,17 @@ function QuickAdd({ value, onChange }) {
     if (!parts.includes(origin)) parts.push(origin);
     onChange(parts.join(', '));
   };
-  return html`
-    <div class="adm-cors-quick">
-      <span>${C('form.quick')}</span>
-      ${COMMON_ORIGINS.map(o => html`<button type="button" class="adm-cors-chip" onClick=${() => add(o)}>${o}</button>`)}
-    </div>`;
+  return html`<${Stack} direction="wrap" align="center" density="compact">
+    <${Text} kind="caption" tone="muted">${C('form.quick')}<//>
+    ${COMMON_ORIGINS.map(o => html`<${Action} key=${o} kind="text" onClick=${() => add(o)}>${o}<//>`)}
+  <//>`;
 }
 
 function OriginsField({ value, onInput, onEnter }) {
-  return html`
-    <div class="adm-cors-fld adm-cors-fld--mono">
-      <input type="text" value=${value} placeholder=${C('form.origins')} spellcheck="false"
-        onInput=${e => onInput(e.target.value)}
-        onKeyDown=${e => { if (e.key === 'Enter' && onEnter) { e.preventDefault(); onEnter(); } }} />
-    </div>`;
+  return html`<${Field} ariaLabel=${C('form.origins')} value=${value} placeholder=${C('form.origins')} spellCheck=${false}
+    passwordManager=${false}
+    onInput=${e => onInput(e.target.value)}
+    onKeyDown=${e => { if (e.key === 'Enter' && onEnter) { e.preventDefault(); onEnter(); } }} />`;
 }
 
 /**
@@ -74,40 +76,33 @@ function PickField({ candidates, placeholder, picked, onPick }) {
     else if (e.key === 'Enter') { if (open && matches[hi]) { e.preventDefault(); pick(matches[hi]); } }
     else if (e.key === 'Escape') { setOpen(false); }
   };
-  return html`
-    <div class="adm-cors-pick">
-      <div class="adm-cors-fld">
-        <input type="text" value=${text} placeholder=${placeholder} autocomplete="off"
-          onInput=${e => { setText(e.target.value); setHi(0); setOpen(true); if (picked) onPick(null); }}
-          onFocus=${() => setOpen(true)}
-          onBlur=${() => setTimeout(() => setOpen(false), 120)}
-          onKeyDown=${onKey} />
-        <svg viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="square"><path d="M6 9l6 6 6-6"></path></svg>
-      </div>
-      ${open && html`
-        <div class="adm-cors-pick-list">
-          ${candidates.length === 0 ? html`<div class="adm-cors-pick-none">${C('form.allListed')}</div>`
-            : matches.length === 0 ? html`<div class="adm-cors-pick-none">${C('form.noMatch')}</div>`
-            : matches.map((c, i) => html`
-              <button type="button" class=${i === hi ? 'on' : ''} onMouseDown=${e => { e.preventDefault(); pick(c); }}>
-                <b>${c.name}</b><small>${c.sub}</small>
-              </button>`)}
-        </div>`}
-    </div>`;
+  // The field has no focus prop of its own; the wrapper hears the focus arrive, which opens the list
+  // as it did before. A match is chosen on mouse-down so the field's blur does not close it first.
+  return html`<div onFocusIn=${() => setOpen(true)}>
+    <${Field} ariaLabel=${placeholder} value=${text} placeholder=${placeholder} autoComplete="off" passwordManager=${false}
+      onInput=${e => { setText(e.target.value); setHi(0); setOpen(true); if (picked) onPick(null); }}
+      onBlur=${() => setTimeout(() => setOpen(false), 120)}
+      onKeyDown=${onKey} />
+    ${open && html`<div role="listbox" aria-label=${placeholder} onMouseDown=${e => e.preventDefault()}>
+      ${candidates.length === 0 ? html`<${Text} tone="muted">${C('form.allListed')}<//>`
+        : matches.length === 0 ? html`<${Text} tone="muted">${C('form.noMatch')}<//>`
+        : matches.map((c, i) => html`<${ListRow} key=${c.id} density="compact" selected=${i === hi}
+            name=${c.name} detail=${c.sub} onOpen=${() => pick(c)} />`)}
+    </div>`}
+  </div>`;
 }
 
 function InlineEditor({ origins, onSave, onCancel }) {
   const [val, setVal] = useState(origins.join(', '));
   const save = () => { const arr = parseOrigins(val); if (arr.length) onSave(arr); };
-  return html`
-    <div class="adm-cors-edit">
-      <${OriginsField} value=${val} onInput=${setVal} onEnter=${save} />
-      <${QuickAdd} value=${val} onChange=${setVal} />
-      <div class="adm-cors-edit-acts">
-        <button type="button" class="adm-btn" onClick=${save} disabled=${parseOrigins(val).length === 0}>${C('form.save')}</button>
-        <button type="button" class="og-door og-door--quiet" onClick=${onCancel}>${C('form.cancel')}</button>
-      </div>
-    </div>`;
+  return html`<${Stack} density="compact">
+    <${OriginsField} value=${val} onInput=${setVal} onEnter=${save} />
+    <${QuickAdd} value=${val} onChange=${setVal} />
+    <${Stack} direction="horizontal" align="center">
+      <${Action} kind="primary" onClick=${save} disabled=${parseOrigins(val).length === 0}>${C('form.save')}<//>
+      <${Action} onClick=${onCancel}>${C('form.cancel')}<//>
+    <//>
+  <//>`;
 }
 
 function GiveForm({ kind, candidates, onSave }) {
@@ -120,19 +115,18 @@ function GiveForm({ kind, candidates, onSave }) {
     const ok = await onSave(picked, parseOrigins(val));
     if (ok) { setPicked(null); setVal(''); setFormKey(k => k + 1); }
   };
-  return html`
-    <div class="adm-cors-give">
-      <div class="adm-cors-lbl">${C(kind + '.give')}</div>
-      <div class="adm-cors-give-grid">
-        <${PickField} key=${formKey} candidates=${candidates} placeholder=${C(kind + '.pick')} picked=${picked} onPick=${setPicked} />
-        <${OriginsField} value=${val} onInput=${setVal} onEnter=${save} />
-      </div>
-      <${QuickAdd} value=${val} onChange=${setVal} />
-      <div class="adm-cors-give-acts">
-        <button type="button" class="adm-btn" onClick=${save} disabled=${!ready}>${C('form.save')}</button>
-        <span class="adm-cors-note">${C('form.rule')}</span>
-      </div>
-    </div>`;
+  return html`<${Stack}>
+    <${Text} kind="label">${C(kind + '.give')}<//>
+    <${Columns} layout="trailing" collapse=${600}>
+      <${PickField} key=${formKey} candidates=${candidates} placeholder=${C(kind + '.pick')} picked=${picked} onPick=${setPicked} />
+      <${OriginsField} value=${val} onInput=${setVal} onEnter=${save} />
+    <//>
+    <${QuickAdd} value=${val} onChange=${setVal} />
+    <${Stack} direction="wrap" align="center">
+      <${Action} kind="primary" onClick=${save} disabled=${!ready}>${C('form.save')}<//>
+      <${Text} kind="caption" tone="muted">${C('form.rule')}<//>
+    <//>
+  <//>`;
 }
 
 /**
@@ -143,24 +137,20 @@ function GiveForm({ kind, candidates, onSave }) {
 export function ListSection({ kind, number, rows, total, candidates, onSave, onClear, door, onDoor }) {
   const [editing, setEditing] = useState(null);
   const saveRow = async (id, arr) => { if (await onSave(id, arr)) setEditing(null); };
-  return html`
-    <section class="og-sec" id=${'adm-cors-' + number}>
-      <div class="og-sec-h"><h2 class="poster-section-title">${C(kind + '.title')}<small>${number}</small></h2>
-        <div class="og-doors"><button type="button" class="og-door og-door--quiet" onClick=${onDoor}>${door}</button></div></div>
-      <p class="adm-cors-lead">${C(kind + '.lead')}</p>
-      ${rows.length === 0 ? html`<div class="adm-cors-empty">${C(kind + '.none', { n: total })}</div>` : null}
-      ${rows.map((r, idx) => html`
-        <div class="adm-cors-orow ${idx === rows.length - 1 ? 'adm-cors-orow--last' : ''}" key=${r.id}>
-          <span><b>${r.name}</b><span class="adm-why adm-cors-mono">${r.sub}</span></span>
-          ${editing === r.id
-            ? html`<${InlineEditor} origins=${r.origins} onSave=${arr => saveRow(r.id, arr)} onCancel=${() => setEditing(null)} />`
-            : html`<span class="adm-cors-origins">${r.origins.map(o => html`<span class="adm-cors-code">${o}</span>`)}</span>`}
-          <span class="adm-cors-acts">
-            ${editing !== r.id ? html`
-              <button type="button" class="adm-btn-action" onClick=${() => setEditing(r.id)}>${C('form.edit')}</button>
-              <button type="button" class="og-door og-door--danger" onClick=${() => onClear(r.id)}>${C('form.clear')}</button>` : null}
-          </span>
-        </div>`)}
+  return html`<${Section} id=${'adm-cors-' + number} title=${C(kind + '.title')} count=${number} description=${C(kind + '.lead')}
+    actions=${html`<${Action} onClick=${onDoor}>${door}<//>`}>
+    <${Stack}>
+      <div>
+        ${rows.length === 0 ? html`<${Text} tone="muted">${C(kind + '.none', { n: total })}<//>` : null}
+        ${rows.map((r) => html`<${ListRow} key=${r.id} name=${r.name} detail=${r.sub}
+          value=${editing === r.id ? null : html`<${Stack} direction="wrap" align="center" density="compact">${r.origins.map(o => html`<${Chip} key=${o}>${o}<//>`)}<//>`}
+          actions=${editing !== r.id ? html`
+            <${Action} onClick=${() => setEditing(r.id)}>${C('form.edit')}<//>
+            <${Action} tone="danger" onClick=${() => onClear(r.id)}>${C('form.clear')}<//>` : null}>
+          ${editing === r.id ? html`<${InlineEditor} origins=${r.origins} onSave=${arr => saveRow(r.id, arr)} onCancel=${() => setEditing(null)} />` : null}
+        <//>`)}
+      </div>
       <${GiveForm} kind=${kind} candidates=${candidates} onSave=${onSave} />
-    </section>`;
+    <//>
+  <//>`;
 }

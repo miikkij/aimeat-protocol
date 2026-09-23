@@ -14,6 +14,10 @@
  *   - buildAiPrompt(tpl, locale) — the paste for the operator's own AI, tags kept intact
  *
  * @version-history
+ *   v3.0.0 -- 2026-09-22 -- Composed from the shared component set: the section with the language
+ *     tabs as its actions, the aside, one shared Fold per template, chips for the placeholders, tab
+ *     words for the three views, shared fields and actions (CopyAction for the AI prompt), and the
+ *     preview in the shared stage, which keeps a light ground in every theme.
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v2.2.0 -- 2026-09-13 -- Compose ink row boundaries from the shared poster class.
  *   v2.1.0 — 2026-09-13 — Compose the shared template heading and external spacing.
@@ -29,7 +33,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { LOCALES } from '/js/utils.js';
 import { useConfirm } from '/components/Modal.js';
-import { CopyButton } from '/components/CopyButton.js';
+import { Section, Fold, Stack, Chip, Field, Surface, Action, CopyAction, Text } from '/components/poster-parts.js';
 import {
   getEmailTemplates, saveEmailTemplate, resetEmailTemplate, seedEmailTemplates, resetAllEmailTemplates,
 } from '/js/services/admin.js';
@@ -125,39 +129,39 @@ function Editor({ tpl, locale, onSave, onReset }) {
     }, { danger: true });
   }
 
+  const views = [['preview', E('tpl.preview')], ['html', E('tpl.html')], ['text', E('tpl.text')]];
+
   return html`
-    <div class="adm-em-open">
+    <${Stack}>
       ${tpl.params?.length > 0 && html`
-        <div class="adm-em-lbl">${E('tpl.placeholders')}</div>
-        <div class="adm-em-params">
-          ${tpl.params.map(p => html`<code>${p}</code>`)}
-          <span>${E('tpl.placeholdersWhy')}</span>
-        </div>`}
+        <${Stack} density="compact">
+          <${Text} kind="label">${E('tpl.placeholders')}<//>
+          <${Stack} direction="wrap" align="center" density="compact">
+            ${tpl.params.map(p => html`<${Chip} key=${p}>${p}<//>`)}
+            <${Text} kind="caption" tone="muted">${E('tpl.placeholdersWhy')}<//>
+          <//>
+        <//>`}
 
-      <div class="adm-em-views">
-        <button type="button" class=${view === 'preview' ? 'on' : ''} onClick=${() => setView('preview')}>${E('tpl.preview')}</button>
-        <button type="button" class=${view === 'html' ? 'on' : ''} onClick=${() => setView('html')}>${E('tpl.html')}</button>
-        <button type="button" class=${view === 'text' ? 'on' : ''} onClick=${() => setView('text')}>${E('tpl.text')}</button>
-        <span class="adm-em-views-r">${E('tpl.width')}</span>
-      </div>
-      <div class="adm-em-stage">
-        ${view === 'preview' && html`<iframe srcdoc=${editHtml} sandbox="" title=${E('tpl.preview')}></iframe>`}
-        ${view === 'html' && html`<textarea spellcheck="false" value=${editHtml} onInput=${e => setEditHtml(e.target.value)}></textarea>`}
-        ${view === 'text' && html`<textarea spellcheck="false" value=${editText} onInput=${e => setEditText(e.target.value)}></textarea>`}
-      </div>
+      <${Stack} direction="wrap" align="between">
+        <${Stack} direction="horizontal" role="tablist" label=${E('tpl.preview')}>
+          ${views.map(([id, label]) => html`<${Action} key=${id} kind="tab" semantics="tab" selected=${view === id} onClick=${() => setView(id)}>${label}<//>`)}
+        <//>
+        <${Text} kind="mono" tone="muted">${E('tpl.width')}<//>
+      <//>
+      ${view === 'preview' && html`<${Surface} kind="stage"><iframe srcdoc=${editHtml} sandbox="" title=${E('tpl.preview')}></iframe><//>`}
+      ${view === 'html' && html`<${Field} type="textarea" rows=${16} ariaLabel=${E('tpl.html')} spellCheck=${false} value=${editHtml} onInput=${e => setEditHtml(e.target.value)} />`}
+      ${view === 'text' && html`<${Field} type="textarea" rows=${16} ariaLabel=${E('tpl.text')} spellCheck=${false} value=${editText} onInput=${e => setEditText(e.target.value)} />`}
 
-      <div class="adm-em-tacts poster-row--thing">
-        <button class="adm-btn" onClick=${save} disabled=${saving || !changed}>${E('tpl.save')}</button>
-        <${CopyButton} text=${buildAiPrompt(tpl, locale)} className="og-door og-door--quiet"
-          label=${E('tpl.aiPrompt')} copiedLabel=${E('tpl.aiPromptCopied')} />
-        ${tpl.isCustom && html`
-          <button type="button" class="og-door og-door--quiet og-door--danger" onClick=${reset}>${E('tpl.backToBuiltIn')}</button>`}
-        ${said && html`<span class="adm-em-said ${said.ok ? 'is-ok' : 'is-bad'}">${said.text}</span>`}
-        ${!said && !changed && html`<span class="adm-em-hint adm-em-hint--flush">${E('tpl.noChanges')}</span>`}
-      </div>
-      <p class="adm-em-hint">${E('tpl.aiHint')}</p>
+      <${Stack} direction="wrap" align="center">
+        <${Action} onClick=${save} disabled=${saving || !changed}>${E('tpl.save')}<//>
+        <${CopyAction} text=${buildAiPrompt(tpl, locale)} label=${E('tpl.aiPrompt')} copiedLabel=${E('tpl.aiPromptCopied')} />
+        ${tpl.isCustom && html`<${Action} tone="danger" onClick=${reset}>${E('tpl.backToBuiltIn')}<//>`}
+        ${said && html`<${Text} kind="caption" tone=${said.ok ? 'success' : 'danger'}>${said.text}<//>`}
+        ${!said && !changed && html`<${Text} kind="caption" tone="muted">${E('tpl.noChanges')}<//>`}
+      <//>
+      <${Text} kind="caption" tone="muted">${E('tpl.aiHint')}<//>
       <${ConfirmUI} />
-    </div>`;
+    <//>`;
 }
 
 export default function Templates({ locale }) {
@@ -210,39 +214,30 @@ export default function Templates({ locale }) {
   }
 
   return html`
-    <section class="og-sec">
-      <div class="og-sec-h">
-        <h2 class="poster-section-title">${E('tpl.title')}<small>05</small></h2>
-        <div class="og-doors">
-          ${LOCALES.map(l => html`
-            <button type="button" class="og-door og-door--quiet ${l === lang ? 'og-door--on' : ''}"
-              onClick=${() => setLang(l)}>${l}</button>`)}
+    <${Section} title=${E('tpl.title')} count="05"
+      actions=${LOCALES.map(l => html`<${Action} key=${l} kind="tab" selected=${l === lang} onClick=${() => setLang(l)}>${l}<//>`)}>
+      <${Stack}>
+        <${Surface} kind="aside"><${Text}><strong>${E('tpl.warnLead')}</strong> ${E('tpl.warn')}<//><//>
+
+        <div>
+          ${(list || []).map(tpl => html`
+            <${Fold} key=${tpl.id} number=${tpl.id} title=${E('kind.' + tpl.id)}
+              sub=${tpl.isCustom ? E('tpl.edited', { lang }) : E('tpl.builtIn')}
+              open=${open === tpl.id} onToggle=${() => setOpen(open === tpl.id ? null : tpl.id)}>
+              <${Editor} key=${tpl.id + '-' + lang} tpl=${tpl} locale=${lang} onSave=${onSave} onReset=${onReset} />
+            <//>`)}
         </div>
-      </div>
 
-      <div class="og-box poster-aside poster-aside--small">
-        <b>${E('tpl.warnLead')}</b> ${E('tpl.warn')}
-      </div>
-
-      <div class="adm-em-templates">
-        ${(list || []).map(tpl => html`
-          <button type="button" class="adm-em-fold ${open === tpl.id ? 'is-open' : ''}" onClick=${() => setOpen(open === tpl.id ? null : tpl.id)}>
-            <i>${tpl.id}</i><b>${E('kind.' + tpl.id)}</b>
-            <em>${tpl.isCustom ? E('tpl.edited', { lang }) : E('tpl.builtIn')}</em>
-            <span class="adm-em-fold-arrow">${open === tpl.id ? '▴' : '▾'}</span>
-          </button>
-          ${open === tpl.id && html`<${Editor} key=${tpl.id + '-' + lang} tpl=${tpl} locale=${lang} onSave=${onSave} onReset=${onReset} />`}`)}
-      </div>
-
-      <div class="adm-em-act">
-        ${seeded
-    ? html`<button type="button" class="og-door og-door--quiet" onClick=${seedAll}>${E('tpl.reseed')}</button>
-           <button type="button" class="og-door og-door--quiet og-door--danger" onClick=${resetAll}>${E('tpl.resetAll')}</button>`
-    : html`<button type="button" class="og-door og-door--quiet" onClick=${seedAll}>${E('tpl.seedDefaults')}</button>`}
-        <p>${seeded ? E('tpl.seededNote') : E('tpl.seedNote')}</p>
-        ${said && html`<span class="adm-em-said ${said.ok ? 'is-ok' : 'is-bad'}">${said.text}</span>`}
-      </div>
-      <p class="adm-em-note">${E('tpl.bothParts')}</p>
+        <${Stack} direction="wrap" align="center">
+          ${seeded
+    ? html`<${Action} onClick=${seedAll}>${E('tpl.reseed')}<//>
+           <${Action} tone="danger" onClick=${resetAll}>${E('tpl.resetAll')}<//>`
+    : html`<${Action} onClick=${seedAll}>${E('tpl.seedDefaults')}<//>`}
+          <${Text} kind="caption" tone="muted">${seeded ? E('tpl.seededNote') : E('tpl.seedNote')}<//>
+          ${said && html`<${Text} kind="caption" tone=${said.ok ? 'success' : 'danger'}>${said.text}<//>`}
+        <//>
+        <${Text} kind="caption" tone="muted">${E('tpl.bothParts')}<//>
+      <//>
       <${ConfirmUI} />
-    </section>`;
+    <//>`;
 }

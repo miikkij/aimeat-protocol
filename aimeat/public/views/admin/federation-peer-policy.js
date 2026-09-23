@@ -21,6 +21,8 @@
  *   - PeerPolicyCell — the per-peer control group
  * @usage <${PeerPolicyCell} peer=${p} onUpdate=${(field, value) => doUpdatePolicy(p.node_id, field, value)} />
  * @version-history
+ *   v2.0.0 -- 2026-09-22 -- Composed from the shared component set: shared checkbox and select fields,
+ *     the ladder as a folding surface of key-value rows. The clamp and its ✗ with the reason stay.
  *   v1.2.0 — 2026-09-05 — A tier-locked switch is marked ✗ with its title, not a padlock emoji: no emoji anywhere in the interface.
  *   v1.1.0 — 2026-09-03 — The routing switch carries a sentence saying which way it points, and is
  *     labelled "Relay to this peer". Every other switch here answers "may this peer do X on my
@@ -31,6 +33,7 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
+import { Stack, Field, KeyValue, Surface, Text } from '/components/poster-parts.js';
 
 /**
  * What each tier may be raised to. The mirror of tierCeiling() in services/federation-tiers.ts —
@@ -68,67 +71,39 @@ const CAPABILITIES = [
  * tier MEANS is a property of the system; which rung a peer is on is the property of the row.
  */
 export function TierLadderLegend() {
-  return html`
-    <details class="adm-tier-ladder">
-      <summary>${t('dashboard.fedTierLadderTitle')}</summary>
-      <dl class="adm-tier-ladder-list">
-        ${['contact', 'visiting', 'member', 'genesis'].map(tier => html`
-          <div class="adm-tier-ladder-row" key=${tier}>
-            <dt>${t(`dashboard.fedTier_${tier}`)}</dt>
-            <dd>${t(`dashboard.fedTierMeaning_${tier}`)}</dd>
-          </div>`)}
-      </dl>
-    </details>`;
+  return html`<${Surface} kind="plain" density="flush" summary=${t('dashboard.fedTierLadderTitle')}>
+    <div>
+      ${['contact', 'visiting', 'member', 'genesis'].map(tier => html`<${KeyValue} key=${tier}
+        label=${t(`dashboard.fedTier_${tier}`)} value=${t(`dashboard.fedTierMeaning_${tier}`)} />`)}
+    </div>
+  <//>`;
 }
 
 export default function PeerPolicyCell({ peer, onUpdate }) {
   const tier = peer.tier || 'member';
   const ceiling = CEILING[tier] || CEILING.member;
 
-  return html`
-    <div class="adm-peer-policy">
+  return html`<${Stack} density="compact">
+    ${CAPABILITIES.map(cap => {
+      // Absent means true for everything a peer written before these words existed could already do.
+      const on = cap.field === 'allow_federated_auth' ? !!peer[cap.field] : peer[cap.field] !== false;
+      const allowed = ceiling[cap.field];
+      return html`<${Stack} key=${cap.field} density="compact">
+        <${Stack} direction="horizontal" align="center" density="compact">
+          <${Field} type="checkbox" label=${t(`dashboard.${cap.label}`)} value=${on && allowed} disabled=${!allowed}
+            onChange=${(e) => onUpdate(cap.field, e.target.checked)} />
+          ${!allowed && html`<${Text} kind="mono" tone="muted" title=${t('dashboard.fedTierLocked')}>✗<//>`}
+        <//>
+        ${cap.hint && html`<${Text} kind="caption" tone="muted">${t(`dashboard.${cap.hint}`)}<//>`}
+      <//>`;
+    })}
 
-      ${CAPABILITIES.map(cap => {
-    // Absent means true for everything a peer written before these words existed could already do.
-    const on = cap.field === 'allow_federated_auth' ? !!peer[cap.field] : peer[cap.field] !== false;
-    const allowed = ceiling[cap.field];
-    return html`
-          <div class="adm-peer-policy-item" key=${cap.field}>
-            <label class="adm-text-sm adm-peer-policy-row">
-              <input
-                type="checkbox"
-                checked=${on && allowed}
-                disabled=${!allowed}
-                onChange=${(e) => onUpdate(cap.field, e.target.checked)}
-              />
-              <span class=${allowed ? '' : 'adm-text-dim'}>${t(`dashboard.${cap.label}`)}</span>
-              ${!allowed && html`<span class="adm-peer-policy-locked" title=${t('dashboard.fedTierLocked')}>✗</span>`}
-            </label>
-            ${cap.hint && html`<p class="adm-peer-policy-hint">${t(`dashboard.${cap.hint}`)}</p>`}
-          </div>`;
-  })}
+    <${Field} type="select" value=${peer.peer_mode || 'federation'} disabled=${!!ceiling.peer_mode}
+      options=${[{ value: 'federation', label: t('dashboard.fedPeerModeFederation') }, { value: 'private', label: t('dashboard.fedPeerModePrivate') }]}
+      onChange=${(e) => onUpdate('peer_mode', e.target.value)} />
 
-      <select
-        class="adm-input adm-peer-policy-mode"
-        value=${peer.peer_mode || 'federation'}
-        disabled=${!!ceiling.peer_mode}
-        onChange=${(e) => onUpdate('peer_mode', e.target.value)}
-      >
-        <option value="federation">${t('dashboard.fedPeerModeFederation')}</option>
-        <option value="private">${t('dashboard.fedPeerModePrivate')}</option>
-      </select>
-
-      <label class="adm-text-sm adm-peer-policy-row adm-peer-policy-support">
-        <input
-          type="checkbox"
-          checked=${!!peer.support_upstream}
-          disabled=${peer.allow_messaging === false}
-          onChange=${(e) => onUpdate('support_upstream', e.target.checked)}
-        />
-        <span>${t('dashboard.fedSupportUpstream')}</span>
-      </label>
-      ${peer.support_upstream && html`
-        <p class="adm-peer-policy-note">${t('dashboard.fedSupportUpstreamOn')}</p>
-      `}
-    </div>`;
+    <${Field} type="checkbox" label=${t('dashboard.fedSupportUpstream')} value=${!!peer.support_upstream}
+      disabled=${peer.allow_messaging === false} onChange=${(e) => onUpdate('support_upstream', e.target.checked)} />
+    ${peer.support_upstream && html`<${Text} kind="caption" tone="muted">${t('dashboard.fedSupportUpstreamOn')}<//>`}
+  <//>`;
 }

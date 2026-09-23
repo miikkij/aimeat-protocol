@@ -10,6 +10,8 @@
  *   - doRebuild(): calls rebuildDirectory() and surfaces success/error feedback
  *
  * @version-history
+ *   v2.0.0 -- 2026-09-22 -- Composed from the shared component set: the maintenance card is a small
+ *     section, the rebuild an underlined action, the result a toned line. No inline styles left.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { h } from 'preact';
@@ -19,6 +21,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { StatsGrid, ExpandableHelp } from './shared.js';
 import { rebuildDirectory } from '/js/services/admin.js';
+import { Section, Stack, Action, Text } from '/components/poster-parts.js';
 
 export default function DirectoryTab({ data }) {
   const dir = data.directory;
@@ -37,9 +40,9 @@ export default function DirectoryTab({ data }) {
     setRebuilding(false);
   }
 
-  return html`
-    <p style="color:var(--text-dim);font-size:.85rem;margin-bottom:12px">${t('dashboard.directoryExplain')}</p>
-    <${ExpandableHelp} title=${t('dashboard.directoryHelpTitle')}>${t('dashboard.directoryHelpDetail')}</${ExpandableHelp}>
+  return html`<${Stack}>
+    <${Text} tone="muted">${t('dashboard.directoryExplain')}<//>
+    <${ExpandableHelp} title=${t('dashboard.directoryHelpTitle')}>${t('dashboard.directoryHelpDetail')}<//>
 
     <${StatsGrid} items=${[
       { label: t('dashboard.totalEntries'), value: dir?.total || 0, tone: 'cyan' },
@@ -47,12 +50,12 @@ export default function DirectoryTab({ data }) {
       { label: t('dashboard.categories'), value: dir?.categories || 0, tone: 'amber' },
     ]} />
 
-    <div class="adm-card" style="margin-top:12px">
-      <h4 style="margin:0 0 12px">${t('dashboard.directoryMaintenance')}</h4>
-      <button class="adm-btn" onClick=${doRebuild} disabled=${rebuilding}>
-        ${rebuilding ? '...' : t('dashboard.rebuildIndex')}
-      </button>
-      ${result && html`<div style="margin-top:8px;font-size:.85rem;color:${result.ok ? '#22c55e' : '#ef4444'}">${result.msg}</div>`}
-    </div>
-  `;
+    <${Section} title=${t('dashboard.directoryMaintenance')} size="small">
+      <${Stack} direction="wrap" align="center">
+        <${Action} onClick=${doRebuild} disabled=${rebuilding}>
+          ${rebuilding ? '...' : t('dashboard.rebuildIndex')}<//>
+        ${result && html`<${Text} tone=${result.ok ? 'success' : 'danger'}>${result.msg}<//>`}
+      <//>
+    <//>
+  <//>`;
 }

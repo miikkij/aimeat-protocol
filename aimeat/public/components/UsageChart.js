@@ -6,7 +6,10 @@
  *   Chart.js (`/lib/chartjs@4.js`, global `window.Chart` — NOT a CDN, so it works under
  *   the app CSP), draws into a `<canvas>`, and destroys/rebuilds the chart when its data
  *   changes and on unmount. The `stacked` flag turns on stacked axes for per-app
- *   spend-over-time bars. Axis/grid/legend colors are dark-theme tokens.
+ *   spend-over-time bars. The axis, grid and legend read the theme's tokens (--text-dim, --border,
+ *   --font-mono) when the chart is drawn, and the chart redraws when the theme changes, so a theme
+ *   reaches the charts like every other part. `type="spark"` is a small line with no axes or legend,
+ *   for one figure's trend beside it; the tooltip still gives each day's reading.
  * @structure
  *   - UsageChart({ type, labels, datasets, stacked, height, legend, yFormat }) — the component
  *   - APP_PALETTE / colorForIndex(i) — stable, distinct data-series colors (cycled for N apps)
@@ -15,11 +18,14 @@
  *   import { UsageChart, colorForIndex } from '/components/UsageChart.js';
  *   html`<${UsageChart} stacked labels=${days} datasets=${series} yFormat=${usd} />`
  * @version-history
+ *   v1.1.0 — 2026-09-22 — The axis, grid and legend colours and the tick face come from the theme
+ *     tokens instead of fixed slate values, and the chart redraws on a theme change. A series without
+ *     a colour takes the coral token. New `type="spark"` for the admin Statistics sparklines.
  *   v1.0.0 — 2026-07-05 — Initial: shared chart primitive for the AI-spend charts
  *     (Generator panel, profile home card, admin AI Apps Usage tab).
  */
 import { h } from 'preact';
-import { useRef, useEffect } from 'preact/hooks';
+import { useRef, useEffect, useState } from 'preact/hooks';
 import htm from 'htm';
 import { swallowed } from '/js/swallowed.js';
 const html = htm.bind(h);
@@ -48,8 +54,23 @@ export const APP_PALETTE = [
 ];
 export const colorForIndex = (i) => APP_PALETTE[((i % APP_PALETTE.length) + APP_PALETTE.length) % APP_PALETTE.length];
 
-const AXIS = '#94a3b8';
-const GRID = 'rgba(148,163,184,0.15)';
+/** The chrome colours and face, read from the theme tokens at draw time (Chart.js needs strings). */
+function themeInk() {
+  const cs = getComputedStyle(document.documentElement);
+  const v = (name, fallback) => (cs.getPropertyValue(name) || '').trim() || fallback;
+  return { axis: v('--text-dim', 'gray'), grid: v('--border', 'lightgray'), accent: v('--accent', 'tomato'), mono: v('--font-mono', 'monospace') };
+}
+
+/** A number that changes whenever the page's theme or palette changes, so a chart redraws in it. */
+function useThemeVersion() {
+  const [version, setVersion] = useState(0);
+  useEffect(() => {
+    const obs = new MutationObserver(() => setVersion((n) => n + 1));
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'data-palette'] });
+    return () => obs.disconnect();
+  }, []);
+  return version;
+}
 
 /**
  * UsageChart — themed Chart.js canvas.
@@ -59,11 +80,13 @@ const GRID = 'rgba(148,163,184,0.15)';
 export function UsageChart({ type = 'bar', labels = [], datasets = [], stacked = false, height = 220, legend = true, yFormat }) {
   const canvasRef = useRef(null);
   const chartRef = useRef(null);
+  const themeVersion = useThemeVersion();
+  const spark = type === 'spark';
 
   // Signature so the chart only rebuilds when the plotted data actually changes
   // (datasets/labels get fresh array identities on every parent render).
   const sig = JSON.stringify({
-    type, stacked, legend, labels,
+    type, stacked, legend, labels, spark,
     datasets: datasets.map((d) => ({ l: d.label, d: d.data, c: d.backgroundColor })),
   });
 
@@ -72,27 +95,35 @@ export function UsageChart({ type = 'bar', labels = [], datasets = [], stacked =
     ensureChartJs().then((Chart) => {
       if (cancelled || !canvasRef.current) return;
       if (chartRef.current) { chartRef.current.destroy(); chartRef.current = null; }
+      const ink = themeInk();
+      const font = { family: ink.mono, size: 10 };
+      // A series without its own colour takes the coral token.
+      const series = datasets.map((d) => ({
+        ...d,
+        ...(d.backgroundColor || d.borderColor ? {} : { backgroundColor: ink.accent, borderColor: ink.accent }),
+        ...(spark ? { pointRadius: 0, borderWidth: d.borderWidth || 2, tension: 0, fill: false } : {}),
+      }));
       chartRef.current = new Chart(canvasRef.current, {
-        type,
-        data: { labels, datasets },
+        type: spark ? 'line' : type,
+        data: { labels, datasets: series },
         options: {
           responsive: true,
           maintainAspectRatio: false,
           interaction: { mode: 'index', intersect: false },
           plugins: {
-            legend: legend
-              ? { labels: { color: AXIS, boxWidth: 12, font: { size: 11 } } }
+            legend: legend && !spark
+              ? { labels: { color: ink.axis, boxWidth: 12, font: { ...font, size: 11 } } }
               : { display: false },
             tooltip: yFormat
               ? { callbacks: { label: (c) => `${c.dataset.label}: ${yFormat(c.parsed.y)}` } }
               : {},
           },
-          scales: {
-            x: { stacked, ticks: { color: AXIS, maxRotation: 45, font: { size: 10 } }, grid: { color: GRID } },
+          scales: spark ? { x: { display: false }, y: { display: false, beginAtZero: true } } : {
+            x: { stacked, ticks: { color: ink.axis, maxRotation: 45, font }, grid: { color: ink.grid } },
             y: {
               stacked, beginAtZero: true,
-              ticks: { color: AXIS, font: { size: 10 }, callback: yFormat ? (v) => yFormat(v) : undefined },
-              grid: { color: GRID },
+              ticks: { color: ink.axis, font, callback: yFormat ? (v) => yFormat(v) : undefined },
+              grid: { color: ink.grid },
             },
           },
         },
@@ -107,7 +138,7 @@ export function UsageChart({ type = 'bar', labels = [], datasets = [], stacked =
     // identities every render and yFormat is display-only — listing them would
     // destroy/recreate the chart on every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sig, height]);
+  }, [sig, height, themeVersion]);
 
   return html`<div class="usage-chart" style="--usage-chart-h:${height}px"><canvas ref=${canvasRef}></canvas></div>`;
 }
