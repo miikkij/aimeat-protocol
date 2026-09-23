@@ -26,6 +26,7 @@
  * @structure main() · parseRules() · classesIn() · tokensIn() · importGraph() · buildFacts() · problems()
  * @usage pnpm build:ui-library · pnpm check:ui-library
  * @version-history
+ *   v1.2.1 — 2026-09-24 — usesClass escapes every regex metacharacter in a class name, not only '-'.
  *   v1.2.0 — 2026-09-23 — The design lab's decisions are held to their samples and crops.
  *   v1.1.0 — 2026-09-23 — The design lab's demos are held to the catalogue (phase 2).
  *   v1.0.0 — 2026-09-23 — Initial (UI consolidation phase 1).
@@ -163,8 +164,11 @@ function exportsOf(src: string): string[] {
     return uniqSorted([...src.matchAll(/export\s+(?:async\s+)?(?:function|const|let|class)\s+([A-Za-z_$][\w$]*)/g)].map(m => m[1]));
 }
 
+// Every regex metacharacter escaped, the backslash included: a class name is text to find, and a
+// hand-picked list (only '-' until 2026-09-24, CodeQL js/incomplete-sanitization) misses the rest.
+const escapeRegExp = (s: string): string => s.replace(/[.*+?^${}()|[\]\\-]/g, '\\$&');
 const usesClass = (src: string, cls: string): boolean =>
-    new RegExp(`(?<![\\w-])${cls.replace(/[-]/g, '\\-')}(?![\\w-])`).test(src);
+    new RegExp(`(?<![\\w-])${escapeRegExp(cls)}(?![\\w-])`).test(src);
 
 export function buildFacts(entries: UiEntrySource[]): Record<string, UiEntryFacts> {
     const files = sourceFiles();
