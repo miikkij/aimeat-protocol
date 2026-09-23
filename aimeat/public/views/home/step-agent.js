@@ -172,7 +172,7 @@ export function StepAgent({ onChanged, showToast }) {
             value=${agentName}
             onInput=${(e) => setAgentName(e.target.value)} />
           <${ActionRow}>
-            <button type="button" class=${cleanName ? 'btn-primary' : 'btn-outline'}
+            <button type="button" class=${cleanName ? 'btn-primary poster-slab' : 'btn-outline'}
               disabled=${!cleanName}
               onClick=${() => {
                 setAgentName(cleanName); setNamed(true);
@@ -208,14 +208,14 @@ export function StepAgent({ onChanged, showToast }) {
           <${PromptCard}
             label=${tr('home.agent.promptLabel', 'The prompt')}
             prompt=${prompt}
-            className=${waiting ? 'btn-outline' : 'btn-primary'}
+            className=${waiting ? 'btn-outline' : 'btn-primary poster-slab'}
             copyLabel=${tr('home.agent.copy', 'Copy the prompt')}
             copiedLabel=${tr('home.agent.copied', 'Copied. Paste it in your AI chat')}
             onCopied=${() => setWaiting(true)} />
         ` : html`
           <${StepList} steps=${steps} />
           <${ActionRow}>
-            <button type="button" class=${waiting ? 'btn-outline' : 'btn-primary'} onClick=${() => setWaiting(true)}>
+            <button type="button" class=${waiting ? 'btn-outline' : 'btn-primary poster-slab'} onClick=${() => setWaiting(true)}>
               ${tr('home.agent.doneManual', 'I have started it')}
             </button>
           <//>`}

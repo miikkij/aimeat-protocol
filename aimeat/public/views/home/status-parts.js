@@ -322,7 +322,7 @@ export function Playbooks({ playbooks, tour }) {
                 drains it INTO THE COMPOSER and the person presses send themselves. A ?ask= query
                 param would have been a second contract, and the chat reads no such thing — a
                 button that navigates somewhere unprepared is the defect this avoids. */''}
-          <button type="button" class="btn-primary" onClick=${() => askAgent(pb)}>
+          <button type="button" class="btn-primary poster-slab" onClick=${() => askAgent(pb)}>
             ${tr('home.playbooks.ask', 'Ask my agent')}
           </button>
           <button type="button" class="btn-outline" onClick=${() => copyPrompt(pb)}>
