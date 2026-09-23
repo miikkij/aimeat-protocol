@@ -5,15 +5,11 @@
  * @description What the Knowledge cover, the package page and the public library share: the words a
  *   package is described in (kind, maturity, synthesis, visibility, a relation), what a manifest
  *   adds up to (entries, public entries, references and how many are verified), which group a
- *   package belongs to (drafts, published, datasets), the rows of packages, the crumb and the page
- *   frame with its rail, all composed from the shared set (components/poster-parts.js).
- * @structure c · words · pkgId · statsOf · groupOf · packageRows · crumb · pageLinks · renderPage · entryText
+ *   package belongs to (drafts, published, datasets), the rows of a packages table, the crumb and
+ *   the page frame with its rail.
+ * @structure c · words · pkgId · statsOf · groupOf · packageRows · crumb · renderPage · entryText
  * @usage import { renderPage, packageRows, statsOf } from './frame.js';
  * @version-history
- *   v2.1.0 -- 2026-09-22 -- The lines() <br> helper is gone: the set's Text keeps typed line breaks.
- *   v2.0.0 -- 2026-09-22 -- Composed from the shared component set: a package is a ListRow, the
- *     crumb is the Masthead trail, the page frame is Page with an index Rail, so the page follows
- *     the one theme and has no sheet of its own. The rail's arrows are the allowed → and ↩.
  *   v1.2.0 -- 2026-09-13 -- Compose existing top rules from poster.css.
  *   v1.1.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.0.0 — 2026-08-30 — Initial.
@@ -24,7 +20,6 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { date as fmtDate, num as fmtNum } from '/js/format.js';
 import { formatRelativeTime } from '/views/profile/memory-tab/helpers.js';
-import { Page, Rail, Stack, ListRow, Action, Text } from '/components/poster-parts.js';
 
 export const c = (key, vars) => t('knowledge.cover.' + key, vars);
 // The loc() helper here derived the FORMAT from the LANGUAGE. /js/format.js reads the
@@ -89,45 +84,57 @@ export function entryText(data) {
   return JSON.stringify(data, null, 2);
 }
 
-/**
- * Rows of packages: name and its line, the entries at the right, a door; the references, the
- * sharing state and when it changed on the line under. (A Table crushed the name column on a phone.)
- */
+/** Rows of a packages table: name and its line, entries, sharing, changed, a door. */
 export function packageRows(ctx, list) {
-  return html`<div>${list.map(pkg => { const m = manifestOf(pkg); const s = statsOf(m); const id = pkgId(pkg); const open = () => ctx.pickView({ kind: 'package', id }); return html`
-    <${ListRow} key=${id} density="compact" detailKind="text" name=${m.name || c('untitled')} onOpen=${open} detail=${subOf(m)}
-      value=${`${s.entries} ${c('entriesWord', { n: s.entries })}`}
-      actions=${html`<${Action} onClick=${open}>${c('open')}<//>`}>
-      <${Text} kind="mono" tone="muted">${[s.refs ? c('refsVerified', { v: s.verified, n: s.refs }) : '', sharingWords(m, !!ctx.fedConsents?.[id]).join(' · '), rel(m.updated || pkg.updated_at || pkg.updatedAt)].filter(Boolean).join(' · ')}<//>
-    <//>`; })}</div>`;
+  return html`<div class="kp-rows">
+    ${list.map(pkg => { const m = manifestOf(pkg); const s = statsOf(m); const id = pkgId(pkg); return html`
+      <div class="kp-nm" key=${'n' + id}><button type="button" class="og-tbl-name" onClick=${() => ctx.pickView({ kind: 'package', id })}>${m.name || c('untitled')}</button><small>${subOf(m)}</small></div>
+      <div class="kp-m" key=${'e' + id}><b>${s.entries}</b> ${c('entriesWord', { n: s.entries })}${s.refs ? html`<br />${c('refsVerified', { v: s.verified, n: s.refs })}` : null}</div>
+      <div class="kp-w" key=${'s' + id}>${sharingWords(m, !!ctx.fedConsents?.[id]).join(' · ')}</div>
+      <div class="kp-m" key=${'u' + id}>${rel(m.updated || pkg.updated_at || pkg.updatedAt)}</div>
+      <div class="og-tbl-door" key=${'d' + id}><button type="button" class="og-door" onClick=${() => ctx.pickView({ kind: 'package', id })}>${c('open')}</button></div>`; })}
+  </div>`;
 }
+export const rowsHead = () => html`<div class="kp-rows kp-rows--head"><div>${c('colPackage')}</div><div>${c('colEntries')}</div><div>${c('colSharing')}</div><div>${c('colChanged')}</div><div></div></div>`;
 
 /* ── The crumb and the page frame ──────────────────────────────────────────────────────────── */
-/** The trail as Masthead crumbs: Settings & Controls, Knowledge, then the parts. */
 export function crumb(ctx, parts) {
-  return [
-    { label: t('nav.profile') },
-    { label: t('knowledge.tabLabel'), onClick: parts.length ? () => ctx.pickView({ kind: 'cover' }) : undefined },
-    ...parts.map(p => ({ label: p })),
-  ];
+  return html`
+    <div class="og-crumb">
+      <span>${t('nav.profile')}</span><span>/</span>
+      ${parts.length ? html`<button type="button" class="og-crumb-link" onClick=${() => ctx.pickView({ kind: 'cover' })}>${t('knowledge.tabLabel')}</button>` : html`<span class="og-crumb-here">${t('knowledge.tabLabel')}</span>`}
+      ${parts.map((p, i) => html`<span key=${i}>/</span><span class="og-crumb-here">${p}</span>`)}
+    </div>`;
 }
 
 export function pageLinks() {
-  return html`<${Stack} density="compact">
-    <${Text} kind="label">${c('pages')}<//>
-    <${Action} onClick=${() => window.open('/v1/publicknowledgeviewer', '_blank', 'noopener')}>${c('library')} →<//>
-    <${Action} onClick=${() => window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId: 'discover' } }))}>${t('discover.title')} →<//>
-  <//>`;
+  return html`
+    <button type="button" class="og-rail-link" onClick=${() => window.open('/v1/publicknowledgeviewer', '_blank', 'noopener')}><i>→</i>${c('library')}<em>↗</em></button>
+    <button type="button" class="og-rail-link" onClick=${() => window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId: 'discover' } }))}><i>→</i>${t('discover.title')}<em>→</em></button>`;
 }
 
-/** A package's page: the Page frame, its index rail with the door back, and the pages. */
-export function renderPage(ctx, { crumbs, title, chips = null, doors = null, strip = null, railTitle, entries = [], rail = null, children }) {
-  return html`<${Page} title=${title} crumbs=${crumb(ctx, crumbs)} identity=${chips} actions=${doors}
-    rail=${html`<${Rail} kind="index" title=${railTitle} label=${c('railTitle')} entries=${entries}><${Stack}>
-      <${Text} kind="label">${t('knowledge.tabLabel')}<//>
-      <${Action} kind="text" onClick=${() => ctx.pickView({ kind: 'cover' })}>↩ ${c('backTo')}<//>
-      ${rail}${pageLinks()}
-    <//><//>`}>
-    ${strip}<${Stack}>${children}<//>
-  <//>`;
+export function renderPage(ctx, { crumbs, title, chips = null, doors = null, strip = null, rail = null, children }) {
+  return html`
+    <div class="og og-kp og-page">
+      ${crumb(ctx, crumbs)}
+      <div class="og-mast og-mast--page">
+        <div class="og-mast-words">
+          <h1 class="og-title poster-page-title kp-title--page">${title}</h1>
+          ${chips ? html`<div class="og-chips">${chips}</div>` : null}
+        </div>
+        ${doors ? html`<div class="og-mast-actions"><div class="og-doors">${doors}</div></div>` : null}
+      </div>
+      ${strip}
+      <div class="og-grid">
+        <div class="og-main poster-row--thing">${children}</div>
+        <nav class="og-rail" aria-label=${c('railTitle')}>
+          <span class="og-rail-label">${t('knowledge.tabLabel')}</span>
+          <button type="button" class="og-rail-link" onClick=${() => ctx.pickView({ kind: 'cover' })}><i>←</i>${c('backTo')}</button>
+          ${rail}
+          <hr />
+          <span class="og-rail-label">${c('pages')}</span>
+          ${pageLinks()}
+        </nav>
+      </div>
+    </div>`;
 }

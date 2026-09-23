@@ -16,8 +16,6 @@
  * @structure default HomeView; shared HomeJourney and HomeSettingsDialog
  * @usage routed at /v1/home by spa.html (and portal.ts spaRoutes, or F5 is a 404)
  * @version-history
- *   2026-09-22: The whole home is composed from the shared set (components/poster-parts.js);
- *     home.css and home-journey.css are gone.
  *   2026-09-14: The failure line is the site's shared toast (theme.css), held for its six seconds.
  *   2026-09-09: Home journey starts with a connected AI; useful prompts and account settings are within reach.
  *   v3.0.0 — 2026-08-26 — The finished home renders through the surface layout engine. The eleven
@@ -58,7 +56,6 @@ import { useSession } from '/js/use-session.js';
 import { getSession } from '/js/services/auth.js';
 import { connect, disconnect, onUpdate, offUpdate } from '/lib/live-updates.js';
 import { Spinner } from '/components/Spinner.js';
-import { Page, Stack, Surface, Action, Text } from '/components/poster-parts.js';
 import { HomeJourney } from './journey.js';
 import { HomeSettingsDialog } from '/views/home/settings-dialog.js';
 import { SurfaceRenderer, useSurfaceLayout } from '/views/surface/renderer.js';
@@ -109,25 +106,30 @@ export default function HomeView({ navigate }) {
 
   if (!session) {
     return html`
-      <${Page} title=${tr('home.signInTitle', 'Step into your home')}>
-        <${Stack} align="start">
-          <${Text} kind="lead" tone="muted">${tr('home.signInDesc', 'Sign in to see where you left off.')}<//>
-          <${Action} kind="primary" onClick=${() => navigate('/v1/portal')}>
+      <div class="koti">
+        <header class="koti-welcome">
+          <h1 class="koti-h1">${tr('home.signInTitle', 'Step into your home')}</h1>
+          <p class="koti-welcome-sub">${tr('home.signInDesc', 'Sign in to see where you left off.')}</p>
+        </header>
+        <div class="koti-actions">
+          <button type="button" class="btn-primary" onClick=${() => navigate('/v1/portal')}>
             ${tr('home.signIn', 'Sign in')}
-          <//>
-        <//>
-      <//>`;
+          </button>
+        </div>
+      </div>`;
   }
 
   if (!stateReady || !surface.ready) {
-    return html`<${Page}><${Stack} align="center"><${Spinner} /><//><//>`;
+    return html`<div class="koti koti-loading"><${Spinner} /></div>`;
   }
 
   if (!state) {
     return html`
-      <${Page}><${Surface} kind="aside" tone="danger" role="alert">
-        <${Text}>${tr('home.loadFailed', 'Your home could not be loaded just now. Try again in a moment.')}<//>
-      <//><//>`;
+      <div class="koti">
+        <div class="koti-error" role="alert">
+          <p class="koti-error-text">${tr('home.loadFailed', 'Your home could not be loaded just now. Try again in a moment.')}</p>
+        </div>
+      </div>`;
   }
 
   // What a block cannot fetch for itself: who is signed in, where the router goes, the way into the
@@ -140,7 +142,7 @@ export default function HomeView({ navigate }) {
   };
 
   return html`
-    <${Page}>
+    <div class="koti">
       <${SurfaceRenderer}
         layout=${surface.layout}
         freeform=${surface.freeform}
@@ -149,5 +151,5 @@ export default function HomeView({ navigate }) {
       <${HomeSettingsDialog} open=${settingsOpen} onClose=${() => setSettingsOpen(false)}
         session=${session} showToast=${showToast} />
       ${toast && html`<div class="toast toast-error toast-hold" role="status">${toast}</div>`}
-    <//>`;
+    </div>`;
 }

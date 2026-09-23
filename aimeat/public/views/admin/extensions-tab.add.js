@@ -12,8 +12,6 @@
  *   - Scaffold({ onReload }) — section 04, the form and what an action script may do
  *
  * @version-history
- *   v2.0.0 -- 2026-09-22 -- Composed from the shared component set: sections, columns of release
- *     cards, the sandbox rules as compact list rows, and the ctx reference as a folding code surface.
  *   v1.1.0 — 2026-09-13 — Compose existing section headings from shared poster B1.
  *   v1.0.0 — 2026-09-12 — Initial, with the page renamed from Services to Extensions.
  */
@@ -23,7 +21,6 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { num, Empty, useToast, Toast } from './shared.js';
-import { Section, Columns, Stack, Surface, ListRow, Steps, Text } from '/components/poster-parts.js';
 import { getAvailableExtensions, installBundledExtension, reinstallExtension } from '/js/services/admin.js';
 import { AvailableExtCard } from './extensions-tab.available-card.js';
 import { ScaffoldForm } from './extensions-tab.scaffold-form.js';
@@ -60,45 +57,52 @@ export function Bundled({ installedNames, onReload }) {
 
   const notIn = list.filter(e => !(e.installed || installedNames.has(e.name))).length;
 
-  return html`<${Section} title=${X('bundled.title')} count="03" description=${X('bundled.lead')}
-    actions=${html`<${Text} kind="caption" tone="muted">${X('bundled.count', { n: num(notIn), total: num(list.length) })}<//>`}>
-    <${Stack}>
+  return html`
+    <section class="og-sec">
       ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
-      ${loading && html`<${Text} kind="caption" tone="muted">${t('dashboard.loading')}<//>`}
+      <div class="og-sec-h">
+        <h2 class="poster-section-title">${X('bundled.title')}<small>03</small></h2>
+        <div class="og-doors"><span class="og-door og-door--quiet">${X('bundled.count', { n: num(notIn), total: num(list.length) })}</span></div>
+      </div>
+      <p class="adm-ex-lead">${X('bundled.lead')}</p>
+      ${loading && html`<p class="adm-ex-hint">${t('dashboard.loading')}</p>`}
       ${!loading && list.length === 0 && html`<${Empty} text=${X('bundled.none')} />`}
-      ${list.length > 0 && html`<${Columns} layout="thirds" collapse=${900}>
-        ${list.map(e => html`<${AvailableExtCard} key=${e.name} ext=${e}
+      <div class="adm-ex-cards">
+        ${list.map(e => html`<${AvailableExtCard} ext=${e}
           isInstalled=${e.installed || installedNames.has(e.name)}
           isInstalling=${busy === e.name}
           onInstall=${install} onReinstall=${again} reload=${onReload} loadAvailable=${load} />`)}
-      <//>`}
-      <${Text} kind="caption" tone="muted">${X('bundled.note')}<//>
-    <//>
-  <//>`;
+      </div>
+      <p class="adm-ex-note">${X('bundled.note')}</p>
+    </section>`;
 }
 
 /** Section 04: write one, and what the sandbox will and will not let it do. */
 export function Scaffold({ onReload }) {
-  return html`<${Section} title=${X('write.title')} count="04" description=${X('write.lead')}>
-    <${Stack}>
-      <${Columns} layout="leading" collapse=${900}>
-        <${ScaffoldForm} onCreated=${onReload} />
-        <${Stack} density="compact">
-          <${Text} kind="label">${X('write.mayTitle')}<//>
-          <${Surface} kind="box" density="compact">
-            <${ListRow} density="compact" name=${X('write.ownStorage')} value=${html`<${Text} kind="mono">${'ext:<name>'}<//>`} />
-            <${ListRow} density="compact" name=${X('write.personData')} value=${html`<${Text} kind="mono">${X('write.withConsent')}<//>`} />
-            <${ListRow} density="compact" name=${X('write.outside')} value=${html`<${Text} kind="mono">${X('write.declaredOnly')}<//>`} />
-            <${ListRow} density="compact" name=${X('write.otherExts')} value=${html`<${Text} kind="mono">${X('write.no')}<//>`} />
-          <//>
-          <${Text} kind="caption" tone="muted">${X('write.sandboxWhy')}<//>
-        <//>
-      <//>
+  return html`
+    <section class="og-sec">
+      <div class="og-sec-h"><h2 class="poster-section-title">${X('write.title')}<small>04</small></h2></div>
+      <p class="adm-ex-lead">${X('write.lead')}</p>
+      <div class="adm-ex-grid">
+        <div>
+          <${ScaffoldForm} onCreated=${onReload} />
+        </div>
+        <div>
+          <div class="adm-ex-lbl">${X('write.mayTitle')}</div>
+          <div class="adm-ex-box">
+            <div class="adm-ex-box-row"><em>${X('write.ownStorage')}</em><span>${'ext:<name>'}</span></div>
+            <div class="adm-ex-box-row"><em>${X('write.personData')}</em><span>${X('write.withConsent')}</span></div>
+            <div class="adm-ex-box-row"><em>${X('write.outside')}</em><span>${X('write.declaredOnly')}</span></div>
+            <div class="adm-ex-box-row"><em>${X('write.otherExts')}</em><span>${X('write.no')}</span></div>
+          </div>
+          <p class="adm-ex-hint">${X('write.sandboxWhy')}</p>
+        </div>
+      </div>
 
-      <${Surface} kind="plain" density="flush" summary=${X('write.ctxTitle')}>
-        <${Stack}>
-          <${Text} kind="caption" tone="muted">${X('write.ctxLead')}<//>
-          <${Surface} kind="code">${[
+      <details class="adm-ex-manual">
+        <summary class="adm-ex-lbl">${X('write.ctxTitle')}</summary>
+        <p class="adm-ex-hint">${X('write.ctxLead')}</p>
+        <pre>${[
     'const { input, memory, wallet, caller, config, instance, log } = ctx;',
     '',
     '// caller.gaii                       ' + X('ctx.caller'),
@@ -116,10 +120,13 @@ export function Scaffold({ onReload }) {
     '// log(message)                      ' + X('ctx.log'),
     '',
     'return { ok: true, data: {} };',
-  ].join('\n')}<//>
-          <${Steps} items=${[X('write.step1'), X('write.step2'), X('write.step3'), X('write.step4')]} />
-        <//>
-      <//>
-    <//>
-  <//>`;
+  ].join('\n')}</pre>
+        <ol>
+          <li>${X('write.step1')}</li>
+          <li>${X('write.step2')}</li>
+          <li>${X('write.step3')}</li>
+          <li>${X('write.step4')}</li>
+        </ol>
+      </details>
+    </section>`;
 }

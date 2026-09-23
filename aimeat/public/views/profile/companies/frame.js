@@ -9,8 +9,6 @@
  * @structure c · day · rel · FIELDS · factsOf · missingWord · kindWord · senderWord · crumb · pageLinks
  * @usage import { c, FIELDS, factsOf, crumb, pageLinks } from './frame.js';
  * @version-history
- *   2026-09-22 -- Composed from the shared set: the crumb is Masthead crumbs (Companies links back
- *     from a company's page) and the rail links are text actions; no class of its own.
  *   v1.0.0 — 2026-08-31 — Initial (design canvas "AIMEAT Yritysten sivu", direction A).
  */
 import { h } from 'preact';
@@ -19,7 +17,6 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { date as fmtDate } from '/js/format.js';
 import { formatRelativeTime } from '/views/profile/memory-tab/helpers.js';
-import { Action, Stack, Text } from '/components/poster-parts.js';
 
 export const c = (key, vars) => t('companypage.' + key, vars);
 // The locale() helper here derived the FORMAT from the LANGUAGE. They are different settings:
@@ -70,25 +67,18 @@ export const kindWord = (kind) => t('profile.companies.front' + (kind === 'app' 
 /** Whose server the company's mail leaves from. */
 export const senderWord = (smtpSet) => c(smtpSet ? 'senderOwn' : 'senderShared');
 
-/** The trail as Masthead crumbs: Settings & Controls, Business, Companies, and the company when one is open. */
-export function crumb(company, back) {
-  return [
-    { label: t('nav.profile') },
-    { label: t('profile.landing.menuBusiness') },
-    { label: c('title'), onClick: company ? back : undefined },
-    ...(company ? [{ label: company.name }] : []),
-  ];
+export function crumb(company) {
+  return html`<div class="og-crumb"><span>${t('nav.profile')}</span><span>/</span>${company
+    ? html`<span>${c('title')}</span><span>/</span><span class="og-crumb-here">${company.name}</span>`
+    : html`<span class="og-crumb-here">${c('title')}</span>`}</div>`;
 }
 
 const openTab = (tabId) => window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId } }));
-/** The doors to the pages next to this one, for the rail. */
 export function pageLinks() {
-  return html`<${Stack} density="compact">
-    <${Text} kind="label">${c('pages')}<//>
-    <${Action} kind="text" onClick=${() => openTab('pnl')}>→ ${t('profile.tabs.pnl')}<//>
-    <${Action} kind="text" onClick=${() => openTab('email')}>→ ${t('profile.tabs.email')}<//>
-    <${Action} kind="text" onClick=${() => openTab('apps')}>→ ${t('profile.tabs.apps')}<//>
-  <//>`;
+  return html`
+    <button type="button" class="og-rail-link" onClick=${() => openTab('pnl')}><i>→</i>${t('profile.tabs.pnl')}<em>→</em></button>
+    <button type="button" class="og-rail-link" onClick=${() => openTab('email')}><i>→</i>${t('profile.tabs.email')}<em>→</em></button>
+    <button type="button" class="og-rail-link" onClick=${() => openTab('apps')}><i>→</i>${t('profile.tabs.apps')}<em>→</em></button>`;
 }
 export const goTab = openTab;
 

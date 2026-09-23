@@ -18,9 +18,6 @@
  * @structure PagePreview
  * @usage html`<${PagePreview} surface="portal" hasCustom=${false} nonce=${n} unsaved=${3} />`
  * @version-history
- *   v1.1.0 -- 2026-09-22 -- Composed from the shared component set: the frame sits on the shared
- *     stage (a light ground in every theme, sized by the stage, at a phone's width while the
- *     Phone tab is on) under tab actions for the two widths; no inline style and no sheet of its own.
  *   v1.0.0 — 2026-09-12 — Initial.
  */
 import { h } from 'preact';
@@ -28,7 +25,6 @@ import { useState, useEffect, useRef } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { swallowed } from '/js/swallowed.js';
-import { Stack, Text, Action, Surface } from '/components/poster-parts.js';
 
 const html = htm.bind(h);
 const P = (key, params) => t('admin.portal.' + key, params);
@@ -94,42 +90,42 @@ export function PagePreview({ surface, hasCustom, nonce, unsaved, shown }) {
   // A member's page is behind a sign-in, so there is nothing honest to put in a frame here.
   if (surface !== 'portal') {
     return html`
-      <${Surface} kind="box">
-        <${Stack} density="compact">
-          <${Text} kind="label">${P('preview.title')}<//>
-          <${Text} kind="caption" tone="muted">${P('preview.memberOnly')}<//>
-        <//>
-      <//>`;
+      <div class="adm-pt-pv">
+        <div class="adm-pt-pvh"><span class="adm-pt-pvl">${P('preview.title')}</span></div>
+        <p class="adm-pt-pvnote" style="padding: 12px 14px">${P('preview.memberOnly')}</p>
+      </div>`;
   }
 
   const path = hasCustom ? '/' : '/v1/portal';
-  // The shared stage frames the page on a light ground in every theme and sizes the frame.
   return html`
-    <${Stack} density="compact">
-      <${Stack} direction="wrap" align="between">
-        <${Text} kind="label">${P('preview.title')}<//>
-        <${Stack} direction="wrap" align="center" density="compact">
-          <${Action} kind="tab" selected=${!phone} onClick=${() => setPhone(false)}>${P('preview.wide')}<//>
-          <${Action} kind="tab" selected=${phone} onClick=${() => setPhone(true)}>${P('preview.phone')}<//>
-          <${Action} onClick=${() => setFolded(f => !f)} expanded=${!folded}>
-            ${folded ? P('preview.unfold') : P('preview.fold')}
-          <//>
-        <//>
-      <//>
-      ${!folded && html`
-        <${Surface} kind="stage" width=${phone ? 'phone' : undefined}>
-          <iframe ref=${frame} title=${P('preview.title')}
+    <div>
+      <div class="adm-pt-pv">
+        <div class="adm-pt-pvh">
+          <span class="adm-pt-pvl">${P('preview.title')}</span>
+          <span class="adm-pt-pvtools">
+            <button type="button" class="og-door og-door--quiet" onClick=${() => setPhone(false)}
+              aria-pressed=${!phone}>${P('preview.wide')}</button>
+            <button type="button" class="og-door og-door--quiet" onClick=${() => setPhone(true)}
+              aria-pressed=${phone}>${P('preview.phone')}</button>
+            <button type="button" class="og-door og-door--quiet" onClick=${() => setFolded(f => !f)}>
+              ${folded ? P('preview.unfold') : P('preview.fold')}
+            </button>
+          </span>
+        </div>
+        ${!folded && html`
+          <iframe ref=${frame} class=${'adm-pt-frame' + (phone ? ' adm-pt-frame--phone' : '')}
+            title=${P('preview.title')}
             src=${`${path}?_preview=${nonce}`}
-            sandbox="allow-same-origin allow-scripts"></iframe>
-        <//>`}
-      <${Text} kind="caption" tone="muted">
+            sandbox="allow-same-origin allow-scripts"></iframe>`}
+      </div>
+      <p class="adm-pt-pvnote">
         ${unsaved > 0 ? P('preview.noteUnsaved', { n: unsaved }) : P('preview.noteSaved')}
         ${marked > 0 ? ' ' + P('preview.noteNumbers') : ''}
-      <//>
-      <${Stack} direction="wrap" align="center">
-        <${Action} href=${path} target="_blank">${P('preview.open')} →<//>
-      <//>
-    <//>`;
+      </p>
+      <div class="og-doors" style="margin-top: 10px">
+        <a class="og-door og-door--quiet" href=${path} target="_blank" rel="noopener">${P('preview.open')} →</a>
+      </div>
+    </div>`;
 }
 
 export default PagePreview;

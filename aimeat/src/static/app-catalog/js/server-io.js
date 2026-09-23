@@ -29,16 +29,8 @@
  *     as a slab and underlined words, one line about who published it and when); a filtered-out
  *     row's panel hides with it.
  *   v2.3.0 — 2026-09-03 — getServerAppRow(owner, filename): the server's own row for one app, for the detail's Needs section.
- *   v2.5.0 — 2026-09-22 — Drawn from the site's one set (parts-html.js): the consents dialog, the
- *     backup selection (a Table with Field checkboxes and selects, chips for new and existing) and
- *     its result are the set's parts; a status line takes a tone (data-tone) instead of a hex colour;
- *     the menu's view rows sit on the sun through data-selected; sections, empty states and the
- *     restore and unassign buttons show and hide with `hidden`; the agent and fork markers are a chip
- *     and a word instead of emoji and a glyph; a filter hides a row's wrapper (rows.js). The
- *     subdomain and consent group moves to grants-io.js and the backup group to backup-io.js by pure
- *     extraction (the file was past the line ceiling); both are re-exported from here.
  */
-import { escapeHtml, jsArg, sameOwner, filterAttr } from './util.js';
+import { escapeHtml, jsArg, bareOwnerName, sameOwner, filterAttr } from './util.js';
 import { getAllApps, saveApp } from './db.js';
 import { showConfirm, showNotice } from './ui.js';
 import { loadConfig } from './config.js';
@@ -47,20 +39,15 @@ import { closeModal } from './apps-io.js';
 import { getCortexOwnerToken } from './cortex.js';
 import { fetchAppContentBase64, refreshServerMgmt } from './detail.js';
 import { favStarHtml, isFavorite, loadFavorites } from './favorites.js';
-import { rowHtml, toggleRow, fmtDate } from './rows.js';
+import { rowHtml, fmtDate } from './rows.js';
 import { loadPromoted } from './promote.js';
-import { openDlg, closeDlg } from './dialogs.js';
-import { action, chip } from './parts-html.js';
-// Two groups live in their own files (pure extraction, 2026-09-22); every name is re-exported below.
-import { isOperatorSession, loadSubdomainSites, showSubdomainModal, submitSubdomainAssign, unassignSubdomain, closeConsents, openConsents, revokeConsent } from './grants-io.js';
-import { setBackupRefresh, exportBackupZip, importBackupPick, importBackupFile, backupUpdateSummary, backupSelectAll, submitBackupRestore } from './backup-io.js';
+import { openDlg, closeDlg, onDlgClose } from './dialogs.js';
 
 // Injected once at bootstrap by main.js: read getters + write setters for the shared app-state
 // (which stays main-owned), plus a few main-local fns.
 let getMainApps, getServerState, getServerManifests, setServerManifests, getOwnServerApps, setOwnServerApps, getActiveTag, getSearchQuery, getSortMode, generateId, renderApps, refreshAll, setListingLoaded, isListingLoaded, setBoundSkillApps;
 export function initServerIo(deps) {
   ({ getMainApps, getServerState, getServerManifests, setServerManifests, getOwnServerApps, setOwnServerApps, getActiveTag, getSearchQuery, getSortMode, generateId, renderApps, refreshAll, setListingLoaded, isListingLoaded, setBoundSkillApps } = deps);
-  setBackupRefresh(refreshAll);
 }
 
 // Cache of the last full server-app list (own + community) + base URL, so a favourite toggle can
@@ -133,7 +120,7 @@ function showPublishModal(appId, opts) {
   var pubSubmit = document.getElementById('publish-submit-btn');
   if (!getCortexOwnerToken()) {
     pubStatus.textContent = t('publish.loginRequired');
-    pubStatus.dataset.tone = 'coral';
+    pubStatus.style.color = 'var(--accent)';
     pubSubmit.disabled = true;
   } else {
     pubStatus.textContent = '';
@@ -160,13 +147,13 @@ function submitPublish() {
 
   if (!filename || !/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$/.test(filename)) {
     statusEl.textContent = 'Invalid filename. Use letters, numbers, dots, hyphens, underscores.';
-    statusEl.dataset.tone = 'coral';
+    statusEl.style.color = 'var(--accent)';
     return;
   }
 
   if (accessCode && (accessCode.length < 4 || accessCode.length > 64)) {
     statusEl.textContent = 'Access code must be 4-64 characters.';
-    statusEl.dataset.tone = 'coral';
+    statusEl.style.color = 'var(--accent)';
     return;
   }
 
@@ -175,7 +162,7 @@ function submitPublish() {
   var description = document.getElementById('publish-description').value.trim();
   if (!description && !app.published) {
     statusEl.textContent = 'A description is required for a new app. Write 1-2 sentences (your AI can write it).';
-    statusEl.dataset.tone = 'coral';
+    statusEl.style.color = 'var(--accent)';
     return;
   }
   app.description = description;
@@ -186,11 +173,11 @@ function submitPublish() {
     htmlContent = app.blob; // already base64
   } else if (app.url) {
     statusEl.textContent = 'Cannot publish URL-linked apps. Download it first (right-click \u2192 View Source \u2192 Save).';
-    statusEl.dataset.tone = 'coral';
+    statusEl.style.color = 'var(--accent)';
     return;
   } else {
     statusEl.textContent = 'No app content found.';
-    statusEl.dataset.tone = 'coral';
+    statusEl.style.color = 'var(--accent)';
     return;
   }
 
@@ -200,13 +187,13 @@ function submitPublish() {
   var token = getCortexOwnerToken();
   if (!token) {
     statusEl.textContent = t('publish.loginRequired');
-    statusEl.dataset.tone = 'coral';
+    statusEl.style.color = 'var(--accent)';
     submitBtn.disabled = false;
     return;
   }
 
   statusEl.textContent = 'Publishing...';
-  statusEl.dataset.tone = 'success';
+  statusEl.style.color = '#34d399';
   submitBtn.disabled = true;
 
   // Omit category + uses_cortex: the server defaults them for a NEW app and now CARRIES THE
@@ -234,8 +221,8 @@ function submitPublish() {
     .then(function(resp) { return resp.json(); })
     .then(function(json) {
       if (json.ok) {
-        statusEl.textContent = '\u2713 Published! ' + (json.data.download_url || '');
-        statusEl.dataset.tone = 'success';
+        statusEl.textContent = '\u2714 Published! ' + (json.data.download_url || '');
+        statusEl.style.color = '#34d399';
         // Mark app as published in IndexedDB
         app.published = true;
         app.publishedFilename = filename;
@@ -247,7 +234,7 @@ function submitPublish() {
           // Create flow: park it immediately so the new app is UNLISTED (server-only, not public).
           if (publishUnlisted) {
             app.parked = true;
-            statusEl.textContent = '\u2713 ' + (t('publish.savedUnlisted') || 'Saved (unlisted)');
+            statusEl.textContent = '\u2714 ' + (t('publish.savedUnlisted') || 'Saved (unlisted)');
             try { toggleParkApp(filename, true); } catch (e) { /* park is best-effort */ }
           }
           publishUnlisted = false;
@@ -260,14 +247,14 @@ function submitPublish() {
           }, 1400);
         });
       } else {
-        statusEl.textContent = '\u2717 ' + ((json.error && json.error.message) || 'Publish failed');
-        statusEl.dataset.tone = 'coral';
+        statusEl.textContent = '\u2718 ' + ((json.error && json.error.message) || 'Publish failed');
+        statusEl.style.color = 'var(--accent)';
         submitBtn.disabled = false;
       }
     })
     .catch(function(err) {
-      statusEl.textContent = '\u2717 ' + (err.message || 'Publish failed');
-      statusEl.dataset.tone = 'coral';
+      statusEl.textContent = '\u2718 ' + (err.message || 'Publish failed');
+      statusEl.style.color = 'var(--accent)';
       submitBtn.disabled = false;
     });
 }
@@ -280,9 +267,8 @@ function toggleCommunity() {
   communityVisible = !communityVisible;
   var grid = document.getElementById('community-grid');
   var arrow = document.getElementById('community-arrow');
-  grid.hidden = !communityVisible;
-  arrow.textContent = communityVisible ? '↓' : '→';
-  arrow.setAttribute('aria-expanded', communityVisible ? 'true' : 'false');
+  grid.style.display = communityVisible ? '' : 'none';
+  arrow.classList.toggle('open', communityVisible);
 }
 
 // ── Two views: Kirjasto (your apps: local + published + parked) / Yhteisö (community) ──
@@ -292,12 +278,8 @@ function switchView(view) {
   document.body.setAttribute('data-active-view', view);
   var names = ['library', 'community', 'favorites'];
   for (var i = 0; i < names.length; i++) {
-    // The menu's view rows: the chosen one on the sun (the row's data-selected, as ListRow emits it).
     var el = document.getElementById('view-tab-' + names[i]);
-    if (!el) continue;
-    el.setAttribute('aria-selected', view === names[i] ? 'true' : 'false');
-    var row = el.closest('article');
-    if (row) row.setAttribute('data-selected', view === names[i] ? 'yes' : 'no');
+    if (el) el.classList.toggle('active', view === names[i]);
   }
   try { localStorage.setItem('appCatalogView', view); } catch (e) { /* private mode */ }
   updateCommunityEmpty();
@@ -311,7 +293,7 @@ function updateFavoritesEmpty() {
   var empty = document.getElementById('favorites-empty');
   var grid = document.getElementById('favorites-grid');
   if (!empty || !grid) return;
-  empty.hidden = grid.children.length > 0;
+  empty.style.display = grid.children.length > 0 ? 'none' : 'block';
 }
 
 // Empty-state for the Community view: shown only when that view is active and has no apps
@@ -326,14 +308,214 @@ function updateCommunityEmpty() {
   // Three states, not two: still fetching, fetched and empty, fetched and full. Before the first
   // listing lands "no community apps yet" would be a claim we cannot make.
   var waiting = !hasApps && inCommunity && !isListingLoaded();
-  if (loading) loading.hidden = !waiting;
-  empty.hidden = !(!hasApps && inCommunity && !waiting);
+  if (loading) loading.style.display = waiting ? 'block' : 'none';
+  empty.style.display = (!hasApps && inCommunity && !waiting) ? 'block' : 'none';
 }
 
 // Owner-match: an app belongs to the logged-in user when the bare owner names
 // match, regardless of whether either side carries a `@node` suffix. Legacy
 // publish paths stored ownerName as the full GHII, so an exact string compare
 // wrongly dumped the user's own apps into "Community".
+
+// ── Operator subdomain mappings ─────────────────
+// Operators can map a subdomain to a published app (served at the subdomain
+// root). Mappings are loaded only for operator sessions; everyone else never
+// sees the controls and the admin API returns 403 anyway.
+
+function getSessionRoles() {
+  try {
+    var token = getCortexOwnerToken();
+    if (!token) return [];
+    var payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+    return payload.roles || [];
+  } catch (e) { return []; }
+}
+
+function isOperatorSession() {
+  return getSessionRoles().indexOf('operator') !== -1;
+}
+
+// target ("owner/filename") → site record; null until loaded
+var subdomainsByTarget = null;
+
+function loadSubdomainSites() {
+  if (!isOperatorSession()) {
+    subdomainsByTarget = null;
+    return Promise.resolve();
+  }
+  var config = loadConfig();
+  var aimeatUrl = config.aimeatUrl ? config.aimeatUrl.replace(/\/+$/, '') : '';
+  if (!aimeatUrl) { subdomainsByTarget = null; return Promise.resolve(); }
+  return fetch(aimeatUrl + '/v1/admin/subdomains', {
+    headers: { 'Authorization': 'Bearer ' + getCortexOwnerToken() }
+  })
+    .then(function (resp) { if (!resp.ok) throw new Error('HTTP ' + resp.status); return resp.json(); })
+    .then(function (json) {
+      subdomainsByTarget = {};
+      var sites = (json.data && json.data.sites) || [];
+      for (var i = 0; i < sites.length; i++) {
+        if (sites[i].kind === 'app') subdomainsByTarget[sites[i].target] = sites[i];
+      }
+    })
+    .catch(function () { subdomainsByTarget = null; });
+}
+
+// The host where subdomain apps are actually served: apps.<domain>, NOT the bare apex. A subdomain
+// chip must read "<sub>.apps.aimeat.io" (the real, reachable app URL), not "<sub>.aimeat.io".
+function apexHostLabel() {
+  if (window.__APP_HOST) return window.__APP_HOST;            // node-injected app host (authoritative)
+  try {
+    var apexHost = new URL(loadConfig().aimeatUrl || window.location.origin).host;
+    return 'apps.' + apexHost;                                 // derive apps.<apex> when not injected
+  } catch (e) { return window.location.host; }
+}
+
+// The app target currently open in the subdomain modal: { target, existingSub }
+var subdomainModalState = null;
+
+function showSubdomainModal(owner, filename) {
+  var target = bareOwnerName(owner) + '/' + filename;
+  var existing = (subdomainsByTarget && subdomainsByTarget[target]) || null;
+  subdomainModalState = { target: target, existingSub: existing ? existing.subdomain : null };
+  document.getElementById('subdomain-app-label').textContent = target;
+  document.getElementById('subdomain-input').value = existing ? existing.subdomain : '';
+  document.getElementById('subdomain-status').textContent = '';
+  document.getElementById('subdomain-unassign-btn').style.display = existing ? '' : 'none';
+  openDlg('subdomain-overlay');
+}
+
+function subdomainApiCall(method, path, body) {
+  var config = loadConfig();
+  var aimeatUrl = config.aimeatUrl.replace(/\/+$/, '');
+  return fetch(aimeatUrl + path, {
+    method: method,
+    headers: {
+      'Authorization': 'Bearer ' + getCortexOwnerToken(),
+      'Content-Type': 'application/json'
+    },
+    body: body ? JSON.stringify(body) : undefined
+  }).then(function (resp) {
+    return resp.json().then(function (json) {
+      if (!json.ok) {
+        var msg = (json.error && (json.error.message || json.error.code)) || ('HTTP ' + resp.status);
+        throw new Error(msg);
+      }
+      return json;
+    });
+  });
+}
+
+function submitSubdomainAssign() {
+  if (!subdomainModalState) return;
+  var sub = document.getElementById('subdomain-input').value.trim().toLowerCase();
+  var statusEl = document.getElementById('subdomain-status');
+  if (!sub) {
+    statusEl.style.color = '#ef4444';
+    statusEl.textContent = t('subModal.empty');
+    return;
+  }
+  if (sub === subdomainModalState.existingSub) {
+    closeDlg('subdomain-overlay');
+    return;
+  }
+  statusEl.style.color = 'var(--text-muted)';
+  statusEl.textContent = t('subModal.saving');
+  var oldSub = subdomainModalState.existingSub;
+  subdomainApiCall('POST', '/v1/admin/subdomains', {
+    subdomain: sub, kind: 'app', target: subdomainModalState.target
+  })
+    .then(function () {
+      // Re-pointing to a new subdomain: drop the old mapping after the new
+      // one exists, so the app is never left unmapped on failure.
+      if (oldSub) return subdomainApiCall('DELETE', '/v1/admin/subdomains/' + encodeURIComponent(oldSub));
+    })
+    .then(function () {
+      statusEl.style.color = '#34d399';
+      statusEl.textContent = '✔ ' + t('subModal.assigned') + ' — ' + sub + '.' + apexHostLabel();
+      return loadSubdomainSites();
+    })
+    .then(function () { loadPublishedApps(); })
+    .catch(function (err) {
+      statusEl.style.color = '#ef4444';
+      statusEl.textContent = err.message || String(err);
+    });
+}
+
+function unassignSubdomain() {
+  if (!subdomainModalState || !subdomainModalState.existingSub) return;
+  var statusEl = document.getElementById('subdomain-status');
+  statusEl.style.color = 'var(--text-muted)';
+  statusEl.textContent = t('subModal.saving');
+  subdomainApiCall('DELETE', '/v1/admin/subdomains/' + encodeURIComponent(subdomainModalState.existingSub))
+    .then(function () {
+      statusEl.style.color = '#34d399';
+      statusEl.textContent = '✔ ' + t('subModal.unassigned');
+      document.getElementById('subdomain-unassign-btn').style.display = 'none';
+      subdomainModalState.existingSub = null;
+      return loadSubdomainSites();
+    })
+    .then(function () { loadPublishedApps(); })
+    .catch(function (err) {
+      statusEl.style.color = '#ef4444';
+      statusEl.textContent = err.message || String(err);
+    });
+}
+
+// ── App grant consents (H-2) ─────────────────────
+// Manage the scoped grant THIS user gave a (usually someone else's) app: see the granted scopes
+// and revoke. Reuses the owner-authenticated /v1/app-grants list + delete; a dialog built on demand
+// in the same shape as the template's, and removed again when it closes.
+function closeConsents() {
+  var d = document.getElementById('consents-overlay');
+  if (!d) return;
+  closeDlg(d);
+  d.remove();
+}
+function openConsents(owner, filename, appName) {
+  var target = bareOwnerName(owner) + '/' + filename;
+  closeConsents();
+  var dlg = document.createElement('dialog');
+  dlg.id = 'consents-overlay';
+  dlg.className = 'dlg modal dlg--md';
+  dlg.setAttribute('data-dlg-guard', 'off');
+  dlg.innerHTML = '<header class="dlg-head"><h2 class="dlg-title">' + escapeHtml(t('consents.title')) + '</h2><button type="button" class="dlg-close"></button></header>'
+    + '<div class="dlg-body">'
+    + '<div class="consents-target">' + escapeHtml(appName || filename) + ' · ' + escapeHtml(target) + '</div>'
+    + '<div id="consents-body" style="font-size:.9rem;color:var(--text-muted)">' + t('common.loading') + '</div>'
+    + '</div>'
+    + '<footer class="dlg-foot">'
+    + '<button type="button" class="modal-btn secondary" data-dlg-close>' + escapeHtml(t('common.close')) + '</button>'
+    + '<button type="button" class="modal-btn danger" id="consents-revoke-btn" hidden>' + escapeHtml(t('consents.revoke')) + '</button>'
+    + '</footer>';
+  document.body.appendChild(dlg);
+  onDlgClose('consents-overlay', closeConsents);
+  openDlg(dlg);
+  subdomainApiCall('GET', '/v1/app-grants').then(function (json) {
+    var grants = (json.data && json.data.grants) || [];
+    var g = grants.filter(function (x) { return x.app === target; })[0];
+    var body = document.getElementById('consents-body');
+    if (!body) return;
+    if (!g) { body.innerHTML = '<span style="color:var(--text-muted)">' + t('consents.none') + '</span>'; return; }
+    body.innerHTML = '<div style="margin-bottom:6px;color:var(--text)">' + t('consents.granted') + '</div>'
+      + '<ul style="margin:0 0 14px;padding-left:18px">'
+      + g.scopes.map(function (s) { return '<li><code>' + escapeHtml(s) + '</code></li>'; }).join('')
+      + '</ul>'
+      + '<div style="font-size:.8rem;color:var(--text-muted)">' + t('consents.hint') + '</div>';
+    var revoke = document.getElementById('consents-revoke-btn');
+    if (revoke) {
+      revoke.onclick = function () { revokeConsent(g.grant_id); };
+      revoke.hidden = false;
+    }
+  }).catch(function (e) {
+    var body = document.getElementById('consents-body');
+    if (body) { body.style.color = '#ef4444'; body.textContent = e.message || String(e); }
+  });
+}
+function revokeConsent(grantId) {
+  subdomainApiCall('DELETE', '/v1/app-grants/' + encodeURIComponent(grantId))
+    .then(function () { closeConsents(); })
+    .catch(function (e) { var b = document.getElementById('consents-body'); if (b) { b.style.color = '#ef4444'; b.textContent = e.message || String(e); } });
+}
 
 // ── Backup: export all + selective import ────────
 // Follows the organism-export bundle model: one ZIP, manifest + per-item
@@ -346,8 +528,6 @@ function toggleBackupMenu(event) {
   var create = document.getElementById('create-menu');
   if (create) create.hidden = true;
   menu.hidden = !menu.hidden;
-  var trigger = document.getElementById('backup-btn');
-  if (trigger) trigger.setAttribute('aria-expanded', menu.hidden ? 'false' : 'true');
 }
 
 // Create menu (Add app / Generate with AI / Generate homepage grouped under one +).
@@ -360,19 +540,300 @@ function toggleCreateMenu(event) {
 }
 function closeCreateMenu() { var m = document.getElementById('create-menu'); if (m) m.hidden = true; }
 
-// Active Extensions bar: the set's fold, closed by default, opening in place (declutters Library).
+// Active Extensions bar: collapsed by default, expand/collapse the chip grid (declutters Library).
 function toggleCortexBar() {
-  var body = document.getElementById('cortex-bar-body');
+  var grid = document.getElementById('cortex-bar-grid');
   var arrow = document.getElementById('cortex-bar-arrow');
-  if (!body) return;
-  var open = body.hidden;
-  body.hidden = !open;
-  if (arrow) arrow.textContent = open ? '↓' : '→';
-  var fold = document.getElementById('cortex-bar-fold');
-  if (fold) fold.setAttribute('data-open', open ? 'yes' : 'no');
-  var toggle = document.getElementById('cortex-bar-toggle');
-  if (toggle) toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+  if (!grid) return;
+  var open = grid.style.display === 'none';
+  grid.style.display = open ? 'flex' : 'none';
+  if (arrow) arrow.innerHTML = open ? '▼' : '▶';
 }
+
+function backupApiBase() {
+  var config = loadConfig();
+  return (config.aimeatUrl || window.location.origin).replace(/\/+$/, '');
+}
+
+function exportBackupZip() {
+  document.getElementById('backup-menu').hidden = true;
+  var token = getCortexOwnerToken();
+  if (!token) { showNotice(t('backup.loginRequired')); return; }
+  var btn = document.getElementById('backup-btn');
+  btn.disabled = true;
+  fetch(backupApiBase() + '/v1/apps/backup', { headers: { 'Authorization': 'Bearer ' + token } })
+    .then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      var cd = r.headers.get('Content-Disposition') || '';
+      var m = cd.match(/filename="([^"]+)"/);
+      return r.blob().then(function (b) { return { blob: b, name: m ? m[1] : 'aimeat-apps-backup.zip' }; });
+    })
+    .then(function (o) {
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(o.blob);
+      a.download = o.name;
+      a.click();
+      setTimeout(function () { URL.revokeObjectURL(a.href); }, 5000);
+    })
+    .catch(function (e) { showNotice('Export failed: ' + (e.message || e)); })
+    .finally(function () { btn.disabled = false; });
+}
+
+var backupInspectData = null;   // inspect response (apps, extensions, backup_token)
+
+function importBackupPick() {
+  document.getElementById('backup-menu').hidden = true;
+  var token = getCortexOwnerToken();
+  if (!token) { showNotice(t('backup.loginRequired')); return; }
+  document.getElementById('backup-file-input').click();
+}
+
+function importBackupFile(file) {
+  var statusEl = document.getElementById('backup-status');
+  var body = document.getElementById('backup-import-body');
+  document.getElementById('backup-restore-btn').style.display = 'none';
+  body.innerHTML = '';
+  statusEl.style.color = 'var(--text-muted)';
+  statusEl.textContent = t('backup.inspecting');
+  openDlg('backup-overlay');
+
+  file.arrayBuffer()
+    .then(function (buf) {
+      return fetch(backupApiBase() + '/v1/apps/backup/inspect', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer ' + getCortexOwnerToken(),
+          'Content-Type': 'application/zip'
+        },
+        body: buf
+      });
+    })
+    .then(function (r) { return r.json().then(function (j) { return { status: r.status, json: j }; }); })
+    .then(function (o) {
+      if (!o.json.ok) {
+        var msg = (o.json.error && (o.json.error.message || o.json.error.code)) || ('HTTP ' + o.status);
+        throw new Error(msg);
+      }
+      backupInspectData = o.json.data;
+      statusEl.textContent = '';
+      renderBackupSelection();
+    })
+    .catch(function (e) {
+      statusEl.style.color = '#ef4444';
+      statusEl.textContent = e.message || String(e);
+    });
+}
+
+function renderBackupSelection() {
+  var d = backupInspectData;
+  var body = document.getElementById('backup-import-body');
+  if (!d || (d.apps.length === 0 && d.extensions.length === 0)) {
+    body.innerHTML = '<p style="color:var(--text-muted)">' + t('backup.empty') + '</p>';
+    return;
+  }
+
+  var conflictOptions =
+    '<option value="skip">' + t('backup.conflictSkip') + '</option>' +
+    '<option value="append">' + t('backup.conflictAppend') + '</option>' +
+    '<option value="copy">' + t('backup.conflictCopy') + '</option>';
+
+  var html =
+    '<div style="font-size:.8rem;color:var(--text-muted)">' + t('backup.from') + ': <span style="font-family:monospace">' +
+      escapeHtml((d.source.owner || '?') + '@' + (d.source.nodeId || '?')) + '</span>' +
+      (d.exported_at ? ' · ' + new Date(d.exported_at).toLocaleString() : '') +
+    '</div>' +
+    '<div class="backup-toolbar-row">' +
+      '<div>' +
+        '<button class="backup-link-btn" onclick="window._launcher.backupSelectAll(true)">' + t('backup.selectAll') + '</button> / ' +
+        '<button class="backup-link-btn" onclick="window._launcher.backupSelectAll(false)">' + t('backup.selectNone') + '</button>' +
+      '</div>' +
+      '<div class="backup-summary-line" id="backup-summary"></div>' +
+    '</div>' +
+    '<table class="backup-table"><thead><tr>' +
+      '<th></th><th>' + t('backup.colApp') + '</th><th>' + t('backup.colVersions') + '</th><th>' + t('backup.colStatus') + '</th>' +
+    '</tr></thead><tbody>';
+
+  for (var i = 0; i < d.apps.length; i++) {
+    var app = d.apps[i];
+    var versionList = '';
+    for (var v = 0; v < app.versions.length; v++) {
+      var ver = app.versions[v];
+      versionList +=
+        '<label><input type="checkbox" class="backup-ver" data-app="' + i + '" data-v="' + ver.version + '" checked ' +
+          'onchange="window._launcher.backupUpdateSummary()"/> v' + ver.version +
+          (ver.semver ? ' (' + escapeHtml(ver.semver) + ')' : '') +
+          ' · ' + (ver.size < 1024 ? ver.size + ' B' : (ver.size / 1024).toFixed(1) + ' KB') +
+          (ver.created_at ? ' · ' + new Date(ver.created_at).toLocaleDateString() : '') +
+        '</label>';
+    }
+    html +=
+      '<tr>' +
+        '<td><input type="checkbox" id="backup-app-' + i + '" checked onchange="window._launcher.backupUpdateSummary()"/></td>' +
+        '<td>' + escapeHtml(app.name || app.filename) +
+          '<div class="mono-cell">' + escapeHtml(app.filename) + '</div></td>' +
+        '<td>' + app.versions.length + ' ' +
+          '<button class="backup-versions-toggle" onclick="var el=document.getElementById(\'backup-app-' + i + '-versions\');el.style.display=el.style.display===\'none\'?\'\':\'none\'">' + t('backup.colVersions').toLowerCase() + ' ▾</button>' +
+          '<div class="backup-version-list" id="backup-app-' + i + '-versions" style="display:none">' + versionList + '</div></td>' +
+        '<td>' +
+          (app.exists
+            ? '<span class="backup-status-badge backup-status-exists">' + t('backup.statusExists') + '</span><br/>' +
+              '<select class="backup-conflict-select" id="backup-app-' + i + '-conflict">' + conflictOptions + '</select>'
+            : '<span class="backup-status-badge backup-status-new">' + t('backup.statusNew') + '</span>') +
+        '</td>' +
+      '</tr>';
+  }
+  html += '</tbody></table>';
+
+  if (d.extensions.length > 0) {
+    html += '<h3 style="font-size:.9rem;margin:14px 0 6px">' + t('backup.extensions') + '</h3>';
+    for (var e = 0; e < d.extensions.length; e++) {
+      var ext = d.extensions[e];
+      html +=
+        '<div style="display:flex;align-items:center;gap:8px;padding:4px 8px;font-size:.85rem">' +
+          '<input type="checkbox" id="backup-ext-' + e + '" checked onchange="window._launcher.backupUpdateSummary()"/>' +
+          '<span style="font-family:monospace">' + escapeHtml(ext.name) + '</span>' +
+          (ext.exists
+            ? '<span class="backup-status-badge backup-status-exists">' + t('backup.statusExists') + '</span>' +
+              '<select class="backup-conflict-select" id="backup-ext-' + e + '-conflict">' +
+                '<option value="skip">' + t('backup.conflictSkip') + '</option>' +
+                '<option value="copy">' + t('backup.conflictCopy') + '</option>' +
+              '</select>'
+            : '<span class="backup-status-badge backup-status-new">' + t('backup.statusNew') + '</span>') +
+        '</div>';
+    }
+  }
+
+  body.innerHTML = html;
+  document.getElementById('backup-restore-btn').style.display = '';
+  backupUpdateSummary();
+}
+
+// Reads the current selection straight from the DOM — no parallel state to drift.
+function backupCollectSelections() {
+  var d = backupInspectData;
+  var selections = [];
+  var extensions = [];
+  if (!d) return { selections: selections, extensions: extensions, versionTotal: 0 };
+  var versionTotal = 0;
+  for (var i = 0; i < d.apps.length; i++) {
+    var cb = document.getElementById('backup-app-' + i);
+    if (!cb || !cb.checked) continue;
+    var app = d.apps[i];
+    var checkedVers = [];
+    var verBoxes = document.querySelectorAll('.backup-ver[data-app="' + i + '"]');
+    verBoxes.forEach(function (b) { if (b.checked) checkedVers.push(parseInt(b.getAttribute('data-v'), 10)); });
+    if (checkedVers.length === 0) continue;
+    var sel = { filename: app.filename };
+    if (checkedVers.length !== app.versions.length) sel.versions = checkedVers;
+    if (app.exists) {
+      var conflictEl = document.getElementById('backup-app-' + i + '-conflict');
+      sel.conflict = conflictEl ? conflictEl.value : 'skip';
+    }
+    versionTotal += checkedVers.length;
+    selections.push(sel);
+  }
+  for (var e = 0; e < d.extensions.length; e++) {
+    var ecb = document.getElementById('backup-ext-' + e);
+    if (!ecb || !ecb.checked) continue;
+    var ext = { name: d.extensions[e].name };
+    if (d.extensions[e].exists) {
+      var ecEl = document.getElementById('backup-ext-' + e + '-conflict');
+      ext.conflict = ecEl ? ecEl.value : 'skip';
+    }
+    extensions.push(ext);
+  }
+  return { selections: selections, extensions: extensions, versionTotal: versionTotal };
+}
+
+function backupUpdateSummary() {
+  var sel = backupCollectSelections();
+  var el = document.getElementById('backup-summary');
+  if (!el) return;
+  el.textContent = t('backup.restoring') + ': ' + sel.selections.length + ' ' + t('backup.sumApps') +
+    ', ' + sel.versionTotal + ' ' + t('backup.sumVersions') +
+    (sel.extensions.length ? ', ' + sel.extensions.length + ' ' + t('backup.sumExts') : '');
+}
+
+function backupSelectAll(checked) {
+  var d = backupInspectData;
+  if (!d) return;
+  for (var i = 0; i < d.apps.length; i++) {
+    var cb = document.getElementById('backup-app-' + i);
+    if (cb) cb.checked = checked;
+    document.querySelectorAll('.backup-ver[data-app="' + i + '"]').forEach(function (b) { b.checked = checked; });
+  }
+  for (var e = 0; e < d.extensions.length; e++) {
+    var ecb = document.getElementById('backup-ext-' + e);
+    if (ecb) ecb.checked = checked;
+  }
+  backupUpdateSummary();
+}
+
+function submitBackupRestore() {
+  var sel = backupCollectSelections();
+  var statusEl = document.getElementById('backup-status');
+  if (sel.selections.length === 0 && sel.extensions.length === 0) {
+    statusEl.style.color = '#ef4444';
+    statusEl.textContent = t('backup.nothingSelected');
+    return;
+  }
+  statusEl.style.color = 'var(--text-muted)';
+  statusEl.textContent = t('backup.restoring') + '...';
+  var btn = document.getElementById('backup-restore-btn');
+  btn.disabled = true;
+  fetch(backupApiBase() + '/v1/apps/backup/restore', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer ' + getCortexOwnerToken(),
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      backup_token: backupInspectData.backup_token,
+      selections: sel.selections,
+      extensions: sel.extensions
+    })
+  })
+    .then(function (r) { return r.json(); })
+    .then(function (json) {
+      if (!json.ok) {
+        var msg = (json.error && (json.error.message || json.error.code)) || 'Restore failed';
+        throw new Error(msg);
+      }
+      statusEl.textContent = '';
+      renderBackupResult(json.data);
+      refreshAll();
+    })
+    .catch(function (e) {
+      statusEl.style.color = '#ef4444';
+      statusEl.textContent = e.message || String(e);
+    })
+    .finally(function () { btn.disabled = false; });
+}
+
+function renderBackupResult(s) {
+  var body = document.getElementById('backup-import-body');
+  document.getElementById('backup-restore-btn').style.display = 'none';
+  var section = function (label, items) {
+    if (!items || items.length === 0) return '';
+    var rendered = items.map(function (x) {
+      if (typeof x === 'string') return escapeHtml(x);
+      if (x && x.from && x.to) return escapeHtml(x.from) + ' → ' + escapeHtml(x.to);
+      if (x && x.item) return escapeHtml(x.item) + ': ' + escapeHtml(x.message || '');
+      return escapeHtml(JSON.stringify(x));
+    });
+    return '<div style="font-size:.85rem;font-weight:600;margin-top:8px">' + label + ' (' + items.length + ')</div>' +
+      '<ul class="backup-result-list">' + rendered.map(function (r) { return '<li>' + r + '</li>'; }).join('') + '</ul>';
+  };
+  body.innerHTML =
+    '<h3 style="font-size:.95rem;margin:6px 0">✔ ' + t('backup.resultTitle') + '</h3>' +
+    '<div style="font-size:.85rem">' + t('backup.resVersions') + ': ' + s.versions_restored + '</div>' +
+    section(t('backup.resCreated'), s.apps_created.concat(s.extensions_created)) +
+    section(t('backup.resAppended'), s.apps_appended) +
+    section(t('backup.resCopied'), s.apps_copied.concat(s.extensions_copied)) +
+    section(t('backup.resSkipped'), s.apps_skipped.concat(s.extensions_skipped)) +
+    (s.errors.length ? '<div class="backup-result-errors">' + section(t('backup.resErrors'), s.errors) + '</div>' : '');
+}
+
 
 // Manifest cache keyed by "owner\nfilename" — lets Restore/Fork reuse the
 // app's metadata (name, description, category, tags, icon) without a re-fetch.
@@ -428,7 +889,7 @@ function loadPublishedApps() {
       setListingLoaded(true);   // nothing to fetch — an empty grid here is the answer, not a wait
       setOwnServerApps([]);
       renderApps();
-      if (communitySection) communitySection.hidden = true;
+      if (communitySection) communitySection.style.display = 'none';
       return;
     }
 
@@ -497,7 +958,7 @@ function loadPublishedApps() {
         setListingLoaded(true);
         setOwnServerApps([]);
         renderApps();
-        if (communitySection) communitySection.hidden = true;
+        if (communitySection) communitySection.style.display = 'none';
       });
   });
 }
@@ -516,9 +977,7 @@ function applyServerFilter() {
   for (var g = 0; g < grids.length; g++) {
     var grid = document.getElementById(grids[g]);
     if (!grid) continue;
-    // Each row sits in a plain wrapper that carries the search attributes (rows.js); the wrapper
-    // hides, and with it the row and its doors. A hidden row is never left open.
-    var rows = grid.querySelectorAll('[data-app-row]');
+    var rows = grid.querySelectorAll('.cat-row');
     var shown = 0;
     rows.forEach(function (row) {
       var match = true;
@@ -527,15 +986,18 @@ function applyServerFilter() {
         match = (',' + (row.getAttribute('data-tags') || '') + ',').indexOf(',' + at.toLowerCase() + ',') !== -1;
       }
       if (match && q) match = (row.getAttribute('data-filter') || '').indexOf(q) !== -1;
-      row.hidden = !match;
-      if (!match && row.firstElementChild && row.firstElementChild.getAttribute('data-selected') === 'yes') toggleRow(row);
+      row.style.display = match ? '' : 'none';
+      // The panel under a hidden row hides with it, and a hidden row is never left open.
+      if (!match) row.classList.remove('is-open');
+      var panel = row.nextElementSibling;
+      if (panel && panel.classList.contains('cat-row-panel')) panel.style.display = match ? '' : 'none';
       if (match) shown++;
     });
     if (grids[g] === 'community-grid' && rows.length) {
       var countEl = document.getElementById('community-count');
-      if (countEl) countEl.textContent = String(shown);
+      if (countEl) countEl.textContent = '· ' + shown;
       var sectionEl = document.getElementById('community-section');
-      if (sectionEl) sectionEl.hidden = filtering && shown === 0;
+      if (sectionEl) sectionEl.style.display = (filtering && shown === 0) ? 'none' : '';
     }
   }
 }
@@ -562,13 +1024,9 @@ function publishedRowHtml(sa, aimeatUrl, index) {
   var metaParts = [author];
   if (sa.version_number) metaParts.push('v' + sa.version_number);
   var when = fmtDate(sa.created_at); if (when) metaParts.push(when);
-  // The agent marker is a chip; the fork count is a word that opens the lineage (its own button,
-  // so it does not open the row).
-  var nameExtra = (shipsAgent ? ' ' + chip(escapeHtml(t('card.agent')), 'plain', t('card.agentHint')) : '') +
+  var nameExtra = (shipsAgent ? ' <span class="pcb-agent" title="' + escapeHtml(t('card.agentHint')) + '">\u{1F916}</span>' : '') +
     ((sa.forks && sa.forks > 0)
-      ? ' ' + action({ kind: 'text', title: t('card.forksHint'),
-          onclick: 'event.stopPropagation(); window._launcher.showLineageModal(\'' + jsArg(owner) + '\', \'' + jsArg(fn) + '\')' },
-          escapeHtml(t('lineage.title')) + ' ' + sa.forks)
+      ? ' <span class="pcb-forks" title="' + escapeHtml(t('card.forksHint')) + '" onclick="event.stopPropagation(); window._launcher.showLineageModal(\'' + jsArg(owner) + '\', \'' + jsArg(fn) + '\')">⑂ ' + sa.forks + '</span>'
       : '');
   return rowHtml({
     n: index + 1, icon: sa.icon || m.icon || '\u{1F4DD}', name: name, nameExtra: nameExtra, favStar: favStarHtml(ref),
@@ -583,13 +1041,13 @@ function publishedRowHtml(sa, aimeatUrl, index) {
 function renderCommunityApps(serverApps, aimeatUrl, section, grid, countEl, currentOwner) {
   if (!section || !grid || !countEl) return;
   if (serverApps.length === 0) {
-    section.hidden = true;
+    section.style.display = 'none';
     grid.innerHTML = '';
     updateCommunityEmpty();
     return;
   }
-  section.hidden = false;
-  countEl.textContent = String(serverApps.length);
+  section.style.display = '';
+  countEl.textContent = '· ' + serverApps.length;
   var railCount = document.getElementById('rail-count-community');
   if (railCount) railCount.textContent = String(serverApps.length);
   var list = sortServerApps(serverApps.slice());
@@ -609,7 +1067,7 @@ function renderFavorites(allServerApps, aimeatUrl) {
   var favs = getFavoriteServerApps();
   var railCount = document.getElementById('rail-count-favorites');
   if (railCount) railCount.textContent = String(favs.length);
-  if (countEl) countEl.textContent = String(favs.length);
+  if (countEl) countEl.textContent = '· ' + favs.length;
   if (favs.length === 0) { grid.innerHTML = ''; updateFavoritesEmpty(); return; }
   var list = sortServerApps(favs.slice());
   var html = '';

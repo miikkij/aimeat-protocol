@@ -4,9 +4,6 @@
  * SPDX-License-Identifier: MIT
  * @description Profile tab showing federated peer nodes and their online/offline status.
  * @version-history
- *   2026-09-22 -- Composed from the shared component set (Page, Section, ListRow, Chip); no own
- *     classes. A peer is a list row; its tier, availability and online state are chips, the online
- *     dot is the success or danger chip beside it.
  *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
  *   2026-09-13 — V1: compose page and B1 section headings from the shared poster classes.
  *   v1.0.0 — 2026-03-16 — Initial federation tab
@@ -24,7 +21,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { Spinner } from './shared.js';
-import { Page, Section, Stack, ListRow, Chip, Surface, Text } from '/components/poster-parts.js';
+import { StatusDot } from '/components/StatusDot.js';
 import { listPeers } from '/js/services/federation.js';
 import { swallowed } from '/js/swallowed.js';
 
@@ -47,25 +44,29 @@ export default function FederationTab() {
   loadRef.current = loadData;
   useEffect(() => onLiveUpdate(['federation'], () => loadRef.current()), []);
 
-  return html`<${Page} width="wide" title=${t('profile.federation.title')}
-    crumbs=${[{ label: t('nav.profile') }, { label: t('profile.landing.menuInfra') }, { label: t('profile.tabs.federation') }]}>
-    <${Stack}>
-      <${Text} kind="lead">${t('profile.federation.desc')}<//>
-      ${!federation ? html`<${Spinner} text=${t('profile.federation.loading')} />`
-        : federation.length === 0 ? html`<${Surface} kind="aside"><${Text} tone="muted">${t('profile.federation.empty')}<//><//>`
-        : html`<${Section} title=${t('profile.federation.peers')} count=${federation.length}>
-            <${Stack} density="compact">${federation.map(p => {
-              const alive = p.status === 'active' || p.alive;
-              const tier = p.tier || 'member';
-              return html`<${ListRow} key=${p.node_id || p.nodeId || p.url}
-                name=${escHtml(p.node_id || p.nodeId || p.url)} detail=${escHtml(p.url || '')}
-                value=${html`<${Stack} direction="wrap" density="compact">
-                  <${Chip} tone=${tier === 'member' ? 'success' : 'plain'}>${t('profile.federation.tier_' + tier) || tier}<//>
-                  ${p.availability && p.availability !== 'unknown' ? html`<${Chip} tone=${p.availability === 'permanent' ? 'success' : 'plain'}>${t('profile.federation.avail_' + p.availability) || p.availability}<//>` : null}
-                  <${Chip} tone=${alive ? 'success' : 'danger'}>${alive ? t('profile.federation.online') : t('profile.federation.offline')}<//>
-                <//>`} />`;
-            })}<//>
-          <//>`}
-    <//>
-  <//>`;
+  return html`
+    <div class="poster-page-title">${t('profile.federation.title')}</div>
+    <div class="section-desc">${t('profile.federation.desc')}</div>
+    ${!federation ? html`<${Spinner} text=${t('profile.federation.loading')} />`
+      : federation.length === 0 ? html`<div class="empty">${t('profile.federation.empty')}</div>`
+      : html`<div class="poster-section-title">${t('profile.federation.peers')}</div>
+          ${federation.map(p => {
+            const alive = p.status === 'active' || p.alive;
+            return html`
+              <div class="card poster-row--thing">
+                <div class="peer-card">
+                  <div>
+                    <div class="card-title">${escHtml(p.node_id || p.nodeId || p.url)}</div>
+                    <div class="card-subtitle">${escHtml(p.url || '')}</div>
+                  </div>
+                  <div class="peer-status">
+                    <span class="badge ${(p.tier || 'member') === 'visiting' ? 'badge-info' : (p.tier || 'member') === 'genesis' ? 'badge-info' : 'badge-success'}">${t('profile.federation.tier_' + (p.tier || 'member')) || (p.tier || 'member')}</span>
+                    ${p.availability && p.availability !== 'unknown' ? html`<span class="badge ${p.availability === 'permanent' ? 'badge-success' : 'badge-info'}">${t('profile.federation.avail_' + p.availability) || p.availability}</span>` : null}
+                    <${StatusDot} status=${alive ? 'alive' : 'dead'} />
+                    <span class="fed-status-text ${alive ? 'online' : 'offline'}">${alive ? t('profile.federation.online') : t('profile.federation.offline')}</span>
+                  </div>
+                </div>
+              </div>`;
+          })}`
+    }`;
 }

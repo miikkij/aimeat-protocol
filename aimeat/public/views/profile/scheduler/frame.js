@@ -5,11 +5,9 @@
  * @description What the scheduler's cover and its pages share: the crumb, the page frame with its
  *   rail, the rail's page links, and the small words (who runs a schedule, how its last run went).
  *   Lives apart from cover.js so the detail page and the cover import one way only.
- * @structure c · hhmm · whoRuns · resultWord · resultTone · lastRun · crumb · chipRow · railList · pageLinks · renderPage
+ * @structure c · hhmm · whoRuns · resultWord · lastRun · crumb · pageLinks · renderPage
  * @usage import { renderPage, whoRuns, c, hhmm } from './frame.js';
  * @version-history
- *   2026-09-22 -- Composed from the shared component set (Page, Rail, Chip, Stack, Action, Text); no
- *     own CSS. A run's result carries a tone instead of a class; the words are unchanged.
  *   v1.3.0 -- 2026-09-13 -- Compose existing top rules from poster.css.
  *   v1.2.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.1.0 — 2026-09-12 — `loc()` is gone: it derived the date FORMAT from the page LANGUAGE, which
@@ -23,7 +21,6 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { time } from '/js/format.js';
 import { formatRelativeTime } from '/views/profile/memory-tab/helpers.js';
-import { Page, Rail, Stack, Action, Chip, Text } from '/components/poster-parts.js';
 import { kindOf } from './model.js';
 
 export const c = (key, vars) => t('profile.scheduler.cover.' + key, vars);
@@ -50,54 +47,56 @@ export function whoRuns(s) {
   return t('profile.scheduler.kind.core');
 }
 export const resultWord = (r) => (r ? c('result.' + r) : '');
-/** A run result as a tone: success, error, or anything else (skipped, limited) muted. */
-export const resultTone = (r) => (r === 'error' ? 'danger' : r === 'success' || !r ? 'success' : 'muted');
-/** The last run in words: when, and how it went. */
 export function lastRun(s) {
-  if (!s.lastRunAt) return t('profile.scheduler.never');
-  return `${formatRelativeTime(s.lastRunAt)} · ${resultWord(s.lastRunResult || 'success')}`;
+  if (!s.lastRunAt) return html`<span class="og-tbl-dot">${t('profile.scheduler.never')}</span>`;
+  return html`${formatRelativeTime(s.lastRunAt)} · <b class=${`sc-res sc-res--${s.lastRunResult || 'success'}`}>${resultWord(s.lastRunResult || 'success')}</b>`;
 }
 
 /* ── The crumb and the page frame ──────────────────────────────────────────────────────────── */
-/** The trail: Settings & Controls, Automation, Scheduler, then the page's own name. */
 export function crumb(ctx, parts) {
-  return [
-    { label: t('nav.profile') },
-    { label: t('profile.landing.menuAutomation') },
-    { label: t('profile.scheduler.title'), onClick: parts.length ? () => ctx.pickView({ kind: 'cover' }) : undefined },
-    ...parts.map(p => ({ label: p })),
-  ];
+  const home = () => ctx.pickView({ kind: 'cover' });
+  return html`
+    <div class="og-crumb">
+      <span>${t('nav.profile')}</span><span>/</span>
+      ${parts.length ? html`<button type="button" class="og-crumb-link" onClick=${home}>${t('profile.scheduler.title')}</button>` : html`<span class="og-crumb-here">${t('profile.scheduler.title')}</span>`}
+      ${parts.map((p, i) => html`<span key=${i}>/</span><span class="og-crumb-here">${p}</span>`)}
+    </div>`;
 }
-
-/** A row of chips: [text, tone] pairs, a falsy entry skipped. */
-export const chipRow = (chips) => html`<${Stack} direction="wrap" density="compact">
-  ${chips.filter(Boolean).map(([text, tone], i) => html`<${Chip} key=${i} tone=${tone}>${text}<//>`)}<//>`;
-
-/** A short list for the rail: a label and one action per entry (a plain line when it goes nowhere). */
-export const railList = (label, entries) => html`<${Stack} density="compact">
-  <${Text} kind="label">${label}<//>
-  ${entries.map(e => (e.onClick ? html`<${Action} key=${e.key} kind="text" onClick=${e.onClick}>${e.label}<//>`
-    : html`<${Text} key=${e.key} kind="mono">${e.label}<//>`))}
-<//>`;
 
 const PAGES = [['create', 'newSchedule'], ['paused', 'pausedPage'], ['failed', 'failedPage'], ['calendar', 'calendar']];
 export function pageLinks(ctx, current) {
   const m = ctx.model;
   const n = { paused: m.paused.length, failed: m.failed.length };
-  return html`<${Stack} density="compact">
-    <${Text} kind="label">${c('pages')}<//>
-    ${PAGES.map(([id, key]) => html`<${Action} key=${id} kind=${current === id ? "tab" : "text"} selected=${current === id} onClick=${() => ctx.pickView({ kind: 'page', id })}>
-      ${id === 'create' ? t('profile.scheduler.newSchedule') : c(key)} ${id in n ? n[id] : '→'}<//>`)}
-  <//>`;
+  return PAGES.map(([id, key]) => html`
+    <button type="button" class=${`og-rail-link ${current === id ? 'on' : ''}`} key=${id} onClick=${() => ctx.pickView({ kind: 'page', id })}>
+      <i>→</i>${id === 'create' ? t('profile.scheduler.newSchedule') : c(key)}<em>${id in n ? n[id] : '→'}</em>
+    </button>`);
 }
 
 export function renderPage(ctx, { id, crumbs, title, chips = null, doors = null, strip = null, rail = null, children }) {
-  return html`<${Page} width="wide" title=${title} crumbs=${crumb(ctx, crumbs)} identity=${chips} actions=${doors}
-    rail=${html`<${Rail} kind="index" title=${t('profile.scheduler.title')} label=${c('railTitle')}><${Stack}>
-      <${Action} onClick=${() => ctx.pickView({ kind: 'cover' })}>← ${c('backTo')}<//>
-      ${rail}
-      ${pageLinks(ctx, id)}
-    <//><//>`}>
-    <${Stack}>${strip}${children}<//>
-  <//>`;
+  return html`
+    <div class="og og-sc og-page">
+      ${crumb(ctx, crumbs)}
+      <div class="og-mast og-mast--page">
+        <div class="og-mast-words">
+          <h1 class="og-title poster-page-title sc-title--page">${title}</h1>
+          ${chips ? html`<div class="og-chips">${chips}</div>` : null}
+        </div>
+        ${doors ? html`<div class="og-mast-actions"><div class="og-doors">${doors}</div></div>` : null}
+      </div>
+      ${strip}
+      <div class="og-grid">
+        <div class="og-main poster-row--thing">${children}</div>
+        <div class="sc-side">
+          <nav class="og-rail" aria-label=${c('railTitle')}>
+            <span class="og-rail-label">${t('profile.scheduler.title')}</span>
+            <button type="button" class="og-rail-link" onClick=${() => ctx.pickView({ kind: 'cover' })}><i>←</i>${c('backTo')}</button>
+            ${rail}
+            <hr />
+            <span class="og-rail-label">${c('pages')}</span>
+            ${pageLinks(ctx, id)}
+          </nav>
+        </div>
+      </div>
+    </div>`;
 }

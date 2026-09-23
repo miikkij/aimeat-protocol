@@ -12,7 +12,6 @@
  *   import { SkillsPanel } from '/views/profile/organisms/skills-panel.js';
  *   html`<${SkillsPanel} orgId=${orgId} wsId=${wsId} showToast=${showToast} />`
  * @version-history
- *   2026-09-22 -- Composed from the shared set (Section, ListRow, Field, Action): no class of its own.
  *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
  *   v1.0.0 -- 2026-07-06 -- Initial creation (Skills feature — workspace UI surface)
  */
@@ -25,7 +24,8 @@ import { copyToClipboard } from '/js/utils.js';
 import { Markdown } from '/components/Markdown.js';
 import { splitSkillMd } from '/views/profile/skills-tab.js';
 import * as skillsService from '/js/services/skills.js';
-import { Section, Stack, Surface, ListRow, Action, Field, Text } from '/components/poster-parts.js';
+
+import { EmptyState } from '/components/EmptyState.js';
 const html = htm.bind(h);
 
 const WS_SKILL_TEMPLATE = `---
@@ -107,59 +107,67 @@ export function SkillsPanel({ orgId, wsId, showToast }) {
   };
 
   return html`
-    <${Section} title=${t('skills.wsPanelTitle') || 'Workspace skills'} count=${loading ? null : skills.length} size="small" density="compact"
-      description=${t('skills.wsPanelDesc') || 'SKILL.md expertise shared with every member and agent of this workspace. Skills travel with workspace exports and templates, and show up in the AI overview map. Link one to an agent by ref from the agent’s Data Access tab.'}
-      actions=${html`<${Action} kind="tab" selected=${editorOpen} onClick=${() => { setEditorMd(WS_SKILL_TEMPLATE); setEditorOpen(!editorOpen); }}>
-        ${t('skills.newSkill') || 'New skill'}
-      <//>`}>
-      <${Stack}>
-        ${editorOpen && html`
-          <${Stack}>
-            <${Field} type="textarea" rows=${18} value=${editorMd} onInput=${(e) => setEditorMd(e.target.value)} />
-            <${Stack} direction="wrap" align="center">
-              <${Action} kind="primary" disabled=${publishing} onClick=${handlePublish}>
-                ${publishing ? (t('skills.publishing') || 'Publishing…') : (t('skills.publish') || 'Publish')}
-              <//>
-              <${Action} onClick=${() => setEditorOpen(false)}>${t('common.cancel')}<//>
-            <//>
-            ${t('skills.editorHint') ? html`<${Text} kind="caption" tone="muted">${t('skills.editorHint')}<//>` : null}
-          <//>
-        `}
+    <div class="pj-section pf-skl poster-row--thing">
+      <div class="pf-skl-section-header">
+        <span class="pf-skl-section-title">${t('skills.wsPanelTitle') || 'Workspace skills'}</span>
+        <button class="btn-primary btn-sm" onClick=${() => { setEditorMd(WS_SKILL_TEMPLATE); setEditorOpen(!editorOpen); }}>
+          + ${t('skills.newSkill') || 'New skill'}
+        </button>
+      </div>
+      <div class="section-desc">${t('skills.wsPanelDesc') || 'SKILL.md expertise shared with every member and agent of this workspace. Skills travel with workspace exports and templates, and show up in the AI overview map. Link one to an agent by ref from the agent’s Data Access tab.'}</div>
 
-        ${loading ? html`<${Text} tone="muted">${t('organisms.loading') || 'Loading…'}<//>` : (
-          skills.length === 0
-            ? html`<${Text} tone="muted">${t('skills.wsEmpty') || 'No workspace skills yet — publish the first one.'}<//>`
-            : html`<${Stack} density="compact">${skills.map(skill => html`
-                <${ListRow} key=${skill.ref} density="compact" detailKind="text" selected=${expanded === skill.ref}
-                  name=${skill.name} detail=${skill.description} value=${`v${skill.version}`}
-                  actions=${html`
-                    <${Action} kind="text" title=${t('skills.zipHint') || ''} onClick=${async () => {
+      ${editorOpen && html`
+        <div class="pf-skl-editor">
+          <textarea class="pf-skl-editor-md" rows="18" value=${editorMd}
+                    onInput=${(e) => setEditorMd(e.target.value)}></textarea>
+          <div class="pf-skl-editor-actions">
+            <button class="btn-primary btn-sm" disabled=${publishing} onClick=${handlePublish}>
+              ${publishing ? (t('skills.publishing') || 'Publishing…') : (t('skills.publish') || 'Publish')}
+            </button>
+            <button class="btn-outline btn-sm" onClick=${() => setEditorOpen(false)}>${t('common.cancel')}</button>
+          </div>
+          <div class="pf-skl-editor-hint">${t('skills.editorHint') || ''}</div>
+        </div>
+      `}
+
+      ${loading ? html`<div class="pj-empty">${t('organisms.loading') || 'Loading…'}</div>` : (
+        skills.length === 0
+          ? html`<${EmptyState} text=${t('skills.wsEmpty') || 'No workspace skills yet — publish the first one.'} />`
+          : skills.map(skill => html`
+              <div key=${skill.ref} class="pf-skl-row">
+                <div class="pf-skl-row-main">
+                  <span class="pf-skl-name">${skill.name}</span>
+                  <span class="pf-skl-version">v${skill.version}</span>
+                  <span class="pf-skl-actions">
+                    <button class="btn-ghost btn-sm" title=${t('skills.zipHint') || ''} onClick=${async () => {
                       try {
                         await skillsService.downloadSkillZip(skill.name, { scope: 'workspace', organism: orgId, ws: wsId });
                         showToast(t('skills.zipDownloaded') || 'Skill ZIP downloaded');
                       } catch (err) {
                         showToast((t('skills.zipFailed') || 'Download failed') + ': ' + err.message, true);
                       }
-                    }}>${t('skills.zipBtn') || '.zip'}<//>
-                    <${Action} kind="text" onClick=${() => copyRef(skill)}>${t('skills.copyRef') || 'Copy ref'}<//>
-                    <${Action} kind="text" expanded=${expanded === skill.ref} onClick=${() => handleToggleView(skill)}>
+                    }}>${t('skills.zipBtn') || '⤓ .zip'}</button>
+                    <button class="btn-ghost btn-sm" onClick=${() => copyRef(skill)}>${t('skills.copyRef') || 'Copy ref'}</button>
+                    <button class="btn-ghost btn-sm" onClick=${() => handleToggleView(skill)}>
                       ${expanded === skill.ref ? (t('skills.hide') || 'Hide') : (t('skills.view') || 'View')}
-                    <//>
-                    <${Action} kind="text" onClick=${() => handleEdit(skill)}>${t('common.edit') || 'Edit'}<//>`}>
-                  ${expanded === skill.ref && expandedSkill && (() => {
-                    const { frontmatter, body } = splitSkillMd(expandedSkill.fileContents?.['SKILL.md']);
-                    return html`
-                      <${Stack} density="compact">
-                        <${Text} kind="mono" tone="muted">${skill.ref}<//>
-                        ${frontmatter && html`<${Surface} kind="code" density="compact">${frontmatter}<//>`}
-                        <${Markdown} text=${body} />
-                      <//>
-                    `;
-                  })()}
-                <//>
-              `)}<//>`
-        )}
-      <//>
-    <//>
+                    </button>
+                    <button class="btn-ghost btn-sm" onClick=${() => handleEdit(skill)}>${t('common.edit') || 'Edit'}</button>
+                  </span>
+                </div>
+                <div class="pf-skl-desc">${skill.description}</div>
+                ${expanded === skill.ref && expandedSkill && (() => {
+                  const { frontmatter, body } = splitSkillMd(expandedSkill.fileContents?.['SKILL.md']);
+                  return html`
+                    <div class="pf-skl-detail">
+                      <div class="pf-skl-detail-ref">${skill.ref}</div>
+                      ${frontmatter && html`<pre class="pf-skl-frontmatter">${frontmatter}</pre>`}
+                      <div class="pf-skl-body-md"><${Markdown} text=${body} /></div>
+                    </div>
+                  `;
+                })()}
+              </div>
+            `)
+      )}
+    </div>
   `;
 }

@@ -12,9 +12,6 @@
    @usage Loaded first in spa.html <head>; the theme is toggled by /js/theme.js
      which flips the data-theme attribute on <html>.
    @version-history
-     v1.41.0 — 2026-09-22 — Shape tokens (--shape-radius, --rule-*, --offset-*): the corner, the rule
-       weights and the offset shadows every shared part reads, so a theme reaches the shapes too. The
-       top bar's open-items button moved here from home.css, which is gone.
      v1.40.0 — 2026-09-14 — The toast wears the poster face: square, 3px ink frame on the card ground, a solid
        6px offset shadow (sun, coral for a failure, ink under the warning's sun ground) and a ✓ or ✗ in front.
        The green, red and blue pill tokens (--toast-*) leave; nothing else read them. .toast-hold keeps a
@@ -253,20 +250,6 @@
      headline reads these two, so a change of face brings its own spacing here, not in ten sheets. */
   --font-poster-tracking: 0.01em;
   --font-poster-leading: 1;
-  /* The shapes are tokens too, so a theme reaches every part through them and no sheet writes a
-     rule weight, a shadow offset or a corner of its own. The values are the poster face's: square
-     corners, a hairline for a row, 2px for a box, 3px for a frame or an action's underline, the
-     4px sun edge of a selected panel, the 6px sun stripe under a section slab, and solid offset
-     shadows at 4, 8 and 12px (a loud action, an opened record, a dialog). No blur, ever. */
-  --shape-radius: 0;
-  --rule-hair: 1px;
-  --rule-thing: 2px;
-  --rule-heavy: 3px;
-  --rule-edge: 4px;
-  --rule-stripe: 6px;
-  --offset-s: 4px;
-  --offset-m: 8px;
-  --offset-l: 12px;
   /* The wordmark is a mark, not a headline: AIME♥AT stays in Archivo Black whatever the headline
      face is, on the top bar, the served pages and the sign-in dialog (the auth library carries the
      same stack as its fallback). */
@@ -727,16 +710,6 @@ a { color: inherit; text-decoration: none; }
   align-items: center;
   gap: 0.75rem;
 }
-
-/* The header's open-items button. Hidden at zero, so it never shows a badge that has to be
-   explained. (Moved from home.css on 2026-09-22: the top bar is on every page, the home is one.) */
-.open-items-btn {
-  display: inline-flex; align-items: center; gap: 0.25rem;
-  background: none; border: 0; cursor: pointer; padding: 0.25rem 0.4rem;
-  color: var(--muted); font-size: 0.85rem;
-}
-.open-items-btn:hover { color: var(--text); }
-.open-items-btn-count { font-weight: 700; color: var(--text); }
 
 /* Header notification bell + dropdown */
 .notif-bell { position: relative; display: inline-flex; }

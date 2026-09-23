@@ -6,14 +6,6 @@
  *   grouped agent-card renderer (none / custom groups / mode / tag). Extracted from
  *   ../agents-tab.js to satisfy max-file-lines.
  * @version-history
- *   v3.0.1 -- 2026-09-22 -- The fleet search carries a hidden label (its placeholder's words); the
- *     grip's tooltip sits on its Text instead of a wrapping span; the group-name field closes on the
- *     Field's own onBlur and carries a hidden label; a group's remove carries the danger tone.
- *   v3.0.0 -- 2026-09-22 -- Composed from the shared set (components/poster-parts.js): the search and
- *     the group-by choice are Fields, the tags chips inside text actions, the running-now panel a
- *     small section of timeline rows, each group a small section with its count and actions. The
- *     table head row is gone with the table (each row now carries its run and access words as chips,
- *     the column names as their tooltips). The grip glyph is an inline SVG. No class of its own.
  *   v2.1.0 -- 2026-09-14 -- FilterBar is a component: the tags fold past twelve, and open on a door.
  *   v2.0.0 -- 2026-09-14 -- The poster face (design canvas "Your Agents"): the search as an underlined
  *     field, the filter line as chips and a select, the list as a table with a head row in the
@@ -32,22 +24,15 @@
  *   v1.0.0 — 2026-07-13 — Extracted from views/profile/agents-tab.js (max-file-lines)
  */
 import { h } from 'preact';
-import { useState, useRef, useEffect } from 'preact/hooks';
+import { useState } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { timeAgo } from '/js/utils.js';
 import AgentCard from './agent-card.js';
 import { effectiveOrderedNames, matchesAgentQuery, UNGROUPED_ID } from './tab-helpers.js';
-import { Section, Stack, ListRow, Field, Chip, Action, Text } from '/components/poster-parts.js';
 
 const AGENT_MODES = ['autonomous', 'interactive', 'task-runner', 'coordinator', 'workstation'];
-
-// The grip a closed row is dragged by: six dots, drawn (an icon here is inline SVG, not a glyph).
-const GRIP = html`<svg viewBox="0 0 10 16" width="10" height="16" aria-hidden="true" fill="currentColor">
-  <circle cx="2.5" cy="3" r="1.4" /><circle cx="7.5" cy="3" r="1.4" /><circle cx="2.5" cy="8" r="1.4" />
-  <circle cx="7.5" cy="8" r="1.4" /><circle cx="2.5" cy="13" r="1.4" /><circle cx="7.5" cy="13" r="1.4" /></svg>`;
-const grip = (title) => html`<${Text} kind="caption" tone="muted" title=${title}>${GRIP}<//>`;
 
 /**
  * The fleet search, above the board rather than above the list: it narrows both, so the status
@@ -57,22 +42,27 @@ const grip = (title) => html`<${Text} kind="caption" tone="muted" title=${title}
  */
 export function AgentSearch({ query, setQuery, shown, total }) {
   const active = query.trim() !== '';
-  // The placeholder names the field (no visible label: the section's title already says what the
-  // list is); the count and Clear stand under it while a search is on.
   return html`
-    <${Stack} density="compact">
-      <${Field} type="search" value=${query}
+    <div class="agp-search">
+      <input class="og-input" type="search"
+             value=${query}
              placeholder=${t('profile.agents.search.placeholder')}
-             ariaLabel=${t('profile.agents.search.placeholder')}
+             aria-label=${t('profile.agents.search.placeholder')}
              onInput=${(e) => setQuery(e.target.value)} />
       ${active && html`
-        <${Stack} direction="horizontal" align="center" density="compact">
-          <${Text} kind="mono">${t('profile.agents.search.count', { shown, total })} ·<//>
-          <${Action} kind="text" onClick=${() => setQuery('')}>${t('profile.agents.filter.clear')}<//>
-        <//>
+        <span class="agp-search-count">${t('profile.agents.search.count', { shown, total })} · <button type="button" class="og-door og-door--quiet" onClick=${() => setQuery('')}>${t('profile.agents.filter.clear')}</button></span>
       `}
-    <//>
+    </div>
   `;
+}
+
+/** The head of the agents table: the six columns every closed row (agent-card.js) fills. */
+function tableHead() {
+  const p = (k) => t('profile.agents.page.' + k);
+  return html`
+    <div class="agp-tbl" key="agp-head">
+      <div>${p('colAgent')}</div><div>${p('colRuns')}</div><div>${p('colAccess')}</div><div>${p('colSeen')}</div><div></div>
+    </div>`;
 }
 
 function collectTags(agents) {
@@ -104,36 +94,37 @@ export function FilterBar({ agents, tagFilter, setTagFilter, groupBy, setGroupBy
   }
 
   return html`
-    <${Stack} direction="wrap" align="end">
+    <div class="agp-filters">
       ${tags.length > 0 && html`
-        <${Stack} direction="wrap" align="center" density="compact">
-          <${Text} kind="label">${t('profile.agents.filter.byTag')}<//>
-          ${shown.map(tag => html`
-            <${Action} kind="text" key=${tag} selected=${tagFilter.has(tag)} onClick=${() => toggleTag(tag)}>
-              <${Chip} tone=${tagFilter.has(tag) ? 'sun' : 'plain'}>${tag}<//>
-            <//>
-          `)}
-          ${tags.length > TAGS_SHOWN && html`
-            <${Action} kind="text" expanded=${!folded} onClick=${() => setTagsOpen(v => !v)}>
-              ${folded ? t('profile.agents.page.allTags', { n: tags.length }) : t('profile.agents.page.fewerTags')}
-            <//>
-          `}
-          ${tagFilter.size > 0 && html`
-            <${Action} kind="text" onClick=${() => setTagFilter(new Set())}>
-              ${t('profile.agents.filter.clear')}
-            <//>
-          `}
-        <//>
+        <span class="og-label">${t('profile.agents.filter.byTag')}</span>
+        ${shown.map(tag => html`
+          <button type="button" key=${tag}
+                  class=${`og-chip ${tagFilter.has(tag) ? 'og-chip--sun' : ''}`}
+                  onClick=${() => toggleTag(tag)}>
+            ${tag}
+          </button>
+        `)}
+        ${tags.length > TAGS_SHOWN && html`
+          <button type="button" class="og-door og-door--quiet" onClick=${() => setTagsOpen(v => !v)}>
+            ${folded ? t('profile.agents.page.allTags', { n: tags.length }) : t('profile.agents.page.fewerTags')}
+          </button>
+        `}
+        ${tagFilter.size > 0 && html`
+          <button type="button" class="og-door og-door--quiet" onClick=${() => setTagFilter(new Set())}>
+            ${t('profile.agents.filter.clear')}
+          </button>
+        `}
       `}
-      <${Field} type="select" label=${t('profile.agents.filter.groupBy')} value=${groupBy}
-        onChange=${(e) => setGroupBy(e.target.value)}
-        options=${[
-          { value: 'none', label: t('profile.agents.filter.groupByNone') },
-          { value: 'custom', label: t('profile.agents.filter.groupByCustom') },
-          { value: 'tag', label: t('profile.agents.filter.groupByTag') },
-          { value: 'mode', label: t('profile.agents.filter.groupByMode') },
-        ]} />
-    <//>
+      <div class="agp-filters-groupby">
+        <span class="og-label">${t('profile.agents.filter.groupBy')}</span>
+        <select value=${groupBy} onChange=${(e) => setGroupBy(e.target.value)}>
+          <option value="none">${t('profile.agents.filter.groupByNone')}</option>
+          <option value="custom">${t('profile.agents.filter.groupByCustom')}</option>
+          <option value="tag">${t('profile.agents.filter.groupByTag')}</option>
+          <option value="mode">${t('profile.agents.filter.groupByMode')}</option>
+        </select>
+      </div>
+    </div>
   `;
 }
 
@@ -159,23 +150,27 @@ export function ActiveTasksPanel({ activeTasksMap, agents, onOpen }) {
   const shown = rows.slice(0, CAP);
   const overflow = rows.length - shown.length;
 
-  // Each row opens its agent on that task; the row's own action carries the "open this task" hint.
   return html`
-    <${Section} size="small" density="compact" title=${t('profile.agents.active.title')} count=${rows.length > 0 ? `(${rows.length})` : null}>
+    <div class="pf-agd-active poster-row--thing">
+      <div class="pf-agd-active-head">
+        <span class="poster-section-title">${t('profile.agents.active.title')}${rows.length > 0 ? html` <span class="pf-agd-count-badge">(${rows.length})</span>` : ''}</span>
+      </div>
       ${rows.length === 0
-        ? html`<${Text} tone="muted">${t('profile.agents.active.empty')}<//>`
-        : html`
+        ? html`<div class="pf-agd-active-empty">${t('profile.agents.active.empty')}</div>`
+        : html`<div class="pf-agd-active-list">
             ${shown.map(r => html`
-              <${ListRow} key=${r.task.id} density="compact" marker="success" live=${true}
-                name=${r.agentDisplay} onOpen=${() => onOpen(r.agentName, r.task.id)}
-                detail=${r.task.title || t('profile.agents.active.untitled')} detailKind="text"
-                value=${timeAgo(r.task.updatedAt || r.task.createdAt)}
-                actions=${html`<${Action} kind="text" title=${t('profile.agents.active.openHint')} label=${t('profile.agents.active.openHint')}
-                  onClick=${() => onOpen(r.agentName, r.task.id)}>→<//>`} />
+              <button class="pf-agd-active-row" key=${r.task.id}
+                      onClick=${() => onOpen(r.agentName, r.task.id)}
+                      title=${t('profile.agents.active.openHint')}>
+                <span class="pf-agd-active-dot" aria-hidden="true"></span>
+                <span class="pf-agd-active-agent">${r.agentDisplay}</span>
+                <span class="pf-agd-active-title">${r.task.title || t('profile.agents.active.untitled')}</span>
+                <span class="pf-agd-active-time">${timeAgo(r.task.updatedAt || r.task.createdAt)}</span>
+              </button>
             `)}
-            ${overflow > 0 && html`<${Text} tone="muted">+ ${overflow} ${t('profile.agents.active.more')}<//>`}
-          `}
-    <//>
+            ${overflow > 0 && html`<div class="pf-agd-active-empty">+ ${overflow} ${t('profile.agents.active.more')}</div>`}
+          </div>`}
+    </div>
   `;
 }
 
@@ -189,13 +184,12 @@ export function renderAgentGroups({ agents, tagFilter, query, groupBy, onboardin
     for (const want of tagFilter) if (!at.has(want)) return false;
     return true;
   });
+
   if (filtered.length === 0) {
-    return html`<${Text} tone="muted">${t('profile.agents.filter.noMatches')}<//>`;
+    return html`<div class="empty">${t('profile.agents.filter.noMatches')}</div>`;
   }
 
-  // `handle` is the grip a closed row shows when it can be dragged (the card puts it with its row's
-  // actions); an open card is not draggable, so it gets none.
-  const card = (a, handle = null) => html`
+  const card = (a) => html`
     <${AgentCard}
       agent=${{ ...a, taskStats: taskStatsMap[a.name] || null }}
       onboarding=${onboardings[a.name]}
@@ -210,7 +204,6 @@ export function renderAgentGroups({ agents, tagFilter, query, groupBy, onboardin
       onDeleteClick=${handleDeleteAgent}
       onFederateToggle=${toggleFederate}
       onPopOut=${onPopOut}
-      dragHandle=${expandedAgent !== a.name ? handle : null}
       preSelectedTab=${deepLink?.agent === a.name ? 'tasks' : null}
       openTaskId=${deepLink?.agent === a.name ? deepLink.taskId : null}
       openTaskNonce=${deepLink?.agent === a.name ? deepLink.nonce : 0}
@@ -221,14 +214,6 @@ export function renderAgentGroups({ agents, tagFilter, query, groupBy, onboardin
     <div data-agent-name=${a.name} key=${a.name}>${card(a)}</div>
   `;
 
-  /** A group of rows under a small section head: its title, its count, and its actions. */
-  const group = (key, title, count, actions, body, drop) => html`
-    <div key=${key} onDragOver=${drop ? groupDnd.onDragOver : undefined}
-         onDrop=${drop ? (e) => { e.preventDefault(); drop(); } : undefined}>
-      <${Section} size="small" density="compact" title=${title} count=${count} actions=${actions}>${body}<//>
-    </div>
-  `;
-
   if (groupBy === 'none') {
     // Apply the per-browser saved order, then (when reorderable) wrap each row
     // in a draggable container with a grip handle.
@@ -237,12 +222,14 @@ export function renderAgentGroups({ agents, tagFilter, query, groupBy, onboardin
     const ordered = [...filtered].sort((a, b) => (idx.get(a.name) ?? 1e9) - (idx.get(b.name) ?? 1e9));
     const row = (a) => (!dnd?.reorderable ? renderCard(a) : html`
       <div data-agent-name=${a.name} key=${a.name}
+           class="pf-agd-dnd-row ${dnd.draggingName === a.name ? 'pf-agd-dnd-dragging' : ''}"
            draggable=${expandedAgent !== a.name}
            onDragStart=${(e) => dnd.onDragStart(a.name, e)}
            onDragOver=${dnd.onDragOver}
            onDrop=${(e) => { e.preventDefault(); dnd.onDrop(a.name); }}
            onDragEnd=${dnd.onDragEnd}>
-        ${card(a, grip(t('profile.agents.reorderHint')))}
+        ${expandedAgent !== a.name ? html`<span class="pf-agd-dnd-grip" title=${t('profile.agents.reorderHint')}>⠿</span>` : ''}
+        ${card(a)}
       </div>
     `);
 
@@ -254,11 +241,18 @@ export function renderAgentGroups({ agents, tagFilter, query, groupBy, onboardin
     // The Chat Sessions tab casts a wider net (it also honours the legacy `session-` naming), and
     // that is deliberate: this grouping has to line up with the teal dot beside each card.
     const tools = ordered.filter(a => a.mode === 'workstation');
-    if (tools.length === 0) return ordered.map(row);
+    if (tools.length === 0) return [tableHead(), ...ordered.map(row)];
     const rest = ordered.filter(a => a.mode !== 'workstation');
     return [
+      tableHead(),
       ...rest.map(row),
-      group('ws-header', t('profile.agents.startedByYou'), tools.length, null, tools.map(row)),
+      html`
+        <div class="agp-group-head poster-row--thing" key="ws-header">
+          <span>${t('profile.agents.startedByYou')}</span>
+          <span class="agp-group-count">${tools.length}</span>
+        </div>
+      `,
+      ...tools.map(row),
     ];
   }
 
@@ -273,32 +267,41 @@ export function renderAgentGroups({ agents, tagFilter, query, groupBy, onboardin
     // not draggable while expanded so its inner controls stay usable.
     const draggableCard = (a) => html`
       <div data-agent-name=${a.name} key=${a.name}
+           class="pf-agd-dnd-row ${groupDnd.draggingAgentName === a.name ? 'pf-agd-dnd-dragging' : ''}"
            draggable=${expandedAgent !== a.name}
            onDragStart=${(e) => groupDnd.onDragStart(a.name, e)}
            onDragEnd=${groupDnd.onDragEnd}>
-        ${card(a, grip(t('profile.agents.groups.dragHint')))}
+        ${expandedAgent !== a.name ? html`<span class="pf-agd-dnd-grip" title=${t('profile.agents.groups.dragHint')}>⠿</span>` : ''}
+        ${card(a)}
       </div>
     `;
-
-    const toggle = (id, collapsed) => html`<${Action} kind="text" expanded=${!collapsed} title=${t('profile.agents.groups.toggle')}
-      label=${t('profile.agents.groups.toggle')} onClick=${() => toggleGroupCollapsed(id)}>${collapsed ? '→' : '↩'}<//>`;
 
     const groupSection = (g) => {
       (g.agents || []).forEach(n => assigned.add(n));
       const members = (g.agents || []).filter(n => filteredNames.has(n)).map(n => byName.get(n));
       const collapsed = collapsedGroups?.has(g.id);
-      // The group's name is its title and renames it when pressed; while renaming, the field stands
-      // at the top of the group.
-      const title = html`<${Action} kind="text" title=${t('profile.agents.groups.rename')} onClick=${() => setEditingGroup(g.id)}>${g.name || t('profile.agents.groups.unnamed')}<//>`;
-      const actions = html`${toggle(g.id, collapsed)}
-        <${Action} kind="text" tone="danger" title=${t('profile.agents.groups.remove')} label=${t('profile.agents.groups.remove')} onClick=${() => removeGroup(g.id)}>✗<//>`;
-      const body = html`
-        ${editingGroup === g.id && html`<${GroupNameField} value=${g.name}
-            onInput=${(v) => renameGroup(g.id, v)} onDone=${() => setEditingGroup(null)} />`}
-        ${!collapsed && (members.length === 0
-          ? html`<${Text} tone="muted">${t('profile.agents.groups.emptyDrop')}<//>`
-          : members.map(draggableCard))}`;
-      return group('cg-' + g.id, title, members.length, actions, body, () => groupDnd.onDropToGroup(g.id));
+      return html`
+        <div class="pf-agd-group" key=${'cg-' + g.id}>
+          <div class="agp-group-head poster-row--thing"
+               onDragOver=${groupDnd.onDragOver}
+               onDrop=${(e) => { e.preventDefault(); groupDnd.onDropToGroup(g.id); }}>
+            <button type="button" class="og-door og-door--quiet" onClick=${() => toggleGroupCollapsed(g.id)} title=${t('profile.agents.groups.toggle')}>${collapsed ? '→' : '↓'}</button>
+            ${editingGroup === g.id
+              ? html`<input class="pf-agd-cgroup-name-input" autofocus
+                       placeholder=${t('profile.agents.groups.namePlaceholder')}
+                       value=${g.name}
+                       onInput=${(e) => renameGroup(g.id, e.target.value)}
+                       onBlur=${() => setEditingGroup(null)}
+                       onKeyDown=${(e) => { if (e.key === 'Enter') setEditingGroup(null); }} />`
+              : html`<button type="button" class="og-door og-door--quiet" onClick=${() => setEditingGroup(g.id)} title=${t('profile.agents.groups.rename')}>${g.name || t('profile.agents.groups.unnamed')}</button>`}
+            <span class="agp-group-count">${members.length}</span>
+            <button type="button" class="og-door og-door--quiet" title=${t('profile.agents.groups.remove')} onClick=${() => removeGroup(g.id)}>✗</button>
+          </div>
+          ${!collapsed && (members.length === 0
+            ? html`<div class="agp-group-empty">${t('profile.agents.groups.emptyDrop')}</div>`
+            : members.map(draggableCard))}
+        </div>
+      `;
     };
 
     // Render groups first (populates `assigned`), then everything not in any
@@ -308,13 +311,21 @@ export function renderAgentGroups({ agents, tagFilter, query, groupBy, onboardin
     const ungCollapsed = collapsedGroups?.has(UNGROUPED_ID);
 
     return html`
-      <${Stack} direction="wrap" align="center">
-        <${Action} onClick=${addGroup}>+ ${t('profile.agents.groups.addGroup')}<//>
-        <${Text} kind="caption" tone="muted">${t('profile.agents.groups.hint')}<//>
-      <//>
+      <div class="agp-group-bar">
+        <button type="button" class="og-door" onClick=${addGroup}>+ ${t('profile.agents.groups.addGroup')}</button>
+        <span class="agp-group-hint">${t('profile.agents.groups.hint')}</span>
+      </div>
       ${groupSections}
-      ${group('cg-ungrouped', t('profile.agents.groups.ungrouped'), ungrouped.length, toggle(UNGROUPED_ID, ungCollapsed),
-        !ungCollapsed && ungrouped.map(draggableCard), () => groupDnd.onDropToGroup(UNGROUPED_ID))}
+      <div class="pf-agd-group" key="cg-ungrouped">
+        <div class="agp-group-head poster-row--thing"
+             onDragOver=${groupDnd.onDragOver}
+             onDrop=${(e) => { e.preventDefault(); groupDnd.onDropToGroup(UNGROUPED_ID); }}>
+          <button type="button" class="og-door og-door--quiet" onClick=${() => toggleGroupCollapsed(UNGROUPED_ID)} title=${t('profile.agents.groups.toggle')}>${ungCollapsed ? '→' : '↓'}</button>
+          <span>${t('profile.agents.groups.ungrouped')}</span>
+          <span class="agp-group-count">${ungrouped.length}</span>
+        </div>
+        ${!ungCollapsed && ungrouped.map(draggableCard)}
+      </div>
     `;
   }
 
@@ -326,8 +337,15 @@ export function renderAgentGroups({ agents, tagFilter, query, groupBy, onboardin
       byMode.get(m).push(a);
     }
     const order = AGENT_MODES.filter(m => byMode.has(m));
-    return order.map(mode => group('mode-' + mode, t('profile.agents.mode.' + mode) || mode,
-      byMode.get(mode).length, null, byMode.get(mode).map(renderCard)));
+    return order.map(mode => html`
+      <div class="pf-agd-group" key=${'mode-' + mode}>
+        <div class="agp-group-head poster-row--thing">
+          <span>${t('profile.agents.mode.' + mode) || mode}</span>
+          <span class="agp-group-count">${byMode.get(mode).length}</span>
+        </div>
+        ${byMode.get(mode).map(renderCard)}
+      </div>
+    `);
   }
 
   // groupBy === 'tag' -- an agent appears under every tag it carries; untagged agents grouped at end
@@ -345,22 +363,25 @@ export function renderAgentGroups({ agents, tagFilter, query, groupBy, onboardin
     }
   }
   const sortedTags = [...byTag.keys()].sort();
-  const sections = sortedTags.map(tag => group('tag-' + tag, tag, byTag.get(tag).length, null, byTag.get(tag).map(renderCard)));
+  const sections = sortedTags.map(tag => html`
+    <div class="pf-agd-group" key=${'tag-' + tag}>
+      <div class="agp-group-head poster-row--thing">
+        <span class="og-chip">${tag}</span>
+        <span class="agp-group-count">${byTag.get(tag).length}</span>
+      </div>
+      ${byTag.get(tag).map(renderCard)}
+    </div>
+  `);
   if (untagged.length > 0) {
-    sections.push(group('tag-untagged', t('profile.agents.filter.untagged'), untagged.length, null, untagged.map(renderCard)));
+    sections.push(html`
+      <div class="pf-agd-group" key="tag-untagged">
+        <div class="agp-group-head poster-row--thing">
+          <span>${t('profile.agents.filter.untagged')}</span>
+          <span class="agp-group-count">${untagged.length}</span>
+        </div>
+        ${untagged.map(renderCard)}
+      </div>
+    `);
   }
   return sections;
-}
-
-/**
- * The field a custom group is renamed in: it takes the focus when it opens (the old input's
- * autofocus), writes every keystroke, and closes on Enter or when the focus leaves it.
- */
-function GroupNameField({ value, onInput, onDone }) {
-  const ref = useRef(null);
-  useEffect(() => { ref.current?.focus(); }, []);
-  return html`<${Field} inputRef=${ref} value=${value} placeholder=${t('profile.agents.groups.namePlaceholder')}
-    ariaLabel=${t('profile.agents.groups.rename')}
-    onInput=${(e) => onInput(e.target.value)} onBlur=${onDone}
-    onKeyDown=${(e) => { if (e.key === 'Enter') onDone(); }} />`;
 }

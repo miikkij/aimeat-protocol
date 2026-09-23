@@ -11,11 +11,6 @@
  * @structure renderOffersView · renderCover · secBack · secAuto · secAsk · catalogue · aiResults · sellPage
  * @usage import { renderOffersView } from './offers/cover.js';
  * @version-history
- *   2026-09-22 -- The set's newer props: the catalogue and selling tables stack on a phone, the rail's
- *     two fold entries open their fold before the jump, and the jump to "ask" uses scrollToId.
- *   2026-09-22 -- Composed from the shared component set: Page, Rail, Section, Fold, NumeralBand
- *     for the strip, Table for the catalogue and the selling register, ListRow for the chains and
- *     the AI's hits. No own CSS; every word, count, door and handler is the one it was.
  *   v1.2.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.1.0 — 2026-09-06 — The map moves to map-page.js, where it gains three flat views and a search field.
  *   v1.0.0 — 2026-08-30 — Initial. Replaces the segment tabs, the facet panel and the wall of cards.
@@ -24,9 +19,9 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { Page, Rail, Section, Fold, Stack, ListRow, Table, NumeralBand, Field, Action, Text, Surface, scrollToId } from '/components/poster-parts.js';
+import { Section, Fold, scrollTo } from '/views/profile/organisms/poster-parts.js';
 import { groupItems } from './model.js';
-import { c, word, agentMark, getWord, costTime, statusWord, deliveryRows, rel, crumb, chipRow, pageLinks, renderPage } from './frame.js';
+import { c, word, agentMark, getWord, costTime, statusWord, deliveryRows, deliveryHead, rel, crumb, pageLinks, renderPage } from './frame.js';
 import { renderOffer } from './offer-page.js';
 import { renderInbox, renderDeliverable } from './inbox.js';
 import { MapPage } from './map-page.js';
@@ -50,149 +45,161 @@ export function renderOffersView(ctx) {
 /* ── The cover ─────────────────────────────────────────────────────────────────────────────── */
 function renderCover(ctx) {
   const m = ctx.model;
+  const chip = (n, key, cls = '') => html`<span class=${`og-chip ${cls}`}>${c(key, { n })}</span>`;
   const last = m.latest[0];
-  const strip = html`<${NumeralBand} tone="plain" items=${[
-    { label: c('stripToday'), value: m.todayN, note: last ? c('stripTodaySub', { a: last.agent, t: rel(last.updated_at), s: statusWord(last.status) }) : c('noneBack') },
-    { label: c('stripWaiting'), value: m.waiting.length, note: c('stripWaitingSub', { q: m.waiting.filter(d => d.status === 'queued').length, s: m.waiting.filter(d => d.status === 'stalled').length, f: m.failed7 }) },
-    { label: c('stripAuto'), value: m.autoN, note: c('stripAutoSub', { c: m.chains.length, s: m.autoSingles.length }) },
-    { label: c('stripRated'), value: m.rated, note: c('stripRatedSub', { n: m.unrated.length }), tone: m.rated ? undefined : 'coral' },
-  ]} />`;
-  const chips = chipRow([
-    [c('chipOffers', { n: m.items.length })], [c('chipAgents', { n: m.agents })], [c('chipOnline', { n: m.onlineAgents })],
-    [c('chipAuto', { n: m.autoN })], [c('chipSteps', { n: m.stepsN })],
-    [c('chipSelling', { n: m.selling.length }), m.selling.length ? 'plain' : 'muted'], [c('chipDeliveries', { n: m.latest.length }), 'sun'],
-  ]);
-  const actions = html`<${Action} kind="primary" onClick=${() => scrollToId('op-ask')}>${c('ask')}<//>
-    <${Action} onClick=${() => ctx.pickView({ kind: 'page', id: 'inbox' })}>${c('inbox')}<//>
-    <${Action} onClick=${() => ctx.pickView({ kind: 'page', id: 'map' })}>${c('map')}<//>`;
-  const rail = html`<${Rail} kind="index" title=${c('railTitle')} entries=${[
-    { href: '#op-back', label: c('secBack'), count: m.latest.length },
-    { href: '#op-auto', label: c('secAuto'), count: m.chains.length + m.autoSingles.length },
-    { href: '#op-ask', label: c('secAsk'), count: m.askable.length },
-    { href: '#op-offline', label: c('secOffline'), count: m.offlineAgents.size, onClick: () => ctx.setOfflineOpen(true) },
-    { href: '#op-selling', label: c('secSelling'), count: m.selling.length, onClick: () => ctx.setSellOpen(true) },
-  ]}>${pageLinks(ctx, null)}<//>`;
-  return html`<${Page} width="wide" title=${t('profile.tabs.offers')} crumbs=${crumb(ctx, [])} identity=${chips} actions=${actions} rail=${rail}>
-    <${Stack}>
-      <${Text} kind="lead">${c('desc')}<//>
+  const strip = html`
+    <div class="og-strip">
+      <div><b>${m.todayN}</b><span>${c('stripToday')}</span><small>${last ? c('stripTodaySub', { a: last.agent, t: rel(last.updated_at), s: statusWord(last.status) }) : c('noneBack')}</small></div>
+      <div><b>${m.waiting.length}</b><span>${c('stripWaiting')}</span><small>${c('stripWaitingSub', { q: m.waiting.filter(d => d.status === 'queued').length, s: m.waiting.filter(d => d.status === 'stalled').length, f: m.failed7 })}</small></div>
+      <div><b>${m.autoN}</b><span>${c('stripAuto')}</span><small>${c('stripAutoSub', { c: m.chains.length, s: m.autoSingles.length })}</small></div>
+      <div><b class=${m.rated ? '' : 'og-strip-coral'}>${m.rated}</b><span>${c('stripRated')}</span><small>${c('stripRatedSub', { n: m.unrated.length })}</small></div>
+    </div>`;
+  return html`
+    <div class="og og-op">
+      ${crumb(ctx, [])}
+      <div class="og-mast">
+        <div class="og-mast-words">
+          <h1 class="og-title poster-page-title">${t('profile.tabs.offers')}</h1>
+          <div class="og-chips">
+            ${chip(m.items.length, 'chipOffers')}${chip(m.agents, 'chipAgents')}${chip(m.onlineAgents, 'chipOnline')}${chip(m.autoN, 'chipAuto')}${chip(m.stepsN, 'chipSteps')}
+            ${chip(m.selling.length, 'chipSelling', m.selling.length ? '' : 'og-chip--dim')}${chip(m.latest.length, 'chipDeliveries', 'og-chip--coral')}
+          </div>
+          <p class="og-desc">${c('desc')}</p>
+        </div>
+        <div class="og-mast-actions">
+          <button type="button" class="og-slab" onClick=${() => scrollTo('op-ask')}>${c('ask')}</button>
+          <div class="og-doors">
+            <button type="button" class="og-door" onClick=${() => ctx.pickView({ kind: 'page', id: 'inbox' })}>${c('inbox')}</button>
+            <button type="button" class="og-door" onClick=${() => ctx.pickView({ kind: 'page', id: 'map' })}>${c('map')}</button>
+          </div>
+        </div>
+      </div>
       ${strip}
-      ${secBack(ctx)}${secAuto(ctx)}${secAsk(ctx)}${secOffline(ctx)}${secSelling(ctx)}
-    <//>
-  <//>`;
+      <div class="og-grid">
+        <div class="og-main">
+          ${secBack(ctx)}
+          ${secAuto(ctx)}
+          ${secAsk(ctx)}
+          ${secOffline(ctx)}
+          ${secSelling(ctx)}
+        </div>
+        <nav class="og-rail" aria-label=${c('railTitle')}>
+          <span class="og-rail-label">${c('railTitle')}</span>
+          ${[['01', 'op-back', c('secBack'), m.latest.length], ['02', 'op-auto', c('secAuto'), m.chains.length + m.autoSingles.length], ['03', 'op-ask', c('secAsk'), m.askable.length],
+            ['04', 'op-offline', c('secOffline'), m.offlineAgents.size], ['05', 'op-selling', c('secSelling'), m.selling.length]]
+            .map(([num, id, label, n]) => html`<button type="button" class="og-rail-link" key=${id} onClick=${() => scrollTo(id)}><i>${num}</i>${label}<em>${n}</em></button>`)}
+          <hr />
+          <span class="og-rail-label">${c('pages')}</span>
+          ${pageLinks(ctx, null)}
+        </nav>
+      </div>
+    </div>`;
 }
 
 /* ── 01 What came back ─────────────────────────────────────────────────────────────────────── */
 function secBack(ctx) {
   const m = ctx.model;
-  const actions = html`
-    <${Action} onClick=${() => ctx.pickView({ kind: 'page', id: 'inbox', filter: 'all' })}>${c('allN', { n: m.latest.length })}<//>
-    <${Action} onClick=${() => ctx.pickView({ kind: 'page', id: 'inbox', filter: 'unrated' })}>${c('unratedN', { n: m.unrated.length })}<//>`;
-  return html`<${Section} id="op-back" title=${c('secBack')} count=${c('secBackSub')} actions=${actions}>
-    ${m.latest.length ? deliveryRows(ctx, m.latest.slice(0, BACK_ROWS)) : html`<${Text} tone="muted">${ctx.loadingDeliveries ? '…' : t('profile.offers.inboxEmpty')}<//>`}
+  const doors = html`
+    <button type="button" class="og-door og-door--quiet" onClick=${() => ctx.pickView({ kind: 'page', id: 'inbox', filter: 'all' })}>${c('allN', { n: m.latest.length })}</button>
+    <button type="button" class="og-door og-door--quiet" onClick=${() => ctx.pickView({ kind: 'page', id: 'inbox', filter: 'unrated' })}>${c('unratedN', { n: m.unrated.length })}</button>`;
+  return html`<${Section} id="op-back" num="01" title=${c('secBack')} count=${c('secBackSub')} doors=${doors} first=${true}>
+    ${m.latest.length ? html`${deliveryHead()}${deliveryRows(ctx, m.latest.slice(0, BACK_ROWS))}` : html`<p class="og-empty">${ctx.loadingDeliveries ? '…' : t('profile.offers.inboxEmpty')}</p>`}
   <//>`;
 }
 
 /* ── 02 Runs on its own ────────────────────────────────────────────────────────────────────── */
 function stepBox(ctx, it) {
   const last = ctx.model.latestByAgent.get(it.agent);
-  const tone = last ? (last.status === 'done' ? 'success' : (['failed', 'stalled'].includes(last.status) ? 'danger' : 'muted')) : 'muted';
-  return html`<${Stack} key=${it.key} density="compact">
-    <${Action} kind="text" onClick=${() => openOffer(ctx, it)}>${it.offer.title}<//>
-    <${Text} kind="caption" tone=${tone}>${it.agent}${last ? ` · ${statusWord(last.status)}` : ''}<//>
-  <//>`;
+  const cls = last ? (last.status === 'done' ? 'op-step--done' : (['failed', 'stalled'].includes(last.status) ? 'op-step--fail' : '')) : '';
+  return html`<button type="button" class=${`op-step ${cls}`} onClick=${() => openOffer(ctx, it)}>${it.offer.title}<small>${it.agent}${last ? ` · ${statusWord(last.status)}` : ''}</small></button>`;
 }
-const stepChain = (ctx, steps) => html`<${Stack} direction="wrap" align="center">
-  ${steps.map((s, i) => html`${i ? html`<${Text} key=${'a' + s.key} kind="mono" tone="muted">→<//>` : null}${stepBox(ctx, s)}`)}
-<//>`;
 function secAuto(ctx) {
   const m = ctx.model;
-  const actions = html`
-    <${Action} onClick=${() => ctx.openTab('scheduler')}>${c('scheduler')}<//>
-    <${Action} onClick=${() => ctx.openTab('workflows')}>${c('workflows')}<//>`;
-  return html`<${Section} id="op-auto" title=${c('secAuto')} count=${c('secAutoSub', { c: m.chains.length, s: m.autoSingles.length })} actions=${actions}>
-    ${m.chains.map(ch => html`<${ListRow} key=${ch.id} name=${ch.title} detailKind="text"
-      detail=${html`${c('stepsN', { n: ch.steps.length })}${ch.last ? ` · ${c('lastRun', { t: rel(ch.last.updated_at) })}` : ''}${ch.failed ? html` · <${Text} kind="caption" tone="danger">${c('stepsFailed', { n: ch.failed })}<//>` : ''}`}
-      actions=${html`<${Action} onClick=${() => ctx.openTab('workflows')}>${c('openWorkflow')}<//>`}>
-      ${stepChain(ctx, ch.steps)}
-    <//>`)}
-    ${m.autoSingles.length ? html`<${ListRow} name=${c('singles')} detail=${c('singlesSub')} detailKind="text">
-      <${Stack} direction="wrap">${m.autoSingles.map(s => stepBox(ctx, s))}<//>
-    <//>` : null}
-    ${!m.chains.length && !m.autoSingles.length ? html`<${Text} tone="muted">${c('noneAuto')}<//>` : null}
+  const doors = html`
+    <button type="button" class="og-door og-door--quiet" onClick=${() => ctx.openTab('scheduler')}>${c('scheduler')}</button>
+    <button type="button" class="og-door og-door--quiet" onClick=${() => ctx.openTab('workflows')}>${c('workflows')}</button>`;
+  return html`<${Section} id="op-auto" num="02" title=${c('secAuto')} count=${c('secAutoSub', { c: m.chains.length, s: m.autoSingles.length })} doors=${doors}>
+    ${m.chains.map(ch => html`<div class="op-line" key=${ch.id}>
+      <div class="op-line-h"><b>${ch.title}</b><small>${c('stepsN', { n: ch.steps.length })}${ch.last ? ` · ${c('lastRun', { t: rel(ch.last.updated_at) })}` : ''}${ch.failed ? html` · <span class="op-st--err">${c('stepsFailed', { n: ch.failed })}</span>` : ''}</small>
+        <div class="og-doors"><button type="button" class="og-door" onClick=${() => ctx.openTab('workflows')}>${c('openWorkflow')}</button></div></div>
+      <div class="op-steps">${ch.steps.map((s, i) => html`${i ? html`<span class="op-arrow">→</span>` : null}${stepBox(ctx, s)}`)}</div>
+    </div>`)}
+    ${m.autoSingles.length ? html`<div class="op-line op-line--last">
+      <div class="op-line-h"><b>${c('singles')}</b><small>${c('singlesSub')}</small></div>
+      <div class="op-steps">${m.autoSingles.map(s => stepBox(ctx, s))}</div>
+    </div>` : null}
+    ${!m.chains.length && !m.autoSingles.length ? html`<p class="og-empty">${c('noneAuto')}</p>` : null}
   <//>`;
 }
 
 /* ── 03 Ask ────────────────────────────────────────────────────────────────────────────────── */
-const nameCell = (ctx, it) => html`<${Stack} density="compact">
-  <${Action} kind="text" onClick=${() => openOffer(ctx, it)}>${it.offer.title}<//>
-  <${Text} kind="caption" tone="muted">${agentMark(it)}<//>
-<//>`;
-const catalogueTable = (ctx, list, label) => html`<${Table} density="compact" collapse=${600} label=${label}
-  headers=${[c('colOffer'), c('colGet'), c('colCostTime'), c('colTrust'), '']}
-  rows=${list.map(it => [nameCell(ctx, it), { text: getWord(it.offer), mono: true }, costTime(it.offer), { text: word('verification', it.offer.verification), mono: true },
-    html`<${Action} onClick=${() => openOffer(ctx, it)}>${c('ask')}<//>`])} />`;
+function catalogueRows(ctx, list) {
+  return list.map(it => html`
+    <div class="op-nm" key=${'n' + it.key}><button type="button" class="og-tbl-name" onClick=${() => openOffer(ctx, it)}>${it.offer.title}</button><small>${agentMark(it)}</small></div>
+    <div class="op-m" key=${'g' + it.key}>${getWord(it.offer)}</div>
+    <div class="op-w" key=${'c' + it.key}>${costTime(it.offer)}</div>
+    <div class="op-m" key=${'v' + it.key}>${word('verification', it.offer.verification)}</div>
+    <div class="og-tbl-door" key=${'d' + it.key}><button type="button" class="og-door" onClick=${() => openOffer(ctx, it)}>${c('ask')}</button></div>`);
+}
 export function catalogue(ctx, items, axis) {
   const groups = groupItems(items, axis);
-  if (axis === 'name') return catalogueTable(ctx, groups[0]?.items || [], c('secAsk'));
-  return html`<${Stack}>${groups.map(g => {
-    const label = axis === 'need' ? needLabel(g.key) : g.key;
-    return html`<${Stack} key=${g.key} density="compact"><${Text} kind="label">${label} ${g.items.length}<//>${catalogueTable(ctx, g.items, label)}<//>`;
-  })}<//>`;
+  return html`
+    <div class="op-cat op-cat--head"><div>${c('colOffer')}</div><div>${c('colGet')}</div><div>${c('colCostTime')}</div><div>${c('colTrust')}</div><div></div></div>
+    <div class="op-cat">
+      ${groups.map(g => html`
+        ${axis !== 'name' ? html`<div class="op-lbl" key=${'l' + g.key}>${axis === 'need' ? needLabel(g.key) : g.key}<em>${g.items.length}</em></div>` : null}
+        ${catalogueRows(ctx, g.items)}`)}
+    </div>`;
 }
 function aiResults(ctx) {
   const r = ctx.aiResult;
-  if (r === 'loading') return html`<${Text} tone="muted">${t('profile.offers.aiThinking')}<//>`;
+  if (r === 'loading') return html`<p class="og-empty">${t('profile.offers.aiThinking')}</p>`;
   const noMatch = !r.ranked.length || r.noMatch;
-  return html`<${Stack}>
-    <${Stack} direction="horizontal" align="between"><${Text} kind="label">${t('profile.offers.aiResultsTitle')}<//><${Action} onClick=${ctx.clearAi}>${t('profile.offers.aiClear')}<//><//>
-    ${noMatch ? html`<${Stack}>
-      <${Text} tone="muted">${t('profile.offers.aiNoMatch')}<//>
-      ${r.brief ? html`<${Surface} kind="box">${r.brief}<//>` : null}
-      ${ctx.builder ? html`<${Stack} direction="horizontal" align="start"><${Action} kind="primary" disabled=${ctx.busy} onClick=${() => ctx.buildForNeed(r.brief)}>${t('profile.offers.buildForNeed')}<//><//>` : null}
-    <//>` : null}
+  return html`
+    <div class="op-ai-head"><span class="og-label">${t('profile.offers.aiResultsTitle')}</span><button type="button" class="og-door og-door--quiet" onClick=${ctx.clearAi}>${t('profile.offers.aiClear')}</button></div>
+    ${noMatch ? html`<div class="op-noneed">
+      <p class="og-empty">${t('profile.offers.aiNoMatch')}</p>
+      ${r.brief ? html`<div class="op-frame">${r.brief}</div>` : null}
+      ${ctx.builder ? html`<button type="button" class="og-slab" disabled=${ctx.busy} onClick=${() => ctx.buildForNeed(r.brief)}>${t('profile.offers.buildForNeed')}</button>` : null}
+    </div>` : null}
     ${r.ranked.map(({ item, why }) => { const it = ctx.model.byKey.get(item.key || (item.agent + '/' + item.offer.id)) || item; return html`
-      <${ListRow} key=${it.key} name=${it.offer.title} onOpen=${() => openOffer(ctx, it)} detail=${it.offer.ask} detailKind="text"
-        value=${agentMark(it)} actions=${html`<${Action} onClick=${() => openOffer(ctx, it)}>${c('ask')}<//>`}>
-        ${why ? html`<${Text} kind="caption" tone="coral">${why}<//>` : null}
-      <//>`; })}
-  <//>`;
+      <div class="op-hit" key=${it.key}>
+        <div><button type="button" class="og-tbl-name" onClick=${() => openOffer(ctx, it)}>${it.offer.title}</button> ${agentMark(it)}<p>${it.offer.ask}</p>${why ? html`<div class="op-why">${why}</div>` : null}</div>
+        <div><button type="button" class="og-door" onClick=${() => openOffer(ctx, it)}>${c('ask')}</button></div>
+      </div>`; })}`;
 }
 function secAsk(ctx) {
   const m = ctx.model;
   const needle = ctx.q.trim().toLowerCase();
   const list = needle ? m.askable.filter(it => (it.offer.title + ' ' + it.offer.ask + ' ' + (it.offer.tags || []).join(' ') + ' ' + it.agent).toLowerCase().includes(needle)) : m.askable;
-  const axisTab = (id, label) => html`<${Action} kind="tab" selected=${ctx.axis === id} onClick=${() => ctx.setAxis(id)}>${label}<//>`;
-  return html`<${Section} id="op-ask" title=${c('secAsk')} count=${c('secAskSub', { n: m.askable.length })}
-    actions=${html`${axisTab('need', c('byNeed'))}${axisTab('agent', c('byAgent'))}${axisTab('name', c('byName'))}`}>
-    <${Stack}>
-      <${Field} type="search" value=${ctx.q} placeholder=${t('profile.offers.searchPlaceholder')} onInput=${(e) => ctx.setQ(e.target.value)}
-        onKeyDown=${(e) => { if (e.key === 'Enter' && ctx.aiOn) ctx.runNeedSearch(); }} />
-      ${ctx.aiOn ? html`<${Stack} direction="wrap" align="center">
-        <${Action} disabled=${!ctx.q.trim() || ctx.aiResult === 'loading'} onClick=${ctx.runNeedSearch}>${t('profile.offers.aiSearch')}<//>
-        <${Text} kind="caption" tone="muted">${c('aiHint')}<//>
-      <//>` : null}
-      ${ctx.aiResult ? aiResults(ctx) : (list.length ? catalogue(ctx, list, ctx.axis) : html`<${Stack}>
-        <${Text} tone="muted">${m.askable.length ? t('profile.offers.noMatch') : t('profile.offers.empty')}<//>
-        ${ctx.builder && needle ? html`<${Stack} direction="horizontal" align="start"><${Action} kind="primary" disabled=${ctx.busy} onClick=${() => ctx.buildForNeed()}>${t('profile.offers.buildForNeed')}<//><//>` : null}
-      <//>`)}
-      ${!ctx.aiResult && list.length ? html`<${Text} kind="caption" tone="muted">${c('groupHint')}<//>` : null}
-    <//>
+  const axisDoor = (id, label) => html`<button type="button" class=${`og-door og-door--quiet ${ctx.axis === id ? 'on' : ''}`} onClick=${() => ctx.setAxis(id)}>${label}</button>`;
+  const doors = html`${axisDoor('need', c('byNeed'))}${axisDoor('agent', c('byAgent'))}${axisDoor('name', c('byName'))}`;
+  return html`<${Section} id="op-ask" num="03" title=${c('secAsk')} count=${c('secAskSub', { n: m.askable.length })} doors=${doors}>
+    <div class="op-search">
+      <input type="search" value=${ctx.q} placeholder=${t('profile.offers.searchPlaceholder')} onInput=${(e) => ctx.setQ(e.target.value)} onKeyDown=${(e) => { if (e.key === 'Enter' && ctx.aiOn) ctx.runNeedSearch(); }} />
+      ${ctx.aiOn ? html`<button type="button" class="og-door" disabled=${!ctx.q.trim() || ctx.aiResult === 'loading'} onClick=${ctx.runNeedSearch}>${t('profile.offers.aiSearch')}</button><span class="op-hint">${c('aiHint')}</span>` : null}
+    </div>
+    ${ctx.aiResult ? aiResults(ctx) : (list.length ? catalogue(ctx, list, ctx.axis) : html`<div class="op-noneed">
+      <p class="og-empty">${m.askable.length ? t('profile.offers.noMatch') : t('profile.offers.empty')}</p>
+      ${ctx.builder && needle ? html`<button type="button" class="og-slab" disabled=${ctx.busy} onClick=${() => ctx.buildForNeed()}>${t('profile.offers.buildForNeed')}</button>` : null}
+    </div>`)}
+    ${!ctx.aiResult && list.length ? html`<p class="op-hint">${c('groupHint')}</p>` : null}
   <//>`;
 }
 
 /* ── 04 Away, 05 Selling ───────────────────────────────────────────────────────────────────── */
 function secOffline(ctx) {
   const m = ctx.model;
-  return html`<${Fold} id="op-offline" number="04" title=${c('secOffline')} sub=${c('secOfflineSub', { n: m.offlineAgents.size })} open=${ctx.offlineOpen} onToggle=${() => ctx.setOfflineOpen(v => !v)}>
-    <${Text} kind="caption" tone="muted">${c('offlineNote')}<//>
-    ${m.offline.length ? catalogueTable(ctx, m.offline, c('secOffline')) : html`<${Text} tone="muted">${c('noneOffline')}<//>`}
+  return html`<${Fold} id="op-offline" num="04" title=${c('secOffline')} sub=${c('secOfflineSub', { n: m.offlineAgents.size })} open=${ctx.offlineOpen} onToggle=${() => ctx.setOfflineOpen(v => !v)}>
+    <p class="op-hint">${c('offlineNote')}</p>
+    ${m.offline.length ? html`<div class="op-cat">${catalogueRows(ctx, m.offline)}</div>` : html`<p class="og-empty">${c('noneOffline')}</p>`}
   <//>`;
 }
 function secSelling(ctx) {
   const m = ctx.model;
-  return html`<${Fold} id="op-selling" number="05" title=${c('secSelling')} sub=${m.selling.length ? c('sellingSub', { n: m.selling.length }) : c('sellingNone')} open=${ctx.sellOpen} onToggle=${() => ctx.setSellOpen(v => !v)}>
-    <${Text} kind="caption" tone="muted">${c('sellingHint')}<//>
-    <${Stack} direction="horizontal" align="start"><${Action} onClick=${() => ctx.pickView({ kind: 'page', id: 'sell' })}>${c('sell')}<//><//>
+  return html`<${Fold} id="op-selling" num="05" title=${c('secSelling')} sub=${m.selling.length ? c('sellingSub', { n: m.selling.length }) : c('sellingNone')} open=${ctx.sellOpen} onToggle=${() => ctx.setSellOpen(v => !v)}>
+    <p class="op-hint">${c('sellingHint')}</p>
+    <div class="og-doors"><button type="button" class="og-door" onClick=${() => ctx.pickView({ kind: 'page', id: 'sell' })}>${c('sell')}</button></div>
   <//>`;
 }
 
@@ -203,11 +210,16 @@ function sellPage(ctx) {
   const price = (o) => [o.price?.morsels > 0 ? `${o.price.morsels} ${t('profile.offers.morsels')}` : '', o.priceMoney ? `${(o.priceMoney.amount / 1e6).toFixed(2)} ${o.priceMoney.currency}` : ''].filter(Boolean).join(' · ') || c('noPrice');
   return renderPage(ctx, {
     id: 'sell', crumbs: [c('sell')], title: c('sell'),
-    chips: chipRow([[c('chipSelling', { n: m.selling.length })], [c('chipOffers', { n: m.items.length }), 'muted']]),
+    chips: html`<span class="og-chip">${c('chipSelling', { n: m.selling.length })}</span><span class="og-chip og-chip--dim">${c('chipOffers', { n: m.items.length })}</span>`,
     children: html`
-      <${Text} kind="lead">${c('sellDesc')}<//>
-      <${Table} density="compact" collapse=${600} label=${c('sell')} headers=${[c('colOffer'), c('colVisibility'), c('colPrice'), '']}
-        rows=${list.map(it => [nameCell(ctx, it), t('profile.offers.visibility.' + (it.offer.visibility || 'private')), { text: price(it.offer), mono: true },
-          html`<${Action} onClick=${() => ctx.pickView({ kind: 'offer', key: it.key, sell: true })}>${c('setPrice')}<//>`])} />`,
+      <p class="og-desc og-desc--page">${c('sellDesc')}</p>
+      <div class="op-cat op-cat--sell op-cat--head"><div>${c('colOffer')}</div><div>${c('colVisibility')}</div><div>${c('colPrice')}</div><div></div></div>
+      <div class="op-cat op-cat--sell">
+        ${list.map(it => html`
+          <div class="op-nm" key=${'n' + it.key}><button type="button" class="og-tbl-name" onClick=${() => openOffer(ctx, it)}>${it.offer.title}</button><small>${agentMark(it)}</small></div>
+          <div class="op-w" key=${'v' + it.key}>${t('profile.offers.visibility.' + (it.offer.visibility || 'private'))}</div>
+          <div class="op-m" key=${'p' + it.key}>${price(it.offer)}</div>
+          <div class="og-tbl-door" key=${'d' + it.key}><button type="button" class="og-door" onClick=${() => ctx.pickView({ kind: 'offer', key: it.key, sell: true })}>${c('setPrice')}</button></div>`)}
+      </div>`,
   });
 }

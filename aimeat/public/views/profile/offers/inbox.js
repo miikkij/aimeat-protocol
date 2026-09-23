@@ -5,17 +5,12 @@
  * @description What came back, as two pages under the Offers crumb. The INBOX is a register of
  *   every delivery (when, what, who, how it went) with three filters and the agents who delivered
  *   most in the rail. A DELIVERY is its own page: the content rendered in full (a document, an image
- *   or a record), where it came from, and the rating as one row, five marks and a note, which feeds
+ *   or a record), where it came from, and the rating as one row, five stars and a note, which feeds
  *   the agent's trust. Both read the deliverables the tab already loaded; the content of one
  *   delivery is fetched when its page opens.
  * @structure renderInbox · renderDeliverable · RatingRow
  * @usage import { renderInbox, renderDeliverable } from './inbox.js';
  * @version-history
- *   2026-09-22 -- A failed or stalled delivery's status chip takes the danger tone the chip now has,
- *     instead of the sun it borrowed.
- *   2026-09-22 -- Composed from the shared component set (Section, ListRow, Field, Action, Surface);
- *     no own CSS. The five rating stars are five numbered choices (the site's text glyphs are
- *     ✓ ✗ → ↩ only); what they save is unchanged.
  *   v1.0.0 — 2026-08-30 — Initial.
  */
 import { h } from 'preact';
@@ -24,8 +19,8 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { DeliverableBody } from '/components/ImageDeliverable.js';
-import { Section, Stack, Action, Field, Text, Surface } from '/components/poster-parts.js';
-import { c, statusWord, statusTone, deliveryRows, rel, hhmm, dayLabel, chipRow, railList, renderPage } from './frame.js';
+import { Section } from '/views/profile/organisms/poster-parts.js';
+import { c, statusWord, statusClass, deliveryRows, deliveryHead, rel, hhmm, dayLabel, renderPage } from './frame.js';
 
 const ROWS = 20;
 
@@ -35,41 +30,38 @@ export function renderInbox(ctx) {
   const list = f === 'unrated' ? m.unrated : f === 'failed' ? m.failed : m.latest;
   const open = ctx.moreOpen.has('inbox');
   const shown = open ? list : list.slice(0, ROWS);
-  const filterTab = (id, label) => html`<${Action} kind="tab" selected=${f === id} onClick=${() => ctx.setInboxFilter(id)}>${label}<//>`;
+  const filterDoor = (id, label) => html`<button type="button" class=${`og-door og-door--quiet ${f === id ? 'on' : ''}`} onClick=${() => ctx.setInboxFilter(id)}>${label}</button>`;
   return renderPage(ctx, {
     id: 'inbox', crumbs: [c('inbox')], title: t('profile.offers.inboxTitle'),
-    chips: chipRow([
-      [c('chipDeliveries', { n: m.latest.length })],
-      [c('doneN', { n: m.latest.filter(d => d.status === 'done').length })],
-      m.failed.length && [c('failedN', { n: m.failed.length }), 'sun'],
-      m.waiting.length && [c('waitingN', { n: m.waiting.length }), 'muted'],
-      [c('ratedN', { n: m.rated }), m.rated ? 'plain' : 'muted'],
-    ]),
-    doors: html`${filterTab('all', c('filterAll'))}${filterTab('unrated', c('filterUnrated'))}${filterTab('failed', c('filterFailed'))}`,
-    rail: m.mostDelivered.length ? railList(c('railMost'), m.mostDelivered.map(([agent, n]) => ({ key: agent, label: `${n} · ${agent}` }))) : null,
+    chips: html`
+      <span class="og-chip">${c('chipDeliveries', { n: m.latest.length })}</span>
+      <span class="og-chip">${c('doneN', { n: m.latest.filter(d => d.status === 'done').length })}</span>
+      ${m.failed.length ? html`<span class="og-chip og-chip--coral">${c('failedN', { n: m.failed.length })}</span>` : null}
+      ${m.waiting.length ? html`<span class="og-chip og-chip--dim">${c('waitingN', { n: m.waiting.length })}</span>` : null}
+      <span class=${`og-chip ${m.rated ? '' : 'og-chip--dim'}`}>${c('ratedN', { n: m.rated })}</span>`,
+    doors: html`${filterDoor('all', c('filterAll'))}${filterDoor('unrated', c('filterUnrated'))}${filterDoor('failed', c('filterFailed'))}`,
+    rail: m.mostDelivered.length ? html`<hr /><span class="og-rail-label">${c('railMost')}</span>
+      ${m.mostDelivered.map(([agent, n]) => html`<span class="og-rail-link on" key=${agent}><i>${n}</i>${agent}</span>`)}` : null,
     children: html`
-      <${Text} kind="lead">${t('profile.offers.inboxDesc')}<//>
-      <${Section}>
-        ${list.length ? deliveryRows(ctx, shown) : html`<${Text} tone="muted">${ctx.loadingDeliveries ? '…' : t('profile.offers.inboxEmpty')}<//>`}
-      <//>
-      ${list.length > ROWS ? html`<${Stack} direction="horizontal" align="start"><${Action} onClick=${() => ctx.toggleMore('inbox')}>${open ? c('showFewer') : c('showRest', { n: list.length - ROWS })}<//><//>` : null}`,
+      <p class="og-desc og-desc--page">${t('profile.offers.inboxDesc')}</p>
+      ${list.length ? html`${deliveryHead()}${deliveryRows(ctx, shown)}` : html`<p class="og-empty">${ctx.loadingDeliveries ? '…' : t('profile.offers.inboxEmpty')}</p>`}
+      ${list.length > ROWS ? html`<p class="op-more"><button type="button" onClick=${() => ctx.toggleMore('inbox')}>${open ? c('showFewer') : c('showRest', { n: list.length - ROWS })}</button></p>` : null}`,
   });
 }
 
-/** Five marks and a note; its own state, saved through the tab's handler. */
+/** Five stars and a note; its own state, saved through the tab's handler. */
 function RatingRow({ d, ctx }) {
   const [stars, setStars] = useState(d.rating?.stars || 0);
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   const submit = async () => { if (!stars) return; setBusy(true); await ctx.rate(d, stars, note.trim()); setNote(''); setBusy(false); };
-  return html`<${Stack}>
-    <${Text} kind="label">${d.rating ? t('profile.offers.yourRating') : t('profile.offers.rateIt')}<//>
-    <${Stack} direction="wrap" density="compact">
-      ${[1, 2, 3, 4, 5].map(n => html`<${Action} key=${n} kind="tab" selected=${n <= stars} disabled=${busy} title=${String(n)} onClick=${() => setStars(n)}>${n}<//>`)}
-    <//>
-    <${Field} type="text" placeholder=${t('profile.offers.ratePlaceholder')} value=${note} onInput=${(e) => setNote(e.target.value)} />
-    <${Stack} direction="horizontal" align="start"><${Action} disabled=${busy || !stars} onClick=${submit}>${t('profile.offers.submitRating')}<//><//>
-  <//>`;
+  return html`
+    <div class="op-rate">
+      <span class="og-label">${d.rating ? t('profile.offers.yourRating') : t('profile.offers.rateIt')}</span>
+      <span class="op-stars">${[1, 2, 3, 4, 5].map(n => html`<button type="button" key=${n} class=${`op-star ${n <= stars ? 'on' : ''}`} disabled=${busy} onClick=${() => setStars(n)} title=${String(n)}>${n <= stars ? '★' : '☆'}</button>`)}</span>
+      <input type="text" class="op-rate-note" placeholder=${t('profile.offers.ratePlaceholder')} value=${note} onInput=${(e) => setNote(e.target.value)} />
+      <button type="button" class="og-door" disabled=${busy || !stars} onClick=${submit}>${t('profile.offers.submitRating')}</button>
+    </div>`;
 }
 
 export function renderDeliverable(ctx, d) {
@@ -80,30 +72,26 @@ export function renderDeliverable(ctx, d) {
   const at = new Date(d.updated_at || 0);
   return renderPage(ctx, {
     id: 'deliverable', crumbs: [{ label: c('inbox'), go: () => ctx.pickView({ kind: 'page', id: 'inbox' }) }, d.title || d.task_id], title: d.title || d.task_id,
-    chips: chipRow([
-      [d.agent, 'sun'],
-      [statusWord(d.status), statusTone(d.status) === 'danger' ? 'danger' : 'plain'],
-      [`${dayLabel(at)} ${hhmm(at)}`, 'muted'],
-      it && [it.offer.title],
-    ]),
-    doors: it ? html`<${Action} onClick=${() => ctx.pickView({ kind: 'offer', key: it.key })}>${c('askAgain')}<//>` : null,
-    rail: others.length ? railList(c('railSameAgent', { a: d.agent }), others.map(x => ({ key: x.task_id, label: `${x.title || x.task_id} · ${rel(x.updated_at)}`, onClick: () => ctx.pickView({ kind: 'deliverable', taskId: x.task_id }) }))) : null,
+    chips: html`
+      <span class="og-chip og-chip--sun op-chip--case">${d.agent}</span>
+      <span class=${`og-chip ${statusClass(d.status) === 'op-st--err' ? 'og-chip--coral' : ''}`}>${statusWord(d.status)}</span>
+      <span class="og-chip og-chip--dim op-chip--case">${dayLabel(at)} ${hhmm(at)}</span>
+      ${it ? html`<span class="og-chip op-chip--case">${it.offer.title}</span>` : null}`,
+    doors: it ? html`<button type="button" class="og-door" onClick=${() => ctx.pickView({ kind: 'offer', key: it.key })}>${c('askAgain')}</button>` : null,
+    rail: others.length ? html`<hr /><span class="og-rail-label">${c('railSameAgent', { a: d.agent })}</span>
+      ${others.map(x => html`<button type="button" class="og-rail-link" key=${x.task_id} onClick=${() => ctx.pickView({ kind: 'deliverable', taskId: x.task_id })}><i>→</i>${x.title || x.task_id}<em>${rel(x.updated_at)}</em></button>`)}` : null,
     children: html`
-      <${Section} id="op-content" title=${c('secContent')}>
-        <${Stack}>
-          ${d.verification ? html`<${Text} kind="caption" tone="muted">${t('profile.offers.expected')}: ${d.verification}<//>` : null}
-          ${d.status === 'failed' ? html`<${Text} tone="danger">${t('profile.offers.failedMsg')}<//>`
-            : content === undefined || content === 'loading' ? html`<${Text} tone="muted">…<//>`
-            : content === null ? html`<${Text} tone="muted">${t('profile.offers.noDeliverableYet')}<//>`
-            : html`<${Surface} kind="box"><${DeliverableBody} value=${content} alt=${d.title || d.task_id} /><//>`}
-          <${Text} kind="mono" tone="muted">${t('profile.offers.provenance')}: ${d.agent} · ${t('profile.offers.task')} ${d.task_id} · ${statusWord(d.status)} · ${dayLabel(at)} ${hhmm(at)}<//>
-        <//>
+      <${Section} id="op-content" num="01" title=${c('secContent')} first=${true}>
+        ${d.verification ? html`<p class="op-hint">${t('profile.offers.expected')}: ${d.verification}</p>` : null}
+        ${d.status === 'failed' ? html`<p class="op-warn">${t('profile.offers.failedMsg')}</p>`
+          : content === undefined || content === 'loading' ? html`<p class="og-empty">…</p>`
+          : content === null ? html`<p class="og-empty">${t('profile.offers.noDeliverableYet')}</p>`
+          : html`<div class="op-frame op-content"><${DeliverableBody} value=${content} alt=${d.title || d.task_id} /></div>`}
+        <p class="op-prov">${t('profile.offers.provenance')}: <b>${d.agent}</b> · ${t('profile.offers.task')} ${d.task_id} · ${statusWord(d.status)} · ${dayLabel(at)} ${hhmm(at)}</p>
       <//>
-      ${d.status === 'done' ? html`<${Section} id="op-rating" title=${c('secRate')}>
-        <${Stack}>
-          <${Text} kind="caption" tone="muted">${c('rateHint')}<//>
-          <${RatingRow} key=${d.task_id} d=${d} ctx=${ctx} />
-        <//>
+      ${d.status === 'done' ? html`<${Section} id="op-rating" num="02" title=${c('secRate')}>
+        <p class="op-hint">${c('rateHint')}</p>
+        <${RatingRow} key=${d.task_id} d=${d} ctx=${ctx} />
       <//>` : null}`,
   });
 }

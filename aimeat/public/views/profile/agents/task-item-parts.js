@@ -3,16 +3,10 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The pieces one task row is built from: the per-browser blur preference, the status
- *   and to-do tone helpers, the scope formatter, the to-do progress counter, the eye icon, the
- *   request-changes dialog and the memory-entry viewer (JSON tree, image, markdown). Pure
+ *   and to-do label/class helpers, the scope formatter, the to-do progress counter, the eye icon,
+ *   the request-changes modal and the memory-entry viewer (JSON tree, image, markdown). Pure
  *   extraction from ./task-item.js so that file stays under the 800-line limit.
  * @version-history
- *   v2.0.1 -- 2026-09-22 -- A task's status chip takes the set's success, danger and coral tones
- *     (done, failed, waiting on the owner) besides the sun for a running task.
- *   v2.0.0 -- 2026-09-22 -- Composed from the shared component set: the request-changes dialog is
- *     a Dialog with a Field, a memory entry is a Fold, the JSON tree is KeyValue rows with toned
- *     mono values, the status and to-do helpers return part tones instead of class names, and the
- *     eye icon draws its own stroke. No pf-agd- or agt- class is left here.
  *   v1.0.0 -- 2026-09-14 -- Extracted from ./task-item.js (max-file-lines) while the Tasks tab
  *     took the poster face. The request-changes modal and the JSON viewer keep their existing
  *     pf-agd- classes on purpose; they are styled by agents-detail.css and are out of that scope.
@@ -22,7 +16,7 @@ import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { Dialog, Field, Action, Fold, KeyValue, Stack, Text } from '/components/poster-parts.js';
+import { Modal } from '/components/Modal.js';
 import { Markdown } from '/components/Markdown.js';
 import { detectImage, ImageView } from '/components/ImageDeliverable.js';
 import { swallowed } from '/js/swallowed.js';
@@ -58,23 +52,22 @@ export function statusLabel(status) {
   return val !== key ? val : status.charAt(0).toUpperCase() + status.slice(1);
 }
 
-/** Which Chip tone a status wears: the sun while it runs, success when done, danger when it failed,
- *  coral when it waits on the owner (stalled, changes asked for), the plain frame for the rest. */
-export function statusChipTone(status) {
-  if (status === 'active') return 'sun';
-  if (status === 'done') return 'success';
-  if (status === 'failed') return 'danger';
-  if (status === 'stalled' || status === 'revision_requested') return 'coral';
-  return 'plain';
+/** Which square chip a status wears: green frame when done, coral when failed, the shared sun
+ *  ground while it runs, plain ink for everything else. */
+export function statusChipClass(status) {
+  if (status === 'done') return 'agt-status--done';
+  if (status === 'failed') return 'agt-status--failed';
+  if (status === 'active') return 'og-chip--sun';
+  return '';
 }
 
-/** The marker tone of one to-do: success when done, danger when failed, the pulsing sun while it
- *  runs, muted while it waits or was skipped. */
-export function todoMarker(status) {
-  if (status === 'done') return { tone: 'success', live: false };
-  if (status === 'failed') return { tone: 'danger', live: false };
-  if (status === 'active') return { tone: 'sun', live: true };
-  return { tone: 'muted', live: false };
+/** The tick box for one to-do: its modifier class and the glyph inside it. */
+export function todoTick(status) {
+  if (status === 'done') return { cls: 'agt-tick--done', glyph: '✓' };
+  if (status === 'failed') return { cls: 'agt-tick--failed', glyph: '✗' };
+  if (status === 'active') return { cls: 'agt-tick--active', glyph: '→' };
+  if (status === 'skipped' || status === 'outdated') return { cls: '', glyph: '' };
+  return { cls: 'agt-tick--pending', glyph: '' };
 }
 
 // Render one task scope entry as readable text. Scope is an array whose entries
@@ -102,12 +95,11 @@ export function todoProgress(todos) {
   return `${done}/${active.length}`;
 }
 
-/** The stroke eye that toggles the title blur. Open eye when the title shows, struck through
- *  when it is hidden. It draws its own stroke so it needs no sheet. */
+/** The 14px stroke eye that toggles the title blur. Open eye when the title shows,
+ *  struck through when it is hidden. */
 export function EyeIcon({ hidden }) {
   return html`
-    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"
-      stroke-linecap="square" aria-hidden="true">
+    <svg viewBox="0 0 24 24" aria-hidden="true">
       <path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6-10-6-10-6z"></path>
       <circle cx="12" cy="12" r="3"></circle>
       ${hidden && html`<path d="M3 3l18 18"></path>`}
@@ -115,7 +107,7 @@ export function EyeIcon({ hidden }) {
   `;
 }
 
-// Dialog where the owner types the change request shown to the agent. Kept
+// Modal where the owner types the change request shown to the agent. Kept
 // inline here (rather than in /components) because the textarea-with-send
 // pattern is specific to this view; if a second caller needs it later, lift
 // it into a shared component.
@@ -127,17 +119,20 @@ export function RequestChangesModal({ open, onClose, onSubmit, submitting }) {
     if (!trimmed) return;
     onSubmit(trimmed);
   }
-  return html`<${Dialog} open=${open} onClose=${onClose} title=${t('profile.agents.tasks.requestChangesTitle')}
-    actions=${html`
-      <${Action} onClick=${onClose} disabled=${submitting}>${t('common.cancel') || 'Cancel'}<//>
-      <${Action} kind="primary" onClick=${handleSend} disabled=${submitting || !message.trim()}>
+  return html`<${Modal} open=${open} onClose=${onClose} title=${t('profile.agents.tasks.requestChangesTitle')}
+    footer=${html`
+      <button class="btn-ghost" onClick=${onClose} disabled=${submitting}>${t('common.cancel') || 'Cancel'}</button>
+      <button class="btn-primary" onClick=${handleSend} disabled=${submitting || !message.trim()}>
         ${submitting ? t('profile.agents.tasks.requestChangesSending') : t('profile.agents.tasks.requestChangesSend')}
-      <//>`}>
-    <${Stack}>
-      <${Text}>${t('profile.agents.tasks.requestChangesHelp')}<//>
-      <${Field} type="textarea" placeholder=${t('profile.agents.tasks.requestChangesPlaceholder')}
-        value=${message} onInput=${e => setMessage(e.target.value)} rows=${6} />
-    <//>
+      </button>`}>
+    <p class="pf-agd-modal-help">${t('profile.agents.tasks.requestChangesHelp')}</p>
+    <textarea
+      class="pf-agd-revision-textarea"
+      placeholder=${t('profile.agents.tasks.requestChangesPlaceholder')}
+      value=${message}
+      onInput=${e => setMessage(e.target.value)}
+      rows=${6}
+    ></textarea>
   <//>`;
 }
 
@@ -158,26 +153,33 @@ function parseMemoryValue(value) {
   return { raw: String(value) };
 }
 
-// Recursive structured JSON renderer: objects/arrays become KeyValue rows (a nested value sits in
-// the value column, which indents it), primitives are mono words toned by type. Far easier to scan
-// than raw JSON.
+// Recursive structured JSON renderer: objects/arrays become indented key/value
+// rows, primitives get type-coloured values. Far easier to scan than raw JSON.
 function JsonNode({ value }) {
-  if (value === null) return html`<${Text} kind="mono" tone="muted">null<//>`;
+  if (value === null) return html`<span class="pf-agd-json-null">null</span>`;
   const kind = typeof value;
-  if (kind === 'string') return html`<${Text} kind="mono">${value}<//>`;
-  if (kind === 'number') return html`<${Text} kind="mono" tone="info">${value}<//>`;
-  if (kind === 'boolean') return html`<${Text} kind="mono" tone="coral">${value ? 'true' : 'false'}<//>`;
+  if (kind === 'string') return html`<span class="pf-agd-json-str">${value}</span>`;
+  if (kind === 'number') return html`<span class="pf-agd-json-num">${value}</span>`;
+  if (kind === 'boolean') return html`<span class="pf-agd-json-bool">${value ? 'true' : 'false'}</span>`;
   const entries = Array.isArray(value) ? value.map((v, i) => [String(i), v]) : Object.entries(value || {});
-  if (entries.length === 0) return html`<${Text} kind="mono" tone="muted">${Array.isArray(value) ? '[ ]' : '{ }'}<//>`;
+  if (entries.length === 0) return html`<span class="pf-agd-json-empty">${Array.isArray(value) ? '[ ]' : '{ }'}</span>`;
   return html`
-    <${Stack} density="compact">
-      ${entries.map(([k, v]) => html`<${KeyValue} key=${k} label=${k} value=${html`<${JsonNode} value=${v} />`} />`)}
-    <//>
+    <div class="pf-agd-json-block">
+      ${entries.map(([k, v]) => {
+        const nested = v !== null && typeof v === 'object';
+        return html`
+          <div class=${`pf-agd-json-row ${nested ? 'pf-agd-json-row--nested' : ''}`} key=${k}>
+            <span class="pf-agd-json-key">${k}</span>
+            <${JsonNode} value=${v} />
+          </div>
+        `;
+      })}
+    </div>
   `;
 }
 
-// One collapsible memory entry. The fold's title is the key, its note says JSON or IMG; the body
-// renders a structured JSON view when the value is JSON, an image, or formatted markdown otherwise.
+// One collapsible memory entry. Header (key + JSON badge) toggles the body, which
+// renders a structured JSON view when the value is JSON, raw text otherwise.
 export function TaskMemoryEntry({ entry }) {
   const [open, setOpen] = useState(false);
   const { json, raw } = parseMemoryValue(entry.value);
@@ -186,16 +188,24 @@ export function TaskMemoryEntry({ entry }) {
   // crews.image-maker.images.<id>) renders as a thumbnail instead of a JSON/text blob.
   const image = detectImage(isJson ? json : raw, entry.key);
   return html`
-    <${Fold} title=${entry.key} sub=${image ? 'IMG' : isJson ? 'JSON' : undefined} open=${open}
-      onToggle=${(e) => { e.stopPropagation(); setOpen(o => !o); }}>
-      ${image
-        ? html`<${ImageView} desc=${image} />`
-        : isJson
-          ? html`<${JsonNode} value=${json} />`
-          // Non-JSON values (e.g. an agent's latest_output) are usually
-          // markdown — render them formatted via the shared safe Markdown
-          // component instead of raw text.
-          : html`<div><${Markdown} text=${raw} /></div>`}
-    <//>
+    <div class="pf-agd-task-memory-entry">
+      <button class="pf-agd-task-memory-head" onClick=${(e) => { e.stopPropagation(); setOpen(o => !o); }} aria-expanded=${open}>
+        <span class="pf-agd-task-memory-caret">${open ? '▼' : '▶'}</span>
+        <code class="pf-agd-task-memory-key">${entry.key}</code>
+        ${image ? html`<span class="pf-agd-task-memory-badge">IMG</span>` : isJson && html`<span class="pf-agd-task-memory-badge">JSON</span>`}
+      </button>
+      ${open && html`
+        <div class="pf-agd-task-memory-body">
+          ${image
+            ? html`<${ImageView} desc=${image} />`
+            : isJson
+              ? html`<${JsonNode} value=${json} />`
+              // Non-JSON values (e.g. an agent's latest_output) are usually
+              // markdown — render them formatted via the shared safe Markdown
+              // component instead of raw text.
+              : html`<div class="pf-agd-task-memory-md"><${Markdown} text=${raw} /></div>`}
+        </div>
+      `}
+    </div>
   `;
 }

@@ -26,10 +26,6 @@
  *   - FieldRow — one field: name, key, description, source, editor
  *   - ConfigTab (default)
  * @version-history
- *   v3.0.0 -- 2026-09-22 -- Composed from the shared component set: the search row is the shared
- *     toolbar, the index is the shared ink rail, domains and groups are sections, each field is a
- *     list row whose editor is a shared field, and an edited row sits on the sun. The page has no
- *     classes of its own, and the "●" marks (not one of the four glyphs) became a sun chip.
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v2.3.0 -- 2026-09-13 -- Compose the configuration index rule from poster.css.
  *   v2.3.0 -- 2026-09-19 -- The `decide` group sits under AI, and SECTION_ACTIONS lets a section carry an
@@ -53,7 +49,6 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { Badge, Empty, ExpandableHelp, ErrorBox } from './shared.js';
-import { Section, Columns, Stack, Rail, ListRow, Toolbar, Field, Action, Chip, Surface, Text, scrollToId } from '/components/poster-parts.js';
 import { saveConfig, deleteConfig } from '/js/services/admin.js';
 import { DecideKeyTest } from './decide-key-test.js';
 
@@ -137,50 +132,63 @@ function shown(v) {
  * there, and the details arrive only when asked for.
  */
 function PendingList({ paths, pending, schema }) {
-  return html`<${Surface} kind="aside" role="status">
-    ${paths.map(p => html`<${ListRow} key=${p} density="compact" name=${html`<${Text} kind="mono">${escHtml(p)}<//>`}
-      value=${html`<${Text} kind="mono" tone="muted">${escHtml(shown(schema[p] && schema[p].value))}<//> <span aria-hidden="true">→</span> <strong>${escHtml(shown(pending[p]))}</strong>`} />`)}
-  <//>`;
+  return html`
+    <div class="adm-cfg-listbox poster-aside" role="status">
+      <ul>
+        ${paths.map(p => html`
+          <li key=${p}>
+            <code>${escHtml(p)}</code>
+            <span class="adm-cfg-pending-was">${escHtml(shown(schema[p] && schema[p].value))}</span>
+            <span aria-hidden="true">→</span>
+            <strong>${escHtml(shown(pending[p]))}</strong>
+          </li>
+        `)}
+      </ul>
+    </div>
+  `;
 }
-
-/** A range such as "1-1000" beside a number field. */
-const rangeNote = (e) => (e.range ? html`<${Text} kind="mono" tone="muted">${escHtml(e.range)}<//>` : null);
 
 /** One field: its name, its key, what it does, where its value came from, and the editor. */
 function FieldRow({ path: p, entry: e, editable, pending, onChange, onReset }) {
   const edited = p in pending;
   const val = edited ? pending[p] : e.value;
   const desc = descOf(p, e);
-  const name = label(p);
-  const readOnlyNote = (word) => html`<${Text} kind="caption" tone="muted">${word}<//>`;
-  const editor = !e.mutable
-    ? (typeof e.value === 'boolean'
-      ? html`${e.value ? html`<${Badge} type="healthy" /> <span>${t('dashboard.yesLabel')}</span>` : html`<${Badge} type="critical" /> <span>${t('dashboard.noLabel')}</span>`}${e.sealed ? readOnlyNote(t('dashboard.cfgSealed')) : null}`
-      : html`<${Text} kind="mono">${escHtml(String(e.value))}<//> ${readOnlyNote(e.sealed ? t('dashboard.cfgSealed') : t('dashboard.readOnly'))}`)
-    : e.type === 'boolean'
-      ? html`<${Field} type="checkbox" label=${val ? t('dashboard.enabled') : t('dashboard.disabled')} value=${val} onChange=${ev => onChange(p, ev.target.checked)} disabled=${!editable} />`
-      : e.type === 'integer'
-        ? html`<${Field} type="number" ariaLabel=${name} width="narrow" value=${val} onInput=${ev => onChange(p, parseInt(ev.target.value))} disabled=${!editable} />${rangeNote(e)}`
-        : e.type === 'float'
-          ? html`<${Field} type="number" step="0.01" ariaLabel=${name} width="narrow" value=${val} onInput=${ev => onChange(p, parseFloat(ev.target.value))} disabled=${!editable} />${rangeNote(e)}`
-          : e.type === 'string'
-            ? html`<${Field} ariaLabel=${name} value=${val || ''} onInput=${ev => onChange(p, ev.target.value)} disabled=${!editable} passwordManager=${false} />`
-            : e.type === 'object'
-              ? (Array.isArray(e.value)
-                  ? html`<${Field} type="textarea" ariaLabel=${name} rows=${4} disabled=${!editable}
-                      value=${pending[p] !== undefined ? pending[p] : e.value.join('\n')}
-                      onInput=${ev => onChange(p, ev.target.value)}
-                      placeholder=${t('dashboard.cfgOnePerLine')} hint=${t('dashboard.cfgOnePerLine')} />`
-                  : html`<${Text} kind="mono">${escHtml(JSON.stringify(e.value)).substring(0, 100)}...<//>`)
-              : html`<${Text} kind="mono">${escHtml(String(e.value))}<//>`;
-  return html`<${ListRow} id=${'cfgf-' + p.replace(/\./g, '-')} selected=${edited} density="compact"
-    name=${name} nameTitle=${edited ? tr('dashboard.cfgEdited', 'Edited, not saved') : undefined} detail=${p}
-    value=${html`<${Stack} direction="horizontal" align="center" density="compact">
-      ${e.source && html`<${Badge} type=${SOURCE_BADGE[e.source] || 'idle'} label=${sourceWord(e.source)} />`}${editor}
-    <//>`}
-    actions=${e.canReset && editable && e.mutable ? html`<${Action} kind="text" onClick=${() => onReset(p)}>${t('dashboard.cfgReset')}<//>` : null}>
-    ${desc ? html`<${Text} kind="caption" tone="muted">${desc}<//>` : null}
-  <//>`;
+  return html`
+    <div class=${'adm-cfg-frow' + (edited ? ' adm-cfg-row-edited' : '')} id=${'cfgf-' + p.replace(/\./g, '-')}>
+      <span class="adm-cfg-fname">
+        ${label(p)}
+        ${edited && html` <span class="adm-cfg-edited-dot" title=${tr('dashboard.cfgEdited', 'Edited, not saved')}>●</span>`}
+        <code>${p}</code>
+        ${desc && html`<span class="adm-cfg-fdesc">${desc}</span>`}
+      </span>
+      <span class="adm-cfg-fsrc">${e.source && html`<span class=${'adm-badge adm-badge-' + (SOURCE_BADGE[e.source] || 'idle')}>${sourceWord(e.source)}</span>`}</span>
+      <span class="adm-cfg-fedit">
+        ${!e.mutable
+          ? (typeof e.value === 'boolean'
+            ? html`${e.value ? html`<${Badge} type="healthy" /> ${t('dashboard.yesLabel')}` : html`<${Badge} type="critical" /> ${t('dashboard.noLabel')}`}${e.sealed ? html` <span class="adm-text-dim adm-text-xs">${t('dashboard.cfgSealed')}</span>` : null}`
+            : html`<code>${escHtml(String(e.value))}</code> <span class="adm-text-dim adm-text-xs">${e.sealed ? t('dashboard.cfgSealed') : t('dashboard.readOnly')}</span>`)
+          : e.type === 'boolean'
+            ? html`<label class="adm-cfg-check"><input type="checkbox" checked=${val} onChange=${ev => onChange(p, ev.target.checked)} disabled=${!editable} /> ${val ? t('dashboard.enabled') : t('dashboard.disabled')}</label>`
+            : e.type === 'integer'
+              ? html`<input type="number" value=${val} onInput=${ev => onChange(p, parseInt(ev.target.value))} disabled=${!editable} />${e.range ? html`<span class="adm-cfg-frange">${escHtml(e.range)}</span>` : null}`
+              : e.type === 'float'
+                ? html`<input type="number" step="0.01" value=${val} onInput=${ev => onChange(p, parseFloat(ev.target.value))} disabled=${!editable} />${e.range ? html`<span class="adm-cfg-frange">${escHtml(e.range)}</span>` : null}`
+                : e.type === 'string'
+                  ? html`<input type="text" value=${val || ''} onInput=${ev => onChange(p, ev.target.value)} disabled=${!editable} />`
+                  : e.type === 'object'
+                    ? (Array.isArray(e.value)
+                        ? html`<textarea class="adm-config-array-edit" rows="4" disabled=${!editable}
+                                  value=${pending[p] !== undefined ? pending[p] : e.value.join('\n')}
+                                  onInput=${ev => onChange(p, ev.target.value)}
+                                  placeholder=${t('dashboard.cfgOnePerLine')}></textarea>
+                               <div class="adm-text-dim adm-text-xs">${t('dashboard.cfgOnePerLine')}</div>`
+                        : html`<code class="adm-text-xs">${escHtml(JSON.stringify(e.value)).substring(0, 100)}...</code>`)
+                    : html`<code>${escHtml(String(e.value))}</code>`
+        }
+      </span>
+      <span>${e.canReset && editable && e.mutable ? html`<button class="adm-btn-sm" onClick=${() => onReset(p)}>${t('dashboard.cfgReset')}</button>` : null}</span>
+    </div>
+  `;
 }
 
 export default function ConfigTab({ data, reload }) {
@@ -232,7 +240,8 @@ export default function ConfigTab({ data, reload }) {
   const domainOrder = [...DOMAINS.map(d => d.id), 'other'].filter(d => byDomain.has(d));
 
   function jumpTo(group) {
-    scrollToId('cfg-' + group);
+    const el = document.getElementById('cfg-' + group);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   function onChange(path, value) {
@@ -282,76 +291,96 @@ export default function ConfigTab({ data, reload }) {
   const pendingKeys = Object.keys(pending);
   const editedIn = (items) => items.filter(({ path }) => path in pending).length;
 
-  const edits = (n) => (n > 0 ? html`<${Chip} tone="sun" title=${tr('dashboard.cfgEdited', 'Edited, not saved')}>${n}<//>` : null);
+  return html`
+    <div class="og">
+      <div class="adm-cfg-tools">
+        <label class="adm-cfg-searchwrap">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-4-4"></path></svg>
+          <input type="search" value=${q} placeholder=${tr('dashboard.cfgSearch', 'Search settings…')} onInput=${ev => setQ(ev.target.value)} />
+        </label>
+        <button type="button" class=${'adm-cfg-filter' + (onlyChanged ? ' on' : '')} onClick=${() => setOnlyChanged(true)}>
+          ${tr('dashboard.cfgOnlyChanged', 'Only changed ({n})').replace('{n}', changedTotal)}
+        </button>
+        <button type="button" class=${'adm-cfg-filter' + (onlyChanged ? '' : ' on')} onClick=${() => setOnlyChanged(false)}>
+          ${tr('dashboard.cfgAll', 'All')}
+        </button>
+        ${editable && pendingKeys.length > 0 && html`
+          <span class="adm-cfg-pending-mini" role="status">
+            <strong>${tr('dashboard.cfgUnsaved', '{n} unsaved change(s)').replace('{n}', pendingKeys.length)}</strong>
+            <button class="adm-btn" onClick=${save} disabled=${saving}>${t('dashboard.saveChanges')}</button>
+            <button class="adm-btn-action" onClick=${cancel} disabled=${saving}>${t('dashboard.cancelLabel')}</button>
+            <button type="button" class="adm-cfg-filter" onClick=${() => setShowChanges(!showChanges)}>
+              ${showChanges ? tr('dashboard.cfgHideChanges', 'Hide the changes') : tr('dashboard.cfgShowChanges', 'What changes?')}
+            </button>
+          </span>`}
+      </div>
+      ${editable && showChanges && pendingKeys.length > 0 && html`<${PendingList} paths=${pendingKeys} pending=${pending} schema=${schema} />`}
 
-  // The index: each domain a label, each group a word that brings its section up, with its count.
-  const rail = html`<${Rail} kind="index" title=${tr('dashboard.cfgToc', 'Sections')} label=${tr('dashboard.cfgToc', 'Sections')}>
-    <${Stack}>${domainOrder.map(domain => html`<${Stack} key=${domain} density="compact">
-      <${Text} kind="label">${domainLabel(domain)}<//>
-      ${byDomain.get(domain).map(([g, items]) => html`<${Stack} key=${g} direction="wrap" align="between" density="compact">
-        <${Action} kind="text" onClick=${() => jumpTo(g)}>${groupLabel(g)}<//>
-        <${Stack} direction="horizontal" align="center" density="compact">${edits(editedIn(items))}<${Text} kind="mono">${items.length}<//><//>
-      <//>`)}
-    <//>`)}<//>
-  <//>`;
+      <!-- Read-only banner for in-memory storage -->
+      ${!editable && html`
+        <div class="adm-config-readonly-banner">
+          <p>${t('dashboard.cfgReadOnlyBanner')}</p>
+          <${ExpandableHelp} title=${t('dashboard.cfgReadOnlyHelpTitle')}>
+            <p>${t('dashboard.cfgReadOnlyHelpDetail')}</p>
+          </${ExpandableHelp}>
+        </div>
+      `}
 
-  return html`<${Stack}>
-    <${Toolbar} label=${tr('dashboard.cfgSearch', 'Search settings…')}
-      search=${{ ariaLabel: tr('dashboard.cfgSearch', 'Search settings…'), placeholder: tr('dashboard.cfgSearch', 'Search settings…'), value: q, onInput: ev => setQ(ev.target.value) }}
-      filters=${[
-        { id: 'changed', label: tr('dashboard.cfgOnlyChanged', 'Only changed ({n})').replace('{n}', changedTotal), selected: onlyChanged, onClick: () => setOnlyChanged(true) },
-        { id: 'all', label: tr('dashboard.cfgAll', 'All'), selected: !onlyChanged, onClick: () => setOnlyChanged(false) },
-      ]}
-      actions=${editable && pendingKeys.length > 0 && html`<${Stack} direction="wrap" align="center" role="status">
-        <strong>${tr('dashboard.cfgUnsaved', '{n} unsaved change(s)').replace('{n}', pendingKeys.length)}</strong>
-        <${Action} kind="primary" onClick=${save} disabled=${saving}>${t('dashboard.saveChanges')}<//>
-        <${Action} onClick=${cancel} disabled=${saving}>${t('dashboard.cancelLabel')}<//>
-        <${Action} kind="text" expanded=${showChanges} onClick=${() => setShowChanges(!showChanges)}>
-          ${showChanges ? tr('dashboard.cfgHideChanges', 'Hide the changes') : tr('dashboard.cfgShowChanges', 'What changes?')}
-        <//>
-      <//>`} />
-    ${editable && showChanges && pendingKeys.length > 0 && html`<${PendingList} paths=${pendingKeys} pending=${pending} schema=${schema} />`}
+      ${s.sealed && s.sealed.length > 0 && html`
+        <div class="adm-config-readonly-banner">
+          <p>${t('dashboard.cfgSealedBanner')}</p>
+        </div>
+      `}
 
-    ${!editable && html`<${Surface} kind="aside"><${Stack} density="compact">
-      <${Text}>${t('dashboard.cfgReadOnlyBanner')}<//>
-      <${ExpandableHelp} title=${t('dashboard.cfgReadOnlyHelpTitle')}>
-        <${Text}>${t('dashboard.cfgReadOnlyHelpDetail')}<//>
-      <//>
-    <//><//>`}
+      ${result && (result.ok
+        ? html`<div class="adm-config-result-ok adm-mb-md adm-text-base">${escHtml(result.msg)}</div>`
+        : html`<div class="adm-mb-md"><${ErrorBox} message=${result.msg} /></div>`)}
 
-    ${s.sealed && s.sealed.length > 0 && html`<${Surface} kind="aside"><${Text}>${t('dashboard.cfgSealedBanner')}<//><//>`}
+      ${domainOrder.length === 0 && html`<div class="adm-cfg-noresult">${tr('dashboard.cfgNoMatches', 'No setting matches.')}</div>`}
 
-    ${result && (result.ok
-      ? html`<${Surface} kind="aside" tone="success" role="status"><${Text}>${escHtml(result.msg)}<//><//>`
-      : html`<${ErrorBox} message=${result.msg} />`)}
-
-    ${domainOrder.length === 0 && html`<${Text} tone="muted">${tr('dashboard.cfgNoMatches', 'No setting matches.')}<//>`}
-
-    ${domainOrder.length > 0 && html`<${Columns} layout="trailing" collapse=${900}>
-      ${rail}
-      <${Stack}>
-        ${domainOrder.map(domain => html`<${Section} key=${domain} title=${domainLabel(domain)} size="small">
-          ${byDomain.get(domain).map(([g, items]) => {
-            const helpKey = 'dashboard.cfgHelp_' + g;
-            const helpText = t(helpKey);
-            const hasHelp = helpText !== helpKey;
-            const editedHere = editedIn(items);
-            const changedHere = items.filter(({ entry }) => isChanged(entry)).length;
-            return html`<${Section} id=${'cfg-' + g} key=${g} density="compact" title=${groupLabel(g)}
-              count=${tr('dashboard.cfgSecCount', '{n} settings').replace('{n}', items.length) + (changedHere ? ' · ' + tr('dashboard.cfgSecChanged', '{n} changed').replace('{n}', changedHere) : '')}
-              actions=${edits(editedHere)}>
-              ${hasHelp && html`<${ExpandableHelp} title=${t('dashboard.cfgHelpTitle')}><${Text}>${helpText}<//><//>`}
-              <div>
-                ${items.map(({ path: p, entry: e }) => html`
-                  <${FieldRow} key=${p} path=${p} entry=${e} editable=${editable}
-                    pending=${pending} onChange=${onChange} onReset=${resetConfig} />
-                `)}
-              </div>
-              ${SECTION_ACTIONS[g] && html`<${SECTION_ACTIONS[g]} />`}
-            <//>`;
-          })}
-        <//>`)}
-      <//>
-    <//>`}
-  <//>`;
+      ${domainOrder.length > 0 && html`
+      <div class="adm-cfg-body">
+        <nav class="adm-cfg-rail poster-row--thing" aria-label=${tr('dashboard.cfgToc', 'Sections')}>
+          ${domainOrder.map(domain => html`
+            <div key=${domain}>
+              <div class="d">${domainLabel(domain)}</div>
+              ${byDomain.get(domain).map(([g, items]) => html`
+                <button type="button" class="g" key=${g} onClick=${() => jumpTo(g)}>
+                  <span>${groupLabel(g)}${editedIn(items) > 0 ? html` <span class="adm-cfg-edited-dot">●</span>` : null}</span>
+                  <em>${items.length}</em>
+                </button>`)}
+            </div>`)}
+        </nav>
+        <div>
+          ${domainOrder.map(domain => html`
+            <div class="adm-cfg-domain" key=${domain}>
+              <h3 class="poster-section-title">${domainLabel(domain)}</h3>
+              ${byDomain.get(domain).map(([g, items]) => {
+                const helpKey = 'dashboard.cfgHelp_' + g;
+                const helpText = t(helpKey);
+                const hasHelp = helpText !== helpKey;
+                const editedHere = editedIn(items);
+                const changedHere = items.filter(({ entry }) => isChanged(entry)).length;
+                return html`
+                <section class="adm-cfg-sec" id=${'cfg-' + g} key=${g}>
+                  <div class="adm-cfg-sec-h">
+                    <h2 class="poster-section-title">${groupLabel(g)}</h2>
+                    <small>${tr('dashboard.cfgSecCount', '{n} settings').replace('{n}', items.length)}${changedHere ? ' · ' + tr('dashboard.cfgSecChanged', '{n} changed').replace('{n}', changedHere) : ''}${editedHere > 0 ? html` <span class="adm-cfg-edited-dot">● ${editedHere}</span>` : ''}</small>
+                  </div>
+                  ${hasHelp && html`<${ExpandableHelp} title=${t('dashboard.cfgHelpTitle')}><p>${helpText}</p></${ExpandableHelp}>`}
+                  <div class=${!editable ? 'adm-config-readonly' : ''}>
+                    ${items.map(({ path: p, entry: e }) => html`
+                      <${FieldRow} key=${p} path=${p} entry=${e} editable=${editable}
+                        pending=${pending} onChange=${onChange} onReset=${resetConfig} />
+                    `)}
+                  </div>
+                  ${SECTION_ACTIONS[g] && html`<${SECTION_ACTIONS[g]} />`}
+                </section>
+              `})}
+            </div>
+          `)}
+        </div>
+      </div>`}
+    </div>
+  `;
 }

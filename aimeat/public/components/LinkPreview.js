@@ -11,7 +11,6 @@
  * @structure extractUrls(text,max) · useSeenInViewport(ref) · LinkPreview({url,onDismiss}) · MessageLinkPreviews({msg})
  * @usage html`<${MessageLinkPreviews} msg=${msg} />`
  * @version-history
- *   2026-09-13: Shared preview rows own the visible card; lazy unfurl and dismissal stay unchanged.
  *   v1.1.0 — 2026-08-03 — Lazy unfurl: a message's preview cards mount only once the message scrolls
  *     near the viewport (IntersectionObserver, 200px margin) — opening a long thread no longer fires
  *     an unfurl request for every link in the whole history.
@@ -22,7 +21,7 @@ import { useState, useEffect, useRef } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { ListRow, Stack, Action, Text } from '/components/poster-parts.js';
+import { escHtml } from '/js/utils.js';
 import * as unfurl from '/js/services/unfurl.js';
 
 /** True once `ref`'s element has been near the viewport (within 200px) at least once, then stays true.
@@ -90,11 +89,19 @@ export function LinkPreview({ url, onDismiss }) {
   }, [url]);
 
   if (meta === undefined || meta === null) return null;
-  return html`<${ListRow} name=${meta.title || meta.siteName || url} detail=${meta.description} preview=${true}
-    href=${meta.resolvedUrl || url} external=${true} mark=${imgUrl && html`<img src=${imgUrl} alt="" loading="lazy" />`}
-    actions=${html`<${Action} kind="icon" label=${t('inbox.linkPreview.hide')} onClick=${() => onDismiss?.(url)}>×<//>`}>
-    ${meta.siteName && html`<${Text} kind="caption">${meta.siteName}<//>`}
-  <//>`;
+  return html`
+    <div class="inbox-linkcard">
+      <a class="inbox-linkcard-main" href=${meta.resolvedUrl || url} target="_blank" rel="noopener noreferrer nofollow">
+        ${imgUrl ? html`<span class="inbox-linkcard-thumb"><img src=${imgUrl} alt="" loading="lazy" /></span>` : null}
+        <span class="inbox-linkcard-text">
+          ${meta.siteName ? html`<span class="inbox-linkcard-site">${escHtml(meta.siteName)}</span>` : null}
+          ${meta.title ? html`<span class="inbox-linkcard-title">${escHtml(meta.title)}</span>` : null}
+          ${meta.description ? html`<span class="inbox-linkcard-desc">${escHtml(meta.description)}</span>` : null}
+        </span>
+      </a>
+      <button class="inbox-linkcard-x" title=${t('inbox.linkPreview.hide')}
+        onClick=${() => onDismiss?.(url)}>✕</button>
+    </div>`;
 }
 
 /** All preview cards for one message: a card per non-dismissed URL in its body. The cards mount (and
@@ -113,7 +120,7 @@ export function MessageLinkPreviews({ msg }) {
     setDismissed(next);
     saveDismissed(next);
   };
-  return html`<div ref=${hostRef}><${Stack}>
+  return html`<div class="inbox-linkcards" ref=${hostRef}>
     ${seen ? visible.map(u => html`<${LinkPreview} key=${u} url=${u} onDismiss=${dismiss} />`) : null}
-  <//></div>`;
+  </div>`;
 }

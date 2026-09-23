@@ -23,9 +23,6 @@
  * @usage registered in views/profile.js TABS as `fleet`, listed in the Automation group of
  *   SIDEBAR_GROUPS (landing-page.cards.js).
  * @version-history
- *   v2.0.0 -- 2026-09-22 -- The tab is a Page from the shared component set, with the trail
- *     (Profile / Automation / Your agents) and the title in its masthead, so it frames like every
- *     other settings page; no class of its own is left.
  *   2026-09-13 — V1: compose page and B1 section headings from the shared poster classes.
  *   v1.1.0 — 2026-09-05 — The agent defaults (the rules every agent carries, the token budget) sit
  *     at the foot of this page. They lived on the Access page, which is about who holds a key to
@@ -37,16 +34,15 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { Page, Text } from '/components/poster-parts.js';
 import FleetView from '/views/fleet.js';
 import BasicAgentsPanel from '/views/profile/agents/basic-agents-panel.js';
 import { AgentDefaultsSection } from './agents/agent-defaults-section.js';
 
 export default function FleetTab({ session, showToast }) {
   return html`
-    <${Page} title=${t('profile.tabs.fleet')}
-      crumbs=${[{ label: t('nav.profile') }, { label: t('profile.landing.menuAutomation') }, { label: t('profile.tabs.fleet') }]}>
-      <${Text} tone="muted">${t('fleet.desc')}<//>
+    <div class="pf-fleet-tab">
+      <h2 class="poster-page-title">${t('profile.tabs.fleet')}</h2>
+      <p class="section-desc">${t('fleet.desc')}</p>
 
       ${/* THE STARTER CARD IS A SLOT, NOT A HEADER. It sat above the fleet at first, and on a
             1280x460 screen the whole first view was an invitation to create MORE agents while
@@ -62,6 +58,6 @@ export default function FleetTab({ session, showToast }) {
             At the foot: a person comes here for the agents first, and the defaults are the one thing
             on this page that is about all of them at once. */''}
       <${AgentDefaultsSection} showToast=${showToast} />
-    <//>
+    </div>
   `;
 }

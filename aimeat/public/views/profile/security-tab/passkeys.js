@@ -16,9 +16,6 @@
  * @structure PasskeysSection({ passkeysAvailable, showToast, onChanged })
  * @usage html`<${PasskeysSection} passkeysAvailable=${true} ... />`
  * @version-history
- *   2026-09-22 -- Composed from the shared component set (ListRow per device with the rename field
- *     as its open body, Field, Action, Text); no own classes. The title and description the Access
- *     page hid are gone: its sign-in row names the panel.
  *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
  *   v1.0.0 — 2026-09-04 — Initial.
  */
@@ -29,7 +26,6 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { useConfirm } from '/components/Modal.js';
-import { Stack, ListRow, Toolbar, Action, Field, Text } from '/components/poster-parts.js';
 import * as securityService from '/js/services/security.js';
 import { passkeySupported, addPasskey } from '/js/services/auth.js';
 import { swallowed } from '/js/swallowed.js';
@@ -104,39 +100,58 @@ export function PasskeysSection({ showToast }) {
     }, { danger: true });
   }
 
-  // The Access page's sign-in row names this panel; the panel is the devices and the one action.
-  return html`<${Stack}>
-    ${state.count === 0
-      ? html`<${Text} kind="caption" tone="muted">${t('profile.security.passkeys.none')}<//>`
-      : html`<${Stack} density="compact">${state.passkeys.map(p => html`
-        <${ListRow} key=${p.id} density="compact"
-          name=${escHtml(p.label)}
-          detail=${`${whereItLives(p)} · ${p.last_used_at
-            ? t('profile.security.passkeys.lastUsed').replace('{when}', fmtDate(p.last_used_at))
-            : t('profile.security.passkeys.neverUsed')}`} detailKind="text"
-          actions=${renaming !== p.id ? html`
-            <${Action} kind="text" onClick=${() => { setRenaming(p.id); setRenameValue(p.label); }}>${t('profile.security.passkeys.rename')}<//>
-            <${Action} kind="text" tone="danger" onClick=${() => removeDevice(p)}>${t('profile.security.passkeys.remove')}<//>` : null}>
-          ${renaming === p.id && html`<${Toolbar} label=${t('profile.security.passkeys.rename')} actions=${html`
-            <${Action} onClick=${() => saveName(p.id)}>${t('profile.security.save')}<//>
-            <${Action} kind="text" onClick=${() => setRenaming(null)}>${t('profile.cancel')}<//>`}>
-            <${Field} ariaLabel=${t('profile.security.passkeys.rename')} maxLength=${80} value=${renameValue} autoFocus
-              onInput=${e => setRenameValue(e.target.value)}
-              onKeyDown=${e => { if (e.key === 'Enter') saveName(p.id); }} />
-          <//>`}
-        <//>
-      `)}<//>`}
+  return html`
+    <h3 class="card-h3 mt-section">${t('profile.security.passkeys.title')}</h3>
+    <p class="text-caption mb-1">${t('profile.security.passkeys.desc')}</p>
+    <div class="card poster-row--thing">
+      ${state.count === 0
+        ? html`<p class="text-caption mb-half">${t('profile.security.passkeys.none')}</p>`
+        : html`
+          <div class="pf-2fa-devices mb-1">
+            ${state.passkeys.map(p => html`
+              <div class="pf-2fa-device" key=${p.id}>
+                <div class="pf-flex-fill">
+                  ${renaming === p.id
+                    ? html`<div class="flex-row">
+                        <input class="input-field" maxlength="80" value=${renameValue}
+                          onInput=${e => setRenameValue(e.target.value)}
+                          onKeyDown=${e => { if (e.key === 'Enter') saveName(p.id); }} />
+                        <button class="btn-primary btn-sm" onClick=${() => saveName(p.id)}>${t('profile.security.save')}</button>
+                        <button class="btn-ghost btn-sm" onClick=${() => setRenaming(null)}>${t('profile.cancel')}</button>
+                      </div>`
+                    : html`<span class="pf-bold">${escHtml(p.label)}</span>`}
+                  <div class="text-caption">
+                    ${whereItLives(p)}
+                    ${' · '}
+                    ${p.last_used_at
+                      ? t('profile.security.passkeys.lastUsed').replace('{when}', fmtDate(p.last_used_at))
+                      : t('profile.security.passkeys.neverUsed')}
+                  </div>
+                </div>
+                ${renaming !== p.id && html`
+                  <div class="flex-row">
+                    <button class="btn-ghost btn-sm" onClick=${() => { setRenaming(p.id); setRenameValue(p.label); }}>
+                      ${t('profile.security.passkeys.rename')}
+                    </button>
+                    <button class="btn-danger-solid btn-sm" onClick=${() => removeDevice(p)}>
+                      ${t('profile.security.passkeys.remove')}
+                    </button>
+                  </div>
+                `}
+              </div>
+            `)}
+          </div>
+        `}
 
-    ${supported
-      ? html`<${Stack} density="compact">
-          <${Stack} direction="horizontal" align="start">
-            <${Action} disabled=${busy} onClick=${addThisDevice}>
-              ${busy ? t('profile.security.twoFactor.working') : t('profile.security.passkeys.addThisDevice')}
-            <//>
-          <//>
-          <${Text} kind="caption" tone="muted">${t('profile.security.passkeys.stillHavePassword')}<//>
-        <//>`
-      : html`<${Text} kind="caption" tone="muted">${t('profile.security.passkeys.unsupported')}<//>`}
+      ${supported
+        ? html`
+          <button class="btn-primary" disabled=${busy} onClick=${addThisDevice}>
+            ${busy ? t('profile.security.twoFactor.working') : t('profile.security.passkeys.addThisDevice')}
+          </button>
+          <p class="text-caption mt-xs">${t('profile.security.passkeys.stillHavePassword')}</p>
+        `
+        : html`<p class="text-caption">${t('profile.security.passkeys.unsupported')}</p>`}
+    </div>
     <${ConfirmUI} />
-  <//>`;
+  `;
 }

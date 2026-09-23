@@ -8,8 +8,6 @@
  *   numbered, the judge a calibration actually uses). These are the parts a wrong number on the
  *   page would come from; the model calls themselves are E2E territory.
  * @version-history
- *   v1.1.0 — 2026-09-22 — The page's frame now composes the shared component set, which imports the
- *     Preact hooks: they are stubbed here, since no case renders.
  *   v1.0.0 — 2026-09-04 — Initial.
  */
 import { describe, it, expect, vi } from 'vitest';
@@ -18,14 +16,8 @@ vi.mock('/js/i18n.js', () => ({ t: (k: string) => k, getLocale: () => 'en' }));
 vi.mock('/js/swallowed.js', () => ({ swallowed: () => {} }));
 vi.mock('/js/services/auth.js', () => ({ authHeaders: () => ({}) }));
 vi.mock('/js/services/calibrator.js', () => ({ updateBatch: async () => null, createVersion: async () => null }));
-vi.mock('preact', () => ({ h: () => null, options: {} }));
+vi.mock('preact', () => ({ h: () => null }));
 vi.mock('htm', () => ({ default: { bind: () => () => null } }));
-// frame.js composes the shared component set, which imports the hooks; nothing here renders, so
-// the hooks are stubs.
-vi.mock('preact/hooks', () => ({
-  useState: (v: unknown) => [v, () => {}], useEffect: () => {}, useRef: () => ({ current: null }),
-  useId: () => 'id', useCallback: (f: unknown) => f, useMemo: (f: () => unknown) => f(), useLayoutEffect: () => {},
-}));
 
 const engine = await import('../../public/views/profile/calibrator/engine.js');
 const frame = await import('../../public/views/profile/calibrator/frame.js');

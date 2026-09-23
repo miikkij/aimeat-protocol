@@ -9,8 +9,6 @@
  *   does not load the app-side dag cortex for a dozen boxes.
  * @structure layoutTasks(tasks) → { nodes, edges, width, height } · TaskDag({ tasks, problemIds })
  * @version-history
- *   2026-09-22 -- The picture carries its colours as SVG attributes reading the theme tokens, with no
- *     class and no wrapper of its own, so the agents-crew sheet can go; square corners, as every part.
  *   v1.0.0 -- 2026-08-28 -- Initial (JSON-agent Crew tab).
  */
 import { h } from 'preact';
@@ -73,30 +71,29 @@ export function TaskDag({ tasks, problemIds }) {
   const { nodes, edges, width, height } = layoutTasks(tasks);
   const bad = problemIds || new Set();
   if (nodes.length === 0) return null;
-  // Width follows the column and the height stays the drawing's own, so with `meet` the picture
-  // shrinks to fit a narrow column and never grows past its natural size on a wide one.
   return html`
-      <svg viewBox="0 0 ${width} ${height}" width="100%" height=${height} preserveAspectRatio="xMinYMin meet" role="img">
+    <div class="pf-agd-crew-dag">
+      <svg viewBox="0 0 ${width} ${height}" width=${width} height=${height} role="img">
         <defs>
           <marker id="pf-agd-crew-arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-            <path d="M0,0 L8,4 L0,8 z" fill="var(--accent)" />
+            <path d="M0,0 L8,4 L0,8 z" class="pf-agd-crew-dag-arrow" />
           </marker>
         </defs>
         ${edges.map(e => {
           const a = nodes[e.from]; const b = nodes[e.to];
           const x1 = a.x + BOX_W / 2, y1 = a.y + BOX_H, x2 = b.x + BOX_W / 2, y2 = b.y;
           const my = (y1 + y2) / 2;
-          return html`<path key=${`${e.from}-${e.to}`} fill="none" stroke="var(--accent)" stroke-width="1.5"
+          return html`<path key=${`${e.from}-${e.to}`} class="pf-agd-crew-dag-edge"
             d="M${x1},${y1} C${x1},${my} ${x2},${my} ${x2},${y2}" marker-end="url(#pf-agd-crew-arrow)" />`;
         })}
         ${nodes.map(n => html`
-          <g key=${n.index} transform="translate(${n.x},${n.y})">
-            <rect width=${BOX_W} height=${BOX_H} fill="var(--card-bg-alt)"
-              stroke=${bad.has(n.index) ? 'var(--danger)' : 'var(--border)'} stroke-width=${bad.has(n.index) ? 2 : 1} />
-            <text x="8" y="18" font-size="12" font-weight="600" fill="var(--text)" font-family="var(--font-mono)">${n.id}</text>
-            <text x="8" y="34" font-size="11" fill="var(--text-dim)">${n.agent}</text>
+          <g key=${n.index} class="pf-agd-crew-dag-node ${bad.has(n.index) ? 'pf-agd-crew-dag-node--problem' : ''}" transform="translate(${n.x},${n.y})">
+            <rect width=${BOX_W} height=${BOX_H} rx="6" />
+            <text x="8" y="18" class="pf-agd-crew-dag-id">${n.id}</text>
+            <text x="8" y="34" class="pf-agd-crew-dag-agent">${n.agent}</text>
           </g>
         `)}
       </svg>
+    </div>
   `;
 }

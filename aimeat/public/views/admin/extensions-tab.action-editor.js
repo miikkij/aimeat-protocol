@@ -4,8 +4,6 @@
  * SPDX-License-Identifier: MIT
  * @description Installed-extension action script editor for the admin Extensions tab. Extracted from the tab file to satisfy max-file-lines.
  * @version-history
- *   v2.0.0 -- 2026-09-22 -- Composed from the shared component set: the actions as tabs, the script
- *     in a shared many-line field, the save as an underlined action. Tab and Ctrl+S work as before.
  *   v1.0.0 — 2026-07-13 — Extracted from the tab file (max-file-lines)
  */
 import { h } from 'preact';
@@ -14,31 +12,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
-import { Stack, Field, Action, Text } from '/components/poster-parts.js';
 import { getActionScript, updateActionScript } from '/js/services/admin.js';
-
-/**
- * Tab inserts two spaces and Ctrl+S saves: the keys a script editor answers to. Shared by the
- * installed-extension editor and the release card's disk-script editor.
- */
-export function scriptKeys(setScript, save) {
-  return (e) => {
-    if (e.key === 'Tab') {
-      e.preventDefault();
-      const ta = e.target;
-      const start = ta.selectionStart;
-      const end = ta.selectionEnd;
-      const val = ta.value;
-      ta.value = val.substring(0, start) + '  ' + val.substring(end);
-      ta.selectionStart = ta.selectionEnd = start + 2;
-      setScript(ta.value);
-    }
-    if (e.key === 's' && (e.ctrlKey || e.metaKey)) {
-      e.preventDefault();
-      save();
-    }
-  };
-}
 
 // ── Action Script Editor ──
 function ActionScriptEditor({ extName, actions, onUpdated }) {
@@ -69,26 +43,55 @@ function ActionScriptEditor({ extName, actions, onUpdated }) {
     setSaving(false);
   }
 
-  return html`<${Stack}>
-    <${Stack} direction="wrap" align="center" density="compact">
-      <${Text} kind="label">${t('dashboard.servicesScriptEditor')}<//>
-      ${actions.map(a => html`<${Action} key=${a.id} kind="tab" selected=${selectedAction === a.id}
-        onClick=${() => loadScript(a.id)}>${a.method} ${escHtml(a.id)}<//>`)}
-    <//>
+  return html`
+    <div style="margin-top:8px;padding:10px;border:1px solid var(--glass-border);border-radius:6px;background:rgba(0,0,0,0.1)">
+      <div class="adm-flex-center adm-mb-sm" style="flex-wrap:wrap">
+        <strong style="font-size:.85rem">${t('dashboard.servicesScriptEditor')}</strong>
+        ${actions.map(a => html`
+          <button class="adm-btn-sm" onClick=${() => loadScript(a.id)}
+            style="font-size:.75rem${selectedAction === a.id ? ';color:#818cf8;border-color:rgba(79,70,229,0.4)' : ''}">
+            ${a.method} ${escHtml(a.id)}
+          </button>
+        `)}
+      </div>
 
-    ${loading && html`<${Text} kind="caption" tone="muted">${t('dashboard.loading')}...<//>`}
+      ${loading && html`<p class="adm-text-dim adm-text-base">${t('dashboard.loading')}...</p>`}
 
-    ${selectedAction && !loading && html`<${Stack} density="compact">
-      <${Text} kind="mono" tone="muted">${extName}/${selectedAction}<//>
-      <${Field} type="textarea" rows=${16} ariaLabel=${`${extName}/${selectedAction}`} value=${script}
-        spellCheck=${false} onInput=${e => setScript(e.target.value)} onKeyDown=${scriptKeys(setScript, handleSave)} />
-      <${Stack} direction="wrap" align="center">
-        <${Action} onClick=${handleSave} disabled=${saving}>${saving ? '...' : t('dashboard.servicesScriptSave')}<//>
-        <${Text} kind="mono" tone="muted">Ctrl+S<//>
-        ${msg && html`<${Text} tone=${msg.ok ? 'success' : 'danger'}>${msg.text}<//>`}
-      <//>
-    <//>`}
-  <//>`;
+      ${selectedAction && !loading && html`
+        <div style="margin-top:4px">
+          <div class="adm-flex-between adm-mb-xs">
+            <code style="font-size:.8rem;color:var(--text-dim)">${extName}/${selectedAction}</code>
+          </div>
+          <textarea class="adm-textarea adm-input-full" value=${script} onInput=${e => setScript(e.target.value)}
+            style="height:320px;font-size:12px"
+            spellcheck="false"
+            onKeyDown=${e => {
+              if (e.key === 'Tab') {
+                e.preventDefault();
+                const ta = e.target;
+                const start = ta.selectionStart;
+                const end = ta.selectionEnd;
+                const val = ta.value;
+                ta.value = val.substring(0, start) + '  ' + val.substring(end);
+                ta.selectionStart = ta.selectionEnd = start + 2;
+                setScript(ta.value);
+              }
+              if (e.key === 's' && (e.ctrlKey || e.metaKey)) {
+                e.preventDefault();
+                handleSave();
+              }
+            }}
+          />
+          <div class="adm-flex-center" style="margin-top:6px">
+            <button class="adm-btn-action adm-text-sm" onClick=${handleSave} disabled=${saving}>
+              ${saving ? '...' : t('dashboard.servicesScriptSave')}</button>
+            <span style="font-size:.75rem" class="adm-text-dim">Ctrl+S</span>
+            ${msg && html`<span class="adm-text-sm" style="color:${msg.ok ? '#22c55e' : '#ef4444'}">${msg.text}</span>`}
+          </div>
+        </div>
+      `}
+    </div>
+  `;
 }
 
 export { ActionScriptEditor };

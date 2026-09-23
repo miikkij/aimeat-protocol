@@ -14,9 +14,6 @@
  *   - ReviewBoard lives in packages-tab.review.js
  *
  * @version-history
- *   v3.0.0 -- 2026-09-22 -- Composed from the shared component set: sections, the metric rows, the
- *     numeral band, three shared tables (stacking on a phone), status filters as tabs, and the
- *     suspend reason in a box under the table naming the listing. The page's own sheet is gone.
  *   v2.2.0 — 2026-09-15 — The example-packages section describes the sync the node now runs: a
  *     changed package gets a new version, the listing and its counts stay, so the confirm is no
  *     longer a danger dialog.
@@ -39,9 +36,9 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { onLiveUpdate } from '/lib/live-updates.js';
 import { t } from '/js/i18n.js';
+import { useViewCSS } from '/components/useViewCSS.js';
 import { num, when, Row, Badge, Spinner, useToast, Toast } from './shared.js';
 import { useConfirm } from '/components/Modal.js';
-import { Section, Columns, Stack, Table, Field, NumeralBand, Chip, Action, Surface, Text } from '/components/poster-parts.js';
 import * as pkgService from '/js/services/packages.js';
 import { seedExamples, listPendingTemplates, suspendTemplate, relistTemplate } from '/js/services/admin.js';
 import { swallowed } from '/js/swallowed.js';
@@ -68,6 +65,10 @@ const LISTED = 'listed';
 const STORE_FILTERS = ['listed', 'suspended', 'rejected'];
 
 export default function PackagesAdminTab() {
+  // A no-op these days: the sheet is a <link> in spa.html. The call stays because every other
+  // tab makes it, and check:importmap holds the two together.
+  useViewCSS('/css/views/admin-packages.css');
+
   const [packages, setPackages] = useState([]);
   const [instances, setInstances] = useState([]);
   const [templates, setTemplates] = useState([]);
@@ -146,11 +147,11 @@ export default function PackagesAdminTab() {
 
   /** Publishing a new version is still a write every installer sees, so it says what and asks first. */
   function askSeed() {
-    const body = html`<${Stack} density="compact">
-      <${Text}>${P('seedAskBody')}<//>
-      <${Text} kind="caption" tone="muted">${P('seedAskArchives')}<//>
-      <${Text} kind="caption" tone="muted">${P('seedAskKeeps')}<//>
-    <//>`;
+    const body = html`<span class="adm-pk-ask">
+      <span>${P('seedAskBody')}</span>
+      <span class="adm-pk-note">${P('seedAskArchives')}</span>
+      <span class="adm-pk-note">${P('seedAskKeeps')}</span>
+    </span>`;
     confirm(body, doSeed, { title: P('seedAskTitle'), confirmLabel: P('seedBtn') });
   }
 
@@ -200,139 +201,169 @@ export default function PackagesAdminTab() {
     ? P('lineNone')
     : P('lineSome', { published: num(publishedCount), listed: num(listedCount), installed: num(installedPackages) });
 
-  const suspending = suspendId && shownListings.find((tpl) => tpl.id === suspendId);
+  return html`
+    <div class="og adm-pk">
+      ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
 
-  return html`<${Stack}>
-    ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
-
-    <${Section} title=${P('now')} count="01">
-      <${Columns} layout="trailing" collapse=${900}>
-        <${Stack} density="compact">
-          <${Text} kind="number" size="large">${P('statusPackages', { n: num(totals.packages) })}<//>
-          <${Text} kind="lead">${statusLine}<//>
-          <${Text} kind="mono" tone="muted">${oldest ? P('oldest', { when: when(oldest) }) : ''}<//>
-        <//>
-        <div>
-          <${Row} title=${P('rowPublished')} why=${P('rowPublishedWhy')}
-            chip=${html`<${Badge} type=${publishedCount ? 'healthy' : 'muted'} label=${num(publishedCount)} />`}
-            value=${P('ofAll', { n: num(publishedCount), all: num(totals.packages) })} />
-          <${Row} title=${P('rowListed')} why=${P('rowListedWhy')}
-            chip=${html`<${Badge} type=${listedCount ? 'healthy' : 'muted'} label=${num(listedCount)} />`}
-            value=${P('ofAll', { n: num(listedCount), all: num(totals.packages) })} />
-          <${Row} title=${P('rowInstalled')} why=${P('rowInstalledWhy')}
-            chip=${html`<${Badge} type="muted" label=${num(totals.instances)} />`}
-            value=${P('ofAllPackages', { n: num(installedPackages), all: num(totals.packages) })} />
-          <${Row} title=${P('rowWaiting')} why=${P('rowWaitingWhy')}
-            chip=${html`<${Badge} type=${pendingCount ? 'watch' : 'muted'} label=${num(pendingCount)} />`}
-            value=${pendingCount ? P('nWaiting', { n: num(pendingCount) }) : P('nothing')} />
+      <section class="og-sec og-sec--first">
+        <div class="og-sec-h"><h2 class="poster-section-title">${P('now')}<small>01</small></h2></div>
+        <div class="adm-ov-grid">
+          <div>
+            <div class="adm-ov-status">${P('statusPackages', { n: num(totals.packages) })}</div>
+            <p class="adm-alert-line">${statusLine}</p>
+            <div class="adm-ov-up">${oldest ? P('oldest', { when: when(oldest) }) : ''}</div>
+          </div>
+          <div>
+            <${Row} title=${P('rowPublished')} why=${P('rowPublishedWhy')}
+              chip=${html`<${Badge} type=${publishedCount ? 'healthy' : 'muted'} label=${num(publishedCount)} />`}
+              value=${P('ofAll', { n: num(publishedCount), all: num(totals.packages) })} />
+            <${Row} title=${P('rowListed')} why=${P('rowListedWhy')}
+              chip=${html`<${Badge} type=${listedCount ? 'healthy' : 'muted'} label=${num(listedCount)} />`}
+              value=${P('ofAll', { n: num(listedCount), all: num(totals.packages) })} />
+            <${Row} title=${P('rowInstalled')} why=${P('rowInstalledWhy')}
+              chip=${html`<${Badge} type="muted" label=${num(totals.instances)} />`}
+              value=${P('ofAllPackages', { n: num(installedPackages), all: num(totals.packages) })} />
+            <${Row} title=${P('rowWaiting')} why=${P('rowWaitingWhy')}
+              chip=${html`<${Badge} type=${pendingCount ? 'watch' : 'muted'} label=${num(pendingCount)} />`}
+              value=${pendingCount ? P('nWaiting', { n: num(pendingCount) }) : P('nothing')} last=${true} />
+          </div>
         </div>
-      <//>
-    <//>
+      </section>
 
-    <${NumeralBand} tone="plain" items=${[
-      { label: P('stripPackages'), value: num(totals.packages), note: P('stripPackagesSub') },
-      { label: P('stripListings'), value: num(totals.templates), note: P('stripListingsSub') },
-      { label: P('stripInstalled'), value: num(totals.instances), note: P('stripInstalledSub'), tone: totals.instances ? 'coral' : undefined },
-      { label: P('stripWaiting'), value: num(pendingCount), note: pendingCount ? P('stripWaitingSome') : P('stripWaitingNone') },
-    ]} />
+      <div class="og-strip">
+        <div><b>${num(totals.packages)}</b><span>${P('stripPackages')}</span><small>${P('stripPackagesSub')}</small></div>
+        <div><b>${num(totals.templates)}</b><span>${P('stripListings')}</span><small>${P('stripListingsSub')}</small></div>
+        <div><b class=${totals.instances ? 'og-coral-num' : ''}>${num(totals.instances)}</b><span>${P('stripInstalled')}</span><small>${P('stripInstalledSub')}</small></div>
+        <div><b>${num(pendingCount)}</b><span>${P('stripWaiting')}</span><small>${pendingCount ? P('stripWaitingSome') : P('stripWaitingNone')}</small></div>
+      </div>
 
-    <${Section} title=${P('packages')} count="02" description=${P('packagesLead')}>
-      ${!packages.length
-        ? html`<${Text} tone="muted">${P('noPackages')}<//>`
-        : html`<${Stack}>
-          <${Table} collapse=${900} label=${P('packages')}
-            headers=${[P('colPackage'), P('colVersion'), P('colCategory'), P('colInstalls'), P('colStatus')]}
-            rows=${packages.map((p) => {
-              const chips = partChips(p.components);
-              const n = installsOf(p);
-              return [
-                html`<${Stack} density="compact">
-                  <strong>${p.name}</strong>
-                  <${Text} kind="mono" tone="muted">${p.packageGroupId || ''}<//>
-                  ${p.description ? html`<${Text} kind="caption">${p.description}<//>` : null}
-                  ${chips.length ? html`<${Stack} direction="wrap" density="compact">${chips.map((c) => html`<${Chip} key=${c}>${c}<//>`)}<//>` : null}
-                <//>`,
-                { text: p.version || '–', mono: true },
-                p.category || '–',
-                html`<${Text} kind="number" size="small" tone=${n ? 'plain' : 'muted'}>${num(n)}<//>`,
-                html`<${Badge} type=${p.status === 'published' ? 'healthy' : 'muted'} label=${p.status} />`,
-              ];
-            })} />
-          <${Text} kind="caption" tone="muted">${P('packagesNote')}<//>
-        <//>`}
-    <//>
+      <section class="og-sec">
+        <div class="og-sec-h"><h2 class="poster-section-title">${P('packages')}<small>02</small></h2></div>
+        <p class="adm-pk-lead">${P('packagesLead')}</p>
+        ${!packages.length
+    ? html`<p class="adm-pk-quiet">${P('noPackages')}</p>`
+    : html`
+        <div class="adm-pk-phead">
+          <span>${P('colPackage')}</span><span>${P('colVersion')}</span><span>${P('colCategory')}</span>
+          <span>${P('colInstalls')}</span><span>${P('colStatus')}</span>
+        </div>
+        ${packages.map((p) => {
+      const chips = partChips(p.components);
+      const n = installsOf(p);
+      return html`
+          <div class="adm-pk-prow" key=${p.id || p.packageGroupId}>
+            <span>
+              <b>${p.name}</b>
+              <span class="adm-pk-gid">${p.packageGroupId || ''}</span>
+              ${p.description ? html`<span class="adm-pk-desc">${p.description}</span>` : null}
+              ${chips.length ? html`<span class="adm-pk-parts">${chips.map((c) => html`<span>${c}</span>`)}</span>` : null}
+            </span>
+            <span class="adm-pk-ver" data-l=${P('colVersion')}>${p.version || '–'}</span>
+            <span data-l=${P('colCategory')}>${p.category || '–'}</span>
+            <span class="adm-pk-num ${n ? '' : 'is-zero'}" data-l=${P('colInstalls')}>${num(n)}</span>
+            <span data-l=${P('colStatus')}><${Badge} type=${p.status === 'published' ? 'healthy' : 'muted'} label=${p.status} /></span>
+          </div>`;
+    })}
+        <p class="adm-pk-note">${P('packagesNote')}</p>`}
+      </section>
 
-    <${Section} title=${P('installed')} count="03" description=${instances.length ? P('installedLead') : null}>
-      ${!instances.length
-        ? html`<${Text} tone="muted">${P('noInstances')}<//>`
-        : html`<${Table} collapse=${900} label=${P('installed')}
-          headers=${[P('colLabel'), P('colPackage'), P('colOwner'), P('colVersionTaken'), P('colParts'), P('colInstalledAt')]}
-          rows=${instances.map((inst) => [
-            html`<strong>${inst.label || '–'}</strong>`,
-            { text: inst.packageGroupId || '–', mono: true },
-            { text: inst.owner || '–', mono: true },
-            { text: inst.packageVersion || '–', mono: true },
-            { text: num(inst.installedComponents?.length ?? 0), mono: true },
-            { text: when(inst.installedAt), mono: true },
-          ])} />`}
-    <//>
+      <section class="og-sec">
+        <div class="og-sec-h"><h2 class="poster-section-title">${P('installed')}<small>03</small></h2></div>
+        ${!instances.length
+    ? html`<p class="adm-pk-quiet">${P('noInstances')}</p>`
+    : html`
+        <p class="adm-pk-lead">${P('installedLead')}</p>
+        <div class="adm-pk-ihead">
+          <span>${P('colLabel')}</span><span>${P('colPackage')}</span><span>${P('colOwner')}</span>
+          <span>${P('colVersionTaken')}</span><span>${P('colParts')}</span><span>${P('colInstalledAt')}</span>
+        </div>
+        ${instances.map((inst) => html`
+          <div class="adm-pk-irow" key=${inst.id}>
+            <span><b>${inst.label || '–'}</b></span>
+            <span class="adm-pk-mono" data-l=${P('colPackage')}>${inst.packageGroupId || '–'}</span>
+            <span class="adm-pk-mono" data-l=${P('colOwner')}>${inst.owner || '–'}</span>
+            <span class="adm-pk-mono" data-l=${P('colVersionTaken')}>${inst.packageVersion || '–'}</span>
+            <span class="adm-pk-mono" data-l=${P('colParts')}>${num(inst.installedComponents?.length ?? 0)}</span>
+            <span class="adm-pk-mono" data-l=${P('colInstalledAt')}>${when(inst.installedAt)}</span>
+          </div>`)}`}
+      </section>
 
-    <${Section} title=${P('store')} count="04" description=${shownListings.length ? (storeStatus === LISTED ? P('storeLead') : P('storeLeadOther')) : null}
-      actions=${STORE_FILTERS.map((st) => html`<${Action} key=${st} kind="tab" selected=${storeStatus === st}
-        disabled=${storeCounts[st] === 0 && st !== LISTED} onClick=${() => showStore(st)}>
-        ${P('filter_' + st)} · ${num(storeCounts[st] ?? 0)}<//>`)}>
-      ${!shownListings.length
-        ? html`<${Text} tone="muted">${storeStatus === LISTED ? P('noListings') : P('noneInStatus')}<//>`
-        : html`<${Stack}>
-          <${Table} collapse=${900} label=${P('store')}
-            headers=${[P('colListing'), P('colPackage'), P('colRating'), P('colInstalls'), P('colFeatured'), '']}
-            rows=${shownListings.map((tpl) => [
-              html`<${Stack} direction="wrap" align="center" density="compact"><strong>${tpl.title || tpl.name || '–'}</strong>
-                ${tpl.status !== LISTED ? html`<${Badge} type=${tpl.status === 'rejected' ? 'critical' : 'watch'} label=${tpl.status} />` : null}<//>`,
-              { text: tpl.packageGroupId || tpl.packageName || '–', mono: true },
-              { text: tpl.reviewCount ? `${tpl.rating?.toFixed(1) ?? '0.0'} (${tpl.reviewCount})` : P('noRating'), mono: true },
-              { text: num(tpl.installCount ?? 0), mono: true },
-              tpl.featured ? '✓' : '–',
-              tpl.status === LISTED
-                ? html`<${Action} tone="danger" expanded=${suspendId === tpl.id}
+      <section class="og-sec">
+        <div class="og-sec-h">
+          <h2 class="poster-section-title">${P('store')}<small>04</small></h2>
+          <div class="og-doors">
+            <span class="adm-pk-chips">
+              ${STORE_FILTERS.map((s) => html`<button type="button" class="adm-pk-chip ${storeStatus === s ? 'on' : ''}"
+                disabled=${storeCounts[s] === 0 && s !== LISTED} onClick=${() => showStore(s)}>
+                ${P('filter_' + s)} · ${num(storeCounts[s] ?? 0)}</button>`)}
+            </span>
+          </div>
+        </div>
+        ${!shownListings.length
+    ? html`<p class="adm-pk-quiet">${storeStatus === LISTED ? P('noListings') : P('noneInStatus')}</p>`
+    : html`
+        <p class="adm-pk-lead">${storeStatus === LISTED ? P('storeLead') : P('storeLeadOther')}</p>
+        <div class="adm-pk-lhead">
+          <span>${P('colListing')}</span><span>${P('colPackage')}</span><span>${P('colRating')}</span>
+          <span>${P('colInstalls')}</span><span>${P('colFeatured')}</span><span></span>
+        </div>
+        ${shownListings.map((tpl) => html`
+          <div key=${tpl.id}>
+            <div class="adm-pk-lrow">
+              <span><b>${tpl.title || tpl.name || '–'}</b>
+                ${tpl.status !== LISTED ? html` <${Badge} type=${tpl.status === 'rejected' ? 'critical' : 'watch'} label=${tpl.status} />` : null}</span>
+              <span class="adm-pk-mono" data-l=${P('colPackage')}>${tpl.packageGroupId || tpl.packageName || '–'}</span>
+              <span class="adm-pk-mono" data-l=${P('colRating')}>${tpl.reviewCount ? `${tpl.rating?.toFixed(1) ?? '0.0'} (${tpl.reviewCount})` : P('noRating')}</span>
+              <span class="adm-pk-mono" data-l=${P('colInstalls')}>${num(tpl.installCount ?? 0)}</span>
+              <span data-l=${P('colFeatured')}>${tpl.featured ? '✓' : '–'}</span>
+              <span>
+                ${tpl.status === LISTED
+      ? html`<button type="button" class="og-door og-door--quiet og-door--danger"
                     onClick=${() => { setSuspendId(suspendId === tpl.id ? null : tpl.id); setSuspendReason(''); }}>
-                    ${suspendId === tpl.id ? P('cancel') : P('suspendBtn')}<//>`
-                : (tpl.status === 'suspended'
-                  ? html`<${Action} onClick=${() => doRelist(tpl.id)}>${P('relistBtn')}<//>`
-                  : ''),
-            ])} />
-          ${suspending && html`<${Surface} kind="box"><${Stack}>
-            <${Text} kind="heading" size="small">${suspending.title || suspending.name || '–'}<//>
-            <${Field} label=${P('suspendReasonLabel')} value=${suspendReason} autoFocus=${true}
-              placeholder=${P('suspendReasonPlaceholder')} onInput=${(e) => setSuspendReason(e.target.value)} />
-            <${Stack} direction="horizontal">
-              <${Action} kind="primary" tone="danger" onClick=${() => doSuspend(suspending.id)}>${P('suspendConfirm')}<//>
-            <//>
-            <${Text} kind="caption" tone="muted">${P('suspendNote')}<//>
-          <//><//>`}
-        <//>`}
-    <//>
+                    ${suspendId === tpl.id ? P('cancel') : P('suspendBtn')}</button>`
+      : (tpl.status === 'suspended'
+        ? html`<button type="button" class="og-door og-door--quiet" onClick=${() => doRelist(tpl.id)}>${P('relistBtn')}</button>`
+        : null)}
+              </span>
+            </div>
+            ${suspendId === tpl.id && html`
+              <div class="adm-pk-panel">
+                <div class="adm-pk-fld">
+                  <div class="adm-pk-fldl">${P('suspendReasonLabel')}</div>
+                  <input type="text" value=${suspendReason} onInput=${(e) => setSuspendReason(e.target.value)}
+                    placeholder=${P('suspendReasonPlaceholder')} />
+                </div>
+                <div class="adm-pk-acts">
+                  <button class="adm-btn" onClick=${() => doSuspend(tpl.id)}>${P('suspendConfirm')}</button>
+                </div>
+                <p class="adm-pk-note">${P('suspendNote')}</p>
+              </div>`}
+          </div>`)}`}
+      </section>
 
-    <${Section} title=${P('review')} count="05"
-      actions=${pendingCount > 0 ? html`<${Badge} type="watch" label=${P('nWaiting', { n: num(pendingCount) })} />` : null}>
-      <${ReviewBoard} pending=${pending} history=${history} onReload=${loadData} />
-    <//>
-
-    <${Section} title=${P('examples')} count="06" description=${P('examplesLead')}>
-      <${Stack}>
-        <div>
-          <${Row} title=${P('rowArchives')} why=${P('rowArchivesWhy')} value=${P('systemPackages')} />
-          <${Row} title=${P('rowKeeps')} why=${P('rowKeepsWhy')} value=${P('systemListings')} />
+      <section class="og-sec">
+        <div class="og-sec-h">
+          <h2 class="poster-section-title">${P('review')}<small>05</small></h2>
+          ${pendingCount > 0 && html`<span><${Badge} type="watch" label=${P('nWaiting', { n: num(pendingCount) })} /></span>`}
         </div>
-        <${Stack} direction="wrap" align="center">
-          <${Action} kind="primary" disabled=${seeding} onClick=${askSeed}>
-            ${seeding ? t('dashboard.loading') : P('seedBtn')}<//>
-          <${Text} kind="caption" tone="muted">${P('seedAsks')}<//>
-        <//>
-        ${said && html`<${Text} tone=${said.ok ? 'success' : 'danger'}>${said.msg}<//>`}
-      <//>
-    <//>
+        <${ReviewBoard} pending=${pending} history=${history} onReload=${loadData} />
+      </section>
 
-    <${ConfirmUI} />
-  <//>`;
+      <section class="og-sec">
+        <div class="og-sec-h"><h2 class="poster-section-title">${P('examples')}<small>06</small></h2></div>
+        <p class="adm-pk-lead">${P('examplesLead')}</p>
+        <${Row} title=${P('rowArchives')} why=${P('rowArchivesWhy')} value=${P('systemPackages')} />
+        <${Row} title=${P('rowKeeps')} why=${P('rowKeepsWhy')}
+          value=${P('systemListings')} last=${true} />
+        <div class="adm-pk-acts">
+          <button class="adm-btn" disabled=${seeding} onClick=${askSeed}>
+            ${seeding ? t('dashboard.loading') : P('seedBtn')}</button>
+          <span class="adm-pk-note adm-pk-note--flush">${P('seedAsks')}</span>
+        </div>
+        ${said && html`<p class="adm-pk-said ${said.ok ? 'is-ok' : 'is-bad'}">${said.msg}</p>`}
+      </section>
+
+      <${ConfirmUI} />
+    </div>
+  `;
 }

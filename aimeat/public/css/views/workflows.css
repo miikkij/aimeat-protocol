@@ -1,0 +1,183 @@
+/**
+ * @file workflows.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description Styles for Profile › Workflows (workflows-tab.js): the list of workflows with a
+ *   health sparkline, the blueprint graph + recent runs detail, and the single-run per-step
+ *   timeline. Prefix: wf-. Theme-token driven (no hardcoded colors) so it flips with dark/light.
+ * @version-history
+ *   v1.0.0 -- 2026-06-13 -- Phase 9: initial workflows tab styles.
+ *   v1.1.0 -- 2026-06-15 -- Form contrast fix: fields use --control-bg/--control-border (not
+ *     --bg-input, which = page --bg in light theme) + focus rings, grouped section surfaces,
+ *     carded step editors, branded accent checkboxes.
+ *   v1.2.0 -- 2026-07-05 -- .wf-progress chip ("leaves N/M") + .wf-progress--live pulse for a
+ *     still-filling dispatched step (resume-on-retry progress surfacing).
+ *   v1.3.0 -- 2026-07-06 -- .wf-badge--offline (amber-outlined) for the agent-offline step state.
+ */
+
+.wf-tab { display: flex; flex-direction: column; gap: 1.1rem; }
+.wf-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
+.wf-loading { color: var(--text-dim); padding: 0.75rem 0; font-size: 0.92rem; }
+.wf-error {
+  background: var(--danger-bg); color: var(--danger-fg);
+  border: 1px solid var(--danger-border, var(--border)); border-radius: var(--radius-sm); padding: 0.6rem 0.85rem;
+}
+.wf-muted { color: var(--text-dim); font-size: 0.82rem; }
+.wf-section-title { font-size: 1rem; font-weight: 700; color: var(--text); margin: 0.5rem 0 0.1rem; }
+
+/* ── badges ── */
+.wf-badge {
+  display: inline-block; padding: 0.1rem 0.5rem; border-radius: var(--radius-full, 999px);
+  font-size: 0.72rem; font-weight: 700; line-height: 1.5;
+}
+.wf-badge--ok { background: var(--success-bg); color: var(--success-fg); }
+.wf-badge--err { background: var(--danger-bg); color: var(--danger-fg); }
+.wf-badge--run { background: var(--info-bg); color: var(--info-fg); }
+.wf-badge--muted { background: var(--bg-dim); color: var(--text-dim); }
+/* agent-offline: a connectivity failure — an amber-outlined chip, visually distinct from the solid
+   red timed-out/-red states and the solid green ok. Uses theme tokens only. */
+.wf-badge--offline { background: var(--bg-dim); color: var(--orange); box-shadow: inset 0 0 0 1px var(--orange); }
+
+/* ── per-step fill progress ("leaves N/M") ── */
+.wf-progress {
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  padding: 0.05rem 0.45rem; border-radius: var(--radius-full, 999px);
+  font-size: 0.72rem; font-weight: 600; line-height: 1.5;
+  background: var(--bg-dim); color: var(--text-dim);
+  border: 1px solid var(--border);
+}
+/* Still-filling (dispatched + rising count): info accent + a gentle pulse so a live crew is visible. */
+.wf-progress--live {
+  background: var(--info-bg); color: var(--info-fg); border-color: transparent;
+  animation: wf-progress-pulse 1.6s ease-in-out infinite;
+}
+@keyframes wf-progress-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
+@media (prefers-reduced-motion: reduce) { .wf-progress--live { animation: none; } }
+
+/* ── list ── */
+.wf-card-list { display: flex; flex-direction: column; gap: 0.75rem; }
+.wf-card {
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.85rem 1rem;
+}
+.wf-card-main { flex: 1; cursor: pointer; display: flex; flex-direction: column; gap: 0.25rem; }
+.wf-card-title { font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 0.5rem; }
+.wf-card-meta { font-size: 0.82rem; color: var(--text-dim); }
+.wf-card-actions { display: flex; gap: 0.4rem; white-space: nowrap; }
+
+/* ── sparkline ── */
+.wf-spark { display: inline-flex; gap: 2px; margin-top: 0.2rem; align-items: flex-end; }
+.wf-spark-bar { width: 7px; height: 14px; border-radius: 2px; display: inline-block; }
+.wf-spark-bar--ok { background: var(--success-fg); }
+.wf-spark-bar--err { background: var(--danger-fg); }
+.wf-spark-bar--none { background: var(--bg-dim); }
+
+/* ── detail ── */
+.wf-detail-head { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+.wf-detail-titlebox { flex: 1; display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; }
+.wf-detail-title { font-size: 1.1rem; font-weight: 700; color: var(--text); }
+.wf-detail-sub { font-size: 0.8rem; color: var(--text-dim); }
+.wf-detail-sub code { font-family: var(--font-mono, monospace); }
+.wf-detail-desc { color: var(--text-dim); font-size: 0.9rem; margin: -0.3rem 0 0.3rem; }
+.wf-detail-actions { display: flex; gap: 0.4rem; }
+.wf-node-desc { font-weight: 400; color: var(--text-dim); font-size: 0.85rem; }
+
+.wf-graph { display: flex; flex-direction: column; gap: 0.5rem; }
+.wf-node {
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 0.6rem 0.8rem; display: flex; flex-direction: column; gap: 0.15rem;
+}
+.wf-node-id { font-weight: 700; color: var(--text); }
+.wf-node-agent { font-size: 0.82rem; color: var(--text-dim); }
+.wf-node-io { font-size: 0.78rem; color: var(--text-dim); font-family: var(--font-mono, monospace); }
+.wf-node-dep { font-size: 0.74rem; color: var(--accent); }
+
+.wf-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+.wf-table td { padding: 0.5rem 0.6rem; border-bottom: 1px solid var(--border); color: var(--text); }
+.wf-run-row { cursor: pointer; }
+.wf-run-row:hover { background: var(--bg-dim); }
+
+/* ── run timeline ── */
+.wf-steps { display: flex; flex-direction: column; gap: 0.5rem; }
+.wf-step {
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.55rem 0.8rem;
+}
+.wf-step-row { display: flex; align-items: center; gap: 0.6rem; }
+.wf-step-id { font-weight: 600; color: var(--text); }
+.wf-observed {
+  margin: 0.4rem 0 0; padding: 0.5rem 0.65rem; background: var(--bg-dim); border-radius: var(--radius-sm);
+  font-size: 0.76rem; color: var(--text-dim); overflow-x: auto; white-space: pre-wrap;
+}
+.wf-inspections {
+  margin-top: 0.5rem; padding: 0.5rem 0.7rem; background: var(--warn-bg); color: var(--warn-fg);
+  border-radius: var(--radius-sm); font-size: 0.82rem;
+}
+
+/* ── create/edit form ── */
+/* Fields use the dedicated control tokens (--control-bg / --control-border), NOT --bg-input
+   (which equals the page --bg in light theme and makes every field melt into the background). */
+.wf-form { display: flex; flex-direction: column; gap: 1rem; }
+.wf-field { display: flex; flex-direction: column; gap: 0.3rem; }
+.wf-field > span { font-size: 0.78rem; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.04em; }
+
+/* The shared control look — applied to every text/number/select in the form. */
+.wf-field input[type="text"], .wf-field input[type="number"], .wf-field select,
+.wf-field-row input, .wf-field-row select,
+.wf-inline input[type="number"] {
+  background: var(--control-bg); color: var(--text);
+  border: 1.5px solid var(--control-border); border-radius: var(--radius-sm);
+  padding: 0.5rem 0.65rem; font: inherit; outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+}
+.wf-field input::placeholder, .wf-field-row input::placeholder { color: var(--text-muted); }
+.wf-field input:focus, .wf-field select:focus,
+.wf-field-row input:focus, .wf-field-row select:focus,
+.wf-inline input[type="number"]:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-subtle);
+  background: var(--bg-input-focus, var(--control-bg));
+}
+.wf-field input:hover:not(:focus), .wf-field select:hover:not(:focus),
+.wf-field-row input:hover:not(:focus), .wf-field-row select:hover:not(:focus) {
+  border-color: var(--text-muted);
+}
+.wf-field input:disabled, .wf-field-row input:disabled, .wf-field select:disabled {
+  opacity: 0.6; cursor: not-allowed; background: var(--bg-surface);
+}
+
+.wf-field-row { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+.wf-field-row > input, .wf-field-row > select { flex: 1; min-width: 8rem; }
+
+/* Grouped sections sit on a faint surface so the field cluster reads as one block. */
+.wf-form-section {
+  border: 1px solid var(--border); border-radius: var(--radius); padding: 0.9rem 1rem;
+  background: var(--bg-surface);
+  display: flex; flex-direction: column; gap: 0.7rem;
+}
+.wf-form-section-head { display: flex; justify-content: space-between; align-items: center; font-weight: 700; color: var(--text); }
+
+/* Each step is a real card with an accent spine — not just an indented text block. */
+.wf-step-edit {
+  border: 1px solid var(--border); border-left: 3px solid var(--accent);
+  border-radius: var(--radius-sm); padding: 0.75rem 0.85rem;
+  background: var(--bg-card);
+  display: flex; flex-direction: column; gap: 0.55rem;
+}
+.wf-step-opts { font-size: 0.82rem; color: var(--text-dim); }
+.wf-step-after {
+  display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; font-size: 0.82rem;
+  padding-top: 0.5rem; border-top: 1px dashed var(--border);
+}
+.wf-inline { display: inline-flex; align-items: center; gap: 0.35rem; color: var(--text); }
+.wf-inline input[type="number"] { width: 4.5rem; padding: 0.3rem 0.45rem; }
+/* Branded, comfortably-sized checkboxes so toggles are obvious. */
+.wf-inline input[type="checkbox"], .wf-llm-toggle input[type="checkbox"], .wf-notify-toggle input[type="checkbox"] {
+  width: 1.05rem; height: 1.05rem; accent-color: var(--accent); cursor: pointer; flex-shrink: 0;
+}
+.wf-llm-toggle, .wf-notify-toggle {
+  margin-top: 0.1rem; font-size: 0.9rem; gap: 0.5rem;
+  padding: 0.6rem 0.75rem; border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--bg-surface); cursor: pointer;
+}
+.wf-form-actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 0.4rem; }
+.wf-err-list { margin: 0; padding-left: 1.1rem; }

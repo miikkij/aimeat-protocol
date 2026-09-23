@@ -23,8 +23,6 @@
  *   import { AiTransparencyCard } from './ai-transparency-card.js';
  *   html`<${AiTransparencyCard} />`
  * @version-history
- *   2026-09-22 -- Composed from the shared set: the AI page's opening section, the four counts as a
- *     numeral band, every list a shared row; it no longer uses the card rules in profile.css.
  *   2026-09-13 — V1: compose page and B1 section headings from the shared poster classes.
  *   v1.1.0 — 2026-08-01 — i18n namespace renamed `aiTransparency.*` → `aiTransparencyMine.*`
  *     (TARGET-058 Phase 10b). It sat one character away from `transparency.*`, the PUBLIC page's
@@ -40,8 +38,6 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { apiGet } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
-import { NumeralBand, ListRow, Text, Action } from '/components/poster-parts.js';
-import { CardSection, StatusLine } from './ai/frame.js';
 
 /** `2026-08-01T18:42:00Z` → `2026-08-01 18:42`, in the reader's locale-neutral short form. */
 function shortTime(iso) {
@@ -94,59 +90,89 @@ export function AiTransparencyCard() {
   const unlabelled = report?.unlabelled ?? 0;
 
   return html`
-    <${CardSection} id="ai-transparency" title=${t('aiTransparencyMine.title')} description=${t('aiTransparencyMine.desc')}
-      open=${!collapsed} onToggle=${() => setCollapsed(c => !c)}>
-      ${loading && html`<${Text} tone="muted">${t('aiTransparencyMine.loading')}<//>`}
-      ${error && html`<${StatusLine} error=${true}>${error}<//>`}
+    <div class="pf-card pf-aitr">
+      <button type="button" class="pf-aitr-head" onClick=${() => setCollapsed(c => !c)}
+              aria-expanded=${!collapsed}>
+        <span class="poster-section-title">${t('aiTransparencyMine.title')}</span>
+        <span class="pf-aitr-chevron">${collapsed ? '+' : '−'}</span>
+      </button>
+      <p class="section-desc">${t('aiTransparencyMine.desc')}</p>
 
-      ${report && html`
-        <${NumeralBand} tone="plain" size="small" items=${[
-          { id: 'unlabelled', label: t('aiTransparencyMine.unlabelled'), value: unlabelled, tone: unlabelled > 0 ? 'coral' : undefined },
-          { id: 'labelled', label: t('aiTransparencyMine.labelled'), value: report.labelled ?? 0 },
-          { id: 'public', label: t('aiTransparencyMine.publicTotal'), value: report.public_total ?? 0 },
-          { id: 'total', label: t('aiTransparencyMine.total'), value: report.total ?? 0 },
-        ]} />
+      ${!collapsed && html`
+        <div class="pf-aitr-body">
+          ${loading && html`<p class="pf-aitr-muted">${t('aiTransparencyMine.loading')}</p>`}
+          ${error && html`<p class="pf-aitr-error">${error}</p>`}
 
-        <${Text} tone="muted">${t('aiTransparencyMine.scopeNote')}<//>
+          ${report && html`
+            <div class="pf-aitr-stats">
+              <div class=${'pf-aitr-stat' + (unlabelled > 0 ? ' pf-aitr-stat-warn' : '')}>
+                <span class="pf-aitr-num">${unlabelled}</span>
+                <span class="pf-aitr-lbl">${t('aiTransparencyMine.unlabelled')}</span>
+              </div>
+              <div class="pf-aitr-stat">
+                <span class="pf-aitr-num">${report.labelled ?? 0}</span>
+                <span class="pf-aitr-lbl">${t('aiTransparencyMine.labelled')}</span>
+              </div>
+              <div class="pf-aitr-stat">
+                <span class="pf-aitr-num">${report.public_total ?? 0}</span>
+                <span class="pf-aitr-lbl">${t('aiTransparencyMine.publicTotal')}</span>
+              </div>
+              <div class="pf-aitr-stat">
+                <span class="pf-aitr-num">${report.total ?? 0}</span>
+                <span class="pf-aitr-lbl">${t('aiTransparencyMine.total')}</span>
+              </div>
+            </div>
 
-        ${unlabelled > 0 && html`
-          <${Text} tone="coral">${t('aiTransparencyMine.unlabelledHelp')}<//>
-          <div>
-            ${(report.unlabelled_detail?.items ?? []).map(item => html`
-              <${ListRow} key=${item.id} density="compact" name=${item.pipeline || t('aiTransparencyMine.unknownSource')}
-                detail=${shortTime(item.generated_at)}
-                actions=${item.record_url && html`<${Action} href=${item.record_url} target="_blank">${t('aiTransparencyMine.openRecord')}<//>`} />`)}
-          </div>
-          ${report.unlabelled_detail
-            && report.unlabelled_detail.shown < report.unlabelled_detail.total
-            && html`<${Text} kind="caption" tone="muted">
-              ${t('aiTransparencyMine.showingOf', {
-                shown: String(report.unlabelled_detail.shown),
-                total: String(report.unlabelled_detail.total),
-              })}
-            <//>`}
-        `}
+            <p class="pf-aitr-note">${t('aiTransparencyMine.scopeNote')}</p>
 
-        ${(report.apps_declaring_generation_with_gap ?? []).length > 0 && html`
-          <${Text} kind="heading" size="small">${t('aiTransparencyMine.appsWithGap')}<//>
-          <div>
-            ${report.apps_declaring_generation_with_gap.map(a => html`
-              <${ListRow} key=${a.owner + '/' + a.filename} density="compact" name=${a.filename} detailKind="text" detail=${a.gap} />`)}
-          </div>`}
-      `}
+            ${unlabelled > 0 && html`
+              <p class="pf-aitr-warn-line">${t('aiTransparencyMine.unlabelledHelp')}</p>
+              <ul class="pf-aitr-list">
+                ${(report.unlabelled_detail?.items ?? []).map(item => html`
+                  <li key=${item.id} class="pf-aitr-row">
+                    <span class="pf-aitr-row-main">${item.pipeline || t('aiTransparencyMine.unknownSource')}</span>
+                    <span class="pf-aitr-row-meta">${shortTime(item.generated_at)}</span>
+                    ${item.record_url && html`
+                      <a class="pf-aitr-row-link" href=${item.record_url} target="_blank" rel="noopener noreferrer">
+                        ${t('aiTransparencyMine.openRecord')}
+                      </a>`}
+                  </li>`)}
+              </ul>
+              ${report.unlabelled_detail
+                && report.unlabelled_detail.shown < report.unlabelled_detail.total
+                && html`<p class="pf-aitr-muted">
+                  ${t('aiTransparencyMine.showingOf', {
+                    shown: String(report.unlabelled_detail.shown),
+                    total: String(report.unlabelled_detail.total),
+                  })}
+                </p>`}
+            `}
 
-      ${policy && html`
-        <${Text} kind="heading" size="small">${t('aiTransparencyMine.policyTitle')}<//>
-        <${Text} tone="muted">${policy.why}<//>
-        <div>
-          ${(policy.records ?? []).map(r => html`
-            <${ListRow} key=${r.what} density="compact" name=${r.what} detailKind="text"
-              detail=${`${t('aiTransparencyMine.retention')}: ${r.retention}`}>
-              <${Text} kind="caption" tone="muted">${t('aiTransparencyMine.neverContains')}: ${r.never_contains}<//>
-            <//>`)}
-        </div>
-        <${Text} tone="muted">${policy.note}<//>`}
-    <//>`;
+            ${(report.apps_declaring_generation_with_gap ?? []).length > 0 && html`
+              <h4 class="pf-aitr-sub">${t('aiTransparencyMine.appsWithGap')}</h4>
+              <ul class="pf-aitr-list">
+                ${report.apps_declaring_generation_with_gap.map(a => html`
+                  <li key=${a.owner + '/' + a.filename} class="pf-aitr-row">
+                    <span class="pf-aitr-row-main">${a.filename}</span>
+                    <span class="pf-aitr-row-meta">${a.gap}</span>
+                  </li>`)}
+              </ul>`}
+          `}
+
+          ${policy && html`
+            <h4 class="pf-aitr-sub">${t('aiTransparencyMine.policyTitle')}</h4>
+            <p class="pf-aitr-note">${policy.why}</p>
+            <ul class="pf-aitr-list">
+              ${(policy.records ?? []).map(r => html`
+                <li key=${r.what} class="pf-aitr-policy">
+                  <span class="pf-aitr-row-main">${r.what}</span>
+                  <span class="pf-aitr-row-meta">${t('aiTransparencyMine.retention')}: ${r.retention}</span>
+                  <span class="pf-aitr-row-meta">${t('aiTransparencyMine.neverContains')}: ${r.never_contains}</span>
+                </li>`)}
+            </ul>
+            <p class="pf-aitr-note">${policy.note}</p>`}
+        </div>`}
+    </div>`;
 }
 
 export default AiTransparencyCard;

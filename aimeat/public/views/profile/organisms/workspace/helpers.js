@@ -10,8 +10,6 @@
  *   kpiMeets, firstLine, shortActor, cap, isMobileView, renderSpaceNotice
  * @usage import { PRIMARY_FIELD, groupDocs } from '/views/profile/organisms/workspace/helpers.js';
  * @version-history
- *   2026-09-22 -- Field values and the space notice are composed from the shared set (Text, a code
- *     Surface, the aside); no class of its own.
  *   2026-09-14 -- A row space reads as a row space: its own notice. It fell into the "backing not
  *     supported" branch, which told the owner to switch it to memory — the one change row spaces
  *     exist to prevent. The repeated name-and-badge head went with it: organism.css hides it inside
@@ -24,7 +22,6 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { Markdown } from '/components/Markdown.js';
-import { Stack, Surface, Text } from '/components/poster-parts.js';
 
 export const PRIMARY_FIELD = { goal: 'title', plan: 'approach', deliverable: 'title', resource: 'label', decision: 'summary' };
 
@@ -36,17 +33,17 @@ export const looksMarkdown = (s) => /\n/.test(s) || /(^|\s)[-*]\s/.test(s) || /[
 // with everything String()'d onto one line — unreadable for real record data.)
 export const renderFieldVal = (v) => {
   if (Array.isArray(v)) {
-    return html`<${Stack} density="compact">${v.map((it, i) => (it && typeof it === 'object')
-      ? html`<${Surface} key=${i} kind="code" density="compact">${JSON.stringify(it, null, 2)}<//>`
-      : html`<${Text} key=${i}>· ${String(it)}<//>`)}<//>`;
+    return html`<ul class="pj-rec-field-list">${v.map((it, i) => html`<li key=${i}>${
+      (it && typeof it === 'object') ? html`<pre class="pj-rec-json">${JSON.stringify(it, null, 2)}</pre>` : String(it)
+    }</li>`)}</ul>`;
   }
-  if (v && typeof v === 'object') return html`<${Surface} kind="code" density="compact">${JSON.stringify(v, null, 2)}<//>`;
+  if (v && typeof v === 'object') return html`<pre class="pj-rec-json">${JSON.stringify(v, null, 2)}</pre>`;
   if (typeof v === 'string') {
     return looksMarkdown(v)
-      ? html`<${Markdown} text=${v} />`
-      : html`<${Text}>${v}<//>`;
+      ? html`<div class="pj-rec-md"><${Markdown} text=${v} /></div>`
+      : html`<span class="pj-rec-field-text">${v}</span>`;
   }
-  return html`<${Text}>${String(v)}<//>`;
+  return html`<span class="pj-rec-field-text">${String(v)}</span>`;
 };
 
 // ── Series niputus: collapse multi-part documents ("Foo — osa 2", "Foo — part 3") under one
@@ -112,10 +109,10 @@ export const isMobileView = () => window.matchMedia('(max-width: 640px)').matche
 // this (cover.js), and the section head this used to repeat them in is `display: none` inside an
 // og-page (css/views/organism.css), so it is the notice alone.
 export const renderSpaceNotice = (ot) => html`
-  <${Surface} kind="aside" key=${ot.name}>
-    <${Text}>${ot.backing === 'tasks'
+  <div class="pj-section poster-row--thing" key=${ot.name}>
+    <div class="pj-space-notice">${ot.backing === 'tasks'
       ? (t('organisms.spaceTasksBacked') || 'This space points at the task system — its items are tasks, not workspace records. Manage them in the Tasks views.')
       : ot.backing === 'rows'
         ? (t('organisms.spaceRowsBacked') || 'This space holds rows the group accumulates. They are appended and never edited, and this page does not list them — they are read with the row tools, which filter and page through them.')
-        : (t('organisms.spaceBackingUnsupported') || 'This space’s backing is not supported, so its content is not shown here. Edit the workspace (manifest) and set this space’s backing to "memory" to restore it — files and knowledge packages attach via Sources or document images instead.')}<//>
-  <//>`;
+        : (t('organisms.spaceBackingUnsupported') || 'This space’s backing is not supported, so its content is not shown here. Edit the workspace (manifest) and set this space’s backing to "memory" to restore it — files and knowledge packages attach via Sources or document images instead.')}</div>
+  </div>`;

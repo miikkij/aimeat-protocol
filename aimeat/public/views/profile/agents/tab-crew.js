@@ -18,9 +18,6 @@
  *   - TabCrew — load, actions (validate / try / publish / draft / restore), the header and the
  *     form-or-JSON body; sections live in ./crew-editor.js, templates in ./crew-templates.js
  * @version-history
- *   2026-09-22 -- Discard draft carries the danger tone.
- *   2026-09-22 -- Composed from the shared parts (Section, ListRow, Chip, Action, Field, Surface, Text)
- *     instead of the agents-crew sheet's own classes, so the tab follows the one component set.
  *   2026-09-20 -- Loads what the tool picker's Decisions group needs: the rules made for agents, and
  *     whether a TypeSafe key exists for this agent.
  *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
@@ -37,7 +34,6 @@ import { api, apiGet, apiPost, apiPut, apiDelete } from '/js/api.js';
 import { timeAgo } from '/js/utils.js';
 import { useConfirm } from '/components/Modal.js';
 import { swallowed } from '/js/swallowed.js';
-import { Section, Stack, Columns, ListRow, Chip, Action, Field, Surface, Text } from '/components/poster-parts.js';
 import { CREW_TEMPLATES, buildTemplate } from './crew-templates.js';
 import CrewLlmPicker from './crew-llm-picker.js';
 import { anchorErrors, ErrorLines, IdentitySection, CrewSection, RunSection, ContractSection } from './crew-editor.js';
@@ -256,8 +252,8 @@ export default function TabCrew({ agentName, showToast }) {
     }
   }
 
-  if (loading) return html`<${Text} tone="muted">…<//>`;
-  if (loadError) return html`<${Text} tone="muted">${loadError}<//>`;
+  if (loading) return html`<div class="pf-agd-empty">…</div>`;
+  if (loadError) return html`<div class="pf-agd-empty">${loadError}</div>`;
 
   const validated = status === 'validated';
   // The live definition passed the validator when it was published, so a trial of it needs no
@@ -266,113 +262,125 @@ export default function TabCrew({ agentName, showToast }) {
   const busyAny = busy !== null || tryRun?.status === 'running' || tryRun?.status === 'starting';
 
   return html`
-    <div onClick=${(e) => e.stopPropagation()}>
+    <div class="pf-agd-crew" onClick=${(e) => e.stopPropagation()}>
       <${ConfirmUI} />
-      <${Stack}>
-        <${Section} size="small" density="compact" title=${t(`${K}.title`)} description=${t(`${K}.intro`)}>
-          <${Stack} density="compact">
-            <${Stack} direction="wrap" density="compact">
-              <${Chip} tone=${status === 'published' || status === 'validated' ? 'sun' : 'plain'}>${t(`${K}.state.${status}`)}<//>
-              <${Chip} tone=${online ? 'plain' : 'muted'} title=${online ? '' : t(`${K}.offlineHint`)}>${t(online ? `${K}.online` : `${K}.offline`)}<//>
-            <//>
-            ${published && html`
-              <${ListRow} density="compact" detailKind="text"
-                name=${published.revision > 0
-                  ? t(`${K}.liveRevision`, { rev: published.revision, when: timeAgo(published.publishedAt) })
-                  : t(`${K}.liveUnnumbered`, { when: timeAgo(published.publishedAt) })}
-                detail=${runtimeLine(runtime, published)} />
-            `}
-            ${!online && html`<${Text} tone="coral">${t(`${K}.offlineHint`)}<//>`}
-          <//>
-        <//>
+      <div class="pf-agd-crew-head">
+        <div>
+          <div class="pf-agd-section-title">${t(`${K}.title`)}</div>
+          <div class="section-desc">${t(`${K}.intro`)}</div>
+        </div>
+        <div class="pf-agd-crew-status">
+          <span class="pf-agd-badge pf-agd-crew-state pf-agd-crew-state--${status}">${t(`${K}.state.${status}`)}</span>
+          <span class="pf-agd-badge ${online ? 'pf-agd-badge--active' : 'pf-agd-badge--inactive'}" title=${online ? '' : t(`${K}.offlineHint`)}>${t(online ? `${K}.online` : `${K}.offline`)}</span>
+        </div>
+      </div>
 
-        ${/* Which model this agent thinks with. Above the definition because it is one line and it
-              decides how everything below it will actually be carried out. */''}
-        <${CrewLlmPicker} agentName=${agentName} menu=${menu} showToast=${showToast} onSaved=${loadMenu} />
+      ${published && html`
+        <div class="pf-agd-crew-live poster-row--thing">
+          <div>${published.revision > 0
+            ? t(`${K}.liveRevision`, { rev: published.revision, when: timeAgo(published.publishedAt) })
+            : t(`${K}.liveUnnumbered`, { when: timeAgo(published.publishedAt) })}</div>
+          <div class="pf-agd-help-text">${runtimeLine(runtime, published)}</div>
+        </div>
+      `}
+      ${!online && html`<div class="pf-agd-warning-text pf-agd-crew-offline">${t(`${K}.offlineHint`)}</div>`}
 
-        ${status === 'empty' ? html`
-          <${Section} size="small" density="compact" title=${t(`${K}.templates.title`)} description=${t(`${K}.templates.hint`)}>
-            <${Columns} density="compact" collapse="600">
-              ${CREW_TEMPLATES.map(tp => html`
-                <${ListRow} key=${tp.id} detailKind="text" name=${t(tp.nameKey)} detail=${t(tp.descKey)}
-                  onOpen=${() => pickTemplate(tp.id)} />
-              `)}
-              <${ListRow} detailKind="text" name=${t(`${K}.templates.pasteJson`)} detail=${t(`${K}.limitNote`)}
-                onOpen=${() => { setView('json'); edit({ agent_name: agentName, agents: [], tasks: [] }); }} />
-            <//>
-          <//>
-        ` : html`
-          <${Stack} direction="wrap" align="between" density="compact">
-            <${Stack} direction="horizontal" density="compact">
-              <${Action} kind="tab" selected=${view === 'form'} onClick=${() => setView('form')}>${t(`${K}.actions.form`)}<//>
-              <${Action} kind="tab" selected=${view === 'json'} onClick=${() => { setJsonText(JSON.stringify(doc, null, 2)); setView('json'); }}>${t(`${K}.actions.json`)}<//>
-            <//>
-            <${Stack} direction="wrap" align="center" density="compact">
-              <${Action} kind="primary" disabled=${busyAny || !online} onClick=${validate}>
-                ${busy === 'validate' ? t(`${K}.actions.validating`) : t(`${K}.actions.validate`)}
-              <//>
-              <${Action} disabled=${busyAny || !validated || !online} onClick=${publish}>
-                ${busy === 'publish' ? t(`${K}.actions.publishing`) : t(`${K}.actions.publish`)}
-              <//>
-              <${Action} kind="text" disabled=${busyAny} onClick=${saveDraft}>${t(`${K}.actions.saveDraft`)}<//>
-              ${state?.draft && html`<${Action} kind="text" tone="danger" disabled=${busyAny} onClick=${discardDraft}>${t(`${K}.actions.discardDraft`)}<//>`}
-              ${!published && html`<${Action} kind="text" disabled=${busyAny} onClick=${() => { setValidation(null); setDoc(null); }}>${t(`${K}.actions.changeTemplate`)}<//>`}
-            <//>
-          <//>
-          ${status === 'draft' && html`<${Text} tone="muted">${t(`${K}.needsValidation`)}${state?.draft || published ? ' ' + t(`${K}.unpublishedEdits`) : ''}<//>`}
-          ${status === 'invalid' && html`
-            <${Surface} kind="aside" tone="danger" density="compact">
-              <${Stack} density="compact">
-                <${Text} kind="label">${t(`${K}.messages.problems`, { n: validation.errors.length })}<//>
-                <${ErrorLines} lines=${errors.general} />
-              <//>
-            <//>
-          `}
-          <${Text} kind="caption" tone="muted">${t(`${K}.limitNote`)}<//>
+      ${/* Which model this agent thinks with. Above the definition because it is one line and it
+            decides how everything below it will actually be carried out. */''}
+      <${CrewLlmPicker} agentName=${agentName} menu=${menu} showToast=${showToast} onSaved=${loadMenu} />
 
-          ${view === 'json' ? html`
-            <${Field} type="textarea" rows=${24} value=${jsonText} spellCheck=${false}
-              onInput=${e => setJsonText(e.target.value)} onChange=${applyJson}
-              error=${jsonError ? t(`${K}.messages.jsonInvalid`, { err: jsonError }) : undefined} />
-          ` : html`
-            <${IdentitySection} doc=${doc} onChange=${edit} errors=${errors} />
-            <${CrewSection} doc=${doc} onChange=${edit} errors=${errors} runtimeTools=${menu?.tools} decideTools=${decideTools} />
-            <${RunSection} doc=${doc} onChange=${edit} errors=${errors} />
-            <${ContractSection} doc=${doc} onChange=${edit} errors=${errors} />
-          `}
-
-          <${Section} size="small" density="compact" title=${t(`${K}.actions.tryRun`)} description=${t(`${K}.actions.tryNoTrace`)}>
-            <${Stack} density="compact">
-              <${Columns} layout="leading" density="compact" collapse="560">
-                <${Field} placeholder=${t(`${K}.actions.tryPrompt`)} value=${tryPrompt}
-                  onInput=${e => setTryPrompt(e.target.value)} disabled=${!canTry || !online} />
-                <${Stack} direction="horizontal" density="compact">
-                  <${Action} disabled=${busyAny || !canTry || !online || !tryPrompt.trim()} onClick=${tryOnce}>
-                    ${tryRun?.status === 'running' || tryRun?.status === 'starting' ? t(`${K}.actions.tryRunning`) : t(`${K}.actions.tryRun`)}
-                  <//>
-                <//>
-              <//>
-              ${tryRun && (tryRun.status === 'done' || tryRun.status === 'failed') && html`
-                <${Text} kind="label">${t(`${K}.actions.tryTitle`)}<//>
-                <${Surface} kind="code" tone=${tryRun.status === 'failed' ? 'danger' : 'plain'}>${tryOutput(tryRun)}<//>
-              `}
-            <//>
-          <//>
-        `}
-
-        ${Array.isArray(state?.versions) && state.versions.length > 0 && html`
-          <${Section} size="small" density="compact" title=${t(`${K}.versions.title`)}
-            description=${t(`${K}.versions.hint`, { n: state.version_window })}>
-            ${state.versions.map(v => html`
-              <${ListRow} key=${v.revision} density="compact" detailKind="text"
-                name=${t(`${K}.versions.byAt`, { rev: v.revision, when: v.publishedAt ? timeAgo(v.publishedAt) : '' })}
-                value=${published?.revision === v.revision ? html`<${Chip} tone="sun">${t(`${K}.versions.live`)}<//>` : null}
-                actions=${published?.revision === v.revision ? null
-                  : html`<${Action} kind="text" disabled=${busyAny || !online} onClick=${() => restore(v.revision)}>${t(`${K}.actions.restore`)}<//>`} />
+      ${status === 'empty' ? html`
+        <div class="pf-agd-crew-templates">
+          <div class="pf-agd-section-title">${t(`${K}.templates.title`)}</div>
+          <div class="pf-agd-help-text">${t(`${K}.templates.hint`)}</div>
+          <div class="pf-agd-crew-template-grid">
+            ${CREW_TEMPLATES.map(tp => html`
+              <button key=${tp.id} type="button" class="pf-agd-crew-template" onClick=${() => pickTemplate(tp.id)}>
+                <div class="pf-agd-crew-template-name">${t(tp.nameKey)}</div>
+                <div class="pf-agd-crew-template-desc">${t(tp.descKey)}</div>
+              </button>
             `)}
-          <//>
+            <button type="button" class="pf-agd-crew-template" onClick=${() => { setView('json'); edit({ agent_name: agentName, agents: [], tasks: [] }); }}>
+              <div class="pf-agd-crew-template-name">${t(`${K}.templates.pasteJson`)}</div>
+              <div class="pf-agd-crew-template-desc">${t(`${K}.limitNote`)}</div>
+            </button>
+          </div>
+        </div>
+      ` : html`
+        <div class="pf-agd-crew-toolbar">
+          <div class="pf-agd-subtab-bar pf-agd-crew-views">
+            <button type="button" class="pf-agd-subtab ${view === 'form' ? 'pf-agd-subtab-active' : ''}" onClick=${() => setView('form')}>${t(`${K}.actions.form`)}</button>
+            <button type="button" class="pf-agd-subtab ${view === 'json' ? 'pf-agd-subtab-active' : ''}" onClick=${() => { setJsonText(JSON.stringify(doc, null, 2)); setView('json'); }}>${t(`${K}.actions.json`)}</button>
+          </div>
+          <div class="pf-agd-crew-actions">
+            <button type="button" class="btn-primary btn-sm" disabled=${busyAny || !online} onClick=${validate}>
+              ${busy === 'validate' ? t(`${K}.actions.validating`) : t(`${K}.actions.validate`)}
+            </button>
+            <button type="button" class="btn-outline btn-sm" disabled=${busyAny || !validated || !online} onClick=${publish}>
+              ${busy === 'publish' ? t(`${K}.actions.publishing`) : t(`${K}.actions.publish`)}
+            </button>
+            <button type="button" class="btn-ghost btn-sm" disabled=${busyAny} onClick=${saveDraft}>${t(`${K}.actions.saveDraft`)}</button>
+            ${state?.draft && html`<button type="button" class="btn-ghost btn-sm" disabled=${busyAny} onClick=${discardDraft}>${t(`${K}.actions.discardDraft`)}</button>`}
+            ${!published && html`<button type="button" class="btn-ghost btn-sm" disabled=${busyAny} onClick=${() => { setValidation(null); setDoc(null); }}>${t(`${K}.actions.changeTemplate`)}</button>`}
+          </div>
+        </div>
+        ${status === 'draft' && html`<div class="pf-agd-help-text pf-agd-crew-note">${t(`${K}.needsValidation`)}${state?.draft || published ? ' ' + t(`${K}.unpublishedEdits`) : ''}</div>`}
+        ${status === 'invalid' && html`
+          <div class="pf-agd-crew-problems poster-row--thing">
+            <div class="pf-agd-crew-problems-title">${t(`${K}.messages.problems`, { n: validation.errors.length })}</div>
+            <${ErrorLines} lines=${errors.general} />
+          </div>
         `}
-      <//>
+        <div class="pf-agd-help-text pf-agd-crew-limit">${t(`${K}.limitNote`)}</div>
+
+        ${view === 'json' ? html`
+          <div class="pf-agd-crew-jsonview">
+            <textarea class="input-field pf-agd-crew-json pf-agd-crew-json--full" rows="24" value=${jsonText}
+              onInput=${e => setJsonText(e.target.value)} onBlur=${applyJson} spellcheck="false"></textarea>
+            ${jsonError && html`<div class="pf-agd-crew-parse-error">${t(`${K}.messages.jsonInvalid`, { err: jsonError })}</div>`}
+          </div>
+        ` : html`
+          <${IdentitySection} doc=${doc} onChange=${edit} errors=${errors} />
+          <${CrewSection} doc=${doc} onChange=${edit} errors=${errors} runtimeTools=${menu?.tools} decideTools=${decideTools} />
+          <${RunSection} doc=${doc} onChange=${edit} errors=${errors} />
+          <${ContractSection} doc=${doc} onChange=${edit} errors=${errors} />
+        `}
+
+        <section class="pf-agd-crew-section pf-agd-crew-try">
+          <div class="pf-agd-section-title">${t(`${K}.actions.tryRun`)}</div>
+          <div class="pf-agd-help-text">${t(`${K}.actions.tryNoTrace`)}</div>
+          <div class="pf-agd-crew-try-row">
+            <input type="text" class="input-field input-sm" placeholder=${t(`${K}.actions.tryPrompt`)} value=${tryPrompt}
+              onInput=${e => setTryPrompt(e.target.value)} disabled=${!canTry || !online} />
+            <button type="button" class="btn-outline btn-sm" disabled=${busyAny || !canTry || !online || !tryPrompt.trim()} onClick=${tryOnce}>
+              ${tryRun?.status === 'running' || tryRun?.status === 'starting' ? t(`${K}.actions.tryRunning`) : t(`${K}.actions.tryRun`)}
+            </button>
+          </div>
+          ${tryRun && (tryRun.status === 'done' || tryRun.status === 'failed') && html`
+            <div class="pf-agd-crew-try-result ${tryRun.status === 'failed' ? 'pf-agd-crew-try-result--failed' : ''}">
+              <div class="pf-agd-crew-sub">${t(`${K}.actions.tryTitle`)}</div>
+              <pre class="pf-agd-crew-try-output">${tryOutput(tryRun)}</pre>
+            </div>
+          `}
+        </section>
+      `}
+
+      ${Array.isArray(state?.versions) && state.versions.length > 0 && html`
+        <section class="pf-agd-crew-section">
+          <div class="pf-agd-section-title">${t(`${K}.versions.title`)}</div>
+          <div class="pf-agd-help-text">${t(`${K}.versions.hint`, { n: state.version_window })}</div>
+          <ul class="pf-agd-crew-versions">
+            ${state.versions.map(v => html`
+              <li key=${v.revision}>
+                <span>${t(`${K}.versions.byAt`, { rev: v.revision, when: v.publishedAt ? timeAgo(v.publishedAt) : '' })}</span>
+                ${published?.revision === v.revision
+                  ? html`<span class="pf-agd-badge pf-agd-badge--active">${t(`${K}.versions.live`)}</span>`
+                  : html`<button type="button" class="btn-ghost btn-sm" disabled=${busyAny || !online} onClick=${() => restore(v.revision)}>${t(`${K}.actions.restore`)}</button>`}
+              </li>
+            `)}
+          </ul>
+        </section>
+      `}
     </div>
   `;
 }

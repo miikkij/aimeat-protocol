@@ -13,15 +13,12 @@
  *   · threadParagraphs (thread → speakable paragraphs, each message prefixed by its sender).
  * @usage import { BubbleSpeakButton, ThreadReadAloud } from './inbox-tab/read-aloud.js';
  * @version-history
- *   v1.1.0 -- 2026-09-22 -- Both controls are the shared set's actions (words, no emoji): Listen,
- *     Pause, Continue and a cross on the thread head; Listen and Stop reading on a message.
  *   v1.0.0 — 2026-07-31 — Initial version: per-message and whole-thread read-aloud in the Inbox tab.
  */
 import { h } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
-import { Action } from '/components/poster-parts.js';
 import { t } from '/js/i18n.js';
 import {
   isSpeechSupported, subscribeSpeech, getSpeechState, speak, stop, pause, resume, textToParagraphs,
@@ -52,8 +49,10 @@ export function BubbleSpeakButton({ msgId, body }) {
   if (!paragraphs.length) return null;
   const on = phase === 'speaking' || phase === 'paused';
   return html`
-    <${Action} kind="text" title=${on ? t('inbox.speak.stop') : t('inbox.speak.message')}
-      onClick=${() => (on ? stop() : speak(id, paragraphs))}>${on ? t('inbox.speak.stop') : t('inbox.speak.listen')}<//>`;
+    <button class=${`inbox-bubble-act${on ? ' inbox-bubble-act--on' : ''}`}
+      title=${on ? t('inbox.speak.stop') : t('inbox.speak.message')}
+      aria-label=${on ? t('inbox.speak.stop') : t('inbox.speak.message')} aria-pressed=${on}
+      onClick=${() => (on ? stop() : speak(id, paragraphs))}>${on ? '⏹' : '🔊'}</button>`;
 }
 
 /** The open thread as speakable paragraphs: each message announces its sender, then its body. Messages
@@ -87,7 +86,13 @@ export function ThreadReadAloud({ thread, peerLabelText, convId }) {
     speak(id, threadParagraphs(thread, t('inbox.quoteYou'), peerLabelText));
   };
   return html`
-    <${Action} onClick=${onClick} title=${t('inbox.speak.thread')}>${label}<//>
-    ${phase ? html`<${Action} kind="text" onClick=${() => stop()}
-      title=${t('inbox.speak.stop')} label=${t('inbox.speak.stop')}>✗<//>` : null}`;
+    <span class="inbox-speak-group">
+      <button class=${`btn-ghost btn-sm inbox-speak-btn${phase ? ' inbox-speak-btn--on' : ''}`}
+        onClick=${onClick} title=${t('inbox.speak.thread')} aria-label=${t('inbox.speak.thread')}>
+        <span class="inbox-speak-ico">${phase === 'speaking' ? '⏸' : '🔊'}</span>
+        <span class="inbox-ai-btn-label">${label}</span>
+      </button>
+      ${phase ? html`<button class="btn-ghost btn-sm inbox-speak-stop" onClick=${() => stop()}
+        title=${t('inbox.speak.stop')} aria-label=${t('inbox.speak.stop')}>✕</button>` : null}
+    </span>`;
 }

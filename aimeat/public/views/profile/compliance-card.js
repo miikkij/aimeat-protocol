@@ -24,8 +24,6 @@
  *   import { ComplianceCard } from './compliance-card.js';
  *   html`<${ComplianceCard} />`
  * @version-history
- *   2026-09-22 -- Composed from the shared set: the AI page's opening section, the four counts as a
- *     numeral band, the entries as key-value rows; it no longer uses the card rules in profile.css.
  *   2026-09-13 — V1: compose page and B1 section headings from the shared poster classes.
  *   v1.0.0 — 2026-08-23 — BR-02, the per-owner slice.
  */
@@ -36,8 +34,6 @@ const html = htm.bind(h);
 import { t, tOr } from '/js/i18n.js';
 import { apiGet } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
-import { NumeralBand, Stack, KeyValue, Chip, Text } from '/components/poster-parts.js';
-import { CardSection, StatusLine } from './ai/frame.js';
 
 /** One limit in the reader's language, falling back to the sentence the node sent. */
 function limitText(item) {
@@ -88,37 +84,68 @@ export function ComplianceCard() {
   const undocumented = models.filter(m => !documented.includes(m));
 
   return html`
-    <${CardSection} id="compliance-mine" title=${t('complianceMine.title')} description=${t('complianceMine.desc')}
-      open=${!collapsed} onToggle=${() => setCollapsed(c => !c)}>
-      ${loading && html`<${Text} tone="muted">${t('complianceMine.loading')}<//>`}
-      ${error && html`<${StatusLine} error=${true}>${error}<//>`}
+    <div class="pf-card pf-cmp">
+      <button type="button" class="pf-cmp-head" onClick=${() => setCollapsed(c => !c)}
+              aria-expanded=${!collapsed}>
+        <span class="poster-section-title">${t('complianceMine.title')}</span>
+        <span class="pf-cmp-chevron">${collapsed ? '+' : '−'}</span>
+      </button>
+      <p class="section-desc">${t('complianceMine.desc')}</p>
 
-      ${report && html`
-        <${NumeralBand} tone="plain" size="small" items=${[
-          { id: 'calls', label: t('complianceMine.calls'), value: usage.calls ?? 0 },
-          { id: 'models', label: t('complianceMine.models'), value: models.length },
-          { id: 'undocumented', label: t('complianceMine.undocumented'), value: undocumented.length, tone: undocumented.length > 0 ? 'coral' : undefined },
-          { id: 'entries', label: t('complianceMine.entries'), value: entries.length },
-        ]} />
+      ${!collapsed && html`
+        <div class="pf-cmp-body">
+          ${loading && html`<p class="pf-cmp-muted">${t('complianceMine.loading')}</p>`}
+          ${error && html`<p class="pf-cmp-error">${error}</p>`}
 
-        ${undocumented.length > 0 && html`
-          <${Text} tone="coral">${t('complianceMine.undocumentedNote')}<//>
-          <${Stack} direction="wrap" density="compact">${undocumented.map(m => html`<${Chip} key=${m}>${m}<//>`)}<//>
-        `}
+          ${report && html`
+            <div class="pf-cmp-stats">
+              <div class="pf-cmp-stat">
+                <span class="pf-cmp-num">${usage.calls ?? 0}</span>
+                <span class="pf-cmp-lbl">${t('complianceMine.calls')}</span>
+              </div>
+              <div class="pf-cmp-stat">
+                <span class="pf-cmp-num">${models.length}</span>
+                <span class="pf-cmp-lbl">${t('complianceMine.models')}</span>
+              </div>
+              <div class=${'pf-cmp-stat' + (undocumented.length > 0 ? ' pf-cmp-stat-warn' : '')}>
+                <span class="pf-cmp-num">${undocumented.length}</span>
+                <span class="pf-cmp-lbl">${t('complianceMine.undocumented')}</span>
+              </div>
+              <div class="pf-cmp-stat">
+                <span class="pf-cmp-num">${entries.length}</span>
+                <span class="pf-cmp-lbl">${t('complianceMine.entries')}</span>
+              </div>
+            </div>
 
-        ${entries.length > 0 && html`
-          <${Text} kind="heading" size="small">${t('complianceMine.entriesTitle')}<//>
-          <${Text} tone="muted">${t('complianceMine.entriesNote')}<//>
-          <div>
-            ${entries.map(e => html`<${KeyValue} key=${e.id} label=${e.title || e.id} value=${e.risk?.label || e.risk?.class || '—'} />`)}
-          </div>
-        `}
+            ${undocumented.length > 0 && html`
+              <p class="pf-cmp-note pf-cmp-note-warn">${t('complianceMine.undocumentedNote')}</p>
+              <ul class="pf-cmp-models">
+                ${undocumented.map(m => html`<li key=${m}><span class="mono">${m}</span></li>`)}
+              </ul>
+            `}
 
-        ${entries.length === 0 && html`<${Text} tone="muted">${t('complianceMine.entriesEmpty')}<//>`}
+            ${entries.length > 0 && html`
+              <h4 class="pf-cmp-sub">${t('complianceMine.entriesTitle')}</h4>
+              <p class="pf-cmp-note">${t('complianceMine.entriesNote')}</p>
+              <ul class="pf-cmp-entries">
+                ${entries.map(e => html`
+                  <li key=${e.id}>
+                    <span class="pf-cmp-entry-title">${e.title || e.id}</span>
+                    <span class="pf-cmp-entry-risk">${e.risk?.label || e.risk?.class || '—'}</span>
+                  </li>
+                `)}
+              </ul>
+            `}
 
-        <${Text} kind="heading" size="small">${t('complianceMine.limitsTitle')}<//>
-        <${Stack} density="compact">${(report.not_covered ?? []).map((l, i) => html`<${Text} key=${l.code || i}>${limitText(l)}<//>`)}<//>
+            ${entries.length === 0 && html`<p class="pf-cmp-note">${t('complianceMine.entriesEmpty')}</p>`}
+
+            <h4 class="pf-cmp-sub">${t('complianceMine.limitsTitle')}</h4>
+            <ul class="pf-cmp-limits">
+              ${(report.not_covered ?? []).map((l, i) => html`<li key=${l.code || i}>${limitText(l)}</li>`)}
+            </ul>
+          `}
+        </div>
       `}
-    <//>
+    </div>
   `;
 }

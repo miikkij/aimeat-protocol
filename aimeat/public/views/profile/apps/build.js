@@ -10,10 +10,6 @@
  * @structure secAgents · secBuild · UploadForm · buildAgentAuthoringPrompt · skillPrompt
  * @usage import { secAgents, secBuild } from './build.js';
  * @version-history
- *   2026-09-22 -- The two file pickers are the shared file field.
- *   2026-09-22 -- Composed from the shared component set: KeyValue for agents and skills, Chips
- *     for the pairs, Field for the editor and the form, Actions for the doors; no own CSS. The two
- *     file inputs stay native inputs until the set's Field takes a file (reported).
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v1.0.0 — 2026-09-02 — Initial. The crew-definition editor and its prompt moved here from
  *     apps-tab.js v1.8.0, where they sat on every card.
@@ -22,7 +18,8 @@ import { h } from 'preact';
 import htm from 'htm';
 import { useState, useRef } from 'preact/hooks';
 const html = htm.bind(h);
-import { Section, Stack, Columns, KeyValue, Field, Action, CopyAction, Chip, Text, Surface } from '/components/poster-parts.js';
+import { CopyButton } from '/components/CopyButton.js';
+import { Section } from '/views/profile/organisms/poster-parts.js';
 import { a, nameOf, appRef, goTab } from './frame.js';
 
 /* ── 04 · Agents and skills ───────────────────────────────────────────────────────────────────── */
@@ -36,72 +33,68 @@ export function secAgents(ctx) {
   const withSkill = apps.filter((x) => (bound[appRef(x)] || []).length).length;
   const picked = apps.find((x) => x.filename === ctx.agentPick) || null;
   return html`
-    <${Section} id="ap-agents" title=${a('secAgents')}>
-      <${Stack}>
-        <div>
-          <${KeyValue} label=${a('agentsLabel')}>
-            <${Stack} density="compact">
-              <span>${withAgents.length ? a('agentsSome', { n: withAgents.length }) : a('agentsNone')}</span>
-              <${Text} kind="caption" tone="muted">${a('agentsNote')}<//>
-              ${withAgents.length ? html`<${Stack} direction="wrap" density="compact">${withAgents.map((x) => html`<${Chip} key=${appRef(x)}>${nameOf(x)} · ${x.manifest.cortex.agents.length}<//>`)}<//>` : null}
-            <//>
-          <//>
-          <${KeyValue} label=${a('skillsLabel')}>
-            <${Stack} density="compact">
-              <span>${pairs.length ? a('skillsCount', { apps: withSkill, skills: pairs.length }) : a('skillsNone')}</span>
-              <${Text} kind="caption" tone="muted">${a('skillsNote', { n: apps.length - withSkill })}<//>
-              ${pairs.length ? html`<${Stack} direction="wrap" density="compact">${pairs.slice(0, 8).map((p) => html`<${Chip} key=${p.skill}>${p.skill} → ${p.app}<//>`)}${pairs.length > 8 ? html`<${Chip} tone="muted">${a('more', { n: pairs.length - 8 })}<//>` : null}<//>` : null}
-            <//>
-          <//>
+    <${Section} id="ap-agents" num="04" title=${a('secAgents')} count=${null}>
+      <div class="ap-kv">
+        <div class="ap-k">${a('agentsLabel')}</div>
+        <div class="ap-v">
+          ${withAgents.length ? a('agentsSome', { n: withAgents.length }) : a('agentsNone')}
+          <small>${a('agentsNote')}</small>
+          ${withAgents.length ? html`<div class="ap-skl">${withAgents.map((x) => html`<span key=${appRef(x)}>${nameOf(x)} · ${x.manifest.cortex.agents.length}</span>`)}</div>` : null}
         </div>
-        <${Stack} direction="wrap">
-          <${Action} onClick=${() => goTab('skills')}>${a('skillsDoor')}<//>
-          <${CopyAction} text=${skillPrompt(apps)} label=${a('skillPromptDoor')} copiedLabel=${a('promptCopied')} onCopied=${() => ctx.showToast?.(a('promptCopiedToast'))} />
-          <${Action} expanded=${!!ctx.agentEditorOpen} onClick=${() => ctx.setAgentEditorOpen(!ctx.agentEditorOpen)}>${ctx.agentEditorOpen ? a('agentEditClose') : a('agentEditOpen')}<//>
-        <//>
-        ${ctx.agentEditorOpen ? html`
-          <${Surface} kind="aside">
-            <${Stack}>
-              <${Text}>${a('agentEditHint')}<//>
-              <${Field} type="select" label=${a('agentEditPick')} value=${ctx.agentPick} onChange=${(e) => ctx.pickAgentApp(e.target.value)}
-                options=${[{ value: '', label: '–' }, ...apps.map((x) => ({ value: x.filename, label: `${nameOf(x)}${x.manifest?.cortex?.agents?.length ? ` · ${x.manifest.cortex.agents.length}` : ''}` }))]} />
-              ${picked ? html`
-                <${Field} type="textarea" rows=${12} spellCheck=${false} value=${ctx.agentJson} onInput=${(e) => ctx.setAgentJson(e.target.value)} />
-                <${Stack} direction="wrap">
-                  <${Action} disabled=${ctx.busy === 'agents'} onClick=${() => ctx.saveAgents(picked)}>${a('agentEditSave')}<//>
-                  <${CopyAction} text=${ctx.agentPromptFor(picked)} label=${a('agentEditCopy')} copiedLabel=${a('promptCopied')} onCopied=${() => ctx.showToast?.(a('agentEditCopied'))} />
-                <//>
-                <${Text} kind="caption" tone="muted">${a('agentClearHint')}<//>` : null}
-            <//>
-          <//>` : null}
-      <//>
+        <div class="ap-k">${a('skillsLabel')}</div>
+        <div class="ap-v">
+          ${pairs.length ? a('skillsCount', { apps: withSkill, skills: pairs.length }) : a('skillsNone')}
+          <small>${a('skillsNote', { n: apps.length - withSkill })}</small>
+          ${pairs.length ? html`<div class="ap-skl">${pairs.slice(0, 8).map((p) => html`<span key=${p.skill}>${p.skill} → ${p.app}</span>`)}${pairs.length > 8 ? html`<span>${a('more', { n: pairs.length - 8 })}</span>` : null}</div>` : null}
+        </div>
+      </div>
+      <div class="og-doors ap-doors">
+        <button type="button" class="og-door og-door--quiet" onClick=${() => goTab('skills')}>${a('skillsDoor')}</button>
+        <${CopyButton} text=${skillPrompt(apps)} className="og-door og-door--quiet" label=${a('skillPromptDoor')} copiedLabel=${a('promptCopied')} onCopied=${() => ctx.showToast?.(a('promptCopiedToast'))} />
+        <button type="button" class="og-door og-door--quiet" onClick=${() => ctx.setAgentEditorOpen(!ctx.agentEditorOpen)}>${ctx.agentEditorOpen ? a('agentEditClose') : a('agentEditOpen')}</button>
+      </div>
+      ${ctx.agentEditorOpen ? html`
+        <div class="ap-panel poster-aside">
+          <p class="ap-panel-lead">${a('agentEditHint')}</p>
+          <label class="ap-field">
+            <span class="og-label">${a('agentEditPick')}</span>
+            <select class="og-input" value=${ctx.agentPick} onChange=${(e) => ctx.pickAgentApp(e.target.value)}>
+              <option value="">–</option>
+              ${apps.map((x) => html`<option key=${x.filename} value=${x.filename}>${nameOf(x)}${x.manifest?.cortex?.agents?.length ? ` · ${x.manifest.cortex.agents.length}` : ''}</option>`)}
+            </select>
+          </label>
+          ${picked ? html`
+            <textarea class="og-input ap-json" rows="12" spellcheck="false" value=${ctx.agentJson} onInput=${(e) => ctx.setAgentJson(e.target.value)}></textarea>
+            <div class="og-doors ap-doors">
+              <button type="button" class="og-door" disabled=${ctx.busy === 'agents'} onClick=${() => ctx.saveAgents(picked)}>${a('agentEditSave')}</button>
+              <${CopyButton} text=${ctx.agentPromptFor(picked)} className="og-door og-door--quiet" label=${a('agentEditCopy')} copiedLabel=${a('promptCopied')} onCopied=${() => ctx.showToast?.(a('agentEditCopied'))} />
+            </div>
+            <p class="ap-hint">${a('agentClearHint')}</p>` : null}
+        </div>` : null}
     <//>`;
 }
 
 /* ── 05 · Build a new one ─────────────────────────────────────────────────────────────────────── */
 
-export function secBuild(ctx, { formOnly }) {
+export function secBuild(ctx, { formOnly, num }) {
   return html`
-    <${Section} id="ap-build" title=${formOnly ? a('uploadLabel') : a('secBuild')} count=${formOnly ? null : a('secBuildSub')}>
-      <${Stack}>
-        ${formOnly ? null : html`
-          <${Stack} direction="wrap">
-            <${CopyAction} text=${ctx.buildPrompt} label=${a('promptDoor')} copiedLabel=${a('promptCopied')} disabled=${!ctx.buildPrompt} onCopied=${() => ctx.showToast?.(a('promptCopiedToast'))} />
-            <${Action} href="/v1/aimeat-os" target="_blank">${a('guideDoor')}<//>
-          <//>
-          <${Action} kind="text" onClick=${() => goTab('appdev')}>${a('appdevDoor')}<//>
-          <${Text} kind="caption" tone="muted">${a('buildHint')}<//>
-          <${Text} kind="label">${a('uploadLabel')}<//>`}
-        <${UploadForm} onUpload=${ctx.upload} busy=${ctx.busy === 'upload'} />
-        <${Text} kind="caption" tone="muted">${a('uploadHint')}<//>
-      <//>
+    <${Section} id="ap-build" num=${num} title=${formOnly ? a('uploadLabel') : a('secBuild')} count=${formOnly ? null : a('secBuildSub')}>
+      ${formOnly ? null : html`
+        <div class="og-doors ap-doors ap-doors--top">
+          <${CopyButton} text=${ctx.buildPrompt} className="og-door" label=${a('promptDoor')} copiedLabel=${a('promptCopied')} disabled=${!ctx.buildPrompt} onCopied=${() => ctx.showToast?.(a('promptCopiedToast'))} />
+          <a class="og-door" href="/v1/aimeat-os" target="_blank" rel="noopener">${a('guideDoor')}</a>
+          <button type="button" class="og-door og-door--quiet" onClick=${() => goTab('appdev')}>${a('appdevDoor')}</button>
+        </div>
+        <p class="ap-hint">${a('buildHint')}</p>
+        <span class="og-label ap-form-label">${a('uploadLabel')}</span>`}
+      <${UploadForm} onUpload=${ctx.upload} busy=${ctx.busy === 'upload'} />
+      <p class="ap-hint">${a('uploadHint')}</p>
     <//>`;
 }
 
 /**
  * The form for a finished file. Its four fields are its own until "Publish the file" sends them:
  * a re-render of the page above must not empty a half-filled form.
- * The file pickers are native inputs: the set's Field has no file type yet (reported as a missing part).
  */
 function UploadForm({ onUpload, busy }) {
   const fileRef = useRef(null);
@@ -110,22 +103,20 @@ function UploadForm({ onUpload, busy }) {
   const [code, setCode] = useState('');
   const [roadmap, setRoadmap] = useState('');
   return html`
-    <${Stack}>
-      <${Columns} collapse=${640}>
-        <${Field} type="file" label=${a('fileLabel')} inputRef=${fileRef} accept=".html,.htm" />
-        <${Field} type="file" label=${a('shotLabel')} inputRef=${shotRef} accept="image/*" />
-      <//>
-      <${Field} type="textarea" label=${a('descLabel')} rows=${2} maxLength=${2000} placeholder=${a('descPlaceholder')} value=${desc} onInput=${(e) => setDesc(e.target.value)} />
-      <${Field} label=${a('codeLabel')} placeholder=${a('codePlaceholder')} value=${code} onInput=${(e) => setCode(e.target.value)} />
-      <${Field} type="textarea" label=${a('roadPublishLabel')} rows=${2} maxLength=${600} value=${roadmap} onInput=${(e) => setRoadmap(e.target.value)} />
-      <${Text} kind="caption" tone="muted">${a('roadPublishHint')}<//>
-      <${Stack} direction="horizontal" align="center">
-        <${Action} disabled=${busy} onClick=${async () => {
+    <div class="ap-form">
+      <label class="ap-field"><span class="og-label">${a('fileLabel')}</span><input type="file" class="og-input ap-file" ref=${fileRef} accept=".html,.htm" /></label>
+      <label class="ap-field"><span class="og-label">${a('shotLabel')}</span><input type="file" class="og-input ap-file" ref=${shotRef} accept="image/*" /></label>
+      <label class="ap-field ap-field--wide"><span class="og-label">${a('descLabel')}</span><textarea class="og-input" rows="2" maxLength="2000" placeholder=${a('descPlaceholder')} value=${desc} onInput=${(e) => setDesc(e.target.value)}></textarea></label>
+      <label class="ap-field"><span class="og-label">${a('codeLabel')}</span><input class="og-input" placeholder=${a('codePlaceholder')} value=${code} onInput=${(e) => setCode(e.target.value)} /></label>
+      <label class="ap-field ap-field--wide"><span class="og-label">${a('roadPublishLabel')}</span><textarea class="og-input" rows="2" maxLength="600" value=${roadmap} onInput=${e => setRoadmap(e.target.value)} /></label>
+      <p class="ap-hint ap-field--wide">${a('roadPublishHint')}</p>
+      <div class="ap-field ap-field--send">
+        <button type="button" class="og-door" disabled=${busy} onClick=${async () => {
           const ok = await onUpload({ file: fileRef.current?.files?.[0], description: desc, screenshot: shotRef.current?.files?.[0], accessCode: code, roadmap });
           if (ok) { setDesc(''); setCode(''); setRoadmap(''); if (fileRef.current) fileRef.current.value = ''; if (shotRef.current) shotRef.current.value = ''; }
-        }}>${a('publishFile')}<//>
-      <//>
-    <//>`;
+        }}>${a('publishFile')}</button>
+      </div>
+    </div>`;
 }
 
 /**

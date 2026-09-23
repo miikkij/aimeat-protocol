@@ -14,15 +14,6 @@
  * @usage html`<${NoteCard} note=${note} showToast=${showToast} orgNames=${orgNames} settings=${settings}
  *                autoEnrich=${auto} onChanged=${loadInbox} onOrgsChanged=${loadOrgNames} onDelete=${handleDelete} />`
  * @version-history
- *   2026-09-22 -- The set's newer props: done and skipped plan steps and unticked chunks are muted
- *     rows (a chunk is a row with its tick as the mark), the enriched preview and each chunk's body
- *     scroll inside a capped height, Delete is in the danger tone.
- *   2026-09-22 -- Composed from the shared set so notebook.css could go: a note is a roster row (its
- *     time, its actions, the note and its open flows in the body), the peek view is the shared clipped
- *     preview, each flow is a box of shared fields and actions, plan steps are rows with chips, the
- *     classify progress is timeline markers, an error is danger text. Only each flow's commit is a loud
- *     action. The emoji (link, plus) are gone, ▸ is a slash, and the view switch is an icon chevron;
- *     a chunk whose home the split will create shows its chip on the sun instead of a plus.
  *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
  *   v1.1.1 — 2026-06-23 — Fix: Skip on an enrichment step was disabled whenever ANY step was running
  *     (so during an auto-run batch every Skip was dead). Skip is now only disabled for the step actually
@@ -48,7 +39,6 @@ import { Markdown } from '/components/Markdown.js';
 import { OpenRouterSettings } from './openrouter-settings.js';
 import { NEW, NB_STEPS, relTime, firstLine, noteText } from './notebook-helpers.js';
 import { swallowed } from '/js/swallowed.js';
-import { Stack, Field, ListRow, Chip, Action, Surface, Text } from '/components/poster-parts.js';
 
 export default function NoteCard({ note, showToast, orgNames, settings, autoEnrich, onChanged, onOrgsChanged, onDelete }) {
   const [view, setView] = useState('peek');               // 'line' | 'peek' | 'full'
@@ -313,16 +303,11 @@ export default function NoteCard({ note, showToast, orgNames, settings, autoEnri
 
   // ── Render helpers ──
 
-  // A home that does not exist yet (the split will create it) is the sun chip; an existing one is plain.
   const orgLabelFor = (target) => {
     if (target.organismId) return orgNames[target.organismId] || target.organismName || target.organismId;
-    if (target.createNew?.organismName || target.organismName) return target.createNew?.organismName || target.organismName;
+    if (target.createNew?.organismName || target.organismName) return `➕ ${target.createNew?.organismName || target.organismName}`;
     return t('profile.notebook.distributeDefaultHome');
   };
-  const orgIsNew = (target) => !target.organismId && !!(target.createNew?.organismName || target.organismName);
-
-  // A step kind as a chip: the librarian plain, a delegation on the sun, reasoning quiet.
-  const kindTone = (kind) => kind === 'delegate' ? 'sun' : kind === 'librarian_assess' ? 'plain' : 'muted';
 
   const renderEnrichPanel = () => {
     const { plan, enrichments, runningStepId, doneStepIds, skippedStepIds, stepStatus = {} } = enrich;
@@ -332,49 +317,52 @@ export default function NoteCard({ note, showToast, orgNames, settings, autoEnri
     const anyDone = enrichments.length > 0;
     const preview = composeEnrichedMarkdown(baseText(), enrichments);
     return html`
-      <${Surface} kind="box"><${Stack}>
-        <${Text} tone="muted">${plan?.summary || ''}${conf !== null ? ` · ${conf}%` : ''}<//>
+      <div class="pf-nb-enrich poster-row--thing">
+        <div class="text-meta-sm pf-nb-enrich-summary">${plan?.summary || ''}${conf !== null ? ` · ${conf}%` : ''}</div>
         ${steps.length === 0
-          ? html`<${Text} tone="muted">${t('profile.notebook.planNoSteps')}<//>`
+          ? html`<div class="empty">${t('profile.notebook.planNoSteps')}</div>`
           : html`
-            <${Stack} density="compact">
+            <ol class="pf-nb-plan-steps">
               ${steps.map(step => {
                 const done = doneStepIds.includes(step.id);
                 const skipped = skippedStepIds.includes(step.id);
                 const running = runningStepId === step.id;
                 return html`
-                  <${ListRow} key=${step.id} name=${step.title} detailKind="text" muted=${done || skipped} detail=${step.description}
-                    value=${html`<${Stack} direction="wrap" align="end" density="compact">
-                      <${Chip} tone=${kindTone(step.kind)}>${t('profile.notebook.kind_' + step.kind)}<//>
-                      ${done && html`<${Chip} tone="sun">✓<//>`}
-                      ${skipped && html`<${Chip} tone="muted">${t('profile.notebook.skipped')}<//>`}
-                    <//>`}
-                    actions=${!done && !skipped && html`
-                      <${Action} disabled=${!!runningStepId} onClick=${() => runOneStep(step)}>${running ? '…' : t('profile.notebook.runStep')}<//>
-                      <${Action} kind="text" disabled=${runningStepId === step.id} onClick=${() => handleSkipStep(step)}>${t('profile.notebook.skipStep')}<//>`}>
-                    ${(step.kind === 'delegate' && step.agent || step.rationale || (running && step.kind === 'delegate')) && html`<${Stack} density="compact">
-                      ${step.kind === 'delegate' && step.agent && html`<${Text} kind="mono" tone="muted">→ ${step.agent}<//>`}
-                      ${step.rationale && html`<${Text} kind="caption" tone="muted">${step.rationale}<//>`}
-                      ${running && step.kind === 'delegate' && html`<${Text} kind="caption" tone="coral">${t('profile.notebook.delegateWaiting').replace('{agent}', step.agent || '')}${stepStatus[step.id] ? ` (${escHtml(stepStatus[step.id])})` : ''}<//>`}
-                    <//>`}
-                  <//>`;
+                  <li key=${step.id} class="pf-nb-plan-step ${done ? 'done' : skipped ? 'skipped' : ''} poster-row--thing">
+                    <div class="pf-nb-plan-step-head">
+                      <span class="badge ${step.kind === 'librarian_assess' ? 'badge-info' : step.kind === 'delegate' ? 'badge-success' : ''}">${t('profile.notebook.kind_' + step.kind)}</span>
+                      <span class="pf-nb-plan-step-title">${step.title}</span>
+                      ${step.kind === 'delegate' && step.agent && html`<span class="text-meta-sm">→ ${step.agent}</span>`}
+                      ${done && html`<span class="pf-nb-plan-tag">✓</span>`}
+                      ${skipped && html`<span class="pf-nb-plan-tag">${t('profile.notebook.skipped')}</span>`}
+                    </div>
+                    ${step.description && html`<div class="text-meta-sm">${step.description}</div>`}
+                    ${step.rationale && html`<div class="text-meta-sm pf-nb-plan-why">${step.rationale}</div>`}
+                    ${running && step.kind === 'delegate' && html`<div class="text-meta-sm pf-nb-plan-why">${t('profile.notebook.delegateWaiting').replace('{agent}', step.agent || '')}${stepStatus[step.id] ? ` (${escHtml(stepStatus[step.id])})` : ''}</div>`}
+                    ${!done && !skipped && html`
+                      <div class="pf-nb-plan-step-btns">
+                        <button class="btn-primary btn-sm" disabled=${!!runningStepId} onClick=${() => runOneStep(step)}>${running ? '…' : t('profile.notebook.runStep')}</button>
+                        <button class="btn-ghost btn-sm" disabled=${runningStepId === step.id} onClick=${() => handleSkipStep(step)}>${t('profile.notebook.skipStep')}</button>
+                      </div>`}
+                  </li>`;
               })}
-            <//>
-            ${!allHandled && html`<${Stack} direction="horizontal">
-              <${Action} disabled=${!!runningStepId} onClick=${handleRunAll}>
+            </ol>
+            ${!allHandled && html`
+              <button class="btn-outline btn-sm" disabled=${!!runningStepId} onClick=${handleRunAll}>
                 ${runningStepId ? t('profile.notebook.running') : t('profile.notebook.runAll')}
-              <//>
-            <//>`}
+              </button>`}
           `}
         ${anyDone && html`
-          <${Text} kind="label">${t('profile.notebook.enrichedPreview')}<//>
-          <${Surface} kind="plain" height="scroll"><${Markdown} text=${preview} /><//>`}
-        <${Stack} direction="wrap" align="center">
-          <${Action} kind="primary" disabled=${!!runningStepId} onClick=${handleFileEnriched}>${t('profile.notebook.fileEnriched')}<//>
-          <${Action} disabled=${!!runningStepId} onClick=${handleSplitEnriched}>${t('profile.notebook.splitEnriched')}<//>
-          <${Action} onClick=${() => setEnrich(null)}>${t('profile.notebook.cancelBtn')}<//>
-        <//>
-      <//><//>
+          <div class="pf-nb-enrich-preview">
+            <div class="pf-nb-suggest-label">${t('profile.notebook.enrichedPreview')}</div>
+            <div class="pf-nb-enrich-preview-body"><${Markdown} text=${preview} /></div>
+          </div>`}
+        <div class="pf-nb-suggest-actions">
+          <button class="btn-primary" disabled=${!!runningStepId} onClick=${handleFileEnriched}>${t('profile.notebook.fileEnriched')}</button>
+          <button class="btn-outline btn-sm" disabled=${!!runningStepId} onClick=${handleSplitEnriched}>${t('profile.notebook.splitEnriched')}</button>
+          <button class="btn-ghost btn-sm" onClick=${() => setEnrich(null)}>${t('profile.notebook.cancelBtn')}</button>
+        </div>
+      </div>
     `;
   };
 
@@ -382,21 +370,28 @@ export default function NoteCard({ note, showToast, orgNames, settings, autoEnri
     const { chunks, busy, filedCount } = distrib;
     const selectedCount = chunks.filter(c => c.include).length;
     return html`
-      <${Surface} kind="box"><${Stack}>
-        <${Text} tone="muted">${(t('profile.notebook.distributeIntro') || '{n} pieces').replace('{n}', String(chunks.length))}<//>
-        ${chunks.map((c, i) => html`
-          <${ListRow} key=${i} name=${c.title} muted=${!c.include}
-            mark=${html`<${Field} type="checkbox" ariaLabel=${c.title} value=${c.include} disabled=${busy} onChange=${() => toggleChunk(i)} />`}
-            value=${html`<${Chip} tone=${orgIsNew(c) ? 'sun' : 'plain'}>${orgLabelFor(c)}${c.workspaceName ? ` / ${c.workspaceName}` : ''}<//>`}>
-            <${Surface} kind="plain" height="scroll"><${Markdown} text=${c.markdown} /><//>
-          <//>`)}
-        <${Stack} direction="wrap" align="center">
-          <${Action} kind="primary" disabled=${busy || selectedCount === 0} onClick=${handleDistributeCommit}>
+      <div class="pf-nb-enrich poster-row--thing">
+        <div class="text-meta-sm pf-nb-enrich-summary">${(t('profile.notebook.distributeIntro') || '{n} pieces').replace('{n}', String(chunks.length))}</div>
+        <ol class="pf-nb-plan-steps">
+          ${chunks.map((c, i) => html`
+            <li key=${i} class="pf-nb-plan-step ${c.include ? '' : 'skipped'} poster-row--thing">
+              <div class="pf-nb-plan-step-head">
+                <label class="pf-nb-chunk-pick">
+                  <input type="checkbox" checked=${c.include} disabled=${busy} onChange=${() => toggleChunk(i)} />
+                  <span class="pf-nb-plan-step-title">${c.title}</span>
+                </label>
+                <span class="badge badge-info">${orgLabelFor(c)}${c.workspaceName ? ` ▸ ${c.workspaceName}` : ''}</span>
+              </div>
+              <div class="pf-nb-enrich-preview-body pf-nb-chunk-body"><${Markdown} text=${c.markdown} /></div>
+            </li>`)}
+        </ol>
+        <div class="pf-nb-suggest-actions">
+          <button class="btn-primary" disabled=${busy || selectedCount === 0} onClick=${handleDistributeCommit}>
             ${busy ? `… ${filedCount}/${selectedCount}` : (t('profile.notebook.distributeCommit') || 'Distribute {n}').replace('{n}', String(selectedCount))}
-          <//>
-          <${Action} disabled=${busy} onClick=${() => setDistrib(null)}>${t('profile.notebook.cancelBtn')}<//>
-        <//>
-      <//><//>
+          </button>
+          <button class="btn-ghost btn-sm" disabled=${busy} onClick=${() => setDistrib(null)}>${t('profile.notebook.cancelBtn')}</button>
+        </div>
+      </div>
     `;
   };
 
@@ -409,107 +404,128 @@ export default function NoteCard({ note, showToast, orgNames, settings, autoEnri
     const docSpaces = ws?.documentSpaces || [];
     const conf = result.suggestion ? Math.round((result.suggestion.confidence || 0) * 100) : null;
     return html`
-      <${Surface} kind="box"><${Stack}>
-        ${result.suggestion?.reason && html`<${Text} tone="muted">${escHtml(result.suggestion.reason)}${conf !== null ? ` · ${conf}%` : ''}<//>`}
-        <${Field} type="select" label=${t('profile.notebook.fieldOrganism')} value=${edit.organismId} onChange=${e => onOrganismChange(e.target.value)}
-          options=${[...orgs.map(o => ({ value: o.id, label: escHtml(o.name) })), { value: NEW, label: t('profile.notebook.newOrganism') }]} />
+      <div class="pf-nb-suggest poster-row--thing">
+        ${result.suggestion?.reason && html`<div class="text-meta-sm pf-nb-suggest-reason">${escHtml(result.suggestion.reason)}${conf !== null ? ` · ${conf}%` : ''}</div>`}
+        <label class="pf-nb-suggest-label">${t('profile.notebook.fieldOrganism')}</label>
+        <select class="input-field" value=${edit.organismId} onChange=${e => onOrganismChange(e.target.value)}>
+          ${orgs.map(o => html`<option key=${o.id} value=${o.id}>${escHtml(o.name)}</option>`)}
+          <option value=${NEW}>➕ ${t('profile.notebook.newOrganism')}</option>
+        </select>
         ${edit.organismId === NEW && html`
-          <${Field} placeholder=${t('profile.notebook.newOrgNamePlaceholder')}
+          <input type="text" class="input-field" placeholder=${t('profile.notebook.newOrgNamePlaceholder')}
             value=${edit.organismName} onInput=${e => patchEdit({ organismName: e.target.value })} />`}
         ${edit.organismId !== NEW && html`
-          <${Field} type="select" label=${t('profile.notebook.fieldWorkspace')} value=${edit.workspaceId} onChange=${e => onWorkspaceChange(e.target.value)}
-            options=${[...workspaces.map(w => ({ value: w.id, label: escHtml(w.name) })), { value: NEW, label: t('profile.notebook.newWorkspace') }]} />`}
+          <label class="pf-nb-suggest-label">${t('profile.notebook.fieldWorkspace')}</label>
+          <select class="input-field" value=${edit.workspaceId} onChange=${e => onWorkspaceChange(e.target.value)}>
+            ${workspaces.map(w => html`<option key=${w.id} value=${w.id}>${escHtml(w.name)}</option>`)}
+            <option value=${NEW}>➕ ${t('profile.notebook.newWorkspace')}</option>
+          </select>`}
         ${(edit.organismId === NEW || edit.workspaceId === NEW) && html`
-          <${Field} placeholder=${t('profile.notebook.newWsNamePlaceholder')}
+          <input type="text" class="input-field" placeholder=${t('profile.notebook.newWsNamePlaceholder')}
             value=${edit.workspaceName} onInput=${e => patchEdit({ workspaceName: e.target.value })} />`}
         ${edit.organismId !== NEW && edit.workspaceId !== NEW && docSpaces.length > 0 && html`
-          <${Field} type="select" label=${t('profile.notebook.fieldSpace')} value=${edit.space} onChange=${e => patchEdit({ space: e.target.value })}
-            options=${docSpaces.map(s => ({ value: s.namespace, label: escHtml(s.name) }))} />`}
+          <label class="pf-nb-suggest-label">${t('profile.notebook.fieldSpace')}</label>
+          <select class="input-field" value=${edit.space} onChange=${e => patchEdit({ space: e.target.value })}>
+            ${docSpaces.map(s => html`<option key=${s.namespace} value=${s.namespace}>${escHtml(s.name)}</option>`)}
+          </select>`}
         ${result.alternatives?.length > 0 && html`
-          <${Stack} direction="wrap" align="center">
-            <${Text} kind="label">${t('profile.notebook.alternatives')}<//>
+          <div class="pf-nb-suggest-alts">
+            <span class="text-meta-sm">${t('profile.notebook.alternatives')}</span>
             ${result.alternatives.map((alt, i) => html`
-              <${Action} key=${i} kind="text" onClick=${() => applyAlternative(alt)}>
-                ${escHtml(alt.organismName || '?')}${alt.workspaceName ? ` / ${escHtml(alt.workspaceName)}` : ''}
-              <//>`)}
-          <//>`}
-        <${Field} label=${t('profile.notebook.fieldTitle')} value=${edit.title} onInput=${e => patchEdit({ title: e.target.value })} />
-        <${Field} type="textarea" rows=${6} label=${t('profile.notebook.fieldBody')} value=${edit.markdown}
-          onInput=${e => patchEdit({ markdown: e.target.value })} />
-        <${Stack} direction="wrap" align="center">
-          <${Action} kind="primary" disabled=${materializing} onClick=${handleMaterialize}>${materializing ? '…' : t('profile.notebook.materializeBtn')}<//>
-          <${Action} onClick=${() => setSuggest(null)}>${t('profile.notebook.cancelBtn')}<//>
-        <//>
-      <//><//>
+              <button key=${i} class="btn-ghost btn-sm" onClick=${() => applyAlternative(alt)}>
+                ${escHtml(alt.organismName || '?')}${alt.workspaceName ? ` ▸ ${escHtml(alt.workspaceName)}` : ''}
+              </button>`)}
+          </div>`}
+        <label class="pf-nb-suggest-label">${t('profile.notebook.fieldTitle')}</label>
+        <input type="text" class="input-field" value=${edit.title} onInput=${e => patchEdit({ title: e.target.value })} />
+        <label class="pf-nb-suggest-label">${t('profile.notebook.fieldBody')}</label>
+        <textarea class="input-field pf-nb-suggest-body" rows="6" value=${edit.markdown}
+          onInput=${e => patchEdit({ markdown: e.target.value })}></textarea>
+        <div class="pf-nb-suggest-actions">
+          <button class="btn-primary" disabled=${materializing} onClick=${handleMaterialize}>${materializing ? '…' : t('profile.notebook.materializeBtn')}</button>
+          <button class="btn-ghost btn-sm" onClick=${() => setSuggest(null)}>${t('profile.notebook.cancelBtn')}</button>
+        </div>
+      </div>
     `;
   };
 
-  /** A failed classify or plan: the reason in the danger tone, the key setup when that is the cause, retry. */
-  const renderError = (err, titleKey, retry, dismiss) => html`
-    <${Surface} kind="box"><${Stack}>
-      <${Text} tone="danger">${t(titleKey)}: ${escHtml(err.message)}<//>
-      ${err.code === 'NO_OPENROUTER_KEY' && html`
-        <${Text} kind="caption" tone="muted">${t('profile.notebook.needKey')}<//>
-        <${OpenRouterSettings} onSettingsChange=${() => {}} />`}
-      <${Stack} direction="wrap" align="center">
-        <${Action} onClick=${retry}>${t('profile.notebook.tryAgain')}<//>
-        <${Action} onClick=${dismiss}>${t('profile.notebook.dismiss')}<//>
-      <//>
-    <//><//>`;
-
-  // The view switch is an icon: a chevron down opens the note further, up folds it back to one line.
-  const chevron = html`<svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2">
-    <path d=${view === 'full' ? 'M5 12l5-5 5 5' : 'M5 8l5 5 5-5'} /></svg>`;
-
-  // A note is a roster row: its time, its actions, and the note itself with its open flows in the body.
-  // The peek view is the shared clipped preview; the full view is the whole Markdown.
   return html`
-    <${ListRow} detail=${relTime(note.updated_at || note.created_at)}
-      actions=${html`
-        <${Action} kind="icon" label=${t('profile.notebook.toggleView')} title=${t('profile.notebook.toggleView')} onClick=${cycleView}>${chevron}<//>
-        <${Action} disabled=${planning} onClick=${() => handleEnrich()}>
-          ${planning ? t('profile.notebook.planning') : t('profile.notebook.enrichBtn')}
-        <//>
-        <${Action} disabled=${sorting} onClick=${() => handleSuggest()}>
-          ${sorting ? t('profile.notebook.sorting') : t('profile.notebook.suggestBtn')}
-        <//>
-        <${Action} disabled=${distributing} onClick=${() => handleDistribute()}>
-          ${distributing ? t('profile.notebook.splitting') : t('profile.notebook.splitBtn')}
-        <//>
-        <${Action} tone="danger" onClick=${() => onDelete(note.key)}>${t('profile.notebook.deleteBtn')}<//>`}>
-      <${Stack}>
-        ${trackMsg && html`
-          <${Surface} kind="aside"><${Stack} direction="wrap" align="between">
-            <${Text}>${(t('inbox.trackParkedBadge') || 'Owes a reply to {peer}').replace('{peer}', escHtml(trackPeer))}<//>
-            <${Action} onClick=${() => setTrackOpen(true)}>${t('inbox.trackResponse')}<//>
-          <//><//>`}
+    <div class="pf-nb-note">
+      ${trackMsg && html`
+        <div class="inbox-track-banner">
+          <span class="inbox-track-banner-ico">🔗</span>
+          <span class="inbox-track-banner-txt">${(t('inbox.trackParkedBadge') || 'Owes a reply to {peer}').replace('{peer}', escHtml(trackPeer))}</span>
+          <button class="btn-primary btn-sm" onClick=${() => setTrackOpen(true)}>${t('inbox.trackResponse')}</button>
+        </div>`}
+      <div class="pf-nb-note-text pf-nb-note-text--${view}">
         ${view === 'line'
-          ? html`<${Text}>${escHtml(firstLine(baseText()))}<//>`
-          : view === 'peek'
-            ? html`<${Surface} kind="preview" density="compact"><${Markdown} text=${baseText()} /><//>`
-            : html`<${Markdown} text=${baseText()} />`}
+          ? html`<span class="pf-nb-note-line">${escHtml(firstLine(baseText()))}</span>`
+          : html`<${Markdown} text=${baseText()} />`}
+      </div>
+      <div class="pf-nb-note-foot">
+        <div class="pf-nb-note-meta">
+          <button class="btn-ghost btn-sm pf-nb-view-btn" title=${t('profile.notebook.toggleView')}
+            onClick=${cycleView}>${view === 'full' ? '⌃' : '⌄'}</button>
+          <span class="text-meta-sm">${relTime(note.updated_at || note.created_at)}</span>
+        </div>
+        <div class="pf-nb-note-btns">
+          <button class="btn-outline btn-sm" disabled=${planning} onClick=${() => handleEnrich()}>
+            ${planning ? t('profile.notebook.planning') : t('profile.notebook.enrichBtn')}
+          </button>
+          <button class="btn-primary btn-sm" disabled=${sorting} onClick=${() => handleSuggest()}>
+            ${sorting ? t('profile.notebook.sorting') : t('profile.notebook.suggestBtn')}
+          </button>
+          <button class="btn-outline btn-sm" disabled=${distributing} onClick=${() => handleDistribute()}>
+            ${distributing ? t('profile.notebook.splitting') : t('profile.notebook.splitBtn')}
+          </button>
+          <button class="btn-danger btn-sm" onClick=${() => onDelete(note.key)}>${t('profile.notebook.deleteBtn')}</button>
+        </div>
+      </div>
 
-        ${sorting && html`
-          <${Surface} kind="box"><${Stack}>
-            <${Spinner} text=${t(NB_STEPS[sortStep])} />
-            <${Stack} density="compact">${NB_STEPS.map((s, i) => html`<${ListRow} key=${i} density="compact" name=${t(s)}
-              marker=${i < sortStep ? 'success' : i === sortStep ? 'sun' : 'muted'} live=${i === sortStep} />`)}<//>
-          <//><//>`}
-        ${sortError && renderError(sortError, 'profile.notebook.sortErrorTitle', () => handleSuggest(), () => setSortError(null))}
-        ${suggest && renderSuggestPanel()}
+      ${sorting && html`
+        <div class="pf-nb-suggest pf-nb-progress poster-row--thing">
+          <${Spinner} text=${t(NB_STEPS[sortStep])} />
+          <ol class="pf-nb-steps">
+            ${NB_STEPS.map((s, i) => html`
+              <li key=${i} class="pf-nb-step ${i < sortStep ? 'done' : i === sortStep ? 'active' : ''}">
+                ${i < sortStep ? '✓' : i === sortStep ? '→' : '·'} ${t(s)}
+              </li>`)}
+          </ol>
+        </div>`}
+      ${sortError && html`
+        <div class="pf-nb-suggest pf-nb-progress poster-row--thing">
+          <div class="alert alert-warning"><span class="alert-msg">${t('profile.notebook.sortErrorTitle')}: ${escHtml(sortError.message)}</span></div>
+          ${sortError.code === 'NO_OPENROUTER_KEY' && html`
+            <div class="text-meta-sm">${t('profile.notebook.needKey')}</div>
+            <${OpenRouterSettings} onSettingsChange=${() => {}} />`}
+          <div class="pf-nb-suggest-actions">
+            <button class="btn-primary btn-sm" onClick=${() => handleSuggest()}>${t('profile.notebook.tryAgain')}</button>
+            <button class="btn-ghost btn-sm" onClick=${() => setSortError(null)}>${t('profile.notebook.dismiss')}</button>
+          </div>
+        </div>`}
+      ${suggest && renderSuggestPanel()}
 
-        ${planning && html`<${Surface} kind="box"><${Spinner} text=${t('profile.notebook.planning')} /><//>`}
-        ${enrichError && renderError(enrichError, 'profile.notebook.planErrorTitle', () => handleEnrich(), () => setEnrichError(null))}
-        ${enrich && !distrib && renderEnrichPanel()}
+      ${planning && html`<div class="pf-nb-suggest pf-nb-progress poster-row--thing"><${Spinner} text=${t('profile.notebook.planning')} /></div>`}
+      ${enrichError && html`
+        <div class="pf-nb-suggest pf-nb-progress poster-row--thing">
+          <div class="alert alert-warning"><span class="alert-msg">${t('profile.notebook.planErrorTitle')}: ${escHtml(enrichError.message)}</span></div>
+          ${enrichError.code === 'NO_OPENROUTER_KEY' && html`
+            <div class="text-meta-sm">${t('profile.notebook.needKey')}</div>
+            <${OpenRouterSettings} onSettingsChange=${() => {}} />`}
+          <div class="pf-nb-suggest-actions">
+            <button class="btn-primary btn-sm" onClick=${() => handleEnrich()}>${t('profile.notebook.tryAgain')}</button>
+            <button class="btn-ghost btn-sm" onClick=${() => setEnrichError(null)}>${t('profile.notebook.dismiss')}</button>
+          </div>
+        </div>`}
+      ${enrich && !distrib && renderEnrichPanel()}
 
-        ${distributing && html`<${Surface} kind="box"><${Spinner} text=${t('profile.notebook.splitting')} /><//>`}
-        ${distrib && renderDistributePanel()}
-      <//>
+      ${distributing && html`<div class="pf-nb-suggest pf-nb-progress poster-row--thing"><${Spinner} text=${t('profile.notebook.splitting')} /></div>`}
+      ${distrib && renderDistributePanel()}
 
       ${trackOpen && trackMsg && html`<${TrackResponseModal} open=${true} msg=${trackMsg}
         defaultMode=${trackedIntent?.mode || 'approve'} allowPark=${false}
         onClose=${() => setTrackOpen(false)} showToast=${showToast}
         onDone=${() => { setTrackOpen(false); deleteMemory(note.key).catch(err => { swallowed('notebook-card: renderSuggestPanel', err); }).finally(() => onChanged?.()); }} />`}
-    <//>
+    </div>
   `;
 }

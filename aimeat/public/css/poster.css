@@ -1,11 +1,8 @@
 /**
  * @file poster.css
- * @description Shared poster and showroom shapes. The parts built from them are parts.css, and
- *   every page is composed from components/poster-parts.js; a page has no rules of its own.
+ * @description Shared poster and showroom shapes. Views compose these classes and own their layout.
  * @usage Linked immediately after theme.css in spa.html.
  * @version-history
- *   v1.5.0 -- 2026-09-22 -- Every rule weight, offset shadow and corner reads the shape tokens in
- *     theme.css; the values are unchanged. The parts moved to parts.css.
  *   v1.4.0 -- 2026-09-14 -- The choice tile (.poster-choice) and the sun sticker (.poster-sticker).
  *   v1.3.0 -- 2026-09-13 -- Share numeral cuts, record titles and the quota meter role.
  *   v1.2.0 -- 2026-09-13 -- Share recurring initials boxes and the compact, large and irreversible asides.
@@ -28,14 +25,14 @@
   font-size: var(--poster-section-size, 1.9rem); line-height: var(--font-poster-leading);
   letter-spacing: var(--font-poster-tracking); text-transform: uppercase;
   background: var(--text); color: var(--bg);
-  padding: .55rem 1rem .5rem; border-bottom: var(--rule-stripe) solid var(--sun);
+  padding: .55rem 1rem .5rem; border-bottom: 6px solid var(--sun);
   margin: 0 0 1.4rem;
 }
-.poster-panel { border-left: var(--rule-edge) solid var(--sun); padding-left: 1.25rem; margin: 0 0 1.5rem; }
+.poster-panel { border-left: 4px solid var(--sun); padding-left: 1.25rem; margin: 0 0 1.5rem; }
 
 /* home-journey.css .koti-journey-status; home.css .koti-mailbox / .koti-fleet. */
-.poster-row { border-block: var(--rule-hair) solid var(--border); padding-block: 1rem; }
-.poster-row--thing { border-top: var(--rule-heavy) solid var(--text); }
+.poster-row { border-block: 1px solid var(--border); padding-block: 1rem; }
+.poster-row--thing { border-top: 3px solid var(--text); }
 .poster-label {
   font-size: .72rem; color: var(--accent); text-transform: uppercase;
   letter-spacing: .1em; font-weight: 800; line-height: 1.3;
@@ -44,7 +41,7 @@
 /* home.css .koti-link, including the unselected tab. */
 .poster-action, .poster-tab {
   display: inline-flex; align-items: center; gap: .4rem;
-  background: none; border: 0; border-bottom: var(--rule-heavy) solid var(--text); border-radius: var(--shape-radius);
+  background: none; border: 0; border-bottom: 3px solid var(--text); border-radius: 0;
   padding: 0 0 2px; cursor: pointer;
   font: inherit; font-weight: 800; font-size: .9rem; text-transform: uppercase; letter-spacing: .04em;
   color: var(--text); text-decoration: none; white-space: nowrap;
@@ -56,18 +53,18 @@
 /* The profile slab and the home's large door are the two cuts named in brief 10.3. */
 .poster-slab {
   background: var(--text); color: var(--bg);
-  border: 0; border-radius: var(--shape-radius); box-shadow: var(--offset-s) var(--offset-s) 0 var(--sun);
+  border: 0; border-radius: 0; box-shadow: 4px 4px 0 var(--sun);
   padding: 10px 16px;
   font-family: var(--font-showroom-body); font-weight: var(--font-poster-strong-weight); font-size: .8rem;
   text-transform: uppercase; letter-spacing: .04em; text-decoration: none;
   transition: transform 120ms ease, box-shadow 120ms ease;
 }
 .poster-slab:hover { transform: translate(2px, 2px); box-shadow: 2px 2px 0 var(--sun); color: var(--sun); }
-.poster-slab--large { padding: 1.2rem 1.7rem; font-size: 1.02rem; font-weight: 800; box-shadow: var(--offset-m) var(--offset-m) 0 var(--sun); }
-.poster-slab--large:hover { box-shadow: var(--offset-s) var(--offset-s) 0 var(--sun); }
+.poster-slab--large { padding: 1.2rem 1.7rem; font-size: 1.02rem; font-weight: 800; box-shadow: 8px 8px 0 var(--sun); }
+.poster-slab--large:hover { box-shadow: 4px 4px 0 var(--sun); }
 
 /* Boxes carry the object; dimensions, grids and placement belong to the view. */
-.poster-box, .poster-box.poster-box--avatar { border: var(--rule-thing) solid var(--text); }
+.poster-box, .poster-box.poster-box--avatar { border: 2px solid var(--text); }
 .poster-box { background: var(--card-bg); padding: 1rem; margin-block: 1rem; }
 .poster-box.poster-box--avatar {
   display: flex; align-items: center; justify-content: center; box-sizing: border-box;
@@ -81,25 +78,25 @@
 .poster-box--meter.poster-box--quota { background: var(--card); }
 .poster-box--quota rect { fill: var(--accent); transition: width .3s; }
 .poster-box--quota.is-full rect { fill: var(--danger); }
-.poster-frame { border: var(--rule-heavy) solid var(--text); background: var(--card); }
-.poster-dialog { border: var(--rule-heavy) solid var(--text); border-radius: var(--shape-radius); box-shadow: var(--offset-l) var(--offset-l) 0 var(--sun); font-family: var(--font-showroom-body); }
-.poster-record { padding: 1.2rem 1.4rem; border: var(--rule-heavy) solid var(--text); box-shadow: var(--offset-m) var(--offset-m) 0 var(--sun); background: var(--card); }
+.poster-frame { border: 3px solid var(--text); background: var(--card); }
+.poster-dialog { border: 3px solid var(--text); border-radius: 0; box-shadow: 12px 12px 0 var(--sun); font-family: var(--font-showroom-body); }
+.poster-record { padding: 1.2rem 1.4rem; border: 3px solid var(--text); box-shadow: 8px 8px 0 var(--sun); background: var(--card); }
 /* A choice tile: one of a few boxed answers, the chosen one on the sun with an ink shadow
    (scheduler-poster.css .sc-choice is the source cut). A sticker: a small sun-ground box with a
    short headline and one door, for the one fact about a thing that must be seen before its name
    is read (the agent's access level, design canvas "Your Agents" header B). */
-.poster-choice { padding: .7rem .8rem; border: var(--rule-thing) solid var(--text); border-radius: var(--shape-radius); background: var(--card-bg); cursor: pointer; text-align: left; font-family: var(--font-showroom-body); font-size: .8rem; line-height: 1.45; color: var(--text-dim); }
+.poster-choice { padding: .7rem .8rem; border: 2px solid var(--text); border-radius: 0; background: var(--card-bg); cursor: pointer; text-align: left; font-family: var(--font-showroom-body); font-size: .8rem; line-height: 1.45; color: var(--text-dim); }
 .poster-choice b { display: block; font-weight: 800; font-size: .88rem; color: var(--text); margin-bottom: .2rem; }
 .poster-choice:hover { border-color: var(--accent); }
-.poster-choice.on { background: var(--sun); color: var(--on-sun); box-shadow: var(--offset-s) var(--offset-s) 0 var(--text); }
+.poster-choice.on { background: var(--sun); color: var(--on-sun); box-shadow: 4px 4px 0 var(--text); }
 .poster-choice.on b { color: var(--on-sun); }
-.poster-sticker { display: flex; flex-direction: column; align-items: flex-end; gap: .35rem; background: var(--sun); color: var(--on-sun); border: var(--rule-thing) solid var(--text); border-radius: var(--shape-radius); padding: .6rem .9rem; box-shadow: var(--offset-s) var(--offset-s) 0 var(--text); }
+.poster-sticker { display: flex; flex-direction: column; align-items: flex-end; gap: .35rem; background: var(--sun); color: var(--on-sun); border: 2px solid var(--text); border-radius: 0; padding: .6rem .9rem; box-shadow: 4px 4px 0 var(--text); }
 .poster-sticker .poster-stat-number { color: var(--on-sun); margin: 0; white-space: nowrap; }
 .poster-sticker .poster-action, .poster-sticker .og-door { color: var(--on-sun); border-bottom-color: var(--on-sun); font-size: .74rem; }
 .poster-sticker .poster-action:hover, .poster-sticker .og-door:hover { color: var(--text); }
 /* profile-poster.css has no coral aside. The existing .ld-sh-box supplies this shape. */
 .poster-aside {
-  padding: 1rem 1.25rem; border: var(--rule-heavy) dashed var(--accent); border-radius: var(--shape-radius); background: var(--card-bg);
+  padding: 1rem 1.25rem; border: 3px dashed var(--accent); border-radius: 0; background: var(--card-bg);
   font-family: var(--font-showroom-body); font-size: .95rem; line-height: 1.6; color: var(--text);
 }
 .poster-aside--small { padding: .9rem 1.1rem; font-family: inherit; font-size: .92rem; line-height: 1.55; color: inherit; }
@@ -107,7 +104,7 @@
 .poster-aside--irreversible { border-style: solid; }
 /* contacts-poster.css .ct-tag, with the brief's explicit mono / 500 typography. */
 .poster-chip {
-  display: inline-block; padding: .1rem .45rem; border: 1px solid var(--text); border-radius: var(--shape-radius);
+  display: inline-block; padding: .1rem .45rem; border: 1px solid var(--text); border-radius: 0;
   font-family: var(--font-mono); font-size: .68rem; font-weight: 500; letter-spacing: .04em;
   color: var(--text); background: transparent;
 }
@@ -115,7 +112,7 @@
 .poster-crumb::after { content: ' /'; }
 .poster-stat {
   display: flex; align-items: baseline; gap: 1rem; margin: 0; padding: .8rem 0;
-  border-top: var(--rule-heavy) solid var(--text); color: var(--text); text-decoration: none; font-size: 1.05rem; font-weight: 800;
+  border-top: 3px solid var(--text); color: var(--text); text-decoration: none; font-size: 1.05rem; font-weight: 800;
 }
 .poster-stat:hover { color: var(--accent); }
 .poster-stat-number {
@@ -142,15 +139,15 @@
    The sun band lives in landing.css (.ld-band--sun), not landing-showroom.css. */
 .showroom-band { padding: 3.5rem 3rem; background: var(--text); color: var(--bg); }
 @media (max-width: 600px) { .showroom-band { padding: 2rem 1.25rem; } }
-.showroom-band--sun { padding: 3rem; background: var(--sun); color: var(--on-sun); border-bottom: var(--rule-heavy) solid var(--text); }
-.showroom-section { padding: 1.75rem; background: var(--card-bg); border: var(--rule-heavy) solid var(--text); box-shadow: var(--offset-m) var(--offset-m) 0 var(--sun); }
+.showroom-band--sun { padding: 3rem; background: var(--sun); color: var(--on-sun); border-bottom: 3px solid var(--text); }
+.showroom-section { padding: 1.75rem; background: var(--card-bg); border: 3px solid var(--text); box-shadow: 8px 8px 0 var(--sun); }
 /* The design skill names sun, coral and ink shadows; the source rooms use the first two. */
-.showroom-section--coral { box-shadow: var(--offset-m) var(--offset-m) 0 var(--accent); }
-.showroom-door { font-family: var(--font-showroom-body); font-size: .95rem; font-weight: 800; color: var(--text); text-decoration: none; border-bottom: var(--rule-heavy) solid var(--accent); }
+.showroom-section--coral { box-shadow: 8px 8px 0 var(--accent); }
+.showroom-door { font-family: var(--font-showroom-body); font-size: .95rem; font-weight: 800; color: var(--text); text-decoration: none; border-bottom: 3px solid var(--accent); }
 .showroom-door:hover { color: var(--accent); }
 .showroom-slab {
   display: inline-block; font-family: var(--font-showroom); text-transform: uppercase; font-size: 1rem;
-  padding: 1rem 1.75rem; border: var(--rule-heavy) solid var(--text); box-shadow: 6px 6px 0 var(--text);
+  padding: 1rem 1.75rem; border: 3px solid var(--text); box-shadow: 6px 6px 0 var(--text);
   text-decoration: none; transition: transform 120ms ease, box-shadow 120ms ease; text-align: center;
 }
 .showroom-slab:hover { transform: translate(2px, 2px); box-shadow: 3px 3px 0 var(--text); }

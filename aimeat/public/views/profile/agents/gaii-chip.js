@@ -6,12 +6,10 @@
  *   the clipboard when pressed. It is the string a person hands to a chat, a config file or
  *   another agent, so it belongs beside the agent wherever the agent is listed rather than only
  *   behind the board's hover card.
- * @structure GaiiChip({ agent })
+ * @structure GaiiChip({ agent, className })
  * @usage import { GaiiChip } from './gaii-chip.js';
  *   html`<${GaiiChip} agent=${agent} />`
  * @version-history
- *   v2.0.0 -- 2026-09-22 -- Composed from the shared set: a text action holding the GAII in the mono
- *     text face and the copy mark. The className prop is gone (no caller passed one); no class of its own.
  *   v1.0.0 — 2026-09-06 — Initial: the copy control the board's ID card already carried, in a form
  *     the agent list rows can wear.
  */
@@ -21,7 +19,6 @@ import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { copyToClipboard } from '/js/utils.js';
 import { agentGaii } from './tab-helpers.js';
-import { Action, Text } from '/components/poster-parts.js';
 
 const html = htm.bind(h);
 
@@ -35,9 +32,9 @@ const CopyMark = html`<svg viewBox="0 0 16 16" width="11" height="11" fill="none
 
 /**
  * GaiiChip — the agent's full GAII, click to copy.
- * @param {{ agent: object }} props
+ * @param {{ agent: object, className?: string }} props
  */
-export function GaiiChip({ agent }) {
+export function GaiiChip({ agent, className = '' }) {
   const [copied, setCopied] = useState(false);
   const gaii = agentGaii(agent);
 
@@ -51,10 +48,12 @@ export function GaiiChip({ agent }) {
   }, [gaii]);
 
   return html`
-    <${Action} kind="text"
+    <button type="button"
+            class="pf-agd-gaii ${copied ? 'pf-agd-gaii--copied' : ''} ${className}"
             title=${copied ? t('profile.agents.gaiiCopied') : t('profile.agents.copyGaii')}
-            label=${t('profile.agents.copyGaii')}
+            aria-label=${t('profile.agents.copyGaii')}
             onClick=${copy}>
-      <${Text} kind="mono">${gaii} ${copied ? '✓' : CopyMark}<//>
-    <//>`;
+      <code class="pf-agd-gaii-value">${gaii}</code>
+      <span class="pf-agd-gaii-mark">${copied ? '✓' : CopyMark}</span>
+    </button>`;
 }

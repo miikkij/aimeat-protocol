@@ -20,14 +20,10 @@
  *   because the value lives on the app record and gates a decision the server makes.
  * @usage import { seoSectionInner, seoOnOpen, seoToggle, seoSave } from './seo.js'
  * @version-history
- *   v1.1.0 — 2026-09-22 — Composed from the shared set (parts-html.js): this module draws the whole
- *     section, the switch and the wording door as underlined words, the three fields as the set's
- *     fields (now labelled for their inputs), the search preview as a record with one list row.
  *   v1.0.0 — 2026-08-25 — Initial.
  */
 import { escapeHtml } from './util.js';
-import { showNotice } from './ui.js';
-import { section, surface, listRow, text, action, stack, field } from './parts-html.js';
+import { dtlBtn, showNotice } from './ui.js';
 import { loadConfig } from './config.js';
 import { t } from './i18n.js';
 import { getCortexOwnerToken } from './cortex.js';
@@ -153,67 +149,67 @@ function stateLine(state, blockReason) {
   return t('seo.stateOff');
 }
 
-/**
- * What a search result would look like, from the values that would actually be served: the set's
- * record surface holding one list row, the screenshot as the row's mark (a search result's
- * thumbnail), the title as the name and the summary as the sentence under it.
- */
+/** What a search result would look like, from the values that would actually be served. */
 function previewHtml(d) {
   var title = (d.seo && d.seo.title) || d.name;
   var desc = (d.seo && d.seo.description) || d.description;
-  return surface({ kind: 'record' },
-    listRow({
-      mark: d.screenshotUrl ? '<img src="' + escapeHtml(d.screenshotUrl) + '" alt="" loading="lazy">' : '',
-      name: escapeHtml(title),
-      detail: escapeHtml(desc),
-      detailKind: 'text',
-    })
-    + (d.screenshotUrl ? '' : text({ kind: 'caption', tone: 'muted' }, escapeHtml(t('seo.noShot')))));
+  return '<div class="dtl-seo-preview">'
+    + '<div class="dtl-seo-preview-title">' + escapeHtml(title) + '</div>'
+    + '<div class="dtl-seo-preview-desc">' + escapeHtml(desc) + '</div>'
+    + (d.screenshotUrl
+      ? '<img class="dtl-seo-preview-img" src="' + escapeHtml(d.screenshotUrl) + '" alt="" loading="lazy">'
+      : '<div class="dtl-seo-preview-noimg">' + escapeHtml(t('seo.noShot')) + '</div>')
+    + '</div>';
 }
 
-/** The whole section; detail.js holds its slot (#detail-seo) and this fills it. */
 export function seoSectionInner() {
   if (seoState === 'off') return '';
-  var wrap = function (description, body) {
-    return section({ title: escapeHtml(t('seo.title')), description: description, body: stack({}, body) });
-  };
-  var quiet = function (key) { return text({ kind: 'caption', tone: 'muted' }, escapeHtml(t(key))); };
-  if (seoState === 'loading') return wrap('', quiet('seo.loading'));
-  if (seoState === 'error' || !seoData) return wrap('', quiet('seo.loadFailed'));
+  var head = '<h3>' + escapeHtml(t('seo.title')) + '</h3>';
+  if (seoState === 'loading') return head + '<p class="dtl-ai-status">' + escapeHtml(t('seo.loading')) + '</p>';
+  if (seoState === 'error' || !seoData) {
+    return head + '<p class="dtl-ai-status">' + escapeHtml(t('seo.loadFailed')) + '</p>';
+  }
 
   var d = seoData;
   var on = !!(d.seo && d.seo.index === true);
   var gated = d.state === 'gated' || d.state === 'hidden';
 
-  // The one sentence that says where the app stands, in a box so it reads as the answer.
-  var html = surface({ kind: 'box', density: 'compact', tone: d.state === 'on' ? 'success' : 'plain' },
-    text({ kind: 'body' }, stateLine(d.state, d.blockReason)));
+  var html = head
+    + '<p class="dtl-ai-status">' + escapeHtml(t('seo.intro')) + '</p>'
+    + '<p class="dtl-seo-state dtl-seo-state-' + escapeHtml(d.state) + '">' + stateLine(d.state, d.blockReason) + '</p>';
 
   // A gated or hidden app cannot be findable whatever the switch says, so the switch is not offered:
   // a control that does nothing is worse than no control.
-  if (gated) return wrap(escapeHtml(t('seo.intro')), html);
+  if (gated) return html;
 
-  var doors = action({ kind: 'secondary', semantics: 'switch', selected: on, disabled: seoBusy, onclick: 'window._launcher.seoToggle()' },
-    escapeHtml(t(on ? 'seo.turnOff' : 'seo.turnOn')));
-  if (on) {
-    doors += action({ kind: 'secondary', expanded: seoOpenEditor, onclick: 'window._launcher.seoToggleEditor()' },
-      escapeHtml(t(seoOpenEditor ? 'seo.hideWording' : 'seo.editWording')));
-  }
-  html += stack({ direction: 'wrap', align: 'center' }, doors);
+  html += '<div class="dtl-seo-switch">'
+    + dtlBtn(t(on ? 'seo.turnOff' : 'seo.turnOn'), 'window._launcher.seoToggle()',
+      { variant: on ? '' : 'primary', disabled: seoBusy })
+    + '</div>';
 
-  if (!on) return wrap(escapeHtml(t('seo.intro')), html);
+  if (!on) return html;
+
+  html += '<div class="dtl-seo-wording">'
+    + dtlBtn(t(seoOpenEditor ? 'seo.hideWording' : 'seo.editWording'), 'window._launcher.seoToggleEditor()')
+    + '</div>';
 
   if (seoOpenEditor) {
     var s = d.seo || {};
-    html += stack({},
-      field({ id: 'seo-title', label: escapeHtml(t('seo.fTitle')), maxLength: 120, value: s.title || '', placeholder: d.name })
-      + field({ id: 'seo-desc', type: 'textarea', rows: 2, label: escapeHtml(t('seo.fDesc')), maxLength: 320, value: s.description || '', placeholder: d.description })
-      + field({ id: 'seo-keywords', label: escapeHtml(t('seo.fKeywords')), value: (s.keywords || []).join(', '), placeholder: (d.tags || []).join(', ') })
-      + quiet('seo.wordingHint')
-      + stack({ direction: 'horizontal', align: 'start' },
-        action({ kind: 'primary', disabled: seoBusy, onclick: 'window._launcher.seoSave()' }, escapeHtml(t('seo.save')))));
+    html += '<label class="dtl-stat-label">' + escapeHtml(t('seo.fTitle')) + '</label>'
+      + '<input id="seo-title" type="text" class="modal-input" maxlength="120" value="'
+      + escapeHtml(s.title || '') + '" placeholder="' + escapeHtml(d.name) + '">'
+      + '<label class="dtl-stat-label">' + escapeHtml(t('seo.fDesc')) + '</label>'
+      + '<textarea id="seo-desc" class="modal-input" rows="2" maxlength="320" placeholder="'
+      + escapeHtml(d.description) + '">' + escapeHtml(s.description || '') + '</textarea>'
+      + '<label class="dtl-stat-label">' + escapeHtml(t('seo.fKeywords')) + '</label>'
+      + '<input id="seo-keywords" type="text" class="modal-input" value="'
+      + escapeHtml((s.keywords || []).join(', ')) + '" placeholder="' + escapeHtml((d.tags || []).join(', ')) + '">'
+      + '<p class="dtl-ai-status">' + escapeHtml(t('seo.wordingHint')) + '</p>'
+      + '<div class="dtl-seo-actions">'
+      + dtlBtn(t('seo.save'), 'window._launcher.seoSave()', { variant: 'primary', disabled: seoBusy })
+      + '</div>';
   }
 
-  html += stack({ density: 'compact' }, text({ kind: 'label' }, escapeHtml(t('seo.previewTitle'))) + previewHtml(d));
-  return wrap(escapeHtml(t('seo.intro')), html);
+  html += '<h4>' + escapeHtml(t('seo.previewTitle')) + '</h4>' + previewHtml(d);
+  return html;
 }

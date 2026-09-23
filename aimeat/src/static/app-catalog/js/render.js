@@ -27,26 +27,19 @@
  *     numbered index that opens in place, the header sticker becomes the band with the numbers
  *     (plus the opens total) and the masthead's mono line, and the foot carries the count.
  *   v3.2.0 — 2026-09-13 — The source editor opens through dialogs.js (the site's one dialog).
- *   v3.3.0 — 2026-09-22 — Drawn from the site's one set (parts-html.js): the menu rows are the
- *     navigation ListRow, the empty and loading states are Text in a Stack without the rocket and
- *     magnifier emoji, the AI and agent markers are chips (the robot emoji leaves), the order words
- *     are found by data-sort and pressed with aria-pressed, and the hidden parts use `hidden`. The
- *     card the list replaced leaves; its note on why a published app opens top-level moves to the row.
- *     The context menu and the prompt outputs move to render-menu.js by pure extraction (the file
- *     was past the line ceiling) and are re-exported from here.
  */
-import { escapeHtml, jsArg, isSameOriginUrl } from './util.js';
-import { listRow, action, chip, text, stack } from './parts-html.js';
-import { getAllApps, saveApp } from './db.js';
+import { escapeHtml, jsArg, sourceLabel, filterAttr, isSameOriginUrl } from './util.js';
+import { getAllApps, saveApp, deleteApp } from './db.js';
+import { showConfirm, showNotice } from './ui.js';
 import { loadConfig } from './config.js';
 import { t, getLang } from './i18n.js';
 import { favStarHtml } from './favorites.js';
 import { setEditingAppId, switchTab } from './apps-io.js';
-import { openPublishedDetail } from './detail.js';
-import { applyServerFilter, getCommunityApps, getFavoriteServerApps, rerenderServerLists } from './server-io.js';
+import { openPromptBuilder } from './cortex.js';
+import { openDetailView, openPublishedDetail } from './detail.js';
+import { loadPublishedApps, showPublishModal, applyServerFilter, deleteServerApp, getCommunityApps, getFavoriteServerApps, rerenderServerLists } from './server-io.js';
 import { rowHtml, fmtKb, fmtDate } from './rows.js';
-// The context menu and the prompt outputs live in render-menu.js (pure extraction, 2026-09-22);
-// they are re-exported below, so the callers still import them from here.
+import { openDlg } from './dialogs.js';
 
 // browser-local list + filter state stay main-owned; injected once via initRender at bootstrap.
 let getMainApps, setAllApps, getActiveTag, setActiveTag, getSearchQuery;
@@ -91,14 +84,10 @@ function kuntoFlags(sa) {
   };
 }
 
-// One row of the menu: the set's navigation row (a compact ListRow), its count as the value, the
-// chosen one on the sun. data-rail-pick lets the phone's menu dialog close after a choice.
-function railItem(label, count, on, onclick) {
-  return listRow({ density: 'compact', name: escapeHtml(label), onOpen: onclick, selected: on,
-    value: typeof count === 'number' ? String(count) : '', rowAttrs: ' data-rail-pick' });
-}
-function railLabel(label) {
-  return text({ kind: 'label' }, escapeHtml(label));
+function railItem(label, count, on, onclick, isTag) {
+  return '<button type="button" class="cat-rail-item' + (isTag ? ' cat-rail-item--tag' : '') + (on ? ' active' : '') +
+    '" onclick="' + onclick + '"><span>' + escapeHtml(label) + '</span>' +
+    (typeof count === 'number' ? '<span class="cat-rail-count">' + count + '</span>' : '') + '</button>';
 }
 
 // What the tags count: in the library the owner's entries, in the community the other people's
@@ -130,18 +119,18 @@ function renderTags(entries) {
   var keys = Object.keys(counts).sort(function (a, b) { return (counts[b] - counts[a]) || a.localeCompare(b); });
   var active = getActiveTag();
   var activeLc = (active && active !== '__favorites__') ? String(active).toLowerCase() : null;
-  var html = railLabel(t('rail.tags'));
-  html += railItem(t('tag.all'), coll.length, active === null, 'window._launcher.filterByTag(null)');
+  var html = '<div class="cat-rail-label">' + escapeHtml(t('rail.tags')) + '</div>';
+  html += railItem(t('tag.all'), coll.length, active === null, 'window._launcher.filterByTag(null)', true);
   var shown = tagsExpanded ? keys : keys.slice(0, TAGS_FOLDED);
   // An active tag past the fold stays on screen, or the reader cannot see why the list is short.
   if (activeLc && shown.indexOf(activeLc) < 0 && keys.indexOf(activeLc) >= 0) shown = shown.concat([activeLc]);
   for (var k = 0; k < shown.length; k++) {
     var key = shown[k];
-    html += railItem(casing[key], counts[key], activeLc === key, 'window._launcher.filterByTag(\'' + jsArg(casing[key]) + '\')');
+    html += railItem(casing[key], counts[key], activeLc === key, 'window._launcher.filterByTag(\'' + jsArg(casing[key]) + '\')', true);
   }
   if (keys.length > TAGS_FOLDED) {
-    html += '<div>' + action({ kind: 'text', onclick: 'window._launcher.toggleAllTags()', expanded: tagsExpanded },
-      escapeHtml(tagsExpanded ? t('rail.fewerTags') : t('rail.allTags').replace('{n}', String(keys.length)))) + '</div>';
+    html += '<button type="button" class="cat-rail-more" onclick="window._launcher.toggleAllTags()">' +
+      escapeHtml(tagsExpanded ? t('rail.fewerTags') : t('rail.allTags').replace('{n}', String(keys.length))) + '</button>';
   }
   tagBar.innerHTML = html;
 }
@@ -163,14 +152,14 @@ function renderStateBar(entries) {
         var key = KUNTO_KEYS[k];
         var n = 0;
         for (var j = 0; j < entries.length; j++) if (entries[j].kunto && entries[j].kunto[key]) n++;
-        if (n) kuntoHtml += railItem(t('kunto.' + key), n, activeState === key, 'window._launcher.filterByState(\'' + key + '\')');
+        if (n) kuntoHtml += railItem(t('kunto.' + key), n, activeState === key, 'window._launcher.filterByState(\'' + key + '\')', false);
       }
     }
-    bar.innerHTML = railLabel(t('rail.state')) +
-      railItem(t('state.listed'), listed, activeState === 'listed', 'window._launcher.filterByState(\'listed\')') +
-      railItem(t('state.unlisted'), unlisted, activeState === 'unlisted', 'window._launcher.filterByState(\'unlisted\')') +
-      railItem(t('state.draft'), drafts, activeState === 'draft', 'window._launcher.filterByState(\'draft\')') +
-      (kuntoHtml ? railLabel(t('rail.kunto')) + kuntoHtml : '');
+    bar.innerHTML = '<div class="cat-rail-label">' + escapeHtml(t('rail.state')) + '</div>' +
+      railItem(t('state.listed'), listed, activeState === 'listed', 'window._launcher.filterByState(\'listed\')', false) +
+      railItem(t('state.unlisted'), unlisted, activeState === 'unlisted', 'window._launcher.filterByState(\'unlisted\')', false) +
+      railItem(t('state.draft'), drafts, activeState === 'draft', 'window._launcher.filterByState(\'draft\')', false) +
+      (kuntoHtml ? '<div class="cat-rail-label">' + escapeHtml(t('rail.kunto')) + '</div>' + kuntoHtml : '');
   }
   // The band under the masthead says the same numbers, plus how often the apps were opened.
   var opensTotal = 0;
@@ -206,13 +195,8 @@ export function filterByState(state) {
 export function setSort(mode) {
   if (mode !== 'opens' && mode !== 'name') mode = 'newest';
   sortMode = mode;
-  // The order words are the set's tabs: the chosen one is on (is-on, as Action emits it) and pressed.
-  var btns = document.querySelectorAll('#cat-sort [data-sort]');
-  for (var i = 0; i < btns.length; i++) {
-    var on = btns[i].getAttribute('data-sort') === mode;
-    btns[i].classList.toggle('is-on', on);
-    btns[i].setAttribute('aria-pressed', on ? 'true' : 'false');
-  }
+  var btns = document.querySelectorAll('.cat-sort-btn');
+  for (var i = 0; i < btns.length; i++) btns[i].classList.toggle('is-on', btns[i].getAttribute('data-sort') === mode);
   renderApps();
   rerenderServerLists();
 }
@@ -297,7 +281,7 @@ function viewPublished(url, name) {
 function updateOpenExternalBtn() {
   var btn = document.getElementById('iframe-external-btn');
   if (!btn) return;
-  btn.hidden = !(currentIframeUrl && !isSameOriginUrl(currentIframeUrl));
+  btn.style.display = (currentIframeUrl && !isSameOriginUrl(currentIframeUrl)) ? '' : 'none';
 }
 
 function launchInIframe(app) {
@@ -357,15 +341,11 @@ export function isListingLoaded() { return listingLoaded; }
 
 /** The grid's "still fetching" block — the same shape as the empty state, so nothing jumps. */
 function loadingStateHtml() {
-  return emptyStateHtml(t('loading.apps'), t('loading.appsHint'), '', 'status');
-}
-
-/** An empty list says why, in the set's words: a heading, the sentence under it, a quiet line. */
-function emptyStateHtml(title, desc, note, role) {
-  return stack({ density: 'compact', align: 'start', role: role },
-    text({ kind: 'heading', size: 'small' }, title) +
-    text({ kind: 'body', tone: 'muted' }, desc) +
-    (note ? text({ kind: 'caption', tone: 'muted' }, note) : ''));
+  return '<div class="empty-state">' +
+      '<div class="cat-spinner" role="status" aria-live="polite"></div>' +
+      '<h3>' + t('loading.apps') + '</h3>' +
+      '<p>' + t('loading.appsHint') + '</p>' +
+    '</div>';
 }
 
 /**
@@ -383,19 +363,39 @@ function aiPostureMarkers(e) {
   if (!p) return '';
   var out = '';
   if (p.generates && p.generates.length) {
-    out += ' ' + chip(escapeHtml(t('card.aiGenerative')), 'plain', t('card.aiGenerativeHint'));
+    out += ' <span class="pcb-ai-gen" title="' + escapeHtml(t('card.aiGenerativeHint')) + '">'
+      + escapeHtml(t('card.aiGenerative')) + '</span>';
   }
   if (p.gap) {
-    out += ' ' + chip(escapeHtml(t('card.aiUnlabelled')), 'coral', t('card.aiUnlabelledHint'));
+    out += ' <span class="pcb-ai-gap" title="' + escapeHtml(t('card.aiUnlabelledHint')) + '">'
+      + escapeHtml(t('card.aiUnlabelled')) + '</span>';
   }
   return out;
+}
+
+// Status of a unified entry, for its badge. The badge shows the app's PUBLICATION
+// state on the server — Listed / Unlisted / (browser-only) Local — NOT whether this
+// browser happens to hold a local copy. A published app with no local twin (e.g.
+// pushed via MCP/VSCode) is still "Listed vN", not a separate "server only" state;
+// materialization of a local copy is an implementation detail the badge never surfaces.
+function libStatus(e) {
+  if (e.parked) return 'parked';        // on the server, hidden from the public catalogue
+  if (e.published) return 'published';  // on the server, public in the catalogue
+  return 'local';                       // a draft in this browser, not on the server yet
+}
+function libStatusLabel(e) {
+  switch (libStatus(e)) {
+    case 'parked':    return t('status.parked');
+    case 'published': return t('status.published') + (e.versionNumber ? ' v' + e.versionNumber : '');
+    default:          return t('status.local');
+  }
 }
 
 // Merge local apps with the owner's server apps into ONE entry per app (deduped by the
 // published filename). Local apps own favorites/drag-drop/openMode; the server copy supplies
 // the authoritative published/parked/version state; a server app with no local twin becomes a
 // read-only "server-only" entry.
-export function buildLibraryEntries(localApps, serverApps) {
+function buildLibraryEntries(localApps, serverApps) {
   var base = (loadConfig().aimeatUrl || '').replace(/\/+$/, '');
   var byFilename = {};
   var entries = [];
@@ -542,17 +542,28 @@ function renderApps() {
     var localHeader = document.getElementById('local-apps-header');
     var localCount = document.getElementById('local-apps-count');
     if (localHeader) {
-      localHeader.hidden = !(entries.length > 0);
-      if (localCount) localCount.textContent = String(entries.length);
+      localHeader.style.display = entries.length > 0 ? '' : 'none';
+      if (localCount) localCount.textContent = '· ' + entries.length;
     }
 
     if (filtered.length === 0) {
       if (!listingLoaded) {
         grid.innerHTML = loadingStateHtml();
       } else if (!getActiveTag() && !getSearchQuery() && entries.length === 0) {
-        grid.innerHTML = emptyStateHtml(t('empty.noApps'), t('empty.noAppsDesc'), t('empty.formats'));
+        grid.innerHTML =
+          '<div class="empty-state">' +
+            '<div class="empty-icon">\u{1F680}</div>' +
+            '<h3>' + t('empty.noApps') + '</h3>' +
+            '<p>' + t('empty.noAppsDesc') + '</p>' +
+            '<span class="empty-formats">' + t('empty.formats') + '</span>' +
+          '</div>';
       } else {
-        grid.innerHTML = emptyStateHtml(t('empty.noMatch'), t('empty.noMatchDesc'));
+        grid.innerHTML =
+          '<div class="empty-state">' +
+            '<div class="empty-icon">\u{1F50D}</div>' +
+            '<h3>' + t('empty.noMatch') + '</h3>' +
+            '<p>' + t('empty.noMatchDesc') + '</p>' +
+          '</div>';
       }
     } else {
       var html = '';
@@ -579,12 +590,7 @@ function libraryRowHtml(e, i) {
   var detailCall = (e.filename)
     ? 'window._launcher.openPublishedDetail(\'' + jsArg(e.owner || '') + '\', \'' + jsArg(e.filename) + '\', \'' + jsArg(e.hasLocal ? e.localId : '') + '\', ' + (e.versionNumber || 0) + ')'
     : 'window._launcher.openDetailView(\'' + jsArg(e.localId) + '\')';
-  // Open: a PUBLISHED/PARKED/server app opens TOP-LEVEL on its served URL (clean full page on the
-  // app origin) — like the old "View". Launching its local blob (a materialized twin) in the apex
-  // sandbox iframe breaks app-origin apps (frame-ancestors CSP). Only a purely-local app launches
-  // its local copy. When a working copy waits, Open stays the released version and "Open the draft"
-  // is its own word, so the two are never confused; openStagingPreview mints a short-lived
-  // owner-only preview URL for the draft and opens it top-level.
+  // A published app opens TOP-LEVEL on its served URL (see the note on libraryCardHtml below).
   var openCall = ((e.published || e.parked || e.serverOnly) && e.viewUrl)
     ? 'window._launcher.viewPublished(\'' + jsArg(e.viewUrl) + '?mode=inline\', \'' + jsArg(e.name) + '\')'
     : (e.hasLocal
@@ -599,8 +605,8 @@ function libraryRowHtml(e, i) {
   if (e.versionNumber) metaParts.push('v' + e.versionNumber);
   var when = fmtDate(e.createdAt); if (when) metaParts.push(when);
   var kb = fmtKb(e.size); if (kb) metaParts.push(kb);
-  var nameExtra = (e.origin === 'ai-published' ? ' ' + chip('AI') : '') +
-    (e.hasAgents ? ' ' + chip(escapeHtml(t('card.agent')), 'plain', t('card.agentHint')) : '') +
+  var nameExtra = (e.origin === 'ai-published' ? ' <span class="ai-origin-badge">AI</span>' : '') +
+    (e.hasAgents ? ' <span class="pcb-agent" title="' + escapeHtml(t('card.agentHint')) + '">\u{1F916}</span>' : '') +
     aiPostureMarkers(e);
   // The one line in the panel: where the work is.
   var line = e.hasDraft ? t('row.lineDraft')
@@ -615,6 +621,68 @@ function libraryRowHtml(e, i) {
     state: e.parked ? 'unlisted' : (e.published ? 'listed' : 'local'),
     draft: !!e.hasDraft, opens: e.opens, tags: e.tags, line: line, actions: actions
   });
+}
+
+// The card the list replaced (2026-08-28). Kept for the notes it carries on WHY a published app
+// opens top-level and a local blob does not; libraryRowHtml above makes the same choices.
+// eslint-disable-next-line no-unused-vars
+function libraryCardHtml(e, i) {
+  var idAttr = e.hasLocal ? escapeHtml(e.localId) : ('srv:' + escapeHtml(e.filename));
+  // Detail routing: openPublishedDetail resolves a local twin itself; local-only -> openDetailView.
+  var detailCall = (e.filename)
+    ? 'window._launcher.openPublishedDetail(\'' + jsArg(e.owner || '') + '\', \'' + jsArg(e.filename) + '\', \'' + jsArg(e.hasLocal ? e.localId : '') + '\', ' + (e.versionNumber || 0) + ')'
+    : 'window._launcher.openDetailView(\'' + jsArg(e.localId) + '\')';
+  // Open: a PUBLISHED/PARKED/server app opens TOP-LEVEL on its served URL (clean full page on the
+  // app origin) — like the old "View". Launching its local blob (a materialized twin) in the apex
+  // sandbox iframe breaks app-origin apps (frame-ancestors CSP). Only a purely-local app launches
+  // its local copy.
+  var openCall = ((e.published || e.parked || e.serverOnly) && e.viewUrl)
+    ? 'window._launcher.viewPublished(\'' + jsArg(e.viewUrl) + '?mode=inline\', \'' + jsArg(e.name) + '\')'
+    : (e.hasLocal
+        ? 'window._launcher.launchApp(\'' + jsArg(e.localId) + '\', \'' + jsArg(e.openMode || 'tab') + '\')'
+        : detailCall);
+  // When a staging draft exists the single "Open" splits into two labelled buttons so the
+  // released version and the unpublished staging draft are never confused. openStagingPreview
+  // mints a short-lived owner-only preview URL for the draft and opens it top-level.
+  var stagingCall = 'window._launcher.openStagingPreview(\'' + jsArg(e.owner || '') + '\', \'' + jsArg(e.filename || '') + '\')';
+  var openBtns = (e.hasDraft && e.viewUrl)
+    ? '<button onclick="event.stopPropagation(); window._launcher.viewPublished(\'' + jsArg(e.viewUrl) + '?mode=inline\', \'' + jsArg(e.name) + '\')" title="' + escapeHtml(t('card.openReleasedHint')) + '">▶ ' + escapeHtml(t('card.openReleased')) + '</button>' +
+      '<button class="act-staging" onclick="event.stopPropagation(); ' + stagingCall + '" title="' + escapeHtml(t('card.openStagingHint')) + '">⏫ ' + escapeHtml(t('card.openStaging')) + '</button>'
+    : '<button onclick="event.stopPropagation(); ' + openCall + '" title="' + escapeHtml(t('card.openHint')) + '">▶ ' + escapeHtml(t('card.open')) + '</button>';
+  var st = libStatus(e);
+  var dragAttrs = e.hasLocal
+    ? ' draggable="true" ondragstart="window._launcher.onCardDragStart(event)" ondragend="window._launcher.onCardDragEnd(event)" ondragover="window._launcher.onCardDragOver(event)" ondrop="window._launcher.onCardDrop(event)"'
+    : '';
+  var menuBtn = e.hasLocal
+    ? '<button class="card-menu-btn" onclick="event.stopPropagation(); window._launcher.showContextMenu(event, \'' + jsArg(e.localId) + '\')" title="' + escapeHtml(t('common.menu')) + '">⋮</button>'
+    : '';
+  return '<div class="app-card' + (e.hasLocal ? '' : ' server-only') + '" data-id="' + idAttr + '"' + dragAttrs +
+      filterAttr(e.name, e.tags) +
+      ' onclick="' + detailCall + '"' +
+      (e.hasLocal ? ' oncontextmenu="window._launcher.showContextMenu(event, \'' + jsArg(e.localId) + '\')"' : '') +
+      ' style="animation-delay:' + (i * 0.04) + 's">' +
+      '<span class="app-status-badge st-' + st + '">' + escapeHtml(libStatusLabel(e)) + '</span>' +
+      (e.hasDraft ? '<span class="app-staging-badge" title="' + escapeHtml(t('card.stagingHint')) + '">' + escapeHtml(t('card.stagingBadge')) + '</span>' : '') +
+      menuBtn +
+      '<div class="app-icon">' + escapeHtml(e.icon || '\u{1F4DD}') + '</div>' +
+      '<div class="app-name">' + escapeHtml(e.name) +
+        (e.origin === 'ai-published' ? ' <span class="ai-origin-badge">AI</span>' : '') +
+        (e.hasAgents ? ' <span class="pcb-agent" title="' + escapeHtml(t('card.agentHint')) + '">\u{1F916}</span>' : '') +
+        aiPostureMarkers(e) + '</div>' +
+      (function () {
+        // Show the description in the current UI language, falling back to the canonical one.
+        var d = (e.descriptions && e.descriptions[getLang()]) || e.description || '';
+        return d
+          ? '<div class="app-source">' + escapeHtml(d) + '</div>'
+          : '<div class="app-source">' + sourceLabel(e.source) + '</div>';
+      })() +
+      '<div class="app-actions">' +
+        openBtns +
+        '<button onclick="event.stopPropagation(); ' + detailCall + '">' + escapeHtml(t('ctx.details')) + '</button>' +
+      '</div>' +
+      // Server-backed favourite toggle (owner/filename); only for server apps with a filename.
+      (e.filename ? favStarHtml((e.owner || e.aimeatOwner || '') + '/' + e.filename) : '') +
+    '</div>';
 }
 
 // ── Iframe helpers ────────────────────────────────
@@ -640,8 +708,239 @@ function openExternal() {
   }
 }
 
+// ── Context Menu ────────────────────────────────
+
+var contextAppId = null;
+
+function showContextMenu(event, id) {
+  if (event.preventDefault) event.preventDefault();
+  if (event.stopPropagation) event.stopPropagation();
+  contextAppId = id;
+
+  var menu = document.getElementById('context-menu');
+  // Reveal off-screen first so we can measure the REAL height — the menu has
+  // a variable number of items (Edit, Favorite, Open mode, Source, Improve,
+  // Share, Publish, Delete…), so a hardcoded estimate overflowed the viewport
+  // and pushed the lower actions out of reach.
+  menu.style.left = '-9999px';
+  menu.style.top = '0px';
+  menu.hidden = false;
+
+  // offsetWidth/Height give the true layout size and ignore the cardIn entry
+  // animation's transform: scale() (getBoundingClientRect would under-measure
+  // mid-animation and let the menu spill off the bottom edge).
+  var menuWidth = menu.offsetWidth || 200;
+  var menuHeight = menu.offsetHeight || 160;
+  var margin = 8;
+  var vw = window.innerWidth;
+  var vh = window.innerHeight;
+
+  var x = (event.clientX != null) ? event.clientX : 0;
+  var y = (event.clientY != null) ? event.clientY : 0;
+
+  // Clamp horizontally within the viewport.
+  if (x + menuWidth + margin > vw) x = vw - menuWidth - margin;
+  if (x < margin) x = margin;
+
+  // Clamp vertically: pin to the bottom edge if it would overflow below,
+  // and never let the top go above the viewport. (Combined with the
+  // max-height in CSS, a menu taller than the screen scrolls instead.)
+  if (y + menuHeight + margin > vh) y = vh - menuHeight - margin;
+  if (y < margin) y = margin;
+
+  menu.style.left = x + 'px';
+  menu.style.top = y + 'px';
+}
+
+function hideContextMenu() {
+  var menu = document.getElementById('context-menu');
+  menu.hidden = true;
+  contextAppId = null;
+}
+
+async function handleContextAction(action) {
+  if (!contextAppId) return;
+  var appId = contextAppId;
+  hideContextMenu();
+
+  var app = null;
+  for (var i = 0; i < getMainApps().length; i++) {
+    if (getMainApps()[i].id === appId) { app = getMainApps()[i]; break; }
+  }
+  if (!app) return;
+
+  switch (action) {
+    case 'details':
+      openDetailView(appId);
+      break;
+
+    case 'edit':
+      // Server-only: editing an app's name/description/icon/tags is done in the detail view
+      // ("Edit details"); route there instead of the old local Add/Edit modal.
+      openDetailView(appId);
+      break;
+
+    case 'favorite':
+      app.favorite = !app.favorite;
+      saveApp(app).then(function () {
+        renderApps();
+      });
+      break;
+
+    case 'view-source':
+      viewSource(app);
+      break;
+
+    case 'delete':
+      // Same rule as the detail view: our own published app is deleted ON THE NODE (deleteServerApp
+      // asks its own confirmation and reports whether the node agreed); a record that was never
+      // published is only dropped from the page-session set.
+      if (app.published && app.publishedFilename && serverStateByFilename[app.publishedFilename]) {
+        if (await deleteServerApp(app.publishedFilename, app.name || app.publishedFilename)) {
+          await deleteApp(appId);
+          renderApps();
+        }
+        break;
+      }
+      if (await showConfirm(t('confirm.deleteApp').replace('{name}', function () { return app.name || 'this app'; }))) {
+        deleteApp(appId).then(function () {
+          renderApps();
+          loadPublishedApps();
+        });
+      }
+      break;
+
+    case 'publish':
+      showPublishModal(appId);
+      break;
+
+    case 'improve-ai':
+      openPromptBuilder(app);
+      break;
+
+    case 'share-prompt':
+      generateSharePrompt(app);
+      break;
+  }
+}
+
+// ── View Source ──────────────────────────────────
+
+function viewSource(app) {
+  var overlay = document.getElementById('source-overlay');
+  var textarea = document.getElementById('source-code');
+  var title = document.getElementById('source-title');
+  var saveBtn = document.getElementById('save-source-btn');
+
+  title.textContent = 'View / Edit Source: ' + (app.name || 'App');
+
+  var isEditable = !!app.blob; // Only blob-based apps can be edited
+  if (app.blob) {
+    textarea.value = decodeURIComponent(escape(atob(app.blob)));
+  } else if (app.url) {
+    textarea.value = '// This app is URL-based (' + app.url + ')\n// Source code is not stored locally.\n// Open the URL to view the app.';
+  } else {
+    textarea.value = '// No source available';
+  }
+
+  textarea.readOnly = !isEditable;
+  saveBtn.disabled = true;
+  saveBtn.style.display = isEditable ? '' : 'none';
+  // Real-origin staging (Test on real origin / Publish tested version) needs a PUBLISHED
+  // app (server draft slot). Show those buttons only then; hide for local-only / URL apps.
+  var canStage = isEditable && !!app.published;
+  var testLiveBtn = document.getElementById('source-test-live-btn');
+  var pubTestedBtn = document.getElementById('source-publish-tested-btn');
+  if (testLiveBtn) testLiveBtn.hidden = !canStage;
+  if (pubTestedBtn) pubTestedBtn.hidden = !canStage;
+  var stageStatus = document.getElementById('source-draft-status');
+  if (stageStatus) stageStatus.textContent = '';
+  openDlg(overlay);
+  // Store app metadata for save and prompt
+  overlay.dataset.appName = app.name || 'App';
+  overlay.dataset.appId = app.id || '';
+  overlay.dataset.originalSource = textarea.value;
+}
+
+// ── Share as Prompt ────────────────────────────
+
+function generateSharePrompt(app) {
+  if (!app || !app.blob) {
+    showNotice('Only local HTML apps can be shared as prompts.');
+    return;
+  }
+
+  var source = decodeURIComponent(escape(atob(app.blob)));
+  var prompt = 'Recreate this HTML app exactly as provided.\n\n';
+  prompt += 'App name: ' + (app.name || 'Untitled') + '\n';
+  if (app.tags && app.tags.length) {
+    prompt += 'Tags: ' + app.tags.join(', ') + '\n';
+  }
+  prompt += '\nReturn the COMPLETE HTML file below without modifications.\n';
+  prompt += 'If the user asks for changes, apply them to this source.\n\n';
+  prompt += '--- Source Code ---\n' + source;
+
+  navigator.clipboard.writeText(prompt).then(function() {
+    showNotice('Share prompt copied! Paste it into any AI chat to recreate this app.');
+  }).catch(function() {
+    // Fallback: show in source overlay
+    var overlay = document.getElementById('source-overlay');
+    var textarea = document.getElementById('source-code');
+    var title = document.getElementById('source-title');
+    var saveBtn = document.getElementById('save-source-btn');
+    title.textContent = 'Share Prompt: ' + (app.name || 'App');
+    textarea.value = prompt;
+    textarea.readOnly = true;
+    saveBtn.style.display = 'none';
+    openDlg(overlay);
+    overlay.dataset.appId = '';
+    overlay.dataset.originalSource = '';
+  });
+}
+
+// ── Generate Homepage Prompt ──────────────────────
+
+function generateHomepagePrompt() {
+  // The catalog is server-only, so the apps are the owner's server apps; the old browser-local
+  // list is always empty now and the button did nothing but say "add some apps first".
+  var apps = buildLibraryEntries([], ownServerApps);
+  if (apps.length === 0) {
+    showNotice(t('homepage.needApps'));
+    return;
+  }
+
+  var appList = apps.map(function(app) {
+    var launchInfo = app.viewUrl ? ('URL: ' + app.viewUrl) : 'Local HTML app (user will open it from their launcher)';
+    return '- ' + (app.icon || '') + ' ' + app.name +
+      (app.description ? ' (' + app.description + ')' : '') +
+      ' [' + launchInfo + ']' +
+      ((app.tags || []).length ? ' Tags: ' + app.tags.join(', ') : '');
+  }).join('\n');
+
+  var prompt = 'Create a single HTML file that serves as my personal homepage/dashboard.\n\n' +
+    'My apps:\n' + appList + '\n\n' +
+    'Requirements:\n' +
+    '- Show each app as a clickable card with its icon and name\n' +
+    '- For URL-based apps, clicking opens the URL in a new tab\n' +
+    '- For local apps, show a note that they can be opened from the App Launcher\n' +
+    '- Modern, responsive design with light theme\n' +
+    '- Group apps by their tags if they have tags\n' +
+    '- Everything in one self-contained HTML file, no external dependencies\n' +
+    '- Add a header with my name/title (I will customize this)\n' +
+    '- Make it visually distinctive and professional';
+
+  // Reuse the source overlay for displaying the prompt
+  var overlay = document.getElementById('source-overlay');
+  var textarea = document.getElementById('source-code');
+  var title = document.getElementById('source-title');
+
+  title.textContent = t('homepage.title');
+  textarea.value = prompt;
+  overlay.dataset.appName = 'Homepage';
+  openDlg(overlay);
+}
+
 export {
-  getMainApps,
   renderTags,
   filterByTag,
   launchApp,
@@ -650,5 +949,11 @@ export {
   launchInIframe,
   renderApps,
   closeIframe,
-  openExternal
+  openExternal,
+  showContextMenu,
+  hideContextMenu,
+  handleContextAction,
+  viewSource,
+  generateSharePrompt,
+  generateHomepagePrompt
 };

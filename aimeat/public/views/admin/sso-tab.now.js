@@ -21,12 +21,8 @@
  * @structure
  *   - Nothing — the empty state: what it buys, and the four things to gather
  *   - RightNow — the word, the five rows, the strip
- *   - Locked — the notice that connection management is frozen (also used by the detail view)
  * @usage Imported by views/admin/sso-tab.js.
  * @version-history
- *   v1.2.0 — 2026-09-22 — Composed from the shared component set (Section, Columns, NumeralBand,
- *     Surface): no class of its own, so a theme change reaches it. The icons carry their stroke as
- *     SVG attributes now that no sheet dresses them.
  *   v1.1.0 — 2026-09-13 — Compose existing section headings from shared poster B1.
  *   v1.0.0 — 2026-09-12 — Initial (the Organisation sign-in page in the poster face).
  */
@@ -36,15 +32,14 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { time as fmtTime } from '/js/format.js';
 import { num, Badge, Row } from './shared.js';
-import { Section, Columns, Stack, NumeralBand, Surface, Action, Text } from '/components/poster-parts.js';
 
 const S = (key, params) => t('admin.sso.' + key, params);
 
 /** Stroke icons on a 24px grid, one style. Never an emoji: these scale and recolour. */
 const ICONS = {
-  key: html`<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" /><path d="M10 17l5-5-5-5" /><path d="M15 12H3" /></svg>`,
-  people: html`<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 11h-6" /></svg>`,
-  shield: html`<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /><path d="M9 12l2 2 4-4" /></svg>`,
+  key: html`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" /><path d="M10 17l5-5-5-5" /><path d="M15 12H3" /></svg>`,
+  people: html`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 11h-6" /></svg>`,
+  shield: html`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /><path d="M9 12l2 2 4-4" /></svg>`,
 };
 
 /**
@@ -63,40 +58,42 @@ export function Nothing({ node, onConnect }) {
   const gather = ['shortName', 'domains', 'someone', 'visibility'];
 
   return html`
-    <${Section} id="adm-sso-01" title=${S('now.title')} count="01"
-      actions=${html`<${Action} kind="primary" disabled=${node.locked} onClick=${onConnect}>${S('now.connect')}<//>`}>
-      <${Stack}>
-        <${Columns} layout="trailing" collapse=${900}>
-          <${Stack} density="compact">
-            <${Text} kind="heading">${S('empty.word')}<//>
-            <${Text}>${node.accounts
+    <section class="og-sec og-sec--first" id="adm-sso-01">
+      <div class="og-sec-h">
+        <h2 class="poster-section-title">${S('now.title')}<small>01</small></h2>
+        <div class="og-doors">
+          <button type="button" class="og-door og-door--danger" disabled=${node.locked} onClick=${onConnect}>
+            ${S('now.connect')}
+          </button>
+        </div>
+      </div>
+
+      <div class="adm-sso-offer">
+        <div>
+          <div class="adm-ov-status">${S('empty.word')}</div>
+          <p class="adm-alert-line">${node.accounts
     ? S('empty.line', { n: num(node.accounts) })
-    : S('empty.lineNoCount')}<//>
-            ${node.locked ? html`<${Locked} setting=${node.locked_setting} />` : null}
-          <//>
-          <${Columns} layout="thirds" collapse=${640}>
-            ${gets.map(g => html`
-              <${Stack} key=${g.title} density="compact">
-                <${Text} kind="label">${g.icon}<//>
-                <strong>${g.title}</strong>
-                <${Text} tone="muted">${g.body}<//>
-              <//>`)}
-          <//>
-        <//>
+    : S('empty.lineNoCount')}</p>
+          ${node.locked ? html`
+            <p class="adm-sso-locked">${S('now.lockedWhy', { setting: node.locked_setting })}</p>` : null}
+        </div>
+        <div class="adm-sso-gets">
+          ${gets.map(g => html`
+            <div class="adm-sso-get">
+              ${g.icon}
+              <b>${g.title}</b>
+              <p>${g.body}</p>
+            </div>`)}
+        </div>
+      </div>
 
-        <${NumeralBand} tone="plain" items=${[
-    { label: S('strip.organisations'), value: '0', note: S('strip.organisationsNone'), tone: 'muted' },
-    { label: S('strip.accounts'), value: num(node.accounts || 0), note: S('strip.accountsSub') },
-    { label: S('strip.switch'), value: S('strip.off'), note: S('strip.switchLater'), tone: 'muted' },
-    { label: S('strip.gather'), value: String(gather.length), note: S('strip.gatherSub') },
-  ]} />
-      <//>
-    <//>`;
-}
-
-/** Connection management is frozen: every write below is refused, and this says which setting did it. */
-export function Locked({ setting }) {
-  return html`<${Surface} kind="aside" tone="coral" density="compact"><${Text}>${S('now.lockedWhy', { setting })}<//><//>`;
+      <div class="og-strip">
+        <div><b class="adm-sso-dim">0</b><span>${S('strip.organisations')}</span><small>${S('strip.organisationsNone')}</small></div>
+        <div><b>${num(node.accounts || 0)}</b><span>${S('strip.accounts')}</span><small>${S('strip.accountsSub')}</small></div>
+        <div><b class="adm-sso-dim">${S('strip.off')}</b><span>${S('strip.switch')}</span><small>${S('strip.switchLater')}</small></div>
+        <div><b>${gather.length}</b><span>${S('strip.gather')}</span><small>${S('strip.gatherSub')}</small></div>
+      </div>
+    </section>`;
 }
 
 /**
@@ -131,19 +128,26 @@ export function RightNow({ data, onConnect, toSection }) {
   ].join(' · ');
 
   return html`
-    <${Section} id="adm-sso-01" title=${S('now.title')} count="01"
-      actions=${html`<${Action} disabled=${node.locked} onClick=${onConnect}>${S('now.connect')}<//>`}>
-      <${Stack}>
-      <${Columns} collapse=${900}>
-        <${Stack} density="compact">
-          <${Text} kind="heading" tone=${blocked || node.locked ? 'danger' : 'plain'}>${word}<//>
-          <${Text}>${line}<//>
-          <${Text} kind="mono" tone="muted">${stamp}<//>
+    <section class="og-sec og-sec--first" id="adm-sso-01">
+      <div class="og-sec-h">
+        <h2 class="poster-section-title">${S('now.title')}<small>01</small></h2>
+        <div class="og-doors">
+          <button type="button" class="og-door og-door--quiet" disabled=${node.locked} onClick=${onConnect}>
+            ${S('now.connect')}
+          </button>
+        </div>
+      </div>
+
+      <div class="adm-ov-grid">
+        <div>
+          <div class="adm-ov-status ${blocked || node.locked ? 'danger' : ''}">${word}</div>
+          <p class="adm-alert-line">${line}</p>
+          <div class="adm-ov-up">${stamp}</div>
           ${blocked ? html`
-            <${Stack} direction="wrap">
-              <${Action} tone="danger" href="/v1/admin?tab=config">${S('now.openConfig')}<//>
-            <//>` : null}
-        <//>
+            <div class="adm-sso-acts">
+              <a class="og-door og-door--danger" href="/v1/admin?tab=config">${S('now.openConfig')}</a>
+            </div>` : null}
+        </div>
 
         <div>
           ${Row({
@@ -183,25 +187,39 @@ export function RightNow({ data, onConnect, toSection }) {
       ? html`<${Badge} type="success" label=${S('now.calling', { n: s.directories_calling })} />`
       : html`<${Badge} type="muted" label=${S('now.notYet')} />`,
     value: S('now.arrivingValue', { logins: num(s.logins_seen), dirs: num(s.directories_calling) }),
+    last: true,
   })}
         </div>
-      <//>
+      </div>
 
-      <${NumeralBand} tone="plain" items=${[
-    { label: S('strip.switch'), value: node.enabled ? S('now.on') : S('now.off'),
-      note: node.enabled ? S('strip.switchOnSub') : S('strip.switchOffSub'), tone: node.enabled ? undefined : 'coral' },
-    { label: S('strip.organisations'), value: String(s.total), note: data.connections.map(c => c.name).slice(0, 2).join(' · ') },
-    { label: S('strip.arrived'), value: num(s.logins_seen), note: s.logins_seen ? S('strip.arrivedSub') : S('strip.arrivedNone'),
-      tone: s.logins_seen ? undefined : 'muted' },
-    { label: S('strip.steps'), value: S('strip.stepsValue', { done: first?.steps_done ?? 0, total: s.steps_total }),
-      note: node.enabled ? S('strip.stepsSub') : S('strip.stepsSixth') },
-  ]} />
+      <div class="og-strip">
+        <div>
+          <b class=${node.enabled ? '' : 'adm-sso-coral'}>${node.enabled ? S('now.on') : S('now.off')}</b>
+          <span>${S('strip.switch')}</span>
+          <small>${node.enabled ? S('strip.switchOnSub') : S('strip.switchOffSub')}</small>
+        </div>
+        <div>
+          <b>${s.total}</b><span>${S('strip.organisations')}</span>
+          <small>${data.connections.map(c => c.name).slice(0, 2).join(' · ')}</small>
+        </div>
+        <div>
+          <b class=${s.logins_seen ? '' : 'adm-sso-dim'}>${num(s.logins_seen)}</b>
+          <span>${S('strip.arrived')}</span>
+          <small>${s.logins_seen ? S('strip.arrivedSub') : S('strip.arrivedNone')}</small>
+        </div>
+        <div>
+          <b>${S('strip.stepsValue', { done: first?.steps_done ?? 0, total: s.steps_total })}</b>
+          <span>${S('strip.steps')}</span>
+          <small>${node.enabled ? S('strip.stepsSub') : S('strip.stepsSixth')}</small>
+        </div>
+      </div>
 
       ${blocked ? html`
-        <${Stack} direction="wrap" align="center" density="compact">
-          <${Text} kind="caption" tone="muted">${S('now.blockedNote')}<//>
-          <${Action} onClick=${() => toSection('02')}>${S('now.seeSteps')}<//>
-        <//>` : null}
-      <//>
-    <//>`;
+        <p class="adm-sso-note">
+          ${S('now.blockedNote')}${' '}
+          <button type="button" class="og-door og-door--quiet" onClick=${() => toSection('02')}>
+            ${S('now.seeSteps')}
+          </button>
+        </p>` : null}
+    </section>`;
 }

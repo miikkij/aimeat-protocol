@@ -15,14 +15,11 @@
  *
  * @structure
  *   - ExtensionsTab({ data, reload }) — the sections and the derived counts
- *   - RightNow: section 01, the six rows and the numeral band
- *   - List: section 02, the toolbar, the rows and the opened record
+ *   - RightNow: section 01, the six rows and the numeral strip
+ *   - List: section 02, the search, the chips, the rows and the opened record
  *   - Sections 03 and 04 are in extensions-tab.add.js, the record in extensions-tab.record.js
  *
  * @version-history
- *   v3.0.0 -- 2026-09-22 -- Composed from the shared component set: sections, a toolbar with the five
- *     filters, list rows that open the record in place, and the numeral band. The page's own sheet is
- *     gone, so a theme or a part changes here with every other page.
  *   v2.1.0 — 2026-09-13 — Compose existing section headings from shared poster B1.
  *   v2.0.0 — 2026-09-12 — The poster face, the name Extensions, and the three numbers an operator
  *     could not see: what calls each extension, which run on a clock, and which do neither.
@@ -33,9 +30,9 @@ import { useState, useCallback } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
+import { useViewCSS } from '/components/useViewCSS.js';
 import { num, shortDate, Empty, Badge, Row, useToast, Toast } from './shared.js';
 import { useConfirm } from '/components/Modal.js';
-import { Section, Columns, Stack, ListRow, Toolbar, NumeralBand, Action, Text, Chip } from '/components/poster-parts.js';
 import { uninstallExtension } from '/js/services/admin.js';
 import ExtensionRecord from './extensions-tab.record.js';
 import { Bundled, Scaffold } from './extensions-tab.add.js';
@@ -82,14 +79,15 @@ function countAll(list) {
 
 /** Section 01: what the installed extensions add, and how much of it anything asks for. */
 function RightNow({ c, oldestIdle }) {
-  return html`<${Section} title=${X('now.title')} count="01">
-    <${Stack}>
-      <${Columns} layout="trailing" collapse=${900}>
-        <${Stack} density="compact">
-          <${Text} kind="number" size="large">${X('now.word', { n: num(c.active) })}<//>
-          <${Text} kind="lead">${X('now.line', { actions: num(c.actions), idle: num(c.idle) })}<//>
-          <${Text} kind="mono" tone="muted">${X('now.log', { total: num(c.total), off: num(c.total - c.active) })}<//>
-        <//>
+  return html`
+    <section class="og-sec og-sec--first">
+      <div class="og-sec-h"><h2 class="poster-section-title">${X('now.title')}<small>01</small></h2></div>
+      <div class="adm-ov-grid">
+        <div>
+          <div class="adm-ov-status">${X('now.word', { n: num(c.active) })}</div>
+          <p class="adm-alert-line">${X('now.line', { actions: num(c.actions), idle: num(c.idle) })}</p>
+          <div class="adm-ov-up">${X('now.log', { total: num(c.total), off: num(c.total - c.active) })}</div>
+        </div>
         <div>
           <${Row} title=${X('now.actions')} why=${X('now.actionsWhy')}
             chip=${html`<${Badge} type="healthy" label=${num(c.actions)} />`}
@@ -106,22 +104,22 @@ function RightNow({ c, oldestIdle }) {
           <${Row} title=${X('now.off')} why=${X('now.offWhy')}
             chip=${html`<${Badge} type=${c.total - c.active ? 'warning' : 'muted'} label=${num(c.total - c.active)} />`}
             value=${X('now.ofTotal', { total: num(c.total) })} />
-          <${Row} title=${X('now.instances')} why=${X('now.instancesWhy')}
+          <${Row} title=${X('now.instances')} why=${X('now.instancesWhy')} last=${true}
             chip=${html`<${Badge} type="muted" label=${num(c.instances)} />`}
             value=${X('now.instancesVal', { n: num(c.supports) })} />
         </div>
-      <//>
-      <${NumeralBand} tone="plain" items=${[
-        { label: X('strip.installed'), value: num(c.total), note: X('strip.installedSub', { n: num(c.active) }) },
-        { label: X('strip.actions'), value: num(c.actions), note: X('strip.actionsSub') },
-        { label: X('strip.clock'), value: num(c.clock), note: X('strip.clockSub') },
-        { label: X('strip.idle'), value: num(c.idle), note: X('strip.idleSub'), tone: c.idle ? 'coral' : undefined },
-      ]} />
-    <//>
-  <//>`;
+      </div>
+      <div class="og-strip">
+        <div><b>${num(c.total)}</b><span>${X('strip.installed')}</span><small>${X('strip.installedSub', { n: num(c.active) })}</small></div>
+        <div><b>${num(c.actions)}</b><span>${X('strip.actions')}</span><small>${X('strip.actionsSub')}</small></div>
+        <div><b>${num(c.clock)}</b><span>${X('strip.clock')}</span><small>${X('strip.clockSub')}</small></div>
+        <div><b class=${c.idle ? 'og-coral-num' : ''}>${num(c.idle)}</b><span>${X('strip.idle')}</span><small>${X('strip.idleSub')}</small></div>
+      </div>
+    </section>`;
 }
 
 export default function ExtensionsTab({ data, reload }) {
+  useViewCSS('/css/views/admin-extensions.css');
   const [toast, showErr, , clearToast] = useToast();
   const { confirm, ConfirmUI } = useConfirm();
   const [filter, setFilter] = useState('all');
@@ -161,67 +159,86 @@ export default function ExtensionsTab({ data, reload }) {
     .sort((a, b) => a.name.localeCompare(b.name));
   const shown = rows.slice(0, limit);
 
-  const filterOf = (id, label, count) => ({ id, label: `${label} ${num(count)}`, selected: filter === id, onClick: () => pick(id) });
+  const chip = (id, label, count, coral) => html`
+    <button type="button" class="adm-ex-chip ${filter === id ? 'on' : ''} ${coral ? 'adm-ex-chip--coral' : ''}"
+      aria-pressed=${filter === id ? 'true' : 'false'} onClick=${() => pick(id)}>${label}<b>${num(count)}</b></button>`;
 
-  return html`<${Stack}>
-    ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
-    <${RightNow} c=${c} oldestIdle=${idleInstalls[0]} />
+  return html`
+    <div class="og adm-ex">
+      ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
+      <${RightNow} c=${c} oldestIdle=${idleInstalls[0]} />
 
-    <${Section} title=${X('list.title')} count="02" actions=${html`<${Text} kind="caption" tone="muted">${X('list.sorted')}<//>`}>
-      <${Stack}>
-        <${Toolbar} label=${X('list.find')}
-          search=${{ label: X('list.find'), placeholder: X('list.findPlaceholder'), value: query, onInput: e => type(e.target.value) }}
-          filters=${[
-            filterOf('all', X('chip.all'), c.total),
-            filterOf('called', X('chip.called'), c.called),
-            filterOf('clock', X('chip.clock'), c.clock),
-            filterOf('idle', X('chip.idle'), c.idle),
-            filterOf('off', X('chip.off'), c.total - c.active),
-          ]} />
-
-        ${shown.length === 0 && html`<${Text} kind="caption" tone="muted">${X('list.nothing')}<//>`}
-
-        <div>
-          ${shown.map(e => {
-            const isOpen = open === e.name;
-            const users = [...(e.used_by?.app_names || []), ...(e.used_by?.cortex_names || [])];
-            const toggle = () => setOpen(isOpen ? null : e.name);
-            return html`<${ListRow} key=${e.name} name=${e.name} onOpen=${toggle} open=${isOpen}
-              detail=${e.description || X('noDescription')} detailKind="text"
-              value=${html`<${Stack} density="compact" align="end">
-                ${e.status !== 'active' && html`<${Chip} tone="muted">${X('switchedOff')}<//>`}
-                <${Text} kind="mono">${X('actionsCount', { n: num(e.actionCount ?? (e.actions || []).length) })}<//>
-                <${Text} kind="caption" tone="muted">${X('col.installed')} ${shortDate(e.installedAt)}<//>
-              <//>`}
-              actions=${html`<${Action} expanded=${isOpen} onClick=${toggle}>${isOpen ? X('close') : X('open')}<//>`}>
-              <${Stack}>
-                <${Stack} direction="wrap" align="center" density="compact">
-                  <${Text} kind="label">${X('col.calledBy')}<//>
-                  ${users.length > 0
-                    ? users.map(n => html`<${Action} key=${n} kind="text" onClick=${() => type(n)}>${n}<//>`)
-                    : onAClock(e)
-                      ? html`<${Text} kind="mono">${X('list.onlyClock')}<//>`
-                      : html`<${Text} kind="mono" tone="coral">${X('list.nobody')}<//>`}
-                <//>
-                ${isOpen && html`<${ExtensionRecord} ext=${e} onClose=${() => setOpen(null)}
-                  onUninstall=${uninstall} onReload=${reload} />`}
-              <//>
-            <//>`;
-          })}
+      <section class="og-sec">
+        <div class="og-sec-h">
+          <h2 class="poster-section-title">${X('list.title')}<small>02</small></h2>
+          <div class="og-doors"><span class="og-door og-door--quiet">${X('list.sorted')}</span></div>
         </div>
 
-        <${Stack} direction="horizontal" align="between">
-          <${Text} kind="mono" tone="muted">${X('list.shown', { shown: num(shown.length), total: num(rows.length) })}${
-            rows.length !== c.total ? X('list.ofAll', { total: num(c.total) }) : ''}<//>
-          ${rows.length > shown.length && html`<${Action} onClick=${() => setLimit(l => l + PAGE)}>
-            ${X('list.more', { n: num(Math.min(PAGE, rows.length - shown.length)) })}<//>`}
-        <//>
-        <${Text} kind="caption" tone="muted">${X('list.note')}<//>
-      <//>
-    <//>
+        <div class="adm-ex-find">
+          <div class="og-field">
+            <label class="og-label" for="adm-ex-q">${X('list.find')}</label>
+            <input id="adm-ex-q" class="og-input" type="search" value=${query}
+              placeholder=${X('list.findPlaceholder')} onInput=${e => type(e.target.value)} />
+          </div>
+          <div class="adm-ex-chips">
+            ${chip('all', X('chip.all'), c.total)}
+            ${chip('called', X('chip.called'), c.called)}
+            ${chip('clock', X('chip.clock'), c.clock)}
+            ${chip('idle', X('chip.idle'), c.idle, true)}
+            ${chip('off', X('chip.off'), c.total - c.active)}
+          </div>
+        </div>
 
-    <${Bundled} installedNames=${new Set(list.map(e => e.name))} onReload=${reload} />
-    <${Scaffold} onReload=${reload} />
-    <${ConfirmUI} />
-  <//>`;
+        <div class="adm-ex-row adm-ex-row--head">
+          <div>${X('col.extension')}</div><div class="adm-ex-uses">${X('col.calledBy')}</div>
+          <div class="adm-ex-n">${X('col.actions')}</div><div class="adm-ex-when">${X('col.installed')}</div><div></div>
+        </div>
+
+        ${shown.length === 0 && html`<p class="adm-ex-note">${X('list.nothing')}</p>`}
+
+        ${shown.map(e => {
+    const isOpen = open === e.name;
+    const users = [...(e.used_by?.app_names || []), ...(e.used_by?.cortex_names || [])];
+    return html`
+      <div class="adm-ex-row ${isOpen ? 'adm-ex-row--open' : ''}">
+        <div>
+          <button type="button" class="adm-ex-nm ${isOpen ? 'is-open' : ''}"
+            onClick=${() => setOpen(isOpen ? null : e.name)}>${e.name}</button>
+          ${e.status !== 'active' && html`<span class="adm-ex-mark adm-ex-mark--off">${X('switchedOff')}</span>`}
+          <span class="adm-ex-desc">${e.description || X('noDescription')}</span>
+        </div>
+        <div class="adm-ex-uses">
+          ${users.length > 0
+    ? users.map((n, i) => html`${i > 0 ? ', ' : ''}<button type="button" onClick=${() => type(n)}>${n}</button>`)
+    : onAClock(e)
+      ? html`<span class="adm-ex-uses--clock">${X('list.onlyClock')}</span>`
+      : html`<span class="adm-ex-uses--none">${X('list.nobody')}</span>`}
+        </div>
+        <div class="adm-ex-n">${num(e.actionCount ?? (e.actions || []).length)}</div>
+        <div class="adm-ex-when">${shortDate(e.installedAt)}</div>
+        <div class="adm-ex-go">
+          <button type="button" class="og-door og-door--quiet" onClick=${() => setOpen(isOpen ? null : e.name)}>
+            ${isOpen ? X('close') : X('open')}
+          </button>
+        </div>
+      </div>
+      ${isOpen && html`<${ExtensionRecord} ext=${e} onClose=${() => setOpen(null)}
+        onUninstall=${uninstall} onReload=${reload} />`}`;
+  })}
+
+        <div class="adm-ex-foot">
+          <span>${X('list.shown', { shown: num(shown.length), total: num(rows.length) })}${
+  rows.length !== c.total ? X('list.ofAll', { total: num(c.total) }) : ''}</span>
+          ${rows.length > shown.length && html`
+            <button type="button" class="og-door og-door--quiet" onClick=${() => setLimit(l => l + PAGE)}>
+              ${X('list.more', { n: num(Math.min(PAGE, rows.length - shown.length)) })}
+            </button>`}
+        </div>
+        <p class="adm-ex-note">${X('list.note')}</p>
+      </section>
+
+      <${Bundled} installedNames=${new Set(list.map(e => e.name))} onReload=${reload} />
+      <${Scaffold} onReload=${reload} />
+      <${ConfirmUI} />
+    </div>`;
 }

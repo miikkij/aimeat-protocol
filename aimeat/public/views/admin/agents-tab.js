@@ -21,8 +21,6 @@
  *   - agents-tab.derive.js does the counting, .list.js is section 02, .record.js is an opened row
  *
  * @version-history
- *   2026-09-22 -- Composed from the shared component set (Section, Columns, NumeralBand, Table,
- *     Meter, Surface): no page sheet and no class of its own, so a theme change reaches it.
  *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v2.1.0 — 2026-09-13 — Compose the remaining B1 headings; fleet ratios use SVG width data.
@@ -37,8 +35,8 @@ import { useState, useCallback } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
+import { useViewCSS } from '/components/useViewCSS.js';
 import { num, Empty, Badge, Row, shortDate } from './shared.js';
-import { Section, Columns, Stack, NumeralBand, Table, Meter, Surface, Action, Text } from '/components/poster-parts.js';
 import { getAgentDetail } from '/js/services/admin.js';
 import { swallowed } from '/js/swallowed.js';
 import {
@@ -55,78 +53,86 @@ function RightNow({ counts, fleets, nodeId, owners, onOwners }) {
     ? Math.round((fleets.biggest.count / counts.total) * 100)
     : 0;
   return html`
-    <${Section} title=${A('nowTitle')} count="01"
-      actions=${html`<${Action} onClick=${onOwners}>${A('toOwners')}<//>`}>
-      <${Stack}>
-        <${Columns} collapse=${900}>
-          <${Stack} density="compact">
-            <${Text} kind="heading">${A('awakeWord', { n: num(counts.awake) })}<//>
-            <${Text}>${A('nowLine', { awake: num(counts.awake), silent: num(counts.silent) })}<//>
-            <${Text} kind="mono" tone="muted">${nodeId}<//>
-            <${Text} kind="mono" tone="muted">${A('nowMeta', {
+    <section class="og-sec og-sec--first">
+      <div class="og-sec-h">
+        <h2 class="poster-section-title">${A('nowTitle')}<small>01</small></h2>
+        <div class="og-doors">
+          <button type="button" class="og-door og-door--quiet" onClick=${onOwners}>${A('toOwners')}</button>
+        </div>
+      </div>
+      <div class="adm-ov-grid">
+        <div>
+          <div class="adm-ov-status">${A('awakeWord', { n: num(counts.awake) })}</div>
+          <p class="adm-alert-line">${A('nowLine', { awake: num(counts.awake), silent: num(counts.silent) })}</p>
+          <div class="adm-ov-up">${nodeId}<br />${A('nowMeta', {
     total: num(counts.total), owners: num(fleets.owners), registered: num(owners),
-  })}<//>
-          <//>
-          <div>
-            <${Row} title=${A('rowAwake')} why=${A('rowAwakeWhy')}
-              chip=${html`<${Badge} type="healthy" label=${num(counts.awake)} />`}
-              value=${A('valShare', { pct: share })} />
-            <${Row} title=${A('rowSilent')} why=${A('rowSilentWhy')}
-              chip=${html`<${Badge} type=${counts.silent ? 'warning' : 'muted'} label=${num(counts.silent)} />`}
-              value=${counts.oldestSilent ? A('valOldest', { date: shortDate(counts.oldestSilent) }) : ''} />
-            <${Row} title=${A('rowNode')} why=${A('rowNodeWhy')}
-              chip=${html`<${Badge} type="muted" label=${num(counts.nodeMade)} />`}
-              value=${A('valSplit', { app: num(counts.app), chat: num(counts.chat) })} />
-            <${Row} title=${A('rowLow')} why=${A('rowLowWhy')}
-              chip=${html`<${Badge} type=${counts.low ? 'warning' : 'muted'} label=${num(counts.low)} />`}
-              value=${counts.lowest !== null ? A('valLowest', { score: trustText(counts.lowest) }) : ''} />
-          </div>
-        <//>
-        <${NumeralBand} tone="plain" items=${[
-    { label: A('stripAgents'), value: num(counts.total), note: A('stripAgentsSub') },
-    { label: A('stripAwake'), value: num(counts.awake), note: A('stripAwakeSub') },
-    { label: A('stripSilent'), value: num(counts.silent), note: A('stripSilentSub'), tone: 'coral' },
-    { label: A('stripFleet'), value: num(fleets.biggest?.count ?? 0),
-      note: fleets.biggest ? A('stripFleetSub', { owner: fleets.biggest.owner, pct: fleetShare }) : '' },
-  ]} />
-      <//>
-    <//>`;
+  })}</div>
+        </div>
+        <div>
+          <${Row} title=${A('rowAwake')} why=${A('rowAwakeWhy')}
+            chip=${html`<${Badge} type="healthy" label=${num(counts.awake)} />`}
+            value=${A('valShare', { pct: share })} />
+          <${Row} title=${A('rowSilent')} why=${A('rowSilentWhy')}
+            chip=${html`<${Badge} type=${counts.silent ? 'warning' : 'muted'} label=${num(counts.silent)} />`}
+            value=${counts.oldestSilent ? A('valOldest', { date: shortDate(counts.oldestSilent) }) : ''} />
+          <${Row} title=${A('rowNode')} why=${A('rowNodeWhy')}
+            chip=${html`<${Badge} type="muted" label=${num(counts.nodeMade)} />`}
+            value=${A('valSplit', { app: num(counts.app), chat: num(counts.chat) })} />
+          <${Row} title=${A('rowLow')} why=${A('rowLowWhy')} last=${true}
+            chip=${html`<${Badge} type=${counts.low ? 'warning' : 'muted'} label=${num(counts.low)} />`}
+            value=${counts.lowest !== null ? A('valLowest', { score: trustText(counts.lowest) }) : ''} />
+        </div>
+      </div>
+      <div class="og-strip">
+        <div><b>${num(counts.total)}</b><span>${A('stripAgents')}</span><small>${A('stripAgentsSub')}</small></div>
+        <div><b>${num(counts.awake)}</b><span>${A('stripAwake')}</span><small>${A('stripAwakeSub')}</small></div>
+        <div><b class="og-coral-num">${num(counts.silent)}</b><span>${A('stripSilent')}</span><small>${A('stripSilentSub')}</small></div>
+        <div><b>${num(fleets.biggest?.count ?? 0)}</b><span>${A('stripFleet')}</span>
+          <small>${fleets.biggest ? A('stripFleetSub', { owner: fleets.biggest.owner, pct: fleetShare }) : ''}</small></div>
+      </div>
+    </section>`;
 }
 
 /** Section 03: who holds what. The bar is the owner's share of the whole node. */
 function Fleets({ fleets, total, onOwners }) {
   const pct = n => (total ? Math.round((n / total) * 100) : 0);
-  const bar = n => html`<${Meter} kind="progress" value=${pct(n)} label=${A('colShare')} />`;
-  const open = html`<${Action} kind="text" onClick=${onOwners}>${A('open')}<//>`;
-  const rows = fleets.top.map(o => [
-    html`<strong>${o.owner}</strong>`,
-    html`<${Text} kind="number" size="small" tone=${o.count === fleets.biggest.count ? 'coral' : 'plain'}>${num(o.count)}<//>`,
-    html`<${Text} kind="mono">${num(o.awake)}<//>`,
-    bar(o.count),
-    open,
-  ]);
-  if (fleets.rest) {
-    rows.push([
-      html`<${Stack} density="compact"><strong>${A('restOwners', { n: num(fleets.rest.owners) })}</strong>
-        <${Text} kind="caption" tone="muted">${A('restWhy', { most: num(fleets.rest.most) })}<//><//>`,
-      html`<${Text} kind="number" size="small">${num(fleets.rest.count)}<//>`,
-      html`<${Text} kind="mono">${num(fleets.rest.awake)}<//>`,
-      bar(fleets.rest.count),
-      open,
-    ]);
-  }
+  const bar = n => html`<div class="adm-ag-bar"><svg width=${pct(n) + '%'} aria-hidden="true"></svg></div>`;
   return html`
-    <${Section} title=${A('fleetsTitle')} count="03"
-      actions=${html`<${Action} onClick=${onOwners}>${A('toOwners')}<//>`}
-      description=${fleets.biggest
+    <section class="og-sec">
+      <div class="og-sec-h">
+        <h2 class="poster-section-title">${A('fleetsTitle')}<small>03</small></h2>
+        <div class="og-doors">
+          <button type="button" class="og-door og-door--quiet" onClick=${onOwners}>${A('toOwners')}</button>
+        </div>
+      </div>
+      <p class="adm-ag-lead">${fleets.biggest
     ? A('fleetsLead', { pct: pct(fleets.biggest.count), owners: num(fleets.owners) })
-    : ''}>
-      <${Table} density="compact" collapse=${600} label=${A('fleetsTitle')}
-        headers=${[A('colOwner'), A('colAgents'), A('colAwake'), A('colShare'), '']} rows=${rows} />
-    <//>`;
+    : ''}</p>
+      <div class="adm-ag-orow adm-ag-orow--head">
+        <div>${A('colOwner')}</div><div>${A('colAgents')}</div><div>${A('colAwake')}</div>
+        <div class="adm-ag-c-share">${A('colShare')}</div><div></div>
+      </div>
+      ${fleets.top.map(o => html`
+        <div class="adm-ag-orow">
+          <div class="adm-ag-onm">${o.owner}</div>
+          <div><span class="adm-ag-onum ${o.count === fleets.biggest.count ? 'adm-ag-onum--coral' : ''} poster-stat-number poster-stat-number--small">${num(o.count)}</span></div>
+          <div><span class="adm-ag-osm">${num(o.awake)}</span></div>
+          ${bar(o.count)}
+          <div class="adm-ag-go"><button type="button" class="og-door og-door--quiet" onClick=${onOwners}>${A('open')}</button></div>
+        </div>`)}
+      ${fleets.rest && html`
+        <div class="adm-ag-orow">
+          <div class="adm-ag-onm">${A('restOwners', { n: num(fleets.rest.owners) })}<small>${A('restWhy', { most: num(fleets.rest.most) })}</small></div>
+          <div><span class="adm-ag-onum poster-stat-number poster-stat-number--small">${num(fleets.rest.count)}</span></div>
+          <div><span class="adm-ag-osm">${num(fleets.rest.awake)}</span></div>
+          ${bar(fleets.rest.count)}
+          <div class="adm-ag-go"><button type="button" class="og-door og-door--quiet" onClick=${onOwners}>${A('open')}</button></div>
+        </div>`}
+    </section>`;
 }
 
 export default function AgentsTab({ data, switchPage }) {
+  useViewCSS('/css/views/admin-agents.css');
   // Hooks run unconditionally before any early return (Rules of Hooks).
   const [filter, setFilter] = useState('all');
   const [query, setQuery] = useState('');
@@ -168,7 +174,7 @@ export default function AgentsTab({ data, switchPage }) {
   );
 
   return html`
-    <${Stack}>
+    <div class="og adm-ag">
       <${RightNow} counts=${counts} fleets=${fleets} nodeId=${data.dash?.node_id || ''}
         owners=${data.dash?.counts?.owners ?? fleets.owners} onOwners=${toOwners} />
 
@@ -180,9 +186,9 @@ export default function AgentsTab({ data, switchPage }) {
 
       <${Fleets} fleets=${fleets} total=${counts.total} onOwners=${toOwners} />
 
-      <${Surface} kind="aside" density="compact">
-        <${Text}><strong>${A('asideLead')}</strong> ${A('aside', { n: num(counts.silent) })}<//>
-      <//>
-      <${Text} kind="caption" tone="muted">${A('asideNote')}<//>
-    <//>`;
+      <div class="og-box poster-aside poster-aside--small">
+        <b>${A('asideLead')}</b> ${A('aside', { n: num(counts.silent) })}
+      </div>
+      <p class="adm-ag-note">${A('asideNote')}</p>
+    </div>`;
 }

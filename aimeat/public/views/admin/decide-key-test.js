@@ -11,8 +11,6 @@
  * @structure DecideKeyTest — a button and its result line
  * @usage html`<${DecideKeyTest} />` (config-tab.js SECTION_ACTIONS.decide)
  * @version-history
- *   v1.1.0 -- 2026-09-22 -- Composed from the shared component set (an action, a caption, the
- *     result in the success or danger tone), so the Config page's own classes can go.
  *   v1.0.0 — 2026-09-19 — Initial.
  */
 import { h } from 'preact';
@@ -21,7 +19,6 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { apiPost } from '/js/api.js';
-import { Stack, Action, Text } from '/components/poster-parts.js';
 
 export function DecideKeyTest() {
   const [busy, setBusy] = useState(false);
@@ -43,11 +40,14 @@ export function DecideKeyTest() {
     }
   };
 
-  return html`<${Stack} density="compact" align="start">
-    <${Action} onClick=${run} disabled=${busy}>${busy ? t('dashboard.decideKeyTesting') : t('dashboard.decideKeyTest')}<//>
-    <${Text} kind="caption" tone="muted">${t('dashboard.decideKeyTestNote')}<//>
-    ${result && html`<${Stack} role="status"><${Text} tone=${result.ok ? 'success' : 'danger'}>${result.text}<//><//>`}
-  <//>`;
+  return html`
+    <div class="adm-cfg-action">
+      <button type="button" class="adm-btn-action" onClick=${run} disabled=${busy}>
+        ${busy ? t('dashboard.decideKeyTesting') : t('dashboard.decideKeyTest')}
+      </button>
+      <small>${t('dashboard.decideKeyTestNote')}</small>
+      ${result && html`<p class=${result.ok ? 'adm-config-result-ok' : 'adm-config-result-err'} role="status">${result.text}</p>`}
+    </div>`;
 }
 
 export default DecideKeyTest;

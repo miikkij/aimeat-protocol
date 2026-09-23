@@ -1,0 +1,154 @@
+/* ── Admin Federation page, in the poster face ──
+ * @file admin-federation.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The operator's Federation page (design canvas "AIMEAT Admin Federation"): where this
+ *   node stands, what waits on a person, who may sign in, what this node offers, the peers, the
+ *   book and the requests. The frame, the sections, the metric rows, the numeral strip, the dashed
+ *   box and the doors come from admin.css and organism.css; only what this page adds lives here.
+ *
+ *   NO SERIES COLOURS, and there is no chart. The only colours that carry meaning are statuses: a
+ *   peer that cannot be switched on, a version that is behind, a policy that reaches nobody. Each
+ *   one wears the status token it belongs to and each one is said in words beside the colour, so
+ *   the page reads the same with the colours removed.
+ *
+ *   A STUCK ROW IS MARKED WITH A RULE, NOT A FILL. `--danger-bg` (#FEE2E2) as a row background put
+ *   every dim and muted token in that row below AA in the light theme: `--text-dim` measured 3.96,
+ *   `--warn-fg` 4.11 and `--text-muted` 2.08 against it, and on a node whose peers are all waiting
+ *   to be switched on that is the page's ordinary state rather than an edge case. The rule carries
+ *   the same signal on the same ground the rest of the table uses, which is what the 390 layout had
+ *   been doing all along. Measured by driving the browser 2026-09-12.
+ *
+ *   AND NO `--text-muted` ON TEXT. #9CA3AF is 2.43 on #FAFAF8, so every text use here is
+ *   `--text-dim` (#6B7280, 4.63) — the same swap the Usage and Statistics sheets made.
+ * @version-history
+ *   v1.1.0 — 2026-09-12 — Contrast: the stuck-row fill becomes a rule, and every --text-muted text
+ *     use becomes --text-dim. The peers table turns into blocks at 1100px rather than 700px,
+ *     because at 1024 it overflowed its own scroller and left the row's action off-screen at rest.
+ *   v1.0.0 — 2026-09-12 — Initial. Replaces eleven sections and twenty collapsible explainers.
+ */
+
+.adm-fed .adm-mrow--last { border-bottom: 0; }
+.adm-fed .adm-mrow .adm-mval { overflow-wrap: anywhere; }
+.adm-fed .og-strip small { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.4; }
+.adm-fed .og-strip b.adm-fed-coral { color: var(--accent); }
+.adm-fed .og-strip b.adm-fed-word { font-size: 1.5rem; text-transform: uppercase; }
+.adm-fed .og-box { max-width: none; }
+.adm-fed .og-door:disabled { opacity: .5; cursor: default; }
+
+.adm-fed-lead { margin: 0 0 14px; font-size: .95rem; line-height: 1.6; color: var(--text); max-width: 92ch; }
+.adm-fed-lbl { font-size: .66rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin-bottom: 8px; }
+/* The spacing modifiers, so nothing on this page carries an inline style attribute. */
+.adm-fed-lbl--gap { margin-top: 20px; }
+.adm-fed-lbl--flush { margin: 0; }
+.adm-fed-box--after { margin-top: 16px; }
+.adm-fed-box--afterRows { margin-top: 18px; }
+.adm-fed-after { margin-top: 16px; }
+.adm-fed-after--tight { margin-top: 14px; }
+.adm-fed-note { margin: 14px 0 0; font-size: .78rem; line-height: 1.55; color: var(--text-dim); max-width: 92ch; }
+.adm-fed-acts { display: flex; gap: 22px; align-items: center; margin-top: 16px; flex-wrap: wrap; }
+.adm-fed-empty { padding: 26px; text-align: center; color: var(--text-dim); font-size: .9rem; border: 2px dashed var(--border); background: var(--bg); }
+.adm-fed-when { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); white-space: nowrap; }
+
+/* 02: the sign-in policy as three rungs, and the scope chips. */
+.adm-fed-pick { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 0 12px; align-items: start; padding: .6rem 0; border-bottom: 1px solid var(--border); font-size: .9rem; cursor: pointer; }
+.adm-fed-pick--last { border-bottom: 0; }
+.adm-fed-pick input { margin-top: 4px; }
+.adm-fed-pick b { font-weight: 700; }
+.adm-fed-pick span > span { display: block; font-size: .78rem; font-weight: 400; line-height: 1.45; color: var(--text-dim); margin-top: 2px; }
+.adm-fed-scopes { display: flex; gap: 8px 10px; flex-wrap: wrap; }
+.adm-fed-scope { font-family: var(--font-mono); font-size: .72rem; font-weight: 500; padding: 3px 9px; border: 2px solid var(--border); background: none; color: var(--text-dim); cursor: pointer; border-radius: 0; }
+.adm-fed-scope:hover { border-color: var(--text); color: var(--text); }
+.adm-fed-scope.on { border-color: var(--text); background: var(--sun); color: var(--on-sun); }
+.adm-fed-switch { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 0 12px; align-items: start; margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--border); font-size: .9rem; cursor: pointer; }
+.adm-fed-switch input { margin-top: 4px; }
+.adm-fed-switch span > span { display: block; font-size: .78rem; font-weight: 400; line-height: 1.45; color: var(--text-dim); margin-top: 2px; }
+.adm-fed-of { color: var(--text-dim); }
+
+/* 03 and 04: the two tables. A peer is a row, not a card. */
+.adm-fed-scroll { overflow-x: auto; }
+.adm-fed-tbl { width: 100%; border-collapse: collapse; font-size: .84rem; }
+.adm-fed-tbl th { text-align: left; color: var(--text-dim); font-weight: 600; padding: 8px 14px 8px 0; border-bottom: 2px solid var(--text); white-space: nowrap; font-size: .69rem; text-transform: uppercase; letter-spacing: .3px; }
+.adm-fed-tbl td { padding: 12px 14px 12px 0; border-bottom: 1px solid var(--border); color: var(--text-dim); vertical-align: top; }
+.adm-fed-tbl td b { display: block; color: var(--text); font-weight: 700; }
+.adm-fed-tbl td.mono, .adm-fed-tbl td b.mono { font-family: var(--font-mono); font-size: .76rem; overflow-wrap: break-word; word-break: normal; }
+.adm-fed-tbl td.acts { text-align: right; white-space: nowrap; padding-right: 0; }
+.adm-fed-tbl th.acts { text-align: right; padding-right: 0; }
+/* A peer that cannot carry anything yet is the reason to be on this page. Marked with a rule down
+   the first cell rather than a fill across the row: a fill changes the ground every token in the
+   row was measured against, and on a node whose peers are all waiting that is the whole table. */
+.adm-fed-tbl tr.adm-fed-row--stuck td:first-child { box-shadow: inset 3px 0 0 var(--danger-fg); padding-left: 11px; }
+.adm-fed-url { display: block; font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); overflow-wrap: anywhere; }
+.adm-fed-state { font-weight: 700; color: var(--text); }
+.adm-fed-state--good { color: var(--success-fg); }
+.adm-fed-state--bad { color: var(--danger-fg); }
+.adm-fed-state--wait { color: var(--warn-fg); }
+.adm-fed-sub { display: block; font-size: .74rem; color: var(--text-dim); margin-top: 3px; }
+.adm-fed-behind { display: block; font-size: .7rem; font-weight: 700; color: var(--warn-fg); margin-top: 3px; }
+.adm-fed-same { display: block; font-size: .7rem; color: var(--text-dim); margin-top: 3px; }
+.adm-fed-may { font-size: .76rem; line-height: 1.6; }
+.adm-fed-maynot { color: var(--text-dim); }
+/* The two rows a reader has to pick out of a directory of identical rows. */
+.adm-fed-mark { display: inline-block; margin-top: 4px; padding: 1px 7px; font-family: var(--font-mono); font-size: .66rem; font-weight: 500; background: var(--sun); color: var(--on-sun); white-space: nowrap; }
+.adm-fed-mark--quiet { background: none; border: 1px solid var(--border); color: var(--text-dim); }
+.adm-fed-nothing { color: var(--warn-fg); font-size: .8rem; }
+
+/* 05: the request, in the dashed box, because it is the one thing a stranger asked for. */
+.adm-fed-req { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px 24px; align-items: start; }
+.adm-fed-req + .adm-fed-req { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); }
+.adm-fed-req p { margin: 8px 0 0; font-size: .86rem; color: var(--text-dim); line-height: 1.55; }
+.adm-fed-reqacts { display: flex; gap: 20px; align-items: center; white-space: nowrap; padding-top: 4px; }
+
+/* 06: the directory search, the same search anatomy as Knowledge. */
+.adm-fed-search { display: flex; align-items: center; gap: 9px; border-bottom: 3px solid var(--text); padding: 3px 2px 4px; min-width: 280px; max-width: 340px; margin-bottom: 16px; }
+.adm-fed-search svg { width: 15px; height: 15px; stroke: var(--text); fill: none; stroke-width: 2.5; stroke-linecap: round; flex: none; }
+.adm .adm-fed-search input { flex: 1 1 auto; min-width: 0; border: 0; border-radius: 0; background: none; padding: 0; font: inherit; font-size: .88rem; font-weight: 600; color: var(--text); outline: none; box-shadow: none; }
+.adm .adm-fed-search input::placeholder { color: var(--text-dim); font-weight: 400; }
+
+/* The two forms behind a door, and the reference doors at the foot. */
+.adm-fed-form { display: flex; gap: 18px; align-items: flex-end; flex-wrap: wrap; margin-top: 14px; }
+.adm-fed-ref { display: flex; gap: 26px; flex-wrap: wrap; align-items: baseline; }
+.adm-fed-ref-note { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); }
+.adm-fed-refbody { margin-top: 14px; font-size: .88rem; line-height: 1.65; color: var(--text-dim); max-width: 86ch; }
+.adm-fed-refbody h5 { margin: 14px 0 4px; font-size: .82rem; color: var(--text); }
+.adm-fed-refbody code { display: block; font-family: var(--font-mono); font-size: .74rem; margin: 2px 0; color: var(--text-dim); }
+
+/* Section 05's second half: what this node ASKED, which is waiting on them rather than on you. */
+.adm-fed-sent { margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--border); }
+.adm-fed-note--top { margin-top: 0; margin-bottom: 12px; }
+.adm-fed-req--sent b { color: var(--text-dim); }
+
+/* A table cannot be a table on a phone: one block per peer, the same words. */
+@media (max-width: 860px) {
+  .adm-fed-req { grid-template-columns: minmax(0, 1fr); }
+  .adm-fed-reqacts { padding-top: 0; }
+}
+/*
+ * 1100, not 700. The peers table is eight columns, and at 1024 it measured 810 px of content in a
+ * 734 px scroller: the row's own action sat 38 px past the viewport, reachable only by scrolling
+ * the box sideways, which nothing on the page suggests. Measured by driving the browser.
+ */
+@media (max-width: 1100px) {
+  .adm-fed-tbl, .adm-fed-tbl thead, .adm-fed-tbl tbody, .adm-fed-tbl tr, .adm-fed-tbl th, .adm-fed-tbl td { display: block; }
+  .adm-fed-tbl thead { display: none; }
+  .adm-fed-tbl tr { border-bottom: 1px solid var(--border); padding: 12px 0; }
+  .adm-fed-tbl td { border-bottom: 0; padding: 0 0 6px; }
+  /* Dropping the header row takes the name off any cell that does not carry its own: a rung read
+     "Member", a version "3.14.3" and a date a bare timestamp, with nothing saying what they were.
+     A cell whose value cannot name itself carries `data-col` and wears it here. */
+  .adm-fed-tbl td[data-col]::before {
+    content: attr(data-col) ": ";
+    color: var(--text-dim); font-size: .69rem; text-transform: uppercase; letter-spacing: .3px; font-weight: 600;
+  }
+  .adm-fed-tbl td.acts { text-align: left; padding-top: 8px; white-space: normal; }
+  .adm-fed-tbl tr.adm-fed-row--stuck { padding-left: 12px; border-left: 3px solid var(--danger-fg); }
+  .adm-fed-tbl tr.adm-fed-row--stuck td:first-child { box-shadow: none; padding-left: 0; }
+}
+/*
+ * A three-column metric row has nowhere to go at 390: the title got 51 px against a 232 px value
+ * and its sentence wrapped one word per line. Stacked, each part gets the whole width.
+ */
+@media (max-width: 560px) {
+  .adm-fed .adm-mrow { grid-template-columns: minmax(0, 1fr) auto; }
+  .adm-fed .adm-mrow .adm-mval { grid-column: 1 / -1; text-align: left; margin-top: 4px; }
+}

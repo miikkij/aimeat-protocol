@@ -10,10 +10,6 @@
  * @structure PRIMARY_FIELD (const), Workspace
  * @usage import { Workspace } from '/views/profile/organisms/workspace.js';
  * @version-history
- *   2026-09-22 -- The hash listener that opened a fold from the rail is gone: the cover's rail entries
- *     open their fold through the set's onClick (workspace/cover.js).
- *   2026-09-22 -- The loading and the empty-workspace states are shared Pages; a rail entry that names a
- *     fold opens it (useRailOpens); no class of its own.
  *   2026-09-13 — V1: compose page and B1 section headings from the shared poster classes.
  *   v2.0.0 — 2026-08-29 — The poster face (design canvas "AIMEAT Työtilan sivu", direction A). The render
  *     is one call into workspace/cover.js: the cover with its tables, the adaptive "New for you"
@@ -62,7 +58,7 @@ import htm from 'htm';
 import { onLiveUpdate } from '/lib/live-updates.js';
 const html = htm.bind(h);
 import { t, getLocale } from '/js/i18n.js';
-import { Page, Stack, Action, Text } from '/components/poster-parts.js';
+import { Spinner } from '/views/profile/shared.js';
 import { useConfirm } from '/components/Modal.js';
 import * as orgService from '/js/services/organisms.js';
 import { getGhii } from '/js/services/auth.js';
@@ -649,20 +645,22 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
     } catch (e) { showToast((e && e.message) || 'Failed to build prompt'); }
   }, [orgId, org, wsId, ws, showToast]);
 
-  const crumbs = buildBreadcrumb({ onBack, onBackToList, org, showSettings, guardWsDirty, setShowSettings, wsName, ws });
+  const back = buildBreadcrumb({ onBack, onBackToList, org, showSettings, guardWsDirty, setShowSettings, wsName, ws });
 
-  if (ws === undefined) return html`<${Page} crumbs=${crumbs}><${Text} tone="muted">${t('organisms.loading') || 'Loading...'}<//><//>`;
+  if (ws === undefined) return html`<div>${back}<${Spinner} text=${t('organisms.loading') || 'Loading...'} /></div>`;
 
   if (ws === null) {
-    return html`<${Page} crumbs=${crumbs} title=${org.name || 'Organism'}>
-      <${Stack} align="start">
-        <${Text} kind="lead" tone="muted">${t('organisms.noWorkspace') || 'The workspace is created, but it is still empty. Give it a structure: the one-click project template covers goals, plans, deliverables and decisions, or describe below what this workspace is for and an AI designs the structure.'}<//>
-        <${Action} kind="primary" onClick=${setup} disabled=${busy || genBusy}>${busy ? '...' : (t('organisms.setupWorkspace') || 'Set up workspace (project template)')}<//>
+    return html`
+      <div class="pj-ws">
+        ${back}
+        <div class="poster-section-title">${(org.name || 'Organism')}</div>
+        <div class="section-desc">${t('organisms.noWorkspace') || 'The workspace is created, but it is still empty. Give it a structure: the one-click project template covers goals, plans, deliverables and decisions, or describe below what this workspace is for and an AI designs the structure.'}</div>
+        <button class="btn-primary" onClick=${setup} disabled=${busy || genBusy}>${busy ? '...' : (t('organisms.setupWorkspace') || 'Set up workspace (project template)')}</button>
         <${WorkspaceGenerator} orgId=${orgId} wsId=${wsId} showToast=${showToast}
           onApplied=${load} onOpenSettings=${() => setShowSettings(true)} showRegenerate=${false}
           manifest=${null} genBusy=${genBusy} setGenBusy=${setGenBusy} />
-      <//>
-    <//>`;
+      </div>
+    `;
   }
 
   // Lazy-loader for the public-sharing state — kept here (not in the model) because an earlier
@@ -701,7 +699,9 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
   };
 
   return html`
-    <${ConfirmUI} />
-    ${renderWorkspaceView(rctx)}
+    <div class="pj-ws">
+      <${ConfirmUI} />
+      ${renderWorkspaceView(rctx)}
+    </div>
   `;
 }

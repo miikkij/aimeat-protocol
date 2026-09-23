@@ -11,8 +11,6 @@
  *   - AiUsageTab (default)  — the tab component
  * @usage  Registered in views/admin.js NAV_GROUPS; rendered with the shared admin tab props.
  * @version-history
- *   v1.1.0 -- 2026-09-22 -- Composed from the shared component set: the period and metric as tab
- *     actions, sections for the chart and the two tables. (No view imports this file today.)
  *   v1.0.0 — 2026-07-05 — Initial: operator AI-spend dashboard (totals + stacked bar + breakdowns).
  */
 import { h } from 'preact';
@@ -21,7 +19,6 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { num, StatsGrid, DataTable, Spinner, Empty } from './shared.js';
-import { Section, Stack, Text, Action } from '/components/poster-parts.js';
 import { UsageChart, colorForIndex } from '/components/UsageChart.js';
 import * as api from '/js/services/admin.js';
 import { swallowed } from '/js/swallowed.js';
@@ -82,20 +79,18 @@ export default function AiUsageTab() {
   ];
 
   const timeRange = html`
-    <${Stack} direction="wrap" align="between">
-      <${Stack} direction="wrap" align="center" density="compact">
-        <${Text} kind="caption" tone="muted">${t('dashboard.periodLabel') || 'Period'}:<//>
-        ${presets.map((p) => html`
-          <${Action} key=${p.key} kind="tab" selected=${period === p.key} onClick=${() => setPeriod(p.key)}>${p.label}<//>
-        `)}
-      <//>
-      <${Stack} direction="wrap" align="center" density="compact">
-        <${Action} kind="tab" selected=${metric === 'cost'} onClick=${() => setMetric('cost')}>${t('dashboard.aiMetricCost') || 'Cost'}<//>
-        <${Action} kind="tab" selected=${metric === 'tokens'} onClick=${() => setMetric('tokens')}>${t('dashboard.aiMetricTokens') || 'Tokens'}<//>
-      <//>
-    <//>`;
+    <div class="adm-time-range">
+      <span class="adm-time-range-label">${t('dashboard.periodLabel') || 'Period'}:</span>
+      ${presets.map((p) => html`
+        <button class="adm-time-btn ${period === p.key ? 'active' : ''}" onClick=${() => setPeriod(p.key)}>${p.label}</button>
+      `)}
+      <span class="adm-time-custom">
+        <button class="adm-time-btn ${metric === 'cost' ? 'active' : ''}" onClick=${() => setMetric('cost')}>${t('dashboard.aiMetricCost') || 'Cost'}</button>
+        <button class="adm-time-btn ${metric === 'tokens' ? 'active' : ''}" onClick=${() => setMetric('tokens')}>${t('dashboard.aiMetricTokens') || 'Tokens'}</button>
+      </span>
+    </div>`;
 
-  if (!data) return html`<${Stack}>${timeRange}${loading ? html`<${Spinner} />` : html`<${Empty} text=${t('dashboard.aiUsageEmpty') || 'No AI usage yet.'} />`}<//>`;
+  if (!data) return html`<div>${timeRange}${loading ? html`<${Spinner} />` : html`<${Empty} text=${t('dashboard.aiUsageEmpty') || 'No AI usage yet.'} />`}</div>`;
 
   const days = Array.isArray(data.days) ? data.days : [];
   const apps = data.apps || [];
@@ -138,18 +133,16 @@ export default function AiUsageTab() {
       ${timeRange}
       <${StatsGrid} items=${statItems} />
       ${datasets.length > 0
-        ? html`<${Section} title=${t('dashboard.aiPerAppOverTime') || 'Per-app spend over time'}>
-            <${UsageChart} stacked labels=${labels} datasets=${datasets} height=${260} yFormat=${yFormat} /><//>`
+        ? html`<div class="adm-card"><h2>${t('dashboard.aiPerAppOverTime') || 'Per-app spend over time'}</h2>
+            <${UsageChart} stacked labels=${labels} datasets=${datasets} height=${260} yFormat=${yFormat} /></div>`
         : html`<${Empty} text=${t('dashboard.aiUsageEmpty') || 'No AI usage yet.'} />`}
-      <${Section} size="small" title=${t('dashboard.aiByApp') || 'By app'}>
-        <${DataTable}
-          headers=${[t('dashboard.aiApp') || 'App', t('dashboard.aiTotalSpend') || 'Spend', t('dashboard.aiTotalTokens') || 'Tokens', t('dashboard.aiTotalCalls') || 'Calls', t('dashboard.aiShare') || 'Share']}
-          rows=${appRows} />
-      <//>
-      <${Section} size="small" title=${t('dashboard.aiByUser') || 'Top spenders'}>
-        <${DataTable}
-          headers=${[t('dashboard.aiUser') || 'User', t('dashboard.aiTotalSpend') || 'Spend', t('dashboard.aiTotalTokens') || 'Tokens', t('dashboard.aiTotalCalls') || 'Calls']}
-          rows=${userRows} />
-      <//>
+      <h3 class="adm-mt-lg adm-text-sm adm-section-cyan">${t('dashboard.aiByApp') || 'By app'}</h3>
+      <${DataTable}
+        headers=${[t('dashboard.aiApp') || 'App', t('dashboard.aiTotalSpend') || 'Spend', t('dashboard.aiTotalTokens') || 'Tokens', t('dashboard.aiTotalCalls') || 'Calls', t('dashboard.aiShare') || 'Share']}
+        rows=${appRows} scroll=${true} />
+      <h3 class="adm-mt-lg adm-text-sm adm-section-purple">${t('dashboard.aiByUser') || 'Top spenders'}</h3>
+      <${DataTable}
+        headers=${[t('dashboard.aiUser') || 'User', t('dashboard.aiTotalSpend') || 'Spend', t('dashboard.aiTotalTokens') || 'Tokens', t('dashboard.aiTotalCalls') || 'Calls']}
+        rows=${userRows} scroll=${true} />
     </div>`;
 }

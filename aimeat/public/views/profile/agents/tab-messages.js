@@ -5,15 +5,6 @@
  * @description Messages tab with command palette, "/" autocomplete, and chat area.
  *   Wraps the existing messages subtab and adds command discovery.
  * @version-history
- *   v2.0.1 -- 2026-09-22 -- The history scrolls inside its own frame again (Surface height="scroll"),
- *     so the newest message stays in view and the input stays under it; the message field carries a
- *     hidden label; the no-commands hint sits on its caption instead of a wrapping span.
- *   v2.0.0 -- 2026-09-22 -- Composed from the shared component set: the command palette is a Fold
- *     of ListRows, the threads are tab actions, a message is a box (the owner's on the sun, the
- *     agent's plain) with a caption under it, an option prompt is a row of tab actions, the
- *     autocomplete is a box of rows over the input, and the input is a Field beside the Send
- *     action. The reply marker is ↩ instead of ↳. The history no longer scrolls inside its own
- *     frame (no part carries a bounded scroll area yet). No behaviour change.
  *   v1.8.0 -- 2026-08-01 -- TARGET-058 Phase 9 step 0: the AI label renders inside the message bubble
  *     from the row's own `ai_provenance`. This is the surface where a model writes prose straight
  *     into a person's reading, and until the message carried a provenance column there was nothing
@@ -51,7 +42,6 @@ import { Markdown } from '/components/Markdown.js';
 import { AiLabel } from '/components/ai-label.js';
 import { swallowed } from '/js/swallowed.js';
 import { time as fmtTime } from '/js/format.js';
-import { Stack, Fold, ListRow, Action, Text, Chip, Surface, Field, Toolbar } from '/components/poster-parts.js';
 
 const html = htm.bind(h);
 
@@ -85,32 +75,38 @@ function CommandPalette({ commands, onSend }) {
   if (!commands || commands.length === 0) {
     // No registered commands → one quiet line, not an expandable empty box.
     return html`
-      <${Stack} direction="wrap" align="center" density="compact">
-        <${Text} kind="label">${t('profile.agents.detail.messages.commands.title')}<//>
-        <${Text} kind="caption" tone="muted" title=${t('profile.agents.detail.messages.commands.noCommandsHint')}>${t('profile.agents.detail.messages.commands.noCommands')}<//>
-      <//>
+      <div class="pf-agd-commands pf-agd-commands--empty" title=${t('profile.agents.detail.messages.commands.noCommandsHint')}>
+        <span>${t('profile.agents.detail.messages.commands.title')}</span>
+        <span class="pf-agd-none-inline">${t('profile.agents.detail.messages.commands.noCommands')}</span>
+      </div>
     `;
   }
 
   return html`
-    <${Fold} title=${t('profile.agents.detail.messages.commands.title')}
-      sub=${`${commands.length} ${t('profile.agents.detail.messages.commands.available')}`}
-      open=${expanded} onToggle=${() => setExpanded(!expanded)}>
-      <${Stack} density="compact">
-        ${Object.entries(categories).map(([cat, cmds]) => html`
-          <${Stack} key=${cat} density="compact">
-            <${Text} kind="label">${cat}<//>
-            ${cmds.map(cmd => html`
-              <${ListRow} key=${cmd.name} density="compact" name=${cmd.name}
-                detail=${cmd.description || ''} detailKind="text"
-                actions=${html`<${Action} kind="text" onClick=${() => onSend(cmd.name)}>
-                  ${t('profile.agents.detail.messages.commands.send')}
-                <//>`} />
-            `)}
-          <//>
-        `)}
-      <//>
-    <//>
+    <div class="pf-agd-commands">
+      <div class="pf-agd-commands-header" onClick=${() => setExpanded(!expanded)}>
+        <span>${t('profile.agents.detail.messages.commands.title')} (${commands.length} ${t('profile.agents.detail.messages.commands.available')})</span>
+        <span>${expanded ? '▼' : '▶'}</span>
+      </div>
+      ${expanded && html`
+        <div class="pf-agd-commands-body">
+          ${Object.entries(categories).map(([cat, cmds]) => html`
+            <div key=${cat}>
+              <div class="pf-agd-commands-category">${cat}</div>
+              ${cmds.map(cmd => html`
+                <div key=${cmd.name} class="pf-agd-command-row">
+                  <span class="pf-agd-command-name">${cmd.name}</span>
+                  <span class="pf-agd-command-desc">${cmd.description || ''}</span>
+                  <button class="btn-outline btn-sm" onClick=${() => onSend(cmd.name)}>
+                    ${t('profile.agents.detail.messages.commands.send')}
+                  </button>
+                </div>
+              `)}
+            </div>
+          `)}
+        </div>
+      `}
+    </div>
   `;
 }
 
@@ -289,59 +285,66 @@ export default function TabMessages({ agent, agentName, showToast }) {
     const locked = promptCtx?.locked || false;
     const answeredChoice = promptCtx?.answeredChoice ?? null;
     const otherChosen = prompt && answeredChoice != null && !prompt.options.includes(answeredChoice);
-    const inbound = msg.direction === 'inbound';
     return html`
-      <${Stack} key=${msg.id || msg.createdAt} density="compact" align=${inbound ? 'end' : 'start'}>
-        <${Surface} kind="box" density="compact" tone=${inbound ? 'sun' : 'plain'}>
-          ${isCommand && html`<${Chip}>${t('profile.agents.detail.messages.command')}<//>`}
+      <div key=${msg.id || msg.createdAt}>
+        <div class="pf-agd-msg-bubble ${msg.direction === 'inbound' ? 'pf-agd-msg-inbound' : 'pf-agd-msg-outbound'} ${isCommand ? 'pf-agd-msg-command' : ''} ${isReply ? 'pf-agd-msg-reply' : ''}">
+          ${isCommand && html`<span class="pf-agd-command-badge">${t('profile.agents.detail.messages.command')}</span>`}
           ${msg.direction === 'outbound'
             // Agent replies are markdown (LLM output). Render them safely via the
             // shared vnode Markdown component. Owner-typed inbound messages stay
             // literal — the input is a plain text field, not markdown.
             ? html`<${Markdown} text=${msg.content || ''} />`
-            : html`<${Text}>${msg.content}<//>`}
+            : msg.content}
           ${/* TARGET-058: whether a label is owed was decided on the server and lives in
                 record.disclosure.required — AiLabel returns null when it is not. Inside the bubble,
                 because Art. 50(5) asks for the mark at first exposure to the content it describes,
                 not in a footer under the whole thread. */''}
           <${AiLabel} record=${msg.ai_provenance?.record}
                       recordUrl=${msg.ai_provenance?.record_url} variant="inline" />
-        <//>
-        ${msg.createdAt && html`<${Text} kind="caption" tone="muted">${fmtTime(msg.createdAt, { hour: '2-digit', minute: '2-digit' })} ${timeAgo(msg.createdAt)}<//>`}
+        </div>
+        <div class="pf-agd-msg-meta ${msg.direction === 'inbound' ? 'pf-agd-msg-meta-right' : ''}">
+          ${msg.createdAt ? html`<span class="pf-agd-msg-time">${fmtTime(msg.createdAt, { hour: '2-digit', minute: '2-digit' })}</span> ${timeAgo(msg.createdAt)}` : ''}
+        </div>
         ${prompt && html`
-          <${Stack} density="compact">
-            <${Text}>${prompt.question}<//>
-            <${Stack} direction="wrap" density="compact">
+          <div class="agd-msg-prompt">
+            <div class="agd-msg-prompt-q">${prompt.question}</div>
+            <div class="agd-msg-prompt-options">
               ${prompt.options.map(opt => html`
-                <${Action} key=${opt} kind="tab" selected=${answeredChoice === opt}
+                <button
+                  key=${opt}
+                  class="agd-msg-prompt-option ${answeredChoice === opt ? 'agd-msg-prompt-option--chosen' : ''}"
                   disabled=${locked || false}
-                  onClick=${() => answerOption(prompt, msg.threadId, opt)}>${opt}<//>
+                  onClick=${() => answerOption(prompt, msg.threadId, opt)}
+                >${opt}</button>
               `)}
               ${prompt.allowOther !== false && html`
-                <${Action} kind="tab" selected=${otherChosen}
+                <button
+                  class="agd-msg-prompt-option agd-msg-prompt-option--other ${otherChosen ? 'agd-msg-prompt-option--chosen' : ''}"
                   disabled=${locked || false}
-                  onClick=${() => chooseOther(prompt, msg.threadId)}>${t('profile.agents.messages.promptOther')}<//>
+                  onClick=${() => chooseOther(prompt, msg.threadId)}
+                >${t('profile.agents.messages.promptOther')}</button>
               `}
-            <//>
-          <//>
+            </div>
+          </div>
         `}
-      <//>
+      </div>
     `;
   }
 
   if (loading && messages.length === 0) {
-    return html`<${Stack}><${Text} tone="muted">${t('profile.loading')}<//><//>`;
+    return html`<div class="pf-agd-empty">${t('profile.loading')}</div>`;
   }
 
   return html`
-    <${Stack}>
+    <div>
       <${CommandPalette} commands=${commands} onSend=${(cmd) => handleSend(cmd)} />
 
       ${meaningfulThreads.length > 0 && html`
-        <${Stack} direction="wrap" density="compact">
-          <${Action} kind="tab" selected=${!activeThread} onClick=${() => setActiveThread(null)}>
+        <div class="pf-agd-msg-threads">
+          <button class="pf-agd-msg-thread-btn ${!activeThread ? 'pf-agd-msg-thread-btn-active' : ''}"
+                  onClick=${() => setActiveThread(null)}>
             ${t('profile.agents.messages.threads')}
-          <//>
+          </button>
           ${(() => {
             // Collapse a long thread list behind a "show more" toggle, but always
             // keep the currently-selected thread visible even when collapsed.
@@ -351,29 +354,31 @@ export default function TabMessages({ agent, agentName, showToast }) {
               if (active) visible = [active, ...visible];
             }
             return visible.map(thread => html`
-              <${Action} key=${thread.threadId} kind="tab" selected=${activeThread === thread.threadId}
+              <button key=${thread.threadId}
+                      class="pf-agd-msg-thread-btn ${activeThread === thread.threadId ? 'pf-agd-msg-thread-btn-active' : ''}"
                       title=${thread.title || thread.lastMessage || ''}
                       onClick=${() => setActiveThread(thread.threadId)}>
                 ${threadLabel(thread)}
-              <//>
+              </button>
             `);
           })()}
           ${meaningfulThreads.length > THREAD_LIMIT && html`
-            <${Action} kind="text" onClick=${() => setShowAllThreads(v => !v)}>
+            <button class="pf-agd-msg-thread-btn pf-agd-msg-thread-more"
+                    onClick=${() => setShowAllThreads(v => !v)}>
               ${showAllThreads
                 ? t('profile.agents.messages.threadsShowLess')
                 : t('profile.agents.messages.threadsShowMore', { count: meaningfulThreads.length - THREAD_LIMIT })}
-            <//>
+            </button>
           `}
-        <//>
+        </div>
       `}
 
       ${messages.length === 0 && !loading && html`
-        <${Text} tone="muted">${t('profile.agents.detail.empty.messages')}<//>
+        <div class="pf-agd-empty">${t('profile.agents.detail.empty.messages')}</div>
       `}
 
       ${messages.length > 0 && html`
-        <${Surface} kind="plain" height="scroll" surfaceRef=${historyRef}><${Stack} density="compact">
+        <div class="pf-agd-msg-history" ref=${historyRef}>
           ${(() => {
             const sorted = [...messages].sort((a, b) => +new Date(a.createdAt || 0) - +new Date(b.createdAt || 0));
             // An option-prompt is answerable only while it is the newest message
@@ -405,11 +410,11 @@ export default function TabMessages({ agent, agentName, showToast }) {
 
               if (hasReply) {
                 rendered.push(html`
-                  <${Stack} key=${msg.id || msg.createdAt} density="compact">
+                  <div class="pf-agd-msg-pair" key=${msg.id || msg.createdAt}>
                     ${renderMessage(msg, true, false, null)}
-                    <${Text} kind="mono" tone="muted">↩<//>
+                    <div class="pf-agd-msg-reply-indicator">↳</div>
                     ${renderMessage(nextMsg, false, true, null)}
-                  <//>
+                  </div>
                 `);
                 i++;
               } else {
@@ -418,32 +423,35 @@ export default function TabMessages({ agent, agentName, showToast }) {
             }
             return rendered;
           })()}
-        <//><//>
+        </div>
       `}
 
-      <${Stack} density="compact">
-        ${showAutocomplete && filteredCommands.length > 0 && html`
-          <${Surface} kind="box" density="compact">
-            ${filteredCommands.map(cmd => html`
-              <${ListRow} key=${cmd.name} density="compact" name=${cmd.name} onOpen=${() => selectCommand(cmd.name)}
-                detail=${cmd.description || ''} detailKind="text" />
-            `)}
-          <//>
-        `}
-        <${Toolbar} actions=${html`<${Action} kind="primary" onClick=${() => handleSend()} disabled=${sending || !draft.trim()}>
-            ${t('profile.agents.messages.send')}
-          <//>`}>
-          <${Field} type="textarea"
-            inputRef=${inputRef}
+      <div class="pf-agd-msg-input">
+        <div class="pf-agd-input-wrap">
+          ${showAutocomplete && filteredCommands.length > 0 && html`
+            <div class="pf-agd-autocomplete">
+              ${filteredCommands.map(cmd => html`
+                <div key=${cmd.name} class="pf-agd-autocomplete-item" onClick=${() => selectCommand(cmd.name)}>
+                  <span class="pf-agd-command-name">${cmd.name}</span>
+                  <span class="pf-agd-command-desc">${cmd.description || ''}</span>
+                </div>
+              `)}
+            </div>
+          `}
+          <textarea
+            ref=${inputRef}
             value=${draft}
             onInput=${handleInput}
             onKeyDown=${handleKeyDown}
             placeholder=${pendingPrompt ? t('profile.agents.messages.promptOtherPlaceholder') : t('profile.agents.detail.messages.placeholder')}
-            ariaLabel=${t('profile.agents.detail.messages.placeholder')}
-            rows=${1} />
-        <//>
-        <${Text} kind="caption" tone="muted">${t('profile.agents.detail.messages.hint')}<//>
-      <//>
-    <//>
+            rows="1"
+          />
+        </div>
+        <button class="btn-primary btn-sm" onClick=${() => handleSend()} disabled=${sending || !draft.trim()}>
+          ${t('profile.agents.messages.send')}
+        </button>
+      </div>
+      <div class="pf-agd-msg-meta">${t('profile.agents.detail.messages.hint')}</div>
+    </div>
   `;
 }

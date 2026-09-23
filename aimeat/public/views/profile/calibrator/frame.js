@@ -10,8 +10,6 @@
  *   labelWords · failedWords · stepsDone · judgeOf · candidatesOf · crumb · pageLinks · openTab
  * @usage import { x, STEPS, judgeOf } from './frame.js';
  * @version-history
- *   2026-09-22 -- The crumb is the shared trail's data (the calibrator step opens the list when a
- *     calibration is open) and the page links are shared actions; no page classes remain.
  *   v1.0.1 — 2026-09-04 — labelWords: a stored label without the maker prefix and the appended price.
  *   v1.0.0 — 2026-09-04 — Initial (design canvas "AIMEAT Kalibraattori-sivu", direction A).
  */
@@ -20,7 +18,6 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { date as fmtDate, time as fmtTime } from '/js/format.js';
-import { Stack, Text, Action } from '/components/poster-parts.js';
 
 export const x = (key, vars) => t('calpage.' + key, vars);
 
@@ -123,20 +120,15 @@ export function judgeOf(project, settings) {
 /** The candidate models that can actually be called: a stored row without a model id is skipped. */
 export const candidatesOf = (project) => (project?.candidateModels || []).filter((m) => m && m.modelId);
 
-/** The trail to the page, as Masthead crumbs; `here` is an opened calibration's name. `back` opens the list. */
-export function crumb(here, back) {
-  return [
-    { label: t('nav.profile') }, { label: t('profile.landing.menuBuildShare') },
-    { label: t('profile.calibrator.tabLabel'), onClick: here ? back : undefined },
-    here ? { label: here } : null,
-  ].filter(Boolean);
+export function crumb(here) {
+  return html`<div class="og-crumb"><span>${t('nav.profile')}</span><span>/</span><span>${t('profile.landing.menuBuildShare')}</span><span>/</span>${here
+    ? html`<span>${t('profile.calibrator.tabLabel')}</span><span>/</span><span class="og-crumb-here">${here}</span>`
+    : html`<span class="og-crumb-here">${t('profile.calibrator.tabLabel')}</span>`}</div>`;
 }
 
 export const openTab = (tabId) => window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId } }));
 export function pageLinks() {
-  return html`<${Stack} density="compact">
-    <${Text} kind="label">${x('pages')}<//>
-    <${Action} onClick=${() => openTab('ai')}>${t('profile.generator.openrouter.title')} →<//>
-    <${Action} onClick=${() => openTab('usage')}>${t('profile.tabs.usage')} →<//>
-  <//>`;
+  return html`
+    <button type="button" class="og-rail-link" onClick=${() => openTab('ai')}><i>→</i>${t('profile.generator.openrouter.title')}<em>→</em></button>
+    <button type="button" class="og-rail-link" onClick=${() => openTab('usage')}><i>→</i>${t('profile.tabs.usage')}<em>→</em></button>`;
 }

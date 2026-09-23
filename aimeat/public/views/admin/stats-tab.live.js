@@ -16,8 +16,6 @@
  *   - DidItArrive (05) — email, push and mailbox as one table with a landing rate
  * @usage Imported by stats-tab.js.
  * @version-history
- *   v1.2.0 -- 2026-09-22 -- Composed from the shared component set: sections, the gauges in two
- *     columns, the delivery as a shared table; the page's own sheet is gone.
  *   v1.1.0 — 2026-09-13 — Compose existing section headings from shared poster B1.
  *   v1.0.0 — 2026-09-12 — Initial (the Statistics page in the poster face).
  */
@@ -25,8 +23,7 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { num, fmtUp, fmtBytes, Badge, Row, Empty } from './shared.js';
-import { Section, Columns, Stack, Text, Table } from '/components/poster-parts.js';
+import { num, fmtUp, fmtBytes, Badge, Row } from './shared.js';
 import { DELIVERY } from './stats-tab.data.js';
 
 const S = (key, params) => t('admin.stats.' + key, params);
@@ -58,10 +55,15 @@ export function LiveNow({ live, gauges }) {
   const oldest = gauges.mailbox_oldest_item_age_seconds ?? mailbox.oldest_item_age_seconds ?? 0;
 
   return html`
-    <${Section} id="adm-st-04" title=${S('live.title')} count="04" description=${S('live.lead')}>
-      <${Columns} layout="equal" collapse=${900} density="roomy">
+    <section class="og-sec" id="adm-st-04">
+      <div class="og-sec-h">
+        <h2 class="poster-section-title">${S('live.title')}<small>04</small></h2>
+      </div>
+      <p class="adm-st-lead">${S('live.lead')}</p>
+
+      <div class="adm-st-two">
         <div>
-          <${Text} kind="label">${S('live.place')}<//>
+          <div class="adm-st-lbl">${S('live.place')}</div>
           ${Row({ title: S('live.up'), why: S('live.upWhy'), chip: null, value: fmtUp(live.uptime_seconds || 0) })}
           ${Row({ title: S('live.people'), why: S('live.peopleWhy'), chip: null, value: num(live.active_owners || 0) })}
           ${Row({ title: S('live.agents'), why: S('live.agentsWhy'), chip: null, value: num(live.active_agents || 0) })}
@@ -71,7 +73,7 @@ export function LiveNow({ live, gauges }) {
   })}
         </div>
         <div>
-          <${Text} kind="label">${S('live.waiting')}<//>
+          <div class="adm-st-lbl">${S('live.waiting')}</div>
           ${Row({
     title: S('live.open'), why: S('live.openWhy'),
     chip: html`<${Badge} type=${open > 0 ? 'success' : 'muted'} label=${S('live.openChip', { n: num(open) })} />`,
@@ -95,8 +97,8 @@ export function LiveNow({ live, gauges }) {
     }),
   })}
         </div>
-      <//>
-    <//>`;
+      </div>
+    </section>`;
 }
 
 /** Section 05: everything sent out in the period, and how much of it landed. */
@@ -111,21 +113,39 @@ export function DidItArrive({ period }) {
   const worst = rows.reduce((m, r) => (r.rate !== null && r.rate < m ? r.rate : m), 100);
 
   return html`
-    <${Section} id="adm-st-05" title=${S('arrive.title')} count="05" description=${S('arrive.lead')}>
+    <section class="og-sec" id="adm-st-05">
+      <div class="og-sec-h">
+        <h2 class="poster-section-title">${S('arrive.title')}<small>05</small></h2>
+      </div>
+      <p class="adm-st-lead">${S('arrive.lead')}</p>
+
       ${anything ? html`
-        <${Stack}>
-          <${Table} density="compact" collapse=${600} label=${S('arrive.title')}
-            headers=${[S('arrive.channel'), S('arrive.what'), S('arrive.sent'), S('arrive.failed'), S('arrive.also'), S('arrive.rate')]}
-            rows=${rows.map(r => [
-    html`<strong>${S('arrive.name.' + r.id)}</strong>`,
-    S('arrive.for.' + r.id),
-    { text: num(r.sent), align: 'end' },
-    { text: num(r.fail), align: 'end' },
-    { text: S('arrive.alsoValue.' + r.id, { n: num(r.also) }), align: 'end' },
-    html`<${Text} kind="mono" tone=${r.rate !== null && r.rate < 95 ? 'danger' : 'plain'}>${r.rate === null ? '—' : r.rate.toFixed(1) + ' %'}<//>`,
-  ])} />
-          <${Text} kind="caption" tone="muted">${worst < 100 ? S('arrive.noteSome', { rate: worst.toFixed(1) }) : S('arrive.noteAll')}<//>
-        <//>
-      ` : html`<${Empty} text=${S('arrive.empty')} />`}
-    <//>`;
+        <div class="adm-st-scroll">
+          <table class="adm-st-tbl">
+            <thead><tr>
+              <th>${S('arrive.channel')}</th>
+              <th>${S('arrive.what')}</th>
+              <th class="num">${S('arrive.sent')}</th>
+              <th class="num">${S('arrive.failed')}</th>
+              <th class="num">${S('arrive.also')}</th>
+              <th class="num">${S('arrive.rate')}</th>
+            </tr></thead>
+            <tbody>
+              ${rows.map(r => html`
+                <tr>
+                  <td><b>${S('arrive.name.' + r.id)}</b></td>
+                  <td>${S('arrive.for.' + r.id)}</td>
+                  <td class="num">${num(r.sent)}</td>
+                  <td class="num">${num(r.fail)}</td>
+                  <td class="num">${S('arrive.alsoValue.' + r.id, { n: num(r.also) })}</td>
+                  <td class="num ${r.rate !== null && r.rate < 95 ? 'adm-st-bad' : ''}">
+                    ${r.rate === null ? '—' : r.rate.toFixed(1) + ' %'}
+                  </td>
+                </tr>`)}
+            </tbody>
+          </table>
+        </div>
+        <p class="adm-st-note">${worst < 100 ? S('arrive.noteSome', { rate: worst.toFixed(1) }) : S('arrive.noteAll')}</p>
+      ` : html`<div class="adm-st-empty">${S('arrive.empty')}</div>`}
+    </section>`;
 }

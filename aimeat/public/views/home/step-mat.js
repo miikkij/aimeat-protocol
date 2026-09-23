@@ -15,12 +15,10 @@
  *   summary once the mat exists.
  * @usage import { StepMat } from './step-mat.js';
  * @version-history
- *   2026-09-13: Compose the welcome-mat editor and result from shared poster parts.
  *   (2026-08-23) Em-dashes swept from the copied and paste fallbacks (banned in every surface).
  *   v1.0.0 — 2026-08-07 — Initial (remake phase 3).
  */
 import { h } from 'preact';
-import { Surface, Stack, Text, Field, Action } from '/components/poster-parts.js';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
@@ -95,25 +93,60 @@ export function StepMat({ onDone }) {
   const shown = usingFallback && fallbackPrompt ? fallbackPrompt : prompt;
   const hasPaste = paste.trim().length > 0;
 
-  return html`<${Surface} kind="record"><${Stack}>
-    <${Text} kind="heading">1 ${tr('home.mat.title','Your welcome mat')}<//>
-    <${Text} tone="muted">${tr('home.mat.lede','Every home needs a welcome mat. You are going to make yours with your own AI: copy the prompt below into your AI chat, paste what it gives back into the box, and press the button.')}<//>
-    <${PromptCard} label=${usingFallback ? tr('home.mat.promptShort','The shorter prompt') : tr('home.mat.promptLabel','The prompt')}
-      prompt=${shown} kind=${hasPaste ? 'secondary' : 'primary'} copyLabel=${tr('home.mat.copy','Copy the prompt')}
-      copiedLabel=${tr('home.mat.copied','Copied. Paste it in your AI chat')} />
-    <${Field} type="textarea" id="koti-paste" inputRef=${boxRef} rows=${8} spellCheck=${false}
-      label=${tr('home.mat.pasteLabel','Paste what your AI gave you here')}
-      placeholder=${tr('home.mat.pastePlaceholder','Everything it wrote is fine, explanation and all.')}
-      value=${paste} onInput=${e=>setPaste(e.target.value)} />
-    ${errText && html`<${Surface} kind="aside" tone="danger" role="alert"><${Stack}>
-      <${Text}>${errText}<//>
-      <${Text}>${tr('home.mat.errKept','Your text is still in the box. Ask your AI for the whole HTML file in one code block, and paste again.')}
-        ${attempts>1 ? ' '+tr('home.mat.attempts','Attempts so far: {n}.').replace('{n}',String(attempts)) : ''}<//>
-      ${fallbackPrompt&&!usingFallback && html`<${Action} onClick=${()=>setUsingFallback(true)}>${tr('home.mat.tryShorter','Show me a shorter prompt to try')}<//>`}
-    <//><//>`}
-    <${Action} kind=${hasPaste ? 'primary' : 'secondary'} disabled=${busy||!hasPaste} onClick=${submit}>
-      ${busy ? tr('home.mat.sending','Reading it…') : tr('home.mat.submit','Here is my welcome mat')}<//>
-  <//><//>`;
+  return html`
+    <div class="koti-step koti-step-open">
+      <div class="koti-step-head">
+        <span class="koti-step-num">1</span>
+        <h2 class="koti-step-title">${tr('home.mat.title', 'Your welcome mat')}</h2>
+      </div>
+
+      <p class="koti-step-lede">
+        ${tr('home.mat.lede', 'Every home needs a welcome mat. You are going to make yours with your own AI: copy the prompt below into your AI chat, paste what it gives back into the box, and press the button.')}
+      </p>
+
+      <${PromptCard}
+        label=${usingFallback ? tr('home.mat.promptShort', 'The shorter prompt') : tr('home.mat.promptLabel', 'The prompt')}
+        prompt=${shown}
+        className=${hasPaste ? 'btn-outline' : 'btn-primary'}
+        copyLabel=${tr('home.mat.copy', 'Copy the prompt')}
+        copiedLabel=${tr('home.mat.copied', 'Copied. Paste it in your AI chat')} />
+
+      <label class="koti-paste-label" for="koti-paste">
+        ${tr('home.mat.pasteLabel', 'Paste what your AI gave you here')}
+      </label>
+      <textarea
+        id="koti-paste"
+        ref=${boxRef}
+        class="koti-paste"
+        rows="8"
+        spellcheck="false"
+        placeholder=${tr('home.mat.pastePlaceholder', 'Everything it wrote is fine, explanation and all.')}
+        value=${paste}
+        onInput=${(e) => setPaste(e.target.value)}></textarea>
+
+      ${errText && html`
+        <div class="koti-error" role="alert">
+          <p class="koti-error-text">${errText}</p>
+          <p class="koti-error-hint">
+            ${tr('home.mat.errKept', 'Your text is still in the box. Ask your AI for the whole HTML file in one code block, and paste again.')}
+            ${attempts > 1 ? ` ${tr('home.mat.attempts', 'Attempts so far: {n}.').replace('{n}', String(attempts))}` : ''}
+          </p>
+          ${fallbackPrompt && !usingFallback && html`
+            <button type="button" class="btn-ghost koti-fallback-btn" onClick=${() => setUsingFallback(true)}>
+              ${tr('home.mat.tryShorter', 'Show me a shorter prompt to try')}
+            </button>`}
+        </div>`}
+
+      <div class="koti-actions">
+        <button
+          type="button"
+          class=${hasPaste ? 'btn-primary' : 'btn-outline'}
+          disabled=${busy || !hasPaste}
+          onClick=${submit}>
+          ${busy ? tr('home.mat.sending', 'Reading it…') : tr('home.mat.submit', 'Here is my welcome mat')}
+        </button>
+      </div>
+    </div>`;
 }
 
 /** The collapsed step, once there is a mat. Shows the thing that was made, not a tick. */
@@ -163,17 +196,36 @@ export function StepMatDone({ state }) {
 
   const state3 = item?.status === 'working' ? 'working' : item ? 'open' : 'off';
 
-  return html`<${Surface} kind="record"><${Stack}>
-    <${Stack} direction="wrap" align="between">
-      <${Text} kind="heading">${tr('home.mat.titleDone','Your welcome mat is up')}<//>
-      <${CardMenu} state=${state3} label=${tr('home.mat.titleDone','Your welcome mat is up')} onOpened=${learned}
-        actions=${[{label:item ? tr('openItems.toggleOff','Take it off your open items') : title,
-          run:async()=>{if(item){await switchOff(item.id);setItem(null);}else{setItem(await addOpenItem({title,kind:'document',origin}));}}}]} />
-    <//>
-    <${Text} tone="muted">${tr('home.mat.doneLede','This is the first thing you made here, and it is a real page with its own address.')}<//>
-    <${Stack} direction="wrap">
-      <${Action} href=${state.mat.url}>${tr('home.mat.view','Look at it')}<//>
-      ${state.mat.standaloneUrl && html`<${Action} kind="text" href=${state.mat.standaloneUrl} target="_blank">${state.mat.standaloneUrl}<//>`}
-    <//>
-    ${!taught && html`<${Text} tone="muted">${tr('home.mat.teachDots','The three dots in the corner are how you act on anything here. Every card has them, always in that same corner.')}<//>`}
-  <//><//>`;}
+  return html`
+    <div class="koti-step koti-step-done">
+      <${CardMenu} state=${state3} label=${tr('home.mat.titleDone', 'Your welcome mat is up')}
+        onOpened=${learned}
+        actions=${[{
+          label: item
+            ? tr('openItems.toggleOff', 'Take it off your open items')
+            : title,
+          run: async () => {
+            if (item) { await switchOff(item.id); setItem(null); }
+            else { setItem(await addOpenItem({ title, kind: 'document', origin })); }
+          },
+        }]} />
+      <div class="koti-step-head">
+        <span class="koti-step-num koti-step-num-done">✓</span>
+        <h2 class="koti-step-title">${tr('home.mat.titleDone', 'Your welcome mat is up')}</h2>
+      </div>
+      <p class="koti-step-lede">
+        ${tr('home.mat.doneLede', 'This is the first thing you made here, and it is a real page with its own address.')}
+      </p>
+      <div class="koti-mat-links">
+        <a class="btn-outline" href=${state.mat.url}>${tr('home.mat.view', 'Look at it')}</a>
+        ${state.mat.standaloneUrl && html`
+          <a class="koti-mat-url" href=${state.mat.standaloneUrl} target="_blank" rel="noopener">
+            ${state.mat.standaloneUrl}
+          </a>`}
+      </div>
+      ${!taught && html`
+        <p class="koti-teach">
+          ${tr('home.mat.teachDots', 'The three dots in the corner are how you act on anything here. Every card has them, always in that same corner.')}
+        </p>`}
+    </div>`;
+}

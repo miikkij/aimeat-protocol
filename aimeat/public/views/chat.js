@@ -16,16 +16,6 @@
  *   - ChatView — the page: status, conversations, one live turn
  * @usage import ChatView from '/views/chat.js'
  * @version-history
- *   v3.1.0 -- 2026-09-22 -- A workspace page again, as the chat sheet made it: the window under the
- *     bar (the whole screen on a phone, sized above the keyboard through --workspace-avail), the
- *     conversation scrolling in a filling surface that "follow the newest line" listens to, and the
- *     composer at the bottom.
- *   v3.0.0 -- 2026-09-22 -- Composed from the shared component set: a wide Page whose leading rail
- *     (the site's navigation rail) carries the list and everything about the open conversation and
- *     becomes the "Conversations" dialog on a phone; the thread is the set's Thread and Message; the
- *     welcome a Section; the cap and the errors asides. The conversation now scrolls with the page,
- *     so following the newest line reads the page's scroll region, and the wish finds the box by a
- *     ref instead of a class. The chat sheet is gone. Loading, streaming and every guard unchanged.
  *   v2.1.0 — 2026-09-15 — A wish that arrived from the front page's GO also puts the cursor in
  *     the box, at the end of the sentence. Jouni: the sentence was there but the focus was not.
  *   2026-09-13 -- V2z: compose the welcome section heading with the shared B1 class.
@@ -73,7 +63,7 @@ import * as chat from '/js/services/chat.js';
 import { primeSpeech } from '/js/services/speech-reader.js';
 import { readIntake, clearIntake, intakeText } from '/js/intake.js';
 import { ThreadList, Turn, LiveTurn, TurnError, Composer, StatusBar, GooseCredit, Choices, choicesIn, AiNotice, MobileNudge } from './chat/parts.js';
-import { Page, Rail, Section, Thread, Stack, Action, CopyAction, Surface, Text } from '/components/poster-parts.js';
+import { CopyButton } from '/components/CopyButton.js';
 import { InstallCta } from '/components/InstallCta.js';
 import { storeHref } from '/js/site.js';
 
@@ -149,20 +139,6 @@ function sessionTokenCap() {
 const sessionTokensOf = (turns) =>
     Math.ceil((turns ?? []).reduce((n, turn) => n + (turn.text || '').length, 0) / 4);
 
-/** Whether the window matches a width query, following it as it changes. */
-function useNarrow(query) {
-    const [narrow, setNarrow] = useState(() => typeof window !== 'undefined' && !!window.matchMedia?.(query).matches);
-    useEffect(() => {
-        const mq = window.matchMedia?.(query);
-        if (!mq) return undefined;
-        const on = () => setNarrow(mq.matches);
-        on();
-        mq.addEventListener('change', on);
-        return () => mq.removeEventListener('change', on);
-    }, [query]);
-    return narrow;
-}
-
 /** Close enough to the bottom to count as "following the conversation". */
 const BOTTOM_SLACK_PX = 48;
 /** How long a scroll up suspends auto-follow. Long enough to read a paragraph and look back up. */
@@ -193,13 +169,6 @@ export default function ChatView() {
 
     const abortRef = useRef(null);
     const bottomRef = useRef(null);
-    const composerRef = useRef(null);
-    // The page root (the phone's keyboard measure goes there) and the conversation's scroll area.
-    const pageRef = useRef(null);
-    const scrollRef = useRef(null);
-    // A phone: the head row and the notice above the words, the list as a dialog. Follows the
-    // window, at the width where the page's rail turns into its menu.
-    const narrow = useNarrow('(max-width: 900px)');
     const lastAskRef = useRef('');
     /**
      * WHICH CONVERSATION THE SCREEN IS SHOWING, as a number that only goes up.
@@ -281,39 +250,27 @@ export default function ChatView() {
         return () => clearInterval(id);
     }, [pinned]);
 
-    // The conversation scrolls in its own area between the page's top and the composer, so
-    // "following" is read off that area once it is on screen.
-    useEffect(() => {
-        const area = scrollRef.current;
-        if (!area) return undefined;
-        area.addEventListener('scroll', onScrollArea, { passive: true });
-        return () => area.removeEventListener('scroll', onScrollArea);
-    }, [loading, onScrollArea]);
-
     useEffect(() => {
         if (!pinned) return;
         bottomRef.current?.scrollIntoView({ block: 'end' });
-        // `loading` too: the first conversation arrives while the page still shows the spinner, so the
-        // end of it exists only once loading ends, and the page must open at the newest line.
-    }, [thread?.turns?.length, live.text, live.tools.length, live.cards.length, pinned, loading]);
+    }, [thread?.turns?.length, live.text, live.tools.length, live.cards.length, pinned]);
 
     // The on-screen keyboard, measured rather than calculated.
     //
     // `100dvh − keyboard` double-counts on Android Chrome, where dvh already shrinks for the
     // keyboard, and the composer ends up floating above a dead gap. The visual viewport excludes the
     // keyboard on every platform, so the distance from the top of the page to the bottom of it is
-    // the space there actually is. Same approach as the inbox, for the same reason. The phone's
-    // workspace page reads it from its own root as --workspace-avail.
+    // the space there actually is. Same approach as the inbox, for the same reason.
     useEffect(() => {
         const vv = window.visualViewport;
-        const page = pageRef.current;
-        if (!vv || !page) return undefined;
+        const root = document.documentElement;
+        if (!vv) return undefined;
         const sync = () => {
             if (!window.matchMedia('(max-width: 760px)').matches) {
-                page.style.removeProperty('--workspace-avail');
+                root.style.removeProperty('--chat-avail');
                 return;
             }
-            page.style.setProperty('--workspace-avail', `${Math.max(220, Math.round(vv.height))}px`);
+            root.style.setProperty('--chat-avail', `${Math.max(220, Math.round(vv.height))}px`);
         };
         sync();
         vv.addEventListener('resize', sync);
@@ -323,9 +280,9 @@ export default function ChatView() {
             vv.removeEventListener('resize', sync);
             vv.removeEventListener('scroll', sync);
             window.removeEventListener('orientationchange', sync);
-            page.style.removeProperty('--workspace-avail');
+            root.style.removeProperty('--chat-avail');
         };
-    }, [loading]);
+    }, []);
 
     // A change to the agent's permissions is made elsewhere, so the status line refreshes with the
     // rest of the page rather than going stale until a reload.
@@ -540,7 +497,7 @@ export default function ChatView() {
         let tries = 0;
         let timer = 0;
         const focusComposer = () => {
-            const box = /** @type {HTMLTextAreaElement|null} */ (composerRef.current);
+            const box = /** @type {HTMLTextAreaElement|null} */ (document.querySelector('.chat-input'));
             if (box && box.value && !box.disabled) {
                 box.focus();
                 const end = box.value.length;
@@ -594,12 +551,13 @@ export default function ChatView() {
 
     if (!hasSession()) {
         return html`
-            <${Page} width="wide" title=${tr('chat.title', 'Chat')}>
-                <${Text}>${tr('chat.signIn', 'Sign in and your first agent is waiting here.')}<//>
-            <//>`;
+            <div class="chat-view chat-view--signin">
+                <h1>${tr('chat.title', 'Chat')}</h1>
+                <p>${tr('chat.signIn', 'Sign in and your first agent is waiting here.')}</p>
+            </div>`;
     }
 
-    if (loading) return html`<${Page} width="wide"><${Spinner} /><//>`;
+    if (loading) return html`<div class="chat-view"><${Spinner} /></div>`;
 
     const turns = thread?.turns ?? [];
     // Capped only when the NODE pays: a person on their own key spends their own money, and this
@@ -610,111 +568,113 @@ export default function ChatView() {
     const lastAgentTurn = [...turns].reverse().find((t) => t.role !== 'user');
     const openChoices = busy ? [] : choicesIn(lastAgentTurn?.text);
     const disabled = status ? !status.enabled : false;
-    const asText = conversationAsText(thread?.title, turns);
 
-    // Everything about THIS conversation that is not the conversation: the list, its name, who
-    // answers and on whose money, and the two actions. The page's rail on a desktop; on a phone
-    // the same rail opens as a dialog from the "Conversations" action, so the column keeps its
-    // height for the words.
-    const rail = html`
-        <${Rail} kind="navigation" label=${tr('chat.openList', 'Conversations')}>
+    return html`
+        <div class="chat-view ${listOpen ? 'chat-view--list' : ''}">
             <${ThreadList}
                 threads=${threads}
                 activeId=${thread?.id}
                 onOpen=${openThread}
                 onNew=${startThread}
                 onDelete=${removeThread}
-                closable=${narrow}
                 onClose=${() => setListOpen(false)}>
-                <${Stack} density="compact">
-                    <${Text} kind="label">${tr('chat.thisConversation', 'This conversation')}<//>
-                    <${Text} kind="lead">${thread?.title ?? tr('chat.title', 'Chat')}<//>
+                ${/* Everything about THIS conversation that is not the conversation: its name, who
+                      answers and on whose money, and the two actions. In the rail on a desktop, in
+                      the drawer on a phone, so the column keeps its height for the words. */''}
+                <div class="chat-this">
+                    <h2 class="chat-rail-h">${tr('chat.thisConversation', 'This conversation')}</h2>
+                    <p class="chat-rail-title">${thread?.title ?? tr('chat.title', 'Chat')}</p>
                     <${StatusBar} status=${status} onReset=${thread ? resetSession : null} />
-                    ${turns.length > 0 && html`<${Stack} direction="horizontal"><${CopyAction} kind="text"
-                        text=${asText}
+                    ${turns.length > 0 && html`<${CopyButton}
+                        text=${conversationAsText(thread?.title, turns)}
+                        className="chat-act chat-copy-all"
                         label=${tr('chat.copyAll', 'Copy conversation')}
-                        copiedLabel=${t('common.copied')}
-                        title=${tr('chat.copyAllTitle', 'Copy the whole conversation as text')} /><//>`}
-                <//>
-                <${Stack} density="compact">
+                        copiedLabel=${'✓ ' + t('common.copied')}
+                        title=${tr('chat.copyAllTitle', 'Copy the whole conversation as text')}
+                        ariaLabel=${tr('chat.copyAll', 'Copy conversation')} />`}
+                </div>
+                <div class="chat-rail-foot">
                     <${AiNotice} compact=${true} />
                     <${GooseCredit} />
-                <//>
+                </div>
             <//>
-        <//>`;
 
-    return html`
-        <${Page} width="wide" layout="workspace" pageRef=${pageRef} rail=${rail} railSide="leading" railLabel=${tr('chat.openList', 'Conversations')}
-            railOpen=${listOpen} onRailOpen=${() => setListOpen(true)} onRailClose=${() => setListOpen(false)}>
-                ${/* The chat is a workspace page: it fills the window under the bar (the whole
-                      screen on a phone), the conversation scrolls in the middle and the composer
-                      stays at the bottom. The parts sit straight in the page's column for that. */''}
-                ${/* On a phone the way back, the name and the copy sit in one row above the words;
-                      the desktop reads them in the rail. The way back is a link to the home. */''}
-                ${narrow && html`
-                    <${Stack} direction="wrap" align="between">
-                        <${Action} kind="text" href=${exitHref} label=${tr('chat.back', 'Back')}>↩ ${tr('chat.back', 'Back')}<//>
-                        <${Text} kind="lead">${thread?.title ?? tr('chat.title', 'Chat')}<//>
-                        ${turns.length > 0 ? html`<${CopyAction} kind="text" text=${asText}
-                            label=${tr('chat.copyAll', 'Copy conversation')} copiedLabel=${t('common.copied')}
-                            title=${tr('chat.copyAllTitle', 'Copy the whole conversation as text')} />` : null}
-                    <//>`}
+            <section class="chat-main">
+                <header class="chat-head">
+                    <!-- On a phone this page owns the whole screen and the site nav is hidden, so
+                         without this there is NO way back to anything. The whole row is phone-only
+                         via CSS: on a desktop the rail carries the name and the actions. -->
+                    <a class="chat-back" href=${exitHref}
+                        aria-label=${tr('chat.back', 'Back')}>← ${tr('chat.back', 'Back')}</a>
+                    <h1 class="chat-title">${thread?.title ?? tr('chat.title', 'Chat')}</h1>
+                    <!-- The whole conversation as plain text: what you paste into a document, an
+                         issue or another AI. Both sides, in order, with the work log left out —
+                         it is a record of the conversation, not of the machinery. -->
+                    ${turns.length > 0 && html`<${CopyButton}
+                        text=${conversationAsText(thread?.title, turns)}
+                        className="chat-ico chat-copy-head"
+                        label="⧉"
+                        copiedLabel="✓"
+                        title=${tr('chat.copyAllTitle', 'Copy the whole conversation as text')}
+                        ariaLabel=${tr('chat.copyAll', 'Copy conversation')} />`}
+                    <button type="button" class="chat-ico chat-list-toggle"
+                        aria-label=${listOpen ? tr('chat.closeList', 'Close') : tr('chat.openList', 'Conversations')}
+                        title=${listOpen ? tr('chat.closeList', 'Close') : tr('chat.openList', 'Conversations')}
+                        onClick=${() => setListOpen((o) => !o)}>${listOpen ? '✕' : '≡'}</button>
+                </header>
+
                 ${/* The phone keeps the notice where the person is looking: full on the first
                       conversation, one line from the first answer onwards. The desktop reads it in
-                      the rail. */''}
-                ${narrow && html`<${AiNotice} compact=${turns.length > 0 || threads.length > 1} />`}
+                      the rail, so this copy is phone-only via CSS. */''}
+                <${AiNotice} compact=${turns.length > 0 || threads.length > 1} className="chat-ai-notice--main" />
                 ${showMobileNudge && html`<${MobileNudge} onDismiss=${dismissNudge} />`}
                 ${!showMobileNudge && html`<${InstallCta} compact=${true} />`}
 
-                <${Surface} kind="plain" density="flush" height="fill" surfaceRef=${scrollRef}><${Stack}>
-                ${turns.length === 0 && !busy ? html`
-                    <${Section} title=${tr('chat.welcomeTitle', 'Your first agent')}>
-                        <${Stack}>
-                            <${Text} kind="lead">${tr('chat.welcomeBody', 'It works here the way your own AI tool would, with the same permissions and the same record of what it did. Ask it for something.')}<//>
-                            <${Text}>${tr('chat.welcomeTrust', 'Everything you make here lands in your own account, and nothing becomes public until you publish it yourself.')}<//>
-                            ${/* One concrete thing to ask for, not a menu. An empty box asks a person
-                                  to invent a task for a system they have not used; a first request
-                                  that ends in a real address they can open answers "what is this for"
-                                  better than any paragraph on this screen could. */''}
-                            <${Stack} direction="wrap">
+                <div class="chat-scroll" onScroll=${onScrollArea}>
+                    ${turns.length === 0 && !busy ? html`
+                        <div class="chat-welcome">
+                            <h2 class="poster-section-title">${tr('chat.welcomeTitle', 'Your first agent')}</h2>
+                            <p>${tr('chat.welcomeBody', 'It works here the way your own AI tool would, with the same permissions and the same record of what it did. Ask it for something.')}</p>
+                            <p class="chat-welcome-trust">${tr('chat.welcomeTrust', 'Everything you make here lands in your own account, and nothing becomes public until you publish it yourself.')}</p>
+                            <!-- One concrete thing to ask for, not a menu. An empty box asks a person
+                                 to invent a task for a system they have not used; a first request
+                                 that ends in a real address they can open answers "what is this for"
+                                 better than any paragraph on this screen could. -->
+                            <div class="chat-starters">
                                 ${STARTERS.map((st) => html`
-                                    <${Action} key=${st.key} disabled=${disabled}
+                                    <button type="button" class="btn-outline chat-starter" key=${st.key}
+                                        disabled=${disabled}
                                         onClick=${() => send(tr(st.key, st.fallback), st.id)}>
                                         ${tr(st.label, st.labelFallback)}
-                                    <//>`)}
-                            <//>
-                        <//>
-                    <//>` : ''}
+                                    </button>`)}
+                            </div>
+                        </div>` : ''}
 
-                <${Thread} label=${thread?.title ?? tr('chat.title', 'Chat')}>
                     ${turns.map((turn, i) => html`<${Turn} key=${i} id=${`${thread?.id}-${i}`} turn=${turn} />`)}
                     <${LiveTurn} text=${live.text} thought=${live.thought} tools=${live.tools} cards=${live.cards} busy=${busy} />
-                <//>
-                ${!busy && html`<${Choices} options=${openChoices} disabled=${disabled}
-                    onPick=${(opt) => send(opt)} />`}
-                <${TurnError} message=${failure}
-                    onRetry=${lastAskRef.current && !busy ? () => send(lastAskRef.current) : null} />
-                <div ref=${bottomRef}></div>
-                <//><//>
+                    ${!busy && html`<${Choices} options=${openChoices} disabled=${disabled}
+                        onPick=${(opt) => send(opt)} />`}
+                    <${TurnError} message=${failure}
+                        onRetry=${lastAskRef.current && !busy ? () => send(lastAskRef.current) : null} />
+                    <div ref=${bottomRef}></div>
+                </div>
 
-                ${!pinned && html`<${Stack} direction="horizontal">
-                    <${Action} onClick=${() => { releaseRef.current = 0; setPinned(true); bottomRef.current?.scrollIntoView({ block: 'end', behavior: 'smooth' }); }}>
+                ${!pinned && html`
+                    <button type="button" class="btn-outline chat-jump-latest"
+                        onClick=${() => { releaseRef.current = 0; setPinned(true); bottomRef.current?.scrollIntoView({ block: 'end', behavior: 'smooth' }); }}>
                         ${tr('chat.jumpLatest', 'Jump to the latest')}
-                    <//>
-                <//>`}
+                    </button>`}
 
                 ${capped ? html`
-                    <${Surface} kind="aside">
-                        <${Stack}>
-                            <${Text} kind="heading" size="small">${tr('chat.capTitle', 'This conversation has used up its free ride.')}<//>
-                            <${Text}>${tr('chat.capBody', "Chat here runs on the house's own AI budget, and this session has reached its share (about 50,000 tokens). The conversation stays right here — nothing is lost. Two ways to keep going:")}<//>
-                            <${Stack} direction="wrap" align="center">
-                                <${Action} kind="primary" href="/v1/profile?tab=ai">${tr('chat.capOwnKey', 'Bring your own key →')}<//>
-                                ${/* The store is the one price door; a node without one offers only the key. */''}
-                                ${storeHref() ? html`<${Action} href=${storeHref()} target="_blank">${tr('chat.capOwnPlace', 'Get your own place →')}<//>` : ''}
-                            <//>
-                        <//>
-                    <//>` : html`
+                    <div class="chat-cap">
+                        <p class="chat-cap-title">${tr('chat.capTitle', 'This conversation has used up its free ride.')}</p>
+                        <p class="chat-cap-body">${tr('chat.capBody', "Chat here runs on the house's own AI budget, and this session has reached its share (about 50,000 tokens). The conversation stays right here — nothing is lost. Two ways to keep going:")}</p>
+                        <div class="chat-cap-actions">
+                            <a class="btn-primary" href="/v1/profile?tab=ai">${tr('chat.capOwnKey', 'Bring your own key →')}</a>
+                            ${/* The store is the one price door; a node without one offers only the key. */''}
+                            ${storeHref() ? html`<a class="btn-outline" href=${storeHref()} target="_blank" rel="noopener">${tr('chat.capOwnPlace', 'Get your own place →')}</a>` : ''}
+                        </div>
+                    </div>` : html`
                 <${Composer}
                     value=${draft}
                     onInput=${setDraft}
@@ -727,8 +687,8 @@ export default function ChatView() {
                     listening=${listening}
                     busy=${busy}
                     disabled=${disabled}
-                    boxRef=${composerRef}
                     note=${disabled ? (status?.note ?? '') : ''} />`}
-        <//>
+            </section>
+        </div>
     `;
 }

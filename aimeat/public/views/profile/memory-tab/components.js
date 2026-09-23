@@ -7,12 +7,6 @@
  *   universal file preview modal, the drag-and-drop upload form, and the edit-memory modal.
  *   Extracted from memory-tab.js to satisfy max-file-lines.
  * @version-history
- *   2026-09-22 -- The file preview is the extra-large dialog again, and a dialog title that shows a
- *     key or a file name sets it in mono.
- *   2026-09-22 -- Composed from the shared component set: the forms are Fields and Actions, the
- *     dialogs are Dialog, the collection is ListRows, the drop zone is the dashed aside. The emoji
- *     (cart, clip, brain, clipboard, arrows) are gone. PDF, video and audio previews keep their
- *     profile.css sizing classes: the set has no media part yet.
  *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
  *   v1.1.1 — 2026-09-13 — The file preview (extra large) and the edit dialog (large) keep their actions
  *     in the footer.
@@ -29,9 +23,9 @@ import { t } from '/js/i18n.js';
 import * as memoryService from '/js/services/memory.js';
 import { getNodeUrl } from '/js/services/auth.js';
 import { listWorkspaces, getWorkspaceSources, saveWorkspaceSources } from '/js/services/organisms.js';
-import { ImageView } from '/components/ImageDeliverable.js';
-import { Dialog, ListRow, Action, CopyAction, Field, Surface, Text, Stack } from '/components/poster-parts.js';
-import { fileCategory, fileBytesUrl, fetchFileBytes, encKeyPath } from './file-helpers.js';
+import { Modal } from '/components/Modal.js';
+import { CopyButton } from '/components/CopyButton.js';
+import { fileIcon, fileCategory, fileBytesUrl, fetchFileBytes, encKeyPath } from './file-helpers.js';
 import { swallowed } from '/js/swallowed.js';
 
 export function DiscoverPreview({ ownerGaii, memKey }) {
@@ -47,11 +41,11 @@ export function DiscoverPreview({ ownerGaii, memKey }) {
     }).catch(e => setErr(e.message)).finally(() => setLoading(false));
   }, [ownerGaii, memKey]);
 
-  if (loading) return html`<${Text} kind="caption" tone="muted">...<//>`;
-  if (err) return html`<${Text} kind="caption" tone="danger">${err}<//>`;
+  if (loading) return html`<div class="mem-discover-preview"><span class="text-meta-sm">...</span></div>`;
+  if (err) return html`<div class="mem-discover-preview"><span class="text-meta-sm" style="color:var(--danger)">${err}</span></div>`;
   const text = typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value || '');
   const truncated = text.length > 2000 ? text.slice(0, 2000) + '\n...' : text;
-  return html`<${Surface} kind="code">${truncated}<//>`;
+  return html`<div class="mem-discover-preview"><pre>${truncated}</pre></div>`;
 }
 
 // Collection cart tray — lists gathered memory entries + files and exports them three ways:
@@ -123,33 +117,49 @@ export function CartTray({ cart, nodeUrl, orgs, onRemove, onClear, showToast }) 
     finally { setSending(false); }
   };
 
-  return html`<${Stack}>
-    <${Stack} direction="horizontal" align="between">
-      <${Action} kind="text" expanded=${open} onClick=${() => setOpen(o => !o)}>${t('profile.memory.cartTitle') || 'Collection'} ${cart.length}<//>
-      <${Action} onClick=${onClear}>${t('profile.memory.cartClear') || 'Clear'}<//>
-    <//>
-    ${open && html`
-      <${Stack} density="compact">${cart.map(it => html`
-        <${ListRow} key=${idOf(it)} density="compact" name=${it.label || it.key} detail=${it.key}
-          actions=${html`<${Action} kind="text" onClick=${() => onRemove(idOf(it))}>${t('profile.memory.cartRemove') || 'Remove from collection'}<//>`} />`)}<//>
-      <${Stack} direction="wrap" align="center">
-        <${CopyAction} text=${urlList} label=${t('profile.memory.cartCopyUrls') || 'Copy URL list'} onCopied=${() => showToast(t('profile.memory.cartUrlsCopied') || 'URL list copied')} />
-        <${Action} onClick=${downloadText}>${t('profile.memory.cartDownloadTxt') || 'URL list (.txt)'}<//>
-        <${Action} disabled=${zipping} onClick=${downloadZip}>${zipping ? '…' : (t('profile.memory.cartDownloadZip') || 'Download ZIP')}<//>
-        <${Action} expanded=${sendOpen} onClick=${() => setSendOpen(s => !s)}>→ ${t('profile.memory.cartSend') || 'Send to workspace'}<//>
-      <//>
-      ${sendOpen && html`<${Surface} kind="box" density="compact">
-        ${(orgs || []).length === 0
-          ? html`<${Text} kind="caption" tone="muted">${t('profile.memory.cartNoOrgs') || 'You are not in any organism workspaces yet.'}<//>`
-          : html`<${Stack} direction="wrap" align="end">
-            <${Field} type="select" value=${sendOrg} onChange=${e => pickOrg(e.target.value)}
-              options=${[{ value: '', label: t('profile.memory.cartPickOrg') || 'Choose organism…' }, ...(orgs || []).map(o => ({ value: o.id, label: o.name }))]} />
-            <${Field} type="select" value=${sendWs} disabled=${!sendOrg} onChange=${e => setSendWs(e.target.value)}
-              options=${[{ value: '', label: t('profile.memory.cartPickWs') || 'Choose workspace…' }, ...workspaces.map(w => ({ value: w.id, label: w.name || w.id }))]} />
-            <${Action} kind="primary" disabled=${!sendWs || sending} onClick=${sendToWorkspace}>${sending ? '…' : (t('profile.memory.cartSendBtn') || 'Add as sources')}<//>
-          <//>`}
-      <//>`}`}
-  <//>`;
+  return html`
+    <div class="mem-cart">
+      <div class="mem-cart-head" role="button" tabindex="0" onClick=${() => setOpen(o => !o)}>
+        <span class="mem-cart-title">🛒 ${t('profile.memory.cartTitle') || 'Collection'} <span class="mem-cart-count">${cart.length}</span></span>
+        <span class="mem-cart-head-actions">
+          <span class="pf-chevron ${open ? 'pf-chevron-open' : ''}">▼</span>
+          <button class="btn-ghost btn-sm" onClick=${(e) => { e.stopPropagation(); onClear(); }}>${t('profile.memory.cartClear') || 'Clear'}</button>
+        </span>
+      </div>
+      ${open && html`
+        <div class="mem-cart-body">
+          <div class="mem-cart-list">
+            ${cart.map(it => html`
+              <div class="mem-cart-item" key=${idOf(it)}>
+                <span class="mem-cart-item-icon">${it.kind === 'file' ? '📎' : '🧠'}</span>
+                <span class="mem-cart-item-label" title=${it.key}>${it.label || it.key}</span>
+                <button class="pj-icon-btn" title=${t('profile.memory.cartRemove') || 'Remove from collection'} onClick=${() => onRemove(idOf(it))}>✕</button>
+              </div>`)}
+          </div>
+          <div class="mem-cart-actions">
+            <${CopyButton} text=${urlList} label=${'📋 ' + (t('profile.memory.cartCopyUrls') || 'Copy URL list')}
+              className="btn-outline btn-sm" onCopied=${() => showToast(t('profile.memory.cartUrlsCopied') || 'URL list copied')} />
+            <button class="btn-outline btn-sm" onClick=${downloadText}>⬇ ${t('profile.memory.cartDownloadTxt') || 'URL list (.txt)'}</button>
+            <button class="btn-outline btn-sm" disabled=${zipping} onClick=${downloadZip}>${zipping ? '…' : '⬇ ' + (t('profile.memory.cartDownloadZip') || 'Download ZIP')}</button>
+            <button class="btn-outline btn-sm" onClick=${() => setSendOpen(s => !s)}>→ ${t('profile.memory.cartSend') || 'Send to workspace'}</button>
+          </div>
+          ${sendOpen && html`
+            <div class="mem-cart-send">
+              ${(orgs || []).length === 0
+                ? html`<span class="text-meta-sm">${t('profile.memory.cartNoOrgs') || 'You are not in any organism workspaces yet.'}</span>`
+                : html`
+                  <select class="input-field mem-vis-select" value=${sendOrg} onChange=${e => pickOrg(e.target.value)}>
+                    <option value="">${t('profile.memory.cartPickOrg') || 'Choose organism…'}</option>
+                    ${(orgs || []).map(o => html`<option key=${o.id} value=${o.id}>${o.name}</option>`)}
+                  </select>
+                  <select class="input-field mem-vis-select" value=${sendWs} disabled=${!sendOrg} onChange=${e => setSendWs(e.target.value)}>
+                    <option value="">${t('profile.memory.cartPickWs') || 'Choose workspace…'}</option>
+                    ${workspaces.map(w => html`<option key=${w.id} value=${w.id}>${w.name || w.id}</option>`)}
+                  </select>
+                  <button class="btn-primary btn-sm" disabled=${!sendWs || sending} onClick=${sendToWorkspace}>${sending ? '…' : (t('profile.memory.cartSendBtn') || 'Add as sources')}</button>`}
+            </div>`}
+        </div>`}
+    </div>`;
 }
 
 export function MemoryForm({ onSave, onCancel }) {
@@ -157,25 +167,27 @@ export function MemoryForm({ onSave, onCancel }) {
   const [value, setValue] = useState('');
   const [vis, setVis] = useState('private');
   const [tags, setTags] = useState('');
-  // No "group" option: a group is an audience, not a visibility. Create the record with the
-  // visibility it should have for everyone else, then share the key space with a group from the
-  // row or from Access — one share covers the keys written after it.
-  const visOptions = [
-    { value: 'private', label: t('profile.memory.visPrivate') },
-    { value: 'shared', label: t('profile.memory.visShared') },
-    { value: 'members', label: t('knowledge.visibility.members') },
-    { value: 'public', label: t('profile.memory.visPublic') },
-  ];
-  return html`<${Stack}>
-    <${Field} label=${t('profile.memory.keyLabel')} placeholder=${t('profile.memory.keyPlaceholder')} value=${key} onInput=${e => setKey(e.target.value)} />
-    <${Field} type="textarea" rows=${3} label=${t('profile.memory.valueLabel')} placeholder=${t('profile.memory.valuePlaceholder')} value=${value} onInput=${e => setValue(e.target.value)} />
-    <${Field} type="select" label=${t('profile.memory.visLabel')} value=${vis} onChange=${e => setVis(e.target.value)} options=${visOptions} />
-    <${Field} label=${t('profile.memory.tagsLabel')} placeholder=${t('profile.memory.tagsPlaceholder')} value=${tags} onInput=${e => setTags(e.target.value)} />
-    <${Stack} direction="wrap" align="center">
-      <${Action} onClick=${() => { if (!key || !value) return; onSave(key, value, vis, tags, undefined); }}>${t('profile.memory.saveBtn')}<//>
-      <${Action} onClick=${onCancel}>${t('profile.memory.cancelBtn')}<//>
-    <//>
-  <//>`;
+  return html`
+    <div class="create-form poster-row--thing">
+      <div class="form-row"><label>${t('profile.memory.keyLabel')}</label><input class="input-field" placeholder=${t('profile.memory.keyPlaceholder')} value=${key} onInput=${e => setKey(e.target.value)} /></div>
+      <div class="form-row"><label>${t('profile.memory.valueLabel')}</label><textarea class="input-field" rows="3" placeholder=${t('profile.memory.valuePlaceholder')} value=${value} onInput=${e => setValue(e.target.value)}></textarea></div>
+      <div class="form-row"><label>${t('profile.memory.visLabel')}</label>
+        <select class="input-field" value=${vis} onChange=${e => setVis(e.target.value)}>
+          ${/* No "group" option: a group is an audience, not a visibility. Create the record with
+                the visibility it should have for everyone else, then share the key space with a
+                group from the row or from Access — one share covers the keys written after it. */''}
+          <option value="private">${t('profile.memory.visPrivate')}</option>
+          <option value="shared">${t('profile.memory.visShared')}</option>
+          <option value="members">${t('knowledge.visibility.members')}</option>
+          <option value="public">${t('profile.memory.visPublic')}</option>
+        </select>
+      </div>
+      <div class="form-row"><label>${t('profile.memory.tagsLabel')}</label><input class="input-field" placeholder=${t('profile.memory.tagsPlaceholder')} value=${tags} onInput=${e => setTags(e.target.value)} /></div>
+      <div class="form-actions">
+        <button class="btn-primary" onClick=${() => { if (!key || !value) return; onSave(key, value, vis, tags, undefined); }}>${t('profile.memory.saveBtn')}</button>
+        <button class="btn-outline" onClick=${onCancel}>${t('profile.memory.cancelBtn')}</button>
+      </div>
+    </div>`;
 }
 
 // In-browser file preview lightbox. Blob-fetches the bytes (so PRIVATE files preview too) and
@@ -231,22 +243,21 @@ export function FilePreviewModal({ file, nodeUrl, onClose, onDownload, showToast
     } catch (err) { swallowed('components', err); showToast(t('profile.files.previewError') || 'Couldn’t load this file', true); }
   };
 
-  const status = (text) => html`<${Text} tone="muted">${text}<//>`;
   return html`
-    <${Dialog} open=${true} onClose=${onClose} title=${html`<${Text} kind="mono">${fKey}<//>`} size="xl" guard=${false}
-      actions=${html`
-        <${Action} onClick=${openInTab}>${t('profile.files.openInTab') || 'Open in new tab'} →<//>
-        <${Action} onClick=${() => onDownload(file)}>${t('profile.files.download')}<//>`}>
-      ${loading && status(t('profile.files.previewLoading') || 'Loading preview…')}
-      ${err && status(t('profile.files.previewError') || 'Couldn’t load this file')}
-      ${!loading && !err && cat === 'image' && objUrl && html`<${ImageView} desc=${{ url: objUrl, alt: fKey }} />`}
-      ${/* A PDF frame, a video and an audio player need a size the set has no part for yet
-            (reported as a missing part); they keep their profile.css classes until it exists. */''}
-      ${!loading && !err && cat === 'pdf' && objUrl && html`<iframe class="pf-file-preview-frame" src=${objUrl} title=${fKey}></iframe>`}
-      ${!loading && !err && cat === 'video' && objUrl && html`<video class="pf-file-preview-media" src=${objUrl} controls></video>`}
-      ${!loading && !err && cat === 'audio' && objUrl && html`<audio class="pf-file-preview-media" src=${objUrl} controls></audio>`}
-      ${!loading && !err && cat === 'text' && text !== null && html`<${Surface} kind="code">${text}<//>`}
-      ${!loading && !err && cat === 'other' && status(t('profile.files.noPreview') || 'No preview for this file type — download it instead')}
+    <${Modal} open=${true} onClose=${onClose} title=${fKey} className="pf-file-preview-modal" size="xl" guard=${false}
+      footer=${html`
+        <button class="btn-outline" onClick=${openInTab}>${t('profile.files.openInTab') || 'Open in new tab'} ↗</button>
+        <button class="btn-outline" onClick=${() => onDownload(file)}>${t('profile.files.download')}</button>`}>
+      <div class="pf-file-preview-body">
+        ${loading && html`<div class="pf-file-preview-status">${t('profile.files.previewLoading') || 'Loading preview…'}</div>`}
+        ${err && html`<div class="pf-file-preview-status">${t('profile.files.previewError') || 'Couldn’t load this file'}</div>`}
+        ${!loading && !err && cat === 'image' && objUrl && html`<img class="pf-file-preview-img" src=${objUrl} alt=${fKey} />`}
+        ${!loading && !err && cat === 'pdf' && objUrl && html`<iframe class="pf-file-preview-frame" src=${objUrl} title=${fKey}></iframe>`}
+        ${!loading && !err && cat === 'video' && objUrl && html`<video class="pf-file-preview-media" src=${objUrl} controls></video>`}
+        ${!loading && !err && cat === 'audio' && objUrl && html`<audio class="pf-file-preview-media" src=${objUrl} controls></audio>`}
+        ${!loading && !err && cat === 'text' && text !== null && html`<pre class="pf-file-preview-text">${text}</pre>`}
+        ${!loading && !err && cat === 'other' && html`<div class="pf-file-preview-status">${t('profile.files.noPreview') || 'No preview for this file type — download it instead'}</div>`}
+      </div>
     <//>`;
 }
 
@@ -301,44 +312,70 @@ export function FileUploadForm({ onUpload, onCancel }) {
     setUploading(false);
   };
 
-  return html`<${Stack}>
-    ${/* The drop target is the dashed aside; it turns to the sun while a file is held over it. */''}
-    <div onDragOver=${(e) => { e.preventDefault(); setDragover(true); }} onDragLeave=${() => setDragover(false)} onDrop=${handleDrop}>
-      <${Surface} kind="aside" tone=${dragover ? 'sun' : 'plain'} onClick=${() => fileRef.current?.click()}>
-        <input type="file" multiple ref=${fileRef} hidden
-          onChange=${e => { addFiles(Array.from(e.target.files || [])); e.target.value = ''; }} />
-        <${Stack} density="compact" align="center">
-          <${Text}>${t('profile.files.dropHere')}<//>
-          <${Text} kind="caption" tone="muted">${t('profile.files.orClick')}<//>
-        <//>
-      <//>
-    </div>
-    ${fileItems.length > 0 && html`<${Stack} density="compact">
-      ${fileItems.map((item, idx) => html`
-        <${Stack} key=${item.file.name + item.file.size} direction="horizontal" align="end">
-          <${Field} value=${item.key} onInput=${e => updateKey(idx, e.target.value)} />
-          <${Text} kind="mono" tone="muted">${Math.round(item.file.size / 1024)} KB<//>
-          <${Action} kind="text" label=${t('profile.files.cancelBtn')} onClick=${() => removeFile(idx)}>✗<//>
-        <//>`)}
-    <//>`}
-    <${Field} type="select" label=${t('profile.files.visLabel')} value=${vis} onChange=${e => setVis(e.target.value)}
-      options=${[{ value: 'private', label: t('profile.files.visPrivate') }, { value: 'owner', label: t('profile.files.visOwner') }, { value: 'group', label: 'Group' }, { value: 'public', label: t('profile.files.visPublic') }]} />
-    <${Stack} direction="wrap" align="end">
-      <${Field} label=${t('profile.files.tagsLabel') || 'Tags'} placeholder=${t('profile.files.tagsPlaceholder') || 'Add tag and press Enter'}
-        value=${tagInput} onInput=${e => setTagInput(e.target.value)}
-        onKeyDown=${e => { if (e.key === 'Enter') { e.preventDefault(); addTag(); } }} />
-      <${Action} onClick=${addTag}>+<//>
-    <//>
-    ${fileTags.length > 0 && html`<${Stack} direction="wrap" density="compact">
-      ${fileTags.map(tag => html`<${Action} key=${tag} kind="tab" selected=${true} onClick=${() => removeTag(tag)}>${tag} ✗<//>`)}
-    <//>`}
-    <${Stack} direction="wrap" align="center">
-      <${Action} disabled=${fileItems.length === 0 || uploading} onClick=${handleSubmit}>
-        ${uploading ? '...' : fileItems.length > 1 ? `${t('profile.files.uploadSaveBtn')} (${fileItems.length})` : t('profile.files.uploadSaveBtn')}
-      <//>
-      <${Action} onClick=${onCancel}>${t('profile.files.cancelBtn')}<//>
-    <//>
-  <//>`;
+  return html`
+    <div class="create-form poster-row--thing">
+      <div class="form-row">
+        <div class="file-dropzone ${dragover ? 'dragover' : ''} ${fileItems.length > 0 ? 'has-file' : ''}"
+          onClick=${() => fileRef.current?.click()}
+          onDragOver=${(e) => { e.preventDefault(); setDragover(true); }}
+          onDragLeave=${() => setDragover(false)}
+          onDrop=${handleDrop}>
+          <input type="file" multiple ref=${fileRef} class="pf-hidden"
+            onChange=${e => { addFiles(Array.from(e.target.files || [])); e.target.value = ''; }} />
+          <div class="file-dropzone-empty">
+            <span class="pf-upload-icon">\u{2B06}️</span>
+            <span>${t('profile.files.dropHere')}</span>
+            <span class="text-meta">${t('profile.files.orClick')}</span>
+          </div>
+        </div>
+      </div>
+      ${fileItems.length > 0 && html`
+        <div class="file-upload-list">
+          ${fileItems.map((item, idx) => html`
+            <div class="file-upload-item" key=${item.file.name + item.file.size}>
+              <span class="pf-file-icon">${fileIcon(item.file.type)}</span>
+              <input class="input-field pf-flex-fill" value=${item.key}
+                onInput=${e => updateKey(idx, e.target.value)}
+                onClick=${e => e.stopPropagation()} />
+              <span class="text-meta pf-nowrap pf-shrink-0">${Math.round(item.file.size / 1024)} KB</span>
+              <button class="btn-outline btn-sm pf-shrink-0" onClick=${() => removeFile(idx)}>✕</button>
+            </div>
+          `)}
+        </div>
+      `}
+      <div class="form-row"><label>${t('profile.files.visLabel')}</label>
+        <select class="input-field" value=${vis} onChange=${e => setVis(e.target.value)}>
+          <option value="private">${t('profile.files.visPrivate')}</option>
+          <option value="owner">${t('profile.files.visOwner')}</option>
+          <option value="group">Group</option>
+          <option value="public">${t('profile.files.visPublic')}</option>
+        </select>
+      </div>
+      <div class="form-row"><label>${t('profile.files.tagsLabel') || 'Tags'}</label>
+        <div class="flex-row">
+          <input class="input-field pf-flex-fill" placeholder=${t('profile.files.tagsPlaceholder') || 'Add tag and press Enter'}
+            value=${tagInput} onInput=${e => setTagInput(e.target.value)}
+            onKeyDown=${e => { if (e.key === 'Enter') { e.preventDefault(); addTag(); } }} />
+          <button type="button" class="btn-sm" onClick=${addTag}>+</button>
+        </div>
+        ${fileTags.length > 0 && html`
+          <div class="file-tag-cloud mb-half">
+            ${fileTags.map(tag => html`
+              <span class="file-tag-btn active" key=${tag} onClick=${() => removeTag(tag)}>
+                ${tag} ✕
+              </span>
+            `)}
+          </div>
+        `}
+      </div>
+      <div class="form-actions">
+        <button class="btn-primary" disabled=${fileItems.length === 0 || uploading}
+          onClick=${handleSubmit}>
+          ${uploading ? '...' : fileItems.length > 1 ? `${t('profile.files.uploadSaveBtn')} (${fileItems.length})` : t('profile.files.uploadSaveBtn')}
+        </button>
+        <button class="btn-outline" onClick=${onCancel}>${t('profile.files.cancelBtn')}</button>
+      </div>
+    </div>`;
 }
 
 export function EditMemoryModal({ memKey, initialValue, initialVisibility, initialVersion, isJson, onSave, onCancel }) {
@@ -355,18 +392,21 @@ export function EditMemoryModal({ memKey, initialValue, initialVisibility, initi
   const canSave = !jsonError;
 
   return html`
-    <${Dialog} open=${true} onClose=${onCancel} title=${html`${t('profile.memory.editTitle')}: <${Text} kind="mono">${memKey}<//>`} size="large"
-      actions=${html`
-        <${Action} onClick=${onCancel}>${t('profile.cancel')}<//>
-        <${Action} kind="primary" disabled=${!canSave}
-          onClick=${() => onSave(value, vis, initialVersion, undefined)}>${t('profile.save')}<//>`}>
-      <${Stack}>
-        ${/* Same as the create form: a group is an audience, not a visibility. Sharing a key
-              space with one is done from the row's share panel or the Access tab. */''}
-        <${Field} type="select" label=${t('profile.memory.visLabel')} value=${vis} onChange=${e => setVis(e.target.value)}
-          options=${['private', 'owner', 'members', 'public'].map(v => ({ value: v, label: t('knowledge.visibility.' + v) }))} />
-        <${Field} type="textarea" rows=${14} value=${value} onInput=${e => setValue(e.target.value)}
-          error=${jsonError ? `${t('profile.memory.invalidJson')} — ${jsonError}` : undefined} />
-      <//>
+    <${Modal} open=${true} onClose=${onCancel} title=${`${t('profile.memory.editTitle')}: ${memKey}`} size="lg"
+      footer=${html`
+        <button class="btn-outline" onClick=${onCancel}>${t('profile.cancel')}</button>
+        <button class="btn-primary" disabled=${!canSave}
+          onClick=${() => onSave(value, vis, initialVersion, undefined)}>${t('profile.save')}</button>`}>
+        <div class="form-row flex-row mb-half">
+          <label class="pf-label-inline">${t('profile.memory.visLabel')}</label>
+          ${/* Same as the create form: a group is an audience, not a visibility. Sharing a key
+                space with one is done from the row's share panel or the Access tab. */''}
+          <select class="input-field mem-vis-select" value=${vis} onChange=${e => setVis(e.target.value)}>
+            ${['private', 'owner', 'members', 'public'].map(v => html`<option key=${v} value=${v}>${t('knowledge.visibility.' + v)}</option>`)}
+          </select>
+        </div>
+        <textarea class="input-field mem-edit-textarea ${jsonError ? 'mem-edit-textarea--error' : ''}" rows="14"
+          value=${value} onInput=${e => setValue(e.target.value)}></textarea>
+        ${jsonError && html`<div class="mem-json-error">${t('profile.memory.invalidJson')} — ${jsonError}</div>`}
     <//>`;
 }

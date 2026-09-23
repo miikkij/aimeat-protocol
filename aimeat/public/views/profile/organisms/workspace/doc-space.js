@@ -10,12 +10,6 @@
  * @structure renderDocSpace
  * @usage import { renderDocSpace } from '/views/profile/organisms/workspace/doc-space.js';
  * @version-history
- *   2026-09-22 -- The section rename commits through the Field's onBlur instead of a listener wired
- *     through the element ref.
- *   2026-09-22 -- Composed from the shared set: the index and the document are two Columns, a section,
- *     a series and a document are ListRows (drag and drop on plain wrappers), a row's icon buttons are
- *     one Menu; the repeated space head that the page already shows is gone. The colour-tag dot stays
- *     (ColorPicker). No class of its own.
  *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
  *   v1.1.0 -- 2026-09-13 -- Compose the document index top rule with poster-row--thing.
  *   v1.0.0 — 2026-07-13 — Extracted from workspace.js (max-file-lines)
@@ -24,7 +18,7 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { Columns, Stack, ListRow, Chip, Menu, Field, Text } from '/components/poster-parts.js';
+import { EmptyState } from '/components/EmptyState.js';
 import { slugifyHeading } from '/components/Markdown.js';
 import { DocumentView, DocumentEditor } from '/views/profile/organisms/document.js';
 import { WorkspaceComments } from '/views/profile/organisms/workspace-comments.js';
@@ -40,7 +34,7 @@ export function renderDocSpace(ctx, ot) {
     sectionsByType, mergedDocs, activeDoc, itemColor, draggedDoc, setItemColor, setActiveDoc,
     showArchived, busy, setRecordArchived, removeObject, moveDocToSection, expandedSeries,
     setExpandedSeries, editingSec, setEditingSec, setSecName, commitSecName, setSectionColor,
-    addSection, removeSection, orgId, savePage, publish, popOut, showToast, wsId,
+    addSection, removeSection, spaceDesc, wsT, orgId, savePage, publish, popOut, showToast, wsId,
     commentsByKey, cKey, reloadComments,
   } = ctx;
   const secs = sectionsByType[ot.name] || [];
@@ -51,22 +45,20 @@ export function renderDocSpace(ctx, ot) {
   const childrenOf = (pid) => secs.filter(s => (s.parentId || null) === (pid || null));
   const isActive = (d) => activeDoc?.type === ot.name && activeDoc.page?.id === d.id;
 
-  const draftChip = html`<${Chip} tone="sun">${t('organisms.draft') || 'draft'}<//>`;
-  // The row is dragged by a plain wrapper, because a list row takes no drag handlers.
   const docItem = (d) => html`
-    <div key=${'di' + d.id} draggable=${true} title=${t('organisms.dragHint') || 'Drag into a section'}
+    <div class="pj-doc-item ${isActive(d) ? 'active' : ''} ${itemColor(ot.name, d.id) ? 'pj-colored pj-tag-' + itemColor(ot.name, d.id) : ''}" key=${'di' + d.id}
+      draggable=${true}
       onDragStart=${(e) => { draggedDoc.current = { type: ot.name, id: d.id }; if (e.dataTransfer) { e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', d.id); } catch (err) { swallowed('doc-space: docItem', err); } } }}
       onDragEnd=${() => { draggedDoc.current = null; }}>
-      <${ListRow} density="compact" selected=${isActive(d)}
-        mark=${html`<${ColorPicker} value=${itemColor(ot.name, d.id)} onPick=${(c) => setItemColor(ot.name, d.id, c)} />`}
-        name=${d.title || d.id} onOpen=${() => setActiveDoc({ type: ot.name, mode: 'view', page: d })}
-        actions=${html`${d._draft ? draftChip : null}
-          <${Menu} label=${t('organisms.moreActions') || 'More actions'} items=${[
-            showArchived
-              ? { label: t('organisms.unarchive') || 'Unarchive', disabled: busy, onClick: () => setRecordArchived(ot, d.id, false) }
-              : { label: t('organisms.archive') || 'Archive', disabled: busy, onClick: () => setRecordArchived(ot, d.id, true) },
-            { label: t('organisms.delete') || 'Delete', danger: true, disabled: busy, onClick: () => removeObject(ot.namespace, d.id, d.title || d.id) },
-          ]} />`} />
+      <span class="pj-grip" title=${t('organisms.dragHint') || 'Drag into a section'}>⠿</span>
+      <${ColorPicker} value=${itemColor(ot.name, d.id)} onPick=${(c) => setItemColor(ot.name, d.id, c)} />
+      <button class="pj-doc-link" onClick=${() => setActiveDoc({ type: ot.name, mode: 'view', page: d })}>
+        ${d._draft ? html`<span class="badge badge-warn pj-mini">${t('organisms.draft') || 'draft'}</span> ` : ''}${d.title || d.id}
+      </button>
+      ${showArchived
+        ? html`<button class="pj-icon-btn" title=${t('organisms.unarchive') || 'Unarchive'} disabled=${busy} onClick=${() => setRecordArchived(ot, d.id, false)}>♻️</button>`
+        : html`<button class="pj-icon-btn" title=${t('organisms.archive') || 'Archive'} disabled=${busy} onClick=${() => setRecordArchived(ot, d.id, true)}>🗄️</button>`}
+      <button class="pj-icon-btn pj-doc-del" title=${t('organisms.delete') || 'Delete'} disabled=${busy} onClick=${() => removeObject(ot.namespace, d.id, d.title || d.id)}>🗑</button>
     </div>`;
 
   // A section is a drop target — dragging a document onto it (or its header) files it here.
@@ -80,81 +72,78 @@ export function renderDocSpace(ctx, ot) {
     const key = ot.name + ':' + g.base;
     const open = g.parts.some(isActive) || !!expandedSeries[key];
     return html`
-      <${ListRow} key=${'ser-' + g.base} density="compact" arrow=${true} selected=${open}
-        name=${g.base} onOpen=${() => setExpandedSeries(s => ({ ...s, [key]: !open }))} value=${g.parts.length}
-        actions=${g.parts.some(p => p._draft) ? draftChip : null}>
-        ${open ? html`<${Stack} density="compact">${g.parts.map(docItem)}<//>` : null}
-      <//>`;
+      <div class="pj-doc-series ${open ? 'open' : ''}" key=${'ser-' + g.base}>
+        <button class="pj-doc-series-head" onClick=${() => setExpandedSeries(s => ({ ...s, [key]: !open }))}>
+          <span class="pj-ov-chevron">${open ? '▾' : '▸'}</span>
+          <span class="pj-doc-series-name">${g.base}</span>
+          <span class="pj-org-tab-count">${g.parts.length}</span>
+          ${g.parts.some(p => p._draft) ? html`<span class="badge badge-warn pj-mini">${t('organisms.draft') || 'draft'}</span>` : null}
+        </button>
+        ${open ? html`<div class="pj-doc-series-parts">${g.parts.map(docItem)}</div>` : null}
+      </div>`;
   });
 
-  // A section and its drop zone: a plain wrapper carries the drop handlers.
   const renderSection = (sec) => html`
-    <div key=${sec.id} onDragOver=${allowDrop} onDrop=${dropOn(sec.id)}>
-      <${ListRow} density="compact"
-        mark=${html`<${ColorPicker} value=${sec.color} onPick=${(c) => setSectionColor(ot.name, sec.id, c)} />`}
-        name=${editingSec === sec.id
-          ? html`<${Field} placeholder=${t('organisms.sectionName') || 'Section name'} inputRef=${focusOnce}
-              onBlur=${() => commitSecName(ot.name)} value=${sec.name} onInput=${e => setSecName(ot.name, sec.id, e.target.value)}
-              onKeyDown=${e => { if (e.key === 'Enter') e.target.blur(); }} />`
-          : html`<span onDblClick=${() => setEditingSec(sec.id)}>${sec.name || t('organisms.unnamed') || '(unnamed)'}</span>`}
-        actions=${html`<${Menu} label=${t('organisms.moreActions') || 'More actions'} items=${[
-          { label: t('organisms.rename') || 'Rename', onClick: () => setEditingSec(sec.id) },
-          { label: t('organisms.newDocHere') || 'New document here', onClick: () => setActiveDoc({ type: ot.name, mode: 'edit', page: { id: '', title: '', markdown: '' }, sectionId: sec.id }) },
-          { label: t('organisms.addSubsection') || 'Sub-section', onClick: () => addSection(ot.name, sec.id) },
-          { label: t('organisms.remove') || 'Remove', danger: true, onClick: () => removeSection(ot.name, sec.id, sec.name) },
-        ]} />`}>
-        <${Stack} density="compact">
-          ${renderDocList((sec.documents || []).map(id => docById[id]).filter(Boolean))}
-          ${childrenOf(sec.id).map(renderSection)}
-        <//>
-      <//>
+    <div class="pj-sec ${sec.color ? 'pj-colored pj-tag-' + sec.color : ''}" key=${sec.id} onDragOver=${allowDrop} onDrop=${dropOn(sec.id)}>
+      <div class="pj-sec-head">
+        <${ColorPicker} value=${sec.color} onPick=${(c) => setSectionColor(ot.name, sec.id, c)} />
+        ${editingSec === sec.id
+          ? html`<input class="input-field input-xs pj-sec-name" autofocus placeholder=${t('organisms.sectionName') || 'Section name'}
+              value=${sec.name} onInput=${e => setSecName(ot.name, sec.id, e.target.value)}
+              onBlur=${() => commitSecName(ot.name)} onKeyDown=${e => { if (e.key === 'Enter') e.target.blur(); }} />`
+          : html`<span class="pj-sec-name-text" onDblClick=${() => setEditingSec(sec.id)}>${(sec.name || t('organisms.unnamed') || '(unnamed)')}</span>`}
+        <button class="pj-icon-btn" title=${t('organisms.rename') || 'Rename'} onClick=${() => setEditingSec(sec.id)}>✎</button>
+        <button class="pj-icon-btn" title=${t('organisms.newDocHere') || 'New document here'} onClick=${() => setActiveDoc({ type: ot.name, mode: 'edit', page: { id: '', title: '', markdown: '' }, sectionId: sec.id })}>+</button>
+        <button class="pj-icon-btn" title=${t('organisms.addSubsection') || 'Sub-section'} onClick=${() => addSection(ot.name, sec.id)}>⊕</button>
+        <button class="pj-icon-btn" title=${t('organisms.remove') || 'Remove'} onClick=${() => removeSection(ot.name, sec.id, sec.name)}>✕</button>
+      </div>
+      ${renderDocList((sec.documents || []).map(id => docById[id]).filter(Boolean))}
+      ${childrenOf(sec.id).map(renderSection)}
     </div>`;
 
   return html`
-    <${Columns} layout="trailing" collapse="900" key=${ot.name}>
-      <${Stack} density="compact">
-        ${childrenOf(null).map(renderSection)}
-        ${unsorted.length > 0 ? html`
-          <div onDragOver=${allowDrop} onDrop=${dropOn(null)}>
-            <${Stack} density="compact"><${Text} kind="label" tone="muted">${t('organisms.unsorted') || 'Unsorted'}<//>${renderDocList(unsorted)}<//>
-          </div>` : null}
-        ${docs.length === 0 && secs.length === 0 ? html`<${Text} tone="muted">${t('organisms.noneYet') || 'none yet'}<//>` : null}
-      <//>
-      <${Stack}>
-        ${(() => {
-          if (activeDoc?.type !== ot.name) return html`<${Text} tone="muted">${t('organisms.selectDoc') || 'Select a document, or create one.'}<//>`;
-          // Re-resolve the open document against the freshly-loaded list by id, so after a save (or
-          // a live-update / F5 restore that only kept the id) the view shows the current draft —
-          // with its correct draft badge, published copy, and Draft/Published toggle.
-          const livePage = (activeDoc.page && activeDoc.page.id && docById[activeDoc.page.id]) || activeDoc.page;
-          if (activeDoc.mode === 'edit') return html`
-            <${DocumentEditor} key=${'ed-' + (livePage.id || 'new')} orgId=${orgId} page=${livePage} busy=${busy} onSave=${(p) => savePage(ot, p, activeDoc.sectionId)} onCancel=${() => setActiveDoc(null)} />`;
-          return html`
-            <${DocumentView} key=${'view-' + livePage.id} page=${livePage} busy=${busy}
-              onEdit=${() => setActiveDoc({ type: ot.name, mode: 'edit', page: livePage })}
-              onPublish=${() => publish(ot, livePage.id)}
-              onPopOut=${() => popOut(ot.name, livePage.id)}
-              onWikiLink=${(content) => {
-                const [titlePart, headingPart] = String(content).split('#');
-                const title = titlePart.trim();
-                const anchor = (headingPart || '').trim();
-                const scrollToAnchor = () => { if (anchor) setTimeout(() => { const el = document.getElementById(slugifyHeading(anchor)); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 80); };
-                if (!title) { scrollToAnchor(); return; }   // [[#Heading]] → jump within the current document
-                const target = docs.find(d => (d.title || '').toLowerCase() === title.toLowerCase());
-                if (target) { setActiveDoc({ type: ot.name, mode: 'view', page: target }); scrollToAnchor(); }
-                else showToast((t('organisms.docNotFound') || 'No document titled “{title}”').replace('{title}', title));
-              }} />
-            <${WorkspaceComments} orgId=${orgId} ws=${wsId} space=${ot.name} instanceId=${livePage.id} showToast=${showToast}
-              batched=${true} initialComments=${commentsByKey[cKey(wsId, ot.name, livePage.id)]} onReload=${reloadComments} />`;
-        })()}
-      <//>
-    <//>`;
+    <div class="pj-section poster-row--thing" key=${ot.name}>
+      <div class="pj-section-head">
+        <span class="pj-section-title">${(wsT('type.' + ot.name) || ot.name)}<span class="pj-doc-tag">${t('organisms.docs') || 'docs'}</span></span>
+        <button class="btn-outline btn-sm" onClick=${() => addSection(ot.name, null)}>${'+ '}${t('organisms.section') || 'Section'}</button>
+        <button class="btn-outline btn-sm" onClick=${() => setActiveDoc({ type: ot.name, mode: 'edit', page: { id: '', title: '', markdown: '' } })}>${'+ '}${t('organisms.newPage') || 'New document'}</button>
+      </div>
+      ${spaceDesc(ot) ? html`<div class="section-desc">${spaceDesc(ot)}</div>` : null}
+      <div class="pj-docspace">
+        <div class="pj-doc-index poster-row--thing">
+          ${childrenOf(null).map(renderSection)}
+          ${unsorted.length > 0 ? html`
+            <div class="pj-sec" onDragOver=${allowDrop} onDrop=${dropOn(null)}><div class="pj-sec-head"><span class="pj-sec-name pj-muted">${t('organisms.unsorted') || 'Unsorted'}</span></div>${renderDocList(unsorted)}</div>` : null}
+          ${docs.length === 0 && secs.length === 0 ? html`<${EmptyState} text=${t('organisms.noneYet') || 'none yet'} />` : null}
+        </div>
+        <div class="pj-doc-main">
+          ${(() => {
+            if (activeDoc?.type !== ot.name) return html`<${EmptyState} icon="📄" text=${t('organisms.selectDoc') || 'Select a document, or create one.'} />`;
+            // Re-resolve the open document against the freshly-loaded list by id, so after a save (or
+            // a live-update / F5 restore that only kept the id) the view shows the current draft —
+            // with its correct draft badge, published copy, and Draft/Published toggle.
+            const livePage = (activeDoc.page && activeDoc.page.id && docById[activeDoc.page.id]) || activeDoc.page;
+            if (activeDoc.mode === 'edit') return html`
+              <${DocumentEditor} key=${'ed-' + (livePage.id || 'new')} orgId=${orgId} page=${livePage} busy=${busy} onSave=${(p) => savePage(ot, p, activeDoc.sectionId)} onCancel=${() => setActiveDoc(null)} />`;
+            return html`
+              <${DocumentView} key=${'view-' + livePage.id} page=${livePage} busy=${busy}
+                onEdit=${() => setActiveDoc({ type: ot.name, mode: 'edit', page: livePage })}
+                onPublish=${() => publish(ot, livePage.id)}
+                onPopOut=${() => popOut(ot.name, livePage.id)}
+                onWikiLink=${(content) => {
+                  const [titlePart, headingPart] = String(content).split('#');
+                  const title = titlePart.trim();
+                  const anchor = (headingPart || '').trim();
+                  const scrollToAnchor = () => { if (anchor) setTimeout(() => { const el = document.querySelector('.pj-doc-view [id="' + slugifyHeading(anchor) + '"]'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 80); };
+                  if (!title) { scrollToAnchor(); return; }   // [[#Heading]] → jump within the current document
+                  const target = docs.find(d => (d.title || '').toLowerCase() === title.toLowerCase());
+                  if (target) { setActiveDoc({ type: ot.name, mode: 'view', page: target }); scrollToAnchor(); }
+                  else showToast((t('organisms.docNotFound') || 'No document titled “{title}”').replace('{title}', title));
+                }} />
+              <${WorkspaceComments} orgId=${orgId} ws=${wsId} space=${ot.name} instanceId=${livePage.id} showToast=${showToast}
+                batched=${true} initialComments=${commentsByKey[cKey(wsId, ot.name, livePage.id)]} onReload=${reloadComments} />`;
+          })()}
+        </div>
+      </div>
+    </div>`;
 }
-
-/** The section-name field takes the focus once when it opens (the old input's autofocus). Preact
- *  does not act on autofocus for an element it inserts later, so the focus is given here. */
-const focusOnce = (el) => {
-  if (!el || el.dataset.focused) return;
-  el.dataset.focused = 'yes';
-  el.focus();
-};

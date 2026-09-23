@@ -7,12 +7,9 @@
  *   render from the SERVED values, so an operator sees the effect of what they saved rather than
  *   the text they typed; a field they are editing shows in the field alone until it is saved.
  *
- * @structure IdentityField · Preview · DiscoveryIdentity({ status, onChanged }) — the seven fields, Save, the two previews
+ * @structure DiscoveryIdentity({ status, onChanged }) — the seven fields, Save, the two previews
  * @usage <${DiscoveryIdentity} status=${status} onChanged=${load} />
  * @version-history
- *   v1.2.0 -- 2026-09-22 -- Composed from the shared component set: the seven settings as shared
- *     fields (their hints show while a field is in use or filled, as everywhere), the two previews
- *     as shared boxes; no sheet of its own.
  *   v1.1.0 — 2026-09-13 — Compose section headings from the shared poster B1 shape.
  *   v1.0.0 — 2026-09-11 — Initial (the Discovery page in the poster face). The fields and the
  *     previews lived in discovery-tab.js before.
@@ -23,7 +20,6 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { useToast, Toast } from './shared.js';
-import { Section, Columns, Stack, Text, Action, Field, Surface } from '/components/poster-parts.js';
 import * as adminService from '/js/services/admin.js';
 
 const S = (key, params) => t('dashboard.seo.' + key, params);
@@ -39,48 +35,47 @@ const FIELDS = [
   { path: 'seo.twitter_site',      key: 'twitterSite',     type: 'text',     from: (i) => i.twitter_site || '' },
 ];
 
-/** One identity setting as a shared field; its hint shows while the field is in use or filled. */
-function IdentityField({ field, value, onInput }) {
-  const label = S('identity.f_' + field.key);
+function Field({ field, value, onInput }) {
+  const label = html`<div class="adm-disc-lbl">${S('identity.f_' + field.key)}</div>`;
+  const hint = html`<p class="adm-disc-note">${S('identity.h_' + field.key)}</p>`;
   if (field.type === 'textarea' || field.type === 'lines') {
     const text = field.type === 'lines' ? (value || []).join('\n') : value;
-    const hint = field.type === 'textarea'
-      ? `${S('identity.h_' + field.key)} ${S('identity.chars', { n: String(value || '').length })}`
-      : S('identity.h_' + field.key);
-    return html`<${Field} type="textarea" rows=${3} label=${label} value=${text} hint=${hint}
-      spellCheck=${field.type === 'lines' ? false : undefined} onInput=${e => onInput(e.target.value)} />`;
+    return html`<div>${label}
+      <textarea class="adm-disc-box-fld ${field.type === 'lines' ? 'adm-disc-box-fld--mono' : ''}" rows="3" value=${text}
+        onInput=${e => onInput(e.target.value)} />
+      ${field.type === 'textarea' ? html`<p class="adm-disc-note">${S('identity.h_' + field.key)} ${S('identity.chars', { n: String(value || '').length })}</p>` : hint}
+    </div>`;
   }
-  return html`<${Field} label=${label} value=${value} spellCheck=${false} passwordManager=${false}
-    placeholder=${S('identity.p_' + field.key)} hint=${S('identity.h_' + field.key)}
-    onInput=${e => onInput(e.target.value)} />`;
+  return html`<div>${label}
+    <div class="adm-disc-fld ${field.type === 'mono' ? 'adm-disc-fld--mono' : ''}">
+      <input type="text" value=${value} spellcheck="false" placeholder=${S('identity.p_' + field.key)} onInput=${e => onInput(e.target.value)} />
+    </div>
+    ${hint}
+  </div>`;
 }
 
 /** What a search result and a shared link look like right now, from the served values. */
 function Preview({ identity, host }) {
   return html`
-    <${Stack}>
-      <${Text} kind="label">${S('identity.serp')}<//>
-      <${Surface} kind="box">
-        <${Stack} density="compact">
-          <${Text} kind="mono" tone="muted">${identity.organization_url}<//>
-          <${Text} kind="heading" size="small" tone="coral">${identity.site_name}<//>
-          <${Text} tone="muted">${identity.site_description}<//>
-        <//>
-      <//>
-      <${Text} kind="label">${S('identity.card')}<//>
-      <${Surface} kind="box" density="flush">
+    <div>
+      <div class="adm-disc-lbl">${S('identity.serp')}</div>
+      <div class="adm-disc-frame">
+        <div class="adm-disc-serp-url">${identity.organization_url}</div>
+        <div class="adm-disc-serp-title">${identity.site_name}</div>
+        <div class="adm-disc-serp-desc">${identity.site_description}</div>
+      </div>
+      <div class="adm-disc-lbl">${S('identity.card')}</div>
+      <div class="adm-disc-frame adm-disc-frame--card">
         ${identity.og_image
-          ? html`<img src=${identity.og_image} alt="" loading="lazy" width="100%" />`
-          : html`<${Surface} kind="plain" tone="ink"><${Text} kind="caption">${S('noImage')}<//><//>`}
-        <${Surface} kind="plain" density="compact">
-          <${Stack} density="compact">
-            <strong>${identity.site_name}</strong>
-            <${Text} tone="muted">${identity.site_description}<//>
-            <${Text} kind="mono" tone="muted">${host}<//>
-          <//>
-        <//>
-      <//>
-    <//>`;
+          ? html`<img class="adm-disc-card-img" src=${identity.og_image} alt="" loading="lazy" />`
+          : html`<div class="adm-disc-card-img adm-disc-card-img--empty">${S('noImage')}</div>`}
+        <div class="adm-disc-card-body">
+          <div class="adm-disc-card-title">${identity.site_name}</div>
+          <div class="adm-disc-serp-desc">${identity.site_description}</div>
+          <div class="adm-disc-card-host">${host}</div>
+        </div>
+      </div>
+    </div>`;
 }
 
 export function DiscoveryIdentity({ status, onChanged }) {
@@ -119,22 +114,26 @@ export function DiscoveryIdentity({ status, onChanged }) {
   const pairB = FIELDS.find(f => f.pair === 'b');
 
   return html`
-    <${Section} id="adm-disc-04" title=${S('identity.title')} count="04" description=${S('identity.lead')}
-      actions=${dirty ? html`<${Action} onClick=${() => setEdits({})}>${S('identity.discard')}<//>` : null}>
+    <section class="og-sec" id="adm-disc-04">
       ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
-      <${Columns} layout="leading" collapse=${900} density="roomy">
-        <${Stack} density="roomy">
-          ${FIELDS.filter(f => !f.pair).slice(0, 3).map(field => html`<${IdentityField} key=${field.path} field=${field} value=${current(field)} onInput=${v => edit(field, v)} />`)}
-          <${Columns} layout="equal" collapse=${560}>
-            <${IdentityField} field=${pairA} value=${current(pairA)} onInput=${v => edit(pairA, v)} />
-            <${IdentityField} field=${pairB} value=${current(pairB)} onInput=${v => edit(pairB, v)} />
-          <//>
-          ${FIELDS.filter(f => !f.pair).slice(3).map(field => html`<${IdentityField} key=${field.path} field=${field} value=${current(field)} onInput=${v => edit(field, v)} />`)}
-          <${Stack} direction="wrap" align="center">
-            <${Action} disabled=${saving || !dirty} onClick=${save}>${S('identity.save')}<//>
-          <//>
-        <//>
+      <div class="og-sec-h"><h2 class="poster-section-title">${S('identity.title')}<small>04</small></h2>
+        <div class="og-doors">
+          ${dirty ? html`<button type="button" class="og-door og-door--quiet" onClick=${() => setEdits({})}>${S('identity.discard')}</button>` : null}
+        </div></div>
+      <p class="adm-disc-lead">${S('identity.lead')}</p>
+      <div class="adm-disc-identity">
+        <div class="adm-disc-fields">
+          ${FIELDS.filter(f => !f.pair).slice(0, 3).map(field => html`<${Field} key=${field.path} field=${field} value=${current(field)} onInput=${v => edit(field, v)} />`)}
+          <div class="adm-disc-pair">
+            <${Field} field=${pairA} value=${current(pairA)} onInput=${v => edit(pairA, v)} />
+            <${Field} field=${pairB} value=${current(pairB)} onInput=${v => edit(pairB, v)} />
+          </div>
+          ${FIELDS.filter(f => !f.pair).slice(3).map(field => html`<${Field} key=${field.path} field=${field} value=${current(field)} onInput=${v => edit(field, v)} />`)}
+          <div class="adm-disc-acts">
+            <button type="button" class="og-slab" disabled=${saving || !dirty} onClick=${save}>${S('identity.save')}</button>
+          </div>
+        </div>
         <${Preview} identity=${status.identity} host=${host} />
-      <//>
-    <//>`;
+      </div>
+    </section>`;
 }

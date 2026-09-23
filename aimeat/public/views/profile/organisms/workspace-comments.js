@@ -12,9 +12,6 @@
  *   v1.1.0 — 2026-06-22 — Optional BATCHED mode (batched/initialComments/onReload): the parent fetches
  *     all visible threads in one /comments/batch request instead of each thread self-fetching +
  *     self-subscribing to 'organisms' events (which was the per-document comments request storm).
- *   v1.2.0 -- 2026-09-22 -- Composed from the shared set: a comment is a ListRow with its body under it,
- *     the composer is Fields; no class of its own.
- *   v1.2.1 -- 2026-09-22 -- Delete carries the danger tone.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
@@ -26,7 +23,6 @@ import { dt } from '/js/format.js';
 import * as orgService from '/js/services/organisms.js';
 import { swallowed } from '/js/swallowed.js';
 import { getSession } from '/js/services/auth.js';
-import { Stack, ListRow, Action, Field, Text } from '/components/poster-parts.js';
 
 /**
  * Comment thread on one workspace object (record or document). Targeted by orgId+ws+space+instanceId.
@@ -82,26 +78,33 @@ export function WorkspaceComments({ orgId, ws, space, instanceId, showToast, bat
   };
 
   const list = comments || [];
-  return html`<${Stack} density="compact">
-    <${Text} kind="label">${(t('organisms.commentsHeading') || 'Comments') + (list.length ? ` (${list.length})` : '')}<//>
-    ${comments === null ? html`<${Text} tone="muted">…<//>` : null}
-    ${comments !== null && list.length === 0 ? html`<${Text} kind="caption" tone="muted">${t('organisms.noComments') || 'No comments yet.'}<//>` : null}
-    ${list.map(c => html`
-      <${ListRow} key=${c.id} density="compact" preview=${false} detailKind="text"
-        name=${c.author || '?'}
-        detail=${`${c.parentId ? `${t('organisms.inReply') || 'reply'} · ` : ''}${c.anchor?.quote ? `“${String(c.anchor.quote).slice(0, 80)}” · ` : ''}${c.anchor?.section ? `§${c.anchor.section} · ` : ''}${c.createdAt ? dt(c.createdAt) : ''}`}
-        actions=${html`<${Action} kind="text" disabled=${busy} onClick=${() => setReplyTo({ id: c.id, body: c.body })}>${t('organisms.reply') || 'Reply'}<//>
-          ${mine(c.author) ? html`<${Action} kind="text" tone="danger" disabled=${busy} onClick=${() => remove(c)}>${t('organisms.delete') || 'Delete'}<//>` : null}`}>
-        <${Text}>${c.body || ''}<//>
-      <//>`)}
-    <${Stack} density="compact">
-      ${replyTo ? html`<${Stack} direction="wrap" align="center" density="compact">
-        <${Text} kind="caption" tone="muted">${t('organisms.replyingTo') || 'Replying to'}: “${String(replyTo.body || '').slice(0, 60)}”<//>
-        <${Action} kind="text" onClick=${() => setReplyTo(null)}>${t('organisms.cancel') || 'Cancel'}<//>
-      <//>` : null}
-      <${Field} placeholder=${t('organisms.anchorQuotePlaceholder') || 'Optional: quote a passage to anchor the comment'} value=${anchorQuote} onInput=${(e) => setAnchorQuote(e.target.value)} />
-      <${Field} type="textarea" rows=${2} placeholder=${t('organisms.commentPlaceholder') || 'Add a comment…'} value=${body} onInput=${(e) => setBody(e.target.value)} />
-      <${Stack} direction="wrap"><${Action} disabled=${busy || !body.trim()} onClick=${submit}>${t('organisms.postComment') || 'Comment'}<//><//>
-    <//>
-  <//>`;
+  return html`
+    <div class="pj-comments">
+      <div class="detail-label">${(t('organisms.commentsHeading') || 'Comments') + (list.length ? ` (${list.length})` : '')}</div>
+      ${comments === null ? html`<div class="section-desc">…</div>` : null}
+      ${comments !== null && list.length === 0 ? html`<div class="section-desc">${t('organisms.noComments') || 'No comments yet.'}</div>` : null}
+      ${list.map(c => html`
+        <div class="pj-comment ${c.parentId ? 'pj-comment-reply' : ''}" key=${c.id}>
+          <div class="pj-comment-head">
+            <b>${(c.author || '?')}</b>
+            ${c.parentId ? html`<span class="pj-mini"> · ${t('organisms.inReply') || 'reply'}</span>` : null}
+            ${c.anchor?.quote ? html`<span class="pj-mini"> · “${(String(c.anchor.quote).slice(0, 80))}”</span>` : null}
+            ${c.anchor?.section ? html`<span class="pj-mini"> · §${(c.anchor.section)}</span>` : null}
+            <span class="pj-mini"> · ${c.createdAt ? dt(c.createdAt) : ''}</span>
+          </div>
+          <div class="pj-comment-body">${(c.body || '')}</div>
+          <div class="pj-comment-actions">
+            <button class="btn-ghost btn-sm" disabled=${busy} onClick=${() => setReplyTo({ id: c.id, body: c.body })}>${t('organisms.reply') || 'Reply'}</button>
+            ${mine(c.author) ? html`<button class="btn-ghost btn-sm" disabled=${busy} onClick=${() => remove(c)}>${t('organisms.delete') || 'Delete'}</button>` : null}
+          </div>
+        </div>
+      `)}
+      <div class="pj-comment-compose">
+        ${replyTo ? html`<div class="pj-mini">${t('organisms.replyingTo') || 'Replying to'}: “${(String(replyTo.body || '').slice(0, 60))}” <button class="btn-ghost btn-sm" onClick=${() => setReplyTo(null)}>${t('organisms.cancel') || 'Cancel'}</button></div>` : null}
+        <input class="input-field input-sm" placeholder=${t('organisms.anchorQuotePlaceholder') || 'Optional: quote a passage to anchor the comment'} value=${anchorQuote} onInput=${(e) => setAnchorQuote(e.target.value)} />
+        <textarea class="input-field input-sm" rows="2" placeholder=${t('organisms.commentPlaceholder') || 'Add a comment…'} value=${body} onInput=${(e) => setBody(e.target.value)}></textarea>
+        <button class="btn-primary btn-sm" disabled=${busy || !body.trim()} onClick=${submit}>${t('organisms.postComment') || 'Comment'}</button>
+      </div>
+    </div>
+  `;
 }

@@ -17,12 +17,11 @@
  *   WHAT IT SHOWS COMES FROM THE NODE, not from a list here. GET /v1/ai-tools says which tools have
  *   an install link and which have a file, and a tool with neither simply does not appear in the
  *   quick row. A second list in the browser would be the drift the served table exists to prevent.
- * @structure McpInstallRow({ tool, serverName }) · McpQuickConnect({ serverName, guideHref, title, lead })
+ * @structure McpInstallRow({ tool, serverName, className }) · McpQuickConnect({ serverName, guideHref, title, lead })
  * @usage
  *   import { McpQuickConnect } from '/components/McpInstall.js';
  *   html`<${McpQuickConnect} serverName=${agentName} />`
  * @version-history
- *   2026-09-13: Shared poster parts own install actions and command surfaces.
  *   2026-09-13 -- Let the caller compose the install row's shared poster shape by class.
  *   v1.1.0 — 2026-09-02 — The double-click install scripts (`install.scripts`, GET /v1/connect/install)
  *     render beside the one-click links, in the setup guide and in the quick row alike.
@@ -31,8 +30,7 @@
 import { h } from 'preact';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
-import { PromptCard } from '/components/PromptCard.js';
-import { Stack, Surface, Text, Action } from '/components/poster-parts.js';
+import { CopyButton } from '/components/CopyButton.js';
 import { useAiTools } from '/views/profile/ai-tool-setup.js';
 
 const html = htm.bind(h);
@@ -62,22 +60,31 @@ function withInstall(tools) {
  * One tool's short way in, for the setup guide. Renders nothing for a tool that has neither, which
  * is most of them: a chat app is attached through its own connector form and there is no file.
  */
-export function McpInstallRow({ tool, serverName }) {
+export function McpInstallRow({ tool, serverName, className = '' }) {
   const install = tool?.mcp?.install;
   if (!install || (!install.link && !install.file && !install.scripts?.length)) return null;
 
-  return html`<${Surface} kind="aside"><${Stack}>
-    <${Text} kind="heading">${tr('mcpInstall.title', 'The short way in')}<//>
-    ${install.link && html`<${Stack} align="start">
-      <${Action} kind="primary" href=${install.link.href}>${install.link.label}<//>
-      <${Text} tone="muted">${install.link.note}<//><//>`}
-    ${(install.scripts ?? []).map(sc => html`<${Stack} key=${sc.os} align="start">
-      <${Action} kind="primary" href=${fileUrl(sc, serverName)} download=${sc.filename}>${sc.label}<//>
-      <${Text} tone="muted">${sc.note}<//><//>`)}
-    ${install.file && html`<${Stack} align="start">
-      <${Action} href=${fileUrl(install.file, serverName)} download=${install.file.filename}>${install.file.label}<//>
-      <${Text} tone="muted">${install.file.where}<//><//>`}
-  <//><//>`;
+  return html`
+    <div class=${`mcpi mcpi--tool ${className}`}>
+      <div class="mcpi-head">${tr('mcpInstall.title', 'The short way in')}</div>
+      ${install.link ? html`
+        <div class="mcpi-oneclick">
+          <a class="btn-primary btn-sm" href=${install.link.href}>${install.link.label}</a>
+          <span class="mcpi-note">${install.link.note}</span>
+        </div>` : null}
+      ${(install.scripts ?? []).map((sc) => html`
+        <div class="mcpi-oneclick" key=${sc.os}>
+          <a class="btn-primary btn-sm" href=${fileUrl(sc, serverName)} download=${sc.filename}>${sc.label}</a>
+          <span class="mcpi-note">${sc.note}</span>
+        </div>`)}
+      ${install.file ? html`
+        <div class="mcpi-file">
+          <a class="btn-outline btn-sm" href=${fileUrl(install.file, serverName)} download=${install.file.filename}>
+            ${install.file.label}
+          </a>
+          <span class="mcpi-note">${install.file.where}</span>
+        </div>` : null}
+    </div>`;
 }
 
 /**
@@ -102,26 +109,48 @@ export function McpQuickConnect({ serverName, guideHref = '/v1/profile?tab=mcp',
   const files = installable.filter((tool) => tool.mcp.install.file);
   const scripts = installable.flatMap((tool) => (tool.mcp.install.scripts ?? []).map((sc) => ({ tool, sc })));
   const commands = installable.filter((tool) => tool.mcp.command && !tool.mcp.install.link);
+  const emphasis = title ? 'btn-primary btn-sm' : 'btn-outline btn-sm';
 
-  const emphasis = title ? 'primary' : 'secondary';
-  return html`<${Stack}>
-    ${title && html`<${Text} kind="heading">${title}<//>`}
-    ${lead && html`<${Text} kind="lead">${lead}<//>`}
-    ${(links.length || scripts.length) ? html`<${Stack} direction="wrap" align="start">
-      ${links.map(tool => html`<${Action} key=${tool.id} kind=${emphasis} href=${tool.mcp.install.link.href}>${tool.mcp.install.link.label}<//>`)}
-      ${scripts.map(({tool,sc}) => html`<${Action} key=${tool.id+sc.os} kind=${emphasis}
-        href=${fileUrl(sc,serverName)} download=${sc.filename} title=${sc.note}>${sc.label}<//>`)}
-    <//>` : null}
-    ${commands.map(tool => html`<${PromptCard} key=${tool.id} label=${tool.label} prompt=${tool.mcp.command}
-      copyLabel=${tr('common.copy','Copy')} copiedLabel=${tr('common.copied','Copied')} />`)}
-    ${files.length ? html`<${Stack} align="start">
-      <${Text} kind="label">${tr('mcpInstall.filesLabel','Or save the configuration file:')}<//>
-      ${files.map(tool => html`<${Action} key=${tool.id} kind="text" href=${fileUrl(tool.mcp.install.file,serverName)}
-        download=${tool.mcp.install.file.filename} title=${tool.mcp.install.file.where}>
-        ${tool.label} <code>${tool.mcp.install.file.filename}</code><//>`)}
-    <//>` : null}
-    <${Action} kind="text" href=${guideHref}>${tr('mcpInstall.more','Another tool, or the steps in full')} →<//>
-  <//>`;
+  return html`
+    <div class="mcpi mcpi--quick">
+      ${title ? html`<div class="mcpi-title">${title}</div>` : null}
+      ${lead ? html`<p class="mcpi-lead">${lead}</p>` : null}
+
+      ${links.length || scripts.length ? html`
+        <div class="mcpi-oneclick">
+          ${links.map(tool => html`
+            <a key=${tool.id} class=${emphasis} href=${tool.mcp.install.link.href}>
+              ${tool.mcp.install.link.label}
+            </a>`)}
+          ${scripts.map(({ tool, sc }) => html`
+            <a key=${tool.id + sc.os} class=${emphasis} href=${fileUrl(sc, serverName)} download=${sc.filename} title=${sc.note}>
+              ${sc.label}
+            </a>`)}
+        </div>` : null}
+
+      ${commands.map(tool => html`
+        <div class="mcpi-cmd" key=${tool.id}>
+          <span class="mcpi-cmd-label">${tool.label}</span>
+          <code class="mcpi-cmd-text">${tool.mcp.command}</code>
+          <${CopyButton} text=${tool.mcp.command} className="btn-ghost btn-sm"
+            label=${tr('common.copy', 'Copy')} copiedLabel=${tr('common.copied', 'Copied')} />
+        </div>`)}
+
+      ${files.length ? html`
+        <div class="mcpi-files">
+          <span class="mcpi-files-label">${tr('mcpInstall.filesLabel', 'Or save the configuration file:')}</span>
+          ${files.map(tool => html`
+            <a key=${tool.id} class="mcpi-file-link" href=${fileUrl(tool.mcp.install.file, serverName)}
+              download=${tool.mcp.install.file.filename}
+              title=${tool.mcp.install.file.where}>
+              ${tool.label} <code>${tool.mcp.install.file.filename}</code>
+            </a>`)}
+        </div>` : null}
+
+      <a class="mcpi-more" href=${guideHref}>
+        ${tr('mcpInstall.more', 'Another tool, or the steps in full')} →
+      </a>
+    </div>`;
 }
 
 export default McpQuickConnect;

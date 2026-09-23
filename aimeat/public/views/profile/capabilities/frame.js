@@ -10,7 +10,6 @@
  *   crumb · pageLinks · openTab
  * @usage import { x, groupCapabilities, agentRule } from './frame.js';
  * @version-history
- *   2026-09-22 -- The crumb is the shared trail's entries and the rail links are shared Actions; no own CSS.
  *   v1.0.0 — 2026-09-03 — Initial (design canvas "AIMEAT Kyvykkyydet-sivu", direction A, with the
  *     registry extended to app tools and agent offers; wish-kyvykkyydet-rekisteri-ja-sivu).
  */
@@ -18,7 +17,6 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { Stack, Action, Text } from '/components/poster-parts.js';
 
 export const x = (key, vars) => t('capspage.' + key, vars);
 
@@ -119,18 +117,15 @@ export function schemaWords(schema) {
 export const callsWord = (n) => (n === 1 ? x('callsOne') : x('callsN', { n }));
 export const vouchesWord = (n) => (n === 1 ? x('vouchesOne') : x('vouchesN', { n }));
 
-/** The trail to this page, as Masthead crumbs. */
 export function crumb() {
-  return [{ label: t('nav.profile') }, { label: t('profile.landing.menuBuildShare') }, { label: t('capabilities.tabLabel') }];
+  return html`<div class="og-crumb"><span>${t('nav.profile')}</span><span>/</span><span>${t('profile.landing.menuBuildShare')}</span><span>/</span><span class="og-crumb-here">${t('capabilities.tabLabel')}</span></div>`;
 }
 
 export const openTab = (tabId) => window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId } }));
 export function pageLinks() {
-  return html`<${Stack} density="compact">
-    <${Text} kind="label">${x('pages')}<//>
-    <${Action} kind="text" onClick=${() => openTab('extensions')}>${t('profile.tabs.extensions')} →<//>
-    <${Action} kind="text" onClick=${() => openTab('libraries')}>${t('librariesTab.tabLabel')} →<//>
-    <${Action} kind="text" onClick=${() => openTab('offers')}>${t('profile.tabs.offers')} →<//>
-    <${Action} kind="text" onClick=${() => openTab('agents')}>${t('profile.tabs.agents')} →<//>
-  <//>`;
+  return html`
+    <button type="button" class="og-rail-link" onClick=${() => openTab('extensions')}><i>→</i>${t('profile.tabs.extensions')}<em>→</em></button>
+    <button type="button" class="og-rail-link" onClick=${() => openTab('libraries')}><i>→</i>${t('librariesTab.tabLabel')}<em>→</em></button>
+    <button type="button" class="og-rail-link" onClick=${() => openTab('offers')}><i>→</i>${t('profile.tabs.offers')}<em>→</em></button>
+    <button type="button" class="og-rail-link" onClick=${() => openTab('agents')}><i>→</i>${t('profile.tabs.agents')}<em>→</em></button>`;
 }

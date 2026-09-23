@@ -24,8 +24,6 @@
  *   - ConnectionDetail — the six steps, the walkthroughs, troubleshooting, the danger zone
  * @usage Imported by views/admin/sso-tab.js.
  * @version-history
- *   2026-09-22 -- Composed from the shared component set (numbered ListRows for the six steps,
- *     KeyValue copy rows, Field, Table, Surface): no class of its own, so a theme change reaches it.
  *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v1.1.0 -- 2026-09-13 -- Compose ink row boundaries from the shared poster class.
@@ -38,9 +36,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { onLiveUpdate } from '/lib/live-updates.js';
 import { Badge, ExpandableHelp, when } from './shared.js';
-import { Columns, Stack, Steps, ListRow, KeyValue, Table, Field, Surface, Action, CopyAction, Text } from '/components/poster-parts.js';
-import { Locked } from './sso-tab.now.js';
-import { Domains } from './sso-tab.list.js';
+import { CopyButton } from '/components/CopyButton.js';
 import { getSsoConnection, updateSsoConnection, deleteSsoConnection, mintSsoScimToken, setSsoIdpMetadata }
   from '/js/services/admin.js';
 
@@ -59,23 +55,24 @@ const TROUBLE = [
 ];
 
 /** One step: number, what it wants, and the state the record proves. */
-function Step({ n, title, children, aside }) {
-  // The measured state is the badge in `aside`; the number is the same coral for every step.
+function Step({ n, state, title, children, aside, last }) {
+  const cls = state === 'done' ? 'done' : state === 'now' ? 'now' : '';
   return html`
-    <${ListRow} number=${n} name=${title} value=${aside}>
-      <${Stack} density="compact">${children}<//>
-    <//>`;
+    <div class="adm-sso-step ${last ? 'adm-sso-step--last' : ''}">
+      <span class="adm-sso-step-n ${cls} poster-stat-number poster-stat-number--small">${n}</span>
+      <span><b>${title}</b>${children}</span>
+      <span class="adm-sso-step-r">${aside}</span>
+    </div>`;
 }
 
 /** What an IdP console asks for, ready to paste. */
 function CopyRow({ label, value }) {
   return html`
-    <${KeyValue} label=${label}>
-      <${Stack} direction="wrap" align="center" density="compact">
-        <${Text} kind="mono">${value}<//>
-        <${CopyAction} kind="text" text=${value} label=${S('detail.copy')} />
-      <//>
-    <//>`;
+    <div class="adm-sso-copyrow">
+      <span>${label}</span>
+      <code class="adm-sso-code">${value}</code>
+      <${CopyButton} text=${value} label=${S('detail.copy')} className="og-door og-door--up" />
+    </div>`;
 }
 
 /** The brief an operator hands their own AI to be walked through the far end. */
@@ -126,146 +123,163 @@ export function ConnectionDetail({ id, node, onBack, onChanged, showErr, confirm
     finally { setBusy(false); }
   };
 
-  const why = (text) => html`<${Text} tone="muted">${text}<//>`;
-  const caption = (text) => html`<${Text} kind="caption" tone="muted">${text}<//>`;
-  const steps = (prefix, count) => html`<${Steps} items=${Array.from({ length: count }, (_, i) => S(prefix + (i + 1)))} />`;
-
   return html`
-    <${Stack}>
-      <${Stack} direction="horizontal" align="between">
-        <${Action} onClick=${onBack}>${S('detail.back')}<//>
-        <${Badge} type=${canSignIn ? 'success' : 'danger'}
-          label=${canSignIn ? S('org.canSignIn') : S('org.cannotSignIn')} />
-      <//>
+    <div class="adm-sso-detail">
+      <div class="og-sec-h adm-sso-detail-h">
+        <div>
+          <button type="button" class="og-door og-door--quiet" onClick=${onBack}>${S('detail.back')}</button>
+        </div>
+        <div class="og-doors">
+          <${Badge} type=${canSignIn ? 'success' : 'danger'}
+            label=${canSignIn ? S('org.canSignIn') : S('org.cannotSignIn')} />
+        </div>
+      </div>
 
-      <${Stack} density="compact">
-        <${Text} kind="heading">${conn.name}<//>
-        <${Text}>${S('detail.lead', { done: conn.steps_done ?? 0, total: 6 })}<//>
-        <${Text} kind="mono" tone="muted">${conn.id} · ${S('detail.created', { at: when(conn.created_at), by: conn.created_by })}<//>
-      <//>
+      <div class="adm-ov-status">${conn.name}</div>
+      <p class="adm-alert-line">${S('detail.lead', { done: conn.steps_done ?? 0, total: 6 })}</p>
+      <div class="adm-ov-up">${conn.id} · ${S('detail.created', { at: when(conn.created_at), by: conn.created_by })}</div>
 
-      ${frozen ? html`<${Locked} setting=${node.locked_setting} />` : null}
+      ${frozen ? html`<p class="adm-sso-locked">${S('now.lockedWhy', { setting: node.locked_setting })}</p>` : null}
 
-      <div>
+      <div class="adm-sso-steps">
         <${Step} n=${1} state="done" title=${S('step.exists')}
           aside=${html`<${Badge} type="success" label=${S('step.done')} />`}>
-          ${why(S('step.existsWhy'))}
-          <${Domains} domains=${conn.domains} />
+          <p>${S('step.existsWhy')}</p>
+          <div class="adm-sso-doms">
+            ${(conn.domains || []).length
+    ? conn.domains.map(d => html`<span class="adm-sso-chip">${d}</span>`)
+    : html`<span class="adm-sso-chip">${S('org.noDomains')}</span>`}
+          </div>
         <//>
 
         <${Step} n=${2} state=${conn.saml_configured ? 'done' : 'now'} title=${S('step.idp')}
           aside=${html`<${Badge} type=${conn.saml_configured ? 'success' : 'muted'}
             label=${conn.saml_configured ? S('step.done') : S('step.todo')} />`}>
-          ${why(S('step.idpWhy'))}
+          <p>${S('step.idpWhy')}</p>
           <${CopyRow} label=${S('detail.identifier')} value=${conn.sp.entity_id} />
           <${CopyRow} label=${S('detail.replyUrl')} value=${conn.sp.acs_url} />
-          <${ExpandableHelp} title=${S('detail.entraTitle')}>${steps('detail.entra', 5)}<//>
-          <${ExpandableHelp} title=${S('detail.oktaTitle')}>${steps('detail.okta', 4)}<//>
-          <${Field} type="url" label=${S('detail.metaUrl')} value=${metaUrl} disabled=${frozen}
-            placeholder="https://login.microsoftonline.com/…/federationmetadata.xml"
-            onInput=${e => setMetaUrl(e.target.value)} />
-          <${Field} type="textarea" rows=${3} label=${S('detail.metaXml')} value=${metaXml} disabled=${frozen}
-            placeholder="<EntityDescriptor …>" onInput=${e => setMetaXml(e.target.value)} />
-          <${Stack} direction="wrap" align="center">
-            <${Action} disabled=${frozen || busy || (!metaUrl.trim() && !metaXml.trim())}
+          <${ExpandableHelp} title=${S('detail.entraTitle')}>
+            <ol>${[1, 2, 3, 4, 5].map(i => html`<li>${S('detail.entra' + i)}</li>`)}</ol>
+          <//>
+          <${ExpandableHelp} title=${S('detail.oktaTitle')}>
+            <ol>${[1, 2, 3, 4].map(i => html`<li>${S('detail.okta' + i)}</li>`)}</ol>
+          <//>
+          <div class="adm-sso-fld adm-sso-gap">
+            <label>${S('detail.metaUrl')}</label>
+            <input type="url" value=${metaUrl} disabled=${frozen}
+              placeholder="https://login.microsoftonline.com/…/federationmetadata.xml"
+              onInput=${e => setMetaUrl(e.target.value)} />
+            <label>${S('detail.metaXml')}</label>
+            <textarea rows="3" value=${metaXml} disabled=${frozen} placeholder="<EntityDescriptor …>"
+              onInput=${e => setMetaXml(e.target.value)}></textarea>
+            <button type="button" class="og-door" disabled=${frozen || busy || (!metaUrl.trim() && !metaXml.trim())}
               onClick=${() => act(async () => {
     await setSsoIdpMetadata(id, metaXml.trim() ? { xml: metaXml } : { url: metaUrl });
     setMetaUrl(''); setMetaXml('');
-  })}>${conn.saml_configured ? S('detail.metaResubmit') : S('detail.metaSubmit')}<//>
+  })}>${conn.saml_configured ? S('detail.metaResubmit') : S('detail.metaSubmit')}</button>
             ${conn.saml_idp_entity_id
-    ? html`<${Text} kind="caption" tone="muted">${S('detail.idpIs')} <${Text} kind="mono">${conn.saml_idp_entity_id}<//><//>`
+    ? html`<span class="adm-why">${S('detail.idpIs')} <code class="adm-sso-code">${conn.saml_idp_entity_id}</code></span>`
     : null}
-          <//>
+          </div>
         <//>
 
         <${Step} n=${3} state="done" title=${S('step.findable')}
           aside=${html`<${Badge} type=${listed ? 'success' : 'info'}
             label=${listed ? S('step.listed') : S('step.hidden')} />`}>
-          ${why(S('step.findableWhy'))}
-          <${Field} type="checkbox" label=${S('step.listedLabel')} hint=${S('step.listedWhy')} value=${listed} disabled=${frozen}
-            onChange=${e => act(() => updateSsoConnection(id, { login_visibility: e.target.checked ? 'listed' : 'hidden' }))} />
-          <${Field} type="checkbox" label=${S('step.idpInitiated')} hint=${S('step.idpInitiatedWhy')} value=${conn.allow_idp_initiated} disabled=${frozen}
-            onChange=${e => act(() => updateSsoConnection(id, { allow_idp_initiated: e.target.checked }))} />
+          <p>${S('step.findableWhy')}</p>
+          <label class="adm-sso-check">
+            <input type="checkbox" checked=${listed} disabled=${frozen}
+              onChange=${e => act(() => updateSsoConnection(id, { login_visibility: e.target.checked ? 'listed' : 'hidden' }))} />
+            <span><b>${S('step.listedLabel')}</b><span class="adm-why">${S('step.listedWhy')}</span></span>
+          </label>
+          <label class="adm-sso-check">
+            <input type="checkbox" checked=${conn.allow_idp_initiated} disabled=${frozen}
+              onChange=${e => act(() => updateSsoConnection(id, { allow_idp_initiated: e.target.checked }))} />
+            <span><b>${S('step.idpInitiated')}</b><span class="adm-why">${S('step.idpInitiatedWhy')}</span></span>
+          </label>
         <//>
 
         <${Step} n=${4} state=${conn.scim_token_configured ? 'done' : 'now'} title=${S('step.key')}
           aside=${html`<${Badge} type=${conn.scim_token_configured ? 'success' : 'muted'}
             label=${conn.scim_token_configured ? S('step.minted') : S('step.todo')} />`}>
-          ${why(S('step.keyWhy'))}
+          <p>${S('step.keyWhy')}</p>
           <${CopyRow} label=${S('detail.scimBase')} value=${conn.sp.scim_base_url} />
-          <${Stack} direction="wrap">
-            <${Action} disabled=${frozen || busy}
-              onClick=${() => confirm(S('detail.mintConfirm'), () => act(async () => {
+          <button type="button" class="og-door" disabled=${frozen || busy}
+            onClick=${() => confirm(S('detail.mintConfirm'), () => act(async () => {
     const r = await mintSsoScimToken(id);
     setScimToken(r.data?.scim_token || '');
-  }))}>${conn.scim_token_configured ? S('detail.mintReplace') : S('detail.mintCreate')}<//>
-          <//>
+  }))}>${conn.scim_token_configured ? S('detail.mintReplace') : S('detail.mintCreate')}</button>
           ${scimToken ? html`
-            <${Surface} kind="box" tone="coral" density="compact"><${Stack} density="compact">
-              <strong>${S('detail.tokenOnce')}</strong>
+            <div class="adm-sso-once">
+              <b>${S('detail.tokenOnce')}</b>
               <${CopyRow} label=${S('detail.tokenLabel')} value=${scimToken} />
-            <//><//>` : null}
-          <${ExpandableHelp} title=${S('detail.scimEntraTitle')}>${steps('detail.scimEntra', 4)}<//>
-          ${caption(conn.last_scim_request_at
+            </div>` : null}
+          <${ExpandableHelp} title=${S('detail.scimEntraTitle')}>
+            <ol>${[1, 2, 3, 4].map(i => html`<li>${S('detail.scimEntra' + i)}</li>`)}</ol>
+          <//>
+          <p class="adm-why">${conn.last_scim_request_at
     ? S('org.lastScim', { at: when(conn.last_scim_request_at) })
-    : S('org.noScimYet'))}
+    : S('org.noScimYet')}</p>
         <//>
 
         <${Step} n=${5} state=${conn.last_login_at ? 'done' : 'now'} title=${S('step.signedIn')}
           aside=${html`<${Badge} type=${conn.last_login_at ? 'success' : 'muted'}
             label=${conn.last_login_at ? S('step.done') : S('step.waiting')} />`}>
-          ${why(node.enabled ? S('step.signedInWhy') : S('step.signedInBlocked'))}
-          <${Stack} direction="wrap">
-            ${canSignIn
-    ? html`<${Action} target="_blank" href=${'/v1/ghii/login/saml/' + encodeURIComponent(id)}>${S('detail.testLogin')}<//>`
-    : html`<${Action} disabled title=${S('org.testOffWhy')}>${S('detail.testLogin')}<//>`}
-          <//>
-          ${caption(conn.last_login_at
+          <p>${node.enabled ? S('step.signedInWhy') : S('step.signedInBlocked')}</p>
+          ${canSignIn
+    ? html`<a class="og-door" target="_blank" rel="noopener"
+        href=${'/v1/ghii/login/saml/' + encodeURIComponent(id)}>${S('detail.testLogin')}</a>`
+    : html`<span class="og-door og-door--off" title=${S('org.testOffWhy')}>${S('detail.testLogin')}</span>`}
+          <p class="adm-why">${conn.last_login_at
     ? S('org.lastLogin', { at: when(conn.last_login_at) })
-    : S('org.noLoginYet'))}
+    : S('org.noLoginYet')}</p>
         <//>
 
-        <${Step} n=${6} state=${node.enabled ? 'done' : 'now'} title=${S('step.door')}
+        <${Step} n=${6} state=${node.enabled ? 'done' : 'now'} title=${S('step.door')} last=${true}
           aside=${html`<${Badge} type=${node.enabled ? 'success' : 'danger'}
             label=${node.enabled ? S('now.on') : S('now.off')} />`}>
-          ${why(S('step.doorWhy', { setting: node.enabled_setting }))}
+          <p>${S('step.doorWhy', { setting: node.enabled_setting })}</p>
           ${!node.enabled ? html`
-            <${Stack} direction="wrap">
-              <${Action} tone="danger" href="/v1/admin?tab=config">${S('now.openConfig')}<//>
-            <//>` : null}
+            <div class="adm-sso-gap">
+              <a class="og-door og-door--danger" href="/v1/admin?tab=config">${S('now.openConfig')}</a>
+            </div>` : null}
         <//>
       </div>
 
-      <${Columns} layout="trailing" collapse=${900}>
-        <${Stack} density="compact">
-          <${Text} kind="label">${S('detail.troubleTitle')}<//>
-          <${Table} density="compact" collapse=${560} label=${S('detail.troubleTitle')}
-            headers=${[S('detail.troubleWhat'), S('detail.troubleCode')]}
-            rows=${TROUBLE.map(([code, key]) => [
-    html`<${Stack} density="compact"><strong>${S('trouble.' + key)}</strong>${why(S('trouble.' + key + 'Fix'))}<//>`,
-    html`<${Text} kind="mono">${code}<//>`,
-  ])} />
-        <//>
-        <${Stack} density="compact">
-          <${Text} kind="label">${S('detail.briefTitle')}<//>
-          <${Surface} kind="aside" density="compact"><${Stack} density="compact">
-            <${Text} kind="label">${S('detail.briefLabel')}<//>
-            <${Text} lines>${aiBrief(conn)}<//>
-          <//><//>
-          <${Stack} direction="wrap">
-            <${CopyAction} text=${aiBrief(conn)} label=${S('detail.copyBrief')} />
-          <//>
+      <div class="adm-sso-two poster-row--thing">
+        <div>
+          <div class="adm-sso-lbl">${S('detail.troubleTitle')}</div>
+          <div class="adm-sso-scroll">
+            <table class="adm-sso-tbl">
+              <thead><tr><th>${S('detail.troubleWhat')}</th><th>${S('detail.troubleCode')}</th></tr></thead>
+              <tbody>
+                ${TROUBLE.map(([code, key]) => html`
+                  <tr>
+                    <td><b>${S('trouble.' + key)}</b><span class="adm-why">${S('trouble.' + key + 'Fix')}</span></td>
+                    <td class="adm-sso-mono">${code}</td>
+                  </tr>`)}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div>
+          <div class="adm-sso-lbl">${S('detail.briefTitle')}</div>
+          <div class="og-box poster-aside poster-aside--small">
+            <span class="og-box-label">${S('detail.briefLabel')}</span>
+            <div class="adm-sso-paste">${aiBrief(conn)}</div>
+          </div>
+          <div class="adm-sso-acts">
+            <${CopyButton} text=${aiBrief(conn)} label=${S('detail.copyBrief')} className="og-door og-door--quiet" />
+          </div>
 
-          <${Text} kind="label">${S('detail.dangerTitle')}<//>
-          ${caption(S('detail.deleteNote'))}
-          <${Stack} direction="wrap">
-            <${Action} tone="danger" disabled=${frozen || busy}
-              onClick=${() => confirm(S('detail.deleteConfirm', { name: conn.name }), async () => {
+          <div class="adm-sso-lbl adm-sso-gap">${S('detail.dangerTitle')}</div>
+          <p class="adm-why">${S('detail.deleteNote')}</p>
+          <button type="button" class="og-door og-door--danger" disabled=${frozen || busy}
+            onClick=${() => confirm(S('detail.deleteConfirm', { name: conn.name }), async () => {
     try { await deleteSsoConnection(id); onBack(); onChanged?.(); }
     catch (e) { showErr(e.message); }
-  })}>${S('detail.delete')}<//>
-          <//>
-        <//>
-      <//>
-    <//>`;
+  })}>${S('detail.delete')}</button>
+        </div>
+      </div>
+    </div>`;
 }

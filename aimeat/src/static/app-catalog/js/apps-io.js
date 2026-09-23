@@ -12,9 +12,6 @@
  *   v2.0.0 — 2026-07-20 — Server-only cutover: drop the local writers (URL/file/paste/zip → IndexedDB);
  *     creation now builds a transient record and publishes it to the server as an unlisted app.
  *   v2.1.0 — 2026-09-13 — The Add dialog opens and closes through dialogs.js (the site's one dialog).
- *   v2.2.0 — 2026-09-22 — The Add dialog is the set's parts: switchTab finds the tabs and panels by
- *     data-tab / data-tab-panel, turns the chosen tab on (is-on, aria-pressed) and hides the other
- *     panel with `hidden`; handleSave reads the pressed tab.
  */
 import { saveApp } from './db.js';
 import { showNotice } from './ui.js';
@@ -168,17 +165,23 @@ function closeModal() {
 }
 
 function switchTab(tabName) {
-  // The source tabs are the set's tab actions: the chosen one is on (is-on, as Action emits it) and
-  // pressed; its panel shows and the other hides.
-  var tabs = document.querySelectorAll('#add-app-modal [data-tab]');
+  // Toggle tab buttons
+  var tabs = document.querySelectorAll('.modal-tab');
   tabs.forEach(function (tab) {
-    var on = tab.getAttribute('data-tab') === tabName;
-    tab.classList.toggle('is-on', on);
-    tab.setAttribute('aria-pressed', on ? 'true' : 'false');
+    if (tab.getAttribute('data-tab') === tabName) {
+      tab.classList.add('active');
+    } else {
+      tab.classList.remove('active');
+    }
   });
-  var contents = document.querySelectorAll('#add-app-modal [data-tab-panel]');
+  // Toggle tab content
+  var contents = document.querySelectorAll('.tab-content');
   contents.forEach(function (content) {
-    content.hidden = content.id !== 'tab-' + tabName;
+    if (content.id === 'tab-' + tabName) {
+      content.classList.add('active');
+    } else {
+      content.classList.remove('active');
+    }
   });
 }
 
@@ -236,7 +239,7 @@ function handleSave() {
   }
 
   // ── Create mode → publish to the server (unlisted) ──
-  var activeTab = document.querySelector('#add-app-modal [data-tab][aria-pressed="true"]');
+  var activeTab = document.querySelector('.modal-tab.active');
   var tabName = activeTab ? activeTab.getAttribute('data-tab') : 'paste';
 
   if (tabName === 'paste') {

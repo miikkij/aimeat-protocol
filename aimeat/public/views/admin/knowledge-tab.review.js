@@ -20,8 +20,6 @@
  *   - CreateForm — the operator's own system package
  * @usage Imported by views/admin/knowledge-tab.js.
  * @version-history
- *   v2.0.0 -- 2026-09-22 -- Composed from the shared component set: the five actions as boxed radio
- *     choices, shared fields, the trail as list rows, the create form in the shared aside.
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v1.1.0 — 2026-09-13 — Compose existing section headings from shared poster B1.
  *   v1.0.0 — 2026-09-12 — Initial (the Knowledge page in the poster face).
@@ -32,7 +30,6 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { num, when, Badge } from './shared.js';
-import { Section, Columns, Stack, ListRow, Field, Action, Surface, Text } from '/components/poster-parts.js';
 import { getKnowledgeReviews } from '/js/services/admin.js';
 
 const S = (key, params) => t('admin.knowledge.' + key, params);
@@ -64,56 +61,76 @@ export function ReviewPanel({ pkg, onClose, onSubmit, busy }) {
 
   const sorted = (trail || []).slice().sort((a, b) => String(b.timestamp).localeCompare(String(a.timestamp)));
 
-  return html`<${Section} id="adm-kn-04" title=${S('review.title')} count="04"
-    actions=${html`<${Action} onClick=${onClose}>${S('review.back')}<//>`}>
-    <${Stack}>
-      <${Stack} density="compact">
-        <${Text} kind="heading">${pkg.name}<//>
-        <${Text} kind="lead">${S('review.lead', {
-          kind: pkg.content_type, entries: num(pkg.entries_count), author: pkg.author || '—',
-        })}<//>
-        <${Text} kind="mono" tone="muted">${pkg.package_id} · ${String(pkg.created || '').slice(0, 10)}<//>
-      <//>
+  return html`
+    <section class="og-sec" id="adm-kn-04">
+      <div class="og-sec-h">
+        <h2 class="poster-section-title">${S('review.title')}<small>04</small></h2>
+        <div class="og-doors">
+          <button type="button" class="og-door og-door--quiet" onClick=${onClose}>${S('review.back')}</button>
+        </div>
+      </div>
 
-      <${Columns} collapse=${900}>
-        <${Stack}>
-          <${Text} kind="label">${S('review.whatYouCanDo')}<//>
-          <${Stack} role="radiogroup" label=${S('review.whatYouCanDo')} density="compact">
-            ${ACTIONS.map(a => html`<${Action} key=${a} kind="choice" semantics="radio" selected=${form.action === a}
-              title=${S('review.action.' + a)} onClick=${() => setForm({ ...form, action: a })}>
-              <${Stack} density="compact">
-                <${Text} kind="caption">${S('review.does.' + a)}<//>
-                <span><${Badge} type=${TONE[a]} label=${S('review.effect.' + a)} /></span>
-              <//>
-            <//>`)}
-          <//>
+      <div class="adm-ov-status">${pkg.name}</div>
+      <p class="adm-alert-line">${S('review.lead', {
+    kind: pkg.content_type, entries: num(pkg.entries_count), author: pkg.author || '—',
+  })}</p>
+      <div class="adm-ov-up">${pkg.package_id} · ${String(pkg.created || '').slice(0, 10)}</div>
 
-          <${Field} type="select" label=${S('review.reason')} value=${form.reason}
-            options=${REASONS.map(r => ({ value: r, label: S('review.reasons.' + r) }))}
-            onChange=${e => setForm({ ...form, reason: e.target.value })} />
-          ${form.reason === 'custom' ? html`<${Field} label=${S('review.customReason')} value=${form.customText}
-            onInput=${e => setForm({ ...form, customText: e.target.value })} />` : null}
+      <div class="adm-kn-two">
+        <div>
+          <div class="adm-kn-lbl">${S('review.whatYouCanDo')}</div>
+          ${ACTIONS.map((a, i) => html`
+            <label class="adm-kn-choice ${form.action === a ? 'on' : ''}">
+              <input type="radio" name="kn-action" checked=${form.action === a}
+                onChange=${() => setForm({ ...form, action: a })} />
+              <span>
+                <b>${S('review.action.' + a)}</b>
+                <span class="adm-why">${S('review.does.' + a)}</span>
+              </span>
+              <${Badge} type=${TONE[a]} label=${S('review.effect.' + a)} />
+              ${i === ACTIONS.length - 1 ? null : null}
+            </label>`)}
 
-          <${Stack} direction="horizontal">
-            <${Action} kind="primary" disabled=${busy}
-              onClick=${() => onSubmit(pkg.package_id, form)}>${S('review.submit')}<//>
-          <//>
-        <//>
+          <div class="adm-kn-fld">
+            <label>${S('review.reason')}</label>
+            <select value=${form.reason} onChange=${e => setForm({ ...form, reason: e.target.value })}>
+              ${REASONS.map(r => html`<option value=${r}>${S('review.reasons.' + r)}</option>`)}
+            </select>
+          </div>
+          ${form.reason === 'custom' ? html`
+            <div class="adm-kn-fld">
+              <label>${S('review.customReason')}</label>
+              <input type="text" value=${form.customText}
+                onInput=${e => setForm({ ...form, customText: e.target.value })} />
+            </div>` : null}
 
-        <${Stack}>
-          <${Text} kind="label">${S('review.trailTitle')}<//>
-          ${trail === null ? html`<${Text} kind="caption" tone="muted">${S('review.trailLoading')}<//>`
-            : sorted.length === 0 ? html`<${Text} tone="muted">${S('review.trailNone')}<//>`
-              : html`<div>${sorted.map((r, i) => html`<${ListRow} key=${i} density="compact"
-                  name=${S('review.reasons.' + r.reason)} detail=${`${when(r.timestamp)} · ${r.operatorGaii}`}
-                  value=${html`<${Badge} type=${TONE[r.action] || 'muted'} label=${S('review.action.' + r.action)} />`}>
-                  ${r.customText ? html`<${Text} kind="caption">${r.customText}<//>` : null}
-                <//>`)}</div>`}
-          <${Text} kind="caption" tone="muted">${S('review.trailNote')}<//>
-        <//>
-      <//>
-    <//>
-  <//>`;
+          <div class="adm-kn-acts">
+            <button type="button" class="og-door" disabled=${busy}
+              onClick=${() => onSubmit(pkg.package_id, form)}>${S('review.submit')}</button>
+          </div>
+        </div>
+
+        <div>
+          <div class="adm-kn-lbl">${S('review.trailTitle')}</div>
+          ${trail === null ? html`<p class="adm-why">${S('review.trailLoading')}</p>`
+    : sorted.length === 0 ? html`
+      <div class="adm-kn-empty">${S('review.trailNone')}</div>`
+      : html`
+        <div class="adm-kn-trail">
+          ${sorted.map(r => html`
+            <div class="adm-kn-trail-row">
+              <div class="adm-kn-trail-head">
+                <${Badge} type=${TONE[r.action] || 'muted'} label=${S('review.action.' + r.action)} />
+                <span>${S('review.reasons.' + r.reason)}</span>
+              </div>
+              ${r.customText ? html`<p class="adm-why">${r.customText}</p>` : null}
+              <div class="adm-kn-when">${when(r.timestamp)} · ${r.operatorGaii}</div>
+            </div>`)}
+        </div>`}
+          <p class="adm-kn-note">${S('review.trailNote')}</p>
+        </div>
+      </div>
+    </section>`;
 }
 
 /** The operator's own package. Kept from the old page, in the face the rest of it now wears. */
@@ -126,50 +143,69 @@ export function CreateForm({ onCreate, onCancel, busy }) {
   const setEntry = (i, k, v) => set({ entries: form.entries.map((e, j) => (i === j ? { ...e, [k]: v } : e)) });
   const ready = form.name.trim() && form.entries.some(e => e.title.trim());
 
-  const kindWord = (c) => (t('knowledge.contentType.' + c) === 'knowledge.contentType.' + c ? c : t('knowledge.contentType.' + c));
+  return html`
+    <div class="adm-kn-newbox poster-aside">
+      <span class="adm-kn-newlabel">${S('create.title')}</span>
+      <div class="adm-kn-form">
+        <div class="adm-kn-fld">
+          <label>${S('create.name')}</label>
+          <input type="text" value=${form.name} onInput=${e => set({ name: e.target.value })} />
+        </div>
+        <div class="adm-kn-fld-row">
+          <div class="adm-kn-fld">
+            <label>${S('create.kind')}</label>
+            <select value=${form.content_type} onChange=${e => set({ content_type: e.target.value })}>
+              ${CONTENT_TYPES.map(c => html`<option value=${c}>${t('knowledge.contentType.' + c) === 'knowledge.contentType.' + c ? c : t('knowledge.contentType.' + c)}</option>`)}
+            </select>
+          </div>
+          <div class="adm-kn-fld">
+            <label>${S('create.maturity')}</label>
+            <select value=${form.maturity} onChange=${e => set({ maturity: e.target.value })}>
+              ${MATURITIES.map(m => html`<option value=${m}>${t('knowledge.maturity.' + m)}</option>`)}
+            </select>
+            <span class="adm-why">${S('create.maturityWhy')}</span>
+          </div>
+        </div>
+        <div class="adm-kn-fld">
+          <label>${S('create.tags')}</label>
+          <input type="text" value=${form.tags} placeholder="one, two, three"
+            onInput=${e => set({ tags: e.target.value })} />
+        </div>
+        <label class="adm-kn-check">
+          <input type="checkbox" checked=${form.visibility === 'public'}
+            onChange=${e => set({ visibility: e.target.checked ? 'public' : 'private' })} />
+          <span><b>${S('create.public')}</b><span class="adm-why">${S('create.publicWhy')}</span></span>
+        </label>
 
-  return html`<${Surface} kind="aside">
-    <${Stack}>
-      <${Text} kind="label">${S('create.title')}<//>
-      <${Field} label=${S('create.name')} value=${form.name} onInput=${e => set({ name: e.target.value })} />
-      <${Columns} collapse=${600}>
-        <${Field} type="select" label=${S('create.kind')} value=${form.content_type}
-          options=${CONTENT_TYPES.map(c => ({ value: c, label: kindWord(c) }))}
-          onChange=${e => set({ content_type: e.target.value })} />
-        <${Stack} density="compact">
-          <${Field} type="select" label=${S('create.maturity')} value=${form.maturity}
-            options=${MATURITIES.map(m => ({ value: m, label: t('knowledge.maturity.' + m) }))}
-            onChange=${e => set({ maturity: e.target.value })} />
-          <${Text} kind="caption" tone="muted">${S('create.maturityWhy')}<//>
-        <//>
-      <//>
-      <${Field} label=${S('create.tags')} value=${form.tags} placeholder="one, two, three"
-        onInput=${e => set({ tags: e.target.value })} />
-      <${Stack} density="compact">
-        <${Field} type="checkbox" label=${S('create.public')} value=${form.visibility === 'public'}
-          onChange=${e => set({ visibility: e.target.checked ? 'public' : 'private' })} />
-        <${Text} kind="caption" tone="muted">${S('create.publicWhy')}<//>
-      <//>
+        <div class="adm-kn-entries">
+          ${form.entries.map((entry, i) => html`
+            <div class="adm-kn-entry">
+              <div class="adm-kn-fld">
+                <label>${S('create.entryTitle', { n: i + 1 })}</label>
+                <input type="text" value=${entry.title} onInput=${e => setEntry(i, 'title', e.target.value)} />
+              </div>
+              <div class="adm-kn-fld">
+                <label>${S('create.entryContent')}</label>
+                <textarea rows="3" value=${entry.content}
+                  onInput=${e => setEntry(i, 'content', e.target.value)}></textarea>
+              </div>
+              ${form.entries.length > 1 ? html`
+                <button type="button" class="og-door og-door--up"
+                  onClick=${() => set({ entries: form.entries.filter((_, j) => j !== i) })}>
+                  ${S('create.removeEntry')}
+                </button>` : null}
+            </div>`)}
+          <button type="button" class="og-door og-door--quiet"
+            onClick=${() => set({ entries: [...form.entries, { title: '', content: '' }] })}>
+            ${S('create.addEntry')}
+          </button>
+        </div>
 
-      <${Stack}>
-        ${form.entries.map((entry, i) => html`<${Stack} key=${i} density="compact">
-          <${Field} label=${S('create.entryTitle', { n: i + 1 })} value=${entry.title} onInput=${e => setEntry(i, 'title', e.target.value)} />
-          <${Field} type="textarea" rows=${3} label=${S('create.entryContent')} value=${entry.content}
-            onInput=${e => setEntry(i, 'content', e.target.value)} />
-          ${form.entries.length > 1 ? html`<${Stack} direction="horizontal">
-            <${Action} tone="danger" onClick=${() => set({ entries: form.entries.filter((_, j) => j !== i) })}>
-              ${S('create.removeEntry')}<//>
-          <//>` : null}
-        <//>`)}
-        <${Stack} direction="horizontal">
-          <${Action} onClick=${() => set({ entries: [...form.entries, { title: '', content: '' }] })}>${S('create.addEntry')}<//>
-        <//>
-      <//>
-
-      <${Stack} direction="wrap" align="center">
-        <${Action} kind="primary" disabled=${!ready || busy} onClick=${() => onCreate(form)}>${S('create.submit')}<//>
-        <${Action} kind="text" onClick=${onCancel}>${S('create.cancel')}<//>
-      <//>
-    <//>
-  <//>`;
+        <div class="adm-kn-acts">
+          <button type="button" class="og-door" disabled=${!ready || busy}
+            onClick=${() => onCreate(form)}>${S('create.submit')}</button>
+          <button type="button" class="og-door og-door--quiet" onClick=${onCancel}>${S('create.cancel')}</button>
+        </div>
+      </div>
+    </div>`;
 }

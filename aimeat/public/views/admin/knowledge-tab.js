@@ -24,8 +24,6 @@
  *   - KnowledgeAdminTab (default) — one read, the four sections, and the review panel
  * @usage Mounted by the admin dashboard tab router (views/admin.js).
  * @version-history
- *   v3.0.0 -- 2026-09-22 -- Composed from the shared component set: sections, the metric rows, the
- *     shared copy action, and the paste in a code surface inside the aside. The page's sheet is gone.
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v2.1.0 — 2026-09-13 — Compose existing section headings from shared poster B1.
  *   v2.0.0 — 2026-09-12 — The poster face. One read that carries the count and the shape, a table
@@ -39,9 +37,10 @@ import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
+import { useViewCSS } from '/components/useViewCSS.js';
 import { onLiveUpdate } from '/lib/live-updates.js';
 import { Spinner, ErrorBox, useToast, Toast, Row } from './shared.js';
-import { Section, Columns, Stack, CopyAction, Surface, Text } from '/components/poster-parts.js';
+import { CopyButton } from '/components/CopyButton.js';
 import { getNodeUrl } from '/js/services/auth.js';
 import * as api from '/js/services/admin.js';
 import { RightNow, WhatIsHere } from './knowledge-tab.shape.js';
@@ -54,26 +53,31 @@ const S = (key, params) => t('admin.knowledge.' + key, params);
 /** Section 05: the tools, and the paste. */
 function AskAi({ summary }) {
   const paste = buildKnowledgePrompt({ url: getNodeUrl(), total: summary.total });
-  return html`<${Section} id="adm-kn-05" title=${S('ai.title')} count="05"
-    actions=${html`<${CopyAction} text=${paste} label=${S('ai.copy')} />`}>
-    <${Columns} collapse=${900}>
-      <${Stack}>
-        <${Text} kind="lead">${S('ai.lead', { n: summary.total })}<//>
+  return html`
+    <section class="og-sec" id="adm-kn-05">
+      <div class="og-sec-h">
+        <h2 class="poster-section-title">${S('ai.title')}<small>05</small></h2>
+        <div class="og-doors">
+          <${CopyButton} text=${paste} label=${S('ai.copy')} className="og-door og-door--quiet" />
+        </div>
+      </div>
+      <div class="adm-kn-ai">
         <div>
+          <p class="adm-kn-lead">${S('ai.lead', { n: summary.total })}</p>
           ${Row({ title: S('ai.list'), why: S('ai.listWhy'), chip: null, value: 'aimeat_knowledge_list' })}
           ${Row({ title: S('ai.get'), why: S('ai.getWhy'), chip: null, value: 'aimeat_knowledge_get' })}
-          ${Row({ title: S('ai.links'), why: S('ai.linksWhy'), chip: null, value: 'aimeat_knowledge_links' })}
+          ${Row({ title: S('ai.links'), why: S('ai.linksWhy'), chip: null, value: 'aimeat_knowledge_links', last: true })}
         </div>
-      <//>
-      <${Surface} kind="aside"><${Stack} density="compact">
-        <${Text} kind="label">${S('ai.label')}<//>
-        <${Surface} kind="code" height="scroll">${paste}<//>
-      <//><//>
-    <//>
-  <//>`;
+        <div class="og-box poster-aside poster-aside--small">
+          <span class="og-box-label">${S('ai.label')}</span>
+          <div class="adm-kn-paste">${paste}</div>
+        </div>
+      </div>
+    </section>`;
 }
 
 export default function KnowledgeAdminTab() {
+  useViewCSS('/css/views/admin-knowledge.css');
   const [data, setData] = useState(null);
   const [failed, setFailed] = useState(null);
   const [q, setQ] = useState('');
@@ -162,7 +166,7 @@ export default function KnowledgeAdminTab() {
   if (failed && !data) return html`<${ErrorBox} message=${failed} />`;
   if (!data) return html`<${Spinner} text=${S('loading')} />`;
 
-  return html`<${Stack}>
+  return html`<div class="adm-kn">
     ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
 
     ${opened
@@ -178,5 +182,5 @@ export default function KnowledgeAdminTab() {
         onPage=${setPage} onOpen=${setOpened} />
       ${creating ? html`<${CreateForm} onCreate=${create} onCancel=${() => setCreating(false)} busy=${busy} />` : null}
       <${AskAi} summary=${data.summary} />`}
-  <//>`;
+  </div>`;
 }

@@ -7,11 +7,6 @@
  *   of memory rows with per-row visibility/rules/cart/federation controls. Extracted verbatim from
  *   memory-tab.js as a ctx-consuming plain render function (all state/handlers passed in via ctx).
  * @version-history
- *   2026-09-22 -- The set's newer props: Delete and Delete group in the danger tone, a key
- *     space's search and delete on the fold's own row, the value's JSON in the tall code box.
- *   2026-09-22 -- Composed from the shared component set: a key space is a Fold, a key is a ListRow
- *     whose visibility badge opens a Menu, the quota is a Meter, fields are Fields. The emoji
- *     buttons (cart, shield, magnifier, bin, archive) became words or inline SVG icons.
  *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
  *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
  *   v1.1.0 — 2026-08-11 — Sharing left the visibility menu. A row shows a "shared · N" badge when a
@@ -24,19 +19,16 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { recipientBadge } from '../shared.js';
+import { escHtml } from '/js/utils.js';
+import { Spinner, recipientBadge, VisibilityPill } from '../shared.js';
 import { detectImage, ImageView } from '/components/ImageDeliverable.js';
 import TagCloud from '/js/components/tag-cloud.js';
 import TagEditor from '/js/components/tag-editor.js';
-import { Fold, ListRow, Chip, Action, CopyAction, Field, Menu, Meter, Surface, Text, Stack } from '/components/poster-parts.js';
+import { CopyButton } from '/components/CopyButton.js';
 import { formatBytes, formatRelativeTime, shortTok, groupOfKey, displayRemainder, VIS_OPTIONS } from './helpers.js';
 import { MemoryForm } from './components.js';
 import { swallowed } from '/js/swallowed.js';
 import { dateTime as fmtDateTime } from '/js/format.js';
-
-// Inline icons on the 20 px grid (the design language allows no emoji).
-const SHIELD = html`<svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 2 3 5v5c0 4 3 7 7 8 4-1 7-4 7-8V5z" /></svg>`;
-const CART = html`<svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h3l2 10h9l2-7H6" /><circle cx="8" cy="17" r="1.3" /><circle cx="15" cy="17" r="1.3" /></svg>`;
 
 export function sortEntries(entries, sortBy) {
   const sorted = [...entries];
@@ -54,97 +46,25 @@ export function sortEntries(entries, sortBy) {
   }
 }
 
-/** The opened row: the whole key, the value, and everything that can be done to the record. */
-function renderDetail(ctx, m) {
-  const {
-    valueOf, fullLoaded, handleQuickVis, editingMemTags, setEditingMemTags, keyRulesPopover, setKeyRulesPopover,
-    loadKeyPerms, sharePanelFor, openSharePanel, setSharePanelFor, sharesCovering, revokeCoveringShare, groups,
-    sharePattern, setSharePattern, shareGroupId, setShareGroupId, submitShare, handleUpdateMemoryTags, setEditModal,
-    valueCopyText, showToast, fedConsents, togglingFed, handleStopSharing, handleShareToFederation, session, doPull,
-    doPush, handleDeleteMemory,
-  } = ctx;
-  // Every share that reaches this key, each with the way to end it. A share is a rule over a
-  // PATTERN, so the action says what it revokes: pressing it takes the whole pattern back.
-  const covering = sharesCovering ? sharesCovering(m.key) : [];
-  return html`<${Stack} density="compact">
-    <${Text} kind="mono">${m.key}<//>
-    ${(!fullLoaded && valueOf(m) === undefined)
-      // Always "loading", never a bare ellipsis: the open row fetches its own value (see the
-      // effect in memory-tab.js), so a missing value is a read in flight and not a state a
-      // person is supposed to interpret.
-      ? html`<${Text} kind="caption" tone="muted">${t('profile.memory.loadingValue') || 'Loading value…'}<//>`
-      : html`
-        ${(() => { const v = valueOf(m); const im = detectImage(v, m.key); return im ? html`<${ImageView} desc=${im} />` : null; })()}
-        <${Surface} kind="code" height="tall">${(() => { const v = valueOf(m); return typeof v === 'object' && v !== null ? JSON.stringify(v, null, 2) : String(v ?? ''); })()}<//>`}
-    <${Field} type="select" label=${t('profile.memory.visLabel')} value=${m.visibility || 'private'}
-      onChange=${(e) => handleQuickVis(m, e.target.value)}
-      options=${VIS_OPTIONS.map(v => ({ value: v, label: t('knowledge.visibility.' + v) }))} />
-    <${Stack} direction="wrap" align="center">
-      <${Action} onClick=${() => setEditingMemTags(editingMemTags === m.key ? null : m.key)}>${t('tags.editTags') || 'Edit tags'}<//>
-      <${Action} onClick=${() => { if (keyRulesPopover?.key === m.key) setKeyRulesPopover(null); else loadKeyPerms(m.key); }}>${t('permissions.sharingRules')}<//>
-      <${Action} onClick=${() => { if (sharePanelFor === m.key) setSharePanelFor(null); else openSharePanel(m.key); }}>${t('profile.memory.shShareThis')}<//>
-    <//>
-    ${covering.length > 0 && html`<${Stack} density="compact">${covering.map(sh => html`
-      <${ListRow} key=${sh.id} density="compact" name=${sh.group?.name || sh.group_id} detail=${sh.key_pattern}
-        actions=${html`<${Action} title=${(t('profile.memory.shRevokeTitle') || 'Stop sharing {pattern}').replace('{pattern}', sh.key_pattern)}
-          onClick=${() => revokeCoveringShare(sh)}>${t('profile.memory.shRevoke') || 'Stop sharing'}<//>`} />`)}<//>`}
-    ${sharePanelFor === m.key && html`<${Surface} kind="box" density="compact"><${Stack}>
-      ${groups.length === 0 ? html`
-        <${Text} kind="caption" tone="muted">${t('profile.memory.shNoGroups')}<//>
-        <${Stack} direction="wrap"><${Action} onClick=${() => {
-          try { sessionStorage.setItem('aimeat.access.focus', 'groups'); } catch { /* noop */ }   // eslint-disable-line aimeat/no-silent-catch -- noop
-          window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId: 'access' } }));
-        }}>${t('profile.memory.createGroupBtn')}<//><//>` : html`
-        <${Field} label=${t('profile.access.shPattern')} value=${sharePattern} hint=${t('profile.access.shPatternHelp')}
-          onInput=${e => setSharePattern(e.target.value)} />
-        <${Field} type="select" label=${t('profile.memory.shPickGroup')} value=${shareGroupId} onChange=${e => setShareGroupId(e.target.value)}
-          options=${groups.map(g => ({ value: g.id, label: g.name }))} />
-        <${Stack} direction="wrap" align="center">
-          <${Action} onClick=${submitShare}>${t('profile.access.shCreate')}<//>
-          <${Action} onClick=${() => setSharePanelFor(null)}>${t('profile.access.shCancel')}<//>
-        <//>`}
-    <//><//>`}
-    ${editingMemTags === m.key && html`<${TagEditor} tags=${m.tags || []} onSave=${(tags) => handleUpdateMemoryTags(m.key, tags, m.version)} />`}
-    ${editingMemTags !== m.key && m.tags?.length > 0 && html`<${Text} kind="caption" tone="muted">${m.tags.join(', ')}<//>`}
-    ${keyRulesPopover && keyRulesPopover.key === m.key && html`<${Surface} kind="box" density="compact"><${Stack} density="compact">
-      <${Stack} direction="horizontal" align="between">
-        <${Text} kind="label">${t('permissions.sharingRules')}<//>
-        <${Action} kind="text" label=${t('profile.cancel')} onClick=${() => setKeyRulesPopover(null)}>✗<//>
-      <//>
-      <${Text} kind="caption" tone="muted">${t('profile.memory.visLabel')} ${t('knowledge.visibility.' + keyRulesPopover.visibility) || keyRulesPopover.visibility}<//>
-      ${keyRulesPopover.rules.length === 0
-        ? html`<${Text} kind="caption" tone="muted">${t('permissions.noRules')}<//>`
-        : keyRulesPopover.rules.map((r, i) => html`<${ListRow} key=${i} density="compact" name=${r.data_pattern} value=${r.scope || '-'} actions=${recipientBadge(r.recipient)} />`)}
-    <//><//>`}
-    <${Stack} direction="wrap" align="center">
-      <${Action} onClick=${() => { const v = valueOf(m); setEditModal({ key: m.key, value: typeof v === 'object' && v !== null ? JSON.stringify(v, null, 2) : String(v ?? ''), visibility: m.visibility || 'private', version: m.version, isJson: typeof v === 'object' && v !== null }); }}>${t('profile.memory.editBtn')}<//>
-      ${valueOf(m) !== undefined && html`<${CopyAction} text=${valueCopyText(m)} label=${t('profile.memory.copyValue') || 'Copy value'}
-        onCopied=${() => showToast(t('profile.memory.valueCopied') || 'Value copied')} />`}
-      ${fedConsents[m.key]
-        ? html`<${Action} disabled=${togglingFed === m.key} onClick=${() => handleStopSharing(m.key)}>${togglingFed === m.key ? '...' : t('profile.memory.stopSharing')}<//>`
-        : html`<${Action} disabled=${togglingFed === m.key} onClick=${() => handleShareToFederation(m.key)}>${togglingFed === m.key ? '...' : t('profile.memory.shareToFederation')}<//>`}
-      ${session.federated && html`
-        <${Action} title=${t('profile.memory.pullFromHome')} onClick=${() => doPull(m.key)}>${t('profile.memory.pullFromHome')}<//>
-        <${Action} title=${t('profile.memory.pushToHome')} onClick=${() => doPush(m.key)}>${t('profile.memory.pushToHome')}<//>`}
-      <${Action} tone="danger" onClick=${() => handleDeleteMemory(m.key)}>${t('profile.memory.deleteBtn')}<//>
-    <//>
-  <//>`;
-}
-
 export function renderEntries(ctx) {
   const {
     memories, valueOf, sortBy, setSortBy, memTagFilter, setMemTagFilter, filterText, setFilterText,
     expandedMem, setExpandedMem, ensureValue, selectedKeys, toggleSelected, setSelectedKeys,
-    keyHasRules, loadKeyPerms, fedConsents, inCart, memCartItem, toggleCartItem, addCartItems, applyVis, groups,
-    showToast, memQuota, loadFullContents, handleExport, importing, fullLoaded,
+    visPopoverFor, setVisPopoverFor, keyHasRules, loadKeyPerms, fedConsents, inCart, memCartItem,
+    toggleCartItem, addCartItems, applyVis, groups, handleQuickVis, fullLoaded,
+    editingMemTags, setEditingMemTags, keyRulesPopover, setKeyRulesPopover, handleUpdateMemoryTags,
+    setEditModal, valueCopyText, showToast, togglingFed, handleStopSharing, handleShareToFederation,
+    session, doPull, doPush, handleDeleteMemory, memQuota, loadFullContents, handleExport, importing,
     triggerImport, importMode, setImportMode, importFileRef, handleImportFile, searchInput,
     setSearchInput, runServerSearch, searchScopePrefix, setSearchScopePrefix, searchLoading,
     searchResults, clearServerSearch, memArchived, setMemArchived, showMemForm, setShowMemForm,
     handleCreateMemory, bulkVis, setBulkVis, applyBulkVis, bulkDelete, collapsedGroups,
-    toggleGroupCollapsed, groupLabel, orgNames, deleteGroup, sharedWith,
+    toggleGroupCollapsed, groupLabel, orgNames, deleteGroup,
+    sharedWith, sharesCovering, revokeCoveringShare, sharePanelFor, openSharePanel, setSharePanelFor,
+    sharePattern, setSharePattern, shareGroupId, setShareGroupId, submitShare,
   } = ctx;
 
-  if (!memories) return html`<${Text} tone="muted">${t('profile.memory.loading')}<//>`;
+  if (!memories) return html`<${Spinner} text=${t('profile.memory.loading')} />`;
 
   // Tag counts across memories — the cloud shows the most-used first, capped at 10.
   const tagCounts = new Map();
@@ -185,96 +105,281 @@ export function renderEntries(ctx) {
   // An active filter force-expands all groups — a hit hidden in a collapsed group reads as "no hit".
   const filtering = !!ft || memTagFilter.size > 0;
 
-  const renderRow = (m, g) => {
-    // A key covered by a share reads as private in the badge, because it IS private — the share is
-    // the exception on top. Saying so on the row is the only way the owner can see, while scanning,
-    // which of their records somebody else can also read.
-    const via = sharedWith(m.key);
-    const carted = inCart(memCartItem(m));
-    return html`<${ListRow} key=${m.key} density="compact" name=${displayRemainder(m.key, g)}
-      onOpen=${() => { const opening = expandedMem !== m.key; setExpandedMem(opening ? m.key : null); if (opening) ensureValue(m.key); }}
-      mark=${html`<${Field} type="checkbox" value=${selectedKeys.has(m.key)} onChange=${() => toggleSelected(m.key)} />`}
-      detail=${html`<span title="${m.created_at ? fmtDateTime(m.created_at) : ''} / ${m.updated_at ? fmtDateTime(m.updated_at) : ''}">${typeof m.bytes === 'number' ? formatBytes(m.bytes) + ' · ' : ''}${formatRelativeTime(m.updated_at || m.created_at)}</span>`}
-      value=${html`<${Stack} direction="wrap" align="center" density="compact">
-        ${via.length > 0 && html`<${Chip} title=${t('profile.memory.shSharedWith').replace('{names}', via.map(x => x.name).join(', '))}>${t('profile.memory.shSharedBadge')} · ${via.length}<//>`}
-        ${fedConsents[m.key] && html`<${Chip} tone="sun">${t('profile.memory.syncedToFederation')}<//>`}
-        ${keyHasRules(m.key) && html`<${Action} kind="icon" label=${t('permissions.sharingRules')} title=${t('permissions.sharingRules')} onClick=${() => loadKeyPerms(m.key)}>${SHIELD}<//>`}
-        <${Menu} label=${t('profile.memory.visLabel')} trigger=${t('profile.visibility.' + (m.visibility || 'private'))}
-          items=${VIS_OPTIONS.filter(v => v !== 'group').map(v => ({ id: v, label: t('knowledge.visibility.' + v), onClick: () => applyVis(m, v) }))} />
-        <${Action} kind="icon" selected=${carted} onClick=${() => toggleCartItem(memCartItem(m))}
-          label=${carted ? (t('profile.memory.cartRemove') || 'Remove from collection') : (t('profile.memory.cartAdd') || 'Add to collection')}
-          title=${carted ? (t('profile.memory.cartRemove') || 'Remove from collection') : (t('profile.memory.cartAdd') || 'Add to collection')}>${CART}<//><//>`}>
-      ${expandedMem === m.key ? renderDetail(ctx, m) : null}
-    <//>`;
-  };
+  const renderRow = (m, g) => html`
+    <div key=${m.key}>
+      <div class="mem-item mem-item--grouped" onClick=${() => { const opening = expandedMem !== m.key; setExpandedMem(opening ? m.key : null); if (opening) ensureValue(m.key); }}>
+        <input type="checkbox" class="mem-row-check" checked=${selectedKeys.has(m.key)}
+          onClick=${(e) => e.stopPropagation()} onChange=${() => toggleSelected(m.key)} />
+        <span class="mem-key" title=${m.key}>${escHtml(displayRemainder(m.key, g))}</span>
+        ${typeof m.bytes === 'number' && html`<span class="pf-mem-size" title=${t('profile.memory.sizeLabel') || 'Value size'}>${formatBytes(m.bytes)}</span>`}
+        <span class="mem-time" title="${m.created_at ? fmtDateTime(m.created_at) : ''} / ${m.updated_at ? fmtDateTime(m.updated_at) : ''}">
+          ${formatRelativeTime(m.updated_at || m.created_at)}
+        </span>
+        <${VisibilityPill} visibility=${m.visibility || 'private'}
+          onClick=${(e) => { e.stopPropagation(); setVisPopoverFor(visPopoverFor === m.key ? null : m.key); }} />
+        ${(() => {
+          // A key covered by a share reads as private in the pill above, because it IS private —
+          // the share is the exception on top. Saying so on the row is the only way the owner can
+          // see, while scanning, which of their records somebody else can also read.
+          const via = sharedWith(m.key);
+          return via.length > 0 && html`
+            <span class="badge badge-info" title=${t('profile.memory.shSharedWith').replace('{names}', via.map(g => g.name).join(', '))}>
+              ${t('profile.memory.shSharedBadge')} · ${via.length}
+            </span>`;
+        })()}
+        ${keyHasRules(m.key) && html`<span class="shield-icon" title=${t('permissions.sharingRules')} onClick=${(e) => { e.stopPropagation(); loadKeyPerms(m.key); }}>\u{1F6E1}️</span>`}
+        ${fedConsents[m.key] && html`<span class="badge badge-success pf-fed-badge">${t('profile.memory.syncedToFederation')}</span>`}
+        <button class="mem-cart-btn ${inCart(memCartItem(m)) ? 'mem-cart-btn--on' : ''}"
+          title=${inCart(memCartItem(m)) ? (t('profile.memory.cartRemove') || 'Remove from collection') : (t('profile.memory.cartAdd') || 'Add to collection')}
+          onClick=${(e) => { e.stopPropagation(); toggleCartItem(memCartItem(m)); }}>🛒</button>
+      </div>
+      ${visPopoverFor === m.key && html`
+        <div class="mem-vis-pop" onClick=${(e) => e.stopPropagation()}>
+          ${VIS_OPTIONS.filter(v => v !== 'group').map(v => html`
+            <button key=${v} class="mem-vis-opt ${(m.visibility || 'private') === v ? 'mem-vis-opt--current' : ''}"
+              onClick=${() => applyVis(m, v)}>${t('knowledge.visibility.' + v)}</button>
+          `)}
+        </div>
+      `}
+      ${expandedMem === m.key && html`
+        <div class="mem-detail poster-row--thing">
+          <div class="mem-detail-key" title=${m.key}>${escHtml(m.key)}</div>
+          ${(!fullLoaded && valueOf(m) === undefined)
+            // Always "loading", never a bare ellipsis: the open row fetches its own value (see the
+            // effect in memory-tab.js), so a missing value is a read in flight and not a state a
+            // person is supposed to interpret. It used to render "…" for good when a background
+            // refresh replaced the list with a values-free one under an already-open row.
+            ? html`<div class="text-meta-sm">${t('profile.memory.loadingValue') || 'Loading value…'}</div>`
+            : html`
+              ${(() => { const v = valueOf(m); const im = detectImage(v, m.key); return im ? html`<${ImageView} desc=${im} />` : null; })()}
+              <pre>${(() => { const v = valueOf(m); return typeof v === 'object' && v !== null ? JSON.stringify(v, null, 2) : String(v ?? ''); })()}</pre>
+            `}
+          <div class="mem-detail-visrow mb-half">
+            <span class="text-meta-sm">${t('profile.memory.visLabel')}</span>
+            <select class="input-field mem-vis-select" value=${m.visibility || 'private'}
+              onClick=${(e) => e.stopPropagation()}
+              onChange=${(e) => handleQuickVis(m, e.target.value)}>
+              ${VIS_OPTIONS.map(v => html`<option key=${v} value=${v}>${t('knowledge.visibility.' + v)}</option>`)}
+            </select>
+          </div>
+          <div class="mb-half">
+            <button class="btn-outline btn-sm" onClick=${(e) => { e.stopPropagation(); setEditingMemTags(editingMemTags === m.key ? null : m.key); }}>
+              ${t('tags.editTags') || 'Edit tags'}
+            </button>
+            <button class="btn-outline btn-sm" onClick=${(e) => { e.stopPropagation(); if (keyRulesPopover?.key === m.key) setKeyRulesPopover(null); else loadKeyPerms(m.key); }}>
+              \u{1F6E1}️ ${t('permissions.sharingRules')}
+            </button>
+            <button class="btn-outline btn-sm" onClick=${(e) => { e.stopPropagation(); if (sharePanelFor === m.key) setSharePanelFor(null); else openSharePanel(m.key); }}>
+              ${t('profile.memory.shShareThis')}
+            </button>
+          </div>
+          ${(() => {
+            // Every share that reaches this key, each with the way to end it. A share is a rule over
+            // a PATTERN, so the button says what it revokes: pressing it takes the whole pattern
+            // back, not this one record.
+            const covering = sharesCovering ? sharesCovering(m.key) : [];
+            return covering.length > 0 && html`
+              <div class="mem-shares mb-half">
+                ${covering.map(sh => html`
+                  <div class="mem-share-row" key=${sh.id}>
+                    <span class="text-meta-sm">${sh.group?.name || sh.group_id} · <code>${escHtml(sh.key_pattern)}</code></span>
+                    <button class="btn-outline btn-sm" onClick=${(e) => { e.stopPropagation(); revokeCoveringShare(sh); }}
+                      title=${(t('profile.memory.shRevokeTitle') || 'Stop sharing {pattern}').replace('{pattern}', sh.key_pattern)}>
+                      ${t('profile.memory.shRevoke') || 'Stop sharing'}
+                    </button>
+                  </div>`)}
+              </div>`;
+          })()}
+          ${sharePanelFor === m.key && html`
+            <div class="key-rules-box poster-row--thing" onClick=${(e) => e.stopPropagation()}>
+              ${groups.length === 0 ? html`
+                <div class="text-meta-sm mb-half">${t('profile.memory.shNoGroups')}</div>
+                <button class="btn-outline btn-sm" onClick=${() => {
+                  try { sessionStorage.setItem('aimeat.access.focus', 'groups'); } catch { /* noop */ }   // eslint-disable-line aimeat/no-silent-catch -- noop
+                  window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId: 'access' } }));
+                }}>${t('profile.memory.createGroupBtn')}</button>
+              ` : html`
+                <div class="form-row">
+                  <label>${t('profile.access.shPattern')}</label>
+                  <input type="text" class="input-field input-sm" value=${sharePattern}
+                    onInput=${e => setSharePattern(e.target.value)} />
+                  <div class="text-meta-sm">${t('profile.access.shPatternHelp')}</div>
+                </div>
+                <div class="form-row">
+                  <label>${t('profile.memory.shPickGroup')}</label>
+                  <select class="input-field input-sm" value=${shareGroupId} onChange=${e => setShareGroupId(e.target.value)}>
+                    ${groups.map(g => html`<option key=${g.id} value=${g.id}>${g.name}</option>`)}
+                  </select>
+                </div>
+                <div class="form-actions">
+                  <button class="btn-primary btn-sm" onClick=${submitShare}>${t('profile.access.shCreate')}</button>
+                  <button class="btn-ghost btn-sm" onClick=${() => setSharePanelFor(null)}>${t('profile.access.shCancel')}</button>
+                </div>
+              `}
+            </div>
+          `}
+          ${editingMemTags === m.key && html`
+            <div class="mb-half">
+              <${TagEditor} tags=${m.tags || []} onSave=${(tags) => handleUpdateMemoryTags(m.key, tags, m.version)} />
+            </div>
+          `}
+          ${editingMemTags !== m.key && m.tags?.length > 0 && html`<div class="text-meta-sm mb-half">${m.tags.join(', ')}</div>`}
+          ${keyRulesPopover && keyRulesPopover.key === m.key && html`
+            <div class="key-rules-box poster-row--thing">
+              <div class="flex-between mb-half">
+                <strong class="text-caption">\u{1F6E1}️ ${t('permissions.sharingRules')}</strong>
+                <button class="btn-outline btn-sm" onClick=${() => setKeyRulesPopover(null)}>✕</button>
+              </div>
+              <div class="text-meta-sm mb-half">${t('profile.memory.visLabel')} ${t('knowledge.visibility.' + keyRulesPopover.visibility) || keyRulesPopover.visibility}</div>
+              ${keyRulesPopover.rules.length === 0
+                ? html`<div class="text-meta pf-italic">${t('permissions.noRules')}</div>`
+                : keyRulesPopover.rules.map(r => html`
+                  <div class="pf-rule-row">
+                    ${recipientBadge(r.recipient)}
+                    <span class="text-code text-meta-sm">${escHtml(r.data_pattern)}</span>
+                    <span class="text-meta-sm pf-ml-auto">${escHtml(r.scope || '-')}</span>
+                  </div>`)
+              }
+            </div>
+          `}
+          <div class="mem-actions">
+            <button class="btn-sm" onClick=${() => { const v = valueOf(m); setEditModal({ key: m.key, value: typeof v === 'object' && v !== null ? JSON.stringify(v, null, 2) : String(v ?? ''), visibility: m.visibility || 'private', version: m.version, isJson: typeof v === 'object' && v !== null }); }}>${t('profile.memory.editBtn')}</button>
+            ${valueOf(m) !== undefined && html`<${CopyButton}
+              text=${valueCopyText(m)}
+              label=${'\u{1F4CB} ' + (t('profile.memory.copyValue') || 'Copy value')}
+              className="btn-outline btn-sm"
+              onCopied=${() => showToast(t('profile.memory.valueCopied') || 'Value copied')} />`}
+            ${fedConsents[m.key]
+              ? html`<button class="btn-outline btn-sm" disabled=${togglingFed === m.key}
+                  onClick=${() => handleStopSharing(m.key)}>
+                  ${togglingFed === m.key ? '...' : t('profile.memory.stopSharing')}
+                </button>`
+              : html`<button class="btn-ghost btn-sm" disabled=${togglingFed === m.key}
+                  onClick=${() => handleShareToFederation(m.key)}>
+                  ${togglingFed === m.key ? '...' : t('profile.memory.shareToFederation')}
+                </button>`
+            }
+            ${session.federated && html`
+              <button class="btn-ghost" onClick=${() => doPull(m.key)} title=${t('profile.memory.pullFromHome')}>
+                ↓ ${t('profile.memory.pullFromHome')}
+              </button>
+              <button class="btn-ghost" onClick=${() => doPush(m.key)} title=${t('profile.memory.pushToHome')}>
+                ↑ ${t('profile.memory.pushToHome')}
+              </button>
+            `}
+            <button class="btn-danger mem-delete-btn" onClick=${() => handleDeleteMemory(m.key)}>${t('profile.memory.deleteBtn')}</button>
+          </div>
+        </div>
+      `}
+    </div>
+  `;
 
-  return html`<${Stack}>
-    ${memQuota && html`<${Stack} density="compact">
-      <${Text} kind="caption" tone="muted">${t('profile.memory.storageUsed') || 'Storage'}: ${memQuota.used_keys}/${memQuota.max_keys} ${t('profile.memory.keysWord') || 'keys'} · ${formatBytes(memQuota.used_bytes)} / ${formatBytes(memQuota.max_bytes)}<//>
-      <${Meter} value=${memQuota.used_bytes || 0} max=${memQuota.max_bytes || 0} label=${t('profile.memory.storageUsed') || 'Storage'} />
-    <//>`}
-    <${Stack} direction="wrap" align="end">
-      <${Text} kind="label">${t('profile.memory.toolsLabel') || 'Tools'}<//>
-      ${!fullLoaded && html`<${Action} onClick=${loadFullContents}>${t('profile.memory.loadContents') || 'Load all contents'}<//>`}
-      <${Action} onClick=${() => handleExport()}>${t('profile.memory.exportBtn') || 'Export'}<//>
-      <${Action} disabled=${importing} onClick=${triggerImport}>${importing ? '…' : (t('profile.memory.importBtn') || 'Import')}<//>
-      <${Field} type="select" label=${t('profile.memory.importModeLabel') || 'Conflict handling'} value=${importMode} onChange=${e => setImportMode(e.target.value)}
-        options=${[{ value: 'skip', label: t('profile.memory.importMode.skip') || 'Skip existing' }, { value: 'overwrite', label: t('profile.memory.importMode.overwrite') || 'Overwrite' }, { value: 'rename', label: t('profile.memory.importMode.rename') || 'Import as new' }]} />
-      <input type="file" accept="application/json,.json" ref=${importFileRef} hidden onChange=${handleImportFile} />
-    <//>
-    <${Stack} direction="wrap" align="end">
-      <${Field} type="search" placeholder=${t('profile.memory.searchContents') || 'Search content or key…'}
-        value=${searchInput} onInput=${e => setSearchInput(e.target.value)}
-        onKeyDown=${e => { if (e.key === 'Enter') runServerSearch(searchInput, searchScopePrefix); }} />
-      <${Action} disabled=${searchLoading} onClick=${() => runServerSearch(searchInput, searchScopePrefix)}>${searchLoading ? '…' : (t('profile.memory.searchBtn') || 'Search')}<//>
-      ${searchResults !== null && html`<${Action} kind="text" label=${t('profile.memory.searchClear') || 'Clear search'} onClick=${clearServerSearch}>✗<//>`}
-      <${Field} type="search" placeholder=${t('profile.memory.filterType')} value=${filterText} onInput=${e => setFilterText(e.target.value)} />
-      ${filterText && html`<${Action} kind="text" label=${t('search.clear') || 'Clear'} onClick=${() => setFilterText('')}>✗<//>`}
-      <${Action} kind="tab" semantics="radio" selected=${!memArchived} onClick=${() => setMemArchived(false)}>${t('profile.memory.viewActive') || 'Active'}<//>
-      <${Action} kind="tab" semantics="radio" selected=${memArchived} onClick=${() => setMemArchived(true)}>${t('profile.memory.viewArchived') || 'Archived'}<//>
-    <//>
-    <${Stack} direction="horizontal" align="between">
-      <${Field} type="select" label=${t('profile.memory.sortLabel')} value=${sortBy} onChange=${e => setSortBy(e.target.value)}
-        options=${[{ value: 'updated', label: t('profile.memory.sortUpdated') }, { value: 'created', label: t('profile.memory.sortCreated') }, { value: 'alpha', label: t('profile.memory.sortAlpha') }, { value: 'size', label: t('profile.memory.sortSize') || 'Largest first' }]} />
-      <${Action} kind="primary" onClick=${() => setShowMemForm(!showMemForm)}>${t('profile.memory.newBtn')}<//>
-    <//>
+  const quotaPct = memQuota && memQuota.max_bytes ? Math.min(100, Math.round((memQuota.used_bytes / memQuota.max_bytes) * 100)) : 0;
+
+  return html`
+    ${memQuota && html`
+      <div class="pf-mem-quota">
+        <div class="pf-mem-quota-row">
+          <span class="text-meta-sm">${t('profile.memory.storageUsed') || 'Storage'}: ${memQuota.used_keys}/${memQuota.max_keys} ${t('profile.memory.keysWord') || 'keys'} · ${formatBytes(memQuota.used_bytes)} / ${formatBytes(memQuota.max_bytes)}</span>
+        </div>
+        <div class="pf-mem-quota-bar"><div class="pf-mem-quota-fill ${quotaPct >= 90 ? 'pf-mem-quota-fill--danger' : ''}" style=${`width:${quotaPct}%`}></div></div>
+      </div>
+    `}
+    <div class="mem-tools-section poster-row--thing">
+      <span class="mem-tools-label">${t('profile.memory.toolsLabel') || 'Tools'}</span>
+      <div class="mem-tools-actions">
+        ${!fullLoaded && html`<button class="btn-outline btn-sm" onClick=${loadFullContents}>${t('profile.memory.loadContents') || 'Load all contents'}</button>`}
+        <span class="mem-import-group">
+          <button class="btn-outline btn-sm" onClick=${() => handleExport()}>${t('profile.memory.exportBtn') || 'Export'}</button>
+          <button class="btn-outline btn-sm" disabled=${importing} onClick=${triggerImport}>${importing ? '…' : (t('profile.memory.importBtn') || 'Import')}</button>
+          <select class="input-field mem-vis-select" value=${importMode} onChange=${e => setImportMode(e.target.value)} title=${t('profile.memory.importModeLabel') || 'Conflict handling'}>
+            <option value="skip">${t('profile.memory.importMode.skip') || 'Skip existing'}</option>
+            <option value="overwrite">${t('profile.memory.importMode.overwrite') || 'Overwrite'}</option>
+            <option value="rename">${t('profile.memory.importMode.rename') || 'Import as new'}</option>
+          </select>
+          <input type="file" accept="application/json,.json" ref=${importFileRef} class="pf-hidden" onChange=${handleImportFile} />
+        </span>
+      </div>
+    </div>
+    <div class="action-bar">
+      <div class="search-bar">
+        <input type="text" class="input-field" placeholder=${t('profile.memory.searchContents') || 'Search content or key…'}
+          value=${searchInput} onInput=${e => setSearchInput(e.target.value)}
+          onKeyDown=${e => { if (e.key === 'Enter') runServerSearch(searchInput, searchScopePrefix); }} />
+        <button class="btn-sm" disabled=${searchLoading} onClick=${() => runServerSearch(searchInput, searchScopePrefix)}>${searchLoading ? '…' : (t('profile.memory.searchBtn') || 'Search')}</button>
+        ${searchResults !== null && html`<button class="btn-ghost btn-sm" onClick=${clearServerSearch}>✕</button>`}
+      </div>
+      <div class="search-bar">
+        <input type="text" class="input-field" placeholder=${t('profile.memory.filterType')}
+          value=${filterText} onInput=${e => setFilterText(e.target.value)} />
+        ${filterText && html`<button class="btn-ghost btn-sm" onClick=${() => setFilterText('')}>✕</button>`}
+      </div>
+      <div class="search-bar">
+        <button class="btn-sm ${!memArchived ? 'btn-primary' : 'btn-outline'}" onClick=${() => setMemArchived(false)}>${t('profile.memory.viewActive') || 'Active'}</button>
+        <button class="btn-sm ${memArchived ? 'btn-primary' : 'btn-outline'}" onClick=${() => setMemArchived(true)}>${'🗄️ '}${t('profile.memory.viewArchived') || 'Archived'}</button>
+      </div>
+    </div>
+    <div class="action-bar mem-bottom-bar">
+      <div class="mem-sort-bar">
+        <label class="text-meta-sm">${t('profile.memory.sortLabel')}</label>
+        <select class="input-field mem-sort-select" value=${sortBy} onChange=${e => setSortBy(e.target.value)}>
+          <option value="updated">${t('profile.memory.sortUpdated')}</option>
+          <option value="created">${t('profile.memory.sortCreated')}</option>
+          <option value="alpha">${t('profile.memory.sortAlpha')}</option>
+          <option value="size">${t('profile.memory.sortSize') || 'Largest first'}</option>
+        </select>
+      </div>
+      <button class="btn-primary mem-new-btn" onClick=${() => setShowMemForm(!showMemForm)}>${t('profile.memory.newBtn')}</button>
+    </div>
     <${TagCloud} tags=${tagsByFreq} selected=${memTagFilter} onToggle=${toggleMemTag} onClear=${() => setMemTagFilter(new Set())} limit=${10} />
-    ${showMemForm && html`<${Surface} kind="panel"><${MemoryForm} onSave=${handleCreateMemory} onCancel=${() => setShowMemForm(false)} groups=${groups} /><//>`}
-    ${selectedKeys.size > 0 && html`<${Stack} direction="wrap" align="end">
-      <${Text} kind="label">${(t('profile.memory.bulkSelected') || '{n} selected').replace('{n}', String(selectedKeys.size))}<//>
-      ${/* Sharing is not a visibility any more, so the bulk bar changes visibility only. Sharing
-            many keys at once is one share over a pattern that covers them, which is the Access
-            tab or the row's own share panel — not a per-record loop dressed up as a bulk edit. */''}
-      <${Field} type="select" value=${bulkVis} onChange=${e => setBulkVis(e.target.value)}
-        options=${VIS_OPTIONS.filter(v => v !== 'group').map(v => ({ value: v, label: t('knowledge.visibility.' + v) }))} />
-      <${Action} onClick=${applyBulkVis}>${t('profile.memory.bulkApply') || 'Change visibility'}<//>
-      <${Action} onClick=${() => { addCartItems((memories || []).filter(m => selectedKeys.has(m.key)).map(memCartItem)); }}>${t('profile.memory.cartAddSelected') || 'Add to collection'}<//>
-      <${Action} tone="danger" onClick=${bulkDelete}>${t('profile.memory.deleteBtn')}<//>
-      <${Action} onClick=${() => setSelectedKeys(new Set())}>${t('profile.memory.bulkClear') || 'Clear selection'}<//>
-    <//>`}
+    ${showMemForm && html`<${MemoryForm} onSave=${handleCreateMemory} onCancel=${() => setShowMemForm(false)} groups=${groups} />`}
+    ${selectedKeys.size > 0 && html`
+      <div class="mem-bulkbar poster-row--thing">
+        <span class="mem-bulkbar-count">${(t('profile.memory.bulkSelected') || '{n} selected').replace('{n}', String(selectedKeys.size))}</span>
+        ${/* Sharing is not a visibility any more, so the bulk bar changes visibility only. Sharing
+              many keys at once is one share over a pattern that covers them, which is the Access
+              tab or the row's own share panel — not a per-record loop dressed up as a bulk edit. */''}
+        <select class="input-field mem-vis-select" value=${bulkVis} onChange=${e => setBulkVis(e.target.value)}>
+          ${VIS_OPTIONS.filter(v => v !== 'group').map(v => html`<option key=${v} value=${v}>${t('knowledge.visibility.' + v)}</option>`)}
+        </select>
+        <button class="btn-outline btn-sm" onClick=${applyBulkVis}>${t('profile.memory.bulkApply') || 'Change visibility'}</button>
+        <button class="btn-outline btn-sm" onClick=${() => { addCartItems((memories || []).filter(m => selectedKeys.has(m.key)).map(memCartItem)); }}>🛒 ${t('profile.memory.cartAddSelected') || 'Add to collection'}</button>
+        <button class="btn-danger btn-sm" onClick=${bulkDelete}>${t('profile.memory.deleteBtn')}</button>
+        <button class="btn-ghost btn-sm" onClick=${() => setSelectedKeys(new Set())}>✕ ${t('profile.memory.bulkClear') || 'Clear selection'}</button>
+      </div>
+    `}
     ${searchResults !== null
       ? html`
-          <${Stack} direction="horizontal" align="between">
-            <${Text} kind="caption" tone="muted">${(t('profile.memory.searchResultCount') || '{n} matches').replace('{n}', String(searchResults.length))}${searchScopePrefix ? ` · ${searchScopePrefix}` : ''}<//>
-            <${Action} onClick=${clearServerSearch}>${t('profile.memory.searchClear') || 'Clear search'}<//>
-          <//>
+          <div class="mem-search-summary">
+            <span class="text-meta-sm">${(t('profile.memory.searchResultCount') || '{n} matches').replace('{n}', String(searchResults.length))}${searchScopePrefix ? ` · ${escHtml(searchScopePrefix)}` : ''}</span>
+            <button class="btn-ghost btn-sm" onClick=${clearServerSearch}>✕ ${t('profile.memory.searchClear') || 'Clear search'}</button>
+          </div>
           ${searchResults.length === 0
-            ? html`<${Text} tone="muted">${t('profile.memory.searchEmpty') || 'No matches'}<//>`
-            : html`<${Stack} density="compact">${sortEntries(searchResults, sortBy).map(m => renderRow(m, groupOfKey(m.key)))}<//>`}`
+            ? html`<div class="empty">${t('profile.memory.searchEmpty') || 'No matches'}</div>`
+            : sortEntries(searchResults, sortBy).map(m => renderRow(m, groupOfKey(m.key)))}
+        `
       : filtered.length === 0
-        ? html`<${Text} tone="muted">${memories.length > 0 ? (t('tags.noMatch') || 'No items match selected tags') : t('profile.memory.empty')}<//>`
-        : html`<div>${groupsOrdered.map(g => {
+        ? html`<div class="empty">${memories.length > 0 ? (t('tags.noMatch') || 'No items match selected tags') : t('profile.memory.empty')}</div>`
+        : groupsOrdered.map(g => {
             const collapsed = !filtering && collapsedGroups.has(g.id);
             const groupPrefix = g.kind === 'organism' ? 'organism.' + g.uuid + '.' : g.kind === 'plain' ? g.id + '.' : null;
-            const count = g.items.length === 1 ? (t('profile.memory.keysOne') || '1 key') : (t('profile.memory.keysCount') || '{n} keys').replace('{n}', String(g.items.length));
-            return html`<${Fold} key=${g.id} title=${groupLabel(g)} open=${!collapsed} onToggle=${() => toggleGroupCollapsed(g.id)}
-              sub=${count + (g.kind === 'organism' && orgNames[g.uuid] ? ' · ' + shortTok(g.uuid) : '')}
-              actions=${groupPrefix && html`
-                <${Action} onClick=${() => { setSearchInput(''); setSearchScopePrefix(groupPrefix); showToast((t('profile.memory.searchInGroupHint') || 'Type a query to search within {g}').replace('{g}', groupLabel(g))); }}>${t('profile.memory.searchInGroup') || 'Search in this group'}<//>
-                <${Action} tone="danger" onClick=${() => deleteGroup(g, g.items.length)}>${t('profile.memory.deleteGroup') || 'Delete group'}<//>`}>
-              <${Stack} density="compact">${g.items.map(m => renderRow(m, g))}<//>
-            <//>`;
-          })}</div>`
-    }
-  <//>`;
+            return html`
+              <div class="mem-group" key=${g.id}>
+                <div class="mem-group-header" role="button" tabindex="0" onClick=${() => toggleGroupCollapsed(g.id)}>
+                  <span class="pf-chevron ${collapsed ? '' : 'pf-chevron-open'}">▼</span>
+                  <span class="mem-group-name">${escHtml(groupLabel(g))}</span>
+                  <span class="mem-group-count">${g.items.length === 1 ? (t('profile.memory.keysOne') || '1 key') : (t('profile.memory.keysCount') || '{n} keys').replace('{n}', String(g.items.length))}</span>
+                  ${g.kind === 'organism' && orgNames[g.uuid] && html`<span class="mem-group-sub">${shortTok(g.uuid)}</span>`}
+                  <span class="mem-group-actions">
+                    ${groupPrefix && html`<button class="btn-ghost btn-sm" title=${t('profile.memory.searchInGroup') || 'Search in this group'}
+                      onClick=${(e) => { e.stopPropagation(); setSearchInput(''); setSearchScopePrefix(groupPrefix); showToast((t('profile.memory.searchInGroupHint') || 'Type a query to search within {g}').replace('{g}', groupLabel(g))); }}>🔍</button>`}
+                    ${groupPrefix && html`<button class="btn-ghost btn-sm" title=${t('profile.memory.deleteGroup') || 'Delete group'}
+                      onClick=${(e) => { e.stopPropagation(); deleteGroup(g, g.items.length); }}>🗑️</button>`}
+                  </span>
+                </div>
+                ${!collapsed && g.items.map(m => renderRow(m, g))}
+              </div>
+            `;
+          })
+    }`;
 }

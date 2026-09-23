@@ -18,9 +18,6 @@
  * @structure DiscoveryApps({ status, onChanged }) — mode chips, tally filters, search, table, block dialog
  * @usage <${DiscoveryApps} status=${status} onChanged=${load} />
  * @version-history
- *   v2.2.0 -- 2026-09-22 -- Composed from the shared component set: the mode as radio tabs in the
- *     section's head, the tallies and the search as the shared toolbar, the list as a shared table
- *     that stacks on a phone, the block reason in the shared dialog; no sheet of its own.
  *   v2.1.0 — 2026-09-13 — Compose section headings from the shared poster B1 shape.
  *   v2.0.1 — 2026-09-13 — The block dialog's actions sit in the dialog's footer.
  *   v2.0.0 — 2026-09-11 — The poster face: mode and tally as chips, the search as an underline
@@ -33,8 +30,8 @@ import { useState, useEffect, useCallback, useMemo } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { Spinner, Empty, Badge, useToast, Toast, when } from './shared.js';
-import { Section, Stack, Text, Action, Toolbar, Table, Field, Dialog } from '/components/poster-parts.js';
+import { Spinner, Badge, useToast, Toast, when } from './shared.js';
+import { Modal } from '/components/Modal.js';
 import { onLiveUpdate } from '/lib/live-updates.js';
 import * as adminService from '/js/services/admin.js';
 import { swallowed } from '/js/swallowed.js';
@@ -136,73 +133,84 @@ export function DiscoveryApps({ status, onChanged }) {
     return a.seo_state === 'on' ? S('apps.never') : '—';
   };
 
-  const doCell = (a) => html`<${Stack} direction="wrap" align="end" density="compact">
-    ${review && a.seo_state === 'pending'
-      ? html`<${Action} kind="text" tone="success" disabled=${busy}
-          onClick=${() => act(() => adminService.approveAppSeo(a.owner, a.filename, true), 'apps.approvedOk')}>${S('apps.approve')}<//>`
-      : null}
-    ${review && a.seo_state === 'on'
-      ? html`<${Action} kind="text" disabled=${busy}
-          onClick=${() => act(() => adminService.approveAppSeo(a.owner, a.filename, false), 'apps.withdrawnOk')}>${S('apps.withdraw')}<//>`
-      : null}
-    ${a.seo_state === 'blocked'
-      ? html`<${Action} kind="text" disabled=${busy}
-          onClick=${() => act(() => adminService.blockAppSeo(a.owner, a.filename, false), 'apps.unblockedOk')}>${S('apps.unblock')}<//>`
-      : html`<${Action} kind="text" tone="danger" disabled=${busy}
-          onClick=${() => setBlocking({ owner: a.owner, filename: a.filename, name: a.manifest?.name || a.filename, reason: '' })}>${S('apps.block')}<//>`}
-  <//>`;
-
   return html`
-    <${Section} id="adm-disc-05" title=${S('apps.title')} count="05"
-      description=${`${S('apps.lead')} ${review ? S('apps.modeReviewHint') : S('apps.modeOwnerHint')}`}
-      actions=${html`<${Stack} direction="wrap" align="center" density="compact" role="radiogroup" label=${S('apps.who')}>
-        <${Text} kind="caption" tone="muted">${S('apps.who')}<//>
-        <${Action} kind="tab" semantics="radio" selected=${!review} disabled=${busy} onClick=${() => setMode('owner')}>${S('apps.modeOwner')}<//>
-        <${Action} kind="tab" semantics="radio" selected=${review} disabled=${busy} onClick=${() => setMode('review')}>${S('apps.modeReview')}<//>
-      <//>`}>
+    <section class="og-sec" id="adm-disc-05">
       ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
+      <div class="og-sec-h"><h2 class="poster-section-title">${S('apps.title')}<small>05</small></h2>
+        <div class="adm-disc-chips">
+          <span class="adm-disc-chips-lbl">${S('apps.who')}</span>
+          <button type="button" class="adm-disc-fchip ${review ? '' : 'on'}" disabled=${busy} onClick=${() => setMode('owner')}>${S('apps.modeOwner')}</button>
+          <button type="button" class="adm-disc-fchip ${review ? 'on' : ''}" disabled=${busy} onClick=${() => setMode('review')}>${S('apps.modeReview')}</button>
+        </div></div>
+      <p class="adm-disc-lead">${S('apps.lead')} ${review ? S('apps.modeReviewHint') : S('apps.modeOwnerHint')}</p>
 
-      <${Toolbar} label=${S('apps.title')}
-        search=${{ ariaLabel: S('apps.search'), placeholder: S('apps.search'), value: query, onInput: e => { setQuery(e.target.value); setAll(false); } }}
-        filters=${STATES.map(s => ({
-          id: s, label: `${status.apps[s] ?? 0} ${S('apps.state_' + s)}`, selected: only === s,
-          onClick: () => { setOnly(only === s ? null : s); setAll(false); },
-        }))} />
+      <div class="adm-disc-filters">
+        ${STATES.map(s => html`
+          <button type="button" key=${s} class="adm-disc-fchip ${only === s ? 'on' : ''}" onClick=${() => { setOnly(only === s ? null : s); setAll(false); }}>
+            ${status.apps[s] ?? 0} ${S('apps.state_' + s)}
+          </button>`)}
+        <span class="adm-disc-sep"></span>
+        <div class="adm-disc-fld">
+          <svg viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
+          <input type="search" value=${query} placeholder=${S('apps.search')} onInput=${e => { setQuery(e.target.value); setAll(false); }} />
+        </div>
+      </div>
 
       ${apps === null
         ? html`<${Spinner} text=${S('loadingApps')} />`
         : filtered.length === 0
-          ? html`<${Empty} text=${S('apps.noApps')} />`
-          : html`<${Table} density="compact" collapse=${640} label=${S('apps.title')}
-              headers=${[S('apps.colApp'), S('apps.colOwner'), S('apps.colAddress'), S('apps.colState'), S('apps.colTold'), '']}
-              rows=${shown.map(a => [
-                html`<${Stack} density="compact"><strong>${a.manifest?.name || a.filename}</strong><${Text} kind="mono" tone="muted">${a.filename}<//><//>`,
-                a.owner,
-                html`<${Text} kind="mono">${address(a)}<//>`,
-                html`<${Stack} density="compact">
-                  <span><${Badge} type=${STATE_TONE[a.seo_state] || 'muted'} label=${S('apps.state_' + a.seo_state)} /></span>
-                  ${a.operator_seo_block_reason ? html`<${Text} kind="caption" tone="muted">${a.operator_seo_block_reason}<//>` : null}
-                <//>`,
-                { text: told(a), mono: true },
-                doCell(a),
-              ])} />`}
+          ? html`<div class="adm-disc-empty">${S('apps.noApps')}</div>`
+          : html`<div class="adm-table-scroll"><table class="adm-table adm-disc-tbl">
+              <thead><tr>
+                <th>${S('apps.colApp')}</th><th>${S('apps.colOwner')}</th><th>${S('apps.colAddress')}</th>
+                <th>${S('apps.colState')}</th><th>${S('apps.colTold')}</th><th></th>
+              </tr></thead>
+              <tbody>
+                ${shown.map(a => html`<tr key=${`${a.owner}/${a.filename}`}>
+                  <td><b>${a.manifest?.name || a.filename}</b><span class="adm-disc-why adm-disc-mono">${a.filename}</span></td>
+                  <td>${a.owner}</td>
+                  <td class="adm-disc-addr">${address(a)}</td>
+                  <td>
+                    <${Badge} type=${STATE_TONE[a.seo_state] || 'muted'} label=${S('apps.state_' + a.seo_state)} />
+                    ${a.operator_seo_block_reason ? html`<span class="adm-disc-why">${a.operator_seo_block_reason}</span>` : null}
+                  </td>
+                  <td class="adm-disc-when">${told(a)}</td>
+                  <td class="adm-disc-do">
+                    ${review && a.seo_state === 'pending'
+                      ? html`<button type="button" class="og-door og-door--quiet" disabled=${busy}
+                          onClick=${() => act(() => adminService.approveAppSeo(a.owner, a.filename, true), 'apps.approvedOk')}>${S('apps.approve')}</button> `
+                      : null}
+                    ${review && a.seo_state === 'on'
+                      ? html`<button type="button" class="og-door og-door--quiet" disabled=${busy}
+                          onClick=${() => act(() => adminService.approveAppSeo(a.owner, a.filename, false), 'apps.withdrawnOk')}>${S('apps.withdraw')}</button> `
+                      : null}
+                    ${a.seo_state === 'blocked'
+                      ? html`<button type="button" class="og-door og-door--quiet" disabled=${busy}
+                          onClick=${() => act(() => adminService.blockAppSeo(a.owner, a.filename, false), 'apps.unblockedOk')}>${S('apps.unblock')}</button>`
+                      : html`<button type="button" class="og-door og-door--quiet og-door--danger" disabled=${busy}
+                          onClick=${() => setBlocking({ owner: a.owner, filename: a.filename, name: a.manifest?.name || a.filename, reason: '' })}>${S('apps.block')}</button>`}
+                  </td>
+                </tr>`)}
+              </tbody>
+            </table></div>`}
       ${apps !== null && filtered.length > 0 ? html`
-        <${Stack} direction="wrap" align="between">
-          <${Text} kind="mono" tone="muted">${S('apps.shown', { n: shown.length, total: filtered.length })}<//>
-          ${filtered.length > PAGE ? html`<${Action} onClick=${() => setAll(!all)}>${all ? S('apps.showFewer') : S('apps.showAll', { n: filtered.length })}<//>` : null}
-        <//>` : null}
+        <div class="adm-disc-foot">
+          <span class="adm-disc-mono">${S('apps.shown', { n: shown.length, total: filtered.length })}</span>
+          ${filtered.length > PAGE ? html`<button type="button" class="og-door og-door--quiet" onClick=${() => setAll(!all)}>${all ? S('apps.showFewer') : S('apps.showAll', { n: filtered.length })}</button>` : null}
+        </div>` : null}
 
-      <${Dialog} open=${!!blocking} onClose=${() => setBlocking(null)} title=${S('apps.blockTitle', { name: blocking?.name ?? '' })}
-        actions=${blocking && html`
-          <${Action} onClick=${() => setBlocking(null)}>${S('cancel')}<//>
-          <${Action} kind="primary" tone="danger" disabled=${busy}
-            onClick=${() => act(() => adminService.blockAppSeo(blocking.owner, blocking.filename, true, blocking.reason?.trim() || undefined), 'apps.blockedOk')}>${S('apps.block')}<//>`}>
+      <${Modal} open=${!!blocking} onClose=${() => setBlocking(null)} title=${S('apps.blockTitle', { name: blocking?.name ?? '' })}
+        footer=${blocking && html`
+          <button type="button" class="og-door og-door--quiet" onClick=${() => setBlocking(null)}>${S('cancel')}</button>
+          <button type="button" class="og-slab og-slab--danger" disabled=${busy}
+            onClick=${() => act(() => adminService.blockAppSeo(blocking.owner, blocking.filename, true, blocking.reason?.trim() || undefined), 'apps.blockedOk')}>${S('apps.block')}</button>`}>
         ${blocking && html`
-          <${Stack}>
-            <${Text}>${S('apps.blockBody')}<//>
-            <${Field} label=${S('apps.blockReason')} value=${blocking.reason} placeholder=${S('apps.blockReasonHint')}
+          <p>${S('apps.blockBody')}</p>
+          <div class="adm-disc-lbl">${S('apps.blockReason')}</div>
+          <div class="adm-disc-fld adm-disc-fld--wide">
+            <input type="text" value=${blocking.reason} placeholder=${S('apps.blockReasonHint')}
               onInput=${e => setBlocking({ ...blocking, reason: e.target.value })} />
-          <//>`}
+          </div>`}
       <//>
-    <//>`;
+    </section>`;
 }

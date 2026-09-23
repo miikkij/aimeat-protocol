@@ -1,0 +1,95 @@
+/**
+ * @file agent-integration-poster.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The agent card's Integration tab in the poster face (agi- prefix; design canvas
+ *   "Integration"). The shapes come from the shared sheets: the section rule is poster-row--thing,
+ *   the coral section label is .og-label, the underlined action is .og-door, the one loud action is
+ *   .og-slab and a step is an .og-chip. This file carries what the tab adds: the two-column grid the
+ *   sections sit in, the key/value rows, the step chips' three states, the webhook form, the delivery
+ *   log table, and the poster skin for the shared MCP quick-connect block, which is restyled from the
+ *   outside because its markup belongs to /components/McpInstall.js.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 -- 2026-09-14 -- Initial: the Integration tab wears the poster face.
+ */
+
+/* ── The grid the sections sit in ──────────────────────────────────────────────────────────── */
+.agi-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.6rem 3rem; align-items: start; }
+.agi-sec { min-width: 0; padding-top: .8rem; }
+.agi-sec--full { grid-column: 1 / -1; }
+.agi-sec-h { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; margin-bottom: .6rem; }
+
+/* ── The words between the rows ────────────────────────────────────────────────────────────── */
+.agi-mono { font-family: var(--font-mono); font-size: .75rem; color: var(--text-dim); white-space: nowrap; }
+.agi-hint { margin: 0; font-size: .85rem; line-height: 1.5; font-weight: 600; color: var(--text-dim); }
+.agi-empty { margin: 0; padding: .6rem 0; font-size: .95rem; line-height: 1.55; font-weight: 600; color: var(--text-dim); }
+.agi-lead { margin-bottom: .8rem; }
+.agi-doors { margin-top: .9rem; }
+
+/* ── Key and value ─────────────────────────────────────────────────────────────────────────── */
+.agi-kv { display: grid; grid-template-columns: minmax(8rem, 10rem) minmax(0, 1fr); gap: 0 1.2rem; font-size: .92rem; line-height: 1.5; }
+.agi-k, .agi-v { min-width: 0; padding: .45rem 0; border-bottom: 1px solid var(--border); }
+.agi-k { font-family: var(--font-mono); font-size: .75rem; color: var(--text-dim); }
+.agi-v { font-weight: 600; overflow-wrap: anywhere; }
+.agi-v.is-dim { color: var(--text-dim); font-weight: 500; }
+.agi-v.is-mono { font-family: var(--font-mono); font-size: .78rem; font-weight: 500; }
+.agi-v .og-door { vertical-align: baseline; }
+.agi-roles { display: inline-flex; flex-wrap: wrap; gap: .4rem; }
+
+/* ── The steps of Hello Integration, one chip each ─────────────────────────────────────────── */
+/* The base chip is the step nobody has reached yet; the three states below colour the frame. Two
+   classes deep, so the state wins over .og-chip's ink frame whichever sheet the browser reads first. */
+.agi-steps { margin: .4rem 0 .9rem; }
+.agi-steps .agi-step { text-transform: none; border-color: var(--border); color: var(--text-dim); }
+.agi-steps .agi-step--passed { border-color: var(--success-fg, #047857); color: var(--success-fg, #047857); }
+.agi-steps .agi-step--failed { border-color: var(--accent); color: var(--accent); }
+.agi-steps .agi-step--warn { border-color: var(--warn-fg, #B45309); color: var(--warn-fg, #B45309); }
+
+/* ── The webhook address, while it is being typed ──────────────────────────────────────────── */
+.agi-form { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem 1.4rem; margin-top: .9rem; }
+.agi-form .og-input { flex: 1 1 16rem; }
+
+/* ── The delivery log, under the connection rows ───────────────────────────────────────────── */
+.agi-log { width: 100%; margin-top: 1rem; border-collapse: collapse; font-size: .82rem; }
+.agi-log th { padding: .35rem .8rem .35rem 0; border-bottom: 2px solid var(--text); font-family: var(--font-mono); font-size: .68rem; font-weight: 500; text-align: left; text-transform: uppercase; letter-spacing: .06em; color: var(--text-dim); }
+.agi-log td { padding: .35rem .8rem .35rem 0; border-bottom: 1px solid var(--border); overflow-wrap: anywhere; }
+.agi-log th:last-child, .agi-log td:last-child { padding-right: 0; }
+.agi-log .is-ok { color: var(--success-fg, #047857); }
+.agi-log .is-bad { color: var(--accent); }
+
+/* ── Attaching the agent somewhere else ────────────────────────────────────────────────────── */
+/* McpQuickConnect's markup is shared, so the poster skin is put on it from here by descendant
+   selector. Its outer 2px ink box comes from profile-poster.css; only the radius is squared. */
+.agi-attach .mcpi { gap: .7rem; }
+.agi-attach .mcpi--quick { padding: .9rem 1.1rem; border-radius: 0; }
+.agi-attach .mcpi-oneclick, .agi-attach .mcpi-file { gap: 1.4rem; }
+.agi-attach .mcpi-note { font-size: .78rem; color: var(--text-dim); }
+.agi-attach .mcpi .btn-primary, .agi-attach .mcpi .btn-outline, .agi-attach .mcpi .btn-ghost {
+  display: inline-block; padding: 0 0 1px; background: none; border: 0; border-bottom: 2px solid var(--text); border-radius: 0;
+  box-shadow: none; cursor: pointer; font-family: var(--font-showroom-body); font-size: .76rem; font-weight: 800;
+  text-transform: uppercase; letter-spacing: .04em; text-decoration: none; color: var(--text);
+}
+.agi-attach .mcpi .btn-primary:hover, .agi-attach .mcpi .btn-outline:hover, .agi-attach .mcpi .btn-ghost:hover {
+  color: var(--accent); border-bottom-color: var(--accent);
+}
+.agi-attach .mcpi-cmd { gap: 1rem; }
+.agi-attach .mcpi-cmd-label { font-size: .68rem; font-weight: 800; text-transform: uppercase; letter-spacing: .12em; color: var(--accent); }
+.agi-attach .mcpi-cmd-text { padding: .5rem .7rem; border-radius: 0; background: var(--card-bg-alt); font-size: .78rem; }
+.agi-attach .mcpi-files { gap: .8rem; font-size: .85rem; font-weight: 600; color: var(--text-dim); }
+.agi-attach .mcpi-file-link { padding: 0 0 1px; border-bottom: 2px solid var(--text); font-size: .8rem; font-weight: 800; color: var(--text); }
+.agi-attach .mcpi-file-link:hover { color: var(--accent); border-bottom-color: var(--accent); }
+.agi-attach .mcpi-file-link code { font-family: var(--font-mono); font-size: .72rem; font-weight: 500; color: var(--text-dim); }
+.agi-attach .mcpi-more { align-self: flex-start; padding: 0 0 1px; border-bottom: 2px solid var(--text); font-size: .88rem; font-weight: 800; color: var(--text); }
+.agi-attach .mcpi-more:hover { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* ── One column, once two would each be too narrow to read a webhook address in ────────────── */
+@media (max-width: 900px) {
+  .agi-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (max-width: 560px) {
+  .agi-sec-h { flex-direction: column; align-items: flex-start; gap: .3rem; }
+  .agi-kv { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .agi-k { padding-bottom: 0; border-bottom: 0; }
+}

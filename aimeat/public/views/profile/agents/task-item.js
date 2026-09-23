@@ -7,14 +7,6 @@
  *   happened, details, memory entries, rating -- plus the actions row (start, request changes,
  *   triage, cancel, delete). The helpers it is built from live in ./task-item-parts.js.
  * @version-history
- *   v3.0.1 — 2026-09-22 — A blurred title is blurred again (ListRow concealed) instead of replaced by
- *     the task id; the opened title is the small heading; Cancel and Delete carry the danger tone.
- *   v3.0.0 — 2026-09-22 — Composed from the shared component set: the closed row is a ListRow (the
- *     eye as an icon action, progress and age as the mono detail, the status as a Chip, the arrow),
- *     the opened task is a record Surface under the row, to-dos and the event log are ListRows
- *     with markers, details are KeyValue rows, and every button is an Action. The rating shows as
- *     "n / 5" instead of star glyphs, and Keep loses its star. A blurred title shows the task id
- *     until ListRow can conceal a name. No behaviour change.
  *   v2.0.0 — 2026-09-14 — The Tasks tab wears the poster face: agt- markup against
  *     css/views/agent-tasks-poster.css, the record box for an open task, the eye icon in place of
  *     the two emoji, doors and a slab in place of the old button classes. No behaviour change. The
@@ -35,15 +27,14 @@ import { useConfirm } from '/components/Modal.js';
 import { Markdown } from '/components/Markdown.js';
 import { DeliverableBody } from '/components/ImageDeliverable.js';
 import RateModal from './rate-modal.js';
-import { ListRow, Surface, Stack, Text, Chip, Action, KeyValue } from '/components/poster-parts.js';
 import { swallowed } from '/js/swallowed.js';
 import { date as fmtDate, time as fmtTime } from '/js/format.js';
 import {
   isTaskBlurred,
   setTaskBlurred,
   statusLabel,
-  statusChipTone,
-  todoMarker,
+  statusChipClass,
+  todoTick,
   formatScopeEntry,
   todoProgress,
   EyeIcon,
@@ -337,176 +328,213 @@ export function TaskItem({ task, agentName, showToast, onRefresh, autoOpen = 0 }
   ].filter(Boolean).join(' · ');
 
   // A fresh vnode per call: the closed row and the open record both show the chip at once.
-  const statusChip = () => html`<${Chip} tone=${statusChipTone(status)}>${statusLabel(status)}<//>`;
+  const statusChip = () => html`<span class=${`og-chip agt-status ${statusChipClass(status)}`}>${statusLabel(status)}</span>`;
   const stars = Math.max(0, Math.min(5, Math.round(rating?.stars || 0)));
   // The log part only appears once there is a log, a fetch in flight, or a recorded emptiness.
   const showLog = loadingEvents || (events && (events.length > 0 || !isQueued));
 
-  // A part of the opened record: a coral label (with an optional mono note at the right) over its content.
-  const part = (label, note, body) => html`<${Stack} density="compact">
-    ${note ? html`<${Stack} direction="wrap" align="between" density="compact">
-      <${Text} kind="label">${label}<//><${Text} kind="mono" tone="muted">${note}<//>
-    <//>` : html`<${Text} kind="label">${label}<//>`}
-    ${body}
-  <//>`;
-  const envWord = (td) => (td.environment === 'aimeat' ? t('profile.agents.tasks.envAimeat') : t('profile.agents.tasks.envAgent'));
-  const todoDetail = (td) => [
-    td.estimateMinutes && `${td.estimateMinutes} ${t('profile.agents.tasks.minuteShort')}`,
-    td.completedAt && formatDateTime(td.completedAt),
-  ].filter(Boolean).join(' · ');
-
   return html`
     <div ref=${taskRef}>
-      <${ListRow}
-        mark=${html`<${Action} kind="icon" onClick=${handleToggleBlur} selected=${blurred}
-          title=${blurred ? t('profile.agents.tasks.unblurTitle') : t('profile.agents.tasks.blurTitle')}><${EyeIcon} hidden=${blurred} /><//>`}
-        name=${task.title || task.id} concealed=${blurred}
-        onOpen=${handleExpand}
-        detail=${[progress, task.createdAt ? timeAgo(task.createdAt) : ''].filter(Boolean).join(' · ')}
-        value=${statusChip()}
-        arrow=${true}
-        selected=${expanded}
-        density="compact" />
-      ${/* The opened record sits UNDER the row, not in its body: a selected row sets the sun's ink
-            as its text colour, and the record inherited it, which left words dark on the dark card
-            in the dark theme. */''}
-      ${expanded && html`
-        <${Surface} kind="record">
-          <${Stack}>
-          <${Stack} direction="wrap" align="between" density="compact">
-            <${Text} kind="heading" size="small">${task.title || task.id}<//>
-            ${statusChip()}
-          <//>
-          ${task.description && html`<div><${Markdown} text=${task.description} /></div>`}
-          ${stamps && html`<${Text} kind="mono" tone="muted">${stamps}<//>`}
+      <div class="agt-row" onClick=${handleExpand}>
+        <div class="agt-nm">
+          <button
+            type="button"
+            class="agt-eye"
+            onClick=${handleToggleBlur}
+            title=${blurred ? t('profile.agents.tasks.unblurTitle') : t('profile.agents.tasks.blurTitle')}
+            aria-pressed=${blurred}
+          ><${EyeIcon} hidden=${blurred} /></button>
+          <span class=${`agt-nm-t ${blurred ? 'is-hidden' : ''} ${expanded ? 'is-open' : ''}`}>${task.title || task.id}</span>
+        </div>
+        <div class="agt-m">${progress || ''}</div>
+        <div class="agt-m">${task.createdAt ? timeAgo(task.createdAt) : ''}</div>
+        <div>${statusChip()}</div>
+      </div>
 
-          ${hasTodos && part(
-            `${t('profile.agents.tasks.todoLabel')} · ${tOr('profile.agents.tasks.todoCount', '{done} of {total}', { done: doneTodos, total: todos.length })}`,
-            planLine,
-            html`
+      ${expanded && html`
+        <div class="poster-record agt-record">
+          <div class="agt-record-h">
+            <h3 class="poster-record-title agt-record-title">${task.title || task.id}</h3>
+            ${statusChip()}
+          </div>
+          ${task.description && html`<div class="agt-desc"><${Markdown} text=${task.description} /></div>`}
+          ${stamps && html`<span class="agt-m agt-stamps">${stamps}</span>`}
+
+          ${hasTodos && html`
+            <div class="agt-part poster-row--thing">
+              <div class="agt-part-h">
+                <span class="og-label">
+                  ${t('profile.agents.tasks.todoLabel')} · ${tOr('profile.agents.tasks.todoCount', '{done} of {total}', { done: doneTodos, total: todos.length })}
+                </span>
+                ${planLine && html`<span class="agt-m">${planLine}</span>`}
+              </div>
               ${todos.map((td, i) => {
-                const mk = todoMarker(td.status || 'pending');
+                const tick = todoTick(td.status || 'pending');
                 return html`
-                  <${ListRow} key=${td.id || i} marker=${mk.tone} live=${mk.live} density="compact"
-                    name=${td.title} detail=${todoDetail(td)} value=${html`<${Chip} tone="muted">${envWord(td)}<//>`}>
-                    ${(td.description || td.environmentReason || td.verification) && html`<${Stack} density="compact">
-                      ${td.description && html`<${Text} kind="caption" tone="muted">${td.description}<//>`}
-                      ${td.environmentReason && html`<${Text} kind="caption" tone="muted">${td.environmentReason}<//>`}
-                      ${td.verification && html`<${Text} kind="caption" tone="muted">${td.verification}<//>`}
-                    <//>`}
-                  <//>
+                  <div class="agt-todo" key=${td.id || i}>
+                    <span class=${`agt-tick ${tick.cls}`}>${tick.glyph}</span>
+                    <div class="agt-todo-b">
+                      <b>${td.title}</b>
+                      <span class="og-chip og-chip--dim">${td.environment === 'aimeat' ? t('profile.agents.tasks.envAimeat') : t('profile.agents.tasks.envAgent')}</span>
+                      ${td.description && html`<div class="agt-sub">${td.description}</div>`}
+                      ${td.environmentReason && html`<div class="agt-sub">${td.environmentReason}</div>`}
+                      ${td.verification && html`<div class="agt-sub">${td.verification}</div>`}
+                    </div>
+                    <div class="agt-todo-r">
+                      ${td.estimateMinutes && html`<span class="agt-m">${td.estimateMinutes} ${t('profile.agents.tasks.minuteShort')}</span>`}
+                      ${td.completedAt && html`<span class="agt-m">${formatDateTime(td.completedAt)}</span>`}
+                    </div>
+                  </div>
                 `;
               })}
               ${outdatedTodos.length > 0 && html`
-                <${Stack} density="compact">
-                  <${Action} kind="text" onClick=${(e) => { e.stopPropagation(); setShowOutdated(v => !v); }} expanded=${showOutdated}>
-                    ${t('profile.agents.tasks.outdatedTodos')} ${outdatedTodos.length}
-                  <//>
+                <div class="agt-history">
+                  <button type="button" class="og-door og-door--quiet" onClick=${(e) => { e.stopPropagation(); setShowOutdated(v => !v); }} aria-expanded=${showOutdated}>
+                    ${t('profile.agents.tasks.outdatedTodos')}<em>${outdatedTodos.length}</em>
+                  </button>
                   ${showOutdated && outdatedTodos.map((td, i) => html`
-                    <${ListRow} key=${td.id || 'old-' + i} marker="muted" density="compact"
-                      name=${td.title} detail=${td.description} detailKind="text" />
+                    <div class="agt-todo agt-todo--old" key=${td.id || 'old-' + i}>
+                      <span class="agt-tick"></span>
+                      <div class="agt-todo-b">
+                        <b>${td.title}</b>
+                        ${td.description && html`<div class="agt-sub">${td.description}</div>`}
+                      </div>
+                    </div>
                   `)}
-                <//>
+                </div>
               `}
-            `)}
+            </div>
+          `}
 
-          ${!hasTodos && isQueued && html`<${Text} tone="muted">${t('profile.agents.tasks.builder.waitingTodos')}<//>`}
-          ${isRevisionRequested && html`<${Text} tone="muted">${t('profile.agents.tasks.revisionWaiting')}<//>`}
+          ${!hasTodos && isQueued && html`<div class="agt-empty">${t('profile.agents.tasks.builder.waitingTodos')}</div>`}
+          ${isRevisionRequested && html`<div class="agt-empty">${t('profile.agents.tasks.revisionWaiting')}</div>`}
 
-          ${showLog && part(tOr('profile.agents.tasks.whatHappened', 'What happened'), null, html`
-            ${loadingEvents && html`<${Text} tone="muted">${t('profile.loading')}<//>`}
-            ${events && events.length > 0 && events.map(ev => html`
-              ${/* The time is the mono detail and the message the row's body, not ListRow's fixed
-                    time column: that column leaves a phone-width message a few words wide. */''}
-              <${ListRow} key=${ev.id || ev.timestamp} kind="chronology" density="compact" marker="muted"
-                name=${ev.type || ''} detail=${ev.timestamp ? timeAgo(ev.timestamp) : ''}>
-                ${ev.message && html`<${Text} kind="caption">${ev.message}<//>`}
-              <//>
-            `)}
-            ${events && events.length === 0 && !isQueued && html`<${Text} tone="muted">${t('profile.agents.tasks.noEventsRecorded')}<//>`}
-          `)}
+          ${showLog && html`
+            <div class="agt-part poster-row--thing">
+              <div class="agt-part-h">
+                <span class="og-label">${tOr('profile.agents.tasks.whatHappened', 'What happened')}</span>
+              </div>
+              ${loadingEvents && html`<div class="agt-empty">${t('profile.loading')}</div>`}
+              ${events && events.length > 0 && html`
+                <div class="agt-log">
+                  ${events.map(ev => html`
+                    <div class="agt-m" key=${(ev.id || ev.timestamp) + '-when'}>${ev.timestamp ? timeAgo(ev.timestamp) : ''}</div>
+                    <div class="agt-w" key=${(ev.id || ev.timestamp) + '-what'}>${ev.type || ''}</div>
+                    <div class="agt-msg" key=${(ev.id || ev.timestamp) + '-said'}>${ev.message || ''}</div>
+                  `)}
+                </div>
+              `}
+              ${events && events.length === 0 && !isQueued && html`<div class="agt-empty">${t('profile.agents.tasks.noEventsRecorded')}</div>`}
+            </div>
+          `}
 
-          ${hasDetails && part(tOr('profile.agents.tasks.detailsLabel', 'Details'), null, html`
-            ${task.deliverableKey && html`
-              <${KeyValue} label=${t('profile.agents.tasks.deliverable')} value=${html`
-                <${Stack} direction="wrap" density="compact">
-                  <${Text} kind="mono">${task.deliverableKey}<//>
-                  <${Action} kind="text" onClick=${(e) => { e.stopPropagation(); fetchDeliverable(); }}>
-                    ${t('profile.agents.tasks.viewDeliverable')}
-                  <//>
-                <//>`} />
-            `}
-            ${hasScope && html`
-              <${KeyValue} label=${t('profile.agents.detail.tasks.scope')} value=${html`<${Stack} density="compact">
-                ${Array.isArray(task.scope)
-                  ? task.scope.map((s, i) => html`<${Text} key=${i}>${formatScopeEntry(s)}<//>`)
-                  : html`<${Text}>${formatScopeEntry(task.scope)}<//>`}
-              <//>`} />
-            `}
-            ${hasRules && html`
-              <${KeyValue} label=${t('profile.agents.detail.tasks.rules')} value=${html`<${Stack} density="compact">
-                ${Array.isArray(task.rules) ? task.rules.map(r => html`<${Text} key=${r}>${r}<//>`) : html`<${Text}>${task.rules}<//>`}
-              <//>`} />
-            `}
-            ${deliverable && html`
-              ${deliverable.loading
-                ? html`<${Text} tone="muted">${t('profile.loading')}<//>`
-                : deliverable.notFound
-                  ? html`<${Text} tone="muted">${t('profile.agents.tasks.deliverableGone')}<//>`
-                  : html`<div><${DeliverableBody} value=${deliverable.value} alt=${task.title || task.description} /></div>`}
-            `}
-          `)}
+          ${hasDetails && html`
+            <div class="agt-part poster-row--thing">
+              <div class="agt-part-h">
+                <span class="og-label">${tOr('profile.agents.tasks.detailsLabel', 'Details')}</span>
+              </div>
+              ${task.deliverableKey && html`
+                <div class="agt-kv">
+                  <span class="agt-k">${t('profile.agents.tasks.deliverable')}</span>
+                  <span class="agt-v">
+                    <code class="agt-key">${task.deliverableKey}</code>
+                    <button type="button" class="og-door og-door--quiet" onClick=${(e) => { e.stopPropagation(); fetchDeliverable(); }}>
+                      ${t('profile.agents.tasks.viewDeliverable')}
+                    </button>
+                  </span>
+                </div>
+              `}
+              ${hasScope && html`
+                <div class="agt-kv">
+                  <span class="agt-k">${t('profile.agents.detail.tasks.scope')}</span>
+                  <span class="agt-v">
+                    ${Array.isArray(task.scope)
+                      ? task.scope.map((s, i) => html`<div key=${i}>${formatScopeEntry(s)}</div>`)
+                      : formatScopeEntry(task.scope)}
+                  </span>
+                </div>
+              `}
+              ${hasRules && html`
+                <div class="agt-kv">
+                  <span class="agt-k">${t('profile.agents.detail.tasks.rules')}</span>
+                  <span class="agt-v">
+                    ${Array.isArray(task.rules) ? task.rules.map(r => html`<div key=${r}>${r}</div>`) : task.rules}
+                  </span>
+                </div>
+              `}
+              ${deliverable && html`
+                ${deliverable.loading
+                  ? html`<div class="agt-empty">${t('profile.loading')}</div>`
+                  : deliverable.notFound
+                    ? html`<div class="agt-empty">${t('profile.agents.tasks.deliverableGone')}</div>`
+                    : html`<div class="agt-preview"><${DeliverableBody} value=${deliverable.value} alt=${task.title || task.description} /></div>`}
+              `}
+            </div>
+          `}
 
-          ${taskMemory && part(t('profile.agents.tasks.memory.show'), null, taskMemory.loading
-            ? html`<${Text} tone="muted">${t('profile.loading')}<//>`
-            : taskMemory.items.length === 0
-              ? html`<${Text} tone="muted">${t('profile.agents.tasks.memory.none')}<//>`
-              : html`<${Stack} density="compact">
-                  ${taskMemory.items.map(it => html`<${TaskMemoryEntry} key=${it.key} entry=${it} />`)}
-                <//>`)}
+          ${taskMemory && html`
+            <div class="agt-part poster-row--thing">
+              <div class="agt-part-h">
+                <span class="og-label">${t('profile.agents.tasks.memory.show')}</span>
+              </div>
+              ${taskMemory.loading
+                ? html`<div class="agt-empty">${t('profile.loading')}</div>`
+                : taskMemory.items.length === 0
+                  ? html`<div class="agt-empty">${t('profile.agents.tasks.memory.none')}</div>`
+                  : html`
+                    <div class="pf-agd-task-memory-list">
+                      ${taskMemory.items.map(it => html`<${TaskMemoryEntry} key=${it.key} entry=${it} />`)}
+                    </div>
+                  `}
+            </div>
+          `}
 
-          ${rating && part(t('profile.agents.tasks.rate.rated'), null, html`
-            <${Stack} direction="wrap" density="compact" align="center">
-              <${Text} kind="number" size="small">${stars} / 5<//>
-              <${Text} kind="mono" tone="muted">${t(`profile.agents.detail.quality.contexts.${rating.context}`)}<//>
-              ${rating.comment && html`<${Text}>${rating.comment}<//>`}
-            <//>
-          `)}
+          ${rating && html`
+            <div class="agt-part poster-row--thing">
+              <div class="agt-part-h">
+                <span class="og-label">${t('profile.agents.tasks.rate.rated')}</span>
+              </div>
+              <div class="agt-rating">
+                <span class="agt-stars">${'★'.repeat(stars)}<span class="agt-stars-off">${'★'.repeat(5 - stars)}</span></span>
+                <span class="agt-m">${t(`profile.agents.detail.quality.contexts.${rating.context}`)}</span>
+                ${rating.comment && html`<span class="agt-rating-note">${rating.comment}</span>`}
+              </div>
+            </div>
+          `}
 
-          <${Stack} direction="wrap" align="center">
+          <div class="agt-actions">
             ${task.triage !== 'kept' && html`
-              <${Action} onClick=${(e) => handleTriage(e, 'kept')} title=${t('profile.agents.tasks.triage.keepHint')}>${t('profile.agents.tasks.triage.keep')}<//>
+              <button type="button" class="og-door" onClick=${(e) => handleTriage(e, 'kept')} title=${t('profile.agents.tasks.triage.keepHint')}>★ ${t('profile.agents.tasks.triage.keep')}</button>
             `}
             ${task.triage !== 'archived' && html`
-              <${Action} onClick=${(e) => handleTriage(e, 'archived')} title=${t('profile.agents.tasks.triage.archiveHint')}>${t('profile.agents.tasks.triage.archive')}<//>
+              <button type="button" class="og-door" onClick=${(e) => handleTriage(e, 'archived')} title=${t('profile.agents.tasks.triage.archiveHint')}>${t('profile.agents.tasks.triage.archive')}</button>
             `}
             ${task.triage && html`
-              <${Action} onClick=${(e) => handleTriage(e, null)}>${t('profile.agents.tasks.triage.restore')}<//>
+              <button type="button" class="og-door" onClick=${(e) => handleTriage(e, null)}>${t('profile.agents.tasks.triage.restore')}</button>
             `}
-            <${Action} onClick=${(e) => { e.stopPropagation(); fetchTaskMemory(); }}>
+            <button type="button" class="og-door" onClick=${(e) => { e.stopPropagation(); fetchTaskMemory(); }}>
               ${t('profile.agents.tasks.memory.show')}
-            <//>
+            </button>
             ${isDone && html`
-              <${Action} onClick=${handleOpenRate}>
+              <button type="button" class="og-door" onClick=${handleOpenRate}>
                 ${rating ? t('profile.agents.tasks.rate.rerate') : t('profile.agents.tasks.rate.button')}
-              <//>
+              </button>
             `}
             ${canRequestChanges && html`
-              <${Action} onClick=${handleOpenRevision}>${t('profile.agents.tasks.requestChanges')}<//>
+              <button type="button" class="og-door" onClick=${handleOpenRevision}>${t('profile.agents.tasks.requestChanges')}</button>
             `}
             ${canStart && html`
-              <${Action} kind="primary" onClick=${handleStart} disabled=${starting}>
+              <button type="button" class="og-slab" onClick=${handleStart} disabled=${starting}>
                 ${starting ? t('profile.agents.tasks.starting') : t('profile.agents.tasks.startThisTask')}
-              <//>
+              </button>
             `}
             ${(isActive || task.status === 'stalled') && html`
-              <${Action} kind="text" tone="danger" onClick=${handleCancel}>${t('profile.agents.tasks.cancel')}<//>
+              <button type="button" class="og-door og-door--danger" onClick=${handleCancel}>${t('profile.agents.tasks.cancel')}</button>
             `}
             ${canDelete && html`
-              <${Action} kind="text" tone="danger" onClick=${handleDelete}>${t('profile.agents.tasks.delete')}<//>
+              <button type="button" class="og-door og-door--danger" onClick=${handleDelete}>${t('profile.agents.tasks.delete')}</button>
             `}
-          <//>
-          <//>
+          </div>
           <${ConfirmUI} />
           <${RequestChangesModal}
             open=${showRevisionModal}
@@ -521,7 +549,7 @@ export function TaskItem({ task, agentName, showToast, onRefresh, autoOpen = 0 }
             submitting=${sendingRate}
             existing=${rating}
           />
-        <//>
+        </div>
       `}
     </div>
   `;

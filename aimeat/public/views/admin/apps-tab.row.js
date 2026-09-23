@@ -13,23 +13,22 @@
  *
  *   OPEN IS FIRST because an operator was choosing by filename: the page never offered a way to
  *   look at the app it was about to take off the wall.
- * @structure appChips · appRowCells
- * @usage rows=${apps.map(a => appRowCells(a, { onHide, onRestore, onDelete, onSeo, busy }))}
+ * @structure appChips · AppRow
+ * @usage html`<${AppRow} app=${a} onHide=${fn} onRestore=${fn} onDelete=${fn} ... />`
  * @version-history
- *   v2.0.0 — 2026-09-22 — The row is the cells of the shared table (appRowCells) instead of a hand-made
- *     <tr>, and its three-dot menu is the shared Menu, which closes on a choice, Escape or a click
- *     elsewhere as the old one did on blur. What the row says and does is unchanged.
  *   v1.0.0 — 2026-09-12 — Initial, with the page in the poster face.
  */
 import { h } from 'preact';
+import { useState } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { dt, fmtBytes, num, Badge } from './shared.js';
-import { Stack, Action, Menu, Text } from '/components/poster-parts.js';
 
 const html = htm.bind(h);
 const A = (key, params) => t('admin.apps.' + key, params);
+
+const DOTS = html`<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1.5" /><circle cx="12" cy="12" r="1.5" /><circle cx="12" cy="19" r="1.5" /></svg>`;
 
 /** What is true about this app, in chips. The quiet state (on the wall, nothing set) shows none. */
 export function appChips(app) {
@@ -44,43 +43,52 @@ export function appChips(app) {
   return chips;
 }
 
-/**
- * The seven cells of one app's row in the shared table: the app (name, file, chips, the take-down
- * reason), owner, size, opened, forks, published, and the actions with the row menu.
- */
-export function appRowCells(app, { onHide, onRestore, onDelete, onSeo, busy }) {
+export function AppRow({ app, onHide, onRestore, onDelete, onSeo, busy }) {
+  const [menu, setMenu] = useState(false);
   const name = app.manifest?.name || app.filename;
-  const chips = appChips(app);
-  return [
-    html`<${Stack} density="compact">
-      <strong>${escHtml(name)}</strong>
-      <${Text} kind="mono" tone="muted">${escHtml(app.filename)}${app.version_number ? ` · v${num(app.version_number)}` : ''}<//>
-      ${chips.length > 0 && html`<${Stack} direction="wrap" density="compact">${chips}<//>`}
-      ${app.operator_hidden && html`
-        <${Text} kind="caption" tone="muted">
-          ${app.operator_hide_reason ? `"${escHtml(app.operator_hide_reason)}" ` : ''}
-          ${app.operator_hidden_by
-            ? A('takenBy', { by: escHtml(app.operator_hidden_by), at: dt(app.operator_hidden_at) })
-            : ''}
-        <//>`}
-    <//>`,
-    html`<${Text} kind="mono" tone="muted">${escHtml(app.owner)}<//>`,
-    { text: fmtBytes(app.size || 0), align: 'end' },
-    { text: num(app.downloads || 0), align: 'end' },
-    { text: num(app.forks || 0), align: 'end' },
-    { text: dt(app.created_at), align: 'end' },
-    html`<${Stack} direction="horizontal" align="end">
-      <${Action} href=${app.download_url} target="_blank">${A('open')}<//>
-      ${app.operator_hidden
-        ? html`<${Action} disabled=${busy} onClick=${() => onRestore(app)}>${A('putBack')}<//>`
-        : html`<${Action} disabled=${busy} onClick=${() => onHide(app)}>${A('takeDown')}<//>`}
-      <${Menu} label=${A('more')} items=${[
-        { label: A('menu.open'), onClick: () => window.open(app.download_url, '_blank', 'noopener') },
-        { label: app.operator_seo_blocked ? A('menu.seoAllow') : A('menu.seoBlock'), onClick: () => onSeo(app) },
-        { divider: true, label: '' },
-        !app.operator_hidden && { label: A('menu.takeDown'), onClick: () => onHide(app) },
-        { label: A('menu.delete'), danger: true, onClick: () => onDelete(app) },
-      ]} />
-    <//>`,
-  ];
+  const close = () => setMenu(false);
+
+  return html`
+    <tr class=${app.operator_hidden ? 'adm-ap-row--down' : ''}>
+      <td>
+        <span class="adm-ap-name">${escHtml(name)}</span>
+        <span class="adm-ap-file">${escHtml(app.filename)}${app.version_number ? ` · v${num(app.version_number)}` : ''}</span>
+        <span class="adm-ap-chips">${appChips(app)}</span>
+        ${app.operator_hidden && html`
+          <span class="adm-ap-reason">
+            ${app.operator_hide_reason ? `"${escHtml(app.operator_hide_reason)}" ` : ''}
+            ${app.operator_hidden_by
+              ? A('takenBy', { by: escHtml(app.operator_hidden_by), at: dt(app.operator_hidden_at) })
+              : ''}
+          </span>`}
+      </td>
+      <td class="adm-ap-owner" data-label=${A('col.owner')}>${escHtml(app.owner)}</td>
+      <td class="r" data-label=${A('col.size')}>${fmtBytes(app.size || 0)}</td>
+      <td class="r" data-label=${A('col.opened')}>${num(app.downloads || 0)}</td>
+      <td class="r" data-label=${A('col.forks')}>${num(app.forks || 0)}</td>
+      <td class="r" data-label=${A('col.published')}>${dt(app.created_at)}</td>
+      <td class="r">
+        <span class="adm-ap-acts">
+          <a class="og-door og-door--quiet" href=${app.download_url} target="_blank" rel="noopener">${A('open')}</a>
+          ${app.operator_hidden
+            ? html`<button type="button" class="og-door og-door--quiet" disabled=${busy} onClick=${() => onRestore(app)}>${A('putBack')}</button>`
+            : html`<button type="button" class="og-door og-door--quiet" disabled=${busy} onClick=${() => onHide(app)}>${A('takeDown')}</button>`}
+          <span class="adm-ap-menuwrap">
+            <button type="button" class="adm-ap-kebab" aria-label=${A('more')} aria-expanded=${menu}
+              onClick=${() => setMenu(m => !m)} onBlur=${() => window.setTimeout(close, 150)}>${DOTS}</button>
+            ${menu && html`
+              <span class="adm-ap-menu">
+                <button type="button" onClick=${() => { close(); window.open(app.download_url, '_blank', 'noopener'); }}>${A('menu.open')}</button>
+                <button type="button" onClick=${() => { close(); onSeo(app); }}>
+                  ${app.operator_seo_blocked ? A('menu.seoAllow') : A('menu.seoBlock')}
+                </button>
+                <span class="adm-ap-menu-sep"></span>
+                ${!app.operator_hidden && html`
+                  <button type="button" onClick=${() => { close(); onHide(app); }}>${A('menu.takeDown')}</button>`}
+                <button type="button" class="adm-ap-danger" onClick=${() => { close(); onDelete(app); }}>${A('menu.delete')}</button>
+              </span>`}
+          </span>
+        </span>
+      </td>
+    </tr>`;
 }
