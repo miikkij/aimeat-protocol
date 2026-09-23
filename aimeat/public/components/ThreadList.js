@@ -36,7 +36,7 @@ export function ThreadList({ threads, activeId, onOpen, onNew, onDelete, onClose
                 ${tr('chat.new', 'New conversation')}
             </button>
             ${threads.length === 0
-                ? html`<p class="poster-conversation-empty">${tr('chat.noThreads', 'Nothing here yet. Say something and this is where it will be.')}</p>`
+                ? html`<p class="poster-quiet poster-conversation-empty">${tr('chat.noThreads', 'Nothing here yet. Say something and this is where it will be.')}</p>`
                 : html`
                     <ul class="poster-thread-list">
                         ${threads.map((thread) => html`

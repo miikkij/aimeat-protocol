@@ -24,4 +24,3 @@
    structure (the chat's work log). */
 .poster-day-title--quiet { color: var(--text-dim); }
 .poster-day .poster-timeline-list { border-top: 0; }
-.poster-day-empty { font-size: 0.95rem; color: var(--text-dim); line-height: 1.6; }
