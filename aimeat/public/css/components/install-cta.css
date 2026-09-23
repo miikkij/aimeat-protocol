@@ -31,14 +31,14 @@
 }
 
 .install-cta-title {
-  font-weight: 600;
+  font-weight: var(--weight-semibold);
   color: var(--text-bright);
-  font-size: 0.95rem;
+  font-size: var(--text-body);
 }
 
 .install-cta-body {
   color: var(--text-dim);
-  font-size: 0.85rem;
+  font-size: var(--text-note);
   line-height: 1.4;
 }
 

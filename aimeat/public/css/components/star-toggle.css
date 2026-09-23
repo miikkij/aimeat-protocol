@@ -12,7 +12,7 @@
 
 .poster-star {
   background: none; border: none; cursor: pointer; padding: 0 0.2rem;
-  font-family: inherit; font-size: 0.9rem; color: var(--muted); line-height: 1;
+  font-family: inherit; font-size: var(--text-body-sm); color: var(--muted); line-height: 1;
 }
 .poster-star:hover { color: var(--sun); }
 .poster-star--on { color: var(--sun); }

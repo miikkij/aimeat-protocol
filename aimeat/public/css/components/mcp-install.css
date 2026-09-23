@@ -38,8 +38,8 @@
 }
 
 .mcpi-head {
-  font-size: 0.75rem;
-  font-weight: 600;
+  font-size: var(--text-caption);
+  font-weight: var(--weight-semibold);
   text-transform: uppercase;
   letter-spacing: 0.03em;
   color: var(--text-dim);
@@ -47,7 +47,7 @@
 
 .mcpi-title {
   font-size: 0.9375rem;
-  font-weight: 600;
+  font-weight: var(--weight-semibold);
   color: var(--text);
 }
 
@@ -82,7 +82,7 @@
 
 .mcpi-cmd-label {
   font-size: 0.8125rem;
-  font-weight: 600;
+  font-weight: var(--weight-semibold);
   color: var(--text-dim);
   flex: none;
 }
@@ -120,7 +120,7 @@
 .mcpi-file-link:hover { border-bottom-color: var(--accent); }
 .mcpi-file-link code {
   font-family: var(--font-mono, ui-monospace, monospace);
-  font-size: 0.75rem;
+  font-size: var(--text-caption);
   color: var(--text-dim);
 }
 

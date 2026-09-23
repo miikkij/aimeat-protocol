@@ -12,6 +12,6 @@
  */
 
 .poster-named { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem; }
-.poster-named-label { color: var(--text-dim); font-size: 0.92rem; }
-.poster-named-value { font-size: 1rem; font-weight: 800; }
-.poster-named-rename { font-size: 0.85rem; }
+.poster-named-label { color: var(--text-dim); font-size: var(--text-base); }
+.poster-named-value { font-size: var(--text-md); font-weight: var(--weight-heavy); }
+.poster-named-rename { font-size: var(--text-note); }

@@ -26,7 +26,7 @@
 .poster-specimen--phone { max-width: calc(390px + 6px); }
 .poster-specimen-box { overflow: hidden; }
 .poster-specimen-frame { display: block; width: 100%; border: 0; background: transparent; }
-.poster-specimen-note { margin: 0; font-size: 0.85rem; color: var(--text-dim); }
+.poster-specimen-note { margin: 0; font-size: var(--text-note); color: var(--text-dim); }
 
 /* Inside the preview page: the part on the page's own ground, with room around it. */
 .poster-specimen-stage { padding: 1.25rem; background: var(--bg); color: var(--text); }
@@ -40,4 +40,4 @@
 
 /* A decision's crop from its real page, set at its own size, and the measured values under it. */
 .poster-specimen-crop { display: block; max-width: 100%; height: auto; }
-.poster-specimen-values { margin: 0; font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-dim); line-height: 1.6; }
+.poster-specimen-values { margin: 0; font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-dim); line-height: 1.6; }

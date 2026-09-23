@@ -25,5 +25,5 @@
   animation: poster-pulse 1.4s ease-in-out infinite;
 }
 @media (prefers-reduced-motion: reduce) { .poster-waiting-dot { animation: none; opacity: 1; } }
-.poster-waiting-title { margin: 0 0 0.25rem; font-weight: 800; }
-.poster-waiting-body { margin: 0; font-size: 0.92rem; color: var(--text-dim); line-height: 1.5; }
+.poster-waiting-title { margin: 0 0 0.25rem; font-weight: var(--weight-heavy); }
+.poster-waiting-body { margin: 0; font-size: var(--text-base); color: var(--text-dim); line-height: 1.5; }

@@ -117,7 +117,7 @@ export default function HomeView({ navigate }) {
         <${PageIntro} title=${tr('home.signInTitle', 'Step into your home')}
           sub=${tr('home.signInDesc', 'Sign in to see where you left off.')} />
         <${ActionRow}>
-          <button type="button" class="btn-primary poster-slab" onClick=${() => navigate('/v1/portal')}>
+          <button type="button" class="poster-slab" onClick=${() => navigate('/v1/portal')}>
             ${tr('home.signIn', 'Sign in')}
           </button>
         <//>

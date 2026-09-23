@@ -16,14 +16,14 @@
   padding: 0.2rem 0;
   border: 0; border-bottom: 3px solid transparent;
   background: none; color: var(--text); text-decoration: none;
-  font-weight: 800; font-size: 1.05rem;
+  font-weight: var(--weight-heavy); font-size: var(--text-md-plus);
   transition: border-color .15s;
 }
 .poster-thing:hover { border-color: var(--accent); }
-.poster-thing-n { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.05rem; color: var(--accent); }
+.poster-thing-n { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: var(--text-md-plus); color: var(--accent); }
 .poster-thing-label { color: var(--text); }
 .poster-thing--named { padding: 0.2rem 0; gap: 0.35rem; }
-.poster-thing--named .poster-thing-n { font-size: 0.95rem; }
+.poster-thing--named .poster-thing-n { font-size: var(--text-body); }
 .poster-thing-door {
   display: inline-flex; align-items: baseline; gap: 0.45rem;
   color: inherit; text-decoration: none; min-width: 0;

@@ -422,7 +422,8 @@
 
 .ai-label__short {
   color: var(--text);
-  font-weight: 600;
+  /* The SDK bundle carries this sheet to app origins without theme.css: the fallback is the weight there. */
+  font-weight: var(--weight-semibold, 600);
 }
 
 .ai-label__long { color: var(--text-dim); }

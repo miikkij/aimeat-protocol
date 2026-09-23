@@ -110,7 +110,7 @@ export function StepMat({ onDone }) {
       <${PromptCard}
         label=${usingFallback ? tr('home.mat.promptShort', 'The shorter prompt') : tr('home.mat.promptLabel', 'The prompt')}
         prompt=${shown}
-        className=${hasPaste ? 'btn-outline' : 'btn-primary poster-slab'}
+        className=${hasPaste ? 'btn-outline' : 'poster-slab'}
         copyLabel=${tr('home.mat.copy', 'Copy the prompt')}
         copiedLabel=${tr('home.mat.copied', 'Copied. Paste it in your AI chat')} />
 
@@ -134,7 +134,7 @@ export function StepMat({ onDone }) {
       <${ActionRow}>
         <button
           type="button"
-          class=${hasPaste ? 'btn-primary poster-slab' : 'btn-outline'}
+          class=${hasPaste ? 'poster-slab' : 'btn-outline'}
           disabled=${busy || !hasPaste}
           onClick=${submit}>
           ${busy ? tr('home.mat.sending', 'Reading it…') : tr('home.mat.submit', 'Here is my welcome mat')}

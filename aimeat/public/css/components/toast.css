@@ -1,0 +1,48 @@
+/**
+ * @file toast.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The toast: a passing word in a box at the edge of the screen.
+ *   Reads only the tokens in theme.css. The rules are theme.css's, moved unchanged and in order.
+ * @usage Linked from public/spa.html right after theme.css, in the order theme.css held these rules
+ *   (the shell block), and from every standalone page that links theme.css.
+ * @version-history
+ *   v1.0.0 — 2026-09-24 — Moved unchanged from css/theme.css (lines 1711-1745), so theme.css
+ *     holds tokens only (UI consolidation, a move).
+ */
+
+/* ── Toast ── the poster's box for a passing word: square, a 3px ink frame on the card ground and a
+   solid offset shadow, the way a dialog and an opened record are drawn. The kind is said by the
+   shadow and one mark in front of the words: sun and a ✓ for done, coral and a ✗ for failed, sun
+   ground for a warning, sun and no mark for plain information. */
+.toast {
+  /* width: max-content (NOT fit-content/auto): a fixed box anchored at left:50%
+     shrink-to-fits against the remaining 50vw, capping the box at half the
+     viewport — a tall skinny tower on phones. max-width does the real capping. */
+  position: fixed; bottom: 2rem; left: 50%; transform: translateX(-50%);
+  z-index: 9999; max-width: min(92vw, 40rem); width: max-content;
+  padding: 0.75rem 1.1rem;
+  font-family: var(--font-poster-section); font-size: var(--text-base);
+  font-weight: var(--font-poster-strong-weight); line-height: 1.45;
+  text-align: left; text-wrap: pretty; overflow-wrap: anywhere; white-space: normal;
+  background: var(--card-bg); color: var(--text);
+  box-shadow: 6px 6px 0 var(--sun);
+  animation: toastIn 0.3s ease, toastOut 0.4s ease 2.4s forwards;
+  pointer-events: auto; box-sizing: border-box;
+  /* The box is a manual popover so it can show above an open dialog (raiseAboveDialogs in
+     /js/dialog.js); these undo the browser's own popover box, which is centred, and set the frame
+     over the one it draws. No display here: an author display would beat the browser's
+     display:none on a popover that is not open. */
+  top: auto; right: auto; margin: 0; overflow: visible;
+  border: 3px solid var(--text); border-radius: 0;
+}
+.toast::before { font-weight: var(--weight-heavy); margin-right: 0.55em; }
+.toast-success::before { content: '✓'; color: var(--success-fg); }
+.toast.error, .toast-error { box-shadow: 6px 6px 0 var(--accent); }
+.toast.error::before, .toast-error::before { content: '✗'; color: var(--accent); }
+.toast-warn { background: var(--sun); color: var(--on-sun); border-color: var(--on-sun); box-shadow: 6px 6px 0 var(--text); }
+/* A message that has to be read, not glanced at, stays up longer: the view holds it for six seconds. */
+.toast-hold { animation: toastIn 0.3s ease, toastOut 0.4s ease 5.6s forwards; }
+@keyframes toastIn { from { opacity: 0; transform: translateX(-50%) translateY(16px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+@keyframes toastOut { from { opacity: 1; } to { opacity: 0; pointer-events: none; } }
+

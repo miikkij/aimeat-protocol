@@ -18,7 +18,7 @@
   gap: 4px;
   padding: 0;
   font-family: var(--font-mono);
-  font-size: 0.68rem;
+  font-size: var(--text-2xs);
   line-height: 1.5;
   color: var(--text-dim);
   overflow-wrap: anywhere;

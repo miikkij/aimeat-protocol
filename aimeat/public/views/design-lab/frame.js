@@ -12,6 +12,7 @@
  * @structure DesignLabFrame (default) — reads ?id=&v=&theme=&solo= · soloLayout
  * @usage /v1/design-lab/frame?id=step-card&v=0&theme=dark · &solo=1 for the decided element alone
  * @version-history
+ *   v1.3.0 — 2026-09-24 — The lab's sheet (css/design-lab-proposals.css) is loaded by this page only.
  *   v1.2.0 — 2026-09-23 — `solo=1`: only the element a decision is about, alone and up to twice its
  *     size (Jouni: "Show only the thing being decided"); the values on the window for the crop script.
  *   v1.1.0 — 2026-09-23 — Decision variants (`id=decision:<id>`), and the drawn element's values
@@ -158,6 +159,17 @@ export default function DesignLabFrame() {
     document.documentElement.setAttribute('data-theme', theme);
     document.documentElement.classList.toggle('dl-solo-page', solo);
   }, [theme, solo]);
+
+  // The lab's own sheet (the proposals and the solo rules) is loaded here, on the preview page only:
+  // no other page of the node carries it.
+  useEffect(() => {
+    if (document.querySelector('link[data-design-lab]')) return;
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = `/css/design-lab-proposals.css${/** @type {any} */ (window).__B || ''}`;
+    link.dataset.designLab = '1';
+    document.head.appendChild(link);
+  }, []);
 
   useEffect(() => {
     let alive = true;

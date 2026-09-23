@@ -1,0 +1,22 @@
+/**
+ * @file text-utility.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The muted and meta text utilities.
+ *   Reads only the tokens in theme.css. The rules are theme.css's, moved unchanged and in order.
+ * @usage Linked from public/spa.html right after theme.css, in the order theme.css held these rules
+ *   (the shell block), and from every standalone page that links theme.css.
+ * @version-history
+ *   v1.0.0 — 2026-09-24 — Moved unchanged from css/theme.css (lines 1602-1610), so theme.css
+ *     holds tokens only (UI consolidation, a move).
+ */
+
+/* ── Muted / meta text utilities ──
+   Shared replacements for the ~8 bespoke `.xx-muted` and ~30 `.xx-*-meta`
+   clones scattered across the view CSS. Colors are tokens so they flip in dark
+   mode. `.muted`/`.text-dim` dim to the mid tier; `.text-faint` to the dimmest;
+   `.meta` is the small dim caption used under cards/rows. */
+.muted, .text-dim { color: var(--text-dim); }
+.text-faint { color: var(--text-muted); }
+.meta { font-size: var(--text-sm); color: var(--text-dim); }
+

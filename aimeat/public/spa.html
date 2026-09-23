@@ -68,11 +68,40 @@
        tokens, and it re-declares --border — a width here, a color there — so order is the tiebreak. -->
   <link rel="stylesheet" href="/lib/aimeat-theme.css">
   <link rel="stylesheet" href="/css/theme.css">
+  <!-- The shell block: the rules theme.css held, one sheet per part, in theme.css's order. Every
+       page that links theme.css links this block right after it (check:theme-tokens holds it). -->
+  <link rel="stylesheet" href="/css/components/page-base.css">
+  <link rel="stylesheet" href="/css/components/top-bar.css">
+  <link rel="stylesheet" href="/css/components/button.css">
+  <link rel="stylesheet" href="/css/components/card.css">
+  <link rel="stylesheet" href="/css/components/badge.css">
+  <link rel="stylesheet" href="/css/components/pill.css">
+  <link rel="stylesheet" href="/css/components/seg.css">
+  <link rel="stylesheet" href="/css/components/start-page.css">
+  <link rel="stylesheet" href="/css/components/status-dot.css">
+  <link rel="stylesheet" href="/css/components/presence-dot.css">
+  <link rel="stylesheet" href="/css/components/key-value-row.css">
+  <link rel="stylesheet" href="/css/components/pagination.css">
+  <link rel="stylesheet" href="/css/components/collapsible.css">
+  <link rel="stylesheet" href="/css/components/data-table.css">
+  <link rel="stylesheet" href="/css/components/usage-chart.css">
+  <link rel="stylesheet" href="/css/components/divider.css">
+  <link rel="stylesheet" href="/css/components/form-field.css">
+  <link rel="stylesheet" href="/css/components/search-bar.css">
+  <link rel="stylesheet" href="/css/components/spinner.css">
+  <link rel="stylesheet" href="/css/components/empty-state.css">
+  <link rel="stylesheet" href="/css/components/text-utility.css">
+  <link rel="stylesheet" href="/css/components/toggle-switch.css">
+  <link rel="stylesheet" href="/css/components/site-footer.css">
+  <link rel="stylesheet" href="/css/components/alert.css">
+  <link rel="stylesheet" href="/css/components/toast.css">
+  <link rel="stylesheet" href="/css/components/section-header.css">
+  <!-- /shell block -->
   <link rel="stylesheet" href="/css/poster.css">
-  <link rel="stylesheet" href="/css/dialog.css">
+  <link rel="stylesheet" href="/css/components/dialog.css">
   <!-- The margin pattern on the home, the chat and the settings pages: a personal choice, set on
        <html> by js/margin-pattern.js once the session is known. -->
-  <link rel="stylesheet" href="/css/margin-pattern.css">
+  <link rel="stylesheet" href="/css/components/margin-pattern.css">
   <!-- Canonical styles for the shared <Markdown> component — load before views so it styles
        rendered markdown everywhere the component is used (no per-view re-definition). -->
   <link rel="stylesheet" href="/css/components/markdown.css">
@@ -121,7 +150,6 @@
   <link rel="stylesheet" href="/css/components/named-row.css">
   <link rel="stylesheet" href="/css/components/thing-link.css">
   <link rel="stylesheet" href="/css/components/star-toggle.css">
-  <link rel="stylesheet" href="/css/components/fold-button.css">
   <link rel="stylesheet" href="/css/components/mode-switch.css">
   <link rel="stylesheet" href="/css/components/quiet-note.css">
   <link rel="stylesheet" href="/css/components/numbered-index.css">
@@ -152,7 +180,6 @@
   <link rel="stylesheet" href="/css/components/credit.css">
   <link rel="stylesheet" href="/css/components/composer.css">
   <link rel="stylesheet" href="/css/components/specimen.css">
-  <link rel="stylesheet" href="/css/design-lab-proposals.css">
   <link rel="stylesheet" href="/css/views/notebook.css">
   <link rel="stylesheet" href="/css/views/living.css">
   <link rel="stylesheet" href="/css/views/offers.css">
@@ -368,6 +395,8 @@
       "/components/EmptyState.js": "/components/EmptyState.js",
       "/components/ToggleSwitch.js": "/components/ToggleSwitch.js",
       "/components/Card.js": "/components/Card.js",
+      "/components/Alert.js": "/components/Alert.js",
+      "/components/FormField.js": "/components/FormField.js",
       "/components/StatusDot.js": "/components/StatusDot.js",
       "/components/PresenceDot.js": "/components/PresenceDot.js",
       "/components/TagList.js": "/components/TagList.js",

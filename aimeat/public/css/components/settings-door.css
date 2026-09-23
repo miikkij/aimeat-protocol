@@ -18,5 +18,5 @@
   text-decoration: none; color: inherit;
 }
 .poster-settings-door:hover .poster-settings-door-title { color: var(--accent); }
-.poster-settings-door-title { font-weight: 800; color: var(--text); text-transform: uppercase; letter-spacing: .04em; font-size: .9rem; }
-.poster-settings-door-hint { font-size: 0.85rem; color: var(--text-dim); }
+.poster-settings-door-title { font-weight: var(--weight-heavy); color: var(--text); text-transform: uppercase; letter-spacing: .04em; font-size: var(--text-body-sm); }
+.poster-settings-door-hint { font-size: var(--text-note); color: var(--text-dim); }

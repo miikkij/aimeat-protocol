@@ -25,7 +25,7 @@
 .poster-suggestion {
   background: none; border: 0; border-bottom: 3px solid var(--text); border-radius: 0; box-shadow: none;
   padding: 0 0 2px; cursor: pointer;
-  font-family: inherit; font-weight: 800; font-size: 0.88rem; color: var(--text);
+  font-family: inherit; font-weight: var(--weight-heavy); font-size: 0.88rem; color: var(--text);
 }
 .poster-suggestion--caps { text-transform: uppercase; letter-spacing: 0.04em; }
 .poster-suggestion:hover { color: var(--accent); border-color: var(--accent); }
@@ -40,4 +40,4 @@
   max-width: 82%;
 }
 /* The choices are .poster-suggestion (above). */
-.poster-choices-note { font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-dim); }
+.poster-choices-note { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-dim); }

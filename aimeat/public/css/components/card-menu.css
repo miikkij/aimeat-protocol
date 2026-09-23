@@ -41,10 +41,10 @@
    reads as a warning rather than as "waiting". Contrast comes from the border and the ink here, so
    the hue survives being legible. */
 .card-menu-dots--open {
-  background: #FEF3C7; border-color: #B45309; color: #78350F;
+  background: var(--state-open-bg); border-color: var(--state-open-border); color: var(--state-open-ink);
 }
 .card-menu-dots--working {
-  background: #D1FAE5; border-color: #047857; color: #065F46;
+  background: var(--state-working-bg); border-color: var(--state-working-border); color: var(--state-working-ink);
   animation: card-menu-pulse 1.8s ease-in-out infinite;
 }
 /* Working is the one state about this moment rather than a standing fact, so it is the one that moves. */

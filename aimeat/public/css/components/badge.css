@@ -1,0 +1,29 @@
+/**
+ * @file badge.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The classic badge: a small rounded word in capitals, with its tint classes.
+ *   Reads only the tokens in theme.css. The rules are theme.css's, moved unchanged and in order.
+ * @usage Linked from public/spa.html right after theme.css, in the order theme.css held these rules
+ *   (the shell block), and from every standalone page that links theme.css.
+ * @version-history
+ *   v1.0.0 — 2026-09-24 — Moved unchanged from css/theme.css (lines 1224-1239), so theme.css
+ *     holds tokens only (UI consolidation, a move).
+ */
+
+/* ── Badges ── */
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  font-size: 0.66rem;
+  font-weight: var(--weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.badge-success { background: var(--success-bg); color: var(--success-fg); }
+.badge-warn { background: var(--warn-bg); color: var(--warn-fg); }
+.badge-danger { background: var(--danger-bg); color: var(--danger-fg); }
+.badge-info { background: var(--info-bg); color: var(--info-fg); }
+

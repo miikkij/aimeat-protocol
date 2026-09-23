@@ -14,7 +14,7 @@
 /* ── The front door on the landing page ── */
 .poster-door { max-width: 720px; margin: 0 auto 2.5rem; padding: 2rem 1.25rem 0; }
 .poster-door-title {
-  font-size: 2.1rem; font-weight: 800; letter-spacing: -0.5px;
+  font-size: 2.1rem; font-weight: var(--weight-heavy); letter-spacing: -0.5px;
   line-height: 1.15; margin: 0 0 1.5rem; color: var(--text);
 }
 .poster-door-agent {
@@ -25,10 +25,10 @@
   margin-bottom: 1.25rem;
 }
 .poster-door-agent-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
-.poster-door-agent-title { margin: 0 0 0.3rem; font-size: 1.1rem; font-weight: 700; }
-.poster-door-agent-sub { margin: 0; font-size: 0.95rem; color: var(--text-dim); line-height: 1.5; max-width: 34rem; }
+.poster-door-agent-title { margin: 0 0 0.3rem; font-size: var(--text-lg); font-weight: var(--weight-bold); }
+.poster-door-agent-sub { margin: 0; font-size: var(--text-body); color: var(--text-dim); line-height: 1.5; max-width: 34rem; }
 .poster-door-after { margin-top: 1rem; padding-top: 0.9rem; border-top: 1px solid var(--border); }
-.poster-door-after p { margin: 0 0 0.5rem; font-size: 0.9rem; color: var(--text-dim); line-height: 1.5; }
+.poster-door-after p { margin: 0 0 0.5rem; font-size: var(--text-body-sm); color: var(--text-dim); line-height: 1.5; }
 .poster-door-after p:last-child { margin-bottom: 0; }
 .poster-door-entrances { display: flex; align-items: center; gap: 1.25rem; flex-wrap: wrap; }
 .poster-door-register {
@@ -38,8 +38,8 @@
   background: var(--surface); color: var(--text); text-decoration: none;
 }
 .poster-door-register:hover { border-color: var(--accent); }
-.poster-door-register-title { font-weight: 700; font-size: 1rem; }
-.poster-door-register-sub { font-size: 0.85rem; color: var(--text-dim); }
+.poster-door-register-title { font-weight: var(--weight-bold); font-size: var(--text-md); }
+.poster-door-register-sub { font-size: var(--text-note); color: var(--text-dim); }
 /* Coming back is stepping into somewhere of your own, so the door is a keyhole. */
 .poster-door-signin {
   display: inline-flex; align-items: center; gap: 0.5rem;

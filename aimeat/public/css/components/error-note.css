@@ -18,6 +18,6 @@
   background: var(--bg-dim);
   padding: 0.85rem 1rem;
 }
-.poster-error-text { margin: 0 0 0.4rem; font-weight: 800; color: var(--text); }
-.poster-error-hint { margin: 0; font-size: 0.9rem; color: var(--text-dim); line-height: 1.5; }
+.poster-error-text { margin: 0 0 0.4rem; font-weight: var(--weight-heavy); color: var(--text); }
+.poster-error-hint { margin: 0; font-size: var(--text-body-sm); color: var(--text-dim); line-height: 1.5; }
 .poster-error-fallback { margin-top: 0.6rem; }

@@ -25,7 +25,7 @@
 }
 .cp-item:hover, .cp-item-hi { background: var(--bg-dim); }
 .cp-item-icon { flex: 0 0 auto; }
-.cp-item-label { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cp-item-label { font-weight: var(--weight-medium); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cp-item-id { color: var(--muted); font-size: 0.74rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-left: auto; }
 .cp-item-src { color: var(--muted); font-size: 0.7rem; border: 1px solid var(--border); border-radius: 999px; padding: 0 0.35rem; }
 .cp-item-resolve { border-top: 1px solid var(--border); color: var(--accent); }

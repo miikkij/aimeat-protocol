@@ -15,10 +15,10 @@
   margin: 5.5rem -2.75rem 0; padding: 2.5rem 2.75rem;
   background: var(--text); color: var(--bg);
   display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2.75rem;
-  font-size: 0.95rem; font-weight: 600; line-height: 1.55;
+  font-size: var(--text-body); font-weight: var(--weight-semibold); line-height: 1.55;
 }
 .poster-foot p { margin: 0; }
-.poster-foot a { color: var(--sun); font-weight: 800; text-decoration: none; }
+.poster-foot a { color: var(--sun); font-weight: var(--weight-heavy); text-decoration: none; }
 .poster-foot a:hover { text-decoration: underline; }
 @media (max-width: 900px) { .poster-foot { margin: 3.5rem -1.1rem 0; padding: 2rem 1.1rem; grid-template-columns: 1fr; gap: 1rem; } }
 @media (max-width: 560px) {

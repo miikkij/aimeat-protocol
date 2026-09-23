@@ -26,6 +26,10 @@ export type UiEntryKind = 'component' | 'shape';
 /** `unused` is a part with a sheet that no page draws today: kept until Jouni says keep or delete. */
 export type UiEntryStatus = 'active' | 'unused';
 
+/** What a person does with a part. The check holds every entry to these words. */
+export type UiUse = 'view' | 'edit' | 'list' | 'pick' | 'compare' | 'status' | 'navigate' | 'converse'
+    | 'act' | 'copy' | 'explain' | 'count' | 'search' | 'notify' | 'wait' | 'layout' | 'open' | 'confirm';
+
 /** One way the part can look, and the class or prop that selects it. */
 export interface UiVariant {
     name: string;
@@ -59,8 +63,10 @@ export interface UiEntrySource {
         /** Each prop or slot, and what it carries. */
         fields: Record<string, string>;
     };
-    /** When to reach for it. */
-    use: string[];
+    /** What a person does with it, in the fixed words (08-component-rules.md); a view filters by them. */
+    use: UiUse[];
+    /** When to reach for it, in a sentence. */
+    useFor: string[];
     variants: UiVariant[];
     /** One data set that draws it. */
     example: Record<string, unknown>;
@@ -81,3 +87,6 @@ export interface UiEntryFacts {
 }
 
 export type UiEntry = UiEntrySource & UiEntryFacts;
+
+/** An entry as the entries-*.ts files write it: its `use` words come from entries-use.ts. */
+export type UiEntryWritten = Omit<UiEntrySource, 'use'>;

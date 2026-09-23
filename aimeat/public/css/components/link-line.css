@@ -11,6 +11,6 @@
  */
 
 /* ── The mat address ── */
-.poster-link-line { margin: 0 0 1.6rem; font-size: 1rem; font-weight: 600; color: var(--text); }
-.poster-link-line a { color: var(--accent); font-weight: 800; text-decoration: none; }
+.poster-link-line { margin: 0 0 1.6rem; font-size: var(--text-md); font-weight: var(--weight-semibold); color: var(--text); }
+.poster-link-line a { color: var(--accent); font-weight: var(--weight-heavy); text-decoration: none; }
 .poster-link-line a:hover { text-decoration: underline; }

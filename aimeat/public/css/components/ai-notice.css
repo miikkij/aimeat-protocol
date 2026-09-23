@@ -18,7 +18,7 @@
   gap: 8px;
   flex-wrap: wrap;
   padding: 0;
-  font-weight: 800;
+  font-weight: var(--weight-heavy);
   font-size: 0.74rem;
   color: var(--text-dim);
   line-height: 1.45;
@@ -28,7 +28,7 @@
 .poster-ai-notice-short { font-size: 0.74rem; color: var(--text-dim); }
 .poster-ai-notice-more {
   background: none; border: 0; box-shadow: none; padding: 0; cursor: pointer;
-  font-family: var(--font-mono); font-weight: 400; font-size: 0.7rem; color: var(--accent);
+  font-family: var(--font-mono); font-weight: var(--weight-regular); font-size: 0.7rem; color: var(--accent);
   text-decoration: underline; text-underline-offset: 3px;
 }
 .poster-ai-notice--main { display: none; }

@@ -29,6 +29,8 @@
  *   keptAsIs, crop }], changes: [{ page, what }], choice }]
  * @usage import { DECISIONS } from './decisions-data.js';
  * @version-history
+ *   v3.1.0 — 2026-09-24 — The home's and the chat's remaining own looks (decisions 14-21, answered
+ *     and written here as the source) and the dialog's footer actions (waiting for Jouni).
  *   v3.0.0 — 2026-09-23 — Plain words for everything visible, the technical half kept for Details
  *     (Jouni's page layout); options named by what they are.
  *   v2.0.0 — 2026-09-23 — Split by job; proposals as one component with named tones.
@@ -358,7 +360,7 @@ export const DECISIONS = [
       { page: 'Chat', what: 'Try again becomes underlined capitals.' },
       { page: 'Home and chat', what: 'The install banner\'s Install becomes underlined capitals.' },
     ],
-    choice: null,
+    choice: {"proposal":"accepted","options":{},"note":"Accepted the proposal: every panel button becomes the underlined action link.","decidedAt":"2026-09-23","decidedBy":"Jouni"},
   },
   {
     id: 'step-state',
@@ -378,7 +380,7 @@ export const DECISIONS = [
     changes: [
       { page: 'Home', what: 'In the first steps, a button that is not the next thing to do reads as underlined capitals instead of a framed rounded button.' },
     ],
-    choice: null,
+    choice: {"proposal":"accepted","options":{},"note":"Accepted the proposal: before and after, a step's button is the underlined action link, dimmed while it cannot be pressed.","decidedAt":"2026-09-23","decidedBy":"Jouni"},
   },
   {
     id: 'dismiss',
@@ -396,7 +398,7 @@ export const DECISIONS = [
     changes: [
       { page: 'Chat', what: '"Not now" on the phone suggestion becomes a plain grey word without a frame.' },
     ],
-    choice: null,
+    choice: {"proposal":"accepted","options":{},"note":"Accepted the proposal: \"Not now\" becomes a plain grey word.","decidedAt":"2026-09-23","decidedBy":"Jouni"},
   },
   {
     id: 'icon-button',
@@ -418,7 +420,7 @@ export const DECISIONS = [
       { page: 'Chat', what: 'The attach and microphone buttons keep their square; delete becomes a small square.' },
       { page: 'Home', what: 'The prompt card\'s more and a card\'s menu become small squares in a thin dark frame. The dialog\'s close already is one and stays.' },
     ],
-    choice: null,
+    choice: {"proposal":"accepted","options":{},"note":"Accepted the proposal: one square in a thin dark frame, large in the composer, small elsewhere; the card menu keeps its fill.","decidedAt":"2026-09-23","decidedBy":"Jouni"},
   },
   {
     id: 'choice',
@@ -437,7 +439,7 @@ export const DECISIONS = [
     changes: [
       { page: 'Home', what: 'The setup guide\'s tools, the pattern tiles and the start page switch become tabs.' },
     ],
-    choice: null,
+    choice: {"proposal":"accepted","options":{"pattern-choice":"accepted"},"note":"Accepted the proposal (tabs), and accepted the background pattern tiles too: by Jouni's rule an accepted option keeps its look as a tone of the one component.","decidedAt":"2026-09-23","decidedBy":"Jouni"},
   },
   {
     id: 'suggestion',
@@ -455,7 +457,7 @@ export const DECISIONS = [
     changes: [
       { page: 'Chat', what: 'The welcome\'s suggestions read as sentences instead of capitals.' },
     ],
-    choice: null,
+    choice: {"proposal":"accepted","options":{},"note":"Accepted the proposal: every suggestion reads as a sentence.","decidedAt":"2026-09-23","decidedBy":"Jouni"},
   },
   {
     id: 'menu-row',
@@ -475,7 +477,7 @@ export const DECISIONS = [
       { page: 'Home', what: 'A card\'s menu rows read as the prompt card\'s menu rows.' },
       { page: 'Every page', what: 'A notification\'s actions read as menu rows instead of rounded buttons; "Approve" loses its coral.' },
     ],
-    choice: null,
+    choice: {"proposal":"accepted","options":{},"note":"Accepted the proposal: every menu row as the prompt card's.","decidedAt":"2026-09-23","decidedBy":"Jouni"},
   },
   {
     id: 'small-link',
@@ -497,6 +499,25 @@ export const DECISIONS = [
     changes: [
       { page: 'Chat', what: 'The side column\'s small links and the jump to the latest message read as small coral underlined words.' },
       { page: 'Home, history', what: '"Official instructions →" and "Show older" read the same way.' },
+    ],
+    choice: {"proposal":"accepted","options":{"ai-more":"accepted","jump":"accepted"},"note":"Accepted the proposal (small coral underlined words), and accepted \"What does that mean?\" and the jump too: by Jouni's rule those keep their looks as tones.","decidedAt":"2026-09-23","decidedBy":"Jouni"},
+  },
+  {
+    id: 'dialog-actions',
+    title: 'Dialog actions: the buttons in a dialog\'s footer',
+    question: 'A dialog\'s footer takes the old button classes (Cancel, Save, Delete) and redraws them as underlined words and dark blocks with rules of its own. Should the footer use the library\'s action link and dark block instead, so each look is written once?',
+    proposal: {
+      variant: 'proposal', name: 'The library\'s own action link and dark block',
+      summary: 'Cancel becomes the underlined action link, Save the dark block at its control size, and Delete a coral dark block; the footer stops redrawing the old classes.',
+      text: 'Cancel: .poster-action (a 3px rule under the words instead of the footer\'s 2px text underline). Save: .poster-slab.poster-slab--control (the same look). Delete: a danger tone of the slab (coral with an ink shadow, as now). The dialog.css rules that restyle .btn-ghost, .btn-outline, .btn-secondary, .btn-primary and .btn-danger-solid go.',
+    },
+    variants: [
+      { id: 'cancel', name: 'Cancel', code: '.btn-ghost in dialog.dlg .dlg-foot (dialog.css)', becomes: 'the underlined action link', where: 'every dialog: the home\'s settings, confirm questions, forms', crop: home('dialog.dlg .dlg-foot .btn-ghost', { click: '.poster-masthead-button' }) },
+      { id: 'confirm', name: 'Save, the dialog\'s one big action', code: '.btn-primary in dialog.dlg .dlg-foot (dialog.css)', becomes: 'the dark block at its control size (no visible change)', where: 'every dialog with a form', crop: null },
+      { id: 'danger', name: 'Delete, an action that cannot be undone', code: '.btn-danger-solid in dialog.dlg .dlg-foot (dialog.css)', becomes: 'a coral dark block (no visible change)', where: 'confirm questions that delete', crop: null },
+    ],
+    changes: [
+      { page: 'Every dialog', what: 'Cancel gets the action link\'s thicker line under the words. Save and Delete look as they do now.' },
     ],
     choice: null,
   },

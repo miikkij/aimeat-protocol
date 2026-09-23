@@ -14,9 +14,13 @@ how it works, for your business, help, members, the change log. The **poster** i
 once inside: the home, every profile tab, the chat, the sign-in dialog, the app catalog. They share
 the type, the colours, the shapes and the rules; they differ in how loud they are. A third register,
 the **classic shell** (rounded controls, cards), remains under the admin dashboard and the oldest
-views and is not extended; it reads the same type tokens.
+views and is not extended; it reads the same type tokens. Its rules (buttons, cards, badges, the
+segmented control, the toast, the top bar) live in `aimeat/public/css/components/`, one sheet each.
 
-Type and colour tokens live in `aimeat/public/css/theme.css`; the shared shapes live in
+Type and colour tokens live in `aimeat/public/css/theme.css`, and nothing else does:
+`pnpm check:theme-tokens` refuses a rule there that is not a custom property. Font sizes and
+weights are tokens too (`--text-2xs` … `--text-xl`, `--weight-regular` … `--weight-heavy`), so a
+theme can change the type scale in one place. The shared shapes live in
 `aimeat/public/css/poster.css`. A view composes a shape by class and owns its layout. Change the
 token or shape at its home; the maps below show which surfaces follow. Existing copies are
 recorded migration debt, not examples for a new view.
@@ -153,7 +157,7 @@ by hand; the list here is the checklist.
 
 | Token | Read by |
 |---|---|
-| `--font-headline` | through `--font-showroom`: `landing-showroom.css`, `landing.css`, `help.css`, `members.css`, `changelog.css`, `build-story.css`, `static-page.css`, `portal-dev.css`; through `--font-poster`: `home.css`, `chat.css`, `profile.css`, `profile-poster.css`, `surface.css`, `app-catalog-poster.css`, the sign-in dialog (`sdk-libs/auth/modal-styles.js`), the top bar in `theme.css` |
+| `--font-headline` | through `--font-showroom`: `landing-showroom.css`, `landing.css`, `help.css`, `members.css`, `changelog.css`, `build-story.css`, `static-page.css`, `portal-dev.css`; through `--font-poster`: `home.css`, `chat.css`, `profile.css`, `profile-poster.css`, `surface.css`, `app-catalog-poster.css`, the sign-in dialog (`sdk-libs/auth/modal-styles.js`), the top bar in `css/components/top-bar.css` |
 | `--font-body` | all of the above through `--font-showroom-body` and `--font-poster-section`, and every classic-shell sheet (admin, the older tabs, form controls) through `--font` |
 | `--font-mono` | every sheet that shows an address, a command, an id or a key; no sheet spells a monospace family |
 | `--font-headline` again, through the palette bridge | `lib/aimeat-theme.css` gives every `h1`-`h6` the palette's display face, and the house palette's display face is `var(--font-headline, 'Archivo Black', …)`: on the node the classic shell's headings follow the token; a published app without `theme.css` keeps the vendored Archivo Black; a chosen palette (paper, circuit, …) keeps its own face on purpose |

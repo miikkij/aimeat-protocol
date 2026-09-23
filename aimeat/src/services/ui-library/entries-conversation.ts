@@ -10,9 +10,9 @@
  * @version-history
  *   v1.0.0 — 2026-09-23 — Initial (UI consolidation phase 1).
  */
-import type { UiEntrySource } from './types.js';
+import type { UiEntryWritten } from './types.js';
 
-export const CONVERSATION_ENTRIES: UiEntrySource[] = [
+export const CONVERSATION_ENTRIES: UiEntryWritten[] = [
     {
         id: 'conversation-frame', name: 'ConversationFrame', kind: 'component', status: 'active',
         summary: 'A conversation with an agent: the rail with the threads and everything about the open one, the conversation, and on a phone one pane at a time, fixed full-screen above the keyboard.',
@@ -26,7 +26,7 @@ export const CONVERSATION_ENTRIES: UiEntrySource[] = [
                 body: 'the welcome or cap text', trust: 'ConversationWelcome: the line on who owns what is made',
             },
         },
-        use: ['The chat page. A ThreadList goes first inside it, then a ConversationMain.'],
+        useFor: ['The chat page. A ThreadList goes first inside it, then a ConversationMain.'],
         variants: [
             { name: 'list', class: 'poster-conversation--list', prop: 'list', when: 'on a phone, the rail is open' },
             { name: 'signin', class: 'poster-conversation--signin', prop: 'signin', when: 'nobody is signed in' },
@@ -41,7 +41,7 @@ export const CONVERSATION_ENTRIES: UiEntrySource[] = [
             shape: 'ThreadList({ threads, activeId, onOpen, onNew, onDelete, onClose, children })',
             fields: { threads: '[{ id, title, turns }]', activeId: 'the open one', onOpen: 'open a thread', onNew: 'start one', onDelete: 'delete one', onClose: 'the phone\'s way back', children: 'what goes under the list in the rail' },
         },
-        use: ['The rail of the chat page, and its drawer on a phone.'],
+        useFor: ['The rail of the chat page, and its drawer on a phone.'],
         variants: [{ name: 'active', class: 'poster-thread--active', when: 'the open conversation' }],
         example: { threads: [{ id: 't1', title: 'Make me a page', turns: 4 }], activeId: 't1' },
     },
@@ -53,7 +53,7 @@ export const CONVERSATION_ENTRIES: UiEntrySource[] = [
             shape: 'StatusBar({ status, onReset })',
             fields: { status: '{ agent_name, pays: own|allowance|node, has_own_key, allowance_remaining_usd, model, enabled }', onReset: 'starts a fresh agent session, or null' },
         },
-        use: ['In the rail of a conversation. The payer comes from the node, never from the page.'],
+        useFor: ['In the rail of a conversation. The payer comes from the node, never from the page.'],
         variants: [],
         example: { status: { agent_name: 'chat#alice@aimeat.io', pays: 'node', has_own_key: false, allowance_remaining_usd: 1.5, model: 'claude-sonnet-5' } },
     },
@@ -62,7 +62,7 @@ export const CONVERSATION_ENTRIES: UiEntrySource[] = [
         summary: 'A small ink-underlined action in a side column.',
         module: null, sheet: '/css/components/rail-action.css', classes: ['poster-rail-action'],
         data: { shape: 'class: poster-rail-action (on a button, or as a CopyButton className)', fields: { children: 'the action words' } },
-        use: ['Copy conversation and Reset session in the chat rail.'],
+        useFor: ['Copy conversation and Reset session in the chat rail.'],
         variants: [],
         example: { children: 'Copy conversation' },
         note: 'A class rather than a module: it is put on a CopyButton and on the reset button in AgentStatus.',
@@ -75,7 +75,7 @@ export const CONVERSATION_ENTRIES: UiEntrySource[] = [
             shape: 'Suggestions({ children }) · Suggestion({ caps, disabled, onClick, children }) · Choices({ options, onPick, disabled }) · choicesIn(text) · stripChoices(text)',
             fields: { caps: 'the starter face, in capitals', options: 'the choices an agent offered in an aimeat-choices block', onPick: 'sends the chosen words', disabled: 'no agent here' },
         },
-        use: ['A fork the agent named, or a first request on an empty conversation.'],
+        useFor: ['A fork the agent named, or a first request on an empty conversation.'],
         variants: [{ name: 'caps', class: 'poster-suggestion--caps', prop: 'caps', when: 'the starters on an empty conversation' }],
         example: { options: ['A page about my team', 'A form for sign-ups', 'Something else'] },
     },
@@ -87,7 +87,7 @@ export const CONVERSATION_ENTRIES: UiEntrySource[] = [
             shape: 'Turn({ turn, id }) · LiveTurn({ text, thought, tools, cards, busy }) · TurnError({ message, onRetry })',
             fields: { turn: '{ role: user|agent, text, at, model, tools, cards, attachments }', id: 'the key for reading it aloud', busy: 'LiveTurn: the answer is still being written', message: 'TurnError: why it could not run', onRetry: 'TurnError: send it again' },
         },
-        use: ['Each message in a conversation. The agent\'s words are Markdown, the person\'s are shown as typed.'],
+        useFor: ['Each message in a conversation. The agent\'s words are Markdown, the person\'s are shown as typed.'],
         variants: [
             { name: 'user', class: 'poster-turn--user', when: 'what the person said' },
             { name: 'agent', class: 'poster-turn--agent', when: 'what the agent said' },
@@ -100,7 +100,7 @@ export const CONVERSATION_ENTRIES: UiEntrySource[] = [
         summary: 'What a turn produced, as a thing: its kind, its name and a way to open it.',
         module: '/components/ResultCard.js', sheet: '/css/components/result-card.css',
         data: { shape: 'ResultCards({ cards })', fields: { cards: '[{ kind: page|app|image|file|memory|workspace, title, url, ref, image }]' } },
-        use: ['Under an agent turn that made something. Cards are stored on the turn, so they come back.'],
+        useFor: ['Under an agent turn that made something. Cards are stored on the turn, so they come back.'],
         variants: [
             { name: 'page', class: 'poster-result--page', when: 'a page' },
             { name: 'app', class: 'poster-result--app', when: 'an app' },
@@ -116,7 +116,7 @@ export const CONVERSATION_ENTRIES: UiEntrySource[] = [
         summary: 'What was actually done, one line per tool call, and the live status while a turn runs.',
         module: '/components/WorkLog.js', sheet: '/css/components/work-log.css',
         data: { shape: 'WorkLog({ tools }) · WorkLine({ tool })', fields: { tools: '[{ title, status: pending|completed|failed }]' } },
-        use: ['Under every agent turn, open by default, so what the agent says it did can be checked.'],
+        useFor: ['Under every agent turn, open by default, so what the agent says it did can be checked.'],
         variants: [
             { name: 'completed', class: 'poster-worklog-line--completed', when: 'the call finished' },
             { name: 'failed', class: 'poster-worklog-line--failed', when: 'the call failed' },
@@ -129,7 +129,7 @@ export const CONVERSATION_ENTRIES: UiEntrySource[] = [
         summary: 'That a machine is on the other end, said where a person is looking, with a way to read more.',
         module: '/components/AiNotice.js', sheet: '/css/components/ai-notice.css',
         data: { shape: 'AiNotice({ compact, className })', fields: { compact: 'one line instead of the full notice', className: "'poster-ai-notice--main' for the phone's copy above the conversation" } },
-        use: ['Every conversation with an AI (EU AI Act, Article 50(1)). Never removed, only shortened.'],
+        useFor: ['Every conversation with an AI (EU AI Act, Article 50(1)). Never removed, only shortened.'],
         variants: [
             { name: 'compact', class: 'poster-ai-notice--compact', prop: 'compact', when: 'after the first answer' },
             { name: 'main', class: 'poster-ai-notice--main', when: 'the phone\'s copy, above the conversation' },
@@ -141,7 +141,7 @@ export const CONVERSATION_ENTRIES: UiEntrySource[] = [
         summary: 'One suggestion, once, in a dashed frame, with the way out on the same line.',
         module: '/components/Nudge.js', sheet: '/css/components/nudge.css',
         data: { shape: 'MobileNudge({ onDismiss })', fields: { onDismiss: 'stores "not now" with the person' } },
-        use: ['The one nudge to put the chat on a phone, shown on a desktop when no device is subscribed.'],
+        useFor: ['The one nudge to put the chat on a phone, shown on a desktop when no device is subscribed.'],
         variants: [],
         example: {},
     },
@@ -150,7 +150,7 @@ export const CONVERSATION_ENTRIES: UiEntrySource[] = [
         summary: 'Whose agent this is, quietly, as a link.',
         module: '/components/Credit.js', sheet: '/css/components/credit.css',
         data: { shape: 'GooseCredit()', fields: {} },
-        use: ['The foot of the chat rail: the open-source agent that answers, linked to its source.'],
+        useFor: ['The foot of the chat rail: the open-source agent that answers, linked to its source.'],
         variants: [],
         example: {},
     },
@@ -166,7 +166,7 @@ export const CONVERSATION_ENTRIES: UiEntrySource[] = [
                 busy: 'a turn is running', disabled: 'no agent here', note: 'why it is disabled', listening: 'a recording is being read',
             },
         },
-        use: ['The foot of a conversation. Enter sends, Shift+Enter opens a line.'],
+        useFor: ['The foot of a conversation. Enter sends, Shift+Enter opens a line.'],
         variants: [{ name: 'error', class: 'poster-attachment--error', when: 'an attachment that failed to upload' }],
         example: { value: 'Make me a page about my team', busy: false, attachments: [] },
     },

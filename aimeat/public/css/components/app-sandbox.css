@@ -31,8 +31,8 @@
 
 .app-sandbox-title {
   flex: 1 1 auto;
-  font-weight: 600;
-  font-size: 0.95rem;
+  font-weight: var(--weight-semibold);
+  font-size: var(--text-body);
   color: var(--text, #e8e8f0);
   white-space: nowrap;
   overflow: hidden;
@@ -47,7 +47,7 @@
   border-radius: 6px;
   background: var(--bg-dim, #14141c);
   color: var(--text, #e8e8f0);
-  font-size: 1rem;
+  font-size: var(--text-md);
   line-height: 1;
   cursor: pointer;
 }

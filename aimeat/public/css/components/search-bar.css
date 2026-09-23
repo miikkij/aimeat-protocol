@@ -1,0 +1,52 @@
+/**
+ * @file search-bar.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The search bar: a field with its icon and its clear button.
+ *   Reads only the tokens in theme.css. The rules are theme.css's, moved unchanged and in order.
+ * @usage Linked from public/spa.html right after theme.css, in the order theme.css held these rules
+ *   (the shell block), and from every standalone page that links theme.css.
+ * @version-history
+ *   v1.0.0 — 2026-09-24 — Moved unchanged from css/theme.css (lines 1534-1572), so theme.css
+ *     holds tokens only (UI consolidation, a move).
+ */
+
+/* ── Search bar (canonical shell) ──
+   Backed by /components/SearchBar.js. `.search-bar` is the flex row that wraps a
+   single `type="search"` input; the input itself reuses `.input-field` so all
+   visuals (border, focus ring, placeholder, dark-mode flip) are token-driven and
+   need no per-view restyling. `.search-bar-input` only makes the input grow to
+   fill the row. Consolidates the hand-rolled search inputs (.pkv-search,
+   .cap-search-input, .pf-agd-search-input) and the profile .search-bar +
+   .input-field combo. The profile-scoped `.pf .search-bar` rule (with max-width)
+   coexists; this base provides the layout everywhere else. */
+.search-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+}
+.search-bar-input { flex: 1; }
+
+.prompt-box {
+  width: 100%;
+  min-height: 140px;
+  max-height: 300px;
+  padding: 1rem 1.2rem;
+  background: var(--bg);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: var(--text-small);
+  line-height: 1.7;
+  resize: vertical;
+  outline: none;
+  text-align: left;
+}
+
+.prompt-box:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-subtle);
+}
+

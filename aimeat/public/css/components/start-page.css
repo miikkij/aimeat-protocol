@@ -1,0 +1,24 @@
+/**
+ * @file start-page.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The start page setting: where a person lands, as words and a segmented control.
+ *   Reads only the tokens in theme.css. The rules are theme.css's, moved unchanged and in order.
+ * @usage Linked from public/spa.html right after theme.css, in the order theme.css held these rules
+ *   (the shell block), and from every standalone page that links theme.css.
+ * @version-history
+ *   v1.0.0 — 2026-09-24 — Moved unchanged from css/theme.css (lines 1275-1285), so theme.css
+ *     holds tokens only (UI consolidation, a move).
+ */
+
+/* ── Start page (components/StartPageSetting.js) ──
+   Where a sign-in lands. Quiet by design: it is a preference, not an action anyone came to
+   perform. One line of words, one segmented control under it. */
+.start-page {
+  display: flex; flex-direction: column; gap: 0.55rem;
+  font-size: 0.88rem; color: var(--text-dim);
+}
+.start-page-words { display: flex; flex-direction: column; gap: 0.15rem; }
+.start-page-title { font-weight: var(--weight-semibold); color: var(--text); }
+.start-page-seg { align-self: flex-start; }
+

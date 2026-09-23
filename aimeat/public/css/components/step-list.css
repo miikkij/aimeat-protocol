@@ -11,4 +11,4 @@
  */
 
 .poster-manual { margin: 0 0 1rem; padding-left: 1.3rem; display: flex; flex-direction: column; gap: 0.6rem; }
-.poster-manual-step { font-size: 0.95rem; line-height: 1.55; color: var(--text-dim); }
+.poster-manual-step { font-size: var(--text-body); line-height: 1.55; color: var(--text-dim); }

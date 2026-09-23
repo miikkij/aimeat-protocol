@@ -1,0 +1,169 @@
+/**
+ * @file page-base.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The page itself: the document and its base elements, the app root and its scroll region, the scrollbar, the page entrance, the agent-facing footer links and the visually-hidden helper.
+ *   Reads only the tokens in theme.css. The rules are theme.css's, moved unchanged and in order.
+ *
+ *   NO RESET HERE, ON PURPOSE. theme.css carried "*, *::before, *::after { margin: 0; padding: 0;
+ *   box-sizing: border-box; }" right after its header, and it never applied: a "*" + "/" inside the
+ *   header's version history (".notif-reply*" then "/") closed the comment early, and the rest of the
+ *   header became part of the reset's selector, which the browser dropped. The site has always been
+ *   drawn without it. Moving it here would switch it on and change every page, so it is left out,
+ *   and switching it on is a decision for Jouni (found 2026-09-24).
+ * @usage Linked from public/spa.html right after theme.css, in the order theme.css held these rules
+ *   (the shell block), and from every standalone page that links theme.css.
+ * @version-history
+ *   v1.0.0 — 2026-09-24 — Moved unchanged from css/theme.css (lines 515-635, 1627-1631, 1652-1656, 1782-1796), so theme.css
+ *     holds tokens only (UI consolidation, a move).
+ */
+
+/* ── Base ── */
+/* overflow: clip, not hidden. `hidden` still lets a programmatic scroll move the window, and the
+   static agent-footer below #app makes the document 70 px taller than the viewport, so every
+   scrollIntoView() inside .page-content (the organism rail, a wiki anchor, a fresh record form)
+   also slid the whole page up by the header's height: the top bar vanished and a blank band
+   appeared at the bottom. `clip` clips without creating a scroll container, so the window cannot
+   move at all and only .page-content scrolls (2026-08-29, measured on the organism page). */
+html { scroll-behavior: smooth; height: 100%; overflow: clip; }
+
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  height: 100%;
+  margin: 0; /* zero the UA default 8px — with the fixed app-shell frame it would push #app past the viewport */
+  /* App-shell: the page (html/body) never scrolls. The topnav is a fixed-height
+     flex row and .page-content owns the ONLY scroll region (see #app +
+     .page-content). This is what stops view content sliding under the header and
+     removes the ~nav-height phantom overscroll that body-scroll + an in-flow
+     (sticky) header produced — the content fills the space below the header and
+     scrolls within it. `clip` rather than `hidden`: hidden makes body a scroll container that a
+     scrollIntoView() can still move (the static agent-footer below #app gives it 70 px to move),
+     clip cannot scroll at all. Both html and body carry it, because once html stops propagating,
+     body's own value is what a programmatic scroll finds. */
+  overflow: clip;
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: inherit; text-decoration: none; }
+
+/* ── Animations ── */
+@keyframes heartPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.15); }
+}
+
+@keyframes twinkle {
+  0%, 100% { opacity: 0.05; transform: scale(0.8); }
+  50% { opacity: 0.6; transform: scale(1.1); }
+}
+
+@keyframes livePulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 8px rgba(34, 197, 94, 0.6); }
+  50% { opacity: 0.4; box-shadow: 0 0 18px rgba(34, 197, 94, 0.9); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes btnGlow {
+  0%, 100% { box-shadow: 0 4px 12px rgba(232, 86, 74, 0.3); }
+  50% { box-shadow: 0 6px 20px rgba(232, 86, 74, 0.4); }
+}
+
+@keyframes expandGlow {
+  0%, 100% { box-shadow: 0 0 12px rgba(232, 86, 74, 0.08); }
+  50% { box-shadow: 0 0 24px rgba(232, 86, 74, 0.15); }
+}
+
+@keyframes worldOpen {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pageIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes nebulaDrift {
+  0% { transform: translate(0, 0) scale(1); }
+  100% { transform: translate(30px, -20px) scale(1.15); }
+}
+
+@keyframes auroraShift {
+  0% { transform: translateX(-20%) scaleY(1); }
+  100% { transform: translateX(-10%) scaleY(0.8); }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Background layers ── */
+.bg-canvas {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  z-index: 0;
+  pointer-events: none;
+  background: var(--bg);
+}
+
+.bg-canvas .star { display: none; }
+
+/* Aurora waves — hidden in light theme */
+.bg-aurora { display: none; }
+.aurora-wave { display: none; }
+
+/* ── App root — must sit above bg-canvas (z-index:0) so all non-positioned
+   descendants form a stacking context that paints over the fixed background ── */
+#app {
+  position: relative;
+  z-index: 1;
+  /* App-shell frame: a full-viewport flex column — topnav (fixed height) on top,
+     .page-content (the scroll region) filling the rest. dvh keeps the frame flush
+     with the visual viewport as mobile browser chrome shows/hides. */
+  height: 100vh;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 4px; }
+
+
+/* ── Page entrance ── */
+/* App-shell scroll region: fills the space under the topnav and owns the only
+   scroll. min-height:0 lets the flex child shrink so overflow-y actually scrolls;
+   overflow-x:hidden replaces the clip that used to live on body. */
+.page-content { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; animation: pageIn 0.8s ease; }
+
+/* ── Accessibility ── */
+.visually-hidden { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+
+/* Agent-facing links in the static markup (spa.html). Quiet for a human reader, present in the
+   document for anything that does not run JavaScript. */
+.agent-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4, 1rem);
+  justify-content: center;
+  padding: var(--space-6, 1.5rem) var(--space-4, 1rem);
+  font-size: var(--font-size-sm, 0.875rem);
+}
+.agent-footer a { color: var(--text-dim); text-decoration: none; }
+.agent-footer a:hover { color: var(--accent); text-decoration: underline; }

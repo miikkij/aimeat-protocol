@@ -1,0 +1,36 @@
+/**
+ * @file pagination.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description Pagination and load more: the way to the next page of a list.
+ *   Reads only the tokens in theme.css. The rules are theme.css's, moved unchanged and in order.
+ * @usage Linked from public/spa.html right after theme.css, in the order theme.css held these rules
+ *   (the shell block), and from every standalone page that links theme.css.
+ * @version-history
+ *   v1.0.0 — 2026-09-24 — Moved unchanged from css/theme.css (lines 1388-1410), so theme.css
+ *     holds tokens only (UI consolidation, a move).
+ */
+
+/* ── Pagination + Load more (canonical) ──
+   Backed by /components/Pagination.js. `.pagination` is the prev / "Page X / Y"
+   / next control (arrow buttons + disabled ends); `.load-more` centers a single
+   "load more" button. Consolidates the near-identical .adm-mem-pagination shape
+   and the centered load-more wrapper. All colors are theme tokens so both flip
+   correctly in dark mode. The numbered .hb-pagination variant is intentionally
+   left in place (different UI). */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+.pagination-info {
+  font-size: var(--text-note);
+  color: var(--text-dim);
+}
+.load-more {
+  text-align: center;
+  margin-top: 1.5rem;
+}
+

@@ -9,6 +9,7 @@
  * @usage pnpm test -- build-app-catalog-tokens
  * @version-history
  *   v1.0.0 — 2026-09-13 — Initial.
+ *   v1.1.0 — 2026-09-24 — The three type tokens the moved dialog sheet reads join the copied list.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -36,6 +37,9 @@ function fixture(edit: (lines: string[]) => string[] = (l) => l): string {
     '  --font-poster-section-weight: 400;',
     '  --sun: #FFB52E;',
     '  --on-sun: #1A1A2E;',
+    '  --text-small: 0.8rem;',
+    '  --text-md: 1rem;',
+    '  --weight-heavy: 800;',
     '}',
     '[data-theme="dark"] {',
     '  --sun: #000000;',
@@ -47,7 +51,7 @@ function fixture(edit: (lines: string[]) => string[] = (l) => l): string {
 describe('themePosterTokens', () => {
   it('finds every copied token in the real theme.css, with the headline face and its spacing', () => {
     const out = themePosterTokens(readFileSync(THEME, 'utf-8'));
-    expect(out.split('\n')).toHaveLength(13);
+    expect(out.split('\n')).toHaveLength(16);
     expect(out).toMatch(/--font-headline: 'Fjalla One'/);
     expect(out).toMatch(/--font-poster-tracking: 0\.01em;/);
     expect(out).toMatch(/--font-poster-leading: 1;/);

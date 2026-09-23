@@ -24,7 +24,7 @@
 .mgd-note-title {
   margin: 0 0 7px;
   font-size: 0.875rem;
-  font-weight: 800;
+  font-weight: var(--weight-heavy);
   color: var(--text);
 }
 
@@ -49,5 +49,5 @@
 
 .mgd-note-link {
   font-size: 0.8125rem;
-  font-weight: 700;
+  font-weight: var(--weight-bold);
 }

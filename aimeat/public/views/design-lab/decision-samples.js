@@ -69,6 +69,8 @@ const adm = (children) => html`<div class="adm">${children}</div>`;
 const sidebar = (count) => adm(html`<nav class="adm-sidebar"><button type="button" class="adm-nav-item">Owners ${count}</button></nav>`);
 /** Result cards sit inside a chat message, whose body sets their weight. */
 const inTurn = (children) => html`<div class="poster-turn-body">${children}</div>`;
+/** A dialog's footer, whose rules restyle the buttons inside it. */
+const foot = (children) => html`<dialog class="dlg" open><footer class="dlg-foot">${children}</footer></dialog>`;
 const tag = (tone, text) => html`<span class=${'dl-tag' + (tone ? ` dl-tag--${tone}` : '')}>${text}</span>`;
 const status = (tone, text) => html`<span class=${`dl-status dl-status--${tone}`}>${text}</span>`;
 const action = (text) => html`<a class="poster-action" href="#">${text}</a>`;
@@ -108,12 +110,12 @@ export const SAMPLES = {
   ],
   count: [
     { id: 'count-coral', measure: '.pf-side-badge', solo: '.pf-side-badge, .open-items-count', render: () => row(html`<span class="pf-side-badge">3</span> <span class="open-items-count">5</span>`),
-      after: after('.dl-count', () => row(html`<span class="dl-count dl-count--waiting">3</span> <span class="dl-count dl-count--waiting">5</span>`)) },
+      after: after('.poster-count', () => row(html`<span class="poster-count poster-count--waiting">3</span> <span class="poster-count poster-count--waiting">5</span>`)) },
     { id: 'count-bell', measure: '.notif-badge', render: () => row(html`<span class="poster-specimen-anchor"><span class="notif-badge">7</span></span>`),
-      after: after('.dl-count', () => row(html`<span class="poster-specimen-anchor"><span class="dl-count dl-count--waiting dl-count--small">7</span></span>`)) },
+      after: after('.poster-count', () => row(html`<span class="poster-specimen-anchor"><span class="poster-count poster-count--waiting poster-count--small">7</span></span>`)) },
     { id: 'count-morsels', measure: '.brand-morsels', render: () => row(html`<span class="brand-morsels">1000</span>`), after: 'same' },
     { id: 'count-admin-nav', measure: '.cnt', solo: '.adm-sidebar', render: () => sidebar(html`<span class="cnt">4</span>`),
-      after: after('.adm-sidebar', () => sidebar(html`<span class="dl-count dl-count--tally">4</span>`), '.dl-count') },
+      after: after('.adm-sidebar', () => sidebar(html`<span class="poster-count poster-count--tally">4</span>`), '.poster-count') },
   ],
   'row-label': [
     { id: 'poster-label', measure: '.poster-label', render: () => html`<${NamedRow} label="Assets"><${ThingLink} href="#" n=${30} label="Apps" /><//>`, after: 'same' },
@@ -125,7 +127,7 @@ export const SAMPLES = {
   'group-heading': [
     { id: 'day-title', measure: '.poster-day-title', render: () => html`<${DayList}><${DayGroup} title="Today"><${TimelineRow} category="made" text="You published a page" when="10:42" href="#" /><//><//>`, after: 'same' },
     { id: 'worklog-head', measure: '.poster-worklog-head', render: () => html`<${WorkLog} tools=${TOOLS} />`,
-      after: after('.poster-day-title', () => row(html`<div class="poster-day-title dl-heading--grey">What was done</div>`)) },
+      after: after('.poster-day-title', () => row(html`<div class="poster-day-title poster-day-title--quiet">What was done</div>`)) },
     { id: 'conversation-label', measure: '.poster-conversation-label', render: () => html`<${ConversationAbout} label="This conversation" name="Make me a page" />`,
       after: after('.poster-day-title', () => row(html`<div class="poster-day-title">This conversation</div>`)) },
   ],
@@ -136,15 +138,15 @@ export const SAMPLES = {
   ],
   'object-box': [
     { id: 'prompt-card', measure: '.poster-prompt', render: prompt,
-      after: after('.poster-prompt', () => html`<div class="dl-box-plain">${prompt()}</div>`) },
+      after: 'same' },
     { id: 'chooser-box', measure: '.poster-box', render: () => html`<${ChooserResult}><p>Saved. Your note is in your memory.</p><//>`, after: 'same' },
     { id: 'result-card', measure: '.poster-result', render: result, after: 'same' },
   ],
   'attention-note': [
     { id: 'waiting-note', measure: '.poster-waiting', render: waiting,
-      after: after('.poster-waiting', () => html`<div class="dl-as-aside">${waiting()}</div>`) },
+      after: 'same' },
     { id: 'nudge', measure: '.poster-nudge', render: () => html`<${MobileNudge} onDismiss=${noop} />`,
-      after: after('.poster-nudge', () => html`<div class="dl-as-aside"><${MobileNudge} onDismiss=${noop} /></div>`) },
+      after: 'same' },
     { id: 'aside', measure: '.poster-aside', render: () => html`<aside class="poster-aside">The next move is in your AI chat: it has to run the prompt and show you a code.</aside>`, after: 'same' },
   ],
   'action-link': [
@@ -269,6 +271,13 @@ export const SAMPLES = {
     { id: 'jump', measure: '.poster-conversation-jump', render: () => html`<${ConversationJump} onClick=${noop}>↓ Latest<//>`,
       after: after('.poster-action--more', () => row(more('↓ Latest'))) },
   ],
+  'dialog-actions': [
+    { id: 'cancel', measure: '.btn-ghost', render: () => foot(html`<button type="button" class="btn-ghost">Cancel</button>`),
+      after: after('.poster-action', () => row(html`<button type="button" class="poster-action">Cancel</button>`)) },
+    { id: 'confirm', measure: '.btn-primary', render: () => foot(html`<button type="button" class="btn-primary">Save</button>`),
+      after: after('.poster-slab', () => row(html`<button type="button" class="poster-slab poster-slab--control">Save</button>`)) },
+    { id: 'danger', measure: '.btn-danger-solid', render: () => foot(html`<button type="button" class="btn-danger-solid">Delete</button>`), after: 'same' },
+  ],
 };
 
 /** A tone of a proposal, captioned with its name under the example word. */
@@ -287,9 +296,9 @@ export const PROPOSALS = {
       ${tone('danger', html`<span class="dl-status dl-status--danger">revoked</span>`)} ${tone('off', html`<span class="dl-status dl-status--off">archived</span>`)}`),
   },
   count: {
-    measure: '.dl-count',
-    render: () => row(html`${tone('waiting', html`<span class="dl-count dl-count--waiting">3</span>`)} ${tone('tally', html`<span class="dl-count dl-count--tally">4</span>`)}
-      ${tone('waiting, on the bell', html`<span class="poster-specimen-anchor"><span class="dl-count dl-count--waiting dl-count--small">7</span></span>`)}
+    measure: '.poster-count',
+    render: () => row(html`${tone('waiting', html`<span class="poster-count poster-count--waiting">3</span>`)} ${tone('tally', html`<span class="poster-count poster-count--tally">4</span>`)}
+      ${tone('waiting, on the bell', html`<span class="poster-specimen-anchor"><span class="poster-count poster-count--waiting poster-count--small">7</span></span>`)}
       ${tone('morsels, kept as it is', html`<span class="brand-morsels">1000</span>`)}`),
   },
   'panel-action': {
@@ -315,6 +324,10 @@ export const PROPOSALS = {
   choice: {
     measure: '.poster-tab.is-on',
     render: () => tabs('claude.ai', 'Claude Desktop', 'ChatGPT'),
+  },
+  'dialog-actions': {
+    measure: '.poster-action',
+    render: () => row(html`<button type="button" class="poster-action">Cancel</button> <button type="button" class="poster-slab poster-slab--control">Save</button>`),
   },
   'small-link': {
     measure: '.poster-action--more',

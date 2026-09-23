@@ -33,7 +33,7 @@
   border-bottom: 2px solid var(--text);
 }
 .open-items-main { flex: 1 1 auto; min-width: 0; }
-.open-items-item { font-size: 1.05rem; font-weight: 800; line-height: 1.35; overflow-wrap: anywhere; }
+.open-items-item { font-size: var(--text-md-plus); font-weight: var(--weight-heavy); line-height: 1.35; overflow-wrap: anywhere; }
 .open-items-meta { font-family: var(--font-mono); font-size: 0.76rem; color: var(--muted); margin-top: 0.15rem; }
 .open-items-control { flex: none; display: flex; align-items: center; gap: 0.35rem; }
 /* The two answers on a row the decision gate opened. Both are real actions a thumb has to hit, so
@@ -49,10 +49,10 @@
 .open-items-btn {
   display: inline-flex; align-items: center; gap: 0.25rem;
   background: none; border: 0; cursor: pointer; padding: 0.25rem 0.4rem;
-  color: var(--muted); font-size: 0.85rem;
+  color: var(--muted); font-size: var(--text-note);
 }
 .open-items-btn:hover { color: var(--text); }
-.open-items-btn-count { font-weight: 700; color: var(--text); }
+.open-items-btn-count { font-weight: var(--weight-bold); color: var(--text); }
 @media (max-width: 640px) {
   /* The row wraps rather than squeezing the title into a column two words wide, and the title
      stops short of the corner so it never runs under the dots. The one rule this whole design

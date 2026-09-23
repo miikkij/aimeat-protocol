@@ -1,0 +1,341 @@
+/**
+ * @file top-bar.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The top bar on every page of the shell: the brand, the links, the notification bell, the login pill, the language and theme buttons, and its phone menu.
+ *   Reads only the tokens in theme.css. The rules are theme.css's, moved unchanged and in order.
+ * @usage Linked from public/spa.html right after theme.css, in the order theme.css held these rules
+ *   (the shell block), and from every standalone page that links theme.css.
+ * @version-history
+ *   v1.0.0 — 2026-09-24 — Moved unchanged from css/theme.css (lines 636-958), so theme.css
+ *     holds tokens only (UI consolidation, a move).
+ */
+
+/* ── Top Navigation ── */
+.topnav {
+  /* App-shell: a fixed-height flex row inside #app (no longer sticky — #app
+     itself doesn't scroll, so the header stays put for free). z-index keeps the
+     header's own dropdowns (notifications, mobile menu) above .page-content. */
+  position: relative;
+  z-index: 100;
+  flex: 0 0 auto;
+  height: var(--nav-height);
+  /* border-box so the 1px border-bottom is INCLUDED in --nav-height — otherwise the
+     header renders 1px taller than the token and every `100dvh - var(--nav-height)`
+     scroll region (sidebars) is 1px too tall and can't stay pinned. */
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 1.5rem;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+}
+
+.topnav-brand {
+  font-weight: var(--weight-heavy);
+  font-size: 1.125rem;
+  color: var(--text);
+  letter-spacing: 0.3px;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  text-decoration: none;
+}
+
+.topnav-brand .brand-name { white-space: nowrap; }
+
+.brand-morsels {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--accent-glow);
+  background: var(--morsel-bg);
+  color: var(--accent);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-bold);
+  line-height: 1.2;
+}
+
+.brand-morsels::before { content: '\2665 '; color: var(--accent); }
+
+.topnav-brand .heart {
+  color: var(--accent);
+  font-style: normal;
+  margin: 0 1px;
+  font-size: var(--text-md);
+  animation: none;
+  filter: none;
+}
+.topnav-brand .brand-at {
+  color: var(--accent);
+}
+
+.topnav-center {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  overflow: hidden;
+  padding: 0;
+}
+
+.topnav-right {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+/* Header notification bell + dropdown */
+.notif-bell { position: relative; display: inline-flex; }
+.notif-bell-btn { position: relative; background: none; border: none; cursor: pointer; font-size: 1.15rem; line-height: 1; padding: 4px 6px; border-radius: 8px; }
+.notif-bell-btn:hover { background: var(--bg-dim); }
+/* The bell's count: its look is the shared count (.poster-count, waiting and small, in poster.css);
+   this keeps only its place on the bell's corner. Two classes, so its flex box outranks the count's
+   inline-block from the later sheet. */
+.notif-badge.poster-count, .notif-badge { position: absolute; top: -1px; right: -1px; min-width: 15px; height: 15px; display: flex; align-items: center; justify-content: center; }
+.notif-dropdown { position: absolute; right: 0; top: calc(100% + 6px); width: 320px; max-height: 60vh; overflow-y: auto; background: var(--card); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,0.18); z-index: 1200; }
+.notif-dropdown-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; font-weight: var(--weight-bold); font-size: var(--text-body-sm); color: var(--text); padding: 0.6rem 0.85rem; border-bottom: 1px solid var(--border-subtle); position: sticky; top: 0; background: var(--card); z-index: 1; }
+.notif-clear-all { font-weight: var(--weight-semibold); font-size: 0.78rem; color: var(--muted); background: none; border: none; padding: 0.15rem 0.35rem; border-radius: 6px; cursor: pointer; }
+.notif-clear-all:hover:not(:disabled) { color: var(--brand); background: var(--bg-dim); }
+.notif-clear-all:disabled { opacity: 0.6; cursor: default; }
+.notif-empty { padding: 1rem 0.85rem; color: var(--muted); font-size: var(--text-note); }
+.notif-item { display: block; border-bottom: 1px solid var(--border-subtle); }
+.notif-item.unread { background: var(--accent-subtle); }
+.notif-item-main { display: block; width: 100%; text-align: left; background: none; border: none; padding: 0.55rem 0.85rem; cursor: pointer; }
+.notif-item-main:hover { background: var(--bg-dim); }
+.notif-item-title { font-size: var(--text-note); font-weight: var(--weight-semibold); color: var(--text); }
+.notif-item-body { font-size: 0.78rem; color: var(--muted); margin-top: 0.15rem; }
+.notif-item-time { font-size: 0.7rem; color: var(--muted); margin-top: 0.2rem; }
+/* Inline notification actions (reply / approve / deny …) */
+.notif-actions { display: flex; flex-wrap: wrap; gap: 0.4rem; padding: 0 0.85rem 0.55rem; }
+.notif-action-btn { font-size: 0.74rem; padding: 0.25rem 0.7rem; border-radius: 7px; line-height: 1.3; }
+.notif-reply { padding: 0 0.85rem 0.6rem; }
+.notif-reply-input { width: 100%; box-sizing: border-box; resize: vertical; font: inherit; font-size: var(--text-small); padding: 0.4rem 0.5rem; border-radius: 7px; border: 1px solid var(--border); background: var(--bg-dim); color: var(--text); }
+.notif-reply-row { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.4rem; }
+.notif-result { font-size: 0.76rem; padding: 0.3rem 0.85rem 0.55rem; }
+.notif-result.ok { color: var(--success, #4caf50); }
+.notif-result.err { color: var(--danger, #e0564a); }
+/* Long sender GHIIs / subjects wrap instead of forcing the panel wider than the screen. */
+.notif-item-title, .notif-item-body { overflow-wrap: anywhere; }
+/* Mobile: the 320px-wide, right:0-anchored dropdown runs off the LEFT edge (the bell sits
+   mid-right of the bar) and gets clipped by body{overflow-x:hidden}. Pin it to fixed viewport
+   insets so it spans the screen width minus small margins, regardless of the bell's position. */
+@media (max-width: 560px) {
+  .notif-dropdown {
+    position: fixed;
+    top: calc(var(--nav-height, 56px) + 4px);
+    right: 8px;
+    left: 8px;
+    width: auto;
+    max-height: 72vh;
+  }
+}
+
+.topnav-right a {
+  font-size: 0.84rem;
+  color: var(--text-dim);
+  text-decoration: none;
+  padding: 6px 12px;
+  border-radius: var(--radius-xs);
+  transition: all 0.15s;
+  font-weight: var(--weight-medium);
+  border: none;
+}
+
+.topnav-right a:hover {
+  color: var(--text);
+  background: var(--bg-surface);
+}
+
+.topnav-right a.active {
+  color: var(--accent);
+  background: var(--accent-subtle);
+}
+
+.topnav-right .profile-link {
+  display: none;
+  color: var(--accent);
+  background: var(--accent-subtle);
+}
+
+.topnav-right .profile-link.visible { display: inline-flex; }
+
+.header-auth-slot {
+  display: inline-flex;
+  align-items: center;
+}
+
+/* ── Header nav: desktop inline; mobile = hamburger + dropdown (see @media) ── */
+/* .topnav is a FIXED-height row, so the menu must never wrap: a second row does not make
+   the bar taller, it spills out below it. Links stay on one line (no "Try / it" splits) and
+   the whole bar collapses to the hamburger the moment it stops fitting — see .topnav--compact. */
+.topnav-menu { display: flex; align-items: center; gap: 0.75rem; flex-wrap: nowrap; justify-content: flex-end; }
+.topnav-menu > a { white-space: nowrap; }
+.topnav-burger { display: none; }
+/* Truncate a long GHII in the pill so it never blows out the bar (desktop). */
+.aimeat-auth-ghii { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── The poster bar: the header wears the same face as the pages under it ──────────────────
+   A 3px ink rule instead of a hairline, bold links with the open one underlined in coral, the
+   morsel count on a sun chip, the bell and the pill in ink frames. Everything reads the shell's
+   tokens, so the dark theme and the palettes keep working. */
+.topnav { border-bottom: 3px solid var(--text); font-family: var(--font-showroom-body); }
+.topnav-brand { font-family: var(--font-wordmark); font-weight: var(--weight-regular); font-size: 1.25rem; letter-spacing: -0.01em; }
+.topnav-right a, .topnav-menu > a { font-weight: var(--weight-bold); font-size: 0.88rem; color: var(--text-dim); padding: 6px 4px; border-radius: 0; }
+.topnav-right a:hover, .topnav-menu > a:hover { color: var(--text); background: none; }
+.topnav-right .profile-link { color: var(--text); background: none; }
+.topnav-right a.active, .topnav-menu > a.active {
+  color: var(--text); background: none;
+  text-decoration: underline; text-decoration-thickness: 3px; text-underline-offset: 7px; text-decoration-color: var(--accent);
+}
+.brand-morsels {
+  font-family: var(--font-mono); font-size: 0.76rem; font-weight: var(--weight-medium); letter-spacing: 0;
+  background: var(--sun); color: var(--on-sun); border: 0; border-radius: 0; padding: 3px 9px; margin-left: 12px;
+}
+.notif-bell-btn { border-radius: 0; }
+.notif-bell-btn:hover { background: var(--sun); }
+.notif-dropdown { border: 3px solid var(--text); border-radius: 0; box-shadow: 8px 8px 0 var(--sun); }
+
+/* Collapse the header to a hamburger the moment the inline nav stops fitting.
+   TWO triggers, one rule set:
+     - the media query is the floor (narrow screens always collapse);
+     - `.topnav--compact` is set by the header itself when it MEASURES an overflow.
+   The measurement matters because how much the bar needs is not a function of screen
+   width alone: signing in adds four links, a bell and a wide gold pill, and an operator
+   adds Admin on top. A fixed pixel breakpoint cannot know that, which is how a 2000px
+   window ended up with a nav hanging out below the bar. */
+@media (max-width: 1180px) {
+  .topnav { padding: 0 0.5rem; }
+  .topnav-right { gap: 0.5rem; }
+  /* Free up bar width so the gold pill never overflows — the morsel count is
+     still shown in the profile dashboard. */
+  .brand-morsels { display: none !important; }
+}
+.topnav--compact { padding: 0 0.5rem; }
+.topnav--compact .topnav-right { gap: 0.5rem; }
+.topnav--compact .brand-morsels { display: none !important; }
+
+@media (max-width: 1180px) {
+  .topnav-burger {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 38px; height: 34px; padding: 0; font-size: 1.2rem; line-height: 1;
+    background: none; color: var(--text); border: 1px solid var(--border);
+    border-radius: var(--radius-xs); cursor: pointer;
+  }
+  .topnav-menu {
+    display: none; position: absolute; top: var(--nav-height); left: 0; right: 0;
+    flex-direction: column; align-items: stretch; gap: 0;
+    background: var(--bg-card); border-bottom: 1px solid var(--border);
+    box-shadow: var(--shadow-lg, 0 8px 24px rgba(0,0,0,.18)); padding: 0.4rem;
+    /* border-box so the padding + border count INSIDE the cap; content-box let the sheet
+       stand 14px past the fold on a short screen. */
+    box-sizing: border-box; max-height: calc(100dvh - var(--nav-height)); overflow-y: auto;
+  }
+  .topnav-menu.open { display: flex; }
+  .topnav-menu a { width: 100%; padding: 0.7rem 0.9rem; font-size: var(--text-body); border-radius: var(--radius-xs); }
+  .topnav-menu .topnav-center { width: fit-content; margin: 0.45rem 0.6rem 0.2rem; }
+  /* Compact gold pill: keep the green dot + Logout, drop the wordy label + GHII. */
+  .aimeat-auth-pill .aimeat-auth-label,
+  .aimeat-auth-pill .aimeat-auth-ghii { display: none !important; }
+  .aimeat-auth-pill { padding: 5px 11px !important; gap: 6px !important; }
+}
+.topnav--compact .topnav-burger {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 38px; height: 34px; padding: 0; font-size: 1.2rem; line-height: 1;
+  background: none; color: var(--text); border: 1px solid var(--border);
+  border-radius: var(--radius-xs); cursor: pointer;
+}
+.topnav--compact .topnav-menu {
+  display: none; position: absolute; top: var(--nav-height); left: 0; right: 0;
+  flex-direction: column; align-items: stretch; gap: 0;
+  background: var(--bg-card); border-bottom: 1px solid var(--border);
+  box-shadow: var(--shadow-lg, 0 8px 24px rgba(0,0,0,.18)); padding: 0.4rem;
+  box-sizing: border-box; max-height: calc(100dvh - var(--nav-height)); overflow-y: auto;
+}
+.topnav--compact .topnav-menu.open { display: flex; }
+.topnav--compact .topnav-menu a { width: 100%; padding: 0.7rem 0.9rem; font-size: var(--text-body); border-radius: var(--radius-xs); }
+.topnav--compact .topnav-menu .topnav-center { width: fit-content; margin: 0.45rem 0.6rem 0.2rem; }
+.topnav--compact .aimeat-auth-pill .aimeat-auth-label,
+.topnav--compact .aimeat-auth-pill .aimeat-auth-ghii { display: none !important; }
+.topnav--compact .aimeat-auth-pill { padding: 5px 11px !important; gap: 6px !important; }
+
+/* Room for the open-items count in the compact bar. Measured 2026-08-09 at 390px: brand 82 +
+   right group 335 = 417 against a 390 viewport, i.e. the bar was already full and anything added
+   overflowed by its own width. The theme switch is a preference you set once and it is reachable
+   from the burger menu; the count is a number you need to see from wherever you are. So the switch
+   is what gives way at this width, not the count.
+
+   P7 rejected a header button on this measurement. P14 overruled it with "if the header does not
+   fit, the header gets fixed". This is that fix, and it is four lines rather than a redesign. */
+@media (max-width: 640px) {
+  /* NOT scoped to .topnav--compact. That was the first attempt and it left a 33px overflow on
+     every page whose bar is not compact — measured at 390 with the count visible, after the
+     compact case had been measured clean and mistaken for the whole story. The media query is the
+     scope; the class was redundant where it worked and wrong where it did not. */
+  .aimeat-auth-pill .aimeat-ctl { display: none !important; }
+}
+
+/* The "Me" dropdown (.topnav-me*) was removed on 2026-08-09. Apps, Profile and Admin are plain
+   links in the bar again: the marketing links now leave when a person signs in (PUBLIC_NAV_LINKS
+   `when` in spa.html), so the row has the width for them and nobody pays a click to reach their
+   own profile. What the bar no longer carries lives in .site-footer below. */
+
+/* ── Language Buttons ── */
+.lang-btn {
+  padding: 4px 10px;
+  border-radius: 0;
+  font-size: var(--text-caption);
+  font-weight: var(--weight-semibold);
+  text-decoration: none;
+  color: var(--text-muted);
+  transition: all 0.15s;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  font-family: var(--font);
+}
+
+.lang-btn.active {
+  background: var(--text);
+  color: var(--on-inverted);
+  box-shadow: none;
+}
+
+.lang-btn:not(.active):hover {
+  color: var(--text);
+  background: var(--bg-surface);
+}
+
+/* ── Theme Toggle ── */
+.theme-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-right: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-dim);
+  font-size: var(--text-body);
+  line-height: 1;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: var(--font);
+}
+
+.theme-toggle-btn:hover {
+  color: var(--accent);
+  background: var(--bg-surface);
+}
+
+
+/* Phone (formerly theme.css "Responsive"). */
+@media (max-width: 480px) {
+  .topnav { padding: 0 0.4rem; }
+}

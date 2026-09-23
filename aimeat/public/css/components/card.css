@@ -1,0 +1,136 @@
+/**
+ * @file card.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The classic card and its kin: the glass card, the content group, the stat card, the category card, the card header and title.
+ *   Reads only the tokens in theme.css. The rules are theme.css's, moved unchanged and in order.
+ * @usage Linked from public/spa.html right after theme.css, in the order theme.css held these rules
+ *   (the shell block), and from every standalone page that links theme.css.
+ * @version-history
+ *   v1.0.0 — 2026-09-24 — Moved unchanged from css/theme.css (lines 1112-1223, 1752-1756), so theme.css
+ *     holds tokens only (UI consolidation, a move).
+ */
+
+/* ── Cards ── */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 2rem;
+  box-shadow: var(--shadow-sm);
+  transition: all 0.2s ease;
+}
+
+.card:hover {
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-2px);
+}
+
+.card-solid {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+}
+
+/* Glass variant (Card variant="glass") — reproduces the former profile
+   .pf-glass-card appearance, fully tokenized. Overrides .card defaults
+   (2rem padding, var(--radius), shadow) with the glass card's flatter geometry. */
+.card-glass {
+  padding: 16px;
+  border-radius: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  margin-bottom: 1rem;
+  box-shadow: none;
+}
+/* Glass card is flat — neutralize the generic .card:hover lift so it looks
+   identical to the former static .pf-glass-card. */
+.card-glass:hover {
+  box-shadow: none;
+  transform: none;
+}
+
+/* ── Content Group Container ── */
+.content-group {
+  position: relative;
+  z-index: 1;
+  max-width: 560px;
+  margin: 3rem auto 0;
+  padding: 2rem 1.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-card);
+  box-shadow: var(--shadow-md);
+}
+
+.content-group > *:first-child { margin-top: 0; }
+.content-group > *:last-child { margin-bottom: 0; }
+
+/* ── Stat Cards ── */
+.stat-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px 20px;
+  background: var(--bg-card);
+  box-shadow: var(--shadow-sm);
+  text-align: center;
+}
+
+.stat-card-label {
+  font-size: 0.66rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: var(--weight-semibold);
+}
+
+.stat-card-value {
+  font-size: var(--text-xl);
+  color: var(--text);
+  font-weight: var(--weight-heavy);
+  margin-top: 0.15rem;
+}
+/* Value tone + mono modifiers — let accent-tinted / earned-spent / monospace stat
+   clones converge onto canonical .stat-card-value without losing their semantics. */
+.stat-card-value.accent  { color: var(--accent); }
+.stat-card-value.success { color: var(--success-fg); }
+.stat-card-value.danger  { color: var(--danger-fg); }
+.stat-card-value.warn    { color: var(--warn); }
+.stat-card-value.purple  { color: var(--purple); }
+.stat-card-value.blue    { color: var(--blue); }
+.stat-card-value.mono    { font-family: var(--font-mono, monospace); }
+/* Placeholder while the counter's fetch is still in flight. A hard 0 on a live counter
+   reads as "nothing runs here", so the card stays quiet until it knows the number. */
+.stat-card-value.is-loading { color: var(--text-muted); opacity: 0.45; }
+/* Optional second line under a counter (e.g. "2 online now"). */
+.stat-card-sub { font-size: var(--text-2xs); color: var(--text-muted); margin-top: 0.2rem; }
+/* Shared responsive stat grid wrapper. */
+.stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; margin-bottom: 32px; }
+
+/* ── Category Card ── */
+/* Canonical clickable directory tile (icon + name + optional count) shared by the
+   marketplace category grid and the hobbies interest grid. Works on both <a> and
+   <div> (text-decoration:none keeps anchors un-underlined). The grid wrapper stays
+   per-view because column density differs (marketplace 160px / hobbies 200px min). */
+.category-card {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 20px; text-align: center; text-decoration: none;
+  transition: all 0.2s; cursor: pointer;
+}
+.category-card:hover { background: var(--bg-surface); border-color: var(--accent); box-shadow: var(--shadow-md); }
+.category-icon { font-size: 2rem; margin-bottom: 8px; }
+.category-name { font-size: var(--text-body); font-weight: var(--weight-semibold); color: var(--text); }
+.category-count { font-size: 0.78rem; color: var(--text-muted); margin-top: 4px; }
+
+
+/* ── Card extensions ── */
+.card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
+.card-title { font-weight: var(--weight-semibold); font-size: var(--text-md); }
+.card-subtitle { color: var(--text-dim); font-size: var(--text-small); }
+.card-hoverable { cursor: pointer; }
+
+/* Phone (formerly theme.css "Responsive"). */
+@media (max-width: 480px) {
+  .content-group { margin-top: 2rem; padding: 1.5rem 1rem; }
+}

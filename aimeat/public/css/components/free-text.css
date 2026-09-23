@@ -28,7 +28,7 @@
 }
 .poster-free-title {
   font-size: var(--text-base);
-  font-weight: 600;
+  font-weight: var(--weight-semibold);
   color: var(--text-bright);
   margin: 0 0 0.5rem;
 }
@@ -40,5 +40,5 @@
   margin: 1.5rem 0;
 }
 /* A notice on the front page: its category as a label, the poster's name beside the date. */
-.poster-notice-block .board-post-cat { display: inline-block; margin-bottom: .2rem; font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
-.poster-notice-block .board-post-meta { display: flex; gap: .8rem; font-family: var(--font-mono); font-size: .75rem; color: var(--text-dim); }
+.poster-notice-block .board-post-cat { display: inline-block; margin-bottom: .2rem; font-size: .66rem; font-weight: var(--weight-heavy); letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+.poster-notice-block .board-post-meta { display: flex; gap: .8rem; font-family: var(--font-mono); font-size: var(--text-caption); color: var(--text-dim); }

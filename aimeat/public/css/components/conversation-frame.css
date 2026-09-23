@@ -58,7 +58,7 @@
 .poster-conversation-name {
   margin: 0;
   font-family: var(--font-poster); font-weight: var(--font-poster-weight);
-  font-size: 0.95rem; line-height: 1.15; letter-spacing: -0.01em; text-transform: uppercase;
+  font-size: var(--text-body); line-height: 1.15; letter-spacing: -0.01em; text-transform: uppercase;
   overflow-wrap: anywhere;
 }
 /* The foot of the rail: that a machine answers, and whose agent it is. */
@@ -86,10 +86,10 @@
   max-width: 46ch;
   margin: auto;
   text-align: center;
-  font-weight: 600;
+  font-weight: var(--weight-semibold);
 }
 .poster-conversation-welcome { --poster-section-size: 2rem; }
-.poster-conversation-welcome p { margin: 0; line-height: 1.6; font-size: 0.95rem; }
+.poster-conversation-welcome p { margin: 0; line-height: 1.6; font-size: var(--text-body); }
 .poster-conversation-welcome .poster-conversation-welcome-trust { color: var(--text-dim); margin-top: 6px; }
 /* The way back to the live edge while auto-follow is suspended. Floats over the conversation
    rather than pushing it, so its appearance never moves the text you are reading. */
@@ -99,7 +99,7 @@
   bottom: 84px;
   z-index: 4;
   font-size: 0.74rem;
-  font-weight: 800;
+  font-weight: var(--weight-heavy);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   padding: 6px 12px;
@@ -116,7 +116,7 @@
   margin-top: 0.5rem;
 }
 .poster-conversation-cap-title { margin: 0 0 0.4rem; font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.2rem; text-transform: uppercase; }
-.poster-conversation-cap-body { margin: 0 0 0.8rem; font-size: 0.95rem; font-weight: 600; color: var(--text-dim); line-height: 1.55; }
+.poster-conversation-cap-body { margin: 0 0 0.8rem; font-size: var(--text-body); font-weight: var(--weight-semibold); color: var(--text-dim); line-height: 1.55; }
 .poster-conversation-cap-actions { display: flex; gap: 0.7rem; flex-wrap: wrap; }
 /* The way OUT of the full-screen phone chat, and the icon buttons of the phone's head row.
    Desktop has the rail, so all of it hides there. */
@@ -158,7 +158,7 @@
   .poster-conversation-rail-close {
     display: inline-flex; align-items: center; align-self: flex-start; min-height: 44px; margin-bottom: 4px;
     background: none; border: 0; box-shadow: none; padding: 0;
-    font-family: var(--font-mono); font-size: 0.8rem; color: var(--accent); cursor: pointer;
+    font-family: var(--font-mono); font-size: var(--text-small); color: var(--accent); cursor: pointer;
   }
 
   .poster-conversation-main { height: 100%; }
@@ -176,14 +176,14 @@
   .poster-conversation-title {
     flex: 1 1 auto; min-width: 0; margin: 0;
     font-family: var(--font-poster); font-weight: var(--font-poster-weight);
-    font-size: 0.9rem; line-height: 1.1; letter-spacing: -0.01em; text-transform: uppercase;
+    font-size: var(--text-body-sm); line-height: 1.1; letter-spacing: -0.01em; text-transform: uppercase;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
   .poster-conversation-icon {
     display: inline-flex; align-items: center; justify-content: center; flex: none;
     width: 44px; height: 40px;
     border: 2px solid var(--text); border-radius: 0; box-shadow: none; background: var(--bg);
-    color: var(--text); font-weight: 800; font-size: 1rem; cursor: pointer; padding: 0;
+    color: var(--text); font-weight: var(--weight-heavy); font-size: var(--text-md); cursor: pointer; padding: 0;
   }
   .poster-conversation-toggle { background: var(--sun); }
   .poster-conversation-copy.copied { background: var(--sun); }

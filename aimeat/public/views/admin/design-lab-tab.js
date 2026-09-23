@@ -126,7 +126,7 @@ function PartDetail({ id, onBack }) {
     <//>
 
     <${Band} title=${tr('designLab.facts', 'What it is')} tight=${true}>
-      <${NamedRow} label=${tr('designLab.use', 'Use')}>${entry.use.join(' ')}<//>
+      <${NamedRow} label=${tr('designLab.use', 'Use')}>${entry.use.join(' · ')}. ${(entry.useFor ?? []).join(' ')}<//>
       <${NamedRow} label=${tr('designLab.data', 'Data')}><code>${entry.data.shape}</code><//>
       ${Object.entries(entry.data.fields).map(([k, v]) => html`<${NamedRow} key=${k} label=${k}>${v}<//>`)}
       ${entry.variants.length > 0 && html`
