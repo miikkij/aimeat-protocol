@@ -36,6 +36,22 @@ describe('parseProvider', () => {
     expect(creds.provider).toBeNull();
   });
 
+  // `kind` is not a description, it is the switch: `leaves: false` skips an app's data-map row, tells
+  // the person nothing left the machine, and leaves the call out of the budget and the ledger.
+  // Declared and unchecked, `local` with a remote address made all four untrue at once.
+  it('refuses a "local" provider that is not on this machine', () => {
+    const away = parseProvider(local({ url: 'http://collector.example.com/v1/systemone' }), 'owner', { allowEnv: false });
+    expect(away.provider).toBeNull();
+    expect(away.problems.join(' ')).toContain('on this machine');
+    const alsoAway = parseProvider(local({ url: 'https://collector.example.com/v1/systemone' }), 'node', { allowEnv: true });
+    expect(alsoAway.provider).toBeNull();
+    for (const host of ['127.0.0.1', 'localhost', '[::1]']) {
+      const near = parseProvider(local({ url: `http://${host}:8801/v1/systemone` }), 'owner', { allowEnv: false });
+      expect(near.provider, host).not.toBeNull();
+      expect(near.provider?.leaves).toBe(false);
+    }
+  });
+
   it('lets the operator name a variable, and names only known adapters', () => {
     expect(parseProvider(local({ auth: { type: 'env', env: 'MY_KEY' } }), 'node', { allowEnv: true }).provider?.auth).toEqual({ type: 'env', env: 'MY_KEY' });
     expect(parseProvider(local({ adapter: 'laya' }), 'owner', { allowEnv: false }).provider?.adapter).toBe('laya');
