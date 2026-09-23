@@ -14,6 +14,10 @@
  *   import SchedulerCalendar from './scheduler-calendar.js';
  *   <${SchedulerCalendar} schedules=${[...managed, ...extensions]} reloadKey=${tick} onJumpTo=${jump} />
  * @version-history
+ *   2026-09-22 -- Composed from the shared component set: the month and the week are Tables, the
+ *     day is a timeline of ListRows, the modes are tabs, the kinds a row of chips; no own CSS. A
+ *     kind is named in the legend but no longer coloured on each event (the set has no toned event
+ *     mark), a past event reads quieter, and the prev/next arrows are the site's arrow glyphs.
  *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
  *   v1.0.0 -- 2026-07-03 -- Initial day/week/month scheduler calendar (server-projected cron cadence)
  *   v1.1.0 -- 2026-07-17 -- Continuous / high-frequency schedules (server `frequent` summary — per-minute /
@@ -28,6 +32,7 @@ import { t } from '/js/i18n.js';
 import { listScheduleOccurrences } from '/js/services/schedules.js';
 import { swallowed } from '/js/swallowed.js';
 import { time, calendar, dayKey } from '/js/format.js';
+import { Stack, Table, ListRow, Surface, Action, Chip, Text } from '/components/poster-parts.js';
 
 const html = htm.bind(h);
 
@@ -68,7 +73,7 @@ function readerToday() {
 function fallsOn(at, cell) { return dayKey(at) === cellDay(cell); }
 function fmtTime(d) { return time(d, { hour: '2-digit', minute: '2-digit' }); }
 
-/** Schedule kind → the CSS/colour suffix used by .sch-cal-ev--* and .sch-badge--*. */
+/** Schedule kind → the short kind id the legend groups by. */
 function kindClass(type) {
   return ({ ai: 'ai', agent_task: 'agent', extension: 'ext', 'eco-capability': 'eco' })[type] || 'core';
 }
@@ -196,125 +201,103 @@ export default function SchedulerCalendar({ schedules = [], reloadKey = 0, onJum
   const goToday = useCallback(() => setAnchorMs(readerToday().getTime()), []);
 
   const onEv = (e) => (ev) => { ev.stopPropagation(); onJumpTo?.(e.scheduleId); };
-  const evClass = (e) => `sch-cal-ev sch-cal-ev--${kindClass(e.type)}${e.past ? ' sch-cal-ev--past' : ''}`;
   const evTitle = (e) => `${fmtTime(e.at)} · ${e.name} — ${t(e.past ? 'profile.scheduler.cal.ran' : 'profile.scheduler.cal.upcoming')}`;
-  const chip = (e, i) => html`<button type="button" class=${evClass(e) + ' sch-cal-ev--click'} key=${i} title=${evTitle(e)} onClick=${onEv(e)}>
-      <span class="sch-cal-evtime">${fmtTime(e.at)}</span> ${e.name}</button>`;
+  // A fire that already happened reads quieter than one still to come.
+  const chip = (e, i) => html`<${Text} key=${i} kind="caption" tone=${e.past ? 'muted' : 'plain'}>
+    <${Action} kind="text" title=${evTitle(e)} onClick=${onEv(e)}>${fmtTime(e.at)} ${e.name}<//><//>`;
+  const dot = (e, j) => html`<${Text} key=${j} kind="caption" tone=${e.past ? 'muted' : 'plain'}>
+    <${Action} kind="text" title=${evTitle(e)} onClick=${onEv(e)}>${e.name}<//><//>`;
 
   const weekdays = useMemo(() => {
     const mon = startOfWeek(new Date(2024, 0, 1));
     return Array.from({ length: 7 }, (_, i) => calendar(addDays(mon, i), { weekday: 'short' }));
   }, []);
 
-  const legend = kindsPresent.length ? html`<div class="sch-cal-legend">
+  const legend = kindsPresent.length ? html`<${Stack} direction="wrap" density="compact">
     ${kindsPresent.map((k) => {
       const type = { ai: 'ai', agent: 'agent_task', ext: 'extension', eco: 'eco-capability', core: 'core' }[k];
       const lk = kindLabel(type);
-      return html`<span class="sch-cal-legend-item" key=${k}><span class="sch-cal-swatch sch-cal-ev--${k}"></span>${lk ? t(lk) : type}</span>`;
+      return html`<${Chip} key=${k} tone="muted">${lk ? t(lk) : type}<//>`;
     })}
-  </div>` : null;
+  <//>` : null;
 
-  const head = html`
-    <div class="sch-cal-head">
-      <div class="sch-cal-nav">
-        <div class="sch-cal-modes">
-          ${['month', 'week', 'day'].map((m) => html`<button key=${m} type="button"
-            class="${mode === m ? 'btn-primary' : 'btn-ghost'} btn-sm" onClick=${() => setMode(m)}>${t('profile.scheduler.cal.' + m)}</button>`)}
-        </div>
-        <div class="sch-cal-move">
-          <button class="btn-ghost btn-sm" type="button" onClick=${() => shift(-1)} title=${t('profile.scheduler.cal.prev')}>‹</button>
-          <button class="btn-ghost btn-sm" type="button" onClick=${goToday}>${t('profile.scheduler.cal.today')}</button>
-          <button class="btn-ghost btn-sm" type="button" onClick=${() => shift(1)} title=${t('profile.scheduler.cal.next')}>›</button>
-        </div>
-        ${legend}
-      </div>
-      <div class="sch-cal-range">${title}${loading ? html` <span class="sch-muted">· ${t('profile.scheduler.cal.loading')}</span>` : null}</div>
-      ${truncated ? html`<div class="sch-cal-trunc">${t('profile.scheduler.cal.truncated')}</div>` : null}
-    </div>`;
+  const head = html`<${Stack} density="compact">
+    <${Stack} direction="wrap" align="center">
+      ${['month', 'week', 'day'].map((m) => html`<${Action} key=${m} kind="tab" selected=${mode === m} onClick=${() => setMode(m)}>${t('profile.scheduler.cal.' + m)}<//>`)}
+      <${Action} onClick=${() => shift(-1)} title=${t('profile.scheduler.cal.prev')} label=${t('profile.scheduler.cal.prev')}>←<//>
+      <${Action} onClick=${goToday}>${t('profile.scheduler.cal.today')}<//>
+      <${Action} onClick=${() => shift(1)} title=${t('profile.scheduler.cal.next')} label=${t('profile.scheduler.cal.next')}>→<//>
+    <//>
+    ${legend}
+    <${Text} kind="lead">${title}${loading ? html` <${Text} kind="caption" tone="muted">· ${t('profile.scheduler.cal.loading')}<//>` : null}<//>
+    ${truncated ? html`<${Text} kind="caption" tone="danger">${t('profile.scheduler.cal.truncated')}<//>` : null}
+  <//>`;
 
   const emptyHint = (!loading && events.length === 0 && frequentList.length === 0)
-    ? html`<div class="sch-cal-empty">${schedules.some((s) => s.enabled !== false && s.cron && s.cron !== '@activate')
-        ? t('profile.scheduler.cal.noEvents') : t('profile.scheduler.cal.empty')}</div>`
+    ? html`<${Text} tone="muted">${schedules.some((s) => s.enabled !== false && s.cron && s.cron !== '@activate')
+        ? t('profile.scheduler.cal.noEvents') : t('profile.scheduler.cal.empty')}<//>`
     : null;
 
   // ── "Continuously running" strip: high-frequency crons summarized (not one-chip-per-fire) ──
   const FREQ_PREVIEW = 6;
-  const frequentStrip = frequentList.length ? html`<div class="sch-cal-freq poster-row--thing">
-    <div class="sch-cal-freq-head">
-      <span class="sch-cal-freq-title">${t('profile.scheduler.cal.frequentTitle')} <span class="sch-cal-freq-count">${frequentList.length}</span></span>
-      <button type="button" class="btn-ghost btn-sm" onClick=${() => setFoldFreq((v) => !v)}>
-        ${foldFreq ? t('profile.scheduler.cal.freqHideGrid') : t('profile.scheduler.cal.freqShowGrid')}
-      </button>
-    </div>
-    <div class="sch-cal-freq-pills">
-      ${(freqExpanded ? frequentList : frequentList.slice(0, FREQ_PREVIEW)).map((f) => html`<button type="button"
-        class="sch-cal-freqpill sch-cal-ev--${kindClass(f.type)}" key=${f.scheduleId}
-        title=${`${f.name} · ${cadenceLabel(f.intervalMinutes)}`} onClick=${() => onJumpTo?.(f.scheduleId)}>
-        <span class="sch-cal-freqdot"></span>
-        <span class="sch-cal-freqname">${f.name}</span>
-        <span class="sch-cal-freqcad">${cadenceLabel(f.intervalMinutes)} · ${t('profile.scheduler.cal.perDay', { n: f.approxPerDay })}</span>
-      </button>`)}
-      ${frequentList.length > FREQ_PREVIEW ? html`<button type="button" class="sch-cal-freqmore" onClick=${() => setFreqExpanded((v) => !v)}>
-        ${freqExpanded ? t('profile.scheduler.cal.showLess') : t('profile.scheduler.cal.showMore', { n: frequentList.length - FREQ_PREVIEW })}
-      </button>` : null}
-    </div>
-  </div>` : null;
+  const frequentStrip = frequentList.length ? html`<${Surface} kind="box" density="compact"><${Stack} density="compact">
+    <${Stack} direction="horizontal" align="between">
+      <${Text} kind="label">${t('profile.scheduler.cal.frequentTitle')} ${frequentList.length}<//>
+      <${Action} onClick=${() => setFoldFreq((v) => !v)}>${foldFreq ? t('profile.scheduler.cal.freqHideGrid') : t('profile.scheduler.cal.freqShowGrid')}<//>
+    <//>
+    <${Stack} direction="wrap">
+      ${(freqExpanded ? frequentList : frequentList.slice(0, FREQ_PREVIEW)).map((f) => html`<${Stack} key=${f.scheduleId} density="compact">
+        <${Action} kind="text" title=${`${f.name} · ${cadenceLabel(f.intervalMinutes)}`} onClick=${() => onJumpTo?.(f.scheduleId)}>${f.name}<//>
+        <${Text} kind="caption" tone="muted">${cadenceLabel(f.intervalMinutes)} · ${t('profile.scheduler.cal.perDay', { n: f.approxPerDay })}<//>
+      <//>`)}
+      ${frequentList.length > FREQ_PREVIEW ? html`<${Action} onClick=${() => setFreqExpanded((v) => !v)}>
+        ${freqExpanded ? t('profile.scheduler.cal.showLess') : t('profile.scheduler.cal.showMore', { n: frequentList.length - FREQ_PREVIEW })}<//>` : null}
+    <//>
+  <//><//>` : null;
 
-  // Aggregated per-day chip for a continuous schedule (used when folded into the grid).
-  const freqChip = (f, key) => html`<button type="button"
-    class="${'sch-cal-ev sch-cal-ev--' + kindClass(f.type) + ' sch-cal-ev--click sch-cal-freqchip'}" key=${key}
-    title=${`${f.name} · ${cadenceLabel(f.intervalMinutes)}`} onClick=${() => onJumpTo?.(f.scheduleId)}>
-    <span class="sch-cal-freqmark">⟳</span> ${f.name} <span class="sch-cal-evtime">×${f.approxPerDay}</span></button>`;
+  // Aggregated per-day entry for a continuous schedule (used when folded into the grid).
+  const freqChip = (f, key) => html`<${Text} key=${key} kind="caption">
+    <${Action} kind="text" title=${`${f.name} · ${cadenceLabel(f.intervalMinutes)}`} onClick=${() => onJumpTo?.(f.scheduleId)}>${f.name} ×${f.approxPerDay}<//><//>`;
   const gridFreq = foldFreq ? frequentList : [];
 
   // ── month ──
   if (mode === 'month') {
     const cells = Array.from({ length: 42 }, (_, i) => addDays(start, i));
-    return html`<section class="sch-cal">
+    const weeks = Array.from({ length: 6 }, (_, w) => cells.slice(w * 7, w * 7 + 7));
+    return html`<${Stack}>
       ${head}
       ${frequentStrip}
-      <div class="sch-cal-weekrow">${weekdays.map((w, i) => html`<div class="sch-cal-wd" key=${i}>${w}</div>`)}</div>
-      <div class="sch-cal-month">
-        ${cells.map((day, i) => {
-          const evs = eventsOn(day);
-          const inMonth = day.getMonth() === anchor.getMonth();
-          return html`<div class="sch-cal-cell ${inMonth ? '' : 'sch-cal-cell--dim'} ${sameDay(day, now) ? 'sch-cal-cell--today' : ''}" key=${i}>
-            <span class="sch-cal-daynum">${day.getDate()}</span>
-            <span class="sch-cal-cell-evs">
-              ${foldFreq && inMonth && gridFreq.length ? html`<span class="sch-cal-ev sch-cal-ev--core sch-cal-ev--dot sch-cal-freqcount" title=${t('profile.scheduler.cal.frequentTitle')}><span class="sch-cal-freqmark">⟳</span> ×${gridFreq.length}</span>` : null}
-              ${evs.slice(0, 3).map((e, j) => html`<button type="button" class=${evClass(e) + ' sch-cal-ev--click sch-cal-ev--dot'} key=${j} title=${evTitle(e)} onClick=${onEv(e)}>${e.name}</button>`)}
-              ${evs.length > 3 ? html`<span class="sch-cal-more">+${evs.length - 3}</span>` : null}
-            </span>
-          </div>`;
-        })}
-      </div>
+      <${Table} density="compact" label=${title} headers=${weekdays} rows=${weeks.map(week => week.map((day) => {
+        const evs = eventsOn(day);
+        const inMonth = day.getMonth() === anchor.getMonth();
+        return html`<${Stack} density="compact">
+          ${sameDay(day, now) ? html`<${Chip} tone="sun">${day.getDate()}<//>` : html`<${Text} kind="mono" tone=${inMonth ? 'plain' : 'muted'}>${day.getDate()}<//>`}
+          ${foldFreq && inMonth && gridFreq.length ? html`<${Text} kind="caption" tone="muted" title=${t('profile.scheduler.cal.frequentTitle')}>×${gridFreq.length}<//>` : null}
+          ${evs.slice(0, 3).map(dot)}
+          ${evs.length > 3 ? html`<${Text} kind="caption" tone="muted">+${evs.length - 3}<//>` : null}
+        <//>`;
+      }))} />
       ${emptyHint}
-    </section>`;
+    <//>`;
   }
 
   // ── week ──
   if (mode === 'week') {
     const days = Array.from({ length: 7 }, (_, i) => addDays(start, i));
-    return html`<section class="sch-cal">
+    return html`<${Stack}>
       ${head}
       ${frequentStrip}
-      <div class="sch-cal-week">
-        ${days.map((day, i) => {
+      <${Table} density="compact" label=${title}
+        headers=${days.map((day) => (sameDay(day, now) ? html`<${Chip} tone="sun">${calendar(day, { weekday: 'short' })} ${day.getDate()}<//>` : `${calendar(day, { weekday: 'short' })} ${day.getDate()}`))}
+        rows=${[days.map((day) => {
           const evs = eventsOn(day);
-          return html`<div class="sch-cal-weekcol ${sameDay(day, now) ? 'sch-cal-weekcol--today' : ''}" key=${i}>
-            <div class="sch-cal-weekcol-head">
-              <span class="sch-cal-wd">${calendar(day, { weekday: 'short' })}</span>
-              <span class="sch-cal-daynum">${day.getDate()}</span>
-            </div>
-            <div class="sch-cal-weekcol-evs">
-              ${gridFreq.map((f, j) => freqChip(f, 'gf' + j))}
-              ${evs.length === 0 && gridFreq.length === 0 ? html`<span class="sch-cal-dotempty">·</span>` : evs.map(chip)}
-            </div>
-          </div>`;
-        })}
-      </div>
+          return html`<${Stack} density="compact">
+            ${gridFreq.map((f, j) => freqChip(f, 'gf' + j))}
+            ${evs.length === 0 && gridFreq.length === 0 ? html`<${Text} kind="mono" tone="muted">·<//>` : evs.map(chip)}
+          <//>`;
+        })]} />
       ${emptyHint}
-    </section>`;
+    <//>`;
   }
 
   // ── day — hourly rail HOUR_START..HOUR_END + earlier/later buckets ──
@@ -323,28 +306,16 @@ export default function SchedulerCalendar({ schedules = [], reloadKey = 0, onJum
   const earlier = dayEvents.filter((e) => e.at.getHours() < HOUR_START);
   const later = dayEvents.filter((e) => e.at.getHours() > HOUR_END);
   const hours = Array.from({ length: HOUR_END - HOUR_START + 1 }, (_, i) => HOUR_START + i);
-  const bucket = (labelKey, list) => html`<div class="sch-cal-bucket">
-      <span class="sch-cal-hour">${t(labelKey)}</span>
-      <div class="sch-cal-hour-evs">${list.map(chip)}</div>
-    </div>`;
-  return html`<section class="sch-cal">
+  const hourRow = (key, label, list) => html`<${ListRow} key=${key} density="compact" time=${label} name=${html`<${Stack} direction="wrap" density="compact">${list}<//>`} />`;
+  return html`<${Stack}>
     ${head}
     ${frequentStrip}
-    ${dayEvents.length === 0 && frequentList.length === 0 && !loading ? html`<div class="sch-cal-empty">${t('profile.scheduler.cal.noEvents')}</div>` : null}
-    ${foldFreq && gridFreq.length ? html`<div class="sch-cal-bucket">
-      <span class="sch-cal-hour"><span class="sch-cal-freqmark">⟳</span></span>
-      <div class="sch-cal-hour-evs">${gridFreq.map((f, j) => freqChip(f, 'gf' + j))}</div>
-    </div>` : null}
-    ${earlier.length ? bucket('profile.scheduler.cal.earlier', earlier) : null}
-    <div class="sch-cal-day">
-      ${hours.map((hr) => {
-        const evs = dayEvents.filter((e) => e.at.getHours() === hr);
-        return html`<div class="sch-cal-hourrow" key=${hr}>
-          <span class="sch-cal-hour">${String(hr).padStart(2, '0')}:00</span>
-          <div class="sch-cal-hour-evs">${evs.map(chip)}</div>
-        </div>`;
-      })}
-    </div>
-    ${later.length ? bucket('profile.scheduler.cal.later', later) : null}
-  </section>`;
+    ${dayEvents.length === 0 && frequentList.length === 0 && !loading ? html`<${Text} tone="muted">${t('profile.scheduler.cal.noEvents')}<//>` : null}
+    <${Stack} density="compact">
+      ${foldFreq && gridFreq.length ? hourRow('freq', '×', gridFreq.map((f, j) => freqChip(f, 'gf' + j))) : null}
+      ${earlier.length ? hourRow('early', t('profile.scheduler.cal.earlier'), earlier.map(chip)) : null}
+      ${hours.map((hr) => hourRow(hr, `${String(hr).padStart(2, '0')}:00`, dayEvents.filter((e) => e.at.getHours() === hr).map(chip)))}
+      ${later.length ? hourRow('late', t('profile.scheduler.cal.later'), later.map(chip)) : null}
+    <//>
+  <//>`;
 }

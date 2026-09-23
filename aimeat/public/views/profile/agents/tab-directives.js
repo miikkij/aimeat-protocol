@@ -6,6 +6,10 @@
  *   View mode shows formatted text; edit mode uses a single textarea.
  *   Memory areas, knowledge packages, and config files live in their own tabs.
  * @version-history
+ *   2026-09-22 -- Composed from the shared component set: one small Section with Edit in its
+ *     actions, the purpose as a label over body text, the directives in a code Surface (it keeps
+ *     their line breaks), the editor two Fields with Save as the one primary action. No class of its
+ *     own is left. Same words, data and handlers.
  *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
  *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
  *   v2.2.0 -- 2026-07-17 -- Tab content wrapped in a single pf-agd-card.
@@ -22,6 +26,7 @@ import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { getDirectives, upsertDirectives } from '/js/services/agent-directives.js';
+import { Section, Stack, Field, Action, Surface, Text } from '/components/poster-parts.js';
 
 const html = htm.bind(h);
 
@@ -109,85 +114,62 @@ export default function TabDirectives({ agentName, showToast }) {
   }
 
   if (loading) {
-    return html`<div class="pf-agd-empty">${t('profile.loading')}</div>`;
+    return html`<${Text} tone="muted">${t('profile.loading')}<//>`;
   }
 
   if (error) {
-    return html`<div class="pf-agd-empty">${error}</div>`;
+    return html`<${Text} tone="muted">${error}<//>`;
   }
 
   const hasContent = purpose || content;
+  const footer = html`<${Text} kind="caption" tone="muted">${t('profile.agents.detail.directives.footer')}<//>`;
+
+  if (!editing) {
+    return html`
+      <${Section} size="small" density="compact" title=${t('profile.agents.directives.title')}
+        actions=${html`<${Action} onClick=${(e) => { e.stopPropagation(); startEditing(); }}>
+          ${t('profile.agents.directives.edit')}
+        <//>`}>
+        <${Stack} density="compact">
+          ${purpose && html`
+            <${Stack} density="compact">
+              <${Text} kind="label">${t('profile.agents.directives.purpose')}<//>
+              <${Text}>${purpose}<//>
+            <//>
+          `}
+
+          ${content ? html`<${Surface} kind="code">${content}<//>` : ''}
+
+          ${!hasContent && html`<${Text} tone="muted">${t('profile.agents.directives.empty')}<//>`}
+
+          ${footer}
+        <//>
+      <//>
+    `;
+  }
 
   return html`
-    <div class="pf-agd-card poster-row--thing">
-      ${!editing ? html`
-        <!-- View mode -->
-        <div class="pf-agd-section-header">
-          <span class="pf-agd-section-title">${t('profile.agents.directives.title')}</span>
-          <div>
-            <button class="btn-outline btn-sm" onClick=${(e) => { e.stopPropagation(); startEditing(); }}>
-              ${t('profile.agents.directives.edit')}
-            </button>
-          </div>
-        </div>
+    <${Section} size="small" density="compact" title=${t('profile.agents.directives.editing')}>
+      <${Stack} density="compact">
+        <${Field} type="textarea" rows=${3} label=${t('profile.agents.directives.purpose')}
+          value=${editPurpose} onInput=${(e) => setEditPurpose(e.target.value)}
+          placeholder=${t('profile.agents.directives.purposePlaceholder')} />
 
-        ${purpose && html`
-          <div class="pf-agd-directive-section">
-            <h4>${t('profile.agents.directives.purpose')}</h4>
-            <div class="pf-agd-purpose-text">${purpose}</div>
-          </div>
-        `}
+        <${Field} type="textarea" rows=${10} label=${t('profile.agents.detail.directives.contentLabel')}
+          value=${editContent} onInput=${(e) => setEditContent(e.target.value)}
+          placeholder=${t('profile.agents.detail.directives.contentPlaceholder')} />
 
-        ${content ? html`
-          <div class="pf-agd-directive-section">
-            <div class="pf-agd-directives-content poster-row--thing">${content}</div>
-          </div>
-        ` : ''}
-
-        ${!hasContent && html`
-          <div class="pf-agd-empty">
-            ${t('profile.agents.directives.empty')}
-          </div>
-        `}
-
-        <div class="pf-agd-directive-footer">
-          ${t('profile.agents.detail.directives.footer')}
-        </div>
-      ` : html`
-        <!-- Edit mode -->
-        <div class="pf-agd-section-header">
-          <span class="pf-agd-section-title">${t('profile.agents.directives.editing')}</span>
-        </div>
-
-        <div class="pf-agd-directive-section">
-          <h4>${t('profile.agents.directives.purpose')}</h4>
-          <div class="pf-agd-form-field">
-            <textarea value=${editPurpose} onInput=${(e) => setEditPurpose(e.target.value)}
-                      placeholder=${t('profile.agents.directives.purposePlaceholder')}></textarea>
-          </div>
-        </div>
-
-        <div class="pf-agd-directive-section">
-          <h4>${t('profile.agents.detail.directives.contentLabel')}</h4>
-          <textarea class="pf-agd-directives-textarea"
-                    value=${editContent}
-                    onInput=${(e) => setEditContent(e.target.value)}
-                    placeholder=${t('profile.agents.detail.directives.contentPlaceholder')}></textarea>
-        </div>
-
-        <div class="pf-agd-form-actions">
-          <button class="btn-primary btn-sm" onClick=${(e) => { e.stopPropagation(); handleSave(); }} disabled=${saving}>
+        <${Stack} direction="wrap" align="center">
+          <${Action} kind="primary" onClick=${(e) => { e.stopPropagation(); handleSave(); }} disabled=${saving}>
             ${saving ? t('profile.agents.directives.saving') : t('profile.agents.directives.save')}
-          </button>
-          <button class="btn-outline btn-sm" onClick=${(e) => { e.stopPropagation(); cancelEditing(); }}>
+          <//>
+          <${Action} onClick=${(e) => { e.stopPropagation(); cancelEditing(); }}>
             ${t('profile.agents.scopeUi.cancel')}
-          </button>
-        </div>
+          <//>
+        <//>
 
-        <div class="pf-agd-directive-footer">
-          ${t('profile.agents.detail.directives.footer')}
-        </div>
-      `}
-    </div>
+        ${footer}
+      <//>
+    <//>
   `;
 }

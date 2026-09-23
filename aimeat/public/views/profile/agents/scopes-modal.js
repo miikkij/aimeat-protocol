@@ -6,6 +6,10 @@
  *   permission checkboxes, read-only view for non-owners. Extracted from ../agents-tab.js
  *   to satisfy max-file-lines.
  * @version-history
+ *   v2.0.0 -- 2026-09-22 -- Composed from the shared set (components/poster-parts.js): the shared
+ *     dialog, the presets as tab actions, the advanced list a Fold of domains whose permissions are
+ *     list rows (the words, the scope string in mono, a checkbox Field), each inside its label. The domain header toggles through its
+ *     "all" action. No class of its own.
  *   v1.0.1 — 2026-09-13 — The large dialog size; Cancel and Save sit in the footer, where they stay in
  *     view while the advanced list scrolls.
  *   v1.0.0 — 2026-07-13 — Extracted from views/profile/agents-tab.js (max-file-lines)
@@ -29,7 +33,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { InboxLink } from '/components/InboxLink.js';
-import { Modal } from '/components/Modal.js';
+import { Dialog, Stack, Fold, ListRow, Field, Chip, Action, Text } from '/components/poster-parts.js';
 import {
   SCOPE_DOMAINS, SCOPE_TEMPLATES, NOT_IN_WILDCARD,
   wildcardScopes, bulkScopes, expandScopes, collapseScopes, detectTemplate, unknownScopes,
@@ -37,7 +41,7 @@ import {
 } from './scope-config.js';
 
 // The envelope beside the agent's address: the door to its inbox thread.
-const MAIL_ICON = html`<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14"/><path d="M3 7l9 6 9-6"/></svg>`;
+const MAIL_ICON = html`<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="18" height="14"/><path d="M3 7l9 6 9-6"/></svg>`;
 
 export default function ScopesModal({ agent, session, onSave, onCancel }) {
   const scopes = agent.default_scopes ?? ['*'];
@@ -90,93 +94,85 @@ export default function ScopesModal({ agent, session, onSave, onCancel }) {
 
   const isReadOnly = !(session.roles?.includes('owner') || session.roles?.includes('operator'));
 
+  const cancel = html`<${Action} onClick=${onCancel}>${t('profile.agents.scopeUi.cancel')}<//>`;
+
+  /**
+   * One permission as a row: its plain words, the scope string in mono, its notes, and the checkbox
+   * at the right. The row is wrapped in a label, as the old row was, so the words name the checkbox
+   * and a press anywhere on the row toggles it.
+   */
+  const scopeRow = (scope, label, { locked = false, extra = false } = {}) => html`
+    <label key=${scope}>
+      <${ListRow} density="compact" name=${label ?? scope} detail=${label != null ? scope : null}
+        actions=${html`<${Field} type="checkbox"
+          value=${checked.has(scope) || locked}
+          onChange=${() => !locked && toggleScope(scope)}
+          disabled=${locked} />`}>
+        ${(locked || extra) && html`<${Stack} direction="wrap" align="center" density="compact">
+          ${locked && html`<${Chip} tone="muted">${t('profile.agents.scopeUi.alwaysOn')}<//>`}
+          ${extra && html`<${Text} kind="caption" tone="coral">${t('profile.agents.scopeUi.notInFullAccess')}<//>`}
+        <//>`}
+      <//>
+    </label>`;
+
   return html`
-    <${Modal} open=${true} onClose=${onCancel} className="scope-modal" size="lg" title=${`${t('profile.agents.scopeUi.scopeProfile')}: ${agent.display_name || agent.name}`}
-      footer=${isReadOnly ? html`
-        <button class="btn-outline" onClick=${onCancel}>${t('profile.agents.scopeUi.cancel')}</button>` : html`
-        <button class="btn-outline" onClick=${onCancel}>${t('profile.agents.scopeUi.cancel')}</button>
-        <button class="btn-primary" onClick=${handleSave} disabled=${saving}>
+    <${Dialog} open=${true} onClose=${onCancel} size="large" title=${`${t('profile.agents.scopeUi.scopeProfile')}: ${agent.display_name || agent.name}`}
+      actions=${isReadOnly ? cancel : html`
+        ${cancel}
+        <${Action} kind="primary" onClick=${handleSave} disabled=${saving}>
           ${saving ? t('profile.agents.scopeUi.saving') : t('profile.agents.scopeUi.save')}
-        </button>`}>
-        <div class="scope-agent-info">${escHtml(agent.gaii || '')}
-          ${agent.gaii ? html`<${InboxLink} to=${agent.gaii} title=${t('inbox.messageThis')} className="scope-agent-msg">${MAIL_ICON}</${InboxLink}>` : null}
-        </div>
+        <//>`}>
+      <${Stack}>
+        <${Stack} direction="horizontal" align="center" density="compact">
+          <${Text} kind="mono">${escHtml(agent.gaii || '')}<//>
+          ${agent.gaii ? html`<${InboxLink} to=${agent.gaii} title=${t('inbox.messageThis')}>${MAIL_ICON}</${InboxLink}>` : null}
+        <//>
 
         ${isReadOnly ? html`
-          <p class="text-caption mb-1">${t('profile.agents.scopeUi.readOnlyView')}</p>
-          <div class="scope-readonly-list">
-            ${scopes.map(s => html`<span class="scope-tag">${escHtml(s)}</span>`)}
-          </div>
+          <${Text} kind="caption" tone="muted">${t('profile.agents.scopeUi.readOnlyView')}<//>
+          <${Stack} direction="wrap" density="compact">
+            ${scopes.map(s => html`<${Chip} key=${s}>${escHtml(s)}<//>`)}
+          <//>
         ` : html`
-          <div class="scope-templates">
+          <${Stack} direction="wrap">
             ${['readonly', 'standard', 'full'].map(tpl => html`
-              <button class="scope-tpl-btn ${currentTemplate === tpl ? 'active' : ''}"
-                      onClick=${() => applyTemplate(tpl)}>
+              <${Action} kind="tab" key=${tpl} selected=${currentTemplate === tpl} onClick=${() => applyTemplate(tpl)}>
                 ${templateLabel(tpl)}
-              </button>
+              <//>
             `)}
-          </div>
+          <//>
 
-          <button class="scope-advanced-toggle" onClick=${() => setAdvanced(!advanced)}>
-            <span>${t('profile.agents.scopeUi.advanced')}</span>
-            <span class="pf-chevron ${advanced ? 'pf-chevron-open' : ''}">▼</span>
-          </button>
+          <${Fold} title=${t('profile.agents.scopeUi.advanced')} open=${advanced} onToggle=${() => setAdvanced(!advanced)}>
+            ${SCOPE_DOMAINS.map(d => {
+              const allChecked = bulkScopes(d).every(s => checked.has(s));
+              const isCatalogue = d.key === 'catalogue';
+              return html`
+                <${Stack} density="compact" key=${d.key}>
+                  <${Stack} direction="horizontal" align="between">
+                    <${Text} kind="label">${domainLabel(d.key)}<//>
+                    ${!isCatalogue && html`<${Action} kind="tab" selected=${allChecked} onClick=${() => toggleDomain(d.key)}>${allChecked ? '✓ ' : ''}${t('profile.agents.scopeUi.all')}<//>`}
+                  <//>
+                  ${d.permissions.map(p => {
+                    const scope = `${d.key}:${p}`;
+                    return scopeRow(scope, permLabel(p, d.key), {
+                      locked: isCatalogue && p === 'read',
+                      extra: NOT_IN_WILDCARD.includes(scope),
+                    });
+                  })}
+                <//>`;
+            })}
 
-          ${advanced && html`
-            <div class="scope-domains">
-              ${SCOPE_DOMAINS.map(d => {
-                const allChecked = bulkScopes(d).every(s => checked.has(s));
-                const isCatalogue = d.key === 'catalogue';
-                return html`
-                  <div class="scope-domain">
-                    <div class="scope-domain-header" onClick=${() => !isCatalogue && toggleDomain(d.key)}>
-                      <span class="domain-label">${domainLabel(d.key)}</span>
-                      ${!isCatalogue && html`<span class=${`domain-toggle ${allChecked ? 'on' : ''}`}>${allChecked ? '✓ ' : ''}${t('profile.agents.scopeUi.all')}</span>`}
-                    </div>
-                    ${d.permissions.map(p => {
-                      const scope = `${d.key}:${p}`;
-                      const isLocked = isCatalogue && p === 'read';
-                      const isExtra = NOT_IN_WILDCARD.includes(scope);
-                      return html`
-                        <div class="scope-row ${isLocked ? 'disabled' : ''}">
-                          <label>
-                            <input type="checkbox"
-                              checked=${checked.has(scope) || isLocked}
-                              onChange=${() => !isLocked && toggleScope(scope)}
-                              disabled=${isLocked}
-                            />
-                            <span class="scope-friendly">${permLabel(p, d.key)}</span>
-                            <span class="scope-technical">${scope}</span>
-                            ${isLocked && html`<span class="scope-lock">${t('profile.agents.scopeUi.alwaysOn')}</span>`}
-                            ${isExtra && html`<span class="scope-extra-note">${t('profile.agents.scopeUi.notInFullAccess')}</span>`}
-                          </label>
-                        </div>`;
-                    })}
-                  </div>`;
-              })}
+            ${unknown.length > 0 && html`
+              <${Stack} density="compact">
+                <${Text} kind="label">${t('profile.agents.scopeUi.domainOther')}<//>
+                <${Text} kind="caption" tone="muted">${t('profile.agents.scopeUi.otherScopesHint')}<//>
+                ${unknown.map(scope => scopeRow(scope, null))}
+              <//>
+            `}
+          <//>
 
-              ${unknown.length > 0 && html`
-                <div class="scope-domain">
-                  <div class="scope-domain-header">
-                    <span class="domain-label">${t('profile.agents.scopeUi.domainOther')}</span>
-                  </div>
-                  <p class="scope-domain-desc">${t('profile.agents.scopeUi.otherScopesHint')}</p>
-                  ${unknown.map(scope => html`
-                    <div class="scope-row">
-                      <label>
-                        <input type="checkbox"
-                          checked=${checked.has(scope)}
-                          onChange=${() => toggleScope(scope)}
-                        />
-                        <span class="scope-technical">${escHtml(scope)}</span>
-                      </label>
-                    </div>`)}
-                </div>
-              `}
-            </div>
-          `}
-
-          <p class="scope-reconnect-note">${t('profile.agents.scopeUi.reconnectNote')}</p>
+          <${Text} kind="caption" tone="muted">${t('profile.agents.scopeUi.reconnectNote')}<//>
         `}
+      <//>
     <//>`;
 }

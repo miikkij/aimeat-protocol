@@ -9,6 +9,9 @@
  * @structure recordAiLabel (internal), recordFields (internal), renderRecordSpace
  * @usage import { renderRecordSpace } from '/views/profile/organisms/workspace/record-space.js';
  * @version-history
+ *   2026-09-22 -- Composed from the shared set: a record is a ListRow that opens in place (its fields as
+ *     KeyValue rows), the row's icon buttons are one Menu (Unarchive stays a worded action in the
+ *     archive view); the repeated space head that the page already shows is gone. No class of its own.
  *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
  *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 3: the AI-transparency label on every record that owes
  *     one — the compact chip in the list row (first exposure), the block form with the
@@ -19,8 +22,7 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { Spinner } from '/views/profile/shared.js';
-import { EmptyState } from '/components/EmptyState.js';
+import { Stack, Surface, ListRow, KeyValue, Chip, Action, Menu, Text } from '/components/poster-parts.js';
 import { AiLabel } from '/components/ai-label.js';
 import { SchemaForm } from '/views/profile/organisms/schema-form.js';
 import { WorkspaceComments } from '/views/profile/organisms/workspace-comments.js';
@@ -47,83 +49,84 @@ function recordFields(ctx, ot, rec) {
   const { wsT } = ctx;
   const rows = Object.entries(rec || {}).filter(([k, v]) =>
     !k.startsWith('_') && v !== undefined && v !== null && v !== '' && !(Array.isArray(v) && v.length === 0));
-  if (!rows.length) return html`<div class="pj-muted pj-rec-empty">${t('organisms.noFields') || 'No fields'}</div>`;
-  return rows.map(([k, v]) => html`<div class="pj-rec-field" key=${k}>
-    <div class="pj-rec-field-label">${wsT(`${ot.namespace}.${k}`) || k}</div>
-    <div class="pj-rec-field-val">${renderFieldVal(v)}</div>
-  </div>`);
+  if (!rows.length) return html`<${Text} kind="caption" tone="muted">${t('organisms.noFields') || 'No fields'}<//>`;
+  return rows.map(([k, v]) => html`<${KeyValue} key=${k} label=${wsT(`${ot.namespace}.${k}`) || k} value=${renderFieldVal(v)} />`);
 }
+
+const loading = () => html`<${Text} tone="muted">${t('profile.loading')}<//>`;
 
 // A record-space tab: schema-form add/edit + draft and published record lists (with comments).
 export function renderRecordSpace(ctx, ot) {
   const {
-    wsT, startAdd, spaceDesc, adding, addingId, addingSchema, busy, addingInitial, saveDraft,
+    wsT, adding, addingId, addingSchema, busy, addingInitial, saveDraft,
     cancelForm, draftsFor, itemColor, setItemColor, toggleExpand, startEdit, publish, removeObject,
     expandedRec, orgId, wsId, showToast, commentsByKey, cKey, reloadComments, objectsFor,
     showArchived, reopen, setRecordArchived,
   } = ctx;
-  return html`
-    <div class="pj-section poster-row--thing" key=${ot.name}>
-      <div class="pj-section-head">
-        <span class="pj-section-title">${(wsT('type.' + ot.name) || ot.name)}</span>
-        ${ot.append ? null : html`<button class="btn-outline btn-sm" onClick=${() => startAdd(ot)}>${'+ '}${t('organisms.addDraft') || 'Add draft'}</button>`}
-      </div>
-      ${spaceDesc(ot) ? html`<div class="section-desc">${spaceDesc(ot)}</div>` : null}
+  const titleOf = (r, fallback) => String(r[PRIMARY_FIELD[ot.name] || 'title'] || fallback || r.id || '');
+  const opened = (r) => html`<${Stack} density="compact">${recordAiLabel(r, 'block')}${recordFields(ctx, ot, r)}<//>
+    <${WorkspaceComments} orgId=${orgId} ws=${wsId} space=${ot.name} instanceId=${r.id} showToast=${showToast} batched=${true} initialComments=${commentsByKey[cKey(wsId, ot.name, r.id)]} onReload=${reloadComments} />`;
+  return html`<${Stack} key=${ot.name}>
+    ${adding === ot.name && !addingId && (addingSchema
+      ? html`<${Surface} kind="box" surfaceRef=${(el) => {
+          // Scroll the freshly opened form into view ONCE. On a phone the form used to open
+          // below the fold, so "+ Add draft" looked like a dead button (UX-remake v3, P12,
+          // measured). The dataset flag stops re-scrolling on every keystroke re-render.
+          if (el && !el.dataset.scrolledIntoView) {
+            el.dataset.scrolledIntoView = '1';
+            el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+          }
+        }}><${SchemaForm} key=${'sf-new'} schema=${addingSchema} busy=${busy} initial=${addingInitial}
+          idPrefix=${ot.name} namespace=${ot.namespace} wsT=${wsT}
+          onSave=${(v) => saveDraft(ot, v)} onCancel=${cancelForm} /><//>`
+      : loading())}
 
-      ${adding === ot.name && !addingId && (addingSchema
-        ? html`<div class="pj-rec-edit pj-rec-edit-new" ref=${(el) => {
-            // Scroll the freshly opened form into view ONCE. On a phone the form used to open
-            // below the fold, so "+ Add draft" looked like a dead button (UX-remake v3, P12,
-            // measured). The dataset flag stops re-scrolling on every keystroke re-render.
-            if (el && !el.dataset.scrolledIntoView) {
-              el.dataset.scrolledIntoView = '1';
-              el.scrollIntoView({ block: 'center', behavior: 'smooth' });
-            }
-          }}>${html`<${SchemaForm} key=${'sf-new'} schema=${addingSchema} busy=${busy} initial=${addingInitial}
-            idPrefix=${ot.name} namespace=${ot.namespace} wsT=${wsT}
-            onSave=${(v) => saveDraft(ot, v)} onCancel=${cancelForm} />`}</div>`
-        : html`<${Spinner} />`)}
-
-      ${draftsFor(ot.name).map((d, i) => html`
-        <div class="pj-rec ${itemColor(ot.name, d.id) ? 'pj-colored pj-tag-' + itemColor(ot.name, d.id) : ''}" key=${'d' + i}>
-          <div class="pj-item pj-item-draft">
-            <${ColorPicker} value=${itemColor(ot.name, d.id)} onPick=${(c) => setItemColor(ot.name, d.id, c)} />
-            <span class="badge badge-warn">${t('organisms.draft') || 'draft'}</span>
-            <button class="pj-rec-title" onClick=${() => toggleExpand(ot, d.id)}>${String(d[PRIMARY_FIELD[ot.name] || 'title'] || d.id || '')}</button>
+    <${Stack} density="compact">
+      ${draftsFor(ot.name).map((d, i) => {
+        const open = !!expandedRec[ot.name + ':' + d.id];
+        return html`
+        <${ListRow} key=${'d' + i} density="compact" selected=${open}
+          mark=${html`<${ColorPicker} value=${itemColor(ot.name, d.id)} onPick=${(c) => setItemColor(ot.name, d.id, c)} />`}
+          name=${titleOf(d)} onOpen=${() => toggleExpand(ot, d.id)}
+          actions=${html`<${Chip} tone="sun">${t('organisms.draft') || 'draft'}<//>
             ${recordAiLabel(d, 'inline')}
-            <button class="btn-ghost btn-sm" onClick=${() => startEdit(ot, d)} disabled=${busy}>${t('organisms.edit') || 'Edit'}</button>
-            <button class="btn-primary btn-sm" onClick=${() => publish(ot, d.id)} disabled=${busy}>${t('organisms.publish') || 'Publish'}</button>
-            <button class="pj-icon-btn" title=${t('organisms.delete') || 'Delete'} disabled=${busy} onClick=${() => removeObject(ot.namespace, d.id, String(d[PRIMARY_FIELD[ot.name] || 'title'] || d.id))}>🗑</button>
-          </div>
+            <${Action} kind="text" onClick=${() => startEdit(ot, d)} disabled=${busy}>${t('organisms.edit') || 'Edit'}<//>
+            <${Action} onClick=${() => publish(ot, d.id)} disabled=${busy}>${t('organisms.publish') || 'Publish'}<//>
+            <${Menu} label=${t('organisms.moreActions') || 'More actions'} items=${[
+              { label: t('organisms.delete') || 'Delete', danger: true, disabled: busy, onClick: () => removeObject(ot.namespace, d.id, titleOf(d)) },
+            ]} />`}>
           ${adding === ot.name && addingId === d.id
-            ? html`<div class="pj-rec-edit">${addingSchema
-                ? html`<${SchemaForm} key=${'sf-' + d.id} schema=${addingSchema} busy=${busy} initial=${addingInitial}
-                    idPrefix=${ot.name} namespace=${ot.namespace} wsT=${wsT}
-                    onSave=${(v) => saveDraft(ot, { ...v, id: addingId })} onCancel=${cancelForm} />`
-                : html`<${Spinner} />`}</div>`
-            : (expandedRec[ot.name + ':' + d.id] ? html`<div class="pj-rec-fields">${recordAiLabel(d, 'block')}${recordFields(ctx, ot, d)}</div><${WorkspaceComments} orgId=${orgId} ws=${wsId} space=${ot.name} instanceId=${d.id} showToast=${showToast} batched=${true} initialComments=${commentsByKey[cKey(wsId, ot.name, d.id)]} onReload=${reloadComments} />` : null)}
-        </div>
-      `)}
+            ? (addingSchema
+              ? html`<${SchemaForm} key=${'sf-' + d.id} schema=${addingSchema} busy=${busy} initial=${addingInitial}
+                  idPrefix=${ot.name} namespace=${ot.namespace} wsT=${wsT}
+                  onSave=${(v) => saveDraft(ot, { ...v, id: addingId })} onCancel=${cancelForm} />`
+              : loading())
+            : (open ? opened(d) : null)}
+        <//>`;
+      })}
 
       ${objectsFor(ot.name).length === 0 && draftsFor(ot.name).length === 0
-        ? html`<${EmptyState} text=${t('organisms.noneYet') || 'none yet'} />`
-        : objectsFor(ot.name).map((o, i) => html`
-          <div class="pj-rec ${itemColor(ot.name, o.id) ? 'pj-colored pj-tag-' + itemColor(ot.name, o.id) : ''}" key=${'o' + i}>
-            <div class="pj-item">
-              <${ColorPicker} value=${itemColor(ot.name, o.id)} onPick=${(c) => setItemColor(ot.name, o.id, c)} />
-              <button class="pj-rec-title" onClick=${() => toggleExpand(ot, o.id)}>${String(o[PRIMARY_FIELD[ot.name] || 'title'] || o.summary || o.id || '')}</button>
-              ${recordAiLabel(o, 'inline')}
-              ${o.status ? html`<span class="badge badge-info">${(o.status)}</span>` : null}
+        ? html`<${Text} tone="muted">${t('organisms.noneYet') || 'none yet'}<//>`
+        : objectsFor(ot.name).map((o, i) => {
+          const open = !!expandedRec[ot.name + ':' + o.id];
+          return html`
+          <${ListRow} key=${'o' + i} density="compact" selected=${open}
+            mark=${html`<${ColorPicker} value=${itemColor(ot.name, o.id)} onPick=${(c) => setItemColor(ot.name, o.id, c)} />`}
+            name=${titleOf(o, o.summary)} onOpen=${() => toggleExpand(ot, o.id)}
+            actions=${html`${recordAiLabel(o, 'inline')}
+              ${o.status ? html`<${Chip}>${o.status}<//>` : null}
               ${!showArchived && !draftsFor(ot.name).some(dr => dr.id === o.id) ? html`
-                <button class="btn-ghost btn-sm" title=${t('organisms.reopenEditHint') || 'Reopen for editing — creates an editable draft from the published version'} disabled=${busy} onClick=${() => reopen(ot, o.id)}>${t('organisms.edit') || 'Edit'}</button>` : null}
+                <${Action} kind="text" title=${t('organisms.reopenEditHint') || 'Reopen for editing — creates an editable draft from the published version'} disabled=${busy} onClick=${() => reopen(ot, o.id)}>${t('organisms.edit') || 'Edit'}<//>` : null}
               ${showArchived
-                ? html`<button class="btn-ghost btn-sm" title=${t('organisms.unarchive') || 'Unarchive'} disabled=${busy} onClick=${() => setRecordArchived(ot, o.id, false)}>${'♻️ '}${t('organisms.unarchive') || 'Unarchive'}</button>`
-                : html`<button class="pj-icon-btn" title=${t('organisms.archive') || 'Archive'} disabled=${busy} onClick=${() => setRecordArchived(ot, o.id, true)}>🗄️</button>`}
-              <button class="pj-icon-btn" title=${t('organisms.delete') || 'Delete'} disabled=${busy} onClick=${() => removeObject(ot.namespace, o.id, String(o[PRIMARY_FIELD[ot.name] || 'title'] || o.id))}>🗑</button>
-            </div>
-            ${expandedRec[ot.name + ':' + o.id] ? html`<div class="pj-rec-fields">${recordAiLabel(o, 'block')}${recordFields(ctx, ot, o)}</div><${WorkspaceComments} orgId=${orgId} ws=${wsId} space=${ot.name} instanceId=${o.id} showToast=${showToast} batched=${true} initialComments=${commentsByKey[cKey(wsId, ot.name, o.id)]} onReload=${reloadComments} />` : null}
-          </div>
-        `)
-      }
-    </div>`;
+                ? html`<${Action} title=${t('organisms.unarchive') || 'Unarchive'} disabled=${busy} onClick=${() => setRecordArchived(ot, o.id, false)}>${t('organisms.unarchive') || 'Unarchive'}<//>`
+                : null}
+              <${Menu} label=${t('organisms.moreActions') || 'More actions'} items=${[
+                !showArchived && { label: t('organisms.archive') || 'Archive', disabled: busy, onClick: () => setRecordArchived(ot, o.id, true) },
+                { label: t('organisms.delete') || 'Delete', danger: true, disabled: busy, onClick: () => removeObject(ot.namespace, o.id, titleOf(o)) },
+              ]} />`}>
+            ${open ? opened(o) : null}
+          <//>`;
+        })}
+    <//>
+  <//>`;
 }

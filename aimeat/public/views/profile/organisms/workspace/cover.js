@@ -5,16 +5,20 @@
  * @description The workspace in the poster face (design canvas "AIMEAT Työtilan sivu", direction A,
  *   the organism page's sibling one step deeper). The COVER answers in order: what is new for me
  *   (a first section that appears only while something is unseen or waits for a decision), what is
- *   here (the record types and the document spaces as tables with counts, the unseen mark and the
+ *   here (the record types and the document spaces as rows with counts, the unseen mark and the
  *   latest item), what has happened, and then the README, the map and the AI instruction as folds.
  *   A space, a panel (activity, people, share, sources, skills, review) and the settings are each a
  *   PAGE of their own under the same crumb, with a rail that leads back. The rail on the cover is a
  *   numbered contents list with the panels as doors; "Show as a tree" swaps it for the whole
- *   structure with the documents nested, a personal choice kept in home.prefs like the margin pattern.
+ *   structure with the documents listed under their space, a personal choice kept in home.prefs.
  *   Pure render functions over the ctx bag the parent Workspace assembles.
  * @structure renderWorkspaceView (cover or page) · renderCover · renderPage · renderRail · renderTree
  * @usage import { renderWorkspaceView } from './workspace/cover.js';
  * @version-history
+ *   2026-09-22 -- Composed from the shared set: Page with an index Rail (the tree is the same rail
+ *     with the structure as its body), Sections, ListRows for the spaces and the events, a plain
+ *     NumeralBand for the figures, a search Field; no class of its own. A rail entry that names a
+ *     fold opens it through the hash (useRailOpens in workspace.js).
  *   2026-09-14 -- An opened space says what it is: a row space and a task space are named as such
  *     instead of "record type", and the count they never had is a dash rather than a 0.
  *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
@@ -26,8 +30,8 @@
 import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
+import { t } from '/js/i18n.js';
 import * as orgService from '/js/services/organisms.js';
-import { SearchBar } from '/components/SearchBar.js';
 import { relTime, fmtDate } from '/views/profile/organisms/helpers.js';
 import { ReadmePanel } from '/views/profile/organisms/readme-panel.js';
 import { StructureMindmap } from '/views/profile/organisms/mindmap.js';
@@ -36,7 +40,8 @@ import { WorkspaceApps } from '/views/profile/organisms/workspace-apps.js';
 import { ParticipantsPanel } from '/views/profile/organisms/participants-panel.js';
 import { SourcesPanel } from '/views/profile/organisms/sources-panel.js';
 import { SkillsPanel } from '/views/profile/organisms/skills-panel.js';
-import { Section, Fold, tr, scrollTo } from '/views/profile/organisms/poster-parts.js';
+import { tr, scrollTo } from '/views/profile/organisms/poster-parts.js';
+import { Page, Rail, Section, Fold, Stack, ListRow, Chip, Action, Field, Text, NumeralBand } from '/components/poster-parts.js';
 import { gotoEvent, ovAddNew, renderWsSearchResults, renderObjectives } from './overview.js';
 import { renderSpacesAdd, renderSettingsPanel, renderShareTab, renderReviewTab, renderActivityTab } from './panels.js';
 import { renderSpaceNotice, shortActor } from './helpers.js';
@@ -58,109 +63,102 @@ const unseenTotal = (ctx) => ctx.allTypes.reduce((n, ot) => n + ctx.unseenOf('sp
 const latestFor = (ctx, ot) => ctx.wsEvents.find(e => e.type === ot.name || e.type === ot.namespace) || null;
 const spaceLabel = (ctx, ot) => ctx.wsT('type.' + ot.name) || ot.name;
 const openSpace = (ctx, ot) => ctx.pickTab('space:' + ot.name);
-const newChip = (n) => n > 0 ? html`<span class="og-chip og-chip--sun">${(tr('organisms.ws.newChip', '{n} new for you')).replace('{n}', String(n))}</span>` : null;
+const newChip = (n) => n > 0 ? html`<${Chip} tone="sun">${(tr('organisms.ws.newChip', '{n} new for you')).replace('{n}', String(n))}<//>` : null;
+const countIn = (ctx, ot) => new Set([...ctx.draftsFor(ot.name), ...ctx.objectsFor(ot.name)].map(d => d.id)).size;
+/** The name field takes the focus once, when it opens (the old search's autofocus). */
+const focusOnce = (el) => { if (el && !el.dataset.focused) { el.dataset.focused = 'yes'; el.focus(); } };
 
 /* ── The rail (numbered contents + the panel doors) and its tree form ───────────────────────── */
-function panelDoors(ctx, current) {
-  return PANELS(ctx).map(([id, label, count]) => html`
-    <button type="button" class=${`og-rail-link ${current === id ? 'on' : ''}`} key=${id} onClick=${() => ctx.pickTab(id)}><i>·</i>${label}<em>${count === '' ? '→' : count}</em></button>`);
-}
-function settingsDoor(ctx, current) {
-  return html`<button type="button" class=${`og-rail-link ${current === 'settings' ? 'on' : ''}`} onClick=${() => ctx.guardWsDirty(() => ctx.setShowSettings(true))}><i>·</i>${tr('organisms.settings', 'Settings')}<em>→</em></button>`;
+/** A door in the rail is a word; the one for the page you are on is the tab that is on. */
+const railKind = (on) => (on ? 'tab' : 'text');
+function railDoors(ctx, current) {
+  return html`<${Stack} density="compact">
+    ${PANELS(ctx).map(([id, label, count]) => html`
+      <${Action} kind=${railKind(current === id)} key=${id} selected=${current === id} onClick=${() => ctx.pickTab(id)}>${label} ${count === '' ? '→' : count}<//>`)}
+    <${Action} kind=${railKind(current === 'settings')} selected=${current === 'settings'} onClick=${() => ctx.guardWsDirty(() => ctx.setShowSettings(true))}>${tr('organisms.settings', 'Settings')} →<//>
+    ${treeToggle(ctx)}
+  <//>`;
 }
 function treeToggle(ctx) {
-  return html`<button type="button" class="og-rail-link og-rail-toggle" onClick=${() => ctx.setRailTree(!ctx.railTree)}><i>${ctx.railTree ? '↩' : '→'}</i>${ctx.railTree ? tr('organisms.ws.showRail', 'Show the contents') : tr('organisms.ws.showTree', 'Show as a tree')}</button>`;
+  return html`<${Action} kind="text" onClick=${() => ctx.setRailTree(!ctx.railTree)}>${ctx.railTree ? '↩' : '→'} ${ctx.railTree ? tr('organisms.ws.showRail', 'Show the contents') : tr('organisms.ws.showTree', 'Show as a tree')}<//>`;
 }
 
-function renderRail(ctx, items, current) {
-  return html`
-    <nav class="og-rail" aria-label=${tr('organisms.ws.railTitle', 'In this workspace')}>
-      <span class="og-rail-label">${tr('organisms.ws.railTitle', 'In this workspace')}</span>
-      ${items}
-      <hr />
-      ${panelDoors(ctx, current)}
-      ${settingsDoor(ctx, current)}
-      <hr />
-      ${treeToggle(ctx)}
-    </nav>`;
+function renderRail(ctx, entries, current, lead = null) {
+  return html`<${Rail} kind="index" title=${tr('organisms.ws.railTitle', 'In this workspace')} entries=${entries}>
+    <${Stack}>${lead}${railDoors(ctx, current)}<//>
+  <//>`;
 }
 
 /* The whole structure as one tree: every group, every space with its count, and the documents of a
- * document space nested under it. */
+ * document space listed under it. */
 function renderTree(ctx, current) {
   const { isDocSpace, mergedDocs, setActiveDoc, unseenOf } = ctx;
   const MAX = 8;
-  return html`
-    <nav class="og-tree poster-row--thing" aria-label=${tr('organisms.ws.railTitle', 'In this workspace')}>
+  return html`<${Rail} kind="index" title=${tr('organisms.ws.railTitle', 'In this workspace')}>
+    <${Stack}>
       ${stacked(ctx).map(g => html`
-        <div class="og-tree-group" key=${g.id}>
-          <span class="og-tree-label">${g.label}<em>${g.count ?? ''}</em></span>
+        <${Stack} key=${g.id} density="compact">
+          <${Text} kind="label">${g.label} ${g.count ?? ''}<//>
           ${g.spaces.map(ot => {
             const id = 'space:' + ot.name;
             const u = unseenOf(id);
             const docs = orgService.isMemorySpace(ot) && isDocSpace(ot) ? mergedDocs(ot) : null;
             return html`
-              <div class="og-tree-space" key=${ot.name}>
-                <button type="button" class=${`og-tree-link ${current === id ? 'on' : ''}`} onClick=${() => openSpace(ctx, ot)}>
-                  <span>${spaceLabel(ctx, ot)}</span><em>${docs ? docs.length : (orgService.isMemorySpace(ot) ? new Set([...ctx.draftsFor(ot.name), ...ctx.objectsFor(ot.name)].map(d => d.id)).size : '·')}${u > 0 ? html` <b>+${u}</b>` : null}</em>
-                </button>
+              <${Stack} key=${ot.name} density="compact">
+                <${Action} kind=${railKind(current === id)} selected=${current === id} onClick=${() => openSpace(ctx, ot)}>
+                  ${spaceLabel(ctx, ot)} ${docs ? docs.length : (orgService.isMemorySpace(ot) ? countIn(ctx, ot) : '·')}${u > 0 ? ` +${u}` : ''}<//>
                 ${docs ? docs.slice(0, MAX).map(d => html`
-                  <button type="button" class=${`og-tree-doc ${ctx.activeDoc?.type === ot.name && ctx.activeDoc.page?.id === d.id ? 'on' : ''}`} key=${d.id}
+                  <${Action} kind="text" key=${d.id} selected=${ctx.activeDoc?.type === ot.name && ctx.activeDoc.page?.id === d.id}
                     onClick=${() => { setActiveDoc({ type: ot.name, mode: 'view', page: { id: d.id } }); openSpace(ctx, ot); }}>
-                    ${d._draft ? html`<span class="og-chip og-chip--sun og-chip--xs">${tr('organisms.draft', 'draft')}</span>` : null}${d.title || d.id}
-                  </button>`) : null}
-                ${docs && docs.length > MAX ? html`<button type="button" class="og-tree-doc og-tree-more" onClick=${() => openSpace(ctx, ot)}>${(tr('organisms.ws.more', '… {n} more')).replace('{n}', String(docs.length - MAX))}</button>` : null}
-              </div>`;
+                    ${d._draft ? `${tr('organisms.draft', 'draft')} · ` : ''}${d.title || d.id}<//>`) : null}
+                ${docs && docs.length > MAX ? html`<${Action} kind="text" onClick=${() => openSpace(ctx, ot)}>${(tr('organisms.ws.more', '… {n} more')).replace('{n}', String(docs.length - MAX))}<//>` : null}
+              <//>`;
           })}
-        </div>`)}
-      <div class="og-tree-group">
-        <span class="og-tree-label">${tr('organisms.groupRelated', 'Workspace')}</span>
-        <button type="button" class=${`og-tree-link ${current === 'activity' ? 'on' : ''}`} onClick=${() => ctx.pickTab('activity')}><span>${tr('organisms.happened', 'What has happened')}</span><em>${ctx.wsEvents.length}</em></button>
-        ${PANELS(ctx).map(([id, label, count]) => html`<button type="button" class=${`og-tree-link ${current === id ? 'on' : ''}`} key=${id} onClick=${() => ctx.pickTab(id)}><span>${label}</span><em>${count === '' ? '→' : count}</em></button>`)}
-        <button type="button" class=${`og-tree-link ${current === 'settings' ? 'on' : ''}`} onClick=${() => ctx.guardWsDirty(() => ctx.setShowSettings(true))}><span>${tr('organisms.settings', 'Settings')}</span><em>→</em></button>
-      </div>
-      <hr />
-      ${treeToggle(ctx)}
-    </nav>`;
+        <//>`)}
+      <${Stack} density="compact">
+        <${Text} kind="label">${tr('organisms.groupRelated', 'Workspace')}<//>
+        <${Action} kind=${railKind(current === 'activity')} selected=${current === 'activity'} onClick=${() => ctx.pickTab('activity')}>${tr('organisms.happened', 'What has happened')} ${ctx.wsEvents.length}<//>
+      <//>
+      ${railDoors(ctx, current)}
+    <//>
+  <//>`;
 }
 
 /* ── The crumb every view shares ───────────────────────────────────────────────────────────── */
-function crumb(ctx, last) {
+function crumbs(ctx, last) {
   const { onBack, onBackToList, org, wsName, ws, pickTab, guardWsDirty, setShowSettings } = ctx;
   const name = wsName || ws?.manifest?.name || '…';
   const home = () => guardWsDirty(() => { setShowSettings(false); pickTab('overview'); });
-  return html`
-    <div class="og-crumb">
-      <button type="button" class="og-crumb-link" onClick=${onBackToList || onBack}>${tr('organisms.title', 'Organisms')}</button>
-      <span>/</span>
-      <button type="button" class="og-crumb-link" onClick=${onBack}>${org.name || org.id || ''}</button>
-      <span>/</span>
-      ${last ? html`<button type="button" class="og-crumb-link" onClick=${home}>${name}</button><span>/</span><span class="og-crumb-here">${last}</span>`
-        : html`<span class="og-crumb-here">${name}</span>`}
-    </div>`;
+  return [
+    { label: t('nav.profile') },
+    { label: t('profile.landing.menuInformation') },
+    { label: tr('organisms.title', 'Organisms'), onClick: onBackToList || onBack },
+    { label: org.name || org.id || '', onClick: onBack },
+    last ? { label: name, onClick: home } : { label: name },
+    last ? { label: last } : null,
+  ].filter(Boolean);
 }
 
-/* ── One table of spaces: the figure, the name with its unseen mark, the latest item, the door ── */
-function spaceTable(ctx, spaces) {
+/* ── One list of spaces: the figure, the name with its unseen mark, the latest item, the door ── */
+function spaceRows(ctx, spaces) {
   const { isDocSpace, unseenOf, instanceTitle } = ctx;
-  return html`
-    <div class="og-tbl og-tbl--head"><div></div><div>${tr('organisms.ws.colType', 'Type')}</div><div></div><div>${tr('organisms.ws.colLatest', 'Latest')}</div><div></div></div>
-    <div class="og-tbl">
-      ${spaces.map(ot => {
-        const memory = orgService.isMemorySpace(ot);
-        const n = memory ? new Set([...ctx.draftsFor(ot.name), ...ctx.objectsFor(ot.name)].map(d => d.id)).size : null;
-        const u = memory ? unseenOf('space:' + ot.name) : 0;
-        const last = memory ? latestFor(ctx, ot) : null;
-        return html`
-          <div class="og-tbl-n poster-stat-number poster-stat-number--small" key=${'n' + ot.name}>${n ?? '·'}</div>
-          <div class="og-tbl-nm" key=${'m' + ot.name}><button type="button" class="og-tbl-name" onClick=${() => openSpace(ctx, ot)}>${spaceLabel(ctx, ot)}</button>${newChip(u)}${!memory ? html`<span class="og-chip og-chip--dim">${String(ot.backing)}</span>` : null}</div>
-          <div class="og-tbl-last" key=${'w' + ot.name}>${last ? tr('organisms.ws.latest', 'latest') : ''}</div>
-          <div class="og-tbl-last" key=${'l' + ot.name}>${last ? html`<button type="button" class="og-tbl-go" onClick=${() => gotoEvent(ctx, last)}>${instanceTitle(last.type, last.instance)}</button>` : html`<span class="og-tbl-dot">·</span>`}</div>
-          <div class="og-tbl-door" key=${'d' + ot.name}>${n ? html`<button type="button" class="og-door" onClick=${() => openSpace(ctx, ot)}>${tr('organisms.ws.open', 'Open')}</button>`
-            : (memory && !ot.append ? html`<button type="button" class="og-door og-door--quiet" onClick=${() => ovAddNew(ctx, ot, isDocSpace(ot))}>${tr('organisms.ws.addFirst', '+ Add')}</button>`
-              : html`<button type="button" class="og-door og-door--quiet" onClick=${() => openSpace(ctx, ot)}>${tr('organisms.ws.open', 'Open')}</button>`)}</div>`;
-      })}
-    </div>`;
+  return html`<${Stack} density="compact">
+    ${spaces.map(ot => {
+      const memory = orgService.isMemorySpace(ot);
+      const n = memory ? countIn(ctx, ot) : null;
+      const u = memory ? unseenOf('space:' + ot.name) : 0;
+      const last = memory ? latestFor(ctx, ot) : null;
+      return html`
+        <${ListRow} key=${ot.name} density="compact"
+          mark=${html`<${Text} kind="number" size="small">${n ?? '·'}<//>`}
+          name=${spaceLabel(ctx, ot)} onOpen=${() => openSpace(ctx, ot)}
+          detail=${last ? html`${tr('organisms.ws.latest', 'latest')} <${Action} kind="text" onClick=${() => gotoEvent(ctx, last)}>${instanceTitle(last.type, last.instance)}<//>` : undefined}
+          actions=${html`${newChip(u)}${!memory ? html`<${Chip} tone="muted">${String(ot.backing)}<//>` : null}
+            ${n ? html`<${Action} onClick=${() => openSpace(ctx, ot)}>${tr('organisms.ws.open', 'Open')}<//>`
+              : (memory && !ot.append ? html`<${Action} onClick=${() => ovAddNew(ctx, ot, isDocSpace(ot))}>${tr('organisms.ws.addFirst', '+ Add')}<//>`
+                : html`<${Action} onClick=${() => openSpace(ctx, ot)}>${tr('organisms.ws.open', 'Open')}<//>`)}`} />`;
+    })}
+  <//>`;
 }
 
 /* ── The cover ─────────────────────────────────────────────────────────────────────────────── */
@@ -173,7 +171,7 @@ function renderCover(ctx) {
     showArchived, setShowArchived, pickTab, guardWsDirty, setShowSettings, railTree,
   } = ctx;
   const groups = stacked(ctx);
-  const countOf = (spaces) => spaces.reduce((n, ot) => n + (orgService.isMemorySpace(ot) ? new Set([...ctx.draftsFor(ot.name), ...ctx.objectsFor(ot.name)].map(d => d.id)).size : 0), 0);
+  const countOf = (spaces) => spaces.reduce((n, ot) => n + (orgService.isMemorySpace(ot) ? countIn(ctx, ot) : 0), 0);
   const recordSpaces = allTypes.filter(ot => !isDocSpace(ot));
   const docSpaces = allTypes.filter(ot => isDocSpace(ot));
   const records = countOf(recordSpaces);
@@ -185,181 +183,143 @@ function renderCover(ctx) {
   const readme = ws.readme || '';
   const readmeTitle = (readme.match(/^#\s+(.+)$/m) || [])[1] || '';
   const openAiFold = () => { setOpenAi(true); setTimeout(() => scrollTo('ws-ai'), 30); };
+  const verb = (e) => (e.action === 'publish' ? tr('organisms.publishedVerb', 'published') : tr('organisms.editedVerb', 'edited'));
   const eventRow = (e, i) => html`
-    <button type="button" class="og-fold og-fold--event" key=${i} onClick=${() => gotoEvent(ctx, e)}>
-      <i>${relTime(e.at)}</i>
-      <span class="og-fold-who">${shortActor(e.actor)}${e.agent ? html` · ${e.agent}` : null}</span>
-      <span>${e.action === 'publish' ? tr('organisms.publishedVerb', 'published') : tr('organisms.editedVerb', 'edited')}</span>
-      <b>${(wsT('type.' + e.type) || e.type)} / ${instanceTitle(e.type, e.instance)}</b>
-    </button>`;
+    <${ListRow} key=${i} density="compact" kind="chronology" time=${relTime(e.at)} marker=${e.action === 'publish' ? 'coral' : 'muted'}
+      name=${`${(wsT('type.' + e.type) || e.type)} / ${instanceTitle(e.type, e.instance)}`} onOpen=${() => gotoEvent(ctx, e)}
+      detail=${`${shortActor(e.actor)}${e.agent ? ` · ${e.agent}` : ''} · ${verb(e)}`} />`;
 
-  let num = 0;
-  const next = () => String(++num).padStart(2, '0');
-  const rail = [];
+  const entries = [];
   const sections = [];
 
   if (hasNew) {
-    const n = next();
-    rail.push(['ws-new', n, tr('organisms.ws.newForYou', 'New for you'), unseen + approvals.length]);
+    entries.push({ id: 'ws-new', href: '#ws-new', label: tr('organisms.ws.newForYou', 'New for you'), count: unseen + approvals.length });
     sections.push(html`
-      <${Section} key="ws-new" id="ws-new" num=${n} first=${true} title=${tr('organisms.ws.newForYou', 'New for you')} count=${unseen || null}
-        doors=${approvals.length ? html`<button type="button" class="og-door og-door--quiet" onClick=${() => pickTab('review')}>${tr('organisms.ws.reviewDoor', 'Review →')}</button>` : null}>
-        ${newSpaces.length ? html`<div class="og-folds">${newSpaces.map(({ ot, n: u }) => html`
-          <div class="og-fold" key=${ot.name}><span class="og-fold-name">${spaceLabel(ctx, ot)}</span><span class="og-fold-r">${newChip(u)}</span><button type="button" class="og-door og-fold-door" onClick=${() => openSpace(ctx, ot)}>${tr('organisms.ws.open', 'Open')}</button></div>`)}</div>` : null}
-        ${approvals.length ? html`
-          <p class="og-hint og-hint--label">${tr('organisms.ws.waiting', 'Waiting for your decision')} <small>${approvals.length}</small></p>
-          <div class="og-folds">${approvals.map(a => html`
-            <div class="og-fold" key=${a.id}><span class="og-fold-name">${a.prompt || a.action}</span>
-              <button type="button" class="og-door og-fold-door" disabled=${busy} onClick=${() => resolve(a.id, 'approve')}>${tr('organisms.approve', 'Approve')}</button>
-              <button type="button" class="og-door og-door--quiet og-fold-door" disabled=${busy} onClick=${() => resolve(a.id, 'reject')}>${tr('organisms.reject', 'Reject')}</button></div>`)}</div>` : null}
+      <${Section} key="ws-new" id="ws-new" title=${tr('organisms.ws.newForYou', 'New for you')} count=${unseen || null} selected=${true} density="compact"
+        actions=${approvals.length ? html`<${Action} onClick=${() => pickTab('review')}>${tr('organisms.ws.reviewDoor', 'Review →')}<//>` : null}>
+        <${Stack}>
+          ${newSpaces.length ? html`<${Stack} density="compact">${newSpaces.map(({ ot, n: u }) => html`
+            <${ListRow} key=${ot.name} density="compact" name=${spaceLabel(ctx, ot)}
+              actions=${html`${newChip(u)}<${Action} onClick=${() => openSpace(ctx, ot)}>${tr('organisms.ws.open', 'Open')}<//>`} />`)}<//>` : null}
+          ${approvals.length ? html`
+            <${Text} kind="label">${tr('organisms.ws.waiting', 'Waiting for your decision')} ${approvals.length}<//>
+            <${Stack} density="compact">${approvals.map(a => html`
+              <${ListRow} key=${a.id} density="compact" name=${a.prompt || a.action}
+                actions=${html`<${Action} disabled=${busy} onClick=${() => resolve(a.id, 'approve')}>${tr('organisms.approve', 'Approve')}<//>
+                  <${Action} kind="text" disabled=${busy} onClick=${() => resolve(a.id, 'reject')}>${tr('organisms.reject', 'Reject')}<//>`} />`)}<//>` : null}
+        <//>
       <//>`);
   }
 
   groups.forEach((g, gi) => {
-    const n = next();
     const isDocs = g.id === 'group:documents';
-    rail.push(['ws-' + g.id, n, isDocs ? tr('organisms.ws.docsTitle', 'Documents') : g.label, g.count ?? 0]);
+    entries.push({ id: 'ws-' + g.id, href: '#ws-' + g.id, label: isDocs ? tr('organisms.ws.docsTitle', 'Documents') : g.label, count: g.count ?? 0 });
     sections.push(html`
-      <${Section} key=${g.id} id=${'ws-' + g.id} num=${n} first=${!hasNew && gi === 0} title=${isDocs ? tr('organisms.ws.docsTitle', 'Documents') : g.label} count=${g.count ?? 0}
-        doors=${html`
-          ${gi === 0 && !showSearch ? html`<button type="button" class="og-door og-door--quiet" onClick=${() => setShowSearch(true)}>${tr('organisms.ws.searchDoor', 'Search this workspace')}</button>` : null}
-          ${isDocs ? html`<button type="button" class="og-door og-door--quiet" onClick=${() => guardWsDirty(() => { setShowSettings(false); setShowSpaces(s => !s); })}>${'+ '}${tr('organisms.addDocSpaceTitle', 'Add a document space')}</button>` : null}`}>
-        ${isDocs && showSpaces ? renderSpacesAdd(ctx) : null}
-        ${spaceTable(ctx, g.spaces)}
-        ${g.desc ? html`<p class="og-hint">${g.desc}</p>` : null}
+      <${Section} key=${g.id} id=${'ws-' + g.id} title=${isDocs ? tr('organisms.ws.docsTitle', 'Documents') : g.label} count=${g.count ?? 0} density="compact"
+        actions=${gi === 0 && !showSearch || isDocs ? html`
+          ${gi === 0 && !showSearch ? html`<${Action} onClick=${() => setShowSearch(true)}>${tr('organisms.ws.searchDoor', 'Search this workspace')}<//>` : null}
+          ${isDocs ? html`<${Action} kind="tab" selected=${showSpaces} onClick=${() => guardWsDirty(() => { setShowSettings(false); setShowSpaces(s => !s); })}>${tr('organisms.addDocSpaceTitle', 'Add a document space')}<//>` : null}` : null}>
+        <${Stack}>
+          ${isDocs && showSpaces ? renderSpacesAdd(ctx) : null}
+          ${spaceRows(ctx, g.spaces)}
+          ${g.desc ? html`<${Text} kind="caption" tone="muted">${g.desc}<//>` : null}
+        <//>
       <//>`);
   });
 
-  {
-    const n = next();
-    rail.push(['ws-history', n, tr('organisms.happened', 'What has happened'), wsEvents.length]);
-    sections.push(html`
-      <${Section} key="ws-history" id="ws-history" num=${n} title=${tr('organisms.happened', 'What has happened')} count=${wsEvents.length || null}
-        doors=${html`<button type="button" class="og-door og-door--quiet" onClick=${() => pickTab('activity')}>${(tr('organisms.ws.fullActivity', 'Full activity {n} →')).replace('{n}', String(wsEvents.length))}</button>`}>
-        ${wsEvents.length ? html`<div class="og-folds">${wsEvents.slice(0, 5).map(eventRow)}</div>` : html`<p class="og-hint">${tr('organisms.noneYet', 'none yet')}</p>`}
-      <//>`);
-  }
+  entries.push({ id: 'ws-history', href: '#ws-history', label: tr('organisms.happened', 'What has happened'), count: wsEvents.length });
+  sections.push(html`
+    <${Section} key="ws-history" id="ws-history" title=${tr('organisms.happened', 'What has happened')} count=${wsEvents.length || null} density="compact"
+      actions=${html`<${Action} onClick=${() => pickTab('activity')}>${(tr('organisms.ws.fullActivity', 'Full activity {n} →')).replace('{n}', String(wsEvents.length))}<//>`}>
+      ${wsEvents.length ? html`<${Stack} density="compact">${wsEvents.slice(0, 5).map(eventRow)}<//>` : html`<${Text} kind="caption" tone="muted">${tr('organisms.noneYet', 'none yet')}<//>`}
+    <//>`);
 
-  const nReadme = next(), nMap = next(), nAi = next();
-  rail.push(['ws-readme', nReadme, tr('organisms.readmeFold', 'README'), '→'], ['ws-map', nMap, tr('organisms.mapAndToc', 'Map and table of contents'), '→'], ['ws-ai', nAi, tr('organisms.forAi', 'For your AI'), '→']);
+  const nReadme = String(entries.length + 1).padStart(2, '0'), nMap = String(entries.length + 2).padStart(2, '0'), nAi = String(entries.length + 3).padStart(2, '0');
+  entries.push(
+    { id: 'ws-readme', href: '#ws-readme', label: tr('organisms.readmeFold', 'README'), count: '→' },
+    { id: 'ws-map', href: '#ws-map', label: tr('organisms.mapAndToc', 'Map and table of contents'), count: '→' },
+    { id: 'ws-ai', href: '#ws-ai', label: tr('organisms.forAi', 'For your AI'), count: '→' },
+  );
 
-  const railItems = rail.map(([id, n, label, count]) => html`
-    <a class="og-rail-link" key=${id} href=${'#' + id} onClick=${(e) => { e.preventDefault(); if (id === 'ws-readme') setOpenReadme(true); if (id === 'ws-map') setOpenMap(true); if (id === 'ws-ai') setOpenAi(true); setTimeout(() => scrollTo(id), 30); }}>
-      <i>${n}</i>${label}<em>${count}</em>
-    </a>`);
+  return html`<${Page} title=${ws.manifest?.name || ctx.wsName || ctx.org.name} crumbs=${crumbs(ctx, null)}
+    identity=${html`<${Stack} direction="wrap" density="compact">
+      <${Chip}>${ws.manifest?.status || 'active'}<//>
+      ${newChip(unseen)}
+      ${ws.manifest?.kind ? html`<${Chip} tone="muted">${ws.manifest.kind}<//>` : null}
+      ${ws.manifest?.updatedAt ? html`<${Chip} tone="muted">${tr('organisms.lastSaved', 'Last saved')} ${fmtDate(ws.manifest.updatedAt)}<//>` : null}
+      ${showArchived ? html`<${Chip} tone="sun">${tr('organisms.archivedView', 'Archived view')}<//>` : null}
+    <//>`}
+    actions=${html`
+      <${Action} kind="primary" onClick=${openAiFold}>${tr('organisms.forAi', 'For your AI')}<//>
+      <${Action} onClick=${() => pickTab('share')}>${tr('organisms.share', 'Share')}<//>
+      <${Action} onClick=${() => guardWsDirty(() => setShowSettings(true))}>${tr('organisms.settings', 'Settings')}<//>
+      <${Action} kind="tab" selected=${showArchived} onClick=${() => setShowArchived(s => !s)}>${showArchived ? tr('organisms.viewActive', 'Active') : tr('organisms.viewArchived', 'Archived')}<//>`}
+    rail=${railTree ? renderTree(ctx, 'overview') : renderRail(ctx, entries, 'overview')}>
+    ${ws.manifest?.summary ? html`<${Text} kind="lead" tone="muted">${ws.manifest.summary}<//>` : null}
+    <${NumeralBand} tone="plain" size="small" items=${[
+      { label: tr('organisms.ws.figRecords', 'records'), value: records, note: (tr('organisms.ws.figTypes', '{n} types')).replace('{n}', String(recordSpaces.length)) },
+      { label: tr('organisms.ws.figDocs', 'documents'), value: docs, note: (tr('organisms.ws.figSpaces', '{n} spaces')).replace('{n}', String(docSpaces.length)) },
+      { label: tr('organisms.ws.figReview', 'to review'), value: approvals.length, note: approvals.length ? tr('organisms.ws.figReviewSub', 'a publish waits for your decision') : undefined },
+      { label: tr('organisms.figLast', 'last change'), value: last ? relTime(last.at) : '·', tone: last ? 'coral' : undefined,
+        note: last ? `${shortActor(last.actor)} ${verb(last)} ${(wsT('type.' + last.type) || last.type)} / ${instanceTitle(last.type, last.instance)}` : undefined },
+    ]} />
 
-  return html`
-    <div class="og og-ws">
-      ${crumb(ctx, null)}
-      <div class="og-mast">
-        <div class="og-mast-words">
-          <h1 class="og-title poster-page-title">${ws.manifest?.name || ctx.wsName || ctx.org.name}</h1>
-          <div class="og-chips">
-            <span class="og-chip">${ws.manifest?.status || 'active'}</span>
-            ${newChip(unseen)}
-            ${ws.manifest?.kind ? html`<span class="og-chip og-chip--dim">${ws.manifest.kind}</span>` : null}
-            ${ws.manifest?.updatedAt ? html`<span class="og-chip og-chip--dim">${tr('organisms.lastSaved', 'Last saved')} ${fmtDate(ws.manifest.updatedAt)}</span>` : null}
-            ${showArchived ? html`<span class="og-chip og-chip--sun">${tr('organisms.archivedView', 'Archived view')}</span>` : null}
-          </div>
-          ${ws.manifest?.summary ? html`<p class="og-desc">${ws.manifest.summary}</p>` : null}
-        </div>
-        <div class="og-mast-actions">
-          <button type="button" class="og-slab" onClick=${openAiFold}>${tr('organisms.forAi', 'For your AI')}</button>
-          <div class="og-doors">
-            <button type="button" class="og-door" onClick=${() => pickTab('share')}>${tr('organisms.share', 'Share')}</button>
-            <button type="button" class="og-door" onClick=${() => guardWsDirty(() => setShowSettings(true))}>${tr('organisms.settings', 'Settings')}</button>
-            <button type="button" class="og-door og-door--quiet" onClick=${() => setShowArchived(s => !s)}>${showArchived ? tr('organisms.viewActive', 'Active') : tr('organisms.viewArchived', 'Archived')}</button>
-          </div>
-        </div>
-      </div>
+    ${wsObjectives.length ? renderObjectives(ctx) : null}
 
-      <div class="og-strip">
-        <div><b>${records}</b><span>${tr('organisms.ws.figRecords', 'records')}</span><small>${(tr('organisms.ws.figTypes', '{n} types')).replace('{n}', String(recordSpaces.length))}</small></div>
-        <div><b>${docs}</b><span>${tr('organisms.ws.figDocs', 'documents')}</span><small>${(tr('organisms.ws.figSpaces', '{n} spaces')).replace('{n}', String(docSpaces.length))}</small></div>
-        <div><b>${approvals.length}</b><span>${tr('organisms.ws.figReview', 'to review')}</span>${approvals.length ? html`<small>${tr('organisms.ws.figReviewSub', 'a publish waits for your decision')}</small>` : null}</div>
-        <div><b class=${last ? 'og-strip-coral' : ''}>${last ? relTime(last.at) : '·'}</b><span>${tr('organisms.figLast', 'last change')}</span>${last ? html`<small>${shortActor(last.actor)} ${last.action === 'publish' ? tr('organisms.publishedVerb', 'published') : tr('organisms.editedVerb', 'edited')} ${(wsT('type.' + last.type) || last.type)} / ${instanceTitle(last.type, last.instance)}</small>` : null}</div>
-      </div>
+    ${showSearch || wsQuery ? html`
+      <${Stack} density="compact">
+        <${Field} type="search" label=${tr('search.wsPlaceholder', 'Search this workspace…')} value=${wsQuery} onInput=${e => setWsQuery(e.target.value)} inputRef=${focusOnce} />
+        <${Stack} direction="wrap"><${Action} onClick=${() => { setWsQuery(''); setWsHits(null); setShowSearch(false); }}>${tr('search.clear', 'Clear')}<//><//>
+      <//>` : null}
 
-      ${wsObjectives.length ? renderObjectives(ctx) : null}
-
-      ${showSearch || wsQuery ? html`
-        <div class="og-search">
-          <${SearchBar} value=${wsQuery} onInput=${e => setWsQuery(e.target.value)} autofocus=${true}
-            placeholder=${tr('search.wsPlaceholder', 'Search this workspace…')} ariaLabel=${tr('search.wsPlaceholder', 'Search this workspace')} />
-          <button type="button" class="og-door og-door--quiet" onClick=${() => { setWsQuery(''); setWsHits(null); setShowSearch(false); }}>${tr('search.clear', 'Clear')}</button>
-        </div>` : null}
-
-      <div class="og-grid">
-        <div class="og-main">
-          ${wsHits !== null ? renderWsSearchResults(ctx) : html`
-            ${sections}
-            ${(ws.apps || []).length || wsCanEdit ? html`<div class="og-apps"><${WorkspaceApps} orgId=${orgId} wsId=${wsId} apps=${ws.apps || []} canEdit=${wsCanEdit} showToast=${showToast} onChanged=${load} /></div>` : null}
-            <${Fold} id="ws-readme" num=${nReadme} title=${tr('organisms.readmeFold', 'README')} sub=${readmeTitle} open=${openReadme} onToggle=${() => setOpenReadme(o => !o)}>
-              ${readme || wsCanEdit
-                ? html`<${ReadmePanel} markdown=${readme} canEdit=${wsCanEdit} kind="workspace" name=${ws.manifest?.name || 'Workspace'} aiPromptSeed=${wsTocSeed} onSave=${saveWsReadme} />`
-                : html`<p class="og-hint">${tr('organisms.readmeEmpty', 'No README yet.')}</p>`}
-            <//>
-            <${Fold} id="ws-map" num=${nMap} title=${tr('organisms.mapAndToc', 'Map and table of contents')} open=${openMap} onToggle=${() => setOpenMap(o => !o)}>
-              <p class="og-hint">${tr('organisms.mapAndTocHint', 'The same structure two ways.')}</p>
-              <${StructureMindmap} scope="workspace" graph=${wsGraph} onNavigate=${onWsMapNav} storageKey=${'ws.' + orgId + '.' + wsId} defaultOpen />
-              <${StructureOverview} label=${tr('organisms.structureOverviewWs', 'Workspace structure — table of contents')} load=${() => orgService.getWorkspaceOverview(orgId, wsId)} defaultOpen />
-            <//>
-            <${Fold} id="ws-ai" num=${nAi} title=${tr('organisms.forAiTitle', 'Bring your AI here')} open=${openAi} onToggle=${() => setOpenAi(o => !o)}>
-              <p class="og-lead">${tr('organisms.ws.forAiLead', 'One instruction that brings your AI into this workspace with its real ids and structure. Paste it into a chat, hand it to a coding agent, or make a contract agent from it.')}</p>
-              <div class="og-doors">${agentMenuItems.filter(m => !m.divider).map((m, i) => html`<button type="button" class=${`og-door ${i === 2 ? 'og-door--quiet' : ''}`} key=${i} onClick=${m.onClick}>${m.label}</button>`)}</div>
-            <//>`}
-        </div>
-        ${railTree ? renderTree(ctx, 'overview') : renderRail(ctx, railItems, 'overview')}
-      </div>
-    </div>`;
+    ${wsHits !== null ? renderWsSearchResults(ctx) : html`
+      ${sections}
+      ${(ws.apps || []).length || wsCanEdit ? html`<${WorkspaceApps} orgId=${orgId} wsId=${wsId} apps=${ws.apps || []} canEdit=${wsCanEdit} showToast=${showToast} onChanged=${load} />` : null}
+      <${Fold} id="ws-readme" number=${nReadme} title=${tr('organisms.readmeFold', 'README')} sub=${readmeTitle} open=${openReadme} onToggle=${() => setOpenReadme(o => !o)}>
+        ${readme || wsCanEdit
+          ? html`<${ReadmePanel} markdown=${readme} canEdit=${wsCanEdit} kind="workspace" name=${ws.manifest?.name || 'Workspace'} aiPromptSeed=${wsTocSeed} onSave=${saveWsReadme} />`
+          : html`<${Text} kind="caption" tone="muted">${tr('organisms.readmeEmpty', 'No README yet.')}<//>`}
+      <//>
+      <${Fold} id="ws-map" number=${nMap} title=${tr('organisms.mapAndToc', 'Map and table of contents')} open=${openMap} onToggle=${() => setOpenMap(o => !o)}>
+        <${Text} kind="caption" tone="muted">${tr('organisms.mapAndTocHint', 'The same structure two ways.')}<//>
+        <${StructureMindmap} scope="workspace" graph=${wsGraph} onNavigate=${onWsMapNav} storageKey=${'ws.' + orgId + '.' + wsId} defaultOpen />
+        <${StructureOverview} label=${tr('organisms.structureOverviewWs', 'Workspace structure — table of contents')} load=${() => orgService.getWorkspaceOverview(orgId, wsId)} defaultOpen />
+      <//>
+      <${Fold} id="ws-ai" number=${nAi} title=${tr('organisms.forAiTitle', 'Bring your AI here')} open=${openAi} onToggle=${() => setOpenAi(o => !o)}>
+        <${Text} kind="lead">${tr('organisms.ws.forAiLead', 'One instruction that brings your AI into this workspace with its real ids and structure. Paste it into a chat, hand it to a coding agent, or make a contract agent from it.')}<//>
+        <${Stack} direction="wrap">${agentMenuItems.filter(m => !m.divider).map((m, i) => html`<${Action} key=${i} onClick=${m.onClick}>${m.label}<//>`)}<//>
+      <//>`}
+  <//>`;
 }
 
 /* ── A page under the same crumb: a space, a panel, the settings ───────────────────────────── */
-function renderPage(ctx, { id, last, title, sub, doors = null, children }) {
+function renderPage(ctx, { id, last, title, chips = null, doors = null, children }) {
   const { activeSpace, groups, railTree } = ctx;
   // A space page lists its siblings in the rail (the other spaces of the same group) so the reader
   // can move sideways without going back to the cover.
   const group = activeSpace ? groups.find(g => g.kind === 'stacked' && g.spaces.some(ot => ot.name === activeSpace.name)) : null;
-  const siblings = group ? group.spaces.map(ot => html`
-    <button type="button" class=${`og-rail-link ${ot.name === activeSpace.name ? 'on' : ''}`} key=${ot.name} onClick=${() => openSpace(ctx, ot)}><i>·</i>${spaceLabel(ctx, ot)}<em>${ctx.unseenOf('space:' + ot.name) > 0 ? '+' + ctx.unseenOf('space:' + ot.name) : ''}</em></button>`) : null;
-  const back = html`<button type="button" class="og-rail-link" onClick=${() => ctx.guardWsDirty(() => { ctx.setShowSettings(false); ctx.pickTab('overview'); })}><i>←</i>${tr('organisms.ws.backToWorkspace', 'Back to the workspace')}</button>`;
-  return html`
-    <div class="og og-ws og-page">
-      ${crumb(ctx, last)}
-      <div class="og-mast og-mast--page">
-        <div class="og-mast-words">
-          <h1 class="og-title poster-page-title">${title}${sub ? html`<small>${sub}</small>` : null}</h1>
-        </div>
-        ${doors ? html`<div class="og-mast-actions"><div class="og-doors">${doors}</div></div>` : null}
-      </div>
-      <div class="og-grid">
-        <div class="og-main poster-row--thing">${children}</div>
-        ${railTree ? renderTree(ctx, id) : html`
-          <nav class="og-rail" aria-label=${tr('organisms.ws.railTitle', 'In this workspace')}>
-            <span class="og-rail-label">${tr('organisms.ws.railTitle', 'In this workspace')}</span>
-            ${back}
-            ${siblings ? html`<hr />${siblings}` : null}
-            <hr />
-            ${panelDoors(ctx, id)}
-            ${settingsDoor(ctx, id)}
-            <hr />
-            ${treeToggle(ctx)}
-          </nav>`}
-      </div>
-    </div>`;
+  const siblings = group ? html`<${Stack} density="compact">${group.spaces.map(ot => html`
+    <${Action} kind=${railKind(ot.name === activeSpace.name)} key=${ot.name} selected=${ot.name === activeSpace.name} onClick=${() => openSpace(ctx, ot)}>${spaceLabel(ctx, ot)}${ctx.unseenOf('space:' + ot.name) > 0 ? ' +' + ctx.unseenOf('space:' + ot.name) : ''}<//>`)}<//>` : null;
+  const back = html`<${Action} kind="text" onClick=${() => ctx.guardWsDirty(() => { ctx.setShowSettings(false); ctx.pickTab('overview'); })}>← ${tr('organisms.ws.backToWorkspace', 'Back to the workspace')}<//>`;
+  return html`<${Page} title=${title} crumbs=${crumbs(ctx, last)}
+    identity=${chips ? html`<${Stack} direction="wrap" density="compact">${chips}<//>` : null}
+    actions=${doors}
+    rail=${railTree ? renderTree(ctx, id) : renderRail(ctx, [], id, html`${back}${siblings}`)}>
+    <${Stack}>${children}<//>
+  <//>`;
 }
 
 export function renderWorkspaceView(ctx) {
   const { ws, showSettings, activeTab, activeSpace, isDocSpace, unseenOf, setActiveDoc, addSection, startAdd } = ctx;
   if (showSettings) {
     return renderPage(ctx, { id: 'settings', last: tr('organisms.settings', 'Settings'), title: tr('organisms.settings', 'Settings'),
-      sub: html`<span>${tr('organisms.template', 'Template')} ${(ws.manifest?.kind || '-')}</span>`, children: renderSettingsPanel(ctx) });
+      chips: html`<${Chip} tone="muted">${tr('organisms.template', 'Template')} ${(ws.manifest?.kind || '-')}<//>`, children: renderSettingsPanel(ctx) });
   }
   if (activeSpace) {
     const ot = activeSpace;
     const memory = orgService.isMemorySpace(ot);
     const docMode = memory && isDocSpace(ot);
-    const n = memory ? new Set([...ctx.draftsFor(ot.name), ...ctx.objectsFor(ot.name)].map(d => d.id)).size : 0;
+    const n = memory ? countIn(ctx, ot) : 0;
     const u = unseenOf('space:' + ot.name);
     // What the space IS, in its own words. A space whose data lives elsewhere used to read "record
     // type · 0" here, which is two wrong things about a row space at once: it holds no records, and
@@ -369,18 +329,18 @@ export function renderWorkspaceView(ctx) {
       : ot.backing === 'rows' ? tr('organisms.ws.kindRows', 'row space')
       : ot.backing === 'tasks' ? tr('organisms.ws.kindTasks', 'task space')
       : String(ot.backing);
-    const sub = html`<span>${kind}</span><span>${memory ? n : '·'}</span>${u > 0 ? newChip(u) : null}`;
+    const chips = html`<${Chip}>${kind}<//><${Chip} tone="muted">${memory ? n : '·'}<//>${u > 0 ? newChip(u) : null}`;
     const doors = !memory ? null : docMode ? html`
-        <button type="button" class="og-door og-door--quiet" onClick=${() => addSection(ot.name, null)}>${'+ '}${tr('organisms.section', 'Section')}</button>
-        <button type="button" class="og-door" onClick=${() => setActiveDoc({ type: ot.name, mode: 'edit', page: { id: '', title: '', markdown: '' } })}>${'+ '}${tr('organisms.newPage', 'New document')}</button>`
-      : (ot.append ? null : html`<button type="button" class="og-door" onClick=${() => startAdd(ot)}>${'+ '}${tr('organisms.addDraft', 'Add draft')}</button>`);
-    return renderPage(ctx, { id: activeTab, last: spaceLabel(ctx, ot), title: spaceLabel(ctx, ot), sub, doors,
-      children: html`${ctx.spaceDesc(ot) ? html`<p class="og-desc og-desc--page">${ctx.spaceDesc(ot)}</p>` : null}
+        <${Action} onClick=${() => addSection(ot.name, null)}>${tr('organisms.section', 'Section')}<//>
+        <${Action} kind="primary" onClick=${() => setActiveDoc({ type: ot.name, mode: 'edit', page: { id: '', title: '', markdown: '' } })}>${tr('organisms.newPage', 'New document')}<//>`
+      : (ot.append ? null : html`<${Action} kind="primary" onClick=${() => startAdd(ot)}>${tr('organisms.addDraft', 'Add draft')}<//>`);
+    return renderPage(ctx, { id: activeTab, last: spaceLabel(ctx, ot), title: spaceLabel(ctx, ot), chips, doors,
+      children: html`${ctx.spaceDesc(ot) ? html`<${Text} kind="lead" tone="muted">${ctx.spaceDesc(ot)}<//>` : null}
         ${!memory ? renderSpaceNotice(ot) : (docMode ? renderDocSpace(ctx, ot) : renderRecordSpace(ctx, ot))}` });
   }
   const panel = PANELS(ctx).find(([id]) => id === activeTab);
   if (activeTab === 'activity') {
-    return renderPage(ctx, { id: 'activity', last: tr('organisms.activity', 'Activity'), title: tr('organisms.happened', 'What has happened'), sub: html`<span>${ctx.wsEvents.length}</span>`, children: renderActivityTab(ctx) });
+    return renderPage(ctx, { id: 'activity', last: tr('organisms.activity', 'Activity'), title: tr('organisms.happened', 'What has happened'), chips: html`<${Chip} tone="muted">${ctx.wsEvents.length}<//>`, children: renderActivityTab(ctx) });
   }
   if (panel) {
     const [id, label] = panel;
@@ -389,8 +349,8 @@ export function renderWorkspaceView(ctx) {
         : id === 'skills' ? html`<${SkillsPanel} orgId=${ctx.orgId} wsId=${ctx.wsId} showToast=${ctx.showToast} />`
           : id === 'share' ? renderShareTab(ctx) : renderReviewTab(ctx);
     const desc = ctx.REL_DESC[id];
-    return renderPage(ctx, { id, last: label, title: label, sub: id === 'review' && ctx.approvals.length ? html`<span>${ctx.approvals.length}</span>` : null,
-      children: html`${desc ? html`<p class="og-desc og-desc--page">${desc}</p>` : null}${body}` });
+    return renderPage(ctx, { id, last: label, title: label, chips: id === 'review' && ctx.approvals.length ? html`<${Chip} tone="sun">${ctx.approvals.length}<//>` : null,
+      children: html`${desc ? html`<${Text} kind="lead" tone="muted">${desc}<//>` : null}${body}` });
   }
   return renderCover(ctx);
 }

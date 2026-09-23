@@ -10,6 +10,8 @@
  * @structure WorkspaceGenerator
  * @usage import { WorkspaceGenerator } from '/views/profile/organisms/workspace/generator.js';
  * @version-history
+ *   2026-09-22 -- Composed from the shared set (Section, Field, Action, an aside for the errors): no class
+ *     of its own; its actions are secondary because the page's one loud action is its own.
  *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
  *   v1.0.0 — 2026-07-13 — Extracted from workspace.js (max-file-lines)
  *   v1.1.0 — 2026-08-08 — Copy labels now resolve from the shared common.copy / common.copied / common.copyPrompt /
@@ -24,6 +26,7 @@ import { t } from '/js/i18n.js';
 import { copyToClipboard } from '/js/utils.js';
 import * as orgService from '/js/services/organisms.js';
 import { OpenRouterSettings } from '/views/profile/openrouter-settings.js';
+import { Section, Stack, Surface, Field, Action, Text } from '/components/poster-parts.js';
 
 export function WorkspaceGenerator({ orgId, wsId, showToast, onApplied, onOpenSettings, showRegenerate, manifest, genBusy, setGenBusy }) {
   const [genDesc, setGenDesc] = useState('');
@@ -84,54 +87,53 @@ export function WorkspaceGenerator({ orgId, wsId, showToast, onApplied, onOpenSe
   }, [pasteText, genErrors, showToast]);
 
   return html`
-    <div class="pj-section poster-row--thing">
-      <div class="pj-section-title">${showRegenerate ? (t('organisms.restructureTitle') || 'Restructure / add types with AI') : (t('organisms.generateTitle') || 'Or generate a custom workspace with AI')}</div>
-      <div class="section-desc">${showRegenerate
+    <${Section} title=${showRegenerate ? (t('organisms.restructureTitle') || 'Restructure / add types with AI') : (t('organisms.generateTitle') || 'Or generate a custom workspace with AI')} size="small" density="compact"
+      description=${showRegenerate
         ? (t('organisms.restructureDesc') || 'Describe what to add or change. Existing types and their data are kept — the AI extends the current structure. (To start completely fresh, delete the workspace below first.)')
-        : (t('organisms.generateDesc') || 'Describe what you want to track — the AI designs the object types. Use your OpenRouter key for one-click generation, or copy the prompt into any AI chat (free) and paste the result back.')}</div>
+        : (t('organisms.generateDesc') || 'Describe what you want to track — the AI designs the object types. Use your OpenRouter key for one-click generation, or copy the prompt into any AI chat (free) and paste the result back.')}>
+      <${Stack}>
+        <${Field} type="textarea" rows=${3}
+          placeholder=${t('organisms.generatePlaceholder') || 'e.g. A research study tracking hypotheses, experiments and validated findings'}
+          value=${genDesc} onInput=${e => setGenDesc(e.target.value)} />
 
-      <textarea class="input-field input-sm" rows="3"
-        placeholder=${t('organisms.generatePlaceholder') || 'e.g. A research study tracking hypotheses, experiments and validated findings'}
-        value=${genDesc} onInput=${e => setGenDesc(e.target.value)}></textarea>
+        <${OpenRouterSettings} onSettingsChange=${s => setHasAiKey(!!(s && s.hasApiKey))} />
 
-      <${OpenRouterSettings} onSettingsChange=${s => setHasAiKey(!!(s && s.hasApiKey))} />
+        <${Stack} direction="wrap" align="center">
+          ${hasAiKey ? html`
+            <${Action} onClick=${generate} disabled=${genBusy || !genDesc.trim()}>
+              ${genBusy ? (t('organisms.generating') || 'Generating…') : (t('organisms.generate') || 'Generate with AI')}
+            <//>
+          ` : null}
+          <${Action} onClick=${copyPrompt} disabled=${!genDesc.trim()}>${t('common.copyPrompt') || 'Copy prompt'}<//>
+        <//>
 
-      <div class="form-actions">
-        ${hasAiKey ? html`
-          <button class="btn-primary btn-sm" onClick=${generate} disabled=${genBusy || !genDesc.trim()}>
-            ${genBusy ? html`<span class="spinner"></span> ${t('organisms.generating') || 'Generating…'}` : (t('organisms.generate') || 'Generate with AI')}
-          </button>
-        ` : null}
-        <button class="btn-outline btn-sm" onClick=${copyPrompt} disabled=${!genDesc.trim()}>${t('common.copyPrompt') || 'Copy prompt'}</button>
-      </div>
+        <${Field} type="textarea" rows=${4} label=${t('organisms.pasteHelp') || 'No key? Copy the prompt above into any AI chat, then paste the JSON it returns here:'}
+          placeholder=${t('organisms.pastePlaceholder') || 'Paste the AI JSON response here'}
+          value=${pasteText} onInput=${e => setPasteText(e.target.value)} />
 
-      <div class="section-desc">${t('organisms.pasteHelp') || 'No key? Copy the prompt above into any AI chat, then paste the JSON it returns here:'}</div>
-      <textarea class="input-field input-sm" rows="4"
-        placeholder=${t('organisms.pastePlaceholder') || 'Paste the AI JSON response here'}
-        value=${pasteText} onInput=${e => setPasteText(e.target.value)}></textarea>
+        ${genFail && html`
+          <${Surface} kind="aside" tone="danger" density="compact">
+            <${Text} kind="label">${t('organisms.genFailed') || 'Generation failed — try again'}<//>
+            <${Text} tone="danger">${genFail}<//>
+          <//>
+        `}
 
-      ${genFail && html`
-        <div class="pj-errors">
-          <div class="pj-errors-title">${t('organisms.genFailed') || 'Generation failed — try again'}</div>
-          <div class="pj-error-line">${(genFail)}</div>
-        </div>
-      `}
+        ${genErrors.length > 0 && html`
+          <${Surface} kind="aside" tone="danger" density="compact">
+            <${Stack} density="compact" align="start">
+              <${Text} kind="label">${t('organisms.fixNeeded') || 'This needs fixing before it can be saved:'}<//>
+              ${genErrors.map((e, i) => html`<${Text} key=${i} tone="danger">${e}<//>`)}
+              <${Action} onClick=${copyFixPrompt}>${t('organisms.copyFixPrompt') || 'Copy fix prompt for the AI'}<//>
+            <//>
+          <//>
+        `}
 
-      ${genErrors.length > 0 && html`
-        <div class="pj-errors">
-          <div class="pj-errors-title">${t('organisms.fixNeeded') || 'This needs fixing before it can be saved:'}</div>
-          ${genErrors.map((e, i) => html`<div class="pj-error-line" key=${i}>${(e)}</div>`)}
-          <div class="form-actions">
-            <button class="btn-outline btn-sm" onClick=${copyFixPrompt}>${t('organisms.copyFixPrompt') || 'Copy fix prompt for the AI'}</button>
-          </div>
-        </div>
-      `}
-
-      <div class="form-actions">
-        <button class="btn-primary btn-sm" onClick=${applyPasted} disabled=${applyBusy || !pasteText.trim()}>
-          ${applyBusy ? html`<span class="spinner"></span> ` : ''}${t('organisms.applyPasted') || 'Validate & apply'}
-        </button>
-      </div>
-    </div>
+        <${Stack} direction="wrap">
+          <${Action} onClick=${applyPasted} disabled=${applyBusy || !pasteText.trim()}>
+            ${applyBusy ? '… ' : ''}${t('organisms.applyPasted') || 'Validate & apply'}
+          <//>
+        <//>
+      <//>
+    <//>
   `;
 }

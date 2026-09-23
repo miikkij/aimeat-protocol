@@ -92,7 +92,7 @@ export function crumb(ctx, parts) {
 export function renderPage(ctx, { crumbs = [], title, chips = null, doors = null, rail = null, children }) {
   return html`<${Page} width='wide' title=${title} crumbs=${crumb(ctx,crumbs)} identity=${chips} actions=${doors}
     rail=${html`<${Rail} kind='index' title=${t('discover.title')}><${Stack}>
-      <${Action} onClick=${() => ctx.pickView({kind:'cover'})}>← ${c('backTo')}<//>
+      <${Action} onClick=${() => ctx.pickView({kind:'cover'})}>↩ ${c('backTo')}<//>
       ${rail}
     <//><//>`}>
     <${Stack}>${desk(ctx)}${children}<//>

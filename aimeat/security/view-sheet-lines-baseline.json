@@ -1,9 +1,9 @@
 {
   "_note": "Per-page stylesheets, recorded as debt rather than approval: every page is composed from the shared set, so this map may only shrink. Lower a count or remove a file as its page migrates. A new sheet needs an entry in exceptions with the reason it cannot be a shared part. Only an explicit developer decision permits pnpm check:view-sheet-lines --record.",
   "_measured": {
-    "date": "2026-09-22T23:53:59Z",
-    "files": 98,
-    "lines": 23492
+    "date": "2026-09-23T01:26:20Z",
+    "files": 84,
+    "lines": 18183
   },
   "exceptions": {},
   "files": {
@@ -44,17 +44,12 @@
     "public/css/views/admin-usage.css": 124,
     "public/css/views/admin-work.css": 127,
     "public/css/views/admin.css": 1194,
-    "public/css/views/agent-integration-poster.css": 95,
-    "public/css/views/agent-tasks-poster.css": 140,
-    "public/css/views/agents-crew.css": 112,
-    "public/css/views/agents-detail.css": 3111,
-    "public/css/views/agents-poster.css": 198,
+    "public/css/views/agents-detail.css": 109,
     "public/css/views/ai-poster.css": 124,
     "public/css/views/aimeat-os.css": 155,
     "public/css/views/app-grant.css": 174,
     "public/css/views/appdev-poster.css": 94,
     "public/css/views/apps-poster.css": 109,
-    "public/css/views/boards-poster.css": 102,
     "public/css/views/build-story.css": 131,
     "public/css/views/calibrator-poster.css": 199,
     "public/css/views/capabilities-poster.css": 115,
@@ -66,7 +61,6 @@
     "public/css/views/email-poster.css": 83,
     "public/css/views/everything.css": 73,
     "public/css/views/extensions-poster.css": 115,
-    "public/css/views/fleet.css": 347,
     "public/css/views/glossary.css": 131,
     "public/css/views/help.css": 181,
     "public/css/views/inbox-poster.css": 130,
@@ -77,13 +71,8 @@
     "public/css/views/landing-v2.css": 232,
     "public/css/views/landing.css": 536,
     "public/css/views/libraries-poster.css": 101,
-    "public/css/views/living.css": 190,
-    "public/css/views/mcp-poster.css": 149,
     "public/css/views/members.css": 76,
-    "public/css/views/memory.css": 49,
-    "public/css/views/notebook.css": 287,
     "public/css/views/notifications-poster.css": 112,
-    "public/css/views/offers-poster.css": 171,
     "public/css/views/offers.css": 157,
     "public/css/views/organism.css": 205,
     "public/css/views/packages-poster.css": 160,
@@ -96,14 +85,11 @@
     "public/css/views/profile.css": 3325,
     "public/css/views/public-knowledge-viewer.css": 23,
     "public/css/views/public-workspace-viewer.css": 253,
-    "public/css/views/scheduler-poster.css": 142,
     "public/css/views/scheduler.css": 249,
     "public/css/views/skills-poster.css": 115,
     "public/css/views/start.css": 98,
     "public/css/views/surface.css": 101,
     "public/css/views/transparency.css": 95,
-    "public/css/views/wallet-poster.css": 133,
-    "public/css/views/workflows-poster.css": 142,
-    "public/css/views/workflows.css": 183
+    "public/css/views/wallet-poster.css": 133
   }
 }

@@ -32,6 +32,8 @@ const html = htm.bind(h);
  * server-generated markup like badges.
  *
  * @version-history
+ *   v1.1.0 — 2026-09-22 — Each cell carries its column's header text as data-label, so the shared
+ *     Table can stack a row as label-value pairs on a phone (components/poster-parts.js Table collapse).
  *   v1.0.0 — 2026-06-02 — Component unification (#13): created canonical generic
  *     DataTable (same _html/mono cell protocol as admin's), backing the shared
  *     .data-table CSS. The admin shared.js DataTable now wraps this in .adm-card.
@@ -42,15 +44,16 @@ export function DataTable({ headers, rows, scroll, className }) {
     <thead><tr>${headers.map(hd => html`<th>${hd}</th>`)}</tr></thead>
     <tbody>
       ${rows.map(row => html`<tr>
-        ${row.map(cell => {
+        ${row.map((cell, i) => {
+          const label = typeof headers[i] === 'string' ? headers[i] : undefined;
           if (cell && typeof cell === 'object' && cell._html) {
-            return html`<td class=${cell.mono ? 'mono' : ''} title=${cell.title || ''}
+            return html`<td class=${cell.mono ? 'mono' : ''} title=${cell.title || ''} data-label=${label}
               dangerouslySetInnerHTML=${{ __html: cell.text }}></td>`;
           }
           if (cell && typeof cell === 'object' && cell.mono) {
-            return html`<td class="mono" title=${cell.title || ''}>${cell.text}</td>`;
+            return html`<td class="mono" title=${cell.title || ''} data-label=${label}>${cell.text}</td>`;
           }
-          return html`<td>${cell}</td>`;
+          return html`<td data-label=${label}>${cell}</td>`;
         })}
       </tr>`)}
     </tbody>

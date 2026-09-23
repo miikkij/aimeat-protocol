@@ -8,6 +8,7 @@
  * @structure StructureOverview
  * @usage import { StructureOverview } from '/views/profile/organisms/widgets.js';
  * @version-history
+ *   v1.2.0 -- 2026-09-22 -- The toggle is the shared Fold; no class of its own.
  *   v1.1.0 — 2026-08-29 — `defaultOpen`: the organism home puts this inside a fold of its own, and a
  *     fold inside a fold is two clicks for one thing, so the home opens it (and loads) on mount.
  *     The toggle names the table of contents without an emoji in front of it.
@@ -18,7 +19,7 @@ import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { Spinner } from '/views/profile/shared.js';
+import { Fold, Text } from '/components/poster-parts.js';
 import { Markdown } from '/components/Markdown.js';
 
 /** Collapsible OKF-style structure-overview panel. A button that, on first expand, lazy-loads a
@@ -51,18 +52,11 @@ export function StructureOverview({ load, label, defaultOpen }) {
     if (next) await fetchMd();
   };
   return html`
-    <div class="pj-struct-overview">
-      <button class="pj-struct-toggle" aria-expanded=${open} onClick=${toggle}>
-        <span class="pj-struct-caret">${open ? '▾' : '▸'}</span>
-        <span>${label}</span>
-      </button>
-      ${open ? html`
-        <div class="pj-struct-body card-detail">
-          ${busy
-            ? html`<${Spinner} text=${t('organisms.loading') || 'Loading...'} />`
-            : (md
-              ? html`<${Markdown} text=${md} />`
-              : html`<div class="section-desc">${t('organisms.structEmpty') || 'No structure to show yet.'}</div>`)}
-        </div>` : null}
-    </div>`;
+    <${Fold} title=${label} open=${open} onToggle=${toggle}>
+      ${busy
+        ? html`<${Text} tone="muted">${t('organisms.loading') || 'Loading...'}<//>`
+        : (md
+          ? html`<${Markdown} text=${md} />`
+          : html`<${Text} kind="caption" tone="muted">${t('organisms.structEmpty') || 'No structure to show yet.'}<//>`)}
+    <//>`;
 }

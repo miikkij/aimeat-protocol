@@ -15,6 +15,9 @@
  *   import RateModal, { RATE_CONTEXTS } from './rate-modal.js';
  *   <RateModal open onClose onSubmit submitting existing=${task.rating} />
  * @version-history
+ *   v2.0.0 -- 2026-09-22 -- Composed from the shared component set: a Dialog, the five stars as
+ *     a group of tab actions that show their number instead of a star glyph, and the context,
+ *     the source check and the comment as Fields. Same exports and props.
  *   v1.0.1 — 2026-09-13 — Cancel and Rate sit in the dialog's footer.
  *   v1.0.0 -- 2026-05-31 -- Extracted from agents-tasks-subtab.js so the Quality
  *     tab can reuse the same rating modal.
@@ -23,7 +26,7 @@ import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
-import { Modal } from '/components/Modal.js';
+import { Dialog, Action, Field, Stack, Text } from '/components/poster-parts.js';
 
 const html = htm.bind(h);
 
@@ -55,38 +58,26 @@ export default function RateModal({ open, onClose, onSubmit, submitting, existin
     if (c) body.comment = c;
     onSubmit(body);
   }
-  return html`<${Modal} open=${open} onClose=${onClose} title=${t('profile.agents.tasks.rate.title')}
-    footer=${html`
-      <button class="btn-ghost" onClick=${onClose} disabled=${submitting}>${t('common.cancel') || 'Cancel'}</button>
-      <button class="btn-primary" onClick=${handleSend} disabled=${submitting || !stars}>
+  return html`<${Dialog} open=${open} onClose=${onClose} title=${t('profile.agents.tasks.rate.title')}
+    actions=${html`
+      <${Action} onClick=${onClose} disabled=${submitting}>${t('common.cancel') || 'Cancel'}<//>
+      <${Action} kind="primary" onClick=${handleSend} disabled=${submitting || !stars}>
         ${submitting ? t('profile.agents.tasks.rate.submitting') : t('profile.agents.tasks.rate.submit')}
-      </button>`}>
-    <p class="pf-agd-modal-help">${t('profile.agents.tasks.rate.help')}</p>
-    <div class="pf-agd-rate-stars" role="radiogroup">
-      ${[1, 2, 3, 4, 5].map(n => html`
-        <button key=${n}
-                class=${`pf-agd-rate-star ${n <= stars ? 'pf-agd-rate-star--on' : ''}`}
-                onClick=${() => setStars(n)}
-                aria-label=${String(n)}
-                aria-pressed=${n <= stars}>★</button>
-      `)}
-    </div>
-    <label class="pf-agd-rate-field">
-      <span>${t('profile.agents.tasks.rate.context')}</span>
-      <select value=${context} onChange=${e => setContext(e.target.value)}>
-        ${RATE_CONTEXTS.map(c => html`<option key=${c} value=${c}>${t(`profile.agents.detail.quality.contexts.${c}`)}</option>`)}
-      </select>
-    </label>
-    <label class="pf-agd-rate-check">
-      <input type="checkbox" checked=${grounded} onChange=${e => setGrounded(e.target.checked)} />
-      <span>${t('profile.agents.tasks.rate.grounded')}</span>
-    </label>
-    <textarea
-      class="pf-agd-revision-textarea"
-      placeholder=${t('profile.agents.tasks.rate.commentPlaceholder')}
-      value=${comment}
-      onInput=${e => setComment(e.target.value)}
-      rows=${3}
-    ></textarea>
+      <//>`}>
+    <${Stack}>
+      <${Text}>${t('profile.agents.tasks.rate.help')}<//>
+      <${Stack} direction="horizontal" density="compact" align="start" role="radiogroup">
+        ${[1, 2, 3, 4, 5].map(n => html`
+          <${Action} key=${n} kind="tab" selected=${n <= stars} onClick=${() => setStars(n)} label=${String(n)}>${n}<//>
+        `)}
+      <//>
+      <${Field} type="select" label=${t('profile.agents.tasks.rate.context')} value=${context}
+        onChange=${e => setContext(e.target.value)}
+        options=${RATE_CONTEXTS.map(c => ({ value: c, label: t(`profile.agents.detail.quality.contexts.${c}`) }))} />
+      <${Field} type="checkbox" label=${t('profile.agents.tasks.rate.grounded')} value=${grounded}
+        onChange=${e => setGrounded(e.target.checked)} />
+      <${Field} type="textarea" placeholder=${t('profile.agents.tasks.rate.commentPlaceholder')}
+        value=${comment} onInput=${e => setComment(e.target.value)} rows=${3} />
+    <//>
   <//>`;
 }

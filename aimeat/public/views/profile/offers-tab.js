@@ -10,6 +10,7 @@
  *   router, the builder, billing, rating, and a delivery's content.
  * @structure default OffersTab({ session, showToast }) — state, loads, handlers, the ctx bag, render
  * @version-history
+ *   v2.2.0 -- 2026-09-22 -- The loading state is the shared Page and Text; the tab has no own CSS.
  *   v2.1.0 -- 2026-09-06 -- Deep link: ?offer=<agent>/<id> opens that offer's page on a cold navigation,
  *     which is what a map tile opens in a new tab (offers/map-page.js).
  *   v2.0.0 -- 2026-08-30 -- The poster face (design canvas "AIMEAT Tarjoaman sivu", direction A). The
@@ -30,6 +31,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { useConfirm } from '/components/Modal.js';
+import { Page, Text } from '/components/poster-parts.js';
 import * as offersService from '/js/services/offers.js';
 import { swallowed } from '/js/swallowed.js';
 import { buildModel } from './offers/model.js';
@@ -173,7 +175,7 @@ export default function OffersTab({ session, showToast }) {
     } catch (e) { showToast((e && e.message) || t('profile.offers.rateFailed')); }
   };
 
-  if (feed === null) return html`<div class="og og-op"><p class="og-empty">…</p></div>`;
+  if (feed === null) return html`<${Page} width="wide" title=${t('profile.tabs.offers')}><${Text} tone="muted">…<//><//>`;
 
   const ctx = {
     showToast, model, builder, busy, loadingDeliveries: deliverables === null,

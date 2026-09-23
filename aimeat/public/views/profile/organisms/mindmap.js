@@ -18,6 +18,8 @@
  *   v1.2.0 — 2026-08-29 — `defaultOpen`: the organism home puts the map inside a fold of its own, so
  *     the map opens with the fold instead of asking for a second click. The toggle names the map
  *     without an emoji in front of it.
+ *   v1.3.0 -- 2026-09-22 -- Composed from the shared set: the toggle is a Fold, the options are Fields,
+ *     the map sits in a flush plain Surface that takes the click; no class of its own.
  *   v1.0.0 — 2026-06-22 — Initial: clickable organism/workspace mindmap with level/users/activity/heatmap.
  *   v1.1.0 — 2026-06-22 — Chart types (mindmap default + flowchart LR/TD), per-org/ws localStorage
  *     persistence, label-text click resolution for mindmap mode.
@@ -30,6 +32,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { Mermaid } from '/components/Mermaid.js';
+import { Fold, Stack, Field, Surface, Text } from '/components/poster-parts.js';
 
 /** Sanitize a label for a Mermaid quoted flowchart string. */
 function mmdLabel(s) {
@@ -273,36 +276,21 @@ export function StructureMindmap({ scope, graph, onNavigate, label, storageKey, 
   const lbl = label || (scope === 'organism' ? (t('mindmap.titleOrg') || 'Organism map') : (t('mindmap.titleWs') || 'Workspace map'));
 
   return html`
-    <div class="pj-mindmap">
-      <button class="pj-struct-toggle" aria-expanded=${open} onClick=${() => setOpen(o => !o)}>
-        <span class="pj-struct-caret">${open ? '▾' : '▸'}</span>
-        <span>${lbl}</span>
-      </button>
-      ${open ? html`
-        <div class="pj-mindmap-body card-detail">
-          <div class="pj-mindmap-opts">
-            <label class="pj-mm-opt">
-              <span>${t('mindmap.chart') || 'Chart'}</span>
-              <select class="input-field input-sm" value=${opts.chartType} onChange=${e => set({ chartType: e.target.value })}>
-                ${CHART_TYPES.map(c => html`<option value=${c.key}>${t(c.label) || c.fallback}</option>`)}
-              </select>
-            </label>
-            <label class="pj-mm-opt">
-              <span>${t('mindmap.level') || 'Level'}</span>
-              <select class="input-field input-sm" value=${opts.level} onChange=${e => set({ level: e.target.value })}>
-                ${LEVELS.map(l => html`<option value=${l.key}>${t(l.label) || l.fallback}</option>`)}
-              </select>
-            </label>
-            ${scope === 'organism' ? html`
-              <label class="pj-mm-check"><input type="checkbox" checked=${opts.showUsers} onChange=${e => set({ showUsers: e.target.checked })} /> ${t('mindmap.showUsers') || 'Users'}</label>
-            ` : null}
-            <label class="pj-mm-check"><input type="checkbox" checked=${opts.showActivity} onChange=${e => set({ showActivity: e.target.checked })} /> ${t('mindmap.showActivity') || 'Activity'}</label>
-            <label class="pj-mm-check"><input type="checkbox" checked=${opts.heatmap} onChange=${e => set({ heatmap: e.target.checked })} /> ${t('mindmap.heatmap') || 'Heatmap'}</label>
-          </div>
-          <div class="pj-mindmap-canvas of-mapwrap--clickable" onClick=${onMapClick}>
-            <${Mermaid} chart=${src} />
-          </div>
-          <div class="pj-mindmap-hint section-desc">${t('mindmap.clickHint') || 'Click a node to open it.'}</div>
-        </div>` : null}
-    </div>`;
+    <${Fold} title=${lbl} open=${open} onToggle=${() => setOpen(o => !o)}>
+      <${Stack} direction="wrap" align="end">
+        <${Field} type="select" label=${t('mindmap.chart') || 'Chart'} value=${opts.chartType} onChange=${e => set({ chartType: e.target.value })}
+          options=${CHART_TYPES.map(c => ({ value: c.key, label: t(c.label) || c.fallback }))} />
+        <${Field} type="select" label=${t('mindmap.level') || 'Level'} value=${opts.level} onChange=${e => set({ level: e.target.value })}
+          options=${LEVELS.map(l => ({ value: l.key, label: t(l.label) || l.fallback }))} />
+        ${scope === 'organism' ? html`
+          <${Field} type="checkbox" label=${t('mindmap.showUsers') || 'Users'} value=${opts.showUsers} onChange=${e => set({ showUsers: e.target.checked })} />
+        ` : null}
+        <${Field} type="checkbox" label=${t('mindmap.showActivity') || 'Activity'} value=${opts.showActivity} onChange=${e => set({ showActivity: e.target.checked })} />
+        <${Field} type="checkbox" label=${t('mindmap.heatmap') || 'Heatmap'} value=${opts.heatmap} onChange=${e => set({ heatmap: e.target.checked })} />
+      <//>
+      <${Surface} kind="plain" density="flush" onClick=${onMapClick}>
+        <${Mermaid} chart=${src} />
+      <//>
+      <${Text} kind="caption" tone="muted">${t('mindmap.clickHint') || 'Click a node to open it.'}<//>
+    <//>`;
 }

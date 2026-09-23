@@ -20,6 +20,12 @@
  *   Table · Toolbar · Field · NumeralBand · Dialog · Action · CopyAction · Menu · Meter · Surface · Text
  * @usage import { Page, Section, ListRow } from '/components/poster-parts.js';
  * @version-history
+ *   v2.1.0 -- 2026-09-22 -- What the settings tabs needed, added once for every page: a danger tone
+ *     and switch semantics on actions; coral and success chips; a table that stacks on a phone;
+ *     scrolling surfaces; rail entries that run a click or scroll only the content area;
+ *     autofocus, input mode and a narrow width on fields; kept line breaks and a small heading in
+ *     text; muted rows and a name tooltip; actions on a fold's row; a mono page title; the
+ *     extra-large dialog.
  *   v2.0.0 -- 2026-09-22 -- Taken to main from the stage-two branch (cc-jouni-codex-styles-0912,
  *     fee2e0f17) with three changes: Action no longer turns into a menu when given `items` (that is
  *     Menu, one component for the three menus the site had); the meter is its own component instead
@@ -43,13 +49,13 @@ const collapseOf = (value) => pick(Number(value), [560, 600, 640, 900], 640);
 const toneOf = (value) => pick(value, ['plain', 'muted', 'coral', 'sun', 'ink', 'success', 'danger'], 'plain');
 
 /** The page frame: width, masthead, and an optional rail that becomes a menu dialog on a phone. */
-export function Page({ title, crumb, crumbs, identity, mark, actions, masthead, rail, width = 'normal', children, id,
+export function Page({ title, titleKind, crumb, crumbs, identity, mark, actions, masthead, rail, width = 'normal', children, id,
   railSide = 'trailing', railLabel, railOpen = false, onRailOpen, onRailClose }) {
   const leading = railSide === 'leading';
   const railNode = rail && html`<div class="poster-page-rail">${rail}</div>`;
   return html`<div class="poster-page" data-width=${pick(width, ['normal', 'wide', 'reading'], 'normal')} id=${id}>
     ${masthead || ((title || crumb || crumbs || identity || actions) && html`<${Masthead}
-      title=${title} crumb=${crumb} crumbs=${crumbs} identity=${identity} mark=${mark} actions=${actions} />`)}
+      title=${title} titleKind=${titleKind} crumb=${crumb} crumbs=${crumbs} identity=${identity} mark=${mark} actions=${actions} />`)}
     ${rail && railLabel && html`<div class="poster-page-menu"><${Action} onClick=${onRailOpen} expanded=${railOpen}>${railLabel}<//></div>`}
     <div class="poster-page-body" data-rail=${rail ? 'yes' : 'no'} data-rail-side=${leading ? 'leading' : 'trailing'} data-navigation=${railLabel ? 'yes' : 'no'}>
       ${leading && railNode}<div class="poster-page-main">${children}</div>${!leading && railNode}
@@ -62,13 +68,14 @@ export function Page({ title, crumb, crumbs, identity, mark, actions, masthead, 
  * The page's opening: the trail, the title, the identity line, and the actions at the right.
  * `crumbs` is the trail to this page: [{ label, href } | { label, onClick } | { label }], the last
  * entry being where the person is. (`crumb` takes a ready node, for a page that has one.)
+ * `titleKind="mono"` sets a title that is a machine value (a key, an address) as it is written.
  */
-export function Masthead({ title, crumb, crumbs, identity, mark, actions, size = 'normal' }) {
+export function Masthead({ title, titleKind, crumb, crumbs, identity, mark, actions, size = 'normal' }) {
   return html`<header class="poster-masthead" data-size=${pick(size, ['normal', 'large'], 'normal')}>
       ${mark && html`<span class="poster-masthead-mark">${mark}</span>`}
       <div class="poster-masthead-words">
         ${crumbs?.length ? html`<${Crumbs} items=${crumbs} />` : crumb && html`<div class="poster-crumb">${crumb}</div>`}
-        ${title && html`<h1 class="poster-page-title">${title}</h1>`}
+        ${title && html`<h1 class="poster-page-title" data-kind=${titleKind === 'mono' ? 'mono' : undefined}>${title}</h1>`}
         ${identity && html`<div class="poster-identity">${identity}</div>`}
       </div>
       ${actions && html`<div class="poster-masthead-actions">${actions}</div>`}
@@ -85,9 +92,12 @@ export function Crumbs({ items = [] }) {
   })}</ol></nav>`;
 }
 
-/** A small square mono chip for a fact about the thing: plain (framed), sun (the one to see) or muted. */
+/**
+ * A small square mono chip for a fact about the thing: plain (framed), sun (the one to see), coral
+ * (needs attention), success (fine, connected) or muted.
+ */
 export function Chip({ tone = 'plain', children, title }) {
-  return html`<span class="poster-chip" data-tone=${pick(tone, ['plain', 'sun', 'muted'], 'plain')} title=${title}>${children}</span>`;
+  return html`<span class="poster-chip" data-tone=${pick(tone, ['plain', 'sun', 'coral', 'success', 'danger', 'muted'], 'plain')} title=${title}>${children}</span>`;
 }
 
 /**
@@ -107,15 +117,21 @@ export function Section({ title, description, actions, children, selected = fals
   </section>`;
 }
 
-/** A folded row that opens in place: a coral number, the title, a quiet note at the right, the arrow. */
-export function Fold({ id, number, title, sub, open = false, onToggle, children }) {
+/**
+ * A folded row that opens in place: a coral number, the title, a quiet note at the right, the arrow.
+ * `actions` sit on the row, outside the toggle, so pressing one does not open or close the fold.
+ */
+export function Fold({ id, number, title, sub, open = false, onToggle, actions, children }) {
   return html`<section class="poster-fold" data-open=${open ? 'yes' : 'no'} id=${id}>
-    <button type="button" class="poster-fold-toggle" aria-expanded=${open ? 'true' : 'false'} onClick=${onToggle}>
-      ${number && html`<span class="poster-list-number">${number}</span>`}
-      <span class="poster-fold-title">${title}</span>
-      ${sub && html`<span class="poster-fold-sub">${sub}</span>`}
-      <span class="poster-fold-arrow" aria-hidden="true">${open ? '↓' : '→'}</span>
-    </button>
+    <div class="poster-fold-row">
+      <button type="button" class="poster-fold-toggle" aria-expanded=${open ? 'true' : 'false'} onClick=${onToggle}>
+        ${number && html`<span class="poster-list-number">${number}</span>`}
+        <span class="poster-fold-title">${title}</span>
+        ${sub && html`<span class="poster-fold-sub">${sub}</span>`}
+        <span class="poster-fold-arrow" aria-hidden="true">${open ? '↓' : '→'}</span>
+      </button>
+      ${actions && html`<div class="poster-actions">${actions}</div>`}
+    </div>
     ${open && html`<div class="poster-fold-body">${children}</div>`}
   </section>`;
 }
@@ -133,12 +149,37 @@ export function Stack({ direction = 'vertical', align = 'stretch', density, chil
     data-density=${densityOf(density)} role=${role} id=${id} aria-label=${label}>${children}</div>`;
 }
 
-/** A sticky, numbered index. Entries carry content and a destination, never styling. */
+/**
+ * Bring an element to the top of the content area, and move nothing else. scrollIntoView() walks
+ * every scrollable ancestor, and on this shell that includes the window, which slides the top bar out
+ * of view (2026-08-29); scrolling the content region by hand touches one element.
+ */
+export function scrollToId(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const box = el.closest('.page-content') || el.closest('.pf-content') || null;
+  if (!box) { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
+  const top = box.scrollTop + el.getBoundingClientRect().top - box.getBoundingClientRect().top - 16;
+  box.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+}
+
+/**
+ * A sticky, numbered index. Entries carry content and a destination, never styling: { label, href,
+ * count?, current?, onClick? }. An in-page href ("#id") scrolls only the content area; `onClick`
+ * runs first (to open a fold, say) and the scroll follows.
+ */
 export function Rail({ title, entries = [], children, label, kind = 'index' }) {
+  const go = (entry) => (e) => {
+    const hash = typeof entry.href === 'string' && entry.href.startsWith('#') ? entry.href.slice(1) : '';
+    if (!entry.onClick && !hash) return;
+    e.preventDefault();
+    entry.onClick?.();
+    if (hash) setTimeout(() => scrollToId(hash), entry.onClick ? 50 : 0);
+  };
   return html`<nav class="poster-rail" data-kind=${pick(kind, ['index', 'navigation'], 'index')} aria-label=${label || (typeof title === 'string' ? title : undefined)}>
     ${title && html`<p class="poster-rail-title">${title}</p>`}
     <ol>${entries.map((entry, index) => html`<li key=${entry.id || entry.href || index}>
-      <a href=${entry.href} aria-current=${entry.current ? 'location' : undefined}>
+      <a href=${entry.href || '#'} onClick=${go(entry)} aria-current=${entry.current ? 'location' : undefined}>
         <span class="poster-rail-number" aria-hidden="true">${String(index + 1).padStart(2, '0')}</span>
         <span>${entry.label}</span>${entry.count != null && html`<small>${entry.count}</small>`}
       </a></li>`)}</ol>${children}
@@ -154,18 +195,20 @@ export function Rail({ title, entries = [], children, label, kind = 'index' }) {
  * which points right, or down while the row is `selected` (open).
  * The second line (`detail`) is mono, for a machine value (an address, a key, a time); a sentence a
  * person reads passes `detailKind="text"`. A `preview` (a message, a note) is text and is clamped.
+ * `muted` fades a row that is done, skipped or not chosen; `nameTitle` is a tooltip on the name;
+ * `concealed` blurs the name and detail of a row the person chose to hide on screen.
  */
 export function ListRow({ mark, name, detail, value, actions, children, href, onOpen, selected = false, density, id, kind = 'normal', preview = false, external = false,
-  time, timeTitle, marker, live = false, number, arrow = false, detailKind = 'mono' }) {
+  time, timeTitle, marker, live = false, number, arrow = false, detailKind = 'mono', muted = false, nameTitle, concealed = false }) {
   const lead = time != null || marker || number != null;
   const detailFace = preview ? 'text' : pick(detailKind, ['mono', 'text'], 'mono');
-  return html`<article class="poster-list-row" data-kind=${pick(kind, ['normal', 'chronology'], 'normal')} data-density=${densityOf(density)} data-selected=${selected ? 'yes' : 'no'} data-preview=${preview ? 'yes' : undefined} data-detail=${detailFace} id=${id}>
+  return html`<article class="poster-list-row" data-kind=${pick(kind, ['normal', 'chronology'], 'normal')} data-density=${densityOf(density)} data-selected=${selected ? 'yes' : 'no'} data-preview=${preview ? 'yes' : undefined} data-detail=${detailFace} data-muted=${muted ? 'yes' : undefined} data-concealed=${concealed ? 'yes' : undefined} id=${id}>
     ${lead ? html`<div class="poster-list-mark poster-list-lead">
       ${number != null && html`<span class="poster-list-number">${number}</span>`}
       ${time != null && html`<span class="poster-list-time" title=${timeTitle}>${time}</span>`}
       ${marker && html`<span class="poster-list-marker" data-tone=${pick(marker, ['coral', 'sun', 'success', 'danger', 'info', 'muted'], 'muted')} data-live=${live ? 'yes' : undefined} aria-hidden="true"></span>`}
     </div>` : mark && html`<div class="poster-list-mark">${mark}</div>`}
-    <div class="poster-list-name">
+    <div class="poster-list-name" title=${nameTitle}>
       ${href || onOpen ? html`<${Action} href=${href} onClick=${onOpen} kind="text" target=${external ? '_blank' : undefined} nofollow=${external}>${name}<//>` : html`<strong>${name}</strong>`}
       ${detail && html`<small>${detail}</small>`}
     </div>
@@ -194,9 +237,12 @@ export function StatRow({ href, onClick, light, tone = 'plain', children }) {
  * One item of a checklist: a square that is ticked on the sun when the thing is done and dashed
  * when it is not, and the words, quieter until done. A link or a button when it goes somewhere.
  */
-export function CheckItem({ done = false, href, onClick, target, children }) {
-  const inner = html`<span class="poster-check-box" aria-hidden="true">${done ? '✓' : ''}</span><span>${children}</span>`;
-  const d = done ? 'yes' : 'no';
+export function CheckItem({ done = false, state, href, onClick, target, children }) {
+  // `state` names more than done/not done: done (✓ on the sun), failed (✗ on the danger ground), warn
+  // (a solid coral frame: needs a look) or pending (dashed). `done` is the short form of state="done".
+  const st = pick(state, ['done', 'failed', 'warn', 'pending'], done ? 'done' : 'pending');
+  const inner = html`<span class="poster-check-box" data-state=${st} aria-hidden="true">${st === 'done' ? '✓' : st === 'failed' ? '✗' : ''}</span><span>${children}</span>`;
+  const d = st === 'done' ? 'yes' : 'no';
   return href ? html`<a class="poster-check" data-done=${d} href=${href} target=${target} rel=${target === '_blank' ? 'noopener noreferrer' : undefined} onClick=${onClick}>${inner}</a>`
     : onClick ? html`<button type="button" class="poster-check" data-done=${d} onClick=${onClick}>${inner}</button>`
       : html`<span class="poster-check" data-done=${d}>${inner}</span>`;
@@ -214,11 +260,16 @@ export function KeyValue({ label, value, mono = false, children }) {
   return html`<div class="poster-key-value"><${KeyValueRow} label=${label} value=${value ?? children} mono=${mono} /></div>`;
 }
 
-/** The existing table renderer keeps its escaping and cell semantics; this wrapper owns scrolling. */
-export function Table({ headers = [], rows = [], label, density }) {
-  return html`<div class="poster-table-wrap" data-density=${densityOf(density)} role="region" aria-label=${label} tabindex="0">
+/**
+ * A table: the existing renderer keeps its escaping and cell semantics; this wrapper owns scrolling.
+ * `collapse` (560, 600 or 640) stacks each row as label-value pairs when the table's own width is
+ * below it, so a table stays readable on a phone instead of breaking words in narrow columns.
+ */
+export function Table({ headers = [], rows = [], label, density, collapse }) {
+  const c = collapse ? collapseOf(collapse) : undefined;
+  return html`<div class="poster-table-frame"><div class="poster-table-wrap" data-density=${densityOf(density)} data-collapse=${c} role="region" aria-label=${label} tabindex="0">
     <${DataTable} headers=${headers} rows=${rows} className="poster-table" />
-  </div>`;
+  </div></div>`;
 }
 
 /** Search, filters and a right-aligned count. */
@@ -237,16 +288,18 @@ export function Toolbar({ search, filters = [], count, actions, children, label 
 /** A field owns its label, its control and its hint, which shows only while the field is in use. */
 export function Field({ label, hint, error, type = 'text', value, onInput, onChange, options = [], placeholder,
   id, name, disabled = false, readOnly = false, required = false, rows = 5, autoComplete, min, max, step,
-  inputRef, maxLength, spellCheck, list, onKeyDown, onPaste }) {
+  inputRef, maxLength, spellCheck, list, onKeyDown, onPaste, onBlur, autoFocus = false, inputMode, width = 'fill', ariaLabel }) {
   const generated = useId();
   const inputId = id || generated;
   const kind = pick(type, ['text', 'email', 'url', 'password', 'search', 'number', 'date', 'datetime-local', 'time', 'checkbox', 'textarea', 'select'], 'text');
   const hasValue = value !== undefined && value !== null && value !== '' && value !== false;
-  const control = { id: inputId, name, disabled, readOnly, required, onInput, onChange, ref: inputRef, maxLength, spellCheck, list, onKeyDown, onPaste,
+  const control = { id: inputId, name, disabled, readOnly, required, onInput, onChange, ref: inputRef, maxLength, spellCheck, list, onKeyDown, onPaste, onBlur,
+    autoFocus, inputMode: pick(inputMode, ['text', 'decimal', 'numeric', 'email', 'url', 'search'], undefined),
     'aria-invalid': error ? 'true' : undefined,
     'aria-describedby': error || hint ? inputId + '-hint' : undefined };
-  return html`<div class="poster-field" data-filled=${hasValue ? 'yes' : 'no'} data-kind=${kind}>
-    ${label && html`<label for=${inputId} class="poster-label">${label}</label>`}
+  return html`<div class="poster-field" data-filled=${hasValue ? 'yes' : 'no'} data-kind=${kind} data-width=${width === 'narrow' ? 'narrow' : undefined}>
+    ${label ? html`<label for=${inputId} class="poster-label">${label}</label>`
+      : ariaLabel && html`<label for=${inputId} class="visually-hidden">${ariaLabel}</label>`}
     ${kind === 'textarea' ? html`<textarea ...${control} value=${value ?? ''} rows=${rows} placeholder=${placeholder}></textarea>`
       : kind === 'select' ? html`<select ...${control} value=${value}>${options.map((option) => html`
         <option key=${option.value} value=${option.value} disabled=${option.disabled}>${option.label}</option>`)}</select>`
@@ -278,7 +331,7 @@ export function NumeralBand({ items = [], lead, actions, tone = 'coral', cut = '
 
 /** The site's one dialog (Modal keeps the native lifecycle, the dirty-form guard and focus return). */
 export function Dialog({ open, onClose, title, children, actions, sideAction, size = 'normal', guard = true }) {
-  const sizes = { small: 'sm', normal: 'md', large: 'lg' };
+  const sizes = { small: 'sm', normal: 'md', large: 'lg', xl: 'xl' };
   return html`<${Modal} open=${open} onClose=${onClose} title=${title} footer=${actions} footerStart=${sideAction}
     size=${sizes[pick(size, Object.keys(sizes), 'normal')]} guard=${guard}
     className="poster-dialog">${children}<//>`;
@@ -287,25 +340,31 @@ export function Dialog({ open, onClose, title, children, actions, sideAction, si
 /**
  * An action names what it does and picks one of five roles, never a CSS hook:
  * primary (the one loud slab), secondary (an underlined word), tab (a choice that can be on),
- * text (a link-like word inside a row) and icon (a square with an SVG in it; `selected` makes it a
- * pressed toggle, such as a pin).
- * `semantics` is for a group of choices: 'tab' or 'radio' gives the button that ARIA role.
+ * text (a link-like word inside a row), icon (a square with an SVG in it; `selected` makes it a
+ * pressed toggle, such as a pin) and choice (a boxed answer: `title` in bold, the children as its
+ * description, the chosen one on the sun).
+ * `semantics` is for a group of choices: 'tab' or 'radio' gives the button that ARIA role; 'switch'
+ * makes an on/off setting (aria-checked). `tone` "danger" or "success" colours an underlined word.
  */
 export function Action({ children, href, onClick, kind = 'secondary', size = 'normal', tone, selected = false,
   disabled = false, type = 'button', label, title, expanded, controls, download, target, semantics, nofollow = false }) {
-  const role = pick(kind, ['primary', 'secondary', 'tab', 'text', 'icon'], 'secondary');
+  const role = pick(kind, ['primary', 'secondary', 'tab', 'text', 'icon', 'choice'], 'secondary');
   const cls = role === 'primary' ? 'poster-slab' + (size === 'large' ? ' poster-slab--large' : '')
+    : role === 'choice' ? 'poster-choice' + (selected ? ' on' : '')
     : role === 'tab' ? 'poster-tab' + (selected ? ' is-on' : '')
       : role === 'text' ? 'poster-text-action' : role === 'icon' ? 'poster-icon-action' : 'poster-action';
-  const common = { class: cls, onClick, 'data-tone': role === 'primary' ? pick(tone, ['plain', 'danger'], 'plain') : 'plain', 'aria-label': label, title,
+  // A primary may be danger; an underlined word or a text action may be danger (delete, disconnect)
+  // or success (approve).
+  const tones = role === 'primary' ? ['plain', 'danger'] : role === 'secondary' || role === 'text' ? ['plain', 'danger', 'success'] : ['plain'];
+  const common = { class: cls, onClick, 'data-tone': pick(tone, tones, 'plain'), 'aria-label': label, title,
     'aria-expanded': expanded, 'aria-controls': controls };
   return href && !disabled ? html`<a ...${common} href=${href} download=${download} target=${target}
     rel=${target === '_blank' ? 'noopener noreferrer' + (nofollow ? ' nofollow' : '') : undefined}>${children}</a>`
     : html`<button ...${common} type=${pick(type, ['button', 'submit', 'reset'], 'button')} disabled=${disabled}
-        role=${pick(semantics, ['radio', 'tab'], undefined)}
-        aria-checked=${semantics === 'radio' ? selected : undefined}
+        role=${pick(semantics, ['radio', 'tab', 'switch'], undefined)}
+        aria-checked=${semantics === 'radio' || semantics === 'switch' ? selected : undefined}
         aria-selected=${semantics === 'tab' ? selected : undefined}
-        aria-pressed=${(role === 'tab' || role === 'icon') && !semantics ? selected : undefined}>${children}</button>`;
+        aria-pressed=${(role === 'tab' || role === 'icon' || role === 'choice') && !semantics ? selected : undefined}>${role === 'choice' && title ? html`<b>${title}</b>` : null}${children}</button>`;
 }
 
 /**
@@ -353,33 +412,43 @@ export function Menu({ items, label, trigger }) {
   </div>`;
 }
 
-/** A filled bar for a ratio: how much of a limit is used. From 90 % it turns to the danger colour. */
-export function Meter({ value, max = 100, label }) {
+/** A filled bar for a ratio. A quota (how much of a limit is used) turns to the danger colour from 90 %; `kind="progress"` never does. */
+export function Meter({ value, max = 100, label, kind = 'quota' }) {
   const limit = Number.isFinite(max) && max > 0 ? max : 100;
   const amount = Number.isFinite(value) ? Math.max(0, Math.min(limit, value)) : 0;
   const percent = (amount / limit) * 100;
-  return html`<div class=${'poster-box poster-box--meter poster-box--quota poster-meter' + (percent >= 90 ? ' is-full' : '')}
+  // A quota warns from 90 %; progress (steps done, a job's share) only ever fills.
+  const quota = kind !== 'progress';
+  return html`<div class=${'poster-box poster-box--meter poster-meter' + (quota ? ' poster-box--quota' : '') + (quota && percent >= 90 ? ' is-full' : '')}
     role="meter" aria-label=${label} aria-valuenow=${amount} aria-valuemin="0" aria-valuemax=${limit}>
     <svg viewBox="0 0 100 100" preserveAspectRatio="none" width="100%" height="100%" aria-hidden="true"><rect width=${percent} height="100" /></svg>
   </div>`;
 }
 
-/** A content surface is a shape with its spacing: a box, an opened record, an aside, code, a panel. */
-export function Surface({ kind = 'box', tone, density, children, id, role, summary, onClick, surfaceRef }) {
+/**
+ * A content surface is a shape with its spacing: a box, an opened record, an aside, code, a panel.
+ * `height="scroll"` caps a long body at 24rem and scrolls inside; `"tall"` caps code at 60vh.
+ * An aside with `tone="danger"` is the solid-framed one that explains an act that cannot be undone.
+ */
+export function Surface({ kind = 'box', tone, density, children, id, role, summary, onClick, surfaceRef, height = 'auto' }) {
   const shapes = { box: 'poster-box', record: 'poster-record', aside: 'poster-aside', code: 'poster-box poster-code', editor: 'poster-box poster-editor', plain: '', panel: 'poster-panel', preview: 'poster-box poster-preview' };
   const tag = summary ? 'details' : 'div';
   return html`<${tag} class=${kind === 'panel' ? 'poster-panel' : 'poster-surface ' + shapes[pick(kind, Object.keys(shapes), 'box')]}
-    data-density=${density === 'flush' ? 'flush' : densityOf(density)} data-tone=${toneOf(tone)} id=${id} role=${role} ref=${surfaceRef} onClick=${onClick}>
+    data-density=${density === 'flush' ? 'flush' : densityOf(density)} data-tone=${toneOf(tone)} data-height=${pick(height, ['auto', 'scroll', 'tall'], 'auto')} id=${id} role=${role} ref=${surfaceRef} onClick=${onClick}>
     ${summary && html`<summary>${summary}</summary>`}${children}<//>`;
 }
 
-/** The small typography vocabulary for literal copy and data inside parts. */
-export function Text({ children, kind = 'body', tone, title, id, size = 'normal' }) {
+/**
+ * The small typography vocabulary for literal copy and data inside parts. `lines` keeps the line
+ * breaks a person typed; a heading or a number takes `size="small"`.
+ */
+export function Text({ children, kind = 'body', tone, title, id, size = 'normal', lines = false }) {
   const roles = { body: 'p', lead: 'p', label: 'span', mono: 'span', caption: 'small', heading: 'h3', number: 'span' };
   const selected = pick(kind, Object.keys(roles), 'body');
   const shape = { heading: 'poster-record-title', number: 'poster-stat-number', label: 'poster-label' }[selected];
   const numberSize = pick(size, ['small', 'normal', 'large'], 'normal');
-  const modifier = selected === 'number' && numberSize !== 'normal' ? ' poster-stat-number--' + numberSize : '';
-  return h(roles[selected], { class: 'poster-copy ' + (shape || 'poster-text') + modifier, 'data-kind': selected,
+  const modifier = selected === 'number' && numberSize !== 'normal' ? ' poster-stat-number--' + numberSize
+    : selected === 'heading' && numberSize === 'small' ? ' poster-record-title--small' : '';
+  return h(roles[selected], { class: 'poster-copy ' + (shape || 'poster-text') + modifier, 'data-kind': selected, 'data-lines': lines ? 'yes' : undefined,
     'data-tone': pick(tone, ['plain', 'muted', 'coral', 'sun', 'info', 'success', 'danger'], 'plain'), title, id }, children);
 }

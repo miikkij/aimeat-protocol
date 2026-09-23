@@ -13,6 +13,7 @@
  *   - SchedulerTab (default) — state, the two loads, the action handlers, the ctx bag, render
  * @usage Registered in profile.js TABS as { id:'scheduler', component: SchedulerTab }.
  * @version-history
+ *   v2.1.0 -- 2026-09-22 -- The loading state is the shared Page and Text; the tab has no own CSS.
  *   v2.0.0 -- 2026-08-30 -- The poster face (design canvas "AIMEAT Ajastimen sivu", direction A). The
  *     seven-column week grid and the wall of cards are replaced by the cover; a schedule opens as a
  *     page; the create form moved to scheduler/create-form.js. Loading and live updates unchanged.
@@ -32,6 +33,7 @@ import { t } from '/js/i18n.js';
 import { listAgents } from '/js/services/agents.js';
 import { listAllSchedules, getSchedulerTab, listScheduleOccurrences, getScheduleDetail, setScheduleEnabled, triggerSchedule, deleteSchedule } from '/js/services/schedules.js';
 import { swallowed } from '/js/swallowed.js';
+import { Page, Text } from '/components/poster-parts.js';
 import { buildModel, startOfDay } from './scheduler/model.js';
 import { renderSchedulerView } from './scheduler/cover.js';
 export { CreateForm } from './scheduler/create-form.js';
@@ -141,7 +143,7 @@ export default function SchedulerTab({ showToast }) {
     run(async () => { await deleteSchedule(s.id); showToast?.(t('profile.scheduler.cancelled')); setView({ kind: 'cover' }); });
   };
 
-  if (loading) return html`<div class="sch-loading">${t('profile.scheduler.loading')}</div>`;
+  if (loading) return html`<${Page} width="wide" title=${t('profile.scheduler.title')}><${Text} tone="muted">${t('profile.scheduler.loading')}<//><//>`;
 
   const ctx = {
     showToast, loadData, error, agents, model, internal: data.agentInternal || [], reloadTick, occLoading,

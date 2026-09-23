@@ -1,20 +1,20 @@
 {
   "_note": "Copied design-language declarations, recorded debt rather than approval. This files map may only shrink. After migration, lower the affected counts or remove cleared files. Only an explicit developer decision permits re-seeding with pnpm check:poster-shapes --record.",
   "_measured": {
-    "date": "2026-09-22T23:53:59Z",
-    "files": 74,
-    "declarations": 504,
+    "date": "2026-09-23T01:26:20Z",
+    "files": 67,
+    "declarations": 461,
     "patterns": {
-      "sun": 113,
-      "box2": 166,
+      "sun": 105,
+      "box2": 146,
       "record": 28,
-      "headline": 57,
-      "action": 67,
-      "frame3": 47,
+      "headline": 50,
+      "action": 64,
+      "frame3": 43,
       "slab": 7,
       "rule": 11,
       "dialog": 1,
-      "label": 7
+      "label": 6
     }
   },
   "files": {
@@ -209,9 +209,6 @@
       "action": 1,
       "sun": 1
     },
-    "public/css/views/agents-detail.css": {
-      "sun": 1
-    },
     "public/css/views/ai-poster.css": {
       "sun": 3,
       "box2": 3,
@@ -278,11 +275,6 @@
       "box2": 2,
       "record": 1
     },
-    "public/css/views/fleet.css": {
-      "headline": 1,
-      "sun": 1,
-      "box2": 1
-    },
     "public/css/views/help.css": {
       "sun": 2,
       "frame3": 2
@@ -318,29 +310,13 @@
       "box2": 1,
       "record": 1
     },
-    "public/css/views/mcp-poster.css": {
-      "headline": 2,
-      "action": 1,
-      "sun": 2,
-      "box2": 6,
-      "label": 1
-    },
     "public/css/views/members.css": {
       "box2": 1,
       "frame3": 2
     },
-    "public/css/views/memory.css": {
-      "box2": 2,
-      "frame3": 1
-    },
     "public/css/views/notifications-poster.css": {
       "sun": 1,
       "box2": 3
-    },
-    "public/css/views/offers-poster.css": {
-      "headline": 4,
-      "action": 1,
-      "box2": 5
     },
     "public/css/views/organism.css": {
       "headline": 7,
@@ -389,11 +365,6 @@
       "sun": 2,
       "box2": 2
     },
-    "public/css/views/scheduler-poster.css": {
-      "action": 1,
-      "sun": 2,
-      "box2": 4
-    },
     "public/css/views/skills-poster.css": {
       "sun": 2,
       "box2": 1,
@@ -407,11 +378,6 @@
       "sun": 1,
       "box2": 3,
       "record": 2
-    },
-    "public/css/views/workflows-poster.css": {
-      "sun": 2,
-      "box2": 2,
-      "frame3": 3
     }
   }
 }

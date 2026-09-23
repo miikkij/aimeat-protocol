@@ -9,23 +9,25 @@
  * @structure renderRun
  * @usage import { renderRun } from './run.js';
  * @version-history
+ *   2026-09-22 -- Composed from the shared component set: a step is a numbered ListRow with its
+ *     state as the value, the verdict the shared block, the raw record a code Surface; no own CSS.
  *   v1.0.0 — 2026-08-30 — Initial.
  */
 import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { Section, Fold } from '/views/profile/organisms/poster-parts.js';
+import { Section, Fold, Stack, ListRow, Surface, Action, Text } from '/components/poster-parts.js';
 import { collectImages, ImageStrip } from '/components/ImageDeliverable.js';
-import { c, loc, rel, day, durationWords, stepWord, stepTone, runWord, runTone, verdictOf, stepTitle, stepAgents, signalWords, renderPage } from './frame.js';
+import { c, loc, rel, day, durationWords, stepWord, stepTone, runWord, runTone, verdictOf, stepTitle, stepAgents, signalWords, renderPage, chipRow, chipTone, toneOf, verdictBlock } from './frame.js';
 import { questionBlock } from './cover.js';
 
 export function renderRun(ctx, item, runId) {
   const run = ctx.run?.runId === runId ? ctx.run : null;
   const wfTitle = loc(item.def.title) || item.def.id;
-  const back = html`<button type="button" class="og-rail-link" onClick=${() => ctx.pickView({ kind: 'detail', id: item.def.id })}><i>←</i>${c('backToWorkflow')}</button>`;
-  const crumbWf = html`<button type="button" class="og-crumb-link" onClick=${() => ctx.pickView({ kind: 'detail', id: item.def.id })}>${wfTitle}</button>`;
-  if (!run) return renderPage(ctx, { crumbs: [crumbWf, '…'], title: wfTitle, back, children: html`<p class="og-empty wp-loading">${t('common.loading')}</p>` });
+  const back = html`<${Action} onClick=${() => ctx.pickView({ kind: 'detail', id: item.def.id })}>← ${c('backToWorkflow')}<//>`;
+  const crumbWf = { label: wfTitle, go: () => ctx.pickView({ kind: 'detail', id: item.def.id }) };
+  if (!run) return renderPage(ctx, { crumbs: [crumbWf, '…'], title: wfTitle, back, children: html`<${Text} tone="muted">${t('common.loading')}<//>` });
 
   const def = run.defSnapshot || item.def;
   const v = verdictOf(run);
@@ -37,38 +39,41 @@ export function renderRun(ctx, item, runId) {
   const isCheck = run.mode === 'signals-only';
   const title = `${wfTitle} · ${isCheck ? c('checkWord') : c('runWord')} ${day(run.startedAt)}`;
 
-  const chips = html`
-    <span class=${`og-chip ${runTone(run.status) === 'bad' ? 'og-chip--coral' : runTone(run.status) === 'wait' ? 'og-chip--sun' : runTone(run.status) === 'ok' ? 'og-chip--sun' : ''}`}>${runWord(run.status)}</span>
-    <span class="og-chip">${c('startedChip', { when: rel(run.startedAt) })}</span>
-    <span class="og-chip">${c('producedChip', { n: green, total: def.steps.length })}</span>
-    ${took ? html`<span class="og-chip og-chip--dim">${c('tookChip', { took })}</span>` : null}
-    ${isCheck ? html`<span class="og-chip og-chip--dim">${c('checkChip')}</span>` : run.mode === 'full-sandbox' ? html`<span class="og-chip og-chip--dim">${c('sandboxRun')}</span>` : null}
-    ${Object.entries(run.vars || {}).filter(([k]) => k !== 'run').slice(0, 3).map(([k, val]) => html`<span class="og-chip og-chip--dim wp-chip--case" key=${k}>${k} = ${val}</span>`)}`;
+  const chips = chipRow([
+    [runWord(run.status), runTone(run.status) === 'ok' ? 'sun' : chipTone(runTone(run.status))],
+    [c('startedChip', { when: rel(run.startedAt) })],
+    [c('producedChip', { n: green, total: def.steps.length })],
+    took && [c('tookChip', { took }), 'muted'],
+    isCheck ? [c('checkChip'), 'muted'] : run.mode === 'full-sandbox' ? [c('sandboxRun'), 'muted'] : null,
+    ...Object.entries(run.vars || {}).filter(([k]) => k !== 'run').slice(0, 3).map(([k, val]) => [`${k} = ${val}`, 'muted']),
+  ]);
   const doors = html`
-    ${waiting.length ? html`<button type="button" class="og-slab" onClick=${() => document.getElementById('wp-question')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>${c('answer')}</button>` : null}
-    ${inFlight ? html`<button type="button" class="og-door og-door--danger" disabled=${ctx.cancelling} onClick=${() => ctx.handleCancel(item.def.id, run.runId)}>${t('profile.workflows.cancelRun')}</button>` : null}
-    ${!inFlight && !isCheck ? html`<button type="button" class="og-door" onClick=${() => { ctx.pickView({ kind: 'detail', id: item.def.id }); ctx.openConfirm(item.def.id); }}>${c('runAgain')}</button>` : null}`;
-  const rail = html`
-    <hr />
-    <span class="og-rail-label">${c('statesTitle')}</span>
-    <div class="wp-words wp-words--rail">
-      ${['green', 'output-red', 'input-red', 'waiting-human', 'timed-out', 'agent-offline', 'skipped'].map(s => html`<div key=${s}><b class=${`wp-st--${stepTone(s)}`}>${stepWord(s)}</b> <code>${s}</code></div>`)}
-    </div>`;
+    ${waiting.length ? html`<${Action} kind="primary" onClick=${() => document.getElementById('wp-question')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>${c('answer')}<//>` : null}
+    ${inFlight ? html`<${Action} disabled=${ctx.cancelling} onClick=${() => ctx.handleCancel(item.def.id, run.runId)}>${t('profile.workflows.cancelRun')}<//>` : null}
+    ${!inFlight && !isCheck ? html`<${Action} onClick=${() => { ctx.pickView({ kind: 'detail', id: item.def.id }); ctx.openConfirm(item.def.id); }}>${c('runAgain')}<//>` : null}`;
+  const rail = html`<${Stack} density="compact">
+    <${Text} kind="label">${c('statesTitle')}<//>
+    ${['green', 'output-red', 'input-red', 'waiting-human', 'timed-out', 'agent-offline', 'skipped'].map(s => html`<${Stack} key=${s} density="compact">
+      <${Text} kind="caption" tone=${toneOf(stepTone(s))}>${stepWord(s)}<//>
+      <${Text} kind="mono">${s}<//>
+    <//>`)}
+  <//>`;
 
   return renderPage(ctx, {
     crumbs: [crumbWf, isCheck ? c('checkWord') : c('runWord') + ' ' + day(run.startedAt)],
     title, chips, doors, rail, back,
     children: html`
-      <div class=${`wp-verdict wp-verdict--${v.tone}`}><div><b>${v.head}</b><span>${v.sub}</span></div></div>
-      ${waiting.length ? html`<${Section} id="wp-question" num="01" title=${c('secQuestion')} first>
-        ${ctx.pending.filter(p => p.runId === run.runId).map(p => questionBlock(ctx, p, false))}
-        ${!ctx.pending.some(p => p.runId === run.runId) ? html`<p class="og-empty">${c('questionLoading')}</p>` : null}
+      ${verdictBlock(v)}
+      ${waiting.length ? html`<${Section} id="wp-question" title=${c('secQuestion')}>
+        <${Stack}>
+          ${ctx.pending.filter(p => p.runId === run.runId).map(p => questionBlock(ctx, p, false))}
+          ${!ctx.pending.some(p => p.runId === run.runId) ? html`<${Text} tone="muted">${c('questionLoading')}<//>` : null}
+        <//>
       <//>` : null}
-      <${Section} id="wp-run-steps" num=${waiting.length ? '02' : '01'} title=${c('secSteps')} count=${`${def.steps.length} · ${c('secRunStepsSub')}`} first=${!waiting.length}>
+      <${Section} id="wp-run-steps" title=${c('secSteps')} count=${`${def.steps.length} · ${c('secRunStepsSub')}`}>
         ${def.steps.map((s, i) => {
           const rs = run.steps?.[s.id] || {};
           const r = resolvedOf(s.id);
-          const tone = stepTone(rs.state);
           const agents = stepAgents(s, r);
           const who = s.action?.kind === 'human-input' ? c('you') : agents.join(', ');
           const obs = ctx.observedWords(rs.outputObserved || rs.inputObserved);
@@ -77,20 +82,23 @@ export function renderRun(ctx, item, runId) {
             : rs.state === 'output-red' ? c('whyOutput', { what: r?.success_signal ? signalWords(r.success_signal) : '' })
             : rs.state === 'skipped' ? c('whySkipped') : rs.state === 'timed-out' ? c('whyTimedOut') : rs.state === 'agent-offline' ? c('whyOffline')
             : rs.state === 'green' ? c('whyGreen', { what: r?.success_signal ? signalWords(r.success_signal) : '' }) : rs.state === 'dispatched' ? c('whyDispatched', { since: rel(rs.startedAt || run.startedAt) }) : '';
-          return html`
-            <div class="wp-step" key=${s.id}>
-              <div class="wp-step-n">${String(i + 1).padStart(2, '0')}</div>
-              <div class="wp-step-body">
-                <b>${stepTitle(s)}<small>${s.id} · ${who}${s.offer ? ` · ${s.offer}` : ''}</small></b>
-                <div class="wp-sig">${why}</div>
-                ${rs.human?.answer ? html`<div class="wp-sig">${c('answered', { pick: rs.human.answer.pick || (rs.human.answer.picks || []).join(', '), other: rs.human.answer.other || '', by: String(rs.human.answer.by || '').split('@')[0] })}</div>` : null}
-                ${imgs.length ? html`<${ImageStrip} images=${imgs} />` : null}
-              </div>
-              <div class="wp-step-st"><b class=${`wp-st--${tone}`}>${stepWord(rs.state)}</b>${obs ? html`<span>${obs}</span>` : null}${rs.attempt ? html`<span>${c('attemptsN', { n: rs.attempt + 1 })}</span>` : null}${rs.endedAt ? html`<span>${rel(rs.endedAt)}</span>` : null}</div>
-            </div>`; })}
+          return html`<${ListRow} key=${s.id} number=${String(i + 1).padStart(2, '0')} name=${stepTitle(s)}
+            detail=${`${s.id} · ${who}${s.offer ? ` · ${s.offer}` : ''}`}
+            value=${html`<${Stack} density="compact">
+              <${Text} kind="label" tone=${toneOf(stepTone(rs.state))}>${stepWord(rs.state)}<//>
+              ${obs ? html`<${Text} kind="caption">${obs}<//>` : null}
+              ${rs.attempt ? html`<${Text} kind="caption">${c('attemptsN', { n: rs.attempt + 1 })}<//>` : null}
+              ${rs.endedAt ? html`<${Text} kind="caption">${rel(rs.endedAt)}<//>` : null}
+            <//>`}>
+            <${Stack} density="compact">
+              ${why ? html`<${Text}>${why}<//>` : null}
+              ${rs.human?.answer ? html`<${Text}>${c('answered', { pick: rs.human.answer.pick || (rs.human.answer.picks || []).join(', '), other: rs.human.answer.other || '', by: String(rs.human.answer.by || '').split('@')[0] })}<//>` : null}
+              ${imgs.length ? html`<${ImageStrip} images=${imgs} />` : null}
+            <//>
+          <//>`; })}
       <//>
-      <${Fold} id="wp-raw" num=${waiting.length ? '03' : '02'} title=${c('rawTitle')} sub=${c('rawSub')} open=${ctx.folds.raw} onToggle=${() => ctx.setFold('raw', !ctx.folds.raw)}>
-        <pre class="wp-code">${JSON.stringify({ runId: run.runId, mode: run.mode, status: run.status, vars: run.vars, steps: run.steps, resolved: run.resolved }, null, 2)}</pre>
+      <${Fold} id="wp-raw" number=${waiting.length ? '03' : '02'} title=${c('rawTitle')} sub=${c('rawSub')} open=${ctx.folds.raw} onToggle=${() => ctx.setFold('raw', !ctx.folds.raw)}>
+        <${Surface} kind="code">${JSON.stringify({ runId: run.runId, mode: run.mode, status: run.status, vars: run.vars, steps: run.steps, resolved: run.resolved }, null, 2)}<//>
       <//>
       <${ctx.ConfirmUI} />`,
   });

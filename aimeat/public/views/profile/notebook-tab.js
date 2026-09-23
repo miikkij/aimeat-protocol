@@ -11,6 +11,9 @@
  *   - NotebookTab (default export) — capture box, trust toggles, librarian search, inbox list → NoteCard
  * @usage html`<${NotebookTab} session=${session} showToast=${showToast} onStats=${onStats} />`
  * @version-history
+ *   2026-09-22 -- Composed from the shared set (Page, Rail, Section, Toolbar, Field, ListRow, Chip,
+ *     Action, Text, Stack) so the tab follows the one theme; no class of its own is left. Search is a
+ *     secondary action now, so Capture is the page's one loud action; the filter's clear glyph is ✗.
  *   2026-09-13 -- V2u: compose the tab strip top rule from poster.css.
  *   2026-09-13 — V1: compose page and B1 section headings from the shared poster classes.
  *   v1.0.0 — 2026-06-19 — Initial: capture + librarian search (slice A).
@@ -35,6 +38,7 @@ import { useConfirm } from '/components/Modal.js';
 import NoteCard from './notebook-card.js';
 import { INBOX_PREFIX, noteText } from './notebook-helpers.js';
 import { swallowed } from '/js/swallowed.js';
+import { Page, Rail, Section, Stack, Toolbar, Field, ListRow, Chip, Action, Text } from '/components/poster-parts.js';
 
 export default function NotebookTab({ session, showToast, onStats }) {
   const { confirm, ConfirmUI } = useConfirm();
@@ -208,99 +212,98 @@ export default function NotebookTab({ session, showToast, onStats }) {
     });
   }
 
+  // A hit is a roster row: the title, its key (a machine value) under it, where it lives as a chip,
+  // the door to open it, and the producer and snippet in the row's body.
   const renderHit = (hit) => html`
-    <div class="pf-nb-hit" key=${hit.key}>
-      <div class="pf-nb-hit-head">
-        <span class="pf-nb-hit-title">${escHtml(hit.title || hit.key)}</span>
-        ${hit.kind === 'knowledge'
-          ? html`<span class="badge badge-success">${t('profile.notebook.kindKnowledge')}${hit.contentType ? ` · ${escHtml(hit.contentType)}` : ''}</span>`
-          : hit.organismId
-            ? html`<span class="badge badge-info">${escHtml(orgNames[hit.organismId] || hit.organismId)}</span>`
-            : html`<span class="badge">${t('profile.notebook.personalNote')}</span>`}
-      </div>
-      ${searchScope === 'public' && html`<div class="text-meta-sm pf-nb-hit-producer">${t('profile.notebook.producer')}: ${escHtml(producerLabel(hit.producer))}</div>`}
-      ${hit.snippet && html`<div class="pf-nb-hit-snippet">${escHtml(hit.snippet)}</div>`}
-      <div class="pf-nb-hit-foot">
-        <span class="text-meta-sm pf-nb-hit-key" title=${hit.key}>${escHtml(hit.key)}</span>
-        ${canOpen(hit) && html`<button class="btn-ghost btn-sm" onClick=${() => openHit(hit)}>${t('profile.notebook.openInMemory')}</button>`}
-      </div>
-    </div>
+    <${ListRow} key=${hit.key} name=${escHtml(hit.title || hit.key)} detail=${escHtml(hit.key)}
+      value=${hit.kind === 'knowledge'
+        ? html`<${Chip} tone="sun">${t('profile.notebook.kindKnowledge')}${hit.contentType ? ` · ${escHtml(hit.contentType)}` : ''}<//>`
+        : hit.organismId
+          ? html`<${Chip}>${escHtml(orgNames[hit.organismId] || hit.organismId)}<//>`
+          : html`<${Chip} tone="muted">${t('profile.notebook.personalNote')}<//>`}
+      actions=${canOpen(hit) && html`<${Action} onClick=${() => openHit(hit)}>${t('profile.notebook.openInMemory')}<//>`}>
+      ${(searchScope === 'public' || hit.snippet) && html`<${Stack} density="compact">
+        ${searchScope === 'public' && html`<${Text} kind="caption" tone="muted">${t('profile.notebook.producer')}: ${escHtml(producerLabel(hit.producer))}<//>`}
+        ${hit.snippet && html`<${Text} tone="muted">${escHtml(hit.snippet)}<//>`}
+      <//>`}
+    <//>
   `;
 
+  const shown = inbox ? visibleInbox() : [];
   return html`
-    ${ConfirmUI}
-    <div class="poster-page-title">${t('profile.notebook.title')}</div>
-    <div class="section-desc">${t('profile.notebook.desc')}</div>
+    <${Page} title=${t('profile.notebook.title')}
+      crumbs=${[{ label: t('nav.profile') }, { label: t('profile.landing.menuInformation') }, { label: t('profile.tabs.notebook') }]}
+      rail=${html`<${Rail} kind="index" title=${t('profile.notebook.title')} entries=${[
+        { href: '#nb-librarian', label: t('profile.notebook.librarianTitle') },
+        { href: '#nb-inbox', label: t('profile.notebook.inboxTitle'), count: inbox ? inbox.length : undefined },
+      ]} />`}>
+      ${ConfirmUI}
+      <${Stack} density="roomy">
+        <${Text} kind="lead" tone="muted">${t('profile.notebook.desc')}<//>
 
-    <div class="pf-nb-capture">
-      <textarea class="input-field pf-nb-textarea" rows="4"
-        placeholder=${t('profile.notebook.capturePlaceholder')}
-        value=${draft} onInput=${e => setDraft(e.target.value)}></textarea>
-      <div class="pf-nb-capture-actions">
-        <button class="btn-primary" disabled=${!draft.trim() || saving} onClick=${handleCapture}>
-          ${saving ? '…' : t('profile.notebook.captureBtn')}
-        </button>
-        <span class="text-meta-sm">${t('profile.notebook.captureHint')}</span>
-      </div>
-      <div class="pf-nb-settings">
-        <span class="text-meta-sm">${t('profile.notebook.trustTitle')}</span>
-        <label class="pf-nb-toggle"><input type="checkbox" checked=${settings.autoDetectIntent} onChange=${() => toggleSetting('autoDetectIntent')} /> ${t('profile.notebook.autoDetect')}</label>
-        <label class="pf-nb-toggle"><input type="checkbox" checked=${settings.autoRunPlan} onChange=${() => toggleSetting('autoRunPlan')} /> ${t('profile.notebook.autoRun')}</label>
-        <label class="pf-nb-toggle"><input type="checkbox" checked=${settings.autoDistribute} onChange=${() => toggleSetting('autoDistribute')} /> ${t('profile.notebook.autoDistribute')}</label>
-      </div>
-    </div>
+        <${Stack}>
+          <${Field} type="textarea" rows=${4} placeholder=${t('profile.notebook.capturePlaceholder')}
+            value=${draft} onInput=${e => setDraft(e.target.value)} />
+          <${Stack} direction="wrap" align="center">
+            <${Action} kind="primary" disabled=${!draft.trim() || saving} onClick=${handleCapture}>
+              ${saving ? '…' : t('profile.notebook.captureBtn')}
+            <//>
+            <${Text} kind="caption" tone="muted">${t('profile.notebook.captureHint')}<//>
+          <//>
+          <${Stack} direction="wrap" align="center">
+            <${Text} kind="label">${t('profile.notebook.trustTitle')}<//>
+            <${Field} type="checkbox" label=${t('profile.notebook.autoDetect')} value=${settings.autoDetectIntent} onChange=${() => toggleSetting('autoDetectIntent')} />
+            <${Field} type="checkbox" label=${t('profile.notebook.autoRun')} value=${settings.autoRunPlan} onChange=${() => toggleSetting('autoRunPlan')} />
+            <${Field} type="checkbox" label=${t('profile.notebook.autoDistribute')} value=${settings.autoDistribute} onChange=${() => toggleSetting('autoDistribute')} />
+          <//>
+        <//>
+      <//>
 
-    <div class="poster-section-title pf-nb-section">${t('profile.notebook.librarianTitle')}</div>
-    <div class="section-desc">${t('profile.notebook.librarianDesc')}</div>
-    <div class="sub-tabs poster-row--thing pf-nb-scope">
-      <button class="sub-tab ${searchScope === 'own' ? 'active' : ''}" onClick=${() => pickScope('own')}>${t('profile.notebook.scopeOwn')}</button>
-      <button class="sub-tab ${searchScope === 'public' ? 'active' : ''}" onClick=${() => pickScope('public')}>${t('profile.notebook.scopePublic')}</button>
-    </div>
-    <div class="action-bar">
-      <div class="search-bar pf-nb-search">
-        <input type="text" class="input-field" placeholder=${t('profile.notebook.searchPlaceholder')}
-          value=${query} onInput=${e => setQuery(e.target.value)}
-          onKeyDown=${e => e.key === 'Enter' && handleSearch()} />
-        <button class="btn-primary" onClick=${handleSearch}>${t('profile.notebook.searchBtn')}</button>
-      </div>
-    </div>
-    ${searching && html`<${Spinner} text=${t('profile.notebook.searching')} />`}
-    ${!searching && hits !== null && html`
-      ${hits.length === 0
-        ? html`<div class="empty">${t('profile.notebook.noHits')}</div>`
-        : html`
-          <div class="text-meta-sm mb-half">${(t('profile.notebook.hitsCount') || '{n} results').replace('{n}', String(hits.length))}</div>
-          <div class="pf-nb-hits">${hits.map(renderHit)}</div>
+      <${Section} id="nb-librarian" title=${t('profile.notebook.librarianTitle')} description=${t('profile.notebook.librarianDesc')}>
+        <${Toolbar} label=${t('profile.notebook.librarianTitle')} filters=${[
+          { id: 'own', label: t('profile.notebook.scopeOwn'), selected: searchScope === 'own', onClick: () => pickScope('own') },
+          { id: 'public', label: t('profile.notebook.scopePublic'), selected: searchScope === 'public', onClick: () => pickScope('public') },
+        ]} actions=${html`<${Action} onClick=${handleSearch}>${t('profile.notebook.searchBtn')}<//>`}>
+          <${Field} placeholder=${t('profile.notebook.searchPlaceholder')}
+            value=${query} onInput=${e => setQuery(e.target.value)}
+            onKeyDown=${e => e.key === 'Enter' && handleSearch()} />
+        <//>
+        ${searching && html`<${Spinner} text=${t('profile.notebook.searching')} />`}
+        ${!searching && hits !== null && html`
+          ${hits.length === 0
+            ? html`<${Text} tone="muted">${t('profile.notebook.noHits')}<//>`
+            : html`
+              <${Text} kind="mono" tone="muted">${(t('profile.notebook.hitsCount') || '{n} results').replace('{n}', String(hits.length))}<//>
+              ${hits.map(renderHit)}
+            `}
         `}
-    `}
+      <//>
 
-    <div class="poster-section-title pf-nb-section">${t('profile.notebook.inboxTitle')}</div>
-    ${inbox === null
-      ? html`<${Spinner} text=${t('profile.notebook.inboxLoading')} />`
-      : inbox.length === 0
-        ? html`<div class="empty">${t('profile.notebook.inboxEmpty')}</div>`
-        : html`
-          <div class="action-bar pf-nb-inbox-bar">
-            <div class="search-bar pf-nb-search">
-              <input type="text" class="input-field" placeholder=${t('profile.notebook.filterPlaceholder')}
-                value=${inboxFilter} onInput=${e => setInboxFilter(e.target.value)} />
-              ${inboxFilter && html`<button class="btn-ghost btn-sm" onClick=${() => setInboxFilter('')}>✕</button>`}
-            </div>
-            <select class="input-field pf-nb-sort" value=${inboxSort} onChange=${e => setInboxSort(e.target.value)}>
-              <option value="new">${t('profile.notebook.sortNew')}</option>
-              <option value="old">${t('profile.notebook.sortOld')}</option>
-            </select>
-          </div>
-          ${visibleInbox().length === 0
-            ? html`<div class="empty">${t('profile.notebook.noMatch')}</div>`
-            : html`<div class="pf-nb-inbox">
-              ${visibleInbox().map(note => html`
-                <${NoteCard} key=${note.key} note=${note} showToast=${showToast} orgNames=${orgNames}
-                  settings=${settings} autoEnrich=${settings.autoDetectIntent && autoEnrichKey === note.key}
-                  onChanged=${loadInbox} onOrgsChanged=${loadOrgNames} onDelete=${handleDelete} />
-              `)}
-            </div>`}
-        `
-    }
+      <${Section} id="nb-inbox" title=${t('profile.notebook.inboxTitle')}>
+        ${inbox === null
+          ? html`<${Spinner} text=${t('profile.notebook.inboxLoading')} />`
+          : inbox.length === 0
+            ? html`<${Text} tone="muted">${t('profile.notebook.inboxEmpty')}<//>`
+            : html`
+              <${Toolbar} label=${t('profile.notebook.inboxTitle')}
+                actions=${inboxFilter && html`<${Action} kind="text" onClick=${() => setInboxFilter('')}>✗<//>`}>
+                <${Field} placeholder=${t('profile.notebook.filterPlaceholder')}
+                  value=${inboxFilter} onInput=${e => setInboxFilter(e.target.value)} />
+                <${Field} type="select" value=${inboxSort} onChange=${e => setInboxSort(e.target.value)} options=${[
+                  { value: 'new', label: t('profile.notebook.sortNew') },
+                  { value: 'old', label: t('profile.notebook.sortOld') },
+                ]} />
+              <//>
+              ${shown.length === 0
+                ? html`<${Text} tone="muted">${t('profile.notebook.noMatch')}<//>`
+                : shown.map(note => html`
+                    <${NoteCard} key=${note.key} note=${note} showToast=${showToast} orgNames=${orgNames}
+                      settings=${settings} autoEnrich=${settings.autoDetectIntent && autoEnrichKey === note.key}
+                      onChanged=${loadInbox} onOrgsChanged=${loadOrgNames} onDelete=${handleDelete} />
+                  `)}
+            `
+        }
+      <//>
+    <//>
   `;
 }

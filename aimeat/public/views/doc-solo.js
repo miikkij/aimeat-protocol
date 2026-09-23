@@ -10,6 +10,8 @@
  *   live-updates on its own (profile.js, which normally bridges SSE, is not mounted here).
  * @structure DocSolo (default export)
  * @version-history
+ *   2026-09-22 -- The window is the shared Page in its reading width and its toast the shared useToast;
+ *     no class of its own, and it no longer loads profile.css (the document parts need only the set).
  *   2026-09-14 — The window's toast is the site's shared one (theme.css .toast).
  *   v1.0.0 — 2026-06-09 — Initial: pop-out document window.
  *   v1.0.1 — 2026-06-19 — Import DocumentView/DocumentEditor from their new home
@@ -21,7 +23,8 @@ import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { getSession } from '/js/services/auth.js';
 import { connect, disconnect, onUpdate, offUpdate } from '/lib/live-updates.js';
-import { useViewCSS } from '/components/useViewCSS.js';
+import { useToast } from '/components/Toast.js';
+import { Page, Text } from '/components/poster-parts.js';
 import * as orgService from '/js/services/organisms.js';
 import { DocumentView, DocumentEditor } from './profile/organisms/document.js';
 import { swallowed } from '/js/swallowed.js';
@@ -36,16 +39,15 @@ function parseDoc() {
 }
 
 export default function DocSolo() {
-  useViewCSS('/css/views/profile.css');
   const session = getSession();
   const { org, ws, type, id } = parseDoc();
   const [doc, setDoc] = useState(undefined);   // undefined=loading, null=not found, object=the page
   const [ot, setOt] = useState(null);
   const [mode, setMode] = useState('view');
   const [busy, setBusy] = useState(false);
-  const [toast, setToast] = useState(null);
-
-  const showToast = useCallback((msg) => { setToast(msg); setTimeout(() => setToast(c => (c === msg ? null : c)), 3000); }, []);
+  const { showToast: raiseToast, ToastContainer } = useToast();
+  // The window's notes are informational, as they were: the shared toast in its info tone, 3 s.
+  const showToast = useCallback((msg) => raiseToast(msg, 'info'), [raiseToast]);
 
   const load = useCallback(async () => {
     if (!session || !org || !ws || !type || !id) { setDoc(null); return; }
@@ -95,15 +97,15 @@ export default function DocSolo() {
     finally { setBusy(false); }
   }, [ot, doc, org, ws, load, showToast]);
 
-  if (!session) return html`<div class="pj-doc-solo"><div class="pj-doc-solo-empty">${t('organisms.loginToView') || 'Sign in to view this document.'}</div></div>`;
-  if (doc === undefined) return html`<div class="pj-doc-solo"><div class="pj-doc-solo-empty">${t('profile.loading') || 'Loading…'}</div></div>`;
-  if (doc === null || !ot) return html`<div class="pj-doc-solo"><div class="pj-doc-solo-empty">${t('organisms.docNotFound2') || 'Document not found.'}</div></div>`;
+  if (!session) return html`<${Page} width="reading"><${Text} tone="muted">${t('organisms.loginToView') || 'Sign in to view this document.'}<//><//>`;
+  if (doc === undefined) return html`<${Page} width="reading"><${Text} tone="muted">${t('profile.loading') || 'Loading…'}<//><//>`;
+  if (doc === null || !ot) return html`<${Page} width="reading"><${Text} tone="muted">${t('organisms.docNotFound2') || 'Document not found.'}<//><//>`;
 
   return html`
-    <div class="pj-doc-solo">
+    <${Page} width="reading">
       ${mode === 'edit'
         ? html`<${DocumentEditor} key=${'ed-' + doc.id} orgId=${org} page=${doc} busy=${busy} onSave=${save} onCancel=${() => setMode('view')} />`
         : html`<${DocumentView} key=${'view-' + doc.id} page=${doc} busy=${busy} onEdit=${() => setMode('edit')} onPublish=${publish} onWikiLink=${() => { }} />`}
-      ${toast ? html`<div class="toast toast-info">${toast}</div>` : null}
-    </div>`;
+      <${ToastContainer} />
+    <//>`;
 }

@@ -5,6 +5,8 @@
  * @description Profile tab for memory entries and file management — CRUD, search,
  *   visibility cycling, tag editing, sharing rules, and file upload with drag-and-drop.
  * @version-history
+ *   v3.1.0 -- 2026-09-22 -- Every screen of the tab is composed from the shared component set; the
+ *     federated-session notice is the set's aside. The tab's own sheet (css/views/memory.css) is gone.
  *   v3.0.0 — 2026-08-29 — The poster face (design canvas "AIMEAT Muistin sivu", direction A). The render
  *     is one call into memory-tab/cover.js: the cover (the store in four parts, what has happened,
  *     what is stale, who else sees), a key space and a record as pages, and the old list, discovery,
@@ -106,6 +108,7 @@ import { EditMemoryModal, FilePreviewModal } from './memory-tab/components.js';
 import { loadBrowseHome, initBrowseRemote, initDiscover, closeBrowse } from './memory-tab/browse-view.js';
 import { renderMemoryView } from './memory-tab/cover.js';
 import { swallowed } from '/js/swallowed.js';
+import { Surface, Text } from '/components/poster-parts.js';
 
 export default function MemoryTab({ session, showToast, onStats }) {
   const { confirm, ConfirmUI } = useConfirm();
@@ -737,11 +740,7 @@ export default function MemoryTab({ session, showToast, onStats }) {
   };
 
   return html`
-    ${session.federated && html`
-      <div class="alert alert-info mb-half">
-        <span class="alert-msg">${t('profile.memory.federatedSession')}</span>
-      </div>
-    `}
+    ${session.federated && html`<${Surface} kind="aside" density="compact"><${Text}>${t('profile.memory.federatedSession')}<//><//>`}
 
     ${renderMemoryView(ctx)}
 

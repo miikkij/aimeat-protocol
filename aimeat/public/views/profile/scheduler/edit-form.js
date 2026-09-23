@@ -9,6 +9,7 @@
  * @structure ScheduleEditForm
  * @usage <${ScheduleEditForm} schedule=${s} showToast=${showToast} onSaved=${reload} onClose=${close} />
  * @version-history
+ *   v1.1.0 -- 2026-09-22 -- Composed from the shared Field, Stack and Action; no own CSS. Same fields, same PATCH.
  *   v1.0.0 — 2026-08-30 — Extracted from schedule-item.js v1.2.0; no behaviour change.
  */
 import { h } from 'preact';
@@ -16,6 +17,7 @@ import { useState } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { updateSchedule } from '/js/services/schedules.js';
+import { Stack, Field, Action } from '/components/poster-parts.js';
 
 const html = htm.bind(h);
 
@@ -53,36 +55,22 @@ export function ScheduleEditForm({ schedule: s, showToast, onSaved, onClose }) {
     finally { setBusy(false); }
   };
 
-  return html`
-    <div class="sch-edit">
-      <div class="sch-form-row"><label>${t('profile.scheduler.field.displayName')}</label>
-        <input type="text" value=${f.display_name} onInput=${e => set('display_name', e.target.value)} /></div>
-      <div class="sch-form-row"><label>${t('profile.scheduler.field.schedule')} (cron)</label>
-        <input type="text" class="sch-cron-input" value=${f.cron} onInput=${e => set('cron', e.target.value)} placeholder="0 7 * * *" /></div>
-      <div class="sch-form-row"><label>${t('profile.scheduler.ph.timezone')}</label>
-        <input type="text" value=${f.timezone} onInput=${e => set('timezone', e.target.value)} placeholder="Europe/Helsinki" /></div>
-
-      ${s.type === 'agent_task' && html`
-        <div class="sch-form-row"><label>${t('profile.scheduler.field.taskTitle')}</label>
-          <input type="text" value=${f.task_title} onInput=${e => set('task_title', e.target.value)} /></div>
-        <div class="sch-form-row"><label>${t('profile.scheduler.field.taskDescription')}</label>
-          <textarea rows="3" value=${f.task_description} onInput=${e => set('task_description', e.target.value)}></textarea></div>
-      `}
-      ${s.type === 'ai' && html`
-        <div class="sch-form-row"><label>${t('profile.scheduler.field.inputKeys')}</label>
-          <input type="text" value=${f.input_keys} onInput=${e => set('input_keys', e.target.value)} placeholder=${t('profile.scheduler.ph.inputKeys')} /></div>
-        <div class="sch-form-row"><label>${t('profile.scheduler.field.prompt')}</label>
-          <textarea rows="3" value=${f.prompt} onInput=${e => set('prompt', e.target.value)}></textarea></div>
-        <div class="sch-form-row"><label>${t('profile.scheduler.field.outputKey')}</label>
-          <input type="text" value=${f.output_key} onInput=${e => set('output_key', e.target.value)} placeholder=${t('profile.scheduler.ph.outputKey')} /></div>
-      `}
-
-      <div class="sch-form-row"><label>${t('profile.scheduler.field.purpose')}</label>
-        <input type="text" value=${f.purpose} onInput=${e => set('purpose', e.target.value)} /></div>
-
-      <div class="sch-form-actions">
-        <button class="btn-primary btn-sm" disabled=${busy} onClick=${onSave}>${busy ? t('profile.scheduler.saving') : t('profile.scheduler.save')}</button>
-        <button class="btn-outline btn-sm" disabled=${busy} onClick=${onClose}>${t('profile.scheduler.close')}</button>
-      </div>
-    </div>`;
+  const field = (key, label, extra = {}) => html`<${Field} label=${label} value=${f[key]} onInput=${e => set(key, e.target.value)} ...${extra} />`;
+  return html`<${Stack}>
+    ${field('display_name', t('profile.scheduler.field.displayName'))}
+    ${field('cron', `${t('profile.scheduler.field.schedule')} (cron)`, { placeholder: '0 7 * * *' })}
+    ${field('timezone', t('profile.scheduler.ph.timezone'), { placeholder: 'Europe/Helsinki' })}
+    ${s.type === 'agent_task' && html`
+      ${field('task_title', t('profile.scheduler.field.taskTitle'))}
+      ${field('task_description', t('profile.scheduler.field.taskDescription'), { type: 'textarea', rows: 3 })}`}
+    ${s.type === 'ai' && html`
+      ${field('input_keys', t('profile.scheduler.field.inputKeys'), { placeholder: t('profile.scheduler.ph.inputKeys') })}
+      ${field('prompt', t('profile.scheduler.field.prompt'), { type: 'textarea', rows: 3 })}
+      ${field('output_key', t('profile.scheduler.field.outputKey'), { placeholder: t('profile.scheduler.ph.outputKey') })}`}
+    ${field('purpose', t('profile.scheduler.field.purpose'))}
+    <${Stack} direction="horizontal" align="start">
+      <${Action} kind="primary" disabled=${busy} onClick=${onSave}>${busy ? t('profile.scheduler.saving') : t('profile.scheduler.save')}<//>
+      <${Action} disabled=${busy} onClick=${onClose}>${t('profile.scheduler.close')}<//>
+    <//>
+  <//>`;
 }
