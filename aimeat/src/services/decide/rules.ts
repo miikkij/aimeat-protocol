@@ -34,6 +34,8 @@
  * @usage
  *   const rule = await ruleForCaller(storage, caller.gaii, 'send-reply', callerKind(caller));
  * @version-history
+ *   v1.1.0 — 2026-09-23 — A rule that names a decision provider is refused at write time when the
+ *     provider does not exist or cannot carry its questions.
  *   v1.0.0 — 2026-09-20 — Initial: decision rules on the node.
  */
 import { randomUUID } from 'node:crypto';
@@ -47,6 +49,7 @@ import { DEFAULT_DECIDE_LIMITS } from './limits.js';
 import { DecideError } from './errors.js';
 import { canonicalJson } from '../attestation.js';
 import { validateRule, RULE_ID_RE, type DecisionRule, type DecisionRuleInput, type RuleProblem } from './rule-validate.js';
+import { getProvider, providerViolations } from './providers.js';
 
 export const RULE_PREFIX = 'decide.rules.';
 export const RULE_PROPOSAL_PREFIX = 'decide.proposals.';
@@ -95,6 +98,18 @@ export async function putRule(
   const body = raw && typeof raw === 'object' && !Array.isArray(raw) ? { ...(raw as Record<string, unknown>), id } : raw;
   const v = validateRule(body, limitsOf(config));
   if (!v.rule) throw invalid(v.problems);
+  // A rule that names a provider is refused at write time when that provider cannot carry it, in the
+  // provider's own numbers, so the rule never exists in a form that fails on every run.
+  if (v.rule.provider) {
+    const p = await getProvider(storage, config, ownerGhii, v.rule.provider);
+    if (!p) {
+      throw invalid([{ field: 'provider', code: 'UNKNOWN_PROVIDER', message: `provider: '${v.rule.provider}' is not a decision provider you can use.` }]);
+    }
+    const cannot = providerViolations(p, v.rule.sample ?? '', v.rule.questions);
+    if (cannot.length) {
+      throw new DecideError('PROVIDER_CANNOT_CARRY', 400, cannot.map(c => c.message).join(' '), { provider: p.id, violations: cannot });
+    }
+  }
 
   const existing = await getRule(storage, ownerGhii, id);
   if (!existing && (await storage.listMemoryMeta(ownerGhii, { prefix: RULE_PREFIX })).length >= MAX_RULES) {

@@ -2,7 +2,7 @@
   "about": "When each skill was last read against the code it describes, and which files that code is. pnpm check:skill-reviews fails when a watched file changes after the review, so whoever changed the code re-reads the skill. Re-stamp after reading with: pnpm check:skill-reviews --record <name>. Reasoning: aimeat/scripts/check-skill-reviews.ts.",
   "skills": {
     "node:aimeat-decide": {
-      "reviewedOn": "2026-09-20",
+      "reviewedOn": "2026-09-23",
       "watches": [
         "aimeat/src/static/sdk-libs/decide/index.js",
         "aimeat/src/services/decide/service.ts",
@@ -10,7 +10,7 @@
         "aimeat/src/services/decide/settings.ts",
         "aimeat/src/services/app-decide-posture.ts"
       ],
-      "digest": "sha256:62b6855b489652cedc8699d1"
+      "digest": "sha256:01fe91bc9f1beaa400cdae33"
     },
     "node:aimeat-open-items": {
       "reviewedOn": "2026-09-20",
@@ -520,10 +520,10 @@
       "aimeat/src/routes/agents-v2/agent-proposals.ts": "1da72b752ee164bc"
     },
     "node:aimeat-decide": {
-      "aimeat/src/static/sdk-libs/decide/index.js": "3a53b66a8d7a8dd6",
-      "aimeat/src/services/decide/service.ts": "d05280eb614c2481",
+      "aimeat/src/static/sdk-libs/decide/index.js": "ce7328b35b4223c6",
+      "aimeat/src/services/decide/service.ts": "c6c277f35aba855a",
       "aimeat/src/services/decide/limits.ts": "af13e600bdfea3ab",
-      "aimeat/src/services/decide/settings.ts": "bd52c40503174432",
+      "aimeat/src/services/decide/settings.ts": "81c5fa8defcab692",
       "aimeat/src/services/app-decide-posture.ts": "65d4966f4b6ff7a8"
     }
   }

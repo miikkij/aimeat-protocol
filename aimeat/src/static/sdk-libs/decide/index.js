@@ -1,7 +1,9 @@
 /**
  * @file decide/index.js
  * @description The aimeat-decide library (TARGET-080). Exposes AIMEAT.decide: typed questions to the
- *   node's decision model (TypeSafe Jev), answered with probabilities, never with text.
+ *   node's decision model, answered with probabilities, never with text. The model has PROVIDERS:
+ *   TypeSafe Jev by default, and others the operator or the owner added, a local decision model on
+ *   the owner's own machine among them (providers(), and `provider` on ask()).
  *
  *   WHY IT IS NOT AIMEAT.ai. A decision model is a different kind of model. It classifies, routes,
  *   screens, scores and gates; it does not write. Putting it behind complete() would invite a prompt
@@ -32,6 +34,8 @@
  *   }, { subject: mail.key, gates: 'which folder the mail goes to', app_id: 'mail-sorter' });
  *   if (r.answers.urgent.value > 0.8) { ... }
  * @version-history
+ *   v1.3.0 - 2026-09-23 - Decision providers: providers(), `provider` on ask() and decisions(), and
+ *     words for the three new refusals.
  *   v1.2.0 - 2026-09-20 - rule(id) and rules(): the owner's decision rules, run by id with only the
  *     state; decisions({ rule }). questionSet() stays as the older, app-kept form.
  *   v1.1.0 - 2026-09-19 - isAvailable() / unavailableReason(): gate a decision feature on whether this
@@ -58,6 +62,9 @@ function decideError(r) {
     DATAMAP_REQUIRED: 'This app must say in its data map that data goes to TypeSafe before it can ask.',
     RATE_LIMITED: 'Too many decisions at once. Try again in a moment.',
     INVALID_REQUEST: 'The questions do not fit the model limits.',
+    PROVIDER_CANNOT_CARRY: 'The chosen decision provider cannot carry these questions. Use another provider, or ask fewer options.',
+    UNKNOWN_PROVIDER: 'That decision provider is not available on this node.',
+    PRIVATE_EGRESS_REQUIRED: 'The decision provider runs on this machine, and the operator has not allowed the node to reach it.',
   }[code];
   const err = /** @type {Error & { code?: string, details?: any }} */ (new Error(said || human || 'The decision call failed'));
   err.code = code;
@@ -120,10 +127,12 @@ function scale(instructions, levels) {
 /**
  * Ask. `questions` is a map of your ids to questions (use yesNo, pickOne, scale). Returns
  * `{ decision_id, model, answers: { id: { type, value, probabilities?, confidence? } }, cached,
- * scrub: { removed, total }, usage, key_source }`.
+ * scrub: { removed, total }, usage, key_source, provider: { id, kind, chosen_by } }`.
+ * `opts.provider` names the decision provider to ask (see providers()); leave it out and the node
+ * picks: the owner's default, else the node's.
  * @param {any} state  what is judged: a string, an object with named fields, or an array
  * @param {Record<string, any>} questions
- * @param {{ subject?: string, gates?: string, thresholds?: Record<string, number>, names?: string[], public_content?: boolean, cache?: boolean, app_id?: string }} [opts]
+ * @param {{ subject?: string, gates?: string, thresholds?: Record<string, number>, names?: string[], public_content?: boolean, cache?: boolean, app_id?: string, provider?: string }} [opts]
  */
 async function ask(state, questions, opts) {
   if (!questions || typeof questions !== 'object') throw new Error('questions map required');
@@ -200,13 +209,13 @@ function rules() { return call('/v1/ai/decide/rules'); }
 /**
  * What was decided, newest first. `{ subject }` answers "what did an AI decide about this record",
  * `{ rule }` lists the decisions one decision rule made.
- * @param {{ subject?: string, rule?: string, app_id?: string, limit?: number, before?: string, id?: string }} [q]
+ * @param {{ subject?: string, rule?: string, provider?: string, app_id?: string, limit?: number, before?: string, id?: string }} [q]
  */
 async function decisions(q) {
   const o = q || {};
   if (o.id) return call(`/v1/ai/decisions/${encodeURIComponent(o.id)}`);
   const p = new URLSearchParams();
-  for (const k of /** @type {const} */ (['subject', 'rule', 'app_id', 'limit', 'before'])) {
+  for (const k of /** @type {const} */ (['subject', 'rule', 'provider', 'app_id', 'limit', 'before'])) {
     if (o[k] !== undefined) p.set(k, String(o[k]));
   }
   const qs = p.toString();
@@ -256,6 +265,14 @@ const run = {
 /** The owner's settings as the node shows them: never the key. */
 function settings() { return call('/v1/ai/decide/settings'); }
 
+/**
+ * The decision providers this account may use: `{ providers, default, node_default, agents }`. Each
+ * provider is `{ id, title, kind: 'hosted'|'local', limits: { context_tokens, max_choice_options,
+ * score_levels }, capabilities, price_per_mtok, leaves, data_statement }`. Show `data_statement` where
+ * the person picks one: it says where their content goes. Pass the id as `provider` to ask().
+ */
+function providers() { return call('/v1/ai/decide/providers'); }
+
 /** @type {{ v: boolean, reason: string|null, t: number } | null} */
 let _availCache = null;
 
@@ -279,6 +296,6 @@ async function isAvailable() {
 /** Why isAvailable() said false, in words to show the person, or null. Call after isAvailable(). */
 function unavailableReason() { return _availCache ? _availCache.reason : null; }
 
-export const decide = { yesNo, pickOne, scale, ask, gate, questionSet, rule, rules, decisions, review, run, settings, isAvailable, unavailableReason };
+export const decide = { yesNo, pickOne, scale, ask, gate, questionSet, rule, rules, decisions, review, run, settings, providers, isAvailable, unavailableReason };
 
 attach('decide', decide);

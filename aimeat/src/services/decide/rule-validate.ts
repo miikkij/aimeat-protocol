@@ -29,6 +29,7 @@
  *   const v = validateRule(body, limits);           // { rule } or { problems }
  *   const e = evaluateRule(rule, answers);          // { outcome, result, passed }
  * @version-history
+ *   v1.2.0 — 2026-09-23 — A rule may name its decision provider (`provider`).
  *   v1.1.0 — 2026-09-20 — A missing confidence is unknown, not zero: `result` is null when the model
  *     gave no certainty at all and the outcome is then `ask`. A rule whose thresholds name only
  *     scale questions used to answer `stop` whatever the model said.
@@ -59,6 +60,11 @@ export interface DecisionRuleInput {
   gate: boolean;
   /** A state to try the rule on. Null when none was given. */
   sample: unknown;
+  /**
+   * The decision provider this rule runs on (services/decide/providers.ts), or absent for "whoever the
+   * agent, the owner or the node would pick". A rule that names one fixes it for every call.
+   */
+  provider?: string;
 }
 
 export interface DecisionRule extends DecisionRuleInput {
@@ -164,9 +170,23 @@ export function validateRule(
     }
   }
 
+  // Only the shape here: whether the provider exists and can carry the questions needs the node,
+  // and putRule checks it (services/decide/rules.ts).
+  let provider: string | undefined;
+  if (raw.provider !== undefined && raw.provider !== null && raw.provider !== '') {
+    if (typeof raw.provider !== 'string' || !/^[a-z0-9][a-z0-9-]{1,62}$/.test(raw.provider)) {
+      bad('provider', 'BAD_PROVIDER', 'provider: the id of a decision provider, or leave it out.');
+    } else {
+      provider = raw.provider;
+    }
+  }
+
   if (problems.length) return { rule: null, problems };
   return {
-    rule: { id, title, decides, sends, questions: known, thresholds, bands, use: use as RuleUse, gate: raw.gate === true, sample },
+    rule: {
+      id, title, decides, sends, questions: known, thresholds, bands, use: use as RuleUse, gate: raw.gate === true, sample,
+      ...(provider ? { provider } : {}),
+    },
     problems: [],
   };
 }

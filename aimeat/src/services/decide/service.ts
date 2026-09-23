@@ -4,7 +4,13 @@
  * SPDX-License-Identifier: MIT
  * @description THE path to the decision model (TARGET-080, AIMEAT.decide). Every door calls
  *   decideForOwner(): the REST route, the MCP tool and a run over many records. There is no second way
- *   to reach TypeSafe, because a second way is where the scrubber or the record gets skipped.
+ *   to reach a decision provider, because a second way is where the scrubber or the record gets skipped.
+ *
+ *   THE PROVIDER (services/decide/providers.ts). TypeSafe's Jev is the node's configured provider and
+ *   answers when nobody chose another. The rule's (or the call's) choice, the agent's, the owner's
+ *   default and the node's are read in that order at step 1b, and what the chosen provider cannot
+ *   carry is refused there, by name. A LOCAL provider takes no key, costs nothing, and skips the
+ *   budget, the agent's cap, the ledger and the allowance; the scrubber runs for it all the same.
  *
  *   WHAT JEV IS. A model that takes a `state` and a map of typed questions (yes/no probability, pick
  *   one, score on a scale) and returns typed answers with probabilities. It writes no text. It is not
@@ -14,7 +20,9 @@
  *
  *   THE ORDER, AND WHY IT IS THIS ORDER. Every refusal happens before anything leaves the node:
  *     1. the operator switch, the request shape and limits (nothing read yet);
- *     2. an app caller must have declared TypeSafe in its data map's "what leaves the house";
+ *    1b. the provider, and what it can carry;
+ *     2. an app caller must have declared the provider in its data map's "what leaves the house",
+ *        unless it is local and nothing leaves;
  *     3. the owner's AI allowlist and daily budget;
  *     4. SCRUB — state, instructions and criteria, choice option NAMES included, because an option
  *        called "Call Anna Virtanen" is personal data in the one place a builder would not look;
@@ -47,6 +55,9 @@
  *   const r = await decideForOwner(storage, config, { gaii, principal, appId, isOwner }, { state, questions });
  *   const g = await decideForOwner(storage, config, caller, { state, rule: 'send-reply' });
  * @version-history
+ *   v1.3.0 — 2026-09-23 — Decision providers: the provider is chosen per call and checked for what
+ *     it can carry before anything is read; the record, the result and the stats name it; a local
+ *     provider needs no key and touches no money.
  *   v1.2.0 — 2026-09-20 — Decision rules: `rule` on the input, the outcome and the gate on the
  *     result and the record; a key per agent and a daily cap per agent; the list filters by rule and
  *     by principal; decisionStats for the quality view.
@@ -58,7 +69,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
 import type {
   Storage, AiDecisionRow, AiDecisionAnswer, AiDecisionQuestion, AiDecisionReview,
-  AiDecisionKeyScope, AiDecisionOutcome, AiDecisionStatsGroup,
+  AiDecisionKeyScope, AiDecisionOutcome, AiDecisionStatsGroup, AiDecisionStatsGroupBy,
 } from '../../storage/interface.js';
 import { assertAppAllowed, assertWithinBudget, getTodayUsage, recordAiUsage, AiCompletionError } from '../ai-completion.js';
 import { readAllowance, remainingOf, debitAllowance } from '../ai-allowance.js';
@@ -68,7 +79,11 @@ import { emitChange } from '../event-bus.js';
 import { canonicalAiAppId } from '../ai-app-id.js';
 import { createScrubber } from './scrub.js';
 import { checkDecideRequest, DEFAULT_DECIDE_LIMITS, type JevQuestion } from './limits.js';
-import { callJev, JevError, type JevAnswer } from './jev-client.js';
+import { callSystemOne, SystemOneError, type SystemOneAnswer } from './systemone-client.js';
+import {
+  selectProvider, providerViolations, assertProviderReachable, readOwnerProviderKey,
+  type DecisionProvider, type ProviderChosenBy,
+} from './providers.js';
 import { takeSlot } from './pacer.js';
 import { readDecidePolicy, readOwnDecideKey } from './settings.js';
 import { DecideError } from './errors.js';
@@ -96,6 +111,11 @@ export interface DecideInput {
   questions?: Record<string, JevQuestion>;
   /** The id of one of the owner's decision rules. With it, the caller sends only the state. */
   rule?: string;
+  /**
+   * The decision provider to ask (services/decide/providers.ts). Beside a rule that names its own,
+   * it is refused. Without it: the agent's, the owner's default, the node's.
+   */
+  provider?: string;
   /** Set only so that a caller who sends bands beside a rule is refused rather than ignored. */
   bands?: unknown;
   /**
@@ -127,6 +147,8 @@ export interface DecideResult {
   usage: { input_tokens: number; cost_usd: number };
   key_source: AiDecisionKeyScope;
   request_id: string | null;
+  /** Which provider answered, where it ran, and which choice picked it. */
+  provider: { id: string; kind: 'hosted' | 'local'; chosen_by: ProviderChosenBy };
   /** Present when a decision rule ran. */
   rule?: { id: string; version: number };
   /** What the rule's thresholds and bands made of the answers. */
@@ -176,18 +198,27 @@ async function knownNamesFor(storage: Storage, gaii: string): Promise<string[]> 
   return names;
 }
 
-/** An app must have said, in its data map, that data goes to TypeSafe. Refused otherwise. */
-async function assertDeclaredInDataMap(storage: Storage, config: AimeatConfig, appRef: string): Promise<void> {
+/**
+ * An app must have said, in its data map, where the data goes when it leaves the machine: a row
+ * naming the provider. A local provider sends nothing off the machine, so there is nothing to declare.
+ */
+async function assertDeclaredInDataMap(storage: Storage, config: AimeatConfig, appRef: string, provider: DecisionProvider): Promise<void> {
+  if (!provider.leaves) return;
   const result = await readProgramMap(storage, config, null, appRef, new Date().toISOString());
   if ('refusal' in result) {
     throw new DecideError('DATAMAP_REQUIRED', 403,
       `This app has no data map this node can read, so it may not send data to the decision model. ${result.refusal.message}`);
   }
   const leaves = result.dataMap?.leaves ?? [];
-  const declared = leaves.some(l => /typesafe|\bjev\b/i.test(`${l.to} ${l.what}`));
-  if (!declared) {
-    throw new DecideError('DATAMAP_REQUIRED', 403,
-      'Before this app can ask the decision model, its data map must say what goes to TypeSafe: add a "leaves" row whose "to" names TypeSafe (for example { what: "scrubbed text of the record being judged", to: "TypeSafe (decision model, USA)", recallable: false }).');
+  const typesafe = provider.id === 'typesafe';
+  const host = URL.canParse(provider.url) ? new URL(provider.url).host.toLowerCase() : '';
+  const names = (s: string): boolean => typesafe
+    ? /typesafe|\bjev\b/i.test(s)
+    : s.toLowerCase().includes(provider.id) || s.toLowerCase().includes(provider.title.toLowerCase()) || (!!host && s.toLowerCase().includes(host));
+  if (!leaves.some(l => names(`${l.to} ${l.what}`))) {
+    throw new DecideError('DATAMAP_REQUIRED', 403, typesafe
+      ? 'Before this app can ask the decision model, its data map must say what goes to TypeSafe: add a "leaves" row whose "to" names TypeSafe (for example { what: "scrubbed text of the record being judged", to: "TypeSafe (decision model, USA)", recallable: false }).'
+      : `Before this app can ask the decision provider '${provider.id}', its data map must say what goes there: add a "leaves" row whose "to" names '${provider.title}' or ${host}.`);
   }
 }
 
@@ -224,7 +255,7 @@ function scrubQuestions(
 }
 
 /** One answer in the record's shape, with the real option names put back. */
-function toRecordAnswer(a: JevAnswer, back: Map<string, string> | undefined): AiDecisionAnswer {
+function toRecordAnswer(a: SystemOneAnswer, back: Map<string, string> | undefined): AiDecisionAnswer {
   const name = (k: string): string => back?.get(k) ?? k;
   if (a.type === 'noul') return { type: 'noul', value: a.noul ?? 0 };
   const probabilities = a.probabilities
@@ -263,20 +294,47 @@ async function resolveDecideKey(
   return { key: nodeKey, scope: 'node' };
 }
 
-function mapJevError(e: JevError, scope: AiDecisionKeyScope): DecideError {
-  const details = { provider_status: e.status, request_id: e.requestId, ...(e.code === 'JEV_INVALID' ? { provider_detail: e.detail } : {}) };
+/**
+ * The key for this provider. The key chain above belongs to the node's configured provider; an
+ * owner's provider has its own key; an operator's names a variable; a local one needs none.
+ */
+async function resolveProviderKey(
+  storage: Storage, config: AimeatConfig, gaii: string, agent: string | null, provider: DecisionProvider,
+): Promise<{ key: string | null; scope: AiDecisionKeyScope }> {
+  if (provider.auth.type === 'none') return { key: null, scope: 'none' };
+  if (provider.auth.type === 'env') {
+    const key = (process.env[provider.auth.env ?? ''] ?? '').trim();
+    if (!key) {
+      throw new DecideError('NO_API_KEY', 503, `The operator named ${provider.auth.env} as the key for the decision provider '${provider.id}', and it is not set on this node.`);
+    }
+    return { key, scope: 'node' };
+  }
+  if (provider.source === 'owner') {
+    const key = await readOwnerProviderKey(storage, config, gaii, provider.id);
+    if (!key) throw new DecideError('NO_API_KEY', 400, `Your decision provider '${provider.id}' has no key. The owner adds it with PUT /v1/ai/decide/providers/${provider.id} and an api_key.`);
+    return { key, scope: 'own' };
+  }
+  return resolveDecideKey(storage, config, gaii, agent);
+}
+
+function mapProviderError(e: SystemOneError, scope: AiDecisionKeyScope, provider: DecisionProvider): DecideError {
+  const details = {
+    provider: provider.id, provider_status: e.status, request_id: e.requestId,
+    ...(e.code === 'JEV_INVALID' ? { provider_detail: e.detail } : {}),
+  };
+  const name = provider.id === 'typesafe' ? 'TypeSafe' : provider.title;
   switch (e.code) {
     case 'JEV_UNAUTHORIZED':
     case 'JEV_FORBIDDEN':
-      if (scope === 'agent') return new DecideError('INVALID_API_KEY', 401, "TypeSafe refused this agent's key. The owner checks it on the agent's page.", details);
+      if (scope === 'agent') return new DecideError('INVALID_API_KEY', 401, `${name} refused this agent's key. The owner checks it on the agent's page.`, details);
       return scope === 'own'
-        ? new DecideError('INVALID_API_KEY', 401, 'TypeSafe refused your key. Check it in AI settings.', details)
-        : new DecideError('PROVIDER_ERROR', 502, "TypeSafe refused this node's key. The operator has been told in the log.", details);
+        ? new DecideError('INVALID_API_KEY', 401, `${name} refused your key. Check it in AI settings.`, details)
+        : new DecideError('PROVIDER_ERROR', 502, `${name} refused this node's key. The operator has been told in the log.`, details);
     case 'JEV_RATE_LIMITED':
-      return new DecideError('RATE_LIMITED', 429, 'TypeSafe is limiting requests right now. Try again shortly.', details);
+      return new DecideError('RATE_LIMITED', 429, `${name} is limiting requests right now. Try again shortly.`, details);
     case 'JEV_INVALID':
     case 'JEV_BAD_REQUEST':
-      return new DecideError('PROVIDER_REJECTED', 422, `TypeSafe refused the request: ${e.message}`, details);
+      return new DecideError('PROVIDER_REJECTED', 422, `${name} refused the request: ${e.message}`, details);
     default:
       return new DecideError('PROVIDER_ERROR', 502, `The decision model did not answer: ${e.message}`, details);
   }
@@ -313,17 +371,32 @@ export async function decideForOwner(
     throw new DecideError('INVALID_REQUEST', 400, violations.map(v => v.message).join(' '), { violations });
   }
 
-  // 2 ── an app must have declared where its data goes
-  if (caller.appRef) await assertDeclaredInDataMap(storage, config, caller.appRef);
+  // 1b ── the provider, strongest choice first, and what it can carry, before anything is read
+  const { provider, chosenBy } = await selectProvider(storage, config, {
+    ownerGhii: caller.gaii, agent,
+    named: rule?.provider ?? inputIn.provider ?? null,
+    namedBy: rule?.provider ? 'rule' : 'call',
+  });
+  const cannot = providerViolations(provider, input.state, questions);
+  if (cannot.length) {
+    throw new DecideError('PROVIDER_CANNOT_CARRY', 400, cannot.map(v => v.message).join(' '), { provider: provider.id, violations: cannot });
+  }
+  const local = provider.kind === 'local';
 
-  // 3 ── the owner's allowlist and budget, the same money as a completion
+  // 2 ── an app must have declared where its data goes
+  if (caller.appRef) await assertDeclaredInDataMap(storage, config, caller.appRef, provider);
+
+  // 3 ── the owner's allowlist and budget, the same money as a completion. A local provider costs
+  //      nothing, so neither the budget nor the agent's cap has anything to say about it.
   const prefsRec = await storage.getMemory(caller.gaii, 'openrouter.settings');
   const prefs = (prefsRec?.value as Record<string, unknown>) ?? {};
   assertAppAllowed(prefs, caller.appId, caller.gaii);
   const usageToday = await getTodayUsage(storage, caller.gaii);
-  assertWithinBudget(usageToday, prefs, caller.appId, caller.gaii);
-  const overCap = await agentCapRefusal(storage, caller.gaii, agent);
-  if (overCap) throw new DecideError('AGENT_QUOTA_EXHAUSTED', 402, overCap);
+  if (!local) {
+    assertWithinBudget(usageToday, prefs, caller.appId, caller.gaii);
+    const overCap = await agentCapRefusal(storage, caller.gaii, agent);
+    if (overCap) throw new DecideError('AGENT_QUOTA_EXHAUSTED', 402, overCap);
+  }
 
   // 4 ── scrub
   const policy = await readDecidePolicy(storage, caller.gaii);
@@ -336,9 +409,12 @@ export async function decideForOwner(
   const { sent, optionBack } = scrubQuestions(questions, scrubber);
   const scrubReport = scrubber ? scrubber.report() : { removed: {}, total: 0 };
 
-  const model = config.decideModel;
+  const model = provider.model;
   const stateJson = canonicalJson(state);
-  const cacheKey = sha256(`${model}\n${stateJson}\n${canonicalJson(sent)}`);
+  // The configured provider keeps the cache key it always had, so an owner who changed nothing
+  // keeps their cache; any other provider's answers are cached apart from it.
+  const cacheScope = provider.source === 'node' && provider.id === config.decideProviderId ? model : `${provider.id}\n${model}`;
+  const cacheKey = sha256(`${cacheScope}\n${stateJson}\n${canonicalJson(sent)}`);
   const stateHash = sha256(stateJson);
   const base = {
     id: randomUUID(), ownerGhii: caller.gaii, principal: caller.principal,
@@ -346,7 +422,7 @@ export async function decideForOwner(
     createdAt: new Date().toISOString(),
   };
   const recordCommon = {
-    spec: 'aimeat.decision/v1' as const, provider: 'typesafe' as const,
+    spec: 'aimeat.decision/v1' as const, provider: provider.id, providerKind: provider.kind,
     questions: sent as Record<string, AiDecisionQuestion>,
     thresholds: input.thresholds ?? null, gates: input.gates ?? null, subject: input.subject ?? null,
     stateHash, scrub: { removed: scrubReport.removed as Record<string, number>, total: scrubReport.total },
@@ -365,7 +441,7 @@ export async function decideForOwner(
     if (hit) {
       const j = await judge(hit.record.answers);
       const row: AiDecisionRow = {
-        ...base, model: hit.model, ...j.columns, keyScope: hit.keyScope,
+        ...base, model: hit.model, ...j.columns, keyScope: hit.keyScope, provider: provider.id, providerKind: provider.kind,
         record: {
           ...recordCommon, model: hit.model, answers: hit.record.answers,
           usage: { inputTokens: 0, costUsd: 0 }, requestId: hit.record.requestId,
@@ -377,14 +453,16 @@ export async function decideForOwner(
         decision_id: row.id, model: hit.model, answers: hit.record.answers, cached: true,
         scrub: { ...recordCommon.scrub, skipped: skipScrub },
         usage: { input_tokens: 0, cost_usd: 0 }, key_source: hit.keyScope, request_id: hit.record.requestId,
+        provider: { id: provider.id, kind: provider.kind, chosen_by: chosenBy },
         ...j.result,
       };
     }
   }
 
-  // 6 ── the key, and the minute window for that key
-  const { key, scope } = await resolveDecideKey(storage, config, caller.gaii, agent);
-  const wait = takeSlot(sha256(key), config.decideRequestsPerMinute);
+  // 6 ── the key, and the minute window for that key (a keyless provider's window is its address)
+  assertProviderReachable(provider);
+  const { key, scope } = await resolveProviderKey(storage, config, caller.gaii, agent, provider);
+  const wait = takeSlot(sha256(key ?? `${provider.id}\n${provider.url}`), config.decideRequestsPerMinute);
   if (wait > 0) {
     throw new DecideError('RATE_LIMITED', 429,
       `This node has sent its minute's worth of decisions on this key. Try again in ${Math.ceil(wait / 1000)} s.`,
@@ -394,37 +472,43 @@ export async function decideForOwner(
   // 7 ── the call
   let res;
   try {
-    res = await callJev({ url: config.decideBaseUrl, key, request: { model, state, questions: sent } });
+    res = await callSystemOne({
+      url: provider.url, key, request: { model, state, questions: sent },
+      providerName: provider.id === 'typesafe' ? 'TypeSafe' : provider.title,
+      ...(provider.adapter ? { adapter: provider.adapter } : {}),
+    });
   } catch (e) {
-    if (e instanceof JevError) {
+    if (e instanceof SystemOneError) {
       if (scope === 'node' && (e.code === 'JEV_UNAUTHORIZED' || e.code === 'JEV_FORBIDDEN')) {
-        logger.error('[decide] TypeSafe refused the node key (AIMEAT_TYPESAFE_INSTANCE_KEY)', { requestId: e.requestId });
+        logger.error('[decide] a provider refused the node key', { provider: provider.id, requestId: e.requestId });
       }
-      throw mapJevError(e, scope);
+      throw mapProviderError(e, scope, provider);
     }
     throw e;
   }
 
-  // 8 ── real names back, meter, record
+  // 8 ── real names back, meter, record. A local provider is free and touches no ledger.
   const answers: Record<string, AiDecisionAnswer> = {};
   for (const [id, a] of Object.entries(res.answers)) answers[id] = toRecordAnswer(a, optionBack.get(id));
   const inputTokens = res.usage.input_tokens;
-  const costUsd = (inputTokens / 1_000_000) * config.decidePricePerMtok;
+  const costUsd = local ? 0 : (inputTokens / 1_000_000) * provider.pricePerMtok;
 
-  try {
-    await recordAiUsage(storage, caller.gaii, usageToday, {
-      costUsd, tokens: inputTokens, appId: caller.appId, model: res.model, provider: 'typesafe',
-      promptTokens: inputTokens, completionTokens: res.usage.output_tokens, source: 'ai-decide', apiKeyScope: scope,
-      ...(agent ? { agent } : {}),
-    }, config);
-  } catch (err) {
-    logger.warn('[decide] usage record failed; the decision was made and paid for', { gaii: caller.gaii, error: String(err) });
+  if (!local && scope !== 'none') {
+    try {
+      await recordAiUsage(storage, caller.gaii, usageToday, {
+        costUsd, tokens: inputTokens, appId: caller.appId, model: res.model, provider: provider.id,
+        promptTokens: inputTokens, completionTokens: res.usage.output_tokens, source: 'ai-decide', apiKeyScope: scope,
+        ...(agent ? { agent } : {}),
+      }, config);
+    } catch (err) {
+      logger.warn('[decide] usage record failed; the decision was made and paid for', { gaii: caller.gaii, error: String(err) });
+    }
+    if (scope === 'node') await debitAllowance(storage, config, caller.gaii, costUsd);
   }
-  if (scope === 'node') await debitAllowance(storage, config, caller.gaii, costUsd);
 
   const j = await judge(answers);
   const row: AiDecisionRow = {
-    ...base, model: res.model, ...j.columns, keyScope: scope,
+    ...base, model: res.model, ...j.columns, keyScope: scope, provider: provider.id, providerKind: provider.kind,
     record: {
       ...recordCommon, model: res.model, answers,
       usage: { inputTokens, costUsd }, requestId: res.requestId, keyScope: scope, ...j.record,
@@ -436,6 +520,7 @@ export async function decideForOwner(
     decision_id: row.id, model: res.model, answers, cached: false,
     scrub: { ...recordCommon.scrub, skipped: skipScrub },
     usage: { input_tokens: inputTokens, cost_usd: costUsd }, key_source: scope, request_id: res.requestId,
+    provider: { id: provider.id, kind: provider.kind, chosen_by: chosenBy },
     ...j.result,
   };
 }
@@ -466,6 +551,12 @@ async function loadRule(storage: Storage, caller: DecideCaller, agent: string | 
       `A call that names a rule sends only the state: the rule holds the ${fixed.join(', ')}. Leave ${fixed.length === 1 ? 'it' : 'them'} out, or ask without a rule.`);
   }
   const rule = await ruleForCaller(storage, caller.gaii, input.rule, callerKindOf(caller, agent));
+  // A rule that names its provider fixes it, the way it fixes its questions. One that names none
+  // leaves the choice to the call, the agent, the owner and the node, in that order.
+  if (rule.provider && input.provider !== undefined && input.provider !== rule.provider) {
+    throw new DecideError('RULE_FIXES_QUESTIONS', 400,
+      `The rule '${rule.id}' runs on the decision provider '${rule.provider}'. Leave provider out, or ask without a rule.`);
+  }
   const extra = fieldsOutside(rule.sends, input.state);
   if (extra.length) {
     throw new DecideError('STATE_OUTSIDE_RULE', 400,
@@ -520,24 +611,27 @@ async function writeRecord(storage: Storage, row: AiDecisionRow): Promise<void> 
 /** The owner's own decisions, newest first. */
 export async function listDecisions(
   storage: Storage, gaii: string,
-  q: { subject?: string; appId?: string; rule?: string; principal?: string; limit?: number; before?: string },
+  q: { subject?: string; appId?: string; rule?: string; principal?: string; provider?: string; limit?: number; before?: string },
 ): Promise<{ items: AiDecisionRow[]; total: number }> {
   const limit = Math.min(200, Math.max(1, Math.floor(q.limit ?? 50)));
   return storage.listAiDecisions({
     ownerGhii: gaii, subject: q.subject, appId: canonicalAiAppId(q.appId, gaii), limit, before: q.before,
     ...(q.rule ? { rule: q.rule } : {}), ...(q.principal ? { principal: q.principal } : {}),
+    ...(q.provider ? { provider: q.provider } : {}),
   });
 }
 
 /**
  * The quality numbers, counted in the store: per rule (all of them, or one agent's share of each),
- * or for one principal as a whole. The owner's own rows only.
+ * for one principal as a whole, or per provider. The owner's own rows only.
  */
 export async function decisionStats(
-  storage: Storage, gaii: string, q: { rule?: string; principal?: string; groupBy: 'rule' | 'principal' },
+  storage: Storage, gaii: string,
+  q: { rule?: string; principal?: string; provider?: string; groupBy: AiDecisionStatsGroupBy },
 ): Promise<AiDecisionStatsGroup[]> {
   return storage.aiDecisionStats({
     ownerGhii: gaii, ...(q.rule ? { rule: q.rule } : {}), ...(q.principal ? { principal: q.principal } : {}),
+    ...(q.provider ? { provider: q.provider } : {}),
   }, q.groupBy);
 }
 

@@ -342,6 +342,8 @@ class Decision:
     bands: dict[str, float] | None = None
     gate: dict[str, Any] | None = None
     proceed: bool | None = None
+    #: Which decision provider answered: ``{id, kind ('hosted' | 'local'), chosen_by}``.
+    provider: dict[str, Any] | None = None
     #: True when this decision was made in direct mode: no scrubbing, no record on any node, no cap.
     direct: bool = False
 
@@ -363,6 +365,7 @@ class Decision:
             bands=data.get("bands"),
             gate=data.get("gate"),
             proceed=data.get("proceed"),
+            provider=data.get("provider") if isinstance(data.get("provider"), dict) else None,
             direct=direct,
         )
 
@@ -490,6 +493,7 @@ def decide(
     *,
     questions: dict[str, Any] | None = None,
     rule: str | None = None,
+    provider: str | None = None,
     subject: str | None = None,
     gates: str | None = None,
     thresholds: dict[str, Any] | None = None,
@@ -518,6 +522,11 @@ def decide(
         rule: the id of one of the owner's decision rules. With it the caller sends ONLY the state:
             ``questions``, ``thresholds``, ``gates`` and bands are the rule's, and the node refuses
             a call that sends them beside it.
+        provider: the id of the decision provider to ask (``settings()["providers"]`` lists them,
+            each with what it can carry). Leave it out and the node picks: the rule's, the one the
+            owner set for this agent, the owner's default, the node's. A local decision model needs
+            no key and costs nothing. What the provider cannot carry is refused before anything is
+            sent (``PROVIDER_CANNOT_CARRY``). ``Decision.provider`` says which one answered.
         subject: what this decision is about (a memory key, a record id), so the owner can later ask
             what was decided about it.
         gates: what the answer gates, in the caller's own words ("send the reply"). Recorded.
@@ -560,6 +569,7 @@ def decide(
     for key, value in (
         ("questions", questions),
         ("rule", rule),
+        ("provider", provider),
         ("subject", subject),
         ("gates", gates),
         ("thresholds", thresholds),
@@ -654,6 +664,7 @@ def decisions(
     subject: str | None = None,
     rule_id: str | None = None,
     principal: str | None = None,
+    provider: str | None = None,
     app_id: str | None = None,
     limit: int | None = None,
     before: str | None = None,
@@ -662,13 +673,15 @@ def decisions(
     agent_token: str | None = None,
     session: Any = None,
 ) -> dict[str, Any]:
-    """The owner's recorded decisions, newest first: ``{decisions: [...], total: n}``."""
+    """The owner's recorded decisions, newest first: ``{decisions: [...], total: n}``. Each row
+    names the ``provider`` that answered and its ``providerKind``."""
     params = {
         k: v
         for k, v in (
             ("subject", subject),
             ("rule", rule_id),
             ("principal", principal),
+            ("provider", provider),
             ("app_id", app_id),
             ("limit", limit),
             ("before", before),
@@ -681,7 +694,7 @@ def decisions(
 
 #: How a quality count may be grouped. The node requires one; there is no "everything" grouping,
 #: because a number that mixes two rules is not a quality number of either.
-STATS_GROUPS = ("rule", "principal")
+STATS_GROUPS = ("rule", "principal", "provider")
 
 
 def decision_stats(
@@ -689,12 +702,13 @@ def decision_stats(
     group_by: str,
     rule_id: str | None = None,
     principal: str | None = None,
+    provider: str | None = None,
     agent_name: str | None = None,
     node_url: str | None = None,
     agent_token: str | None = None,
     session: Any = None,
 ) -> list[dict[str, Any]]:
-    """The quality numbers of the owner's decisions, per rule or per principal.
+    """The quality numbers of the owner's decisions, per rule, per principal or per provider.
 
     This is the sixth step of the setup order, and the one the other five exist for: thresholds are
     tuned from decisions that have already been made, not chosen in advance. Counted in the STORE,
@@ -712,10 +726,11 @@ def decision_stats(
     answer.
 
     Args:
-        group_by: 'rule' or 'principal'. Required by the node, and checked here so a typo costs
-            nothing instead of a round trip.
-        rule_id / principal: narrow the count to one rule, one caller, or both -- an agent's share
-            of a rule is `group_by='rule'` with `principal=` its GAII.
+        group_by: 'rule', 'principal' or 'provider'. Required by the node, and checked here so a
+            typo costs nothing instead of a round trip.
+        rule_id / principal / provider: narrow the count -- an agent's share of a rule is
+            `group_by='rule'` with `principal=` its GAII; one rule on each provider is
+            `group_by='provider'` with `rule_id=`.
 
     Returns:
         The list of groups, newest activity in each one's ``lastAt``.
@@ -724,7 +739,7 @@ def decision_stats(
         raise DecideError(f"group_by must be one of {' or '.join(STATS_GROUPS)}, not {group_by!r}.")
     params = {
         k: v
-        for k, v in (("group_by", group_by), ("rule", rule_id), ("principal", principal))
+        for k, v in (("group_by", group_by), ("rule", rule_id), ("principal", principal), ("provider", provider))
         if v is not None
     }
     node = _node(agent_name=agent_name, node_url=node_url, agent_token=agent_token, session=session)
@@ -808,6 +823,7 @@ def settings(
 def run_start(
     *,
     rule_id: str | None = None,
+    provider: str | None = None,
     questions: dict[str, Any] | None = None,
     items: list[dict[str, Any]] | None = None,
     keys: list[str] | None = None,
@@ -831,6 +847,7 @@ def run_start(
         k: v
         for k, v in (
             ("rule", rule_id),
+            ("provider", provider),
             ("questions", questions),
             ("items", items),
             ("keys", keys),

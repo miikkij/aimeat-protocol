@@ -19,6 +19,9 @@
  * @structure decideRouter(config, storage)
  * @usage mounted in server-bootstrap/routes-loader.ts
  * @version-history
+ *   v1.3.0 — 2026-09-23 — Decision providers: `provider` on a call and a run and in the list filter;
+ *     GET/PUT/DELETE /v1/ai/decide/providers; the settings door takes the owner's default provider
+ *     and each agent's.
  *   v1.2.0 — 2026-09-20 — `rule` on POST /v1/ai/decide and on a run; the decisions list filters by
  *     rule and by principal. The rules' own doors are routes/ai-decide-rules.ts.
  *   v1.1.0 — 2026-09-19 — Key tests: the owner's (POST /v1/ai/decide/settings/test, the key that would
@@ -48,6 +51,9 @@ import {
   startDecideRun, getDecideRun, listDecideRuns, resumeDecideRun, stopDecideRun, runSummary,
   type RunItem,
 } from '../services/decide/runs.js';
+import {
+  providersView, providerView, putOwnerProvider, deleteOwnerProvider, writeProviderChoice,
+} from '../services/decide/providers.js';
 
 /** The human whose account a decision belongs to, whoever asked. */
 export function decideOwnerOf(auth: NonNullable<Request['auth']>, nodeId: string): string {
@@ -78,6 +84,7 @@ export function decideInputOf(body: Record<string, unknown>): DecideInput {
     // the service rather than silently ignored here.
     ...(body.questions !== undefined ? { questions: body.questions as DecideInput['questions'] } : {}),
     ...(body.rule !== undefined ? { rule: body.rule as string } : {}),
+    ...(typeof body.provider === 'string' && body.provider ? { provider: body.provider } : {}),
     ...(body.bands !== undefined ? { bands: body.bands } : {}),
     ...(typeof body.subject === 'string' ? { subject: body.subject.slice(0, 500) } : {}),
     ...(typeof body.gates === 'string' ? { gates: body.gates.slice(0, 500) } : {}),
@@ -123,7 +130,7 @@ export function decideRouter(config: AimeatConfig, storage: Storage): Router {
     const q = req.query as Record<string, string | undefined>;
     try {
       const r = await listDecisions(storage, decideOwnerOf(req.auth!, config.nodeId), {
-        subject: q.subject, appId: q.app_id, rule: q.rule, principal: q.principal, before: q.before,
+        subject: q.subject, appId: q.app_id, rule: q.rule, principal: q.principal, provider: q.provider, before: q.before,
         limit: q.limit ? parseInt(q.limit, 10) : undefined,
       });
       res.json(success(config.nodeId, { decisions: r.items, total: r.total }));
@@ -159,6 +166,7 @@ export function decideRouter(config: AimeatConfig, storage: Storage): Router {
       const input = decideInputOf(body);
       const run = await startDecideRun(storage, config, decideCallerOf(req, config.nodeId, body.app_id), {
         ...(input.rule !== undefined ? { rule: input.rule } : {}),
+        ...(input.provider !== undefined ? { provider: input.provider } : {}),
         ...(input.questions !== undefined ? { questions: input.questions } : {}),
         ...(body.items !== undefined ? { items: body.items as RunItem[] } : {}),
         ...(body.keys !== undefined ? { keys: body.keys as string[] } : {}),
@@ -230,6 +238,13 @@ export function decideRouter(config: AimeatConfig, storage: Storage): Router {
     const body = (req.body ?? {}) as Record<string, unknown>;
     try {
       if (body.api_key !== undefined) await writeOwnDecideKey(storage, config, gaii, body.api_key);
+      // The owner's default provider and the one each agent uses. `null` gives the choice back.
+      if (body.provider !== undefined || body.agent_providers !== undefined) {
+        await writeProviderChoice(storage, config, gaii, {
+          ...(body.provider !== undefined ? { default: body.provider } : {}),
+          ...(body.agent_providers !== undefined ? { agents: body.agent_providers } : {}),
+        });
+      }
       const policy = body.policy as Record<string, unknown> | undefined;
       if (policy !== undefined) {
         if (!policy || typeof policy !== 'object' || Array.isArray(policy)) {
@@ -254,6 +269,38 @@ export function decideRouter(config: AimeatConfig, storage: Storage): Router {
   router.post('/v1/admin/decide/test', requireAuth(), requireRole('operator'), aiRateLimit, async (req: Request, res: Response) => {
     try {
       res.json(success(config.nodeId, await testDecideKey(storage, config, { gaii: decideOwnerOf(req.auth!, config.nodeId), which: 'node' })));
+    } catch (e) { fail(res, e); }
+  });
+
+  // ── GET /v1/ai/decide/providers ── every provider this owner may use, and who chose which. Never a
+  //    key, so an agent with ai:use reads it too; only the owner in person adds or removes one.
+  router.get('/v1/ai/decide/providers', requireAuth(), async (req: Request, res: Response) => {
+    if (!assertAiUseAllowed(req, res, config.nodeId)) return;
+    try {
+      const gaii = decideOwnerOf(req.auth!, config.nodeId);
+      const agent = agentNameOf(resolveIdentity(req.auth!, config.nodeId), gaii);
+      res.json(success(config.nodeId, await providersView(storage, config, gaii, agent)));
+    } catch (e) { fail(res, e); }
+  });
+
+  // ── PUT /v1/ai/decide/providers/:id ── the owner's own provider: their address, their key. In
+  //    person only: an agent or app that could write one could send the owner's states anywhere.
+  router.put('/v1/ai/decide/providers/:id', requireAuth(), requireOwnerPrincipal(), async (req: Request, res: Response) => {
+    const gaii = decideOwnerOf(req.auth!, config.nodeId);
+    try {
+      const p = await putOwnerProvider(storage, config, gaii, req.params.id as string, req.body ?? {});
+      res.json(success(config.nodeId, { provider: providerView(p, p.auth.type === 'key'), providers: await providersView(storage, config, gaii) }));
+    } catch (e) { fail(res, e); }
+  });
+
+  // ── DELETE /v1/ai/decide/providers/:id ── remove it, its key, and any choice that named it
+  router.delete('/v1/ai/decide/providers/:id', requireAuth(), requireOwnerPrincipal(), async (req: Request, res: Response) => {
+    const gaii = decideOwnerOf(req.auth!, config.nodeId);
+    try {
+      if (!(await deleteOwnerProvider(storage, config, gaii, req.params.id as string))) {
+        return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such provider of yours. A node provider is the operator\'s to remove.'));
+      }
+      res.json(success(config.nodeId, await providersView(storage, config, gaii)));
     } catch (e) { fail(res, e); }
   });
 

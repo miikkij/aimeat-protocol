@@ -21,6 +21,8 @@
  *   import { decideDefaults } from './config-decide.js';
  *   const config = { ...decideDefaults(), ... };
  * @version-history
+ *   v1.1.0 — 2026-09-23 — Decision providers: the configured provider has an id and a kind, and the
+ *     operator may add providers of their own, switch on the built-in examples and name the default.
  *   v1.0.0 — 2026-09-19 — Initial (TARGET-080).
  */
 
@@ -56,6 +58,22 @@ export interface DecideConfig {
   decideCacheHours: number;
   /** How many days a decision record is kept before the nightly prune removes it. */
   decideRetentionDays: number;
+  /**
+   * The id the provider above (`decideBaseUrl`, `decideModel`, the key chain) is known by. It is
+   * written into every decision it answers. `typesafe` unless the operator points it elsewhere.
+   */
+  decideProviderId: string;
+  /** Whether that provider runs elsewhere (`hosted`) or on this machine (`local`). */
+  decideProviderKind: string;
+  /**
+   * More providers the operator runs, as a JSON array of provider records (services/decide/providers.ts).
+   * Their auth is `none` or the NAME of an environment variable on this node, never a key.
+   */
+  decideProviders: string;
+  /** Built-in example providers the operator switches on, comma separated: `laya,von,jeff`. */
+  decideBuiltinProviders: string;
+  /** The provider an owner who chose none gets. Empty means `decideProviderId`. */
+  decideDefaultProvider: string;
 }
 
 /** The decision provider's settings, from the environment. */
@@ -72,5 +90,10 @@ export function decideDefaults(): DecideConfig {
     decideConcurrency: parseInt(process.env.AIMEAT_DECIDE_CONCURRENCY ?? '4', 10),
     decideCacheHours: parseFloat(process.env.AIMEAT_DECIDE_CACHE_HOURS ?? '24') || 0,
     decideRetentionDays: parseInt(process.env.AIMEAT_DECIDE_RETENTION_DAYS ?? '365', 10),
+    decideProviderId: process.env.AIMEAT_DECIDE_PROVIDER_ID ?? 'typesafe',
+    decideProviderKind: process.env.AIMEAT_DECIDE_PROVIDER_KIND === 'local' ? 'local' : 'hosted',
+    decideProviders: process.env.AIMEAT_DECIDE_PROVIDERS ?? '',
+    decideBuiltinProviders: process.env.AIMEAT_DECIDE_BUILTIN_PROVIDERS ?? '',
+    decideDefaultProvider: process.env.AIMEAT_DECIDE_DEFAULT_PROVIDER ?? '',
   };
 }

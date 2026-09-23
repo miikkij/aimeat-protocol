@@ -15,6 +15,7 @@
  * @structure testDecideKey(storage, config, { gaii, which })
  * @usage const r = await testDecideKey(storage, config, { gaii, which: 'mine' });
  * @version-history
+ *   v1.1.1 — 2026-09-23 — Through the generic System One client (systemone-client.ts).
  *   v1.1.0 — 2026-09-20 — `which: 'agent'`: the key that would pay for one agent.
  *   v1.0.0 — 2026-09-19 — Initial.
  */
@@ -22,7 +23,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { getTodayUsage, recordAiUsage } from '../ai-completion.js';
 import { logger } from '../../utils/logger.js';
-import { callJev, JevError } from './jev-client.js';
+import { callSystemOne, SystemOneError } from './systemone-client.js';
 import { readOwnDecideKey } from './settings.js';
 import { readAgentKey } from '../agent-ai-keys.js';
 import { DecideError } from './errors.js';
@@ -67,8 +68,9 @@ export async function testDecideKey(
   }
 
   try {
-    const res = await callJev({
-      url: config.decideBaseUrl, key,
+    // The key chain belongs to the configured provider, so that is the one tested.
+    const res = await callSystemOne({
+      url: config.decideBaseUrl, key, providerName: 'TypeSafe',
       request: { model: config.decideModel, state: PROBE.state, questions: PROBE.questions },
       policy: { maxRetries: 0 },
     });
@@ -84,7 +86,7 @@ export async function testDecideKey(
     }
     return { ok: true, key_source: scope, model: res.model, request_id: res.requestId };
   } catch (e) {
-    if (!(e instanceof JevError)) throw e;
+    if (!(e instanceof SystemOneError)) throw e;
     const refused = e.code === 'JEV_UNAUTHORIZED' || e.code === 'JEV_FORBIDDEN';
     return {
       ok: false, key_source: scope, code: refused ? 'INVALID_API_KEY' : e.code, request_id: e.requestId,

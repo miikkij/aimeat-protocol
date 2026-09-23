@@ -7,6 +7,7 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/mcp/catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
+ *   v1.10.0 -- 2026-09-23 -- Decision providers: how the node picks one, and naming one.
  *   v1.9.0 -- 2026-09-20 -- Decision rules: aimeat_decide_rules, aimeat_decide_rule_propose, `rule`
  *     on aimeat_decide, `proceed`, and the one setup order. The Decisions section named a skill
  *     `typesafe-jev` that does not exist; it is `aimeat-decide`.
@@ -121,6 +122,12 @@ removes the personal data it recognises, the rest of what you send is your respo
 \`aimeat_decide_run\` does many records in the background · \`aimeat_decision_list\` reads what was
 decided · \`aimeat_decision_review\` records a person's confirm or override · \`aimeat_decide_settings\`
 says whether the owner can ask at all. Skill: aimeat-decide.
+
+**Decision providers.** More than one model answers the same questions: TypeSafe Jev, and a local
+decision model on the owner's machine that needs no key and costs nothing. \`aimeat_decide_settings\`
+lists them under \`providers\` with what each can carry. Leave \`provider\` out and the node picks (the
+rule's, the one your owner set for you, the owner's default, the node's); name one to choose. A
+question a provider cannot carry is refused before anything is sent, naming the provider and its limit.
 
 **Decision rules.** A decision rule is a set of questions, thresholds and two bands your owner wrote
 once. \`aimeat_decide_rules\` lists the ones you may run; run one with \`aimeat_decide { rule, state }\`

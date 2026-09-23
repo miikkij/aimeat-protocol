@@ -629,6 +629,12 @@ components:
             and bands; `questions`, `thresholds`, `bands` or `gates` sent beside it are refused
             (400 RULE_FIXES_QUESTIONS), and a state field outside the rule's `sends` is refused
             (400 STATE_OUTSIDE_RULE).
+        provider:
+          type: string
+          description: >
+            The decision provider to ask (GET /v1/ai/decide/providers lists them). Leave out to let
+            the node pick: the rule's, the agent's, the owner's default, the node's. Refused beside a
+            rule that names a different one (400 RULE_FIXES_QUESTIONS).
         questions:
           type: object
           additionalProperties: { $ref: '#/components/schemas/DecideQuestion' }
@@ -683,6 +689,7 @@ components:
         use: { type: string, enum: [agent, app, both], description: Who may run it. Enforced on every door; the owner in person may always run their own rule. }
         gate: { type: boolean, default: false, description: What the gate switch starts at for an agent whose owner never set it. }
         sample: { description: A state to try the rule on. }
+        provider: { type: string, description: 'The decision provider it always runs on. Refused at write time (400 PROVIDER_CANNOT_CARRY) when that provider cannot carry the questions.' }
         version: { type: integer, readOnly: true, description: Bumped when the questions change, and only then. }
         createdAt: { type: string, format: date-time, readOnly: true }
         updatedAt: { type: string, format: date-time, readOnly: true }
@@ -14954,7 +14961,18 @@ paths:
 
 
         THE KEY, strongest first: the calling agent's own, the owner's own, the node's.
-        `key_source` says which one paid (`agent` | `own` | `node`).
+        `key_source` says which one paid (`agent` | `own` | `node`), or `none` for a provider that
+        takes no key.
+
+
+        THE DECISION PROVIDER (`provider`). TypeSafe Jev is the node's configured provider; other
+        projects that serve `POST /v1/systemone` can be providers too, including a local decision
+        model on the owner's machine. Strongest first: the rule's provider (or `provider` in the
+        body), the one the owner set for the calling agent, the owner's default, the node's. What
+        the chosen provider cannot carry (too many options, a state longer than it reads, a score
+        with too many levels) is refused with `PROVIDER_CANNOT_CARRY` before anything is sent, in
+        that provider's own numbers. A LOCAL provider takes no key, costs nothing, and is not
+        metered on the budget, the ledger or the allowance; the scrubber runs for it all the same.
 
 
         Requires an owner session or a token carrying `ai:use`.
@@ -14971,16 +14989,21 @@ paths:
         '200':
           description: >
             `data` is `{ decision_id, model, answers, cached, scrub: { removed, total, skipped },
-            usage: { input_tokens, cost_usd }, key_source, request_id }`, plus the rule fields above
-            when a rule ran. Each answer is `{ type, value, probabilities?, confidence?, legend? }`.
+            usage: { input_tokens, cost_usd }, key_source, request_id, provider: { id, kind,
+            chosen_by } }`, plus the rule fields above when a rule ran. `provider.chosen_by` is
+            `call`, `rule`, `agent`, `owner` or `node`. Each answer is `{ type, value,
+            probabilities?, confidence?, legend? }`.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AimeatEnvelope'
         '400':
           description: >
-            `INVALID_REQUEST` (limits; `details.violations` lists each), `NO_API_KEY` (the message
-            says what to set and where), `RULE_FIXES_QUESTIONS` or `STATE_OUTSIDE_RULE`.
+            `INVALID_REQUEST` (limits; `details.violations` lists each), `PROVIDER_CANNOT_CARRY`
+            (the chosen provider's own limits; `details.provider` and `details.violations`),
+            `UNKNOWN_PROVIDER`, `NO_API_KEY` (the message says what to set and where),
+            `RULE_FIXES_QUESTIONS` (also for a `provider` beside a rule that names another) or
+            `STATE_OUTSIDE_RULE`.
           content:
             application/json:
               schema:
@@ -15023,11 +15046,99 @@ paths:
         '502':
           $ref: '#/components/responses/AimeatError'
         '503':
-          description: '`DECIDE_DISABLED` — the operator has turned the decision model off.'
+          description: '`DECIDE_DISABLED` — the operator has turned the decision model off; `PRIVATE_EGRESS_REQUIRED` — the provider is on this machine and the operator has not set AIMEAT_ALLOW_PRIVATE_EGRESS.'
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AimeatEnvelope'
+
+  /v1/ai/decide/providers:
+    get:
+      operationId: listDecideProviders
+      summary: The decision providers this owner may use, and who chose which
+      description: >
+        Every provider the operator made available (the configured one, the operator's own, the
+        built-in local examples they switched on) and the owner's own. Each is `{ id, title, kind
+        (hosted | local), source (node | builtin | owner), url, model, auth: { type, env?, has_key? },
+        limits: { context_tokens, max_choice_options, score_levels }, capabilities, price_per_mtok,
+        leaves, data_statement }`. Never a key. `default` is the owner's choice (or the node's),
+        `agents` the owner's choice per agent, and for an agent caller `this_agent` the one it gets.
+
+
+        Requires an owner session or a token carrying `ai:use`.
+      tags: [Memory]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '401':
+          $ref: '#/components/responses/AimeatError'
+        '403':
+          $ref: '#/components/responses/AimeatError'
+
+  /v1/ai/decide/providers/{id}:
+    put:
+      operationId: putDecideProvider
+      summary: Add or replace the owner's own decision provider
+      description: >
+        The owner's own address, and their own key when it takes one. Body: `{ title?, kind (hosted
+        | local), url (the full /v1/systemone address; https for hosted), model, auth: { type: none |
+        key }, api_key? (stored encrypted, never shown), limits?: { context_tokens,
+        max_choice_options, score_levels: { min, max } }, capabilities?: { confidence, languages },
+        price_per_mtok? (0 for local), adapter? }`. An id the node already uses is refused
+        (`PROVIDER_ID_TAKEN`). The owner in person only: an agent or an app that could write a
+        provider could send the owner's states anywhere.
+      tags: [Memory]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, pattern: '^[a-z0-9][a-z0-9-]{1,62}$' } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '200':
+          description: '`data` is `{ provider, providers }`: the stored provider and the whole list.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '400':
+          description: '`INVALID_PROVIDER` — `details.problems` lists each thing wrong.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '401':
+          $ref: '#/components/responses/AimeatError'
+        '403':
+          $ref: '#/components/responses/AimeatError'
+        '409':
+          description: '`PROVIDER_ID_TAKEN` or `TOO_MANY_PROVIDERS` (20 per account).'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+    delete:
+      operationId: deleteDecideProvider
+      summary: Remove the owner's own decision provider, its key, and any choice that named it
+      tags: [Memory]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '401':
+          $ref: '#/components/responses/AimeatError'
+        '403':
+          $ref: '#/components/responses/AimeatError'
+        '404':
+          $ref: '#/components/responses/AimeatError'
 
   /v1/ai/decisions:
     get:
@@ -15049,13 +15160,15 @@ paths:
         - { name: app_id, in: query, schema: { type: string } }
         - { name: rule, in: query, schema: { type: string }, description: Only decisions one decision rule made. }
         - { name: principal, in: query, schema: { type: string }, description: Only decisions one principal asked for (an agent's GAII). }
+        - { name: provider, in: query, schema: { type: string }, description: Only decisions one decision provider answered. }
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
         - { name: before, in: query, schema: { type: string }, description: 'Paging cursor: only decisions created before this ISO time.' }
       responses:
         '200':
           description: >
             `data` is `{ decisions, total }`. Each decision row carries `rule`, `ruleVersion`,
-            `outcome` and `keyScope` beside its `record`.
+            `outcome`, `keyScope`, `provider` and `providerKind` beside its `record`. Rows written
+            before providers existed read as `typesafe`, `hosted`.
           content:
             application/json:
               schema:
@@ -15068,12 +15181,13 @@ paths:
   /v1/ai/decisions/stats:
     get:
       operationId: decisionStats
-      summary: The quality numbers of the owner's decisions, per rule or per principal
+      summary: The quality numbers of the owner's decisions, per rule, per principal or per provider
       description: >
         Counted in the store, so exact whatever the list's page size is. Each group is
         `{ key, decisions, outcomes: { act, ask, stop }, gateStops, overridden, confirmed, costUsd,
         lastAt }`. Grouped by rule, decisions that named no rule are left out, and so is the owner's
-        try of a rule on its sample.
+        try of a rule on its sample. Grouped by provider, rows from before providers count as
+        `typesafe`.
 
 
         Requires an owner session or a token carrying `ai:use`.
@@ -15081,9 +15195,10 @@ paths:
       security:
         - BearerAuth: []
       parameters:
-        - { name: group_by, in: query, required: true, schema: { type: string, enum: [rule, principal] } }
+        - { name: group_by, in: query, required: true, schema: { type: string, enum: [rule, principal, provider] } }
         - { name: rule, in: query, schema: { type: string } }
         - { name: principal, in: query, schema: { type: string } }
+        - { name: provider, in: query, schema: { type: string } }
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
@@ -15600,10 +15715,13 @@ paths:
           $ref: '#/components/responses/AimeatSuccess'
     put:
       operationId: putDecideSettings
-      summary: Set the owner's own TypeSafe key and data policy
+      summary: Set the owner's own TypeSafe key, data policy and decision provider choices
       description: >
-        The owner in person only (no app, no agent): these decide what the scrubber lets through.
-        The key is stored encrypted and never returned.
+        The owner in person only (no app, no agent): these decide what the scrubber lets through and
+        where the owner's states go. The key is stored encrypted and never returned. `provider` is
+        the owner's default decision provider and `agent_providers` the one each agent uses
+        (`null` gives a choice back); every id must be a provider the owner can use
+        (400 UNKNOWN_PROVIDER).
       tags: [Memory]
       security:
         - BearerAuth: []
@@ -15615,6 +15733,11 @@ paths:
               type: object
               properties:
                 api_key: { type: string }
+                provider: { type: string, nullable: true, description: The owner's default decision provider. }
+                agent_providers:
+                  type: object
+                  additionalProperties: { type: string, nullable: true }
+                  description: Agent name to the decision provider it uses.
                 policy:
                   type: object
                   properties:

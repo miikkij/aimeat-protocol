@@ -7,6 +7,8 @@
  *   source), the list cursor and bounds, and the age-out. Postgres mirrors this file's expectations
  *   but is not run here.
  * @version-history
+ *   v1.1.0 — 2026-09-23 — Decision providers: the provider columns, their pre-column fallback, the
+ *     list filter and the count per provider.
  *   v1.0.0 — 2026-09-19 — TARGET-080. Initial.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
@@ -29,6 +31,8 @@ function makeRow(over: Partial<AiDecisionRow> & { id: string; createdAt: string 
     ruleVersion: null,
     outcome: null,
     keyScope: 'own',
+    provider: 'typesafe',
+    providerKind: 'hosted',
     ...over,
     record: {
       spec: 'aimeat.decision/v1',
@@ -191,6 +195,27 @@ describe('ai_decisions storage (sqlite)', () => {
     expect(codex[0].outcomes.stop).toBe(1);
 
     expect(await storage.aiDecisionStats({ ownerGhii: ALICE, rule: 'nothing-here' }, 'rule')).toEqual([]);
+  });
+
+  it('a row keeps its provider; the list filters by it and the counts group by it, an older row as typesafe', async () => {
+    const local = makeRow({ id: 'p1', createdAt: '2026-09-23T10:00:00.000Z', provider: 'laya', providerKind: 'local', keyScope: 'none' });
+    local.record.usage = { inputTokens: 150, costUsd: 0 };
+    await storage.createAiDecision(local);
+    await storage.createAiDecision(makeRow({ id: 'p2', createdAt: '2026-09-23T10:01:00.000Z' }));
+    // A row written before the provider column existed: the columns are empty, the document says typesafe.
+    await storage.createAiDecision(makeRow({ id: 'p3', createdAt: '2026-09-23T10:02:00.000Z' }));
+    (storage as unknown as { db: { prepare(s: string): { run(...a: unknown[]): void } } }).db
+      .prepare('UPDATE ai_decisions SET provider = NULL, providerKind = NULL WHERE id = ?').run('p3');
+
+    expect(await storage.getAiDecision('p1')).toEqual(local);
+    const old = await storage.getAiDecision('p3');
+    expect([old?.provider, old?.providerKind]).toEqual(['typesafe', 'hosted']);
+    expect((await storage.listAiDecisions({ ownerGhii: ALICE, provider: 'laya' })).items.map(r => r.id)).toEqual(['p1']);
+    expect((await storage.listAiDecisions({ ownerGhii: ALICE, provider: 'typesafe' })).total).toBe(2);
+
+    const per = await storage.aiDecisionStats({ ownerGhii: ALICE }, 'provider');
+    expect(Object.fromEntries(per.map(g => [g.key, g.decisions]))).toEqual({ laya: 1, typesafe: 2 });
+    expect(per.find(g => g.key === 'laya')?.costUsd).toBe(0);
   });
 
   it('deleteAiDecisionsBefore removes rows older than the cut across owners and returns the count', async () => {

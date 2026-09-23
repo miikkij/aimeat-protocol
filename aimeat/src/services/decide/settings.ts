@@ -24,6 +24,8 @@
  *   const policy = await readDecidePolicy(storage, gaii);
  *   const own = await readOwnDecideKey(storage, config, gaii); // string | null, never logged
  * @version-history
+ *   v1.2.0 — 2026-09-23 — The view carries the decision providers and who chose which; a provider
+ *     that takes no key makes the model available without anyone's key.
  *   v1.1.0 — 2026-09-20 — The view carries `setup_order`, and for an agent caller what the owner set
  *     for that agent (a key of its own, the name of its variable, cap, gate). Never a key.
  *   v1.0.0 — 2026-09-19 — Initial (TARGET-080).
@@ -38,6 +40,8 @@ import { DecideError } from './errors.js';
 import { agentAiView } from '../agent-ai-keys.js';
 import { gateSettingOf, type GateSetting } from './gate.js';
 import { DECIDE_SETUP_ORDER, type SetupStep } from './setup-order.js';
+import { providersView, selectProvider } from './providers.js';
+import { logger } from '../../utils/logger.js';
 
 export const DECIDE_KEY_RECORD = 'decide.apikey';
 export const DECIDE_POLICY_RECORD = 'decide.policy';
@@ -150,9 +154,10 @@ export async function clearOwnDecideKey(storage: Storage, gaii: string): Promise
  * The one answer every surface gives (the settings door, the library's isAvailable(), the appdev
  * overview), so an app is not built for a model its owner cannot reach.
  */
-export function decideAvailability(config: AimeatConfig, hasOwnKey: boolean): { available: boolean; reason: string | null } {
+export function decideAvailability(config: AimeatConfig, hasOwnKey: boolean, keylessProvider = false): { available: boolean; reason: string | null } {
   if (!config.decideEnabled) return { available: false, reason: 'The operator has turned the decision model off on this node.' };
-  if (hasOwnKey || config.decideInstanceKey.trim()) return { available: true, reason: null };
+  // A provider that takes no key (a local decision model) answers without anyone's key.
+  if (keylessProvider || hasOwnKey || config.decideInstanceKey.trim()) return { available: true, reason: null };
   // An instruction, not a bare error: what to set, where, and what comes next.
   return { available: false, reason: 'No TypeSafe key is set. The owner adds one under Settings, AI, Decision model (or one for a single agent on that agent\'s page under AI keys), presses Test, and then writes a decision rule.' };
 }
@@ -166,17 +171,22 @@ export async function decideSettingsView(storage: Storage, config: AimeatConfig,
   has_own_key: boolean; node_key_available: boolean; policy: DecidePolicy; pii_classes: readonly PiiClass[];
   setup_order: readonly SetupStep[];
   agent?: { name: string; has_key: boolean; key_env: string | null; daily_usd: number | null; spent_today_usd: number; gate: GateSetting };
+  providers: Awaited<ReturnType<typeof providersView>>;
 }> {
-  const [keyRec, policy, mine, gate] = await Promise.all([
+  const [keyRec, policy, mine, gate, providers] = await Promise.all([
     storage.getMemory(gaii, DECIDE_KEY_RECORD),
     readDecidePolicy(storage, gaii),
     agent ? agentAiView(storage, gaii, agent) : null,
     agent ? gateSettingOf(storage, gaii, agent) : null,
+    providersView(storage, config, gaii, agent),
   ]);
   const hasOwnKey = typeof (keyRec?.value as { encrypted?: unknown } | undefined)?.encrypted === 'string';
+  const effective = providers.providers.find(p => p.id === (providers.this_agent ?? providers.default));
+  const keyless = (effective?.auth as { type?: string } | undefined)?.type === 'none';
   // An agent with a key of its own can ask even when the owner and the node have none.
-  const { available, reason } = decideAvailability(config, hasOwnKey || !!mine?.decide.has_key);
+  const { available, reason } = decideAvailability(config, hasOwnKey || !!mine?.decide.has_key, keyless);
   return {
+    providers,
     setup_order: DECIDE_SETUP_ORDER,
     ...(agent && mine && gate ? { agent: {
       name: agent, has_key: mine.decide.has_key, key_env: mine.decide.key_env,
@@ -195,6 +205,15 @@ export async function decideSettingsView(storage: Storage, config: AimeatConfig,
 
 /** The same answer for a caller that only needs the yes/no (the appdev overview). */
 export async function decideAvailableFor(storage: Storage, config: AimeatConfig, gaii: string): Promise<{ available: boolean; reason: string | null }> {
-  const keyRec = await storage.getMemory(gaii, DECIDE_KEY_RECORD);
-  return decideAvailability(config, typeof (keyRec?.value as { encrypted?: unknown } | undefined)?.encrypted === 'string');
+  const [keyRec, { provider }] = await Promise.all([
+    storage.getMemory(gaii, DECIDE_KEY_RECORD),
+    // A choice that names a vanished provider is refused at call time with its own message; here it
+    // only means "cannot tell whether a keyless provider applies", so the key answer stands.
+    selectProvider(storage, config, { ownerGhii: gaii, agent: null }).catch((err: unknown) => {
+      logger.warn('[decide] the owner\'s provider choice does not resolve', { gaii, error: String(err) });
+      return { provider: null };
+    }),
+  ]);
+  return decideAvailability(config, typeof (keyRec?.value as { encrypted?: unknown } | undefined)?.encrypted === 'string',
+    provider?.auth.type === 'none');
 }

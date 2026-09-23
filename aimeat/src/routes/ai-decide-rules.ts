@@ -24,6 +24,7 @@
  * @structure decideRulesRouter(config, storage)
  * @usage mounted in server-bootstrap/routes-loader.ts
  * @version-history
+ *   v1.2.0 — 2026-09-23 — The quality numbers group by provider too (`group_by=provider`).
  *   v1.1.0 — 2026-09-20 — The five owner-only doors say what they are and what an agent's own way in
  *     is; they were answering with the sign-in gate's sentence, which named the wrong permission.
  *   v1.0.0 — 2026-09-20 — Initial: decision rules on the node.
@@ -70,16 +71,17 @@ export function decideRulesRouter(config: AimeatConfig, storage: Storage): Route
     return res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', (e as Error).message));
   };
 
-  // ── GET /v1/ai/decisions/stats ── the quality numbers, per rule or per principal
+  // ── GET /v1/ai/decisions/stats ── the quality numbers, per rule, per principal or per provider
   router.get('/v1/ai/decisions/stats', requireAuth(), async (req: Request, res: Response) => {
     if (!assertAiUseAllowed(req, res, config.nodeId)) return;
     const q = req.query as Record<string, string | undefined>;
-    if (q.group_by !== 'rule' && q.group_by !== 'principal') {
-      return res.status(400).json(error(config.nodeId, 'INVALID_QUERY', "group_by is 'rule' or 'principal'."));
+    if (q.group_by !== 'rule' && q.group_by !== 'principal' && q.group_by !== 'provider') {
+      return res.status(400).json(error(config.nodeId, 'INVALID_QUERY', "group_by is 'rule', 'principal' or 'provider'."));
     }
     try {
       const groups = await decisionStats(storage, decideOwnerOf(req.auth!, config.nodeId), {
         groupBy: q.group_by, ...(q.rule ? { rule: q.rule } : {}), ...(q.principal ? { principal: q.principal } : {}),
+        ...(q.provider ? { provider: q.provider } : {}),
       });
       res.json(success(config.nodeId, { groups }));
     } catch (e) { fail(res, e); }

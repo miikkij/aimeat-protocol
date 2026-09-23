@@ -21,6 +21,7 @@
  * @structure SECRET_RECORD_KEYS · isSecretRecordKey · shownMemoryValue · secretRecordWriteRefusal
  * @usage value: shownMemoryValue(record.key, record.value)
  * @version-history
+ *   v1.2.0 — 2026-09-23 — The key of an owner's own decision provider (`decide.apikey.provider.<id>`).
  *   v1.1.0 — 2026-09-20 — `decide.apikey` joins the list (it had been readable as ciphertext through
  *     the generic doors since 2026-09-19), and so do the per-agent key records of both models,
  *     matched by prefix because the agent's name is the tail of the key.
@@ -41,7 +42,11 @@ export const SECRET_RECORD_KEYS: ReadonlySet<string> = new Set([OPENROUTER_KEY_R
  * A key per agent, for both models: `openrouter.apikey.agent.<name>` and `decide.apikey.agent.<name>`
  * (services/agent-ai-keys.ts). The agent's name is the tail, so these two are matched by prefix.
  */
-export const AGENT_KEY_PREFIXES: readonly string[] = [`${OPENROUTER_KEY_RECORD}.agent.`, `${DECIDE_KEY_RECORD_KEY}.agent.`];
+export const AGENT_KEY_PREFIXES: readonly string[] = [
+  `${OPENROUTER_KEY_RECORD}.agent.`, `${DECIDE_KEY_RECORD_KEY}.agent.`,
+  // The key of an owner's own decision provider (services/decide/providers.ts): its id is the tail.
+  `${DECIDE_KEY_RECORD_KEY}.provider.`,
+];
 
 export function isSecretRecordKey(key: unknown): boolean {
   return typeof key === 'string' && (SECRET_RECORD_KEYS.has(key) || AGENT_KEY_PREFIXES.some(p => key.startsWith(p)));
@@ -63,7 +68,9 @@ export function shownMemoryValue(key: string, value: unknown): unknown {
 
 /** The refusal a generic write door gives for these keys, with the door to use instead. */
 export function secretRecordWriteRefusal(key: string): { code: string; message: string } {
-  const door = AGENT_KEY_PREFIXES.some(p => key.startsWith(p))
+  const door = key.startsWith(`${DECIDE_KEY_RECORD_KEY}.provider.`)
+    ? 'PUT /v1/ai/decide/providers/{id} (the owner in person)'
+    : AGENT_KEY_PREFIXES.some(p => key.startsWith(p))
     ? 'PUT /v1/agents/{name}/ai-keys (the agent\'s page)'
     : key === OPENROUTER_KEY_RECORD
       ? 'PUT /v1/openrouter/settings (the AI settings page)'

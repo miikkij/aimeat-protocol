@@ -9,6 +9,8 @@
  * @structure registerDecideTools(mcp, registry)
  * @usage imported by mcp/tools/index.ts
  * @version-history
+ *   v1.2.0 -- 2026-09-23 -- Decision providers: `provider` on aimeat_decide, aimeat_decide_run and
+ *     aimeat_decision_list, and stats by provider.
  *   v1.1.0 -- 2026-09-20 -- Decision rules: `rule` on aimeat_decide, aimeat_decide_run and
  *     aimeat_decision_list; aimeat_decide_rules; aimeat_decide_rule_propose.
  *   v1.0.0 -- 2026-09-19 -- Initial (TARGET-080).
@@ -33,6 +35,7 @@ export function registerDecideTools(mcp: McpServer, registry: AgentRegistry): vo
   mcp.tool('aimeat_decide', descriptionFor('aimeat_decide'), {
     state: z.unknown().describe('What is being judged: a string, an object with named fields, or an array.'),
     rule: z.string().optional().describe('The id of one of the owner\'s decision rules. It holds the questions, thresholds and bands: send only the state beside it.'),
+    provider: z.string().optional().describe('The decision provider to ask (aimeat_decide_settings lists them). Leave out to let the node pick.'),
     questions: questionsSchema.optional().describe('Required unless `rule` is given. Your ids to questions, in English.'),
     subject: z.string().optional().describe('What the decision is about: a memory key or record id.'),
     gates: z.string().optional().describe('What the answer decides, in plain words.'),
@@ -45,6 +48,7 @@ export function registerDecideTools(mcp: McpServer, registry: AgentRegistry): vo
     return out(await client.post('/v1/ai/decide', {
       state: a.state as never,
       ...(a.rule !== undefined ? { rule: a.rule } : {}),
+      ...(a.provider !== undefined ? { provider: a.provider } : {}),
       ...(a.questions !== undefined ? { questions: a.questions as never } : {}),
       ...(a.subject !== undefined ? { subject: a.subject } : {}),
       ...(a.gates !== undefined ? { gates: a.gates } : {}),
@@ -61,7 +65,8 @@ export function registerDecideTools(mcp: McpServer, registry: AgentRegistry): vo
     subject: z.string().optional().describe('Only decisions about this subject.'),
     rule: z.string().optional().describe('Only decisions one decision rule made (its id).'),
     principal: z.string().optional().describe('Only decisions one principal asked for (an agent\'s full identity).'),
-    stats_by: z.enum(['rule', 'principal']).optional().describe('Return the quality numbers instead, one group per rule or per principal.'),
+    provider: z.string().optional().describe('Only decisions one decision provider answered (its id).'),
+    stats_by: z.enum(['rule', 'principal', 'provider']).optional().describe('Return the quality numbers instead, one group per rule, per principal or per provider.'),
     app_id: z.string().optional().describe('Only decisions made for this app.'),
     limit: z.number().optional().describe('How many (1-200, default 50).'),
     before: z.string().optional().describe('Only decisions made before this ISO time.'),
@@ -70,6 +75,7 @@ export function registerDecideTools(mcp: McpServer, registry: AgentRegistry): vo
     const q = new URLSearchParams();
     if (a.rule !== undefined) q.set('rule', a.rule);
     if (a.principal !== undefined) q.set('principal', a.principal);
+    if (a.provider !== undefined) q.set('provider', a.provider);
     if (a.stats_by !== undefined) {
       q.set('group_by', a.stats_by);
       return out(await client.get(`/v1/ai/decisions/stats?${q.toString()}`));
@@ -99,6 +105,7 @@ export function registerDecideTools(mcp: McpServer, registry: AgentRegistry): vo
     action: z.enum(['start', 'get', 'list', 'resume', 'stop']).describe('start | get | list | resume | stop'),
     run_id: z.string().optional().describe('The run, for get, resume and stop.'),
     rule: z.string().optional().describe('For start: one of the owner\'s decision rules, in place of questions, thresholds and gates.'),
+    provider: z.string().optional().describe('For start: the decision provider every item is asked on.'),
     questions: questionsSchema.optional(),
     items: z.array(z.object({ subject: z.string(), state: z.unknown().optional() })).optional().describe('For start: [{ subject, state }].'),
     keys: z.array(z.string()).optional().describe('For start: owner memory keys.'),
@@ -113,6 +120,7 @@ export function registerDecideTools(mcp: McpServer, registry: AgentRegistry): vo
     if (a.action === 'start') {
       return out(await client.post('/v1/ai/decide/runs', {
         ...(a.rule !== undefined ? { rule: a.rule } : {}),
+        ...(a.provider !== undefined ? { provider: a.provider } : {}),
         ...(a.questions ? { questions: a.questions as never } : {}),
         ...(a.items ? { items: a.items as never } : {}),
         ...(a.keys ? { keys: a.keys } : {}),

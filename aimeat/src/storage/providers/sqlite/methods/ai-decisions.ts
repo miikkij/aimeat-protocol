@@ -9,6 +9,8 @@
  *   listAiDecisions · setAiDecisionReview · aiDecisionStats · deleteAiDecisionsBefore
  * @usage merged onto SqliteStorage.prototype in ../index.ts
  * @version-history
+ *   v1.2.0 — 2026-09-23 — Decision providers: the provider and providerKind columns, the list's
+ *     provider filter and the count per provider.
  *   v1.1.0 — 2026-09-20 — Decision rules: the rule, ruleVersion, outcome and keyScope columns, the
  *     list's rule and principal filters, and aiDecisionStats.
  *   v1.0.0 — 2026-09-19 — TARGET-080. Initial.
@@ -16,6 +18,7 @@
 import type {
   AiDecisionRow, AiDecisionRecord, AiDecisionListQuery, AiDecisionReview,
   AiDecisionStatsQuery, AiDecisionStatsGroup, AiDecisionOutcome, AiDecisionKeyScope,
+  AiDecisionProviderKind, AiDecisionStatsGroupBy,
 } from '../../../interface.js';
 import type Database from 'better-sqlite3';
 
@@ -39,9 +42,15 @@ function deserialize(row: Record<string, unknown>): AiDecisionRow {
     outcome: (row.outcome as AiDecisionOutcome | null) ?? null,
     // A row written before the column existed carries its scope in the document only.
     keyScope: ((row.keyScope as AiDecisionKeyScope | null) ?? record.keyScope ?? 'node'),
+    // Rows from before the provider column were all TypeSafe's, hosted, and their document says so.
+    provider: (row.provider as string | null) ?? record.provider ?? 'typesafe',
+    providerKind: (row.providerKind as AiDecisionProviderKind | null) ?? record.providerKind ?? 'hosted',
     record,
   };
 }
+
+/** The provider column, with an older row counted as the one provider there was. */
+const PROVIDER_EXPR = "COALESCE(provider, 'typesafe')";
 
 /** Same bounds on both providers: default 50, at least 1, at most 200. */
 function clampLimit(limit: number | undefined): number {
@@ -52,12 +61,12 @@ export const aiDecisionMethods = {
   async createAiDecision(this: SqliteStorage, row: AiDecisionRow): Promise<void> {
     this.db.prepare(
       `INSERT INTO ai_decisions (id, ownerGhii, principal, appId, subject, cacheKey, model, createdAt,
-                                 rule, ruleVersion, outcome, keyScope, record)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+                                 rule, ruleVersion, outcome, keyScope, provider, providerKind, record)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       row.id, row.ownerGhii, row.principal, row.appId, row.subject,
       row.cacheKey, row.model, row.createdAt,
-      row.rule, row.ruleVersion, row.outcome, row.keyScope,
+      row.rule, row.ruleVersion, row.outcome, row.keyScope, row.provider, row.providerKind,
       JSON.stringify(row.record),
     );
   },
@@ -91,6 +100,7 @@ export const aiDecisionMethods = {
     if (query.appId !== undefined) { where.push('appId = ?'); params.push(query.appId); }
     if (query.rule !== undefined) { where.push('rule = ?'); params.push(query.rule); }
     if (query.principal !== undefined) { where.push('principal = ?'); params.push(query.principal); }
+    if (query.provider !== undefined) { where.push(`${PROVIDER_EXPR} = ?`); params.push(query.provider); }
     const clause = where.join(' AND ');
     const total = (this.db.prepare(`SELECT COUNT(*) AS n FROM ai_decisions WHERE ${clause}`)
       .get(...params) as { n: number }).n;
@@ -114,16 +124,18 @@ export const aiDecisionMethods = {
   },
 
   async aiDecisionStats(
-    this: SqliteStorage, query: AiDecisionStatsQuery, groupBy: 'rule' | 'principal',
+    this: SqliteStorage, query: AiDecisionStatsQuery, groupBy: AiDecisionStatsGroupBy,
   ): Promise<AiDecisionStatsGroup[]> {
     const where: string[] = ['ownerGhii = ?'];
     const params: unknown[] = [query.ownerGhii];
     if (query.rule !== undefined) { where.push('rule = ?'); params.push(query.rule); }
     if (query.principal !== undefined) { where.push('principal = ?'); params.push(query.principal); }
+    if (query.provider !== undefined) { where.push(`${PROVIDER_EXPR} = ?`); params.push(query.provider); }
     if (groupBy === 'rule') where.push('rule IS NOT NULL');
-    // groupBy is one of two literals, never caller text, so it is safe in the statement.
+    // groupBy is one of three literals, never caller text, so it is safe in the statement.
+    const col = groupBy === 'provider' ? PROVIDER_EXPR : groupBy;
     const rows = this.db.prepare(
-      `SELECT ${groupBy} AS k,
+      `SELECT ${col} AS k,
               COUNT(*) AS decisions,
               SUM(CASE WHEN outcome = 'act' THEN 1 ELSE 0 END) AS act,
               SUM(CASE WHEN outcome = 'ask' THEN 1 ELSE 0 END) AS ask,
@@ -133,7 +145,7 @@ export const aiDecisionMethods = {
               SUM(CASE WHEN json_extract(record, '$.review.outcome') = 'confirmed' THEN 1 ELSE 0 END) AS confirmed,
               SUM(COALESCE(json_extract(record, '$.usage.costUsd'), 0)) AS costUsd,
               MAX(createdAt) AS lastAt
-         FROM ai_decisions WHERE ${where.join(' AND ')} GROUP BY ${groupBy}`
+         FROM ai_decisions WHERE ${where.join(' AND ')} GROUP BY ${col}`
     ).all(...params) as Record<string, unknown>[];
     return rows.map(r => ({
       key: String(r.k ?? ''),

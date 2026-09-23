@@ -24,6 +24,8 @@
  * @structure DECIDE_SKILL_ENTRY
  * @usage import { DECIDE_SKILL_ENTRY } from './builtin-skills.decide.js';
  * @version-history
+ *   v1.3.0 — 2026-09-23 — "Providers: who answers": the decision provider, the local decision model,
+ *     providers() and sizing a question to the provider.
  *   v1.2.1 — 2026-09-20 — A missing confidence is not zero certainty: `result` null and the outcome
  *     `ask`, which is what the node now does.
  *   v1.2.0 — 2026-09-20 — Section 3: decision rules, a key per agent and the gate, with the one
@@ -58,14 +60,27 @@ typed answers with probabilities. It writes no text. Three question types:
 | Builder | Asks | \`answers[id].value\` |
 |---|---|---|
 | \`AIMEAT.decide.yesNo(statement)\` | is this statement true | the probability, 0 to 1 (no confidence) |
-| \`AIMEAT.decide.pickOne(question, { option: meaning })\` | which one of 2 to 240 options | the option name, plus \`probabilities\` and \`confidence\` |
+| \`AIMEAT.decide.pickOne(question, { option: meaning })\` | which one of 2 to 240 options (fewer on some providers) | the option name, plus \`probabilities\` and \`confidence\` |
 | \`AIMEAT.decide.scale(question, [lowest, …, highest])\` | where on 2 to 10 ordered levels | the weighted level, counted from 0, plus \`probabilities\`, \`legend\`, \`confidence\` |
+
+## Providers: who answers
+
+TypeSafe's Jev is the default **decision provider**. Other projects serve the same questions, and a
+**local decision model** on the owner's own machine is one of them: no key, no cost, and the content
+does not leave the machine (the node still removes personal data first). \`AIMEAT.decide.providers()\`
+and \`aimeat_decide_settings\` list the providers this account may use, each with its limits
+(\`max_choice_options\`, \`context_tokens\`) and a sentence saying where the content goes. Name one with
+\`provider\` on \`ask()\` or \`aimeat_decide\`; leave it out and the node picks: the rule's, the agent's,
+the owner's default, the node's. **Size the question to the provider**: a local model may carry 20
+options where Jev carries 240, and a question over the limit is refused before sending
+(\`PROVIDER_CANNOT_CARRY\`), naming the provider and its number.
 
 ## 0. Check that this owner can use it, before designing anything
 
 \`aimeat_appdev_overview\` answers \`decision_model.available\`; so do \`aimeat_decide_settings\` and
 \`GET /v1/ai/decide/settings\` (\`available\`, \`unavailable_reason\`). It is false when the operator
-turned it off or no TypeSafe key is set (the owner's own, or the server's). **When it is false, do not
+turned it off, or no TypeSafe key is set (the owner's own, or the server's) and the provider this
+owner gets is not one that needs no key (a local decision model). **When it is false, do not
 build a feature on it.** Tell the owner the reason, or design the feature without it. In the app, gate
 the feature on \`await AIMEAT.decide.isAvailable()\` and show \`AIMEAT.decide.unavailableReason()\`
 when it is false.

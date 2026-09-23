@@ -29,6 +29,7 @@
  * @usage
  *   const run = await startDecideRun(storage, config, caller, { questions, keys, fields });
  * @version-history
+ *   v1.2.0 — 2026-09-23 — A run may name the decision provider every item is asked on.
  *   v1.1.0 — 2026-09-20 — A run may name one of the owner's decision rules in place of questions;
  *     each result then carries the rule's outcome.
  *   v1.0.1 — 2026-09-19 — A run records its app under the one name (services/ai-app-id.ts).
@@ -44,6 +45,7 @@ import { canonicalAiAppId } from '../ai-app-id.js';
 import type { JevQuestion } from './limits.js';
 import { decideForOwner, ruleCallerKind, type DecideCaller } from './service.js';
 import { ruleForCaller } from './rules.js';
+import { getProvider } from './providers.js';
 import { DecideError } from './errors.js';
 import { Semaphore } from './pacer.js';
 
@@ -71,6 +73,8 @@ export interface DecideRun {
   state: RunState;
   /** The owner's decision rule every item is run through, or null when the run carries its own questions. */
   rule?: string | null;
+  /** The decision provider every item is asked on, when the run named one. */
+  provider?: string | null;
   questions: Record<string, JevQuestion>;
   /** Items the caller sent carry their state; key items are read when their turn comes. */
   items: RunItem[];
@@ -91,6 +95,8 @@ export interface DecideRun {
 export interface StartRunInput {
   /** One of the owner's decision rules, in place of questions, thresholds and gates. */
   rule?: string;
+  /** The decision provider to ask for every item. */
+  provider?: string;
   questions?: Record<string, JevQuestion>;
   items?: RunItem[];
   keys?: string[];
@@ -164,6 +170,7 @@ async function work(storage: Storage, config: AimeatConfig, caller: DecideCaller
             ...(run.thresholds ? { thresholds: run.thresholds } : {}),
           }),
           ...(run.names.length ? { names: run.names } : {}),
+          ...(run.provider ? { provider: run.provider } : {}),
         });
         run.results[item.subject] = {
           decision_id: r.decision_id, cached: r.cached,
@@ -238,6 +245,12 @@ export async function startDecideRun(
     }
     await ruleForCaller(storage, caller.gaii, input.rule, ruleCallerKind(caller));
   }
+  // A provider that does not exist is refused once, here, rather than on every item.
+  if (input.provider !== undefined) {
+    if (typeof input.provider !== 'string' || !(await getProvider(storage, config, caller.gaii, input.provider))) {
+      throw new DecideError('UNKNOWN_PROVIDER', 400, `'${String(input.provider)}' is not a decision provider you can use.`);
+    }
+  }
   let items: RunItem[];
   let source: DecideRun['source'];
   if (input.items) {
@@ -270,7 +283,7 @@ export async function startDecideRun(
 
   const now = new Date().toISOString();
   const run: DecideRun = {
-    id: randomUUID(), state: 'running', rule: input.rule ?? null, questions: input.questions ?? {}, items, source,
+    id: randomUUID(), state: 'running', rule: input.rule ?? null, provider: input.provider ?? null, questions: input.questions ?? {}, items, source,
     fields: input.fields ?? null, gates: input.gates ?? null, thresholds: input.thresholds ?? null,
     names: input.names ?? [], results: {},
     counts: { total: items.length, done: 0, failed: 0, pending: items.length },
