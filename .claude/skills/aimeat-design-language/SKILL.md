@@ -2,8 +2,8 @@
 name: aimeat-design-language
 description: "The AIMEAT design language in words and in numbers: the two faces (showroom outside, poster inside), the three type tokens every font on the site descends from, the four shapes, the colours, the wordmark, and the one place a value is changed (theme.css tokens) with the map of every surface a token reaches. Use before designing or styling anything that carries the AIMEAT name, before changing a font or a colour, and to judge whether a screen looks like this product."
 metadata:
-  version: 1.6.0
-  updated: 2026-09-13
+  version: 1.7.0
+  updated: 2026-09-23
   owner: Jouni Miikki
 ---
 
@@ -215,11 +215,21 @@ another modifier. A view never re-declares a modifier's values.
 | Showroom section | `.showroom-section--coral` | 8px coral shadow; the named coral room cut. |
 | Showroom slab | `.showroom-slab--hot`, `--sun`, `--ink` | Named hot, sun and ink action colours; each shares the showroom slab geometry. |
 
-The parts a page is composed of, with their spacing, live beside the shapes: `parts.css` (page
-frame, masthead, band, named row, index, timeline, foot, task chooser, settings dialog, open items),
-`parts-steps.css` (setup steps, prompt block, paste box, front door) and `parts-conversation.css`
-(the chat's frame, turns, work log, suggestions, composer). The home and the chat have no sheet of
-their own since 2026-09-23; their values moved there unchanged.
+The parts a page is composed of are components: one module in `public/components/` (the markup)
+and one sheet in `public/css/components/` (the look, composing the shapes above), named by role:
+`StepCard` and `step-card.css`, `Turn` and `turn.css`. The home and the chat are built from them and
+have no sheet of their own since 2026-09-23; the values moved unchanged. Page compositions stay in
+the page files and use only library components.
+
+**The component catalogue says what exists.** `GET /v1/ui/components` and
+`aimeat_ui_component_list` / `aimeat_ui_component_get` give each part's data shape, when to use it,
+its variants (the class or prop for each), one example, the theme tokens its sheet reads and the
+pages that draw it; the shapes of `poster.css` are in it too. Read it before building a page and
+reuse the part that exists. A new component gets an entry in `aimeat/src/services/ui-library/`
+(the purpose half, written by hand), then `pnpm build:ui-library` reads the rest from the files.
+`pnpm check:ui-library` refuses a sheet with no entry, a variant class its sheet does not carry, an
+"active" part no page draws and stale facts. This catalogue is the node's own interface only;
+Atelier's catalogue of app parts is a different thing and shares nothing with it.
 
 Run `pnpm check:poster-shapes` from `aimeat/`. It scans view and component sheets and refuses
 any new per-file pattern count. `pnpm debt` shows the remaining copies. Lower the baseline after
