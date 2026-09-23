@@ -62,4 +62,5 @@
   overflow-wrap: anywhere;
 }
 .poster-result-ref { font-size: 0.72rem; color: var(--text-dim); overflow-wrap: anywhere; }
-.poster-result-open { flex: 0 0 auto; font-size: 0.78rem; padding: 4px 10px; }
+/* Open is the underlined action link (poster.css .poster-action); this keeps its place in the card. */
+.poster-result-open { flex: 0 0 auto; }

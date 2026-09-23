@@ -65,6 +65,28 @@
 .poster-action:hover, .poster-tab:hover { border-color: var(--accent); color: var(--accent); }
 /* The source's later on-sun correction keeps selected words ink in both themes. */
 .poster-tab.is-on { background: var(--sun); color: var(--on-sun); text-decoration: none; padding: .2rem .5rem; }
+/* The action link's tones (Jouni's decision "Action link"): the looks he kept, each in its own
+   values, so one component carries every quiet way on. A tone sets back what the base above sets
+   and the look does not have. more: "Show all" under a list (formerly .poster-fold); quiet: the
+   chat's side column actions (formerly .poster-rail-action's look); back: the back link (formerly
+   .poster-back's look); text: a plain word under a chat message (Listen, Copy; formerly .btn-ghost). */
+.poster-action--more {
+  display: inline-block; padding: .2rem 0; border: 0;
+  font-family: var(--font-mono); font-weight: 400; font-size: .8rem; line-height: normal; text-transform: none; letter-spacing: normal;
+  color: var(--accent); text-decoration: underline; text-underline-offset: 4px; white-space: normal;
+}
+.poster-action--more:hover { color: var(--text); }
+.poster-action--quiet { border-bottom-width: 2px; padding: 0 0 1px; font-family: var(--font-showroom-body); font-size: .78rem; line-height: normal; white-space: normal; }
+.poster-action--quiet.copied { color: var(--success-fg); border-color: var(--success-fg); }
+.poster-action--back {
+  display: inline-block; padding: 0; border: 0;
+  font-family: var(--font-mono); font-weight: 400; font-size: .85rem; text-transform: none; letter-spacing: normal;
+  color: var(--accent); white-space: normal;
+}
+.poster-action--back:hover { color: var(--text); }
+.poster-action--text { padding: 0 6px; border: 0; gap: .35rem; font-family: var(--font-body); font-weight: 500; font-size: .7rem; line-height: normal; text-transform: none; letter-spacing: normal; color: var(--text-dim); }
+.poster-action--text:hover { color: var(--text); }
+.poster-action--text.copied { color: var(--success-fg); }
 
 /* The profile slab and the home's large door are the two cuts named in brief 10.3. */
 .poster-slab {

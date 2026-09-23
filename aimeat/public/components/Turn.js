@@ -89,12 +89,12 @@ export function Turn({ turn, id }) {
                 ${turn.model ? html`<span class="poster-turn-model" title=${tr('chat.modelTitle', 'The model that answered this turn')}>${turn.model}</span>` : ''}
                 <!-- The RAW markdown, which is what pastes usefully into an editor or another chat.
                      Same control and same behaviour as the message bubbles in the inbox. -->
-                ${turn.text ? html`<${CopyButton} text=${String(turn.text)} className="btn-ghost poster-turn-copy"
+                ${turn.text ? html`<${CopyButton} text=${String(turn.text)} className="poster-action poster-action--text poster-turn-copy"
                     label="⧉" copiedLabel="✓"
                     title=${tr('chat.copyTurn', 'Copy this message')} copiedTitle=${t('common.copied')}
                     ariaLabel=${tr('chat.copyTurn', 'Copy this message')} />` : ''}
                 ${!mine && turn.text && isSpeechSupported() ? html`
-                    <button type="button" class="btn-ghost poster-turn-listen" onClick=${listen}>
+                    <button type="button" class="poster-action poster-action--text poster-turn-listen" onClick=${listen}>
                         ${reading ? tr('chat.stopListening', 'Stop') : tr('chat.listen', 'Listen')}
                     </button>` : ''}
             </div>

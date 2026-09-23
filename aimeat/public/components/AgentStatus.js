@@ -60,7 +60,7 @@ export function StatusBar({ status, onReset }) {
             ${status.model && html`<span class="poster-turn-model poster-agent-status-model"
                 title=${tr('chat.modelTitle', 'The model that answered this turn')}>${status.model}</span>`}
             ${onReset && html`
-                <button type="button" class="btn-ghost poster-rail-action"
+                <button type="button" class="poster-action poster-action--quiet poster-rail-action"
                     title=${tr('chat.resetTitle', 'Start a fresh agent session for this conversation. Needed after changing what the agent may do.')}
                     onClick=${onReset}>${tr('chat.reset', 'Reset session')}</button>`}
         </div>

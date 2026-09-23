@@ -18,10 +18,13 @@ import htm from 'htm';
 const html = htm.bind(h);
 
 /** @param {{ on?: boolean, expanded?: boolean, onClick?: () => void, children?: any }} props */
-export function FoldButton({ on = false, expanded, onClick, children }) {
+export function FoldButton({ on, expanded, onClick, children }) {
+  // Without `on` it opens more of a list: the action link's "more" tone. With `on` it is one of a
+  // group that chooses what a row shows.
+  const cls = on === undefined ? 'poster-action poster-action--more' : `poster-fold ${on ? 'poster-fold--on' : ''}`;
   return html`
     <button type="button"
-      class="poster-fold ${on ? 'poster-fold--on' : ''}"
+      class=${cls}
       aria-expanded=${expanded}
       onClick=${onClick}>${children}</button>`;
 }

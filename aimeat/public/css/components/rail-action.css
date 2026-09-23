@@ -11,13 +11,5 @@
  */
 
 /* The actions: ink-underlined words, never buttons competing with the conversation. */
-.poster-rail-action {
-  align-self: flex-start;
-  margin-top: 4px;
-  background: none; border: 0; border-bottom: 2px solid var(--text); border-radius: 0; box-shadow: none;
-  padding: 0 0 1px; cursor: pointer;
-  font-family: var(--font-showroom-body); font-weight: 800; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em;
-  color: var(--text);
-}
-.poster-rail-action:hover { color: var(--accent); border-color: var(--accent); }
-.poster-rail-action.copied { color: var(--success-fg); border-color: var(--success-fg); }
+/* The look is the quiet action link (poster.css .poster-action--quiet); this keeps its place. */
+.poster-rail-action { align-self: flex-start; margin-top: 4px; }

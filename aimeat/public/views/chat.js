@@ -602,7 +602,7 @@ export default function ChatView() {
                     <${StatusBar} status=${status} onReset=${thread ? resetSession : null} />
                     ${turns.length > 0 && html`<${CopyButton}
                         text=${conversationAsText(thread?.title, turns)}
-                        className="poster-rail-action"
+                        className="poster-action poster-action--quiet poster-rail-action"
                         label=${tr('chat.copyAll', 'Copy conversation')}
                         copiedLabel=${'✓ ' + t('common.copied')}
                         title=${tr('chat.copyAllTitle', 'Copy the whole conversation as text')}

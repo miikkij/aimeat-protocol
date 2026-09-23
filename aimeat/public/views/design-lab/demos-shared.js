@@ -109,6 +109,10 @@ export const SHAPE_DEMOS = {
   'action': { variants: [
     { name: 'action', render: () => html`<a class="poster-action" href="#">Settings</a>` },
     { name: 'tab', render: () => html`<span><button type="button" class="poster-tab is-on">Chosen</button> <button type="button" class="poster-tab">Another</button></span>` },
+    { name: 'more', render: () => html`<button type="button" class="poster-action poster-action--more">Show all (12)</button>` },
+    { name: 'quiet', render: () => html`<button type="button" class="poster-action poster-action--quiet">Copy conversation</button>` },
+    { name: 'back', render: () => html`<a class="poster-action poster-action--back" href="#">↩ Back to your home</a>` },
+    { name: 'text', render: () => html`<button type="button" class="poster-action poster-action--text">Listen</button>` },
   ] },
   'slab': { variants: [
     { name: 'default', render: () => html`<button type="button" class="btn-primary poster-slab">Do it</button>` },

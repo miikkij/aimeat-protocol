@@ -18,7 +18,7 @@ const html = htm.bind(h);
 /** @param {{ href: string, onClick?: (e: Event) => void, children?: any }} props */
 export function BackLink({ href, onClick, children }) {
   return html`
-    <a class="poster-back" href=${href}
+    <a class="poster-action poster-action--back poster-back" href=${href}
        onClick=${onClick}>
       ${children}
     </a>`;

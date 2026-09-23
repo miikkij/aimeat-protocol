@@ -40,7 +40,7 @@ export function ResultCards({ cards }) {
                         ${card.ref && !card.url && html`<code class="poster-result-ref">${card.ref}</code>`}
                     </div>
                     ${card.url && html`
-                        <a class="btn-outline poster-result-open" href=${card.url} target="_blank" rel="noopener noreferrer">
+                        <a class="poster-action poster-result-open" href=${card.url} target="_blank" rel="noopener noreferrer">
                             ${tr('chat.card.open', 'Open')}
                         </a>`}
                 </div>`)}
