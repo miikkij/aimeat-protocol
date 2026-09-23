@@ -22,6 +22,7 @@
  * @usage
  *   html`<${PromptCard} label=${t('...')} prompt=${text} copyLabel=${t('...')} />`
  * @version-history
+ *   2026-09-23: The label is the shared row label, .poster-label (Jouni's decision "Row label").
  *   2026-09-23: Composed from the shared parts in css/parts.css and css/parts-steps.css (class names by role, values moved from views/home.css unchanged; UI consolidation slice 1).
  *   v1.0.0 — 2026-08-09 — Extracted from four call sites in views/home (intent pool, phase 2).
  */
@@ -82,7 +83,7 @@ export function PromptCard({
   return html`
     <div class="poster-prompt" onClick=${hasMenu ? stop : undefined}>
       <div class="poster-prompt-head">
-        <span class="poster-prompt-label">${label}</span>
+        <span class="poster-label">${label}</span>
         <div class="poster-prompt-actions">
           <${CopyButton}
             text=${prompt}
