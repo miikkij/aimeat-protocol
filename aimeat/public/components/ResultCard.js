@@ -31,7 +31,7 @@ export function ResultCards({ cards }) {
     return html`
         <div class="poster-results">
             ${cards.map((card, i) => html`
-                <div class=${'poster-result poster-result--' + (card.kind || 'page')} key=${card.url || card.ref || i}>
+                <div class=${'poster-box poster-box--row poster-result poster-result--' + (card.kind || 'page')} key=${card.url || card.ref || i}>
                     ${card.image && html`
                         <img class="poster-result-img" src=${card.image} alt=${card.title || ''} loading="lazy" />`}
                     <div class="poster-result-body">

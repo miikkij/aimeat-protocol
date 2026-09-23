@@ -197,7 +197,7 @@ export const DECISIONS = [
     proposal: {
       variant: 'chooser-box', name: 'The dark frame on white',
       summary: 'Every object box in the dark frame on a white ground, as the home\'s answer box is today.',
-      text: '.poster-box: 2px ink frame, card ground. The prompt card moves from --bg-dim to the card ground; the result card has the frame and the ground already.',
+      text: '.poster-box: 2px ink frame, card ground. The prompt card moves from --bg-dim to the card ground; the result card has the frame and the ground already, and keeps its 6px edge in its kind\'s colour.',
     },
     variants: [
       { id: 'prompt-card', name: 'The prompt card', code: '.poster-prompt (prompt-card.css)', becomes: 'the white ground', where: 'the home: every prompt to copy', crop: home('.poster-prompt') },
@@ -206,9 +206,9 @@ export const DECISIONS = [
     ],
     changes: [
       { page: 'Home', what: 'The prompt cards turn from grey to white inside their frame.' },
-      { page: 'Chat', what: 'Nothing: the result cards have the dark frame on white already.' },
+      { page: 'Chat', what: 'Nothing: the result cards have the dark frame on white already, with a coloured edge on the left for their kind.' },
     ],
-    choice: {"proposal":null,"options":{"prompt-card":"accepted","chooser-box":"accepted","result-card":"accepted"},"note":"No answer to the proposal; accepted all three options. Open: what accepting every option means.","decidedBy":"Jouni","decidedAt":"2026-09-23"},
+    choice: {"proposal":null,"options":{"prompt-card":"accepted","chooser-box":"accepted","result-card":"accepted"},"note":"Every look kept: one box component with the three looks as its tones, no visible change (Jouni, in chat).","decidedBy":"Jouni","decidedAt":"2026-09-23"},
   },
   {
     id: 'attention-note',
@@ -228,7 +228,7 @@ export const DECISIONS = [
       { page: 'Home', what: 'The waiting note gets a thick dashed coral frame.' },
       { page: 'Chat', what: 'The phone suggestion gets a thick dashed coral frame.' },
     ],
-    choice: {"proposal":null,"options":{"waiting-note":"accepted","nudge":"accepted","aside":"accepted"},"note":"No answer to the proposal; accepted all three options. Open: what accepting every option means.","decidedBy":"Jouni","decidedAt":"2026-09-23"},
+    choice: {"proposal":null,"options":{"waiting-note":"accepted","nudge":"accepted","aside":"accepted"},"note":"Every look kept: one attention note with the three looks as its tones, no visible change (Jouni, in chat).","decidedBy":"Jouni","decidedAt":"2026-09-23"},
   },
   {
     id: 'action-link',
@@ -252,7 +252,7 @@ export const DECISIONS = [
       { page: 'Home', what: '"Show all" becomes dark underlined capitals instead of coral.' },
       { page: 'History', what: 'The back link becomes dark underlined capitals.' },
     ],
-    choice: {"proposal":null,"options":{"poster-action":"accepted","fold":"accepted","rail-action":"accepted","back":"accepted"},"note":"No answer to the proposal; accepted four options; the rounded frame button and the plain button have no answer. Open.","decidedBy":"Jouni","decidedAt":"2026-09-23"},
+    choice: {"proposal":null,"options":{"poster-action":"accepted","fold":"accepted","rail-action":"accepted","back":"accepted"},"note":"The four accepted looks become tones of one action link; the rounded framed button becomes the underlined action link, the plain text button its text tone (Jouni, in chat).","decidedBy":"Jouni","decidedAt":"2026-09-23"},
   },
   {
     id: 'tabs-filters',
@@ -275,7 +275,7 @@ export const DECISIONS = [
       { page: 'Home', what: 'The task choices, the apps switch and the agent step\'s two buttons become tabs.' },
       { page: 'Admin, about 25 pages', what: 'The framed filters become tabs; the chosen one stays on the sun.' },
     ],
-    choice: {"proposal":null,"options":{"fold-switch":"accepted","poster-tab":"accepted","adm-filter-chip":"accepted"},"note":"No answer to the proposal; accepted three options; the two ways have no answer, and the task choice was added after the answers. Open.","decidedBy":"Jouni","decidedAt":"2026-09-23"},
+    choice: {"proposal":null,"options":{"fold-switch":"accepted","poster-tab":"accepted","adm-filter-chip":"accepted"},"note":"The three accepted looks become one tab component; the agent step's two ways become the accepted tab (Jouni, in chat).","decidedBy":"Jouni","decidedAt":"2026-09-23"},
   },
   {
     id: 'loud-action',

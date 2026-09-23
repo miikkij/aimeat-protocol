@@ -81,7 +81,7 @@ export function PromptCard({
   }
 
   return html`
-    <div class="poster-prompt" onClick=${hasMenu ? stop : undefined}>
+    <div class="poster-box poster-box--copy poster-prompt" onClick=${hasMenu ? stop : undefined}>
       <div class="poster-prompt-head">
         <span class="poster-label">${label}</span>
         <div class="poster-prompt-actions">

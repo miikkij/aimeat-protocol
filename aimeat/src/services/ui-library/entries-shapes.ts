@@ -63,9 +63,11 @@ export const SHAPE_ENTRIES: UiEntrySource[] = [
             { name: 'large', class: 'poster-slab--large', when: 'the home\'s large door' },
             { name: 'control', class: 'poster-slab--control', when: 'a 44px button in a row of controls (New conversation, Send)' },
         ]),
-    shape('box', 'Box', ['poster-box', 'poster-box--avatar', 'poster-box--small', 'poster-box--meter', 'poster-box--quota'], '<div class="poster-box">…</div>',
+    shape('box', 'Box', ['poster-box', 'poster-box--avatar', 'poster-box--small', 'poster-box--meter', 'poster-box--quota', 'poster-box--copy', 'poster-box--row'], '<div class="poster-box">…</div>',
         'A 2px ink frame that carries one object; its size and place belong to the view.', 'An initials box, a meter, or a framed result.',
         [
+            { name: 'copy', class: 'poster-box--copy', when: 'a text a person copies, on the grey ground (the prompt card)' },
+            { name: 'row', class: 'poster-box--row', when: 'one result in a list, with small padding (the chat\'s result card)' },
             { name: 'avatar', class: 'poster-box--avatar', when: 'initials in a square' },
             { name: 'small', class: 'poster-box--small', when: 'a smaller avatar box' },
             { name: 'meter', class: 'poster-box--meter', when: 'a bar of sun on paper' },

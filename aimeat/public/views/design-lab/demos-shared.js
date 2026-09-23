@@ -122,6 +122,8 @@ export const SHAPE_DEMOS = {
   ] },
   'box': { variants: [
     { name: 'default', render: () => el('div', 'poster-box', 'A framed object.') },
+    { name: 'copy', render: () => el('div', 'poster-box poster-box--copy', 'A text to copy.') },
+    { name: 'row', render: () => el('div', 'poster-box poster-box--row', 'One result in a list.') },
     { name: 'avatar', render: () => el('span', 'poster-box poster-box--avatar', 'AB') },
     { name: 'avatar small', render: () => el('span', 'poster-box poster-box--avatar poster-box--small', 'AB') },
     { name: 'meter', render: () => html`<svg class="poster-box poster-box--meter" width="200" height="12"><rect width="120" height="12"></rect></svg>` },

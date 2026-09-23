@@ -14,12 +14,8 @@
  */
 
 /* ── The prompt block ── */
-.poster-prompt {
-  border: 2px solid var(--text);
-  background: var(--bg-dim);
-  margin-bottom: 1.25rem;
-  overflow: hidden;
-}
+/* The look is the box's copy tone (poster.css .poster-box--copy); this keeps its place. */
+.poster-prompt { margin: 0 0 1.25rem; }
 .poster-prompt-head {
   display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;
   flex-wrap: wrap;
