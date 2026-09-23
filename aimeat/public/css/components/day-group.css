@@ -20,5 +20,8 @@
   color: var(--accent); font-weight: 800; margin: 0 0 0.3rem;
   padding-bottom: 0.35rem; border-bottom: 3px solid var(--text);
 }
+/* The quiet heading: the same heading in grey, over a list that is a record rather than the page's
+   structure (the chat's work log). */
+.poster-day-title--quiet { color: var(--text-dim); }
 .poster-day .poster-timeline-list { border-top: 0; }
 .poster-day-empty { font-size: 0.95rem; color: var(--text-dim); line-height: 1.6; }

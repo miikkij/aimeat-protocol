@@ -40,7 +40,7 @@ export function WorkLog({ tools }) {
     if (!tools || tools.length === 0) return null;
     return html`
         <div class="poster-worklog">
-            <div class="poster-worklog-head">${tr('chat.work.title', 'What was done')}</div>
+            <div class="poster-day-title poster-day-title--quiet poster-worklog-head">${tr('chat.work.title', 'What was done')}</div>
             <ul class="poster-worklog-list">
                 ${tools.map((tool, i) => html`<${WorkLine} key=${i} tool=${tool} />`)}
             </ul>

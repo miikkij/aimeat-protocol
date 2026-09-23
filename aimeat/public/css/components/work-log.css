@@ -17,14 +17,8 @@
   border-top: 2px dashed var(--border);
   padding-top: 8px;
 }
-.poster-worklog-head {
-  font-size: 0.68rem;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--text-dim);
-  margin-bottom: 4px;
-}
+/* The heading's look is the quiet day heading's (.poster-day-title--quiet); this keeps its place. */
+.poster-worklog-head { margin: 0 0 4px; }
 .poster-worklog-list {
   list-style: none;
   margin: 0;
