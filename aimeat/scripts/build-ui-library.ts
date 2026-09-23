@@ -298,7 +298,7 @@ export function decisionProblems(): string[] {
     // a sample's own data (a thread, a card) is not taken for either.
     const ids = (src: string, indent: number) => [...src.matchAll(new RegExp(`^ {${indent}}\\{ id: '([\\w-]+)'`, 'gm'))].map(m => m[1]);
     for (const [id, body] of decisions) {
-        const wanted = ids(body.split(/^ {4}proposal:/m)[0], 6);
+        const wanted = ids(/^ {4}variants: \[$([\s\S]*?)^ {4}\],$/m.exec(body)?.[1] ?? '', 6);
         const have = ids(sampleBlocks.get(id) ?? '', 4);
         for (const v of wanted) if (!have.includes(v)) out.push(`decision ${id}: variant "${v}" has no sample in decision-samples.js`);
         for (const v of have) if (!wanted.includes(v)) out.push(`decision ${id}: sample "${v}" is not a variant in decisions-data.js`);
