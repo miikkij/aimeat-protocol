@@ -149,11 +149,11 @@ export const PAGE_ENTRIES: UiEntrySource[] = [
     },
     {
         id: 'fold-button', name: 'FoldButton', kind: 'component', status: 'active',
-        summary: 'A mono coral underlined button that shows more or switches a list; the chosen one on the sun.',
+        summary: 'A mono coral underlined button: without `on` the action link\'s more tone, with `on` the tab\'s fold tone; the chosen one on the sun.',
         module: '/components/FoldButton.js', sheet: '/css/components/fold-button.css',
-        data: { shape: 'FoldButton({ on, expanded, onClick, children })', fields: { on: 'the chosen one in a ModeSwitch', expanded: 'aria-expanded for a fold', onClick: 'handler', children: 'the words' } },
+        data: { shape: 'FoldButton({ on, expanded, onClick, children })', fields: { on: 'given: one choice in a ModeSwitch, true for the chosen one', expanded: 'aria-expanded for a fold', onClick: 'handler', children: 'the words' } },
         use: ['"Show all" under a cut list, or one choice in a ModeSwitch.'],
-        variants: [{ name: 'on', class: 'poster-fold--on', prop: 'on', when: 'the chosen one' }],
+        variants: [{ name: 'on', prop: 'on', when: 'the chosen one (poster.css .poster-tab--fold.is-on)' }],
         example: one('Show all'),
     },
     {
@@ -309,7 +309,7 @@ export const PAGE_ENTRIES: UiEntrySource[] = [
             fields: { titleId: 'the heading id', title: 'the headline', lead: 'the line under it', label: 'the choices, for a screen reader', on: 'the chosen task', summary: 'the fold\'s words' },
         },
         use: ['A band where the person first picks what they want to do, then gets the prompt or the connection for it.'],
-        variants: [{ name: 'chosen', prop: 'on', when: 'the chosen task, in the fold button\'s chosen look (poster-fold--on, fold-button.css)' }],
+        variants: [{ name: 'chosen', prop: 'on', when: 'the chosen task, the chosen tab (poster.css .poster-tab.is-on)' }],
         example: { title: 'Connect your AI', choices: [{ on: true, children: 'Claude' }, { on: false, children: 'ChatGPT' }] },
     },
     {

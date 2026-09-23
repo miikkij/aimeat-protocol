@@ -29,7 +29,7 @@
 .poster-chooser-result { overflow-wrap: anywhere; }
 .poster-chooser-result p { white-space: pre-wrap; }
 @media (max-width: 600px) {
-  .poster-chooser .poster-action { white-space: normal; text-align: left; }
+  .poster-chooser .poster-action, .poster-chooser .poster-tab { white-space: normal; text-align: left; }
   .poster-chooser-connect { padding: .75rem; }
   .poster-chooser-panel { padding-left: .9rem; }
   .poster-chooser .poster-prompt-head { flex-wrap: wrap; gap: .75rem; }

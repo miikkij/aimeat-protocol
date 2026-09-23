@@ -141,7 +141,7 @@ export const SAMPLES = {
   ],
   'action-link': [
     { id: 'poster-action', measure: '.poster-action', render: () => row(html`<a class="poster-action" href="#">Settings</a> <a class="poster-action" href="#">Sign out</a>`), after: 'same' },
-    { id: 'fold', measure: '.poster-fold', render: () => row(html`<${FoldButton} onClick=${noop}>Show all (12)<//>`),
+    { id: 'fold', measure: '.poster-action--more', render: () => row(html`<${FoldButton} onClick=${noop}>Show all (12)<//>`),
       after: after('.poster-action', () => row(action('Show all (12)'))) },
     { id: 'rail-action', measure: '.poster-rail-action', render: () => row(html`<button type="button" class="btn-ghost poster-rail-action">Copy conversation</button> <button type="button" class="btn-ghost poster-rail-action">Reset session</button>`),
       after: after('.poster-action', () => row(html`${action('Copy conversation')} ${action('Reset session')}`)) },
@@ -153,11 +153,11 @@ export const SAMPLES = {
       after: after('.poster-action', () => row(action('Listen'))) },
   ],
   'tabs-filters': [
-    { id: 'chooser-choice', measure: '.poster-fold--on', solo: '.poster-chooser-choices > *', render: () => html`<div class="poster-chooser"><${ChooserChoices} label="What to do"><${ChooserChoice} on=${true} onClick=${noop}>Remember something<//><${ChooserChoice} on=${false} onClick=${noop}>Make a page<//><//></div>`,
+    { id: 'chooser-choice', measure: '.poster-chooser-choices .is-on', solo: '.poster-chooser-choices > *', render: () => html`<div class="poster-chooser"><${ChooserChoices} label="What to do"><${ChooserChoice} on=${true} onClick=${noop}>Remember something<//><${ChooserChoice} on=${false} onClick=${noop}>Make a page<//><//></div>`,
       after: after('.poster-tab', () => tabs('Remember something', 'Make a page')) },
-    { id: 'fold-switch', measure: '.poster-fold--on', solo: '.poster-fold', render: () => html`<${ModeSwitch} label="Which apps"><${FoldButton} on=${true} onClick=${noop}>Recent<//><${FoldButton} onClick=${noop}>Mine<//><//>`,
+    { id: 'fold-switch', measure: '.poster-tab--fold.is-on', solo: '.poster-tab--fold', render: () => html`<${ModeSwitch} label="Which apps"><${FoldButton} on=${true} onClick=${noop}>Recent<//><${FoldButton} onClick=${noop}>Mine<//><//>`,
       after: after('.poster-tab', () => tabs('Recent', 'Mine')) },
-    { id: 'mode-tabs', measure: '.poster-mode--on', solo: '.poster-modes > *', render: () => html`<${ModeTabs}><${ModeTab} on=${true} onClick=${noop}>Give it a prompt<//><${ModeTab} on=${false} onClick=${noop}>Do it step by step<//><//>`,
+    { id: 'mode-tabs', measure: '.poster-modes .is-on', solo: '.poster-modes > *', render: () => html`<${ModeTabs}><${ModeTab} on=${true} onClick=${noop}>Give it a prompt<//><${ModeTab} on=${false} onClick=${noop}>Do it step by step<//><//>`,
       after: after('.poster-tab', () => tabs('Give it a prompt', 'Do it step by step')) },
     { id: 'poster-tab', measure: '.poster-tab.is-on', solo: '.poster-tab', render: () => row(html`<button type="button" class="poster-tab is-on">Overview</button> <button type="button" class="poster-tab">Tasks</button> <button type="button" class="poster-tab">Messages</button>`), after: 'same' },
     { id: 'adm-filter-chip', measure: '.adm-hook-fchip.on', solo: '.adm-hook-fchip', render: () => adm(row(html`<button type="button" class="adm-hook-fchip on">all</button> <button type="button" class="adm-hook-fchip">failed</button> <button type="button" class="adm-hook-fchip">sent</button>`)),

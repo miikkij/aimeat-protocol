@@ -47,7 +47,7 @@ export const SHAPE_ENTRIES: UiEntrySource[] = [
         [{ name: 'thing', class: 'poster-row--thing', when: 'a row that is one thing a person has or does' }]),
     shape('label', 'Label', ['poster-label'], '<span class="poster-label">…</span>',
         'A small coral word in capitals that names what follows.', 'Above a value, a prompt or a group of controls.'),
-    shape('action', 'Action', ['poster-action', 'poster-tab', 'poster-action--more', 'poster-action--quiet', 'poster-action--back', 'poster-action--text'], '<a class="poster-action" href="…">…</a>',
+    shape('action', 'Action', ['poster-action', 'poster-tab', 'poster-action--more', 'poster-action--quiet', 'poster-action--back', 'poster-action--text', 'poster-tab--fold'], '<a class="poster-action" href="…">…</a>',
         'An ink-underlined action in capitals; the same cut is the unselected tab. Its tones are the quiet ways on Jouni kept.', 'A secondary action or a door in a masthead, or a tab.',
         [
             { name: 'tab', class: 'poster-tab', when: 'one tab in a row; is-on puts the chosen one on the sun' },
@@ -55,6 +55,7 @@ export const SHAPE_ENTRIES: UiEntrySource[] = [
             { name: 'quiet', class: 'poster-action--quiet', when: 'a small action in a side column (the chat\'s Reset session, Copy conversation)' },
             { name: 'back', class: 'poster-action--back', when: 'the way back to where a person came from' },
             { name: 'text', class: 'poster-action--text', when: 'a plain word under a message (Listen, Copy)' },
+            { name: 'fold tab', class: 'poster-tab--fold', when: 'a small switch in a row ("Recent", "Mine"): coral typewriter words, the chosen one on the sun' },
         ]),
     shape('slab', 'Slab', ['poster-slab', 'poster-slab--large', 'poster-slab--control'], '<button class="btn-primary poster-slab">…</button>',
         'An ink block with a sun shadow that moves when pressed.', 'The one primary action of a place.',

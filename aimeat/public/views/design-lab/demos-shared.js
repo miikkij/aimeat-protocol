@@ -113,6 +113,7 @@ export const SHAPE_DEMOS = {
     { name: 'quiet', render: () => html`<button type="button" class="poster-action poster-action--quiet">Copy conversation</button>` },
     { name: 'back', render: () => html`<a class="poster-action poster-action--back" href="#">↩ Back to your home</a>` },
     { name: 'text', render: () => html`<button type="button" class="poster-action poster-action--text">Listen</button>` },
+    { name: 'fold tab', render: () => html`<span><button type="button" class="poster-tab poster-tab--fold is-on">Recent</button> <button type="button" class="poster-tab poster-tab--fold">Mine</button></span>` },
   ] },
   'slab': { variants: [
     { name: 'default', render: () => html`<button type="button" class="btn-primary poster-slab">Do it</button>` },

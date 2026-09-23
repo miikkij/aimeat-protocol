@@ -21,7 +21,7 @@ const html = htm.bind(h);
 export function FoldButton({ on, expanded, onClick, children }) {
   // Without `on` it opens more of a list: the action link's "more" tone. With `on` it is one of a
   // group that chooses what a row shows.
-  const cls = on === undefined ? 'poster-action poster-action--more' : `poster-fold ${on ? 'poster-fold--on' : ''}`;
+  const cls = on === undefined ? 'poster-action poster-action--more' : `poster-tab poster-tab--fold${on ? ' is-on' : ''}`;
   return html`
     <button type="button"
       class=${cls}

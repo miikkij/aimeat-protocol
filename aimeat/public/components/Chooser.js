@@ -45,7 +45,7 @@ export function ChooserChoices({ label, children }) {
 
 /** @param {{ on: boolean, onClick: () => void, children?: any }} props */
 export function ChooserChoice({ on, onClick, children }) {
-  return html`<button type="button" class=${'poster-action' + (on ? ' poster-fold--on' : '')}
+  return html`<button type="button" class=${'poster-tab' + (on ? ' is-on' : '')}
           aria-pressed=${on} onClick=${onClick}>
           ${children}
         </button>`;

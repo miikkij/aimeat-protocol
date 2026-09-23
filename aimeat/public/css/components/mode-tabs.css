@@ -12,4 +12,3 @@
  */
 
 .poster-modes { display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; }
-.poster-mode--on { border-color: var(--accent); color: var(--accent); }

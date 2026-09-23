@@ -3,16 +3,19 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description A numbered index: a lead line, then a named row whose items are numbered rows with
- *   an arrow (fold buttons, components/FoldButton.js, passed as children), an optional tour link,
+ *   an arrow (IndexItem, passed as children), an optional tour link,
  *   and under it the one open item's panel. IndexPanel is that panel: what it is, its steps, where
  *   it already runs, and its actions, in an opened record (poster.css .poster-record). Its look is
  *   css/components/numbered-index.css; the catalogue entry is `numbered-index`.
- * @structure NumberedIndex({ lead, label, tour, children, panel }) · IndexPanel({ what, steps, proof, children })
+ * @structure NumberedIndex({ lead, label, tour, children, panel }) · IndexItem({ on, expanded, onClick, children }) ·
+ *   IndexPanel({ what, steps, proof, children })
  * @usage
  *   html`<${NumberedIndex} lead=${…} label=${…} tour=${{ href, label }} panel=${open && html`<${IndexPanel} …/>`}>
- *     ${items.map((i) => html`<${FoldButton} on=${…} expanded=${…} onClick=${…}>…<//>`)}
+ *     ${items.map((i) => html`<${IndexItem} on=${…} expanded=${…} onClick=${…}>…<//>`)}
  *   <//>`
  * @version-history
+ *   v1.1.0 — 2026-09-23 — IndexItem: the rows are the index's own, no longer fold buttons restyled,
+ *     with the same values (a move; the fold button became a tab, Jouni's decision "Tabs and filters").
  *   v1.0.0 — 2026-09-23 — Moved out of views/home/status-parts.js (the playbooks) with its markup
  *     unchanged (UI consolidation phase 1, a move).
  */
@@ -36,6 +39,16 @@ export function NumberedIndex({ lead, label, tour, children, panel }) {
       <//>
       ${panel}
     </div>`;
+}
+
+/**
+ * One numbered row of the index; the open one is on the sun with its arrow turned down.
+ * @param {{ on: boolean, expanded?: boolean, onClick: () => void, children?: any }} props
+ */
+export function IndexItem({ on, expanded, onClick, children }) {
+  return html`
+    <button type="button" class=${'poster-index-item' + (on ? ' poster-index-item--on' : '')}
+      aria-expanded=${expanded} onClick=${onClick}>${children}</button>`;
 }
 
 /**

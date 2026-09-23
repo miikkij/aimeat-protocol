@@ -71,7 +71,7 @@ import { ThingLink, ThingChip } from '/components/ThingLink.js';
 import { FoldButton } from '/components/FoldButton.js';
 import { ModeSwitch } from '/components/ModeSwitch.js';
 import { QuietNote } from '/components/QuietNote.js';
-import { NumberedIndex, IndexPanel } from '/components/NumberedIndex.js';
+import { NumberedIndex, IndexItem, IndexPanel } from '/components/NumberedIndex.js';
 import { InkFoot } from '/components/InkFoot.js';
 import { CheckItem } from '/components/CheckItem.js';
 
@@ -332,7 +332,7 @@ export function Playbooks({ playbooks, tour }) {
           </button>
         <//>`)}>
       ${playbooks.map((pb) => html`
-        <${FoldButton} key=${pb.id}
+        <${IndexItem} key=${pb.id}
           on=${open === pb.id}
           expanded=${open === pb.id}
           onClick=${() => setOpen(open === pb.id ? null : pb.id)}>

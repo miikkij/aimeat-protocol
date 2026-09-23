@@ -27,7 +27,7 @@ export function ModeTabs({ children }) {
 export function ModeTab({ on, onClick, children }) {
   return html`
           <button type="button" role="tab" aria-selected=${on}
-            class=${on ? 'btn-outline poster-mode--on' : 'btn-ghost'}
+            class=${'poster-tab' + (on ? ' is-on' : '')}
             onClick=${onClick}>
             ${children}
           </button>`;
