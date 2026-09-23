@@ -12,14 +12,18 @@
  * @structure renderDetail · confirmPanel · checkPanel · stepBlock · runsTable · settingsFold
  * @usage import { renderDetail } from './detail.js';
  * @version-history
+ *   2026-09-22 -- Composed from the shared component set: steps are numbered ListRows, the runs a
+ *     timeline, the confirmation an opened record, settings KeyValue rows; no own CSS. The delete
+ *     door is an underlined word like the others (the set's danger tone is on the primary slab).
  *   v1.0.0 — 2026-08-30 — Initial.
  */
 import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { Section, Fold, scrollTo } from '/views/profile/organisms/poster-parts.js';
-import { c, loc, rel, day, durationWords, minutesWords, triggerWords, kindWords, signalWords, stepWord, stepTone, runWord, runTone, verdictOf, stepTitle, stepAgents, renderPage } from './frame.js';
+import { Section, Fold, Stack, ListRow, KeyValue, Surface, Action, Text } from '/components/poster-parts.js';
+import { scrollTo } from '/views/profile/organisms/poster-parts.js';
+import { c, loc, rel, day, durationWords, minutesWords, triggerWords, kindWords, signalWords, stepWord, stepTone, runWord, runTone, verdictOf, stepTitle, stepAgents, renderPage, chipRow, chipTone, toneOf, verdictBlock, railList } from './frame.js';
 
 export function renderDetail(ctx, item) {
   const def = item.def;
@@ -34,44 +38,45 @@ export function renderDetail(ctx, item) {
   const resolvedOf = (stepId) => (last?.resolved || d?.blueprintResolved || []).find(r => r.stepId === stepId);
   const title = loc(def.title) || id;
 
-  const chips = html`
-    <span class="og-chip">${triggerWords(def.trigger)}</span>
-    <span class="og-chip">${c('stepsN', { n: def.steps.length })}</span>
-    ${agents.size ? html`<span class="og-chip">${c('agentsN', { n: agents.size })}</span>` : null}
-    ${gates.length ? html`<span class="og-chip">${c('gatesN', { n: gates.length })}</span>` : null}
-    ${last ? html`<span class=${`og-chip ${runTone(last.status) === 'bad' ? 'og-chip--coral' : runTone(last.status) === 'wait' ? 'og-chip--sun' : ''}`}>${c('lastRunChip', { word: runWord(last.status).toLowerCase(), when: rel(last.startedAt) })}</span>` : null}
-    ${def.notify_on_finish ? html`<span class="og-chip og-chip--dim">${c('chipNotify')}</span>` : null}
-    ${def.skip_done ? html`<span class="og-chip og-chip--dim">${c('chipSkipDone')}</span>` : null}
-    ${def.parallel ? html`<span class="og-chip og-chip--dim">${c('chipParallel')}</span>` : null}`;
+  const chips = chipRow([
+    [triggerWords(def.trigger)],
+    [c('stepsN', { n: def.steps.length })],
+    agents.size && [c('agentsN', { n: agents.size })],
+    gates.length && [c('gatesN', { n: gates.length })],
+    last && [c('lastRunChip', { word: runWord(last.status).toLowerCase(), when: rel(last.startedAt) }), chipTone(runTone(last.status))],
+    def.notify_on_finish && [c('chipNotify'), 'muted'],
+    def.skip_done && [c('chipSkipDone'), 'muted'],
+    def.parallel && [c('chipParallel'), 'muted'],
+  ]);
   const doors = html`
-    <button type="button" class="og-slab" onClick=${() => ctx.openConfirm(id)}>${c('run')}</button>
-    <button type="button" class="og-door" disabled=${ctx.checking === id} onClick=${() => ctx.handleCheck(id)}>${c('checkNow')}</button>
-    <button type="button" class="og-door" onClick=${() => ctx.pickView({ kind: 'edit', id })}>${t('profile.workflows.edit')}</button>
-    <button type="button" class="og-door og-door--quiet" onClick=${() => { ctx.setFold('prompt', true); scrollTo('wp-prompt'); }}>${c('promptToChat')}</button>`;
+    <${Action} kind="primary" onClick=${() => ctx.openConfirm(id)}>${c('run')}<//>
+    <${Action} disabled=${ctx.checking === id} onClick=${() => ctx.handleCheck(id)}>${c('checkNow')}<//>
+    <${Action} onClick=${() => ctx.pickView({ kind: 'edit', id })}>${t('profile.workflows.edit')}<//>
+    <${Action} onClick=${() => { ctx.setFold('prompt', true); scrollTo('wp-prompt'); }}>${c('promptToChat')}<//>`;
+  const writes = d?.blueprint?.nodes?.length ? [...new Set(d.blueprint.nodes.flatMap(n => n.writes))].slice(0, 6) : [];
   const rail = html`
-    <hr />
-    <span class="og-rail-label">${c('railAgents')}</span>
-    ${[...agents].map(a => { const red = last && def.steps.some(s => (Array.isArray(s.agent) ? s.agent.includes(a) : s.agent === a) && ['output-red', 'timed-out', 'agent-offline'].includes(last.steps?.[s.id]?.state)); return html`<span class="og-rail-link wp-rail-static" key=${a}><i>→</i>${a}${red ? html`<em>!</em>` : null}</span>`; })}
-    ${d?.blueprint?.nodes?.length ? html`<hr /><span class="og-rail-label">${c('railWrites')}</span>${[...new Set(d.blueprint.nodes.flatMap(n => n.writes))].slice(0, 6).map(k => html`<span class="og-rail-link wp-rail-static wp-rail-key" key=${k}><i>→</i>${k}</span>`)}` : null}`;
+    ${railList(c('railAgents'), [...agents].map(a => { const red = last && def.steps.some(s => (Array.isArray(s.agent) ? s.agent.includes(a) : s.agent === a) && ['output-red', 'timed-out', 'agent-offline'].includes(last.steps?.[s.id]?.state)); return { key: a, label: `${a}${red ? ' !' : ''}`, tone: red ? 'danger' : undefined }; }))}
+    ${writes.length ? railList(c('railWrites'), writes.map(k => ({ key: k, label: k }))) : null}`;
 
   return renderPage(ctx, {
     crumbs: [title], title, chips, doors, rail,
     children: html`
-      ${loc(def.description) ? html`<p class="og-desc og-desc--page">${loc(def.description)}</p>` : null}
+      ${loc(def.description) ? html`<${Text} kind="lead">${loc(def.description)}<//>` : null}
       ${ctx.confirm?.id === id ? confirmPanel(ctx, item) : null}
       ${ctx.checks[id] ? checkPanel(ctx, item) : null}
-      ${last ? html`<div class=${`wp-verdict wp-verdict--${v.tone}`}><div><b>${v.head}</b><span>${v.sub}</span></div><div class="og-doors"><button type="button" class="og-door" onClick=${() => ctx.pickView({ kind: 'run', id, runId: last.runId })}>${c('openRun')}</button></div></div>` : null}
-      <${Section} id="wp-steps" num="01" title=${c('secSteps')} count=${`${def.steps.length} · ${c('secStepsSub')}`} doors=${html`<button type="button" class=${`og-door og-door--quiet ${ctx.showKeys ? 'on' : ''}`} onClick=${() => ctx.setShowKeys(!ctx.showKeys)}>${c('showKeys')}</button>`} first>
+      ${last ? verdictBlock(v, html`<${Action} onClick=${() => ctx.pickView({ kind: 'run', id, runId: last.runId })}>${c('openRun')}<//>`) : null}
+      <${Section} id="wp-steps" title=${c('secSteps')} count=${`${def.steps.length} · ${c('secStepsSub')}`} actions=${html`<${Action} kind="tab" selected=${ctx.showKeys} onClick=${() => ctx.setShowKeys(!ctx.showKeys)}>${c('showKeys')}<//>`}>
         ${def.steps.map((s, i) => stepBlock(ctx, s, i, resolvedOf(s.id), last?.steps?.[s.id]))}
-        <p class="wp-hint">${c('stepsHint')}</p>
+        <${Text} kind="caption" tone="muted">${c('stepsHint')}<//>
       <//>
-      <${Section} id="wp-runs" num="02" title=${c('secRuns')} count=${ctx.runsTab === 'checks' ? c('checksN', { n: d?.checkCount ?? checks.length }) : c('runsN', { n: d?.runCount ?? runs.length })} doors=${html`<button type="button" class=${`og-door og-door--quiet ${ctx.runsTab !== 'checks' ? 'on' : ''}`} onClick=${() => ctx.setRunsTab('runs')}>${c('runsWord')}</button><button type="button" class=${`og-door og-door--quiet ${ctx.runsTab === 'checks' ? 'on' : ''}`} onClick=${() => ctx.setRunsTab('checks')}>${c('checksWord', { n: d?.checkCount ?? checks.length })}</button>`}>
+      <${Section} id="wp-runs" title=${c('secRuns')} count=${ctx.runsTab === 'checks' ? c('checksN', { n: d?.checkCount ?? checks.length }) : c('runsN', { n: d?.runCount ?? runs.length })}
+        actions=${html`<${Action} kind="tab" selected=${ctx.runsTab !== 'checks'} onClick=${() => ctx.setRunsTab('runs')}>${c('runsWord')}<//><${Action} kind="tab" selected=${ctx.runsTab === 'checks'} onClick=${() => ctx.setRunsTab('checks')}>${c('checksWord', { n: d?.checkCount ?? checks.length })}<//>`}>
         ${runsTable(ctx, item, ctx.runsTab === 'checks' ? checks : runs)}
       <//>
-      <${Fold} id="wp-settings" num="03" title=${c('secSettings')} sub=${c('settingsSub')} open=${ctx.folds.settings} onToggle=${() => ctx.setFold('settings', !ctx.folds.settings)}>${settingsFold(ctx, item)}<//>
-      <${Fold} id="wp-prompt" num="04" title=${c('promptToChat')} sub=${c('promptSub')} open=${ctx.folds.prompt} onToggle=${() => ctx.setFold('prompt', !ctx.folds.prompt)}>
-        <p class="wp-prose">${c('promptImproveBody')}</p>
-        <div class="og-doors"><button type="button" class="og-door" onClick=${() => ctx.copyPrompt('improve-mcp', id)}>${c('copyImprove')}</button><button type="button" class="og-door og-door--quiet" onClick=${() => ctx.copyPrompt('create-chat')}>${c('copyChatVersion')}</button></div>
+      <${Fold} id="wp-settings" number="03" title=${c('secSettings')} sub=${c('settingsSub')} open=${ctx.folds.settings} onToggle=${() => ctx.setFold('settings', !ctx.folds.settings)}>${settingsFold(ctx, item)}<//>
+      <${Fold} id="wp-prompt" number="04" title=${c('promptToChat')} sub=${c('promptSub')} open=${ctx.folds.prompt} onToggle=${() => ctx.setFold('prompt', !ctx.folds.prompt)}>
+        <${Text}>${c('promptImproveBody')}<//>
+        <${Stack} direction="wrap"><${Action} onClick=${() => ctx.copyPrompt('improve-mcp', id)}>${c('copyImprove')}<//><${Action} onClick=${() => ctx.copyPrompt('create-chat')}>${c('copyChatVersion')}<//><//>
       <//>
       <${ctx.ConfirmUI} />`,
   });
@@ -82,25 +87,24 @@ function confirmPanel(ctx, item) {
   const def = item.def;
   const p = ctx.confirm.preflight;
   const title = loc(def.title) || def.id;
-  const kv = (k, v) => html`<div class="wp-kv-k">${k}</div><div class="wp-kv-v">${v}</div>`;
-  return html`
-    <div class="wp-confirm">
-      <h3>${c('confirmTitle', { name: title })}</h3>
-      ${!p ? html`<p class="og-empty wp-loading">${t('common.loading')}</p>` : html`
-        <div class="wp-kv">
-          ${kv(c('confirmWhat'), p.agents.length ? c('confirmWhatAgents', { n: p.willRun.length, agents: p.agents.join(', ') }) : c('confirmWhatNoAgents', { n: p.willRun.length }))}
-          ${kv(c('confirmHowLong'), p.lastRun?.durationMs ? c('confirmHowLongBoth', { last: durationWords(p.lastRun.durationMs), max: minutesWords(p.maxMinutes) }) : c('confirmHowLongMax', { max: minutesWords(p.maxMinutes) }))}
-          ${kv(c('confirmSpends'), c('confirmSpendsBody'))}
-          ${p.skipDone && p.steps.some(s => s.willSkip) ? kv(c('confirmSkips'), c('confirmSkipsBody', { steps: p.steps.filter(s => s.willSkip).map(s => stepTitle(def.steps.find(d => d.id === s.id)) || s.id).join(', ') })) : null}
-          ${kv(c('confirmVars'), Object.entries(p.vars).filter(([k]) => k !== 'run').map(([k, v]) => `${k} = ${v}`).join(' · ') || c('confirmVarsNone'))}
-        </div>
-        <div class="og-doors">
-          <button type="button" class="og-slab" disabled=${ctx.running} onClick=${() => ctx.handleRun(def.id, false)}>${c('runNow')}</button>
-          <button type="button" class="og-door" disabled=${ctx.running} onClick=${() => ctx.handleRun(def.id, true)}>${c('runSandbox')}</button>
-          <button type="button" class="og-door og-door--quiet" onClick=${() => ctx.closeConfirm()}>${t('profile.cancel')}</button>
-        </div>
-        <p class="wp-hint">${c('confirmHint')}</p>`}
-    </div>`;
+  const kv = (k, v) => html`<${KeyValue} label=${k} value=${v} />`;
+  return html`<${Surface} kind="record"><${Stack}>
+    <${Text} kind="heading">${c('confirmTitle', { name: title })}<//>
+    ${!p ? html`<${Text} tone="muted">${t('common.loading')}<//>` : html`
+      <${Stack} density="compact">
+        ${kv(c('confirmWhat'), p.agents.length ? c('confirmWhatAgents', { n: p.willRun.length, agents: p.agents.join(', ') }) : c('confirmWhatNoAgents', { n: p.willRun.length }))}
+        ${kv(c('confirmHowLong'), p.lastRun?.durationMs ? c('confirmHowLongBoth', { last: durationWords(p.lastRun.durationMs), max: minutesWords(p.maxMinutes) }) : c('confirmHowLongMax', { max: minutesWords(p.maxMinutes) }))}
+        ${kv(c('confirmSpends'), c('confirmSpendsBody'))}
+        ${p.skipDone && p.steps.some(s => s.willSkip) ? kv(c('confirmSkips'), c('confirmSkipsBody', { steps: p.steps.filter(s => s.willSkip).map(s => stepTitle(def.steps.find(d => d.id === s.id)) || s.id).join(', ') })) : null}
+        ${kv(c('confirmVars'), Object.entries(p.vars).filter(([k]) => k !== 'run').map(([k, v]) => `${k} = ${v}`).join(' · ') || c('confirmVarsNone'))}
+      <//>
+      <${Stack} direction="wrap" align="center">
+        <${Action} kind="primary" disabled=${ctx.running} onClick=${() => ctx.handleRun(def.id, false)}>${c('runNow')}<//>
+        <${Action} disabled=${ctx.running} onClick=${() => ctx.handleRun(def.id, true)}>${c('runSandbox')}<//>
+        <${Action} onClick=${() => ctx.closeConfirm()}>${t('profile.cancel')}<//>
+      <//>
+      <${Text} kind="caption" tone="muted">${c('confirmHint')}<//>`}
+  <//><//>`;
 }
 
 /** What Check now found in memory, on the page, starting nothing. */
@@ -108,13 +112,12 @@ function checkPanel(ctx, item) {
   const def = item.def;
   const ch = ctx.checks[def.id];
   const words = def.steps.map(s => `${stepTitle(s)}: ${stepWord(ch.steps?.[s.id]?.state).toLowerCase()}`);
-  return html`
-    <div class="wp-note wp-note--check">
-      <b>${c('checkTitle', { when: rel(ch.at) })}</b>
-      <span>${words.join(' · ')}</span>
-      <span class="wp-hint">${c('checkHint')}</span>
-      <button type="button" class="og-door og-door--quiet" onClick=${() => ctx.dismissCheck(def.id)}>${c('close')}</button>
-    </div>`;
+  return html`<${Surface} kind="box" tone="sun" density="compact"><${Stack} density="compact">
+    <${Text} kind="label">${c('checkTitle', { when: rel(ch.at) })}<//>
+    <${Text}>${words.join(' · ')}<//>
+    <${Text} kind="caption">${c('checkHint')}<//>
+    <${Stack} direction="horizontal" align="start"><${Action} onClick=${() => ctx.dismissCheck(def.id)}>${c('close')}<//><//>
+  <//><//>`;
 }
 
 /** One step: what it does, who does it, what must be there and how the node sees it produced, and the last run's state. */
@@ -126,48 +129,46 @@ export function stepBlock(ctx, step, i, resolved, runStep) {
   const inputWords = step.action?.kind === 'human-input' ? c('gateWords', { q: step.action.question?.prompt || '' }) : input && input !== 'none' ? c('needs', { what: signalWords(input) }) : c('noInputNeeded');
   const outputWords = resolved?.success_signal ? c('producedWhen', { what: signalWords(resolved.success_signal) }) : '';
   const state = runStep?.state;
-  const tone = stepTone(state);
   const observed = runStep?.outputObserved || runStep?.inputObserved;
   const obs = observed ? ctx.observedWords(observed) : '';
-  return html`
-    <div class="wp-step" key=${step.id}>
-      <div class="wp-step-n">${String(i + 1).padStart(2, '0')}</div>
-      <div class="wp-step-body">
-        <b>${stepTitle(step)}<small>${step.id} · ${who}</small></b>
-        <div class="wp-sig">${after}. ${inputWords} ${outputWords}</div>
-        ${ctx.showKeys && resolved?.deliverableKey ? html`<div class="wp-sig wp-sig--key">${c('writesKey', { key: resolved.deliverableKey })}</div>` : null}
-      </div>
-      <div class="wp-step-st">${state ? html`<b class=${`wp-st--${tone}`}>${stepWord(state)}</b>${obs ? html`<span>${obs}</span>` : null}${runStep?.attempt ? html`<span>${c('attemptsN', { n: runStep.attempt + 1 })}</span>` : null}` : html`<b class="wp-st--none">${c('notRunYet')}</b>`}</div>
-    </div>`;
+  return html`<${ListRow} key=${step.id} number=${String(i + 1).padStart(2, '0')} name=${stepTitle(step)} detail=${`${step.id} · ${who}`}
+    value=${state ? html`<${Stack} density="compact">
+      <${Text} kind="label" tone=${toneOf(stepTone(state))}>${stepWord(state)}<//>
+      ${obs ? html`<${Text} kind="caption">${obs}<//>` : null}
+      ${runStep?.attempt ? html`<${Text} kind="caption">${c('attemptsN', { n: runStep.attempt + 1 })}<//>` : null}
+    <//>` : html`<${Text} kind="label" tone="muted">${c('notRunYet')}<//>`}>
+    <${Stack} density="compact">
+      <${Text}>${after}. ${inputWords} ${outputWords}<//>
+      ${ctx.showKeys && resolved?.deliverableKey ? html`<${Text} kind="mono" tone="muted">${c('writesKey', { key: resolved.deliverableKey })}<//>` : null}
+    <//>
+  <//>`;
 }
 
 function runsTable(ctx, item, list) {
-  if (ctx.detailLoading && !list.length) return html`<p class="og-empty wp-loading">${t('common.loading')}</p>`;
-  if (!list.length) return html`<p class="og-empty">${ctx.runsTab === 'checks' ? c('noChecks') : t('profile.workflows.noRuns')}</p>`;
-  return html`
-    <div class="wp-runs">
-      ${list.slice(0, 20).map(r => { const v = verdictOf(r); return html`
-        <div class="wp-m" key=${'w' + r.runId}>${rel(r.startedAt)}</div>
-        <div class=${`wp-m wp-m--${v.tone}`} key=${'s' + r.runId}><b>${runWord(r.status)}</b></div>
-        <div class="wp-m wp-m--sub" key=${'v' + r.runId}>${v.head}${r.mode === 'full-sandbox' ? ` · ${c('sandboxRun')}` : ''}</div>
-        <div class="og-tbl-door" key=${'d' + r.runId}><button type="button" class="og-door" onClick=${() => ctx.pickView({ kind: 'run', id: item.def.id, runId: r.runId })}>${c('open')}</button></div>`; })}
-    </div>`;
+  if (ctx.detailLoading && !list.length) return html`<${Text} tone="muted">${t('common.loading')}<//>`;
+  if (!list.length) return html`<${Text} tone="muted">${ctx.runsTab === 'checks' ? c('noChecks') : t('profile.workflows.noRuns')}<//>`;
+  return list.slice(0, 20).map(r => {
+    const v = verdictOf(r);
+    return html`<${ListRow} key=${r.runId} density="compact" time=${rel(r.startedAt)}
+      marker=${v.tone === 'ok' ? 'success' : v.tone === 'bad' ? 'danger' : v.tone === 'wait' ? 'sun' : 'muted'}
+      name=${runWord(r.status)} detailKind="text" detail=${`${v.head}${r.mode === 'full-sandbox' ? ` · ${c('sandboxRun')}` : ''}`}
+      actions=${html`<${Action} onClick=${() => ctx.pickView({ kind: 'run', id: item.def.id, runId: r.runId })}>${c('open')}<//>`} />`;
+  });
 }
 
 function settingsFold(ctx, item) {
   const def = item.def;
-  const row = (k, v) => html`<div class="wp-kv-k">${k}</div><div class="wp-kv-v">${v}</div>`;
-  return html`
-    <div class="wp-kv">
-      ${row(c('setTrigger'), triggerWords(def.trigger))}
-      ${row(c('setVars'), (def.vars || []).length ? def.vars.map(v => `${v.name} = ${v.default ?? ''}${loc(v.description) ? ` (${loc(v.description)})` : ''}`).join(' · ') : c('confirmVarsNone'))}
-      ${row(c('setNotify'), def.notify_on_finish ? c('yes') : c('no'))}
-      ${row(c('setSkipDone'), def.skip_done ? c('yes') : c('no'))}
-      ${row(c('setFresh'), def.fresh ? c('yes') : c('no'))}
-      ${row(c('setParallel'), def.parallel ? c('yes') : c('no'))}
-      ${row(c('setOnFail'), c('onFailInspect'))}
-      ${row(c('setLlm'), def.llm?.approved ? c('yes') : c('no'))}
-      ${row(c('setCreated'), `${day(def.createdAt)}${def.createdBy ? ` · ${String(def.createdBy).split('@')[0]}` : ''}`)}
-    </div>
-    <div class="og-doors wp-danger-row"><button type="button" class="og-door" onClick=${() => ctx.pickView({ kind: 'edit', id: def.id })}>${t('profile.workflows.edit')}</button><button type="button" class="og-door og-door--danger" onClick=${() => ctx.handleDelete(def.id)}>${c('deleteWorkflow')}</button></div>`;
+  const row = (k, v) => html`<${KeyValue} label=${k} value=${v} />`;
+  return html`<${Stack} density="compact">
+    ${row(c('setTrigger'), triggerWords(def.trigger))}
+    ${row(c('setVars'), (def.vars || []).length ? def.vars.map(v => `${v.name} = ${v.default ?? ''}${loc(v.description) ? ` (${loc(v.description)})` : ''}`).join(' · ') : c('confirmVarsNone'))}
+    ${row(c('setNotify'), def.notify_on_finish ? c('yes') : c('no'))}
+    ${row(c('setSkipDone'), def.skip_done ? c('yes') : c('no'))}
+    ${row(c('setFresh'), def.fresh ? c('yes') : c('no'))}
+    ${row(c('setParallel'), def.parallel ? c('yes') : c('no'))}
+    ${row(c('setOnFail'), c('onFailInspect'))}
+    ${row(c('setLlm'), def.llm?.approved ? c('yes') : c('no'))}
+    ${row(c('setCreated'), `${day(def.createdAt)}${def.createdBy ? ` · ${String(def.createdBy).split('@')[0]}` : ''}`)}
+    <${Stack} direction="wrap"><${Action} onClick=${() => ctx.pickView({ kind: 'edit', id: def.id })}>${t('profile.workflows.edit')}<//><${Action} onClick=${() => ctx.handleDelete(def.id)}>${c('deleteWorkflow')}<//><//>
+  <//>`;
 }

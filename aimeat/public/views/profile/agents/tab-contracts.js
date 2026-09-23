@@ -9,6 +9,10 @@
  * @structure TabContracts — offered-contracts row + Active engagements + Retired (history)
  * @usage <${TabContracts} agent=${agent} agentName=${agent.name} showToast=${showToast} />
  * @version-history
+ *   2026-09-22 -- Composed from the shared component set: the three groups are small Sections (offers
+ *     and active side by side in Columns), each engagement a ListRow with its contract as a Chip and
+ *     Retire / Re-adopt as text actions. The scroll emoji before an offered contract is gone. No class
+ *     of its own is left. Same words, data and handlers.
  *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
  *   v1.1.0 -- 2026-07-17 -- Card layout: offers and active-workspaces side by side in
  *     pf-agd-card-grid; retired history spans full width.
@@ -23,6 +27,7 @@ import { getAgentEngagements, contractNamesOf, offersWorkspaceContract, adoptCon
 import { retireEngagement, activateEngagement } from '/js/services/organisms.js';
 import { swallowed } from '/js/swallowed.js';
 import { date as fmtDate } from '/js/format.js';
+import { Section, Columns, Stack, ListRow, Chip, Action, Text } from '/components/poster-parts.js';
 
 const html = htm.bind(h);
 
@@ -66,60 +71,56 @@ export default function TabContracts({ agent, agentName, showToast }) {
     finally { setBusy(''); }
   };
 
-  if (loading) return html`<div class="pf-agd-empty">${t('profile.loading') || 'Loading…'}</div>`;
+  if (loading) return html`<${Text} tone="muted">${t('profile.loading') || 'Loading…'}<//>`;
 
   const active = engagements.filter(e => e.state === 'active');
   const retired = engagements.filter(e => e.state === 'retired');
   const label = (e) => e.contract || (t('organisms.bareContract') || 'contract');
+  // The organism and the date are read as one sentence under the workspace's name.
+  const where = (e, date) => `${e.organismName || e.organism_id} · ${date}`;
 
   return html`
-    <div class="pf-agd-contracts pf-agd-card-grid">
-      <div class="pf-agd-card poster-row--thing">
-      <div class="pf-agd-section-title">${t('profile.agents.detail.contracts.offersTitle') || 'Contracts this agent offers'}</div>
-      <div class="section-desc">${t('profile.agents.detail.contracts.offersDesc') || 'The workspace contracts this agent advertises. Owners see these when choosing an agent for a workspace.'}</div>
-      <div class="agc-caps">
-        ${advertises || capabilities.length
-          ? (capabilities.length ? capabilities : ['']).map(c => html`<span class="badge badge-info pj-mini" key=${c}>${'📜 '}${c || (t('organisms.bareContract') || 'contract')}</span>`)
-          : html`<span class="pf-agd-empty">${t('profile.agents.detail.contracts.noOffers') || 'This agent advertises no workspace contract (add a workspace-contract + contract.<id> tag in Data Access).'}</span>`}
-      </div>
-      </div>
+    <${Stack}>
+      <${Columns} collapse=${900}>
+        <${Section} size="small" density="compact"
+          title=${t('profile.agents.detail.contracts.offersTitle') || 'Contracts this agent offers'}
+          description=${t('profile.agents.detail.contracts.offersDesc') || 'The workspace contracts this agent advertises. Owners see these when choosing an agent for a workspace.'}>
+          ${advertises || capabilities.length
+            ? html`<${Stack} direction="wrap" density="compact">
+                ${(capabilities.length ? capabilities : ['']).map(c => html`<${Chip} key=${c}>${c || (t('organisms.bareContract') || 'contract')}<//>`)}
+              <//>`
+            : html`<${Text} tone="muted">${t('profile.agents.detail.contracts.noOffers') || 'This agent advertises no workspace contract (add a workspace-contract + contract.<id> tag in Data Access).'}<//>`}
+        <//>
 
-      <div class="pf-agd-card poster-row--thing">
-      <div class="pf-agd-section-title">${t('profile.agents.detail.contracts.activeTitle') || 'Active in these workspaces'}</div>
-      ${active.length ? html`
-        <div class="agc-list">
-          ${active.map(e => html`
-            <div class="agc-row" key=${engKey(e)}>
-              <span class="agc-where">
-                <span class="badge badge-success pj-mini">${'✓ '}${label(e)}</span>
-                <strong>${e.wsName || e.ws}</strong>
-                <span class="agc-org">${e.organismName || e.organism_id}</span>
-                <span class="agc-since">${(t('profile.agents.detail.contracts.since') || 'since {d}').replace('{d}', fmtDay(e.adoptedAt))}</span>
-              </span>
-              <button class="btn-outline btn-sm" disabled=${busy === engKey(e)}
-                title=${t('organisms.retireHint') || 'Stop this agent from working in this workspace — its loop skips it and the chip becomes “retired”. Its past work stays as history.'}
-                onClick=${() => retire(e)}>${busy === engKey(e) ? '…' : (t('organisms.retire') || 'Retire')}</button>
-            </div>`)}
-        </div>`
-        : html`<div class="pf-agd-empty">${t('profile.agents.detail.contracts.noneActive') || 'Not active in any workspace yet. Owners adopt this agent from a workspace’s People panel.'}</div>`}
-      </div>
+        <${Section} size="small" density="compact"
+          title=${t('profile.agents.detail.contracts.activeTitle') || 'Active in these workspaces'}>
+          ${active.length ? html`
+            <div>
+              ${active.map(e => html`
+                <${ListRow} key=${engKey(e)} density="compact" detailKind="text"
+                  mark=${html`<${Chip} tone="sun">${'✓ '}${label(e)}<//>`}
+                  name=${e.wsName || e.ws}
+                  detail=${where(e, (t('profile.agents.detail.contracts.since') || 'since {d}').replace('{d}', fmtDay(e.adoptedAt)))}
+                  actions=${html`<${Action} kind="text" disabled=${busy === engKey(e)}
+                    title=${t('organisms.retireHint') || 'Stop this agent from working in this workspace — its loop skips it and the chip becomes “retired”. Its past work stays as history.'}
+                    onClick=${() => retire(e)}>${busy === engKey(e) ? '…' : (t('organisms.retire') || 'Retire')}<//>`} />`)}
+            </div>`
+            : html`<${Text} tone="muted">${t('profile.agents.detail.contracts.noneActive') || 'Not active in any workspace yet. Owners adopt this agent from a workspace’s People panel.'}<//>`}
+        <//>
+      <//>
 
       ${retired.length ? html`
-        <div class="pf-agd-card pf-agd-card--full poster-row--thing">
-        <div class="pf-agd-section-title">${t('profile.agents.detail.contracts.retiredTitle') || 'Retired (history)'}</div>
-        <div class="agc-list">
-          ${retired.map(e => html`
-            <div class="agc-row agc-row--retired" key=${engKey(e)}>
-              <span class="agc-where">
-                <span class="badge badge-muted pj-mini">${label(e)}</span>
-                <strong>${e.wsName || e.ws}</strong>
-                <span class="agc-org">${e.organismName || e.organism_id}</span>
-                <span class="agc-since">${(t('profile.agents.detail.contracts.until') || 'used here until {d}').replace('{d}', fmtDay(e.retiredAt))}</span>
-              </span>
-              <button class="btn-ghost btn-sm" disabled=${busy === engKey(e)}
-                onClick=${() => readopt(e)}>${busy === engKey(e) ? '…' : (t('organisms.reAdopt') || 'Re-adopt')}</button>
-            </div>`)}
-        </div>
-        </div>` : null}
-    </div>`;
+        <${Section} size="small" density="compact"
+          title=${t('profile.agents.detail.contracts.retiredTitle') || 'Retired (history)'}>
+          <div>
+            ${retired.map(e => html`
+              <${ListRow} key=${engKey(e)} density="compact" detailKind="text"
+                mark=${html`<${Chip} tone="muted">${label(e)}<//>`}
+                name=${e.wsName || e.ws}
+                detail=${where(e, (t('profile.agents.detail.contracts.until') || 'used here until {d}').replace('{d}', fmtDay(e.retiredAt)))}
+                actions=${html`<${Action} kind="text" disabled=${busy === engKey(e)}
+                  onClick=${() => readopt(e)}>${busy === engKey(e) ? '…' : (t('organisms.reAdopt') || 'Re-adopt')}<//>`} />`)}
+          </div>
+        <//>` : null}
+    <//>`;
 }

@@ -9,6 +9,10 @@
  *   - AgentServicesSubtab (default export) -- main component
  *   - ServiceCard -- individual service display card
  * @version-history
+ *   2026-09-22 -- Composed from the shared component set: the info note is an aside Surface, each
+ *     service a ListRow (description as its sentence, active/inactive as a Chip, Unpublish as a text
+ *     action, the cost/visibility/call figures as mono words under it). The status dot is gone, the
+ *     chip says the same. No class of its own is left. Same words, data and handlers.
  *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
  *   v1.1.0 -- 2026-05-24 -- Fix locale keys; add status dots and active/inactive labels
  *   v1.0.0 -- 2026-05-22 -- Initial creation for Agent Dashboard Phase 3
@@ -20,6 +24,7 @@ import { onLiveUpdate } from '/lib/live-updates.js';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { getAgentServices } from '/js/services/agent-services.js';
+import { ListRow, Chip, Action, Stack, Surface, Text } from '/components/poster-parts.js';
 
 function ServiceCard({ service, onUnpublish }) {
   const name = service.display_name || service.name || service.action_id || t('profile.agents.services.unnamed');
@@ -31,27 +36,21 @@ function ServiceCard({ service, onUnpublish }) {
   const successRate = service.success_rate != null ? `${Math.round(service.success_rate)}%` : null;
   const avgResponse = service.avg_response_ms != null ? `${Math.round(service.avg_response_ms)}ms` : null;
 
+  // The status dot and the status badge said the same thing; the chip carries it alone now.
   return html`
-    <div class="agd-service-card">
-      <div class="agd-service-name">
-        <span class="pf-agd-status-dot ${isActive ? 'pf-agd-status-dot--active' : 'pf-agd-status-dot--inactive'}"></span>
-        ${name}
-      </div>
-      ${desc && html`<div class="agd-service-desc">${desc}</div>`}
-      <div class="agd-service-meta">
-        <span>${cost}</span>
-        <span>${visibility}</span>
-        <span class="pf-agd-badge ${isActive ? 'pf-agd-badge--active' : 'pf-agd-badge--inactive'}">${isActive ? t('profile.agents.detail.services.active') : t('profile.agents.detail.services.inactive')}</span>
-        <span>${calls} ${t('profile.agents.services.calls')}</span>
-        ${successRate && html`<span>${successRate} ${t('profile.agents.activity.successRate')}</span>`}
-        ${avgResponse && html`<span>${avgResponse} ${t('profile.agents.services.avg')}</span>`}
-      </div>
-      <div class="agd-service-actions">
-        <button class="btn-ghost btn-sm" onClick=${() => onUnpublish(service)}>
-          ${t('profile.agents.services.unpublish')}
-        </button>
-      </div>
-    </div>
+    <${ListRow} density="compact" detailKind="text" name=${name} detail=${desc || undefined}
+      value=${html`<${Chip} tone=${isActive ? 'sun' : 'muted'}>${isActive ? t('profile.agents.detail.services.active') : t('profile.agents.detail.services.inactive')}<//>`}
+      actions=${html`<${Action} kind="text" onClick=${() => onUnpublish(service)}>
+        ${t('profile.agents.services.unpublish')}
+      <//>`}>
+      <${Stack} direction="wrap" density="compact">
+        <${Text} kind="mono" tone="muted">${cost}<//>
+        <${Text} kind="mono" tone="muted">${visibility}<//>
+        <${Text} kind="mono" tone="muted">${calls} ${t('profile.agents.services.calls')}<//>
+        ${successRate && html`<${Text} kind="mono" tone="muted">${successRate} ${t('profile.agents.activity.successRate')}<//>`}
+        ${avgResponse && html`<${Text} kind="mono" tone="muted">${avgResponse} ${t('profile.agents.services.avg')}<//>`}
+      <//>
+    <//>
   `;
 }
 
@@ -103,24 +102,24 @@ export default function AgentServicesSubtab({ agentName, session, showToast }) {
   }, [agentName]);
 
   if (loading) {
-    return html`<div class="agd-empty">${t('profile.loading')}</div>`;
+    return html`<${Text} tone="muted">${t('profile.loading')}<//>`;
   }
 
   return html`
-    <div>
-      <div class="agd-services-info poster-row--thing">
-        ${t('profile.agents.detail.services.info')}
-      </div>
+    <${Stack}>
+      <${Surface} kind="aside">
+        <${Text}>${t('profile.agents.detail.services.info')}<//>
+      <//>
 
       ${services.length === 0 && html`
-        <div class="agd-empty">${t('profile.agents.detail.empty.services')}</div>
+        <${Text} tone="muted">${t('profile.agents.detail.empty.services')}<//>
       `}
 
       ${services.length > 0 && html`
-        <div class="agd-services-list">
+        <div>
           ${services.map(s => html`<${ServiceCard} service=${s} key=${s.action_id || s.name} onUnpublish=${handleUnpublish} />`)}
         </div>
       `}
-    </div>
+    <//>
   `;
 }

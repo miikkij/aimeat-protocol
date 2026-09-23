@@ -6,9 +6,11 @@
  *   files, knowledge packages; own or external/read-only). Pointers ONLY: nothing is copied or moved.
  *   Attach via a picker with Memory / Storage / Knowledge tabs. Extracted from organisms-tab.js with
  *   no behaviour change.
- * @structure SRC_ICON (internal), SourcesPanel
+ * @structure SourcesPanel
  * @usage import { SourcesPanel } from '/views/profile/organisms/sources-panel.js';
  * @version-history
+ *   2026-09-22 -- Composed from the shared set (Section, ListRow, Chip, Field, tab Actions): no class of
+ *     its own; the source-kind emoji (SRC_ICON) are gone, the kind is its worded chip.
  *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
  *   v1.0.0 — 2026-06-19 — Extracted from organisms-tab.js during the module split.
  */
@@ -21,12 +23,10 @@ import { t } from '/js/i18n.js';
 import * as orgService from '/js/services/organisms.js';
 import * as memoryService from '/js/services/memory.js';
 import * as knowledgeService from '/js/services/knowledge.js';
-import { EmptyState } from '/components/EmptyState.js';
-import { SearchBar } from '/components/SearchBar.js';
+import { Section, Stack, Surface, ListRow, Chip, Action, Field, Text } from '/components/poster-parts.js';
 import { fmtBytes } from '/js/format.js';
 import { swallowed } from '/js/swallowed.js';
 
-const SRC_ICON = { memory: '🧠', storage: '📎', knowledge: '📚' };
 
 /* Sources: references the workspace draws on — memory entries, storage files, and knowledge
  * packages (own, or external/read-only). Pointers ONLY: nothing is copied or moved; the referenced
@@ -112,54 +112,48 @@ export function SourcesPanel({ orgId, wsId, showToast }) {
     else if (tab === 'storage') { label = item.key; meta = (item.mime_type || '') + ' · ' + fmtBytes(item.size || 0); }
     else { label = scope === 'mine' ? (item.value?.name || item.key) : (item.name || item.package_id); meta = (scope === 'mine' ? (item.value?.entries?.length || 0) : (item.entries_count || 0)) + ' ' + (t('organisms.entries') || 'entries'); }
     return html`
-      <div class="pj-src-result" key=${'r' + i}>
-        <span class="pj-src-result-label" title=${String(label)}>${(String(label))}</span>
-        <span class="pj-src-result-meta">${(String(meta))}</span>
-        <button class="btn-ghost btn-sm" disabled=${busy} onClick=${() => attach(item)}>${t('organisms.attach') || 'Attach'}</button>
-      </div>`;
+      <${ListRow} key=${'r' + i} density="compact" name=${html`<span title=${String(label)}>${String(label)}</span>`} detail=${String(meta)}
+        actions=${html`<${Action} disabled=${busy} onClick=${() => attach(item)}>${t('organisms.attach') || 'Attach'}<//>`} />`;
   };
 
   return html`
-    <div class="pj-section pj-sources poster-row--thing">
-      <div class="pj-section-head">
-        <span class="pj-section-title">${t('organisms.sources') || 'Sources'}<span class="pj-doc-tag">${sources.length}</span></span>
-        <button class="btn-outline btn-sm" onClick=${() => setPicking(p => !p)}>
-          ${picking ? (t('organisms.close') || 'Close') : ('+ ' + (t('organisms.addSource') || 'Add source'))}
-        </button>
-      </div>
-      <div class="section-desc pj-sources-desc">${t('organisms.sourcesDesc') || 'References this workspace draws on — memory, files, and knowledge packages. Pointers only; the originals stay where they live.'}</div>
+    <${Section} title=${t('organisms.sources') || 'Sources'} count=${sources.length} size="small" density="compact"
+      description=${t('organisms.sourcesDesc') || 'References this workspace draws on — memory, files, and knowledge packages. Pointers only; the originals stay where they live.'}
+      actions=${html`<${Action} kind="tab" selected=${picking} onClick=${() => setPicking(p => !p)}>
+        ${picking ? (t('organisms.close') || 'Close') : (t('organisms.addSource') || 'Add source')}
+      <//>`}>
+      <${Stack}>
+        ${picking ? html`
+          <${Surface} kind="box" density="compact">
+            <${Stack}>
+              <${Stack} direction="wrap" role="tablist" density="compact">
+                ${['memory', 'storage', 'knowledge'].map(tk => html`<${Action} kind="tab" semantics="tab" key=${tk} selected=${tab === tk} onClick=${() => setTab(tk)}>${t('organisms.src_' + tk) || tk}<//>`)}
+              <//>
+              <${Stack} direction="wrap" align="end">
+                ${tab !== 'storage' ? html`
+                  <${Stack} direction="horizontal" density="compact">
+                    <${Action} kind="tab" selected=${scope === 'mine'} onClick=${() => setScope('mine')}>${t('organisms.mine') || 'Mine'}<//>
+                    <${Action} kind="tab" selected=${scope === 'discover'} onClick=${() => setScope('discover')}>${t('organisms.discover') || 'Discover'}<//>
+                  <//>` : null}
+                <${Field} type="search" placeholder=${t('organisms.searchSources') || 'Search…'} value=${q} onInput=${e => setQ(e.target.value)}
+                  onKeyDown=${e => { if (e.key === 'Enter') doSearch(); }} />
+                <${Action} onClick=${doSearch} disabled=${loading}>${t('organisms.search') || 'Search'}<//>
+              <//>
+              ${loading ? html`<${Text} tone="muted">${t('organisms.loading') || 'Loading…'}<//>`
+                : results.length === 0 ? html`<${Text} tone="muted">${t('organisms.noResults') || 'No results'}<//>`
+                : html`<${Stack} density="compact">${results.slice(0, 100).map(resultRow)}<//>`}
+            <//>
+          <//>` : null}
 
-      ${picking ? html`
-        <div class="pj-src-picker">
-          <div class="seg" role="tablist">
-            ${['memory', 'storage', 'knowledge'].map(tk => html`<button class="seg-btn ${tab === tk ? 'active' : ''}" key=${tk} onClick=${() => setTab(tk)}>${SRC_ICON[tk]} ${t('organisms.src_' + tk) || tk}</button>`)}
-          </div>
-          <div class="pj-src-controls">
-            ${tab !== 'storage' ? html`
-              <div class="seg">
-                <button class="seg-btn ${scope === 'mine' ? 'active' : ''}" onClick=${() => setScope('mine')}>${t('organisms.mine') || 'Mine'}</button>
-                <button class="seg-btn ${scope === 'discover' ? 'active' : ''}" onClick=${() => setScope('discover')}>${t('organisms.discover') || 'Discover'}</button>
-              </div>` : null}
-            <div class="pj-src-search"><${SearchBar} value=${q} onInput=${e => setQ(e.target.value)} onSubmit=${() => doSearch()} placeholder=${t('organisms.searchSources') || 'Search…'} /></div>
-            <button class="btn-ghost btn-sm" onClick=${doSearch} disabled=${loading}>${t('organisms.search') || 'Search'}</button>
-          </div>
-          <div class="pj-src-results">
-            ${loading ? html`<${EmptyState} text=${t('organisms.loading') || 'Loading…'} />`
-              : results.length === 0 ? html`<${EmptyState} text=${t('organisms.noResults') || 'No results'} />`
-              : results.slice(0, 100).map(resultRow)}
-          </div>
-        </div>` : null}
-
-      ${sources.length === 0 ? html`<${EmptyState} text=${t('organisms.noSources') || 'No sources yet'} />`
-        : html`<div class="pj-src-list">
-          ${sources.map(s => html`
-            <div class="pj-src-item" key=${s.id}>
-              <span class="pj-src-icon">${SRC_ICON[s.type] || '•'}</span>
-              <span class="pj-src-label" title=${s.key || s.packageId || ''}>${(String(s.label || s.key || s.packageId || ''))}</span>
-              ${s.external ? html`<span class="badge badge-muted pj-mini">${t('organisms.external') || 'external'}</span>` : null}
-              <span class="badge badge-info pj-mini">${t('organisms.src_' + s.type) || s.type}</span>
-              <button class="pj-icon-btn" title=${t('organisms.remove') || 'Remove'} onClick=${() => removeSource(s.id)}>✕</button>
-            </div>`)}
-        </div>`}
-    </div>`;
+        ${sources.length === 0 ? html`<${Text} tone="muted">${t('organisms.noSources') || 'No sources yet'}<//>`
+          : html`<${Stack} density="compact">
+            ${sources.map(s => html`
+              <${ListRow} key=${s.id} density="compact" name=${html`<span title=${s.key || s.packageId || ''}>${String(s.label || s.key || s.packageId || '')}</span>`}
+                actions=${html`
+                  ${s.external ? html`<${Chip} tone="muted">${t('organisms.external') || 'external'}<//>` : null}
+                  <${Chip}>${t('organisms.src_' + s.type) || s.type}<//>
+                  <${Action} kind="text" onClick=${() => removeSource(s.id)}>${t('organisms.remove') || 'Remove'}<//>`} />`)}
+          <//>`}
+      <//>
+    <//>`;
 }

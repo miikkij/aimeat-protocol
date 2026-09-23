@@ -12,6 +12,9 @@
  * @structure renderDetail · limitsOf · runRows
  * @usage import { renderDetail } from './detail.js';
  * @version-history
+ *   2026-09-22 -- Composed from the shared component set (NumeralBand strip, Section, Fold,
+ *     KeyValue, ListRow timelines, Surface for the prompt); no own CSS. The cancel door is an
+ *     underlined word like the others: the set's danger tone exists only on the primary slab.
  *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   v1.0.0 — 2026-08-30 — Initial.
  */
@@ -21,12 +24,12 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { date as fmtDate } from '/js/format.js';
 import { formatRelativeTime } from '/views/profile/memory-tab/helpers.js';
-import { Section, Fold } from '/views/profile/organisms/poster-parts.js';
+import { Section, Fold, Stack, ListRow, KeyValue, NumeralBand, Action, Text, Surface } from '/components/poster-parts.js';
 import { formatUntil, scheduleIo, describeDispatch } from '../schedule-item.js';
 import { cronWordsFor, zoneOf } from './cron-words.js';
 import { kindOf, nameOf, dayLabel } from './model.js';
 import { ScheduleEditForm } from './edit-form.js';
-import { renderPage, whoRuns, resultWord, c, hhmm } from './frame.js';
+import { renderPage, whoRuns, resultWord, resultTone, chipRow, railList, c, hhmm } from './frame.js';
 
 function limitsOf(s) {
   const out = [];
@@ -39,16 +42,15 @@ function limitsOf(s) {
 }
 
 function runRows(runs) {
-  return html`<div class="sc-agenda sc-agenda--runs">
-    ${runs.map((r, i) => { const d = new Date(r.createdAt); return html`
-      <div class="sc-at poster-stat-number poster-stat-number--small" key=${'a' + i}>${hhmm(d)}<small>${dayLabel(d)}</small></div>
-      <div class="sc-nm sc-nm--run" key=${'n' + i}>
-        <b class=${`sc-res sc-res--${r.result}`}>${resultWord(r.result)}</b> · ${c('trigger.' + (r.trigger || 'cron'))}${r.durationMs ? ` · ${(r.durationMs / 1000).toFixed(1)} s` : ''}
-        ${r.errorMessage ? html`<small class="sc-err">${r.errorMessage}</small>` : null}
-      </div>
-      <div class="sc-who" key=${'w' + i}>${(r.memoryWrites || []).length ? html`${c('wroteTo')} ${r.memoryWrites.join(', ')}` : (r.taskId ? c('taskCreated') : '')}</div>
-      <div class="sc-in" key=${'i' + i}></div>`; })}
-  </div>`;
+  return runs.map((r, i) => {
+    const d = new Date(r.createdAt);
+    const wrote = (r.memoryWrites || []).length ? `${c('wroteTo')} ${r.memoryWrites.join(', ')}` : (r.taskId ? c('taskCreated') : '');
+    return html`<${ListRow} key=${i} density="compact" time=${`${hhmm(d)} ${dayLabel(d)}`} marker=${resultTone(r.result)}
+      name=${`${resultWord(r.result)} · ${c('trigger.' + (r.trigger || 'cron'))}${r.durationMs ? ` · ${(r.durationMs / 1000).toFixed(1)} s` : ''}`}
+      detail=${wrote || undefined}>
+      ${r.errorMessage ? html`<${Text} kind="caption" tone="danger">${r.errorMessage}<//>` : null}
+    <//>`;
+  });
 }
 
 export function renderDetail(ctx, s) {
@@ -63,66 +65,70 @@ export function renderDetail(ctx, s) {
   const sameAgent = s.agentName ? m.all.filter(x => x.id !== s.id && x.agentName === s.agentName) : [];
   const runs = ctx.detail?.id === s.id ? (ctx.detail.runs || []) : [];
 
-  const chips = html`
-    <span class=${`og-chip ${s.enabled === false ? 'og-chip--dim' : 'og-chip--sun'}`}>${s.enabled === false ? t('profile.scheduler.paused') : c('status.running')}</span>
-    <span class="og-chip">${cronWordsFor(s)}</span>
-    ${/* The effective zone, so a schedule that never named one still says which clock its hour
-          belongs to. It was `s.timezone` alone, which is null for anything created without the
-          field and left the chip off exactly where it was most needed. */''}
-    ${zoneOf(s) ? html`<span class="og-chip og-chip--dim sc-chip--mono">${zoneOf(s)}</span>` : null}
-    <span class="og-chip og-chip--dim sc-chip--mono">${s.cron}</span>
-    <span class="og-chip">${whoRuns(s)}</span>
-    ${s.createdByAgent ? html`<span class="og-chip og-chip--coral">${t('profile.scheduler.byAgent')}</span>` : null}`;
+  // The effective zone, so a schedule that never named one still says which clock its hour
+  // belongs to. It was `s.timezone` alone, which is null for anything created without the field
+  // and left the chip off exactly where it was most needed.
+  const chips = chipRow([
+    [s.enabled === false ? t('profile.scheduler.paused') : c('status.running'), s.enabled === false ? 'muted' : 'sun'],
+    [cronWordsFor(s)],
+    zoneOf(s) && [zoneOf(s), 'muted'],
+    [s.cron, 'muted'],
+    [whoRuns(s)],
+    s.createdByAgent && [t('profile.scheduler.byAgent'), 'sun'],
+  ]);
 
   const doors = s.readOnly ? null : html`
-    <button type="button" class="og-slab" disabled=${busy} onClick=${() => ctx.onTrigger(s)}>${t('profile.scheduler.runNow')}</button>
-    <button type="button" class="og-door" disabled=${busy} onClick=${() => ctx.onToggle(s)}>${s.enabled === false ? t('profile.scheduler.resume') : t('profile.scheduler.pause')}</button>
-    <button type="button" class="og-door" onClick=${() => ctx.setEditOpen(v => !v)}>${t('profile.scheduler.edit')}</button>
-    <button type="button" class="og-door og-door--danger" disabled=${busy} onClick=${() => ctx.onCancel(s)}>${t('profile.scheduler.cancel')}</button>`;
+    <${Action} kind="primary" disabled=${busy} onClick=${() => ctx.onTrigger(s)}>${t('profile.scheduler.runNow')}<//>
+    <${Action} disabled=${busy} onClick=${() => ctx.onToggle(s)}>${s.enabled === false ? t('profile.scheduler.resume') : t('profile.scheduler.pause')}<//>
+    <${Action} onClick=${() => ctx.setEditOpen(v => !v)}>${t('profile.scheduler.edit')}<//>
+    <${Action} disabled=${busy} onClick=${() => ctx.onCancel(s)}>${t('profile.scheduler.cancel')}<//>`;
 
-  const strip = html`
-    <div class="og-strip">
-      <div>${s.lastRunAt
-        ? html`<b class=${`og-strip-coral sc-res--${s.lastRunResult || 'success'}`}>${resultWord(s.lastRunResult || 'success')}</b><span>${c('stripLast')}</span><small>${formatRelativeTime(s.lastRunAt)} · ${dayLabel(new Date(s.lastRunAt))} ${hhmm(new Date(s.lastRunAt))}${s.lastRunError ? ` · ${s.lastRunError}` : ''}</small>`
-        : html`<b>·</b><span>${c('stripLast')}</span><small>${t('profile.scheduler.never')}</small>`}</div>
-      <div>${s.enabled === false
-        ? html`<b>·</b><span>${c('stripNextRun')}</span><small>${t('profile.scheduler.paused')}</small>`
-        : html`<b>${formatUntil(s.nextRunAt)}</b><span>${c('stripNextRun')}</span><small>${s.nextRunAt ? `${dayLabel(new Date(s.nextRunAt))} ${hhmm(new Date(s.nextRunAt))}` : ''}</small>`}</div>
-      <div><b>${s.runCount ?? 0}</b><span>${c('stripRuns')}</span><small>${s.createdAt ? c('sinceDate', { d: fmtDate(s.createdAt) }) : ''}</small></div>
-      <div><b class="og-strip-coral">${s.createdByAgent ? (s.agentName || t('profile.scheduler.byAgent')) : c('byYou')}</b><span>${c('stripCreator')}</span><small>${s.createdAt ? fmtDate(s.createdAt) : ''}</small></div>
-    </div>`;
+  const strip = html`<${NumeralBand} tone="plain" items=${[
+    s.lastRunAt ? { label: c('stripLast'), value: resultWord(s.lastRunResult || 'success'), tone: 'coral',
+      note: `${formatRelativeTime(s.lastRunAt)} · ${dayLabel(new Date(s.lastRunAt))} ${hhmm(new Date(s.lastRunAt))}${s.lastRunError ? ` · ${s.lastRunError}` : ''}` }
+      : { label: c('stripLast'), value: '·', note: t('profile.scheduler.never') },
+    s.enabled === false ? { label: c('stripNextRun'), value: '·', note: t('profile.scheduler.paused') }
+      : { label: c('stripNextRun'), value: formatUntil(s.nextRunAt), note: s.nextRunAt ? `${dayLabel(new Date(s.nextRunAt))} ${hhmm(new Date(s.nextRunAt))}` : undefined },
+    { label: c('stripRuns'), value: s.runCount ?? 0, note: s.createdAt ? c('sinceDate', { d: fmtDate(s.createdAt) }) : undefined },
+    { label: c('stripCreator'), value: s.createdByAgent ? (s.agentName || t('profile.scheduler.byAgent')) : c('byYou'), note: s.createdAt ? fmtDate(s.createdAt) : undefined, tone: 'coral' },
+  ]} />`;
 
   const rail = html`
-    ${sameTime.length ? html`<hr /><span class="og-rail-label">${c('railSameTime')}</span>
-      ${sameTime.map(r => html`<button type="button" class="og-rail-link" key=${r.s.id} onClick=${() => ctx.pickView({ kind: 'detail', id: r.s.id })}><i>${r.times[0]}</i>${nameOf(r.s)}</button>`)}` : null}
-    ${sameAgent.length ? html`<hr /><span class="og-rail-label">${c('railSameCreator', { a: s.agentName })}</span>
-      ${sameAgent.slice(0, 5).map(x => html`<button type="button" class="og-rail-link" key=${x.id} onClick=${() => ctx.pickView({ kind: 'detail', id: x.id })}><i>→</i>${nameOf(x)}</button>`)}
-      ${sameAgent.length > 5 ? html`<span class="og-rail-link"><i>·</i>${c('moreN', { n: sameAgent.length - 5 })}</span>` : null}` : null}`;
+    ${sameTime.length ? railList(c('railSameTime'), sameTime.map(r => ({ key: r.s.id, label: `${r.times[0]} · ${nameOf(r.s)}`, onClick: () => ctx.pickView({ kind: 'detail', id: r.s.id }) }))) : null}
+    ${sameAgent.length ? railList(c('railSameCreator', { a: s.agentName }), [
+      ...sameAgent.slice(0, 5).map(x => ({ key: x.id, label: nameOf(x), onClick: () => ctx.pickView({ kind: 'detail', id: x.id }) })),
+      ...(sameAgent.length > 5 ? [{ key: 'more', label: c('moreN', { n: sameAgent.length - 5 }) }] : []),
+    ]) : null}`;
 
   const whatLabel = kind === 'ai' ? c('promptLabel') : kind === 'agent' ? c('taskLabel') : kind === 'ext' ? c('actionLabel') : c('secWhat');
 
   return renderPage(ctx, {
     id: 'detail', crumbs: [nameOf(s)], title: nameOf(s), chips, doors, strip, rail,
     children: html`
-      <${Section} id="sc-what" num="01" title=${c('secWhat')} first=${true}>
-        ${d.title || d.body ? html`<div class="sc-prompt"><span class="og-label">${whatLabel}</span>${d.title ? html`<div class="sc-prompt-title">${d.title}</div>` : null}${d.body ? html`<div class="sc-prompt-body">${d.body}</div>` : null}</div>` : null}
-        <div class="sc-kv">
-          ${io ? html`<div class="k">${t('profile.scheduler.reads')}</div><div><code>${io.reads}</code></div><div class="k">${t('profile.scheduler.writes')}</div><div><code>${io.writes}</code></div>` : null}
-          ${s.purpose ? html`<div class="k">${c('kPurpose')}</div><div>${s.purpose}</div>` : null}
-          ${s.readOnly ? null : html`<div class="k">${t('profile.scheduler.constraints')}</div><div>${limitsOf(s)}</div>`}
-          ${s.agentName ? html`<div class="k">${t('profile.scheduler.col.agent')}</div><div>${s.agentName}</div>` : null}
-          ${s.readOnly ? html`<div class="k">${t('profile.scheduler.col.extension')}</div><div>${s.extensionName}${s.actionId ? ` / ${s.actionId}` : ''} · ${c('readOnlyNote')}</div>` : null}
-        </div>
+      <${Section} id="sc-what" title=${c('secWhat')}>
+        <${Stack}>
+          ${d.title || d.body ? html`<${Surface} kind="box"><${Stack} density="compact">
+            <${Text} kind="label">${whatLabel}<//>
+            ${d.title ? html`<${Text} kind="heading">${d.title}<//>` : null}
+            ${d.body ? html`<${Text}>${d.body}<//>` : null}
+          <//><//>` : null}
+          <${Stack} density="compact">
+            ${io ? html`<${KeyValue} label=${t('profile.scheduler.reads')} value=${io.reads} mono=${true} /><${KeyValue} label=${t('profile.scheduler.writes')} value=${io.writes} mono=${true} />` : null}
+            ${s.purpose ? html`<${KeyValue} label=${c('kPurpose')} value=${s.purpose} />` : null}
+            ${s.readOnly ? null : html`<${KeyValue} label=${t('profile.scheduler.constraints')} value=${limitsOf(s)} />`}
+            ${s.agentName ? html`<${KeyValue} label=${t('profile.scheduler.col.agent')} value=${s.agentName} />` : null}
+            ${s.readOnly ? html`<${KeyValue} label=${t('profile.scheduler.col.extension')} value=${`${s.extensionName}${s.actionId ? ` / ${s.actionId}` : ''} · ${c('readOnlyNote')}`} />` : null}
+          <//>
+        <//>
       <//>
-      <${Section} id="sc-runs" num="02" title=${c('secRuns')} count=${runs.length || null}>
-        ${runs.length ? runRows(runs) : html`<p class="og-empty">${ctx.detail?.loading ? t('profile.scheduler.cal.loading') : c('noRuns')}</p>`}
+      <${Section} id="sc-runs" title=${c('secRuns')} count=${runs.length || null}>
+        ${runs.length ? runRows(runs) : html`<${Text} tone="muted">${ctx.detail?.loading ? t('profile.scheduler.cal.loading') : c('noRuns')}<//>`}
       <//>
-      <${Section} id="sc-coming" num="03" title=${c('secComing')}>
-        ${coming.length ? html`<div class="sc-agenda sc-agenda--coming">
-          ${coming.map((o, i) => html`<div class="sc-at poster-stat-number poster-stat-number--small" key=${'a' + i}>${hhmm(o.at)}<small>${dayLabel(o.at)}</small></div><div class="sc-who" key=${'w' + i}>${zoneOf(s)}</div>`)}
-        </div>` : html`<p class="og-empty">${s.enabled === false ? t('profile.scheduler.paused') : (s.nextRunAt ? `${dayLabel(new Date(s.nextRunAt))} ${hhmm(new Date(s.nextRunAt))}` : c('noneNext'))}</p>`}
+      <${Section} id="sc-coming" title=${c('secComing')}>
+        ${coming.length ? coming.map((o, i) => html`<${ListRow} key=${i} density="compact" time=${`${hhmm(o.at)} ${dayLabel(o.at)}`} name=${zoneOf(s)} />`)
+          : html`<${Text} tone="muted">${s.enabled === false ? t('profile.scheduler.paused') : (s.nextRunAt ? `${dayLabel(new Date(s.nextRunAt))} ${hhmm(new Date(s.nextRunAt))}` : c('noneNext'))}<//>`}
       <//>
-      ${s.readOnly ? null : html`<${Fold} id="sc-edit" num="04" title=${t('profile.scheduler.edit')} sub=${c('editSub')} open=${ctx.editOpen} onToggle=${() => ctx.setEditOpen(v => !v)}>
+      ${s.readOnly ? null : html`<${Fold} id="sc-edit" number="04" title=${t('profile.scheduler.edit')} sub=${c('editSub')} open=${ctx.editOpen} onToggle=${() => ctx.setEditOpen(v => !v)}>
         <${ScheduleEditForm} schedule=${s} showToast=${ctx.showToast} onSaved=${() => { ctx.setEditOpen(false); ctx.loadData(); }} onClose=${() => ctx.setEditOpen(false)} />
       <//>`}`,
   });

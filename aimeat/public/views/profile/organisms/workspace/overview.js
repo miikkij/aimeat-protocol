@@ -9,6 +9,8 @@
  * @structure gotoEvent, openOvRec, gotoHit, renderWsSearchResults, openOvDoc, ovAddNew, renderObjectives
  * @usage import { gotoEvent, renderObjectives } from '/views/profile/organisms/workspace/overview.js';
  * @version-history
+ *   v2.1.0 -- 2026-09-22 -- Composed from the shared set (Section, ListRow, KeyValue, Chip): no class of
+ *     its own; a KPI's met and off marks are ✓ and ✗ instead of emoji.
  *   v2.0.0 — 2026-08-29 — renderOverview, renderOvSection and the mobile inline document removed with
  *     the tab block; a document opens on its space page on every screen size.
  *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 3: the AI-transparency chip on every record and document
@@ -21,8 +23,7 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { Spinner } from '/views/profile/shared.js';
-import { EmptyState } from '/components/EmptyState.js';
+import { Section, Stack, ListRow, KeyValue, Chip, Text } from '/components/poster-parts.js';
 import * as orgService from '/js/services/organisms.js';
 import { cap, kpiMeets, kpiTargetText } from './helpers.js';
 
@@ -51,21 +52,17 @@ export function gotoHit(ctx, hit) {
 }
 export function renderWsSearchResults(ctx) {
   const { wsSearching, wsHits, wsT } = ctx;
-  if (wsSearching && !wsHits) return html`<${Spinner} text=${t('organisms.loading') || 'Loading...'} />`;
-  if (!wsHits || !wsHits.length) return html`<${EmptyState} text=${t('search.noMatches') || 'No matches'} />`;
+  if (wsSearching && !wsHits) return html`<${Text} tone="muted">${t('organisms.loading') || 'Loading...'}<//>`;
+  if (!wsHits || !wsHits.length) return html`<${Text} tone="muted">${t('search.noMatches') || 'No matches'}<//>`;
   const bySpace = {};
   for (const h of wsHits) (bySpace[h.space] = bySpace[h.space] || []).push(h);
-  return html`<div class="pj-search-results">
+  return html`<${Stack}>
     ${Object.entries(bySpace).map(([space, hits]) => html`
-      <div class="pj-search-group" key=${space}>
-        <div class="pj-search-group-head">${cap(wsT('type.' + space) || space)}<span class="pj-org-tab-count">${hits.length}</span></div>
-        ${hits.map(h => html`
-          <button class="pj-search-hit" key=${h.id} onClick=${() => gotoHit(ctx, h)}>
-            <span class="pj-search-hit-title">${h.title}</span>
-            <span class="pj-search-hit-snippet">${h.snippet}</span>
-          </button>`)}
-      </div>`)}
-  </div>`;
+      <${Section} key=${space} title=${cap(wsT('type.' + space) || space)} count=${hits.length} size="small" density="compact">
+        <${Stack} density="compact">${hits.map(h => html`
+          <${ListRow} key=${h.id} density="compact" preview=${true} onOpen=${() => gotoHit(ctx, h)} name=${h.title} detail=${h.snippet} />`)}<//>
+      <//>`)}
+  <//>`;
 }
 // A document opens on its space page.
 export function openOvDoc(ctx, ot, d) {
@@ -82,32 +79,26 @@ export function ovAddNew(ctx, ot, docMode) {
 export function renderObjectives(ctx) {
   const { wsObjectives } = ctx;
   return html`
-    <div class="pj-obj">
-      <div class="pj-obj-title">${t('organisms.objectivesTitle') || 'Objectives'}</div>
-      ${wsObjectives.map((o, oi) => html`
-        <div class="pj-obj-card" key=${o.id || oi}>
-          <div class="pj-obj-statement">
-            ${(o.statement || o.id)}
-            ${o.status === 'met' ? html`<span class="badge badge-success pj-obj-status">${t('organisms.objStatusMet') || 'met'}</span>` : null}
-            ${o.status === 'abandoned' ? html`<span class="badge pj-obj-status">${t('organisms.objStatusAbandoned') || 'abandoned'}</span>` : null}
-          </div>
-          ${o.why ? html`<div class="pj-obj-why">${(o.why)}</div>` : null}
-          ${(o.kpis && o.kpis.length) ? html`
-            <div class="pj-obj-kpis">
+    <${Section} title=${t('organisms.objectivesTitle') || 'Objectives'} count=${wsObjectives.length} size="small" density="compact">
+      <${Stack} density="compact">
+        ${wsObjectives.map((o, oi) => html`
+          <${ListRow} key=${o.id || oi} density="compact" detailKind="text" name=${o.statement || o.id} detail=${o.why || undefined}
+            actions=${o.status === 'met' ? html`<${Chip} tone="sun">${t('organisms.objStatusMet') || 'met'}<//>`
+              : o.status === 'abandoned' ? html`<${Chip} tone="muted">${t('organisms.objStatusAbandoned') || 'abandoned'}<//>` : null}>
+            ${(o.kpis && o.kpis.length) ? html`<${Stack} density="compact">
               ${o.kpis.map((k, ki) => {
                 const ok = kpiMeets(k.current, k.target);
                 const tgt = kpiTargetText(k.target);
                 const unit = k.unit ? ` ${k.unit}` : '';
                 const val = (k.current === null || k.current === undefined) ? '—' : String(k.current);
-                return html`
-                  <div class="pj-obj-kpi ${ok === true ? 'met' : ok === false ? 'off' : ''}" key=${k.name || ki}>
-                    <span class="pj-obj-kpi-name">${k.name}</span>
-                    <span class="pj-obj-kpi-val">${val}${unit}${ok === true ? ' ✅' : ok === false ? ' ⚠️' : ''}</span>
-                    ${tgt ? html`<span class="pj-obj-kpi-target">${(t('organisms.kpiTarget') || 'target {t}').replace('{t}', tgt)}</span>` : null}
-                    ${k.computed === false ? html`<span class="pj-obj-kpi-declared" title=${t('organisms.kpiDeclaredHint') || 'Self-reported — not computed from records'}>${t('organisms.kpiDeclared') || 'self-reported'}</span>` : null}
-                  </div>`;
+                return html`<${KeyValue} key=${k.name || ki} label=${k.name} value=${html`<${Stack} direction="wrap" density="compact" align="center">
+                  <${Text} kind="mono" tone=${ok === true ? 'success' : ok === false ? 'danger' : 'plain'}>${val}${unit}${ok === true ? ' ✓' : ok === false ? ' ✗' : ''}<//>
+                  ${tgt ? html`<${Text} kind="caption" tone="muted">${(t('organisms.kpiTarget') || 'target {t}').replace('{t}', tgt)}<//>` : null}
+                  ${k.computed === false ? html`<${Chip} tone="muted" title=${t('organisms.kpiDeclaredHint') || 'Self-reported — not computed from records'}>${t('organisms.kpiDeclared') || 'self-reported'}<//>` : null}
+                <//>`} />`;
               })}
-            </div>` : null}
-        </div>`)}
-    </div>`;
+            <//>` : null}
+          <//>`)}
+      <//>
+    <//>`;
 }

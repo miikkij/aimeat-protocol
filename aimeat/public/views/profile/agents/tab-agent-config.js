@@ -6,6 +6,8 @@
  *   and two-way sync. Shows files pushed by the agent (soul.md, AGENTS.md, etc).
  *   Supports edit, copy, download, and upload actions.
  * @version-history
+ *   2026-09-22 -- Composed from the shared parts (Section, ListRow, Field, Action, Surface, Text); it no
+ *     longer borrows the scheduler's and projects' classes. The danger zone keeps its typed-name gate.
  *   2026-09-20 -- The agent's AI section (agent-ai-section.js): its own keys, cap, gate and numbers.
  *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
  *   v1.0.0 -- 2026-05-24 -- Initial creation for Agent Detail Tab-View
@@ -33,6 +35,7 @@ import { apiGet, apiPut, apiPatch } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
 import { date as fmtDate } from '/js/format.js';
 import { AgentAiSection } from './agent-ai-section.js';
+import { Section, Stack, Columns, ListRow, Chip, Field, Action, Surface, Text } from '/components/poster-parts.js';
 
 const html = htm.bind(h);
 
@@ -59,28 +62,28 @@ function ScheduleBudgetSection({ agent, agentName, showToast }) {
     finally { setSaving(false); }
   };
 
+  // Each guard is a switch and its number. The number field has no label of its own: the switch's
+  // words name both, as the one label around them did before.
   return html`
-    <div class="sch-form sch-budget-section poster-row--thing">
-      <div class="pf-agd-section-title">${t('profile.scheduler.budgetTitle')}</div>
-      <div class="section-desc">${t('profile.scheduler.budgetDesc')}</div>
-      <div class="sch-constraints">
-        <label class="sch-check">
-          <input type="checkbox" checked=${maxRuns.enabled} onChange=${e => setMaxRuns(s => ({ ...s, enabled: e.target.checked }))} />
-          ${t('profile.scheduler.maxRuns')}
-          <input type="number" min="1" value=${maxRuns.limit} disabled=${!maxRuns.enabled}
-            onInput=${e => setMaxRuns(s => ({ ...s, limit: e.target.value }))} class="sch-num" />
-        </label>
-        <label class="sch-check">
-          <input type="checkbox" checked=${dailyLimit.enabled} onChange=${e => setDailyLimit(s => ({ ...s, enabled: e.target.checked }))} />
-          ${t('profile.scheduler.dailyLimit')}
-          <input type="number" min="0" step="0.1" value=${dailyLimit.limit} disabled=${!dailyLimit.enabled}
-            onInput=${e => setDailyLimit(s => ({ ...s, limit: e.target.value }))} class="sch-num" />
-        </label>
-      </div>
-      <div class="sch-form-actions">
-        <button class="btn-primary btn-sm" disabled=${saving} onClick=${save}>${saving ? t('profile.scheduler.saving') : t('profile.scheduler.budgetSave')}</button>
-      </div>
-    </div>`;
+    <${Section} size="small" density="compact" title=${t('profile.scheduler.budgetTitle')} description=${t('profile.scheduler.budgetDesc')}>
+      <${Stack} density="compact">
+        <${Columns} layout="leading" density="compact" collapse="560">
+          <${Field} type="checkbox" label=${t('profile.scheduler.maxRuns')} value=${maxRuns.enabled}
+            onChange=${e => setMaxRuns(s => ({ ...s, enabled: e.target.checked }))} />
+          <${Field} type="number" min="1" value=${maxRuns.limit} disabled=${!maxRuns.enabled}
+            onInput=${e => setMaxRuns(s => ({ ...s, limit: e.target.value }))} />
+        <//>
+        <${Columns} layout="leading" density="compact" collapse="560">
+          <${Field} type="checkbox" label=${t('profile.scheduler.dailyLimit')} value=${dailyLimit.enabled}
+            onChange=${e => setDailyLimit(s => ({ ...s, enabled: e.target.checked }))} />
+          <${Field} type="number" min="0" step="0.1" value=${dailyLimit.limit} disabled=${!dailyLimit.enabled}
+            onInput=${e => setDailyLimit(s => ({ ...s, limit: e.target.value }))} />
+        <//>
+        <${Stack} direction="horizontal" density="compact">
+          <${Action} disabled=${saving} onClick=${save}>${saving ? t('profile.scheduler.saving') : t('profile.scheduler.budgetSave')}<//>
+        <//>
+      <//>
+    <//>`;
 }
 
 /** Danger zone — deleting the agent lives HERE (not on every tab's footer): a red-bordered box
@@ -90,23 +93,25 @@ function AgentDangerZone({ agent, agentName, onDeleteClick }) {
   const [typed, setTyped] = useState('');
   if (!onDeleteClick) return null;
   return html`
-    <div class="pj-danger pj-danger-box">
-      <div class="pj-danger-row">
-        <div class="pj-danger-text">
-          <div class="pj-danger-title">${t('profile.agents.detail.agent_config.deleteTitle') || 'Delete this agent'}</div>
-          <div class="pj-danger-sub">${t('profile.agents.detail.agent_config.deleteDesc') || 'Removes the agent, its credentials and its task history. This cannot be undone.'}</div>
-        </div>
-        <button class="btn-danger btn-sm" onClick=${() => { setOpen(o => !o); setTyped(''); }}>${t('profile.agents.deleteAgent')}…</button>
-      </div>
-      ${open && html`
-        <div class="pj-danger-confirm">
-          <label class="pj-field"><span>${(t('profile.agents.detail.agent_config.deleteConfirmLabel') || 'Type the agent’s name to confirm') + ': ' + agentName}</span>
-            <input type="text" class="input-field input-sm" value=${typed} onInput=${(e) => setTyped(e.target.value)} placeholder=${agentName} /></label>
-          <button class="btn-danger btn-sm" disabled=${typed.trim() !== agentName}
-            onClick=${() => onDeleteClick(agent.name)}>${t('profile.agents.deleteAgent')}</button>
-        </div>
-      `}
-    </div>`;
+    <${Surface} kind="aside" tone="danger" density="compact">
+      <${Stack} density="compact">
+        <${Stack} direction="wrap" align="between" density="compact">
+          <${Stack} density="compact">
+            <${Text} tone="danger"><strong>${t('profile.agents.detail.agent_config.deleteTitle') || 'Delete this agent'}</strong><//>
+            <${Text} tone="muted">${t('profile.agents.detail.agent_config.deleteDesc') || 'Removes the agent, its credentials and its task history. This cannot be undone.'}<//>
+          <//>
+          <${Action} expanded=${open} onClick=${() => { setOpen(o => !o); setTyped(''); }}>${t('profile.agents.deleteAgent')}…<//>
+        <//>
+        ${open && html`
+          <${Stack} direction="wrap" align="end" density="compact">
+            <${Field} label=${(t('profile.agents.detail.agent_config.deleteConfirmLabel') || 'Type the agent’s name to confirm') + ': ' + agentName}
+              value=${typed} onInput=${(e) => setTyped(e.target.value)} placeholder=${agentName} />
+            <${Action} kind="primary" tone="danger" disabled=${typed.trim() !== agentName}
+              onClick=${() => onDeleteClick(agent.name)}>${t('profile.agents.deleteAgent')}<//>
+          <//>
+        `}
+      <//>
+    <//>`;
 }
 
 export default function TabAgentConfig({ agent, agentName, showToast, onDeleteClick }) {
@@ -227,73 +232,66 @@ export default function TabAgentConfig({ agent, agentName, showToast, onDeleteCl
   }
 
   if (loading) {
-    return html`<div class="pf-agd-empty">${t('profile.loading')}</div>`;
+    return html`<${Text} tone="muted">${t('profile.loading')}<//>`;
   }
+
+  const upload = html`
+    <${Stack} direction="horizontal" density="compact">
+      <${Action} onClick=${handleUploadClick}>${t('profile.agents.detail.agent_config.upload')}<//>
+      <input ref=${fileInputRef} type="file" accept=".md,.yaml,.yml,.json" hidden onChange=${handleFileUpload} />
+    <//>`;
 
   if (files.length === 0) {
     return html`
-      <div>
+      <${Stack}>
         <${ScheduleBudgetSection} agent=${agent} agentName=${agentName} showToast=${showToast} />
         <${AgentAiSection} agentName=${agentName} showToast=${showToast} />
-        <div class="pf-agd-config-upload">
-          <button class="btn-outline btn-sm" onClick=${handleUploadClick}>+ ${t('profile.agents.detail.agent_config.upload')}</button>
-          <input ref=${fileInputRef} type="file" accept=".md,.yaml,.yml,.json" class="pf-agd-hidden-input" onChange=${handleFileUpload} />
-        </div>
-        <div class="pf-agd-empty">${t('profile.agents.detail.empty.agent_config')}</div>
+        ${upload}
+        <${Text} tone="muted">${t('profile.agents.detail.empty.agent_config')}<//>
         <${AgentDangerZone} agent=${agent} agentName=${agentName} onDeleteClick=${onDeleteClick} />
-      </div>
+      <//>
     `;
   }
 
   return html`
-    <div>
+    <${Stack}>
       <${ScheduleBudgetSection} agent=${agent} agentName=${agentName} showToast=${showToast} />
       <${AgentAiSection} agentName=${agentName} showToast=${showToast} />
-      <div class="pf-agd-config-upload">
-        <button class="btn-outline btn-sm" onClick=${handleUploadClick}>+ ${t('profile.agents.detail.agent_config.upload')}</button>
-        <input ref=${fileInputRef} type="file" accept=".md,.yaml,.yml,.json" class="pf-agd-hidden-input" onChange=${handleFileUpload} />
-      </div>
+      ${upload}
 
-      <div class="pf-agd-config-list">
+      <${Stack} density="compact">
         ${files.map(file => html`
-          <div key=${file.key}
-               class="pf-agd-config-item ${selectedFile === file.key ? 'pf-agd-config-item--active' : ''}"
-               onClick=${() => selectFile(file)}>
-            ${file.active !== false && html`<span class="pf-agd-status-dot pf-agd-status-dot--active"></span>`}
-            <span class="pf-agd-config-name">${file.filename}</span>
-            ${file.description && html`<span class="pf-agd-config-desc">${file.description}</span>`}
-            ${!file.description && html`<span class="pf-agd-config-desc">${file.updatedAt ? `${t('profile.agents.tasks.updated')}: ${fmtDate(file.updatedAt)}` : ''}</span>`}
-            ${file.platform && html`<span class="pf-agd-config-platform">${file.platform}</span>`}
-          </div>
+          <${ListRow} key=${file.key} density="compact" selected=${selectedFile === file.key}
+            marker=${file.active !== false ? 'success' : 'muted'}
+            name=${file.filename} onOpen=${() => selectFile(file)}
+            detail=${file.description || (file.updatedAt ? `${t('profile.agents.tasks.updated')}: ${fmtDate(file.updatedAt)}` : '')}
+            detailKind=${file.description ? 'text' : 'mono'}
+            value=${file.platform ? html`<${Chip}>${file.platform}<//>` : null} />
         `)}
-      </div>
+      <//>
 
       ${selectedFile && html`
-        <div>
-          <div class="pf-agd-config-preview-header">
-            <span>${t('profile.agents.detail.agent_config.viewing')}: ${files.find(f => f.key === selectedFile)?.filename || ''}</span>
-            <div class="pf-agd-config-actions">
-              ${!editing && html`
-                <button class="btn-outline btn-sm" onClick=${handleEdit}>${t('profile.agents.detail.agent_config.edit')}</button>
-                <button class="btn-outline btn-sm" onClick=${handleCopy}>${t('common.copy')}</button>
-                <button class="btn-outline btn-sm" onClick=${handleDownload}>${t('profile.agents.detail.agent_config.download')}</button>
-              `}
-            </div>
-          </div>
+        <${Section} size="small" density="compact"
+          title=${`${t('profile.agents.detail.agent_config.viewing')}: ${files.find(f => f.key === selectedFile)?.filename || ''}`}
+          actions=${!editing && html`
+            <${Action} kind="text" onClick=${handleEdit}>${t('profile.agents.detail.agent_config.edit')}<//>
+            <${Action} kind="text" onClick=${handleCopy}>${t('common.copy')}<//>
+            <${Action} kind="text" onClick=${handleDownload}>${t('profile.agents.detail.agent_config.download')}<//>
+          `}>
           ${editing ? html`
-            <div class="pf-agd-config-edit">
-              <textarea class="pf-agd-config-textarea" value=${editContent} onInput=${(e) => setEditContent(e.target.value)}></textarea>
-              <div class="pf-agd-form-actions">
-                <button class="btn-primary btn-sm" onClick=${handleSave}>${t('profile.agents.detail.agent_config.save')}</button>
-                <button class="btn-outline btn-sm" onClick=${handleCancelEdit}>${t('profile.agents.detail.agent_config.cancel')}</button>
-              </div>
-            </div>
+            <${Stack} density="compact">
+              <${Field} type="textarea" rows=${16} value=${editContent} onInput=${(e) => setEditContent(e.target.value)} />
+              <${Stack} direction="horizontal" density="compact">
+                <${Action} kind="primary" onClick=${handleSave}>${t('profile.agents.detail.agent_config.save')}<//>
+                <${Action} onClick=${handleCancelEdit}>${t('profile.agents.detail.agent_config.cancel')}<//>
+              <//>
+            <//>
           ` : html`
-            <div class="pf-agd-config-preview">${preview}</div>
+            <${Surface} kind="code">${preview}<//>
           `}
-        </div>
+        <//>
       `}
       <${AgentDangerZone} agent=${agent} agentName=${agentName} onDeleteClick=${onDeleteClick} />
-    </div>
+    <//>
   `;
 }

@@ -7,9 +7,11 @@
  *   the one sentence that says what a run did, the rows of the workflows table, the crumb and the
  *   page frame with its rail. Every machine word (partial, output-red, count_nonempty) is turned
  *   into the reader's language here and nowhere else.
- * @structure c · loc · words (runWord, stepWord, triggerWords, signalWords, observedWords) · verdictOf · workflowRows · crumb · renderPage
+ * @structure c · loc · words (runWord, stepWord, triggerWords, signalWords, observedWords) · verdictOf · toneOf · chipTone · workflowRows · crumb · chipRow · pageLinks · renderPage · verdictBlock · railList
  * @usage import { renderPage, verdictOf, signalWords } from './frame.js';
  * @version-history
+ *   2026-09-22 -- Composed from the shared component set (Page, Rail, Table, Surface, Chip); no own
+ *     CSS. A tone is a named Text, Chip or Surface tone; the verdict is one shared block.
  *   v1.2.0 -- 2026-09-13 -- Compose existing top rules from poster.css.
  *   v1.1.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.0.0 — 2026-08-30 — Initial (design canvas "AIMEAT Työnkulkujen sivu", direction A).
@@ -21,6 +23,7 @@ import { t, getLocale } from '/js/i18n.js';
 import { date as fmtDate } from '/js/format.js';
 import { formatRelativeTime } from '/views/profile/memory-tab/helpers.js';
 import { cronWords } from '../scheduler/cron-words.js';
+import { Page, Rail, Stack, Table, Surface, Action, Chip, Text } from '/components/poster-parts.js';
 
 export const c = (key, vars) => t('profile.workflows.cover.' + key, vars);
 // The locale() helper here derived the FORMAT from the LANGUAGE. They are different settings:
@@ -147,60 +150,86 @@ export function lastRunWords(item) {
   return { tone: v.tone, word: runWord(run.status), sub: `${rel(run.startedAt)}: ${v.head}` };
 }
 
-/** Rows of the workflows table: name and its line, when it runs, the last run's word, what happened, the doors. */
+/** A tone word ('ok' | 'bad' | 'wait' | '') as a Text tone. */
+export const toneOf = (tone) => (tone === 'ok' ? 'success' : tone === 'bad' ? 'danger' : tone === 'wait' ? 'coral' : 'plain');
+/** The same tone as a Chip tone: a bad or waiting state is the one to see. */
+export const chipTone = (tone) => (tone === 'bad' || tone === 'wait' ? 'sun' : 'plain');
+
+/** The workflows table: name and its line, when it runs, the last run's word, what happened, the doors. */
 export function workflowRows(ctx, items) {
-  return html`<div class="wp-rows">
-    ${items.map(item => { const def = item.def; const w = lastRunWords(item); const agents = new Set(def.steps.flatMap(s => Array.isArray(s.agent) ? s.agent : s.agent ? [s.agent] : [])); const gates = def.steps.filter(s => s.action?.kind === 'human-input').length; return html`
-      <div class="wp-nm" key=${'n' + def.id}><button type="button" class="og-tbl-name" onClick=${() => ctx.pickView({ kind: 'detail', id: def.id })}>${loc(def.title) || def.id}</button><small>${[c('stepsN', { n: def.steps.length }), agents.size ? c('agentsN', { n: agents.size }) : '', gates ? c('gatesN', { n: gates }) : ''].filter(Boolean).join(' · ')}</small></div>
-      <div class="wp-m" key=${'t' + def.id}>${triggerWords(def.trigger)}</div>
-      <div class=${`wp-m wp-m--${w.tone}`} key=${'s' + def.id}><b>${w.word}</b></div>
-      <div class="wp-m wp-m--sub" key=${'w' + def.id}>${w.sub}</div>
-      <div class="og-tbl-door wp-doors2" key=${'d' + def.id}><button type="button" class="og-door og-door--quiet" onClick=${() => ctx.handleCheck(def.id)}>${c('checkNow')}</button><button type="button" class="og-door" onClick=${() => ctx.pickView({ kind: 'detail', id: def.id })}>${item.waiting ? c('answer') : c('open')}</button></div>`; })}
-  </div>`;
+  return html`<${Table} density="compact" label=${t('profile.workflows.title')}
+    headers=${[c('colWorkflow'), c('colTrigger'), c('colLast'), c('colWhat'), '']}
+    rows=${items.map(item => {
+      const def = item.def;
+      const w = lastRunWords(item);
+      const agents = new Set(def.steps.flatMap(s => Array.isArray(s.agent) ? s.agent : s.agent ? [s.agent] : []));
+      const gates = def.steps.filter(s => s.action?.kind === 'human-input').length;
+      return [
+        html`<${Stack} density="compact">
+          <${Action} kind="text" onClick=${() => ctx.pickView({ kind: 'detail', id: def.id })}>${loc(def.title) || def.id}<//>
+          <${Text} kind="caption" tone="muted">${[c('stepsN', { n: def.steps.length }), agents.size ? c('agentsN', { n: agents.size }) : '', gates ? c('gatesN', { n: gates }) : ''].filter(Boolean).join(' · ')}<//>
+        <//>`,
+        triggerWords(def.trigger),
+        html`<${Text} kind="label" tone=${toneOf(w.tone)}>${w.word}<//>`,
+        html`<${Text} kind="caption" tone="muted">${w.sub}<//>`,
+        html`<${Stack} direction="wrap" density="compact">
+          <${Action} onClick=${() => ctx.handleCheck(def.id)}>${c('checkNow')}<//>
+          <${Action} onClick=${() => ctx.pickView({ kind: 'detail', id: def.id })}>${item.waiting ? c('answer') : c('open')}<//>
+        <//>`,
+      ];
+    })} />`;
 }
-export const rowsHead = () => html`<div class="wp-rows wp-rows--head"><div>${c('colWorkflow')}</div><div>${c('colTrigger')}</div><div>${c('colLast')}</div><div>${c('colWhat')}</div><div></div></div>`;
 
 /* ── The crumb and the page frame ──────────────────────────────────────────────────────────── */
+/** The trail: Settings & Controls, Automation, Workflows, then the parts ({ label, go } or a string). */
 export function crumb(ctx, parts) {
-  return html`
-    <div class="og-crumb">
-      <span>${t('nav.profile')}</span><span>/</span>
-      ${parts.length ? html`<button type="button" class="og-crumb-link" onClick=${() => ctx.pickView({ kind: 'cover' })}>${t('profile.workflows.title')}</button>` : html`<span class="og-crumb-here">${t('profile.workflows.title')}</span>`}
-      ${parts.map((p, i) => html`<span key=${i}>/</span>${typeof p === 'string' ? html`<span class="og-crumb-here">${p}</span>` : p}`)}
-    </div>`;
+  return [
+    { label: t('nav.profile') },
+    { label: t('profile.landing.menuAutomation') },
+    { label: t('profile.workflows.title'), onClick: parts.length ? () => ctx.pickView({ kind: 'cover' }) : undefined },
+    ...parts.map((p, i) => (typeof p === 'string' ? { label: p } : { label: p.label, onClick: i < parts.length - 1 ? p.go : undefined })),
+  ];
 }
+
+/** A row of chips: [text, tone] pairs, a falsy entry skipped. */
+export const chipRow = (chips) => html`<${Stack} direction="wrap" density="compact">
+  ${chips.filter(Boolean).map(([text, tone], i) => html`<${Chip} key=${i} tone=${tone}>${text}<//>`)}<//>`;
 
 const openTab = (tabId) => window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId } }));
 export function pageLinks() {
-  return html`
-    <button type="button" class="og-rail-link" onClick=${() => openTab('scheduler')}><i>→</i>${t('profile.tabs.scheduler')}<em>→</em></button>
-    <button type="button" class="og-rail-link" onClick=${() => openTab('agents')}><i>→</i>${t('profile.tabs.agents')}<em>→</em></button>
-    <button type="button" class="og-rail-link" onClick=${() => openTab('offers')}><i>→</i>${t('profile.tabs.offers')}<em>→</em></button>`;
+  return html`<${Stack} density="compact">
+    <${Text} kind="label">${c('pages')}<//>
+    <${Action} kind="text" onClick=${() => openTab('scheduler')}>${t('profile.tabs.scheduler')} →<//>
+    <${Action} kind="text" onClick=${() => openTab('agents')}>${t('profile.tabs.agents')} →<//>
+    <${Action} kind="text" onClick=${() => openTab('offers')}>${t('profile.tabs.offers')} →<//>
+  <//>`;
 }
 
+/** A page under the Workflows crumb. `back` replaces the rail's door back to the cover. */
 export function renderPage(ctx, { crumbs, label = null, title, chips = null, doors = null, strip = null, rail = null, back = null, children }) {
-  return html`
-    <div class="og og-wp og-page">
-      ${crumb(ctx, crumbs)}
-      <div class="og-mast og-mast--page">
-        <div class="og-mast-words">
-          ${label ? html`<div class="og-label">${label}</div>` : null}
-          <h1 class="og-title poster-page-title wp-title--page">${title}</h1>
-          ${chips ? html`<div class="og-chips">${chips}</div>` : null}
-        </div>
-        ${doors ? html`<div class="og-mast-actions"><div class="og-doors">${doors}</div></div>` : null}
-      </div>
-      ${strip}
-      <div class="og-grid">
-        <div class="og-main poster-row--thing">${children}</div>
-        <nav class="og-rail" aria-label=${c('railTitle')}>
-          <span class="og-rail-label">${t('profile.workflows.title')}</span>
-          ${back || html`<button type="button" class="og-rail-link" onClick=${() => ctx.pickView({ kind: 'cover' })}><i>←</i>${c('backTo')}</button>`}
-          ${rail}
-          <hr />
-          <span class="og-rail-label">${c('pages')}</span>
-          ${pageLinks()}
-        </nav>
-      </div>
-    </div>`;
+  return html`<${Page} width="wide" title=${title} crumbs=${crumb(ctx, crumbs)}
+    identity=${label || chips ? html`<${Stack} density="compact">${label ? html`<${Text} kind="label">${label}<//>` : null}${chips}<//>` : null}
+    actions=${doors}
+    rail=${html`<${Rail} kind="index" title=${t('profile.workflows.title')} label=${c('railTitle')}><${Stack}>
+      ${back || html`<${Action} onClick=${() => ctx.pickView({ kind: 'cover' })}>← ${c('backTo')}<//>`}
+      ${rail}
+      ${pageLinks()}
+    <//><//>`}>
+    <${Stack}>${strip}${children}<//>
+  <//>`;
 }
+
+/** The verdict of a run as one sentence and a line of numbers, in the run's tone. */
+export const verdictBlock = (v, actions = null) => html`<${Surface} kind="box" tone=${v.tone === 'bad' ? 'danger' : v.tone === 'ok' ? 'success' : v.tone === 'wait' ? 'sun' : 'plain'}>
+  <${Stack} density="compact">
+    <${Text} kind="heading">${v.head}<//>
+    <${Text} kind="mono" tone="muted">${v.sub}<//>
+    ${actions ? html`<${Stack} direction="horizontal" align="start">${actions}<//>` : null}
+  <//>
+<//>`;
+
+/** A short list for the rail: a label and one line per entry. */
+export const railList = (label, entries) => html`<${Stack} density="compact">
+  <${Text} kind="label">${label}<//>
+  ${entries.map(e => html`<${Text} key=${e.key} kind="mono" tone=${e.tone}>${e.label}<//>`)}
+<//>`;

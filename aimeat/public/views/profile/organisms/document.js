@@ -19,6 +19,9 @@
  *     (pdf etc.) keep their raw URL and are fetched ON CLICK (onDocClick) — fetch-with-token → open the
  *     blob in a new tab — so a private/workspace file opens without a big eager download and without a
  *     token-less navigation 401'ing.
+ *   v1.3.0 -- 2026-09-22 -- Composed from the shared set (Stack, KeyValue, Action tabs, Field, the editor
+ *     Surface as the Toast UI mount): no class of its own; the pop-out glyph and the camera emoji are
+ *     worded actions, the image upload is an action that opens the hidden file input.
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
@@ -26,7 +29,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { VisibilityPill } from '/views/profile/shared.js';
-import { KeyValueRow } from '/components/KeyValueRow.js';
+import { Stack, Columns, Surface, ListRow, KeyValue, Field, Action, Text } from '/components/poster-parts.js';
 import { Markdown } from '/components/Markdown.js';
 import { dt } from '/js/format.js';
 import * as orgService from '/js/services/organisms.js';
@@ -109,27 +112,29 @@ export function DocumentView({ page, busy, onEdit, onPublish, onWikiLink, onPopO
   const savedAt = page._draft ? page._updatedAt : null;          // draft = working copy → "last saved"
   const publishedAt = page._pub?._updatedAt || (!page._draft && page._published ? page._updatedAt : null);
 
-  return html`
-    <div class="pj-doc-toolbar">
-      <span class="pj-doc-vtitle">${shown.title || shown.id || page.id}</span>
-      ${hasBoth ? html`
-        <div class="seg" role="tablist">
-          <button class="seg-btn ${tab === 'draft' ? 'active' : ''}" onClick=${() => setTab('draft')}>${t('organisms.draftVersion') || 'Draft'}</button>
-          <button class="seg-btn ${tab === 'published' ? 'active' : ''}" onClick=${() => setTab('published')}>${t('organisms.publishedVersion') || 'Published'}</button>
-        </div>` : null}
-      <button class="btn-ghost btn-sm" onClick=${onEdit}>${t('organisms.edit') || 'Edit'}</button>
-      ${page._draft ? html`<button class="btn-primary btn-sm" onClick=${onPublish} disabled=${busy}>${t('organisms.publish') || 'Publish'}</button>` : null}
-      ${onPopOut ? html`<button class="btn-ghost btn-sm pj-doc-popout" title=${t('organisms.popOut') || 'Open in its own window'} onClick=${onPopOut}>${'⧉'}</button>` : null}
-    </div>
+  return html`<${Stack}>
+    <${Stack} direction="wrap" align="between">
+      <${Text} kind="heading">${shown.title || shown.id || page.id}<//>
+      <${Stack} direction="wrap" align="center">
+        ${hasBoth ? html`
+          <${Stack} direction="horizontal" role="tablist" density="compact">
+            <${Action} kind="tab" semantics="tab" selected=${tab === 'draft'} onClick=${() => setTab('draft')}>${t('organisms.draftVersion') || 'Draft'}<//>
+            <${Action} kind="tab" semantics="tab" selected=${tab === 'published'} onClick=${() => setTab('published')}>${t('organisms.publishedVersion') || 'Published'}<//>
+          <//>` : null}
+        <${Action} kind="text" onClick=${onEdit}>${t('organisms.edit') || 'Edit'}<//>
+        ${page._draft ? html`<${Action} onClick=${onPublish} disabled=${busy}>${t('organisms.publish') || 'Publish'}<//>` : null}
+        ${onPopOut ? html`<${Action} kind="text" title=${t('organisms.popOut') || 'Open in its own window'} onClick=${onPopOut}>${t('organisms.popOut') || 'Open in its own window'}<//>` : null}
+      <//>
+    <//>
     ${(created || savedAt || publishedAt) ? html`
-      <div class="pj-doc-meta">
-        ${created ? html`<${KeyValueRow} label=${t('organisms.createdAt') || 'Created'} value=${dt(created)} />` : null}
-        ${savedAt ? html`<${KeyValueRow} label=${t('organisms.lastSaved') || 'Last saved'} value=${dt(savedAt)} />` : null}
-        ${publishedAt ? html`<${KeyValueRow} label=${t('organisms.publishedAt') || 'Published'} value=${dt(publishedAt)} />` : null}
-      </div>` : null}
-    <div class="pj-doc-view" onClick=${onDocClick}><${Markdown} text=${rendered} onWikiLink=${onWikiLink} /></div>`;
+      <${Stack} density="compact">
+        ${created ? html`<${KeyValue} label=${t('organisms.createdAt') || 'Created'} value=${dt(created)} />` : null}
+        ${savedAt ? html`<${KeyValue} label=${t('organisms.lastSaved') || 'Last saved'} value=${dt(savedAt)} />` : null}
+        ${publishedAt ? html`<${KeyValue} label=${t('organisms.publishedAt') || 'Published'} value=${dt(publishedAt)} />` : null}
+      <//>` : null}
+    <${Surface} kind="record" onClick=${onDocClick}><${Markdown} text=${rendered} onWikiLink=${onWikiLink} /><//>
+  <//>`;
 }
-
 /* Document editor: a Toast UI Editor (WYSIWYG, with its own built-in Markdown⇄WYSIWYG toggle, so
  * non-technical users type like a document). Falls back to a plain markdown textarea + live preview
  * if the editor can't load. Title is a separate Preact-controlled field. */
@@ -145,6 +150,7 @@ export function DocumentEditor({ orgId, page, busy, onSave, onCancel }) {
   const [saving, setSaving] = useState(false);
   const [images, setImages] = useState([]);                // embedded /v1/storage images: [{key, alt, visibility}]
   const [imgBusy, setImgBusy] = useState(false);
+  const fileRef = useRef(null);                            // the hidden image-file input the upload action opens
 
   // Load the visibility of the document's already-saved /v1/storage images, so the author can make
   // them public (a private image won't load for other viewers of a shared/published document).
@@ -272,43 +278,39 @@ export function DocumentEditor({ orgId, page, busy, onSave, onCancel }) {
     } finally { setSaving(false); }
   };
 
-  return html`
-    <div class="pj-doc-editor">
-      <input type="text" class="input-field input-sm" placeholder=${t('organisms.pageTitle') || 'Document title'}
-        value=${title} onInput=${e => setTitle(e.target.value)} />
-      <div class="pj-doc-imgbar">
-        <label class="btn-outline btn-sm pj-file-btn">
-          <span class="pj-file-btn-icon">📷</span> ${t('organisms.insertImage') || 'Upload image from file'}
-          <input type="file" accept="image/*" hidden onChange=${e => { insertFromFile(e.target.files && e.target.files[0]); e.target.value = ''; }} />
-        </label>
-        <span class="pj-imgbar-hint">${t('organisms.orPaste') || '…or paste / drag an image into the editor'}</span>
-      </div>
-      ${images.length ? html`
-        <div class="pj-img-vis">
-          <div class="pj-img-vis-head">
-            <span class="pj-img-vis-title">${t('organisms.fileVisibility') || 'File visibility'}</span>
-            <span class="pj-img-vis-note">${t('organisms.fileVisibilityNote') || 'Private files only load for you — make them public to share the document.'}</span>
-            ${images.some(i => i.visibility !== 'public') ? html`<button class="btn-ghost btn-sm" disabled=${imgBusy} onClick=${makeAllImagesPublic}>${t('organisms.makeAllPublic') || 'Make all public'}</button>` : null}
-          </div>
+  return html`<${Stack}>
+    <${Field} placeholder=${t('organisms.pageTitle') || 'Document title'}
+      value=${title} onInput=${e => setTitle(e.target.value)} />
+    <${Stack} direction="wrap" align="center">
+      <${Action} onClick=${() => fileRef.current && fileRef.current.click()}>${t('organisms.insertImage') || 'Upload image from file'}<//>
+      <input type="file" accept="image/*" hidden ref=${fileRef} onChange=${e => { insertFromFile(e.target.files && e.target.files[0]); e.target.value = ''; }} />
+      <${Text} kind="caption" tone="muted">${t('organisms.orPaste') || '…or paste / drag an image into the editor'}<//>
+    <//>
+    ${images.length ? html`
+      <${Surface} kind="box" density="compact">
+        <${Stack} density="compact">
+          <${Stack} direction="wrap" align="between">
+            <${Text} kind="label">${t('organisms.fileVisibility') || 'File visibility'}<//>
+            ${images.some(i => i.visibility !== 'public') ? html`<${Action} kind="text" disabled=${imgBusy} onClick=${makeAllImagesPublic}>${t('organisms.makeAllPublic') || 'Make all public'}<//>` : null}
+          <//>
+          <${Text} kind="caption" tone="muted">${t('organisms.fileVisibilityNote') || 'Private files only load for you — make them public to share the document.'}<//>
           ${images.map(i => html`
-            <div class="pj-img-vis-row" key=${i.key}>
-              <span class="pj-img-vis-name" title=${i.key}>${(i.alt)}</span>
-              <${VisibilityPill} visibility=${i.visibility} onClick=${() => { if (!imgBusy) changeImageVisibility(i.key, i.visibility === 'public' ? 'private' : 'public'); }} />
-            </div>`)}
-        </div>` : null}
-      ${mode === 'rich'
-        ? html`<div ref=${containerRef} class="pj-tui"></div>`
-        : html`<div class="pj-doc-grid">
-            <textarea class="input-field pj-doc-md" rows="14" placeholder=${t('organisms.writeMarkdown') || 'Write markdown…'}
-              value=${md} onInput=${e => setMd(e.target.value)}></textarea>
-            <div class="pj-doc-preview"><${Markdown} text=${md} /></div>
-          </div>`}
-      <div class="form-actions">
-        <button class="btn-primary btn-sm" onClick=${save} disabled=${busy || saving || !title.trim()}>
-          ${saving ? html`<span class="spinner"></span> ${t('organisms.saving') || 'Saving…'}` : (t('organisms.saveDraft') || 'Save draft')}
-        </button>
-        <button class="btn-ghost btn-sm" onClick=${onCancel}>${t('organisms.cancel') || 'Cancel'}</button>
-      </div>
-    </div>
-  `;
+            <${ListRow} key=${i.key} density="compact" name=${html`<span title=${i.key}>${i.alt}</span>`}
+              actions=${html`<${VisibilityPill} visibility=${i.visibility} onClick=${() => { if (!imgBusy) changeImageVisibility(i.key, i.visibility === 'public' ? 'private' : 'public'); }} />`} />`)}
+        <//>
+      <//>` : null}
+    ${mode === 'rich'
+      ? html`<${Surface} kind="editor" density="flush" surfaceRef=${containerRef}><//>`
+      : html`<${Columns} collapse="640">
+          <${Field} type="textarea" rows=${14} placeholder=${t('organisms.writeMarkdown') || 'Write markdown…'}
+            value=${md} onInput=${e => setMd(e.target.value)} />
+          <${Surface} kind="box"><${Markdown} text=${md} /><//>
+        <//>`}
+    <${Stack} direction="wrap" align="center">
+      <${Action} kind="primary" onClick=${save} disabled=${busy || saving || !title.trim()}>
+        ${saving ? (t('organisms.saving') || 'Saving…') : (t('organisms.saveDraft') || 'Save draft')}
+      <//>
+      <${Action} onClick=${onCancel}>${t('organisms.cancel') || 'Cancel'}<//>
+    <//>
+  <//>`;
 }

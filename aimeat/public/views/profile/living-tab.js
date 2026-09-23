@@ -11,6 +11,11 @@
  * @structure LivingTab (default export) — templates list/editor + deploy + instances list/viewer
  * @usage html`<${LivingTab} session=${session} showToast=${showToast} />`
  * @version-history
+ *   2026-09-22 -- Composed from the shared set (Page, Rail, Section, ListRow, Field, Toolbar, Surface,
+ *     Chip, Action, Text, Stack, Columns) so the tab follows the one theme; living.css is gone. Each
+ *     view has one loud action (author, save, deploy or pulse); the ✨ ↻ ⏳ ＋ glyphs are dropped and
+ *     ✕ is ✗. The data-point and source entry rows keep their typed text in state, because the
+ *     shared Field is controlled and a live-update re-render would otherwise empty them.
  *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
  *   2026-09-13 — V1: compose page and B1 section headings from the shared poster classes.
  *   v1.1.0 — 2026-07-16 — Mount folds templates + instances + organisms into GET /v1/living-docs
@@ -32,6 +37,7 @@ import * as offersService from '/js/services/offers.js';
 import { buildCatalogue } from '/js/services/notebook-plan.js';
 import { swallowed } from '/js/swallowed.js';
 import { dateTime as fmtDateTime } from '/js/format.js';
+import { Page, Rail, Section, Stack, Columns, Toolbar, Field, ListRow, Chip, Action, Surface, Text } from '/components/poster-parts.js';
 
 export default function LivingTab({ session, showToast }) {
   const { confirm, ConfirmUI } = useConfirm();
@@ -49,6 +55,7 @@ export default function LivingTab({ session, showToast }) {
   const [pulseStatus, setPulseStatus] = useState({}); // slotId → phase
   const [ledger, setLedger] = useState([]);
   const [picked, setPicked] = useState({});           // slotId → chosen history version (timeline)
+  const [drafts, setDrafts] = useState({});           // entry-row id → typed text (data points, sources)
 
   // loadAll is re-created each render and closes over session; this effect intentionally loads only
   // when the session changes. Including it would re-run every render (loop).
@@ -241,13 +248,16 @@ export default function LivingTab({ session, showToast }) {
     try { await living.addSource(opened.loc, slotId, { text: `${label || ''}: ${value}`, data: { label: label || '', value: v } }); await reopen(); }
     catch (e) { showToast(e.message || t('profile.error'), true); }
   }
-  /** @param {string} id @returns {HTMLInputElement|null} */
-  const dpEl = (id) => /** @type {HTMLInputElement|null} */ (document.getElementById(id));
+  // The per-section entry rows (a data point's label and value, a new source) keep what is typed in
+  // `drafts`, keyed as the old element ids were: the shared Field is a controlled input, so a re-render
+  // (a live update) would otherwise empty a half-typed entry.
+  const draftOf = (id) => drafts[id] || '';
+  const setDraft = (id, v) => setDrafts(d => ({ ...d, [id]: v }));
   async function submitDp(slot) {
-    const l = dpEl('dp-l-' + slot), val = dpEl('dp-v-' + slot);
-    if (!val || !val.value) return;
-    await addDataPoint(slot, l?.value || '', val.value);
-    if (l) l.value = ''; if (val) val.value = '';
+    const l = draftOf('dp-l-' + slot), val = draftOf('dp-v-' + slot);
+    if (!val) return;
+    await addDataPoint(slot, l, val);
+    setDrafts(d => ({ ...d, ['dp-l-' + slot]: '', ['dp-v-' + slot]: '' }));
   }
   const pickVersion = (slotId, idx) => setPicked(p => {
     const next = { ...p };
@@ -255,15 +265,16 @@ export default function LivingTab({ session, showToast }) {
     return next;
   });
 
-  /** Tiny dependency-free inline bar chart for an aggregate slot's numeric series. */
+  /** Tiny dependency-free inline bar chart for an aggregate slot's numeric series. The bars take the
+   *  surface's coral tone through currentColor; the box around them is the shared Surface. */
   const renderChart = (series) => {
     if (!series.length) return null;
     const W = 280, Hh = 56, n = series.length;
     const max = Math.max(...series.map(d => d.value), 1), min = Math.min(...series.map(d => d.value), 0);
     const range = (max - min) || 1, bw = W / n;
-    return html`<svg class="pf-ld-chart poster-row--thing" viewBox="0 0 ${W} ${Hh}" width="100%" height=${Hh} preserveAspectRatio="none">
+    return html`<${Surface} kind="box" density="flush" tone="coral"><svg viewBox="0 0 ${W} ${Hh}" width="100%" height=${Hh} preserveAspectRatio="none" fill="currentColor">
       ${series.map((d, i) => { const h = ((d.value - min) / range) * (Hh - 8) + 4; return html`<rect key=${i} x=${i * bw + 1} y=${Hh - h} width=${Math.max(1, bw - 2)} height=${h}><title>${escHtml(d.label)}: ${d.value}</title></rect>`; })}
-    </svg>`;
+    </svg><//>`;
   };
 
   function orgName(id) { return orgs.find(o => o.id === id)?.name || id; }
@@ -271,78 +282,65 @@ export default function LivingTab({ session, showToast }) {
   // ── Render: template editor ──
 
   const renderEditor = () => html`
-    <div class="pf-ld-editor poster-row--thing">
-      <div class="poster-section-title pf-nb-section">${editing.id && templates?.some(x => x.id === editing.id) ? t('profile.living.editTemplate') : t('profile.living.newTemplate')}</div>
-      <label class="pf-nb-suggest-label">${t('profile.living.fieldTitle')}</label>
-      <input class="input-field" value=${editing.title} onInput=${e => patchEditing({ title: e.target.value })} />
-      <label class="pf-nb-suggest-label">${t('profile.living.fieldDescription')}</label>
-      <input class="input-field" value=${editing.description} onInput=${e => patchEditing({ description: e.target.value })} />
-      <label class="pf-nb-suggest-label">${t('profile.living.fieldScope')}</label>
-      <textarea class="input-field" rows="2" value=${editing.charter?.scope || ''}
-        onInput=${e => patchEditing({ charter: { ...editing.charter, scope: e.target.value } })}></textarea>
+    <${Section} title=${editing.id && templates?.some(x => x.id === editing.id) ? t('profile.living.editTemplate') : t('profile.living.newTemplate')}>
+      <${Stack}>
+        <${Field} label=${t('profile.living.fieldTitle')} value=${editing.title} onInput=${e => patchEditing({ title: e.target.value })} />
+        <${Field} label=${t('profile.living.fieldDescription')} value=${editing.description} onInput=${e => patchEditing({ description: e.target.value })} />
+        <${Field} type="textarea" rows=${2} label=${t('profile.living.fieldScope')} value=${editing.charter?.scope || ''}
+          onInput=${e => patchEditing({ charter: { ...editing.charter, scope: e.target.value } })} />
 
-      <div class="pf-ld-charter-views">
-        <span class="text-meta-sm">${t('profile.living.charter')}:</span>
-        <button class="btn-ghost btn-sm ${charterView === 'readable' ? 'pf-ld-cv-active' : ''}" onClick=${() => setCharterView(v => v === 'readable' ? null : 'readable')}>${t('profile.living.charterReadable')}</button>
-        <button class="btn-ghost btn-sm ${charterView === 'yaml' ? 'pf-ld-cv-active' : ''}" onClick=${() => setCharterView(v => v === 'yaml' ? null : 'yaml')}>${t('profile.living.charterYaml')}</button>
-      </div>
-      ${charterView === 'readable' && html`<div class="pf-ld-charter-box poster-row--thing"><${Markdown} text=${editing.charterReadable || editing.charter?.scope || t('profile.living.charterEmpty')} /></div>`}
-      ${charterView === 'yaml' && html`<pre class="pf-ld-charter-box pf-ld-yaml poster-row--thing">${escHtml(living.charterToYaml(editing.charter || {}))}</pre>`}
+        <${Stack} direction="wrap" align="center">
+          <${Text} kind="label">${t('profile.living.charter')}<//>
+          <${Action} kind="tab" selected=${charterView === 'readable'} onClick=${() => setCharterView(v => v === 'readable' ? null : 'readable')}>${t('profile.living.charterReadable')}<//>
+          <${Action} kind="tab" selected=${charterView === 'yaml'} onClick=${() => setCharterView(v => v === 'yaml' ? null : 'yaml')}>${t('profile.living.charterYaml')}<//>
+        <//>
+        ${charterView === 'readable' && html`<${Surface} kind="box"><${Markdown} text=${editing.charterReadable || editing.charter?.scope || t('profile.living.charterEmpty')} /><//>`}
+        ${charterView === 'yaml' && html`<${Surface} kind="code">${escHtml(living.charterToYaml(editing.charter || {}))}<//>`}
 
-      <div class="pf-nb-suggest-label">${t('profile.living.automation')}</div>
-      <div class="pf-ld-automation">
-        <label class="text-meta-sm">${t('profile.living.trust')}:
-          <select class="pf-ld-cadence" value=${editing.charter?.trust?.derive || 'auto'} onChange=${e => setTrust(e.target.value)}>
-            <option value="auto">${t('profile.living.trustAuto')}</option>
-            <option value="gated">${t('profile.living.trustGated')}</option>
-          </select>
-        </label>
-        <label class="text-meta-sm">${t('profile.living.activityTrigger')}:
-          <input type="number" min="0" class="input-field pf-ld-num" value=${activityThreshold(editing)} onInput=${e => setActivityTrigger(e.target.value)} />
-        </label>
-      </div>
+        <${Text} kind="label">${t('profile.living.automation')}<//>
+        <${Columns} collapse=${560}>
+          <${Field} type="select" label=${t('profile.living.trust')} value=${editing.charter?.trust?.derive || 'auto'} onChange=${e => setTrust(e.target.value)}
+            options=${[{ value: 'auto', label: t('profile.living.trustAuto') }, { value: 'gated', label: t('profile.living.trustGated') }]} />
+          <${Field} type="number" min="0" label=${t('profile.living.activityTrigger')} value=${activityThreshold(editing)} onInput=${e => setActivityTrigger(e.target.value)} />
+        <//>
 
-      <div class="pf-nb-suggest-label">${t('profile.living.sections')}</div>
-      <div class="pf-ld-slots">
+        <${Text} kind="label">${t('profile.living.sections')}<//>
         ${editing.template.map((s, i) => html`
-          <div class="pf-ld-slot-row" key=${i}>
-            <input class="input-field" placeholder=${t('profile.living.sectionName')} value=${s.section} onInput=${e => patchSlot(i, { section: e.target.value })} />
-            <input class="input-field" placeholder=${t('profile.living.sectionDesc')} value=${s.desc} onInput=${e => patchSlot(i, { desc: e.target.value })} />
-            <input class="input-field pf-ld-slot-id" placeholder="slot-id" value=${s.slot} onInput=${e => patchSlot(i, { slot: e.target.value })} />
-            <button class="btn-ghost btn-sm" onClick=${() => removeSlot(i)}>✕</button>
-          </div>`)}
-      </div>
-      <button class="btn-ghost btn-sm" onClick=${addSlot}>＋ ${t('profile.living.addSection')}</button>
-
-      <div class="pf-nb-suggest-actions">
-        <button class="btn-primary" disabled=${busy} onClick=${saveEditing}>${t('profile.living.saveTemplate')}</button>
-        <button class="btn-ghost btn-sm" onClick=${() => setEditing(null)}>${t('profile.notebook.cancelBtn')}</button>
-      </div>
-    </div>`;
+          <${Columns} key=${i} layout="quarters" density="compact">
+            <${Field} placeholder=${t('profile.living.sectionName')} value=${s.section} onInput=${e => patchSlot(i, { section: e.target.value })} />
+            <${Field} placeholder=${t('profile.living.sectionDesc')} value=${s.desc} onInput=${e => patchSlot(i, { desc: e.target.value })} />
+            <${Field} placeholder="slot-id" value=${s.slot} onInput=${e => patchSlot(i, { slot: e.target.value })} />
+            <${Stack} direction="horizontal"><${Action} kind="text" onClick=${() => removeSlot(i)}>✗<//><//>
+          <//>`)}
+        <${Stack} direction="horizontal"><${Action} onClick=${addSlot}>${t('profile.living.addSection')}<//><//>
+        <${Stack} direction="wrap" align="center">
+          <${Action} kind="primary" disabled=${busy} onClick=${saveEditing}>${t('profile.living.saveTemplate')}<//>
+          <${Action} onClick=${() => setEditing(null)}>${t('profile.notebook.cancelBtn')}<//>
+        <//>
+      <//>
+    <//>`;
 
   // ── Render: deploy panel ──
 
   const renderDeploy = () => html`
-    <div class="pf-ld-editor poster-row--thing">
-      <div class="poster-section-title pf-nb-section">${t('profile.living.deployTitle').replace('{title}', deploying.template.title)}</div>
+    <${Section} title=${t('profile.living.deployTitle').replace('{title}', deploying.template.title)}>
+      <${Stack}>
       ${orgs.length === 0
-        ? html`<div class="empty">${t('profile.living.noOrgs')}</div>`
-        : html`
-          <label class="pf-nb-suggest-label">${t('profile.living.organism')}</label>
-          <select class="input-field" value=${deploying.orgId} onChange=${e => pickDeployOrg(e.target.value)}>
-            ${orgs.map(o => html`<option key=${o.id} value=${o.id}>${escHtml(o.name)}</option>`)}
-          </select>
-          <label class="pf-nb-suggest-label">${t('profile.living.workspace')}</label>
+        ? html`<${Text} tone="muted">${t('profile.living.noOrgs')}<//>`
+        : html`<${Stack}>
+          <${Field} type="select" label=${t('profile.living.organism')} value=${deploying.orgId} onChange=${e => pickDeployOrg(e.target.value)}
+            options=${orgs.map(o => ({ value: o.id, label: escHtml(o.name) }))} />
           ${deploying.workspaces.length === 0
-            ? html`<div class="empty">${t('profile.living.noWorkspaces')}</div>`
-            : html`<select class="input-field" value=${deploying.wsId} onChange=${e => setDeploying(d => ({ ...d, wsId: e.target.value }))}>
-                ${deploying.workspaces.map(w => html`<option key=${w.id} value=${w.id}>${escHtml(w.name || w.id)}</option>`)}
-              </select>`}`}
-      <div class="pf-nb-suggest-actions">
-        <button class="btn-primary" disabled=${busy || !deploying.orgId || !deploying.wsId} onClick=${confirmDeploy}>${t('profile.living.deployBtn')}</button>
-        <button class="btn-ghost btn-sm" onClick=${() => setDeploying(null)}>${t('profile.notebook.cancelBtn')}</button>
-      </div>
-    </div>`;
+            ? html`<${Stack} density="compact"><${Text} kind="label">${t('profile.living.workspace')}<//><${Text} tone="muted">${t('profile.living.noWorkspaces')}<//><//>`
+            : html`<${Field} type="select" label=${t('profile.living.workspace')} value=${deploying.wsId} onChange=${e => setDeploying(d => ({ ...d, wsId: e.target.value }))}
+                options=${deploying.workspaces.map(w => ({ value: w.id, label: escHtml(w.name || w.id) }))} />`}
+        <//>`}
+      <${Stack} direction="wrap" align="center">
+        <${Action} kind="primary" disabled=${busy || !deploying.orgId || !deploying.wsId} onClick=${confirmDeploy}>${t('profile.living.deployBtn')}<//>
+        <${Action} onClick=${() => setDeploying(null)}>${t('profile.notebook.cancelBtn')}<//>
+      <//>
+      <//>
+    <//>`;
 
   // ── Render: instance viewer ──
 
@@ -351,162 +349,151 @@ export default function LivingTab({ session, showToast }) {
     const st = opened.config.status || {};
     const lastPulse = st.last_pulse ? fmtDateTime(st.last_pulse) : t('profile.living.never');
     return html`
-      <div class="pf-ld-editor poster-row--thing">
-        <div class="pf-ld-opened-head">
-          <div class="poster-section-title">${escHtml(opened.config.title)}</div>
-          <div class="pf-ld-card-btns">
-            <button class="btn-primary btn-sm" disabled=${pulsing} onClick=${handlePulse}>${pulsing ? t('profile.living.pulsing') : `↻ ${t('profile.living.pulseNow')}`}</button>
-            <button class="btn-outline btn-sm" onClick=${togglePause}>${st.paused ? t('profile.living.resume') : t('profile.living.pause')}</button>
-            <button class="btn-outline btn-sm" onClick=${handleSaveSnapshot}>${t('profile.living.saveSnapshot')}</button>
-            <button class="btn-ghost btn-sm" onClick=${() => setOpened(null)}>${t('profile.living.backToList')}</button>
-          </div>
-        </div>
-        <div class="text-meta-sm pf-ld-status">
-          ${orgName(opened.loc.orgId)} · ${escHtml(opened.loc.wsId)} · v${st.version || 1}
-          · ${t('profile.living.lastPulse')}: ${lastPulse}
-          · ${t('profile.living.cost')}: $${(st.cost || 0).toFixed(4)}
-          ${st.paused && html`· <span class="badge badge-warning">${t('profile.living.paused')}</span>`}
-          ${st.health === 'retired' && html`· <span class="badge badge-danger">${t('profile.living.retired')}: ${escHtml(st.retired_reason || '')}</span>`}
-          · ${t('profile.living.cadence')}:
-          <select class="pf-ld-cadence" value=${opened.config.charter?.cadence || 'daily'} onChange=${e => changeCadence(e.target.value)}>
-            <option value="hourly">${t('profile.living.cadenceHourly')}</option>
-            <option value="daily">${t('profile.living.cadenceDaily')}</option>
-            <option value="weekly">${t('profile.living.cadenceWeekly')}</option>
-          </select>
-        </div>
+      <${Section} title=${escHtml(opened.config.title)}
+        actions=${html`<${Action} kind="primary" disabled=${pulsing} onClick=${handlePulse}>${pulsing ? t('profile.living.pulsing') : t('profile.living.pulseNow')}<//>
+          <${Action} onClick=${togglePause}>${st.paused ? t('profile.living.resume') : t('profile.living.pause')}<//>
+          <${Action} onClick=${handleSaveSnapshot}>${t('profile.living.saveSnapshot')}<//>
+          <${Action} onClick=${() => setOpened(null)}>${t('profile.living.backToList')}<//>`}>
+        <${Stack}>
+          <${Stack} direction="wrap" align="center" density="compact">
+            <${Text} kind="mono" tone="muted">
+              ${orgName(opened.loc.orgId)} · ${escHtml(opened.loc.wsId)} · v${st.version || 1}
+              · ${t('profile.living.lastPulse')}: ${lastPulse}
+              · ${t('profile.living.cost')}: $${(st.cost || 0).toFixed(4)}
+            <//>
+            ${st.paused && html`<${Chip} tone="sun">${t('profile.living.paused')}<//>`}
+            ${st.health === 'retired' && html`<${Chip}>${t('profile.living.retired')}: ${escHtml(st.retired_reason || '')}<//>`}
+          <//>
+          <${Columns} layout="trailing" collapse=${560}>
+            <${Field} type="select" label=${t('profile.living.cadence')} value=${opened.config.charter?.cadence || 'daily'} onChange=${e => changeCadence(e.target.value)}
+              options=${[
+                { value: 'hourly', label: t('profile.living.cadenceHourly') },
+                { value: 'daily', label: t('profile.living.cadenceDaily') },
+                { value: 'weekly', label: t('profile.living.cadenceWeekly') },
+              ]} />
+          <//>
 
-        <div class="pf-nb-enrich-preview-body pf-ld-preview"><${Markdown} text=${md} /></div>
+          <${Surface} kind="box"><${Markdown} text=${md} /><//>
 
-        <div class="pf-nb-suggest-label">${t('profile.living.sections')}</div>
-        ${(opened.config.template || []).map(sec => {
-          const der = opened.slots[sec.slot];
-          const slotSources = opened.sources.filter(s => s.slot === sec.slot);
-          const phase = pulseStatus[sec.slot];
-          const versions = opened.history?.[sec.slot] || [];
-          const pickedVer = picked[sec.slot];
-          const series = sec.kind === 'aggregate' ? living.aggregateData(opened.sources, sec.slot) : [];
-          return html`
-            <div class="pf-ld-slot-edit" key=${sec.slot}>
-              <div class="pf-ld-slot-edit-head">
-                <strong>${escHtml(sec.section || sec.slot)}</strong>
-                <span class="text-meta-sm">${escHtml(sec.desc || '')}</span>
-                ${sec.agent && html`<span class="badge badge-info">→ ${escHtml(String(sec.agent).split('/')[0])}</span>`}
-                ${phase && html`<span class="text-meta-sm pf-ld-phase">${escHtml(phase)}</span>`}
-              </div>
-              ${versions.length > 1 && html`
-                <div class="pf-ld-timeline">
-                  <span class="text-meta-sm">${t('profile.living.timeline')}:</span>
-                  <select class="pf-ld-cadence" value=${pickedVer ? String(versions.indexOf(pickedVer)) : ''} onChange=${e => pickVersion(sec.slot, e.target.value)}>
-                    <option value="">${t('profile.living.versionCurrent')}</option>
-                    ${versions.map((v, i) => html`<option key=${i} value=${i}>${fmtDateTime(v.producedAt)} · ${escHtml(v.producedBy || '')}</option>`)}
-                  </select>
-                </div>
-                ${pickedVer && html`<div class="pf-ld-charter-box poster-row--thing"><${Markdown} text=${pickedVer.markdown} /></div>`}`}
-              ${sec.kind === 'aggregate' && html`
-                <div class="pf-ld-aggregate">
-                  ${series.length ? renderChart(series) : html`<span class="text-meta-sm">${t('profile.living.noData')}</span>`}
-                  <div class="pf-ld-slot-sources">
-                    <input class="input-field" placeholder=${t('profile.living.dpLabel')} id=${'dp-l-' + sec.slot} />
-                    <input class="input-field pf-ld-num" type="number" placeholder=${t('profile.living.dpValue')} id=${'dp-v-' + sec.slot}
-                      onKeyDown=${e => { if (e.key === 'Enter') submitDp(sec.slot); }} />
-                    <button class="btn-ghost btn-sm" onClick=${() => submitDp(sec.slot)}>${t('profile.living.addPoint')}</button>
-                  </div>
-                </div>`}
-              <textarea class="input-field" rows="3" placeholder=${t('profile.living.sectionContentPh')}
-                value=${der?.markdown || ''} onChange=${e => saveSlot(sec.slot, e.target.value)}></textarea>
-              ${opened.pending?.[sec.slot] && html`
-                <div class="pf-ld-pending poster-row--thing">
-                  <div class="text-meta-sm">⏳ ${t('profile.living.pendingTitle')}</div>
-                  <div class="pf-nb-enrich-preview-body pf-ld-pending-body"><${Markdown} text=${opened.pending[sec.slot].markdown} /></div>
-                  <div class="pf-ld-card-btns">
-                    <button class="btn-success btn-sm" onClick=${() => approveSlot(sec.slot)}>${t('profile.living.approve')}</button>
-                    <button class="btn-danger btn-sm" onClick=${() => rejectSlot(sec.slot)}>${t('profile.living.reject')}</button>
-                  </div>
-                </div>`}
-              <div class="pf-ld-slot-sources">
-                <input class="input-field" placeholder=${t('profile.living.addSourcePh')}
-                  onKeyDown=${e => { if (e.key === 'Enter') { addSourceTo(sec.slot, e.target.value); e.target.value = ''; } }} />
-                <button class="btn-ghost btn-sm" onClick=${() => composeSlot(sec.slot)}>${t('profile.living.compose')}</button>
-                ${slotSources.length > 0 && html`<span class="text-meta-sm">${slotSources.length} ${t('profile.living.sources')}</span>`}
-              </div>
-            </div>`;
-        })}
+          <${Text} kind="label">${t('profile.living.sections')}<//>
+          <${Stack} density="compact">
+          ${(opened.config.template || []).map(sec => {
+            const der = opened.slots[sec.slot];
+            const slotSources = opened.sources.filter(s => s.slot === sec.slot);
+            const phase = pulseStatus[sec.slot];
+            const versions = opened.history?.[sec.slot] || [];
+            const pickedVer = picked[sec.slot];
+            const series = sec.kind === 'aggregate' ? living.aggregateData(opened.sources, sec.slot) : [];
+            return html`
+              <${ListRow} key=${sec.slot} name=${escHtml(sec.section || sec.slot)} detailKind="text" detail=${escHtml(sec.desc || '')}
+                value=${phase && html`<${Text} kind="mono" tone="coral">${escHtml(phase)}<//>`}
+                actions=${sec.agent && html`<${Chip}>→ ${escHtml(String(sec.agent).split('/')[0])}<//>`}>
+                <${Stack}>
+                  ${versions.length > 1 && html`
+                    <${Field} type="select" label=${t('profile.living.timeline')} value=${pickedVer ? String(versions.indexOf(pickedVer)) : ''} onChange=${e => pickVersion(sec.slot, e.target.value)}
+                      options=${[{ value: '', label: t('profile.living.versionCurrent') },
+                        ...versions.map((v, i) => ({ value: String(i), label: `${fmtDateTime(v.producedAt)} · ${escHtml(v.producedBy || '')}` }))]} />
+                    ${pickedVer && html`<${Surface} kind="box"><${Markdown} text=${pickedVer.markdown} /><//>`}`}
+                  ${sec.kind === 'aggregate' && html`
+                    ${series.length ? renderChart(series) : html`<${Text} kind="caption" tone="muted">${t('profile.living.noData')}<//>`}
+                    <${Toolbar} label=${t('profile.living.addPoint')} actions=${html`<${Action} onClick=${() => submitDp(sec.slot)}>${t('profile.living.addPoint')}<//>`}>
+                      <${Field} placeholder=${t('profile.living.dpLabel')} id=${'dp-l-' + sec.slot}
+                        value=${draftOf('dp-l-' + sec.slot)} onInput=${e => setDraft('dp-l-' + sec.slot, e.target.value)} />
+                      <${Field} type="number" placeholder=${t('profile.living.dpValue')} id=${'dp-v-' + sec.slot}
+                        value=${draftOf('dp-v-' + sec.slot)} onInput=${e => setDraft('dp-v-' + sec.slot, e.target.value)}
+                        onKeyDown=${e => { if (e.key === 'Enter') submitDp(sec.slot); }} />
+                    <//>`}
+                  <${Field} type="textarea" rows=${3} placeholder=${t('profile.living.sectionContentPh')}
+                    value=${der?.markdown || ''} onChange=${e => saveSlot(sec.slot, e.target.value)} />
+                  ${opened.pending?.[sec.slot] && html`
+                    <${Surface} kind="aside">
+                      <${Stack} density="compact">
+                        <${Text} kind="caption" tone="muted">${t('profile.living.pendingTitle')}<//>
+                        <${Markdown} text=${opened.pending[sec.slot].markdown} />
+                        <${Stack} direction="wrap">
+                          <${Action} onClick=${() => approveSlot(sec.slot)}>${t('profile.living.approve')}<//>
+                          <${Action} onClick=${() => rejectSlot(sec.slot)}>${t('profile.living.reject')}<//>
+                        <//>
+                      <//>
+                    <//>`}
+                  <${Toolbar} label=${t('profile.living.compose')}
+                    count=${slotSources.length > 0 ? `${slotSources.length} ${t('profile.living.sources')}` : undefined}
+                    actions=${html`<${Action} onClick=${() => composeSlot(sec.slot)}>${t('profile.living.compose')}<//>`}>
+                    <${Field} placeholder=${t('profile.living.addSourcePh')}
+                      value=${draftOf('src-' + sec.slot)} onInput=${e => setDraft('src-' + sec.slot, e.target.value)}
+                      onKeyDown=${e => { if (e.key === 'Enter') { addSourceTo(sec.slot, e.target.value); setDraft('src-' + sec.slot, ''); } }} />
+                  <//>
+                <//>
+              <//>`;
+          })}
+          <//>
 
-        ${ledger.length > 0 && html`
-          <div class="pf-nb-suggest-label">${t('profile.living.ledgerTitle')}</div>
-          <ul class="pf-ld-ledger">
-            ${ledger.slice(0, 10).map((ev, i) => html`<li key=${i} class="text-meta-sm">${fmtDateTime(ev.at)} — ${escHtml(ev.event)}${ev.slot ? ` · ${escHtml(ev.slot)}` : ''}${typeof ev.costUsd === 'number' ? ` · $${ev.costUsd.toFixed(4)}` : ''}</li>`)}
-          </ul>`}
-      </div>`;
+          ${ledger.length > 0 && html`
+            <${Text} kind="label">${t('profile.living.ledgerTitle')}<//>
+            <${Stack} density="compact">
+              ${ledger.slice(0, 10).map((ev, i) => html`<${ListRow} key=${i} density="compact" time=${fmtDateTime(ev.at)}
+                name=${`${escHtml(ev.event)}${ev.slot ? ` · ${escHtml(ev.slot)}` : ''}${typeof ev.costUsd === 'number' ? ` · $${ev.costUsd.toFixed(4)}` : ''}`} />`)}
+            <//>`}
+        <//>
+      <//>`;
   };
 
   // ── Render: main ──
 
+  const listing = !opened && !editing && !deploying;
   return html`
-    ${ConfirmUI}
-    <div class="poster-page-title">${t('profile.living.title')}</div>
-    <div class="section-desc">${t('profile.living.desc')}</div>
+    <${Page} title=${t('profile.living.title')}
+      crumbs=${[{ label: t('nav.profile') }, { label: t('profile.landing.menuInformation') }, { label: t('profile.tabs.living') }]}
+      rail=${listing && html`<${Rail} kind="index" title=${t('profile.living.title')} entries=${[
+        { href: '#ld-templates', label: t('profile.living.templatesTitle'), count: templates ? templates.length : undefined },
+        { href: '#ld-instances', label: t('profile.living.instancesTitle'), count: instances ? instances.length : undefined },
+      ]} />`}>
+      ${ConfirmUI}
+      <${Text} kind="lead" tone="muted">${t('profile.living.desc')}<//>
 
-    ${opened ? renderOpened() : html`
-      ${deploying && renderDeploy()}
-      ${editing && renderEditor()}
+      ${opened ? renderOpened() : html`
+        ${deploying && renderDeploy()}
+        ${editing && renderEditor()}
 
-      ${!editing && !deploying && html`
-        <div class="poster-section-title pf-nb-section">${t('profile.living.templatesTitle')}</div>
-        <div class="section-desc">${t('profile.living.templatesDesc')}</div>
-        <div class="pf-ld-author">
-          <textarea class="input-field" rows="2" placeholder=${t('profile.living.authorPh')}
-            value=${need} onInput=${e => setNeed(e.target.value)}></textarea>
-          <button class="btn-primary btn-sm" disabled=${!need.trim() || authoring} onClick=${handleAuthor}>
-            ${authoring ? t('profile.living.authoring') : `✨ ${t('profile.living.authorBtn')}`}
-          </button>
-        </div>
-        <button class="btn-outline btn-sm" onClick=${newTemplate}>＋ ${t('profile.living.newTemplate')}</button>
-        ${templates === null
-          ? html`<${Spinner} text=${t('profile.living.loading')} />`
-          : templates.length === 0
-            ? html`<div class="empty">${t('profile.living.noTemplates')}</div>`
-            : html`<div class="pf-ld-list">
-                ${templates.map(tpl => html`
-                  <div class="pf-ld-card" key=${tpl.id}>
-                    <div class="pf-ld-card-head">
-                      <span class="pf-nb-hit-title">${escHtml(tpl.title || t('profile.living.untitled'))}</span>
-                      <span class="text-meta-sm">${(tpl.template || []).length} ${t('profile.living.sectionsShort')}</span>
-                    </div>
-                    ${tpl.description && html`<div class="text-meta-sm">${escHtml(tpl.description)}</div>`}
-                    <div class="pf-ld-card-btns">
-                      <button class="btn-primary btn-sm" onClick=${() => startDeploy(tpl)}>${t('profile.living.deploy')}</button>
-                      <button class="btn-outline btn-sm" onClick=${() => setEditing({ ...tpl })}>${t('profile.living.edit')}</button>
-                      <button class="btn-danger btn-sm" onClick=${() => deleteTpl(tpl)}>${t('profile.notebook.deleteBtn')}</button>
-                    </div>
-                  </div>`)}
-              </div>`}
+        ${!editing && !deploying && html`
+          <${Section} id="ld-templates" title=${t('profile.living.templatesTitle')} description=${t('profile.living.templatesDesc')}
+            actions=${html`<${Action} onClick=${newTemplate}>${t('profile.living.newTemplate')}<//>`}>
+            <${Stack}>
+              <${Field} type="textarea" rows=${2} placeholder=${t('profile.living.authorPh')}
+                value=${need} onInput=${e => setNeed(e.target.value)} />
+              <${Stack} direction="horizontal">
+                <${Action} kind="primary" disabled=${!need.trim() || authoring} onClick=${handleAuthor}>
+                  ${authoring ? t('profile.living.authoring') : t('profile.living.authorBtn')}
+                <//>
+              <//>
+              ${templates === null && html`<${Spinner} text=${t('profile.living.loading')} />`}
+              ${templates?.length === 0 && html`<${Text} tone="muted">${t('profile.living.noTemplates')}<//>`}
+            <//>
+            ${templates?.length > 0 && templates.map(tpl => html`
+              <${ListRow} key=${tpl.id} name=${escHtml(tpl.title || t('profile.living.untitled'))}
+                detailKind="text" detail=${tpl.description && escHtml(tpl.description)}
+                value=${`${(tpl.template || []).length} ${t('profile.living.sectionsShort')}`}
+                actions=${html`<${Action} onClick=${() => startDeploy(tpl)}>${t('profile.living.deploy')}<//>
+                  <${Action} onClick=${() => setEditing({ ...tpl })}>${t('profile.living.edit')}<//>
+                  <${Action} onClick=${() => deleteTpl(tpl)}>${t('profile.notebook.deleteBtn')}<//>`} />`)}
+          <//>
 
-        <div class="poster-section-title pf-nb-section">${t('profile.living.instancesTitle')}</div>
-        <div class="section-desc">${t('profile.living.instancesDesc')}</div>
-        ${instances === null
-          ? html`<${Spinner} text=${t('profile.living.loading')} />`
-          : instances.length === 0
-            ? html`<div class="empty">${t('profile.living.noInstances')}</div>`
-            : html`<div class="pf-ld-list">
-                ${instances.map(inst => html`
-                  <div class="pf-ld-card" key=${inst.loc.docId}>
-                    <div class="pf-ld-card-head">
-                      <span class="pf-nb-hit-title">${escHtml(inst.config.title)}</span>
-                      <span class="badge badge-info">${escHtml(orgName(inst.loc.orgId))}</span>
-                    </div>
-                    <div class="text-meta-sm">
-                      v${inst.config.status?.version || 1} ·
-                      ${t('profile.living.lastPulse')}: ${inst.config.status?.last_pulse ? fmtDateTime(inst.config.status.last_pulse) : t('profile.living.never')} ·
-                      ${t('profile.living.cost')}: $${(inst.config.status?.cost || 0).toFixed(4)}
-                      ${inst.config.status?.paused && html` · <span class="badge badge-warning">${t('profile.living.paused')}</span>`}
-                    </div>
-                    <div class="pf-ld-card-btns">
-                      <button class="btn-primary btn-sm" onClick=${() => openInstance(inst.loc)}>${t('profile.living.open')}</button>
-                    </div>
-                  </div>`)}
-              </div>`}
+          <${Section} id="ld-instances" title=${t('profile.living.instancesTitle')} description=${t('profile.living.instancesDesc')}>
+            ${instances === null
+              ? html`<${Spinner} text=${t('profile.living.loading')} />`
+              : instances.length === 0
+                ? html`<${Text} tone="muted">${t('profile.living.noInstances')}<//>`
+                : instances.map(inst => html`
+                    <${ListRow} key=${inst.loc.docId} name=${escHtml(inst.config.title)}
+                      detail=${`v${inst.config.status?.version || 1} · ${t('profile.living.lastPulse')}: ${inst.config.status?.last_pulse ? fmtDateTime(inst.config.status.last_pulse) : t('profile.living.never')} · ${t('profile.living.cost')}: $${(inst.config.status?.cost || 0).toFixed(4)}`}
+                      value=${html`<${Stack} direction="wrap" align="end" density="compact">
+                        <${Chip}>${escHtml(orgName(inst.loc.orgId))}<//>
+                        ${inst.config.status?.paused && html`<${Chip} tone="sun">${t('profile.living.paused')}<//>`}
+                      <//>`}
+                      actions=${html`<${Action} onClick=${() => openInstance(inst.loc)}>${t('profile.living.open')}<//>`} />`)}
+          <//>
+        `}
       `}
-    `}
+    <//>
   `;
 }

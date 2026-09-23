@@ -12,29 +12,38 @@
  * @structure renderForm · basics · varsBlock · stepFold · offerWords · endFold
  * @usage import { renderForm } from './form.js';
  * @version-history
+ *   2026-09-22 -- Composed from the shared component set (Field, Action tabs for a choice, Columns,
+ *     Section, Fold, KeyValue); no own CSS. Same fields, same saved definition.
  *   v1.0.0 — 2026-08-30 — Initial. Replaces workflows-form.js's machine fields.
  */
 import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { Section, Fold } from '/views/profile/organisms/poster-parts.js';
+import { Section, Fold, Stack, Columns, Field, Action, Text } from '/components/poster-parts.js';
 import { timeOfCron, withTime } from '../scheduler/cron-words.js';
 import { c, loc, triggerWords, signalWords, kindWords, renderPage } from './frame.js';
 
 const TTL_CHOICES = [['15', '15 min'], ['60', '1 h'], ['240', '4 h'], ['1440', '24 h']];
 const RETRY_CHOICES = [['0', 'retryNone'], ['1', 'retryOnce'], ['2', 'retryTwice']];
 
+/** A group of choices: a label, the choices as tabs (one or more on), a hint under them. */
+const choiceGroup = (label, options, hint = null) => html`<${Stack} density="compact">
+  ${label ? html`<${Text} kind="label">${label}<//>` : null}
+  <${Stack} direction="wrap" density="compact">${options.map(([key, text, on, onClick]) => html`<${Action} key=${key} kind="tab" selected=${on} onClick=${onClick}>${text}<//>`)}<//>
+  ${hint ? html`<${Text} kind="caption" tone="muted">${hint}<//>` : null}
+<//>`;
+
 export function renderForm(ctx) {
   const f = ctx.form;
   const editing = ctx.view.kind === 'edit';
   const set = (patch) => ctx.setForm({ ...f, ...patch });
   const title = editing ? c('formEditTitle', { name: f.title || f.id }) : c('formNewTitle');
-  const back = html`<button type="button" class="og-rail-link" onClick=${() => ctx.pickView(editing ? { kind: 'detail', id: f.id } : { kind: 'cover' })}><i>←</i>${editing ? c('backToWorkflow') : c('backTo')}</button>`;
+  const back = html`<${Action} onClick=${() => ctx.pickView(editing ? { kind: 'detail', id: f.id } : { kind: 'cover' })}>← ${editing ? c('backToWorkflow') : c('backTo')}<//>`;
   const doors = html`
-    <button type="button" class="og-slab" disabled=${ctx.saving || !f.id.trim() || !f.steps.length} onClick=${() => ctx.handleSave()}>${c('save')}</button>
-    ${editing ? html`<button type="button" class="og-door" onClick=${() => ctx.copyPrompt('improve-mcp', f.id)}>${c('promptToChat')}</button>` : null}
-    <button type="button" class="og-door og-door--quiet" onClick=${() => ctx.pickView(editing ? { kind: 'detail', id: f.id } : { kind: 'cover' })}>${t('profile.cancel')}</button>`;
+    <${Action} kind="primary" disabled=${ctx.saving || !f.id.trim() || !f.steps.length} onClick=${() => ctx.handleSave()}>${c('save')}<//>
+    ${editing ? html`<${Action} onClick=${() => ctx.copyPrompt('improve-mcp', f.id)}>${c('promptToChat')}<//>` : null}
+    <${Action} onClick=${() => ctx.pickView(editing ? { kind: 'detail', id: f.id } : { kind: 'cover' })}>${t('profile.cancel')}<//>`;
   const checks = [
     [f.steps.every(s => s.action || (s.agent && s.offer)), c('checkEveryStepOffer')],
     [!hasCycle(f.steps), c('checkNoCycle')],
@@ -42,74 +51,73 @@ export function renderForm(ctx) {
     [f.steps.every(s => s.id && /^[a-z0-9][a-z0-9-]*$/.test(s.id)), c('checkStepIds')],
   ];
   const rail = html`
-    <hr />
-    <span class="og-rail-label">${c('beforeSave')}</span>
-    <div class="wp-words wp-words--rail">
-      ${checks.map(([ok, label], i) => html`<div key=${i} class=${ok ? '' : 'wp-bad'}>${ok ? '✓' : '✗'} ${label}</div>`)}
-      ${ctx.saveErrors.map((e, i) => html`<div key=${'e' + i} class="wp-bad">✗ ${e}</div>`)}
-    </div>
-    <hr />
-    <span class="og-rail-label">${c('ratherInChat')}</span>
-    <button type="button" class="og-rail-link" onClick=${() => ctx.copyPrompt(editing ? 'improve-mcp' : 'create-mcp', editing ? f.id : undefined)}><i>→</i>${editing ? c('copyImprove') : c('copyPrompt')}</button>`;
+    <${Stack} density="compact">
+      <${Text} kind="label">${c('beforeSave')}<//>
+      ${checks.map(([ok, label], i) => html`<${Text} key=${i} kind="caption" tone=${ok ? 'plain' : 'danger'}>${ok ? '✓' : '✗'} ${label}<//>`)}
+      ${ctx.saveErrors.map((e, i) => html`<${Text} key=${'e' + i} kind="caption" tone="danger">✗ ${e}<//>`)}
+    <//>
+    <${Stack} density="compact">
+      <${Text} kind="label">${c('ratherInChat')}<//>
+      <${Action} kind="text" onClick=${() => ctx.copyPrompt(editing ? 'improve-mcp' : 'create-mcp', editing ? f.id : undefined)}>${editing ? c('copyImprove') : c('copyPrompt')} →<//>
+    <//>`;
 
   return renderPage(ctx, {
-    crumbs: editing ? [html`<button type="button" class="og-crumb-link" onClick=${() => ctx.pickView({ kind: 'detail', id: f.id })}>${f.title || f.id}</button>`, t('profile.workflows.edit')] : [c('formNewTitle')],
+    crumbs: editing ? [{ label: f.title || f.id, go: () => ctx.pickView({ kind: 'detail', id: f.id }) }, t('profile.workflows.edit')] : [c('formNewTitle')],
     title, doors, rail, back,
     children: html`
-      <p class="og-desc og-desc--page">${c('formDesc')}</p>
-      <${Section} id="wp-basics" num="01" title=${c('secBasics')} first>${basics(ctx, f, set, editing)}<//>
-      <${Section} id="wp-form-steps" num="02" title=${c('secSteps')} count=${f.steps.length} doors=${html`<button type="button" class="og-door" onClick=${() => ctx.addStep()}>${c('addStep')}</button>`}>
+      <${Text} kind="lead">${c('formDesc')}<//>
+      <${Section} id="wp-basics" title=${c('secBasics')}>${basics(ctx, f, set, editing)}<//>
+      <${Section} id="wp-form-steps" title=${c('secSteps')} count=${f.steps.length} actions=${html`<${Action} onClick=${() => ctx.addStep()}>${c('addStep')}<//>`}>
         ${f.steps.map((s, i) => stepFold(ctx, f, s, i))}
-        ${!f.steps.length ? html`<p class="og-empty">${c('noStepsYet')}</p>` : null}
+        ${!f.steps.length ? html`<${Text} tone="muted">${c('noStepsYet')}<//>` : null}
       <//>
-      <${Fold} id="wp-end" num="03" title=${c('secEnd')} sub=${c('endSub')} open=${ctx.folds.end} onToggle=${() => ctx.setFold('end', !ctx.folds.end)}>${endFold(f, set)}<//>
-      <${Fold} id="wp-llm" num="04" title=${c('secLlm')} sub=${c('llmSub')} open=${ctx.folds.llm} onToggle=${() => ctx.setFold('llm', !ctx.folds.llm)}>
-        <div class="og-choice"><button type="button" class=${`og-choice-btn ${!f.llm ? 'on' : ''}`} onClick=${() => set({ llm: false })}>${c('no')}</button><button type="button" class=${`og-choice-btn ${f.llm ? 'on' : ''}`} onClick=${() => set({ llm: true })}>${c('yes')}</button></div>
-        <p class="wp-hint">${c('llmHint')}</p>
+      <${Fold} id="wp-end" number="03" title=${c('secEnd')} sub=${c('endSub')} open=${ctx.folds.end} onToggle=${() => ctx.setFold('end', !ctx.folds.end)}>${endFold(f, set)}<//>
+      <${Fold} id="wp-llm" number="04" title=${c('secLlm')} sub=${c('llmSub')} open=${ctx.folds.llm} onToggle=${() => ctx.setFold('llm', !ctx.folds.llm)}>
+        ${choiceGroup(null, [['no', c('no'), !f.llm, () => set({ llm: false })], ['yes', c('yes'), !!f.llm, () => set({ llm: true })]], c('llmHint'))}
       <//>
       <${ctx.ConfirmUI} />`,
   });
 }
 
 function basics(ctx, f, set, editing) {
-  const choice = (key, options) => html`<div class="og-choice">${options.map(([v, label]) => html`<button type="button" key=${v} class=${`og-choice-btn ${f[key] === v ? 'on' : ''}`} onClick=${() => set({ [key]: v })}>${label}</button>`)}</div>`;
+  const choice = (key, options) => options.map(([v, label]) => [v, label, f[key] === v, () => set({ [key]: v })]);
   const time = timeOfCron(f.cron);
-  return html`
-    <div class="og-fields wp-form">
-      <div class="og-fields--2">
-        <div class="og-field"><label class="og-label" for="wp-f-title">${c('fName')}</label><input id="wp-f-title" class="og-input" value=${f.title} onInput=${e => set({ title: e.target.value, id: editing ? f.id : slugOf(e.target.value) })} placeholder=${c('namePlaceholder')} /></div>
-        <div class="og-field"><label class="og-label" for="wp-f-id">${c('fId')}</label><input id="wp-f-id" class="og-input" value=${f.id} disabled=${editing} onInput=${e => set({ id: e.target.value })} placeholder="my-workflow" /><span class="wp-hint">${c('idHint')}</span></div>
-      </div>
-      <div class="og-field"><label class="og-label" for="wp-f-desc">${c('fDesc')}</label><input id="wp-f-desc" class="og-input" value=${f.description} onInput=${e => set({ description: e.target.value })} placeholder=${c('descPlaceholder')} /></div>
-      <div class="og-field"><span class="og-label">${c('fTrigger')}</span>${choice('triggerKind', [['manual', c('trigger.manual')], ['schedule', c('trigger.scheduleWord')], ['event', c('trigger.eventWord')]])}
-        ${f.triggerKind === 'schedule' ? html`<div class="wp-inline-fields">
-          <label class="og-field wp-field--narrow"><span class="og-label">${c('fTime')}</span><input class="og-input" type="time" value=${time} onInput=${e => set({ cron: withTime(f.cron, e.target.value) })} /></label>
-          <label class="og-field"><span class="og-label">${c('fCron')}</span><input class="og-input wp-mono" value=${f.cron} onInput=${e => set({ cron: e.target.value })} /></label>
-          <label class="og-field"><span class="og-label">${c('fTimezone')}</span><input class="og-input" value=${f.timezone} onInput=${e => set({ timezone: e.target.value })} /></label>
-        </div><span class="wp-hint">${triggerWords({ kind: 'schedule', cron: f.cron, timezone: f.timezone })}</span>` : null}
-        ${f.triggerKind === 'event' ? html`<div class="wp-inline-fields">
-          <div class="og-field"><span class="og-label">${c('fEventOn')}</span>${choice('eventOn', [['memory.write', c('eventMemory')], ['offer.ordered', c('eventOffer')]])}</div>
-          <label class="og-field"><span class="og-label">${f.eventOn === 'memory.write' ? c('fEventKey') : c('fEventOffer')}</span><input class="og-input wp-mono" value=${f.eventMatch} onInput=${e => set({ eventMatch: e.target.value })} placeholder=${f.eventOn === 'memory.write' ? 'news.*' : 'fetch'} /></label>
-        </div>` : null}
-      </div>
-      ${varsBlock(ctx, f, set)}
-    </div>`;
+  return html`<${Stack}>
+    <${Columns} layout="equal" collapse="600">
+      <${Field} id="wp-f-title" label=${c('fName')} value=${f.title} onInput=${e => set({ title: e.target.value, id: editing ? f.id : slugOf(e.target.value) })} placeholder=${c('namePlaceholder')} />
+      <${Field} id="wp-f-id" label=${c('fId')} value=${f.id} disabled=${editing} onInput=${e => set({ id: e.target.value })} placeholder="my-workflow" hint=${c('idHint')} />
+    <//>
+    <${Field} id="wp-f-desc" label=${c('fDesc')} value=${f.description} onInput=${e => set({ description: e.target.value })} placeholder=${c('descPlaceholder')} />
+    ${choiceGroup(c('fTrigger'), choice('triggerKind', [['manual', c('trigger.manual')], ['schedule', c('trigger.scheduleWord')], ['event', c('trigger.eventWord')]]))}
+    ${f.triggerKind === 'schedule' ? html`<${Stack} density="compact">
+      <${Columns} layout="thirds" collapse="600" density="compact">
+        <${Field} type="time" label=${c('fTime')} value=${time} onInput=${e => set({ cron: withTime(f.cron, e.target.value) })} />
+        <${Field} label=${c('fCron')} value=${f.cron} onInput=${e => set({ cron: e.target.value })} />
+        <${Field} label=${c('fTimezone')} value=${f.timezone} onInput=${e => set({ timezone: e.target.value })} />
+      <//>
+      <${Text} kind="caption" tone="muted">${triggerWords({ kind: 'schedule', cron: f.cron, timezone: f.timezone })}<//>
+    <//>` : null}
+    ${f.triggerKind === 'event' ? html`<${Columns} layout="equal" collapse="600" density="compact">
+      ${choiceGroup(c('fEventOn'), choice('eventOn', [['memory.write', c('eventMemory')], ['offer.ordered', c('eventOffer')]]))}
+      <${Field} label=${f.eventOn === 'memory.write' ? c('fEventKey') : c('fEventOffer')} value=${f.eventMatch} onInput=${e => set({ eventMatch: e.target.value })} placeholder=${f.eventOn === 'memory.write' ? 'news.*' : 'fetch'} />
+    <//>` : null}
+    ${varsBlock(ctx, f, set)}
+  <//>`;
 }
 
 function varsBlock(ctx, f, set) {
   const setVar = (i, patch) => set({ vars: f.vars.map((v, j) => j === i ? { ...v, ...patch } : v) });
-  return html`
-    <div class="og-field">
-      <span class="og-label">${c('fVars')}</span>
-      ${f.vars.map((v, i) => html`<div class="wp-var-row" key=${i}>
-        <input class="og-input wp-mono" placeholder=${c('varName')} value=${v.name} onInput=${e => setVar(i, { name: e.target.value })} />
-        <div class="og-choice">${['string', 'date', 'number'].map(ty => html`<button type="button" key=${ty} class=${`og-choice-btn ${v.type === ty ? 'on' : ''}`} onClick=${() => setVar(i, { type: ty })}>${c('varType.' + ty)}</button>`)}</div>
-        <input class="og-input wp-mono" placeholder=${v.type === 'date' ? '<run-date>' : c('varDefault')} value=${v.default || ''} onInput=${e => setVar(i, { default: e.target.value })} />
-        <button type="button" class="og-door og-door--quiet" onClick=${() => set({ vars: f.vars.filter((_, j) => j !== i) })}>${c('remove')}</button>
-      </div>`)}
-      <div class="og-doors"><button type="button" class="og-door og-door--quiet" onClick=${() => set({ vars: [...f.vars, { name: '', type: 'string', default: '' }] })}>${c('addVar')}</button></div>
-      <span class="wp-hint">${c('varsHint')}</span>
-    </div>`;
+  return html`<${Stack} density="compact">
+    <${Text} kind="label">${c('fVars')}<//>
+    ${f.vars.map((v, i) => html`<${Stack} key=${i} direction="wrap" align="end" density="compact">
+      <${Field} placeholder=${c('varName')} value=${v.name} onInput=${e => setVar(i, { name: e.target.value })} />
+      ${choiceGroup(null, ['string', 'date', 'number'].map(ty => [ty, c('varType.' + ty), v.type === ty, () => setVar(i, { type: ty })]))}
+      <${Field} placeholder=${v.type === 'date' ? '<run-date>' : c('varDefault')} value=${v.default || ''} onInput=${e => setVar(i, { default: e.target.value })} />
+      <${Action} onClick=${() => set({ vars: f.vars.filter((_, j) => j !== i) })}>${c('remove')}<//>
+    <//>`)}
+    <${Stack} direction="horizontal" align="start"><${Action} onClick=${() => set({ vars: [...f.vars, { name: '', type: 'string', default: '' }] })}>${c('addVar')}<//><//>
+    <${Text} kind="caption" tone="muted">${c('varsHint')}<//>
+  <//>`;
 }
 
 function stepFold(ctx, f, s, i) {
@@ -119,38 +127,40 @@ function stepFold(ctx, f, s, i) {
   const offers = ctx.offersByAgent[s.agent] || null;
   const offer = offers?.find(o => o.id === s.offer);
   const sub = s.action ? kindWords(s) : [s.agent, s.offer].filter(Boolean).join(' · ') + (s.after?.length ? ` · ${c('afterSteps', { steps: s.after.join(', ') })}` : '');
+  const offerLabel = !s.agent ? c('pickAgentFirst') : offers === null ? t('common.loading') : offers.length ? c('pickOffer') : c('noCompatibleOffers');
   return html`
-    <${Fold} key=${i} id=${'wp-step-' + i} num=${String(i + 1).padStart(2, '0')} title=${s.id || c('newStep')} sub=${sub} open=${open} onToggle=${() => ctx.setOpenStep(open ? -1 : i)}>
-      <div class="og-fields wp-form">
-        <div class="og-fields--2">
-          <div class="og-field"><label class="og-label" for=${'wp-s-id-' + i}>${c('fStepId')}</label><input id=${'wp-s-id-' + i} class="og-input wp-mono" value=${s.id} onInput=${e => setStep({ id: e.target.value })} placeholder="fetch" /></div>
-          <div class="og-field"><label class="og-label" for=${'wp-s-desc-' + i}>${c('fStepDesc')}</label><input id=${'wp-s-desc-' + i} class="og-input" value=${s.description} onInput=${e => setStep({ description: e.target.value })} placeholder=${c('stepDescPlaceholder')} /></div>
-        </div>
-        ${s.action ? html`<div class="og-field"><span class="og-label">${c('fStepKind')}</span><span class="wp-prose">${kindWords(s)}${s.action.kind === 'human-input' ? `: ${s.action.question?.prompt || ''}` : ''}</span><span class="wp-hint">${c('actionStepHint')}</span></div>` : html`
-        <div class="og-fields--2">
-          <div class="og-field"><label class="og-label" for=${'wp-s-agent-' + i}>${c('fAgent')}</label>
-            <select id=${'wp-s-agent-' + i} class="og-input" value=${s.agent} onChange=${e => { setStep({ agent: e.target.value, offer: '' }); ctx.loadOffers(e.target.value); }}>
-              <option value="">${c('pickAgent')}</option>
-              ${ctx.agents.map(a => html`<option value=${a.name} key=${a.name}>${a.name}</option>`)}
-            </select></div>
-          <div class="og-field"><label class="og-label" for=${'wp-s-offer-' + i}>${c('fOffer')}</label>
-            <select id=${'wp-s-offer-' + i} class="og-input" value=${s.offer} disabled=${!s.agent} onChange=${e => setStep({ offer: e.target.value })}>
-              <option value="">${!s.agent ? c('pickAgentFirst') : offers === null ? t('common.loading') : offers.length ? c('pickOffer') : c('noCompatibleOffers')}</option>
-              ${(offers || []).map(o => html`<option value=${o.id} key=${o.id}>${o.id}${loc(o.title) ? ` · ${loc(o.title)}` : ''}</option>`)}
-            </select>
-            ${offer ? html`<span class="wp-hint">${offerWords(offer)}</span>` : s.agent && offers && !offers.length ? html`<span class="wp-hint wp-bad">${c('noCompatibleOffersHint')}</span>` : null}</div>
-        </div>`}
-        <div class="og-fields--2">
-          <div class="og-field"><span class="og-label">${c('fStartsWhen')}</span>
-            <div class="og-choice"><button type="button" class=${`og-choice-btn ${!s.after?.length ? 'on' : ''}`} onClick=${() => setStep({ after: [] })}>${c('startsAtOnce')}</button>${others.map(o => html`<button type="button" key=${o} class=${`og-choice-btn ${s.after?.includes(o) ? 'on' : ''}`} onClick=${() => setStep({ after: s.after?.includes(o) ? s.after.filter(a => a !== o) : [...(s.after || []), o] })}>${c('afterStep', { step: o })}</button>`)}</div>
-            ${!s.action ? html`<label class="wp-check"><input type="checkbox" checked=${s.noInput} onChange=${e => setStep({ noInput: e.target.checked })} /> ${c('noInputGate')}</label>` : null}</div>
-          <div class="og-field"><span class="og-label">${c('fIfNotProduced')}</span>
-            ${!s.action ? html`<div class="og-choice">${RETRY_CHOICES.map(([v, key]) => html`<button type="button" key=${v} class=${`og-choice-btn ${String(s.retryMax) === v ? 'on' : ''}`} onClick=${() => setStep({ retryMax: Number(v) })}>${c(key)}</button>`)}</div>` : null}
-            <div class="og-choice wp-choice--tight">${TTL_CHOICES.map(([v, label]) => html`<button type="button" key=${v} class=${`og-choice-btn ${String(s.timeoutMin) === v ? 'on' : ''}`} onClick=${() => setStep({ timeoutMin: Number(v) })}>${label}</button>`)}<input class="og-input wp-num" type="number" min="1" value=${s.timeoutMin} onInput=${e => setStep({ timeoutMin: Number(e.target.value) || 60 })} /></div>
-            <span class="wp-hint">${c('timeoutHint')}</span></div>
-        </div>
-        <div class="og-doors"><button type="button" class="og-door og-door--quiet" onClick=${() => ctx.setOpenStep(-1)}>${c('close')}</button><button type="button" class="og-door og-door--danger" onClick=${() => ctx.removeStep(i)}>${c('removeStep')}</button></div>
-      </div>
+    <${Fold} key=${i} id=${'wp-step-' + i} number=${String(i + 1).padStart(2, '0')} title=${s.id || c('newStep')} sub=${sub} open=${open} onToggle=${() => ctx.setOpenStep(open ? -1 : i)}>
+      <${Columns} layout="equal" collapse="600">
+        <${Field} id=${'wp-s-id-' + i} label=${c('fStepId')} value=${s.id} onInput=${e => setStep({ id: e.target.value })} placeholder="fetch" />
+        <${Field} id=${'wp-s-desc-' + i} label=${c('fStepDesc')} value=${s.description} onInput=${e => setStep({ description: e.target.value })} placeholder=${c('stepDescPlaceholder')} />
+      <//>
+      ${s.action ? html`<${Stack} density="compact">
+        <${Text} kind="label">${c('fStepKind')}<//>
+        <${Text}>${kindWords(s)}${s.action.kind === 'human-input' ? `: ${s.action.question?.prompt || ''}` : ''}<//>
+        <${Text} kind="caption" tone="muted">${c('actionStepHint')}<//>
+      <//>` : html`<${Columns} layout="equal" collapse="600">
+        <${Field} id=${'wp-s-agent-' + i} type="select" label=${c('fAgent')} value=${s.agent} onChange=${e => { setStep({ agent: e.target.value, offer: '' }); ctx.loadOffers(e.target.value); }}
+          options=${[{ value: '', label: c('pickAgent') }, ...ctx.agents.map(a => ({ value: a.name, label: a.name }))]} />
+        <${Stack} density="compact">
+          <${Field} id=${'wp-s-offer-' + i} type="select" label=${c('fOffer')} value=${s.offer} disabled=${!s.agent} onChange=${e => setStep({ offer: e.target.value })}
+            options=${[{ value: '', label: offerLabel }, ...(offers || []).map(o => ({ value: o.id, label: `${o.id}${loc(o.title) ? ` · ${loc(o.title)}` : ''}` }))]} />
+          ${offer ? html`<${Text} kind="caption" tone="muted">${offerWords(offer)}<//>` : s.agent && offers && !offers.length ? html`<${Text} kind="caption" tone="danger">${c('noCompatibleOffersHint')}<//>` : null}
+        <//>
+      <//>`}
+      <${Columns} layout="equal" collapse="600">
+        <${Stack} density="compact">
+          ${choiceGroup(c('fStartsWhen'), [['now', c('startsAtOnce'), !s.after?.length, () => setStep({ after: [] })],
+            ...others.map(o => [o, c('afterStep', { step: o }), !!s.after?.includes(o), () => setStep({ after: s.after?.includes(o) ? s.after.filter(a => a !== o) : [...(s.after || []), o] })])])}
+          ${!s.action ? html`<${Field} type="checkbox" label=${c('noInputGate')} value=${s.noInput} onChange=${e => setStep({ noInput: e.target.checked })} />` : null}
+        <//>
+        <${Stack} density="compact">
+          ${!s.action ? choiceGroup(c('fIfNotProduced'), RETRY_CHOICES.map(([v, key]) => [v, c(key), String(s.retryMax) === v, () => setStep({ retryMax: Number(v) })])) : html`<${Text} kind="label">${c('fIfNotProduced')}<//>`}
+          ${choiceGroup(null, TTL_CHOICES.map(([v, label]) => [v, label, String(s.timeoutMin) === v, () => setStep({ timeoutMin: Number(v) })]))}
+          <${Field} type="number" min="1" value=${s.timeoutMin} onInput=${e => setStep({ timeoutMin: Number(e.target.value) || 60 })} />
+          <${Text} kind="caption" tone="muted">${c('timeoutHint')}<//>
+        <//>
+      <//>
+      <${Stack} direction="wrap"><${Action} onClick=${() => ctx.setOpenStep(-1)}>${c('close')}<//><${Action} onClick=${() => ctx.removeStep(i)}>${c('removeStep')}<//><//>
     <//>`;
 }
 
@@ -163,14 +173,14 @@ function offerWords(o) {
 }
 
 function endFold(f, set) {
-  const yn = (key, label, hint) => html`<div class="og-field"><span class="og-label">${label}</span><div class="og-choice"><button type="button" class=${`og-choice-btn ${!f[key] ? 'on' : ''}`} onClick=${() => set({ [key]: false })}>${c('no')}</button><button type="button" class=${`og-choice-btn ${f[key] ? 'on' : ''}`} onClick=${() => set({ [key]: true })}>${c('yes')}</button></div><span class="wp-hint">${hint}</span></div>`;
-  return html`<div class="og-fields--2 wp-form">
+  const yn = (key, label, hint) => choiceGroup(label, [['no', c('no'), !f[key], () => set({ [key]: false })], ['yes', c('yes'), !!f[key], () => set({ [key]: true })]], hint);
+  return html`<${Columns} layout="equal" collapse="600">
     ${yn('notify', c('setNotify'), c('notifyHint'))}
     ${yn('skipDone', c('setSkipDone'), c('skipDoneHint'))}
     ${yn('fresh', c('setFresh'), c('freshHint'))}
     ${yn('parallel', c('setParallel'), c('parallelHint'))}
-    <div class="og-field"><span class="og-label">${c('setOnFail')}</span><span class="wp-prose">${c('onFailInspect')}</span><span class="wp-hint">${c('onFailHint')}</span></div>
-  </div>`;
+    <${Stack} density="compact"><${Text} kind="label">${c('setOnFail')}<//><${Text}>${c('onFailInspect')}<//><${Text} kind="caption" tone="muted">${c('onFailHint')}<//><//>
+  <//>`;
 }
 
 /* ── helpers ───────────────────────────────────────────────────────────────────────────────── */

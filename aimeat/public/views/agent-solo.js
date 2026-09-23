@@ -10,6 +10,9 @@
  *   connection so the card live-updates independently.
  * @structure AgentSolo (default export)
  * @version-history
+ *   2026-09-22 -- The window is the shared Page frame and its messages are the shared muted text;
+ *     the toast is the site's own useToast (components/Toast.js), which also reads a string kind
+ *     ('success' / 'error') the card passes instead of turning every such toast red. No class of its own.
  *   2026-09-14 -- The window's toast is the site's shared one (theme.css .toast).
  *   v1.0.0 -- 2026-05-31 -- Initial creation for the agent pop-out window
  */
@@ -25,6 +28,8 @@ import { getOnboarding } from '/js/services/agent-integration.js';
 import { listTasks } from '/js/services/agent-tasks.js';
 import AgentCard from './profile/agents/agent-card.js';
 import { swallowed } from '/js/swallowed.js';
+import { useToast } from '/components/Toast.js';
+import { Page, Text } from '/components/poster-parts.js';
 
 const html = htm.bind(h);
 
@@ -41,12 +46,7 @@ export default function AgentSolo() {
   const [allAgents, setAllAgents] = useState([]);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [toast, setToast] = useState(null);
-
-  const showToast = useCallback((msg, isErr = false) => {
-    setToast({ msg, isErr });
-    setTimeout(() => setToast(cur => (cur && cur.msg === msg ? null : cur)), 3000);
-  }, []);
+  const { showToast, ToastContainer } = useToast();
 
   const load = useCallback(async () => {
     if (!session || !name) return;
@@ -104,17 +104,17 @@ export default function AgentSolo() {
   }, [session?.owner]);
 
   if (!session) {
-    return html`<div class="pf pf-agd-solo"><div class="pf-agd-empty">${t('profile.agents.solo.loginRequired')}</div></div>`;
+    return html`<${Page}><${Text} tone="muted">${t('profile.agents.solo.loginRequired')}<//><//>`;
   }
   if (loading && !agent) {
-    return html`<div class="pf pf-agd-solo"><div class="pf-agd-empty">${t('profile.loading')}</div></div>`;
+    return html`<${Page}><${Text} tone="muted">${t('profile.loading')}<//><//>`;
   }
   if (error) {
-    return html`<div class="pf pf-agd-solo"><div class="pf-agd-empty">${error}</div></div>`;
+    return html`<${Page}><${Text} tone="muted">${error}<//><//>`;
   }
 
   return html`
-    <div class="pf pf-agd-solo">
+    <${Page}>
       <${AgentCard}
         agent=${agent}
         onboarding=${onboarding}
@@ -125,7 +125,7 @@ export default function AgentSolo() {
         showToast=${showToast}
         allAgents=${allAgents}
       />
-      ${toast && html`<div class=${`toast ${toast.isErr ? 'toast-error' : 'toast-success'}`}>${toast.msg}</div>`}
-    </div>
+    <//>
+    <${ToastContainer} />
   `;
 }

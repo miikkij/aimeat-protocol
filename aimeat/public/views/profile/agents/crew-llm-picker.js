@@ -20,6 +20,8 @@
  * @structure CrewLlmPicker({ agentName, menu, onSaved, showToast })
  * @usage <${CrewLlmPicker} agentName=${name} menu=${menu} onSaved=${reload} showToast=${showToast} />
  * @version-history
+ *   2026-09-22 -- Composed from the shared parts (Section, Field, Action, Text). The shared select has
+ *     no option groups, so the Profiles and Models names are disabled rows above their options.
  *   v1.0.0 — 2026-09-09 — Initial. `llm_profile` had been carried in the definition and honoured by
  *     nothing since the JSON crew shipped.
  */
@@ -29,6 +31,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { apiPut } from '/js/api.js';
+import { Section, Stack, Field, Action, Text } from '/components/poster-parts.js';
 
 const K = 'profile.agents.detail.crew.llm';
 
@@ -104,51 +107,47 @@ export default function CrewLlmPicker({ agentName, menu, onSaved, showToast }) {
 
   const nothingToOffer = profiles.length === 0 && models.length === 0;
 
-  return html`
-    <div class="pf-agd-crew-llm">
-      <div class="pf-agd-section-title">${t(`${K}.title`)}</div>
-      <div class="pf-agd-help-text">${t(`${K}.hint`)}</div>
+  // The shared Field has no option groups, so each group's name is a disabled row above its options.
+  const options = [
+    { value: '', label: inherited ? t(`${K}.inherited`) : t(`${K}.unset`) },
+    ...(profiles.length > 0 ? [{ value: '#profiles', label: t(`${K}.profiles`), disabled: true },
+      ...profiles.map(p => ({ value: `profile:${p}`, label: p }))] : []),
+    ...(models.length > 0 ? [{ value: '#models', label: t(`${K}.models`), disabled: true },
+      ...models.map(m => ({ value: `model:${m.label}`, label: m.label }))] : []),
+  ];
 
+  return html`
+    <${Section} size="small" density="compact" title=${t(`${K}.title`)} description=${t(`${K}.hint`)}>
       ${nothingToOffer ? html`
-        ${/* A CHOICE CAN EXIST WITH NO LIST TO SHOW IT IN: it was made while the agent was up, or
-              from a chat, and the machine has not reported since. Saying only "never said which
-              models" would tell the owner nothing is set while something is. */''}
-        ${choice && html`
-          <div class="pf-agd-crew-llm-row">
-            <span class="pf-agd-crew-llm-current">
-              ${t(inherited ? `${K}.currentInherited` : `${K}.current`, {
-                what: choice.value.profile || choice.value.label || '',
-              })}
-            </span>
-            ${!inherited && html`
-              <button type="button" class="btn-ghost btn-sm" disabled=${busy} onClick=${() => save('')}>
-                ${t(`${K}.clear`)}
-              </button>`}
-          </div>`}
-        <div class="pf-agd-help-text pf-agd-crew-llm-empty">${t(`${K}.noneKnown`)}</div>
+        <${Stack} density="compact">
+          ${/* A CHOICE CAN EXIST WITH NO LIST TO SHOW IT IN: it was made while the agent was up, or
+                from a chat, and the machine has not reported since. Saying only "never said which
+                models" would tell the owner nothing is set while something is. */''}
+          ${choice && html`
+            <${Stack} direction="wrap" align="center" density="compact">
+              <${Text}>
+                ${t(inherited ? `${K}.currentInherited` : `${K}.current`, {
+                  what: choice.value.profile || choice.value.label || '',
+                })}
+              <//>
+              ${!inherited && html`
+                <${Action} kind="text" disabled=${busy} onClick=${() => save('')}>${t(`${K}.clear`)}<//>`}
+            <//>`}
+          <${Text} tone="muted">${t(`${K}.noneKnown`)}<//>
+        <//>
       ` : html`
-        <div class="pf-agd-crew-llm-row">
-          <select class="input-field" disabled=${busy} value=${current} onChange=${e => save(e.target.value)}>
-            <option value="">${inherited ? t(`${K}.inherited`) : t(`${K}.unset`)}</option>
-            ${profiles.length > 0 && html`
-              <optgroup label=${t(`${K}.profiles`)}>
-                ${profiles.map(p => html`<option key=${p} value=${`profile:${p}`}>${p}</option>`)}
-              </optgroup>`}
-            ${models.length > 0 && html`
-              <optgroup label=${t(`${K}.models`)}>
-                ${models.map(m => html`<option key=${m.label} value=${`model:${m.label}`}>${m.label}</option>`)}
-              </optgroup>`}
-          </select>
-          <button type="button" class="btn-ghost btn-sm" disabled=${busy || !current} onClick=${saveDefault}>
-            ${t(`${K}.setDefault`)}
-          </button>
-        </div>
-        <div class="pf-agd-help-text">
-          ${inherited && choice?.value
-            ? t(`${K}.inheritedFrom`, { what: choice.value.profile || choice.value.label || '' })
-            : t(menu?.source === 'runtime' ? `${K}.fromRuntime` : `${K}.fromCatalog`)}
-        </div>
+        <${Stack} density="compact">
+          <${Stack} direction="wrap" align="end" density="compact">
+            <${Field} type="select" disabled=${busy} value=${current} options=${options} onChange=${e => save(e.target.value)} />
+            <${Action} kind="text" disabled=${busy || !current} onClick=${saveDefault}>${t(`${K}.setDefault`)}<//>
+          <//>
+          <${Text} kind="caption" tone="muted">
+            ${inherited && choice?.value
+              ? t(`${K}.inheritedFrom`, { what: choice.value.profile || choice.value.label || '' })
+              : t(menu?.source === 'runtime' ? `${K}.fromRuntime` : `${K}.fromCatalog`)}
+          <//>
+        <//>
       `}
-    </div>
+    <//>
   `;
 }

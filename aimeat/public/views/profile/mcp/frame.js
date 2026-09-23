@@ -9,6 +9,7 @@
  * @structure m · rel · day · toolLabel · initials · mayWord · buildRows · crumb · pageLinks · goTab
  * @usage import { m, buildRows, crumb, pageLinks } from './frame.js';
  * @version-history
+ *   2026-09-22 -- The crumb is the shared trail's entries and the rail links are shared Actions; no own CSS.
  *   v1.0.0 — 2026-09-02 — Initial (design canvas "AIMEAT MCP-sivu", direction A).
  */
 import { h } from 'preact';
@@ -18,6 +19,7 @@ import { t } from '/js/i18n.js';
 import { date as fmtDate } from '/js/format.js';
 import { formatRelativeTime } from '/views/profile/memory-tab/helpers.js';
 import { detectTemplate, expandScopes } from '/views/profile/agents/scope-model.js';
+import { Stack, Action, Text } from '/components/poster-parts.js';
 
 export const m = (key, vars) => t('mcppage.' + key, vars);
 // The locale() helper here derived the FORMAT from the LANGUAGE. They are different settings:
@@ -84,15 +86,18 @@ export function buildRows(agents, instances) {
   return [...agentRows, ...toolRows].sort((a, b) => Date.parse(b.when || 0) - Date.parse(a.when || 0));
 }
 
+/** The trail: Settings & Controls, Automation, MCP. */
 export function crumb() {
-  return html`<div class="og-crumb"><span>${t('nav.profile')}</span><span>/</span><span>${t('profile.landing.menuAutomation')}</span><span>/</span><span class="og-crumb-here">${t('profile.tabs.mcp')}</span></div>`;
+  return [{ label: t('nav.profile') }, { label: t('profile.landing.menuAutomation') }, { label: t('profile.tabs.mcp') }];
 }
 
 const openTab = (tabId) => window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId } }));
 export const goTab = openTab;
 export function pageLinks() {
-  return html`
-    <button type="button" class="og-rail-link" onClick=${() => openTab('agents')}><i>→</i>${t('profile.tabs.agents')}<em>→</em></button>
-    <button type="button" class="og-rail-link" onClick=${() => openTab('organisms')}><i>→</i>${t('profile.tabs.organisms')}<em>→</em></button>
-    <a class="og-rail-link" href="/v1/chat"><i>→</i>${t('nav.chat')}<em>→</em></a>`;
+  return html`<${Stack} density="compact">
+    <${Text} kind="label">${m('pages')}<//>
+    <${Action} kind="text" onClick=${() => openTab('agents')}>${t('profile.tabs.agents')} →<//>
+    <${Action} kind="text" onClick=${() => openTab('organisms')}>${t('profile.tabs.organisms')} →<//>
+    <${Action} kind="text" href="/v1/chat">${t('nav.chat')} →<//>
+  <//>`;
 }

@@ -25,6 +25,10 @@
  * @structure NewAgentPanel({ session, showToast, onCreated, agents, open, setOpen, onWaiting })
  * @usage <${NewAgentPanel} session=${session} showToast=${showToast} onCreated=${loadData} />
  * @version-history
+ *   v3.0.0 -- 2026-09-22 -- Composed from the shared set (components/poster-parts.js): the form is
+ *     Fields, the starting shape and the reach and run choices are radio groups of the shared tab
+ *     action (a shape's description stands under its name), the proposals are list rows with their
+ *     approve and decline actions. No class of its own.
  *   v2.0.0 — 2026-09-14 — The poster face (design canvas "Your Agents"): a B1 section whose form is a
  *     label column with underlined fields, the starting shape as four tiles, reach and run as
  *     choice groups, one slab. The open state comes from the page, so its NEW AGENT slab can open
@@ -40,7 +44,7 @@ import { t } from '/js/i18n.js';
 import { apiGet, apiPost } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
 import { areaLine } from '/js/consent-vocab.js';
-import { Section } from '/views/profile/organisms/poster-parts.js';
+import { Section, Stack, Columns, ListRow, Field, Action, Text } from '/components/poster-parts.js';
 import { CREW_TEMPLATES, buildTemplate } from './crew-templates.js';
 import { SCOPE_TEMPLATES } from './scope-model.js';
 
@@ -167,108 +171,104 @@ export default function NewAgentPanel({ session, showToast, onCreated, agents, o
   // is the ordinary case, and a repair only the creating tab knows about is no repair at all.
   const unattached = (agents ?? []).filter(a => a.identity_version === 2 && a.card_enrolled === false);
 
-  const door = html`<button type="button" class="og-door og-door--quiet" onClick=${() => setOpen(!open)}>${open ? p('close') : p('open')}</button>`;
+  const door = html`<${Action} expanded=${open} onClick=${() => setOpen(!open)}>${open ? p('close') : p('open')}<//>`;
   const shapes = [...CREW_TEMPLATES.map(tpl => ({ id: tpl.id, name: t(tpl.nameKey), desc: t(tpl.descKey) })),
     { id: 'none', name: t('profile.agents.new.shapeNone'), desc: t('profile.agents.new.shapeNoneHint') }];
 
+  /** A labelled group of radio choices: the label, an optional note, the choices, an optional hint. */
+  const choices = (label, note, items, current, key, hint) => html`
+    <${Stack} density="compact">
+      <${Text} kind="label">${label}<//>
+      ${note && html`<${Text} kind="caption" tone="muted">${note}<//>`}
+      <${Stack} direction="wrap" role="radiogroup" label=${label}>
+        ${items.map(([v, word]) => html`
+          <${Action} kind="tab" semantics="radio" key=${v} selected=${current === v} onClick=${pick(key, v)}>${word}<//>`)}
+      <//>
+      ${hint && html`<${Text} kind="caption" tone="muted">${hint}<//>`}
+    <//>`;
+
   return html`
-    <${Section} id="agp-new" num="02" title=${t('profile.agents.new.title')}
-      count=${waiting.length > 0 ? p('waitingCount', { n: waiting.length }) : null} doors=${door}>
+    <${Section} id="agp-new" density="compact" title=${t('profile.agents.new.title')}
+      count=${waiting.length > 0 ? p('waitingCount', { n: waiting.length }) : '02'} actions=${door}>
+      <${Stack}>
       ${!open && waiting.length === 0 && unattached.length === 0
-        ? html`<p class="agp-folded">${t('profile.agents.new.desc')}</p>`
+        ? html`<${Text} tone="muted">${t('profile.agents.new.desc')}<//>`
         : null}
 
       ${open && html`
-        <p class="agp-lead">${t('profile.agents.new.desc')}</p>
-        <div class="agp-form">
-          <div class="agp-form-k">${t('profile.agents.new.name')}<small>${t('profile.agents.new.nameHint')}</small></div>
-          <div class="agp-form-v"><input class="og-input" type="text" value=${form.name} onInput=${set('name')} placeholder="news-watcher" /></div>
+        <${Text} kind="lead">${t('profile.agents.new.desc')}<//>
+        <${Stack}>
+          <${Field} label=${t('profile.agents.new.name')} hint=${t('profile.agents.new.nameHint')}
+            value=${form.name} onInput=${set('name')} placeholder="news-watcher" />
+          <${Field} label=${t('profile.agents.new.displayName')}
+            value=${form.displayName} onInput=${set('displayName')} placeholder=${form.name ? form.name : ''} />
+          <${Field} type="textarea" rows=${2} label=${t('profile.agents.new.purpose')}
+            value=${form.purpose} onInput=${set('purpose')} placeholder=${t('profile.agents.new.purposePlaceholder')} />
 
-          <div class="agp-form-k">${t('profile.agents.new.displayName')}</div>
-          <div class="agp-form-v"><input class="og-input" type="text" value=${form.displayName} onInput=${set('displayName')} placeholder=${form.name ? form.name : ''} /></div>
+          <${Stack} density="compact">
+            <${Text} kind="label">${t('profile.agents.new.shape')}<//>
+            <${Text} kind="caption" tone="muted">${p('shapeHint')}<//>
+            <${Stack} role="radiogroup" label=${t('profile.agents.new.shape')}>
+              <${Columns} layout="quarters" collapse="900">
+                ${shapes.map(s => html`
+                  <${Stack} density="compact" key=${s.id}>
+                    <${Action} kind="tab" semantics="radio" selected=${form.template === s.id} onClick=${pick('template', s.id)}>${s.name}<//>
+                    <${Text} kind="caption" tone="muted">${s.desc}<//>
+                  <//>`)}
+              <//>
+            <//>
+          <//>
 
-          <div class="agp-form-k">${t('profile.agents.new.purpose')}</div>
-          <div class="agp-form-v"><textarea class="og-textarea" rows="2" value=${form.purpose} onInput=${set('purpose')}
-            placeholder=${t('profile.agents.new.purposePlaceholder')}></textarea></div>
+          ${/* The wildcard has no areas to name — areaLine renders it as a bare asterisk, which
+                tells the reader nothing about what they are handing over. */''}
+          ${choices(t('profile.agents.new.reaches'),
+            form.scopes === 'full' ? t('profile.agents.new.scopesFullHint') : areaLine(scopeList, t),
+            [['readonly', 'scopesReadonly'], ['standard', 'scopesStandard'], ['full', 'scopesFull']].map(([v, key]) => [v, t('profile.agents.new.' + key)]),
+            form.scopes, 'scopes', null)}
 
-          <div class="agp-form-k">${t('profile.agents.new.shape')}<small>${p('shapeHint')}</small></div>
-          <div class="agp-form-v">
-            <div class="agp-choices" role="radiogroup" aria-label=${t('profile.agents.new.shape')}>
-              ${shapes.map(s => html`
-                <button type="button" key=${s.id} class=${`poster-choice ${form.template === s.id ? 'on' : ''}`}
-                  role="radio" aria-checked=${form.template === s.id ? 'true' : 'false'} onClick=${pick('template', s.id)}>
-                  <b>${s.name}</b>${s.desc}
-                </button>`)}
-            </div>
-          </div>
+          ${choices(t('profile.agents.new.runModeLabel'), null,
+            ['spawn', 'resident'].map(v => [v, t('profile.agents.runMode.' + v)]),
+            form.runMode, 'runMode',
+            form.runMode === 'spawn' ? t('profile.agents.new.runModeSpawnHint') : t('profile.agents.new.runModeResidentHint'))}
 
-          <div class="agp-form-k">${t('profile.agents.new.reaches')}
-            ${/* The wildcard has no areas to name — areaLine renders it as a bare asterisk, which
-                  tells the reader nothing about what they are handing over. */''}
-            <small>${form.scopes === 'full' ? t('profile.agents.new.scopesFullHint') : areaLine(scopeList, t)}</small>
-          </div>
-          <div class="agp-form-v">
-            <div class="og-choice" role="radiogroup" aria-label=${t('profile.agents.new.reaches')}>
-              ${[['readonly', 'scopesReadonly'], ['standard', 'scopesStandard'], ['full', 'scopesFull']].map(([v, key]) => html`
-                <button type="button" key=${v} class=${`og-choice-btn ${form.scopes === v ? 'on' : ''}`}
-                  role="radio" aria-checked=${form.scopes === v ? 'true' : 'false'} onClick=${pick('scopes', v)}>
-                  ${t('profile.agents.new.' + key)}
-                </button>`)}
-            </div>
-          </div>
-
-          <div class="agp-form-k">${t('profile.agents.new.runModeLabel')}</div>
-          <div class="agp-form-v">
-            <div class="og-choice" role="radiogroup" aria-label=${t('profile.agents.new.runModeLabel')}>
-              ${['spawn', 'resident'].map(v => html`
-                <button type="button" key=${v} class=${`og-choice-btn ${form.runMode === v ? 'on' : ''}`}
-                  role="radio" aria-checked=${form.runMode === v ? 'true' : 'false'} onClick=${pick('runMode', v)}>
-                  ${t('profile.agents.runMode.' + v)}
-                </button>`)}
-            </div>
-            <p class="agp-hint">${form.runMode === 'spawn' ? t('profile.agents.new.runModeSpawnHint') : t('profile.agents.new.runModeResidentHint')}</p>
-          </div>
-
-          <div class="agp-form-actions">
-            <button type="button" class="og-slab" disabled=${busy} onClick=${create}>
+          <${Stack} direction="wrap" align="center">
+            <${Action} kind="primary" disabled=${busy} onClick=${create}>
               ${busy ? t('profile.agents.new.working') : t('profile.agents.new.create')}
-            </button>
-            <button type="button" class="og-door" onClick=${() => setOpen(false)}>${t('profile.agents.detail.zone2.cancel')}</button>
-          </div>
-        </div>`}
+            <//>
+            <${Action} onClick=${() => setOpen(false)}>${t('profile.agents.detail.zone2.cancel')}<//>
+          <//>
+        <//>`}
 
       ${unattached.map(a => html`
-        <div class="agp-attach" key=${a.gaii || a.name}>
-          <span>${t('profile.agents.new.attachHint').replace('{name}', a.display_name || a.name)}</span>
-          <button type="button" class="og-door" disabled=${busy} onClick=${() => attach(a)}>
-            ${t('profile.agents.new.attach')}
-          </button>
-        </div>`)}
+        <${ListRow} key=${a.gaii || a.name} detailKind="text"
+          name=${a.display_name || a.name}
+          detail=${t('profile.agents.new.attachHint').replace('{name}', a.display_name || a.name)}
+          actions=${html`<${Action} disabled=${busy} onClick=${() => attach(a)}>${t('profile.agents.new.attach')}<//>`} />`)}
 
       ${waiting.length > 0 && html`
-        <div class="agp-waiting poster-row--thing">
-          <span class="og-label">${t('profile.agents.new.waitingTitle')}</span>
+        <${Stack} density="compact">
+          <${Text} kind="label">${t('profile.agents.new.waitingTitle')}<//>
+          <div>
           ${waiting.map(pr => html`
-            <div class="agp-waiting-row" key=${pr.id}>
-              <div>
-                <div class="agp-waiting-name">${pr.display_name || pr.name}</div>
-                <div class="agp-waiting-desc">${pr.purpose}</div>
-                <div class="agp-waiting-meta">
-                  ${t('profile.agents.new.proposedBy').replace('{who}', pr.proposed_by)}
-                  ${(pr.scopes ?? []).length > 0 && html` · ${areaLine(pr.scopes, t)}`}
-                  ${!pr.crew_def && html` · ${t('profile.agents.new.noDefinition')}`}
-                </div>
-              </div>
-              <div class="agp-waiting-actions">
-                <button type="button" class="og-slab" disabled=${busy} onClick=${() => settle(pr, 'approve')}>
+            <${ListRow} key=${pr.id} detailKind="text"
+              name=${pr.display_name || pr.name}
+              detail=${pr.purpose}
+              actions=${html`
+                <${Action} kind="primary" disabled=${busy} onClick=${() => settle(pr, 'approve')}>
                   ${t('profile.agents.new.approve')}
-                </button>
-                <button type="button" class="og-door" disabled=${busy} onClick=${() => settle(pr, 'decline')}>
+                <//>
+                <${Action} disabled=${busy} onClick=${() => settle(pr, 'decline')}>
                   ${t('profile.agents.new.decline')}
-                </button>
-              </div>
-            </div>`)}
-        </div>`}
+                <//>`}>
+              <${Text} kind="mono" tone="muted">
+                ${t('profile.agents.new.proposedBy').replace('{who}', pr.proposed_by)}
+                ${(pr.scopes ?? []).length > 0 && html` · ${areaLine(pr.scopes, t)}`}
+                ${!pr.crew_def && html` · ${t('profile.agents.new.noDefinition')}`}
+              <//>
+            <//>`)}
+          </div>
+        <//>`}
+      <//>
     <//>
   `;
 }

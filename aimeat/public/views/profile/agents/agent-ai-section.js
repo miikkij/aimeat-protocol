@@ -19,6 +19,9 @@
  * @structure AgentAiSection({ agentName, showToast })
  * @usage import { AgentAiSection } from './agent-ai-section.js';
  * @version-history
+ *   2026-09-22 -- Composed from the shared parts (Section, Field, Action, NumeralBand, ListRow, Text);
+ *     it no longer borrows the scheduler's, organism's and AI tab's classes. The key and variable
+ *     fields carry a visible label now, the words that were their placeholder and aria-label.
  *   v1.0.0 — 2026-09-20 — Initial: a key per agent.
  */
 import { h } from 'preact';
@@ -27,6 +30,7 @@ import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { apiGet, apiPut, apiPost, apiDelete } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
+import { Section, Stack, Columns, Field, Action, NumeralBand, ListRow, Text } from '/components/poster-parts.js';
 
 const html = htm.bind(h);
 const MODELS = ['decide', 'openrouter'];
@@ -111,81 +115,78 @@ export function AgentAiSection({ agentName, showToast }) {
   const q = data.quality || {};
 
   return html`
-    <div class="sch-form poster-row--thing pf-aai" id="agent-ai-section">
-      <div class="pf-agd-section-title">${t('agentAi.title')}</div>
-      <div class="section-desc">${t('agentAi.desc')}</div>
+    <${Section} size="small" density="compact" id="agent-ai-section" title=${t('agentAi.title')} description=${t('agentAi.desc')}>
+      <${Stack}>
+        ${MODELS.map(model => html`
+          <${Stack} key=${model} density="compact">
+            <${Text} kind="label">${t(`agentAi.model.${model}`)}<//>
+            <${Text}>${data[model].has_key
+              ? t('agentAi.keySet', { when: String(data[model].set_at || '').slice(0, 10) })
+              : t('agentAi.keyNotSet')}<//>
+            <${Columns} density="compact" collapse="560">
+              <${Field} type="password" autoComplete="off" label=${t('agentAi.keyLabel')} placeholder=${t('agentAi.keyLabel')}
+                value=${keys[model]} disabled=${!!busy} onInput=${e => setKeys(k => ({ ...k, [model]: e.currentTarget.value }))} />
+              <${Field} label=${t('agentAi.envLabel')} placeholder=${t(`agentAi.envHint.${model}`)}
+                value=${envs[model]} disabled=${!!busy} onInput=${e => setEnvs(x => ({ ...x, [model]: e.currentTarget.value }))} />
+            <//>
+            <${Text} kind="caption" tone="muted">${t('agentAi.envHelp')}<//>
+            <${Stack} direction="wrap" density="compact">
+              <${Action} disabled=${!!busy} onClick=${() => saveKey(model)}>${t('agentAi.save')}<//>
+              <${Action} kind="text" disabled=${!!busy} onClick=${() => test(model)}>
+                ${busy === model ? t('agentAi.testing') : t('agentAi.test')}<//>
+              ${(data[model].has_key || data[model].key_env) && html`
+                <${Action} kind="text" disabled=${!!busy} onClick=${() => forget(model)}>${t('agentAi.forget')}<//>`}
+            <//>
+            ${tested[model] && html`
+              <div role="status">
+                <${Text} tone=${tested[model].ok ? 'success' : 'danger'}>
+                  ${tested[model].ok
+                    ? t(`agentAi.testOk.${tested[model].key_source}`, { model: tested[model].model || '' })
+                    : (tested[model].message || t('agentAi.testFailed'))}
+                <//>
+              </div>`}
+          <//>`)}
 
-      ${MODELS.map(model => html`
-        <div class="pf-aai-model" key=${model}>
-          <div class="pf-aai-model-title">${t(`agentAi.model.${model}`)}</div>
-          <p class="pf-aitr-note">${data[model].has_key
-            ? t('agentAi.keySet', { when: String(data[model].set_at || '').slice(0, 10) })
-            : t('agentAi.keyNotSet')}</p>
-          <div class="pf-aai-row">
-            <input class="og-input" type="password" autocomplete="off" data-1p-ignore data-lpignore="true"
-                   aria-label=${t('agentAi.keyLabel')} placeholder=${t('agentAi.keyLabel')}
-                   value=${keys[model]} disabled=${!!busy} onInput=${e => setKeys(k => ({ ...k, [model]: e.currentTarget.value }))} />
-            <input class="og-input og-input--mono" aria-label=${t('agentAi.envLabel')} placeholder=${t(`agentAi.envHint.${model}`)}
-                   value=${envs[model]} disabled=${!!busy} onInput=${e => setEnvs(x => ({ ...x, [model]: e.currentTarget.value }))} />
-          </div>
-          <p class="pf-aitr-muted">${t('agentAi.envHelp')}</p>
-          <div class="og-doors">
-            <button type="button" class="og-door" disabled=${!!busy} onClick=${() => saveKey(model)}>${t('agentAi.save')}</button>
-            <button type="button" class="og-door og-door--quiet" disabled=${!!busy} onClick=${() => test(model)}>
-              ${busy === model ? t('agentAi.testing') : t('agentAi.test')}</button>
-            ${(data[model].has_key || data[model].key_env) && html`
-              <button type="button" class="og-door og-door--quiet" disabled=${!!busy} onClick=${() => forget(model)}>${t('agentAi.forget')}</button>`}
-          </div>
-          ${tested[model] && html`
-            <p class=${tested[model].ok ? 'pf-aitr-note' : 'pf-aitr-error'} role="status">
-              ${tested[model].ok
-                ? t(`agentAi.testOk.${tested[model].key_source}`, { model: tested[model].model || '' })
-                : (tested[model].message || t('agentAi.testFailed'))}
-            </p>`}
-        </div>`)}
+        <${Stack} density="compact">
+          <${Text} kind="label">${t('agentAi.capTitle')}<//>
+          <${Text}>${t('agentAi.capDesc', { spent: money(data.spent_today_usd) })}<//>
+          <${Stack} direction="wrap" align="end" density="compact">
+            <${Field} type="number" min="0" step="0.1" label=${t('agentAi.capLabel')} placeholder=${t('agentAi.capNone')}
+              value=${cap} disabled=${!!busy} onInput=${e => setCap(e.currentTarget.value)} />
+            <${Action} disabled=${!!busy}
+              onClick=${() => put({ daily_usd: cap.trim() === '' ? null : Number(cap) }, 'agentAi.saved')}>${t('agentAi.save')}<//>
+          <//>
+        <//>
 
-      <div class="pf-aai-model">
-        <div class="pf-aai-model-title">${t('agentAi.capTitle')}</div>
-        <p class="pf-aitr-note">${t('agentAi.capDesc', { spent: money(data.spent_today_usd) })}</p>
-        <div class="pf-aai-row">
-          <input class="og-input" type="number" min="0" step="0.1" aria-label=${t('agentAi.capLabel')} placeholder=${t('agentAi.capNone')}
-                 value=${cap} disabled=${!!busy} onInput=${e => setCap(e.currentTarget.value)} />
-          <button type="button" class="og-door" disabled=${!!busy}
-                  onClick=${() => put({ daily_usd: cap.trim() === '' ? null : Number(cap) }, 'agentAi.saved')}>${t('agentAi.save')}</button>
-        </div>
-      </div>
+        <${Stack} density="compact">
+          <${Text} kind="label">${t('agentAi.gateTitle')}<//>
+          <${Text}>${t('agentAi.gateDesc')}<//>
+          <${Stack} direction="wrap" density="compact" role="radiogroup" label=${t('agentAi.gateTitle')}>
+            ${['rule', 'on', 'off'].map(g => html`
+              <${Action} key=${g} kind="tab" semantics="radio" selected=${data.gate === g} disabled=${!!busy}
+                onClick=${() => put({ gate: g }, 'agentAi.saved')}>${t(`agentAi.gate.${g}`)}<//>`)}
+          <//>
+        <//>
 
-      <div class="pf-aai-model">
-        <div class="pf-aai-model-title">${t('agentAi.gateTitle')}</div>
-        <p class="pf-aitr-note">${t('agentAi.gateDesc')}</p>
-        <div class="og-choice" role="radiogroup" aria-label=${t('agentAi.gateTitle')}>
-          ${['rule', 'on', 'off'].map(g => html`
-            <button type="button" key=${g} role="radio" aria-checked=${data.gate === g}
-                    class=${`og-choice-btn ${data.gate === g ? 'on' : ''}`} disabled=${!!busy}
-                    onClick=${() => put({ gate: g }, 'agentAi.saved')}>${t(`agentAi.gate.${g}`)}</button>`)}
-        </div>
-      </div>
-
-      <div class="pf-aai-model">
-        <div class="pf-aai-model-title">${t('agentAi.qualityTitle')}</div>
-        <div class="pf-aitr-stats">
-          <div class="pf-aitr-stat"><span class="pf-aitr-num">${q.decisions ?? 0}</span><span class="pf-aitr-lbl">${t('agentAi.q.decisions')}</span></div>
-          <div class="pf-aitr-stat"><span class="pf-aitr-num">${q.gateStops ?? 0}</span><span class="pf-aitr-lbl">${t('agentAi.q.gateStops')}</span></div>
-          <div class="pf-aitr-stat"><span class="pf-aitr-num">${q.overridden ?? 0}</span><span class="pf-aitr-lbl">${t('agentAi.q.overridden')}</span></div>
-          <div class="pf-aitr-stat"><span class="pf-aitr-num">${money(q.costUsd)}</span><span class="pf-aitr-lbl">${t('agentAi.q.cost')}</span></div>
-        </div>
-        ${Object.keys(data.quality_by_rule || {}).length > 0 && html`
-          <ul class="pf-aitr-list pf-aai-rules">
-            ${Object.entries(data.quality_by_rule).map(([rule, r]) => html`
-              <li key=${rule} class="pf-aitr-row">
-                <span class="pf-aitr-row-main">${rule}</span>
-                <span class="pf-aitr-row-meta">${t('agentAi.q.perRule', {
-                  decisions: String(r.decisions), stops: String(r.gateStops), overridden: String(r.overridden), cost: money(r.costUsd),
-                })}</span>
-              </li>`)}
-          </ul>`}
-      </div>
-    </div>`;
+        <${Stack} density="compact">
+          <${Text} kind="label">${t('agentAi.qualityTitle')}<//>
+          <${NumeralBand} size="small" tone="plain" items=${[
+            { id: 'decisions', label: t('agentAi.q.decisions'), value: q.decisions ?? 0 },
+            { id: 'gateStops', label: t('agentAi.q.gateStops'), value: q.gateStops ?? 0 },
+            { id: 'overridden', label: t('agentAi.q.overridden'), value: q.overridden ?? 0 },
+            { id: 'cost', label: t('agentAi.q.cost'), value: money(q.costUsd) },
+          ]} />
+          ${Object.keys(data.quality_by_rule || {}).length > 0 && html`
+            <${Stack} density="compact">
+              ${Object.entries(data.quality_by_rule).map(([rule, r]) => html`
+                <${ListRow} key=${rule} density="compact" detailKind="text" name=${rule}
+                  detail=${t('agentAi.q.perRule', {
+                    decisions: String(r.decisions), stops: String(r.gateStops), overridden: String(r.overridden), cost: money(r.costUsd),
+                  })} />`)}
+            <//>`}
+        <//>
+      <//>
+    <//>`;
 }
 
 export default AgentAiSection;

@@ -10,6 +10,8 @@
  * @structure WorkspaceList
  * @usage import { WorkspaceList } from '/views/profile/organisms/workspace-list.js';
  * @version-history
+ *   v1.2.0 -- 2026-09-22 -- Composed from the shared set (ListRow, Menu, Field, Fold, Chip): no class of
+ *     its own; the emoji marks are gone (the participants count is a worded toggle), the archived list is a Fold.
  *   v1.1.0 -- 2026-09-13 -- Compose list and guide rules from poster.css; retire unused list rules.
  *   v1.0.1 — 2026-08-29 — The description line above the bar is gone: the organism home's Workspaces
  *     section carries it under the list, where it reads as a note rather than a preface.
@@ -31,9 +33,8 @@ import htm from 'htm';
 import { onLiveUpdate } from '/lib/live-updates.js';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { Spinner, KebabMenu } from '/views/profile/shared.js';
 import { useConfirm } from '/components/Modal.js';
-import { EmptyState } from '/components/EmptyState.js';
+import { Stack, ListRow, Chip, Action, Menu, Field, Fold, Surface, Text } from '/components/poster-parts.js';
 import { Mermaid } from '/components/Mermaid.js';
 import * as orgService from '/js/services/organisms.js';
 import * as memoryService from '/js/services/memory.js';
@@ -271,125 +272,111 @@ export function WorkspaceList({ org, showToast, onOpen, onCount }) {
     return parts.join(' · ');
   };
 
-  return html`
-    <div class="pj-ws-embedded">
-      <${ConfirmUI} />
-      <input type="file" accept=".zip,application/zip" ref=${fileRef} class="pj-hidden-input" onChange=${(e) => { const f = e.target.files && e.target.files[0]; e.target.value = ''; doImport(f); }} />
+  const sortField = activeSorted.length > 1 ? html`
+    <${Field} type="select" label=${t('organisms.sortTitle') || 'Sort'} value=${sortMode}
+      onChange=${(e) => { const m = e.target.value; setSortMode(m); savePrefs(customOrder, m); }} options=${[
+        { value: 'custom', label: t('organisms.sortCustom') || 'My order' },
+        { value: 'name', label: t('organisms.sortName') || 'Name A–Z' },
+        { value: 'newest', label: t('organisms.sortNewest') || 'Newest first' },
+      ]} />` : null;
 
-      <div class="pj-ws-bar">
-        ${creating ? html`
-          <input class="input-field input-sm pj-ws-name-input" autofocus placeholder=${t('organisms.workspaceName') || 'Workspace name'}
-            value=${newName} onInput=${e => setNewName(e.target.value)} onKeyDown=${e => { if (e.key === 'Enter') create(); }} />
-          <button class="btn-primary btn-sm" onClick=${create} disabled=${busy || !newName.trim()}>${t('organisms.create') || 'Create'}</button>
-          <button class="btn-ghost btn-sm" onClick=${() => { setCreating(false); setNewName(''); }}>${t('organisms.cancel') || 'Cancel'}</button>
-        ` : html`
-          <button class="btn-primary btn-sm" onClick=${() => setCreating(true)}>${'+ '}${t('organisms.newWorkspace') || 'New workspace'}</button>
-          <button class="btn-outline btn-sm" disabled=${busy} title=${t('organisms.importHint') || 'Restore a workspace from a .zip backup'} onClick=${() => fileRef.current && fileRef.current.click()}>${'⬆ '}${t('organisms.import') || 'Import'}</button>
-          ${overview ? html`<button class="btn-outline btn-sm ${showOverview ? 'pj-org-btn-active' : ''}" onClick=${() => setShowOverview(s => !s)}>${'🗺 '}${t('organisms.showMap') || 'Map'}</button>` : null}
-          ${activeSorted.length > 1 ? html`
-            <select class="input-field input-sm pj-org-sort" title=${t('organisms.sortTitle') || 'Sort'} value=${sortMode}
-              onChange=${(e) => { const m = e.target.value; setSortMode(m); savePrefs(customOrder, m); }}>
-              <option value="custom">${t('organisms.sortCustom') || 'My order'}</option>
-              <option value="name">${t('organisms.sortName') || 'Name A–Z'}</option>
-              <option value="newest">${t('organisms.sortNewest') || 'Newest first'}</option>
-            </select>` : null}`}
-      </div>
+  const renderWsRow = (w, canDrag) => {
+    const locked = w.access === 'none';
+    const reviews = apprByWs[w.id] || 0;
+    const owners = wsStats[w.id]?.owners || [];
+    const menuItems = w.access === 'owner' ? [
+      { label: t('organisms.requests') || 'Access requests', onClick: () => toggleInbox(w) },
+      { label: t('organisms.export') || 'Export backup (.zip)', onClick: () => doExport(w) },
+      w.archived
+        ? { label: t('organisms.unarchive') || 'Unarchive', onClick: () => setArchived(w, false) }
+        : { label: t('organisms.archive') || 'Archive', onClick: () => setArchived(w, true) },
+      { label: t('organisms.delete') || 'Delete', danger: true, onClick: () => remove(w.id, w.name || w.id) },
+    ] : [];
+    // The row is dragged by a plain wrapper, because a list row takes no drag handlers.
+    return html`
+      <div key=${w.id}
+        draggable=${canDrag}
+        onDragStart=${canDrag ? ((e) => { dragIdRef.current = w.id; e.dataTransfer.effectAllowed = 'move'; }) : undefined}
+        onDragOver=${canDrag ? ((e) => { e.preventDefault(); setDragOverId(w.id); }) : undefined}
+        onDragLeave=${canDrag ? (() => setDragOverId(d => (d === w.id ? null : d))) : undefined}
+        onDrop=${canDrag ? (() => onDropRow(w.id)) : undefined}
+        onDragEnd=${canDrag ? (() => { dragIdRef.current = null; setDragOverId(null); }) : undefined}>
+        <${ListRow} density="compact" selected=${dragOverId === w.id} detailKind="text"
+          name=${w.name || w.id} onOpen=${locked ? undefined : (() => onOpen(w.id))}
+          detail=${locked ? (t('organisms.byCreator') || 'by {creator}').replace('{creator}', w.created_by || '?') : metaLine(w)}
+          value=${w.created_at ? fmtDate(w.created_at) : undefined}
+          actions=${html`
+            ${w.archived ? html`<${Chip} tone="muted" title=${t('organisms.archivedHint') || 'Archived — read-only, hidden from AI operations'}>${t('organisms.archived') || 'archived'}<//>` : null}
+            ${reviews > 0 ? html`<${Chip} tone="sun">${(t('organisms.toReview') || '{n} to review').replace('{n}', String(reviews))}<//>` : null}
+            ${owners.length > 0 ? html`<${Action} kind="tab" selected=${openPeopleWs === w.id} expanded=${openPeopleWs === w.id}
+              onClick=${(e) => { e.stopPropagation(); setOpenPeopleWs(p => (p === w.id ? null : w.id)); }}>${t('organisms.participants') || 'Who works here'} ${owners.length}<//>` : null}
+            ${locked
+              ? html`<${Action} disabled=${busy} onClick=${() => requestAccess(w)}>${t('organisms.requestAccess') || 'Request access'}<//>`
+              : html`<${Action} onClick=${() => onOpen(w.id)}>${t('organisms.open') || 'Open'}<//>`}
+            ${menuItems.length ? html`<${Menu} label=${t('organisms.moreActions') || 'More actions'} items=${menuItems} />` : null}`}>
+          ${openPeopleWs === w.id ? html`<${Stack} density="compact">
+            ${owners.map(o => html`<${ListRow} key=${'p-' + o.owner} density="compact" name=${o.owner}
+              detail=${!o.isLocalNode ? o.node : undefined}
+              value=${(o.agents || []).length > 0 ? `${t('organisms.attachedAgents') || 'Attached agents'} ${(o.agents || []).length}` : undefined}
+              actions=${o.isCreator || o.isSelf ? html`
+                ${o.isCreator ? html`<${Chip} tone="sun">${t('organisms.creatorTag') || 'creator'}<//>` : null}
+                ${o.isSelf ? html`<${Chip}>${t('organisms.you') || 'you'}<//>` : null}` : undefined} />`)}
+          <//>` : null}
+          ${openReqWs === w.id ? html`<${Stack} density="compact">
+            ${reqInbox.length === 0 ? html`<${Text} kind="caption" tone="muted">${t('organisms.noRequests') || 'No access requests.'}<//>`
+              : reqInbox.map(r => html`<${ListRow} key=${r.requester} density="compact" name=${r.requester}
+                  detail=${r.message ? `— ${r.message}` : undefined} detailKind="text"
+                  actions=${r.status === 'approved'
+                    ? html`<${Text} kind="caption" tone="success">✓ ${t('organisms.approved') || 'approved'}<//><${Action} disabled=${busy} onClick=${() => decide(w, r.requester, 'deny')}>${t('organisms.revoke') || 'Revoke'}<//>`
+                    : html`<${Action} disabled=${busy} onClick=${() => decide(w, r.requester, 'approve')}>${t('organisms.approve') || 'Approve'}<//><${Action} disabled=${busy} onClick=${() => decide(w, r.requester, 'deny')}>${t('organisms.deny') || 'Deny'}<//>`} />`)}
+          <//>` : null}
+        <//>
+      </div>`;
+  };
 
-      <${OrgSearch} orgId=${orgId} onOpenWorkspace=${(ws) => onOpen(ws)} />
+  return html`<${Stack}>
+    <${ConfirmUI} />
+    <input type="file" accept=".zip,application/zip" ref=${fileRef} hidden onChange=${(e) => { const f = e.target.files && e.target.files[0]; e.target.value = ''; doImport(f); }} />
 
-      ${list === null ? html`<${Spinner} />`
-        : list.length === 0 ? html`<${EmptyState} icon="🗂️" text=${t('organisms.noWorkspaces') || 'No workspaces yet — create one to get started.'} />`
-        : (() => {
-          const renderWsRow = (w, canDrag) => {
-            const locked = w.access === 'none';
-            const reviews = apprByWs[w.id] || 0;
-            const menuItems = w.access === 'owner' ? [
-              { label: t('organisms.requests') || 'Access requests', icon: '👥', onClick: () => toggleInbox(w) },
-              { label: t('organisms.export') || 'Export backup (.zip)', icon: '⬇', onClick: () => doExport(w) },
-              w.archived
-                ? { label: t('organisms.unarchive') || 'Unarchive', icon: '♻️', onClick: () => setArchived(w, false) }
-                : { label: t('organisms.archive') || 'Archive', icon: '🗄️', onClick: () => setArchived(w, true) },
-              { label: t('organisms.delete') || 'Delete', danger: true, onClick: () => remove(w.id, w.name || w.id) },
-            ] : [];
-            return html`
-            <div class="pj-org-row ${dragOverId === w.id ? 'pj-org-drag-over' : ''}" key=${w.id}
-              draggable=${canDrag}
-              onDragStart=${canDrag ? ((e) => { dragIdRef.current = w.id; e.dataTransfer.effectAllowed = 'move'; }) : undefined}
-              onDragOver=${canDrag ? ((e) => { e.preventDefault(); setDragOverId(w.id); }) : undefined}
-              onDragLeave=${canDrag ? (() => setDragOverId(d => (d === w.id ? null : d))) : undefined}
-              onDrop=${canDrag ? (() => onDropRow(w.id)) : undefined}
-              onDragEnd=${canDrag ? (() => { dragIdRef.current = null; setDragOverId(null); }) : undefined}>
-              <div class="pj-org-avatar" aria-hidden="true">${'🗂'}</div>
-              <div class="pj-org-main ${locked ? 'pj-org-main-static' : ''}" role=${locked ? undefined : 'button'} tabindex=${locked ? undefined : '0'}
-                onClick=${locked ? undefined : (() => onOpen(w.id))}
-                onKeyDown=${locked ? undefined : ((e) => { if (e.key === 'Enter') onOpen(w.id); })}>
-                <div class="pj-org-titlerow">
-                  ${locked ? html`<span class="pj-org-lock">${'🔒'}</span>` : null}
-                  <span class="pj-org-name">${(w.name || w.id)}</span>
-                  ${w.archived ? html`<span class="pj-tab-pill" title=${t('organisms.archivedHint') || 'Archived — read-only, hidden from AI operations'}>${'🗄️ '}${t('organisms.archived') || 'archived'}</span>` : null}
-                  ${reviews > 0 ? html`<span class="pj-tab-pill">${'📨 '}${(t('organisms.toReview') || '{n} to review').replace('{n}', String(reviews))}</span>` : null}
-                </div>
-                <div class="pj-org-desc">${locked
-                  ? (t('organisms.byCreator') || 'by {creator}').replace('{creator}', w.created_by || '?')
-                  : metaLine(w)}</div>
-              </div>
-              <div class="pj-org-stats">
-                ${(wsStats[w.id]?.owners || []).length > 0 ? html`
-                  <button class="pj-org-stat pj-stat-btn ${openPeopleWs === w.id ? 'active' : ''}" title=${t('organisms.participants') || 'Who works here'}
-                    onClick=${(e) => { e.stopPropagation(); setOpenPeopleWs(p => (p === w.id ? null : w.id)); }}>${'👥'} ${wsStats[w.id].owners.length}</button>` : null}
-                ${w.created_at ? html`<span class="pj-org-stat pj-org-date" title=${t('organisms.createdAt') || 'Created'}>${fmtDate(w.created_at)}</span>` : null}
-              </div>
-              ${locked
-                ? html`<button class="btn-outline btn-sm pj-org-openbtn" disabled=${busy} onClick=${() => requestAccess(w)}>${t('organisms.requestAccess') || 'Request access'}</button>`
-                : html`<button class="btn-outline btn-sm pj-org-openbtn" onClick=${() => onOpen(w.id)}>${t('organisms.open') || 'Open'}</button>`}
-              ${menuItems.length ? html`<${KebabMenu} label=${t('organisms.moreActions') || 'More actions'} items=${menuItems} />` : null}
-              ${openPeopleWs === w.id ? html`
-                <div class="pj-org-detail">
-                  ${(wsStats[w.id]?.owners || []).map(o => html`
-                    <div class="pj-ws-person" key=${'p-' + o.owner}>
-                      <span>${'👤 '}<strong>${(o.owner)}</strong></span>
-                      ${o.isCreator ? html`<span class="badge badge-success pj-mini">${t('organisms.creatorTag') || 'creator'}</span>` : null}
-                      ${o.isSelf ? html`<span class="badge badge-info pj-mini">${t('organisms.you') || 'you'}</span>` : null}
-                      ${!o.isLocalNode ? html`<span class="pj-mini">${'🌐 '}${(o.node)}</span>` : null}
-                      ${(o.agents || []).length > 0 ? html`<span class="pj-ws-person-agents">${'🤖'} ${(o.agents || []).length}</span>` : null}
-                    </div>`)}
-                </div>` : null}
-              ${openReqWs === w.id ? html`
-                <div class="pj-org-detail">
-                  ${reqInbox.length === 0 ? html`<div class="pj-ws-inbox-empty">${t('organisms.noRequests') || 'No access requests.'}</div>`
-                    : reqInbox.map(r => html`
-                      <div class="pj-ws-req" key=${r.requester}>
-                        <span class="pj-ws-req-who">${(r.requester)}${r.message ? html` <span class="pj-ws-req-msg">— ${(r.message)}</span>` : null}</span>
-                        ${r.status === 'approved'
-                          ? html`<span class="pj-ws-req-ok">✓ ${t('organisms.approved') || 'approved'}</span><button class="btn-ghost btn-sm" disabled=${busy} onClick=${() => decide(w, r.requester, 'deny')}>${t('organisms.revoke') || 'Revoke'}</button>`
-                          : html`<button class="btn-success btn-sm" disabled=${busy} onClick=${() => decide(w, r.requester, 'approve')}>${t('organisms.approve') || 'Approve'}</button><button class="btn-ghost btn-sm" disabled=${busy} onClick=${() => decide(w, r.requester, 'deny')}>${t('organisms.deny') || 'Deny'}</button>`}
-                      </div>`)}
-                </div>` : null}
-            </div>`;
-          };
-          // Active workspaces in the main list (reorderable); archived ones collapse into a section
-          // below (restorable, not reorderable). Ordering is a per-user preference (see activeSorted).
-          const archived = archivedList;
-          return html`
-            <div class="pj-org-list poster-row--thing">${activeSorted.map(w => renderWsRow(w, true))}</div>
-            ${sortMode === 'custom' && activeSorted.length > 1 ? html`
-              <div class="pj-org-hint">${t('organisms.reorderHint') || 'Drag rows to reorder — the order is saved to your profile.'}</div>` : null}
-            ${archived.length > 0 ? html`
-              <button class="pj-struct-toggle section-title-spaced" aria-expanded=${archivedOpen} onClick=${() => setArchivedOpen(o => !o)}>
-                <span class="pj-struct-caret">${archivedOpen ? '▾' : '▸'}</span>
-                <span>${'🗄️ '}${(t('organisms.archivedWorkspacesSection') || 'Archived workspaces ({n})').replace('{n}', String(archived.length))}</span>
-              </button>
-              ${archivedOpen ? html`<div class="pj-org-list poster-row--thing">${archived.map(w => renderWsRow(w, false))}</div>` : null}` : null}
-          `;
-        })()}
+    <${Stack} direction="wrap" align="end">
+      ${creating ? html`
+        <${Field} placeholder=${t('organisms.workspaceName') || 'Workspace name'} inputRef=${focusOnce}
+          value=${newName} onInput=${e => setNewName(e.target.value)} onKeyDown=${e => { if (e.key === 'Enter') create(); }} />
+        <${Action} kind="primary" onClick=${create} disabled=${busy || !newName.trim()}>${t('organisms.create') || 'Create'}<//>
+        <${Action} onClick=${() => { setCreating(false); setNewName(''); }}>${t('organisms.cancel') || 'Cancel'}<//>
+      ` : html`
+        <${Action} onClick=${() => setCreating(true)}>${t('organisms.newWorkspace') || 'New workspace'}<//>
+        <${Action} disabled=${busy} title=${t('organisms.importHint') || 'Restore a workspace from a .zip backup'} onClick=${() => fileRef.current && fileRef.current.click()}>${t('organisms.import') || 'Import'}<//>
+        ${overview ? html`<${Action} kind="tab" selected=${showOverview} onClick=${() => setShowOverview(s => !s)}>${t('organisms.showMap') || 'Map'}<//>` : null}
+        ${sortField}`}
+    <//>
 
-      ${overview && showOverview ? html`
-        <div class="pj-chart">
-          <div class="pj-chart-head">
-            <span class="pj-chart-title">${'🔗 '}${t('organisms.overview') || 'Overview — who & what uses this organism'}</span>
-            <button class="btn-ghost btn-sm" onClick=${() => setShowOverview(false)}>${t('organisms.hide') || 'Hide'}</button>
-          </div>
+    <${OrgSearch} orgId=${orgId} onOpenWorkspace=${(ws) => onOpen(ws)} />
+
+    ${list === null ? html`<${Text} tone="muted">${t('profile.loading')}<//>`
+      : list.length === 0 ? html`<${Text} tone="muted">${t('organisms.noWorkspaces') || 'No workspaces yet — create one to get started.'}<//>`
+      : html`
+        <${Stack} density="compact">${activeSorted.map(w => renderWsRow(w, true))}<//>
+        ${sortMode === 'custom' && activeSorted.length > 1 ? html`
+          <${Text} kind="caption" tone="muted">${t('organisms.reorderHint') || 'Drag rows to reorder — the order is saved to your profile.'}<//>` : null}
+        ${archivedList.length > 0 ? html`
+          <${Fold} title=${(t('organisms.archivedWorkspacesSection') || 'Archived workspaces ({n})').replace('{n}', String(archivedList.length))}
+            open=${archivedOpen} onToggle=${() => setArchivedOpen(o => !o)}>
+            <${Stack} density="compact">${archivedList.map(w => renderWsRow(w, false))}<//>
+          <//>` : null}`}
+
+    ${overview && showOverview ? html`
+      <${Surface} kind="box">
+        <${Stack}>
+          <${Stack} direction="horizontal" align="between">
+            <${Text} kind="label">${t('organisms.overview') || 'Overview — who & what uses this organism'}<//>
+            <${Action} onClick=${() => setShowOverview(false)}>${t('organisms.hide') || 'Hide'}<//>
+          <//>
           <${Mermaid} chart=${overview} />
-        </div>` : null}
-    </div>`;
+        <//>
+      <//>` : null}
+  <//>`;
 }
+
+/** The name field takes the focus once, when it opens (the old input's autofocus). */
+const focusOnce = (el) => { if (el && !el.dataset.focused) { el.dataset.focused = 'yes'; el.focus(); } };

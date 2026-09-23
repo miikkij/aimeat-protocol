@@ -5,6 +5,8 @@
  * @description Enhanced Activity tab with governance filter and category badges.
  *   Wraps the existing activity subtab with additional filter pills.
  * @version-history
+ *   2026-09-22 -- Composed from the shared component set: a small numeral band, a governance section
+ *     of key-value rows, tab filters and timeline rows whose marker carries the old badge colour.
  *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
  *   v1.8.0 -- 2026-09-06 -- The delivery line's dot counts a held connection, not just a sighting in
  *     the last 24 h, so an agent whose runtime starts per job stops reading as inactive between jobs.
@@ -33,6 +35,7 @@ import { getWebhookConfig, getTelemetry } from '/js/services/agent-integration.j
 import { getLedgerUsage } from '/js/services/ledger.js';
 import { swallowed } from '/js/swallowed.js';
 import { num, time as fmtTime } from '/js/format.js';
+import { Stack, Section, ListRow, NumeralBand, KeyValue, Toolbar, Chip, Action, Text } from '/components/poster-parts.js';
 
 const html = htm.bind(h);
 
@@ -52,6 +55,14 @@ const FILTERS = [
  */
 function socketHeld(agent) {
   return agent?.health?.delivery?.channel === 'socket';
+}
+
+/** The timeline marker's tone for an event: a policy violation is danger, otherwise its category. */
+const CATEGORY_MARKER = { tasks: 'info', messages: 'sun', governance: 'coral', system: 'muted' };
+function eventMarker(event, cat) {
+  const type = (event.type || '').toLowerCase();
+  if (type.includes('policy') || type.includes('violation')) return 'danger';
+  return CATEGORY_MARKER[cat] || 'muted';
 }
 
 function eventCategory(event) {
@@ -177,7 +188,7 @@ export default function TabActivity({ agent, agentName }) {
   }
 
   if (loading) {
-    return html`<div class="pf-agd-empty">${t('profile.loading')}</div>`;
+    return html`<${Text} tone="muted">${t('profile.loading')}<//>`;
   }
 
   // Strict newest-first ordering — the backend pages can interleave lifecycle events
@@ -189,116 +200,72 @@ export default function TabActivity({ agent, agentName }) {
   // wired ≠ zero consumption — don't let "0" claim there was none.
   const ledgerTokens = (ledgerTotals && (ledgerTotals.calls || 0) > 0) ? (ledgerTotals.total_tokens || 0) : null;
   const telemetryConnected = ledgerTokens != null || (governance?.telemetryCount || 0) > 0 || (stats?.tokensUsed30d || 0) > 0;
+  const recentlySeen = socketHeld(agent) || (agent?.last_seen && (Date.now() - new Date(agent.last_seen).getTime() < 24 * 3600 * 1000));
 
   return html`
-    <div>
-      <!-- Stats summary -->
+    <${Stack}>
       ${stats && html`
-        <div class="stat-grid">
-          <div class="stat-card poster-row--thing">
-            <div class="stat-card-value">${stats.tasksCompleted ?? 0}</div>
-            <div class="stat-card-label">${t('profile.agents.activity.tasksCompleted')}</div>
-          </div>
-          <div class="stat-card poster-row--thing">
-            <div class="stat-card-value">${ledgerTokens != null ? num(ledgerTokens) : (telemetryConnected ? (stats.tokensUsed30d ?? 0) : '—')}</div>
-            <div class="stat-card-label">${t('profile.agents.activity.tokensUsed')}${telemetryConnected ? '' : ` (${t('profile.agents.detail.activity.notReported') || 'not reported'})`}</div>
-          </div>
-          <div class="stat-card poster-row--thing">
-            <div class="stat-card-value">${stats.successRate != null ? `${Math.round(stats.successRate)}%` : '-'}</div>
-            <div class="stat-card-label">${t('profile.agents.activity.successRate')}</div>
-          </div>
-        </div>
+        <${NumeralBand} size="small" tone="plain" items=${[
+          { id: 'completed', label: t('profile.agents.activity.tasksCompleted'), value: stats.tasksCompleted ?? 0 },
+          { id: 'tokens', label: `${t('profile.agents.activity.tokensUsed')}${telemetryConnected ? '' : ` (${t('profile.agents.detail.activity.notReported') || 'not reported'})`}`,
+            value: ledgerTokens != null ? num(ledgerTokens) : (telemetryConnected ? (stats.tokensUsed30d ?? 0) : '—') },
+          { id: 'success', label: t('profile.agents.activity.successRate'), value: stats.successRate != null ? `${Math.round(stats.successRate)}%` : '-' },
+        ]} />
       `}
 
-      <!-- Governance summary -->
       ${governance && html`
-        <div class="pf-agd-governance-section poster-row--thing">
-          <div class="pf-agd-section-title">${t('profile.agents.detail.activity.governance.title')}</div>
-          <div class="pf-agd-governance-grid">
-            ${governance.budget ? html`
-              <div class="pf-agd-governance-item">
-                <span class="pf-agd-governance-label">${t('profile.agents.detail.activity.governance.tokenBudget')}</span>
-                <span class="pf-agd-governance-value">${num(governance.tokensUsedToday || 0)} / ${num(governance.budget.max_tokens_per_day || '---')}${governance.budget.max_tokens_per_day ? ` (${Math.round((governance.tokensUsedToday || 0) / governance.budget.max_tokens_per_day * 100)}%)` : ''}</span>
-              </div>
-            ` : ''}
-            <div class="pf-agd-governance-item">
-              <span class="pf-agd-governance-label">${t('profile.agents.detail.activity.governance.tasksToday')}</span>
-              <span class="pf-agd-governance-value">${t('profile.agents.detail.activity.governance.completed')}: ${governance.tasksCompleted}, ${t('profile.agents.detail.activity.governance.activeTasks')}: ${governance.tasksActive}, ${t('profile.agents.detail.activity.governance.failed')}: ${governance.tasksFailed}</span>
-            </div>
-            <div class="pf-agd-governance-item">
-              <span class="pf-agd-governance-label">${t('profile.agents.detail.activity.governance.policyIssues')}</span>
-              <span class="pf-agd-governance-value ${governance.policyIssues > 0 ? 'pf-agd-warning-text' : ''}">${governance.policyIssues}</span>
-            </div>
-            <div class="pf-agd-governance-item">
-              <span class="pf-agd-governance-label">${t('profile.agents.detail.activity.governance.telemetryEvents')}</span>
-              <span class="pf-agd-governance-value">${governance.telemetryCount}</span>
-            </div>
-          </div>
-          <div class="pf-agd-governance-delivery">
-            <span class="pf-agd-governance-label">${t('profile.agents.detail.activity.governance.deliveryHealth')}</span>
-            <span class="pf-agd-governance-value">
-              ${(!governance.mcpActive && !governance.webhookEnabled)
-                ? html`<span class="pf-agd-status-dot ${socketHeld(agent) || (agent?.last_seen && (Date.now() - new Date(agent.last_seen).getTime() < 24 * 3600 * 1000)) ? 'pf-agd-status-dot--active' : 'pf-agd-status-dot--inactive'}"></span> ${socketHeld(agent) ? (t('profile.agents.detail.activity.deliverySocketLine') || 'Delivery: live link') : (t('profile.agents.detail.activity.deliveryPollingLine') || 'Delivery: polling')}`
-                : html`
-                  ${governance.mcpActive
-                    ? html`<span class="pf-agd-status-dot pf-agd-status-dot--active"></span> ${t('profile.agents.detail.activity.governance.mcpLabel')}: ${t('profile.agents.detail.activity.governance.connected')}`
-                    : html`<span class="pf-agd-status-dot pf-agd-status-dot--inactive"></span> ${t('profile.agents.detail.activity.governance.mcpLabel')}: ${t('profile.agents.detail.activity.governance.notConfigured')}`
-                  }
-                  ${' | '}
-                  ${governance.webhookEnabled
-                    ? `${t('profile.agents.webhook.title')}: ${governance.webhookSuccessCount}/${governance.webhookTotalCount}`
-                    : t('profile.agents.detail.integration.webhookNotConfigured')
-                  }`}
-            </span>
-          </div>
-        </div>
+        <${Section} size="small" density="compact" title=${t('profile.agents.detail.activity.governance.title')}>
+          ${governance.budget ? html`
+            <${KeyValue} label=${t('profile.agents.detail.activity.governance.tokenBudget')}
+              value=${`${num(governance.tokensUsedToday || 0)} / ${num(governance.budget.max_tokens_per_day || '---')}${governance.budget.max_tokens_per_day ? ` (${Math.round((governance.tokensUsedToday || 0) / governance.budget.max_tokens_per_day * 100)}%)` : ''}`} />
+          ` : ''}
+          <${KeyValue} label=${t('profile.agents.detail.activity.governance.tasksToday')}
+            value=${`${t('profile.agents.detail.activity.governance.completed')}: ${governance.tasksCompleted}, ${t('profile.agents.detail.activity.governance.activeTasks')}: ${governance.tasksActive}, ${t('profile.agents.detail.activity.governance.failed')}: ${governance.tasksFailed}`} />
+          <${KeyValue} label=${t('profile.agents.detail.activity.governance.policyIssues')}
+            value=${html`<${Text} tone=${governance.policyIssues > 0 ? 'danger' : 'plain'}>${governance.policyIssues}<//>`} />
+          <${KeyValue} label=${t('profile.agents.detail.activity.governance.telemetryEvents')} value=${governance.telemetryCount} />
+          <${KeyValue} label=${t('profile.agents.detail.activity.governance.deliveryHealth')}
+            value=${(!governance.mcpActive && !governance.webhookEnabled)
+              ? html`<${Text} kind="mono" tone=${recentlySeen ? 'success' : 'muted'}>${socketHeld(agent) ? (t('profile.agents.detail.activity.deliverySocketLine') || 'Delivery: live link') : (t('profile.agents.detail.activity.deliveryPollingLine') || 'Delivery: polling')}<//>`
+              : html`
+                <${Text} kind="mono" tone=${governance.mcpActive ? 'success' : 'muted'}>${governance.mcpActive
+                  ? `${t('profile.agents.detail.activity.governance.mcpLabel')}: ${t('profile.agents.detail.activity.governance.connected')}`
+                  : `${t('profile.agents.detail.activity.governance.mcpLabel')}: ${t('profile.agents.detail.activity.governance.notConfigured')}`}<//>
+                ${' | '}
+                ${governance.webhookEnabled
+                  ? `${t('profile.agents.webhook.title')}: ${governance.webhookSuccessCount}/${governance.webhookTotalCount}`
+                  : t('profile.agents.detail.integration.webhookNotConfigured')
+                }`} />
+        <//>
       `}
 
-      <!-- Filter bar -->
-      <div class="pf-agd-filter-bar">
-        ${FILTERS.map(f => {
-          const label = t(f.key);
-          return html`
-            <button key=${f.id}
-                    class="pf-agd-filter-pill ${filter === f.id ? 'pf-agd-filter-pill--active' : ''}"
-                    onClick=${() => setFilter(f.id)}>
-              ${label !== f.key ? label : f.id.charAt(0).toUpperCase() + f.id.slice(1)}
-            </button>
-          `;
-        })}
-      </div>
+      <${Toolbar} filters=${FILTERS.map(f => {
+        const label = t(f.key);
+        return { id: f.id, selected: filter === f.id, onClick: () => setFilter(f.id),
+          label: label !== f.key ? label : f.id.charAt(0).toUpperCase() + f.id.slice(1) };
+      })} />
 
-      <!-- Event log -->
-      <div class="pf-agd-event-log-scroll">
+      <${Stack} density="compact">
         ${filtered.length === 0 && html`
-          <div class="pf-agd-empty">${t('profile.agents.detail.empty.activity')}</div>
+          <${Text} tone="muted">${t('profile.agents.detail.empty.activity')}<//>
         `}
         ${filtered.map((ev, i) => {
           const cat = eventCategory(ev);
-          const evType = (ev.type || '').toLowerCase();
-          const badgeClass = (evType.includes('policy') || evType.includes('violation'))
-            ? 'pf-agd-event-badge--violation'
-            : `pf-agd-event-badge--${cat}`;
           return html`
-            <div key=${ev.id || i} class="pf-agd-log-entry pf-agd-log-entry--two-line">
-              <div class="pf-agd-log-entry-primary">
-                <span class="pf-agd-log-time">${ev.timestamp ? fmtTime(ev.timestamp, { hour: '2-digit', minute: '2-digit' }) : '-'}</span>
-                <span class="pf-agd-event-badge ${badgeClass}">${t(FILTERS.find(f => f.id === cat)?.key || '') || cat}</span>
-                <span class="pf-agd-log-type">${ev.type || ev.event || '-'}</span>
-              </div>
-              ${ev.message && html`<div class="pf-agd-log-entry-detail">${ev.message}</div>`}
-            </div>
+            <${ListRow} key=${ev.id || i} density="compact" detailKind="text"
+              time=${ev.timestamp ? fmtTime(ev.timestamp, { hour: '2-digit', minute: '2-digit' }) : '-'}
+              marker=${eventMarker(ev, cat)}
+              name=${html`<${Chip} tone="muted">${t(FILTERS.find(f => f.id === cat)?.key || '') || cat}<//> ${ev.type || ev.event || '-'}`}
+              detail=${ev.message} />
           `;
         })}
-      </div>
+      <//>
 
       ${hasMore && html`
-        <button class="btn-ghost btn-sm" onClick=${handleLoadMore}>
-          ${t('profile.agents.detail.showAll')}
-        </button>
+        <${Action} onClick=${handleLoadMore}>${t('profile.agents.detail.showAll')}<//>
       `}
 
-      <div class="pf-agd-help-text">${t('profile.agents.detail.activity.auditTrail')}</div>
-    </div>
+      <${Text} kind="caption" tone="muted">${t('profile.agents.detail.activity.auditTrail')}<//>
+    <//>
   `;
 }

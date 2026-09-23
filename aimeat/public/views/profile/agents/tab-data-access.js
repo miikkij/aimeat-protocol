@@ -5,6 +5,9 @@
  * @description Data Access tab: shared tags, memory areas, knowledge packages,
  *   and effective scope summary.
  * @version-history
+ *   2026-09-22 -- Composed from the shared component set: sections with the add action on the title row
+ *     and "none" as the title's count, list rows (a stored key opens in its row), fields, chips and a
+ *     code surface for a value and the scope summary; the sort direction is an SVG icon action.
  *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
  *   v1.12.0 — 2026-08-25 — The shared data map was added here and removed again the same day: it
  *     describes an app, and this panel already has the control the owner needs.
@@ -43,6 +46,7 @@ import * as skillsService from '/js/services/skills.js';
 import { useConfirm } from '/components/Modal.js';
 import { swallowed } from '/js/swallowed.js';
 import { dateTime as fmtDateTime } from '/js/format.js';
+import { Stack, Section, Columns, ListRow, Field, Chip, Action, Surface, Text } from '/components/poster-parts.js';
 
 const html = htm.bind(h);
 
@@ -430,13 +434,18 @@ export default function TabDataAccess({ agent, agentName, showToast, allAgents }
   }
 
   if (loading) {
-    return html`<div class="pf-agd-empty">${t('profile.loading')}</div>`;
+    return html`<${Text} tone="muted">${t('profile.loading')}<//>`;
   }
 
   const hasTags = tags.length > 0;
   const hasAreas = memoryAreas.length > 0;
   const hasResources = resources.length > 0;
   const hasKeys = memoryKeys.length > 0;
+  const none = t('profile.agents.detail.data_access.noneInline') || 'none';
+  const permOptions = [
+    { value: 'read+write', label: t('profile.agents.detail.data_access.permReadWrite') },
+    { value: 'read', label: t('profile.agents.detail.data_access.permReadOnly') },
+  ];
 
   // Sort the stored-key list by created/updated, newest- or oldest-first.
   // Sorting is purely a display concern; loadData order is not relied on.
@@ -449,264 +458,218 @@ export default function TabDataAccess({ agent, agentName, showToast, allAgents }
 
   if (!hasTags && !hasAreas && !hasResources && !hasKeys && !addingTag && !addingArea && !addingPackage && !addingKey) {
     return html`
-      <div>
-        <div class="pf-agd-empty">${t('profile.agents.detail.empty.data_access')}</div>
-        <div class="pf-agd-form-actions">
-          <button class="btn-outline btn-sm" onClick=${() => setAddingTag(true)}>+ ${t('profile.agents.detail.data_access.addTag')}</button>
-          <button class="btn-outline btn-sm" onClick=${() => setAddingArea(true)}>+ ${t('profile.agents.detail.data_access.addArea')}</button>
-          <button class="btn-outline btn-sm" onClick=${() => setAddingPackage(true)}>+ ${t('profile.agents.detail.data_access.linkPackage')}</button>
-          <button class="btn-outline btn-sm" onClick=${() => setAddingKey(true)}>+ ${t('profile.agents.detail.data_access.addKey')}</button>
-        </div>
+      <${Stack}>
+        <${Text} tone="muted">${t('profile.agents.detail.empty.data_access')}<//>
+        <${Stack} direction="wrap" density="compact">
+          <${Action} onClick=${() => setAddingTag(true)}>+ ${t('profile.agents.detail.data_access.addTag')}<//>
+          <${Action} onClick=${() => setAddingArea(true)}>+ ${t('profile.agents.detail.data_access.addArea')}<//>
+          <${Action} onClick=${() => setAddingPackage(true)}>+ ${t('profile.agents.detail.data_access.linkPackage')}<//>
+          <${Action} onClick=${() => setAddingKey(true)}>+ ${t('profile.agents.detail.data_access.addKey')}<//>
+        <//>
         <${ConfirmUI} />
-      </div>
+      <//>
     `;
   }
 
+  const sortDirTitle = keySortDir === 'desc' ? t('profile.agents.detail.data_access.sortNewestFirst') : t('profile.agents.detail.data_access.sortOldestFirst');
+
   return html`
-    <div class="pf-agd-card-grid">
-      <!-- SHARED TAGS -->
-      <div class="pf-agd-data-section pf-agd-card poster-row--thing">
-        <div class="pf-agd-section-header">
-          <span class="pf-agd-section-title">${t('profile.agents.detail.data_access.sharedTagsTitle')}</span>
-          ${tags.length === 0 && !addingTag && html`<span class="pf-agd-none-inline">${t('profile.agents.detail.data_access.noneInline') || 'none'}</span>`}
-          <button class="btn-outline btn-sm" onClick=${() => setAddingTag(!addingTag)}>+ ${t('profile.agents.detail.data_access.addTag')}</button>
-        </div>
-        ${addingTag && html`
-          <div class="pf-agd-form-field pf-agd-tag-input-row">
-            <input type="text" value=${newTag} onInput=${(e) => setNewTag(e.target.value)}
-                   placeholder=${t('profile.agents.detail.data_access.tagPlaceholder')}
-                   onKeyDown=${(e) => e.key === 'Enter' && handleAddTag()} />
-            <button class="btn-primary btn-sm" onClick=${handleAddTag}>${t('common.add')}</button>
-          </div>
-        `}
-        ${tags.map(tag => {
-          const shared = getSharedWith(tag);
-          return html`
-            <div key=${tag} class="pf-agd-tag-row">
-              <span class="pf-agd-tag-name">[${tag}]</span>
-              <span class="pf-agd-tag-prefix">agents.tag.${tag}.*</span>
-              <span class="pf-agd-tag-sharing">
-                ${shared.length > 0
-                  ? `${t('profile.agents.detail.data_access.with')}: ${shared.map(a => a.name).join(', ')}`
-                  : t('profile.agents.detail.data_access.onlyYou')}
-              </span>
-              <button class="pf-agd-remove-btn" onClick=${() => handleRemoveTag(tag)}>x</button>
-            </div>
-          `;
-        })}
-        ${(tags.length > 0 || addingTag) && html`<div class="pf-agd-help-text">${t('profile.agents.detail.data_access.tagsHelp')}</div>`}
-      </div>
-
-
-      <!-- MEMORY AREAS -->
-      <div class="pf-agd-data-section pf-agd-card poster-row--thing">
-        <div class="pf-agd-section-header">
-          <span class="pf-agd-section-title">${t('profile.agents.detail.data_access.memoryAreasTitle')}</span>
-          ${!hasAreas && !addingArea && html`<span class="pf-agd-none-inline">${t('profile.agents.detail.data_access.noneInline') || 'none'}</span>`}
-          <button class="btn-outline btn-sm" onClick=${() => setAddingArea(!addingArea)}>+ ${t('profile.agents.detail.data_access.addArea')}</button>
-        </div>
-        ${addingArea && html`
-          <div class="pf-agd-area-form">
-            <input type="text" value=${newAreaKey} onInput=${(e) => setNewAreaKey(e.target.value)}
-                   placeholder=${t('profile.agents.detail.data_access.areaKeyPlaceholder')} />
-            <input type="text" value=${newAreaDesc} onInput=${(e) => setNewAreaDesc(e.target.value)}
-                   placeholder=${t('profile.agents.detail.data_access.areaDescPlaceholder')} />
-            <select value=${newAreaPerm} onChange=${(e) => setNewAreaPerm(e.target.value)}>
-              <option value="read+write">${t('profile.agents.detail.data_access.permReadWrite')}</option>
-              <option value="read">${t('profile.agents.detail.data_access.permReadOnly')}</option>
-            </select>
-            <button class="btn-primary btn-sm" onClick=${handleAddArea}>${t('profile.agents.detail.data_access.addArea')}</button>
-            <button class="btn-outline btn-sm" onClick=${() => setAddingArea(false)}>${t('common.cancel')}</button>
-          </div>
-        `}
-        ${hasAreas ? memoryAreas.map((area, idx) => (
-          editingAreaIdx === idx ? html`
-            <div key=${'edit-' + idx} class="pf-agd-area-form">
-              <input type="text" value=${editAreaKey} onInput=${(e) => setEditAreaKey(e.target.value)}
-                     placeholder=${t('profile.agents.detail.data_access.areaKeyPlaceholder')} />
-              <input type="text" value=${editAreaDesc} onInput=${(e) => setEditAreaDesc(e.target.value)}
-                     placeholder=${t('profile.agents.detail.data_access.areaDescPlaceholder')} />
-              <select value=${editAreaPerm} onChange=${(e) => setEditAreaPerm(e.target.value)}>
-                <option value="read+write">${t('profile.agents.detail.data_access.permReadWrite')}</option>
-                <option value="read">${t('profile.agents.detail.data_access.permReadOnly')}</option>
-              </select>
-              <button class="btn-primary btn-sm" onClick=${() => handleSaveArea(idx)}>${t('common.save')}</button>
-              <button class="btn-outline btn-sm" onClick=${cancelEditArea}>${t('common.cancel')}</button>
-            </div>
-          ` : html`
-            <div key=${area.key_prefix || area.key || idx} class="pf-agd-area-row">
-              <span class="pf-agd-area-key">${area.key_prefix || area.key || area}</span>
-              <span class="pf-agd-area-desc">${area.description || ''}</span>
-              <span class="pf-agd-area-perm ${area.access === 'read' ? 'pf-agd-area-perm--ro' : 'pf-agd-area-perm--rw'}">
-                ${area.access === 'read' ? t('profile.agents.detail.data_access.permReadOnly') : t('profile.agents.detail.data_access.permReadWrite')}
-              </span>
-              <span class="pf-agd-area-actions">
-                <button class="btn-ghost btn-sm" onClick=${() => startEditArea(idx, area)}>${t('profile.agents.detail.data_access.edit')}</button>
-                <button class="btn-ghost btn-sm pf-agd-action-danger" onClick=${() => handleRemoveArea(idx)}>${t('common.delete')}</button>
-              </span>
-            </div>
-          `
-        )) : null}
-      </div>
-
-      <!-- KNOWLEDGE PACKAGES -->
-      <div class="pf-agd-data-section pf-agd-card poster-row--thing">
-        <div class="pf-agd-section-header">
-          <span class="pf-agd-section-title">${t('profile.agents.detail.data_access.knowledgeTitle')}</span>
-          ${!hasResources && !addingPackage && html`<span class="pf-agd-none-inline">${t('profile.agents.detail.data_access.noneInline') || 'none'}</span>`}
-          <button class="btn-outline btn-sm" onClick=${() => setAddingPackage(!addingPackage)}>+ ${t('profile.agents.detail.data_access.linkPackage')}</button>
-        </div>
-        ${addingPackage && html`
-          <div class="pf-agd-area-form">
-            <input type="text" value=${newPkgName} onInput=${(e) => setNewPkgName(e.target.value)}
-                   placeholder=${t('profile.agents.detail.data_access.packageNamePlaceholder')} />
-            <input type="text" value=${newPkgDesc} onInput=${(e) => setNewPkgDesc(e.target.value)}
-                   placeholder=${t('profile.agents.detail.data_access.packageDescPlaceholder')} />
-            <button class="btn-primary btn-sm" onClick=${handleLinkPackage}>${t('profile.agents.detail.data_access.linkPackage')}</button>
-            <button class="btn-outline btn-sm" onClick=${() => setAddingPackage(false)}>${t('common.cancel')}</button>
-          </div>
-        `}
-        ${hasResources ? resources.map(res => html`
-          <div key=${res.url || res.name || res} class="pf-agd-area-row">
-            <span class="pf-agd-area-key">${res.name || res.url || res}</span>
-            <span class="pf-agd-area-desc">${res.description || ''}</span>
-            ${(res.documentCount || res.count) ? html`<span class="pf-agd-package-count">${res.documentCount || res.count} ${t('profile.agents.detail.data_access.docCount')}</span>` : ''}
-          </div>
-        `) : null}
-      </div>
-
-      <!-- SKILLS (registry refs — distinct from knowledge packages) -->
-      <div class="pf-agd-data-section pf-agd-card poster-row--thing">
-        <div class="pf-agd-section-header">
-          <span class="pf-agd-section-title">${t('profile.agents.detail.data_access.skillsTitle')}</span>
-          ${skillLinks.length === 0 && !addingSkill && html`<span class="pf-agd-none-inline">${t('profile.agents.detail.data_access.noneInline') || 'none'}</span>`}
-          <button class="btn-outline btn-sm" onClick=${openSkillPicker}>+ ${t('profile.agents.detail.data_access.linkSkill')}</button>
-        </div>
-        ${addingSkill && html`
-          <div class="pf-agd-area-form">
-            ${skillLibrary === null ? html`<span>${t('common.loading') || '...'}</span>` : html`
-              <select value=${selectedSkillRef} onChange=${(e) => setSelectedSkillRef(e.target.value)}>
-                ${[...(skillLibrary.user ?? []), ...(skillLibrary.node ?? []), ...(skillLibrary.workspace ?? [])]
-                  .filter(s => !skillLinks.some(l => l.ref === s.ref))
-                  .map(s => html`<option key=${s.ref} value=${s.ref}>${s.name} (${s.scope}) — ${s.description.slice(0, 60)}</option>`)}
-              </select>
-              <button class="btn-primary btn-sm" disabled=${!selectedSkillRef} onClick=${handleLinkSkill}>${t('profile.agents.detail.data_access.linkSkill')}</button>
-            `}
-            <button class="btn-outline btn-sm" onClick=${() => setAddingSkill(false)}>${t('common.cancel')}</button>
-          </div>
-        `}
-        ${skillLinks.map(link => html`
-          <div key=${link.ref} class="pf-agd-area-row">
-            <span class="pf-agd-area-key">${link.name}</span>
-            <span class="pf-agd-area-desc">${link.description || link.ref}</span>
-            <span class="pf-agd-area-actions">
-              <button class="btn-ghost btn-sm pf-agd-action-danger" onClick=${() => handleUnlinkSkill(link.ref)}>${t('profile.agents.detail.data_access.unlinkSkill')}</button>
-            </span>
-          </div>
-        `)}
-        ${skillLinks.length > 0 && html`<div class="pf-agd-help-text">${t('profile.agents.detail.data_access.skillsHelp')}</div>`}
-      </div>
-
-      <!-- STORED MEMORY KEYS -->
-      <div class="pf-agd-data-section pf-agd-card pf-agd-card--full poster-row--thing">
-          <div class="pf-agd-section-header">
-            <span class="pf-agd-section-title">${t('profile.agents.detail.data_access.storedKeysTitle')}</span>
-            ${!hasKeys && !addingKey && html`<span class="pf-agd-none-inline">${t('profile.agents.detail.data_access.noneInline') || 'none'}</span>`}
-            <div class="pf-agd-keys-controls">
-              ${hasKeys && html`
-                <label class="pf-agd-sort-label">${t('profile.agents.detail.data_access.sortBy')}</label>
-                <select class="pf-agd-sort-select" value=${keySortField} onChange=${(e) => setKeySortField(e.target.value)}>
-                  <option value="updated">${t('profile.agents.detail.data_access.sortUpdated')}</option>
-                  <option value="created">${t('profile.agents.detail.data_access.sortCreated')}</option>
-                </select>
-                <button class="pf-agd-sort-dir" title=${keySortDir === 'desc' ? t('profile.agents.detail.data_access.sortNewestFirst') : t('profile.agents.detail.data_access.sortOldestFirst')}
-                        onClick=${() => setKeySortDir(keySortDir === 'desc' ? 'asc' : 'desc')}>
-                  ${keySortDir === 'desc' ? '↓' : '↑'}
-                </button>
-              `}
-              <button class="btn-outline btn-sm" onClick=${() => setAddingKey(!addingKey)}>+ ${t('profile.agents.detail.data_access.addKey')}</button>
-            </div>
-          </div>
-          ${addingKey && html`
-            <div class="pf-agd-area-form pf-agd-keyadd-form">
-              <input type="text" value=${newKeyName} onInput=${(e) => setNewKeyName(e.target.value)}
-                     placeholder=${t('profile.agents.detail.data_access.keyNamePlaceholder')} />
-              <select value=${newKeyVis} onChange=${(e) => setNewKeyVis(e.target.value)}>
-                <option value="private">private</option>
-                <option value="owner">owner</option>
-                <option value="public">public</option>
-              </select>
-              <textarea class="pf-agd-memory-edit" value=${newKeyValue}
-                        onInput=${(e) => setNewKeyValue(e.target.value)}
-                        placeholder=${t('profile.agents.detail.data_access.keyValuePlaceholder')}
-                        disabled=${creatingKey}></textarea>
-              <div class="pf-agd-memory-actions">
-                <button class="btn-primary btn-sm" disabled=${creatingKey || !newKeyName.trim()} onClick=${handleCreateKey}>
-                  ${creatingKey ? t('profile.agents.detail.data_access.saving') : t('common.save')}
-                </button>
-                <button class="btn-outline btn-sm" disabled=${creatingKey} onClick=${() => setAddingKey(false)}>${t('common.cancel')}</button>
-              </div>
-            </div>
+    <${Stack}>
+      <${Columns} layout="equal" collapse="900">
+        <${Section} size="small" density="compact" title=${t('profile.agents.detail.data_access.sharedTagsTitle')}
+          count=${tags.length === 0 && !addingTag ? none : undefined}
+          actions=${html`<${Action} onClick=${() => setAddingTag(!addingTag)}>+ ${t('profile.agents.detail.data_access.addTag')}<//>`}>
+          ${addingTag && html`
+            <${Stack} direction="horizontal" align="end" density="compact">
+              <${Field} value=${newTag} onInput=${(e) => setNewTag(e.target.value)}
+                placeholder=${t('profile.agents.detail.data_access.tagPlaceholder')}
+                onKeyDown=${(e) => e.key === 'Enter' && handleAddTag()} />
+              <${Action} onClick=${handleAddTag}>${t('common.add')}<//>
+            <//>
           `}
-          ${sortedKeys.map(mk => html`
-            <div key=${mk.key}>
-              <div class="pf-agd-area-row pf-agd-area-row--clickable" onClick=${() => toggleExpandKey(mk)}>
-                <span class="pf-agd-expand-icon">${expandedKey === mk.key ? '▼' : '▶'}</span>
-                <span class="pf-agd-area-key">${mk.key}</span>
-                <span class="pf-agd-key-meta">
-                  ${mk.createdAt ? html`<span title=${fmtDateTime(mk.createdAt)}>${t('profile.agents.detail.data_access.created')}: ${timeAgo(mk.createdAt)}</span>` : ''}
-                  ${mk.updatedAt ? html`<span title=${fmtDateTime(mk.updatedAt)}>${t('profile.agents.detail.data_access.updated')}: ${timeAgo(mk.updatedAt)}</span>` : ''}
-                </span>
-                <span class="pf-agd-area-perm pf-agd-area-perm--${mk.visibility === 'public' ? 'rw' : 'ro'}">${mk.visibility}</span>
-              </div>
-              ${expandedKey === mk.key && html`
-                <div class="pf-agd-memory-detail">
-                  ${editingKey === mk.key ? html`
-                    <textarea class="pf-agd-memory-edit" value=${editValue}
-                              onInput=${(e) => setEditValue(e.target.value)}
-                              disabled=${savingKey}></textarea>
-                    <div class="pf-agd-memory-actions">
-                      <button class="btn-primary btn-sm" disabled=${savingKey} onClick=${() => handleSaveKey(mk)}>
-                        ${savingKey ? t('profile.agents.detail.data_access.saving') : t('common.save')}
-                      </button>
-                      <button class="btn-outline btn-sm" disabled=${savingKey} onClick=${cancelEditKey}>${t('common.cancel')}</button>
-                    </div>
-                  ` : html`
-                    ${(() => {
-                      const imgs = extractImageUrls(expandedValue);
-                      return imgs.length ? html`
-                        <div class="pf-agd-memory-imgs">
-                          ${imgs.map(u => html`
-                            <a key=${u} href=${u} target="_blank" rel="noopener noreferrer"
-                               class="pf-agd-memory-img-link" title=${t('profile.agents.detail.data_access.openImageFull')}>
-                              <img class="pf-agd-memory-img" src=${u} loading="lazy"
-                                   alt=${t('profile.agents.detail.data_access.imagePreviewAlt')} />
-                            </a>
-                          `)}
-                        </div>
-                      ` : null;
-                    })()}
-                    <pre class="pf-agd-memory-preview">${expandedValue}</pre>
-                    <div class="pf-agd-memory-actions">
-                      <button class="btn-ghost btn-sm" onClick=${() => startEditKey(mk)}>${t('profile.agents.detail.data_access.edit')}</button>
-                      <button class="btn-ghost btn-sm pf-agd-action-danger" onClick=${() => handleDeleteKey(mk)}>${t('common.delete')}</button>
-                    </div>
-                  `}
-                </div>
-              `}
-            </div>
-          `)}
-      </div>
+          ${tags.map(tag => {
+            const shared = getSharedWith(tag);
+            return html`
+              <${ListRow} key=${tag} density="compact" name=${`[${tag}]`} detail=${`agents.tag.${tag}.*`}
+                value=${html`<${Text} kind="caption" tone="muted">${shared.length > 0
+                  ? `${t('profile.agents.detail.data_access.with')}: ${shared.map(a => a.name).join(', ')}`
+                  : t('profile.agents.detail.data_access.onlyYou')}<//>`}
+                actions=${html`<${Action} kind="text" onClick=${() => handleRemoveTag(tag)}>x<//>`} />
+            `;
+          })}
+          ${(tags.length > 0 || addingTag) && html`<${Text} kind="caption" tone="muted">${t('profile.agents.detail.data_access.tagsHelp')}<//>`}
+        <//>
 
-      <!-- EFFECTIVE SCOPE SUMMARY -->
-      <div class="pf-agd-scope-summary pf-agd-card--full">
-        ${t('profile.agents.detail.data_access.effectiveScope')}:\n${
+        <${Section} size="small" density="compact" title=${t('profile.agents.detail.data_access.memoryAreasTitle')}
+          count=${!hasAreas && !addingArea ? none : undefined}
+          actions=${html`<${Action} onClick=${() => setAddingArea(!addingArea)}>+ ${t('profile.agents.detail.data_access.addArea')}<//>`}>
+          ${addingArea && html`
+            <${Stack} direction="wrap" align="end" density="compact">
+              <${Field} value=${newAreaKey} onInput=${(e) => setNewAreaKey(e.target.value)}
+                placeholder=${t('profile.agents.detail.data_access.areaKeyPlaceholder')} />
+              <${Field} value=${newAreaDesc} onInput=${(e) => setNewAreaDesc(e.target.value)}
+                placeholder=${t('profile.agents.detail.data_access.areaDescPlaceholder')} />
+              <${Field} type="select" value=${newAreaPerm} onChange=${(e) => setNewAreaPerm(e.target.value)} options=${permOptions} />
+              <${Action} onClick=${handleAddArea}>${t('profile.agents.detail.data_access.addArea')}<//>
+              <${Action} kind="text" onClick=${() => setAddingArea(false)}>${t('common.cancel')}<//>
+            <//>
+          `}
+          ${hasAreas ? memoryAreas.map((area, idx) => (
+            editingAreaIdx === idx ? html`
+              <${Stack} key=${'edit-' + idx} direction="wrap" align="end" density="compact">
+                <${Field} value=${editAreaKey} onInput=${(e) => setEditAreaKey(e.target.value)}
+                  placeholder=${t('profile.agents.detail.data_access.areaKeyPlaceholder')} />
+                <${Field} value=${editAreaDesc} onInput=${(e) => setEditAreaDesc(e.target.value)}
+                  placeholder=${t('profile.agents.detail.data_access.areaDescPlaceholder')} />
+                <${Field} type="select" value=${editAreaPerm} onChange=${(e) => setEditAreaPerm(e.target.value)} options=${permOptions} />
+                <${Action} onClick=${() => handleSaveArea(idx)}>${t('common.save')}<//>
+                <${Action} kind="text" onClick=${cancelEditArea}>${t('common.cancel')}<//>
+              <//>
+            ` : html`
+              <${ListRow} key=${area.key_prefix || area.key || idx} density="compact"
+                name=${area.key_prefix || area.key || area} detail=${area.description || ''} detailKind="text"
+                value=${html`<${Chip} tone=${area.access === 'read' ? 'muted' : 'plain'}>${area.access === 'read' ? t('profile.agents.detail.data_access.permReadOnly') : t('profile.agents.detail.data_access.permReadWrite')}<//>`}
+                actions=${html`
+                  <${Action} kind="text" onClick=${() => startEditArea(idx, area)}>${t('profile.agents.detail.data_access.edit')}<//>
+                  <${Action} kind="text" onClick=${() => handleRemoveArea(idx)}>${t('common.delete')}<//>`} />
+            `
+          )) : null}
+        <//>
+
+        <${Section} size="small" density="compact" title=${t('profile.agents.detail.data_access.knowledgeTitle')}
+          count=${!hasResources && !addingPackage ? none : undefined}
+          actions=${html`<${Action} onClick=${() => setAddingPackage(!addingPackage)}>+ ${t('profile.agents.detail.data_access.linkPackage')}<//>`}>
+          ${addingPackage && html`
+            <${Stack} direction="wrap" align="end" density="compact">
+              <${Field} value=${newPkgName} onInput=${(e) => setNewPkgName(e.target.value)}
+                placeholder=${t('profile.agents.detail.data_access.packageNamePlaceholder')} />
+              <${Field} value=${newPkgDesc} onInput=${(e) => setNewPkgDesc(e.target.value)}
+                placeholder=${t('profile.agents.detail.data_access.packageDescPlaceholder')} />
+              <${Action} onClick=${handleLinkPackage}>${t('profile.agents.detail.data_access.linkPackage')}<//>
+              <${Action} kind="text" onClick=${() => setAddingPackage(false)}>${t('common.cancel')}<//>
+            <//>
+          `}
+          ${hasResources ? resources.map(res => html`
+            <${ListRow} key=${res.url || res.name || res} density="compact"
+              name=${res.name || res.url || res} detail=${res.description || ''} detailKind="text"
+              value=${(res.documentCount || res.count) ? html`<${Chip} tone="muted">${res.documentCount || res.count} ${t('profile.agents.detail.data_access.docCount')}<//>` : null} />
+          `) : null}
+        <//>
+
+        <${Section} size="small" density="compact" title=${t('profile.agents.detail.data_access.skillsTitle')}
+          count=${skillLinks.length === 0 && !addingSkill ? none : undefined}
+          actions=${html`<${Action} onClick=${openSkillPicker}>+ ${t('profile.agents.detail.data_access.linkSkill')}<//>`}>
+          ${addingSkill && html`
+            <${Stack} direction="wrap" align="end" density="compact">
+              ${skillLibrary === null ? html`<${Text} tone="muted">${t('common.loading') || '...'}<//>` : html`
+                <${Field} type="select" value=${selectedSkillRef} onChange=${(e) => setSelectedSkillRef(e.target.value)}
+                  options=${[...(skillLibrary.user ?? []), ...(skillLibrary.node ?? []), ...(skillLibrary.workspace ?? [])]
+                    .filter(s => !skillLinks.some(l => l.ref === s.ref))
+                    .map(s => ({ value: s.ref, label: `${s.name} (${s.scope}) — ${s.description.slice(0, 60)}` }))} />
+                <${Action} disabled=${!selectedSkillRef} onClick=${handleLinkSkill}>${t('profile.agents.detail.data_access.linkSkill')}<//>
+              `}
+              <${Action} kind="text" onClick=${() => setAddingSkill(false)}>${t('common.cancel')}<//>
+            <//>
+          `}
+          ${skillLinks.map(link => html`
+            <${ListRow} key=${link.ref} density="compact" name=${link.name} detail=${link.description || link.ref} detailKind="text"
+              actions=${html`<${Action} kind="text" onClick=${() => handleUnlinkSkill(link.ref)}>${t('profile.agents.detail.data_access.unlinkSkill')}<//>`} />
+          `)}
+          ${skillLinks.length > 0 && html`<${Text} kind="caption" tone="muted">${t('profile.agents.detail.data_access.skillsHelp')}<//>`}
+        <//>
+      <//>
+
+      <${Section} size="small" density="compact" title=${t('profile.agents.detail.data_access.storedKeysTitle')}
+        count=${!hasKeys && !addingKey ? none : undefined}
+        actions=${html`
+          ${hasKeys && html`
+            <${Field} type="select" label=${t('profile.agents.detail.data_access.sortBy')} value=${keySortField}
+              onChange=${(e) => setKeySortField(e.target.value)} options=${[
+                { value: 'updated', label: t('profile.agents.detail.data_access.sortUpdated') },
+                { value: 'created', label: t('profile.agents.detail.data_access.sortCreated') },
+              ]} />
+            <${Action} kind="icon" title=${sortDirTitle} label=${sortDirTitle}
+              onClick=${() => setKeySortDir(keySortDir === 'desc' ? 'asc' : 'desc')}>
+              <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2">
+                ${keySortDir === 'desc' ? html`<path d="M10 3v14M4 11l6 6 6-6" />` : html`<path d="M10 17V3M4 9l6-6 6 6" />`}
+              </svg>
+            <//>
+          `}
+          <${Action} onClick=${() => setAddingKey(!addingKey)}>+ ${t('profile.agents.detail.data_access.addKey')}<//>`}>
+        ${addingKey && html`
+          <${Stack} density="compact">
+            <${Stack} direction="wrap" align="end" density="compact">
+              <${Field} value=${newKeyName} onInput=${(e) => setNewKeyName(e.target.value)}
+                placeholder=${t('profile.agents.detail.data_access.keyNamePlaceholder')} />
+              <${Field} type="select" value=${newKeyVis} onChange=${(e) => setNewKeyVis(e.target.value)} options=${[
+                { value: 'private', label: 'private' },
+                { value: 'owner', label: 'owner' },
+                { value: 'public', label: 'public' },
+              ]} />
+            <//>
+            <${Field} type="textarea" value=${newKeyValue} onInput=${(e) => setNewKeyValue(e.target.value)}
+              placeholder=${t('profile.agents.detail.data_access.keyValuePlaceholder')} disabled=${creatingKey} />
+            <${Stack} direction="horizontal" density="compact">
+              <${Action} disabled=${creatingKey || !newKeyName.trim()} onClick=${handleCreateKey}>
+                ${creatingKey ? t('profile.agents.detail.data_access.saving') : t('common.save')}
+              <//>
+              <${Action} kind="text" disabled=${creatingKey} onClick=${() => setAddingKey(false)}>${t('common.cancel')}<//>
+            <//>
+          <//>
+        `}
+        ${sortedKeys.map(mk => html`
+          <${ListRow} key=${mk.key} density="compact" name=${mk.key} onOpen=${() => toggleExpandKey(mk)}
+            selected=${expandedKey === mk.key} arrow
+            detail=${(mk.createdAt || mk.updatedAt) && html`
+              ${mk.createdAt ? html`<span title=${fmtDateTime(mk.createdAt)}>${t('profile.agents.detail.data_access.created')}: ${timeAgo(mk.createdAt)}</span>` : ''}
+              ${mk.createdAt && mk.updatedAt ? ' · ' : ''}
+              ${mk.updatedAt ? html`<span title=${fmtDateTime(mk.updatedAt)}>${t('profile.agents.detail.data_access.updated')}: ${timeAgo(mk.updatedAt)}</span>` : ''}`}
+            value=${html`<${Chip} tone=${mk.visibility === 'public' ? 'plain' : 'muted'}>${mk.visibility}<//>`}>
+            ${expandedKey === mk.key && (editingKey === mk.key ? html`
+              <${Stack} density="compact">
+                <${Field} type="textarea" value=${editValue} onInput=${(e) => setEditValue(e.target.value)} disabled=${savingKey} />
+                <${Stack} direction="horizontal" density="compact">
+                  <${Action} disabled=${savingKey} onClick=${() => handleSaveKey(mk)}>
+                    ${savingKey ? t('profile.agents.detail.data_access.saving') : t('common.save')}
+                  <//>
+                  <${Action} kind="text" disabled=${savingKey} onClick=${cancelEditKey}>${t('common.cancel')}<//>
+                <//>
+              <//>
+            ` : html`
+              <${Stack} density="compact">
+                ${(() => {
+                  const imgs = extractImageUrls(expandedValue);
+                  return imgs.length ? html`
+                    <${Stack} direction="wrap" density="compact">
+                      ${imgs.map(u => html`
+                        <a key=${u} href=${u} target="_blank" rel="noopener noreferrer"
+                           title=${t('profile.agents.detail.data_access.openImageFull')}>
+                          <img src=${u} loading="lazy" height="160"
+                               alt=${t('profile.agents.detail.data_access.imagePreviewAlt')} />
+                        </a>
+                      `)}
+                    <//>
+                  ` : null;
+                })()}
+                <${Surface} kind="code">${expandedValue}<//>
+                <${Stack} direction="horizontal" density="compact">
+                  <${Action} kind="text" onClick=${() => startEditKey(mk)}>${t('profile.agents.detail.data_access.edit')}<//>
+                  <${Action} kind="text" onClick=${() => handleDeleteKey(mk)}>${t('common.delete')}<//>
+                <//>
+              <//>
+            `)}
+          <//>
+        `)}
+      <//>
+
+      <${Stack} density="compact">
+        <${Surface} kind="code">${t('profile.agents.detail.data_access.effectiveScope')}:\n${
           [...memoryAreas.map(a => a.key_prefix || a.key || a), ...tags.map(tag => `agents.tag.${tag}.*`), 'agents.shared.index'].join(', ')
-        }${hasResources ? `\n${t('profile.agents.detail.data_access.knowledgeTitle')}: ${resources.map(r => r.name || r.url || r).join(', ')}` : ''}
-        <div class="pf-agd-scope-footer">${t('profile.agents.detail.data_access.scopeFooter')}</div>
-      </div>
+        }${hasResources ? `\n${t('profile.agents.detail.data_access.knowledgeTitle')}: ${resources.map(r => r.name || r.url || r).join(', ')}` : ''}<//>
+        <${Text} kind="caption" tone="muted">${t('profile.agents.detail.data_access.scopeFooter')}<//>
+      <//>
 
       <${ConfirmUI} />
-    </div>
+    <//>
   `;
 }

@@ -9,6 +9,9 @@
  *   renderPlatformBadge(onboarding) · renderModelBadge(agent) · renderReadinessBadge(state, onboarding)
  * @usage import { renderDeliveryIndicator, renderReadinessBadge } from './agent-card-badges.js';
  * @version-history
+ *   v2.0.0 -- 2026-09-22 -- The badges are the shared Chip (components/poster-parts.js): muted for a
+ *     quiet fact, sun for a readiness level that has reached standard or better. The warning glyph on
+ *     a failing webhook is the ✗ mark. No class of its own.
  *   v1.0.0 — 2026-09-06 — Extracted from agent-card.js, which reached 801 lines when the GAII
  *     control landed on the row. Carried over from that file's history: the delivery word reads the
  *     server's channel (2026-09-06), the model badge (2026-07), and the 2026-08-09 round that
@@ -17,6 +20,7 @@
 import { h } from 'preact';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
+import { Chip, Text } from '/components/poster-parts.js';
 
 const html = htm.bind(h);
 
@@ -44,53 +48,56 @@ export function renderDeliveryIndicator(agent) {
   const delivery = agent?.health?.delivery;
   if (!delivery) return null;
   const label = deliveryLabel(delivery);
-  const icon = delivery.webhook_configured ? (delivery.channel === 'webhook-failing' ? '⚠' : '✓') : '';
+  const icon = delivery.webhook_configured ? (delivery.channel === 'webhook-failing' ? '✗' : '✓') : '';
 
-  return html`<span class="pf-agd-delivery-indicator">${label}${icon ? ` ${icon}` : ''} · </span>`;
+  return html`<${Text} kind="mono" tone="muted">${label}${icon ? ` ${icon}` : ''} · <//>`;
 }
+
+// A readiness level of standard or better is the one to see (sun); below it the chip is quiet.
+const readyTone = (level) => (['standard', 'advanced', 'full'].includes(level) ? 'sun' : 'muted');
 
 export function renderPlatformBadge(onboarding) {
   const platform = onboarding?.platformName || onboarding?.detectedPlatform;
   if (!platform) return null;
   const version = onboarding?.platformVersion;
-  return html`<span class="pf-agd-badge pf-agd-badge--platform">${platform}${version ? ` v${version}` : ''}</span>`;
+  return html`<${Chip} tone="muted">${platform}${version ? ` v${version}` : ''}<//>`;
 }
 
 // Self-reported primary LLM (indicative — coding platforms delegate to subagents on other
 // models mid-session). Comes from the owner agent list projection (agent.model).
 export function renderModelBadge(agent) {
   if (!agent?.model) return null;
-  return html`<span class="pf-agd-badge pf-agd-badge--model" title=${t('profile.agents.modelBadgeTitle')}>${agent.model}</span>`;
+  return html`<${Chip} tone="muted" title=${t('profile.agents.modelBadgeTitle')}>${agent.model}<//>`;
 }
 
 export function renderReadinessBadge(state, onboarding) {
   if (state === 'system') {
     // Internal (auto-provisioned) agent — no device-auth onboarding / readiness.
-    return html`<span class="pf-agd-badge pf-agd-badge--readiness-none">${t('profile.agents.detail.state.internal')}</span>`;
+    return html`<${Chip} tone="muted">${t('profile.agents.detail.state.internal')}<//>`;
   }
   if (state === 'new') {
-    return html`<span class="pf-agd-badge pf-agd-badge--readiness-none">--</span>`;
+    return html`<${Chip} tone="muted">--<//>`;
   }
   if (state === 'onboarding') {
     const passed = onboarding?.steps?.filter(s => s.status === 'passed').length ?? 0;
     const total = onboarding?.steps?.length ?? 11;
-    return html`<span class="pf-agd-badge pf-agd-badge--readiness-onboarding">${t('profile.agents.detail.state.onboarding')}: ${passed}/${total}</span>`;
+    return html`<${Chip}>${t('profile.agents.detail.state.onboarding')}: ${passed}/${total}<//>`;
   }
   if (state === 'problem') {
     const level = onboarding?.readinessLevel || 'none';
     const score = onboarding?.readinessScore;
-    if (!score && score !== 0) return html`<span class="pf-agd-badge pf-agd-badge--readiness-none">--</span>`;
+    if (!score && score !== 0) return html`<${Chip} tone="muted">--<//>`;
     const label = t(`agentOnboarding.readiness.${level}`);
     // No "degraded ↓" marker: it was driven by onboarding.previousReadinessLevel, which is not a
     // field on the record, has no column in either backend and is written nowhere — so the arrow
     // could never appear. Reintroducing it needs a stored previous level first, not a rank table.
-    return html`<span class="pf-agd-badge pf-agd-badge--readiness-${level}">${label} (${score})</span>`;
+    return html`<${Chip} tone=${readyTone(level)}>${label} (${score})<//>`;
   }
   // idle and production both show level + score
   const level = onboarding?.readinessLevel || 'none';
   const score = onboarding?.readinessScore;
-  if (!score && score !== 0) return html`<span class="pf-agd-badge pf-agd-badge--readiness-none">--</span>`;
+  if (!score && score !== 0) return html`<${Chip} tone="muted">--<//>`;
   const label = t(`agentOnboarding.readiness.${level}`);
-  return html`<span class="pf-agd-badge pf-agd-badge--readiness-${level}"
-    title=${t('profile.agents.detail.readinessTooltip') || 'Readiness score 0–100 from onboarding checks. Levels: none → basic → standard → advanced → full.'}>${label} (${score})</span>`;
+  return html`<${Chip} tone=${readyTone(level)}
+    title=${t('profile.agents.detail.readinessTooltip') || 'Readiness score 0–100 from onboarding checks. Levels: none → basic → standard → advanced → full.'}>${label} (${score})<//>`;
 }
