@@ -19,9 +19,12 @@
  *   settings have no history. These do: every write archives what it replaced, and set answers with
  *   the version number that went into it, so putting a page back is one call rather than a token
  *   dance. The gate is also stricter — an exact word no wildcard carries.
- * @structure registerSurfaceLayoutTools(mcp, storage, config, getAgentGaii)
- * @usage registerSurfaceLayoutTools(mcp, storage, config, () => agentGaii);
+ * @structure registerSurfaceLayoutTools(mcp, storage, config, getAgentGaii, scopes)
+ * @usage registerSurfaceLayoutTools(mcp, storage, config, () => agentGaii, scopes);
  * @version-history
+ *   v1.1.0 — 2026-09-24 — SECURITY (audit A8-1): the operator test at call time is asked of the
+ *     agent and its scopes (the service's callerIsOperator, through services/operator-principal.ts),
+ *     so site:layout-write is checked at call time as well as at registration.
  *   v1.0.0 — 2026-08-26 — Initial.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -32,7 +35,6 @@ import { SiteError } from '../services/site.js';
 import { SurfaceLayoutService, type LayoutSubmission } from '../services/surface-layout/service.js';
 import { blocksForSurface, operatorLabelKey } from '../services/surface-layout/registry.js';
 import type { SurfaceId } from '../services/surface-layout/types.js';
-import { parseGAII } from '../utils/gaii.js';
 import { aiProvenanceInputs, toDeclaredProvenance } from './ai-provenance-input.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
@@ -59,6 +61,8 @@ export function registerSurfaceLayoutTools(
     storage: Storage,
     config: AimeatConfig,
     getAgentGaii: () => string,
+    /** This session's granted scopes: the operator test asks site:layout-write of them. */
+    scopes: readonly string[] = [],
 ): void {
     const svc = new SurfaceLayoutService(config, storage);
 
@@ -66,13 +70,13 @@ export function registerSurfaceLayoutTools(
      * The operator test, at call time rather than at registration, the same way the other admin
      * tools do it: roles are not known when the session is made.
      *
-     * The DECISION is in the service, not here. The tool surface already filters by scope, but the
-     * scope word says "this agent may arrange pages" and this says "the account it acts for runs
-     * this node" — two different questions, and the second is what stops the word from working when
-     * an ordinary owner is granted it. Both doors ask the same function for that answer.
+     * The DECISION is in the service, not here. It asks two things of THIS AGENT: the account it
+     * acts for runs this node, which is what stops the word from working when an ordinary owner is
+     * granted it, and the agent holds site:layout-write, which the registration filter also asks
+     * and a node run with AIMEAT_MCP_ENFORCE_SCOPES=false does not.
      */
     async function isOperator(): Promise<boolean> {
-        return svc.callerIsOperator(parseGAII(getAgentGaii())?.owner);
+        return svc.callerIsOperator({ sub: getAgentGaii(), roles: ['agent'], scopes });
     }
 
     const notOperator = (): TextResult => out({

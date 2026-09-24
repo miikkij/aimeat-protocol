@@ -27,6 +27,9 @@
  *     capability over a remote MCP tool refuses an agent without mcp:use, as the REST twin does.
  *   v1.6.1 -- 2026-09-24 -- The scopes travel as the service's authority object; an agent session is
  *     never the owner in person.
+ *   v1.7.0 -- 2026-09-24 -- SECURITY (audit A8-1): the operator's two powers from v1.5.0 are asked of
+ *     the agent through services/operator-principal.ts, so they take operator:admin. They were read
+ *     off the owner record, so every agent of an operator holding capability:write carried them.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import {
@@ -37,7 +40,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
-import { parseGaiiLoose } from '../utils/gaii.js';
+import { resolveOperatorAgentName } from '../services/operator-principal.js';
 
 export function registerCapabilitiesTools(
     mcp: McpServer,
@@ -50,7 +53,8 @@ export function registerCapabilitiesTools(
      *  authenticated HTTP surface, so the caller's token has to travel with the invocation. */
     getToken: () => string | undefined = () => undefined,
     /** What this session holds. A capability over a remote MCP tool asks for mcp:use in it, as the
-     *  REST twin does; left out, the session holds nothing there. */
+     *  REST twin does, and the operator's two powers here are asked of it; left out, the session
+     *  holds nothing there. */
     scopes: string[] = [],
 ): void {
 
@@ -63,13 +67,13 @@ export function registerCapabilitiesTools(
      * which door made it. That is an ownership decision rather than a copied line, so it is reported
      * in the August 2026 audit and left exactly as it stands.
      *
-     * Operator-ness comes from the OWNER record, because a tool session carries an agent while the
-     * role lives on the human. mcp/boards.ts answers the same question the same way.
+     * Operator-ness is asked of THIS AGENT (services/operator-principal.ts): an operator account's
+     * agent holding operator:admin. The role lives on the human, and reading it off the owner record
+     * handed it to every agent of the operator. mcp/boards.ts asks the same question the same way.
      */
     async function caller(): Promise<{ gaii: string; isOperator: boolean }> {
         const gaii = getAgentGaii();
-        const owner = await storage.getOwner(parseGaiiLoose(gaii).owner);
-        return { gaii, isOperator: !!owner?.roles.includes('operator') };
+        return { gaii, isOperator: (await resolveOperatorAgentName(storage, gaii, scopes)) !== null };
     }
 
     mcp.tool(

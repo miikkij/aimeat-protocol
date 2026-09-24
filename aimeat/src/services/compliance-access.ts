@@ -30,6 +30,8 @@
  *   const refusal = await complianceRefusal(storage, { gaii, scopes }, COMPLIANCE_READ_SCOPE);
  *   if (refusal) return refuse(refusal);
  * @version-history
+ *   v1.2.0 — 2026-09-24 — The decision is services/operator-principal.ts askOperator(), the one
+ *     operator question every door asks; this file keeps its sentences. Nothing it answers changed.
  *   v1.1.0 — 2026-08-23 — SECURITY (audit AI-triage, invariant 13): the scope demand keys on the
  *     principal's shape (delegated GAII/GEAI vs the person's bare GHII), not on whether the scope
  *     list happens to be empty — a zero-scope agent of an operator passed the old gate.
@@ -37,7 +39,7 @@
  */
 import type { Storage } from '../storage/interface.js';
 import { parseGAII } from '../utils/gaii.js';
-import { scopeIsCovered } from '../utils/scope-coverage.js';
+import { askOperator } from './operator-principal.js';
 
 export interface ComplianceCaller {
   /** The principal as it identifies itself: a GAII, a GEAI, or a bare owner GHII. */
@@ -60,20 +62,15 @@ export async function complianceRefusal(
   if (!ownerName) {
     return 'This is for whoever runs this installation, and this session has no identity to check.';
   }
-  const owner = await storage.getOwner(ownerName);
-  if (!owner?.roles.includes('operator')) {
-    return 'This is the compliance report for the whole installation. The account behind this session does not run it.';
-  }
-  // A delegated principal — an agent (GAII) or an ecosystem app (GEAI) — must carry the exact
-  // word, and an empty grant list is the strongest possible reason to refuse, not an exemption.
-  // Only the bare owner GHII is the operator in person.
-  const delegated = caller.gaii.startsWith('eco:') || parsed !== null;
-  // scopeIsCovered() rather than includes(): it is the one place that knows these words are outside
-  // every wildcard, and restating that rule is how three copies of it came to disagree in
-  // auth/middleware.ts.
-  if (delegated && !scopeIsCovered(caller.scopes ?? [], scope)) {
+  // The operator question, asked the one way every door asks it (services/operator-principal.ts):
+  // the account first, then the exact word from anything acting for it. A delegated principal, an
+  // agent (GAII) or an ecosystem app (GEAI), must carry the word however short its grant list; only
+  // the bare owner GHII is the operator in person.
+  const answer = await askOperator(storage, { sub: caller.gaii, scopes: caller.scopes ?? [] }, scope);
+  if (answer.ok) return null;
+  if (answer.why === 'needs-word') {
     return `This needs the "${scope}" permission. Whoever runs this installation grants it per agent, `
       + 'and "Full access" does not carry it.';
   }
-  return null;
+  return 'This is the compliance report for the whole installation. The account behind this session does not run it.';
 }

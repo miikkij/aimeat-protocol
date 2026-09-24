@@ -39,6 +39,10 @@
  *   DELETE /v1/mcp-servers/:id              -- detach, and forget the credential
  * @usage app.use(mcpServersRouter(config, storage));
  * @version-history
+ *   v1.4.0 — 2026-09-24 — SECURITY (audit A8-1): the node registry doors ask operator:admin of
+ *     anything acting for the operator, the word aimeat_mcp_registry_* asks. They asked mcp:manage,
+ *     the word for attaching a server to one's OWN account, so an operator's agent allowed that could
+ *     also run what the whole node offers.
  *   v1.3.1 — 2026-09-24 — POST /:id/call also says whether the caller is the owner in person
  *     (callAuthority), the one thing the chokepoint spares a scope for.
  *   v1.3.0 — 2026-09-24 — POST /:id/call hands the chokepoint the session's own scopes (heldScopes),
@@ -60,6 +64,7 @@ import {
 } from '../auth/middleware.js';
 import { callAuthority } from '../auth/effective-scopes.js';
 import { resolveIdentity, ownerGhiiOf, callerPrincipal } from '../utils/gaii.js';
+import { OPERATOR_ADMIN_SCOPE } from '../utils/scope-coverage.js';
 import {
   toPublicMcpServer,
   type McpTransport, type McpServerCredential,
@@ -223,11 +228,12 @@ export function mcpServersRouter(config: AimeatConfig, storage: Storage): Router
 
   // ── The operator's registry ─────────────────────────────────────────────────────────────────
   //
-  // requireOperatorPrincipal, not requireRole('operator'): the operator IN PERSON, never something
-  // acting on their behalf. Attaching a server to the whole node, deciding who reaches it and
-  // pricing it are three acts an agent must not perform in an operator's name.
+  // requireOperatorPrincipal with operator:admin: the operator in person, or an agent the operator
+  // ticked that word for, the same answer aimeat_mcp_registry_* gives. Attaching a server to the whole
+  // node, deciding who reaches it and pricing it are node administration, and mcp:manage, the word
+  // for attaching a server to one's OWN account, must not carry them.
 
-  router.get('/v1/mcp-servers/node', requireAuth(), requireOperatorPrincipal(storage, 'mcp:manage'),
+  router.get('/v1/mcp-servers/node', requireAuth(), requireOperatorPrincipal(storage, OPERATOR_ADMIN_SCOPE),
     async (_req: Request, res: Response) => {
       const servers = await listNodeServers(storage);
       // The operator's own view carries availability and price, which PublicMcpServer omits because
@@ -242,7 +248,7 @@ export function mcpServersRouter(config: AimeatConfig, storage: Storage): Router
       }));
     });
 
-  router.post('/v1/mcp-servers/node', requireAuth(), requireOperatorPrincipal(storage, 'mcp:manage'),
+  router.post('/v1/mcp-servers/node', requireAuth(), requireOperatorPrincipal(storage, OPERATOR_ADMIN_SCOPE),
     async (req: Request, res: Response) => {
       const b = (req.body ?? {}) as Record<string, unknown>;
       const name = typeof b.name === 'string' ? b.name : '';
@@ -321,7 +327,7 @@ export function mcpServersRouter(config: AimeatConfig, storage: Storage): Router
       }));
     });
 
-  router.patch('/v1/mcp-servers/node/:id', requireAuth(), requireOperatorPrincipal(storage, 'mcp:manage'),
+  router.patch('/v1/mcp-servers/node/:id', requireAuth(), requireOperatorPrincipal(storage, OPERATOR_ADMIN_SCOPE),
     async (req: Request, res: Response) => {
       const server = await storage.getMcpServer(req.params.id as string);
       // Scoped to node-wide rows on purpose: this door must not become a way for an operator to
@@ -350,7 +356,7 @@ export function mcpServersRouter(config: AimeatConfig, storage: Storage): Router
       }));
     });
 
-  router.delete('/v1/mcp-servers/node/:id', requireAuth(), requireOperatorPrincipal(storage, 'mcp:manage'),
+  router.delete('/v1/mcp-servers/node/:id', requireAuth(), requireOperatorPrincipal(storage, OPERATOR_ADMIN_SCOPE),
     async (req: Request, res: Response) => {
       const server = await storage.getMcpServer(req.params.id as string);
       if (!server || server.ownership !== 'node') return notFound(res);

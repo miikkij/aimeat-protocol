@@ -10,6 +10,10 @@
  *   declares a split against somebody else's revenue.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-mcp-beneficiary
  * @version-history
+ *   v1.1.0 — 2026-09-24 — The operator's two agents hold operator:admin. Their setup no longer matched
+ *     the node: reading another account's approval state and recording one are asked of the agent
+ *     now, so an operator's agent needs that tick (security audit A8-1). The bare agent keeps
+ *     operator:admin and lacks commerce:beneficiary-verify, which is the refusal it is there for.
  *   v1.0.0 — 2026-07-30 — Initial.
  */
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
@@ -165,7 +169,8 @@ await test('Setup: operator, provider, beneficiary and consumer, each with an MC
     // and no wildcard carries it: recording a beneficiary as verified is what makes a payout
     // possible, so it costs its own tick. Reading an approval state still needs only wallet:read,
     // which is why the tool itself is registered on that.
-    opAgent = await agentSession(operator.token, operator.name, 'opa', ['wallet:read', 'exchange:beneficiary', 'commerce:beneficiary-verify']);
+    // operator:admin as well: the operator's reach is asked of the AGENT, not read off its owner.
+    opAgent = await agentSession(operator.token, operator.name, 'opa', ['wallet:read', 'exchange:beneficiary', 'commerce:beneficiary-verify', 'operator:admin']);
     // ext:invoke is separate from ext:write since the 2026-08-10 scope work: publishing an extension
     // and running one are different promises, and running one can spend the caller's morsels. An
     // agent that does both needs both words. (The REST invoke route asks for no scope at all, so
@@ -294,7 +299,7 @@ await test('An operator WITHOUT commerce:beneficiary-verify is refused the write
     // makes a payout possible, so it costs a permission no wildcard carries — an operator account
     // whose agent was never given that tick cannot open the gate from a chat. Reading stays open,
     // which is why the tool is registered on wallet:read and the word is checked on the write.
-    const bare = await agentSession(operator.token, operator.name, 'opbare', ['wallet:read']);
+    const bare = await agentSession(operator.token, operator.name, 'opbare', ['wallet:read', 'operator:admin']);
 
     const write = await bare.session.call('aimeat_commerce_beneficiary_approve', {
         ghii: benef.ghii, state: 'verified', method: 'contract-on-file',

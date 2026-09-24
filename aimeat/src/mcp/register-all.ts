@@ -24,6 +24,8 @@
  * @usage
  *   registerAllServerTools(mcp, { storage, config, agentGaii: () => gaii, ... });
  * @version-history
+ *   v1.7.0 — 2026-09-24 — The boards, skills, cortex, page-layout and theme groups receive the
+ *     session's scopes: each asks the operator question of the agent (security audit A8-1).
  *   v1.6.0 — 2026-09-24 — registerContactTools receives the session's bearer: the email lookup asks
  *     the REST door with it, so the door's owner gate and limiter decide (security audit A5-2).
  *   v1.5.0 — 2026-09-24 — registerSeoTools receives the session's scopes: its operator tools, like the
@@ -145,7 +147,7 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     const { emitResourceUpdated, emitResourceListChanged } = deps;
 
     registerCoreTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes, peers);
-    registerBoardsTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);
+    registerBoardsTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
     registerOrganismsTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);
     registerWorkspaceTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);
     registerConnectionTools(mcp, storage, config, agentGaii, scopes);
@@ -155,7 +157,7 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     registerAppdevResearchTools(mcp, storage, config, agentGaii);
     registerAppTemplateProposalTools(mcp, storage, config, agentGaii);
     registerAppdevProofTools(mcp, storage, config, agentGaii, scopes);
-    registerSkillsTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);
+    registerSkillsTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
     registerOperatorConfigTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
     registerComplianceTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
     registerDataMapTools(mcp, storage, config, agentGaii, () => scopes);
@@ -176,7 +178,7 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     // The second primitive, beside aimeat_discover: run what you found. Needs the session's
     // raw bearer, because the call is dispatched as the caller through the node's own routes.
     registerInvokeTool(mcp, config, getToken, agentGaii);
-    registerCortexTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);
+    registerCortexTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
     registerAppsTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);
     registerAppDraftEditTools(mcp, storage, config, agentGaii);
     registerAppScreenshotTool(mcp, storage, config, agentGaii);
@@ -208,11 +210,11 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     // record, never from the caller's arguments.
     registerPackageTools(mcp, storage, config, agentGaii, peers, scopes);
     registerPortfolioTools(mcp, storage, config, agentGaii);
-    registerSurfaceLayoutTools(mcp, storage, config, agentGaii);
+    registerSurfaceLayoutTools(mcp, storage, config, agentGaii, scopes);
     registerAppUiTools(mcp, storage, config, agentGaii);
     registerDesignbookTools(mcp, storage, config, agentGaii);
     registerUiLibraryTools(mcp, storage, config);
-    registerThemeTools(mcp, storage, config, agentGaii);
+    registerThemeTools(mcp, storage, config, agentGaii, scopes);
     registerAgentTelemetryTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);
     registerAgentOnboardingTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);
     registerAgentManagementTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);

@@ -20,6 +20,10 @@
  *   import { registerCommerceTools } from './commerce.js';
  *   registerCommerceTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.6.0 — 2026-09-24 — SECURITY (audit A8-1): aimeat_commerce_beneficiary_approve asks the operator
+ *     question of the agent through services/operator-principal.ts, so reading another account's
+ *     approval state and recording one take operator:admin; recording keeps its own word too. The role
+ *     was read off the owner record, so every agent of an operator holding wallet:read carried it.
  *   v1.5.1 — 2026-09-16 — psp_set and psp_delete store the PSP secrets encrypted
  *     (commerce/psp-secrets.ts); psp_set refuses on a node with no encryption key.
  *   v1.5.0 — 2026-09-13 — A refused write hands back its details with the text, so aimeat_app_tools_publish
@@ -70,6 +74,7 @@ import { issueJWT } from '../auth/jwt.js';
 import { writeMemoryRecord } from '../services/memory-write.js';
 import { exchangeOutcome, type ReconcileReport } from '../services/exchange-projection.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
+import { resolveOperatorAgentName } from '../services/operator-principal.js';
 import { logger } from '../utils/logger.js';
 
 const PSP_KEY = 'commerce.psp';
@@ -630,10 +635,10 @@ export function registerCommerceTools(
         },
         annotationsFor('aimeat_commerce_beneficiary_approve'),
         async ({ ghii, state, method, subject, evidence }) => {
-            // Same runtime check the admin tools use (core-admin.ts): read the OWNER record rather
-            // than trust a session claim, because roles are not known at session-creation time.
-            const ownerRec = await storage.getOwner(owner);
-            const isOperator = !!ownerRec && ownerRec.roles.includes('operator');
+            // The question the admin tools ask (services/operator-principal.ts): an operator
+            // account's agent holding operator:admin. The owner record alone handed both branches
+            // below to every agent of an operator holding wallet:read.
+            const isOperator = (await resolveOperatorAgentName(storage, agentGaii, sessionScopes)) !== null;
             // READ path. Your own is yours to see; somebody else's verification state is an operator question.
             if (!state) {
                 const target = ghii || ownerGhii;
