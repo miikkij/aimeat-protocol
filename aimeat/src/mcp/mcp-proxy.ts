@@ -30,6 +30,9 @@
  * @structure registerMcpProxyTools(mcp, storage, config, agentGaii)
  * @usage registerMcpProxyTools(mcp, storage, config, () => agentGaii);
  * @version-history
+ *   v1.1.0 — 2026-09-24 — aimeat_mcp_update, aimeat_mcp_authorize and aimeat_mcp_detach resolve the
+ *     server through requireManageableServer, the question their REST twins ask: a node-wide server
+ *     is used by the owners it admits and changed by none of them.
  *   v1.0.0 — 2026-09-16 — Phase 1 of the MCP proxy.
  */
 import { z } from 'zod';
@@ -38,10 +41,12 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
+import { toolError } from './tool-error.js';
 import { ownerGhiiOf } from '../utils/gaii.js';
 import {
   attachMcpServer, attachOrganismServer, listUsableServers, requireUsableServer, detachMcpServer,
   updateMcpServerSettings, listNodeServers, setNodeServerPolicy, findNodeServer,
+  requireManageableServer,
 } from '../services/mcp-client/registry.js';
 import { callRemoteTool, listRemoteTools } from '../services/mcp-client/invoke.js';
 import { startMcpOAuth } from '../services/mcp-client/oauth.js';
@@ -71,6 +76,16 @@ export function registerMcpProxyTools(
   const notFound = (name: string): TextResult => fail(
     // Absent and not-yours answer alike: naming another owner's server must not confirm it exists.
     `There is no server called "${name}" you can use. aimeat_mcp_list shows the ones you have.`,
+  );
+
+  /**
+   * The server this session may CHANGE, the question the REST write doors ask. A node-wide server
+   * shows in aimeat_mcp_list and is still not one of these, so the refusal says why in general terms.
+   */
+  const manageable = (name: string) => requireManageableServer(storage, ownerGhii(), name, config);
+  const notManageable = (name: string): TextResult => toolError('NOT_FOUND',
+    `There is no server called "${name}" that you can change. You can change or remove a server `
+    + 'attached to your own account or to a group you run; one this node offers is changed by whoever runs the node.',
   );
 
   // ── Using what is attached ──────────────────────────────────────────────────────────────────
@@ -212,8 +227,9 @@ export function registerMcpProxyTools(
     },
     annotationsFor('aimeat_mcp_authorize'),
     async ({ server, return_url }): Promise<TextResult> => {
-      const row = await requireUsableServer(storage, ownerGhii(), server);
-      if (!row) return notFound(server);
+      // A sign-in writes the credential onto the row, so it is a change like the two tools below.
+      const row = await manageable(server);
+      if (!row) return notManageable(server);
 
       const started = await startMcpOAuth({
         storage, config, server: row, ownerGhii: ownerGhii(),
@@ -245,8 +261,8 @@ export function registerMcpProxyTools(
     },
     annotationsFor('aimeat_mcp_update'),
     async ({ server, enabled, title, description, exposure }): Promise<TextResult> => {
-      const row = await requireUsableServer(storage, ownerGhii(), server);
-      if (!row) return notFound(server);
+      const row = await manageable(server);
+      if (!row) return notManageable(server);
 
       // The same service the REST door calls, so neither can switch a server off in a way the
       // other does not: the pool invalidation and the live-update announcement live in there.
@@ -390,8 +406,8 @@ export function registerMcpProxyTools(
     { server: z.string().describe('Which server, by its short name.') },
     annotationsFor('aimeat_mcp_detach'),
     async ({ server }): Promise<TextResult> => {
-      const row = await requireUsableServer(storage, ownerGhii(), server);
-      if (!row) return notFound(server);
+      const row = await manageable(server);
+      if (!row) return notManageable(server);
       await detachMcpServer(storage, row);
       return ok({ removed: row.slug });
     });

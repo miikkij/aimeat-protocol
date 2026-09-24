@@ -21,6 +21,7 @@
  *   - Phase 4: the fences — cross-owner 404, and the scope split on an agent session
  *   - Phase 5: the directory and a published capability over a remote tool
  *   - Phase 5b: a server that belongs to a group, attached by an AGENT
+ *   - Phase 5d: the node's own server — an ordinary owner uses it, and cannot change it on any door
  *   - Phase 6: a local process, refused because this node does not run them
  *   - Phase 7: off and gone — disable stops it, detach removes it
  *
@@ -29,6 +30,9 @@
  *     test/run-e2e-ci.ts --test=mcp-proxy
  *
  * @version-history
+ *   v1.4.0 — 2026-09-24 — Phase 5d: an owner a node-wide server admits gets 404 on PATCH, DELETE and
+ *     authorize of it, over REST and over MCP, and the operator changes it on the node doors
+ *     (secaudit 2026-09 A2-1). Adds an ordinary owner, and a small MCP driver for the tool arms.
  *   v1.3.0 — 2026-09-17 — The loop brake: 508 on the node's own endpoint, and this node refused as a
  *     server of its own by its address and by any other spelling of it.
  *   v1.2.0 — 2026-09-16 — The stdio refusals (proxy phase 7).
@@ -106,6 +110,88 @@ async function agentTokenFor(gaii: string, privKey: string): Promise<string> {
   });
   assert(body.ok === true, `agent token for ${gaii}: ${JSON.stringify(body.error)}`);
   return body.data.token as string;
+}
+
+/**
+ * An ORDINARY owner, registered through the public door. The two owners phase 0 makes come from the
+ * admin setup door, which makes every account it creates an operator, and a fence proven against an
+ * operator says nothing about everybody else.
+ */
+async function plainOwner(prefix: string): Promise<{ name: string; token: string }> {
+  const name = `${prefix}${Date.now().toString(36).slice(-6)}`;
+  for (let attempt = 0; ; attempt++) {
+    const reg = await json('/v1/ghii', {
+      method: 'POST',
+      body: JSON.stringify({ username: name, display_name: name, password: 'McpProxyTest1234' }),
+    });
+    if (reg.status === 429 && attempt < 8) { await new Promise((r) => setTimeout(r, 1500)); continue; }
+    assert(reg.status === 201, `registration: ${reg.status} ${JSON.stringify(reg.body)}`);
+    return { name, token: await ownerTokenFor(name, reg.body.data.private_key) };
+  }
+}
+
+/** An agent of `owner` holding exactly `scopes`, with a token minted after they were set. */
+async function agentWithScopes(
+  owner: { name: string; token: string }, agentName: string, scopes: string[],
+): Promise<{ gaii: string; token: string }> {
+  const auth = { Authorization: `Bearer ${owner.token}` };
+  const made = await json('/v1/agents', {
+    method: 'POST', headers: auth,
+    body: JSON.stringify({ name: agentName, owner: owner.name, capabilities: ['memory'], model: 'test' }),
+  });
+  assert(made.status === 201, `agent: ${made.status}: ${JSON.stringify(made.body)}`);
+  // Through their own door, for the reason phase 0 gives: POST /v1/agents ignores a scope list.
+  const scoped = await json(`/v1/agents/${agentName}/scopes`, {
+    method: 'PATCH', headers: auth, body: JSON.stringify({ scopes }),
+  });
+  assert(scoped.status === 200, `scopes: ${scoped.status}: ${JSON.stringify(scoped.body)}`);
+  const gaii = made.body.data.agent.gaii as string;
+  return { gaii, token: await agentTokenFor(gaii, made.body.data.private_key) };
+}
+
+// ─── The node's own MCP door, for the arms that must hold on both surfaces ───
+interface McpSession { token: string; sessionId?: string }
+let rpcId = 0;
+
+async function mcpRpc(session: McpSession, method: string, params: Record<string, unknown> = {}): Promise<any> {
+  const id = ++rpcId;
+  const res = await fetch(`${BASE}/v1/mcp`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json', Accept: 'application/json, text/event-stream',
+      Authorization: `Bearer ${session.token}`,
+      ...(session.sessionId ? { 'mcp-session-id': session.sessionId, 'mcp-protocol-version': '2025-03-26' } : {}),
+    },
+    body: JSON.stringify({ jsonrpc: '2.0', id, method, params }),
+  });
+  const sid = res.headers.get('mcp-session-id');
+  if (sid) session.sessionId = sid;
+  const text = await res.text();
+  if (!(res.headers.get('content-type') ?? '').includes('text/event-stream')) {
+    try { return JSON.parse(text); } catch { return { _raw: text }; }
+  }
+  const msgs = text.split('\n').filter((l) => l.startsWith('data: '))
+    .map((l) => { try { return JSON.parse(l.slice(6)); } catch { return null; } })
+    .filter(Boolean);
+  return msgs.find((m: any) => m.id === id) ?? msgs[0] ?? {};
+}
+
+async function openMcpSession(token: string): Promise<McpSession> {
+  const session: McpSession = { token };
+  await mcpRpc(session, 'initialize', {
+    protocolVersion: '2025-03-26', capabilities: {},
+    clientInfo: { name: 'e2e-mcp-proxy', version: '1.0.0' },
+  });
+  return session;
+}
+
+/** One tool call: whether the node refused it, and the text it answered with. */
+async function mcpTool(
+  session: McpSession, name: string, args: Record<string, unknown>,
+): Promise<{ isError: boolean; text: string }> {
+  const body = await mcpRpc(session, 'tools/call', { name, arguments: args });
+  const text = body?.result?.content?.[0]?.text ?? JSON.stringify(body?.error ?? body ?? {});
+  return { isError: body?.result?.isError === true || body?.error !== undefined, text };
 }
 
 // ─── The far side ───
@@ -892,6 +978,99 @@ await test('a money price is accepted, and a call answers 402 until payment can 
   });
   assert(freed.status === 200 && freed.body.data.server.price === null,
     `a price of zero should clear it: ${JSON.stringify(freed.body)}`);
+});
+
+// ─── Phase 5d: using the node's server is not owning it ───
+console.log('\nPhase 5d — The node’s server stays the node’s');
+
+let plain = { name: '', token: '' };
+let houseId = '';
+const plainAuth = () => ({ Authorization: `Bearer ${plain.token}` });
+
+/** The operator's view of the house server: the one place its settings can be read. */
+async function houseRow(): Promise<any> {
+  const listed = await json('/v1/mcp-servers/node', { headers: ownerAuth() });
+  return (listed.body.data.servers as any[]).find((x) => x.slug === 'housewide');
+}
+
+await test('an ordinary owner the node offers the server to may call it', async () => {
+  plain = await plainOwner('mcpplain');
+  const row = await houseRow();
+  assert(row?.slug === 'housewide', 'the house server is missing');
+  houseId = row.id;
+  const called = await json('/v1/mcp-servers/housewide/call', {
+    method: 'POST', headers: plainAuth(),
+    body: JSON.stringify({ tool: 'echo', arguments: { text: 'offered to me' } }),
+  });
+  assert(called.status === 200, `an admitted owner should reach it, got ${called.status}`);
+});
+
+await test('…and gets 404 when changing, signing in or detaching it, by id and by name', async () => {
+  // Before 2026-09-24 this owner could switch the server off for everybody, rename it, start a
+  // sign-in on it and delete it with its credential (secaudit 2026-09 A2-1).
+  for (const ref of [houseId, 'housewide']) {
+    const patched = await json(`/v1/mcp-servers/${ref}`, {
+      method: 'PATCH', headers: plainAuth(),
+      body: JSON.stringify({ enabled: false, title: 'hijacked', exposure: 'flatten' }),
+    });
+    assert(patched.status === 404, `PATCH ${ref}: expected 404, got ${patched.status}`);
+    const authorized = await json(`/v1/mcp-servers/${ref}/authorize`, {
+      method: 'POST', headers: plainAuth(), body: JSON.stringify({ return_url: '/spa.html#access' }),
+    });
+    assert(authorized.status === 404, `authorize ${ref}: expected 404, got ${authorized.status}`);
+    const removed = await json(`/v1/mcp-servers/${ref}`, { method: 'DELETE', headers: plainAuth() });
+    assert(removed.status === 404, `DELETE ${ref}: expected 404, got ${removed.status}`);
+  }
+  const row = await houseRow();
+  assert(row?.slug === 'housewide', 'the house server was deleted by an owner it was only offered to');
+  assert(row.enabled === true && row.title === 'housewide' && row.exposure === 'gateway',
+    `the house server was changed: ${JSON.stringify(row)}`);
+});
+
+await test('…and its agent holding mcp:manage is refused the same three acts over MCP', async () => {
+  const agent = await agentWithScopes(plain, 'mcpplainadmin', ['mcp:read', 'mcp:use', 'mcp:manage']);
+  const session = await openMcpSession(agent.token);
+  const acts: [string, Record<string, unknown>][] = [
+    ['aimeat_mcp_update', { server: 'housewide', enabled: false, title: 'hijacked' }],
+    ['aimeat_mcp_authorize', { server: 'housewide' }],
+    ['aimeat_mcp_detach', { server: 'housewide' }],
+  ];
+  for (const [tool, args] of acts) {
+    const r = await mcpTool(session, tool, args);
+    // The not-found sentence, not merely an error: before the fix the sign-in failed only because
+    // this upstream offers no OAuth, which would have passed a bare isError check.
+    assert(r.isError && r.text.includes('no server called'), `${tool} was not refused: ${r.text}`);
+  }
+  const row = await houseRow();
+  assert(row && row.enabled === true && row.title === 'housewide',
+    `the house server was changed over MCP: ${JSON.stringify(row)}`);
+});
+
+await test('the operator changes it on the node doors, and a personal door reaches it for nobody', async () => {
+  const personal = await json('/v1/mcp-servers/housewide', {
+    method: 'PATCH', headers: ownerAuth(), body: JSON.stringify({ title: 'renamed' }),
+  });
+  assert(personal.status === 404, `the operator's personal door: expected 404, got ${personal.status}`);
+
+  const off = await json(`/v1/mcp-servers/node/${houseId}`, {
+    method: 'PATCH', headers: ownerAuth(), body: JSON.stringify({ enabled: false }),
+  });
+  assert(off.status === 200, `node door off: ${off.status}: ${JSON.stringify(off.body)}`);
+  const refused = await json('/v1/mcp-servers/housewide/call', {
+    method: 'POST', headers: plainAuth(),
+    body: JSON.stringify({ tool: 'echo', arguments: { text: 'x' } }),
+  });
+  assert(refused.status === 403, `switched off for everybody: expected 403, got ${refused.status}`);
+
+  const on = await json(`/v1/mcp-servers/node/${houseId}`, {
+    method: 'PATCH', headers: ownerAuth(), body: JSON.stringify({ enabled: true }),
+  });
+  assert(on.status === 200, `node door on: ${on.status}`);
+  const back = await json('/v1/mcp-servers/housewide/call', {
+    method: 'POST', headers: plainAuth(),
+    body: JSON.stringify({ tool: 'echo', arguments: { text: 'back' } }),
+  });
+  assert(back.status === 200, `on again: expected 200, got ${back.status}`);
 });
 
 // ─── Phase 6: a local process, which this node does not run ───

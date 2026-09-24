@@ -9,6 +9,8 @@
  *   would look like it working: somebody outside the group reaching it, and a workspace binding
  *   turning out to be no narrower than the organism it sits in.
  * @version-history
+ *   v1.1.0 — 2026-09-24 — Changing one: the group's owners and admins may change or remove its
+ *     server, a member may only use it (requireManageableServer, secaudit 2026-09 A2-1).
  *   v1.0.0 — 2026-09-16 — Phase 5 of the MCP proxy.
  */
 import { describe, it, expect } from 'vitest';
@@ -16,7 +18,7 @@ import { randomUUID } from 'node:crypto';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { McpServerRecord } from '../../src/models/mcp-server-schemas.js';
 import {
-  organismAdmits, requireUsableServer, listUsableServers, attachOrganismServer,
+  organismAdmits, requireUsableServer, requireManageableServer, listUsableServers, attachOrganismServer,
 } from '../../src/services/mcp-client/registry.js';
 import { grantWorkspaceRole } from '../../src/services/workspace-roles.js';
 import type { AimeatConfig } from '../../src/config.js';
@@ -219,5 +221,43 @@ describe('attaching one', () => {
     // server with their account — the ruling migration 0052 already made for workspace rows.
     expect(stored?.ownerGhii).toBeNull();
     expect(stored?.organismId).toBe(ORG);
+  });
+});
+
+describe('changing one', () => {
+  it("is for the group's owners and admins; a member may use it and not change it", async () => {
+    const storage = new SqliteStorage(':memory:');
+    await withOrganism(storage);
+    const s = orgServer();
+    await storage.createMcpServer(s);
+
+    // The same people who may attach one there: switching it off or removing it is governance too.
+    for (const who of [BOSS, ADMIN]) {
+      expect((await requireManageableServer(storage, who, s.id, config))?.id).toBe(s.id);
+    }
+    expect((await requireUsableServer(storage, MEMBER, s.id, config))?.id).toBe(s.id);
+    expect(await requireManageableServer(storage, MEMBER, s.id, config)).toBeNull();
+    expect(await requireManageableServer(storage, OUTSIDER, s.id, config)).toBeNull();
+  });
+
+  it('reads a roll of bare account names as accounts on THIS node', async () => {
+    // organism-ownership.ts writes owners as bare names ('boss'), and the rolls above hold whole
+    // GHIIs; both must answer alike, and only for the account on this node.
+    const storage = new SqliteStorage(':memory:');
+    await storage.createOrganism({
+      id: ORG, name: 'The team', description: '', type: 'team', location: '', interests: [],
+      creatorGhii: BOSS, createdBy: BOSS, owners: ['boss'], admins: ['admin'], members: ['member'],
+      agentGaiis: [], boardId: '', joinPolicy: 'invite_only', maxMembers: 100,
+      visibility: 'private', memoryNamespace: `organism.${ORG}`,
+      moderationConfig: {}, memberVisibility: 'members',
+      createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+    } as never);
+    const s = orgServer();
+    await storage.createMcpServer(s);
+
+    expect((await requireManageableServer(storage, BOSS, s.id, config))?.id).toBe(s.id);
+    expect((await requireManageableServer(storage, ADMIN, s.id, config))?.id).toBe(s.id);
+    expect(await requireManageableServer(storage, MEMBER, s.id, config)).toBeNull();
+    expect(await requireManageableServer(storage, 'boss@another-node-002', s.id, config)).toBeNull();
   });
 });

@@ -11,6 +11,8 @@
  *   caller holding only the read word can call a tool, and whether a tool saying no is told apart
  *   from the proxy failing. Each of those has a named test below.
  * @version-history
+ *   v1.1.0 — 2026-09-24 — A server the node offers: an owner it admits may call it, and gets 404 on
+ *     every door that changes or removes it (secaudit 2026-09 A2-1).
  *   v1.0.0 — 2026-09-16 — Phase 1 of the MCP proxy.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
@@ -23,6 +25,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import { mcpServersRouter } from '../../src/routes/mcp-servers.js';
 import { mcpClientPool } from '../../src/services/mcp-client/pool.js';
+import type { McpServerRecord } from '../../src/models/mcp-server-schemas.js';
 import type { AimeatConfig } from '../../src/config.js';
 import type { Storage } from '../../src/storage/interface.js';
 
@@ -401,5 +404,53 @@ describe('switching a server off and removing it', () => {
     expect(res.status).toBe(200);
     expect(JSON.stringify(res.body)).toContain('revoke');
     expect((await call(app, 'GET', '/v1/mcp-servers')).body.data).toEqual({ servers: [] });
+  });
+});
+
+describe('a server the node offers', () => {
+  /** The operator's server, offered to every owner. It belongs to the node and to no owner. */
+  function houseServer(): McpServerRecord {
+    const now = new Date().toISOString();
+    return {
+      id: randomUUID(), slug: 'market', title: 'Market data', description: '',
+      ownership: 'node', ownerGhii: null, organismId: null, ws: null, createdBy: `operator@${NODE_ID}`,
+      transport: { kind: 'http', url: UPSTREAM_URL },
+      auth: 'none', credential: null, credentialShape: null, expiresAt: null, providerClientId: null,
+      callerIdentity: 'node-credential', exposure: 'gateway',
+      toolCache: [], toolCacheHash: '', lastListedAt: null,
+      availability: 'all-owners', allowlist: [], price: null,
+      directory: { listed: false, visibility: 'private', tags: [] },
+      enabled: true, status: 'active', lastOkAt: null, lastError: null,
+      createdAt: now, updatedAt: now,
+    };
+  }
+
+  it('is USED by an owner it admits, and never changed, signed in or removed by them', async () => {
+    const storage = new SqliteStorage(':memory:');
+    const house = houseServer();
+    await storage.createMcpServer(house);
+    const app = appFor(storage, () => BOB);
+
+    // Admitted: offering it to every owner is the point of a node-wide server.
+    const used = await call(app, 'POST', '/v1/mcp-servers/market/call', {
+      tool: 'create_issue', arguments: { title: 'on the house' },
+    });
+    expect(used.status).toBe(200);
+
+    // Both spellings, as for another owner's server. Before 2026-09-24 each of these answered 200
+    // (or started a sign-in) and wrote the operator's row: secaudit 2026-09 A2-1.
+    for (const ref of [house.id, 'market']) {
+      expect((await call(app, 'PATCH', `/v1/mcp-servers/${ref}`, {
+        enabled: false, title: 'hijacked', exposure: 'flatten',
+      })).status).toBe(404);
+      expect((await call(app, 'POST', `/v1/mcp-servers/${ref}/authorize`, {})).status).toBe(404);
+      expect((await call(app, 'DELETE', `/v1/mcp-servers/${ref}`)).status).toBe(404);
+    }
+
+    const after = await storage.getMcpServer(house.id);
+    expect(after).not.toBeNull();
+    expect(after?.enabled).toBe(true);
+    expect(after?.title).toBe('Market data');
+    expect(after?.exposure).toBe('gateway');
   });
 });

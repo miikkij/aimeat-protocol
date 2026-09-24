@@ -9,6 +9,8 @@
  *   strength of a half-finished setup. And no call may ever take morsels from anybody, because
  *   morsels are a pacer and buy nothing; that failure reaches a balance rather than a log.
  * @version-history
+ *   v1.2.0 — 2026-09-24 — Changing one: an owner a node-wide server admits may use it and never
+ *     change it; an owner changes their own server and nobody else's (secaudit 2026-09 A2-1).
  *   v1.1.0 — 2026-09-16 — Morsels are not money. The four tests that asserted a morsel charge, its
  *     refund and the INSUFFICIENT refusal now assert that no balance ever moves, and a new block
  *     holds the one check every door uses to refuse a morsel price.
@@ -23,7 +25,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import { normalizeMcpPrice, type McpServerRecord } from '../../src/models/mcp-server-schemas.js';
 import {
-  nodeWideAdmits, requireUsableServer, listUsableServers,
+  nodeWideAdmits, requireUsableServer, requireManageableServer, listUsableServers,
 } from '../../src/services/mcp-client/registry.js';
 import { callRemoteTool } from '../../src/services/mcp-client/invoke.js';
 import { sealMcpCredential } from '../../src/services/mcp-client/credential.js';
@@ -184,6 +186,31 @@ describe('reaching one', () => {
     const listed = await listUsableServers(storage, ALICE);
     // The one Alice is admitted to, and not the one reserved for Bob.
     expect(listed.map((s) => s.slug)).toEqual(['market']);
+  });
+});
+
+describe('changing one', () => {
+  it('an owner it admits may USE it and may not change it, by name or by id', async () => {
+    const storage = new SqliteStorage(':memory:');
+    const s = nodeServer();
+    await storage.createMcpServer(s);
+
+    expect((await requireUsableServer(storage, ALICE, s.id))?.id).toBe(s.id);
+    // The operator changes it at /v1/mcp-servers/node/:id. Every personal door asks this question,
+    // and before 2026-09-24 they asked the one above, so any admitted owner could switch it off.
+    expect(await requireManageableServer(storage, ALICE, 'market', config)).toBeNull();
+    expect(await requireManageableServer(storage, ALICE, s.id, config)).toBeNull();
+  });
+
+  it("an owner changes their OWN server, and nobody else's", async () => {
+    const storage = new SqliteStorage(':memory:');
+    const mine = nodeServer({ ownership: 'owner', ownerGhii: ALICE, availability: null });
+    await storage.createMcpServer(mine);
+
+    expect((await requireManageableServer(storage, ALICE, 'market', config))?.id).toBe(mine.id);
+    expect((await requireManageableServer(storage, ALICE, mine.id, config))?.id).toBe(mine.id);
+    expect(await requireManageableServer(storage, BOB, 'market', config)).toBeNull();
+    expect(await requireManageableServer(storage, BOB, mine.id, config)).toBeNull();
   });
 });
 
