@@ -16,6 +16,8 @@
  *   - toEntry() — classify + normalize → DiscoveryEntry
  * @usage registry.register(createMemorySource(storage, config));
  * @version-history
+ *   v0.5.1 — 2026-09-24 — A workspace's name is read from its creator's copy of the manifest
+ *     (readWorkspaceManifest takes the node id; secaudit 2026-09, A6-9).
  *   v0.5.0 — 2026-08-31 — apps.{appId}.tools is left to the `app-tools` source. It used to arrive
  *     here as a plain `memory` record: one row for a manifest holding many tools, described by its
  *     own JSON. The other apps.* records (ui, legal, cost) have no other home and still surface here,
@@ -104,7 +106,7 @@ function plain(s: string): string {
  * The organism and workspace each workspace record lives in, by name. One organism read and one
  * manifest read per distinct pair per call; a record outside a workspace has no place.
  */
-async function attachPlaces(storage: Storage, hits: MemHit[]): Promise<void> {
+async function attachPlaces(storage: Storage, nodeId: string, hits: MemHit[]): Promise<void> {
   const orgNames = new Map<string, Promise<string>>();
   const wsNames = new Map<string, Promise<string>>();
   const orgName = (id: string) => {
@@ -115,7 +117,7 @@ async function attachPlaces(storage: Storage, hits: MemHit[]): Promise<void> {
   const wsName = (org: string, ws: string) => {
     const k = `${org}|${ws}`;
     let p = wsNames.get(k);
-    if (!p) { p = readWorkspaceManifest(storage, org, ws).then(m => (typeof m?.name === 'string' && m.name) || ws).catch(() => ws); wsNames.set(k, p); }
+    if (!p) { p = readWorkspaceManifest(storage, org, ws, nodeId).then(m => (typeof m?.name === 'string' && m.name) || ws).catch(() => ws); wsNames.set(k, p); }
     return p;
   };
   await Promise.all(hits.map(async h => {
@@ -251,7 +253,7 @@ async function enumerateShared(storage: Storage, config: AimeatConfig, ctx: Disc
       if (allowed) out.push(toMemHit(rec, score));
     }
   }
-  await attachPlaces(storage, out);
+  await attachPlaces(storage, config.nodeId, out);
   return out;
 }
 
@@ -293,7 +295,7 @@ export function createMemorySource(storage: Storage, config: AimeatConfig): Disc
       }
 
       const kept = hits.filter(h => !isOwnedElsewhere(h.key) && !isCopyOrMeta(h.key));
-      await attachPlaces(storage, kept);
+      await attachPlaces(storage, config.nodeId, kept);
       return kept.map(h => ({ sourceId: MEMORY_SOURCE_ID, record: h, score: h.score }));
     },
 

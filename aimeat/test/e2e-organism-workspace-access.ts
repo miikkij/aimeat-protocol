@@ -8,6 +8,9 @@
  *   v1.0.0 — 2026-06-08 — Initial: workspace access request/approve/consent flow.
  *   v1.1.0 — 2026-07-15 — Org-admin auto-access: a promoted admin (D) reads + writes a workspace they
  *     did not create, with no per-workspace grant; a plain member (B) still cannot (regression guard).
+ *   v1.2.0 — 2026-09-24 — The workspace's meta namespace (secaudit 2026-09, A6-9): a contributor
+ *     writes the content and is refused the manifest and the share record; an admin and the
+ *     workspace's own creator still write it.
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=organism-workspace-access
 
@@ -251,6 +254,42 @@ await test('17. A file bound to MULTIPLE workspaces is readable via ANY one the 
         const cres = await fetch(`${BASE}/v1/pub/${encodeURIComponent(A_GHII)}/${encodeURIComponent(multiKey)}`, { headers: auth(C.token) });
         assert(cres.status === 403, `non-member expected 403 on multi-bound file, got ${cres.status}`);
     }
+});
+
+// ─── The workspace's own meta namespace (secaudit 2026-09, A6-9). `organism.{id}.meta.*` has been
+//     admin-only for as long as it has held the registry; one level down, `organism.{id}.w.{ws}.meta.*`
+//     holds the workspace's manifest and its share record, and nothing kept a member out of it. A
+//     memory key is unique per OWNER, so a member's write did not overwrite the creator's manifest:
+//     it put a second copy beside it, and a reader took whichever copy the store returned first. B is
+//     a contributor here (re-approved in test 15), which is the strongest ordinary member: allowed to
+//     write the workspace's content, and still not its structure. ───
+await test('17a. Contributor B writes WS content, and is refused WS meta: the manifest and the share record (403)', async () => {
+    const content = await json('/v1/memory', { method: 'POST', headers: auth(B.token), body: JSON.stringify({ key: `${root()}.shared.tasks.b-${Date.now()}.draft`, value: { title: 'contributor task' }, visibility: 'private' }) });
+    assert(content.status === 201, `the contributor's content write ${content.status}: ${JSON.stringify(content.body.error)}`);
+
+    const planted = { manifestVersion: '1.0', id: orgId, name: 'Coordination', kind: 'project', status: 'active', objectTypes: [{ name: 'task', schemaRef: 'schema:task@1', namespace: 'shared.tasks', backing: 'memory', writeRole: 'member', cardinality: 'many', versioned: true, mode: 'records' }] };
+    const m = await json('/v1/memory', { method: 'POST', headers: auth(B.token), body: JSON.stringify({ key: `${root()}.meta.manifest`, value: planted, visibility: 'private' }) });
+    assert(m.status === 403, `a contributor's own copy of the workspace manifest must be refused, got ${m.status}: ${JSON.stringify(m.body.error ?? m.body.data)}`);
+
+    const s = await json('/v1/memory', { method: 'POST', headers: auth(B.token), body: JSON.stringify({ key: `${root()}.meta.share`, value: { public: true }, visibility: 'private' }) });
+    assert(s.status === 403, `a contributor's own copy of the workspace share record must be refused, got ${s.status}: ${JSON.stringify(s.body.error ?? s.body.data)}`);
+});
+
+await test('17b. Admin D, an organism manager, still writes WS meta', async () => {
+    const r = await json('/v1/memory', { method: 'POST', headers: auth(D!.token), body: JSON.stringify({ key: `${root()}.meta.readme`, value: '# Coordination\n\nKept up by an admin.', visibility: 'private' }) });
+    assert(r.status === 201, `admin meta write ${r.status}: ${JSON.stringify(r.body.error)}`);
+});
+
+await test('17c. A plain member who creates a workspace still writes that workspace\'s meta', async () => {
+    const c = await json(`/v1/organisms/${orgId}/workspaces`, {
+        method: 'POST', headers: auth(B.token),
+        body: JSON.stringify({ name: 'B own', manifest: { objectTypes: [{ name: 'note', namespace: 'notes', mode: 'records', backing: 'memory', writeRole: 'member', schemaRef: 'schema:note@1' }] } }),
+    });
+    assert(c.status === 201, `B creates a workspace ${c.status}: ${JSON.stringify(c.body.error)}`);
+    const own = c.body.data.ws as string;
+    // Provisioning wrote the readme under B's name, so this is an update of B's own record: 200.
+    const r = await json('/v1/memory', { method: 'POST', headers: auth(B.token), body: JSON.stringify({ key: `organism.${orgId}.w.${own}.meta.readme`, value: '# B own\n\nWritten by the workspace\'s creator.', visibility: 'private' }) });
+    assert(r.status === 200, `the creator's own meta write ${r.status}: ${JSON.stringify(r.body.error)}`);
 });
 
 await test('18. removing a member closes the question they left open', async () => {

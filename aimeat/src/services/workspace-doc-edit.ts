@@ -34,6 +34,8 @@
  *   const res = await appendToDocument({ storage, config }, caller,
  *     { organismId, wsId, space: 'notes', id: 'doc-x', markdown: '## Found\n\n…' });
  * @version-history
+ *   v1.2.0 — 2026-09-24 — The space is resolved from the workspace creator's copy of the manifest
+ *     (readWorkspaceManifest takes the node id; secaudit 2026-09, A6-9).
  *   v1.1.0 — 2026-09-13 — A space the manifest does not declare is the shared 422 UNDECLARED_SPACE
  *     refusal (the developer's decision, the same answer every workspace write door gives), where it
  *     was 404 NO_SPACE with a sentence of its own. A caller the access rule refuses is told that
@@ -204,7 +206,7 @@ async function editDocument(
     const root = `organism.${target.organismId}.w.${target.wsId}`;
 
     // 1. The space.
-    const manifest = await readWorkspaceManifest(storage, target.organismId, target.wsId);
+    const manifest = await readWorkspaceManifest(storage, target.organismId, target.wsId, config.nodeId);
     if (!manifest) {
         throw new WorkspaceDocError('WS_NOT_FOUND', 404,
             `No manifest for workspace ${target.wsId} — an empty workspace, the wrong id, or no access to it.`);

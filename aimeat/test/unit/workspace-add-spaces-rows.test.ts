@@ -14,6 +14,8 @@
  *   - an explicit value still wins over every default
  * @usage cd aimeat && pnpm exec vitest run test/unit/workspace-add-spaces-rows.test.ts
  * @version-history
+ *   v1.1.0 — 2026-09-24 — readWorkspaceManifest takes the node id, and the owner's id is built from
+ *     the same config the update runs with, so the two agree on which identities are this node's.
  *   v1.0.0 — 2026-09-14 — Initial.
  */
 
@@ -25,7 +27,8 @@ import { loadConfig } from '../../src/config.js';
 
 const ORG = 'org-rows';
 const OWNER = 'alice';
-const OWNER_GHII = 'alice@aimeat-local-001-dev';
+const NODE = loadConfig().config.nodeId;
+const OWNER_GHII = `alice@${NODE}`;
 
 type ObjType = Record<string, unknown>;
 
@@ -53,7 +56,7 @@ async function addSpaces(storage: SqliteStorage, ws: string, spaces: ObjType[]) 
 }
 
 async function spaceNamed(storage: SqliteStorage, ws: string, name: string): Promise<ObjType> {
-  const man = await readWorkspaceManifest(storage as never, ORG, ws);
+  const man = await readWorkspaceManifest(storage as never, ORG, ws, NODE);
   const ot = (man?.objectTypes as ObjType[] | undefined)?.find(o => o.name === name);
   expect(ot, `space "${name}" is in the manifest`).toBeTruthy();
   return ot!;

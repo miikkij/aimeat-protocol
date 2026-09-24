@@ -3,8 +3,9 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Who may read or write an `organism.{id}.*` key. Membership, the namespace role
- *   (meta = admin/creator write, shared = member, member.{owner} = self) and the consent layer,
- *   in one function that takes a caller rather than an Express request.
+ *   (meta = admin/creator write, a workspace's meta = its creator or an admin, shared = member,
+ *   member.{owner} = self) and the consent layer, in one function that takes a caller rather than
+ *   an Express request.
  *
  *   WHY IT MOVED HERE. This rule lived entirely inside middleware/workspace-access.ts, which is
  *   RequestHandler-shaped, so only a road with a `req` could reach it. services/memory-write.ts —
@@ -29,9 +30,16 @@
  *   v1.0.0 -- 2026-08-11 -- Extracted from middleware/workspace-access.ts (security audit, MCP/REST
  *     drift): the consent layer, the meta.* admin rule and the member.* self-write rule reach every
  *     door instead of only the HTTP one.
+ *   v1.1.0 -- 2026-09-24 -- A workspace's own meta namespace, `organism.{id}.w.{ws}.meta.*`, is
+ *     written by the workspace's registered creator or an organism admin (secaudit 2026-09, A6-9).
+ *     The admin rule matched the organism-level prefix only, and a human member skips the consent
+ *     layer, so any active member stored a copy of a workspace's manifest under their own name; the
+ *     manifest carries a row space's writeRole and app allowlist. The creator is read through
+ *     findWorkspaceRegistration (services/workspace-meta.ts), which the consent step now shares.
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
+import { findWorkspaceRegistration } from './workspace-meta.js';
 
 /** The session asking, in the terms this rule decides on. */
 export interface OrganismAccessCaller {
@@ -111,24 +119,16 @@ export async function checkOrganismNamespaceAccess(
 
     // An AGENT of the workspace's own creator is that creator's tool, and likewise does not consent
     // to itself. A cross-owner member's agent still needs a granted contributor role.
-    let isOwnWorkspaceAgent = false;
-    let wsCreator: string | null = null;
     const wsMatch = /^organism\.[^.]+\.w\.([^.]+)\./.exec(key);
     const wsId = wsMatch ? wsMatch[1] : null;
-    if (wsId && !isHumanOwnerSession) {
-        const regKey = `organism.${organismId}.meta.workspaces`;
-        const { items } = await storage.listAllMemory({ prefix: regKey, limit: 1000 });
-        for (const rec of items) {
-            if (rec.key !== regKey) continue;
-            const list = (rec.value as { workspaces?: Array<{ id: string; createdBy?: string }> } | null)?.workspaces ?? [];
-            const entry = list.find(w => w.id === wsId);
-            if (entry) {
-                wsCreator = entry.createdBy ?? (rec.ownerGaii.includes('#') ? rec.ownerGaii.split('#')[1] : rec.ownerGaii).split('@')[0];
-                if (wsCreator === caller.owner) isOwnWorkspaceAgent = true;
-                break;
-            }
-        }
+    // A write into the workspace's own meta namespace needs to know the creator whoever is asking,
+    // except an org manager, who passes that rule whatever the registry says.
+    const isWsMetaWrite = wsId !== null && mode === 'write' && key.startsWith(`organism.${organismId}.w.${wsId}.meta.`);
+    let wsCreator: string | null = null;
+    if (wsId && (!isHumanOwnerSession || (isWsMetaWrite && !isOrgManager))) {
+        wsCreator = (await findWorkspaceRegistration(storage, organismId, wsId))?.creator ?? null;
     }
+    const isOwnWorkspaceAgent = !isHumanOwnerSession && wsCreator !== null && wsCreator === caller.owner;
 
     const needsConsent = !isOwnMemberNamespace && !isHumanOwnerSession && !isOwnWorkspaceAgent && !isOrgManager;
 
@@ -172,6 +172,19 @@ export async function checkOrganismNamespaceAccess(
         if (membership.role !== 'admin' && membership.role !== 'creator') {
             return { status: 403, code: 'ACCESS_DENIED', message: 'Admin access required for meta namespace' };
         }
+    }
+
+    // A workspace's own meta namespace, the same rule one level down: every member with access reads
+    // it, and the workspace's registered creator or an org manager writes it. It holds the manifest,
+    // which carries each row space's writeRole and app allowlist, and the share record, which decides
+    // what the public reads. A memory key is unique per owner, so a member's write here never
+    // overwrote the creator's record: it stored a second copy beside it for a reader to take. A
+    // workspace nobody registered has no creator, and only a manager writes its meta.
+    if (isWsMetaWrite && !isOrgManager && wsCreator !== caller.owner) {
+        return {
+            status: 403, code: 'ACCESS_DENIED',
+            message: 'Only the workspace\'s creator or an organism admin may write its meta namespace',
+        };
     }
 
     // Member namespace: every member reads it, only its owner writes it.

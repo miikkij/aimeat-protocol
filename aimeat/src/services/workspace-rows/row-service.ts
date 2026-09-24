@@ -28,6 +28,8 @@
  *   - appendRows / readRows / readRow / deleteRow / sweepRows / spaceStats / workspaceRowIndex
  * @usage const res = await appendRows(deps, caller, { organismId, wsId, space, rows });
  * @version-history
+ *   v1.2.0 — 2026-09-24 — loadSpace reads the workspace creator's copy of the manifest, whatever the
+ *     store's order (readWorkspaceManifest takes the node id; secaudit 2026-09, A6-9).
  *   v1.1.0 — 2026-08-29 — authorizeApp + gate(): a role-'app' caller reaches one row space by the
  *     two-hand rule (the space names the app, the person holds organism:rows and an active
  *     membership); every entry point goes through gate().
@@ -176,7 +178,7 @@ async function requireWriteRole(
 async function loadSpace(
   deps: RowServiceDeps, organismId: string, wsId: string, space: string,
 ): Promise<RowSpace> {
-  const manifest = await readWorkspaceManifest(deps.storage, organismId, wsId);
+  const manifest = await readWorkspaceManifest(deps.storage, organismId, wsId, deps.config.nodeId);
   if (!manifest) {
     throw new WorkspaceRowError('WS_NOT_FOUND', 404,
       `No manifest for workspace ${wsId} — an empty workspace, the wrong id, or no access to it.`);
