@@ -10,6 +10,8 @@
  *   asserted in the same group, because that is the path every other app on the node still takes.
  * @usage pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-app-dev-grant
  * @version-history
+ *   v1.3.0 — 2026-09-24 — A6-5: revoking a pure builder's right takes the roster row it made, so
+ *     they no longer read as a member on their own standing or on the owner's roster.
  *   v1.2.0 — 2026-09-14 — A builder's PATCH that is refused leaves the fields before the refusal
  *     alone. It landed the rename and then answered 403 on the reviewer's name.
  *   v1.1.0 — 2026-09-08 — Phase 3: the doors accept a target owner, so the suite stops asserting
@@ -199,6 +201,32 @@ await test('the right comes off without taking the membership with it', async ()
     const roster = await json(`/v1/apps/${owner.name}/${APP}/members`, { headers: auth(owner.token) });
     const still = (roster.body.data.members as any[]).find(x => x.owner === builder.name);
     assert(!!still && still.role === 'subscriber', 'and they are still a member of it');
+});
+
+// A6-5. A pure builder's roster row carries nothing but the right: no role, no offerings, no term.
+// Revoking stripped the right and kept the row, so the ex-builder still read as a live member of
+// the app, on their own standing and on the owner's roster. The row goes with the right now; the
+// test above holds the other half, a real membership surviving the same revoke.
+await test('a pure builder\'s right comes off with the row it made', async () => {
+    const pure = await setupOwner('pur');
+    const g = await json(grantPath(owner.name, pure.name), {
+        method: 'PUT', headers: auth(owner.token), body: JSON.stringify({ level: 'drafter' }),
+    });
+    assert(g.status === 200, `grant ${g.status}: ${JSON.stringify(g.body?.error)}`);
+    const before = await json(`/v1/apps/${owner.name}/${APP}/members`, { headers: auth(owner.token) });
+    assert((before.body.data.members as any[]).some(x => x.owner === pure.name),
+        'while they hold the right, the roster lists them (so the check below is not vacuous)');
+
+    const r = await json(grantPath(owner.name, pure.name), { method: 'DELETE', headers: auth(owner.token) });
+    assert(r.status === 200 && r.body.data.revoked === true, `revoke ${r.status}`);
+
+    const me = await json(`/v1/apps/${owner.name}/${APP}/members/me`, { headers: auth(pure.token) });
+    assert(me.status === 200, `members/me ${me.status}`);
+    assert(me.body.data.member === null,
+        `no membership is left behind: ${JSON.stringify(me.body.data.member)}`);
+    const roster = await json(`/v1/apps/${owner.name}/${APP}/members`, { headers: auth(owner.token) });
+    const still = (roster.body.data.members as any[]).find(x => x.owner === pure.name);
+    assert(!still, `and the roster no longer lists them: ${JSON.stringify(still)}`);
 });
 
 await test('a role change at the roster door does not quietly revoke the right', async () => {

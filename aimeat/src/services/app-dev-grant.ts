@@ -41,6 +41,8 @@
  *   const t = await resolveAppTarget(storage, config, { callerOwner, requestedOwner, filename, act: 'publish' });
  *   if (!t.ok) return res.status(t.status).json(error(config.nodeId, t.code, t.message));
  * @version-history
+ *   v1.1.0 — 2026-09-24 — removeDevGrant deletes a roster row that carried nothing but the right
+ *     (A6-5). Stripping the right and keeping the row left the ex-builder as a live member.
  *   v1.0.1 — 2026-09-12 — Both resolveGhii calls hand it the node; the GHII these composed by hand
  *     is what the helper composes. wish-identity-gate-sees-resolveghii.
  *   v1.0.0 — 2026-09-08 — Initial. The ladder, both grant records, and the seam. No door passes a
@@ -52,7 +54,7 @@ import { canonicalAppId, listAppRecords } from './app-record-keys.js';
 import type { Storage } from '../storage/interface.js';
 import { resolveGhii } from '../utils/ghii-resolver.js';
 import {
-  accountOf, getMemberRow, isLive, memberKey, sameApp, writePrivateRecord,
+  accountOf, getMemberRow, isLive, memberKey, removeMember, sameApp, writePrivateRecord,
   type AppMemberRecord,
 } from './app-members.js';
 
@@ -181,15 +183,35 @@ export async function getDevGrant(
 }
 
 /**
- * Take the development right away, leaving the membership behind.
+ * Does this roster row carry anything besides the development right?
  *
- * The row survives on purpose: somebody can be a paying member of an app they no longer help build,
- * and deleting the row here would take their access with it. Returns whether there was a right.
+ * putDevGrant creates a row for somebody who is not a member, and that row holds no role, no
+ * offerings, no term and no level: it exists only to carry the right. A membership always has a
+ * role, because the roster door refuses an approval without one.
+ */
+function onlyCarriesTheRight(row: AppMemberRecord): boolean {
+  return !row.role
+    && !(row.offerings?.length)
+    && !row.expiresAt
+    && (row.level === null || row.level === undefined);
+}
+
+/**
+ * Take the development right away.
+ *
+ * A member keeps the row: somebody can be a paying member of an app they no longer help build, and
+ * deleting the row here would take their access with it. A row that only carried the right goes
+ * with it. Kept, it read as a live membership, so the ex-builder stayed on the owner's roster and
+ * on every member-only surface of the app (A6-5). Returns whether there was a right.
  */
 export async function removeDevGrant(storage: Storage, appId: string, principal: string): Promise<boolean> {
   const account = accountOf(principal);
   const prev = await getMemberRow(storage, appId, account);
   if (!prev || typeof prev.dev !== 'number') return false;
+  if (onlyCarriesTheRight(prev)) {
+    await removeMember(storage, appId, account);
+    return true;
+  }
   const rec: AppMemberRecord = { ...prev, updatedAt: new Date().toISOString() };
   delete rec.dev;
   delete rec.devSince;

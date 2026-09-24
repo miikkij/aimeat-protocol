@@ -27337,9 +27337,11 @@ paths:
       operationId: appDevGrantRevoke
       summary: Take the development right back
       description: >
-        Owner-only. The roster row survives: somebody can pay for an app they no longer help build,
-        and deleting the row here would take their access away with the right. Returns
-        `{ revoked, account }`, where `revoked` is false when there was nothing to take.
+        Owner-only. A member's roster row survives: somebody can pay for an app they no longer help
+        build, and deleting the row here would take their access away with the right. A row that
+        only carried the right (no role, no offerings, no term) is removed with it, so a pure
+        builder is no longer a member afterwards. Returns `{ revoked, account }`, where `revoked` is
+        false when there was nothing to take.
       tags: [Apps]
       security:
         - BearerAuth: []
