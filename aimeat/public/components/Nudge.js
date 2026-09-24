@@ -7,6 +7,7 @@
  * @structure MobileNudge({ onDismiss })
  * @usage html`<${MobileNudge} onDismiss=${dismiss} />`
  * @version-history
+ *   v1.1.0 — 2026-09-24 — "Not now" is the action link's text tone (Jouni's decision "Dismiss").
  *   v1.0.0 — 2026-09-23 — Moved out of views/chat/parts.js with its markup unchanged (UI
  *     consolidation phase 1, a move).
  */
@@ -37,7 +38,7 @@ export function MobileNudge({ onDismiss }) {
                 ${' '}
                 ${tr('chat.nudgeMobileBody', 'It installs as an app, and with notifications on I can tell you when something finishes instead of you coming back to check.')}
             </span>
-            <button type="button" class="btn-ghost poster-nudge-dismiss" onClick=${onDismiss}>
+            <button type="button" class="poster-action poster-action--text poster-nudge-dismiss" onClick=${onDismiss}>
                 ${tr('chat.nudgeDismiss', 'Not now')}
             </button>
         </div>
