@@ -26,12 +26,23 @@
  *   domain makes every registered key unusable, which is why config derives it from baseUrl rather
  *   than letting it drift as a setting somebody edits.
  *
+ *   A PASSKEY IS TWO FACTORS ONLY WHEN THE DEVICE CHECKED THE PERSON. The device holds the key
+ *   (something the person has); a PIN, a fingerprint or a face on the device is the second factor,
+ *   and the user-verification (UV) flag in its answer says that check happened. An account whose
+ *   owner armed two-step sign-in asked for two factors, so for that account a passkey answer without
+ *   UV is refused, at sign-in and when a device is added. Every other account keeps presence alone.
+ *
  * @structure
+ *   - twoStepArmed: does this account ask for two factors (the password door's own test)
  *   - beginRegistration / finishRegistration: add a device to an account that is already signed in
  *   - beginLogin / finishLogin: sign in with a device, by username or discoverable
  *   - PasskeyCeremony: what a caller gets back, and the refusal shape both doors render
  * @usage const r = await beginLogin(config, storage, 'alice');
  * @version-history
+ *   v1.2.0 — 2026-09-24 — An account that armed two-step sign-in requires user verification: its
+ *     sign-in and registration options ask for it, and finishLogin and finishRegistration refuse an
+ *     answer without it (PASSKEY_USER_NOT_VERIFIED). A key with no PIN had entered such an account
+ *     with one factor (audit A3-2). Other accounts are unchanged.
  *   v1.1.0 — 2026-09-14 — finishLogin refuses a missing or deactivated account BEFORE it marks the
  *     device as used, and returns the account record it read. The counter and "last used" were
  *     stored between the signature check and the account check, so a refused sign-in showed on the
@@ -103,6 +114,23 @@ function disabled(config: AimeatConfig): PasskeyResult<never> | null {
   return { ok: false, status: 503, code: 'FEATURE_DISABLED', message: 'Passkeys are not enabled on this node.' };
 }
 
+/**
+ * Does this account ask for two factors? The same test the password door applies before it asks for
+ * a code (routes/ghii/register-login.ts): a confirmed setup with a secret behind it. A setup that was
+ * started and never confirmed does not count there, so it does not count here.
+ */
+export function twoStepArmed(account: Pick<GHIIRecord, 'totpEnabled' | 'totpSecret'> | null | undefined): boolean {
+  return !!account && account.totpEnabled === true && !!account.totpSecret;
+}
+
+/** The refusal for an answer without user verification, on an account that needs it. */
+function userNotVerified(status: number, whatToDo: string): PasskeyResult<never> {
+  return {
+    ok: false, status, code: 'PASSKEY_USER_NOT_VERIFIED',
+    message: `This device did not check that it is you with a PIN, a fingerprint or your face. Your account uses two-step sign-in, so a passkey must do that. ${whatToDo}`,
+  };
+}
+
 // ── Registering a device on an account that is already signed in ──
 
 export interface BeginRegistrationData {
@@ -122,6 +150,9 @@ export async function beginRegistration(
   const off = disabled(config); if (off) return off;
 
   const existing = await storage.listPasskeysByOwner(owner);
+  // On an account with two-step sign-in armed, a passkey signs in only when the device checked the
+  // person (finishLogin), so the device is asked to do that from the first ceremony on.
+  const userVerification = twoStepArmed(await storage.getGHIIByOwner(owner)) ? 'required' : 'preferred';
   let options: Awaited<ReturnType<typeof generateRegistrationOptions>>;
   try {
     options = await generateRegistrationOptions({
@@ -138,7 +169,7 @@ export async function beginRegistration(
       authenticatorSelection: {
         // Discoverable, so signing in can start from the device rather than from a typed username.
         residentKey: 'preferred',
-        userVerification: 'preferred',
+        userVerification,
       },
     });
   } catch (err) {
@@ -173,6 +204,7 @@ export async function finishRegistration(
       expectedChallenge: ceremony.challenge,
       expectedOrigin: expectedOrigins(config),
       expectedRPID: config.passkeyRpId,
+      // Decided below, per account, with a refusal that says what to do.
       requireUserVerification: false,
     });
   } catch (err) {
@@ -184,6 +216,12 @@ export async function finishRegistration(
   }
 
   const info = verification.registrationInfo;
+  // A device that did not check the person could never sign in to an account with two-step
+  // sign-in armed, so it is refused here, where the person can still act on it, not stored as a
+  // way in that is always refused.
+  if (!info.userVerified && twoStepArmed(await storage.getGHIIByOwner(args.owner))) {
+    return userNotVerified(400, 'Set a PIN on this device, or add one that checks your fingerprint or face.');
+  }
   // REFUSE BEFORE YOU WRITE: a credential id is unique across the node, and one that already exists
   // belongs to whoever registered it first. Writing first and checking after would let a second
   // account claim a device that is already somebody's way in.
@@ -226,6 +264,12 @@ export interface BeginLoginData {
  * A username that does not exist is answered the SAME WAY as one that does — an empty allow-list,
  * a real challenge — because this door takes no credential and would otherwise tell anyone who
  * types a name whether an account by that name is here.
+ *
+ * A named account that has passkeys AND two-step sign-in armed is asked for user verification, so
+ * the browser asks for the PIN or the fingerprint before the touch, not after a refusal. That tells
+ * whoever types the name one more fact, on an account whose device list the allow-list already
+ * names. A name with no passkeys is not asked, so it still answers like a name that does not exist.
+ * The discoverable flow cannot know the account yet; finishLogin enforces the rule for both.
  */
 export async function beginLogin(
   config: AimeatConfig, storage: Storage, username?: string,
@@ -233,16 +277,18 @@ export async function beginLogin(
   const off = disabled(config); if (off) return off;
 
   let allow: { id: string; transports?: string[] }[] = [];
+  let userVerification: 'required' | 'preferred' = 'preferred';
   const named = (username ?? '').trim().toLowerCase();
   if (named) {
     const keys = await storage.listPasskeysByOwner(named);
     allow = keys.map(p => ({ id: p.id, transports: p.transports }));
+    if (keys.length && twoStepArmed(await storage.getGHIIByOwner(named))) userVerification = 'required';
   }
 
   const options = await generateAuthenticationOptions({
     rpID: config.passkeyRpId,
     allowCredentials: allow,
-    userVerification: 'preferred',
+    userVerification,
   });
 
   try {
@@ -301,6 +347,9 @@ export async function finishLogin(
         counter: stored.counter,
         transports: stored.transports,
       },
+      // NOT asked of the library, on purpose. It checks the flag BEFORE the signature, so a forged
+      // answer without the flag would learn whether this account has two-step sign-in armed. The
+      // rule is applied below, once the signature has proved the answer came from the device.
       requireUserVerification: false,
     });
   } catch (err) {
@@ -325,6 +374,14 @@ export async function finishLogin(
   const owner = await storage.getOwner(stored.owner);
   if (owner?.disabledAt) {
     return { ok: false, status: 403, code: 'ACCOUNT_DISABLED', message: 'This account has been deactivated' };
+  }
+
+  // TWO FACTORS WHERE THE OWNER ASKED FOR TWO. This door completes a login with no code step, so on
+  // an account with two-step sign-in armed the device's own check of the person is the second
+  // factor. Without the UV flag the answer proves possession only, which is one. Refused before the
+  // write, like the two refusals above.
+  if (!verification.authenticationInfo.userVerified && twoStepArmed(ghiiRecord)) {
+    return userNotVerified(401, 'Use a device that does, or sign in with your password and your code.');
   }
 
   const usedAt = new Date().toISOString();

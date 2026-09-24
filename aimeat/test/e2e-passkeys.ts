@@ -21,16 +21,20 @@
  *     - an agent token trying to register a device on the human's account
  *     - a passkey belonging to somebody else, deleted or renamed by the wrong owner
  *     - a deactivated account, which must not get a session from this door either
+ *     - a key with no PIN on an account with two-step sign-in armed, which proves possession only
  *
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=passkeys
  * @version-history
+ *   v1.2.0 — 2026-09-24 — Two-step sign-in armed: a device that does not check the person is
+ *     refused at sign-in and when it is added, and one that does still works (audit A3-2).
  *   v1.1.0 — 2026-09-14 — A sign-in refused because the account is deactivated leaves no "last
  *     used" on the device. It moved the mark before it read the account.
  *   v1.0.0 — 2026-09-04 — Initial, with passkeys.
  */
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { TOTP, Secret } from 'otpauth';
 import { SoftAuthenticator } from './helpers/soft-authenticator.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -44,7 +48,13 @@ const stamp = Date.now() % 1000000;
 const opName = `pkop${stamp}`;
 const alice = `pkalice${stamp}`;
 const bob = `pkbob${stamp}`;
+const carol = `pkcarol${stamp}`;
 const PASSWORD = 'PasskeyE2ETest1234';
+
+/** The two-step code an authenticator app would show right now for this secret. */
+function codeNow(secret: string): string {
+    return new TOTP({ secret: Secret.fromBase32(secret), algorithm: 'SHA1', digits: 6, period: 30 }).generate();
+}
 
 let passed = 0, failed = 0;
 async function test(name: string, fn: () => Promise<void>) {
@@ -120,11 +130,11 @@ async function loginOptions(username?: string) {
 }
 
 /** Options, answer, verify: one whole passkey sign-in, retried as a whole when the limiter says wait. */
-async function passkeyLogin(dev: SoftAuthenticator, username?: string) {
+async function passkeyLogin(dev: SoftAuthenticator, username?: string, answerAs: { userVerified?: boolean } = {}) {
     for (let i = 0; i < 14; i++) {
         const opts = await loginOptions(username);
         if (opts.status !== 200) return opts;
-        const answer = dev.authenticate(opts.body.data.options);
+        const answer = dev.authenticate(opts.body.data.options, answerAs);
         const r = await json('/v1/ghii/login/passkey/verify', {
             method: 'POST', body: JSON.stringify({ ceremony_id: opts.body.data.ceremony_id, response: answer }),
         });
@@ -455,11 +465,93 @@ async function main() {
         assert(r.body.error?.code === 'PASSKEY_UNKNOWN', `expected PASSKEY_UNKNOWN, got ${r.body.error?.code}`);
     });
 
+    // ── Two-step sign-in armed: the device must check the person (audit A3-2) ──
+    // This door completes a login with no code step. On an account whose owner armed password plus
+    // a code, a passkey is the two factors only when the device verified the person (the UV flag);
+    // a key with no PIN proves possession alone. Carol starts without two-step sign-in, so the same
+    // device shows the rule switching on, and every other account staying as it was.
+
+    let carolToken = '';
+    let carolArmed = false;
+    let noPinKeyId = '';
+    const noPinKey = new SoftAuthenticator(ORIGIN, RP_ID);
+    const pinKey = new SoftAuthenticator(ORIGIN, RP_ID);
+    const spareNoPin = new SoftAuthenticator(ORIGIN, RP_ID);
+    const lastUsed = async (token: string, id: string) =>
+        (await json('/v1/ghii/passkeys', { headers: auth(token) })).body.data.passkeys.find((p: any) => p.id === id)?.last_used_at;
+
+    await test('without two-step sign-in, a key with no PIN is added and signs in, as before', async () => {
+        // Registered before the check, so the cleanup can erase her whether passkeys are on or off.
+        carolToken = await registerOwner(carol);
+        if (!enabled) return;
+        const opts = await registerOptions(carolToken);
+        assert(opts.status === 200, `options: ${opts.status}`);
+        assert(opts.body.data.options.authenticatorSelection?.userVerification === 'preferred',
+            `an account without two-step sign-in only prefers the check, got ${opts.body.data.options.authenticatorSelection?.userVerification}`);
+        const added = await json('/v1/ghii/passkeys/register/verify', {
+            method: 'POST', headers: auth(carolToken),
+            body: JSON.stringify({ ceremony_id: opts.body.data.ceremony_id, response: noPinKey.register(opts.body.data.options, { userVerified: false }), label: 'Key, no PIN' }),
+        });
+        assert(added.status === 201, `register: ${added.status} ${JSON.stringify(added.body.error)}`);
+        noPinKeyId = added.body.data.passkey.id;
+        const r = await passkeyLogin(noPinKey, carol, { userVerified: false });
+        assert(r.status === 200, `presence alone signs in where two-step sign-in is off: ${r.status} ${JSON.stringify(r.body.error)}`);
+    });
+
+    await test('once two-step sign-in is armed, the key with no PIN is refused and leaves no mark', async () => {
+        if (!enabled || !carolToken) return;
+        const setup = await json('/v1/ghii/totp/setup', { method: 'POST', headers: auth(carolToken), body: '{}' });
+        if (setup.status === 503) { console.log('    (two-step sign-in is off on this node, skipping this part)'); return; }
+        assert(setup.status === 200, `totp setup: ${setup.status} ${JSON.stringify(setup.body.error)}`);
+        const verify = await json('/v1/ghii/totp/verify', {
+            method: 'POST', headers: auth(carolToken), body: JSON.stringify({ code: codeNow(setup.body.data.totp_secret) }),
+        });
+        assert(verify.status === 200, `totp verify: ${verify.status} ${JSON.stringify(verify.body.error)}`);
+        carolArmed = true;
+
+        const usedBefore = await lastUsed(carolToken, noPinKeyId);
+        for (const username of [carol, undefined]) {
+            const r = await passkeyLogin(noPinKey, username, { userVerified: false });
+            assert(r.status === 401, `${username ? 'named' : 'discoverable'}: expected 401, got ${r.status} ${JSON.stringify(r.body.error)}`);
+            assert(r.body.error?.code === 'PASSKEY_USER_NOT_VERIFIED', `expected PASSKEY_USER_NOT_VERIFIED, got ${r.body.error?.code}`);
+        }
+        assert(await lastUsed(carolToken, noPinKeyId) === usedBefore, 'a refused sign-in left a "last used" mark');
+
+        const opts = await loginOptions(carol);
+        assert(opts.body.data.options?.userVerification === 'required',
+            `the sign-in asks the device to check the person, got ${opts.body.data.options?.userVerification}`);
+    });
+
+    await test('on the armed account, a device must check the person to be added, and one that does signs in', async () => {
+        if (!enabled || !carolArmed) return;
+        const opts = await registerOptions(carolToken);
+        assert(opts.body.data.options.authenticatorSelection?.userVerification === 'required',
+            `adding a device asks for the check, got ${opts.body.data.options.authenticatorSelection?.userVerification}`);
+        const refused = await json('/v1/ghii/passkeys/register/verify', {
+            method: 'POST', headers: auth(carolToken),
+            body: JSON.stringify({ ceremony_id: opts.body.data.ceremony_id, response: spareNoPin.register(opts.body.data.options, { userVerified: false }) }),
+        });
+        assert(refused.status === 400, `a key with no PIN was added to the armed account: ${refused.status}`);
+        assert(refused.body.error?.code === 'PASSKEY_USER_NOT_VERIFIED', `expected PASSKEY_USER_NOT_VERIFIED, got ${refused.body.error?.code}`);
+
+        const again = await registerOptions(carolToken);
+        const added = await json('/v1/ghii/passkeys/register/verify', {
+            method: 'POST', headers: auth(carolToken),
+            body: JSON.stringify({ ceremony_id: again.body.data.ceremony_id, response: pinKey.register(again.body.data.options), label: 'Key with PIN' }),
+        });
+        assert(added.status === 201, `a device that checks the person is added: ${added.status} ${JSON.stringify(added.body.error)}`);
+        const r = await passkeyLogin(pinKey, carol);
+        assert(r.status === 200, `a device that checks the person signs in: ${r.status} ${JSON.stringify(r.body.error)}`);
+        assert(r.body.data.owner?.name === carol, `the session is Carol's, got ${r.body.data.owner?.name}`);
+    });
+
     await test('the accounts are erased (cleanup)', async () => {
         const a = await json(`/v1/owners/${alice}`, { method: 'DELETE', headers: auth(aliceToken) });
         assert(a.status === 200, `cleanup alice: ${a.status}`);
         const b = await json(`/v1/owners/${bob}`, { method: 'DELETE', headers: auth(bobToken) });
         assert(b.status === 200, `cleanup bob: ${b.status}`);
+        const c = await json(`/v1/owners/${carol}`, { method: 'DELETE', headers: auth(carolToken) });
+        assert(c.status === 200, `cleanup carol: ${c.status}`);
     });
 
     console.log(`\n=== ${passed} passed, ${failed} failed ===\n`);
