@@ -9,6 +9,8 @@
  *   arguments a caller can steer out of. Those are the failures that would not look like failures —
  *   the feature would appear to work and would be handing out more than the owner wrote.
  * @version-history
+ *   v1.1.0 — 2026-09-24 — The owner's pass is for the owner IN PERSON, as the door states it: a name
+ *     that resolves to the owner's account is not enough (an app under a grant).
  *   v1.0.0 — 2026-09-16 — Phase 2 of the MCP proxy.
  */
 import { describe, it, expect } from 'vitest';
@@ -115,11 +117,24 @@ describe('a grant narrows and never widens', () => {
     const storage = new SqliteStorage(':memory:');
     await putMcpGrant(storage, grant({ grantee: '*', tools: [] }));
     const r = await resolveMcpAccess({
-      storage, server: makeServer(), grantee: OWNER, tool: 'anything', scopes: [],
+      storage, server: makeServer(), grantee: OWNER, tool: 'anything', scopes: [], ownerInPerson: true,
     });
     // Grants exist to narrow the things acting FOR a person. A person cannot be narrowed out of
     // their own account, and a grant of zero tools to everything must not lock them out.
     expect(r.allowed).toBe(true);
+  });
+
+  it("is never the owner's pass for something that resolves to the owner's account", async () => {
+    // An app under a grant resolves to its owner's GHII, so the name matches the server's owner.
+    // The door says whether the caller is the owner IN PERSON; until 2026-09-24 the name alone
+    // decided, and an app holding no mcp:use called its owner's server.
+    const storage = new SqliteStorage(':memory:');
+    const r = await resolveMcpAccess({
+      storage, server: makeServer(), grantee: OWNER, tool: 'anything', scopes: ['memory:read'], ownerInPerson: false,
+    });
+    expect(r.allowed).toBe(false);
+    if (r.allowed) return;
+    expect(r.code).toBe('NO_SCOPE');
   });
 });
 

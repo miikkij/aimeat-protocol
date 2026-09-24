@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Agent offers routes (publish/read per-agent offers, owner aggregate feed, callable-offer invoke with settlement). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.6.1 — 2026-09-24 — …and whether the caller is the owner in person (callAuthority), so an app
+ *     under a grant is never taken for its owner.
  *   v1.6.0 — 2026-09-24 — The offer invoke hands the capability service the session's scopes
  *     (heldScopes), so an offer bound to a capability over a remote MCP tool runs for a caller who
  *     holds mcp:use, the owner in person included, as on the capability door.
@@ -28,7 +30,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { requireAuth, requireRole, requireScope } from '../../auth/middleware.js';
-import { heldScopes } from '../../auth/effective-scopes.js';
+import { callAuthority } from '../../auth/effective-scopes.js';
 import { success, error } from '../../middleware/envelope.js';
 import { buildGAII, resolveIdentity } from '../../utils/gaii.js';
 import { emitChange } from '../../services/event-bus.js';
@@ -206,7 +208,7 @@ export function registerOffersRoutes(router: Router, config: AimeatConfig, stora
       const { invokeCapability } = await import('../../services/capability-invoke.js');
       // This door has a session, so the session answers the scope question, as on the capability door.
       result = await invokeCapability(config, storage, cap, input, callerGhii, jwt, mode,
-        undefined, heldScopes(req.auth!));
+        undefined, callAuthority(req.auth!));
     } catch (err) {
       if (price > 0) await storage.creditBalance(callerGhii, price); // refund the reservation
       const e = err as { statusCode?: number; code?: string; message?: string };

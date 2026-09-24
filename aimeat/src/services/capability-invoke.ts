@@ -6,6 +6,9 @@
  *   extension over a localhost fetch, a manual webhook, an ecosystem app over the connect-tunnel,
  *   or a tool on an MCP server this node has attached.
  * @version-history
+ *   v1.5.0 - 2026-09-24 - `authority` replaces `callerScopes`: the scopes AND whether the caller is the
+ *     owner in person, which the `mcp` case hands to the chokepoint. It passed the resolved identity
+ *     alone, so an app under a grant was taken for its owner and called the owner's server.
  *   v1.4.1 - 2026-09-24 - `callerScopes` says what a paid path states: the purchase authorises the call.
  *   v1.4.0 - 2026-09-24 - `callerScopes`: the `mcp` case hands the caller's own scopes to the
  *     chokepoint. It passed none, which the chokepoint read as mcp:use, and the invoke door proves
@@ -51,13 +54,14 @@ export async function invokeCapability(
    */
   internalPass?: string,
   /**
-   * Every scope the caller holds for this call. Asked only by a capability over a remote MCP tool,
-   * where it decides whether a caller that is not the server's owner may spend it (mcp:use). A door
-   * with a session states the session's scopes; a paid path with none (a checkout fulfilling a
-   * purchase, one capability buying from another) states mcp:use, because the purchase is what
-   * authorises the call. Left out, nothing is held.
+   * What authorises this call, asked only by a capability over a remote MCP tool: every scope the
+   * caller holds, and whether it is the account holder in person (only then does the server's own
+   * owner pass without mcp:use). A door with a session states callAuthority(req.auth); a paid path
+   * with none (a checkout fulfilling a purchase, one capability buying from another) states mcp:use,
+   * because the purchase authorises the call, and never the owner in person. Left out, nothing is
+   * held and the caller is nobody in person.
    */
-  callerScopes: string[] = [],
+  authority: { scopes: string[]; ownerInPerson?: boolean } = { scopes: [] },
 ): Promise<InvokeResult> {
   const start = Date.now();
 
@@ -152,7 +156,10 @@ export async function invokeCapability(
         storage, config, server, tool: toolName,
         args: (input && typeof input === 'object' ? input : {}) as Record<string, unknown>,
         caller: callerGhii,
-        scopes: callerScopes,
+        scopes: authority.scopes,
+        // `callerGhii` is the resolved identity, which for an app under a grant is its owner's
+        // GHII. Whether the caller is that owner IN PERSON is the door's to say, never this name's.
+        ownerInPerson: authority.ownerInPerson === true,
       });
       if (!called.ok) {
         throw Object.assign(new Error(called.message), {

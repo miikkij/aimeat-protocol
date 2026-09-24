@@ -25,6 +25,8 @@
  *     the HTTP door had been writing.
  *   v1.6.0 -- 2026-09-24 -- aimeat_capabilities_invoke hands the service the session's scopes, so a
  *     capability over a remote MCP tool refuses an agent without mcp:use, as the REST twin does.
+ *   v1.6.1 -- 2026-09-24 -- The scopes travel as the service's authority object; an agent session is
+ *     never the owner in person.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import {
@@ -147,8 +149,9 @@ export function registerCapabilitiesTools(
 
             try {
                 const { invokeCapability } = await import('../services/capability-invoke.js');
+                // An MCP session is an agent, never the owner in person: it holds its own scopes.
                 const result = await invokeCapability(config, storage, cap, input, callerGhii, getToken() ?? '',
-                    args.mode || 'normal', undefined, scopes);
+                    args.mode || 'normal', undefined, { scopes });
 
                 // Stats AND a line in the capability's call log. This door wrote the counters only,
                 // so the log an owner reads to see who has been calling them was missing every

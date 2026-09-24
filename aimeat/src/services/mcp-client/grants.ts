@@ -27,6 +27,8 @@
  * @structure McpGrant · putMcpGrant · listMcpGrants · removeMcpGrant · resolveMcpAccess
  * @usage const verdict = await resolveMcpAccess({ storage, owner, server, grantee, tool, scopes });
  * @version-history
+ *   v1.1.0 — 2026-09-24 — The owner's pass needs `ownerInPerson` from the door: a caller whose name
+ *     resolves to the owner's account (an app under a grant) holds only the scopes it was given.
  *   v1.0.0 — 2026-09-16 — Phase 2 of the MCP proxy.
  */
 import type { Storage } from '../../storage/interface.js';
@@ -126,6 +128,12 @@ export interface AccessInput {
   tool?: string;
   /** What the session holds, so the default path can be answered without a grant. */
   scopes: string[];
+  /**
+   * True only when the door proved the caller is the account holder in person (isOwnerInPerson in
+   * auth/effective-scopes.ts). A name cannot answer that: an app under a grant resolves to its
+   * owner's GHII. Left out, the caller is not the owner in person.
+   */
+  ownerInPerson?: boolean;
 }
 
 /**
@@ -136,14 +144,17 @@ export interface AccessInput {
  * permission the owner did not give the agent in the first place.
  *
  * An OWNER asking about their own server needs no grant: grants exist to narrow the things acting
- * FOR them, and a person cannot be narrowed out of their own account.
+ * FOR them, and a person cannot be narrowed out of their own account. The door says whether the
+ * caller IS that person; something acting in their name holds only what it was given.
  */
 export async function resolveMcpAccess(input: AccessInput): Promise<McpAccess> {
   const { storage, server, grantee, tool, scopes } = input;
 
-  // The owner themselves. `ownerGhii` is null only on a node-wide server, which phase 4 fences
-  // separately; here a match means this is the person the server belongs to.
-  const isOwnerThemselves = server.ownerGhii !== null && grantee === server.ownerGhii;
+  // The owner themselves: the account holder in person, as the door proved it, calling the server
+  // their account owns. `ownerGhii` is null only on a node-wide server. The name alone decided
+  // until 2026-09-24, and an app under a grant, which resolves to its owner's GHII, passed as them.
+  const isOwnerThemselves = input.ownerInPerson === true
+    && server.ownerGhii !== null && grantee === server.ownerGhii;
   if (!isOwnerThemselves && !scopeIsCovered(scopes, tool ? 'mcp:use' : 'mcp:read')) {
     return {
       allowed: false,

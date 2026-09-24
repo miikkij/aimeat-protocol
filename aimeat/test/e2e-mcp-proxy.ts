@@ -30,6 +30,8 @@
  *     test/run-e2e-ci.ts --test=mcp-proxy
  *
  * @version-history
+ *   v1.9.0 — 2026-09-24 — An app grant of the server's owner, holding no mcp:use, is refused on the
+ *     capability and WebMCP doors, and the owner in person is still answered on WebMCP.
  *   v1.8.0 — 2026-09-24 — A capability over the node's server, bought by a second owner, runs at
  *     checkout, and an offer over it answers a second owner in person: the paths that send no
  *     session state what authorises the call.
@@ -51,7 +53,7 @@
  */
 
 import * as ed from '@noble/ed25519';
-import { createHash, randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import http from 'node:http';
 import { z } from 'zod';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -157,6 +159,49 @@ async function agentWithScopes(
   assert(scoped.status === 200, `scopes: ${scoped.status}: ${JSON.stringify(scoped.body)}`);
   const gaii = made.body.data.agent.gaii as string;
   return { gaii, token: await agentTokenFor(gaii, made.body.data.private_key) };
+}
+
+/**
+ * An app-grant bearer of `owner` holding `scopes`, through the real flow: publish a probe app, ask,
+ * the owner consents, exchange the code. An app grant resolves to its owner's account, so it is the
+ * principal a name alone mistakes for the owner in person. Copied from e2e-connections.ts.
+ */
+async function appGrantToken(ownerBearer: string, owner: string, scopes: string[]): Promise<string> {
+  const filename = `mcp-proxy-probe-${Date.now()}-${Math.random().toString(36).slice(2, 7)}.html`;
+  const redirect = 'http://localhost:9933/callback';
+  const verifier = randomBytes(32).toString('base64url');
+  const challenge = createHash('sha256').update(verifier).digest('base64url');
+  const bearer = { Authorization: `Bearer ${ownerBearer}` };
+
+  const pub = await json('/v1/apps', {
+    method: 'POST', headers: bearer,
+    body: JSON.stringify({
+      filename, name: 'Gate probe', description: 'app-grant gate probe', category: 'tool',
+      content: Buffer.from('<!DOCTYPE html><html><body>gate</body></html>', 'utf8').toString('base64'),
+    }),
+  });
+  assert(pub.status === 201, `publish probe app: ${pub.status} ${JSON.stringify(pub.body.error)}`);
+
+  const q = new URLSearchParams({
+    app: `${owner}/${filename}`, response_type: 'code', scope: scopes.join(' '),
+    redirect_uri: redirect, state: 'x', code_challenge: challenge, code_challenge_method: 'S256',
+  });
+  const authorize = await fetch(`${BASE}/v1/app-grants/authorize?${q}`, { redirect: 'manual' });
+  assert(authorize.status === 302, `authorize: ${authorize.status}`);
+  const requestId = decodeURIComponent(/req=([^&]+)/.exec(authorize.headers.get('location') ?? '')?.[1] ?? '');
+
+  const consent = await json('/v1/app-grants/authorize-consent', {
+    method: 'POST', headers: bearer, body: JSON.stringify({ request_id: requestId }),
+  });
+  assert(consent.status === 200, `consent: ${consent.status} ${JSON.stringify(consent.body.error)}`);
+  const code = new URL(consent.body.data.redirect_url as string).searchParams.get('code') ?? '';
+
+  const tok = await json('/v1/app-grants/token', {
+    method: 'POST',
+    body: JSON.stringify({ grant_type: 'authorization_code', code, code_verifier: verifier, redirect_uri: redirect }),
+  });
+  assert(tok.status === 200, `app token: ${tok.status} ${JSON.stringify(tok.body.error)}`);
+  return tok.body.data.access_token as string;
 }
 
 // ─── The node's own MCP door, for the arms that must hold on both surfaces ───
@@ -945,6 +990,40 @@ await test('…and answers the same agent once it holds mcp:use, on both doors',
   const session = await openMcpSession(withUse.token);
   const viaMcp = await mcpTool(session, 'aimeat_capabilities_invoke', { id: capabilityId, input: { text: 'the mcp twin' } });
   assert(!viaMcp.isError && viaMcp.text.includes('the mcp twin'), `MCP: ${viaMcp.text}`);
+});
+
+await test("an app grant of the server's owner is refused on the capability and WebMCP doors", async () => {
+  // Grantable words only, and mcp:use is not one: an app never holds the word a remote call asks.
+  const appAuth = { Authorization: `Bearer ${await appGrantToken(ownerToken, ownerName, ['memory:read'])}` };
+
+  // The capability door asks work:request first, which is not an app word either.
+  const viaCapability = await json(`/v1/capabilities/${capabilityId}/invoke`, {
+    method: 'POST', headers: appAuth, body: JSON.stringify({ input: { text: 'as the app' } }),
+  });
+  assert(viaCapability.status === 403, `capability door: ${viaCapability.status} ${JSON.stringify(viaCapability.body.error)}`);
+
+  // WebMCP asks no word of its own, and an app grant resolves to its owner's account. Until
+  // 2026-09-24 the grant check took that account for the owner in person, and the far side answered.
+  const manifest = await json('/v1/memory', {
+    method: 'POST', headers: ownerAuth(),
+    body: JSON.stringify({
+      key: 'apps.mcpproxytools.tools', visibility: 'public',
+      value: { tools: [{ name: 'say-back', description: "Says it back through the owner's own server.", action_id: capabilityId }] },
+    }),
+  });
+  assert(manifest.status === 201, `manifest: ${manifest.status}: ${JSON.stringify(manifest.body)}`);
+  const viaWebMcp = await json(`/v1/apps/${ownerName}/mcpproxytools/webmcp/tools/say-back`, {
+    method: 'POST', headers: appAuth, body: JSON.stringify({ input: { text: 'as the app' } }),
+  });
+  assert(viaWebMcp.status === 403 && viaWebMcp.body.error?.code === 'NOT_GRANTED',
+    `WebMCP door: ${viaWebMcp.status} ${JSON.stringify(viaWebMcp.body.error ?? viaWebMcp.body.data)}`);
+
+  // The owner in person, on the same door, is answered.
+  const inPerson = await json(`/v1/apps/${ownerName}/mcpproxytools/webmcp/tools/say-back`, {
+    method: 'POST', headers: ownerAuth(), body: JSON.stringify({ input: { text: 'in person' } }),
+  });
+  assert(inPerson.status === 200 && JSON.stringify(inPerson.body.data).includes('echo:in person'),
+    `the owner in person: ${inPerson.status} ${JSON.stringify(inPerson.body.error ?? inPerson.body.data)}`);
 });
 
 await test('the ref is resolved through the CALLER, not the publisher', async () => {
