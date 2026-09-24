@@ -177,9 +177,11 @@ dimensions. It does not re-declare the shape's font, rule, fill, padding or shad
 | Area governed by the selected tab | `.poster-panel` |
 | Hairline row; row that is the thing | `.poster-row`; `.poster-row--thing` |
 | Small coral label | `.poster-label` (also the prompt card's label; Jouni's decision "Row label") |
-| Underlined action, and its tones | `.poster-action`; `--more` ("Show all"), `--quiet` (a side column action), `--back` (the way back), `--text` (Listen, Copy under a message) (Jouni's decision "Action link") |
-| Tab and selected tab, and the fold tab | `.poster-tab`, `.poster-tab.is-on`; `.poster-tab--fold` (a small switch in a row, "Recent / Mine") (Jouni's decision "Tabs and filters") |
-| Loud action and the home's large door | `.poster-slab`, `.poster-slab--large`; composed over `.btn-primary` for the one big button on the home and the chat (Jouni's decision "Loud action") |
+| Underlined action, and its tones | `.poster-action`; `--more` ("Show all", every small way on inside a part), `--quiet` (a side column action), `--back` (the way back), `--text` (Listen, Copy, "Not now"), `--notice` ("What does that mean?"), `--jump` (the jump to the latest message); `:disabled` is dimmed (Jouni's decisions "Action link", "Panel action", "Step button", "Dismiss", "Small link"). Every button of a small panel, and a first step's button that is not the next move, is this link |
+| Tab and selected tab, and its tones | `.poster-tab`, `.poster-tab.is-on`; `.poster-tab--fold` (a small switch in a row, "Recent / Mine"), `.poster-tab--tile` (a choice among named looks, the background pattern) (Jouni's decisions "Tabs and filters", "Choice") |
+| Loud action and the home's large door | `.poster-slab`, `.poster-slab--large`; the one big button of a place, and only the next move in the first steps (Jouni's decision "Loud action") |
+| Icon button | `.poster-icon` (44px, the composer), `.poster-icon--small` (28px, everywhere else): a square in a 2px ink frame, the sun under the pointer; a card's menu keeps its state fill (Jouni's decision "Icon button") |
+| Menu row | `.poster-menu-row`: one choice in an opened menu, plain words on a quiet ground, a thin line between rows; the menu around it is a column (Jouni's decision "Menu row") |
 | Box; frame; opened record | `.poster-box` with the tones `--copy` (a text to copy, on grey: the prompt card) and `--row` (one result in a list) (Jouni's decision "Object box"); `.poster-frame`; `.poster-record` (the dialog is the site's own Modal; `.poster-dialog` was deleted on 2026-09-23) |
 | Dashed coral aside | `.poster-aside` with the tones `--waiting` (the next move is elsewhere) and `--suggestion` (a line to wave away) (Jouni's decision "Attention note") |
 | Mono chip; crumb | `.poster-chip` (a candidate in the design lab's chip decision; not in use until Jouni decides); `.poster-crumb` |
