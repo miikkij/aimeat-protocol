@@ -9,6 +9,7 @@
  *   (the setup guide .ast-*, the instruction block .ib-*, the install row .mcpi-*, the managed-
  *   environment note .mgd-*). NOTE: this file must be linked in spa.html.
  * @version-history
+ *   2026-09-24 -- The guide's "Official instructions" is no longer redrawn here (the more tone).
  *   2026-09-13 -- Compose shared aside cuts; normalize one-off geometry under brief 10.7.
  *   2026-09-13 -- Compose the shared initials box; retain only row dimensions and placement.
  *   2026-09-13 -- V2aa: shared B1 class owns the connection proof heading.
@@ -100,8 +101,8 @@
 .og-mcp .ast-param-note { grid-column: 2; font-size: .74rem; color: var(--text-dim); }
 .og-mcp .ast-code { font-family: var(--font-mono); font-size: .78rem; background: var(--bg-dim); padding: .15rem .45rem; border: 0; overflow-wrap: anywhere; }
 .og-mcp .ast-param-empty { font-style: italic; color: var(--text-dim); font-size: .82rem; }
-.og-mcp .ast-docs { display: inline-block; margin-top: .3rem; font-family: var(--font-showroom-body); font-weight: 800; font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; color: var(--text); text-decoration: none; border-bottom: 2px solid var(--text); }
-.og-mcp .ast-docs:hover { color: var(--accent); border-bottom-color: var(--accent); }
+/* "Official instructions" is the action link's more tone (Jouni's decision "Small link"); its place only. */
+.og-mcp .ast-docs { margin-top: .3rem; }
 
 .og-mcp .mcpi { gap: .45rem; }
 .og-mcp .mcpi--tool { margin: 0 0 .9rem; }

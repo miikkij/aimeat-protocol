@@ -10,6 +10,7 @@
  * @structure ArchiveSection({ title, note, children }) · ArchiveMore({ disabled, onClick, children }) · ArchiveError({ children })
  * @usage html`<${ArchiveSection} title=${…} note=${…}>…<${ArchiveMore} onClick=${load}>…<//><//>`
  * @version-history
+ *   v1.1.0 — 2026-09-24 — "Show older" is the action link's more tone (Jouni's decision "Small link").
  *   v1.0.0 — 2026-09-23 — Moved out of views/home/history.js with its markup unchanged (UI
  *     consolidation phase 1, a move).
  */
@@ -33,7 +34,7 @@ export function ArchiveSection({ title, note, children }) {
 /** @param {{ disabled?: boolean, onClick?: () => void, children?: any }} props */
 export function ArchiveMore({ disabled = false, onClick, children }) {
   return html`
-    <button type="button" class="btn-outline poster-archive-more"
+    <button type="button" class="poster-action poster-action--more poster-archive-more"
             disabled=${disabled} onClick=${onClick}>
       ${children}
     </button>`;

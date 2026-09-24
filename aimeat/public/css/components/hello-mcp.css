@@ -9,6 +9,7 @@
  * @structure .ib (instruction block) · .ib-tabs · .ib-block · .pj-org-instr · .ast (setup guide)
  * @usage loaded from spa.html
  * @version-history
+ *   v1.3.0 — 2026-09-24 — .ast-docs' own look removed: it is the action link's more tone.
  *   v1.2.0 — 2026-09-24 — "recommended" on a tab takes the tab's text colour.
  *   v1.1.0 — 2026-09-02 — The Hello MCP panel rules (`.hm-*`) removed with the panel: the MCP page
  *     is a poster page now (views/profile/mcp/) and nothing rendered them any more.
@@ -202,7 +203,7 @@
   overflow-wrap: anywhere;
 }
 
-.ast-docs { font-size: 0.8125rem; font-weight: var(--weight-bold); }
+/* "Official instructions" is the action link's more tone (poster.css, Jouni's decision "Small link"). */
 
 .ast-label {
   display: block;

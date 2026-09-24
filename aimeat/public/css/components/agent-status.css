@@ -8,6 +8,7 @@
  * @usage Linked from public/spa.html in the component block, whose order keeps the order these
  *   rules had when they were one sheet.
  * @version-history
+ *   v1.1.0 — 2026-09-24 — The own-key link is the action link's more tone.
  *   v1.0.0 — 2026-09-23 — Moved unchanged from css/parts*.css (UI consolidation phase 1, a move).
  */
 
@@ -24,6 +25,6 @@
   overflow-wrap: anywhere;
 }
 .poster-agent-status-who { color: var(--accent); }
-.poster-agent-status-link { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+/* "Use your own key →" is the action link's more tone (poster.css, Jouni's decision "Small link"). */
 .poster-agent-status-model { color: var(--text-dim); }
 .poster-agent-status-note { color: var(--text-dim); }

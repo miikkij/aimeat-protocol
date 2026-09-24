@@ -10,6 +10,7 @@
  *   skin the connect guide and the older tab parts wear inside it. NOTE: linked in spa.html after
  *   organism.css (useViewCSS is a no-op).
  * @version-history
+ *   v1.1.0 -- 2026-09-24 -- The guide's "Official instructions" is no longer redrawn here (the more tone).
  *   v1.0.0 -- 2026-09-14 -- Initial: the page anatomy, the form, the table, the card masthead.
  */
 
@@ -72,8 +73,8 @@
 .agp-connect .ast-code { font-family: var(--font-mono); font-size: .82rem; background: var(--bg-surface); padding: 2px 6px; overflow-wrap: anywhere; }
 .agp-connect .ast-param-empty { font-style: italic; color: var(--text-muted); }
 .agp-connect .ast-param-note { grid-column: 2; font-size: .82rem; color: var(--text-dim); line-height: 1.45; }
-.agp-connect .ast-docs { display: inline-block; margin-top: .9rem; font-weight: 800; font-size: .88rem; color: var(--text); text-decoration: none; border-bottom: 2px solid var(--text); }
-.agp-connect .ast-docs:hover { color: var(--accent); border-bottom-color: var(--accent); }
+/* "Official instructions" is the action link's more tone (Jouni's decision "Small link"); its place only. */
+.agp-connect .ast-docs { margin-top: .9rem; }
 /* The guide's and the folds' buttons become the page's words. */
 .agp-connect .btn-primary, .agp-connect .btn-ghost, .agp-connect .btn-outline, .agp-connect .expand-btn { background: none; border: 0; border-bottom: 2px solid var(--text); border-radius: 0; padding: 0 0 1px; cursor: pointer; font-family: var(--font-showroom-body); font-weight: 800; font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; color: var(--text); box-shadow: none; }
 .agp-connect .btn-primary:hover, .agp-connect .btn-ghost:hover, .agp-connect .btn-outline:hover, .agp-connect .expand-btn:hover { color: var(--accent); border-bottom-color: var(--accent); background: none; transform: none; }

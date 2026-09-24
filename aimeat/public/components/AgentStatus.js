@@ -8,6 +8,8 @@
  * @structure StatusBar({ status, onReset })
  * @usage html`<${StatusBar} status=${status} onReset=${reset} />`
  * @version-history
+ *   v1.1.0 — 2026-09-24 — "Use your own key →" is the action link's more tone (Jouni's decision
+ *     "Small link").
  *   v1.0.0 — 2026-09-23 — Moved out of views/chat/parts.js with its markup unchanged (UI
  *     consolidation phase 1, a move).
  */
@@ -56,7 +58,7 @@ export function StatusBar({ status, onReset }) {
             <span class="poster-agent-status-who" title=${status.agent_name}>${tr('chat.statusYourAgent', 'Your agent')}</span>
             ${payer && html`<span>${payer()}</span>`}
             ${elsewhere && html`<span class="poster-agent-status-note">${elsewhere}</span>`}
-            ${ownKeyLink && html`<a class="poster-agent-status-link" href="/v1/profile?tab=ai">${ownKeyLink} →</a>`}
+            ${ownKeyLink && html`<a class="poster-action poster-action--more poster-agent-status-link" href="/v1/profile?tab=ai">${ownKeyLink} →</a>`}
             ${status.model && html`<span class="poster-turn-model poster-agent-status-model"
                 title=${tr('chat.modelTitle', 'The model that answered this turn')}>${status.model}</span>`}
             ${onReset && html`

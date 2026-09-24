@@ -8,6 +8,8 @@
  * @structure AiNotice({ compact, className })
  * @usage html`<${AiNotice} compact=${turns.length > 0} />`
  * @version-history
+ *   v1.1.0 — 2026-09-24 — "What does that mean?" is the action link's notice tone (Jouni's decision
+ *     "Small link").
  *   v1.0.0 — 2026-09-23 — Moved out of views/chat/parts.js with its markup unchanged (UI
  *     consolidation phase 1, a move).
  */
@@ -53,7 +55,7 @@ export function AiNotice({ compact = false, className = '' }) {
                              and not this one: here the node's own key pays. A true sentence in the
                              person's own context beats a shared one that is nearly right. -->
                        <${AiInteractionNotice} class="poster-ai-notice-line" bodyKey="chat.aiNoticeBody" />`}
-            <button type="button" class="btn-ghost poster-ai-notice-more" onClick=${() => setOpen(true)}>
+            <button type="button" class="poster-action poster-action--notice poster-ai-notice-more" onClick=${() => setOpen(true)}>
                 ${tr('chat.aiMore', 'What does that mean?')}
             </button>
             <${Modal} open=${open} onClose=${() => setOpen(false)}

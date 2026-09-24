@@ -3,6 +3,7 @@
  * @description Shared poster and showroom shapes. Views compose these classes and own their layout.
  * @usage Linked immediately after theme.css in spa.html.
  * @version-history
+ *   v1.12.0 -- 2026-09-24 -- The action link's notice and jump tones (Jouni's decision "Small link").
  *   v1.11.0 -- 2026-09-24 -- The menu row, .poster-menu-row (Jouni's decision "Menu row").
  *   v1.10.0 -- 2026-09-24 -- The tab's tile tone, .poster-tab--tile (Jouni's decision "Choice").
  *   v1.9.0 -- 2026-09-24 -- .poster-icon and its small cut (Jouni's decision "Icon button").
@@ -94,6 +95,23 @@
 .poster-action--text { padding: 0 6px; border: 0; gap: .35rem; font-family: var(--font-body); font-weight: var(--weight-medium); font-size: .7rem; line-height: normal; text-transform: none; letter-spacing: normal; color: var(--text-dim); }
 .poster-action--text:hover { color: var(--text); }
 .poster-action--text.copied { color: var(--success-fg); }
+/* Two small links Jouni kept as they look (decision "Small link"), each in the values it had with the
+   classic button it wore, hover included. notice: "What does that mean?" under the AI notice
+   (formerly .btn-ghost with .poster-ai-notice-more); jump: the jump to the latest message (formerly
+   .btn-outline with .poster-conversation-jump, a small ink block). */
+.poster-action--notice {
+  gap: 0.35rem; padding: 0; border: 0; border-radius: var(--radius-sm);
+  font-family: var(--font-mono); font-weight: var(--weight-regular); font-size: 0.7rem; line-height: normal;
+  text-transform: none; letter-spacing: normal; white-space: normal;
+  color: var(--accent); text-decoration: underline; text-underline-offset: 3px; transition: all 0.15s;
+}
+.poster-action--notice:hover { color: var(--text); background: var(--control-bg); }
+.poster-action--jump {
+  display: inline-block; padding: 6px 12px; border: 0; background: var(--text); color: var(--bg); box-shadow: 4px 4px 0 var(--sun);
+  font-family: var(--font); font-weight: var(--weight-heavy); font-size: 0.74rem; line-height: normal;
+  text-transform: uppercase; letter-spacing: 0.04em; white-space: normal; transition: all 0.15s;
+}
+.poster-action--jump:hover { color: var(--text); background: var(--control-bg); box-shadow: var(--shadow-sm); transform: none; }
 /* The tab's fold tone (Jouni's decision "Tabs and filters"): the home's switch ("Recent", "Mine";
    formerly .poster-fold), coral typewriter words underlined; the chosen one is on the sun by
    .poster-tab.is-on above. */
