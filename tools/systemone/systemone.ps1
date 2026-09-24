@@ -43,14 +43,14 @@ param(
 $ErrorActionPreference = 'Stop'
 $Root = Join-Path $PSScriptRoot '.runtime'
 # KeyVar: the variable each server reads its key from (laya 0.3.11 laya/serve.py, von-sdk 1.1.1
-# von/server.py, jeff src/jeff/server/config.py). Repo and Revision: the weights, at the commit the
-# Docker images download (docker\<model>\Dockerfile).
+# von/server.py, jeff src/jeff/server/config.py); NodeKeyVar: the one the node sends it from.
+# Repo and Revision: the weights, at the commit the Docker images download (docker\<model>\Dockerfile).
 $Providers = @{
-  laya = @{ Port = 8801; Model = 'multilingual';       KeyVar = 'LAYA_API_KEY'
+  laya = @{ Port = 8801; Model = 'multilingual';       KeyVar = 'LAYA_API_KEY';  NodeKeyVar = 'AIMEAT_DECIDE_LAYA_KEY'
             Repo = 'convaiinnovations/laya';          Revision = '55cf4c4ebb4ebe31b2550e8bdf3bd21b99753851' }
-  von  = @{ Port = 8802; Model = 'von-1.1.0';          KeyVar = 'VON_API_KEY'
+  von  = @{ Port = 8802; Model = 'von-1.1.0';          KeyVar = 'VON_API_KEY';   NodeKeyVar = 'AIMEAT_DECIDE_VON_KEY'
             Repo = 'wfzyx/von';                       Revision = 'd8bb5e0745d8ee1fb65d536d6d4892d54d5a93fd' }
-  jeff = @{ Port = 8803; Model = 'gliformer-large-v1'; KeyVar = 'JEFF_API_KEYS'
+  jeff = @{ Port = 8803; Model = 'gliformer-large-v1'; KeyVar = 'JEFF_API_KEYS'; NodeKeyVar = 'AIMEAT_DECIDE_JEFF_KEY'
             Repo = 'knowledgator/gliformer-large-v1'; Revision = 'd0a4e53d09cebe6bc963dd9be319d4279084bb2d' }
 }
 
@@ -171,7 +171,7 @@ function Install-Provider([string]$name) {
   }
   Save-Weights $name
   New-Key $name
-  Write-Host "[$name] installed. Its key is in $(Key-File $name); the node sends the same value (README.md, Connecting a node)."
+  Write-Host "[$name] installed. Its key is in $(Key-File $name). On the node, set $($Providers[$name].NodeKeyVar) to the same value (README.md, Connecting a node)."
 }
 
 # ── up / down / status ────────────────────────────────────────────────────────────────────────

@@ -21,6 +21,8 @@
  *   import { decideDefaults } from './config-decide.js';
  *   const config = { ...decideDefaults(), ... };
  * @version-history
+ *   v1.3.0 — 2026-09-24 — decideJeffKey, decideLayaKey, decideVonKey: the built-in local models'
+ *     bearer keys, so the Config tab says whether each is set. laya's and von's are optional.
  *   v1.2.0 — 2026-09-23 — decideProviderEgress: the exact addresses of the operator's own local
  *     models, reachable without AIMEAT_ALLOW_PRIVATE_EGRESS.
  *   v1.1.0 — 2026-09-23 — Decision providers: the configured provider has an id and a kind, and the
@@ -83,6 +85,16 @@ export interface DecideConfig {
    * providers use it; an owner's own address never does.
    */
   decideProviderEgress: string;
+  /**
+   * The bearer keys of the built-in local models, each the value its model was started with
+   * (JEFF_API_KEYS, LAYA_API_KEY, VON_API_KEY in tools/systemone). jeff's is required. laya's and
+   * von's are optional: empty, the call carries no key, for a model started without one. The
+   * providers read the variables by name (services/decide/providers.ts envKeyOf); these fields are
+   * how the Config tab says whether each is set.
+   */
+  decideJeffKey: string;
+  decideLayaKey: string;
+  decideVonKey: string;
 }
 
 /** The decision provider's settings, from the environment. */
@@ -105,5 +117,8 @@ export function decideDefaults(): DecideConfig {
     decideBuiltinProviders: process.env.AIMEAT_DECIDE_BUILTIN_PROVIDERS ?? '',
     decideDefaultProvider: process.env.AIMEAT_DECIDE_DEFAULT_PROVIDER ?? '',
     decideProviderEgress: process.env.AIMEAT_DECIDE_PROVIDER_EGRESS ?? '',
+    decideJeffKey: process.env.AIMEAT_DECIDE_JEFF_KEY ?? '',
+    decideLayaKey: process.env.AIMEAT_DECIDE_LAYA_KEY ?? '',
+    decideVonKey: process.env.AIMEAT_DECIDE_VON_KEY ?? '',
   };
 }

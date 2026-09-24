@@ -15085,9 +15085,11 @@ paths:
       description: >
         Every provider the operator made available (the configured one, the operator's own, the
         built-in local examples they switched on) and the owner's own. Each is `{ id, title, kind
-        (hosted | local), source (node | builtin | owner), url, model, auth: { type, env?, has_key? },
-        limits: { context_tokens, max_choice_options, score_levels }, capabilities, price_per_mtok,
-        leaves, data_statement }`. Never a key. `default` is the owner's choice (or the node's),
+        (hosted | local), source (node | builtin | owner), url, model, auth: { type, env?, optional?,
+        has_key? }, limits: { context_tokens, max_choice_options, score_levels }, capabilities,
+        price_per_mtok, leaves, data_statement }`. Never a key. `auth.optional` marks a variable
+        whose absence sends no key rather than refusing the call (the built-in laya and von).
+        `default` is the owner's choice (or the node's),
         `agents` the owner's choice per agent, and for an agent caller `this_agent` the one it gets.
 
 

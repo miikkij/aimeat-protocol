@@ -22,7 +22,9 @@
  *   CAPABILITY IS CHECKED BEFORE THE CALL. A rule needing 40 options on a provider that carries 20 is
  *   refused by name, in the provider's own numbers, rather than answered badly.
  *
- *   A LOCAL PROVIDER needs no key, costs nothing and touches no allowance. It sits on loopback, or,
+ *   A LOCAL PROVIDER costs nothing and touches no allowance. It sends the key its model was started
+ *   with, from a variable the operator sets: jeff always, laya and von when the variable is set, and
+ *   none otherwise, as a keyless model expects (envKeyOf). It sits on loopback, or,
  *   for the operator's own, at an address the operator named in AIMEAT_DECIDE_PROVIDER_EGRESS (a
  *   container on the node's Docker network). safeFetch refuses a private address unless it is on that
  *   list or the operator allowed private egress everywhere; the refusal says so here rather than
@@ -30,7 +32,7 @@
  *   machine" is a different sentence from "the data goes to TypeSafe in the USA", and each provider
  *   carries its own.
  * @structure
- *   DecisionProvider · ProviderAuth · ProviderLimits · BUILTIN_PROVIDERS · nodeProviders ·
+ *   DecisionProvider · ProviderAuth · ProviderLimits · BUILTIN_PROVIDERS · envKeyOf · takesNoOwnerKey · nodeProviders ·
  *   listProviders · getProvider · selectProvider · providerViolations · assertProviderReachable ·
  *   putOwnerProvider · deleteOwnerProvider · readOwnerProviderKey · readProviderChoice ·
  *   planProviderChoice · writeProviderChoice · providerView
@@ -38,6 +40,11 @@
  *   const { provider, chosenBy } = await selectProvider(storage, config, { ownerGhii, agent, named });
  *   const problems = providerViolations(provider, state, questions);
  * @version-history
+ *   v1.3.0 — 2026-09-24 — The built-in laya and von send AIMEAT_DECIDE_LAYA_KEY and
+ *     AIMEAT_DECIDE_VON_KEY as their bearer, as jeff sends AIMEAT_DECIDE_JEFF_KEY. The two are
+ *     `optional`: unset, the call carries no key, so a model started without one still answers.
+ *     envKeyOf reads a provider's variable for service.ts and the view says `optional`;
+ *     takesNoOwnerKey keeps the two counting as needing no key of the owner's.
  *   v1.2.1 — 2026-09-24 — A provider id is read once, trimmed and checked (providerIdOf), and the
  *     taken-id guard, the stored key, the provider's own key and delete all use that one
  *     (fb2dacf3f593): " typesafe" passed the guard as sent and was stored as the node's "typesafe".
@@ -70,9 +77,10 @@ export type ProviderSource = 'node' | 'builtin' | 'owner';
 /**
  * How the provider is authorised. `key`: for the node's configured provider, the key chain (the
  * agent's, the owner's, the node's); for an owner's provider, the key stored with it. `env`: the NAME
- * of a variable on this node (operator providers only). `none`: nothing is sent.
+ * of a variable on this node (operator providers only). `none`: nothing is sent. `optional`, with
+ * `env`: an unset variable sends no key instead of refusing the call (envKeyOf).
  */
-export interface ProviderAuth { type: 'key' | 'env' | 'none'; env?: string }
+export interface ProviderAuth { type: 'key' | 'env' | 'none'; env?: string; optional?: boolean }
 
 export interface ProviderLimits {
   /** Estimated tokens one request may carry, state and questions together. */
@@ -135,20 +143,20 @@ const LOCAL_STATEMENT = 'The scrubbed state goes to a decision model on this mac
 export const BUILTIN_PROVIDERS: Readonly<Record<string, Omit<DecisionProvider, 'source'>>> = Object.freeze({
   laya: {
     id: 'laya', title: 'Laya (local, multilingual)', kind: 'local',
-    url: 'http://127.0.0.1:8801/v1/systemone', model: 'multilingual', auth: { type: 'none' },
+    url: 'http://127.0.0.1:8801/v1/systemone', model: 'multilingual', auth: { type: 'env', env: 'AIMEAT_DECIDE_LAYA_KEY', optional: true },
     limits: { contextTokens: 1024, maxChoiceOptions: 20, scoreLevels: { min: 2, max: 10 } },
     capabilities: { confidence: true, languages: ['*'] },
     pricePerMtok: 0, leaves: false, dataStatement: LOCAL_STATEMENT,
-    measured: 'laya 0.3.7, multilingual checkpoint, 2026-09-23: reads 1024 tokens and drops the rest without an error, so the node refuses a longer state; 12/12 right at 5 and at 20 options, 9/12 at 60; confidence on every answer type; Finnish content 5/6 at 5 options and 4/6 at 20; about 21 ms a call.',
+    measured: 'laya 0.3.7, multilingual checkpoint, 2026-09-23: reads 1024 tokens and drops the rest without an error, so the node refuses a longer state; 12/12 right at 5 and at 20 options, 9/12 at 60; confidence on every answer type; Finnish content 5/6 at 5 options and 4/6 at 20; about 21 ms a call. Started with a key, it wants that bearer: AIMEAT_DECIDE_LAYA_KEY must match LAYA_API_KEY; with the variable unset, the call carries no key.',
     adapter: 'laya',
   },
   von: {
     id: 'von', title: 'von (local)', kind: 'local',
-    url: 'http://127.0.0.1:8802/v1/systemone', model: 'von-1.1.0', auth: { type: 'none' },
+    url: 'http://127.0.0.1:8802/v1/systemone', model: 'von-1.1.0', auth: { type: 'env', env: 'AIMEAT_DECIDE_VON_KEY', optional: true },
     limits: { contextTokens: 4700, maxChoiceOptions: 20, scoreLevels: { min: 2, max: 10 } },
     capabilities: { confidence: true, languages: ['en'] },
     pricePerMtok: 0, leaves: false, dataStatement: LOCAL_STATEMENT,
-    measured: 'von-sdk 1.1.1, 2026-09-23: a fact at the end is read at 4700 tokens, weaker at 9400 and lost at 18800, with no error; 12/12 right at 5 options, 11/12 at 20, 8/12 at 60; confidence on choice and score; no Finnish (0/6); about 46 ms a call once the weights are loaded (the first call took 47 s).',
+    measured: 'von-sdk 1.1.1, 2026-09-23: a fact at the end is read at 4700 tokens, weaker at 9400 and lost at 18800, with no error; 12/12 right at 5 options, 11/12 at 20, 8/12 at 60; confidence on choice and score; no Finnish (0/6); about 46 ms a call once the weights are loaded (the first call took 47 s). Started with a key, it wants that bearer: AIMEAT_DECIDE_VON_KEY must match VON_API_KEY; with the variable unset, the call carries no key.',
   },
   jeff: {
     id: 'jeff', title: 'jeff (local, GLiFormer)', kind: 'local',
@@ -161,6 +169,27 @@ export const BUILTIN_PROVIDERS: Readonly<Record<string, Omit<DecisionProvider, '
 });
 
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
+
+/**
+ * The key a provider with `env` auth sends: its variable's value on this node, trimmed. Null when it
+ * sends none: any other auth, or an `optional` variable left unset. A required variable left unset is
+ * refused here, before anything is sent. `key` auth is the key chain's (service.ts), never this.
+ */
+export function envKeyOf(p: DecisionProvider, env: Readonly<Record<string, string | undefined>> = process.env): string | null {
+  if (p.auth.type !== 'env') return null;
+  const key = (env[p.auth.env ?? ''] ?? '').trim();
+  if (key || p.auth.optional) return key || null;
+  throw new DecideError('NO_API_KEY', 503, `The operator named ${p.auth.env} as the key for the decision provider '${p.id}', and it is not set on this node.`);
+}
+
+/**
+ * Whether a provider answers without a key of the owner's: `none`, or an optional variable of the
+ * operator's (the built-in laya and von, set or not). Read from a record or from its view, so the
+ * settings view and the availability answer agree on what an owner needs.
+ */
+export function takesNoOwnerKey(auth: { type?: unknown; optional?: unknown } | null | undefined): boolean {
+  return auth?.type === 'none' || (auth?.type === 'env' && auth.optional === true);
+}
 
 /** What the node's configured provider is: the one every owner had before providers existed. */
 function configuredProvider(config: AimeatConfig): DecisionProvider {
@@ -587,7 +616,10 @@ export async function deleteOwnerProvider(storage: Storage, config: AimeatConfig
 export function providerView(p: DecisionProvider, hasKey?: boolean): Record<string, unknown> {
   return {
     id: p.id, title: p.title, kind: p.kind, source: p.source, url: p.url, model: p.model,
-    auth: { type: p.auth.type, ...(p.auth.env ? { env: p.auth.env } : {}), ...(p.source === 'owner' && p.auth.type === 'key' ? { has_key: !!hasKey } : {}) },
+    auth: {
+      type: p.auth.type, ...(p.auth.env ? { env: p.auth.env } : {}), ...(p.auth.optional ? { optional: true } : {}),
+      ...(p.source === 'owner' && p.auth.type === 'key' ? { has_key: !!hasKey } : {}),
+    },
     limits: { context_tokens: p.limits.contextTokens, max_choice_options: p.limits.maxChoiceOptions, score_levels: p.limits.scoreLevels },
     capabilities: p.capabilities,
     price_per_mtok: p.pricePerMtok,

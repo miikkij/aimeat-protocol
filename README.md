@@ -508,20 +508,23 @@ Some AI work is a decision rather than a text: which folder a mail belongs in, w
 
 #### Local decision models
 
-Three open models answer the same questions on your own machine: **Laya** (Apache 2.0, reads Finnish content), **von** (Apache 2.0) and **jeff** (MIT, GLiFormer). A local model needs no key and costs nothing, and the content does not leave the machine; personal data is still removed first. [`tools/systemone/`](tools/systemone/) runs all three with one command, on a CPU or a GPU:
+Three open models answer the same questions on your own machine: **Laya** (Apache 2.0, reads Finnish content), **von** (Apache 2.0) and **jeff** (MIT, GLiFormer). A local model costs nothing, and the content does not leave the machine; personal data is still removed first. [`tools/systemone/`](tools/systemone/) runs all three with one command, on a CPU or a GPU. Each model answers only a call that carries its own key, which you make once:
 
 ```bash
 cd tools/systemone/docker
-JEFF_API_KEYS=devkey docker compose up -d --build                                  # CPU
-JEFF_API_KEYS=devkey docker compose -f compose.yaml -f compose.gpu.yaml up -d --build  # GPU
+for v in JEFF_API_KEYS LAYA_API_KEY VON_API_KEY; do echo "$v=$(openssl rand -hex 32)"; done > .env  # the keys, once
+docker compose up -d --build                                        # CPU
+docker compose -f compose.yaml -f compose.gpu.yaml up -d --build    # GPU
 ```
 
-Then the node needs three settings, and a restart:
+Then the node needs these settings, the three keys from that `.env`, and a restart:
 
 ```bash
 AIMEAT_DECIDE_BUILTIN_PROVIDERS=laya,von,jeff
 AIMEAT_DECIDE_PROVIDER_EGRESS=http://127.0.0.1:8801,http://127.0.0.1:8802,http://127.0.0.1:8803
-AIMEAT_DECIDE_JEFF_KEY=devkey
+AIMEAT_DECIDE_JEFF_KEY=<JEFF_API_KEYS>
+AIMEAT_DECIDE_LAYA_KEY=<LAYA_API_KEY>
+AIMEAT_DECIDE_VON_KEY=<VON_API_KEY>
 ```
 
 `AIMEAT_DECIDE_PROVIDER_EGRESS` lets the decision call, and nothing else, reach exactly those addresses on the node's own machine, so a public node can run local models safely. The weights are inside the images, and a container starts with no network. On four CPU cores Laya and jeff answer in well under a second; on a GPU every model answers in tens of milliseconds. The [tools/systemone README](tools/systemone/README.md) covers Windows without Docker, a node on the same Docker network, and measuring a model's limits.

@@ -97,27 +97,18 @@ takes about 1.7 s on the same 4 cores.
 The node reaches a model on its own machine only when you name the model's exact address in
 `AIMEAT_DECIDE_PROVIDER_EGRESS`. That permission covers the decision call and nothing else.
 
-The node also sends each model its key. The built-in `jeff` provider sends `AIMEAT_DECIDE_JEFF_KEY`.
-The built-in `laya` and `von` send no key, so describe those two in `AIMEAT_DECIDE_PROVIDERS` with
-the variable that holds each key; an entry there takes the place of the built-in with the same id.
-The limits below are the built-ins' own (`aimeat/src/services/decide/providers.ts`).
+The node also sends each model its key: `AIMEAT_DECIDE_JEFF_KEY`, `AIMEAT_DECIDE_LAYA_KEY` and
+`AIMEAT_DECIDE_VON_KEY`, each the value that model was started with. jeff's is required. laya's and
+von's may be left unset for a model started without a key: the node then sends none.
 
 ```bash
-# jeff as the built-in, laya and von described here, all three on the ports above
-AIMEAT_DECIDE_BUILTIN_PROVIDERS=jeff
+# the built-in providers, pointed at the ports above
+AIMEAT_DECIDE_BUILTIN_PROVIDERS=laya,von,jeff
 AIMEAT_DECIDE_PROVIDER_EGRESS=http://127.0.0.1:8801,http://127.0.0.1:8802,http://127.0.0.1:8803
 # the keys the models were started with: docker/.env, or .runtime\<model>\api-key on Windows
 AIMEAT_DECIDE_JEFF_KEY=<jeff's key>
 AIMEAT_DECIDE_LAYA_KEY=<laya's key>
 AIMEAT_DECIDE_VON_KEY=<von's key>
-AIMEAT_DECIDE_PROVIDERS='[
-  {"id":"laya","title":"Laya (local, multilingual)","kind":"local","url":"http://127.0.0.1:8801/v1/systemone",
-   "model":"multilingual","auth":{"type":"env","env":"AIMEAT_DECIDE_LAYA_KEY"},"adapter":"laya",
-   "limits":{"context_tokens":1024,"max_choice_options":20}},
-  {"id":"von","title":"von (local)","kind":"local","url":"http://127.0.0.1:8802/v1/systemone",
-   "model":"von-1.1.0","auth":{"type":"env","env":"AIMEAT_DECIDE_VON_KEY"},
-   "limits":{"context_tokens":4700,"max_choice_options":20},"capabilities":{"languages":["en"]}}
-]'
 # optional: what an owner who chose no provider gets
 AIMEAT_DECIDE_DEFAULT_PROVIDER=laya
 ```
@@ -166,8 +157,10 @@ weights at the images' commits.
 ```
 
 Each command takes `laya`, `von`, `jeff` or `all`. Everything stays under `.runtime\` (gitignored,
-several GB). `install` makes each model's key once, in `.runtime\<model>\api-key`; `up` starts the
-model with it, `smoke` sends it, and the node needs the same values (Connecting a node, above).
+several GB). `install` makes each model's key once, in `.runtime\<model>\api-key`, and prints the
+variable the node reads it from; `up` starts the model with it, `smoke` sends it, and the node needs
+the same values in `AIMEAT_DECIDE_LAYA_KEY`, `AIMEAT_DECIDE_VON_KEY` and `AIMEAT_DECIDE_JEFF_KEY`
+(Connecting a node, above).
 
 ## Measuring
 
