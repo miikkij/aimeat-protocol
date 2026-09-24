@@ -7,6 +7,7 @@
 )]
 
 mod node_manager;
+mod opener;
 mod ai_connector;
 mod connectors;
 mod chat;
