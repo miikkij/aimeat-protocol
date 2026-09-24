@@ -16,6 +16,8 @@
  *   - GET  /v1/apps/:owner/:filename/webmcp             public WebMCP-shaped tool listing
  *   - POST /v1/apps/:owner/:filename/webmcp/tools/:tool invoke (402 for priced; auth for free)
  * @version-history
+ *   v1.6.0 — 2026-09-24 — Both invoke paths hand the capability service the session's scopes
+ *     (heldScopes), so a tool bound to a capability over a remote MCP tool asks for mcp:use.
  *   v1.5.0 — 2026-09-19 — The invoke checks the input against the tool's published schema before
  *     metering or payment, and answers 400 INVALID_INPUT naming every missing field at once.
  *   v1.4.0 — 2026-07-28 — The listing carries `app_surface` (declared scopes, bound SKILL.md packs,
@@ -36,6 +38,7 @@ import type { Request, Response } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AppRecord } from '../storage/interface.js';
 import { requireAuth } from '../auth/middleware.js';
+import { heldScopes } from '../auth/effective-scopes.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity, callerPrincipal } from '../utils/gaii.js';
 import { AppToolsDocSchema, appToolsKey, isToolPriced, applyLockedInput, type AppTool } from '../models/app-tool-schemas.js';
@@ -235,7 +238,7 @@ export function webmcpRouter(config: AimeatConfig, storage: Storage): Router {
           // The capability runs over this node's own HTTP surface and meets the raw-invoke paywall,
           // which cannot know which product was bought. The pass says this call was already ruled on.
           const invoked = await invokeCapability(config, storage, cap, toolInput,
-            callerGaii, jwt, 'normal', mintInternalPass(coordExt, toolName));
+            callerGaii, jwt, 'normal', mintInternalPass(coordExt, toolName), heldScopes(req.auth));
           // Measured so the provider can propose a service commitment from evidence (call-timing.ts).
           recordCallDuration(storage, providerGhii, coordExt, toolName, Date.now() - startedAt);
 
@@ -316,7 +319,8 @@ export function webmcpRouter(config: AimeatConfig, storage: Storage): Router {
         // would then bill this free call at that neighbour's price. Say what was decided instead of
         // letting it be re-decided by the one place with less information.
         const invoked = await invokeCapability(config, storage, cap, toolInput,
-          callerGhii, jwt, 'normal', mintInternalPass(`apptool:${ownerName}/${filename}`, toolName, 'unpriced'));
+          callerGhii, jwt, 'normal', mintInternalPass(`apptool:${ownerName}/${filename}`, toolName, 'unpriced'),
+          heldScopes(req.auth!));
         res.json(success(config.nodeId, { app: appRef, tool: toolName, result: invoked.result }));
       } catch (err) {
         const e = err as { statusCode?: number; code?: string; message?: string };

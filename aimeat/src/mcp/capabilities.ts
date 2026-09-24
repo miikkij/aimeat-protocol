@@ -23,6 +23,8 @@
  *     missing arrive with it: the operator's exemption from the publishing policy, the operator's
  *     reach over another owner's capability, and a call-log entry for every invocation, which only
  *     the HTTP door had been writing.
+ *   v1.6.0 -- 2026-09-24 -- aimeat_capabilities_invoke hands the service the session's scopes, so a
+ *     capability over a remote MCP tool refuses an agent without mcp:use, as the REST twin does.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import {
@@ -45,6 +47,9 @@ export function registerCapabilitiesTools(
     /** The session's CURRENT bearer token. An extension-backed capability runs behind the node's own
      *  authenticated HTTP surface, so the caller's token has to travel with the invocation. */
     getToken: () => string | undefined = () => undefined,
+    /** What this session holds. A capability over a remote MCP tool asks for mcp:use in it, as the
+     *  REST twin does; left out, the session holds nothing there. */
+    scopes: string[] = [],
 ): void {
 
     /**
@@ -142,7 +147,8 @@ export function registerCapabilitiesTools(
 
             try {
                 const { invokeCapability } = await import('../services/capability-invoke.js');
-                const result = await invokeCapability(config, storage, cap, input, callerGhii, getToken() ?? '', args.mode || 'normal');
+                const result = await invokeCapability(config, storage, cap, input, callerGhii, getToken() ?? '',
+                    args.mode || 'normal', undefined, scopes);
 
                 // Stats AND a line in the capability's call log. This door wrote the counters only,
                 // so the log an owner reads to see who has been calling them was missing every

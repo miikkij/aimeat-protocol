@@ -19,8 +19,10 @@
  * @structure registerExchangeRunTools() — registers 6 tools (app-tool invoke · work start/deliver/list · proposals/decide)
  * @usage
  *   import { registerExchangeRunTools } from './exchange-run.js';
- *   registerExchangeRunTools(mcp, storage, config, () => agentGaii, () => sessionToken);
+ *   registerExchangeRunTools(mcp, storage, config, () => agentGaii, () => sessionToken, scopes);
  * @version-history
+ *   v1.6.0 — 2026-09-24 — Takes the session's scopes, and aimeat_app_tool_invoke hands them to the
+ *     capability service, so a tool bound to a capability over a remote MCP tool asks for mcp:use.
  *   v1.5.0 — 2026-09-19 — aimeat_app_tool_invoke checks the input against the tool's published
  *     schema before metering, and a refusal names every missing field at once.
  *   v1.4.0 — 2026-08-30 — aimeat_app_tool_invoke asks the chokepoint BEFORE looking for an
@@ -96,6 +98,9 @@ export function registerExchangeRunTools(
     config: AimeatConfig,
     getAgentGaii: () => string,
     getToken: () => string | undefined,
+    /** What this session holds. An app tool bound to a capability over a remote MCP tool asks for
+     *  mcp:use in it, as the REST twin does. */
+    scopes: string[],
 ): void {
     const agentGaii = getAgentGaii();
     const owner = parseGaiiLoose(agentGaii).owner;
@@ -207,7 +212,7 @@ export function registerExchangeRunTools(
                 // of this route the caller reached (the REST WebMCP path carries the same pass).
                 const startedAt = Date.now();
                 const invoked = await invokeCapability(config, storage, cap, toolInput,
-                    callerGaii, getToken() ?? '', 'normal', mintInternalPass(coordExt, tool));
+                    callerGaii, getToken() ?? '', 'normal', mintInternalPass(coordExt, tool), scopes);
                 // Measured, so the provider can propose a service commitment from evidence rather
                 // than from a guess (services/call-timing.ts). The REST twin has recorded this since
                 // it was written, so a capability's published p50/p95 described its HTTP traffic only

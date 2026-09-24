@@ -12,6 +12,8 @@
  *   The upstream server is built with the SDK's own server half, so the protocol on the wire is the
  *   protocol, and the test moves when the SDK does.
  * @version-history
+ *   v1.2.0 — 2026-09-24 — A capability over a remote tool asks the caller's own scopes: an agent
+ *     without mcp:use is refused (secaudit 2026-09 f740ecf9bc39).
  *   v1.1.0 — 2026-09-24 — A tool list past the ceiling is refused by name, parks the server and
  *     caches nothing (secaudit 2026-09 A2-2).
  *   v1.0.0 — 2026-09-16 — Phase 1 of the MCP proxy.
@@ -30,6 +32,8 @@ import {
 import { sealMcpCredential } from '../../src/services/mcp-client/credential.js';
 import { mcpClientPool } from '../../src/services/mcp-client/pool.js';
 import { attachMcpServer } from '../../src/services/mcp-client/registry.js';
+import { invokeCapability } from '../../src/services/capability-invoke.js';
+import type { CapabilityRecord } from '../../src/storage/interface.js';
 
 // Loopback egress is gated, and the whole point of this suite is a real socket. RFC1918 and
 // link-local stay blocked regardless of this flag, which is what the SSRF suite relies on.
@@ -301,6 +305,50 @@ describe('the MCP proxy chokepoint, against a real server', () => {
     // which is a different sentence for the person reading it. mcp-peer-transport.test.ts holds
     // the rest of the peering rules.
     expect(r.code).toBe('PEER_UNKNOWN');
+  });
+});
+
+describe('a capability over a remote tool, through the real chokepoint', () => {
+  // mcp-capability-invoke.test.ts mocks callRemoteTool to test which server is resolved. This one
+  // does not, because what is under test is the scope question the chokepoint asks.
+  const capability = (): CapabilityRecord => {
+    const now = new Date().toISOString();
+    return {
+      id: randomUUID(), name: 'say-it', summary: 'Says it back.', ownerGhii: 'alice@node-a',
+      visibility: 'public', scope: 'local', status: 'active',
+      rejectionReason: null, deprecationMessage: null, replacedBy: null,
+      source: { type: 'mcp', ref: 'upstream/echo' } as CapabilityRecord['source'],
+      authRequired: 'registered', callable: true,
+      inputSchema: null, outputSchema: null, exports: null,
+      usage: '', whenToUse: '', whenNotToUse: '', examples: [], dependencies: [],
+      schemaHash: '', webhookUrl: null, cost: null, trustRequired: null,
+      trust: {} as CapabilityRecord['trust'], redactedFields: [], operatorOverride: null,
+      stats: { totalInvocations: 0, successCount: 0, errorCount: 0, lastInvokedAt: null, avgResponseMs: 0, lastError: null },
+      tags: [], createdAt: now, updatedAt: now,
+    };
+  };
+  const AGENT = 'claude#alice@node-a';
+
+  it('refuses an agent that holds work:request and not mcp:use', async () => {
+    const storage = new SqliteStorage(':memory:');
+    await storage.createMcpServer(makeRow());
+
+    // Until 2026-09-24 the chokepoint read a missing scope list as mcp:use, and this path passed
+    // none, so the far side answered (secaudit 2026-09 f740ecf9bc39).
+    await expect(invokeCapability(config, storage as never, capability(), { text: 'x' }, AGENT, '',
+      'normal', undefined, ['work:request'])).rejects.toMatchObject({ statusCode: 403, code: 'NOT_GRANTED' });
+  });
+
+  it('lets the same agent through once it holds mcp:use, and the owner in person needs no word', async () => {
+    const storage = new SqliteStorage(':memory:');
+    await storage.createMcpServer(makeRow());
+
+    const agent = await invokeCapability(config, storage as never, capability(), { text: 'agent' }, AGENT, '',
+      'normal', undefined, ['work:request', 'mcp:use']);
+    expect(JSON.stringify(agent.result)).toContain('echo:agent');
+    const owner = await invokeCapability(config, storage as never, capability(), { text: 'owner' }, 'alice@node-a', '',
+      'normal', undefined, []);
+    expect(JSON.stringify(owner.result)).toContain('echo:owner');
   });
 });
 
