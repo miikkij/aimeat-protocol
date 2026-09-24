@@ -21,11 +21,13 @@
  *   const missing = missingStepScopes(def, caller, 'full');
  *   if (missing.length > 0) return stepScopeRefusal(missing);   // 403 SCOPE_DENIED, the words named
  * @version-history
+ *   v1.1.1 — 2026-09-24 — ownerInPerson asks utils/scope-coverage.ts ownerBypassesScopes, which the
+ *     package install now asks too; the rule is written once.
  *   v1.1.0 — 2026-09-24 — A workflow that reads the owner's records costs memory:read, on a check
  *     too: every signal leaf reads a record and the run keeps what it saw, which workflow:read serves.
  *   v1.0.0 — 2026-09-24 — Initial.
  */
-import { scopeIsCovered } from '../../utils/scope-coverage.js';
+import { scopeIsCovered, ownerBypassesScopes } from '../../utils/scope-coverage.js';
 import type { WorkflowStep, Signal } from '../../models/workflow-schemas.js';
 
 /** Every kind of step. A step with no `action` is an agent step. */
@@ -102,13 +104,11 @@ export interface WorkflowCaller {
 }
 
 /**
- * The account holder in person, whom requireScope waves through every door (auth/middleware.ts): an
- * owner role, and none of the three things that make a role list a scoped principal's. An agent, an
- * ecosystem app and a visitor from another node answer for their words.
+ * The account holder in person, whom requireScope waves through every door. The rule lives in
+ * utils/scope-coverage.ts ownerBypassesScopes, beside the rule for what a scope covers.
  */
 export function ownerInPerson(caller: WorkflowCaller): boolean {
-    const roles = caller.roles;
-    return roles.includes('owner') && !caller.federated && !roles.includes('agent') && !roles.includes('ecosystem');
+    return ownerBypassesScopes(caller);
 }
 
 function kindOf(step: Pick<WorkflowStep, 'action'>): StepKind {

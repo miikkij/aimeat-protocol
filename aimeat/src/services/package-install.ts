@@ -20,6 +20,10 @@
  *   import { installPackage } from '../services/package-install.js';
  *   const out = await installPackage({ storage, config, scheduler }, caller, { groupId });
  * @version-history
+ *   v1.2.0 — 2026-09-24 — The caller carries its roles and scopes, and a package with a memory
+ *     component costs an agent memory:write and memory:write-as-owner, an app grant memory:write, as
+ *     the memory door asks for a write into the owner's namespace. Refused before any component
+ *     registers, dry run included.
  *   v1.1.0 — 2026-09-24 — A package whose memory component names a key the node trusts is refused
  *     with 403 RESERVED_KEY before any component registers, on a dry run too.
  *   v1.0.0 — 2026-08-23 — Pure extraction out of routes/instances/install.ts so the node's own MCP
@@ -42,7 +46,7 @@ import {
     fetchComponentContent,
     computeHash,
 } from './component-registrar.js';
-import { reservedKeysInComponent, reservedComponentMessage } from './package-memory-component.js';
+import { reservedKeysInComponent, reservedComponentMessage, memoryComponentWriteRefusal } from './package-memory-component.js';
 import { registerExtensionSchedules } from './extension-schedules.js';
 import { emitChange } from './event-bus.js';
 import type { Scheduler } from './scheduler.js';
@@ -57,11 +61,16 @@ export interface PackageInstallDeps {
 /**
  * Who is installing. `ownerGhii` is the resolved identity everything is registered under, and
  * `sub` is the raw principal, recorded as the actor on any schedule the package brings with it.
+ * `roles` and `scopes` are the session's: a memory component writes into the owner's namespace, and
+ * that costs what the memory door asks (package-memory-component.ts memoryComponentWriteRefusal).
  */
 export interface PackageInstallCaller {
     owner: string;
     sub: string;
     ownerGhii: string;
+    roles: string[];
+    scopes: string[];
+    federated?: boolean;
 }
 
 export interface PackageInstallInput {
@@ -229,6 +238,11 @@ export async function installPackage(
                 message: `${reservedComponentMessage(comp.id, reserved)} Nothing was installed.`,
             };
         }
+    }
+    // And writing the owner's memory at all costs what the memory door asks of this caller.
+    const writeRefusal = memoryComponentWriteRefusal(pkg.components, caller, ownerGhii);
+    if (writeRefusal) {
+        return { ok: false, status: writeRefusal.status, code: writeRefusal.code, message: `${writeRefusal.message} Nothing was installed.` };
     }
 
     // ── Dry run: validate without registering ────────────────────────

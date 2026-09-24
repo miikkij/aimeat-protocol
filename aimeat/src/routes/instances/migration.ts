@@ -6,6 +6,8 @@
  *   and apply a migration to an instance (replace/skip/custom/install_new actions).
  *   Extracted from src/routes/instances.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.4.0 — 2026-09-24 — apply-migration and update hand the session's roles and scopes to the
+ *     service, which asks them for a memory component that writes into the owner's memory.
  *   v1.3.0 — 2026-09-14 — requireLocalSession on all three doors, as on the rest of the instance
  *     surface: the owner comparison reads `req.auth.owner`, which a federated session carries as
  *     the local part of the visitor's HOME name.
@@ -189,7 +191,7 @@ export function registerMigrationRoutes(
     const { targetVersion, components: migrationActions } = req.body ?? {};
 
     const out = await applyInstanceMigration({ storage, config },
-      { owner, ownerGhii: ownerGaii, sub: req.auth!.sub },
+      { owner, ownerGhii: ownerGaii, sub: req.auth!.sub, roles: req.auth!.roles, scopes: req.auth!.scopes ?? [], federated: req.auth!.federated },
       { instanceId: id, targetVersion, actions: migrationActions });
 
     if (!out.ok) {
@@ -218,7 +220,7 @@ export function registerMigrationRoutes(
     const owner = req.auth!.owner;
     const ownerGaii = await resolveGhii(storage, owner, config);
     const out = await updateInstanceToLatest({ storage, config },
-      { owner, ownerGhii: ownerGaii, sub: req.auth!.sub },
+      { owner, ownerGhii: ownerGaii, sub: req.auth!.sub, roles: req.auth!.roles, scopes: req.auth!.scopes ?? [], federated: req.auth!.federated },
       { instanceId: id, dryRun: req.body?.dry_run === true });
 
     if (!out.ok) {

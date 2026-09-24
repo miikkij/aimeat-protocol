@@ -17,10 +17,12 @@
  *
  *   THE SCOPE IS THE GATE. `packages:write` is what the route requires, and TOOL_SCOPES carries the
  *   same word here, so an agent without it is not handed the tool at all.
- * @structure registerPackageTools(mcp, storage, config, getAgentGaii) — registers
+ * @structure registerPackageTools(mcp, storage, config, getAgentGaii, peers, sessionScopes) — registers
  *   aimeat_package_list, aimeat_package_get, aimeat_package_status_set, aimeat_package_install.
  * @usage import { registerPackageTools } from './packages.js';
  * @version-history
+ *   v1.2.0 — 2026-09-24 — install and update hand the session's scopes to the service, which asks
+ *     them for a memory component that writes into the owner's memory, as the HTTP door does.
  *   v1.1.1 — 2026-09-12 — resolveGhii takes the node here too. These tools passed the AGENT's GAII
  *     as the fallback identity, so a missing owner record would have filed the package under the
  *     agent rather than the person it acted for. wish-identity-gate-sees-resolveghii.
@@ -69,12 +71,15 @@ export function registerPackageTools(
     config: AimeatConfig,
     getAgentGaii: () => string,
     peers: Map<string, PeerInfo> = new Map(),
+    sessionScopes: string[] = [],
 ): void {
     /** The owner this agent acts for. Never a caller-supplied id. */
     const ownerOf = (): string => {
         const gaii = getAgentGaii();
         return parseGaiiLoose(gaii).owner || gaii;
     };
+    /** What this session answers for when a component writes into the owner's memory. */
+    const grant = { roles: ['agent'], scopes: sessionScopes };
 
     mcp.tool('aimeat_package_list', descriptionFor('aimeat_package_list'), {
         search: z.string().optional().describe('Search over name, description and tags.'),
@@ -191,7 +196,7 @@ export function registerPackageTools(
         const owner = ownerOf();
         const gaii = getAgentGaii();
         const out = await updateInstanceToLatest({ storage, config },
-            { owner, ownerGhii: await resolveGhii(storage, owner, config), sub: gaii },
+            { owner, ownerGhii: await resolveGhii(storage, owner, config), sub: gaii, ...grant },
             { instanceId: instance_id, dryRun: dryRun === true });
         if (!out.ok) {
             return {
@@ -231,7 +236,7 @@ export function registerPackageTools(
 
         const out = await installPackage(
             { storage, config, scheduler: getActiveScheduler() ?? undefined },
-            { owner, sub: gaii, ownerGhii },
+            { owner, sub: gaii, ownerGhii, ...grant },
             { groupId: group_id, label, version, dryRun: dryRun === true },
         );
 

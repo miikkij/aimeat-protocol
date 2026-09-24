@@ -24,12 +24,16 @@
  *     its coverage test read `memory:*` as covering `memory:write-reserved`.
  *
  *   Neither was an escalation before this scope existed. Both were, the moment it did.
- * @structure SCOPES_OUTSIDE_WILDCARD · scopeIsCovered(held, scope) · uncoveredScopes(held, wanted)
+ * @structure SCOPES_OUTSIDE_WILDCARD · scopeIsCovered(held, scope) · uncoveredScopes(held, wanted) ·
+ *   ownerBypassesScopes(caller)
  * @usage
  *   import { uncoveredScopes } from '../utils/scope-coverage.js';
  *   const added = uncoveredScopes(agent.defaultScopes ?? [], proposed.scopes);
  *   if (added.length > 0) return err(`…${added.join(', ')}`);
  * @version-history
+ *   v1.10.0 — 2026-09-24 — ownerBypassesScopes(caller): requireScope's owner bypass as a value, for a
+ *     service that answers the same question without a request (the workflow steps, the package
+ *     memory components).
  *   v1.9.0 — 2026-09-24 — THEME_WRITE_SCOPE (site:theme-write): making and editing the node's themes,
  *     outside every wildcard like site:layout-write.
  *   v1.8.0 — 2026-09-16 — MCP_MANAGE_SCOPE, attaching another MCP server to this account. Outside
@@ -61,6 +65,7 @@
  *   v1.0.0 — 2026-08-08 — Initial, closing the two paths that let an agent grant itself
  *     memory:write-reserved without the owner's tick.
  */
+import { isForeignPrincipal } from './gaii.js';
 
 /** The scope an owner grants an agent to write into the owner's own namespace. */
 export const WRITE_AS_OWNER_SCOPE = 'memory:write-as-owner';
@@ -288,4 +293,15 @@ export function scopeIsCovered(held: readonly string[], scope: string): boolean 
  */
 export function uncoveredScopes(held: readonly string[], wanted: readonly string[]): string[] {
     return wanted.filter(s => !scopeIsCovered(held, s));
+}
+
+/**
+ * The account holder in person, whom requireScope waves past every scope (auth/middleware.ts): an
+ * owner role, and none of the three things that make a role list a scoped principal's. An agent, an
+ * ecosystem app and a visitor from another node answer for their words; an app grant carries no
+ * owner role at all. For a service that decides the same question without an Express request.
+ */
+export function ownerBypassesScopes(caller: { roles: readonly string[]; federated?: boolean }): boolean {
+    return caller.roles.includes('owner') && !isForeignPrincipal(caller)
+        && !caller.roles.includes('agent') && !caller.roles.includes('ecosystem');
 }

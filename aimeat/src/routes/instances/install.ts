@@ -6,6 +6,8 @@
  *   itself (dry_run validation, component registration, @activate-cron firing, rollback on failure)
  *   lives in the service, so this door and the MCP tool run the same code.
  * @version-history
+ *   v1.6.0 — 2026-09-24 — The session's roles and scopes go to installPackage, which asks them for a
+ *     package whose memory component writes into the owner's memory.
  *   v1.5.0 — 2026-09-14 — requireLocalSession, as on every other instance door: the install files
  *     the instance under `req.auth.owner`, which a federated session carries as the local part of
  *     the visitor's HOME name.
@@ -59,7 +61,7 @@ export function registerInstallRoutes(
 
     const out = await installPackage(
       { storage, config, scheduler },
-      { owner, sub: req.auth!.sub, ownerGhii },
+      { owner, sub: req.auth!.sub, ownerGhii, roles: req.auth!.roles, scopes: req.auth!.scopes ?? [], federated: req.auth!.federated },
       { groupId, label, version, dryRun: dryRun === true },
     );
 

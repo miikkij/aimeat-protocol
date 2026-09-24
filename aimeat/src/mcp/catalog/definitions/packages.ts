@@ -12,6 +12,8 @@
  * @structure packagesTools[] -- catalog entries, folded into definitions.ts
  * @usage import { packagesTools } from './packages.js';
  * @version-history
+ *   v1.3.1 -- 2026-09-24 -- aimeat_package_install names the two memory words a package that seeds
+ *     memory records costs an agent.
  *   v1.3.0 -- 2026-09-05 -- aimeat_package_status_set, because publishing was reachable on no
  *     surface at all; aimeat_package_list gains the parameters the route actually reads (its `query`
  *     was sent as ?q= and the route reads ?search=, so the filter was dropped in silence).
@@ -149,7 +151,7 @@ export const packagesTools: AimeatToolDefinition[] = [
         // reaches for by name ("install the company brain"), and until 2026-08-23 it existed on the
         // HTTP route alone, so an agent could list a package and not install it.
         name: 'aimeat_package_install',
-        description: 'Install a component package as your own copy. Each component is registered under your identity, so what you get is yours to edit.',
+        description: 'Install a component package as your own copy. Each component is registered under your identity, so what you get is yours to edit. A package that seeds memory records writes them into your owner\'s memory, which takes the memory:write and memory:write-as-owner permissions.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {

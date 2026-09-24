@@ -29,6 +29,8 @@
  *   import { applyInstanceMigration } from '../services/package-migrate.js';
  *   const out = await applyInstanceMigration({ storage, config }, caller, { instanceId, targetVersion, actions });
  * @version-history
+ *   v1.2.0 — 2026-09-24 — A memory or translation component brought by an agent or an app grant costs
+ *     the memory door's write words (memoryComponentWriteRefusal), asked before anything is deleted.
  *   v1.1.0 — 2026-09-24 — A memory component that names a key the node trusts is refused with 403
  *     RESERVED_KEY, for replace, custom and install_new alike, before anything is deleted.
  *   v1.0.0 — 2026-09-05 — Extraction out of routes/instances/migration.ts, plus the three fixes.
@@ -43,7 +45,7 @@ import {
     registerComponent, validateComponentContent, deleteComponent, computeHash,
 } from './component-registrar.js';
 import { registeredNameFor } from './package-install.js';
-import { reservedKeysInComponent, reservedComponentMessage } from './package-memory-component.js';
+import { reservedKeysInComponent, reservedComponentMessage, memoryComponentWriteRefusal } from './package-memory-component.js';
 import { planInstanceUpdate } from './package-update-plan.js';
 import { emitChange } from './event-bus.js';
 import { logger } from '../utils/logger.js';
@@ -97,7 +99,15 @@ export type InstanceUpdateResult =
     | { ok: false; status: number; code: string; message: string };
 
 export interface PackageMigrateDeps { storage: Storage; config: AimeatConfig }
-export interface PackageMigrateCaller { owner: string; ownerGhii: string; sub: string }
+export interface PackageMigrateCaller {
+    owner: string;
+    ownerGhii: string;
+    sub: string;
+    /** What the session carries, for the write a memory component makes into the owner's memory. */
+    roles: string[];
+    scopes: string[];
+    federated?: boolean;
+}
 
 export interface PackageMigrateInput {
     instanceId: string;
@@ -257,6 +267,11 @@ export async function applyInstanceMigration(
                     ok: false, status: 403, code: 'RESERVED_KEY',
                     message: `${reservedComponentMessage(compId, reserved)} Nothing was changed.`,
                 };
+            }
+            // The component writes into the owner's memory, so the caller answers for that write.
+            const writeRefusal = memoryComponentWriteRefusal([{ id: compId, type }], caller, ownerGhii);
+            if (writeRefusal) {
+                return { ok: false, status: writeRefusal.status, code: writeRefusal.code, message: `${writeRefusal.message} Nothing was changed.` };
             }
         }
         if (action.action !== 'replace' && action.action !== 'custom') continue;
