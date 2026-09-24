@@ -9,6 +9,7 @@
  * @usage Linked from public/spa.html in the component block, whose order keeps the order these
  *   rules had when they were one sheet.
  * @version-history
+ *   v1.1.0 — 2026-09-24 — The jump's look moved to poster.css as the jump tone.
  *   v1.0.0 — 2026-09-23 — Moved unchanged from css/parts*.css (UI consolidation phase 1, a move).
  */
 
@@ -93,19 +94,13 @@
 .poster-conversation-welcome .poster-conversation-welcome-trust { color: var(--text-dim); margin-top: 6px; }
 /* The way back to the live edge while auto-follow is suspended. Floats over the conversation
    rather than pushing it, so its appearance never moves the text you are reading. */
+/* The jump is the action link's jump tone (poster.css, Jouni's decision "Small link"); this keeps
+   where it floats. */
 .poster-conversation-jump {
   position: absolute;
   right: 8px;
   bottom: 84px;
   z-index: 4;
-  font-size: 0.74rem;
-  font-weight: var(--weight-heavy);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  padding: 6px 12px;
-  background: var(--text); color: var(--bg);
-  border: 0; border-radius: 0; box-shadow: 4px 4px 0 var(--sun);
-  cursor: pointer;
 }
 /* The session cap's managed landing: stands where the composer stood, so the conversation ends
    in a door rather than a dead input. */

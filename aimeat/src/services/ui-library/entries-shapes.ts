@@ -9,6 +9,7 @@
  * @structure SHAPE_ENTRIES
  * @usage import { SHAPE_ENTRIES } from './entries-shapes.js';
  * @version-history
+ *   v1.5.0 — 2026-09-24 — The action link's notice and jump tones (Jouni's decision "Small link").
  *   v1.4.0 — 2026-09-24 — The menu row (Jouni's decision "Menu row").
  *   v1.3.0 — 2026-09-24 — The tab's tile tone (Jouni's decision "Choice").
  *   v1.2.0 — 2026-09-24 — The icon button (Jouni's decision "Icon button").
@@ -50,14 +51,16 @@ export const SHAPE_ENTRIES: UiEntryWritten[] = [
         [{ name: 'thing', class: 'poster-row--thing', when: 'a row that is one thing a person has or does' }]),
     shape('label', 'Label', ['poster-label'], '<span class="poster-label">…</span>',
         'A small coral word in capitals that names what follows.', 'Above a value, a prompt or a group of controls.'),
-    shape('action', 'Action', ['poster-action', 'poster-tab', 'poster-action--more', 'poster-action--quiet', 'poster-action--back', 'poster-action--text', 'poster-tab--fold', 'poster-tab--tile'], '<a class="poster-action" href="…">…</a>',
+    shape('action', 'Action', ['poster-action', 'poster-tab', 'poster-action--more', 'poster-action--quiet', 'poster-action--back', 'poster-action--text', 'poster-action--notice', 'poster-action--jump', 'poster-tab--fold', 'poster-tab--tile'], '<a class="poster-action" href="…">…</a>',
         'An ink-underlined action in capitals; the same cut is the unselected tab. Its tones are the quiet ways on Jouni kept.', 'A secondary action or a door in a masthead, or a tab.',
         [
             { name: 'tab', class: 'poster-tab', when: 'one tab in a row; is-on puts the chosen one on the sun' },
             { name: 'more', class: 'poster-action--more', when: 'more of a list: "Show all", in coral typewriter letters' },
             { name: 'quiet', class: 'poster-action--quiet', when: 'a small action in a side column (the chat\'s Reset session, Copy conversation)' },
             { name: 'back', class: 'poster-action--back', when: 'the way back to where a person came from' },
-            { name: 'text', class: 'poster-action--text', when: 'a plain word under a message (Listen, Copy)' },
+            { name: 'text', class: 'poster-action--text', when: 'a plain word under a message (Listen, Copy); "Not now"' },
+            { name: 'notice', class: 'poster-action--notice', when: '"What does that mean?" under the AI notice: small coral typewriter words' },
+            { name: 'jump', class: 'poster-action--jump', when: 'the jump to the latest message: a small ink block with a sun shadow' },
             { name: 'fold tab', class: 'poster-tab--fold', when: 'a small switch in a row ("Recent", "Mine"): coral typewriter words, the chosen one on the sun' },
             { name: 'tile tab', class: 'poster-tab--tile', when: 'a choice among named looks (the background pattern): framed tiles, the chosen one on the sun' },
         ]),

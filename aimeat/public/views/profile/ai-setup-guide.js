@@ -14,6 +14,8 @@
  * @structure McpSetupGuide({ installClassName }) · InstructionsDialog({ open, onClose })
  * @usage import { McpSetupGuide, InstructionsDialog } from '/views/profile/ai-setup-guide.js';
  * @version-history
+ *   2026-09-24 -- "Official instructions" is the action link's more tone (Jouni's decision "Small
+ *     link").
  *   2026-09-24 -- The copy buttons (a field's Copy, Copy the command) are the underlined action link
  *     (Jouni's decision "Panel action").
  *   2026-09-14 -- McpSetupGuide takes tabClass / activeClass for its tool tabs, so the agents page
@@ -133,7 +135,7 @@ export function McpSetupGuide({ installClassName = '', tabClass, activeClass } =
 
       ${tool.mcp.note ? html`<p class="ast-note">${tool.mcp.note}</p>` : null}
 
-      <a class="ast-docs" href=${tool.mcp.docs} target="_blank" rel="noopener">
+      <a class="poster-action poster-action--more ast-docs" href=${tool.mcp.docs} target="_blank" rel="noopener">
         ${tr('setup.officialDocs', 'Official instructions from')} ${tool.label} →
       </a>
     </div>`;
@@ -191,7 +193,7 @@ export function InstructionsDialog({ open, onClose }) {
           <${ToolPicker} tools=${tools} value=${tool.id} onPick=${pick} />
           <p class="ast-where-path">${tool.instructions.where}</p>
           ${tool.instructions.docs ? html`
-            <a class="ast-docs" href=${tool.instructions.docs} target="_blank" rel="noopener">
+            <a class="poster-action poster-action--more ast-docs" href=${tool.instructions.docs} target="_blank" rel="noopener">
               ${tr('setup.officialDocs', 'Official instructions from')} ${tool.label} →
             </a>` : null}
         </div>` : null}

@@ -19,6 +19,7 @@
  *   - ConversationCap({ title, body, children }) — the free share is spent, and the ways on
  * @usage html`<${ConversationFrame} list=${open}><${ThreadList} …/><${ConversationMain}>…<//><//>`
  * @version-history
+ *   v1.1.0 — 2026-09-24 — The jump is the action link's jump tone (Jouni's decision "Small link").
  *   v1.0.0 — 2026-09-23 — Moved out of views/chat.js with its markup unchanged (UI consolidation
  *     phase 1, a move).
  */
@@ -99,7 +100,7 @@ export function ConversationWelcome({ title, body, trust, children }) {
 
 export function ConversationJump({ onClick, children }) {
     return html`
-                    <button type="button" class="btn-outline poster-conversation-jump"
+                    <button type="button" class="poster-action poster-action--jump poster-conversation-jump"
                         onClick=${onClick}>
                         ${children}
                     </button>`;

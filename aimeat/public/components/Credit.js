@@ -7,6 +7,7 @@
  * @structure GooseCredit()
  * @usage html`<${GooseCredit} />`
  * @version-history
+ *   v1.1.0 — 2026-09-24 — The link is the action link's more tone (Jouni's decision "Small link").
  *   v1.0.0 — 2026-09-23 — Moved out of views/chat/parts.js with its markup unchanged (UI
  *     consolidation phase 1, a move).
  */
@@ -29,7 +30,7 @@ const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fa
 export function GooseCredit() {
     return html`
         <div class="poster-credit">
-            <a class="poster-credit-link" href="https://github.com/block/goose" target="_blank" rel="noopener noreferrer">
+            <a class="poster-action poster-action--more poster-credit-link" href="https://github.com/block/goose" target="_blank" rel="noopener noreferrer">
                 <span class="poster-credit-mark" aria-hidden="true">🪿</span>
                 <span>${tr('chat.poweredBy', 'Powered by goose')}</span>
             </a>
