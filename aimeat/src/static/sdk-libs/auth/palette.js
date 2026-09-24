@@ -24,6 +24,8 @@
  *   v1.3.0 — 2026-09-24 — On the node's own pages the picker reads the shell's look
  *     (window.__aimeatLook): the styles of the person's theme, the available themes when there are
  *     more than one, and no picker when the operator decides. Everywhere else PALETTES as before.
+ *     The styles' group is "Styles in this theme": the AIMEAT theme's first style is also AIMEAT.
+ *     The list has a name, and each option says it is chosen with aria-selected.
  *   v1.2.0 — 2026-08-28 — VOLTAGE joins the palettes: the front-demo2 register as a theme — hot
  *     magenta on warm cream, deep violet night, electric yellow, 2px borders, Space Grotesk
  *     display. check:theme holds its swatches and ratios like every other.
@@ -185,7 +187,8 @@ export function paletteControlHtml(i) {
     + '<button type="button" class="aimeat-pop-btn" aria-haspopup="listbox" aria-expanded="false" '
     + 'title="' + esc(label) + '" aria-label="' + esc(label) + '">'
     + '<span class="aimeat-pal-dot" style="background:' + esc(curAcc) + '"></span></button>'
-    + '<span class="aimeat-pop" role="listbox">'
+    // An option's chosen state is aria-selected for a screen reader; aria-pressed stays as the CSS hook.
+    + '<span class="aimeat-pop" role="listbox" aria-label="' + esc(label) + '">'
     // A style with one mode says so here too: the light/dark switch beside the picker is off.
     + (s && s.only ? '<span class="aimeat-pop-note">' + esc(s.only === 'light' ? ((i && i.styleLightOnly) || 'This style has a light mode only')
       : ((i && i.styleDarkOnly) || 'This style has a dark mode only')) + '</span>' : '')
@@ -193,13 +196,14 @@ export function paletteControlHtml(i) {
       ? head((i && i.lookThemes) || 'Themes')
         + themes.map(function (t) {
           var def = t.styles.find(function (x) { return x.id === t.defaultStyle; }) || t.styles[0];
-          return '<button type="button" role="option" data-look-theme="' + esc(t.id) + '" aria-label="' + esc(t.name) + '" aria-pressed="' + (t.id === s.theme) + '">'
+          return '<button type="button" role="option" data-look-theme="' + esc(t.id) + '" aria-label="' + esc(t.name) + '" aria-pressed="' + (t.id === s.theme) + '" aria-selected="' + (t.id === s.theme) + '">'
             + (def ? chipHtml(def.swatch[mode]) : '') + esc(t.name) + '</button>';
         }).join('')
-        + head((i && i.lookStyles) || 'Styles')
+        // "Styles in this theme": the built-in theme and its first style share the name AIMEAT.
+        + head((i && i.lookStyles) || 'Styles in this theme')
       : '')
     + list.map(function (p) {
-      return '<button type="button" role="option" data-palette="' + esc(p.id) + '" aria-label="' + esc(p.label) + '" aria-pressed="' + (p.id === cur) + '">'
+      return '<button type="button" role="option" data-palette="' + esc(p.id) + '" aria-label="' + esc(p.label) + '" aria-pressed="' + (p.id === cur) + '" aria-selected="' + (p.id === cur) + '">'
         + chipHtml(p.swatch[mode]) + esc(p.label) + '</button>';
     }).join('')
     + '</span></span>';
@@ -227,6 +231,7 @@ export function wirePaletteControl(container, clampPopover) {
     if (dot) dot.style.background = p.swatch[mode].accent;
     root.querySelectorAll('button[data-palette]').forEach(function (b) {
       b.setAttribute('aria-pressed', String(b.getAttribute('data-palette') === cur));
+      b.setAttribute('aria-selected', String(b.getAttribute('data-palette') === cur));
       // Re-tint the chips for the mode in effect, so the picker always previews truthfully.
       var pp = list.find(function (x) { return x.id === b.getAttribute('data-palette'); });
       if (!pp) return;

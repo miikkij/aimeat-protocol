@@ -11482,7 +11482,14 @@
     "howItWorks": "Cómo funciona",
     "business": "Para tu empresa",
     "learn": "Aprende",
-    "exchange": "EXCHANGE"
+    "exchange": "EXCHANGE",
+    "lookMode": "Claro u oscuro",
+    "lookLight": "Claro",
+    "lookDark": "Oscuro",
+    "lookLightOnly": "Este estilo solo tiene modo claro.",
+    "lookDarkOnly": "Este estilo solo tiene modo oscuro.",
+    "lookThemes": "Temas",
+    "lookStyles": "Estilos de este tema"
   },
   "nav.chat": "Chat",
   "nav.glossary": "Glosario",
@@ -17655,18 +17662,18 @@
     }
   },
   "designLab": {
-    "intro": "Cada parte de la interfaz propia de este AIMEAT, dibujada en vivo por su componente real con sus datos de ejemplo. Abre una parte para ver cada variante en claro y en oscuro, en el ancho de un teléfono, y para qué sirve.",
-    "filterLabel": "Qué partes",
+    "intro": "Cada componente de la interfaz propia de este AIMEAT, dibujado en vivo con sus datos de ejemplo. Abre un componente para ver cada variante en claro y en oscuro, en el ancho de un teléfono, y para qué sirve.",
+    "filterLabel": "Qué componentes",
     "filter": {
       "all": "Todas",
       "component": "Componentes",
       "shape": "Formas",
       "unused": "Sin uso"
     },
-    "find": "Buscar una parte",
-    "none": "Ninguna parte coincide.",
+    "find": "Buscar un componente",
+    "none": "Ningún componente coincide.",
     "unused": "sin uso",
-    "back": "Todas las partes",
+    "back": "Todos los componentes",
     "light": "Claro",
     "dark": "Oscuro",
     "phone": "En un teléfono",
@@ -17678,7 +17685,7 @@
     "noPages": "ninguna página la dibuja",
     "tokens": "Valores del tema",
     "code": "Código",
-    "noDemo": "Esta parte no tiene ejemplo.",
+    "noDemo": "Este componente no tiene ejemplo.",
     "modeLabel": "Qué muestra el laboratorio",
     "modeLibrary": "La biblioteca",
     "modeDecisions": "Las decisiones",
@@ -17780,11 +17787,11 @@
     "lookTheme": "Tema",
     "lookThemeHint": "Todos los temas de este servidor, también los que la gente no puede elegir.",
     "lookStyle": "Estilo",
-    "lookStyleHint": "Todos los estilos del tema. Las partes de abajo lo muestran.",
+    "lookStyleHint": "Todos los estilos del tema. Los componentes de abajo lo muestran.",
     "builtWithout": "Construido sin una decisión: {title}"
   },
   "themes": {
-    "intro": "Los aspectos de las páginas propias de este AIMEAT (el inicio, el chat, Configuración y controles, la administración). Un tema contiene estilos; un estilo tiene sus colores en claro y en oscuro. La gente elige en el selector de aspecto de la parte superior de la página. Mientras esta vista está abierta muestra el aspecto incorporado, así que un tema no puede estropearla.",
+    "intro": "Los aspectos de las páginas propias de este AIMEAT (el inicio, el chat, Configuración y controles, la administración). Un tema contiene estilos; un estilo tiene sus colores en claro y en oscuro. La gente elige en el selector de aspecto de la parte superior de la página y, en un teléfono, en el menú. Mientras esta vista está abierta muestra el aspecto incorporado, así que un tema no puede estropearla.",
     "loading": "Cargando…",
     "themes": "Temas",
     "newTheme": "Tema nuevo",
@@ -17823,7 +17830,7 @@
     "undo": "Deshacer los cambios",
     "allThemes": "Todos los temas",
     "builtinHint": "Esto es incorporado y solo de lectura. Cópialo para cambiarlo.",
-    "copyToChange": "Copiar para cambiarlo",
+    "copyToChange": "Hacer una copia",
     "tab": {
       "styles": "Estilos",
       "components": "Componentes",
@@ -17831,7 +17838,7 @@
       "pages": "En páginas reales"
     },
     "styles": "Estilos",
-    "stylesHint": "Un estilo es un juego de colores en claro y en oscuro, tres tipos de letra y su modo. La gente elige entre los estilos que ofreces.",
+    "stylesHint": "Un estilo es un juego de colores en claro y en oscuro, tres tipos de letra y si tiene los dos modos o solo uno. La gente elige entre los estilos que ofreces.",
     "newStyle": "Estilo nuevo",
     "inPill": "en el selector de aspecto",
     "notInPill": "no está en el selector de aspecto",
@@ -17864,7 +17871,7 @@
     "phone": "En un teléfono",
     "details": "Detalles: los nombres en el código",
     "faces": "Tipos de letra",
-    "facesHint": "Solo los tipos de letra que sirve este servidor.",
+    "facesHint": "Solo los tipos de letra que sirve este servidor. La vista previa de arriba muestra los que eliges.",
     "faceAsBuilt": "Como en el estilo incorporado",
     "face": {
       "headline": "Titulares",
@@ -17918,9 +17925,9 @@
       "controlBorder": "El borde de un control",
       "codeBg": "El fondo del código",
       "scrollbarThumb": "La barra de desplazamiento",
-      "morselBg": "La insignia de morsels",
+      "morselBg": "La insignia con la cifra en la barra superior (♥ 1000)",
       "pfHeroGradient": "La parte superior de Configuración y controles",
-      "pfCtaGradient": "Un panel de llamada a la acción",
+      "pfCtaGradient": "Un panel que te pide hacer algo",
       "pfCalloutGradient": "Un recuadro destacado",
       "sun": "Realce: la sombra de los paneles oscuros, la pestaña elegida, el borde de una sección",
       "onSun": "Texto sobre el color de realce"
@@ -17941,11 +17948,10 @@
       "none": "Sin CSS propio en este tema",
       "empty": "Sin CSS propio en este tema",
       "served": "Tiene CSS en este tema",
-      "stale": "Su CSS no se usa ahora",
+      "stale": "Su CSS no se usa: ninguna de sus reglas empieza por las clases de este componente",
       "broken": "Su CSS no se puede leer, así que no se usa",
       "removed": "Componente eliminado"
     },
-    "staleWhy": "ninguna de sus reglas empieza ya por las clases del componente",
     "removedWhy": "Este componente ya no está en las páginas. Su CSS se conserva y no se usa.",
     "deleteCss": "Eliminar su CSS",
     "allComponents": "Todos los componentes",
@@ -17972,7 +17978,7 @@
       "motion": "{property} mueve cosas también para quien pidió menos movimiento a su dispositivo. Ponlo dentro de @media (prefers-reduced-motion: no-preference).",
       "literalColour": "{property} nombra un color directamente, así que se ve igual en todos los estilos, en claro y en oscuro. Un valor del estilo, como var(--accent), sigue al estilo.",
       "face": "Este servidor no sirve este tipo de letra, así que el navegador usa otro.",
-      "outside": "Esta regla no empieza por las clases del componente, así que también cambia otras cosas de la página.",
+      "outside": "Esta regla no empieza por las clases del componente, así que puede cambiar cualquier cosa en todas las páginas de este tema.",
       "loads": "Esto carga un archivo. La política de contenido de este servidor decide si el navegador puede cargarlo."
     },
     "check": {
@@ -18004,24 +18010,24 @@
       "fleet": "Agentes"
     },
     "use": {
-      "view": "ver",
-      "edit": "editar",
-      "list": "lista",
-      "pick": "elegir",
-      "compare": "comparar",
-      "status": "estado",
-      "navigate": "navegar",
-      "converse": "conversar",
-      "act": "actuar",
-      "copy": "copiar",
-      "explain": "explicar",
-      "count": "contar",
-      "search": "buscar",
-      "notify": "avisar",
-      "wait": "esperar",
-      "layout": "disposición",
-      "open": "abrir",
-      "confirm": "confirmar"
+      "view": "Mostrar",
+      "edit": "Editar",
+      "list": "Listas",
+      "pick": "Elegir",
+      "compare": "Comparar",
+      "status": "Estado",
+      "navigate": "Moverse",
+      "converse": "Conversación",
+      "act": "Acciones",
+      "copy": "Copiar",
+      "explain": "Explicar",
+      "count": "Cifras",
+      "search": "Búsqueda",
+      "notify": "Avisos",
+      "wait": "Esperar",
+      "layout": "Disposición de la página",
+      "open": "Abrir",
+      "confirm": "Confirmar"
     },
     "factLightOnly": "solo claro",
     "factDarkOnly": "solo oscuro",
@@ -18039,6 +18045,10 @@
     "hidesConfirm": "Con este CSS los marcos no ven o no alcanzan: {list}. Puede que la gente no pueda usarlos. ¿Guardar de todos modos?",
     "renameTheme": "Cambiar el nombre del tema…",
     "lastTheme": "Al menos un tema sigue disponible: activa otro antes de desactivar este.",
-    "noCss": "Sin CSS."
+    "noCss": "Sin CSS.",
+    "filters": "Filtros",
+    "reachesAll": "Algunas de sus reglas no empiezan por las clases del componente, así que pueden cambiar todas las páginas de este tema.",
+    "findInFrames": "Buscar un componente para mostrar",
+    "accentOthers": "Los tonos más claro, más oscuro y tenue del acento no lo siguen. Ponlos en \"Todos los demás colores\"."
   }
 }

@@ -10,6 +10,7 @@
  * @structure registerThemeTools(mcp, registry)
  * @usage registerThemeTools(mcp, registry);
  * @version-history
+ *   v2.1.0 — 2026-09-24 — aimeat_theme_policy_set.
  *   v2.0.0 — 2026-09-24 — The two-level model of 07; one request mapping shared with the CLI door.
  *   v1.0.0 — 2026-09-24 — Initial (UI consolidation phase 4).
  */
@@ -59,6 +60,12 @@ export function registerThemeTools(mcp: McpServer, registry: AgentRegistry): voi
     retired: z.boolean().optional().describe('true takes the style out of the pill; false brings it back.'),
     dryRun: z.boolean().optional().describe('Check everything and save nothing.'),
   }, annotationsFor('aimeat_theme_style_save'), call('aimeat_theme_style_save'));
+
+  mcp.tool('aimeat_theme_policy_set', descriptionFor('aimeat_theme_policy_set'), {
+    personalChoice: z.boolean().optional().describe('People choose in the look picker (true), or everybody sees the default (false).'),
+    offered: z.array(z.string().max(40)).min(1).max(40).optional().describe("The theme ids people can choose, for example ['aimeat', 'pebble']."),
+    default: z.string().max(40).optional().describe('The default theme: one of the offered.'),
+  }, annotationsFor('aimeat_theme_policy_set'), call('aimeat_theme_policy_set'));
 
   mcp.tool('aimeat_theme_component_css_set', descriptionFor('aimeat_theme_component_css_set'), {
     theme: z.string().min(1).max(40).describe('The theme the CSS belongs to.'),

@@ -31,6 +31,8 @@
  *   BUILT_WITHOUT_DECISION — { [id]: the same, with a title }: built work Jouni looks at that no decision holds
  * @usage import { DECISIONS, BUILT } from './decisions-data.js';
  * @version-history
+ *   v3.5.0 — 2026-09-24 — Themes & Styles: the example theme Pebble, and `reach`, what it reached on
+ *     each page and what it did not, with the reason.
  *   v3.4.0 — 2026-09-24 — BUILT_WITHOUT_DECISION: Themes & Styles, its numbers and its yes.
  *   v3.3.0 — 2026-09-24 — BUILT: what was built from decisions 13-22, for the lab's "Built" section.
  *   v3.2.0 — 2026-09-24 — Dialog actions answered (Jouni: the proposal, and Save is the loud action).
@@ -592,5 +594,13 @@ export const BUILT_WITHOUT_DECISION = {
       set('Public pages signed in (help, members, change log), with four looks kept in the browser', 72, 0),
       set('Signed in, "/" (it opens the home, which themes reach), with four looks kept in the browser', 24, 6),
     ],
-    note: 'The 6 changed pictures are "/" with Harbour Day kept: the home wears the theme chosen, as intended; the old code does not know that style. With a theme\'s component CSS worn, the 21 driven steps of the home and the chat did the same as in the AIMEAT look (0 differences).' },
+    note: 'The 6 changed pictures are "/" with Harbour Day kept: the home wears the theme chosen, as intended; the old code does not know that style. With a theme\'s component CSS worn, the 21 driven steps of the home and the chat did the same as in the AIMEAT look (0 differences). The example theme Pebble was made from chat with the MCP tools only: one style for light and dark, the faces Fraunces and DM Sans, CSS for 39 components and a few lines of theme CSS. Its pictures come first below: AIMEAT on the left of the red line, Pebble on the right, same node, data and account.',
+    // What the example theme reached on each page, and what it did not, with the reason.
+    reach: [
+      { page: 'Home', reached: 'All of it: the name and the picture, the section titles, the task tabs, the panels, the prompt card, the action links, the loud action, the notes, the settings dialog.', not: '' },
+      { page: 'Chat', reached: 'All of it: the conversation list, the messages, the tool and result cards, the notes, the text field and Send, the side column.', not: '' },
+      { page: 'Settings & Controls', reached: 'The top bar, the section titles, the labels, the loud actions, the action links, the open items, the boxes and notes drawn with the library.', not: 'The side menu, the step rows, the MCP and standalone badges and the avatar frame still use the page\'s own CSS (pf-*). Phases 5 to 7 move them to the library; then the theme reaches them.' },
+      { page: 'Admin', reached: 'The top bar, the page and section titles, the labels, the buttons, the action links, the choices.', not: 'The dark side bar (only its chosen row follows the highlight colour), the metrics grid with its rules, the health table and the other tables still use admin\'s own CSS. Phases 5 to 7.' },
+      { page: 'The app catalog', reached: 'Nothing yet.', not: 'Its screens are a separate build with their own CSS. Phase 9 (07, "Left").' },
+    ] },
 };

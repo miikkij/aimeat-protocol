@@ -31,7 +31,7 @@ import { Modal } from '/components/Modal.js';
 import { FormField } from '/components/FormField.js';
 import { TextInput } from '/components/TextInput.js';
 import { ActionRow } from '/components/ActionRow.js';
-import { StyleMarks } from './themes-bits.js';
+import { StyleMarks, useOpenAtTop } from './themes-bits.js';
 import StyleScreen from './themes-style.js';
 import ComponentsTab from './themes-components.js';
 import ThemeCssTab from './themes-css.js';
@@ -46,7 +46,7 @@ function StylesTab({ theme, readOnly, onOpen, onChange, onRename }) {
   const copy = (s) => onChange(() => apiPost(`/v1/themes/${encodeURIComponent(theme.id)}/styles`, { basedOn: s.id, name: t('themes.copyName', { name: s.name }) }));
   const retire = (s) => onChange(() => apiPut(`/v1/themes/${encodeURIComponent(theme.id)}/styles/${encodeURIComponent(s.id)}`, { retired: !s.retired }));
   return html`
-    <${Band} title=${t('themes.styles')}>
+    <${Band}>
       <${Hint}>${t('themes.stylesHint')}<//>
       ${!readOnly && html`<${ActionRow}>
         <button type="button" class="poster-slab poster-slab--control" onClick=${() => copy(theme.styles.find((s) => s.id === theme.defaultStyle) || theme.styles[0])}>${t('themes.newStyle')}</button>
@@ -56,8 +56,9 @@ function StylesTab({ theme, readOnly, onOpen, onChange, onRename }) {
         <${NamedRow} key=${s.id} label=${s.name}><div>
           <${StyleMarks} swatch=${s.swatch} name=${s.name} />
           <p class="text-meta">${[
-            // The switch below says whether the look picker offers it; the words say it only where there is no switch.
-            s.retired ? t('themes.retired') : readOnly ? (theme.offeredStyles.includes(s.id) ? t('themes.inPill') : t('themes.notInPill')) : '',
+            // The switch below says whether the look picker offers it. Without a switch (a built-in
+            // theme) only the exception is said: a style the picker leaves out.
+            s.retired ? t('themes.retired') : readOnly && !theme.offeredStyles.includes(s.id) ? t('themes.notInPill') : '',
             theme.defaultStyle === s.id ? t('themes.isDefaultStyle') : '',
             s.onlyMode === 'light' ? t('themes.factLightOnly') : s.onlyMode === 'dark' ? t('themes.factDarkOnly') : '',
             s.contrastMissing?.length ? t('themes.contrastMisses', { n: s.contrastMissing.length }) : '',
@@ -100,6 +101,7 @@ export default function ThemeScreen({ themeId, policy, vocabulary, onBack, onCop
   const [renaming, setRenaming] = useState(false);
   const [pages, setPages] = useState(/** @type {{ path?: string, draft?: any }} */ ({}));
   const [error, setError] = useState('');
+  useOpenAtTop(`${themeId}|${style || ''}`);
 
   const load = useCallback(async () => {
     try {
@@ -137,8 +139,9 @@ export default function ThemeScreen({ themeId, policy, vocabulary, onBack, onCop
       onBack=${() => { setStyle(null); load(); }} />`;
   }
   const facts = [
-    readOnly ? t('themes.builtinShort') : t('themes.own'),
-    policy.offered.includes(theme.id) ? t('themes.isAvailable') : t('themes.notAvailable'),
+    // A built-in theme says so once, in the hint under the title.
+    readOnly ? '' : t('themes.own'),
+    // Whether people can choose it is said by its switch under "Who chooses", on the first screen.
     policy.default === theme.id ? t('themes.isDefault') : '',
     theme.retired ? t('themes.retired') : '',
   ].filter(Boolean).join(' · ');

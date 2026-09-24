@@ -609,7 +609,7 @@ export async function mountRoutes(
   app.use(validateRouter(config));
   app.use(unfurlRouter(config));                        // GET /v1/unfurl(/image) — link previews
   app.use(mcpRouter(config, storage, peers));
-  app.use(siteRouter(config, storage, siteService));    // Node Portal — GET / + /v1/site/*
+  app.use(siteRouter(config, storage, siteService, provenance));    // Node Portal — GET / + /v1/site/*
 
   // Site LB sync — manual trigger endpoint + background job
   if (config.siteLbEnabled && config.siteLbOriginUrl) {

@@ -7,7 +7,8 @@
  *              the operator-authored portal template).
  * @usage Mounted in server.ts via siteRouter(config, storage).
  * @version-history
- *   v1.7.0 — 2026-09-24 — Mounts themesRouter (/v1/themes*, Themes & Styles) behind the same LB guard.
+ *   v1.7.0 — 2026-09-24 — Mounts themesRouter (/v1/themes*, Themes & Styles) behind the same LB guard,
+ *            with the config provenance (who chooses is saved like any setting).
  *   v1.6.0 — 2026-08-28 — GET /v1/site/store-tiers: the store's public price record (ext:shop /
  *            tiers), fetched by the node through safeFetch and held five minutes, because the
  *            browser's CSP cannot reach the store's origin and the front page must not wait on it.
@@ -33,6 +34,7 @@ import { injectCspNonce } from '../utils/csp-nonce.js';
 import { prefersMarkdown, sendMarkdown, htmlToMarkdown } from '../services/markdown-negotiation.js';
 import { siteLayoutRouter } from './site-layout.js';
 import { themesRouter } from './themes.js';
+import type { ConfigProvenance } from '../services/config-provenance.js';
 import { isReservedSurfaceKey } from '../services/surface-layout/keys.js';
 import { safeFetch } from '../utils/url-validator.js';
 import { logger } from '../utils/logger.js';
@@ -41,7 +43,7 @@ import { logger } from '../utils/logger.js';
 const STORE_TIERS_TTL_MS = 5 * 60 * 1000;
 let storeTiersCache: { store: string; at: number; body: { store: string | null; from: string | null; tiers: { name: string; price: string }[] } } | null = null;
 
-export function siteRouter(config: AimeatConfig, storage: Storage, siteService?: SiteService): Router {
+export function siteRouter(config: AimeatConfig, storage: Storage, siteService?: SiteService, provenance?: ConfigProvenance): Router {
     const router = Router();
     const site = siteService ?? new SiteService(config, storage);
 
@@ -59,7 +61,7 @@ export function siteRouter(config: AimeatConfig, storage: Storage, siteService?:
     // and the whole site family answers from one mount.
     router.use(siteLayoutRouter(config, storage, requireNotLb));
     // The node's themes (Themes & Styles) are the site's look: the same family, the same guard.
-    router.use(themesRouter(config, storage, requireNotLb));
+    router.use(themesRouter(config, storage, requireNotLb, provenance));
 
     // GET / — Serve the portal HTML (Markdown for Agents: Accept: text/markdown gets a
     // markdown rendering of the same portal content; browsers keep the HTML).

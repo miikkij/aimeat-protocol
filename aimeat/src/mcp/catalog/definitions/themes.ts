@@ -9,6 +9,7 @@
  * @structure themeTools
  * @usage import { themeTools } from './themes.js';
  * @version-history
+ *   v2.1.0 — 2026-09-24 — aimeat_theme_policy_set: who chooses, from chat (the settings tool only reads).
  *   v2.0.0 — 2026-09-24 — The two-level model: aimeat_theme_style_save and
  *     aimeat_theme_component_css_set; free CSS with warnings; versions and restore.
  *   v1.0.0 — 2026-09-24 — Initial (UI consolidation phase 4).
@@ -18,7 +19,7 @@ import type { AimeatToolDefinition } from './types.js';
 export const themeTools: AimeatToolDefinition[] = [
     {
         name: 'aimeat_theme_list',
-        description: "List this server's themes: the look of every page of AIMEAT's own interface (the home, the chat, Settings & Controls, admin; published apps keep their own). A theme holds styles; a style is a set of colours in light and dark, three faces and a mode (both, light only, dark only). The built-in AIMEAT theme holds the six built-in styles (aimeat, paper, circuit, contrast, mist, voltage) and is read only; copy it to make your own. For each theme you get its styles with their main colours and any contrast line they miss, which styles the pill offers and the default one, which components have CSS in it and whether that CSS is served, and its theme CSS warnings. You also get who chooses (whether people pick, which themes are available, the default theme: config rows themes.personal_choice, themes.offered and themes.default, changed with aimeat_admin_config) and what a style may set (the colour tokens, the faces this server serves, each component's usual things to change).",
+        description: "List this server's themes: the look of every page of AIMEAT's own interface (the home, the chat, Settings & Controls, admin; published apps keep their own). A theme holds styles; a style is a set of colours in light and dark, three faces and a mode (both, light only, dark only). The built-in AIMEAT theme holds the six built-in styles (aimeat, paper, circuit, contrast, mist, voltage) and is read only; copy it to make your own. For each theme you get its styles with their main colours and any contrast line they miss, which styles the pill offers and the default one, which components have CSS in it and whether that CSS is served, and its theme CSS warnings. You also get who chooses (whether people pick, which themes are available, the default theme; changed with aimeat_theme_policy_set) and what a style may set (the colour tokens, the faces this server serves, each component's usual things to change).",
         caller: 'agent',
         visibility: { publicMcp: true, connectorMcp: true, cliFallback: true },
         input: {},
@@ -34,7 +35,7 @@ export const themeTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_theme_save',
-        description: "Make or change one of this server's themes. Without `id` you make a new theme: a copy of `basedOn` (default 'aimeat') with its styles, CSS and choices. With `id` you change that theme: `name`; `css`, the theme CSS for the whole theme (any CSS: selectors, !important, @media, @keyframes; empty removes it); `defaultStyle` and `offeredStyles` (style ids of this theme, which the pill offers); `retired` true takes it out of the pill without deleting it. `restoreVersion` puts back a version from aimeat_theme_get, which is the way to undo a save. `dryRun` checks and saves nothing. Only CSS that does not parse is refused; everything else comes back as warnings with the line. The built-in theme is read only. Only the operator of this server can do this, with the site:theme-write permission. To make a theme available to people, set themes.offered with aimeat_admin_config.",
+        description: "Make or change one of this server's themes. Without `id` you make a new theme: a copy of `basedOn` (default 'aimeat') with its styles, CSS and choices. With `id` you change that theme: `name`; `css`, the theme CSS for the whole theme (any CSS: selectors, !important, @media, @keyframes; empty removes it); `defaultStyle` and `offeredStyles` (style ids of this theme, which the pill offers); `retired` true takes it out of the pill without deleting it. `restoreVersion` puts back a version from aimeat_theme_get, which is the way to undo a save. `dryRun` checks and saves nothing. Only CSS that does not parse is refused; everything else comes back as warnings with the line. The built-in theme is read only. Only the operator of this server can do this, with the site:theme-write permission. To make a theme available to people, use aimeat_theme_policy_set.",
         caller: 'agent',
         visibility: { publicMcp: true, connectorMcp: true, cliFallback: true },
         input: {
@@ -65,6 +66,17 @@ export const themeTools: AimeatToolDefinition[] = [
             onlyMode: { type: 'string', description: "'light' or 'dark' for a style with one mode; empty for both." },
             retired: { type: 'boolean', description: 'true takes the style out of the pill; false brings it back.' },
             dryRun: { type: 'boolean', description: 'Check everything and save nothing.' },
+        },
+    },
+    {
+        name: 'aimeat_theme_policy_set',
+        description: "Decide who chooses the look of this server's own pages: `personalChoice` (true: people pick a theme and a style in the look picker; false: everybody sees the default theme in its default style and there is no picker), `offered` (the theme ids people can choose; at least one, none retired) and `default` (the theme a visitor and a new person see first; one of the offered). Send only what changes. These are the Config tab's themes.* settings, saved the same way. Only the operator, with site:theme-write. aimeat_theme_list shows the current choice.",
+        caller: 'agent',
+        visibility: { publicMcp: true, connectorMcp: true, cliFallback: true },
+        input: {
+            personalChoice: { type: 'boolean', description: 'People choose in the look picker (true), or everybody sees the default (false).' },
+            offered: { type: 'array', description: "The theme ids people can choose, for example ['aimeat', 'pebble']." },
+            default: { type: 'string', description: 'The default theme: one of the offered.' },
         },
     },
     {

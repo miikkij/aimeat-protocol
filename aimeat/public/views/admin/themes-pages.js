@@ -40,7 +40,7 @@ export default function PagesTab({ theme, draft, path }) {
   useDraftSheets({ pages: draft || theme });
   const src = (mode) => pageFrame(page, { mode, key: 'pages', style });
   return html`
-    <${Band} title=${t('themes.tab.pages')}>
+    <${Band}>
       <${Hint}>${t('themes.pagesHint')}<//>
       <${Choice} label=${t('themes.whichPage')} hint=${t('themes.whichPageHint')} value=${page}
         choices=${PAGES.map(([p, key]) => ({ value: p, label: t(key) }))} onChoose=${setPage} />

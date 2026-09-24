@@ -23,6 +23,7 @@
  *     async ({ key }) => { ... }
  *   );
  * @version-history
+ *   2026-09-24 — aimeat_theme_policy_set (idempotent, nothing destroyed).
  *   2026-09-24 — aimeat_theme_style_save and aimeat_theme_component_css_set (writes, nothing destroyed).
  *   2026-09-24 — aimeat_theme_list and aimeat_theme_get (read-only), aimeat_theme_save (a write).
  *   2026-09-23 — aimeat_ui_component_list and aimeat_ui_component_get (read-only).
@@ -556,6 +557,7 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_theme_save: { title: 'Themes: make, change, copy, retire or put back a version', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     aimeat_theme_style_save: { title: 'Themes: make or change a style', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     aimeat_theme_component_css_set: { title: 'Themes: CSS for one component', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    aimeat_theme_policy_set: { title: 'Themes: who chooses, which are available, the default', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_memory_hands: { title: 'Memory: who has written here', readOnlyHint: true },
     aimeat_compliance_register_read: { title: 'Compliance: Read Register', readOnlyHint: true },
     // destructiveHint: it REPLACES the document rather than merging into it, so a partial write

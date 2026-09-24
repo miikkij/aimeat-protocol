@@ -43,6 +43,9 @@ import { lintCss, type CssWarning } from './css-lint.js';
 import { builtinStyles, prepareStyle, swatchOf, STYLE_ID_RE, type Style, type StyleInput } from './styles.js';
 import { themeSheet, componentCssState, catalogueHooks, servedFaces, type ComponentCssState } from './sheet.js';
 import type { ContrastResult } from './contrast.js';
+import type { ConfigProvenance } from '../config-provenance.js';
+import { applyConfigChanges } from '../config-apply.js';
+import { isSealed, sealRefusal } from '../config-sealing.js';
 
 export const THEME_KEY_PREFIX = 'ui.theme.';
 export const THEME_CHOICE_KEY = 'settings.theme';
@@ -418,6 +421,38 @@ export class ThemeService {
         const css = typeof draft.css === 'string' ? draft.css : null;
         const theme = { id: 'draft', name: String(draft.name || 'draft'), styles, componentCss, css };
         return { stylesheet: themeSheet(theme), warnings: this.warningsOf(theme), refused };
+    }
+
+    // ── Who chooses ──
+
+    /**
+     * The operator's choices, changed through the same code the admin Config tab saves with
+     * (services/config-apply.ts): whether people choose, which themes are available (live theme ids,
+     * at least one), and the default theme (one of them). Every id is checked before anything is written.
+     */
+    async setPolicy(input: { personalChoice?: boolean; offered?: string[]; default?: string }, provenance?: ConfigProvenance): Promise<ThemeSnapshot> {
+        const themes = await this.listAll();
+        const live = themes.filter((t) => !t.retired).map((t) => t.id);
+        const current = this.policyFrom(themes);
+        const offered = input.offered === undefined ? current.offered : input.offered;
+        if (!Array.isArray(offered) || !offered.length || offered.some((id) => typeof id !== 'string' || !live.includes(id))) {
+            throw new ThemeError('INVALID_POLICY', `offered: one or more themes that are not retired (${live.join(', ')})`, 422);
+        }
+        const def = input.default === undefined ? (offered.includes(current.default) ? current.default : offered[0]) : input.default;
+        if (!offered.includes(def)) throw new ThemeError('INVALID_POLICY', `default: one of the available themes (${offered.join(', ')})`, 422);
+        if (input.personalChoice !== undefined && typeof input.personalChoice !== 'boolean') throw new ThemeError('INVALID_POLICY', 'personalChoice: true or false', 422);
+        const changes = [
+            ...(input.personalChoice !== undefined ? [{ path: 'themes.personal_choice', value: input.personalChoice }] : []),
+            // Only the AIMEAT theme available is written as empty, the node's own default.
+            { path: 'themes.offered', value: offered.length === 1 && offered[0] === BUILTIN_THEME ? '' : [...new Set(offered)].join(',') },
+            { path: 'themes.default', value: def },
+        ];
+        const sealed = changes.map((c) => c.path).filter((p) => isSealed(this.config, p));
+        if (sealed.length) throw new ThemeError('SEALED_CONFIG', sealRefusal(sealed[0]).message, 403);
+        const { errors } = await applyConfigChanges({ config: this.config, storage: this.storage, provenance }, changes);
+        if (errors.length) throw new ThemeError('NOT_SAVED', errors.map((e) => `${e.path}: ${e.reason}`).join('; '), 500);
+        emitChange('config');
+        return this.offered();
     }
 
     // ── A person's choice ──

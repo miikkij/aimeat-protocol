@@ -753,7 +753,7 @@
     // is exactly what it did before these settings existed. Awaiting it would put a network round
     // trip in front of every date on the screen.
     import { loadDisplayPrefs } from '/js/display-prefs.js';
-    import { initThemeSystem } from '/js/theme.js';
+    import { initThemeSystem, setTheme } from '/js/theme.js';
     import { siteLink } from '/js/site.js';
     import { loadMarginPattern } from '/js/margin-pattern.js';
     import { loadThemeChoice, watchThemeChoice } from '/js/theme-choice.js';
@@ -1126,6 +1126,45 @@
       return order;
     }
 
+    /**
+     * The look on a phone. At 640px and below the header hides the pill's language, light/dark and
+     * look controls (top-bar.css), so the menu carries them: light or dark, the available themes and
+     * the styles of the one worn, as buttons in the language switch's own group. AIMEAT's own pages
+     * only: the public pages keep behaving as before (Jouni, 2026-09-24).
+     */
+    function LookMenu({ t }) {
+      const [, redraw] = useState(0);
+      useEffect(() => {
+        const again = () => redraw((n) => n + 1);
+        window.addEventListener('aimeat-look-change', again);
+        window.addEventListener('aimeat-theme-change', again);
+        return () => { window.removeEventListener('aimeat-look-change', again); window.removeEventListener('aimeat-theme-change', again); };
+      }, []);
+      const L = window.__aimeatLook;
+      const s = L?.state();
+      if (!s || !s.inner) return null;
+      const mode = document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
+      const theme = s.themes.find((x) => x.id === s.theme) || s.themes[0];
+      return html`
+        <div class="topnav-center topnav-look" role="group" aria-label=${t('nav.lookMode')}>
+          ${['light', 'dark'].map((m) => html`<button key=${m} class="lang-btn ${mode === m ? 'active' : ''}" disabled=${!!s.only}
+            onClick=${() => setTheme(m)}>${m === 'light' ? t('nav.lookLight') : t('nav.lookDark')}</button>`)}
+        </div>
+        ${s.only && html`<p class="topnav-look-note">${s.only === 'light' ? t('nav.lookLightOnly') : t('nav.lookDarkOnly')}</p>`}
+        ${s.personalChoice && s.themes.length > 1 && html`
+          <p class="topnav-look-note" aria-hidden="true">${t('nav.lookThemes')}</p>
+          <div class="topnav-center topnav-look" role="group" aria-label=${t('nav.lookThemes')}>
+            ${s.themes.map((x) => html`<button key=${x.id} class="lang-btn ${x.id === s.theme ? 'active' : ''}"
+              onClick=${() => L.choose(x.id, null)}>${x.name}</button>`)}
+          </div>`}
+        ${s.personalChoice && theme && theme.styles.length > 1 && html`
+          <p class="topnav-look-note" aria-hidden="true">${t('nav.lookStyles')}</p>
+          <div class="topnav-center topnav-look" role="group" aria-label=${t('nav.lookStyles')}>
+            ${theme.styles.map((x) => html`<button key=${x.id} class="lang-btn ${x.id === s.style ? 'active' : ''}"
+              onClick=${() => L.choose(theme.id, x.id)}>${x.name}</button>`)}
+          </div>`}`;
+    }
+
     function Header({ navigate, locale }) {
       // The session comes from the ONE session source (/js/services/auth.js via useSession), not a
       // private copy synced by a hand-fired window event. That private copy is what kept the
@@ -1284,6 +1323,7 @@
                     onClick=${() => handleLangSwitch(l)}>${l.toUpperCase()}</button>
                 `)}
               </div>
+              <${LookMenu} t=${t} />
             </div>
             ${session && html`<${OpenItemsButton} t=${t} onNavigate=${(p) => navigate(p)} />`}
             ${session && html`<${NotificationBell} t=${t} onNavigate=${(p) => navigate(p)} />`}

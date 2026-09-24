@@ -34,9 +34,10 @@ import { ErrorNote } from '/components/ErrorNote.js';
 import { PageIntro } from '/components/PageIntro.js';
 import { BackLink } from '/components/BackLink.js';
 import { SearchBar } from '/components/SearchBar.js';
+import { Collapsible } from '/components/Collapsible.js';
 import { ConfirmDialog } from '/components/Modal.js';
 import { Specimens, Specimen } from '/components/Specimen.js';
-import { Choice, StylePicker, ModePicker, CssEditor, WarningList, tokenKey } from './themes-bits.js';
+import { Choice, StylePicker, ModePicker, CssEditor, WarningList, tokenKey, useOpenAtTop } from './themes-bits.js';
 import { useDraftSheets, useFrameChecks, newFindings, componentFrame } from './themes-draft.js';
 
 const html = htm.bind(h);
@@ -77,6 +78,7 @@ function ComponentGrid({ theme, components, onOpen, onRemove, readOnly }) {
   const [use, setUse] = useState('');
   const [page, setPage] = useState('');
   const [which, setWhich] = useState('all');
+  const [filters, setFilters] = useState(false);
   const [q, setQ] = useState('');
   useDraftSheets({ grid: theme });
 
@@ -93,16 +95,18 @@ function ComponentGrid({ theme, components, onOpen, onRemove, readOnly }) {
   const gone = Object.keys(theme.componentCss || {}).filter((id) => !known.has(id));
 
   return html`
-    <${Band} title=${t('themes.tab.components')}>
+    <${Band}>
       <${Hint}>${t('themes.componentsHint')}<//>
       <${StylePicker} theme=${{ ...theme, styles: live }} value=${style} onChoose=${setStyle} />
       <${ModePicker} value=${mode} onChoose=${setMode} />
-      <${Choice} label=${t('themes.filterUse')} hint=${t('themes.filterUseHint')} value=${use}
-        choices=${[{ value: '', label: t('themes.all') }, ...uses.map((u) => ({ value: u, label: t('themes.use.' + u) }))]} onChoose=${setUse} />
-      <${Choice} label=${t('themes.filterPage')} hint=${t('themes.filterPageHint')} value=${page}
-        choices=${[{ value: '', label: t('themes.all') }, ...INNER.map(([p, key]) => ({ value: p, label: t(key) }))]} onChoose=${setPage} />
-      <${Choice} label=${t('themes.filterCss')} value=${which}
-        choices=${[{ value: 'all', label: t('themes.all') }, { value: 'css', label: t('themes.withCssHere') }]} onChoose=${setWhich} />
+      <${Collapsible} title=${t('themes.filters')} open=${filters} onToggle=${() => setFilters(!filters)}>
+        <${Choice} label=${t('themes.filterCss')} value=${which}
+          choices=${[{ value: 'all', label: t('themes.all') }, { value: 'css', label: t('themes.withCssHere') }]} onChoose=${setWhich} />
+        <${Choice} label=${t('themes.filterPage')} hint=${t('themes.filterPageHint')} value=${page}
+          choices=${[{ value: '', label: t('themes.all') }, ...INNER.map(([p, key]) => ({ value: p, label: t(key) }))]} onChoose=${setPage} />
+        <${Choice} label=${t('themes.filterUse')} hint=${t('themes.filterUseHint')} value=${use}
+          choices=${[{ value: '', label: t('themes.all') }, ...uses.map((u) => ({ value: u, label: t('themes.use.' + u) }))]} onChoose=${setUse} />
+      <//>
       <${SearchBar} value=${q} onInput=${(e) => setQ(e.target.value)} placeholder=${t('themes.findComponent')} ariaLabel=${t('themes.findComponent')} />
       <p class="text-meta">${t('themes.shownCount', { n: shown.length, total: components.length })}</p>
     <//>
@@ -117,7 +121,7 @@ function ComponentGrid({ theme, components, onOpen, onRemove, readOnly }) {
       ${shown.map((c) => {
         const st = theme.componentCssState?.[c.id];
         return html`<${Specimen} key=${c.id + style + mode} label=${spaced(c.name)} src=${componentFrame({ id: c.id, mode, key: 'grid', style })}
-          note=${html`${cssStateText(st)}${st && st.status === 'stale' ? ` · ${t('themes.staleWhy')}` : ''}
+          note=${html`${cssStateText(st)}
             <br /><button type="button" class="poster-action" onClick=${() => onOpen(c.id, style)}>${readOnly ? t('themes.open') : hasCss(c) ? t('themes.changeCss') : t('themes.styleIt')}</button>`} />`;
       })}
     <//>`;
@@ -133,6 +137,7 @@ function ComponentEditor({ theme, componentId, initialStyle, readOnly, onBack, o
   const [state, setState] = useState({ busy: false, error: '', saved: false });
   const [removing, setRemoving] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  useOpenAtTop(componentId);
 
   useEffect(() => {
     apiGet(`/v1/ui/components/${encodeURIComponent(componentId)}`).then((r) => setEntry(r.data)).catch((e) => setError(e.message || String(e)));
@@ -180,6 +185,8 @@ function ComponentEditor({ theme, componentId, initialStyle, readOnly, onBack, o
       .map((tk) => ({ label: t(tokenKey(tk)), code: `var(${tk})` }));
   // What the frames found hidden or out of reach because of this CSS: named before it is saved (Q2: warn, never refuse).
   const hidden = [...new Set(findings.filter((f) => f.code === 'hidden' || f.code === 'covered').map((f) => f.what))];
+  // The frames draw this component only, so a rule that reaches past it is said in words as well.
+  const reaches = (cssState?.warnings || []).some((w) => w.code === 'outside');
   const pages = innerPagesOf(entry || {});
   const elsewhere = (entry?.pages || []).filter((f) => !pagePath(f)).length;
   const back = html`<${BackLink} href="#" onClick=${(e) => { e.preventDefault(); onBack(); }}>↩ ${t('themes.allComponents')}<//>`;
@@ -211,20 +218,20 @@ function ComponentEditor({ theme, componentId, initialStyle, readOnly, onBack, o
         <${ActionRow}>
           <button type="button" class="poster-action" disabled=${css === saved} onClick=${() => setCss(saved)}>${t('themes.undo')}</button>
           ${saved && html`<button type="button" class="poster-action" onClick=${() => setRemoving(true)}>${t('themes.removeCss')}</button>`}
-          <button type="button" class="poster-slab poster-slab--control" disabled=${state.busy || css === saved || !!broken} onClick=${() => (hidden.length ? setConfirming(true) : save(css))}>${t('themes.save')}</button>
+          <button type="button" class="poster-slab poster-slab--control" disabled=${state.busy || css === saved || !!broken} onClick=${() => (hidden.length || reaches ? setConfirming(true) : save(css))}>${t('themes.save')}</button>
           ${state.saved && html`<span class="text-meta">${t('themes.saved')}</span>`}
         <//>`}
     <//>
 
     <${Band} title=${t('themes.whereItShows')} tight=${true}>
       ${pages.length === 0 && html`<${QuietNote}>${t('themes.noPage')}<//>`}
-      ${pages.map((p) => html`<${NamedRow} key=${p} label=${innerName(p)}>
-        <button type="button" class="poster-action" onClick=${() => onOpenPage(p, drafts.with)}>${t('themes.seeOnPage', { page: innerName(p) })}</button>
-      <//>`)}
+      ${pages.length > 0 && html`<${ActionRow}>
+        ${pages.map((p) => html`<button key=${p} type="button" class="poster-action" onClick=${() => onOpenPage(p, drafts.with)}>${t('themes.seeOnPage', { page: innerName(p) })}</button>`)}
+      <//>`}
       ${elsewhere > 0 && html`<${Hint}>${t('themes.alsoPublic', { n: elsewhere })}<//>`}
     <//>
     ${confirming && html`<${ConfirmDialog} open=${true} onClose=${() => setConfirming(false)} danger=${true}
-      title=${t('themes.saveAnyway')} message=${t('themes.hidesConfirm', { list: hidden.join(', ') })}
+      title=${t('themes.saveAnyway')} message=${[reaches ? t('themes.reachesAll') : '', hidden.length ? t('themes.hidesConfirm', { list: hidden.join(', ') }) : t('themes.saveAnyway') + '?'].filter(Boolean).join(' ')}
       confirmLabel=${t('themes.saveAnyway')} cancelLabel=${t('themes.cancel')}
       onConfirm=${() => { setConfirming(false); save(css); }} />`}
     ${removing && html`<${ConfirmDialog} open=${true} onClose=${() => setRemoving(false)} danger=${true}

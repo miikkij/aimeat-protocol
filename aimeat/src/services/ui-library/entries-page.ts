@@ -265,7 +265,7 @@ export const PAGE_ENTRIES: UiEntryWritten[] = [
         id: 'settings-switch', name: 'SettingsSwitch', kind: 'component', status: 'active',
         summary: 'A setting that is on or off: a checkbox and its words.',
         module: '/components/SettingsSwitch.js', sheet: '/css/components/settings-switch.css',
-        data: { shape: 'SettingsSwitch({ checked, onChange, children })', fields: { checked: 'on', onChange: 'flip', children: 'what it turns on' } },
+        data: { shape: 'SettingsSwitch({ checked, onChange, disabled, children })', fields: { checked: 'on', onChange: 'flip', disabled: 'it cannot change now', children: 'what it turns on' } },
         useFor: ['One on-or-off choice in a settings dialog.'],
         variants: [],
         example: { checked: true, children: 'Show what I have tried' },

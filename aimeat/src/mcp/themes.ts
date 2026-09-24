@@ -14,6 +14,7 @@
  * @structure registerThemeTools(mcp, storage, config, getAgentGaii)
  * @usage registerThemeTools(mcp, storage, config, agentGaii);
  * @version-history
+ *   v2.1.0 — 2026-09-24 — aimeat_theme_policy_set: who chooses, which themes are available, the default.
  *   v2.0.0 — 2026-09-24 — The two-level model of 07: styles and component CSS have their own tools;
  *     theme CSS is free and answered with warnings; restoreVersion.
  *   v1.0.0 — 2026-09-24 — Initial (UI consolidation phase 4).
@@ -139,6 +140,24 @@ export function registerThemeTools(mcp: McpServer, storage: Storage, config: Aim
             try {
                 const r = await svc.saveStyle(args.theme, args.style ?? null, input, gaii, !!args.dryRun);
                 return out({ ok: true, saved: !args.dryRun, style: r.style, contrast: r.warnings.contrast[r.style.id] ?? [] });
+            } catch (err) { return refusal(err); }
+        },
+    );
+
+    mcp.tool(
+        'aimeat_theme_policy_set',
+        descriptionFor('aimeat_theme_policy_set'),
+        {
+            personalChoice: z.boolean().optional().describe('People choose in the look picker (true), or everybody sees the default (false).'),
+            offered: z.array(z.string().max(40)).min(1).max(40).optional().describe("The theme ids people can choose, for example ['aimeat', 'pebble']."),
+            default: z.string().max(40).optional().describe('The default theme: one of the offered.'),
+        },
+        annotationsFor('aimeat_theme_policy_set'),
+        async (args) => {
+            if (!await operatorGaii()) return toolError('ACCESS_DENIED', NOT_OPERATOR);
+            try {
+                const snap = await svc.setPolicy({ personalChoice: args.personalChoice, offered: args.offered, default: args.default });
+                return out({ ok: true, saved: true, policy: snap.policy, themes: snap.themes.map((t) => ({ id: t.id, name: t.name, styles: t.styles.map((s) => s.id) })) });
             } catch (err) { return refusal(err); }
         },
     );

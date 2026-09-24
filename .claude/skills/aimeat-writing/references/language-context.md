@@ -87,10 +87,10 @@ everywhere at once, and say so in the Changes section.
 | sign-in from elsewhere | another AIMEAT vouching that a sign-in is really them | federation | federaatio | federación |
 | the account holder | the human who owns everything here | owner | omistaja | propietario |
 | this product's settings area | where a person changes their own things | Settings & Controls | Asetukset ja hallinta | Configuración y controles |
-| one piece of this AIMEAT's own screens | a component or a shape of the interface library, as the design lab lists it; never an app | part | osa | parte |
-| a part no page draws today | kept until the developer says keep or delete | unused | käyttämätön | sin uso |
-| the values a theme sets | colours, faces and sizes that a part reads from the theme | theme tokens | teeman arvot | valores del tema |
-| the admin view that shows the parts | its name, on the Design group of the admin pages | aimeat-design-lab | aimeat-design-lab | aimeat-design-lab |
+| one piece of this AIMEAT's own screens | an entry of the interface library (one with a module, or a shape of the design language), as the design lab and Themes & Styles list it; never an app | component | komponentti | componente |
+| a component no page draws today | kept until the developer says keep or delete | unused | käyttämätön | sin uso |
+| the values a theme sets | colours, faces and sizes that a component reads from the theme | theme tokens | teeman arvot | valores del tema |
+| the admin view that shows the components | its name, on the Design group of the admin pages | aimeat-design-lab | aimeat-design-lab | aimeat-design-lab |
 | the whole look of this AIMEAT's own pages | its styles, the CSS the operator gave single components and the whole of it; the operator makes it, people pick it when it is offered; never an app's look | theme | teema | tema |
 | one look inside a theme | a set of colours in light and dark, three faces and its mode; Paper is a style of the AIMEAT theme | style | tyyli | estilo |
 | the operator's CSS for one component, in one theme | served only in that theme and only to that component | component CSS | komponentin CSS | CSS del componente |
@@ -264,6 +264,9 @@ service, the directory, the token, the identifier and the username: the test nam
   picker, with the Themes & Styles admin view. The first six are the words of its spec
   (07-themes-and-styles.md) and of the developer's own sentences (*teema*, *tyyli*, *Teemat ja
   tyylit*); *Temas y estilos* is his ruling of 2026-09-24. *Look picker* names what the spec calls
-  the pill, because *pill* says nothing to a reader who has not built one. Open: this view and its
-  spec say *component* (*komponentti*) for a catalogue entry, which the row *part* above calls
-  *osa*; the developer decides which one both views use.
+  the pill, because *pill* says nothing to a reader who has not built one.
+- **2026-09-24, same day** — *part* / *osa* / *parte* became *component* / *komponentti* /
+  *componente* for an entry of the interface library, in every row above and on every screen that
+  names one (the design lab, Themes & Styles, the MCP tool texts). Ruled by the developer: "the word
+  is "component" / "komponentti" everywhere, the lab and the language context too". *Part* stays
+  the ordinary word for other things (a block of a page layout, the contents of a package).

@@ -26448,12 +26448,12 @@ paths:
   /v1/ui/components:
     get:
       operationId: listUiComponents
-      summary: The parts this node's own interface is built from
+      summary: The components this node's own interface is built from
       description: >-
-        The component catalogue of this node's own web interface. Each row is a component (a module
-        in /components/ with its own stylesheet in /css/components/) or a shape of the design
-        language (a class in /css/poster.css), with its data shape and the pages that draw it.
-        `unused` marks a part whose sheet no page draws today. PUBLIC and read-only: it describes
+        The component catalogue of this node's own web interface. Each row is a component: one with
+        a module (in /components/ with its own stylesheet in /css/components/) or a shape of the
+        design language (a class in /css/poster.css), with its data shape and the pages that draw it.
+        `unused` marks a component whose sheet no page draws today. PUBLIC and read-only: it describes
         code the node ships to every browser. The same catalogue answers aimeat_ui_component_list.
       tags: [Bootstrap]
       security: []
@@ -26503,7 +26503,7 @@ paths:
   /v1/ui/components/{id}:
     get:
       operationId: getUiComponent
-      summary: One part of this node's own interface, whole
+      summary: One component of this node's own interface, whole
       description: >-
         One catalogue entry: its data shape and fields, when to use it, its variants and the class
         or prop that selects each, one example data set, the theme tokens its stylesheet reads, the
@@ -37002,6 +37002,47 @@ paths:
           description: FIXED, the operator decides the look for everybody
         '422':
           description: NOT_OFFERED
+
+  /v1/themes/policy:
+    put:
+      operationId: setThemePolicy
+      summary: Who chooses the look, which themes are available, and the default
+      description: |
+        Operator only (requireOperatorPrincipal with site:theme-write). `personalChoice` (people
+        pick in the look picker, or everybody sees the default theme in its default style),
+        `offered` (theme ids people can choose; at least one, none retired) and `default` (one of
+        the offered). Send only what changes. Saved as the Config tab saves the same settings
+        (themes.personal_choice, themes.offered, themes.default); every id is checked first.
+      tags: [Site]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                personalChoice: { type: boolean }
+                offered: { type: array, items: { type: string } }
+                default: { type: string }
+      responses:
+        '200':
+          description: What the look picker offers now
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data: { type: object, additionalProperties: true }
+        '403':
+          description: Not the node operator, the principal does not carry `site:theme-write`, or SEALED_CONFIG
+        '409':
+          description: This copy only mirrors the main site (load-balancer mode)
+        '422':
+          description: INVALID_POLICY (an id that is not an available theme)
 
   /v1/themes/preview:
     post:

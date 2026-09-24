@@ -13267,7 +13267,14 @@
     "business": "For your business",
     "learn": "Learn",
     "exchange": "EXCHANGE",
-    "members": "Members"
+    "members": "Members",
+    "lookMode": "Light or dark",
+    "lookLight": "Light",
+    "lookDark": "Dark",
+    "lookLightOnly": "This style has a light mode only.",
+    "lookDarkOnly": "This style has a dark mode only.",
+    "lookThemes": "Themes",
+    "lookStyles": "Styles in this theme"
   },
   "nav.chat": "Chat",
   "nav.glossary": "Glossary",
@@ -19889,18 +19896,18 @@
     "doorSignIn": "I already have one, sign me in →"
   },
   "designLab": {
-    "intro": "Every part of this AIMEAT's own interface, drawn live by its real component with its example data. Open a part to see every variant in light and dark, at a phone width, and what it is for.",
-    "filterLabel": "Which parts",
+    "intro": "Every component of this AIMEAT's own interface, drawn live with its example data. Open a component to see every variant in light and dark, at a phone width, and what it is for.",
+    "filterLabel": "Which components",
     "filter": {
       "all": "All",
       "component": "Components",
       "shape": "Shapes",
       "unused": "Unused"
     },
-    "find": "Find a part",
-    "none": "No part matches.",
+    "find": "Find a component",
+    "none": "No component matches.",
     "unused": "unused",
-    "back": "All parts",
+    "back": "All components",
     "light": "Light",
     "dark": "Dark",
     "phone": "On a phone",
@@ -19912,7 +19919,7 @@
     "noPages": "no page draws it",
     "tokens": "Theme tokens",
     "code": "Code",
-    "noDemo": "No demo for this part.",
+    "noDemo": "No demo for this component.",
     "modeLabel": "What the lab shows",
     "modeLibrary": "The library",
     "modeDecisions": "The decisions",
@@ -20014,11 +20021,11 @@
     "lookTheme": "Theme",
     "lookThemeHint": "Every theme of this server, also the ones people cannot choose.",
     "lookStyle": "Style",
-    "lookStyleHint": "Every style of the theme. The parts below show it.",
+    "lookStyleHint": "Every style of the theme. The components below show it.",
     "builtWithout": "Built without a decision: {title}"
   },
   "themes": {
-    "intro": "The looks of this AIMEAT's own pages (the home, the chat, Settings & Controls, admin). A theme holds styles; a style has its colours in light and dark. People choose in the look picker at the top of the page. While this view is open it shows the built-in look, so a theme cannot break it.",
+    "intro": "The looks of this AIMEAT's own pages (the home, the chat, Settings & Controls, admin). A theme holds styles; a style has its colours in light and dark. People choose in the look picker at the top of the page, and on a phone in the menu. While this view is open it shows the built-in look, so a theme cannot break it.",
     "loading": "Loading…",
     "themes": "Themes",
     "newTheme": "New theme",
@@ -20057,7 +20064,7 @@
     "undo": "Undo the changes",
     "allThemes": "All themes",
     "builtinHint": "This is built in and read only. Copy it to change it.",
-    "copyToChange": "Copy it to change it",
+    "copyToChange": "Make a copy",
     "tab": {
       "styles": "Styles",
       "components": "Components",
@@ -20065,7 +20072,7 @@
       "pages": "On real pages"
     },
     "styles": "Styles",
-    "stylesHint": "A style is one set of colours in light and dark, three fonts and its mode. People choose among the styles you offer.",
+    "stylesHint": "A style is one set of colours in light and dark, three fonts, and whether it has both modes or only one. People choose among the styles you offer.",
     "newStyle": "New style",
     "inPill": "in the look picker",
     "notInPill": "not in the look picker",
@@ -20098,7 +20105,7 @@
     "phone": "On a phone",
     "details": "Details: the names in the code",
     "faces": "Fonts",
-    "facesHint": "Only the fonts this server serves.",
+    "facesHint": "Only the fonts this server serves. The preview at the top of this page shows the fonts you choose.",
     "faceAsBuilt": "As in the built-in style",
     "face": {
       "headline": "Headlines",
@@ -20152,9 +20159,9 @@
       "controlBorder": "The edge of a control",
       "codeBg": "The ground of code",
       "scrollbarThumb": "The scrollbar",
-      "morselBg": "The morsel badge",
+      "morselBg": "The count badge in the top bar (♥ 1000)",
       "pfHeroGradient": "The top of Settings & Controls",
-      "pfCtaGradient": "A call-to-action panel",
+      "pfCtaGradient": "A panel that asks you to do something",
       "pfCalloutGradient": "A callout",
       "sun": "Highlight: the shadow of dark panels, the chosen tab, the edge of a section",
       "onSun": "Words on the highlight"
@@ -20175,11 +20182,10 @@
       "none": "No CSS of its own in this theme",
       "empty": "No CSS of its own in this theme",
       "served": "Has CSS in this theme",
-      "stale": "Its CSS is not used now",
+      "stale": "Its CSS is not used: no rule in it starts from this component's classes",
       "broken": "Its CSS does not parse, so it is not used",
       "removed": "Component removed"
     },
-    "staleWhy": "none of its rules starts from the component's classes any more",
     "removedWhy": "This component is no longer on the pages. Its CSS is kept and not used.",
     "deleteCss": "Delete its CSS",
     "allComponents": "All components",
@@ -20206,7 +20212,7 @@
       "motion": "{property} moves things for people who asked their device for less motion. Put it inside @media (prefers-reduced-motion: no-preference).",
       "literalColour": "{property} names a colour directly, so it looks the same in every style, in light and in dark. A value of the style, such as var(--accent), follows the style.",
       "face": "This face is not one this server serves, so the browser uses another one.",
-      "outside": "This rule does not start from the component's classes, so it also changes other things on the page.",
+      "outside": "This rule does not start from the component's classes, so it can change anything on every page of this theme.",
       "loads": "This loads a file. The content policy of this server decides whether the browser may load it."
     },
     "check": {
@@ -20238,24 +20244,24 @@
       "fleet": "Agents"
     },
     "use": {
-      "view": "view",
-      "edit": "edit",
-      "list": "list",
-      "pick": "pick",
-      "compare": "compare",
-      "status": "status",
-      "navigate": "navigate",
-      "converse": "converse",
-      "act": "act",
-      "copy": "copy",
-      "explain": "explain",
-      "count": "count",
-      "search": "search",
-      "notify": "notify",
-      "wait": "wait",
-      "layout": "layout",
-      "open": "open",
-      "confirm": "confirm"
+      "view": "Showing things",
+      "edit": "Editing",
+      "list": "Lists",
+      "pick": "Choosing",
+      "compare": "Comparing",
+      "status": "Status",
+      "navigate": "Moving around",
+      "converse": "Conversation",
+      "act": "Actions",
+      "copy": "Copying",
+      "explain": "Explaining",
+      "count": "Numbers",
+      "search": "Search",
+      "notify": "Notices",
+      "wait": "Waiting",
+      "layout": "Page layout",
+      "open": "Opening",
+      "confirm": "Confirming"
     },
     "factLightOnly": "light only",
     "factDarkOnly": "dark only",
@@ -20273,6 +20279,10 @@
     "hidesConfirm": "With this CSS the frames cannot see or reach: {list}. People may not be able to use them. Save anyway?",
     "renameTheme": "Rename the theme…",
     "lastTheme": "At least one theme stays available: switch another one on before you switch this one off.",
-    "noCss": "No CSS."
+    "noCss": "No CSS.",
+    "filters": "Filters",
+    "reachesAll": "Some of its rules do not start from the component's classes, so they can change every page of this theme.",
+    "findInFrames": "Find a component to show",
+    "accentOthers": "The lighter, deeper and faint shades of the accent do not follow it. Set them under \"Every other colour\"."
   }
 }

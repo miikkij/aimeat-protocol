@@ -32,6 +32,7 @@
  *   ProposalPart · OptionPart · DetailsPart · Answer · useChoice · answersOf
  * @usage Mounted by views/admin/design-lab-tab.js (the Decisions switch).
  * @version-history
+ *   v4.3.0 — 2026-09-24 — A built entry's `reach`: per page, what it reached and what it did not.
  *   v4.2.0 — 2026-09-24 — Built work without a decision (Themes & Styles) under the summary.
  *   v4.1.0 — 2026-09-24 — "Built": what each built decision changed, its commit, its numbers and its
  *     before/after pictures, and the yes for a result not yet on main.
@@ -245,6 +246,11 @@ function BuiltPart({ decision, built, pictures }) {
       <//>
       ${built.sets.map((s) => html`<${NamedRow} key=${s.name} label=${s.name}>${setLine(s)}<//>`)}
       ${built.note && html`<p>${built.note}</p>`}
+      ${built.reach?.length > 0 && html`
+        <p><strong>${tr('designLab.builtReach', 'What the example theme reaches, page by page')}</strong></p>
+        ${built.reach.map((r) => html`<${NamedRow} key=${r.page} label=${r.page}>
+          ${r.reached}${r.not && html`<br /><span class="text-meta">${tr('designLab.builtNotReached', 'Not reached:')} ${r.not}</span>`}
+        <//>`)}`}
       ${!built.onMain && html`
         <${ActionRow}>
           <${FoldButton} on=${answered} onClick=${() => save(answered ? null : 'yes').catch((e) => swallowed('design-lab: built yes save', e))}>

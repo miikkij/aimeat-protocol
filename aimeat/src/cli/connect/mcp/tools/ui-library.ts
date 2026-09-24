@@ -35,7 +35,7 @@ export function registerUiLibraryTools(mcp: McpServer, registry: AgentRegistry):
   });
 
   mcp.tool('aimeat_ui_component_get', descriptionFor('aimeat_ui_component_get'), {
-    id: z.string().min(1).max(80).describe("The part's id or name, from aimeat_ui_component_list."),
+    id: z.string().min(1).max(80).describe("The component's id or name, from aimeat_ui_component_list."),
   }, annotationsFor('aimeat_ui_component_get'), async ({ id }) => {
     return out(await client.get(`/v1/ui/components/${encodeURIComponent(id)}`));
   });

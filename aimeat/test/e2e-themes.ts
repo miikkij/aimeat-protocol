@@ -236,6 +236,19 @@ await test('The operator makes the theme available; the page shell carries it be
     assert(shell.includes('window.__AIMEAT_THEMES=') && shell.includes(`"id":"${themeId}"`), 'the shell carries the snapshot');
 });
 
+await test('PUT /v1/themes/policy — who chooses, checked: an owner → 403, a wrong id → 422, the operator → saved', async () => {
+    const mine = await json('/v1/themes/policy', member(put({ offered: ['aimeat'] })));
+    assert(mine.status === 403, `member: ${mine.status}`);
+    const bad = await json('/v1/themes/policy', op(put({ offered: ['aimeat', 'no-such-theme'] })));
+    assert(bad.status === 422 && bad.body.error?.code === 'INVALID_POLICY', `bad: ${bad.status} ${bad.body.error?.code}`);
+    const off = await json('/v1/themes/policy', op(put({ offered: [themeId], default: 'aimeat' })));
+    assert(off.status === 422, `a default that is not offered: ${off.status}`);
+    const ok = await json('/v1/themes/policy', op(put({ offered: ['aimeat', themeId], default: themeId })));
+    assert(ok.status === 200 && ok.body.data.policy.default === themeId, `ok: ${ok.status} ${JSON.stringify(ok.body.data?.policy)}`);
+    const cfg = await json('/v1/admin/config', op());
+    assert(JSON.stringify(cfg.body).includes(`aimeat,${themeId}`), 'saved as the Config tab saves it');
+});
+
 await test('The component catalogue names the theme that styles the part', async () => {
     const { body } = await json('/v1/ui/components/slab');
     assert(body.data.themes.some((x: any) => x.theme === themeId), JSON.stringify(body.data.themes));
