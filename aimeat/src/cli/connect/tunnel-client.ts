@@ -30,6 +30,7 @@
  *   if (outcome === 'online') { const { status, body } = await client.forward('GET', '/v1/memory'); }
  *   await client.close();
  * @version-history
+ *   v1.10.0 -- 2026-09-24 -- Counts what the socket carries (./tunnel-traffic.ts), for `aimeat connect tui`.
  *   v1.9.2 -- 2026-09-06 -- The socket's OWN identity reconnects only when a reconnect would produce a
  *     DIFFERENT credential. An agent on a stored bearer gets the same string back, so bouncing the
  *     tunnel bought nothing and cost every call that followed; it now says out loud that an ADDED
@@ -86,6 +87,7 @@ import { randomUUID } from 'node:crypto';
 import { logger } from '../../utils/logger.js';
 import { getInstallId } from './install-id.js';
 import { onScopesChanged } from './tunnel-scopes-changed.js';
+import { TunnelTraffic, type TrafficSnapshot } from './tunnel-traffic.js';
 
 import type {
   ConnectTunnelClientOptions, ForwardOptions, ForwardResult, PendingForward,
@@ -141,6 +143,7 @@ export class ConnectTunnelClient {
   private tokenExpiresAt: number | null = null; // epoch seconds
   private serverConfig: Record<string, unknown> | null = null;
   private authFailed = false;
+  private readonly traffic = new TunnelTraffic();
 
   constructor(options: ConnectTunnelClientOptions) {
     this.opts = {
@@ -158,6 +161,8 @@ export class ConnectTunnelClient {
   getStatus(): TunnelStatus { return this.status; }
   isOnline(): boolean { return this.status === 'online'; }
   getConnectCount(): number { return this.connectCount; }
+  /** Bytes, frames and forwarded calls this client's sockets have carried. For /local/stats. */
+  getTraffic(): TrafficSnapshot { return this.traffic.snapshot(); }
   getTokenExpiresAt(): number | null { return this.tokenExpiresAt; }
   getServerConfig(): Record<string, unknown> | null { return this.serverConfig; }
 
@@ -271,7 +276,9 @@ export class ConnectTunnelClient {
     // `agent` names WHOSE call this is. Omitted for the socket's own identity, which is every call
     // a single-agent client makes and every call against a node that does not multiplex.
     const frame: TunnelFrame = { type: 'request', id, agent, method, path, query: opts.query, headers: opts.headers, body: opts.body };
-    return new Promise<ForwardResult>((resolve) => {
+    const done = this.traffic.startForward();
+    return new Promise<ForwardResult>((answer) => {
+      const resolve = (r: ForwardResult) => { done(r.status); answer(r); };
       // Small grace over the server timeout so the server's own synthetic 504
       // (same id) normally wins; this local timer is the dead-socket fallback.
       const grace = Math.min(5_000, this.opts.requestTimeoutMs);
@@ -421,6 +428,7 @@ export class ConnectTunnelClient {
       }
       this.ws = ws;
       this.welcomed = false;
+      ws.on('upgrade', (res) => this.traffic.attachSocket(res.socket));
 
       // Upgrade rejected with an HTTP status (server reachable, tunnel said no).
       ws.on('unexpected-response', (_req, res) => {
@@ -437,6 +445,7 @@ export class ConnectTunnelClient {
       });
 
       ws.on('message', (data) => {
+        this.traffic.frameIn();
         let frame: TunnelFrame;
         try { frame = JSON.parse(data.toString()); } catch { return; }
         if (frame.type === 'welcome' && !this.welcomed) {

@@ -13,6 +13,8 @@
  * @usage
  *   const ch = new AgentChannel(entry); ch.handleTask(payload, 'deliver'); await ch.nextTask(25_000);
  * @version-history
+ *   v1.3.0 — 2026-09-24 — `onActivity`: every delivery is reported to an observer for the daemon's
+ *     activity feed (`aimeat connect tui`). It consumes nothing and changes no queue.
  *   v1.2.0 — 2026-09-08 — Dedup stops double WORK, never double NOTICE. handleTask and
  *     handleMessages returned on a seen id BEFORE signalWake, and both id sets live as long as the
  *     daemon, so one id was worth one wake for ever: a delivery that arrived while nobody listened
@@ -32,6 +34,9 @@ import type { RegisteredAgent } from '../agent-registry.js';
 import { wakeAgent } from './wakeup.js';
 import { legacyWakeAdapter } from './poller.js';
 import { launchTaskRunner, isRunner } from '../task-runner.js';
+
+/** What kind of delivery an `onActivity` report is. `invoke` is reported by the daemon itself. */
+export type ActivityKind = 'task' | 'record' | 'dm' | 'message' | 'cancelled' | 'invoke';
 
 /** How an agent's API calls reach the node right now. Mirrors ServeDiscoveryAgent['transport']. */
 export type ChannelTransport = 'tunnel' | 'direct' | 'auth_failed';
@@ -115,6 +120,12 @@ export class AgentChannel {
   private cancelledIds = new Set<string>();
   /** Spaces the agent asked to subscribe to — held so the daemon re-sends them on each reconnect. */
   private subscriptions: SpaceRef[] = [];
+  /**
+   * Told about every delivery this channel takes in, for the daemon's activity feed
+   * (./local-stats.ts, read by `aimeat connect tui`). An observer only: it consumes nothing, so a
+   * TUI watching the daemon can never take a task away from the runtime that parks on the queue.
+   */
+  onActivity: ((kind: ActivityKind, item: unknown) => void) | null = null;
 
   constructor(readonly entry: RegisteredAgent) {}
 
@@ -125,6 +136,7 @@ export class AgentChannel {
   handleCancelled(payload: unknown): void {
     const id = (payload as { id?: unknown })?.id;
     if (typeof id === 'string' && id) this.cancelledIds.add(id);
+    this.onActivity?.('cancelled', payload);
   }
   getCancelledIds(): string[] { return [...this.cancelledIds]; }
 
@@ -137,6 +149,7 @@ export class AgentChannel {
     if (waiter) waiter(item);
     else this.recordQueue.push(item);
     this.signalWake();
+    this.onActivity?.('record', payload);
   }
 
   /** Long-poll: next undelivered record event, or null after `waitMs` with none. */
@@ -165,6 +178,7 @@ export class AgentChannel {
     if (waiter) waiter(item);
     else this.dmQueue.push(item);
     this.signalWake();
+    this.onActivity?.('dm', payload);
   }
 
   /** Long-poll: next undelivered DM event, or null after `waitMs` with none. */
@@ -202,6 +216,7 @@ export class AgentChannel {
 
     if (this.seenTaskIds.has(id)) return;
     this.seenTaskIds.add(id);
+    this.onActivity?.('task', task);
 
     // Same side effects the poll loop used to produce on a new queued task.
     void wakeAgent(legacyWakeAdapter(this.entry), 'task_new', `task ${id} via ${via}`);
@@ -229,6 +244,7 @@ export class AgentChannel {
       if (!id || this.seenMessageIds.has(id)) continue;
       this.seenMessageIds.add(id);
       fresh++;
+      this.onActivity?.('message', m);
     }
     // The legacy per-agent wake stays gated on something actually being new: it is a notification
     // with a count in it, and re-announcing "1 new message" for a message from an hour ago is wrong.

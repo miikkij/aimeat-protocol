@@ -2,8 +2,9 @@
  * @file src/index-connect.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description `aimeat connect` subcommand dispatch (agent connector: auth, serve, inbox, tasks, tools, list, remove, refresh, logout). Extracted from index.ts to satisfy max-file-lines.
+ * @description `aimeat connect` subcommand dispatch (agent connector: auth, serve, tui, inbox, tasks, tools, list, remove, refresh, logout). Extracted from index.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.1.0 — 2026-09-24 — `aimeat connect tui` (./cli/connect/tui/).
  *   v1.0.0 — 2026-07-13 — Extracted from index.ts (max-file-lines)
  */
 
@@ -58,6 +59,9 @@ export async function runConnectCli(positionals: string[]): Promise<void> {
   } else if (connectAction === 'send') {
     const { runSend } = await import('./cli/connect/send.js');
     await runSend(connectFlags);
+  } else if (connectAction === 'tui') {
+    const { runTui } = await import('./cli/connect/tui/index.js');
+    await runTui(connectFlags);
   } else if (connectAction === 'status' || connectAction === 'whoami') {
     const { runStatus } = await import('./cli/connect/status.js');
     await runStatus();

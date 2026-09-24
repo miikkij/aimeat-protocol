@@ -93,6 +93,15 @@
      "plain": "aimeat connect CLI One command creates a dedicated agent and writes the MCP settings for Goose, Claude Code, Claude Desktop, Cursor or VS Code, without writing your key into a settings file. Also runs as a local stdio MCP server and an ACP bridge. aimeat connect client <name>"
     },
     {
+     "slug": "g-1-watch-the-connector-in-the-terminal",
+     "cells": [
+      "<strong>Watch the connector in the terminal</strong>",
+      "A full-screen view of the running connector: how long it has run, its CPU and memory, the traffic to the node and from local clients, each agent's connection, and deliveries as they arrive. Tab shows one agent's open tasks or inbox. It only reads, so it can stay open beside a running crew.",
+      "<code>aimeat connect tui</code>"
+     ],
+     "plain": "Watch the connector in the terminal A full-screen view of the running connector: how long it has run, its CPU and memory, the traffic to the node and from local clients, each agent's connection, and deliveries as they arrive. Tab shows one agent's open tasks or inbox. It only reads, so it can stay open beside a running crew. aimeat connect tui"
+    },
+    {
      "slug": "g-1-downloadable-client-config",
      "cells": [
       "<strong>Downloadable client config</strong>",
@@ -3317,6 +3326,6 @@
  "outro": "AIMEAT Feature List, reviewed 2026-09-15 against node 3.15.0. The contract is <code>openapi.yaml</code>; the specifications are RFC v4.0 Core and Platform; later changes are at <a href=\"/v1/changelog\">the change log</a>.",
  "counts": {
   "groups": 23,
-  "rows": 328
+  "rows": 329
  }
 }
