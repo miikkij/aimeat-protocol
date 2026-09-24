@@ -12,6 +12,7 @@
  *   Q2: "mahdollisimman muokattavaksi"), and nobody but the operator writes a theme.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=themes
  * @version-history
+ *   v1.1.0 — 2026-09-24 — Who chooses (PUT /v1/themes/policy), and one name, one theme (NAME_TAKEN).
  *   v1.0.0 — 2026-09-24 — Initial suite (UI consolidation phase 4).
  */
 import * as ed from '@noble/ed25519';
@@ -130,6 +131,25 @@ await test('POST /v1/themes — a copy of the AIMEAT theme, its styles under new
     dayStyle = body.data.theme.defaultStyle;
     assert(body.data.theme.styles.length === 6, 'six styles copied');
     assert(body.data.theme.styles.every((s: any) => !s.builtin && s.id !== 'paper'), 'the copies are the theme\'s own');
+});
+
+await test('A theme name another theme has → 409 NAME_TAKEN, retired themes and the built-in one included', async () => {
+    // Jouni 2026-09-24: "a save with a name another theme has is refused with a plain reason; retired themes count too".
+    const same = await json('/v1/themes', op(post({ name: 'harbour ', basedOn: 'aimeat' })));
+    assert(same.status === 409 && same.body.error?.code === 'NAME_TAKEN', `copy named like Harbour: ${same.status} ${same.body.error?.code}`);
+    assert(/Harbour/.test(same.body.error?.message ?? ''), `the reason names the other theme: ${same.body.error?.message}`);
+    const builtin = await json('/v1/themes', op(post({ name: 'AIMEAT' })));
+    assert(builtin.status === 409 && builtin.body.error?.code === 'NAME_TAKEN', `named like the built-in: ${builtin.status}`);
+    // Renames go to a second theme, so Harbour's own versions (restored by number below) stay as they were.
+    const other = await json('/v1/themes', op(post({ name: 'Retired later', basedOn: 'aimeat' })));
+    assert(other.status === 201, `second theme: ${other.status}`);
+    const otherId = other.body.data.theme.id;
+    const rename = await json(`/v1/themes/${otherId}`, op(put({ name: 'HARBOUR' })));
+    assert(rename.status === 409 && rename.body.error?.code === 'NAME_TAKEN', `rename onto Harbour's name: ${rename.status}`);
+    const own = await json(`/v1/themes/${otherId}`, op(put({ name: 'Retired later', retired: true })));
+    assert(own.status === 200, `a theme keeps its own name: ${own.status}`);
+    const retired = await json('/v1/themes', op(post({ name: 'Retired Later' })));
+    assert(retired.status === 409 && /retired/.test(retired.body.error?.message ?? ''), `named like a retired theme: ${retired.status} ${retired.body.error?.message}`);
 });
 
 await test('POST /v1/themes with its own fields — one call; old style ids name the copies', async () => {

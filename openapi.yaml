@@ -36867,7 +36867,8 @@ paths:
         can make a theme from a chat). The new theme is a copy of `basedOn` (default `aimeat`): its
         styles under new ids, its component CSS, its theme CSS, its default and offered styles. The
         theme's own fields may come in the same call; a style id there may name the copied style by
-        its old id (`paper`).
+        its old id (`paper`). A name another theme has (built-in and retired ones included,
+        compared without case) is refused with NAME_TAKEN.
       tags: [Site]
       security:
         - BearerAuth: []
@@ -36904,7 +36905,7 @@ paths:
         '404':
           description: '`basedOn` names no theme'
         '409':
-          description: This copy only mirrors the main site (load-balancer mode)
+          description: NAME_TAKEN (another theme has that name), or load-balancer mode
         '422':
           description: INVALID_THEME (the name)
 
@@ -37123,6 +37124,7 @@ paths:
         `defaultStyle` and `offeredStyles` (style ids of this theme); `retired: true` takes the
         theme out of the look picker without deleting it. `dryRun: true` checks and saves nothing.
         Every save keeps the version before it. A built-in theme is read only (READ_ONLY): copy it.
+        A new name another theme has (built-in and retired ones included) is refused (NAME_TAKEN).
       tags: [Site]
       security:
         - BearerAuth: []
@@ -37161,7 +37163,7 @@ paths:
         '404':
           description: No such theme
         '409':
-          description: READ_ONLY (a built-in), or load-balancer mode
+          description: READ_ONLY (a built-in), NAME_TAKEN (another theme has that name), or load-balancer mode
         '422':
           description: CSS_DOES_NOT_PARSE or INVALID_THEME
 
