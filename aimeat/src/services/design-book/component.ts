@@ -30,6 +30,12 @@
  * @structure COMPONENT_LIMITS · validateComponentBody(raw) · componentPreviewHtml(body) · componentSnippet(body)
  * @usage const body = validateComponentBody(raw);
  * @version-history
+ *   v1.3.0 — 2026-09-24 — Every selector is read to its end (selectorEscape), since a rule styles
+ *     what its last compound names: it starts at one of the component's own elements, goes down
+ *     freely, goes sideways only onto another of its own elements until it has gone down once, and
+ *     names no part of the page (html, body, :root, :scope, :host, a leading *). :is(), :where() and
+ *     :not() hold plain conditions on the element, and :has() looks only down into it. The check
+ *     read only the first class, so `.wkgrid ~ p` restyled every paragraph after the component.
  *   v1.2.0 — 2026-09-24 — The bench reads what a browser reads, and refuses what it cannot read
  *     cleanly (1a0a15eb7b20, e82c9f26d729). An "=" with no name before it, a tag whose name does
  *     not follow its "<" at once, and a closing tag carrying anything are refused: each let a
@@ -51,7 +57,10 @@
  *   v1.0.0 — 2026-09-20 — Initial.
  */
 import { DesignBookError } from './errors.js';
-import { attributesOf, cssAsRead, declarationsOf, selectorsOf, tagsOf, withoutVarFallbacks } from './component-scan.js';
+import {
+  attributesOf, complexSelectorOf, cssAsRead, declarationsOf, selectorListOf, selectorsOf, tagsOf, withoutVarFallbacks,
+  type Compound,
+} from './component-scan.js';
 
 export const COMPONENT_LIMITS = { html: 12_000, css: 12_000, use: 600, why: 400, whyMin: 20 } as const;
 
@@ -181,13 +190,130 @@ function checkStyles(raw: string, prefix: string): void {
       + 'A genre hands the kit its own values through its bridge, so these are already the genre\'s.');
   }
   if (!/var\(\s*--ak-/.test(css)) refuse('A component\'s stylesheet reads the page\'s tokens (var(--ak-…)) at least once: one that reads none cannot follow a look, a theme or a genre.');
-  // Every rule is about the component's own classes. Selectors are read between rule boundaries.
-  for (const selector of selectorsOf(css).flatMap(s => s.split(',')).map(s => s.trim()).filter(Boolean)) {
-    const first = /^[.]([a-zA-Z][\w-]*)/.exec(selector)?.[1];
-    if (!first || (first !== prefix && !first.startsWith(prefix + '-'))) {
-      refuse(`Every rule in a component's stylesheet starts at one of its own classes (".${prefix}" or ".${prefix}-…"): "${selector.slice(0, 60)}" does not, so it would restyle the page it lands in.`);
+  // EVERY RULE STAYS INSIDE THE COMPONENT, read to the END of its selector: a rule styles what its
+  // last compound names, and the first class says only where it starts. `.wkgrid ~ p` starts at the
+  // component and styles every paragraph after it on the page. Every entry of every selector list,
+  // in every rule, @media and @supports included (selectorsOf sees through them).
+  for (const selector of selectorsOf(css).flatMap(selectorListOf)) {
+    const escape = selectorEscape(selector, prefix);
+    if (escape) refuse(SELECTOR_REFUSAL[escape](selector.slice(0, 60), prefix));
+  }
+}
+
+/** A class of the component's own: the prefix itself, or the prefix and a dash. */
+const ownClass = (cls: string, prefix: string) => cls === prefix || cls.startsWith(prefix + '-');
+
+const PAGE_TYPES = new Set(['html', 'body']);
+const PAGE_PSEUDOS = new Set(['root', 'scope', 'host', 'host-context', 'slotted']);
+/** Pseudo-classes whose argument is a list the element ITSELF matches, or does not. */
+const ELEMENT_CONDITIONS = new Set(['is', 'where', 'not', 'matches', '-webkit-any', '-moz-any']);
+const NTH = new Set(['nth-child', 'nth-last-child', 'nth-of-type', 'nth-last-of-type', 'nth-col', 'nth-last-col']);
+const AN_PLUS_B = /^\s*(?:odd|even|[-+]?\d*n(?:\s*[-+]\s*\d+)?|[-+]?\d+)\s*$/i;
+/** The argument of any other functional pseudo (`:lang(fi)`, `:dir(rtl)`, `::part(x)`): no selector in it. */
+const PLAIN_ARG = /^[\w\s,*"'.-]*$/;
+/** How deep a check follows pseudo-classes inside pseudo-classes before it stops vouching. */
+const MAX_DEPTH = 4;
+
+type SelectorEscape = 'anchor' | 'page' | 'beside' | 'reach' | 'unreadable';
+
+const SELECTOR_REFUSAL: Record<SelectorEscape, (sel: string, prefix: string) => string> = {
+  anchor: (sel, prefix) => `Every rule in a component's stylesheet starts at one of its own classes (".${prefix}" or ".${prefix}-…"): "${sel}" does not, so it would restyle the page it lands in.`,
+  page: sel => `"${sel}" names the page itself (html, body, :root, :scope, :host, or * at the start). A component's rules stay inside the component.`,
+  beside: sel => `"${sel}" reaches from the component to an element beside it. After "+" or "~" the next element is one of the component's own classes too, or the rule would restyle the page around it.`,
+  reach: sel => `"${sel}" reaches out of the element it styles. :is(), :where() and :not() take plain conditions on that element, and :has() looks only down into it, never beside or above it.`,
+  unreadable: sel => `"${sel}" does not read as a selector the bench can follow the way a browser does. Write the component's own classes joined by spaces or ">", and "+" or "~" between two of its own classes.`,
+};
+
+/** The alternatives of a condition list, each a single compound, or null when one is not. */
+function conditionCompounds(arg: string): Compound[] | 'reach' | 'unreadable' {
+  const out: Compound[] = [];
+  for (const alt of selectorListOf(arg)) {
+    const x = complexSelectorOf(alt);
+    if (!x) return 'unreadable';
+    if (x.lead || x.compounds.length !== 1) return 'reach';
+    out.push(x.compounds[0]);
+  }
+  return out;
+}
+
+/**
+ * Is this compound one of the component's own elements? Its own class written on it, or an `:is()`
+ * or `:where()` every alternative of which is one: `:where(.wkgrid-cell)` keeps the specificity at
+ * nothing, which is how a component loses to the page it lands in.
+ */
+function isOwnCompound(c: Compound, prefix: string, depth = 0): boolean {
+  if (c.classes.some(cls => ownClass(cls, prefix))) return true;
+  if (depth >= MAX_DEPTH) return false;
+  return c.pseudos.some(p => {
+    if (p.element || p.arg === null || (p.name !== 'is' && p.name !== 'where')) return false;
+    const alts = conditionCompounds(p.arg);
+    return Array.isArray(alts) && alts.length > 0 && alts.every(a => isOwnCompound(a, prefix, depth + 1));
+  });
+}
+
+/** Why a compound reaches the page, its functional pseudo-classes followed down, or null. */
+function compoundEscape(c: Compound, prefix: string, first: boolean, depth = 0): SelectorEscape | null {
+  if (c.types.some(t => PAGE_TYPES.has(t)) || (first && c.types.includes('*'))) return 'page';
+  for (const p of c.pseudos) {
+    if (PAGE_PSEUDOS.has(p.name)) return 'page';
+    if (p.arg === null) continue;
+    if (depth >= MAX_DEPTH) return 'unreadable';
+    let inner: Compound[] = [];
+    if (!p.element && ELEMENT_CONDITIONS.has(p.name)) {
+      const alts = conditionCompounds(p.arg);
+      if (!Array.isArray(alts)) return alts;
+      inner = alts;
+    } else if (!p.element && p.name === 'has') {
+      // A relative selector that looks DOWN: into the element (` `) or at its children (`>`).
+      for (const alt of selectorListOf(p.arg)) {
+        const x = complexSelectorOf(alt);
+        if (!x) return 'unreadable';
+        if ((x.lead && x.lead !== '>') || x.combinators.some(k => k !== ' ' && k !== '>')) return 'reach';
+        inner.push(...x.compounds);
+      }
+    } else if (!p.element && NTH.has(p.name)) {
+      const of = p.arg.toLowerCase().indexOf(' of ');
+      const step = of < 0 ? p.arg : p.arg.slice(0, of);
+      if (step.length > 40 || !AN_PLUS_B.test(step)) return 'unreadable';
+      if (of >= 0) {
+        const alts = conditionCompounds(p.arg.slice(of + 4));
+        if (!Array.isArray(alts)) return alts;
+        inner = alts;
+      }
+    } else if (!PLAIN_ARG.test(p.arg)) {
+      return 'unreadable';
+    }
+    for (const x of inner) {
+      const escape = compoundEscape(x, prefix, false, depth + 1);
+      if (escape) return escape;
     }
   }
+  return null;
+}
+
+/**
+ * Why this selector could style something outside the component, or null when every element it can
+ * reach is the component's own. It starts at one of the component's own elements; going down (` `,
+ * `>`) stays inside; going sideways (`+`, `~`) stays inside once the chain has gone down at least
+ * once, because siblings share their parent, and otherwise only onto another of the component's own
+ * elements, because the one it started at may be the component's root with the page all around it.
+ */
+function selectorEscape(selector: string, prefix: string): SelectorEscape | null {
+  const x = complexSelectorOf(selector);
+  if (!x) return 'unreadable';
+  if (x.lead || !isOwnCompound(x.compounds[0], prefix)) return 'anchor';
+  let below = false;
+  for (const [i, c] of x.compounds.entries()) {
+    if (i > 0) {
+      const k = x.combinators[i - 1];
+      if (k === '||') return 'beside';
+      if (k === ' ' || k === '>') below = true;
+      else if (!below && !isOwnCompound(c, prefix)) return 'beside';
+    }
+    const escape = compoundEscape(c, prefix, i === 0);
+    if (escape) return escape;
+  }
+  return null;
 }
 
 export function validateComponentBody(raw: unknown): ComponentBody {

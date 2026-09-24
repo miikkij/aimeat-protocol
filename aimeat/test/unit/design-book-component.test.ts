@@ -5,6 +5,10 @@
  * @description The component bench: what a component may carry and what it may not. The good case
  *   is the part three measured builds each made by hand on 2026-09-20, a week grid a person ticks.
  * @version-history
+ *   v1.2.0 — 2026-09-24 — Every selector is read to its end: `.wkgrid ~ p` and `.wkgrid + *` reach the
+ *     page beside the component and are refused, as are a :has() looking sideways, an :is() looking
+ *     up and a rule naming the page; what stays inside the component still passes. The two new
+ *     readers are timed like the others.
  *   v1.1.0 — 2026-09-24 — The bench reads what a browser reads (1a0a15eb7b20, e82c9f26d729): an "="
  *     with no name before it, a tag a browser reads as text or a comment, a closing tag carrying
  *     anything, and a stylesheet whose escapes, strings or comments hide url(), @import,
@@ -14,7 +18,9 @@
 import { describe, it, expect } from 'vitest';
 import { validateComponentBody, componentPreviewHtml, componentSnippet, type ComponentBody } from '../../src/services/design-book/component.js';
 import { validatePartInput, PART_KINDS } from '../../src/services/design-book/validate.js';
-import { attributesOf, cssAsRead, declarationsOf, selectorsOf, tagsOf, withoutVarFallbacks } from '../../src/services/design-book/component-scan.js';
+import {
+  attributesOf, complexSelectorOf, cssAsRead, declarationsOf, selectorListOf, selectorsOf, tagsOf, withoutVarFallbacks,
+} from '../../src/services/design-book/component-scan.js';
 
 const WEEK_GRID = {
   prefix: 'wkgrid',
@@ -145,12 +151,16 @@ describe('the component bench', () => {
     timed('comments', () => cssAsRead('/* '.repeat(n)));
     timed('strings', () => cssAsRead('"a\\'.repeat(n)));
     timed('escapes', () => cssAsRead('\\75 '.repeat(n)));
+    timed('selector lists', () => selectorListOf('(,'.repeat(n)));
+    timed('selectors, open', () => complexSelectorOf('.a:is('.repeat(n)));
+    timed('selectors, nested', () => complexSelectorOf(':is('.repeat(n) + '.a' + ')'.repeat(n)));
     timed('declarations', () => declarationsOf('animation '.repeat(n)));
     timed('selectors', () => selectorsOf('@media '.repeat(n)));
     timed('var fallbacks', () => withoutVarFallbacks('var(--a,('.repeat(n)));
     // And through the bench itself, at the most it accepts.
     timed('the bench, markup', () => { try { validateComponentBody({ ...WEEK_GRID, html: '<div class="wkgrid">' + '<a '.repeat(3900) }); } catch { /* refused is the right answer */ } });
     timed('the bench, styles', () => { try { validateComponentBody({ ...WEEK_GRID, css: '.wkgrid { color: var(--ak-ink); }' + 'animation '.repeat(1100) }); } catch { /* refused is the right answer */ } });
+    timed('the bench, selectors', () => { try { validateComponentBody({ ...WEEK_GRID, css: '.wkgrid { color: var(--ak-ink); }\n.wkgrid' + ':is(.wkgrid'.repeat(900) + ')'.repeat(900) + ' { color: var(--ak-ink); }' }); } catch { /* refused is the right answer */ } });
   });
 
   it('cannot reach outside itself', () => {
@@ -160,6 +170,34 @@ describe('the component bench', () => {
     expect(bad({ css: WEEK_GRID.css + '\n.wkgrid-x { color: var(--ak-ink) !important; }' })).toThrow(/no !important/);
     expect(bad({ html: '<div class="wkgrid other-thing"></div>' })).toThrow(/starts with its prefix/);
     expect(bad({ prefix: 'ak' })).toThrow(/the kit's prefix/);
+  });
+
+  // A rule styles whatever its WHOLE selector reaches, which a browser reads to the end: the first
+  // class says only where it starts. `.wkgrid ~ p` starts at the component and styles every
+  // paragraph after it on the page.
+  it('reads every selector to its end, and each one stays inside the component', () => {
+    const rule = (selector: string) => ({ css: `${WEEK_GRID.css}\n${selector} { color: var(--ak-ink); }` });
+    expect(bad(rule('.wkgrid ~ p'))).toThrow(/beside it/);
+    expect(bad(rule('.wkgrid + *'))).toThrow(/beside it/);
+    expect(bad(rule('.wkgrid, body'))).toThrow(/starts at one of its own classes/);
+    expect(bad(rule('@media (min-width: 1px) { .wkgrid-row ~ div'))).toThrow(/beside it/);
+    expect(bad(rule('@supports (display: grid) { .wkgrid-a, .wkgrid-b + section'))).toThrow(/beside it/);
+    expect(bad(rule('.wkgrid:has(~ p)'))).toThrow(/looks only down/);
+    expect(bad(rule('.wkgrid-x:is(.page-theme .wkgrid-x)'))).toThrow(/looks only down/);
+    expect(bad(rule('.wkgrid:not(body)'))).toThrow(/names the page itself/);
+    expect(bad(rule('.wkgrid:root'))).toThrow(/names the page itself/);
+    expect(bad(rule('*.wkgrid'))).toThrow(/names the page itself/);
+    expect(bad(rule('.wkgrid || td'))).toThrow(/beside it/);
+    expect(bad(rule('.wkgrid-x { & ~ p'))).toThrow(/starts at one of its own classes/);
+    // …and what a component legitimately writes still passes: inside it, and between its own parts.
+    for (const ok of [
+      '.wkgrid > *', '.wkgrid li', '.wkgrid-row + .wkgrid-row', '.wkgrid-cell ~ .wkgrid-cell-today',
+      '.wkgrid-cell:not(:last-child)', '.wkgrid-row:nth-child(2n+1)', '.wkgrid-cell:is(:hover, :focus-visible)',
+      '.wkgrid:has(.wkgrid-cell[aria-pressed="true"])', '.wkgrid:has(> .wkgrid-row)', ':where(.wkgrid-cell)',
+      '.wkgrid-cell[aria-pressed="true"]::after', 'div.wkgrid', '.wkgrid-a, .wkgrid-b',
+    ]) {
+      expect(() => validateComponentBody({ ...WEEK_GRID, ...rule(ok) }), ok).not.toThrow();
+    }
   });
 
   it('wears the page it lands in: a literal colour is refused with the tokens named, a fallback is fine', () => {

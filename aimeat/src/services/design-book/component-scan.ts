@@ -22,10 +22,16 @@
  *   WHAT THE READER CANNOT READ CLEANLY IS ODD, AND ODD IS REFUSED. Every place where a browser
  *   and this reader could part ways is marked, never stepped over: an "=" where a browser expects
  *   a name, a tag whose name does not follow its "<" at once, a closing tag carrying anything. And
- *   the stylesheet is read as a browser's tokenizer reads it (`cssAsRead`), escapes resolved.
- * @structure tagsOf · attributesOf · cssAsRead · declarationsOf · selectorsOf · withoutVarFallbacks
+ *   the stylesheet is read as a browser's tokenizer reads it (`cssAsRead`), escapes resolved, and
+ *   each selector is read to its end (`complexSelectorOf`), since its end is what a rule styles.
+ * @structure tagsOf · attributesOf · cssAsRead · declarationsOf · selectorsOf · selectorListOf ·
+ *   complexSelectorOf · withoutVarFallbacks
  * @usage for (const tag of tagsOf(html)) { … }
  * @version-history
+ *   v1.2.0 — 2026-09-24 — selectorListOf and complexSelectorOf: a selector list split where a browser
+ *     splits it, and each selector read to its end, compound by compound, with its combinators and
+ *     the arguments of its pseudo-classes. The bench read only a selector's first class, and a rule
+ *     styles what its last compound names.
  *   v1.1.0 — 2026-09-24 — The reader fails closed where it used to step over (1a0a15eb7b20). An
  *     attribute with no name was dropped, so `<div class="x" ="><script>…</script>">` read as a
  *     clean div while a browser took `="` for the name, ended the tag at the first ">" and ran the
@@ -240,6 +246,126 @@ export function selectorsOf(css: string): string[] {
     }
   }
   return out;
+}
+
+/**
+ * One compound selector as the check reads it: what is written on the element itself. A class
+ * inside a pseudo-class's parentheses is a condition, not the element's own class, so it stays with
+ * its pseudo-class and is never counted in `classes`.
+ */
+export interface Compound {
+  classes: string[];
+  /** Type names, lower-cased, `*` included. */
+  types: string[];
+  /** Pseudo-classes and pseudo-elements, lower-cased, each with its argument when it takes one. */
+  pseudos: Array<{ name: string; element: boolean; arg: string | null }>;
+  /** `&`, the parent rule's selector under CSS nesting. */
+  nesting: boolean;
+}
+
+/**
+ * A complex selector: compounds joined by combinators, `' '` (descendant), `'>'`, `'+'`, `'~'` or
+ * `'||'`. `lead` is a combinator written before the first compound, which is what a relative
+ * selector looks like (inside `:has()`, or a nested rule).
+ */
+export interface ComplexSelector { lead: string | null; compounds: Compound[]; combinators: string[] }
+
+const IDENT_CHAR = /[\w\u0080-￿-]/;
+
+/** Where the bracket opened at `at` closes, strings stepped over, or -1 when it never does. */
+function closingOf(s: string, at: number, open: string, close: string): number {
+  let depth = 0;
+  let quote = '';
+  for (let i = at; i < s.length; i++) {
+    const ch = s[i];
+    if (quote) { if (ch === quote) quote = ''; continue; }
+    if (ch === '"' || ch === '\'') quote = ch;
+    else if (ch === open) depth++;
+    else if (ch === close && --depth === 0) return i;
+  }
+  return -1;
+}
+
+/** The entries of a selector list: split at the commas outside parentheses, brackets and strings. */
+export function selectorListOf(text: string): string[] {
+  const out: string[] = [];
+  let depth = 0;
+  let quote = '';
+  let from = 0;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (quote) { if (ch === quote) quote = ''; continue; }
+    if (ch === '"' || ch === '\'') quote = ch;
+    else if (ch === '(' || ch === '[') depth++;
+    else if (ch === ')' || ch === ']') depth = Math.max(0, depth - 1);
+    else if (ch === ',' && depth === 0) { out.push(text.slice(from, i)); from = i + 1; }
+  }
+  out.push(text.slice(from));
+  return out.map(s => s.trim()).filter(Boolean);
+}
+
+/**
+ * One complex selector read to its end, as a browser reads it, or null when it does not read as one
+ * (a namespace bar, two compounds with nothing between them, a bracket that never closes). Null is a
+ * refusal to the caller: what this reader cannot follow, the bench cannot vouch for. Meant for the
+ * stylesheet as cssAsRead gives it, escapes resolved.
+ */
+export function complexSelectorOf(text: string): ComplexSelector | null {
+  const s = text.trim();
+  let i = 0;
+  const identAt = (): string => { const from = i; while (i < s.length && IDENT_CHAR.test(s[i])) i++; return s.slice(from, i); };
+  const spaceAt = (): boolean => { const from = i; while (i < s.length && /\s/.test(s[i])) i++; return i > from; };
+  const combinatorAt = (): string | null => (s.startsWith('||', i) ? '||' : s[i] === '>' || s[i] === '+' || s[i] === '~' ? s[i] : null);
+  const compoundAt = (): Compound | null => {
+    const c: Compound = { classes: [], types: [], pseudos: [], nesting: false };
+    const start = i;
+    if (s[i] === '*') { c.types.push('*'); i++; } else if (IDENT_CHAR.test(s[i] ?? '')) c.types.push(identAt().toLowerCase());
+    for (;;) {
+      const ch = s[i];
+      if (ch === '.' || ch === '#') {
+        i++;
+        const name = identAt();
+        if (!name) return null;
+        if (ch === '.') c.classes.push(name);
+      } else if (ch === '&') {
+        i++;
+        c.nesting = true;
+      } else if (ch === '[') {
+        const close = closingOf(s, i, '[', ']');
+        if (close < 0) return null;
+        i = close + 1;
+      } else if (ch === ':') {
+        const element = s[i + 1] === ':';
+        i += element ? 2 : 1;
+        const name = identAt().toLowerCase();
+        if (!name) return null;
+        let arg: string | null = null;
+        if (s[i] === '(') {
+          const close = closingOf(s, i, '(', ')');
+          if (close < 0) return null;
+          arg = s.slice(i + 1, close);
+          i = close + 1;
+        }
+        c.pseudos.push({ name, element, arg });
+      } else break;
+    }
+    return i > start ? c : null;
+  };
+
+  const out: ComplexSelector = { lead: null, compounds: [], combinators: [] };
+  const lead = combinatorAt();
+  if (lead) { out.lead = lead; i += lead.length; spaceAt(); }
+  for (;;) {
+    const compound = compoundAt();
+    if (!compound) return null;
+    out.compounds.push(compound);
+    const spaced = spaceAt();
+    if (i >= s.length) return out;
+    const combinator = combinatorAt();
+    if (combinator) { out.combinators.push(combinator); i += combinator.length; spaceAt(); continue; }
+    if (!spaced) return null;
+    out.combinators.push(' ');
+  }
 }
 
 /** The stylesheet with every `var(--x, fallback)` reduced to `var()`, parentheses matched by counting. */
