@@ -61,6 +61,8 @@
  *     The fan-out itself moved to engine-triggers.ts (pure move, max-file-lines).
  *   v1.8.0 — 2026-09-24 — startRun refuses a run whose finished keys would write, or send out, a key
  *     the node trusts (store.ts reservedStepKeys). A variable can complete a key only at start.
+ *   v1.9.0 — 2026-09-24 — startRun takes the starting principal and refuses, with `denied`, a run
+ *     whose steps need a word it lacks (step-authority.ts). A trigger's own run passes no caller.
  */
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
@@ -73,6 +75,7 @@ import { logger } from '../../utils/logger.js';
 import { evaluateSignal, extractProgress, type SignalEvalCtx } from './signal-eval.js';
 import { buildEvalCtx } from './eval-context.js';
 import { getWorkflow, validateWorkflow, runKey, reservedStepKeys, reservedStepKeyErrors, type ResolvedStep } from './store.js';
+import { missingStepScopes, stepScopeRefusal, type WorkflowCaller } from './step-authority.js';
 import { readEventTriggers, readEcosystemEventTriggers, readActiveRuns, reconcileActiveRun } from './lifecycle.js';
 import { fireMemoryWrite, fireOfferOrdered, fireEcosystemEvent, type TriggerDeps } from './engine-triggers.js';
 import { template, runDateIn } from './engine-util.js';
@@ -107,6 +110,9 @@ export interface StartRunOpts {
   // agent writes there; signal eval reads/writes under it).
   mode: 'signals-only' | 'full-live' | 'full-sandbox';
   vars?: Record<string, string>;
+  /** The principal starting the run, which answers for its steps (step-authority.ts). Absent for a
+   *  run the workflow's own trigger starts: that runs what was checked when it was saved. */
+  caller?: WorkflowCaller;
 }
 
 /**
@@ -115,7 +121,9 @@ export interface StartRunOpts {
  * new one. Every door passes the flag on, because a skip that looks like a start is the failure no
  * metric shows (a partner's intake logged a case as started on exactly that, 2026-09-09).
  */
-export type StartRunResult = { runId: string; skipped: boolean } | { error: string[] };
+export type StartRunResult =
+  | { runId: string; skipped: boolean }
+  | { error: string[]; denied?: { needed: string[]; message: string } };
 
 export class WorkflowEngine {
   private config: AimeatConfig;
@@ -176,6 +184,16 @@ export class WorkflowEngine {
   async startRun(ownerGhii: string, ownerName: string, workflowId: string, opts: StartRunOpts): Promise<StartRunResult> {
     const def = await getWorkflow(this.storage, ownerGhii, workflowId);
     if (!def) return { error: [`workflow "${workflowId}" not found`] };
+
+    // The principal starting the run answers for what its steps do, whoever saved the definition:
+    // each step costs the word its own door costs (step-authority.ts). A check dispatches no step.
+    if (opts.caller) {
+      const missing = missingStepScopes(def, opts.caller, opts.mode === 'signals-only' ? 'signals-only' : 'full');
+      if (missing.length > 0) {
+        const refusal = stepScopeRefusal(missing);
+        return { error: [refusal.message], denied: { needed: refusal.needed, message: refusal.message } };
+      }
+    }
 
     const v = await validateWorkflow(this.storage, this.config, ownerName, def);
     if (!v.ok || !v.resolved) return { error: v.errors };

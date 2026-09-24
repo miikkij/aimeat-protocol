@@ -43831,8 +43831,13 @@ paths:
         `required_to_function` + `deliverable.location`. A step using an `llm` signal leaf requires
         `llm.approved=true` (owner consent to node-LLM use). A step may not write, or send out of the
         node, a key this node reads to decide what it does (`openrouter.*`, `ai-usage.*`,
-        `commerce.*` and the rest of the reserved keys). Authorable by the owner or an agent holding
-        `workflow:write`.
+        `commerce.*` and the rest of the reserved keys). An export-out or trigger-geai step names
+        only an app of this owner on this node. Authorable by the owner or an agent holding
+        `workflow:write`, and a step costs the word its own door asks (403 SCOPE_DENIED names the
+        missing one): `ai:use` for an ai step or `llm.approved`, `ext:invoke` for an extension
+        step, `memory:read` + `storage:write` + `memory:write` for a datapackage step,
+        `memory:read` + `work:request` for export-out, `work:request` for trigger-geai. The owner in
+        person passes.
       tags: [Workflows]
       security:
         - BearerAuth: []
@@ -43860,6 +43865,8 @@ paths:
               schema: { $ref: '#/components/schemas/AimeatEnvelope' }
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
     delete:
       operationId: deleteWorkflow
       summary: Delete a workflow definition
@@ -43928,7 +43935,9 @@ paths:
         `mode=signals-only` evaluates every step's signals against existing memory with NO dispatch
         (an instant health check — the run completes synchronously) · `mode=full` executes the steps
         live (dispatches the agent tasks; poll the run for progress). `vars` overrides the workflow's
-        declared variables for this run. Requires `workflow:write` (owners bypass). Returns the runId.
+        declared variables for this run. Requires `workflow:write` (owners bypass), and a full run
+        also the word each step's own door asks, as for a save (403 SCOPE_DENIED names it; a
+        signals-only check asks only `ai:use`, and only when `llm.approved` is set). Returns the runId.
       tags: [Workflows]
       security:
         - BearerAuth: []
@@ -43973,6 +43982,8 @@ paths:
               schema: { $ref: '#/components/schemas/AimeatEnvelope' }
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
   /v1/workflows/{id}/health:
     parameters:
       - name: id

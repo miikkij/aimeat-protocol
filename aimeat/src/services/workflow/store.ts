@@ -39,12 +39,16 @@
  *   v1.9.0 — 2026-09-24 — reservedStepKeys(): a step may not write, or send out of the node, a key the
  *     node reads and trusts (utils/reserved-keys.ts). Refused at save for what the templates spell,
  *     and by the engine at run start for the finished keys.
+ *   v1.10.0 — 2026-09-24 — saveWorkflow takes the saving principal and refuses a step whose own door
+ *     asks a word it lacks (step-authority.ts). An export-out or trigger-geai step names only an app
+ *     of this owner on this node.
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
-import { buildGAII } from '../../utils/gaii.js';
+import { buildGAII, parseGEAI } from '../../utils/gaii.js';
 import { isReservedServerKey, RESERVED_OWNER_KEY_PREFIXES, SERVER_WRITTEN_KEYS } from '../../utils/reserved-keys.js';
 import { template } from './engine-util.js';
+import { missingStepScopes, stepScopeRefusal, type WorkflowCaller } from './step-authority.js';
 import {
   WorkflowDefInputSchema, WORKFLOW_ID_RE,
   type WorkflowDef, type WorkflowDefInput, type WorkflowStep, type WorkflowRun, type Signal,
@@ -335,6 +339,17 @@ export async function validateWorkflow(
           if (!declaredVars.has(v)) errors.push(`step "${step.id}": input or result_to_key references undeclared var "{${v}}"`);
         }
       }
+      if (a.kind === 'export-out' || a.kind === 'trigger-geai') {
+        // OWN CONNECTED APP ONLY. The capability door and a scheduled eco-capability job build the
+        // app's address from the caller's own name; a step names the address in full, so it is held
+        // to the same: an app of this owner, on this node. Without it a step could push this owner's
+        // data to, or invoke a capability of, an app another account connected. Checked here, so at
+        // save and again when a run starts.
+        const target = parseGEAI(a.geai);
+        if (!target || target.owner !== ownerName || target.node !== config.nodeId) {
+          errors.push(`step "${step.id}": "${a.geai}" is not an app of this account; an ecosystem step reaches only the owner's own connected apps`);
+        }
+      }
       if (a.kind === 'datapackage') {
         // `changes` is refused at SAVE as well as at publish. The publish contract requires it, and
         // a workflow that only discovers that at 06:00 has already lost the run it was written for.
@@ -435,15 +450,20 @@ export async function listWorkflows(storage: Storage, ownerGhii: string): Promis
   return recs.map(r => r.value as WorkflowDef);
 }
 
-export interface SaveResult { ok: boolean; def?: WorkflowDef; errors?: string[]; }
+export interface SaveResult {
+  ok: boolean; def?: WorkflowDef; errors?: string[];
+  /** Set when the saver lacks a word a step needs (step-authority.ts): the door answers 403. */
+  denied?: { needed: string[]; message: string };
+}
 
 /**
  * Validate + persist a workflow definition under the owner GHII namespace. `createdBy` records the
- * author (owner GHII or agent GAII) for audit; createdAt is preserved across updates.
+ * author (owner GHII or agent GAII) for audit; createdAt is preserved across updates. `caller` is
+ * the principal saving it, which answers for what its steps do; every door passes one.
  */
 export async function saveWorkflow(
   storage: Storage, config: AimeatConfig, ownerGhii: string, ownerName: string,
-  id: string, body: unknown, createdBy: string,
+  id: string, body: unknown, createdBy: string, caller?: WorkflowCaller,
 ): Promise<SaveResult> {
   if (!WORKFLOW_ID_RE.test(id)) return { ok: false, errors: [`invalid workflow id "${id}" — use a lowercase slug`] };
 
@@ -452,6 +472,16 @@ export async function saveWorkflow(
     return { ok: false, errors: parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`) };
   }
   const input = parsed.data;
+
+  // Each step costs the word its own door costs, and the saver answers for it before anything is
+  // read or written (step-authority.ts). The owner in person passes.
+  if (caller) {
+    const missing = missingStepScopes(input, caller, 'save');
+    if (missing.length > 0) {
+      const refusal = stepScopeRefusal(missing);
+      return { ok: false, errors: [refusal.message], denied: { needed: refusal.needed, message: refusal.message } };
+    }
+  }
 
   // llm leaves require explicit owner approval (consent gate).
   const usesLlm = input.steps.some(s =>
