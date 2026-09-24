@@ -10,7 +10,8 @@
  * @usage import { escHtml, modeSwitchHtml, wireModeSwitch } from './theme.js';
  * @version-history
  *   v1.7.0 — 2026-09-24 — A style with one mode only (Themes & Styles): the switch stands down as on a
- *     fixed-light page, shows the mode the style keeps, and says the style is why.
+ *     fixed-light page, shows the mode the style keeps, and says the style is why. The kept mode
+ *     carries the word "only" beside its icon, so the reason shows without a hover.
  *   v1.6.0 — 2026-09-13 — The signed-out pill has a compact form. At ≤600px its language, light/dark
  *     and palette controls fold into a popover behind a settings button, hung from the row's right
  *     edge, and Sign In stays in the row. Signed out had no small-screen rule at all, so a visitor
@@ -148,11 +149,13 @@ export function modeSwitchHtml(i) {
     ? ' class="aimeat-seg aimeat-seg--fixed" title="' + escHtml(why) + '" aria-label="' + escHtml(why) + '"'
     : ' class="aimeat-seg" aria-label="' + escHtml(i.themeLabel || 'Theme') + '"';
   var off = fixed ? ' disabled aria-disabled="true" title="' + escHtml(why) + '"' : '';
+  // A one-mode style says so where the switch is seen, not only on hover: "☾ only" on the kept mode.
+  var onlyWord = function (m) { return only === m ? '<span aria-hidden="true">' + escHtml(i.modeOnly || 'only') + '</span>' : ''; };
   return '<span id="aimeat-mode-switch" role="group"' + seg + '>'
     + '<button type="button" data-mode="light" aria-pressed="' + (cur === 'light') + '"' + (fixed ? off : ' title="' + escHtml(light) + '"') + ' aria-label="' + escHtml(fixed ? why : light) + '">'
-    + '<span class="seg-ico" aria-hidden="true">☀</span></button>'
+    + '<span class="seg-ico" aria-hidden="true">☀</span>' + onlyWord('light') + '</button>'
     + '<button type="button" data-mode="dark" aria-pressed="' + (cur === 'dark') + '"' + (fixed ? off : ' title="' + escHtml(dark) + '"') + ' aria-label="' + escHtml(fixed ? why : dark) + '">'
-    + '<span class="seg-ico" aria-hidden="true">☾</span></button>'
+    + '<span class="seg-ico" aria-hidden="true">☾</span>' + onlyWord('dark') + '</button>'
     + '</span>';
 }
 

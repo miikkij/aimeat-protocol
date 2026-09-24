@@ -27,7 +27,6 @@ import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { apiGet, apiPost, apiPut } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
-import { saveConfig } from '/js/services/admin.js';
 import { Band } from '/components/Band.js';
 import { NamedRow } from '/components/NamedRow.js';
 import { Hint } from '/components/Hint.js';
@@ -56,12 +55,8 @@ function WhoChooses({ policy, themes, onSaved }) {
     const theDefault = list.includes(next.default) ? next.default : list[0];
     setState({ busy: true, error: '', saved: false });
     try {
-      await saveConfig([
-        { path: 'themes.personal_choice', value: next.personalChoice },
-        // Only the AIMEAT theme available is written as empty, the node's own default.
-        { path: 'themes.offered', value: list.length === 1 && list[0] === 'aimeat' ? '' : list.join(',') },
-        { path: 'themes.default', value: theDefault },
-      ]);
+      // The same door aimeat_theme_policy_set uses: it checks every id and saves as the Config tab does.
+      await apiPut('/v1/themes/policy', { personalChoice: next.personalChoice, offered: list, default: theDefault });
       setState({ busy: false, error: '', saved: true });
       onSaved();
     } catch (e) {
@@ -79,7 +74,8 @@ function WhoChooses({ policy, themes, onSaved }) {
     <${Band} title=${t('themes.whoChooses')}>
       <${Hint}>${t('themes.whoChoosesHint')}<//>
       ${live.map((th) => html`
-        <${SettingsSwitch} key=${th.id} checked=${policy.offered.includes(th.id)} onChange=${() => toggle(th.id)}>
+        <${SettingsSwitch} key=${th.id} checked=${policy.offered.includes(th.id)} onChange=${() => toggle(th.id)}
+          disabled=${state.busy || (policy.offered.includes(th.id) && available.length === 1)}>
           ${t('themes.available', { name: th.name })}
         <//>`)}
       ${available.length === 1 && html`<${Hint}>${t('themes.lastTheme')}<//>`}
@@ -94,9 +90,10 @@ function WhoChooses({ policy, themes, onSaved }) {
 
 /** One theme: its styles' colours, what it is, and what can be done with it. */
 function ThemeRow({ theme, policy, versions, onOpen, onCopy, onRetire, onRestore }) {
+  // Whether people can choose it is said once, by its switch under "Who chooses".
   const facts = [
     theme.builtin ? t('themes.builtinShort') : t('themes.own'),
-    theme.retired ? t('themes.retired') : policy.offered.includes(theme.id) ? t('themes.isAvailable') : t('themes.notAvailable'),
+    theme.retired ? t('themes.retired') : '',
     policy.default === theme.id ? t('themes.isDefault') : '',
     t('themes.styleCount', { n: theme.styles.filter((s) => !s.retired).length }),
   ].filter(Boolean).join(' · ');

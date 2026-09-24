@@ -2,9 +2,9 @@
  * @file public/views/admin/design-lab-tab.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description aimeat-design-lab, the library view: every part of the node's own interface drawn
+ * @description aimeat-design-lab, the library view: every component of the node's own interface drawn
  *   live by its real component with its catalogue example, so a person judges pictures rather than
- *   names. The overview shows each part once; a part opened shows every variant and state in light
+ *   names. The overview shows each component once; one opened shows every variant and state in light
  *   and dark side by side, at a phone width, and beside them its name, what it is for, the data it
  *   takes, its use, the theme tokens it reads, the pages that draw it and its history.
  *
@@ -13,6 +13,7 @@
  * @structure DesignLabTab (default: the library / decisions switch) · Library · Overview · PartDetail
  * @usage Mounted by the admin dashboard tab router (views/admin.js), group Design.
  * @version-history
+ *   v1.4.0 — 2026-09-24 — "component" for a catalogue entry, as everywhere (Jouni's ruling).
  *   v1.3.0 — 2026-09-24 — The preview wears any theme and style of this server, offered or not (R16):
  *     a theme and style picker above the library, passed to every frame as `look=` and `style=`.
  *   v1.2.0 — 2026-09-23 — The agent step's wrapper is a decision in the decisions view, not a panel
@@ -44,7 +45,7 @@ import DecisionsView from './design-lab-decisions.js';
 const html = htm.bind(h);
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 
-/** A part's frame, in the theme and style the lab's picker chose (none: the page's own look). */
+/** A component's frame, in the theme and style the lab's picker chose (none: the page's own look). */
 const frameSrc = (id, v, theme, look) => `/v1/design-lab/frame?id=${encodeURIComponent(id)}&v=${v}&theme=${theme}`
   + (look?.theme ? `&look=${encodeURIComponent(look.theme)}&style=${encodeURIComponent(look.style || '')}` : '');
 
@@ -94,17 +95,17 @@ function Overview({ entries, onOpen, look }) {
   const count = (f) => entries.filter(FILTERS[f]).length;
   return html`
     ${/* The admin page prints the tab's name as its title; the intro is the line under it. */''}
-    <${Hint}>${tr('designLab.intro', 'Every part of this AIMEAT\'s own interface, drawn live by its real component with its example data. Open a part to see every variant in light and dark, at a phone width, and what it is for.')}<//>
-    <${ModeSwitch} label=${tr('designLab.filterLabel', 'Which parts')}>
+    <${Hint}>${tr('designLab.intro', 'Every component of this AIMEAT\'s own interface, drawn live with its example data. Open a component to see every variant in light and dark, at a phone width, and what it is for.')}<//>
+    <${ModeSwitch} label=${tr('designLab.filterLabel', 'Which components')}>
       ${Object.keys(FILTERS).map((f) => html`
         <${FoldButton} key=${f} on=${filter === f} onClick=${() => setFilter(f)}>
           ${tr('designLab.filter.' + f, { all: 'All', component: 'Components', shape: 'Shapes', unused: 'Unused' }[f])} (${count(f)})
         <//>`)}
     <//>
-    <${TextInput} id="design-lab-find" maxLength="80" placeholder=${tr('designLab.find', 'Find a part')} value=${q}
+    <${TextInput} id="design-lab-find" maxLength="80" placeholder=${tr('designLab.find', 'Find a component')} value=${q}
       onInput=${(e) => setQ(e.target.value)} />
     ${shown.length === 0
-      ? html`<${QuietNote}>${tr('designLab.none', 'No part matches.')}<//>`
+      ? html`<${QuietNote}>${tr('designLab.none', 'No component matches.')}<//>`
       : html`
         <${Specimens}>
           ${shown.map((e) => html`
@@ -130,7 +131,7 @@ function PartDetail({ id, onBack, look }) {
   if (error) return html`<${ErrorNote} text=${error} />`;
   if (!entry) return html`<${QuietNote}>…<//>`;
   return html`
-    <${BackLink} href="#" onClick=${(e) => { e.preventDefault(); onBack(); }}>↩ ${tr('designLab.back', 'All parts')}<//>
+    <${BackLink} href="#" onClick=${(e) => { e.preventDefault(); onBack(); }}>↩ ${tr('designLab.back', 'All components')}<//>
     <${PageIntro} title=${spaced(entry.name)} sub=${entry.summary} />
     ${entry.note && html`<${BandNote}>${entry.note}<//>`}
 

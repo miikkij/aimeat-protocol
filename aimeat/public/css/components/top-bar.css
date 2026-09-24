@@ -7,6 +7,7 @@
  * @usage Linked from public/spa.html right after theme.css, in the order theme.css held these rules
  *   (the shell block), and from every standalone page that links theme.css.
  * @version-history
+ *   v1.2.0 — 2026-09-24 — The look on a phone: the menu carries light/dark, the themes and the styles.
  *   v1.1.0 — 2026-09-24 — A notification's actions are menu rows in a column.
  *   v1.0.0 — 2026-09-24 — Moved unchanged from css/theme.css (lines 636-958), so theme.css
  *     holds tokens only (UI consolidation, a move).
@@ -279,6 +280,14 @@
      compact case had been measured clean and mistaken for the whole story. The media query is the
      scope; the class was redundant where it worked and wrong where it did not. */
   .aimeat-auth-pill .aimeat-ctl { display: none !important; }
+}
+
+/* The look on a phone (spa.html LookMenu): the controls the pill hides above live in the menu, in
+   the language switch's own group. Not drawn at all above 640px, where the pill carries them. */
+.topnav-look, .topnav-look-note { display: none; }
+@media (max-width: 640px) {
+  .topnav-menu .topnav-look { display: flex; flex-wrap: wrap; width: fit-content; margin: 0.45rem 0.6rem 0.2rem; }
+  .topnav-menu .topnav-look-note { display: block; margin: 0.2rem 0.9rem; font-size: var(--text-caption); color: var(--text-dim); }
 }
 
 /* The "Me" dropdown (.topnav-me*) was removed on 2026-08-09. Apps, Profile and Admin are plain

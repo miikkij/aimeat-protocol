@@ -18,6 +18,8 @@
  *   - mutation routes: validate + persist mutable config, emit change events
  *
  * @version-history
+ *   v1.4.0 -- 2026-09-24 -- PUT's loop moved to services/config-apply.ts unchanged (a second door,
+ *     Themes & Styles' who-chooses, applies settings through it).
  *   v1.3.0 -- 2026-09-16 -- PUT answers a secret field (adminDisplay configured) with
  *     `{ configured }` in old_value and new_value, not the value. It returned the old value raw,
  *     and on aimeat.io that was the OpenRouter key the environment injected. GET marks a sealed
@@ -40,8 +42,9 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
-import { CONFIG_FIELDS, MUTABLE_CONFIG_MAP, DOT_PATH_TO_ENV, serializeConfigValue, readConfigField, writeConfigField } from '../services/config-schema.js';
-import { isSealed, isSecretField, sealRefusal } from '../services/config-sealing.js';
+import { CONFIG_FIELDS, MUTABLE_CONFIG_MAP, DOT_PATH_TO_ENV, serializeConfigValue, readConfigField } from '../services/config-schema.js';
+import { applyConfigChanges, type ConfigChange } from '../services/config-apply.js';
+import { isSealed, sealRefusal } from '../services/config-sealing.js';
 import type { ConfigProvenance } from '../services/config-provenance.js';
 import type { ConsulConfigService } from '../services/consul-config.js';
 import { applyConsulValues } from '../services/consul-config.js';
@@ -171,52 +174,9 @@ export function adminConfigRouter(
             return;
         }
 
-        const applied: { path: string; old_value: unknown; new_value: unknown; secret?: true }[] = [];
-        const errors: { path: string; reason: string }[] = [];
-
-        for (const change of changes) {
-            const { path, value } = change ?? {};
-            if (typeof path !== 'string' || value === undefined) {
-                errors.push({ path: path ?? '(missing)', reason: 'Each change must have "path" (string) and "value"' });
-                continue;
-            }
-            const mapping = MUTABLE_CONFIG_MAP[path];
-            if (!mapping) {
-                errors.push({ path, reason: `Unknown or immutable config path. Valid mutable paths: ${Object.keys(MUTABLE_CONFIG_MAP).join(', ')}` });
-                continue;
-            }
-            if (!mapping.validate(value)) {
-                errors.push({ path, reason: `Invalid value for ${path}` });
-                continue;
-            }
-            const oldValue = readConfigField(config, mapping);
-
-            // THE DURABLE WRITE FIRST, and the live one only if it took. This ran the other way
-            // round: the running node was changed, the persist was attempted, and a failure went to
-            // console.warn — not to the logger, so it reached no log this node keeps — while the
-            // loop carried on, the path went into `applied`, and the answer said "Changes survive
-            // restart". The operator was told a setting was saved when it was live-only and would
-            // vanish on the next boot, which is the worst of the three possible outcomes because
-            // nobody investigates a success.
-            try {
-                await storage.setConfigValue(path, serializeConfigValue(value));
-            } catch (e) {
-                logger.error('admin-config: a change could not be persisted, so it was not applied', { path, error: String(e) });
-                errors.push({
-                    path,
-                    reason: 'Could not be saved to this node\'s database. Nothing changed for this setting: it still has the value it had.',
-                });
-                continue;
-            }
-            writeConfigField(config, mapping, value);
-            if (provenance) provenance.markDatabase([path]);
-            // A secret is answered with whether it was and is configured, never with the value.
-            // The old value can be a key the host injected through the environment, which the
-            // operator may replace and must not read. Measured on aimeat.io 2026-09-16.
-            applied.push(isSecretField(mapping)
-                ? { path, old_value: { configured: !!oldValue }, new_value: { configured: !!value }, secret: true }
-                : { path, old_value: oldValue, new_value: value });
-        }
+        // The loop that checks, persists and applies each change: services/config-apply.ts, shared with
+        // the other door that changes settings (Themes & Styles' who-chooses).
+        const { applied, errors } = await applyConfigChanges({ config, storage, provenance }, changes as ConfigChange[]);
 
         if (applied.length === 0 && errors.length > 0) {
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'No valid changes applied', undefined, { errors }));

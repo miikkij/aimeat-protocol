@@ -137,20 +137,24 @@ export default function StyleScreen({ theme, styleId, vocabulary, readOnly, onBa
     <//>
 
     <${Band} title=${t('themes.mainColours')} tight=${true}>
+      <${Hint}>${t('themes.accentOthers')}<//>
       ${MAIN.map((tk) => html`<${ColourRow} key=${tk} name=${tk} light=${light[tk]} dark=${dark[tk]} readOnly=${readOnly} onChange=${(mode, v) => set(mode, tk, v)} />`)}
     <//>
     <${Collapsible} title=${t('themes.everyColour', { n: GROUPS.flatMap(([, tokens]) => tokens).filter((tk) => !MAIN.includes(tk)).length })} open=${every} onToggle=${() => setEvery(!every)}>
-      ${GROUPS.map(([group, tokens]) => html`
-        <${Band} key=${group} title=${t('themes.group.' + group)} tight=${true}>
+      ${/* A group whose colours are all among the main ones has nothing left to show here. */''}
+      ${GROUPS.filter(([, tokens]) => tokens.some((tk) => !MAIN.includes(tk))).map(([group, tokens]) => html`
+        <section key=${group}>
+          <h3 class="poster-section-title">${t('themes.group.' + group)}</h3>
           ${tokens.filter((tk) => !MAIN.includes(tk)).map((tk) => html`<${ColourRow} key=${tk} name=${tk} light=${light[tk]} dark=${dark[tk]} readOnly=${readOnly} onChange=${(mode, v) => set(mode, tk, v)} />`)}
-        <//>`)}
+        </section>`)}
     <//>
 
     <${Band} title=${t('themes.faces')} tight=${true}>
+      ${!readOnly && html`<${Hint}>${t('themes.facesHint')}<//>`}
       ${['headline', 'body', 'mono'].map((slot) => html`
         ${readOnly
           ? html`<${NamedRow} key=${slot} label=${t('themes.face.' + slot)}>${faces[slot] || t('themes.faceAsBuilt')}<//>`
-          : html`<${Choice} key=${slot} label=${t('themes.face.' + slot)} hint=${t('themes.facesHint')} value=${faces[slot] || ''}
+          : html`<${Choice} key=${slot} label=${t('themes.face.' + slot)} value=${faces[slot] || ''}
             choices=${[{ value: '', label: t('themes.faceAsBuilt') }, ...vocabulary.faces.map((f) => ({ value: f, label: f }))]}
             onChoose=${(f) => setFaces({ ...faces, [slot]: f || undefined })} />`}`)}
     <//>

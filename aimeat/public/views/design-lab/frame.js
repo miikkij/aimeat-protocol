@@ -277,7 +277,7 @@ export default function DesignLabFrame() {
     return () => ro.disconnect();
   }, [example, demo, v, solo, sendChecks]);
 
-  if (!demo) return html`<p class="poster-specimen-stage">${tr('designLab.noDemo', 'No demo for this part.')}</p>`;
+  if (!demo) return html`<p class="poster-specimen-stage">${tr('designLab.noDemo', 'No demo for this component.')}</p>`;
   const variant = demo.variants[v] ?? demo.variants[0];
   if (example === null) return html`<div ref=${stage} class="poster-specimen-stage"></div>`;
 

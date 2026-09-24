@@ -48,7 +48,7 @@ export function registerUiLibraryTools(mcp: McpServer, storage: Storage, config:
         'aimeat_ui_component_get',
         descriptionFor('aimeat_ui_component_get'),
         {
-            id: z.string().min(1).max(80).describe("The part's id or name, from aimeat_ui_component_list."),
+            id: z.string().min(1).max(80).describe("The component's id or name, from aimeat_ui_component_list."),
         },
         annotationsFor('aimeat_ui_component_get'),
         async ({ id }) => {

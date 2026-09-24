@@ -10,6 +10,7 @@
  *   GET  /v1/themes/all                           public: every theme whole, its warnings, and what a
  *                                                 theme may set (?summary=1: core colours only)
  *   GET  /v1/themes/choice   PUT                  a signed-in person's own { theme, style }
+ *   PUT  /v1/themes/policy                        operator: who chooses, the available themes, the default
  *   POST /v1/themes/preview                       operator: a draft's stylesheet and warnings, unsaved
  *   POST /v1/themes                               operator: a new theme, a copy of basedOn
  *   GET  /v1/themes/:id                           public: one theme, its warnings, its versions
@@ -24,7 +25,7 @@
  *   Reading is public: a theme is CSS every visitor of AIMEAT's own pages downloads anyway. Writing
  *   goes through requireOperatorPrincipal with site:theme-write (Jouni: only the operator edits), so
  *   the operator's own agent can make and repair a theme from a chat.
- * @structure themesRouter(config, storage, requireNotLb?)
+ * @structure themesRouter(config, storage, requireNotLb?, provenance?)
  * @usage router.use(themesRouter(config, storage, requireNotLb));  (mounted by routes/site.ts)
  * @version-history
  *   v2.0.0 — 2026-09-24 — The two-level model of 07: styles, component CSS, versions, previews,
@@ -40,10 +41,11 @@ import { resolveIdentity } from '../utils/gaii.js';
 import { THEME_WRITE_SCOPE } from '../utils/scope-coverage.js';
 import { ThemeService, ThemeError, type ThemeInput, type Theme } from '../services/themes/service.js';
 import type { StyleInput } from '../services/themes/styles.js';
+import type { ConfigProvenance } from '../services/config-provenance.js';
 import { requireOwnerSession } from './home/welcome-mat.js';
 import { onChangeEvent } from '../services/event-bus.js';
 
-export function themesRouter(config: AimeatConfig, storage: Storage, requireNotLb?: RequestHandler): Router {
+export function themesRouter(config: AimeatConfig, storage: Storage, requireNotLb?: RequestHandler, provenance?: ConfigProvenance): Router {
     const router = Router();
     const svc = new ThemeService(config, storage);
     const notLb: RequestHandler[] = requireNotLb ? [requireNotLb] : [];
@@ -89,6 +91,12 @@ export function themesRouter(config: AimeatConfig, storage: Storage, requireNotL
             return;
         }
         try { res.json(success(config.nodeId, await svc.choiceSet(by(req), theme, style as string | undefined))); } catch (err) { sendError(res, err); }
+    });
+
+    // Who chooses: before /v1/themes/:id, or "policy" would be read as a theme id.
+    router.put('/v1/themes/policy', ...operator, ...notLb, async (req, res) => {
+        const { personalChoice, offered, default: def } = (req.body ?? {}) as { personalChoice?: boolean; offered?: string[]; default?: string };
+        try { res.json(success(config.nodeId, await svc.setPolicy({ personalChoice, offered, default: def }, provenance))); } catch (err) { sendError(res, err); }
     });
 
     router.post('/v1/themes/preview', ...operator, async (req, res) => {

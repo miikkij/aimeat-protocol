@@ -22,6 +22,7 @@ import { ActionRow } from '/components/ActionRow.js';
 import { Hint } from '/components/Hint.js';
 import { ErrorNote } from '/components/ErrorNote.js';
 import { ConfirmDialog } from '/components/Modal.js';
+import { SearchBar } from '/components/SearchBar.js';
 import { Specimens, Specimen } from '/components/Specimen.js';
 import { Choice, StylePicker, CssEditor, WarningList } from './themes-bits.js';
 import { useDraftSheets, useFrameChecks, newFindings, componentFrame } from './themes-draft.js';
@@ -34,6 +35,7 @@ export default function ThemeCssTab({ theme, readOnly, onSaved }) {
   const [css, setCss] = useState(saved);
   const [style, setStyle] = useState(theme.defaultStyle);
   const [part, setPart] = useState(SAMPLER);
+  const [find, setFind] = useState('');
   const [components, setComponents] = useState(/** @type {any[]} */ ([]));
   const [state, setState] = useState({ busy: false, error: '', saved: false });
   const [removing, setRemoving] = useState(false);
@@ -60,12 +62,24 @@ export default function ThemeCssTab({ theme, readOnly, onSaved }) {
     }
   };
   const frame = (mode, withCss) => componentFrame({ id: part, mode, key: withCss ? 'css-with' : 'css-without', style, fk: `s6:${mode}:${withCss ? 'with' : 'without'}` });
-  const choices = [{ value: SAMPLER, label: t('themes.sampler') }, ...components.map((c) => ({ value: c.id, label: String(c.name).replace(/([a-z])([A-Z])/g, '$1 $2') }))];
+  // Over a hundred components: words narrow the list, and the one shown stays in it.
+  const words = find.toLowerCase().split(/\s+/).filter(Boolean);
+  const named = components.map((c) => ({ value: c.id, label: String(c.name).replace(/([a-z])([A-Z])/g, '$1 $2'), text: `${c.id} ${c.name} ${c.summary || ''}`.toLowerCase() }));
+  const choices = [{ value: SAMPLER, label: t('themes.sampler') },
+    ...named.filter((c) => c.value === part || words.every((w) => c.text.includes(w))).map(({ value, label }) => ({ value, label }))];
+  // Typing shows the first match in the frames at once, so the search is seen to work.
+  const narrow = (text) => {
+    setFind(text);
+    const ws = text.toLowerCase().split(/\s+/).filter(Boolean);
+    const first = ws.length ? named.find((c) => ws.every((w) => c.text.includes(w))) : null;
+    if (first) setPart(first.value);
+  };
 
   return html`
-    <${Band} title=${t('themes.tab.css')}>
+    <${Band}>
       <${Hint}>${readOnly ? t('themes.builtinHint') : t('themes.themeCssHint')}<//>
       <${StylePicker} theme=${{ ...theme, styles: theme.styles.filter((s) => !s.retired) }} value=${style} onChoose=${setStyle} />
+      <${SearchBar} value=${find} onInput=${(e) => narrow(e.target.value)} placeholder=${t('themes.findInFrames')} ariaLabel=${t('themes.findInFrames')} />
       <${Choice} label=${t('themes.showComponent')} hint=${t('themes.showComponentHint')} value=${part} choices=${choices} onChoose=${setPart} />
       <${Specimens}>
         <${Specimen} key=${part + style + 'wl'} label=${t('themes.withoutLight')} src=${frame('light', false)} eager=${true} />

@@ -13254,7 +13254,14 @@
     "business": "Yrityksellesi",
     "learn": "Opi",
     "exchange": "EXCHANGE",
-    "members": "Jäsenet"
+    "members": "Jäsenet",
+    "lookMode": "Vaalea vai tumma",
+    "lookLight": "Vaalea",
+    "lookDark": "Tumma",
+    "lookLightOnly": "Tällä tyylillä on vain vaalea tila.",
+    "lookDarkOnly": "Tällä tyylillä on vain tumma tila.",
+    "lookThemes": "Teemat",
+    "lookStyles": "Tämän teeman tyylit"
   },
   "nav.chat": "Chat",
   "nav.glossary": "Sanasto",
@@ -19858,18 +19865,18 @@
     "doorSignIn": "Mulla on jo tili, kirjaa mut sisään →"
   },
   "designLab": {
-    "intro": "Jokainen tämän AIMEATin oman käyttöliittymän osa piirrettynä sen omalla komponentilla ja esimerkkitiedoilla. Avaa osa, niin näet sen jokaisen muunnelman vaaleana ja tummana, puhelimen leveydellä, ja mihin se on tarkoitettu.",
-    "filterLabel": "Mitkä osat",
+    "intro": "Jokainen tämän AIMEATin oman käyttöliittymän komponentti piirrettynä esimerkkitiedoillaan. Avaa komponentti, niin näet sen jokaisen muunnelman vaaleana ja tummana, puhelimen leveydellä, ja mihin se on tarkoitettu.",
+    "filterLabel": "Mitkä komponentit",
     "filter": {
       "all": "Kaikki",
       "component": "Komponentit",
       "shape": "Muodot",
       "unused": "Käyttämättömät"
     },
-    "find": "Etsi osa",
-    "none": "Yksikään osa ei vastaa hakua.",
+    "find": "Etsi komponentti",
+    "none": "Yksikään komponentti ei vastaa hakua.",
     "unused": "käyttämätön",
-    "back": "Kaikki osat",
+    "back": "Kaikki komponentit",
     "light": "Vaalea",
     "dark": "Tumma",
     "phone": "Puhelimessa",
@@ -19881,7 +19888,7 @@
     "noPages": "mikään sivu ei piirrä sitä",
     "tokens": "Teeman arvot",
     "code": "Koodi",
-    "noDemo": "Tälle osalle ei ole esimerkkiä.",
+    "noDemo": "Tälle komponentille ei ole esimerkkiä.",
     "modeLabel": "Mitä laboratorio näyttää",
     "modeLibrary": "Kirjasto",
     "modeDecisions": "Päätökset",
@@ -19983,11 +19990,11 @@
     "lookTheme": "Teema",
     "lookThemeHint": "Kaikki tämän palvelimen teemat, myös ne, joita ihmiset eivät voi valita.",
     "lookStyle": "Tyyli",
-    "lookStyleHint": "Teeman kaikki tyylit. Alla olevat osat näyttävät valitun.",
+    "lookStyleHint": "Teeman kaikki tyylit. Alla olevat komponentit näyttävät valitun.",
     "builtWithout": "Rakennettu ilman päätöstä: {title}"
   },
   "themes": {
-    "intro": "Tämän AIMEATin omien sivujen ulkoasut (koti, keskustelu, Asetukset ja hallinta, ylläpito). Teemassa on tyylejä, ja tyylillä on värit vaaleassa ja tummassa tilassa. Ihmiset valitsevat sivun yläreunan ulkoasun valitsimesta. Kun tämä näkymä on auki, se näyttää valmiin ulkoasun, joten teema ei voi rikkoa sitä.",
+    "intro": "Tämän AIMEATin omien sivujen ulkoasut (koti, keskustelu, Asetukset ja hallinta, ylläpito). Teemassa on tyylejä, ja tyylillä on värit vaaleassa ja tummassa tilassa. Ihmiset valitsevat sivun yläreunan ulkoasun valitsimesta, puhelimessa valikosta. Kun tämä näkymä on auki, se näyttää valmiin ulkoasun, joten teema ei voi rikkoa sitä.",
     "loading": "Ladataan…",
     "themes": "Teemat",
     "newTheme": "Uusi teema",
@@ -20026,7 +20033,7 @@
     "undo": "Kumoa muutokset",
     "allThemes": "Kaikki teemat",
     "builtinHint": "Tämä on valmis ja vain luettava. Kopioi se, jos haluat muuttaa sitä.",
-    "copyToChange": "Kopioi ja muuta",
+    "copyToChange": "Tee kopio",
     "tab": {
       "styles": "Tyylit",
       "components": "Komponentit",
@@ -20034,7 +20041,7 @@
       "pages": "Oikeilla sivuilla"
     },
     "styles": "Tyylit",
-    "stylesHint": "Tyyli on yksi värijoukko vaaleassa ja tummassa tilassa, kolme kirjasinta ja tila. Ihmiset valitsevat tarjoamistasi tyyleistä.",
+    "stylesHint": "Tyyli on yksi värijoukko vaaleassa ja tummassa tilassa, kolme kirjasinta ja tieto siitä, onko tyylillä molemmat tilat vai vain toinen. Ihmiset valitsevat tarjoamistasi tyyleistä.",
     "newStyle": "Uusi tyyli",
     "inPill": "ulkoasun valitsimessa",
     "notInPill": "ei ulkoasun valitsimessa",
@@ -20067,7 +20074,7 @@
     "phone": "Puhelimessa",
     "details": "Tiedot: nimet koodissa",
     "faces": "Kirjasimet",
-    "facesHint": "Vain tämän palvelimen omat kirjasimet.",
+    "facesHint": "Vain tämän palvelimen omat kirjasimet. Sivun yläreunan esikatselu näyttää valitsemasi kirjasimet.",
     "faceAsBuilt": "Kuten valmiissa tyylissä",
     "face": {
       "headline": "Otsikot",
@@ -20121,9 +20128,9 @@
       "controlBorder": "Painikkeen reuna",
       "codeBg": "Koodin tausta",
       "scrollbarThumb": "Vierityspalkki",
-      "morselBg": "Morsel-merkki",
+      "morselBg": "Yläpalkin lukumäärämerkki (♥ 1000)",
       "pfHeroGradient": "Asetukset ja hallinta -sivun yläosa",
-      "pfCtaGradient": "Toimintakehotuksen paneeli",
+      "pfCtaGradient": "Paneeli, joka pyytää tekemään jotain",
       "pfCalloutGradient": "Huomiolaatikko",
       "sun": "Huomioväri: tummien paneelien varjo, valittu välilehti, osion reuna",
       "onSun": "Teksti huomiovärin päällä"
@@ -20144,11 +20151,10 @@
       "none": "Ei omaa CSS:ää tässä teemassa",
       "empty": "Ei omaa CSS:ää tässä teemassa",
       "served": "Tässä teemassa on oma CSS",
-      "stale": "Sen CSS ei ole nyt käytössä",
+      "stale": "Sen CSS ei ole käytössä: yksikään sen sääntö ei ala tämän komponentin luokista",
       "broken": "Sen CSS on virheellinen, joten sitä ei käytetä",
       "removed": "Poistettu komponentti"
     },
-    "staleWhy": "yksikään sen säännöistä ei enää ala komponentin luokista",
     "removedWhy": "Tätä komponenttia ei enää ole sivuilla. Sen CSS säilyy, mutta sitä ei käytetä.",
     "deleteCss": "Poista sen CSS",
     "allComponents": "Kaikki komponentit",
@@ -20175,7 +20181,7 @@
       "motion": "{property} liikuttaa asioita myös niille, jotka ovat pyytäneet laitteeltaan vähemmän liikettä. Sijoita se lohkoon @media (prefers-reduced-motion: no-preference).",
       "literalColour": "{property} käyttää kiinteää väriä, joten se näyttää samalta kaikissa tyyleissä ja sekä vaaleassa että tummassa tilassa. Tyylin arvo, kuten var(--accent), seuraa tyyliä.",
       "face": "Tämä palvelin ei tarjoa tätä kirjasinta, joten selain käyttää toista.",
-      "outside": "Tämä sääntö ei ala komponentin luokista, joten se muuttaa myös muita asioita sivulla.",
+      "outside": "Tämä sääntö ei ala komponentin luokista, joten se voi muuttaa mitä tahansa tämän teeman jokaisella sivulla.",
       "loads": "Tämä lataa tiedoston. Palvelimen sisältökäytäntö päättää, saako selain ladata sen."
     },
     "check": {
@@ -20207,24 +20213,24 @@
       "fleet": "Agentit"
     },
     "use": {
-      "view": "katselu",
-      "edit": "muokkaus",
-      "list": "luettelo",
-      "pick": "valinta",
-      "compare": "vertailu",
-      "status": "tila",
-      "navigate": "siirtyminen",
-      "converse": "keskustelu",
-      "act": "toiminta",
-      "copy": "kopiointi",
-      "explain": "selitys",
-      "count": "määrä",
-      "search": "haku",
-      "notify": "ilmoitus",
-      "wait": "odotus",
-      "layout": "asettelu",
-      "open": "avaaminen",
-      "confirm": "vahvistus"
+      "view": "Näyttäminen",
+      "edit": "Muokkaaminen",
+      "list": "Luettelot",
+      "pick": "Valitseminen",
+      "compare": "Vertailu",
+      "status": "Tila",
+      "navigate": "Siirtyminen",
+      "converse": "Keskustelu",
+      "act": "Toiminnot",
+      "copy": "Kopiointi",
+      "explain": "Selittäminen",
+      "count": "Luvut",
+      "search": "Haku",
+      "notify": "Ilmoitukset",
+      "wait": "Odottaminen",
+      "layout": "Sivun asettelu",
+      "open": "Avaaminen",
+      "confirm": "Vahvistaminen"
     },
     "factLightOnly": "vain vaalea",
     "factDarkOnly": "vain tumma",
@@ -20242,6 +20248,10 @@
     "hidesConfirm": "Tämän CSS:n kanssa kehykset eivät näe tai tavoita näitä: {list}. Ihmiset eivät ehkä voi käyttää niitä. Tallennetaanko silti?",
     "renameTheme": "Nimeä teema uudelleen…",
     "lastTheme": "Vähintään yksi teema pysyy valittavana: ota toinen käyttöön ennen kuin poistat tämän.",
-    "noCss": "Ei CSS:ää."
+    "noCss": "Ei CSS:ää.",
+    "filters": "Rajaukset",
+    "reachesAll": "Osa sen säännöistä ei ala komponentin luokista, joten ne voivat muuttaa tämän teeman jokaista sivua.",
+    "findInFrames": "Etsi näytettävä komponentti",
+    "accentOthers": "Korostusvärin vaaleampi, tummempi ja haalea sävy eivät seuraa sitä. Aseta ne kohdassa \"Kaikki muut värit\"."
   }
 }

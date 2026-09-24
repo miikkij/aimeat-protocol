@@ -6,14 +6,14 @@
  *   marks, the pickers for a style and for light or dark, and the CSS editor with its warnings (S5,
  *   S6). A warning comes from the node with a code and a line, and is said here in the reader's
  *   language, because the node's own sentence is English.
- * @structure StyleMarks · Choice · ColourMark · StylePicker · ModePicker · tokenKey · warningText · checkText · CssEditor ·
- *   WarningList · versionLabel
+ * @structure StyleMarks · Choice · GradientMark · ColourMark · StylePicker · ModePicker · tokenKey · warningText · checkText · CssEditor ·
+ *   WarningList · useOpenAtTop · versionLabel
  * @usage import { StyleMarks, CssEditor } from './themes-bits.js';
  * @version-history
  *   v1.0.0 — 2026-09-24 — Initial (UI consolidation phase 4, Themes & Styles).
  */
 import { h } from 'preact';
-import { useRef } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { dateTime } from '/js/format.js';
@@ -70,10 +70,30 @@ export function Choice({ label, hint, value, choices, onChoose, id }) {
   <//>`;
 }
 
+/** The plain colours a gradient passes through, in order: hex, rgb() and hsl() stops only. */
+const STOPS = /#[0-9a-f]{3,8}\b|(?:rgb|hsl)a?\([^)]*\)/gi;
+let gradientIds = 0;
+
+/**
+ * A gradient as a strip of its colours, left to right. The angle and the stop positions are not
+ * drawn: the strip says which colours it holds, and the preview frames show the gradient itself.
+ */
+function GradientMark({ value }) {
+  const stops = String(value).match(STOPS) || [];
+  const [id] = useState(() => `theme-grad-${++gradientIds}`);
+  if (stops.length < 2) return null;
+  return html`<svg width="44" height="18" viewBox="0 0 44 18" aria-hidden="true">
+    <defs><linearGradient id=${id}>
+      ${stops.map((c, i) => html`<stop key=${i} offset=${i / (stops.length - 1)} stop-color=${c} />`)}
+    </linearGradient></defs>
+    <rect x="0.5" y="0.5" width="43" height="17" fill=${`url(#${id})`} stroke="currentColor" />
+  </svg>`;
+}
+
 /** One colour as a small square beside its value, so a value reads as the colour it is. */
 export function ColourMark({ value }) {
-  // A gradient is not one colour: an SVG fill cannot draw it, so it has no square.
-  if (!value || value.includes('gradient(')) return null;
+  if (!value) return null;
+  if (value.includes('gradient(')) return html`<${GradientMark} value=${value} />`;
   return html`<svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
     <rect x="0.5" y="0.5" width="17" height="17" fill=${value || 'transparent'} stroke="currentColor" />
   </svg>`;
@@ -152,6 +172,17 @@ export function CssEditor({ id, label, value, onInput, classes = [], usual = [],
           onInput=${(e) => onInput(/** @type {HTMLTextAreaElement} */ (e.currentTarget).value)} />`}
     ${!readOnly && html`<${Hint}>${t('themes.cssFree')}<//>`}
   </div>`;
+}
+
+/**
+ * A screen opened from a list starts at its top, where its name and its way back are. The page keeps
+ * the list's scroll position otherwise, and a theme opened from far down showed its middle.
+ */
+export function useOpenAtTop(key) {
+  useEffect(() => {
+    (document.querySelector('.page-content') || window).scrollTo(0, 0);
+    window.scrollTo(0, 0);
+  }, [key]);
 }
 
 /** "24 Sep, 14:05" in the reader's own format and time zone: short enough for a phone's row. */

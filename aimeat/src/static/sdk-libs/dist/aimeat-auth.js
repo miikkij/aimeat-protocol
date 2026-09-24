@@ -291,7 +291,10 @@
     }
     var seg = fixed ? ' class="aimeat-seg aimeat-seg--fixed" title="' + escHtml(why) + '" aria-label="' + escHtml(why) + '"' : ' class="aimeat-seg" aria-label="' + escHtml(i.themeLabel || "Theme") + '"';
     var off2 = fixed ? ' disabled aria-disabled="true" title="' + escHtml(why) + '"' : "";
-    return '<span id="aimeat-mode-switch" role="group"' + seg + '><button type="button" data-mode="light" aria-pressed="' + (cur === "light") + '"' + (fixed ? off2 : ' title="' + escHtml(light) + '"') + ' aria-label="' + escHtml(fixed ? why : light) + '"><span class="seg-ico" aria-hidden="true">☀</span></button><button type="button" data-mode="dark" aria-pressed="' + (cur === "dark") + '"' + (fixed ? off2 : ' title="' + escHtml(dark) + '"') + ' aria-label="' + escHtml(fixed ? why : dark) + '"><span class="seg-ico" aria-hidden="true">☾</span></button></span>';
+    var onlyWord = function(m) {
+      return only === m ? '<span aria-hidden="true">' + escHtml(i.modeOnly || "only") + "</span>" : "";
+    };
+    return '<span id="aimeat-mode-switch" role="group"' + seg + '><button type="button" data-mode="light" aria-pressed="' + (cur === "light") + '"' + (fixed ? off2 : ' title="' + escHtml(light) + '"') + ' aria-label="' + escHtml(fixed ? why : light) + '"><span class="seg-ico" aria-hidden="true">☀</span>' + onlyWord("light") + '</button><button type="button" data-mode="dark" aria-pressed="' + (cur === "dark") + '"' + (fixed ? off2 : ' title="' + escHtml(dark) + '"') + ' aria-label="' + escHtml(fixed ? why : dark) + '"><span class="seg-ico" aria-hidden="true">☾</span>' + onlyWord("dark") + "</button></span>";
   }
   function wireModeSwitch(container) {
     var root = container.querySelector("#aimeat-mode-switch");
@@ -597,7 +600,8 @@
       styleLightOnly: "This style has a light mode only",
       styleDarkOnly: "This style has a dark mode only",
       lookThemes: "Themes",
-      lookStyles: "Styles",
+      lookStyles: "Styles in this theme",
+      modeOnly: "only",
       chooseLook: "Choose look",
       switchLanguage: "Language",
       pageSettings: "Settings"
@@ -616,7 +620,8 @@
       styleLightOnly: "Tällä tyylillä on vain vaalea tila",
       styleDarkOnly: "Tällä tyylillä on vain tumma tila",
       lookThemes: "Teemat",
-      lookStyles: "Tyylit",
+      lookStyles: "Tämän teeman tyylit",
+      modeOnly: "vain",
       chooseLook: "Valitse tyyli",
       switchLanguage: "Kieli",
       pageSettings: "Asetukset"
@@ -635,7 +640,8 @@
       styleLightOnly: "Este estilo solo tiene modo claro",
       styleDarkOnly: "Este estilo solo tiene modo oscuro",
       lookThemes: "Temas",
-      lookStyles: "Estilos",
+      lookStyles: "Estilos de este tema",
+      modeOnly: "solo",
       chooseLook: "Elige el aspecto",
       switchLanguage: "Idioma",
       pageSettings: "Ajustes"
@@ -777,13 +783,13 @@
     var head = function(text) {
       return '<span class="aimeat-pop-head">' + esc(text) + "</span>";
     };
-    return '<span id="aimeat-palette-switch" class="aimeat-pop-wrap"><button type="button" class="aimeat-pop-btn" aria-haspopup="listbox" aria-expanded="false" title="' + esc(label) + '" aria-label="' + esc(label) + '"><span class="aimeat-pal-dot" style="background:' + esc(curAcc) + '"></span></button><span class="aimeat-pop" role="listbox">' + (s && s.only ? '<span class="aimeat-pop-note">' + esc(s.only === "light" ? i && i.styleLightOnly || "This style has a light mode only" : i && i.styleDarkOnly || "This style has a dark mode only") + "</span>" : "") + (themes ? head(i && i.lookThemes || "Themes") + themes.map(function(t) {
+    return '<span id="aimeat-palette-switch" class="aimeat-pop-wrap"><button type="button" class="aimeat-pop-btn" aria-haspopup="listbox" aria-expanded="false" title="' + esc(label) + '" aria-label="' + esc(label) + '"><span class="aimeat-pal-dot" style="background:' + esc(curAcc) + '"></span></button><span class="aimeat-pop" role="listbox" aria-label="' + esc(label) + '">' + (s && s.only ? '<span class="aimeat-pop-note">' + esc(s.only === "light" ? i && i.styleLightOnly || "This style has a light mode only" : i && i.styleDarkOnly || "This style has a dark mode only") + "</span>" : "") + (themes ? head(i && i.lookThemes || "Themes") + themes.map(function(t) {
       var def = t.styles.find(function(x) {
         return x.id === t.defaultStyle;
       }) || t.styles[0];
-      return '<button type="button" role="option" data-look-theme="' + esc(t.id) + '" aria-label="' + esc(t.name) + '" aria-pressed="' + (t.id === s.theme) + '">' + (def ? chipHtml(def.swatch[mode]) : "") + esc(t.name) + "</button>";
-    }).join("") + head(i && i.lookStyles || "Styles") : "") + list.map(function(p) {
-      return '<button type="button" role="option" data-palette="' + esc(p.id) + '" aria-label="' + esc(p.label) + '" aria-pressed="' + (p.id === cur) + '">' + chipHtml(p.swatch[mode]) + esc(p.label) + "</button>";
+      return '<button type="button" role="option" data-look-theme="' + esc(t.id) + '" aria-label="' + esc(t.name) + '" aria-pressed="' + (t.id === s.theme) + '" aria-selected="' + (t.id === s.theme) + '">' + (def ? chipHtml(def.swatch[mode]) : "") + esc(t.name) + "</button>";
+    }).join("") + head(i && i.lookStyles || "Styles in this theme") : "") + list.map(function(p) {
+      return '<button type="button" role="option" data-palette="' + esc(p.id) + '" aria-label="' + esc(p.label) + '" aria-pressed="' + (p.id === cur) + '" aria-selected="' + (p.id === cur) + '">' + chipHtml(p.swatch[mode]) + esc(p.label) + "</button>";
     }).join("") + "</span></span>";
   }
   function wirePaletteControl(container, clampPopover2) {
@@ -815,6 +821,7 @@
       if (dot) dot.style.background = p.swatch[mode].accent;
       root.querySelectorAll("button[data-palette]").forEach(function(b) {
         b.setAttribute("aria-pressed", String(b.getAttribute("data-palette") === cur));
+        b.setAttribute("aria-selected", String(b.getAttribute("data-palette") === cur));
         var pp = list.find(function(x) {
           return x.id === b.getAttribute("data-palette");
         });

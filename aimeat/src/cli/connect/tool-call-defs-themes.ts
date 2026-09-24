@@ -11,6 +11,7 @@
  * @structure themeCliTools[] -- the shell handler table, registered by tool-call.ts · themeRequests
  * @usage import { themeCliTools } from './tool-call-defs-themes.js';
  * @version-history
+ *   v2.1.0 -- 2026-09-24 -- aimeat_theme_policy_set (PUT /v1/themes/policy).
  *   v2.0.0 -- 2026-09-24 -- The two-level model of 07: style and component CSS tools, restoreVersion,
  *     one request mapping shared with the connector MCP.
  *   v1.0.0 -- 2026-09-24 -- Initial (UI consolidation phase 4).
@@ -65,6 +66,10 @@ export async function themeRequests(client: AimeatClient, tool: string, input: J
                 ? client.put(`/v1/themes/${theme}/styles/${enc(style)}`, { ...body, ...dryRun })
                 : client.post(`/v1/themes/${theme}/styles`, { ...body, ...dryRun });
         }
+        case 'aimeat_theme_policy_set': {
+            const body = sent(input, [['personalChoice', 'boolean'], ['offered', 'array'], ['default', 'string']]);
+            return client.put('/v1/themes/policy', body);
+        }
         case 'aimeat_theme_component_css_set':
             return client.put(`/v1/themes/${enc(requiredString(input, 'theme'))}/components/${enc(requiredString(input, 'component'))}`,
                 { css: optionalString(input, 'css') || null, ...dryRun });
@@ -75,4 +80,5 @@ export async function themeRequests(client: AimeatClient, tool: string, input: J
 
 export const themeCliTools: ConnectCliToolDefinition[] = [
     'aimeat_theme_list', 'aimeat_theme_get', 'aimeat_theme_save', 'aimeat_theme_style_save', 'aimeat_theme_component_css_set',
+    'aimeat_theme_policy_set',
 ].map((name) => ({ name, handler: ({ client }, input) => themeRequests(client, name, input) }));

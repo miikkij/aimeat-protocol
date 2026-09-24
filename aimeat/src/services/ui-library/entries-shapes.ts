@@ -65,7 +65,7 @@ export const SHAPE_ENTRIES: UiEntryWritten[] = [
             { name: 'tile tab', class: 'poster-tab--tile', when: 'a choice among named looks (the background pattern): framed tiles, the chosen one on the sun' },
         ]),
     shape('slab', 'Slab', ['poster-slab', 'poster-slab--large', 'poster-slab--control', 'poster-slab--danger'], '<button class="btn-primary poster-slab">…</button>',
-        'An ink block with a sun shadow that moves when pressed.', 'The one primary action of a place.',
+        'The loud action: a filled block that moves when pressed (in the built-in look, a dark block with a yellow shadow).', 'The one primary action of a place.',
         [
             { name: 'large', class: 'poster-slab--large', when: 'the home\'s large door' },
             { name: 'control', class: 'poster-slab--control', when: 'a 44px button in a row of controls (New conversation, Send, a dialog\'s Save)' },
