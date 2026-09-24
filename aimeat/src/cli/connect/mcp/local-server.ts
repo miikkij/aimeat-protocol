@@ -34,6 +34,7 @@
  *     discovery-file lifecycle, signal handling.
  * @usage Called by mcp/server.ts `runServe()` when `--http`/`--daemon` is set.
  * @version-history
+ *   2026-09-24 — An enrolment offer is handed the identity whose socket carried it (A9-2).
  *   2026-09-24 — One admission check in front of every route (./local-admission.ts): a loopback Host
  *     for this port, no Origin, and the per-start secret written into serve.json (secaudit A9-1).
  *   2026-09-24 — `GET /local/stats` (./local-stats.ts): uptime, memory, CPU, traffic, delivery feed.
@@ -258,6 +259,8 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
         if (frame.capability === ENROL_CAPABILITY) {
           const id = frame.id;
           void handleEnrolOffer(frame.input, {
+            // The identity whose socket carried this offer: the offer is checked against it (A9-2).
+            receiver: entry,
             // Never `tunnel` directly: see the note above. A refusal naming the missing wire beats
             // a TDZ ReferenceError, which reaches the owner's button as a stack-trace phrase.
             forward: (m, p, o) => {

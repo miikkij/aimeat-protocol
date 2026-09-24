@@ -25,18 +25,37 @@
  *   WHAT THIS DOES NOT DO. Decide what the agents are (the node does, from its own template), or run
  *   them (their runtime does). This gets them credentialled and served.
  *
+ *   WHO MAY OFFER WHAT. An offer arrives on the socket of ONE identity this daemon holds, and a
+ *   daemon may hold identities on several nodes run by different people. So an offer is bound to
+ *   that receiving identity before anything else happens: it must name the receiver's owner, a node
+ *   URL with the receiver's origin and the receiver's node id; every name must fit the node's own
+ *   name grammar before a path is built from it; and a key, bearer or settings file this connector
+ *   already holds for another node is never written over. The written settings take the receiver's
+ *   own node URL, the one this daemon already reaches that node on.
+ *
  * @structure
- *   - EnrolOffer / EnrolledAgent — the wire shapes
+ *   - EnrolOffer / EnrolledAgent / EnrolReceiver — the wire shapes and the receiving identity
+ *   - refuseUnboundOffer / heldForAnotherNode — the binding checks, before any write
  *   - handleEnrolOffer(offer, deps) — the whole flow, answering the invoke
  * @usage
  *   onInvoke: (frame) => frame.capability === ENROL_CAPABILITY
- *     ? handleEnrolOffer(frame.input, deps).then(r => tunnel.replyInvoke(frame.id, r.ok, r.result))
+ *     ? handleEnrolOffer(frame.input, { receiver: entry, ...deps }).then(r => tunnel.replyInvoke(frame.id, r.ok, r.result))
  *     : inv.handleInvoke(frame)
  * @version-history
+ *   v1.1.0 — 2026-09-24 — The offer is bound to the identity whose socket carried it: owner, node
+ *     origin and node id must be the receiver's, names must fit the node's grammar before any path
+ *     is built, and nothing held for another node is written over (secaudit 2026-09, A9-2).
  *   v1.0.0 — 2026-08-31 — Initial (Agent v2, V1).
  */
-import { savePerAgentConfig, loadPerAgentConfig, type AimeatPerAgentConfig } from './config.js';
-import { generateAgentKey, signCompact, storeAgentKey, cacheToken, type AgentKey } from './agent-key.js';
+import {
+  savePerAgentConfig, loadPerAgentConfig, peekPerAgentConfig, fallbackConfigFor, type AimeatPerAgentConfig,
+} from './config.js';
+import {
+  generateAgentKey, signCompact, storeAgentKey, cacheToken, getAgentKey, hasAgentKey, type AgentKey,
+} from './agent-key.js';
+import { getToken } from './keychain.js';
+import { gaiiFromToken, gaiiParts } from './agent-gaii.js';
+import { buildGAII, parseGAII } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
 
 /** The capability the node sends this under. Kept in step with routes/agents-v2/basic-agents.ts. */
@@ -75,7 +94,16 @@ interface EnrolledAgent {
   run_mode?: string;
 }
 
+/** The identity whose socket carried the offer. Structural: the daemon's RegisteredAgent fits it. */
+export interface EnrolReceiver {
+  gaii: string;
+  owner: string;
+  config: { node_url: string };
+}
+
 export interface EnrolDeps {
+  /** Who the offer arrived for. Everything in the offer is checked against this before any write. */
+  receiver: EnrolReceiver;
   /** Forward a request over the daemon's existing tunnel, so it authenticates as this daemon. */
   forward(method: string, path: string, opts: { body?: unknown }): Promise<{ status: number; body: unknown }>;
   /** Bring one newly credentialled agent into the live registry and give it its own tunnel. */
@@ -95,6 +123,65 @@ function isOffer(v: unknown): v is EnrolOffer {
     && o.agents.every(a => a && typeof a === 'object' && typeof (a as EnrolOfferAgent).name === 'string');
 }
 
+/** `scheme://host[:port]`, or null for something that is not an http(s) URL. */
+function originOf(url: string): string | null {
+  if (!URL.canParse(url)) return null;
+  const origin = new URL(url).origin;
+  return origin === 'null' ? null : origin;
+}
+
+type Refusal = { ok: false; result: { code: string; message: string } };
+const refusal = (code: string, message: string): Refusal => ({ ok: false, result: { code, message } });
+
+/**
+ * The offer against the identity that received it. Null when it is bound to that identity; a
+ * refusal otherwise. Reads nothing from disk and writes nothing.
+ */
+function refuseUnboundOffer(offer: EnrolOffer, receiver: EnrolReceiver): Refusal | null {
+  if (offer.owner !== receiver.owner) {
+    return refusal('OFFER_NOT_FOR_THIS_OWNER', `This offer names the account "${offer.owner}", but it arrived for an agent of "${receiver.owner}".`);
+  }
+  const origin = originOf(offer.node_url);
+  if (!origin || origin !== originOf(receiver.config.node_url)) {
+    return refusal('OFFER_FROM_ANOTHER_NODE', `This offer names the node ${offer.node_url}, but it arrived from ${receiver.config.node_url}.`);
+  }
+  if (offer.node_id !== gaiiParts(receiver.gaii)?.node) {
+    return refusal('OFFER_FROM_ANOTHER_NODE', `This offer names the node id "${offer.node_id}", but it arrived for ${receiver.gaii}.`);
+  }
+  const seen = new Set<string>();
+  for (const a of offer.agents) {
+    // The node's own grammar for the three parts, so no name can carry a path segment.
+    const expected = buildGAII(a.name, offer.owner, offer.node_id);
+    if (!parseGAII(expected) || seen.has(a.name)) {
+      return refusal('BAD_OFFER', `"${a.name}" is not an agent name this connector can take on.`);
+    }
+    if (a.gaii !== expected) {
+      return refusal('BAD_OFFER', `The offer names "${a.name}" as ${a.gaii}, which is not ${expected}.`);
+    }
+    seen.add(a.name);
+  }
+  return null;
+}
+
+/**
+ * What this connector already holds under (name, owner), when it came from another node: a
+ * sentence naming it, or null. A key or a bearer must be this very identity, and the settings the
+ * agent is served with must point at the offering node's origin. Reads only.
+ */
+async function heldForAnotherNode(name: string, owner: string, expectedGaii: string, origin: string): Promise<string | null> {
+  if (hasAgentKey(name, owner)) {
+    const key = await getAgentKey(name, owner);
+    if (key?.gaii !== expectedGaii) return `the key for ${name}@${owner} belongs to ${key?.gaii ?? 'an identity this connector cannot read'}`;
+  }
+  const token = await getToken(name, owner);
+  const tokenGaii = token ? gaiiFromToken(token) : null;
+  if (token && tokenGaii !== expectedGaii) return `the stored token for ${name}@${owner} belongs to ${tokenGaii ?? 'an identity this connector cannot read'}`;
+  // The settings it would be served with, however the loader arrives at them.
+  const settings = peekPerAgentConfig(name, owner) ?? (token ? fallbackConfigFor(name, owner) : null);
+  if (settings && originOf(settings.node_url) !== origin) return `the settings for ${name}@${owner} point at ${settings.node_url}`;
+  return null;
+}
+
 /**
  * Answer one enrolment offer. Never throws: the node is waiting on an `invoke_result`, and an
  * exception here would leave the owner's button spinning until the node's own timeout with nothing
@@ -106,6 +193,18 @@ export async function handleEnrolOffer(offer: unknown, deps: EnrolDeps): Promise
   }
   if (offer.agents.length === 0) {
     return { ok: false, result: { code: 'BAD_OFFER', message: 'The enrolment offer named no agents.' } };
+  }
+
+  // 0: BOUND TO THE RECEIVER, before a key is made, the node is asked or a path is built.
+  const unbound = refuseUnboundOffer(offer, deps.receiver);
+  if (unbound) return unbound;
+  const origin = originOf(deps.receiver.config.node_url) as string;
+  const held = (await Promise.all(offer.agents.map(a => heldForAnotherNode(a.name, offer.owner, a.gaii, origin))))
+    .filter((h): h is string => h !== null);
+  if (held.length) {
+    return refusal('HELD_FOR_ANOTHER_NODE',
+      `Nothing was enrolled, because this connector already holds these for another node: ${held.join('; ')}. `
+      + 'Remove them, or point them at this node, and ask again.');
   }
 
   // 1-2: a keypair and a signed card per agent, all in memory.
@@ -174,6 +273,15 @@ export async function handleEnrolOffer(offer: unknown, deps: EnrolDeps): Promise
   for (const e of enrolled) {
     const prep = prepared.find(p => p.offered.name === e.name);
     if (!prep) continue;
+    // The identity the node answers with is the one it was offered, and nothing held for another
+    // node appeared while the node was answering; otherwise this agent is not written.
+    const conflict = e.gaii !== prep.offered.gaii
+      ? `the node answered ${e.gaii} for ${prep.offered.gaii}`
+      : await heldForAnotherNode(e.name, offer.owner, e.gaii, origin);
+    if (conflict) {
+      failed.push({ name: e.name, message: conflict });
+      continue;
+    }
     try {
       await storeAgentKey(e.name, offer.owner, { ...prep.key, gaii: e.gaii, nodeId: offer.node_id });
       if (e.access_token) cacheToken(e.name, offer.owner, e.access_token, e.expires_in ?? 3600);
@@ -188,8 +296,10 @@ export async function handleEnrolOffer(offer: unknown, deps: EnrolDeps): Promise
       // names no agent had nobody to answer it, across 66 identities. Measured on disk, not
       // inferred: the write below carries these four, and it never saw them because the object
       // handed to it was built empty.
+      // The node URL is the RECEIVER's, the one this daemon already reaches that node on; the
+      // offer's has the same origin by now, but it is the node's word and this one is ours.
       const existing = loadPerAgentConfig(e.name, offer.owner) ?? {};
-      const perAgent: AimeatPerAgentConfig = { ...existing, node_url: offer.node_url };
+      const perAgent: AimeatPerAgentConfig = { ...existing, node_url: deps.receiver.config.node_url };
       savePerAgentConfig(e.name, offer.owner, perAgent);
       // The identity the node just confirmed, carried straight through: the registry keys by it
       // and must never have to assemble one from a name.
