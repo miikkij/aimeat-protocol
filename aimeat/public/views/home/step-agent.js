@@ -17,6 +17,8 @@
  * @structure StepAgent({ state, onChanged }) — the open step 2.
  * @usage import { StepAgent } from './step-agent.js';
  * @version-history
+ *   2026-09-24: A button that is not the next thing to do (no name yet, the prompt copied, started)
+ *     is the underlined action link (Jouni's decision "Step button").
  *   2026-09-23: AgentCard deleted (Jouni's decision): no page had drawn it since eaf81e18c
  *     (2026-08-18), when the one-line fleet summary took its place.
  *   2026-09-23: StepAgent is composed from library components (StepCard, StepLede, PasteLabel, Hint,
@@ -172,7 +174,7 @@ export function StepAgent({ onChanged, showToast }) {
             value=${agentName}
             onInput=${(e) => setAgentName(e.target.value)} />
           <${ActionRow}>
-            <button type="button" class=${cleanName ? 'poster-slab' : 'btn-outline'}
+            <button type="button" class=${cleanName ? 'poster-slab' : 'poster-action'}
               disabled=${!cleanName}
               onClick=${() => {
                 setAgentName(cleanName); setNamed(true);
@@ -208,14 +210,14 @@ export function StepAgent({ onChanged, showToast }) {
           <${PromptCard}
             label=${tr('home.agent.promptLabel', 'The prompt')}
             prompt=${prompt}
-            className=${waiting ? 'btn-outline' : 'poster-slab'}
+            className=${waiting ? 'poster-action' : 'poster-slab'}
             copyLabel=${tr('home.agent.copy', 'Copy the prompt')}
             copiedLabel=${tr('home.agent.copied', 'Copied. Paste it in your AI chat')}
             onCopied=${() => setWaiting(true)} />
         ` : html`
           <${StepList} steps=${steps} />
           <${ActionRow}>
-            <button type="button" class=${waiting ? 'btn-outline' : 'poster-slab'} onClick=${() => setWaiting(true)}>
+            <button type="button" class=${waiting ? 'poster-action' : 'poster-slab'} onClick=${() => setWaiting(true)}>
               ${tr('home.agent.doneManual', 'I have started it')}
             </button>
           <//>`}
