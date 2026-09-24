@@ -20,13 +20,15 @@
  *      username-choice step; finalize creates owner + GHII and establishes the session.
  * @structure PendingSignup + cookie/token helpers; maskOwnerName/emailHashOf/normalizeUsername/
  *   deriveUniqueUsername; externalIdUpdate; createOwnerForProvider; establishForGhii;
- *   mapExternalIdentity; finalizeExternalSignup; safeRedirectPath.
+ *   mapExternalIdentity; finalizeExternalSignup. (safeRedirectPath is utils/same-origin-path.ts.)
  * @usage const mapped = await mapExternalIdentity(storage, { providerId: 'google', … });
  * @version-history
  *   v1.0.0 — 2026-08-23 — Extracted from routes/oauth-login.ts (BR-04 phase 2). Two widenings:
  *     provider ids are strings (`saml:<connection>` joins the union), and createOwnerForProvider
  *     carries managedBy. One addition: adoption keys and the email-domain restriction, both
  *     no-ops for the OIDC callers.
+ *   v1.1.0 — 2026-09-24 — safeRedirectPath moved to utils/same-origin-path.ts, hardened there, so
+ *     every door that sends a browser to an address a request named asks one function.
  */
 import { createHash } from 'node:crypto';
 import { SignJWT, jwtVerify } from 'jose';
@@ -38,6 +40,7 @@ import { establishOwnerSession } from './owner-session.js';
 import { provisionOwner, registrationRefusal, type RegistrationVia } from './owner-provisioning.js';
 import { emitChange } from './event-bus.js';
 import { validateOwnerName } from '../utils/gaii.js';
+import { safeRedirectPath } from '../utils/same-origin-path.js';
 
 /** Name of the short-lived, signed cookie that carries a not-yet-finalized external signup. */
 export const PENDING_COOKIE = 'aimeat_pending_signup';
@@ -170,12 +173,6 @@ export function clearPendingCookie(req: Request, res: Response): void {
     sameSite: 'lax',
     path: PENDING_COOKIE_PATH,
   });
-}
-
-/** Sanitize a post-login redirect target: only same-site absolute paths are allowed. */
-export function safeRedirectPath(raw: unknown): string {
-  if (typeof raw === 'string' && raw.startsWith('/') && !raw.startsWith('//')) return raw;
-  return '/';
 }
 
 /**

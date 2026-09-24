@@ -17,6 +17,8 @@
  *   /v1/ghii/username-available, GET /v1/auth/providers (OIDC providers + listed SSO connections).
  * @usage const providers = buildOidcProviders(config); app.use(oauthLoginRouter(config, storage, providers));
  * @version-history
+ *   v3.1.0 — 2026-09-24 — safeRedirectPath comes from utils/same-origin-path.ts, its one home, where
+ *     it also refuses a backslash and a control character in the post-login address.
  *   v3.0.0 — 2026-08-23 — Pure extraction (BR-04): the mapping tree, pending-cookie machinery and
  *     finalize body moved to services/external-login.ts, shared with SAML. Behaviour-preserving
  *     for every OIDC provider. GET /v1/auth/providers additionally lists the LISTED SAML
@@ -41,10 +43,11 @@ import { AccountDisabledError } from '../auth/jwt.js';
 import {
   mapExternalIdentity, finalizeExternalSignup, establishForGhii,
   signPendingToken, verifyPendingToken, readPendingCookie, setPendingCookie,
-  safeRedirectPath, normalizeUsername,
+  normalizeUsername,
 } from '../services/external-login.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { validateOwnerName } from '../utils/gaii.js';
+import { safeRedirectPath } from '../utils/same-origin-path.js';
 import { logger } from '../utils/logger.js';
 
 export function oauthLoginRouter(

@@ -12,6 +12,8 @@
  * @structure safeNotificationLink, extensionCrossNotify
  * @usage if (opts?.to) return extensionCrossNotify(storage, config, ext.name, opts.to, message, opts);
  * @version-history
+ *   v1.3.0 — 2026-09-24 — A relative link is kept only when safeRedirectPath says it is a path of
+ *     this node, so `/\host` (which a browser reads as `//host`) falls back like any other address.
  *   v1.2.0 — 2026-08-30 — The notification names the extension as its source and lives in the bell
  *     store only; the parallel `notifications.<owner>` list, which nothing read, is no longer written.
  *   v1.0.0 — 2026-08-06 — Initial (TINKI watch push; generic for every extension)
@@ -22,6 +24,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { notify } from './notify.js';
 import { logger } from '../utils/logger.js';
+import { safeRedirectPath } from '../utils/same-origin-path.js';
 
 /**
  * Where an extension's notification may lead. A notification is a message the node delivers in its
@@ -32,8 +35,10 @@ import { logger } from '../utils/logger.js';
  */
 export function safeNotificationLink(config: AimeatConfig, link: unknown, fallback: string): string {
   if (typeof link !== 'string' || !link) return fallback;
-  // Relative path on this node. Reject protocol-relative "//host" — that leaves the node.
-  if (link.startsWith('/') && !link.startsWith('//')) return link.slice(0, 500);
+  // A path on this node, as safeRedirectPath reads one: "//host" and "/\host" leave the node, and a
+  // relative address that is not a path of ours cannot parse below, so it takes the fallback.
+  const local = safeRedirectPath(link, '');
+  if (local) return local.slice(0, 500);
   let url: URL;
   try { url = new URL(link); } catch { return fallback; }  // unparseable IS the "not allowed" answer
   if (url.protocol !== 'https:' && url.protocol !== 'http:') return fallback;

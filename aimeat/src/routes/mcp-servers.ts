@@ -39,6 +39,8 @@
  *   DELETE /v1/mcp-servers/:id              -- detach, and forget the credential
  * @usage app.use(mcpServersRouter(config, storage));
  * @version-history
+ *   v1.2.0 — 2026-09-24 — The sign-in callback sends the browser only to an address that
+ *     safeRedirectPath accepts; any other return address is treated as none.
  *   v1.1.0 — 2026-09-24 — PATCH, DELETE and authorize on /:id resolve the server through
  *     requireManageableServer, so a node-wide server answers 404 there for every owner it admits.
  *   v1.0.0 — 2026-09-16 — Phase 1 of the MCP proxy.
@@ -69,6 +71,7 @@ import {
 } from '../services/mcp-client/grants.js';
 import { emitChange } from '../services/event-bus.js';
 import { recordAccountEvent } from '../services/account-events.js';
+import { safeRedirectPath } from '../utils/same-origin-path.js';
 
 export function mcpServersRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -479,9 +482,10 @@ export function mcpServersRouter(config: AimeatConfig, storage: Storage): Router
     await listRemoteTools(storage, config, done.server);
 
     // A person is looking at this in a browser, so send them back where they came from rather than
-    // leaving them on a JSON page. Only a path of our own: a return URL from the round could
-    // otherwise be used to bounce somebody off this node.
-    if (done.returnUrl.startsWith('/')) return res.redirect(done.returnUrl);
+    // leaving them on a JSON page. Only a path of our own, as safeRedirectPath reads one: anything
+    // else is treated as no address at all, and the person gets the JSON answer.
+    const back = safeRedirectPath(done.returnUrl, '');
+    if (back) return res.redirect(back);
     return res.json(success(config.nodeId, { connected: done.server.slug }));
   });
 

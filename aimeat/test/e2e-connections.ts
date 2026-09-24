@@ -19,6 +19,8 @@
  *   membership IS the access) · 16 reading numbers back · 17 publishing later
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-connections
  * @version-history
+ *   v1.4.0 — 2026-09-24 — The callback sends the browser to a path of this node only: `//host` and
+ *     `/\host` land on the access page (secaudit 2026-09 A5-5).
  *   v1.3.0 — 2026-08-17 — E2E quality, connections :945 and :405. Phase 13 ran synthetic principals
  *     through guards the TEST built, which proves the middleware behaves and nothing about which guard
  *     each route mounts; 13b drives the real doors with a real app-grant bearer holding connections:use,
@@ -246,6 +248,25 @@ async function main(): Promise<void> {
     await test('a state nobody started is refused', async () => {
       const r = await fetch(`${BASE}/v1/connections/callback?state=made-up&code=code-x`, { redirect: 'manual' });
       assert(r.status === 400, `status ${r.status}`);
+    });
+    await test('the callback sends the browser to a path of this node, and nowhere else', async () => {
+      /** One round naming `returnUrl`; the Location the callback answers with. Re-authorises alpha. */
+      const land = async (returnUrl: string): Promise<string | null> => {
+        const start = await api('/v1/connections/start', { bearer: jwtA, body: { provider: 'fake', return_url: returnUrl } });
+        assert(start.status === 200 && start.data?.ok, `start: ${start.status} ${start.data?.error?.message}`);
+        const res = await fetch(`${BASE}/v1/connections/callback?state=${
+          encodeURIComponent(start.data.data.state as string)}&code=code-alpha`, { redirect: 'manual' });
+        assert(res.status === 302, `callback: ${res.status}`);
+        return res.headers.get('location');
+      };
+      const home = await land('/profile#access');
+      assert(home === '/profile#access', `a path of this node was not kept: ${home}`);
+      // A browser reads both as `//evil.example`. Until 2026-09-24 the callback sent it there
+      // (secaudit 2026-09 A5-5); now such an address lands on the access page.
+      for (const offSite of ['//evil.example/x', '/\\evil.example/x']) {
+        const location = await land(offSite);
+        assert(location === '/profile#access', `${offSite} sent the browser to ${location}`);
+      }
     });
 
     console.log('\nPhase 3 — The credential never leaves');

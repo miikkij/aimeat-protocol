@@ -28,6 +28,8 @@
  *   GET    /v1/connections/delegations/:did/quota -- allowance left, BEFORE anything is refused
  * @usage app.use(connectionsRouter(config, storage));
  * @version-history
+ *   v1.2.0 — 2026-09-24 — The callback redirects through safeRedirectPath, so a return address a
+ *     browser resolves to another site lands on the access page instead.
  *   v1.1.0 — 2026-08-02 — A publish to one's OWN connection runs through the shared runOwnPublish(),
  *     so the scheduler (schedules kind 'connections-publish') takes the identical idempotency-gated
  *     path rather than a second copy of it.
@@ -56,6 +58,7 @@ import { quotaStatus, openPublish } from '../services/connections/publish-gate.j
 import { publishToProvider } from '../services/connections/publish.js';
 import { readMetrics, toStoredSample } from '../services/connections/metrics.js';
 import { runOwnPublish } from '../services/connections/publish-run.js';
+import { safeRedirectPath } from '../utils/same-origin-path.js';
 import type { ConnectionMode, ModerationMode } from '../models/connection-schemas.js';
 
 // The projection and the two access sentences live in services/connections/access.ts, so the MCP
@@ -446,10 +449,10 @@ export function connectionsRouter(config: AimeatConfig, storage: Storage): Route
       res.status(400).send(`Could not finish connecting: ${result.reason}`);
       return;
     }
-    // Back to wherever the flow started, when the starter said where that was. Same-origin only:
-    // an absolute URL from the request would make this an open redirect.
-    const target = result.returnUrl && result.returnUrl.startsWith('/') ? result.returnUrl : '/profile#access';
-    res.redirect(target);
+    // Back to wherever the flow started, when the starter said where that was. Same-origin only, as
+    // safeRedirectPath reads it: an address from the request that a browser resolves to another
+    // site would make this an open redirect, so it lands on the access page instead.
+    res.redirect(safeRedirectPath(result.returnUrl, '/profile#access'));
   });
 
   // ── DELETE /v1/connections/:id ──
