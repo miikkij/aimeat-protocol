@@ -28,6 +28,10 @@
  *   - appendRows / readRows / readRow / deleteRow / sweepRows / spaceStats / workspaceRowIndex
  * @usage const res = await appendRows(deps, caller, { organismId, wsId, space, rows });
  * @version-history
+ *   v1.3.0 — 2026-09-24 — A write on the app path meets the space's writeRole too, with the person's
+ *     membership (secaudit 2026-09, A6-8). gate() returned after authorizeApp, so a plain member's
+ *     app wrote a space kept to admins; the comment on authorizeApp that said the naming replaced the
+ *     writeRole ladder now says the naming opens the space and the person's role still decides.
  *   v1.2.0 — 2026-09-24 — loadSpace reads the workspace creator's copy of the manifest, whatever the
  *     store's order (readWorkspaceManifest takes the node id; secaudit 2026-09, A6-9).
  *   v1.1.0 — 2026-08-29 — authorizeApp + gate(): a role-'app' caller reaches one row space by the
@@ -126,11 +130,16 @@ async function authorize(
  * organism's data is not the person's to open with a click. So a role-'app' caller reaches a row
  * space only when (1) the ORGANISM named the app in the space's `apps` list, (2) the PERSON the app
  * acts for is an active member, and (3) the grant carries `organism:rows`, which the route checked
- * before the call arrived. Nothing else on this path: not the consent machinery written for
- * agents, not the writeRole ladder — the organism's naming IS the consent, and it names one app
- * for one space. The app appends and reads THAT space; every other space, and every other write
- * surface of the workspace, is closed to it as before. Decided 2026-08-29 so an app can keep an
- * append-only audit trail on the organism it belongs to (the legal-pages demo).
+ * before the call arrived. Not the consent machinery written for agents: the organism's naming is
+ * what opens the space to the app, and it names one app for one space. The app appends and reads
+ * THAT space; every other space, and every other write surface of the workspace, is closed to it as
+ * before. Decided 2026-08-29 so an app can keep an append-only audit trail on the organism it
+ * belongs to (the legal-pages demo).
+ *
+ * THE NAMING OPENS THE SPACE, IT RAISES NOBODY'S ROLE. An app acts for its person, so a write still
+ * meets the space's writeRole with that person's membership (gate() below): a plain member's app is
+ * refused a space kept to admins, exactly as the member is. This path used to stop here, and the
+ * writeRole an organism set was no ceiling for an app (secaudit 2026-09, A6-8).
  */
 async function authorizeApp(
   deps: RowServiceDeps, caller: RowCaller, organismId: string, space: RowSpace,
@@ -146,15 +155,19 @@ async function authorizeApp(
   }
 }
 
-/** Every entry point goes through here: the app path when the caller is one, else the member path. */
+/**
+ * Every entry point goes through here: the app path when the caller is one, else the member path.
+ * Either way a write then meets the space's writeRole, with the membership of the person the caller
+ * is or acts for: an app is never more than its person.
+ */
 async function gate(
   deps: RowServiceDeps, caller: RowCaller, organismId: string, wsId: string, space: RowSpace, mode: 'read' | 'write',
 ): Promise<void> {
   if (caller.roles.includes('app')) {
     await authorizeApp(deps, caller, organismId, space);
-    return;
+  } else {
+    await authorize(deps, caller, organismId, wsId, space.namespace, mode);
   }
-  await authorize(deps, caller, organismId, wsId, space.namespace, mode);
   if (mode === 'write') await requireWriteRole(deps, caller, organismId, space);
 }
 
