@@ -69,6 +69,22 @@ wt_all=$(git -C "${toplevel:-.}" worktree list --porcelain 2>/dev/null | grep -c
 wt_repo=$(git -C "${toplevel:-.}" worktree list --porcelain 2>/dev/null | grep '^worktree ' | grep -c '/\.worktrees/')
 printf '  %s worktrees, %s of them under .worktrees/ (git worktree list names them; the claims board says whose)\n' "$wt_all" "$wt_repo"
 
+# CodeQL decides whether `pnpm gate` is the whole CI check on this machine: check:field-reach needs
+# it, and without it the gate refuses. Read the pointer `pnpm codeql:install` writes, the same file
+# scripts/inventory/field-reach-facts.ts resolveCodeql() reads, and say which it is before any work.
+codeql_ptr="$HOME/.aimeat/codeql.json"
+codeql_cli=''
+if [ -f "$codeql_ptr" ]; then
+  codeql_cli=$(sed -n 's/.*"cli": *"\(.*\)".*/\1/p' "$codeql_ptr" | sed 's/\\\\/\\/g')
+fi
+if [ -n "$codeql_cli" ] && [ -f "$codeql_cli" ]; then
+  printf '\nCodeQL: registered (%s). pnpm gate runs the whole CI check here; do not wait for GitHub.\n' "$codeql_cli"
+else
+  printf '\nCodeQL: MISSING on this machine. Install it FIRST, before any other work:\n'
+  printf '    cd aimeat && pnpm codeql:install\n'
+  printf '  Without it pnpm gate refuses check:field-reach, and the local CI run is not complete.\n'
+fi
+
 cat <<'RITUAL'
 
 Before your first edit, in this order (skill `aimeat-dev-session` on the node has the detail,
