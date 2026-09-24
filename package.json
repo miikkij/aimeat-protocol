@@ -143,6 +143,7 @@
     "test:e2e:guards:postgres-kysely": "cd aimeat && pnpm test:e2e:guards:postgres-kysely",
     "check:scope-parity": "cd aimeat && pnpm check:scope-parity",
     "debt": "cd aimeat && pnpm debt",
+    "ci:stats": "cd aimeat && pnpm ci:stats",
     "check:liaison-surface": "cd aimeat && pnpm check:liaison-surface",
     "check:storage-parity": "cd aimeat && pnpm check:storage-parity",
     "check:audit-gates": "cd aimeat && pnpm check:audit-gates",
