@@ -3,7 +3,16 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Federated memory browsing routes: pull, push-home, list-home (federated sessions) + list-remote, pull-remote (home users). Extracted from src/routes/memory.ts to satisfy max-file-lines.
+ *
+ *   A pull WRITES a record here, into the caller's own namespace, so both pull doors write the way
+ *   POST /v1/memory writes: memory:write before the far node is asked, the same key checks at the
+ *   door, and then services/memory-write.ts writeMemoryRecord with the caller's own roles and scopes.
  * @version-history
+ *   v1.4.0 — 2026-09-24 — pull and pull-remote store what the far node answered through
+ *     writeMemoryRecord, after requireScope('memory:write') and the door's key checks (an ecosystem
+ *     app's data areas, the keys the node trusts in the owner's namespace). They wrote with
+ *     storage.setMemory and asked for nothing. Their session-kind check moved into a middleware
+ *     ahead of the scope, so a session of the wrong kind still hears NOT_FEDERATED or NOT_HOME.
  *   v1.3.0 — 2026-09-24 — The visitor's home GHII comes from homeIdentityOf, and "is this a visitor"
  *     from isForeignPrincipal. verifyJWT now hands a visitor its home GHII as `owner`, so composing
  *     `${owner}@${homeNode}` here would have named it twice (secaudit 2026-09, F-1).
@@ -14,18 +23,62 @@
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/memory.ts (max-file-lines)
  */
 
-import type { Router } from 'express';
-import { requireAuth } from '../../auth/middleware.js';
+import type { Router, Request, Response, RequestHandler } from 'express';
+import { requireAuth, requireScope } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { validateOutboundUrl } from '../../utils/url-validator.js';
-import { homeIdentityOf, isForeignPrincipal } from '../../utils/gaii.js';
+import { homeIdentityOf, isForeignPrincipal, resolveIdentity } from '../../utils/gaii.js';
+import { appMayWriteKey } from '../../utils/reserved-keys.js';
 import { logger } from '../../utils/logger.js';
-import { emitChange } from '../../services/event-bus.js';
+import { writeMemoryRecord } from '../../services/memory-write.js';
+import { ecoMayWriteKey } from '../../services/ecosystem-access.js';
+import { emitResourceUpdated, emitResourceListChanged } from '../../mcp/index.js';
 import { sign } from '../../auth/keypair.js';
 import type { MemoryRouteCtx } from './shared.js';
 
 export function registerFederationRoutes(router: Router, ctx: MemoryRouteCtx): void {
-  const { config, storage, peers, resolve } = ctx;
+  const { config, storage, peers, resolve, stats, onDirectoryChange } = ctx;
+
+  /**
+   * The key checks POST /v1/memory makes at its own door before the shared writer runs: an ecosystem
+   * app's data areas, and the keys the node trusts in the owner's namespace, which an app grant
+   * writes into. Neither depends on the value, so both are asked before the far node is.
+   */
+  async function pullKeyRefusal(req: Request, key: string): Promise<{ code: string; message: string } | null> {
+    if (req.auth!.roles.includes('ecosystem') && !(await ecoMayWriteKey(storage, resolveIdentity(req.auth!, config.nodeId), key))) {
+      return { code: 'DATA_AREA_DENIED', message: `Write to "${key}" is not permitted by this app's data-area allowlist` };
+    }
+    if (!appMayWriteKey(req.auth!.roles, key)) {
+      return { code: 'RESERVED_KEY', message: `The key "${key}" is managed by the account owner and cannot be written by an app.` };
+    }
+    return null;
+  }
+
+  /**
+   * Store what the far node answered in the caller's own namespace here, through the writer every
+   * memory door uses: the memory:write gate, the credential records, the keys only the node writes,
+   * the schema locks, the ceilings and the version. A refusal is answered here, and false returned.
+   */
+  async function storePulled(
+    req: Request, res: Response, target: string, key: string, value: unknown, tags: string[], pipeline: string,
+  ): Promise<boolean> {
+    const written = await writeMemoryRecord({
+      storage, config, peers, emitResourceUpdated, emitResourceListChanged, onDirectoryChange, stats,
+      fromAgent: req.auth!.roles.includes('agent'),
+      ownerName: req.auth!.owner,
+    }, {
+      principal: target,
+      targetGaii: target,
+      scopes: req.auth!.scopes ?? [],
+      roles: req.auth!.roles,
+      federated: isForeignPrincipal(req.auth),
+    }, { key, value, visibility: 'private', tags, ttlHours: null, pipeline });
+    if (!written.ok) {
+      res.status(written.status).json(error(config.nodeId, written.code, written.message, written.status, written.details));
+      return false;
+    }
+    return true;
+  }
 
   /**
    * Sign a peer-to-peer memory-list request with this node's key. The receiving node verifies it
@@ -41,16 +94,37 @@ export function registerFederationRoutes(router: Router, ctx: MemoryRouteCtx): v
     return body;
   }
 
-  // ── /v1/memory/pull — Copy a memory entry from home node to local (federated sessions) ──
-  router.post('/v1/memory/pull', requireAuth(), async (req, res) => {
+  /**
+   * Which kind of session a pull door is for, answered before the scope: a session of the wrong
+   * kind is told the door is not its own, whatever words it carries.
+   */
+  const visitorsOnly: RequestHandler = (req, res, next) => {
     if (!isForeignPrincipal(req.auth)) {
       res.status(400).json(error(config.nodeId, 'NOT_FEDERATED', 'This endpoint is only available for federated sessions'));
       return;
     }
+    next();
+  };
+  const homeSessionsOnly: RequestHandler = (req, res, next) => {
+    if (isForeignPrincipal(req.auth)) {
+      res.status(400).json(error(config.nodeId, 'NOT_HOME', 'This endpoint is only available for home sessions'));
+      return;
+    }
+    next();
+  };
 
+  // ── /v1/memory/pull — Copy a memory entry from home node to local (federated sessions) ──
+  // It writes a record here, so it costs memory:write, the word the visitor's scope list carries
+  // only when this node's peer record grants it.
+  router.post('/v1/memory/pull', requireAuth(), visitorsOnly, requireScope('memory:write'), async (req, res) => {
     const { key } = req.body ?? {};
     if (!key || typeof key !== 'string') {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'key is required'));
+      return;
+    }
+    const keyRefusal = await pullKeyRefusal(req, key);
+    if (keyRefusal) {
+      res.status(403).json(error(config.nodeId, keyRefusal.code, keyRefusal.message));
       return;
     }
 
@@ -108,27 +182,10 @@ export function registerFederationRoutes(router: Router, ctx: MemoryRouteCtx): v
         return;
       }
 
-      // Store locally with private visibility and a pulled-from tag
-      const localGhii = resolve(req);
-      const now = new Date().toISOString();
-      const existing = await storage.getMemory(localGhii, key);
-      const tags = [...remoteTags, `pulled-from:${homeNode}`];
-      // Deduplicate tags
-      const uniqueTags = [...new Set(tags)];
+      // Store locally with private visibility and one pulled-from tag
+      const uniqueTags = [...new Set([...remoteTags, `pulled-from:${homeNode}`])];
+      if (!(await storePulled(req, res, resolve(req), key, value, uniqueTags, 'memory.pull'))) return;
 
-      await storage.setMemory({
-        key,
-        ownerGaii: localGhii,
-        value,
-        visibility: 'private',
-        tags: uniqueTags,
-        ttlHours: null,
-        version: existing ? existing.version + 1 : 1,
-        createdAt: existing?.createdAt ?? now,
-        updatedAt: now,
-      });
-
-      emitChange('memory');
       res.json(success(config.nodeId, {
         pulled: true,
         key,
@@ -369,12 +426,8 @@ export function registerFederationRoutes(router: Router, ctx: MemoryRouteCtx): v
   });
 
   // ── /v1/memory/pull-remote — Pull a specific key from a remote peer node (home users) ──
-  router.post('/v1/memory/pull-remote', requireAuth(), async (req, res) => {
-    if (isForeignPrincipal(req.auth)) {
-      res.status(400).json(error(config.nodeId, 'NOT_HOME', 'This endpoint is only available for home sessions'));
-      return;
-    }
-
+  // It writes a record here, so it costs memory:write, as POST /v1/memory does.
+  router.post('/v1/memory/pull-remote', requireAuth(), homeSessionsOnly, requireScope('memory:write'), async (req, res) => {
     const { peer_node_id, key } = req.body ?? {};
     if (!peer_node_id || typeof peer_node_id !== 'string') {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'peer_node_id is required'));
@@ -382,6 +435,11 @@ export function registerFederationRoutes(router: Router, ctx: MemoryRouteCtx): v
     }
     if (!key || typeof key !== 'string') {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'key is required'));
+      return;
+    }
+    const keyRefusal = await pullKeyRefusal(req, key);
+    if (keyRefusal) {
+      res.status(403).json(error(config.nodeId, keyRefusal.code, keyRefusal.message));
       return;
     }
 
@@ -433,24 +491,9 @@ export function registerFederationRoutes(router: Router, ctx: MemoryRouteCtx): v
         return;
       }
 
-      const now = new Date().toISOString();
-      const existing = await storage.getMemory(gaii, key);
-      const tags = [...remoteTags, `pulled-from:${peer.nodeId}`];
-      const uniqueTags = [...new Set(tags)];
+      const uniqueTags = [...new Set([...remoteTags, `pulled-from:${peer.nodeId}`])];
+      if (!(await storePulled(req, res, gaii, key, value, uniqueTags, 'memory.pull-remote'))) return;
 
-      await storage.setMemory({
-        key,
-        ownerGaii: gaii,
-        value,
-        visibility: 'private',
-        tags: uniqueTags,
-        ttlHours: null,
-        version: existing ? existing.version + 1 : 1,
-        createdAt: existing?.createdAt ?? now,
-        updatedAt: now,
-      });
-
-      emitChange('memory');
       res.json(success(config.nodeId, {
         pulled: true,
         key,

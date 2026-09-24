@@ -25,16 +25,21 @@
  *
  * @structure Phase 1 setup (owner, operator check, fake peer) · 2 peer registration and the
  *   not-yet-active refusal · 3 list-remote happy path + the signed body · 4 pull-remote happy path,
- *   the local write and the second pull's version bump · 5 refusals (unknown peer, peer 500, no
- *   value, missing input, unreachable peer, unauthenticated) · 6 the federated-session doors
- *   (pull, push-home, list-home) refusing a home token · 7 cleanup.
+ *   the local write and the second pull's version bump · 4b the memory write rules on pull-remote
+ *   (a credential record, a key only the node writes, memory:write, an app grant and a reserved
+ *   key, an ecosystem app and its data areas) · 5 refusals (unknown peer, peer 500, no value,
+ *   missing input, unreachable peer, unauthenticated) · 6 the federated-session doors (pull,
+ *   push-home, list-home) refusing a home token · 7 cleanup.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-memory-federation-remote
  * @version-history
+ *   v1.1.0 — 2026-09-24 — Phase 4b: pull-remote writes through the shared memory writer, so a
+ *     credential record, `__redirect__`, a caller without memory:write, an app grant's reserved
+ *     key and an ecosystem app's organism key without a data area are refused as at POST /v1/memory.
  *   v1.0.0 — 2026-09-08 — Written to cover the two home-user federation routes and their refusals.
  */
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from 'node:http';
 import { AddressInfo } from 'node:net';
-import { createHash } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import * as ed from '@noble/ed25519';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
@@ -302,6 +307,134 @@ async function run() {
         assert(read.body.data.version === 2, `second pull must be version 2, got ${read.body.data.version}`);
         const tagCount = read.body.data.tags.filter((t: string) => t === `pulled-from:${peerNodeId}`).length;
         assert(tagCount === 1, `the pulled-from tag must be deduplicated, got ${tagCount} copies`);
+    });
+
+    // ─── Phase 4b: pull-remote writes the way POST /v1/memory writes ───
+    //
+    // The record a peer answers with lands in the caller's namespace here, and it landed through
+    // storage.setMemory with no scope and none of the key rules the memory doors apply. So a caller
+    // could overwrite the record holding their AI key, write the pointer the node forwards visitors
+    // by, or (an app grant, whose namespace is the owner's) write the address a decrypted AI key is
+    // sent to, all with a key the peer answered for.
+    console.log('Phase 4b — pull-remote and the memory write rules');
+
+    await test('pull-remote refuses a credential record and a key only the node writes, and writes neither', async () => {
+        peerMode = 'ok';
+        for (const [key, code] of [['openrouter.apikey', 'SECRET_RECORD'], ['__redirect__', 'RESERVED_KEY']] as const) {
+            const r = await json('/v1/memory/pull-remote', {
+                method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+                body: JSON.stringify({ peer_node_id: peerNodeId, key }),
+            });
+            const local = await json(`/v1/memory/${encodeURIComponent(key)}`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+            // Whatever an unfixed node let through is removed before the verdict.
+            if (local.status === 200) {
+                await json(key === 'openrouter.apikey' ? '/v1/openrouter/settings' : `/v1/memory/${encodeURIComponent(key)}`,
+                    { method: 'DELETE', headers: { Authorization: `Bearer ${ownerToken}` } });
+            }
+            assert(r.status === 403 && r.body.error?.code === code, `${key}: expected 403 ${code}, got ${r.status} ${JSON.stringify(r.body.error ?? r.body.data)}`);
+            assert(local.status === 404, `${key} must not have been written, got ${local.status}`);
+        }
+    });
+
+    await test('pull-remote costs memory:write, and a caller without it is refused before the peer is asked', async () => {
+        const reg = await json('/v1/agents', {
+            method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+            body: JSON.stringify({ name: 'remote-reader', owner: ownerName, capabilities: ['memory'], scopes: ['memory:read'] }),
+        });
+        assert(reg.status === 201, `agent: ${reg.status} ${JSON.stringify(reg.body.error)}`);
+        const gaii = reg.body.data.agent.gaii as string;
+        const ts = new Date().toISOString();
+        const tok = await json('/v1/auth/token', {
+            method: 'POST', body: JSON.stringify({ gaii, timestamp: ts, signature: await signMsg(reg.body.data.private_key, gaii + ts) }),
+        });
+        assert(tok.body.ok === true, `agent token: ${JSON.stringify(tok.body.error)}`);
+        const asked = memoryPaths.length;
+        const r = await json('/v1/memory/pull-remote', {
+            method: 'POST', headers: { Authorization: `Bearer ${tok.body.data.token}` },
+            body: JSON.stringify({ peer_node_id: peerNodeId, key: PULL_KEY }),
+        });
+        assert(r.status === 403 && r.body.error?.code === 'SCOPE_DENIED', `a memory:read agent: ${r.status} ${JSON.stringify(r.body.error ?? r.body.data)}`);
+        assert(memoryPaths.length === asked, `the peer must not be asked, got ${memoryPaths.length - asked} request(s)`);
+    });
+
+    await test('an app grant pulling a key the node trusts into the owner\'s namespace is refused', async () => {
+        // An app grant's namespace IS the owner's, so a reserved key is refused to it here as at POST /v1/memory.
+        const file = 'fedrem-app.html';
+        const pub = await json('/v1/apps', {
+            method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+            body: JSON.stringify({ filename: file, content: Buffer.from('<!DOCTYPE html><html><body>remote</body></html>').toString('base64'), name: 'Remote', description: 'pulls', category: 'utility' }),
+        });
+        assert(pub.status === 201, `publish: ${pub.status} ${JSON.stringify(pub.body.error)}`);
+        const verifier = randomBytes(32).toString('base64url');
+        const challenge = createHash('sha256').update(verifier).digest('base64url');
+        const redirect = 'http://localhost:9922/callback';
+        const q = new URLSearchParams({
+            app: `${ownerName}/${file}`, response_type: 'code', scope: 'memory:write memory:read',
+            redirect_uri: redirect, state: 'x', code_challenge: challenge, code_challenge_method: 'S256',
+        });
+        const authz = await fetch(`${BASE}/v1/app-grants/authorize?${q}`, { redirect: 'manual' });
+        assert(authz.status === 302, `authorize: ${authz.status}`);
+        const rid = decodeURIComponent(/req=([^&]+)/.exec(authz.headers.get('location') ?? '')![1]);
+        const con = await json('/v1/app-grants/authorize-consent', {
+            method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ request_id: rid }),
+        });
+        assert(con.status === 200, `consent: ${con.status} ${JSON.stringify(con.body.error)}`);
+        const code = new URL(con.body.data.redirect_url).searchParams.get('code') ?? '';
+        const grant = await json('/v1/app-grants/token', {
+            method: 'POST', body: JSON.stringify({ grant_type: 'authorization_code', code, code_verifier: verifier, redirect_uri: redirect }),
+        });
+        assert(grant.status === 200, `grant token: ${grant.status} ${JSON.stringify(grant.body.error)}`);
+        const appToken = grant.body.data.access_token as string;
+
+        const r = await json('/v1/memory/pull-remote', {
+            method: 'POST', headers: { Authorization: `Bearer ${appToken}` },
+            body: JSON.stringify({ peer_node_id: peerNodeId, key: 'openrouter.settings' }),
+        });
+        const local = await json('/v1/memory/openrouter.settings', { headers: { Authorization: `Bearer ${ownerToken}` } });
+        if (local.status === 200) await json('/v1/memory/openrouter.settings', { method: 'DELETE', headers: { Authorization: `Bearer ${ownerToken}` } });
+        assert(r.status === 403 && r.body.error?.code === 'RESERVED_KEY', `an app grant pulling openrouter.settings: ${r.status} ${JSON.stringify(r.body.error ?? r.body.data)}`);
+        assert(local.status === 404, `the owner's AI settings must not have been written, got ${local.status}`);
+
+        // POSITIVE CONTROL: the same app pulls an ordinary key.
+        const ok = await json('/v1/memory/pull-remote', {
+            method: 'POST', headers: { Authorization: `Bearer ${appToken}` },
+            body: JSON.stringify({ peer_node_id: peerNodeId, key: 'peer.app-note' }),
+        });
+        assert(ok.status === 200, `an ordinary key: ${ok.status} ${JSON.stringify(ok.body.error)}`);
+    });
+
+    await test('an ecosystem app pulling into an organism area it holds no data-area grant for is refused before the peer is asked', async () => {
+        // POST /v1/memory asks an ecosystem app's data areas before it writes an organism key.
+        const app = 'fedrem-eco';
+        const scopes = ['memory:read', 'memory:write'];
+        const hello = await json('/v1/ecosystem-apps/hello', {
+            method: 'POST', body: JSON.stringify({ owner: ownerName, app, public_key: Buffer.from(`verify-key-${app}`).toString('base64'), scopes }),
+        });
+        assert(hello.body.ok === true, `hello: ${JSON.stringify(hello.body.error)}`);
+        const approve = await json(`/v1/ecosystem-apps/${hello.body.data.user_code}/approve`, {
+            method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ action: 'approve', scopes }),
+        });
+        assert(approve.body.data?.status === 'approved', `approve: ${JSON.stringify(approve.body)}`);
+        const tok = await json('/v1/ecosystem-apps/token', {
+            method: 'POST', body: JSON.stringify({ device_code: hello.body.data.device_code, grant_type: 'urn:ietf:params:oauth:grant-type:device_code' }),
+        });
+        assert(typeof tok.body.access_token === 'string', `token: ${JSON.stringify(tok.body)}`);
+        const ecoToken = tok.body.access_token as string;
+
+        const asked = memoryPaths.length;
+        const r = await json('/v1/memory/pull-remote', {
+            method: 'POST', headers: { Authorization: `Bearer ${ecoToken}` },
+            body: JSON.stringify({ peer_node_id: peerNodeId, key: 'organism.fedrem-org.notes.pulled' }),
+        });
+        assert(r.status === 403 && r.body.error?.code === 'DATA_AREA_DENIED', `an organism key without a data area: ${r.status} ${JSON.stringify(r.body.error ?? r.body.data)}`);
+        assert(memoryPaths.length === asked, `the peer must not be asked, got ${memoryPaths.length - asked} request(s)`);
+
+        // POSITIVE CONTROL: its own working namespace needs no grant.
+        const own = await json('/v1/memory/pull-remote', {
+            method: 'POST', headers: { Authorization: `Bearer ${ecoToken}` },
+            body: JSON.stringify({ peer_node_id: peerNodeId, key: 'eco.pulled-note' }),
+        });
+        assert(own.status === 200, `its own key: ${own.status} ${JSON.stringify(own.body.error)}`);
     });
 
     // ─── Phase 5: Refusals ───

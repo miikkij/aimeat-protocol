@@ -19056,6 +19056,11 @@ paths:
         Copy a memory entry from the user's home node to the current (remote) node.
         Only available for federated sessions. The remote node fetches the entry from
         the home node and stores it locally with private visibility.
+
+        The copy is a memory write, so it costs memory:write (a visitor carries the words this
+        node's peer record grants) and is refused before the home node is asked without it. It is
+        written the way POST /v1/memory writes: a credential record (403 SECRET_RECORD), a key only
+        the node writes (403 RESERVED_KEY), the schema locks and the ceilings apply.
       tags: [Memory]
       security:
         - BearerAuth: []
@@ -19093,6 +19098,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
 
@@ -57818,6 +57825,12 @@ paths:
         For a home session, fetch a specific key from a named active peer node and store it locally
         under the caller's identity (tagged `pulled-from:<node>`). Fails with 400 if federated or on
         missing input, and 404 if the peer or key is not found.
+
+        The store is a memory write, so it costs memory:write and is refused before the peer is
+        asked without it. It is written the way POST /v1/memory writes: a credential record (403
+        SECRET_RECORD), a key only the node writes, or for an app grant a key the node trusts in the
+        owner's namespace (403 RESERVED_KEY), and for an ecosystem app an organism key outside its
+        data areas (403 DATA_AREA_DENIED) are refused.
       security:
         - BearerAuth: []
       requestBody:
@@ -57850,6 +57863,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
   # ── Admin Data+Setup ──────────────────────────
