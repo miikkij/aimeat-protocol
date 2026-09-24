@@ -24,6 +24,9 @@
  *   const policy = await readDecidePolicy(storage, gaii);
  *   const own = await readOwnDecideKey(storage, config, gaii); // string | null, never logged
  * @version-history
+ *   v1.3.1 — 2026-09-24 — A provider that needs no key of the owner's is read by takesNoOwnerKey
+ *     (providers.ts), in the view and in the availability answer alike: the built-in laya and von
+ *     now name an optional variable, and still count as needing none.
  *   v1.3.0 — 2026-09-24 — writeDecideSettings is the settings door's one write, and it checks the
  *     key, the provider choice and the policy before it writes any of them (273435328c90): the door
  *     stored the key and the choice first, so a request refused for its policy left the key replaced.
@@ -43,7 +46,7 @@ import { DecideError } from './errors.js';
 import { agentAiView } from '../agent-ai-keys.js';
 import { gateSettingOf, type GateSetting } from './gate.js';
 import { DECIDE_SETUP_ORDER, type SetupStep } from './setup-order.js';
-import { planProviderChoice, providersView, selectProvider, writeProviderChoice } from './providers.js';
+import { planProviderChoice, providersView, selectProvider, takesNoOwnerKey, writeProviderChoice } from './providers.js';
 import { logger } from '../../utils/logger.js';
 
 export const DECIDE_KEY_RECORD = 'decide.apikey';
@@ -231,7 +234,7 @@ export async function decideSettingsView(storage: Storage, config: AimeatConfig,
   ]);
   const hasOwnKey = typeof (keyRec?.value as { encrypted?: unknown } | undefined)?.encrypted === 'string';
   const effective = providers.providers.find(p => p.id === (providers.this_agent ?? providers.default));
-  const keyless = (effective?.auth as { type?: string } | undefined)?.type === 'none';
+  const keyless = takesNoOwnerKey(effective?.auth as { type?: unknown; optional?: unknown } | undefined);
   // An agent with a key of its own can ask even when the owner and the node have none.
   const { available, reason } = decideAvailability(config, hasOwnKey || !!mine?.decide.has_key, keyless);
   return {
@@ -264,5 +267,5 @@ export async function decideAvailableFor(storage: Storage, config: AimeatConfig,
     }),
   ]);
   return decideAvailability(config, typeof (keyRec?.value as { encrypted?: unknown } | undefined)?.encrypted === 'string',
-    provider?.auth.type === 'none');
+    takesNoOwnerKey(provider?.auth));
 }

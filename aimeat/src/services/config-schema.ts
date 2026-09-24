@@ -12,6 +12,8 @@
  *   - CONFIG_FIELDS: the exhaustive field list grouped by domain (node, morsel policy, auth, features, work, quotas, federation, ...)
  *
  * @version-history
+ *   v1.13.1 — 2026-09-24 — decide.jeff_key, decide.laya_key, decide.von_key: the built-in local
+ *     models' bearer keys, shown as whether each is set.
  *   v1.13.0 — 2026-09-24 — The `themes.` group (Themes & Styles): whether people choose, which themes
  *     are available to them, and the default theme. The row's shape moved to config-field-def.ts
  *     (with no imports, so no cycle) to make room.
@@ -663,6 +665,10 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   { key: 'decideBuiltinProviders', dotPath: 'decide.builtin_providers', envVar: 'AIMEAT_DECIDE_BUILTIN_PROVIDERS', type: 'string', validate: v => typeof v === 'string' && /^[a-z,\s]*$/.test(v as string), immutable: true, description: 'Built-in local examples to switch on, comma separated: laya, von, jeff. For a development machine that runs them', range: 'laya,von,jeff' },
   { key: 'decideDefaultProvider', dotPath: 'decide.default_provider', envVar: 'AIMEAT_DECIDE_DEFAULT_PROVIDER', type: 'string', validate: v => typeof v === 'string', immutable: true, description: 'The provider an owner who chose none gets. Empty means decide.provider_id' },
   { key: 'decideProviderEgress', dotPath: 'decide.provider_egress', envVar: 'AIMEAT_DECIDE_PROVIDER_EGRESS', type: 'string', validate: v => typeof v === 'string', immutable: true, description: 'Exact addresses (scheme, host, port) of the operator\'s own local decision models, comma separated. Only the decision call may reach them, so a public node needs no AIMEAT_ALLOW_PRIVATE_EGRESS', range: 'http://127.0.0.1:8801,http://laya:8000' },
+  // The built-in local models' bearer keys: set in the environment, shown only as whether each is set.
+  { key: 'decideJeffKey', dotPath: 'decide.jeff_key', envVar: 'AIMEAT_DECIDE_JEFF_KEY', type: 'string', validate: () => true, immutable: true, description: "The built-in jeff's bearer key, its JEFF_API_KEYS value (required when jeff is on)", adminDisplay: 'configured' },
+  { key: 'decideLayaKey', dotPath: 'decide.laya_key', envVar: 'AIMEAT_DECIDE_LAYA_KEY', type: 'string', validate: () => true, immutable: true, description: "The built-in laya's bearer key, its LAYA_API_KEY value (empty sends none)", adminDisplay: 'configured' },
+  { key: 'decideVonKey', dotPath: 'decide.von_key', envVar: 'AIMEAT_DECIDE_VON_KEY', type: 'string', validate: () => true, immutable: true, description: "The built-in von's bearer key, its VON_API_KEY value (empty sends none)", adminDisplay: 'configured' },
   { key: 'decideRetentionDays', dotPath: 'decide.retention_days', envVar: 'AIMEAT_DECIDE_RETENTION_DAYS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 36500, immutable: false, description: 'Days a decision record is kept before the nightly prune removes it', range: '1-36500' },
 
   // ── AI: the built-in chat agent (a `goose acp` child process) ──

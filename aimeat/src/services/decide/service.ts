@@ -9,8 +9,9 @@
  *   THE PROVIDER (services/decide/providers.ts). TypeSafe's Jev is the node's configured provider and
  *   answers when nobody chose another. The rule's (or the call's) choice, the agent's, the owner's
  *   default and the node's are read in that order at step 1b, and what the chosen provider cannot
- *   carry is refused there, by name. A LOCAL provider takes no key, costs nothing, and skips the
- *   budget, the agent's cap, the ledger and the allowance; the scrubber runs for it all the same.
+ *   carry is refused there, by name. A LOCAL provider costs nothing and skips the budget, the agent's
+ *   cap, the ledger and the allowance; it sends only the key its model was started with, when the
+ *   operator set one, and the scrubber runs for it all the same.
  *
  *   WHAT JEV IS. A model that takes a `state` and a map of typed questions (yes/no probability, pick
  *   one, score on a scale) and returns typed answers with probabilities. It writes no text. It is not
@@ -55,6 +56,8 @@
  *   const r = await decideForOwner(storage, config, { gaii, principal, appId, isOwner }, { state, questions });
  *   const g = await decideForOwner(storage, config, caller, { state, rule: 'send-reply' });
  * @version-history
+ *   v1.3.2 — 2026-09-24 — A provider's variable is read by envKeyOf (providers.ts): an optional one
+ *     left unset sends no key, as the built-in laya and von expect; a required one is still refused.
  *   v1.3.1 — 2026-09-23 — The call carries the operator's listed origin for this provider, so a node's
  *     own local model is reached without opening private egress to every fetch.
  *   v1.3.0 — 2026-09-23 — Decision providers: the provider is chosen per call and checked for what
@@ -83,7 +86,7 @@ import { createScrubber } from './scrub.js';
 import { checkDecideRequest, DEFAULT_DECIDE_LIMITS, type JevQuestion } from './limits.js';
 import { callSystemOne, SystemOneError, type SystemOneAnswer } from './systemone-client.js';
 import {
-  selectProvider, providerViolations, assertProviderReachable, providerAllowOrigins, readOwnerProviderKey,
+  selectProvider, providerViolations, assertProviderReachable, providerAllowOrigins, readOwnerProviderKey, envKeyOf,
   type DecisionProvider, type ProviderChosenBy,
 } from './providers.js';
 import { takeSlot } from './pacer.js';
@@ -305,11 +308,9 @@ async function resolveProviderKey(
 ): Promise<{ key: string | null; scope: AiDecisionKeyScope }> {
   if (provider.auth.type === 'none') return { key: null, scope: 'none' };
   if (provider.auth.type === 'env') {
-    const key = (process.env[provider.auth.env ?? ''] ?? '').trim();
-    if (!key) {
-      throw new DecideError('NO_API_KEY', 503, `The operator named ${provider.auth.env} as the key for the decision provider '${provider.id}', and it is not set on this node.`);
-    }
-    return { key, scope: 'node' };
+    // The operator's variable. An optional one left unset sends no key; a required one is refused.
+    const key = envKeyOf(provider);
+    return key ? { key, scope: 'node' } : { key: null, scope: 'none' };
   }
   if (provider.source === 'owner') {
     const key = await readOwnerProviderKey(storage, config, gaii, provider.id);
