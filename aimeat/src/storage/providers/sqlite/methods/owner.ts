@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Owner and Memory storage methods. Extracted from sqlite/index.ts to satisfy max-file-lines; bodies verbatim, bound to SqliteStorage via prototype merge.
  * @version-history
+ *   v1.10.0 -- 2026-09-24 -- deleteOwner rewrites the erased person out of the purchase receipts they
+ *     are a party to (repos/app-purchase-erasure.ts). The receipts stay for the other side's books.
  *   v1.9.0 -- 2026-09-08 -- countMemoryWithOrigins, for the operator's CORS page.
  *   v1.6.0 -- 2026-09-06 -- Review item 5.5: listAllMemory takes the Postgres order and default --
  *     key unless newestFirst, and no implicit limit -- so the same call answers the same on both.
@@ -40,6 +42,8 @@ import type {
 import type { MemoryTextHit, MemoryTextSearchOpts, MemoryVersionRecord } from '../../../repositories/memory.repository.js';
 import { resolveGroupId } from '../../../memory-sharing.js';
 import { pseudonymiseWriter } from '../repos/memory-tally.js';
+import { pseudonymisePurchaseParties } from '../repos/app-purchase-erasure.js';
+import { erasedPartyPseudonym } from '../../../erased-party.js';
 import type { SqliteStorage } from '../index.js';
 import { searchTextMemory, countMemory as countMemoryRepo, countMemoryWithOrigins as countMemoryWithOriginsRepo, sumMemoryBytes as sumMemoryBytesRepo, sumMemoryBytesForOwners as sumMemoryBytesForOwnersRepo, archivedSql, archiveMemoryByKey as archiveMemoryByKeyRepo, unarchiveMemoryByRoot as unarchiveMemoryByRootRepo, unarchiveMemoryByKey as unarchiveMemoryByKeyRepo, countArchivedByKeyPrefix as countArchivedByKeyPrefixRepo } from '../repos/memory.js';
 
@@ -127,6 +131,11 @@ export const ownerMethods = {
       // still readable.
       const tallyNodeId = ghiiRows[0]?.ghii.split('@')[1] ?? '';
       if (tallyNodeId) pseudonymiseWriter(this.db, name, tallyNodeId);
+
+      // The purchase receipts this person is a party to stay, because each one is also the other
+      // side's book entry. The name leaves them: it is released for reuse, and every purchase read
+      // keys on it. One pseudonym for the whole erasure, so the books still see one party.
+      pseudonymisePurchaseParties(this.db, name, ghiiRows.map(r => r.ghii), erasedPartyPseudonym());
 
       // 4. Delete GHII records for this owner
       this.db.prepare('DELETE FROM ghiis WHERE ownerName = ?').run(name);
