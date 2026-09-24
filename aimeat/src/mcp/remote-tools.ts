@@ -25,6 +25,8 @@
  * @structure remoteToolName · splitRemoteToolName · registerRemoteTools
  * @usage await registerRemoteTools(mcp, { storage, config, agentGaii, scopes });
  * @version-history
+ *   v1.1.0 — 2026-09-24 — Each call resolves the server row again through requireUsableServer, as
+ *     the gateway does, so a server switched off, detached or re-credentialed mid-session is honoured.
  *   v1.0.0 — 2026-09-16 — Phase 3 of the MCP proxy.
  */
 import { z } from 'zod';
@@ -34,10 +36,11 @@ import type { Storage } from '../storage/interface.js';
 import { MCP_TOOL_SEPARATOR, type McpServerRecord } from '../models/mcp-server-schemas.js';
 import { callRemoteTool } from '../services/mcp-client/invoke.js';
 import { resolveMcpAccess } from '../services/mcp-client/grants.js';
-import { listOwnedServers } from '../services/mcp-client/registry.js';
+import { listOwnedServers, requireUsableServer } from '../services/mcp-client/registry.js';
 import { ownerGhiiOf } from '../utils/gaii.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { logger } from '../utils/logger.js';
+import { toolError } from './tool-error.js';
 
 /**
  * The name a remote tool takes on our surface: `{slug}__{tool}`.
@@ -148,10 +151,18 @@ export async function registerRemoteTools(
           },
         },
         async (args: Record<string, unknown>) => {
+          // The row as it is NOW, resolved the way the gateway resolves it on every call. The one
+          // listed when the session opened is a snapshot: a server switched off, detached or given
+          // a new credential since then must be honoured on the next call, not at the next session.
+          const current = await requireUsableServer(storage, owner, server.id, config);
+          if (!current) {
+            return toolError('NOT_FOUND',
+              `"${server.slug}" is no longer attached to this account, so ${tool.name} cannot be called.`);
+          }
           // The SAME chokepoint the gateway calls. A flattened tool has exactly the reach a
           // gateway call would have had, including the grant, the locked arguments and the meter.
           const result = await callRemoteTool({
-            storage, config, server, tool: tool.name,
+            storage, config, server: current, tool: tool.name,
             args: args ?? {},
             caller: agentGaii(), callerKind: 'agent', scopes,
           });

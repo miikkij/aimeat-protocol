@@ -30,6 +30,8 @@
  *     test/run-e2e-ci.ts --test=mcp-proxy
  *
  * @version-history
+ *   v1.6.0 — 2026-09-24 — A flattened tool, over a real MCP session, is refused on the call after
+ *     its server is switched off in the same session (secaudit 2026-09 a49e32ddeb4e).
  *   v1.5.0 — 2026-09-24 — A whole OAuth round against a far side of its own: the callback sends the
  *     browser to a path of this node and never to `//host` or `/\host` (secaudit 2026-09 A2-3).
  *   v1.4.0 — 2026-09-24 — Phase 5d: an owner a node-wide server admits gets 404 on PATCH, DELETE and
@@ -510,9 +512,9 @@ await test('a finished sign-in sends the browser back to a path of this node, an
   // gets the JSON answer a round with no return address gets.
   for (const offSite of ['//evil.example/x', '/\\evil.example/x']) {
     const r = await land(offSite);
-    const lands = r.location === null ? null : new URL(r.location, BASE).origin;
-    assert(lands === null || lands === new URL(BASE).origin, `${offSite} sent the browser to ${r.location}`);
-    assert(r.status === 200, `${offSite}: expected the JSON answer, got ${r.status} → ${r.location}`);
+    // Resolved the way a browser resolves it, so a failure names the site it would have reached.
+    const lands = r.location === null ? 'nowhere' : new URL(r.location, BASE).href;
+    assert(r.status === 200 && r.location === null, `${offSite} sent the browser to ${lands} (${r.status})`);
   }
 
   const removed = await json('/v1/mcp-servers/oauthround', { method: 'DELETE', headers: ownerAuth() });
@@ -796,6 +798,33 @@ await test('re-enabling it brings it back', async () => {
     body: JSON.stringify({ tool: 'echo', arguments: { text: 'back' } }),
   });
   assert(status === 200, `expected 200, got ${status}`);
+});
+
+await test('a flattened tool honours a switch-off made while its session is open', async () => {
+  const flat = await json('/v1/mcp-servers/upstream', {
+    method: 'PATCH', headers: ownerAuth(), body: JSON.stringify({ exposure: 'flatten' }),
+  });
+  assert(flat.status === 200, `flatten: ${flat.status}`);
+  try {
+    // Opened AFTER the server was flattened: the session lists upstream__echo as a tool of its own.
+    const session = await openMcpSession(agentToken);
+    const before = await mcpTool(session, 'upstream__echo', { text: 'flat' });
+    assert(!before.isError && before.text.includes('echo:flat'), `the flattened tool: ${before.text}`);
+
+    const off = await json('/v1/mcp-servers/upstream', {
+      method: 'PATCH', headers: ownerAuth(), body: JSON.stringify({ enabled: false }),
+    });
+    assert(off.status === 200, `switch off: ${off.status}`);
+    // The same session. Until 2026-09-24 the tool called with the row listed at session open and
+    // the far side still answered (secaudit 2026-09 a49e32ddeb4e).
+    const after = await mcpTool(session, 'upstream__echo', { text: 'flat' });
+    assert(after.isError && after.text.includes('switched off'), `still answered after switch-off: ${after.text}`);
+  } finally {
+    // As it was, for the phases after this one.
+    await json('/v1/mcp-servers/upstream', {
+      method: 'PATCH', headers: ownerAuth(), body: JSON.stringify({ enabled: true, exposure: 'gateway' }),
+    });
+  }
 });
 
 // ─── Phase 5: the directory, and a capability over a remote tool ───
