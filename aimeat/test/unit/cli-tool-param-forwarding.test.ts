@@ -26,6 +26,8 @@
  *   on the fleet door with this suite green.
  * @usage pnpm test -- cli-tool-param-forwarding
  * @version-history
+ *   v1.3.0 — 2026-09-24 — The connector's aimeat_memory_restore sends owner_scope on the route, as the
+ *     CLI does. Failed on the old code first: the connector sent the restore without it.
  *   v1.2.0 — 2026-09-13 — The routes, not only the values: update and activate on the extension
  *     install reach PUT and the activate route, include_source reaches the scripts read, update on the
  *     cortex install reaches PUT, and board rules reach the create and the rules route, on the CLI
@@ -435,6 +437,23 @@ describe('the redeploy, source and board-rules parameters reach the route that r
         sent.length = 0;
         await get.handler({ name: 'probe-ext', include_source: true });
         expect(sent.map(s => s.path)).toEqual(['/v1/extensions/probe-ext?full=true']);
+    });
+
+    // The connector's restore declared `owner_scope` and dropped it, so an owner-scoped restore went out
+    // as a plain one and reached only the caller's own bin: the node's tool and the CLI both send it.
+    it('connector MCP aimeat_memory_restore sends owner_scope, as the node tool and the CLI do', async () => {
+        const { registerCoreTools } = await import('../../src/cli/connect/mcp/tools/core.js');
+        const sent: Sent[] = [];
+        const tools = connectorTools(registerCoreTools as never, sent);
+        const restore = tools.get('aimeat_memory_restore')!;
+        expect(Object.keys(restore.shape)).toContain('owner_scope');
+        await restore.handler({ key: 'notes.one', owner_scope: true });
+        expect(sent.map(s => `${s.method} ${s.path}`)).toEqual(['POST /v1/memory/notes.one/restore?owner_scope=true']);
+        sent.length = 0;
+        await restore.handler({ key: 'notes.one' });
+        expect(sent.map(s => `${s.method} ${s.path}`)).toEqual(['POST /v1/memory/notes.one/restore']);
+        const viaCli = await record(cli('aimeat_memory_restore'), { key: 'notes.one', owner_scope: true } as never);
+        expect(viaCli.sent.map(s => `${s.method} ${s.path}`)).toEqual(['POST /v1/memory/notes.one/restore?owner_scope=true']);
     });
 
     it('connector MCP aimeat_board_create declares rules, and aimeat_board_rules_set exists', async () => {

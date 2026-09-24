@@ -8,6 +8,9 @@
  * @structure
  *   - registerCoreTools() -- Registers core REST-backed connector MCP tools
  * @version-history
+ *   v1.15.1 -- 2026-09-24 -- aimeat_memory_restore sends owner_scope. It declared the flag and dropped
+ *     it, so an owner-scoped restore reached only the caller's own bin, where the node's tool and the
+ *     CLI reached the owner's other principals too.
  *   v1.15.0 -- 2026-09-12 -- aimeat_admin_statistics, thin over GET /v1/stats, with from and to
  *     forwarded as a pair because the route reads them only as a pair.
  *   v1.14.0 -- 2026-09-12 -- aimeat_admin_hooks and aimeat_admin_hook_set, thin over
@@ -94,9 +97,11 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
     agent_name: agentNameSchema,
     key: z.string().describe('Memory entry key to put back'),
     owner_scope: z.boolean().optional().describe("Also reach the OWNER's namespace and your sibling agents'."),
-  }, annotationsFor('aimeat_memory_restore'), async ({ agent_name, key }) => {
+  }, annotationsFor('aimeat_memory_restore'), async ({ agent_name, key, owner_scope }) => {
     const { client } = pickAgent(registry, agent_name);
-    const resp = await client.post(`/v1/memory/${encodeURIComponent(key)}/restore`, {});
+    // As the delete above and the node's own tool: the owner's reach, only when asked for.
+    const q = owner_scope ? '?owner_scope=true' : '';
+    const resp = await client.post(`/v1/memory/${encodeURIComponent(key)}/restore${q}`, {});
     return flagged(jsonContent(resp), resp);
   });
 
