@@ -14,6 +14,10 @@
  *   - the refusal path itself (deny401/deny403 and the audit context) lives in ./deny.ts
  *
  * @version-history
+ *   2026-09-24 — requireRole and requireRoleOrScope refuse a federated session as a local role-holder:
+ *     the 2026-09-08 requireScope fix covered the scope bypass, but requireRole('owner') still
+ *     admitted a visitor from another node whose name matched a local account, and the door-by-door
+ *     requireLocalSession sweep never reached the gate itself (secaudit 2026-09: A3-3, A10-1).
  *   2026-09-12 — isThirdPartyPrincipal(auth): whose SOFTWARE a principal is, beside isOwnerPrincipal's
  *     question of whether it may change the account. A read door with a half that suits a person's
  *     own agents and not a published product needed a question `owner` cannot answer, because all
@@ -419,9 +423,16 @@ export function requireRole(role: string) {
       return;
     }
 
-    // Federated sessions cannot access operator functions
-    if (role === 'operator' && req.auth.federated) {
-      deny403(req, res, 'FORBIDDEN', 'Federated sessions cannot access operator functions');
+    // A federated session is a visitor from another node. Its role list is ['owner'] by the mint's
+    // courtesy (routes/ghii/register-login.ts), and `owner` is the local part of the visitor's home
+    // name — which can equal a LOCAL account's name. It holds no local role here: its real reach is
+    // the federation scopes, enforced by requireScope, and the pull/push/list-home doors it needs are
+    // behind requireAuth, not this gate. Admitting it as a local owner/operator/agent is the
+    // namesake-takeover class the door-by-door fixes of 2026-09 kept missing (secaudit 2026-09:
+    // A3-1/A3-3/A10-1). Refused here so the whole owner-role family closes at the gate, not one door
+    // at a time. requireRoleOrScope still admits it on a scope it actually holds.
+    if (req.auth.federated) {
+      deny403(req, res, 'FORBIDDEN', 'A session from another node holds no local role here');
       return;
     }
 
@@ -635,9 +646,13 @@ export function requireRoleOrScope(role: string, ...scopes: string[]) {
     if (!req.auth) { deny401(req, res, 'Authentication required'); return; }
     const roles = req.auth.roles;
     // Role path — mirrors requireRole(role) exactly (owner/operator satisfy 'agent'; operator satisfies 'owner').
-    if (roles.includes(role) ||
+    // A federated session takes the SCOPE path only: its ['owner'] role is a visitor's, not a local
+    // role (see requireRole above), so a board or memory door it reaches it reaches by holding the
+    // scope this node granted the peer, never by the role. Without this a federated namesake passed
+    // every requireRoleOrScope('owner', …) door on the role alone (secaudit 2026-09).
+    if (!req.auth.federated && (roles.includes(role) ||
         (role === 'agent' && (roles.includes('owner') || roles.includes('operator'))) ||
-        (role === 'owner' && roles.includes('operator'))) { next(); return; }
+        (role === 'owner' && roles.includes('operator')))) { next(); return; }
     // Scope path — any authenticated principal carrying the grant. The wildcard rule is
     // scopeIsCovered()'s, not this function's; see requireScope below for why that matters.
     const have = req.auth.scopes ?? [];

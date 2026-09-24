@@ -18,6 +18,10 @@
  *   attestation. The runner pins AIMEAT_FEDERATION_AUTH_POLICY=all_peers and private egress.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-federated-namesake
  * @version-history
+ *   v1.4.0 — 2026-09-24 — The GATES, not one door at a time: requireRole('owner'),
+ *     requireOwnerPrincipal and requireOwnerSession admitted a federated session, so every owner
+ *     door the door-by-door sweep did not name (agent rekey, passkey setup, the home step) was open
+ *     to the namesake's visitor. Each of the three gates now refuses federated (secaudit 2026-09).
  *   v1.3.0 — 2026-09-14 — The doors that hand over the ACCOUNT, not just a read of it: the session
  *     refresh, the GDPR export and delete, the connectivity-key mint, and the file listing. Each
  *     one failed on the source with the harm in the message.
@@ -224,6 +228,48 @@ async function run() {
         }
         const own = await json('/v1/memory/export', as(alice.token));
         assert(own.status === 200 && JSON.stringify(own.body).includes(`alice-${stamp}`), `positive control: the local account exports its own memory: ${own.status}`);
+    });
+
+    await test('THE ACCOUNT GATES: a federated session is not a local owner (rekey, passkey setup, the home step)', async () => {
+        // The September remediation added requireLocalSession door by door, but left the GATES that
+        // decide "is this an owner in person" — requireRole('owner'), requireOwnerPrincipal and
+        // requireOwnerSession — admitting a federated session, whose role list is ['owner']. So every
+        // owner door the door-by-door sweep did not name was still open to the namesake's visitor.
+        // Three doors, one per gate. Each was proved handing the visitor the local account on the
+        // source (secaudit 2026-09: A3-1, A3-3, A10-1).
+        const made = await json('/v1/agents', as(alice.token, {
+            method: 'POST', body: JSON.stringify({ name: `gate${stamp}`, owner: namesake, capabilities: ['*'] }),
+        }));
+        assert(made.status === 201, `setup: the namesake's agent: ${made.status} ${JSON.stringify(made.body?.error)}`);
+        const g = made.body.data.agent.gaii as string;
+        const before = await json(`/v1/agents/${encodeURIComponent(g)}`, as(alice.token));
+        assert(before.status === 200, `setup: read the namesake's agent: ${before.status}`);
+        const keyBefore = before.body.data.public_key as string;
+
+        // requireRole('owner') — POST /v1/agents/:gaii/rekey. Currently 200, returning the local
+        // agent's NEW private key to the visitor and invalidating the real owner's tokens.
+        const rekey = await json(`/v1/agents/${encodeURIComponent(g)}/rekey`, as(fedToken, { method: 'POST' }));
+        assert(rekey.status === 403, `rekey admitted the visitor: ${rekey.status} ${JSON.stringify(rekey.body?.data ?? rekey.body?.error).slice(0, 200)}`);
+
+        // requireOwnerPrincipal — POST /v1/ghii/passkeys/register/options. Currently 200, letting the
+        // visitor register their OWN authenticator against the local namesake's account.
+        const passkey = await json('/v1/ghii/passkeys/register/options', as(fedToken, { method: 'POST', body: JSON.stringify({}) }));
+        assert(passkey.status === 403, `passkey register admitted the visitor: ${passkey.status}`);
+
+        // requireOwnerSession — GET /v1/home/state. Currently 200, the namesake's own home.
+        const home = await json('/v1/home/state', as(fedToken));
+        assert(home.status === 403, `the home step admitted the visitor: ${home.status}`);
+
+        // The local agent's key is untouched: the visitor never rotated it.
+        const seen = await json(`/v1/agents/${encodeURIComponent(g)}`, as(alice.token));
+        assert(seen.status === 200 && seen.body.data.public_key === keyBefore,
+            `the visitor rotated the local agent's key: ${seen.status} ${seen.body?.data?.public_key === keyBefore ? 'same' : 'CHANGED'}`);
+
+        // Positive control: the account holder in person still passes every one of these gates.
+        const ownRekey = await json(`/v1/agents/${encodeURIComponent(g)}/rekey`, as(alice.token, { method: 'POST' }));
+        assert(ownRekey.status === 200, `positive control: the namesake cannot rekey her own agent: ${ownRekey.status} ${JSON.stringify(ownRekey.body?.error)}`);
+        const ownHome = await json('/v1/home/state', as(alice.token));
+        assert(ownHome.status === 200, `positive control: the namesake's own home step: ${ownHome.status}`);
     });
 
     await test('A visitor\'s own write lands in THEIR namespace, never the namesake\'s', async () => {

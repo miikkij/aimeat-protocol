@@ -7,6 +7,9 @@
  *   and their docblocks moved unchanged, and middleware.ts re-exports all three, so every existing
  *   import keeps working.
  * @version-history
+ *   v1.3.0 — 2026-09-24 — isOwnerPrincipal returns false for a federated session: a visitor from
+ *     another node whose name matches a local account is never the account holder, so every
+ *     requireOwnerPrincipal door refuses it (secaudit 2026-09: A3-1, A3-3).
  *   v1.2.0 — 2026-09-20 — requireOwnerPrincipal(reason): a door that is not about signing in says
  *     what it is and what the caller's own way in is.
  *   v1.1.0 — 2026-09-14 — isSignedInCaller(auth): is there anybody behind this call, on a node that
@@ -72,6 +75,13 @@ import { deny401, deny403 } from './deny.js';
  */
 export function isOwnerPrincipal(auth: Request['auth'] | undefined): boolean {
   if (!auth) return false;
+  // A federated session is a visitor from another node whose `owner` is the local part of their home
+  // name and may equal a LOCAL account's name (routes/ghii/register-login.ts). It is never the local
+  // account holder in person, so it is never an owner principal — this is the root of the
+  // namesake-takeover class, closed here for every requireOwnerPrincipal door at once (secaudit
+  // 2026-09: A3-1/A3-3). requireRole('owner') refuses it too; a federated visitor's reach is its
+  // granted scopes, not the account.
+  if (auth.federated) return false;
   const roles = auth.roles;
   const isApp = roles.includes('app');
   if (roles.includes('owner') && !isApp && !roles.includes('agent') && !roles.includes('ecosystem')) return true;
