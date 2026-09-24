@@ -17,6 +17,8 @@
  *   - Chat instance + device-auth user-code helpers
  * @usage import { resolveIdentity, parseGEAI, isGEAI } from '../utils/gaii.js';
  * @version-history
+ *   v1.6.1 — 2026-09-24 — RESERVED_NAMES gains `security-system` and `scheduler`, the two owners
+ *     the node writes under itself that were still open to registration.
  *   v1.6.0 — 2026-09-24 — `isForeignPrincipal`, `homeIdentityOf` and `FEDERATED_ROLE`: the ONE
  *     question every federated check asks, and the visitor's own name. verifyJWT reads a federated
  *     token as a visitor with this role and this name, so no door can mistake it for the local
@@ -37,8 +39,6 @@
  *     out of step with the balance paying for them.
  *   v1.1.0 — 2026-06-14 — Add GEAI (ecosystem app) identity helpers; harden GAII parsers to reject
  *     `eco:`; make parseGaiiLoose/resolveIdentity GEAI-aware (ecosystem-apps foundation, chunk 1).
- *   v1.5.1 — 2026-09-24 — RESERVED_NAMES gains `security-system` and `scheduler`, the two owners
- *     the node writes under itself that were still open to registration.
  */
 import { randomBytes } from 'node:crypto';
 
