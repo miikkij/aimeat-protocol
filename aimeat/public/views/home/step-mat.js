@@ -14,6 +14,8 @@
  * @structure StepMat({ state, onDone }) — the open step.
  * @usage import { StepMat } from './step-mat.js';
  * @version-history
+ *   2026-09-24: A button that is not the next thing to do (nothing pasted yet, the prompt once
+ *     something is pasted) is the underlined action link (Jouni's decision "Step button").
  *   2026-09-23: StepMatDone deleted with its link row and one-time teach note (Jouni's decision):
  *     no page had drawn it since 07f7040c5 (2026-09-09); the optional page is a fold in the home
  *     journey.
@@ -110,7 +112,7 @@ export function StepMat({ onDone }) {
       <${PromptCard}
         label=${usingFallback ? tr('home.mat.promptShort', 'The shorter prompt') : tr('home.mat.promptLabel', 'The prompt')}
         prompt=${shown}
-        className=${hasPaste ? 'btn-outline' : 'poster-slab'}
+        className=${hasPaste ? 'poster-action' : 'poster-slab'}
         copyLabel=${tr('home.mat.copy', 'Copy the prompt')}
         copiedLabel=${tr('home.mat.copied', 'Copied. Paste it in your AI chat')} />
 
@@ -134,7 +136,7 @@ export function StepMat({ onDone }) {
       <${ActionRow}>
         <button
           type="button"
-          class=${hasPaste ? 'poster-slab' : 'btn-outline'}
+          class=${hasPaste ? 'poster-slab' : 'poster-action'}
           disabled=${busy || !hasPaste}
           onClick=${submit}>
           ${busy ? tr('home.mat.sending', 'Reading it…') : tr('home.mat.submit', 'Here is my welcome mat')}

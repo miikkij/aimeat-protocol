@@ -3,6 +3,7 @@
  * @description Shared poster and showroom shapes. Views compose these classes and own their layout.
  * @usage Linked immediately after theme.css in spa.html.
  * @version-history
+ *   v1.8.0 -- 2026-09-24 -- .poster-action:disabled, dimmed (Jouni's decision "Step button").
  *   v1.7.0 -- 2026-09-23 -- .poster-dialog deleted (Jouni's decision): no page ever put it on markup
  *     outside the rolled-back unification, and the site has its own dialog.
  *   v1.6.0 -- 2026-09-23 -- The pulse two components share (the waiting note's dot and a live
@@ -63,6 +64,9 @@
   color: var(--text); text-decoration: none; white-space: nowrap;
 }
 .poster-action:hover, .poster-tab:hover { border-color: var(--accent); color: var(--accent); }
+/* An action that cannot be pressed yet is dimmed and does not answer the pointer (Jouni's decision
+   "Step button"; the dimming is the control slab's). */
+.poster-action:disabled { opacity: 0.45; cursor: default; border-color: var(--text); color: var(--text); }
 /* The source's later on-sun correction keeps selected words ink in both themes. */
 .poster-tab.is-on { background: var(--sun); color: var(--on-sun); text-decoration: none; padding: .2rem .5rem; }
 /* The action link's tones (Jouni's decision "Action link"): the looks he kept, each in its own
