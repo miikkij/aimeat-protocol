@@ -13,6 +13,9 @@
  * @structure designbookRouter(config, storage): Router
  * @usage mounted by server-bootstrap/routes-loader.ts
  * @version-history
+ *   v1.4.2 — 2026-09-24 — A component's preview is served without the CSP nonce (1a0a15eb7b20):
+ *     the nonce was stamped on every <script> in the page, the one a component body smuggled in
+ *     included, and a component page has no script of its own that needs it.
  *   v1.4.1 — 2026-09-20 — The preview takes ?theme=dark|light for a component part: a reader in
  *     the dark saw every component on a light ground.
  *   v1.4.0 — 2026-09-19 — GET /v1/designbook?view=map: the whole published shelf as one page of
@@ -203,7 +206,12 @@ export function designbookRouter(config: AimeatConfig, storage: Storage): Router
       res.setHeader('Content-Security-Policy', csp.replace(/img-src [^;]*/, 'img-src * data: blob:'));
       res.setHeader('Cache-Control', 'no-store');
       res.setHeader('X-Robots-Tag', 'noindex');
-      res.type('html').send(injectCspNonce(html, res.locals.cspNonce as string | undefined));
+      // A COMPONENT'S PAGE GETS NO NONCE. It is the one page here built from a stranger's markup,
+      // and it carries no script of its own (component.ts), so nothing on it needs the nonce, and
+      // withholding it means a <script> that ever got past the bench is still refused by the CSP.
+      // Its <style> blocks need none: style-src allows inline styles without one.
+      const nonce = part?.kind === 'component' ? undefined : res.locals.cspNonce as string | undefined;
+      res.type('html').send(injectCspNonce(html, nonce));
     } catch (err) { refuse(res, err); }
   });
 

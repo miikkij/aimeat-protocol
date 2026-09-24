@@ -5,12 +5,16 @@
  * @description The component bench: what a component may carry and what it may not. The good case
  *   is the part three measured builds each made by hand on 2026-09-20, a week grid a person ticks.
  * @version-history
+ *   v1.1.0 — 2026-09-24 — The bench reads what a browser reads (1a0a15eb7b20, e82c9f26d729): an "="
+ *     with no name before it, a tag a browser reads as text or a comment, a closing tag carrying
+ *     anything, and a stylesheet whose escapes, strings or comments hide url(), @import,
+ *     position: fixed or !important. The preview benches the stored body again before it shows it.
  *   v1.0.0 — 2026-09-20 — Initial.
  */
 import { describe, it, expect } from 'vitest';
-import { validateComponentBody, componentPreviewHtml, componentSnippet } from '../../src/services/design-book/component.js';
+import { validateComponentBody, componentPreviewHtml, componentSnippet, type ComponentBody } from '../../src/services/design-book/component.js';
 import { validatePartInput, PART_KINDS } from '../../src/services/design-book/validate.js';
-import { attributesOf, declarationsOf, selectorsOf, tagsOf, withoutComments, withoutVarFallbacks } from '../../src/services/design-book/component-scan.js';
+import { attributesOf, cssAsRead, declarationsOf, selectorsOf, tagsOf, withoutVarFallbacks } from '../../src/services/design-book/component-scan.js';
 
 const WEEK_GRID = {
   prefix: 'wkgrid',
@@ -65,6 +69,66 @@ describe('the component bench', () => {
     expect(bad({ html: '<svg class="wkgrid"><path class="wkgrid-p" d="java\nscript:alert(1)"></path></svg>' })).toThrow(/may not carry an address/);
   });
 
+  // 1a0a15eb7b20: each of these passed the bench, and a browser ran the script in it. A browser
+  // reads an "=" where it expects a name as the NAME, quotes and all, and ends the tag at the first
+  // ">"; it reads "</ div" as a comment that ends at the first ">"; it reads the attributes of a
+  // closing tag like any other. The bench read a quoted value there, so the <script> was inside it.
+  it('reads an attribute region the way a browser does, and refuses what it cannot read cleanly', () => {
+    expect(bad({ html: '<div class="wkgrid" ="><script>alert(1)</script>"></div>' })).toThrow(/"=" stands where a browser expects/);
+    expect(bad({ html: '<div class="wkgrid" = "><script>alert(1)</script>"></div>' })).toThrow(/"=" stands where a browser expects/);
+    expect(bad({ html: '<div class="wkgrid" hidden/="><script>alert(1)</script>"></div>' })).toThrow();
+    expect(bad({ html: '<div class="wkgrid"></div ="><script>alert(1)</script>">' })).toThrow(/closing tag carries nothing/);
+    expect(bad({ html: '<div class="wkgrid"></div title="><script>alert(1)</script>">' })).toThrow(/closing tag carries nothing/);
+    expect(bad({ html: '<div class="wkgrid"></ div title="><script>alert(1)</script>">' })).toThrow(/right after "<" or "<\/"/);
+    expect(bad({ html: '<div class="wkgrid">< div title="x"></div>' })).toThrow(/right after "<" or "<\/"/);
+    // The reader says so itself: nothing it could not read is dropped on the floor.
+    expect(attributesOf(' class="wkgrid" ="><script>x</script>"')).toEqual([
+      { key: 'class', value: 'wkgrid', odd: false },
+      { key: '', value: '><script>x</script>', odd: true },
+    ]);
+    expect(tagsOf('<div></ div title="><script>x</script>">').tags[1]).toMatchObject({ closing: true, odd: true });
+    // What a browser and the bench agree on still passes: a self-closing SVG path, a bare attribute.
+    expect(() => validateComponentBody({ ...WEEK_GRID, html: '<div class="wkgrid" hidden><svg class="wkgrid-i" viewBox="0 0 8 8"><path class="wkgrid-p" d="M0 0L8 8"/></svg><br/></div >' })).not.toThrow();
+  });
+
+  // e82c9f26d729: a browser resolves CSS escapes, so each of these is url(), @import, fixed or
+  // !important to it; and it has no comment inside a string or behind a backslash, so a "comment"
+  // the bench skipped over was rules to a browser.
+  it('reads the stylesheet the way a browser does: escapes resolved, comments only where a browser has one', () => {
+    const rule = (decl: string) => `\n.wkgrid-x { ${decl}; color: var(--ak-ink); }`;
+    expect(bad({ css: WEEK_GRID.css + rule('background: u\\rl(https://evil.example/x.png)') })).toThrow(/no url\(\)/);
+    expect(bad({ css: WEEK_GRID.css + rule('background: \\75 rl(https://evil.example/x.png)') })).toThrow(/no url\(\)/);
+    expect(bad({ css: '@\\import "https://evil.example/a.css";\n' + WEEK_GRID.css })).toThrow(/loads nothing/);
+    expect(bad({ css: WEEK_GRID.css + rule('position: f\\ixed') })).toThrow(/position/);
+    expect(bad({ css: WEEK_GRID.css + rule('p\\osition: fixed') })).toThrow(/position/);
+    expect(bad({ css: WEEK_GRID.css + '\n.wkgrid-x { color: var(--ak-ink) !\\important; }' })).toThrow(/no !important/);
+    expect(bad({ css: WEEK_GRID.css + rule('color: r\\gb(0, 0, 0)') })).toThrow(/never a literal/);
+    expect(bad({ css: WEEK_GRID.css + '\n.wkgrid-a::before { content: "/*"; }\n.wkgrid-b { background: url(https://evil.example/x.png); }\n.wkgrid-c::before { content: "*/"; }' })).toThrow(/no url\(\)/);
+    expect(bad({ css: WEEK_GRID.css + '\n.wkgrid-a\\/* { }\n.wkgrid-b { background: url(https://evil.example/x.png); }\n.wkgrid-c { color: var(--ak-ink); } */' })).toThrow(/no url\(\)/);
+    // A value handed in through a custom property is not the word the bench reads, so position is a word.
+    expect(bad({ css: WEEK_GRID.css + '\n.wkgrid-x { --wkgrid-p: fixed; position: var(--wkgrid-p); color: var(--ak-ink); }' })).toThrow(/position/);
+    // image-set() takes its address as a string, with no url( in sight.
+    expect(bad({ css: WEEK_GRID.css + rule('background-image: image-set("https://evil.example/x.png" 1x)') })).toThrow(/no url\(\)/);
+    expect(cssAsRead('a\\62 c /* x */ "/*" \\2f\\2a d')).toBe('abc   "/*" /*d');
+    // An escape a real component uses, a tick drawn by the stylesheet, still passes.
+    expect(() => validateComponentBody({ ...WEEK_GRID, css: WEEK_GRID.css + '\n.wkgrid-cell[aria-pressed="true"]::after { content: "\\2713"; position: absolute; color: var(--ak-accent-ink); }' })).not.toThrow();
+  });
+
+  // Served from the node's own origin, so a body stored before the bench learned a trick is not
+  // trusted for having passed once: the page shows only what passes the bench now.
+  it('benches the stored body again before the preview shows any of it', () => {
+    const stored = { ...WEEK_GRID, html: '<div class="wkgrid" ="><script>alert(1)</script>"></div>' } as unknown as ComponentBody;
+    const page = componentPreviewHtml(stored);
+    expect(page).not.toMatch(/<script/i);
+    expect(page).not.toContain('alert(1)');
+    expect(page).toMatch(/no longer passes/);
+    const styled = componentPreviewHtml({ ...WEEK_GRID, css: WEEK_GRID.css + '\n.wkgrid-x { background: u\\rl(https://evil.example/x.png); color: var(--ak-ink); }' } as unknown as ComponentBody);
+    expect(styled).not.toContain('evil.example');
+    // Taking it hands the two texts to a builder who pastes them into an app: the same bench first.
+    expect(() => componentSnippet(stored)).toThrow(/no longer passes/);
+    expect(componentSnippet(validateComponentBody(WEEK_GRID)).html).toContain('class="wkgrid"');
+  });
+
   it('reads text that opens and never closes in time that grows with its length and nothing else', () => {
     // MEASURED 2026-09-20 on the patterns this replaced, 40 000 openings each: the tag pattern took
     // 1.3 s, the comment strip 0.6 s, the at-rule strip 3.2 s and "animation … infinite" 6.3 s, and
@@ -78,7 +142,9 @@ describe('the component bench', () => {
     };
     timed('tags', () => tagsOf('<a '.repeat(n)));
     timed('attributes', () => attributesOf('a= '.repeat(n)));
-    timed('comments', () => withoutComments('/* '.repeat(n)));
+    timed('comments', () => cssAsRead('/* '.repeat(n)));
+    timed('strings', () => cssAsRead('"a\\'.repeat(n)));
+    timed('escapes', () => cssAsRead('\\75 '.repeat(n)));
     timed('declarations', () => declarationsOf('animation '.repeat(n)));
     timed('selectors', () => selectorsOf('@media '.repeat(n)));
     timed('var fallbacks', () => withoutVarFallbacks('var(--a,('.repeat(n)));
