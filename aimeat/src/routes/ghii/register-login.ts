@@ -6,6 +6,11 @@
  *   POST /v1/ghii/login (password + federated + TOTP), POST /v1/ghii/login/attach-email. Extracted
  *   from src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.10.0 — 2026-09-24 — The federated mint names the visitor as what it is: role `federated`, and
+ *     its home GHII as `sub` and `owner`. It was roles:['owner'] and the bare local part, which a
+ *     LOCAL account can share, so every door deciding on the role or the name answered for that
+ *     account (secaudit 2026-09, root cause F-1). verifyJWT reads any federated token the same way,
+ *     so the ones minted before this change are visitors too.
  *   v1.9.0 — 2026-09-14 — The welcome bonus is creditWelcomeBonus() from owner-provisioning, not a
  *     transaction this route writes itself.
  *   v1.8.0 — 2026-09-09 — Three guards behind the zod schemas are gone (username required, password
@@ -44,7 +49,7 @@ import type { PeerInfo } from '../../services/federation.js';
 import { generateKeyPair } from '../../auth/keypair.js';
 import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
-import { validateOwnerName } from '../../utils/gaii.js';
+import { validateOwnerName, FEDERATED_ROLE, homeIdentityOf } from '../../utils/gaii.js';
 import { issueJWT } from '../../auth/jwt.js';
 import { createHash } from 'node:crypto';
 import { validateTotpCode, validateBackupCode } from '../../services/totp.js';
@@ -483,14 +488,19 @@ export function registerRegisterLoginRoutes(
                     ? homePeer.federationAuthScopes
                     : config.federationDefaultScopes;
                 const fedTtl = Math.min(config.jwtTtlSeconds, 3600); // max 1 hour
+                // A VISITOR, named by its home GHII and holding no local role. `loginName` alone is
+                // the local part, which a LOCAL account can share; a role of 'owner' made every door
+                // that asks the role take the visitor for that account (secaudit 2026-09, F-1).
+                const homeNode = attestation.home_node ?? federatedNodeId;
+                const visitor = homeIdentityOf({ owner: loginName, homeNode });
                 const token = await issueJWT({
-                    sub: loginName,
-                    owner: loginName,
+                    sub: visitor,
+                    owner: visitor,
                     node: config.nodeId,
-                    roles: ['owner'],
+                    roles: [FEDERATED_ROLE],
                     scopes: fedScopes,
                     federated: true,
-                    homeNode: attestation.home_node ?? federatedNodeId,
+                    homeNode,
                     homeUrl: attestation.home_url ?? homePeer.url,
                 }, fedTtl);
 
@@ -506,7 +516,7 @@ export function registerRegisterLoginRoutes(
                     token,
                     expires_at: new Date(Date.now() + fedTtl * 1000).toISOString(),
                     federated: true,
-                    home_node: attestation.home_node ?? federatedNodeId,
+                    home_node: homeNode,
                     home_url: attestation.home_url ?? homePeer.url,
                 }));
                 return;

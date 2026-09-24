@@ -11,6 +11,7 @@
  *   - POST /v1/owners: validates name, runs pre_owner_registration hook, creates owner + keypair
  *
  * @version-history
+ *   v1.6.1 — 2026-09-24 — The federated test is isForeignPrincipal(), the one question (secaudit 2026-09, F-1).
  *   v1.6.0 — 2026-09-14 — DELETE /v1/owners/:name is behind requireLocalSession as well.
  *     requireOwnerPrincipal admits a federated login — roles ['owner'], the local part of the
  *     visitor's HOME name — and the name comparison then matched the LOCAL account, so a visitor
@@ -39,7 +40,7 @@ import type { Storage } from '../storage/interface.js';
 import { generateKeyPair } from '../auth/keypair.js';
 import { requireAuth, requireOwnerPrincipal, requireRole, requireLocalSession } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
-import { validateOwnerName } from '../utils/gaii.js';
+import { validateOwnerName, isForeignPrincipal } from '../utils/gaii.js';
 import { calculateTrustScore } from '../services/trust.js';
 import { executeHooks } from '../services/hooks.js';
 import { fireHook } from '../utils/fire-hook.js';
@@ -210,7 +211,7 @@ export function ownersRouter(config: AimeatConfig, storage: Storage): Router {
     // the name alone made a visitor the local namesake here and showed them its roles and agent
     // roster (docs/pitfalls.md §83, security-development-dna invariant 11c). A federated session is
     // never this account and never this node's operator.
-    const local = !!req.auth && !req.auth.anonymous && req.auth.federated !== true;
+    const local = !!req.auth && !req.auth.anonymous && !isForeignPrincipal(req.auth);
     const isSelf = local && req.auth!.owner === owner.name;
     const isOperator = local && req.auth!.roles?.includes('operator');
     const privileged = isSelf || isOperator;

@@ -11,6 +11,7 @@
  *   - flagsRouter(config, storage): POST /v1/flags plus flag listing/review routes
  *
  * @version-history
+ *   v1.2.1 — 2026-09-24 — The federated test is isForeignPrincipal(), the one question (secaudit 2026-09, F-1).
  *   v1.2.0 — 2026-09-14 — The organism-admin path asks which PRINCIPAL is calling, not whose name
  *     the call carries: it read the admin's GHII from `req.auth.owner`, so the admin's own agent
  *     moderated in their name and so did a same-named visitor from another node. Invariant 11.
@@ -23,6 +24,7 @@ import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole, requireScope, isOwnerPrincipal } from '../auth/middleware.js';
+import { isForeignPrincipal } from '../utils/gaii.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { FlagCreateSchema, validateBody } from '../models/schemas.js';
@@ -140,7 +142,7 @@ export function flagsRouter(config: AimeatConfig, storage: Storage): Router {
         // triage of 2026-09-13.
         const isOperator = req.auth!.roles.includes('operator');
         let isOrganismAdmin = false;
-        if (!isOperator && isOwnerPrincipal(req.auth) && !req.auth!.federated) {
+        if (!isOperator && isOwnerPrincipal(req.auth) && !isForeignPrincipal(req.auth)) {
             const organism = await resolveOrganismForFlag(storage, existing.targetType, existing.targetId);
             if (organism) {
                 const ghiiRecord = await storage.getGHIIByOwner(req.auth!.owner);

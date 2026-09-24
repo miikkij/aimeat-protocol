@@ -11,6 +11,8 @@ paths:
 
 **Every route that stores or retrieves by identity uses `resolveIdentity(req.auth!, config.nodeId)`** from `src/utils/gaii.ts`, never raw `req.auth!.sub`. Owner sessions turn the bare name into a GHII; agent and ecosystem sessions return `sub` as-is. Skip it and owner data lands under bare `alice`, invisible to list, search and update. Compare ownership against the resolved identity.
 
+**A session from another node is a visitor, decided where the token is read.** `verifyJWT()` gives it role `federated` and its home GHII (`alice@home-node`) as `sub` and `owner`, so no door can take it for the local account sharing its local part. Ask `isForeignPrincipal(auth)`, never `auth.federated` inline; shorten an identity to an account name with `localAccountName()`, never `split('@')[0]`, which turns a visitor back into the local namesake. Ruled 2026-09-24 after the September audit found the door-by-door fixes and the four gates still leaving doors that decided on the role or the name alone. → `docs/coding-guidelines/identity-model.md`
+
 Key files: `src/utils/gaii.ts`, `src/routes/ghii.ts`, `src/routes/agents.ts`, `src/auth/middleware.ts`, `src/routes/libs.ts`.
 
 ## Gates for this area

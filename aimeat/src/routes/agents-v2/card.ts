@@ -35,6 +35,7 @@
  * @structure cardUri / jwksUri / nodeKeyUri · registerAgentCardRoutes(router, config, storage)
  * @usage registerAgentCardRoutes(router, config, storage);
  * @version-history
+ *   v1.1.1 — 2026-09-24 — The federated test is isForeignPrincipal(), the one question (secaudit 2026-09, F-1).
  *   v1.1.0 — 2026-08-31 — The public/extended split (spec chapter 4). `/card` becomes the node-signed
  *     public projection and `/card/extended` carries the agent's own bytes; `/card/info` answers with
  *     whichever half the reader is entitled to and says which it gave them. `requestedScopes`, the
@@ -45,7 +46,7 @@ import type { Router, Request } from 'express';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, AgentRecord } from '../../storage/interface.js';
 import { success, error } from '../../middleware/envelope.js';
-import { isValidGAII } from '../../utils/gaii.js';
+import { isValidGAII, isForeignPrincipal } from '../../utils/gaii.js';
 import {
   readCardJws, verifyCardJws, publicCardProjection, signWithNodeKey, jwkThumbprint, base64KeyToJwkX,
   type PublicAgentCard,
@@ -77,7 +78,7 @@ export function nodeKeyUri(baseUrl: string): string {
  */
 function isSameOwnerReader(req: Request, agent: AgentRecord): boolean {
   const auth = req.auth;
-  if (!auth || auth.anonymous || auth.federated) return false;
+  if (!auth || auth.anonymous || isForeignPrincipal(auth)) return false;
   return auth.owner === agent.owner;
 }
 

@@ -6,6 +6,8 @@
  *   extension over a localhost fetch, a manual webhook, an ecosystem app over the connect-tunnel,
  *   or a tool on an MCP server this node has attached.
  * @version-history
+ *   v1.3.1 - 2026-09-24 - The ecosystem branch names the caller's account with localAccountName, so a
+ *     visitor's home GHII never binds the local namesake's app tunnel (secaudit 2026-09, F-1).
  *   v1.3.0 - 2026-09-16 - Add `case 'mcp'`: a published capability can be a tool on an attached
  *     remote MCP server. It resolves through the CALLER's own reach and the same callRemoteTool()
  *     chokepoint, so publishing one does not hand anybody access to the server behind it.
@@ -19,7 +21,7 @@ import type { Storage, CapabilityRecord } from '../storage/interface.js';
 import { safeFetch } from '../utils/url-validator.js';
 import { INTERNAL_PASS_HEADER } from '../routes/extensions/internal-pass.js';
 import { getActiveConnectTunnelManager } from './connect-tunnel.js';
-import { parseGaiiLoose, buildGEAI, ownerGhiiOf } from '../utils/gaii.js';
+import { buildGEAI, ownerGhiiOf, localAccountName } from '../utils/gaii.js';
 import { requireUsableServer } from './mcp-client/registry.js';
 import { callRemoteTool, statusForRemoteRefusal } from './mcp-client/invoke.js';
 
@@ -192,7 +194,7 @@ export async function invokeCapability(
       if (!app) {
         throw Object.assign(new Error('Malformed ecosystem capability ref'), { statusCode: 500, code: 'BAD_ECOSYSTEM_REF' });
       }
-      const owner = parseGaiiLoose(callerGhii).owner;
+      const owner = localAccountName(callerGhii);
       const geai = buildGEAI(app, owner, config.nodeId);
       const mgr = getActiveConnectTunnelManager();
       if (!mgr) {

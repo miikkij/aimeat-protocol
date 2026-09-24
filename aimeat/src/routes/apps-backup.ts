@@ -13,6 +13,8 @@
  *   the caller's own account regardless of the backup's source owner.
  * @structure appsBackupRouter(config, storage) — mount BEFORE appsRouter.
  * @version-history
+ *   v1.0.3 — 2026-09-24 — The caller's owner claim is shortened with localAccountName, which keeps a
+ *     visitor's home GHII whole (secaudit 2026-09, F-1).
  *   v1.0.2 — 2026-09-16 — The three doors refuse a federated session: the owner bucket came from the
  *     owner NAME, which a visitor shares with the local account of the same name.
  *   v1.0.1 — 2026-09-12 — The owner bucket comes from resolveGhii(storage, owner, config); the
@@ -26,7 +28,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole, requireLocalSession } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
-import { resolveIdentity } from '../utils/gaii.js';
+import { resolveIdentity, localAccountName } from '../utils/gaii.js';
 import { resolveGhii } from '../utils/ghii-resolver.js';
 import { ZipSecurityError } from '../services/safe-zip.js';
 import { recordSecurityIncident } from '../services/security-incident.js';
@@ -60,7 +62,7 @@ export function appsBackupRouter(config: AimeatConfig, storage: Storage): Router
   // Same canonicalization as appsRouter — apps live in the owner's GHII bucket.
   const canonicalOwner = async (req: Express.Request): Promise<{ owner: string; ownerGhii: string }> => {
     const rawOwner = req.auth!.owner;
-    const owner = rawOwner.includes('@') ? rawOwner.split('@')[0] : rawOwner;
+    const owner = localAccountName(rawOwner);
     const ownerGhii = await resolveGhii(storage, owner, config);
     return { owner, ownerGhii };
   };

@@ -32,10 +32,14 @@
  * @structure SendingCompany · resolveSendingCompany · listSendableCompanies
  * @usage const sender = await resolveSendingCompany(storage, callerGhii, companyId);
  * @version-history
+ *   v1.0.1 — 2026-09-24 — The caller's account is localAccountName's: a visitor's home GHII stays
+ *     whole, so it never finds the memberships of the local account sharing its local part
+ *     (secaudit 2026-09, F-1).
  *   v1.0.0 — 2026-08-24 — Initial: organism-scoped sending identity.
  */
 import type { Storage } from '../../storage/interface.js';
 import type { CompanyRecord } from '../../models/company-schemas.js';
+import { localAccountName } from '../../utils/gaii.js';
 
 export interface SendingCompany {
   company: CompanyRecord;
@@ -48,8 +52,8 @@ export interface SendingCompany {
   via: 'owner' | 'organism';
 }
 
-/** The bare account name a membership row is keyed by. */
-const bareOwner = (ghii: string): string => String(ghii || '').split('@')[0];
+/** The bare account name a membership row is keyed by; another node's GHII names no local row. */
+const bareOwner = (ghii: string): string => localAccountName(String(ghii || ''));
 
 /**
  * May this caller send as this company, and whose book is it?

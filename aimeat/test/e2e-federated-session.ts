@@ -41,6 +41,9 @@
  *   500, the verified:false pin, per-peer scopes) · 9 cleanup.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-federated-session
  * @version-history
+ *   v1.2.0 — 2026-09-24 — The minted session is a VISITOR: role 'federated' and the home GHII as
+ *     `sub` and `owner`. The claims test asserted roles ['owner'] and the bare local part, which is
+ *     the shape a local account can share (secaudit 2026-09, root cause F-1).
  *   v1.1.0 — 2026-09-13 — A visitor's records are keyed by their HOME GHII, so the dead-peer session
  *     and the live-peer session are two identities rather than one shared local namespace. The
  *     push-home assertion in the unreachable-home test changes from the proxy error to 404: that
@@ -398,7 +401,9 @@ async function run() {
         assert(c.federated === true, `federated: ${JSON.stringify(c.federated)}`);
         assert(c.homeNode === homeNodeId, `homeNode: ${c.homeNode}`);
         assert(c.homeUrl === homeUrl, `homeUrl: ${c.homeUrl}`);
-        assert(c.sub === visitor && c.owner === visitor, `sub/owner: ${c.sub}/${c.owner}`);
+        // Named by the visitor's HOME GHII, never the bare local part: a local account can share that
+        // (secaudit 2026-09, F-1).
+        assert(c.sub === `${visitor}@${homeNodeId}` && c.owner === `${visitor}@${homeNodeId}`, `sub/owner: ${c.sub}/${c.owner}`);
         assert(c.node === NODE_ID, `the session belongs to the node that minted it: ${c.node}`);
         // The RECEIVING node decides what a visitor may do. The home node asked for ['memory:read']
         // in its attestation and is not consulted: with no per-peer list, config.federationDefaultScopes
@@ -406,7 +411,8 @@ async function run() {
         assert(Array.isArray(c.scopes) && c.scopes.join(',') === 'memory:read,catalogue:read',
             `scopes must come from this node's policy, got ${JSON.stringify(c.scopes)}`);
         assert(c.exp - c.iat <= 3600 && c.exp - c.iat > 0, `a federated session is capped at an hour: ${c.exp - c.iat}s`);
-        assert(JSON.stringify(c.roles) === '["owner"]', `roles: ${JSON.stringify(c.roles)}`);
+        // A visitor holds no local role: role 'federated', never 'owner' (secaudit 2026-09, F-1).
+        assert(JSON.stringify(c.roles) === '["federated"]', `roles: ${JSON.stringify(c.roles)}`);
     });
 
     // ─── Phase 4: pull ───

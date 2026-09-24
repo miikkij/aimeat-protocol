@@ -6,6 +6,7 @@
  *   get/put, GET /v1/ghii/me, GET /v1/ghii/:ghii, PUT /v1/ghii, DELETE /v1/ghii. Extracted from
  *   src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.4.1 — 2026-09-24 — The federated test is isForeignPrincipal(), the one question (secaudit 2026-09, F-1).
  *   v1.4.0 — 2026-09-12 — GET /v1/ghii/me splits its response instead of taking a gate, which closes
  *     the last DEBT line in the route-scope ratchet. The door is open to everything acting in the
  *     person's name and always was safe across people: it reads the record by req.auth.owner, so
@@ -37,6 +38,7 @@ import { createHash } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { isOwnerPrincipal, isThirdPartyPrincipal, requireAuth, requireOwnerPrincipal, requireScope } from '../../auth/middleware.js';
+import { isForeignPrincipal } from '../../utils/gaii.js';
 import { success, error } from '../../middleware/envelope.js';
 import { isValidRegion, isValidTimeZone } from '../../services/display-prefs.js';
 import { emitChange } from '../../services/event-bus.js';
@@ -188,7 +190,7 @@ export function registerProfileRoutes(
         // bare owner NAME: for a visitor that name is the local part of an account on their home
         // node, so it answered with the profile of whichever local account shares it — including
         // the account-security half. Their profile lives on their home node.
-        if (req.auth!.federated) {
+        if (isForeignPrincipal(req.auth)) {
             res.status(404).json(error(config.nodeId, 'NOT_FOUND',
                 `This account lives on ${req.auth!.homeNode ?? 'another node'}, and its profile is read there.`));
             return;

@@ -7,6 +7,7 @@
  *   and their docblocks moved unchanged, and middleware.ts re-exports all three, so every existing
  *   import keeps working.
  * @version-history
+ *   v1.3.1 — 2026-09-24 — The federated test is isForeignPrincipal(), the one question.
  *   v1.3.0 — 2026-09-24 — isOwnerPrincipal returns false for a federated session: a visitor from
  *     another node whose name matches a local account is never the account holder, so every
  *     requireOwnerPrincipal door refuses it (secaudit 2026-09: A3-1, A3-3).
@@ -21,6 +22,7 @@
  */
 import type { Request, Response, NextFunction } from 'express';
 import { ACCOUNT_SECURITY_SCOPE } from '../utils/scope-coverage.js';
+import { isForeignPrincipal } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 import { deny401, deny403 } from './deny.js';
 
@@ -81,7 +83,7 @@ export function isOwnerPrincipal(auth: Request['auth'] | undefined): boolean {
   // namesake-takeover class, closed here for every requireOwnerPrincipal door at once (secaudit
   // 2026-09: A3-1/A3-3). requireRole('owner') refuses it too; a federated visitor's reach is its
   // granted scopes, not the account.
-  if (auth.federated) return false;
+  if (isForeignPrincipal(auth)) return false;
   const roles = auth.roles;
   const isApp = roles.includes('app');
   if (roles.includes('owner') && !isApp && !roles.includes('agent') && !roles.includes('ecosystem')) return true;

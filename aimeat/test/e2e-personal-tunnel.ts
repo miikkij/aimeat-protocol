@@ -32,6 +32,9 @@
  *   heartbeat timeout.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-personal-tunnel
  * @version-history
+ *   v1.1.0 — 2026-09-24 — An agent of the anchored owner is refused the tunnel (403): the upgrade now
+ *     asks isOwnerPrincipal, as the anchor door asks requireRole('owner'). It failed on the source,
+ *     where the agent's token opened the socket (secaudit 2026-09, found in verification).
  *   v1.0.0 — 2026-09-08 — Written to cover src/services/personal-tunnel.ts end to end.
  */
 import { WebSocket } from 'ws';
@@ -325,6 +328,19 @@ async function sharedNodePhases() {
             `a token is not enough: the tunnel is for an anchored node, expected 403, got ${refusal}`);
     });
 
+    await test('an agent of the owner is refused with 403: the tunnel is the owner\'s own, as its anchor door is', async () => {
+        // The upgrade verified the token and then found the anchored node by the token's owner NAME,
+        // with no question about which kind of principal held it. A new socket replaces the live one,
+        // so any token naming the owner took the tunnel over: any of the owner's agents, and a
+        // visitor from another node who shares the name (secaudit 2026-09, found in verification).
+        let refusal = 'opened';
+        try {
+            const s = await HomeNodeSocket.connect(BASE, agentToken);
+            openSockets.push(s);
+        } catch (err) { refusal = (err as Error).message; }
+        assert(refusal.includes('403'), `an agent's token took the owner's personal tunnel: ${refusal}`);
+    });
+
     // ─── Phase 3: Welcome and mailbox sync ───
     console.log('Phase 3 — Welcome and mailbox sync');
 
@@ -559,7 +575,11 @@ async function startHeartbeatNode(): Promise<void> {
     });
     hbNode.stdout?.on('data', c => { hbLog += c.toString(); });
     hbNode.stderr?.on('data', c => { hbLog += c.toString(); });
-    await waitForServer(hbNode, HB_BASE, { label: 'the heartbeat node' });
+    // The node's own words are the only account of why it did not come up, so a failed start shows
+    // the end of them (the log was collected and never read until 2026-09-24).
+    await waitForServer(hbNode, HB_BASE, { label: 'the heartbeat node' }).catch((err: unknown) => {
+        throw new Error(`${(err as Error).message}\n--- heartbeat node log (last 2000 chars) ---\n${hbLog.slice(-2000)}`);
+    });
 }
 
 async function stopHeartbeatNode(): Promise<void> {

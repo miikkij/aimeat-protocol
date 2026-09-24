@@ -14,6 +14,9 @@
  *   - the refusal path itself (deny401/deny403 and the audit context) lives in ./deny.ts
  *
  * @version-history
+ *   2026-09-24 — Every federated test here is isForeignPrincipal(), the one question (utils/gaii.ts),
+ *     and verifyJWT now reads a visitor as role 'federated' named by its home GHII, so these gates
+ *     are the second line and the inline role checks elsewhere hold as well (secaudit 2026-09, F-1).
  *   2026-09-24 — requireRole and requireRoleOrScope refuse a federated session as a local role-holder:
  *     the 2026-09-08 requireScope fix covered the scope bypass, but requireRole('owner') still
  *     admitted a visitor from another node whose name matched a local account, and the door-by-door
@@ -80,6 +83,7 @@
 import type { Request, Response, NextFunction } from 'express';
 import { verifyJWT, isRevoked, type VerifiedToken } from './jwt.js';
 import { OPERATOR_ORGANISM_REPAIR_SCOPE, scopeIsCovered } from '../utils/scope-coverage.js';
+import { isForeignPrincipal, setThisNodeId } from '../utils/gaii.js';
 import { setRefreshCookie, readRefreshCookie } from '../services/owner-session.js';
 import { resolvePat, PAT_PREFIX } from '../services/access-token.js';
 import type { AimeatConfig } from '../config.js';
@@ -97,6 +101,8 @@ export function initSessionAuth(storage: Storage, config?: AimeatConfig): void {
   _sessionStorage = storage;
   _config = config ?? null;
   setDenyConfig(_config);
+  // So localAccountName (utils/gaii.ts) can tell this node's identities from a visitor's home GHII.
+  setThisNodeId(_config?.nodeId ?? null);
 }
 
 const _lastSeenCache = new Map<string, number>();
@@ -246,7 +252,7 @@ async function appGrantRevoked(verified: VerifiedToken): Promise<boolean> {
  * attestation instead (federation-auth.ts).
  */
 async function ownerDisabled(verified: VerifiedToken): Promise<boolean> {
-  if (verified.federated === true || !verified.owner || !_sessionStorage) return false;
+  if (isForeignPrincipal(verified) || !verified.owner || !_sessionStorage) return false;
   const owner = await _sessionStorage.getOwner(verified.owner);
   return !!owner?.disabledAt;
 }
@@ -423,15 +429,14 @@ export function requireRole(role: string) {
       return;
     }
 
-    // A federated session is a visitor from another node. Its role list is ['owner'] by the mint's
-    // courtesy (routes/ghii/register-login.ts), and `owner` is the local part of the visitor's home
-    // name — which can equal a LOCAL account's name. It holds no local role here: its real reach is
-    // the federation scopes, enforced by requireScope, and the pull/push/list-home doors it needs are
-    // behind requireAuth, not this gate. Admitting it as a local owner/operator/agent is the
-    // namesake-takeover class the door-by-door fixes of 2026-09 kept missing (secaudit 2026-09:
-    // A3-1/A3-3/A10-1). Refused here so the whole owner-role family closes at the gate, not one door
-    // at a time. requireRoleOrScope still admits it on a scope it actually holds.
-    if (req.auth.federated) {
+    // A federated session is a visitor from another node. Until 2026-09-24 its role list was
+    // ['owner'] by the mint's courtesy and its `owner` the local part of its home name, which can
+    // equal a LOCAL account's name; verifyJWT now reads it as role 'federated', named by its home GHII
+    // (utils/gaii.ts isForeignPrincipal). It holds no local role here: its real reach is the
+    // federation scopes, enforced by requireScope, and the pull/push/list-home doors it needs are
+    // behind requireAuth, not this gate. Refused by name as well as by role, so the refusal says why
+    // (secaudit 2026-09: A3-1/A3-3/A10-1). requireRoleOrScope still admits it on a scope it holds.
+    if (isForeignPrincipal(req.auth)) {
       deny403(req, res, 'FORBIDDEN', 'A session from another node holds no local role here');
       return;
     }
@@ -492,7 +497,7 @@ export function requireOperatorPrincipal(storage: Storage, scope: string = OPERA
       deny401(req, res, 'Authentication required');
       return;
     }
-    if (req.auth.federated) {
+    if (isForeignPrincipal(req.auth)) {
       deny403(req, res, 'FORBIDDEN', 'Federated sessions cannot access operator functions');
       return;
     }
@@ -542,8 +547,13 @@ export function requireExternalPrincipal() {
     // holding an explicit, scoped grant token. Like agent/ecosystem it is scope-enforced by
     // requireScope() (no owner bypass — its role is not 'owner'), so widening here only lets a
     // granted app reach the same data CRUD an agent/GEAI uses, never escalating its scopes.
+    // A visitor from another node is an outside principal here too, and like an agent it reaches
+    // these doors only on the scopes this node granted its peer (requireScope gives it no owner
+    // bypass). It held roles ['owner'] and passed on that until 2026-09-24; it passes by name now,
+    // under its own home identity (secaudit 2026-09, F-1).
     const ok = roles.includes('agent') || roles.includes('ecosystem') ||
-      roles.includes('app') || roles.includes('owner') || roles.includes('operator');
+      roles.includes('app') || roles.includes('owner') || roles.includes('operator') ||
+      isForeignPrincipal(req.auth);
     if (!ok) {
       deny403(req, res, 'ACCESS_DENIED', 'Agent, ecosystem-app, or app principal required');
       return;
@@ -601,7 +611,7 @@ export function agentNotFoundResponse(
  */
 export function requireLocalSession() {
   return (req: Request, res: Response, next: NextFunction) => {
-    if (req.auth?.federated) {
+    if (isForeignPrincipal(req.auth)) {
       deny403(req, res, 'FORBIDDEN', 'This action requires a local session');
       return;
     }
@@ -650,7 +660,7 @@ export function requireRoleOrScope(role: string, ...scopes: string[]) {
     // role (see requireRole above), so a board or memory door it reaches it reaches by holding the
     // scope this node granted the peer, never by the role. Without this a federated namesake passed
     // every requireRoleOrScope('owner', …) door on the role alone (secaudit 2026-09).
-    if (!req.auth.federated && (roles.includes(role) ||
+    if (!isForeignPrincipal(req.auth) && (roles.includes(role) ||
         (role === 'agent' && (roles.includes('owner') || roles.includes('operator'))) ||
         (role === 'owner' && roles.includes('operator')))) { next(); return; }
     // Scope path — any authenticated principal carrying the grant. The wildcard rule is
@@ -673,7 +683,7 @@ export function requireScope(...requiredScopes: string[]) {
     // operator: a GEAI is a scoped external principal and must NEVER receive the owner bypass.
     // Nor a FEDERATED session: its owner role is the mint's courtesy and its scope list is what the
     // receiving node granted; until 2026-09-08 the role waved a memory:read visitor past a write.
-    if (req.auth.roles.includes('owner') && !req.auth.federated &&
+    if (req.auth.roles.includes('owner') && !isForeignPrincipal(req.auth) &&
         !req.auth.roles.includes('agent') && !req.auth.roles.includes('ecosystem')) {
       next();
       return;

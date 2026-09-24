@@ -29,6 +29,7 @@
  *   const out = await writeMemoryRecord({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   v1.8.1 — 2026-09-24 — The federated test is isForeignPrincipal(), the one question (secaudit 2026-09, F-1).
  *   v1.8.0 — 2026-09-16 — SECRET_RECORD: openrouter.apikey and commerce.psp are refused on every
  *     generic write road. The generic read doors show them redacted, so a value saved back would
  *     overwrite the credential. The commerce tools (pipeline mcp.commerce) still write commerce.psp.
@@ -85,7 +86,7 @@ import { logger } from '../utils/logger.js';
 import { recordMemoryTouch } from './data-map/write-tally-buffer.js';
 import { checkOrganismNamespaceAccess } from './organism-namespace-access.js';
 import { misdirectedCrewKey } from './crew-def-store.js';
-import { parseGAII } from '../utils/gaii.js';
+import { parseGAII, isForeignPrincipal } from '../utils/gaii.js';
 import { undeclaredSpaceForKey } from './workspace-write-items.js';
 import { odpsWriteRefusal } from './exchange-odps-write.js';
 import { isSecretRecordKey, secretRecordWriteRefusal } from './secret-records.js';
@@ -240,7 +241,7 @@ export async function writeMemoryRecord(
     //    scope list is the receiving node's grant (2026-09-08, e2e-federated-session: a visitor with
     //    memory:read wrote memory here).
     const scopedPrincipal = caller.roles.includes('agent') || caller.roles.includes('ecosystem')
-        || caller.federated === true;
+        || isForeignPrincipal(caller);
     const privileged = !scopedPrincipal
         && (caller.roles.includes('owner') || caller.roles.includes('operator'));
     const needed = input.authorisingScope ?? 'memory:write';

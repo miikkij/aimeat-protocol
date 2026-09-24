@@ -10,11 +10,14 @@
  *   import { cortexCallerOf } from './cortex/caller.js';
  *   const out = await installCortex({ storage, config }, cortexCallerOf(req), { manifest, libs });
  * @version-history
+ *   v1.1.0 — 2026-09-24 — The visitor's name is homeIdentityOf's: verifyJWT hands a visitor its home
+ *     GHII as `owner` since this day, so appending the home node again would have named it twice.
  *   v1.0.0 — 2026-09-14 — Extraction, with the federated session no longer answering to the local
  *     account's name.
  */
 import type { Request } from 'express';
 import type { CortexCaller } from '../../services/cortex-lifecycle.js';
+import { homeIdentityOf, isForeignPrincipal } from '../../utils/gaii.js';
 
 /**
  * `req.auth!.owner` is the bare owner name for an owner session and for that owner's agents alike,
@@ -39,7 +42,7 @@ import type { CortexCaller } from '../../services/cortex-lifecycle.js';
  */
 export function cortexCallerOf(req: Request): CortexCaller {
   return {
-    ownerName: req.auth!.federated ? `${req.auth!.owner}@${req.auth!.homeNode ?? 'unknown-home'}` : req.auth!.owner,
+    ownerName: isForeignPrincipal(req.auth) ? homeIdentityOf(req.auth!) : req.auth!.owner,
     gaii: req.auth!.sub,
     isOperator: req.auth!.roles.includes('operator'),
   };

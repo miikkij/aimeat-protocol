@@ -6,9 +6,14 @@
  *   token revocation. Issues credentials for every authenticated principal — owner (GHII), agent
  *   (GAII), and ecosystem app (GEAI). Optional claims (mcp_client, federated, eco_app, …) are threaded
  *   conditionally so tokens stay minimal.
- * @structure initNodeKeys / AccountDisabledError / issueJWT / verifyJWT / generateSessionId / revokeToken / isRevoked
+ * @structure initNodeKeys / AccountDisabledError / issueJWT / verifyJWT (+ asVisitor) / generateSessionId / revokeToken / isRevoked
  * @usage import { issueJWT, verifyJWT } from '../auth/jwt.js';
  * @version-history
+ *   v1.4.0 — 2026-09-24 — verifyJWT reads a federated token as a VISITOR: role `federated` and its
+ *     home GHII as `owner` and `sub`, whatever the token says. Every consumer of a token goes
+ *     through here (the global auth middleware, MCP, the tunnels, device approval, OAuth consent), so
+ *     no door can take a visitor from another node for the local account that shares its local part
+ *     (secaudit 2026-09, root cause F-1).
  *   v1.3.0 — 2026-08-23 — Mint backstop (BR-04): issueJWT throws AccountDisabledError for a
  *     deactivated local owner, so a door that forgot to ask still cannot mint in their name.
  *   v1.2.0 — 2026-08-10 — Fails closed at both ends: issueJWT writes [] rather than ['*'] when the
@@ -20,6 +25,7 @@ import { SignJWT, jwtVerify } from 'jose';
 import { createHash, randomBytes } from 'node:crypto';
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
+import { FEDERATED_ROLE, homeIdentityOf, isForeignPrincipal } from '../utils/gaii.js';
 
 // We use EdDSA JWTs signed with the node's private key
 // jose requires CryptoKey objects, so we convert from raw Ed25519 bytes
@@ -97,7 +103,7 @@ export async function issueJWT(payload: JWTPayload, ttlSeconds: number, sessionI
   // twenty call sites asked. Same shape as provisionOwner's registration-mode backstop — the human
   // doors refuse with a clean 403 before reaching here, and this makes a forgotten door impossible.
   // Federated mints are excluded: their `owner` is a remote node's name, judged by its home node.
-  if (payload.owner && !payload.federated && _storage) {
+  if (payload.owner && !isForeignPrincipal(payload) && _storage) {
     const ownerRecord = await _storage.getOwner(payload.owner);
     if (ownerRecord?.disabledAt) throw new AccountDisabledError(payload.owner);
   }
@@ -151,6 +157,24 @@ export interface VerifiedToken {
   app?: string;         // the app's own id ("owner/filename") for role-'app' tokens
 }
 
+/**
+ * A session signed in on ANOTHER node, as this node must see it: a visitor, holding the role
+ * `federated` and no other, named by its home GHII.
+ *
+ * The federated login minted `roles: ['owner']` and the bare local part of the visitor's name until
+ * 2026-09-24, and whatever this function returns is what every door reads. A door that asked "is this
+ * the account holder" of the role, or looked an account up by the name, answered for the LOCAL
+ * account sharing the local part: the agent roster, the home feed, the A2A account road, the
+ * AI-spend gate, device authorization's same-owner shortcut, the schema door, the personal tunnel
+ * (secaudit 2026-09). Rewritten here, once, so a token minted before this change reads the same as
+ * one minted after it, and every consumer of a token sees one answer.
+ */
+function asVisitor(v: VerifiedToken): VerifiedToken {
+  if (!isForeignPrincipal(v)) return v;
+  const home = homeIdentityOf(v);
+  return { ...v, sub: home, owner: home, roles: [FEDERATED_ROLE] };
+}
+
 export async function verifyJWT(token: string): Promise<VerifiedToken | null> {
   if (!nodePublicKey) throw new Error('Node keys not initialized');
 
@@ -158,7 +182,7 @@ export async function verifyJWT(token: string): Promise<VerifiedToken | null> {
     const { payload } = await jwtVerify(token, nodePublicKey, {
       algorithms: ['EdDSA'],
     });
-    return {
+    return asVisitor({
       sub: payload.sub as string,
       owner: payload.owner as string,
       node: payload.node as string,
@@ -178,7 +202,7 @@ export async function verifyJWT(token: string): Promise<VerifiedToken | null> {
       eco_app: payload.eco_app as string | undefined,
       app_grant: payload.app_grant as string | undefined,
       app: payload.app as string | undefined,
-    };
+    });
   } catch {
     // Fail-closed by design: any verification error (bad signature, expiry, malformed claims) means
     // "not authenticated". Logging every rejected token on a public endpoint is a flooding vector.
