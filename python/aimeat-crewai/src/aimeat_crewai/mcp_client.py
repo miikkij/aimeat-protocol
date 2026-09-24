@@ -24,12 +24,20 @@ AIMEAT exposes the same tool surface through two MCP transports:
    auto-starting it if needed. The daemon holds ONE persistent WS tunnel per
    agent to the node, so every local MCP/REST call rides that socket instead
    of opening fresh TLS connections. This is the preferred local transport
-   since 0.4.0; use `serve_params()`.
+   since 0.4.0; use `serve_params()`. Every request to the daemon carries the
+   secret it wrote into serve.json at start (0.29.0).
 
 This module returns dictionaries (for HTTP/SSE/serve) or
 `StdioServerParameters` objects (for stdio) that the caller passes to
 `MCPServerAdapter` from `crewai_tools` -- either directly or via
 `create_liaison_agent()`.
+
+Changelog:
+  0.29.0 -- 2026-09-24 -- The serve daemon requires the secret it writes into serve.json at every
+    start (connector schema 3), because it used to answer any web page or local process that
+    reached 127.0.0.1 (secaudit 2026-09, A9-1). `serve_params()` sends it instead of the old
+    placeholder bearer, the liveness probe behind `ensure_serve()` sends it, and
+    `serve_auth_headers(doc)` gives the header to a client that builds its own session.
 """
 from __future__ import annotations
 
@@ -40,6 +48,7 @@ import subprocess
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from collections.abc import Sequence
 from pathlib import Path
@@ -295,14 +304,63 @@ def _read_discovery(path: Path) -> dict[str, Any] | None:
     return doc
 
 
-def _probe_serve(port: int, expected_pid: int | None, timeout: float = 2.0) -> bool:
+def serve_secret(doc: dict[str, Any] | None) -> str | None:
+    """The secret a serve daemon wrote into its discovery file, or None for a daemon older than
+    connector schema 3, which writes none and checks none."""
+    secret = (doc or {}).get("secret")
+    return secret if isinstance(secret, str) and secret else None
+
+
+def serve_auth_headers(doc: dict[str, Any] | None) -> dict[str, str]:
+    """The header every request to the serve daemon carries: `Authorization: Bearer <secret>`,
+    with the secret from `doc` (what `ensure_serve()` returns). Empty for an older daemon.
+
+    For a client that builds its own HTTP session against the daemon. The helpers in this package
+    (`serve_params`, the daemon's REST session, `ServeClient`) already send it."""
+    secret = serve_secret(doc)
+    return {"Authorization": f"Bearer {secret}"} if secret else {}
+
+
+def _secret_for_port(port: int | None) -> str | None:
+    """The secret of the daemon this home's serve.json names, when that daemon listens on `port`.
+
+    Matched on the port so the secret goes to the one daemon it was made for and nowhere else."""
+    if not port:
+        return None
+    doc = _read_discovery(serve_discovery_path())
+    if doc is None or doc.get("port") != port:
+        return None
+    return serve_secret(doc)
+
+
+def loopback_secret(base_url: str) -> str | None:
+    """The secret for a loopback base URL such as `http://127.0.0.1:<port>`, read from serve.json
+    when it names that port; None otherwise. Used by the clients that are given only a URL."""
+    try:
+        port = urllib.parse.urlsplit(base_url).port
+    except ValueError:
+        return None
+    return _secret_for_port(port)
+
+
+def _probe_serve(
+    port: int, expected_pid: int | None, timeout: float = 2.0, secret: str | None = None,
+) -> bool:
     """GET /local/status on the loopback daemon; True when it answers ok (and,
     when given, with the pid the discovery file promised -- guards against an
-    unrelated process having taken over the port)."""
+    unrelated process having taken over the port).
+
+    The request carries the daemon's secret: `secret` when the caller has it, else the one this
+    home's serve.json names for `port`. Without it a schema-3 daemon answers 401, which reads here
+    as "does not answer"."""
+    if secret is None:
+        secret = _secret_for_port(port)
+    request = urllib.request.Request(
+        f"http://127.0.0.1:{port}/local/status",
+        headers={"Authorization": f"Bearer {secret}"} if secret else {},
+    )
     try:
-        with urllib.request.urlopen(
-            f"http://127.0.0.1:{port}/local/status", timeout=timeout
-        ) as resp:
+        with urllib.request.urlopen(request, timeout=timeout) as resp:
             body = json.loads(resp.read().decode("utf-8"))
     except (urllib.error.URLError, OSError, ValueError):
         return False
@@ -400,7 +458,7 @@ def ensure_serve(
     if doc is not None:
         pid = doc.get("pid") or 0
         if _pid_alive(pid):
-            if _probe_serve(doc["port"], pid):
+            if _probe_serve(doc["port"], pid, secret=serve_secret(doc)):
                 return doc
             # Pid alive but the daemon does not answer -- we must not spawn a
             # second one (it would refuse on the discovery-file lock anyway).
@@ -422,7 +480,7 @@ def ensure_serve(
     while time.monotonic() < deadline:
         doc = _read_discovery(path)
         if doc is not None and doc.get("pid") and _pid_alive(doc["pid"]) \
-                and _probe_serve(doc["port"], doc["pid"], timeout=1.0):
+                and _probe_serve(doc["port"], doc["pid"], timeout=1.0, secret=serve_secret(doc)):
             return doc
         if child.poll() is not None:
             break  # spawned daemon exited -- report instead of spinning
@@ -464,9 +522,11 @@ def serve_params(
     kickoffs can share the one daemon -- the "shared stdio can't be parallel"
     constraint of `stdio_params()` does not apply.
 
-    Auth: the loopback bind IS the trust boundary -- the daemon ignores
-    Authorization and holds the real agent tokens itself. The Bearer value
-    returned here is a documented placeholder, never validated.
+    Auth: the daemon holds the real agent tokens itself. What it checks is its
+    own secret, written into serve.json at every start (connector schema 3):
+    the Bearer value returned here is that secret, and the daemon refuses a
+    session without it. Against an older daemon, which writes no secret and
+    checks none, it is a placeholder as before.
 
     AGENT SELECTION: THE SESSION SAYS WHO IT IS. The resolved GAII is sent as
     `X-Aimeat-Agent` on every request of this MCP session, so the daemon knows
@@ -509,7 +569,8 @@ def serve_params(
     )
     params = http_params(
         node_url=f"http://127.0.0.1:{doc['port']}",
-        agent_token="loopback-trusted",  # placeholder -- loopback MCP has no auth
+        # The daemon's own secret; the placeholder only for a daemon that predates it.
+        agent_token=serve_secret(doc) or "loopback-trusted",
     )
     params["headers"]["X-Aimeat-Agent"] = _resolve_session_identity(doc, agent_name)
     return params

@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description CLI help text constants (top-level + connector) for the aimeat binary. Extracted from index.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.1.1 — 2026-09-24 — The serve help says every loopback request presents the secret from serve.json.
  *   v1.1.0 — 2026-09-24 — `aimeat connect tui` in the connector help.
  *   v1.0.0 — 2026-07-13 — Extracted from index.ts (max-file-lines)
  */
@@ -132,9 +133,11 @@ USAGE
       per agent to the node (forward API calls + realtime task delivery, no
       polling) and exposes a local Streamable-HTTP MCP endpoint (/v1/mcp), a
       REST proxy (/v1/*), and a long-poll push surface (/local/tasks/next),
-      advertised via the discovery file <AIMEAT_HOME>/serve.json. Prefer this
-      for CrewAI crews / clients that make many calls; the default stdio mode
-      stays for one-shot and CI/serverless use.
+      advertised via the discovery file <AIMEAT_HOME>/serve.json. Every request
+      sends "Authorization: Bearer <secret>" with the secret from serve.json,
+      which is new at every start; a request from a web page is refused.
+      Prefer this for CrewAI crews / clients that make many calls; the default
+      stdio mode stays for one-shot and CI/serverless use.
       e.g. aimeat connect serve --http
 
   aimeat connect tui [--once] [--interval <ms>] [--no-color]

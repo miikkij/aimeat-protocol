@@ -22,6 +22,9 @@ uses). Mirrors the node contract in aimeat/src/models/message-schemas.ts (the no
 mismatch).
 
 Changelog:
+  0.29.0 -- 2026-09-24 -- ServeClient sends the serve daemon's secret on every request: the one
+    serve_client() read with the port, or the one serve.json names for the port it is given. The
+    daemon refuses a request without it since connector schema 3 (secaudit 2026-09, A9-1).
   0.9.0 -- New: ask() / read_answers() / answers_from_dm() / build_question() + serve_client() for
     federated AskUserQuestion. The on_dm wake already carries `interactive` ("questions" | "answers" |
     None) so a handler can tell a question it should answer from an answer to one it asked; read_answers
@@ -47,10 +50,13 @@ class AimeatMessagingError(RuntimeError):
 
 class ServeClient:
     """Minimal REST client against the loopback `aimeat connect serve` daemon. The daemon proxies any
-    `/v1/...` path over its persistent tunnel and holds the agent's bearer token, so no Authorization
-    header is needed here -- `X-Aimeat-Agent` selects which registered agent the call runs as."""
+    `/v1/...` path over its persistent tunnel and holds the agent's bearer token; the Authorization
+    header here carries the DAEMON's secret from serve.json, which it requires on every request, and
+    `X-Aimeat-Agent` selects which registered agent the call runs as."""
 
-    def __init__(self, base_url: str, agent_name: str | None = None, session: Any = None) -> None:
+    def __init__(
+        self, base_url: str, agent_name: str | None = None, session: Any = None, secret: str | None = None,
+    ) -> None:
         # `agent_name` is what ROUTES, so on a daemon holding two owners it must be the full GAII:
         # a bare name that two owners share is refused there by design, and rightly. A single-owner
         # daemon resolves a bare name as it always did. daemon.AgentIdentity.gaii is the value to
@@ -60,6 +66,11 @@ class ServeClient:
         self.session = session or requests.Session()
         if agent_name:
             self.session.headers.update({"X-Aimeat-Agent": agent_name})
+        # The daemon's secret: the caller's when given, else the one serve.json names for this port.
+        from .mcp_client import loopback_secret  # local import: keeps this module crewai-free
+        secret = secret or loopback_secret(self.base_url)
+        if secret:
+            self.session.headers.update({"Authorization": f"Bearer {secret}"})
 
     def get(self, path: str, **kwargs: Any) -> Any:
         kwargs.setdefault("timeout", 15)
@@ -75,11 +86,12 @@ def serve_client(agent_name: str | None = None, *, base_url: str | None = None, 
     ensure_serve). Pass `base_url` to skip discovery (e.g. a node URL in a test)."""
     if base_url:
         return ServeClient(base_url, agent_name)
-    from .mcp_client import ensure_serve  # local import: keeps this module crewai-free
+    # Local import: keeps this module crewai-free.
+    from .mcp_client import ensure_serve, serve_secret
     disc = ensure_serve(**ensure_kwargs)
     port = disc["port"]
     agent = agent_name or ((disc.get("agents") or [{}])[0].get("agent"))
-    return ServeClient(f"http://127.0.0.1:{port}", agent)
+    return ServeClient(f"http://127.0.0.1:{port}", agent, secret=serve_secret(disc))
 
 
 def build_question(

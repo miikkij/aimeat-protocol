@@ -202,11 +202,19 @@ live. `stdio_params` / `http_params` remain for one-shot / CI use. See
   preferred via `Authorization` header). Opt-in via
   `AIMEAT_CONNECT_TUNNEL_ENABLED=true`.
 - **Discovery file:** `<AIMEAT_HOME or ~/.aimeat>/serve.json` —
-  `{ schema_version, port, pid, agents:[{agent, owner, node_url, transport}],
-  started_at }`. Written atomically on start, removed on clean exit,
+  `{ schema_version, port, pid, secret, agents:[{agent, gaii, owner, node_url,
+  transport}], started_at }` (schema 3). Written atomically on start, readable
+  by its owner only where the OS has file modes, removed on clean exit,
   stale-detected by pid (a live pid refuses a second daemon).
-- **Local endpoints (loopback only):** `/v1/mcp` (Streamable HTTP MCP, no auth —
-  loopback is the trust boundary), `/v1/*` (REST proxy; agent via
+- **Admission, in front of every local endpoint:** the Host header must be
+  `127.0.0.1`, `localhost` or `[::1]` with the daemon's own port (403
+  otherwise, which stops DNS rebinding); a request that carries an `Origin`
+  header comes from a web page and is refused (403); and every request sends
+  `Authorization: Bearer <secret>` with the `secret` from serve.json (401
+  otherwise). The secret is new at every start, so a client reads it together
+  with the port. `aimeat connect tui` and `aimeat-crewai` (0.29.0+) do this.
+- **Local endpoints (loopback only):** `/v1/mcp` (Streamable HTTP MCP),
+  `/v1/*` (REST proxy; agent via
   `X-Aimeat-Agent` header or `?agent=`), `POST /local/call/:tool` (deterministic
   shell-callable tool dispatch over the tunnel — JSON body = tool input, response
   = AIMEAT envelope; same registry as `aimeat connect call`, no subprocess),
@@ -234,8 +242,10 @@ live. `stdio_params` / `http_params` remain for one-shot / CI use. See
   no privilege the agent didn't already have.
 - Forward dispatch is **loopback-origin-pinned** (no SSRF) with an HTTP-method
   allowlist and a header allowlist; the WS frame size is capped.
-- The local `serve` surface binds **127.0.0.1 only**; the daemon holds the token,
-  so local clients never handle credentials.
+- The local `serve` surface binds **127.0.0.1 only** and admits a request only
+  with a loopback Host for its port, no `Origin`, and the per-start secret from
+  serve.json. The daemon holds the agent tokens, so local clients handle only
+  that secret, never a node credential.
 - The forward bearer is the pinned JWT (no server-side expiry close — ~90-day
   agent JWTs overflow a single timer); the client reconnects with a fresh token
   before `token_expires_at`.

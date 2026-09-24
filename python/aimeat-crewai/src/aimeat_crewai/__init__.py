@@ -24,6 +24,10 @@ Typical use:
     crew.kickoff()
 
 See the package README and `examples/` for full recipes.
+
+Changelog:
+  0.29.0 -- 2026-09-24 -- `serve_auth_headers` is exported: the header carrying the serve daemon's
+    per-start secret, for a client that builds its own session against the daemon.
 """
 from .daemon import (
     DAEMON_DEFAULT_TOOL_FILTER,
@@ -98,6 +102,7 @@ from .mcp_client import (
     AimeatServeError,
     ensure_serve,
     http_params,
+    serve_auth_headers,
     serve_params,
     sse_params,
     stdio_params,
@@ -154,7 +159,7 @@ from .workflow_spec import (
 
 # Kept in step with pyproject BY HAND, which is why it was wrong: 0.20.0 shipped announcing
 # itself as 0.19.0, and the first crew to install it reported the mismatch before we saw it.
-__version__ = "0.28.0"
+__version__ = "0.29.0"
 
 __all__ = [  # noqa: RUF022 -- grouped by topic with the version each group arrived in; alphabetical order would scatter those comments away from what they name
     "__version__",
@@ -167,6 +172,8 @@ __all__ = [  # noqa: RUF022 -- grouped by topic with the version each group arri
     "sse_params",
     "serve_params",
     "ensure_serve",
+    # The serve daemon's per-start secret, for a client that builds its own session (0.29.0)
+    "serve_auth_headers",
     "run_crew_daemon",
     "BuildCrewCallback",
     "DAEMON_DEFAULT_TOOL_FILTER",

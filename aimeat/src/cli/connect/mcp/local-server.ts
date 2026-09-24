@@ -5,8 +5,8 @@
  *   to its AIMEAT node and exposes everything a local crew needs on
  *   `127.0.0.1:<ephemeral>`:
  *     - `/v1/mcp` — local Streamable-HTTP MCP endpoint (fresh McpServer per
- *       session, same tool surface as stdio serve; no auth — the loopback bind
- *       is the trust boundary).
+ *       session, same tool surface as stdio serve). Every route, this one too,
+ *       sits behind ./local-admission.ts: loopback Host, no Origin, the secret.
  *     - `ALL /v1/*` — REST proxy: method/path/query/body forwarded over the
  *       agent's tunnel (`X-Aimeat-Agent` header picks the agent; defaults to
  *       the registry's primary). Falls back to direct HTTP when degraded.
@@ -18,8 +18,8 @@
  *       tunnel-backed client; one loopback POST, no subprocess / fresh TLS.
  *     - `GET /local/status`, `POST /local/shutdown` — introspection + clean stop.
  *   Writes the discovery file `<AIMEAT_HOME>/serve.json` (schema_version, port,
- *   pid, agents, started_at) atomically on start, removes it on clean exit, and
- *   stale-detects a previous daemon by pid.
+ *   pid, secret, agents, started_at) atomically on start, removes it on clean
+ *   exit, and stale-detects a previous daemon by pid.
  *
  *   Graceful degradation: if an agent's node has the tunnel disabled / too old
  *   (`unsupported`/`unreachable`), that agent keeps the direct-fetch transport
@@ -34,6 +34,8 @@
  *     discovery-file lifecycle, signal handling.
  * @usage Called by mcp/server.ts `runServe()` when `--http`/`--daemon` is set.
  * @version-history
+ *   2026-09-24 — One admission check in front of every route (./local-admission.ts): a loopback Host
+ *     for this port, no Origin, and the per-start secret written into serve.json (secaudit A9-1).
  *   2026-09-24 — `GET /local/stats` (./local-stats.ts): uptime, memory, CPU, traffic, delivery feed.
  *   2026-09-07 — The serve.json operations moved to ./local-discovery.ts, which already owns that
  *     file's contract: the refusal when a live pid still holds it, the document builder and the
@@ -142,6 +144,7 @@ import { AgentChannel, type SpaceRef } from './local-channel.js';
 import { InvokeChannel, registerLocalInvokeRoutes } from './local-invoke.js';
 import { pollWaitMs, refuseUnknownAgent } from './local-poll-guard.js';
 import { DaemonStats, registerLocalStats } from './local-stats.js';
+import { admitLoopbackCaller, newLoopbackSecret } from './local-admission.js';
 import { CONNECT_CLI_TOOLS } from '../tool-call.js';
 
 // Re-exported so the unit test (serve-wake-watermark.test.ts) and any importer keep resolving
@@ -401,7 +404,11 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
   }
 
   // ── Loopback HTTP server ──
+  // Admission FIRST, before the body parser and every route: nothing below is reachable without a
+  // loopback Host for this port, no Origin, and the secret this start writes into serve.json.
+  const secret = newLoopbackSecret();
   const app = express();
+  app.use(admitLoopbackCaller(secret));
   app.use(express.json({ limit: '25mb' }));
   const transports = new Map<string, StreamableHTTPServerTransport>();
   registerLocalStats(app, stats, { startedAt, agents: () => registry.list(), channel: g => channels.get(g), mcpSessions: () => transports.size });
@@ -427,7 +434,7 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
   // GET /local/invoke/next + POST /local/invoke/:id/result — the invoke surface (./local-invoke.ts).
   registerLocalInvokeRoutes(app, resolveAgent, invokeChannels);
 
-  // ── Local MCP (Streamable HTTP) — mirrors the node's session plumbing, no auth ──
+  // ── Local MCP (Streamable HTTP) — mirrors the node's session plumbing; admitted above ──
 
   app.post('/v1/mcp', async (req: Request, res: Response) => {
     const sessionId = req.headers['mcp-session-id'] as string | undefined;
@@ -749,7 +756,7 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
   const port = (server.address() as { port: number }).port;
 
   const writeDiscovery = (): void => {
-    const doc = buildDiscoveryDoc(port, startedAt, registry.list(), gaii => channels.get(gaii)!.transportMode);
+    const doc = buildDiscoveryDoc(port, startedAt, registry.list(), gaii => channels.get(gaii)!.transportMode, secret);
     writeDiscoveryFile(discoveryFile, doc);
   };
   writeDiscovery();

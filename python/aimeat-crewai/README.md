@@ -64,8 +64,12 @@ it if it isn't running**. The daemon holds ONE persistent WebSocket tunnel per
 agent to the node, so every MCP call from your crew rides that socket — no
 per-call TLS handshakes, no per-crew connector subprocess, and parallel
 kickoffs can all share it (loopback HTTP is naturally concurrent, unlike a
-shared stdio subprocess). No auth handling needed: the loopback bind is the
-trust boundary and the daemon holds the agent tokens itself.
+shared stdio subprocess). The daemon holds the agent tokens itself. What it
+checks is its own secret: a fresh one is written into `serve.json` at every
+start, and a request without it is refused (0.29.0 with a connector that
+writes it). `serve_params()`, the daemon's REST helpers and `serve_client()`
+send it for you; a client that builds its own HTTP session adds
+`serve_auth_headers(ensure_serve())`.
 
 ```python
 from aimeat_crewai import create_liaison_agent, serve_params

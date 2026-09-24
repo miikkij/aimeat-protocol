@@ -23,6 +23,8 @@
  *   bogus level · spoofed principal · attach-by-id · non-carrying tool · shell path · scope gate
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=ai-provenance-connector
  * @version-history
+ *   v1.0.1 — 2026-09-24 — Every call to the daemon and both MCP sessions carry the secret from
+ *     serve.json, which the daemon now requires (secaudit 2026-09, A9-1).
  *   v1.0.0 — 2026-08-01 — TARGET-058 Phase 11.
  */
 import * as ed from '@noble/ed25519';
@@ -50,8 +52,16 @@ async function test(name: string, fn: () => Promise<void>) {
 function assert(cond: boolean, msg: string) { if (!cond) throw new Error(msg); }
 function sleep(ms: number) { return new Promise(r => setTimeout(r, ms)); }
 
+/** The daemon's secret from serve.json, sent on every call to it (never to the node). */
+let daemonSecret = '';
+const LOOPBACK = /^http:\/\/127\.0\.0\.1:\d+$/;
+function daemonAuth(): Record<string, string> {
+  return daemonSecret ? { Authorization: `Bearer ${daemonSecret}` } : {};
+}
+
 async function json(base: string, path: string, opts: RequestInit = {}): Promise<{ status: number; body: any }> {
-  const res = await fetch(`${base}${path}`, { ...opts, headers: { 'Content-Type': 'application/json', ...opts.headers } });
+  const auth = LOOPBACK.test(base) ? daemonAuth() : {};
+  const res = await fetch(`${base}${path}`, { ...opts, headers: { 'Content-Type': 'application/json', ...auth, ...opts.headers } });
   const ct = res.headers.get('content-type') ?? '';
   const body = res.status === 204 ? null : ct.includes('json') ? await res.json() : { _raw: await res.text() };
   return { status: res.status, body };
@@ -187,8 +197,11 @@ await test('`aimeat connect serve --http` starts and both agents register', asyn
   });
   assert(disc.agents.length === 2, `agents: ${JSON.stringify(disc.agents)}`);
   loopbackBase = `http://127.0.0.1:${disc.port}`;
+  daemonSecret = String(disc.secret ?? '');
   mcp = new Client({ name: 'prov-connector-e2e', version: '1.0.0' });
-  await mcp.connect(new StreamableHTTPClientTransport(new URL(`${loopbackBase}/v1/mcp`)));
+  await mcp.connect(new StreamableHTTPClientTransport(new URL(`${loopbackBase}/v1/mcp`), {
+    requestInit: { headers: daemonAuth() },
+  }));
 });
 
 // ─── 1. The schema the crews actually read ───
@@ -469,7 +482,7 @@ let muteMcp: Client | undefined;
 await test('a second MCP session binds to the OTHER identity through X-Aimeat-Agent', async () => {
   muteMcp = new Client({ name: 'prov-connector-e2e-mute', version: '1.0.0' });
   await muteMcp.connect(new StreamableHTTPClientTransport(new URL(`${loopbackBase}/v1/mcp`), {
-    requestInit: { headers: { 'X-Aimeat-Agent': mute } },
+    requestInit: { headers: { ...daemonAuth(), 'X-Aimeat-Agent': mute } },
   }));
   const tools = await muteMcp.listTools();
   assert(tools.tools.some(t => t.name === 'aimeat_memory_write'),

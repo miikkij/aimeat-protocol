@@ -14,6 +14,8 @@
  * @structure readDiscovery · fetchJson · Poller (tick, readLists) · runTui (terminal lifecycle, keys)
  * @usage aimeat connect tui [--once [--view activity|tasks|inbox] [--agent <name|gaii>]] [--interval <ms>] [--no-color]
  * @version-history
+ *   v1.0.1 — 2026-09-24 — Sends the daemon's secret from serve.json on every read: the daemon now
+ *     refuses a caller without it (secaudit 2026-09, A9-1).
  *   v1.0.0 — 2026-09-24 — Created.
  */
 import { readFileSync, existsSync } from 'node:fs';
@@ -31,14 +33,15 @@ const OPEN_STATUSES = ['active', 'queued', 'revision_requested', 'paused', 'stal
 
 const NO_DAEMON = 'No serve daemon is running on this machine. Start one with: aimeat connect serve --daemon';
 
-/** The running daemon's port, or why there is none. */
-export function readDiscovery(path = serveDiscoveryPath()): { port: number } | { error: string } {
+/** The running daemon's port and the secret it takes, or why there is none. */
+export function readDiscovery(path = serveDiscoveryPath()): { port: number; secret: string } | { error: string } {
   if (!existsSync(path)) return { error: NO_DAEMON };
   let doc: ServeDiscovery;
   try { doc = JSON.parse(readFileSync(path, 'utf8')) as ServeDiscovery; }
   catch (err) { return { error: `Could not read ${path}: ${(err as Error).message}` }; }
   if (!doc.pid || !pidAlive(doc.pid)) return { error: NO_DAEMON };
-  return { port: doc.port };
+  // A daemon older than schema 3 writes no secret and checks none, so an empty value does no harm.
+  return { port: doc.port, secret: typeof doc.secret === 'string' ? doc.secret : '' };
 }
 
 async function fetchJson(url: string, headers: Record<string, string> = {}): Promise<unknown> {
@@ -54,6 +57,8 @@ export class Poller {
   private lastSeq = 0;
   private prev: { at: number; in: number; out: number } | null = null;
   private listsInFlight = false;
+  /** The header every read sends: the secret from the serve.json the last tick found. */
+  private auth: Record<string, string> = {};
 
   constructor(color: boolean, private readonly discover = readDiscovery) { this.view = emptyView(color); }
 
@@ -64,8 +69,9 @@ export class Poller {
     if ('error' in d) { v.error = d.error; v.stats = null; v.port = null; return; }
     if (v.port !== d.port) { this.lastSeq = 0; this.prev = null; v.feed = []; }
     v.port = d.port;
+    this.auth = { Authorization: `Bearer ${d.secret}` };
     let s: StatsSnapshot;
-    try { s = await fetchJson(`http://127.0.0.1:${d.port}/local/stats?since=${this.lastSeq}`) as StatsSnapshot; }
+    try { s = await fetchJson(`http://127.0.0.1:${d.port}/local/stats?since=${this.lastSeq}`, this.auth) as StatsSnapshot; }
     catch (err) { v.error = `The daemon on port ${d.port} did not answer: ${(err as Error).message}`; v.stats = null; return; }
     v.error = null;
     // A lower sequence than the one we hold is a daemon that restarted on the same port.
@@ -108,7 +114,7 @@ export class Poller {
     this.listsInFlight = true;
     const base = `http://127.0.0.1:${v.port}/v1/agents/${encodeURIComponent(sel.agent)}`;
     // The daemon's proxy speaks as the agent named in this header, over the agent's own tunnel.
-    const headers = { 'X-Aimeat-Agent': sel.gaii };
+    const headers = { ...this.auth, 'X-Aimeat-Agent': sel.gaii };
     try {
       // One status per call: a status-filtered read is one indexed page on the node, where an
       // unfiltered one loads the agent's whole task history to count it.
