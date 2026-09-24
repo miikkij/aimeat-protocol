@@ -210,7 +210,15 @@ live. `stdio_params` / `http_params` remain for one-shot / CI use. See
   `X-Aimeat-Agent` header or `?agent=`), `POST /local/call/:tool` (deterministic
   shell-callable tool dispatch over the tunnel — JSON body = tool input, response
   = AIMEAT envelope; same registry as `aimeat connect call`, no subprocess),
-  `/local/tasks/next` (long-poll), `/local/status`, `POST /local/shutdown`.
+  `/local/tasks/next` (long-poll), `/local/status`, `/local/stats`, `POST /local/shutdown`.
+- **`GET /local/stats[?since=<seq>]`:** what the daemon knows about itself, for
+  `aimeat connect tui`: uptime, memory, CPU since the previous read, event-loop
+  delay; the tunnel sockets' bytes (the TCP counters, so TLS and framing
+  included), frames and forwarded calls with their failures and round-trip
+  time; loopback requests per surface; per-identity delivery counts; and the
+  last 200 deliveries, `since` the sequence a reader already holds. It observes
+  only: reading it never takes a task off a queue. A daemon degraded to direct
+  HTTP reports no tunnel traffic, because those calls are not metered.
 - **Console:** every line the daemon prints starts with the local date and time
   (`2026-09-07 18:42:38`), the same format the serve watchdog writes, so the two
   logs read side by side. It is done at the stream, so the tunnel's reconnect and
@@ -242,5 +250,6 @@ live. `stdio_params` / `http_params` remain for one-shot / CI use. See
 | Node tunnel client | `aimeat/src/cli/connect/tunnel-client.ts` |
 | Transport seam | `aimeat/src/cli/connect/api-client.ts` |
 | Loopback daemon | `aimeat/src/cli/connect/mcp/local-server.ts` |
+| Daemon stats + terminal view | `aimeat/src/cli/connect/mcp/local-stats.ts`, `aimeat/src/cli/connect/tunnel-traffic.ts`, `aimeat/src/cli/connect/tui/` |
 | Python integration | `python/aimeat-crewai/src/aimeat_crewai/mcp_client.py`, `daemon.py` |
 | Design + phases | `docs/plans/2026-06-10-connector-forward-tunnel.md` |

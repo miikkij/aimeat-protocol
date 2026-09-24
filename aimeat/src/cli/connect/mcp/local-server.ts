@@ -34,6 +34,7 @@
  *     discovery-file lifecycle, signal handling.
  * @usage Called by mcp/server.ts `runServe()` when `--http`/`--daemon` is set.
  * @version-history
+ *   2026-09-24 — `GET /local/stats` (./local-stats.ts): uptime, memory, CPU, traffic, delivery feed.
  *   2026-09-07 — The serve.json operations moved to ./local-discovery.ts, which already owns that
  *     file's contract: the refusal when a live pid still holds it, the document builder and the
  *     atomic write. Pure extraction, forced by the cap; nothing changed but where the lines live.
@@ -140,6 +141,7 @@ import { startPollerForAgent } from './poller.js';
 import { AgentChannel, type SpaceRef } from './local-channel.js';
 import { InvokeChannel, registerLocalInvokeRoutes } from './local-invoke.js';
 import { pollWaitMs, refuseUnknownAgent } from './local-poll-guard.js';
+import { DaemonStats, registerLocalStats } from './local-stats.js';
 import { CONNECT_CLI_TOOLS } from '../tool-call.js';
 
 // Re-exported so the unit test (serve-wake-watermark.test.ts) and any importer keep resolving
@@ -203,6 +205,7 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
   // runtime is the failure that keying prevents.
   const channels = new Map<string, AgentChannel>();
   const invokeChannels = new Map<string, InvokeChannel>();
+  const stats = new DaemonStats();   // GET /local/stats, read by `aimeat connect tui`
 
   /**
    * Give ONE agent its channel and its tunnel. Extracted from the startup loop so the same code
@@ -214,6 +217,7 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
   const hubs = new TunnelHub();
   async function attachRegistered(entry: RegisteredAgent): Promise<void> {
     const ch = new AgentChannel(entry);
+    ch.onActivity = (kind, item) => stats.record(entry, kind, item);
     channels.set(entry.gaii, ch);
     // Server-initiated invokes (Crew tab validate/try) queue here and are answered back over the
     // same socket. `tunnel` is assigned just below; the reply closure only runs after it exists.
@@ -262,6 +266,7 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
           }).then(r => { if (id) ch.tunnel?.replyInvoke(id, r.ok, r.result, entry.gaii); });
           return;
         }
+        stats.record(entry, 'invoke', frame);
         inv.handleInvoke(frame);
       },
       onDeliver: (kind, payload) => {
@@ -398,6 +403,8 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
   // ── Loopback HTTP server ──
   const app = express();
   app.use(express.json({ limit: '25mb' }));
+  const transports = new Map<string, StreamableHTTPServerTransport>();
+  registerLocalStats(app, stats, { startedAt, agents: () => registry.list(), channel: g => channels.get(g), mcpSessions: () => transports.size });
 
   /**
    * Which identity this loopback call is for.
@@ -421,7 +428,6 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
   registerLocalInvokeRoutes(app, resolveAgent, invokeChannels);
 
   // ── Local MCP (Streamable HTTP) — mirrors the node's session plumbing, no auth ──
-  const transports = new Map<string, StreamableHTTPServerTransport>();
 
   app.post('/v1/mcp', async (req: Request, res: Response) => {
     const sessionId = req.headers['mcp-session-id'] as string | undefined;

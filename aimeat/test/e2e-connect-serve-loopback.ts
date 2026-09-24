@@ -804,6 +804,103 @@ await test('Node-side cross-check — stats report one active tunnel connection'
   assert(r.body.data.stats.activeConnections === 1, `activeConnections: ${r.body.data.stats.activeConnections}`);
 });
 
+// ─── What the daemon says about itself, and the TUI that shows it ───
+console.log('\nPhase 4b — /local/stats and `aimeat connect tui`');
+
+/** Run `aimeat connect tui` to completion against a connector home; stdout, stderr and exit code. */
+async function runTuiOnce(home: string, ...args: string[]): Promise<{ code: number | null; out: string; err: string }> {
+  const child = spawn('node', [...nodeEntryArgs(), 'connect', 'tui', '--once', '--no-color', ...args], {
+    cwd: process.cwd(), env: { ...process.env, AIMEAT_HOME: home, NO_COLOR: '1' }, stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  let out = '';
+  let err = '';
+  child.stdout?.on('data', (d) => { out += d.toString(); });
+  child.stderr?.on('data', (d) => { err += d.toString(); });
+  const exited = await waitForExit(child, 60_000);
+  if (!exited) { child.kill(); throw new Error(`tui --once did not finish in 60s\n${out}\n${err}`); }
+  return { code: child.exitCode, out, err };
+}
+
+await test('/local/stats reports the process, the traffic on the tunnel and the deliveries so far', async () => {
+  const r = await json(loopbackBase, '/local/stats');
+  assert(r.status === 200 && r.body.ok === true, `status ${r.status}: ${JSON.stringify(r.body).slice(0, 200)}`);
+  const s = r.body.data;
+  assert(s.process.pid === daemon1!.child.pid, `pid ${s.process.pid} != ${daemon1!.child.pid}`);
+  assert(s.process.uptime_s >= 1 && s.process.memory.rss > 0, `process: ${JSON.stringify(s.process)}`);
+  // Every earlier phase went through this socket: the proxy, the tool calls, the pushes.
+  const t = s.network.tunnel;
+  assert(t.sockets === 1, `sockets: ${t.sockets}`);
+  assert(t.bytes_in > 0 && t.bytes_out > 0, `bytes on the wire: in ${t.bytes_in} out ${t.bytes_out}`);
+  assert(t.forwards > 0 && t.forward_ms_total >= 0, `forwards: ${JSON.stringify(t)}`);
+  assert(s.network.loopback.by_surface.call > 0 && s.network.loopback.by_surface.proxy > 0,
+    `loopback surfaces: ${JSON.stringify(s.network.loopback.by_surface)}`);
+  const me = s.agents.find((a: { agent: string }) => a.agent === agentName);
+  assert(me && me.counts.task >= 1 && me.counts.dm >= 1, `per-agent counts: ${JSON.stringify(me)}`);
+  const kinds = new Set(s.activity.map((e: { kind: string }) => e.kind));
+  assert(kinds.has('task') && kinds.has('dm'), `feed kinds: ${[...kinds].join(',')}`);
+  assert(s.activity.some((e: { summary: string }) => e.summary.includes('Loopback push task')), 'the pushed task is in the feed by its title');
+});
+
+await test('/local/stats?since= returns only what arrived after that sequence', async () => {
+  const first = await json(loopbackBase, '/local/stats');
+  const seq = first.body.data.activity_seq;
+  const again = await json(loopbackBase, `/local/stats?since=${seq}`);
+  assert(again.body.data.activity.length === 0, `expected nothing new, got ${JSON.stringify(again.body.data.activity)}`);
+});
+
+await test('Watching takes nothing: a task seen on the feed still reaches the runtime\'s long-poll', async () => {
+  // The TUI reads the same daemon a crew runs on. If reading the feed consumed a delivery, opening
+  // the TUI would steal work from the crew, which is the one thing it must never do.
+  const before = (await json(loopbackBase, '/local/stats')).body.data.activity_seq;
+  const created = await json(BASE, `/v1/agents/${agentName}/tasks`, {
+    method: 'POST', headers: { Authorization: `Bearer ${account.ownerToken}` },
+    body: JSON.stringify({ title: 'Seen by the TUI first', description: 'observer', status: 'queued' }),
+  });
+  assert(created.status === 201, `create: ${created.status}`);
+  const taskId = created.body.data.task.id;
+  let onFeed = false;
+  for (let i = 0; i < 40 && !onFeed; i++) {
+    const s = await json(loopbackBase, `/local/stats?since=${before}`);
+    onFeed = s.body.data.activity.some((e: { summary: string }) => e.summary === 'Seen by the TUI first');
+    if (!onFeed) await sleep(100);
+  }
+  assert(onFeed, 'the task never appeared on the feed');
+  const r = await json(loopbackBase, '/local/tasks/next?wait=3000');
+  assert(r.status === 200 && r.body.data.task.id === taskId, `the long-poll lost the task: ${r.status} ${JSON.stringify(r.body?.data?.task?.id)}`);
+});
+
+await test('`aimeat connect tui --once` prints the daemon, the agent online and the feed', async () => {
+  const r = await runTuiOnce(home1);
+  assert(r.code === 0, `exit ${r.code}\n${r.out}\n${r.err}`);
+  assert(r.out.includes(`daemon pid ${daemon1!.child.pid}`), `no daemon line:\n${r.out}`);
+  const agentLine = r.out.split('\n').find(l => l.startsWith('> ') && l.includes(agentName));
+  assert(!!agentLine && agentLine.includes('online'), `agent row:\n${r.out}`);
+  assert(r.out.includes('Seen by the TUI first'), `the feed is missing the task:\n${r.out}`);
+  assert(!r.out.includes('\x1b['), 'escape codes in --no-color output');
+});
+
+await test('`--view tasks` reads the agent\'s open tasks from the node through the daemon', async () => {
+  const created = await json(BASE, `/v1/agents/${agentName}/tasks`, {
+    method: 'POST', headers: { Authorization: `Bearer ${account.ownerToken}` },
+    body: JSON.stringify({ title: 'Listed in the tasks view', description: 'x', status: 'queued' }),
+  });
+  assert(created.status === 201, `create: ${created.status}`);
+  const r = await runTuiOnce(home1, '--view', 'tasks', '--agent', agentName);
+  assert(r.code === 0, `exit ${r.code}\n${r.err}`);
+  assert(/queued\s+.*Listed in the tasks view/.test(r.out), `task not listed:\n${r.out}`);
+  // Leave the long-poll queue as Phase 5 and later expect it.
+  for (let i = 0; i < 5; i++) {
+    const drained = await json(loopbackBase, '/local/tasks/next?wait=0');
+    if (drained.status === 204) break;
+  }
+});
+
+await test('`--agent` naming an agent the daemon does not serve is refused', async () => {
+  const r = await runTuiOnce(home1, '--agent', 'no-such-agent');
+  assert(r.code === 1, `exit ${r.code}`);
+  assert(r.err.includes('no agent called no-such-agent'), `stderr: ${r.err}`);
+});
+
 // ─── Clean shutdown ───
 console.log('\nPhase 5 — Clean shutdown removes the discovery file');
 
@@ -813,6 +910,12 @@ await test('POST /local/shutdown stops the daemon and removes serve.json', async
   const exited = await waitForExit(daemon1!.child);
   assert(exited, 'daemon did not exit within 10s');
   assert(!existsSync(join(home1, 'serve.json')), 'serve.json still present after clean shutdown');
+});
+
+await test('`aimeat connect tui --once` with no daemon running exits 1 and says how to start one', async () => {
+  const r = await runTuiOnce(home1);
+  assert(r.code === 1, `exit ${r.code}\n${r.out}`);
+  assert(r.out.includes('aimeat connect serve --daemon'), `no guidance:\n${r.out}`);
 });
 
 // ─── Degraded fallback ───

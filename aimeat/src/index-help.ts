@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description CLI help text constants (top-level + connector) for the aimeat binary. Extracted from index.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.1.0 — 2026-09-24 — `aimeat connect tui` in the connector help.
  *   v1.0.0 — 2026-07-13 — Extracted from index.ts (max-file-lines)
  */
 
@@ -135,6 +136,13 @@ USAGE
       for CrewAI crews / clients that make many calls; the default stdio mode
       stays for one-shot and CI/serverless use.
       e.g. aimeat connect serve --http
+
+  aimeat connect tui [--once] [--interval <ms>] [--no-color]
+      Watch the running serve daemon in the terminal: how long it has run,
+      its CPU and memory, traffic to the node and from local clients, every
+      agent's connection, and the deliveries as they arrive. Tab shows the
+      selected agent's open tasks or inbox, read from the node. It only
+      reads, so it is safe beside a running crew. --once prints one frame.
 
   aimeat connect status
       Show the connected agent, owner, node, and token status.
