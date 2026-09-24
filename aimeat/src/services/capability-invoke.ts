@@ -6,6 +6,7 @@
  *   extension over a localhost fetch, a manual webhook, an ecosystem app over the connect-tunnel,
  *   or a tool on an MCP server this node has attached.
  * @version-history
+ *   v1.4.1 - 2026-09-24 - `callerScopes` says what a paid path states: the purchase authorises the call.
  *   v1.4.0 - 2026-09-24 - `callerScopes`: the `mcp` case hands the caller's own scopes to the
  *     chokepoint. It passed none, which the chokepoint read as mcp:use, and the invoke door proves
  *     only work:request.
@@ -50,11 +51,11 @@ export async function invokeCapability(
    */
   internalPass?: string,
   /**
-   * Every scope the caller's session holds. Asked only by a capability over a remote MCP tool, where
-   * it decides whether a caller that is not the server's owner may spend it (mcp:use). Empty means
-   * nothing is held: a door with a session states its scopes, and a path with none (a checkout
-   * fulfilling a purchase, one capability buying from another) reaches a remote tool only as the
-   * server's own owner.
+   * Every scope the caller holds for this call. Asked only by a capability over a remote MCP tool,
+   * where it decides whether a caller that is not the server's owner may spend it (mcp:use). A door
+   * with a session states the session's scopes; a paid path with none (a checkout fulfilling a
+   * purchase, one capability buying from another) states mcp:use, because the purchase is what
+   * authorises the call. Left out, nothing is held.
    */
   callerScopes: string[] = [],
 ): Promise<InvokeResult> {
