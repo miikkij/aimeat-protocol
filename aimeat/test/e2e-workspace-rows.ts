@@ -11,6 +11,9 @@
  *   here is either "this works end to end" or "this is refused with a sentence naming the fix".
  *   There is deliberately no middle.
  * @version-history
+ *   v1.1.0 — 2026-09-24 — Which copy of the manifest decides a row space's policy (secaudit 2026-09,
+ *     A6-9): an admin's copy written first and the creator's after it, and the row gate answers from
+ *     the creator's; a plain member's own copy is refused at the write.
  *   v1.0.0 — 2026-08-26 — Initial.
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=workspace-rows
@@ -328,10 +331,74 @@ await test('one row is removed by id, and the second delete says there is nothin
     assert(again.status === 404, `second delete: ${again.status}`);
 });
 
+// ── Which copy of the manifest decides (secaudit 2026-09, A6-9) ──────────────
+//
+// A memory key is unique per owner, not per node, so `…meta.manifest` can be stored once under each
+// identity, and the row door read whichever copy the store returned first. Here an organism admin's
+// copy opens the space to every member and is written FIRST, so SQLite, which returns rows that share
+// a key in insertion order, hands it back first; Postgres returns them in the order they sit on disk,
+// which no test controls. The creator's copy, written after it, keeps the space to admins, and the
+// row gate answers from it whatever the order. A plain member's own copy is refused at the write,
+// which is the other half of the same finding.
+
+let C!: Awaited<ReturnType<typeof setupOwner>>;
+let org2 = '';
+const WS2 = 'ws-rows-copies';
+const authC = () => ({ Authorization: `Bearer ${C.token}` });
+const ledgerUrl = () => `/v1/organisms/${org2}/workspace/rows/ledger?ws=${WS2}`;
+const ledgerKey = () => `organism.${org2}.w.${WS2}.meta.manifest`;
+const ledgerManifest = (writeRole: string) => ({
+    manifestVersion: '1', id: org2, name: 'Ledger', kind: 'workspace', status: 'active',
+    objectTypes: [{ name: 'ledger', schemaRef: 'schema:ledger@1', namespace: 'books.ledger', backing: 'rows', writeRole, indexOn: ['account'] }],
+});
+
+await test('A6-9 setup: an open organism, B a plain member, C an admin, a workspace registered to A', async () => {
+    C = await setupOwner('c');
+    const o = await json('/v1/organisms', {
+        method: 'POST', headers: authA(),
+        body: JSON.stringify({ name: 'Rows Copies Org', description: 'x', type: 'project', join_policy: 'open', visibility: 'public' }),
+    });
+    assert(o.status === 201, `org ${o.status}: ${JSON.stringify(o.body)}`);
+    org2 = o.body.data.organism.id;
+    for (const [who, hdr] of [['B', authB()], ['C', authC()]] as const) {
+        const j = await json(`/v1/organisms/${org2}/join`, { method: 'POST', headers: hdr, body: '{}' });
+        assert(j.status === 201, `${who} joins ${j.status}: ${JSON.stringify(j.body.error)}`);
+    }
+    const p = await json(`/v1/organisms/${org2}/admins`, { method: 'POST', headers: authA(), body: JSON.stringify({ target_ghii: C.ownerName }) });
+    assert(p.status === 200, `C promoted to admin ${p.status}: ${JSON.stringify(p.body.error)}`);
+    const reg = await json('/v1/memory', {
+        method: 'POST', headers: authA(),
+        body: JSON.stringify({ key: `organism.${org2}.meta.workspaces`, value: { workspaces: [{ id: WS2, name: 'Ledger', createdAt: new Date().toISOString(), createdBy: A.ownerName }] }, visibility: 'private' }),
+    });
+    assert(reg.status === 201, `registry ${reg.status}: ${JSON.stringify(reg.body.error)}`);
+});
+
+// Each copy is its writer's first write of the key, so each answers 201 Created.
+await test('A6-9: with an admin\'s copy first and the creator\'s second, the row gate follows the creator\'s', async () => {
+    const first = await json('/v1/memory', { method: 'POST', headers: authC(), body: JSON.stringify({ key: ledgerKey(), value: ledgerManifest('member'), visibility: 'private' }) });
+    assert(first.status === 201, `the admin's copy ${first.status}: ${JSON.stringify(first.body.error)}`);
+    const second = await json('/v1/memory', { method: 'POST', headers: authA(), body: JSON.stringify({ key: ledgerKey(), value: ledgerManifest('admin'), visibility: 'private' }) });
+    assert(second.status === 201, `the creator's copy ${second.status}: ${JSON.stringify(second.body.error)}`);
+
+    const member = await json(ledgerUrl(), { method: 'POST', headers: authB(), body: JSON.stringify({ body: { account: 'a-1', amount: 1 } }) });
+    assert(member.status === 403, `the creator's copy keeps "ledger" to admins, so a plain member's append is refused; got ${member.status}: ${JSON.stringify(member.body)}`);
+    const creator = await json(ledgerUrl(), { method: 'POST', headers: authA(), body: JSON.stringify({ body: { account: 'a-1', amount: 2 } }) });
+    assert(creator.status === 200, `the creator appends ${creator.status}: ${JSON.stringify(creator.body)}`);
+});
+
+await test('A6-9: a plain member\'s own copy of the workspace manifest is refused at the write', async () => {
+    const planted = await json('/v1/memory', { method: 'POST', headers: authB(), body: JSON.stringify({ key: ledgerKey(), value: ledgerManifest('member'), visibility: 'private' }) });
+    assert(planted.status === 403, `a plain member wrote a copy of the workspace manifest: ${planted.status} ${JSON.stringify(planted.body.error ?? planted.body.data)}`);
+    const member = await json(ledgerUrl(), { method: 'POST', headers: authB(), body: JSON.stringify({ body: { account: 'a-2', amount: 3 } }) });
+    assert(member.status === 403, `still refused after the attempt: ${member.status}`);
+});
+
 await test('Cleanup', async () => {
     await json(`/v1/organisms/${orgId}`, { method: 'DELETE', headers: authA() });
+    if (org2) await json(`/v1/organisms/${org2}`, { method: 'DELETE', headers: authA() });
     await json(`/v1/owners/${A.ownerName}`, { method: 'DELETE', headers: authA() });
     await json(`/v1/owners/${B.ownerName}`, { method: 'DELETE', headers: authB() });
+    if (C) await json(`/v1/owners/${C.ownerName}`, { method: 'DELETE', headers: authC() });
 });
 
 console.log(`\n${passed} passed, ${failed} failed out of ${passed + failed}`);

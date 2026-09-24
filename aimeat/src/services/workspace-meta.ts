@@ -47,6 +47,12 @@
  *     `versioned: true` it had just stamped itself, and a row space that got through carried
  *     `mode: 'records'` — a memory space's storage mode, on a space that stores neither records nor
  *     documents. Reported 2026-09-14 from a node building an eCOA diary on row spaces.
+ *   v1.10.0 — 2026-09-24 — readWorkspaceManifest reads the workspace creator's copy, whatever order
+ *     the store returns the copies in (secaudit 2026-09, A6-9). It took the first row, with no owner
+ *     filter, and a row space takes its writeRole and its app allowlist from that manifest.
+ *     findWorkspaceRegistration() and pickWorkspaceMetaCopy() are the shared halves: the first says
+ *     who created a workspace, the second which copy counts, and updateWorkspaceMeta writes the copy
+ *     the read takes. It takes the node id to tell this node's identities from a visitor's.
  */
 import type { Storage, MemoryRecord } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
@@ -87,19 +93,29 @@ export function isRowBackedSpace(ot: { backing?: unknown }): boolean {
 export type WorkspaceManifest = { objectTypes?: Array<Record<string, unknown>> } & Record<string, unknown>;
 
 /**
- * Read a workspace's manifest from whichever member created it.
+ * Read a workspace's manifest from the member who created it.
  *
  * The prefix read rather than a single-owner get is the point: the registry is per creator, so a
  * member who did not create the workspace must still be able to resolve its spaces. Every surface
  * that resolves a space shares this, because two copies is two chances for one door to see a space
  * the other does not.
+ *
+ * WHICH COPY. A memory key is unique per owner, not per node, so the manifest can be stored under
+ * more than one identity. This took the first row the store returned, and a row space takes its
+ * writeRole and its app allowlist from here, so the copy that sorted first decided who may write
+ * the space; on Postgres, rows that share a key come back in no defined order. pickWorkspaceMetaCopy
+ * says which copy counts. `nodeId` is this node's, so a copy under another node's identity counts
+ * for nothing.
  */
 export async function readWorkspaceManifest(
-  storage: Storage, organismId: string, wsId: string,
+  storage: Storage, organismId: string, wsId: string, nodeId: string,
 ): Promise<WorkspaceManifest | null> {
   const key = `organism.${organismId}.w.${wsId}.meta.manifest`;
   const { items } = await storage.listAllMemory({ prefix: key, limit: 100 });
-  const rec = items.find(r => r.key === key);
+  const copies = items.filter(r => r.key === key);
+  if (!copies.length) return null;
+  const registration = await findWorkspaceRegistration(storage, organismId, wsId);
+  const rec = await pickWorkspaceMetaCopy(storage, organismId, copies, nodeId, registration);
   return rec ? (rec.value as WorkspaceManifest) : null;
 }
 
@@ -226,6 +242,99 @@ export async function listOrganismWorkspaceEntries(storage: Storage, orgId: stri
   return out;
 }
 
+/** Where a workspace is registered, and who the registry names as its creator. */
+export interface WorkspaceRegistration {
+  entry: WorkspaceRegistryEntry;
+  /** The registry record that lists the workspace. Its owner is the identity that registered it. */
+  record: MemoryRecord;
+  /** The creator's bare owner name: the entry's `createdBy`, else the owner of the registry record. */
+  creator: string;
+}
+
+/** The bare owner behind a memory owner id: `agent#owner@node` and `owner@node` both give `owner`. */
+function bareOwnerOf(gaii: string): string {
+  return (gaii.includes('#') ? gaii.slice(gaii.indexOf('#') + 1) : gaii).split('@')[0];
+}
+
+/** The node an owner id belongs to: what follows its last `@`. */
+function nodeOf(gaii: string): string {
+  return gaii.slice(gaii.lastIndexOf('@') + 1);
+}
+
+/** Owner-id order, the tie-break that makes a choice between copies the same on every backend. */
+function byOwnerId(a: MemoryRecord, b: MemoryRecord): number {
+  return a.ownerGaii < b.ownerGaii ? -1 : a.ownerGaii > b.ownerGaii ? 1 : 0;
+}
+
+/** Newest write first, then owner-id order. */
+function freshestFirst(a: MemoryRecord, b: MemoryRecord): number {
+  const at = String(a.updatedAt);
+  const bt = String(b.updatedAt);
+  return at > bt ? -1 : at < bt ? 1 : byOwnerId(a, b);
+}
+
+/**
+ * Find a workspace in the organism's registry, and the creator it names.
+ *
+ * The registry is one record per creator, so every copy is read, as updateWorkspaceMeta always has.
+ * When more than one copy lists the workspace, the answer must not depend on the order the store
+ * returns them in: a copy whose entry names its own owner as the creator wins over one that names
+ * somebody else, and owner-id order breaks a remaining tie. Only an organism manager or a workspace's
+ * provisioning writes a registry copy, so two that disagree are an administrator's doing.
+ */
+export async function findWorkspaceRegistration(
+  storage: Storage, orgId: string, wsId: string,
+): Promise<WorkspaceRegistration | null> {
+  const regKey = `organism.${orgId}.meta.workspaces`;
+  const { items } = await storage.listAllMemory({ prefix: regKey, limit: 1000 });
+  const found: WorkspaceRegistration[] = [];
+  for (const record of items) {
+    if (record.key !== regKey) continue;
+    const list = ((record.value as { workspaces?: WorkspaceRegistryEntry[] } | null)?.workspaces) ?? [];
+    const entry = list.find(w => w && w.id === wsId);
+    if (entry) found.push({ entry, record, creator: entry.createdBy ?? bareOwnerOf(record.ownerGaii) });
+  }
+  const selfNamed = (r: WorkspaceRegistration) => (r.creator === bareOwnerOf(r.record.ownerGaii) ? 0 : 1);
+  found.sort((a, b) => selfNamed(a) - selfNamed(b) || byOwnerId(a.record, b.record));
+  return found[0] ?? null;
+}
+
+/**
+ * Which copy of a workspace meta record counts, when the key is stored under several identities.
+ *
+ * A copy counts when its writer is someone the organism namespace rule lets write there
+ * (services/organism-namespace-access.ts): the workspace's registered creator, and after them an
+ * organism creator or admin. The creator's copies come first, including one under an agent of
+ * theirs, and the newest of those wins, because they are all the same person's. Only when the creator
+ * holds no copy does an organism manager's count, newest first. A plain member's copy never counts,
+ * and neither does a copy under another node's identity. Returns null when no copy counts.
+ *
+ * The order the store returned the copies in plays no part: that order is what decided this before,
+ * and on Postgres it is not defined for rows that share a key.
+ */
+export async function pickWorkspaceMetaCopy(
+  storage: Storage, orgId: string, copies: MemoryRecord[], nodeId: string,
+  registration: WorkspaceRegistration | null,
+): Promise<MemoryRecord | null> {
+  const local = copies.filter(r => nodeOf(r.ownerGaii) === nodeId);
+  if (registration) {
+    const creators = local.filter(r => bareOwnerOf(r.ownerGaii) === registration.creator);
+    if (creators.length) return creators.sort(freshestFirst)[0];
+  }
+  const roles = new Map<string, string | null>();
+  const managers: MemoryRecord[] = [];
+  for (const rec of local) {
+    const name = bareOwnerOf(rec.ownerGaii);
+    if (!roles.has(name)) {
+      const m = await storage.getMembership(orgId, name);
+      roles.set(name, m && m.status === 'active' ? m.role : null);
+    }
+    const role = roles.get(name);
+    if (role === 'creator' || role === 'admin') managers.push(rec);
+  }
+  return managers.sort(freshestFirst)[0] ?? null;
+}
+
 export interface UpdateWorkspaceOpts {
   orgId: string;
   ws: string;
@@ -251,7 +360,7 @@ export interface UpdateWorkspaceOpts {
 
 export async function updateWorkspaceMeta(
   storage: Storage,
-  _config: AimeatConfig,
+  config: AimeatConfig,
   opts: UpdateWorkspaceOpts,
 ): Promise<{ updated: string[]; creator: string; name?: string; added?: string[]; skipped?: string[] }> {
   const { orgId, ws, callerOwner, isAdmin } = opts;
@@ -266,19 +375,16 @@ export async function updateWorkspaceMeta(
   const root = `organism.${orgId}.w.${ws}`;
   // The workspace's registry entry lives in its creator's registry record — find it across members.
   const regKey = `organism.${orgId}.meta.workspaces`;
-  const regItems = (await storage.listAllMemory({ prefix: regKey, limit: 1000 })).items.filter(r => r.key === regKey);
-  let regRec: MemoryRecord | null = null;
-  let entry: { id: string; name?: string; createdBy?: string } | null = null;
-  for (const rec of regItems) {
-    const list = ((rec.value as { workspaces?: Array<{ id: string; name?: string; createdBy?: string }> } | null)?.workspaces) ?? [];
-    const e = list.find(w => w.id === ws);
-    if (e) { regRec = rec; entry = e; break; }
-  }
-  if (!regRec || !entry) throw new WorkspaceMetaError('WS_NOT_FOUND', 'Workspace not found');
+  const registration = await findWorkspaceRegistration(storage, orgId, ws);
+  if (!registration) throw new WorkspaceMetaError('WS_NOT_FOUND', 'Workspace not found');
+  const regRec: MemoryRecord = registration.record;
+  const entry = registration.entry;
   if (entry.createdBy !== callerOwner && !isAdmin) throw new WorkspaceMetaError('NOT_CREATOR', 'Only the workspace creator (or an org admin) can update it.');
 
   const meta = (await storage.listAllMemory({ prefix: `${root}.meta.`, limit: 200 })).items;
-  const manRec = meta.find(r => r.key === `${root}.meta.manifest`) ?? null;
+  // The copy readWorkspaceManifest reads, so an edit lands where every reader looks for it.
+  const manRec = await pickWorkspaceMetaCopy(storage, orgId,
+    meta.filter(r => r.key === `${root}.meta.manifest`), config.nodeId, registration);
   const readmeRec = meta.find(r => r.key === `${root}.meta.readme`) ?? null;
   const appsRec = meta.find(r => r.key === `${root}.meta.apps`) ?? null;
   const creatorGhii = regRec.ownerGaii;
