@@ -21,6 +21,9 @@
  * @structure registerWelcomeMatRoutes(router, ctx): POST /v1/home/welcome-mat, POST /v1/home/ai-client
  * @usage Registered from src/routes/home.ts.
  * @version-history
+ *   v1.2.0 — 2026-09-24 — requireOwnerSession refuses a federated session: a visitor from another
+ *     node carries roles:['owner'] and passed the person test, so the home step served the local
+ *     namesake's home to a stranger (secaudit 2026-09: A3-1).
  *   v1.1.0 — 2026-09-18 — The branch payload carries `family` and `variant_options` with the
  *     which-variant question (Gemini, Microsoft Copilot), and a named variant records a real
  *     `mcp: yes|no`. See services/ai-tool-setup.ts v1.6.0.
@@ -65,7 +68,10 @@ export interface HomeRouteCtx {
 export function requireOwnerSession(nodeId: string): RequestHandler {
     return (req, res, next) => {
         const roles = req.auth?.roles ?? [];
-        const isPerson = roles.includes('owner')
+        // A federated session carries roles:['owner'] with none of agent/ecosystem/app, so the test
+        // below said "person" for a visitor from another node whose name matches a local account. The
+        // home is the LOCAL person's; a visitor has none here (secaudit 2026-09: A3-1).
+        const isPerson = roles.includes('owner') && !req.auth?.federated
             && !roles.includes('agent') && !roles.includes('ecosystem') && !roles.includes('app');
         if (!isPerson) {
             res.status(403).json(error(nodeId, 'ACCESS_DENIED',

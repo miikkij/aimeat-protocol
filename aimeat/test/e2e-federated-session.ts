@@ -727,7 +727,9 @@ async function run() {
             headers: { Authorization: `Bearer ${fedToken}` },
         });
         assert(status === 403, `a visitor must not read the peer table, got ${status}: ${JSON.stringify(body)}`);
-        assert(String(body.error?.message).includes('Federated sessions'), `message: ${body.error?.message}`);
+        // requireRole refuses a federated session as a non-local role-holder (2026-09-24); before that
+        // only role==='operator' refused it, with a wording that named operator functions.
+        assert(/another node|Federated session/i.test(String(body.error?.message)), `message: ${body.error?.message}`);
     });
 
     await test('the visitor\'s scope list is enforced: memory:read does not write', async () => {
