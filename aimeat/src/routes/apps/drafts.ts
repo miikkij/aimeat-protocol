@@ -6,6 +6,9 @@
  *   preview-token, DELETE .../draft, POST .../publish-draft. Edit + test the next version without
  *   touching the live one. Extracted from src/routes/apps.ts to satisfy max-file-lines.
  * @version-history
+ *   v2.7.1 -- 2026-09-24 -- POST .../frame-token refuses a delegated caller with 403 before any other
+ *     check (A6-6). It was authorised on the `draft` act, which every development rung carries, so a
+ *     drafter could mint a grant for any Origin. The owner and the owner's own agents still mint.
  *   v2.7.0 -- 2026-09-13 -- publish-draft answers with `served_marks_removed` / `served_marks_note`
  *     when the draft was a served copy, which the promotion now stores without the node's serve
  *     marks (the developer's decision; services/app-serve-marks-strip.ts). The four draft-slot
@@ -373,6 +376,16 @@ export function registerDraftRoutes(
         const filename = req.params.filename as string;
         const t = await appTargetOr(appTarget, config, req, res, 'draft');
         if (!t) return;
+        // OWNER-ONLY, ENFORCED HERE. The resolver answers "may this caller work on the app", and
+        // every development rung carries `draft`, so a builder the owner invited only to write the
+        // draft passed it and got a twelve-hour grant for any Origin they sent (A6-6). Framing is a
+        // security grant, not part of building the app, so a delegated caller is refused before
+        // anything else is looked at. The owner and the owner's own agents are not delegated.
+        if (t.delegated) {
+            res.status(403).json(error(config.nodeId, 'FORBIDDEN',
+                `Only ${t.owner} may let another page frame this app. A development right covers building it, not who embeds it.`));
+            return;
+        }
         const { owner, ownerGhii } = t;
 
         const app = await storage.getAppByOwnerName(owner, filename);
