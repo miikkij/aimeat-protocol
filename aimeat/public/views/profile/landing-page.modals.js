@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Profile edit / change-password / presence modals + presence pill. Extracted from landing-page.js to satisfy max-file-lines.
  * @version-history
+ *   2026-09-24: The footers' actions are the library's (Jouni's decision "Dialog actions"): Cancel and
+ *     "Change password…" the action link, Save the dark block.
  *   2026-09-13: The three dialogs open in the site's one dialog (components/Modal.js) instead of an
  *     overlay of their own: the same header, X, scrolling body and footer as every other dialog, the
  *     phone sheet, and Modal's guard in place of the two hand-written Escape listeners.
@@ -98,7 +100,7 @@ export function EditProfileModal({ session, onClose, onSaved, onChangePassword }
       ${saving ? t('profile.landing.editSaving') : t('profile.landing.editSave')}
     </button>`;
   const footerStart = loading ? null : html`
-    <a href="#" class="pf-edit-link" onClick=${(e) => { e.preventDefault(); onChangePassword?.(); }}>
+    <a href="#" class="poster-action" onClick=${(e) => { e.preventDefault(); onChangePassword?.(); }}>
       ${t('profile.landing.changePassword')}…</a>`;
 
   return html`

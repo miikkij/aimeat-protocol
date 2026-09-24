@@ -569,8 +569,9 @@ export const BUILT = {
     what: '"Use your own key", "Powered by goose", "Official instructions" and "Show older" are small coral underlined words; "What does that mean?" and the jump keep their looks as tones.',
     sets: [set(HOME_CHAT, 150, 42), set(FORCED, 72, 36), set(OTHER, 126, 6, 14), set(LAB, 68, 10)] },
   'dialog-actions': { commit: '350d5c91e', onMain: false, date: '2026-09-24',
-    what: 'In every dialog, the app catalog\'s too, a way out is the underlined action link, the one "do it" the dark block, and a delete the dark block\'s coral tone. The footers drew 10 different looks before and 3 after.',
+    what: 'In every dialog, the app catalog\'s too, a way out or a side door is the underlined action link, the one "do it" the dark block, and a delete the dark block\'s coral tone. The footers drew 10 different looks before and 3 after. "Change password…" at the start of the Edit profile footer became the action link too (your answer).',
     sets: [set('Ten dialogs opened on their pages, whole and footer, two widths, both modes', 88, 88),
+      set('"Change password…": the Edit profile dialog, whole and footer, two widths, both modes', 8, 8),
       set(HOME_CHAT, 150, 0), set(FORCED, 72, 0), set(OTHER, 126, 1, 13)],
-    note: 'Every dialog picture changed in its footer row only. The one other page picture that changed is the settings landing on a phone, which differs by the same amount between two runs of the same code: it sometimes draws before its data arrives.' },
+    note: 'Every dialog picture changed in its footer row only. On a phone the Edit profile dialog\'s dark block is a little narrower after the "Change password…" change, because the longer link takes more of the row. The one other page picture that changed is the settings landing on a phone, which differs by the same amount between two runs of the same code: it sometimes draws before its data arrives.' },
 };
