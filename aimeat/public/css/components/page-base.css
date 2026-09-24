@@ -9,8 +9,8 @@
  *   box-sizing: border-box; }" right after its header, and it never applied: a "*" + "/" inside the
  *   header's version history (".notif-reply*" then "/") closed the comment early, and the rest of the
  *   header became part of the reset's selector, which the browser dropped. The site has always been
- *   drawn without it. Moving it here would switch it on and change every page, so it is left out,
- *   and switching it on is a decision for Jouni (found 2026-09-24).
+ *   drawn without it. Moving it here would switch it on and change every page, so it is deleted:
+ *   Jouni ruled on 2026-09-24 to keep it off. docs/pitfalls.md §95.
  * @usage Linked from public/spa.html right after theme.css, in the order theme.css held these rules
  *   (the shell block), and from every standalone page that links theme.css.
  * @version-history

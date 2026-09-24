@@ -93,7 +93,7 @@ export function Composer({ value, onInput, onSend, onStop, onSpeak, onAttach, at
                     <${VoiceRecorder} maxSeconds=${voiceMaxSeconds} disabled=${disabled || listening}
                         className="btn-outline poster-composer-tool" onRecorded=${(file) => onSpeak(file)} />` : ''}
                 ${busy
-                    ? html`<button type="button" class="poster-slab poster-slab--control poster-composer-send" onClick=${onStop}>${tr('chat.stop', 'Stop')}</button>`
+                    ? html`<button type="button" class="btn-outline poster-slab poster-slab--control poster-composer-send" onClick=${onStop}>${tr('chat.stop', 'Stop')}</button>`
                     : html`<button type="button" class="poster-slab poster-slab--control poster-composer-send"
                         disabled=${disabled || !value.trim()}
                         onClick=${onSend}>${tr('chat.send', 'Send')}</button>`}

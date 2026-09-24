@@ -127,6 +127,7 @@ and its shape. Symptom first in the section too, then cause, then the rule.
 | 92 | One press, and "you already have one called X" for the thing just tried | 1 |
 | 93 | "AIMEAT node started" printed, yet the port refuses connections for minutes | 1 |
 | 94 | Every check green, every page "verified", and the pages do not look like the originals | 2 |
+| 95 | A CSS rule in the source that never applied on any page | 1 |
 
 ---
 
@@ -1064,3 +1065,11 @@ Two SESSIONS in one checkout is forbidden now (`CLAUDE.md`), so the case below i
 - **The second attempt failed the other way.** Its plan (2026-09-23, branch `cc-jouni-ui-slice1`) demanded 0.00 % visible difference AND forbade merging two looks into one. Together those forbid all unifying: it moved the home's and the chat's CSS into shared sheets, looked exactly as before, and unified almost nothing. Jouni: "then this was a fail." The builder had seen the conflict and built on it for nine hours instead of asking. The root cause of both attempts was one sentence read two ways, "just make it look same": the same as before, or the same as each other. He meant the second: "ulkoasun pitää pysyä samannäköisenä, mutta meidän on alettava käyttämään samannäköisiä komponentteja joka puolella."
 - **The rule.** The requirement is quoted in his words, never paraphrased, and a question goes to him when it, or two rules, read two ways or leave no room for the goal. Every UI step is one of two kinds and says which. A **move** (code, names and CSS change place) passes only with no visible difference from the old code, side by side on the same data. A **unification** (one look for one kind of thing) takes the look he chose in aimeat-design-lab from the existing variants shown side by side, and every other pixel stays unchanged. Every difference no decision covers goes on a list for him; the builder does not grade its own. Visual work stays off `main` until he has seen it. → `CLAUDE.md` "Accepting a result", skill `aimeat-frontend-verify`
 - **The tell.** A sentence in a brief that explains what the user "meant". A difference described by a category ("the part's standard look") instead of a crop he has seen. Two rules that together leave no room for what was asked.
+
+## 95. A CSS rule in the source that never applied on any page
+
+*Symptoms: a rule sits in a stylesheet, reads correctly, and nothing on the page obeys it. Moving it to another file, unchanged, suddenly changes every page.*
+
+- **The case.** `theme.css` opened with the global reset `*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }`. Its header's version history held the text `.notif-reply*` followed by `/`, which closed the comment early. The rest of the header became part of the reset's selector, the browser dropped the invalid rule without a message, and the site had always been drawn without it. When the rules moved out of `theme.css` on 2026-09-24, the split carried the reset into a sheet of its own, where it would have applied for the first time.
+- **The rule.** A glob or a path pattern in a CSS comment is written without `*/`, and `pnpm check:theme-tokens` refuses a comment closed early in `theme.css`. The reset was deleted, not revived: Jouni ruled on 2026-09-24 to keep it off, because turning it on changes spacing on every page.
+- **The tell.** A move of CSS that changes the look although no declaration changed: look for a comment closed early above the rule that moved.
