@@ -29989,6 +29989,10 @@ paths:
         Account-holder only: an agent, a granted app or an ecosystem app carries the human's account
         name and must not be able to register a way in that the human never made. The ceremony
         expires in 60 seconds.
+
+        On an account with two-step sign-in armed, `authenticatorSelection.userVerification` is
+        `required`: a passkey signs in to such an account only when the device checks the person
+        (a PIN, a fingerprint or a face). Otherwise it is `preferred`.
       tags: [Passkeys]
       security:
         - BearerAuth: []
@@ -30023,7 +30027,7 @@ paths:
                 label: { type: string, description: What to call this device. Defaults to "Passkey". }
       responses:
         '201': { description: The device is registered }
-        '400': { description: The ceremony expired, or the answer did not check out }
+        '400': { description: 'The ceremony expired, or the answer did not check out, or (PASSKEY_USER_NOT_VERIFIED) the account has two-step sign-in armed and the device did not check the person' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '409': { description: That device is already registered here }
 
@@ -30193,6 +30197,10 @@ paths:
         A username that does not exist is answered exactly like one that does — an empty allow-list
         and a real challenge — because this door takes no credential and would otherwise tell anyone
         who types a name whether an account by that name is here.
+
+        For a named account that has passkeys and two-step sign-in armed, `userVerification` is
+        `required`, so the browser asks for the PIN or the fingerprint up front. Otherwise, and in
+        the discoverable flow, it is `preferred`; the verify door enforces the rule either way.
       tags: [Passkeys]
       requestBody:
         content:
@@ -30213,6 +30221,10 @@ paths:
         Checks the device's answer and, if it holds, mints the same owner session a password login
         would: the same deactivation refusal, the same login count, the same owner-key handling and
         the same response body. The signature counter is stored back.
+
+        On an account with two-step sign-in armed there is no code step here, so the device's own
+        check of the person is the second factor: an answer without the user-verification flag is
+        refused with 401 PASSKEY_USER_NOT_VERIFIED. Other accounts accept user presence alone.
       tags: [Passkeys]
       requestBody:
         required: true
@@ -30228,7 +30240,7 @@ paths:
       responses:
         '200': { description: Signed in, with the session token }
         '400': { description: The ceremony expired }
-        '401': { description: The device is unknown here, or its answer did not check out }
+        '401': { description: 'The device is unknown here, or its answer did not check out, or (PASSKEY_USER_NOT_VERIFIED) the account has two-step sign-in armed and the device did not check the person' }
         '403': { description: The account has been deactivated }
 
   /v1/ghii/totp/setup:

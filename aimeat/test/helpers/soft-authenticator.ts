@@ -22,6 +22,8 @@
  * @structure SoftAuthenticator — register(options) · authenticate(options) · id · counter
  * @usage const auth = new SoftAuthenticator('http://localhost:40251', 'localhost');
  * @version-history
+ *   v1.1.0 — 2026-09-24 — `userVerified: false` answers as a key with no PIN would: the UV flag is
+ *     left out, so presence is all the answer proves.
  *   v1.0.0 — 2026-09-04 — Initial, with passkeys.
  */
 import { createHash, createSign, generateKeyPairSync, randomBytes, type KeyObject } from 'node:crypto';
@@ -87,7 +89,7 @@ export class SoftAuthenticator {
    */
   register(
     options: { challenge: string },
-    opts: { challengeOverride?: string; originOverride?: string; backedUp?: boolean; credentialIdOverride?: string } = {},
+    opts: { challengeOverride?: string; originOverride?: string; backedUp?: boolean; credentialIdOverride?: string; userVerified?: boolean } = {},
   ): Record<string, unknown> {
     const pair = generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
     this.privateKey = pair.privateKey;
@@ -98,8 +100,8 @@ export class SoftAuthenticator {
     this.counter = 0;
 
     const clientDataJSON = this.clientData('webauthn.create', opts.challengeOverride ?? options.challenge, opts.originOverride);
-    // UP | UV | AT, plus BE|BS when this is a synced key.
-    const flags = 0x01 | 0x04 | 0x40 | (opts.backedUp ? 0x08 | 0x10 : 0);
+    // UP | UV | AT, plus BE|BS when this is a synced key. UV is left out for a key with no PIN.
+    const flags = 0x01 | (opts.userVerified === false ? 0 : 0x04) | 0x40 | (opts.backedUp ? 0x08 | 0x10 : 0);
     const authData = this.authData(flags, true);
     const attestationObject = isoCBOR.encode(new Map<string, unknown>([
       ['fmt', 'none'],
@@ -123,13 +125,14 @@ export class SoftAuthenticator {
   /** Answer an authentication ceremony. Bumps the counter, as a hardware key would. */
   authenticate(
     options: { challenge: string },
-    opts: { challengeOverride?: string; originOverride?: string; rpIdOverride?: string; credentialIdOverride?: string } = {},
+    opts: { challengeOverride?: string; originOverride?: string; rpIdOverride?: string; credentialIdOverride?: string; userVerified?: boolean } = {},
   ): Record<string, unknown> {
     if (!this.privateKey) throw new Error('register() first');
     this.counter += 1;
 
     const clientDataJSON = this.clientData('webauthn.get', opts.challengeOverride ?? options.challenge, opts.originOverride);
-    const authData = this.authData(0x01 | 0x04, false, opts.rpIdOverride);
+    // UP | UV, and UP alone for a key with no PIN: it proves the key is here, not who holds it.
+    const authData = this.authData(0x01 | (opts.userVerified === false ? 0 : 0x04), false, opts.rpIdOverride);
     const signed = Buffer.concat([authData, createHash('sha256').update(clientDataJSON).digest()]);
     const signature = createSign('SHA256').update(signed).sign(this.privateKey);
 
