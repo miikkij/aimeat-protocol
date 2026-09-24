@@ -13,8 +13,10 @@
  *   chatter, intermediate LLM calls) is intentionally NOT surfaced to AIMEAT;
  *   only the final deliverable shows up on the task. Subprocesses that want
  *   richer integration can call back to AIMEAT themselves via
- *   `aimeat connect call <tool> --json '{...}'` using the token env var the
- *   runner sets.
+ *   `aimeat connect call <tool> --agent <name> --json '{...}'`: the runner sets
+ *   AIMEAT_HOME to this connector home, so that command reaches this daemon and
+ *   a current credential for as long as the task runs. The token env var is the
+ *   credential at launch, asked for then, and it ends with its own expiry.
  *
  *   SECURITY: `runner.command` is exec'd verbatim. Same foot-gun as
  *   `wake.command` in wakeup.ts. Trust your own ~/.aimeat/ contents.
@@ -27,10 +29,16 @@
  *
  * @version-history
  *   v1.0.0 -- 2026-05-29 -- Initial subprocess task runner
+ *   v1.1.0 -- 2026-09-24 -- The child gets a CURRENT credential, asked for at launch (a key mints),
+ *     not the one the daemon's client was built with, which for an agent moved onto a key was the
+ *     stray stored bearer; and AIMEAT_HOME, so its own `aimeat connect call` reaches this daemon
+ *     (production refusal log L-3).
  */
 import { spawn } from 'node:child_process';
 import { readFileSync, existsSync } from 'node:fs';
 import type { RegisteredAgent } from './agent-registry.js';
+import { resolveToken } from './agent-key.js';
+import { getConfigDir } from './config.js';
 import { logger } from '../../utils/logger.js';
 
 const SUMMARY_MAX_BYTES = 64 * 1024;
@@ -104,13 +112,25 @@ export async function launchTaskRunner(agent: RegisteredAgent, task: TaskRunnerI
   const nodeUrlEnv = runner.node_url_env || 'AIMEAT_NODE_URL';
   const timeoutSec = runner.timeout_seconds && runner.timeout_seconds > 0 ? runner.timeout_seconds : DEFAULT_TIMEOUT_SECONDS;
 
+  // The credential as it is NOW: a key mints one, a stored bearer is read from its file. What the
+  // daemon's client was built with may be a bearer that has been replaced since.
+  let token = '';
+  try {
+    token = (await resolveToken(agent.agent, agent.owner, agent.config.node_url)) ?? '';
+  } catch (err) {
+    console.error(`[runner:${agent.agent}] no credential for task ${task.id} right now (${(err as Error).message}); it can still use \`aimeat connect call\``);
+  }
+
   const env: Record<string, string> = {
     ...process.env as Record<string, string>,
+    // This connector home, so the child's own `aimeat connect call` reaches this daemon and its
+    // current credentials however long the task runs. A runner's own env still wins.
+    AIMEAT_HOME: getConfigDir(),
     ...(runner.env ?? {}),
     [promptEnv]: buildPrompt(task),
     [taskIdEnv]: task.id,
     [agentNameEnv]: agent.agent,
-    [tokenEnv]: agent.client.getTokenValue() ?? '',
+    [tokenEnv]: token,
     [nodeUrlEnv]: agent.client.getBaseUrl(),
   };
 

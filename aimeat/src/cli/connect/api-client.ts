@@ -10,6 +10,12 @@
  *   MCP tool call flows over the single persistent WS without per-tool changes.
  * @usage Imported by `aimeat connect` subcommands and MCP tools.
  * @version-history
+ *   v1.7.0 -- 2026-09-24 -- A CURRENT credential, and a dead one is not sent again every few seconds
+ *     (production refusal log L-3). A client that knows whose credential it carries asks
+ *     `resolveToken` at send time on the direct path (a key mints, a stored bearer is read), instead
+ *     of the value it was built with, which for a migrated agent was the stray bearer beside its key.
+ *     A credential the node answered 401 is held back by ./refused-credentials.ts, which the next
+ *     process reads too. `fromConfig` asks `resolveToken` as well, so a key-only primary works.
  *   v1.6.0 -- 2026-09-07 -- ONE mint per credential, not one per call. Removing v1.3.0's string
  *     comparison left nothing in its place: a genuinely unpermitted agent minted on EVERY refusal,
  *     for ever, against a 60-a-minute IP-keyed door — the budget that took 22 agents down in
@@ -45,9 +51,9 @@
  *   v2.1.0 — 2026-08-01 — TARGET-058 Phase 11b: ApiResponse models `meta`. It always arrived; not
  *     being in the type is why every tool handler dropped meta.provenance without anyone noticing.
  */
-import { getToken } from './keychain.js';
 import { loadConfig } from './config.js';
 import { forgetCachedToken, resolveToken } from './agent-key.js';
+import { refusedCredential, noteCredentialAnswer } from './refused-credentials.js';
 
 export interface ApiResponse {
   ok: boolean;
@@ -90,7 +96,9 @@ export class AimeatClient {
   static async fromConfig(): Promise<AimeatClient> {
     const config = loadConfig();
     if (!config) throw new Error('Not configured. Run: npx aimeat connect');
-    const token = await getToken(config.agent, config.owner);
+    // The current credential: a key mints one, else the stored bearer. The bearer alone left an
+    // agent that holds only a key with nothing to send.
+    const token = await resolveToken(config.agent, config.owner, config.node_url);
     if (!token) throw new Error('No stored token. Run: npx aimeat connect');
     return new AimeatClient(config.node_url, token, { agent: config.agent, owner: config.owner });
   }
@@ -121,10 +129,30 @@ export class AimeatClient {
   setTransport(t: Transport | null): void { this.transport = t; }
   hasTransport(): boolean { return this.transport !== null; }
 
-  private headers(): Record<string, string> {
+  private headers(token: string | null): Record<string, string> {
     const h: Record<string, string> = { 'Content-Type': 'application/json', Connection: 'close' };
-    if (this.token) h['Authorization'] = `Bearer ${this.token}`;
+    if (token) h['Authorization'] = `Bearer ${token}`;
     return h;
+  }
+
+  /**
+   * The credential to send now. A client that knows whose it carries asks the credential store at
+   * send time: a key mints (cached until near expiry), a stored bearer is read from its file. The
+   * value the client was built with is only the fallback, because a long-lived client, or one built
+   * from a stored bearer that has since been replaced by a key, would otherwise send a credential
+   * nobody can renew for as long as it lives.
+   */
+  private async currentToken(): Promise<string | null> {
+    if (!this.agent || !this.owner) return this.token;
+    try {
+      const fresh = await resolveToken(this.agent, this.owner, this.baseUrl);
+      if (fresh) this.token = fresh;
+    } catch (err) {
+      // A mint that failed this second (agent-key.ts MintFailedError) is not a missing credential:
+      // this call goes with the one held, and the next call asks again.
+      console.error(`[connect] ${this.agent}@${this.owner}: no fresh credential right now (${String(err)}); using the one held`);
+    }
+    return this.token;
   }
 
   /**
@@ -221,13 +249,27 @@ export class AimeatClient {
       return r.body as ApiResponse;
     }
     const url = path.startsWith('http') ? path : `${this.baseUrl}${path}`;
+    // Only a client that knows whose credential it carries (the connector's own, for one agent)
+    // resolves it now and keeps the refusal record. A client built with just a bearer sends that
+    // bearer, as before: the node's own loopback dispatcher (services/node-invoke.ts) uses this
+    // class with a caller's token, and must neither read nor write a connector home.
+    const own = !path.startsWith('http') && !!this.agent && !!this.owner;
+    const token = own ? await this.currentToken() : this.token;
+    // A credential the node refused is answered here, with no request, until its hold passes.
+    const held = own && token ? refusedCredential(token) : null;
+    if (held) {
+      this.lastStatus = 401;
+      return held as ApiResponse;
+    }
     const res = await fetch(url, {
       method,
-      headers: this.headers(),
+      headers: this.headers(token),
       body: body !== undefined && body !== null ? JSON.stringify(body) : undefined,
     });
     this.lastStatus = res.status;
-    return res.json() as Promise<ApiResponse>;
+    const answer = await res.json() as ApiResponse;
+    if (own && token) noteCredentialAnswer(token, res.status, answer);
+    return answer;
   }
 
   async get(path: string): Promise<ApiResponse> { return this.send('GET', path); }

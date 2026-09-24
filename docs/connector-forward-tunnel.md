@@ -212,7 +212,9 @@ live. `stdio_params` / `http_params` remain for one-shot / CI use. See
   header comes from a web page and is refused (403); and every request sends
   `Authorization: Bearer <secret>` with the `secret` from serve.json (401
   otherwise). The secret is new at every start, so a client reads it together
-  with the port. `aimeat connect tui` and `aimeat-crewai` (0.29.0+) do this.
+  with the port. `aimeat connect tui`, `aimeat connect call` (which goes
+  through the daemon when it serves the agent) and `aimeat-crewai` (0.29.0+)
+  do this.
 - **Local endpoints (loopback only):** `/v1/mcp` (Streamable HTTP MCP),
   `/v1/*` (REST proxy; agent via
   `X-Aimeat-Agent` header or `?agent=`), `POST /local/call/:tool` (deterministic

@@ -34,6 +34,7 @@
  *     discovery-file lifecycle, signal handling.
  * @usage Called by mcp/server.ts `runServe()` when `--http`/`--daemon` is set.
  * @version-history
+ *   2026-09-24 — The degraded proxy holds back a credential the node refused (../refused-credentials.ts).
  *   2026-09-24 — An enrolment offer is handed the identity whose socket carried it (A9-2).
  *   2026-09-24 — One admission check in front of every route (./local-admission.ts): a loopback Host
  *     for this port, no Origin, and the per-start secret written into serve.json (secaudit A9-1).
@@ -135,6 +136,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { ConnectTunnelClient, type TunnelIdentity } from '../tunnel-client.js';
 import { TunnelHub, statusOfIdentity, principalRow } from './tunnel-hub.js';
 import { resolveToken } from '../agent-key.js';
+import { refusedCredential, noteCredentialAnswer } from '../refused-credentials.js';
 import { type AimeatPerAgentConfig } from '../config.js';
 import { AimeatClient } from '../api-client.js';
 import { handleEnrolOffer, ENROL_CAPABILITY } from '../enrolment.js';
@@ -739,6 +741,8 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
       const url = new URL(entry.config.node_url.replace(/\/+$/, '') + req.path);
       for (const [k, v] of Object.entries(query)) url.searchParams.set(k, v);
       const token = await resolveToken(entry.agent, entry.owner, entry.config.node_url);
+      const held = token ? refusedCredential(token) : null;   // refused before: no request (L-3)
+      if (held) { res.status(401).json(held); return; }
       const headers: Record<string, string> = { 'Content-Type': 'application/json', Connection: 'close' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
       const r = await fetch(url, { method: req.method, headers, body: body !== undefined ? JSON.stringify(body) : undefined });
@@ -746,6 +750,7 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
       let parsed: unknown;
       // eslint-disable-next-line aimeat/no-silent-catch -- the exception IS the answer here: the input is not of that shape
       try { parsed = text ? JSON.parse(text) : null; } catch { parsed = text; }
+      if (token) noteCredentialAnswer(token, r.status, parsed);
       res.status(r.status).json(parsed);
     } catch (err) {
       res.status(502).json({ ok: false, error: { code: 'PROXY_ERROR', message: (err as Error).message } });

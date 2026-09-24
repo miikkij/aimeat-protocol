@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description CLI help text constants (top-level + connector) for the aimeat binary. Extracted from index.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.1.2 — 2026-09-24 — `connect call` goes through the serve daemon when one serves the agent.
  *   v1.1.1 — 2026-09-24 — The serve help says every loopback request presents the secret from serve.json.
  *   v1.1.0 — 2026-09-24 — `aimeat connect tui` in the connector help.
  *   v1.0.0 — 2026-07-13 — Extracted from index.ts (max-file-lines)
@@ -170,8 +171,10 @@ USAGE
       Print JSON input metadata for a shell-callable tool.
 
     aimeat connect call <tool-name> --json input.json
-      Call a shell-callable tool using the stored connector token. Use --stdin
-      to read the JSON object from standard input.
+      Call a shell-callable tool. When a serve daemon in this connector home
+      serves the agent, the call goes through it; otherwise it goes to the
+      node with the agent's current credential. Use --stdin to read the JSON
+      object from standard input.
 
   aimeat connect refresh
       Re-download and extract the local skill bundle.
