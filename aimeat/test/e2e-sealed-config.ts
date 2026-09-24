@@ -21,6 +21,9 @@
  *   suite's own server with the variable unset.
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-sealed-config.ts
  * @version-history
+ *   v1.2.0 — 2026-09-24 — The operator's agent is created holding operator:admin beside '*'. Its
+ *     setup no longer matched the node: an operator's agent is offered the admin tools only with that
+ *     word ticked (security audit A8-1), and '*' alone does not carry it.
  *   v1.1.0 — 2026-09-16 — Secrets: PUT on a secret answers with configured flags, not values
  *     (2b), and a sealed secret is locked and still not shown on GET, PUT or MCP (5b, 6b, 13).
  *   v1.0.0 — 2026-08-18 — Initial.
@@ -421,7 +424,7 @@ async function main() {
             const agentName = 'sealcfgagent';
             const reg = await json('/v1/agents', {
                 method: 'POST', headers: auth(opToken),
-                body: JSON.stringify({ name: agentName, owner: unsealedOp.name, capabilities: ['admin'], model: 'gpt-4o' }),
+                body: JSON.stringify({ name: agentName, owner: unsealedOp.name, capabilities: ['admin'], model: 'gpt-4o', scopes: ['*', 'operator:admin'] }),
             });
             assert(reg.status === 201, `agent register: ${reg.status}: ${JSON.stringify(reg.body)}`);
             const agentGaii = reg.body.data.agent.gaii;

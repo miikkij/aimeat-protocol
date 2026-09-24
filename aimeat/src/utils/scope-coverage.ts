@@ -31,6 +31,9 @@
  *   const added = uncoveredScopes(agent.defaultScopes ?? [], proposed.scopes);
  *   if (added.length > 0) return err(`…${added.join(', ')}`);
  * @version-history
+ *   v1.11.0 — 2026-09-24 — OPERATOR_ADMIN_SCOPE, node administration through an agent (security audit
+ *     A8-1). The administration tools asked only whether the ACCOUNT runs the node, so every agent
+ *     an operator connected could administer it, whatever the operator had granted that agent.
  *   v1.10.0 — 2026-09-24 — ownerBypassesScopes(caller): requireScope's owner bypass as a value, for a
  *     service that answers the same question without a request (the workflow steps, the package
  *     memory components).
@@ -106,6 +109,30 @@ export const ACCOUNT_SECURITY_SCOPE = 'account:security';
  * a capability that did not exist before, so no agent can lose one it had.
  */
 export const OPERATOR_ORGANISM_REPAIR_SCOPE = 'operator:organism-repair';
+
+/**
+ * Node administration through an agent: the tools behind the admin pages, from minting morsels and
+ * resetting somebody's second factor to the CORS lists, the hooks, the SSO connections and the MCP
+ * registry. The operator in person needs no word; the HTTP admin doors are theirs and stay theirs.
+ *
+ * WHY IT EXISTS. Those tools asked one question, whether the ACCOUNT behind the session runs this
+ * node, so every agent an operator had ever connected was handed node administration: an agent
+ * granted nothing but memory:read reset another person's two-step sign-in and rewrote a CORS list
+ * (security audit A8-1). The account test stays the outer gate and is asked first; this word is the
+ * operator's tick per agent, the same shape OPERATOR_ORGANISM_REPAIR_SCOPE already had for its two
+ * tools. services/owner-lifecycle.ts resolveOperatorAgentName() asks both, for every such tool.
+ *
+ * One word for the block rather than one per page: every tool in it acts on the node rather than on
+ * one account's data, and an operator deciding which of their agents helps run the node is deciding
+ * one thing. The two words that already had a door of their own keep it, and this one does not
+ * stand in for them.
+ *
+ * Out of every wildcard for the reason the repair word is: "Full access" is one click, and nobody
+ * clicking it is deciding that an agent may administer the node. Nobody is grandfathered onto it
+ * (services/scope-vocabulary-migration.ts has no entry), the same as every other operator word here:
+ * an operator's agent that used these tools needs the tick in the agent editor.
+ */
+export const OPERATOR_ADMIN_SCOPE = 'operator:admin';
 
 /**
  * The node-wide compliance report and the register behind it: read, and write.
@@ -262,7 +289,7 @@ const OWN_TICK_SCOPES = [
 ] as const;
 
 export const SCOPES_OUTSIDE_WILDCARD: readonly string[] = [
-    WRITE_RESERVED_SCOPE, ACCOUNT_SECURITY_SCOPE, OPERATOR_ORGANISM_REPAIR_SCOPE,
+    WRITE_RESERVED_SCOPE, ACCOUNT_SECURITY_SCOPE, OPERATOR_ORGANISM_REPAIR_SCOPE, OPERATOR_ADMIN_SCOPE,
     COMPLIANCE_READ_SCOPE, COMPLIANCE_WRITE_SCOPE, SURFACE_LAYOUT_WRITE_SCOPE, THEME_WRITE_SCOPE, SECRETS_MANAGE_SCOPE,
     MCP_MANAGE_SCOPE,
     ...OWN_TICK_SCOPES,

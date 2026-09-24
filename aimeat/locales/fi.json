@@ -14908,7 +14908,8 @@
             "manage": "Lisää, vaihtaa ja poistaa nimettyjä avaimia ja salasanoja, joita pidät täällä. Arvoa ei saa luettua takaisin, ei tämä agentti eikä kukaan muu."
           },
           "operator": {
-            "organism-repair": "Palauta omistaja organismiin jota tämä tili ei omista. Toimii vain noden operaattorilla: muulla tilillä tämä oikeus ei tee mitään. Tällä pääsee takaisin organismiin jonka omistajatiliin ei enää saa yhteyttä, ja se antaa organismin sille jonka agentti nimeää."
+            "organism-repair": "Palauta omistaja organismiin jota tämä tili ei omista. Toimii vain noden operaattorilla: muulla tilillä tämä oikeus ei tee mitään. Tällä pääsee takaisin organismiin jonka omistajatiliin ei enää saa yhteyttä, ja se antaa organismin sille jonka agentti nimeää.",
+            "admin": "Ylläpidä tätä asennusta tämän agentin kautta. Se voi esimerkiksi sulkea tilejä, poistaa jonkun kaksivaiheisen kirjautumisen ja muuttaa organisaatiokirjautumista, sallittuja alkuperiä, koukkuja ja kaikille tileille tarjottuja MCP-palvelimia. Toimii vain sille, joka pyörittää tätä asennusta; millä tahansa muulla tilillä tämä lupa ei tee mitään. \"Täydet oikeudet\" ei sisällä sitä."
           },
           "packages": {
             "write": "Asenna puolestasi paketteja. Se ottaa käyttöön paketin sovelluksen, laajennukset ja mahdolliset ajastetut työt sinun nimissäsi."

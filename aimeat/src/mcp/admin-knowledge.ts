@@ -22,9 +22,11 @@
  *   string here is what makes this tool see the packages the page sees. Reading the agent's GAII
  *   instead would hide the operator's own imports from the operator, which is the defect this
  *   change fixed on the review and delete doors.
- * @structure registerAdminKnowledgeTools(mcp, storage, config, getAgentGaii) — one read.
- * @usage registerAdminKnowledgeTools(mcp, storage, config, () => agentGaii);
+ * @structure registerAdminKnowledgeTools(mcp, storage, config, getAgentGaii, scopes) — one read.
+ * @usage registerAdminKnowledgeTools(mcp, storage, config, () => agentGaii, scopes);
  * @version-history
+ *   v1.1.0 — 2026-09-24 — SECURITY (audit A8-1): the operator test asks the operator:admin word as
+ *     well as the account (services/owner-lifecycle.ts resolveOperatorAgentName).
  *   v1.0.0 — 2026-09-12 — Initial, with the Knowledge page's rebuild.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -33,7 +35,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
-import { resolveOperatorName } from '../services/owner-lifecycle.js';
+import { resolveOperatorAgentName, OPERATOR_AGENT_REFUSAL } from '../services/owner-lifecycle.js';
 import { buildKnowledgeOverview, DEFAULT_PER_PAGE, MAX_PER_PAGE } from '../services/knowledge-overview.js';
 
 const text = (payload: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(payload, null, 2) }] });
@@ -44,6 +46,8 @@ export function registerAdminKnowledgeTools(
   storage: Storage,
   config: AimeatConfig,
   getAgentGaii: () => string,
+  /** This session's granted scopes: operator:admin is asked of them at call time. */
+  scopes: readonly string[] = [],
 ): void {
   const agentGaii = getAgentGaii();
 
@@ -58,8 +62,8 @@ export function registerAdminKnowledgeTools(
     },
     annotationsFor('aimeat_admin_knowledge'),
     async ({ page, limit, q, author_key, content_type, flagged }) => {
-      const operator = await resolveOperatorName(storage, agentGaii);
-      if (!operator) return refuse('Operator role required');
+      const operator = await resolveOperatorAgentName(storage, agentGaii, scopes);
+      if (!operator) return refuse(OPERATOR_AGENT_REFUSAL);
 
       return text(await buildKnowledgeOverview(config, storage, `${operator}@${config.nodeId}`, {
         ...(page !== undefined ? { page } : {}),

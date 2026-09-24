@@ -29,13 +29,18 @@
  *   - OwnerLifecycleResult: what was ended, so the caller can claim it truthfully
  *   - deactivateOwner(storage, name, by): flag + revoke everything, one transaction
  *   - reactivateOwner(storage, name): clear the flag
+ *   - resolveOperatorName / resolveOperatorAgentName: the operator tools' call-time test
  * @usage const result = await deactivateOwner(storage, 'alice', 'operator-bob');
  * @version-history
+ *   v1.1.0 — 2026-09-24 — resolveOperatorAgentName and OPERATOR_AGENT_REFUSAL: an operator tool asks
+ *     the account role first and then the exact word the operator ticked for this agent (security
+ *     audit A8-1). The account role alone had armed every agent an operator connected.
  *   v1.0.0 — 2026-08-23 — Initial implementation (BR-04 phase 0).
  */
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 import { parseGAII } from '../utils/gaii.js';
+import { OPERATOR_ADMIN_SCOPE, scopeIsCovered } from '../utils/scope-coverage.js';
 import { getActiveConnectTunnelManager } from './connect-tunnel.js';
 
 export interface OwnerLifecycleResult {
@@ -145,6 +150,35 @@ export async function resolveOperatorName(storage: Storage, callerGaii: string):
   const record = await storage.getOwner(parsed.owner);
   return record && record.roles.includes('operator') ? record.name : null;
 }
+
+/**
+ * The test every operator tool asks at call time: the operator's bare name when the account behind
+ * `callerGaii` is an operator AND `scopes` carries `word` as the exact string, else null.
+ *
+ * Two questions, in this order. The account comes first and is the outer gate: the word means
+ * nothing on an account that does not run the node. The word comes second, because the account
+ * role alone armed every agent an operator had ever connected (security audit A8-1), and a tool
+ * session is always an agent. scopeIsCovered() rather than includes(), because it is the one place
+ * that knows these words sit outside every wildcard.
+ *
+ * The tool surface already leaves these tools unregistered for a session without the word (the
+ * TOOL_SCOPES entry), so this is the second of two gates. It is here as well because a node run with
+ * AIMEAT_MCP_ENFORCE_SCOPES=false registers every tool, and a gate that disappears with a logging
+ * switch is not one. `word` defaults to operator:admin; a tool that has a word of its own names it.
+ */
+export async function resolveOperatorAgentName(
+  storage: Storage, callerGaii: string, scopes: readonly string[], word: string = OPERATOR_ADMIN_SCOPE,
+): Promise<string | null> {
+  const name = await resolveOperatorName(storage, callerGaii);
+  if (!name) return null;
+  return scopeIsCovered(scopes, word) ? name : null;
+}
+
+/** What an operator tool answers when resolveOperatorAgentName() says no. It names both halves of
+ *  the test, so the agent can tell the person what to change rather than guess which half failed. */
+export const OPERATOR_AGENT_REFUSAL = 'This is for the node operator\'s own agent, and only with the '
+  + `"${OPERATOR_ADMIN_SCOPE}" permission, which the operator ticks for that agent in its settings. `
+  + '"Full access" does not include it.';
 
 export type OperatorLifecycleResult =
   | { ok: true; result?: OwnerLifecycleResult }

@@ -10,8 +10,9 @@
  *   Only tools whose REST route is genuinely scope-gated appear in TOOL_SCOPES. Tools omitted here
  *   (tasks, apps, extensions, cortex, organisms, knowledge, instances, groups, capabilities, flags,
  *   storage, catalogue, board reads, onboarding, handbook, agent self-report, messages) are NOT
- *   scope-gated in REST either, so leaving them ungated keeps MCP consistent with REST. Admin tools
- *   are omitted because they self-gate via a runtime operator check.
+ *   scope-gated in REST either, so leaving them ungated keeps MCP consistent with REST. The operator's
+ *   tools ride words no wildcard carries (operator:admin and its siblings), because every tool
+ *   session is an agent and the account role alone armed every agent an operator connected.
  * @structure
  *   - TOOL_SCOPES — tool name -> required scope (mirrors REST requireScope gates)
  *   - scopeAllowsTool() — wildcard-aware check (exact / domain:* / global *), mirroring middleware
@@ -20,6 +21,10 @@
  *   import { scopeAllowsTool } from '../catalog/scopes.js';
  *   if (scopeAllowsTool(agentScopes, 'aimeat_memory_write')) mcp.tool(...)
  * @version-history
+ *   v1.26.0 -- 2026-09-24 -- SECURITY (audit A8-1): the node administration block leaves
+ *     SCOPE_EXEMPT_TOOLS for operator:admin, outside every wildcard: the 24 aimeat_admin_* tools that
+ *     had no word, the MCP registry pair and the SEO pair (from app:write). aimeat_surface_layout_get
+ *     takes site:layout-write, the word of its write. Not grandfathered, like every operator word.
  *   v1.25.0 -- 2026-09-24 -- aimeat_theme_policy_set → site:theme-write.
  *   v1.24.0 -- 2026-09-24 -- aimeat_theme_style_save and aimeat_theme_component_css_set → site:theme-write.
  *   v1.23.0 -- 2026-09-24 -- aimeat_theme_save → site:theme-write (Themes & Styles).
@@ -117,51 +122,11 @@ export const SCOPE_EXEMPT_TOOLS = new Set<string>([
     // one, and it would have to guess which scope the target wants. `aimeat_invoke` can do exactly
     // what its caller can already do and nothing more; see services/node-invoke.ts.
     'aimeat_invoke',
-    'aimeat_admin_mint',                             // gated in the handler on the operator role, not by a scope
-    // BR-04 SSO administration: all seven mutate node-level connection records or account
-    // lifecycle, and every one is gated in the handler on the operator role — the same decision
-    // aimeat_admin_mint records. No scope word narrows an operator.
-    'aimeat_admin_sso_create',
-    'aimeat_admin_sso_update',
-    'aimeat_admin_sso_delete',
-    'aimeat_admin_sso_idp_metadata',
-    'aimeat_admin_sso_scim_token',
-    'aimeat_admin_owner_disable',
-    'aimeat_admin_owner_enable',
-    'aimeat_admin_totp_reset',
-    // The Security page's read and its one action: gated in the handler on the operator role, like
-    // the admin tools above them.
-    'aimeat_admin_security_overview',
-    'aimeat_admin_incident_resolve',
-    // This node's MCP registry: what it offers every owner, to whom, and at what price. Gated in
-    // the handler on the OWNER record's operator role, like the admin tools above. A scope word
-    // cannot say "the operator in person", and one that could would be grantable to an agent —
-    // which is exactly what must not happen to a control over the whole node.
-    'aimeat_mcp_registry_list',
-    'aimeat_mcp_registry_set',
-    // The CORS page's read and its one write: the same decision.
-    'aimeat_admin_cors_overview',
-    'aimeat_admin_cors_set',
-    // The Hooks page's read and its one write: the same decision again.
-    'aimeat_admin_hooks',
-    'aimeat_admin_hook_set',
-    // The Statistics page's read. Operator-gated in the handler like the rest of this block; there
-    // is nothing to narrow, because it is one read of counters the node keeps about itself.
-    'aimeat_admin_statistics',
-    // The Usage page's read: what AI costs here and whose money paid. Same gate, same reason.
-    'aimeat_admin_usage',
-    // The Knowledge page's read: the whole collection, its shape and its review trail. Operator-
-    // gated in the handler, and there is nothing to narrow — an operator either moderates this node
-    // or does not, and a scope word here would let a credential hold half of that.
-    'aimeat_admin_knowledge',
-    // The Federation page's read: the peers, what waits on a person, and the book. Operator-gated in
-    // the handler like the rest of this block, and there is nothing here to narrow — it is one read
-    // of what this node's own federation looks like from the inside.
-    'aimeat_admin_federation',
-    // Reading how a page is arranged, and the catalogue of blocks this node can serve. Gated in the
-    // handler on the operator, like the admin tools above it, and there is nothing here to narrow:
-    // a layout is a list of block names, and the front page's describes a page anyone can look at.
-    'aimeat_surface_layout_get',
+    // The node administration block (mint, SSO, account lifecycle, the second-factor reset, the
+    // Security, CORS, Hooks, Statistics, Usage, Knowledge and Federation pages, the MCP registry, and
+    // the layout read) stood here until 2026-09-24 with the reason "gated in the handler on the
+    // operator role; no scope word narrows an operator". The role was the ACCOUNT's, so every agent
+    // an operator connected was handed all of it (security audit A8-1). They are in TOOL_SCOPES now.
     'aimeat_agent_capabilities_report',              // Identity is resolved once from the session at agent-capabilities
     'aimeat_agent_telemetry_report',                 // Every write is keyed to `agentGaii` from the session closure (agent-telemetry
     'aimeat_capabilities_vouch',                     // gated in the handler on the operator role, not by a scope
@@ -255,14 +220,12 @@ export const TOOL_SCOPES: Record<string, string> = {
     // app:write, not app:read: the route behind every door is gated on the one app scope the
     // owner's checkboxes carry, and an agent that may manage an app may read its log.
     aimeat_app_audit:                         'app:write',
-    // The line above states the rule and this line broke it until 2026-09-04. `app:read` is not a
-    // word the owner is offered — the app domain carries write and manage — so no owner could grant
-    // it, and the surface is filtered by the words the owner ticked: aimeat_seo_status was invisible
-    // to every agent on every node since it was added. Found by check:scope-parity, which asks the
-    // vocabulary and the demands whether they are the same list.
-    aimeat_seo_status:                        'app:write',
-    // The same word as the status it acts on; the route behind it is operator-gated on top.
-    aimeat_seo_announce:                      'app:write',
+    // The node's discovery status and the announcement to search engines. Both refuse everyone but
+    // the operator in their handler, so the word is the operator's (security audit A8-1): on app:write,
+    // which every Full-access agent holds, any agent of the operator could tell the search engines
+    // about the whole node.
+    aimeat_seo_status:                        'operator:admin',
+    aimeat_seo_announce:                      'operator:admin',
     aimeat_image_generate:                    'ai:use',
     aimeat_voice_reply:                       'ai:use',
     aimeat_voice_speak:                       'ai:use',
@@ -396,6 +359,38 @@ export const TOOL_SCOPES: Record<string, string> = {
     aimeat_admin_organism_ownership:          'operator:organism-repair',
     aimeat_admin_organism_owner_add:          'operator:organism-repair',
 
+    // Node administration through an agent (security audit A8-1). Each handler asks the account role
+    // first and this word second, through services/owner-lifecycle.ts resolveOperatorAgentName(). No
+    // wildcard carries it and nobody was grandfathered onto it, so an operator's agent holds it only
+    // by an explicit tick. The operator in person uses the HTTP admin doors, which are unchanged.
+    aimeat_admin_stats:                       'operator:admin',
+    aimeat_admin_agents:                      'operator:admin',
+    aimeat_admin_config:                      'operator:admin',
+    aimeat_admin_mint:                        'operator:admin',
+    aimeat_admin_sso_list:                    'operator:admin',
+    aimeat_admin_sso_get:                     'operator:admin',
+    aimeat_admin_sso_create:                  'operator:admin',
+    aimeat_admin_sso_update:                  'operator:admin',
+    aimeat_admin_sso_delete:                  'operator:admin',
+    aimeat_admin_sso_idp_metadata:            'operator:admin',
+    aimeat_admin_sso_scim_token:              'operator:admin',
+    aimeat_admin_owner_disable:               'operator:admin',
+    aimeat_admin_owner_enable:                'operator:admin',
+    aimeat_admin_totp_reset:                  'operator:admin',
+    aimeat_admin_security_overview:           'operator:admin',
+    aimeat_admin_incident_resolve:            'operator:admin',
+    aimeat_admin_cors_overview:               'operator:admin',
+    aimeat_admin_cors_set:                    'operator:admin',
+    aimeat_admin_hooks:                       'operator:admin',
+    aimeat_admin_hook_set:                    'operator:admin',
+    aimeat_admin_statistics:                  'operator:admin',
+    aimeat_admin_usage:                       'operator:admin',
+    aimeat_admin_knowledge:                   'operator:admin',
+    aimeat_admin_federation:                  'operator:admin',
+    // What this node's own MCP registry offers every owner, to whom, and at what price.
+    aimeat_mcp_registry_list:                 'operator:admin',
+    aimeat_mcp_registry_set:                  'operator:admin',
+
     // The node-wide compliance report and the register behind it. The handler resolves the caller's
     // OWNER and refuses a non-operator, so the word alone gets nobody in; it is here as well because
     // a tool is REGISTERED according to this table, and neither word is carried by any wildcard
@@ -413,9 +408,10 @@ export const TOOL_SCOPES: Record<string, string> = {
 
     // Stores a file, or takes one back — the same permission over the same namespace.
     aimeat_portfolio_publish:                 'storage:write',
-    // Arranging the node's pages. The write word is one no wildcard carries, because what it
-    // changes is what everyone sees on arrival. The read half is in SCOPE_EXEMPT_TOOLS with its
-    // reason: it is gated on the operator in the handler, and no scope word narrows an operator.
+    // Arranging the node's pages. The word is one no wildcard carries, because what it changes is
+    // what everyone sees on arrival. The read takes the same word: it carries the block vocabulary
+    // the write needs, and it was open to every agent of the operator on the account role alone.
+    aimeat_surface_layout_get:                'site:layout-write',
     aimeat_surface_layout_set:                'site:layout-write',
     // Making the node's themes: the look of every page. The same kind of word as the layout's, no
     // wildcard carries it, and the handler also asks whether the account runs this node.
@@ -650,9 +646,7 @@ export const TOOL_SCOPES: Record<string, string> = {
     aimeat_mcp_authorize: 'mcp:manage',
     // The LIST is mcp:read: knowing which agent was narrowed to what is knowing what you have,
     // and an app showing a person their own permissions must not need the word that CHANGES them.
-    // aimeat_mcp_registry_list / _set are NOT here: they self-gate at runtime on the OWNER
-    // record's operator role, the way every other operator tool does. A scope word cannot say
-    // "the operator in person", and one that could would be grantable to an agent.
+    // aimeat_mcp_registry_list / _set ride operator:admin, with the rest of node administration.
     aimeat_mcp_grant_list: 'mcp:read',
     aimeat_mcp_grant_set: 'mcp:manage',
     aimeat_mcp_grant_revoke: 'mcp:manage',

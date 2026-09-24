@@ -30,6 +30,9 @@
  * @structure registerMcpProxyTools(mcp, storage, config, agentGaii, scopes)
  * @usage registerMcpProxyTools(mcp, storage, config, () => agentGaii, scopes);
  * @version-history
+ *   v1.3.0 — 2026-09-24 — SECURITY (audit A8-1): the registry pair asks the operator:admin word as
+ *     well as the account (services/owner-lifecycle.ts resolveOperatorAgentName). The account alone
+ *     let any agent of the operator switch a node-wide server off for everybody.
  *   v1.2.0 — 2026-09-24 — Takes the session's scopes, and aimeat_mcp_call hands them to the
  *     chokepoint, which no longer reads a missing list as mcp:use.
  *   v1.1.0 — 2026-09-24 — aimeat_mcp_update, aimeat_mcp_authorize and aimeat_mcp_detach resolve the
@@ -56,7 +59,7 @@ import {
   listMcpGrants, putMcpGrant, removeMcpGrant, type McpGrant,
 } from '../services/mcp-client/grants.js';
 import { emitChange } from '../services/event-bus.js';
-import { resolveOperatorName } from '../services/owner-lifecycle.js';
+import { resolveOperatorAgentName, OPERATOR_AGENT_REFUSAL } from '../services/owner-lifecycle.js';
 import {
   toPublicMcpServer, type McpTransport, type McpServerCredential,
 } from '../models/mcp-server-schemas.js';
@@ -68,7 +71,8 @@ export function registerMcpProxyTools(
   storage: Storage,
   config: AimeatConfig,
   getAgentGaii: () => string,
-  /** What this session holds. aimeat_mcp_call hands it to the chokepoint, which assumes nothing. */
+  /** What this session holds. aimeat_mcp_call hands it to the chokepoint, which assumes nothing, and
+   *  the registry pair asks operator:admin of it at call time. */
   scopes: string[],
 ): void {
   const ok = (obj: unknown): TextResult => ({ content: [{ type: 'text', text: JSON.stringify(obj, null, 2) }] });
@@ -281,17 +285,18 @@ export function registerMcpProxyTools(
 
   // ── The operator's registry ──
   //
-  // Self-gated at runtime on the OWNER record's operator role, the way every other operator tool
-  // here does it (core-admin.ts). Not a scope word: an operator's own agent holding mcp:manage must
-  // not be able to attach a server to the whole node in their name, and a scope cannot express
-  // "this principal is the operator in person".
+  // Asked at runtime of the OWNER record's operator role AND of the operator:admin word, the way
+  // every other operator tool asks it (services/owner-lifecycle.ts resolveOperatorAgentName). The
+  // word is not mcp:manage: an operator's agent that may attach a server to its owner's account must
+  // not thereby control what the whole node offers, and the role alone armed every agent the
+  // operator connected (security audit A8-1).
 
   mcp.tool('aimeat_mcp_registry_list', descriptionFor('aimeat_mcp_registry_list'),
     {},
     annotationsFor('aimeat_mcp_registry_list'),
     async (): Promise<TextResult> => {
-      const operator = await resolveOperatorName(storage, getAgentGaii());
-      if (!operator) return fail('Only whoever runs this node can see its registry.');
+      const operator = await resolveOperatorAgentName(storage, getAgentGaii(), scopes);
+      if (!operator) return fail(OPERATOR_AGENT_REFUSAL);
       const servers = await listNodeServers(storage);
       return ok({
         servers: servers.map((s) => ({
@@ -323,8 +328,8 @@ export function registerMcpProxyTools(
     },
     annotationsFor('aimeat_mcp_registry_set'),
     async ({ server, availability, allowlist, price, exposure, enabled }): Promise<TextResult> => {
-      const operator = await resolveOperatorName(storage, getAgentGaii());
-      if (!operator) return fail('Only whoever runs this node can change its registry.');
+      const operator = await resolveOperatorAgentName(storage, getAgentGaii(), scopes);
+      if (!operator) return fail(OPERATOR_AGENT_REFUSAL);
 
       const row = await findNodeServer(storage, server);
       if (!row) return fail(`This node offers no server called "${server}".`);
