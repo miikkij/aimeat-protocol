@@ -28,6 +28,9 @@
  *   const r = await readWorkspaceOp({ storage, config }, caller, { organismId, ws });
  *   if (!r.ok) return fail(r.message);
  * @version-history
+ *   v1.3.2 — 2026-09-24 — A draft's provenance record is stored only once the draft lands: built and
+ *     held before the write, stored by writeWorkspaceRecord's onLanded. It was stored before the
+ *     compare-and-swap, so every write that lost the swap left a record about bytes never stored.
  *   v1.3.1 — 2026-09-24 — A document's embedded files are scoped to the workspace right after its
  *     draft lands, no longer before the write loop (2c0639ff342e). The compare-and-swap inside that
  *     loop is a refusal too, so a write that lost it answered 409 VERSION_CONFLICT with nothing
@@ -52,7 +55,7 @@
  *     opened record, which is what a script needs to swap against.
  */
 import type { AimeatConfig } from '../config.js';
-import type { Storage, MemoryRecord } from '../storage/interface.js';
+import type { Storage, MemoryRecord, AiProvenanceRecordRow } from '../storage/interface.js';
 import { canWriteNamespaceRule, readOrganismConfig, createOrganismHelpers, fresherRec } from '../routes/organisms/shared.js';
 import { checkOrganismNamespaceAccess } from './organism-namespace-access.js';
 import { workspaceRowIndex } from './workspace-rows/row-service.js';
@@ -384,22 +387,30 @@ export async function writeWorkspaceDraftsOp(
             baseUrl: config.baseUrl,
             enabled: config.aiProvenance,
         };
+        // THE RECORD IS STORED ONLY IF THE DRAFT LANDS. The draft names the record's id, so the record
+        // is built and checked here, and held: writeWorkspaceRecord stores it once the draft has
+        // landed (onLanded). A write that loses the compare-and-swap below stores none, where it
+        // used to leave a record about bytes that were never stored; the store is append-only, so
+        // one written first could not have been taken back. A declaration the caller may not make
+        // still throws here, before anything is written.
+        const held: AiProvenanceRecordRow[] = [];
         const provenanceId = args.nodeStamp
             ? await stampAutonomousOutput(storage, {
                 principal: caller.principal, content: memoryContentBytes(v),
                 level: args.nodeStamp.level, method: args.nodeStamp.method, pipeline: args.pipeline,
-                ...provenanceSurface,
+                ...provenanceSurface, held,
             })
             : await provenanceForWrite(storage, {
                 principal: caller.principal, content: memoryContentBytes(v),
                 declaredId: args.aiProvenanceId, declared: args.aiProvenance, pipeline: args.pipeline,
-                ...provenanceSurface,
+                ...provenanceSurface, held,
             });
         lastProvenanceId = provenanceId ?? lastProvenanceId;
         const prev = await findWorkspaceRecord(storage, key);
         const outcome = await writeWorkspaceRecord({ storage, config }, {
             key, value: v, owner: caller.ownerGhii, prev, aiProvenanceId: provenanceId, principal: caller.principal,
             ...(args.ifVersion !== undefined ? { ifVersion: args.ifVersion } : {}),
+            onLanded: async () => { for (const row of held) await storage.createAiProvenance(row); },
         });
         if (!outcome.written) {
             return refuse(409, 'VERSION_CONFLICT',

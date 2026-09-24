@@ -37,6 +37,9 @@
  *   const prev = await findWorkspaceRecord(storage, key);
  *   await writeWorkspaceRecord({ storage, config }, { key, value, owner: ownerGhii, prev });
  * @version-history
+ *   v1.2.0 — 2026-09-24 — `onLanded`: what the caller stores only if the record lands, run after the
+ *     store took it and before the collapse and the fan-out. The workspace draft door stores the
+ *     draft's provenance record there, so a write that loses its compare-and-swap leaves none.
  *   v1.1.0 — 2026-09-02 — `ifVersion`: the write can be a compare-and-swap, and it reports whether it
  *     landed. In-place document edits (append, section replace) read, compute and write, and without
  *     this two sessions editing one spec would silently lose one of the two.
@@ -92,6 +95,13 @@ export interface WorkspaceRecordWrite {
      * happens between them.
      */
     ifVersion?: number | null;
+    /**
+     * What the caller stores ONLY IF this record lands: run once the store has taken it, before the
+     * fork collapse and before anything is told about the write, and never when a compare-and-swap
+     * refused it. The provenance record the value names by `aiProvenanceId` is the case it exists
+     * for: the store is append-only, so a record about bytes that never landed cannot be taken back.
+     */
+    onLanded?: () => Promise<void>;
 }
 
 /** What a write did. `written: false` means a compare-and-swap refused and nothing was stored. */
@@ -155,6 +165,8 @@ export async function writeWorkspaceRecord(
     } else {
         await storage.setMemory(record);
     }
+    // Landed: what the caller stores only if it did, before anything below reads or announces it.
+    if (input.onLanded) await input.onLanded();
 
     if (prev && prev.ownerGaii !== input.owner) await collapseKeyTo(storage, input.key, input.owner);
 
