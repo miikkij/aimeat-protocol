@@ -27,8 +27,10 @@
  * @structure DECISIONS — [{ id, counted, title, question, proposal: { variant, name, summary, text,
  *   tones?: [{ name, meaning, from }] }, variants: [{ id, name, code, look, where, becomes, files,
  *   keptAsIs, crop }], changes: [{ page, what }], choice }]
- * @usage import { DECISIONS } from './decisions-data.js';
+ *   BUILT — { [decisionId]: { commit, onMain, date, what, sets: [{ name, total, changed, noise }], note? } }
+ * @usage import { DECISIONS, BUILT } from './decisions-data.js';
  * @version-history
+ *   v3.3.0 — 2026-09-24 — BUILT: what was built from decisions 13-22, for the lab's "Built" section.
  *   v3.2.0 — 2026-09-24 — Dialog actions answered (Jouni: the proposal, and Save is the loud action).
  *   v3.1.0 — 2026-09-24 — The home's and the chat's remaining own looks (decisions 14-21, answered
  *     and written here as the source) and the dialog's footer actions (waiting for Jouni).
@@ -523,3 +525,52 @@ export const DECISIONS = [
     choice: {"proposal":"accepted","options":{},"note":"Accepted the proposal: Cancel the underlined action link, Confirm the slab, Delete the slab's danger tone. \"I was thinking that hopefully the save button is the action button in general way that all the action buttons then looks like that.\" Save and Confirm are the loud action, the dark block.","decidedAt":"2026-09-24","decidedBy":"Jouni"},
   },
 ];
+
+/**
+ * What was built from each decision (the plan's 06-design-lab.md item 4, "The built results"): the
+ * commit, whether it is on main, what changed in words, and every compared set of pictures: how many
+ * were taken and how many changed. A set's other pictures are unchanged (0.00 %), and each changed
+ * picture was checked to change only where the decided part is. `noise` counts the pictures of
+ * Access, Statistics and Overview that move under 0.2 % between two runs of the same code (their
+ * data is live). The before/after pictures themselves are files on the node that built them
+ * (/img/design-lab/built.json, outside the repo like the crops).
+ */
+const set = (name, total, changed, noise = 0) => ({ name, total, changed, noise });
+const HOME_CHAT = 'The home and the chat, every state, three widths, both modes';
+const OTHER = 'Other pages: settings & controls, admin, catalog, help, legal, front';
+const FORCED = 'Forced states: the install banner, a failed answer, a review waiting, menus opened, first steps';
+const LAB = 'The lab\'s own pictures';
+export const BUILT = {
+  'agent-step-wrapper': { commit: 'bb57e3bc0', onMain: true, date: '2026-09-24',
+    what: 'The agent step\'s name label and hint read in the body letters, and the name field is full width.',
+    sets: [set(HOME_CHAT, 150, 0), set(FORCED, 72, 6), set(OTHER, 126, 0, 14), set(LAB, 68, 0)] },
+  'panel-action': { commit: 'db8d69d95', onMain: true, date: '2026-09-24',
+    what: 'Every panel button is the underlined action link: open items\' copy and review buttons, Install, the playbook\'s copy, the setup guide\'s copies, Try again.',
+    sets: [set(HOME_CHAT, 150, 75), set(FORCED, 72, 54), set(OTHER, 126, 13, 18), set(LAB, 68, 2)] },
+  'step-state': { commit: '43e5d7c60', onMain: true, date: '2026-09-24',
+    what: 'In the first steps, a button that is not the next thing to do is the underlined action link, dimmed while it cannot be pressed.',
+    sets: [set(HOME_CHAT, 150, 0), set(FORCED, 72, 30), set(OTHER, 126, 0, 18), set(LAB, 68, 0)] },
+  dismiss: { commit: '69221fdf9', onMain: true, date: '2026-09-24',
+    what: '"Not now" on the phone suggestion and the install banner is a plain grey word.',
+    sets: [set(HOME_CHAT, 150, 64), set(FORCED, 72, 24), set(OTHER, 126, 0, 14), set(LAB, 68, 2)] },
+  'icon-button': { commit: '5e9ae299a', onMain: true, date: '2026-09-24',
+    what: 'Delete (✗), the card menu\'s dots and attach are the framed square; attach is dimmed while it cannot be used, as the microphone was.',
+    sets: [set(HOME_CHAT, 150, 120), set(FORCED, 72, 42), set(OTHER, 126, 6, 14), set(LAB, 68, 8)] },
+  choice: { commit: '66652c9bb', onMain: true, date: '2026-09-24',
+    what: 'The setup guide\'s tools and the start page switch are tabs; the background pattern tiles keep their look as the tile tone.',
+    sets: [set(HOME_CHAT, 150, 8), set(FORCED, 72, 24), set(OTHER, 126, 8, 14), set(LAB, 68, 4)] },
+  suggestion: { commit: '0a800370d', onMain: true, date: '2026-09-24',
+    what: 'The welcome\'s suggestions read as sentences, as the ones after an answer do.',
+    sets: [set(HOME_CHAT, 150, 10), set(FORCED, 72, 6), set(OTHER, 126, 0, 16), set(LAB, 68, 2)] },
+  'menu-row': { commit: 'b31c94c74', onMain: true, date: '2026-09-24',
+    what: 'A card\'s menu rows and the bell\'s actions read as the prompt card\'s menu rows.',
+    sets: [set(HOME_CHAT, 150, 0), set(FORCED, 72, 12), set(OTHER, 126, 0, 14), set(LAB, 68, 6)] },
+  'small-link': { commit: '5a287a9a3', onMain: true, date: '2026-09-24',
+    what: '"Use your own key", "Powered by goose", "Official instructions" and "Show older" are small coral underlined words; "What does that mean?" and the jump keep their looks as tones.',
+    sets: [set(HOME_CHAT, 150, 42), set(FORCED, 72, 36), set(OTHER, 126, 6, 14), set(LAB, 68, 10)] },
+  'dialog-actions': { commit: '350d5c91e', onMain: false, date: '2026-09-24',
+    what: 'In every dialog, the app catalog\'s too, a way out is the underlined action link, the one "do it" the dark block, and a delete the dark block\'s coral tone. The footers drew 10 different looks before and 3 after.',
+    sets: [set('Ten dialogs opened on their pages, whole and footer, two widths, both modes', 88, 88),
+      set(HOME_CHAT, 150, 0), set(FORCED, 72, 0), set(OTHER, 126, 1, 13)],
+    note: 'Every dialog picture changed in its footer row only. The one other page picture that changed is the settings landing on a phone, which differs by the same amount between two runs of the same code: it sometimes draws before its data arrives.' },
+};
