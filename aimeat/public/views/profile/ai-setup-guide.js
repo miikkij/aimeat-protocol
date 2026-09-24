@@ -14,6 +14,8 @@
  * @structure McpSetupGuide({ installClassName }) · InstructionsDialog({ open, onClose })
  * @usage import { McpSetupGuide, InstructionsDialog } from '/views/profile/ai-setup-guide.js';
  * @version-history
+ *   2026-09-24 -- The copy buttons (a field's Copy, Copy the command) are the underlined action link
+ *     (Jouni's decision "Panel action").
  *   2026-09-14 -- McpSetupGuide takes tabClass / activeClass for its tool tabs, so the agents page
  *     can hand in the shared poster tab instead of restyling .ast-tool from outside.
  *   2026-09-13 -- Pass the caller's shared install-row shape to McpInstallRow.
@@ -74,7 +76,7 @@ function Params({ params }) {
             <div class="ast-param-label">${prm.label}</div>
             <div class="ast-param-value">
               ${v
-                ? html`<code class="ast-code">${v}</code><${CopyButton} text=${v} className="btn-ghost btn-sm"
+                ? html`<code class="ast-code">${v}</code><${CopyButton} text=${v} className="poster-action"
                     label=${tr('common.copy', 'Copy')} copiedLabel=${tr('common.copied', 'Copied')} />`
                 : html`<span class="ast-param-empty">${tr('setup.leaveEmpty', 'leave empty')}</span>`}
             </div>
@@ -123,7 +125,7 @@ export function McpSetupGuide({ installClassName = '', tabClass, activeClass } =
       ${cmd ? html`
         <div class="ast-cmd">
           <pre class="ast-cmd-text">${cmd}</pre>
-          <${CopyButton} text=${cmd} className="btn-primary btn-sm"
+          <${CopyButton} text=${cmd} className="poster-action"
             label=${tr('setup.copyCmd', 'Copy the command')} copiedLabel=${tr('common.copied', 'Copied')} />
         </div>` : null}
 

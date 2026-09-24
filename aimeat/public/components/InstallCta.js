@@ -12,6 +12,7 @@
  * @structure InstallCta({ compact }) — compact drops the body line for tight surfaces (chat).
  * @usage import { InstallCta } from '/components/InstallCta.js';  html`<${InstallCta} />`
  * @version-history
+ *   v1.1.0 — 2026-09-24 — Install is the underlined action link (Jouni's decision "Panel action").
  *   v1.0.0 — 2026-08-16 — Initial: prompt-backed card + iOS hint + per-browser dismissal.
  */
 import { h } from 'preact';
@@ -55,7 +56,7 @@ export function InstallCta({ compact = false }) {
                 </span>`}
             </div>
             <div class="install-cta-actions">
-                ${offer && html`<button type="button" class="btn-primary install-cta-install"
+                ${offer && html`<button type="button" class="poster-action install-cta-install"
                     onClick=${install}>${tr('install.install', 'Install')}</button>`}
                 <button type="button" class="btn-ghost install-cta-dismiss"
                     onClick=${() => dismissInstall()}>${tr('install.notNow', 'Not now')}</button>
