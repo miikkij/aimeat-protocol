@@ -27,10 +27,12 @@
  *   words, the commit, every compared set in numbers and every before/after picture from
  *   /img/design-lab/built.json. A result not yet on main takes Jouni's yes there
  *   (`design-lab.built.<id>`). Results are shown here and nowhere else.
+ *   Work built without a decision (Themes & Styles) shows its Built part under the summary.
  * @structure DecisionsView (default) · Summary · DecisionDetail · BuiltPart · useBuiltYes ·
  *   ProposalPart · OptionPart · DetailsPart · Answer · useChoice · answersOf
  * @usage Mounted by views/admin/design-lab-tab.js (the Decisions switch).
  * @version-history
+ *   v4.2.0 — 2026-09-24 — Built work without a decision (Themes & Styles) under the summary.
  *   v4.1.0 — 2026-09-24 — "Built": what each built decision changed, its commit, its numbers and its
  *     before/after pictures, and the yes for a result not yet on main.
  *   v4.0.0 — 2026-09-23 — Rebuilt to Jouni's five points: the proposal with what it covers and two
@@ -55,7 +57,7 @@ import { FoldButton } from '/components/FoldButton.js';
 import { ActionRow } from '/components/ActionRow.js';
 import { ChooserFold } from '/components/Chooser.js';
 import { Specimens, Specimen, SpecimenImage } from '/components/Specimen.js';
-import { DECISIONS, BUILT } from '/views/design-lab/decisions-data.js';
+import { DECISIONS, BUILT, BUILT_WITHOUT_DECISION } from '/views/design-lab/decisions-data.js';
 import { plainDiff } from '/views/design-lab/plain-diff.js';
 
 const html = htm.bind(h);
@@ -327,5 +329,8 @@ export default function DecisionsView() {
   return html`
     <${Hint}>${tr('designLab.decisionsIntro', 'One decision per job the pages do in more than one way. Open one to see the proposal, what it covers and what would change, and answer the proposal and every option. You can change an answer at any time; nothing changes on the pages before you say so in chat.')}<//>
     <${BandNote}>${tr('designLab.decisionsCount', '{n} decisions, {w} waiting for you').replace('{n}', String(DECISIONS.length)).replace('{w}', String(waiting))}<//>
-    <${Summary} records=${records} onOpen=${setOpen} />`;
+    <${Summary} records=${records} onOpen=${setOpen} />
+    ${Object.entries(BUILT_WITHOUT_DECISION).map(([id, b]) => html`
+      <${BandNote} key=${'n' + id}>${t('designLab.builtWithout', { title: b.title })}<//>
+      <${BuiltPart} key=${id} decision=${{ id }} built=${b} pictures=${built?.[id]} />`)}`;
 }

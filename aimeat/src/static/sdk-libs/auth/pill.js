@@ -14,6 +14,8 @@
  *   container replaces the first.
  * @usage import { mountPill } from './pill.js';  (auth.mountLoginButton delegates here)
  * @version-history
+ *   v1.7.0 — 2026-09-24 — The pill re-draws on 'aimeat-look-change': on the node's own pages the picker
+ *     and the light/dark switch follow the theme the page wears (Themes & Styles).
  *   v1.6.0 — 2026-09-13 — onSession(session, { restored }), the developer's decision: called whenever a
  *     session appears while the pill is mounted, the restore on page load (restored: true) and a
  *     sign-in through its button or any other road (false), and for a session already live at mount
@@ -200,6 +202,9 @@ export function mountPill(auth, selector, opts = {}) {
   // The pill's own switch fires this, and so does an app that sets the language itself. Re-render so
   // the pill's labels follow the language it just changed rather than staying in the old one.
   window.addEventListener('aimeat-lang-change', render);
+  // The node's own pages change their look on a route or a choice (Themes & Styles): the picker's
+  // themes and styles, and whether light/dark stands down, follow it.
+  window.addEventListener('aimeat-look-change', render);
   // Close any open cluster popover (palette / language list) on an outside click or Escape.
   document.addEventListener('click', (ev) => {
     container.querySelectorAll('.aimeat-pop-wrap.aimeat-open').forEach((w) => {
@@ -257,6 +262,7 @@ export function mountPill(auth, selector, opts = {}) {
       auth.off('session-updated', render);
     }
     window.removeEventListener('aimeat-lang-change', render);
+    window.removeEventListener('aimeat-look-change', render);
   };
   // Silent SSO: on an app origin with no session yet, attempt the silent bridge ourselves. Always
   // re-confirm via the bridge on load (the cached session is only a UI cache); drop a stale cache.

@@ -277,6 +277,12 @@ const AI_PROVENANCE_REQUIRED = [
  * nothing to anyone. `app_draft_save` is the one deliberate content exception; the reason is on it.
  */
 const AI_PROVENANCE_REVIEWED_WITHOUT = [
+  // DECIDED, 2026-09-24 (the session that built Themes & Styles; the developer reviews it with the
+  // build). A style is CONFIGURATION of the node's own look: colour values, three font names from a
+  // fixed list, a mode, and a name the look picker shows as a label beside a colour chip. Nobody reads
+  // it as authored prose, so "who wrote what I am reading" has no reader to answer. Who changed a
+  // theme is kept where it matters, on the theme itself (updatedBy, and every earlier version).
+  'aimeat_theme_style_save',
   // DECIDED, 2026-09-16. `title` and `description` on a remote MCP server are a LABEL on a settings
   // row, not authored content. They name a machine the owner attached, so that a list of servers
   // reads as something other than a column of slugs, and the only person they are ever shown to is

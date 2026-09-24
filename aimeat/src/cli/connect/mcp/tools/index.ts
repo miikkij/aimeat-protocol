@@ -14,7 +14,7 @@
  *   v2.1.0 -- 2026-09-06 -- Register the secrets-vault tools, so a desktop client can store the key
  *     an integration needs instead of the person pasting it into the chat.
  *   v2.2.0 -- 2026-09-23 -- Register the component catalogue tools (aimeat_ui_component_list/get).
- *   v2.3.0 -- 2026-09-24 -- Register the theme tools (aimeat_theme_list/get/save).
+ *   v2.3.0 -- 2026-09-24 -- Register the theme tools (aimeat_theme_list/get/save/style_save/component_css_set).
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { AgentRegistry } from '../../agent-registry.js';

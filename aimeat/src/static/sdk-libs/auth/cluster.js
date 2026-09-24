@@ -11,6 +11,8 @@
  * @structure ensureClusterStyles() — idempotent <style> injector.
  * @usage import { ensureClusterStyles } from './cluster.js';   (pill.js calls it once per render)
  * @version-history
+ *   v1.3.0 — 2026-09-24 — `.aimeat-pop-head`: the name of a group in the popover, for the themes
+ *     and the styles of the node's own pages (Themes & Styles).
  *   v1.2.0 — 2026-09-05 — `.aimeat-seg--fixed` and the disabled segment: how a control that has
  *     stood down looks, for the light/dark switch on a page that keeps its own palette.
  *   v1.1.1 — 2026-08-29 — The pressed segment reads --aimeat-ink / --aimeat-paper (defined on the pill's
@@ -70,6 +72,11 @@ export function ensureClusterStyles() {
       'padding:8px;width:max-content;max-width:calc(100vw - 24px)}',
     '.aimeat-pop-wrap.aimeat-open .aimeat-pop{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px}',
     '.aimeat-pop.aimeat-pop-list{grid-template-columns:minmax(0,1fr)}',
+    /* A group's name inside the popover (the node's themes above the theme's styles). */
+    '.aimeat-pop-head{grid-column:1/-1;padding:6px 9px 2px;font:800 10px/1.2 "Inter","Segoe UI",system-ui,sans-serif;',
+      'letter-spacing:.06em;text-transform:uppercase;opacity:.7}',
+    /* A sentence in the popover (why the light/dark switch is off): plain words, not a group name. */
+    '.aimeat-pop-note{grid-column:1/-1;padding:4px 9px 6px;font:600 12px/1.35 "Inter","Segoe UI",system-ui,sans-serif}',
     '.aimeat-pop button{appearance:none;display:flex;align-items:center;gap:8px;padding:7px 9px;margin:0;',
       'background:transparent;border:1px solid transparent;border-radius:calc(var(--radius-box,14px) - 6px);',
       'cursor:pointer;color:inherit;font:600 12px/1.1 "Inter","Segoe UI",system-ui,sans-serif;text-align:left;',

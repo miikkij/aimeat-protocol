@@ -20,6 +20,7 @@
  *   import { scopeAllowsTool } from '../catalog/scopes.js';
  *   if (scopeAllowsTool(agentScopes, 'aimeat_memory_write')) mcp.tool(...)
  * @version-history
+ *   v1.24.0 -- 2026-09-24 -- aimeat_theme_style_save and aimeat_theme_component_css_set → site:theme-write.
  *   v1.23.0 -- 2026-09-24 -- aimeat_theme_save → site:theme-write (Themes & Styles).
  *   v1.22.1 -- 2026-09-13 -- aimeat_board_rules_set → social:write, the word PATCH /v1/boards/:id/rules asks.
  *   v1.22.0 -- 2026-09-13 -- aimeat_dm_archive_as_owner and aimeat_dm_organize_as_owner →
@@ -418,6 +419,8 @@ export const TOOL_SCOPES: Record<string, string> = {
     // Making the node's themes: the look of every page. The same kind of word as the layout's, no
     // wildcard carries it, and the handler also asks whether the account runs this node.
     aimeat_theme_save:                        'site:theme-write',
+    aimeat_theme_style_save:                  'site:theme-write',
+    aimeat_theme_component_css_set:           'site:theme-write',
     aimeat_storage_upload:                    'storage:write',
     aimeat_storage_delete:                    'storage:write',
 

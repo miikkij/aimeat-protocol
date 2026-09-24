@@ -9,6 +9,8 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   v1.54.0 -- 2026-09-24 -- Add e2e-themes.ts to ALL_SUITES: Themes & Styles (a theme, a style,
+ *            component CSS, warnings, the operator-only writes). Not in the guard tier.
  *   v1.53.1 -- 2026-09-13 -- Add e2e-memory-discover.ts to ALL_SUITES: the cross-user public read a
  *            shared feed is built on (AIMEAT.data.discover), with two accounts. Not in the guard tier.
  *   v1.53.0 -- 2026-09-13 -- Add e2e-inbox-organize.ts to ALL_SUITES: the Messages list's sections,
@@ -255,6 +257,7 @@ const ALL_SUITES = [
     'test/e2e-app-ui.ts',
     'test/e2e-designbook.ts',
     'test/e2e-ui-components.ts',
+    'test/e2e-themes.ts',
     'test/e2e-app-fork.ts',
     'test/e2e-app-marks.ts',
     'test/e2e-app-legal.ts',

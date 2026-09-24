@@ -13,6 +13,8 @@
  * @structure DesignLabTab (default: the library / decisions switch) · Library · Overview · PartDetail
  * @usage Mounted by the admin dashboard tab router (views/admin.js), group Design.
  * @version-history
+ *   v1.3.0 — 2026-09-24 — The preview wears any theme and style of this server, offered or not (R16):
+ *     a theme and style picker above the library, passed to every frame as `look=` and `style=`.
  *   v1.2.0 — 2026-09-23 — The agent step's wrapper is a decision in the decisions view, not a panel
  *     under the Unused filter: the filter's count and its content agree.
  *   v1.1.0 — 2026-09-23 — The decisions view beside the library (views/admin/design-lab-decisions.js).
@@ -23,6 +25,7 @@ import { useEffect, useMemo, useState } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { apiGet } from '/js/api.js';
+import { swallowed } from '/js/swallowed.js';
 import { Band, BandNote } from '/components/Band.js';
 import { NamedRow } from '/components/NamedRow.js';
 import { PageIntro } from '/components/PageIntro.js';
@@ -34,13 +37,34 @@ import { BackLink } from '/components/BackLink.js';
 import { QuietNote } from '/components/QuietNote.js';
 import { ErrorNote } from '/components/ErrorNote.js';
 import { Specimens, Specimen } from '/components/Specimen.js';
+import { Choice } from './themes-bits.js';
 import { DEMOS } from '/views/design-lab/demos.js';
 import DecisionsView from './design-lab-decisions.js';
 
 const html = htm.bind(h);
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 
-const frameSrc = (id, v, theme) => `/v1/design-lab/frame?id=${encodeURIComponent(id)}&v=${v}&theme=${theme}`;
+/** A part's frame, in the theme and style the lab's picker chose (none: the page's own look). */
+const frameSrc = (id, v, theme, look) => `/v1/design-lab/frame?id=${encodeURIComponent(id)}&v=${v}&theme=${theme}`
+  + (look?.theme ? `&look=${encodeURIComponent(look.theme)}&style=${encodeURIComponent(look.style || '')}` : '');
+
+/**
+ * Every theme and every style of this server, offered to people or not (R16): the frames below wear
+ * the one chosen. The AIMEAT theme in its AIMEAT style is the lab as it always looked.
+ */
+function LookPicker({ look, onChange }) {
+  const [themes, setThemes] = useState(/** @type {any[]} */ ([]));
+  useEffect(() => { apiGet('/v1/themes/all?summary=1').then((r) => setThemes(r.data.themes)).catch((e) => { swallowed('design-lab: themes', e); setThemes([]); }); }, []);
+  const theme = themes.find((th) => th.id === look.theme) || themes[0];
+  if (!theme) return null;
+  return html`
+    <${Choice} label=${t('designLab.lookTheme')} hint=${t('designLab.lookThemeHint')} value=${theme.id}
+      choices=${themes.map((th) => ({ value: th.id, label: th.name }))}
+      onChoose=${(id) => { const th = themes.find((x) => x.id === id); onChange({ theme: id, style: th?.defaultStyle }); }} />
+    <${Choice} label=${t('designLab.lookStyle')} hint=${t('designLab.lookStyleHint')} value=${look.style || theme.defaultStyle}
+      choices=${theme.styles.map((s) => ({ value: s.id, label: s.name }))}
+      onChoose=${(id) => onChange({ theme: theme.id, style: id })} />`;
+}
 
 /** Which rows a filter keeps. */
 const FILTERS = {
@@ -59,7 +83,7 @@ function pageName(p) {
   return known[p] ?? p.replace(/^views\//, '').replace(/\.js$/, '');
 }
 
-function Overview({ entries, onOpen }) {
+function Overview({ entries, onOpen, look }) {
   const [filter, setFilter] = useState('all');
   const [q, setQ] = useState('');
   const words = q.toLowerCase().split(/\s+/).filter(Boolean);
@@ -86,12 +110,12 @@ function Overview({ entries, onOpen }) {
           ${shown.map((e) => html`
             <${Specimen} key=${e.id}
               label=${html`<button type="button" class="poster-action" onClick=${() => onOpen(e.id)}>${spaced(e.name)}${e.status === 'unused' ? ' · ' + tr('designLab.unused', 'unused') : ''}</button>`}
-              src=${frameSrc(e.id, 0, 'light')}
+              src=${frameSrc(e.id, 0, 'light', look)}
               note=${e.summary} />`)}
         <//>`}`;
 }
 
-function PartDetail({ id, onBack }) {
+function PartDetail({ id, onBack, look }) {
   const [entry, setEntry] = useState(/** @type {any} */ (null));
   const [error, setError] = useState('');
   useEffect(() => {
@@ -113,15 +137,15 @@ function PartDetail({ id, onBack }) {
     ${variants.map((v, i) => html`
       <${Band} key=${i} title=${v.name} tight=${true}>
         <${Specimens}>
-          <${Specimen} label=${tr('designLab.light', 'Light')} src=${frameSrc(id, i, 'light')} />
-          <${Specimen} label=${tr('designLab.dark', 'Dark')} src=${frameSrc(id, i, 'dark')} />
+          <${Specimen} label=${tr('designLab.light', 'Light')} src=${frameSrc(id, i, 'light', look)} />
+          <${Specimen} label=${tr('designLab.dark', 'Dark')} src=${frameSrc(id, i, 'dark', look)} />
         <//>
       <//>`)}
 
     <${Band} title=${tr('designLab.phone', 'On a phone')} tight=${true}>
       <${Specimens}>
-        <${Specimen} phone=${true} label=${(variants[0]?.name ?? '') + ' · ' + tr('designLab.light', 'Light')} src=${frameSrc(id, 0, 'light')} />
-        <${Specimen} phone=${true} label=${(variants[0]?.name ?? '') + ' · ' + tr('designLab.dark', 'Dark')} src=${frameSrc(id, 0, 'dark')} />
+        <${Specimen} phone=${true} label=${(variants[0]?.name ?? '') + ' · ' + tr('designLab.light', 'Light')} src=${frameSrc(id, 0, 'light', look)} />
+        <${Specimen} phone=${true} label=${(variants[0]?.name ?? '') + ' · ' + tr('designLab.dark', 'Dark')} src=${frameSrc(id, 0, 'dark', look)} />
       <//>
     <//>
 
@@ -143,6 +167,7 @@ function Library() {
   const [entries, setEntries] = useState(/** @type {any[]|null} */ (null));
   const [error, setError] = useState('');
   const [open, setOpen] = useState(/** @type {string|null} */ (null));
+  const [look, setLook] = useState({ theme: 'aimeat', style: 'aimeat' });
 
   useEffect(() => {
     apiGet('/v1/ui/components')
@@ -153,9 +178,11 @@ function Library() {
   const sorted = useMemo(() => entries ?? [], [entries]);
   if (error) return html`<${ErrorNote} text=${error} />`;
   if (!entries) return html`<${QuietNote}>…<//>`;
-  return open
-    ? html`<${PartDetail} id=${open} onBack=${() => setOpen(null)} />`
-    : html`<${Overview} entries=${sorted} onOpen=${setOpen} />`;
+  return html`
+    <${LookPicker} look=${look} onChange=${setLook} />
+    ${open
+      ? html`<${PartDetail} key=${look.theme + look.style} id=${open} onBack=${() => setOpen(null)} look=${look} />`
+      : html`<${Overview} key=${look.theme + look.style} entries=${sorted} onOpen=${setOpen} look=${look} />`}`;
 }
 
 export default function DesignLabTab() {

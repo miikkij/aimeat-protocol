@@ -8,6 +8,7 @@
  * @structure uiLibraryTools
  * @usage import { uiLibraryTools } from './ui-library.js';
  * @version-history
+ *   v1.1.0 — 2026-09-24 — aimeat_ui_component_get names the themes that carry CSS for the part.
  *   v1.0.0 — 2026-09-23 — Initial (UI consolidation phase 1).
  */
 import type { AimeatToolDefinition } from './types.js';
@@ -26,7 +27,7 @@ export const uiLibraryTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_ui_component_get',
-        description: "Read one part of this node's own web interface whole: its data shape and every field, when to use it, its variants and the class or prop that selects each, one example data set, the theme tokens its stylesheet reads, the names its module exports, and the files and pages that use it. `id` is the id from aimeat_ui_component_list (for example 'step-card' or 'slab') or the component name ('StepCard').",
+        description: "Read one part of this node's own web interface whole: its data shape and every field, when to use it, its variants and the class or prop that selects each, one example data set, the theme tokens its stylesheet reads, the names its module exports, the files and pages that use it, and the themes of this node that carry CSS for it (with whether that CSS is served; aimeat_theme_component_css_set changes it). `id` is the id from aimeat_ui_component_list (for example 'step-card' or 'slab') or the component name ('StepCard').",
         caller: 'agent',
         visibility: { publicMcp: true, connectorMcp: true, cliFallback: true },
         input: {

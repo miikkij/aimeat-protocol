@@ -260,6 +260,15 @@
     }
   }
   var FIXED_LIGHT = "fixed";
+  function styleOnlyMode() {
+    try {
+      var m = document.querySelector('meta[name="aimeat-light"][data-look]');
+      var v = m && m.getAttribute("data-look");
+      return v === "light" || v === "dark" ? v : null;
+    } catch {
+      return null;
+    }
+  }
   function aimeatFixedLight() {
     try {
       var m = document.querySelector('meta[name="aimeat-light"]');
@@ -275,6 +284,11 @@
     var dark = i.darkMode || "Dark mode";
     var fixed = aimeatFixedLight();
     var why = i.fixedRegister || "This register keeps its own light";
+    var only = styleOnlyMode();
+    if (only) {
+      cur = only;
+      why = only === "light" ? i.styleLightOnly || "This style has a light mode only" : i.styleDarkOnly || "This style has a dark mode only";
+    }
     var seg = fixed ? ' class="aimeat-seg aimeat-seg--fixed" title="' + escHtml(why) + '" aria-label="' + escHtml(why) + '"' : ' class="aimeat-seg" aria-label="' + escHtml(i.themeLabel || "Theme") + '"';
     var off2 = fixed ? ' disabled aria-disabled="true" title="' + escHtml(why) + '"' : "";
     return '<span id="aimeat-mode-switch" role="group"' + seg + '><button type="button" data-mode="light" aria-pressed="' + (cur === "light") + '"' + (fixed ? off2 : ' title="' + escHtml(light) + '"') + ' aria-label="' + escHtml(fixed ? why : light) + '"><span class="seg-ico" aria-hidden="true">☀</span></button><button type="button" data-mode="dark" aria-pressed="' + (cur === "dark") + '"' + (fixed ? off2 : ' title="' + escHtml(dark) + '"') + ' aria-label="' + escHtml(fixed ? why : dark) + '"><span class="seg-ico" aria-hidden="true">☾</span></button></span>';
@@ -419,6 +433,11 @@
       "padding:8px;width:max-content;max-width:calc(100vw - 24px)}",
       ".aimeat-pop-wrap.aimeat-open .aimeat-pop{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px}",
       ".aimeat-pop.aimeat-pop-list{grid-template-columns:minmax(0,1fr)}",
+      /* A group's name inside the popover (the node's themes above the theme's styles). */
+      '.aimeat-pop-head{grid-column:1/-1;padding:6px 9px 2px;font:800 10px/1.2 "Inter","Segoe UI",system-ui,sans-serif;',
+      "letter-spacing:.06em;text-transform:uppercase;opacity:.7}",
+      /* A sentence in the popover (why the light/dark switch is off): plain words, not a group name. */
+      '.aimeat-pop-note{grid-column:1/-1;padding:4px 9px 6px;font:600 12px/1.35 "Inter","Segoe UI",system-ui,sans-serif}',
       ".aimeat-pop button{appearance:none;display:flex;align-items:center;gap:8px;padding:7px 9px;margin:0;",
       "background:transparent;border:1px solid transparent;border-radius:calc(var(--radius-box,14px) - 6px);",
       'cursor:pointer;color:inherit;font:600 12px/1.1 "Inter","Segoe UI",system-ui,sans-serif;text-align:left;',
@@ -573,8 +592,12 @@
       manageAccess: "Manage permissions",
       lightMode: "Light mode",
       darkMode: "Dark mode",
-      themeLabel: "Theme",
+      themeLabel: "Light or dark",
       fixedRegister: "This register keeps its own light",
+      styleLightOnly: "This style has a light mode only",
+      styleDarkOnly: "This style has a dark mode only",
+      lookThemes: "Themes",
+      lookStyles: "Styles",
       chooseLook: "Choose look",
       switchLanguage: "Language",
       pageSettings: "Settings"
@@ -588,8 +611,12 @@
       manageAccess: "Hallitse oikeuksia",
       lightMode: "Vaalea tila",
       darkMode: "Tumma tila",
-      themeLabel: "Teema",
+      themeLabel: "Vaalea vai tumma",
       fixedRegister: "Tämä rekisteri pitää oman valonsa",
+      styleLightOnly: "Tällä tyylillä on vain vaalea tila",
+      styleDarkOnly: "Tällä tyylillä on vain tumma tila",
+      lookThemes: "Teemat",
+      lookStyles: "Tyylit",
       chooseLook: "Valitse tyyli",
       switchLanguage: "Kieli",
       pageSettings: "Asetukset"
@@ -603,8 +630,12 @@
       manageAccess: "Gestionar permisos",
       lightMode: "Modo claro",
       darkMode: "Modo oscuro",
-      themeLabel: "Tema",
+      themeLabel: "Claro u oscuro",
       fixedRegister: "Este registro conserva su propia luz",
+      styleLightOnly: "Este estilo solo tiene modo claro",
+      styleDarkOnly: "Este estilo solo tiene modo oscuro",
+      lookThemes: "Temas",
+      lookStyles: "Estilos",
       chooseLook: "Elige el aspecto",
       switchLanguage: "Idioma",
       pageSettings: "Ajustes"
@@ -647,28 +678,38 @@
     } }
   ];
   var HOUSE = "aimeat";
-  function nodeThemes() {
+  function look() {
     try {
-      var T = (
+      var L = (
         /** @type {any} */
-        window.__AIMEAT_THEMES
+        window.__aimeatLook
       );
-      return T && T.policy && T.themes && T.themes.length ? T : null;
+      return L && typeof L.state === "function" ? L : null;
     } catch {
       return null;
     }
   }
+  function innerState() {
+    var L = look();
+    var s = L ? L.state() : null;
+    return s && s.inner ? s : null;
+  }
+  function currentTheme(s) {
+    for (var i = 0; i < s.themes.length; i++) if (s.themes[i].id === s.theme) return s.themes[i];
+    return s.themes[0] || null;
+  }
   function paletteRegistry() {
-    var T = nodeThemes();
-    if (!T) return PALETTES;
-    return T.themes.map(function(t) {
-      return { id: t.id, label: t.name, swatch: t.swatch };
+    var s = innerState();
+    var th = s ? currentTheme(s) : null;
+    if (!th) return PALETTES;
+    return th.styles.map(function(x) {
+      return { id: x.id, label: x.name, swatch: x.swatch };
     });
   }
   function aimeatReadPalette() {
-    var T = nodeThemes();
-    if (T && !T.policy.personalChoice) return T.policy.fixed;
-    var ids = paletteRegistry().map(function(p) {
+    var L = look();
+    if (L) return L.state().style || HOUSE;
+    var ids = PALETTES.map(function(p) {
       return p.id;
     });
     try {
@@ -682,10 +723,14 @@
     } catch {
     }
     var attr = document.documentElement.getAttribute("data-palette");
-    if (attr && ids.indexOf(attr) >= 0) return attr;
-    return T && ids.indexOf(T.policy.default) >= 0 ? T.policy.default : PALETTES[0].id;
+    return attr && ids.indexOf(attr) >= 0 ? attr : PALETTES[0].id;
   }
   function aimeatApplyPalette(id) {
+    var L = look();
+    if (L) {
+      L.choose(null, id);
+      return;
+    }
     if (id === HOUSE) document.documentElement.removeAttribute("data-palette");
     else document.documentElement.setAttribute("data-palette", id);
     try {
@@ -698,19 +743,29 @@
     }
   }
   function aimeatRestorePalette() {
-    var cur = aimeatReadPalette();
-    if (cur !== HOUSE) document.documentElement.setAttribute("data-palette", cur);
-    else document.documentElement.removeAttribute("data-palette");
+    var L = look();
+    if (!L) {
+      var cur = aimeatReadPalette();
+      if (cur !== HOUSE) document.documentElement.setAttribute("data-palette", cur);
+      else document.documentElement.removeAttribute("data-palette");
+    }
     try {
       window.addEventListener("storage", function(e) {
-        if (e.key === AIMEAT_PALETTE_KEY && e.newValue) aimeatApplyPalette(e.newValue);
+        if (e.key !== AIMEAT_PALETTE_KEY && e.key !== "aimeat-look-theme") return;
+        var LL = look();
+        if (LL) LL.apply(location.pathname);
+        else if (e.key === AIMEAT_PALETTE_KEY && e.newValue) aimeatApplyPalette(e.newValue);
       });
     } catch {
     }
   }
+  function chipHtml(sw) {
+    return '<span class="aimeat-pal-chip" style="background:' + esc(sw.bg) + '"><span class="pc-card" style="background:' + esc(sw.card) + '"></span><span class="pc-acc" style="background:' + esc(sw.accent) + '"></span></span>';
+  }
+  var reopen = null;
   function paletteControlHtml(i) {
-    var T = nodeThemes();
-    if (T && !T.policy.personalChoice) return "";
+    var s = innerState();
+    if (s && !s.personalChoice) return "";
     var list = paletteRegistry();
     var cur = aimeatReadPalette();
     var mode = document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
@@ -718,9 +773,17 @@
       return p.id === cur;
     }) || list[0]).swatch[mode].accent;
     var label = i && i.chooseLook || "Choose look";
-    return '<span id="aimeat-palette-switch" class="aimeat-pop-wrap"><button type="button" class="aimeat-pop-btn" aria-haspopup="listbox" aria-expanded="false" title="' + esc(label) + '" aria-label="' + esc(label) + '"><span class="aimeat-pal-dot" style="background:' + esc(curAcc) + '"></span></button><span class="aimeat-pop" role="listbox">' + list.map(function(p) {
-      var s = p.swatch[mode];
-      return '<button type="button" role="option" data-palette="' + esc(p.id) + '" aria-pressed="' + (p.id === cur) + '"><span class="aimeat-pal-chip" style="background:' + esc(s.bg) + '"><span class="pc-card" style="background:' + esc(s.card) + '"></span><span class="pc-acc" style="background:' + esc(s.accent) + '"></span></span>' + esc(p.label) + "</button>";
+    var themes = s && s.themes.length > 1 ? s.themes : null;
+    var head = function(text) {
+      return '<span class="aimeat-pop-head">' + esc(text) + "</span>";
+    };
+    return '<span id="aimeat-palette-switch" class="aimeat-pop-wrap"><button type="button" class="aimeat-pop-btn" aria-haspopup="listbox" aria-expanded="false" title="' + esc(label) + '" aria-label="' + esc(label) + '"><span class="aimeat-pal-dot" style="background:' + esc(curAcc) + '"></span></button><span class="aimeat-pop" role="listbox">' + (s && s.only ? '<span class="aimeat-pop-note">' + esc(s.only === "light" ? i && i.styleLightOnly || "This style has a light mode only" : i && i.styleDarkOnly || "This style has a dark mode only") + "</span>" : "") + (themes ? head(i && i.lookThemes || "Themes") + themes.map(function(t) {
+      var def = t.styles.find(function(x) {
+        return x.id === t.defaultStyle;
+      }) || t.styles[0];
+      return '<button type="button" role="option" data-look-theme="' + esc(t.id) + '" aria-label="' + esc(t.name) + '" aria-pressed="' + (t.id === s.theme) + '">' + (def ? chipHtml(def.swatch[mode]) : "") + esc(t.name) + "</button>";
+    }).join("") + head(i && i.lookStyles || "Styles") : "") + list.map(function(p) {
+      return '<button type="button" role="option" data-palette="' + esc(p.id) + '" aria-label="' + esc(p.label) + '" aria-pressed="' + (p.id === cur) + '">' + chipHtml(p.swatch[mode]) + esc(p.label) + "</button>";
     }).join("") + "</span></span>";
   }
   function wirePaletteControl(container, clampPopover2) {
@@ -731,6 +794,14 @@
       root.querySelector(".aimeat-pop-btn")
     );
     var list = paletteRegistry();
+    function open() {
+      root.classList.add("aimeat-open");
+      trigger.setAttribute("aria-expanded", "true");
+      clampPopover2(
+        /** @type {HTMLElement} */
+        root.querySelector(".aimeat-pop")
+      );
+    }
     function syncDot() {
       var cur = aimeatReadPalette();
       var mode = document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
@@ -774,15 +845,34 @@
         trigger.setAttribute("aria-expanded", "false");
       });
     });
+    root.querySelectorAll("button[data-look-theme]").forEach(function(b) {
+      b.addEventListener("click", function() {
+        var L = look();
+        if (!L) return;
+        reopen = { compact: !!container.querySelector(".aimeat-auth-wrap.aimeat-open") };
+        L.choose(b.getAttribute("data-look-theme"), null);
+      });
+    });
     trigger.addEventListener("click", function(ev) {
       ev.stopPropagation();
-      var open = root.classList.toggle("aimeat-open");
-      trigger.setAttribute("aria-expanded", String(open));
-      if (open) clampPopover2(
-        /** @type {HTMLElement} */
-        root.querySelector(".aimeat-pop")
-      );
+      if (root.classList.contains("aimeat-open")) {
+        root.classList.remove("aimeat-open");
+        trigger.setAttribute("aria-expanded", "false");
+      } else open();
     });
+    if (reopen) {
+      var again = reopen;
+      reopen = null;
+      setTimeout(function() {
+        var wrap = container.querySelector(".aimeat-auth-wrap");
+        if (again.compact && wrap) {
+          wrap.classList.add("aimeat-open");
+          var cb = wrap.querySelector(".aimeat-auth-compact");
+          if (cb) cb.setAttribute("aria-expanded", "true");
+        }
+        if (root.isConnected) open();
+      }, 0);
+    }
     window.addEventListener("aimeat-palette-change", syncDot);
     window.addEventListener("aimeat-theme-change", syncDot);
   }
@@ -942,6 +1032,7 @@
     ensureClusterStyles();
     render();
     window.addEventListener("aimeat-lang-change", render);
+    window.addEventListener("aimeat-look-change", render);
     document.addEventListener("click", (ev) => {
       container.querySelectorAll(".aimeat-pop-wrap.aimeat-open").forEach((w) => {
         if (!w.contains(
@@ -998,6 +1089,7 @@
         auth2.off("session-updated", render);
       }
       window.removeEventListener("aimeat-lang-change", render);
+      window.removeEventListener("aimeat-look-change", render);
     };
     if (isAppOrigin() && !auth2.getSession()) {
       restoreSessionFromAppOrigin(false).then((s) => {
@@ -3200,5 +3292,5 @@
     aimeatRestoreMode();
   }
   var ns = attach("auth", auth);
-  ns.version = "2026-07-25-002";
+  ns.version = "2026-09-24-001";
 })();

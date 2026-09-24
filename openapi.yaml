@@ -26495,6 +26495,7 @@ paths:
                                 sheet: { type: string }
                                 shape: { type: string, description: The call, as a person would write it }
                                 pages: { type: array, items: { type: string } }
+                                use: { type: array, items: { type: string }, description: What a person does with the part, in fixed words. }
                           total: { type: integer }
         '400':
           $ref: '#/components/responses/BadRequest'
@@ -26562,6 +26563,14 @@ paths:
                           exports: { type: array, items: { type: string } }
                           usedBy: { type: array, items: { type: string } }
                           pages: { type: array, items: { type: string } }
+                          themes:
+                            type: array
+                            description: The themes of this node that carry component CSS for the part, and whether it is served.
+                            items:
+                              type: object
+                              properties:
+                                theme: { type: string }
+                                status: { type: string, enum: [served, stale, removed, broken, empty] }
         '404':
           $ref: '#/components/responses/NotFound'
 
@@ -36806,14 +36815,16 @@ paths:
   /v1/themes:
     get:
       operationId: getOfferedThemes
-      summary: The themes the pill offers, and the operator's choices
+      summary: The themes the look picker offers, and who chooses
       description: |
-        Themes & Styles. What a person can choose in the pill (each theme's name and the three
-        colours its chip shows per mode), and the operator's choices: whether people choose
-        their own theme, the one theme for everybody when they do not, which themes are
-        offered and the default. `stylesheet` is the address of the node's own themes as CSS,
-        stamped so a change is fetched at once. No authentication required: the page reads
-        this before anyone has signed in, and a theme is CSS every visitor downloads anyway.
+        Themes & Styles. A theme holds styles; a style is a set of colours in light and dark, three
+        faces and a mode. This answers what a page needs before its first paint: the operator's
+        choices (whether people choose, which themes are available, the default theme), the
+        available themes with their offered styles and each style's chip colours, the address of
+        each theme's own stylesheet (stamped with its hash; null for the built-in theme), the
+        pages the themes reach (`inner`), and the built-in style ids. The SPA shell writes the same
+        answer into the page as `window.__AIMEAT_THEMES`. No authentication: a theme is CSS every
+        visitor downloads anyway.
       tags: [Site]
       security: []
       responses:
@@ -36829,18 +36840,34 @@ paths:
                       data:
                         type: object
                         properties:
-                          policy: { $ref: '#/components/schemas/ThemePolicy' }
-                          themes: { type: array, items: { $ref: '#/components/schemas/OfferedTheme' } }
-                          stylesheet: { type: string, description: 'Address of /v1/themes.css with its stamp.' }
+                          policy:
+                            type: object
+                            properties:
+                              personalChoice: { type: boolean }
+                              offered: { type: array, items: { type: string } }
+                              default: { type: string }
+                          themes:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id: { type: string }
+                                name: { type: string }
+                                builtin: { type: boolean }
+                                defaultStyle: { type: string }
+                                sheet: { type: string, nullable: true }
+                                styles: { type: array, items: { type: object, additionalProperties: true } }
+                          inner: { type: array, items: { type: string } }
+                          builtin: { type: array, items: { type: string } }
     post:
       operationId: createTheme
-      summary: Make a new theme, or a copy of one
+      summary: Make a new theme, a copy of another
       description: |
-        Operator only (requireOperatorPrincipal with site:theme-write, so the operator's own
-        agent can make a theme from a chat). The new theme starts as a copy of `basedOn`
-        (default `aimeat`) and takes what is sent over it. Everything is checked before it is
-        saved: token names and values, faces (only faces the node serves), the theme CSS
-        (component hooks only) and contrast in both modes. A refusal names every problem.
+        Operator only (requireOperatorPrincipal with site:theme-write, so the operator's own agent
+        can make a theme from a chat). The new theme is a copy of `basedOn` (default `aimeat`): its
+        styles under new ids, its component CSS, its theme CSS, its default and offered styles. The
+        theme's own fields may come in the same call; a style id there may name the copied style by
+        its old id (`paper`).
       tags: [Site]
       security:
         - BearerAuth: []
@@ -36848,10 +36875,18 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/ThemeInput' }
+            schema:
+              type: object
+              properties:
+                name: { type: string, maxLength: 60 }
+                basedOn: { type: string, description: "The theme it copies (default 'aimeat')." }
+                css: { type: string, nullable: true }
+                defaultStyle: { type: string }
+                offeredStyles: { type: array, items: { type: string } }
+                retired: { type: boolean }
       responses:
         '201':
-          description: The theme as stored
+          description: The theme as stored, and its warnings
           content:
             application/json:
               schema:
@@ -36859,7 +36894,11 @@ paths:
                   - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
-                      data: { type: object, properties: { theme: { $ref: '#/components/schemas/Theme' } } }
+                      data:
+                        type: object
+                        properties:
+                          theme: { type: object, additionalProperties: true }
+                          warnings: { type: object, additionalProperties: true }
         '403':
           description: Not the node operator, or the principal does not carry `site:theme-write`
         '404':
@@ -36867,37 +36906,19 @@ paths:
         '409':
           description: This copy only mirrors the main site (load-balancer mode)
         '422':
-          description: INVALID_THEME or CONTRAST, with every reason in `error.details`
-
-  /v1/themes.css:
-    get:
-      operationId: getThemesStylesheet
-      summary: The node's own themes as one stylesheet
-      description: |
-        Every custom theme that is not retired, as CSS on `html[data-palette='<id>']` (light) and
-        `…[data-theme='dark']` (dark), plus each theme's hook rules. The built-in palettes are
-        /lib/aimeat-theme.css. Answers 304 to a matching If-None-Match. No authentication.
-      tags: [Site]
-      security: []
-      responses:
-        '200':
-          description: The stylesheet
-          content:
-            text/css:
-              schema: { type: string }
-        '304':
-          description: Unchanged since the ETag the browser holds
+          description: INVALID_THEME (the name)
 
   /v1/themes/all:
     get:
       operationId: listAllThemes
-      summary: Every theme with its values, and what a theme may set
+      summary: Every theme whole, its warnings, and what a theme may set
       description: |
-        Every theme, built-in and the node's own (retired ones too), each with its full light
-        and dark values, faces, theme CSS and contrast lines; the operator's choices; and the
-        vocabulary: the tokens a theme may set, the faces the node serves and each component's
-        hooks. `summary=1` gives each theme only its core colours and failing contrast lines.
-        No authentication: other admins read what only the operator may change.
+        Every theme, built-in and the node's own (retired ones too): its styles with every colour
+        in light and dark, each style's chip colours and the contrast lines it misses, its
+        component CSS and whether each is served (served, stale, removed, broken), its theme CSS
+        warnings; the operator's choices; and what a style may set (the colour tokens, the faces
+        the node serves, each component's hooks). `summary=1` gives each style its core colours
+        only. No authentication: other admins read what only the operator may change.
       tags: [Site]
       security: []
       parameters:
@@ -36918,21 +36939,21 @@ paths:
                       data:
                         type: object
                         properties:
-                          policy: { $ref: '#/components/schemas/ThemePolicy' }
+                          policy: { type: object, additionalProperties: true }
                           themes: { type: array, items: { type: object, additionalProperties: true } }
                           vocabulary: { type: object, additionalProperties: true }
 
   /v1/themes/choice:
     get:
       operationId: getMyThemeChoice
-      summary: A person's own theme choice
-      description: The theme the signed-in person chose (null before they choose), saved to their account so it follows them to every device. A person's own session only.
+      summary: A person's own look
+      description: The theme and style the signed-in person chose (null before they choose), kept on their account so it follows them to every device. A person's own session only.
       tags: [Site]
       security:
         - BearerAuth: []
       responses:
         '200':
-          description: The choice, whether people may choose, and the default
+          description: The choice, whether people may choose, and the default theme
           content:
             application/json:
               schema:
@@ -36944,12 +36965,13 @@ paths:
                         type: object
                         properties:
                           theme: { type: string, nullable: true }
+                          style: { type: string, nullable: true }
                           personalChoice: { type: boolean }
                           default: { type: string }
     put:
       operationId: setMyThemeChoice
-      summary: Save a person's theme choice to their account
-      description: Refused with FIXED when the operator shows one theme to everybody, and NOT_OFFERED for a theme the pill does not offer.
+      summary: Keep a person's look on their account
+      description: Refused with FIXED when the operator decides the look for everybody, and NOT_OFFERED for a theme or a style the look picker does not offer. Without `style`, the theme's default style.
       tags: [Site]
       security:
         - BearerAuth: []
@@ -36961,7 +36983,8 @@ paths:
               type: object
               required: [theme]
               properties:
-                theme: { type: string, description: 'A theme id the pill offers.' }
+                theme: { type: string, description: 'A theme id the look picker offers.' }
+                style: { type: string, description: 'A style of that theme the look picker offers.' }
       responses:
         '200':
           description: Saved
@@ -36972,22 +36995,24 @@ paths:
                   - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
-                      data: { type: object, properties: { theme: { type: string } } }
+                      data: { type: object, properties: { theme: { type: string }, style: { type: string } } }
         '400':
           description: No theme id
         '409':
-          description: FIXED, the operator shows one theme to everybody
+          description: FIXED, the operator decides the look for everybody
         '422':
           description: NOT_OFFERED
 
-  /v1/themes/check:
+  /v1/themes/preview:
     post:
-      operationId: checkThemeDraft
-      summary: Check a theme draft without saving it
+      operationId: previewThemeDraft
+      summary: A draft theme's stylesheet and warnings, saved nowhere
       description: |
-        Operator only. Runs every check a save runs and answers `ok` with the contrast lines and
-        the stylesheet the draft would be, or `ok: false` with the code (INVALID_THEME,
-        CONTRAST), the message and the details. Send `id` to check an edit of that theme.
+        Operator only. Themes & Styles' live frames: the editor sends the theme as it holds it
+        (styles, component CSS, theme CSS, unsaved changes included) and gets the stylesheet it
+        would be, every warning (contrast lines, CSS that can hide a control, motion, literal
+        colours, faces, selectors outside their component, CSS that does not parse) and the style
+        values that were refused. Nothing is stored.
       tags: [Site]
       security:
         - BearerAuth: []
@@ -36996,14 +37021,12 @@ paths:
         content:
           application/json:
             schema:
-              allOf:
-                - $ref: '#/components/schemas/ThemeInput'
-                - type: object
-                  properties:
-                    id: { type: string }
+              type: object
+              properties:
+                theme: { type: object, additionalProperties: true }
       responses:
         '200':
-          description: The verdict
+          description: The stylesheet and the warnings
           content:
             application/json:
               schema:
@@ -37011,7 +37034,12 @@ paths:
                   - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
-                      data: { type: object, additionalProperties: true }
+                      data:
+                        type: object
+                        properties:
+                          stylesheet: { type: string }
+                          warnings: { type: object, additionalProperties: true }
+                          refused: { type: array, items: { type: string } }
         '403':
           description: Not the node operator, or the principal does not carry `site:theme-write`
 
@@ -37023,8 +37051,8 @@ paths:
         schema: { type: string }
     get:
       operationId: getTheme
-      summary: One theme whole
-      description: Every value in light and dark, faces, theme CSS, one mode or both, retired or not, what it was copied from, and its contrast lines. No authentication.
+      summary: One theme whole, its warnings and its saved versions
+      description: Its styles, component CSS, theme CSS, default and offered styles, retired or not, what it was copied from, every warning it carries, and the versions it was saved as. No authentication.
       tags: [Site]
       security: []
       responses:
@@ -37037,27 +37065,44 @@ paths:
                   - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
-                      data: { type: object, properties: { theme: { $ref: '#/components/schemas/Theme' } } }
+                      data:
+                        type: object
+                        properties:
+                          theme: { type: object, additionalProperties: true }
+                          warnings: { type: object, additionalProperties: true }
+                          versions: { type: array, items: { type: object, additionalProperties: true } }
         '404':
           description: No such theme
     put:
       operationId: updateTheme
-      summary: Edit, retire or bring back one of the node's themes
+      summary: Change, retire or bring back one of the node's themes
       description: |
-        Operator only. Send only what changes; `retired: true` takes the theme out of the pill
-        without deleting it. A built-in theme is read only (READ_ONLY): copy it with POST
-        /v1/themes and `basedOn`.
+        Operator only. Send only what changes: `name`; `css`, the theme CSS (any CSS, null or empty
+        removes it; refused only when it does not parse, CSS_DOES_NOT_PARSE with the line);
+        `defaultStyle` and `offeredStyles` (style ids of this theme); `retired: true` takes the
+        theme out of the look picker without deleting it. `dryRun: true` checks and saves nothing.
+        Every save keeps the version before it. A built-in theme is read only (READ_ONLY): copy it.
       tags: [Site]
       security:
         - BearerAuth: []
+      parameters:
+        - { name: dryRun, in: query, required: false, schema: { type: string, enum: ['1'] } }
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/ThemeInput' }
+            schema:
+              type: object
+              properties:
+                name: { type: string, maxLength: 60 }
+                css: { type: string, nullable: true }
+                defaultStyle: { type: string }
+                offeredStyles: { type: array, items: { type: string } }
+                retired: { type: boolean }
+                dryRun: { type: boolean }
       responses:
         '200':
-          description: The theme as stored
+          description: The theme and its warnings
           content:
             application/json:
               schema:
@@ -37065,7 +37110,11 @@ paths:
                   - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
-                      data: { type: object, properties: { theme: { $ref: '#/components/schemas/Theme' } } }
+                      data:
+                        type: object
+                        properties:
+                          theme: { type: object, additionalProperties: true }
+                          warnings: { type: object, additionalProperties: true }
         '403':
           description: Not the node operator, or the principal does not carry `site:theme-write`
         '404':
@@ -37073,7 +37122,255 @@ paths:
         '409':
           description: READ_ONLY (a built-in), or load-balancer mode
         '422':
-          description: INVALID_THEME or CONTRAST, with every reason in `error.details`
+          description: CSS_DOES_NOT_PARSE or INVALID_THEME
+
+  /v1/themes/{id}/theme.css:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      operationId: getThemeStylesheet
+      summary: One theme's own stylesheet
+      description: |
+        The theme's styles as CSS on `html[data-palette='<style id>']` (light) and
+        `…[data-theme='dark']` (dark), its component CSS that is served, and its theme CSS when it
+        parses. A page wearing the theme links this sheet and no other theme's. The built-in theme
+        and a retired theme serve a comment only. Answers 304 to a matching If-None-Match.
+      tags: [Site]
+      security: []
+      responses:
+        '200':
+          description: The stylesheet
+          content:
+            text/css:
+              schema: { type: string }
+        '304':
+          description: Unchanged since the ETag the browser holds
+        '404':
+          description: No such theme
+
+  /v1/themes/{id}/styles:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    post:
+      operationId: createThemeStyle
+      summary: A new style in a theme
+      description: |
+        Operator only. A copy of `basedOn` (a style of the theme; its default style when left
+        out) with what is sent over it: `name`, `light` and `dark` (token → colour, only what
+        changes), `faces` ({ headline, body, mono }, faces the node serves), `onlyMode` ('light',
+        'dark' or empty). A value that does not parse is refused (INVALID_STYLE); a contrast line
+        under its minimum is a warning. `dryRun: true` checks and saves nothing.
+      tags: [Site]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string, maxLength: 60 }
+                basedOn: { type: string }
+                light: { type: object, additionalProperties: { type: string } }
+                dark: { type: object, additionalProperties: { type: string } }
+                faces: { type: object, additionalProperties: { type: string } }
+                onlyMode: { type: string, nullable: true }
+                retired: { type: boolean }
+                dryRun: { type: boolean }
+      responses:
+        '201':
+          description: The theme, the style and the warnings
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          theme: { type: object, additionalProperties: true }
+                          style: { type: object, additionalProperties: true }
+                          warnings: { type: object, additionalProperties: true }
+        '403':
+          description: Not the node operator, or the principal does not carry `site:theme-write`
+        '404':
+          description: No such theme
+        '409':
+          description: READ_ONLY (a built-in theme)
+        '422':
+          description: INVALID_STYLE, with every reason in `error.details`
+
+  /v1/themes/{id}/styles/{styleId}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string } }
+      - { name: styleId, in: path, required: true, schema: { type: string } }
+    put:
+      operationId: updateThemeStyle
+      summary: Change a style of a theme
+      description: Operator only. The same fields as a new style, without `basedOn`; `retired` takes the style out of the look picker. Contrast is a warning.
+      tags: [Site]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string, maxLength: 60 }
+                light: { type: object, additionalProperties: { type: string } }
+                dark: { type: object, additionalProperties: { type: string } }
+                faces: { type: object, additionalProperties: { type: string } }
+                onlyMode: { type: string, nullable: true }
+                retired: { type: boolean }
+                dryRun: { type: boolean }
+      responses:
+        '200':
+          description: The theme, the style and the warnings
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data: { type: object, additionalProperties: true }
+        '403':
+          description: Not the node operator, or the principal does not carry `site:theme-write`
+        '404':
+          description: No such theme or style
+        '409':
+          description: READ_ONLY (a built-in theme)
+        '422':
+          description: INVALID_STYLE
+
+  /v1/themes/{id}/components/{componentId}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string } }
+      - { name: componentId, in: path, required: true, schema: { type: string } }
+    put:
+      operationId: setThemeComponentCss
+      summary: Component CSS for one component in one theme
+      description: |
+        Operator only. Any CSS; refused only when it does not parse (CSS_DOES_NOT_PARSE with the
+        line). The answer says whether it is served and every warning: a selector outside the
+        component's classes, something that can hide a control, motion without a reduced-motion
+        guard, a literal colour, a face the node does not serve. Empty or null removes it.
+        `dryRun: true` checks and saves nothing.
+      tags: [Site]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                css: { type: string, nullable: true }
+                dryRun: { type: boolean }
+      responses:
+        '200':
+          description: The theme and the state of this component's CSS
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          theme: { type: object, additionalProperties: true }
+                          state: { type: object, additionalProperties: true }
+        '400':
+          description: css is not text
+        '403':
+          description: Not the node operator, or the principal does not carry `site:theme-write`
+        '404':
+          description: No such theme, or no such component
+        '409':
+          description: READ_ONLY (a built-in theme)
+        '422':
+          description: CSS_DOES_NOT_PARSE
+
+  /v1/themes/{id}/versions:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string } }
+    get:
+      operationId: listThemeVersions
+      summary: The versions a theme was saved as
+      description: Operator only. Newest first; the current version is not in the list.
+      tags: [Site]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: The versions
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          versions:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                version: { type: integer }
+                                at: { type: string }
+                                name: { type: string }
+        '403':
+          description: Not the node operator
+        '404':
+          description: No such theme
+
+  /v1/themes/{id}/versions/{version}/restore:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string } }
+      - { name: version, in: path, required: true, schema: { type: integer } }
+    post:
+      operationId: restoreThemeVersion
+      summary: Put back a saved version of a theme
+      description: Operator only. "Back to the version of <date>". The version it replaces is kept too, so this can be undone.
+      tags: [Site]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: The theme as put back, and its warnings
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data: { type: object, additionalProperties: true }
+        '400':
+          description: version is not a whole number
+        '403':
+          description: Not the node operator, or the principal does not carry `site:theme-write`
+        '404':
+          description: No such theme or version
+        '409':
+          description: READ_ONLY (a built-in theme)
 
   /v1/site/header-nav:
     get:

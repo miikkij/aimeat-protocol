@@ -46,7 +46,6 @@
  *   v2.0.1 — 2026-09-12 — getProfile()'s docblock stops promising the email. GET /v1/ghii/me now
  *     renders its account-security half only for the person and their own agents, so a caller
  *     running as a published app reads four of those fields as absent rather than null.
- *   v2.1.0 — 2026-09-24 — getPalette() and setPalette(), for a person's theme kept on their account.
  */
 
 /* eslint-disable aimeat/no-direct-auth -- THIS is the module the rule points everything else to;
@@ -75,18 +74,6 @@ export function getSession() {
 /** Check if a session is active. @returns {boolean} */
 export function hasSession() {
   return getSession() !== null;
-}
-
-/** The theme on the page (the auth lib's palette axis), or null before the lib has loaded. */
-export function getPalette() {
-  const a = lib();
-  return a && typeof a.getPalette === 'function' ? a.getPalette() : null;
-}
-
-/** Put a theme on the page and keep it in the browser, as the pill does. */
-export function setPalette(id) {
-  const a = lib();
-  if (a && typeof a.setPalette === 'function') a.setPalette(id);
 }
 
 /** Get owner name from session. @returns {string|null} */

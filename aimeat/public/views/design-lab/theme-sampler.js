@@ -9,10 +9,13 @@
  * @structure THEME_SAMPLER — a lab-only demo (`theme:sampler`)
  * @usage import { THEME_SAMPLER } from './theme-sampler.js';  demoFor('theme:sampler')
  * @version-history
+ *   v1.1.0 — 2026-09-24 — The tabs and the actions are the ModeTabs and ActionRow parts, as on a page.
  *   v1.0.0 — 2026-09-24 — Initial (UI consolidation phase 4, Themes & Styles).
  */
 import { h } from 'preact';
 import htm from 'htm';
+import { ModeTabs, ModeTab } from '/components/ModeTabs.js';
+import { ActionRow } from '/components/ActionRow.js';
 
 const html = htm.bind(h);
 const noop = () => {};
@@ -28,20 +31,20 @@ export const THEME_SAMPLER = {
               <div class="poster-row poster-row--thing"><strong>Pick the junior designer</strong><br /><span class="text-meta">Yours · in 19 hours</span></div>
               <div class="poster-row"><strong>Send the August invoice</strong><br /><span class="text-meta">Yours · tomorrow</span></div>
             </div>
-            <div role="tablist">
-              <button type="button" class="poster-tab is-on" onClick=${noop}>Overview</button>
-              <button type="button" class="poster-tab" onClick=${noop}>Tasks</button>
-              <button type="button" class="poster-tab" onClick=${noop}>Files</button>
-            </div>
+            <${ModeTabs}>
+              <${ModeTab} on=${true} onClick=${noop}>Overview<//>
+              <${ModeTab} on=${false} onClick=${noop}>Tasks<//>
+              <${ModeTab} on=${false} onClick=${noop}>Files<//>
+            <//>
             <div class="poster-box">
               <p>Words on a card read as they do on the page. <a href="#" onClick=${(e) => e.preventDefault()}>A link</a> takes the accent.</p>
               <p class="text-meta">Quiet words say when and whose.</p>
             </div>
-            <p>
+            <${ActionRow}>
               <button type="button" class="poster-action" onClick=${noop}>Cancel</button>
               <button type="button" class="poster-slab poster-slab--control" onClick=${noop}>Save</button>
               <button type="button" class="poster-slab poster-slab--control poster-slab--danger" onClick=${noop}>Delete</button>
-            </p>
+            <//>
           </div>`,
     }],
 };
