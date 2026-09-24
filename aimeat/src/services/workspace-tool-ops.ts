@@ -28,6 +28,10 @@
  *   const r = await readWorkspaceOp({ storage, config }, caller, { organismId, ws });
  *   if (!r.ok) return fail(r.message);
  * @version-history
+ *   v1.3.1 — 2026-09-24 — A document's embedded files are scoped to the workspace right after its
+ *     draft lands, no longer before the write loop (2c0639ff342e). The compare-and-swap inside that
+ *     loop is a refusal too, so a write that lost it answered 409 VERSION_CONFLICT with nothing
+ *     written and the files already readable by every member.
  *   v1.3.0 — 2026-09-19 — A batch-open takes a record's FULL memory key as well as its instance id.
  *     aimeat_discover names a workspace record by its key, and a cold agent handed that to `ids`
  *     in three measured runs of three: it was answered `missing`, read the index and asked again,
@@ -363,13 +367,11 @@ export async function writeWorkspaceDraftsOp(
     const overLimit = await checkWorkspaceWriteLimits(storage, config, caller.ownerGhii, planned, i => (batch ? `items[${i}]: ` : ''));
     if (overLimit) return refuse(413, 'LIMIT_EXCEEDED', overLimit);
 
-    // Past every refusal, so now the embedded files may be opened to the workspace's members. Above
-    // this line a batch's second item could still send the whole call back 422, 409 or 413 with the
-    // first item's images already readable and nothing written.
-    for (const { v, item } of planned) {
-        if (item.isDoc) await scopeDocImagesToWorkspace(storage, config, v, caller.ownerName, `${organismId}/${ws}`);
-    }
-
+    // The embedded files are opened to the workspace's members in the loop below, each document's
+    // right after ITS write has landed, and never before. Above this line a batch's second item
+    // could still send the whole call back 422, 409 or 413; and the compare-and-swap inside the loop
+    // is a refusal too, so a write that lost it answered 409 with the images already readable and
+    // nothing written (2c0639ff342e).
     const written: Record<string, unknown>[] = [];
     let lastProvenanceId: string | undefined;
     for (const { key, v, item } of planned) {
@@ -404,6 +406,8 @@ export async function writeWorkspaceDraftsOp(
                 `Draft at ${key} is at version ${outcome.version}, not ${args.ifVersion ?? 'absent'}; nothing was written. Read it again and retry.`,
                 { version: outcome.version });
         }
+        // The draft landed, so its embedded files may now be opened to the workspace's members.
+        if (item.isDoc) await scopeDocImagesToWorkspace(storage, config, v, caller.ownerName, `${organismId}/${ws}`);
         if (item.isDoc && item.section) {
             const secKey = `${root}.meta.sections.${item.space}`;
             const secRec = await findWorkspaceRecord(storage, secKey);

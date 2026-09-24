@@ -21,6 +21,9 @@
  *   each test with `// HOLE:`. Two tests (no declaration, scheduled run) assert a GUARD the old tree
  *   satisfied trivially, and say so.
  * @version-history
+ *   v1.1.0 — 2026-09-24 — A document write that loses its compare-and-swap opens none of its
+ *     embedded files to the workspace (2c0639ff342e); the write that lands does. Failed on the old
+ *     code first.
  *   v1.0.0 — 2026-09-05 — Initial.
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=extension-workspace
@@ -110,6 +113,10 @@ const SCRIPTS = {
         var w = await ctx.workspace.writeDoc(input.org, input.ws, 'handoff', { title: 'Hand-off', markdown: '# Hand-off\\n\\nport 12345 is yours' });
         var pub = await ctx.workspace.publish(input.org, input.ws, 'shared.handoff', w.id);
         return { written: w, pub: pub };
+    }`,
+    // A document written under a compare-and-swap, with whatever markdown the caller sends.
+    docv: `export default async function(ctx, input){
+        return ctx.workspace.write(input.org, input.ws, 'handoff', input.id, { title: 'Versioned hand-off', markdown: input.markdown }, { ifVersion: input.ifVersion });
     }`,
     // A script that CATCHES the refusal sees the service's code and words.
     catchit: `export default async function(ctx, input){
@@ -307,6 +314,30 @@ await test('ifVersion: 0 creates, a second 0 is refused (409 VERSION_CONFLICT) a
     const third = await invoke(EXT, 'claim', bAgentToken, { id: 'c2', port: 'p-third', ifVersion: 1 });
     assert(third.status === 200 && third.body.data.written?.version === 2, `third ${third.status}: ${JSON.stringify(third.body?.error ?? third.body.data.written)}`);
     assert(third.body.data.got.items[0]._draftVersion === 2, `draft version after the swap: ${JSON.stringify(third.body.data.got.items[0])}`);
+});
+
+// REFUSE BEFORE YOU WRITE (2c0639ff342e). Opening a document's embedded files to the workspace's
+// members is a write, and it ran before the compare-and-swap: a write that lost the swap answered
+// 409 VERSION_CONFLICT, nothing written, with the file already readable by every member.
+await test('ifVersion on a document: a write that loses the swap opens none of its embedded files', async () => {
+    const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+    const key = `img/ews-cas-${Date.now()}.png`;
+    const up = await json('/v1/storage', { method: 'POST', headers: auth(B.token), body: JSON.stringify({ key, data: PNG, mime_type: 'image/png', visibility: 'private' }) });
+    assert(up.status === 201, `upload ${up.status}: ${JSON.stringify(up.body?.error)}`);
+    const visibility = async () => (await fetch(`${BASE}/v1/storage/${key}`, { method: 'HEAD', headers: auth(B.token) })).headers.get('x-aimeat-visibility');
+    assert(await visibility() === 'private', 'the file starts private');
+    const embed = `# Second\n\n![x](/v1/storage/${key})`;
+
+    const first = await invoke(EXT, 'docv', bAgentToken, { id: 'd-cas', markdown: '# First', ifVersion: 0 });
+    assert(first.status === 200 && first.body.data?.version === 1, `first ${first.status}: ${JSON.stringify(first.body?.error ?? first.body?.data)}`);
+    const lost = await invoke(EXT, 'docv', bAgentToken, { id: 'd-cas', markdown: embed, ifVersion: 0 });
+    assert(lost.status === 409 && lost.body?.error?.code === 'VERSION_CONFLICT', `lost ${lost.status}: ${JSON.stringify(lost.body?.error)}`);
+    assert(await visibility() === 'private', `a write that lost the swap opened the file: ${await visibility()}`);
+
+    // The write that lands is the one that opens it to the members.
+    const won = await invoke(EXT, 'docv', bAgentToken, { id: 'd-cas', markdown: embed, ifVersion: 1 });
+    assert(won.status === 200 && won.body.data?.version === 2, `won ${won.status}: ${JSON.stringify(won.body?.error ?? won.body?.data)}`);
+    assert(await visibility() !== 'private', 'the write that landed scoped the file to the workspace');
 });
 
 await test('Documents: writeDoc files a draft document with a generated id, and it publishes', async () => {
