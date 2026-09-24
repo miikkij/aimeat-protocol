@@ -6,6 +6,9 @@
  *   backward-compat invariant: an unguarded namespace behaves exactly as before.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=write-guards
  * @version-history
+ *   v1.2.0 — 2026-09-24 — Restore asks what delete asks (A6-12): a record binned while its space was
+ *     free is not put back once the space is append-only (409), and a member who left the organism
+ *     puts nothing back into it (403). Both failed on the old code first (200).
  *   v1.1.0 — 2026-08-26 — Surface layouts: who may write the page every visitor and every member
  *     lands on. Here rather than in e2e-surface-layout because it is a namespace-write boundary,
  *     and because two of these are only interesting in the blocking tier — a non-operator refused
@@ -247,6 +250,55 @@ async function run() {
       // for the policy read to get wrong. Recorded rather than skipped silently.
       console.log(`     (the namespace rule refused the forked manifest with ${forked.status} — guard unreachable by this route)`);
     }
+  });
+
+  // A6-12. Putting a record back out of the bin is a write into its namespace, and restore asked
+  // neither of the two things delete asks. So a record that left an append-only space (binned before
+  // the space became one) could be put back outside that space's write path, and a member who had
+  // left an organism could put their own record back into it.
+  await test('restore asks what delete asks: an append-only space refuses it (409)', async () => {
+    const manifest = (lateCreateOnly: boolean) => ({
+      manifestVersion: '1.0', id: orgId, name: 'Guards', kind: 'project', status: 'active',
+      objectTypes: [
+        { name: 'event', schemaRef: 'schema:event@1', writeRole: 'member', namespace: 'evt', backing: 'memory', cardinality: 'many', versioned: true, mode: 'records', create_only: true },
+        { name: 'record', schemaRef: 'schema:record@1', writeRole: 'member', namespace: 'rec', backing: 'memory', cardinality: 'many', versioned: true, mode: 'records', requires_expected_version: true },
+        { name: 'free', schemaRef: 'schema:free@1', writeRole: 'member', namespace: 'free', backing: 'memory', cardinality: 'many', versioned: true, mode: 'records' },
+        { name: 'late', schemaRef: 'schema:late@1', writeRole: 'member', namespace: 'late', backing: 'memory', cardinality: 'many', versioned: true, mode: 'records', ...(lateCreateOnly ? { create_only: true } : {}) },
+      ],
+    });
+    const writeManifest = async (lateCreateOnly: boolean) => {
+      const mr = await json('/v1/memory', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ key: `${root()}.meta.manifest`, value: manifest(lateCreateOnly), visibility: 'private' }) });
+      // The setup test wrote this key, so this is always the update (200), never the create.
+      assert(mr.status === 200, `manifest ${mr.status}: ${JSON.stringify(mr.body.error)}`);
+    };
+    const key = `${root()}.late.l1.latest`;
+    await writeManifest(false);
+    await draft('late', 'l1', { id: 'l1', kind: 'BEFORE-THE-GUARD' });
+    assert((await publish('late', 'l1')).status === 200, 'published while the space was free');
+    const del = await json(`/v1/memory/${encodeURIComponent(key)}`, { method: 'DELETE', headers: auth(A.token) });
+    assert(del.status === 200, `a free space's record may be binned: ${del.status}`);
+    await writeManifest(true);
+    const back = await json(`/v1/memory/${encodeURIComponent(key)}/restore`, { method: 'POST', headers: auth(A.token), body: '{}' });
+    assert(back.status === 409 && back.body.error?.code === 'WRITE_CONFLICT', `the append-only space refuses the restore: ${back.status} ${JSON.stringify(back.body.error)}`);
+    assert((await json(`/v1/memory/${encodeURIComponent(key)}`, { headers: auth(A.token) })).status === 404, 'and the record stays in the bin');
+  });
+
+  await test('restore asks what delete asks: a member who has left the organism is refused (403)', async () => {
+    const B = await setupOwner('wgb');
+    const o = await json('/v1/organisms', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ name: 'Restore Rig', description: 'e2e', type: 'project', join_policy: 'open', visibility: 'public' }) });
+    assert(o.status === 201, `org ${o.status}`);
+    const org = o.body.data.organism.id as string;
+    const key = `organism.${org}.shared.bnote`;
+    assert((await json(`/v1/organisms/${org}/join`, { method: 'POST', headers: auth(B.token), body: '{}' })).status === 201, 'B joins');
+    const w = await json('/v1/memory', { method: 'POST', headers: auth(B.token), body: JSON.stringify({ key, value: { note: 'mine' }, visibility: 'private' }) });
+    assert(w.status === 201, `a member writes the shared space: ${w.status} ${JSON.stringify(w.body.error)}`);
+    assert((await json(`/v1/memory/${encodeURIComponent(key)}`, { method: 'DELETE', headers: auth(B.token) })).status === 200, 'and bins it');
+    const left = await json(`/v1/organisms/${org}/leave`, { method: 'POST', headers: auth(B.token), body: '{}' });
+    assert(left.status === 200, `B leaves: ${left.status}`);
+    const back = await json(`/v1/memory/${encodeURIComponent(key)}/restore`, { method: 'POST', headers: auth(B.token), body: '{}' });
+    assert(back.status === 403 && back.body.error?.code === 'ACCESS_DENIED', `a leaver puts nothing back into the organism: ${back.status} ${JSON.stringify(back.body.error)}`);
+    const bin = await json('/v1/memory/deleted', { headers: auth(B.token) });
+    assert(JSON.stringify(bin.body).includes(key), `the record is still in B's bin: ${JSON.stringify(bin.body).slice(0, 200)}`);
   });
 
   // ── Surface layouts: which principal may write the page everyone lands on ──

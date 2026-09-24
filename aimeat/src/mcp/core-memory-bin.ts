@@ -14,6 +14,8 @@
  * @structure registerMemoryBinTools(mcp, deps)
  * @usage registerMemoryBinTools(mcp, { storage, config, agentGaii });
  * @version-history
+ *   v1.0.1 — 2026-09-24 — aimeat_memory_restore hands the service the agent role, as the delete
+ *     does, now that restore asks the organism namespace rule too (A6-12).
  *   v1.0.0 — 2026-09-03 — Extracted from core.ts (max-file-lines), with the tools it holds.
  */
 import { z } from 'zod';
@@ -75,6 +77,9 @@ mcp.tool(
         const out = await restoreMemoryRecord({ storage, config }, {
             caller: agentGaii, ownerName: parsed?.owner ?? agentGaii, key,
             ownerScope: owner_scope === true,
+            // As the delete above: an agent session, so the organism namespace check and the
+            // append-only guard inside the service both apply to putting a record back too.
+            roles: ['agent'],
         });
         if (!out.ok) {
             return { content: [{ type: 'text' as const, text: JSON.stringify({ error: out.code, message: out.message }, null, 2) }], isError: true };

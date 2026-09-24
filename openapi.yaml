@@ -14066,6 +14066,14 @@ paths:
         Gated on `memory:write`, not `memory:delete`: putting a record back into
         the working set is making it exist again, and an agent trusted to remove
         things is not automatically trusted to make them reappear.
+
+
+        Putting a record back is a write into its namespace, so it asks what the
+        delete asks: an `organism.*` key needs the caller's write access to that
+        namespace (403 ACCESS_DENIED, for example after leaving the organism), and
+        a record of an append-only workspace space is not put back through the
+        bin (409 WRITE_CONFLICT). Both depend on the key and the caller only, so
+        they tell nothing about whether a record exists.
       tags: [Memory]
       security:
         - BearerAuth: []
@@ -14078,8 +14086,12 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
   /v1/memory/{key}:
     get:
       operationId: readMemory
