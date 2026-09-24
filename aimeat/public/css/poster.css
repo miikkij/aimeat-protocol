@@ -3,6 +3,7 @@
  * @description Shared poster and showroom shapes. Views compose these classes and own their layout.
  * @usage Linked immediately after theme.css in spa.html.
  * @version-history
+ *   v1.10.0 -- 2026-09-24 -- The tab's tile tone, .poster-tab--tile (Jouni's decision "Choice").
  *   v1.9.0 -- 2026-09-24 -- .poster-icon and its small cut (Jouni's decision "Icon button").
  *   v1.8.0 -- 2026-09-24 -- .poster-action:disabled, dimmed (Jouni's decision "Step button").
  *   v1.7.0 -- 2026-09-23 -- .poster-dialog deleted (Jouni's decision): no page ever put it on markup
@@ -101,6 +102,17 @@
   color: var(--accent); text-decoration: underline; text-underline-offset: 4px; white-space: normal;
 }
 .poster-tab--fold:hover { color: var(--text); }
+/* The tab's tile tone (Jouni's decision "Choice": the background pattern tiles kept as they look;
+   formerly .poster-settings-pattern-choice): framed tiles on the card ground, the chosen one on the
+   sun, a solid ink shadow under the pointer. It sets back what the tab's base sets and the tile does
+   not have (the underline, the capitals, the line height a button has by default). */
+.poster-tab--tile {
+  display: inline-block; background: var(--card-bg); border: 2px solid var(--text); color: var(--text);
+  padding: 0.35rem 0.7rem; font-family: var(--font-showroom-body); font-size: var(--text-small); font-weight: var(--weight-bold);
+  line-height: normal; text-transform: none; letter-spacing: normal; white-space: normal;
+}
+.poster-tab--tile:hover { border-color: var(--text); color: var(--text); box-shadow: 3px 3px 0 var(--text); }
+.poster-tab--tile.is-on { background: var(--sun); color: var(--on-sun); padding: 0.35rem 0.7rem; box-shadow: 3px 3px 0 var(--text); }
 
 /* The profile slab and the home's large door are the two cuts named in brief 10.3. */
 .poster-slab {

@@ -9,6 +9,7 @@
  * @structure SHARED_DEMOS · SHAPE_DEMOS — { [id]: { variants: [{ name, render(ex) }], height?, emptyNote? } }
  * @usage import { SHARED_DEMOS, SHAPE_DEMOS } from './demos-shared.js';
  * @version-history
+ *   v1.3.0 — 2026-09-24 — The tab's tile tone.
  *   v1.2.0 — 2026-09-24 — The icon button's demo.
  *   v1.1.0 — 2026-09-23 — The data map's and the dialog shape's demos go with them (Jouni's
  *     decision).
@@ -115,6 +116,7 @@ export const SHAPE_DEMOS = {
     { name: 'back', render: () => html`<a class="poster-action poster-action--back" href="#">↩ Back to your home</a>` },
     { name: 'text', render: () => html`<button type="button" class="poster-action poster-action--text">Listen</button>` },
     { name: 'fold tab', render: () => html`<span><button type="button" class="poster-tab poster-tab--fold is-on">Recent</button> <button type="button" class="poster-tab poster-tab--fold">Mine</button></span>` },
+    { name: 'tile tab', render: () => html`<span><button type="button" class="poster-tab poster-tab--tile">Off</button> <button type="button" class="poster-tab poster-tab--tile is-on">Pixel grid</button> <button type="button" class="poster-tab poster-tab--tile">Hearts</button></span>` },
   ] },
   'slab': { variants: [
     { name: 'default', render: () => html`<button type="button" class="btn-primary poster-slab">Do it</button>` },
