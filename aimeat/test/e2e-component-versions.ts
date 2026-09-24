@@ -9,6 +9,10 @@
  * @usage
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=component-versions
  * @version-history
+ *   v1.1.0 — 2026-09-24 — A kept version is immutable (secaudit 2026-09, A6-7): re-publishing 1.1.0
+ *     with other code is refused on both kinds and the pinned address keeps its bytes; the same code
+ *     again is a no-op; a PATCH of a live action becomes 1.1.1 while a call pinned to 1.1.0 runs the
+ *     original; a PATCH naming a version kept with other code is refused.
  *   v1.0.0 — 2026-09-03 — Initial (versions, slice 2; brief doc-mtkr34qa1dg1).
  */
 
@@ -169,6 +173,66 @@ await test('the kept versions and the map refuse a caller without a session (401
     assert(v2.status === 401, `anonymous cortex versions expected 401, got ${v2.status}`);
     const m = await json(`/v1/dependencies?extension=${EXT}`);
     assert(m.status === 401, `anonymous dependency map expected 401, got ${m.status}`);
+});
+
+// ── A kept version is immutable (secaudit 2026-09, A6-7) ─────────────────────
+//
+// `name@1.1.0` is an address an app builds against, and a cortex lib at a pinned address is served
+// `immutable`, so a browser keeps it for a year. Re-publishing 1.1.0 with other code used to replace
+// the kept snapshot, and a PATCH of a live action changed what every call pinned to the live version
+// ran, with the version string unchanged. Both kinds are asked here; each call pins or reads back
+// exactly what the pin is supposed to mean.
+const swappedScript = { 'actions/hello.js': `export default async function(ctx, input) { return { version: 'swapped' }; }` };
+const callExt = (addr: string) => json(`/v1/ext/${addr}/hello`, auth(token, { method: 'POST', body: '{}' }));
+const says = (r: { body: unknown }) => JSON.stringify(r.body);
+
+await test('re-publishing a kept version with other code is refused, and the kept code still runs', async () => {
+    const ext = await json(`/v1/extensions/${EXT}`, auth(token, { method: 'PUT', body: JSON.stringify({ manifest: extManifest('1.1.0'), scripts: swappedScript }) }));
+    assert(ext.status === 409 && ext.body.error?.code === 'VERSION_EXISTS', `extension re-publish: ${ext.status} ${says(ext).slice(0, 240)}`);
+    assert(/1\.1\.0/.test(ext.body.error?.message ?? ''), `the refusal names the version: ${ext.body.error?.message}`);
+    const pinned = await callExt(`${EXT}@1.1.0`);
+    assert(pinned.status === 200 && says(pinned).includes('"1.1.0"') && !says(pinned).includes('swapped'), `pinned call after the refusal: ${pinned.status} ${says(pinned).slice(0, 200)}`);
+    const bare = await callExt(EXT);
+    assert(bare.status === 200 && says(bare).includes('"1.1.0"') && !says(bare).includes('swapped'), `nothing was written, so the bare call runs 1.1.0 too: ${says(bare).slice(0, 200)}`);
+
+    const cx = await json(`/v1/cortex/${CORTEX}`, auth(token, { method: 'PUT', body: JSON.stringify({ manifest: cortexManifest('1.1.0'), libs: { 'v.js': "window.AIMEAT_VER = 'swapped';" } }) }));
+    assert(cx.status === 409 && cx.body.error?.code === 'VERSION_EXISTS', `cortex re-publish: ${cx.status} ${says(cx).slice(0, 240)}`);
+    const lib = await raw(`/v1/cortex/${CORTEX}@1.1.0/libs/v.js`);
+    assert(lib.status === 200 && lib.text.includes("'1.1.0'"), `pinned lib after the refusal: ${lib.status} ${lib.text}`);
+    const bareLib = await raw(`/v1/cortex/${CORTEX}/libs/v.js`);
+    assert(bareLib.status === 200 && bareLib.text.includes("'1.1.0'"), `nothing was swapped at the bare address: ${bareLib.text}`);
+});
+
+await test('the same code again under the same version is a no-op', async () => {
+    const ext = await json(`/v1/extensions/${EXT}`, auth(token, { method: 'PUT', body: JSON.stringify({ manifest: extManifest('1.1.0'), scripts: extScript('1.1.0') }) }));
+    assert(ext.status === 200 && ext.body.data?.action === 'unchanged', `extension: ${ext.status} ${says(ext).slice(0, 200)}`);
+    const cx = await json(`/v1/cortex/${CORTEX}`, auth(token, { method: 'PUT', body: JSON.stringify({ manifest: cortexManifest('1.1.0'), libs: cortexLib('1.1.0') }) }));
+    assert(cx.status === 200 && cx.body.data?.action === 'unchanged', `cortex: ${cx.status} ${says(cx).slice(0, 200)}`);
+});
+
+await test('a PATCH of a live action becomes a new version, and a call pinned to the old one runs the original', async () => {
+    const patch = await json(`/v1/extensions/${EXT}/actions/hello`, auth(token, { method: 'PATCH', body: JSON.stringify({ scriptContent: `export default async function(ctx, input) { return { version: 'patched' }; }` }) }));
+    assert(patch.status === 200, `patch ${patch.status}: ${says(patch).slice(0, 200)}`);
+    assert(patch.body.data.version === '1.1.1' && patch.body.data.previous_version === '1.1.0', `the patch names its version: ${JSON.stringify(patch.body.data)}`);
+
+    const pinned = await callExt(`${EXT}@1.1.0`);
+    assert(pinned.status === 200 && says(pinned).includes('"1.1.0"') && !says(pinned).includes('patched'), `a call pinned to 1.1.0 ran: ${says(pinned).slice(0, 200)}`);
+    const bare = await callExt(EXT);
+    assert(bare.status === 200 && says(bare).includes('"patched"'), `the bare call runs the patch: ${says(bare).slice(0, 200)}`);
+    const newPin = await callExt(`${EXT}@1.1.1`);
+    assert(newPin.status === 200 && says(newPin).includes('"patched"'), `1.1.1 is kept: ${says(newPin).slice(0, 200)}`);
+
+    const { body: list } = await json(`/v1/extensions/${EXT}/versions`, auth(token));
+    assert(list.data.current === '1.1.1' && list.data.total === 3, `versions after the patch: ${JSON.stringify(list.data)}`);
+});
+
+await test('a PATCH naming a version already kept with other code is refused, and nothing changes', async () => {
+    const r = await json(`/v1/extensions/${EXT}/actions/hello`, auth(token, { method: 'PATCH', body: JSON.stringify({ scriptContent: `export default async function(ctx, input) { return { version: 'again' }; }`, version: '1.0.0' }) }));
+    assert(r.status === 409 && r.body.error?.code === 'VERSION_EXISTS', `patch onto 1.0.0: ${r.status} ${says(r).slice(0, 200)}`);
+    const bare = await callExt(EXT);
+    assert(says(bare).includes('"patched"'), `the live code is still the patch: ${says(bare).slice(0, 200)}`);
+    const old = await callExt(`${EXT}@1.0.0`);
+    assert(says(old).includes('"1.0.0"') && !says(old).includes('again'), `1.0.0 still runs its own code: ${says(old).slice(0, 200)}`);
 });
 
 await test('uninstalling drops the kept versions', async () => {

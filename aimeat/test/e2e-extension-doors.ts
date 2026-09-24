@@ -24,6 +24,9 @@
  *     test/run-e2e-ci.ts --test=extension-doors
  *
  * @version-history
+ *   v1.1.0 — 2026-09-24 — The action-script PATCH is a new version (secaudit 2026-09, A6-7): the
+ *     answer names 1.0.1, and the versions list keeps 1.0.0 beside it. The list asserted 1.0.0 as
+ *     current after the PATCH, which held only while a PATCH changed the code under the version.
  *   v1.0.0 — 2026-09-08 — Initial suite
  */
 
@@ -655,6 +658,9 @@ await test('PATCH the action script — the new bytes are what the next call run
   });
   assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
   assert(body.data?.action?.scriptContent === script, 'the answer echoes the stored script');
+  // A changed script is a new version: the one it replaces stays what a pinned caller runs.
+  assert(body.data?.version === '1.0.1' && body.data?.previous_version === '1.0.0',
+    `the answer names the new version: ${JSON.stringify(body.data)}`);
   const read = await json('/v1/extensions/doors-echo/actions/echo', { headers: ownerAuth() });
   assert(read.body.data?.action?.scriptContent === script, 'and a read back agrees');
 });
@@ -696,8 +702,10 @@ await test('PATCH an action id the extension does not have → 404', async () =>
 await test('GET versions lists what is kept, newest first', async () => {
   const { status, body } = await json('/v1/extensions/doors-echo/versions', { headers: ownerAuth() });
   assert(status === 200, `status ${status}: ${JSON.stringify(body?.error)}`);
-  assert(body.data?.current === '1.0.0', `current ${body.data?.current}`);
+  assert(body.data?.current === '1.0.1', `current after the PATCH ${body.data?.current}`);
   assert(Array.isArray(body.data?.versions), 'versions is an array');
+  const kept = (body.data.versions as Array<{ version: string }>).map(v => v.version);
+  assert(kept[0] === '1.0.1' && kept.includes('1.0.0'), `1.0.1 newest, 1.0.0 still kept: ${JSON.stringify(kept)}`);
 });
 
 await test('six doors on a name nobody installed, six 404s', async () => {

@@ -5,6 +5,10 @@
  *   mid-upsert), init re-runs so new behaviour goes live, no quota slot consumed on update,
  *   identical bytes are a 200 no-op, and create-via-PUT works.
  * @version-history
+ *   v1.3.0 — 2026-09-24 — The extension's v2 code is deployed as version 1.0.1. A kept version is
+ *     immutable now (secaudit 2026-09, A6-7), so other code under 1.0.0 is refused with 409
+ *     VERSION_EXISTS; the suite had redeployed v2 under v1's version, which the node no longer
+ *     accepts. The cortex half already bumped (1.0.0 → 1.0.1).
  *   v1.2.0 — 2026-09-24 — A redeploy of an active cortex that the public-board ceiling refuses
  *     leaves the served bytes, the record and the live activation as they were (db8a5635a633).
  *     Failed on the old code first.
@@ -96,11 +100,11 @@ spec:
 const LIB_A = "export const render = () => 'render-A';\n";
 const LIB_B = "export const render = () => 'render-B';\n";
 
-const extManifest = `
+const extManifestAt = (version: string) => `
 extension: "1.0"
 metadata:
   name: "${EXT}"
-  version: "1.0.0"
+  version: "${version}"
   description: "Upsert extension"
   author: "test"
 required_apis:
@@ -116,6 +120,9 @@ limits:
   timeout_ms: 2000
   max_api_calls: 10
 `;
+/** v1 of the extension's code is deployed as 1.0.0 and v2 as 1.0.1: a kept version is immutable. */
+const extManifest = extManifestAt('1.0.0');
+const extManifestV2 = extManifestAt('1.0.1');
 
 const EXT_SCRIPT_V1 = `export default async function(ctx, input) {
   await ctx.memory.set('persist', 'kept');
@@ -409,7 +416,7 @@ await test('PUT extension v2 — endpoint never 404s, new code live, ext memory 
   const { status, body } = await json(`/v1/extensions/${EXT}`, {
     method: 'PUT',
     headers: ownerHdr(),
-    body: JSON.stringify({ manifest: extManifest, scripts: { 'actions/echo.js': EXT_SCRIPT_V2 } }),
+    body: JSON.stringify({ manifest: extManifestV2, scripts: { 'actions/echo.js': EXT_SCRIPT_V2 } }),
   });
   done = true;
   await poller;
@@ -429,7 +436,7 @@ await test('PUT extension again with identical v2 → 200 no-op (action: unchang
   const { status, body } = await json(`/v1/extensions/${EXT}`, {
     method: 'PUT',
     headers: ownerHdr(),
-    body: JSON.stringify({ manifest: extManifest, scripts: { 'actions/echo.js': EXT_SCRIPT_V2 } }),
+    body: JSON.stringify({ manifest: extManifestV2, scripts: { 'actions/echo.js': EXT_SCRIPT_V2 } }),
   });
   assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
   assert(body.data.action === 'unchanged', `action: ${body.data.action}`);

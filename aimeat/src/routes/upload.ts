@@ -24,6 +24,9 @@
  *   import { uploadRouter } from '../routes/upload.js';
  *   app.use(uploadRouter(config, storage));
  * @version-history
+ *   v1.18.0 — 2026-09-24 — Both ZIP replace doors refuse other code under a version already kept
+ *     (409 VERSION_EXISTS) before anything is written, and keep the version they deploy, as PUT
+ *     /v1/extensions/:name and PUT /v1/cortex/:name do (secaudit 2026-09, A6-7).
  *   v1.17.1 — 2026-09-13 — The extension ZIP upload refuses a flagged action whose changed text would
  *     break an ODPS length cap, 422 ODPS_FIELD_TOO_LONG, as the other install doors do.
  *   v1.17.0 — 2026-09-13 — handleAppUpload answers with `served_marks_removed` and
@@ -118,6 +121,10 @@ import { verifyUploadToken, UploadTokenError } from '../services/upload-token.js
 import { parseExtensionZip, parseCortexZip } from '../services/upload-zip.js';
 import { validateNamespaceOwnership } from '../services/cortex-manifest.js';
 import { installCortex, libsWithoutContent, missingLibsMessage } from '../services/cortex-lifecycle.js';
+import {
+    keptVersionRefusal, extensionCodeOf, cortexCodeOf, cortexLibsAfterDeploy,
+    snapshotExtensionVersion, snapshotCortexVersion, servedCortexLibs,
+} from '../services/component-versions.js';
 import { writeStorageFile } from '../services/storage-file-write.js';
 import { safeUnzip, ZipSecurityError } from '../services/safe-zip.js';
 import { SkillValidationError, isAllowedSkillPath } from '../services/skill-md.js';
@@ -481,6 +488,10 @@ async function handleExtensionUpload(
     const odps = odpsWriteRefusal(extensionOdpsKey(record.name), record, existing);
     if (odps) { res.status(odps.status).json({ success: false, error: odps.code, message: odps.message, details: odps.details }); return; }
 
+    // A kept version is immutable on this door as on PUT /v1/extensions/:name (A6-7).
+    const kept = existing ? await keptVersionRefusal(storage, 'extension', record.name, record.version, extensionCodeOf(record)) : null;
+    if (kept) { res.status(kept.status).json({ success: false, error: kept.code, message: kept.message }); return; }
+
     // Encrypt `type: secret` config values before they are stored, exactly as POST/PUT
     // /v1/extensions do. Without this a ZIP install was a way to write an API key to the database
     // in plaintext.
@@ -535,6 +546,9 @@ async function handleExtensionUpload(
         }
         saved = await storage.createExtension(record);
     }
+    // Kept like every other install and update, so `name@version` answers for what this door deployed.
+    await snapshotExtensionVersion(storage, saved, sub)
+        .catch(err => logger.warn('Extension upload: version not kept', { name: saved.name, version: saved.version, error: String(err) }));
 
     // Parity with the REST and MCP install paths: re-project any EXCHANGE listings the actions
     // declare, and refresh aggregated capabilities when the extension is live.
@@ -730,6 +744,12 @@ async function handleCortexUpload(
         return;
     }
 
+    // A kept version is immutable on this door as on PUT /v1/cortex/:name: other lib bytes under a
+    // version already kept are refused before the first byte is written (A6-7).
+    const kept = await keptVersionRefusal(storage, 'cortex', incoming.name, incoming.version,
+        cortexCodeOf(await cortexLibsAfterDeploy(storage, incoming.name, incoming.components, result.libs ?? {})));
+    if (kept) { res.status(kept.status).json({ success: false, error: kept.code, message: kept.message }); return; }
+
     if (result.libs) {
         for (const [filename, content] of Object.entries(result.libs)) {
             await storage.setCortexLibFile(incoming.name, filename, content);
@@ -737,6 +757,8 @@ async function handleCortexUpload(
     }
 
     const record = (await storage.updateCortexExtension(incoming.name, incoming)) ?? incoming;
+    await snapshotCortexVersion(storage, record, await servedCortexLibs(storage, record), ownerName)
+        .catch(err => logger.warn('Cortex upload: version not kept', { name: record.name, version: record.version, error: String(err) }));
     emitChange('cortex');
     respondCortexInstalled(res, record, true, sub);
 }
