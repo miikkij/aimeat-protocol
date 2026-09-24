@@ -7,18 +7,24 @@
  * @structure componentVersionMethods — saveComponentVersion · listComponentVersions ·
  *   getComponentVersion · deleteComponentVersions
  * @version-history
+ *   v1.1.0 — 2026-09-24 — saveComponentVersion keeps a version once (ON CONFLICT DO NOTHING) and
+ *     answers whether it stored this one. INSERT OR REPLACE let a re-publish replace the snapshot a
+ *     pinned address serves (secaudit 2026-09, A6-7).
  *   v1.0.0 — 2026-09-03 — Initial (versions, slice 2).
  */
 import type { SqliteStorage } from '../index.js';
 import type { ComponentKind, ComponentVersionRecord, ComponentVersionSummary } from '../../../types/component-versions.js';
 
 export const componentVersionMethods = {
-  async saveComponentVersion(this: SqliteStorage, record: ComponentVersionRecord): Promise<void> {
+  async saveComponentVersion(this: SqliteStorage, record: ComponentVersionRecord): Promise<boolean> {
     const snapshot = JSON.stringify(record.snapshot);
-    this.db.prepare(
-      `INSERT OR REPLACE INTO component_versions (kind, name, version, snapshot, bytes, createdAt, createdBy)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    // A kept version is never replaced: the conflict on the primary key writes nothing.
+    const r = this.db.prepare(
+      `INSERT INTO component_versions (kind, name, version, snapshot, bytes, createdAt, createdBy)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT (kind, name, version) DO NOTHING`,
     ).run(record.kind, record.name, record.version, snapshot, Buffer.byteLength(snapshot, 'utf8'), record.createdAt, record.createdBy);
+    return Number(r.changes ?? 0) > 0;
   },
 
   async listComponentVersions(this: SqliteStorage, kind: ComponentKind, name: string): Promise<ComponentVersionSummary[]> {

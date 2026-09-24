@@ -19561,7 +19561,9 @@ paths:
         '409':
           description: |
             Token already used (single-use), or — for an extension upload without `update:true` in
-            the token meta — an extension of that name is already installed (`ALREADY_EXISTS`).
+            the token meta — an extension of that name is already installed (`ALREADY_EXISTS`), or
+            an extension or cortex replace brings other code under a version already kept
+            (`VERSION_EXISTS`).
         '410':
           description: Token expired (60 min TTL)
         '422':
@@ -38281,6 +38283,10 @@ paths:
         and `@activate` jobs re-run. Identical bytes are a safe 200 no-op, and updating never
         consumes a quota slot. Create requires ext:write (like POST); update requires owning the
         extension.
+        A deployed version is kept and never replaced: `name@version` is an address apps pin. The
+        same version with other code (actions, limits or required APIs) is refused with 409
+        VERSION_EXISTS before anything is written; give the change a new version. A change to
+        config alone is not code and goes through.
       tags: [Extensions]
       security:
         - BearerAuth: []
@@ -38319,7 +38325,7 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
         '409':
-          description: Install limit exceeded.
+          description: Install limit exceeded, or VERSION_EXISTS, this version is already kept with other code.
         '422':
           $ref: '#/components/responses/OdpsFieldTooLong'
         '429':
@@ -38577,6 +38583,13 @@ paths:
     patch:
       operationId: updateExtensionAction
       summary: Update extension action
+      description: |
+        Replace one action's script. A changed script is a new version of the extension, because
+        the version it replaces stays what a caller pinned to it runs: name the new version in
+        `version`, or leave it out and the node takes the next version not kept yet (1.1.0 becomes
+        1.1.1). The answer carries `version` and `previous_version`, and the new version is kept.
+        The same script again answers with the current version and `unchanged: true`. Only the
+        installing owner, an agent of theirs holding ext:write, or an operator may patch.
       tags: [Extensions]
       security:
         - BearerAuth: []
@@ -38597,11 +38610,25 @@ paths:
           application/json:
             schema:
               type: object
+              required: [scriptContent]
+              properties:
+                scriptContent:
+                  type: string
+                  description: The action's new JavaScript source.
+                version:
+                  type: string
+                  description: The new version. It starts with a digit and holds letters, digits, dots, plus and minus.
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          description: VERSION_EXISTS. The version named is the current one, or is already kept with other code.
 
   /v1/extensions/{name}/instances:
     post:
@@ -39735,6 +39762,10 @@ paths:
         Every answer (created, updated, unchanged) carries `lib_urls`, as POST /v1/cortex does. A
         lib component whose filename has no content in libs, and no bytes already stored under it,
         is refused with INVALID_MANIFEST before anything is written.
+        A deployed version is kept and never replaced, and a pinned lib address
+        (`/v1/cortex/{name}@{version}/libs/{libFile}`) is served immutable. The same version with
+        other lib bytes is refused with 409 VERSION_EXISTS before any byte is swapped; give the
+        change a new version.
       tags: [Cortex]
       security:
         - BearerAuth: []
@@ -39769,6 +39800,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '409':
+          description: VERSION_EXISTS. This version is already kept with other lib bytes.
         '413':
           description: Manifest, lib, or quota limit exceeded.
     delete:

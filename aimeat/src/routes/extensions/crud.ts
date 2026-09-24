@@ -22,6 +22,10 @@
  *   v1.6.0 — 2026-09-16 — Install, update, activate and deactivate answer with secret config masked
  *                         (shownExtension), as GET :name does. They returned the ciphertext and the
  *                         __secretKeys marker.
+ *   v1.7.0 — 2026-09-24 — PATCH :name/actions/:actionId makes a changed script a new version and
+ *                         keeps it (secaudit 2026-09, A6-7): `version` in the body, or the next one not
+ *                         kept yet; the answer names it and the previous one. It swapped the script
+ *                         under the unchanged version, so a call pinned to that version ran the patch.
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
@@ -37,7 +41,10 @@ import {
 import { ExtensionInstallSchema, validateBody } from '../../models/schemas.js';
 import { getExtSecretKeys, maskSecretFields } from '../../services/extension-secrets.js';
 import { dependencyIndex, visibleAppRefs, usedBySummary } from '../../services/dependency-map.js';
-import { listVersions } from '../../services/component-versions.js';
+import {
+  listVersions, isPinnableVersion, nextFreeVersion, keptVersionRefusal, versionExistsRefusal, extensionCodeOf,
+  snapshotExtensionVersion,
+} from '../../services/component-versions.js';
 import { buildExtensionRecordFromManifest } from './manifest.js';
 import { hasExtWritePermission, canManageInstalledExt } from './permissions.js';
 import { generateUploadToken, buildUploadMeta } from '../../services/upload-token.js';
@@ -445,15 +452,46 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
       const updatedActions = [...ext.actions];
       updatedActions[actionIdx] = { ...updatedActions[actionIdx], scriptContent };
 
-      await storage.updateExtension(name, { actions: updatedActions });
+      // The same script again changes nothing, so it keeps the version it has.
+      if (ext.actions[actionIdx].scriptContent === scriptContent) {
+        res.json(success(config.nodeId, { action: { id: actionId, scriptContent }, version: ext.version, unchanged: true }));
+        return;
+      }
 
-      logger.info(`Action script updated: ${name}/${actionId}`, { by: req.auth!.sub, sizeKb: sizeKb.toFixed(1) });
+      // A changed script is a NEW VERSION (secaudit 2026-09, A6-7). `name@<version>` is an address
+      // apps pin, and the version this replaces stays what a caller pinned to it runs. The caller may
+      // name the new version; otherwise it is the next one not kept yet (1.1.0 → 1.1.1), and the
+      // answer says which. Refused before anything is written.
+      const asked = typeof body.version === 'string' ? body.version.trim() : undefined;
+      if (asked !== undefined && !isPinnableVersion(asked)) {
+        res.status(400).json(error(config.nodeId, 'VALIDATION_ERROR',
+          `version "${asked}" cannot be pinned. A version starts with a digit and holds letters, digits, dots, plus and minus, like 1.2.1.`));
+        return;
+      }
+      const version = asked ?? await nextFreeVersion(storage, 'extension', name, ext.version);
+      const kept = version === ext.version
+        ? versionExistsRefusal('extension', name, version)
+        : await keptVersionRefusal(storage, 'extension', name, version, extensionCodeOf({ ...ext, actions: updatedActions }));
+      if (kept) {
+        res.status(kept.status).json(error(config.nodeId, kept.code, kept.message));
+        return;
+      }
+
+      const updated = await storage.updateExtension(name, { actions: updatedActions, version });
+      if (updated) {
+        await snapshotExtensionVersion(storage, updated, resolveIdentity(req.auth!, config.nodeId))
+          .catch(err => logger.warn('PATCH action script: version not kept', { name, version, error: String(err) }));
+      }
+
+      logger.info(`Action script updated: ${name}/${actionId}`, { by: req.auth!.sub, sizeKb: sizeKb.toFixed(1), version });
 
       res.json(success(config.nodeId, {
         action: {
           id: actionId,
           scriptContent,
         },
+        version,
+        previous_version: ext.version,
       }));
       emitChange('extensions');
     } catch (err) {

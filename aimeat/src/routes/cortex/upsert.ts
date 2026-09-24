@@ -9,6 +9,9 @@
  * @structure CortexUpsertResult · upsertCortex(deps, caller, input, mayReplaceOthers)
  * @usage const out = await upsertCortex({ storage, config }, caller, { name, manifest, libs });
  * @version-history
+ *   v1.2.0 — 2026-09-24 — upsertCortex refuses other lib bytes under a kept version (409
+ *     VERSION_EXISTS) before its first write, and its create branch keeps the version it creates
+ *     (secaudit 2026-09, A6-7).
  *   v1.1.0 — 2026-09-24 — A redeploy of an active cortex asks the activation's board ceiling before
  *     its first write (db8a5635a633). The ceiling refused inside that activation, after the lib
  *     bytes, the manifest and the old activation's teardown, and the redeploy answered 500 with the
@@ -25,7 +28,9 @@ import {
 } from '../../services/cortex-lifecycle.js';
 import { activateExtension, activationRefusal, deactivateExtension } from './activation.js';
 import { refreshCortexDependencies } from '../../services/dependency-map.js';
-import { snapshotCortexVersion } from '../../services/component-versions.js';
+import {
+  snapshotCortexVersion, keptVersionRefusal, cortexCodeOf, cortexLibsAfterDeploy,
+} from '../../services/component-versions.js';
 import { logger } from '../../utils/logger.js';
 
 /** What an upsert did. `record` carries what the answer and lib_urls are built from. */
@@ -134,6 +139,9 @@ export async function upsertCortex(
       await storage.setCortexLibFile(name, filename, content);
     }
     const record = await storage.createCortexExtension(parsed);
+    // Kept like every install, so `name@version` answers for what this created (A6-7).
+    await snapshotCortexVersion(storage, record, newLibs, ownerName)
+      .catch(err => logger.warn('PUT /v1/cortex/:name: version not kept', { name, version: parsed.version, error: String(err) }));
     emitChange('cortex');
     return { ok: true, value: { action: 'created', record, warnings: result.warnings } };
   }
@@ -162,6 +170,10 @@ export async function upsertCortex(
   if (existing.manifest.trim() === manifest.trim() && libsEqual) {
     return { ok: true, value: { action: 'unchanged', record: existing } };
   }
+  // A kept version is immutable: other lib bytes under it are refused before the first write (A6-7).
+  const kept = await keptVersionRefusal(storage, 'cortex', name, parsed.version,
+    cortexCodeOf(await cortexLibsAfterDeploy(storage, name, parsed.components, newLibs, currentLibs)));
+  if (kept) return upsertRefusal(kept.status, kept.code, kept.message);
 
   const wasActive = existing.status === 'active';
   const gaii = caller.gaii;

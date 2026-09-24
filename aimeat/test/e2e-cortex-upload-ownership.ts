@@ -9,6 +9,9 @@
  *   that B's own upload still installs and can still be replaced by B.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=cortex-upload-ownership
  * @version-history
+ *   v1.1.0 — 2026-09-24 — B's re-upload of their own cortex carries a new version (secaudit 2026-09,
+ *     A6-7). A kept version is immutable on this door too: the same 1.0.0 with other bytes is now
+ *     refused with 409 VERSION_EXISTS, which the test asserts before it re-uploads as 1.0.1.
  *   v1.0.0 — 2026-08-10 — Initial (security audit C-4).
  */
 import * as ed from '@noble/ed25519';
@@ -51,7 +54,7 @@ function makeZip(entries: { name: string; data: string }[]): Promise<Buffer> {
     });
 }
 
-function manifestFor(name: string, namespace: string, libFile: string): string {
+function manifestFor(name: string, namespace: string, libFile: string, version = '1.0.0'): string {
     return `apiVersion: cortex.aimeat.org/v1
 kind: Extension
 metadata:
@@ -59,7 +62,7 @@ metadata:
   namespace: ${namespace}
   description: C-4 regression fixture
 spec:
-  version: "1.0.0"
+  version: "${version}"
   components:
     - type: lib
       name: greeter
@@ -356,10 +359,18 @@ await test('Owner B CAN still install their own cortex (the gate does not break 
 });
 
 await test('Owner B CAN re-upload their own cortex (replace, not a duplicate-name failure)', async () => {
+    const V2 = "export function hello() { return 'from owner B v2'; }";
+    // Other bytes under the version already kept are refused on this door as on PUT (A6-7).
+    const sameVersion = await putZip(await cortexUploadUrl(B), await makeZip([
+        { name: 'manifest.yaml', data: manifestFor(ownName, B.owner, LIB) },
+        { name: `libs/${LIB}`, data: V2 },
+    ]));
+    assert(sameVersion.status === 409 && sameVersion.body.error === 'VERSION_EXISTS',
+        `new bytes under the kept 1.0.0: ${sameVersion.status} ${JSON.stringify(sameVersion.body)}`);
     const url = await cortexUploadUrl(B);
     const zip = await makeZip([
-        { name: 'manifest.yaml', data: manifestFor(ownName, B.owner, LIB) },
-        { name: `libs/${LIB}`, data: "export function hello() { return 'from owner B v2'; }" },
+        { name: 'manifest.yaml', data: manifestFor(ownName, B.owner, LIB, '1.0.1') },
+        { name: `libs/${LIB}`, data: V2 },
     ]);
     const { status, body } = await putZip(url, zip);
     assert(status === 200, `re-upload status ${status}: ${JSON.stringify(body)}`);
