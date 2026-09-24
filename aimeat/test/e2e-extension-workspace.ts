@@ -21,6 +21,9 @@
  *   each test with `// HOLE:`. Two tests (no declaration, scheduled run) assert a GUARD the old tree
  *   satisfied trivially, and say so.
  * @version-history
+ *   v1.2.0 — 2026-09-24 — A write that loses its compare-and-swap leaves no provenance record, and the
+ *     write that lands leaves one, counted through GET /v1/ai-transparency/mine. Failed on the old
+ *     code first (5 → 6).
  *   v1.1.0 — 2026-09-24 — A document write that loses its compare-and-swap opens none of its
  *     embedded files to the workspace (2c0639ff342e); the write that lands does. Failed on the old
  *     code first.
@@ -314,6 +317,24 @@ await test('ifVersion: 0 creates, a second 0 is refused (409 VERSION_CONFLICT) a
     const third = await invoke(EXT, 'claim', bAgentToken, { id: 'c2', port: 'p-third', ifVersion: 1 });
     assert(third.status === 200 && third.body.data.written?.version === 2, `third ${third.status}: ${JSON.stringify(third.body?.error ?? third.body.data.written)}`);
     assert(third.body.data.got.items[0]._draftVersion === 2, `draft version after the swap: ${JSON.stringify(third.body.data.got.items[0])}`);
+});
+
+// REFUSE BEFORE YOU WRITE. The provenance record is part of the write: the draft carries its id. It
+// was stored BEFORE the compare-and-swap, so a write that lost the swap left a record describing
+// bytes that were never stored, one for every lost write.
+await test('ifVersion: a write that loses the swap leaves no provenance record, and the write that lands leaves one', async () => {
+    const records = async () => (await json('/v1/ai-transparency/mine', { headers: auth(B.token) })).body.data?.recent?.total as number;
+    const first = await invoke(EXT, 'claim', bAgentToken, { id: 'c-prov', port: 'p-first', ifVersion: 0 });
+    assert(first.status === 200 && first.body.data.written?.version === 1, `first ${first.status}: ${JSON.stringify(first.body?.error ?? first.body.data.written)}`);
+    const before = await records();
+    assert(typeof before === 'number' && before >= 1, `the first write left its record: ${before}`);
+    const lost = await invoke(EXT, 'claim', bAgentToken, { id: 'c-prov', port: 'p-lost', ifVersion: 0 });
+    assert(lost.status === 409 && lost.body?.error?.code === 'VERSION_CONFLICT', `lost ${lost.status}: ${JSON.stringify(lost.body?.error)}`);
+    const afterLost = await records();
+    assert(afterLost === before, `a write that lost the swap left a provenance record: ${before} → ${afterLost}`);
+    const won = await invoke(EXT, 'claim', bAgentToken, { id: 'c-prov', port: 'p-won', ifVersion: 1 });
+    assert(won.status === 200 && won.body.data.written?.version === 2, `won ${won.status}: ${JSON.stringify(won.body?.error ?? won.body.data.written)}`);
+    assert(await records() === before + 1, 'the write that landed carries its record');
 });
 
 // REFUSE BEFORE YOU WRITE (2c0639ff342e). Opening a document's embedded files to the workspace's

@@ -42,6 +42,10 @@
  *   import { mintProvenance, contentHashOf } from './ai-provenance.js';
  *   const row = await mintProvenance(storage, { stampedBy: 'node', ... , content });
  * @version-history
+ *   v1.3.2 — 2026-09-24 — `held`: mintProvenance, stampAgentWrite, stampAutonomousOutput and
+ *     provenanceForWrite can build and check a record and hand it back unstored, for a write that may
+ *     still lose a compare-and-swap after the item names the record's id. The store is append-only,
+ *     so a record about bytes that never landed must not be stored in the first place.
  *   v1.3.1 — 2026-09-24 — provenanceDeclarationRefusal(): provenanceForWrite()'s refusal, asked
  *     without minting, so a door that writes several fields asks it before the first (508c32904067).
  *   v1.3.0 — 2026-08-01 — TARGET-058 Phase 4. provenanceForWrite() folds the three cases a write
@@ -188,9 +192,15 @@ export function buildDisclosure(
  * Throws on a record that does not satisfy the frozen schema — which should be unreachable, since
  * the input type constrains every enum, and is therefore worth failing loudly on rather than
  * writing a record no reader can parse.
+ *
+ * `held`: the record is built and checked in full but handed back in this list instead of being
+ * stored, for a caller whose write may still be refused after the item names the record's id (a
+ * compare-and-swap). That caller stores the held rows once its write has landed, and drops them
+ * when it has not: the store is append-only, so a record about bytes that never landed cannot be
+ * taken back afterwards.
  */
 export async function mintProvenance(
-  storage: Storage, input: MintProvenanceInput,
+  storage: Storage, input: MintProvenanceInput, held?: AiProvenanceRecordRow[],
 ): Promise<AiProvenanceRecordRow> {
   const id = randomUUID();
   const generatedAt = new Date(input.generatedAt ?? Date.now()).toISOString();
@@ -238,7 +248,8 @@ export async function mintProvenance(
     createdAt: new Date().toISOString(),
     record: parsed.data,
   };
-  await storage.createAiProvenance(row);
+  if (held) held.push(row);
+  else await storage.createAiProvenance(row);
   return row;
 }
 
@@ -275,6 +286,8 @@ export async function stampAgentWrite(
     baseUrl?: string;
     /** `false` disables minting entirely (AIMEAT_AI_PROVENANCE=off). */
     enabled?: boolean;
+    /** Hand the record back here instead of storing it (mintProvenance says when). */
+    held?: AiProvenanceRecordRow[];
   },
 ): Promise<string | undefined> {
   if (input.enabled === false) return undefined;
@@ -317,7 +330,7 @@ export async function stampAgentWrite(
     labelPolicy: input.labelPolicy,
     nodeId: input.nodeId,
     baseUrl: input.baseUrl,
-  });
+  }, input.held);
   return row.id;
 }
 
@@ -432,6 +445,12 @@ export async function provenanceForWrite(
     baseUrl?: string;
     /** `false` disables minting entirely (AIMEAT_AI_PROVENANCE=off). */
     enabled?: boolean;
+    /**
+     * Hand a newly minted record back here instead of storing it (mintProvenance says when). An
+     * attached record already exists and is never held; the scope refusal still throws here, before
+     * the caller's write.
+     */
+    held?: AiProvenanceRecordRow[];
   },
 ): Promise<string | undefined> {
   if (input.enabled === false) return undefined;
@@ -470,7 +489,7 @@ export async function provenanceForWrite(
       labelPolicy: input.labelPolicy,
       nodeId: input.nodeId,
       baseUrl: input.baseUrl,
-    });
+    }, input.held);
     return row.id;
   }
 
@@ -483,6 +502,7 @@ export async function provenanceForWrite(
     nodeId: input.nodeId,
     baseUrl: input.baseUrl,
     enabled: input.enabled,
+    held: input.held,
   });
 }
 
@@ -546,6 +566,8 @@ export async function stampAutonomousOutput(
     baseUrl?: string;
     /** `false` disables minting entirely (AIMEAT_AI_PROVENANCE=off). */
     enabled?: boolean;
+    /** Hand the record back here instead of storing it (mintProvenance says when). */
+    held?: AiProvenanceRecordRow[];
   },
 ): Promise<string | undefined> {
   if (input.enabled === false) return undefined;
@@ -568,7 +590,7 @@ export async function stampAutonomousOutput(
     labelPolicy: input.labelPolicy,
     nodeId: input.nodeId,
     baseUrl: input.baseUrl,
-  });
+  }, input.held);
   return row.id;
 }
 
