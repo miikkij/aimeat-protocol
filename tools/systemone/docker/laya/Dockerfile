@@ -6,17 +6,21 @@
 # The weights (all three checkpoints) are inside the image and the hub is switched off at run time,
 # so the container needs no network to start. The weights layer comes before torch, so the CPU and
 # the CUDA image share it. LAYA_DEVICE=cuda at run time on the CUDA image.
-# Every package is installed from a hash-pinned lock (../lock.sh writes them from requirements.in)
-# and the base image is pinned by digest, so a build gets exactly what was measured.
+# Every package is installed from a hash-pinned lock (../lock.sh writes them from requirements.in),
+# the weights are a fixed commit of convaiinnovations/laya and the base image is pinned by digest,
+# so a build gets exactly what was measured.
 ARG TORCH=cpu
 FROM python:3.12-slim@sha256:2f17fc044b579bab302c2e8054d3a686e2cb9a83de48e70534b94cd8ebbe06a9
 ARG TORCH
 ENV PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1 PIP_DISABLE_PIP_VERSION_CHECK=1 HF_HOME=/opt/hf
 RUN useradd -m -u 10001 app
 
+# The weights at one commit. laya-serve asks the cache for the default branch by name, and the hub
+# is off at run time, so that name is pointed at the pinned commit: a download by commit writes no
+# branch name, and without one the server does not start.
 COPY hub.txt /tmp/req/hub.txt
 RUN pip install --require-hashes -r /tmp/req/hub.txt \
- && python -c "from huggingface_hub import snapshot_download; print(snapshot_download('convaiinnovations/laya'))" \
+ && python -c "import pathlib; from huggingface_hub import snapshot_download; rev = '55cf4c4ebb4ebe31b2550e8bdf3bd21b99753851'; p = pathlib.Path(snapshot_download('convaiinnovations/laya', revision=rev)); (p.parents[1] / 'refs').mkdir(exist_ok=True); (p.parents[1] / 'refs' / 'main').write_text(rev); print(p)" \
  && chown -R app /opt/hf
 
 # laya 0.3.11 (0.3.7 was withdrawn from PyPI on 2026-09-23; 0.3.11 answers the same) and torch.

@@ -1,8 +1,9 @@
 # GPU override: CUDA images and an NVIDIA GPU for each model. Needs the NVIDIA container runtime.
 #
-#   JEFF_API_KEYS=devkey docker compose -f compose.yaml -f compose.gpu.yaml up -d --build
+#   docker compose -f compose.yaml -f compose.gpu.yaml up -d --build
 #
-# It sets the variables compose.yaml reads, so nothing else needs to be exported.
+# It sets the variables compose.yaml reads, so nothing else needs to be exported. The models' keys
+# come from .env, as for the CPU images (compose.yaml says how to make them).
 x-gpu: &gpu
   deploy:
     resources:

@@ -1,9 +1,14 @@
 # The three open System One decision models, on the ports the node's built-in providers expect
 # (laya 8801, von 8802, jeff 8803), bound to 127.0.0.1 only.
 #
-#   CPU:  JEFF_API_KEYS=devkey docker compose up -d --build
-#   GPU:  JEFF_API_KEYS=devkey docker compose -f compose.yaml -f compose.gpu.yaml up -d --build
-#   One:  JEFF_API_KEYS=devkey docker compose up -d --build laya
+# Each model answers only a call that carries its key, and compose refuses to start one without
+# it. Make the three keys once, into .env beside this file (gitignored; compose reads it itself):
+#
+#   for v in JEFF_API_KEYS LAYA_API_KEY VON_API_KEY; do echo "$v=$(openssl rand -hex 32)"; done > .env
+#
+#   CPU:  docker compose up -d --build
+#   GPU:  docker compose -f compose.yaml -f compose.gpu.yaml up -d --build
+#   One:  docker compose up -d --build laya
 #   Stop: docker compose down
 #
 # See ../README.md for connecting a node to them.
@@ -14,6 +19,8 @@ services:
     build: { context: ./laya, args: { TORCH: "${SYSTEMONE_TORCH:-cpu}" } }
     image: "aimeat-systemone/laya:0.3.11-${SYSTEMONE_TORCH:-cpu}"
     environment:
+      # The bearer the node sends as AIMEAT_DECIDE_LAYA_KEY. Required: no key is built in.
+      LAYA_API_KEY: "${LAYA_API_KEY:?set LAYA_API_KEY, the key the node sends as AIMEAT_DECIDE_LAYA_KEY}"
       LAYA_DEVICE: "${SYSTEMONE_DEVICE:-cpu}"
     ports: ["127.0.0.1:${LAYA_PORT:-8801}:8000"]
     restart: unless-stopped
@@ -22,6 +29,8 @@ services:
     build: { context: ./von, args: { TORCH: "${SYSTEMONE_TORCH:-cpu}" } }
     image: "aimeat-systemone/von:1.1.1-${SYSTEMONE_TORCH:-cpu}"
     environment:
+      # The bearer the node sends as AIMEAT_DECIDE_VON_KEY. Required: no key is built in.
+      VON_API_KEY: "${VON_API_KEY:?set VON_API_KEY, the key the node sends as AIMEAT_DECIDE_VON_KEY}"
       VON_DEVICE: "${SYSTEMONE_DEVICE:-cpu}"
     ports: ["127.0.0.1:${VON_PORT:-8802}:8000"]
     restart: unless-stopped
