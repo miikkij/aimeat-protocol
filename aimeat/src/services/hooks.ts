@@ -22,8 +22,16 @@
  *   action: the old shape called storage.listActions() inside the loop, so three bound actions were
  *   three full scans of the actions table on the critical path of every registration.
  *
+ *   A REFERENCE NAMES ONE ACTION OR NONE. The table is keyed (provider, id), so two owners can
+ *   publish the same id. `id#provider` always names exactly one; a bare id names one only while
+ *   exactly one provider publishes it. indexActionRefs() is the one place that decides this, for the
+ *   executor, the page and the binding write alike: a bare id two providers publish resolves to
+ *   nothing, the binding is refused, and a gate bound to one refuses rather than calling whichever
+ *   row the scan returned last (security audit A8-3).
+ *
  * @structure
  *   - HOOK_NAMES / hookKind(name)         — the canonical list, and gate vs notify
+ *   - indexActionRefs(published)          — what each reference names, and the ambiguous bare ids
  *   - executeHooks(config, storage, ...)  — resolve, call in order, record, abort on refusal
  *   - listHooks(config)                   — what is bound to each moment
  *   - HookContext / HookResult            — the context passed through and the outcome
@@ -31,6 +39,10 @@
  *   const r = await executeHooks(config, storage, 'pre_owner_registration', { name, display_name });
  *   if (!r.allowed) return refuse(r.reason);
  * @version-history
+ *   v1.2.0 — 2026-09-24 — SECURITY (audit A8-3): indexActionRefs(). A bare id resolved to whichever
+ *     owner's action listActions() returned last, so a second owner publishing the same id could
+ *     receive the moment's context. Now a bare id two providers publish names nothing: the executor
+ *     calls neither and a gate refuses, the binding write refuses it, and the page shows neither.
  *   v1.1.0 — 2026-09-12 — HOOK_NAMES and hookKind (the list lived in three places); the actions are
  *     resolved once per execution rather than once per bound action; every call is recorded through
  *     hook-log.ts, including the ones that used to vanish into the server log.
@@ -76,6 +88,45 @@ export interface HookResult {
     hookAction?: string;
 }
 
+/** What the references a binding may hold name among the published actions. */
+export interface ActionRefIndex<T> {
+    /** Every reference that names exactly one action: each `id#provider`, and each bare id only
+     *  one provider publishes. */
+    byRef: Map<string, T>;
+    /** Each bare id two or more providers publish, with the `id#provider` reference of each. */
+    ambiguous: Map<string, string[]>;
+}
+
+/**
+ * Index the published actions by the two spellings a binding may use, without ever letting scan
+ * order choose between owners.
+ *
+ * `listActions()` has no ORDER BY and the table is keyed (provider, id), so filling one map with
+ * both spellings made a bare id mean whichever row came last: a second owner publishing the operator's
+ * id took the binding over (security audit A8-3). A bare id is kept only when exactly one provider
+ * publishes it; otherwise it goes into `ambiguous` with every provider-qualified reference, which is
+ * what the refusal names back so the operator can pick one.
+ */
+export function indexActionRefs<T extends Pick<ActionRecord, 'id' | 'providerGaii'>>(
+    published: readonly T[],
+): ActionRefIndex<T> {
+    const byRef = new Map<string, T>();
+    const byId = new Map<string, T[]>();
+    for (const a of published) {
+        byRef.set(`${a.id}#${a.providerGaii}`, a);
+        byId.set(a.id, [...(byId.get(a.id) ?? []), a]);
+    }
+    const ambiguous = new Map<string, string[]>();
+    for (const [id, holders] of byId) {
+        if (holders.length === 1) {
+            if (!byRef.has(id)) byRef.set(id, holders[0]);
+        } else {
+            ambiguous.set(id, holders.map((a) => `${a.id}#${a.providerGaii}`));
+        }
+    }
+    return { byRef, ambiguous };
+}
+
 /**
  * Execute every action bound to one moment, in the order the operator listed them.
  *
@@ -112,15 +163,29 @@ export async function executeHooks(
         }
         return { allowed: true };
     }
-    const byRef = new Map<string, ActionRecord>();
-    for (const a of published) {
-        // Two accepted spellings, unchanged: the bare id, and the id with its provider's identity.
-        byRef.set(a.id, a);
-        byRef.set(`${a.id}#${a.providerGaii}`, a);
-    }
+    // Two accepted spellings, the bare id and the id with its provider's identity, and a bare id
+    // only while exactly one provider publishes it (indexActionRefs).
+    const { byRef, ambiguous } = indexActionRefs(published);
 
     for (const actionRef of actions) {
         const started = Date.now();
+        const claimants = ambiguous.get(actionRef);
+        if (claimants) {
+            // Calling either would let whoever published last decide where this moment's context
+            // goes, so neither is called. A gate that cannot tell what it is bound to has not been
+            // satisfied, the same rule as an address that will not answer: it refuses.
+            logger.warn(`Extension hook ${hookName}: "${actionRef}" is published by ${claimants.length} providers, calling none`);
+            await record(storage, hookName, actionRef, undefined, 'missing', null, Date.now() - started, kind !== 'gate', subject,
+                `More than one provider publishes this id: ${claimants.join(', ')}. Bind the one you mean as id#provider.`);
+            if (kind === 'gate') {
+                return {
+                    allowed: false,
+                    reason: `Hook action "${actionRef}" names more than one published action`,
+                    hookAction: actionRef,
+                };
+            }
+            continue;
+        }
         const action = byRef.get(actionRef);
         if (!action) {
             logger.warn(`Extension hook ${hookName}: action "${actionRef}" not found, skipping`);

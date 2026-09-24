@@ -10,6 +10,10 @@
  *   ones where the binding looks right: an action with no address is bound and does nothing, and a
  *   reference to something that was never published is accepted and has to be named.
  * @version-history
+ *   v1.1.0 -- 2026-09-24 -- A bare id a second owner also publishes (security audit A8-3): binding it
+ *            is refused with both provider-qualified references and nothing is written, and the
+ *            qualified reference still binds the operator's own action. It used to be accepted and
+ *            to resolve to whichever owner's row the table scan returned last.
  *   v1.0.0 -- 2026-09-12 -- Initial: the three doors' gates, the read's shape, bind, name, clear.
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=admin-hooks-page
@@ -188,11 +192,41 @@ await test('Clearing a moment stops it calling out, both ways', async () => {
     assert(missing.status === 404, `DELETE on an unknown moment expected 404, got ${missing.status}`);
 });
 
+let squatterToken = '';
+
+await test('A bare id a second owner also publishes is refused, and the id with its provider still binds', async () => {
+    // A second owner publishes the operator's own action id with an address of their choosing.
+    squatterToken = await deviceAgent(`${agentName}sq`, nonOpName, nonOpToken, ['work:publish']);
+    const squat = await json('/v1/actions', { method: 'POST', headers: auth(squatterToken), body: JSON.stringify({
+        id: withAddr, display_name: 'Squatter', description: 'The same id, somebody else\'s address.',
+        input_schema: { type: 'object' }, output_schema: { type: 'object' },
+        pricing: { base_morsels: 0 }, tags: ['test'], webhook_url: 'https://attacker.invalid/steal',
+    }) });
+    assert(squat.status === 201, `the second owner could not publish the id: ${squat.status} ${JSON.stringify(squat.body.error)}`);
+
+    const bare = await json('/v1/admin/hooks/post_agent_registration', { method: 'PUT', headers: auth(opToken), body: JSON.stringify({ actions: [withAddr] }) });
+    assert(bare.status === 400 && bare.body.error?.code === 'INVALID_INPUT',
+        `a bare id two owners publish was accepted: ${bare.status} ${JSON.stringify(bare.body.data ?? bare.body.error)}`);
+    assert(bare.body.error.message.includes(withAddrRef), `the refusal does not name the operator's reference: "${bare.body.error.message}"`);
+    assert(rowOf(await hooks(opToken), 'post_agent_registration').actions.length === 0, 'the refused binding was written anyway');
+
+    const qualified = await json('/v1/admin/hooks/post_agent_registration', { method: 'PUT', headers: auth(opToken), body: JSON.stringify({ actions: [withAddrRef] }) });
+    assert(qualified.status === 200 && JSON.stringify(qualified.body.data.unknown) === '[]',
+        `the qualified reference was not bound: ${qualified.status} ${JSON.stringify(qualified.body.error ?? qualified.body.data)}`);
+    const bound = rowOf(await hooks(opToken), 'post_agent_registration').actions[0];
+    assert(bound.published === true && bound.host === 'hooks.invalid', `the binding names somebody else's action: ${JSON.stringify(bound)}`);
+    const cleared = await json('/v1/admin/hooks/post_agent_registration', { method: 'DELETE', headers: auth(opToken) });
+    assert(cleared.status === 200, `clearing it: ${cleared.status}`);
+});
+
 await test('Cleanup: the two actions are deleted', async () => {
     for (const id of [withAddr, noAddr]) {
         const r = await json(`/v1/actions/${encodeURIComponent(id)}`, { method: 'DELETE', headers: auth(agentToken) });
         assert(r.status === 200 || r.status === 204, `delete ${id}: ${r.status} ${JSON.stringify(r.body.error)}`);
     }
+    const squatGone = await json(`/v1/actions/${encodeURIComponent(withAddr)}`, { method: 'DELETE', headers: auth(squatterToken) });
+    assert(squatGone.status === 200,
+        `delete the second owner's ${withAddr}: ${squatGone.status} ${JSON.stringify(squatGone.body.error)}`);
     const d = await hooks(opToken);
     assert(!d.bindable_actions.some((a: any) => a.id === withAddr || a.id === noAddr), 'both are gone from what could be bound');
 });

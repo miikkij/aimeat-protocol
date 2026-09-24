@@ -17,7 +17,14 @@
  *   3. Nothing was recorded anywhere a person could read. Every assertion here about `runs` is new
  *      behaviour: a refusal that leaves no trace is indistinguishable from nobody having tried.
  *
+ *   4. A BARE action id resolved to whichever owner's action the table scan returned last. Two
+ *      owners may publish the same id, so a binding the operator made to their own action could call
+ *      a squatter's webhook with the moment's context (security audit A8-3). "a bare id two
+ *      providers publish" below asserts that nobody is called, that the binding is refused, and
+ *      that the page does not show the squatter's host.
+ *
  * @version-history
+ *   v1.1.0 — 2026-09-24 — A bare id two providers publish: never resolved by scan order (A8-3).
  *   v1.0.0 — 2026-09-12 — Initial.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -48,6 +55,7 @@ vi.mock('../../src/utils/logger.js', () => ({
 
 import { executeHooks, listHooks, hookKind, HOOK_NAMES, subjectOf } from '../../src/services/hooks.js';
 import { readHookRuns, HOOK_RUNS_KEPT } from '../../src/services/hook-log.js';
+import { buildHooksOverview, setHookActions } from '../../src/services/hooks-overview.js';
 import type { AimeatConfig, HookName } from '../../src/config.js';
 import type { Storage } from '../../src/storage/interface.js';
 import type { ActionRecord } from '../../src/storage/types/commerce.js';
@@ -140,6 +148,80 @@ describe('resolving the actions', () => {
     expect(r.allowed).toBe(true);
     expect(fetched).toHaveLength(0);
     expect((await readHookRuns(storage))[0]).toMatchObject({ answer: 'no_address', allowed: true, actionName: 'Allowlist check' });
+  });
+});
+
+describe('a bare id two providers publish', () => {
+  // The operator's own action and a second owner's action under the SAME id. The table is keyed
+  // (provider, id), so both are legal rows, and listActions() returns them in no stated order.
+  const operatorsOwn = action({ id: 'gate', providerGaii: 'bot#opr@node', displayName: 'Mine', webhookUrl: 'https://operator-legit.example/gate' });
+  const squatter = action({ id: 'gate', providerGaii: 'bot#mallory@node', displayName: 'Squatter', webhookUrl: 'https://attacker.example/steal' });
+
+  /** Enough storage for the binding write as well: the config rows it writes and deletes. */
+  function bindingStorage(actions: ActionRecord[]) {
+    const { storage } = fakeStorage(actions);
+    const written: string[] = [];
+    Object.assign(storage, {
+      setConfigValue: async (key: string) => { written.push(key); },
+      deleteConfigValue: async (key: string) => { written.push(key); },
+    });
+    return { storage, written };
+  }
+
+  it('a gate bound to it calls nobody and refuses, in either scan order', async () => {
+    for (const order of [[operatorsOwn, squatter], [squatter, operatorsOwn]]) {
+      fetched.length = 0;
+      const { storage } = fakeStorage(order);
+      const r = await executeHooks(cfg({ pre_owner_registration: ['gate'] }), storage, 'pre_owner_registration', { name: 'eve' });
+      expect(fetched).toEqual([]);
+      expect(r.allowed).toBe(false);
+      const run = (await readHookRuns(storage))[0];
+      expect(run).toMatchObject({ actionRef: 'gate', allowed: false });
+      expect(run.reason).toContain('gate#bot#mallory@node');
+    }
+  });
+
+  it('a notify hook bound to it calls nobody and stops nothing', async () => {
+    const { storage } = fakeStorage([operatorsOwn, squatter]);
+    const r = await executeHooks(cfg({ post_agent_registration: ['gate'] }), storage, 'post_agent_registration', { name: 'bot' });
+    expect(r).toEqual({ allowed: true });
+    expect(fetched).toEqual([]);
+  });
+
+  it('the id with its provider still names exactly one, whoever else publishes the id', async () => {
+    const { storage } = fakeStorage([squatter, operatorsOwn]);
+    const r = await executeHooks(cfg({ pre_owner_registration: ['gate#bot#opr@node'] }), storage, 'pre_owner_registration', { name: 'eve' });
+    expect(r.allowed).toBe(true);
+    expect(fetched).toEqual(['https://operator-legit.example/gate']);
+  });
+
+  it('binding it is refused before anything is written, and the answer names both references', async () => {
+    const { storage, written } = bindingStorage([operatorsOwn, squatter]);
+    const config = cfg();
+    const out = await setHookActions(config, storage, 'pre_owner_registration', ['gate']);
+    expect(out.ok).toBe(false);
+    if (out.ok) return;
+    expect(out.code).toBe('INVALID_INPUT');
+    expect(out.message).toContain('gate#bot#opr@node');
+    expect(out.message).toContain('gate#bot#mallory@node');
+    expect(config.extensionHooks.pre_owner_registration).toEqual([]);
+    expect(written).toEqual([]);
+  });
+
+  it('binding the provider-qualified reference is accepted', async () => {
+    const { storage, written } = bindingStorage([operatorsOwn, squatter]);
+    const config = cfg();
+    const out = await setHookActions(config, storage, 'pre_owner_registration', ['gate#bot#opr@node']);
+    expect(out).toMatchObject({ ok: true, actions: ['gate#bot#opr@node'], unknown: [] });
+    expect(written).toEqual(['hooks.pre_owner_registration']);
+  });
+
+  it('the page shows a binding made before the second owner published as naming nothing, never the squatter', async () => {
+    const { storage } = fakeStorage([operatorsOwn, squatter]);
+    const overview = await buildHooksOverview(cfg({ pre_owner_registration: ['gate'] }), storage);
+    const bound = overview.hooks.find(h => h.name === 'pre_owner_registration')!.actions[0];
+    expect(bound).toMatchObject({ ref: 'gate', published: false, name: null, host: null });
+    expect(bound.ambiguous).toEqual(['gate#bot#opr@node', 'gate#bot#mallory@node']);
   });
 });
 
