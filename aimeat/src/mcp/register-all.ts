@@ -201,7 +201,7 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     registerSurfaceLayoutTools(mcp, storage, config, agentGaii);
     registerAppUiTools(mcp, storage, config, agentGaii);
     registerDesignbookTools(mcp, storage, config, agentGaii);
-    registerUiLibraryTools(mcp);
+    registerUiLibraryTools(mcp, storage, config);
     registerThemeTools(mcp, storage, config, agentGaii);
     registerAgentTelemetryTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);
     registerAgentOnboardingTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);

@@ -10,8 +10,8 @@
  *   listeners; attach('auth', auth) + version.
  * @usage <script src="/v1/libs/aimeat-auth.js"></script>  const s = await AIMEAT.auth.login();
  * @version-history
- *   v1.5.0 — 2026-09-24 — AIMEAT.auth.getPalettes() answers the node's themes on the node's own pages
- *     (palette.js paletteRegistry), and PALETTES everywhere else.
+ *   v1.5.0 — 2026-09-24 — AIMEAT.auth.getPalettes() answers the styles of the theme the page wears on
+ *     AIMEAT's own pages (palette.js paletteRegistry, Themes & Styles), and PALETTES everywhere else.
  *   v1.4.0 — 2026-09-06 — The page says whether it keeps its own light, and the register no longer
  *     answers for it. v1.3.0 disabled the control on any body naming a `genre-…` register, which
  *     was right for the twenty-one that hardcode their palette and wrong for genre-living, whose
@@ -73,4 +73,4 @@ auth.getPalettes = function () { return paletteRegistry().map(function (p) { ret
 if (typeof document !== 'undefined') { aimeatRestorePalette(); aimeatRestoreMode(); }
 
 const ns = attach('auth', auth);
-ns.version = '2026-07-25-002';
+ns.version = '2026-09-24-001';

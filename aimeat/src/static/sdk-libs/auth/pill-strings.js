@@ -18,6 +18,10 @@
  * @usage import { pillStrings } from './pill-strings.js';
  *   const i = Object.assign({}, pillStrings(lang), opts.i18n);   // a caller's strings always win
  * @version-history
+ *   v1.3.0 — 2026-09-24 — Themes & Styles: `lookThemes` and `lookStyles` name the picker's two groups,
+ *     `styleLightOnly` and `styleDarkOnly` say why light/dark stands down for a style with one mode.
+ *     `themeLabel` names the light/dark group "Light or dark": "theme" is the whole look now, one word
+ *     for one thing.
  *   v1.2.0 — 2026-09-13 — `pageSettings`: the name of the button a signed-out pill folds its
  *     language, light/dark and palette controls behind on a phone. The settled word in each
  *     language (Settings, Asetukset, Ajustes).
@@ -30,22 +34,28 @@ export var PILL_STRINGS = {
   en: {
     loggedIn: 'logged in', logoutBtn: 'Logout', signInBtn: '❤️ Sign In', account: 'Account',
     federated: 'Federated', manageAccess: 'Manage permissions',
-    lightMode: 'Light mode', darkMode: 'Dark mode', themeLabel: 'Theme',
+    lightMode: 'Light mode', darkMode: 'Dark mode', themeLabel: 'Light or dark',
     fixedRegister: 'This register keeps its own light',
+    styleLightOnly: 'This style has a light mode only', styleDarkOnly: 'This style has a dark mode only',
+    lookThemes: 'Themes', lookStyles: 'Styles',
     chooseLook: 'Choose look', switchLanguage: 'Language', pageSettings: 'Settings',
   },
   fi: {
     loggedIn: 'kirjautuneena', logoutBtn: 'Kirjaudu ulos', signInBtn: '❤️ Kirjaudu', account: 'Tili',
     federated: 'Federoitu', manageAccess: 'Hallitse oikeuksia',
-    lightMode: 'Vaalea tila', darkMode: 'Tumma tila', themeLabel: 'Teema',
+    lightMode: 'Vaalea tila', darkMode: 'Tumma tila', themeLabel: 'Vaalea vai tumma',
     fixedRegister: 'Tämä rekisteri pitää oman valonsa',
+    styleLightOnly: 'Tällä tyylillä on vain vaalea tila', styleDarkOnly: 'Tällä tyylillä on vain tumma tila',
+    lookThemes: 'Teemat', lookStyles: 'Tyylit',
     chooseLook: 'Valitse tyyli', switchLanguage: 'Kieli', pageSettings: 'Asetukset',
   },
   es: {
     loggedIn: 'sesión iniciada', logoutBtn: 'Cerrar sesión', signInBtn: '❤️ Entrar', account: 'Cuenta',
     federated: 'Federado', manageAccess: 'Gestionar permisos',
-    lightMode: 'Modo claro', darkMode: 'Modo oscuro', themeLabel: 'Tema',
+    lightMode: 'Modo claro', darkMode: 'Modo oscuro', themeLabel: 'Claro u oscuro',
     fixedRegister: 'Este registro conserva su propia luz',
+    styleLightOnly: 'Este estilo solo tiene modo claro', styleDarkOnly: 'Este estilo solo tiene modo oscuro',
+    lookThemes: 'Temas', lookStyles: 'Estilos',
     chooseLook: 'Elige el aspecto', switchLanguage: 'Idioma', pageSettings: 'Ajustes',
   },
 };

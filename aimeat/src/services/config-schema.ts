@@ -12,9 +12,9 @@
  *   - CONFIG_FIELDS: the exhaustive field list grouped by domain (node, morsel policy, auth, features, work, quotas, federation, ...)
  *
  * @version-history
- *   v1.13.0 — 2026-09-24 — The `themes.` group (Themes & Styles): whether people choose their own
- *     theme, the one theme when they do not, which themes the pill offers and the default. The row
- *     type moved to config-field-def.ts, unchanged, to make room.
+ *   v1.13.0 — 2026-09-24 — The `themes.` group (Themes & Styles): whether people choose, which themes
+ *     are available to them, and the default theme. The row's shape moved to config-field-def.ts
+ *     (with no imports, so no cycle) to make room.
  *   v1.12.1 — 2026-09-23 — decide.provider_egress: the exact addresses of the operator's own local
  *     decision models.
  *   v1.12.0 — 2026-09-19 — The `decide.` group (TARGET-080): the decision provider's switch, key,
@@ -54,10 +54,23 @@
  */
 
 import type { AimeatConfig } from '../config.js';
-import type { ConfigFieldDef } from './config-field-def.js';
+import type { SiteLinksConfig } from '../config-types-site-links.js';
+import type { OperatorConfig } from '../config-types.js';
+import type { ConfigFieldShape } from './config-field-def.js';
 
-// ── Field Definition ── in config-field-def.ts (moved there when this file reached the line ceiling).
-export type { ConfigFieldDef, SiteLinkFieldKey, OperatorFieldKey } from './config-field-def.js';
+// ── Field Definition ── the row's shape is in config-field-def.ts (this file reached the line ceiling).
+
+/**
+ * The site links are the one nested group a row may address: `siteLinks.learn` and its siblings.
+ * Every reader and writer of a row's value goes through readConfigField / writeConfigField below,
+ * which is what lets a row point one level down without each consumer learning to.
+ */
+export type SiteLinkFieldKey = `siteLinks.${keyof SiteLinksConfig}`;
+
+/** The operator identity block, addressed the same way: `operator.name` and its siblings. */
+export type OperatorFieldKey = `operator.${keyof OperatorConfig}`;
+
+export type ConfigFieldDef = ConfigFieldShape<keyof AimeatConfig | SiteLinkFieldKey | OperatorFieldKey>;
 
 // ── All Known Config Fields ──
 
@@ -301,10 +314,9 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   // ── Themes (mutable) ── the look of the node's own interface (Themes & Styles, services/themes/).
   // An id that names no theme is dropped where the values are read, so a stale setting never offers
   // a theme that does not exist; the Themes & Styles view offers only real ids.
-  { key: 'themesPersonalChoice', dotPath: 'themes.personal_choice', envVar: 'AIMEAT_THEMES_PERSONAL_CHOICE', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'People choose their own theme in the pill. Off: every page wears the one theme in themes.fixed' },
-  { key: 'themesFixed', dotPath: 'themes.fixed', envVar: 'AIMEAT_THEMES_FIXED', type: 'string', validate: v => typeof v === 'string' && /^[a-z0-9-]{2,40}$/.test(v), immutable: false, description: 'The one theme every page wears when people do not choose their own (a theme id)' },
-  { key: 'themesOffered', dotPath: 'themes.offered', envVar: 'AIMEAT_THEMES_OFFERED', type: 'string', validate: v => typeof v === 'string' && /^([a-z0-9-]{2,40}(\s*,\s*[a-z0-9-]{2,40})*)?$/.test(v.trim()), immutable: false, description: 'The themes the pill offers, comma separated ids; empty offers every theme that is not retired' },
-  { key: 'themesDefault', dotPath: 'themes.default', envVar: 'AIMEAT_THEMES_DEFAULT', type: 'string', validate: v => typeof v === 'string' && /^[a-z0-9-]{2,40}$/.test(v), immutable: false, description: 'The theme a person sees before they choose one (a theme id among the offered)' },
+  { key: 'themesPersonalChoice', dotPath: 'themes.personal_choice', envVar: 'AIMEAT_THEMES_PERSONAL_CHOICE', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'People choose a theme and a style in the pill. Off: every page wears the default theme in its default style, and the pill shows no choice' },
+  { key: 'themesOffered', dotPath: 'themes.offered', envVar: 'AIMEAT_THEMES_OFFERED', type: 'string', validate: v => typeof v === 'string' && /^([a-z0-9-]{2,40}(\s*,\s*[a-z0-9-]{2,40})*)?$/.test(v.trim()), immutable: false, description: 'The themes available to people, comma separated theme ids; empty means the built-in AIMEAT theme only' },
+  { key: 'themesDefault', dotPath: 'themes.default', envVar: 'AIMEAT_THEMES_DEFAULT', type: 'string', validate: v => typeof v === 'string' && /^[a-z0-9-]{2,40}$/.test(v), immutable: false, description: 'The default theme: what a person sees before choosing, and what everybody sees when people do not choose (a theme id among the available)' },
 
   // ── Extensions (Phase 2.7, mutable) ──
   { key: 'extensionsEnabled', dotPath: 'extensions.enabled', envVar: 'AIMEAT_EXTENSIONS_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Sandboxed extension system enabled' },

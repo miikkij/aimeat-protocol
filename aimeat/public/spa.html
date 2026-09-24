@@ -48,8 +48,8 @@
   <script src="/v1/libs/aimeat-webmcp.js?expose=node" defer></script>
   <meta name="theme-color" content="#FAFAF8">
   <!-- The node's themes and who chooses (Themes & Styles), written here by the node per request
-       (routes/portal-spa.ts) as window.__AIMEAT_THEMES, so the boot below can set the theme before
-       the first paint. -->
+       (routes/portal-spa.ts) as window.__AIMEAT_THEMES, so the look script after the stylesheets can
+       put the theme on the page before the first paint. -->
   <!-- __AIMEAT_THEMES__ -->
   <!-- No-flash theme boot: set data-theme on <html> before first paint.
        Plain inline JS (NOT a module — modules defer and reintroduce the flash).
@@ -65,29 +65,6 @@
       } catch (e) {
         document.documentElement.dataset.theme = 'light';
       }
-      // The theme (the palette axis), when the node said which ones exist: the operator's one theme,
-      // or the person's stored choice when the node still offers it, or the node's default. The
-      // house theme has no attribute. A theme with one mode only sets that mode and says so to the
-      // pill's light/dark switch (auth/theme.js reads the aimeat-light meta).
-      try {
-        var T = window.__AIMEAT_THEMES, root = document.documentElement, pal = null;
-        if (T && T.policy && T.themes) {
-          var ids = T.themes.map(function (t) { return t.id; });
-          if (!T.policy.personalChoice) pal = T.policy.fixed;
-          else {
-            var s = null;
-            try { s = localStorage.getItem('aimeat-palette'); } catch (e) { s = null; }
-            pal = (s && ids.indexOf(s) >= 0) ? s : T.policy.default;
-          }
-          if (pal && pal !== 'aimeat') root.setAttribute('data-palette', pal);
-          var only = T.onlyMode && T.onlyMode[pal];
-          if (only === 'light' || only === 'dark') {
-            root.dataset.theme = only;
-            var m = document.createElement('meta'); m.name = 'aimeat-light'; m.content = 'fixed';
-            document.head.appendChild(m);
-          }
-        }
-      } catch (e) { /* the auth library restores the palette later, as it always has */ }
     })();
   </script>
   <!-- The palette definitions (--color-* per data-palette, light and dark), loaded BEFORE
@@ -126,9 +103,6 @@
   <!-- /shell block -->
   <link rel="stylesheet" href="/css/poster.css">
   <link rel="stylesheet" href="/css/components/dialog.css">
-  <!-- The node's own themes (Themes & Styles), after theme.css: the node stamps this address with
-       the themes' own hash per request, so an edit reaches the next page load without a restart. -->
-  <link rel="stylesheet" href="/v1/themes.css">
   <!-- The margin pattern on the home, the chat and the settings pages: a personal choice, set on
        <html> by js/margin-pattern.js once the session is known. -->
   <link rel="stylesheet" href="/css/components/margin-pattern.css">
@@ -305,6 +279,153 @@
   <link rel="stylesheet" href="/css/views/agent-tasks-poster.css">
   <link rel="stylesheet" href="/css/views/memory.css">
   <link rel="stylesheet" href="/css/views/inbox-poster.css">
+  <!-- THE LOOK (Themes & Styles, 07-themes-and-styles.md), after every stylesheet and before the
+       first paint. On AIMEAT's own pages (window.__AIMEAT_THEMES.inner: the home, the chat, Settings
+       & Controls, admin, Agents) the page wears a theme and one of its styles: data-palette names
+       the style, data-aimeat-theme names a theme of the node's own, and that theme's sheet is linked
+       here, last, so its CSS wins. Every other page keeps behaving as it did before themes: one of
+       the built-in styles from the browser, no theme sheet (Jouni, 2026-09-24). A style with one mode
+       only sets that mode and tells the pill's light/dark switch why it stands down.
+       ?theme=aimeat shows every page of this tab in the built-in theme until a choice is made in
+       the pill: the way back in when a theme broke the page. window.__aimeatLook is what the SPA's
+       router, the pill (sdk-libs/auth/palette.js), the account choice and the admin view call. -->
+  <script>
+    (function () {
+      var root = document.documentElement, anchor = document.currentScript;
+      var T = window.__AIMEAT_THEMES || null;
+      var HOUSE = 'aimeat', KEY_STYLE = 'aimeat-palette', KEY_THEME = 'aimeat-look-theme', KEY_SAFE = 'aimeat-look-safe';
+      var BUILTIN = (T && T.builtin) || ['aimeat', 'paper', 'circuit', 'contrast', 'mist', 'voltage'];
+      var held = false, safe = false, current = null;
+      function get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+      function put(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* storage blocked */ } }
+      try {
+        if (new URLSearchParams(location.search).get('theme') === HOUSE) sessionStorage.setItem(KEY_SAFE, '1');
+        safe = sessionStorage.getItem(KEY_SAFE) === '1';
+      } catch (e) { safe = false; }
+      function inner(path) {
+        var list = (T && T.inner) || [];
+        for (var i = 0; i < list.length; i++) if (path === list[i] || path.indexOf(list[i] + '/') === 0) return true;
+        return false;
+      }
+      function themeOf(id) {
+        for (var i = 0; T && id && i < T.themes.length; i++) if (T.themes[i].id === id) return T.themes[i];
+        return null;
+      }
+      function styleOf(th, id) {
+        for (var i = 0; th && id && i < th.styles.length; i++) if (th.styles[i].id === id) return th.styles[i];
+        return null;
+      }
+      function themeWithStyle(id) {
+        for (var i = 0; T && id && i < T.themes.length; i++) if (styleOf(T.themes[i], id)) return T.themes[i];
+        return null;
+      }
+      // The pages outside AIMEAT's own interface, exactly as before themes: ?palette=, then the stored
+      // choice, when it is a built-in style; else the house style.
+      function builtinStyle() {
+        var s = null;
+        try { s = new URLSearchParams(location.search).get('palette'); } catch (e) { s = null; }
+        if (!s || BUILTIN.indexOf(s) < 0) s = get(KEY_STYLE);
+        return s && BUILTIN.indexOf(s) >= 0 ? s : HOUSE;
+      }
+      // Themes & Styles' preview of a draft on a real page (S7): ?look-draft=<key>&style=<id>&mode=.
+      // The draft exists only in the operator's own browser; it arrives on a same-origin channel.
+      var draft = null;
+      try {
+        var dq = new URLSearchParams(location.search);
+        if (dq.get('look-draft')) draft = { key: dq.get('look-draft'), style: dq.get('style') || HOUSE, mode: dq.get('mode') };
+      } catch (e) { draft = null; }
+      function resolve(path) {
+        var isInner = !!T && inner(path);
+        if (draft) return { inner: isInner, theme: null, style: draft.style, only: null, sheet: null };
+        if (!isInner || safe || held) return { inner: isInner, theme: isInner ? HOUSE : null, style: builtinStyle(), only: null, sheet: null };
+        var p = T.policy, th, st;
+        if (!p.personalChoice) th = themeOf(p.default);
+        else th = themeOf(get(KEY_THEME)) || themeWithStyle(get(KEY_STYLE)) || themeOf(p.default);
+        th = th || T.themes[0];
+        st = (p.personalChoice && styleOf(th, get(KEY_STYLE))) || styleOf(th, th.defaultStyle) || th.styles[0];
+        return { inner: true, theme: th.id, style: st.id, only: st.onlyMode || null, sheet: th.sheet || null };
+      }
+      function storedMode() {
+        var m = get('aimeat-theme');
+        if (m === 'light' || m === 'dark') return m;
+        return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      }
+      function wear(L) {
+        if (L.theme && L.theme !== HOUSE) root.setAttribute('data-aimeat-theme', L.theme); else root.removeAttribute('data-aimeat-theme');
+        if (L.style && L.style !== HOUSE) root.setAttribute('data-palette', L.style); else root.removeAttribute('data-palette');
+        var link = document.getElementById('aimeat-theme-sheet');
+        if (L.sheet) {
+          if (!link) {
+            link = document.createElement('link');
+            link.id = 'aimeat-theme-sheet';
+            link.rel = 'stylesheet';
+            link.setAttribute('blocking', 'render');
+            anchor.parentNode.insertBefore(link, anchor);
+          }
+          if (link.getAttribute('href') !== L.sheet) link.setAttribute('href', L.sheet);
+        } else if (link) link.parentNode.removeChild(link);
+        var meta = document.querySelector('meta[name="aimeat-light"][data-look]');
+        if (L.only === 'light' || L.only === 'dark') {
+          if (!meta) { meta = document.createElement('meta'); meta.name = 'aimeat-light'; meta.content = 'fixed'; document.head.appendChild(meta); }
+          meta.setAttribute('data-look', L.only);
+          root.dataset.theme = L.only;
+        } else if (meta) {
+          meta.parentNode.removeChild(meta);
+          root.dataset.theme = storedMode();
+        }
+        current = L;
+        try { window.dispatchEvent(new CustomEvent('aimeat-look-change', { detail: L })); } catch (e) { /* no window */ }
+      }
+      function apply(path) { wear(resolve(path || location.pathname)); }
+      window.__aimeatLook = {
+        apply: apply,
+        /** What the page wears, and what the pill may offer on it. */
+        state: function () {
+          var L = current || resolve(location.pathname);
+          return { inner: L.inner, theme: L.theme, style: L.style, only: L.only, safe: safe, held: held,
+            personalChoice: !T || T.policy.personalChoice, themes: T ? T.themes : [], builtin: BUILTIN };
+        },
+        /** A choice in the pill: kept in the browser, worn now, announced for the account to keep. */
+        choose: function (themeId, styleId) {
+          if (T && !T.policy.personalChoice && current && current.inner) return;
+          var th = themeOf(themeId) || themeWithStyle(styleId);
+          if (th) {
+            put(KEY_THEME, th.id);
+            styleId = (styleOf(th, styleId) || styleOf(th, th.defaultStyle) || th.styles[0]).id;
+          }
+          if (styleId) put(KEY_STYLE, styleId);
+          safe = false;
+          try { sessionStorage.removeItem(KEY_SAFE); } catch (e) { /* storage blocked */ }
+          apply(location.pathname);
+          try { window.dispatchEvent(new CustomEvent('aimeat-palette-change', { detail: { palette: styleId, theme: th ? th.id : null } })); } catch (e) { /* no window */ }
+        },
+        /** The Themes & Styles view wears the built-in theme while it is open, so a theme cannot break it. */
+        hold: function (on) { held = !!on; apply(location.pathname); },
+        /** Wear a given theme and style whatever is offered: the design lab's preview frames. */
+        show: function (L) { wear({ inner: false, theme: L.theme || null, style: L.style || HOUSE, only: L.only || null, sheet: L.sheet || null }); },
+      };
+      try { apply(location.pathname); } catch (e) { /* the pages keep the built-in look */ }
+      if (draft && (draft.mode === 'light' || draft.mode === 'dark')) root.dataset.theme = draft.mode;
+      if (draft && window.BroadcastChannel && 'adoptedStyleSheets' in document) {
+        try {
+          var sheet = new CSSStyleSheet(), channel = new BroadcastChannel('aimeat-theme-preview');
+          document.adoptedStyleSheets = document.adoptedStyleSheets.concat([sheet]);
+          channel.onmessage = function (ev) {
+            var d = ev.data || {};
+            if (d.type === 'draft' && d.key === draft.key && typeof d.css === 'string') { try { sheet.replaceSync(d.css); } catch (e) { /* a draft that does not parse shows nothing */ } }
+          };
+          channel.postMessage({ type: 'ready', key: draft.key });
+          // The frame around the page takes its height from the page, up to a screen and a half.
+          if (window.parent !== window && window.ResizeObserver) {
+            // The shell scrolls inside its own region, so the page is as tall as its frame: it asks for a screen.
+            document.addEventListener('DOMContentLoaded', function () {
+              window.parent.postMessage({ type: 'design-lab-size', height: 820 }, location.origin);
+            });
+          }
+        } catch (e) { /* no preview: the page shows the built-in look */ }
+      }
+    })();
+  </script>
   <script type="importmap">
   {
     "imports": {
@@ -784,6 +905,8 @@
       const navigate = useCallback(async (path, replace = false) => {
         const url = new URL(path, window.location.origin);
         const loader = matchRoute(url.pathname, url.search);
+        // The look follows the address: AIMEAT's own pages wear the chosen theme, the others do not.
+        window.__aimeatLook?.apply(url.pathname);
         
         if (replace) {
           history.replaceState(null, '', path);
@@ -846,6 +969,7 @@
 
         // Handle back/forward
         const onPopState = () => {
+          window.__aimeatLook?.apply(location.pathname);
           const loader = matchRoute(location.pathname, location.search);
           loader().then(mod => {
             setViewError(null);

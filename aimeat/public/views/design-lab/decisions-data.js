@@ -28,8 +28,10 @@
  *   tones?: [{ name, meaning, from }] }, variants: [{ id, name, code, look, where, becomes, files,
  *   keptAsIs, crop }], changes: [{ page, what }], choice }]
  *   BUILT — { [decisionId]: { commit, onMain, date, what, sets: [{ name, total, changed, noise }], note? } }
+ *   BUILT_WITHOUT_DECISION — { [id]: the same, with a title }: built work Jouni looks at that no decision holds
  * @usage import { DECISIONS, BUILT } from './decisions-data.js';
  * @version-history
+ *   v3.4.0 — 2026-09-24 — BUILT_WITHOUT_DECISION: Themes & Styles, its numbers and its yes.
  *   v3.3.0 — 2026-09-24 — BUILT: what was built from decisions 13-22, for the lab's "Built" section.
  *   v3.2.0 — 2026-09-24 — Dialog actions answered (Jouni: the proposal, and Save is the loud action).
  *   v3.1.0 — 2026-09-24 — The home's and the chat's remaining own looks (decisions 14-21, answered
@@ -574,4 +576,21 @@ export const BUILT = {
       set('"Change password…": the Edit profile dialog, whole and footer, two widths, both modes', 8, 8),
       set(HOME_CHAT, 150, 0), set(FORCED, 72, 0), set(OTHER, 126, 1, 13)],
     note: 'Every dialog picture changed in its footer row only. On a phone the Edit profile dialog\'s dark block is a little narrower after the "Change password…" change, because the longer link takes more of the row. The one other page picture that changed is the settings landing on a phone, which differs by the same amount between two runs of the same code: it sometimes draws before its data arrives.' },
+};
+
+/**
+ * Built work that no decision holds, shown under the decisions' summary with the same Built part.
+ * Themes & Styles (07-themes-and-styles.md): what the move measured against the old code, what the
+ * public pages did before and after, and the interactions with a theme's CSS worn.
+ */
+export const BUILT_WITHOUT_DECISION = {
+  'themes-and-styles': { title: 'Themes & Styles', commit: 'PENDING', onMain: false, date: '2026-09-24',
+    what: 'The admin view Themes & Styles (Design group): a theme holds styles, component CSS and theme CSS; the look picker offers the themes and their styles; the six built-in looks are now the AIMEAT theme. Measured against the old code (origin/main) on the same data.',
+    sets: [
+      set('The move: the home, the account record and the chat in the six built-in styles, three widths, both modes', 108, 0),
+      set('Public pages and the front page, signed out, with four looks kept in the browser', 96, 0),
+      set('Public pages signed in (help, members, change log), with four looks kept in the browser', 72, 0),
+      set('Signed in, "/" (it opens the home, which themes reach), with four looks kept in the browser', 24, 6),
+    ],
+    note: 'The 6 changed pictures are "/" with Harbour Day kept: the home wears the theme chosen, as intended; the old code does not know that style. With a theme\'s component CSS worn, the 21 driven steps of the home and the chat did the same as in the AIMEAT look (0 differences).' },
 };

@@ -18,6 +18,8 @@
  *   toggleTheme();                           // flip light <-> dark
  * @version-history
  *   v1.0.0 — 2026-06-02 — Initial dark/light theming (Phase 1 mechanism).
+ *   v1.2.0 — 2026-09-24 — The OS listener leaves the mode alone while the page wears a style with
+ *     one mode only (Themes & Styles).
  *   v1.1.0 — 2026-06-28 — Adopt external `aimeat-theme-change` events (the login pill now
  *     owns the toggle) so SPA subscribers repaint; loop-guarded via selfDispatch.
  */
@@ -119,6 +121,8 @@ export function initThemeSystem() {
     mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     const onOsChange = (e) => {
       if (hasExplicitChoice()) return; // explicit choice wins over OS
+      // A style with one mode only keeps that mode (Themes & Styles; the look boot in spa.html).
+      if (document.querySelector('meta[name="aimeat-light"][data-look]')) return;
       setTheme(e.matches ? 'dark' : 'light', false);
     };
     if (mediaQuery.addEventListener) {

@@ -9,16 +9,21 @@
  *   'aimeat' coral palette, so a page with no stored choice is byte-identical to the pre-palette
  *   era). Changing it fires an 'aimeat-palette-change' window event — a pure CSS-variable swap,
  *   so an app never needs to re-render, exactly like TDR.setPalette() in the MACHINE ROOM kit.
+ *
+ *   ON THE NODE'S OWN PAGES the shell owns the look (Themes & Styles): its look script
+ *   (window.__aimeatLook, spa.html) knows the node's themes and which page is AIMEAT's own
+ *   interface. There the picker offers the styles of the person's theme, and the other themes when
+ *   the operator makes more than one available; it is gone when the operator decides for everybody.
+ *   On every other page, and in every published app, nothing changed: PALETTES, as before.
  * @structure AIMEAT_PALETTE_KEY · PALETTES (the registry, synced against aimeat-theme.css) ·
- *   aimeatReadPalette/aimeatApplyPalette/aimeatRestorePalette · paletteControlHtml/
- *   wirePaletteControl (the swatch picker) · esc
+ *   paletteRegistry · aimeatReadPalette/aimeatApplyPalette/aimeatRestorePalette ·
+ *   paletteControlHtml/wirePaletteControl (the swatch picker) · esc
  * @usage import { PALETTES, aimeatApplyPalette, aimeatRestorePalette } from './palette.js';
  *   In the app: nothing — the login pill renders the picker and the CSS follows.
  * @version-history
- *   v1.3.0 — 2026-09-24 — On the node's own pages the picker offers the node's themes (Themes &
- *     Styles), read from window.__AIMEAT_THEMES, which the node's shell writes before its first
- *     paint; when the operator shows one theme to everybody that theme is the palette and there is
- *     no picker. A published app has no such list and keeps PALETTES as before.
+ *   v1.3.0 — 2026-09-24 — On the node's own pages the picker reads the shell's look
+ *     (window.__aimeatLook): the styles of the person's theme, the available themes when there are
+ *     more than one, and no picker when the operator decides. Everywhere else PALETTES as before.
  *   v1.2.0 — 2026-08-28 — VOLTAGE joins the palettes: the front-demo2 register as a theme — hot
  *     magenta on warm cream, deep violet night, electric yellow, 2px borders, Space Grotesk
  *     display. check:theme holds its swatches and ratios like every other.
@@ -63,31 +68,40 @@ export var PALETTES = [
 /** The house palette: no attribute on <html>. */
 var HOUSE = 'aimeat';
 
-/**
- * The node's own themes, when the page is one of the node's (its shell writes window.__AIMEAT_THEMES
- * before the first paint, from Themes & Styles): the themes it offers and who chooses. A published
- * app never has it, so an app keeps PALETTES exactly as before.
- */
-function nodeThemes() {
+/** The shell's look on the node's own pages (spa.html), or null in an app and on other pages. */
+function look() {
   try {
-    var T = /** @type {any} */ (window).__AIMEAT_THEMES;
-    return T && T.policy && T.themes && T.themes.length ? T : null;
+    var L = /** @type {any} */ (window).__aimeatLook;
+    return L && typeof L.state === 'function' ? L : null;
   } catch { return null; }
 }
 
-/** What the picker offers: the node's themes on the node's own pages, PALETTES everywhere else. */
+/** The look's state when this page is AIMEAT's own interface, else null. */
+function innerState() {
+  var L = look();
+  var s = L ? L.state() : null;
+  return s && s.inner ? s : null;
+}
+
+/** The theme the page wears, from the look's state. */
+function currentTheme(s) {
+  for (var i = 0; i < s.themes.length; i++) if (s.themes[i].id === s.theme) return s.themes[i];
+  return s.themes[0] || null;
+}
+
+/** What the picker offers: the styles of the person's theme on AIMEAT's own pages, PALETTES elsewhere. */
 export function paletteRegistry() {
-  var T = nodeThemes();
-  if (!T) return PALETTES;
-  return T.themes.map(function (t) { return { id: t.id, label: t.name, swatch: t.swatch }; });
+  var s = innerState();
+  var th = s ? currentTheme(s) : null;
+  if (!th) return PALETTES;
+  return th.styles.map(function (x) { return { id: x.id, label: x.name, swatch: x.swatch }; });
 }
 
 /** The palette in effect: stored choice if valid, else the default (first in PALETTES). */
 export function aimeatReadPalette() {
-  var T = nodeThemes();
-  // The operator shows one theme to everybody: that is the palette, whatever was stored.
-  if (T && !T.policy.personalChoice) return T.policy.fixed;
-  var ids = paletteRegistry().map(function (p) { return p.id; });
+  var L = look();
+  if (L) return L.state().style || HOUSE;
+  var ids = PALETTES.map(function (p) { return p.id; });
   try {
     // ?palette= first, exactly where ?lang= sits in the locale lookup, and for the same reason:
     // localStorage is per ORIGIN, so an app embedded by another page cannot see the look the
@@ -102,12 +116,13 @@ export function aimeatReadPalette() {
     if (s && ids.indexOf(s) >= 0) return s;
   } catch { /* storage blocked */ }
   var attr = document.documentElement.getAttribute('data-palette');
-  if (attr && ids.indexOf(attr) >= 0) return attr;
-  return T && ids.indexOf(T.policy.default) >= 0 ? T.policy.default : PALETTES[0].id;
+  return attr && ids.indexOf(attr) >= 0 ? attr : PALETTES[0].id;
 }
 
 /** Apply + persist + announce. The default palette REMOVES the attribute (canonical no-attr form). */
 export function aimeatApplyPalette(id) {
+  var L = look();
+  if (L) { L.choose(null, id); return; }   // the shell keeps it, wears it and announces it
   if (id === HOUSE) document.documentElement.removeAttribute('data-palette');
   else document.documentElement.setAttribute('data-palette', id);
   try { localStorage.setItem(AIMEAT_PALETTE_KEY, id); } catch { /* storage blocked */ }
@@ -117,47 +132,75 @@ export function aimeatApplyPalette(id) {
 /**
  * Restore the stored choice onto <html> (idempotent; no event — nothing changed from the user's
  * point of view). Runs at lib parse time via auth/index so every app follows the choice even
- * before any UI mounts, and follows other-tab changes through the storage event.
+ * before any UI mounts, and follows other-tab changes through the storage event. On the node's
+ * own pages the shell has already put the look on before the first paint.
  */
 export function aimeatRestorePalette() {
-  var cur = aimeatReadPalette();
-  if (cur !== HOUSE) document.documentElement.setAttribute('data-palette', cur);
-  else document.documentElement.removeAttribute('data-palette');   // an embed may ask for the default
+  var L = look();
+  if (!L) {
+    var cur = aimeatReadPalette();
+    if (cur !== HOUSE) document.documentElement.setAttribute('data-palette', cur);
+    else document.documentElement.removeAttribute('data-palette');   // an embed may ask for the default
+  }
   try {
     window.addEventListener('storage', function (e) {
-      if (e.key === AIMEAT_PALETTE_KEY && e.newValue) aimeatApplyPalette(e.newValue);
+      if (e.key !== AIMEAT_PALETTE_KEY && e.key !== 'aimeat-look-theme') return;
+      var LL = look();
+      if (LL) LL.apply(location.pathname);
+      else if (e.key === AIMEAT_PALETTE_KEY && e.newValue) aimeatApplyPalette(e.newValue);
     });
   } catch { /* no window */ }
 }
+
+/** A chip: page, card and accent of one look in the current mode, as inline data. */
+function chipHtml(sw) {
+  return '<span class="aimeat-pal-chip" style="background:' + esc(sw.bg) + '">'
+    + '<span class="pc-card" style="background:' + esc(sw.card) + '"></span>'
+    + '<span class="pc-acc" style="background:' + esc(sw.accent) + '"></span></span>';
+}
+
+/** Open the picker again after the pill re-drew itself for a theme just chosen in it. */
+var reopen = null;
 
 /**
  * The PALETTE picker: a swatch trigger (the active palette's accent as a dot) opening a popover
  * grid where every palette is a true-colour chip (page/card/accent in the CURRENT mode) plus its
  * name — you see what you are choosing, not a dropdown of words. The chip colours are data, so
- * they ride as inline background values; all layout lives in cluster.js.
- * @param {{ chooseLook?: string }} [i]
+ * they ride as inline background values; all layout lives in cluster.js. On AIMEAT's own pages
+ * with more than one theme available, the themes come first and the theme's styles under them.
+ * @param {{ chooseLook?: string, lookThemes?: string, lookStyles?: string, styleLightOnly?: string, styleDarkOnly?: string }} [i]
  */
 export function paletteControlHtml(i) {
-  // The operator shows one theme to everybody: there is nothing to choose, so there is no picker.
-  var T = nodeThemes();
-  if (T && !T.policy.personalChoice) return '';
+  var s = innerState();
+  // The operator decides the look for everybody: there is nothing to choose, so there is no picker.
+  if (s && !s.personalChoice) return '';
   var list = paletteRegistry();
   var cur = aimeatReadPalette();
   var mode = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
   var curAcc = (list.find(function (p) { return p.id === cur; }) || list[0]).swatch[mode].accent;
   var label = (i && i.chooseLook) || 'Choose look';
+  var themes = s && s.themes.length > 1 ? s.themes : null;
+  var head = function (text) { return '<span class="aimeat-pop-head">' + esc(text) + '</span>'; };
   return '<span id="aimeat-palette-switch" class="aimeat-pop-wrap">'
     + '<button type="button" class="aimeat-pop-btn" aria-haspopup="listbox" aria-expanded="false" '
     + 'title="' + esc(label) + '" aria-label="' + esc(label) + '">'
     + '<span class="aimeat-pal-dot" style="background:' + esc(curAcc) + '"></span></button>'
     + '<span class="aimeat-pop" role="listbox">'
+    // A style with one mode says so here too: the light/dark switch beside the picker is off.
+    + (s && s.only ? '<span class="aimeat-pop-note">' + esc(s.only === 'light' ? ((i && i.styleLightOnly) || 'This style has a light mode only')
+      : ((i && i.styleDarkOnly) || 'This style has a dark mode only')) + '</span>' : '')
+    + (themes
+      ? head((i && i.lookThemes) || 'Themes')
+        + themes.map(function (t) {
+          var def = t.styles.find(function (x) { return x.id === t.defaultStyle; }) || t.styles[0];
+          return '<button type="button" role="option" data-look-theme="' + esc(t.id) + '" aria-label="' + esc(t.name) + '" aria-pressed="' + (t.id === s.theme) + '">'
+            + (def ? chipHtml(def.swatch[mode]) : '') + esc(t.name) + '</button>';
+        }).join('')
+        + head((i && i.lookStyles) || 'Styles')
+      : '')
     + list.map(function (p) {
-      var s = p.swatch[mode];
-      return '<button type="button" role="option" data-palette="' + esc(p.id) + '" aria-pressed="' + (p.id === cur) + '">'
-        + '<span class="aimeat-pal-chip" style="background:' + esc(s.bg) + '">'
-        + '<span class="pc-card" style="background:' + esc(s.card) + '"></span>'
-        + '<span class="pc-acc" style="background:' + esc(s.accent) + '"></span></span>'
-        + esc(p.label) + '</button>';
+      return '<button type="button" role="option" data-palette="' + esc(p.id) + '" aria-label="' + esc(p.label) + '" aria-pressed="' + (p.id === cur) + '">'
+        + chipHtml(p.swatch[mode]) + esc(p.label) + '</button>';
     }).join('')
     + '</span></span>';
 }
@@ -171,6 +214,11 @@ export function wirePaletteControl(container, clampPopover) {
   if (!root) return;
   var trigger = /** @type {HTMLElement} */ (root.querySelector('.aimeat-pop-btn'));
   var list = paletteRegistry();
+  function open() {
+    root.classList.add('aimeat-open');
+    trigger.setAttribute('aria-expanded', 'true');
+    clampPopover(/** @type {HTMLElement} */ (root.querySelector('.aimeat-pop')));
+  }
   function syncDot() {
     var cur = aimeatReadPalette();
     var mode = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
@@ -199,12 +247,36 @@ export function wirePaletteControl(container, clampPopover) {
       trigger.setAttribute('aria-expanded', 'false');
     });
   });
+  // A theme: the page takes its default style at once, and the picker stays open on its styles.
+  // The pill re-draws itself on the look's change, so the new picker opens after this click is done.
+  root.querySelectorAll('button[data-look-theme]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var L = look();
+      if (!L) return;
+      reopen = { compact: !!container.querySelector('.aimeat-auth-wrap.aimeat-open') };
+      L.choose(b.getAttribute('data-look-theme'), null);
+    });
+  });
   trigger.addEventListener('click', function (ev) {
     ev.stopPropagation();
-    var open = root.classList.toggle('aimeat-open');
-    trigger.setAttribute('aria-expanded', String(open));
-    if (open) clampPopover(/** @type {HTMLElement} */ (root.querySelector('.aimeat-pop')));
+    if (root.classList.contains('aimeat-open')) {
+      root.classList.remove('aimeat-open');
+      trigger.setAttribute('aria-expanded', 'false');
+    } else open();
   });
+  if (reopen) {
+    var again = reopen;
+    reopen = null;
+    setTimeout(function () {
+      var wrap = container.querySelector('.aimeat-auth-wrap');
+      if (again.compact && wrap) {
+        wrap.classList.add('aimeat-open');
+        var cb = wrap.querySelector('.aimeat-auth-compact');
+        if (cb) cb.setAttribute('aria-expanded', 'true');
+      }
+      if (root.isConnected) open();
+    }, 0);
+  }
   window.addEventListener('aimeat-palette-change', syncDot);
   window.addEventListener('aimeat-theme-change', syncDot);
 }

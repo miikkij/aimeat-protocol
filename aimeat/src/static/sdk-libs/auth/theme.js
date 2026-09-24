@@ -9,6 +9,8 @@
  *   modeSwitchHtml/wireModeSwitch · ensureAuthPillStyles · pillInitials.
  * @usage import { escHtml, modeSwitchHtml, wireModeSwitch } from './theme.js';
  * @version-history
+ *   v1.7.0 — 2026-09-24 — A style with one mode only (Themes & Styles): the switch stands down as on a
+ *     fixed-light page, shows the mode the style keeps, and says the style is why.
  *   v1.6.0 — 2026-09-13 — The signed-out pill has a compact form. At ≤600px its language, light/dark
  *     and palette controls fold into a popover behind a settings button, hung from the row's right
  *     edge, and Sign In stays in the row. Signed out had no small-screen rule at all, so a visitor
@@ -103,6 +105,15 @@ export function aimeatRestoreMode() {
  */
 var FIXED_LIGHT = 'fixed';
 
+/** 'light' or 'dark' while the node's own page wears a style with one mode only, else null. */
+function styleOnlyMode() {
+  try {
+    var m = document.querySelector('meta[name="aimeat-light"][data-look]');
+    var v = m && m.getAttribute('data-look');
+    return v === 'light' || v === 'dark' ? v : null;
+  } catch { return null; }
+}
+
 export function aimeatFixedLight() {
   try {
     var m = document.querySelector('meta[name="aimeat-light"]');
@@ -127,6 +138,12 @@ export function modeSwitchHtml(i) {
   var dark = i.darkMode || 'Dark mode';
   var fixed = aimeatFixedLight();
   var why = i.fixedRegister || 'This register keeps its own light';
+  // A style with one mode only (Themes & Styles): the node's look script says which mode it keeps.
+  var only = styleOnlyMode();
+  if (only) {
+    cur = only;
+    why = only === 'light' ? (i.styleLightOnly || 'This style has a light mode only') : (i.styleDarkOnly || 'This style has a dark mode only');
+  }
   var seg = fixed
     ? ' class="aimeat-seg aimeat-seg--fixed" title="' + escHtml(why) + '" aria-label="' + escHtml(why) + '"'
     : ' class="aimeat-seg" aria-label="' + escHtml(i.themeLabel || 'Theme') + '"';

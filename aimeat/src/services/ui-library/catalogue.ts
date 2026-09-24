@@ -12,10 +12,11 @@
  * @structure listUiComponents(filter) · getUiComponent(id) · UiComponentFilter
  * @usage import { listUiComponents } from '../services/ui-library/catalogue.js';
  * @version-history
+ *   v1.2.0 — 2026-09-24 — A row carries its `use` words (the filter in Themes & Styles, S4).
  *   v1.1.0 — 2026-09-24 — The search reads `useFor` too (`use` is now fixed words).
  *   v1.0.0 — 2026-09-23 — Initial (UI consolidation phase 1).
  */
-import type { UiEntry, UiEntryKind, UiEntryStatus } from './types.js';
+import type { UiEntry, UiEntryKind, UiEntryStatus, UiUse } from './types.js';
 import { UI_ENTRY_SOURCES } from './entries.js';
 import { UI_FACTS } from './facts.generated.js';
 
@@ -41,6 +42,8 @@ export interface UiComponentRow {
     sheet: string;
     shape: string;
     pages: string[];
+    /** What a person does with it, in the fixed words: the filter of Themes & Styles' component view. */
+    use: UiUse[];
 }
 
 export function listUiComponents(filter: UiComponentFilter = {}): UiComponentRow[] {
@@ -55,7 +58,7 @@ export function listUiComponents(filter: UiComponentFilter = {}): UiComponentRow
         })
         .map(e => ({
             id: e.id, name: e.name, kind: e.kind, status: e.status, summary: e.summary,
-            module: e.module, sheet: e.sheet, shape: e.data.shape, pages: e.pages,
+            module: e.module, sheet: e.sheet, shape: e.data.shape, pages: e.pages, use: e.use,
         }));
 }
 

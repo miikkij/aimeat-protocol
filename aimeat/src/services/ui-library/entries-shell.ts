@@ -10,6 +10,7 @@
  * @structure SHELL_ENTRIES
  * @usage import { SHELL_ENTRIES } from './entries-shell.js';
  * @version-history
+ *   v1.1.0 — 2026-09-24 — FormField is active: Themes & Styles draws it.
  *   v1.0.0 — 2026-09-24 — Initial (UI consolidation: theme.css to tokens only; every module catalogued).
  */
 import type { UiEntryWritten } from './types.js';
@@ -160,12 +161,12 @@ export const SHELL_ENTRIES: UiEntryWritten[] = [
         variants: [], example: { children: 'or' }, note: 'No page draws it today. Kept until Jouni says keep or delete.',
     },
     {
-        id: 'form-field', name: 'FormField', kind: 'component', status: 'unused',
+        id: 'form-field', name: 'FormField', kind: 'component', status: 'active',
         summary: 'Form fields of the classic shell: the input, the textarea and the select, the form group with its label and its hint.',
         module: '/components/FormField.js', sheet: '/css/components/form-field.css',
         data: { shape: 'FormField({ label, hint, children, className })', fields: { label: 'what to write', hint: 'a line of help', children: 'the input' } },
         useFor: ['A form in the classic shell. The poster pages use TextInput.'],
-        variants: [], example: { label: 'Name', hint: 'Lower-case letters and dashes.' }, note: 'No page draws the component today; the classic forms write .input-field and .form-group as markup in page code. Kept until Jouni says keep or delete.',
+        variants: [], example: { label: 'Name', hint: 'Lower-case letters and dashes.' }, note: 'Themes & Styles draws it (2026-09-24): a label and a hint around a text field, a choice or the CSS editor. The classic forms still write .input-field and .form-group as markup in page code.',
     },
     {
         id: 'search-bar', name: 'SearchBar', kind: 'component', status: 'active',

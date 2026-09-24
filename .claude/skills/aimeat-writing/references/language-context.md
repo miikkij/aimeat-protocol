@@ -91,6 +91,13 @@ everywhere at once, and say so in the Changes section.
 | a part no page draws today | kept until the developer says keep or delete | unused | käyttämätön | sin uso |
 | the values a theme sets | colours, faces and sizes that a part reads from the theme | theme tokens | teeman arvot | valores del tema |
 | the admin view that shows the parts | its name, on the Design group of the admin pages | aimeat-design-lab | aimeat-design-lab | aimeat-design-lab |
+| the whole look of this AIMEAT's own pages | its styles, the CSS the operator gave single components and the whole of it; the operator makes it, people pick it when it is offered; never an app's look | theme | teema | tema |
+| one look inside a theme | a set of colours in light and dark, three faces and its mode; Paper is a style of the AIMEAT theme | style | tyyli | estilo |
+| the operator's CSS for one component, in one theme | served only in that theme and only to that component | component CSS | komponentin CSS | CSS del componente |
+| the operator's CSS for a whole theme | for what no single component owns | theme CSS | teeman CSS | CSS del tema |
+| shipped with this server | the AIMEAT theme and its six styles: read only, can be copied | built-in | valmis | incorporado |
+| the admin view that manages themes | its name, on the Design group of the admin pages | Themes & Styles | Teemat ja tyylit | Temas y estilos |
+| where a person picks the look | the control at the top of the page, beside language and light or dark, that offers the themes and styles (the "pill") | look picker | ulkoasun valitsin | selector de aspecto |
 | the service the person is on | the AIMEAT they are reading this screen on, which is a thing with a name | this service, or its name | tämä palvelu, tai sen nimi | este servicio, o su nombre |
 | the list of public systems | where a public AIMEAT can be found by others | the federation directory | AIMEAT-palvelimien luettelo | el directorio de la federación |
 | a machine credential | what a program presents to prove it may connect | token | token | token |
@@ -253,3 +260,10 @@ service, the directory, the token, the identifier and the username: the test nam
   *Päätösmallin tarjoaja* and *paikallinen päätösmalli* are the developer's own words in the ruling
   (decision-the-decision-model-has-providers-jev-is-one-of-them-and-a-lo). *Proveedor* follows
   *proveedor de IA*, which the Spanish AI settings already use; no screen shows the two yet.
+- **2026-09-24** — theme, style, component CSS, theme CSS, built-in, Themes & Styles and look
+  picker, with the Themes & Styles admin view. The first six are the words of its spec
+  (07-themes-and-styles.md) and of the developer's own sentences (*teema*, *tyyli*, *Teemat ja
+  tyylit*); *Temas y estilos* is his ruling of 2026-09-24. *Look picker* names what the spec calls
+  the pill, because *pill* says nothing to a reader who has not built one. Open: this view and its
+  spec say *component* (*komponentti*) for a catalogue entry, which the row *part* above calls
+  *osa*; the developer decides which one both views use.

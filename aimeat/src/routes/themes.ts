@@ -2,28 +2,34 @@
  * @file src/routes/themes.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Themes & Styles over HTTP: the node's themes, what the pill offers, the stylesheet of
- *   the node's own themes, the operator's edits, and a person's own choice.
+ * @description Themes & Styles over HTTP (07-themes-and-styles.md). A theme holds styles, its
+ *   component CSS and its theme CSS; the operator's CSS is refused only when it does not parse, and
+ *   every other finding comes back as a warning.
  *
- *   GET  /v1/themes             public: what the pill offers and the operator's choices
- *   GET  /v1/themes.css         public: every custom theme that is not retired, as one stylesheet
- *   GET  /v1/themes/all         public: every theme with its full values and contrast, and what a
- *                               theme may set (tokens, faces, hooks), for the editor and for an AI
- *   GET  /v1/themes/choice      a signed-in person's own choice
- *   PUT  /v1/themes/choice      save it to their account
- *   POST /v1/themes/check       operator: check a draft without saving it
- *   POST /v1/themes             operator: a new theme, or a copy (basedOn)
- *   GET  /v1/themes/:id         public: one theme
- *   PUT  /v1/themes/:id         operator: edit, retire (retired: true) or bring back
+ *   GET  /v1/themes                               public: what the pill offers, and who chooses
+ *   GET  /v1/themes/all                           public: every theme whole, its warnings, and what a
+ *                                                 theme may set (?summary=1: core colours only)
+ *   GET  /v1/themes/choice   PUT                  a signed-in person's own { theme, style }
+ *   POST /v1/themes/preview                       operator: a draft's stylesheet and warnings, unsaved
+ *   POST /v1/themes                               operator: a new theme, a copy of basedOn
+ *   GET  /v1/themes/:id                           public: one theme, its warnings, its versions
+ *   PUT  /v1/themes/:id                           operator: name, theme CSS, default and offered styles, retired
+ *   GET  /v1/themes/:id/theme.css                 public: the theme's stylesheet
+ *   POST /v1/themes/:id/styles                    operator: a new style in the theme
+ *   PUT  /v1/themes/:id/styles/:styleId           operator: change a style
+ *   PUT  /v1/themes/:id/components/:componentId   operator: component CSS (empty removes it)
+ *   GET  /v1/themes/:id/versions                  operator: the saved versions
+ *   POST /v1/themes/:id/versions/:version/restore operator: put one back
  *
- *   Reading is public on purpose: a theme is CSS every visitor downloads anyway, and other admins
- *   see the themes without being able to change them (Jouni, 2026-09-24: only the operator edits).
- *   The writes go through requireOperatorPrincipal, not requireRole('operator'), so the operator's
- *   own agent can make a theme from a chat when it holds site:theme-write.
+ *   Reading is public: a theme is CSS every visitor of AIMEAT's own pages downloads anyway. Writing
+ *   goes through requireOperatorPrincipal with site:theme-write (Jouni: only the operator edits), so
+ *   the operator's own agent can make and repair a theme from a chat.
  * @structure themesRouter(config, storage, requireNotLb?)
- * @usage app.use(themesRouter(config, storage, requireNotLb));
+ * @usage router.use(themesRouter(config, storage, requireNotLb));  (mounted by routes/site.ts)
  * @version-history
- *   v1.0.0 — 2026-09-24 — Initial (UI consolidation phase 4, Themes & Styles).
+ *   v2.0.0 — 2026-09-24 — The two-level model of 07: styles, component CSS, versions, previews,
+ *     warnings instead of refusals, a sheet per theme.
+ *   v1.0.0 — 2026-09-24 — Initial (one level).
  */
 import { Router, type RequestHandler } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -32,8 +38,8 @@ import { requireAuth, requireRole, requireOperatorPrincipal } from '../auth/midd
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { THEME_WRITE_SCOPE } from '../utils/scope-coverage.js';
-import { ThemeService, ThemeError, type ThemeInput } from '../services/themes/service.js';
-import { catalogueHooks, themeStylesheet } from '../services/themes/css.js';
+import { ThemeService, ThemeError, type ThemeInput, type Theme } from '../services/themes/service.js';
+import type { StyleInput } from '../services/themes/styles.js';
 import { requireOwnerSession } from './home/welcome-mat.js';
 import { onChangeEvent } from '../services/event-bus.js';
 
@@ -41,7 +47,7 @@ export function themesRouter(config: AimeatConfig, storage: Storage, requireNotL
     const router = Router();
     const svc = new ThemeService(config, storage);
     const notLb: RequestHandler[] = requireNotLb ? [requireNotLb] : [];
-    const operator: RequestHandler[] = [requireAuth(), requireOperatorPrincipal(storage, THEME_WRITE_SCOPE), ...notLb];
+    const operator: RequestHandler[] = [requireAuth(), requireOperatorPrincipal(storage, THEME_WRITE_SCOPE)];
 
     // The SPA shell reads the snapshot synchronously before its first paint (portal-spa.ts): build it
     // now, and again whenever the operator changes a setting (a theme write refreshes it itself).
@@ -56,19 +62,60 @@ export function themesRouter(config: AimeatConfig, storage: Storage, requireNotL
         }
         throw err;
     }
+    const by = (req: Parameters<RequestHandler>[0]) => resolveIdentity(req.auth!, config.nodeId);
+    const dry = (req: Parameters<RequestHandler>[0]) => req.query.dryRun === '1' || (req.body ?? {}).dryRun === true;
 
     router.get('/v1/themes', async (_req, res) => {
         try {
-            const snap = await svc.offered();
-            res.json(success(config.nodeId, { policy: snap.policy, themes: snap.themes, stylesheet: `/v1/themes.css?v=${snap.stamp}` }, [
-                { description: 'Every theme with its values', method: 'GET', url: '/v1/themes/all' },
-            ]));
+            res.json(success(config.nodeId, await svc.offered(), [{ description: 'Every theme whole', method: 'GET', url: '/v1/themes/all' }]));
         } catch (err) { sendError(res, err); }
     });
 
-    router.get('/v1/themes.css', async (req, res) => {
+    router.get('/v1/themes/all', async (req, res) => {
+        try { res.json(success(config.nodeId, await svc.catalogue(req.query.summary === '1' || req.query.summary === 'true'))); } catch (err) { sendError(res, err); }
+    });
+
+    router.get('/v1/themes/choice', requireAuth(), requireRole('owner'), requireOwnerSession(config.nodeId), async (req, res) => {
         try {
-            const { css, etag } = await svc.stylesheet();
+            const snap = await svc.offered();
+            res.json(success(config.nodeId, { ...(await svc.choiceGet(by(req))), personalChoice: snap.policy.personalChoice, default: snap.policy.default }));
+        } catch (err) { sendError(res, err); }
+    });
+
+    router.put('/v1/themes/choice', requireAuth(), requireRole('owner'), requireOwnerSession(config.nodeId), async (req, res) => {
+        const { theme, style } = (req.body ?? {}) as { theme?: unknown; style?: unknown };
+        if (typeof theme !== 'string' || !theme || (style !== undefined && typeof style !== 'string')) {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'theme is a theme id such as "aimeat", and style (optional) a style id of it'));
+            return;
+        }
+        try { res.json(success(config.nodeId, await svc.choiceSet(by(req), theme, style as string | undefined))); } catch (err) { sendError(res, err); }
+    });
+
+    router.post('/v1/themes/preview', ...operator, async (req, res) => {
+        try { res.json(success(config.nodeId, svc.preview(((req.body ?? {}) as { theme?: Partial<Theme> }).theme ?? {}))); } catch (err) { sendError(res, err); }
+    });
+
+    router.post('/v1/themes', ...operator, ...notLb, async (req, res) => {
+        // A copy of basedOn; the theme's own fields sent with it land on the copy in the same save.
+        const body = (req.body ?? {}) as ThemeInput & { basedOn?: string };
+        try { res.status(201).json(success(config.nodeId, await svc.create(body, by(req)))); } catch (err) { sendError(res, err); }
+    });
+
+    router.get('/v1/themes/:id', async (req, res) => {
+        try {
+            const theme = await svc.get(String(req.params.id));
+            if (!theme) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', `There is no theme "${String(req.params.id)}".`)); return; }
+            res.json(success(config.nodeId, { theme, warnings: svc.warningsOf(theme), versions: await svc.versions(theme.id) }));
+        } catch (err) { sendError(res, err); }
+    });
+
+    router.put('/v1/themes/:id', ...operator, ...notLb, async (req, res) => {
+        try { res.json(success(config.nodeId, await svc.update(String(req.params.id), (req.body ?? {}) as ThemeInput, by(req), dry(req)))); } catch (err) { sendError(res, err); }
+    });
+
+    router.get('/v1/themes/:id/theme.css', async (req, res) => {
+        try {
+            const { css, etag } = await svc.stylesheet(String(req.params.id));
             res.setHeader('ETag', etag);
             res.setHeader('Cache-Control', 'public, max-age=60');
             if (req.headers['if-none-match'] === etag) { res.status(304).end(); return; }
@@ -76,76 +123,28 @@ export function themesRouter(config: AimeatConfig, storage: Storage, requireNotL
         } catch (err) { sendError(res, err); }
     });
 
-    // ?summary=1 gives each theme its core colours and failing contrast only (what a chat needs).
-    router.get('/v1/themes/all', async (req, res) => {
-        try {
-            res.json(success(config.nodeId, await svc.catalogue(req.query.summary === '1' || req.query.summary === 'true')));
-        } catch (err) { sendError(res, err); }
+    router.post('/v1/themes/:id/styles', ...operator, ...notLb, async (req, res) => {
+        try { res.status(dry(req) ? 200 : 201).json(success(config.nodeId, await svc.saveStyle(String(req.params.id), null, (req.body ?? {}) as StyleInput & { basedOn?: string }, by(req), dry(req)))); } catch (err) { sendError(res, err); }
     });
 
-    router.get('/v1/themes/choice', requireAuth(), requireRole('owner'), requireOwnerSession(config.nodeId), async (req, res) => {
-        try {
-            const snap = await svc.offered();
-            const chosen = await svc.choiceGet(resolveIdentity(req.auth!, config.nodeId));
-            res.json(success(config.nodeId, { theme: chosen, personalChoice: snap.policy.personalChoice, default: snap.policy.default }));
-        } catch (err) { sendError(res, err); }
+    router.put('/v1/themes/:id/styles/:styleId', ...operator, ...notLb, async (req, res) => {
+        try { res.json(success(config.nodeId, await svc.saveStyle(String(req.params.id), String(req.params.styleId), (req.body ?? {}) as StyleInput, by(req), dry(req)))); } catch (err) { sendError(res, err); }
     });
 
-    router.put('/v1/themes/choice', requireAuth(), requireRole('owner'), requireOwnerSession(config.nodeId), async (req, res) => {
-        const theme = (req.body ?? {}).theme;
-        if (typeof theme !== 'string' || !theme) {
-            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'theme is a theme id, such as "aimeat"'));
-            return;
-        }
-        try {
-            res.json(success(config.nodeId, await svc.choiceSet(resolveIdentity(req.auth!, config.nodeId), theme)));
-        } catch (err) { sendError(res, err); }
+    router.put('/v1/themes/:id/components/:componentId', ...operator, ...notLb, async (req, res) => {
+        const css = ((req.body ?? {}) as { css?: unknown }).css;
+        if (css !== null && css !== undefined && typeof css !== 'string') { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'css is text, or empty to remove it')); return; }
+        try { res.json(success(config.nodeId, await svc.setComponentCss(String(req.params.id), String(req.params.componentId), (css as string | null | undefined) ?? null, by(req), dry(req)))); } catch (err) { sendError(res, err); }
     });
 
-    router.post('/v1/themes/check', ...operator, async (req, res) => {
-        const body = (req.body ?? {}) as ThemeInput & { id?: string };
-        try {
-            const draft = await svc.draft(body, body.id ?? null);
-            res.json(success(config.nodeId, {
-                ok: true, contrast: svc.contrastOf(draft.light, draft.dark),
-                stylesheet: themeStylesheet({ ...draft, id: 'draft' }, catalogueHooks()),
-            }));
-        } catch (err) {
-            if (err instanceof ThemeError && (err.code === 'INVALID_THEME' || err.code === 'CONTRAST')) {
-                // A draft that only misses contrast can still be looked at: its stylesheet comes too.
-                const draft = (err.details as { draft?: Parameters<typeof themeStylesheet>[0] } | undefined)?.draft;
-                res.json(success(config.nodeId, {
-                    ok: false, code: err.code, message: err.message, details: err.details,
-                    ...(draft ? { stylesheet: themeStylesheet({ ...draft, id: 'draft' }, catalogueHooks()) } : {}),
-                }));
-                return;
-            }
-            sendError(res, err);
-        }
+    router.get('/v1/themes/:id/versions', ...operator, async (req, res) => {
+        try { res.json(success(config.nodeId, { versions: await svc.versions(String(req.params.id)) })); } catch (err) { sendError(res, err); }
     });
 
-    router.post('/v1/themes', ...operator, async (req, res) => {
-        try {
-            const theme = await svc.create((req.body ?? {}) as ThemeInput, resolveIdentity(req.auth!, config.nodeId));
-            res.status(201).json(success(config.nodeId, { theme }, [
-                { description: 'Offer it in the pill', method: 'PUT', url: '/v1/admin/config' },
-            ]));
-        } catch (err) { sendError(res, err); }
-    });
-
-    router.get('/v1/themes/:id', async (req, res) => {
-        try {
-            const theme = await svc.get(String(req.params.id));
-            if (!theme) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', `There is no theme "${String(req.params.id)}".`)); return; }
-            res.json(success(config.nodeId, { theme: { ...theme, contrast: svc.contrastOf(theme.light, theme.dark) } }));
-        } catch (err) { sendError(res, err); }
-    });
-
-    router.put('/v1/themes/:id', ...operator, async (req, res) => {
-        try {
-            const theme = await svc.update(String(req.params.id), (req.body ?? {}) as ThemeInput, resolveIdentity(req.auth!, config.nodeId));
-            res.json(success(config.nodeId, { theme }));
-        } catch (err) { sendError(res, err); }
+    router.post('/v1/themes/:id/versions/:version/restore', ...operator, ...notLb, async (req, res) => {
+        const version = Number(req.params.version);
+        if (!Number.isInteger(version) || version < 1) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'version is a whole number from the versions list')); return; }
+        try { res.json(success(config.nodeId, await svc.restore(String(req.params.id), version, by(req)))); } catch (err) { sendError(res, err); }
     });
 
     return router;

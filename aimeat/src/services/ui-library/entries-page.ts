@@ -9,6 +9,7 @@
  * @structure PAGE_ENTRIES
  * @usage import { PAGE_ENTRIES } from './entries-page.js';
  * @version-history
+ *   v1.2.0 — 2026-09-24 — Specimen is active: Themes & Styles draws it too.
  *   v1.1.0 — 2026-09-23 — DiagonalBand deleted with ChatDoor (Jouni's decision); Specimen added.
  *   v1.0.0 — 2026-09-23 — Initial (UI consolidation phase 1).
  */
@@ -334,15 +335,15 @@ export const PAGE_ENTRIES: UiEntryWritten[] = [
         example: { tone: 'card', title: 'Opening hours', children: 'We answer on weekdays.' },
     },
     {
-        id: 'specimen', name: 'Specimen', kind: 'component', status: 'unused',
-        note: 'Drawn only by the design lab (views/admin/design-lab-*), whose files are left out of the page facts.',
+        id: 'specimen', name: 'Specimen', kind: 'component', status: 'active',
+        note: 'Drawn by the design lab and by Themes & Styles (views/admin/themes-*), the two views of the admin\'s Design group.',
         summary: 'One live preview of an interface part in its own frame, with a caption; a row of them shows one part in several looks side by side.',
         module: '/components/Specimen.js', sheet: '/css/components/specimen.css',
         data: {
             shape: 'Specimens({ children }) · Specimen({ label, src, phone, note })',
             fields: { label: 'the caption', src: 'the preview page address (/v1/design-lab/frame?id=&v=&theme=)', phone: 'a 390-pixel frame', note: 'a line under the frame' },
         },
-        useFor: ['The design lab: every part drawn live, light and dark side by side, and at a phone width.'],
+        useFor: ['The design lab and Themes & Styles: a part or a real page drawn live, light and dark side by side, and at a phone width.'],
         variants: [{ name: 'phone', class: 'poster-specimen--phone', prop: 'phone', when: 'the phone-width frame' }],
         example: { label: 'Light', src: '/v1/design-lab/frame?id=turn&v=0&theme=light' },
     },
