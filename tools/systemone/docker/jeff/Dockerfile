@@ -8,7 +8,8 @@
 # JEFF_DEVICE=cuda on the CUDA image. On the CPU image, JEFF_BACKEND=onnx JEFF_QUANT=int8 switches
 # on jeff's own CPU arm, which gives the same answers as the torch one and is much faster.
 # Every package is installed from a hash-pinned lock (../lock.sh writes them from requirements.in),
-# jeff's source is a fixed commit, and the base image is pinned by digest.
+# jeff's source is a fixed commit, the weights are a fixed commit of knowledgator/gliformer-large-v1
+# (the one the image was measured with), and the base image is pinned by digest.
 FROM python:3.12-slim@sha256:2f17fc044b579bab302c2e8054d3a686e2cb9a83de48e70534b94cd8ebbe06a9 AS src
 RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates \
  && git clone https://github.com/logan-markewich/jeff /src \
@@ -23,7 +24,7 @@ RUN useradd -m -u 10001 app
 
 COPY hub.txt /tmp/req/hub.txt
 RUN pip install --require-hashes -r /tmp/req/hub.txt \
- && python -c "from huggingface_hub import snapshot_download; snapshot_download('knowledgator/gliformer-large-v1', local_dir='/opt/models/gliformer-large-v1')" \
+ && python -c "from huggingface_hub import snapshot_download; snapshot_download('knowledgator/gliformer-large-v1', revision='d0a4e53d09cebe6bc963dd9be319d4279084bb2d', local_dir='/opt/models/gliformer-large-v1')" \
  && chown -R app /opt/models
 
 # jeff's dependencies, ONNX and torch, all from the lock. jeff itself is not installed: it runs from

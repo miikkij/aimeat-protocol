@@ -1,15 +1,27 @@
 // Measures the local System One providers: option ceiling, context limit, confidence, latency.
 // Usage: node measure.mjs <out.json> [laya,von,jeff]   (tools/systemone/README.md)
-import { mkdirSync, writeFileSync } from 'node:fs';
-import { dirname } from 'node:path';
+// 2026-09-24: each model answers only a call that carries its key, so the key is read here.
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+// Each model's key: the variable its server reads (as docker/.env holds them), else the key
+// systemone.ps1 made at install (.runtime/<model>/api-key).
+const RUNTIME = join(dirname(fileURLToPath(import.meta.url)), '..', '.runtime');
+function keyOf(model, variable) {
+  const fromEnv = (process.env[variable] ?? '').split(',')[0].trim();
+  if (fromEnv) return fromEnv;
+  const file = join(RUNTIME, model, 'api-key');
+  return existsSync(file) ? readFileSync(file, 'utf8').trim() : null;
+}
 
 // SYSTEMONE_PORTS=9801,9802,9803 when the models are not on 8801-8803.
 // SYSTEMONE_MACHINE names the machine in the output.
 const [PL, PV, PJ] = (process.env.SYSTEMONE_PORTS ?? '8801,8802,8803').split(',');
 const PROVIDERS = {
-  laya: { url: `http://127.0.0.1:${PL}/v1/systemone`, model: 'multilingual', auth: null },
-  von: { url: `http://127.0.0.1:${PV}/v1/systemone`, model: 'von-1.1.0', auth: null },
-  jeff: { url: `http://127.0.0.1:${PJ}/v1/systemone`, model: 'gliformer-large-v1', auth: 'devkey' },
+  laya: { url: `http://127.0.0.1:${PL}/v1/systemone`, model: 'multilingual', auth: keyOf('laya', 'LAYA_API_KEY') },
+  von: { url: `http://127.0.0.1:${PV}/v1/systemone`, model: 'von-1.1.0', auth: keyOf('von', 'VON_API_KEY') },
+  jeff: { url: `http://127.0.0.1:${PJ}/v1/systemone`, model: 'gliformer-large-v1', auth: keyOf('jeff', 'JEFF_API_KEYS') },
 };
 
 // 60 support-ticket topics. The first 12 have a ticket whose right answer is known.
