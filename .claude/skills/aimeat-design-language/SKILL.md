@@ -2,8 +2,8 @@
 name: aimeat-design-language
 description: "The AIMEAT design language in words and in numbers: the two faces (showroom outside, poster inside), the three type tokens every font on the site descends from, the four shapes, the colours, the wordmark, and the one place a value is changed (theme.css tokens) with the map of every surface a token reaches. Use before designing or styling anything that carries the AIMEAT name, before changing a font or a colour, and to judge whether a screen looks like this product."
 metadata:
-  version: 1.7.0
-  updated: 2026-09-23
+  version: 1.8.0
+  updated: 2026-09-24
   owner: Jouni Miikki
 ---
 
@@ -119,6 +119,10 @@ is in that field or has written in it; a form is read as its labels until one is
 on 2026-08-29 and found Cancel only by reading). Escape. And a click on the dim page behind the
 dialog. The last two close only while nothing has been typed: a half-filled form must never be
 lost to a stray click or key. Cancel under the form stays for the people who read.
+The footer's actions are the library's (Jouni's decision "Dialog actions", 2026-09-24): a way out or
+a side door (Cancel, "Change password…") is `.poster-action`, the one "do it" is
+`.poster-slab.poster-slab--control`, and a delete adds `.poster-slab--danger`. On a phone the dark
+block takes the rest of the row.
 
 **Bands.** An ink band (`--text` ground, `--bg` words, the headline in `--sun`, items in 2px
 frames at 28 % opacity) for the argument that closes a page; a sun band (`--sun` ground, ink
@@ -206,7 +210,8 @@ another modifier. A view never re-declares a modifier's values.
 | Shape | Shared variant | Values and reason |
 |---|---|---|
 | Loud action | `.poster-slab--large` | 1.02rem, 8px sun shadow; the named big door role (brief 10.3). Base stays .8rem, 600, 4px sun shadow. |
-| Loud action | `.poster-slab--control` | A 44px control in a row of controls: inline-flex, centred, `0 16px` padding, weight 800, the parent's face; the chat's New conversation and Send (formerly chat.css). Dimmed to .45 when disabled. |
+| Loud action | `.poster-slab--control` | A 44px control in a row of controls: inline-flex, centred, `0 16px` padding, weight 800, the parent's face; the chat's New conversation and Send (formerly chat.css), and a dialog's Save or Confirm. Dimmed to .45 when disabled. |
+| Loud action | `.poster-slab--danger` | An action that cannot be undone (a dialog's Delete): `--accent` ground, white words, a `4px 4px 0 --text` shadow (Jouni's decision "Dialog actions"). |
 | Section headline | `.poster-section-title--large` | 2.4rem, and 1.7rem with `.45rem .8rem .4rem` padding at 560px; the home's bands and the layout engine's band (formerly home.css and surface.css). |
 | Box | `.poster-box--avatar` | Square initials mark, .95rem poster face, no padding or margin, transparent ground; Contacts, Email and Notifications share this cut. Dimensions remain layout. |
 | Box initials mark | `.poster-box--avatar.poster-box--small` | .85rem; Apps, Companies and MCP share the smaller initials cut. |
