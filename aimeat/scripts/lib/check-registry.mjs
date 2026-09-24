@@ -2,6 +2,7 @@
  * @file check-registry.mjs
  * @description Canonical read-only checks for check:fast, audit reports and SARIF.
  * @version-history
+ *  - 1.8.0 (2026-09-24): check:supply-chain, the CI workflows and the local model files.
  *  - 1.7.0 (2026-09-24): check:shape-tokens, a component sheet reads the theme's shape values.
  *  - 1.6.0 (2026-09-24): check:theme-tokens, theme.css holds tokens only.
  *  - 1.5.0 (2026-09-23): check:ui-library, the component catalogue held to the sheets and modules.
@@ -44,6 +45,7 @@ export const FAST_CHECKS = [
     { script: 'check:licenses', label: 'Licences allowed, every served file accounted for' },
     { script: 'check:notices', label: 'Third-party notices match the tree' },
     { script: 'check:protocol-versions', label: 'Protocol versions declared vs current' },
+    { script: 'check:supply-chain', label: 'CI and model images: third-party code runs pinned, and never beside a secret or a write token' },
     { script: 'check:route-scopes', label: 'Route authorization gates' },
     { script: 'check:denial-coverage', label: 'Every suite asks what a second principal gets' },
     { script: 'check:suite-ports', label: 'No two E2E suites write down the same port' },

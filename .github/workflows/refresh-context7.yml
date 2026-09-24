@@ -20,10 +20,12 @@ jobs:
     permissions: {}
     steps:
       - name: Ask Context7 to re-parse the library
+        env:
+          CONTEXT7_API_KEY: ${{ secrets.CONTEXT7_API_KEY }}
         run: |
           # --fail-with-body so a rejected key or a renamed library breaks the build instead of
           # failing silently for the 45 days until the automatic refresh would have run anyway.
           curl --fail-with-body -sS -X POST https://context7.com/api/v1/refresh \
             -H "Content-Type: application/json" \
-            -H "Authorization: Bearer ${{ secrets.CONTEXT7_API_KEY }}" \
+            -H "Authorization: Bearer $CONTEXT7_API_KEY" \
             -d '{"libraryName": "/${{ github.repository }}"}'
