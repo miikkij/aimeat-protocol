@@ -17,6 +17,8 @@
  *   gets this file copied into its page at build time (scripts/build-app-catalog.ts).
  * @structure frame · header and X · body · footer and its actions · sizes · phone
  * @version-history
+ *   v1.4.0 — 2026-09-24 — The frame, corner, shadow, title case and footer rule read the theme's shape
+ *     values (theme.css --shape-*), today's values (a move).
  *   v1.3.0 — 2026-09-24 — The footer's actions are the library's action link, loud action and its
  *     danger tone (Jouni's decision "Dialog actions"); the rules that redrew the classic button
  *     classes here are gone.
@@ -37,9 +39,9 @@ dialog.dlg {
   max-width: none; min-width: 0;
   max-height: calc(100dvh - 48px);
   margin: auto; padding: 0;
-  border: 3px solid var(--text); border-radius: 0;
+  border: var(--shape-frame-heavy) solid var(--shape-frame-colour); border-radius: var(--shape-corner-dialog);
   background: var(--bg); color: var(--text);
-  box-shadow: 12px 12px 0 var(--sun);
+  box-shadow: var(--shape-shadow-dialog);
   font-family: var(--font-body);
   overflow: hidden;
 }
@@ -57,7 +59,7 @@ dialog.dlg .dlg-title {
   flex: 1 1 auto; min-width: 0; margin: 0; padding: 0; background: none; border: 0;
   font-family: var(--font-poster); font-weight: var(--font-poster-weight);
   font-size: var(--dlg-title-size, 1.4rem); line-height: var(--font-poster-leading);
-  letter-spacing: var(--font-poster-tracking); text-transform: uppercase;
+  letter-spacing: var(--font-poster-tracking); text-transform: var(--shape-case-heading);
   color: inherit; overflow-wrap: anywhere;
 }
 /* The X: a 26px square framed in the header's own colour, inside a 44px press area. */
@@ -101,7 +103,7 @@ dialog.dlg .modal-confirm-message { color: var(--text); margin: 0; font-size: va
 dialog.dlg .dlg-foot {
   flex: none; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end;
   gap: .8rem 1.4rem; margin: 0; padding: .9rem 1.5rem 1rem;
-  border-top: 3px solid var(--text); background: var(--bg);
+  border-top: var(--shape-frame-heavy) solid var(--shape-rule-colour); background: var(--bg);
   /* The site's body line (page-base.css), set here so the actions stand the same on a page whose
      body sets another one (the app catalog). */
   line-height: 1.6;

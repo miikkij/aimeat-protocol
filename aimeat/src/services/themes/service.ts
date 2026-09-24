@@ -29,6 +29,9 @@
  * @structure ThemeError · Theme · ThemeInput · ThemeService · themeSnapshot · INNER_PATHS
  * @usage const svc = new ThemeService(config, storage); await svc.offered();
  * @version-history
+ *   v2.2.0 — 2026-09-24 — Shape values: a theme's corners, frames, shadows and letter case (shapes.ts),
+ *     checked per value (422 INVALID_SHAPE), copied with the theme, listed in the vocabulary with the
+ *     built-in value.
  *   v2.1.0 — 2026-09-24 — One name, one theme: a name another theme has (built-in and retired
  *     included) is refused with 409 NAME_TAKEN, on a new theme and on a rename. setPolicy.
  *   v2.0.0 — 2026-09-24 — The two-level model of 07 (a theme holds styles), component CSS, theme CSS,
@@ -44,6 +47,7 @@ import { THEME_TOKENS, CORE_TOKENS, THEME_FACES } from './tokens.js';
 import { lintCss, type CssWarning } from './css-lint.js';
 import { builtinStyles, prepareStyle, swatchOf, STYLE_ID_RE, type Style, type StyleInput } from './styles.js';
 import { themeSheet, componentCssState, catalogueHooks, servedFaces, type ComponentCssState } from './sheet.js';
+import { SHAPE_TOKENS, builtinShapes, checkShape } from './shapes.js';
 import type { ContrastResult } from './contrast.js';
 import type { ConfigProvenance } from '../config-provenance.js';
 import { applyConfigChanges } from '../config-apply.js';
@@ -73,6 +77,8 @@ export interface Theme {
     styles: Style[];
     defaultStyle: string;
     offeredStyles: string[];
+    /** The theme's shape values (shapes.ts), only the ones it changes; a record from before has none. */
+    shapes?: Record<string, string>;
     componentCss: Record<string, string>;
     css: string | null;
     retired: boolean;
@@ -83,8 +89,11 @@ export interface Theme {
     updatedAt: string | null;
 }
 
-/** What a caller may change on a theme (its styles and its component CSS have their own doors). */
-export interface ThemeInput { name?: string; css?: string | null; defaultStyle?: string; offeredStyles?: string[]; retired?: boolean }
+/**
+ * What a caller may change on a theme (its styles and its component CSS have their own doors).
+ * `shapes`: only the values that change; an empty value puts the built-in one back.
+ */
+export interface ThemeInput { name?: string; css?: string | null; defaultStyle?: string; offeredStyles?: string[]; retired?: boolean; shapes?: Record<string, string | null> }
 
 /** The warnings that go back with a save or a check. */
 export interface ThemeWarnings { css: CssWarning[]; components: Record<string, ComponentCssState>; contrast: Record<string, ContrastResult[]> }
@@ -139,6 +148,18 @@ function applyInput(t: Theme, input: ThemeInput): Theme {
         next.offeredStyles = [...new Set(input.offeredStyles)];
     }
     if (input.retired !== undefined) next.retired = !!input.retired;
+    if (input.shapes !== undefined) {
+        if (!input.shapes || typeof input.shapes !== 'object' || Array.isArray(input.shapes)) throw new ThemeError('INVALID_SHAPE', 'shapes: an object of shape value → value', 422);
+        const shapes: Record<string, string> = { ...(t.shapes || {}) };
+        const refused: string[] = [];
+        for (const [name, value] of Object.entries(input.shapes)) {
+            if (value === null || value === '') { delete shapes[name]; continue; }
+            const bad = checkShape(name, value);
+            if (bad) refused.push(bad); else shapes[name] = String(value).trim();
+        }
+        if (refused.length) throw new ThemeError('INVALID_SHAPE', refused.join('; '), 422, { refused });
+        next.shapes = shapes;
+    }
     return next;
 }
 
@@ -239,9 +260,11 @@ export class ThemeService {
                     core: { light: Object.fromEntries(CORE_TOKENS.map((k) => [k, s.light[k]])), dark: Object.fromEntries(CORE_TOKENS.map((k) => [k, s.dark[k]])) } } : s),
                     swatch: swatchOf(s), contrastMissing: w.contrast[s.id].filter((r) => !r.ok) }));
                 return { ...(summary ? { id: t.id, name: t.name, builtin: t.builtin, retired: t.retired, defaultStyle: t.defaultStyle, offeredStyles: t.offeredStyles, basedOn: t.basedOn,
-                    componentCss: Object.keys(t.componentCss || {}), hasThemeCss: !!t.css } : t), styles, componentCssState: w.components, cssWarnings: w.css };
+                    shapes: t.shapes || {}, componentCss: Object.keys(t.componentCss || {}), hasThemeCss: !!t.css } : { ...t, shapes: t.shapes || {} }), styles, componentCssState: w.components, cssWarnings: w.css };
             }),
-            vocabulary: { tokens: THEME_TOKENS, core: CORE_TOKENS, faces: Object.keys(THEME_FACES), hooks: catalogueHooks() },
+            // `shapes`: every shape value a theme may set, with the built-in theme's value.
+            vocabulary: { tokens: THEME_TOKENS, core: CORE_TOKENS, faces: Object.keys(THEME_FACES), hooks: catalogueHooks(),
+                shapes: SHAPE_TOKENS.map((s) => ({ ...s, builtin: builtinShapes()[s.name] ?? null })) },
         };
     }
 
@@ -334,11 +357,12 @@ export class ThemeService {
         const theme: Theme = {
             id, name, builtin: false, styles, defaultStyle: map.get(base.defaultStyle) ?? styles[0].id,
             offeredStyles: base.offeredStyles.map((s) => map.get(s)).filter((s): s is string => !!s),
-            componentCss: { ...(base.componentCss || {}) }, css: base.css ?? null, retired: false, basedOn: base.id,
+            shapes: { ...(base.shapes || {}) }, componentCss: { ...(base.componentCss || {}) }, css: base.css ?? null, retired: false, basedOn: base.id,
             createdBy: by, createdAt: now, updatedBy: by, updatedAt: now,
         };
         const own: ThemeInput = {
             ...(input.css !== undefined ? { css: input.css } : {}),
+            ...(input.shapes !== undefined ? { shapes: input.shapes } : {}),
             ...(input.defaultStyle !== undefined ? { defaultStyle: map.get(input.defaultStyle) ?? input.defaultStyle } : {}),
             ...(input.offeredStyles !== undefined ? { offeredStyles: Array.isArray(input.offeredStyles) ? input.offeredStyles.map((s) => map.get(s) ?? s) : input.offeredStyles } : {}),
             ...(input.retired !== undefined ? { retired: input.retired } : {}),
@@ -348,7 +372,7 @@ export class ThemeService {
         return { theme: made, warnings: this.warningsOf(made) };
     }
 
-    /** A theme's own fields changed: name, theme CSS, default and offered styles, retired. */
+    /** A theme's own fields changed: name, shape values, theme CSS, default and offered styles, retired. */
     async update(id: string, input: ThemeInput, by: string, dryRun = false): Promise<{ theme: Theme; warnings: ThemeWarnings }> {
         const t = await this.must(id);
         this.editable(t);
@@ -436,7 +460,14 @@ export class ThemeService {
         const componentCss: Record<string, string> = {};
         for (const [c, css] of Object.entries(draft.componentCss || {})) if (typeof css === 'string') componentCss[c] = css;
         const css = typeof draft.css === 'string' ? draft.css : null;
-        const theme = { id: 'draft', name: String(draft.name || 'draft'), styles, componentCss, css };
+        // Shape values that do not pass are named and left out of the sheet, as a style's colours are.
+        const shapes: Record<string, string> = {};
+        for (const [k, v] of Object.entries(draft.shapes || {})) {
+            if (v === '' || v === null) continue;
+            const bad = checkShape(k, v);
+            if (bad) refused.push(bad); else shapes[k] = String(v);
+        }
+        const theme = { id: 'draft', name: String(draft.name || 'draft'), styles, shapes, componentCss, css };
         return { stylesheet: themeSheet(theme), warnings: this.warningsOf(theme), refused };
     }
 

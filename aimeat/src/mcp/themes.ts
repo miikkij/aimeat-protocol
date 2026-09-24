@@ -81,6 +81,7 @@ export function registerThemeTools(mcp: McpServer, storage: Storage, config: Aim
             name: z.string().max(60).optional().describe('What people see in the pill. 1 to 60 characters, and no other theme may have it (retired ones included).'),
             basedOn: z.string().max(40).optional().describe("For a new theme: the theme it copies (default 'aimeat')."),
             css: z.string().max(64000).optional().describe('Theme CSS for the whole theme; empty removes it.'),
+            shapes: z.record(z.string(), z.string().max(200)).optional().describe("The theme's shape values (corners, frames, shadows, letter case), only the ones you change; an empty value puts the built-in one back. aimeat_theme_list names them."),
             defaultStyle: z.string().max(40).optional().describe('The style a person sees first in this theme.'),
             offeredStyles: z.array(z.string().max(40)).max(40).optional().describe('The style ids of this theme the pill offers.'),
             retired: z.boolean().optional().describe('true takes the theme out of the pill; false brings it back.'),
@@ -100,7 +101,7 @@ export function registerThemeTools(mcp: McpServer, storage: Storage, config: Aim
                     if (args.dryRun) return toolError('INVALID_INPUT', 'dryRun checks a change to a theme that exists; making a copy has nothing to check.');
                     // A copy takes its CSS and choices from basedOn; what else is sent lands on the copy, in one save.
                     const made = await svc.create({ ...pick(args), name: args.name, basedOn: args.basedOn }, gaii);
-                    return out({ ok: true, saved: true, ...made, next: 'To make it available to people, add its id to themes.offered with aimeat_admin_config.' });
+                    return out({ ok: true, saved: true, ...made, next: 'To make it available to people, add its id to `offered` with aimeat_theme_policy_set.' });
                 }
                 const result = await svc.update(args.id, pick(args), gaii, !!args.dryRun);
                 return out({ ok: true, saved: !args.dryRun, ...result });
@@ -184,11 +185,12 @@ export function registerThemeTools(mcp: McpServer, storage: Storage, config: Aim
 }
 
 /** The theme's own fields out of the tool's arguments; only what the caller sent. */
-function pick(args: { name?: string; css?: string; defaultStyle?: string; offeredStyles?: string[]; retired?: boolean; id?: string }): ThemeInput {
+function pick(args: { name?: string; css?: string; shapes?: Record<string, string>; defaultStyle?: string; offeredStyles?: string[]; retired?: boolean; id?: string }): ThemeInput {
     return {
         // A new theme took its name at creation; only a change to an existing theme renames.
         ...(args.id && args.name !== undefined ? { name: args.name } : {}),
         ...(args.css !== undefined ? { css: args.css || null } : {}),
+        ...(args.shapes !== undefined ? { shapes: args.shapes } : {}),
         ...(args.defaultStyle !== undefined ? { defaultStyle: args.defaultStyle } : {}),
         ...(args.offeredStyles !== undefined ? { offeredStyles: args.offeredStyles } : {}),
         ...(args.retired !== undefined ? { retired: args.retired } : {}),

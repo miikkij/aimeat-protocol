@@ -14,6 +14,7 @@
  *   - buildAppCatalog() → assemble + write src/static/app-catalog.html (+ a generated-file banner)
  * @usage  pnpm build:app-catalog   (also run by `pnpm build` and `pnpm dev`)
  * @version-history
+ *   v1.5.0 — 2026-09-24 — The shape values the copied ranges and dialog.css read join the token list.
  *   v1.4.0 — 2026-09-24 — The ranges of public/css/poster.css between its @app-catalog markers (the
  *     action link and the loud action) are appended before dialog.css, so the catalog's dialog
  *     footers wear the library's actions (Jouni's decision "Dialog actions").
@@ -57,6 +58,11 @@ const THEME_TOKENS = [
   '--text-md', '--text-small', '--weight-heavy',
   // The tokens the library ranges of poster.css read (the action link and the loud action).
   '--text-body-sm', '--font-showroom-body', '--success-gradient', '--success-glow',
+  // The shape values those ranges and dialog.css read (07 "New components follow the theme"); the
+  // catalog wears the built-in theme's, as it wears no theme (phase 9).
+  '--shape-corner-pill', '--shape-corner-dialog', '--shape-frame', '--shape-frame-heavy', '--shape-frame-colour', '--shape-rule-colour',
+  '--shape-shadow-action', '--shape-shadow-action-pressed', '--shape-shadow-dialog',
+  '--shape-case-action', '--shape-tracking-action', '--shape-case-heading',
 ];
 
 const POSTER_FILE = join(__dirname, '..', 'public', 'css', 'poster.css');

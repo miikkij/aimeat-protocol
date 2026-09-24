@@ -2,6 +2,7 @@
  * @file check-registry.mjs
  * @description Canonical read-only checks for check:fast, audit reports and SARIF.
  * @version-history
+ *  - 1.7.0 (2026-09-24): check:shape-tokens, a component sheet reads the theme's shape values.
  *  - 1.6.0 (2026-09-24): check:theme-tokens, theme.css holds tokens only.
  *  - 1.5.0 (2026-09-23): check:ui-library, the component catalogue held to the sheets and modules.
  *  - 1.4.0 (2026-09-18): check:prompt-refs, agent-facing text held to the catalogue and the routes.
@@ -35,6 +36,7 @@ export const FAST_CHECKS = [
     { script: 'check:poster-shapes', label: 'Design-language shapes live in poster.css, not in view sheets' },
     { script: 'check:ui-library', label: 'Every interface part is in the component catalogue, and its facts are fresh' },
     { script: 'check:theme-tokens', label: 'theme.css holds tokens only; every page that links it links the shell block' },
+    { script: 'check:shape-tokens', label: 'A component sheet reads the theme\'s shape values, never a corner, frame, shadow or letter case of its own' },
     { script: 'check:dialogs', label: 'One dialog for the site: no hand-rolled overlay, backdrop or role="dialog" box' },
     { script: 'check:viewport', label: 'Cortex pack integrity: embed + VERSION constants + registry versions' },
     { script: 'check:ai-disclosure', label: 'AI disclosure gates: one LLM path, one publish path, labels intact' },

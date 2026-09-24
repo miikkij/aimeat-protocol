@@ -64,6 +64,13 @@ const RATCHETS: Ratchet[] = [
         count: raw => Object.values((JSON.parse(raw) as { files: Record<string, Record<string, number>> }).files)
             .reduce((total, counts) => total + Object.values(counts).reduce((sum, n) => sum + n, 0), 0),
     },
+    {
+        file: 'aimeat/security/shape-tokens-baseline.json',
+        label: 'Shape literals where a theme shape value exists',
+        check: 'check:shape-tokens',
+        count: raw => Object.values((JSON.parse(raw) as { files: Record<string, Record<string, number>> }).files)
+            .reduce((total, counts) => total + Object.values(counts).reduce((sum, n) => sum + n, 0), 0),
+    },
     { file: 'aimeat/security/route-scope-exemptions.json', label: 'Ungated route handlers', check: 'check:route-scopes', count: exemptMap },
     { file: 'aimeat/security/trusted-key-exemptions.json', label: 'Server-trusted memory keys', check: 'check:trusted-keys', count: exemptMap },
     { file: 'aimeat/security/config-coverage-exemptions.json', label: 'Settings not in the Config tab', check: 'check:config-coverage', count: exemptMap },

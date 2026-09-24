@@ -96,6 +96,7 @@ everywhere at once, and say so in the Changes section.
 | the operator's CSS for one component, in one theme | served only in that theme and only to that component | component CSS | komponentin CSS | CSS del componente |
 | the operator's CSS for a whole theme | for what no single component owns | theme CSS | teeman CSS | CSS del tema |
 | shipped with this server | the AIMEAT theme and its six styles: read only, can be copied | built-in | valmis | incorporado |
+| a theme's corners, frames, shadows and letter case | the same in every style and in light and dark; every component reads them, so a component added later follows them | shapes (one of them: a shape value) | muodot (yksi: muoto) | formas (una: forma) |
 | the admin view that manages themes | its name, on the Design group of the admin pages | Themes & Styles | Teemat ja tyylit | Temas y estilos |
 | where a person picks the look | the control at the top of the page, beside language and light or dark, that offers the themes and styles (the "pill") | look picker | ulkoasun valitsin | selector de aspecto |
 | the service the person is on | the AIMEAT they are reading this screen on, which is a thing with a name | this service, or its name | tämä palvelu, tai sen nimi | este servicio, o su nombre |
@@ -270,3 +271,8 @@ service, the directory, the token, the identifier and the username: the test nam
   names one (the design lab, Themes & Styles, the MCP tool texts). Ruled by the developer: "the word
   is "component" / "komponentti" everywhere, the lab and the language context too". *Part* stays
   the ordinary word for other things (a block of a page layout, the contents of a package).
+- **2026-09-24, same day** — *shapes* / *muodot* / *formas*, with the Shapes tab of Themes & Styles
+  (07 "New components follow the theme"). The spec says "shape values"; on screen the tab and the
+  group are *Shapes*, and one row is named by what it shapes ("Corner of a box"), never by its
+  token. *Muoto* over *tyyli* or *ulkoasu*, which already name a style and the whole look. The main
+  button (the design language's slab) is *pääpainike* / *el botón principal* on these screens.

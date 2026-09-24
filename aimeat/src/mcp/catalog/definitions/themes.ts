@@ -9,6 +9,7 @@
  * @structure themeTools
  * @usage import { themeTools } from './themes.js';
  * @version-history
+ *   v2.2.0 — 2026-09-24 — Shape values: aimeat_theme_save takes `shapes`, aimeat_theme_list names them.
  *   v2.1.0 — 2026-09-24 — aimeat_theme_policy_set: who chooses, from chat (the settings tool only reads).
  *   v2.0.0 — 2026-09-24 — The two-level model: aimeat_theme_style_save and
  *     aimeat_theme_component_css_set; free CSS with warnings; versions and restore.
@@ -19,7 +20,7 @@ import type { AimeatToolDefinition } from './types.js';
 export const themeTools: AimeatToolDefinition[] = [
     {
         name: 'aimeat_theme_list',
-        description: "List this server's themes: the look of every page of AIMEAT's own interface (the home, the chat, Settings & Controls, admin; published apps keep their own). A theme holds styles; a style is a set of colours in light and dark, three faces and a mode (both, light only, dark only). The built-in AIMEAT theme holds the six built-in styles (aimeat, paper, circuit, contrast, mist, voltage) and is read only; copy it to make your own. For each theme you get its styles with their main colours and any contrast line they miss, which styles the pill offers and the default one, which components have CSS in it and whether that CSS is served, and its theme CSS warnings. You also get who chooses (whether people pick, which themes are available, the default theme; changed with aimeat_theme_policy_set) and what a style may set (the colour tokens, the faces this server serves, each component's usual things to change).",
+        description: "List this server's themes: the look of every page of AIMEAT's own interface (the home, the chat, Settings & Controls, admin; published apps keep their own). A theme holds styles; a style is a set of colours in light and dark, three faces and a mode (both, light only, dark only). The built-in AIMEAT theme holds the six built-in styles (aimeat, paper, circuit, contrast, mist, voltage) and is read only; copy it to make your own. For each theme you get its styles with their main colours and any contrast line they miss, which styles the pill offers and the default one, which components have CSS in it and whether that CSS is served, and its theme CSS warnings. You also get who chooses (whether people pick, which themes are available, the default theme; changed with aimeat_theme_policy_set), what a style may set (the colour tokens, the faces this server serves, each component's usual things to change) and the shape values a theme may set (vocabulary.shapes: corners, frames, shadows, letter case, each with what it is for and the built-in value). Every component reads the shape values, so set a theme's look there first and keep component CSS for what is one component's own.",
         caller: 'agent',
         visibility: { publicMcp: true, connectorMcp: true, cliFallback: true },
         input: {},
@@ -35,7 +36,7 @@ export const themeTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_theme_save',
-        description: "Make or change one of this server's themes. Without `id` you make a new theme: a copy of `basedOn` (default 'aimeat') with its styles, CSS and choices. With `id` you change that theme: `name`; `css`, the theme CSS for the whole theme (any CSS: selectors, !important, @media, @keyframes; empty removes it); `defaultStyle` and `offeredStyles` (style ids of this theme, which the pill offers); `retired` true takes it out of the pill without deleting it. `restoreVersion` puts back a version from aimeat_theme_get, which is the way to undo a save. `dryRun` checks and saves nothing. Only CSS that does not parse is refused; everything else comes back as warnings with the line. The built-in theme is read only. Only the operator of this server can do this, with the site:theme-write permission. To make a theme available to people, use aimeat_theme_policy_set.",
+        description: "Make or change one of this server's themes. Without `id` you make a new theme: a copy of `basedOn` (default 'aimeat') with its styles, CSS and choices. With `id` you change that theme: `name`; `shapes`, the theme's shape values (for example { \"--shape-corner\": \"16px\", \"--shape-case-heading\": \"none\" }; a value that does not fit its kind is refused with the reason); `css`, the theme CSS for the whole theme (any CSS: selectors, !important, @media, @keyframes; empty removes it); `defaultStyle` and `offeredStyles` (style ids of this theme, which the pill offers); `retired` true takes it out of the pill without deleting it. `restoreVersion` puts back a version from aimeat_theme_get, which is the way to undo a save. `dryRun` checks and saves nothing. Only CSS that does not parse is refused; everything else comes back as warnings with the line. The built-in theme is read only. Only the operator of this server can do this, with the site:theme-write permission. To make a theme available to people, use aimeat_theme_policy_set.",
         caller: 'agent',
         visibility: { publicMcp: true, connectorMcp: true, cliFallback: true },
         input: {
@@ -43,6 +44,7 @@ export const themeTools: AimeatToolDefinition[] = [
             name: { type: 'string', description: 'What people see in the pill. 1 to 60 characters, and no other theme may have it (retired ones included).' },
             basedOn: { type: 'string', description: "For a new theme: the theme it copies (default 'aimeat')." },
             css: { type: 'string', description: 'Theme CSS for the whole theme; empty removes it.' },
+            shapes: { type: 'object', description: "The theme's shape values (corners, frames, shadows, letter case), only the ones you change; an empty value puts the built-in one back. aimeat_theme_list names them." },
             defaultStyle: { type: 'string', description: 'The style a person sees first in this theme.' },
             offeredStyles: { type: 'array', description: 'The style ids of this theme the pill offers.' },
             retired: { type: 'boolean', description: 'true takes the theme out of the pill; false brings it back.' },

@@ -242,6 +242,28 @@ await test('Every save keeps the version before; restore puts one back', async (
     assert(member403.status === 403, `member versions: ${member403.status}`);
 });
 
+await test('Shape values — listed with the built-in value, saved, served in the sheet; a bad value → 422 INVALID_SHAPE', async () => {
+    // Jouni 2026-09-24: new components must follow Pebble; a theme sets corners, frames, shadows and case once.
+    const all = await json('/v1/themes/all', op());
+    const corner = all.body.data.vocabulary.shapes?.find((s: any) => s.name === '--shape-corner');
+    assert(corner && corner.builtin === '0' && corner.kind === 'corner', `vocabulary: ${JSON.stringify(corner)}`);
+    const made = await json('/v1/themes', op(post({ name: 'Shapes check', basedOn: 'aimeat' })));
+    const id = made.body.data.theme.id;
+    const ok = await json(`/v1/themes/${id}`, op(put({ shapes: { '--shape-corner': '16px', '--shape-case-heading': 'none', '--shape-shadow': '0 8px 24px color-mix(in srgb, var(--text) 8%, transparent)' } })));
+    assert(ok.status === 200 && ok.body.data.theme.shapes['--shape-corner'] === '16px', `save: ${ok.status} ${JSON.stringify(ok.body.error)}`);
+    const sheet = await fetch(`${BASE}/v1/themes/${id}/theme.css`).then((r) => r.text());
+    assert(/html:root \{[^}]*--shape-corner: 16px;[^}]*--shape-case-heading: none;/.test(sheet), `sheet: ${sheet.slice(0, 300)}`);
+    for (const bad of [{ '--shape-corner': 'red' }, { '--shape-nope': '1px' }, { '--shape-shadow': '0 0 4px url(x)' }, { '--shape-case-action': 'shout' }]) {
+        const r = await json(`/v1/themes/${id}`, op(put({ shapes: bad })));
+        assert(r.status === 422 && r.body.error?.code === 'INVALID_SHAPE', `${JSON.stringify(bad)}: ${r.status} ${r.body.error?.code}`);
+    }
+    const back = await json(`/v1/themes/${id}`, op(put({ shapes: { '--shape-corner': '' } })));
+    assert(back.status === 200 && back.body.data.theme.shapes['--shape-corner'] === undefined && back.body.data.theme.shapes['--shape-case-heading'] === 'none', 'an empty value puts the built-in one back');
+    const member403 = await json(`/v1/themes/${id}`, member(put({ shapes: { '--shape-corner': '4px' } })));
+    assert(member403.status === 403, `member: ${member403.status}`);
+    await json(`/v1/themes/${id}`, op(put({ retired: true })));
+});
+
 console.log('\nWho chooses, and what a page carries');
 
 await test('The operator makes the theme available; the page shell carries it before its first paint', async () => {

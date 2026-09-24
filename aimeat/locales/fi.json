@@ -20038,7 +20038,8 @@
       "styles": "Tyylit",
       "components": "Komponentit",
       "css": "Teeman CSS",
-      "pages": "Oikeilla sivuilla"
+      "pages": "Oikeilla sivuilla",
+      "shapes": "Muodot"
     },
     "styles": "Tyylit",
     "stylesHint": "Tyyli on yksi värijoukko vaaleassa ja tummassa tilassa, kolme kirjasinta ja tieto siitä, onko tyylillä molemmat tilat vai vain toinen. Ihmiset valitsevat tarjoamistasi tyyleistä.",
@@ -20252,6 +20253,42 @@
     "filters": "Rajaukset",
     "reachesAll": "Osa sen säännöistä ei ala komponentin luokista, joten ne voivat muuttaa tämän teeman jokaista sivua.",
     "findInFrames": "Etsi näytettävä komponentti",
-    "accentOthers": "Korostusvärin vaaleampi, tummempi ja haalea sävy eivät seuraa sitä. Aseta ne kohdassa \"Kaikki muut värit\"."
+    "accentOthers": "Korostusvärin vaaleampi, tummempi ja haalea sävy eivät seuraa sitä. Aseta ne kohdassa \"Kaikki muut värit\".",
+    "shapesHint": "Muodot ovat teeman kulmat, kehykset, varjot ja kirjainkoko. Jokainen komponentti lukee ne, joten myöhemmin lisätty komponenttikin noudattaa niitä. Käytä komponentin CSS:ää vain siihen, mikä on yhden komponentin omaa.",
+    "shapeEmpty": "Jätä kenttä tyhjäksi, niin valmis arvo pysyy.",
+    "shapeBuiltin": "Valmis: {value}",
+    "shapeRefused": "Ei tallennettu: {reason}",
+    "saveShapes": "Tallenna muodot",
+    "shapeGroup": {
+      "corners": "Kulmat",
+      "frames": "Kehykset",
+      "shadows": "Varjot",
+      "type": "Kirjaimet"
+    },
+    "shape": {
+      "shapeCorner": "Laatikon, paneelin tai kortin kulma",
+      "shapeCornerControl": "Kentän tai pienen säätimen kulma",
+      "shapeCornerPill": "Pääpainikkeen, välilehden ja lukumäärän kulma",
+      "shapeCornerDialog": "Dialogin ja avatun valikon kulma",
+      "shapeFrame": "Laatikon tai säätimen kehys",
+      "shapeFrameHeavy": "Paksu kehys ja viiva",
+      "shapeFrameColour": "Laatikon kehyksen väri",
+      "shapeRuleColour": "Osien välisen viivan ja säätimen kehyksen väri",
+      "shapeFieldColour": "Kentän kehyksen väri",
+      "shapeShadow": "Laatikon varjo",
+      "shapeShadowRaised": "Tietueen ja avatun valikon varjo",
+      "shapeShadowDialog": "Dialogin varjo",
+      "shapeShadowAction": "Pääpainikkeen varjo",
+      "shapeShadowActionPressed": "Pääpainikkeen varjo osoittimen alla",
+      "shapeShadowChosen": "Valitun vaihtoehdon varjo",
+      "shapeCaseHeading": "Otsikoiden kirjainkoko",
+      "fontPosterWeight": "Otsikoiden paksuus",
+      "fontPosterTracking": "Otsikoiden kirjainväli",
+      "fontPosterLeading": "Otsikoiden riviväli",
+      "shapeCaseAction": "Toimintojen ja välilehtien kirjainkoko",
+      "shapeTrackingAction": "Toimintojen ja välilehtien kirjainväli",
+      "shapeCaseLabel": "Nimikkeiden kirjainkoko",
+      "shapeTrackingLabel": "Nimikkeiden kirjainväli"
+    }
   }
 }

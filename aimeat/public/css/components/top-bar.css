@@ -7,6 +7,8 @@
  * @usage Linked from public/spa.html right after theme.css, in the order theme.css held these rules
  *   (the shell block), and from every standalone page that links theme.css.
  * @version-history
+ *   v1.3.0 — 2026-09-24 — The rule, the corners and the menu's frame and shadow read the theme's shape
+ *     values (a move).
  *   v1.2.0 — 2026-09-24 — The look on a phone: the menu carries light/dark, the themes and the styles.
  *   v1.1.0 — 2026-09-24 — A notification's actions are menu rows in a column.
  *   v1.0.0 — 2026-09-24 — Moved unchanged from css/theme.css (lines 636-958), so theme.css
@@ -186,7 +188,7 @@
    A 3px ink rule instead of a hairline, bold links with the open one underlined in coral, the
    morsel count on a sun chip, the bell and the pill in ink frames. Everything reads the shell's
    tokens, so the dark theme and the palettes keep working. */
-.topnav { border-bottom: 3px solid var(--text); font-family: var(--font-showroom-body); }
+.topnav { border-bottom: var(--shape-frame-heavy) solid var(--shape-rule-colour); font-family: var(--font-showroom-body); }
 .topnav-brand { font-family: var(--font-wordmark); font-weight: var(--weight-regular); font-size: 1.25rem; letter-spacing: -0.01em; }
 .topnav-right a, .topnav-menu > a { font-weight: var(--weight-bold); font-size: 0.88rem; color: var(--text-dim); padding: 6px 4px; border-radius: 0; }
 .topnav-right a:hover, .topnav-menu > a:hover { color: var(--text); background: none; }
@@ -197,11 +199,11 @@
 }
 .brand-morsels {
   font-family: var(--font-mono); font-size: 0.76rem; font-weight: var(--weight-medium); letter-spacing: 0;
-  background: var(--sun); color: var(--on-sun); border: 0; border-radius: 0; padding: 3px 9px; margin-left: 12px;
+  background: var(--sun); color: var(--on-sun); border: 0; border-radius: var(--shape-corner-pill); padding: 3px 9px; margin-left: 12px;
 }
-.notif-bell-btn { border-radius: 0; }
+.notif-bell-btn { border-radius: var(--shape-corner-control); }
 .notif-bell-btn:hover { background: var(--sun); }
-.notif-dropdown { border: 3px solid var(--text); border-radius: 0; box-shadow: 8px 8px 0 var(--sun); }
+.notif-dropdown { border: var(--shape-frame-heavy) solid var(--shape-frame-colour); border-radius: var(--shape-corner-dialog); box-shadow: var(--shape-shadow-raised); }
 
 /* Collapse the header to a hamburger the moment the inline nav stops fitting.
    TWO triggers, one rule set:
