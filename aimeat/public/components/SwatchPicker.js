@@ -12,6 +12,8 @@
  *     preview=${current ? html`<div class=${'mp-swatch mp-swatch--' + current}></div>` : null}
  *     choices=${[{ value: '', label: 'Off', active: !current }, …]} onChoose=${choose} />`
  * @version-history
+ *   v1.1.0 — 2026-09-24 — The choices are the tab's tile tone, with their look unchanged (Jouni's
+ *     decision "Choice").
  *   v1.0.0 — 2026-09-23 — Moved out of views/home/settings-dialog.js (the margin pattern) with its
  *     markup unchanged (UI consolidation phase 1, a move).
  */
@@ -36,7 +38,7 @@ export function SwatchPicker({ title, hint, preview, emptyLabel, choices, onChoo
       </div>
       <div class="poster-settings-pattern-choices" role="radiogroup" aria-label=${title}>
         ${choices.map((c) => html`
-          <button type="button" key=${c.value} class=${`poster-settings-pattern-choice ${c.active ? 'active' : ''}`}
+          <button type="button" key=${c.value} class=${`poster-tab poster-tab--tile ${c.active ? 'is-on' : ''}`}
             role="radio" aria-checked=${c.active ? 'true' : 'false'} onClick=${() => onChoose(c.value)}>
             ${c.label}
           </button>

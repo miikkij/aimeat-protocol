@@ -20,6 +20,7 @@
  *   import { StartPageSetting } from '/components/StartPageSetting.js';
  *   html`<${StartPageSetting} />`
  * @version-history
+ *   v1.1.0 — 2026-09-24 — The choices are tabs, the chosen one on the sun (Jouni's decision "Choice").
  *   v1.0.0 — 2026-08-27 — Initial, in place of HomeUiSwitch.js.
  */
 import { h } from 'preact';
@@ -80,10 +81,10 @@ export function StartPageSetting({ className = '' }) {
           ${tr('home.startPage.hint', 'Where you land when you sign in or arrive at the front page.')}
         </span>
       </div>
-      <div class="seg start-page-seg" role="radiogroup" aria-label=${tr('home.startPage.title', 'Start page')}>
+      <div class="start-page-seg" role="radiogroup" aria-label=${tr('home.startPage.title', 'Start page')}>
         ${options.map(o => html`
           <button type="button" key=${o.id} role="radio" aria-checked=${ui === o.id}
-            class="seg-btn ${ui === o.id ? 'active' : ''}" disabled=${busy}
+            class="poster-tab ${ui === o.id ? 'is-on' : ''}" disabled=${busy}
             onClick=${() => choose(o.id)}>
             ${tr(o.key, o.fallback)}
           </button>`)}

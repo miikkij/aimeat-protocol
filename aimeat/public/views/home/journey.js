@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Choose useful work, connect an AI, copy the task and see the saved note at home.
  * @version-history
+ *   2026-09-24: The setup guide's tools are tabs (Jouni's decision "Choice").
  *   2026-09-23: Composed from components/Chooser.js and Hint.js, which emit the markup this file
  *     wrote; what the chooser holds stays here (UI consolidation phase 1, a move).
  *   2026-09-23: Composed from the shared parts in css/parts.css and css/parts-steps.css (class names by role, values moved from views/home.css unchanged; UI consolidation slice 1).
@@ -86,7 +87,7 @@ export function HomeJourney() {
       <//>
       ${connecting && html`<${ChooserBox}>
         <p>${t('homeJourney.consent')}</p>
-        <${McpSetupGuide} />
+        <${McpSetupGuide} tabClass="poster-tab" activeClass="is-on" />
         <h3>${t('homeJourney.prove')}</h3>
         <p>${t('homeJourney.proveHint')}</p>
         <${PromptCard} label=${t('homeJourney.prove')} prompt=${proof?.prompt || ''} className="poster-action"

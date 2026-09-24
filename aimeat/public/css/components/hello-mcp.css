@@ -9,6 +9,7 @@
  * @structure .ib (instruction block) · .ib-tabs · .ib-block · .pj-org-instr · .ast (setup guide)
  * @usage loaded from spa.html
  * @version-history
+ *   v1.2.0 — 2026-09-24 — "recommended" on a tab takes the tab's text colour.
  *   v1.1.0 — 2026-09-02 — The Hello MCP panel rules (`.hm-*`) removed with the panel: the MCP page
  *     is a poster page now (views/profile/mcp/) and nothing rendered them any more.
  *   v1.0.0 — 2026-07-31 — Initial.
@@ -122,6 +123,9 @@
   text-transform: uppercase;
   letter-spacing: 0.03em;
 }
+/* On a tab it takes the tab's own text colour, which stays readable on the sun of the chosen tab
+   (coral on the sun is not; Jouni's decision "Choice"). */
+.poster-tab .ast-tool-reco { color: inherit; }
 
 .ast-plans, .ast-warn, .ast-note {
   margin: 0 0 0.6rem;
