@@ -9,6 +9,8 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=designbook
  * @version-history
+ *   v1.5.1 — 2026-09-24 — A component whose stylesheet reaches beside it (`.wkgrid ~ p`) is refused at
+ *     propose. Failed on the old code first (201).
  *   v1.5.0 — 2026-09-24 — A component with an "=" where a name belongs, or an escaped url(, is
  *     refused at propose (1a0a15eb7b20, e82c9f26d729), and a component's preview carries no CSP
  *     nonce. Both failed on the old code first.
@@ -460,6 +462,9 @@ const GOOD_BODY = {
         assert(unnamed.status === 422 && /"=" stands where a browser expects/.test(unnamed.body.error?.message ?? ''), `an "=" with no name is refused: ${unnamed.status} ${JSON.stringify(unnamed.body?.error)}`);
         const escaped = await propose(`comp-bad-${stamp}`, body({ css: '.wkgrid { color: var(--ak-ink); background: u\\rl(https://evil.example/x.png); }' }));
         assert(escaped.status === 422 && /no url\(\)/.test(escaped.body.error?.message ?? ''), `an escaped url( is refused: ${escaped.status} ${JSON.stringify(escaped.body?.error)}`);
+        // A selector is read to its end: `.wkgrid ~ p` starts at the component and styles the page after it.
+        const beside = await propose(`comp-bad-${stamp}`, body({ css: '.wkgrid { color: var(--ak-ink); }\n.wkgrid ~ p { color: var(--ak-accent); }' }));
+        assert(beside.status === 422 && /beside it/.test(beside.body.error?.message ?? ''), `a rule reaching beside the component is refused: ${beside.status} ${JSON.stringify(beside.body?.error)}`);
 
         // The app exists and wrote down what it made, and its owner has NOT said it turned out well.
         const page = APP(f).replace('</head>', `<script type="application/json" id="aimeat-build-notes">${JSON.stringify({ made: [{ name: 'week-grid', what: 'seven tappable days per row', why: 'the Book has no grid a person ticks' }] })}</` + 'script></head>');
