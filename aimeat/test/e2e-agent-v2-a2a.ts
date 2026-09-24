@@ -30,6 +30,8 @@
  *
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=agent-v2-a2a
  * @version-history
+ *   v1.3.0 — 2026-09-24 — A re-spelled copy of a spent assertion is refused as the same assertion
+ *     (audit A4-3).
  *   v1.2.0 — 2026-09-16 — The payout address is set through its route and compared without case.
  *   v1.1.0 — 2026-09-01 — The foreign caller: a stranger hires a published offering, pays for it,
  *     and reaches nothing else (V6a, the phase criterion).
@@ -177,6 +179,16 @@ async function makeStranger(name: string, opts: { publishKey?: boolean; gaii?: s
             }))).setProtectedHeader({ alg: 'EdDSA', kid: pair.kid }).sign(key);
         },
     };
+}
+
+/**
+ * The same assertion, spelled differently. The last base64url character of an Ed25519 signature has
+ * four bits nobody reads, so changing only those gives a string that still verifies.
+ */
+function respell(jws: string): string {
+    const B64U = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+    const last = B64U.indexOf(jws[jws.length - 1]);
+    return jws.slice(0, -1) + B64U[(last & 0x30) | ((last + 1) & 0x0f)];
 }
 
 /**
@@ -963,6 +975,23 @@ async function run(): Promise<void> {
         // Spending one must not lock the peer out: the pin is the identity, the assertion is one call.
         const fresh = await foreignRpc(a.owner, worker.name, stranger, 'GetTask', { id: foreignTaskId });
         assert(!fresh.error, `a fresh assertion from the same peer still works, got ${JSON.stringify(fresh.error)}`);
+    });
+
+    await test('a re-spelled copy of a spent assertion is the same assertion (audit A4-3)', async () => {
+        // The spend used to be keyed on the raw string, so each of the sixteen spellings of one
+        // signature was one more call on the road where money moves. It is keyed on sub, aud and jti.
+        const once = await stranger.assertion();
+        const respelt = respell(once);
+        assert(respelt !== once, 'the copy is spelled differently');
+        const first = await foreignRpc(a.owner, worker.name, stranger, 'GetTask', { id: foreignTaskId },
+            { assertion: once });
+        assert(!first.error, `the first use works, got ${JSON.stringify(first.error)}`);
+
+        const copy = await foreignRpc(a.owner, worker.name, stranger, 'GetTask', { id: foreignTaskId },
+            { assertion: respelt });
+        assert(copy.status === 401, `the re-spelled copy is refused, got ${copy.status}`);
+        assert(copy.body?.error?.code === 'A2A_ASSERTION_REPLAYED',
+            `for reuse, by name, got ${copy.body?.error?.code}`);
     });
 
     await test('an expired assertion is refused for expiry, not for reuse', async () => {
