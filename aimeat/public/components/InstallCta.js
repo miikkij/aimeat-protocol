@@ -12,6 +12,7 @@
  * @structure InstallCta({ compact }) — compact drops the body line for tight surfaces (chat).
  * @usage import { InstallCta } from '/components/InstallCta.js';  html`<${InstallCta} />`
  * @version-history
+ *   v1.2.0 — 2026-09-24 — "Not now" is the action link's text tone (Jouni's decision "Dismiss").
  *   v1.1.0 — 2026-09-24 — Install is the underlined action link (Jouni's decision "Panel action").
  *   v1.0.0 — 2026-08-16 — Initial: prompt-backed card + iOS hint + per-browser dismissal.
  */
@@ -58,7 +59,7 @@ export function InstallCta({ compact = false }) {
             <div class="install-cta-actions">
                 ${offer && html`<button type="button" class="poster-action install-cta-install"
                     onClick=${install}>${tr('install.install', 'Install')}</button>`}
-                <button type="button" class="btn-ghost install-cta-dismiss"
+                <button type="button" class="poster-action poster-action--text install-cta-dismiss"
                     onClick=${() => dismissInstall()}>${tr('install.notNow', 'Not now')}</button>
             </div>
         </div>

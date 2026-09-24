@@ -8,6 +8,7 @@
  * @usage Linked from public/spa.html in the component block, whose order keeps the order these
  *   rules had when they were one sheet.
  * @version-history
+ *   v1.1.0 — 2026-09-24 — "Not now" is the action link's text tone (Jouni's decision "Dismiss").
  *   v1.0.0 — 2026-09-23 — Moved unchanged from css/parts*.css (UI consolidation phase 1, a move).
  */
 
@@ -21,7 +22,8 @@
   margin: 12px 0 0;
 }
 .poster-nudge-text { flex: 1 1 260px; }
-.poster-nudge-dismiss { flex: 0 0 auto; font-size: var(--text-caption); padding: 2px 8px; }
+/* "Not now" is the action link's text tone (Jouni's decision "Dismiss"); this keeps its place. */
+.poster-nudge-dismiss { flex: 0 0 auto; }
 @media (max-width: 760px) {
   .poster-nudge { margin: 8px 12px 0; }
 }
