@@ -45,6 +45,10 @@
  *     agent copy); a non-public agent face still falls back like no face.
  *   v1.12.0 — 2026-07-30 — Phase 10: the inline app CSP permits WebAssembly compilation
  *     ('wasm-unsafe-eval') and still refuses eval() (no 'unsafe-eval').
+ *   v1.13.0 — 2026-09-24 — Phase 13 (A7-2): the generic storage doors cannot write an app's icon or
+ *     screenshot key, the icon and screenshot GETs never answer as a page or an SVG, the screenshot
+ *     doors refuse a page (the publish door before it publishes), and a real picture is served as
+ *     the type its bytes are.
  */
 
 import * as ed from '@noble/ed25519';
@@ -872,6 +876,97 @@ await test('a re-publish that omits the name keeps the name, inline and presigne
         body: JSON.stringify({ filename: file, name: 'RENAMED', description: 'fourth', content: b64('<html>four</html>') }),
     }));
     assert((await read()).name === 'RENAMED', 'an explicit name still renames it');
+});
+
+// ── Phase 13: an app's icon and screenshot are pictures, whichever door wrote them ──
+// A7-2. The icon and screenshot GET doors sent the Content-Type a file was stored with, and the
+// generic storage doors could store anything under an app's icon or screenshot key: text/html
+// written through POST /v1/storage came back from the icon door as text/html on the node's own
+// origin, and the icon POST's PNG check was simply walked around. Those keys now belong to the
+// app's own doors, which check that the bytes are a picture, and the GET doors serve only a PNG,
+// a JPEG or a WebP image.
+console.log('\nPhase 13: App icon and screenshot keys');
+
+const NOT_A_PICTURE = b64('<!doctype html><h1>not a picture</h1>');
+const SVG_PICTURE = b64('<svg xmlns="http://www.w3.org/2000/svg"><script>1</script></svg>');
+const JPEG_1x1 = '/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=';
+
+await test("the generic storage doors cannot write an app's icon or screenshot", async () => {
+    const attempts: Array<[string, string, string]> = [
+        [`apps/icons/${FILENAME}`, 'text/html', NOT_A_PICTURE],
+        [`apps/screenshots/${FILENAME}`, 'image/svg+xml', SVG_PICTURE],
+    ];
+    for (const [key, mime, data] of attempts) {
+        const inline = await json('/v1/storage', authed({
+            method: 'POST', body: JSON.stringify({ key, data, mime_type: mime, visibility: 'public' }),
+        }));
+        assert(inline.status === 403, `POST /v1/storage ${key}: expected 403, got ${inline.status}`);
+        const presigned = await json('/v1/storage', authed({
+            method: 'POST', body: JSON.stringify({ key, mime_type: mime, mode: 'presigned' }),
+        }));
+        assert(presigned.status === 403, `presigned ${key}: expected 403, got ${presigned.status}`);
+        const memoryFiles = await json('/v1/memory/files', authed({
+            method: 'POST', body: JSON.stringify({ key, content: data, mime_type: mime, visibility: 'public' }),
+        }));
+        assert(memoryFiles.status === 403, `POST /v1/memory/files ${key}: expected 403, got ${memoryFiles.status}`);
+        const chunked = await json('/v1/storage/upload/init', authed({
+            method: 'POST', body: JSON.stringify({ key, mime_type: mime, chunk_size: 1024, total_chunks: 1 }),
+        }));
+        assert(chunked.status === 403, `chunked upload ${key}: expected 403, got ${chunked.status}`);
+    }
+});
+
+await test('an icon or screenshot GET never answers as a page or an SVG', async () => {
+    for (const door of ['icon', 'screenshot']) {
+        const res = await fetch(`${BASE}/v1/apps/${ownerName}/${FILENAME}/${door}`);
+        const ct = (res.headers.get('content-type') ?? '').toLowerCase();
+        assert(!ct.startsWith('text/html') && !ct.startsWith('image/svg'), `${door} answered ${res.status} as ${ct}`);
+    }
+});
+
+await test('the screenshot doors refuse a page offered as a picture, before anything is stored', async () => {
+    const asPage = await json(`/v1/apps/${ownerName}/${FILENAME}/screenshot`, authed({
+        method: 'POST', body: JSON.stringify({ screenshot: NOT_A_PICTURE, screenshot_mime_type: 'text/html' }),
+    }));
+    assert(asPage.status === 400, `a page is not a screenshot (got ${asPage.status})`);
+    // A real picture under a false label is refused too, so the caller learns the label is wrong.
+    const mislabelled = await json(`/v1/apps/${ownerName}/${FILENAME}/screenshot`, authed({
+        method: 'POST', body: JSON.stringify({ screenshot: PNG_1x1, screenshot_mime_type: 'text/html' }),
+    }));
+    assert(mislabelled.status === 400, `a picture labelled as a page is refused (got ${mislabelled.status})`);
+    const shot = await fetch(`${BASE}/v1/apps/${ownerName}/${FILENAME}/screenshot`);
+    assert(shot.status === 404, `neither attempt stored anything (got ${shot.status})`);
+
+    // The publish door takes a screenshot too, and refuses it before the version is published.
+    const before = await json(`/v1/apps/${ownerName}/${FILENAME}/versions`, authed());
+    const n = (before.body.data.versions as any[]).length;
+    const pub = await json('/v1/apps', authed({
+        method: 'POST',
+        body: JSON.stringify({ filename: FILENAME, content: b64(HTML_V2), screenshot: NOT_A_PICTURE, screenshot_mime_type: 'text/html' }),
+    }));
+    assert(pub.status === 400, `a publish carrying a page as its screenshot is refused (got ${pub.status})`);
+    const after = await json(`/v1/apps/${ownerName}/${FILENAME}/versions`, authed());
+    assert((after.body.data.versions as any[]).length === n, 'and the refused publish added no version');
+});
+
+await test('a real picture still goes through, typed by its bytes', async () => {
+    const up = await json(`/v1/apps/${ownerName}/${FILENAME}/icon`, authed({
+        method: 'POST', body: JSON.stringify({ icon: PNG_1x1 }),
+    }));
+    assert(up.status === 200, `icon upload ${up.status}: ${JSON.stringify(up.body?.error)}`);
+    const icon = await fetch(`${BASE}/v1/apps/${ownerName}/${FILENAME}/icon`);
+    assert(icon.status === 200, `icon GET ${icon.status}`);
+    assert(icon.headers.get('content-type') === 'image/png', `icon served as ${icon.headers.get('content-type')}`);
+    assert(icon.headers.get('x-content-type-options') === 'nosniff', 'the browser may not guess another type');
+
+    // A JPEG labelled as a PNG is stored as what it is.
+    const shot = await json(`/v1/apps/${ownerName}/${FILENAME}/screenshot`, authed({
+        method: 'POST', body: JSON.stringify({ screenshot: JPEG_1x1, screenshot_mime_type: 'image/png' }),
+    }));
+    assert(shot.status === 200, `screenshot upload ${shot.status}: ${JSON.stringify(shot.body?.error)}`);
+    const got = await fetch(`${BASE}/v1/apps/${ownerName}/${FILENAME}/screenshot`);
+    assert(got.status === 200, `screenshot GET ${got.status}`);
+    assert(got.headers.get('content-type') === 'image/jpeg', `screenshot served as ${got.headers.get('content-type')}`);
 });
 
 console.log(`\n${passed} passed, ${failed} failed\n`);

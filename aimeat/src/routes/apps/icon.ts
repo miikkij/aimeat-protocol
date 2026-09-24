@@ -20,6 +20,9 @@
  * @structure registerAppIconRoutes() — GET and POST /v1/apps/:owner/:filename/icon
  * @usage registerAppIconRoutes(router, config, storage, appTarget); // from appsRouter
  * @version-history
+ *   v1.1.0 — 2026-09-24 — GET serves the icon only when its bytes are a PNG, JPEG or WebP image,
+ *     typed by the bytes rather than by the stored label, and answers 404 otherwise (A7-2). The key
+ *     could be written through the generic storage door with any type, and this door sent that type.
  *   v1.0.0 — 2026-09-15 — Initial.
  */
 import type { Router } from 'express';
@@ -29,6 +32,7 @@ import { requireAuth, requireScope } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
 import { decodeStrictBase64 } from '../../utils/base64.js';
+import { setStoredImageHeaders } from '../../utils/file-download-headers.js';
 import { appIconKey } from '../../services/app-seo.js';
 import { appTargetOr, type AppTargetFor } from './helpers.js';
 
@@ -43,6 +47,9 @@ function badFilename(filename: string): boolean {
 
 /** Tolerate the legacy full-GHII owner segment (owner@node) in old links. */
 const bareOwner = (segment: string): string => (segment.includes('@') ? segment.split('@')[0] : segment);
+
+/** The app's filename without `.html`, for the name a saved picture gets. */
+const pictureName = (filename: string): string => filename.replace(/\.html?$/i, '') || 'app';
 
 export function registerAppIconRoutes(
     router: Router,
@@ -72,11 +79,16 @@ export function registerAppIconRoutes(
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', `No icon image for app "${filename}"`));
             return;
         }
-        res.setHeader('Content-Type', file.mimeType);
+        // A PICTURE, TYPED BY ITS BYTES, OR NOTHING. The stored label is not believed: this door sent
+        // it as it was, so a page stored under this key by another door came back as a page on the
+        // node's origin (A7-2). setStoredImageHeaders also sets nosniff and the stored-file CSP.
+        if (!setStoredImageHeaders(res, { key: file.key, data: file.data, name: `${pictureName(filename)}-icon` })) {
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND',
+                `The file stored as the icon of "${filename}" is not a PNG, JPEG or WebP image, so it is not served.`));
+            return;
+        }
         res.setHeader('Content-Length', file.size.toString());
         res.setHeader('Cache-Control', 'public, max-age=3600');
-        // Owner-supplied bytes: name the type and refuse to let a browser guess a different one.
-        res.setHeader('X-Content-Type-Options', 'nosniff');
         res.send(file.data);
     });
 

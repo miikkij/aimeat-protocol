@@ -8,6 +8,9 @@
  *   own business: validating the payload, decoding the base64, the optional screenshot, and this
  *   route's response document.
  * @version-history
+ *   v2.8.1 -- 2026-09-24 -- The optional screenshot is checked before the publish rather than after
+ *     it, and must be a PNG, JPEG or WebP image, stored as the type its bytes are (A7-2). It was
+ *     stored with the caller's label, and a bad one answered 400 on a version already live.
  *   v2.8.0 -- 2026-09-13 -- The response carries `served_marks_removed` and `served_marks_note` when
  *     the upload was a served copy: the publish stored it without the node's serve marks (the
  *     developer's decision; services/app-serve-marks-strip.ts) instead of warning in `app_hints`.
@@ -68,6 +71,7 @@ import { servedMarksResponse } from '../../services/app-serve-marks-strip.js';
 import { isSharedApp } from '../../services/app-dev-grant.js';
 import { roadmapGate } from '../../services/app-roadmap.js';
 import { decodeStrictBase64 } from '../../utils/base64.js';
+import { imageUploadType } from '../../utils/raster-image.js';
 import { sanitizeProtection } from '../../utils/app-protect.js';
 import { appTargetOr, type AppTargetFor } from './helpers.js';
 
@@ -224,6 +228,31 @@ export function registerPublishRoutes(
             return;
         }
 
+        // The optional screenshot is checked BEFORE the publish, so a refusal leaves the app as it
+        // was; checked after, a bad screenshot answered 400 on a version that had already gone live.
+        // The bytes must be a PNG, JPEG or WebP image and are stored as the type they are, the same
+        // test the screenshot door applies, because the GET door serves them to anybody (A7-2).
+        let shot: { data: Buffer; mimeType: string } | null = null;
+        if (screenshot && typeof screenshot === 'string') {
+            const screenshotData = decodeStrictBase64(screenshot);
+            if (!screenshotData) {
+                res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'screenshot must be base64-encoded image data'));
+                return;
+            }
+            const MAX_SCREENSHOT_SIZE = 2 * 1024 * 1024;
+            if (screenshotData.length > MAX_SCREENSHOT_SIZE) {
+                res.status(413).json(error(config.nodeId, 'TOO_LARGE', `Screenshot exceeds 2MB limit (${screenshotData.length} bytes)`));
+                return;
+            }
+            const screenshotMime = imageUploadType(screenshotData, screenshot_mime_type);
+            if (!screenshotMime) {
+                res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
+                    'A screenshot must be a PNG, JPEG or WebP image, and screenshot_mime_type, when given, must say which.'));
+                return;
+            }
+            shot = { data: screenshotData, mimeType: screenshotMime };
+        }
+
         const out = await publishApp(storage, config, {
             ownerName: owner,
             ownerGhii,
@@ -264,32 +293,20 @@ export function registerPublishRoutes(
             return;
         }
 
-        // Handle optional screenshot upload (still uses file storage). Inline-only: it rides in this
-        // route's body and there is nothing equivalent on the other two doors.
-        let hasScreenshot = false;
-        if (screenshot && typeof screenshot === 'string') {
-            const screenshotData = decodeStrictBase64(screenshot);
-            if (!screenshotData) {
-                res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'screenshot must be base64-encoded image data'));
-                return;
-            }
-            const MAX_SCREENSHOT_SIZE = 2 * 1024 * 1024;
-            if (screenshotData.length > MAX_SCREENSHOT_SIZE) {
-                res.status(413).json(error(config.nodeId, 'TOO_LARGE', `Screenshot exceeds 2MB limit (${screenshotData.length} bytes)`));
-                return;
-            }
-            const screenshotMime = typeof screenshot_mime_type === 'string' ? screenshot_mime_type : 'image/png';
+        // The optional screenshot, checked above (still uses file storage). Inline-only: it rides in
+        // this route's body and there is nothing equivalent on the other two doors.
+        if (shot) {
             await storage.createStorageFile({
                 key: `apps/screenshots/${filename}`,
                 ownerGaii: ownerGhii,   // match app row's ownerGaii so reads find it
                 visibility: 'public',
-                mimeType: screenshotMime,
-                size: screenshotData.length,
-                data: screenshotData,
+                mimeType: shot.mimeType,
+                size: shot.data.length,
+                data: shot.data,
                 createdAt: new Date().toISOString(),
             });
-            hasScreenshot = true;
         }
+        const hasScreenshot = shot !== null;
 
 
         res.status(201).json(success(config.nodeId, {

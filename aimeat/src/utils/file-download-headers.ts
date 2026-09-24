@@ -35,11 +35,15 @@
  * @structure
  *   - isInlineSafeFileType() -- the allowlist, as a predicate
  *   - setStoredFileHeaders() -- sets Content-Type, nosniff, Content-Disposition and the CSP
+ *   - setStoredImageHeaders() -- the same for a door that serves only a picture, typed by its bytes
  * @usage
  *   import { setStoredFileHeaders } from '../utils/file-download-headers.js';
  *   setStoredFileHeaders(res, file);       // then Content-Length / Content-Range / Cache-Control
  *   res.end(file.data);
  * @version-history
+ *   v1.2.0 -- 2026-09-24 -- setStoredImageHeaders(): the app icon and screenshot doors serve a PNG,
+ *     JPEG or WebP typed by its bytes, and nothing else. They sent the stored label as it was, so a
+ *     page stored under an app's icon key was served as a page (A7-2).
  *   v1.1.0 -- 2026-09-08 -- `downloadName`: the name a file is SAVED as, when the caller knows it
  *     and the key does not. A direct-message attachment is stored at dm/<thread>/<message>/<id>, so
  *     the key's last segment is an id: pressing download saved `23ea6d2c`, with no extension and no
@@ -50,6 +54,7 @@
  */
 import type { Response } from 'express';
 import { sniffedContentType, verifiedContentType } from './app-content-type.js';
+import { rasterImageType, type RasterImageType } from './raster-image.js';
 
 /**
  * Everything a stored file may be rendered as when someone navigates to it. Read the reasoning in
@@ -173,4 +178,36 @@ export function setStoredFileHeaders(
     const filename = safeDownloadName(file.downloadName)
         || (String(file.key ?? '').split('/').filter(Boolean).pop() ?? '');
     res.setHeader('Content-Disposition', dispositionValue(inline ? 'inline' : 'attachment', filename));
+}
+
+/** The extension a picture is saved with, by the type its bytes are. */
+const IMAGE_EXTENSION: Record<RasterImageType, string> = {
+    'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp',
+};
+
+/**
+ * Headers for a stored file that a door serves ONLY as a picture: an app's icon and its screenshot.
+ *
+ * The type comes from the bytes (utils/raster-image.ts), never from the label the file was stored
+ * with, and only a PNG, a JPEG or a WebP image is served. Anything else answers false having set
+ * nothing, so the door can send its own refusal on a clean response. These doors used to send the
+ * stored type as it was, so `text/html` or `image/svg+xml` stored under an app's icon key came back
+ * as a page on the node's origin (A7-2).
+ *
+ * `name` is what the picture is saved as, without the extension, which follows the type. Without it
+ * the key's last segment is used, as for every stored file.
+ */
+export function setStoredImageHeaders(
+    res: Response,
+    file: { key: string; data?: Buffer | Uint8Array | null; name?: string },
+): boolean {
+    const type = rasterImageType(file.data);
+    if (!type) return false;
+    setStoredFileHeaders(res, {
+        key: file.key,
+        mimeType: type,
+        data: file.data,
+        ...(file.name ? { downloadName: `${file.name}.${IMAGE_EXTENSION[type]}` } : {}),
+    });
+    return true;
 }
