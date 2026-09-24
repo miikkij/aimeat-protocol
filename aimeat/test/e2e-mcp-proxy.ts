@@ -30,6 +30,9 @@
  *     test/run-e2e-ci.ts --test=mcp-proxy
  *
  * @version-history
+ *   v1.8.0 — 2026-09-24 — A capability over the node's server, bought by a second owner, runs at
+ *     checkout, and an offer over it answers a second owner in person: the paths that send no
+ *     session state what authorises the call.
  *   v1.7.0 — 2026-09-24 — A capability over a remote tool asks the caller's own scopes: an agent with
  *     work:request and not mcp:use is refused on REST and MCP, and answered once it holds mcp:use;
  *     an owner in person reaches the node's server through one (secaudit 2026-09 f740ecf9bc39).
@@ -1130,6 +1133,8 @@ console.log('\nPhase 5d — The node’s server stays the node’s');
 
 let plain = { name: '', token: '' };
 let houseId = '';
+/** The public capability over the node's server, published by the operator in this phase. */
+let houseCapId = '';
 const plainAuth = () => ({ Authorization: `Bearer ${plain.token}` });
 
 /** The operator's view of the house server: the one place its settings can be read. */
@@ -1203,12 +1208,60 @@ await test('a capability over the node server answers an owner in person, who ho
     }),
   });
   assert(cap.status === 201, `create: ${cap.status}: ${JSON.stringify(cap.body)}`);
-  const id = cap.body.data.capability?.id ?? cap.body.data.id;
-  const r = await json(`/v1/capabilities/${id}/invoke`, {
+  houseCapId = cap.body.data.capability?.id ?? cap.body.data.id;
+  const r = await json(`/v1/capabilities/${houseCapId}/invoke`, {
     method: 'POST', headers: plainAuth(), body: JSON.stringify({ input: { text: 'on the house' } }),
   });
   assert(r.status === 200 && JSON.stringify(r.body.data).includes('echo:on the house'),
     `an owner in person: ${r.status} ${JSON.stringify(r.body)}`);
+});
+
+await test('a capability over a remote tool, bought by a second owner, runs at checkout', async () => {
+  // The seller's public tool manifest: one priced tool, bound to the capability above.
+  const manifest = await json('/v1/memory', {
+    method: 'POST', headers: ownerAuth(),
+    body: JSON.stringify({
+      key: 'apps.mcpproxyshop.tools', visibility: 'public',
+      value: { tools: [{
+        name: 'house-echo', description: 'Says it back through the server this node offers.',
+        action_id: houseCapId, price: { morsels: 1, unit: 'per-call' },
+      }] },
+    }),
+  });
+  // 201: the key is new on a fresh database (the write door answers 200 only for an existing key).
+  assert(manifest.status === 201, `manifest: ${manifest.status}: ${JSON.stringify(manifest.body)}`);
+
+  const create = await json('/v1/commerce/checkout-sessions', {
+    method: 'POST', headers: plainAuth(),
+    body: JSON.stringify({ items: [{ kind: 'app-tool', app: `${ownerName}/mcpproxyshop`, tool: 'house-echo', input: { text: 'bought' } }] }),
+  });
+  assert(create.status === 201, `checkout: ${create.status}: ${JSON.stringify(create.body.error)}`);
+  const done = await json(`/v1/commerce/checkout-sessions/${create.body.data.session.id}/complete`, {
+    method: 'POST', headers: plainAuth(), body: JSON.stringify({}),
+  });
+  // The purchase is what authorises the call. Right after the scope default went, the fulfilment
+  // ran with no scopes and the remote tool refused a buyer who had paid.
+  const result = done.body.data?.session?.fulfillment?.results?.[0]?.result;
+  assert(done.status === 200 && JSON.stringify(result).includes('echo:bought'),
+    `complete: ${done.status} ${JSON.stringify(done.body.error ?? done.body.data?.session?.fulfillment)}`);
+});
+
+await test('an offer over a remote tool answers a second owner in person', async () => {
+  // The offer door has a session, so it asks the session, as the capability door does.
+  const offers = await json('/v1/agents/mcpproxybot/offers', {
+    method: 'PUT', headers: ownerAuth(),
+    body: JSON.stringify({ offers: [{
+      id: 'house-echo', title: 'Say it back', ask: 'Give it text; it comes back through the node server.',
+      deliverable: { format: 'document', sample: 'untested' },
+      visibility: 'public', callable: { action_id: houseCapId },
+    }] }),
+  });
+  assert(offers.status === 200, `offers: ${offers.status}: ${JSON.stringify(offers.body.error)}`);
+  const r = await json(`/v1/agents/${encodeURIComponent(agentGaii)}/offers/house-echo/invoke`, {
+    method: 'POST', headers: plainAuth(), body: JSON.stringify({ input: { text: 'offered' } }),
+  });
+  assert(r.status === 200 && JSON.stringify(r.body.data).includes('echo:offered'),
+    `offer: ${r.status} ${JSON.stringify(r.body.error ?? r.body.data)}`);
 });
 
 await test('the operator changes it on the node doors, and a personal door reaches it for nobody', async () => {

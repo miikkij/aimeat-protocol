@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description Agent offers routes (publish/read per-agent offers, owner aggregate feed, callable-offer invoke with settlement). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.6.0 — 2026-09-24 — The offer invoke hands the capability service the session's scopes
+ *     (heldScopes), so an offer bound to a capability over a remote MCP tool runs for a caller who
+ *     holds mcp:use, the owner in person included, as on the capability door.
  *   v1.5.0 — 2026-09-13 — PUT /v1/agents/:name/offers refuses with 422 ODPS_FIELD_TOO_LONG, before the
  *     write, an offer flagged for EXCHANGE whose changed text would publish an ODPS document past a
  *     schema cap (services/exchange-odps-write.ts, the developer's decision). Unchanged text still publishes.
@@ -25,6 +28,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { requireAuth, requireRole, requireScope } from '../../auth/middleware.js';
+import { heldScopes } from '../../auth/effective-scopes.js';
 import { success, error } from '../../middleware/envelope.js';
 import { buildGAII, resolveIdentity } from '../../utils/gaii.js';
 import { emitChange } from '../../services/event-bus.js';
@@ -200,7 +204,9 @@ export function registerOffersRoutes(router: Router, config: AimeatConfig, stora
     let result: unknown;
     try {
       const { invokeCapability } = await import('../../services/capability-invoke.js');
-      result = await invokeCapability(config, storage, cap, input, callerGhii, jwt, mode);
+      // This door has a session, so the session answers the scope question, as on the capability door.
+      result = await invokeCapability(config, storage, cap, input, callerGhii, jwt, mode,
+        undefined, heldScopes(req.auth!));
     } catch (err) {
       if (price > 0) await storage.creditBalance(callerGhii, price); // refund the reservation
       const e = err as { statusCode?: number; code?: string; message?: string };

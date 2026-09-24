@@ -16,6 +16,8 @@
  *   registerSellableResolver(appToolSellableResolver());
  *   const sellable = await getSellableResolver(ref.kind).resolve(storage, config, ref, buyerOwner);
  * @version-history
+ *   v1.4.0 — 2026-09-24 — app-tool: fulfillment hands the capability service mcp:use, because the paid
+ *     checkout authorises the call; a tool bound to a remote MCP tool runs for the buyer again.
  *   v1.3.0 — 2026-07-27 — app-tool: fulfillment carries the internal pass (the checkout IS the payment,
  *     so the raw paywall must not charge it again — or refuse it outright), and a buyer the provider has
  *     GRANTED resolves at price 0 like a self-purchase.
@@ -235,6 +237,8 @@ export function appToolSellableResolver(): SellableResolver {
             applyLockedInput(tool, (item.input ?? {}) as Record<string, unknown>),
             session.buyerIdentity, callerJwt ?? '', 'normal',
             mintInternalPass(`apptool:${sellerOwner}/${appId}`, toolName),
+            // The paid checkout is what authorises this call, so a remote MCP tool behind it runs.
+            ['mcp:use'],
           );
           return { result: invoked.result };
         },
