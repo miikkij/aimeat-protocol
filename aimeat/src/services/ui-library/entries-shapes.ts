@@ -9,6 +9,7 @@
  * @structure SHAPE_ENTRIES
  * @usage import { SHAPE_ENTRIES } from './entries-shapes.js';
  * @version-history
+ *   v1.2.0 — 2026-09-24 — The icon button (Jouni's decision "Icon button").
  *   v1.1.0 — 2026-09-23 — The dialog shape deleted (Jouni's decision: the site has its own dialog);
  *     the chip kept as a candidate for the design lab's first decision.
  *   v1.0.0 — 2026-09-23 — Initial (UI consolidation phase 1).
@@ -63,6 +64,9 @@ export const SHAPE_ENTRIES: UiEntryWritten[] = [
             { name: 'large', class: 'poster-slab--large', when: 'the home\'s large door' },
             { name: 'control', class: 'poster-slab--control', when: 'a 44px button in a row of controls (New conversation, Send)' },
         ]),
+    shape('icon', 'Icon button', ['poster-icon', 'poster-icon--small'], '<button class="poster-icon" aria-label="…">…</button>',
+        'A button that is a mark, not a word: a square in a thin ink frame, the sun under the pointer, dimmed while disabled.', 'Attach, record, delete, more, a card\'s menu.',
+        [{ name: 'small', class: 'poster-icon--small', when: 'everywhere but the composer: 28px, the size of the dialog\'s close square' }]),
     shape('box', 'Box', ['poster-box', 'poster-box--avatar', 'poster-box--small', 'poster-box--meter', 'poster-box--quota', 'poster-box--copy', 'poster-box--row'], '<div class="poster-box">…</div>',
         'A 2px ink frame that carries one object; its size and place belong to the view.', 'An initials box, a meter, or a framed result.',
         [

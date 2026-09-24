@@ -29,6 +29,8 @@
  * @usage
  *   html`<${CardMenu} state=${'open'} actions=${[{ label: 'Copy', run: copy }]} />`
  * @version-history
+ *   v1.1.0 — 2026-09-24 — The dots are the small icon button; the state fills stay (Jouni's decision
+ *     "Icon button").
  *   v1.0.0 — 2026-08-09 — Initial. Replaces the grey prompt box plus a separate loose light, which
  *     repeated the card's own heading and left a 10px dot alone in the whitespace under it.
  */
@@ -83,7 +85,7 @@ export function CardMenu({
   return html`
     <div class="card-menu" ref=${ref} onClick=${stop}>
       <button type="button"
-        class="card-menu-dots card-menu-dots--${state}"
+        class="poster-icon poster-icon--small card-menu-dots card-menu-dots--${state}"
         aria-haspopup="menu" aria-expanded=${open} aria-label=${hint} title=${hint}
         onClick=${(e) => { stop(e); if (!open) onOpened?.(); setOpen(v => !v); }}>
         <span aria-hidden="true">⋯</span>

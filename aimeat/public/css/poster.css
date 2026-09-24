@@ -3,6 +3,7 @@
  * @description Shared poster and showroom shapes. Views compose these classes and own their layout.
  * @usage Linked immediately after theme.css in spa.html.
  * @version-history
+ *   v1.9.0 -- 2026-09-24 -- .poster-icon and its small cut (Jouni's decision "Icon button").
  *   v1.8.0 -- 2026-09-24 -- .poster-action:disabled, dimmed (Jouni's decision "Step button").
  *   v1.7.0 -- 2026-09-23 -- .poster-dialog deleted (Jouni's decision): no page ever put it on markup
  *     outside the rolled-back unification, and the site has its own dialog.
@@ -124,6 +125,18 @@
   font-family: inherit; font-weight: var(--weight-heavy); cursor: pointer;
 }
 .poster-slab--control:disabled { opacity: 0.45; cursor: default; transform: none; }
+
+/* The icon button (Jouni's decision "Icon button"): a button that is a mark, not a word. One square
+   in a thin ink frame, the sun under the pointer; 44px is the composer's control size, the small cut
+   is the size of the dialog's close square. A disabled one is dimmed like the control slab. */
+.poster-icon {
+  display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box;
+  width: 44px; height: 44px; padding: 0; border: 2px solid var(--text); border-radius: 0; box-shadow: none;
+  background: var(--bg); color: var(--text); font: inherit; font-size: var(--text-md); line-height: 1; cursor: pointer;
+}
+.poster-icon:hover { background: var(--sun); color: var(--on-sun); }
+.poster-icon:disabled { opacity: 0.45; cursor: default; background: var(--bg); color: var(--text); }
+.poster-icon--small { width: 28px; height: 28px; font-size: var(--text-note); }
 
 /* Boxes carry the object; dimensions, grids and placement belong to the view. */
 .poster-box, .poster-box.poster-box--avatar { border: 2px solid var(--text); }

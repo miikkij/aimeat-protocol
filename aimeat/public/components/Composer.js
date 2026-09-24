@@ -9,6 +9,8 @@
  *   onDropAttachment, busy, disabled, note, listening, voiceMaxSeconds })
  * @usage html`<${Composer} value=${draft} onInput=${setDraft} onSend=${send} onStop=${stop} busy=${busy} />`
  * @version-history
+ *   v1.1.0 — 2026-09-24 — Attach and the microphone are the large icon button (Jouni's decision
+ *     "Icon button").
  *   v1.0.0 — 2026-09-23 — Moved out of views/chat/parts.js with its markup unchanged (UI
  *     consolidation phase 1, a move).
  */
@@ -86,12 +88,12 @@ export function Composer({ value, onInput, onSend, onStop, onSpeak, onAttach, at
                 ${onAttach && !busy ? html`
                     <input type="file" multiple ref=${fileRef} class="poster-composer-file"
                         onChange=${(e) => { onAttach([...e.target.files]); e.target.value = ''; }} />
-                    <button type="button" class="btn-outline poster-composer-tool" disabled=${disabled}
+                    <button type="button" class="poster-icon poster-composer-tool" disabled=${disabled}
                         title=${tr('chat.attachTitle', 'Attach a file')}
                         onClick=${() => fileRef.current?.click()}>📎</button>` : ''}
                 ${onSpeak && !busy ? html`
                     <${VoiceRecorder} maxSeconds=${voiceMaxSeconds} disabled=${disabled || listening}
-                        className="btn-outline poster-composer-tool" onRecorded=${(file) => onSpeak(file)} />` : ''}
+                        className="poster-icon poster-composer-tool" plain=${true} onRecorded=${(file) => onSpeak(file)} />` : ''}
                 ${busy
                     ? html`<button type="button" class="btn-outline poster-slab poster-slab--control poster-composer-send" onClick=${onStop}>${tr('chat.stop', 'Stop')}</button>`
                     : html`<button type="button" class="poster-slab poster-slab--control poster-composer-send"
