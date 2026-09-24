@@ -12,6 +12,8 @@
  * @structure readProgramMap · stateProgramMap · putProgramMap · handsOnKey · splitAppRef
  * @usage import { readProgramMap } from './data-map-access.js';
  * @version-history
+ *   v2.1.1 — 2026-09-24 — readProgramMap strips the stamp's `gap` for everyone but the owner, as it
+ *     already did `findings` (A6-10). The REST read and aimeat_datamap_get both come through here.
  *   v2.1.0 — 2026-09-14 — putProgramMap: validate, write, restamp, with no opinion about who may do
  *     it. The package installer is its second caller, so an installed app arrives with the map its
  *     author wrote instead of being stamped as having none.
@@ -80,10 +82,17 @@ export async function readProgramMap(
   const isOwn = !!caller && caller.ownerName === record.ownerName;
   const check = checkMap(map, at);
 
+  // The stamp carries the worst finding as `gap`, and that is the same unfinished business as
+  // `findings`, so it is stripped for everyone but the owner here, where every door reads the map.
+  // It reached anybody who asked, a caller with no token included (A6-10). stampFor builds a new
+  // object on every call, so removing the field touches nothing that is stored.
+  const stamp = stampFor(map, appId, at);
+  if (!isOwn) delete stamp.gap;
+
   return {
     app: appRef,
     dataMap: map,
-    stamp: stampFor(map, appId, at),
+    stamp,
     ...(isOwn ? { findings: check.findings } : {}),
   };
 }
