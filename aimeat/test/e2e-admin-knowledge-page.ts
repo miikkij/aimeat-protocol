@@ -16,6 +16,9 @@
  *   defect wearing a different door.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-admin-knowledge-page
  * @version-history
+ *   v1.3.0 — 2026-09-24 — The operator's agent is created holding operator:admin. Its setup no
+ *     longer matched the node: an operator's agent is offered the admin tools only with that word
+ *     ticked (security audit A8-1), and this agent had the default scopes.
  *   v1.2.0 — 2026-09-12 — aimeat_admin_knowledge over a real MCP session, held against the HTTP
  *     door. The static gates prove the name and the parameters on all three surfaces; only this
  *     proves the tool looks under the operator's own identity rather than the calling agent's.
@@ -273,7 +276,7 @@ await test("The operator's agent reads the same collection over MCP", async () =
     const agent = await json('/v1/agents', {
         method: 'POST',
         headers: { Authorization: `Bearer ${opToken}` },
-        body: JSON.stringify({ name: 'knopagent', owner: opName, capabilities: ['knowledge'], model: 'gpt-4o' }),
+        body: JSON.stringify({ name: 'knopagent', owner: opName, capabilities: ['knowledge'], model: 'gpt-4o', scopes: ['memory:read', 'operator:admin'] }),
     });
     assert(agent.status === 201, `agent: ${agent.status} ${JSON.stringify(agent.body.error ?? '')}`);
     const gaii = agent.body.data.agent.gaii as string;

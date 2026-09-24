@@ -21,6 +21,9 @@
  *   made appeared under "asking to join" with Approve and Refuse beside it, naming this node as the
  *   asker. Found by driving the browser on 2026-09-12.
  * @version-history
+ *   v1.3.0 — 2026-09-24 — The operator's agent is created holding operator:admin. Its setup no
+ *     longer matched the node: an operator's agent is offered the admin tools only with that word
+ *     ticked (security audit A8-1), and this agent had the default scopes.
  *   v1.2.0 — 2026-09-12 — aimeat_admin_federation over a real MCP session, held against the HTTP
  *     door. The tool takes the LIVE peers map through an optional parameter that defaults to an
  *     empty one, and a tool handed the empty one answers "no peers" — which is what a quiet node
@@ -258,7 +261,7 @@ await test("The operator's agent reads the same federation over MCP", async () =
     const agent = await json('/v1/agents', {
         method: 'POST',
         headers: { Authorization: `Bearer ${opToken}` },
-        body: JSON.stringify({ name: 'fedopagent', owner: opName, capabilities: ['federation'], model: 'gpt-4o' }),
+        body: JSON.stringify({ name: 'fedopagent', owner: opName, capabilities: ['federation'], model: 'gpt-4o', scopes: ['memory:read', 'operator:admin'] }),
     });
     assert(agent.status === 201, `agent: ${agent.status} ${JSON.stringify(agent.body.error ?? '')}`);
     const gaii = agent.body.data.agent.gaii as string;

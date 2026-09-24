@@ -462,7 +462,7 @@ A node can run alone, peer with others, or anchor a personal node. aimeat.io is 
 
 ## 19. Operating a node
 
-The operator dashboard is the one place with server-built screens. Everything on it is also reachable by an operator's own agent, because agents must be able to run a whole node without a person present.
+The operator dashboard is the one place with server-built screens. Everything on it is also reachable by an operator's own agent, because agents must be able to run a whole node without a person present. An agent gets these tools only when the operator ticks the `operator:admin` permission for it; "Full access" does not include it.
 
 | Feature | What you get | Reach |
 |---|---|---|

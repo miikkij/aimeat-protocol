@@ -13131,7 +13131,8 @@
             "manage": "Añadir, sustituir y eliminar las claves y contraseñas con nombre que guardas aquí. Volver a leer un valor no es posible, ni para este agente ni para nadie."
           },
           "operator": {
-            "organism-repair": "Devuelve un propietario a un organismo que esta cuenta no posee. Solo funciona para el operador del nodo: en cualquier otra cuenta este permiso no hace nada. Es la vuelta atrás cuando ya no se alcanza la cuenta propietaria de un organismo, y entrega ese organismo a quien el agente nombre."
+            "organism-repair": "Devuelve un propietario a un organismo que esta cuenta no posee. Solo funciona para el operador del nodo: en cualquier otra cuenta este permiso no hace nada. Es la vuelta atrás cuando ya no se alcanza la cuenta propietaria de un organismo, y entrega ese organismo a quien el agente nombre.",
+            "admin": "Administrar esta instalación a través de este agente. Puede, por ejemplo, desactivar cuentas, quitarle a alguien la verificación en dos pasos y cambiar el inicio de sesión de organización, los orígenes permitidos, los hooks y los servidores MCP que se ofrecen a todas las cuentas. Solo funciona para quien administra esta instalación; en cualquier otra cuenta este permiso no hace nada. \"Acceso total\" no lo incluye."
           },
           "packages": {
             "write": "Instalar paquetes por ti. Eso pone en marcha la aplicación del paquete, sus extensiones y las tareas programadas que traiga, a tu nombre."

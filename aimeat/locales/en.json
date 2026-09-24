@@ -14921,7 +14921,8 @@
             "manage": "Add, replace and delete the named keys and passwords you keep here. Reading a value back is not possible, for this agent or for anybody."
           },
           "operator": {
-            "organism-repair": "Put an owner back on an organism this account does not own. Only works for a node operator: on any other account this permission does nothing. It is the way back when an organism's owner account can no longer be reached, and it hands that organism to whoever the agent names."
+            "organism-repair": "Put an owner back on an organism this account does not own. Only works for a node operator: on any other account this permission does nothing. It is the way back when an organism's owner account can no longer be reached, and it hands that organism to whoever the agent names.",
+            "admin": "Administer this installation through this agent. It can, for example, close accounts, remove someone's two-step sign-in, and change organisation sign-in, the allowed origins, the hooks and the MCP servers every account is offered. Only works for whoever runs this installation; on any other account this permission does nothing. \"Full access\" does not include it."
           },
           "packages": {
             "write": "Install packages for you. That sets up the package's app, its extensions and any scheduled jobs it brings, under your name."

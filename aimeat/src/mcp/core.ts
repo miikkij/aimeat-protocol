@@ -11,6 +11,8 @@
  *   import { registerCoreTools } from './core.js';
  *   registerCoreTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.28.0 — 2026-09-24 — The eight admin registrations receive the session's scopes, so each
+ *     operator tool asks the operator:admin word at call time as well as the account (audit A8-1).
  *   v1.27.0 — 2026-09-16 — aimeat_memory_read shows a credential record redacted (shownMemoryValue).
  *   v1.26.0 — 2026-09-13 — aimeat_memory_write renders the shared write's UNDECLARED_SPACE refusal
  *     (`{ error, message, namespace, declared_spaces, how_to_fix }`, isError) where it used to carry
@@ -763,19 +765,19 @@ export function registerCoreTools(
     registerCoreDataPackageTools(mcp, storage, config, getAgentGaii);
 
     // ── Admin Tools (operator-only) — extracted to ./core-admin.ts ──
-    registerCoreAdminTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
+    registerCoreAdminTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, sessionScopes);
     // BR-04: the operator's SSO administration and manual account lifecycle.
-    registerAdminSsoTools(mcp, storage, config, getAgentGaii);
+    registerAdminSsoTools(mcp, storage, config, getAgentGaii, sessionScopes);
     // The Security page in one read, and the incident action a chat could not do before.
-    registerAdminSecurityTools(mcp, storage, config, getAgentGaii);
+    registerAdminSecurityTools(mcp, storage, config, getAgentGaii, sessionScopes);
     // The CORS page in one read, and the write that sets a person's or an agent's list.
-    registerAdminCorsTools(mcp, storage, config, getAgentGaii);
+    registerAdminCorsTools(mcp, storage, config, getAgentGaii, sessionScopes);
     // The Hooks page in one read, and the write that binds a moment to an address.
-    registerAdminHooksTools(mcp, storage, config, getAgentGaii);
+    registerAdminHooksTools(mcp, storage, config, getAgentGaii, sessionScopes);
     // The Statistics page in one read: the counters, their day tallies, and the live gauges.
-    registerAdminStatisticsTools(mcp, storage, config, getAgentGaii);
+    registerAdminStatisticsTools(mcp, storage, config, getAgentGaii, sessionScopes);
     // The Knowledge page in one read: the whole collection, its shape, and who has already looked.
-    registerAdminKnowledgeTools(mcp, storage, config, getAgentGaii);
+    registerAdminKnowledgeTools(mcp, storage, config, getAgentGaii, sessionScopes);
     // The Federation page in one read: where this node stands, and what is waiting on a person.
-    registerAdminFederationTools(mcp, storage, config, peers, getAgentGaii);
+    registerAdminFederationTools(mcp, storage, config, peers, getAgentGaii, sessionScopes);
 }

@@ -4,10 +4,15 @@
  *   wildcard-matching semantics (exact / domain:* / global *) that decide which tools the
  *   /v1/mcp surface registers per agent (F1), and the role->scope profile bundles.
  * @version-history
+ *   v1.1.0 -- 2026-09-24 -- The operator's tools: every tool the catalog names as the operator's is
+ *     registered only for a word no wildcard carries, so an operator's agent holding "Full access"
+ *     or an ordinary word is offered none of them (security audit A8-1).
  *   v1.0.0 -- 2026-05-30 -- MCP audit Phase 3 (F1)
  */
 import { describe, it, expect } from 'vitest';
 import { scopeAllowsTool, requiredScopeForTool, scopesForProfile, MCP_SCOPE_PROFILES } from '../../src/mcp/catalog/scopes.js';
+import { CLI_FALLBACK_TOOL_DEFINITIONS } from '../../src/mcp/catalog/definitions.js';
+import { isOutsideWildcard } from '../../src/utils/scope-coverage.js';
 
 describe('scopeAllowsTool', () => {
     it('always allows ungated tools regardless of scopes', () => {
@@ -62,6 +67,53 @@ describe('scopeAllowsTool', () => {
     it('requiredScopeForTool returns the gate or undefined', () => {
         expect(requiredScopeForTool('aimeat_memory_write')).toBe('memory:write');
         expect(requiredScopeForTool('aimeat_task_list')).toBeUndefined();
+    });
+});
+
+/**
+ * Security audit A8-1. The administration tools checked only that the ACCOUNT behind the session is
+ * an operator, and every one of them sat outside the scope table, which scopeAllowsTool() reads as
+ * permission. So every agent an operator ever connected was handed node administration: an agent
+ * holding nothing but memory:read reset another person's second factor, read every owner's agents
+ * and rewrote a CORS list. The list is derived from the catalog's own `caller: 'operator'` rather
+ * than written out, so a new operator tool is covered on the day it is added.
+ */
+describe("the operator's tools cost their own tick", () => {
+    const operatorTools = CLI_FALLBACK_TOOL_DEFINITIONS.filter(d => d.caller === 'operator').map(d => d.name);
+
+    it('every tool the catalog names as the operator\'s rides a word no wildcard carries', () => {
+        expect(operatorTools.length).toBeGreaterThan(20);
+        const loose = operatorTools.filter((t) => {
+            const word = requiredScopeForTool(t);
+            return !word || !isOutsideWildcard(word);
+        });
+        expect(loose).toEqual([]);
+    });
+
+    it('an agent holding Full access or an ordinary word is offered none of them', () => {
+        const offered = operatorTools.filter(t => scopeAllowsTool(['*'], t) || scopeAllowsTool(['memory:read'], t));
+        expect(offered).toEqual([]);
+    });
+
+    it('node administration answers to operator:admin, and only the exact word', () => {
+        expect(requiredScopeForTool('aimeat_admin_security_overview')).toBe('operator:admin');
+        expect(requiredScopeForTool('aimeat_mcp_registry_set')).toBe('operator:admin');
+        expect(scopeAllowsTool(['memory:read', 'operator:admin'], 'aimeat_admin_totp_reset')).toBe(true);
+        expect(scopeAllowsTool(['operator:*'], 'aimeat_admin_mint')).toBe(false);
+        // The repair word is its own tick and does not open the rest of the block.
+        expect(scopeAllowsTool(['operator:organism-repair'], 'aimeat_admin_cors_set')).toBe(false);
+    });
+
+    it('the three operator-only tools the catalog files under agent ride an operator word too', () => {
+        // Each refuses everyone but the operator in its handler, and each was registered for an
+        // operator's agent on a word every Full-access agent holds, or on none at all.
+        expect(requiredScopeForTool('aimeat_seo_status')).toBe('operator:admin');
+        expect(requiredScopeForTool('aimeat_seo_announce')).toBe('operator:admin');
+        // The layout read takes the word its write takes: one tick arranges the pages and reads them.
+        expect(requiredScopeForTool('aimeat_surface_layout_get')).toBe('site:layout-write');
+        for (const t of ['aimeat_seo_status', 'aimeat_seo_announce', 'aimeat_surface_layout_get']) {
+            expect(scopeAllowsTool(['*'], t)).toBe(false);
+        }
     });
 });
 

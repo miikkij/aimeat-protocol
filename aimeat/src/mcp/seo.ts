@@ -24,9 +24,12 @@
  *   install chip got their own door on 2026-08-29 (app-marks.ts, `aimeat_app_marks_set`), built
  *   the same way as this one.
  *
- * @structure registerSeoTools(mcp, storage, config, getAgentGaii)
+ * @structure registerSeoTools(mcp, storage, config, getAgentGaii, scopes)
  * @usage import { registerSeoTools } from './seo.js';
  * @version-history
+ *   v1.2.0 — 2026-09-24 — SECURITY (audit A8-1): the status and the announcement ask the
+ *     operator:admin word as well as the account (services/owner-lifecycle.ts
+ *     resolveOperatorAgentName), and are registered on that word rather than on app:write.
  *   v1.1.0 — 2026-09-11 — aimeat_seo_announce: the whole site to IndexNow, or its plan. Calls
  *     planAnnouncement / announceEverything (indexnow-site.ts), the same functions
  *     POST /v1/admin/seo/indexnow calls.
@@ -43,13 +46,15 @@ import { buildSeoStatus, announceNote } from '../routes/admin-seo.js';
 import { ownerAppSeo } from '../services/app-seo.js';
 import { planAnnouncement, announceEverything } from '../services/indexnow-site.js';
 import { emitChange } from '../services/event-bus.js';
-import { resolveOperatorName } from '../services/owner-lifecycle.js';
+import { resolveOperatorAgentName, OPERATOR_AGENT_REFUSAL } from '../services/owner-lifecycle.js';
 
 export function registerSeoTools(
   mcp: McpServer,
   storage: Storage,
   config: AimeatConfig,
   getAgentGaii: () => string,
+  /** This session's granted scopes: the two operator tools ask operator:admin of them at call time. */
+  scopes: readonly string[] = [],
 ): void {
   mcp.tool(
     'aimeat_seo_status',
@@ -63,12 +68,10 @@ export function registerSeoTools(
       // permission word is enforced on every door or it does not exist.
       //
       // An MCP token carries roles ['agent'] and nothing else, so the check is on the ACCOUNT the
-      // agent acts for, the way every other operator tool on this surface does it.
-      if (!(await resolveOperatorName(storage, getAgentGaii()))) {
-        return {
-          content: [{ type: 'text' as const, text: 'Only whoever runs this node can read its discovery status.' }],
-          isError: true,
-        };
+      // agent acts for, and then on the operator:admin word the operator ticked for this agent, the
+      // way every other operator tool on this surface does it.
+      if (!(await resolveOperatorAgentName(storage, getAgentGaii(), scopes))) {
+        return { content: [{ type: 'text' as const, text: OPERATOR_AGENT_REFUSAL }], isError: true };
       }
       const status = await buildSeoStatus(config, storage);
       return { content: [{ type: 'text' as const, text: JSON.stringify(status, null, 2) }] };
@@ -86,12 +89,9 @@ export function registerSeoTools(
     async (args: { scope?: 'all' | 'pages'; plan?: boolean }) => {
       // Operator-gated here for the same reason aimeat_seo_status is: this calls the service the
       // route calls, not the route, so the route's gate has to be repeated at this door.
-      const operator = await resolveOperatorName(storage, getAgentGaii());
+      const operator = await resolveOperatorAgentName(storage, getAgentGaii(), scopes);
       if (!operator) {
-        return {
-          content: [{ type: 'text' as const, text: 'Only whoever runs this node can tell the search engines about it.' }],
-          isError: true,
-        };
+        return { content: [{ type: 'text' as const, text: OPERATOR_AGENT_REFUSAL }], isError: true };
       }
       const scope = args.scope ?? 'all';
       if (args.plan) {

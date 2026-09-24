@@ -24,6 +24,8 @@
  * @usage
  *   registerAllServerTools(mcp, { storage, config, agentGaii: () => gaii, ... });
  * @version-history
+ *   v1.5.0 — 2026-09-24 — registerSeoTools receives the session's scopes: its operator tools, like the
+ *     MCP proxy's registry pair, ask the operator:admin word at call time (security audit A8-1).
  *   v1.4.3 — 2026-09-24 — The MCP proxy, capability and app-tool groups take the session's scopes, which
  *     their remote-tool calls hand to the chokepoint instead of it assuming mcp:use.
  *   v1.4.2 — 2026-09-24 — registerPackageTools gets the session's scopes: a memory component answers
@@ -176,7 +178,7 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     registerAppsTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);
     registerAppDraftEditTools(mcp, storage, config, agentGaii);
     registerAppScreenshotTool(mcp, storage, config, agentGaii);
-    registerSeoTools(mcp, storage, config, agentGaii);
+    registerSeoTools(mcp, storage, config, agentGaii, scopes);
     registerAppMarksTools(mcp, storage, config, agentGaii);
     registerAppVisitorsTools(mcp, storage, config, agentGaii);
     registerAppLegalTools(mcp, storage, config, agentGaii);

@@ -18,6 +18,9 @@
  *   const checked = expandScopes(agent.default_scopes ?? ['*']);
  *   await save(collapseScopes(checked));
  * @version-history
+ *   v1.13.0 — 2026-09-24 — operator:admin, outside every wildcard: node administration through an
+ *     agent (the admin tools, the MCP registry, the SEO pair). Only an operator's own agent can be
+ *     given it at all, and nobody was grandfathered onto it (security audit A8-1).
  *   v1.12.0 — 2026-09-24 — site:theme-write, outside every wildcard: making the node's themes.
  *   v1.11.0 — 2026-09-16 — The mcp domain: read, use and manage for the other MCP servers this
  *     account has attached. manage is outside every wildcard; the other two are not, because
@@ -148,6 +151,12 @@ export const NOT_IN_WILDCARD = [
   // account at an address of the agent's own choosing with a credential stored behind it. "Full
   // access" is one click, and nobody clicking it is deciding that.
   'mcp:manage',
+  // ── Added 2026-09-24 ─────────────────────────────────────────────────────────────────────────
+  // Node administration through an agent: minting, the SSO connections, deactivating an account,
+  // resetting somebody's second factor, the CORS lists, the hooks and the MCP registry. These tools
+  // asked only whether the account runs the node, so every agent an operator connected held all of
+  // them. Only an operator's own agent can be given it at all.
+  'operator:admin',
 ];
 
 /**
@@ -289,7 +298,10 @@ export const SCOPE_DOMAINS = [
   //   normal account this box grants nothing and the sentence says so. It exists because an
   //   organism whose creator became unreachable had no repair path on any surface, and a capability
   //   an operator cannot grant from this page is a capability with no door.
-  { key: 'operator',   permissions: ['organism-repair'] },
+  // operator:admin — administer the node through this agent: the admin tools, the MCP registry and
+  //   the search-engine announcement (2026-09-24). Same caveat as the repair word: on a normal
+  //   account it grants nothing. The operator in person needs no box; the admin pages are theirs.
+  { key: 'operator',   permissions: ['organism-repair', 'admin'] },
 
   // ── Added 2026-08-23 (BR-02) ─────────────────────────────────────────────────────────────────
   // compliance:read / compliance:write — the node-wide compliance report, and the use-case register

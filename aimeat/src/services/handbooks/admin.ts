@@ -3,9 +3,12 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Operating handbook for the v2 `admin` surface (/v2/mcp/admin). Self-contained; tool
- *   list mirrors MCP_SURFACES.admin. Operator/owner governance — most tools require operator role and
- *   are runtime-gated (a non-operator caller will get "Operator role required").
+ *   list mirrors MCP_SURFACES.admin. Operator/owner governance — the operator tools are offered only
+ *   to an operator's agent holding the operator:admin permission, and ask again at call time.
  * @version-history
+ *   v1.7.0 -- 2026-09-24 -- The operator tools are offered only to an agent the operator ticked
+ *     operator:admin for (security audit A8-1), and the opening paragraph says so, and says to ask the
+ *     operator for the tick, instead of promising an "Operator role required" answer.
  *   v1.6.1 -- 2026-09-18 -- The moderation paragraph no longer names aimeat_knowledge_list, which this
  *     surface does not carry. Instruction review.
  *   v1.6.0 -- 2026-09-12 -- aimeat_admin_federation, with the thing that trips every operator:
@@ -30,8 +33,9 @@ export const ADMIN_HANDBOOK = `# AIMEAT — Admin / Governance Surface Handbook
 
 You are connected to the **admin** surface: operator and owner governance for the node. This is
 sensitive — node administration, content moderation, data-sharing governance, and owner-side agent
-management. Several tools require the **operator** role and are runtime-gated; if you are not an
-operator they return "Operator role required". Use deliberately.
+management. The node administration tools are for the **operator's** own agent: they are offered
+only when the operator has ticked the \`operator:admin\` permission for this agent, which "Full access"
+does not include. If one you need is missing, ask the operator to tick it. Use deliberately.
 
 ## Your tools
 

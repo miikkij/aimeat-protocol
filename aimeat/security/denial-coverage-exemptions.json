@@ -25,10 +25,6 @@
       "reason": "REVIEWED 2026-09-04. This surface has no refusal to test, and that is the design rather than an omission. The suite guards ONE route, POST /v1/registration-invites, which is open by necessity: an AI calls it with a person's email before that person has any account, so there is no principal to refuse. Its whole security property is the OPPOSITE of a refusal — the response must be byte-identical whether the address is new, already has an account, or already has a live invitation, because any difference turns it into an address-checking machine. The suite asserts exactly that in three tests, plus the per-address cap and single-use expiry that bound the abuse a 403 cannot. There is no second route on this router: no listing, no read, nothing an owner could reach across. A 401 or 403 added here would have to be invented.",
       "sha": "9bfa527729132d7e"
     },
-    "test/e2e-mcp-scopes.ts": {
-      "reason": "Reviewed 2026-08-15. This suite is ALL refusal, and none of it is status-shaped: the MCP tool surface refuses by not registering the tool (assert(!tools.includes(...))) and a filtered call comes back through a local {ok} wrapper rather than isError. Kept exempt because the detector cannot see those two shapes, not because the fence is untested — it now also asserts that a '*' agent is refused every tool riding a SCOPES_OUTSIDE_WILDCARD word, list derived from the vocabulary.",
-      "sha": "5e467aad8068349d"
-    },
     "test/e2e-mcp-v2.ts": {
       "reason": "REVIEWED 2026-08-16 (E2E test-quality audit, finding e2e-mcp-v2:92). This surface does not refuse with a status code: a tool outside the caller's surface or scopes is never REGISTERED on the session, so the refusal is an ABSENCE from tools/list — src/mcp/index.ts calls it a hard skip, silent, not a scope denial. The suite now drives that refusal with a second agent holding only memory:read, asserting its agent-surface listing is a strict subset with no memory_write while the broad agent keeps it. There is no 401 or 403 on this door to assert.",
       "sha": "e3dca6fe2c37cc12"

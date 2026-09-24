@@ -23,9 +23,11 @@
  *   page tells an operator to hand its numbers to their AI, and no tool could read them. Two reads
  *   of the same shape — a period of numbers about this node, operator-gated, calling the one service
  *   the HTTP route calls — so they share a file rather than each having one.
- * @structure registerAdminStatisticsTools(mcp, storage, config, getAgentGaii) — two reads.
- * @usage registerAdminStatisticsTools(mcp, storage, config, () => agentGaii);
+ * @structure registerAdminStatisticsTools(mcp, storage, config, getAgentGaii, scopes) — two reads.
+ * @usage registerAdminStatisticsTools(mcp, storage, config, () => agentGaii, scopes);
  * @version-history
+ *   v1.2.0 — 2026-09-24 — SECURITY (audit A8-1): the operator test asks the operator:admin word as
+ *     well as the account (services/owner-lifecycle.ts resolveOperatorAgentName).
  *   v1.1.0 — 2026-09-12 — aimeat_admin_usage: what AI costs here and whose money paid, including
  *     the key the node cannot meter and, on request, what the provider says it spent.
  *   v1.0.0 — 2026-09-12 — Initial: aimeat_admin_statistics.
@@ -37,7 +39,7 @@ import type { Storage } from '../storage/interface.js';
 import { getStats } from '../services/stats.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
-import { resolveOperatorName } from '../services/owner-lifecycle.js';
+import { resolveOperatorAgentName, OPERATOR_AGENT_REFUSAL } from '../services/owner-lifecycle.js';
 import { buildStatsSnapshot } from '../services/stats-page.js';
 import { buildUsagePage } from '../services/usage-page.js';
 
@@ -51,9 +53,11 @@ export function registerAdminStatisticsTools(
   storage: Storage,
   config: AimeatConfig,
   getAgentGaii: () => string,
+  /** This session's granted scopes: operator:admin is asked of them at call time. */
+  scopes: readonly string[] = [],
 ): void {
   const agentGaii = getAgentGaii();
-  const operatorName = () => resolveOperatorName(storage, agentGaii);
+  const operatorName = () => resolveOperatorAgentName(storage, agentGaii, scopes);
 
   mcp.tool('aimeat_admin_statistics', descriptionFor('aimeat_admin_statistics'),
     {
@@ -62,7 +66,7 @@ export function registerAdminStatisticsTools(
     },
     annotationsFor('aimeat_admin_statistics'),
     async ({ from, to }) => {
-      if (!(await operatorName())) return refuse('Operator role required');
+      if (!(await operatorName())) return refuse(OPERATOR_AGENT_REFUSAL);
       if (!config.statsEnabled) return refuse('Statistics are switched off on this node.');
       const stats = getStats();
       if (!stats) return refuse('The counters are not running on this node yet.');
@@ -92,7 +96,7 @@ export function registerAdminStatisticsTools(
     },
     annotationsFor('aimeat_admin_usage'),
     async ({ from, to, ask_provider }) => {
-      if (!(await operatorName())) return refuse('Operator role required');
+      if (!(await operatorName())) return refuse(OPERATOR_AGENT_REFUSAL);
 
       for (const [label, value] of [['from', from], ['to', to]] as const) {
         if (value !== undefined && !ISO_DAY.test(value)) {

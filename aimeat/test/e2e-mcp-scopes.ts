@@ -5,6 +5,11 @@
  *   the words no wildcard carries, which is the half this file used to leave out.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-mcp-scopes
  * @version-history
+ *   v1.2.0 — 2026-09-24 — The operator's agents (security audit A8-1). An operator's agent holding
+ *     only memory:read was offered, and could call, every administration tool, because those tools
+ *     asked only whether the ACCOUNT runs the node. Asserted now: that agent is offered none of the
+ *     catalog's operator tools and is refused one called by name; an agent the operator ticked
+ *     operator:admin for is offered and answered; the HTTP admin doors answer as they did.
  *   v1.1.0 — 2026-08-15 — The '*' agent is now asserted NEGATIVELY as well. The suite checked only
  *     that four ordinary tools ARE present, so reintroducing a local wildcard rule inside
  *     scopeAllowsTool — the exact regression mcp/catalog/scopes.ts v1.7.0 records — kept it green
@@ -47,6 +52,7 @@ import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { TOOL_SCOPES } from '../src/mcp/catalog/scopes.js';
 import { SCOPES_OUTSIDE_WILDCARD } from '../src/utils/scope-coverage.js';
+import { CLI_FALLBACK_TOOL_DEFINITIONS } from '../src/mcp/catalog/definitions.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
 async function signMsg(privateKeyB64: string, message: string): Promise<string> {
@@ -252,6 +258,97 @@ await test('An agent granted the exact word DOES see the tool it names', async (
     const tools = await client.list();
     assert(tools.includes(probeTool!),
         `an agent holding ${probeScope} must see ${probeTool} — the exception withholds it from wildcards, not from a grant`);
+});
+
+// ─── The operator's agents (security audit A8-1) ───
+//
+// The administration tools asked one question, whether the ACCOUNT behind the session runs this
+// node, and sat outside the scope table, so every agent an operator connected was offered all of
+// them. The operator here comes through the admin-password door, which always grants the role, so
+// the arms below do not depend on which owner registered first.
+const ADMIN_PW = process.env.AIMEAT_ADMIN_PASSWORD ?? 'test-admin-pw';
+const opName = `scopeop${Date.now()}`;
+let opToken = '';
+let opReader: { gaii: string; key: string } = { gaii: '', key: '' };
+let opAdmin: { gaii: string; key: string } = { gaii: '', key: '' };
+/** Every tool the catalog names as the operator's. Derived, so a new one is covered the day it lands. */
+const OPERATOR_TOOLS = CLI_FALLBACK_TOOL_DEFINITIONS.filter(d => d.caller === 'operator').map(d => d.name);
+
+await test("Setup: an operator, an agent holding memory:read only, and one holding operator:admin", async () => {
+    const reg = await json('/v1/admin/setup/register', {
+        method: 'POST', headers: { 'X-Admin-Password': ADMIN_PW }, body: JSON.stringify({ name: opName }),
+    });
+    assert(reg.status === 200 && reg.body.owner?.roles?.includes('operator'),
+        `operator ${reg.status}: ${JSON.stringify(reg.body).slice(0, 200)}`);
+    const ts = new Date().toISOString();
+    const tk = await json('/v1/auth/token', {
+        method: 'POST',
+        body: JSON.stringify({ owner: opName, timestamp: ts, signature: await signMsg(reg.body.private_key, opName + NODE_ID + ts) }),
+    });
+    opToken = tk.body.data.token;
+    const mk = async (name: string, scopes: string[]) => {
+        const r = await json('/v1/agents', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${opToken}` },
+            body: JSON.stringify({ name, owner: opName, capabilities: ['memory'], model: 'gpt-4o', scopes }),
+        });
+        assert(r.status === 201, `register ${name} ${r.status}: ${JSON.stringify(r.body)}`);
+        return { gaii: r.body.data.agent.gaii as string, key: r.body.data.private_key as string };
+    };
+    opReader = await mk('opreader', ['memory:read']);
+    opAdmin = await mk('opadmin', ['memory:read', 'operator:admin']);
+    assert(OPERATOR_TOOLS.length > 20, `the catalog names ${OPERATOR_TOOLS.length} operator tools; this proves nothing`);
+});
+
+await test("An operator's agent holding only memory:read is offered none of the operator's tools", async () => {
+    const client = await connectMcp(opReader.gaii, opReader.key);
+    const tools = await client.list();
+    assert(tools.includes('aimeat_memory_read'), 'the session itself works: memory_read is offered');
+    const leaked = OPERATOR_TOOLS.filter(t => tools.includes(t));
+    assert(leaked.length === 0, `a memory:read agent of the operator was offered ${leaked.length}: ${leaked.join(', ')}`);
+});
+
+await test('…and is refused one it calls by name, however it learned the name', async () => {
+    const client = await connectMcp(opReader.gaii, opReader.key);
+    const answered: string[] = [];
+    for (const [name, args] of [
+        ['aimeat_admin_security_overview', {}],
+        ['aimeat_admin_agents', { limit: 1 }],
+        ['aimeat_admin_cors_overview', {}],
+        ['aimeat_mcp_registry_list', {}],
+    ] as const) {
+        const { ok } = await client.call(name, args);
+        if (ok) answered.push(name);
+    }
+    assert(answered.length === 0, `these answered an agent holding only memory:read: ${answered.join(', ')}`);
+});
+
+await test("An agent the operator ticked operator:admin for is offered them, and answered", async () => {
+    const client = await connectMcp(opAdmin.gaii, opAdmin.key);
+    const tools = await client.list();
+    for (const t of ['aimeat_admin_security_overview', 'aimeat_admin_totp_reset', 'aimeat_mcp_registry_set', 'aimeat_seo_status']) {
+        assert(tools.includes(t), `an agent holding operator:admin was not offered ${t}`);
+    }
+    // The repair word is its own tick: operator:admin does not stand in for it.
+    assert(!tools.includes('aimeat_admin_organism_owner_add'), 'operator:admin opened the organism repair as well');
+    const { ok, body } = await client.call('aimeat_admin_security_overview', {});
+    assert(ok === true, `the operator's ticked agent was refused: ${JSON.stringify(body).slice(0, 200)}`);
+    const overview = JSON.parse(body.result.content[0].text);
+    assert(typeof overview.generated_at === 'string' && typeof overview.now?.status === 'string',
+        `the overview came back without its reading: ${JSON.stringify(overview).slice(0, 200)}`);
+});
+
+await test('The HTTP admin doors answer as they did: the operator in person passes, an agent token does not', async () => {
+    const inPerson = await json('/v1/admin/security/overview', { headers: { Authorization: `Bearer ${opToken}` } });
+    assert(inPerson.status === 200, `the operator in person: ${inPerson.status}`);
+    const ts = new Date().toISOString();
+    const tk = await json('/v1/auth/token', {
+        method: 'POST',
+        body: JSON.stringify({ gaii: opAdmin.gaii, timestamp: ts, signature: await signMsg(opAdmin.key, opAdmin.gaii + ts) }),
+    });
+    assert(tk.body.ok === true, `agent token: ${JSON.stringify(tk.body.error)}`);
+    const asAgent = await json('/v1/admin/security/overview', { headers: { Authorization: `Bearer ${tk.body.data.token}` } });
+    assert(asAgent.status === 403, `an agent token on the HTTP admin door: expected 403, got ${asAgent.status}`);
 });
 
 console.log(`\n────────────────────────────────────────`);

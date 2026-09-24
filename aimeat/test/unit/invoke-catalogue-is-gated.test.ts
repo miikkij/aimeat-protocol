@@ -16,6 +16,8 @@
  *   absent from the tables, or the reverse — this is the one that says so.
  *
  * @version-history
+ *   v1.2.0 — 2026-09-24 — The bound falls to 16: the operator's writes left the exemptions for the
+ *     operator:admin word (security audit A8-1).
  *   v1.1.0 — 2026-09-08 — The exemption bound grows to 26 for aimeat_admin_cors_set.
  *   v1.0.0 — 2026-09-01 — Initial (Agent v2, post-audit item 2).
  */
@@ -70,7 +72,11 @@ describe('the invoke catalogue is a gated surface', () => {
         // costs them, the handler resolves the operator from the OWNER record before it writes, and
         // a scope word cannot say "the operator in person" — one that could would be grantable to
         // an agent, which is exactly what must not happen to a control over the whole node.
-        expect(exempt.length).toBeLessThanOrEqual(28);
+        // 16 since 2026-09-24, and the reasoning of the three entries above was wrong: the role the
+        // handlers asked was the ACCOUNT's, so every agent the operator connected held all of it.
+        // The operator's writes ride operator:admin now, a word no wildcard carries and the operator
+        // ticks per agent (security audit A8-1).
+        expect(exempt.length).toBeLessThanOrEqual(16);
         expect(mutating.length).toBeGreaterThan(100);
     });
 });
