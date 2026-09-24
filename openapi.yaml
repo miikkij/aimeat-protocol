@@ -45957,6 +45957,10 @@ paths:
             owner's inbox, so a name nobody ever registered under a real account is refused here
             rather than accepted and reported delivered. Only a LOCAL identity can be checked; a
             recipient on another node is handed to federation as before.
+        '429':
+          description: >-
+            More than 30 sends a minute from this sender. This door and POST /v1/messages/broadcast
+            count against one limit per principal.
 
   /v1/messages/broadcast:
     post:
@@ -46011,6 +46015,10 @@ paths:
                           failed: { type: array, items: { type: object } }
         '400':
           $ref: '#/components/responses/BadRequest'
+        '429':
+          description: >-
+            More than 30 sends a minute from this sender, counting each broadcast as one. This door
+            and POST /v1/messages count against one limit per principal.
 
   /v1/messages/broadcast/{id}:
     get:

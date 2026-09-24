@@ -4,6 +4,10 @@
 // Verifies POST /v1/messages/broadcast fans out one message per recipient under a shared broadcastId
 // (explicit list + Share Group audience), the announcement mode is non-respondable (replies rejected),
 // and GET /v1/messages/broadcast/:id aggregates the results.
+//
+// Version history:
+//   2026-09-24 — Test 10, the limit (security audit A5-3): one principal's sends and broadcasts share
+//     one per-minute limit, the call past it is 429, and another sender is not held back by it.
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -469,6 +473,36 @@ await test('13. The reported case: one person owning every recipient sees ONE ro
     assert(rows[0].unread === 3, `unread must count every copy under the row, got ${rows[0].unread}`);
     const nestedUnread = (rows[0].folded ?? []).reduce((n: number, f: any) => n + f.unread, 0);
     assert(nestedUnread === 2, `and the nested rows keep their own counts, got ${nestedUnread}`);
+});
+
+// The send doors had only the node-wide limiter, so one principal could fan a 500-recipient broadcast
+// out again and again inside it. They share one per-principal limit now, the same shape as the
+// outbound send door: 30 a minute. retries=0, because the helper above waits out a 429 on its own.
+await test('10. THE LIMIT: sends and broadcasts share one per-minute limit per sender, and the one past it is 429', async () => {
+    const LIMIT = 30;
+    const sender = await registerOwner(`bcburst${stamp}`);
+    const burst = (i: number) => json('/v1/messages/broadcast', {
+        method: 'POST', headers: { Authorization: `Bearer ${sender.token}` },
+        body: JSON.stringify({ to: [bob.ghii], mode: 'broadcast', body: `burst ${i}` }),
+    }, 0);
+    const statuses: number[] = [];
+    for (let i = 0; i < LIMIT; i++) statuses.push((await burst(i)).status);
+    assert(statuses.every(s => s === 201), `the first ${LIMIT} did not all go: ${statuses.join(',')}`);
+
+    const over = await burst(LIMIT);
+    assert(over.status === 429 && over.body.error?.code === 'RATE_LIMITED',
+        `broadcast number ${LIMIT + 1} in a minute: ${over.status} ${JSON.stringify(over.body.error ?? over.body.data)}`);
+    const dm = await json('/v1/messages', {
+        method: 'POST', headers: { Authorization: `Bearer ${sender.token}` },
+        body: JSON.stringify({ to: bob.ghii, body: 'one more, through the other door' }),
+    }, 0);
+    assert(dm.status === 429, `the one-to-one door did not count the broadcasts: ${dm.status}`);
+
+    const other = await json('/v1/messages', {
+        method: 'POST', headers: { Authorization: `Bearer ${carol.token}` },
+        body: JSON.stringify({ to: bob.ghii, body: 'somebody else, not held back' }),
+    }, 0);
+    assert(other.status === 201, `another sender was held back by this one's burst: ${other.status}`);
 });
 
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total\n`);
