@@ -14,6 +14,8 @@ mod chat;
 mod agent_runtime;
 mod updater;
 mod tray;
+#[cfg(test)]
+mod webview_policy;
 
 fn main() {
     tauri::Builder::default()
