@@ -27915,8 +27915,10 @@ paths:
 
         The grant is issued to the CALLING page's `Origin` header — never to an origin supplied in the
         body, which would let a page request permission on someone else's behalf. Owner-only: a grant
-        to frame an app you do not own is a clickjacking primitive. A malformed, expired or
-        wrong-app grant simply leaves the strict policy in place, so framing fails closed.
+        to frame an app you do not own is a clickjacking primitive. The owner and the owner's own
+        agents may mint one; somebody holding a development right on the app is refused with `403`
+        whatever their rung, because who may embed the app is not part of building it. A malformed,
+        expired or wrong-app grant simply leaves the strict policy in place, so framing fails closed.
 
         Deliberately one origin per grant rather than a list of allowed origins on the app: a list
         grows with how many apps the owner has, and past roughly seventy it overruns a typical reverse
@@ -27947,6 +27949,7 @@ paths:
                           note: { type: string }
         '400': { description: The request carried no usable Origin header }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: The caller is not the app's owner or one of the owner's agents; a development right does not carry this }
         '404': { description: No such app owned by the caller }
         '409': { description: App origins are disabled on this node }
 

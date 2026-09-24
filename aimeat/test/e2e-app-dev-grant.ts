@@ -10,6 +10,7 @@
  *   asserted in the same group, because that is the path every other app on the node still takes.
  * @usage pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-app-dev-grant
  * @version-history
+ *   v1.4.0 — 2026-09-24 — A6-6: a builder's frame-token request is refused before any other check.
  *   v1.3.0 — 2026-09-24 — A6-5: revoking a pure builder's right takes the roster row it made, so
  *     they no longer read as a member on their own standing or on the owner's roster.
  *   v1.2.0 — 2026-09-14 — A builder's PATCH that is refused leaves the fields before the refusal
@@ -321,6 +322,17 @@ await test('a drafter may write the draft and may not publish it', async () => {
     });
     assert(pub.status === 403, `expected 403 on publish-draft, got ${pub.status}`);
     assert(String(pub.body.error?.message).includes('drafter'), 'and the refusal names the rung they hold');
+});
+
+// A6-6. Who may frame the app is the owner's call, and no rung carries it. The frame-token door let
+// this drafter through its authorisation: on this node, which has no app origin, the answer was the
+// 409 of the check after it, and on a node with one it was a grant for the Origin the request named.
+// e2e-app-origin proves that half; this one proves the refusal comes first, on both backends.
+await test('a builder cannot mint a frame grant for the app', async () => {
+    const r = await json(`/v1/apps/${owner.name}/${APP}/frame-token`, {
+        method: 'POST', headers: { ...auth(builder.token), Origin: 'http://evil.example' }, body: '{}',
+    });
+    assert(r.status === 403, `expected 403, got ${r.status}: ${JSON.stringify(r.body?.error)}`);
 });
 
 await test('no rung carries what the app costs', async () => {

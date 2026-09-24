@@ -10,6 +10,8 @@
  *       subdomain form (x-app-origin + x-subdomain).
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-app-origin.ts
  * @version-history
+ *   v1.8.0 — 2026-09-24 — Phase 5: a builder holding a development right, drafter or full, cannot
+ *     mint a frame grant (A6-6). The owner's own session still can.
  *   v1.7.0 — 2026-09-18 — Phase 11: a page whose owner opted it in is counted when it is fetched on
  *     its own origin. The page-view counter was wired to the apex route alone, and with the app
  *     origin on the apex only redirects, so an opted-in page counted nothing where people land.
@@ -551,6 +553,36 @@ async function main() {
             // it says and the refusal names the reason. Nothing leaks: an app's existence is
             // already public, and the refusal is the same whether or not it exists.
             assert(r.status === 403, `outsider must not mint (expected 403, got ${r.status})`);
+        });
+
+        // A6-6. The mint was authorised on the `draft` act, which the lowest development rung
+        // carries, and the grant names whatever Origin the request sent. So somebody invited only
+        // to write the draft could mint a twelve-hour grant for a page of their own choosing, and
+        // the app's frame-ancestors would open to it. Who may frame the app is the owner's call.
+        await test('a builder holding a development right cannot mint a grant either', async () => {
+            const nm = `framebuilder${Date.now() % 100000}`;
+            const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: nm, public_key: 'placeholder' }) });
+            assert(reg.status === 201, `builder register: ${reg.status} ${JSON.stringify(reg.body.error ?? '')}`);
+            const ts = new Date().toISOString();
+            const sig = await signMsg(reg.body.data.private_key, nm + NODE_ID + ts);
+            const tk = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: nm, timestamp: ts, signature: sig }) });
+            assert(tk.body.ok === true, `builder token: ${JSON.stringify(tk.body.error)}`);
+            const EVIL = 'http://evil.example';
+            for (const level of ['drafter', 'full']) {
+                const grant = await json(`/v1/apps/${owner}/${filename}/dev-grants/${nm}`, {
+                    method: 'PUT', headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify({ level }),
+                });
+                assert(grant.status === 200, `grant ${level}: ${grant.status} ${JSON.stringify(grant.body.error ?? '')}`);
+                const r = await json(`/v1/apps/${owner}/${filename}/frame-token`, {
+                    method: 'POST', headers: { Authorization: `Bearer ${tk.body.data.token}`, Origin: EVIL }, body: '{}',
+                });
+                assert(r.status === 403,
+                    `a ${level} builder must not mint (expected 403, got ${r.status}: ${JSON.stringify(r.body.data ?? r.body.error)})`);
+            }
+            const revoke = await json(`/v1/apps/${owner}/${filename}/dev-grants/${nm}`, {
+                method: 'DELETE', headers: { Authorization: `Bearer ${token}` },
+            });
+            assert(revoke.status === 200, `revoke: ${revoke.status}`);
         });
 
         // ── Phase 6: the app origin answers as ITSELF ──────────────────────────────────────
