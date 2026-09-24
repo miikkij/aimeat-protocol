@@ -471,7 +471,7 @@ The operator dashboard is the one place with server-built screens. Everything on
 | **People and roles** | Disable or enable an account, grant or revoke roles, reset two-step sign-in, recover an account. | `aimeat_admin_owner_*`, `/v1/admin/roles/*` |
 | **Security overview** | Door activity, the refusal log, and quarantined incidents to resolve. | `/v1/admin/security/*`, `aimeat_admin_security_overview` |
 | **CORS** | Allowed origins per node, person, agent and memory key. | `aimeat_admin_cors_*` |
-| **Memory across accounts** | Search, delete and restore records across owners. | `/v1/admin/memory*` |
+| **Memory across accounts** | Search, delete and restore records across owners. Each search, read, delete and restore of someone's entry is on that person's feed and in the operator's usage record. | `/v1/admin/memory*` |
 | **Organism break-glass** | Take over or add an owner to an organism whose owners are gone. | `aimeat_admin_organism_*` |
 | **Scheduler and maintenance** | See and trigger background jobs; put the node in maintenance. | `/v1/admin/scheduler/*`, `/v1/admin/maintenance` |
 | **Usage and storage growth** | Who spends what, and how storage grows. | `aimeat_admin_usage`, `/v1/admin/storage-stats` |

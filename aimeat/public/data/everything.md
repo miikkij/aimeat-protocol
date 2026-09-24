@@ -509,7 +509,7 @@ The operator dashboard is the one place with server-built screens. Everything on
 | <a id="g-19-people-and-roles"></a> **People and roles** | Disable or enable an account, grant or revoke roles, reset two-step sign-in, recover an account. | `aimeat_admin_owner_*`, `/v1/admin/roles/*` |
 | <a id="g-19-security-overview"></a> **Security overview** | Door activity, the refusal log, and quarantined incidents to resolve. | `/v1/admin/security/*`, `aimeat_admin_security_overview` |
 | <a id="g-19-cors"></a> **CORS** | Allowed origins per node, person, agent and memory key. | `aimeat_admin_cors_*` |
-| <a id="g-19-memory-across-accounts"></a> **Memory across accounts** | Search, delete and restore records across owners. | `/v1/admin/memory*` |
+| <a id="g-19-memory-across-accounts"></a> **Memory across accounts** | Search, delete and restore records across owners. Each search, read, delete and restore of someone's entry is on that person's feed and in the operator's usage record. | `/v1/admin/memory*` |
 | <a id="g-19-organism-break-glass"></a> **Organism break-glass** | Take over or add an owner to an organism whose owners are gone. | `aimeat_admin_organism_*` |
 | <a id="g-19-scheduler-and-maintenance"></a> **Scheduler and maintenance** | See and trigger background jobs; put the node in maintenance. | `/v1/admin/scheduler/*`, `/v1/admin/maintenance` |
 | <a id="g-19-usage-and-storage-growth"></a> **Usage and storage growth** | Who spends what, and how storage grows. | `aimeat_admin_usage`, `/v1/admin/storage-stats` |

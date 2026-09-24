@@ -15,9 +15,18 @@
  *   read one: `group` and `workspace` name an audience the row carries and the word does not, and a
  *   per-key origin list narrows any of the six further. So the reads here project the audience and
  *   the provenance, never the value — the value is fetched for the one record somebody opens.
+ *
+ *   WHAT A READ LEAVES BEHIND. The search, the one-record read, the delete and the restore each
+ *   reach another person's entry, so each writes the operator-access trail before it answers
+ *   (services/operator-access-audit.ts): a usage row naming the account inspected, and a line on
+ *   that account's feed. The listing and the bin carry no values and write none.
  * @structure adminMemoryRouter · search · list · one record · delete · restore
  * @usage mounted by server-bootstrap/routes-loader.ts
  * @version-history
+ *   v2.2.0 — 2026-09-24 — SECURITY (audit A8-2): the search, the one-record read, the delete and the
+ *     restore write the operator-access trail through recordOperatorAccess(), the usage row the
+ *     usage and compliance doors already write and a line on the inspected owner's feed. The four
+ *     doors that reach another owner's private entry recorded nothing at all.
  *   v2.1.1 — 2026-09-24 — The operator's restore hands the service the operator's roles, as the delete
  *     does, and answers the service's own status: restore asks the organism namespace rule and the
  *     append-only guard now (A6-12), and without the roles the override was not an override.
@@ -38,9 +47,10 @@ import type { Storage, ArchiveFilter } from '../storage/interface.js';
 import type { MemoryMetaRow } from '../storage/repositories/memory.repository.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
-import { resolveIdentity } from '../utils/gaii.js';
+import { resolveIdentity, ownerGhiiOf } from '../utils/gaii.js';
 import { deleteMemoryRecord, restoreMemoryRecord } from '../services/memory-bin.js';
 import { shownMemoryValue } from '../services/secret-records.js';
+import { recordOperatorAccess, type OperatorAccess } from '../services/operator-access-audit.js';
 
 /** How much of a value is scanned for the search excerpt. A megabyte value is legal; reading all of
  *  it to highlight one word is not worth the wall clock, and the hit is ranked by the index anyway. */
@@ -111,6 +121,12 @@ export function adminMemoryRouter(
     const router = Router();
     const operator = [requireAuth(), requireRole('operator')] as const;
 
+    /** Write the trail for one reach into somebody's entries, before the door answers. */
+    const trail = (req: Express.Request, what: Pick<OperatorAccess, 'ownerOf' | 'action' | 'key' | 'count'>) => {
+        const actorGaii = resolveIdentity(req.auth!, config.nodeId);
+        return recordOperatorAccess(storage, config, { operatorGhii: ownerGhiiOf(actorGaii), actorGaii, ...what });
+    };
+
     // GET /v1/admin/memory/search — what is WRITTEN in memory, across every owner.
     //
     // BEFORE `/v1/admin/memory/:owner/:key`, and that is deliberate even though the two cannot
@@ -135,6 +151,15 @@ export function adminMemoryRouter(
             archived: archiveFilter(req.query.archived),
             limit,
         });
+
+        // Every hit carries an excerpt of its value, so every owner a hit belongs to has had part of
+        // an entry read. One line each, with how many of theirs the search showed.
+        const shownPerOwner = new Map<string, number>();
+        for (const h of hits) {
+            const who = ownerGhiiOf(h.record.ownerGaii);
+            shownPerOwner.set(who, (shownPerOwner.get(who) ?? 0) + 1);
+        }
+        await Promise.all([...shownPerOwner].map(([ownerOf, count]) => trail(req, { ownerOf, action: 'search', count })));
 
         res.json(success(config.nodeId, {
             query: q,
@@ -275,6 +300,8 @@ export function adminMemoryRouter(
             }))
             : [];
 
+        await trail(req, { ownerOf: rec.ownerGaii, action: 'read', key: rec.key });
+
         res.json(success(config.nodeId, {
             key: rec.key,
             owner_gaii: rec.ownerGaii,
@@ -324,6 +351,7 @@ export function adminMemoryRouter(
             res.status(out.status ?? 404).json(error(config.nodeId, out.code, out.message));
             return;
         }
+        await trail(req, { ownerOf: out.ownerGaii, action: 'delete', key: out.key });
         res.json(success(config.nodeId, {
             deleted: true,
             owner_gaii: out.ownerGaii,
@@ -351,6 +379,7 @@ export function adminMemoryRouter(
             res.status(out.status ?? 404).json(error(config.nodeId, out.code, out.message));
             return;
         }
+        await trail(req, { ownerOf: out.ownerGaii, action: 'restore', key: out.key });
         res.json(success(config.nodeId, { restored: true, owner_gaii: out.ownerGaii, key: out.key }));
     });
 

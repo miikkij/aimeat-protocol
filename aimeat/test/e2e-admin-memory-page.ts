@@ -17,10 +17,15 @@
  *   - Section C: one record — the value, the kept versions, 404 on a key that is not there
  *   - Section D: the bin — delete stamps the operator, restore brings it back, the window is said
  *   - Section E: the refusals — every door answers 403 to a plain owner and 401 to nobody
+ *   - Section F: the trail — each of the four doors that touch another owner's entry leaves a line
+ *     on that owner's feed and a usage row naming them, and the operator's own entries leave none
  * @usage
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts \
  *     --test=e2e-admin-memory-page
  * @version-history
+ *   v1.1.0 — 2026-09-24 — Section F, the trail (security audit A8-2). The operator read, searched,
+ *     deleted and restored another owner's private entry and nothing was recorded anywhere: not on
+ *     the owner's feed and not in the usage stream the sibling admin doors write to.
  *   v1.0.0 — 2026-09-12 — Written with the page rebuilt around the question.
  */
 import * as ed from '@noble/ed25519';
@@ -376,6 +381,67 @@ await test('25. And the refused delete left the record exactly where it was', as
     const { status, body } = await json(recPath(opGhii, `${PREFIX}public`), op());
     assert(status === 200, `a refused delete removed the record: ${status}`);
     assert(body.data.value?.note?.includes('lycopodium'), 'a refused delete changed the value');
+});
+
+// ─── Section F: the trail ───
+console.log('\nSection F — what the operator leaves behind in someone else\'s account');
+
+const TRAIL = `${PREFIX}trail`;
+
+/** The account's own feed, as its owner reads it. */
+async function feedOf(token: string): Promise<any[]> {
+    const { status, body } = await json('/v1/account/events?limit=200', { headers: { Authorization: `Bearer ${token}` } });
+    assert(status === 200, `account events: ${status} ${JSON.stringify(body.error)}`);
+    return (body.data.events as any[]).filter(e => e.kind === 'memory_accessed_by_operator');
+}
+
+/** The operator's own audit rows about that owner, by what was done. */
+async function operatorRowsAbout(ownerGhii: string): Promise<any[]> {
+    const { status, body } = await json(`/v1/admin/usage/calls?owner=${enc(opName)}&surface=operator&limit=500`, op());
+    assert(status === 200, `usage calls: ${status} ${JSON.stringify(body.error)}`);
+    return (body.data.calls as any[]).filter(c => c.counterpartyGhii === ownerGhii && c.actorKind === 'operator');
+}
+
+await test('26. THE TRAIL: an operator opening another owner\'s private entry is on that owner\'s feed', async () => {
+    await write(plainToken, TRAIL, { note: 'a private diagnosis the plain owner keeps to themselves' }, 'private');
+    const read = await json(recPath(plainGhii, TRAIL), op());
+    assert(read.status === 200, `the operator could not open it: ${read.status}`);
+    const lines = (await feedOf(plainToken)).filter(e => e.data?.action === 'read' && e.data?.key === TRAIL);
+    assert(lines.length === 1, `the owner's feed says nothing about the read: ${lines.length} lines`);
+    assert(lines[0].actorGaii === opGhii, `the line names ${lines[0].actorGaii}, not the operator`);
+});
+
+await test('27. …and in the usage stream, as the operator inspecting that owner', async () => {
+    const rows = (await operatorRowsAbout(plainGhii)).filter(c => c.coordinate === 'memory.read');
+    assert(rows.length >= 1, 'no memory.read row names the owner as the one inspected');
+    assert(rows[0].surface === 'operator' && rows[0].ownerGhii === opGhii,
+        `the row is not the operator's own: ${JSON.stringify(rows[0]).slice(0, 200)}`);
+});
+
+await test('28. A search that shows the entry, a delete and a restore each leave a line and a row', async () => {
+    const found = await json(`/v1/admin/memory/search?q=diagnosis&prefix=${enc(PREFIX)}&owner=${enc(plainGhii)}&limit=50`, op());
+    assert(found.status === 200 && (found.body.data.items as any[]).some(i => i.key === TRAIL),
+        `the search did not find the entry: ${found.status}`);
+    const del = await json(recPath(plainGhii, TRAIL), { ...op(), method: 'DELETE' });
+    assert(del.status === 200, `delete: ${del.status}`);
+    const back = await json(`${recPath(plainGhii, TRAIL)}/restore`, { ...op(), method: 'POST' });
+    assert(back.status === 200, `restore: ${back.status}`);
+
+    const actions = new Set((await feedOf(plainToken)).map(e => e.data?.action));
+    for (const a of ['search', 'delete', 'restore']) {
+        assert(actions.has(a), `the owner's feed has no "${a}" line: ${[...actions].join(', ')}`);
+    }
+    const coords = new Set((await operatorRowsAbout(plainGhii)).map(c => c.coordinate));
+    for (const c of ['memory.search', 'memory.delete', 'memory.restore']) {
+        assert(coords.has(c), `no ${c} row names the owner: ${[...coords].join(', ')}`);
+    }
+});
+
+await test('29. The operator\'s own entries leave no line on anybody\'s feed', async () => {
+    const own = await json(recPath(opGhii, `${PREFIX}private`), op());
+    assert(own.status === 200, `the operator could not open their own entry: ${own.status}`);
+    const mine = await feedOf(opToken);
+    assert(mine.length === 0, `the operator was told about their own entries: ${JSON.stringify(mine).slice(0, 200)}`);
 });
 
 // ─── Summary ───
