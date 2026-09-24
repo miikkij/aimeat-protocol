@@ -17,6 +17,8 @@
  * @structure MailboxRow · YourTurn · FleetLine · Things · FavoriteApps · Playbooks · TrustLine · Achievements
  * @usage import { MailboxRow, FleetLine, Things, FavoriteApps, Achievements } from '/views/home/status-parts.js';
  * @version-history
+ *   2026-09-24: The playbook's copy button is the underlined action link (Jouni's decision "Panel
+ *     action").
  *   2026-09-23: ChatDoor deleted (Jouni's decision): no page had drawn it since 07f7040c5
  *     (2026-09-09), when the home journey took its place.
  *   2026-09-23: Each piece is composed from library components (StatLine, Band, LineList, NamedRow,
@@ -325,7 +327,7 @@ export function Playbooks({ playbooks, tour }) {
           <button type="button" class="poster-slab" onClick=${() => askAgent(pb)}>
             ${tr('home.playbooks.ask', 'Ask my agent')}
           </button>
-          <button type="button" class="btn-outline" onClick=${() => copyPrompt(pb)}>
+          <button type="button" class="poster-action" onClick=${() => copyPrompt(pb)}>
             ${copied === pb.id
               ? tr('home.playbooks.copied', 'Copied. Paste it in your AI chat')
               : tr('home.playbooks.copy', 'Copy for my own AI')}

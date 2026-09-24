@@ -22,6 +22,7 @@
  *   import { McpQuickConnect } from '/components/McpInstall.js';
  *   html`<${McpQuickConnect} serverName=${agentName} />`
  * @version-history
+ *   2026-09-24 -- The command's Copy is the underlined action link (Jouni's decision "Panel action").
  *   2026-09-13 -- Let the caller compose the install row's shared poster shape by class.
  *   v1.1.0 — 2026-09-02 — The double-click install scripts (`install.scripts`, GET /v1/connect/install)
  *     render beside the one-click links, in the setup guide and in the quick row alike.
@@ -132,7 +133,7 @@ export function McpQuickConnect({ serverName, guideHref = '/v1/profile?tab=mcp',
         <div class="mcpi-cmd" key=${tool.id}>
           <span class="mcpi-cmd-label">${tool.label}</span>
           <code class="mcpi-cmd-text">${tool.mcp.command}</code>
-          <${CopyButton} text=${tool.mcp.command} className="btn-ghost btn-sm"
+          <${CopyButton} text=${tool.mcp.command} className="poster-action"
             label=${tr('common.copy', 'Copy')} copiedLabel=${tr('common.copied', 'Copied')} />
         </div>`)}
 

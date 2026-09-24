@@ -9,6 +9,7 @@
  *   TurnError({ message, onRetry })
  * @usage html`<${Turn} key=${i} id=${`${thread.id}-${i}`} turn=${turn} />`
  * @version-history
+ *   v1.1.0 — 2026-09-24 — Try again is the underlined action link (Jouni's decision "Panel action").
  *   v1.0.0 — 2026-09-23 — Moved out of views/chat/parts.js with its markup unchanged (UI
  *     consolidation phase 1, a move).
  */
@@ -166,7 +167,7 @@ export function TurnError({ message, onRetry }) {
         <div class="poster-turn-error" role="alert">
             <p class="poster-turn-error-msg">${message}</p>
             ${onRetry && html`
-                <button type="button" class="btn-outline" onClick=${onRetry}>
+                <button type="button" class="poster-action" onClick=${onRetry}>
                     ${tr('chat.retry', 'Try again')}
                 </button>`}
         </div>

@@ -26,6 +26,8 @@
  * @structure OpenItemsList({ maxAgeDays })
  * @usage html`<${OpenItemsList} />` — or `maxAgeDays={7}` to hide rows that have gone stale
  * @version-history
+ *   v1.3.0 — 2026-09-24 — The copy button and the two review buttons are the underlined action link
+ *     (Jouni's decision "Panel action").
  *   v1.2.0 — 2026-09-20 — A row the decision gate opened carries the two answers a person can give:
  *     it was right, it was wrong. Both record a review on the decision, which is what makes the
  *     register say a human was in the loop, and the node then takes the row off.
@@ -126,7 +128,7 @@ export function OpenItemsList({ maxAgeDays } = {}) {
         </h3>
         <${CopyButton}
           text=${prompt}
-          className="btn-primary btn-sm"
+          className="poster-action"
           label=${tr('openItems.copyPrompt', 'Take these into your AI chat')}
           copiedLabel=${tr('openItems.copied', 'Copied. Paste it in your chat')} />
       </div>
@@ -161,11 +163,11 @@ export function OpenItemsList({ maxAgeDays } = {}) {
                  dead end: the only control was "Take it off", which records nothing. */''}
             ${i.kind === 'decision' && i.object?.type === 'ai-decision' && html`
               <div class="open-items-decide">
-                <button type="button" class="btn-outline btn-sm"
+                <button type="button" class="poster-action"
                   onClick=${() => act(i.id, () => reviewDecision(i.object.id, 'confirmed'))}>
                   ${tr('openItems.decision.confirm', 'It was right')}
                 </button>
-                <button type="button" class="btn-outline btn-sm"
+                <button type="button" class="poster-action"
                   onClick=${() => act(i.id, () => reviewDecision(i.object.id, 'overridden'))}>
                   ${tr('openItems.decision.override', 'It was wrong')}
                 </button>
