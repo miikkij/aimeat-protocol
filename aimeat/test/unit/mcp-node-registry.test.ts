@@ -9,6 +9,8 @@
  *   strength of a half-finished setup. And no call may ever take morsels from anybody, because
  *   morsels are a pacer and buy nothing; that failure reaches a balance rather than a log.
  * @version-history
+ *   v1.3.0 — 2026-09-24 — The price arms hand the chokepoint Alice's scopes as a door does
+ *     (heldScopes); it no longer reads a missing list as mcp:use (secaudit 2026-09 f740ecf9bc39).
  *   v1.2.0 — 2026-09-24 — Changing one: an owner a node-wide server admits may use it and never
  *     change it; an owner changes their own server and nobody else's (secaudit 2026-09 A2-1).
  *   v1.1.0 — 2026-09-16 — Morsels are not money. The four tests that asserted a morsel charge, its
@@ -28,6 +30,7 @@ import {
   nodeWideAdmits, requireUsableServer, requireManageableServer, listUsableServers,
 } from '../../src/services/mcp-client/registry.js';
 import { callRemoteTool } from '../../src/services/mcp-client/invoke.js';
+import { heldScopes } from '../../src/auth/effective-scopes.js';
 import { sealMcpCredential } from '../../src/services/mcp-client/credential.js';
 import { mcpClientPool } from '../../src/services/mcp-client/pool.js';
 
@@ -222,6 +225,13 @@ describe('a call never takes morsels', () => {
   const legacyMorselPriced = (perCall: number) =>
     nodeServer({ price: { unit: 'morsels', perCall } as unknown as McpServerRecord['price'] });
 
+  /**
+   * What a door hands the chokepoint for Alice in person: every word, by the owner's role. These
+   * calls named no scopes until 2026-09-24 and passed on the chokepoint's mcp:use default, which is
+   * gone (secaudit 2026-09 f740ecf9bc39). The setup changed to match the doors; the assertions did not.
+   */
+  const scopes = heldScopes({ roles: ['owner'], scopes: [] });
+
   it('leaves the balance exactly where it was, on a row still priced in morsels', async () => {
     const storage = new SqliteStorage(':memory:');
     const s = legacyMorselPriced(5);
@@ -230,7 +240,7 @@ describe('a call never takes morsels', () => {
 
     const before = await balanceOf(storage, ALICE);
     const r = await callRemoteTool({
-      storage, config, server: s, tool: 'quote', args: { symbol: 'AAPL' }, caller: ALICE,
+      storage, config, server: s, tool: 'quote', args: { symbol: 'AAPL' }, caller: ALICE, scopes,
     });
     // Morsels are a pacer and buy nothing. The row reads as FREE rather than as an error, because
     // refusing every call on it would punish the owners for the operator's old setting.
@@ -245,7 +255,7 @@ describe('a call never takes morsels', () => {
     await ownerWith(storage, 'alice', 0);
 
     const r = await callRemoteTool({
-      storage, config, server: s, tool: 'quote', args: { symbol: 'AAPL' }, caller: ALICE,
+      storage, config, server: s, tool: 'quote', args: { symbol: 'AAPL' }, caller: ALICE, scopes,
     });
     // Phase 4 answered INSUFFICIENT here. A person with no morsels is not a person who cannot pay.
     expect(r.ok).toBe(true);
@@ -260,7 +270,7 @@ describe('a call never takes morsels', () => {
 
     const before = await balanceOf(storage, ALICE);
     const r = await callRemoteTool({
-      storage, config, server: s, tool: 'quote', args: { symbol: 'AAPL' }, caller: ALICE,
+      storage, config, server: s, tool: 'quote', args: { symbol: 'AAPL' }, caller: ALICE, scopes,
     });
     expect(r.ok).toBe(false);
     if (r.ok) return;
@@ -279,7 +289,7 @@ describe('a call never takes morsels', () => {
 
     const before = await balanceOf(storage, ALICE);
     const r = await callRemoteTool({
-      storage, config, server: free, tool: 'quote', args: { symbol: 'X' }, caller: ALICE,
+      storage, config, server: free, tool: 'quote', args: { symbol: 'X' }, caller: ALICE, scopes,
     });
     expect(r.ok).toBe(true);
     expect(await balanceOf(storage, ALICE)).toBe(before);
@@ -297,7 +307,7 @@ describe('a call never takes morsels', () => {
 
     const before = await balanceOf(storage, ALICE);
     const r = await callRemoteTool({
-      storage, config, server: mine, tool: 'quote', args: { symbol: 'X' }, caller: ALICE,
+      storage, config, server: mine, tool: 'quote', args: { symbol: 'X' }, caller: ALICE, scopes,
     });
     expect(r.ok).toBe(true);
     expect(await balanceOf(storage, ALICE)).toBe(before);

@@ -7,8 +7,11 @@
  *   auth/middleware.ts when that file passed the 800-line ceiling; both gates there call it.
  * @structure withCurrentScopes(storage, verified) → VerifiedToken (calls withCurrentOperatorRole first)
  *   withCurrentOperatorRole(storage, verified) → VerifiedToken
+ *   heldScopes(auth) → string[], the session's scopes with the owner's role reading written out
  * @usage req.auth = await withCurrentScopes(storage, verified);
  * @version-history
+ *   v1.3.0 -- 2026-09-24 -- heldScopes: what a door hands a service that asks the scope question
+ *     itself, so the owner in person is not refused for carrying no scopes on their token.
  *   v1.2.1 -- 2026-09-24 -- The federated test is isForeignPrincipal(), the one question.
  *   v1.2.0 -- 2026-09-09 -- withCurrentOperatorRole: the operator role is read from the owner record
  *     on every request whose token claims it, so a revoked operator loses the doors at once.
@@ -22,7 +25,7 @@
  */
 import type { Storage } from '../storage/interface.js';
 import type { VerifiedToken } from './jwt.js';
-import { scopeIsCovered } from '../utils/scope-coverage.js';
+import { scopeIsCovered, SCOPES_OUTSIDE_WILDCARD } from '../utils/scope-coverage.js';
 import { logger } from '../utils/logger.js';
 import { isForeignPrincipal } from '../utils/gaii.js';
 
@@ -124,4 +127,22 @@ export async function withCurrentOperatorRole(storage: Storage | null, v: Verifi
   if (!owner || owner.roles.includes('operator')) return v;
   logger.info('effective-scopes: the operator role was revoked; the token no longer carries it', { sub: v.sub, owner: v.owner });
   return { ...v, roles: v.roles.filter(r => r !== 'operator') };
+}
+
+/**
+ * Every scope this session holds, as a list a service can ask scopeIsCovered() about.
+ *
+ * requireScope admits the account holder in person on the ROLE, and their token carries no scopes
+ * at all, so a service handed only `auth.scopes` would refuse the one person every door admits. The
+ * owner in person is written here as every word — the wildcard and each word no wildcard carries —
+ * which is what that role reading means; everybody else holds what their token says, already
+ * narrowed to their record by withCurrentScopes. The test is requireScope's: a federated visitor,
+ * an agent and an ecosystem app never get the role reading, whatever their role list says.
+ */
+export function heldScopes(
+  auth: { roles: string[]; scopes?: string[]; federated?: boolean },
+): string[] {
+  const ownerInPerson = auth.roles.includes('owner') && !auth.federated
+    && !auth.roles.includes('agent') && !auth.roles.includes('ecosystem');
+  return ownerInPerson ? ['*', ...SCOPES_OUTSIDE_WILDCARD] : [...(auth.scopes ?? [])];
 }

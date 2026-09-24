@@ -6,6 +6,9 @@
  *   extension over a localhost fetch, a manual webhook, an ecosystem app over the connect-tunnel,
  *   or a tool on an MCP server this node has attached.
  * @version-history
+ *   v1.4.0 - 2026-09-24 - `callerScopes`: the `mcp` case hands the caller's own scopes to the
+ *     chokepoint. It passed none, which the chokepoint read as mcp:use, and the invoke door proves
+ *     only work:request.
  *   v1.3.1 - 2026-09-24 - The ecosystem branch names the caller's account with localAccountName, so a
  *     visitor's home GHII never binds the local namesake's app tunnel (secaudit 2026-09, F-1).
  *   v1.3.0 - 2026-09-16 - Add `case 'mcp'`: a published capability can be a tool on an attached
@@ -46,6 +49,14 @@ export async function invokeCapability(
    * Minted in-process, single use, seconds long — see `routes/extensions/internal-pass.ts`.
    */
   internalPass?: string,
+  /**
+   * Every scope the caller's session holds. Asked only by a capability over a remote MCP tool, where
+   * it decides whether a caller that is not the server's owner may spend it (mcp:use). Empty means
+   * nothing is held: a door with a session states its scopes, and a path with none (a checkout
+   * fulfilling a purchase, one capability buying from another) reaches a remote tool only as the
+   * server's own owner.
+   */
+  callerScopes: string[] = [],
 ): Promise<InvokeResult> {
   const start = Date.now();
 
@@ -134,11 +145,13 @@ export async function invokeCapability(
       }
 
       // The same chokepoint every other door uses: the grant, the locked arguments, the price and
-      // the usage row all happen in there and cannot be skipped by arriving this way.
+      // the usage row all happen in there and cannot be skipped by arriving this way. The door
+      // above proved work:request, not mcp:use, so the caller's own scopes go with the call.
       const called = await callRemoteTool({
         storage, config, server, tool: toolName,
         args: (input && typeof input === 'object' ? input : {}) as Record<string, unknown>,
         caller: callerGhii,
+        scopes: callerScopes,
       });
       if (!called.ok) {
         throw Object.assign(new Error(called.message), {

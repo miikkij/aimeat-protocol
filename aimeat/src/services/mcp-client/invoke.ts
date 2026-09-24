@@ -17,8 +17,10 @@
  *   carries a header naming the real caller, so a server that wants to audit the chain can, even
  *   when one stored credential is spent by several of the owner's agents.
  * @structure RemoteCallResult · callRemoteTool · listRemoteTools · toolCacheHash
- * @usage const r = await callRemoteTool({ storage, config, server, tool, args, caller });
+ * @usage const r = await callRemoteTool({ storage, config, server, tool, args, caller, scopes });
  * @version-history
+ *   v1.5.0 — 2026-09-24 — `scopes` is required and nothing is assumed when a door leaves it out:
+ *     a missing list was read as mcp:use, which the capability door had never proved.
  *   v1.4.0 — 2026-09-24 — listRemoteTools refuses a tool list over MAX_TOOL_LIST_BYTES with
  *     TOOL_LIST_TOO_LARGE, parks the server with the reason, and stores nothing of it.
  *   v1.3.0 — 2026-09-17 — A 508 from the far side is LOOP_DETECTED, answered with 508, and does not
@@ -152,13 +154,14 @@ export interface RemoteCallInput {
   /** What kind of principal it is, for the usage row. */
   callerKind?: 'owner' | 'agent' | 'app' | 'eco' | 'operator';
   /**
-   * The session's scopes, so the grant check can answer the default case.
-   *
-   * Omitted means "the caller already proved its scope at the door", which is what the REST route
-   * and the MCP tools do — requireScope and TOOL_SCOPES ran before this was reached. Passing them
-   * lets a caller that has NOT been through such a door (an app, an extension) be checked here.
+   * Every scope the calling session holds, so the grant check can answer the default case: a
+   * caller that is not the server's own owner needs mcp:use. REQUIRED, with no default. It was
+   * optional and read as mcp:use when missing, on the reasoning that every door had proved the word
+   * already; the capability door proves only work:request, so an agent the owner never gave mcp:use
+   * reached the owner's servers through any capability over one. A door states what the session
+   * holds (auth/effective-scopes.ts heldScopes for an HTTP session), and nothing is assumed here.
    */
-  scopes?: string[];
+  scopes: string[];
 }
 
 /**
@@ -393,7 +396,9 @@ export async function callRemoteTool(input: RemoteCallInput): Promise<RemoteCall
   // which agent wanted which tool it could not have.
   const access = await resolveMcpAccess({
     storage, server, grantee: caller, tool,
-    scopes: input.scopes ?? ['mcp:use'],
+    // Required by the type. A caller the compiler never saw (a script, a test) that leaves it out
+    // holds nothing, and is refused like one that holds nothing, rather than breaking the call.
+    scopes: input.scopes ?? [],
   });
   if (!access.allowed) {
     record('refused', access.code);

@@ -16,10 +16,12 @@
  * @usage cd aimeat && pnpm exec vitest run test/unit/effective-scopes.test.ts
  * @version-history
  *   v1.0.0 — 2026-09-07 — Written with the fix for the regression above.
+ *   v1.1.0 — 2026-09-24 — heldScopes: the owner in person holds every word, everybody else what
+ *     their token says (secaudit 2026-09 f740ecf9bc39).
  */
 import { describe, it, expect } from 'vitest';
-import { intersectScopes } from '../../src/auth/effective-scopes.js';
-import { SECRETS_MANAGE_SCOPE } from '../../src/utils/scope-coverage.js';
+import { intersectScopes, heldScopes } from '../../src/auth/effective-scopes.js';
+import { SECRETS_MANAGE_SCOPE, MCP_MANAGE_SCOPE, scopeIsCovered } from '../../src/utils/scope-coverage.js';
 
 describe('intersectScopes: a token narrowed to what the record currently allows', () => {
   it('a wildcard token against a named record becomes the record — NOT nothing', () => {
@@ -75,5 +77,26 @@ describe('intersectScopes: a token narrowed to what the record currently allows'
   it('no duplicates, however the two lists overlap', () => {
     expect(intersectScopes(['*', 'memory:read'], ['memory:read', 'memory:write']))
       .toEqual(['memory:read', 'memory:write']);
+  });
+});
+
+describe('heldScopes: what a door hands a service that asks the scope question itself', () => {
+  it('the owner in person holds every word, the ones no wildcard carries included', () => {
+    // Their token carries no scopes at all: requireScope admits them on the role. A service handed
+    // only the token's list would refuse the one person every door admits.
+    const held = heldScopes({ roles: ['owner'], scopes: [] });
+    for (const word of ['mcp:use', 'memory:write', MCP_MANAGE_SCOPE, SECRETS_MANAGE_SCOPE]) {
+      expect(scopeIsCovered(held, word), word).toBe(true);
+    }
+  });
+
+  it('everybody else holds exactly what their token says, whatever else their roles say', () => {
+    expect(heldScopes({ roles: ['agent'], scopes: ['work:request'] })).toEqual(['work:request']);
+    expect(heldScopes({ roles: ['owner', 'agent'], scopes: ['work:request'] })).toEqual(['work:request']);
+    expect(heldScopes({ roles: ['ecosystem'], scopes: [] })).toEqual([]);
+    expect(heldScopes({ roles: ['app'], scopes: ['mcp:read'] })).toEqual(['mcp:read']);
+    // A visitor from another node is never the account holder in person.
+    expect(heldScopes({ roles: ['owner'], scopes: ['memory:read'], federated: true })).toEqual(['memory:read']);
+    expect(scopeIsCovered(heldScopes({ roles: ['agent'], scopes: ['work:request'] }), 'mcp:use')).toBe(false);
   });
 });

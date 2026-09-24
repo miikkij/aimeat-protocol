@@ -24,6 +24,8 @@
  * @usage
  *   registerAllServerTools(mcp, { storage, config, agentGaii: () => gaii, ... });
  * @version-history
+ *   v1.4.3 — 2026-09-24 — The MCP proxy, capability and app-tool groups take the session's scopes, which
+ *     their remote-tool calls hand to the chokepoint instead of it assuming mcp:use.
  *   v1.4.2 — 2026-09-24 — registerPackageTools gets the session's scopes: a memory component answers
  *     for the words the memory door asks.
  *   v1.4.1 — 2026-09-24 — registerWorkflowTools gets the session's scopes: a step answers for the word
@@ -143,7 +145,7 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     registerOrganismsTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);
     registerWorkspaceTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);
     registerConnectionTools(mcp, storage, config, agentGaii, scopes);
-    registerMcpProxyTools(mcp, storage, config, agentGaii);
+    registerMcpProxyTools(mcp, storage, config, agentGaii, scopes);
     registerKnowledgeTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
     registerAppdevPitfallTools(mcp, storage, config, agentGaii, emitResourceUpdated, scopes);
     registerAppdevResearchTools(mcp, storage, config, agentGaii);
@@ -162,11 +164,11 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     registerSecretTools(mcp, storage, config, agentGaii);
     registerCommerceTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
     registerExchangeTools(mcp, storage, config, agentGaii);
-    registerExchangeRunTools(mcp, storage, config, agentGaii, getToken);
+    registerExchangeRunTools(mcp, storage, config, agentGaii, getToken, scopes);
     registerChatInstancesTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);
     registerFlagsTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);
     registerPromptsTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, deps.role ?? 'all');
-    registerCapabilitiesTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, getToken);
+    registerCapabilitiesTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, getToken, scopes);
     // The second primitive, beside aimeat_discover: run what you found. Needs the session's
     // raw bearer, because the call is dispatched as the caller through the node's own routes.
     registerInvokeTool(mcp, config, getToken, agentGaii);

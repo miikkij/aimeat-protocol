@@ -30,6 +30,9 @@
  *     test/run-e2e-ci.ts --test=mcp-proxy
  *
  * @version-history
+ *   v1.7.0 — 2026-09-24 — A capability over a remote tool asks the caller's own scopes: an agent with
+ *     work:request and not mcp:use is refused on REST and MCP, and answered once it holds mcp:use;
+ *     an owner in person reaches the node's server through one (secaudit 2026-09 f740ecf9bc39).
  *   v1.6.0 — 2026-09-24 — A flattened tool, over a real MCP session, is refused on the call after
  *     its server is switched off in the same session (secaudit 2026-09 a49e32ddeb4e).
  *   v1.5.0 — 2026-09-24 — A whole OAuth round against a far side of its own: the callback sends the
@@ -911,6 +914,36 @@ await test('and invoking it reaches the remote tool', async () => {
     `the far side did not answer: ${JSON.stringify(body.data)}`);
 });
 
+await test('an agent holding work:request and NOT mcp:use is refused it, on REST and on MCP', async () => {
+  const noUse = await agentWithScopes({ name: ownerName, token: ownerToken }, 'mcpcapnouse', ['work:request']);
+  const refused = await json(`/v1/capabilities/${capabilityId}/invoke`, {
+    method: 'POST', headers: { Authorization: `Bearer ${noUse.token}` },
+    body: JSON.stringify({ input: { text: 'no mcp:use' } }),
+  });
+  // Until 2026-09-24 this answered 200: the invoke door proves work:request only, and the chokepoint
+  // read the scope list it was not given as mcp:use (secaudit 2026-09 f740ecf9bc39).
+  assert(refused.status === 403 && refused.body.error?.code === 'NOT_GRANTED',
+    `expected 403 NOT_GRANTED, got ${refused.status} ${JSON.stringify(refused.body.error)}`);
+
+  const session = await openMcpSession(noUse.token);
+  const viaMcp = await mcpTool(session, 'aimeat_capabilities_invoke', { id: capabilityId, input: { text: 'no mcp:use' } });
+  assert(viaMcp.isError && viaMcp.text.includes('not given permission'), `the MCP door let it through: ${viaMcp.text}`);
+});
+
+await test('…and answers the same agent once it holds mcp:use, on both doors', async () => {
+  const withUse = await agentWithScopes({ name: ownerName, token: ownerToken }, 'mcpcapuse', ['work:request', 'mcp:use']);
+  const answered = await json(`/v1/capabilities/${capabilityId}/invoke`, {
+    method: 'POST', headers: { Authorization: `Bearer ${withUse.token}` },
+    body: JSON.stringify({ input: { text: 'with mcp:use' } }),
+  });
+  assert(answered.status === 200 && JSON.stringify(answered.body.data).includes('with mcp:use'),
+    `REST: ${answered.status} ${JSON.stringify(answered.body)}`);
+
+  const session = await openMcpSession(withUse.token);
+  const viaMcp = await mcpTool(session, 'aimeat_capabilities_invoke', { id: capabilityId, input: { text: 'the mcp twin' } });
+  assert(!viaMcp.isError && viaMcp.text.includes('the mcp twin'), `MCP: ${viaMcp.text}`);
+});
+
 await test('the ref is resolved through the CALLER, not the publisher', async () => {
   // The stranger has their own `upstream`, so this call goes to THEIR server and succeeds. That is
   // the design working: a capability names a slug, and a slug means whatever it means to whoever
@@ -1156,6 +1189,26 @@ await test('…and its agent holding mcp:manage is refused the same three acts o
   const row = await houseRow();
   assert(row && row.enabled === true && row.title === 'housewide',
     `the house server was changed over MCP: ${JSON.stringify(row)}`);
+});
+
+await test('a capability over the node server answers an owner in person, who holds every word by the role', async () => {
+  // The node's server belongs to no owner, so the chokepoint asks the caller's scopes, and an owner
+  // session carries none: the role is what admits the account holder. This holds that reading.
+  const cap = await json('/v1/capabilities', {
+    method: 'POST', headers: ownerAuth(),
+    body: JSON.stringify({
+      name: 'house-echo', summary: 'Says it back through the server this node offers.',
+      visibility: 'public', source: { type: 'mcp', ref: 'housewide/echo' },
+      status: 'active', callable: true, authRequired: 'registered', usage: 'Give it text.',
+    }),
+  });
+  assert(cap.status === 201, `create: ${cap.status}: ${JSON.stringify(cap.body)}`);
+  const id = cap.body.data.capability?.id ?? cap.body.data.id;
+  const r = await json(`/v1/capabilities/${id}/invoke`, {
+    method: 'POST', headers: plainAuth(), body: JSON.stringify({ input: { text: 'on the house' } }),
+  });
+  assert(r.status === 200 && JSON.stringify(r.body.data).includes('echo:on the house'),
+    `an owner in person: ${r.status} ${JSON.stringify(r.body)}`);
 });
 
 await test('the operator changes it on the node doors, and a personal door reaches it for nobody', async () => {

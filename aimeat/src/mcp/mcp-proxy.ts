@@ -27,9 +27,11 @@
  *
  *   `mcp:manage` is OUTSIDE the wildcard. Attaching a server to somebody's account is a human act:
  *   an agent holding "Full access" still cannot do it.
- * @structure registerMcpProxyTools(mcp, storage, config, agentGaii)
- * @usage registerMcpProxyTools(mcp, storage, config, () => agentGaii);
+ * @structure registerMcpProxyTools(mcp, storage, config, agentGaii, scopes)
+ * @usage registerMcpProxyTools(mcp, storage, config, () => agentGaii, scopes);
  * @version-history
+ *   v1.2.0 — 2026-09-24 — Takes the session's scopes, and aimeat_mcp_call hands them to the
+ *     chokepoint, which no longer reads a missing list as mcp:use.
  *   v1.1.0 — 2026-09-24 — aimeat_mcp_update, aimeat_mcp_authorize and aimeat_mcp_detach resolve the
  *     server through requireManageableServer, the question their REST twins ask: a node-wide server
  *     is used by the owners it admits and changed by none of them.
@@ -66,6 +68,8 @@ export function registerMcpProxyTools(
   storage: Storage,
   config: AimeatConfig,
   getAgentGaii: () => string,
+  /** What this session holds. aimeat_mcp_call hands it to the chokepoint, which assumes nothing. */
+  scopes: string[],
 ): void {
   const ok = (obj: unknown): TextResult => ({ content: [{ type: 'text', text: JSON.stringify(obj, null, 2) }] });
   const fail = (msg: string): TextResult => ({ content: [{ type: 'text', text: msg }], isError: true });
@@ -131,7 +135,7 @@ export function registerMcpProxyTools(
 
       const result = await callRemoteTool({
         storage, config, server: row, tool, args: args ?? {},
-        caller: getAgentGaii(), callerKind: 'agent',
+        caller: getAgentGaii(), callerKind: 'agent', scopes,
       });
       if (!result.ok) return fail(result.message);
       // isError is carried through rather than flattened: the far side's tool said no, and the
