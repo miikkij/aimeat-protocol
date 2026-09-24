@@ -11,6 +11,8 @@
  *   that guessing cannot come back without turning this suite red.
  * @usage pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=data-map
  * @version-history
+ *   v2.1.0 — 2026-09-24 — A6-10: another owner and a caller with no token read the stamp without
+ *     its `gap`; the owner still reads it.
  *   v2.0.0 — 2026-08-25 — Rewritten for aimeat.datamap/2.
  */
 import * as ed from '@noble/ed25519';
@@ -206,6 +208,23 @@ async function publish(o: Owner, filename: string): Promise<void> {
         assert(r.body.data.data_map?.what === GOOD_MAP.what, 'the rows are the promise, so they are public');
         assert(r.body.data.findings === undefined,
             'what is still missing is the owner\'s own business, not a stranger\'s');
+    });
+
+    // A6-10. The stamp carries the publish check's finding as `gap`, and the read handed it to every
+    // caller: another owner and a caller with no token both read `stamp.gap`. It is the owner's
+    // unfinished business on the stamp exactly as it is in `findings`.
+    await test('the finding on the stamp is the owner\'s too', async () => {
+        const mine = await json(`/v1/datamap/apps/${o.name}/probe-none.html`, { headers: auth(o.token) });
+        assert(mine.body.data.stamp.gap?.code === 'DATAMAP_MISSING',
+            `the owner still reads it: ${JSON.stringify(mine.body.data.stamp)}`);
+        const readers: Array<[string, RequestInit]> = [['another owner', { headers: auth(other.token) }], ['no token', {}]];
+        for (const [who, opts] of readers) {
+            const r = await json(`/v1/datamap/apps/${o.name}/probe-none.html`, opts);
+            assert(r.status === 200, `${who} can read the map: ${r.status}`);
+            assert(r.body.data.stamp.gap === undefined,
+                `${who} must not read the finding: ${JSON.stringify(r.body.data.stamp.gap)}`);
+            assert(r.body.data.stamp.missing === true, `${who} still reads the rest of the stamp`);
+        }
     });
 
     await test('another owner cannot write this map', async () => {
