@@ -12,8 +12,15 @@
  *   THE CROSS-PRINCIPAL CHECK IS THE ONE THIS FILE EXISTS FOR. Owner B buys; B's agent checks the
  *   licence, lists the purchase, and forks the paid source. All three must succeed. Against the
  *   pre-fix source the licence check and the fork both fail.
+ *
+ *   THE LICENCE ALSO ENDS WITH THE PERSON. A receipt outlives the account that made it, because it is
+ *   the other side's book entry too, and a deleted name can be registered again. The erasure tests
+ *   at the end prove that the next person to take the name starts with nothing, on either side of a
+ *   sale, while the books keep the amount, the date and the app.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=app-store-license
  * @version-history
+ *   v1.1.0 — 2026-09-24 — Erasure: a name registered again after its buyer or its seller deleted the
+ *     account inherits no receipt, no sale, no paid content and no licence (audit A8-4).
  *   v1.0.0 — 2026-08-23 — Initial: purchase-as-owner, licence recognised for the owner's agent.
  */
 import * as ed from '@noble/ed25519';
@@ -224,6 +231,100 @@ await test('An APP GRANT without contract:spend cannot buy — and with it, can'
         `an app granted contract:spend was still refused: ${bought.status} ${JSON.stringify(bought.body?.error)}`);
     const licence = await json(`/v1/app-store/license-check?app_filename=${PAID2}&app_owner=${sellerName}`, auth(buyerTok));
     assert(licence.body.data?.has_license === true, `the permitted purchase wrote no licence: ${JSON.stringify(licence.body.data)}`);
+});
+
+// ── Erasure: the next person to register a freed name starts with nothing ─────────────────────
+// A deleted username is released for reuse, and the purchase receipt is KEPT when an account is
+// deleted, because it is also the other side's book entry. Until 2026-09-24 the kept receipt still
+// named its parties by `name@node`, which is the very coordinate every purchase read keys on, so
+// whoever registered the freed name next held the previous person's receipts, the paid content in
+// them and a valid licence (audit A8-4). One test per side of the sale.
+
+/** A kept party is written as this prefix plus a random token: nothing any account can be named. */
+const ERASED = /^erased:[0-9a-f]{24}$/;
+
+await test('A name registered again after the BUYER deleted their account inherits no receipt, content or licence', async () => {
+    if (!marketplaceOn) return;
+    const name = `aperb${ts}`;
+    const first = await registerOwner(name);
+    const buy = await json('/v1/app-store/purchase', { ...auth(first.token), method: 'POST', body: JSON.stringify({ app_filename: PAID, app_owner: sellerName }) });
+    assert(buy.status === 201, `purchase before the erasure: ${buy.status} ${JSON.stringify(buy.body)}`);
+    const txId = buy.body.data.transaction_id as string;
+    const held = await json(`/v1/app-store/license-check?app_filename=${PAID}&app_owner=${sellerName}`, auth(first.token));
+    assert(held.body.data?.has_license === true, `the buyer holds the licence before the erasure: ${JSON.stringify(held.body.data)}`);
+
+    const del = await json(`/v1/owners/${name}`, { ...auth(first.token), method: 'DELETE' });
+    assert(del.status === 200, `delete the buyer: ${del.status} ${JSON.stringify(del.body)}`);
+    const again = await registerOwner(name);
+
+    const list = await json('/v1/app-store/purchases', auth(again.token));
+    assert(list.status === 200, `purchases: ${list.status}`);
+    assert((list.body.data?.purchases ?? []).length === 0,
+        `the new account inherited the previous person's receipts: ${JSON.stringify(list.body.data?.purchases)}`);
+    const lic = await json(`/v1/app-store/license-check?app_filename=${PAID}&app_owner=${sellerName}`, auth(again.token));
+    assert(lic.body.data?.has_license === false, `the new account inherited a licence it never paid for: ${JSON.stringify(lic.body.data)}`);
+    const receipt = await json(`/v1/app-store/purchases/${txId}`, auth(again.token));
+    assert(receipt.status === 403, `the new account read the old receipt and the paid content in it: ${receipt.status}`);
+    const dl = await json(`/v1/apps/${sellerName}/${PAID}`, auth(again.token));
+    assert(dl.status === 402, `the paywall opened for the new account: ${dl.status}`);
+
+    // The seller's book entry stays: the amount, the date and the app, and no longer the name.
+    const sales = await json('/v1/app-store/sales', auth(sellerTok));
+    const row = (sales.body.data?.sales ?? []).find((s: any) => s.transaction_id === txId);
+    assert(!!row, `the sale must outlive the buyer's account: ${JSON.stringify(sales.body.data?.sales)}`);
+    assert(row.buyer_owner !== name, `the seller's sales list still names the erased buyer: ${JSON.stringify(row)}`);
+    assert(ERASED.test(String(row.buyer_owner)), `the buyer is written as a pseudonym: ${JSON.stringify(row)}`);
+    assert(row.price_morsels === 50 && row.app_filename === PAID && row.purchased_at === buy.body.data.purchased_at,
+        `the books changed with the erasure: ${JSON.stringify(row)}`);
+    const detail = await json(`/v1/app-store/purchases/${txId}`, auth(sellerTok));
+    assert(detail.status === 200, `the seller still reads their sale: ${detail.status}`);
+    assert(detail.body.data.buyer_owner === row.buyer_owner, `the receipt names the same pseudonym: ${JSON.stringify(detail.body.data.buyer_owner)}`);
+    // The node's signature covered the erased identity, so keeping it would confirm a guessed name.
+    assert(detail.body.data.signature === '', 'the signature over the erased identity was kept');
+
+    await json(`/v1/owners/${name}`, { ...auth(again.token), method: 'DELETE' });
+});
+
+await test('A name registered again after the SELLER deleted their account inherits none of their sales', async () => {
+    if (!marketplaceOn) return;
+    const shop = `apers${ts}`;
+    const customer = `apercu${ts}`;
+    const APP = 'erased-seller-app.html';
+    const s1 = await registerOwner(shop);
+    const pub = await json('/v1/apps', { ...auth(s1.token), method: 'POST', body: JSON.stringify({ filename: APP, content: b64('<h1>bought before</h1>'), name: 'Bought Before', description: 'costs morsels', category: 'utility', tags: [], price_morsels: 10, license_type: 'lifetime' }) });
+    assert(pub.status === 201, `publish: ${pub.status} ${JSON.stringify(pub.body)}`);
+    const c = await registerOwner(customer);
+    const buy = await json('/v1/app-store/purchase', { ...auth(c.token), method: 'POST', body: JSON.stringify({ app_filename: APP, app_owner: shop }) });
+    assert(buy.status === 201, `purchase: ${buy.status} ${JSON.stringify(buy.body)}`);
+    const txId = buy.body.data.transaction_id as string;
+
+    const del = await json(`/v1/owners/${shop}`, { ...auth(s1.token), method: 'DELETE' });
+    assert(del.status === 200, `delete the seller: ${del.status} ${JSON.stringify(del.body)}`);
+    const s2 = await registerOwner(shop);
+
+    const sales = await json('/v1/app-store/sales', auth(s2.token));
+    assert(sales.status === 200, `sales: ${sales.status}`);
+    assert((sales.body.data?.sales ?? []).length === 0,
+        `the new account inherited the previous seller's sales and customers: ${JSON.stringify(sales.body.data?.sales)}`);
+    const peek = await json(`/v1/app-store/purchases/${txId}`, auth(s2.token));
+    assert(peek.status === 403, `the new account read a receipt of the previous seller's customer: ${peek.status}`);
+
+    // The customer keeps the receipt and the content they paid for, without the erased seller's name.
+    const mine = await json(`/v1/app-store/purchases/${txId}`, auth(c.token));
+    assert(mine.status === 200, `the customer still reads their receipt: ${mine.status}`);
+    assert(Buffer.from(String(mine.body.data.app_content), 'base64').toString('utf8').includes('bought before'),
+        'the customer keeps the content they paid for');
+    assert(mine.body.data.seller_owner !== shop && ERASED.test(String(mine.body.data.seller_owner)),
+        `the receipt still names the erased seller: ${JSON.stringify(mine.body.data.seller_owner)}`);
+
+    // And the old licence does not open whatever the new account publishes under the same name.
+    const pub2 = await json('/v1/apps', { ...auth(s2.token), method: 'POST', body: JSON.stringify({ filename: APP, content: b64('<h1>somebody new</h1>'), name: 'Somebody New', description: 'costs morsels', category: 'utility', tags: [], price_morsels: 10, license_type: 'lifetime' }) });
+    assert(pub2.status === 201, `publish under the reused name: ${pub2.status} ${JSON.stringify(pub2.body)}`);
+    const lic = await json(`/v1/app-store/license-check?app_filename=${APP}&app_owner=${shop}`, auth(c.token));
+    assert(lic.body.data?.has_license === false, `a licence bought from the erased seller opened the new account's app: ${JSON.stringify(lic.body.data)}`);
+
+    await json(`/v1/owners/${shop}`, { ...auth(s2.token), method: 'DELETE' });
+    await json(`/v1/owners/${customer}`, { ...auth(c.token), method: 'DELETE' });
 });
 
 await test('Cleanup', async () => {

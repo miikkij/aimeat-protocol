@@ -35228,6 +35228,7 @@ paths:
                                   type: integer
                                 seller_owner:
                                   type: string
+                                  description: The seller's account name, or an `erased:` pseudonym once the seller's account has been deleted.
                                 purchased_at:
                                   type: string
                                   format: date-time
@@ -35269,8 +35270,10 @@ paths:
                             type: string
                           buyer_owner:
                             type: string
+                            description: The buyer's account name, or an `erased:` pseudonym once the buyer's account has been deleted.
                           seller_owner:
                             type: string
+                            description: The seller's account name, or an `erased:` pseudonym once the seller's account has been deleted.
                           app_filename:
                             type: string
                           app_name:
@@ -35297,7 +35300,7 @@ paths:
                             description: Base64-encoded screenshot
                           signature:
                             type: string
-                            description: Node signature for verification
+                            description: Node signature for verification. Empty once either party's account has been deleted, because it was made over that party's identity.
                           node_id:
                             type: string
                           node_public_key:
@@ -35349,6 +35352,7 @@ paths:
                                   type: integer
                                 buyer_owner:
                                   type: string
+                                  description: The buyer's account name, or an `erased:` pseudonym once the buyer's account has been deleted.
                                 purchased_at:
                                   type: string
                                   format: date-time

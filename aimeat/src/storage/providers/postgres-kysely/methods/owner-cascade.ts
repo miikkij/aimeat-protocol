@@ -27,9 +27,13 @@
  *
  * @structure
  *   - cascadeDeleteIdentityData(db, gaii) — every owner-scoped table for ONE identity (GHII or GAII)
+ *   - pseudonymisePurchasePartiesDb(db, name, ghiis, pseudonym) — the kept receipts, without the name
  *   - deleteOwnerCascade(db, name) — agents + GHIIs through the cascade, then the owner-level tables
  * @usage Called by identityMethods.deleteOwner inside one db.transaction().
  * @version-history
+ *   v1.4.0 — 2026-09-24 — pseudonymisePurchasePartiesDb: the purchase receipts an erased person is a
+ *     party to are kept for the other side's books and rewritten to a pseudonym no account can hold
+ *     (audit A8-4). deleteOwnerCascade calls it.
  *   v1.3.0 — 2026-09-19 — AiDecision joins the cascade (TARGET-080).
  *   v1.2.1 — 2026-09-09 — The tally comment names the function this cascade actually calls
  *     (pseudonymiseTallyWriterDb); the Storage method it named was deleted for having no caller.
@@ -45,6 +49,7 @@
 import type { Kysely } from 'kysely';
 import type { DB } from '../db-types.js';
 import { pseudonymiseTallyWriterDb } from './memory-tally.js';
+import { erasedPartyPseudonym, partyIdentities } from '../../../erased-party.js';
 
 /** A Kysely handle: the root connection or an open transaction. */
 type Db = Kysely<DB>;
@@ -181,6 +186,38 @@ export async function cascadeDeleteIdentityData(db: Db, gaii: string): Promise<v
 }
 
 /**
+ * Rewrite an erased person out of every purchase receipt they are a party to, and keep the receipts.
+ *
+ * A receipt is also the OTHER side's record, so it outlives the account (the "AppPurchase" entry in
+ * security/storage-parity-exemptions.json). But a deleted username is released for reuse, and every
+ * purchase read, the licence check and the sales list key on `name@node`. So a receipt that kept the
+ * name handed the next registrant of that name the receipts, the paid content in them and a valid
+ * licence. Each side is rewritten when its own account goes. The amounts, the dates, the app and the
+ * other party stay for the books.
+ *
+ * The node's signature goes too. It was made over the erased identity, and every other field it
+ * covered is still in the row, so keeping it would let anyone who holds the row confirm a guessed
+ * name. An empty signature is what an unsigned receipt already carries.
+ *
+ * Postgres LIKE escapes with a backslash by default, which is how partyIdentities escapes. Written
+ * out twice rather than looped over the two sides, so each statement names its own columns.
+ */
+export async function pseudonymisePurchasePartiesDb(
+  db: Db, name: string, ghiis: string[], pseudonym: string,
+): Promise<number> {
+  const { exact, suffixPatterns } = partyIdentities(name, ghiis);
+  const buyer = await db.updateTable('AppPurchase')
+    .set({ buyerGaii: pseudonym, buyerOwner: pseudonym, signature: '' })
+    .where(eb => eb.or([eb('buyerGaii', 'in', exact), ...suffixPatterns.map(p => eb('buyerGaii', 'like', p))]))
+    .executeTakeFirst();
+  const seller = await db.updateTable('AppPurchase')
+    .set({ sellerGaii: pseudonym, sellerOwner: pseudonym, signature: '' })
+    .where(eb => eb.or([eb('sellerGaii', 'in', exact), ...suffixPatterns.map(p => eb('sellerGaii', 'like', p))]))
+    .executeTakeFirst();
+  return Number(buyer?.numUpdatedRows ?? 0) + Number(seller?.numUpdatedRows ?? 0);
+}
+
+/**
  * Delete an owner and everything owner-scoped underneath. Runs every agent GAII and every GHII
  * through {@link cascadeDeleteIdentityData}, then clears the tables keyed by the owner NAME.
  * Returns true when an Owner row was actually removed.
@@ -199,6 +236,11 @@ export async function deleteOwnerCascade(db: Db, name: string): Promise<boolean>
   // their "four hands" into three. Runs before the GHII rows go, because the node id comes from one.
   const nodeId = ghiis[0]?.ghii.split('@')[1] ?? '';
   if (nodeId) await pseudonymiseTallyWriterDb(db, name, nodeId);
+
+  // The purchase receipts this person is a party to stay, because each one is also the other side's
+  // book entry. The name leaves them: it is released for reuse, and every purchase read keys on it.
+  // One pseudonym for the whole erasure, so the books still see one party.
+  await pseudonymisePurchasePartiesDb(db, name, ghiis.map(g => g.ghii), erasedPartyPseudonym());
 
   await db.deleteFrom('Ghii').where('ownerName', '=', name).execute();
 
