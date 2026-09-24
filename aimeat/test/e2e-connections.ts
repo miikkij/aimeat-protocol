@@ -19,6 +19,8 @@
  *   membership IS the access) · 16 reading numbers back · 17 publishing later
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-connections
  * @version-history
+ *   v1.4.1 — 2026-09-25 — The read-through arm follows A5-1: an app holding only connections:use is
+ *     refused with the word it needs named, and one holding connections:read-through reads.
  *   v1.4.0 — 2026-09-24 — The callback sends the browser to a path of this node only: `//host` and
  *     `/\host` land on the access page (secaudit 2026-09 A5-5).
  *   v1.3.0 — 2026-08-17 — E2E quality, connections :945 and :405. Phase 13 ran synthetic principals
@@ -1793,16 +1795,26 @@ async function main(): Promise<void> {
       assert(r.status === 401, `expected 401, got ${r.status}`);
     });
 
-    await test('an app granted connections:use can read through, because an agent is a first-class caller', async () => {
-      const appToken = await grantAppToken(jwtA, userA, ['connections:use']);
+    await test('an app granted connections:use alone does not read through: reading takes connections:read-through', async () => {
+      // Until eda5b1caa this arm asserted the opposite: `connections:use`, described to the owner as
+      // publishing, also opened the read door. Reading is its own word now (secaudit 2026-09, A5-1),
+      // so this arm asserts the hole that commit closed.
+      const useOnly = await grantAppToken(jwtA, userA, ['connections:use']);
+      const r = await api(`/v1/connections/${connA}/read/items`, { method: 'POST', bearer: useOnly, body: { limit: 1 } });
+      assert(r.status === 403, `an app holding only connections:use read through: ${r.status}`);
+      assert(JSON.stringify(r.data?.error ?? {}).includes('connections:read-through'), `the refusal names the word it needs: ${JSON.stringify(r.data?.error)}`);
+    });
+
+    await test('an app granted connections:read-through can read through, because an agent is a first-class caller', async () => {
+      const appToken = await grantAppToken(jwtA, userA, ['connections:read-through']);
       const r = await api(`/v1/connections/${connA}/read/items`, { method: 'POST', bearer: appToken, body: { limit: 1 } });
       assert(r.status === 200, `an app may read through: ${r.status} ${JSON.stringify(r.data?.error)}`);
       assert(Array.isArray(r.data.data.data?.items), 'and gets the answer');
     });
 
     await test('an app granted nothing of the sort is refused', async () => {
-      // `connections:use` is the ONLY connection scope an app grant offers, so the meaningful
-      // negative is an app that holds a different scope entirely.
+      // An app grant offers two connection words, `connections:use` and `connections:read-through`,
+      // so the meaningful negative is an app that holds a different scope entirely.
       const elsewhere = await grantAppToken(jwtA, userA, ['memory:read']);
       const r = await api(`/v1/connections/${connA}/read/items`, { method: 'POST', bearer: elsewhere, body: {} });
       assert(r.status === 403, `expected 403, got ${r.status}`);
