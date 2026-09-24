@@ -19,6 +19,9 @@
  * @structure decideRouter(config, storage)
  * @usage mounted in server-bootstrap/routes-loader.ts
  * @version-history
+ *   v1.3.3 — 2026-09-24 — PUT /v1/ai/decide/settings hands the whole body to writeDecideSettings,
+ *     which checks every field before it writes any (273435328c90). The door stored the key and the
+ *     provider choice first and read the policy last, so a refused request had replaced the key.
  *   v1.3.2 — 2026-09-24 — The federated test is isForeignPrincipal(), the one question (secaudit 2026-09, F-1).
  *   v1.3.1 — 2026-09-23 — The five owner-only doors here say what they are and what an agent's own
  *     way in is, instead of the sign-in gate's sentence about the account:security permission.
@@ -48,14 +51,14 @@ import {
   type DecideCaller, type DecideInput,
 } from '../services/decide/service.js';
 import {
-  decideSettingsView, writeDecidePolicy, writeOwnDecideKey, clearOwnDecideKey,
+  decideSettingsView, writeDecideSettings, clearOwnDecideKey,
 } from '../services/decide/settings.js';
 import {
   startDecideRun, getDecideRun, listDecideRuns, resumeDecideRun, stopDecideRun, runSummary,
   type RunItem,
 } from '../services/decide/runs.js';
 import {
-  providersView, providerView, putOwnerProvider, deleteOwnerProvider, writeProviderChoice,
+  providersView, providerView, putOwnerProvider, deleteOwnerProvider,
 } from '../services/decide/providers.js';
 
 /** The human whose account a decision belongs to, whoever asked. */
@@ -252,23 +255,8 @@ export function decideRouter(config: AimeatConfig, storage: Storage): Router {
     const gaii = decideOwnerOf(req.auth!, config.nodeId);
     const body = (req.body ?? {}) as Record<string, unknown>;
     try {
-      if (body.api_key !== undefined) await writeOwnDecideKey(storage, config, gaii, body.api_key);
-      // The owner's default provider and the one each agent uses. `null` gives the choice back.
-      if (body.provider !== undefined || body.agent_providers !== undefined) {
-        await writeProviderChoice(storage, config, gaii, {
-          ...(body.provider !== undefined ? { default: body.provider } : {}),
-          ...(body.agent_providers !== undefined ? { agents: body.agent_providers } : {}),
-        });
-      }
-      const policy = body.policy as Record<string, unknown> | undefined;
-      if (policy !== undefined) {
-        if (!policy || typeof policy !== 'object' || Array.isArray(policy)) {
-          throw new DecideError('INVALID_BODY', 400, 'policy must be an object: { allow, store_state, allow_public_opt_out }.');
-        }
-        await writeDecidePolicy(storage, gaii, {
-          allow: policy.allow, storeState: policy.store_state, allowPublicOptOut: policy.allow_public_opt_out,
-        });
-      }
+      // The key, the provider choice and the policy: all checked before any is written.
+      await writeDecideSettings(storage, config, gaii, body);
       res.json(success(config.nodeId, await decideSettingsView(storage, config, gaii)));
     } catch (e) { fail(res, e); }
   });
