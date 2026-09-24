@@ -400,6 +400,12 @@ components:
               published: { type: boolean, description: Whether an action with this reference exists here }
               has_address: { type: boolean, description: A published action without one is bound and does nothing }
               host: { type: string, nullable: true, description: The address's host, never the whole address }
+              ambiguous:
+                type: array
+                items: { type: string }
+                description: >
+                  Present when the reference is a bare id that more than one provider publishes: the
+                  id#provider of each. Such a reference names none of them and nothing is called.
         last:
           allOf:
             - $ref: '#/components/schemas/HookRun'
@@ -24669,6 +24675,10 @@ paths:
         A reference that is not published here is accepted and named back in `unknown` rather than
         refused: binding before publishing is a legitimate order of work, and a silent acceptance is
         how a binding that calls nothing ends up looking exactly like one that works.
+
+        A bare id that more than one provider publishes is refused with 400 before anything is
+        written, and the message names the `id#provider` of each. It names no one action, and a
+        gate bound to such an id refuses rather than calling either.
 
         An empty list clears the moment, the same as DELETE.
       tags: [Admin]

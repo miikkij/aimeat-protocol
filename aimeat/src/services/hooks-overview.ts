@@ -25,11 +25,16 @@
  * @usage
  *   const overview = await buildHooksOverview(config, storage);
  * @version-history
+ *   v1.1.0 — 2026-09-24 — SECURITY (audit A8-3): references resolve through indexActionRefs() in
+ *     hooks.ts, the one the executor uses. A bare id two providers publish is refused at binding,
+ *     named back with both provider-qualified references, before anything is written; a binding made
+ *     before the second owner published reads as naming nothing, with `ambiguous`, never as the
+ *     squatter's action and host.
  *   v1.0.0 — 2026-09-12 — Initial.
  */
 import type { AimeatConfig, HookName } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { HOOK_NAMES, hookKind, HOOK_TIMEOUT_MS, type HookKind } from './hooks.js';
+import { HOOK_NAMES, hookKind, HOOK_TIMEOUT_MS, indexActionRefs, type HookKind } from './hooks.js';
 import { readHookRuns, HOOK_RUNS_KEPT, type HookRun } from './hook-log.js';
 import { logger } from '../utils/logger.js';
 
@@ -60,6 +65,9 @@ export interface BoundAction {
   has_address: boolean;
   /** The address's host, never the whole address: enough to recognise it, nothing to copy out of a screen. */
   host: string | null;
+  /** When the reference is a bare id two or more providers publish: the `id#provider` of each. It
+   *  names none of them, and the executor calls none of them. */
+  ambiguous?: string[];
 }
 
 export interface HookRow {
@@ -108,11 +116,9 @@ export async function buildHooksOverview(config: AimeatConfig, storage: Storage)
     readHookRuns(storage),
   ]);
 
-  const byRef = new Map<string, { id: string; displayName: string; webhookUrl?: string }>();
-  for (const a of published) {
-    byRef.set(a.id, a);
-    byRef.set(`${a.id}#${a.providerGaii}`, a);
-  }
+  // The executor's own index, so the page cannot show a binding as naming something the executor
+  // would not call.
+  const { byRef, ambiguous } = indexActionRefs(published);
   const newestFor = new Map<string, HookRun>();
   for (const run of runs) {
     if (!newestFor.has(run.hook)) newestFor.set(run.hook, run);
@@ -123,12 +129,14 @@ export async function buildHooksOverview(config: AimeatConfig, storage: Storage)
     const refs = config.extensionHooks[name] ?? [];
     const actions: BoundAction[] = refs.map((ref) => {
       const found = byRef.get(ref);
+      const claimants = ambiguous.get(ref);
       return {
         ref,
         name: found?.displayName ?? null,
         published: !!found,
         has_address: !!found?.webhookUrl,
         host: hostOf(found?.webhookUrl),
+        ...(claimants ? { ambiguous: claimants } : {}),
       };
     });
     const last = newestFor.get(name) ?? null;
@@ -186,6 +194,10 @@ export type SetHookOutcome =
  * An action that is not published here is accepted and NAMED back, rather than refused: binding
  * before publishing is a legitimate order of work, and a silent acceptance is how a binding that
  * calls nothing ends up looking exactly like one that works.
+ *
+ * A bare id that two or more providers publish is REFUSED, before anything is written, and the
+ * answer names the `id#provider` of each: it names no one action, and binding it would leave the
+ * choice to whichever row a scan returns last (security audit A8-3).
  */
 export async function setHookActions(
   config: AimeatConfig,
@@ -202,6 +214,23 @@ export async function setHookActions(
   const name = hookName as HookName;
   const list = (actions as string[]).map((a) => a.trim());
 
+  // Read what is published BEFORE writing, so an ambiguous reference is refused rather than stored.
+  // An unreadable actions table means we cannot say whether a reference is ambiguous, so nothing is
+  // refused on that ground; the executor still refuses to guess at call time.
+  const published = await storage.listActions().catch((err: unknown) => {
+    logger.warn('hooks-overview: the actions could not be read for a binding, so it is not checked', { error: String(err) });
+    return [];
+  });
+  const { byRef, ambiguous } = indexActionRefs(published);
+  const clashes = list.filter((ref) => ambiguous.has(ref));
+  if (clashes.length > 0) {
+    const named = clashes.map((ref) => `"${ref}" is published by ${ambiguous.get(ref)!.length} providers (${ambiguous.get(ref)!.join(', ')})`);
+    return {
+      ok: false, code: 'INVALID_INPUT',
+      message: `${named.join('; ')}. Bind the one you mean with its provider, as id#provider. Nothing was changed.`,
+    };
+  }
+
   config.extensionHooks[name] = list;
   if (list.length === 0) {
     await storage.deleteConfigValue(`hooks.${name}`);
@@ -209,16 +238,7 @@ export async function setHookActions(
     await storage.setConfigValue(`hooks.${name}`, JSON.stringify(list));
   }
 
-  // The binding is already written; whether the references match anything published is the extra
-  // courtesy below it. An unreadable actions table means we cannot say, so nothing is named as
-  // unknown rather than everything being named wrongly.
-  const published = await storage.listActions().catch((err: unknown) => {
-    logger.warn('hooks-overview: the actions could not be read after a binding, so it is not checked', { error: String(err) });
-    return [];
-  });
-  const known = new Set<string>();
-  for (const a of published) { known.add(a.id); known.add(`${a.id}#${a.providerGaii}`); }
-  const unknown = list.filter((ref) => !known.has(ref));
+  const unknown = list.filter((ref) => !byRef.has(ref));
 
   const kind = hookKind(name);
   const note = list.length === 0

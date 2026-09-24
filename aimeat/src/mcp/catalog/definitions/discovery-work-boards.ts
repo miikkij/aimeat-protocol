@@ -5,6 +5,8 @@
  * @description Catalogue/discovery, action execution, work inbox, wallet balance, storage, admin read, and notification-board tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   v1.6.2 — 2026-09-24 — aimeat_admin_hook_set says a bare id more than one provider publishes is
+ *     refused, and how to name the one meant (security audit A8-3).
  *   v1.6.1 — 2026-09-18 — aimeat_admin_organism_ownership points at aimeat_admin_organism_owner_add;
  *     it named an _owner_set tool that does not exist. Instruction review.
  *   v1.6.0 — 2026-09-13 — aimeat_board_create takes `rules` and says a post lives seven days by
@@ -413,7 +415,7 @@ export const discoveryWorkBoardsTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_admin_hook_set',
-        description: 'Operator-only. Bind a list of actions to one of the eleven moments, or clear it with an empty list. The actions are called in the order given, each after the last has answered. A gate (any hook whose name starts with pre_) WAITS for them and refuses the thing when one answers no, returns a non-2xx, or does not answer within ten seconds, so binding an address that is not reachable stops everything that moment guards; the other seven are told afterwards and stop nothing. An action reference is a published action\'s id, or its id with its provider (id#provider). An action that is not published here is accepted and named back in `unknown` rather than refused, because binding before publishing is a legitimate order of work. Read aimeat_admin_hooks first.',
+        description: 'Operator-only. Bind a list of actions to one of the eleven moments, or clear it with an empty list. The actions are called in the order given, each after the last has answered. A gate (any hook whose name starts with pre_) WAITS for them and refuses the thing when one answers no, returns a non-2xx, or does not answer within ten seconds, so binding an address that is not reachable stops everything that moment guards; the other seven are told afterwards and stop nothing. An action reference is a published action\'s id, or its id with its provider (id#provider). An action that is not published here is accepted and named back in `unknown` rather than refused, because binding before publishing is a legitimate order of work. A bare id that more than one provider publishes is refused, with the id#provider of each: bind the one you mean with its provider. Read aimeat_admin_hooks first.',
         caller: 'operator',
         visibility: agentEverywhere,
         input: {
