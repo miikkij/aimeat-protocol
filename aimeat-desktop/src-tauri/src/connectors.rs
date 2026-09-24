@@ -274,6 +274,39 @@ fn server_name(raw: Option<String>) -> String {
     }
 }
 
+/// A TOML basic string: `text` in double quotes, with the quote, the backslash and every control
+/// character escaped, so nothing in `text` can end the string or start a line of its own.
+fn toml_string(text: &str) -> String {
+    let mut out = String::with_capacity(text.len() + 2);
+    out.push('"');
+    for c in text.chars() {
+        match c {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            c if c.is_control() => out.push_str(&format!("\\u{:04X}", c as u32)),
+            c => out.push(c),
+        }
+    }
+    out.push('"');
+    out
+}
+
+/// A TOML key: bare when TOML allows it bare, a basic string otherwise.
+fn toml_key(name: &str) -> String {
+    let bare = !name.is_empty()
+        && name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_');
+    if bare {
+        name.to_string()
+    } else {
+        toml_string(name)
+    }
+}
+
 // ── Reading and editing a client's JSON, as pure functions ──────────────────
 
 /// Every `url` under the client's servers object, in file order.
@@ -477,10 +510,12 @@ pub fn connector_snippet(
         // The URL entry does nothing on its own: Codex reaches an HTTP server through its RMCP
         // client, which is behind a feature switch. Newer builds spell it `[features] rmcp_client`
         // and older ones `experimental_use_rmcp_client`, so both lines are given and the extra one
-        // is ignored by whichever build reads it.
+        // is ignored by whichever build reads it. The name and the address are written as TOML
+        // values, never pasted in as they are: the address is what the person typed.
         return Ok(format!(
-            "experimental_use_rmcp_client = true\n\n[features]\nrmcp_client = true\n\n[mcp_servers.{}]\nurl = \"{}\"\n",
-            name, url
+            "experimental_use_rmcp_client = true\n\n[features]\nrmcp_client = true\n\n[mcp_servers.{}]\nurl = {}\n",
+            toml_key(&name),
+            toml_string(&url)
         ));
     }
     let mut servers = serde_json::Map::new();
@@ -609,6 +644,32 @@ mod tests {
         assert!(codex.contains("rmcp_client = true"));
         assert!(codex.contains("[mcp_servers.aimeat]"));
         assert!(codex.contains("url = \"https://aimeat.io/v1/mcp\""));
+    }
+
+    #[test]
+    fn the_codex_lines_keep_a_typed_address_inside_its_string() {
+        // A quote and a line break typed into the address stay part of the url's value.
+        let typed = "https://a.example\"\n[other]\nx = \"1";
+        let codex = connector_snippet("codex".into(), typed.into(), None).unwrap();
+        assert!(
+            codex.contains(r#"url = "https://a.example\"\n[other]\nx = \"1/v1/mcp""#),
+            "{}",
+            codex
+        );
+        assert!(!codex.lines().any(|l| l.trim_start().starts_with("[other]")), "{}", codex);
+    }
+
+    #[test]
+    fn a_toml_value_escapes_what_toml_reads_as_syntax() {
+        assert_eq!(toml_string("https://aimeat.io/v1/mcp"), r#""https://aimeat.io/v1/mcp""#);
+        assert_eq!(toml_string("a\"b\\c"), r#""a\"b\\c""#);
+        assert_eq!(toml_string("a\nb\rc\td"), r#""a\nb\rc\td""#);
+        assert_eq!(toml_string("\u{0}\u{1b}\u{7f}"), r#""\u0000\u001B\u007F""#);
+        assert_eq!(toml_string("äö"), "\"äö\"");
+        assert_eq!(toml_key("aimeat"), "aimeat");
+        assert_eq!(toml_key("my_node-2"), "my_node-2");
+        assert_eq!(toml_key(""), r#""""#);
+        assert_eq!(toml_key("a.b]\n[c"), r#""a.b]\n[c""#);
     }
 
     #[test]
