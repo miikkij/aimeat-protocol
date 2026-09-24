@@ -5,6 +5,8 @@
  * @description File-storage routes under /v1/memory/files: upload (presigned or inline base64),
  *   visibility/tags PATCH, list, download, delete. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.5.0 -- 2026-09-24 -- POST refuses an app's icon and screenshot keys with 403, through the
+ *     same appOwnedKeyRefusal() as POST /v1/storage, before the mint and the inline write (A7-2).
  *   v1.4.1 -- 2026-09-24 -- The federated test is isForeignPrincipal(), the one question (secaudit 2026-09, F-1).
  *   v1.4.0 -- 2026-09-14 -- The owner branch of the listing is for a LOCAL owner session. It built
  *     the GHII from the owner name, which for a session signed in from another node is the local
@@ -36,7 +38,7 @@ import { emitChange } from '../../services/event-bus.js';
 import { decodeStrictBase64 } from '../../utils/base64.js';
 import { sniffedContentType } from '../../utils/app-content-type.js';
 import { generateUploadToken, buildUploadMeta } from '../../services/upload-token.js';
-import { removeStorageFile } from '../../services/storage-file-write.js';
+import { removeStorageFile, appOwnedKeyRefusal } from '../../services/storage-file-write.js';
 import type { MemoryRouteCtx } from './shared.js';
 
 export function registerFilesRoutes(router: Router, ctx: MemoryRouteCtx): void {
@@ -52,6 +54,13 @@ export function registerFilesRoutes(router: Router, ctx: MemoryRouteCtx): void {
     // `content` is required only for the inline path; a presigned mint carries no bytes at all.
     if (!key || (mode !== 'presigned' && !content)) {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'key and content (base64) are required'));
+      return;
+    }
+    // An app's icon and screenshot keys belong to the app's own doors, on this door as on
+    // POST /v1/storage (A7-2). Refused before the mint as well as before the inline write.
+    const owned = appOwnedKeyRefusal(String(key));
+    if (owned) {
+      res.status(owned.status).json(error(config.nodeId, owned.code, owned.message));
       return;
     }
 

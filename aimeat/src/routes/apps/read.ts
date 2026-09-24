@@ -10,6 +10,9 @@
  *   - registerReadRoutes() — versions, forks, lineage, screenshot GET/POST/DELETE, app download
  * @usage registerReadRoutes(router, config, storage, canonicalOwner); // from appsRouter
  * @version-history
+ *   v1.10.0 — 2026-09-24 — The screenshot GET serves only a PNG, JPEG or WebP image, typed by its
+ *     bytes, and answers 404 otherwise; the screenshot POST refuses anything else and stores the
+ *     type the bytes are (A7-2). Both used the caller's label as it was.
  *   v1.9.0 — 2026-09-18 — The page-view count carries the place the proxy reported for the request
  *     (utils/geo-headers.ts), kept only when the page's owner chose a precision.
  *   v1.8.0 — 2026-08-29 — The apex inline serve reads the owner's badge switch and the named
@@ -52,6 +55,8 @@ import { emitChange } from '../../services/event-bus.js';
 import { verifyDraftToken, DraftTokenError } from '../../services/draft-token.js';
 import { generateAppAccessToken } from '../../services/app-access-token.js';
 import { decodeStrictBase64 } from '../../utils/base64.js';
+import { setStoredImageHeaders } from '../../utils/file-download-headers.js';
+import { imageUploadType } from '../../utils/raster-image.js';
 import { ownerCoordinate } from '../../utils/gaii.js';
 import { applyServeMarks } from '../../services/app-serve-marks.js';
 import { appBadgeOn, appReviewedBy } from '../../services/app-marks.js';
@@ -228,7 +233,16 @@ export function registerReadRoutes(
         const screenshotKey = `apps/screenshots/${filename}`;
         const file = await storage.getStorageFile(app.ownerGaii, screenshotKey);
         if (file) {
-            res.setHeader('Content-Type', file.mimeType);
+            // A picture, typed by its bytes, or nothing: the stored label is not believed. This door
+            // sent it as it was, so a page stored under this key came back as a page (A7-2).
+            const shown = setStoredImageHeaders(res, {
+                key: file.key, data: file.data, name: `${filename.replace(/\.html?$/i, '') || 'app'}-screenshot`,
+            });
+            if (!shown) {
+                res.status(404).json(error(config.nodeId, 'NOT_FOUND',
+                    `The file stored as the screenshot of "${filename}" is not a PNG, JPEG or WebP image, so it is not served.`));
+                return;
+            }
             res.setHeader('Content-Length', file.size.toString());
             res.setHeader('Cache-Control', 'public, max-age=3600');
             res.send(file.data);
@@ -323,7 +337,15 @@ export function registerReadRoutes(
             res.status(413).json(error(config.nodeId, 'TOO_LARGE', `Screenshot exceeds 2MB limit (${screenshotData.length} bytes)`));
             return;
         }
-        const screenshotMime = typeof screenshot_mime_type === 'string' ? screenshot_mime_type : 'image/png';
+        // CHECKED, NOT BELIEVED, like the icon. The bytes must be a PNG, JPEG or WebP image and are
+        // stored as the type they are; a label naming anything else is refused, because the GET door
+        // serves this key to anybody from the node's own origin (A7-2).
+        const screenshotMime = imageUploadType(screenshotData, screenshot_mime_type);
+        if (!screenshotMime) {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
+                'A screenshot must be a PNG, JPEG or WebP image, and screenshot_mime_type, when given, must say which.'));
+            return;
+        }
 
         await storage.createStorageFile({
             key: `apps/screenshots/${filename}`,

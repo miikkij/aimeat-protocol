@@ -19299,6 +19299,10 @@ paths:
           $ref: '#/components/responses/AimeatSuccess'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '403':
+          description: >
+            The key is under `apps/icons/` or `apps/screenshots/`, which only an app's own icon and
+            screenshot doors write, because they check that the bytes are a picture.
         '413':
           description: File exceeds the per-file limit or the account storage quota.
     get:
@@ -20044,7 +20048,9 @@ paths:
                           versioned_url: { type: string }
         '403':
           description: >
-            An anonymous principal targeted a key outside `anonymous/*`. Applies to both the inline
+            An anonymous principal targeted a key outside `anonymous/*`, or any caller targeted a key
+            under `apps/icons/` or `apps/screenshots/`, which only an app's own icon and screenshot
+            doors write, because they check that the bytes are a picture. Applies to both the inline
             and the presigned form: the namespace fence is on the write, not on the representation.
         '413':
           description: Storage quota exceeded, or the file exceeds the per-file size limit
@@ -23937,6 +23943,11 @@ paths:
       responses:
         '201':
           $ref: '#/components/responses/AimeatSuccess'
+        '403':
+          description: >
+            An anonymous principal targeted a key outside `anonymous/*`, or the key is under
+            `apps/icons/` or `apps/screenshots/`, which only an app's own icon and screenshot doors
+            write.
 
   /v1/storage/upload/{id}/{chunk}:
     put:
@@ -25298,8 +25309,8 @@ paths:
                 tags: { type: array, items: { type: string } }
                 icon: { type: string }
                 access_code: { type: string, description: 4-64 chars; gates downloads }
-                screenshot: { type: string, description: Base64 image }
-                screenshot_mime_type: { type: string }
+                screenshot: { type: string, description: 'Base64 PNG, JPEG or WebP image, checked by its bytes before anything is published; anything else is refused with 400' }
+                screenshot_mime_type: { type: string, description: 'Optional. When given, image/png, image/jpeg or image/webp; the bytes decide what is stored' }
                 price_morsels: { type: number }
                 license_type: { type: string, enum: [single, lifetime] }
                 uses_cortex:
@@ -28434,7 +28445,8 @@ paths:
       description: >
         Returns the icon image the app's author uploaded, or 404 when it has none. No auth: it is
         the icon of a page anyone with the link can open. The app's own origin serves the same
-        bytes at /apple-touch-icon.png.
+        bytes at /apple-touch-icon.png. Only a PNG, JPEG or WebP image is served, with the type its
+        bytes are rather than the type it was stored with; any other stored file answers 404.
       tags: [App Store]
       responses:
         '200':
@@ -28444,10 +28456,18 @@ paths:
               schema:
                 type: string
                 format: binary
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+            image/webp:
+              schema:
+                type: string
+                format: binary
         '400':
           $ref: '#/components/responses/BadRequest'
         '404':
-          $ref: '#/components/responses/NotFound'
+          description: The app has no icon image, or the stored file is not a PNG, JPEG or WebP image
     post:
       operationId: setAppIcon
       summary: Set or replace an app's icon image without re-publishing
@@ -28509,7 +28529,10 @@ paths:
     get:
       operationId: getAppScreenshot
       summary: Serve an app's screenshot image
-      description: Returns the stored screenshot for the app, or 404 if none. No auth.
+      description: >
+        Returns the stored screenshot for the app, or 404 if none. No auth. Only a PNG, JPEG or WebP
+        image is served, with the type its bytes are rather than the type it was stored with; any
+        other stored file answers 404.
       tags: [App Store]
       responses:
         '200':
@@ -28519,17 +28542,27 @@ paths:
               schema:
                 type: string
                 format: binary
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+            image/webp:
+              schema:
+                type: string
+                format: binary
         '400':
           $ref: '#/components/responses/BadRequest'
         '404':
-          $ref: '#/components/responses/NotFound'
+          description: The app has no screenshot, or the stored file is not a PNG, JPEG or WebP image
     post:
       operationId: setAppScreenshot
       summary: Set or replace an app's screenshot without re-publishing
       description: >
         Stores a base64-encoded image as the app's screenshot. The app's owner may set their
         own; a node operator may set any app's, so the screenshot worker can backfill defaults
-        for apps that have none. Idempotent (overwrites any existing screenshot). Max 2 MB.
+        for apps that have none. Idempotent (overwrites any existing screenshot). Max 2 MB. The
+        bytes must be a PNG, JPEG or WebP image and are stored as the type they are; anything else,
+        or a `screenshot_mime_type` naming another type, is refused with 400.
       tags: [App Store]
       security:
         - BearerAuth: []
@@ -28543,10 +28576,10 @@ paths:
               properties:
                 screenshot:
                   type: string
-                  description: Base64-encoded image data (PNG or JPEG).
+                  description: Base64-encoded image data (PNG, JPEG or WebP).
                 screenshot_mime_type:
                   type: string
-                  default: image/png
+                  description: Optional. When given, image/png, image/jpeg or image/webp; the bytes decide what is stored.
       responses:
         '200':
           description: Screenshot stored

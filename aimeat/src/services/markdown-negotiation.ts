@@ -21,6 +21,7 @@
  *   import { prefersMarkdown, sendMarkdown, htmlToMarkdown } from '../services/markdown-negotiation.js';
  *   if (prefersMarkdown(req)) { sendMarkdown(res, htmlToMarkdown(html), html); return; }
  * @version-history
+ *   2026-09-24 - sendMarkdown sets X-Content-Type-Options: nosniff, like sendPlainText (A7-3).
  *   2026-09-18 - The landing markdown tells an agent how to get in, from services/first-steps.ts:
  *     MCP first. It listed addresses and left the order to the reader.
  *   2026-09-17 - TARGET-078: root Markdown leads with the same ownership promise as HTML.
@@ -64,13 +65,21 @@ export function estimateTokens(text: string): number {
   return Math.ceil(text.length / 4);
 }
 
-/** Send a negotiated markdown response with the convention's headers. */
+/**
+ * Send a negotiated markdown response with the convention's headers.
+ *
+ * `nosniff` is set here as sendPlainText() in middleware/plain-text.ts sets it: a declared type is a
+ * rule only when the browser is told not to guess another one. The node sets the header on every
+ * response through a middleware as well; this makes it the helper's own promise, on whatever response
+ * reaches it (A7-3).
+ */
 export function sendMarkdown(res: Response, markdown: string, originalHtml?: string): void {
   res.vary('Accept');
   res.set('x-markdown-tokens', String(estimateTokens(markdown)));
   if (originalHtml !== undefined) {
     res.set('x-original-tokens', String(estimateTokens(originalHtml)));
   }
+  res.setHeader('X-Content-Type-Options', 'nosniff');
   res.type('text/markdown; charset=utf-8').send(markdown);
 }
 

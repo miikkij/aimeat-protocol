@@ -28,6 +28,7 @@
  *   refusal or a result is rendered. The service never sees an Express Response and never writes one.
  * @structure
  *   - StorageWriteDeps / StorageFileInput / StorageFileWriteResult — the contract
+ *   - APP_OWNED_KEYS / appOwnedKeyRefusal() — the keys only an app's own doors write
  *   - writeStorageFile() — the inline write, in order, with the fence first
  *   - mintStorageUploadUrl() — the presigned representation of the same write
  *   - removeStorageFile() — the delete, sharing the same key fence and change events
@@ -43,6 +44,10 @@
  *     copy on that route, and because the route emitted only `files` while the upload emits `files`
  *     and `memory` — a delete moves the byte budget the memory view renders exactly as an upload
  *     does, and the two views disagreed about it.
+ *   v1.2.0 — 2026-09-24 — appOwnedKeyRefusal(): the write and the presigned mint refuse the
+ *     `apps/icons/` and `apps/screenshots/` prefixes with 403, so only an app's own doors, which
+ *     check that the bytes are a picture, write them (A7-2). A page stored there through this write
+ *     was served by the icon door as a page. The delete is not fenced.
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage, StorageFileRecord } from '../storage/interface.js';
@@ -96,13 +101,43 @@ export type StorageFileWriteResult =
 /**
  * The two refusals the key fence itself can produce. Narrower than either result type on purpose, so
  * it is assignable to both the write's and the delete's, and neither door can be handed a refusal
- * code it does not answer for.
+ * code it does not answer for. Exported because appOwnedKeyRefusal() returns it to other doors.
  */
-interface KeyRefusal {
+export interface KeyRefusal {
     ok: false;
     status: number;
     code: 'INVALID_INPUT' | 'FORBIDDEN';
     message: string;
+}
+
+/**
+ * Key prefixes that only an app's own doors write: its icon image (POST /v1/apps/{owner}/{file}/icon)
+ * and its screenshot (POST .../screenshot, the publish body, the node's own capture). Those doors
+ * check that the bytes are a picture; a generic write checks nothing about the bytes, and the icon
+ * and screenshot doors serve these keys to anybody from the node's own origin (A7-2).
+ */
+const APP_OWNED_KEYS: ReadonlyArray<{ prefix: string; holds: string; door: string }> = [
+    { prefix: 'apps/icons/', holds: 'icon image', door: 'icon' },
+    { prefix: 'apps/screenshots/', holds: 'screenshot', door: 'screenshot' },
+];
+
+/**
+ * Refuse a generic write to a key an app's own door owns. Exported for the upload doors that do not
+ * store through writeStorageFile (POST /v1/memory/files, the chunked upload), so every generic door
+ * refuses the same keys with the same answer.
+ *
+ * Writing only. Removing a file under these keys stays open to its owner through the generic DELETE,
+ * because the icon has no DELETE door of its own and a file that should not be there must be
+ * removable.
+ */
+export function appOwnedKeyRefusal(key: string): KeyRefusal | null {
+    const owned = APP_OWNED_KEYS.find(k => String(key ?? '').startsWith(k.prefix));
+    if (!owned) return null;
+    return {
+        ok: false, status: 403, code: 'FORBIDDEN',
+        message: `Keys under "${owned.prefix}" hold an app's ${owned.holds}. Only the app's own door writes `
+            + `them, because it checks that the bytes are a picture: POST /v1/apps/{owner}/{filename}/${owned.door}.`,
+    };
 }
 
 /**
@@ -131,7 +166,7 @@ export async function writeStorageFile(
 ): Promise<StorageFileWriteResult> {
     const { storage, config } = deps;
 
-    const fenced = checkKey(ownerGaii, input.key);
+    const fenced = checkKey(ownerGaii, input.key) ?? appOwnedKeyRefusal(input.key);
     if (fenced) return fenced;
 
     const visibility = input.visibility ?? 'private';
@@ -287,7 +322,7 @@ export async function mintStorageUploadUrl(
 ): Promise<StorageUploadUrlResult> {
     const { config } = deps;
 
-    const fenced = checkKey(ownerGaii, input.key);
+    const fenced = checkKey(ownerGaii, input.key) ?? appOwnedKeyRefusal(input.key);
     if (fenced) return fenced;
 
     // The operator's own setting, not a constant: a node configured for 50 MB used to mint 10 MB

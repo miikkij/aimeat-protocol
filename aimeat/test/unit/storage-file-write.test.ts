@@ -5,9 +5,11 @@
  *   overage charge that follows it (present on the HTTP door, absent on the tool, so the same upload
  *   was billed through one and free through the other), the anonymous key fence, and the presigned
  *   token meta, which used to drop `group_id` and land a group file bound to no group.
- * @structure Two describes: writeStorageFile() and mintStorageUploadUrl().
+ * @structure Three describes: writeStorageFile(), mintStorageUploadUrl() and removeStorageFile().
  * @usage cd aimeat && pnpm exec vitest run test/unit/storage-file-write.test.ts
  * @version-history
+ *   v1.1.0 — 2026-09-24 — A7-2: the write and the mint refuse an app's icon and screenshot keys;
+ *     removing a file under them still works.
  *   v1.0.0 — 2026-08-11 — Initial, with services/storage-file-write.ts (August 2026 audit step 8).
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
@@ -24,7 +26,7 @@ vi.mock('../../src/services/upload-token.js', async (importOriginal) => {
     return { ...actual, generateUploadToken };
 });
 
-const { writeStorageFile, mintStorageUploadUrl } = await import('../../src/services/storage-file-write.js');
+const { writeStorageFile, mintStorageUploadUrl, removeStorageFile } = await import('../../src/services/storage-file-write.js');
 
 const OWNER = 'bot#alice@test-node';
 const ANON = 'shared#anonymous@test-node';
@@ -125,6 +127,22 @@ describe('writeStorageFile', () => {
         const out = await writeStorageFile(deps, OWNER, { key: '', data: bytes(8) });
         expect(out).toMatchObject({ ok: false, status: 400, code: 'INVALID_INPUT' });
     });
+
+    // A7-2. The icon and screenshot doors check that the bytes are a picture; this door checked
+    // nothing about them, so `text/html` stored here under an app's icon key came back from the
+    // icon door as a page on the node's own origin.
+    it('refuses the keys that only an app\'s own doors write', async () => {
+        for (const key of ['apps/icons/demo.html', 'apps/screenshots/demo.html']) {
+            const out = await writeStorageFile(deps, OWNER, { key, data: Buffer.from('<h1>x</h1>'), mimeType: 'text/html' });
+            expect(out, key).toMatchObject({ ok: false, status: 403, code: 'FORBIDDEN' });
+        }
+        expect(createStorageFile).not.toHaveBeenCalled();
+    });
+
+    it('leaves the rest of apps/ to the caller', async () => {
+        const out = await writeStorageFile(deps, OWNER, { key: 'apps/notes/demo.txt', data: bytes(8), mimeType: 'text/plain' });
+        expect(out.ok).toBe(true);
+    });
 });
 
 describe('mintStorageUploadUrl', () => {
@@ -158,5 +176,28 @@ describe('mintStorageUploadUrl', () => {
     it('refuses an empty key', async () => {
         const out = await mintStorageUploadUrl(deps, OWNER, { key: '' });
         expect(out).toMatchObject({ ok: false, status: 400, code: 'INVALID_INPUT' });
+    });
+
+    it('refuses an app\'s icon and screenshot keys, so the URL is not a way around the write', async () => {
+        for (const key of ['apps/icons/demo.html', 'apps/screenshots/demo.html']) {
+            const out = await mintStorageUploadUrl(deps, OWNER, { key, mimeType: 'image/svg+xml' });
+            expect(out, key).toMatchObject({ ok: false, status: 403, code: 'FORBIDDEN' });
+        }
+        expect(generateUploadToken).not.toHaveBeenCalled();
+    });
+});
+
+describe('removeStorageFile', () => {
+    // Writing is fenced and removing is not: the owner can still clear a file that sits under an
+    // app's icon key, which is the only way to take an icon image away, since its door has no DELETE.
+    it('still lets the owner remove a file under an app\'s icon key', async () => {
+        const key = 'apps/icons/demo.html';
+        const file = { key, ownerGaii: OWNER, size: 3, mimeType: 'text/html', visibility: 'public' } as StorageFileRecord;
+        const own = {
+            getStorageFile: vi.fn(async () => file),
+            deleteStorageFile: vi.fn(async () => true),
+        } as unknown as Storage;
+        const out = await removeStorageFile({ storage: own, config }, OWNER, key);
+        expect(out).toMatchObject({ ok: true, key });
     });
 });

@@ -17,6 +17,8 @@
  *   import { storageChunkedUploadRouter } from './storage-files-chunked.js';
  *   router.use(storageChunkedUploadRouter(config, storage));   // before the wildcard routes
  * @version-history
+ *   v1.2.0 -- 2026-09-24 -- Init refuses an app's icon and screenshot keys with 403, through the same
+ *     appOwnedKeyRefusal() as POST /v1/storage (A7-2).
  *   v1.1.0 -- 2026-09-13 -- The complete answer carries owner_gaii and versioned_url, like every
  *     other storage upload answer (AIMEAT.storage.uploadChunked had neither).
  *   v1.0.0 -- 2026-09-08 -- Extracted from routes/storage-files.ts, unchanged.
@@ -29,6 +31,7 @@ import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { checkStorageQuota, chargeOverage } from '../services/quota.js';
+import { appOwnedKeyRefusal } from '../services/storage-file-write.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
 import { ChunkedUploadInitSchema, validateBody } from '../models/schemas.js';
 import { randomBytes } from 'node:crypto';
@@ -61,6 +64,13 @@ export function storageChunkedUploadRouter(config: AimeatConfig, storage: Storag
         // Anonymous namespace enforcement
         if (isAnonymousGaii(gaii) && !key.startsWith('anonymous/')) {
             res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Anonymous agents can only upload to keys prefixed with "anonymous/"'));
+            return;
+        }
+        // An app's icon and screenshot keys belong to the app's own doors (A7-2). Refused here, at
+        // the start of the session, rather than at complete, when the chunks are already in.
+        const owned = appOwnedKeyRefusal(String(key));
+        if (owned) {
+            res.status(owned.status).json(error(config.nodeId, owned.code, owned.message));
             return;
         }
 
