@@ -568,7 +568,7 @@ export const BUILT = {
   'small-link': { commit: '5a287a9a3', onMain: true, date: '2026-09-24',
     what: '"Use your own key", "Powered by goose", "Official instructions" and "Show older" are small coral underlined words; "What does that mean?" and the jump keep their looks as tones.',
     sets: [set(HOME_CHAT, 150, 42), set(FORCED, 72, 36), set(OTHER, 126, 6, 14), set(LAB, 68, 10)] },
-  'dialog-actions': { commit: '350d5c91e', onMain: false, date: '2026-09-24',
+  'dialog-actions': { commit: '350d5c91e and 203bd4ba9', onMain: true, date: '2026-09-24',
     what: 'In every dialog, the app catalog\'s too, a way out or a side door is the underlined action link, the one "do it" the dark block, and a delete the dark block\'s coral tone. The footers drew 10 different looks before and 3 after. "Change password…" at the start of the Edit profile footer became the action link too (your answer).',
     sets: [set('Ten dialogs opened on their pages, whole and footer, two widths, both modes', 88, 88),
       set('"Change password…": the Edit profile dialog, whole and footer, two widths, both modes', 8, 8),
