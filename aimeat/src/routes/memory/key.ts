@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description Per-key memory routes: GET/DELETE/PUT /v1/memory/:key, CORS management, and the public GET /v1/memory/:gaii/:key read. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.6.1 — 2026-09-24 — POST /v1/memory/:key/restore carries workspaceAccess as the delete does,
+ *     hands the service the caller's roles, and says the service's organism or append-only refusal
+ *     as it is instead of as NOT_RESTORABLE (A6-12).
  *   v1.6.0 — 2026-09-24 — PUT refuses a key only the node writes (`__redirect__`) with RESERVED_KEY,
  *     whoever asks.
  *   v1.5.1 — 2026-09-24 — The federated test is isForeignPrincipal(), the one question (secaudit 2026-09, F-1).
@@ -255,7 +258,10 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
   // `memory:write`, not `memory:delete`: restoring puts a record back into the working set, which is
   // a write. An agent trusted to remove things is not automatically trusted to make them reappear,
   // and the person who has to live with the record is the one whose scope should say so.
-  router.post('/v1/memory/:key/restore', requireAuth(), requireExternalPrincipal(), requireScope('memory:write'), async (req, res) => {
+  //
+  // `workspaceAccess` as on the delete beside it: putting a record back into an organism namespace
+  // is a write there, so the caller must still be allowed to write it (A6-12).
+  router.post('/v1/memory/:key/restore', requireAuth(), requireExternalPrincipal(), requireScope('memory:write'), workspaceAccess, async (req, res) => {
     const gaii = resolve(req);
     const key = decodeURIComponent(req.params.key as string);
     const out = await restoreMemoryRecord({ storage, config }, {
@@ -263,13 +269,20 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
       // Same reach as the delete beside it, and for the same reason: whoever could remove a
       // sibling's key has to be able to put it back, or the undo is narrower than the act.
       ownerScope: (req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent')) || req.query.owner_scope === 'true',
+      // The organism namespace rule inside the service reads the roles, as the delete's does.
+      roles: req.auth!.roles,
     });
-    const restored = out.ok;
-    if (!restored) {
-      // ONE REFUSAL FOR THREE CAUSES, said as the one thing a person can act on. It was never
-      // deleted, it was never yours, or the window closed and it is genuinely gone — and the node
-      // cannot tell the first two apart without turning this route into a way to ask whether
-      // somebody else's key exists.
+    if (!out.ok) {
+      // A refusal about the key and the caller (the organism rule, the append-only guard) is said
+      // as it is: it tells nothing about whether a record exists. Everything else is ONE REFUSAL FOR
+      // THREE CAUSES, said as the one thing a person can act on. It was never deleted, it was never
+      // yours, or the window closed and it is genuinely gone — and the node cannot tell the first
+      // two apart without turning this route into a way to ask whether somebody else's key exists.
+      if (out.code !== 'NOT_RESTORABLE') {
+        res.status(out.status ?? 404).json(error(config.nodeId, out.code, out.message,
+          out.status ?? 404, out.violations ? { violations: out.violations } : undefined));
+        return;
+      }
       res.status(404).json(error(config.nodeId, 'NOT_RESTORABLE',
         'There is nothing of that name waiting to be put back. Either it was never deleted, or it has already been removed for good.'));
       return;

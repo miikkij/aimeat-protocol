@@ -18,6 +18,9 @@
  * @structure adminMemoryRouter · search · list · one record · delete · restore
  * @usage mounted by server-bootstrap/routes-loader.ts
  * @version-history
+ *   v2.1.1 — 2026-09-24 — The operator's restore hands the service the operator's roles, as the delete
+ *     does, and answers the service's own status: restore asks the organism namespace rule and the
+ *     append-only guard now (A6-12), and without the roles the override was not an override.
  *   v2.1.0 — 2026-09-16 — The record read and the search excerpt show a credential record redacted:
  *     the operator saw another owner's Stripe key ciphertext, or a legacy key in plain text.
  *   v2.0.0 — 2026-09-12 — The page rebuilt around the question. GET /search (node-wide FTS with an
@@ -340,9 +343,12 @@ export function adminMemoryRouter(
             ownerName: req.auth!.owner,
             key: req.params.key as string,
             ownerOverride: ownerGaii,
+            // As the delete above: the operator's override skips the organism membership check,
+            // and the append-only guard still holds, now that restore asks both (A6-12).
+            roles: req.auth!.roles,
         });
         if (!out.ok) {
-            res.status(404).json(error(config.nodeId, out.code, out.message));
+            res.status(out.status ?? 404).json(error(config.nodeId, out.code, out.message));
             return;
         }
         res.json(success(config.nodeId, { restored: true, owner_gaii: out.ownerGaii, key: out.key }));

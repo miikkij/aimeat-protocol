@@ -17,9 +17,13 @@
  *   read; `services/memory-bin-sweep.ts` removes it once `memoryDeleteGraceDays` has passed. This
  *   node had no delete at all before 2026-09-03 — a value could be emptied, never removed — and the
  *   grace window is how that principle survives having one.
- * @structure MemoryBinRefusal · deleteMemoryRecord() · restoreMemoryRecord()
+ * @structure MemoryBinRefusal · binRefusal() · deleteMemoryRecord() · restoreMemoryRecord()
  * @usage const out = await deleteMemoryRecord({ storage, config }, { caller, ownerName, key });
  * @version-history
+ *   v1.1.0 — 2026-09-24 — Restore asks the two refusals delete asks (A6-12), through one binRefusal():
+ *     the organism namespace rule and the append-only guard. It asked neither, so a member who had
+ *     left an organism put their own record back into it, and a record binned before its space
+ *     became append-only could be put back past the space's write path.
  *   v1.0.0 — 2026-09-03 — Initial, with the delete and restore it exists to hold.
  */
 import type { AimeatConfig } from '../config.js';
@@ -84,17 +88,20 @@ async function locate(
 }
 
 /**
- * Into the bin. Answers with the moment it stops being takeable back, which is the one thing a
- * person needs after pressing delete and the one thing a "deleted: true" never told them.
+ * What the bin refuses before it looks for anything, on the way in AND on the way out: the organism
+ * namespace rule and the append-only guard. Both are about the key and the caller, never about
+ * whether the record exists, so answering them first says nothing about somebody else's key.
+ *
+ * BOTH REFUSALS BELONG HERE, NOT ON ONE DOOR. DELETE /v1/memory/:key ran the organism namespace
+ * check as middleware and the append-only write guard inline, and `aimeat_memory_delete` ran
+ * neither: it called this function straight and this function asked nothing. So the MCP tool
+ * removed a `.latest` or `.version` event out of a workspace whose manifest says create_only, and
+ * reached an organism namespace the REST door would have refused. Found by the AI triage of
+ * 2026-09-13. And restore asked neither (A6-12), though putting a record back is a write into the
+ * same namespace: a member who had left an organism put their record back into it, and a record
+ * binned before its space became append-only could be put back past the space's write path.
  */
-export async function deleteMemoryRecord(deps: MemoryBinDeps, req: MemoryBinRequest): Promise<MemoryBinOutcome> {
-  // BOTH REFUSALS BELONG HERE, NOT ON ONE DOOR. DELETE /v1/memory/:key ran the organism namespace
-  // check as middleware and the append-only write guard inline, and `aimeat_memory_delete` ran
-  // neither: it called this function straight and this function asked nothing. So the MCP tool
-  // removed a `.latest` or `.version` event out of a workspace whose manifest says create_only, and
-  // reached an organism namespace the REST door would have refused. Found by the AI triage of
-  // 2026-09-13. This file's own header already said why they belong here — "the tools bring
-  // parameters and this brings the rules" — and these two rules had not arrived yet.
+async function binRefusal(deps: MemoryBinDeps, req: MemoryBinRequest, act: 'delete' | 'restore'): Promise<MemoryBinRefusal | null> {
   const operatorOverride = !!req.ownerOverride && (req.roles ?? []).includes('operator');
   if (!operatorOverride) {
     const denied = await checkOrganismNamespaceAccess(deps, {
@@ -104,15 +111,28 @@ export async function deleteMemoryRecord(deps: MemoryBinDeps, req: MemoryBinRequ
   }
 
   // An append-only workspace namespace refuses .latest/.version deletes on every path — existing
-  // events can never be erased, and that holds for an operator too.
+  // events can never be erased, and that holds for an operator too. Its records are not put back
+  // through the bin either: what enters an append-only space enters by its own write path.
   const guard = await checkDeleteGuard(req.key, deps.storage);
   if (!guard.valid) {
     return {
       ok: false, code: 'WRITE_CONFLICT', status: 409,
-      message: guard.errors?.[0]?.message ?? 'Delete refused by the workspace write guard',
+      message: act === 'delete'
+        ? guard.errors?.[0]?.message ?? 'Delete refused by the workspace write guard'
+        : 'This record belongs to an append-only space, and a record there is not put back through the bin: it enters by the space\'s own write path.',
       violations: guard.errors,
     };
   }
+  return null;
+}
+
+/**
+ * Into the bin. Answers with the moment it stops being takeable back, which is the one thing a
+ * person needs after pressing delete and the one thing a "deleted: true" never told them.
+ */
+export async function deleteMemoryRecord(deps: MemoryBinDeps, req: MemoryBinRequest): Promise<MemoryBinOutcome> {
+  const refused = await binRefusal(deps, req, 'delete');
+  if (refused) return refused;
 
   const found = await locate(deps, req, async gaii => !!(await deps.storage.getMemory(gaii, req.key)));
   if (!found) {
@@ -142,6 +162,10 @@ export async function deleteMemoryRecord(deps: MemoryBinDeps, req: MemoryBinRequ
  * do next — so the sentence names it.
  */
 export async function restoreMemoryRecord(deps: MemoryBinDeps, req: MemoryBinRequest): Promise<MemoryBinOutcome> {
+  // The same two refusals as the delete, asked before the bin is even read (binRefusal says why).
+  const refused = await binRefusal(deps, req, 'restore');
+  if (refused) return refused;
+
   // The bin is invisible to getMemory by design, so "is it in there" is a bin read, not a key read.
   const inBin = async (gaii: string) => (await deps.storage.listDeletedMemory(gaii)).some(r => r.key === req.key);
   const found = await locate(deps, req, inBin);
