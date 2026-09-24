@@ -41,6 +41,10 @@
  *   500, the verified:false pin, per-peer scopes) · 9 cleanup.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-federated-session
  * @version-history
+ *   v1.3.0 — 2026-09-24 — A pull writes memory, so it costs memory:write and runs the memory write
+ *     rules: the memory:read visitor is refused before its home node is asked, and a visitor signed
+ *     in after the peer record grants memory:write pulls. A credential record and `__redirect__`
+ *     are refused to that visitor too.
  *   v1.2.0 — 2026-09-24 — The minted session is a VISITOR: role 'federated' and the home GHII as
  *     `sub` and `owner`. The claims test asserted roles ['owner'] and the bare local part, which is
  *     the shape a local account can share (secaudit 2026-09, root cause F-1).
@@ -143,6 +147,8 @@ const NO_VALUE_KEY = 'home.valueless';
 
 let ownerToken = '';
 let fedToken = '';
+/** A visitor session holding memory:write, minted after the peer record grants it (Phase 4). */
+let writerToken = '';
 let deadFedToken = '';
 let homeUrl = '';
 let homeKeys = { publicKey: '', privateKey: '' };
@@ -418,11 +424,51 @@ async function run() {
     // ─── Phase 4: pull ───
     console.log('Phase 4 — pull');
 
+    // Pulling WRITES a record here, and the visitor's scope list is this node's grant. A memory:read
+    // visitor pulled until 2026-09-24: the pull wrote with storage.setMemory and asked for nothing.
+    await test('a visitor holding memory:read cannot pull, because a pull writes memory; the home node is not asked', async () => {
+        doorMode = 'ok';
+        const asked = memoryPaths.length;
+        const { status, body } = await json('/v1/memory/pull', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${fedToken}` },
+            body: JSON.stringify({ key: PULL_KEY }),
+        });
+        assert(status === 403 && body.error?.code === 'SCOPE_DENIED', `a memory:read visitor pulling: ${status} ${JSON.stringify(body.error ?? body.data)}`);
+        assert(memoryPaths.length === asked, `the home node must not be asked, got ${memoryPaths.length - asked} request(s)`);
+        const local = await json(`/v1/memory/${encodeURIComponent(PULL_KEY)}`, { headers: { Authorization: `Bearer ${fedToken}` } });
+        assert(local.status === 404, `nothing landed: ${local.status}`);
+    });
+
+    await test('the home node\'s peer record grants memory:write, and a visitor signed in again carries it', async () => {
+        const put = await json(`/v1/federation/peers/${homeNodeId}`, {
+            method: 'PUT',
+            headers: { Authorization: `Bearer ${ownerToken}` },
+            body: JSON.stringify({ federation_auth_scopes: ['memory:read', 'memory:write', 'catalogue:read'] }),
+        });
+        assert(put.status === 200, `set the peer's scopes: ${put.status} ${JSON.stringify(put.body)}`);
+        const login = await federatedLogin(homeNodeId);
+        assert(login.status === 200, `login: ${login.status} ${JSON.stringify(login.body)}`);
+        writerToken = login.body.data.token;
+        assert(claims(writerToken).scopes.includes('memory:write'), `scopes: ${JSON.stringify(claims(writerToken).scopes)}`);
+    });
+
+    await test('a pull writes the way POST /v1/memory writes: a credential record and a key only the node writes are refused', async () => {
+        for (const [key, code] of [['openrouter.apikey', 'SECRET_RECORD'], ['__redirect__', 'RESERVED_KEY']] as const) {
+            const { status, body } = await json('/v1/memory/pull', {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${writerToken}` },
+                body: JSON.stringify({ key }),
+            });
+            assert(status === 403 && body.error?.code === code, `${key}: expected 403 ${code}, got ${status} ${JSON.stringify(body.error ?? body.data)}`);
+        }
+    });
+
     await test('POST /v1/memory/pull — the record is fetched from home and lands here', async () => {
         doorMode = 'ok';
         const { status, body } = await json('/v1/memory/pull', {
             method: 'POST',
-            headers: { Authorization: `Bearer ${fedToken}` },
+            headers: { Authorization: `Bearer ${writerToken}` },
             body: JSON.stringify({ key: PULL_KEY }),
         });
         assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
@@ -454,7 +500,7 @@ async function run() {
     await test('a second pull bumps the version and does not duplicate the source tag', async () => {
         const { status } = await json('/v1/memory/pull', {
             method: 'POST',
-            headers: { Authorization: `Bearer ${fedToken}` },
+            headers: { Authorization: `Bearer ${writerToken}` },
             body: JSON.stringify({ key: PULL_KEY }),
         });
         assert(status === 200, `second pull ${status}`);
@@ -583,7 +629,7 @@ async function run() {
         for (const path of ['/v1/memory/pull', '/v1/memory/push-home']) {
             const { status, body } = await json(path, {
                 method: 'POST',
-                headers: { Authorization: `Bearer ${fedToken}` },
+                headers: { Authorization: `Bearer ${writerToken}` },
                 body: JSON.stringify({}),
             });
             assert(status === 400, `${path} without a key: ${status} ${JSON.stringify(body)}`);
@@ -607,7 +653,7 @@ async function run() {
     await test('a 200 from home carrying no value is a NOT_FOUND, not a write of undefined', async () => {
         const { status, body } = await json('/v1/memory/pull', {
             method: 'POST',
-            headers: { Authorization: `Bearer ${fedToken}` },
+            headers: { Authorization: `Bearer ${writerToken}` },
             body: JSON.stringify({ key: NO_VALUE_KEY }),
         });
         assert(status === 404, `status ${status}: ${JSON.stringify(body)}`);
@@ -622,7 +668,7 @@ async function run() {
         doorMode = 'fail';
         const pull = await json('/v1/memory/pull', {
             method: 'POST',
-            headers: { Authorization: `Bearer ${fedToken}` },
+            headers: { Authorization: `Bearer ${writerToken}` },
             body: JSON.stringify({ key: PULL_KEY }),
         });
         assert(pull.status === 500, `pull ${pull.status}: ${JSON.stringify(pull.body)}`);
