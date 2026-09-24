@@ -95,6 +95,7 @@
     "no-twin:PATCH /v1/templates/:id": "NOT YET REVIEWED. Seeded 2026-09-14: the door reads record fields (category, screenshots) and no agent tool does the same job.",
     "no-twin:PATCH /v1/templates/:id/featured": "NOT YET REVIEWED. Seeded 2026-09-14: the door reads record fields (featured) and no agent tool does the same job.",
     "no-twin:POST /acp/v1/checkout_sessions": "NOT YET REVIEWED. Seeded 2026-09-14: the door reads record fields (items) and no agent tool does the same job.",
+    "no-twin:GET /local/stats": "Not a record and not the node. The connector daemon's own introspection on 127.0.0.1, read by `aimeat connect tui`; `since` is the feed sequence the reader already holds, not a record field, and nothing is stored. An agent has no use for a twin: it would be reading the process it runs in. Reviewed 2026-09-24 when the route was added.",
     "no-twin:POST /local/invoke/:id/result": "NOT YET REVIEWED. Seeded 2026-09-14: the door reads record fields (result) and no agent tool does the same job.",
     "no-twin:POST /ucp/v1/checkout-sessions": "NOT YET REVIEWED. Seeded 2026-09-14: the door reads record fields (currency) and no agent tool does the same job.",
     "no-twin:POST /v1/access/tokens": "NOT YET REVIEWED. Seeded 2026-09-14: the door reads record fields (grant_operator, grant_owner, label, read_owner_data) and no agent tool does the same job.",
