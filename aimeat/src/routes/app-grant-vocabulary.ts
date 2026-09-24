@@ -9,6 +9,9 @@
  * @structure APP_GRANTABLE_SCOPES — the one list, keyed by scope word.
  * @usage import { APP_GRANTABLE_SCOPES } from './app-grant-vocabulary.js';
  * @version-history
+ *   v1.4.0 -- 2026-09-24 -- connections:read-through, reading what is in a connected account, and
+ *     connections:use says what it does: publish and send. The one word used to open the mailbox
+ *     too while the consent screen said "publish" (security audit A5-1).
  *   v1.3.0 -- 2026-09-07 -- Document the enforced publishing scope and existing migration.
  *   v1.2.0 -- 2026-09-06 -- secrets:manage: the owner's credential vault, askable by an app.
  *   v1.1.0 -- 2026-08-29 -- organism:rows: the person's half of the two-hand rule that lets an app
@@ -56,7 +59,11 @@ export const APP_GRANTABLE_SCOPES: Record<string, string> = {
   // TARGET-057. Deliberately NOT connections:write: an app that may publish to an account you
   // already connected is a different favour from one that may attach new accounts to your name.
   // Attaching is a human act at the provider's own consent screen and no app performs it.
-  'connections:use': 'Publish to accounts you have already connected (never see or change the accounts themselves)',
+  'connections:use': 'Publish and send through accounts you have already connected (never read what is in them, never change the accounts)',
+  // Reading what is IN a connected account (a mailbox, its attachments, its send-as addresses) is its
+  // own favour and its own tick. It rode connections:use until 2026-09-24, so an app the owner
+  // allowed to publish could read their mail. Grants made before then were not given this word.
+  'connections:read-through': 'Read what is in accounts you have already connected: your mail, its attachments and the addresses you send from',
   // TARGET-058. Recording what the node OBSERVED needs no permission — that happens whether anyone
   // asks or not. Asserting how content was made is different: a declaration can say a person wrote
   // or reviewed something, which is exactly the statement that decides whether a visible AI label is

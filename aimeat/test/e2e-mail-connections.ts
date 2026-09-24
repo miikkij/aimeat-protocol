@@ -20,6 +20,11 @@
  *   dead connection gives
  * @usage cd aimeat && node --import tsx test/e2e-mail-connections.ts
  * @version-history
+ *   v1.1.0 — 2026-09-24 — Phase 14 pinned the wrong favour (security audit A5-1). It asserted that an
+ *     app holding connections:use reads the mailbox, while the owner was told that word publishes
+ *     and nothing else. Reading through a connection is connections:read-through now: an app holding
+ *     only connections:use is refused the read door, and an app granted the read word names a
+ *     connection and reads through it.
  *   v1.0.0 — 2026-09-08 — Initial.
  */
 import { randomBytes, createHash } from 'node:crypto';
@@ -656,17 +661,28 @@ try {
     });
     assert(r.status === 200 && r.data.data.status === 'sent', `${r.status} ${JSON.stringify(r.data?.error)}`);
   });
-  await test('an app holding connections:use can name a connection AND read through it', async () => {
+  await test('an app holding connections:use can name a connection, and is refused the mailbox', async () => {
+    // The owner was told this word publishes to the accounts they connected and nothing else.
     const appToken = await grantAppToken(jwt, owner, ['connections:use']);
     const list = await api('/v1/connections', { method: 'GET', bearer: appToken });
     assert(list.status === 200, `an app that may publish cannot name a connection: ${list.status}`);
     const r = await readVia(appToken, gmailRead, 'messages', {});
+    assert(r.status === 403 && r.data?.error?.code === 'SCOPE_DENIED',
+      `an app granted publishing read the mailbox: ${r.status} ${r.data?.error?.code}`);
+  });
+  await test('an app granted connections:read-through names a connection and reads through it', async () => {
+    const appToken = await grantAppToken(jwt, owner, ['connections:read-through']);
+    const list = await api('/v1/connections', { method: 'GET', bearer: appToken });
+    assert(list.status === 200, `an app that may read through a connection cannot name one: ${list.status}`);
+    const r = await readVia(appToken, gmailRead, 'messages', {});
     assert(r.status === 200, `${r.status} ${r.data?.error?.message}`);
+    const publish = await api('/v1/connections/publish', { bearer: appToken, body: { connection_id: xConn, caption: 'no' } });
+    assert(publish.status === 403, `the read word published as well: ${publish.status}`);
   });
   await test('an app holding neither word cannot read a mailbox', async () => {
     const appToken = await grantAppToken(jwt, owner, ['memory:read']);
     const r = await readVia(appToken, gmailRead, 'messages', {});
-    assert(r.status === 403, `the mailbox was read without connections:use: ${r.status}`);
+    assert(r.status === 403, `the mailbox was read without connections:read-through: ${r.status}`);
   });
   await test('connections:read is not a word an app may ask for at all', async () => {
     // TODAY'S BEHAVIOUR, asserted rather than assumed. APP_GRANTABLE_SCOPES

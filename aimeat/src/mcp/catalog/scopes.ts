@@ -21,6 +21,8 @@
  *   import { scopeAllowsTool } from '../catalog/scopes.js';
  *   if (scopeAllowsTool(agentScopes, 'aimeat_memory_write')) mcp.tool(...)
  * @version-history
+ *   v1.27.0 -- 2026-09-24 -- SECURITY (audit A5-1): aimeat_mail_search, aimeat_mail_read and
+ *     aimeat_mail_aliases ride connections:read-through instead of connections:use.
  *   v1.26.0 -- 2026-09-24 -- SECURITY (audit A8-1): the node administration block leaves
  *     SCOPE_EXEMPT_TOOLS for operator:admin, outside every wildcard: the 24 aimeat_admin_* tools that
  *     had no word, the MCP registry pair and the SEO pair (from app:write). aimeat_surface_layout_get
@@ -287,10 +289,10 @@ export const TOOL_SCOPES: Record<string, string> = {
     // Removes a stored record.
     aimeat_workspace_object_delete:           'memory:delete',
 
-    // Outbound connections. Three words, and the distinction between them is the design: READING the
-  // list of accounts you attached is knowing what you have, STARTING one is attaching another, and
-  // reading or sending THROUGH one is spending it. An app granted only the first must not be able
-  // to open the mailbox.
+    // Outbound connections. Four words, and the distinction between them is the design: READING the
+  // list of accounts you attached is knowing what you have, STARTING one is attaching another,
+  // publishing and sending THROUGH one is `use`, and reading what is IN one is `read-through`. An
+  // app granted the first, or the third, must not be able to open the mailbox.
   aimeat_connection_start:                  'connections:write',
   // Sending needs `connections:use` AND `outbound:send`; the tool is not registered without both,
   // so a session holding one never sees a control whose only possible answer is a refusal. This map
@@ -621,13 +623,14 @@ export const TOOL_SCOPES: Record<string, string> = {
     aimeat_contact_invite: 'messages:send',
 
     // Outbound connections, read side. `connections:read` is knowing WHAT you attached;
-    // `connections:use` is spending it, which is what reaching into a mailbox actually is. An app
-    // granted only the first must not be able to read the mail — that split is why there are two
-    // words rather than one, and it is enforced identically on the REST door.
+    // `connections:read-through` is reading what is IN one: the mailbox, its attachments, its send-as
+    // addresses. It rode `connections:use`, the publish-and-send word, until 2026-09-24, so a grant
+    // made for publishing opened the mail (security audit A5-1). Enforced identically on the REST
+    // door, POST /v1/connections/:id/read/:resource, which the connector and CLI tools call.
     aimeat_connection_list: 'connections:read',
-    aimeat_mail_search: 'connections:use',
-    aimeat_mail_read: 'connections:use',
-    aimeat_mail_aliases: 'connections:use',
+    aimeat_mail_search: 'connections:read-through',
+    aimeat_mail_read: 'connections:read-through',
+    aimeat_mail_aliases: 'connections:read-through',
 
     // Remote MCP servers. The same three-way split as connections above, and for the same reason:
     // knowing WHICH servers are attached, calling a tool THROUGH one, and attaching another are

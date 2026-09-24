@@ -18,6 +18,9 @@
  *   const checked = expandScopes(agent.default_scopes ?? ['*']);
  *   await save(collapseScopes(checked));
  * @version-history
+ *   v1.14.0 — 2026-09-24 — connections:read-through: reading what is in a connected account (a
+ *     mailbox, its attachments, its send-as addresses). It rode connections:use, which the box
+ *     describes as publishing and sending (security audit A5-1).
  *   v1.13.0 — 2026-09-24 — operator:admin, outside every wildcard: node administration through an
  *     agent (the admin tools, the MCP registry, the SEO pair). Only an operator's own agent can be
  *     given it at all, and nobody was grandfathered onto it (security audit A8-1).
@@ -217,7 +220,9 @@ export const SCOPE_DOMAINS = [
   // apart from write so an agent can run a campaign's counters without being handed the readers.
   { key: 'signals',   permissions: ['read', 'write'] },
   { key: 'company',   permissions: ['read', 'write'] },
-  { key: 'connections', permissions: ['read', 'write', 'use'] },
+  // connections:use publishes and sends THROUGH an account; connections:read-through reads what is
+  // IN one, the mailbox included. Two favours, two boxes, since 2026-09-24.
+  { key: 'connections', permissions: ['read', 'write', 'use', 'read-through'] },
   // The other MCP servers this account has attached — an issue tracker, a wiki, whatever the
   // person connected. Three words for the same reason connections has three: knowing WHICH servers
   // are attached, calling a tool THROUGH one, and attaching another are three different favours.
