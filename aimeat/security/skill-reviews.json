@@ -184,13 +184,13 @@
       "digest": "sha256:03e6a1ea7cae56de132ca606"
     },
     "node:aimeat-node-guide": {
-      "reviewedOn": "2026-09-19",
+      "reviewedOn": "2026-09-24",
       "watches": [
         "aimeat/src/routes/agents/device-auth.ts",
         "aimeat/src/routes/ghii/register-login.ts",
         "aimeat/src/services/first-steps.ts"
       ],
-      "digest": "sha256:857553632458c55dad15e7f4"
+      "digest": "sha256:c98a69659770428c6bd6ce8c"
     },
     "node:ai-transparency": {
       "reviewedOn": "2026-09-19",
@@ -223,7 +223,7 @@
       "digest": "sha256:184fb3a1ed1959b0032a449a"
     },
     "node:add-a-crew-agent": {
-      "reviewedOn": "2026-09-20",
+      "reviewedOn": "2026-09-24",
       "watches": [
         "aimeat/src/routes/agents/device-auth.ts",
         "aimeat/src/mcp/catalog/scopes.ts",
@@ -231,7 +231,7 @@
         "aimeat/src/routes/agents-v2/agent-proposals.ts",
         "aimeat/src/data/basic-agents.ts"
       ],
-      "digest": "sha256:c8506e2c834cf6c0a4f21ee3"
+      "digest": "sha256:f29846286f285dde713ecefe"
     },
     "node:set-up-content-pipeline": {
       "reviewedOn": "2026-09-19",
@@ -438,8 +438,8 @@
       "aimeat/src/static/sdk-libs/phaser/chiptune.js": "4305c95f9370f982"
     },
     "node:aimeat-node-guide": {
-      "aimeat/src/routes/agents/device-auth.ts": "7d37b0bbc2105613",
-      "aimeat/src/routes/ghii/register-login.ts": "ec36d3ac666da6f1",
+      "aimeat/src/routes/agents/device-auth.ts": "1cf5d3f6b45c5cb9",
+      "aimeat/src/routes/ghii/register-login.ts": "5b394a0c41435277",
       "aimeat/src/services/first-steps.ts": "8b9905de90360fa2"
     },
     "node:ai-transparency": {
@@ -457,7 +457,7 @@
       "aimeat/src/routes/memory/shared.ts": "b91f8414d40a59c6"
     },
     "node:add-a-crew-agent": {
-      "aimeat/src/routes/agents/device-auth.ts": "7d37b0bbc2105613",
+      "aimeat/src/routes/agents/device-auth.ts": "1cf5d3f6b45c5cb9",
       "aimeat/src/mcp/catalog/scopes.ts": "07aab1f422b7a9e9",
       "aimeat/src/mcp/catalog/definitions/crew.ts": "f18f927aad1a04d6",
       "aimeat/src/routes/agents-v2/agent-proposals.ts": "1da72b752ee164bc",
