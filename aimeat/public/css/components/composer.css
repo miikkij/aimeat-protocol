@@ -8,6 +8,7 @@
  * @usage Linked from public/spa.html in the component block, whose order keeps the order these
  *   rules had when they were one sheet.
  * @version-history
+ *   v1.2.0 — 2026-09-24 — The attachment and the field read the theme's shape values (a move).
  *   v1.1.0 — 2026-09-24 — The tools are the icon button; only their place stays here.
  *   v1.0.0 — 2026-09-23 — Moved unchanged from css/parts*.css (UI consolidation phase 1, a move).
  */
@@ -19,7 +20,8 @@
   align-items: center;
   gap: 6px;
   padding: 3px 6px;
-  border: 2px solid var(--text);
+  border: var(--shape-frame) solid var(--shape-rule-colour);
+  border-radius: var(--shape-corner-control);
   background: var(--bg-surface);
   font-size: var(--text-caption);
   font-weight: var(--weight-semibold);
@@ -57,8 +59,8 @@
   max-height: 200px;
   padding: 8px 0;
   border: 0;
-  border-bottom: 3px solid var(--text);
-  border-radius: 0;
+  border-bottom: var(--shape-frame-heavy) solid var(--shape-field-colour);
+  border-radius: var(--shape-corner-control);
   background: transparent;
   color: inherit;
   font: inherit;

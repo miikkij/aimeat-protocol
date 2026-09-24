@@ -40,6 +40,7 @@ export function registerThemeTools(mcp: McpServer, registry: AgentRegistry): voi
     name: z.string().max(60).optional().describe('What people see in the pill. 1 to 60 characters, and no other theme may have it (retired ones included).'),
     basedOn: z.string().max(40).optional().describe("For a new theme: the theme it copies (default 'aimeat')."),
     css: z.string().max(64000).optional().describe('Theme CSS for the whole theme; empty removes it.'),
+    shapes: z.record(z.string(), z.string().max(200)).optional().describe("The theme's shape values (corners, frames, shadows, letter case), only the ones you change; an empty value puts the built-in one back. aimeat_theme_list names them."),
     defaultStyle: z.string().max(40).optional().describe('The style a person sees first in this theme.'),
     offeredStyles: z.array(z.string().max(40)).max(40).optional().describe('The style ids of this theme the pill offers.'),
     retired: z.boolean().optional().describe('true takes the theme out of the pill; false brings it back.'),

@@ -12,7 +12,10 @@
    @usage Loaded first in spa.html <head>; the theme is toggled by /js/theme.js
      which flips the data-theme attribute on <html>.
    @version-history
-     v1.40.0 — 2026-09-14 — The toast wears the poster face: square, 3px ink frame on the card ground, a solid
+     v1.41.0 — 2026-09-24 — The shape tokens (--shape-corner…, --shape-frame…, --shape-shadow…,
+       --shape-case…): the poster's corners, frames, shadows and letter case as values a theme sets,
+       with today's values, read by the component sheets (a move).
+     v1.40.0 — 2026-09-14 —The toast wears the poster face: square, 3px ink frame on the card ground, a solid
        6px offset shadow (sun, coral for a failure, ink under the warning's sun ground) and a ✓ or ✗ in front.
        The green, red and blue pill tokens (--toast-*) leave; nothing else read them. .toast-hold keeps a
        message up for six seconds.
@@ -202,6 +205,33 @@
   --radius-xs: 6px;
   --radius-xl: 20px;
   --radius-full: 9999px;
+
+  /* Shapes (07 "New components follow the theme", 2026-09-24): the corners, frames, shadows and
+     letter case every component sheet reads, so a theme changes them once and a component added
+     later follows it. These are the built-in theme's values, today's poster shapes; a theme's own
+     come in its sheet (Themes & Styles, aimeat_theme_save `shapes`). The server reads this block
+     for the built-in values (src/services/themes/shapes.ts), so a value changes here and nowhere
+     else. Colour values name a style's token, so they follow light, dark and every style. */
+  --shape-corner: 0;
+  --shape-corner-control: 0;
+  --shape-corner-pill: 0;
+  --shape-corner-dialog: 0;
+  --shape-frame: 2px;
+  --shape-frame-heavy: 3px;
+  --shape-frame-colour: var(--text);
+  --shape-rule-colour: var(--text);
+  --shape-field-colour: var(--text);
+  --shape-shadow: none;
+  --shape-shadow-raised: 8px 8px 0 var(--sun);
+  --shape-shadow-dialog: 12px 12px 0 var(--sun);
+  --shape-shadow-action: 4px 4px 0 var(--sun);
+  --shape-shadow-action-pressed: 2px 2px 0 var(--sun);
+  --shape-shadow-chosen: 4px 4px 0 var(--text);
+  --shape-case-heading: uppercase;
+  --shape-case-action: uppercase;
+  --shape-tracking-action: .04em;
+  --shape-case-label: uppercase;
+  --shape-tracking-label: .1em;
 
   /* Typography.
      THE DESIGN LANGUAGE IS WRITTEN DOWN ONCE: skill `aimeat-design-language` (in this repo under

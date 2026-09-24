@@ -2,9 +2,10 @@
  * @file public/views/admin/themes-theme.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description One theme in Themes & Styles, opened: its name, and four tabs. Styles (S2): each
+ * @description One theme in Themes & Styles, opened: its name, and five tabs. Styles (S2): each
  *   style with its colours in light and dark, whether the pill offers it, which one is the default,
- *   and the doors to open (S3, themes-style.js), copy and retire it. Components (S4 and S5,
+ *   and the doors to open (S3, themes-style.js), copy and retire it. Shapes (themes-shapes.js): the
+ *   corners, frames, shadows and letter case every component reads. Components (S4 and S5,
  *   themes-components.js). Theme CSS (S6, themes-css.js). On real pages (S7, themes-pages.js).
  *
  *   A built-in theme is shown read only, with the door to copy it (07: "copy them to change them").
@@ -34,6 +35,7 @@ import { ActionRow } from '/components/ActionRow.js';
 import { StyleMarks, useOpenAtTop } from './themes-bits.js';
 import StyleScreen from './themes-style.js';
 import ComponentsTab from './themes-components.js';
+import ShapesTab from './themes-shapes.js';
 import ThemeCssTab from './themes-css.js';
 import PagesTab from './themes-pages.js';
 
@@ -155,11 +157,13 @@ export default function ThemeScreen({ themeId, policy, vocabulary, onBack, onCop
     ${error && html`<${ErrorNote} text=${error} />`}
     <${ModeTabs}>
       <${ModeTab} on=${tab === 'styles'} onClick=${() => setTab('styles')}>${t('themes.tab.styles')}<//>
+      <${ModeTab} on=${tab === 'shapes'} onClick=${() => setTab('shapes')}>${t('themes.tab.shapes')}<//>
       <${ModeTab} on=${tab === 'components'} onClick=${() => setTab('components')}>${t('themes.tab.components')}<//>
       <${ModeTab} on=${tab === 'css'} onClick=${() => setTab('css')}>${t('themes.tab.css')}<//>
       <${ModeTab} on=${tab === 'pages'} onClick=${() => { setPages({}); setTab('pages'); }}>${t('themes.tab.pages')}<//>
     <//>
     ${tab === 'styles' && html`<${StylesTab} theme=${theme} readOnly=${readOnly} onOpen=${setStyle} onChange=${change} onRename=${() => setRenaming(true)} />`}
+    ${tab === 'shapes' && html`<${ShapesTab} theme=${theme} vocabulary=${vocabulary} readOnly=${readOnly} onSaved=${load} />`}
     ${tab === 'components' && html`<${ComponentsTab} theme=${theme} readOnly=${readOnly} onSaved=${load}
       onOpenPage=${(path, draft) => { setPages({ path, draft }); setTab('pages'); }} />`}
     ${tab === 'css' && html`<${ThemeCssTab} theme=${theme} warnings=${warnings} readOnly=${readOnly} onSaved=${load} />`}

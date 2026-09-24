@@ -2,7 +2,7 @@
 name: aimeat-design-language
 description: "The AIMEAT design language in words and in numbers: the two faces (showroom outside, poster inside), the three type tokens every font on the site descends from, the four shapes, the colours, the wordmark, and the one place a value is changed (theme.css tokens) with the map of every surface a token reaches. Use before designing or styling anything that carries the AIMEAT name, before changing a font or a colour, and to judge whether a screen looks like this product."
 metadata:
-  version: 1.8.0
+  version: 1.9.0
   updated: 2026-09-24
   owner: Jouni Miikki
 ---
@@ -166,6 +166,40 @@ by hand; the list here is the checklist.
 | `--font-mono` | every sheet that shows an address, a command, an id or a key; no sheet spells a monospace family |
 | `--font-headline` again, through the palette bridge | `lib/aimeat-theme.css` gives every `h1`-`h6` the palette's display face, and the house palette's display face is `var(--font-headline, 'Archivo Black', …)`: on the node the classic shell's headings follow the token; a published app without `theme.css` keeps the vendored Archivo Black; a chosen palette (paper, circuit, …) keeps its own face on purpose |
 | `--sun`, `--on-sun`, `--accent`, `--text`, `--bg` | every sheet; the auth pill and dialog read them with a fallback so an app origin without the tokens still gets the design |
+
+### The shape values: what a theme changes once
+
+The four shapes above are the built-in theme's. Their corners, frames, shadows and letter case are
+tokens in `theme.css` (`--shape-*`), and every component sheet reads them instead of writing a
+value, so a theme that sets them reaches every component, the ones made later included (Jouni,
+2026-09-24: "katsoo että pebble syntyy myös niille uusille tehdyille komponenteille"). A theme sets
+them in Themes & Styles (the Shapes tab) or with `aimeat_theme_save` `shapes`; colours stay the
+style's, faces stay the style's.
+
+| Token | Built-in value | What it shapes |
+|---|---|---|
+| `--shape-corner` | `0` | a box, a panel, a frame, a record, a sticker |
+| `--shape-corner-control` | `0` | a field, an icon button, a choice, a menu row, a chat row |
+| `--shape-corner-pill` | `0` | the loud action, an action link and a tab, a count, the morsel badge |
+| `--shape-corner-dialog` | `0` | a dialog, the bell's menu |
+| `--shape-frame` / `--shape-frame-heavy` | `2px` / `3px` | a box's or a control's frame / the heavy frame, the rule under an action, the page's rules |
+| `--shape-frame-colour` / `--shape-rule-colour` / `--shape-field-colour` | `var(--text)` each | a box's frame / a rule and a control's frame / a field's frame |
+| `--shape-shadow` | `none` | a box at rest |
+| `--shape-shadow-raised` | `8px 8px 0 var(--sun)` | a record, an open step, an open menu |
+| `--shape-shadow-dialog` | `12px 12px 0 var(--sun)` | a dialog |
+| `--shape-shadow-action` / `-pressed` | `4px 4px 0` / `2px 2px 0 var(--sun)` | the loud action, and under the pointer |
+| `--shape-shadow-chosen` | `4px 4px 0 var(--text)` | a chosen choice |
+| `--shape-case-heading`, `--font-poster-weight`, `--font-poster-tracking`, `--font-poster-leading` | `uppercase`, `400`, `.01em`, `1` | every headline |
+| `--shape-case-action`, `--shape-tracking-action` | `uppercase`, `.04em` | the loud action, an action link, a tab |
+| `--shape-case-label`, `--shape-tracking-label` | `uppercase`, `.1em` | the small coral label |
+
+**A component sheet reads a shape value wherever one exists**, and writes its own corner, frame
+width, shadow or letter case only where none does (a circle, a 1px hairline, a 4px sun bar). A
+component made in a later phase is shown in the lab in the built-in theme and in Pebble, the
+example theme that sets every value (its record travels with the UI plan as `fixtures/pebble.json`
+and is loaded into a sandbox, never seeded into a node); one
+that does not follow Pebble without CSS of its own is a finding. `pnpm check:shape-tokens` holds
+it: a ratchet of the literals still written, which only falls.
 
 ### Shape to class: one CSS home
 

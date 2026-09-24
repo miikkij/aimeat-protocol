@@ -14,6 +14,7 @@
  *   pageFrame · newFindings
  * @usage const out = useDraftSheets({ with: draft, without: bare });  out.with?.warnings
  * @version-history
+ *   v1.1.0 — 2026-09-24 — A draft carries the theme's shape values.
  *   v1.0.0 — 2026-09-24 — Initial (UI consolidation phase 4, Themes & Styles S5-S7).
  */
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
@@ -23,7 +24,7 @@ import { swallowed } from '/js/swallowed.js';
 export const PREVIEW_CHANNEL = 'aimeat-theme-preview';
 
 /** The fields of a theme a draft carries to the node. */
-const draftBody = (theme) => ({ name: theme.name, styles: theme.styles, componentCss: theme.componentCss || {}, css: theme.css || null });
+const draftBody = (theme) => ({ name: theme.name, styles: theme.styles, shapes: theme.shapes || {}, componentCss: theme.componentCss || {}, css: theme.css || null });
 
 /**
  * Turn each keyed draft into its stylesheet and warnings after each pause in editing, and send the

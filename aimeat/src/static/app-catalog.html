@@ -2357,6 +2357,18 @@
   --font-showroom-body: var(--font-body);
   --success-gradient: linear-gradient(135deg, #10B981, #059669);
   --success-glow: 0 4px 12px rgba(16, 185, 129, 0.25);
+  --shape-corner-pill: 0;
+  --shape-corner-dialog: 0;
+  --shape-frame: 2px;
+  --shape-frame-heavy: 3px;
+  --shape-frame-colour: var(--text);
+  --shape-rule-colour: var(--text);
+  --shape-shadow-action: 4px 4px 0 var(--sun);
+  --shape-shadow-action-pressed: 2px 2px 0 var(--sun);
+  --shape-shadow-dialog: 12px 12px 0 var(--sun);
+  --shape-case-action: uppercase;
+  --shape-tracking-action: .04em;
+  --shape-case-heading: uppercase;
   --card-bg: var(--surface);
   --bg-surface: var(--bg-subtle);
   --border: var(--border-subtle);
@@ -3175,9 +3187,9 @@ textarea.cx-code { resize: vertical; tab-size: 2; }
 /* Lifted from the home's ink-underlined action (formerly home.css .koti-link), including the unselected tab. */
 .poster-action, .poster-tab {
   display: inline-flex; align-items: center; gap: .4rem;
-  background: none; border: 0; border-bottom: 3px solid var(--text); border-radius: 0;
+  background: none; border: 0; border-bottom: var(--shape-frame-heavy) solid var(--shape-rule-colour); border-radius: var(--shape-corner-pill);
   padding: 0 0 2px; cursor: pointer;
-  font: inherit; font-weight: var(--weight-heavy); font-size: var(--text-body-sm); text-transform: uppercase; letter-spacing: .04em;
+  font: inherit; font-weight: var(--weight-heavy); font-size: var(--text-body-sm); text-transform: var(--shape-case-action); letter-spacing: var(--shape-tracking-action);
   color: var(--text); text-decoration: none; white-space: nowrap;
 }
 .poster-action:hover, .poster-tab:hover { border-color: var(--accent); color: var(--accent); }
@@ -3189,13 +3201,13 @@ textarea.cx-code { resize: vertical; tab-size: 2; }
 /* The profile slab and the home's large door are the two cuts named in brief 10.3. */
 .poster-slab {
   background: var(--text); color: var(--bg);
-  border: 0; border-radius: 0; box-shadow: 4px 4px 0 var(--sun);
+  border: 0; border-radius: var(--shape-corner-pill); box-shadow: var(--shape-shadow-action);
   padding: 10px 16px;
   font-family: var(--font-showroom-body); font-weight: var(--font-poster-strong-weight); font-size: var(--text-small);
-  text-transform: uppercase; letter-spacing: .04em; text-decoration: none; cursor: pointer;
+  text-transform: var(--shape-case-action); letter-spacing: var(--shape-tracking-action); text-decoration: none; cursor: pointer;
   transition: transform 120ms ease, box-shadow 120ms ease;
 }
-.poster-slab:hover { transform: translate(2px, 2px); box-shadow: 2px 2px 0 var(--sun); color: var(--sun); }
+.poster-slab:hover { transform: translate(2px, 2px); box-shadow: var(--shape-shadow-action-pressed); color: var(--sun); }
 /* A copy made from a slab says so in green for a moment (the values .btn-primary.copied gave it
    while slabs also wore .btn-primary). */
 .poster-slab.copied, .poster-slab.success { background: var(--success-gradient); box-shadow: var(--success-glow); }
@@ -3233,6 +3245,8 @@ textarea.cx-code { resize: vertical; tab-size: 2; }
  *   gets this file copied into its page at build time (scripts/build-app-catalog.ts).
  * @structure frame · header and X · body · footer and its actions · sizes · phone
  * @version-history
+ *   v1.4.0 — 2026-09-24 — The frame, corner, shadow, title case and footer rule read the theme's shape
+ *     values (theme.css --shape-*), today's values (a move).
  *   v1.3.0 — 2026-09-24 — The footer's actions are the library's action link, loud action and its
  *     danger tone (Jouni's decision "Dialog actions"); the rules that redrew the classic button
  *     classes here are gone.
@@ -3253,9 +3267,9 @@ dialog.dlg {
   max-width: none; min-width: 0;
   max-height: calc(100dvh - 48px);
   margin: auto; padding: 0;
-  border: 3px solid var(--text); border-radius: 0;
+  border: var(--shape-frame-heavy) solid var(--shape-frame-colour); border-radius: var(--shape-corner-dialog);
   background: var(--bg); color: var(--text);
-  box-shadow: 12px 12px 0 var(--sun);
+  box-shadow: var(--shape-shadow-dialog);
   font-family: var(--font-body);
   overflow: hidden;
 }
@@ -3273,7 +3287,7 @@ dialog.dlg .dlg-title {
   flex: 1 1 auto; min-width: 0; margin: 0; padding: 0; background: none; border: 0;
   font-family: var(--font-poster); font-weight: var(--font-poster-weight);
   font-size: var(--dlg-title-size, 1.4rem); line-height: var(--font-poster-leading);
-  letter-spacing: var(--font-poster-tracking); text-transform: uppercase;
+  letter-spacing: var(--font-poster-tracking); text-transform: var(--shape-case-heading);
   color: inherit; overflow-wrap: anywhere;
 }
 /* The X: a 26px square framed in the header's own colour, inside a 44px press area. */
@@ -3317,7 +3331,7 @@ dialog.dlg .modal-confirm-message { color: var(--text); margin: 0; font-size: va
 dialog.dlg .dlg-foot {
   flex: none; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end;
   gap: .8rem 1.4rem; margin: 0; padding: .9rem 1.5rem 1rem;
-  border-top: 3px solid var(--text); background: var(--bg);
+  border-top: var(--shape-frame-heavy) solid var(--shape-rule-colour); background: var(--bg);
   /* The site's body line (page-base.css), set here so the actions stand the same on a page whose
      body sets another one (the app catalog). */
   line-height: 1.6;

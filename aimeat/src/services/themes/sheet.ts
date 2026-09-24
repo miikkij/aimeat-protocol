@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description One theme as the stylesheet the node serves (`GET /v1/themes/:id/theme.css`): its
- *   custom styles' token blocks, its component CSS and its theme CSS. A page links the sheet of the
+ *   custom styles' token blocks, its shape values, its component CSS and its theme CSS. A page links the sheet of the
  *   theme it wears and no other, so the operator's CSS is written as it is, unscoped: as free as CSS
  *   is (07 "What the operator's CSS may do").
  *
@@ -16,6 +16,8 @@
  * @structure ComponentCssState · componentCssState · themeSheet · catalogueHooks · servedFaces
  * @usage import { themeSheet, componentCssState } from './sheet.js';
  * @version-history
+ *   v1.1.0 — 2026-09-24 — The theme's shape values, before its component CSS (07 "New components
+ *     follow the theme").
  *   v1.0.0 — 2026-09-24 — Initial (replaces css.ts's hooks-only theme CSS).
  */
 import { getUiComponent } from '../ui-library/catalogue.js';
@@ -24,6 +26,7 @@ import type { UiThemeHook } from '../ui-library/types.js';
 import { THEME_FACES } from './tokens.js';
 import { lintCss, touchesClasses, type CssWarning } from './css-lint.js';
 import { styleSheet, type Style } from './styles.js';
+import { shapeSheet } from './shapes.js';
 
 /** The families the node serves, for the face warning. */
 export const servedFaces = (): string[] => Object.keys(THEME_FACES);
@@ -56,9 +59,12 @@ export function componentCssState(componentId: string, css: string): ComponentCs
  * The stylesheet of one theme. `styles` are the theme's custom styles (a built-in style is drawn by
  * the node's own sheets); retired styles are left out.
  */
-export function themeSheet(theme: { id: string; name: string; styles: Style[]; componentCss: Record<string, string>; css: string | null }): string {
+export function themeSheet(theme: { id: string; name: string; styles: Style[]; shapes?: Record<string, string>; componentCss: Record<string, string>; css: string | null }): string {
     const parts: string[] = [`/* Theme "${theme.name.replace(/\*\//g, '')}" (${theme.id}), served by the node from its record. */`];
     for (const s of theme.styles) if (!s.builtin && !s.retired) parts.push(styleSheet(s));
+    // The theme's shapes before its component CSS, so one component's own CSS can still differ.
+    const shapes = shapeSheet(theme.shapes);
+    if (shapes) parts.push('/* Shape values */', shapes);
     for (const [component, css] of Object.entries(theme.componentCss || {})) {
         if (componentCssState(component, css).status !== 'served') continue;
         parts.push(`/* Component CSS: ${component} */`, css.trim());

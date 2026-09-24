@@ -8,6 +8,7 @@
  * @usage Linked from public/spa.html in the component block, whose order keeps the order these
  *   rules had when they were one sheet.
  * @version-history
+ *   v1.2.0 — 2026-09-24 — The corner and the chosen row's rule read the theme's shape values (a move).
  *   v1.1.0 — 2026-09-24 — Delete is the small icon button; only its place and showing stay here.
  *   v1.0.0 — 2026-09-23 — Moved unchanged from css/parts*.css (UI consolidation phase 1, a move).
  */
@@ -25,8 +26,9 @@
   align-items: center;
   gap: 4px;
   border-bottom: 1px solid var(--border);
+  border-radius: var(--shape-corner-control);
 }
-.poster-thread--active { background: var(--sun); border-bottom: 2px solid var(--text); }
+.poster-thread--active { background: var(--sun); border-bottom: var(--shape-frame) solid var(--shape-rule-colour); }
 .poster-thread-open {
   flex: 1 1 auto;
   min-width: 0;

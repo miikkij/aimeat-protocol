@@ -52,6 +52,7 @@
     "build:ui-library": "tsx scripts/build-ui-library.ts",
     "check:ui-library": "tsx scripts/build-ui-library.ts --check",
     "check:theme-tokens": "tsx scripts/check-theme-tokens.ts",
+    "check:shape-tokens": "tsx scripts/check-shape-tokens.ts",
     "design-lab:crops": "tsx scripts/design-lab-crops.ts",
     "check:dialogs": "tsx scripts/check-dialogs.ts",
     "check:packs-doc": "vitest run test/unit/library-packs-doc-truth.test.ts",

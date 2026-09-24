@@ -8,6 +8,8 @@
  * @usage Linked from public/spa.html in the component block, whose order keeps the order these
  *   rules had when they were one sheet.
  * @version-history
+ *   v1.2.0 — 2026-09-24 — The frames, corner, open shadow and title case read the theme's shape values
+ *     (a move).
  *   v1.1.0 — 2026-09-23 — The done and limit looks and branch B's "way" block deleted (Jouni's
  *     decision): only StepMatDone and StepBranchB drew them, and neither had been drawn since
  *     07f7040c5 (2026-09-09).
@@ -16,24 +18,25 @@
 
 /* ── The step list ── */
 .poster-step {
-  border: 3px solid var(--border);
+  border: var(--shape-frame-heavy) solid var(--border);
+  border-radius: var(--shape-corner);
   background: var(--card);
   padding: 1.25rem 1.35rem;
 }
 /* The open step is the only thing on the page with an accent edge. */
-.poster-step--open { border-color: var(--text); box-shadow: 8px 8px 0 var(--sun); }
+.poster-step--open { border-color: var(--text); box-shadow: var(--shape-shadow-raised); }
 .poster-step-head { display: flex; align-items: center; gap: 0.7rem; margin-bottom: 0.6rem; }
 .poster-step-num {
   flex: none;
   width: 1.75rem; height: 1.75rem;
   display: inline-flex; align-items: center; justify-content: center;
-  border: 2px solid var(--border);
+  border: var(--shape-frame) solid var(--border);
   background: var(--bg-dim);
   font-family: var(--font-mono); font-size: var(--text-small); font-weight: var(--weight-bold);
   color: var(--text-dim);
 }
 .poster-step--open .poster-step-num { border-color: var(--text); background: var(--sun); color: var(--text); }
-.poster-step-title { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.15rem; text-transform: uppercase; margin: 0; }
+.poster-step-title { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.15rem; text-transform: var(--shape-case-heading); margin: 0; }
 .poster-step-lede { color: var(--text-dim); font-size: 0.98rem; line-height: 1.55; margin: 0 0 1.1rem; }
 .poster-step .agc-step { margin-top: 1.25rem; }
 .poster-step .agc-explain { margin: 0.5rem 0 0 0.8rem; line-height: 1.5; }

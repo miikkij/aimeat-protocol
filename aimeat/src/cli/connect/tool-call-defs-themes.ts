@@ -11,6 +11,7 @@
  * @structure themeCliTools[] -- the shell handler table, registered by tool-call.ts · themeRequests
  * @usage import { themeCliTools } from './tool-call-defs-themes.js';
  * @version-history
+ *   v2.2.0 -- 2026-09-24 -- aimeat_theme_save forwards `shapes`, the theme's shape values.
  *   v2.1.0 -- 2026-09-24 -- aimeat_theme_policy_set (PUT /v1/themes/policy).
  *   v2.0.0 -- 2026-09-24 -- The two-level model of 07: style and component CSS tools, restoreVersion,
  *     one request mapping shared with the connector MCP.
@@ -50,7 +51,7 @@ export async function themeRequests(client: AimeatClient, tool: string, input: J
                 if (!id) return { ok: false, error: { code: 'INVALID_INPUT', message: 'restoreVersion needs the id of the theme.' } };
                 return client.post(`/v1/themes/${enc(id)}/versions/${restore}/restore`, {});
             }
-            const own = sent(input, [['css', 'string'], ['defaultStyle', 'string'], ['offeredStyles', 'array'], ['retired', 'boolean']]);
+            const own = sent(input, [['css', 'string'], ['shapes', 'record'], ['defaultStyle', 'string'], ['offeredStyles', 'array'], ['retired', 'boolean']]);
             if (typeof own.css === 'string' && !own.css) own.css = null;
             if (id) return client.put(`/v1/themes/${enc(id)}`, { ...sent(input, [['name', 'string']]), ...own, ...dryRun });
             if (dryRun.dryRun) return { ok: false, error: { code: 'INVALID_INPUT', message: 'dryRun checks a change to a theme that exists; making a copy has nothing to check.' } };

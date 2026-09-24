@@ -36977,6 +36977,7 @@ paths:
               properties:
                 name: { type: string, maxLength: 60 }
                 basedOn: { type: string, description: "The theme it copies (default 'aimeat')." }
+                shapes: { type: object, additionalProperties: { type: string }, description: "Shape values over the copied ones (GET /v1/themes/all vocabulary.shapes names them)." }
                 css: { type: string, nullable: true }
                 defaultStyle: { type: string }
                 offeredStyles: { type: array, items: { type: string } }
@@ -37014,7 +37015,8 @@ paths:
         in light and dark, each style's chip colours and the contrast lines it misses, its
         component CSS and whether each is served (served, stale, removed, broken), its theme CSS
         warnings; the operator's choices; and what a style may set (the colour tokens, the faces
-        the node serves, each component's hooks). `summary=1` gives each style its core colours
+        the node serves, each component's hooks) and what a theme may set (`vocabulary.shapes`: each
+        shape value, what it is for, and the built-in value). `summary=1` gives each style its core colours
         only. No authentication: other admins read what only the operator may change.
       tags: [Site]
       security: []
@@ -37215,7 +37217,8 @@ paths:
       operationId: updateTheme
       summary: Change, retire or bring back one of the node's themes
       description: |
-        Operator only. Send only what changes: `name`; `css`, the theme CSS (any CSS, null or empty
+        Operator only. Send only what changes: `name`; `shapes`, the theme's shape values (corners,
+        frames, shadows, letter case; every component reads them); `css`, the theme CSS (any CSS, null or empty
         removes it; refused only when it does not parse, CSS_DOES_NOT_PARSE with the line);
         `defaultStyle` and `offeredStyles` (style ids of this theme); `retired: true` takes the
         theme out of the look picker without deleting it. `dryRun: true` checks and saves nothing.
@@ -37234,6 +37237,7 @@ paths:
               type: object
               properties:
                 name: { type: string, maxLength: 60 }
+                shapes: { type: object, additionalProperties: { type: string, nullable: true }, description: "Only the shape values that change; an empty value or null puts the built-in one back. A value that does not fit its kind: 422 INVALID_SHAPE." }
                 css: { type: string, nullable: true }
                 defaultStyle: { type: string }
                 offeredStyles: { type: array, items: { type: string } }
@@ -37261,7 +37265,7 @@ paths:
         '409':
           description: READ_ONLY (a built-in), NAME_TAKEN (another theme has that name), or load-balancer mode
         '422':
-          description: CSS_DOES_NOT_PARSE or INVALID_THEME
+          description: CSS_DOES_NOT_PARSE, INVALID_THEME or INVALID_SHAPE
 
   /v1/themes/{id}/theme.css:
     parameters:

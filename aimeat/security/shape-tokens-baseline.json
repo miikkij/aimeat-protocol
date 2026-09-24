@@ -1,0 +1,164 @@
+{
+  "_note": "Shape literals in the component sheets where a theme shape value exists (src/services/themes/shapes.ts): recorded debt, not approval. A count may only go down: after a component reads the shape values, lower its counts or remove the file. Seeded 2026-09-24 on Jouni's word; only his decision permits re-seeding with pnpm check:shape-tokens --record.",
+  "_measured": {
+    "date": "2026-09-24T19:48:48.781Z",
+    "files": 43,
+    "literals": 117,
+    "kinds": {
+      "frame": 36,
+      "shadow": 37,
+      "case": 16,
+      "corner": 28
+    }
+  },
+  "files": {
+    "public/css/poster.css": {
+      "frame": 9,
+      "shadow": 14,
+      "case": 3,
+      "corner": 1
+    },
+    "public/css/components/ai-label.css": {
+      "frame": 1
+    },
+    "public/css/components/app-sandbox.css": {
+      "corner": 1
+    },
+    "public/css/components/archive.css": {
+      "frame": 1,
+      "case": 1
+    },
+    "public/css/components/badge.css": {
+      "case": 1
+    },
+    "public/css/components/button.css": {
+      "shadow": 5
+    },
+    "public/css/components/card.css": {
+      "corner": 1,
+      "case": 1
+    },
+    "public/css/components/check-item.css": {
+      "frame": 2
+    },
+    "public/css/components/contact-picker.css": {
+      "corner": 2,
+      "shadow": 1
+    },
+    "public/css/components/data-table.css": {
+      "case": 1
+    },
+    "public/css/components/day-group.css": {
+      "case": 1,
+      "frame": 1
+    },
+    "public/css/components/dialog.css": {
+      "corner": 1,
+      "frame": 3,
+      "shadow": 1
+    },
+    "public/css/components/error-note.css": {
+      "frame": 1
+    },
+    "public/css/components/form-field.css": {
+      "shadow": 1,
+      "case": 1
+    },
+    "public/css/components/free-text.css": {
+      "frame": 1,
+      "case": 1
+    },
+    "public/css/components/hello-mcp.css": {
+      "case": 2,
+      "frame": 1
+    },
+    "public/css/components/image-deliverable.css": {
+      "corner": 2
+    },
+    "public/css/components/install-cta.css": {
+      "corner": 1
+    },
+    "public/css/components/managed-env.css": {
+      "frame": 1
+    },
+    "public/css/components/markdown.css": {
+      "frame": 2,
+      "corner": 6
+    },
+    "public/css/components/mcp-install.css": {
+      "case": 1
+    },
+    "public/css/components/numbered-index.css": {
+      "frame": 2
+    },
+    "public/css/components/page-base.css": {
+      "shadow": 6,
+      "corner": 1
+    },
+    "public/css/components/page-intro.css": {
+      "case": 1
+    },
+    "public/css/components/paste-box.css": {
+      "frame": 1
+    },
+    "public/css/components/presence-dot.css": {
+      "shadow": 1
+    },
+    "public/css/components/result-card.css": {
+      "case": 1
+    },
+    "public/css/components/search-bar.css": {
+      "shadow": 1
+    },
+    "public/css/components/settings-door.css": {
+      "case": 1
+    },
+    "public/css/components/spinner.css": {
+      "frame": 1
+    },
+    "public/css/components/stat-line.css": {
+      "frame": 1
+    },
+    "public/css/components/status-dot.css": {
+      "shadow": 2
+    },
+    "public/css/components/suggestion.css": {
+      "frame": 1,
+      "corner": 1
+    },
+    "public/css/components/swatch-picker.css": {
+      "frame": 1
+    },
+    "public/css/components/tags.css": {
+      "corner": 1
+    },
+    "public/css/components/text-input.css": {
+      "frame": 1
+    },
+    "public/css/components/thing-link.css": {
+      "frame": 1
+    },
+    "public/css/components/timeline.css": {
+      "frame": 2
+    },
+    "public/css/components/toast.css": {
+      "shadow": 3,
+      "frame": 1,
+      "corner": 1
+    },
+    "public/css/components/toggle-switch.css": {
+      "corner": 1,
+      "shadow": 1
+    },
+    "public/css/components/top-bar.css": {
+      "corner": 7,
+      "shadow": 1
+    },
+    "public/css/components/voice-recorder.css": {
+      "corner": 1
+    },
+    "public/css/components/work-log.css": {
+      "frame": 1
+    }
+  }
+}

@@ -17835,7 +17835,8 @@
       "styles": "Estilos",
       "components": "Componentes",
       "css": "CSS del tema",
-      "pages": "En páginas reales"
+      "pages": "En páginas reales",
+      "shapes": "Formas"
     },
     "styles": "Estilos",
     "stylesHint": "Un estilo es un juego de colores en claro y en oscuro, tres tipos de letra y si tiene los dos modos o solo uno. La gente elige entre los estilos que ofreces.",
@@ -18049,6 +18050,42 @@
     "filters": "Filtros",
     "reachesAll": "Algunas de sus reglas no empiezan por las clases del componente, así que pueden cambiar todas las páginas de este tema.",
     "findInFrames": "Buscar un componente para mostrar",
-    "accentOthers": "Los tonos más claro, más oscuro y tenue del acento no lo siguen. Ponlos en \"Todos los demás colores\"."
+    "accentOthers": "Los tonos más claro, más oscuro y tenue del acento no lo siguen. Ponlos en \"Todos los demás colores\".",
+    "shapesHint": "Las formas son las esquinas, los marcos, las sombras y las mayúsculas del tema. Cada componente las lee, así que un componente que se añada después también las sigue. Deja el CSS de un componente para lo que es solo suyo.",
+    "shapeEmpty": "Deja un campo vacío para mantener el valor incorporado.",
+    "shapeBuiltin": "Incorporado: {value}",
+    "shapeRefused": "No se ha guardado: {reason}",
+    "saveShapes": "Guardar las formas",
+    "shapeGroup": {
+      "corners": "Esquinas",
+      "frames": "Marcos",
+      "shadows": "Sombras",
+      "type": "Letras"
+    },
+    "shape": {
+      "shapeCorner": "Esquina de una caja, un panel o una tarjeta",
+      "shapeCornerControl": "Esquina de un campo o de un control pequeño",
+      "shapeCornerPill": "Esquina del botón principal, de una pestaña y de un contador",
+      "shapeCornerDialog": "Esquina de un diálogo y de un menú abierto",
+      "shapeFrame": "Marco de una caja o de un control",
+      "shapeFrameHeavy": "Marco y línea gruesos",
+      "shapeFrameColour": "Color del marco de una caja",
+      "shapeRuleColour": "Color de una línea entre partes y del marco de un control",
+      "shapeFieldColour": "Color del marco de un campo",
+      "shapeShadow": "Sombra de una caja",
+      "shapeShadowRaised": "Sombra de un registro y de un menú abierto",
+      "shapeShadowDialog": "Sombra de un diálogo",
+      "shapeShadowAction": "Sombra del botón principal",
+      "shapeShadowActionPressed": "Sombra del botón principal bajo el puntero",
+      "shapeShadowChosen": "Sombra de una opción elegida",
+      "shapeCaseHeading": "Mayúsculas o minúsculas de los títulos",
+      "fontPosterWeight": "Grosor de los títulos",
+      "fontPosterTracking": "Espaciado entre letras de los títulos",
+      "fontPosterLeading": "Interlineado de los títulos",
+      "shapeCaseAction": "Mayúsculas o minúsculas de las acciones y las pestañas",
+      "shapeTrackingAction": "Espaciado entre letras de las acciones y las pestañas",
+      "shapeCaseLabel": "Mayúsculas o minúsculas de las etiquetas",
+      "shapeTrackingLabel": "Espaciado entre letras de las etiquetas"
+    }
   }
 }

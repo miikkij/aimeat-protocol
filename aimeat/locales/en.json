@@ -20069,7 +20069,8 @@
       "styles": "Styles",
       "components": "Components",
       "css": "Theme CSS",
-      "pages": "On real pages"
+      "pages": "On real pages",
+      "shapes": "Shapes"
     },
     "styles": "Styles",
     "stylesHint": "A style is one set of colours in light and dark, three fonts, and whether it has both modes or only one. People choose among the styles you offer.",
@@ -20283,6 +20284,42 @@
     "filters": "Filters",
     "reachesAll": "Some of its rules do not start from the component's classes, so they can change every page of this theme.",
     "findInFrames": "Find a component to show",
-    "accentOthers": "The lighter, deeper and faint shades of the accent do not follow it. Set them under \"Every other colour\"."
+    "accentOthers": "The lighter, deeper and faint shades of the accent do not follow it. Set them under \"Every other colour\".",
+    "shapesHint": "Shapes are the theme's corners, frames, shadows and letter case. Every component reads them, so a component added later follows them too. Keep component CSS for what is one component's own.",
+    "shapeEmpty": "Leave a field empty to keep the built-in value.",
+    "shapeBuiltin": "Built-in: {value}",
+    "shapeRefused": "Not saved: {reason}",
+    "saveShapes": "Save the shapes",
+    "shapeGroup": {
+      "corners": "Corners",
+      "frames": "Frames",
+      "shadows": "Shadows",
+      "type": "Letters"
+    },
+    "shape": {
+      "shapeCorner": "Corner of a box, a panel or a card",
+      "shapeCornerControl": "Corner of a field or a small control",
+      "shapeCornerPill": "Corner of the main button, a tab and a count",
+      "shapeCornerDialog": "Corner of a dialog and an open menu",
+      "shapeFrame": "Frame of a box or a control",
+      "shapeFrameHeavy": "Heavy frame and line",
+      "shapeFrameColour": "Colour of a box's frame",
+      "shapeRuleColour": "Colour of a line between parts and of a control's frame",
+      "shapeFieldColour": "Colour of a field's frame",
+      "shapeShadow": "Shadow of a box",
+      "shapeShadowRaised": "Shadow of a record and an open menu",
+      "shapeShadowDialog": "Shadow of a dialog",
+      "shapeShadowAction": "Shadow of the main button",
+      "shapeShadowActionPressed": "Shadow of the main button under the pointer",
+      "shapeShadowChosen": "Shadow of a chosen choice",
+      "shapeCaseHeading": "Letter case of headings",
+      "fontPosterWeight": "Weight of headings",
+      "fontPosterTracking": "Letter spacing of headings",
+      "fontPosterLeading": "Line height of headings",
+      "shapeCaseAction": "Letter case of actions and tabs",
+      "shapeTrackingAction": "Letter spacing of actions and tabs",
+      "shapeCaseLabel": "Letter case of labels",
+      "shapeTrackingLabel": "Letter spacing of labels"
+    }
   }
 }

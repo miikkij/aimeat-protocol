@@ -31,6 +31,8 @@
  *   BUILT_WITHOUT_DECISION — { [id]: the same, with a title }: built work Jouni looks at that no decision holds
  * @usage import { DECISIONS, BUILT } from './decisions-data.js';
  * @version-history
+ *   v3.6.0 — 2026-09-24 — Themes & Styles, shape values: the move and the remade Pebble, measured,
+ *     with Pebble's values and how much of its component CSS was left.
  *   v3.5.0 — 2026-09-24 — Themes & Styles: the example theme Pebble, and `reach`, what it reached on
  *     each page and what it did not, with the reason.
  *   v3.4.0 — 2026-09-24 — BUILT_WITHOUT_DECISION: Themes & Styles, its numbers and its yes.
@@ -603,4 +605,29 @@ export const BUILT_WITHOUT_DECISION = {
       { page: 'Admin', reached: 'The top bar, the page and section titles, the labels, the buttons, the action links, the choices.', not: 'The dark side bar (only its chosen row follows the highlight colour), the metrics grid with its rules, the health table and the other tables still use admin\'s own CSS. Phases 5 to 7.' },
       { page: 'The app catalog', reached: 'Nothing yet.', not: 'Its screens are a separate build with their own CSS. Phase 9 (07, "Left").' },
     ] },
+  'themes-shapes': { title: 'Themes & Styles, shape values', commit: 'not committed yet', onMain: false, date: '2026-09-24',
+    what: 'A theme\'s corners, frames, shadows and letter case are now its shape values (theme.css --shape-*), and the component sheets read them instead of writing their own. A theme sets them once, in the Shapes tab or with aimeat_theme_save, and a component added later follows them. Pebble was remade on them from chat with the MCP tools only. Jouni: "katsoo että pebble syntyy myös niille uusille tehdyille komponenteille mitä tullaan tekemään kun tehdään settings & controls kirjastoon."',
+    sets: [
+      set('The move, AIMEAT: the home and the chat, every state, three widths, both modes', 150, 0),
+      set('The move in the six built-in styles (A3): the home, the account record, the chat', 108, 0),
+      set('The move on Settings & Controls and admin, AIMEAT', 42, 0),
+      set('Pebble remade on the shape values, against the Pebble of 131096f2a: the home and the chat', 150, 0),
+      set('Pebble remade, Settings & Controls and admin', 42, 0, 6),
+    ],
+    note: 'Of Pebble\'s 39 entries of component CSS, 36 are left, and they are smaller: 222 declarations became 153, and 23 shape values carry the rest. Three went whole (the rule over a row, the text field, the open items). Seven of the 36 are the classic shell\'s older parts (button, card, badge, form field, tags, the card menu, the install card), which read no shape value yet; the rest keep only what is one component\'s own: the fill of the main button and its danger tone, the action link\'s underline, the tabs\' pill ground, a section title\'s side bar, the panels\' ground, a few corners that differ (a record 20px, a step 18px, a choice 14px). Theme CSS went from 6 declarations to 3 (the selection and the focus ring). The shape literals still written in the component sheets fell from 181 to 117; check:shape-tokens holds that number and lets it only fall. The 6 not at 0.00 % on admin are its uptime line, which changes between any two runs. Found: the old Pebble hid two states by accident, the card menu\'s state frame (open, working) and a result card\'s coloured kind edge; the remade Pebble keeps them hidden so it stays the same, and one line each would show them.',
+    values: { title: 'Pebble\'s shape values (the built-in value in the grey line)', rows: [
+      ['Corner of a box, a panel or a card', '16px', 'built-in 0'], ['Corner of a field or a small control', '12px', 'built-in 0'],
+      ['Corner of the main button, a tab and a count', '999px', 'built-in 0'], ['Corner of a dialog and an open menu', '22px', 'built-in 0'],
+      ['Frame of a box or a control', '1px', 'built-in 2px'], ['Heavy frame and line', '1px', 'built-in 3px'],
+      ['Colour of a box\'s frame', 'var(--card-border)', 'built-in var(--text)'], ['Colour of a line and a control\'s frame', 'var(--border)', 'built-in var(--text)'],
+      ['Colour of a field\'s frame', 'var(--control-border)', 'built-in var(--text)'],
+      ['Shadow of a box', 'two soft shadows in 6 % and 8 % of the text colour', 'built-in none'],
+      ['Shadow of a record and an open menu', '0 12px 32px, 10 % of the text colour', 'built-in 8px 8px 0 sun'],
+      ['Shadow of a dialog', '0 24px 64px, 28 % of the text colour', 'built-in 12px 12px 0 sun'],
+      ['Shadow of the main button, and under the pointer', '0 6px 16px, 35 % and 45 % of the accent', 'built-in 4px 4px 0 and 2px 2px 0 sun'],
+      ['Shadow of a chosen choice', '0 6px 16px, 30 % of the accent', 'built-in 4px 4px 0 ink'],
+      ['Letter case of headings, actions and tabs, labels', 'none', 'built-in uppercase'],
+      ['Weight, letter spacing and line height of headings', '600, -0.01em, 1.1', 'built-in 400, .01em, 1'],
+      ['Letter spacing of actions and tabs, and of labels', '0 and 0', 'built-in .04em and .1em'],
+    ] } },
 };
