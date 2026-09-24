@@ -5,6 +5,9 @@
  *   contact never resets the DM first-contact gate), blocked-row handling, the q filter,
  *   cross-owner isolation, and exact-match email resolve (found / not-found / invalid / unauth).
  * @version-history
+ *   v1.3.0 — 2026-09-24 — Test 28 (security audit A5-2): the email lookup over MCP answers an agent
+ *     the way POST /v1/contacts/resolve does, refused, where it used to answer any agent holding
+ *     messages:read with no owner gate and no limit.
  *   v1.2.0 — 2026-08-30 — The Contacts page in the poster face: the last message on a row, nobody
  *     their own contact, ?include=together and GET /:id/together, POST /invite with its refusals
  *     and its public read, ?include=invites scoped to the inviter, the chat prompt (tests 22–27).
@@ -500,6 +503,56 @@ await test('27. The chat prompt is served with the owner\'s name; unauthenticate
     assert(typeof r.body.data.prompt === 'string' && r.body.data.prompt.includes(A.name) && r.body.data.prompt.includes('aimeat_contact_invite'), 'prompt carries the owner and the tools');
     const anon = await json('/v1/templates/contacts-mcp');
     assert(anon.status === 401, `anon → 401, got ${anon.status}`);
+});
+
+/** One MCP call as an agent: OAuth by the agent's signature, a session, one tools/call. */
+async function mcpCallAs(gaii: string, key: string, name: string, args: Record<string, unknown>) {
+    const reg = await json('/v1/mcp/register', { method: 'POST', body: JSON.stringify({ client_name: 'contacts-e2e' }) });
+    const ts = new Date().toISOString();
+    const q = new URLSearchParams({ response_type: 'code', client_id: reg.body.client_id, gaii, signature: await sign(key, gaii + NODE_ID + ts), timestamp: ts });
+    const code = (await json(`/v1/mcp/authorize?${q}`)).body.code as string;
+    const tok = await json('/v1/mcp/token', { method: 'POST', body: JSON.stringify({ grant_type: 'authorization_code', code, client_id: reg.body.client_id, client_secret: reg.body.client_secret }) });
+    const token = tok.body.access_token as string;
+    assert(typeof token === 'string', `mcp token: ${JSON.stringify(tok.body)}`);
+    let session = '';
+    const rpc = async (method: string, params: Record<string, unknown>, id: number) => {
+        const res = await fetch(`${BASE}/v1/mcp`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json', Accept: 'application/json, text/event-stream', Authorization: `Bearer ${token}`,
+                ...(session ? { 'mcp-session-id': session, 'mcp-protocol-version': '2025-03-26' } : {}),
+            },
+            body: JSON.stringify({ jsonrpc: '2.0', id, method, params }),
+        });
+        session = res.headers.get('mcp-session-id') ?? session;
+        const text = await res.text();
+        const events = text.split('\n').filter(l => l.startsWith('data:')).map(l => JSON.parse(l.slice(5).trim()));
+        return (events.find((e: any) => e.id === id) ?? (events.length ? events[0] : JSON.parse(text))) as any;
+    };
+    await rpc('initialize', { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 'contacts-e2e', version: '1.0.0' } }, 1);
+    return rpc('tools/call', { name, arguments: args }, 2);
+}
+
+await test('28. The email lookup over MCP answers an agent the way the REST door does: refused', async () => {
+    // The REST door is the account holder's, and throttled: whether an address has an account here
+    // is an oracle. The tool gave an agent holding messages:read the same answer with neither.
+    const made = await json('/v1/agents', {
+        method: 'POST', headers: auth(A.token),
+        body: JSON.stringify({ name: 'resolvebot', owner: A.name, capabilities: ['messages'], model: 'gpt-4o', scopes: ['messages:read'] }),
+    });
+    assert(made.status === 201, `agent ${made.status}: ${JSON.stringify(made.body.error)}`);
+    const gaii = made.body.data.agent.gaii as string;
+    const key = made.body.data.private_key as string;
+
+    const ts = new Date().toISOString();
+    const agentTok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ gaii, timestamp: ts, signature: await sign(key, gaii + ts) }) });
+    const rest = await json('/v1/contacts/resolve', { method: 'POST', headers: auth(agentTok.body.data.token), body: JSON.stringify({ email: 'probe@example.com' }) });
+    assert(rest.status === 403 && rest.body.error?.code === 'ACCESS_DENIED', `the REST door, as the control: ${rest.status} ${rest.body.error?.code}`);
+
+    const over = await mcpCallAs(gaii, key, 'aimeat_contact_resolve_email', { email: 'probe@example.com' });
+    const text = String(over.result?.content?.[0]?.text ?? '');
+    assert(over.result?.isError === true && text.startsWith('ACCESS_DENIED'),
+        `the tool answered the agent: ${JSON.stringify(over.result ?? over.error).slice(0, 200)}`);
 });
 
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total`);

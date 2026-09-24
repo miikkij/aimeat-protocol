@@ -24,6 +24,8 @@
  * @usage
  *   registerAllServerTools(mcp, { storage, config, agentGaii: () => gaii, ... });
  * @version-history
+ *   v1.6.0 — 2026-09-24 — registerContactTools receives the session's bearer: the email lookup asks
+ *     the REST door with it, so the door's owner gate and limiter decide (security audit A5-2).
  *   v1.5.0 — 2026-09-24 — registerSeoTools receives the session's scopes: its operator tools, like the
  *     MCP proxy's registry pair, ask the operator:admin word at call time (security audit A8-1).
  *   v1.4.3 — 2026-09-24 — The MCP proxy, capability and app-tool groups take the session's scopes, which
@@ -200,7 +202,7 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     registerDmMessageTools(mcp, storage, config, agentGaii, peers);
     registerDmOrganizeTools(mcp, storage, config, agentGaii);
     registerNotifyTools(mcp, storage, config, agentGaii);
-    registerContactTools(mcp, storage, config, agentGaii);
+    registerContactTools(mcp, storage, config, agentGaii, getToken);
     registerCompanyTools(mcp, storage, config, agentGaii);
     // peers: pulling a package from another node reads that node's address and key from the peer
     // record, never from the caller's arguments.

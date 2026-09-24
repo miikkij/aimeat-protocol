@@ -9,10 +9,14 @@
  *   gate; email lookup is EXACT-match only (privacy-preserving hash — no enumeration). Contacts
  *   feed identity pickers: use a resolved/looked-up owner with aimeat_organism_invite /
  *   aimeat_organism_member_add / aimeat_workspace_member_grant.
- * @structure registerContactTools(mcp, storage, config, getAgentGaii) — registers
+ * @structure registerContactTools(mcp, storage, config, getAgentGaii, getToken) — registers
  *   aimeat_contact_list, aimeat_contact_add, aimeat_contact_remove, aimeat_contact_resolve_email.
  * @usage import { registerContactTools } from './contacts.js';
  * @version-history
+ *   v1.3.0 — 2026-09-24 — SECURITY (audit A5-2): aimeat_contact_resolve_email asks POST
+ *     /v1/contacts/resolve with the session's own bearer, over loopback, instead of calling the
+ *     service behind messages:read alone. The route's owner gate and its 20-per-10-minutes limiter
+ *     now decide for both doors, so an agent is refused exactly as REST refuses it.
  *   v1.2.0 — 2026-08-30 — aimeat_contact_list takes include (together, invites); aimeat_contact_invite
  *     sends a person an invitation to join this AIMEAT with no organism behind it. Same service
  *     functions as the routes.
@@ -29,11 +33,13 @@ import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
 import {
-    ContactsError, listContactsMerged, addContact, removeContact, resolveContactEmail, parseContactInclude,
+    ContactsError, listContactsMerged, addContact, removeContact, parseContactInclude,
     type AddContactInput,
 } from '../services/contacts.js';
 import { createContactInvitation, ContactInvitationError } from '../services/contact-invitations.js';
 import { invitePublic } from '../services/invitations.js';
+import { AimeatClient } from '../cli/connect/api-client.js';
+import { toolError } from './tool-error.js';
 
 /** The link shape both MCP surfaces accept, declared once so they cannot drift. */
 const LinkSchema = z.object({
@@ -46,6 +52,8 @@ export function registerContactTools(
     storage: Storage,
     config: AimeatConfig,
     getAgentGaii: () => string,
+    /** The session's live bearer: the email lookup asks the REST door with it (see below). */
+    getToken: () => string | undefined = () => undefined,
 ): void {
     /** Contacts belong to the OWNER — resolve the agent's owner GHII (never a client-supplied id). */
     const ownerGhii = (): string => {
@@ -148,6 +156,13 @@ export function registerContactTools(
     );
 
     // ── aimeat_contact_resolve_email — exact-match email → local owner ──
+    //
+    // THE ROUTE, NOT THE SERVICE. Whether an address has an account here is an oracle, so POST
+    // /v1/contacts/resolve is the account holder's door and throttled: requireRole('owner') and 20
+    // lookups per 10 minutes. This tool called resolveContactEmail() itself behind messages:read, so
+    // any agent holding that word asked as often as it liked (security audit A5-2). It now asks the
+    // route with the session's own bearer over loopback, the way aimeat_invoke does, so the gate and
+    // the limiter are the route's single copy and the agent reads the answer REST would give it.
     mcp.tool(
         'aimeat_contact_resolve_email',
         descriptionFor('aimeat_contact_resolve_email'),
@@ -156,12 +171,15 @@ export function registerContactTools(
         },
         annotationsFor('aimeat_contact_resolve_email'),
         async ({ email }) => {
-            try {
-                const result = await resolveContactEmail(storage, email);
-                return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
-            } catch (e) {
-                return { content: [{ type: 'text' as const, text: errText(e) }], isError: true };
+            const bearer = getToken();
+            if (!bearer) return { ...toolError('AUTH_REQUIRED', 'This session carries no credential to look the address up with.') };
+            // Loopback, not config.baseUrl: the call never leaves this process's host.
+            const client = new AimeatClient(`http://127.0.0.1:${config.port}`, bearer);
+            const answer = await client.post('/v1/contacts/resolve', { email });
+            if (!answer.ok) {
+                return { ...toolError(answer.error?.code ?? 'REFUSED', answer.error?.message ?? 'The lookup was refused.') };
             }
+            return { content: [{ type: 'text' as const, text: JSON.stringify(answer.data, null, 2) }] };
         },
     );
 }
