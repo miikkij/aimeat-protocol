@@ -584,7 +584,7 @@ export const BUILT = {
  * public pages did before and after, and the interactions with a theme's CSS worn.
  */
 export const BUILT_WITHOUT_DECISION = {
-  'themes-and-styles': { title: 'Themes & Styles', commit: 'PENDING', onMain: false, date: '2026-09-24',
+  'themes-and-styles': { title: 'Themes & Styles', commit: '6dc3916c2 and 848267736', onMain: false, date: '2026-09-24',
     what: 'The admin view Themes & Styles (Design group): a theme holds styles, component CSS and theme CSS; the look picker offers the themes and their styles; the six built-in looks are now the AIMEAT theme. Measured against the old code (origin/main) on the same data.',
     sets: [
       set('The move: the home, the account record and the chat in the six built-in styles, three widths, both modes', 108, 0),
