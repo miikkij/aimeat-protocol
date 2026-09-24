@@ -6,6 +6,9 @@
  *   schemas, ontologies, prompts, actions, boards, seed-data and lib registrations. Extracted
  *   from src/routes/cortex.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.3.0 — 2026-09-24 — The ceiling pre-pass is activationRefusal(), exported, so a cortex redeploy
+ *     asks it before it swaps libs, stores the manifest and tears the old activation down
+ *     (db8a5635a633). It takes the activation a redeploy replaces, whose boards go first.
  *   v1.2.0 — 2026-09-14 — The public-board ceiling is asked BEFORE the component walk, for all the
  *     new public boards at once. It was asked at the board-template case, in the middle of the walk,
  *     and a refusal there is a throw: every schema, prompt, action and ontology listed before that
@@ -20,10 +23,39 @@ import { randomBytes } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, CortexExtensionRecord, CortexActivationArtifacts } from '../../storage/interface.js';
 import { logger } from '../../utils/logger.js';
-import { publicBoardCeiling } from '../../services/board-write.js';
+import { publicBoardCeiling, type BoardWriteRefusal } from '../../services/board-write.js';
 import { cortexOntologyToSkos } from '../../services/cortex-ontology-skos.js';
 
 // ── Activation Logic ──
+
+/**
+ * What activating `ext` would refuse, asked without writing anything: the public-board ceiling,
+ * for all of its NEW public boards at once (asking per board would count the same free slot
+ * several times over). activateExtension asks it before its component walk; a cortex redeploy asks
+ * it before it swaps a byte (routes/cortex.ts upsertCortex).
+ *
+ * `replacing` is an activation torn down before this one runs, as a redeploy tears down the old one:
+ * its boards are deleted first, so they are neither "already there" nor held against the ceiling.
+ */
+export async function activationRefusal(
+  ext: Pick<CortexExtensionRecord, 'name' | 'components'>,
+  config: AimeatConfig,
+  storage: Storage,
+  gaii: string,
+  isOperator = false,
+  replacing?: Pick<CortexExtensionRecord, 'activationArtifacts'>,
+): Promise<BoardWriteRefusal | null> {
+  const leaving = new Set(replacing?.activationArtifacts.boardIds ?? []);
+  let wanted = 0;
+  for (const comp of ext.components) {
+    if (comp.type !== 'board-template' || comp.visibility !== 'public') continue;
+    const boardId = `cortex-${ext.name}-${comp.name}`;
+    if (!leaving.has(boardId) && await storage.getBoard(boardId)) continue;   // already there, and staying
+    wanted++;
+  }
+  if (wanted === 0) return null;
+  return publicBoardCeiling({ storage, config }, { gaii, roles: isOperator ? ['operator'] : [] }, 'public', wanted, leaving);
+}
 
 export async function activateExtension(
   ext: CortexExtensionRecord,
@@ -51,22 +83,13 @@ export async function activateExtension(
   // walk, and a refusal there is a `throw` — so every schema lock, prompt, action and ontology
   // record the manifest listed BEFORE that template was already written, activateCortex never
   // reached the line that records them in activationArtifacts, and nothing was left that could take
-  // them back. The upsert path is worse: libraries and manifest already swapped, the previous
-  // activation's side effects already torn down. Found by the AI triage of 2026-09-13, twice.
+  // them back. The upsert path was worse: libraries and manifest already swapped, the previous
+  // activation's side effects already torn down. Found by the AI triage of 2026-09-13, twice; the
+  // upsert now asks activationRefusal() itself before its first write (routes/cortex.ts).
   //
-  // Asked once, for ALL the new public boards together, because asking per board before creating
-  // any of them would count the same free slot several times over.
-  const wantedPublicBoards: string[] = [];
-  for (const comp of ext.components) {
-    if (comp.type !== 'board-template' || comp.visibility !== 'public') continue;
-    if (await storage.getBoard(`cortex-${ext.name}-${comp.name}`)) continue;   // already there, not new
-    wantedPublicBoards.push(comp.name);
-  }
-  if (wantedPublicBoards.length > 0) {
-    const ceiling = await publicBoardCeiling({ storage, config },
-      { gaii, roles: isOperator ? ['operator'] : [] }, 'public', wantedPublicBoards.length);
-    if (ceiling) throw new Error(ceiling.message);
-  }
+  // Asked once, for ALL the new public boards together (activationRefusal says why).
+  const ceiling = await activationRefusal(ext, config, storage, gaii, isOperator);
+  if (ceiling) throw new Error(ceiling.message);
 
   for (const comp of ext.components) {
     switch (comp.type) {

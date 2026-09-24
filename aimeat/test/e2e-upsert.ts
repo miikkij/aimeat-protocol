@@ -5,6 +5,9 @@
  *   mid-upsert), init re-runs so new behaviour goes live, no quota slot consumed on update,
  *   identical bytes are a 200 no-op, and create-via-PUT works.
  * @version-history
+ *   v1.2.0 — 2026-09-24 — A redeploy of an active cortex that the public-board ceiling refuses
+ *     leaves the served bytes, the record and the live activation as they were (db8a5635a633).
+ *     Failed on the old code first.
  *   v1.1.0 — 2026-08-10 — The "no new quota slot consumed" assertion counts THIS owner's
  *     extensions instead of the node-wide total. The node seeds its own bundled packs at boot, so
  *     the total moved between the two list calls whenever seeding was still in flight, and the
@@ -309,6 +312,59 @@ await test('PUT with manifest name ≠ URL name → 400 NAME_MISMATCH', async ()
   });
   assert(status === 400, `status ${status}: ${JSON.stringify(body)}`);
   assert(body.error?.code === 'NAME_MISMATCH', `code: ${body.error?.code}`);
+});
+
+// REFUSE BEFORE THE FIRST WRITE (db8a5635a633). A redeploy of an ACTIVE cortex swaps the lib bytes,
+// stores the new manifest, tears the old activation down and only then activates the new one, and
+// that activation is where the public-board ceiling refused. So a refused redeploy left the new
+// bytes served, the old schemas and boards gone, and a record still saying "active".
+await test('A redeploy the board ceiling refuses changes nothing: bytes, manifest and the live activation stay', async () => {
+  const name = `upsertq${Date.now()}`;
+  const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }) });
+  assert(reg.status === 201, `owner ${reg.status}`);
+  const ts = new Date().toISOString();
+  const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: name, timestamp: ts, signature: await signMsg(reg.body.data.private_key, name + NODE_ID + ts) }) });
+  const hdr = { Authorization: `Bearer ${tok.body.data.token}` };
+  // Nine public boards of its own, so the cortex's one public board is the tenth and last allowed.
+  for (let i = 1; i <= 9; i++) {
+    const b = await json('/v1/boards', { method: 'POST', headers: hdr, body: JSON.stringify({ name: `Upsert quota board ${i}`, visibility: 'public' }) });
+    assert(b.status === 201, `board ${i}: ${b.status} ${JSON.stringify(b.body?.error)}`);
+  }
+  const cortex = `quota-redeploy-${Date.now()}`;
+  const keyOld = `upsertq.${Date.now()}.old`;
+  const keyNew = `upsertq.${Date.now()}.new`;
+  const manifest = (version: string, key: string, boards: string[]) => [
+    'apiVersion: cortex.aimeat.org/v1', 'kind: Extension', 'metadata:', `  name: ${cortex}`, `  namespace: ${name}`,
+    'spec:', `  version: "${version}"`, '  description: "A redeploy the board ceiling refuses"', '  components:',
+    '    - type: lib', '      name: q-ui', '      filename: q.js', '      exports: [render]',
+    '    - type: schema', '      name: lock', `      key_pattern: ${key}`, '      apply_to: exact',
+    '      schema:', '        type: object', '        properties:', '          title:', '            type: string',
+    ...boards.flatMap(b => ['    - type: board-template', `      name: ${b}`, `      title: Board ${b}`, '      visibility: public']),
+  ].join('\n') + '\n';
+  const install = await json('/v1/cortex', { method: 'POST', headers: hdr, body: JSON.stringify({ manifest: manifest('1.0.0', keyOld, ['first']), libs: { 'q.js': LIB_A } }) });
+  assert(install.status === 201, `install: ${install.status} ${JSON.stringify(install.body?.error)}`);
+  const act = await json(`/v1/cortex/${encodeURIComponent(cortex)}/activate`, { method: 'POST', headers: hdr });
+  assert(act.status === 200, `activate: ${act.status} ${JSON.stringify(act.body?.error)}`);
+
+  // The redeploy frees the old board and asks for two: nine plus two is over ten.
+  const put = await json(`/v1/cortex/${encodeURIComponent(cortex)}`, {
+    method: 'PUT', headers: hdr, body: JSON.stringify({ manifest: manifest('2.0.0', keyNew, ['first', 'second']), libs: { 'q.js': LIB_B } }),
+  });
+  assert(put.status === 403 && put.body.error?.code === 'BOARD_QUOTA', `the redeploy is refused by the ceiling: ${put.status} ${JSON.stringify(put.body?.error)}`);
+
+  const lib = await (await fetch(`${BASE}/v1/cortex/${encodeURIComponent(cortex)}/libs/q.js`)).text();
+  assert(lib.includes('render-A') && !lib.includes('render-B'), `the old bytes are still the served ones: ${lib.slice(0, 80)}`);
+  const detail = await json(`/v1/cortex/${encodeURIComponent(cortex)}`, { headers: hdr });
+  assert(detail.body.data?.version === '1.0.0' && detail.body.data?.status === 'active', `the record is as it was: ${detail.body.data?.version} ${detail.body.data?.status}`);
+  const oldLock = await json(`/v1/memory/${encodeURIComponent(keyOld)}/schema`, { headers: hdr });
+  assert(oldLock.body?.data?.has_schema === true, `the live activation's schema lock is still there: ${JSON.stringify(oldLock.body?.data)}`);
+  const newLock = await json(`/v1/memory/${encodeURIComponent(keyNew)}/schema`, { headers: hdr });
+  assert(newLock.body?.data?.has_schema === false, `and the refused one wrote none: ${JSON.stringify(newLock.body?.data)}`);
+  const board = await json(`/v1/boards/${encodeURIComponent(`cortex-${cortex}-first`)}/posts`, { headers: hdr });
+  assert(board.status === 200, `the live activation's board still stands: ${board.status}`);
+
+  await json(`/v1/cortex/${encodeURIComponent(cortex)}`, { method: 'DELETE', headers: hdr });
+  await json(`/v1/owners/${name}`, { method: 'DELETE', headers: hdr });
 });
 
 await test('Agent without cortex:write is rejected on PUT (scope gate)', async () => {

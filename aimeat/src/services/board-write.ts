@@ -45,6 +45,8 @@
  *   const out = await createBoard({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   v1.4.1 -- 2026-09-24 -- publicBoardCeiling() takes the boards the same act deletes first
+ *     (`leaving`), so a cortex redeploy can ask it before it tears the old activation down.
  *   v1.4.0 -- 2026-09-14 -- publicBoardCeiling() counts under the owner GHII and takes the number of
  *     boards the caller is about to open. It counted with isSameOwner(), which answers the empty
  *     string for the bare account name the cortex door passes, so that door's ceiling had never
@@ -216,13 +218,18 @@ export async function publicBoardCeiling(
      * it has to know BEFORE it writes the first of them — see routes/cortex/activation.ts.
      */
     wanted = 1,
+    /**
+     * Boards the same act deletes before it opens the new ones, so they do not count as held: a
+     * cortex redeploy tears its old activation down first, and it is asked before that teardown.
+     */
+    leaving: ReadonlySet<string> = new Set(),
 ): Promise<BoardWriteRefusal | null> {
     if (visibility !== 'public') return null;
     if (caller.roles.includes('operator')) return null;
     const { storage, config } = deps;
     const account = boardAccountOf(caller.gaii, config.nodeId);
     const mine = (await storage.listBoards({ visibility: 'public' }))
-        .filter(b => boardAccountOf(b.ownerGaii, config.nodeId) === account).length;
+        .filter(b => boardAccountOf(b.ownerGaii, config.nodeId) === account && !leaving.has(b.id)).length;
     if (mine + wanted <= config.boardPublicPerOwnerMax) return null;
     return {
         ok: false, status: 403, code: 'BOARD_QUOTA',
