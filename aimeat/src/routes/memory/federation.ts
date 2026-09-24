@@ -8,6 +8,8 @@
  *   POST /v1/memory writes: memory:write before the far node is asked, the same key checks at the
  *   door, and then services/memory-write.ts writeMemoryRecord with the caller's own roles and scopes.
  * @version-history
+ *   v1.5.0 — 2026-09-25 — pull and pull-remote refuse a key only this node writes (`__redirect__`,
+ *     `notif.`) before the far node is asked; the shared writer refused it only after the fetch.
  *   v1.4.0 — 2026-09-24 — pull and pull-remote store what the far node answered through
  *     writeMemoryRecord, after requireScope('memory:write') and the door's key checks (an ecosystem
  *     app's data areas, the keys the node trusts in the owner's namespace). They wrote with
@@ -28,7 +30,7 @@ import { requireAuth, requireScope } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { validateOutboundUrl } from '../../utils/url-validator.js';
 import { homeIdentityOf, isForeignPrincipal, resolveIdentity } from '../../utils/gaii.js';
-import { appMayWriteKey } from '../../utils/reserved-keys.js';
+import { appMayWriteKey, isServerWrittenKey, serverWrittenKeyRefusal } from '../../utils/reserved-keys.js';
 import { logger } from '../../utils/logger.js';
 import { writeMemoryRecord } from '../../services/memory-write.js';
 import { ecoMayWriteKey } from '../../services/ecosystem-access.js';
@@ -45,6 +47,9 @@ export function registerFederationRoutes(router: Router, ctx: MemoryRouteCtx): v
    * writes into. Neither depends on the value, so both are asked before the far node is.
    */
   async function pullKeyRefusal(req: Request, key: string): Promise<{ code: string; message: string } | null> {
+    // A key only this node writes (`__redirect__`, a `notif.` notification) is nobody's to pull in,
+    // whoever asks: refused here, before the far node is asked for it.
+    if (isServerWrittenKey(key)) return serverWrittenKeyRefusal(key);
     if (req.auth!.roles.includes('ecosystem') && !(await ecoMayWriteKey(storage, resolveIdentity(req.auth!, config.nodeId), key))) {
       return { code: 'DATA_AREA_DENIED', message: `Write to "${key}" is not permitted by this app's data-area allowlist` };
     }

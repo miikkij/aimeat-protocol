@@ -46,6 +46,9 @@
  * @usage
  *   cd aimeat && pnpm exec node --import tsx test/e2e-mailbox-push.ts
  * @version-history
+ *   v1.1.0 -- 2026-09-25 -- The two held notifications are written into the node's own database. The
+ *     suite wrote them through POST /v1/memory, which refuses a `notif.` key to every principal now:
+ *     its setup no longer matched production, where only the node writes a notification.
  *   v1.0.0 -- 2026-09-08 -- Initial.
  */
 import { spawn, type ChildProcess } from 'node:child_process';
@@ -60,6 +63,7 @@ import * as ed from '@noble/ed25519';
 import { startFakeSmtp, type FakeSmtp, type ParsedMail } from './helpers/fake-smtp.js';
 import { startFakePushReceiver, type FakePushReceiver } from './helpers/fake-push.js';
 import { waitForServer } from './helpers/wait-for-server.js';
+import { createStorage } from '../src/storage/storage-factory.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -348,19 +352,23 @@ async function run(): Promise<void> {
         assert(w.status === 201, `settings write ${w.status}: ${short(w.body)}`);
 
         // Two notifications old enough to be past the digest's one-hour cutoff and marked held, so
-        // one arc of fixtures drives both sweeps.
+        // one arc of fixtures drives both sweeps. They go straight into this node's own database:
+        // only the node writes a notification record (utils/reserved-keys.ts refuses `notif.` on
+        // every memory door), and no door writes one that is two hours old and already held.
         const old = new Date(Date.now() - 2 * 3_600_000).toISOString();
-        for (const tag of ['aaaaaaaa', 'bbbbbbbb']) {
-            const value = {
-                id: `${tag}-${STAMP}`, type: 'report', title: `Held while quiet (${tag})`,
-                body: 'waited for the morning', link: '', actions: [], read: false, held: true, createdAt: old,
-            };
-            const n = await json('/v1/memory', {
-                method: 'POST', headers: bearer(sweepToken),
-                body: JSON.stringify({ key: `notif.${old}.${tag}`, value, visibility: 'private', tags: ['notif'], ttl_hours: 24 }),
-            });
-            assert(n.status === 201, `held notification write ${n.status}: ${short(n.body)}`);
-        }
+        const store = await createStorage({ provider: 'sqlite', sqlitePath: join(dbDir, 'mailbox-push.db') });
+        try {
+            for (const tag of ['aaaaaaaa', 'bbbbbbbb']) {
+                const value = {
+                    id: `${tag}-${STAMP}`, type: 'report', title: `Held while quiet (${tag})`,
+                    body: 'waited for the morning', link: '', actions: [], read: false, held: true, createdAt: old,
+                };
+                await store.setMemory({
+                    key: `notif.${old}.${tag}`, ownerGaii: `${sweepOwner}@${NODE_ID}`, value, visibility: 'private',
+                    tags: ['notif'], ttlHours: 24, version: 1, createdAt: old, updatedAt: old,
+                });
+            }
+        } finally { await store.close?.(); }
         const list = await json('/v1/notifications', { headers: bearer(sweepToken) });
         assert(list.status === 200, `list ${list.status}`);
         // Count nothing: registering through the web door leaves its own notifications behind, and

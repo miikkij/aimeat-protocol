@@ -44,11 +44,14 @@
  *     of this owner on this node.
  *   v1.11.0 — 2026-09-24 — getRun and listRuns return a run as a door may serve it: an observation of a
  *     credential record is redacted as the memory doors redact it (run-redaction.ts).
+ *   v1.12.0 — 2026-09-25 — A `*` pattern that could reach a prefix only the node writes (`notif.`) is
+ *     a reserved step key too, asked of SERVER_WRITTEN_KEY_PREFIXES rather than of the prefixes it
+ *     happens to share a head with.
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { buildGAII, parseGEAI } from '../../utils/gaii.js';
-import { isReservedServerKey, RESERVED_OWNER_KEY_PREFIXES, SERVER_WRITTEN_KEYS } from '../../utils/reserved-keys.js';
+import { isReservedServerKey, RESERVED_OWNER_KEY_PREFIXES, SERVER_WRITTEN_KEYS, SERVER_WRITTEN_KEY_PREFIXES } from '../../utils/reserved-keys.js';
 import { template } from './engine-util.js';
 import { missingStepScopes, stepScopeRefusal, type WorkflowCaller } from './step-authority.js';
 import { shownRun } from './run-redaction.js';
@@ -199,7 +202,8 @@ function mayNameReservedKey(pattern: string): boolean {
   const head = pattern.slice(0, star);
   return isReservedServerKey(head)
     || RESERVED_OWNER_KEY_PREFIXES.some(p => p.startsWith(head))
-    || SERVER_WRITTEN_KEYS.some(k => k.startsWith(head));
+    || SERVER_WRITTEN_KEYS.some(k => k.startsWith(head))
+    || SERVER_WRITTEN_KEY_PREFIXES.some(p => p.startsWith(head));
 }
 
 /** The key or key_glob of every `llm` leaf in a signal tree: the records the node's model is shown. */

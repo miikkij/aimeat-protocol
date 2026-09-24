@@ -10,6 +10,8 @@
  * @structure NotificationsTab (default) — state, loads, handlers, the ctx bag, render
  * @usage Registered in views/profile.js TABS as id 'notifications'.
  * @version-history
+ *   v2.2.0 — 2026-09-25 — An inline action runs only when its button calls a door of this node's own
+ *     API (isRunnableActionEndpoint); any other says why it was not used, and nothing is sent.
  *   v2.1.0 — 2026-09-13 — Nothing is saved while the owner's settings are not loaded. The page saves
  *     the whole record, and a save built from defaults after a failed load erased the owner's muted
  *     senders and quiet hours (docs/pitfalls.md §84).
@@ -117,6 +119,12 @@ export default function NotificationsTab({ session, showToast }) {
     }, { danger: true });
   }
   async function runAction(n, a) {
+    // The button runs with the owner's session, so only one that calls a door of this node's own API
+    // runs at all: the same rule the bell and a push click ask (notif.isRunnableActionEndpoint).
+    if (!notif.isRunnableActionEndpoint(a.endpoint)) {
+      setResults(s => ({ ...s, [n.id]: { ok: false, msg: c('action.refused') } }));
+      return;
+    }
     if (a.confirm && !window.confirm(c('action.confirm'))) return;
     setBusyId(n.id);
     try {

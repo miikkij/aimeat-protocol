@@ -15,10 +15,15 @@
  *   (services/ecosystem-access.ts). See
  *   docs/coding-guidelines/security-development-dna.md invariant #2.
  * @structure RESERVED_OWNER_KEY_PREFIXES · isReservedServerKey(key) ·
- *   SERVER_WRITTEN_KEYS · isServerWrittenKey(key) · serverWrittenKeyRefusal(key) ·
- *   appMayWriteKey(roles, key, delegatedOwnerWrite?, reservedAllowed?)
+ *   SERVER_WRITTEN_KEYS · SERVER_WRITTEN_KEY_PREFIXES · isServerWrittenKey(key) ·
+ *   serverWrittenKeyRefusal(key) · appMayWriteKey(roles, key, delegatedOwnerWrite?, reservedAllowed?)
  * @usage import { appMayWriteKey } from '../utils/reserved-keys.js';
  * @version-history
+ *   v1.12.0 — 2026-09-25 — `notif.` is written only by the node (SERVER_WRITTEN_KEY_PREFIXES). A
+ *     notification carries buttons the owner's browser runs with the owner's own session, so a
+ *     principal that could write one could make the owner's next click call any door in their name.
+ *     Every memory door that refuses `__redirect__` refuses it now, to every principal; notify()
+ *     writes it straight to storage. The refusal names the door that does send a notification.
  *   v1.11.0 — 2026-09-24 — A second, stricter kind of reserved key: one the node writes itself and
  *     no memory door accepts from ANY principal, the account owner included. `__redirect__` is the
  *     first: the public agent profile forwards every visitor to the address it names, and the
@@ -171,9 +176,26 @@ export const RESERVED_OWNER_KEY_PREFIXES = [
  */
 export const SERVER_WRITTEN_KEYS: readonly string[] = ['__redirect__'];
 
-/** True iff `key` is written only by the node itself. Matched exactly: a key is an address. */
+/**
+ * Key prefixes the node writes itself, under the same rule as SERVER_WRITTEN_KEYS: no memory door
+ * accepts a key under one of them, from any principal, the account owner included.
+ *
+ * `notif.` (2026-09-25) is the owner's notification inbox (services/notify.ts). A notification can
+ * carry buttons, and the owner's browser runs an `api` button with the owner's own session: the bell,
+ * the Notifications page and a push click all do. So whoever writes the record chooses which door the
+ * owner's next click calls, and in their name. notify() is the one writer, straight to storage; POST
+ * /v1/notifications is how an app, an agent or the owner sends one, and it takes no buttons. The
+ * owner still reads, marks and clears the inbox through /v1/notifications, and still deletes a record.
+ */
+export const SERVER_WRITTEN_KEY_PREFIXES: readonly string[] = ['notif.'];
+
+/**
+ * True iff `key` is written only by the node itself: one of SERVER_WRITTEN_KEYS exactly (a key is an
+ * address, so `__redirect__.old` is ordinary data), or a key under one of SERVER_WRITTEN_KEY_PREFIXES.
+ */
 export function isServerWrittenKey(key: unknown): boolean {
-  return typeof key === 'string' && SERVER_WRITTEN_KEYS.includes(key);
+  if (typeof key !== 'string') return false;
+  return SERVER_WRITTEN_KEYS.includes(key) || SERVER_WRITTEN_KEY_PREFIXES.some((prefix) => key.startsWith(prefix));
 }
 
 /**
@@ -187,6 +209,13 @@ export function isReservedServerKey(key: string): boolean {
 
 /** What a memory door answers when asked to write one of them, and which act writes it instead. */
 export function serverWrittenKeyRefusal(key: string): { code: 'RESERVED_KEY'; message: string } {
+  if (key.startsWith('notif.')) {
+    return {
+      code: 'RESERVED_KEY',
+      message: `"${key}" is a notification, and only this node writes those. No memory door accepts it. `
+        + 'To tell the account owner something, send a notification with POST /v1/notifications.',
+    };
+  }
   return {
     code: 'RESERVED_KEY',
     message: `"${key}" is written only by this node, when an agent moves to another node. No memory door accepts it.`,

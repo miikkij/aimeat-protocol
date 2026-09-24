@@ -13,6 +13,8 @@
  *   - NotificationBell({ t, onNavigate }) — t = i18n fn, onNavigate(path) = SPA navigate.
  * @usage import { NotificationBell } from '/components/NotificationBell.js';  html`<${NotificationBell} t=${t} onNavigate=${navigate} />`
  * @version-history
+ *   v1.6.0 — 2026-09-25 — An api button runs only when it calls a door of this node's own API
+ *     (isRunnableActionEndpoint); any other says why it was not used, and nothing is sent.
  *   v1.1.0 — 2026-09-24 — A notification's actions are the shared menu row, in a column; the action's
  *     style no longer picks a coral or framed button (Jouni's decision "Menu row").
  *   v1.0.0 — 2026-06-08 — Initial: header bell + dropdown + mark-read for the notification inbox.
@@ -36,7 +38,7 @@ import htm from 'htm';
 import { onLiveUpdate } from '/lib/live-updates.js';
 import { swallowed } from '/js/swallowed.js';
 import { getJwt } from '/js/services/auth.js';
-import { titleOf, bodyOf, sourceName } from '/js/services/notifications.js';
+import { titleOf, bodyOf, sourceName, isRunnableActionEndpoint } from '/js/services/notifications.js';
 import { ago } from '/js/format.js';
 const html = htm.bind(h);
 
@@ -180,7 +182,13 @@ export function NotificationBell({ t, onNavigate }) {
   const actionLabel = (a) => tr(ACTION_I18N[a.id], a.label || a.id);
 
   // 'api' action (approve/deny/accept/decline/reject): call the endpoint with the owner's session.
+  // Every button that is not a reply or a link lands here, so the endpoint is judged here: only a door
+  // of this node's own API runs with the session (isRunnableActionEndpoint, the page's half of the rule).
   const runApi = async (n, a) => {
+    if (!isRunnableActionEndpoint(a.endpoint)) {
+      setResults(s => ({ ...s, [n.id]: { ok: false, msg: tr('notif.action.refused', 'The button was not used, because it does not belong to this service.') } }));
+      return;
+    }
     if (a.confirm && !window.confirm(tr('notif.action.confirm', 'Are you sure?'))) return;
     setBusyKey(`${n.id}:${a.id}`);
     const r = await api(a.endpoint, { method: a.method || 'POST', body: a.body ? JSON.stringify(a.body) : undefined });

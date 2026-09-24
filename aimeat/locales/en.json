@@ -7880,6 +7880,7 @@
   "notifpage.action.reject": "Reject",
   "notifpage.action.confirm": "Are you sure?",
   "notifpage.action.failed": "That did not go through.",
+  "notifpage.action.refused": "The button was not used, because it does not belong to this service.",
   "notifpage.kind.aimeat": "AIMEAT",
   "notifpage.kind.app": "app",
   "notifpage.kind.extension": "extension",
@@ -13300,7 +13301,8 @@
       "replyPlaceholder": "Write a reply…",
       "confirm": "Are you sure?",
       "sent": "Reply sent",
-      "failed": "Action failed"
+      "failed": "Action failed",
+      "refused": "The button was not used, because it does not belong to this service."
     }
   },
   "oauthConsent": {

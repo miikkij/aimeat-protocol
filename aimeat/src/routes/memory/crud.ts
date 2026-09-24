@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description Core memory CRUD routes: POST /v1/memory (write), GET /v1/memory (list), GET /v1/memory/search. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.8.0 -- 2026-09-25 -- POST refuses a key only the node writes (`__redirect__`, `notif.`) before
+ *     the reserved-key guard, so an app or a delegated agent hears that nobody writes it here, rather
+ *     than that the owner does.
  *   v1.7.1 -- 2026-09-24 -- The federated test is isForeignPrincipal(), the one question (secaudit 2026-09, F-1).
  *   v1.7.0 -- 2026-09-16 -- The list and search answers show openrouter.apikey and commerce.psp through
  *     shownMemoryValue: a credential reads as configured, never as its ciphertext.
@@ -45,7 +48,7 @@ import { parseGaiiLoose } from '../../utils/gaii.js';
 import { cached, TTL } from '../../services/cache.js';
 import { writeMemoryRecord } from '../../services/memory-write.js';
 import { ecoMayWriteKey } from '../../services/ecosystem-access.js';
-import { appMayWriteKey } from '../../utils/reserved-keys.js';
+import { appMayWriteKey, isServerWrittenKey, serverWrittenKeyRefusal } from '../../utils/reserved-keys.js';
 import { resolveWriteTarget } from './owner-target.js';
 import { resolveIdentity, isForeignPrincipal } from '../../utils/gaii.js';
 import { exchangeOutcome } from '../../services/exchange-projection.js';
@@ -87,6 +90,15 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
       return;
     }
     let gaii = target.gaii;
+
+    // A key only the node writes (`__redirect__`, a `notif.` notification) is refused to everyone, the
+    // owner included, and with the words that say so. The shared writer refuses it again below; asked
+    // here first, an app or a delegated agent is not told the owner could have written it.
+    if (typeof key === 'string' && isServerWrittenKey(key)) {
+      const refusal = serverWrittenKeyRefusal(key);
+      res.status(403).json(error(config.nodeId, refusal.code, refusal.message));
+      return;
+    }
 
     // Reserved-key guard (DNA invariant #2): a role-'app' token (H-2 app grant) has sub = the owner's
     // GHII, so its memory:write lands in the owner's namespace — where the server reads openrouter.*

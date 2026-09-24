@@ -13782,6 +13782,13 @@ paths:
     post:
       operationId: writeMemory
       summary: Write memory
+      description: >-
+        Write one memory record. A key only this node writes is refused with 403 RESERVED_KEY to every
+        principal, the owner included: `__redirect__` (where a ported agent went) and every `notif.` key
+        (a notification, whose buttons the owner's browser runs with the owner's session; POST
+        /v1/notifications sends one). An app grant, or an agent writing into the owner's namespace, is
+        also refused with 403 RESERVED_KEY for a key the node reads to decide what it does (its AI
+        settings, the spend cap, a payout record).
       tags: [Memory]
       security:
         - BearerAuth: []
@@ -13816,6 +13823,8 @@ paths:
                         $ref: '#/components/schemas/MemoryWriteResult'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '413':
           description: Memory quota exceeded
         '422':
@@ -34423,6 +34432,11 @@ paths:
         `{ id, label, kind }` where kind is `reply` (opens a reply box → POST /v1/messages),
         `api` (calls `endpoint` with the caller's own session, e.g. approve/deny a request), or
         `navigate` (a deep link). Actions are set only by trusted node emit code — see the POST note.
+        No memory door writes a notification record (a `notif.` key): each refuses it with 403
+        RESERVED_KEY to every principal, the owner included. An `api` action is served only when its
+        `endpoint` is a door of this node's own API: a path of this node under `/v1/`, still under
+        `/v1/` once its dot segments resolve. Any other action, and one of an unknown kind, is left out
+        of the answer and logged, whatever wrote the record.
 
         Every row also carries `source` ({ kind: aimeat|app|extension|agent|owner, name, id? }, derived
         from the title prefix for rows written before it travelled with them), `group` (organisms,
