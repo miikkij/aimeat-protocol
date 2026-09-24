@@ -42,8 +42,13 @@ jobs:
         with:
           python-version: "3.12"
 
+      # What this job builds is what the publish job uploads, so every build tool comes from
+      # requirements-ci.txt, which names a sha256 for each package, as wheels only (pip checks no
+      # hash inside a source build's own environment). The build below then runs in this
+      # environment (--no-isolation) rather than in a fresh one it would fill from PyPI.
       - name: Install build backend
-        run: python -m pip install --upgrade pip build
+        run: |
+          python -m pip install --require-hashes --only-binary :all: -r requirements-ci.txt
 
       - name: Verify version tag matches pyproject.toml
         # Prevents accidentally publishing a tag that does not match the
@@ -61,7 +66,7 @@ jobs:
           echo "Version check OK: $TAG_VERSION"
 
       - name: Build distributions
-        run: python -m build
+        run: python -m build --no-isolation
 
       - name: List built artifacts
         run: ls -la dist/

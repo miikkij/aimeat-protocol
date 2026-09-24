@@ -1,0 +1,12 @@
+# The Python tools CI installs to build and test this package, at exact versions. requirements-ci.txt
+# is this file with a hash for every package (and every package they need), on every platform:
+#   uv pip compile requirements-ci.in -o requirements-ci.txt --generate-hashes --universal --python-version 3.12
+# The workflows install it with --require-hashes. To move a version, change it here, run the line
+# above from this folder, and commit both files.
+pip==26.2.1
+build==1.6.1
+hatchling==1.32.4
+# hatchling's editable build (the test job's `pip install -e .`) imports it.
+editables==0.6
+# The test job exports the package's own dependencies from uv.lock with it.
+uv==0.12.18

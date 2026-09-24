@@ -93,8 +93,11 @@ jobs:
         with:
           python-version: '3.12'
 
+      # Semgrep and every package it needs come from requirements-semgrep.txt, which names a sha256
+      # for each, as wheels only (pip checks no hash inside a source build's own environment).
       - name: Install Semgrep
-        run: pip install semgrep
+        run: |
+          pip install --require-hashes --only-binary :all: -r security/semantic-audit/requirements-semgrep.txt
 
       - name: Run taint rules
         continue-on-error: true

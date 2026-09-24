@@ -5,6 +5,7 @@
  *   case is a file's text in and a list of findings out.
  * @usage cd aimeat && pnpm exec vitest run test/unit/check-supply-chain.test.ts
  * @version-history
+ *   v1.1.0 — 2026-09-24 — The pip rules in every workflow step, whatever the job holds.
  *   v1.0.0 — 2026-09-24 — Initial, with the gate.
  */
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -111,6 +112,25 @@ describe('check:supply-chain, workflows', () => {
   it('refuses a script piped into a shell, whatever else the step checks', () => {
     const wf = `on: push\npermissions: {}\njobs:\n  j:\n    runs-on: ubuntu-latest\n    steps:\n      - run: |\n          curl -fsSL https://example.com/install.sh | sh\n          echo "${SHA}  other.tar.gz" | sha256sum -c -\n`;
     expect(workflowFindings('w.yml', wf).map(f => [f.rule, f.line])).toEqual([['pipe-to-shell', 8]]);
+  });
+
+  it('holds the pip rules in every step, also in a job that can only read', () => {
+    const job = (run: string) => `on: push\npermissions:\n  contents: read\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - run: |\n          ${run}\n`;
+    const found = (run: string) => workflowFindings('w.yml', job(run)).map(f => [f.rule, f.line]);
+    // Refused: a name without ==, a requirements file without hashes, a local install that fetches
+    // what it needs, a build that fills its own environment, and a git+ address without a commit.
+    expect(found('python -m pip install --upgrade pip build')).toEqual([['pip-unpinned', 9], ['pip-unpinned', 9]]);
+    expect(found('pip install -r requirements.txt')).toEqual([['pip-unpinned', 9]]);
+    expect(found('pip install -e ".[dev]"')).toEqual([['pip-unpinned', 9]]);
+    expect(found('python -m build')).toEqual([['pip-unpinned', 9]]);
+    expect(found('pip install git+https://github.com/x/y.git')).toEqual([['git-unpinned', 9]]);
+    // Accepted: a hash-locked file, an exact version, a local install with everything already in
+    // place, and a build in the environment the job filled.
+    expect(found('python -m pip install --require-hashes --only-binary :all: -r requirements-ci.txt')).toEqual([]);
+    expect(found('pip install semgrep==1.178.0')).toEqual([]);
+    expect(found('python -m pip install --no-deps --no-build-isolation -e .')).toEqual([]);
+    expect(found('python -m build --no-isolation')).toEqual([]);
+    expect(workflowFindings('w.yml', job('pip install semgrep'))[0]?.fix).toMatch(/^job "build": pin "semgrep" with ==/);
   });
 });
 

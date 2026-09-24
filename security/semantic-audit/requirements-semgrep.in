@@ -1,0 +1,6 @@
+# The Semgrep version the semgrep-taint job runs. requirements-semgrep.txt is this file with a hash
+# for every package (and every package it needs), on every platform:
+#   uv pip compile requirements-semgrep.in -o requirements-semgrep.txt --generate-hashes --universal --python-version 3.12
+# The workflow installs it with --require-hashes. To move the version, change it here, run the line
+# above from this folder, and commit both files.
+semgrep==1.178.0
