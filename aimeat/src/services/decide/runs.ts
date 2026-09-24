@@ -29,6 +29,10 @@
  * @usage
  *   const run = await startDecideRun(storage, config, caller, { questions, keys, fields });
  * @version-history
+ *   v1.3.0 — 2026-09-24 — A run never sends a record the node reads and trusts (utils/reserved-keys.ts)
+ *     to the provider: a `keys` list naming one is refused 403 RESERVED_KEY, a `prefix` runs over the
+ *     keys it resolves to less those, and the read itself checks again. The old guard read only the
+ *     prefix as typed, so `prefix: "de"` reached `decide.apikey`.
  *   v1.2.0 — 2026-09-23 — A run may name the decision provider every item is asked on.
  *   v1.1.0 — 2026-09-20 — A run may name one of the owner's decision rules in place of questions;
  *     each result then carries the rule's outcome.
@@ -48,6 +52,7 @@ import { ruleForCaller } from './rules.js';
 import { getProvider } from './providers.js';
 import { DecideError } from './errors.js';
 import { Semaphore } from './pacer.js';
+import { isReservedServerKey } from '../../utils/reserved-keys.js';
 
 const RUN_PREFIX = 'decide.runs.';
 const RUNS_KEPT = 50;
@@ -114,6 +119,12 @@ const active = new Map<string, { stop: boolean }>();
 // builders by name read this one as the workflows prefix.
 const decideRunKey = (id: string) => `${RUN_PREFIX}${id}`;
 
+/** Why a run does not send these records: the node reads them to decide what it does. */
+function reservedSubjectMessage(keys: string[]): string {
+  return `${keys.map(k => `"${k}"`).join(', ')}: this node reads ${keys.length === 1 ? 'that record' : 'those records'} `
+    + 'to decide what it does, so a decision run does not send it to a decision provider.';
+}
+
 async function save(storage: Storage, owner: string, run: DecideRun): Promise<void> {
   run.updated_at = new Date().toISOString();
   const done = Object.values(run.results).filter(r => r.decision_id).length;
@@ -151,6 +162,12 @@ async function work(storage: Storage, config: AimeatConfig, caller: DecideCaller
     if (flag.stop) return;
     let state = item.state;
     if (run.source !== 'items') {
+      // Checked again at the read, where the record would leave: a run stored before startDecideRun
+      // refused these keys can still be resumed.
+      if (isReservedServerKey(item.subject)) {
+        run.results[item.subject] = { error: { code: 'RESERVED_KEY', message: reservedSubjectMessage([item.subject]) } };
+        return;
+      }
       const rec = await storage.getMemory(caller.gaii, item.subject);
       if (!rec) {
         run.results[item.subject] = { error: { code: 'NOT_FOUND', message: 'The record is gone.' } };
@@ -263,14 +280,22 @@ export async function startDecideRun(
     if (!Array.isArray(input.keys) || input.keys.some(k => typeof k !== 'string' || !k)) {
       throw new DecideError('INVALID_BODY', 400, 'keys must be a list of memory keys.');
     }
+    // Every record a run reads goes to the decision provider. A key the node reads and trusts (its
+    // AI and decision keys, the payout record, the spend cap) is not sent, and a list that names one
+    // is refused whole rather than run in part.
+    const reserved = input.keys.filter(k => isReservedServerKey(k));
+    if (reserved.length > 0) throw new DecideError('RESERVED_KEY', 403, reservedSubjectMessage(reserved));
     items = [...new Set(input.keys)].map(k => ({ subject: k }));
     source = 'keys';
   } else {
-    if (typeof input.prefix !== 'string' || input.prefix.length < 2 || input.prefix.startsWith('decide.')) {
+    // A prefix that lies wholly inside the node's own records names nothing of the owner's. One that
+    // merely covers some of them ("de" covers decide.*) runs over the rest: the check is made on the
+    // keys the prefix RESOLVES to, which is where it was missing.
+    if (typeof input.prefix !== 'string' || input.prefix.length < 2 || isReservedServerKey(input.prefix)) {
       throw new DecideError('INVALID_BODY', 400, 'prefix must name a key prefix of your own records.');
     }
     const meta = await storage.listMemoryMeta(caller.gaii, { prefix: input.prefix });
-    items = meta.map(m => ({ subject: m.key }));
+    items = meta.filter(m => !isReservedServerKey(m.key)).map(m => ({ subject: m.key }));
     source = 'prefix';
   }
   if (items.length === 0) throw new DecideError('INVALID_BODY', 400, 'There is nothing to decide: no items.');

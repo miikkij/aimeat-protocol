@@ -37,6 +37,8 @@
  *     out of step with the balance paying for them.
  *   v1.1.0 — 2026-06-14 — Add GEAI (ecosystem app) identity helpers; harden GAII parsers to reject
  *     `eco:`; make parseGaiiLoose/resolveIdentity GEAI-aware (ecosystem-apps foundation, chunk 1).
+ *   v1.5.1 — 2026-09-24 — RESERVED_NAMES gains `security-system` and `scheduler`, the two owners
+ *     the node writes under itself that were still open to registration.
  */
 import { randomBytes } from 'node:crypto';
 
@@ -65,10 +67,15 @@ const GEAI_RE = /^eco:([a-z0-9][a-z0-9-]{1,62}[a-z0-9])#([a-z0-9][a-z0-9-]{1,62}
 // 'support' and 'operators' are the two halves of `support@operators`, the named address that
 // reaches whoever runs this node (services/message-alias.ts). An owner or agent registered under
 // either name would make the address ambiguous, so neither is available.
+// 'security-system' and 'scheduler' are owners the node writes under itself: every security
+// incident and quarantined upload (services/security-incident.ts), and the caller of an unattended
+// extension run. An account with that name would own the namespace. Every owner name the source
+// writes as `<name>@${nodeId}` is held to this list by test/unit/synthetic-owner-names.test.ts.
 export const RESERVED_NAMES = new Set([
   'admin', 'system', 'root', 'operator', 'operators', 'support', 'meat', 'aimeat', 'node', 'network',
   'registry', 'anonymous', 'null', 'undefined', 'test', 'debug', 'internal',
   'public', 'private', 'shared', 'all', 'none', 'any', 'self', 'global',
+  'security-system', 'scheduler',
 ]);
 
 export interface ParsedGAII {

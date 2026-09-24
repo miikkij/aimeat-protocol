@@ -59,6 +59,8 @@
  *     guard for a workflow whose keys carry a run-distinguishing var. The event-trigger loops no
  *     longer pre-check overlap themselves, because they cannot see the definition; startRun can.
  *     The fan-out itself moved to engine-triggers.ts (pure move, max-file-lines).
+ *   v1.8.0 — 2026-09-24 — startRun refuses a run whose finished keys would write, or send out, a key
+ *     the node trusts (store.ts reservedStepKeys). A variable can complete a key only at start.
  */
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
@@ -70,7 +72,7 @@ import { emitChange } from '../event-bus.js';
 import { logger } from '../../utils/logger.js';
 import { evaluateSignal, extractProgress, type SignalEvalCtx } from './signal-eval.js';
 import { buildEvalCtx } from './eval-context.js';
-import { getWorkflow, validateWorkflow, runKey, type ResolvedStep } from './store.js';
+import { getWorkflow, validateWorkflow, runKey, reservedStepKeys, reservedStepKeyErrors, type ResolvedStep } from './store.js';
 import { readEventTriggers, readEcosystemEventTriggers, readActiveRuns, reconcileActiveRun } from './lifecycle.js';
 import { fireMemoryWrite, fireOfferOrdered, fireEcosystemEvent, type TriggerDeps } from './engine-triggers.js';
 import { template, runDateIn } from './engine-util.js';
@@ -201,6 +203,10 @@ export class WorkflowEngine {
 
     const runId = randomUUID();
     const vars = this.resolveVars(def, opts.vars, runId);
+    // The finished keys, now that the variables are fixed for the whole run: no step writes, or sends
+    // out, a key the node trusts (store.ts reservedStepKeys; save judged only what the templates spell).
+    const reserved = reservedStepKeys(def.steps, v.resolved, vars, opts.mode === 'full-sandbox' ? `wf-test.${runId}.` : '');
+    if (reserved.length > 0) return { error: reservedStepKeyErrors(reserved) };
     const now = new Date().toISOString();
     const steps: Record<string, WorkflowRunStep> = {};
     for (const s of def.steps) steps[s.id] = { state: 'pending', attempt: 0, reads: [], writes: [] };

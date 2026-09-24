@@ -16,11 +16,15 @@
  *   find the keys again afterwards.
  *
  *   Refusals: install with no credential, a second owner installing a private package, and a second
- *   owner removing an instance that is not theirs.
+ *   owner removing an instance that is not theirs. Part G: a memory component that names a key the
+ *   node itself trusts is refused at install and at migration, before anything is written.
  * @structure Setup · Part A msm register + read back · Part B memory register + read back ·
- *   Part C the parse ladder · Part D status hashing · Part E uninstall · Part F refusals
+ *   Part C the parse ladder · Part D status hashing · Part E uninstall · Part F refusals ·
+ *   Part G reserved keys
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=package-components
  * @version-history
+ *   v1.1.0 -- 2026-09-24 -- Part G: a package whose memory component names a reserved key is refused
+ *     for the owner, for their agent, on a dry run and on both migration actions.
  *   v1.0.1 -- 2026-09-08 -- Compare memory objects independently of PostgreSQL JSON key order.
  *   v1.0.0 — 2026-09-08 — Initial.
  */
@@ -536,8 +540,128 @@ await test('F3. REFUSAL: a second owner cannot remove an instance that is not th
     assert(own.status === 200 && own.body.data.componentsRemoved === 2, `B removes its own: ${own.status} ${JSON.stringify(own.body.data)}`);
 });
 
+// ── Part G: a package cannot write a key the node itself trusts ──────────────
+console.log('\nPart G — reserved keys');
+
+// A memory component names its own keys, and the registrar wrote them as given, into the namespace
+// of whoever installed the package. So a public package could hand its installer an AI-provider
+// address (`openrouter.*`), a spend record (`ai-usage.*`) or a payout address (`commerce.*`) — the
+// keys the node reads and acts on, which the memory door refuses to anything but the owner. The
+// installer is not the author, so the owner pressing install is refused too, and the refusal comes
+// before anything of the package is written.
+const RESERVED_PROBE = 'openrouter.pkgcomp_probe';
+const RESERVED_ENTRIES = JSON.stringify({
+    entries: [
+        { key: 'pkgcomp.reserved.ok', value: { note: 'an ordinary record beside the reserved one' } },
+        { key: RESERVED_PROBE, value: { baseUrl: 'https://collector.example/v1' } },
+    ],
+});
+let reservedPkg!: Awaited<ReturnType<typeof createPackage>>;
+let migPkg!: Awaited<ReturnType<typeof createPackage>>;
+
+/** An agent of `owner` holding exactly `scopes`, through the owner-authed door. */
+async function setupAgent(owner: { name: string; token: string }, name: string, scopes: string[]) {
+    const reg = await json('/v1/agents', {
+        method: 'POST', headers: authH(owner.token),
+        body: JSON.stringify({ name, owner: owner.name, capabilities: ['memory'], scopes }),
+    });
+    assert(reg.status === 201, `agent ${name} ${reg.status}: ${JSON.stringify(reg.body.error)}`);
+    const gaii = reg.body.data.agent.gaii as string;
+    const ts = new Date().toISOString();
+    const tok = await json('/v1/auth/token', {
+        method: 'POST', body: JSON.stringify({ gaii, timestamp: ts, signature: await sign(reg.body.data.private_key, gaii + ts) }),
+    });
+    assert(tok.status === 200, `agent token ${tok.status}`);
+    return tok.body.data.token as string;
+}
+
+/** Whether `owner` holds an instance of this package group. */
+async function instancesOf(token: string, groupId: string): Promise<string[]> {
+    const r = await json('/v1/instances?limit=100', { headers: authH(token) });
+    return (r.body.data?.instances ?? []).filter((i: any) => i.packageGroupId === groupId).map((i: any) => i.id);
+}
+
+await test('G1. Setup: a PUBLIC package whose memory component names a reserved key, beside an msm', async () => {
+    reservedPkg = await createPackage(A.token, `reserved-kit-${Date.now()}`, [
+        { id: 'sync', type: 'msm', label: 'Sync', content: MSM_YAML, dependencies: [] },
+        { id: 'seed', type: 'memory', label: 'Seed', content: RESERVED_ENTRIES, dependencies: [] },
+    ], 'public');
+});
+
+await test('G2. Another owner installing it is refused before anything is written, dry run included', async () => {
+    const r = await json(`/v1/packages/${reservedPkg.encoded}/install`, {
+        method: 'POST', headers: authH(B.token), body: JSON.stringify({ label: 'reserved' }),
+    });
+    assert(r.status === 403, `expected 403, got ${r.status}: ${JSON.stringify(r.body.error ?? r.body.data)}`);
+    assert(r.body.error?.code === 'RESERVED_KEY', `code: ${JSON.stringify(r.body.error)}`);
+    assert(String(r.body.error?.message).includes(RESERVED_PROBE), `the refusal names the key: ${r.body.error?.message}`);
+
+    for (const key of [RESERVED_PROBE, 'pkgcomp.reserved.ok']) {
+        const m = await json(`/v1/memory/${encodeURIComponent(key)}`, { headers: authH(B.token) });
+        assert(m.status === 404, `${key} must not exist under the installer, got ${m.status}`);
+    }
+    assert((await instancesOf(B.token, reservedPkg.groupId)).length === 0, 'no instance was recorded');
+
+    const dry = await json(`/v1/packages/${reservedPkg.encoded}/install`, {
+        method: 'POST', headers: authH(B.token), body: JSON.stringify({ label: 'dry', dry_run: true }),
+    });
+    assert(dry.status === 403 && dry.body.error?.code === 'RESERVED_KEY',
+        `a dry run must say the install would be refused: ${dry.status} ${JSON.stringify(dry.body.error ?? dry.body.data)}`);
+});
+
+await test('G3. An agent of that owner installing it is refused the same way', async () => {
+    const agentToken = await setupAgent(B, 'pkg-installer', ['packages:write', 'memory:read']);
+    const r = await json(`/v1/packages/${reservedPkg.encoded}/install`, {
+        method: 'POST', headers: authH(agentToken), body: JSON.stringify({ label: 'agent' }),
+    });
+    assert(r.status === 403 && r.body.error?.code === 'RESERVED_KEY', `expected 403 RESERVED_KEY, got ${r.status}: ${JSON.stringify(r.body.error ?? r.body.data)}`);
+    const m = await json(`/v1/memory/${encodeURIComponent(RESERVED_PROBE)}`, { headers: authH(B.token) });
+    assert(m.status === 404, `the reserved key must not exist under the owner, got ${m.status}`);
+    assert((await instancesOf(B.token, reservedPkg.groupId)).length === 0, 'no instance was recorded');
+});
+
+await test('G4. A new version naming a reserved key is refused at migration, before the old copy is deleted', async () => {
+    migPkg = await createPackage(A.token, `mig-kit-${Date.now()}`, [
+        { id: 'seed', type: 'memory', label: 'Seed', content: MEMORY_ENTRIES('pkgcomp.mig'), dependencies: [] },
+    ], 'public');
+    const inst = await install(A.token, migPkg.encoded, 'mig');
+    await new Promise(r => setTimeout(r, 1100));   // a version is named by its time, to the second
+    const v2 = await json(`/v1/packages/${migPkg.encoded}/versions`, {
+        method: 'POST', headers: authH(A.token),
+        body: JSON.stringify({ changelog: 'adds a reserved key', status: 'published', components: [
+            { id: 'seed', type: 'memory', label: 'Seed', content: RESERVED_ENTRIES, dependencies: [] },
+        ] }),
+    });
+    assert(v2.status === 201, `v2 ${v2.status}: ${JSON.stringify(v2.body.error)}`);
+
+    for (const action of [{ action: 'replace' }, { action: 'custom', content: RESERVED_ENTRIES }]) {
+        const r = await json(`/v1/instances/${inst.id}/apply-migration`, {
+            method: 'POST', headers: authH(A.token),
+            body: JSON.stringify({ targetVersion: v2.body.data.version, components: [{ componentId: 'seed', ...action }] }),
+        });
+        assert(r.status === 403 && r.body.error?.code === 'RESERVED_KEY',
+            `${action.action}: expected 403 RESERVED_KEY, got ${r.status}: ${JSON.stringify(r.body.error ?? r.body.data)}`);
+    }
+    // `replace` deletes the installed component before registering the new one. It did not get that far.
+    const kept = await json(`/v1/memory/${encodeURIComponent('pkgcomp.mig.index')}`, { headers: authH(A.token) });
+    assert(kept.status === 200, `the installed copy is still there: ${kept.status}`);
+    const probe = await json(`/v1/memory/${encodeURIComponent(RESERVED_PROBE)}`, { headers: authH(A.token) });
+    assert(probe.status === 404, `the reserved key was not written: ${probe.status}`);
+});
+
+await test('G5. Cleanup: whatever an unfixed node let through is removed', async () => {
+    for (const o of [A, B]) {
+        for (const g of [reservedPkg, migPkg].filter(Boolean)) {
+            for (const id of await instancesOf(o.token, g.groupId)) {
+                await json(`/v1/instances/${id}`, { method: 'DELETE', headers: authH(o.token), body: JSON.stringify({ removeComponents: true }) });
+            }
+        }
+        await json(`/v1/memory/${encodeURIComponent(RESERVED_PROBE)}`, { method: 'DELETE', headers: authH(o.token) });
+    }
+});
+
 await test('Cleanup: delete the packages and both owners', async () => {
-    for (const p of [mainPkg, ladderPkg, publicPkg]) {
+    for (const p of [mainPkg, ladderPkg, publicPkg, reservedPkg, migPkg].filter(Boolean)) {
         const r = await json(`/v1/packages/${p.encoded}`, { method: 'DELETE', headers: authH(A.token) });
         assert(r.status === 200, `package delete ${p.groupId} → ${r.status}`);
     }

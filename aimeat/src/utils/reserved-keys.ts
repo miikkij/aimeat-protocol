@@ -15,9 +15,14 @@
  *   (services/ecosystem-access.ts). See
  *   docs/coding-guidelines/security-development-dna.md invariant #2.
  * @structure RESERVED_OWNER_KEY_PREFIXES · isReservedServerKey(key) ·
+ *   SERVER_WRITTEN_KEYS · isServerWrittenKey(key) · serverWrittenKeyRefusal(key) ·
  *   appMayWriteKey(roles, key, delegatedOwnerWrite?, reservedAllowed?)
  * @usage import { appMayWriteKey } from '../utils/reserved-keys.js';
  * @version-history
+ *   v1.11.0 — 2026-09-24 — A second, stricter kind of reserved key: one the node writes itself and
+ *     no memory door accepts from ANY principal, the account owner included. `__redirect__` is the
+ *     first: the public agent profile forwards every visitor to the address it names, and the
+ *     porting route is its one writer. isReservedServerKey answers for both kinds.
  *   v1.10.0 — 2026-09-19 — `decide.` joins the list: the owner's TypeSafe key and the policy that says
  *     which personal data the decision scrubber may let through (TARGET-080).
  *   v1.9.1 — 2026-09-16 — The `crews.llm.` comment said the runtime publishes its catalogue past this
@@ -148,9 +153,44 @@ export const RESERVED_OWNER_KEY_PREFIXES = [
   'decide.',
 ] as const;
 
-/** True iff `key` falls under a reserved, server-trusted owner-namespace prefix. */
+/**
+ * Keys the node writes itself and no memory door accepts from any principal: not an app, not an
+ * agent in its own namespace, and not the account owner either.
+ *
+ * The reserved prefixes above stop a DELEGATED write, because what they hold is the owner's to set:
+ * the owner writing their own AI settings is the point of those keys. A key here is different in
+ * both halves. The server reads it in every namespace, so an agent writing into its own is as
+ * dangerous as an app writing into the owner's; and nobody sets it by hand, because it records an
+ * act the node performed. The door that performs the act writes it, and every memory door refuses it.
+ *
+ * `__redirect__` (2026-09-24) is where a ported agent went. The unauthenticated GET /v1/agents/:gaii
+ * reads it when no agent lives at that address and forwards the visitor there, so it is an
+ * instruction to everyone who looks the address up. Its one writer is the porting route
+ * (routes/agents/management.ts), straight to storage. An exact key, not a prefix, which is why it is
+ * not in the list above, whose every entry ends in a dot.
+ */
+export const SERVER_WRITTEN_KEYS: readonly string[] = ['__redirect__'];
+
+/** True iff `key` is written only by the node itself. Matched exactly: a key is an address. */
+export function isServerWrittenKey(key: unknown): boolean {
+  return typeof key === 'string' && SERVER_WRITTEN_KEYS.includes(key);
+}
+
+/**
+ * True iff the server reads `key` and acts on it: a reserved owner-namespace prefix, or a key only
+ * the node itself writes. What every internal path that writes a key it was handed, or sends a
+ * record out of the node, asks before it does.
+ */
 export function isReservedServerKey(key: string): boolean {
-  return RESERVED_OWNER_KEY_PREFIXES.some((prefix) => key.startsWith(prefix));
+  return RESERVED_OWNER_KEY_PREFIXES.some((prefix) => key.startsWith(prefix)) || isServerWrittenKey(key);
+}
+
+/** What a memory door answers when asked to write one of them, and which act writes it instead. */
+export function serverWrittenKeyRefusal(key: string): { code: 'RESERVED_KEY'; message: string } {
+  return {
+    code: 'RESERVED_KEY',
+    message: `"${key}" is written only by this node, when an agent moves to another node. No memory door accepts it.`,
+  };
 }
 
 /**

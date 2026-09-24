@@ -29,6 +29,8 @@
  *   const out = await writeMemoryRecord({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   v1.9.0 — 2026-09-24 — RESERVED_KEY for a key only the node writes (`__redirect__`): refused for
+ *     every principal and in every namespace, the owner and an agent's own included.
  *   v1.8.1 — 2026-09-24 — The federated test is isForeignPrincipal(), the one question (secaudit 2026-09, F-1).
  *   v1.8.0 — 2026-09-16 — SECRET_RECORD: openrouter.apikey and commerce.psp are refused on every
  *     generic write road. The generic read doors show them redacted, so a value saved back would
@@ -90,6 +92,7 @@ import { parseGAII, isForeignPrincipal } from '../utils/gaii.js';
 import { undeclaredSpaceForKey } from './workspace-write-items.js';
 import { odpsWriteRefusal } from './exchange-odps-write.js';
 import { isSecretRecordKey, secretRecordWriteRefusal } from './secret-records.js';
+import { isServerWrittenKey, serverWrittenKeyRefusal } from '../utils/reserved-keys.js';
 
 /** What a caller must supply for the fan-out that a memory write sets off. */
 export interface MemoryWriteFanout {
@@ -204,6 +207,8 @@ export type MemoryWriteResult =
             | 'UNDECLARED_SPACE'
             // A record that holds a credential, written through a door that does not own it.
             | 'SECRET_RECORD'
+            // A key only the node itself writes (utils/reserved-keys.ts SERVER_WRITTEN_KEYS).
+            | 'RESERVED_KEY'
             // An EXCHANGE listing source whose changed text would break an ODPS length cap.
             | 'ODPS_FIELD_TOO_LONG';
         message: string;
@@ -259,6 +264,13 @@ export async function writeMemoryRecord(
     if (isSecretRecordKey(input.key) && input.pipeline !== 'mcp.commerce') {
         const refusal = secretRecordWriteRefusal(input.key);
         return { ok: false, status: 403, code: 'SECRET_RECORD', message: refusal.message };
+    }
+    // A key the node writes itself (utils/reserved-keys.ts SERVER_WRITTEN_KEYS) is refused here for
+    // every principal, the owner included, and in every namespace: the server reads it wherever it
+    // is, so an agent writing into its own is the same act as an app writing into the owner's.
+    if (isServerWrittenKey(input.key)) {
+        const refusal = serverWrittenKeyRefusal(input.key);
+        return { ok: false, status: 403, code: refusal.code, message: refusal.message };
     }
 
     // 1b. An anonymous identity writes under anonymous.* and nowhere else. The HTTP route has said

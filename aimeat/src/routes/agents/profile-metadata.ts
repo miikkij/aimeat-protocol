@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description Agent read + owner-managed metadata routes (public profile, list, tags, engagements, mode, concurrency, schedule constraints, heartbeat). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.9.0 — 2026-09-24 — GET /v1/agents/:gaii forwards a ported agent only to an active federation
+ *     peer, at an address built from that peer's own URL (services/agent-port-redirect.ts). It
+ *     forwarded to whatever the pointer said.
  *   v1.8.0 — 2026-09-06 — The health verdict is given the owner's connected principals, so an agent
  *     parked on its daemon's socket reads as available instead of stale. Nine of this owner's
  *     agents were being called problems while a socket was open for each of them.
@@ -54,6 +57,7 @@ import { computeAgentHealthMany } from '../../services/agent-health.js';
 import { getActiveConnectTunnelManager } from '../../services/connect-tunnel.js';
 import type { AgentOnboardingRecord } from '../../storage/types/agents-messaging.js';
 import { credentialHealthForOwner, summariseCredentialHealth } from '../../services/agent-credential-health.js';
+import { portRedirectFor } from '../../services/agent-port-redirect.js';
 
 /** HTTP status for a refusal from services/agent-profile-write.ts. */
 function agentWriteStatus(code: AgentWriteRefusal['code']): number {
@@ -70,17 +74,17 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
     const gaii = decodeURIComponent(req.params.gaii as string);
     const agent = await storage.getAgent(gaii);
     if (!agent) {
-      // Check for redirect pointer (ported agent)
-      const redirect = await storage.getMemory(gaii, '__redirect__');
-      if (redirect && typeof redirect.value === 'object' && redirect.value !== null && 'target_node_url' in (redirect.value as Record<string, unknown>)) {
-        const val = redirect.value as { target_node_url: string; target_node_id?: string; ported_at?: string };
-        const location = `${val.target_node_url}/v1/agents/${encodeURIComponent(gaii)}`;
-        res.setHeader('Location', location);
+      // A ported agent's pointer, honoured only towards an active federation peer and built from that
+      // peer's own URL (services/agent-port-redirect.ts). This answer goes to anyone, so an address
+      // the node does not already trust is treated as no pointer at all.
+      const moved = await portRedirectFor(storage, gaii);
+      if (moved) {
+        res.setHeader('Location', moved.location);
         res.status(301).json(success(config.nodeId, {
           ported: true,
-          target_node_url: val.target_node_url,
-          target_node_id: val.target_node_id,
-          ported_at: val.ported_at,
+          target_node_url: moved.targetNodeUrl,
+          target_node_id: moved.targetNodeId,
+          ported_at: moved.portedAt,
           message: 'Agent has been ported. Follow the Location header.',
         }));
         return;

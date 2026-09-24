@@ -20,6 +20,8 @@
  *   import { installPackage } from '../services/package-install.js';
  *   const out = await installPackage({ storage, config, scheduler }, caller, { groupId });
  * @version-history
+ *   v1.1.0 — 2026-09-24 — A package whose memory component names a key the node trusts is refused
+ *     with 403 RESERVED_KEY before any component registers, on a dry run too.
  *   v1.0.0 — 2026-08-23 — Pure extraction out of routes/instances/install.ts so the node's own MCP
  *     surface can install a package. Behaviour, status codes and messages unchanged.
  */
@@ -40,6 +42,7 @@ import {
     fetchComponentContent,
     computeHash,
 } from './component-registrar.js';
+import { reservedKeysInComponent, reservedComponentMessage } from './package-memory-component.js';
 import { registerExtensionSchedules } from './extension-schedules.js';
 import { emitChange } from './event-bus.js';
 import type { Scheduler } from './scheduler.js';
@@ -211,6 +214,22 @@ export async function installPackage(
     });
 
     const instanceLabel = (typeof label === 'string' && label) ? label : `${pkg.name} instance`;
+
+    // ── Refuse before anything is written ────────────────────────────
+    // A memory component names its own keys, and they land in THIS installer's namespace. None may be
+    // a key the node reads and trusts (services/package-memory-component.ts). Every component is
+    // checked before the first one registers, so a refusal leaves nothing to roll back, and a dry run
+    // gives the same answer. The owner pressing install is refused too: the author is not the owner.
+    for (const planned of plannedComponents) {
+        const comp = componentMap.get(planned.componentId)!;
+        const reserved = reservedKeysInComponent(comp.type, comp.content, planned.registeredAs);
+        if (reserved.length > 0) {
+            return {
+                ok: false, status: 403, code: 'RESERVED_KEY',
+                message: `${reservedComponentMessage(comp.id, reserved)} Nothing was installed.`,
+            };
+        }
+    }
 
     // ── Dry run: validate without registering ────────────────────────
     if (isDryRun) {

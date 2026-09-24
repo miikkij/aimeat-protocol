@@ -10535,6 +10535,14 @@ paths:
                     properties:
                       data:
                         $ref: '#/components/schemas/AgentProfile'
+        '301':
+          description: >-
+            The agent moved to another node. Location is the agent's address on that node, built from
+            this node's own record of it. Given only when the node it moved to is an active federation
+            peer; a pointer to any other address answers 404, as if there were none.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
         '404':
           $ref: '#/components/responses/NotFound'
 
@@ -15609,6 +15617,11 @@ paths:
         each value one state) or `prefix`. At most 1000 items. Answers 202 at once.
 
 
+        A run does not send a record this node reads to decide what it does (its AI and decision
+        keys, a payout record, the spend cap): a `keys` list that names one is refused with 403
+        RESERVED_KEY, and a `prefix` runs over the records it covers less those.
+
+
         Requires an owner session or a token carrying `ai:use`.
       tags: [Memory]
       security:
@@ -15638,6 +15651,8 @@ paths:
         '202':
           $ref: '#/components/responses/AimeatSuccess'
         '400':
+          $ref: '#/components/responses/AimeatError'
+        '403':
           $ref: '#/components/responses/AimeatError'
         '503':
           $ref: '#/components/responses/AimeatError'
@@ -41867,7 +41882,11 @@ paths:
     post:
       operationId: installPackage
       summary: Install package
-      description: Install a package, creating an instance with registered components.
+      description: >-
+        Install a package, creating an instance with registered components. A memory component
+        writes into the installer's namespace, so one that names a key this node reads to decide what
+        it does (an AI-provider setting, the spend cap, a payout record) is refused with 403
+        RESERVED_KEY before any component registers, for the owner too. A dry run answers the same.
       tags: [Instances]
       security:
         - BearerAuth: []
@@ -41900,6 +41919,8 @@ paths:
                         $ref: '#/components/schemas/PackageInstanceRecord'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           description: Package not found
 
@@ -42060,7 +42081,10 @@ paths:
     post:
       operationId: applyMigration
       summary: Apply migration
-      description: Apply a migration to update an instance to a newer package version.
+      description: >-
+        Apply a migration to update an instance to a newer package version. A memory component that
+        names a key this node reads to decide what it does is refused with 403 RESERVED_KEY, for
+        replace, custom and install_new alike, before anything is deleted.
       tags: [Instances]
       security:
         - BearerAuth: []
@@ -43805,8 +43829,10 @@ paths:
         Rejected (400 WORKFLOW_INVALID, `error.details.errors[]`) unless the `after` graph is a DAG
         and every step's agent/offer is workflow-compatible — i.e. publishes `success_signal` +
         `required_to_function` + `deliverable.location`. A step using an `llm` signal leaf requires
-        `llm.approved=true` (owner consent to node-LLM use). Authorable by the owner or an agent
-        holding `workflow:write`.
+        `llm.approved=true` (owner consent to node-LLM use). A step may not write, or send out of the
+        node, a key this node reads to decide what it does (`openrouter.*`, `ai-usage.*`,
+        `commerce.*` and the rest of the reserved keys). Authorable by the owner or an agent holding
+        `workflow:write`.
       tags: [Workflows]
       security:
         - BearerAuth: []
@@ -43939,7 +43965,9 @@ paths:
                           skipped: { type: boolean, description: 'true when nothing was started because a run is already in flight. Absent otherwise.' }
                           reason: { type: string, description: 'With skipped=true: why, and what to set to let runs overlap.' }
         '400':
-          description: Could not start the run (error.details.errors[] lists why)
+          description: >-
+            Could not start the run (error.details.errors[] lists why). This includes a key a variable
+            completes into one this node reads and trusts: the finished keys are judged at start.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/AimeatEnvelope' }
