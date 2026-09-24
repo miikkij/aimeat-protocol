@@ -7,6 +7,7 @@
  * @usage Linked from public/spa.html right after theme.css, in the order theme.css held these rules
  *   (the shell block), and from every standalone page that links theme.css.
  * @version-history
+ *   v1.1.0 — 2026-09-24 — A notification's actions are menu rows in a column.
  *   v1.0.0 — 2026-09-24 — Moved unchanged from css/theme.css (lines 636-958), so theme.css
  *     holds tokens only (UI consolidation, a move).
  */
@@ -110,8 +111,9 @@
 .notif-item-title { font-size: var(--text-note); font-weight: var(--weight-semibold); color: var(--text); }
 .notif-item-body { font-size: 0.78rem; color: var(--muted); margin-top: 0.15rem; }
 .notif-item-time { font-size: 0.7rem; color: var(--muted); margin-top: 0.2rem; }
-/* Inline notification actions (reply / approve / deny …) */
-.notif-actions { display: flex; flex-wrap: wrap; gap: 0.4rem; padding: 0 0.85rem 0.55rem; }
+/* A notification's actions (reply / approve / deny …) are menu rows in a column (poster.css
+   .poster-menu-row, Jouni's decision "Menu row"). */
+.notif-actions { display: flex; flex-direction: column; align-items: stretch; padding: 0 0.85rem 0.55rem; }
 .notif-action-btn { font-size: 0.74rem; padding: 0.25rem 0.7rem; border-radius: 7px; line-height: 1.3; }
 .notif-reply { padding: 0 0.85rem 0.6rem; }
 .notif-reply-input { width: 100%; box-sizing: border-box; resize: vertical; font: inherit; font-size: var(--text-small); padding: 0.4rem 0.5rem; border-radius: 7px; border: 1px solid var(--border); background: var(--bg-dim); color: var(--text); }

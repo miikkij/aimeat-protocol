@@ -22,6 +22,8 @@
  * @usage
  *   html`<${PromptCard} label=${t('...')} prompt=${text} copyLabel=${t('...')} />`
  * @version-history
+ *   2026-09-24: The menu's rows are the shared menu row, .poster-menu-row, with their look unchanged
+ *     (Jouni's decision "Menu row").
  *   2026-09-24: More (⌄) is the small icon button (Jouni's decision "Icon button").
  *   2026-09-23: The label is the shared row label, .poster-label (Jouni's decision "Row label").
  *   2026-09-23: Composed from the shared parts in css/parts.css and css/parts-steps.css (class names by role, values moved from views/home.css unchanged; UI consolidation slice 1).
@@ -102,23 +104,23 @@ export function PromptCard({
 
       ${open && html`
         <div class="poster-prompt-menu">
-          <button type="button" class="btn-ghost poster-prompt-menu-item"
+          <button type="button" class="poster-menu-row"
             onClick=${(e) => { stop(e); setBodyShown(v => !v); setOpen(false); }}>
             ${bodyShown ? tr('prompt.hideText', 'Hide the prompt') : tr('prompt.showText', 'Show the prompt')}
           </button>
           ${saveIntent && html`
-            <button type="button" class="btn-ghost poster-prompt-menu-item" disabled=${busy || saved}
+            <button type="button" class="poster-menu-row" disabled=${busy || saved}
               onClick=${(e) => { stop(e); run(saveIntent, () => setSaved(true)); }}>
               ${saved ? tr('prompt.saved', 'Waiting on your list') : tr('prompt.save', 'Leave it waiting')}
             </button>`}
           ${canGive && agents.map(a => html`
-            <button type="button" key=${a.gaii || a.name} class="btn-ghost poster-prompt-menu-item"
+            <button type="button" key=${a.gaii || a.name} class="poster-menu-row"
               disabled=${busy}
               onClick=${(e) => { stop(e); run(() => onGiveToAgent(a)); }}>
               ${tr('prompt.giveTo', 'Give it to')} ${a.display_name || a.name}
             </button>`)}
           ${extraActions.map((a, idx) => html`
-            <button type="button" key=${'x' + idx} class="btn-ghost poster-prompt-menu-item"
+            <button type="button" key=${'x' + idx} class="poster-menu-row"
               disabled=${busy || a.disabled}
               onClick=${(e) => { stop(e); run(a.run); }}>
               ${a.label}

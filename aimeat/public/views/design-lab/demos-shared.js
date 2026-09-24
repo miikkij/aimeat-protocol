@@ -9,6 +9,7 @@
  * @structure SHARED_DEMOS · SHAPE_DEMOS — { [id]: { variants: [{ name, render(ex) }], height?, emptyNote? } }
  * @usage import { SHARED_DEMOS, SHAPE_DEMOS } from './demos-shared.js';
  * @version-history
+ *   v1.4.0 — 2026-09-24 — The menu row's demo.
  *   v1.3.0 — 2026-09-24 — The tab's tile tone.
  *   v1.2.0 — 2026-09-24 — The icon button's demo.
  *   v1.1.0 — 2026-09-23 — The data map's and the dialog shape's demos go with them (Jouni's
@@ -122,6 +123,9 @@ export const SHAPE_DEMOS = {
     { name: 'default', render: () => html`<button type="button" class="btn-primary poster-slab">Do it</button>` },
     { name: 'large', render: () => html`<a class="btn-primary poster-slab poster-slab--large" href="#">Continue in the chat</a>` },
     { name: 'control', render: () => html`<button type="button" class="btn-primary poster-slab poster-slab--control">Send</button>` },
+  ] },
+  'menu-row': { variants: [
+    { name: 'default', render: () => html`<div class="poster-prompt-menu"><button type="button" class="poster-menu-row">Save as my own</button><button type="button" class="poster-menu-row">Give it to my agent</button></div>` },
   ] },
   'icon': { variants: [
     { name: 'default', render: () => html`<button type="button" class="poster-icon" aria-label="Attach a file">📎</button>` },

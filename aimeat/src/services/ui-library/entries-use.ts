@@ -51,7 +51,7 @@ export const USE_OF: Record<string, UiUse[]> = {
     'memory-embed': ['view'], mermaid: ['view'], 'offer-card-view': ['view', 'explain'],
     // The shapes of poster.css
     'page-title': ['explain'], section: ['layout'], panel: ['layout'], row: ['layout', 'list'], label: ['explain'],
-    action: ['act', 'navigate', 'pick'], slab: ['act'], icon: ['act'], box: ['view'], frame: ['view'], record: ['view', 'open'], choice: ['pick'],
+    action: ['act', 'navigate', 'pick'], slab: ['act'], icon: ['act'], 'menu-row': ['pick', 'act'], box: ['view'], frame: ['view'], record: ['view', 'open'], choice: ['pick'],
     sticker: ['status', 'navigate'], aside: ['explain', 'notify'], chip: ['status'], crumb: ['navigate'], count: ['count', 'status'],
     time: ['view'], stat: ['count', 'navigate'], 'showroom-band': ['layout'], 'showroom-section': ['layout'],
     'showroom-door': ['navigate'], 'showroom-slab': ['act'],
