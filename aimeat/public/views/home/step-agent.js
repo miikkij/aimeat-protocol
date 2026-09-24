@@ -17,6 +17,8 @@
  * @structure StepAgent({ state, onChanged }) — the open step 2.
  * @usage import { StepAgent } from './step-agent.js';
  * @version-history
+ *   2026-09-24: The name form's wrapper no longer wears the masthead's name class (Jouni's decision
+ *     "The agent step's name form").
  *   2026-09-24: A button that is not the next thing to do (no name yet, the prompt copied, started)
  *     is the underlined action link (Jouni's decision "Step button").
  *   2026-09-23: AgentCard deleted (Jouni's decision): no page had drawn it since eaf81e18c
@@ -160,9 +162,10 @@ export function StepAgent({ onChanged, showToast }) {
       <//>
 
       ${!named ? html`
-        ${/* This wrapper wears the masthead's name class, as it did before the library. Found,
-              not fixed: a visible change needs Jouni's decision (UI consolidation phase 1). */''}
-        <div class="poster-masthead-name">
+        ${/* The wrapper wore the masthead's name class until 2026-09-24, which set the label, the
+              hint, the field and the button in the headline letters; Jouni's decision "The agent
+              step's name form" removed it, so they read in the body letters. */''}
+        <div>
           <${PasteLabel} htmlFor="koti-agent-name">
             ${tr('home.agent.nameLabel', 'Give your agent a name')}
           <//>
