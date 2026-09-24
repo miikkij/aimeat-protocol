@@ -16,10 +16,15 @@
  *     - a space that does not name the app → 403 from the service (the organism's hand missing);
  *     - a memory space → 403 (row spaces only);
  *     - the same app granted by a NON-member → 403 (membership still required);
- *     - a member's own session keeps working as before on the same space.
+ *     - a member's own session keeps working as before on the same space;
+ *     - the space's writeRole is a ceiling for the app too: a plain member's app is refused a
+ *       writeRole:'admin' space and still writes a 'member' one, and the organism creator's app
+ *       writes the admin space.
  *
  *   Runs against a live server (E2E_BASE, default http://localhost:40251).
  * @version-history
+ *   v1.1.0 — 2026-09-24 — An app never exceeds the role of the person it acts for (secaudit 2026-09,
+ *     A6-8): the writeRole cases above, with a plain member P added directly by A.
  *   v1.0.0 — 2026-08-29 — Initial.
  */
 import * as ed from '@noble/ed25519';
@@ -120,6 +125,9 @@ await test('Setup: two owners, an organism, a workspace naming the app on one ro
             { name: 'event', schemaRef: 'schema:event@1', namespace: 'demo.event', backing: 'rows', writeRole: 'member', mode: 'records',
               indexOn: ['app', 'kind'], apps: [`${A.name}/${FILENAME}`] },
             { name: 'closed', schemaRef: 'schema:closed@1', namespace: 'demo.closed', backing: 'rows', writeRole: 'member', mode: 'records', indexOn: ['kind'] },
+            // Names the same app, and keeps writing to admins: the case A6-8 is about.
+            { name: 'audit', schemaRef: 'schema:audit@1', namespace: 'demo.audit', backing: 'rows', writeRole: 'admin', mode: 'records',
+              indexOn: ['kind'], apps: [`${A.name}/${FILENAME}`] },
             { name: 'note', schemaRef: 'schema:note@1', namespace: 'demo.notes', backing: 'memory', writeRole: 'member', mode: 'records' },
         ],
     };
@@ -189,6 +197,42 @@ await test('The member\'s own session keeps working on the same space', async ()
     assert(r.status === 200, `member append: ${r.status} ${JSON.stringify(r.body)}`);
     const g = await json(rowsUrl('event'), { headers: bearer(A.token) });
     assert(g.status === 200 && g.body.data.rows.length === 3, `member read: ${g.status} ${g.body.data?.rows?.length}`);
+});
+
+// ── The space's writeRole is a ceiling for the app too (secaudit 2026-09, A6-8) ──
+//
+// The app path used to return as soon as the space named the app and the person was a member, so the
+// writeRole an organism set on the space never applied to it: a plain member's app wrote a space kept
+// to admins. An app acts for its person, and it now carries exactly that person's role.
+let P!: Awaited<ReturnType<typeof setupOwner>>;
+let appOfP = '';
+
+await test('A6-8 setup: A adds P as a plain member, and P approves organism:rows for the same app', async () => {
+    P = await setupOwner('p');
+    const add = await json(`/v1/organisms/${orgId}/members`, { method: 'POST', headers: bearer(A.token), body: JSON.stringify({ ghii: P.name }) });
+    assert(add.status === 201 && add.body.data.member?.role === 'member', `add P ${add.status}: ${JSON.stringify(add.body)}`);
+    appOfP = await grantApp(P.token, A.name, ['memory:read', 'organism:rows']);
+    assert(!!appOfP, 'P holds an app token');
+});
+
+await test('A6-8: a plain member\'s app is refused a writeRole:"admin" space, and says why', async () => {
+    const r = await json(rowsUrl('audit'), { method: 'POST', headers: bearer(appOfP), body: JSON.stringify(row('audit', 'from a plain member\'s app')) });
+    assert(r.status === 403, `a plain member's app wrote an admin-only space: ${r.status} ${JSON.stringify(r.body)}`);
+    assert(/limited to an admin or the creator/.test(r.body.error?.message ?? ''), `message: ${r.body.error?.message}`);
+    const s = await json(`/v1/organisms/${orgId}/workspace/rows/audit/stats?ws=${WS}`, { headers: bearer(A.token) });
+    assert(s.status === 200 && s.body.data.stats.rows === 0, `nothing was written: ${JSON.stringify(s.body.data)}`);
+});
+
+await test('A6-8: the same app still writes a writeRole:"member" space for P, and reads the admin one', async () => {
+    const r = await json(rowsUrl('event'), { method: 'POST', headers: bearer(appOfP), body: JSON.stringify(row('order', 'from P')) });
+    assert(r.status === 200 && r.body.data.written === 1, `member space: ${r.status} ${JSON.stringify(r.body)}`);
+    const g = await json(rowsUrl('audit'), { headers: bearer(appOfP) });
+    assert(g.status === 200, `reading is every member's: ${g.status} ${JSON.stringify(g.body)}`);
+});
+
+await test('A6-8: the organism creator\'s app writes the admin space', async () => {
+    const r = await json(rowsUrl('audit'), { method: 'POST', headers: bearer(appNamed), body: JSON.stringify(row('audit', 'from the creator\'s app')) });
+    assert(r.status === 200 && r.body.data.written === 1, `creator's app: ${r.status} ${JSON.stringify(r.body)}`);
 });
 
 console.log('\nCleanup');
