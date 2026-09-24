@@ -2762,6 +2762,8 @@
 
     // Minimal, SAFE markdown → HTML (escape first, then transform). Handles headings, bold, italic,
     // inline code, fenced code, ordered/unordered (nested) lists, links, and paragraphs.
+    // escapeHtml leaves a double quote as it is, and a link's address is written into a
+    // double-quoted attribute, so an address stops at a double quote; the text stays plain text.
     function renderMarkdown(src) {
       if (!src) return '';
       let s = escapeHtml(String(src));
@@ -2774,7 +2776,7 @@
         .replace(/`([^`]+)`/g, '<code class="cm-code">$1</code>')
         .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
         .replace(/(^|[^*])\*([^*\s][^*]*?)\*(?!\*)/g, '$1<em>$2</em>')
-        .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g,
+        .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s"]+)\)/g,
           '<a class="cm-link" data-href="$2" onclick="openExternal(this.dataset.href);return false;">$1</a>');
       const out = [];
       const stack = []; // { type, indent }

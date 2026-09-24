@@ -601,40 +601,14 @@ pub fn clear_node_logs(app: AppHandle) -> Result<(), String> {
 pub fn open_portal(app: AppHandle) -> Result<(), String> {
     let port = read_configured_port(&app);
     let url = format!("http://localhost:{}/v1/portal", port);
-    open_url(&url)
+    crate::opener::open_url(&url)
 }
 
-/// Open an external http(s) URL in the user's default browser (used for help links).
+/// Open an external http(s) URL in the user's default browser (help links, and links in a chat
+/// answer). The opener decides what may be opened; see opener.rs.
 #[tauri::command]
 pub fn open_external(url: String) -> Result<(), String> {
-    if !url.starts_with("https://") && !url.starts_with("http://") {
-        return Err("Only http(s) URLs are allowed".to_string());
-    }
-    open_url(&url)
-}
-
-#[cfg(windows)]
-fn open_url(url: &str) -> Result<(), String> {
-    // `cmd /C start "" <url>` opens the default browser; the empty "" is the window title.
-    Command::new("cmd")
-        .args(["/C", "start", "", url])
-        .spawn()
-        .map_err(|e| format!("Failed to open browser: {}", e))?;
-    Ok(())
-}
-
-#[cfg(not(windows))]
-fn open_url(url: &str) -> Result<(), String> {
-    let opener = if cfg!(target_os = "macos") {
-        "open"
-    } else {
-        "xdg-open"
-    };
-    Command::new(opener)
-        .arg(url)
-        .spawn()
-        .map_err(|e| format!("Failed to open browser: {}", e))?;
-    Ok(())
+    crate::opener::open_url(&url)
 }
 
 /// Parse a `.env` file content into a key-value map. Strips surrounding quotes.
