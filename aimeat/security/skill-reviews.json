@@ -2,7 +2,7 @@
   "about": "When each skill was last read against the code it describes, and which files that code is. pnpm check:skill-reviews fails when a watched file changes after the review, so whoever changed the code re-reads the skill. Re-stamp after reading with: pnpm check:skill-reviews --record <name>. Reasoning: aimeat/scripts/check-skill-reviews.ts.",
   "skills": {
     "node:aimeat-decide": {
-      "reviewedOn": "2026-09-23",
+      "reviewedOn": "2026-09-24",
       "watches": [
         "aimeat/src/static/sdk-libs/decide/index.js",
         "aimeat/src/services/decide/service.ts",
@@ -10,7 +10,7 @@
         "aimeat/src/services/decide/settings.ts",
         "aimeat/src/services/app-decide-posture.ts"
       ],
-      "digest": "sha256:121a6e2eb23326b66fd59df0"
+      "digest": "sha256:e9e49fac0aac7305011cb6e6"
     },
     "node:aimeat-open-items": {
       "reviewedOn": "2026-09-20",
@@ -193,12 +193,12 @@
       "digest": "sha256:c98a69659770428c6bd6ce8c"
     },
     "node:ai-transparency": {
-      "reviewedOn": "2026-09-19",
+      "reviewedOn": "2026-09-24",
       "watches": [
         "aimeat/src/mcp/ai-provenance-input.ts",
         "aimeat/src/services/ai-provenance.ts"
       ],
-      "digest": "sha256:b416ac94aac73b04af05b121"
+      "digest": "sha256:d8f59aafdc69533011a59422"
     },
     "node:aimeat-node-operations": {
       "reviewedOn": "2026-09-19",
@@ -444,7 +444,7 @@
     },
     "node:ai-transparency": {
       "aimeat/src/mcp/ai-provenance-input.ts": "449e2c4e36182748",
-      "aimeat/src/services/ai-provenance.ts": "03a8185fe7688c45"
+      "aimeat/src/services/ai-provenance.ts": "b9a2e289865427a5"
     },
     "node:aimeat-node-operations": {
       "aimeat/src/mcp/core-admin.ts": "db0624d23f6ee92b"
@@ -523,7 +523,7 @@
       "aimeat/src/static/sdk-libs/decide/index.js": "ce7328b35b4223c6",
       "aimeat/src/services/decide/service.ts": "cfb0f0215bb13b7d",
       "aimeat/src/services/decide/limits.ts": "65c3e881405e3685",
-      "aimeat/src/services/decide/settings.ts": "81c5fa8defcab692",
+      "aimeat/src/services/decide/settings.ts": "7ba7d7b35ef5682e",
       "aimeat/src/services/app-decide-posture.ts": "65d4966f4b6ff7a8"
     }
   }
