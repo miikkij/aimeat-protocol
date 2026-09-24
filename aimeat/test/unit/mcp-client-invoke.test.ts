@@ -12,6 +12,8 @@
  *   The upstream server is built with the SDK's own server half, so the protocol on the wire is the
  *   protocol, and the test moves when the SDK does.
  * @version-history
+ *   v1.1.0 — 2026-09-24 — A tool list past the ceiling is refused by name, parks the server and
+ *     caches nothing (secaudit 2026-09 A2-2).
  *   v1.0.0 — 2026-09-16 — Phase 1 of the MCP proxy.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
@@ -27,6 +29,7 @@ import {
 } from '../../src/services/mcp-client/invoke.js';
 import { sealMcpCredential } from '../../src/services/mcp-client/credential.js';
 import { mcpClientPool } from '../../src/services/mcp-client/pool.js';
+import { attachMcpServer } from '../../src/services/mcp-client/registry.js';
 
 // Loopback egress is gated, and the whole point of this suite is a real socket. RFC1918 and
 // link-local stay blocked regardless of this flag, which is what the SSRF suite relies on.
@@ -298,6 +301,78 @@ describe('the MCP proxy chokepoint, against a real server', () => {
     // which is a different sentence for the person reading it. mcp-peer-transport.test.ts holds
     // the rest of the peering rules.
     expect(r.code).toBe('PEER_UNKNOWN');
+  });
+});
+
+describe('a tool list larger than this node keeps', () => {
+  // Its own server, because the size is the whole point: one tool whose description alone is past
+  // the ceiling. Real servers list a hundred tools in 100 to 200 KB.
+  const BIG_PORT = 40695;
+  let big: http.Server;
+  const bigTransports = new Map<string, StreamableHTTPServerTransport>();
+
+  beforeAll(async () => {
+    big = http.createServer(async (req, res) => {
+      const sid = req.headers['mcp-session-id'] as string | undefined;
+      let transport = sid ? bigTransports.get(sid) : undefined;
+      if (!transport) {
+        const srv = new McpServer({ name: 'oversized', version: '1.0.0' });
+        srv.tool('huge', 'x'.repeat(600 * 1024), {}, async () => ({ content: [{ type: 'text', text: 'ok' }] }));
+        const created = new StreamableHTTPServerTransport({
+          sessionIdGenerator: () => randomUUID(),
+          onsessioninitialized: (id: string) => bigTransports.set(id, created),
+        });
+        transport = created;
+        await srv.connect(created);
+      }
+      let body: unknown;
+      if (req.method === 'POST') {
+        const chunks: Buffer[] = [];
+        for await (const c of req) chunks.push(c as Buffer);
+        body = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+      }
+      await transport.handleRequest(req, res, body);
+    });
+    await new Promise<void>((r) => big.listen(BIG_PORT, '127.0.0.1', () => r()));
+  });
+
+  afterAll(async () => {
+    await mcpClientPool.closeAll();
+    for (const t of bigTransports.values()) await t.close();
+    await new Promise<void>((r) => big.close(() => r()));
+  });
+
+  it('is refused by name, parks the server with the reason, and stores nothing', async () => {
+    const storage = new SqliteStorage(':memory:');
+    const row = makeRow({ slug: 'oversized', transport: { kind: 'http', url: `http://127.0.0.1:${BIG_PORT}/mcp` } });
+    await storage.createMcpServer(row);
+
+    const listed = await listRemoteTools(storage, config, row);
+    // Until 2026-09-24 this was ok, and the whole list was cached and served to every caller
+    // (secaudit 2026-09 A2-2).
+    expect(listed.ok).toBe(false);
+    if (listed.ok) return;
+    expect(listed.code).toBe('TOOL_LIST_TOO_LARGE');
+    expect(statusForRemoteRefusal(listed.code)).toBe(502);
+
+    const stored = await storage.getMcpServer(row.id);
+    expect(stored?.toolCache).toEqual([]);
+    expect(stored?.toolCacheHash).toBe('');
+    // Parked with the sentence the owner's panel shows, as the other failed looks are.
+    expect(stored?.status).toBe('unreachable');
+    expect(stored?.lastError).toBe(listed.message);
+    expect(listed.message).toContain('oversized');
+  });
+
+  it('refuses the attach by that name, not as a server that did not answer', async () => {
+    const storage = new SqliteStorage(':memory:');
+    const r = await attachMcpServer({
+      storage, config, ownerGhii: 'alice@node-a', createdBy: 'alice@node-a',
+      slug: 'oversized', title: 'Oversized', transport: { kind: 'http', url: `http://127.0.0.1:${BIG_PORT}/mcp` },
+    });
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.code).toBe('TOOL_LIST_TOO_LARGE');
   });
 });
 

@@ -28,6 +28,8 @@
  *   detachMcpServer
  * @usage const server = await requireUsableServer(storage, ownerGhii, idOrSlug);
  * @version-history
+ *   v1.4.0 — 2026-09-24 — An attach whose first look finds a tool list larger than this node keeps
+ *     is refused as TOOL_LIST_TOO_LARGE rather than UNREACHABLE, because the server did answer.
  *   v1.3.0 — 2026-09-24 — requireManageableServer: the write doors resolve a server through it, so a
  *     node-wide server the operator offers is no longer changed or removed by the owners it admits.
  *   v1.2.0 — 2026-09-17 — All three attach doors refuse this AIMEAT's own address (SELF_ADDRESS),
@@ -109,6 +111,8 @@ export type AttachRefusal =
   | 'SELF_ADDRESS'
   /** The first look at the server came back to this AIMEAT by another spelling of its address. */
   | 'LOOP_DETECTED'
+  /** The server answered with a tool list larger than this node keeps; it is parked, not attached. */
+  | 'TOOL_LIST_TOO_LARGE'
   | 'UNREACHABLE';
 
 /**
@@ -140,9 +144,11 @@ async function refusalFromProbe(
     case 'UPSTREAM_UNAUTHORIZED':
     case 'CREDENTIAL_UNREADABLE':
       return { ok: false, code: 'UPSTREAM_UNAUTHORIZED', message };
+    // TOOL_LIST_TOO_LARGE is its own answer: the server did answer, with more than this node keeps.
     case 'NO_ENCRYPTION_KEY':
     case 'STDIO_DISABLED':
     case 'STDIO_NOT_ALLOWED':
+    case 'TOOL_LIST_TOO_LARGE':
       return { ok: false, code, message };
     default:
       return { ok: false, code: 'UNREACHABLE', message };
