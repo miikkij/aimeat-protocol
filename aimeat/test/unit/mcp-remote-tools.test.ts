@@ -10,6 +10,8 @@
  *   to decide what it registers was tried on 2026-08-16 and was wrong in both directions inside an
  *   hour.
  * @version-history
+ *   v1.1.0 — 2026-09-24 — A flattened tool calls with the server row as it is at call time: a
+ *     server switched off or detached mid-session is honoured (secaudit 2026-09 a49e32ddeb4e).
  *   v1.0.0 — 2026-09-16 — Phase 3 of the MCP proxy.
  */
 import { describe, it, expect } from 'vitest';
@@ -28,11 +30,18 @@ const OWNER = 'alice@test-node-001';
 const AGENT = 'claude#alice@test-node-001';
 const config = { nodeId: 'test-node-001' } as unknown as AimeatConfig;
 
+type ToolAnswer = { content: { type: string; text: string }[]; isError?: boolean };
+
 /** Records what was registered, so the test asserts on the real calls rather than on source. */
 function fakeMcp() {
-  const registered: { name: string; cfg: Record<string, unknown> }[] = [];
+  const registered: {
+    name: string; cfg: Record<string, unknown>;
+    handler: (args: Record<string, unknown>) => Promise<ToolAnswer>;
+  }[] = [];
   const mcp = {
-    registerTool(name: string, cfg: Record<string, unknown>) { registered.push({ name, cfg }); },
+    registerTool(name: string, cfg: Record<string, unknown>, handler: (args: Record<string, unknown>) => Promise<ToolAnswer>) {
+      registered.push({ name, cfg, handler });
+    },
   } as unknown as McpServer;
   return { mcp, registered };
 }
@@ -208,6 +217,34 @@ describe('what must NOT reach the tool list', () => {
     expect(await registerRemoteTools(mcp, deps(storage))).toBe(1);
     // A control whose only possible answer is a refusal costs the AI a turn to discover.
     expect(registered.map(r => r.name)).toEqual(['jira__read_issue']);
+  });
+
+  it('a server switched off after the session opened is off for its flattened tools too', async () => {
+    const storage = new SqliteStorage(':memory:');
+    const s = makeServer();
+    await storage.createMcpServer(s);
+    const { mcp, registered } = fakeMcp();
+    await registerRemoteTools(mcp, deps(storage));
+
+    // The owner switches it off while this session is open. Until 2026-09-24 the tool held the row
+    // it was registered with and went on as if it were still on (secaudit 2026-09 a49e32ddeb4e).
+    await storage.updateMcpServer(s.id, { enabled: false });
+    const r = await registered.find((t) => t.name === 'jira__read_issue')!.handler({ key: 'SUP-1' });
+    expect(r.isError).toBe(true);
+    expect(r.content[0].text).toContain('switched off');
+  });
+
+  it('a server detached after the session opened answers that it is gone', async () => {
+    const storage = new SqliteStorage(':memory:');
+    const s = makeServer();
+    await storage.createMcpServer(s);
+    const { mcp, registered } = fakeMcp();
+    await registerRemoteTools(mcp, deps(storage));
+
+    await storage.deleteMcpServer(s.id);
+    const r = await registered.find((t) => t.name === 'jira__read_issue')!.handler({ key: 'SUP-1' });
+    expect(r.isError).toBe(true);
+    expect(r.content[0].text).toContain('no longer attached');
   });
 
   it('a storage failure leaves the session usable rather than breaking it', async () => {
