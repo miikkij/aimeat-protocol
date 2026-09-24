@@ -30,6 +30,16 @@
  * @structure COMPONENT_LIMITS · validateComponentBody(raw) · componentPreviewHtml(body) · componentSnippet(body)
  * @usage const body = validateComponentBody(raw);
  * @version-history
+ *   v1.2.0 — 2026-09-24 — The bench reads what a browser reads, and refuses what it cannot read
+ *     cleanly (1a0a15eb7b20, e82c9f26d729). An "=" with no name before it, a tag whose name does
+ *     not follow its "<" at once, and a closing tag carrying anything are refused: each let a
+ *     <script> through as a quoted value the browser never saw as one. The stylesheet checks read
+ *     the text with its escapes resolved and its comments found where a browser finds them, so
+ *     `u\rl(`, `@\import`, `f\ixed`, `!\important` and a url() between two strings holding "/*"
+ *     and "*\/" are refused. Position is one of three words, so `var(--p)` cannot carry "fixed" in,
+ *     and image-set() is refused beside url(). The preview and the snippet an adopter takes bench
+ *     the stored body again: the preview shows none of it, and the snippet is refused, when it no
+ *     longer passes.
  *   v1.1.1 — 2026-09-20 — componentPreviewHtml takes the theme the reader is on.
  *   v1.1.0 — 2026-09-20 — The markup and the stylesheet are read with an index, one character at a
  *     time (component-scan.ts), and no longer with patterns over the whole text. Three of those
@@ -41,7 +51,7 @@
  *   v1.0.0 — 2026-09-20 — Initial.
  */
 import { DesignBookError } from './errors.js';
-import { attributesOf, declarationsOf, selectorsOf, tagsOf, withoutComments, withoutVarFallbacks } from './component-scan.js';
+import { attributesOf, cssAsRead, declarationsOf, selectorsOf, tagsOf, withoutVarFallbacks } from './component-scan.js';
 
 export const COMPONENT_LIMITS = { html: 12_000, css: 12_000, use: 600, why: 400, whyMin: 20 } as const;
 
@@ -58,6 +68,10 @@ export interface ComponentBody {
 }
 
 const PREFIX_RE = /^[a-z][a-z0-9]{1,11}$/;
+const LETTER_FIRST = /^[a-z]/;
+
+/** The only positions a component may take: it stays where the app puts it, and says so in a word. */
+const POSITIONS = new Set(['static', 'relative', 'absolute']);
 
 const ELEMENTS = new Set([
   'div', 'span', 'section', 'article', 'header', 'footer', 'nav', 'aside', 'main', 'figure', 'figcaption',
@@ -87,12 +101,24 @@ function checkMarkup(html: string, prefix: string): void {
   if (unclosed) refuse('A component\'s markup has a "<" that never meets its ">". Every tag is closed, and a "<" in text is written &lt;.');
   for (const tag of tags) {
     const name = tag.name;
+    // Odd before anything else: the name and the attributes below are what THIS reader made of
+    // the tag, and a browser made something else of it (component-scan.ts).
+    if (tag.odd) {
+      refuse(tag.closing && LETTER_FIRST.test(tag.name)
+        ? `A closing tag carries nothing but its name: "</${name}${tag.attrs.slice(0, 40)}>" does not, and a browser reads what follows the name as attributes, quotes and all. Write </${name}>.`
+        : 'A tag starts with its element\'s name right after "<" or "</". With a space or anything but a letter there, a browser reads it as text or as a comment ending at the first ">", '
+          + 'so the bench and the browser would disagree about what is markup. A "<" in text is written &lt;.');
+    }
     if (!ELEMENTS.has(name)) {
       refuse(`A component's markup may not carry <${name}>. It is structure and nothing else: no script, style, link, iframe, object, embed, form, img, video, audio or anchor. `
         + 'A picture or a link is the app\'s to add, where it knows the address.');
     }
     if (tag.closing) continue;
     for (const { key, value, odd } of attributesOf(tag.attrs)) {
+      if (odd && !key) {
+        refuse(`On <${name}>, an "=" stands where a browser expects an attribute's name. A browser reads the "=" and what follows it as the name, quotes included, and ends the tag at the first ">". `
+          + 'Every attribute is a name, "=", and a value in double quotes.');
+      }
       if (odd) {
         refuse(`On <${name}>, the attribute "${key.slice(0, 40)}" carries a quote or an angle bracket where a browser and this bench could read the tag differently. `
           + 'Write every value in double quotes, with no quote, "<" or ">" inside it.');
@@ -120,15 +146,28 @@ function checkMarkup(html: string, prefix: string): void {
 }
 
 function checkStyles(raw: string, prefix: string): void {
-  // Comments go first, by index, so nothing below can be hidden inside one or split by one.
-  const css = withoutComments(raw);
+  // EVERY CHECK READS WHAT A BROWSER READS (component-scan.ts cssAsRead): the escapes resolved,
+  // since `u\rl(` is url( to a browser, and the comments blanked only where a browser has one, by
+  // index, so nothing below can be hidden inside one or split by one, and a "/*" inside a string
+  // hides nothing. The raw text is never read again.
+  const css = cssAsRead(raw);
   if (/@import|@font-face|@namespace/i.test(css)) refuse('A component\'s stylesheet loads nothing: no @import, @font-face or @namespace. The type comes from the page it lands in (var(--ak-font)).');
   // Whitespace is taken out once, so "url (" and "position : fixed" are found by plain inclusion.
   const dense = css.replace(/\s/g, '').toLowerCase();
-  if (dense.includes('url(')) refuse('A component\'s stylesheet carries no url(): it loads nothing, and a picture is the app\'s to add.');
+  // image-set() takes its address as a plain string, so it loads with no url( written anywhere.
+  if (dense.includes('url(') || dense.includes('image-set(')) refuse('A component\'s stylesheet carries no url() or image-set(): it loads nothing, and a picture is the app\'s to add.');
   if (dense.includes('expression(') || dense.includes('behavior:') || dense.includes('-moz-binding')) refuse('A component\'s stylesheet carries no expression(), behavior or binding.');
   if (dense.includes('!important')) refuse('A component\'s stylesheet carries no !important: it lands inside somebody else\'s page and must lose to it where they disagree.');
-  if (dense.includes('position:fixed') || dense.includes('position:sticky')) refuse('A component stays where the app puts it: no position: fixed or sticky.');
+  // POSITION IS A WORD, read one declaration at a time: `position: var(--p)` with `--p: fixed`
+  // is fixed to a browser, and no reading of this text short of the cascade could tell.
+  for (const d of declarationsOf(css)) {
+    const colon = d.indexOf(':');
+    if (d.slice(0, colon).trim().toLowerCase() !== 'position') continue;
+    const value = d.slice(colon + 1).trim().toLowerCase();
+    if (!POSITIONS.has(value)) {
+      refuse(`A component stays where the app puts it: no position: fixed or sticky. Position is static, relative or absolute, written as the word itself and never through a variable ("${value.slice(0, 40)}").`);
+    }
+  }
   // One declaration at a time: a pattern spanning "animation … infinite" over the whole sheet restarts at every "animation".
   if (declarationsOf(css).some(d => { const l = d.toLowerCase(); return l.trimStart().startsWith('animation') && /\binfinite\b/.test(l); })) {
     refuse('A component does not move at idle: no infinite animation. An entrance that ends is fine, and the ambient is the one layer allowed to keep moving.');
@@ -185,9 +224,36 @@ export function validateComponentBody(raw: unknown): ComponentBody {
   return { prefix, html, css, use, judgement: { reach: reach as 'general' | 'special', why }, ...(fromApp ? { from_app: fromApp } : {}) };
 }
 
-/** What an app gets when it takes the component: the two texts to paste, and how to wire it. */
+/**
+ * What an app gets when it takes the component: the two texts to paste, and how to wire it. They
+ * are benched again first (benchedNow): a builder pastes them into a page as they come, so a body
+ * that no longer passes is refused here, not handed out.
+ */
 export function componentSnippet(body: ComponentBody): { html: string; css: string; use: string; prefix: string } {
-  return { html: body.html, css: body.css, use: body.use, prefix: body.prefix };
+  const shown = benchedNow(body);
+  if (!shown) return refuse('This component no longer passes the Design Book\'s bench, so it is not handed out. Its proposer can propose it again as the bench asks.');
+  return { html: shown.html, css: shown.css, use: body.use, prefix: body.prefix };
+}
+
+/**
+ * The markup and the stylesheet as the bench reads them TODAY, or null when they no longer pass.
+ * A body is benched when it is proposed and stored as it passed; the bench has learned since
+ * (v1.2.0), and what this node serves or hands out cannot lean on a check made under older rules.
+ */
+function benchedNow(body: ComponentBody): { html: string; css: string } | null {
+  const o = (body ?? {}) as unknown as Record<string, unknown>;
+  const prefix = str(o.prefix).trim();
+  const html = str(o.html).trim();
+  const css = str(o.css).trim();
+  if (!PREFIX_RE.test(prefix) || !html || !css) return null;
+  try {
+    checkMarkup(html, prefix);
+    checkStyles(css, prefix);
+  } catch (err) {
+    if (err instanceof DesignBookError) return null;
+    throw err;
+  }
+  return { html, css };
 }
 
 /**
@@ -195,8 +261,12 @@ export function componentSnippet(body: ComponentBody): { html: string; css: stri
  * on the page ground and again on a surface, so it is seen where an app would put it. No script.
  * `theme` is the ground the reader is on: a component reads the page's tokens, so the same markup
  * is a different picture in the dark, and the gallery asks for the one its reader is looking at.
+ *
+ * What it shows is benched again first (benchedNow): a stored body that no longer passes is a
+ * sentence saying so, and none of its markup or stylesheet reaches the page.
  */
 export function componentPreviewHtml(body: ComponentBody, theme: 'light' | 'dark' = 'light'): string {
+  const shown = benchedNow(body);
   return [
     `<!DOCTYPE html><html lang="en" data-theme="${theme === 'dark' ? 'dark' : 'light'}"><head><meta charset="utf-8">`,
     '<meta name="viewport" content="width=device-width, initial-scale=1.0">',
@@ -205,10 +275,11 @@ export function componentPreviewHtml(body: ComponentBody, theme: 'light' | 'dark
     '.dbc-stage { max-width: 960px; margin: 0 auto; padding: 24px 16px; display: grid; gap: 24px; }',
     '.dbc-surface { background: var(--ak-surface); border: var(--ak-line-w, 1px) solid var(--ak-line); border-radius: var(--ak-radius); padding: 16px; }',
     '</style>',
-    `<style>${body.css.replace(/<\//g, '<\\/')}</style>`,
+    shown ? `<style>${shown.css.replace(/<\//g, '<\\/')}</style>` : '',
     '</head><body class="ak-root"><div class="dbc-stage">',
-    `<div>${body.html}</div>`,
-    `<div class="dbc-surface">${body.html}</div>`,
+    ...(shown
+      ? [`<div>${shown.html}</div>`, `<div class="dbc-surface">${shown.html}</div>`]
+      : ['<p>This component no longer passes the Design Book\'s bench, so it is not shown. Its proposer can propose it again as the bench asks.</p>']),
     '</div></body></html>',
   ].join('\n');
 }

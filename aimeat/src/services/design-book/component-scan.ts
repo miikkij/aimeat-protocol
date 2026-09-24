@@ -18,13 +18,32 @@
  *
  *   UNCLOSED MEANS REFUSED, where a pattern used to mean "not matched". A `<` with no `>` is not
  *   skipped: `tagsOf` reports it, because skipping it is how markup gets past an allowlist.
- * @structure tagsOf · attributesOf · declarationsOf · selectorsOf · withoutComments · withoutVarFallbacks
+ *
+ *   WHAT THE READER CANNOT READ CLEANLY IS ODD, AND ODD IS REFUSED. Every place where a browser
+ *   and this reader could part ways is marked, never stepped over: an "=" where a browser expects
+ *   a name, a tag whose name does not follow its "<" at once, a closing tag carrying anything. And
+ *   the stylesheet is read as a browser's tokenizer reads it (`cssAsRead`), escapes resolved.
+ * @structure tagsOf · attributesOf · cssAsRead · declarationsOf · selectorsOf · withoutVarFallbacks
  * @usage for (const tag of tagsOf(html)) { … }
  * @version-history
+ *   v1.1.0 — 2026-09-24 — The reader fails closed where it used to step over (1a0a15eb7b20). An
+ *     attribute with no name was dropped, so `<div class="x" ="><script>…</script>">` read as a
+ *     clean div while a browser took `="` for the name, ended the tag at the first ">" and ran the
+ *     script. A closing tag's attributes were never read, and `</ div` was read as a tag where a
+ *     browser has a comment. All three are odd now. The stylesheet is read with its escapes
+ *     resolved and its comments found only where a browser finds them (e82c9f26d729): `u\rl(` is
+ *     `url(` to a browser, and `content: "/*"` opens a string, not a comment.
  *   v1.0.0 — 2026-09-20 — Initial.
  */
 
-export interface Tag { closing: boolean; name: string; attrs: string }
+/**
+ * One tag. `odd` is set when a browser would not read it as the tag this reader does: its name does
+ * not follow the "<" or "</" at once (a browser reads that as text, or as a comment that ends at the
+ * first ">"), or a closing tag carries anything after its name (a browser reads it as attributes).
+ */
+export interface Tag { closing: boolean; name: string; attrs: string; odd: boolean }
+
+const LETTER = /[a-zA-Z]/;
 
 /** Every tag in the markup, in order. `unclosed` is set when a `<` never meets its `>`. */
 export function tagsOf(html: string): { tags: Tag[]; unclosed: boolean } {
@@ -43,41 +62,57 @@ export function tagsOf(html: string): { tags: Tag[]; unclosed: boolean } {
       else if (ch === '>') { end = i; break; }
     }
     if (end === -1) return { tags, unclosed: true };
-    let inner = html.slice(at + 1, end).trim();
+    // Nothing is trimmed off the front: a browser starts a tag only on a letter straight after
+    // "<" or "</". `< div` is text to it and `</ div` a comment that ends at the first ">", quoted
+    // or not, so whatever this reader would take for a quoted value there is markup to a browser.
+    let inner = html.slice(at + 1, end);
     const closing = inner.startsWith('/');
-    if (closing) inner = inner.slice(1).trim();
+    if (closing) inner = inner.slice(1);
+    let odd = !LETTER.test(inner[0] ?? '');
     let n = 0;
     while (n < inner.length && /[\w:-]/.test(inner[n])) n++;
-    tags.push({ closing, name: inner.slice(0, n).toLowerCase(), attrs: inner.slice(n) });
+    const attrs = inner.slice(n);
+    // A closing tag is its name and nothing else. A browser reads what follows the name as
+    // attributes, "=" and quotes included, and never shows them to anyone, so nothing there is
+    // needed and nothing there is checked: it is refused instead of skipped.
+    if (closing && attrs.trim()) odd = true;
+    tags.push({ closing, name: inner.slice(0, n).toLowerCase(), attrs, odd });
     at = html.indexOf('<', end + 1);
   }
   return { tags, unclosed: false };
 }
 
+/** What separates two attributes: HTML whitespace, and "/" (a browser starts the next attribute after it). */
 const SPACE = new Set([' ', '\t', '\n', '\r', '\f', '/']);
+/** What a browser skips around an "=": whitespace only. A "/" there is part of a name or a value. */
+const WHITESPACE = new Set([' ', '\t', '\n', '\r', '\f']);
 
 /**
  * The attributes of one tag's text: name, and value with its quotes taken off (empty when bare).
  * `odd` marks an attribute a browser and this reader could disagree about: a quote or an angle
- * bracket in a name or in an unquoted value, or a quoted value that never closes. The bench
- * refuses those outright, because an allowlist is only as good as the agreement on where a tag ends.
+ * bracket in a name or in an unquoted value, a quoted value that never closes, or an "=" where a
+ * browser expects a name (it reads the "=" and what follows as the NAME, quotes and all, and ends
+ * the tag at the first ">"). The bench refuses those outright, because an allowlist is only as
+ * good as the agreement on where a tag ends. Nothing is dropped: an attribute with no name is
+ * returned with `key: ''`, odd, so the one who reads the list sees it.
  */
 export function attributesOf(text: string): Array<{ key: string; value: string; odd: boolean }> {
   const out: Array<{ key: string; value: string; odd: boolean }> = [];
   const risky = (s: string) => s.includes('"') || s.includes('\'') || s.includes('`') || s.includes('<') || s.includes('>');
   let i = 0;
-  const skipSpace = () => { while (i < text.length && SPACE.has(text[i])) i++; };
+  const skip = (set: Set<string>) => { while (i < text.length && set.has(text[i])) i++; };
   while (i < text.length) {
-    skipSpace();
+    skip(SPACE);
+    if (i >= text.length) break;
     const start = i;
     while (i < text.length && !SPACE.has(text[i]) && text[i] !== '=') i++;
     const key = text.slice(start, i).toLowerCase();
-    skipSpace();
+    skip(WHITESPACE);
     let value = '';
-    let odd = risky(key);
+    let odd = !key || risky(key);
     if (text[i] === '=') {
       i++;
-      skipSpace();
+      skip(WHITESPACE);
       const quote = text[i] === '"' || text[i] === '\'' ? text[i] : '';
       if (quote) {
         const close = text.indexOf(quote, i + 1);
@@ -87,29 +122,80 @@ export function attributesOf(text: string): Array<{ key: string; value: string; 
         if (value.includes('<') || value.includes('>')) odd = true;
       } else {
         const from = i;
-        while (i < text.length && !SPACE.has(text[i])) i++;
+        while (i < text.length && !WHITESPACE.has(text[i])) i++;
         value = text.slice(from, i);
         if (risky(value)) odd = true;
       }
     }
-    if (key) out.push({ key, value, odd });
-    else if (i === start) i++;   // a stray character: step over it, never loop on it
+    // An empty name is always an "=" (the loop above stops only at one or at a separator, and
+    // separators were skipped), and the "=" branch always moves past it: no stray character is
+    // stepped over, and the loop always advances.
+    out.push({ key, value, odd });
   }
   return out;
 }
 
-/** The stylesheet with its block comments blanked. An unclosed comment takes the rest, as a parser does. */
-export function withoutComments(css: string): string {
+const HEX = /[0-9a-fA-F]/;
+const CSS_NEWLINE = new Set(['\n', '\r', '\f']);
+
+/**
+ * The stylesheet as a browser's tokenizer reads it, so that a check reads what the browser reads:
+ *   - every escape is resolved to the character it stands for: `u\rl(` is `url(`, `\75 rl(` is
+ *     `url(` (up to six hex digits and one whitespace after them), `f\ixed` is `fixed`;
+ *   - a comment is blanked only where a browser has one: never inside a string (`content: "/*"`
+ *     opens a string) and never behind a backslash (`\/*` is an escaped "/" and a "*"). An
+ *     unclosed comment takes the rest, as a parser does;
+ *   - a string ends at its quote or at a newline, as a browser ends it.
+ * One pass with an index, like every reader here. What an escape turns into is never read again
+ * as structure: an escaped quote does not open a string and an escaped "/*" does not open a comment.
+ */
+export function cssAsRead(css: string): string {
   let out = '';
-  let at = 0;
-  for (;;) {
-    const open = css.indexOf('/*', at);
-    if (open === -1) return out + css.slice(at);
-    out += css.slice(at, open) + ' ';
-    const close = css.indexOf('*/', open + 2);
-    if (close === -1) return out;
-    at = close + 2;
+  let quote = '';
+  let i = 0;
+  while (i < css.length) {
+    const ch = css[i];
+    if (ch === '\\') {
+      const next = css[i + 1];
+      if (next === undefined) { out += '�'; i++; continue; }
+      if (CSS_NEWLINE.has(next)) {
+        // In a string a backslash before a newline joins the lines; outside one it escapes nothing.
+        if (quote) i += next === '\r' && css[i + 2] === '\n' ? 3 : 2;
+        else { out += ch; i++; }
+        continue;
+      }
+      if (HEX.test(next)) {
+        let j = i + 1;
+        while (j < css.length && j < i + 7 && HEX.test(css[j])) j++;
+        const cp = parseInt(css.slice(i + 1, j), 16);
+        out += cp === 0 || cp > 0x10FFFF || (cp >= 0xD800 && cp <= 0xDFFF) ? '�' : String.fromCodePoint(cp);
+        if (css[j] === '\r' && css[j + 1] === '\n') j += 2;
+        else if (css[j] === ' ' || css[j] === '\t' || CSS_NEWLINE.has(css[j])) j++;
+        i = j;
+        continue;
+      }
+      out += next;
+      i += 2;
+      continue;
+    }
+    if (quote) {
+      if (ch === quote || CSS_NEWLINE.has(ch)) quote = '';
+      out += ch;
+      i++;
+      continue;
+    }
+    if (ch === '"' || ch === '\'') { quote = ch; out += ch; i++; continue; }
+    if (ch === '/' && css[i + 1] === '*') {
+      out += ' ';
+      const close = css.indexOf('*/', i + 2);
+      if (close === -1) return out;
+      i = close + 2;
+      continue;
+    }
+    out += ch;
+    i++;
   }
+  return out;
 }
 
 /** Every `property: value` of the stylesheet, as written, whatever rule it sits in. */

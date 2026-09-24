@@ -9,6 +9,9 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=designbook
  * @version-history
+ *   v1.5.0 — 2026-09-24 — A component with an "=" where a name belongs, or an escaped url(, is
+ *     refused at propose (1a0a15eb7b20, e82c9f26d729), and a component's preview carries no CSP
+ *     nonce. Both failed on the old code first.
  *   v1.4.0 — 2026-09-08 — Browser results cover both themes and report clipped content,
  *     small text and JavaScript errors alongside the existing render checks.
  *   v1.3.0 — 2026-09-05 — The EFFECT kind (wish-atelier-post-process-effects): the worded
@@ -451,6 +454,12 @@ const GOOD_BODY = {
         // The bench refuses script, in words.
         const script = await propose(`comp-bad-${stamp}`, body({ html: '<div class="wkgrid" onclick="x()"></div>' }));
         assert(script.status === 422 && /attribute "onclick"/.test(script.body.error?.message ?? ''), `an event handler is refused: ${script.status} ${JSON.stringify(script.body?.error)}`);
+        // 1a0a15eb7b20: an "=" with no name before it hid a <script> the browser ran, with the page's
+        // nonce, on this node's origin. And e82c9f26d729: an escaped url( the browser loads.
+        const unnamed = await propose(`comp-bad-${stamp}`, body({ html: '<div class="wkgrid" ="><script>document.title=1</script>"></div>' }));
+        assert(unnamed.status === 422 && /"=" stands where a browser expects/.test(unnamed.body.error?.message ?? ''), `an "=" with no name is refused: ${unnamed.status} ${JSON.stringify(unnamed.body?.error)}`);
+        const escaped = await propose(`comp-bad-${stamp}`, body({ css: '.wkgrid { color: var(--ak-ink); background: u\\rl(https://evil.example/x.png); }' }));
+        assert(escaped.status === 422 && /no url\(\)/.test(escaped.body.error?.message ?? ''), `an escaped url( is refused: ${escaped.status} ${JSON.stringify(escaped.body?.error)}`);
 
         // The app exists and wrote down what it made, and its owner has NOT said it turned out well.
         const page = APP(f).replace('</head>', `<script type="application/json" id="aimeat-build-notes">${JSON.stringify({ made: [{ name: 'week-grid', what: 'seven tappable days per row', why: 'the Book has no grid a person ticks' }] })}</` + 'script></head>');
@@ -486,6 +495,10 @@ const GOOD_BODY = {
         const prev = await fetch(`${BASE}/v1/designbook/comp-week-${stamp}/preview`);
         const html = await prev.text();
         assert(prev.status === 200 && html.includes('class="wkgrid"') && !/<script/i.test(html.replace(/<script[^>]*nonce[^>]*><\/script>/gi, '')), `the preview renders it, scriptless: ${prev.status}`);
+        // And it is handed no nonce: the nonce is what lets an inline script run on this origin, and
+        // a page built from a stranger's markup is the one page where nothing may be handed it.
+        assert(!/nonce=/.test(html) && /script-src 'self' 'nonce-/.test(prev.headers.get('content-security-policy') ?? ''),
+            `a component's preview carries no nonce, under the same script rule: ${html.match(/<[^>]*nonce=[^>]*>/)?.[0]}`);
         // It wears the page it lands in, so the gallery asks for the ground its reader is on.
         assert(/<html[^>]*data-theme="light"/.test(html), 'with no theme asked for, it is the light page');
         const dark = await (await fetch(`${BASE}/v1/designbook/comp-week-${stamp}/preview?theme=dark`)).text();
