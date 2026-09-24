@@ -20,6 +20,7 @@
  * @structure SAMPLES — { [decisionId]: [{ id, measure, solo?, render(), after }] } · PROPOSALS — { [decisionId]: { measure, render() } }
  * @usage import { SAMPLES, PROPOSALS } from './decision-samples.js';
  * @version-history
+ *   v3.1.0 — 2026-09-24 — The icon button's pictures use the built shape (.poster-icon).
  *   v3.0.0 — 2026-09-23 — `solo` and `after` for every sample; the prompt card drawn with the
  *     underlined copy action the home's task chooser passes it (it was drawn with the red button of
  *     the first steps, which the signed-in home does not show).
@@ -224,17 +225,17 @@ export const SAMPLES = {
   ],
   'icon-button': [
     { id: 'composer-tool', measure: '.poster-composer-tool', render: () => row(html`<button type="button" class="btn-outline poster-composer-tool">📎</button> <button type="button" class="vr-btn btn-outline poster-composer-tool">🎤</button>`),
-      after: after('.dl-icon', () => row(html`<button type="button" class="dl-icon">📎</button> <button type="button" class="dl-icon">🎤</button>`)) },
+      after: after('.poster-icon', () => row(html`<button type="button" class="poster-icon">📎</button> <button type="button" class="poster-icon">🎤</button>`)) },
     // The row alone: the list's side column hides itself at a lab frame's width (the phone rule).
     { id: 'thread-del', measure: '.poster-thread-del', render: () => html`<ul class="poster-thread-list"><li class="poster-thread poster-thread--active"><button type="button" class="poster-thread-open"><span class="poster-thread-title">Make me a pong game</span><span class="poster-thread-sub">2 messages</span></button><button type="button" class="btn-ghost poster-thread-del" aria-label="Delete conversation">✗</button></li></ul>`,
-      after: after('.dl-icon', () => row(html`<button type="button" class="dl-icon dl-icon--small">✗</button>`)) },
+      after: after('.poster-icon', () => row(html`<button type="button" class="poster-icon poster-icon--small">✗</button>`)) },
     // The close square is drawn in the dark header's colour, so the header is shown with it.
     { id: 'dialog-close', measure: '.dlg-close', solo: '.dlg-head', render: () => html`<dialog class="dlg" open><header class="dlg-head"><h2 class="dlg-title">Settings</h2><button type="button" class="dlg-close" aria-label="Close" dangerouslySetInnerHTML=${{ __html: CLOSE_ICON }}></button></header></dialog>`,
       after: 'same' },
     { id: 'prompt-more', measure: '.poster-prompt-more', render: () => html`<${PromptCard} label="Remember something" prompt="Tell me in the language I use with you…" className="poster-action" copyLabel="Copy prompt" copiedLabel="Copied" saveIntent=${() => Promise.resolve()} />`,
-      after: after('.dl-icon', () => row(html`<button type="button" class="dl-icon dl-icon--small">▾</button>`)) },
+      after: after('.poster-icon', () => row(html`<button type="button" class="poster-icon poster-icon--small">▾</button>`)) },
     { id: 'card-dots', measure: '.card-menu-dots', render: () => row(html`<${CardMenu} state="open" actions=${[{ label: 'Open', run: noop }]} />`),
-      after: after('.dl-icon', () => row(html`<button type="button" class="dl-icon dl-icon--small dl-icon--open">⋯</button>`)) },
+      after: after('.poster-icon', () => row(html`<button type="button" class="poster-icon poster-icon--small card-menu-dots card-menu-dots--open">⋯</button>`)) },
   ],
   choice: [
     { id: 'setup-tools', measure: '.ast-tool--active', solo: '.ast-tool', render: () => html`<div class="poster-chooser"><div class="ast-tools" role="tablist"><button type="button" class="ast-tool ast-tool--active">claude.ai <span class="ast-tool-reco">recommended</span></button><button type="button" class="ast-tool">Claude Desktop</button><button type="button" class="ast-tool">ChatGPT</button></div></div>`,
@@ -316,10 +317,10 @@ export const PROPOSALS = {
     render: () => row(html`<button type="button" class="poster-action poster-action--text">Not now</button>`),
   },
   'icon-button': {
-    measure: '.dl-icon',
-    render: () => row(html`${tone('large', html`<button type="button" class="dl-icon">📎</button>`)}
-      ${tone('small', html`<button type="button" class="dl-icon dl-icon--small">✗</button>`)}
-      ${tone('small, a menu with something on it', html`<button type="button" class="dl-icon dl-icon--small dl-icon--open">⋯</button>`)}`),
+    measure: '.poster-icon',
+    render: () => row(html`${tone('large', html`<button type="button" class="poster-icon">📎</button>`)}
+      ${tone('small', html`<button type="button" class="poster-icon poster-icon--small">✗</button>`)}
+      ${tone('small, a menu with something on it', html`<button type="button" class="poster-icon poster-icon--small card-menu-dots card-menu-dots--open">⋯</button>`)}`),
   },
   choice: {
     measure: '.poster-tab.is-on',

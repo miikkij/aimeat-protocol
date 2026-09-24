@@ -13,6 +13,8 @@
  *   that may never ship, and a part's sheet is catalogued and drawn by pages.
  * @usage Loaded by the lab's preview page only (views/design-lab/frame.js); no other page carries it.
  * @version-history
+ *   v1.2.0 — 2026-09-24 — The rules of built proposals removed (count, headings, box, aside; the icon
+ *     button, the tab's reco colour and the dimmed action link of decisions 14-21).
  *   v1.1.0 — 2026-09-23 — The after-looks no class draws alone, and the solo rules.
  *   v1.0.0 — 2026-09-23 — Initial: the tag, status and count proposals (UI consolidation phase 2).
  */
@@ -43,22 +45,8 @@
    On an icon, a count sits on its corner, where the bell's count sits (.notif-badge). */
 .poster-specimen-anchor > .poster-count { position: absolute; top: -1px; right: -1px; }
 
-/* Icon button (proposal): one square in a thin ink frame, the sun under the pointer. 44px is the
-   composer's control size; the small cut is the size of the dialog's close square. */
-.dl-icon {
-  display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box;
-  width: 44px; height: 44px; padding: 0; border: 2px solid var(--text); border-radius: 0;
-  background: var(--bg); color: var(--text); font: inherit; font-size: 1rem; line-height: 1; cursor: pointer;
-}
-.dl-icon:hover { background: var(--sun); color: var(--on-sun); }
-.dl-icon--small { width: 28px; height: 28px; font-size: .85rem; }
-/* A card's menu keeps the fill that says a state; the values are .card-menu-dots--open's. */
-.dl-icon--open { background: var(--state-open-bg); border-color: var(--state-open-border); color: var(--state-open-ink); }
-/* Choice: "recommended" beside a tab's name takes the tab's own text colour, which stays readable on
-   the yellow of the chosen tab (coral on yellow is not). */
-.poster-specimen-stage .poster-tab .ast-tool-reco { color: inherit; }
-/* A step's button that cannot be pressed yet: dimmed as the chat's Send is (.poster-slab--control). */
-.poster-specimen-stage .poster-action:disabled { opacity: .45; cursor: default; }
+/* Decisions 14-21 are built (2026-09-24): the icon button (.poster-icon), the tab's reco colour
+   (hello-mcp.css) and the dimmed action link (.poster-action:disabled) live in the library. */
 
 /* Solo: only the element a decision is about. The rest of the drawn part keeps its place, so the
    element keeps the look its surroundings give it, but is not painted (frame.js soloLayout). */
