@@ -23,6 +23,8 @@
  *   GET/PUT/DELETE dev-grants (per app), GET/PUT/DELETE /v1/app-dev-grants (across all of them)
  * @usage app.use(appMembersRouter(config, storage))
  * @version-history
+ *   v1.1.2 — 2026-09-24 — The dev-grant DELETE comment says what the revoke now does to a row that
+ *     only carried the right (A6-5, services/app-dev-grant.ts). No behaviour change in this file.
  *   v1.1.1 — 2026-09-12 — bucketOf hands resolveGhii the node; composing `${owner}@${nodeId}` at the
  *     call site is what the helper does now. wish-identity-gate-sees-resolveghii.
  *   v1.1.0 — 2026-09-08 — The DEVELOPMENT right: who, other than the owner, may build this app. Three
@@ -548,8 +550,9 @@ export function appMembersRouter(config: AimeatConfig, storage: Storage): Router
   });
 
   // ── DELETE .../dev-grants/:account — take the right back. Owner only. ──
-  // The roster row survives: somebody can pay for an app they no longer help build, and deleting the
-  // row here would take their access away with the right.
+  // A member's roster row survives: somebody can pay for an app they no longer help build, and
+  // deleting the row here would take their access away with the right. A row that existed only to
+  // carry the right goes with it (removeDevGrant), so a pure builder does not stay on as a member.
   router.delete('/v1/apps/:owner/:filename/dev-grants/:account', requireAuth(), requireScope('app:manage'), async (req, res) => {
     const c = await context(req);
     if ('bad' in c) return res.status(400).json(error(config.nodeId, 'INVALID_INPUT', c.bad));
