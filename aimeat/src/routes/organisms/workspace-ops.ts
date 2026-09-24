@@ -7,6 +7,9 @@
  *   export/import, workspace wipe, and archive/unarchive. Extracted from src/routes/organisms.ts to
  *   satisfy max-file-lines.
  * @version-history
+ *   v1.7.0 -- 2026-09-24 -- The activity feeds read the workspace manifest, and the share write the
+ *     share record, through services/workspace-meta.ts: the copy that counts, not the first the scan
+ *     returned. The share write updates that copy, so what it writes is what the readers take.
  *   v1.6.0 -- 2026-09-06 -- Review item 2.7: workspace update/delete, organism import and
  *     archive/unarchive carry organism:write, the word their MCP twins publish and their sibling
  *     doors in this same file already had.
@@ -32,7 +35,7 @@ import { emitChange } from '../../services/event-bus.js';
 import { recordPublicActivity } from '../../services/public-activity.js';
 import { hashPassword, verifyPassword } from '../../services/password.js';
 import { generateShareToken, SHARE_TOKEN_TTL_SECONDS } from '../../services/share-token.js';
-import { updateWorkspaceMeta, WorkspaceMetaError } from '../../services/workspace-meta.js';
+import { updateWorkspaceMeta, WorkspaceMetaError, workspaceMetaReader, readWorkspaceMetaRecord } from '../../services/workspace-meta.js';
 import { provisionWorkspace, WorkspaceProvisionError } from '../../services/workspace-provision.js';
 import { deriveWorkspaceEvents } from '../../services/workspace-enrichment.js';
 import { activateEngagement, retireEngagement, listByWorkspace as listEngagementsByWorkspace } from '../../services/workspace-engagements.js';
@@ -129,7 +132,7 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
     const callerGaii = resolveIdentity(req.auth!, config.nodeId);
     const root = `organism.${id}.w.${ws}`;
     const { items } = await storage.listAllMemory({ prefix: `${root}.`, limit: 10000 });
-    const manifest = (items.find(r => r.key === `${root}.meta.manifest`)?.value as Record<string, unknown> | undefined) ?? null;
+    const manifest = ((await workspaceMetaReader(storage, id, config.nodeId).pick(ws, 'meta.manifest', items))?.value as Record<string, unknown> | undefined) ?? null;
 
     // Read-authorize each record (the caller's own records AND their own agents' records — same owner,
     // different GAII — are always theirs to see; only genuinely other-owner records hit the consent
@@ -196,6 +199,7 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
       let arr = buckets.get(wsId); if (!arr) { arr = []; buckets.set(wsId, arr); } arr.push(r);
     }
     const agg: Record<string, { count: number; lastAt: string; workspaces: Set<string> }> = {};
+    const metaReader = workspaceMetaReader(storage, id, config.nodeId);
     for (const w of wss) {
       const root = `organism.${id}.w.${w.id}`;
       const bucket = perWsScan ? (await storage.listAllMemory({ prefix: `${root}.`, limit: 10000 })).items : (buckets.get(w.id) ?? []);
@@ -207,7 +211,7 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
         }
         readable.push(r);
       }
-      const manifest = (bucket.find(r => r.key === `${root}.meta.manifest`)?.value as Record<string, unknown> | undefined) ?? null;
+      const manifest = ((await metaReader.pick(w.id, 'meta.manifest', bucket))?.value as Record<string, unknown> | undefined) ?? null;
       for (const e of deriveWorkspaceEvents(readable, manifest, root)) {
         if (!e.agent) continue;
         const a = agg[e.agent] ?? (agg[e.agent] = { count: 0, lastAt: '', workspaces: new Set<string>() });
@@ -504,10 +508,12 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', "access 'password' requires a password to be set")); return;
     }
     const key = `organism.${id}.w.${ws}.meta.share`;
-    const existing = (await storage.listAllMemory({ prefix: key, limit: 10 })).items.find(r => r.key === key);
+    // This write replaces the copy the readers take (services/workspace-meta.ts); with none yet, it is
+    // stored under the identity that registered the workspace, as it always was.
+    const existing = await readWorkspaceMetaRecord(storage, id, ws, 'meta.share', config.nodeId);
     const now = new Date().toISOString();
     await storage.setMemory({
-      key, ownerGaii: entry.ownerGaii, value: next, visibility: 'private', tags: ['share'], ttlHours: null,
+      key, ownerGaii: existing?.ownerGaii ?? entry.ownerGaii, value: next, visibility: 'private', tags: ['share'], ttlHours: null,
       version: existing ? existing.version + 1 : 1, createdAt: existing?.createdAt ?? now, updatedAt: now,
     });
     emitChange('organisms');

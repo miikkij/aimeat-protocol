@@ -24,12 +24,16 @@
  *     live path makes first, which is whether this exporter may read this workspace at all, so the
  *     organism bundle handed every active member workspaces the workspace list reports to them as
  *     `access: 'none'`. An org manager still reads all; everyone else gets the manifest's own gate.
+ *   v1.3.0 — 2026-09-24 — The gate, and the manifest, readme, sources and config the bundle carries,
+ *     come from the copies that count (services/workspace-meta.ts), not the first copy the scan
+ *     returned for the gate and the last one the loop met for the bundle.
  */
 import { ZipArchive } from 'archiver';
 import type { Storage, MemoryRecord } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
 import { authorizeRead } from './access-guard.js';
 import { isSameOwner } from '../utils/gaii.js';
+import { workspaceMetaReader } from './workspace-meta.js';
 import { logger } from '../utils/logger.js';
 
 export const WS_EXPORT_VERSION = '1.0';
@@ -94,7 +98,10 @@ export async function collectWorkspace(
   // bundle export used to skip that decision entirely and hand every active member every workspace,
   // including ones the organism's own workspace list reports to them as `access: 'none'`. Refusing
   // here is what makes the route's promise true: the bundle carries what the member can read live.
-  const manifestRec = items.find(r => r.key === `${root}.meta.manifest`) ?? null;
+  // The workspace's own records are the copies that count (services/workspace-meta.ts), for the gate
+  // and for what the bundle carries, not the first copy the scan returned or the last one looped over.
+  const metaReader = workspaceMetaReader(storage, orgId, config.nodeId);
+  const manifestRec = await metaReader.pick(ws, 'meta.manifest', items);
   let canReadWorkspace = opts.isOrgManager === true;
   if (!canReadWorkspace && manifestRec) {
     canReadWorkspace = manifestRec.ownerGaii === exporterGaii || isSameOwner(manifestRec.ownerGaii, exporterGaii);
@@ -124,12 +131,18 @@ export async function collectWorkspace(
   const namespaces = new Set<string>();
   const imageKeys = new Set<string>();
 
+  const countedValue = async (rel: string) => (await metaReader.pick(ws, rel, readable))?.value ?? null;
+  out.manifest = await countedValue('meta.manifest');
+  const manifestName = (out.manifest as { name?: string } | null)?.name;
+  if (manifestName) out.name = manifestName;
+  out.readme = await countedValue('meta.readme');
+  out.sources = await countedValue('meta.sources');
+  out.config = await countedValue('meta.config');
+  const single = new Set(['meta.manifest', 'meta.readme', 'meta.sources', 'meta.config']);
+
   for (const r of readable) {
     const rel = r.key.slice(root.length + 1);   // after "root."
-    if (rel === 'meta.manifest') { out.manifest = r.value; const m = r.value as { name?: string } | null; if (m?.name) out.name = m.name; continue; }
-    if (rel === 'meta.readme') { out.readme = r.value; continue; }
-    if (rel === 'meta.sources') { out.sources = r.value; continue; }
-    if (rel === 'meta.config') { out.config = r.value; continue; }
+    if (single.has(rel)) continue;
     if (rel.startsWith('meta.sections.')) { out.sections[rel.slice('meta.sections.'.length)] = r.value; continue; }
     if (rel.startsWith('access.')) continue;   // access requests are not workspace content
 

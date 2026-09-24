@@ -27,11 +27,14 @@
  *     workspace read; structured-field + fence-stripped prose detectors; same-workspace resolution.
  *   v1.1.0 -- 2026-07-16 -- Scans exclude `.version.N` rows in SQL (excludeVersionRows) — history
  *     rows were loaded with full values then dropped by the role filter.
+ *   v1.2.0 -- 2026-09-24 -- The read gate and the spaces come from the copy of the manifest that counts
+ *     (services/workspace-meta.ts), not the first copy the scan returned.
  */
 import type { Storage, MemoryRecord, OrganismRecord } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
 import { authorizeRead } from './access-guard.js';
 import { isSameOwner } from '../utils/gaii.js';
+import { workspaceMetaReader } from './workspace-meta.js';
 
 export interface DanglingRefFinding {
   ws: string;
@@ -154,7 +157,8 @@ async function scanWorkspace(
   // Live rows (archived excluded by default) + archived-only rows, in two bounded scans.
   // excludeVersionRows: the scan skips `.version.N` rows in SQL (they were loaded then discarded).
   const live = (await storage.listAllMemory({ prefix: nsRoot, limit: 5000, excludeVersionRows: true })).items;
-  const manRec = live.find(r => r.key === `${nsRoot}meta.manifest`);
+  // The copy of the manifest that counts (services/workspace-meta.ts), not the first the scan returned.
+  const manRec = await workspaceMetaReader(storage, orgId, config.nodeId).pick(ws, 'meta.manifest', live);
   if (!manRec) return { readable: false, findings: [] };
 
   // Same workspace-level read gate as GET /:id/workspace — the manifest is the single gate record.

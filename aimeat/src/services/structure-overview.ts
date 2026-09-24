@@ -47,12 +47,14 @@
  *   v1.7.0 — 2026-07-16 — collectWorkspaceSummary's scan excludes `.version.N` rows in SQL
  *     (excludeVersionRows): the overview never renders history, so its full-copy values were loaded
  *     only to be skipped by the role filter.
+ *   v1.8.0 — 2026-09-24 — collectWorkspaceSummary gates on, and summarises, the copies of the manifest
+ *     and readme that count (services/workspace-meta.ts), not the first copy the scan returned.
  */
 import type { Storage, MemoryRecord } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
 import { authorizeRead } from './access-guard.js';
 import { isSameOwner } from '../utils/gaii.js';
-import { isMemoryBackedSpace } from './workspace-meta.js';
+import { isMemoryBackedSpace, workspaceMetaReader } from './workspace-meta.js';
 import { isRecordsSource, evaluateRecordsKpi } from './kpi-rollup.js';
 import { logger } from '../utils/logger.js';
 
@@ -175,7 +177,9 @@ export async function collectWorkspaceSummary(
   // history — dropping those rows in SQL avoids loading every historic full-copy value.
   const { items } = await storage.listAllMemory({ prefix: `${root}.`, limit: 5000, excludeVersionRows: true });
 
-  const manRec = items.find(r => r.key === `${root}.meta.manifest`);
+  // The meta records are the copies that count (services/workspace-meta.ts), for the gate and the summary.
+  const metaReader = workspaceMetaReader(storage, orgId, config.nodeId);
+  const manRec = await metaReader.pick(ws, 'meta.manifest', items);
   const summary: WorkspaceSummary = {
     ws, name: opts.name || ws, readme: null, readable: false,
     spaces: [], skills: [], objectives: [], totalRecords: 0, totalDocuments: 0, lastActivity: null,
@@ -195,7 +199,7 @@ export async function collectWorkspaceSummary(
   }
   const manifest = manRec.value as { name?: unknown; objectTypes?: ObjType[]; objectives?: RawObjective[] } | null;
   if (typeof manifest?.name === 'string') summary.name = manifest.name;
-  summary.readme = oneLine(items.find(r => r.key === `${root}.meta.readme`)?.value);
+  summary.readme = oneLine((await metaReader.pick(ws, 'meta.readme', items))?.value);
   summary.readable = readable;
   if (!readable) return summary;
 

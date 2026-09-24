@@ -31,6 +31,9 @@
  *     INTAKE_SCHEMA_MISMATCH naming every property ("id", an allowed field, a default) the space's
  *     closed schema does not list. The definition used to succeed and every anonymous submission then
  *     failed on the "id" the submit path adds, seen only by the anonymous submitter.
+ *   v1.4.0 — 2026-09-24 — A form's config is the copy that counts (services/workspace-meta.ts: the
+ *     workspace creator's, then an organism admin's), on the public descriptor and submit, the owner's
+ *     list and the delete, instead of the first copy the store returned.
  */
 import type { Router, Request, Response } from 'express';
 import { randomUUID, randomBytes } from 'node:crypto';
@@ -42,6 +45,7 @@ import { rateLimit } from '../../middleware/rate-limit.js';
 import { resolveIdentity } from '../../utils/gaii.js';
 import { validateMemoryWrite } from '../../services/schema-validator.js';
 import { readPublishSpace, undeclaredSpaceRefusal } from '../../services/workspace-write-items.js';
+import { readWorkspaceMetaRecord, workspaceMetaReader } from '../../services/workspace-meta.js';
 import { emitChange } from '../../services/event-bus.js';
 import { logger } from '../../utils/logger.js';
 import type { OrganismHelpers } from './shared.js';
@@ -89,10 +93,12 @@ export function registerOrganismIntakeRoutes(router: Router, config: AimeatConfi
   const cfgKey = (org: string, ws: string, formId: string) => `organism.${org}.w.${ws}.meta.intake.${formId}`;
   const cfgPrefix = (org: string, ws: string) => `organism.${org}.w.${ws}.meta.intake.`;
 
+  /** A form's config: the copy that counts (services/workspace-meta.ts), because it is what a public
+   *  submission obeys, and only the workspace's creator or an organism admin writes it. */
+  const readFormRecord = (org: string, ws: string, formId: string) =>
+    readWorkspaceMetaRecord(storage, org, ws, `meta.intake.${formId}`, config.nodeId);
   async function readForm(org: string, ws: string, formId: string): Promise<IntakeFormConfig | null> {
-    const key = cfgKey(org, ws, formId);
-    const { items } = await storage.listAllMemory({ prefix: key, limit: 5 });
-    return (items.find(r => r.key === key)?.value as IntakeFormConfig | undefined) ?? null;
+    return ((await readFormRecord(org, ws, formId))?.value as IntakeFormConfig | undefined) ?? null;
   }
 
   /** Only the workspace creator (or an org admin) may manage that workspace's intake forms. Returns the
@@ -218,9 +224,12 @@ export function registerOrganismIntakeRoutes(router: Router, config: AimeatConfi
     if (!ownerGhii) return;
     const prefix = cfgPrefix(org, ws);
     const { items } = await storage.listAllMemory({ prefix, limit: 500 });
-    const forms = items
-      .filter(r => r.key.startsWith(prefix) && !r.key.slice(prefix.length).includes('.'))
-      .map(r => r.value as IntakeFormConfig).filter(Boolean)
+    // One entry per form, the copy that counts, as the public door reads it.
+    const metaReader = workspaceMetaReader(storage, org, config.nodeId);
+    const formIds = [...new Set(items.map(r => r.key.slice(prefix.length)).filter(rest => rest && !rest.includes('.')))];
+    const counted = await Promise.all(formIds.map(fid => metaReader.pick(ws, `meta.intake.${fid}`, items)));
+    const forms = counted
+      .map(r => r?.value as IntakeFormConfig | undefined).filter((f): f is IntakeFormConfig => !!f)
       .map(f => ({ form_id: f.formId, namespace: f.namespace, mode: f.mode, enabled: f.enabled, discoverable: f.discoverable, title: f.title, allowed_fields: f.allowedFields, submit_url: `/v1/intake/${org}/${ws}/${f.formId}` }));
     res.json(success(config.nodeId, { forms }));
   });
@@ -234,8 +243,8 @@ export function registerOrganismIntakeRoutes(router: Router, config: AimeatConfi
     const ownerGhii = await requireWsOwner(req, res, org, ws);
     if (!ownerGhii) return;
     const key = cfgKey(org, ws, formId);
-    const { items } = await storage.listAllMemory({ prefix: key, limit: 5 });
-    const rec = items.find(r => r.key === key);
+    // The copy the public door reads is the one removed, so the link really stops working.
+    const rec = await readFormRecord(org, ws, formId);
     if (rec) await storage.deleteMemory(rec.ownerGaii, key);
     emitChange('organisms');
     res.json(success(config.nodeId, { deleted: !!rec }));
