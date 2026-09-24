@@ -4,9 +4,11 @@
  * SPDX-License-Identifier: MIT
  * @description The words a workflow's steps cost the principal that saves or starts it
  *   (services/workflow/step-authority.ts): each kind of step costs what its own door asks, the owner
- *   in person passes as requireScope lets them, a check asks only about the model, and a wildcard
- *   covers what it covers at every other door.
+ *   in person passes as requireScope lets them, a check asks only about the records it reads and the
+ *   model, a workflow that reads the owner's records costs memory:read, and a wildcard covers what it
+ *   covers at every other door.
  * @version-history
+ *   v1.1.0 — 2026-09-24 — A workflow that reads the owner's records costs memory:read.
  *   v1.0.0 — 2026-09-24 — Initial.
  */
 import { describe, it, expect } from 'vitest';
@@ -46,13 +48,54 @@ describe('the words a step costs', () => {
     });
 
     it('costs ai:use for llm.approved, on a check as well as on a run', () => {
-        expect(words(missingStepScopes(def([undefined], true), agent(['workflow:write']), 'save'))).toEqual(['ai:use']);
-        expect(words(missingStepScopes(def([undefined], true), agent(['workflow:write']), 'signals-only'))).toEqual(['ai:use']);
+        expect(words(missingStepScopes(def(['human-input'], true), agent(['workflow:write']), 'save'))).toEqual(['ai:use']);
+        expect(words(missingStepScopes(def(['human-input'], true), agent(['workflow:write']), 'signals-only'))).toEqual(['ai:use']);
     });
 
-    it('asks a check about nothing a check does not do', () => {
-        expect(missingStepScopes(def(['datapackage', 'ai']), agent(['workflow:write']), 'signals-only')).toEqual([]);
+    it('asks a check about what a check does: the records it reads, and nothing it dispatches', () => {
+        expect(words(missingStepScopes(def(['datapackage', 'ai']), agent(['workflow:write']), 'signals-only'))).toEqual(['memory:read']);
+        expect(missingStepScopes(def(['human-input', 'trigger-geai']), agent(['workflow:write']), 'signals-only')).toEqual([]);
         expect(words(missingStepScopes(def(['datapackage', 'ai']), agent(['workflow:write']), 'full'))).toEqual(['ai:use', 'memory:read', 'memory:write', 'storage:write']);
+    });
+});
+
+describe('a workflow that reads the owner\'s records costs memory:read', () => {
+    const step = (over: Record<string, unknown>) => ({ steps: [{ id: 'x', ...over }] as never });
+    const leaf = { kind: 'deterministic', key: 'owner.record', op: 'json_field', path: 'secret' };
+
+    it('for a signal leaf, however deep it sits', () => {
+        for (const signal of [leaf, { all: [leaf] }, { any: [{ all: [leaf] }] }, { when: leaf, then: leaf }]) {
+            const d = step({ action: { kind: 'human-input' }, success_signal: signal });
+            expect(words(missingStepScopes(d, agent(['workflow:write']), 'save')), JSON.stringify(signal)).toEqual(['memory:read']);
+        }
+        const input = step({ action: { kind: 'human-input' }, required_to_function: leaf });
+        expect(words(missingStepScopes(input, agent(['workflow:write']), 'signals-only'))).toEqual(['memory:read']);
+    });
+
+    it('for an agent step, which inherits its offer\'s signals', () => {
+        expect(words(missingStepScopes(def([undefined]), agent(['workflow:write']), 'save'))).toEqual(['memory:read']);
+    });
+
+    it('for a key a step writes its answer to, which its signal reads back, and for keys an ai step reads', () => {
+        for (const action of [
+            { kind: 'ai', result_to_key: 'k' }, { kind: 'ai', prompt_key: 'k' }, { kind: 'ai', input_keys: ['k'] },
+            { kind: 'extension', result_to_key: 'k' }, { kind: 'human-input', answer_to_key: 'k' },
+        ]) {
+            const missing = missingStepScopes(step({ action }), agent(['ai:use', 'ext:invoke']), 'save');
+            expect(words(missing), JSON.stringify(action)).toEqual(['memory:read']);
+            expect(missing[0].kind).toBe('read');
+        }
+    });
+
+    it('and not for a step that reads nothing', () => {
+        expect(missingStepScopes(step({ action: { kind: 'human-input' }, required_to_function: 'none' }), agent([]), 'save')).toEqual([]);
+        expect(missingStepScopes(step({ action: { kind: 'human-input' } }), agent(['memory:read']), 'save')).toEqual([]);
+    });
+
+    it('says which step reads', () => {
+        const r = stepScopeRefusal(missingStepScopes(step({ action: { kind: 'human-input' }, success_signal: leaf }), agent([]), 'save'));
+        expect(r.needed).toEqual(['memory:read']);
+        expect(r.message).toContain('step "x" reads the owner\'s records');
     });
 });
 

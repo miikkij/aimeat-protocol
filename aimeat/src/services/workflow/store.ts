@@ -42,6 +42,8 @@
  *   v1.10.0 — 2026-09-24 — saveWorkflow takes the saving principal and refuses a step whose own door
  *     asks a word it lacks (step-authority.ts). An export-out or trigger-geai step names only an app
  *     of this owner on this node.
+ *   v1.11.0 — 2026-09-24 — getRun and listRuns return a run as a door may serve it: an observation of a
+ *     credential record is redacted as the memory doors redact it (run-redaction.ts).
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
@@ -49,6 +51,7 @@ import { buildGAII, parseGEAI } from '../../utils/gaii.js';
 import { isReservedServerKey, RESERVED_OWNER_KEY_PREFIXES, SERVER_WRITTEN_KEYS } from '../../utils/reserved-keys.js';
 import { template } from './engine-util.js';
 import { missingStepScopes, stepScopeRefusal, type WorkflowCaller } from './step-authority.js';
+import { shownRun } from './run-redaction.js';
 import {
   WorkflowDefInputSchema, WORKFLOW_ID_RE,
   type WorkflowDef, type WorkflowDefInput, type WorkflowStep, type WorkflowRun, type Signal,
@@ -569,14 +572,16 @@ export async function listRuns(
 ): Promise<WorkflowRun[]> {
   const recs = await storage.listMemory(ownerGhii, { prefix: runKeyPrefix(id) });
   const checks = opts.checks ?? 'exclude';
-  return recs.map(r => r.value as WorkflowRun)
+  // As a door may serve it: an observation of a credential record is redacted (run-redaction.ts).
+  return recs.map(r => shownRun(r.value as WorkflowRun))
     .filter(r => checks === 'include' || (checks === 'only') === isCheckRun(r))
     .sort((a, b) => (b.startedAt ?? '').localeCompare(a.startedAt ?? ''));
 }
 
 export async function getRun(storage: Storage, ownerGhii: string, id: string, runId: string): Promise<WorkflowRun | null> {
   const rec = await storage.getMemory(ownerGhii, runKey(id, runId));
-  return rec ? (rec.value as WorkflowRun) : null;
+  // As a door may serve it: an observation of a credential record is redacted (run-redaction.ts).
+  return rec ? shownRun(rec.value as WorkflowRun) : null;
 }
 
 // ── blueprint (derived) ──────────────────────────────────────────────────────────

@@ -43836,8 +43836,10 @@ paths:
         `workflow:write`, and a step costs the word its own door asks (403 SCOPE_DENIED names the
         missing one): `ai:use` for an ai step or `llm.approved`, `ext:invoke` for an extension
         step, `memory:read` + `storage:write` + `memory:write` for a datapackage step,
-        `memory:read` + `work:request` for export-out, `work:request` for trigger-geai. The owner in
-        person passes.
+        `memory:read` + `work:request` for export-out, `work:request` for trigger-geai, and
+        `memory:read` for a workflow that reads the owner's records (every signal leaf and every
+        agent step reads one). The owner in person passes. A run's observation of a credential
+        record is served as the memory doors show it.
       tags: [Workflows]
       security:
         - BearerAuth: []
@@ -43937,7 +43939,8 @@ paths:
         live (dispatches the agent tasks; poll the run for progress). `vars` overrides the workflow's
         declared variables for this run. Requires `workflow:write` (owners bypass), and a full run
         also the word each step's own door asks, as for a save (403 SCOPE_DENIED names it; a
-        signals-only check asks only `ai:use`, and only when `llm.approved` is set). Returns the runId.
+        signals-only check asks `memory:read` when the workflow reads the owner's records, and
+        `ai:use` when `llm.approved` is set). Returns the runId.
       tags: [Workflows]
       security:
         - BearerAuth: []

@@ -1040,16 +1040,19 @@ async function run() {
       const runs = await json(`/v1/workflows/${id}/runs`, { headers: auth });
       assert(runs.body.data.count === 0, `${id}: the refused start started nothing, found ${runs.body.data.count}`);
     }
-    // A signals-only check dispatches no step, so it is not the step's door.
-    const check = await run('scope-ask', onlyWorkflow, { mode: 'signals-only' });
-    assert(check.status === 200, `a check by workflow:write alone: ${check.status} ${JSON.stringify(check.body.error)}`);
+    // A signals-only check dispatches no step, so it is not the step's door. It does read the owner's
+    // records (the ai step's answer key is its signal), which is memory:read, and nothing more.
+    const readerOnly = await mint('wf-check', ['workflow:read', 'workflow:write', 'memory:read']);
+    const check = await run('scope-ask', readerOnly, { mode: 'signals-only' });
+    assert(check.status === 200, `a check without ai:use: ${check.status} ${JSON.stringify(check.body.error)}`);
 
     // The owner starts the run.
     const ownerRun = await run('scope-ask', auth, { mode: 'full', target: 'sandbox' });
     assert(ownerRun.status === 200, `the owner runs the ai step: ${ownerRun.status} ${JSON.stringify(ownerRun.body.error)}`);
 
-    // POSITIVE CONTROL: the same agent shape, one word more, saves and runs the same ai step.
-    const granted = await mint('wf-ai', ['workflow:read', 'workflow:write', 'ai:use']);
+    // POSITIVE CONTROL: the same agent shape with the step's word, saves and runs the same ai step.
+    // memory:read beside it, because the step's answer key is read back by its signal.
+    const granted = await mint('wf-ai', ['workflow:read', 'workflow:write', 'ai:use', 'memory:read']);
     const grantedSave = await put('scope-ask-granted', granted, ASK);
     assert(grantedSave.status === 200, `with ai:use the save passes: ${grantedSave.status} ${JSON.stringify(grantedSave.body.error)}`);
     const grantedRun = await run('scope-ask-granted', granted, { mode: 'full', target: 'sandbox' });
@@ -1086,6 +1089,114 @@ async function run() {
     const ok = await json('/v1/workflows/eco-own', { method: 'PUT', headers: auth, body: JSON.stringify(wf({ kind: 'trigger-geai', geai: own, capability: 'ping' })) });
     assert(ok.status === 200, `the owner's own app: ${ok.status} ${JSON.stringify(ok.body.error)}`);
     for (const id of ['eco-foreign', 'eco-own']) await json(`/v1/workflows/${id}?withRuns=true`, { method: 'DELETE', headers: auth });
+  });
+
+  // ── a signal reads the owner's records, and that read is the memory door's read ──
+  // Every signal leaf reads an owner record, and a run records what it saw: a json_field leaf keeps
+  // the field's value in the run, and workflow:read serves the run. So workflow:read+write alone read
+  // any field of any owner record the memory door refused them, and a credential record's fields came
+  // back whole where every memory door shows it redacted.
+  await test('a signal that reads an owner record costs memory:read, at save and at run', async () => {
+    const mint = async (name: string, scopes: string[]) => {
+      const reg = await json('/v1/agents', {
+        method: 'POST', headers: auth,
+        body: JSON.stringify({ name, owner: ownerName, capabilities: ['memory'], scopes }),
+      });
+      assert(reg.status === 201, `create ${name}: ${reg.status} ${JSON.stringify(reg.body)}`);
+      const token = await getToken(reg.body.data.agent.gaii, reg.body.data.private_key, true);
+      return { Authorization: `Bearer ${token}` };
+    };
+    const noRead = await mint('wf-noread', ['workflow:read', 'workflow:write']);
+    const reader = await mint('wf-reader', ['workflow:read', 'workflow:write', 'memory:read']);
+    const peek = (key: string, path: string) => ({
+      title: { en_US: 'Peek' }, description: { en_US: 'a signal that reads a record' },
+      trigger: { kind: 'manual' }, vars: [], on_step_fail: 'inspect',
+      steps: [{
+        id: 'peek', description: { en_US: 'Peek' }, required_to_function: 'none',
+        success_signal: { kind: 'deterministic', key, op: 'json_field', path, nonempty: true },
+        action: { kind: 'human-input', question: { prompt: 'Go?', options: [{ id: 'go', label: 'Go' }] } },
+      }],
+    });
+    const put = (id: string, headers: Record<string, string>, body: unknown) =>
+      json(`/v1/workflows/${id}`, { method: 'PUT', headers, body: JSON.stringify(body) });
+    const check = (id: string, headers: Record<string, string>) =>
+      json(`/v1/workflows/${id}/run`, { method: 'POST', headers, body: JSON.stringify({ mode: 'signals-only' }) });
+
+    // An owner record the agent cannot read through the memory door.
+    const w = await json('/v1/memory', { method: 'POST', headers: auth, body: JSON.stringify({ key: 'wfsig.private', value: { secret: 'owner-only-value' }, visibility: 'private' }) });
+    assert(w.status === 200 || w.status === 201, `write the owner record: ${w.status}`);
+    const direct = await json('/v1/memory/wfsig.private?owner_scope=true', { headers: noRead });
+    assert(direct.status === 403, `the memory door refuses the agent: ${direct.status}`);
+
+    // SAVE: the signal is the read, so it costs the read's word.
+    const saved = await put('sig-peek', noRead, peek('wfsig.private', 'secret'));
+    assert(saved.status === 403 && saved.body.error?.code === 'SCOPE_DENIED' && /memory:read/.test(saved.body.error?.message ?? ''),
+      `a json_field signal by workflow:write alone: ${saved.status} ${JSON.stringify(saved.body.error)}`);
+    assert((await json('/v1/workflows/sig-peek', { headers: auth })).status === 404, 'the refused save wrote nothing');
+    // An agent step inherits its offer's signals, so it reads too.
+    const agentStep = await put('sig-agent', noRead, WORKFLOW);
+    assert(agentStep.status === 403 && /memory:read/.test(agentStep.body.error?.message ?? ''),
+      `an agent step by workflow:write alone: ${agentStep.status} ${JSON.stringify(agentStep.body.error)}`);
+
+    // RUN: the owner saves it, and a check started by the agent is the same read.
+    assert((await put('sig-peek', auth, peek('wfsig.private', 'secret'))).status === 200, 'the owner saves it');
+    const refused = await check('sig-peek', noRead);
+    assert(refused.status === 403 && /memory:read/.test(refused.body.error?.message ?? ''),
+      `a check by workflow:write alone: ${refused.status} ${JSON.stringify(refused.body.error ?? refused.body.data)}`);
+    const none = await json('/v1/workflows/sig-peek/runs?include=checks', { headers: auth });
+    assert(none.body.data.count === 0, `the refused check recorded nothing, found ${none.body.data.count}`);
+    // POSITIVE CONTROL: the same agent shape holding memory:read checks it.
+    const allowed = await check('sig-peek', reader);
+    assert(allowed.status === 200, `with memory:read the check runs: ${allowed.status} ${JSON.stringify(allowed.body.error)}`);
+
+    await json('/v1/memory/wfsig.private', { method: 'DELETE', headers: auth });
+    for (const id of ['sig-peek', 'sig-agent']) await json(`/v1/workflows/${id}?withRuns=true`, { method: 'DELETE', headers: auth });
+  });
+
+  await test('a run never serves a credential record\'s value, what a signal saw of it or what an older run recorded', async () => {
+    const peek = (key: string, path: string) => ({
+      title: { en_US: 'Peek' }, description: { en_US: 'a signal that reads a record' },
+      trigger: { kind: 'manual' }, vars: [], on_step_fail: 'inspect',
+      steps: [{
+        id: 'peek', description: { en_US: 'Peek' }, required_to_function: 'none',
+        success_signal: { kind: 'deterministic', key, op: 'json_field', path, nonempty: true },
+        action: { kind: 'human-input', question: { prompt: 'Go?', options: [{ id: 'go', label: 'Go' }] } },
+      }],
+    });
+    const put = (id: string, headers: Record<string, string>, body: unknown) =>
+      json(`/v1/workflows/${id}`, { method: 'PUT', headers, body: JSON.stringify(body) });
+    const check = (id: string, headers: Record<string, string>) =>
+      json(`/v1/workflows/${id}/run`, { method: 'POST', headers, body: JSON.stringify({ mode: 'signals-only' }) });
+
+    // A CREDENTIAL: every memory door shows openrouter.apikey as { configured: true }. A signal
+    // reading it, and a run showing what the signal saw, must show no more than that.
+    const key = await json('/v1/openrouter/settings', { method: 'PUT', headers: auth, body: JSON.stringify({ apiKey: 'sk-or-v1-wfsig-probe-0000000000000000' }) });
+    assert(key.status === 200, `store an AI key: ${key.status} ${JSON.stringify(key.body.error)}`);
+    assert((await put('sig-cred', auth, peek('openrouter.apikey', 'encrypted'))).status === 200, 'the owner saves the credential probe');
+    const credRun = await check('sig-cred', auth);
+    assert(credRun.status === 200, `the owner's check runs: ${credRun.status}`);
+    const served = await json(`/v1/workflows/sig-cred/runs/${credRun.body.data.runId}`, { headers: auth });
+    const seen = served.body.data?.steps?.peek?.outputObserved;
+    assert(seen && typeof seen.value !== 'string',
+      `the run must not carry the stored credential, got ${JSON.stringify(seen)}`);
+
+    // A run recorded before this change can still hold one: the run doors redact what they serve.
+    const planted = {
+      runId: 'recorded-before', workflowId: 'sig-cred', status: 'partial', mode: 'signals-only', startedAt: new Date().toISOString(),
+      steps: { peek: { state: 'green', attempt: 0, reads: ['openrouter.apikey'], writes: [],
+        outputObserved: { op: 'json_field', key: 'openrouter.apikey', path: 'encrypted', value: 'CIPHERTEXT-PROBE' } } },
+    };
+    const plant = await json('/v1/memory', { method: 'POST', headers: auth, body: JSON.stringify({ key: 'workflows.run.sig-cred.recorded-before', value: planted, visibility: 'private' }) });
+    assert(plant.status === 200 || plant.status === 201, `record the old run: ${plant.status} ${JSON.stringify(plant.body.error)}`);
+    const old = await json('/v1/workflows/sig-cred/runs/recorded-before', { headers: auth });
+    assert(old.status === 200 && !JSON.stringify(old.body.data).includes('CIPHERTEXT-PROBE'),
+      `GET one run must redact a credential it recorded: ${JSON.stringify(old.body.data?.steps)}`);
+    const list = await json('/v1/workflows/sig-cred/runs?include=checks', { headers: auth });
+    assert(list.status === 200 && !JSON.stringify(list.body.data).includes('CIPHERTEXT-PROBE'),
+      `the run list must redact it too: ${JSON.stringify(list.body.data).slice(0, 300)}`);
+
+    await json('/v1/openrouter/settings', { method: 'DELETE', headers: auth });
+    await json('/v1/workflows/sig-cred?withRuns=true', { method: 'DELETE', headers: auth });
   });
 
   console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total`);

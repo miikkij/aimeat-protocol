@@ -15,12 +15,15 @@
  *   v1.0.0 — 2026-06-13 — Phase 5: extracted from engine.ts (keep the engine focused on the loop).
  *   v1.1.0 — 2026-06-13 — FIX: read OWNER-SCOPE (owner + all agents), not the owner GHII keyspace
  *     alone — agent-produced keys live in agent keyspaces, so cross-agent signals falsely counted 0.
+ *   v1.2.0 — 2026-09-24 — A signal reads a record as the memory doors show it (shownMemoryValue), so
+ *     a credential record reads as { configured: true } and neither the run nor the llm judge holds it.
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { completeForOwner } from '../ai-completion.js';
 import { validateValueAgainstSchema } from '../schema-validator.js';
 import { listOwnerScopeMemory, getOwnerScopeMemory } from '../owner-memory.js';
+import { shownMemoryValue } from '../secret-records.js';
 import { globToRegExp, type SignalEvalCtx } from './signal-eval.js';
 import type { WorkflowRun } from '../../models/workflow-schemas.js';
 
@@ -57,9 +60,12 @@ export function buildEvalCtx(storage: Storage, config: AimeatConfig, ownerGhii: 
     // a signal over agent-produced keys must read across the owner's GHII + every agent (the same
     // aggregation as GET /v1/memory?owner_scope=true), not the owner GHII keyspace alone — otherwise
     // every cross-agent signal falsely counts 0 and the step goes RED.
+    // What a signal sees of a record is what the memory doors show of it (services/secret-records.ts):
+    // a credential reads as { configured: true }. The run keeps what a leaf saw, and the llm judge
+    // sends it to the model, so neither ever holds the credential itself.
     read: async (key) => {
       const rec = await getOwnerScopeMemory(storage, config.nodeId, ownerName, prefix + key);
-      return rec ? { key, value: rec.value } : null;
+      return rec ? { key, value: shownMemoryValue(rec.key, rec.value) } : null;
     },
     listGlob: async (glob) => {
       const full = prefix + glob;
@@ -67,7 +73,7 @@ export function buildEvalCtx(storage: Storage, config: AimeatConfig, ownerGhii: 
       const listPrefix = star >= 0 ? full.slice(0, star) : full;
       const recs = await listOwnerScopeMemory(storage, config.nodeId, ownerName, { prefix: listPrefix });
       const re = globToRegExp(full);
-      return recs.filter(r => re.test(r.key)).map(r => ({ key: r.key.slice(prefix.length), value: r.value }));
+      return recs.filter(r => re.test(r.key)).map(r => ({ key: r.key.slice(prefix.length), value: shownMemoryValue(r.key, r.value) }));
     },
     vars: run.vars,
     llm: llmEnabled ? makeLlmJudge(storage, config, ownerGhii, run.workflowId) : null,
