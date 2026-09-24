@@ -246,8 +246,8 @@ export function FilePreviewModal({ file, nodeUrl, onClose, onDownload, showToast
   return html`
     <${Modal} open=${true} onClose=${onClose} title=${fKey} className="pf-file-preview-modal" size="xl" guard=${false}
       footer=${html`
-        <button class="btn-outline" onClick=${openInTab}>${t('profile.files.openInTab') || 'Open in new tab'} ↗</button>
-        <button class="btn-outline" onClick=${() => onDownload(file)}>${t('profile.files.download')}</button>`}>
+        <button class="poster-action" onClick=${openInTab}>${t('profile.files.openInTab') || 'Open in new tab'} ↗</button>
+        <button class="poster-action" onClick=${() => onDownload(file)}>${t('profile.files.download')}</button>`}>
       <div class="pf-file-preview-body">
         ${loading && html`<div class="pf-file-preview-status">${t('profile.files.previewLoading') || 'Loading preview…'}</div>`}
         ${err && html`<div class="pf-file-preview-status">${t('profile.files.previewError') || 'Couldn’t load this file'}</div>`}
@@ -394,8 +394,8 @@ export function EditMemoryModal({ memKey, initialValue, initialVisibility, initi
   return html`
     <${Modal} open=${true} onClose=${onCancel} title=${`${t('profile.memory.editTitle')}: ${memKey}`} size="lg"
       footer=${html`
-        <button class="btn-outline" onClick=${onCancel}>${t('profile.cancel')}</button>
-        <button class="btn-primary" disabled=${!canSave}
+        <button class="poster-action" onClick=${onCancel}>${t('profile.cancel')}</button>
+        <button class="poster-slab poster-slab--control" disabled=${!canSave}
           onClick=${() => onSave(value, vis, initialVersion, undefined)}>${t('profile.save')}</button>`}>
         <div class="form-row flex-row mb-half">
           <label class="pf-label-inline">${t('profile.memory.visLabel')}</label>

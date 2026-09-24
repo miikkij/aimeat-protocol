@@ -177,7 +177,7 @@
     <div class="dlg-body" id="cortex-popup-content"></div>
     <footer class="dlg-foot">
       <div class="dlg-foot-start" id="cortex-popup-owner"></div>
-      <button type="button" class="modal-btn secondary" data-dlg-close data-i18n="common.close">Close</button>
+      <button type="button" class="poster-action" data-dlg-close data-i18n="common.close">Close</button>
     </footer>
   </dialog>
 
@@ -193,9 +193,9 @@
       <button type="button" class="modal-btn secondary cx-add" onclick="window._launcher.cortexEditorAddLib()" data-i18n="cortex.addLib">+ Add Lib File</button>
     </div>
     <footer class="dlg-foot">
-      <div class="dlg-foot-start"><button type="button" class="modal-btn secondary" onclick="window._launcher.cortexEditorExport()" data-i18n="cortex.exportFiles">Export Files</button></div>
-      <button type="button" class="modal-btn secondary" data-dlg-close data-i18n="common.cancel">Cancel</button>
-      <button type="button" class="modal-btn primary" onclick="window._launcher.cortexEditorSave()" id="cortex-editor-save-btn" data-i18n="cortex.saveReinstall">Save &amp; Re-install</button>
+      <div class="dlg-foot-start"><button type="button" class="poster-action" onclick="window._launcher.cortexEditorExport()" data-i18n="cortex.exportFiles">Export Files</button></div>
+      <button type="button" class="poster-action" data-dlg-close data-i18n="common.cancel">Cancel</button>
+      <button type="button" class="poster-slab poster-slab--control" onclick="window._launcher.cortexEditorSave()" id="cortex-editor-save-btn" data-i18n="cortex.saveReinstall">Save &amp; Re-install</button>
     </footer>
   </dialog>
 
@@ -257,8 +257,8 @@
       </div>
     </div>
     <footer class="dlg-foot">
-      <button type="button" class="modal-btn secondary" id="modal-cancel-btn" data-i18n="common.cancel">Cancel</button>
-      <button type="button" class="modal-btn primary" id="modal-save-btn" data-i18n="common.save">Save</button>
+      <button type="button" class="poster-action" id="modal-cancel-btn" data-i18n="common.cancel">Cancel</button>
+      <button type="button" class="poster-slab poster-slab--control" id="modal-save-btn" data-i18n="common.save">Save</button>
     </footer>
   </dialog>
 
@@ -321,7 +321,7 @@
       </section>
     </div>
     <footer class="dlg-foot">
-      <button type="button" class="modal-btn secondary" data-dlg-close data-i18n="common.close">Close</button>
+      <button type="button" class="poster-action" data-dlg-close data-i18n="common.close">Close</button>
     </footer>
   </dialog>
 
@@ -334,8 +334,8 @@
       <p id="confirm-message" class="confirm-message"></p>
     </div>
     <footer class="dlg-foot">
-      <button type="button" class="modal-btn secondary" id="confirm-cancel-btn" data-i18n="common.cancel">Cancel</button>
-      <button type="button" class="modal-btn primary" id="confirm-ok-btn" autofocus data-i18n="common.confirm">OK</button>
+      <button type="button" class="poster-action" id="confirm-cancel-btn" data-i18n="common.cancel">Cancel</button>
+      <button type="button" class="poster-slab poster-slab--control" id="confirm-ok-btn" autofocus data-i18n="common.confirm">OK</button>
     </footer>
   </dialog>
 
@@ -374,8 +374,8 @@
       </section>
     </div>
     <footer class="dlg-foot">
-      <button type="button" class="modal-btn secondary" id="settings-cancel-btn" data-i18n="common.cancel">Cancel</button>
-      <button type="button" class="modal-btn primary" id="settings-save-btn" data-i18n="common.save">Save</button>
+      <button type="button" class="poster-action" id="settings-cancel-btn" data-i18n="common.cancel">Cancel</button>
+      <button type="button" class="poster-slab poster-slab--control" id="settings-save-btn" data-i18n="common.save">Save</button>
     </footer>
   </dialog>
 
@@ -389,15 +389,15 @@
     </div>
     <footer class="dlg-foot">
       <div class="dlg-foot-start">
-        <button type="button" class="modal-btn secondary" id="copy-source-btn" data-i18n="source.copy">Copy Source</button>
-        <button type="button" class="modal-btn secondary" id="copy-prompt-btn" data-i18n="source.copyPrompt">Copy with AI Prompt</button>
+        <button type="button" class="poster-action" id="copy-source-btn" data-i18n="source.copy">Copy Source</button>
+        <button type="button" class="poster-action" id="copy-prompt-btn" data-i18n="source.copyPrompt">Copy with AI Prompt</button>
       </div>
-      <button type="button" class="modal-btn secondary" id="close-source-btn" data-i18n="common.close">Close</button>
+      <button type="button" class="poster-action" id="close-source-btn" data-i18n="common.close">Close</button>
       <!-- The three canonical verbs, identical to the detail view's AI loop (TARGET-048):
            save (private, checkpointed) → try (real origin, live untouched) → publish (public). -->
-      <button type="button" class="modal-btn secondary" id="source-test-live-btn" hidden data-i18n="wc.try">Try it safely</button>
-      <button type="button" class="modal-btn primary" id="save-source-btn" disabled data-i18n="source.save">Save working copy</button>
-      <button type="button" class="modal-btn success" id="source-publish-tested-btn" hidden data-i18n="wc.publishNew">Publish as a new version</button>
+      <button type="button" class="poster-action" id="source-test-live-btn" hidden data-i18n="wc.try">Try it safely</button>
+      <button type="button" class="poster-slab poster-slab--control" id="save-source-btn" disabled data-i18n="source.save">Save working copy</button>
+      <button type="button" class="poster-slab poster-slab--control" id="source-publish-tested-btn" hidden data-i18n="wc.publishNew">Publish as a new version</button>
     </footer>
   </dialog>
 
@@ -423,8 +423,8 @@
       <div id="publish-status" style="margin-top:8px;font-size:.85rem"></div>
     </div>
     <footer class="dlg-foot">
-      <button type="button" class="modal-btn secondary" data-dlg-close data-i18n="common.cancel">Cancel</button>
-      <button type="button" class="modal-btn primary" id="publish-submit-btn" onclick="window._launcher.submitPublish()" data-i18n="publish.submit">Publish</button>
+      <button type="button" class="poster-action" data-dlg-close data-i18n="common.cancel">Cancel</button>
+      <button type="button" class="poster-slab poster-slab--control" id="publish-submit-btn" onclick="window._launcher.submitPublish()" data-i18n="publish.submit">Publish</button>
     </footer>
   </dialog>
 
@@ -436,8 +436,8 @@
       <div id="backup-import-body"></div>
     </div>
     <footer class="dlg-foot">
-      <button type="button" class="modal-btn secondary" data-dlg-close data-i18n="common.close">Close</button>
-      <button type="button" class="modal-btn primary" id="backup-restore-btn" onclick="window._launcher.submitBackupRestore()" data-i18n="backup.restore" style="display:none">Restore selected</button>
+      <button type="button" class="poster-action" data-dlg-close data-i18n="common.close">Close</button>
+      <button type="button" class="poster-slab poster-slab--control" id="backup-restore-btn" onclick="window._launcher.submitBackupRestore()" data-i18n="backup.restore" style="display:none">Restore selected</button>
     </footer>
   </dialog>
 
@@ -454,9 +454,9 @@
       <div id="subdomain-status" style="margin-top:8px;font-size:.85rem;min-height:1.1em"></div>
     </div>
     <footer class="dlg-foot">
-      <div class="dlg-foot-start"><button type="button" class="modal-btn secondary" id="subdomain-unassign-btn" onclick="window._launcher.unassignSubdomain()" data-i18n="subModal.unassign">Unassign</button></div>
-      <button type="button" class="modal-btn secondary" data-dlg-close data-i18n="common.cancel">Cancel</button>
-      <button type="button" class="modal-btn primary" id="subdomain-save-btn" onclick="window._launcher.submitSubdomainAssign()" data-i18n="common.save">Save</button>
+      <div class="dlg-foot-start"><button type="button" class="poster-action" id="subdomain-unassign-btn" onclick="window._launcher.unassignSubdomain()" data-i18n="subModal.unassign">Unassign</button></div>
+      <button type="button" class="poster-action" data-dlg-close data-i18n="common.cancel">Cancel</button>
+      <button type="button" class="poster-slab poster-slab--control" id="subdomain-save-btn" onclick="window._launcher.submitSubdomainAssign()" data-i18n="common.save">Save</button>
     </footer>
   </dialog>
 
@@ -469,7 +469,7 @@
       <div id="versions-list"></div>
     </div>
     <footer class="dlg-foot">
-      <button type="button" class="modal-btn secondary" data-dlg-close data-i18n="common.close">Close</button>
+      <button type="button" class="poster-action" data-dlg-close data-i18n="common.close">Close</button>
     </footer>
   </dialog>
 
@@ -483,7 +483,7 @@
       <div id="lineage-tree" style="font-size:.85rem"></div>
     </div>
     <footer class="dlg-foot">
-      <button type="button" class="modal-btn secondary" data-dlg-close data-i18n="common.close">Close</button>
+      <button type="button" class="poster-action" data-dlg-close data-i18n="common.close">Close</button>
     </footer>
   </dialog>
 
@@ -495,7 +495,7 @@
       <div id="agents-modal-body" class="aga-body"></div>
     </div>
     <footer class="dlg-foot">
-      <button type="button" class="modal-btn secondary" data-dlg-close data-i18n="common.close">Close</button>
+      <button type="button" class="poster-action" data-dlg-close data-i18n="common.close">Close</button>
     </footer>
   </dialog>
 
@@ -511,8 +511,8 @@
       <div id="protection-status" style="margin:8px 0 0;font-size:.85rem;min-height:1.1em"></div>
     </div>
     <footer class="dlg-foot">
-      <button type="button" class="modal-btn secondary" data-dlg-close data-i18n="common.close">Close</button>
-      <button type="button" class="modal-btn primary" onclick="window._launcher.saveProtection()" data-i18n="protect.save">Save</button>
+      <button type="button" class="poster-action" data-dlg-close data-i18n="common.close">Close</button>
+      <button type="button" class="poster-slab poster-slab--control" onclick="window._launcher.saveProtection()" data-i18n="protect.save">Save</button>
     </footer>
   </dialog>
 
@@ -571,7 +571,7 @@
       </div>
     </div>
     <footer class="dlg-foot">
-      <button type="button" class="modal-btn secondary" id="pb-cancel-btn" data-i18n="common.close">Close</button>
+      <button type="button" class="poster-action" id="pb-cancel-btn" data-i18n="common.close">Close</button>
     </footer>
   </dialog>
 

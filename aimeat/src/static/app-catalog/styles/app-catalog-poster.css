@@ -16,6 +16,9 @@
   @structure tokens · site bar · masthead, band, tools · rail · the index (rows and panels) ·
     foot · detail view · phone
   @version-history
+    v1.11.0 — 2026-09-24 — The footer's own button words are gone: a dialog's footer wears the
+      library's action link and loud action, built in from poster.css (Jouni's decision "Dialog
+      actions").
     v1.10.0 — 2026-09-13 — The dialogs are the site's one dialog (public/css/dialog.css, built in
       after this sheet): the dialog frame, the title slab rule for .modal h2, .modal-actions, the
       overlay scroll list, the .cx-overlay and #consents-overlay wrappers and the phone's .modal
@@ -566,14 +569,6 @@ label.dtl-stat-label, .dtl-ac-editor .dtl-stat-label, .od-form .dtl-stat-label, 
 /* This page has no global [hidden] rule, and a button word sets its own display, so a hidden
    footer button (Try it safely before a draft exists) would still show without this. */
 dialog.dlg [hidden] { display: none !important; }
-/* A footer word is the dialog's underlined word with a 44px press area; the slab stays the slab. */
-dialog.dlg .dlg-foot .modal-btn:not(.primary):not(.success) {
-  display: inline-flex; align-items: center; min-height: 44px; padding: 0; border: 0;
-  font-size: .8rem; text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 5px;
-}
-dialog.dlg .dlg-foot .modal-btn:not(.primary):not(.success):hover { color: var(--accent); }
-dialog.dlg .dlg-foot .modal-btn.danger { color: var(--accent); }
-dialog.dlg .dlg-foot .modal-btn.primary, dialog.dlg .dlg-foot .modal-btn.success { font-size: .8rem; }
 /* The page behind a dialog does not scroll under it. */
 html:has(dialog.dlg[open]) { overflow: hidden; }
 /* The toast stack is a manual popover so it can show above an open dialog; the browser's own

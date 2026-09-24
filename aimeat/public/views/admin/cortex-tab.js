@@ -268,8 +268,8 @@ export default function CortexTab() {
         return html`
       <${Modal} open=${!!e} onClose=${() => setTurningOff(null)} title=${e ? C('dialog.offTitle', { name: e.name }) : ''}
         footer=${e && html`
-          <button type="button" class="og-door og-door--quiet" onClick=${() => setTurningOff(null)}>${t('common.cancel')}</button>
-          <button type="button" class="adm-btn" disabled=${busy} onClick=${doTurnOff}>
+          <button type="button" class="poster-action" onClick=${() => setTurningOff(null)}>${t('common.cancel')}</button>
+          <button type="button" class="poster-slab poster-slab--control" disabled=${busy} onClick=${doTurnOff}>
             ${apps === 0 ? C('dialog.offDo')
               : apps === 1 ? C('dialog.offDoForOne')
                 : C('dialog.offDoFor', { n: num(apps) })}</button>`}>
@@ -296,8 +296,8 @@ export default function CortexTab() {
       <${Modal} open=${!!removing} onClose=${() => setRemoving(null)}
         title=${removing ? C('dialog.removeTitle', { name: removing.name }) : ''}
         footer=${removing && html`
-          <button type="button" class="og-door og-door--quiet" onClick=${() => setRemoving(null)}>${t('common.cancel')}</button>
-          <button type="button" class="og-door og-door--quiet og-door--danger"
+          <button type="button" class="poster-action" onClick=${() => setRemoving(null)}>${t('common.cancel')}</button>
+          <button type="button" class="poster-slab poster-slab--control poster-slab--danger"
             disabled=${busy || removing.typed !== removing.name} onClick=${doRemove}>${C('removeForGood')}</button>`}>
         ${removing && html`
           <div class="og-box poster-aside poster-aside--small">
@@ -455,8 +455,8 @@ export default function CortexTab() {
 
       <${Modal} open=${!!removingBatch} onClose=${() => setRemovingBatch(null)} title=${C('dialog.batchTitle')}
         footer=${removingBatch && html`
-          <button type="button" class="og-door og-door--quiet" onClick=${() => setRemovingBatch(null)}>${t('common.cancel')}</button>
-          <button type="button" class="og-door og-door--quiet og-door--danger"
+          <button type="button" class="poster-action" onClick=${() => setRemovingBatch(null)}>${t('common.cancel')}</button>
+          <button type="button" class="poster-slab poster-slab--control poster-slab--danger"
             disabled=${busy || removingBatch.typed !== C('dialog.removeWord')}
             onClick=${doRemoveBatch}>${C('group.removeAll', { n: num(removingBatch.items.length) })}</button>`}>
         ${removingBatch && html`

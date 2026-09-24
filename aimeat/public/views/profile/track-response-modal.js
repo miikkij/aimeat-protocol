@@ -145,16 +145,16 @@ export function TrackResponseModal({ open, msg, onClose, onDone, showToast, defa
     setBusy(false);
   };
 
-  const parkBtn = allowPark ? html`<button class="btn-outline" disabled=${busy} onClick=${park}>📓 ${t('inbox.trackPark')}</button>` : null;
+  const parkBtn = allowPark ? html`<button class="poster-action" disabled=${busy} onClick=${park}>📓 ${t('inbox.trackPark')}</button>` : null;
 
   const footer = phase === 'error' ? html`
-      <button class="btn-ghost" disabled=${busy} onClick=${onClose}>${t('common.cancel')}</button>
+      <button class="poster-action" disabled=${busy} onClick=${onClose}>${t('common.cancel')}</button>
       ${parkBtn}
-      <button class="btn-outline" disabled=${busy} onClick=${() => { window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId: 'mcp' } })); onClose?.(); }}>${t('inbox.trackConfigureAi')}</button>`
+      <button class="poster-action" disabled=${busy} onClick=${() => { window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId: 'mcp' } })); onClose?.(); }}>${t('inbox.trackConfigureAi')}</button>`
     : phase === 'review' ? html`
-      <button class="btn-ghost" disabled=${busy} onClick=${close}>${t('common.cancel')}</button>
+      <button class="poster-action" disabled=${busy} onClick=${close}>${t('common.cancel')}</button>
       ${parkBtn}
-      <button class="btn-primary" disabled=${busy || !namespace} onClick=${submit}>
+      <button class="poster-slab poster-slab--control" disabled=${busy || !namespace} onClick=${submit}>
         ${busy ? html`<span class="inbox-spinner"></span> ${t('inbox.trackCreating')}` : t('inbox.trackCreate')}
       </button>`
     : null;

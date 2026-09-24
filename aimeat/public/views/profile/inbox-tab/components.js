@@ -156,8 +156,8 @@ export function MarkdownViewer({ url, name, onClose }) {
   return html`
     <${Modal} open=${true} onClose=${onClose} title=${name} size="lg" guard=${false} className="inbox-mdviewer"
       footer=${html`
-        <a class="btn-ghost" href=${url} target="_blank" rel="noopener">${t('inbox.attachmentOpenRaw')}</a>
-        <a class="btn-ghost" href=${url} download=${name}>${t('inbox.attachmentDownload')}</a>`}>
+        <a class="poster-action" href=${url} target="_blank" rel="noopener">${t('inbox.attachmentOpenRaw')}</a>
+        <a class="poster-action" href=${url} download=${name}>${t('inbox.attachmentDownload')}</a>`}>
       ${failed ? html`<div class="inbox-empty-sm">${t('inbox.attachmentLoadError')}</div>`
         : text === null ? html`<div class="inbox-empty-sm">…</div>`
         : html`<${Markdown} text=${text} />`}
@@ -654,7 +654,7 @@ export function ReplyWithAiPopover({ title, build, onClose, showToast }) {
   // The two ways are tabs; what the chosen one decides sits under a sun bar (poster-panel).
   return html`
     <${Modal} open=${true} onClose=${onClose} title=${title} size="lg" guard=${false} className="inbox-ai-modal"
-      footer=${html`<${CopyButton} text=${text} className="btn-primary"
+      footer=${html`<${CopyButton} text=${text} className="poster-slab poster-slab--control"
         label=${t('common.copy')} copiedLabel=${'✓ ' + t('inbox.ai.copied')}
         onCopied=${() => showToast?.(t('inbox.ai.copied'))} />`}>
       <div class="inbox-ai-modes" role="tablist">

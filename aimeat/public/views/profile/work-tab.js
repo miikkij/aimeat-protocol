@@ -218,8 +218,8 @@ function RateModal({ desc, onSubmit, onCancel }) {
   return html`
     <${Modal} open=${true} onClose=${onCancel} title=${t('profile.work.rateTitle')}
       footer=${html`
-        <button class="btn-outline" onClick=${onCancel}>${t('profile.cancel')}</button>
-        <button class="btn-primary" onClick=${() => onSubmit(rating, comment)}>${t('profile.work.submitRating')}</button>`}>
+        <button class="poster-action" onClick=${onCancel}>${t('profile.cancel')}</button>
+        <button class="poster-slab poster-slab--control" onClick=${() => onSubmit(rating, comment)}>${t('profile.work.submitRating')}</button>`}>
       <p class="text-meta mb-1">${t('profile.work.rateDesc')} ${escHtml(desc || '')}</p>
       <div class="star-rating mb-1">
         ${[1,2,3,4,5].map(i => html`
@@ -235,8 +235,8 @@ function DeliverModal({ desc, loading, onSubmit, onCancel }) {
   return html`
     <${Modal} open=${true} onClose=${onCancel} title=${t('profile.work.deliver')}
       footer=${html`
-        <button class="btn-outline" disabled=${loading} onClick=${onCancel}>${t('profile.cancel')}</button>
-        <button class="btn-primary" disabled=${loading} onClick=${() => onSubmit(result || undefined)}>
+        <button class="poster-action" disabled=${loading} onClick=${onCancel}>${t('profile.cancel')}</button>
+        <button class="poster-slab poster-slab--control" disabled=${loading} onClick=${() => onSubmit(result || undefined)}>
           ${loading ? t('profile.work.delivering') : t('profile.work.deliver')}
         </button>`}>
       <p class="text-meta mb-1">${t('profile.work.delivering')}: ${escHtml(desc || '')}</p>

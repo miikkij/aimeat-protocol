@@ -353,8 +353,8 @@ export default function AppsAdminTab() {
 
       <${Modal} open=${!!hiding} onClose=${() => setHiding(null)} title=${A('hideTitle')}
         footer=${hiding && html`
-          <button type="button" class="og-door og-door--quiet" onClick=${() => setHiding(null)}>${t('common.cancel')}</button>
-          <button type="button" class="adm-btn" disabled=${busy} onClick=${doHide}>${A('takeDown')}</button>`}>
+          <button type="button" class="poster-action" onClick=${() => setHiding(null)}>${t('common.cancel')}</button>
+          <button type="button" class="poster-slab poster-slab--control" disabled=${busy} onClick=${doHide}>${A('takeDown')}</button>`}>
         ${hiding && html`
           <p>${A('hideAsk', { name: escHtml(hiding.name), owner: escHtml(hiding.owner) })}</p>
           <p class="adm-ap-note">${A('hideExplain')}</p>
@@ -367,8 +367,8 @@ export default function AppsAdminTab() {
 
       <${Modal} open=${!!deleting} onClose=${() => setDeleting(null)} title=${A('deleteTitle')}
         footer=${deleting && html`
-          <button type="button" class="og-door og-door--quiet" onClick=${() => setDeleting(null)}>${t('common.cancel')}</button>
-          <button type="button" class="og-door og-door--quiet og-door--danger"
+          <button type="button" class="poster-action" onClick=${() => setDeleting(null)}>${t('common.cancel')}</button>
+          <button type="button" class="poster-slab poster-slab--control poster-slab--danger"
             disabled=${busy || deleting.typed !== deleting.filename} onClick=${doDelete}>${A('deleteForGood')}</button>`}>
         ${deleting && html`
           <p>${A('deleteAsk', { name: escHtml(deleting.name), owner: escHtml(deleting.owner) })}</p>

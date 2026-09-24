@@ -91,10 +91,10 @@ export function EditProfileModal({ session, onClose, onSaved, onChangePassword }
   const requestClose = () => { if (!saving) onClose(); };
 
   const footer = loading ? null : html`
-    <button class="btn-outline" onClick=${requestClose} disabled=${saving}>
+    <button class="poster-action" onClick=${requestClose} disabled=${saving}>
       ${t('profile.landing.editCancel')}
     </button>
-    <button class="btn-primary" onClick=${save} disabled=${saving}>
+    <button class="poster-slab poster-slab--control" onClick=${save} disabled=${saving}>
       ${saving ? t('profile.landing.editSaving') : t('profile.landing.editSave')}
     </button>`;
   const footerStart = loading ? null : html`
@@ -237,10 +237,10 @@ export function ChangePasswordModal({ onClose, onChanged }) {
   const setupMode = hasPassword === false;
 
   const footer = html`
-    <button class="btn-outline" onClick=${requestClose} disabled=${saving}>
+    <button class="poster-action" onClick=${requestClose} disabled=${saving}>
       ${t('profile.landing.editCancel')}
     </button>
-    <button class="btn-primary" onClick=${save} disabled=${saving || hasPassword === null || (!setupMode && !current) || !rulesOk || !confirm || mismatch}>
+    <button class="poster-slab poster-slab--control" onClick=${save} disabled=${saving || hasPassword === null || (!setupMode && !current) || !rulesOk || !confirm || mismatch}>
       ${saving
         ? (setupMode ? (t('profile.landing.passwordSaving') || t('profile.landing.passwordChanging')) : t('profile.landing.passwordChanging'))
         : (setupMode ? (t('profile.landing.setPasswordBtn') || 'Set password') : (t('profile.landing.changePasswordBtn') || 'Change password'))}
@@ -284,7 +284,7 @@ export function PresenceDialog({ cfg, status, saving, onSave, onClose }) {
   return html`
     <${Modal} open=${true} onClose=${onClose} title=${t('presence.control.title')} size="sm" guard=${false}
       className="pf-presence-modal"
-      footer=${html`<button class="btn-primary" onClick=${onClose}>${t('profile.close')}</button>`}>
+      footer=${html`<button class="poster-slab poster-slab--control" onClick=${onClose}>${t('profile.close')}</button>`}>
           <div class="pf-presence-head">
             <div class="section-desc">${t('presence.control.desc')}</div>
             <${PresenceDot} status=${status} size="md" label=${true} />

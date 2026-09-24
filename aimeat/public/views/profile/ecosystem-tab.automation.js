@@ -649,8 +649,8 @@ export function EcoAutomationSection({ app, showToast }) {
 
       <${Modal} open=${!!confirmId} onClose=${() => setConfirmId(null)} title=${t('profile.ecosystem.advReject')} size="sm"
         footer=${html`
-          <button class="btn-ghost" onClick=${() => setConfirmId(null)}>${t('common.cancel')}</button>
-          <button class="btn-danger-solid" onClick=${() => onRejectAdv(confirmId)}>${t('profile.ecosystem.advReject')}</button>`}>
+          <button class="poster-action" onClick=${() => setConfirmId(null)}>${t('common.cancel')}</button>
+          <button class="poster-slab poster-slab--control poster-slab--danger" onClick=${() => onRejectAdv(confirmId)}>${t('profile.ecosystem.advReject')}</button>`}>
         <p>${t('profile.ecosystem.advRejectConfirm')}</p>
       <//>
     </div>`;

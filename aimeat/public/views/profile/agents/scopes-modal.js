@@ -93,9 +93,9 @@ export default function ScopesModal({ agent, session, onSave, onCancel }) {
   return html`
     <${Modal} open=${true} onClose=${onCancel} className="scope-modal" size="lg" title=${`${t('profile.agents.scopeUi.scopeProfile')}: ${agent.display_name || agent.name}`}
       footer=${isReadOnly ? html`
-        <button class="btn-outline" onClick=${onCancel}>${t('profile.agents.scopeUi.cancel')}</button>` : html`
-        <button class="btn-outline" onClick=${onCancel}>${t('profile.agents.scopeUi.cancel')}</button>
-        <button class="btn-primary" onClick=${handleSave} disabled=${saving}>
+        <button class="poster-action" onClick=${onCancel}>${t('profile.agents.scopeUi.cancel')}</button>` : html`
+        <button class="poster-action" onClick=${onCancel}>${t('profile.agents.scopeUi.cancel')}</button>
+        <button class="poster-slab poster-slab--control" onClick=${handleSave} disabled=${saving}>
           ${saving ? t('profile.agents.scopeUi.saving') : t('profile.agents.scopeUi.save')}
         </button>`}>
         <div class="scope-agent-info">${escHtml(agent.gaii || '')}

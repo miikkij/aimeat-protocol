@@ -13,8 +13,11 @@
  * @usage
  *   import { Modal, ConfirmDialog, useConfirm } from '/components/Modal.js';
  *   <${Modal} open=${open} onClose=${close} title="Change password"
- *     footer=${html`<button class="btn-ghost" onClick=${close}>Cancel</button>
- *                   <button class="btn-primary" onClick=${save}>Save</button>`}>
+ *     footer=${html`<button class="poster-action" onClick=${close}>Cancel</button>
+ *                   <button class="poster-slab poster-slab--control" onClick=${save}>Save</button>`}>
+ *   A footer's actions are the library's (Jouni's decision "Dialog actions"): a way out or a side
+ *   door is .poster-action, the one "do it" is .poster-slab.poster-slab--control, and one that
+ *   cannot be undone adds .poster-slab--danger.
  *     …fields…
  *   <//>
  *   Props: open, onClose, title, children, footer, footerStart (a side door at the footer's other
@@ -22,6 +25,8 @@
  *   (default true: Escape and the page behind do not close once something has been typed),
  *   className (extra class on the <dialog>, e.g. a width modifier).
  * @version-history
+ *   v2.1.0 — 2026-09-24 — The question's Cancel is the action link and its confirm the loud action,
+ *     coral when it deletes (Jouni's decision "Dialog actions").
  *   v1.0.0 — 2026-03-10 — Initial Modal component
  *   v1.1.0 — 2026-03-14 — Add ConfirmDialog with danger variant
  *   v1.2.0 — 2026-03-16 — Add useConfirm hook for easy confirm() replacement
@@ -125,8 +130,8 @@ export function Modal({ open, onClose, title, className = '', children, footer, 
 export function ConfirmDialog({ open, onClose, onConfirm, title, message, confirmLabel, cancelLabel, danger, className = '' }) {
   if (!open) return null;
   const footer = html`
-    <button type="button" class="btn-ghost" autofocus=${!!danger} onClick=${() => onClose()}>${cancelLabel || t('common.cancel') || 'Cancel'}</button>
-    <button type="button" class=${danger ? 'btn-danger-solid' : 'btn-primary'} autofocus=${!danger} onClick=${onConfirm}>
+    <button type="button" class="poster-action" autofocus=${!!danger} onClick=${() => onClose()}>${cancelLabel || t('common.cancel') || 'Cancel'}</button>
+    <button type="button" class=${danger ? 'poster-slab poster-slab--control poster-slab--danger' : 'poster-slab poster-slab--control'} autofocus=${!danger} onClick=${onConfirm}>
       ${confirmLabel || t('common.confirm') || 'Confirm'}
     </button>`;
   return html`<${DialogFrame} onClose=${onClose} title=${title} className=${className} size="sm"

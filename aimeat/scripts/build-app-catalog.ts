@@ -14,6 +14,9 @@
  *   - buildAppCatalog() → assemble + write src/static/app-catalog.html (+ a generated-file banner)
  * @usage  pnpm build:app-catalog   (also run by `pnpm build` and `pnpm dev`)
  * @version-history
+ *   v1.4.0 — 2026-09-24 — The ranges of public/css/poster.css between its @app-catalog markers (the
+ *     action link and the loud action) are appended before dialog.css, so the catalog's dialog
+ *     footers wear the library's actions (Jouni's decision "Dialog actions").
  *   v1.3.0 — 2026-09-18 — styles/app-catalog-visitors.css is appended after the poster sheet: the
  *     Visitors section's own sheet, because the poster sheet is at the line ceiling.
  *   v1.2.0 — 2026-09-13 — public/css/components/dialog.css is appended after the poster sheet, and the bundle
@@ -52,7 +55,35 @@ const THEME_TOKENS = [
   '--sun', '--on-sun',
   // The type tokens public/css/components/dialog.css reads (the catalog appends that sheet).
   '--text-md', '--text-small', '--weight-heavy',
+  // The tokens the library ranges of poster.css read (the action link and the loud action).
+  '--text-body-sm', '--font-showroom-body', '--success-gradient', '--success-glow',
 ];
+
+const POSTER_FILE = join(__dirname, '..', 'public', 'css', 'poster.css');
+const LIBRARY_BEGIN = '/* @app-catalog:begin';
+const LIBRARY_END = '/* @app-catalog:end */';
+
+/**
+ * The ranges of poster.css between its @app-catalog markers, in order: the action link and the loud
+ * action the catalog's dialogs wear (Jouni's decision "Dialog actions", 2026-09-24). Copied rather
+ * than linked because the catalog is one self-contained page; a change to a range makes
+ * check:app-catalog fail until the page is rebuilt. An unclosed or empty set of markers stops the
+ * build rather than copying half a sheet.
+ */
+export function posterLibraryRanges(posterCss: string): string {
+  const out: string[] = [];
+  let at = 0;
+  for (;;) {
+    const begin = posterCss.indexOf(LIBRARY_BEGIN, at);
+    if (begin < 0) break;
+    const end = posterCss.indexOf(LIBRARY_END, begin);
+    if (end < 0) throw new Error('poster.css has an @app-catalog:begin without its end');
+    out.push(posterCss.slice(begin, end + LIBRARY_END.length));
+    at = end + LIBRARY_END.length;
+  }
+  if (!out.length) throw new Error('poster.css has no @app-catalog ranges');
+  return out.join('\n');
+}
 
 /**
  * The declarations of THEME_TOKENS in theme.css's :root block, one per line. The catalog page cannot
@@ -105,12 +136,14 @@ export async function renderAppCatalog(): Promise<string> {
     // with a chart, a map and two tables is a coherent group to keep together. After the poster
     // sheet, because it composes the poster's tokens and shapes.
     readFileSync(join(SRC_DIR, 'styles', 'app-catalog-visitors.css'), 'utf-8') + '\n' +
+    // The library's action link and loud action, which the dialogs' footers wear.
+    posterLibraryRanges(readFileSync(POSTER_FILE, 'utf-8')) + '\n' +
     readFileSync(DIALOG_CSS_FILE, 'utf-8');
   const bundle = await bundleJs();
 
   const banner =
     '<!-- GENERATED FILE — do not edit directly. Source: src/static/app-catalog/ ' +
-    '(js/*.js + styles/*.css + _template.html), the type tokens of public/css/theme.css, and public/css/components/dialog.css + public/js/dialog.js. Rebuild: pnpm build:app-catalog -->\n';
+    '(js/*.js + styles/*.css + _template.html), the type tokens of public/css/theme.css, the @app-catalog ranges of public/css/poster.css, and public/css/components/dialog.css + public/js/dialog.js. Rebuild: pnpm build:app-catalog -->\n';
 
   return banner + template.replace(STYLES_MARKER, () => css).replace(BUNDLE_MARKER, () => bundle);
 }
@@ -124,7 +157,7 @@ async function checkAppCatalog(): Promise<void> {
   const fresh = await renderAppCatalog();
   const onDisk = readFileSync(OUT_FILE, 'utf-8');
   if (fresh !== onDisk) {
-    console.error('✗ src/static/app-catalog.html is STALE vs its sources: src/static/app-catalog/, the type tokens in public/css/theme.css, and public/css/components/dialog.css + public/js/dialog.js.');
+    console.error('✗ src/static/app-catalog.html is STALE vs its sources: src/static/app-catalog/, the type tokens in public/css/theme.css, the @app-catalog ranges of public/css/poster.css, and public/css/components/dialog.css + public/js/dialog.js.');
     console.error('  Run `pnpm build:app-catalog` and commit the regenerated file (a theme.css token change lands in the catalog this way).');
     process.exit(1);
   }

@@ -3,6 +3,7 @@
  * @description Shared poster and showroom shapes. Views compose these classes and own their layout.
  * @usage Linked immediately after theme.css in spa.html.
  * @version-history
+ *   v1.13.0 -- 2026-09-24 -- The slab's danger tone, .poster-slab--danger (Jouni's decision "Dialog actions").
  *   v1.12.0 -- 2026-09-24 -- The action link's notice and jump tones (Jouni's decision "Small link").
  *   v1.11.0 -- 2026-09-24 -- The menu row, .poster-menu-row (Jouni's decision "Menu row").
  *   v1.10.0 -- 2026-09-24 -- The tab's tile tone, .poster-tab--tile (Jouni's decision "Choice").
@@ -59,6 +60,9 @@
   letter-spacing: .1em; font-weight: var(--weight-heavy); line-height: 1.3;
 }
 
+/* @app-catalog:begin — the app catalog's build (scripts/build-app-catalog.ts) copies every range
+   between these markers into its page, so its dialogs draw the action link and the loud action from
+   these rules rather than from a copy. The tokens the ranges read are on that script's list. */
 /* Lifted from the home's ink-underlined action (formerly home.css .koti-link), including the unselected tab. */
 .poster-action, .poster-tab {
   display: inline-flex; align-items: center; gap: .4rem;
@@ -71,6 +75,7 @@
 /* An action that cannot be pressed yet is dimmed and does not answer the pointer (Jouni's decision
    "Step button"; the dimming is the control slab's). */
 .poster-action:disabled { opacity: 0.45; cursor: default; border-color: var(--text); color: var(--text); }
+/* @app-catalog:end */
 /* The source's later on-sun correction keeps selected words ink in both themes. */
 .poster-tab.is-on { background: var(--sun); color: var(--on-sun); text-decoration: none; padding: .2rem .5rem; }
 /* The action link's tones (Jouni's decision "Action link"): the looks he kept, each in its own
@@ -133,6 +138,7 @@
 .poster-tab--tile:hover { border-color: var(--text); color: var(--text); box-shadow: 3px 3px 0 var(--text); }
 .poster-tab--tile.is-on { background: var(--sun); color: var(--on-sun); padding: 0.35rem 0.7rem; box-shadow: 3px 3px 0 var(--text); }
 
+/* @app-catalog:begin */
 /* The profile slab and the home's large door are the two cuts named in brief 10.3. */
 .poster-slab {
   background: var(--text); color: var(--bg);
@@ -156,6 +162,11 @@
   font-family: inherit; font-weight: var(--weight-heavy); cursor: pointer;
 }
 .poster-slab--control:disabled { opacity: 0.45; cursor: default; transform: none; }
+/* The slab's danger tone (Jouni's decision "Dialog actions"): an action that cannot be undone, coral
+   with an ink shadow, in the values the dialog's footer gave .btn-danger-solid. */
+.poster-slab--danger { background: var(--accent); color: #fff; box-shadow: 4px 4px 0 var(--text); }
+.poster-slab--danger:hover { color: #fff; box-shadow: 2px 2px 0 var(--text); }
+/* @app-catalog:end */
 
 /* The icon button (Jouni's decision "Icon button"): a button that is a mark, not a word. One square
    in a thin ink frame, the sun under the pointer; 44px is the composer's control size, the small cut

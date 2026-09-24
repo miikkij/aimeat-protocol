@@ -29,6 +29,7 @@
  *   keptAsIs, crop }], changes: [{ page, what }], choice }]
  * @usage import { DECISIONS } from './decisions-data.js';
  * @version-history
+ *   v3.2.0 — 2026-09-24 — Dialog actions answered (Jouni: the proposal, and Save is the loud action).
  *   v3.1.0 — 2026-09-24 — The home's and the chat's remaining own looks (decisions 14-21, answered
  *     and written here as the source) and the dialog's footer actions (waiting for Jouni).
  *   v3.0.0 — 2026-09-23 — Plain words for everything visible, the technical half kept for Details
@@ -519,6 +520,6 @@ export const DECISIONS = [
     changes: [
       { page: 'Every dialog', what: 'Cancel gets the action link\'s thicker line under the words. Save and Delete look as they do now.' },
     ],
-    choice: null,
+    choice: {"proposal":"accepted","options":{},"note":"Accepted the proposal: Cancel the underlined action link, Confirm the slab, Delete the slab's danger tone. \"I was thinking that hopefully the save button is the action button in general way that all the action buttons then looks like that.\" Save and Confirm are the loud action, the dark block.","decidedAt":"2026-09-24","decidedBy":"Jouni"},
   },
 ];
