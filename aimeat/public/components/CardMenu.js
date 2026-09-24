@@ -29,6 +29,7 @@
  * @usage
  *   html`<${CardMenu} state=${'open'} actions=${[{ label: 'Copy', run: copy }]} />`
  * @version-history
+ *   v1.2.0 — 2026-09-24 — The rows are the shared menu row (Jouni's decision "Menu row").
  *   v1.1.0 — 2026-09-24 — The dots are the small icon button; the state fills stay (Jouni's decision
  *     "Icon button").
  *   v1.0.0 — 2026-08-09 — Initial. Replaces the grey prompt box plus a separate loose light, which
@@ -93,7 +94,7 @@ export function CardMenu({
       ${open && html`
         <div class="card-menu-list" role="menu">
           ${actions.map((a, i) => html`
-            <button type="button" role="menuitem" key=${a.label} class="card-menu-item"
+            <button type="button" role="menuitem" key=${a.label} class="poster-menu-row card-menu-item"
               onClick=${(e) => { stop(e); run(a, i); }}>
               ${flash === i ? (a.doneLabel ?? tr('cardMenu.done', 'Done')) : a.label}
             </button>`)}

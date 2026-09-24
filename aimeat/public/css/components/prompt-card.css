@@ -8,6 +8,7 @@
  * @usage Linked from public/spa.html in the component block, whose order keeps the order these
  *   rules had when they were one sheet.
  * @version-history
+ *   v1.3.0 — 2026-09-24 — The menu's rows moved to poster.css as the shared menu row.
  *   v1.2.0 — 2026-09-24 — More is the small icon button; only its place stays here.
  *   v1.1.0 — 2026-09-23 — The label is the shared row label (.poster-label); its own copy of the
  *     rule is gone (Jouni's decision "Row label", a unification).
@@ -33,11 +34,7 @@
   border-bottom: 2px solid var(--text);
   background: var(--card);
 }
-.poster-prompt-menu-item {
-  text-align: left; padding: 0.55rem 0.85rem; font-size: var(--text-note);
-  border-radius: 0;
-}
-.poster-prompt-menu-item + .poster-prompt-menu-item { border-top: 1px solid var(--border); }
+/* Its rows are the shared menu row (poster.css .poster-menu-row, Jouni's decision "Menu row"). */
 .poster-prompt-body {
   margin: 0;
   padding: 0.85rem;

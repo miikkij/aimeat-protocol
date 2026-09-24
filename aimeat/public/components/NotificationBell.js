@@ -13,6 +13,8 @@
  *   - NotificationBell({ t, onNavigate }) — t = i18n fn, onNavigate(path) = SPA navigate.
  * @usage import { NotificationBell } from '/components/NotificationBell.js';  html`<${NotificationBell} t=${t} onNavigate=${navigate} />`
  * @version-history
+ *   v1.1.0 — 2026-09-24 — A notification's actions are the shared menu row, in a column; the action's
+ *     style no longer picks a coral or framed button (Jouni's decision "Menu row").
  *   v1.0.0 — 2026-06-08 — Initial: header bell + dropdown + mark-read for the notification inbox.
  *   v1.0.1 — 2026-06-19 — JSDoc type annotations for frontend type-checking
  *   v1.1.0 — 2026-07-02 — Extract openNotificationLink() so push-notification clicks reuse the
@@ -69,12 +71,11 @@ function relTime(iso) {
   return ago(iso, { horizonDays: 1 });
 }
 
-// Action id → i18n key (falls back to the server-provided English label) and → button class.
+// Action id → i18n key (falls back to the server-provided English label).
 const ACTION_I18N = {
   reply: 'notif.action.reply', approve: 'notif.action.approve', deny: 'notif.action.deny',
   accept: 'notif.action.accept', decline: 'notif.action.decline', reject: 'notif.action.reject',
 };
-const BTN_CLASS = { primary: 'btn-primary', danger: 'btn-danger', default: 'btn-outline' };
 
 /**
  * Deep-link a notification target into the SPA. Handles both notification link vocabularies:
@@ -215,7 +216,9 @@ export function NotificationBell({ t, onNavigate }) {
   const renderAction = (n, a) => {
     const key = `${n.id}:${a.id}`;
     const busy = busyKey === key;
-    const cls = BTN_CLASS[a.style] || 'btn-outline';
+    // Every action is the shared menu row, whatever its style asks for (Jouni's decision "Menu row":
+    // "Approve" loses its coral, so every action reads the same).
+    const cls = 'poster-menu-row';
     if (a.kind === 'reply') {
       return html`<button class="notif-action-btn ${cls}" key=${a.id} disabled=${busy} onClick=${(e) => { e.stopPropagation(); openReply(n, a); }}>${actionLabel(a)}</button>`;
     }

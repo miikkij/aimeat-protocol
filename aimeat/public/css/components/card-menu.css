@@ -9,6 +9,7 @@
  *   rendered black and unpositioned, 140px down the card instead of in its corner. A stylesheet
  *   nobody loads is not a stylesheet.
  * @version-history
+ *   v1.2.0 — 2026-09-24 — The rows are the shared menu row.
  *   v1.1.0 — 2026-09-24 — The dots are the small icon button; the state fills stay here.
  *   v1.0.0 — 2026-08-09 — Initial.
  */
@@ -52,9 +53,5 @@
   border-radius: var(--radius-sm); box-shadow: var(--shadow-lg, 0 8px 24px rgba(0,0,0,.18));
   overflow: hidden;
 }
-.card-menu-item {
-  background: none; border: 0; text-align: left; cursor: pointer;
-  padding: 0.6rem 0.8rem; font-size: 0.88rem; color: var(--text);
-}
-.card-menu-item:hover { background: var(--bg); }
-.card-menu-item + .card-menu-item { border-top: 1px solid var(--border); }
+/* The rows are the shared menu row (poster.css .poster-menu-row, Jouni's decision "Menu row"). */
+.card-menu-item { cursor: pointer; }

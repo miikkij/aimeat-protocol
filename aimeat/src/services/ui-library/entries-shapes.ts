@@ -9,6 +9,7 @@
  * @structure SHAPE_ENTRIES
  * @usage import { SHAPE_ENTRIES } from './entries-shapes.js';
  * @version-history
+ *   v1.4.0 — 2026-09-24 — The menu row (Jouni's decision "Menu row").
  *   v1.3.0 — 2026-09-24 — The tab's tile tone (Jouni's decision "Choice").
  *   v1.2.0 — 2026-09-24 — The icon button (Jouni's decision "Icon button").
  *   v1.1.0 — 2026-09-23 — The dialog shape deleted (Jouni's decision: the site has its own dialog);
@@ -69,6 +70,8 @@ export const SHAPE_ENTRIES: UiEntryWritten[] = [
     shape('icon', 'Icon button', ['poster-icon', 'poster-icon--small'], '<button class="poster-icon" aria-label="…">…</button>',
         'A button that is a mark, not a word: a square in a thin ink frame, the sun under the pointer, dimmed while disabled.', 'Attach, record, delete, more, a card\'s menu.',
         [{ name: 'small', class: 'poster-icon--small', when: 'everywhere but the composer: 28px, the size of the dialog\'s close square' }]),
+    shape('menu-row', 'Menu row', ['poster-menu-row'], '<div class="poster-prompt-menu"><button class="poster-menu-row">…</button>…</div>',
+        'One choice in an opened menu: plain words on a quiet ground, a thin line between rows.', 'The prompt card\'s other ways to send, a card\'s actions, a notification\'s actions.'),
     shape('box', 'Box', ['poster-box', 'poster-box--avatar', 'poster-box--small', 'poster-box--meter', 'poster-box--quota', 'poster-box--copy', 'poster-box--row'], '<div class="poster-box">…</div>',
         'A 2px ink frame that carries one object; its size and place belong to the view.', 'An initials box, a meter, or a framed result.',
         [
