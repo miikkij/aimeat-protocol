@@ -144,6 +144,7 @@
     "check:scope-parity": "cd aimeat && pnpm check:scope-parity",
     "debt": "cd aimeat && pnpm debt",
     "ci:stats": "cd aimeat && pnpm ci:stats",
+    "codeql:install": "cd aimeat && pnpm codeql:install",
     "check:liaison-surface": "cd aimeat && pnpm check:liaison-surface",
     "check:storage-parity": "cd aimeat && pnpm check:storage-parity",
     "check:audit-gates": "cd aimeat && pnpm check:audit-gates",

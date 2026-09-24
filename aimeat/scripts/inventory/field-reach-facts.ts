@@ -23,21 +23,37 @@
  *   check:fast.
  *
  *   WHERE THE CLI COMES FROM, in order: CODEQL_CLI (the path to the `codeql` executable), `codeql` on
- *   PATH, and the GitHub runner's tool cache, which carries the CodeQL bundle on its hosted images.
- * @structure resolveCodeql() · treeKey(cli) · buildFacts(cli, dir) · loadFacts(opts) · parseCsv(text) ·
- *   factsFromCsv(sets)
+ *   PATH, the per-user pointer `~/.aimeat/codeql.json` that `pnpm codeql:install` writes, and the
+ *   GitHub runner's tool cache, which carries the CodeQL bundle on its hosted images. The pointer is
+ *   what a workstation uses: it is read by every process, every worktree and every session, where an
+ *   environment variable reaches only the shells started after it was set.
+ * @structure CODEQL_BUNDLE, CODEQL_POINTER · resolveCodeql() · treeKey(cli) · buildFacts(cli, dir) ·
+ *   loadFacts(opts) · parseCsv(text) · factsFromCsv(sets)
  * @usage
  *   const got = loadFacts({ build: true });
  *   if (got.facts) for (const r of got.facts.reads) console.log(r.kind, r.field, r.file, r.line, r.handler);
  * @version-history
+ *   v1.1.0 — 2026-09-24 — resolveCodeql() reads ~/.aimeat/codeql.json. On 2026-09-16 the bundle was
+ *     installed on the developer machine and pitfall 90 recorded CODEQL_CLI as naming it, but nothing
+ *     set the variable, so the gate went on printing NOT MEASURED and passing; eight red CI pushes
+ *     from 2026-09-16 to 2026-09-23 were findings that machine could have shown before the push.
  *   v1.0.0 — 2026-09-14 — Initial (wish-kenttien-tavoitettavuus-portiksi, step 3).
  */
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import { delimiter, join, relative } from 'node:path';
 import { AIMEAT } from './program.js';
+
+/**
+ * The CodeQL bundle a workstation installs: the release ci.yml downloads when the runner's tool cache
+ * has none. Measured 2026-09-24: CI's tool cache carries the same 2.27.0, and a local measurement of
+ * ea413de9d gave CI's counts and CI's cache key. Change both places together.
+ */
+export const CODEQL_BUNDLE = { tag: 'codeql-bundle-v2.27.0', version: '2.27.0' } as const;
+/** `{ "cli": "<path to the codeql executable>", "version": "<its terse version>" }`, per user. */
+export const CODEQL_POINTER = join(homedir(), '.aimeat', 'codeql.json');
 
 /** The query pack: the query and its qlpack.yml. */
 export const QUERY_DIR = join(AIMEAT, 'scripts', 'inventory', 'codeql');
@@ -81,6 +97,15 @@ export function resolveCodeql(): string | null {
     if (process.env.CODEQL_CLI && existsSync(process.env.CODEQL_CLI)) return process.env.CODEQL_CLI;
     for (const dir of (process.env.PATH ?? '').split(delimiter)) {
         if (dir && existsSync(join(dir, exe))) return join(dir, exe);
+    }
+    if (existsSync(CODEQL_POINTER)) {
+        try {
+            const { cli } = JSON.parse(readFileSync(CODEQL_POINTER, 'utf-8')) as { cli?: string };
+            if (cli && existsSync(cli)) return cli;
+        } catch {
+            // A pointer that does not parse names no CLI; `pnpm codeql:install` writes it again.
+            console.error(`  ${CODEQL_POINTER} does not parse; run pnpm codeql:install`);
+        }
     }
     // The hosted runner images carry the CodeQL bundle: $RUNNER_TOOL_CACHE/CodeQL/<version>/x64/codeql.
     const toolCache = process.env.RUNNER_TOOL_CACHE;
@@ -159,7 +184,7 @@ export type FactsResult =
  */
 export function loadFacts(opts: { build: boolean }): FactsResult {
     const cli = resolveCodeql();
-    if (!cli) return { facts: null, reason: 'no CodeQL CLI on this machine (set CODEQL_CLI, or put codeql on PATH)' };
+    if (!cli) return { facts: null, reason: 'no CodeQL CLI on this machine (run pnpm codeql:install)' };
     const dir = join(CACHE_DIR, treeKey(cli));
     const complete = (): boolean => RESULT_SETS.every(s => existsSync(join(dir, `${s}.csv`)));
     let built = false;
