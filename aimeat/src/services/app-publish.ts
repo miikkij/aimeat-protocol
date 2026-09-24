@@ -40,6 +40,8 @@
  *   });
  *   if ('refusal' in out) return res.status(out.refusal.status).json(error(...));
  * @version-history
+ *   2026-09-24 — A new app's missing description is refused above the dry-run return
+ *     (bbfbeca149de), so a dry run answers what the real publish answers.
  *   2026-09-19 — A build that left the Atelier track is named in the publish hints
  *     (services/app-track-drift.ts): the Atelier token carried with a Classic app, or a NEW app on
  *     Classic. Warnings, never a refusal.
@@ -327,21 +329,10 @@ export async function publishApp(
     if (forbidden) return { refusal: { status: 403, code: 'FORBIDDEN', message: 'Your development right does not permit changing these app settings.' } };
   }
 
-  // A DRY RUN STOPS HERE, and this line is only correct because of how the rest of the function is
-  // ordered. Every refusal publishApp can make is ABOVE it — the publish right, the roadmap, the
-  // per-owner quota, the artifact lint and the delegated-settings check — and everything below
-  // builds the manifest, mints provenance and writes. `pnpm check:route-scopes` will not tell you
-  // that; the three `return { refusal` sites will.
-  //
-  // WHO ASKS FOR ONE. services/package-migrate.ts, whose `replace` and `custom` actions delete the
-  // owner's installed component before registering its replacement. Without a way to ask "would
-  // this register?", a lint or quota refusal left the owner with neither copy. One implementation:
-  // the answer comes from the same checks the real publish runs, not from a second reading of them.
-  if (input.dryRun) return { dryRun: true as const };
-
   // A description is REQUIRED for a NEW app so the catalogue and the landing wall always have one.
   // On an update, silence carries the existing one forward — a re-publish or a restore must never
-  // blank it.
+  // blank it. Asked ABOVE the dry run: it sat below it, so a dry run answered "would pass" to a
+  // publish that then refused (bbfbeca149de).
   const description = (requested.description ?? '').trim() || (prev?.description ?? '');
   if (!description) {
     return {
@@ -351,6 +342,18 @@ export async function publishApp(
       },
     };
   }
+
+  // A DRY RUN STOPS HERE, and this line is only correct because of how the rest of the function is
+  // ordered. Every refusal publishApp can make is ABOVE it — the publish right, the roadmap, the
+  // per-owner quota, the artifact lint, the delegated-settings check and a new app's description —
+  // and everything below builds the manifest, mints provenance and writes. `pnpm check:route-scopes`
+  // will not tell you that; the `return { refusal` sites will.
+  //
+  // WHO ASKS FOR ONE. services/package-migrate.ts, whose `replace` and `custom` actions delete the
+  // owner's installed component before registering its replacement. Without a way to ask "would
+  // this register?", a lint or quota refusal left the owner with neither copy. One implementation:
+  // the answer comes from the same checks the real publish runs, not from a second reading of them.
+  if (input.dryRun) return { dryRun: true as const };
 
   // ── The manifest: one carry-forward list, applied to every door ──
   const manifest: AppManifest = {

@@ -1,7 +1,10 @@
 /**
  * @file app-publish-atomic.test.ts
  * @description A required roadmap note and app version either both commit or neither does.
- * @version-history v1.0.0 - 2026-09-08 - Exercise failures against real SQLite transactions.
+ * @version-history
+ *   v1.1.0 - 2026-09-24 - A dry run refuses a new app with no description, as the real publish does
+ *     (bbfbeca149de). Failed on the old code first.
+ *   v1.0.0 - 2026-09-08 - Exercise failures against real SQLite transactions.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
@@ -38,5 +41,18 @@ describe('atomic app publication', () => {
     vi.spyOn(storage, 'createApp').mockRejectedValueOnce(new Error('App disk failure'));
     await expect(publishApp(storage, config, input)).rejects.toThrow('App disk failure');
     expect(await readAppRoadmap(storage, 'alice/app.bin')).toBeNull();
+  });
+  // bbfbeca149de: a dry run is how package-migrate asks "would this register?" before it deletes the
+  // installed copy, so it has to answer what the real publish answers. It returned before a new app's
+  // description was required, and said "would pass" to a publish that then refused.
+  it('a dry run refuses a new app with no description, as the real publish does', async () => {
+    const { storage, input } = setup();
+    const bare = { ...input, requested: { name: 'App' } };
+    expect(await publishApp(storage, config, bare)).toMatchObject({ refusal: { status: 400, code: 'INVALID_INPUT' } });
+    expect(await publishApp(storage, config, { ...bare, dryRun: true })).toMatchObject({ refusal: { status: 400, code: 'INVALID_INPUT' } });
+    expect(await publishApp(storage, config, { ...input, dryRun: true })).toEqual({ dryRun: true });
+    // An update carries its description forward, so silence passes there, dry or not.
+    expect(await publishApp(storage, config, input)).not.toHaveProperty('refusal');
+    expect(await publishApp(storage, config, { ...bare, dryRun: true })).toEqual({ dryRun: true });
   });
 });
