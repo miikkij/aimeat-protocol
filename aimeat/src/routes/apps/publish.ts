@@ -8,6 +8,7 @@
  *   own business: validating the payload, decoding the base64, the optional screenshot, and this
  *   route's response document.
  * @version-history
+ *   v2.8.2 -- 2026-09-24 -- A GIF or AVIF screenshot is a picture too, and is accepted.
  *   v2.8.1 -- 2026-09-24 -- The optional screenshot is checked before the publish rather than after
  *     it, and must be a PNG, JPEG or WebP image, stored as the type its bytes are (A7-2). It was
  *     stored with the caller's label, and a bad one answered 400 on a version already live.
@@ -230,8 +231,8 @@ export function registerPublishRoutes(
 
         // The optional screenshot is checked BEFORE the publish, so a refusal leaves the app as it
         // was; checked after, a bad screenshot answered 400 on a version that had already gone live.
-        // The bytes must be a PNG, JPEG or WebP image and are stored as the type they are, the same
-        // test the screenshot door applies, because the GET door serves them to anybody (A7-2).
+        // The bytes must be a PNG, JPEG, WebP, GIF or AVIF image and are stored as the type they are,
+        // the same test the screenshot door applies, because the GET door serves them to anybody (A7-2).
         let shot: { data: Buffer; mimeType: string } | null = null;
         if (screenshot && typeof screenshot === 'string') {
             const screenshotData = decodeStrictBase64(screenshot);
@@ -247,7 +248,7 @@ export function registerPublishRoutes(
             const screenshotMime = imageUploadType(screenshotData, screenshot_mime_type);
             if (!screenshotMime) {
                 res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
-                    'A screenshot must be a PNG, JPEG or WebP image, and screenshot_mime_type, when given, must say which.'));
+                    'A screenshot must be a PNG, JPEG, WebP, GIF or AVIF image, and screenshot_mime_type, when given, must say which.'));
                 return;
             }
             shot = { data: screenshotData, mimeType: screenshotMime };

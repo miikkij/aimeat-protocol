@@ -7,6 +7,8 @@
  * @structure One describe per exported function.
  * @usage cd aimeat && pnpm exec vitest run test/unit/raster-image.test.ts
  * @version-history
+ *   v1.1.0 — 2026-09-24 — GIF and AVIF are pictures too. Screenshots were stored with any type until
+ *     A7-2, and the catalogue's upload offers every image, so refusing them broke an ordinary upload.
  *   v1.0.0 — 2026-09-24 — Initial (A7-2).
  */
 import { describe, it, expect } from 'vitest';
@@ -20,6 +22,13 @@ const WEBP = Buffer.concat([Buffer.from('RIFF'), Buffer.from([0x1A, 0, 0, 0]), B
 const HTML = Buffer.from('<!doctype html><h1>not a picture</h1>');
 const SVG = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script>1</script></svg>');
 const GIF = Buffer.from('GIF89a\x01\x00\x01\x00\x00\x00\x00;', 'latin1');
+const GIF87 = Buffer.from('GIF87a\x01\x00\x01\x00\x00\x00\x00;', 'latin1');
+/** An ISO-BMFF `ftyp` box naming the given brand: AVIF is `avif` (a still) or `avis` (a sequence). */
+const ftyp = (brand: string) => Buffer.concat([Buffer.from([0, 0, 0, 0x1C]), Buffer.from(`ftyp${brand}`), Buffer.alloc(16)]);
+const AVIF = ftyp('avif');
+const AVIS = ftyp('avis');
+const HEIC = ftyp('heic');
+const MP4 = ftyp('isom');
 const WAVE = Buffer.concat([Buffer.from('RIFF'), Buffer.from([0x1A, 0, 0, 0]), Buffer.from('WAVEfmt '), Buffer.alloc(8)]);
 
 /** Minimal stand-in for the bits of an Express response the header helper touches. */
@@ -32,14 +41,18 @@ function fakeRes(): Response & { headers: Record<string, string> } {
 }
 
 describe('rasterImageType', () => {
-    it('names the three pictures by their signature', () => {
+    it('names the pictures by their signature', () => {
         expect(rasterImageType(PNG)).toBe('image/png');
         expect(rasterImageType(JPEG)).toBe('image/jpeg');
         expect(rasterImageType(WEBP)).toBe('image/webp');
+        expect(rasterImageType(GIF)).toBe('image/gif');
+        expect(rasterImageType(GIF87)).toBe('image/gif');
+        expect(rasterImageType(AVIF)).toBe('image/avif');
+        expect(rasterImageType(AVIS)).toBe('image/avif');
     });
 
     it('names nothing else, whatever it is called', () => {
-        for (const [name, bytes] of Object.entries({ HTML, SVG, GIF, WAVE })) {
+        for (const [name, bytes] of Object.entries({ HTML, SVG, WAVE, HEIC, MP4 })) {
             expect(rasterImageType(bytes), name).toBeNull();
         }
         expect(rasterImageType(Buffer.alloc(0))).toBeNull();
@@ -50,14 +63,14 @@ describe('rasterImageType', () => {
 });
 
 describe('isRasterImageType', () => {
-    it('accepts the three labels, in any case, with parameters, and the common jpg spelling', () => {
-        for (const t of ['image/png', 'IMAGE/PNG', 'image/jpeg', 'image/jpeg; q=1', 'image/jpg', 'image/webp']) {
+    it('accepts the picture labels, in any case, with parameters, and the common jpg spelling', () => {
+        for (const t of ['image/png', 'IMAGE/PNG', 'image/jpeg', 'image/jpeg; q=1', 'image/jpg', 'image/webp', 'image/gif', 'image/avif']) {
             expect(isRasterImageType(t), t).toBe(true);
         }
     });
 
     it('refuses every other label, SVG first among them', () => {
-        for (const t of ['image/svg+xml', 'text/html', 'image/gif', 'application/octet-stream', '', undefined, null, 42]) {
+        for (const t of ['image/svg+xml', 'text/html', 'image/heic', 'application/octet-stream', '', undefined, null, 42]) {
             expect(isRasterImageType(t), String(t)).toBe(false);
         }
     });
@@ -98,8 +111,15 @@ describe('setStoredImageHeaders', () => {
         expect(res.headers['Content-Type']).toBe('image/png');
     });
 
+    it('serves a GIF as a GIF, so a screenshot stored as one before A7-2 still shows', () => {
+        const res = fakeRes();
+        expect(setStoredImageHeaders(res, { key: 'apps/screenshots/demo.html', data: GIF, name: 'demo-screenshot' })).toBe(true);
+        expect(res.headers['Content-Type']).toBe('image/gif');
+        expect(res.headers['Content-Disposition']).toMatch(/filename="demo-screenshot\.gif"/);
+    });
+
     it('refuses a page or an SVG and sets no header at all, so the door can answer with its refusal', () => {
-        for (const data of [HTML, SVG, GIF]) {
+        for (const data of [HTML, SVG, WAVE]) {
             const res = fakeRes();
             expect(setStoredImageHeaders(res, { key: 'apps/icons/demo.html', data })).toBe(false);
             expect(res.headers).toEqual({});

@@ -10,6 +10,7 @@
  *   - registerReadRoutes() — versions, forks, lineage, screenshot GET/POST/DELETE, app download
  * @usage registerReadRoutes(router, config, storage, canonicalOwner); // from appsRouter
  * @version-history
+ *   v1.10.1 — 2026-09-24 — GIF and AVIF screenshots are pictures too, stored and served as such.
  *   v1.10.0 — 2026-09-24 — The screenshot GET serves only a PNG, JPEG or WebP image, typed by its
  *     bytes, and answers 404 otherwise; the screenshot POST refuses anything else and stores the
  *     type the bytes are (A7-2). Both used the caller's label as it was.
@@ -240,7 +241,7 @@ export function registerReadRoutes(
             });
             if (!shown) {
                 res.status(404).json(error(config.nodeId, 'NOT_FOUND',
-                    `The file stored as the screenshot of "${filename}" is not a PNG, JPEG or WebP image, so it is not served.`));
+                    `The file stored as the screenshot of "${filename}" is not a PNG, JPEG, WebP, GIF or AVIF image, so it is not served.`));
                 return;
             }
             res.setHeader('Content-Length', file.size.toString());
@@ -337,13 +338,13 @@ export function registerReadRoutes(
             res.status(413).json(error(config.nodeId, 'TOO_LARGE', `Screenshot exceeds 2MB limit (${screenshotData.length} bytes)`));
             return;
         }
-        // CHECKED, NOT BELIEVED, like the icon. The bytes must be a PNG, JPEG or WebP image and are
-        // stored as the type they are; a label naming anything else is refused, because the GET door
-        // serves this key to anybody from the node's own origin (A7-2).
+        // CHECKED, NOT BELIEVED, like the icon. The bytes must be a PNG, JPEG, WebP, GIF or AVIF image
+        // and are stored as the type they are; a label naming anything else is refused, because the
+        // GET door serves this key to anybody from the node's own origin (A7-2).
         const screenshotMime = imageUploadType(screenshotData, screenshot_mime_type);
         if (!screenshotMime) {
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
-                'A screenshot must be a PNG, JPEG or WebP image, and screenshot_mime_type, when given, must say which.'));
+                'A screenshot must be a PNG, JPEG, WebP, GIF or AVIF image, and screenshot_mime_type, when given, must say which.'));
             return;
         }
 
