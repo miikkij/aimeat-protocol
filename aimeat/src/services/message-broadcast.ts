@@ -13,6 +13,10 @@
  * @structure resolveAudience(ctx, senderGhii, sel) → string[] · sendBroadcast(ctx, input) → BroadcastResult
  * @usage import { resolveAudience, sendBroadcast } from '../services/message-broadcast.js';
  * @version-history
+ *   v1.4.0 — 2026-09-24 — SECURITY (audit A5-3): broadcastFromPrincipal() counts the broadcast as ONE
+ *     send against the account's limit (services/message-send-limit.ts), first, before any other
+ *     decision, and answers 429 RATE_LIMITED past it. Every copy carries that turn, so the fan-out is
+ *     not counted again per recipient.
  *   v1.3.0 — 2026-09-14 — broadcastFromPrincipal() takes stampProvenance() and calls it below its
  *     own refusals. Both doors stamped the record first, and stamping WRITES one, so a broadcast
  *     refused for an operator-only audience or an empty recipient list left a row describing the
@@ -35,6 +39,7 @@ import { ownerGhiiOf } from '../utils/gaii.js';
 import { isAddressableRecipient } from '../utils/messaging.js';
 import type { DeliveryCtx } from './message-delivery.js';
 import { sendDirectMessage } from './message-send.js';
+import { takeSendTurn, type SendLimitMark } from './message-send-limit.js';
 import { sign } from '../auth/keypair.js';
 import { logger } from '../utils/logger.js';
 
@@ -64,6 +69,9 @@ export interface BroadcastInput {
   /** TARGET-058: the provenance record describing the body. Every copy carries the SAME id, because
    *  the statement is about the bytes and one broadcast is one set of bytes. */
   aiProvenanceId?: string;
+  /** The turn the whole broadcast was counted with (services/message-send-limit.ts). Every copy
+   *  carries it, so the copies are not counted again one by one. */
+  sendLimit: SendLimitMark;
 }
 
 export interface BroadcastResult {
@@ -136,6 +144,7 @@ export async function sendBroadcast(ctx: DeliveryCtx, input: BroadcastInput): Pr
         respondable,
         skipContactGate: input.skipContactGate,
         aiProvenanceId: input.aiProvenanceId,
+        sendLimit: input.sendLimit,
       });
       if (result.ok) sent++;
       else failed.push({ recipient: recipientGhii, code: result.code });
@@ -231,8 +240,19 @@ export async function broadcastFromPrincipal(
       /** What stampProvenance answered, for the door that echoes the record back to its caller. */
       aiProvenanceId?: string;
     }
-  | { ok: false; status: number; code: string; message: string }
+  | {
+      ok: false; status: number; code: string; message: string;
+      /** RATE_LIMITED only: whole seconds until the account may send again. */
+      retryAfterSec?: number;
+    }
 > {
+  // The account's send limit comes first: one broadcast is one send, however many it reaches, and
+  // nothing below runs for a sender who has used this minute's allowance.
+  const turn = takeSendTurn(input.senderGhii);
+  if (!turn.ok) {
+    return { ok: false, status: 429, code: turn.code, message: turn.message, retryAfterSec: turn.retryAfterSec };
+  }
+
   // "All node users" and "all federation users" are operator-only: a node-wide announcement reaches
   // every human here and auto-accepts the contact for each of them.
   const isOperatorAudience = input.audience === 'node-users' || input.audience === 'federation-users';
@@ -253,7 +273,7 @@ export async function broadcastFromPrincipal(
   const result = await sendBroadcast(ctx, {
     senderGhii: input.senderGhii, recipients, mode: input.mode, body: input.body, subject: input.subject,
     attachments: input.attachments, interactive: input.interactive, skipContactGate: isOperatorAudience,
-    aiProvenanceId,
+    aiProvenanceId, sendLimit: turn,
   });
 
   let federationPeers = 0;

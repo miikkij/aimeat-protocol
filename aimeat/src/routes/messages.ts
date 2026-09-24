@@ -21,6 +21,11 @@
  *   - GET    /v1/messages/contacts                         -- list contacts + states
  * @usage import { messagesRouter } from '../routes/messages.js'; app.use(messagesRouter(config, storage));
  * @version-history
+ *   v1.14.0 -- 2026-09-24 -- SECURITY (audit A5-3): the send limit moved into the send services and
+ *     counts per ACCOUNT (services/message-send-limit.ts), so the aimeat_dm_* tools count too and an
+ *     owner's agents share the owner's allowance. POST /v1/messages takes the turn before it writes
+ *     anything of its own (the provenance record, a new support thread) and hands it on; the
+ *     broadcast service counts its own. Both answer 429 RATE_LIMITED with Retry-After.
  *   v1.13.0 -- 2026-09-24 -- SECURITY (audit A5-3): POST /v1/messages and POST /v1/messages/broadcast
  *     share one per-principal limiter, 30 a minute, the same shape the outbound send door has. They
  *     had only the node-wide limiter, so one principal could send a 500-recipient broadcast again and
@@ -72,13 +77,12 @@
  *     opened stops lingering in the bell; owner-scoped 'notifications' emit refreshes the bell live.
  */
 
-import { Router } from 'express';
+import { Router, type Response } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, DirectMessageRecord } from '../storage/interface.js';
 import type { PeerInfo } from '../services/federation.js';
 import { requireAuth, requireRole, requireScope, requireExternalPrincipal, requireLocalSession } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
-import { rateLimit } from '../middleware/rate-limit.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { conversationIdFor, messagePreview, deliveryTargetFor, isAddressableRecipient } from '../utils/messaging.js';
 import { emitChange } from '../services/event-bus.js';
@@ -87,6 +91,7 @@ import { dismissConversationNotifications } from '../services/notify.js';
 import { MessageSendSchema, BroadcastSendSchema } from '../models/message-schemas.js';
 import { propagateReadReceipt } from '../services/message-delivery.js';
 import { sendDirectMessage, mapMessageAttachments } from '../services/message-send.js';
+import { takeSendTurn } from '../services/message-send-limit.js';
 import { resolveGroupTarget, soleParticipantNote } from '../services/message-alias.js';
 import { sendGroupMessage } from '../services/conversation-group.js';
 import { readAgentDmInbox, readAgentDmThread } from '../services/agent-dm-reads.js';
@@ -105,13 +110,16 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
   /** Resolve the caller's effective identity (owner→GHII, agent/eco→sub). */
   const resolve = (req: Express.Request) => resolveIdentity(req.auth!, config.nodeId);
 
-  // The send doors are an amplification surface: a broadcast fans one request out to 500 people.
-  // ONE limiter for both, keyed by the principal, so a caller cannot trade one door's allowance for
-  // the other's. The same shape and number as the outbound send door (routes/outbound.ts sendLimit).
-  const sendLimit = rateLimit({ windowMs: 60_000, max: 30 });
+  // The account's message limit lives in the send services (services/message-send-limit.ts), which
+  // the aimeat_dm_* tools call too: one allowance per account, whichever door and whichever of the
+  // owner's agents sends. This is the answer both doors here give when it is used up.
+  const refuseSendLimit = (res: Response, wait: { retryAfterSec?: number; message?: string }): void => {
+    res.setHeader('Retry-After', wait.retryAfterSec ?? 60);
+    res.status(429).json(error(config.nodeId, 'RATE_LIMITED', wait.message ?? 'This account has sent as many messages as it may this minute.'));
+  };
 
   /* ── POST /v1/messages — send ── */
-  router.post('/v1/messages', requireAuth(), requireLocalSession(), requireExternalPrincipal(), requireScope('messages:send'), sendLimit, async (req, res) => {
+  router.post('/v1/messages', requireAuth(), requireLocalSession(), requireExternalPrincipal(), requireScope('messages:send'), async (req, res) => {
     const parsed = MessageSendSchema.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
@@ -120,6 +128,13 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
     }
     const input = parsed.data;
     const senderGhii = resolve(req);
+    // Counted before this door writes anything of its own (the provenance record below, a new
+    // support thread), and handed to the send service, which then does not count it again.
+    const turn = takeSendTurn(senderGhii);
+    if (!turn.ok) {
+      refuseSendLimit(res, turn);
+      return;
+    }
     let recipientGhii = input.to.trim();
     // Overridden below when support here is answered by another node: the ordinary 1:1 path carries it.
     let threadId = input.conversation_id;
@@ -170,7 +185,12 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
         interactive: input.interactive,
         replyToId: input.reply_to,
         aiProvenanceId,
+        sendLimit: turn,
       });
+      if (!sent.ok && sent.code === 'RATE_LIMITED') {
+        refuseSendLimit(res, sent);
+        return;
+      }
       if (!sent.ok) {
         const status = sent.code === 'CONVERSATION_NOT_FOUND' ? 404 : 403;
         res.status(status).json(error(config.nodeId, sent.code, sent.code === 'CONVERSATION_NOT_FOUND'
@@ -239,9 +259,13 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
     const result = await sendDirectMessage(deliveryCtx, {
       senderGhii, recipientGhii, body: input.body, replyToId: input.reply_to, attachments,
       conversationId: threadId, subject: threadSubject, interactive: input.interactive,
-      aiProvenanceId,
+      aiProvenanceId, sendLimit: turn,
     });
     if (!result.ok) {
+      if (result.code === 'RATE_LIMITED') {
+        refuseSendLimit(res, { retryAfterSec: result.retryAfterSec, message: result.reason });
+        return;
+      }
       if (result.code === 'RECIPIENT_NOT_FOUND') {
         res.status(404).json(error(config.nodeId, 'RECIPIENT_NOT_FOUND',
           result.reason ?? `No such recipient: ${recipientGhii}`));
@@ -281,7 +305,7 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
   });
 
   /* ── POST /v1/messages/broadcast — send one message to MANY (announcement / broadcast / poll) ── */
-  router.post('/v1/messages/broadcast', requireAuth(), requireLocalSession(), requireExternalPrincipal(), requireScope('messages:send'), sendLimit, async (req, res) => {
+  router.post('/v1/messages/broadcast', requireAuth(), requireLocalSession(), requireExternalPrincipal(), requireScope('messages:send'), async (req, res) => {
     const parsed = BroadcastSendSchema.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
@@ -313,6 +337,8 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
       }),
     });
     if (!result.ok) {
+      // The service counts the broadcast against the account's message limit before anything else.
+      if (result.retryAfterSec !== undefined) res.setHeader('Retry-After', result.retryAfterSec);
       res.status(result.status).json(error(config.nodeId, result.code, result.message));
       return;
     }

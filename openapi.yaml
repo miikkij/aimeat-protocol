@@ -45959,8 +45959,9 @@ paths:
             recipient on another node is handed to federation as before.
         '429':
           description: >-
-            More than 30 sends a minute from this sender. This door and POST /v1/messages/broadcast
-            count against one limit per principal.
+            More than 30 sends a minute from this account: the owner and every agent and app acting
+            for them count together, on this door, on POST /v1/messages/broadcast and on the
+            aimeat_dm_* tools. RATE_LIMITED, with Retry-After in seconds.
 
   /v1/messages/broadcast:
     post:
@@ -46017,8 +46018,9 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '429':
           description: >-
-            More than 30 sends a minute from this sender, counting each broadcast as one. This door
-            and POST /v1/messages count against one limit per principal.
+            More than 30 sends a minute from this account, counting each broadcast as one: the owner
+            and every agent and app acting for them count together, on this door, on POST
+            /v1/messages and on the aimeat_dm_* tools. RATE_LIMITED, with Retry-After in seconds.
 
   /v1/messages/broadcast/{id}:
     get:

@@ -31,6 +31,8 @@
  * @usage
  *   void reportSystemFault({ storage, config }, { code, route, method, requestId });
  * @version-history
+ *   v1.1.0 — 2026-09-24 — The report is the node's own message, so it does not count against the
+ *     operator account's message limit (services/message-send-limit.ts).
  *   v1.0.0 — 2026-08-16 — Initial, from the review of what 2107 user-visible messages actually say.
  */
 import type { AimeatConfig } from '../config.js';
@@ -121,6 +123,9 @@ export async function reportSystemFault(
             body,
             kind: 'system-fault',
             skipContactGate: true,
+            // The node writes this, not the operator: a burst of faults must not use up, or be
+            // refused by, the operator's own message limit.
+            sendLimit: 'exempt',
         });
     } catch (err) {
         // The report is best-effort by design. If it cannot be sent the user is unaffected, and a

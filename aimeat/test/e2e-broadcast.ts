@@ -6,6 +6,8 @@
 // and GET /v1/messages/broadcast/:id aggregates the results.
 //
 // Version history:
+//   2026-09-24 — The limit test is number 14 (there was a test 10 already), and it names the ACCOUNT:
+//     the limit moved into the send services and counts the owner and their agents together.
 //   2026-09-24 — Test 10, the limit (security audit A5-3): one principal's sends and broadcasts share
 //     one per-minute limit, the call past it is 429, and another sender is not held back by it.
 
@@ -22,13 +24,13 @@ async function test(name: string, fn: () => Promise<void>) {
 function assert(cond: boolean, msg: string) { if (!cond) throw new Error(msg); }
 function sleep(ms: number) { return new Promise(r => setTimeout(r, ms)); }
 
-async function json(path: string, opts: RequestInit = {}, retries = 5): Promise<{ status: number; body: any }> {
+async function json(path: string, opts: RequestInit = {}, retries = 5): Promise<{ status: number; body: any; retryAfter: string | null }> {
     for (let attempt = 0; attempt <= retries; attempt++) {
         const res = await fetch(`${BASE}${path}`, { ...opts, headers: { 'Content-Type': 'application/json', ...opts.headers } });
         const ct = res.headers.get('content-type') ?? '';
         const body = ct.includes('json') ? await res.json() as any : { _raw: await res.text() };
         if (res.status === 429 && attempt < retries) { await sleep(Number(res.headers.get('Retry-After') || '5') * 1000 + 500); continue; }
-        return { status: res.status, body };
+        return { status: res.status, body, retryAfter: res.headers.get('Retry-After') };
     }
     throw new Error('unreachable');
 }
@@ -476,9 +478,9 @@ await test('13. The reported case: one person owning every recipient sees ONE ro
 });
 
 // The send doors had only the node-wide limiter, so one principal could fan a 500-recipient broadcast
-// out again and again inside it. They share one per-principal limit now, the same shape as the
-// outbound send door: 30 a minute. retries=0, because the helper above waits out a 429 on its own.
-await test('10. THE LIMIT: sends and broadcasts share one per-minute limit per sender, and the one past it is 429', async () => {
+// out again and again inside it. They share one limit per ACCOUNT now, 30 a minute, the number the
+// outbound send door uses. retries=0, because the helper above waits out a 429 on its own.
+await test('14. THE LIMIT: sends and broadcasts share one per-minute limit per account, and the one past it is 429', async () => {
     const LIMIT = 30;
     const sender = await registerOwner(`bcburst${stamp}`);
     const burst = (i: number) => json('/v1/messages/broadcast', {
@@ -492,6 +494,7 @@ await test('10. THE LIMIT: sends and broadcasts share one per-minute limit per s
     const over = await burst(LIMIT);
     assert(over.status === 429 && over.body.error?.code === 'RATE_LIMITED',
         `broadcast number ${LIMIT + 1} in a minute: ${over.status} ${JSON.stringify(over.body.error ?? over.body.data)}`);
+    assert(Number(over.retryAfter) > 0, `a 429 without Retry-After: ${over.retryAfter}`);
     const dm = await json('/v1/messages', {
         method: 'POST', headers: { Authorization: `Bearer ${sender.token}` },
         body: JSON.stringify({ to: bob.ghii, body: 'one more, through the other door' }),

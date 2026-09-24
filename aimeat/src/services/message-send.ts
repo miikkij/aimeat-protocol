@@ -11,6 +11,10 @@
  * @structure sendDirectMessage(ctx, input) → { ok, message } | { ok:false, code }
  * @usage import { sendDirectMessage } from '../services/message-send.js';
  * @version-history
+ *   v1.8.0 — 2026-09-24 — SECURITY (audit A5-3): the account's send limit (services/message-send-limit.ts)
+ *     is asked here, before anything is read or written. A send that carries no turn is counted here
+ *     and refused RATE_LIMITED past the limit; `sendLimit` carries the turn a door took before its
+ *     own writes, or 'exempt' for the node's own messages.
  *   v1.7.0 — 2026-09-15 — A message to yourself is written once, inbound, instead of twice under the
  *     same (id, owner) key. Every system-fault report (operator → operator) and a campaign send to the
  *     sender's own address threw "duplicate key value violates unique constraint DirectMessage_pkey".
@@ -54,6 +58,7 @@ import { emitChange, emitDelivery } from './event-bus.js';
 import { deliverDirectMessage, logDelivery, type DeliveryCtx } from './message-delivery.js';
 import { duplicateMessageAttachments } from './attachment-duplication.js';
 import { localIdentityExists, missingIdentityReason } from './local-identity.js';
+import { checkSendLimit, type SendLimitMark } from './message-send-limit.js';
 
 export interface SendMessageInput {
   senderGhii: string;
@@ -98,6 +103,12 @@ export interface SendMessageInput {
    * held it. Naming the acting agent here lets the send find the bytes and record their real holder.
    */
   actingGaii?: string;
+  /**
+   * The account's send limit (services/message-send-limit.ts). Omitted, this send is counted here.
+   * A turn: the door counted it before writing anything of its own. 'exempt': the node's own message,
+   * one copy of a broadcast counted as a whole, or a door with a limit of its own.
+   */
+  sendLimit?: SendLimitMark;
 }
 
 /**
@@ -189,10 +200,12 @@ export type SendMessageResult =
   }
   | {
     ok: false;
-    code: 'RECIPIENT_NOT_FOUND' | 'BLOCKED' | 'ATTACHMENT_NOT_FOUND';
+    code: 'RECIPIENT_NOT_FOUND' | 'BLOCKED' | 'ATTACHMENT_NOT_FOUND' | 'RATE_LIMITED';
     /** What was wrong with the address, in the words of whoever wrote it. Callers show this instead
      *  of their own generic line when it is present. */
     reason?: string;
+    /** RATE_LIMITED only: whole seconds until the account may send again. */
+    retryAfterSec?: number;
   };
 
 /**
@@ -204,6 +217,11 @@ export type SendMessageResult =
 export async function sendDirectMessage(ctx: DeliveryCtx, input: SendMessageInput): Promise<SendMessageResult> {
   const { config, storage } = ctx;
   const { senderGhii, recipientGhii, body, replyToId, subject, interactive, broadcastId, respondable, kind, aiProvenanceId } = input;
+
+  // The account's send limit, before anything is read or written. Every door reaches delivery
+  // through here, so a send nobody counted yet is counted now.
+  const limited = checkSendLimit(senderGhii, input.sendLimit);
+  if (limited) return { ok: false, code: 'RATE_LIMITED', reason: limited.message, retryAfterSec: limited.retryAfterSec };
 
   // recipientGhii is what the thread is WITH (may be an agent/eco GAII). deliveryGhii is where the
   // message physically lands (the owner's human GHII for an agent/eco recipient; itself for a human).
