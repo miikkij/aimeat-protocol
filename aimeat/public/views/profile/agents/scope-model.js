@@ -18,6 +18,7 @@
  *   const checked = expandScopes(agent.default_scopes ?? ['*']);
  *   await save(collapseScopes(checked));
  * @version-history
+ *   v1.12.0 — 2026-09-24 — site:theme-write, outside every wildcard: making the node's themes.
  *   v1.11.0 — 2026-09-16 — The mcp domain: read, use and manage for the other MCP servers this
  *     account has attached. manage is outside every wildcard; the other two are not, because
  *     reaching an attached server is what the person attached it for.
@@ -111,6 +112,10 @@ export const NOT_IN_WILDCARD = [
   // to take the shop off the members' home is the use it exists for, so an agent is not shut out —
   // it just costs its own tick. Only an operator's own agent can be given it at all.
   'site:layout-write',
+  // ── Added 2026-09-24 ─────────────────────────────────────────────────────────────────────────
+  // Making and editing the node's themes (Themes & Styles): the look of every page. Same reach and
+  // the same gate as the layout above; only an operator's own agent can be given it.
+  'site:theme-write',
   // ── Added 2026-09-06 ─────────────────────────────────────────────────────────────────────────
   // The owner's secrets vault: the named credentials this account holds so the things acting in its
   // name can use them without holding them. Nothing reads a value back, so the only power the word
@@ -302,7 +307,9 @@ export const SCOPE_DOMAINS = [
   //   it reads the OWNER's roles first, and on a normal account this box grants nothing. It is here
   //   because this is meant to be driven from a chat — "take the shop off our home page" — and a
   //   capability an operator cannot grant from this page is a capability with no door.
-  { key: 'site',       permissions: ['layout-write'] },
+  //   site:theme-write (2026-09-24) — make and edit the node's themes, the look of every page; the
+  //   same gate, so it grants nothing on an account that is not the operator's.
+  { key: 'site',       permissions: ['layout-write', 'theme-write'] },
 ];
 
 export const SCOPE_TEMPLATES = {

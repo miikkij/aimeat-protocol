@@ -30,6 +30,8 @@
  *   const added = uncoveredScopes(agent.defaultScopes ?? [], proposed.scopes);
  *   if (added.length > 0) return err(`…${added.join(', ')}`);
  * @version-history
+ *   v1.9.0 — 2026-09-24 — THEME_WRITE_SCOPE (site:theme-write): making and editing the node's themes,
+ *     outside every wildcard like site:layout-write.
  *   v1.8.0 — 2026-09-16 — MCP_MANAGE_SCOPE, attaching another MCP server to this account. Outside
  *     the wildcard from the day it exists; its two siblings mcp:read and mcp:use stay inside it,
  *     because reaching an attached server is what the person attached it for.
@@ -147,6 +149,14 @@ export const COMPLIANCE_WRITE_SCOPE = 'compliance:write';
 export const SURFACE_LAYOUT_WRITE_SCOPE = 'site:layout-write';
 
 /**
+ * Making and editing the node's themes (Themes & Styles): the look every page of the node wears.
+ * The same gate and the same reasons as site:layout-write above: only the operator edits themes
+ * (Jouni, 2026-09-24), an operator's own agent may be given the word so a theme can be made from a
+ * chat, and nobody is grandfathered onto it because the capability did not exist before.
+ */
+export const THEME_WRITE_SCOPE = 'site:theme-write';
+
+/**
  * The owner's secrets vault: the named credentials this account holds so the things acting in its
  * name can use them without holding them.
  *
@@ -248,7 +258,7 @@ const OWN_TICK_SCOPES = [
 
 export const SCOPES_OUTSIDE_WILDCARD: readonly string[] = [
     WRITE_RESERVED_SCOPE, ACCOUNT_SECURITY_SCOPE, OPERATOR_ORGANISM_REPAIR_SCOPE,
-    COMPLIANCE_READ_SCOPE, COMPLIANCE_WRITE_SCOPE, SURFACE_LAYOUT_WRITE_SCOPE, SECRETS_MANAGE_SCOPE,
+    COMPLIANCE_READ_SCOPE, COMPLIANCE_WRITE_SCOPE, SURFACE_LAYOUT_WRITE_SCOPE, THEME_WRITE_SCOPE, SECRETS_MANAGE_SCOPE,
     MCP_MANAGE_SCOPE,
     ...OWN_TICK_SCOPES,
 ];

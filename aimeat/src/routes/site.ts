@@ -7,6 +7,7 @@
  *              the operator-authored portal template).
  * @usage Mounted in server.ts via siteRouter(config, storage).
  * @version-history
+ *   v1.7.0 — 2026-09-24 — Mounts themesRouter (/v1/themes*, Themes & Styles) behind the same LB guard.
  *   v1.6.0 — 2026-08-28 — GET /v1/site/store-tiers: the store's public price record (ext:shop /
  *            tiers), fetched by the node through safeFetch and held five minutes, because the
  *            browser's CSP cannot reach the store's origin and the front page must not wait on it.
@@ -31,6 +32,7 @@ import { SiteService, SiteError } from '../services/site.js';
 import { injectCspNonce } from '../utils/csp-nonce.js';
 import { prefersMarkdown, sendMarkdown, htmlToMarkdown } from '../services/markdown-negotiation.js';
 import { siteLayoutRouter } from './site-layout.js';
+import { themesRouter } from './themes.js';
 import { isReservedSurfaceKey } from '../services/surface-layout/keys.js';
 import { safeFetch } from '../utils/url-validator.js';
 import { logger } from '../utils/logger.js';
@@ -56,6 +58,8 @@ export function siteRouter(config: AimeatConfig, storage: Storage, siteService?:
     // The surface layouts live in their own file but on this router, so they inherit the LB guard
     // and the whole site family answers from one mount.
     router.use(siteLayoutRouter(config, storage, requireNotLb));
+    // The node's themes (Themes & Styles) are the site's look: the same family, the same guard.
+    router.use(themesRouter(config, storage, requireNotLb));
 
     // GET / — Serve the portal HTML (Markdown for Agents: Accept: text/markdown gets a
     // markdown rendering of the same portal content; browsers keep the HTML).

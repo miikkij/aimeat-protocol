@@ -20,6 +20,7 @@
  *   import { scopeAllowsTool } from '../catalog/scopes.js';
  *   if (scopeAllowsTool(agentScopes, 'aimeat_memory_write')) mcp.tool(...)
  * @version-history
+ *   v1.23.0 -- 2026-09-24 -- aimeat_theme_save → site:theme-write (Themes & Styles).
  *   v1.22.1 -- 2026-09-13 -- aimeat_board_rules_set → social:write, the word PATCH /v1/boards/:id/rules asks.
  *   v1.22.0 -- 2026-09-13 -- aimeat_dm_archive_as_owner and aimeat_dm_organize_as_owner →
  *     messages:organize-as-owner, outside the '*' bundle.
@@ -414,6 +415,9 @@ export const TOOL_SCOPES: Record<string, string> = {
     // changes is what everyone sees on arrival. The read half is in SCOPE_EXEMPT_TOOLS with its
     // reason: it is gated on the operator in the handler, and no scope word narrows an operator.
     aimeat_surface_layout_set:                'site:layout-write',
+    // Making the node's themes: the look of every page. The same kind of word as the layout's, no
+    // wildcard carries it, and the handler also asks whether the account runs this node.
+    aimeat_theme_save:                        'site:theme-write',
     aimeat_storage_upload:                    'storage:write',
     aimeat_storage_delete:                    'storage:write',
 

@@ -8,6 +8,7 @@
  * @structure DEMOS · demoFor(id) · isLabOnly(id)
  * @usage import { demoFor } from './demos.js';
  * @version-history
+ *   v1.4.0 — 2026-09-24 — `theme:sampler`, the parts a theme changes most (Themes & Styles' preview).
  *   v1.3.0 — 2026-09-23 — `after:<id>`, each variant as it would look after the proposal; `solo`.
  *   v1.2.0 — 2026-09-23 — Proposal pictures (`proposal:<id>`); the extras went into the decisions.
  *   v1.1.0 — 2026-09-23 — Decision variants (`decision:<id>`) from decision-samples.js.
@@ -19,6 +20,7 @@ import { CONVERSATION_DEMOS } from './demos-conversation.js';
 import { SHARED_DEMOS, SHAPE_DEMOS } from './demos-shared.js';
 import { SHELL_DEMOS } from './demos-shell.js';
 import { SAMPLES, PROPOSALS } from './decision-samples.js';
+import { THEME_SAMPLER } from './theme-sampler.js';
 
 export const DEMOS = { ...STEP_DEMOS, ...PAGE_DEMOS, ...CONVERSATION_DEMOS, ...SHARED_DEMOS, ...SHELL_DEMOS, ...SHAPE_DEMOS };
 
@@ -53,6 +55,7 @@ function proposalDemo(id) {
 
 /** The demo for a catalogue id, a decision (`decision:<id>`) or a proposal (`proposal:<id>`), or null. */
 export function demoFor(id) {
+  if (id === 'theme:sampler') return THEME_SAMPLER;
   if (id.startsWith('decision:')) return decisionDemo(id.slice('decision:'.length));
   if (id.startsWith('proposal:')) return proposalDemo(id.slice('proposal:'.length));
   if (id.startsWith('after:')) return afterDemo(id.slice('after:'.length));
@@ -60,4 +63,4 @@ export function demoFor(id) {
 }
 
 /** True for an id that is not a catalogue entry, so the preview page asks the catalogue nothing. */
-export const isLabOnly = (id) => id.startsWith('decision:') || id.startsWith('proposal:') || id.startsWith('after:');
+export const isLabOnly = (id) => id.startsWith('decision:') || id.startsWith('proposal:') || id.startsWith('after:') || id.startsWith('theme:');

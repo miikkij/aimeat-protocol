@@ -7,6 +7,8 @@
  *   Extracted from config.ts to satisfy max-file-lines; config.ts re-exports
  *   every symbol so no consumer import changes.
  * @version-history
+ *   v1.8.0 — 2026-09-24 — ThemesConfig mixed in (config-themes.ts); the capability fields moved to
+ *     config-types-capabilities.ts unchanged, to stay under the line ceiling.
  *   v1.7.0 — 2026-09-05 — mcpSessionSweepMs: the MCP idle sweep's interval, read at boot.
  *   v1.6.0 — 2026-08-28 — siteLinks.store and siteLinks.incubator, and storeEnabled derived from the
  *     first: the store is its own AIMEAT instance and the one place a price exists, so this node
@@ -146,8 +148,10 @@ import type { ConnectionsConfig } from './config-types-connections.js';
 import type { McpProxyConfig } from './config-types-mcp-proxy.js';
 import type { EnterpriseSsoConfig } from './config-types-enterprise-sso.js';
 import type { AccountSecurityConfig } from './config-types-account-security.js';
+import type { CapabilitiesConfig } from './config-types-capabilities.js';
+import type { ThemesConfig } from './config-themes.js';
 
-export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, SealedConfig, SitePresenceConfig, SocialLoginConfig, ConnectionsConfig, McpProxyConfig, EnterpriseSsoConfig, AccountSecurityConfig {
+export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, SealedConfig, SitePresenceConfig, SocialLoginConfig, ConnectionsConfig, McpProxyConfig, EnterpriseSsoConfig, AccountSecurityConfig, CapabilitiesConfig, ThemesConfig {
   port: number;
   baseUrl: string;
   /**
@@ -731,16 +735,7 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, Se
   portfolioMaxSizeKb: number;
   portfolioMaxImages: number;
 
-  // Capabilities
-  capabilityPublishing: 'disabled' | 'self_only' | 'moderated' | 'open';
-  capabilityPublishers: 'all_users' | 'trusted_only' | 'allowlist';
-  capabilityMinPublisherTrust: number;
-  capabilityPublisherAllowlist: string[];
-  capabilityWebhooks: 'disabled' | 'allowlist_only' | 'open';
-  capabilityWebhookDomainAllowlist: string[];
-  capabilityLogRetentionDays: number;
-  /** Count direct extension calls into capability stats (proxy calls always count). Default false. */
-  capabilityCallCounting: boolean;
+  // Capabilities → CapabilitiesConfig in config-types-capabilities.ts; themes → ThemesConfig in config-themes.ts
 
   // Agent Tasks (Phase 1)
   taskStallThresholdMinutes: number;
