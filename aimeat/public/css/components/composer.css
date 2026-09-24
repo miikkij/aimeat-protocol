@@ -8,6 +8,7 @@
  * @usage Linked from public/spa.html in the component block, whose order keeps the order these
  *   rules had when they were one sheet.
  * @version-history
+ *   v1.1.0 — 2026-09-24 — The tools are the icon button; only their place stays here.
  *   v1.0.0 — 2026-09-23 — Moved unchanged from css/parts*.css (UI consolidation phase 1, a move).
  */
 
@@ -71,15 +72,9 @@
   border-color: var(--accent);
 }
 .poster-composer-input:disabled { opacity: 0.6; }
-/* The two tools beside the field: square, ink-framed, 44px. */
-.poster-composer-tool {
-  flex: 0 0 auto;
-  width: 44px; height: 44px; padding: 0;
-  display: inline-flex; align-items: center; justify-content: center;
-  border: 2px solid var(--text); border-radius: 0; box-shadow: none;
-  background: var(--bg); color: var(--text); cursor: pointer; font-size: var(--text-md);
-}
-.poster-composer-tool:hover { background: var(--sun); }
+/* The two tools beside the field are the large icon button (poster.css .poster-icon, Jouni's
+   decision "Icon button"); this keeps their place in the row. */
+.poster-composer-tool { flex: 0 0 auto; }
 .poster-composer-send { flex: 0 0 auto; }
 @media (max-width: 760px) {
   .poster-composer {
@@ -89,4 +84,3 @@
   .poster-composer-tool { width: 40px; }
   .poster-composer-send { min-width: 60px; padding: 0 14px; }
 }
-.poster-composer-tool:hover { color: var(--on-sun); }

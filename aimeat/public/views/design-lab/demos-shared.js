@@ -9,6 +9,7 @@
  * @structure SHARED_DEMOS · SHAPE_DEMOS — { [id]: { variants: [{ name, render(ex) }], height?, emptyNote? } }
  * @usage import { SHARED_DEMOS, SHAPE_DEMOS } from './demos-shared.js';
  * @version-history
+ *   v1.2.0 — 2026-09-24 — The icon button's demo.
  *   v1.1.0 — 2026-09-23 — The data map's and the dialog shape's demos go with them (Jouni's
  *     decision).
  *   v1.0.0 — 2026-09-23 — Initial (UI consolidation phase 2, the library view).
@@ -119,6 +120,11 @@ export const SHAPE_DEMOS = {
     { name: 'default', render: () => html`<button type="button" class="btn-primary poster-slab">Do it</button>` },
     { name: 'large', render: () => html`<a class="btn-primary poster-slab poster-slab--large" href="#">Continue in the chat</a>` },
     { name: 'control', render: () => html`<button type="button" class="btn-primary poster-slab poster-slab--control">Send</button>` },
+  ] },
+  'icon': { variants: [
+    { name: 'default', render: () => html`<button type="button" class="poster-icon" aria-label="Attach a file">📎</button>` },
+    { name: 'small', render: () => html`<button type="button" class="poster-icon poster-icon--small" aria-label="Delete">✗</button>` },
+    { name: 'disabled', render: () => html`<button type="button" class="poster-icon" aria-label="Attach a file" disabled>📎</button>` },
   ] },
   'box': { variants: [
     { name: 'default', render: () => el('div', 'poster-box', 'A framed object.') },

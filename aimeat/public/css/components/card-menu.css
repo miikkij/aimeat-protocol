@@ -9,6 +9,7 @@
  *   rendered black and unpositioned, 140px down the card instead of in its corner. A stylesheet
  *   nobody loads is not a stylesheet.
  * @version-history
+ *   v1.1.0 — 2026-09-24 — The dots are the small icon button; the state fills stay here.
  *   v1.0.0 — 2026-08-09 — Initial.
  */
 
@@ -18,17 +19,10 @@
    on it right now. Three dots rather than a hamburger because the hamburger already means site
    navigation in this product's own top bar. */
 .card-menu { position: absolute; top: 0.5rem; right: 0.5rem; z-index: 2; }
-.card-menu-dots {
-  display: inline-flex; align-items: center; justify-content: center;
-  width: 30px; height: 30px; padding: 0; line-height: 1;
-  background: var(--bg); border: 1px solid var(--border);
-  border-radius: var(--radius-xs);
-  font-size: 1.15rem; cursor: pointer; color: var(--text);
-  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
-}
-/* A resting chip, not a bare glyph. Without the fill and the border this read as the ellipsis a
-   truncated string leaves behind, and nobody could tell it was a button until the pointer arrived. */
-.card-menu-dots:hover { border-color: var(--muted); }
+/* The dots are the small icon button (poster.css .poster-icon--small, Jouni's decision "Icon
+   button"): a framed square, not a bare glyph, which would read as the ellipsis a truncated string
+   leaves behind. The fills below say the state and stay this part's own. */
+.card-menu-dots { transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease; }
 
 /* State is a FILLED SHAPE, not the hue of a glyph. Measured on the first version: amber glyph on
    card 2.1:1, green 2.5:1, grey 4.8:1 — so a card that WAS on your list read fainter than one that

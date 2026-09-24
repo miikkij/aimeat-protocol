@@ -9,6 +9,7 @@
  * @structure ThreadList({ threads, activeId, onOpen, onNew, onDelete, onClose, children })
  * @usage html`<${ThreadList} threads=${threads} activeId=${id} onOpen=${…} onNew=${…} onDelete=${…} onClose=${…}>…<//>`
  * @version-history
+ *   v1.1.0 — 2026-09-24 — Delete (✗) is the small icon button (Jouni's decision "Icon button").
  *   v1.0.0 — 2026-09-23 — Moved out of views/chat/parts.js with its markup unchanged (UI
  *     consolidation phase 1, a move).
  */
@@ -45,7 +46,7 @@ export function ThreadList({ threads, activeId, onOpen, onNew, onDelete, onClose
                                     <span class="poster-thread-title">${thread.title}</span>
                                     <span class="poster-thread-sub">${tr('chat.turnCount', '{n} messages').replace('{n}', String(thread.turns ?? 0))}</span>
                                 </button>
-                                <button type="button" class="btn-ghost poster-thread-del"
+                                <button type="button" class="poster-icon poster-icon--small poster-thread-del"
                                     aria-label=${tr('chat.delete', 'Delete conversation')}
                                     onClick=${() => onDelete(thread.id)}>✗</button>
                             </li>

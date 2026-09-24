@@ -22,6 +22,7 @@
  * @usage
  *   html`<${PromptCard} label=${t('...')} prompt=${text} copyLabel=${t('...')} />`
  * @version-history
+ *   2026-09-24: More (⌄) is the small icon button (Jouni's decision "Icon button").
  *   2026-09-23: The label is the shared row label, .poster-label (Jouni's decision "Row label").
  *   2026-09-23: Composed from the shared parts in css/parts.css and css/parts-steps.css (class names by role, values moved from views/home.css unchanged; UI consolidation slice 1).
  *   v1.0.0 — 2026-08-09 — Extracted from four call sites in views/home (intent pool, phase 2).
@@ -92,7 +93,7 @@ export function PromptCard({
             copiedLabel=${copiedLabel}
             onCopied=${onCopied} />
           ${hasMenu && html`
-            <button type="button" class="btn-ghost poster-prompt-more"
+            <button type="button" class="poster-icon poster-icon--small poster-prompt-more"
               aria-expanded=${open}
               aria-label=${tr('prompt.more', 'More')}
               onClick=${(e) => { stop(e); setOpen(v => !v); }}>▾</button>`}
