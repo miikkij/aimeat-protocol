@@ -22,10 +22,17 @@
  *   nothing is final until Jouni says in chat to read the decisions; the session then writes them
  *   into public/views/design-lab/decisions-data.js. A decision already written there shows as
  *   decided and takes no new answer.
- * @structure DecisionsView (default) · Summary · DecisionDetail · ProposalPart · OptionPart ·
- *   DetailsPart · Answer · useChoice · answersOf
+ *
+ *   A built decision shows first what was built (06-design-lab.md item 4, "The built results"): the
+ *   words, the commit, every compared set in numbers and every before/after picture from
+ *   /img/design-lab/built.json. A result not yet on main takes Jouni's yes there
+ *   (`design-lab.built.<id>`). Results are shown here and nowhere else.
+ * @structure DecisionsView (default) · Summary · DecisionDetail · BuiltPart · useBuiltYes ·
+ *   ProposalPart · OptionPart · DetailsPart · Answer · useChoice · answersOf
  * @usage Mounted by views/admin/design-lab-tab.js (the Decisions switch).
  * @version-history
+ *   v4.1.0 — 2026-09-24 — "Built": what each built decision changed, its commit, its numbers and its
+ *     before/after pictures, and the yes for a result not yet on main.
  *   v4.0.0 — 2026-09-23 — Rebuilt to Jouni's five points: the proposal with what it covers and two
  *     buttons, every option on its own with Accept and Reject, the state beside every answer, all
  *     values in one closed Details, and the answers in the list.
@@ -48,7 +55,7 @@ import { FoldButton } from '/components/FoldButton.js';
 import { ActionRow } from '/components/ActionRow.js';
 import { ChooserFold } from '/components/Chooser.js';
 import { Specimens, Specimen, SpecimenImage } from '/components/Specimen.js';
-import { DECISIONS } from '/views/design-lab/decisions-data.js';
+import { DECISIONS, BUILT } from '/views/design-lab/decisions-data.js';
 import { plainDiff } from '/views/design-lab/plain-diff.js';
 
 const html = htm.bind(h);
@@ -193,7 +200,64 @@ function DetailsPart({ decision }) {
     <//>`;
 }
 
-function DecisionDetail({ decision, crops, onBack }) {
+const builtKey = (id) => `design-lab.built.${id}`;
+
+/** The operator's yes to a built result, kept as their own record on this node like the answers. */
+function useBuiltYes(id) {
+  const [yes, setYes] = useState(/** @type {any} */ (null));
+  useEffect(() => {
+    apiGet(`/v1/memory/${encodeURIComponent(builtKey(id))}?soft=1`)
+      .then((r) => setYes(r?.data && r.data.exists !== false ? (r.data.value ?? null) : null))
+      .catch((e) => swallowed('design-lab: built yes read', e));
+  }, [id]);
+  const save = useCallback(async (answer) => {
+    const value = { kind: id, answer, at: new Date().toISOString() };
+    await api('/v1/memory', { method: 'POST', body: JSON.stringify({ key: builtKey(id), value, visibility: 'private' }) });
+    setYes(value);
+  }, [id]);
+  return { yes, save };
+}
+
+/**
+ * What was built from the decision (06-design-lab.md item 4): in words, the commit and whether it is
+ * on main, every compared set of pictures in numbers, and every before/after picture (left of the
+ * red line before, right after). A result not yet on main takes Jouni's yes here.
+ */
+function BuiltPart({ decision, built, pictures }) {
+  const { yes, save } = useBuiltYes(decision.id);
+  const setLine = (s) => {
+    const same = s.total - s.changed - s.noise;
+    const parts = [tr('designLab.builtChanged', '{c} of {t} pictures changed').replace('{c}', String(s.changed)).replace('{t}', String(s.total))];
+    if (same > 0) parts.push(tr('designLab.builtSame', '{n} unchanged (0.00 %)').replace('{n}', String(same)));
+    if (s.noise) parts.push(tr('designLab.builtNoise', '{n} on Access, Statistics and Overview moved under 0.2 %, as they do between two runs of the same code').replace('{n}', String(s.noise)));
+    return parts.join('; ') + '.';
+  };
+  const answered = yes?.answer === 'yes';
+  return html`
+    <${Band} title=${tr('designLab.built', 'Built')} tight=${true}>
+      <p>${built.what}</p>
+      <${NamedRow} label=${tr('designLab.builtCommit', 'Commit')}>
+        <code>${built.commit}</code> · ${built.date} · ${built.onMain
+          ? tr('designLab.builtOnMain', 'on main')
+          : tr('designLab.builtNotOnMain', 'not on main: it waits for your yes')}
+      <//>
+      ${built.sets.map((s) => html`<${NamedRow} key=${s.name} label=${s.name}>${setLine(s)}<//>`)}
+      ${built.note && html`<p>${built.note}</p>`}
+      ${!built.onMain && html`
+        <${ActionRow}>
+          <${FoldButton} on=${answered} onClick=${() => save(answered ? null : 'yes').catch((e) => swallowed('design-lab: built yes save', e))}>
+            ${tr('designLab.builtYes', 'Yes, put it on main')}
+          <//>
+          <span>${tr('designLab.answerLabel', 'Your answer')}: <strong>${answered ? tr('designLab.builtYesGiven', 'yes') : answerWord(null)}</strong></span>
+        <//>`}
+      <${Hint}>${tr('designLab.builtPairs', 'Each picture: before on the left of the red line, after on the right, on the same node and data.')}<//>
+      ${pictures?.length
+        ? html`<${Specimens}>${pictures.map((p) => html`<${SpecimenImage} key=${p.src} label=${p.caption} src=${p.src} />`)}<//>`
+        : html`<${Hint}>${tr('designLab.builtNoPictures', 'The pictures are on the machine that built it; this node has none.')}<//>`}
+    <//>`;
+}
+
+function DecisionDetail({ decision, crops, built, onBack }) {
   const { choice, save } = useChoice(decision.id);
   const answers = answersOf(choice);
   const record = (patch) => save({
@@ -207,6 +271,7 @@ function DecisionDetail({ decision, crops, onBack }) {
   return html`
     <${BackLink} href="#" onClick=${(e) => { e.preventDefault(); onBack(); }}>↩ ${tr('designLab.allDecisions', 'All decisions')}<//>
     <${PageIntro} title=${decision.title} sub=${decision.question} />
+    ${BUILT[decision.id] && html`<${BuiltPart} decision=${decision} built=${BUILT[decision.id]} pictures=${built?.[decision.id]} />`}
     <${ProposalPart} decision=${decision} state=${answers.proposal} onSet=${(state) => record({ proposal: state })} />
     <${BandNote}>${tr('designLab.everyOption', 'Every option on its own')}<//>
     ${decision.variants.map((v, i) => html`<${OptionPart} key=${v.id} decision=${decision} variant=${v} index=${i} crops=${crops}
@@ -223,8 +288,10 @@ function Summary({ records, onOpen }) {
         const given = Object.values(a.options);
         const accepted = given.filter((s) => s === 'accepted').length;
         const rejected = given.filter((s) => s === 'rejected').length;
+        const b = BUILT[d.id];
+        const builtText = b ? ` ${tr('designLab.built', 'Built')}: ${b.onMain ? tr('designLab.builtOnMain', 'on main') : tr('designLab.builtNotOnMain', 'not on main: it waits for your yes')}.` : '';
         const answerText = d.choice
-          ? `${tr('designLab.decided', 'Decided')}: ${d.choice.note}`
+          ? `${tr('designLab.decided', 'Decided')}: ${d.choice.note}${builtText}`
           : `${tr('designLab.proposal', 'The proposal')}: ${answerWord(a.proposal)}. ${tr('designLab.optionsCount', 'Options: {a} accepted, {r} rejected, {n} without an answer.')
             .replace('{a}', String(accepted)).replace('{r}', String(rejected)).replace('{n}', String(d.variants.length - accepted - rejected))}`;
         return html`
@@ -239,11 +306,14 @@ function Summary({ records, onOpen }) {
 export default function DecisionsView() {
   const [open, setOpen] = useState(/** @type {string|null} */ (null));
   const [crops, setCrops] = useState(/** @type {any} */ (null));
+  const [built, setBuilt] = useState(/** @type {any} */ (null));
   const [records, setRecords] = useState(/** @type {Record<string, any>|null} */ (null));
   // The server gives /img a week's cache; a new crop run must show at once, so ask every time.
   useEffect(() => {
     fetch('/img/design-lab/crops.json', { cache: 'no-cache' }).then((r) => (r.ok ? r.json() : {})).then(setCrops)
       .catch((e) => { swallowed('design-lab: crops', e); setCrops({}); });
+    fetch('/img/design-lab/built.json', { cache: 'no-cache' }).then((r) => (r.ok ? r.json() : {})).then(setBuilt)
+      .catch((e) => { swallowed('design-lab: built pictures', e); setBuilt({}); });
   }, []);
   // The answers are read again whenever the list is shown, so an answer given inside a decision
   // is in the summary on the way back.
@@ -252,7 +322,7 @@ export default function DecisionsView() {
     Promise.all(DECISIONS.map(async (d) => [d.id, await readChoice(d.id)])).then((pairs) => setRecords(Object.fromEntries(pairs)));
   }, [open]);
   const decision = DECISIONS.find((d) => d.id === open);
-  if (decision) return html`<${DecisionDetail} decision=${decision} crops=${crops} onBack=${() => setOpen(null)} />`;
+  if (decision) return html`<${DecisionDetail} decision=${decision} crops=${crops} built=${built} onBack=${() => setOpen(null)} />`;
   const waiting = DECISIONS.filter((d) => !d.choice && !answersOf(records?.[d.id]).proposal).length;
   return html`
     <${Hint}>${tr('designLab.decisionsIntro', 'One decision per job the pages do in more than one way. Open one to see the proposal, what it covers and what would change, and answer the proposal and every option. You can change an answer at any time; nothing changes on the pages before you say so in chat.')}<//>
