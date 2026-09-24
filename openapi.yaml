@@ -27216,12 +27216,20 @@ paths:
                 state: { type: string, enum: [wanted, done], default: wanted }
       responses:
         '201':
-          description: Created. Returns the new entry and a roadmap filtered for the caller. A full list of 300 wishes refuses new wishes with 409.
+          description: Created. Returns the new entry and a roadmap filtered for the caller.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/AimeatEnvelope' }
         '400': { $ref: '#/components/responses/BadRequest' }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          description: >
+            A wish was refused. `WISH_LIMIT_REACHED`: the caller already holds 10 open wishes on this
+            app; withdrawing one frees its place, and the app's owner is not counted.
+            `CAPACITY_EXCEEDED`: the list already holds 300 wishes.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
     patch:
       operationId: appRoadmapVisibility
       summary: Open the wishes to everybody, or close them again
