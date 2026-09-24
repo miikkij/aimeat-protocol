@@ -24,6 +24,10 @@
  *   import { pullPackage } from '../services/package-pull.js';
  *   const out = await pullPackage({ storage, config, peers }, caller, { groupId, nodeId });
  * @version-history
+ *   v1.2.0 — 2026-09-24 — The package body is read through utils/read-capped.ts, which stops at
+ *     packageMaxSizeMb while the stream arrives (secaudit 2026-09, A6-13). A source that sent no
+ *     Content-Length passed the declared-size check, and arrayBuffer() then held its whole answer
+ *     in memory before the cap measured it.
  *   v1.1.0 — 2026-09-12 — PackagePullCaller loses `sub`, which travelled from the federation route
  *     through here into importParsedPackage to be resolveGhii's fallback identity.
  *     wish-identity-gate-sees-resolveghii.
@@ -37,6 +41,7 @@ import type { Storage, PackageRecord, UpstreamRef } from '../storage/interface.j
 import type { PeerInfo } from './federation.js';
 import { gatePeer } from './federation-peer-gate.js';
 import { safeFetch, stripTrailingSlashes } from '../utils/url-validator.js';
+import { readBodyCapped } from '../utils/read-capped.js';
 import { parseZip, ZipValidationError } from './package-zip.js';
 import {
     verifyAttestation, verifyComponentDigests, type AttestationDoc,
@@ -201,13 +206,16 @@ export async function pullPackage(
                 message: `That package is ${(declared / 1024 / 1024).toFixed(1)}MB, over this node's ${config.packageMaxSizeMb}MB limit.`,
             };
         }
-        buf = Buffer.from(await res.arrayBuffer());
-        if (buf.length > capBytes) {
+        // The cap holds while the body arrives. Content-Length is the source's own word and may be
+        // missing or wrong, and arrayBuffer() held the whole body before its length was measured.
+        const body = await readBodyCapped(res, capBytes);
+        if (body === null) {
             return {
                 ok: false, status: 413, code: 'SIZE_EXCEEDED',
                 message: `That package is over this node's ${config.packageMaxSizeMb}MB limit.`,
             };
         }
+        buf = body;
     } catch (err) {
         return { ok: false, status: 502, code: 'SOURCE_UNREACHABLE', message: `Could not fetch from ${source.nodeId}: ${String(err)}` };
     }

@@ -26,11 +26,15 @@
  * @usage const r = await readResource(ctx, connectionId, 'messages', { limit: 20 });
  * @version-history
  *   v1.0.0 -- 2026-08-17 -- Initial: the read direction on the existing connection machinery.
+ *   v1.1.0 -- 2026-09-24 -- The streamed, capped read moves to utils/read-capped.ts so the package
+ *     pull can share it instead of holding a whole body before measuring it (secaudit 2026-09,
+ *     A6-13). Same cap, same answers here.
  */
 import type { ConnectContext } from './oauth.js';
 import { ensureFreshCredential } from './refresh.js';
 import { findProvider } from './providers.js';
 import { safeFetch } from '../../utils/url-validator.js';
+import { readBodyCapped } from '../../utils/read-capped.js';
 import { logger } from '../../utils/logger.js';
 
 /** How much one read may bring back. A mailbox is unbounded; a response is not. */
@@ -142,23 +146,16 @@ export async function readResource(
  * The body, or null when it is bigger than we said we would carry.
  *
  * Streamed rather than `resp.text()` then measured, because measuring afterwards means the whole
- * thing is already in this process's memory and the cap has done nothing.
+ * thing is already in this process's memory and the cap has done nothing. The streaming read is
+ * utils/read-capped.ts, which the package pull shares; a response with no body at all answers null
+ * here, as it always has.
  */
 async function readCapped(resp: Response): Promise<unknown | null> {
-    const reader = resp.body?.getReader();
-    if (!reader) return null;
+    if (!resp.body) return null;
+    const body = await readBodyCapped(resp, MAX_RESPONSE_BYTES);
+    if (body === null) return null;
 
-    const chunks: Uint8Array[] = [];
-    let total = 0;
-    for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        total += value.byteLength;
-        if (total > MAX_RESPONSE_BYTES) { await reader.cancel(); return null; }
-        chunks.push(value);
-    }
-
-    const text = Buffer.concat(chunks).toString('utf8');
+    const text = body.toString('utf8');
     try { return JSON.parse(text); } catch { return text; }
 }
 
