@@ -26,10 +26,10 @@
  *   forgives the whole backlog, so it is a decision.
  *
  *   WHEN CODEQL IS NOT HERE. CI measures in its own step before check:fast and fails this gate if it
- *   cannot. On a workstation without the CLI the gate says NOT MEASURED, in those words, and exits 0:
- *   pnpm gate stays usable for every session, and CI is the one that decides. With CODEQL_CLI set,
- *   or codeql on PATH, it measures locally (a few minutes cold, a file read after that for the same
- *   tree).
+ *   cannot. On a workstation without the CLI the gate says NOT MEASURED, in those words, and under
+ *   --strict it refuses: `pnpm codeql:install` installs the pinned bundle once per machine (or
+ *   registers one already on disk), and from then on every worktree measures locally (about 155 s
+ *   cold on 2026-09-24, a file read after that until something under src/ changes).
  * @structure main(): measure, compare against the exemption file, report, gate under --strict
  * @usage
  *   cd aimeat && pnpm check:field-reach                              # the gate (check:fast, pnpm gate, CI)
@@ -37,6 +37,9 @@
  *   cd aimeat && pnpm exec tsx scripts/check-field-reach.ts          # report only, never fails
  *   cd aimeat && pnpm exec tsx scripts/check-field-reach.ts --seed   # rewrite the exemption file
  * @version-history
+ *   v2.1.0 — 2026-09-24 — NOT MEASURED refuses under --strict (pnpm gate, CI) instead of passing, and
+ *     names `pnpm codeql:install`. The pass was what let a session push over a finding only CI could
+ *     see: eight red CI periods from 2026-09-16 to 2026-09-23, all of them field-reach findings.
  *   v2.0.0 — 2026-09-14 — Door by door: what CodeQL says a route reads against what its twin tools
  *     declare, instead of mentions; the blind spots are ratcheted too.
  *   v1.0.0 — 2026-09-14 — Initial (wish-kenttien-tavoitettavuus-portiksi).
@@ -81,8 +84,11 @@ function main(): void {
         }
         console.log('');
         console.log(`  field reach NOT MEASURED on this machine: ${got.reason}.`);
-        console.log('  CI measures it on every push and fails there. To measure here, point CODEQL_CLI at a');
-        console.log('  CodeQL CLI (the bundle from github/codeql-action releases).');
+        console.log('  pnpm codeql:install puts the CodeQL bundle CI uses where this check finds it (once per');
+        console.log('  machine), and the next run measures in about two and a half minutes.');
+        // A pass here is what CI turned red eight times from 2026-09-16 to 2026-09-23: the gate said
+        // green over a finding it never looked for. As a gate it refuses; as a report it only says so.
+        if (strict) process.exit(1);
         return;
     }
     const { facts } = got;
