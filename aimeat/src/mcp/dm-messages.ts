@@ -12,6 +12,8 @@
  * @structure registerDmMessageTools(mcp, storage, config, getAgentGaii, peers)
  * @usage import { registerDmMessageTools } from './dm-messages.js';
  * @version-history
+ *   v1.11.1 -- 2026-09-25 -- The comment on aimeat_dm_broadcast's isOperator: false states the rule the
+ *     other tools apply now: an operator's agent counts as the operator only with operator:admin.
  *   v1.11.0 -- 2026-09-24 -- SECURITY (audit A5-3): the four send tools count against the account's
  *     message limit (services/message-send-limit.ts), the one POST /v1/messages and its broadcast door
  *     count against: 30 a minute per ACCOUNT, the owner and all their agents together. aimeat_dm_send,
@@ -308,12 +310,13 @@ export function registerDmMessageTools(
                 return { isError: true, content: [{ type: 'text' as const, text: JSON.stringify({ error: 'A broadcast must have a body, an attachment, or questions.' }) }] };
             }
             const mapped = attachments?.length ? mapMessageAttachments(attachments, senderGhii, config.nodeId) : undefined;
-            // isOperator: false, deliberately. Other tools on this surface read the OWNER's record and
-            // treat the agent as an operator when the human is one. A node-wide announcement is not the
-            // place for that: it reaches every human here and auto-accepts the contact for each of them,
-            // and the REST door refuses the very same agent token, which carries no operator role. A
-            // tool that grants more than the route for one principal is the drift check:mcp-tools exists
-            // to catch, and it would be granting it in the dangerous direction.
+            // isOperator: false, deliberately. Other tools on this surface treat an operator's agent as
+            // the operator when it holds operator:admin (services/operator-principal.ts). A node-wide
+            // announcement is not the place for that even then: it reaches every human here and
+            // auto-accepts the contact for each of them, and the REST door refuses the very same agent
+            // token, which carries no operator role. A tool that grants more than the route for one
+            // principal is the drift check:mcp-tools exists to catch, and it would be granting it in the
+            // dangerous direction.
             const result = await broadcastFromPrincipal(ctx, {
                 senderGhii, isOperator: false,
                 to, groupId: group_id, audience,
