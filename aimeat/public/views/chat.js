@@ -16,6 +16,7 @@
  *   - ChatView — the page: status, conversations, one live turn
  * @usage import ChatView from '/views/chat.js'
  * @version-history
+ *   2026-09-24: The welcome's starters read as sentences (Jouni's decision "Suggestion").
  *   2026-09-23: Composed from library components in /components/ (ConversationFrame and its
  *     parts, ThreadList, Turn, Composer, StatusBar, Suggestion, AiNotice, Nudge, Credit), which emit
  *     the markup this file and views/chat/parts.js wrote; chat/parts.js is gone (UI consolidation
@@ -651,7 +652,7 @@ export default function ChatView() {
                                  better than any paragraph on this screen could. -->
                             <${Suggestions}>
                                 ${STARTERS.map((st) => html`
-                                    <${Suggestion} caps=${true} key=${st.key}
+                                    <${Suggestion} key=${st.key}
                                         disabled=${disabled}
                                         onClick=${() => send(tr(st.key, st.fallback), st.id)}>
                                         ${tr(st.label, st.labelFallback)}
