@@ -10,6 +10,8 @@
  * @version-history
  *   v1.0.0 — 2026-09-13 — Initial.
  *   v1.1.0 — 2026-09-24 — The three type tokens the moved dialog sheet reads join the copied list.
+ *   v1.2.0 — 2026-09-24 — The four tokens the library's action link and loud action read (the
+ *     poster.css ranges the catalog copies for its dialogs, decision 22) join the list.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -40,6 +42,10 @@ function fixture(edit: (lines: string[]) => string[] = (l) => l): string {
     '  --text-small: 0.8rem;',
     '  --text-md: 1rem;',
     '  --weight-heavy: 800;',
+    '  --text-body-sm: 0.9rem;',
+    '  --font-showroom-body: var(--font-body);',
+    '  --success-gradient: linear-gradient(135deg, #10B981, #059669);',
+    '  --success-glow: 0 4px 12px rgba(16, 185, 129, 0.25);',
     '}',
     '[data-theme="dark"] {',
     '  --sun: #000000;',
@@ -51,7 +57,7 @@ function fixture(edit: (lines: string[]) => string[] = (l) => l): string {
 describe('themePosterTokens', () => {
   it('finds every copied token in the real theme.css, with the headline face and its spacing', () => {
     const out = themePosterTokens(readFileSync(THEME, 'utf-8'));
-    expect(out.split('\n')).toHaveLength(16);
+    expect(out.split('\n')).toHaveLength(20);
     expect(out).toMatch(/--font-headline: 'Fjalla One'/);
     expect(out).toMatch(/--font-poster-tracking: 0\.01em;/);
     expect(out).toMatch(/--font-poster-leading: 1;/);
