@@ -12,6 +12,11 @@
  * @structure registerDmMessageTools(mcp, storage, config, getAgentGaii, peers)
  * @usage import { registerDmMessageTools } from './dm-messages.js';
  * @version-history
+ *   v1.11.0 -- 2026-09-24 -- SECURITY (audit A5-3): the four send tools count against the account's
+ *     message limit (services/message-send-limit.ts), the one POST /v1/messages and its broadcast door
+ *     count against: 30 a minute per ACCOUNT, the owner and all their agents together. aimeat_dm_send,
+ *     aimeat_dm_ask and aimeat_dm_send_as_owner take the turn before the provenance record is written
+ *     and hand it on; aimeat_dm_broadcast is counted by its service. Past it: RATE_LIMITED.
  *   v1.10.0 -- 2026-09-13 -- aimeat_dm_inbox_as_owner rows say where the owner's list shows them
  *     (section, heading, archived and why, how many threads a folded row stands for). Additive.
  *   v1.9.0 -- 2026-09-12 -- aimeat_dm_inbox_as_owner and aimeat_dm_thread_as_owner read the OWNER's
@@ -59,6 +64,8 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { PeerInfo } from '../services/federation.js';
 import { sendDirectMessage, mapMessageAttachments } from '../services/message-send.js';
+import { takeSendTurn } from '../services/message-send-limit.js';
+import { toolError } from './tool-error.js';
 import { resolveGroupTarget, soleParticipantNote } from '../services/message-alias.js';
 import { readAgentDmInbox, readAgentDmThread } from '../services/agent-dm-reads.js';
 import { deleteOwnerMessage } from '../services/direct-message-delete.js';
@@ -122,6 +129,12 @@ export function registerDmMessageTools(
 ): void {
     const ctx: DeliveryCtx = { config, storage, peers };
 
+    /** The account has sent as many messages as it may this minute (services/message-send-limit.ts).
+     *  The same limit, and the same code, as POST /v1/messages. */
+    const sendLimitRefused = (wait: { message?: string }) => ({
+        ...toolError('RATE_LIMITED', wait.message ?? 'This account has sent as many messages as it may this minute.'),
+    });
+
     // ── aimeat_dm_send — send a federated direct message from this agent to anyone ──
     mcp.tool(
         'aimeat_dm_send',
@@ -148,6 +161,10 @@ export function registerDmMessageTools(
             if (!body?.trim() && !attachments?.length) {
                 return { isError: true, content: [{ type: 'text' as const, text: JSON.stringify({ error: 'A message must have a body or at least one attachment.' }) }] };
             }
+            // Counted before anything is written (the provenance record below, a new support
+            // thread), and handed to the send service, which then does not count it again.
+            const turn = takeSendTurn(senderGhii);
+            if (!turn.ok) return sendLimitRefused(turn);
 
             const mapped = attachments?.length ? mapMessageAttachments(attachments, senderGhii, config.nodeId) : undefined;
             // TARGET-058. A message an agent sends is AI-written text delivered to a named person, so
@@ -189,7 +206,9 @@ export function registerDmMessageTools(
                 const sent = await sendGroupMessage(ctx, {
                     conversationId: group.conversation.id,
                     senderGhii, body: body ?? '', attachments: mapped, replyToId: reply_to, aiProvenanceId,
+                    sendLimit: turn,
                 });
+                if (!sent.ok && sent.code === 'RATE_LIMITED') return sendLimitRefused(sent);
                 if (!sent.ok) {
                     return { isError: true, content: [{ type: 'text' as const, text: JSON.stringify({ error: sent.code === 'CONVERSATION_NOT_FOUND' ? 'No such conversation' : 'You are not a participant in this conversation', code: sent.code }) }] };
                 }
@@ -214,10 +233,11 @@ export function registerDmMessageTools(
 
             const result = await sendDirectMessage(ctx, {
                 senderGhii, recipientGhii, body: body ?? '', replyToId: reply_to, attachments: mapped,
-                conversationId: conversation_id, subject, aiProvenanceId,
+                conversationId: conversation_id, subject, aiProvenanceId, sendLimit: turn,
             });
 
             if (!result.ok) {
+                if (result.code === 'RATE_LIMITED') return sendLimitRefused({ message: result.reason });
                 const msg = result.reason ?? (result.code === 'RECIPIENT_NOT_FOUND'
                     ? `No such recipient: ${recipientGhii}`
                     : 'The recipient is not accepting messages from you (blocked or pending first-contact approval).');
@@ -309,6 +329,8 @@ export function registerDmMessageTools(
                     pipeline: 'mcp.dm_broadcast',
                 }),
             });
+            // The service counts the broadcast as one send against the account's limit, first.
+            if (!result.ok && result.code === 'RATE_LIMITED') return sendLimitRefused(result);
             if (!result.ok) {
                 return { isError: true, content: [{ type: 'text' as const, text: JSON.stringify({ error: result.message, code: result.code }) }] };
             }
@@ -368,6 +390,10 @@ export function registerDmMessageTools(
             if (!body?.trim() && !attachments?.length) {
                 return { isError: true, content: [{ type: 'text' as const, text: JSON.stringify({ error: 'A message must have a body or at least one attachment.' }) }] };
             }
+            // The owner's account is the sender, and the agent is part of it: one allowance, counted
+            // before the provenance record below is written.
+            const turn = takeSendTurn(ownerGhii);
+            if (!turn.ok) return sendLimitRefused(turn);
 
             const mapped = attachments?.length ? mapMessageAttachments(attachments, ownerGhii, config.nodeId) : undefined;
             // TARGET-058, and this is the sharpest case on the whole surface. The message is SENT as
@@ -398,9 +424,11 @@ export function registerDmMessageTools(
                 // GAII while the descriptor above names the owner. The send resolves which of the two
                 // actually holds each file, and refuses if neither does.
                 actingGaii: agentGaii,
+                sendLimit: turn,
             });
 
             if (!result.ok) {
+                if (result.code === 'RATE_LIMITED') return sendLimitRefused({ message: result.reason });
                 const msg = result.reason ?? (result.code === 'RECIPIENT_NOT_FOUND'
                     ? `No such recipient: ${recipientGhii}`
                     : 'The recipient is not accepting messages (blocked or pending first-contact approval).');
@@ -581,6 +609,9 @@ export function registerDmMessageTools(
             if (recipientGhii === senderGhii) {
                 return { isError: true, content: [{ type: 'text' as const, text: JSON.stringify({ error: 'Cannot send a message to yourself.' }) }] };
             }
+            // A question is a message: counted before the provenance record below is written.
+            const turn = takeSendTurn(senderGhii);
+            if (!turn.ok) return sendLimitRefused(turn);
             // TARGET-058. A structured question is not a lesser kind of message: the framing and the
             // options are what a person reads, and the options are what they are steered to choose
             // between. So the hash covers the intro AND the questions — hashing the body alone would
@@ -600,9 +631,10 @@ export function registerDmMessageTools(
             const result = await sendDirectMessage(ctx, {
                 senderGhii, recipientGhii, body: body ?? '', conversationId: conversation_id, subject,
                 interactive: { role: 'questions', v: 1, questions, submitLabel: submit_label },
-                aiProvenanceId,
+                aiProvenanceId, sendLimit: turn,
             });
             if (!result.ok) {
+                if (result.code === 'RATE_LIMITED') return sendLimitRefused({ message: result.reason });
                 const msg = result.reason ?? (result.code === 'RECIPIENT_NOT_FOUND'
                     ? `No such recipient: ${recipientGhii}`
                     : 'The recipient is not accepting messages from you (blocked or pending first-contact approval).');

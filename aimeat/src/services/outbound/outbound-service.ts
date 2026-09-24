@@ -24,6 +24,9 @@
  *   recordBounce/optOut · sendOutbound
  * @usage const result = await sendOutbound(config, storage, ownerGhii, {...});
  * @version-history
+ *   v1.6.0 — 2026-09-24 — The inbox channel's message does not count against the account's message
+ *     limit (services/message-send-limit.ts): this door has its own per-sender limit, and one send
+ *     here must not cost the sender twice.
  *   v1.5.0 — 2026-09-15 — A contact whose address is the sender's own takes the email channel, not
  *     the inbox. A campaign test to your own address answered 500 (duplicate key on DirectMessage)
  *     and sent nothing; an inbox copy to yourself would not have shown the email anyway.
@@ -567,6 +570,9 @@ export async function sendOutbound(config: AimeatConfig, storage: Storage, owner
       body: `**${subject}**\n\n${body}${noteLine}`,
       subject,
       skipContactGate: false,   // first contact lands in requests — the recipient still decides
+      // POST /v1/outbound/send has its own per-sender limit (routes/outbound.ts), so this send is
+      // counted there and not a second time against the account's message limit.
+      sendLimit: 'exempt',
     });
     status = result.ok ? 'sent' : 'failed';
     if (!result.ok) error = result.code;

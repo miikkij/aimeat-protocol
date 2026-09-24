@@ -20,6 +20,8 @@
  *   import { exchangeRouter } from './routes/exchange.js';
  *   app.use(exchangeRouter(config, storage));
  * @version-history
+ *   v1.7.0 — 2026-09-24 — The notice to the other party of a proposal is the node's own message, so
+ *     it does not count against the sending account's message limit (services/message-send-limit.ts).
  *   v1.6.0 — 2026-09-01 — Work that was paid up front at the A2A door delivers without a second
  *     settlement: a buyer from another node holds no contract here, and metering it again would
  *     either refuse the delivery or charge twice (Agent v2, V6a).
@@ -516,6 +518,7 @@ export function exchangeRouter(config: AimeatConfig, storage: Storage): Router {
     try {
       await sendDirectMessage({ config, storage, peers: new Map<string, PeerInfo>() }, {
         senderGhii: gh(senderOwner), recipientGhii: gh(recipientOwner), body, subject, respondable: false, skipContactGate: true,
+        sendLimit: 'exempt', // the node's own notice about the proposal, not a message the owner sent
       });
     } catch (err) { logger.warn('notify: a notification failure must not fail the proposal itself', { error: String(err) }); }
   }

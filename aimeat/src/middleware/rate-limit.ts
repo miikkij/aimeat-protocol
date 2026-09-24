@@ -7,6 +7,9 @@
  *   can't mint fresh buckets). Role-based multipliers widen limits for owners/operators.
  * @usage app.use(rateLimit({ windowMs, max }, roleMultipliers))
  * @version-history
+ *   v1.3.0 — 2026-09-24 — The bucket counting moved to services/rate-buckets.ts, unchanged, so the
+ *     per-account message limit (services/message-send-limit.ts) counts the same way. What a
+ *     request is answered, its headers included, is the same.
  *   v1.2.0 — 2026-07-10 — keyBy:'ip' option: always key by client IP, never by GAII.
  *     Needed for no-auth brute-forceable endpoints (share-password unlock) where anonymous
  *     mode would otherwise collapse every visitor into one shared anonymous-GAII bucket.
@@ -16,12 +19,7 @@
 import type { Request, Response, NextFunction } from 'express';
 import type { RateLimitTier, RoleMultipliers } from '../config.js';
 import { getStats } from '../services/stats.js';
-import { getPromMetrics } from '../services/prometheus.js';
-
-interface RateBucket {
-    count: number;
-    resetAt: number;
-}
+import { rateBuckets } from '../services/rate-buckets.js';
 
 /**
  * Normalise an IP into a rate-limit key. IPv6 addresses are aggregated to their
@@ -47,16 +45,7 @@ export function rateLimit(opts: Partial<RateLimitTier> & { keyBy?: 'auto' | 'ip'
     const keyBy = opts.keyBy ?? 'auto';
 
     // Each rate limiter instance has its own bucket store
-    const buckets = new Map<string, RateBucket>();
-
-    // Cleanup expired buckets every 60 seconds
-    const cleanup = setInterval(() => {
-        const now = Date.now();
-        for (const [key, bucket] of buckets) {
-            if (now > bucket.resetAt) buckets.delete(key);
-        }
-    }, 60_000);
-    cleanup.unref();
+    const take = rateBuckets(windowMs);
 
     return (req: Request, res: Response, next: NextFunction) => {
         // Key by GAII if authenticated, otherwise by IP (IPv6 aggregated to /64).
@@ -67,7 +56,6 @@ export function rateLimit(opts: Partial<RateLimitTier> & { keyBy?: 'auto' | 'ip'
         const resolvedKey = keyBy === 'ip' ? ipRateKey(rawIp) : (req.auth?.sub ?? ipRateKey(rawIp));
         const key = resolvedKey || 'unknown';
         if ((keyBy === 'ip' || !req.auth?.sub) && !rawIp) getStats()?.increment('rate_limit.unknown_key');
-        const now = Date.now();
 
         // Determine role-based multiplier
         let multiplier = 1;
@@ -80,25 +68,15 @@ export function rateLimit(opts: Partial<RateLimitTier> & { keyBy?: 'auto' | 'ip'
         }
         const max = Math.ceil(baseMax * multiplier);
 
-        let bucket = buckets.get(key);
-        if (!bucket || now > bucket.resetAt) {
-            bucket = { count: 0, resetAt: now + windowMs };
-            buckets.set(key, bucket);
-        }
-
-        bucket.count++;
+        // Counts this request, and counts a refusal in the hit metrics (services/rate-buckets.ts).
+        const counted = take(key, max);
 
         res.setHeader('X-RateLimit-Limit', max);
-        res.setHeader('X-RateLimit-Remaining', Math.max(0, max - bucket.count));
-        res.setHeader('X-RateLimit-Reset', Math.ceil(bucket.resetAt / 1000));
+        res.setHeader('X-RateLimit-Remaining', counted.remaining);
+        res.setHeader('X-RateLimit-Reset', Math.ceil(counted.resetAt / 1000));
 
-        if (bucket.count > max) {
-            const stats = getStats();
-            if (stats) stats.increment('rate_limit_hits_total');
-            const prom = getPromMetrics();
-            if (prom) prom.rateLimitHitsTotal.inc();
-            const retryAfterSec = Math.ceil((bucket.resetAt - now) / 1000);
-            res.setHeader('Retry-After', retryAfterSec);
+        if (!counted.ok) {
+            res.setHeader('Retry-After', counted.retryAfterSec);
             res.status(429).json({
                 ok: false,
                 protocol: 'aimeat',
@@ -106,7 +84,7 @@ export function rateLimit(opts: Partial<RateLimitTier> & { keyBy?: 'auto' | 'ip'
                 timestamp: new Date().toISOString(),
                 error: {
                     code: 'RATE_LIMITED',
-                    message: `Too many requests. Limit: ${max} per ${windowMs / 1000}s. Try again at ${new Date(bucket.resetAt).toISOString()}`,
+                    message: `Too many requests. Limit: ${max} per ${windowMs / 1000}s. Try again at ${new Date(counted.resetAt).toISOString()}`,
                 },
                 hints: {
                     next_actions: [

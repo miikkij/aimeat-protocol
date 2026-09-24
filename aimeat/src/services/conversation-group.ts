@@ -31,6 +31,9 @@
  *   const convo = await createGroupConversation(ctx, { createdBy, participants, subject });
  *   await sendGroupMessage(ctx, { conversationId: convo.id, senderGhii, body });
  * @version-history
+ *   v1.3.0 — 2026-09-24 — SECURITY (audit A5-3): sendGroupMessage asks the account's send limit
+ *     (services/message-send-limit.ts) before it reads or writes anything, and answers RATE_LIMITED
+ *     past it. A door that took the turn before its own writes hands it on in `sendLimit`.
  *   v1.2.0 — 2026-09-08 — A file sent into a group thread is duplicated into each recipient's own
  *     storage, as it always has been in a 1:1 DM. It never was here: every mailbox got the sender's
  *     descriptor, so nobody but the sender could open the file, and the retry sweep had nothing to
@@ -54,6 +57,7 @@ import { deliveryTargetFor, messagePreviewWithAttachments } from '../utils/messa
 import { notify } from './notify.js';
 import { emitChange, emitDelivery } from './event-bus.js';
 import { messagePreview } from '../utils/messaging.js';
+import { checkSendLimit, type SendLimitMark } from './message-send-limit.js';
 
 /** The maximum number of identities in one group thread. High enough for a team plus its AIs, low
  *  enough that a single send stays one bounded write rather than an unbounded fan-out. */
@@ -84,7 +88,8 @@ export function isParticipant(convo: ConversationRecord, identity: string): bool
 
 export type GroupSendResult =
   | { ok: true; messageId: string; delivered: number }
-  | { ok: false; code: 'CONVERSATION_NOT_FOUND' | 'NOT_A_PARTICIPANT' };
+  | { ok: false; code: 'CONVERSATION_NOT_FOUND' | 'NOT_A_PARTICIPANT' }
+  | { ok: false; code: 'RATE_LIMITED'; retryAfterSec: number; message: string };
 
 export interface CreateGroupInput {
   createdBy: string;
@@ -169,6 +174,9 @@ export interface GroupSendInput {
   interactive?: InteractivePayload;
   replyToId?: string;
   aiProvenanceId?: string;
+  /** The account's send limit (services/message-send-limit.ts). Omitted, this send is counted here;
+   *  a turn means the door counted it before writing anything of its own. */
+  sendLimit?: SendLimitMark;
 }
 
 /**
@@ -185,6 +193,11 @@ export interface GroupSendInput {
  */
 export async function sendGroupMessage(ctx: DeliveryCtx, input: GroupSendInput): Promise<GroupSendResult> {
   const { config, storage } = ctx;
+  // The account's send limit, before anything is read or written: one message into a thread is one
+  // send, however many mailboxes it reaches.
+  const limited = checkSendLimit(input.senderGhii, input.sendLimit);
+  if (limited) return { ok: false, code: 'RATE_LIMITED', retryAfterSec: limited.retryAfterSec, message: limited.message };
+
   const convo = await storage.getConversation(input.conversationId);
   if (!convo) return { ok: false, code: 'CONVERSATION_NOT_FOUND' };
   if (!isParticipant(convo, input.senderGhii)) return { ok: false, code: 'NOT_A_PARTICIPANT' };

@@ -21,6 +21,8 @@
  *   import { registerExchangeRunTools } from './exchange-run.js';
  *   registerExchangeRunTools(mcp, storage, config, () => agentGaii, () => sessionToken, scopes);
  * @version-history
+ *   v1.7.0 — 2026-09-24 — The notice to the other party of an exchange is the node's own message, so
+ *     it does not count against the sending account's message limit (services/message-send-limit.ts).
  *   v1.6.1 — 2026-09-24 — The scopes travel as the capability service's authority object; an agent
  *     session is never the owner in person.
  *   v1.6.0 — 2026-09-24 — Takes the session's scopes, and aimeat_app_tool_invoke hands them to the
@@ -116,6 +118,8 @@ export function registerExchangeRunTools(
         try {
             await sendDirectMessage({ config, storage, peers: new Map<string, PeerInfo>() }, {
                 senderGhii: gh(owner), recipientGhii: gh(recipientOwner), body, subject, respondable: false, skipContactGate: true,
+                // The node's own notice about the exchange, not a message the owner chose to send.
+                sendLimit: 'exempt',
             });
         } catch (err) { logger.warn('notify: notification failure must never fail the action', { error: String(err) }); }
     }

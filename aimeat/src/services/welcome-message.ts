@@ -25,6 +25,9 @@
  *     .then(m => m.sendOperatorWelcome(storage, config, owner.name))
  *     .catch(err => logger.warn('welcome message failed', { error: String(err) }));
  * @version-history
+ *   v1.1.0 — 2026-09-24 — The welcome is the node's own message, so it does not count against the
+ *     operator account's message limit (services/message-send-limit.ts): thirty sign-ups in one
+ *     minute must not leave the thirty-first without one.
  *   v1.0.0 — 2026-08-07 — Initial.
  */
 import type { AimeatConfig } from '../config.js';
@@ -96,6 +99,8 @@ export async function sendOperatorWelcome(
         // first-contact requests bucket, where the newcomer has to accept a stranger before
         // reading the message that explains where they are.
         skipContactGate: true,
+        // The node welcomes, not the operator, so the operator's own message limit is not asked.
+        sendLimit: 'exempt',
     });
     if (!result.ok) {
         logger.warn('welcome message not delivered', { to: recipientGhii, code: result.code });

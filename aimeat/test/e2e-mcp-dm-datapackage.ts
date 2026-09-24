@@ -32,8 +32,12 @@
  *   - Phase 6: aimeat_dm_broadcast — to[], group_id, and the operator-only audience
  *   - Phase 7: aimeat_dm_inbox
  *   - Phase 8: aimeat_datapackage_publish / _export, both refusal arms and the REST twins
+ *   - Phase 9: the account's send limit on the tool door
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-dm-datapackage
  * @version-history
+ *   v1.2.0 — 2026-09-24 — Test 29 (security audit A5-3): the 31st send in a minute through
+ *     aimeat_dm_send is refused, aimeat_dm_broadcast and the owner's REST send count against the same
+ *     account, and another account is not held back.
  *   v1.1.0 — 2026-09-08 — Test 22 asserts the tool's own cap now that /v1/mcp admits it.
  *   v1.0.0 — 2026-09-08 — Initial: seven DM tools with their refusal arms, both data-package tools,
  *     and the body-limit finding pinned on test 22.
@@ -646,6 +650,45 @@ await test('28. An unknown package and an unknown resource each refuse, and the 
     assert(noRes.isError && noRes.data.code === 'NOT_FOUND', `unknown resource: ${noRes.text.slice(0, 300)}`);
     assert(Array.isArray(noRes.data.available) && noRes.data.available.includes('rows'),
         `the refusal must name what the package does have: ${JSON.stringify(noRes.data.available)}`);
+});
+
+console.log('\nPhase 9 — one send limit per account, on the tool door too');
+
+// One account sends at most 30 messages a minute, whichever door it uses: the owner and every agent
+// acting for them count together. A fresh account, so the sends above do not count against it.
+await test('29. The 31st send in a minute through aimeat_dm_send is refused, and the account\'s other doors share the count', async () => {
+    const LIMIT = 30;
+    const burstOwner = await makeOwner('dmburst');
+    const burster = await makeAgent(burstOwner, ['messages:send']);
+    const session = await openSession(burster.token);
+    for (let i = 1; i <= LIMIT; i++) {
+        const r = await callTool(session, 'aimeat_dm_send', { to: recipientOwner.ghii, body: `burst ${i} ${STAMP}` });
+        assert(!r.isError, `send ${i} of ${LIMIT} was refused: ${r.text.slice(0, 300)}`);
+    }
+
+    const oneLine = (text: string): string => text.replace(/\s+/g, ' ').slice(0, 300);
+    const over = await callTool(session, 'aimeat_dm_send', { to: recipientOwner.ghii, body: `one too many ${STAMP}` });
+    assert(over.isError && over.text.startsWith('RATE_LIMITED'),
+        `send ${LIMIT + 1} in a minute through aimeat_dm_send went through: ${oneLine(over.text)}`);
+
+    const cast = await callTool(session, 'aimeat_dm_broadcast', { to: [recipientOwner.ghii], body: `a broadcast past the limit ${STAMP}` });
+    assert(cast.isError && cast.text.startsWith('RATE_LIMITED'),
+        `aimeat_dm_broadcast did not count the account's sends: ${oneLine(cast.text)}`);
+
+    // The owner is the same account, so the REST door refuses the owner too. A plain fetch, because
+    // json() above waits out a 429 and retries.
+    const own = await fetch(`${BASE}/v1/messages`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', ...authed(burstOwner.token) },
+        body: JSON.stringify({ to: recipientOwner.ghii, body: `the owner, same account ${STAMP}` }),
+    });
+    assert(own.status === 429, `the owner's REST send did not count the agent's sends: ${own.status}`);
+    assert(Number(own.headers.get('Retry-After')) > 0, `a 429 without Retry-After: ${own.headers.get('Retry-After')}`);
+
+    const other = await fetch(`${BASE}/v1/messages`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', ...authed(recipientOwner.token) },
+        body: JSON.stringify({ to: burstOwner.ghii, body: `another account ${STAMP}` }),
+    });
+    assert(other.status === 201, `another account was held back by this one's sends: ${other.status}`);
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

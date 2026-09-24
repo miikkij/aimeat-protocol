@@ -19,6 +19,8 @@
  *   - TRACKED_RESPONSE_SPEC — served inline spec for self-description
  * @usage import { createTrackedResponse, evaluateTrackedKey } from '../services/tracked-response.js';
  * @version-history
+ *   v1.2.0 — 2026-09-24 — The automatic reply does not count against the owner's message limit
+ *     (services/message-send-limit.ts): the node sends it, once for each message that arrives.
  *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 4: an AUTO-sent reply carries a provenance record —
  *     `assisted` (a person wrote the template, the node filled a slot) with humanInvolvement
  *     `none`, because configuring a trigger once is not reading this message. The `approve`
@@ -245,6 +247,9 @@ async function evaluateContract(ctx: DeliveryCtx, c: TrackedResponse): Promise<v
       body,
       replyToId: c.source.messageId,
       aiProvenanceId,
+      // The node sends this, one reply to one message that arrived, on a rule the owner set up
+      // once. It is not a send the owner makes, so it does not use up their message limit.
+      sendLimit: 'exempt',
     });
     if (sent.ok) {
       c.delivery.sentMessageId = sent.message.id;
