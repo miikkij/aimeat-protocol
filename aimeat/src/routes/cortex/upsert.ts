@@ -9,6 +9,10 @@
  * @structure CortexUpsertResult · upsertCortex(deps, caller, input, mayReplaceOthers)
  * @usage const out = await upsertCortex({ storage, config }, caller, { name, manifest, libs });
  * @version-history
+ *   v1.1.0 — 2026-09-24 — A redeploy of an active cortex asks the activation's board ceiling before
+ *     its first write (db8a5635a633). The ceiling refused inside that activation, after the lib
+ *     bytes, the manifest and the old activation's teardown, and the redeploy answered 500 with the
+ *     cortex half replaced. It answers 403 BOARD_QUOTA now, with nothing changed.
  *   v1.0.0 — 2026-09-24 — Extracted from src/routes/cortex.ts v1.6.1 (pure move, max-file-lines).
  */
 import type { CortexExtensionRecord } from '../../storage/interface.js';
@@ -19,7 +23,7 @@ import {
   libsWithoutContent, missingLibsMessage, type CortexCaller,
   type CortexDeps, type CortexOutcome, type CortexRefusal,
 } from '../../services/cortex-lifecycle.js';
-import { activateExtension, deactivateExtension } from './activation.js';
+import { activateExtension, activationRefusal, deactivateExtension } from './activation.js';
 import { refreshCortexDependencies } from '../../services/dependency-map.js';
 import { snapshotCortexVersion } from '../../services/component-versions.js';
 import { logger } from '../../utils/logger.js';
@@ -162,6 +166,16 @@ export async function upsertCortex(
   const wasActive = existing.status === 'active';
   const gaii = caller.gaii;
   const now = new Date().toISOString();
+
+  // 0) REFUSE BEFORE THE FIRST WRITE. An active cortex is re-activated in step 3, and activation is
+  //    where the public-board ceiling refuses. Asked there, a refusal arrived with the new bytes
+  //    served, the new manifest stored and the old activation already torn down, and nothing put
+  //    them back. So the same question is asked here first, counting the boards step 3 deletes
+  //    before it opens the new ones (activationRefusal's `replacing`). Invariant 14, db8a5635a633.
+  if (wasActive) {
+    const ceiling = await activationRefusal({ name, components: parsed.components }, config, storage, gaii, false, existing);
+    if (ceiling) return upsertRefusal(ceiling.status, ceiling.code, ceiling.message);
+  }
 
   // 1) Swap lib bytes in place FIRST. Files present in both old and new are overwritten
   //    atomically (per-row), so the live app sees new code immediately and never 404s.
