@@ -49398,8 +49398,9 @@ paths:
       operationId: listNodeMcpServers
       summary: What this node offers everybody with an account on it
       description: >
-        Operator only, and the operator IN PERSON (requireOperatorPrincipal), never something acting
-        on their behalf. Carries availability, the allowlist and the price, which the ordinary
+        Operator only: the operator in person, or an agent of the operator's account that the
+        operator ticked `operator:admin` for (requireOperatorPrincipal), the same answer
+        aimeat_mcp_registry_list gives. Carries availability, the allowlist and the price, which the ordinary
         projection omits because a caller has no business knowing who else is on the list. A server
         with NO availability set is attached and offered to NOBODY, which is a common half-finished
         state that looks identical to a broken one.
@@ -49415,9 +49416,10 @@ paths:
       operationId: attachNodeMcpServer
       summary: Attach a server for the whole node
       description: >
-        Operator only, and the operator IN PERSON: attaching a server to the whole node, deciding who
-        reaches it and pricing it are three acts nothing may perform in an operator's name, so there
-        is deliberately no agent twin for this door. Attaching is not OFFERING, so set availability
+        Operator only: the operator in person, or an agent of the operator's account that the
+        operator ticked `operator:admin` for. Attaching a server to the whole node, deciding who
+        reaches it and pricing it are node administration, so no other word carries them, `mcp:manage`
+        included. Attaching is not OFFERING, so set availability
         or it is reachable by nobody. A price is in money, per call, paid by the CALLER. Morsels are
         never a price: they pace how much gets used and buy nothing, so a morsel price is refused with
         BAD_PRICE. A proxied call cannot take payment yet, so a priced server refuses its calls with
@@ -49515,7 +49517,7 @@ paths:
       operationId: setNodeMcpServerPolicy
       summary: Who may use it, what it costs, how it is listed, and whether it is on
       description: >
-        Operator only, in person. Scoped to node-wide rows on purpose: this must not become a way for
+        Operator only, in person or through an agent holding `operator:admin`. Scoped to node-wide rows on purpose: this must not become a way for
         an operator to edit somebody's personal server, which is theirs and not the house's, so a row
         that is not node-wide answers 404 here.
       tags: [MCP Servers]
@@ -49558,7 +49560,7 @@ paths:
       operationId: detachNodeMcpServer
       summary: Remove a node-wide server
       description: >
-        Operator only, in person. Everybody on this node loses those tools at once.
+        Operator only, in person or through an agent holding `operator:admin`. Everybody on this node loses those tools at once.
       tags: [MCP Servers]
       security:
         - BearerAuth: []

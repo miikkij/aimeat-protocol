@@ -29,6 +29,9 @@
  * @structure ThemeError · Theme · ThemeInput · ThemeService · themeSnapshot · INNER_PATHS
  * @usage const svc = new ThemeService(config, storage); await svc.offered();
  * @version-history
+ *   v2.3.0 — 2026-09-24 — SECURITY (audit A8-1): callerIsOperator takes the principal and asks
+ *     services/operator-principal.ts with site:theme-write, the question requireOperatorPrincipal asks
+ *     on the /v1/themes doors. It took an owner name and read the account's role alone.
  *   v2.2.0 — 2026-09-24 — Shape values: a theme's corners, frames, shadows and letter case (shapes.ts),
  *     checked per value (422 INVALID_SHAPE), copied with the theme, listed in the vocabulary with the
  *     built-in value.
@@ -52,6 +55,8 @@ import type { ContrastResult } from './contrast.js';
 import type { ConfigProvenance } from '../config-provenance.js';
 import { applyConfigChanges } from '../config-apply.js';
 import { isSealed, sealRefusal } from '../config-sealing.js';
+import { operatorName, type OperatorCaller } from '../operator-principal.js';
+import { THEME_WRITE_SCOPE } from '../../utils/scope-coverage.js';
 
 export const THEME_KEY_PREFIX = 'ui.theme.';
 export const THEME_CHOICE_KEY = 'settings.theme';
@@ -274,10 +279,13 @@ export class ThemeService {
             .map((t) => ({ theme: t.id, status: componentCssState(componentId, t.componentCss[componentId]).status }));
     }
 
-    async callerIsOperator(ownerName: string | null | undefined): Promise<boolean> {
-        if (!ownerName) return false;
-        const owner = await this.storage.getOwner(ownerName);
-        return !!owner && owner.roles.includes('operator');
+    /**
+     * Whether the PRINCIPAL acting here may make this node's themes: the operator in person, or an
+     * operator account's agent holding site:theme-write (services/operator-principal.ts). The HTTP
+     * doors ask the same question through requireOperatorPrincipal; the tool surface asks here.
+     */
+    async callerIsOperator(caller: OperatorCaller): Promise<boolean> {
+        return (await operatorName(this.storage, caller, THEME_WRITE_SCOPE)) !== null;
     }
 
     // ── Writing ──

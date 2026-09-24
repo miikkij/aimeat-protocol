@@ -27,6 +27,9 @@
  *   const svc = new SurfaceLayoutService(config, storage);
  *   const { layout, degraded } = await svc.resolve('home');
  * @version-history
+ *   v1.1.0 — 2026-09-24 — SECURITY (audit A8-1): callerIsOperator takes the principal and asks
+ *     services/operator-principal.ts with site:layout-write, the question requireOperatorPrincipal
+ *     asks on the HTTP door. It took an owner name and read the account's role alone.
  *   v1.0.0 — 2026-08-26 — Initial.
  */
 import { randomBytes } from 'node:crypto';
@@ -42,6 +45,8 @@ import type { ResolvedLayout, SurfaceId, SurfaceLayout } from './types.js';
 import { SURFACE_IDS } from './types.js';
 import { MAX_FREEFORM_BYTES, SLUG_RE, parseLayout, refuseMarkup, validateLayout } from './validate.js';
 import { freeformKey, layoutKey } from './keys.js';
+import { operatorName, type OperatorCaller } from '../operator-principal.js';
+import { SURFACE_LAYOUT_WRITE_SCOPE } from '../../utils/scope-coverage.js';
 
 export { LAYOUT_KEY_PREFIX, FREEFORM_KEY_PREFIX, layoutKey, freeformKey, isReservedSurfaceKey } from './keys.js';
 
@@ -96,16 +101,15 @@ export class SurfaceLayoutService {
     }
 
     /**
-     * Whether the account acting here runs this node.
+     * Whether the PRINCIPAL acting here may arrange this node's pages: the operator in person, or
+     * an operator account's agent holding site:layout-write (services/operator-principal.ts).
      *
      * It lives in the service rather than in the tool that needs it, because a capability written
-     * twice is how this surface and REST came to differ in 315 measured places. The HTTP door gets
-     * the same answer from requireOperatorPrincipal; the tool surface asks here.
+     * twice is how this surface and REST came to differ in 315 measured places. The HTTP door asks
+     * the same question through requireOperatorPrincipal; the tool surface asks here.
      */
-    async callerIsOperator(ownerName: string | null | undefined): Promise<boolean> {
-        if (!ownerName) return false;
-        const owner = await this.storage.getOwner(ownerName);
-        return !!owner && owner.roles.includes('operator');
+    async callerIsOperator(caller: OperatorCaller): Promise<boolean> {
+        return (await operatorName(this.storage, caller, SURFACE_LAYOUT_WRITE_SCOPE)) !== null;
     }
 
     // ── Reading ──

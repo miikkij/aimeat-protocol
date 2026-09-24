@@ -24,6 +24,11 @@
  *   import { uploadRouter } from '../routes/upload.js';
  *   app.use(uploadRouter(config, storage));
  * @version-history
+ *   v1.19.0 — 2026-09-24 — SECURITY (audit A8-1): the cortex ZIP's namespace claim asks the uploading
+ *     principal through services/operator-principal.ts, with the agent's current grant from its own
+ *     record (a presigned token carries no scopes), so it takes operator:admin as the inline door
+ *     does. It was read off the owner record, so every agent of an operator holding cortex:write
+ *     carried it.
  *   v1.18.0 — 2026-09-24 — Both ZIP replace doors refuse other code under a version already kept
  *     (409 VERSION_EXISTS) before anything is written, and keep the version they deploy, as PUT
  *     /v1/extensions/:name and PUT /v1/cortex/:name do (secaudit 2026-09, A6-7).
@@ -130,6 +135,7 @@ import { safeUnzip, ZipSecurityError } from '../services/safe-zip.js';
 import { SkillValidationError, isAllowedSkillPath } from '../services/skill-md.js';
 import { publishSkill, type SkillScope } from '../services/skills.js';
 import { parseGAII } from '../utils/gaii.js';
+import { operatorName } from '../services/operator-principal.js';
 import { publishApp } from '../services/app-publish.js';
 import { servedMarksResponse } from '../services/app-serve-marks-strip.js';
 import { validateCortexAgents } from '../models/crew-def-schemas.js';
@@ -679,13 +685,16 @@ async function handleCortexUpload(
     }
     const incoming = result.extension!;
 
-    // An agent token carries the operator role when its owner holds it (routes/auth.ts), and a
-    // presigned token carries no roles at all, so the role is read off the owner record here the way
-    // aimeat_cortex_install reads it. It buys one thing: a namespace this owner does not own. POST
-    // /v1/cortex and the MCP tool both grant it and this door did not, so the same bundle installed
-    // as an inline manifest and was refused as a ZIP.
-    const ownerRec = await storage.getOwner(ownerName);
-    const isOperator = ownerRec?.roles.includes('operator') ?? false;
+    // The operator answer buys one thing: a namespace this owner does not own. POST /v1/cortex and
+    // the MCP tool both grant it, and this door must answer as they do, or the same bundle installs as
+    // an inline manifest and is refused as a ZIP. A presigned token carries neither roles nor scopes,
+    // so the question is asked of the principal it names with the grant its own record holds now:
+    // an agent passes only while it holds operator:admin (services/operator-principal.ts).
+    const agent = sub.includes('#') ? await storage.getAgent(sub) : null;
+    const isOperator = (await operatorName(storage, {
+        sub,
+        ...(agent ? { roles: ['agent'], scopes: agent.defaultScopes ?? [] } : {}),
+    })) !== null;
 
     const existing = await storage.getCortexExtension(incoming.name);
 

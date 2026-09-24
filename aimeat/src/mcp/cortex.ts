@@ -8,8 +8,11 @@
  *   - registerCortexTools() - registers all cortex tools on an McpServer instance
  * @usage
  *   import { registerCortexTools } from './cortex.js';
- *   registerCortexTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
+ *   registerCortexTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
  * @version-history
+ *   v1.8.0 -- 2026-09-24 -- SECURITY (audit A8-1): the namespace claim on install and redeploy is
+ *     asked of the agent through services/operator-principal.ts, so it takes operator:admin. It was
+ *     read off the owner record, so every agent of an operator holding cortex:write carried it.
  *   v1.7.0 -- 2026-09-13 -- aimeat_cortex_install takes update:true and redeploys through
  *     upsertCortex(), the function PUT /v1/cortex/:name runs, and both answers carry lib_urls. The
  *     tool was create-only and told the agent to use the HTTP route, so an MCP-only agent could
@@ -42,6 +45,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { parseGAII } from '../utils/gaii.js';
 import { generateUploadToken } from '../services/upload-token.js';
+import { resolveOperatorAgentName } from '../services/operator-principal.js';
 import {
     installCortex, activateCortex, deactivateCortex, deleteCortex,
     visibleCortexes, type CortexCaller, type CortexRefusal,
@@ -58,6 +62,8 @@ export function registerCortexTools(
     getAgentGaii: () => string,
     emitResourceUpdated: (agentGaii: string, uri: string) => void,
     emitResourceListChanged: (agentGaii: string) => void,
+    /** This session's granted scopes: the namespace claim is asked of them. */
+    scopes: readonly string[] = [],
 ): void {
 
     /**
@@ -76,9 +82,11 @@ export function registerCortexTools(
      *
      * `isOperator` is false on the lifecycle three on purpose: an MCP session is an agent, and an
      * operator managing somebody else's cortex does it through the HTTP door. Install passes the
-     * owner's real role instead, because the namespace claim is the one place this surface has
-     * always honoured it. The two doors therefore disagree about operators, which is a live
-     * question for the developer rather than something to settle by extraction.
+     * operator answer instead, because the namespace claim is the one place this surface has always
+     * honoured it: asked of THIS AGENT, so it is an operator account's agent holding operator:admin
+     * (services/operator-principal.ts). The two doors still disagree about operators on the
+     * lifecycle three, which is a live question for the developer rather than something to settle
+     * by extraction.
      */
     const agentCaller = (isOperator = false): CortexCaller => ({
         ownerName: callerOwner,
@@ -191,11 +199,10 @@ export function registerCortexTools(
 
             // --- INLINE MODE: manifest provided, process immediately ---
 
-            // An agent token carries the operator role when its owner holds it
-            // (routes/auth.ts:265-267), so the role is read off the owner record. It buys one thing
-            // here: a namespace this owner does not own.
-            const ownerRec = await storage.getOwner(callerOwner);
-            const caller = agentCaller(ownerRec?.roles.includes('operator') ?? false);
+            // The operator answer buys one thing here: a namespace this owner does not own. Asked of
+            // the agent and its scopes, never of the owner record alone, which handed the claim to
+            // every agent of an operator holding cortex:write.
+            const caller = agentCaller((await resolveOperatorAgentName(storage, agentGaii, scopes)) !== null);
 
             // --- REDEPLOY: the same upsert PUT /v1/cortex/:name performs (routes/cortex.ts). ---
             // The operator role buys the namespace claim here, as it does on install, and NOT the

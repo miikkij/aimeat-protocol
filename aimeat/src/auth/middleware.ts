@@ -14,6 +14,9 @@
  *   - the refusal path itself (deny401/deny403 and the audit context) lives in ./deny.ts
  *
  * @version-history
+ *   2026-09-24 — requireOperatorPrincipal asks services/operator-principal.ts askOperator(), the operator
+ *     question the tool surface and the services ask too (security audit A8-1). Its refusals and
+ *     their codes are the same.
  *   2026-09-24 — Every federated test here is isForeignPrincipal(), the one question (utils/gaii.ts),
  *     and verifyJWT now reads a visitor as role 'federated' named by its home GHII, so these gates
  *     are the second line and the inline role checks elsewhere hold as well (secaudit 2026-09, F-1).
@@ -91,6 +94,7 @@ import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 import { deny401, deny403, denyScope403, setDenyConfig } from './deny.js';
 import { withCurrentScopes } from './effective-scopes.js';
+import { askOperator } from '../services/operator-principal.js';
 
 // P3-7: Reference to storage for session revocation checks
 let _sessionStorage: Storage | null = null;
@@ -490,6 +494,9 @@ export { isOwnerPrincipal, isThirdPartyPrincipal, isSignedInCaller, requireOwner
  *
  * Federated sessions are refused for the same reason requireRole('operator') refuses them: operator
  * power stops at this node's own front door.
+ *
+ * THE DECISION IS askOperator() (services/operator-principal.ts), the one operator question every door
+ * asks, tool surface included; this gate keeps its own refusals and their codes.
  */
 export function requireOperatorPrincipal(storage: Storage, scope: string = OPERATOR_ORGANISM_REPAIR_SCOPE) {
   return async (req: Request, res: Response, next: NextFunction) => {
@@ -501,24 +508,19 @@ export function requireOperatorPrincipal(storage: Storage, scope: string = OPERA
       deny403(req, res, 'FORBIDDEN', 'Federated sessions cannot access operator functions');
       return;
     }
-    const roles = req.auth.roles;
-    // The operator in person: an operator session that is not something acting on its behalf.
-    if (roles.includes('operator') && !roles.includes('app') &&
-        !roles.includes('agent') && !roles.includes('ecosystem')) {
-      next();
-      return;
-    }
-    if (roles.includes('app')) {
+    if (req.auth.roles.includes('app')) {
       deny403(req, res, 'ACCESS_DENIED', 'An app grant cannot carry operator functions');
       return;
     }
-    // Anything else: the ACCOUNT must be an operator, and the principal must carry the exact word.
-    const owner = await storage.getOwner(req.auth.owner as string);
-    if (!owner?.roles.includes('operator')) {
+    // The operator in person passes; anything acting for an operator account passes on the exact word.
+    const answer = await askOperator(storage, {
+      sub: req.auth.sub, owner: req.auth.owner, roles: req.auth.roles, scopes: req.auth.scopes,
+    }, scope);
+    if (!answer.ok && answer.why !== 'needs-word') {
       deny403(req, res, 'ACCESS_DENIED', 'Node operator required');
       return;
     }
-    if (!(req.auth.scopes ?? []).includes(scope)) {
+    if (!answer.ok) {
       logger.warn(`[operator-scope-denied] ${req.auth.sub} on ${req.method} ${req.path}`);
       denyScope403(req, res, [scope], `Scope "${scope}" required. The node operator grants it per agent, `
         + 'and no wildcard carries it.');

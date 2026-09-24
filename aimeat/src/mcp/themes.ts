@@ -9,11 +9,16 @@
  *
  *   Reading is open, as the routes are: a theme is CSS every visitor downloads. Saving is the
  *   operator's (Jouni, 2026-09-24): the scope word site:theme-write says "this agent may make
- *   themes", and the handler asks the service whether the account it acts for runs this node,
- *   which is the question that stops the word from working when an ordinary owner is granted it.
- * @structure registerThemeTools(mcp, storage, config, getAgentGaii)
- * @usage registerThemeTools(mcp, storage, config, agentGaii);
+ *   themes", and the handler asks the service two things of THIS AGENT: the account it acts for runs
+ *   this node, which stops the word from working when an ordinary owner is granted it, and the agent
+ *   holds site:theme-write, which the registration filter also asks and a node run with
+ *   AIMEAT_MCP_ENFORCE_SCOPES=false does not.
+ * @structure registerThemeTools(mcp, storage, config, getAgentGaii, scopes)
+ * @usage registerThemeTools(mcp, storage, config, agentGaii, scopes);
  * @version-history
+ *   v2.2.0 — 2026-09-24 — SECURITY (audit A8-1): the operator test at call time is asked of the
+ *     agent and its scopes (the service's callerIsOperator, through services/operator-principal.ts),
+ *     so site:theme-write is checked at call time as well as at registration.
  *   v2.1.0 — 2026-09-24 — aimeat_theme_policy_set: who chooses, which themes are available, the default.
  *   v2.0.0 — 2026-09-24 — The two-level model of 07: styles and component CSS have their own tools;
  *     theme CSS is free and answered with warnings; restoreVersion.
@@ -23,7 +28,6 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { parseGAII } from '../utils/gaii.js';
 import { ThemeService, ThemeError, type ThemeInput } from '../services/themes/service.js';
 import type { StyleInput } from '../services/themes/styles.js';
 import { annotationsFor } from './annotations.js';
@@ -41,12 +45,16 @@ function refusal(err: unknown) {
 const tokenMap = z.record(z.string(), z.string());
 const NOT_OPERATOR = 'Only the person who runs this installation can make or change its themes.';
 
-export function registerThemeTools(mcp: McpServer, storage: Storage, config: AimeatConfig, getAgentGaii: () => string): void {
+export function registerThemeTools(
+    mcp: McpServer, storage: Storage, config: AimeatConfig, getAgentGaii: () => string,
+    /** This session's granted scopes: the operator test asks site:theme-write of them. */
+    scopes: readonly string[] = [],
+): void {
     const svc = new ThemeService(config, storage);
-    /** The acting identity when it acts for this node's operator, else null. */
+    /** The acting identity when it is an operator's agent holding site:theme-write, else null. */
     const operatorGaii = async (): Promise<string | null> => {
         const gaii = getAgentGaii();
-        return (await svc.callerIsOperator(parseGAII(gaii)?.owner)) ? gaii : null;
+        return (await svc.callerIsOperator({ sub: gaii, roles: ['agent'], scopes })) ? gaii : null;
     };
 
     mcp.tool(

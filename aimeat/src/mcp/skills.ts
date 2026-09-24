@@ -12,8 +12,12 @@
  *   - registerSkillsTools() — registers the 5 aimeat_skill_* tools on an McpServer instance
  * @usage
  *   import { registerSkillsTools } from './skills.js';
- *   registerSkillsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
+ *   registerSkillsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
  * @version-history
+ *   v1.2.0 -- 2026-09-24 -- SECURITY (audit A8-1): node-scope publishing and visibility, which put a
+ *     skill into every member's library, ask the operator question of the agent through
+ *     services/operator-principal.ts, so they take operator:admin. It was read off the owner record,
+ *     so every agent of an operator holding memory:write carried it.
  *   v1.1.0 -- 2026-09-03 -- aimeat_skill_update: visibility without a republish, the same door as
  *     PATCH /v1/skills/:name.
  *   v1.0.0 -- 2026-07-05 -- Initial: Phase 2a registry tools (node + user scopes).
@@ -23,6 +27,7 @@ import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { parseGAII } from '../utils/gaii.js';
+import { resolveOperatorAgentName, OPERATOR_AGENT_REFUSAL } from '../services/operator-principal.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 import { emitChange } from '../services/event-bus.js';
@@ -40,20 +45,21 @@ export function registerSkillsTools(
     getAgentGaii: () => string,
     _emitResourceUpdated: (agentGaii: string, uri: string) => void,
     emitResourceListChanged: (agentGaii: string) => void,
+    /** This session's granted scopes: the node-scope operator question is asked of them. */
+    scopes: readonly string[] = [],
 ): void {
     const agentGaii = getAgentGaii();
     const parsed = parseGAII(agentGaii);
     const ownerName = parsed?.owner ?? null;
 
-    const accessor = async (): Promise<SkillAccessor> => {
-        const owner = ownerName ? await storage.getOwner(ownerName) : null;
-        return {
-            ownerName,
-            isOperator: owner?.roles?.includes('operator') ?? false,
-            sub: agentGaii,
-            gaii: agentGaii,
-        };
-    };
+    // Node scope is the operator's, asked of THIS AGENT: an operator account's agent holding
+    // operator:admin (services/operator-principal.ts), never the owner record alone.
+    const accessor = async (): Promise<SkillAccessor> => ({
+        ownerName,
+        isOperator: (await resolveOperatorAgentName(storage, agentGaii, scopes)) !== null,
+        sub: agentGaii,
+        gaii: agentGaii,
+    });
 
     const err = (text: string) => ({ content: [{ type: 'text' as const, text }], isError: true });
     const ok = (payload: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(payload, null, 2) }] });
@@ -76,7 +82,7 @@ export function registerSkillsTools(
             const acc = await accessor();
             const targetScope: SkillScope = scope === 'node' ? 'node' : scope === 'workspace' ? 'workspace' : 'user';
             if (targetScope === 'node' && !acc.isOperator) {
-                return err('Node-scope skills are operator-managed — your owner is not an operator on this node');
+                return err(`Node-scope skills are operator-managed. ${OPERATOR_AGENT_REFUSAL}`);
             }
             if (targetScope === 'workspace' && (!organism_id || !workspace_id)) {
                 return err('Workspace scope requires organism_id and workspace_id');
@@ -261,7 +267,7 @@ export function registerSkillsTools(
             const acc = await accessor();
             const targetScope = scope === 'node' ? 'node' : 'user';
             if (targetScope === 'node' && !acc.isOperator) {
-                return err('Node-scope skills are operator-managed — your owner is not an operator on this node');
+                return err(`Node-scope skills are operator-managed. ${OPERATOR_AGENT_REFUSAL}`);
             }
             const summary = await setSkillVisibility(storage, config, targetScope, name, visibility, targetScope === 'user' ? ownerName : undefined);
             if (!summary) return err(`Skill not found: ${name}`);

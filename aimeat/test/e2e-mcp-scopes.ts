@@ -5,6 +5,13 @@
  *   the words no wildcard carries, which is the half this file used to leave out.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-mcp-scopes
  * @version-history
+ *   v1.3.0 — 2026-09-24 — The operator's reach inside ordinary tools (security audit A8-1, second
+ *     half). Seven paths asked whether the ACCOUNT runs the node, so an operator's agent holding only
+ *     the tool's own word deleted another owner's board, published a public capability past the
+ *     node's policy, changed another owner's capability, claimed another owner's cortex namespace
+ *     (inline and by ZIP), read another account's beneficiary state, published a skill into every
+ *     member's library, and ran the node's own MCP registry over HTTP on mcp:manage. Each path is
+ *     asserted both ways now: refused without operator:admin, answered with it.
  *   v1.2.0 — 2026-09-24 — The operator's agents (security audit A8-1). An operator's agent holding
  *     only memory:read was offered, and could call, every administration tool, because those tools
  *     asked only whether the ACCOUNT runs the node. Asserted now: that agent is offered none of the
@@ -53,6 +60,7 @@ import { createHash } from 'node:crypto';
 import { TOOL_SCOPES } from '../src/mcp/catalog/scopes.js';
 import { SCOPES_OUTSIDE_WILDCARD } from '../src/utils/scope-coverage.js';
 import { CLI_FALLBACK_TOOL_DEFINITIONS } from '../src/mcp/catalog/definitions.js';
+import { ZipArchive } from 'archiver';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
 async function signMsg(privateKeyB64: string, message: string): Promise<string> {
@@ -349,6 +357,174 @@ await test('The HTTP admin doors answer as they did: the operator in person pass
     assert(tk.body.ok === true, `agent token: ${JSON.stringify(tk.body.error)}`);
     const asAgent = await json('/v1/admin/security/overview', { headers: { Authorization: `Bearer ${tk.body.data.token}` } });
     assert(asAgent.status === 403, `an agent token on the HTTP admin door: expected 403, got ${asAgent.status}`);
+});
+
+// ─── The operator's reach inside ordinary tools (security audit A8-1, second half) ───
+//
+// These tools are open to every agent holding their own word, and give an OPERATOR more: another
+// owner's board, another owner's capability, any cortex namespace, another account's payout state, a
+// skill in every member's library. Each asked whether the ACCOUNT runs the node, so every agent the
+// operator connected carried that reach. Two agents of the operator, both holding each tool's own
+// word; only the second holds operator:admin. Each path is asserted both ways.
+const REACH_WORDS = ['social:write', 'capability:write', 'cortex:write', 'wallet:read', 'memory:write', 'mcp:manage'];
+const reachStamp = Date.now();
+const plainName = `scopeplain${reachStamp}`;
+let plainToken = '';
+let reach: { gaii: string; key: string } = { gaii: '', key: '' };
+let reachAdmin: { gaii: string; key: string } = { gaii: '', key: '' };
+
+function makeZip(entries: { name: string; data: string }[]): Promise<Buffer> {
+    return new Promise((resolve, reject) => {
+        const a = new ZipArchive({ zlib: { level: 9 } });
+        const chunks: Buffer[] = [];
+        a.on('data', (c: Buffer) => chunks.push(c));
+        a.on('end', () => resolve(Buffer.concat(chunks)));
+        a.on('error', reject);
+        for (const e of entries) a.append(e.data, { name: e.name });
+        a.finalize();
+    });
+}
+
+/** A cortex whose namespace is the PLAIN owner's, which only an operator may claim. */
+const foreignCortex = (name: string) => `apiVersion: cortex.aimeat.org/v1
+kind: Extension
+metadata:
+  name: ${name}
+  namespace: ${plainName}
+  description: operator reach fixture
+spec:
+  version: "1.0.0"
+  components:
+    - type: lib
+      name: greeter
+      filename: greeter.js
+      exports: [hello]
+      api_surface: hello()
+`;
+const GREETER = "export function hello() { return 'hi'; }";
+
+async function agentToken(a: { gaii: string; key: string }): Promise<string> {
+    const ts = new Date().toISOString();
+    const tk = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ gaii: a.gaii, timestamp: ts, signature: await signMsg(a.key, a.gaii + ts) }) });
+    assert(tk.body.ok === true, `agent token: ${JSON.stringify(tk.body.error)}`);
+    return tk.body.data.token as string;
+}
+
+/** The text of a tool's answer, whichever way it came back. */
+const answerText = (body: any): string => String(body?.result?.content?.[0]?.text ?? JSON.stringify(body?.error ?? body));
+
+await test("Setup: a plain owner, and two agents of the operator holding the tools' own words, one of them also operator:admin", async () => {
+    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: plainName, public_key: 'placeholder' }) });
+    assert(reg.status === 201, `register ${plainName}: ${reg.status} ${JSON.stringify(reg.body)}`);
+    assert(!(reg.body.data.owner?.roles ?? []).includes('operator'), 'the plain owner came out an operator, so nothing below proves anything');
+    const ts = new Date().toISOString();
+    const tk = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: plainName, timestamp: ts, signature: await signMsg(reg.body.data.private_key, plainName + NODE_ID + ts) }) });
+    plainToken = tk.body.data.token;
+    const mk = async (name: string, scopes: string[]) => {
+        const r = await json('/v1/agents', {
+            method: 'POST', headers: { Authorization: `Bearer ${opToken}` },
+            body: JSON.stringify({ name, owner: opName, capabilities: ['memory'], model: 'gpt-4o', scopes }),
+        });
+        assert(r.status === 201, `register ${name} ${r.status}: ${JSON.stringify(r.body)}`);
+        return { gaii: r.body.data.agent.gaii as string, key: r.body.data.private_key as string };
+    };
+    reach = await mk('opreach', REACH_WORDS);
+    reachAdmin = await mk('opreachadmin', [...REACH_WORDS, 'operator:admin']);
+});
+
+await test("Boards: deleting another owner's board takes operator:admin", async () => {
+    const made = await json('/v1/boards', {
+        method: 'POST', headers: { Authorization: `Bearer ${plainToken}` },
+        body: JSON.stringify({ name: `plain-board-${reachStamp}`, visibility: 'private' }),
+    });
+    assert(made.status === 201, `plain owner's board: ${made.status} ${JSON.stringify(made.body.error)}`);
+    const boardId = made.body.data.id as string;
+
+    // The owner's own list says whether the board is there: a posts read answers 200 for any id.
+    const ownerHas = async (): Promise<boolean> => {
+        const list = await json('/v1/boards', { headers: { Authorization: `Bearer ${plainToken}` } });
+        return (list.body.data.boards as any[]).some(b => b.id === boardId);
+    };
+
+    const refused = await (await connectMcp(reach.gaii, reach.key)).call('aimeat_board_delete', { board_id: boardId });
+    assert(!refused.ok, `an agent holding social:write deleted another owner's board: ${answerText(refused.body).slice(0, 200)}`);
+    assert(await ownerHas(), 'the refused delete removed the board');
+
+    const done = await (await connectMcp(reachAdmin.gaii, reachAdmin.key)).call('aimeat_board_delete', { board_id: boardId });
+    assert(done.ok, `the operator's ticked agent was refused: ${answerText(done.body).slice(0, 200)}`);
+    assert(!(await ownerHas()), 'the board is still there after the operator\'s delete');
+});
+
+await test("Capabilities: a public capability past the node's policy takes operator:admin", async () => {
+    const args = { name: `reach-cap-${reachStamp}`, summary: 'operator reach fixture', visibility: 'public' };
+    const refused = await (await connectMcp(reach.gaii, reach.key)).call('aimeat_capabilities_create', args);
+    assert(!refused.ok && answerText(refused.body).includes('PUBLIC_DISABLED'),
+        `an agent holding capability:write published past the node's policy: ${answerText(refused.body).slice(0, 200)}`);
+    const done = await (await connectMcp(reachAdmin.gaii, reachAdmin.key)).call('aimeat_capabilities_create', { ...args, name: `${args.name}-admin` });
+    assert(done.ok, `the operator's ticked agent was refused: ${answerText(done.body).slice(0, 200)}`);
+});
+
+await test("Capabilities: changing another owner's capability takes operator:admin", async () => {
+    const made = await json('/v1/capabilities', {
+        method: 'POST', headers: { Authorization: `Bearer ${plainToken}` },
+        body: JSON.stringify({ name: `plain-cap-${reachStamp}`, summary: 'the plain owner\'s own', visibility: 'private' }),
+    });
+    assert(made.status === 201, `plain owner's capability: ${made.status} ${JSON.stringify(made.body.error)}`);
+    const capId = made.body.data.id as string;
+
+    const refused = await (await connectMcp(reach.gaii, reach.key)).call('aimeat_capabilities_update', { id: capId, summary: 'rewritten by the operator\'s agent' });
+    assert(!refused.ok, `an agent holding capability:write changed another owner's capability: ${answerText(refused.body).slice(0, 200)}`);
+    const done = await (await connectMcp(reachAdmin.gaii, reachAdmin.key)).call('aimeat_capabilities_update', { id: capId, summary: 'moderated by the operator' });
+    assert(done.ok, `the operator's ticked agent was refused: ${answerText(done.body).slice(0, 200)}`);
+});
+
+await test("Cortex: another owner's namespace takes operator:admin, inline", async () => {
+    const refused = await (await connectMcp(reach.gaii, reach.key)).call('aimeat_cortex_install', {
+        manifest: foreignCortex(`reach-inline-${reachStamp}`), libs: { 'greeter.js': GREETER },
+    });
+    assert(!refused.ok, `an agent holding cortex:write claimed another owner's namespace: ${answerText(refused.body).slice(0, 200)}`);
+    const done = await (await connectMcp(reachAdmin.gaii, reachAdmin.key)).call('aimeat_cortex_install', {
+        manifest: foreignCortex(`reach-inline-admin-${reachStamp}`), libs: { 'greeter.js': GREETER },
+    });
+    assert(done.ok, `the operator's ticked agent was refused: ${answerText(done.body).slice(0, 200)}`);
+});
+
+await test("Cortex: the same claim through the ZIP upload takes operator:admin", async () => {
+    const upload = async (a: { gaii: string; key: string }, name: string) => {
+        const asked = await (await connectMcp(a.gaii, a.key)).call('aimeat_cortex_install', {});
+        const url = JSON.parse(answerText(asked.body)).upload_url as string;
+        assert(typeof url === 'string', `no upload_url: ${answerText(asked.body).slice(0, 200)}`);
+        const zip = await makeZip([{ name: 'manifest.yaml', data: foreignCortex(name) }, { name: 'libs/greeter.js', data: GREETER }]);
+        const res = await fetch(url, { method: 'PUT', headers: { 'Content-Type': 'application/zip' }, body: zip });
+        return res.status;
+    };
+    const refused = await upload(reach, `reach-zip-${reachStamp}`);
+    assert(refused === 403, `an agent holding cortex:write claimed another owner's namespace by ZIP: ${refused}`);
+    const done = await upload(reachAdmin, `reach-zip-admin-${reachStamp}`);
+    assert(done === 200, `the operator's ticked agent was refused the ZIP: ${done}`);
+});
+
+await test("Beneficiaries: another account's approval state takes operator:admin", async () => {
+    const ghii = `${plainName}@${NODE_ID}`;
+    const refused = await (await connectMcp(reach.gaii, reach.key)).call('aimeat_commerce_beneficiary_approve', { ghii });
+    assert(!refused.ok, `an agent holding wallet:read read another account's approval state: ${answerText(refused.body).slice(0, 200)}`);
+    const done = await (await connectMcp(reachAdmin.gaii, reachAdmin.key)).call('aimeat_commerce_beneficiary_approve', { ghii });
+    assert(done.ok, `the operator's ticked agent was refused: ${answerText(done.body).slice(0, 200)}`);
+});
+
+await test("Skills: a skill in every member's library takes operator:admin", async () => {
+    const skill = (name: string) => `---\nname: ${name}\ndescription: Operator reach fixture. Use when checking who may publish to every member.\n---\n\n# Fixture\n\nNothing to do.\n`;
+    const refused = await (await connectMcp(reach.gaii, reach.key)).call('aimeat_skill_publish', { skill_md: skill(`reach-node-${reachStamp}`), scope: 'node' });
+    assert(!refused.ok, `an agent holding memory:write published a node-scope skill: ${answerText(refused.body).slice(0, 200)}`);
+    const done = await (await connectMcp(reachAdmin.gaii, reachAdmin.key)).call('aimeat_skill_publish', { skill_md: skill(`reach-node-admin-${reachStamp}`), scope: 'node' });
+    assert(done.ok, `the operator's ticked agent was refused: ${answerText(done.body).slice(0, 200)}`);
+});
+
+await test("The node's own MCP server registry over HTTP takes operator:admin, not the account word mcp:manage", async () => {
+    const refused = await json('/v1/mcp-servers/node', { headers: { Authorization: `Bearer ${await agentToken(reach)}` } });
+    assert(refused.status === 403, `an agent holding mcp:manage read the node's registry: ${refused.status}`);
+    const done = await json('/v1/mcp-servers/node', { headers: { Authorization: `Bearer ${await agentToken(reachAdmin)}` } });
+    assert(done.status === 200, `the operator's ticked agent was refused: ${done.status} ${JSON.stringify(done.body.error)}`);
 });
 
 console.log(`\n────────────────────────────────────────`);

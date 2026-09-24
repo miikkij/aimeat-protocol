@@ -9,7 +9,7 @@
  *   - registerBoardsTools() — registers all board tools and resources on an McpServer instance
  * @usage
  *   import { registerBoardsTools } from './boards.js';
- *   registerBoardsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
+ *   registerBoardsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
  * @version-history
  *   v1.0.0 — 2026-03-21 — Initial creation: 7 tools + 1 resource for board management via MCP
  *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
@@ -31,13 +31,18 @@
  *     catalogue board emptied itself seven days after launch with nothing at creation saying so.
  *   v1.5.0 -- 2026-08-30 -- The board-posts resource leaves out a post flags have hidden
  *     (services/board-moderation.ts), as the HTTP listing and aimeat_board_read do.
+ *   v1.7.0 -- 2026-09-24 -- SECURITY (audit A8-1): the operator's reach on a board (deleting and
+ *     setting the rules of another owner's board, the public-board ceiling) is asked of the agent
+ *     through services/operator-principal.ts, so it takes operator:admin. It was read off the owner
+ *     record, so every agent of an operator holding social:write carried it.
  */
 
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, BoardRecord } from '../storage/interface.js';
-import { parseGAII, parseGaiiLoose } from '../utils/gaii.js';
+import { parseGaiiLoose } from '../utils/gaii.js';
+import { resolveOperatorAgentName } from '../services/operator-principal.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 import { createBoardReply, boardPostPrice } from '../services/board-post.js';
@@ -105,15 +110,15 @@ export function registerBoardsTools(
     getAgentGaii: () => string,
     emitResourceUpdated: (agentGaii: string, uri: string) => void,
     emitResourceListChanged: (agentGaii: string) => void,
+    /** This session's granted scopes: the operator's reach is asked of them. */
+    scopes: readonly string[] = [],
 ): void {
     const agentGaii = getAgentGaii();
 
-    /** Check if the current agent's owner is an operator. */
+    /** Whether THIS AGENT may use the operator's reach: an operator account's agent holding
+     *  operator:admin (services/operator-principal.ts). The account alone is not enough. */
     async function isOperator(): Promise<boolean> {
-        const parsed = parseGAII(agentGaii);
-        if (!parsed) return false;
-        const owner = await storage.getOwner(parsed.owner);
-        return !!owner && owner.roles.includes('operator');
+        return (await resolveOperatorAgentName(storage, agentGaii, scopes)) !== null;
     }
 
     /** Check if the agent can see a board (visibility rules). */
@@ -122,10 +127,10 @@ export function registerBoardsTools(
     }
 
     /**
-     * The caller the board services rule on. The roles come from the OWNER record rather than the
-     * session, because an MCP token carries roles ['agent'] and nothing else: an operator's agent
-     * would otherwise look like any other agent to a rule written against roles, and creating a
-     * public board over MCP has always been something an operator's agent can do.
+     * The caller the board services rule on. An MCP token carries roles ['agent'] and nothing else,
+     * so the operator role is added here for an agent the operator ticked operator:admin for, and
+     * for no other: a rule written against roles would otherwise see every agent of an operator as
+     * the operator.
      */
     async function boardCaller(): Promise<BoardWriteCaller> {
         return { gaii: agentGaii, roles: (await isOperator()) ? ['agent', 'operator'] : ['agent'] };
