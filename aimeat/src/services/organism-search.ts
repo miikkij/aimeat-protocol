@@ -16,11 +16,14 @@
  *     scan; hits now carry `namespace` (for deep-linking to the record) and `score` (relevance order).
  *   v1.2.0 -- 2026-06-26 -- Organism archive: optional `archived` filter (exclude default / only / include)
  *     threaded to searchText, backing archive search (the live FTS index excludes archived rows).
+ *   v1.3.0 -- 2026-09-24 -- Each workspace's read gate and spaces come from the copy of its manifest
+ *     that counts (services/workspace-meta.ts), not the first copy the store returned.
  */
 import type { ArchiveFilter, Storage, MemoryRecord, OrganismRecord } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
 import { authorizeRead } from './access-guard.js';
 import { isSameOwner } from '../utils/gaii.js';
+import { workspaceMetaReader } from './workspace-meta.js';
 
 export interface OrganismSearchHit {
   ws: string;
@@ -73,13 +76,13 @@ export async function searchOrganismContent(
   const keyPrefix = onlyWs ? `organism.${id}.w.${onlyWs}.` : `organism.${id}.w.`;
   const hits = await storage.searchText(q, { keyPrefix, maxFlags: 0, limit: CANDIDATES, archived: opts?.archived });
 
-  // Per-workspace manifest + read-permission cache (resolved once per workspace).
+  // Per-workspace manifest + read-permission cache (resolved once per workspace). The manifest is the
+  // copy that counts (services/workspace-meta.ts), not the first one the store returns.
   const wsMeta = new Map<string, { canRead: boolean; types: Array<{ name: string; ns: string }> } | null>();
+  const metaReader = workspaceMetaReader(storage, id, config.nodeId);
   const resolveWs = async (ws: string) => {
     if (wsMeta.has(ws)) return wsMeta.get(ws);
-    const nsRoot = `organism.${id}.w.${ws}.`;
-    const manScan = await storage.listAllMemory({ prefix: `${nsRoot}meta.manifest`, limit: 5 });
-    const manRec = manScan.items.find(r => r.key === `${nsRoot}meta.manifest`);
+    const manRec = await metaReader.read(ws, 'meta.manifest');
     if (!manRec) { wsMeta.set(ws, null); return null; }
     let canRead = manRec.ownerGaii === callerGaii || isSameOwner(manRec.ownerGaii, callerGaii);
     if (!canRead) {

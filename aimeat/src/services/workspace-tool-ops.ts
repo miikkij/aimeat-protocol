@@ -28,6 +28,8 @@
  *   const r = await readWorkspaceOp({ storage, config }, caller, { organismId, ws });
  *   if (!r.ok) return fail(r.message);
  * @version-history
+ *   v1.4.0 — 2026-09-24 — readWorkspaceOp gates on, and answers with, the copies of the manifest and
+ *     apps records that count (services/workspace-meta.ts), not the first copy the scan returned.
  *   v1.3.2 — 2026-09-24 — A draft's provenance record is stored only once the draft lands: built and
  *     held before the write, stored by writeWorkspaceRecord's onLanded. It was stored before the
  *     compare-and-swap, so every write that lost the swap left a record about bytes never stored.
@@ -65,7 +67,7 @@ import { parseGAII, isSameOwner } from '../utils/gaii.js';
 import { validateMemoryWrite } from './schema-validator.js';
 import { authorizeRead } from './access-guard.js';
 import { entryTitle } from './structure-overview.js';
-import { isMemoryBackedSpace, readWorkspaceSchemas } from './workspace-meta.js';
+import { isMemoryBackedSpace, readWorkspaceSchemas, workspaceMetaReader } from './workspace-meta.js';
 import { emitChange } from './event-bus.js';
 import { updateOrganismStructure } from './structure-snapshot.js';
 import { normalizeDocValueImages, scopeDocImagesToWorkspace } from './doc-images.js';
@@ -205,7 +207,9 @@ export async function readWorkspaceOp(
     const deny = await denyReason(storage, caller, organismId); if (deny) return deny;
     const root = wsRoot(organismId, ws);
     const { items } = await storage.listAllMemory({ prefix: `${root}.`, limit: 5000, archived: args.includeArchived ? 'include' : undefined, excludeVersionRows: true });
-    const manRec = items.find(r => r.key === `${root}.meta.manifest`);
+    // The meta records are the copies that count (services/workspace-meta.ts), for the gate and the answer.
+    const metaReader = workspaceMetaReader(storage, organismId, config.nodeId);
+    const manRec = await metaReader.pick(ws, 'meta.manifest', items);
     let canRead = false;
     if (manRec) {
         canRead = manRec.ownerGaii === caller.ownerGhii || isSameOwner(manRec.ownerGaii, caller.ownerGhii);
@@ -266,7 +270,7 @@ export async function readWorkspaceOp(
         return { ok: true, data: { organism_id: organismId, ws, mode: 'content', items: found, ...(missing.length ? { missing } : {}) } };
     }
 
-    const apps = ((items.find(r => r.key === `${root}.meta.apps`)?.value as { apps?: unknown[] } | undefined)?.apps) ?? [];
+    const apps = (((await metaReader.pick(ws, 'meta.apps', items))?.value as { apps?: unknown[] } | undefined)?.apps) ?? [];
     const index: Record<string, unknown[]> = {};
     const counts: Record<string, number> = {};
     for (const [name, s] of spaces) {

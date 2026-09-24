@@ -25,12 +25,15 @@
  *     reads every workspace under the organism without a per-workspace grant (they already manage its
  *     access, invites, export + archive). Shared isOrgManager() helper reused by the write middleware +
  *     the discovery/list surfaces. Gate 3 (GEAI strict) still narrows after — a GEAI never rides this.
+ *   v1.3.0 -- 2026-09-24 -- Gate 2 reads the copy of the manifest that counts (readWorkspaceMetaRecord:
+ *     the workspace creator's, then an organism manager's), not the first copy the store returns.
  */
 import type { Storage, OrganismRecord } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
 import { authorizeRead } from './access-guard.js';
 import { isSameOwner, isGEAI } from '../utils/gaii.js';
 import { ecoMayReadKey } from './ecosystem-access.js';
+import { readWorkspaceMetaRecord } from './workspace-meta.js';
 
 /**
  * True when this owner is the organism's creator or an admin. Org managers get automatic read+write
@@ -84,10 +87,11 @@ export async function canReadWorkspace(
   if (!isMember) return false;
 
   // Gate 2: workspace read (manifest is the single gate record). An org manager (creator/admin) passes
-  // unconditionally — they own the organism's access, so they read every workspace under it.
+  // unconditionally — they own the organism's access, so they read every workspace under it. The
+  // record is the copy that counts (services/workspace-meta.ts), never the first one the store
+  // returns: a member's own copy of the manifest would otherwise make them its owner here.
   const manKey = `organism.${organism.id}.w.${ws}.meta.manifest`;
-  const scan = await storage.listAllMemory({ prefix: manKey, limit: 5 });
-  const manRec = scan.items.find(r => r.key === manKey);
+  const manRec = await readWorkspaceMetaRecord(storage, organism.id, ws, 'meta.manifest', config.nodeId);
   if (!manRec) return false;
   let allowed: boolean;
   if (manager || manRec.ownerGaii === callerGaii || isSameOwner(manRec.ownerGaii, callerGaii)) {

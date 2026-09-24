@@ -17,8 +17,14 @@
  *   - the read: creator's copy in both orders, an agent copy of the creator, the admin fallback, a
  *     plain member's copy never, another node's copy never
  *   - the update path writes the copy the read takes
+ *   - the readers that decide who reads a workspace, what it shares and how a space publishes: a plain
+ *     member's copy stored straight into storage, as data from before the write rule would be,
+ *     changes none of their answers
  * @usage cd aimeat && pnpm exec vitest run test/unit/workspace-meta-copies.test.ts
  * @version-history
+ *   v1.1.0 — 2026-09-24 — The readers that decide access, sharing and publishing read the copy that
+ *     counts too: canReadWorkspace, the route helpers' canReadWs / readWsManifests /
+ *     readWsManifestValue / readShareMeta, and readPublishSpace's object type.
  *   v1.0.0 — 2026-09-24 — Initial (secaudit 2026-09, A6-9).
  */
 
@@ -26,6 +32,9 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import { checkOrganismNamespaceAccess } from '../../src/services/organism-namespace-access.js';
 import { readWorkspaceManifest, updateWorkspaceMeta } from '../../src/services/workspace-meta.js';
+import { canReadWorkspace } from '../../src/services/workspace-access.js';
+import { readPublishSpace } from '../../src/services/workspace-write-items.js';
+import { createOrganismHelpers } from '../../src/routes/organisms/shared.js';
 import type { OrganismRecord, OrganismMembershipRecord, GHIIRecord, ConsentRecord } from '../../src/storage/interface.js';
 import type { AimeatConfig } from '../../src/config.js';
 
@@ -194,5 +203,62 @@ describe('the update path writes the copy the read takes', () => {
     expect(names).toEqual(['ledger', 'journal']);
     const admins = await storage.getMemory(`carol@${NODE}`, manifestKey());
     expect(((admins?.value as { objectTypes?: unknown[] }).objectTypes ?? []).length, 'the admin\'s copy is left alone').toBe(1);
+  });
+});
+
+// A copy written before the write rule existed is still in storage, so these store it directly, the
+// way old data sits, and each time FIRST: SQLite hands back rows that share a key in insertion order,
+// which is the order a reader that takes the first row would follow.
+describe('the readers that decide access, sharing and publishing take the copy that counts', () => {
+  const shareKey = `organism.${ORG}.w.${WS}.meta.share`;
+  const bobGhii = `bob@${NODE}`;
+  let storage: SqliteStorage;
+  beforeEach(async () => { storage = await world(); });
+
+  it('canReadWorkspace: a plain member\'s manifest copy does not open the workspace to them', async () => {
+    await put(storage, bobGhii, manifestKey(), ledger('member'));
+    await put(storage, `alice@${NODE}`, manifestKey(), ledger('admin'));
+    const organism = (await storage.getOrganism(ORG))!;
+    expect(await canReadWorkspace(storage, config, organism, 'bob', 'bob', bobGhii, WS)).toBe(false);
+    expect(await canReadWorkspace(storage, config, organism, 'alice', 'alice', `alice@${NODE}`, WS), 'the creator still reads').toBe(true);
+  });
+
+  it('readShareMeta: a plain member\'s share copy neither publishes the workspace nor hides the creator\'s', async () => {
+    const H = createOrganismHelpers(config, storage);
+    await put(storage, bobGhii, shareKey, { public: true, spaces: { ledger: true } });
+    expect((await H.readShareMeta(ORG, WS)).public, 'a plant alone shares nothing').toBe(false);
+    await put(storage, `alice@${NODE}`, shareKey, { public: false, docs: { 'ledger/one': true } });
+    const share = await H.readShareMeta(ORG, WS);
+    expect(share.public).toBe(false);
+    expect(share.spaces).toEqual({});
+    expect(share.docs).toEqual({ 'ledger/one': true });
+  });
+
+  it('canReadWs and readWsManifestValue answer from the creator\'s copy', async () => {
+    const H = createOrganismHelpers(config, storage);
+    await put(storage, bobGhii, manifestKey(), { ...ledger('member'), name: 'Planted' });
+    await put(storage, `alice@${NODE}`, manifestKey(), ledger('admin'));
+    expect(await H.canReadWs(ORG, WS, bobGhii)).toBe(false);
+    expect((await H.readWsManifestValue(ORG, WS))?.name).toBe('Ledger');
+  });
+
+  it('readWsManifests: a FRESHER plain member\'s copy does not win the discovery list', async () => {
+    const H = createOrganismHelpers(config, storage);
+    await put(storage, `alice@${NODE}`, manifestKey(), ledger('admin'));
+    await new Promise(r => setTimeout(r, 5));
+    await put(storage, bobGhii, manifestKey(), ledger('member'));
+    const rec = (await H.readWsManifests(ORG, [WS])).get(WS) ?? null;
+    expect(rec?.ownerGaii).toBe(`alice@${NODE}`);
+    expect(await H.canReadWsManifest(bobGhii, manifestKey(), rec)).toBe(false);
+  });
+
+  it('readPublishSpace: the space\'s own settings come from the creator\'s copy', async () => {
+    const guarded = { ...ledger('member'), objectTypes: [{ name: 'ledger', schemaRef: 'schema:ledger@1', namespace: 'books.ledger', backing: 'memory', writeRole: 'member', create_only: true, maxVersions: 5 }] };
+    const loose = { ...ledger('member'), objectTypes: [{ name: 'ledger', schemaRef: 'schema:ledger@1', namespace: 'books.ledger', backing: 'memory', writeRole: 'member', maxVersions: 1 }] };
+    await put(storage, bobGhii, manifestKey(), loose);
+    await put(storage, `alice@${NODE}`, manifestKey(), guarded);
+    const { ot } = await readPublishSpace(storage, ORG, WS, 'books.ledger', { nodeId: NODE });
+    expect(ot?.create_only).toBe(true);
+    expect(ot?.maxVersions).toBe(5);
   });
 });

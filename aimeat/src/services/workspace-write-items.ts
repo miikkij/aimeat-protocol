@@ -20,6 +20,9 @@
  *   const resolved = norm.items.map(it => resolveWriteItem(it, objectTypes));
  *   const refusal = await undeclaredSpaceForKey(storage, key);   // before anything is written
  * @version-history
+ *   v1.4.0 — 2026-09-24 — readPublishSpace takes the space's own settings (`ot`) from the copy of the
+ *     manifest that counts (services/workspace-meta.ts) when the caller passes `nodeId`, instead of the
+ *     first live copy the scan returned. The UNDECLARED_SPACE decision still reads every copy.
  *   v1.3.0 — 2026-09-13 — UNDECLARED_SPACE is a REFUSAL on every door, decided by the developer on
  *     2026-09-13: 422, nothing written, naming the namespace, the spaces the manifest declares and how
  *     to declare one. undeclaredSpaceRefusal() is the one decision and the one wording; resolveSpace()
@@ -41,7 +44,7 @@
  */
 
 import type { Storage, MemoryRecord } from '../storage/interface.js';
-import { isMemoryBackedSpace } from './workspace-meta.js';
+import { isMemoryBackedSpace, workspaceMetaReader } from './workspace-meta.js';
 import { parseWorkspaceRecordKey } from './write-guards.js';
 
 /** One tool call may carry this many items. Past this the caller should split the migration. */
@@ -316,22 +319,30 @@ export function undeclaredSpaceRefusal(
 /**
  * Read the manifest entry a publish into `namespace` needs, and the UNDECLARED_SPACE refusal.
  *
- * `ot` comes from the first live copy of the manifest the scan returns, which is what both publish
- * paths read inline before this existed. The decision reads EVERY copy, archived ones included: a key
- * is unique per owner, so a workspace can hold more than one manifest, and a space any of them
- * declares is declared. An archived workspace is refused by the archive guard, which the doors run
- * separately and which says so; without the archived copies it would be refused here as having no
- * manifest, which is not true. The organism root (no `ws`) has no workspace manifest and is not refused.
+ * `ot` is the space as the copy of the manifest that counts declares it (services/workspace-meta.ts:
+ * the workspace creator's, then an organism manager's), live copies before archived ones. It carries
+ * the space's own settings, whether history is kept, how much, and the batch publish's write guards,
+ * so the first copy the scan returned let a member's own copy set them. It is read only when the
+ * caller passes `nodeId`; a caller that wants the refusal alone does not. The decision reads EVERY
+ * copy, archived ones included: a key is unique per owner, so a workspace can hold more than one
+ * manifest, and a space any of them declares is declared. An archived workspace is refused by the
+ * archive guard, which the doors run separately and which says so; without the archived copies it
+ * would be refused here as having no manifest, which is not true. The organism root (no `ws`) has no
+ * workspace manifest and is not refused.
  */
 export async function readPublishSpace(
     storage: Storage, organismId: string, ws: string | undefined, namespace: string,
-    opts?: { audience?: UndeclaredSpaceAudience },
+    opts?: { audience?: UndeclaredSpaceAudience; nodeId?: string },
 ): Promise<{ ot: PublishObjectType | undefined; refusal: UndeclaredSpaceRefusal | null }> {
     const mkey = `${ws ? `organism.${organismId}.w.${ws}` : `organism.${organismId}`}.meta.manifest`;
     const copies = (await storage.listAllMemory({ prefix: mkey, limit: 10, archived: 'include' })).items.filter(r => r.key === mkey);
-    const typesOf = (r: MemoryRecord | undefined): PublishObjectType[] =>
+    const typesOf = (r: MemoryRecord | null | undefined): PublishObjectType[] =>
         (r?.value as { objectTypes?: PublishObjectType[] } | undefined)?.objectTypes ?? [];
-    const ot = typesOf(copies.find(r => !r.archived) ?? copies[0]).find(o => o?.namespace === namespace);
+    const live = copies.filter(r => !r.archived);
+    const counted = !ws ? (live[0] ?? copies[0])
+        : opts?.nodeId ? await workspaceMetaReader(storage, organismId, opts.nodeId).pick(ws, 'meta.manifest', live.length ? live : copies)
+        : null;
+    const ot = typesOf(counted).find(o => o?.namespace === namespace);
     const refusal = ws && !isPlatformWorkspaceNamespace(namespace)
         ? undeclaredSpaceRefusal(namespace, copies.flatMap(typesOf), { organismId, ws, audience: opts?.audience })
         : null;

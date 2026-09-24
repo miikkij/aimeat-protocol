@@ -25,6 +25,9 @@
  *     manifest, so a caller could REPLACE a schema it had no way to read first — and the advice in
  *     the tool that replaces them was to fetch GET /v1/memory/{key}/schema, which an MCP-only agent
  *     cannot call. Empty when the caller cannot read the workspace.
+ *   v1.7.0 — 2026-09-24 — The workspace read gates on, and answers with, the copies of the manifest,
+ *     readme and apps records that count (services/workspace-meta.ts workspaceMetaReader) instead of
+ *     the first copy the scan returned for the gate and the last one for the answer.
  */
 import type { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
@@ -34,7 +37,7 @@ import { requireAuth, requireRole, requireScope } from '../../auth/middleware.js
 import { resolveIdentity, isSameOwner, isGEAI } from '../../utils/gaii.js';
 import { authorizeRead } from '../../services/access-guard.js';
 import { ecoMayReadKey } from '../../services/ecosystem-access.js';
-import { isMemoryBackedSpace, readWorkspaceSchemas } from '../../services/workspace-meta.js';
+import { isMemoryBackedSpace, readWorkspaceSchemas, workspaceMetaReader } from '../../services/workspace-meta.js';
 import { workspaceRowIndex } from '../../services/workspace-rows/row-service.js';
 import { emitChange } from '../../services/event-bus.js';
 import { searchOrganismContent } from '../../services/organism-search.js';
@@ -124,7 +127,12 @@ export function registerOrganismWorkspaceReadRoutes(router: Router, config: Aime
     } else {
       items = (await storage.listAllMemory({ prefix: nsRoot, limit: 5000, excludeVersionRows: true })).items;
     }
-    const manRec = items.find(r => r.key === `${nsRoot}meta.manifest`);
+    // A workspace's meta records are the copies that count (services/workspace-meta.ts), not the
+    // first or the last the scan holds; the organism root keeps its own manifest as before.
+    const reader = ws ? workspaceMetaReader(storage, id, config.nodeId) : null;
+    const metaOf = async (rel: string, from: MemoryRecord[]): Promise<MemoryRecord | undefined> =>
+      (reader ? await reader.pick(ws!, rel, from) : null) ?? undefined;
+    const manRec = reader ? await metaOf('meta.manifest', items) : items.find(r => r.key === `${nsRoot}meta.manifest`);
     let canReadWorkspace = false;
     if (manRec) {
       canReadWorkspace = isOrgManager || manRec.ownerGaii === callerGaii || isSameOwner(manRec.ownerGaii, callerGaii);
@@ -152,11 +160,12 @@ export function registerOrganismWorkspaceReadRoutes(router: Router, config: Aime
     const provenanceById = await loadServedProvenanceMany(
       storage, config, readable.map(r => r.aiProvenanceId));
 
-    const manifestRec = byKey.get(`${nsRoot}meta.manifest`);
+    const manifestRec = reader ? (canReadWorkspace ? manRec : undefined) : byKey.get(`${nsRoot}meta.manifest`);
     const manifest = (manifestRec?.value as Record<string, unknown> | undefined) ?? null;
-    const readme = byKey.get(`${nsRoot}meta.readme`)?.value ?? null;
+    const readme = (reader ? await metaOf('meta.readme', readable) : byKey.get(`${nsRoot}meta.readme`))?.value ?? null;
     // Apps pinned to this workspace (meta.apps binding record) — presentation/launch-context only.
-    const apps = ((byKey.get(`${nsRoot}meta.apps`)?.value as { apps?: unknown[] } | undefined)?.apps) ?? [];
+    const appsRec = reader ? await metaOf('meta.apps', readable) : byKey.get(`${nsRoot}meta.apps`);
+    const apps = ((appsRec?.value as { apps?: unknown[] } | undefined)?.apps) ?? [];
 
     // Build the generic objects map from whatever objectTypes the manifest declares.
     // Versioning convention: each instance is one key, optionally suffixed `.draft` (working

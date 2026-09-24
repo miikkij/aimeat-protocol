@@ -17,6 +17,8 @@
  *   - _access (request/list/decide) + _member_grant / _member_revoke / _members (creator-managed roles)
  * @usage import { registerWorkspaceTools } from './workspaces.js';
  * @version-history
+ *   v1.24.0 -- 2026-09-24 -- readManifest is services/workspace-meta.ts readWorkspaceManifest: the copy
+ *     of the manifest that counts, not the first copy the store returned.
  *   v1.23.0 -- 2026-09-13 -- _write, _publish and _revert_to_draft answer the shared UNDECLARED_SPACE
  *     refusal (the developer's decision: a space the workspace manifest does not declare is refused
  *     on every door) as `{ error, message, namespace, declared_spaces, how_to_fix }`, the shape
@@ -149,7 +151,7 @@ import { descriptionFor } from './catalog/shape.js';
 import { checkDeleteGuard } from '../services/write-guards.js';
 import { canReadWorkspace } from '../services/workspace-access.js';
 import { buildOrganismOverview, buildWorkspaceOverview } from '../services/structure-overview.js';
-import { updateWorkspaceMeta, WorkspaceMetaError, listOrganismWorkspaceEntries } from '../services/workspace-meta.js';
+import { updateWorkspaceMeta, WorkspaceMetaError, listOrganismWorkspaceEntries, readWorkspaceManifest } from '../services/workspace-meta.js';
 import { emitChange } from '../services/event-bus.js';
 import { updateOrganismStructure } from '../services/structure-snapshot.js';
 import { MAX_BATCH_ITEMS } from '../services/workspace-write-items.js';
@@ -265,14 +267,11 @@ export function registerWorkspaceTools(
         }
         return null;
     };
-    /** Read a workspace's manifest from whichever member created it (aggregates across registries), so a
-     *  member who didn't create the workspace can still resolve its spaces to write/delete records. */
-    const readManifest = async (orgId: string, ws: string): Promise<Manifest | null> => {
-        const key = `${wsRoot(orgId, ws)}.meta.manifest`;
-        const { items } = await storage.listAllMemory({ prefix: key, limit: 100 });
-        const rec = items.find(r => r.key === key);
-        return rec ? (rec.value as Manifest) : null;
-    };
+    /** Read a workspace's manifest from the member who created it, so a member who didn't create the
+     *  workspace can still resolve its spaces to write/delete records: the copy that counts, the one
+     *  every other reader takes (services/workspace-meta.ts). */
+    const readManifest = async (orgId: string, ws: string): Promise<Manifest | null> =>
+        (await readWorkspaceManifest(storage, orgId, ws, config.nodeId)) as Manifest | null;
     /** Active membership role of the agent's owner in an org, or null. */
     const roleOf = async (orgId: string): Promise<string | null> => {
         const m = await storage.getMembership(orgId, ownerName);

@@ -6,6 +6,8 @@
  *   email invitations, provisioned-code ("key") invitations, and the PUBLIC invitation token flow.
  *   Extracted from src/routes/organisms.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.10.0 — 2026-09-24 — The discovery list's enrichment reads each workspace's manifest and apps
+ *     records through services/workspace-meta.ts, the copy that counts, not the first the scan held.
  *   v1.9.0 — 2026-08-23 — SECURITY (audit AI-triage, invariant 15): the four email-invitation doors
  *     move from requireRoleOrScope('agent', 'organism:invite') to requireScope('organism:invite').
  *     The role path ran first, so ANY agent passed and the scope word was decorative on the HTTP
@@ -59,6 +61,7 @@ import { provisionOwner, ProvisionEmailTakenError, RegistrationClosedError } fro
 import { getActiveEmailService } from '../../services/email.js';
 import { countWorkspaceInstances, latestWorkspaceEvent, aggregateParticipants } from '../../services/workspace-enrichment.js';
 import { isOrgManager } from '../../services/workspace-access.js';
+import { workspaceMetaReader } from '../../services/workspace-meta.js';
 import { createEmailInvitation, cancelEmailInvitation, invitePublic, hashInviteToken, inviteEmailHash, normalizeOrgRole, normalizeWorkspaceGrants, applyInvitationWorkspaceGrants, InvitationError, INVITE_CODE_QUOTA_PER_MEMBER, INVITE_DEFAULT_EXPIRY_DAYS, INVITE_MAX_EXPIRY_DAYS } from '../../services/invitations.js';
 import type { InvitationRecord, InvitationWorkspaceGrant } from '../../storage/repositories/invitation.repository.js';
 import type { OrganismHelpers } from './shared.js';
@@ -166,15 +169,16 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
         if (w) reviewByWs[w] = (reviewByWs[w] ?? 0) + 1;
       }
       const enriched: Array<Record<string, unknown>> = [];
+      const metaReader = workspaceMetaReader(storage, id, config.nodeId);
       for (const w of seen.values()) {
         if (w.access === 'none') { enriched.push({ ...w }); continue; }
         const root = `organism.${id}.w.${w.id}`;
         const bucket = perWsScan
           ? (await storage.listAllMemory({ prefix: `${root}.`, limit: 10000 })).items
           : (buckets.get(w.id) ?? []);
-        const manifestRec = bucket.find(r => r.key === `${root}.meta.manifest`);
+        const manifestRec = await metaReader.pick(w.id, 'meta.manifest', bucket);
         const manifest = (manifestRec?.value as Record<string, unknown> | undefined) ?? null;
-        const appsRec = bucket.find(r => r.key === `${root}.meta.apps`);
+        const appsRec = await metaReader.pick(w.id, 'meta.apps', bucket);
         // Per-record read-authorization for lastEvent (cross-owner only; same-owner short-circuits) —
         // identical to GET /workspace/activity.
         const readable: MemoryRecord[] = [];

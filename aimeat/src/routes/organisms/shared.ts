@@ -8,6 +8,9 @@
  *   invitation gates, archive handler) that every organism route group shares; the module-level
  *   fresherRec/roleSatisfies are pure utilities the route handlers reference directly.
  * @version-history
+ *   v1.10.0 — 2026-09-24 — canReadWs, readWsManifests, readWsManifestValue and readShareMeta read the
+ *     copy that counts (services/workspace-meta.ts), and both publish paths take the space's settings
+ *     from it; the first copy the store returned, or the freshest, had decided who reads and what is shared.
  *   v1.9.0 — 2026-09-13 — publishDraft and publishDraftsBatch REFUSE a space the workspace manifest
  *     does not declare (the developer's decision): `{ code: 'UNDECLARED_SPACE', refusal }`, returned
  *     before the scan, the image scoping or any write. The warning they carried is gone.
@@ -56,6 +59,7 @@ import { grantWorkspaceRole, revokeWorkspaceRole as revokeWsRoleSvc, listWorkspa
 import { listVersionRefs, versionRefsByBase, maxVersionOf, pruneVersionsAfterPublish, effectiveMaxVersions, versionRefsToPrune } from '../../services/workspace-versions.js';
 import { updateOrganismStructure } from '../../services/structure-snapshot.js';
 import { readPublishSpace, type UndeclaredSpaceRefusal } from '../../services/workspace-write-items.js';
+import { readWorkspaceMetaRecord, workspaceMetaReader } from '../../services/workspace-meta.js';
 import { logger } from '../../utils/logger.js';
 
 // Moved to ./record-helpers.ts on 2026-08-11 (max-file-lines), and readOrganismConfig on 2026-09-14
@@ -173,7 +177,7 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
     const ownerGhii = ownerGhiiOf(publisher);
     // A space the workspace manifest does not declare is refused first, before the image scoping
     // below changes a single file's visibility (the developer's decision, 2026-09-13).
-    const { ot: pubOt, refusal } = await readPublishSpace(storage, organismId, ws, namespace);
+    const { ot: pubOt, refusal } = await readPublishSpace(storage, organismId, ws, namespace, { nodeId: config.nodeId });
     if (refusal) return { ok: false, code: 'UNDECLARED_SPACE', refusal };
     // Value-free version handling: skip `.version.N` rows in the scan (their full values were loaded
     // just to find maxN) — the version numbers come from the key names alone (listVersionRefs below).
@@ -284,7 +288,7 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
     // ONE manifest read (`versioned`, the UNDECLARED_SPACE refusal) + ONE scan of the namespace for the
     // entire batch. The whole batch is one namespace, so an undeclared space refuses all of it, before
     // the scan and before any record is touched (the developer's decision, 2026-09-13).
-    const { ot: pubOt, refusal } = await readPublishSpace(storage, organismId, ws, namespace);
+    const { ot: pubOt, refusal } = await readPublishSpace(storage, organismId, ws, namespace, { nodeId: config.nodeId });
     if (refusal) return { results: [], refusal };
     // excludeVersionRows: the batch needs each record's .draft/.latest VALUES but only the version
     // NUMBERS — those come from ONE value-free key scan (versionRefsByBase below).
@@ -447,37 +451,25 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
 
   /** Can this accessor read the workspace's content (i.e. its manifest)? One manifest scan, then the
    *  shared {@link canReadWsManifest} decision. */
-  const canReadWs = async (id: string, ws: string, callerGaii: string): Promise<boolean> => {
-    const mkey = `organism.${id}.w.${ws}.meta.manifest`;
-    const { items } = await storage.listAllMemory({ prefix: mkey, limit: 10 });
-    return canReadWsManifest(callerGaii, mkey, items.find(r => r.key === mkey) ?? null);
-  };
+  const canReadWs = async (id: string, ws: string, callerGaii: string): Promise<boolean> =>
+    canReadWsManifest(callerGaii, `organism.${id}.w.${ws}.meta.manifest`,
+      await readWorkspaceMetaRecord(storage, id, ws, 'meta.manifest', config.nodeId));
 
   /** Batch-fetch the manifest record of MANY workspaces in ONE cross-owner `key IN (…)` read (falls back
-   *  to a per-ws scan when the backend lacks the primitive). Returns wsId → freshest manifest record —
+   *  to a per-ws scan when the backend lacks the primitive). Returns wsId → the manifest copy that
+   *  counts (workspaceMetaReader: the creator's, then a manager's; never the freshest whoever wrote it) —
    *  collapses the discovery list's per-workspace canReadWs manifest scans (N → 1). Pair with
    *  {@link canReadWsManifest} to resolve each workspace's access from the pre-fetched manifest without a
    *  second round-trip. */
   const readWsManifests = async (id: string, wsIds: string[]): Promise<Map<string, MemoryRecord>> => {
     const out = new Map<string, MemoryRecord>();
     if (wsIds.length === 0) return out;
+    const reader = workspaceMetaReader(storage, id, config.nodeId);
     const keyOf = (ws: string) => `organism.${id}.w.${ws}.meta.manifest`;
-    const wsOfKey = new Map(wsIds.map(ws => [keyOf(ws), ws]));
-    let recs: MemoryRecord[];
-    if (storage.getMemoryByKeysAnyOwner) {
-      recs = await storage.getMemoryByKeysAnyOwner([...wsOfKey.keys()]);
-    } else {
-      recs = [];
-      for (const ws of wsIds) {
-        const mkey = keyOf(ws);
-        const { items } = await storage.listAllMemory({ prefix: mkey, limit: 10 });
-        const m = items.find(r => r.key === mkey);
-        if (m) recs.push(m);
-      }
-    }
-    for (const r of recs) {
-      const ws = wsOfKey.get(r.key);
-      if (ws) out.set(ws, fresherRec(out.get(ws), r));   // dedupe forked-owner copies → freshest
+    const recs: MemoryRecord[] = storage.getMemoryByKeysAnyOwner ? await storage.getMemoryByKeysAnyOwner(wsIds.map(keyOf)) : [];
+    for (const ws of wsIds) {
+      const m = storage.getMemoryByKeysAnyOwner ? await reader.pick(ws, 'meta.manifest', recs) : await reader.read(ws, 'meta.manifest');
+      if (m) out.set(ws, m);
     }
     return out;
   };
@@ -550,10 +542,9 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
 
   // ── Document-space public sharing (meta.share) ──
 
+  // The copy that counts (services/workspace-meta.ts), so a member's own copy shares nothing.
   const readShareMeta = async (id: string, ws: string): Promise<ResolvedShare> => {
-    const key = `organism.${id}.w.${ws}.meta.share`;
-    const { items } = await storage.listAllMemory({ prefix: key, limit: 10 });
-    const v = (items.find(r => r.key === key)?.value as ShareMeta | undefined) ?? {};
+    const v = ((await readWorkspaceMetaRecord(storage, id, ws, 'meta.share', config.nodeId))?.value as ShareMeta | undefined) ?? {};
     const access: ShareAccess = v.access === 'password' || v.access === 'account' ? v.access : 'open';
     return {
       public: !!v.public, spaces: v.spaces ?? {}, docs: v.docs ?? {},
@@ -599,12 +590,9 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
     return !!share.public;
   };
 
-  /** Read a workspace's manifest value regardless of which member owns it (public path — no auth). */
-  const readWsManifestValue = async (id: string, ws: string): Promise<Record<string, unknown> | null> => {
-    const key = `organism.${id}.w.${ws}.meta.manifest`;
-    const { items } = await storage.listAllMemory({ prefix: key, limit: 10 });
-    return (items.find(r => r.key === key)?.value as Record<string, unknown> | undefined) ?? null;
-  };
+  /** Read a workspace's manifest value, the copy that counts whoever holds it (public path — no auth). */
+  const readWsManifestValue = async (id: string, ws: string): Promise<Record<string, unknown> | null> =>
+    ((await readWorkspaceMetaRecord(storage, id, ws, 'meta.manifest', config.nodeId))?.value as Record<string, unknown> | undefined) ?? null;
 
   /** Collect the PUBLISHED (.latest) document-space pages that the share meta marks public. An optional
    *  filter narrows to one {type,id}. Drafts/versions are never included. */
