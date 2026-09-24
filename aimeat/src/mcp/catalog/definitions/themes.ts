@@ -40,7 +40,7 @@ export const themeTools: AimeatToolDefinition[] = [
         visibility: { publicMcp: true, connectorMcp: true, cliFallback: true },
         input: {
             id: { type: 'string', description: 'The theme to change. Leave it out to make a new one.' },
-            name: { type: 'string', description: 'What people see in the pill. 1 to 60 characters.' },
+            name: { type: 'string', description: 'What people see in the pill. 1 to 60 characters, and no other theme may have it (retired ones included).' },
             basedOn: { type: 'string', description: "For a new theme: the theme it copies (default 'aimeat')." },
             css: { type: 'string', description: 'Theme CSS for the whole theme; empty removes it.' },
             defaultStyle: { type: 'string', description: 'The style a person sees first in this theme.' },

@@ -37,7 +37,7 @@ export function registerThemeTools(mcp: McpServer, registry: AgentRegistry): voi
 
   mcp.tool('aimeat_theme_save', descriptionFor('aimeat_theme_save'), {
     id: z.string().max(40).optional().describe('The theme to change. Leave it out to make a new one.'),
-    name: z.string().max(60).optional().describe('What people see in the pill. 1 to 60 characters.'),
+    name: z.string().max(60).optional().describe('What people see in the pill. 1 to 60 characters, and no other theme may have it (retired ones included).'),
     basedOn: z.string().max(40).optional().describe("For a new theme: the theme it copies (default 'aimeat')."),
     css: z.string().max(64000).optional().describe('Theme CSS for the whole theme; empty removes it.'),
     defaultStyle: z.string().max(40).optional().describe('The style a person sees first in this theme.'),

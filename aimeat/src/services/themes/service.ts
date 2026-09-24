@@ -29,6 +29,8 @@
  * @structure ThemeError · Theme · ThemeInput · ThemeService · themeSnapshot · INNER_PATHS
  * @usage const svc = new ThemeService(config, storage); await svc.offered();
  * @version-history
+ *   v2.1.0 — 2026-09-24 — One name, one theme: a name another theme has (built-in and retired
+ *     included) is refused with 409 NAME_TAKEN, on a new theme and on a rename. setPolicy.
  *   v2.0.0 — 2026-09-24 — The two-level model of 07 (a theme holds styles), component CSS, theme CSS,
  *     versions and restore, warnings instead of refusals, the lifecycle of component CSS.
  *   v1.0.0 — 2026-09-24 — Initial (one level; what it called a theme is a style now).
@@ -279,6 +281,19 @@ export class ThemeService {
         return new Set((await this.listAll()).flatMap((t) => t.styles.map((s) => s.id)));
     }
 
+    /**
+     * One name, one theme (Jouni, 2026-09-24): a name another theme has is refused, the built-in and the
+     * retired ones included, so the list and the look picker never show two themes the same. Compared
+     * without case and outer spaces. `self` is the theme being renamed, which keeps its own name.
+     */
+    private async nameFree(name: string, self?: string): Promise<void> {
+        const want = name.trim().toLowerCase();
+        const other = (await this.listAll()).find((t) => t.id !== self && t.name.trim().toLowerCase() === want);
+        if (other) {
+            throw new ThemeError('NAME_TAKEN', `Another theme is already called "${other.name}"${other.retired ? ' (it is retired)' : ''}. Choose another name.`, 409);
+        }
+    }
+
     private async freeThemeId(name: string): Promise<string> {
         const stem = slug(name, 'theme');
         for (let n = 1; n < 100; n++) {
@@ -306,6 +321,7 @@ export class ThemeService {
         const base = await this.must(input.basedOn || BUILTIN_THEME);
         const name = (input.name ?? `${base.name} copy`).trim();
         if (!name || name.length > 60 || /[<>]/.test(name)) throw new ThemeError('INVALID_THEME', 'name: 1 to 60 characters, no angle brackets', 422);
+        await this.nameFree(name);
         const id = await this.freeThemeId(name);
         const taken = await this.allStyleIds();
         const map = new Map<string, string>();
@@ -337,6 +353,7 @@ export class ThemeService {
         const t = await this.must(id);
         this.editable(t);
         const next = applyInput(t, input);
+        if (input.name !== undefined) await this.nameFree(next.name, t.id);
         next.updatedBy = by;
         next.updatedAt = new Date().toISOString();
         if (!dryRun) await this.write(next, 'updated');
