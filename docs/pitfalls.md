@@ -128,6 +128,7 @@ and its shape. Symptom first in the section too, then cause, then the rule.
 | 93 | "AIMEAT node started" printed, yet the port refuses connections for minutes | 1 |
 | 94 | Every check green, every page "verified", and the pages do not look like the originals | 2 |
 | 95 | A CSS rule in the source that never applied on any page | 1 |
+| 96 | A suite that boots its own node fails in your gate, passes alone | 5 |
 
 ---
 
@@ -1073,3 +1074,13 @@ Two SESSIONS in one checkout is forbidden now (`CLAUDE.md`), so the case below i
 - **The case.** `theme.css` opened with the global reset `*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }`. Its header's version history held the text `.notif-reply*` followed by `/`, which closed the comment early. The rest of the header became part of the reset's selector, the browser dropped the invalid rule without a message, and the site had always been drawn without it. When the rules moved out of `theme.css` on 2026-09-24, the split carried the reset into a sheet of its own, where it would have applied for the first time.
 - **The rule.** A glob or a path pattern in a CSS comment is written without `*/`, and `pnpm check:theme-tokens` refuses a comment closed early in `theme.css`. The reset was deleted, not revived: Jouni ruled on 2026-09-24 to keep it off, because turning it on changes spacing on every page.
 - **The tell.** A move of CSS that changes the look although no declaration changed: look for a comment closed early above the rule that moved.
+
+## 96. A claimed E2E port that a suite names breaks that suite in another session's run
+
+*Symptoms: in one session's gate, a suite that boots its own node (e2e-auth-tarpit, a federation suite) fails with `fetch failed`, or with assertions about a log it never wrote. The same suite passes alone on another port.*
+
+- **The case.** On 2026-09-24 a lead session gave eight fixer agents the E2E ports 40270 to 40277. Every one of them is a port some suite names: e2e-federation-messages (40270, 40271), e2e-presence (40272), e2e-federation-visiting (40273, 40274), e2e-auth-tarpit and e2e-federation-policy (40275, 40276), e2e-federation-nodeinfo (40277). The lead's own gate then ran e2e-auth-tarpit, which boots a node on 40275 while a fixer's test server was listening there: 1 of 9 passed. With `E2E_TARPIT_PORT` on a free port it passed 9 of 9.
+- **Why the runner did not stop it.** `portClashes()` in `test/run-e2e-ci.ts` (§71) compares the runner's port with the suites IN THIS RUN. The fixer's runs never included the tarpit suite, so its port passed; the lead's run included the suite, not the fixer's port. Neither run can see the other session.
+- **Why the advice misled.** CLAUDE.md said to claim "any free port from 40251 up", and the runner's STOP message said nothing is written down above 40650. On this date the suites name about eighty ports between 40250 and 40512, and 40650, 40665, 40672, 40701, 40702 and 40961 above that.
+- **The rule.** Claim a port no suite names: `grep -lE "\b<port>\b" aimeat/test/*.ts` finds nothing. Give a suite that boots its own node its override variable (for example `E2E_TARPIT_PORT`) when a neighbour's server may hold its default.
+- **The tell.** A failure only in a suite that starts its own server, on a machine where other sessions test at the same time.

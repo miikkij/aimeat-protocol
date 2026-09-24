@@ -9,6 +9,9 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   v1.54.1 -- 2026-09-25 -- The port STOP message no longer says nothing is written down above
+ *            40650 (suites name 40665, 40672, 40701, 40702 and 40961); it names the grep that
+ *            answers the question and the cross-session trap (docs/pitfalls.md §96).
  *   v1.54.0 -- 2026-09-24 -- Add e2e-themes.ts to ALL_SUITES: Themes & Styles (a theme, a style,
  *            component CSS, warnings, the operator-only writes). Not in the guard tier.
  *   v1.53.1 -- 2026-09-13 -- Add e2e-memory-discover.ts to ALL_SUITES: the cross-user public read a
@@ -1434,8 +1437,9 @@ async function main() {
   database, and every assertion after that is noise that reads like broken code.
 
   Give the runner a port no suite writes down:  AIMEAT_PORT=<port> pnpm ...
-  Clear ranges: 40500-40599 is this runner's own lanes, 40600-40649 is pnpm sandbox,
-  and above 40650 nothing is written down at all.
+  40500-40599 is this runner's own lanes and 40600-40649 is pnpm sandbox. Any other port is
+  clear only when no test file names it: grep -lE "\\b<port>\\b" test/*.ts finds nothing.
+  A suite in ANOTHER session's run cannot see your port either (docs/pitfalls.md §96).
 `);
             process.exit(1);
         }
