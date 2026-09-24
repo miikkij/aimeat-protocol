@@ -33,11 +33,16 @@
  *   DecisionProvider · ProviderAuth · ProviderLimits · BUILTIN_PROVIDERS · nodeProviders ·
  *   listProviders · getProvider · selectProvider · providerViolations · assertProviderReachable ·
  *   putOwnerProvider · deleteOwnerProvider · readOwnerProviderKey · readProviderChoice ·
- *   writeProviderChoice · providerView
+ *   planProviderChoice · writeProviderChoice · providerView
  * @usage
  *   const { provider, chosenBy } = await selectProvider(storage, config, { ownerGhii, agent, named });
  *   const problems = providerViolations(provider, state, questions);
  * @version-history
+ *   v1.2.1 — 2026-09-24 — A provider id is read once, trimmed and checked (providerIdOf), and the
+ *     taken-id guard, the stored key, the provider's own key and delete all use that one
+ *     (fb2dacf3f593): " typesafe" passed the guard as sent and was stored as the node's "typesafe".
+ *     planProviderChoice checks a choice without writing it, so the settings door can check every
+ *     field before it writes any (273435328c90).
  *   v1.2.0 — 2026-09-23 — The operator's egress list (AIMEAT_DECIDE_PROVIDER_EGRESS): the node's own
  *     providers at a listed origin are reached without AIMEAT_ALLOW_PRIVATE_EGRESS, and a listed
  *     origin that is not loopback (a container name) may still be `local`. An owner's provider never
@@ -109,6 +114,7 @@ export interface DecisionProvider {
 }
 
 const PROVIDER_ID_RE = /^[a-z0-9][a-z0-9-]{1,62}$/;
+const ID_PROBLEM = "id: lower-case letters, digits and '-', 2 to 63 characters.";
 const MODEL_RE = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/;
 const ENV_RE = /^[A-Z][A-Z0-9_]{1,63}$/;
 export const PROVIDER_PREFIX = 'decide.providers.';
@@ -209,6 +215,17 @@ export function providerAllowOrigins(provider: DecisionProvider, config: AimeatC
 }
 
 /**
+ * A provider id as every door reads it: trimmed, then held to PROVIDER_ID_RE, or null. ONE reading
+ * for the record, the taken-id guard, the key it is stored under and delete (invariant 13): the
+ * guard once read the path id as sent while the record held it trimmed, so " typesafe" passed the
+ * guard and was stored as an owner provider under the node's own id, where delete never found it.
+ */
+function providerIdOf(raw: unknown): string | null {
+  const id = typeof raw === 'string' ? raw.trim() : '';
+  return PROVIDER_ID_RE.test(id) ? id : null;
+}
+
+/**
  * Read one provider record from untrusted input: the operator's JSON or an owner's request body.
  * Returns the record or the list of what is wrong with it. `allowEnv` is the operator's privilege:
  * an owner naming a variable of this node would have the node send its secret to the owner's address.
@@ -219,8 +236,8 @@ export function parseProvider(
 ): { provider: DecisionProvider; problems: [] } | { provider: null; problems: string[] } {
   const problems: string[] = [];
   if (!isObj(raw)) return { provider: null, problems: ['A provider is an object.'] };
-  const id = typeof raw.id === 'string' ? raw.id.trim() : '';
-  if (!PROVIDER_ID_RE.test(id)) problems.push("id: lower-case letters, digits and '-', 2 to 63 characters.");
+  const id = providerIdOf(raw.id) ?? '';
+  if (!id) problems.push(ID_PROBLEM);
   const title = typeof raw.title === 'string' && raw.title.trim() ? raw.title.trim().slice(0, 80) : id;
   const kind = raw.kind === 'local' ? 'local' : raw.kind === 'hosted' ? 'hosted' : null;
   if (!kind) problems.push("kind: 'hosted' or 'local'.");
@@ -379,10 +396,11 @@ export async function readProviderChoice(storage: Storage, ownerGhii: string): P
 }
 
 /**
- * The owner sets their default, or one agent's provider. `null` removes the choice. Every id named
- * must be a provider this owner can use now, so a choice never points at nothing.
+ * The choice the owner's input would leave, checked and not written, or the refusal. Every id named
+ * must be a provider this owner can use now, so a choice never points at nothing. The settings door
+ * asks this before it writes anything (settings.ts writeDecideSettings).
  */
-export async function writeProviderChoice(
+export async function planProviderChoice(
   storage: Storage, config: AimeatConfig, ownerGhii: string, input: { default?: unknown; agents?: unknown },
 ): Promise<ProviderChoice> {
   const current = await readProviderChoice(storage, ownerGhii);
@@ -404,6 +422,14 @@ export async function writeProviderChoice(
       if (v === null) delete next.agents[agent]; else next.agents[agent] = v;
     }
   }
+  return next;
+}
+
+/** The owner sets their default, or one agent's provider. `null` removes the choice. Checked first (planProviderChoice). */
+export async function writeProviderChoice(
+  storage: Storage, config: AimeatConfig, ownerGhii: string, input: { default?: unknown; agents?: unknown },
+): Promise<ProviderChoice> {
+  const next = await planProviderChoice(storage, config, ownerGhii, input);
   await upsertPrivateRecord(storage, ownerGhii, PROVIDER_CHOICE_RECORD, { ...next, updatedAt: new Date().toISOString() }, ['decide', 'provider']);
   emitChange('ai-decisions', ownerGhii);
   return next;
@@ -502,8 +528,11 @@ export async function readOwnerProviderKey(storage: Storage, config: AimeatConfi
  * name always means one address. `api_key` is stored encrypted beside it and never read back.
  */
 export async function putOwnerProvider(
-  storage: Storage, config: AimeatConfig, ownerGhii: string, id: string, body: unknown,
+  storage: Storage, config: AimeatConfig, ownerGhii: string, rawId: string, body: unknown,
 ): Promise<DecisionProvider> {
+  // The id is read once, here, and every line below sees that one (providerIdOf).
+  const id = providerIdOf(rawId);
+  if (!id) throw new DecideError('INVALID_PROVIDER', 400, ID_PROBLEM, { problems: [ID_PROBLEM] });
   const raw = isObj(body) ? { ...body, id } : body;
   const p = parseProvider(raw, 'owner', { allowEnv: false });
   if (!p.provider) throw new DecideError('INVALID_PROVIDER', 400, p.problems.join(' '), { problems: p.problems });
@@ -538,8 +567,9 @@ export async function putOwnerProvider(
 }
 
 /** Remove an owner's provider and its key. A choice that named it is cleared with it. */
-export async function deleteOwnerProvider(storage: Storage, config: AimeatConfig, ownerGhii: string, id: string): Promise<boolean> {
-  if (!PROVIDER_ID_RE.test(id) || !(await storage.getMemory(ownerGhii, `${PROVIDER_PREFIX}${id}`))) return false;
+export async function deleteOwnerProvider(storage: Storage, config: AimeatConfig, ownerGhii: string, rawId: string): Promise<boolean> {
+  const id = providerIdOf(rawId);
+  if (!id || !(await storage.getMemory(ownerGhii, `${PROVIDER_PREFIX}${id}`))) return false;
   await storage.deleteMemory(ownerGhii, `${PROVIDER_PREFIX}${id}`);
   if (await storage.getMemory(ownerGhii, `${PROVIDER_KEY_PREFIX}${id}`)) await storage.deleteMemory(ownerGhii, `${PROVIDER_KEY_PREFIX}${id}`);
   const choice = await readProviderChoice(storage, ownerGhii);

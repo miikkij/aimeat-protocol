@@ -24,6 +24,10 @@
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-ai-decide.ts
  *   cd aimeat && pnpm exec node --env-file=.env.test.postgres-kysely --import tsx test/e2e-ai-decide.ts
  * @version-history
+ *   v1.6.0 — 2026-09-24 — 4f: a settings call refused for its policy, its class or its provider
+ *     stores neither the key nor the choice (273435328c90). 11a2: a provider id is trimmed once, so a
+ *     space before a node's id is the node's id, and a padded id of your own is deleted by its id
+ *     (fb2dacf3f593). Both failed on the old code first.
  *   v1.5.0 — 2026-09-23 — Phase 12: with private egress off, the operator's listed local model
  *     answers; an unlisted origin and an owner's provider at the listed address are refused unsent.
  *   v1.4.1 — 2026-09-23 — 11e: the refusal names the provider as the page does, and carries the
@@ -491,6 +495,23 @@ const QUESTIONS = {
     assert(d.status === 200 && d.body.data.has_own_key === false, 'the key is forgotten');
   });
 
+  // 273435328c90: the door stored the key and the provider choice, and only THEN read the policy,
+  // so a request refused for its policy had already replaced the owner's key.
+  await test('4f. a refused settings call stores nothing: every field is checked before any is written', async () => {
+    const put = (body: unknown) => json('/v1/ai/decide/settings', { method: 'PUT', headers: auth(A.token), body: JSON.stringify(body) });
+    const before = await json('/v1/ai/decide/settings', { headers: auth(A.token) });
+    assert(before.body.data?.has_own_key === false, 'no key to start from');
+    const notObject = await put({ api_key: OWN_KEY, agent_providers: { deciderbot: 'typesafe' }, policy: 'not-an-object' });
+    assert(notObject.status === 400 && notObject.body.error?.code === 'INVALID_BODY', `a policy that is not an object is refused, got ${notObject.status} ${notObject.body.error?.code}`);
+    const unknownClass = await put({ api_key: OWN_KEY, policy: { allow: ['no-such-class'] } });
+    assert(unknownClass.status === 400 && unknownClass.body.error?.code === 'INVALID_BODY', `a class nobody knows is refused, got ${unknownClass.status} ${unknownClass.body.error?.code}`);
+    const unknownProvider = await put({ api_key: OWN_KEY, provider: 'no-such' });
+    assert(unknownProvider.status === 400 && unknownProvider.body.error?.code === 'UNKNOWN_PROVIDER', `a provider nobody has is refused, got ${unknownProvider.status} ${unknownProvider.body.error?.code}`);
+    const after = await json('/v1/ai/decide/settings', { headers: auth(A.token) });
+    assert(after.body.data?.has_own_key === false, 'no refused call stored the key');
+    assert(Object.keys(after.body.data?.providers?.agents ?? {}).length === 0, `no refused call stored a provider choice, got ${JSON.stringify(after.body.data?.providers?.agents)}`);
+  });
+
   console.log('\nPhase 5: one decision over many records');
 
   await test('5a. a run over three items finishes and records each', async () => {
@@ -838,6 +859,21 @@ const QUESTIONS = {
     assert(taken.status === 409 && taken.body.error?.code === 'PROVIDER_ID_TAKEN', `a node provider's id is refused, got ${taken.status}`);
     const other = await json('/v1/ai/decide/providers', { headers: auth(B.token) });
     assert(!(other.body.data?.providers ?? []).some((p: any) => p.id === 'mine-local'), 'another owner does not see it');
+  });
+
+  // fb2dacf3f593: the taken-id guard read the path id as sent and the record stored it trimmed, so
+  // " typesafe" passed the guard and became an owner provider under the node's own id, which the
+  // delete door (reading the id as sent) could never find again.
+  await test('11a2. a provider id is read once, trimmed, by the guard, the record and delete alike', async () => {
+    const padded = await putProvider('%20typesafe', LOCAL);
+    assert(padded.status === 409 && padded.body.error?.code === 'PROVIDER_ID_TAKEN', `a node id with a space before it is the node's id, got ${padded.status} ${padded.body.error?.code}`);
+    const mine = await putProvider('%20mine-padded', LOCAL);
+    assert(mine.status === 200 && mine.body.data.provider.id === 'mine-padded', `got ${mine.status} ${JSON.stringify(mine.body.error)}`);
+    const del = await json('/v1/ai/decide/providers/mine-padded', { method: 'DELETE', headers: auth(A.token) });
+    assert(del.status === 200, `delete finds it under the id it answers to, got ${del.status}`);
+    const list = await json('/v1/ai/decide/providers', { headers: auth(A.token) });
+    const rows = (list.body.data?.providers ?? []).filter((p: any) => p.id === 'typesafe' || p.id === 'mine-padded');
+    assert(rows.length === 1 && rows[0].source === 'node', `one typesafe, the node's, and no mine-padded, got ${JSON.stringify(rows.map((p: any) => `${p.id}/${p.source}`))}`);
   });
 
   await test('11b. an agent or an app cannot write one, by the provider door or the memory door', async () => {

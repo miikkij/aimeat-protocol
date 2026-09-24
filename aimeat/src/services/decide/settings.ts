@@ -19,11 +19,14 @@
  *   key), and no read in this file returns it: `hasOwnKey` is a boolean.
  * @structure
  *   DecidePolicy · readDecidePolicy · writeDecidePolicy · readOwnDecideKey · writeOwnDecideKey ·
- *   clearOwnDecideKey · decideSettingsView
+ *   writeDecideSettings · clearOwnDecideKey · decideSettingsView
  * @usage
  *   const policy = await readDecidePolicy(storage, gaii);
  *   const own = await readOwnDecideKey(storage, config, gaii); // string | null, never logged
  * @version-history
+ *   v1.3.0 — 2026-09-24 — writeDecideSettings is the settings door's one write, and it checks the
+ *     key, the provider choice and the policy before it writes any of them (273435328c90): the door
+ *     stored the key and the choice first, so a request refused for its policy left the key replaced.
  *   v1.2.0 — 2026-09-23 — The view carries the decision providers and who chose which; a provider
  *     that takes no key makes the model available without anyone's key.
  *   v1.1.0 — 2026-09-20 — The view carries `setup_order`, and for an agent caller what the owner set
@@ -40,7 +43,7 @@ import { DecideError } from './errors.js';
 import { agentAiView } from '../agent-ai-keys.js';
 import { gateSettingOf, type GateSetting } from './gate.js';
 import { DECIDE_SETUP_ORDER, type SetupStep } from './setup-order.js';
-import { providersView, selectProvider } from './providers.js';
+import { planProviderChoice, providersView, selectProvider, writeProviderChoice } from './providers.js';
 import { logger } from '../../utils/logger.js';
 
 export const DECIDE_KEY_RECORD = 'decide.apikey';
@@ -85,26 +88,31 @@ export async function readDecidePolicy(storage: Storage, gaii: string): Promise<
   return normalisePolicy(rec?.value);
 }
 
+type PolicyInput = { allow?: unknown; storeState?: unknown; allowPublicOptOut?: unknown };
+
 /**
- * Write the policy. Validates rather than filters: an unknown class is a typo the owner should hear
- * about, not a line silently dropped from the thing that decides what leaves their node.
+ * Check a policy input without writing it, or refuse. Validates rather than filters: an unknown
+ * class is a typo the owner should hear about, not a line silently dropped from the thing that
+ * decides what leaves their node.
  */
-export async function writeDecidePolicy(
-  storage: Storage, gaii: string, input: { allow?: unknown; storeState?: unknown; allowPublicOptOut?: unknown },
-): Promise<DecidePolicy> {
-  const current = await readDecidePolicy(storage, gaii);
-  let allow = current.allow;
+function checkDecidePolicy(input: PolicyInput): void {
   if (input.allow !== undefined) {
     if (!Array.isArray(input.allow) || input.allow.some(c => typeof c !== 'string' || !(PII_CLASSES as readonly string[]).includes(c))) {
       throw new DecideError('INVALID_BODY', 400, `allow must be a list drawn from: ${PII_CLASSES.join(', ')}.`);
     }
-    allow = [...new Set(input.allow as PiiClass[])];
   }
   for (const f of ['storeState', 'allowPublicOptOut'] as const) {
     if (input[f] !== undefined && typeof input[f] !== 'boolean') {
       throw new DecideError('INVALID_BODY', 400, `${f} must be true or false.`);
     }
   }
+}
+
+/** Write the policy, checked first (checkDecidePolicy). */
+export async function writeDecidePolicy(storage: Storage, gaii: string, input: PolicyInput): Promise<DecidePolicy> {
+  checkDecidePolicy(input);
+  const current = await readDecidePolicy(storage, gaii);
+  const allow = input.allow !== undefined ? [...new Set(input.allow as PiiClass[])] : current.allow;
   const next: DecidePolicy = {
     allow,
     storeState: typeof input.storeState === 'boolean' ? input.storeState : current.storeState,
@@ -128,7 +136,8 @@ export async function readOwnDecideKey(storage: Storage, config: AimeatConfig, g
   return decrypt(encrypted, encKey);
 }
 
-export async function writeOwnDecideKey(storage: Storage, config: AimeatConfig, gaii: string, apiKey: unknown): Promise<void> {
+/** The key as it would be stored and the node key that would encrypt it, checked, or the refusal. */
+function checkOwnDecideKey(config: AimeatConfig, apiKey: unknown): { key: string; encKey: Buffer } {
   if (typeof apiKey !== 'string' || apiKey.trim().length < 8 || apiKey.length > 512 || /\s/.test(apiKey.trim())) {
     throw new DecideError('INVALID_BODY', 400, 'api_key must be the TypeSafe key as issued: one token, no spaces.');
   }
@@ -137,8 +146,48 @@ export async function writeOwnDecideKey(storage: Storage, config: AimeatConfig, 
     throw new DecideError('ENCRYPTION_NOT_CONFIGURED', 503,
       'Encryption key not configured. Set AIMEAT_ENCRYPTION_KEY or AIMEAT_TOTP_ENCRYPTION_KEY.');
   }
+  return { key: apiKey.trim(), encKey };
+}
+
+export async function writeOwnDecideKey(storage: Storage, config: AimeatConfig, gaii: string, apiKey: unknown): Promise<void> {
+  const { key, encKey } = checkOwnDecideKey(config, apiKey);
   await upsert(storage, gaii, DECIDE_KEY_RECORD,
-    { encrypted: encrypt(apiKey.trim(), encKey), set_at: new Date().toISOString() }, ['decide', 'secret']);
+    { encrypted: encrypt(key, encKey), set_at: new Date().toISOString() }, ['decide', 'secret']);
+}
+
+/**
+ * The settings door's one write: the owner's own key, their provider choice and their data policy,
+ * any of them. EVERY FIELD IS CHECKED BEFORE ANY IS WRITTEN (invariant 14, 273435328c90): the door
+ * stored the key and the choice and only then read the policy, so a request refused for its policy
+ * had already replaced the owner's key.
+ *
+ * The choice is written first of the three, because it is the one write that reads the store again
+ * (the providers this owner can use) and so the one that could still refuse.
+ */
+export async function writeDecideSettings(storage: Storage, config: AimeatConfig, gaii: string, body: Record<string, unknown>): Promise<void> {
+  let policy: PolicyInput | undefined;
+  if (body.policy !== undefined) {
+    const p = body.policy;
+    if (!p || typeof p !== 'object' || Array.isArray(p)) {
+      throw new DecideError('INVALID_BODY', 400, 'policy must be an object: { allow, store_state, allow_public_opt_out }.');
+    }
+    const o = p as Record<string, unknown>;
+    policy = { allow: o.allow, storeState: o.store_state, allowPublicOptOut: o.allow_public_opt_out };
+    checkDecidePolicy(policy);
+  }
+  if (body.api_key !== undefined) checkOwnDecideKey(config, body.api_key);
+  // The owner's default provider and the one each agent uses. `null` gives the choice back.
+  const choice = body.provider !== undefined || body.agent_providers !== undefined
+    ? {
+      ...(body.provider !== undefined ? { default: body.provider } : {}),
+      ...(body.agent_providers !== undefined ? { agents: body.agent_providers } : {}),
+    }
+    : undefined;
+  if (choice) await planProviderChoice(storage, config, gaii, choice);
+
+  if (choice) await writeProviderChoice(storage, config, gaii, choice);
+  if (body.api_key !== undefined) await writeOwnDecideKey(storage, config, gaii, body.api_key);
+  if (policy) await writeDecidePolicy(storage, gaii, policy);
 }
 
 export async function clearOwnDecideKey(storage: Storage, gaii: string): Promise<boolean> {
