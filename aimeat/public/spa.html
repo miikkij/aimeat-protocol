@@ -758,6 +758,7 @@
     import { loadMarginPattern } from '/js/margin-pattern.js';
     import { loadThemeChoice, watchThemeChoice } from '/js/theme-choice.js';
     import { NotificationBell, openNotificationLink } from '/components/NotificationBell.js';
+    import { isRunnableActionEndpoint } from '/js/services/notifications.js';
     import { OpenItemsButton } from '/components/OpenItemsButton.js';
     import { useSession } from '/js/use-session.js';
     import { CommandPalette } from '/views/command-palette.js';
@@ -930,8 +931,10 @@
       //   - 'aimeat-notification-click': the notification's target URL → deep-link it in place.
       //   - 'aimeat-notification-action': an action button was pressed. A lock screen can't hold the
       //     JWT, so the SW hands the action here to run with the owner's session. An 'api' action
-      //     (approve/deny/accept/decline) executes directly; 'reply'/'navigate' just deep-link so the
-      //     owner completes it in the SPA (a reply needs text we can't compose from a button).
+      //     (approve/deny/accept/decline) executes directly, and only when it calls a door of this
+      //     node's own API (isRunnableActionEndpoint, the rule the bell and the page ask too);
+      //     'reply'/'navigate' just deep-link so the owner completes it in the SPA (a reply needs
+      //     text we can't compose from a button).
       useEffect(() => {
         if (!('serviceWorker' in navigator)) return undefined;
         const onSwMessage = async (e) => {
@@ -940,7 +943,7 @@
           if (d.type === 'aimeat-notification-click' && d.url) { openNotificationLink(d.url, navigate); return; }
           if (d.type === 'aimeat-notification-action' && d.action) {
             const a = d.action;
-            if (a.kind === 'api' && a.endpoint) {
+            if (a.kind === 'api' && isRunnableActionEndpoint(a.endpoint)) {
               try {
                 const jwt = window.AIMEAT?.auth?.getSession?.()?.jwt;
                 if (jwt) {

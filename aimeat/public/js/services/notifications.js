@@ -6,9 +6,12 @@
  *   decided about it (/settings), who may notify them (/senders), their push devices
  *   (/v1/push/subscriptions) and the browser side of push (subscribe, unsubscribe, test). Also
  *   the words: a notification's title and body in the reader's language when the record carries
- *   an i18n key, and the sender's name and kind.
+ *   an i18n key, and the sender's name and kind. And the one rule for which notification button
+ *   the page may run with the owner's session (isRunnableActionEndpoint).
  * @usage import * as notif from '/js/services/notifications.js';
  * @version-history
+ *   v1.1.0 — 2026-09-25 — isRunnableActionEndpoint: the bell, the Notifications page and a push
+ *     click run an `api` button only when it calls a door of this node's own API.
  *   v1.0.0 — 2026-08-30 — Initial (design canvas "AIMEAT Ilmoitusten sivu", direction A).
  */
 import { apiGet, apiPost, apiPut, apiDelete } from '/js/api.js';
@@ -80,6 +83,28 @@ export async function unsubscribeThisBrowser() {
     if (sub) { endpoint = sub.endpoint; await sub.unsubscribe(); }
   } catch (err) { swallowed('notifications: unsubscribe', err); }
   return endpoint ? removeDevice(endpoint) : apiDelete('/v1/push/subscribe');
+}
+
+/* ── The buttons ───────────────────────────────────────────────────────────────────────────── */
+/**
+ * May the page run this `api` button with the owner's session? Only when its endpoint is a door of
+ * this node's own API: a path of this node (one leading slash, no backslash, no control character),
+ * at most 500 characters, under /v1/, and still on this origin and under /v1/ once the browser has
+ * resolved it ('/v1/../spa.html' is a page, not the API). The node applies the same rule before it
+ * stores or serves a button (src/services/notify.ts isSafeNotifActionEndpoint); this is the page's
+ * half, asked by the bell, the Notifications page and a push click before each one runs.
+ * @param {unknown} endpoint
+ * @returns {boolean}
+ */
+export function isRunnableActionEndpoint(endpoint) {
+  if (typeof endpoint !== 'string' || endpoint.length > 500 || !endpoint.startsWith('/v1/')) return false;
+  for (let i = 0; i < endpoint.length; i++) {
+    const c = endpoint.charCodeAt(i);
+    // 0x5C is the backslash; below 0x20, and 0x7F, are the control characters.
+    if (c === 0x5c || c < 0x20 || c === 0x7f) return false;
+  }
+  const url = new URL(endpoint, window.location.href);
+  return url.origin === window.location.origin && url.pathname.startsWith('/v1/');
 }
 
 /* ── The words ─────────────────────────────────────────────────────────────────────────────── */

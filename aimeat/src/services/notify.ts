@@ -18,8 +18,11 @@
  *   - NotifAction — an inline action a notification carries (reply | api | navigate), rendered as a
  *     button in the header bell. SECURITY: 'reply'/'api' actions execute with the RECIPIENT's own
  *     authority when they click, so they may ONLY be set by trusted server-side emit code — never
- *     derived from a principal's input. The public POST /v1/notifications route rejects them.
- *   - isSafeNotifActionEndpoint(path) — same-node-path guard shared with the route.
+ *     derived from a principal's input. The public POST /v1/notifications route rejects them, and no
+ *     memory door writes a `notif.` record at all (utils/reserved-keys.ts SERVER_WRITTEN_KEY_PREFIXES).
+ *   - isSafeNotifActionEndpoint(path) — where an `api` button may point: a door of this node's API
+ *   - servableNotifActions(actions, where) — the buttons a page may be handed; notify() stores only
+ *     these and GET /v1/notifications serves only these
  * @usage import { notify } from '../services/notify.js';
  *   await notify(storage, `${creatorOwner}@${nodeId}`, { type: 'workspace_access_request', title, link });
  * @version-history
@@ -39,6 +42,10 @@
  *     lingering in the header bell. Called from POST /v1/messages/conversations/:id/read.
  *   v1.5.0 -- 2026-09-24 -- isSafeNotifActionEndpoint asks isSameOriginPath, so `/\host`, which a
  *     browser reads as `//host`, is not a path of this node here either.
+ *   v1.6.0 -- 2026-09-25 -- An `api` button calls a door of this node's own API or it is not kept.
+ *     isSafeNotifActionEndpoint had no caller; it now also asks for /v1/ as the browser resolves it,
+ *     and servableNotifActions applies it: notify() stores and pushes only such buttons, and
+ *     GET /v1/notifications serves only such buttons from whatever is stored.
  */
 import { randomUUID } from 'node:crypto';
 import type { Storage } from '../storage/interface.js';
@@ -68,9 +75,49 @@ export type NotifAction =
   | { id: string; label: string; kind: 'reply'; to: string; conversationId?: string; subject?: string; replyTo?: string; style?: NotifActionStyle }
   | { id: string; label: string; kind: 'api'; method: 'POST' | 'PATCH' | 'DELETE'; endpoint: string; body?: Record<string, unknown>; confirm?: boolean; style?: NotifActionStyle };
 
-/** Same-node path guard for an action endpoint/link: a path of this node, never '//host' or a URL. */
+/** Where the node's own API lives. Every `api` button the node emits calls a door under it. */
+const NODE_API_ROOT = '/v1/';
+
+/**
+ * Where an `api` button may point: a door of this node's own API. The owner's browser runs the button
+ * with the owner's own session, so this is the one rule, asked by notify() before it stores a button,
+ * by GET /v1/notifications before it serves one, and, in the same words, by the page before it runs one
+ * (public/js/services/notifications.js isRunnableActionEndpoint).
+ *
+ * A path of this node as a browser reads one (isSameOriginPath: not '//host', not '/\host', no control
+ * character), at most 500 characters, under /v1/, and still under /v1/ once the browser has resolved
+ * its dot segments: '/v1/../spa.html' and '/v1/%2e%2e/x' are other pages of this node, not its API.
+ */
 export function isSafeNotifActionEndpoint(path: unknown): path is string {
-  return isSameOriginPath(path) && path.length <= 500;
+  if (!isSameOriginPath(path) || path.length > 500 || !path.startsWith(NODE_API_ROOT)) return false;
+  // The origin is a placeholder: only the path the browser would request is read back.
+  return new URL(path, 'http://node.invalid').pathname.startsWith(NODE_API_ROOT);
+}
+
+/** The kinds of button the page knows. Anything else is run by the bell as an `api` button. */
+const ACTION_KINDS = new Set(['navigate', 'reply', 'api']);
+
+/**
+ * The buttons of a notification the node may hand to a page: a link, a reply box, and an `api` button
+ * whose endpoint passes isSafeNotifActionEndpoint. Any other button is dropped and logged: one of an
+ * unknown kind too, because the bell runs every button that is not a reply or a link as an `api` one.
+ * `where` names the record in the log line.
+ */
+export function servableNotifActions(actions: unknown, where: { recipient: string; notif?: string }): NotifAction[] {
+  if (!Array.isArray(actions)) return [];
+  const kept: NotifAction[] = [];
+  for (const raw of actions) {
+    const a = (raw && typeof raw === 'object' ? raw : {}) as Partial<NotifAction> & { endpoint?: unknown };
+    if (ACTION_KINDS.has(a.kind as string) && (a.kind !== 'api' || isSafeNotifActionEndpoint(a.endpoint))) {
+      kept.push(raw as NotifAction);
+      continue;
+    }
+    logger.warn('notifications: a button that does not call a door of this node was dropped', {
+      recipient: where.recipient, notif: where.notif, action: typeof a.id === 'string' ? a.id : null,
+      kind: typeof a.kind === 'string' ? a.kind : null, endpoint: String(a.endpoint ?? '').slice(0, 200),
+    });
+  }
+  return kept;
 }
 
 /** Wired once at boot (routes-loader) so every notify() call can also fire a web push. */
@@ -168,7 +215,9 @@ export async function notify(storage: Storage, recipientGhii: string, input: Not
     }
     const id = randomUUID();
     const now = new Date().toISOString();
-    const actions = Array.isArray(input.actions) ? input.actions.slice(0, MAX_NOTIF_ACTIONS) : [];
+    // The same rule the route serves by, applied before anything is stored or pushed: a button the
+    // page would refuse to run is never written, and never rides a push to the lock screen.
+    const actions = servableNotifActions(input.actions, { recipient: recipientGhii, notif: id }).slice(0, MAX_NOTIF_ACTIONS);
     const wantPush = !!pushService?.enabled && prefs.push;
     const quiet = wantPush && quietState(settings, input.type).quiet;
     result.held = quiet;

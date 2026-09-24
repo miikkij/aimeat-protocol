@@ -43,6 +43,8 @@
  *   cd aimeat && pnpm check:trusted-keys:seed       # merge today's reads into the exemption file
  *   ... --root <dir>                                # scan a fixture tree instead of this one
  * @version-history
+ *   v2.1.1 — 2026-09-25 — The summary line lists the prefixes only the node writes (`notif.`) beside
+ *     the keys; the three `notif.` exemptions are gone, because every memory door now refuses the key.
  *   v2.1.0 — 2026-09-24 — "Covered by the denylist" asks isReservedServerKey, so a key only the node
  *     writes (SERVER_WRITTEN_KEYS, refused on every memory door to every principal) counts as covered.
  *   v2.0.0 — 2026-08-14 — The gate finds the keys the audit found by hand. Each change has its own
@@ -61,7 +63,7 @@
 import { readFileSync, writeFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { RESERVED_OWNER_KEY_PREFIXES, SERVER_WRITTEN_KEYS, isReservedServerKey } from '../src/utils/reserved-keys.js';
+import { RESERVED_OWNER_KEY_PREFIXES, SERVER_WRITTEN_KEYS, SERVER_WRITTEN_KEY_PREFIXES, isReservedServerKey } from '../src/utils/reserved-keys.js';
 
 /**
  * The tree to scan: the working directory, which `pnpm check:trusted-keys` sets to the package, or
@@ -568,7 +570,7 @@ export function main(): void {
     console.log('  ' + '─'.repeat(62));
     console.log(`  reads outside the guard   ${String(findings.length).padStart(4)}   (${distinct.size} distinct keys)`);
     console.log(`  found via a constant      ${String(viaConstant).padStart(4)}   (invisible to a literal-only scan)`);
-    console.log(`  covered by the denylist   ${String(reserved).padStart(4)}   ${[...RESERVED_OWNER_KEY_PREFIXES, ...SERVER_WRITTEN_KEYS].join(' ')}`);
+    console.log(`  covered by the denylist   ${String(reserved).padStart(4)}   ${[...RESERVED_OWNER_KEY_PREFIXES, ...SERVER_WRITTEN_KEYS, ...SERVER_WRITTEN_KEY_PREFIXES].join(' ')}`);
     console.log(`  under a system identity   ${String(systemIdentity).padStart(4)}   (out of reach of an owner-scoped token)`);
     console.log(`  key not resolvable        ${String(unresolved).padStart(4)}   (built from runtime values, not judged)`);
     console.log(`  exempt, reason written    ${String(known.size - unreviewed.length - reasonless.length).padStart(4)}`);

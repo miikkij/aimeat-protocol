@@ -21,6 +21,8 @@
  *   - appMayWriteKey: owner passes, app refused, delegated agent refused, reserved grant passes
  * @usage cd aimeat && pnpm exec vitest run test/unit/reserved-keys.test.ts
  * @version-history
+ *   v1.x — 2026-09-25 — `notif.`, the first PREFIX only the node writes: a notification's buttons run
+ *     with the owner's session, so no principal writes one, and its neighbours are untouched.
  *   v1.x — 2026-09-24 — `__redirect__`, the first key only the node writes: exact, and reserved.
  *   v1.x — 2026-09-19 — `decide.` is the fourteenth: the owner's TypeSafe key and scrubber policy.
  *   v1.x — 2026-09-13 — `messages.organize.` is the thirteenth: the owner's archive and rules for the
@@ -40,7 +42,7 @@
 import { describe, it, expect } from 'vitest';
 import {
     RESERVED_OWNER_KEY_PREFIXES, isReservedServerKey, appMayWriteKey,
-    SERVER_WRITTEN_KEYS, isServerWrittenKey, serverWrittenKeyRefusal,
+    SERVER_WRITTEN_KEYS, SERVER_WRITTEN_KEY_PREFIXES, isServerWrittenKey, serverWrittenKeyRefusal,
 } from '../../src/utils/reserved-keys.js';
 
 /** The two records the August 2026 audit found unprotected, by their real production key names. */
@@ -139,6 +141,36 @@ describe('a key only the node writes', () => {
         const refusal = serverWrittenKeyRefusal('__redirect__');
         expect(refusal.code).toBe('RESERVED_KEY');
         expect(refusal.message).toContain('__redirect__');
+    });
+});
+
+describe('a notification is a record only the node writes', () => {
+    // The owner's browser runs a notification's `api` button with the owner's own session, so the
+    // writer of the record chooses the door the owner's next click calls. notify() is the one writer.
+    it('`notif.` is a prefix of keys only the node writes, and every key under it is reserved', () => {
+        expect([...SERVER_WRITTEN_KEY_PREFIXES]).toEqual(['notif.']);
+        for (const key of ['notif.2026-09-25T10:00:00.000Z.1a2b3c4d', 'notif.x']) {
+            expect(isServerWrittenKey(key), key).toBe(true);
+            expect(isReservedServerKey(key), key).toBe(true);
+            expect(appMayWriteKey(['app'], key), key).toBe(false);
+            expect(appMayWriteKey(['agent'], key, true), key).toBe(false);
+        }
+    });
+
+    it('its neighbours stay what they were', () => {
+        // The owner's notification settings are reserved as the owner's to set, not the node's alone.
+        expect(isServerWrittenKey('notifications.settings')).toBe(false);
+        expect(isReservedServerKey('notifications.settings')).toBe(true);
+        for (const key of ['notif', 'notify.me', 'my.notif.x', 'notifs.draft']) {
+            expect(isServerWrittenKey(key), key).toBe(false);
+        }
+    });
+
+    it('the refusal names the door that does send one', () => {
+        const refusal = serverWrittenKeyRefusal('notif.x');
+        expect(refusal.code).toBe('RESERVED_KEY');
+        expect(refusal.message).toContain('notif.x');
+        expect(refusal.message).toContain('POST /v1/notifications');
     });
 });
 

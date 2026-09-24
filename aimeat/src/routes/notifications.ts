@@ -17,6 +17,9 @@
  *   - DELETE /v1/notifications          — clear notifications (all, or a given { ids }) — the bell's "Clear all"
  * @usage app.use(notificationsRouter(config, storage));
  * @version-history
+ *   v1.7.0 -- 2026-09-25 -- GET serves a row's buttons only when the page may run them: an `api`
+ *     button whose endpoint is not a door of this node's API, or a button of a kind the page does not
+ *     know, is dropped from the answer and logged (services/notify.ts servableNotifActions).
  *   v1.6.0 -- 2026-09-13 -- The settings and senders doors answer 503 SETTINGS_UNAVAILABLE when the
  *     record cannot be read, instead of defaults the page would have saved over the owner's real
  *     settings; PUT writes through updateNotificationSettings, which keeps the digest bookmark from
@@ -41,7 +44,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { requireAuth, requireScope, requireRole } from '../auth/middleware.js';
-import { NOTIF_PREFIX, type NotifAction } from '../services/notify.js';
+import { NOTIF_PREFIX, servableNotifActions, type NotifAction } from '../services/notify.js';
 import { emitChange } from '../services/event-bus.js';
 import { createPrincipalNotification, NotificationCreateError } from '../services/notification-create.js';
 import {
@@ -76,8 +79,11 @@ export function notificationsRouter(config: AimeatConfig, storage: Storage): Rou
       .filter(v => v && typeof v === 'object' && v.id)
       .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
       // Who sent it and which group it belongs to travel with every row, derived for the rows
-      // written before the source did, so the page and the bell never have to guess.
-      .map(v => ({ ...v, source: sourceOf(v), group: groupOfType(v.type) }));
+      // written before the source did, so the page and the bell never have to guess. The buttons
+      // travel only when the page may run them: the owner's browser runs an `api` button with the
+      // owner's own session, so one that does not call a door of this node is dropped and logged,
+      // whatever wrote the record and whenever (services/notify.ts servableNotifActions).
+      .map(v => ({ ...v, actions: servableNotifActions(v.actions, { recipient: ghii, notif: v.id }), source: sourceOf(v), group: groupOfType(v.type) }));
     const unread = mine.filter(n => !n.read).length;
     const onlyUnread = req.query.unread === '1' || req.query.unread === 'true';
     const limit = Math.min(200, Math.max(1, Number(req.query.limit) || 50));

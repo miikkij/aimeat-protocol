@@ -6746,6 +6746,7 @@
   "notifpage.action.reject": "Rechazar",
   "notifpage.action.confirm": "¿Seguro?",
   "notifpage.action.failed": "Eso no pasó.",
+  "notifpage.action.refused": "No se usó el botón porque no pertenece a este servicio.",
   "notifpage.kind.aimeat": "AIMEAT",
   "notifpage.kind.app": "aplicación",
   "notifpage.kind.extension": "extensión",
@@ -11515,7 +11516,8 @@
       "replyPlaceholder": "Escribe una respuesta…",
       "confirm": "¿Seguro?",
       "sent": "Respuesta enviada",
-      "failed": "La acción falló"
+      "failed": "La acción falló",
+      "refused": "No se usó el botón porque no pertenece a este servicio."
     }
   },
   "oauthConsent": {
