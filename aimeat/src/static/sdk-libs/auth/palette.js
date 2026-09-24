@@ -15,6 +15,10 @@
  * @usage import { PALETTES, aimeatApplyPalette, aimeatRestorePalette } from './palette.js';
  *   In the app: nothing — the login pill renders the picker and the CSS follows.
  * @version-history
+ *   v1.3.0 — 2026-09-24 — On the node's own pages the picker offers the node's themes (Themes &
+ *     Styles), read from window.__AIMEAT_THEMES, which the node's shell writes before its first
+ *     paint; when the operator shows one theme to everybody that theme is the palette and there is
+ *     no picker. A published app has no such list and keeps PALETTES as before.
  *   v1.2.0 — 2026-08-28 — VOLTAGE joins the palettes: the front-demo2 register as a theme — hot
  *     magenta on warm cream, deep violet night, electric yellow, 2px borders, Space Grotesk
  *     display. check:theme holds its swatches and ratios like every other.
@@ -56,9 +60,34 @@ export var PALETTES = [
     dark: { bg: '#150d20', card: '#2c1d3f', accent: '#ff4fa8' } } },
 ];
 
+/** The house palette: no attribute on <html>. */
+var HOUSE = 'aimeat';
+
+/**
+ * The node's own themes, when the page is one of the node's (its shell writes window.__AIMEAT_THEMES
+ * before the first paint, from Themes & Styles): the themes it offers and who chooses. A published
+ * app never has it, so an app keeps PALETTES exactly as before.
+ */
+function nodeThemes() {
+  try {
+    var T = /** @type {any} */ (window).__AIMEAT_THEMES;
+    return T && T.policy && T.themes && T.themes.length ? T : null;
+  } catch { return null; }
+}
+
+/** What the picker offers: the node's themes on the node's own pages, PALETTES everywhere else. */
+export function paletteRegistry() {
+  var T = nodeThemes();
+  if (!T) return PALETTES;
+  return T.themes.map(function (t) { return { id: t.id, label: t.name, swatch: t.swatch }; });
+}
+
 /** The palette in effect: stored choice if valid, else the default (first in PALETTES). */
 export function aimeatReadPalette() {
-  var ids = PALETTES.map(function (p) { return p.id; });
+  var T = nodeThemes();
+  // The operator shows one theme to everybody: that is the palette, whatever was stored.
+  if (T && !T.policy.personalChoice) return T.policy.fixed;
+  var ids = paletteRegistry().map(function (p) { return p.id; });
   try {
     // ?palette= first, exactly where ?lang= sits in the locale lookup, and for the same reason:
     // localStorage is per ORIGIN, so an app embedded by another page cannot see the look the
@@ -73,12 +102,13 @@ export function aimeatReadPalette() {
     if (s && ids.indexOf(s) >= 0) return s;
   } catch { /* storage blocked */ }
   var attr = document.documentElement.getAttribute('data-palette');
-  return attr && ids.indexOf(attr) >= 0 ? attr : PALETTES[0].id;
+  if (attr && ids.indexOf(attr) >= 0) return attr;
+  return T && ids.indexOf(T.policy.default) >= 0 ? T.policy.default : PALETTES[0].id;
 }
 
 /** Apply + persist + announce. The default palette REMOVES the attribute (canonical no-attr form). */
 export function aimeatApplyPalette(id) {
-  if (id === PALETTES[0].id) document.documentElement.removeAttribute('data-palette');
+  if (id === HOUSE) document.documentElement.removeAttribute('data-palette');
   else document.documentElement.setAttribute('data-palette', id);
   try { localStorage.setItem(AIMEAT_PALETTE_KEY, id); } catch { /* storage blocked */ }
   try { window.dispatchEvent(new CustomEvent('aimeat-palette-change', { detail: { palette: id } })); } catch { /* no window */ }
@@ -91,7 +121,7 @@ export function aimeatApplyPalette(id) {
  */
 export function aimeatRestorePalette() {
   var cur = aimeatReadPalette();
-  if (cur !== PALETTES[0].id) document.documentElement.setAttribute('data-palette', cur);
+  if (cur !== HOUSE) document.documentElement.setAttribute('data-palette', cur);
   else document.documentElement.removeAttribute('data-palette');   // an embed may ask for the default
   try {
     window.addEventListener('storage', function (e) {
@@ -108,16 +138,20 @@ export function aimeatRestorePalette() {
  * @param {{ chooseLook?: string }} [i]
  */
 export function paletteControlHtml(i) {
+  // The operator shows one theme to everybody: there is nothing to choose, so there is no picker.
+  var T = nodeThemes();
+  if (T && !T.policy.personalChoice) return '';
+  var list = paletteRegistry();
   var cur = aimeatReadPalette();
   var mode = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
-  var curAcc = (PALETTES.find(function (p) { return p.id === cur; }) || PALETTES[0]).swatch[mode].accent;
+  var curAcc = (list.find(function (p) { return p.id === cur; }) || list[0]).swatch[mode].accent;
   var label = (i && i.chooseLook) || 'Choose look';
   return '<span id="aimeat-palette-switch" class="aimeat-pop-wrap">'
     + '<button type="button" class="aimeat-pop-btn" aria-haspopup="listbox" aria-expanded="false" '
     + 'title="' + esc(label) + '" aria-label="' + esc(label) + '">'
     + '<span class="aimeat-pal-dot" style="background:' + esc(curAcc) + '"></span></button>'
     + '<span class="aimeat-pop" role="listbox">'
-    + PALETTES.map(function (p) {
+    + list.map(function (p) {
       var s = p.swatch[mode];
       return '<button type="button" role="option" data-palette="' + esc(p.id) + '" aria-pressed="' + (p.id === cur) + '">'
         + '<span class="aimeat-pal-chip" style="background:' + esc(s.bg) + '">'
@@ -136,16 +170,17 @@ export function wirePaletteControl(container, clampPopover) {
   var root = container.querySelector('#aimeat-palette-switch');
   if (!root) return;
   var trigger = /** @type {HTMLElement} */ (root.querySelector('.aimeat-pop-btn'));
+  var list = paletteRegistry();
   function syncDot() {
     var cur = aimeatReadPalette();
     var mode = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
-    var p = PALETTES.find(function (x) { return x.id === cur; }) || PALETTES[0];
+    var p = list.find(function (x) { return x.id === cur; }) || list[0];
     var dot = /** @type {HTMLElement|null} */ (root.querySelector('.aimeat-pal-dot'));
     if (dot) dot.style.background = p.swatch[mode].accent;
     root.querySelectorAll('button[data-palette]').forEach(function (b) {
       b.setAttribute('aria-pressed', String(b.getAttribute('data-palette') === cur));
       // Re-tint the chips for the mode in effect, so the picker always previews truthfully.
-      var pp = PALETTES.find(function (x) { return x.id === b.getAttribute('data-palette'); });
+      var pp = list.find(function (x) { return x.id === b.getAttribute('data-palette'); });
       if (!pp) return;
       var s = pp.swatch[mode];
       var chip = /** @type {HTMLElement|null} */ (b.querySelector('.aimeat-pal-chip'));
@@ -158,7 +193,7 @@ export function wirePaletteControl(container, clampPopover) {
   }
   root.querySelectorAll('button[data-palette]').forEach(function (b) {
     b.addEventListener('click', function () {
-      aimeatApplyPalette(b.getAttribute('data-palette') || PALETTES[0].id);
+      aimeatApplyPalette(b.getAttribute('data-palette') || HOUSE);
       syncDot();
       root.classList.remove('aimeat-open');
       trigger.setAttribute('aria-expanded', 'false');

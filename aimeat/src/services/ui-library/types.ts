@@ -17,6 +17,7 @@
  * @structure UiEntryKind · UiEntryStatus · UiVariant · UiEntrySource · UiEntryFacts · UiEntry
  * @usage import type { UiEntry } from './types.js';
  * @version-history
+ *   v1.1.0 — 2026-09-24 — themeHooks: what a theme's CSS may change on a part (phase 4).
  *   v1.0.0 — 2026-09-23 — Initial (UI consolidation phase 1).
  */
 
@@ -38,6 +39,19 @@ export interface UiVariant {
     /** The prop that selects it on the component, when there is one. */
     prop?: string;
     when: string;
+}
+
+/**
+ * A theme hook: a custom property the part reads with its own look as the fallback, so a theme's CSS
+ * may change that one thing and nothing else (Themes & Styles). The check holds `var(<name>,` to the
+ * part's own rules.
+ */
+export interface UiThemeHook {
+    name: string;
+    kind: 'colour' | 'length';
+    /** The value the part uses when no theme sets the hook: what it drew before the hook existed. */
+    default: string;
+    what: string;
 }
 
 /** The half a person writes. */
@@ -72,6 +86,8 @@ export interface UiEntrySource {
     example: Record<string, unknown>;
     /** Where an unused part's code still sits, or anything else a builder needs to know. */
     note?: string;
+    /** The class a theme's CSS names to reach this part, and the hooks it may set there. */
+    themeHooks?: { selector: string; hooks: UiThemeHook[] };
 }
 
 /** The half a script reads from the files. */

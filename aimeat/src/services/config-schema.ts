@@ -12,6 +12,9 @@
  *   - CONFIG_FIELDS: the exhaustive field list grouped by domain (node, morsel policy, auth, features, work, quotas, federation, ...)
  *
  * @version-history
+ *   v1.13.0 — 2026-09-24 — The `themes.` group (Themes & Styles): whether people choose their own
+ *     theme, the one theme when they do not, which themes the pill offers and the default. The row
+ *     type moved to config-field-def.ts, unchanged, to make room.
  *   v1.12.1 — 2026-09-23 — decide.provider_egress: the exact addresses of the operator's own local
  *     decision models.
  *   v1.12.0 — 2026-09-19 — The `decide.` group (TARGET-080): the decision provider's switch, key,
@@ -51,46 +54,10 @@
  */
 
 import type { AimeatConfig } from '../config.js';
-import type { SiteLinksConfig } from '../config-types-site-links.js';
-import type { OperatorConfig } from '../config-types.js';
+import type { ConfigFieldDef } from './config-field-def.js';
 
-// ── Field Definition ──
-
-/**
- * The site links are the one nested group a row may address: `siteLinks.learn` and its siblings.
- * Every reader and writer of a row's value goes through readConfigField / writeConfigField below,
- * which is what lets a row point one level down without each consumer learning to.
- */
-export type SiteLinkFieldKey = `siteLinks.${keyof SiteLinksConfig}`;
-
-/** The operator identity block, addressed the same way: `operator.name` and its siblings. */
-export type OperatorFieldKey = `operator.${keyof OperatorConfig}`;
-
-export interface ConfigFieldDef {
-  /** AimeatConfig property name (e.g. 'welcomeBonus'), or a site link as 'siteLinks.<name>'. */
-  key: keyof AimeatConfig | SiteLinkFieldKey | OperatorFieldKey;
-  /** Dot-path notation for admin API (e.g. 'morsel_policy.welcome_bonus') */
-  dotPath: string;
-  /** AIMEAT_* environment variable name */
-  envVar: string;
-  /** Value type for raw-string parsing */
-  type: 'number' | 'boolean' | 'string' | 'float' | 'object';
-  /** Validation function */
-  validate: (v: unknown) => boolean;
-  /** true = cannot be changed after startup */
-  immutable: boolean;
-  /** Human-readable description */
-  description: string;
-  /** Valid range hint for numbers (e.g. '0-10000') */
-  range?: string;
-  /**
-   * Admin API display mode:
-   * - undefined / 'visible': shown with actual value
-   * - 'configured': shown as dotPath_configured boolean (for secrets)
-   * - 'hidden': omitted entirely (internal bootstrap fields)
-   */
-  adminDisplay?: 'visible' | 'configured' | 'hidden';
-}
+// ── Field Definition ── in config-field-def.ts (moved there when this file reached the line ceiling).
+export type { ConfigFieldDef, SiteLinkFieldKey, OperatorFieldKey } from './config-field-def.js';
 
 // ── All Known Config Fields ──
 
@@ -330,6 +297,14 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   { key: 'seoVerificationExtra', dotPath: 'seo.verification_extra', envVar: 'AIMEAT_SEO_VERIFICATION_EXTRA', type: 'object', validate: v => !!v && typeof v === 'object' && !Array.isArray(v) && Object.values(v as Record<string, unknown>).every(c => typeof c === 'string'), immutable: false, description: 'Any other verification meta tag as {name: content} — Yandex, Pinterest, Facebook' },
   { key: 'seoIndexnowAuto', dotPath: 'seo.indexnow_auto', envVar: 'AIMEAT_SEO_INDEXNOW_AUTO', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Notify IndexNow when indexable content changes (no-op without an IndexNow key)' },
   { key: 'appsSeoMode', dotPath: 'apps.seo_mode', envVar: 'AIMEAT_APPS_SEO_MODE', type: 'string', validate: v => v === 'owner' || v === 'review', immutable: false, description: 'Who decides an app is search-visible: "owner" (their own switch is the decision) or "review" (they request, the operator approves). The operator\'s per-app block works in both', range: 'owner|review' },
+
+  // ── Themes (mutable) ── the look of the node's own interface (Themes & Styles, services/themes/).
+  // An id that names no theme is dropped where the values are read, so a stale setting never offers
+  // a theme that does not exist; the Themes & Styles view offers only real ids.
+  { key: 'themesPersonalChoice', dotPath: 'themes.personal_choice', envVar: 'AIMEAT_THEMES_PERSONAL_CHOICE', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'People choose their own theme in the pill. Off: every page wears the one theme in themes.fixed' },
+  { key: 'themesFixed', dotPath: 'themes.fixed', envVar: 'AIMEAT_THEMES_FIXED', type: 'string', validate: v => typeof v === 'string' && /^[a-z0-9-]{2,40}$/.test(v), immutable: false, description: 'The one theme every page wears when people do not choose their own (a theme id)' },
+  { key: 'themesOffered', dotPath: 'themes.offered', envVar: 'AIMEAT_THEMES_OFFERED', type: 'string', validate: v => typeof v === 'string' && /^([a-z0-9-]{2,40}(\s*,\s*[a-z0-9-]{2,40})*)?$/.test(v.trim()), immutable: false, description: 'The themes the pill offers, comma separated ids; empty offers every theme that is not retired' },
+  { key: 'themesDefault', dotPath: 'themes.default', envVar: 'AIMEAT_THEMES_DEFAULT', type: 'string', validate: v => typeof v === 'string' && /^[a-z0-9-]{2,40}$/.test(v), immutable: false, description: 'The theme a person sees before they choose one (a theme id among the offered)' },
 
   // ── Extensions (Phase 2.7, mutable) ──
   { key: 'extensionsEnabled', dotPath: 'extensions.enabled', envVar: 'AIMEAT_EXTENSIONS_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Sandboxed extension system enabled' },

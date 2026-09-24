@@ -22,6 +22,7 @@
  *   import { toolsForSurface } from '../catalog/surfaces.js';
  *   const allowed = toolsForSurface('agent'); // register only these on /v2/mcp/agent
  * @version-history
+ *   2026-09-24 — aimeat_theme_list, aimeat_theme_get and aimeat_theme_save on the agent and admin surfaces.
  *   2026-09-23 — aimeat_ui_component_list and aimeat_ui_component_get on the agent and admin surfaces.
  *   2026-09-13 — aimeat_board_rules_set on the service surface, beside the other board tools.
  *   2026-09-13 — aimeat_dm_archive_as_owner and aimeat_dm_organize_as_owner on the agent surface.
@@ -173,6 +174,8 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_designbook_keep',
         // The parts this node's own interface is built from, read before a page is changed.
         'aimeat_ui_component_list', 'aimeat_ui_component_get',
+        // The node's themes: the look of every page. Saving is the operator's, gated in the tool.
+        'aimeat_theme_list', 'aimeat_theme_get', 'aimeat_theme_save',
         'aimeat_storage_upload', 'aimeat_storage_download', 'aimeat_storage_delete',
         'aimeat_datapackage_publish', 'aimeat_datapackage_export',
         // NOTE: aimeat_task_request_changes is connector-only (owner tool, not registered on the
@@ -316,8 +319,9 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_admin_federation',
         // Arranging this node's front page and the page its members land on.
         'aimeat_surface_layout_get', 'aimeat_surface_layout_set',
-        // ...and the parts those pages are drawn from.
+        // ...and the parts those pages are drawn from, and the themes they wear.
         'aimeat_ui_component_list', 'aimeat_ui_component_get',
+        'aimeat_theme_list', 'aimeat_theme_get', 'aimeat_theme_save',
         // The operator's break-glass over an organism whose creator account is unreachable, plus the
         // read that shows the roster before it is re-pointed.
         'aimeat_admin_organism_ownership', 'aimeat_admin_organism_owner_add',

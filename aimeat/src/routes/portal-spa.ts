@@ -21,6 +21,8 @@
  *   const spaPath = resolvePublicFile('spa.html');
  *   if (spaPath) serveSpa(res, spaPath, config, '/v1/glossary');
  * @version-history
+ *   v1.5.0 — 2026-09-24 — The shell carries window.__AIMEAT_THEMES (Themes & Styles) before its first
+ *     paint, and /v1/themes.css is stamped with the node's themes' own hash.
  *   v1.4.0 — 2026-09-24 — serveSpa() takes the page's live markdown (apps, change log, members, help)
  *     and appends it to the authored body, for readers that do not run JavaScript (Bing).
  *   v1.3.0 — 2026-09-23 — stampAssets(): the build stamp reaches every first-party stylesheet, not
@@ -38,6 +40,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { AimeatConfig } from '../config.js';
 import { getSoftwareVersion } from '../utils/version.js';
+import { themeSnapshot } from '../services/themes/service.js';
 import { findPublicPage, type PublicPage } from '../data/public-pages.js';
 import { injectPageHead, injectSiteHead } from '../utils/page-head.js';
 import { injectPageBody } from '../utils/page-body.js';
@@ -144,6 +147,17 @@ export function serveSpa(
     `document.addEventListener("visibilitychange",function(){if(!document.hidden)chk();});` +
     `setInterval(chk,60000);})();`;
   html = html.replace('</head>', `<script${nonceAttr}>${bootScript}</script>\n</head>`);
+
+  // Themes & Styles: which themes this node offers and who chooses, before the first paint (the
+  // shell's boot reads window.__AIMEAT_THEMES and sets data-palette), and the node's own themes'
+  // stylesheet stamped with their hash, so an edit reaches the next page load without a restart.
+  // The snapshot is ThemeService's, refreshed on every theme write and every config change.
+  const themes = themeSnapshot();
+  const themesJson = JSON.stringify(themes
+    ? { policy: themes.policy, themes: themes.themes, onlyMode: themes.onlyMode }
+    : null).replace(/</g, '\\u003c');
+  html = html.replace('<!-- __AIMEAT_THEMES__ -->', `<script${nonceAttr}>window.__AIMEAT_THEMES=${themesJson};</script>`);
+  html = html.replace('href="/v1/themes.css"', `href="/v1/themes.css?v=${themes?.stamp ?? '0'}"`);
 
   // The node's own identity — its name, description, social image, verification tags and the two
   // site-level JSON-LD blocks — unconditionally, because it is true of every route including the

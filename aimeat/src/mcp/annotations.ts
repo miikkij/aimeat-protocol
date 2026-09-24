@@ -23,6 +23,7 @@
  *     async ({ key }) => { ... }
  *   );
  * @version-history
+ *   2026-09-24 — aimeat_theme_list and aimeat_theme_get (read-only), aimeat_theme_save (a write).
  *   2026-09-23 — aimeat_ui_component_list and aimeat_ui_component_get (read-only).
  *   2026-09-13 — aimeat_board_rules_set (idempotent, nothing destroyed).
  *   2026-09-13 — aimeat_dm_archive_as_owner (idempotent, nothing destroyed) and aimeat_dm_organize_as_owner.
@@ -549,6 +550,9 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_designbook_keep: { title: 'Design Book: the owner is satisfied with this app', idempotentHint: true },
     aimeat_ui_component_list: { title: 'Interface parts: list', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_ui_component_get: { title: 'Interface parts: one, whole', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    aimeat_theme_list: { title: 'Themes: list, with the operator\'s choices', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    aimeat_theme_get: { title: 'Themes: one, whole', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    aimeat_theme_save: { title: 'Themes: make, change, copy or retire', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     aimeat_memory_hands: { title: 'Memory: who has written here', readOnlyHint: true },
     aimeat_compliance_register_read: { title: 'Compliance: Read Register', readOnlyHint: true },
     // destructiveHint: it REPLACES the document rather than merging into it, so a partial write

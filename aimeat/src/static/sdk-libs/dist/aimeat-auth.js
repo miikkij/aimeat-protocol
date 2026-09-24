@@ -646,8 +646,29 @@
       dark: { bg: "#150d20", card: "#2c1d3f", accent: "#ff4fa8" }
     } }
   ];
+  var HOUSE = "aimeat";
+  function nodeThemes() {
+    try {
+      var T = (
+        /** @type {any} */
+        window.__AIMEAT_THEMES
+      );
+      return T && T.policy && T.themes && T.themes.length ? T : null;
+    } catch {
+      return null;
+    }
+  }
+  function paletteRegistry() {
+    var T = nodeThemes();
+    if (!T) return PALETTES;
+    return T.themes.map(function(t) {
+      return { id: t.id, label: t.name, swatch: t.swatch };
+    });
+  }
   function aimeatReadPalette() {
-    var ids = PALETTES.map(function(p) {
+    var T = nodeThemes();
+    if (T && !T.policy.personalChoice) return T.policy.fixed;
+    var ids = paletteRegistry().map(function(p) {
       return p.id;
     });
     try {
@@ -661,10 +682,11 @@
     } catch {
     }
     var attr = document.documentElement.getAttribute("data-palette");
-    return attr && ids.indexOf(attr) >= 0 ? attr : PALETTES[0].id;
+    if (attr && ids.indexOf(attr) >= 0) return attr;
+    return T && ids.indexOf(T.policy.default) >= 0 ? T.policy.default : PALETTES[0].id;
   }
   function aimeatApplyPalette(id) {
-    if (id === PALETTES[0].id) document.documentElement.removeAttribute("data-palette");
+    if (id === HOUSE) document.documentElement.removeAttribute("data-palette");
     else document.documentElement.setAttribute("data-palette", id);
     try {
       localStorage.setItem(AIMEAT_PALETTE_KEY, id);
@@ -677,7 +699,7 @@
   }
   function aimeatRestorePalette() {
     var cur = aimeatReadPalette();
-    if (cur !== PALETTES[0].id) document.documentElement.setAttribute("data-palette", cur);
+    if (cur !== HOUSE) document.documentElement.setAttribute("data-palette", cur);
     else document.documentElement.removeAttribute("data-palette");
     try {
       window.addEventListener("storage", function(e) {
@@ -687,13 +709,16 @@
     }
   }
   function paletteControlHtml(i) {
+    var T = nodeThemes();
+    if (T && !T.policy.personalChoice) return "";
+    var list = paletteRegistry();
     var cur = aimeatReadPalette();
     var mode = document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
-    var curAcc = (PALETTES.find(function(p) {
+    var curAcc = (list.find(function(p) {
       return p.id === cur;
-    }) || PALETTES[0]).swatch[mode].accent;
+    }) || list[0]).swatch[mode].accent;
     var label = i && i.chooseLook || "Choose look";
-    return '<span id="aimeat-palette-switch" class="aimeat-pop-wrap"><button type="button" class="aimeat-pop-btn" aria-haspopup="listbox" aria-expanded="false" title="' + esc(label) + '" aria-label="' + esc(label) + '"><span class="aimeat-pal-dot" style="background:' + esc(curAcc) + '"></span></button><span class="aimeat-pop" role="listbox">' + PALETTES.map(function(p) {
+    return '<span id="aimeat-palette-switch" class="aimeat-pop-wrap"><button type="button" class="aimeat-pop-btn" aria-haspopup="listbox" aria-expanded="false" title="' + esc(label) + '" aria-label="' + esc(label) + '"><span class="aimeat-pal-dot" style="background:' + esc(curAcc) + '"></span></button><span class="aimeat-pop" role="listbox">' + list.map(function(p) {
       var s = p.swatch[mode];
       return '<button type="button" role="option" data-palette="' + esc(p.id) + '" aria-pressed="' + (p.id === cur) + '"><span class="aimeat-pal-chip" style="background:' + esc(s.bg) + '"><span class="pc-card" style="background:' + esc(s.card) + '"></span><span class="pc-acc" style="background:' + esc(s.accent) + '"></span></span>' + esc(p.label) + "</button>";
     }).join("") + "</span></span>";
@@ -705,12 +730,13 @@
       /** @type {HTMLElement} */
       root.querySelector(".aimeat-pop-btn")
     );
+    var list = paletteRegistry();
     function syncDot() {
       var cur = aimeatReadPalette();
       var mode = document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
-      var p = PALETTES.find(function(x) {
+      var p = list.find(function(x) {
         return x.id === cur;
-      }) || PALETTES[0];
+      }) || list[0];
       var dot = (
         /** @type {HTMLElement|null} */
         root.querySelector(".aimeat-pal-dot")
@@ -718,7 +744,7 @@
       if (dot) dot.style.background = p.swatch[mode].accent;
       root.querySelectorAll("button[data-palette]").forEach(function(b) {
         b.setAttribute("aria-pressed", String(b.getAttribute("data-palette") === cur));
-        var pp = PALETTES.find(function(x) {
+        var pp = list.find(function(x) {
           return x.id === b.getAttribute("data-palette");
         });
         if (!pp) return;
@@ -742,7 +768,7 @@
     }
     root.querySelectorAll("button[data-palette]").forEach(function(b) {
       b.addEventListener("click", function() {
-        aimeatApplyPalette(b.getAttribute("data-palette") || PALETTES[0].id);
+        aimeatApplyPalette(b.getAttribute("data-palette") || HOUSE);
         syncDot();
         root.classList.remove("aimeat-open");
         trigger.setAttribute("aria-expanded", "false");
@@ -3165,7 +3191,7 @@
     aimeatApplyPalette(String(id).toLowerCase());
   };
   auth.getPalettes = function() {
-    return PALETTES.map(function(p) {
+    return paletteRegistry().map(function(p) {
       return { id: p.id, label: p.label, swatch: p.swatch };
     });
   };

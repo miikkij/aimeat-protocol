@@ -6,6 +6,7 @@
  * @structure Single `loadAll` fetches all dashboard data; tabs render slices of it. SSE
  *            live-updates trigger a debounced, silent background refresh.
  * @version-history
+ *   v1.11.0 — 2026-09-24 — Themes & Styles in the Design group (UI consolidation phase 4).
  *   v1.10.0 — 2026-09-23 — A Design group with aimeat-design-lab (the library view).
  *   v1.8.0 -- 2026-09-13 -- Compose the existing page title with poster-page-title.
  *   v1.9.0 — 2026-09-09 — The marketplace stats fetch goes: its route was deleted, and nothing here
@@ -83,6 +84,7 @@ import SharingGroupsAdminTab from './admin/sharing-groups-tab.js';
 import AgentIntegrationAdminTab from './admin/agent-integration-tab.js';
 import SubdomainsAdminTab from './admin/subdomains-tab.js';
 import DesignLabTab from './admin/design-lab-tab.js';
+import ThemesTab from './admin/themes-tab.js';
 import AppsAdminTab        from './admin/apps-tab.js';
 import SkillsAdminTab      from './admin/skills-tab.js';
 import { swallowed } from '/js/swallowed.js';
@@ -153,9 +155,11 @@ const NAV_GROUPS = [
     { id: 'federation', key: 'dashboard.federation', component: FederationTab, count: 'peers' },
     { id: 'genesis',    key: 'dashboard.genesis',    component: GenesisTab,    count: 'genesis' },
   ]},
-  // The look of the node's own interface: the design lab now, Themes & Styles when it is built.
+  // The look of the node's own interface: the design lab shows and decides the parts' looks, Themes &
+  // Styles manages the themes the pages wear (two views, Jouni 2026-09-23).
   { key: 'dashboard.navDesign', items: [
     { id: 'design-lab', key: 'dashboard.designLab', component: DesignLabTab },
+    { id: 'themes', key: 'dashboard.themes', component: ThemesTab },
   ]},
 ];
 

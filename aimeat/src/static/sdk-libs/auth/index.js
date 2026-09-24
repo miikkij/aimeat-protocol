@@ -10,6 +10,8 @@
  *   listeners; attach('auth', auth) + version.
  * @usage <script src="/v1/libs/aimeat-auth.js"></script>  const s = await AIMEAT.auth.login();
  * @version-history
+ *   v1.5.0 — 2026-09-24 — AIMEAT.auth.getPalettes() answers the node's themes on the node's own pages
+ *     (palette.js paletteRegistry), and PALETTES everywhere else.
  *   v1.4.0 — 2026-09-06 — The page says whether it keeps its own light, and the register no longer
  *     answers for it. v1.3.0 disabled the control on any body naming a `genre-…` register, which
  *     was right for the twenty-one that hardcode their palette and wrong for genre-living, whose
@@ -34,7 +36,7 @@ import { auth, refreshOnFocus } from './session.js';
 import { maybeShowGoogleSignup } from './signup.js';
 import { attach } from '../_core/namespace.js';
 import { readLocales, aimeatReadLang, aimeatApplyLang } from './locale.js';
-import { PALETTES, aimeatReadPalette, aimeatApplyPalette, aimeatRestorePalette } from './palette.js';
+import { paletteRegistry, aimeatReadPalette, aimeatApplyPalette, aimeatRestorePalette } from './palette.js';
 import { aimeatRestoreMode } from './theme.js';
 
 // ── Boot: first-time OIDC signup prompt (after the callback bounced back with ?aimeat_signup=1) ──
@@ -64,7 +66,7 @@ auth.setLang = function (lang) { aimeatApplyLang(String(lang).toLowerCase()); };
 // The pill renders the picker; these let an app read/set/enumerate the same value.
 auth.getPalette = function () { return aimeatReadPalette(); };
 auth.setPalette = function (id) { aimeatApplyPalette(String(id).toLowerCase()); };
-auth.getPalettes = function () { return PALETTES.map(function (p) { return { id: p.id, label: p.label, swatch: p.swatch }; }); };
+auth.getPalettes = function () { return paletteRegistry().map(function (p) { return { id: p.id, label: p.label, swatch: p.swatch }; }); };
 
 // Apply the stored palette at parse time (before any UI mounts), so a published app follows the
 // user's chosen look with zero app code — the same free ride the mode snippet gives light/dark.

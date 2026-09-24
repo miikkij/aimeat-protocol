@@ -47,6 +47,10 @@
        no agent API is present. -->
   <script src="/v1/libs/aimeat-webmcp.js?expose=node" defer></script>
   <meta name="theme-color" content="#FAFAF8">
+  <!-- The node's themes and who chooses (Themes & Styles), written here by the node per request
+       (routes/portal-spa.ts) as window.__AIMEAT_THEMES, so the boot below can set the theme before
+       the first paint. -->
+  <!-- __AIMEAT_THEMES__ -->
   <!-- No-flash theme boot: set data-theme on <html> before first paint.
        Plain inline JS (NOT a module — modules defer and reintroduce the flash).
        Unset key = follow OS until the user makes an explicit choice. -->
@@ -61,6 +65,29 @@
       } catch (e) {
         document.documentElement.dataset.theme = 'light';
       }
+      // The theme (the palette axis), when the node said which ones exist: the operator's one theme,
+      // or the person's stored choice when the node still offers it, or the node's default. The
+      // house theme has no attribute. A theme with one mode only sets that mode and says so to the
+      // pill's light/dark switch (auth/theme.js reads the aimeat-light meta).
+      try {
+        var T = window.__AIMEAT_THEMES, root = document.documentElement, pal = null;
+        if (T && T.policy && T.themes) {
+          var ids = T.themes.map(function (t) { return t.id; });
+          if (!T.policy.personalChoice) pal = T.policy.fixed;
+          else {
+            var s = null;
+            try { s = localStorage.getItem('aimeat-palette'); } catch (e) { s = null; }
+            pal = (s && ids.indexOf(s) >= 0) ? s : T.policy.default;
+          }
+          if (pal && pal !== 'aimeat') root.setAttribute('data-palette', pal);
+          var only = T.onlyMode && T.onlyMode[pal];
+          if (only === 'light' || only === 'dark') {
+            root.dataset.theme = only;
+            var m = document.createElement('meta'); m.name = 'aimeat-light'; m.content = 'fixed';
+            document.head.appendChild(m);
+          }
+        }
+      } catch (e) { /* the auth library restores the palette later, as it always has */ }
     })();
   </script>
   <!-- The palette definitions (--color-* per data-palette, light and dark), loaded BEFORE
@@ -99,6 +126,9 @@
   <!-- /shell block -->
   <link rel="stylesheet" href="/css/poster.css">
   <link rel="stylesheet" href="/css/components/dialog.css">
+  <!-- The node's own themes (Themes & Styles), after theme.css: the node stamps this address with
+       the themes' own hash per request, so an edit reaches the next page load without a restart. -->
+  <link rel="stylesheet" href="/v1/themes.css">
   <!-- The margin pattern on the home, the chat and the settings pages: a personal choice, set on
        <html> by js/margin-pattern.js once the session is known. -->
   <link rel="stylesheet" href="/css/components/margin-pattern.css">
@@ -312,6 +342,7 @@
       "/js/swallowed.js": "/js/swallowed.js",
       "/js/site.js": "/js/site.js",
       "/js/margin-pattern.js": "/js/margin-pattern.js",
+      "/js/theme-choice.js": "/js/theme-choice.js",
       "/js/dialog.js": "/js/dialog.js",
       "/js/theme.js": "/js/theme.js",
       "/js/utils.js": "/js/utils.js",
@@ -604,6 +635,7 @@
     import { initThemeSystem } from '/js/theme.js';
     import { siteLink } from '/js/site.js';
     import { loadMarginPattern } from '/js/margin-pattern.js';
+    import { loadThemeChoice, watchThemeChoice } from '/js/theme-choice.js';
     import { NotificationBell, openNotificationLink } from '/components/NotificationBell.js';
     import { OpenItemsButton } from '/components/OpenItemsButton.js';
     import { useSession } from '/js/use-session.js';
@@ -1262,6 +1294,12 @@
       // format. Never awaited: it resolves after the first paint and the page repaints itself.
       loadDisplayPrefs();
       window.addEventListener('aimeat-auth-change', () => { loadDisplayPrefs(); });
+
+      // The person's theme lives on their account (Themes & Styles): read it once the session is
+      // known and on every sign-in change, and save a choice made in the pill.
+      watchThemeChoice();
+      loadThemeChoice();
+      window.addEventListener('aimeat-auth-change', () => { loadThemeChoice(); });
 
       // Listen for session expiry — show notification and trigger re-login
       if (window.AIMEAT?.auth?.on) {

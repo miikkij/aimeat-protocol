@@ -36,6 +36,7 @@
  *     which is the one a fleet daemon actually calls and the one a new tool is forgotten on.
  *   v1.10.0 -- 2026-09-08 -- adminCliTools joins the table: the operator's CORS page in one read and
  *     the write that sets a person's or an agent's list, on the third surface from day one.
+ *   v1.11.0 -- 2026-09-24 -- themeCliTools joins the table: the node's themes (Themes & Styles).
  */
 
 import { existsSync, readFileSync } from 'node:fs';
@@ -62,6 +63,7 @@ import { exchangeTools } from './tool-call-defs-exchange.js';
 import { connectionCliTools } from './tool-call-defs-connections.js';
 import { mcpProxyCliTools } from './tool-call-defs-mcp-proxy.js';
 import { adminCliTools } from './tool-call-defs-admin.js';
+import { themeCliTools } from './tool-call-defs-themes.js';
 import { withProvenanceCarrying } from './ai-provenance-carry.js';
 
 // The full tool catalog is assembled from sibling group modules, preserving declaration order.
@@ -90,6 +92,7 @@ export const CONNECT_CLI_TOOLS: ConnectCliToolDefinition[] = [
     ...connectionCliTools,
     ...mcpProxyCliTools,
     ...adminCliTools,
+    ...themeCliTools,
 ].map(withProvenanceCarrying).map(withDeclaredInputOnly);
 
 /**
