@@ -23,6 +23,7 @@
  *   a wish list nobody reads.
  * @structure
  *   - AppRoadmap / AppRoadmapEntry / APP_ROADMAP_SPEC — the record
+ *   - APP_ROADMAP_MAX / APP_ROADMAP_WISHES_PER_ACCOUNT — the list's cap, and one account's share of it
  *   - appRoadmapKey / readAppRoadmap / writeAppRoadmap — storage
  *   - addRoadmapEntry / removeRoadmapEntry / setWantedVisibility — the changes
  *   - publicRoadmap / roadmapStamp — what a reader outside the build sees, and the manifest's copy
@@ -30,6 +31,9 @@
  *   const road = await readAppRoadmap(storage, ownerGhii, appId);
  *   await addRoadmapEntry(storage, { ownerGhii, appId, state: 'done', what: 'The login pill fits a phone.', by, version });
  * @version-history
+ *   v1.1.0 — 2026-09-24 — APP_ROADMAP_WISHES_PER_ACCOUNT: one account holds at most ten open wishes
+ *     on one app, refused with WISH_LIMIT_REACHED, and the owner is not counted (A6-16). The list's
+ *     own cap names its code too, CAPACITY_EXCEEDED, so the door renders what the service decided.
  *   v1.0.0 — 2026-09-08 — Initial. Phase 5 of the shared-app work.
  */
 import type { Storage } from '../storage/interface.js';
@@ -40,6 +44,23 @@ export const APP_ROADMAP_SPEC = 'aimeat.approadmap/1' as const;
 
 /** Separate capacity for each half: wishes cannot evict the changelog. */
 export const APP_ROADMAP_MAX = 300;
+
+/**
+ * How many OPEN wishes one account may hold on one app at a time.
+ *
+ * The cap above is shared by everybody who can see the app, so without this one account could leave
+ * all of it and every other visitor would be refused until the owner pruned (A6-16). Ten is room for
+ * a real list of asks from one person. A wish that is withdrawn or pruned frees its place, because
+ * only open wishes are counted. The app's owner is not counted: the list is theirs to keep, and they
+ * are also the one who prunes it.
+ */
+export const APP_ROADMAP_WISHES_PER_ACCOUNT = 10;
+
+/** The owner's account in an app id (`alice/paja.html` → `alice`), in the lowercase `by` uses. */
+function ownerAccountOf(appId: string): string {
+  const slash = appId.indexOf('/');
+  return slash < 0 ? '' : appId.slice(0, slash).toLowerCase();
+}
 
 /** The platform's own namespace, so the record is not writable through the memory API. */
 const NS_ROADMAP = 'app-roadmap';
@@ -126,6 +147,10 @@ const nextId = () => randomUUID();
  *
  * The cap drops the OLDEST `done` lines and never a wish: a changelog is worth less the further back
  * it goes, and a wish that scrolled off is a request somebody made that nobody will ever see again.
+ *
+ * A wish is refused, with `status` 409 and a `code` the door renders, when its author already holds
+ * APP_ROADMAP_WISHES_PER_ACCOUNT open wishes on this app, or when the list as a whole is full. Both
+ * are counted inside the retried change, against the record that is actually being written.
  */
 export async function addRoadmapEntry(
   storage: Storage,
@@ -137,9 +162,18 @@ export async function addRoadmapEntry(
     ...(typeof input.version === 'number' ? { version: input.version } : {}),
   };
   if (entry.what.length < 3) throw new Error('A roadmap entry needs at least three characters.');
+  const author = String(input.by ?? '').toLowerCase();
+  const counted = author !== ownerAccountOf(input.appId);
   return changeRoadmap(storage, input.appId, road => {
-    if (entry.state === 'wanted' && road.entries.filter(e => e.state === 'wanted').length >= APP_ROADMAP_MAX) {
-      throw Object.assign(new Error('The wish list is full. Withdraw or complete an existing wish first.'), { status: 409 });
+    const wishes = entry.state === 'wanted' ? road.entries.filter(e => e.state === 'wanted') : [];
+    if (counted && wishes.filter(e => String(e.by ?? '').toLowerCase() === author).length >= APP_ROADMAP_WISHES_PER_ACCOUNT) {
+      throw Object.assign(new Error(
+        `You already have ${APP_ROADMAP_WISHES_PER_ACCOUNT} open wishes on this app. Withdraw one of yours, or wait until the owner has dealt with some, before you leave another.`,
+      ), { status: 409, code: 'WISH_LIMIT_REACHED' });
+    }
+    if (wishes.length >= APP_ROADMAP_MAX) {
+      throw Object.assign(new Error('The wish list is full. Withdraw or complete an existing wish first.'),
+        { status: 409, code: 'CAPACITY_EXCEEDED' });
     }
     const entries = [entry, ...road.entries];
     let done = 0;

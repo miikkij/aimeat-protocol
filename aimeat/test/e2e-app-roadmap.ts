@@ -10,6 +10,8 @@
  *   shared app the person who loses by the silence is somebody else.
  * @usage pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-app-roadmap
  * @version-history
+ *   v1.1.0 — 2026-09-24 — A6-16: one account holds at most ten open wishes on one app, another
+ *     account can still leave one, the owner is not counted, and a withdrawn wish frees its place.
  *   v1.0.0 — 2026-09-08 — Initial. Phases 4, 5 and 6 of the shared-app work.
  */
 import * as ed from '@noble/ed25519';
@@ -431,6 +433,45 @@ await test('a former builder can withdraw a wish but cannot erase a completed ch
     assert(upload.status === 403, 'old upload token stops working after revocation');
     const removed = await json(`${road()}/${id}`, { method: 'DELETE', headers: auth(builder.token) });
     assert(removed.status === 403, 'revoked author cannot delete a done entry');
+});
+
+// A6-16. The wish list had one cap, 300, shared by everybody who can see the app, and nothing that
+// counted by person: one account could leave all 300 and every other visitor was refused until the
+// owner pruned. One account now holds at most ten open wishes on one app (the constant is
+// APP_ROADMAP_WISHES_PER_ACCOUNT in services/app-roadmap.ts); the owner's own wishes are not counted.
+await test('one account cannot fill the wish list for everybody else', async () => {
+    const PER_ACCOUNT = 10;
+    const WISH_APP = 'roadmap-wishes.html';
+    const made = await publish(owner.token, WISH_APP, 'wishes');
+    assert(made.status === 201, `publish ${made.status}: ${JSON.stringify(made.body?.error)}`);
+    const wishes = `/v1/apps/${owner.name}/${WISH_APP}/roadmap`;
+    const wish = (token: string, what: string) =>
+        json(wishes, { method: 'POST', headers: auth(token), body: JSON.stringify({ what }) });
+
+    for (let i = 0; i < PER_ACCOUNT; i++) {
+        const r = await wish(stranger.token, `Wish number ${i} from one account.`);
+        assert(r.status === 201, `wish ${i}: ${r.status} ${JSON.stringify(r.body?.error)}`);
+    }
+    const over = await wish(stranger.token, 'One wish past the limit.');
+    assert(over.status === 409, `the account's own limit refuses the next one (got ${over.status})`);
+    assert(over.body.error?.code === 'WISH_LIMIT_REACHED', `and the code says which limit: ${over.body.error?.code}`);
+
+    const other = await wish(builder.token, 'Somebody else can still ask.');
+    assert(other.status === 201, `another account can still leave a wish: ${other.status} ${JSON.stringify(other.body?.error)}`);
+
+    for (let i = 0; i <= PER_ACCOUNT; i++) {
+        const r = await wish(owner.token, `The owner's own note ${i}.`);
+        assert(r.status === 201, `the owner's wish ${i} is not counted: ${r.status} ${JSON.stringify(r.body?.error)}`);
+    }
+
+    // An open wish is what counts, so withdrawing one frees its place.
+    const list = await json(wishes, { headers: auth(owner.token) });
+    const mine = (list.body.data.roadmap.entries as any[]).find(e => e.by === stranger.name && e.state === 'wanted');
+    assert(!!mine, 'the stranger has a wish to withdraw');
+    const gone = await json(`${wishes}/${mine.id}`, { method: 'DELETE', headers: auth(stranger.token) });
+    assert(gone.status === 200, `withdraw ${gone.status}`);
+    const again = await wish(stranger.token, 'A new wish in the freed place.');
+    assert(again.status === 201, `a withdrawn wish frees its place: ${again.status} ${JSON.stringify(again.body?.error)}`);
 });
 
 console.log(`\n=== ${passed} passed, ${failed} failed ===\n`);

@@ -16,6 +16,9 @@
  *   GET /roadmap · POST /roadmap · DELETE /roadmap/:entryId · PATCH /roadmap
  * @usage registerRoadmapRoutes(router, config, storage, appTarget);
  * @version-history
+ *   v1.0.2 — 2026-09-24 — POST renders the code the service's 409 carries: WISH_LIMIT_REACHED when
+ *     the author already holds their share of open wishes (A6-16), CAPACITY_EXCEEDED when the list
+ *     is full.
  *   v1.0.1 — 2026-09-08 — `signedIn(req)` replaces the two `if (!req.auth)` lines. On a node in
  *     anonymous mode optionalAuth hands a stranger a reader identity, so `req.auth` is set for one
  *     and neither line refused anybody. What refused the visitor was the check AFTER it — the
@@ -140,8 +143,12 @@ export function registerRoadmapRoutes(
                 added: true, entry: road.entries[0], roadmap: inside ? road : publicRoadmap(road),
             }));
         } catch (err) {
-            if ((err as { status?: number }).status === 409) {
-                return res.status(409).json(error(config.nodeId, 'CAPACITY_EXCEEDED', (err as Error).message));
+            // Two refusals, both decided by the service: this author's own share of the list
+            // (WISH_LIMIT_REACHED) and the list as a whole (CAPACITY_EXCEEDED). The code travels
+            // with the refusal so a caller can tell "withdraw one of yours" from "the list is full".
+            const refusal = err as { status?: number; code?: string };
+            if (refusal.status === 409) {
+                return res.status(409).json(error(config.nodeId, refusal.code ?? 'CAPACITY_EXCEEDED', (err as Error).message));
             }
             throw err;
         }
