@@ -5,10 +5,12 @@
  * @description Things a person can press instead of typing: the starter suggestions on an empty
  *   conversation, and the choices an agent offered in a fenced ```aimeat-choices block. Its look is
  *   css/components/suggestion.css; the catalogue entry is `suggestion`.
- * @structure Suggestions({ children }) · Suggestion({ caps, disabled, onClick, children }) ·
+ * @structure Suggestions({ children }) · Suggestion({ disabled, onClick, children }) ·
  *   Choices({ options, onPick, disabled }) · choicesIn(text) · stripChoices(text)
  * @usage html`<${Choices} options=${choicesIn(text)} onPick=${send} />`
  * @version-history
+ *   v1.1.0 — 2026-09-24 — `caps` removed: every suggestion reads as a sentence (Jouni's decision
+ *     "Suggestion").
  *   v1.0.0 — 2026-09-23 — Choices, choicesIn and stripChoices moved out of views/chat/parts.js, and
  *     the starter row out of views/chat.js, with their markup unchanged (UI consolidation phase 1,
  *     a move).
@@ -53,10 +55,10 @@ export function Suggestions({ children }) {
                             </div>`;
 }
 
-/** One suggestion. `caps` is the starter's small-capitals face. */
-export function Suggestion({ caps = false, disabled, onClick, children }) {
+/** One suggestion, read as a sentence (Jouni's decision "Suggestion": the starters' capitals went). */
+export function Suggestion({ disabled, onClick, children }) {
     return html`
-                                    <button type="button" class=${'btn-outline poster-suggestion' + (caps ? ' poster-suggestion--caps' : '')}
+                                    <button type="button" class="btn-outline poster-suggestion"
                                         disabled=${disabled}
                                         onClick=${onClick}>
                                         ${children}

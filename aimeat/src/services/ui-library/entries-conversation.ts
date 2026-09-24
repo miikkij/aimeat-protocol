@@ -8,6 +8,7 @@
  * @structure CONVERSATION_ENTRIES
  * @usage import { CONVERSATION_ENTRIES } from './entries-conversation.js';
  * @version-history
+ *   v1.1.0 — 2026-09-24 — The suggestion's caps variant removed (Jouni's decision "Suggestion").
  *   v1.0.0 — 2026-09-23 — Initial (UI consolidation phase 1).
  */
 import type { UiEntryWritten } from './types.js';
@@ -72,11 +73,11 @@ export const CONVERSATION_ENTRIES: UiEntryWritten[] = [
         summary: 'Underlined words a person can press instead of typing: the agent\'s choices, and the starters in capitals.',
         module: '/components/Suggestion.js', sheet: '/css/components/suggestion.css',
         data: {
-            shape: 'Suggestions({ children }) · Suggestion({ caps, disabled, onClick, children }) · Choices({ options, onPick, disabled }) · choicesIn(text) · stripChoices(text)',
-            fields: { caps: 'the starter face, in capitals', options: 'the choices an agent offered in an aimeat-choices block', onPick: 'sends the chosen words', disabled: 'no agent here' },
+            shape: 'Suggestions({ children }) · Suggestion({ disabled, onClick, children }) · Choices({ options, onPick, disabled }) · choicesIn(text) · stripChoices(text)',
+            fields: { options: 'the choices an agent offered in an aimeat-choices block', onPick: 'sends the chosen words', disabled: 'no agent here' },
         },
         useFor: ['A fork the agent named, or a first request on an empty conversation.'],
-        variants: [{ name: 'caps', class: 'poster-suggestion--caps', prop: 'caps', when: 'the starters on an empty conversation' }],
+        variants: [],
         example: { options: ['A page about my team', 'A form for sign-ups', 'Something else'] },
     },
     {

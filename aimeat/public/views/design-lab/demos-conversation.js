@@ -9,6 +9,7 @@
  * @structure CONVERSATION_DEMOS — { [id]: { variants: [{ name, render(ex) }], height? } }
  * @usage import { CONVERSATION_DEMOS } from './demos-conversation.js';
  * @version-history
+ *   v1.1.0 — 2026-09-24 — The starters read as sentences (Jouni's decision "Suggestion").
  *   v1.0.0 — 2026-09-23 — Initial (UI consolidation phase 2, the library view).
  */
 import { h } from 'preact';
@@ -60,7 +61,7 @@ function Conversation({ list = false, empty = false, capped = false }) {
           ${empty
             ? html`<${ConversationWelcome} title="Your first agent" body="It works here the way your own AI tool would. Ask it for something."
                 trust="Everything you make here lands in your own account.">
-                <${Suggestions}><${Suggestion} caps=${true} onClick=${noop}>Make me a page<//><${Suggestion} caps=${true} onClick=${noop}>What can you do?<//><//>
+                <${Suggestions}><${Suggestion} onClick=${noop}>Make me a page<//><${Suggestion} onClick=${noop}>What can you do?<//><//>
               <//>`
             : html`<${Turn} id="d1" turn=${USER} /><${Turn} id="d2" turn=${AGENT} />`}
         <//>
@@ -94,7 +95,7 @@ export const CONVERSATION_DEMOS = {
   ] },
   'suggestion': { variants: [
     { name: "the agent's choices", render: (ex) => html`<${Choices} options=${ex.options} onPick=${noop} />` },
-    { name: 'starters (caps)', render: () => html`<${Suggestions}><${Suggestion} caps=${true} onClick=${noop}>Make me a page<//><${Suggestion} caps=${true} onClick=${noop}>What can you do?<//><//>` },
+    { name: 'starters', render: () => html`<${Suggestions}><${Suggestion} onClick=${noop}>Make me a page<//><${Suggestion} onClick=${noop}>What can you do?<//><//>` },
     { name: 'disabled', render: (ex) => html`<${Choices} options=${ex.options} onPick=${noop} disabled=${true} />` },
   ] },
   'turn': { variants: [
