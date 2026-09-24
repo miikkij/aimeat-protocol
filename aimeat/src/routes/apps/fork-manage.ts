@@ -6,6 +6,9 @@
  *   PATCH /v1/apps/:filename (rename/access-code/parked/forkable/protection/cortex), DELETE /v1/apps/:filename.
  *   Extracted from src/routes/apps.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.6.1 — 2026-09-24 — PATCH asks the provenance scope a legal declaration needs before its first
+ *     write too (508c32904067): an agent holding app:write and not provenance:write renamed, parked
+ *     and re-coded the app, and only the legal block, read last, answered 403.
  *   v1.6.0 — 2026-09-14 — PATCH asks every refusal the body can produce BEFORE its first write.
  *     It wrote each field as the walk reached it and refused where each was read, in a different
  *     order, so a delegated developer's PATCH carrying a rename and a reviewer's name landed the
@@ -43,7 +46,7 @@ import {
     applyOwnerMarksUpdate, appMarksState, parseMarksInput, parseAuthorInput, AUTHOR_NEEDS_OWNER_PRINCIPAL,
 } from '../../services/app-marks.js';
 import {
-    applyOwnerLegalUpdate, appLegalState, legalReadiness, appSellsForMoney, parseLegalInput,
+    applyOwnerLegalUpdate, appLegalState, legalReadiness, appSellsForMoney, parseLegalInput, legalUpdateRefusal,
 } from '../../services/app-legal.js';
 import { recordAppAudit, type AppAuditAction } from '../../services/app-audit.js';
 import { parseDeclaredProvenanceInput } from '../../mcp/ai-provenance-input.js';
@@ -59,7 +62,8 @@ const bad = (message: string): PatchRefusal => ({ status: 400, code: 'INVALID_IN
  * once, before the first write — see the comment at the call site for why the order is the point.
  *
  * It answers `null` when nothing in the body can be refused. What it deliberately does NOT cover is
- * the refusals that need storage: the app itself is looked up before this runs, and a page that
+ * the refusals that need storage: the app itself is looked up before this runs, the provenance
+ * scope a legal declaration needs is asked right after it (legalUpdateRefusal), and a page that
  * disappears mid-request is a 404 no ordering can prevent.
  */
 function patchRefusal(body: Record<string, unknown>, roles: string[], delegated: unknown): PatchRefusal | null {
@@ -292,6 +296,23 @@ export function registerForkManageRoutes(
         if (refusal) {
             res.status(refusal.status).json(error(config.nodeId, refusal.code, refusal.message));
             return;
+        }
+        // The one refusal the body cannot answer alone: whether this principal may DECLARE how a
+        // legal page was made (provenance:write), which the store knows. Asked here, still before
+        // the first write, by the same service the legal block below calls: an agent without the
+        // scope renamed the app, parked it and set its code, and heard 403 only at the legal block.
+        if ('legal' in body) {
+            const declared = parseDeclaredProvenanceInput(body.ai_provenance);
+            const legalRefusal = await legalUpdateRefusal(storage, config, app, {
+                legal: body.legal, actor: { ghii: callerGaii },
+                declared: declared.ok ? declared.declared : undefined,
+                declaredId: typeof body.ai_provenance_id === 'string' ? body.ai_provenance_id : undefined,
+            });
+            if (legalRefusal) {
+                const code = legalRefusal.status === 403 ? 'ACCESS_DENIED' : 'INVALID_INPUT';
+                res.status(legalRefusal.status).json(error(config.nodeId, code, legalRefusal.error, legalRefusal.status, legalRefusal.details));
+                return;
+            }
         }
 
         // Each field is independent and only touched when present in the body, so a

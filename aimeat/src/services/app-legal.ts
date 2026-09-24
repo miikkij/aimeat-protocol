@@ -31,11 +31,15 @@
  *   - LEGAL_KIND_INFO — the kinds, their paths, link relations and the reason each exists
  *   - parseLegalInput / appLegalState / legalReadiness
  *   - applyOwnerLegalUpdate (both doors) / ownerAppLegal (the agent-shaped entry)
+ *   - legalUpdateRefusal — its refusals, asked before a door's first write
  *   - legalLinksFor — the head links and the llms.txt lines
  *   - renderLegalPage — what a reader gets at /terms and friends
  * @usage
  *   const out = await applyOwnerLegalUpdate(storage, { ownerGaii, filename }, { legal: body.legal, actor });
  * @version-history
+ *   v1.2.0 — 2026-09-24 — legalUpdateRefusal(): what applyOwnerLegalUpdate() would refuse, the
+ *     provenance scope included, asked without writing (508c32904067). PATCH /v1/apps/:filename
+ *     asks it before its first write.
  *   v1.1.0 — 2026-08-29 — Money decides a shop (appSellsForMoney, the tools document's currency
  *     prices), never morsels; a page set here mints an AI-provenance record through
  *     provenanceForWrite() and the served page carries its marks and label.
@@ -52,7 +56,7 @@ import { recordAppAudit } from './app-audit.js';
 import { renderMarkdownLite } from '../utils/markdown-lite.js';
 import { appDisplayName } from './app-agent-surfaces.js';
 import { AppToolsDocSchema } from '../models/app-tool-schemas.js';
-import { provenanceForWrite, ProvenanceScopeError, type DeclaredProvenance } from './ai-provenance.js';
+import { provenanceForWrite, provenanceDeclarationRefusal, ProvenanceScopeError, type DeclaredProvenance } from './ai-provenance.js';
 import { logger } from '../utils/logger.js';
 
 export const LEGAL_CONTENT_MAX = 200_000;
@@ -257,6 +261,37 @@ function shortHash(s: string): string {
   return createHash('sha256').update(s, 'utf8').digest('hex').slice(0, 16);
 }
 
+/** Whether a page already reads as sent: then setting it again is no change and mints nothing. */
+function sameDoc(before: AppLegalDoc | undefined, doc: AppLegalDoc): boolean {
+  return !!before && before.format === doc.format && before.content === doc.content;
+}
+
+/**
+ * The refusal applyOwnerLegalUpdate() would reach for this input, asked without writing anything:
+ * a malformed block, or a declaration of how a page was made from a principal that may not make
+ * one (provenance:write), on a page whose text changes. A door that writes other fields in the
+ * same request asks this before its first write (invariant 14). PATCH /v1/apps/:filename read the
+ * legal block last, so an agent without the scope renamed and parked the app and then heard 403.
+ */
+export async function legalUpdateRefusal(
+  storage: Storage,
+  config: AimeatConfig,
+  app: Pick<AppSummaryRecord, 'manifest'>,
+  input: LegalUpdateInput,
+): Promise<{ error: string; status: 400 | 403; details?: unknown } | null> {
+  const parsed = parseLegalInput(input.legal, input.actor.ghii);
+  if ('error' in parsed) return { error: parsed.error, status: 400 };
+  if (!Object.keys(parsed.legal).length) return { error: 'legal names no page to set or remove', status: 400 };
+  // The pages applyOwnerLegalUpdate mints a record for: new text, not a link, not unchanged.
+  const mints = (Object.entries(parsed.legal) as Array<[AppLegalKind, AppLegalDoc | null]>)
+    .some(([kind, doc]) => !!doc && doc.format !== 'url' && !sameDoc(app.manifest?.legal?.[kind], doc));
+  if (!mints) return null;
+  const refused = await provenanceDeclarationRefusal(storage, {
+    principal: input.actor.ghii, declared: input.declared, declaredId: input.declaredId, enabled: config.aiProvenance,
+  });
+  return refused ? { error: refused.message, status: 403, details: { held_scopes: refused.heldScopes } } : null;
+}
+
 /**
  * The write, the provenance record, the audit entries and the note, for both doors.
  *
@@ -290,7 +325,7 @@ export async function applyOwnerLegalUpdate(
       notes.push(`${title} removed; the page no longer answers.`);
       continue;
     }
-    if (before && before.format === doc.format && before.content === doc.content) continue;
+    if (sameDoc(before, doc)) continue;
     // A link is not text anybody wrote here; the page it points to carries its own marks.
     if (doc.format !== 'url') {
       try {
