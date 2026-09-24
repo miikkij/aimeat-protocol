@@ -19,6 +19,9 @@
  *   services/owner-secrets.js — the module is not there. Every assertion below is new behaviour.
  * @usage pnpm test -- owner-secrets
  * @version-history
+ *   v1.2.0 — 2026-09-24 — The host binding is made only once the call is accepted: not when a later
+ *     name refuses it (7d6c102099f3), not before ctx.fetch has checked the address (919ef5f56d69).
+ *     Against an in-memory store; both failed on the old code first.
  *   v1.1.0 — 2026-09-16 — The summary carries `hosts`, the hosts a secret is bound to.
  *   v1.0.0 — 2026-09-06 — Initial.
  */
@@ -26,10 +29,13 @@ import { describe, it, expect } from 'vitest';
 import {
     SECRET_NAME_RE, SECRET_MAX_BYTES, USED_BY_WINDOW_DAYS,
     toSummary, secretPlaceholderNames, resolveHeaderSecrets, extensionConfigSecrets,
-    secretUnknownMessage,
+    secretUnknownMessage, putOwnerSecret, listOwnerSecrets, resolveSecretForHeaders,
 } from '../../src/services/owner-secrets.js';
 import { encrypt, decrypt, getEncryptionKey } from '../../src/services/encryption.js';
 import type { SecretRecord } from '../../src/storage/types/secrets.js';
+import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
+import { buildExtensionCtx } from '../../src/services/extension-ctx.js';
+import { loadConfig } from '../../src/config.js';
 
 const KEY_HEX = '0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20';
 const key = getEncryptionKey({ encryptionKey: KEY_HEX, totpSecretEncryptionKey: null })!;
@@ -222,5 +228,43 @@ describe('the refusal words', () => {
         expect(msg).toContain('Authorization');
         expect(msg).toContain('STRIPE_KEY');
         expect(msg).toContain('aimeat_secret_set');
+    });
+});
+
+// A vault secret is bound to the host of its first use, and a bound secret goes nowhere else. So
+// binding is a WRITE that a refused call must not make: bound to a host that received nothing, the
+// secret then refuses the owner's real host until they store the value again. It was made inside
+// the per-name loop, before a later name refused the call (7d6c102099f3), and before ctx.fetch
+// checked the address it would send to (919ef5f56d69). Against a real store, in memory.
+describe('the host binding — made only once the call is accepted', () => {
+    const cfg = { ...loadConfig().config, encryptionKey: KEY_HEX };
+    const owner = `alice@${cfg.nodeId}`;
+    const hostsOf = async (storage: SqliteStorage, name: string) =>
+        (await listOwnerSecrets(storage as never, owner)).find(s => s.name === name)?.hosts;
+    const resolve = (storage: SqliteStorage, headers: Record<string, string>, url: string) => resolveSecretForHeaders({
+        storage: storage as never, config: cfg, ownerGhii: owner, extConfig: {}, extName: 'probe', headers, url,
+    });
+
+    it('binds nothing when a later name in the same call refuses it', async () => {
+        const storage = new SqliteStorage(':memory:');
+        expect((await putOwnerSecret(storage as never, cfg, owner, 'FIRST', 'first-value')).ok).toBe(true);
+        const out = await resolve(storage, { 'X-First': '{{secret:FIRST}}', 'X-Missing': '{{secret:NOT_SET}}' }, 'https://api.example.com/x');
+        expect(out).toMatchObject({ ok: false, reason: 'unknown', secretName: 'NOT_SET' });
+        expect(await hostsOf(storage, 'FIRST')).toEqual([]);
+        // …and the call that IS accepted binds it, to the host it goes to.
+        expect((await resolve(storage, { 'X-First': '{{secret:FIRST}}' }, 'https://api.example.com/x')).ok).toBe(true);
+        expect(await hostsOf(storage, 'FIRST')).toEqual(['api.example.com']);
+    });
+
+    it('ctx.fetch binds nothing to an address it refuses to reach', async () => {
+        const storage = new SqliteStorage(':memory:');
+        expect((await putOwnerSecret(storage as never, cfg, owner, 'SECOND', 'second-value')).ok).toBe(true);
+        const ctx = buildExtensionCtx({
+            config: cfg, storage: storage as never, extMemoryOwner: 'ext:probe',
+            caller: { gaii: owner, owner: 'alice', roles: ['owner'] } as never, extConfig: {}, logPrefix: 'test',
+        });
+        await expect(ctx.fetch('http://169.254.169.254/latest/meta-data/', { headers: { Authorization: 'Bearer {{secret:SECOND}}' } }))
+            .rejects.toThrow(/Fetch blocked/);
+        expect(await hostsOf(storage, 'SECOND')).toEqual([]);
     });
 });

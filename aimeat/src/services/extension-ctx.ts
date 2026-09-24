@@ -27,6 +27,9 @@
  *   const ctx = buildExtensionCtx({ config, storage, extMemoryOwner, caller, extConfig, log, files });
  *   await executeExtensionAction(script, ctx, …);
  * @version-history
+ *   v1.6.3 — 2026-09-24 — A ctx.fetch that carries a secret checks its address before the secret is
+ *     resolved (919ef5f56d69). Resolving binds a first use to the host, and safeFetch refused the
+ *     address only after that, so a refused address stayed the secret's one permitted host.
  *   v1.6.2 — 2026-09-24 — ctx.memory.set refuses a key only the node writes (`__redirect__`), as every
  *     memory door does.
  *   v1.6.1 — 2026-09-16 — ctx.fetch passes its URL to the secret resolver, and a vault secret bound to
@@ -68,7 +71,7 @@ import { enforceExtensionMemoryLimits } from './quota.js';
 import { isServerWrittenKey, serverWrittenKeyRefusal } from '../utils/reserved-keys.js';
 import { extensionCrossNotify, safeNotificationLink } from './extension-notify.js';
 import { notify } from './notify.js';
-import { safeFetch } from '../utils/url-validator.js';
+import { safeFetch, validateOutboundUrl } from '../utils/url-validator.js';
 import { parseGAII, ownerGhiiOf } from '../utils/gaii.js';
 import { resolveSecretForHeaders, secretPlaceholderNames, secretUnknownMessage, secretHostMessage } from './owner-secrets.js';
 import { logger } from '../utils/logger.js';
@@ -354,6 +357,14 @@ async function resolveOutboundSecrets(
     const named = secretPlaceholderNames(headers);
     // The common case: no placeholder, no database read, nothing changed.
     if (!named.length) return { values: headers, sensitive: [] };
+
+    // THE ADDRESS FIRST (919ef5f56d69). Resolving binds a vault secret's first use to this host, and
+    // safeFetch checks the address only after that, so an address it refuses (the cloud metadata
+    // service, a private range) was left as the secret's only host and every real call after it was
+    // refused. The same check safeFetch makes on its first hop, asked before anything is bound; only
+    // a call that carries a secret pays for it.
+    const address = await validateOutboundUrl(url);
+    if (!address.valid) throw new Error(`Fetch blocked: ${address.reason}`);
 
     // The extension's name from the record when a road knows it, and otherwise from the namespace,
     // which is always `ext:{name}` or `ext:{name}.{instanceId}`. Only the usedBy stamp reads it.

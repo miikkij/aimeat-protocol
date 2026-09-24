@@ -36,6 +36,10 @@
  *   const r = await putOwnerSecret(storage, config, ownerGhii, name, value);
  *   if (!r.ok) res.status(r.status).json(error(config.nodeId, r.code, r.message));
  * @version-history
+ *   v1.1.1 — 2026-09-24 — resolveSecretForHeaders binds a first use to its host only once every
+ *     name has resolved (7d6c102099f3). It bound inside the per-name loop, so a call that a later
+ *     name refused left the secret bound to a host that received nothing, and the owner's real host
+ *     was refused until the value was stored again.
  *   v1.1.0 — 2026-09-16 — A vault secret is bound to the host of its first use, and the resolver
  *     refuses any other host (SECRET_HOST). The address comes from an extension's script, so any
  *     extension a person ran could send their credential to its author. The list shows `hosts`;
@@ -331,6 +335,10 @@ export async function resolveSecretForHeaders(deps: {
   const fallback = extensionConfigSecrets(extConfig);
   const resolved = new Map<string, string>();
   const fromVault: string[] = [];
+  // The vault secrets no host is bound to yet. They are bound to this one only at the end, once
+  // every name has resolved: a binding is a write, and a call refused by a later name would leave
+  // the secret bound to a host that received nothing, refusing the owner's real host from then on.
+  const toBind: string[] = [];
   // An address that does not parse binds nothing and sends nothing.
   const host = URL.canParse(url) ? new URL(url).host.toLowerCase() : '';
 
@@ -354,11 +362,13 @@ export async function resolveSecretForHeaders(deps: {
       if (plain) {
         // THE HOST. The address comes from the extension's script, so without this any extension a
         // person ran could send their credential to its author. The first use binds the host;
-        // every later call must go there. Storing the value again clears the binding.
-        const bound = record.hosts?.length ? record.hosts : (host ? await storage.bindSecretHost(ownerGhii, name, host) : []);
-        if (!host || !bound.includes(host)) {
+        // every later call must go there. Storing the value again clears the binding. Checked
+        // here, bound below (toBind).
+        const bound = record.hosts ?? [];
+        if (!host || (bound.length && !bound.includes(host))) {
           return { ok: false, reason: 'host', headerName: headerNaming(headers, name), secretName: name, boundTo: bound, host };
         }
+        if (!bound.length) toBind.push(name);
         resolved.set(name, plain); fromVault.push(name); continue;
       }
     }
@@ -372,6 +382,16 @@ export async function resolveSecretForHeaders(deps: {
     // several headers in it, and "which one" is half the answer.
     const missing = substituted.missing;
     return { ok: false, reason: 'unknown', headerName: headerNaming(headers, missing), secretName: missing };
+  }
+
+  // THE CALL IS ACCEPTED: every name resolved, every bound secret goes where it is bound. Only now
+  // is a first use bound to this host. The store answers the hosts the secret ended up bound to, so
+  // a concurrent first use that bound it elsewhere a moment ago is still refused here.
+  for (const name of toBind) {
+    const bound = await storage.bindSecretHost(ownerGhii, name, host);
+    if (!bound.includes(host)) {
+      return { ok: false, reason: 'host', headerName: headerNaming(headers, name), secretName: name, boundTo: bound, host };
+    }
   }
 
   // Fire-and-forget: the call must not wait on bookkeeping, and a lost stamp costs a line on a list.
