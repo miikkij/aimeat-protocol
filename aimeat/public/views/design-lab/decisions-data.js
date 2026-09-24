@@ -605,7 +605,7 @@ export const BUILT_WITHOUT_DECISION = {
       { page: 'Admin', reached: 'The top bar, the page and section titles, the labels, the buttons, the action links, the choices.', not: 'The dark side bar (only its chosen row follows the highlight colour), the metrics grid with its rules, the health table and the other tables still use admin\'s own CSS. Phases 5 to 7.' },
       { page: 'The app catalog', reached: 'Nothing yet.', not: 'Its screens are a separate build with their own CSS. Phase 9 (07, "Left").' },
     ] },
-  'themes-shapes': { title: 'Themes & Styles, shape values', commit: 'not committed yet', onMain: false, date: '2026-09-24',
+  'themes-shapes': { title: 'Themes & Styles, shape values', commit: '128a67649', onMain: false, date: '2026-09-24',
     what: 'A theme\'s corners, frames, shadows and letter case are now its shape values (theme.css --shape-*), and the component sheets read them instead of writing their own. A theme sets them once, in the Shapes tab or with aimeat_theme_save, and a component added later follows them. Pebble was remade on them from chat with the MCP tools only. Jouni: "katsoo että pebble syntyy myös niille uusille tehdyille komponenteille mitä tullaan tekemään kun tehdään settings & controls kirjastoon."',
     sets: [
       set('The move, AIMEAT: the home and the chat, every state, three widths, both modes', 150, 0),
