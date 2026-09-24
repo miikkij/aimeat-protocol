@@ -17,7 +17,6 @@ on:
 
 permissions:
   contents: read
-  issues: write
 
 jobs:
   sweep:
@@ -42,6 +41,8 @@ jobs:
           --health-retries 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Install pnpm
         uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
@@ -105,10 +106,39 @@ jobs:
           AIMEAT_E2E_NODE_ENTRY: dist
         run: pnpm test:e2e:${{ matrix.backend }}
 
-      - name: Open or update the issue for a red sweep
-        if: failure()
+  # THE ISSUE IS WRITTEN BY A JOB OF ITS OWN. The sweep installs and runs the whole dependency tree,
+  # so it holds a token that can only read; this job holds the one that writes issues and runs
+  # nothing but the gh CLI the runner carries. It reads each backend's result from this run (the
+  # sweep leg is named "sweep (<backend>)" after its job id and matrix value) and does what the
+  # sweep's own last two steps did: a red leg opens or updates its issue, a green one closes it.
+  issue:
+    needs: sweep
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read # read the sweep legs' results from this run
+      issues: write # open, comment on and close the nightly-sweep issue
+    strategy:
+      fail-fast: false
+      matrix:
+        backend: [sqlite, postgres-kysely]
+    steps:
+      - name: Read this backend's sweep result
+        id: sweep
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          BACKEND: ${{ matrix.backend }}
+        run: |
+          CONCLUSION="$(gh run view "$GITHUB_RUN_ID" --json jobs --jq ".jobs[] | select(.name == \"sweep ($BACKEND)\") | .conclusion")"
+          echo "sweep ($BACKEND): ${CONCLUSION:-not found}"
+          echo "conclusion=$CONCLUSION" >> "$GITHUB_OUTPUT"
+
+      - name: Open or update the issue for a red sweep
+        if: steps.sweep.outputs.conclusion == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
           BACKEND: ${{ matrix.backend }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
@@ -128,11 +158,12 @@ jobs:
       # #4 collected a "still red" comment every night from 2026-09-06 and nothing would ever have
       # taken them down, so the open count stopped meaning "something is broken now" and the person
       # who fixed the last red suite had to remember to close the issue by hand. The permission for
-      # this is already on the job (issues: write), and the step is silent when nothing is open.
+      # this is on this job (issues: write), and the step is silent when nothing is open.
       - name: Close the issue when the sweep is green
-        if: success()
+        if: steps.sweep.outputs.conclusion == 'success'
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
           BACKEND: ${{ matrix.backend }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |

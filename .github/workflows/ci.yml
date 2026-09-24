@@ -24,6 +24,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Install pnpm
         uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
@@ -87,6 +89,9 @@ jobs:
           if ! ls "$RUNNER_TOOL_CACHE"/CodeQL/*/x64/codeql/codeql >/dev/null 2>&1; then
             gh release download codeql-bundle-v2.27.0 --repo github/codeql-action \
               --pattern codeql-bundle-linux64.tar.zst --dir "$RUNNER_TEMP"
+            # The sha256 from the release's own codeql-bundle-linux64.tar.zst.checksum.txt for this
+            # tag, the file scripts/codeql-install.ts checks against on a workstation.
+            echo "5e0f04bcb92c0c0973b6f5597e55316269051fa98bda3f725d8af9a85016721a  $RUNNER_TEMP/codeql-bundle-linux64.tar.zst" | sha256sum -c -
             tar --zstd -xf "$RUNNER_TEMP/codeql-bundle-linux64.tar.zst" -C "$RUNNER_TEMP"
             export CODEQL_CLI="$RUNNER_TEMP/codeql/codeql"
             echo "CODEQL_CLI=$CODEQL_CLI" >> "$GITHUB_ENV"
@@ -112,6 +117,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Install pnpm
         uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
@@ -151,6 +158,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Install pnpm
         uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
@@ -196,6 +205,8 @@ jobs:
           --health-retries 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Install pnpm
         uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10

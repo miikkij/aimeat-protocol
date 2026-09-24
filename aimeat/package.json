@@ -25,6 +25,7 @@
     "check:notices": "tsx scripts/gen-third-party-notices.ts --check",
     "check:licenses": "tsx scripts/check-licenses.ts",
     "check:protocol-versions": "tsx scripts/check-protocol-versions.ts",
+    "check:supply-chain": "tsx scripts/check-supply-chain.ts",
     "sbom": "tsx scripts/gen-sbom.ts",
     "scan:vulns": "tsx scripts/scan-vulns.ts",
     "dev": "node scripts/vendor-libs.mjs && tsx scripts/kill-port.ts && tsx scripts/build-app-catalog.ts && tsx scripts/build-everything.ts && tsx scripts/build-sdk-libs.ts && node --env-file=.env --import tsx src/index.ts start",

@@ -5,6 +5,14 @@
 #
 # The installer is what the landing "Get your own →" button links to
 # (https://github.com/miikkij/aimeat-protocol/releases/latest).
+#
+# THREE JOBS, EACH HOLDING ONLY WHAT IT NEEDS. The build installs and runs the whole dependency
+# tree (npm packages, crates and their build scripts), so it holds no secret and a token that can
+# only read. The sign job holds the updater signing key and runs nothing but the Tauri CLI's
+# signer, a fixed release checked by its sha256, over the installer the build made. The publish
+# job holds the token that writes releases and runs nothing but a copy: it downloads what the two
+# jobs made and uploads it. The file names, the release assets, latest.json and the
+# `desktop-latest` release are the ones this workflow published when it was one job.
 name: Release Desktop Installer
 
 on:
@@ -20,9 +28,11 @@ jobs:
   build-windows:
     runs-on: windows-latest
     permissions:
-      contents: write # create the GitHub Release and upload installer assets
+      contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Verify tag matches tauri.conf.json version
         if: startsWith(github.ref, 'refs/tags/')
@@ -68,14 +78,16 @@ jobs:
         run: pnpm stage
         working-directory: aimeat-desktop
 
+      # No updater artifacts in this build, so it needs no signing key: sign-windows below signs
+      # the installer. With Tauri v2 and createUpdaterArtifacts true, the NSIS updater artifact is
+      # the -setup.exe itself and `tauri build` only adds its .sig, so the installers come out the
+      # same (tauri-cli 2.11.2: sign_updaters in bundle.rs returns at once when the setting is
+      # false, and the bundler builds NSIS and MSI the same way either way).
       - name: Build installers (NSIS + MSI)
-        run: pnpm tauri build
+        run: |
+          Set-Content -Path "$env:RUNNER_TEMP\no-updater-artifacts.json" -Value '{"bundle":{"createUpdaterArtifacts":false}}' -NoNewline -Encoding ascii
+          pnpm tauri build --config "$env:RUNNER_TEMP\no-updater-artifacts.json"
         working-directory: aimeat-desktop
-        env:
-          # Signs the Tauri updater artifacts (.sig) so the app can verify updates (minisign,
-          # NOT Authenticode). createUpdaterArtifacts in tauri.conf.json requires these.
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
       - name: List built bundles
         shell: bash
@@ -93,14 +105,57 @@ jobs:
           cp aimeat-desktop/src-tauri/target/release/bundle/msi/*.msi dist/
           ls -la dist
 
+      # The run's copy of the installers, and what sign-windows and publish-windows download.
+      - name: Upload build artifacts (run copy)
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: aimeat-desktop-windows
+          path: dist/*
+          if-no-files-found: error
+
+  # THE UPDATER SIGNING KEY IS USED HERE AND NOWHERE ELSE. The job downloads the installers the
+  # build made, puts the Tauri CLI on the runner and signs the installer the updater verifies. The
+  # CLI is tauri-cli 2.11.2, the version aimeat-desktop/pnpm-lock.yaml pins, from the release
+  # tauri-apps publishes it in; the sha256 is GitHub's digest of that asset. `tauri signer sign` is
+  # the routine `tauri build` signs updater artifacts with (sign_file in the CLI's
+  # helpers/updater_signature.rs) and writes <file>.sig beside the file. No checkout, no package
+  # install and no build script runs in this job.
+  sign-windows:
+    needs: build-windows
+    runs-on: windows-latest
+    permissions: {}
+    steps:
+      - name: Download the installers
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: aimeat-desktop-windows
+          path: dist
+
+      - name: Install the Tauri CLI (the signer only)
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path tauri-cli | Out-Null
+          Invoke-WebRequest -Uri https://github.com/tauri-apps/tauri/releases/download/tauri-cli-v2.11.2/cargo-tauri-x86_64-pc-windows-msvc.zip -OutFile tauri-cli/cargo-tauri.zip
+          $sha = (Get-FileHash -Algorithm SHA256 tauri-cli/cargo-tauri.zip).Hash.ToLowerInvariant()
+          if ($sha -ne 'b6844470bcbf1da6e5dbf01990ae317d4d7969171628bb8badbdbff2e3d06d23') { throw "cargo-tauri.zip: sha256 $sha is not the pinned one" }
+          Expand-Archive -Path tauri-cli/cargo-tauri.zip -DestinationPath tauri-cli
+          ./tauri-cli/cargo-tauri.exe --version
+
+      - name: Sign the installer the updater verifies
+        shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: ./tauri-cli/cargo-tauri.exe signer sign "$(ls dist/*-setup.exe | head -1)"
+
       # Build the updater manifest the app polls (tauri.conf.json endpoint). The .sig is the
-      # minisign signature tauri build produced over the SAME .exe we publish. NOTE: GitHub
+      # minisign signature the step above made over the SAME .exe we publish. NOTE: GitHub
       # replaces spaces in asset names with dots, so the URL uses the dotted name.
       - name: Generate update manifest (latest.json)
         if: startsWith(github.ref, 'refs/tags/')
         shell: bash
         run: |
-          NSIS=aimeat-desktop/src-tauri/target/release/bundle/nsis
+          NSIS=dist
           EXE="$(ls $NSIS/*-setup.exe | head -1)"
           SIG="$(ls $NSIS/*-setup.exe.sig 2>/dev/null | head -1 || true)"
           if [ -z "$SIG" ]; then echo "No .sig (updater artifacts not built) — skipping latest.json"; exit 0; fi
@@ -112,12 +167,34 @@ jobs:
             '{version:$v, pub_date:$d, platforms:{"windows-x86_64":{signature:$s, url:$u}}}' > dist/latest.json
           echo "latest.json:"; cat dist/latest.json
 
-      - name: Upload build artifacts (run copy)
+      - name: Hand the manifest to the publish job
+        if: startsWith(github.ref, 'refs/tags/')
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: aimeat-desktop-windows
-          path: dist/*
+          name: aimeat-desktop-update-manifest
+          path: dist/latest.json
           if-no-files-found: error
+
+  # THE TOKEN THAT WRITES RELEASES IS HERE, and the job runs nothing but a copy: it downloads the
+  # installers from build-windows and the manifest from sign-windows, and uploads them.
+  publish-windows:
+    needs: [build-windows, sign-windows]
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: windows-latest
+    permissions:
+      contents: write # create the GitHub Release and upload installer assets
+    steps:
+      - name: Download the installers
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: aimeat-desktop-windows
+          path: dist
+
+      - name: Download the update manifest
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: aimeat-desktop-update-manifest
+          path: dist
 
       # Publish the downloadable GitHub Release only for real tags.
       - name: Create / update GitHub Release
