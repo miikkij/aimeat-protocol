@@ -37,13 +37,20 @@
  *   v1.10.0 -- 2026-09-08 -- adminCliTools joins the table: the operator's CORS page in one read and
  *     the write that sets a person's or an agent's list, on the third surface from day one.
  *   v1.11.0 -- 2026-09-24 -- themeCliTools joins the table: the node's themes (Themes & Styles).
+ *   v1.12.0 -- 2026-09-24 -- `connect call` goes through the running serve daemon when it serves the
+ *     agent, and otherwise sends a credential asked for at that moment (a key mints) instead of the
+ *     stored bearer by value. A crew ran this every five seconds with an agent whose stray bearer had
+ *     expired, and the node refused it every time (production refusal log L-3).
  */
 
 import { existsSync, readFileSync } from 'node:fs';
 import { CLI_FALLBACK_TOOL_DEFINITIONS, getAimeatToolDefinition } from '../../mcp/catalog/definitions.js';
-import type { AimeatClient } from './api-client.js';
+import type { AimeatClient, ApiResponse } from './api-client.js';
 import { AimeatClient as Client } from './api-client.js';
 import { loadConfig, loadAgentByName, type AimeatConnectConfig } from './config.js';
+import { resolveToken } from './agent-key.js';
+import { readLiveDiscovery } from './mcp/local-discovery.js';
+import { LOOPBACK_REFUSAL } from './mcp/local-admission.js';
 import type { JsonObject, ConnectCliToolDefinition } from './tool-call-helpers.js';
 import { agentTools } from './tool-call-defs-agent.js';
 import { coreTools } from './tool-call-defs-core.js';
@@ -225,6 +232,48 @@ export function runToolSchema(toolName: string | undefined): void {
     printJson(tool);
 }
 
+/** The agent one `aimeat connect call` speaks as. */
+interface CallTarget { agent: string; owner: string; node_url: string }
+
+/**
+ * THROUGH THE RUNNING DAEMON, when one in this connector home serves the agent. The daemon holds a
+ * current credential for every agent it serves (minted from the key and renewed on its own), so a
+ * call made through it never carries a stored bearer by value, and a crew that runs this command
+ * every few seconds costs the node no mint and no refused request. It is one loopback POST to
+ * `/local/call/<tool>`, the same dispatch table, with the daemon's secret from serve.json.
+ *
+ * Null when no live daemon serves the agent, when the daemon has gone away, when it refuses the
+ * secret (a file from an earlier start) or no longer holds the agent: the caller then goes to the
+ * node itself.
+ */
+async function callThroughServeDaemon(tool: string, target: CallTarget, input: JsonObject): Promise<ApiResponse | null> {
+    const daemon = readLiveDiscovery();
+    const row = daemon?.agents.find(a => a.agent === target.agent && a.owner === target.owner);
+    if (!daemon || !row) return null;
+    const loopback = new Client(`http://127.0.0.1:${daemon.port}`, daemon.secret);
+    let answer: ApiResponse;
+    try {
+        answer = await loopback.post(`/local/call/${encodeURIComponent(tool)}?agent=${encodeURIComponent(row.gaii)}`, input);
+    } catch (err) {
+        console.error(`[connect] the serve daemon on port ${daemon.port} did not answer (${(err as Error).message}); calling the node directly`);
+        return null;
+    }
+    const code = String(answer?.error?.code);
+    const notForThisDaemon = (Object.values(LOOPBACK_REFUSAL) as string[]).includes(code) || code === 'UNKNOWN_AGENT';
+    return notForThisDaemon ? null : answer;
+}
+
+/**
+ * A client for the node itself, carrying a CURRENT credential: a key mints one, else the stored
+ * bearer is read. It knows whose credential it carries, so it asks again at every send and keeps
+ * the record of a credential the node refused (./refused-credentials.ts).
+ */
+async function directClient(target: CallTarget): Promise<AimeatClient> {
+    const token = await resolveToken(target.agent, target.owner, target.node_url);
+    if (!token) throw new Error(`No credential for ${target.agent}@${target.owner}. Run: npx aimeat connect`);
+    return new Client(target.node_url, token, { agent: target.agent, owner: target.owner });
+}
+
 export async function runToolCall(toolName: string | undefined, flags: Record<string, string>): Promise<void> {
     if (!toolName) {
         console.error('Usage: aimeat connect call <tool-name> --json input.json');
@@ -246,9 +295,7 @@ export async function runToolCall(toolName: string | undefined, flags: Record<st
         // `connect call --agent foo` silently used the primary's token and the primary's
         // agent name in the REST path -- so a multi-agent install could not target a
         // specific agent at all (the call always ran as the primary).
-        let agentName: string;
-        let owner: string;
-        let client: AimeatClient;
+        let target: CallTarget;
         let config: AimeatConnectConfig | { agent: string; owner: string; node_url: string };
 
         if (flags.agent) {
@@ -256,22 +303,20 @@ export async function runToolCall(toolName: string | undefined, flags: Record<st
             if (!loaded) {
                 throw new Error(`Agent "${flags.agent}" not found in connector. Run: aimeat connect list`);
             }
-            agentName = loaded.agent;
-            owner = loaded.owner;
-            client = new Client(loaded.config.node_url, loaded.token);
+            target = { agent: loaded.agent, owner: loaded.owner, node_url: loaded.config.node_url };
             config = { agent: loaded.agent, owner: loaded.owner, node_url: loaded.config.node_url };
         } else {
             const cfg = loadConfig();
             if (!cfg) throw new Error('Not configured. Run: npx aimeat connect');
-            agentName = cfg.agent;
-            owner = cfg.owner;
-            client = await Client.fromConfig();
+            target = { agent: cfg.agent, owner: cfg.owner, node_url: cfg.node_url };
             config = cfg;
         }
 
-        void owner; // reserved for future per-tool authorization checks
         const input = await readInput(flags);
-        const response = await tool.handler({ client, config, agentPath: encodeURIComponent(agentName) }, input);
+        // Through the running daemon when it serves this agent; otherwise straight to the node with
+        // a credential asked for now. Never a stored bearer by value: see callThroughServeDaemon.
+        const response = await callThroughServeDaemon(tool.name, target, input)
+            ?? await tool.handler({ client: await directClient(target), config, agentPath: encodeURIComponent(target.agent) }, input);
         if (!response.ok) {
             console.error(JSON.stringify(response.error ?? response, null, 2));
             process.exitCode = 1;

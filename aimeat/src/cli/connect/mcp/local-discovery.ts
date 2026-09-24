@@ -12,10 +12,12 @@
  *   Nothing changed in the move; local-server.ts re-exports every name so no importer notices.
  *
  * @structure SERVE_DISCOVERY_SCHEMA_VERSION · ServeDiscoveryAgent · ServeDiscoveryPrincipal ·
- *   ServeDiscovery · serveDiscoveryPath() · pidAlive() · exitIfAnotherDaemonOwns() ·
- *   writeDiscoveryFile()
+ *   ServeDiscovery · serveDiscoveryPath() · pidAlive() · readLiveDiscovery() ·
+ *   exitIfAnotherDaemonOwns() · buildDiscoveryDoc() · writeDiscoveryFile()
  * @usage import { serveDiscoveryPath, type ServeDiscovery } from './local-discovery.js';
  * @version-history
+ *   v1.3.0 — 2026-09-24 — `readLiveDiscovery()`: the running daemon, for a local program that calls
+ *     it (`aimeat connect call` goes through it when it serves the agent; L-3).
  *   v1.2.0 — 2026-09-24 — Schema 3: the file carries `secret`, which every request to the daemon must
  *     present (./local-admission.ts), and it is written readable by its owner only where the OS
  *     supports modes. Secaudit 2026-09, A9-1.
@@ -88,6 +90,23 @@ export function serveDiscoveryPath(): string {
 export function pidAlive(pid: number): boolean {
   try { process.kill(pid, 0); return true; }
   catch (err) { return (err as NodeJS.ErrnoException).code === 'EPERM'; }
+}
+
+/**
+ * The daemon this home's serve.json names, when its pid is alive and the file carries a secret
+ * (schema 3 and later); null otherwise. For a local program that calls the daemon.
+ */
+export function readLiveDiscovery(discoveryFile = serveDiscoveryPath()): ServeDiscovery | null {
+  if (!existsSync(discoveryFile)) return null;
+  let doc: ServeDiscovery | null = null;
+  try {
+    doc = JSON.parse(readFileSync(discoveryFile, 'utf-8')) as ServeDiscovery;
+  } catch (err) {
+    // A hand-edited or foreign file names no daemon the caller can use; it goes to the node instead.
+    console.error(`[connect] ${discoveryFile} could not be read (${String(err)}); not using the serve daemon`);
+  }
+  if (!doc?.pid || !pidAlive(doc.pid) || typeof doc.secret !== 'string' || !doc.secret || !Array.isArray(doc.agents)) return null;
+  return doc;
 }
 
 /**
