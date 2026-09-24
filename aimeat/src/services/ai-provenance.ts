@@ -30,6 +30,7 @@
  *   - contentHashOf(bytes)            — `sha256:<hex>`, node:crypto, no dependency
  *   - mintProvenance(storage, …)      — build + validate + persist, returns the stored row
  *   - provenanceForWrite(storage, …)  — THE decision a write surface makes: attach / declare / Mint-3
+ *   - provenanceDeclarationRefusal(…) — its refusal, asked before a door's first write
  *   - stampAutonomousOutput(…)        — the stamp for output the node produced on its own initiative;
  *                                       the "only substantive review upgrades it" rule lives here
  *   - stampAgentWrite(storage, …)     — MINT-3: the default for a non-human principal that declared
@@ -41,6 +42,8 @@
  *   import { mintProvenance, contentHashOf } from './ai-provenance.js';
  *   const row = await mintProvenance(storage, { stampedBy: 'node', ... , content });
  * @version-history
+ *   v1.3.1 — 2026-09-24 — provenanceDeclarationRefusal(): provenanceForWrite()'s refusal, asked
+ *     without minting, so a door that writes several fields asks it before the first (508c32904067).
  *   v1.3.0 — 2026-08-01 — TARGET-058 Phase 4. provenanceForWrite() folds the three cases a write
  *     surface faces — attach an existing record, honour a caller's DECLARATION, or fall back to
  *     Mint-3 — into one function, so the MCP write tools and the REST routes cannot drift into
@@ -481,6 +484,22 @@ export async function provenanceForWrite(
     baseUrl: input.baseUrl,
     enabled: input.enabled,
   });
+}
+
+/**
+ * Would provenanceForWrite() refuse this declaration? The same answer in the same order (minting
+ * off, a record of the caller's own attached, then the scope), asked without minting or writing
+ * anything. A door that writes other fields in the same request asks it before its first write
+ * (invariant 14): the refusal is otherwise heard only after those fields have landed.
+ */
+export async function provenanceDeclarationRefusal(
+  storage: Storage,
+  input: { principal: string; declaredId?: string; declared?: DeclaredProvenance; enabled?: boolean },
+): Promise<ProvenanceScopeError | null> {
+  if (input.enabled === false || !input.declared) return null;
+  if (await resolveAttachableProvenanceId(storage, ownerGhiiOf(input.principal), input.declaredId)) return null;
+  const may = await mayDeclareProvenance(storage, input.principal);
+  return may.ok ? null : new ProvenanceScopeError(may.scopes);
 }
 
 /**

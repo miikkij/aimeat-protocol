@@ -21,6 +21,9 @@
  *
  *   Runs against a live server (E2E_BASE, default http://localhost:40251).
  * @version-history
+ *   v1.1.0 — 2026-09-24 — An agent without provenance:write that declares how a legal page was
+ *     made is refused before its rename, park and access code land (508c32904067). Failed on the
+ *     old code first.
  *   v1.0.0 — 2026-08-29 — Initial.
  */
 import * as ed from '@noble/ed25519';
@@ -330,6 +333,43 @@ await test('Removing a page takes it down and is logged', async () => {
 await test('Owner B cannot write A\'s pages (404)', async () => {
     const { status } = await json(`/v1/apps/${FILE}`, bAuthed({ method: 'PATCH', body: JSON.stringify({ legal: { terms: { format: 'markdown', content: 'x' } } }) }));
     assert(status === 404, `status ${status}`);
+});
+
+// REFUSE BEFORE THE FIRST WRITE (508c32904067). Declaring how a page was made takes
+// provenance:write, and the legal block is read last: an agent holding app:write and not that
+// renamed the app, parked it and set its access code, and only then answered 403.
+await test('An agent that may not declare provenance is refused before anything in its PATCH lands', async () => {
+    const reg = await json('/v1/agents', aAuthed({
+        method: 'POST',
+        body: JSON.stringify({ name: 'legalnoprov', owner: ownerAName, capabilities: ['actions'], scopes: ['app:read', 'app:write'], model: 'test-model' }),
+    }));
+    assert(reg.status === 201, `register: ${reg.status} ${JSON.stringify(reg.body?.error)}`);
+    const gaii = reg.body.data.agent.gaii as string;
+    const timestamp = new Date().toISOString();
+    const signature = await signMsg(reg.body.data.private_key, gaii + timestamp);
+    const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ gaii, timestamp, signature }) });
+    assert(tok.body.ok === true, `agent token: ${JSON.stringify(tok.body.error)}`);
+    const narrow = bearer(tok.body.data.token as string);
+
+    const logTotal = async () => (await json(`${appPath}/audit?limit=1`, aAuthed())).body.data.total as number;
+    const nameNow = async () => {
+        const list = await json('/v1/apps?own=true&limit=200', aAuthed());
+        return (list.body.data.apps as Array<Record<string, any>>).find(a => a.filename === FILE)?.manifest?.name as string;
+    };
+    const [totalBefore, nameBefore] = [await logTotal(), await nameNow()];
+    const r = await json(`/v1/apps/${FILE}`, narrow({ method: 'PATCH', body: JSON.stringify({
+        name: 'Renamed by a refused call', parked: true, access_code: 'refused1234',
+        legal: { imprint: { format: 'markdown', content: '# Imprint\n\nShop Oy, Helsinki.' } },
+        ai_provenance: { level: 'ai-generated', method: 'fully-generated', human_involvement: 'none', model: 'test/model' },
+    }) }));
+    assert(r.status === 403 && /provenance:write/.test(String(r.body.error?.message)), `the declaration is refused by its scope: ${r.status} ${JSON.stringify(r.body?.error)}`);
+    assert(await nameNow() === nameBefore, 'the name did not change');
+    assert(await logTotal() === totalBefore, 'nothing reached the audit log: no rename, no park, no code');
+    assert((await page('imprint')).status === 404, 'and no imprint page');
+
+    // Without the declaration the same agent sets the page, stamped as the node saw it written.
+    const plain = await json(`/v1/apps/${FILE}`, narrow({ method: 'PATCH', body: JSON.stringify({ legal: { imprint: { format: 'markdown', content: '# Imprint\n\nShop Oy, Helsinki.' } } }) }));
+    assert(plain.status === 200, `an undeclared page is the agent's to set: ${plain.status} ${JSON.stringify(plain.body?.error)}`);
 });
 
 console.log('\nCleanup');
