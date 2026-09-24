@@ -18,6 +18,8 @@
  *
  * @usage cd aimeat && pnpm exec vitest run test/unit/connector-config-layout.test.ts
  * @version-history
+ *   v1.0.1 — 2026-09-24 — The re-enrolment case stays on one node and names its receiving identity:
+ *     an offer may no longer move an agent to another node (secaudit 2026-09, A9-2).
  *   v1.0.0 — 2026-09-01 — Initial, with the slimmed file and the per-owner layout.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -276,19 +278,26 @@ describe('a new-layout install', () => {
         // then write — and passed with the defect still in place, because a test that imitates the
         // path it is meant to guard asserts a rule that path never has to obey. `handleEnrolOffer`
         // is driven here against a fake node instead, so the assertion is about the code that runs.
+        //
+        // ONE NODE, since 2026-09-24. This setup used to re-enrol the agent from http://old:1 into
+        // http://new:2, which is an offer moving an agent to another node: exactly what an offer may
+        // no longer do (secaudit 2026-09, A9-2; connect-enrol-offer-binding.test.ts). The setup no
+        // longer matched what the path allows; the four connector fields are still the subject.
         mkdirSync(join(home, 'tokens'), { recursive: true });
         mkdirSync(join(home, 'keys'), { recursive: true });
         const { savePerAgentConfig } = await loadModule();
-        savePerAgentConfig('concierge', 'alice', { node_url: 'http://old:1', primary: true, runner: { command: 'run.sh' } });
+        savePerAgentConfig('concierge', 'alice', { node_url: 'http://node.example:2', primary: true, runner: { command: 'run.sh' } });
 
         process.env.AIMEAT_HOME = home;
         vi.resetModules();
         const { handleEnrolOffer } = await import('../../src/cli/connect/enrolment.js');
         const gaii = 'concierge#alice@test-node';
         const out = await handleEnrolOffer({
-            grant_id: 'g1', owner: 'alice', node_id: 'test-node', node_url: 'http://new:2',
+            grant_id: 'g1', owner: 'alice', node_id: 'test-node', node_url: 'http://node.example:2',
             agents: [{ name: 'concierge', gaii, scopes: [] }],
         }, {
+            // The offer arrived on the socket of another of alice's agents on the same node.
+            receiver: { gaii: 'receiver-bot#alice@test-node', owner: 'alice', config: { node_url: 'http://node.example:2' } },
             // The node accepts the card and hands back the identity, which is all this path reads.
             forward: async () => ({ status: 200, body: { ok: true, data: { enrolled: [{ name: 'concierge', gaii }] } } }),
             attach: async () => { /* the registry is not what this test is about */ },
@@ -297,7 +306,7 @@ describe('a new-layout install', () => {
         expect(out.ok).toBe(true);
 
         const after = yamlParse(readFileSync(newPath('concierge', 'alice'), 'utf-8')) as Record<string, unknown>;
-        expect(after.node_url).toBe('http://new:2');
+        expect(after.node_url).toBe('http://node.example:2');
         expect(after.primary).toBe(true);
         expect(after.runner).toEqual({ command: 'run.sh' });
     });

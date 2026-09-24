@@ -22,6 +22,10 @@
  *     config (or synthesize one from the global config for legacy installs)
  *
  * @version-history
+ *   v2.4.0 -- 2026-09-24 -- `peekPerAgentConfig` (the settings an agent is served with, read without
+ *                           the migration's write) and `fallbackConfigFor` (the loader's rule for a
+ *                           bearer with no per-agent file, moved out of loadAllAgents unchanged), so
+ *                           enrolment can check what it would overwrite before writing (secaudit A9-2).
  *   v1.0.0 -- original single-agent config
  *   v1.1.0 -- 2026-05-28 -- Security warning on wake.command (executes via exec)
  *   v2.0.0 -- 2026-05-29 -- Per-agent config layout + runner block + loadAllAgents
@@ -258,6 +262,27 @@ export function loadPerAgentConfig(agent: string, owner: string): AimeatPerAgent
 }
 
 /**
+ * The same answer as loadPerAgentConfig, WITHOUT the migration's write: the per-owner file, else
+ * the old shared one. For a check that must refuse before anything lands on disk.
+ */
+export function peekPerAgentConfig(agent: string, owner: string): AimeatPerAgentConfig | null {
+  return readConfigFile(perAgentConfigPath(agent, owner)) ?? readConfigFile(legacyPerAgentConfigPath(agent));
+}
+
+/**
+ * What loadAllAgents serves a stored bearer with when it has no per-agent file: the global config
+ * when that names this agent, else the public node. Legacy single-agent installs only.
+ */
+export function fallbackConfigFor(agent: string, owner: string, global: AimeatConnectConfig | null = loadConfig()): AimeatPerAgentConfig {
+  const isPrimary = !!global && global.agent === agent && global.owner === owner;
+  return {
+    node_url: isPrimary && global?.node_url ? global.node_url : 'https://aimeat.io',
+    wake: isPrimary ? global?.wake : undefined,
+    poll_interval: isPrimary ? global?.poll_interval : undefined,
+  };
+}
+
+/**
  * Write this agent's settings. Only the fields that belong here reach the file: `agent`, `owner`
  * and `mode` are dropped on every write, so a migrated old file loses them the first time anything
  * saves, without a migration that rewrites installs just to delete three lines.
@@ -331,17 +356,9 @@ export async function loadAllAgents(): Promise<LoadedAgent[]> {
 
   for (const cred of credentials) {
     seen.add(`${cred.agent}@${cred.owner}`);
-    let perAgent = loadPerAgentConfig(cred.agent, cred.owner);
-    if (!perAgent) {
-      // Legacy install: synthesize per-agent config from the global config when
-      // the global config points at this agent. Otherwise fall back to defaults.
-      const isPrimary = global && global.agent === cred.agent && global.owner === cred.owner;
-      perAgent = {
-        node_url: isPrimary && global?.node_url ? global.node_url : 'https://aimeat.io',
-        wake: isPrimary ? global?.wake : undefined,
-        poll_interval: isPrimary ? global?.poll_interval : undefined,
-      };
-    }
+    // Legacy install: synthesize per-agent config from the global config when
+    // the global config points at this agent. Otherwise fall back to defaults.
+    const perAgent = loadPerAgentConfig(cred.agent, cred.owner) ?? fallbackConfigFor(cred.agent, cred.owner, global);
     // The identity, from the credential. A v1 bearer carries it as `sub`; a token that does not is
     // one this daemon cannot place, and serving it under a bare name is exactly the defect this
     // resolves — so it is reported and skipped rather than guessed at.
