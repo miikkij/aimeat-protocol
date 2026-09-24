@@ -19,6 +19,7 @@
  * @structure decideRouter(config, storage)
  * @usage mounted in server-bootstrap/routes-loader.ts
  * @version-history
+ *   v1.3.2 — 2026-09-24 — The federated test is isForeignPrincipal(), the one question (secaudit 2026-09, F-1).
  *   v1.3.1 — 2026-09-23 — The five owner-only doors here say what they are and what an agent's own
  *     way in is, instead of the sign-in gate's sentence about the account:security permission.
  *   v1.3.0 — 2026-09-23 — Decision providers: `provider` on a call and a run and in the list filter;
@@ -39,7 +40,7 @@ import { assertAiUseAllowed } from '../auth/ai-gate.js';
 import { requireOwnerPrincipal, isOwnerPrincipal } from '../auth/account-security.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { success, error } from '../middleware/envelope.js';
-import { resolveIdentity } from '../utils/gaii.js';
+import { resolveIdentity, isForeignPrincipal } from '../utils/gaii.js';
 import { AiCompletionError } from '../services/ai-completion.js';
 import { agentNameOf } from '../services/agent-ai-keys.js';
 import {
@@ -59,7 +60,7 @@ import {
 
 /** The human whose account a decision belongs to, whoever asked. */
 export function decideOwnerOf(auth: NonNullable<Request['auth']>, nodeId: string): string {
-  if ((auth as { federated?: boolean }).federated) return resolveIdentity(auth, nodeId);
+  if (isForeignPrincipal(auth)) return resolveIdentity(auth, nodeId);
   return `${auth.owner}@${nodeId}`;
 }
 

@@ -38,12 +38,13 @@
  *   if (!reader) → 403
  *   const { conversations } = await readOwnerConversations(storage, reader);
  * @version-history
+ *   v1.0.1 — 2026-09-24 — The federated test is isForeignPrincipal(), the one question (secaudit 2026-09, F-1).
  *   v1.0.0 — 2026-09-12 — Initial: messages:read-as-owner for agents, and the messages:read door for
  *     apps, on the four mailbox reads that were owner-session only.
  */
 import type { Storage, DirectMessageRecord, ConversationRecord } from '../storage/interface.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
-import { parseGaiiLoose } from '../utils/gaii.js';
+import { parseGaiiLoose, isForeignPrincipal } from '../utils/gaii.js';
 import { createMessagingDbService, type OwnerConversation } from './db/messaging-db-service.js';
 import { createMessagesInboxService, type InboxOverview } from './db/messages-inbox-db-service.js';
 import { withMessageProvenance } from './message-provenance.js';
@@ -92,7 +93,7 @@ export function mailboxReaderOf(auth: MailboxPrincipal, nodeId: string): Mailbox
   const at = (kind: MailboxReaderKind): MailboxReader => ({
     kind, ownerGhii: `${auth.owner}@${nodeId}`, ownerName: auth.owner, actor: auth.sub,
   });
-  if (auth.federated) return null;
+  if (isForeignPrincipal(auth)) return null;
   const isApp = roles.includes('app');
   const actsForSomeone = isApp || roles.includes('agent') || roles.includes('ecosystem');
   if (!actsForSomeone && (roles.includes('owner') || roles.includes('operator'))) return at('owner');

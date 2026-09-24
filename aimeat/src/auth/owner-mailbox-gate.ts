@@ -16,12 +16,14 @@
  * @structure requireOwnerMailboxRead(nodeId)
  * @usage router.get('/v1/messages/inbox', requireAuth(), requireOwnerMailboxRead(config.nodeId), handler)
  * @version-history
+ *   v1.0.2 — 2026-09-24 — The federated test is isForeignPrincipal(), the one question.
  *   v1.0.1 — 2026-09-13 — The 401 also refuses the anonymous identity optionalAuth injects.
  *   v1.0.0 — 2026-09-12 — Initial, replacing requireRole('owner') on the four mailbox reads.
  */
 import type { Request, Response, NextFunction } from 'express';
 import { deny401, deny403, denyScope403 } from './deny.js';
 import { mailboxReaderOf, MESSAGES_READ_AS_OWNER_SCOPE } from '../services/owner-mailbox-reads.js';
+import { isForeignPrincipal } from '../utils/gaii.js';
 
 export function requireOwnerMailboxRead(nodeId: string) {
   return (req: Request, res: Response, next: NextFunction) => {
@@ -32,7 +34,7 @@ export function requireOwnerMailboxRead(nodeId: string) {
     if (!req.auth || req.auth.anonymous) { deny401(req, res, 'Authentication required'); return; }
     if (mailboxReaderOf(req.auth, nodeId)) { next(); return; }
     const roles = req.auth.roles ?? [];
-    if (req.auth.federated) {
+    if (isForeignPrincipal(req.auth)) {
       deny403(req, res, 'ACCESS_DENIED', 'A session signed in from another node has no mailbox on this one.');
       return;
     }

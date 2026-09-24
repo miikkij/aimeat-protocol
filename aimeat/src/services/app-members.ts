@@ -35,6 +35,7 @@
  */
 import { appKeySegment, equalAppId, readAppRecord, listAppRecords } from './app-record-keys.js';
 import type { Storage } from '../storage/interface.js';
+import { localAccountName } from '../utils/gaii.js';
 
 /** Platform-owned namespaces. Never an `ext:` one: that is the namespace the world can read. */
 const NS_MEMBER = 'app-member';
@@ -187,11 +188,12 @@ export function sameApp(a: string, b: string): boolean {
  * The owner name behind any principal (`alice`, `alice@node`, `bot#alice@node`), with its case left
  * alone. Owner names are looked up with an EXACT match in both storage providers, so anything that
  * feeds an identity lookup has to keep the capitals the account was registered with.
+ *
+ * A principal of ANOTHER node (a visitor's home GHII) comes back whole, because shortened it names
+ * the local account that shares its local part: localAccountName (utils/gaii.ts) says why.
  */
 export function bareOwner(principal: string): string {
-  const s = String(principal || '');
-  const afterHash = s.includes('#') ? s.slice(s.indexOf('#') + 1) : s;
-  return afterHash.split('@')[0];
+  return localAccountName(String(principal || ''));
 }
 
 /**

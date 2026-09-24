@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description Federated memory browsing routes: pull, push-home, list-home (federated sessions) + list-remote, pull-remote (home users). Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.3.0 — 2026-09-24 — The visitor's home GHII comes from homeIdentityOf, and "is this a visitor"
+ *     from isForeignPrincipal. verifyJWT now hands a visitor its home GHII as `owner`, so composing
+ *     `${owner}@${homeNode}` here would have named it twice (secaudit 2026-09, F-1).
  *   v1.2.0 — 2026-09-08 — push-home signs the replicate payload with the node key, over the seven
  *     fields the receiving door verifies. It had sent none, so it could not land on a real node.
  *   v1.1.0 — 2026-08-10 — Security audit H-15: list-home and list-remote sign the peer memory-list request
@@ -15,6 +18,7 @@ import type { Router } from 'express';
 import { requireAuth } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { validateOutboundUrl } from '../../utils/url-validator.js';
+import { homeIdentityOf, isForeignPrincipal } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
 import { emitChange } from '../../services/event-bus.js';
 import { sign } from '../../auth/keypair.js';
@@ -39,7 +43,7 @@ export function registerFederationRoutes(router: Router, ctx: MemoryRouteCtx): v
 
   // ── /v1/memory/pull — Copy a memory entry from home node to local (federated sessions) ──
   router.post('/v1/memory/pull', requireAuth(), async (req, res) => {
-    if (!req.auth!.federated) {
+    if (!isForeignPrincipal(req.auth)) {
       res.status(400).json(error(config.nodeId, 'NOT_FEDERATED', 'This endpoint is only available for federated sessions'));
       return;
     }
@@ -58,7 +62,7 @@ export function registerFederationRoutes(router: Router, ctx: MemoryRouteCtx): v
     }
 
     // Construct the owner's GHII on the home node
-    const ownerGhii = `${req.auth!.owner}@${homeNode}`;
+    const ownerGhii = homeIdentityOf(req.auth!);
 
     // Resolve home URL: prefer peer map (verified), fall back to JWT claim
     let resolvedUrl = homeUrl;
@@ -139,7 +143,7 @@ export function registerFederationRoutes(router: Router, ctx: MemoryRouteCtx): v
 
   // ── /v1/memory/push-home — Save local memory entry to home node (federated sessions) ──
   router.post('/v1/memory/push-home', requireAuth(), async (req, res) => {
-    if (!req.auth!.federated) {
+    if (!isForeignPrincipal(req.auth)) {
       res.status(400).json(error(config.nodeId, 'NOT_FEDERATED', 'This endpoint is only available for federated sessions'));
       return;
     }
@@ -185,7 +189,7 @@ export function registerFederationRoutes(router: Router, ctx: MemoryRouteCtx): v
     try {
       const payload: Record<string, unknown> = {
         source_node: config.nodeId,
-        gaii: `${req.auth!.owner}@${homeNode}`,
+        gaii: homeIdentityOf(req.auth!),
         key,
         value: record.value,
         visibility: record.visibility,
@@ -237,7 +241,7 @@ export function registerFederationRoutes(router: Router, ctx: MemoryRouteCtx): v
 
   // ── /v1/memory/list-home — List memories on home node (federated sessions) ──
   router.post('/v1/memory/list-home', requireAuth(), async (req, res) => {
-    if (!req.auth!.federated) {
+    if (!isForeignPrincipal(req.auth)) {
       res.status(400).json(error(config.nodeId, 'NOT_FEDERATED', 'This endpoint is only available for federated sessions'));
       return;
     }
@@ -249,7 +253,7 @@ export function registerFederationRoutes(router: Router, ctx: MemoryRouteCtx): v
       return;
     }
 
-    const ownerGhii = `${req.auth!.owner}@${homeNode}`;
+    const ownerGhii = homeIdentityOf(req.auth!);
 
     let resolvedUrl = homeUrl;
     if (peers) {
@@ -300,7 +304,7 @@ export function registerFederationRoutes(router: Router, ctx: MemoryRouteCtx): v
 
   // ── /v1/memory/list-remote — List memories on a remote peer node (home users) ──
   router.post('/v1/memory/list-remote', requireAuth(), async (req, res) => {
-    if (req.auth!.federated) {
+    if (isForeignPrincipal(req.auth)) {
       res.status(400).json(error(config.nodeId, 'NOT_HOME', 'This endpoint is only available for home sessions'));
       return;
     }
@@ -366,7 +370,7 @@ export function registerFederationRoutes(router: Router, ctx: MemoryRouteCtx): v
 
   // ── /v1/memory/pull-remote — Pull a specific key from a remote peer node (home users) ──
   router.post('/v1/memory/pull-remote', requireAuth(), async (req, res) => {
-    if (req.auth!.federated) {
+    if (isForeignPrincipal(req.auth)) {
       res.status(400).json(error(config.nodeId, 'NOT_HOME', 'This endpoint is only available for home sessions'));
       return;
     }

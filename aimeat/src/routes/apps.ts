@@ -101,8 +101,12 @@
  *     (ownAppScope), the one place that answers "whose app does this write land in". Pure move:
  *     this door still extracts the owner from its own `owner` claim, and with nobody else's app
  *     named the answer is the caller's own, exactly as before.
+ *   2026-09-24 -- canonicalOwner and appTarget shorten the caller's `owner` claim with
+ *     localAccountName: `name@node` of THIS node is still the bare name, and a visitor's home GHII
+ *     stays whole, so it no longer lands in the local namesake's app bucket (secaudit 2026-09, F-1).
  */
 import { Router } from 'express';
+import { localAccountName } from '../utils/gaii.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { PeerInfo } from '../services/federation.js';
@@ -136,7 +140,7 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
         // and it stays here because the MCP door parses a GAII instead and the two disagree about
         // which strings they accept. What they agreed on — resolve the identity record, fall back to
         // `owner@node` — is now one function, so a change to where an app lands lands in one place.
-        const owner = rawOwner.includes('@') ? rawOwner.split('@')[0] : rawOwner;
+        const owner = localAccountName(rawOwner);
         const t = await resolveAppTarget(storage, config, { callerOwner: owner, act: 'draft' });
         // The own-owner branch cannot refuse, and this closure has no way to report one: every door
         // that can name a DIFFERENT owner asks `appTarget` instead, which answers with the refusal.
@@ -159,7 +163,7 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
         const raw = String(req.params?.owner ?? (req.body as Record<string, unknown> | undefined)?.owner ?? '');
         const named = raw === 'me' ? '' : raw;
         const rawOwner = req.auth!.owner;
-        const callerOwner = rawOwner.includes('@') ? rawOwner.split('@')[0] : rawOwner;
+        const callerOwner = localAccountName(rawOwner);
         const t = await resolveAppTarget(storage, config, {
             callerOwner,
             requestedOwner: named,

@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Per-key memory routes: GET/DELETE/PUT /v1/memory/:key, CORS management, and the public GET /v1/memory/:gaii/:key read. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.5.1 — 2026-09-24 — The federated test is isForeignPrincipal(), the one question (secaudit 2026-09, F-1).
  *   v1.5.0 — 2026-09-16 — Every read answer shows a credential record redacted (shownMemoryValue), and
  *     PUT refuses openrouter.apikey and commerce.psp with SECRET_RECORD.
  *   v1.4.1 — 2026-09-13 — PUT refuses an EXCHANGE listing source whose changed text would break an
@@ -41,7 +42,7 @@ import { ecoMayReadKey, ecoMayWriteKey } from '../../services/ecosystem-access.j
 import { appMayWriteKey } from '../../utils/reserved-keys.js';
 import { isSecretRecordKey, secretRecordWriteRefusal, shownMemoryValue } from '../../services/secret-records.js';
 import { stampAgentWrite, resolveAttachableProvenanceId } from '../../services/ai-provenance.js';
-import { ownerGhiiOf } from '../../utils/gaii.js';
+import { ownerGhiiOf, isForeignPrincipal } from '../../utils/gaii.js';
 import { loadServedProvenance, envelopeMeta, setProvenanceHeaders } from '../../services/ai-provenance-marks.js';
 import { type MemoryRouteCtx, isAnonymousGaii, visibilityToZone, memoryContentBytes } from './shared.js';
 import { logger } from '../../utils/logger.js';
@@ -89,7 +90,7 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
       const targetAgent = await storage.getAgent(agentParam);
       // `targetAgent.owner !== req.auth!.owner` compares NAMES, and a federated visitor's name is
       // the local part of an account on another node: it matches the local namesake's agents.
-      if (!targetAgent || targetAgent.owner !== req.auth!.owner || req.auth!.federated) {
+      if (!targetAgent || targetAgent.owner !== req.auth!.owner || isForeignPrincipal(req.auth)) {
         res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'You can only read memory of your own agents'));
         return;
       }
@@ -123,7 +124,7 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
     // the fan-out would read the local account that happens to share it. Their own records are
     // keyed by their home GHII (utils/gaii.ts resolveIdentity), which the plain read below uses.
     const ownerScopeRead = (isOwnerSession || req.query.owner_scope === 'true')
-      && !agentParam && !isEcosystem && !req.auth!.federated;
+      && !agentParam && !isEcosystem && !isForeignPrincipal(req.auth);
     let record = ownerScopeRead
       ? await memoryDb.getOwnerScope(req.auth!.owner, key)
       : await storage.getMemory(gaii, key);

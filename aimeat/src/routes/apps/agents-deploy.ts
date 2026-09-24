@@ -14,6 +14,8 @@
  *     GET .../instances (hosted instances of the agent + their PUBLIC offers/prices)
  * @usage registered from appsRouter() in src/routes/apps.ts
  * @version-history
+ *   v1.2.1 — 2026-09-24 — bareOwner(req) is localAccountName: a visitor's home GHII stays whole and
+ *     never names the local account sharing its local part (secaudit 2026-09, F-1).
  *   v1.2.0 — 2026-09-06 — The shelf's `online` counts a live connector socket, so a hosted agent
  *     that starts a runtime per job is offered rather than sorted to the bottom as offline.
  *   v1.1.0 — 2026-07-16 — Slice 2: GET .../instances — discover already-hosted instances of an
@@ -26,7 +28,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage, AppRecord } from '../../storage/interface.js';
 import { requireAuth, optionalAuth, requireScope } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
-import { buildGAII, validateAgentName } from '../../utils/gaii.js';
+import { buildGAII, validateAgentName, localAccountName } from '../../utils/gaii.js';
 import { deployedAgentName } from '../../models/crew-def-schemas.js';
 import type { Offer } from '../../models/offer-schemas.js';
 import { createAppAgentTask } from '../../services/app-agent-deploy.js';
@@ -37,8 +39,7 @@ const DEFAULT_RUNNER = 'crew-forge';
 
 /** Bare owner name of the authenticated principal (owner claim may carry an @node suffix). */
 function bareOwner(req: Request): string {
-    const raw = req.auth!.owner;
-    return raw.includes('@') ? raw.split('@')[0] : raw;
+    return localAccountName(req.auth!.owner);
 }
 
 function tokenHasScope(req: Request, scope: string): boolean {

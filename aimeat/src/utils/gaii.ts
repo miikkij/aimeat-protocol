@@ -12,9 +12,17 @@
  *   - GAII: parseGAII / buildGAII / isValidGAII / validateAgentName
  *   - GEAI: parseGEAI / buildGEAI / isValidGEAI / validateAppName / isGEAI / ECO_PREFIX
  *   - resolveIdentity (owner→GHII, agent/ecosystem→sub verbatim), parseGaiiLoose, isSameOwner
+ *   - isForeignPrincipal / homeIdentityOf / FEDERATED_ROLE: a session signed in on another node
+ *   - setThisNodeId / localAccountName: the account an identity names on THIS node, or none
  *   - Chat instance + device-auth user-code helpers
  * @usage import { resolveIdentity, parseGEAI, isGEAI } from '../utils/gaii.js';
  * @version-history
+ *   v1.6.0 — 2026-09-24 — `isForeignPrincipal`, `homeIdentityOf` and `FEDERATED_ROLE`: the ONE
+ *     question every federated check asks, and the visitor's own name. verifyJWT reads a federated
+ *     token as a visitor with this role and this name, so no door can mistake it for the local
+ *     account that shares its local part (secaudit 2026-09, root cause F-1). `localAccountName` and a
+ *     node-aware `isSameOwner` close the other half: an identity of another node is never shortened
+ *     or compared into a local account name.
  *   v1.5.0 — 2026-08-24 — Node-id grammar loses the hardcoded `aimeat-` prefix: any 3-64 chars of
  *     lowercase alphanumerics in two or more hyphen-separated segments. The prefix made every
  *     strict parse fail on the first organisation node (innokas-finland-001-genesis), which broke
@@ -193,6 +201,72 @@ export function agentGaiiFromIdentifier(identifier: string, owner: string, nodeI
     return identifier.includes('#') ? identifier : buildGAII(identifier, owner, nodeId);
 }
 
+/**
+ * The role a session signed in on ANOTHER node holds here, and the only one.
+ *
+ * The federated login minted `roles: ['owner']` until 2026-09-24, as a courtesy, with `owner` set to
+ * the local part of the visitor's home name. Every door that asked "is this the account holder" of
+ * the role, or looked the account up by that name, then answered for whichever LOCAL account shares
+ * the local part. September's fixes closed it door by door (`requireLocalSession`), then at four
+ * gates, and the audit still found doors deciding on `roles.includes('owner')` or `req.auth.owner`
+ * alone: the agent roster, the home feed, the A2A account road, the AI-spend gate, device
+ * authorization's same-owner shortcut, the schema door, the personal tunnel. A role no gate treats as
+ * an owner, and a name no local account can have, close all of them where the token is read.
+ */
+export const FEDERATED_ROLE = 'federated';
+
+/**
+ * Is this principal a visitor signed in on ANOTHER node (a federated session)?
+ *
+ * The one question every federated check asks, so the exclusion cannot be present on two doors out
+ * of five again (secaudit 2026-09, A4). A visitor acts here under its own home identity and reaches
+ * what the scopes this node granted its peer allow: never a local account, never a local role.
+ */
+export function isForeignPrincipal(auth: { federated?: boolean } | null | undefined): boolean {
+  return auth?.federated === true;
+}
+
+/**
+ * A visitor's own identity: its HOME GHII (`alice@their-node`). Idempotent, so a name already in that
+ * shape is kept. A session with no home node gets a name that resolves to nothing rather than one
+ * that could resolve to a local account.
+ */
+export function homeIdentityOf(auth: { owner: string; homeNode?: string }): string {
+  return auth.owner.includes('@') ? auth.owner : `${auth.owner}@${auth.homeNode ?? 'unknown-home-node'}`;
+}
+
+/**
+ * This node's own id, registered once at boot (auth/middleware.ts initSessionAuth), so that
+ * localAccountName can tell this node's identities from another node's without a config argument at
+ * every call. Unset (unit tests, the connector CLI), localAccountName shortens every identity, which
+ * is what it did before it knew.
+ */
+let thisNodeId: string | null = null;
+export function setThisNodeId(nodeId: string | null): void {
+  thisNodeId = nodeId;
+}
+
+/**
+ * The account name an identity names ON THIS NODE, case kept: `alice` for `alice`, `alice@this-node`,
+ * `bot#alice@this-node` and `eco:app#alice@this-node`.
+ *
+ * An identity of ANOTHER node is returned WHOLE. A visitor signed in from another node is named by
+ * its home GHII (`alice@their-node`); shortened to its local part it names the LOCAL account `alice`,
+ * and the doors that asked "is the caller this app's owner" or "which roster row is the caller's" on
+ * the shortened name answered for her: the app member roster and its plan, the roadmap, the legal
+ * page, every door behind the apps router's canonicalOwner (secaudit 2026-09, root cause F-1). Whole,
+ * it names nobody here. The six copies of `x.includes('@') ? x.split('@')[0] : x` that shortened the
+ * CALLER are this function now; the ones that shorten a stored record's owner or an app id are not
+ * the caller and stay as they are.
+ */
+export function localAccountName(identity: string): string {
+  const s = String(identity ?? '');
+  const at = s.lastIndexOf('@');
+  if (thisNodeId && at >= 0 && s.slice(at + 1) !== thisNodeId) return s;
+  const afterHash = s.includes('#') ? s.slice(s.indexOf('#') + 1) : s;
+  return afterHash.split('@')[0];
+}
+
 export function resolveIdentity(
   auth: { sub: string; owner: string; roles: string[]; federated?: boolean; homeNode?: string },
   nodeId: string,
@@ -217,7 +291,10 @@ export function resolveIdentity(
   // A federated session whose token carries no homeNode gets a name that resolves to nothing rather
   // than falling through to the local composition. There is no such mint today, and if one appears,
   // it reads nobody's data instead of reading the namesake's.
-  if (auth.federated) return `${auth.owner}@${auth.homeNode ?? 'unknown-home-node'}`;
+  //
+  // Since 2026-09-24 verifyJWT already hands a visitor its home GHII as `owner`; homeIdentityOf keeps
+  // a name in that shape and composes one only for a caller that built the auth object by hand.
+  if (isForeignPrincipal(auth)) return homeIdentityOf(auth);
   const isOwnerSession = auth.roles.includes('owner') &&
     !auth.roles.includes('agent') && !auth.roles.includes('ecosystem');
   return isOwnerSession ? `${auth.owner}@${nodeId}` : auth.sub;
@@ -292,7 +369,14 @@ export function parseGaiiLoose(gaii: string): { agent: string; owner: string; no
  * Handles both GHII ("alice@node") and GAII ("agent#alice@node") formats.
  */
 export function isSameOwner(gaiiA: string, gaiiB: string): boolean {
-  return parseGaiiLoose(gaiiA).owner === parseGaiiLoose(gaiiB).owner;
+  // The NODE is half of who an owner is. `alice@their-node` and `alice@this-node` are two people who
+  // share a local part, and a peer's operator chooses the names on their own node. Compared by name
+  // alone, a visitor from another node was the owner of the local namesake's shared boards and
+  // workspace manifests, and a direct message from a remote namesake skipped the request queue
+  // (secaudit 2026-09, root cause F-1).
+  const a = parseGaiiLoose(gaiiA);
+  const b = parseGaiiLoose(gaiiB);
+  return a.owner === b.owner && a.node === b.node;
 }
 
 /**

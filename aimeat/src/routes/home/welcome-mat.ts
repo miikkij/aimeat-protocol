@@ -21,6 +21,7 @@
  * @structure registerWelcomeMatRoutes(router, ctx): POST /v1/home/welcome-mat, POST /v1/home/ai-client
  * @usage Registered from src/routes/home.ts.
  * @version-history
+ *   v1.2.1 — 2026-09-24 — The federated test is isForeignPrincipal(), the one question (secaudit 2026-09, F-1).
  *   v1.2.0 — 2026-09-24 — requireOwnerSession refuses a federated session: a visitor from another
  *     node carries roles:['owner'] and passed the person test, so the home step served the local
  *     namesake's home to a stranger (secaudit 2026-09: A3-1).
@@ -33,6 +34,7 @@ import type { Router, RequestHandler } from 'express';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { requireAuth, requireRole } from '../../auth/middleware.js';
+import { isForeignPrincipal } from '../../utils/gaii.js';
 import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
 import { logger } from '../../utils/logger.js';
@@ -71,7 +73,7 @@ export function requireOwnerSession(nodeId: string): RequestHandler {
         // A federated session carries roles:['owner'] with none of agent/ecosystem/app, so the test
         // below said "person" for a visitor from another node whose name matches a local account. The
         // home is the LOCAL person's; a visitor has none here (secaudit 2026-09: A3-1).
-        const isPerson = roles.includes('owner') && !req.auth?.federated
+        const isPerson = roles.includes('owner') && !isForeignPrincipal(req.auth)
             && !roles.includes('agent') && !roles.includes('ecosystem') && !roles.includes('app');
         if (!isPerson) {
             res.status(403).json(error(nodeId, 'ACCESS_DENIED',

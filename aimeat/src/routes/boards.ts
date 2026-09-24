@@ -13,6 +13,7 @@
  *   - resolve(): identity resolution via resolveIdentity for owner-scoped writes
  *
  * @version-history
+ *   v1.8.1 — 2026-09-24 — The federated test is isForeignPrincipal(), the one question (secaudit 2026-09, F-1).
  *   v1.8.0 — 2026-09-12 — GET /v1/boards says how many live notices each board carries and when the
  *     newest was written (storage.boardPostCounts, one grouped query for the listing). A listing is
  *     asked first which of its boards is alive, and answering it needed one request per board.
@@ -80,7 +81,7 @@ import {
   createBoard, subscribeToBoard, reactToBoardPost, unreactToBoardPost, setBoardMembers, setBoardRules, deleteBoardById, boardRulesBlock,
   publicBoardCeiling,
 } from '../services/board-write.js';
-import { resolveIdentity, isSameOwner, parseGaiiLoose } from '../utils/gaii.js';
+import { resolveIdentity, isSameOwner, parseGaiiLoose, isForeignPrincipal } from '../utils/gaii.js';
 import {
   loadServedProvenance, loadServedProvenanceMany, provenanceItemBlock, setProvenanceHeaders,
 } from '../services/ai-provenance-marks.js';
@@ -257,7 +258,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
     // a visitor from another node carries the local part of THEIR name, which matches the local
     // account that shares it. Their boards are on their home node.
     const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent')
-      && !req.auth!.federated;
+      && !isForeignPrincipal(req.auth);
     const isOperatorOwner = isOwnerSession && req.auth!.roles.includes('operator');
     if (!isOwnerSession) {
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the board owner (owner session) or operator can manage members'));

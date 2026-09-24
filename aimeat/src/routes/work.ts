@@ -12,6 +12,7 @@
  *   - Routes: POST /v1/work[/request|/batch], GET inbox/sent/:tc, POST :tc/{accept,progress,reject,deliver,rate}
  *
  * @version-history
+ *   v1.3.1 — 2026-09-24 — The federated test is isForeignPrincipal(), the one question (secaudit 2026-09, F-1).
  *   v1.3.0 — 2026-09-13 — Forwarding a work request to a remote node goes through safeFetch. The
  *     validateOutboundUrl() above it reads the first hop only, so a node that passed it could 302
  *     the call to loopback; safeFetch re-validates every hop. The pre-check stays, because it is
@@ -34,6 +35,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { MailboxNotificationService } from '../services/mailbox-notification.js';
 import { requireAuth, requireExternalPrincipal, requireScope } from '../auth/middleware.js';
+import { isForeignPrincipal } from '../utils/gaii.js';
 import { success, error } from '../middleware/envelope.js';
 import { generateTrackingCode } from '../utils/tracking-code.js';
 import { calculateWorkCost, holdEscrow } from '../services/morsel.js';
@@ -333,7 +335,7 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
     // Not a federated session: the fan-out below resolves agents from the owner NAME, which for a
     // visitor from another node is the local part of their own name and names the local namesake.
     const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent')
-      && !req.auth!.federated;
+      && !isForeignPrincipal(req.auth);
     let items: Awaited<ReturnType<typeof storage.listWorkByProvider>>;
     if (isOwnerSession) {
       // Owner sees work across all their agents — ONE providerGaii IN (…) query, not one per agent.
@@ -367,7 +369,7 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
     // admits the `owner` role and asks nothing about where the session came from, so it does not
     // cover this. Found by the AI triage of 2026-09-13.
     const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent')
-      && !req.auth!.federated;
+      && !isForeignPrincipal(req.auth);
     let items: Awaited<ReturnType<typeof storage.listWorkByRequester>>;
     if (isOwnerSession) {
       // ONE requesterGaii IN (…) query across the owner's agents, not one per agent.
@@ -399,7 +401,7 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
   router.get('/v1/work/overview', requireAuth(), requireExternalPrincipal(), requireScope('work:read'), async (req, res) => {
     // Same reason as /v1/work/inbox above: an owner-name fan-out is not a visitor's own work.
     const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent')
-      && !req.auth!.federated;
+      && !isForeignPrincipal(req.auth);
     const data = await workTabDb.overview(isOwnerSession, req.auth!.owner as string, req.auth!.sub as string);
     res.json(success(config.nodeId, data));
   });

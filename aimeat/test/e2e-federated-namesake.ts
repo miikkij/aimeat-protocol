@@ -18,6 +18,12 @@
  *   attestation. The runner pins AIMEAT_FEDERATION_AUTH_POLICY=all_peers and private egress.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-federated-namesake
  * @version-history
+ *   v1.5.0 — 2026-09-24 — The ROOT, not the gates: verifyJWT reads the visitor as role 'federated'
+ *     named by its home GHII, and the suite asks EVERY GET door in openapi.yaml whether a visitor
+ *     named like the local account gets anything a visitor with a fresh name does not. Plus the four
+ *     doors that decided on the role alone: the A2A account road, the AI-spend gate, device
+ *     authorization's same-owner shortcut and the node-wide schema door. Each new case failed on the
+ *     source (secaudit 2026-09: A3-1, A4-1, A4-2, A6-4, A1-1).
  *   v1.4.0 — 2026-09-24 — The GATES, not one door at a time: requireRole('owner'),
  *     requireOwnerPrincipal and requireOwnerSession admitted a federated session, so every owner
  *     door the door-by-door sweep did not name (agent rekey, passkey setup, the home step) was open
@@ -35,7 +41,9 @@
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from 'node:http';
 import { AddressInfo } from 'node:net';
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import * as ed from '@noble/ed25519';
+import { parse as parseYaml } from 'yaml';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -91,15 +99,16 @@ function send(res: ServerResponse, status: number, payload: unknown): void {
     res.end(JSON.stringify(payload));
 }
 
-/** The home node: one door, the signed attestation register-login.ts verifies. */
+/** The home node: one door, the signed attestation register-login.ts verifies. It vouches for any
+ *  name it is asked about, so a second visitor with a name no local account has is the control. */
 function startHomeNode(): Promise<{ server: Server; url: string }> {
     const server = createServer((req, res) => {
         void (async () => {
             if (req.method === 'POST' && req.url === '/v1/federation/auth/verify') {
-                await readBody(req);
+                const who = /"username"\s*:\s*"([^"]+)"/.exec(await readBody(req))?.[1] ?? namesake;
                 const payload = {
                     verified: true,
-                    ghii: `${namesake}@${homeNodeId}`,
+                    ghii: `${who}@${homeNodeId}`,
                     display_name: 'A visitor who shares a local name',
                     home_node: homeNodeId,
                     home_url: homeUrl,
@@ -161,12 +170,15 @@ async function run() {
         assert(act.status === 200, `peer activate: ${act.status} ${JSON.stringify(act.body)}`);
     });
 
-    await test('The visitor signs in from the home node, and the session carries the LOCAL name', async () => {
+    await test('The visitor signs in from the home node as a visitor: its home GHII, no local role', async () => {
+        // Until 2026-09-24 the session carried the LOCAL name (the bare local part) and roles
+        // ['owner'], which is the whole of this suite's subject. It is named by its home node now.
         const r = await json('/v1/ghii/login', { method: 'POST', body: JSON.stringify({ username: `${namesake}@${homeNodeId}`, password: 'the-home-node-decides' }) });
         assert(r.status === 200, `federated login: ${r.status} ${JSON.stringify(r.body)}`);
         fedToken = r.body.data.token;
         const c = claims(fedToken);
-        assert(c.federated === true && c.owner === namesake, `the session this suite is about: ${JSON.stringify({ federated: c.federated, owner: c.owner })}`);
+        assert(c.federated === true && c.owner === `${namesake}@${homeNodeId}` && JSON.stringify(c.roles) === '["federated"]',
+            `the session this suite is about: ${JSON.stringify({ federated: c.federated, owner: c.owner, roles: c.roles })}`);
     });
 
     // ── The identity itself. Everything below follows from this one answer. ──
@@ -203,8 +215,9 @@ async function run() {
         }
         for (const path of ['/v1/memory', '/v1/memory?owner_scope=true', '/v1/memory?prefix=namesake.']) {
             const l = await json(path, as(fedToken));
-            assert(!JSON.stringify(l.body?.data ?? '').includes('namesake.private'),
-                `the visitor listed the local account's keys via ${path}: ${JSON.stringify(l.body?.data).slice(0, 300)}`);
+            const seen = JSON.stringify(l.body?.data ?? l.body ?? '');
+            assert(l.status < 500, `${path} broke for the visitor: ${l.status} ${seen.slice(0, 300)}`);
+            assert(!seen.includes('namesake.private'), `the visitor listed the local account's keys via ${path}: ${seen.slice(0, 300)}`);
         }
     });
 
@@ -270,6 +283,103 @@ async function run() {
         assert(ownRekey.status === 200, `positive control: the namesake cannot rekey her own agent: ${ownRekey.status} ${JSON.stringify(ownRekey.body?.error)}`);
         const ownHome = await json('/v1/home/state', as(alice.token));
         assert(ownHome.status === 200, `positive control: the namesake's own home step: ${ownHome.status}`);
+    });
+
+    // EVERY GET DOOR THE CONTRACT NAMES, NOT A HAND-PICKED LIST. Each September sweep named the doors
+    // it had found and left the ones it had not: after the gates were closed, the agent roster, the
+    // home feed, the chat instances and an app's member roster still answered the visitor with the
+    // namesake's own data, because they sit behind requireAuth or a scope a visitor holds and key on
+    // the session's owner NAME (secaudit 2026-09: A3-1, A6-4). So every GET door in openapi.yaml is
+    // asked, with the namesake's data in place: a visitor named like the local account must get what
+    // a visitor with a fresh name gets.
+    await test('EVERY GET DOOR: the visitor named like the local account gets a stranger\'s answer, never hers', async () => {
+        const strangerName = `fednsstranger${stamp}`;
+        const login = await json('/v1/ghii/login', { method: 'POST', body: JSON.stringify({ username: `${strangerName}@${homeNodeId}`, password: 'the-home-node-decides' }) });
+        assert(login.status === 200, `the control visitor's login: ${login.status} ${JSON.stringify(login.body?.error)}`);
+        const strangerToken = login.body.data.token as string;
+
+        const agentName = `sweep${stamp}`;
+        const made = await json('/v1/agents', as(alice.token, { method: 'POST', body: JSON.stringify({ name: agentName, owner: namesake, capabilities: ['*'] }) }));
+        assert(made.status === 201, `setup: the namesake's agent: ${made.status} ${JSON.stringify(made.body?.error)}`);
+        const filename = `fedns-${stamp}.html`;
+        const app = await json('/v1/apps', as(alice.token, { method: 'POST', body: JSON.stringify({
+            filename, name: 'The namesake\'s app', description: 'Gives the app doors a path to fill', category: 'utility',
+            content: Buffer.from('<!DOCTYPE html><html><body>the local alice</body></html>').toString('base64'),
+        }) }));
+        assert(app.status === 201, `setup: the namesake's app: ${app.status} ${JSON.stringify(app.body?.error)}`);
+
+        const fill: Record<string, string> = {
+            owner: namesake, name: namesake, username: namesake, ownerName: namesake,
+            ghii: alice.ghii, gaii: made.body.data.agent.gaii as string, agent: agentName, agentName,
+            filename, app: filename, appId: `${namesake}/${filename}`,
+        };
+        const spec = parseYaml(readFileSync(new URL('../../openapi.yaml', import.meta.url), 'utf8')) as { paths: Record<string, Record<string, unknown>> };
+        const skip = /logout|revoke|signout|stream|events|sse|\/ws\b|download|callback|authorize|verify|confirm|unsubscribe/i;
+        const names: Array<[string, string]> = [[`${namesake}@${homeNodeId}`, '<visitor>'], [`${strangerName}@${homeNodeId}`, '<visitor>'], [namesake, '<name>'], [strangerName, '<name>']];
+        const norm = (s: string) => names.reduce((t, [from, to]) => t.split(from).join(to), s)
+            .replace(/"timestamp":"[^"]*"|"request_id":"[^"]*"/g, '').replace(/\d{4}-\d\d-\d\dT[\d:.]+Z/g, 'T');
+        const get = async (path: string, token: string): Promise<{ status: number; body: string }> => {
+            const r = await fetch(`${BASE}${path}`, { headers: { Authorization: `Bearer ${token}` }, redirect: 'manual', signal: AbortSignal.timeout(10_000) })
+                .catch((err: unknown) => ({ status: 0, text: async () => String(err) }));
+            return { status: r.status, body: norm(await r.text()) };
+        };
+        const leaks: string[] = [];
+        let asked = 0;
+        for (const [route, ops] of Object.entries(spec.paths)) {
+            if (!ops.get || skip.test(route)) continue;
+            let fillable = true;
+            const path = route.replace(/\{([^}]+)\}/g, (_, k: string) => {
+                if (fill[k]) return encodeURIComponent(fill[k]);
+                fillable = false;
+                return '_';
+            });
+            if (!fillable) continue;
+            asked++;
+            const [visitor, own, stranger] = await Promise.all([get(path, fedToken), get(path, alice.token), get(path, strangerToken)]);
+            if (visitor.status === 0 || visitor.status >= 300) continue;
+            if (stranger.status >= 400) leaks.push(`GET ${route}: admitted the namesake's visitor (${visitor.status}) where a stranger gets ${stranger.status}`);
+            else if (visitor.body === own.body && own.body !== stranger.body) leaks.push(`GET ${route}: answered the visitor with the namesake's own data`);
+        }
+        assert(asked > 100, `the sweep reached only ${asked} doors; the contract or the fill list is wrong`);
+        assert(leaks.length === 0, `${leaks.length} door(s) treated the visitor as the local account:\n      ${leaks.join('\n      ')}`);
+    });
+
+    // THE DOORS THAT ASKED "IS THIS AN OWNER" OF THE ROLE ALONE, with no gate in front: the A2A
+    // account road, the AI-spend gate, device authorization's same-owner shortcut and the
+    // node-wide schema door. Each admitted the visitor on roles:['owner'] (secaudit 2026-09: A4-1,
+    // A4-2, A1-1).
+    await test('The A2A account road refuses the visitor: a visitor hires through the stranger road', async () => {
+        const r = await json(`/v1/a2a/${encodeURIComponent(namesake)}/nsagent`, as(fedToken, {
+            method: 'POST', body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'ListTasks', params: {} }),
+        }));
+        assert(r.status === 403, `the account road admitted the visitor: ${r.status} ${JSON.stringify(r.body).slice(0, 200)}`);
+    });
+
+    await test('The AI doors ask the visitor for ai:use, as they ask any scoped principal', async () => {
+        for (const path of ['/v1/ai/jobs', '/v1/ai/decide/settings']) {
+            const r = await json(path, as(fedToken));
+            assert(r.status === 403, `${path} admitted a visitor that holds no ai:use: ${r.status}`);
+        }
+        const own = await json('/v1/ai/jobs', as(alice.token));
+        assert(own.status === 200, `positive control: the account holder's own AI jobs: ${own.status}`);
+    });
+
+    await test('A device authorization the visitor starts for the namesake waits for her; it is not auto-approved', async () => {
+        const r = await json('/v1/agents/device-authorize', as(fedToken, {
+            method: 'POST', body: JSON.stringify({ agent_name: `fedda${stamp}`, owner: namesake }),
+        }));
+        assert(r.status === 200, `device-authorize: ${r.status} ${JSON.stringify(r.body?.error)}`);
+        assert(r.body.data.auto_approved === false,
+            `the visitor made an agent in the local account with no approval: ${JSON.stringify(r.body.data).slice(0, 200)}`);
+    });
+
+    await test('The node-wide schema door refuses the visitor', async () => {
+        // A schema governs every write that matches its key pattern, whoever writes, so a visitor
+        // setting one reaches the local accounts' writes.
+        const r = await json(`/v1/memory/${encodeURIComponent(`fedns.schema.${stamp}`)}/schema`, as(fedToken, {
+            method: 'PUT', body: JSON.stringify({ schema: { type: 'object' }, apply_to: 'prefix', schema_mode: 'strict' }),
+        }));
+        assert(r.status === 403, `the visitor set a node-wide schema: ${r.status} ${JSON.stringify(r.body?.error ?? r.body?.data).slice(0, 200)}`);
     });
 
     await test('A visitor\'s own write lands in THEIR namespace, never the namesake\'s', async () => {
@@ -434,16 +544,11 @@ async function run() {
         assert((own.body.data.items as any[]).some(w => w.tracking_code === tc),
             `the namesake lost their own sent work: ${JSON.stringify(own.body.data.items).slice(0, 300)}`);
 
-        // The visitor gets theirs, which is none.
-        const seen = await json('/v1/work/sent', as(workToken));
-        assert(seen.status === 200, `the visitor's sent: ${seen.status} ${JSON.stringify(seen.body?.error)}`);
-        const codes = (seen.body.data.items as any[]).map(w => w.tracking_code);
-        assert(!codes.includes(tc), `the visitor was handed the local namesake's sent work: ${JSON.stringify(codes)}`);
-
-        // And the two doors that were fixed first stay fixed.
-        for (const path of ['/v1/work/inbox', '/v1/work/overview']) {
+        // The visitor gets theirs, which is none: it passes the door as an outside principal holding
+        // work:read, under its own home identity, and the namesake's work is not in the answer.
+        for (const path of ['/v1/work/sent', '/v1/work/inbox', '/v1/work/overview']) {
             const r = await json(path, as(workToken));
-            assert(r.status === 200, `${path}: ${r.status}`);
+            assert(r.status === 200, `${path}: ${r.status} ${JSON.stringify(r.body?.error)}`);
             assert(!JSON.stringify(r.body.data).includes(tc), `${path} handed the visitor the namesake's work`);
         }
     });

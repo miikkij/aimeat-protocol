@@ -9,6 +9,7 @@
  *   withCurrentOperatorRole(storage, verified) → VerifiedToken
  * @usage req.auth = await withCurrentScopes(storage, verified);
  * @version-history
+ *   v1.2.1 -- 2026-09-24 -- The federated test is isForeignPrincipal(), the one question.
  *   v1.2.0 -- 2026-09-09 -- withCurrentOperatorRole: the operator role is read from the owner record
  *     on every request whose token claims it, so a revoked operator loses the doors at once.
  *   v1.1.0 -- 2026-09-07 -- The intersection was wrong in one direction, and e2e-profile-tabs
@@ -23,6 +24,7 @@ import type { Storage } from '../storage/interface.js';
 import type { VerifiedToken } from './jwt.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { logger } from '../utils/logger.js';
+import { isForeignPrincipal } from '../utils/gaii.js';
 
 /**
  * The permissions a principal holding `token` has, given that its record currently allows `record`.
@@ -114,7 +116,7 @@ export async function withCurrentScopes(storage: Storage | null, v: VerifiedToke
  * names that anomaly better than a silent demotion would.
  */
 export async function withCurrentOperatorRole(storage: Storage | null, v: VerifiedToken): Promise<VerifiedToken> {
-  if (!storage || v.anonymous || v.federated === true || !v.owner || !v.roles.includes('operator')) return v;
+  if (!storage || v.anonymous || isForeignPrincipal(v) || !v.owner || !v.roles.includes('operator')) return v;
   const owner = await storage.getOwner(v.owner).catch((err: unknown) => {
     logger.warn('effective-scopes: the owner record could not be read; proceeding on the token\'s own roles', { owner: v.owner, error: String(err) });
     return null;

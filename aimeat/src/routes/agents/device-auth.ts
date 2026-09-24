@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description RFC 8628 device authorization flow routes (authorize, token poll, consent info, verify submit). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.10.1 — 2026-09-24 — The same-owner shortcut names the caller's account with localAccountName,
+ *     so a visitor's home GHII is never the requested owner, and a visitor holds no owner role to
+ *     approve with in the first place (secaudit 2026-09, A4-1).
  *   v1.10.0 — 2026-09-06 — Re-approval pushes scopes_changed down the live tunnel as well as
  *     emitting the tool-list change. It was one of three doors that change what an agent may do and
  *     the only one wired, which is the half-working kind this file's own comment warns about.
@@ -70,7 +73,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage, DeviceAuthorizationRecord } from '../../storage/interface.js';
 import { generateKeyPair } from '../../auth/keypair.js';
 import { success, error } from '../../middleware/envelope.js';
-import { validateAgentName, buildGAII, generateUserCode } from '../../utils/gaii.js';
+import { validateAgentName, buildGAII, generateUserCode, localAccountName } from '../../utils/gaii.js';
 import { executeHooks } from '../../services/hooks.js';
 import { recordAccountEvent } from '../../services/account-events.js';
 import { fireHook } from '../../utils/fire-hook.js';
@@ -331,7 +334,7 @@ function autoApprovePrincipal(req: Request, owner: string): { kind: 'owner' | 'a
   if (!auth || auth.anonymous) return null;
   const roles = auth.roles as string[];
   if (roles.includes('app') || roles.includes('ecosystem')) return null;
-  const bare = auth.owner.includes('@') ? auth.owner.split('@')[0] : auth.owner;
+  const bare = localAccountName(auth.owner);
   if (bare !== owner) return null;
   if (roles.includes('agent')) {
     const scopes = (auth.scopes ?? []) as string[];

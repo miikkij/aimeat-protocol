@@ -10,6 +10,7 @@
  * @usage
  *   app.use(authRouter(config, storage));
  * @version-history
+ *   v1.8.1 -- 2026-09-24 -- The federated test is isForeignPrincipal(), the one question (secaudit 2026-09, F-1).
  *   v1.8.0 -- 2026-09-05 -- DELETE /v1/auth/sessions/others: end every other device's session and
  *     keep this one, the Access page's "sign out everywhere else". The device list no longer shows
  *     rows past their expiry: on aimeat.io it listed 3 290 sessions of which 2 848 were dead.
@@ -70,7 +71,7 @@ import { success, error } from '../middleware/envelope.js';
 import { loginTarpit } from '../middleware/login-tarpit.js';
 import { readRefreshCookie, refreshOwnerSession, hashToken, clearRefreshCookie } from '../services/owner-session.js';
 import { resolvePat, PAT_PREFIX } from '../services/access-token.js';
-import { parseGAII, isExternalPrincipal } from '../utils/gaii.js';
+import { parseGAII, isExternalPrincipal, isForeignPrincipal } from '../utils/gaii.js';
 import { createSecurityTabService } from '../services/db/security-tab-db-service.js';
 import { randomBytes } from 'node:crypto';
 import { AuthTokenRequestSchema, validateBody } from '../models/schemas.js';
@@ -400,7 +401,7 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
     // signing in again, which re-checks the home node's attestation; renewing it here would be
     // minting a local credential on a remote node's say-so, from a check nobody re-ran.
     // Found by the AI triage of 2026-09-13.
-    if (req.auth!.federated) {
+    if (isForeignPrincipal(req.auth)) {
       res.status(403).json(error(config.nodeId, 'FORBIDDEN',
         'A session from your home node is renewed by signing in again, not here.'));
       return;

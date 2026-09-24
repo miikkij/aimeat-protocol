@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Core memory CRUD routes: POST /v1/memory (write), GET /v1/memory (list), GET /v1/memory/search. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.7.1 -- 2026-09-24 -- The federated test is isForeignPrincipal(), the one question (secaudit 2026-09, F-1).
  *   v1.7.0 -- 2026-09-16 -- The list and search answers show openrouter.apikey and commerce.psp through
  *     shownMemoryValue: a credential reads as configured, never as its ciphertext.
  *   v1.6.0 -- 2026-09-13 -- UNDECLARED_SPACE is no longer a warning here: the shared write refuses a
@@ -46,7 +47,7 @@ import { writeMemoryRecord } from '../../services/memory-write.js';
 import { ecoMayWriteKey } from '../../services/ecosystem-access.js';
 import { appMayWriteKey } from '../../utils/reserved-keys.js';
 import { resolveWriteTarget } from './owner-target.js';
-import { resolveIdentity } from '../../utils/gaii.js';
+import { resolveIdentity, isForeignPrincipal } from '../../utils/gaii.js';
 import { exchangeOutcome } from '../../services/exchange-projection.js';
 import { type MemoryRouteCtx, isAnonymousGaii, visibilityToZone, MEMORY_LIST_MAX_LIMIT } from './shared.js';
 import { isVersionKey, searchHitShape, matchesType } from '../../services/memory-search-shape.js';
@@ -159,7 +160,7 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
       targetGaii: gaii,
       scopes: req.auth!.scopes ?? [],
       roles: req.auth!.roles,
-      federated: req.auth!.federated === true,
+      federated: isForeignPrincipal(req.auth),
     }, {
       key,
       value,
@@ -233,14 +234,14 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
     // NOT a federated session: the broadening resolves from the bare owner NAME, and a visitor from
     // another node carries the local part of THEIR name, which names the local account sharing it.
     const ownerScope = (isOwnerSession || req.query.owner_scope === 'true')
-      && !req.auth!.roles.includes('ecosystem') && !req.auth!.federated;
+      && !req.auth!.roles.includes('ecosystem') && !isForeignPrincipal(req.auth);
 
     // Allow owner to view another of their agents' memory
     if (agentParam && agentParam !== gaii) {
       const callerOwner = req.auth!.owner;
       const targetAgent = await storage.getAgent(agentParam);
       // The name comparison is not an ownership test for a visitor from another node (see above).
-      if (!targetAgent || targetAgent.owner !== callerOwner || req.auth!.federated) {
+      if (!targetAgent || targetAgent.owner !== callerOwner || isForeignPrincipal(req.auth)) {
         res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'You can only view memory of your own agents'));
         return;
       }

@@ -19,6 +19,25 @@ There is also a bare **Owner** name (`alice`) which is the account layer. It app
 |------|-----------|-------------|--------|
 | **GHII login** (password/TOTP) | `alice` (bare owner name) | `['owner']` or `['owner','operator']` | Bypassed — owners can do anything |
 | **Agent device auth** (RFC 8628) | `claude#alice@node-id` (full GAII) | `['agent']` | Enforced per agent's scope list |
+| **Federated login** (a visitor signed in on its home node) | `alice@home-node` (its home GHII) | `['federated']` | Enforced: the scopes this node grants the peer |
+
+## A visitor from another node
+
+A session signed in on another node is a VISITOR here. It holds the role `federated` and no other,
+and it is named by its home GHII (`alice@home-node`) in `sub`, `owner` and `resolveIdentity()`.
+`verifyJWT()` reads every federated token that way, including one minted before 2026-09-24, when the
+mint still said `roles: ['owner']` and the bare local part. That old shape is why a visitor called
+`alice` passed as the LOCAL `alice` on any door that asked the role or looked her up by name.
+
+- **Ask `isForeignPrincipal(auth)`** (`src/utils/gaii.ts`) whenever a door needs to know. It is the
+  one question; do not test `auth.federated` inline.
+- **Shorten an identity with `localAccountName()`**, never with `x.split('@')[0]`. It gives the bare
+  account name of an identity on THIS node and returns another node's identity whole, because
+  shortened it names the local account that shares its local part. `isSameOwner()` compares the
+  node as well as the name for the same reason.
+- A visitor reaches a door on the scopes it holds (`requireScope` gives it no owner bypass), under
+  its own home identity. It is never the local account holder: `requireRole('owner')`,
+  `isOwnerPrincipal()` and `requireLocalSession()` refuse it.
 
 ## Identity resolution — `resolveIdentity()`
 
@@ -36,8 +55,8 @@ const gaii = resolve(req);  // Returns GHII for owners, GAII for agents
 
 - Owner session (`roles: ['owner']`, no `'agent'`) → converts bare username to GHII: `alice` → `alice@node-id`
 - Agent session (`roles: ['agent']`) → returns `req.auth!.sub` as-is (already full GAII)
-- Ecosystem session returns its GEAI. A federated owner resolves to the home-node
-  GHII, even when a local account has the same name.
+- Ecosystem session returns its GEAI. A visitor from another node resolves to its home-node
+  GHII, even when a local account has the same name (see "A visitor from another node").
 - Hosted apps use `resolveIdentity()` for their permitted owner data and
   `callerPrincipal()` for app attribution. The scoped app grant still controls access.
 

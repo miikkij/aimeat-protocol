@@ -4,6 +4,11 @@
  * SPDX-License-Identifier: MIT
  * @description `aimeat start` / `serve` runtime: asset self-heal, server listen + banner, WebSocket upgrade routing (personal tunnel / connector tunnel / realtime P2P + echat), and graceful shutdown. Extracted from index.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.2.0 — 2026-09-24 — The personal tunnel upgrade asks the question its anchor door asks: is this
+ *     the account holder in person (isOwnerPrincipal). It verified the token and then found the node
+ *     by the token's owner NAME, so any of the owner's agents, and a visitor from another node sharing
+ *     the name, took the tunnel over; a new socket replaces the live one (secaudit 2026-09, found in
+ *     verification).
  *   v1.1.0 — 2026-09-17 — A failed listen is reported and ends the process. Express 5 hands the
  *     listen error to the same callback as success, and the banner used to print over it.
  *   v1.0.0 — 2026-07-13 — Extracted from index.ts (max-file-lines)
@@ -189,7 +194,7 @@ export async function runStart(config: AimeatConfig, sources: ConfigSources, pkg
   if (tunnelManager || realtimeManager || connectTunnelManager) {
     const { WebSocketServer } = await import('ws');
     const { verifyJWT } = await import('./auth/jwt.js');
-    const { isAnonymousMode, credentialRevoked } = await import('./auth/middleware.js');
+    const { isAnonymousMode, credentialRevoked, isOwnerPrincipal } = await import('./auth/middleware.js');
     const { CONNECT_TUNNEL_PATH } = await import('./services/connect-tunnel.js');
     const tunnelWss = tunnelManager ? new WebSocketServer({ noServer: true }) : null;
     const realtimeWss = realtimeManager ? new WebSocketServer({ noServer: true }) : null;
@@ -241,6 +246,16 @@ export async function runStart(config: AimeatConfig, sources: ConfigSources, pkg
 
           if (await credentialRevoked(token, payload)) {
             socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+            socket.destroy();
+            return;
+          }
+
+          // The tunnel is the account holder's own, as POST /v1/personal/anchor is (requireRole
+          // owner). The owner NAME alone is on every token of the account: its agents, its app
+          // grants, and a visitor from another node that shares the local part. A new socket replaces
+          // the live one, so any of them took the node's traffic over (secaudit 2026-09).
+          if (!isOwnerPrincipal(payload)) {
+            socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
             socket.destroy();
             return;
           }

@@ -5,6 +5,7 @@
  * @description File-storage routes under /v1/memory/files: upload (presigned or inline base64),
  *   visibility/tags PATCH, list, download, delete. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.4.1 -- 2026-09-24 -- The federated test is isForeignPrincipal(), the one question (secaudit 2026-09, F-1).
  *   v1.4.0 -- 2026-09-14 -- The owner branch of the listing is for a LOCAL owner session. It built
  *     the GHII from the owner name, which for a session signed in from another node is the local
  *     part of THEIR name, so a same-named visitor listed the local account's files and its agents'.
@@ -25,6 +26,7 @@ import type { Router } from 'express';
 import type { StorageFileRecord } from '../../storage/interface.js';
 import { normalizeWorkspaceRefs } from '../../utils/workspace-ref.js';
 import { requireAuth, requireExternalPrincipal, requireScope } from '../../auth/middleware.js';
+import { isForeignPrincipal } from '../../utils/gaii.js';
 import { success, error } from '../../middleware/envelope.js';
 import { checkStorageQuota, chargeOverage } from '../../services/quota.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../../mcp/index.js';
@@ -229,7 +231,7 @@ export function registerFilesRoutes(router: Router, ctx: MemoryRouteCtx): void {
     // the session came from. A federated session falls to the else branch and sees its own `sub`,
     // which is what a visitor should see. Found by the AI triage of 2026-09-13.
     const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent')
-      && !req.auth!.federated;
+      && !isForeignPrincipal(req.auth);
     let files: Awaited<ReturnType<typeof storage.listStorageFiles>>;
     if (isOwnerSession) {
       const callerOwner = req.auth!.owner as string;
