@@ -24,6 +24,8 @@
  * @usage
  *   registerAllServerTools(mcp, { storage, config, agentGaii: () => gaii, ... });
  * @version-history
+ *   v1.4.1 — 2026-09-24 — registerWorkflowTools gets the session's scopes: a step answers for the word
+ *     its own door asks.
  *   v1.4.0 — 2026-09-24 — registerThemeTools: the node's themes, read and made from a chat.
  *   v1.3.0 — 2026-09-23 — registerUiLibraryTools: the component catalogue of the node's own interface.
  *   v1.2.0 — 2026-09-13 — registerDmOrganizeTools: archiving and the list rules on the chat path.
@@ -178,7 +180,7 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     registerSharingGroupTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
     registerAgentTaskTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);
     registerAgentScheduleTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
-    registerWorkflowTools(mcp, storage, config, agentGaii);
+    registerWorkflowTools(mcp, storage, config, agentGaii, scopes);
     registerAiJobTools(mcp, storage, config, agentGaii);
     registerDecideTools(mcp, storage, config, agentGaii);
     registerAiVoiceTools(mcp, storage, config, agentGaii);

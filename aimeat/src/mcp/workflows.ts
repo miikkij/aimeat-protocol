@@ -7,10 +7,12 @@
  *   run. The full descriptor is passed as one `definition` object (validated server-side against the
  *   offer contract + DAG), so the surface stays small as the descriptor grows. Workflows belong to
  *   the owner (shared across their agents); an agent needs the `workflow:write` scope to author.
- * @structure registerWorkflowTools(mcp, storage, config, getAgentGaii)
+ * @structure registerWorkflowTools(mcp, storage, config, getAgentGaii, sessionScopes)
  * @usage import { registerWorkflowTools } from './workflows.js';
- *   registerWorkflowTools(mcp, storage, config, () => agentGaii);
+ *   registerWorkflowTools(mcp, storage, config, () => agentGaii, scopes);
  * @version-history
+ *   v1.5.0 — 2026-09-24 — aimeat_workflow_save and aimeat_workflow_run pass the session's scopes, and
+ *     answer SCOPE_DENIED when a step needs a word the session lacks, as the HTTP door does.
  *   v1.4.0 — 2026-09-09 — aimeat_workflow_run says when nothing started: `skipped: true` and the id
  *     of the run already in flight, which the engine had returned bare as if it were new.
  *   v1.3.0 — 2026-08-30 — aimeat_workflow_run takes `vars` and `target`. POST /v1/workflows/:id/run
@@ -46,10 +48,14 @@ export function registerWorkflowTools(
   storage: Storage,
   config: AimeatConfig,
   getAgentGaii: () => string,
+  sessionScopes: string[] = [],
 ): void {
   const agentGaii = getAgentGaii();
   const owner = parseGAII(agentGaii)?.owner ?? '';
   const ownerGhii = `${owner}@${config.nodeId}`;
+  // This session answers for what a workflow's steps do, at save and at start, on the same words
+  // the HTTP door asks (services/workflow/step-authority.ts). An MCP session is always an agent's.
+  const caller = { roles: ['agent'], scopes: sessionScopes };
 
   const text = (data: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] });
   const err = (msg: string) => ({ content: [{ type: 'text' as const, text: msg }], isError: true });
@@ -100,7 +106,8 @@ export function registerWorkflowTools(
         }
       }
 
-      const result = await saveWorkflow(storage, config, ownerGhii, owner, a.id, a.definition, agentGaii);
+      const result = await saveWorkflow(storage, config, ownerGhii, owner, a.id, a.definition, agentGaii, caller);
+      if (result.denied) return err(`SCOPE_DENIED: ${result.denied.message}`);
       // routes/workflows.ts emits this on save. A workflow an agent authored did not appear in the
       // owner's list, which reads as the save having failed.
       emitChange('workflows');
@@ -152,8 +159,10 @@ export function registerWorkflowTools(
       // asking for the same trial must get the same run. `target` is meaningless without a full
       // run, exactly as it is on the route.
       const mode = a.mode === 'full' ? (a.target === 'sandbox' ? 'full-sandbox' : 'full-live') : 'signals-only';
-      const result = await engine.startRun(ownerGhii, owner, a.id, { mode, ...(a.vars ? { vars: a.vars } : {}) });
-      if ('error' in result) return err(`Could not start run:\n- ${result.error.join('\n- ')}`);
+      const result = await engine.startRun(ownerGhii, owner, a.id, { mode, ...(a.vars ? { vars: a.vars } : {}), caller });
+      if ('error' in result) {
+        return err(result.denied ? `SCOPE_DENIED: ${result.denied.message}` : `Could not start run:\n- ${result.error.join('\n- ')}`);
+      }
       // Nothing started. The id is the run that IS in flight, and the caller needs to know it is not
       // theirs: a skip that looks like a start is the failure no metric shows.
       if (result.skipped) {

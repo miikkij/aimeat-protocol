@@ -5,6 +5,7 @@
  * @description Schedule, workflow, task lifecycle, and agent memory (read/write/list/search) tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   v1.4.1 — 2026-09-24 — aimeat_workflow_save names the permission each kind of step costs.
  *   v1.4.0 — 2026-09-05 — aimeat_schedule_create publishes `input` and `instance_id`, the two fields
  *     POST /v1/schedules has stored for an extension schedule since it was written and no tool
  *     surface sent. THE SAME DEFECT AS v1.3.0 BELOW, thirteen days later and in this same file: a
@@ -94,7 +95,7 @@ export const schedulesTasksMemoryTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_workflow_save',
-        description: 'Create or update an Agent Workflow: a declared, ordered set of steps with per-step input (required_to_function) and output (success_signal) signals, run by ONE trigger, with the signal checked after each step (so you see "did it produce", not just "did it fire"). Use instead of chaining separate schedules when steps depend on each other. Pass the whole descriptor as `definition`; each step names an agent + offer and inherits that offer\'s signals + deliverable location. Rejected at save if the after-graph is not a DAG or an offer is not workflow-compatible (must publish success_signal + required_to_function + deliverable.location). A schedule trigger creates one backing cron; an event trigger fires on a matching memory write / offer order.',
+        description: 'Create or update an Agent Workflow: a declared, ordered set of steps with per-step input (required_to_function) and output (success_signal) signals, run by ONE trigger, with the signal checked after each step (so you see "did it produce", not just "did it fire"). Use instead of chaining separate schedules when steps depend on each other. Pass the whole descriptor as `definition`; each step names an agent + offer and inherits that offer\'s signals + deliverable location. Rejected at save if the after-graph is not a DAG or an offer is not workflow-compatible (must publish success_signal + required_to_function + deliverable.location). A schedule trigger creates one backing cron; an event trigger fires on a matching memory write / offer order. A step costs the permission its own door asks, at save and again at a full run: ai:use for an ai step or llm.approved, ext:invoke for an extension step, memory:read + storage:write + memory:write for a datapackage step, memory:read + work:request for export-out, work:request for trigger-geai; without it the answer is SCOPE_DENIED naming the permission.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {

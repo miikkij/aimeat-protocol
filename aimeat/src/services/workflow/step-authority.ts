@@ -1,0 +1,130 @@
+/**
+ * @file src/services/workflow/step-authority.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The permission words a principal needs to put a step in a workflow, and to start a
+ *   run of one.
+ *
+ *   A workflow runs its steps with the owner's authority, and nobody sits at the screen while it
+ *   does: an ai step spends the owner's AI budget, a datapackage step publishes an owner record as a
+ *   public package, an extension step runs an action as the operator, and an ecosystem step pushes
+ *   owner data to a connected app. `workflow:write` says only "may author workflows", so a principal
+ *   holding it and nothing else could do each of those through a step while the door that does the
+ *   same thing directly refused it. Now each kind of step costs the word its own door costs, and the
+ *   workflow is checked when it is saved and again when a run is started, for the principal that
+ *   saves or starts it. The account holder in person passes, as requireScope lets them pass every
+ *   door. A run started by the workflow's own trigger has no caller to ask; it runs what was checked
+ *   when the definition was saved.
+ * @structure STEP_KIND_SCOPES · LLM_SCOPES · WorkflowCaller · ownerInPerson(caller) ·
+ *   missingStepScopes(def, caller, mode) · stepScopeRefusal(missing)
+ * @usage
+ *   const missing = missingStepScopes(def, caller, 'full');
+ *   if (missing.length > 0) return stepScopeRefusal(missing);   // 403 SCOPE_DENIED, the words named
+ * @version-history
+ *   v1.0.0 — 2026-09-24 — Initial.
+ */
+import { scopeIsCovered } from '../../utils/scope-coverage.js';
+import type { WorkflowStep } from '../../models/workflow-schemas.js';
+
+/** Every kind of step. A step with no `action` is an agent step. */
+export type StepKind = 'agent' | 'human-input' | 'ai' | 'extension' | 'datapackage' | 'export-out' | 'trigger-geai';
+
+/**
+ * The words each kind of step costs: what the door that does the same thing directly asks for.
+ *
+ * A kind with no words acts through somebody else's grant or through the owner in person. An agent
+ * step hands a task to one of the owner's agents, which then works on its own permissions; the task
+ * door (POST /v1/agents/:name/tasks) lets a same-owner agent do that without a word of its own. A
+ * human-input step asks the owner.
+ */
+export const STEP_KIND_SCOPES: Readonly<Record<StepKind, readonly string[]>> = {
+    agent: [],
+    'human-input': [],
+    // The owner's model and budget: every AI door asks ai:use (auth/ai-gate.ts, the AI jobs routes).
+    ai: ['ai:use'],
+    // An installed extension's action, run as the operator: the MCP door's word (aimeat_extension_invoke).
+    extension: ['ext:invoke'],
+    // An owner record read and published as a public package: the read, then POST /v1/datapackages,
+    // which asks storage:write and memory:write.
+    datapackage: ['memory:read', 'storage:write', 'memory:write'],
+    // An owner record read and handed to a connected app: the read, then the capability invoke door.
+    'export-out': ['memory:read', 'work:request'],
+    // A connected app's capability, invoked: POST /v1/capabilities/:id/invoke.
+    'trigger-geai': ['work:request'],
+};
+
+/**
+ * `llm.approved` switches on the node's model as the judge of the workflow's `llm` signals, which
+ * spends the owner's AI budget on every check and every run. Approving it is that spend.
+ */
+export const LLM_SCOPES: readonly string[] = ['ai:use'];
+
+/** Who saves or starts the workflow, in the terms every door can supply. */
+export interface WorkflowCaller {
+    roles: string[];
+    scopes: string[];
+    federated?: boolean;
+}
+
+/**
+ * The account holder in person, whom requireScope waves through every door (auth/middleware.ts): an
+ * owner role, and none of the three things that make a role list a scoped principal's. An agent, an
+ * ecosystem app and a visitor from another node answer for their words.
+ */
+export function ownerInPerson(caller: WorkflowCaller): boolean {
+    const roles = caller.roles;
+    return roles.includes('owner') && !caller.federated && !roles.includes('agent') && !roles.includes('ecosystem');
+}
+
+function kindOf(step: Pick<WorkflowStep, 'action'>): StepKind {
+    return (step.action?.kind ?? 'agent') as StepKind;
+}
+
+/** One word the caller lacks, with the first step that needs it, so a refusal can point at it. */
+export interface MissingStepScope { scope: string; step: string; kind: StepKind | 'llm' }
+
+/**
+ * The words this workflow needs that the caller does not hold, each once. A signals-only check
+ * dispatches no step, so only the model that judges the `llm` signals is asked about; a full run and
+ * a save are asked about every step.
+ */
+export function missingStepScopes(
+    def: { steps: Array<Pick<WorkflowStep, 'id' | 'action'>>; llm?: { approved?: boolean } },
+    caller: WorkflowCaller,
+    mode: 'save' | 'full' | 'signals-only',
+): MissingStepScope[] {
+    if (ownerInPerson(caller)) return [];
+    const needs: MissingStepScope[] = [];
+    const need = (scope: string, step: string, kind: MissingStepScope['kind']): void => {
+        if (!needs.some(n => n.scope === scope)) needs.push({ scope, step, kind });
+    };
+    if (mode !== 'signals-only') {
+        for (const step of def.steps) {
+            const kind = kindOf(step);
+            for (const scope of STEP_KIND_SCOPES[kind] ?? []) need(scope, step.id, kind);
+        }
+    }
+    if (def.llm?.approved) for (const scope of LLM_SCOPES) need(scope, '', 'llm');
+    return needs.filter(n => !scopeIsCovered(caller.scopes, n.scope));
+}
+
+/**
+ * A step id as the refusal shows it. The id is the author's own text, and the HTTP door repeats the
+ * message in a WWW-Authenticate header, where a character outside printable ASCII would throw.
+ */
+function shownStepId(id: string): string {
+    return id.replace(/[^\x20-\x7e]/g, '?');
+}
+
+/** The refusal: 403 SCOPE_DENIED, the missing words, and which step asks for each. */
+export function stepScopeRefusal(missing: MissingStepScope[]): { status: 403; code: 'SCOPE_DENIED'; needed: string[]; message: string } {
+    const why = missing.map(m => (m.kind === 'llm'
+        ? `"${m.scope}" (llm.approved lets the node's model judge the signals)`
+        : `"${m.scope}" (step "${shownStepId(m.step)}" is ${m.kind === 'ai' || m.kind === 'extension' || m.kind === 'export-out' ? 'an' : 'a'} ${m.kind} step)`));
+    return {
+        status: 403, code: 'SCOPE_DENIED',
+        needed: missing.map(m => m.scope),
+        message: `This workflow needs ${why.join(', ')}, and this session does not carry ${missing.length === 1 ? 'it' : 'them'}. `
+            + 'A step does what its own door does, so it costs the same permission. The owner grants it in the permissions of this agent or app.',
+    };
+}

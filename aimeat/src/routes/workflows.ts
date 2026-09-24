@@ -27,6 +27,10 @@
  *   import { workflowsRouter } from './routes/workflows.js';
  *   app.use(workflowsRouter(config, storage));
  * @version-history
+ *   v1.4.0 — 2026-09-24 — PUT /:id and POST /:id/run answer 403 SCOPE_DENIED, the missing words named,
+ *     when a step needs a word its own door asks and the saving or starting principal lacks it
+ *     (services/workflow/step-authority.ts). workflow:write alone had published owner records and
+ *     spent the owner's AI budget through a step. The owner in person passes.
  *   v1.3.0 — 2026-09-09 — POST /:id/run says when nothing started: `skipped: true` with the id of
  *     the run already in flight, and no "run started" row in the account feed. The engine had
  *     answered with that id bare and this route logged a start that never happened.
@@ -48,6 +52,8 @@ import type { Scheduler } from '../services/scheduler.js';
 import type { WorkflowEngine } from '../services/workflow/engine.js';
 import { success, error } from '../middleware/envelope.js';
 import { requireAuth, requireScope } from '../auth/middleware.js';
+import { denyScope403 } from '../auth/deny.js';
+import type { WorkflowCaller } from '../services/workflow/step-authority.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { recordAccountEvent } from '../services/account-events.js';
 import { emitChange } from '../services/event-bus.js';
@@ -112,6 +118,11 @@ export function workflowsRouter(config: AimeatConfig, storage: Storage, schedule
   // namespace for storage regardless of whether the caller is the owner or one of their agents.
   const ownerGhiiOf = (req: Request): string => `${req.auth!.owner}@${config.nodeId}`;
 
+  /** The principal saving or starting a workflow, which answers for its steps (step-authority.ts). */
+  const callerOf = (req: Request): WorkflowCaller => ({
+    roles: req.auth!.roles, scopes: req.auth!.scopes ?? [], federated: req.auth!.federated === true,
+  });
+
   // GET /v1/workflows — list the owner's workflows. ?include=health attaches each workflow's run-health
   // inline (replaces the list view's per-workflow GET /:id/health fan-out).
   router.get('/v1/workflows', requireAuth(), requireScope('workflow:read'), async (req: Request, res: Response) => {
@@ -152,7 +163,11 @@ export function workflowsRouter(config: AimeatConfig, storage: Storage, schedule
     const id = req.params.id as string;
     const createdBy = resolveIdentity(req.auth!, config.nodeId);
     const existed = !!(await getWorkflow(storage, ownerGhiiOf(req), id));
-    const result = await saveWorkflow(storage, config, ownerGhiiOf(req), req.auth!.owner, id, req.body, createdBy);
+    const result = await saveWorkflow(storage, config, ownerGhiiOf(req), req.auth!.owner, id, req.body, createdBy, callerOf(req));
+    if (result.denied) {
+      denyScope403(req, res, result.denied.needed, result.denied.message);
+      return;
+    }
     if (!result.ok) {
       res.status(400).json(error(config.nodeId, 'WORKFLOW_INVALID', 'This workflow has something wrong in it and was not saved. The details below say which step.', undefined, { errors: result.errors }));
       return;
@@ -202,8 +217,12 @@ export function workflowsRouter(config: AimeatConfig, storage: Storage, schedule
       ? (req.body?.target === 'sandbox' ? 'full-sandbox' : 'full-live')
       : 'signals-only';
     const vars = (req.body?.vars && typeof req.body.vars === 'object') ? req.body.vars as Record<string, string> : undefined;
-    const result = await engine.startRun(ownerGhiiOf(req), req.auth!.owner, id, { mode, vars });
+    const result = await engine.startRun(ownerGhiiOf(req), req.auth!.owner, id, { mode, vars, caller: callerOf(req) });
     if ('error' in result) {
+      if (result.denied) {
+        denyScope403(req, res, result.denied.needed, result.denied.message);
+        return;
+      }
       res.status(400).json(error(config.nodeId, 'WORKFLOW_RUN_FAILED', 'Could not start the run', undefined, { errors: result.error }));
       return;
     }

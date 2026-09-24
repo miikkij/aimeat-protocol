@@ -22,6 +22,9 @@
  *     three siblings, with the declared-var save as the positive control.
  *   v1.7.0 — 2026-09-24 — A step does not write, or send out, a key the node reads and trusts:
  *     refused at save for a key written out, and at start for a key a variable builds.
+ *   v1.8.0 — 2026-09-24 — A step costs the word its own door costs, at save and at start, for the
+ *     principal that saves or starts it; the owner in person passes. An ecosystem step reaches only
+ *     the owner's own connected app.
  */
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -977,6 +980,112 @@ async function run() {
     for (const id of ['reserved-ai', 'reserved-dp', 'reserved-in', 'reserved-var']) {
       await json(`/v1/workflows/${id}?withRuns=true`, { method: 'DELETE', headers: auth });
     }
+  });
+
+  // ── a step costs the word its own door costs ──
+  // A workflow runs its steps with the owner's authority: a datapackage step publishes an owner
+  // record to the public, an ai step spends the owner's AI budget. The doors that do the same
+  // directly ask storage:write + memory:write and ai:use, and workflow:write alone was enough to do
+  // both through a step. The saver answers for the steps at save, and the starter at run.
+  await test('a step costs the word its own door costs: workflow:read+write alone saves and runs neither a datapackage nor an ai step, and the owner does both', async () => {
+    const mint = async (name: string, scopes: string[]) => {
+      const reg = await json('/v1/agents', {
+        method: 'POST', headers: auth,
+        body: JSON.stringify({ name, owner: ownerName, capabilities: ['memory'], scopes }),
+      });
+      assert(reg.status === 201, `create ${name}: ${reg.status} ${JSON.stringify(reg.body)}`);
+      const token = await getToken(reg.body.data.agent.gaii, reg.body.data.private_key, true);
+      return { Authorization: `Bearer ${token}` };
+    };
+    const onlyWorkflow = await mint('wf-only', ['workflow:read', 'workflow:write']);
+    const wf = (action: unknown) => ({
+      title: { en_US: 'Scope' }, description: { en_US: 'step scope probe' },
+      trigger: { kind: 'manual' }, vars: [], on_step_fail: 'inspect',
+      steps: [{ id: 'only', description: { en_US: 'Only' }, required_to_function: 'none', action }],
+    });
+    const PUBLISH = wf({ kind: 'datapackage', name: 'wfscope-probe', from_key: 'wfscope.rows', changes: 'First version.' });
+    const ASK = wf({ kind: 'ai', prompt: 'Say hello.', result_to_key: 'wfscope.answer' });
+    const put = (id: string, headers: Record<string, string>, body: unknown) =>
+      json(`/v1/workflows/${id}`, { method: 'PUT', headers, body: JSON.stringify(body) });
+    const run = (id: string, headers: Record<string, string>, body: unknown) =>
+      json(`/v1/workflows/${id}/run`, { method: 'POST', headers, body: JSON.stringify(body) });
+
+    // SAVE: refused, with the missing word named, and nothing written.
+    const publishSave = await put('scope-publish', onlyWorkflow, PUBLISH);
+    assert(publishSave.status === 403 && publishSave.body.error?.code === 'SCOPE_DENIED',
+      `a datapackage step by workflow:write alone: ${publishSave.status} ${JSON.stringify(publishSave.body.error)}`);
+    assert(/storage:write/.test(publishSave.body.error?.message ?? ''), `the refusal names storage:write: ${publishSave.body.error?.message}`);
+    assert((await json('/v1/workflows/scope-publish', { headers: auth })).status === 404, 'the refused save wrote nothing');
+
+    const askSave = await put('scope-ask', onlyWorkflow, ASK);
+    assert(askSave.status === 403 && askSave.body.error?.code === 'SCOPE_DENIED',
+      `an ai step by workflow:write alone: ${askSave.status} ${JSON.stringify(askSave.body.error)}`);
+    assert(/ai:use/.test(askSave.body.error?.message ?? ''), `the refusal names ai:use: ${askSave.body.error?.message}`);
+    assert((await json('/v1/workflows/scope-ask', { headers: auth })).status === 404, 'the refused save wrote nothing');
+
+    // The owner in person saves both.
+    const ownerPublish = await put('scope-publish', auth, PUBLISH);
+    assert(ownerPublish.status === 200, `the owner saves the datapackage step: ${ownerPublish.status} ${JSON.stringify(ownerPublish.body.error)}`);
+    const ownerAsk = await put('scope-ask', auth, ASK);
+    assert(ownerAsk.status === 200, `the owner saves the ai step: ${ownerAsk.status} ${JSON.stringify(ownerAsk.body.error)}`);
+
+    // RUN: the principal that starts a run answers for its steps, whoever saved it.
+    const publishRun = await run('scope-publish', onlyWorkflow, { mode: 'full' });
+    assert(publishRun.status === 403 && /storage:write/.test(publishRun.body.error?.message ?? ''),
+      `running the datapackage step: ${publishRun.status} ${JSON.stringify(publishRun.body.error ?? publishRun.body.data)}`);
+    const askRun = await run('scope-ask', onlyWorkflow, { mode: 'full', target: 'sandbox' });
+    assert(askRun.status === 403 && /ai:use/.test(askRun.body.error?.message ?? ''),
+      `running the ai step: ${askRun.status} ${JSON.stringify(askRun.body.error ?? askRun.body.data)}`);
+    for (const id of ['scope-publish', 'scope-ask']) {
+      const runs = await json(`/v1/workflows/${id}/runs`, { headers: auth });
+      assert(runs.body.data.count === 0, `${id}: the refused start started nothing, found ${runs.body.data.count}`);
+    }
+    // A signals-only check dispatches no step, so it is not the step's door.
+    const check = await run('scope-ask', onlyWorkflow, { mode: 'signals-only' });
+    assert(check.status === 200, `a check by workflow:write alone: ${check.status} ${JSON.stringify(check.body.error)}`);
+
+    // The owner starts the run.
+    const ownerRun = await run('scope-ask', auth, { mode: 'full', target: 'sandbox' });
+    assert(ownerRun.status === 200, `the owner runs the ai step: ${ownerRun.status} ${JSON.stringify(ownerRun.body.error)}`);
+
+    // POSITIVE CONTROL: the same agent shape, one word more, saves and runs the same ai step.
+    const granted = await mint('wf-ai', ['workflow:read', 'workflow:write', 'ai:use']);
+    const grantedSave = await put('scope-ask-granted', granted, ASK);
+    assert(grantedSave.status === 200, `with ai:use the save passes: ${grantedSave.status} ${JSON.stringify(grantedSave.body.error)}`);
+    const grantedRun = await run('scope-ask-granted', granted, { mode: 'full', target: 'sandbox' });
+    assert(grantedRun.status === 200, `with ai:use the run starts: ${grantedRun.status} ${JSON.stringify(grantedRun.body.error)}`);
+
+    for (const id of ['scope-publish', 'scope-ask', 'scope-ask-granted']) {
+      await json(`/v1/workflows/${id}?withRuns=true`, { method: 'DELETE', headers: auth });
+    }
+  });
+
+  // ── an ecosystem step reaches only the owner's own connected app ──
+  // The capability door and a scheduled eco-capability job build the app's address from the
+  // caller's own name. A workflow step named the address in full, so it could push the owner's data
+  // to, or invoke a capability of, an app another account had connected. Refused at save, and at
+  // start through the same validation.
+  await test('an ecosystem step reaches only the owner\'s own connected app', async () => {
+    const wf = (action: unknown) => ({
+      title: { en_US: 'Eco' }, description: { en_US: 'ecosystem target probe' },
+      trigger: { kind: 'manual' }, vars: [], on_step_fail: 'inspect',
+      steps: [{ id: 'push', description: { en_US: 'Push' }, required_to_function: 'none',
+        success_signal: { kind: 'deterministic', key: 'eco.probe', op: 'exists' }, action }],
+    });
+    const someoneElses = `eco:probe-app#someone-else@${NODE_ID}`;
+    const own = `eco:probe-app#${ownerName}@${NODE_ID}`;
+    for (const action of [
+      { kind: 'trigger-geai', geai: someoneElses, capability: 'ping' },
+      { kind: 'export-out', geai: someoneElses, from: 'eco.src' },
+    ]) {
+      const r = await json('/v1/workflows/eco-foreign', { method: 'PUT', headers: auth, body: JSON.stringify(wf(action)) });
+      assert(r.status === 400, `${action.kind} to another account's app: expected 400, got ${r.status}`);
+      assert(JSON.stringify(r.body.error).includes('probe-app'), `the refusal names the app: ${JSON.stringify(r.body.error)}`);
+    }
+    // POSITIVE CONTROL: the owner's own app, the same step.
+    const ok = await json('/v1/workflows/eco-own', { method: 'PUT', headers: auth, body: JSON.stringify(wf({ kind: 'trigger-geai', geai: own, capability: 'ping' })) });
+    assert(ok.status === 200, `the owner's own app: ${ok.status} ${JSON.stringify(ok.body.error)}`);
+    for (const id of ['eco-foreign', 'eco-own']) await json(`/v1/workflows/${id}?withRuns=true`, { method: 'DELETE', headers: auth });
   });
 
   console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total`);
