@@ -16,10 +16,18 @@
 //     the daemon still works via direct transport (no crash).
 //   - Console clock: every line the daemon prints — its own, the tunnel's, the
 //     listening line — starts with the local date and time.
+//   - Admission (secaudit 2026-09, A9-1): every request presents the secret the
+//     daemon wrote into serve.json; a request without it, one carrying an Origin
+//     and one addressed to a foreign Host are refused, and the daemon stays up.
+//
+// Version history:
+//   2026-09-24 — Phase 0 (admission) added; every call to a daemon and every MCP
+//     session carries the secret from serve.json, which is schema 3 now (A9-1).
 
 import * as ed from '@noble/ed25519';
 import { nodeEntryArgs } from './helpers/node-entry.js';
 import { createHash } from 'node:crypto';
+import { request as httpRequest } from 'node:http';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { mkdirSync, writeFileSync, existsSync, readFileSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -46,8 +54,18 @@ async function test(name: string, fn: () => Promise<void>) {
 function assert(cond: boolean, msg: string) { if (!cond) throw new Error(msg); }
 function sleep(ms: number) { return new Promise(r => setTimeout(r, ms)); }
 
+/**
+ * The secret each spawned daemon wrote into its serve.json, by loopback base URL. Every call to a
+ * daemon carries it, as every real client does; a call to the node carries none.
+ */
+const loopbackSecrets = new Map<string, string>();
+function daemonAuth(base: string): Record<string, string> {
+  const secret = loopbackSecrets.get(base);
+  return secret ? { Authorization: `Bearer ${secret}` } : {};
+}
+
 async function json(base: string, path: string, opts: RequestInit = {}): Promise<{ status: number; body: any }> {
-  const res = await fetch(`${base}${path}`, { ...opts, headers: { 'Content-Type': 'application/json', ...opts.headers } });
+  const res = await fetch(`${base}${path}`, { ...opts, headers: { 'Content-Type': 'application/json', ...daemonAuth(base), ...opts.headers } });
   const ct = res.headers.get('content-type') ?? '';
   const body = res.status === 204 ? null : ct.includes('json') ? await res.json() : { _raw: await res.text() };
   return { status: res.status, body };
@@ -150,13 +168,55 @@ await test('Daemon starts and writes the discovery file (tunnel transport)', asy
   const disc = await waitForDiscovery(home1).catch((err) => {
     throw new Error(`${err.message}\n--- daemon output ---\n${daemon1!.stderr()}`);
   });
-  assert(disc.schema_version === 2, `schema_version: ${disc.schema_version}`);
+  assert(disc.schema_version === 3, `schema_version: ${disc.schema_version}`);
   assert(disc.pid === daemon1!.child.pid, `pid ${disc.pid} != child pid ${daemon1!.child.pid}`);
   assert(typeof disc.port === 'number' && disc.port > 0, `port: ${disc.port}`);
+  assert(typeof disc.secret === 'string' && disc.secret.length >= 32, 'serve.json must carry the secret every request presents');
   assert(disc.agents.length === 1, `agents: ${JSON.stringify(disc.agents)}`);
   assert(disc.agents[0].agent === agentName, `agent: ${disc.agents[0].agent}`);
   assert(disc.agents[0].transport === 'tunnel', `transport: ${disc.agents[0].transport} (expected tunnel)\n--- daemon output ---\n${daemon1!.stderr()}`);
   loopbackBase = `http://127.0.0.1:${disc.port}`;
+  loopbackSecrets.set(loopbackBase, disc.secret);
+});
+
+/** One request with exactly these headers and no secret added; Node sends the Host it is given. */
+function rawStatus(base: string, method: string, path: string, headers: Record<string, string>): Promise<number> {
+  const url = new URL(path, base);
+  return new Promise((resolveStatus, reject) => {
+    const req = httpRequest({ host: url.hostname, port: url.port, method, path: url.pathname + url.search, headers }, (res) => {
+      res.resume();
+      res.on('end', () => resolveStatus(res.statusCode ?? 0));
+    });
+    req.on('error', reject);
+    req.end();
+  });
+}
+
+// ─── Admission (secaudit 2026-09, A9-1) ───
+console.log('\nPhase 0 — Only the daemon\'s own callers are admitted');
+
+await test('A request without the secret is refused with 401: status, proxy, tool call and shutdown', async () => {
+  const host = new URL(loopbackBase).host;
+  for (const [method, path] of [['GET', '/local/status'], ['GET', '/v1/memory'], ['POST', '/local/call/aimeat_memory_list'], ['POST', '/local/shutdown']]) {
+    const status = await rawStatus(loopbackBase, method, path, { host, 'content-type': 'application/json' });
+    assert(status === 401, `${method} ${path} without the secret: ${status}`);
+  }
+});
+
+await test('A foreign Host is refused with 403 even with the secret (DNS rebinding)', async () => {
+  const status = await rawStatus(loopbackBase, 'GET', '/v1/memory', {
+    host: `rebind.attacker.example:${new URL(loopbackBase).port}`, ...daemonAuth(loopbackBase),
+  });
+  assert(status === 403, `foreign Host: ${status}`);
+});
+
+await test('A shutdown carrying an Origin is refused with 403, and the daemon keeps serving', async () => {
+  const r = await json(loopbackBase, '/local/shutdown', { method: 'POST', headers: { Origin: 'https://evil.example' } });
+  assert(r.status === 403, `Origin shutdown: ${r.status} ${JSON.stringify(r.body)}`);
+  await sleep(300);
+  assert(daemon1!.child.exitCode === null, 'the daemon exited on a refused shutdown');
+  const st = await json(loopbackBase, '/local/status');
+  assert(st.status === 200 && st.body.ok === true, `status after the refusal: ${st.status}`);
 });
 
 await test('Every line the daemon prints starts with a local date and time', async () => {
@@ -640,7 +700,9 @@ console.log('\nPhase 2 — Local Streamable-HTTP MCP');
 
 await test('MCP initialize + tools/list works on the loopback /v1/mcp', async () => {
   const client = new Client({ name: 'loopback-e2e', version: '1.0.0' });
-  const transport = new StreamableHTTPClientTransport(new URL(`${loopbackBase}/v1/mcp`));
+  const transport = new StreamableHTTPClientTransport(new URL(`${loopbackBase}/v1/mcp`), {
+    requestInit: { headers: daemonAuth(loopbackBase) },
+  });
   await client.connect(transport);
   try {
     const tools = await client.listTools();
@@ -667,7 +729,9 @@ await test('owner_scope survives the connector — a dropped permission flag loo
   assert(written.status === 200 || written.status === 201, `owner write: ${written.status} ${JSON.stringify(written.body)}`);
 
   const client = new Client({ name: 'loopback-e2e-scope', version: '1.0.0' });
-  const transport = new StreamableHTTPClientTransport(new URL(`${loopbackBase}/v1/mcp`));
+  const transport = new StreamableHTTPClientTransport(new URL(`${loopbackBase}/v1/mcp`), {
+    requestInit: { headers: daemonAuth(loopbackBase) },
+  });
   await client.connect(transport);
   try {
     const plain = await client.callTool({ name: 'aimeat_memory_read', arguments: { key } });
@@ -691,7 +755,9 @@ await test('REFUSAL — owner_scope now reaches the node, and it must NOT become
   // agent — which holds '*' — is exactly the principal that must still be refused: full access is
   // not the reserved grant, and openrouter.* is where a decrypted AI key's destination URL lives.
   const client = new Client({ name: 'loopback-e2e-reserved', version: '1.0.0' });
-  const transport = new StreamableHTTPClientTransport(new URL(`${loopbackBase}/v1/mcp`));
+  const transport = new StreamableHTTPClientTransport(new URL(`${loopbackBase}/v1/mcp`), {
+    requestInit: { headers: daemonAuth(loopbackBase) },
+  });
   await client.connect(transport);
   try {
     const r = await client.callTool({
@@ -948,6 +1014,7 @@ await test('Daemon degrades to direct transport and still serves the proxy', asy
   });
   assert(disc.agents[0].transport === 'direct', `transport: ${disc.agents[0].transport} (expected direct)\n--- daemon output ---\n${daemon2!.stderr()}`);
   const lb2 = `http://127.0.0.1:${disc.port}`;
+  loopbackSecrets.set(lb2, disc.secret);
   // REST proxy works over direct HTTP fallback — same envelope as the node.
   const direct = await json(NODE2_BASE, '/v1/agents/degbot/tasks?status=queued', { headers: { Authorization: `Bearer ${acc2.agentToken}` } });
   const proxied = await json(lb2, '/v1/agents/degbot/tasks?status=queued');
@@ -988,9 +1055,10 @@ await test('Two owners each with `concierge` both load: two identities, neither 
     throw new Error(`${err.message}\n--- daemon stderr ---\n${daemon3!.stderr()}`);
   });
   lb3 = `http://127.0.0.1:${disc.port}`;
+  loopbackSecrets.set(lb3, disc.secret);
 
   // serve.json must show two rows, or the surface is lying about what is served.
-  assert(disc.schema_version === 2, `schema_version should be 2, got ${disc.schema_version}`);
+  assert(disc.schema_version === 3, `schema_version should be 3, got ${disc.schema_version}`);
   const ids = (disc.principals as any[]).map(p => p.id).sort();
   assert(ids.length === 2, `expected two principals, got ${JSON.stringify(ids)}`);
   assert(ids.includes(`concierge#${acc3a.ownerName}@${NODE_ID}`), `alice's identity missing: ${JSON.stringify(ids)}`);
@@ -1121,7 +1189,7 @@ await test('An MCP session that names its agent works on a two-owner daemon', as
   const gaiiA = `concierge#${acc3a!.ownerName}@${NODE_ID}`;
   const client = new Client({ name: 'two-owner-e2e', version: '1.0.0' });
   const transport = new StreamableHTTPClientTransport(new URL(`${lb3}/v1/mcp`), {
-    requestInit: { headers: { 'X-Aimeat-Agent': gaiiA } },
+    requestInit: { headers: { ...daemonAuth(lb3), 'X-Aimeat-Agent': gaiiA } },
   });
   await client.connect(transport);
   try {
@@ -1135,7 +1203,10 @@ await test('An MCP session that names its agent works on a two-owner daemon', as
 
 await test('naming none is refused cleanly, and the daemon is still there afterwards', async () => {
   const client = new Client({ name: 'two-owner-e2e-anon', version: '1.0.0' });
-  const transport = new StreamableHTTPClientTransport(new URL(`${lb3}/v1/mcp`));
+  // The secret, so what refuses this session is the registry naming the candidates, not admission.
+  const transport = new StreamableHTTPClientTransport(new URL(`${lb3}/v1/mcp`), {
+    requestInit: { headers: daemonAuth(lb3) },
+  });
   let refused = false;
   try {
     await client.connect(transport);

@@ -14,6 +14,11 @@ This is the second half of the AIMEAT-CrewAI integration story:
     them up automatically.
 
 Changelog:
+  0.29.0 -- 2026-09-24 -- Every loopback request carries the serve daemon's secret. The daemon
+    writes a fresh one into serve.json at each start (connector schema 3) and refuses a request
+    without it, because it used to answer any web page or local process that reached 127.0.0.1
+    (secaudit 2026-09, A9-1). `_Api` sends it: the one `run_crew_daemon` read with the port, or,
+    for a caller that passes only a URL, the one serve.json names for that port.
   0.26.0 -- A refusal stops being indistinguishable from an empty result. Five node calls read the
     status, threw it away and returned a neutral value -- `_poll_tasks` [], the message body "",
     `_poll_messages` [], `_agent_engagements` None, `_space_contract` None -- so an agent whose
@@ -292,7 +297,7 @@ from pathlib import Path
 from typing import Any
 
 from .liaison import AimeatLiaisonError, create_liaison_agent
-from .mcp_client import ensure_serve, serve_params
+from .mcp_client import ensure_serve, loopback_secret, serve_params, serve_secret
 from .paths import aimeat_home
 from .usage_telemetry import install_usage_telemetry, usage_run
 
@@ -328,13 +333,16 @@ class _Api:
     `base_url` is the LOOPBACK serve daemon (`http://127.0.0.1:<port>`), not
     the node: the serve daemon proxies any `/v1/...` path over its persistent
     WS tunnel (or direct HTTP when degraded) and holds the agent's bearer
-    token itself, so no Authorization header is needed here. The
+    token itself. What goes in the Authorization header is the DAEMON's secret
+    from serve.json (0.29.0), which it requires on every request. The
     `X-Aimeat-Agent` header picks which registered agent the call runs as.
     One `requests.Session` is shared by every helper -- loopback keep-alive
     makes the 30s poll cycle effectively free.
     """
 
-    def __init__(self, base_url: str, identity: AgentIdentity | str, session: Any = None) -> None:
+    def __init__(
+        self, base_url: str, identity: AgentIdentity | str, session: Any = None, secret: str | None = None,
+    ) -> None:
         # ROUTING TAKES THE GAII, PATHS TAKE THE NAME. On a daemon holding two owners a bare name
         # is ambiguous and the connector refuses it by design, so the header must carry the full
         # identity; the node's `/v1/agents/{name}/...` routes are scoped by the caller the header
@@ -350,6 +358,11 @@ class _Api:
         self.base_url = base_url.rstrip("/")
         self.session = session or requests.Session()
         self.session.headers.update({"X-Aimeat-Agent": self.gaii})
+        # The daemon's secret: the caller's when given, else the one serve.json names for this port.
+        # Absent only against a daemon older than connector schema 3, which checks none.
+        secret = secret or loopback_secret(self.base_url)
+        if secret:
+            self.session.headers.update({"Authorization": f"Bearer {secret}"})
         # Permission refusals this credential has collected, newest wins: {call label: error code}.
         # Kept rather than counted -- a refusal is a standing fact, not an event rate.
         self.refusals: dict[str, str] = {}
@@ -1473,7 +1486,7 @@ def run_crew_daemon(
     # the bearer token itself; X-Aimeat-Agent routes to the right identity.
     discovery = ensure_serve(**serve_opts)
     loopback_base = f"http://127.0.0.1:{discovery['port']}"
-    api = _Api(loopback_base, identity)
+    api = _Api(loopback_base, identity, secret=serve_secret(discovery))
 
     # Per-LLM-call usage -> node ledger (LEDGER TARGET-016). Subscribes once to CrewAI's
     # event bus and POSTs an llm_call telemetry event per call over this same loopback, so

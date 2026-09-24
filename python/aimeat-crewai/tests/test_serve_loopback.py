@@ -17,6 +17,8 @@ What is asserted (the Phase 5 contract):
   - Clean shutdown via `POST /local/shutdown` removes serve.json and leaves no
     orphan process.
   - The example crew wiring still imports/constructs.
+  - (0.29.0, 2026-09-24) Every request carries the secret the daemon wrote into
+    serve.json, and a request without it is refused (secaudit 2026-09, A9-1).
 
 Environment: needs the aimeat-protocol repo checkout (the tests live in it)
 plus `node` on PATH -- the node server and the serve daemon are spawned from
@@ -262,6 +264,11 @@ def test_serve_params_auto_starts_daemon(env: Env) -> None:
 
     assert params["url"] == f"{env.loopback_base}/v1/mcp"
     assert params["transport"] == "streamable-http"
+    # The session carries the daemon's own secret, and the daemon refuses a request without it.
+    assert disc.get("secret"), "a schema-3 daemon writes the secret every request must present"
+    assert params["headers"]["Authorization"] == f"Bearer {disc['secret']}"
+    refused = requests.get(f"{env.loopback_base}/local/status", timeout=10)
+    assert refused.status_code == 401, f"a request without the secret must be refused, got {refused.status_code}"
 
 
 def test_serve_params_reuses_running_daemon(env: Env) -> None:
@@ -284,17 +291,34 @@ def test_serve_params_unknown_agent_fails_fast(env: Env) -> None:
 
 def test_mcp_tool_call_over_loopback(env: Env) -> None:
     """A liaison-style MCP tool call works over the loopback /v1/mcp."""
+    import contextlib
+
+    import httpx
     from mcp import ClientSession
+
+    from aimeat_crewai import serve_auth_headers
+
+    # The daemon admits only a session that carries its secret from serve.json.
+    headers = serve_auth_headers(_read_serve_json(env.home))
+    url = f"{env.loopback_base}/v1/mcp"
     # mcp renamed streamablehttp_client -> streamable_http_client; use the new
     # (non-deprecated) name when present, fall back to the old one on older mcp.
     try:
         from mcp.client.streamable_http import streamable_http_client
+
+        @contextlib.asynccontextmanager
+        async def open_transport():  # type: ignore[no-untyped-def]
+            async with httpx.AsyncClient(headers=headers) as http, streamable_http_client(url, http_client=http) as t:
+                yield t
     except ImportError:  # pragma: no cover -- older mcp
-        from mcp.client.streamable_http import streamablehttp_client as streamable_http_client
+        from mcp.client.streamable_http import streamablehttp_client
+
+        def open_transport():  # type: ignore[no-untyped-def]
+            return streamablehttp_client(url, headers=headers)
 
     async def run() -> None:
         async with (
-            streamable_http_client(f"{env.loopback_base}/v1/mcp") as (read, write, _),
+            open_transport() as (read, write, _),
             ClientSession(read, write) as session,
         ):
             await session.initialize()
@@ -402,10 +426,12 @@ def test_examples_still_import_and_construct(env: Env) -> None:
 
 
 def test_clean_shutdown_removes_discovery_and_leaves_no_orphan(env: Env) -> None:
+    from aimeat_crewai import serve_auth_headers
     from aimeat_crewai.mcp_client import _pid_alive
 
-    pid = _read_serve_json(env.home)["pid"]
-    r = requests.post(f"{env.loopback_base}/local/shutdown", timeout=10)
+    disc = _read_serve_json(env.home)
+    pid = disc["pid"]
+    r = requests.post(f"{env.loopback_base}/local/shutdown", headers=serve_auth_headers(disc), timeout=10)
     assert r.status_code == 200 and r.json().get("ok") is True
 
     deadline = time.monotonic() + 15

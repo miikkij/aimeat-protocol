@@ -2,8 +2,9 @@
  * @file cli/connect/mcp/local-discovery.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description `serve.json` — the file a serve daemon writes so anything else on the machine can
- *   find it: which port it listens on, which pid holds it, and which identities it is serving.
+ * @description `serve.json` — the file a serve daemon writes so its own clients can find it: which
+ *   port it listens on, which pid holds it, which identities it is serving, and the secret every
+ *   request to it must present.
  *
  *   PURE EXTRACTION from local-server.ts, which passed the 800-line cap. Its own unit: this is a
  *   CONTRACT with other processes, read by crew runtimes and sidecars that never import the daemon,
@@ -15,22 +16,29 @@
  *   writeDiscoveryFile()
  * @usage import { serveDiscoveryPath, type ServeDiscovery } from './local-discovery.js';
  * @version-history
+ *   v1.2.0 — 2026-09-24 — Schema 3: the file carries `secret`, which every request to the daemon must
+ *     present (./local-admission.ts), and it is written readable by its owner only where the OS
+ *     supports modes. Secaudit 2026-09, A9-1.
  *   v1.1.0 — 2026-09-07 — The two operations ON the file follow the file's own contract here:
  *     refusing to start when a live pid still owns it, and the atomic write. Pure extraction from
  *     local-server.ts, which passed the cap again; nothing changed but where the lines live.
  *   v1.0.0 — 2026-09-03 — Extracted from local-server.ts (max-file-lines).
  */
 import { join } from 'node:path';
-import { writeFileSync, renameSync, existsSync, readFileSync, mkdirSync } from 'node:fs';
+import { writeFileSync, renameSync, existsSync, readFileSync, mkdirSync, chmodSync } from 'node:fs';
 import { getConfigDir } from '../config.js';
 
 /**
+ * 3 since 2026-09-24: the file carries `secret`, and the daemon refuses every request that does not
+ * present it. Before that the daemon answered anything that reached 127.0.0.1, so a web page or
+ * another user on the machine could speak as any agent it held (secaudit 2026-09, A9-1).
+ *
  * 2 since 2026-09-01: `principals[].id` is the GAII it was always documented to be (it carried the
  * bare agent name instead), and every `agents[]` row gained a `gaii`. Two owners with one agent
  * name were one indistinguishable row before that, so the file described a daemon that does not
  * exist.
  */
-export const SERVE_DISCOVERY_SCHEMA_VERSION = 2;
+export const SERVE_DISCOVERY_SCHEMA_VERSION = 3;
 
 export interface ServeDiscoveryAgent {
   /** The bare name, kept for sidecars that read it. Not unique across owners — use `gaii`. */
@@ -59,6 +67,12 @@ export interface ServeDiscovery {
   schema_version: number;
   port: number;
   pid: number;
+  /**
+   * What every request to this daemon presents, as `Authorization: Bearer <secret>`. Made fresh at
+   * each start, so a client reads it from here together with the port. A credential: the file is
+   * written readable by its owner only.
+   */
+  secret: string;
   /** Neutral principal list (agents + ecosystem apps). Prefer this over `agents`. */
   principals: ServeDiscoveryPrincipal[];
   /** Transitional alias of the agent-typed principals — kept so existing sidecars keep working. */
@@ -115,11 +129,13 @@ export function buildDiscoveryDoc(
   startedAt: string,
   entries: DiscoverySource[],
   transportOf: (gaii: string) => ServeDiscoveryAgent['transport'],
+  secret: string,
 ): ServeDiscovery {
   return {
     schema_version: SERVE_DISCOVERY_SCHEMA_VERSION,
     port,
     pid: process.pid,
+    secret,
     started_at: startedAt,
     // Neutral principal list — an `eco:`-prefixed id is type 'ecosystem', else 'agent'.
     principals: entries.map(e => ({
@@ -143,10 +159,17 @@ export function buildDiscoveryDoc(
   };
 }
 
-/** Write it whole or not at all: a reader must never catch this file half-written. */
+/**
+ * Write it whole or not at all: a reader must never catch this file half-written.
+ *
+ * Owner-only, because it holds the daemon's secret. `mode` applies only when a file is created, so
+ * the temporary file is also chmod-ed in case one was left from an earlier write. Windows keeps the
+ * mode bits it cannot express and relies on the ACL of the connector home instead.
+ */
 export function writeDiscoveryFile(discoveryFile: string, doc: ServeDiscovery): void {
-  mkdirSync(getConfigDir(), { recursive: true });
+  mkdirSync(getConfigDir(), { recursive: true, mode: 0o700 });
   const tmp = `${discoveryFile}.tmp-${process.pid}`;
-  writeFileSync(tmp, JSON.stringify(doc, null, 2), 'utf-8');
+  writeFileSync(tmp, JSON.stringify(doc, null, 2), { encoding: 'utf-8', mode: 0o600 });
+  chmodSync(tmp, 0o600);
   renameSync(tmp, discoveryFile); // atomic replace on the same volume
 }
