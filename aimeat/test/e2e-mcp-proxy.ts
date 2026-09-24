@@ -30,6 +30,8 @@
  *     test/run-e2e-ci.ts --test=mcp-proxy
  *
  * @version-history
+ *   v1.5.0 — 2026-09-24 — A whole OAuth round against a far side of its own: the callback sends the
+ *     browser to a path of this node and never to `//host` or `/\host` (secaudit 2026-09 A2-3).
  *   v1.4.0 — 2026-09-24 — Phase 5d: an owner a node-wide server admits gets 404 on PATCH, DELETE and
  *     authorize of it, over REST and over MCP, and the operator changes it on the node doors
  *     (secaudit 2026-09 A2-1). Adds an ordinary owner, and a small MCP driver for the tool arms.
@@ -222,6 +224,47 @@ const upstream = http.createServer(async (req, res) => {
   await transport.handleRequest(req, res, body);
 });
 
+// ─── A far side that signs in with OAuth, for the callback arms ───
+// Its own port, so the plain upstream above keeps offering no OAuth at all, which the sign-in
+// refusal in phase 1 relies on. Far from the node's port for the reason UPSTREAM_PORT is: sessions
+// on neighbouring E2E ports run at the same time.
+const OAUTH_PORT = Number(new URL(BASE).port || '40251') + 220;
+const OAUTH_BASE = `http://127.0.0.1:${OAUTH_PORT}`;
+const oauthUpstream = http.createServer(async (req, res) => {
+  const url = new URL(req.url ?? '/', OAUTH_BASE);
+  const send = (body: unknown, status = 200) => {
+    res.writeHead(status, { 'content-type': 'application/json' });
+    res.end(JSON.stringify(body));
+  };
+  const chunks: Buffer[] = [];
+  for await (const c of req) chunks.push(c as Buffer);
+  const raw = Buffer.concat(chunks).toString('utf8');
+  // RFC 9728, RFC 8414 and RFC 7591, answered literally; test/unit/mcp-client-oauth.test.ts holds
+  // the PKCE proof. What this far side is for is the one redirect the callback makes afterwards.
+  if (url.pathname.startsWith('/.well-known/oauth-protected-resource')) {
+    return send({ resource: `${OAUTH_BASE}/mcp`, authorization_servers: [OAUTH_BASE] });
+  }
+  if (url.pathname === '/.well-known/oauth-authorization-server') {
+    return send({
+      issuer: OAUTH_BASE,
+      authorization_endpoint: `${OAUTH_BASE}/authorize`,
+      token_endpoint: `${OAUTH_BASE}/token`,
+      registration_endpoint: `${OAUTH_BASE}/register`,
+      response_types_supported: ['code'],
+      grant_types_supported: ['authorization_code', 'refresh_token'],
+      code_challenge_methods_supported: ['S256'],
+      token_endpoint_auth_methods_supported: ['client_secret_post'],
+    });
+  }
+  if (url.pathname === '/register' && req.method === 'POST') {
+    return send({ ...JSON.parse(raw), client_id: 'e2e-client', client_secret: 'e2e-secret' }, 201);
+  }
+  if (url.pathname === '/token' && req.method === 'POST') {
+    return send({ access_token: 'e2e-oauth-token', token_type: 'Bearer', expires_in: 3600 });
+  }
+  return send({ error: 'not_found' }, 404);
+});
+
 // ─── State ───
 const ownerName = `mcpproxy${Date.now()}`;
 const strangerName = `mcpproxyalt${Date.now()}`;
@@ -241,7 +284,8 @@ const manageAgentAuth = () => ({ Authorization: `Bearer ${manageAgentToken}` });
 console.log('\n=== AIMEAT MCP Proxy E2E ===\n');
 
 await new Promise<void>((r) => upstream.listen(UPSTREAM_PORT, '127.0.0.1', () => r()));
-console.log(`  (upstream MCP server on ${UPSTREAM_URL})\n`);
+await new Promise<void>((r) => oauthUpstream.listen(OAUTH_PORT, '127.0.0.1', () => r()));
+console.log(`  (upstream MCP server on ${UPSTREAM_URL}, OAuth far side on ${OAUTH_BASE})\n`);
 
 // ─── Phase 0: principals ───
 console.log('Phase 0 — Principals');
@@ -434,6 +478,45 @@ await test('the callback refuses a state nobody issued', async () => {
 await test('the callback refuses a request with no code at all', async () => {
   const { status } = await json('/v1/mcp-servers/callback?state=x');
   assert(status === 400, `expected 400, got ${status}`);
+});
+
+await test('a finished sign-in sends the browser back to a path of this node, and nowhere else', async () => {
+  const attached = await json('/v1/mcp-servers', {
+    method: 'POST', headers: ownerAuth(),
+    body: JSON.stringify({ name: 'oauthround', url: `${OAUTH_BASE}/mcp`, auth: 'oauth' }),
+  });
+  assert(attached.status === 201, `attach: ${attached.status}: ${JSON.stringify(attached.body)}`);
+
+  /** One whole round: start it naming `returnUrl`, then come back the way the far side sends a browser. */
+  const land = async (returnUrl: string): Promise<{ status: number; location: string | null }> => {
+    const started = await json('/v1/mcp-servers/oauthround/authorize', {
+      method: 'POST', headers: ownerAuth(), body: JSON.stringify({ return_url: returnUrl }),
+    });
+    assert(started.status === 200 && started.body.data.needs_person === true,
+      `authorize: ${started.status}: ${JSON.stringify(started.body)}`);
+    // `manual`: following an off-site Location from a test would be the very bounce under test.
+    const res = await fetch(`${BASE}/v1/mcp-servers/callback?state=${
+      encodeURIComponent(started.body.data.state)}&code=e2e-code`, { redirect: 'manual' });
+    await res.arrayBuffer();
+    return { status: res.status, location: res.headers.get('location') };
+  };
+
+  const home = await land('/spa.html#access');
+  assert(home.status === 302 && home.location === '/spa.html#access',
+    `a path of this node: ${home.status} → ${home.location}`);
+
+  // A browser reads both as `//evil.example`. Until 2026-09-24 the callback answered 302 with the
+  // address as it was sent (secaudit 2026-09 A2-3). Now it is no address at all, and the person
+  // gets the JSON answer a round with no return address gets.
+  for (const offSite of ['//evil.example/x', '/\\evil.example/x']) {
+    const r = await land(offSite);
+    const lands = r.location === null ? null : new URL(r.location, BASE).origin;
+    assert(lands === null || lands === new URL(BASE).origin, `${offSite} sent the browser to ${r.location}`);
+    assert(r.status === 200, `${offSite}: expected the JSON answer, got ${r.status} → ${r.location}`);
+  }
+
+  const removed = await json('/v1/mcp-servers/oauthround', { method: 'DELETE', headers: ownerAuth() });
+  assert(removed.status === 200, `clean up: ${removed.status}`);
 });
 
 await test('an agent without mcp:manage cannot start a sign-in', async () => {
@@ -1120,6 +1203,7 @@ await test('detach removes it, and the call path goes with it', async () => {
 // ─── Done ───
 for (const t of upstreamTransports.values()) await t.close();
 await new Promise<void>((r) => upstream.close(() => r()));
+await new Promise<void>((r) => oauthUpstream.close(() => r()));
 
 console.log(`\n=== ${passed} passed, ${failed} failed ===\n`);
 process.exit(failed > 0 ? 1 : 0);

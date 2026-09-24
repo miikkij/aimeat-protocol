@@ -20,6 +20,8 @@
  * @usage app.use(samlLoginRouter(config, storage));
  * @version-history
  *   v1.0.0 — 2026-08-23 — Initial (BR-04 phase 2).
+ *   v1.1.0 — 2026-09-24 — safeRedirectPath comes from utils/same-origin-path.ts, its one home, where
+ *     it also refuses a backslash and a control character in the post-login address.
  */
 import { Router } from 'express';
 import { randomUUID } from 'node:crypto';
@@ -32,10 +34,11 @@ import { samlForConnection } from '../services/saml-sp.js';
 import { ensureSsoMembership } from '../services/sso-membership.js';
 import {
   mapExternalIdentity, finalizeExternalSignup, establishForGhii,
-  signPendingToken, setPendingCookie, safeRedirectPath,
+  signPendingToken, setPendingCookie,
 } from '../services/external-login.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { logger } from '../utils/logger.js';
+import { safeRedirectPath } from '../utils/same-origin-path.js';
 
 /** How often lastLoginAt on the connection is worth a write — playbook evidence, not analytics. */
 const LOGIN_STAMP_THROTTLE_MS = 60_000;

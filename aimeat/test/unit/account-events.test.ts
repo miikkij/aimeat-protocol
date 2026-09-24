@@ -11,9 +11,13 @@
  * @usage cd aimeat && pnpm exec vitest run test/unit/account-events.test.ts
  * @version-history
  *   v1.0.0 — 2026-08-17 — Initial.
+ *   v1.1.0 — 2026-09-24 — The link an app gives its event stays on this node, as safeRedirectPath
+ *     reads a path (secaudit 2026-09 A2-3/A5-5, the same check in a third place).
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
+import express from 'express';
+import { accountEventsRouter } from '../../src/routes/account-events.js';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { Storage, AccountEventKind } from '../../src/storage/interface.js';
 import {
@@ -257,5 +261,45 @@ describe('backfill gives an existing account its history back', () => {
     await backfillHomeFeed(storage, cfg, 'alice');
     const rows = await readAccountEvents(storage, ALICE, { limit: 50 });
     expect(rows.map(r => r.kind)).toEqual(['account_created']);
+  });
+});
+
+describe('the link an app gives its event', () => {
+  /** POST /v1/account/events as an app under a grant, the one principal that door takes. */
+  async function postAsApp(link: string): Promise<number> {
+    const app = express();
+    app.use(express.json());
+    app.use((req, _res, next) => {
+      (req as unknown as { auth: unknown }).auth = {
+        sub: ALICE, owner: 'alice', node: 'node', roles: ['app'], scopes: ['memory:write'],
+        app: 'shop.html', exp: 0,
+      };
+      next();
+    });
+    app.use(accountEventsRouter({ nodeId: 'node' } as never, storage));
+    const server = app.listen(0, '127.0.0.1');
+    await new Promise<void>((r) => server.once('listening', () => r()));
+    try {
+      const port = (server.address() as { port: number }).port;
+      const res = await fetch(`http://127.0.0.1:${port}/v1/account/events`, {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ kind: 'order_placed', link }),
+      });
+      return res.status;
+    } finally {
+      await new Promise<void>((r) => server.close(() => r()));
+    }
+  }
+
+  it('stays on this node: a link a browser reads as another site is dropped', async () => {
+    // A person follows this link from their own feed. `/\evil.example` passed until 2026-09-24,
+    // because the check was a startsWith('/') of its own rather than safeRedirectPath.
+    for (const [link, kept] of [
+      ['/orders/7', '/orders/7'], ['//evil.example/x', ''], ['/\\evil.example/x', ''], ['/\t/evil.example', ''],
+    ]) {
+      expect(await postAsApp(link)).toBe(201);
+      const [row] = await readAccountEvents(storage, ALICE);
+      expect(row.link, JSON.stringify(link)).toBe(kept);
+    }
   });
 });

@@ -29,6 +29,8 @@
  *   import { accountEventsRouter } from './routes/account-events.js';
  *   app.use(accountEventsRouter(config, storage));
  * @version-history
+ *   v1.2.0 — 2026-09-24 — An app's event link is checked by safeRedirectPath, so a link a browser
+ *     reads as another site (`/\host`, a tab or a line break inside) is dropped.
  *   v1.1.0 — 2026-08-17 — Moved to /v1/account/events. /v1/events belongs to the SSE stream and
  *     matched first, so the window read returned MISSING_TICKET on every call.
  *   v1.0.0 — 2026-08-17 — Initial: the app-facing write door and the two reads.
@@ -43,6 +45,7 @@ import { resolveIdentity, ownerGhiiOf } from '../utils/gaii.js';
 import {
   recordAccountEvent, readAccountEvents, readAccountEventArchive, windowSize,
 } from '../services/account-events.js';
+import { safeRedirectPath } from '../utils/same-origin-path.js';
 
 /** A kind an app may spell: lower-case, short, no separators that would break the namespace. */
 const APP_KIND = /^[a-z][a-z0-9_]{1,39}$/;
@@ -72,9 +75,12 @@ function safeData(raw: unknown): Record<string, string> {
   return out;
 }
 
-/** A link is followed by a person, so it stays on this node. */
+/**
+ * A link is followed by a person, so it stays on this node: a path as safeRedirectPath reads one,
+ * or no link. Cut after the check, and a cut path is still a path of this node.
+ */
 function safeLink(raw: unknown): string {
-  return typeof raw === 'string' && raw.startsWith('/') && !raw.startsWith('//') ? raw.slice(0, 300) : '';
+  return safeRedirectPath(raw, '').slice(0, 300);
 }
 
 export function accountEventsRouter(config: AimeatConfig, storage: Storage): Router {

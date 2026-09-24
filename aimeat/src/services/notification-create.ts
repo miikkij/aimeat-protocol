@@ -11,6 +11,8 @@
  * @structure NotificationCreateError · createPrincipalNotification
  * @usage const r = await createPrincipalNotification(storage, config, req.auth!, body);
  * @version-history
+ *   v1.2.0 — 2026-09-24 — The link is checked by isSameOriginPath, so `/\host`, which a browser reads
+ *     as `//host`, is refused like any other address off this node.
  *   v1.1.0 — 2026-09-07 — `created` says whether it was created. It was the literal `true`, and
  *     notify()'s answer was taken apart for `muted` alone, so the one field carrying a storage
  *     failure was dropped here: POST /v1/notifications answered 201 and aimeat_notify answered
@@ -23,6 +25,7 @@ import type { Storage } from '../storage/interface.js';
 import { notify } from './notify.js';
 import type { NotifSource } from './notification-settings.js';
 import { emitChange } from './event-bus.js';
+import { isSameOriginPath } from '../utils/same-origin-path.js';
 
 export class NotificationCreateError extends Error {
   constructor(public status: number, public code: string, message: string) { super(message); this.name = 'NotificationCreateError'; }
@@ -43,8 +46,9 @@ export async function createPrincipalNotification(
   if (body !== undefined && (typeof body !== 'string' || body.length > 10_000)) {
     throw new NotificationCreateError(400, 'VALIDATION_ERROR', 'body must be a string (max 10000 chars)');
   }
-  // Same-node paths only ('/...', not '//host' or absolute URLs) — a notification never deep-links off the node.
-  if (link !== undefined && (typeof link !== 'string' || !link.startsWith('/') || link.startsWith('//') || link.length > 500)) {
+  // A path of this node only, as isSameOriginPath reads one: not '//host', not '/\host', not a URL.
+  // A notification never deep-links off the node.
+  if (link !== undefined && (!isSameOriginPath(link) || link.length > 500)) {
     throw new NotificationCreateError(400, 'VALIDATION_ERROR', 'link must be a same-node path starting with "/"');
   }
   if (type !== undefined && (typeof type !== 'string' || !/^[a-z0-9_:.-]{1,64}$/i.test(type))) {

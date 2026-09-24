@@ -37,11 +37,14 @@
  *   v1.3.0 -- 2026-07-21 -- dismissConversationNotifications(): reading a DM thread deletes its bell
  *     notifications (delivered #inbox/<id> + request #inbox/req:<id> links) so a seen message stops
  *     lingering in the header bell. Called from POST /v1/messages/conversations/:id/read.
+ *   v1.5.0 -- 2026-09-24 -- isSafeNotifActionEndpoint asks isSameOriginPath, so `/\host`, which a
+ *     browser reads as `//host`, is not a path of this node here either.
  */
 import { randomUUID } from 'node:crypto';
 import type { Storage } from '../storage/interface.js';
 import type { PushService } from './push.js';
 import { logger } from '../utils/logger.js';
+import { isSameOriginPath } from '../utils/same-origin-path.js';
 import { readNotificationSettings, prefsFor, quietState, senderKey, type NotifSource } from './notification-settings.js';
 
 export const NOTIF_PREFIX = 'notif.';
@@ -65,9 +68,9 @@ export type NotifAction =
   | { id: string; label: string; kind: 'reply'; to: string; conversationId?: string; subject?: string; replyTo?: string; style?: NotifActionStyle }
   | { id: string; label: string; kind: 'api'; method: 'POST' | 'PATCH' | 'DELETE'; endpoint: string; body?: Record<string, unknown>; confirm?: boolean; style?: NotifActionStyle };
 
-/** Same-node path guard for an action endpoint/link ('/...' only — never '//host' or a full URL). */
+/** Same-node path guard for an action endpoint/link: a path of this node, never '//host' or a URL. */
 export function isSafeNotifActionEndpoint(path: unknown): path is string {
-  return typeof path === 'string' && path.startsWith('/') && !path.startsWith('//') && path.length <= 500;
+  return isSameOriginPath(path) && path.length <= 500;
 }
 
 /** Wired once at boot (routes-loader) so every notify() call can also fire a web push. */
