@@ -18,9 +18,11 @@
  *   v1.0.0 — 2026-09-07 — Written with the fix for the regression above.
  *   v1.1.0 — 2026-09-24 — heldScopes: the owner in person holds every word, everybody else what
  *     their token says (secaudit 2026-09 f740ecf9bc39).
+ *   v1.2.0 — 2026-09-24 — isOwnerInPerson and callAuthority: an app under a grant, an agent, an
+ *     ecosystem app and a visitor are never the owner in person.
  */
 import { describe, it, expect } from 'vitest';
-import { intersectScopes, heldScopes } from '../../src/auth/effective-scopes.js';
+import { intersectScopes, heldScopes, isOwnerInPerson, callAuthority } from '../../src/auth/effective-scopes.js';
 import { SECRETS_MANAGE_SCOPE, MCP_MANAGE_SCOPE, scopeIsCovered } from '../../src/utils/scope-coverage.js';
 
 describe('intersectScopes: a token narrowed to what the record currently allows', () => {
@@ -98,5 +100,26 @@ describe('heldScopes: what a door hands a service that asks the scope question i
     // A visitor from another node is never the account holder in person.
     expect(heldScopes({ roles: ['owner'], scopes: ['memory:read'], federated: true })).toEqual(['memory:read']);
     expect(scopeIsCovered(heldScopes({ roles: ['agent'], scopes: ['work:request'] }), 'mcp:use')).toBe(false);
+  });
+});
+
+describe('isOwnerInPerson and callAuthority: the account holder, never something acting for them', () => {
+  it('only the owner role, from this node, with nothing acting in its name', () => {
+    expect(isOwnerInPerson({ roles: ['owner'] })).toBe(true);
+    expect(isOwnerInPerson({ roles: ['owner', 'operator'] })).toBe(true);
+    // An app under a grant resolves to its owner's account; that is why the question is asked of
+    // the session and never of the name the session resolves to.
+    expect(isOwnerInPerson({ roles: ['app'] })).toBe(false);
+    expect(isOwnerInPerson({ roles: ['owner', 'app'] })).toBe(false);
+    expect(isOwnerInPerson({ roles: ['agent'] })).toBe(false);
+    expect(isOwnerInPerson({ roles: ['owner', 'agent'] })).toBe(false);
+    expect(isOwnerInPerson({ roles: ['ecosystem'] })).toBe(false);
+    expect(isOwnerInPerson({ roles: ['owner'], federated: true })).toBe(false);
+  });
+
+  it('callAuthority carries both halves, so no door can state one and forget the other', () => {
+    expect(callAuthority({ roles: ['owner'], scopes: [] }).ownerInPerson).toBe(true);
+    expect(scopeIsCovered(callAuthority({ roles: ['owner'], scopes: [] }).scopes, 'mcp:use')).toBe(true);
+    expect(callAuthority({ roles: ['app'], scopes: ['memory:read'] })).toEqual({ ownerInPerson: false, scopes: ['memory:read'] });
   });
 });

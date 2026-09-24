@@ -12,6 +12,9 @@
  *   The upstream server is built with the SDK's own server half, so the protocol on the wire is the
  *   protocol, and the test moves when the SDK does.
  * @version-history
+ *   v1.3.0 — 2026-09-24 — Alice's calls say she is the owner in person (`ownerInPerson`), as the door
+ *     now tells the chokepoint; a name that matches the server's owner no longer passes alone. Setup
+ *     only: every assertion is unchanged.
  *   v1.2.0 — 2026-09-24 — A capability over a remote tool asks the caller's own scopes: an agent
  *     without mcp:use is refused (secaudit 2026-09 f740ecf9bc39).
  *   v1.1.0 — 2026-09-24 — A tool list past the ceiling is refused by name, parks the server and
@@ -103,6 +106,8 @@ function makeRow(over: Partial<McpServerRecord> = {}): McpServerRecord {
   };
 }
 
+// Every call below is Alice, the account holder in person, on her own server, so each says so with
+// `ownerInPerson: true`, as the REST door does through callAuthority.
 describe('the MCP proxy chokepoint, against a real server', () => {
   it('lists the far side\'s tools and caches them with a hash', async () => {
     const storage = new SqliteStorage(':memory:');
@@ -144,7 +149,7 @@ describe('the MCP proxy chokepoint, against a real server', () => {
     await storage.createMcpServer(row);
 
     const r = await callRemoteTool({
-      storage, config, server: row, tool: 'echo', args: { text: 'hello' }, caller: 'alice@node-a',
+      storage, config, server: row, tool: 'echo', args: { text: 'hello' }, caller: 'alice@node-a', ownerInPerson: true,
     });
     expect(r.ok).toBe(true);
     if (!r.ok) return;
@@ -158,7 +163,7 @@ describe('the MCP proxy chokepoint, against a real server', () => {
     await storage.createMcpServer(row);
 
     const r = await callRemoteTool({
-      storage, config, server: row, tool: 'always_fails', args: {}, caller: 'alice@node-a',
+      storage, config, server: row, tool: 'always_fails', args: {}, caller: 'alice@node-a', ownerInPerson: true,
     });
     // ok: the proxy worked. isError: the TOOL refused. Folding these together would make an
     // upstream "no" indistinguishable from our own machinery breaking.
@@ -173,7 +178,7 @@ describe('the MCP proxy chokepoint, against a real server', () => {
     await storage.createMcpServer(row);
 
     const r = await callRemoteTool({
-      storage, config, server: row, tool: 'echo', args: { text: 'x' }, caller: 'alice@node-a',
+      storage, config, server: row, tool: 'echo', args: { text: 'x' }, caller: 'alice@node-a', ownerInPerson: true,
     });
     expect(r.ok).toBe(false);
     if (r.ok) return;
@@ -190,7 +195,7 @@ describe('the MCP proxy chokepoint, against a real server', () => {
     await storage.createMcpServer(row);
 
     const r = await callRemoteTool({
-      storage, config, server: row, tool: 'echo', args: { text: 'x' }, caller: 'alice@node-a',
+      storage, config, server: row, tool: 'echo', args: { text: 'x' }, caller: 'alice@node-a', ownerInPerson: true,
     });
     expect(r.ok).toBe(false);
     if (r.ok) return;
@@ -221,7 +226,7 @@ describe('the MCP proxy chokepoint, against a real server', () => {
       await storage.createMcpServer(row);
 
       const r = await callRemoteTool({
-        storage, config, server: row, tool: 'echo', args: { text: 'x' }, caller: 'alice@node-a',
+        storage, config, server: row, tool: 'echo', args: { text: 'x' }, caller: 'alice@node-a', ownerInPerson: true,
       });
       expect(r.ok).toBe(false);
       if (r.ok) return;
@@ -243,7 +248,7 @@ describe('the MCP proxy chokepoint, against a real server', () => {
     await storage.createMcpServer(row);
 
     const r = await callRemoteTool({
-      storage, config, server: row, tool: 'echo', args: { text: 'x' }, caller: 'alice@node-a',
+      storage, config, server: row, tool: 'echo', args: { text: 'x' }, caller: 'alice@node-a', ownerInPerson: true,
     });
     expect(r.ok).toBe(false);
     if (r.ok) return;
@@ -259,7 +264,7 @@ describe('the MCP proxy chokepoint, against a real server', () => {
     const r = await callRemoteTool({
       storage,
       config: { encryptionKey: null, totpSecretEncryptionKey: null } as never,
-      server: row, tool: 'echo', args: { text: 'x' }, caller: 'alice@node-a',
+      server: row, tool: 'echo', args: { text: 'x' }, caller: 'alice@node-a', ownerInPerson: true,
     });
     expect(r.ok).toBe(false);
     if (r.ok) return;
@@ -276,7 +281,7 @@ describe('the MCP proxy chokepoint, against a real server', () => {
     await storage.createMcpServer(row);
 
     const r = await callRemoteTool({
-      storage, config, server: row, tool: 'echo', args: {}, caller: 'alice@node-a',
+      storage, config, server: row, tool: 'echo', args: {}, caller: 'alice@node-a', ownerInPerson: true,
     });
     expect(r.ok).toBe(false);
     if (r.ok) return;
@@ -296,7 +301,7 @@ describe('the MCP proxy chokepoint, against a real server', () => {
     await storage.createMcpServer(row);
 
     const r = await callRemoteTool({
-      storage, config, server: row, tool: 'echo', args: {}, caller: 'alice@node-a',
+      storage, config, server: row, tool: 'echo', args: {}, caller: 'alice@node-a', ownerInPerson: true,
     });
     expect(r.ok).toBe(false);
     if (r.ok) return;
@@ -336,7 +341,7 @@ describe('a capability over a remote tool, through the real chokepoint', () => {
     // Until 2026-09-24 the chokepoint read a missing scope list as mcp:use, and this path passed
     // none, so the far side answered (secaudit 2026-09 f740ecf9bc39).
     await expect(invokeCapability(config, storage as never, capability(), { text: 'x' }, AGENT, '',
-      'normal', undefined, ['work:request'])).rejects.toMatchObject({ statusCode: 403, code: 'NOT_GRANTED' });
+      'normal', undefined, { scopes: ['work:request'] })).rejects.toMatchObject({ statusCode: 403, code: 'NOT_GRANTED' });
   });
 
   it('lets the same agent through once it holds mcp:use, and the owner in person needs no word', async () => {
@@ -344,10 +349,10 @@ describe('a capability over a remote tool, through the real chokepoint', () => {
     await storage.createMcpServer(makeRow());
 
     const agent = await invokeCapability(config, storage as never, capability(), { text: 'agent' }, AGENT, '',
-      'normal', undefined, ['work:request', 'mcp:use']);
+      'normal', undefined, { scopes: ['work:request', 'mcp:use'] });
     expect(JSON.stringify(agent.result)).toContain('echo:agent');
     const owner = await invokeCapability(config, storage as never, capability(), { text: 'owner' }, 'alice@node-a', '',
-      'normal', undefined, []);
+      'normal', undefined, { scopes: [], ownerInPerson: true });
     expect(JSON.stringify(owner.result)).toContain('echo:owner');
   });
 });

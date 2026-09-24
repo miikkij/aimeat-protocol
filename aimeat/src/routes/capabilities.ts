@@ -40,6 +40,8 @@
  *            only; a third party still counts their failure. E2E test-quality audit finding A12.
  *   v1.5.0 - 2026-09-24 - POST /:id/invoke hands the service the session's scopes (heldScopes), so a
  *            capability over a remote MCP tool refuses a caller without mcp:use.
+ *   v1.5.1 - 2026-09-24 - …and whether the caller is the owner in person (callAuthority), so an app
+ *            under a grant is never taken for its owner.
  */
 import { Router } from 'express';
 import {
@@ -50,7 +52,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, CapabilityFilter, CapabilityRecord } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
-import { heldScopes } from '../auth/effective-scopes.js';
+import { callAuthority } from '../auth/effective-scopes.js';
 import { resolveIdentity } from '../utils/gaii.js';
 
 /**
@@ -309,10 +311,11 @@ export function capabilitiesRouter(config: AimeatConfig, storage: Storage): Rout
 
     try {
       const { invokeCapability } = await import('../services/capability-invoke.js');
-      // This door proves work:request only. What else the session holds goes with the call, so a
-      // capability over a remote MCP tool asks for mcp:use there, as every MCP door does.
+      // This door proves work:request only. What else the session holds, and whether it is the
+      // owner in person, goes with the call, so a capability over a remote MCP tool asks for
+      // mcp:use there, as every MCP door does.
       const result = await invokeCapability(config, storage, cap, input, callerGhii, jwt, mode,
-        undefined, heldScopes(req.auth!));
+        undefined, callAuthority(req.auth!));
 
       await recordCapabilityInvocation({ storage }, cap, callerGhii, input, { ok: true, durationMs: result.duration_ms });
 

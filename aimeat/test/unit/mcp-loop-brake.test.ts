@@ -12,6 +12,8 @@
  *   stored, and any other spelling of it is caught by the first look and leaves no row behind.
  * @version-history
  *   v1.0.0 — 2026-09-17 — Initial.
+ *   v1.1.0 — 2026-09-24 — Alice's calls say she is the owner in person (`ownerInPerson`), as the door
+ *     now tells the chokepoint. Setup only: the assertions are unchanged.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import express from 'express';
@@ -187,7 +189,7 @@ describe('the header on the wire', () => {
     const row = makeRow();
     await storage.createMcpServer(row);
     const callAs = (text: string) => callRemoteTool({
-      storage, config, server: row, tool: 'echo', args: { text }, caller: `alice@${NODE_ID}`,
+      storage, config, server: row, tool: 'echo', args: { text }, caller: `alice@${NODE_ID}`, ownerInPerson: true,
     });
 
     // The client is built by the first call. If the chain were fixed when the client was built,
@@ -214,7 +216,7 @@ describe('the header on the wire', () => {
     await storage.createMcpServer(row);
 
     const r = await callRemoteTool({
-      storage, config, server: row, tool: 'echo', args: { text: 'x' }, caller: `alice@${NODE_ID}`,
+      storage, config, server: row, tool: 'echo', args: { text: 'x' }, caller: `alice@${NODE_ID}`, ownerInPerson: true,
     });
     expect(r.ok).toBe(false);
     if (r.ok) return;

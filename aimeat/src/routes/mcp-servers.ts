@@ -39,6 +39,8 @@
  *   DELETE /v1/mcp-servers/:id              -- detach, and forget the credential
  * @usage app.use(mcpServersRouter(config, storage));
  * @version-history
+ *   v1.3.1 — 2026-09-24 — POST /:id/call also says whether the caller is the owner in person
+ *     (callAuthority), the one thing the chokepoint spares a scope for.
  *   v1.3.0 — 2026-09-24 — POST /:id/call hands the chokepoint the session's own scopes (heldScopes),
  *     which no longer assumes mcp:use for a caller that names none.
  *   v1.2.0 — 2026-09-24 — The sign-in callback sends the browser only to an address that
@@ -56,7 +58,7 @@ import { success, error } from '../middleware/envelope.js';
 import {
   requireAuth, requireScope, requireAnyScope, requireOperatorPrincipal,
 } from '../auth/middleware.js';
-import { heldScopes } from '../auth/effective-scopes.js';
+import { callAuthority } from '../auth/effective-scopes.js';
 import { resolveIdentity, ownerGhiiOf, callerPrincipal } from '../utils/gaii.js';
 import {
   toPublicMcpServer,
@@ -142,8 +144,8 @@ export function mcpServersRouter(config: AimeatConfig, storage: Storage): Router
         // The EXACT principal, for attribution. Authorisation happened above, against the owner.
         caller: callerPrincipal(req.auth!, config.nodeId),
         callerKind: req.auth!.roles.includes('owner') ? 'owner' : 'agent',
-        // What this session holds, the owner's role reading included; the chokepoint assumes nothing.
-        scopes: heldScopes(req.auth!),
+        // What this session holds and whether it is the owner in person; the chokepoint assumes nothing.
+        ...callAuthority(req.auth!),
       });
 
       if (!result.ok) {

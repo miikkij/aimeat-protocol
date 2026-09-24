@@ -24,6 +24,8 @@
  *   // inside an extension action
  *   const r = await ctx.buy('alice/data.html', 'lookup', { id: '123' });
  * @version-history
+ *   v1.2.1 — 2026-09-24 — The scope travels as the capability service's authority object; a purchase
+ *     is never the owner in person.
  *   v1.2.0 — 2026-09-24 — The invoke hands the capability service mcp:use, because the settled
  *     purchase authorises the call; a tool bound to a remote MCP tool runs for the buyer again.
  *   v1.1.0 — 2026-08-11 — The backing capability must belong to the seller (August 2026 audit H-17),
@@ -155,7 +157,7 @@ export async function buyForExtension(args: {
       // Already settled on the product's own coordinate — the raw paywall must not charge it again.
       mintInternalPass(coordExt, tool),
       // The paid purchase is what authorises this call, so a remote MCP tool behind it runs.
-      ['mcp:use'],
+      { scopes: ['mcp:use'] },
     );
     // Delivered → book the SELLER's beneficiaries out of the seller's own cut, exactly as the REST
     // and MCP doors do. A capability buying from another capability is still a sale.

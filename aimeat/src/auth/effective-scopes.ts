@@ -7,9 +7,14 @@
  *   auth/middleware.ts when that file passed the 800-line ceiling; both gates there call it.
  * @structure withCurrentScopes(storage, verified) → VerifiedToken (calls withCurrentOperatorRole first)
  *   withCurrentOperatorRole(storage, verified) → VerifiedToken
+ *   isOwnerInPerson(auth) → boolean, the account holder in person and nothing acting in their name
  *   heldScopes(auth) → string[], the session's scopes with the owner's role reading written out
+ *   callAuthority(auth) → both, for the remote MCP chokepoint
  * @usage req.auth = await withCurrentScopes(storage, verified);
  * @version-history
+ *   v1.4.0 -- 2026-09-24 -- isOwnerInPerson and callAuthority: a door tells the remote MCP chokepoint
+ *     whether the caller is the owner in person, so an app grant, which resolves to its owner's
+ *     account, is never taken for them. heldScopes asks isOwnerInPerson, with isForeignPrincipal.
  *   v1.3.0 -- 2026-09-24 -- heldScopes: what a door hands a service that asks the scope question
  *     itself, so the owner in person is not refused for carrying no scopes on their token.
  *   v1.2.1 -- 2026-09-24 -- The federated test is isForeignPrincipal(), the one question.
@@ -130,19 +135,38 @@ export async function withCurrentOperatorRole(storage: Storage | null, v: Verifi
 }
 
 /**
+ * Is this session the account holder IN PERSON? The test requireScope's role bypass makes, as a
+ * value: the owner role, and nothing acting in the owner's name. A visitor from another node, an
+ * agent, an ecosystem app and an app under a grant never are, whatever their role list says, and a
+ * name cannot answer it: an app grant resolves to its owner's GHII.
+ */
+export function isOwnerInPerson(auth: { roles: string[]; federated?: boolean }): boolean {
+  return auth.roles.includes('owner') && !isForeignPrincipal(auth)
+    && !auth.roles.includes('agent') && !auth.roles.includes('ecosystem') && !auth.roles.includes('app');
+}
+
+/**
  * Every scope this session holds, as a list a service can ask scopeIsCovered() about.
  *
  * requireScope admits the account holder in person on the ROLE, and their token carries no scopes
  * at all, so a service handed only `auth.scopes` would refuse the one person every door admits. The
  * owner in person is written here as every word — the wildcard and each word no wildcard carries —
  * which is what that role reading means; everybody else holds what their token says, already
- * narrowed to their record by withCurrentScopes. The test is requireScope's: a federated visitor,
- * an agent and an ecosystem app never get the role reading, whatever their role list says.
+ * narrowed to their record by withCurrentScopes.
  */
 export function heldScopes(
   auth: { roles: string[]; scopes?: string[]; federated?: boolean },
 ): string[] {
-  const ownerInPerson = auth.roles.includes('owner') && !auth.federated
-    && !auth.roles.includes('agent') && !auth.roles.includes('ecosystem');
-  return ownerInPerson ? ['*', ...SCOPES_OUTSIDE_WILDCARD] : [...(auth.scopes ?? [])];
+  return isOwnerInPerson(auth) ? ['*', ...SCOPES_OUTSIDE_WILDCARD] : [...(auth.scopes ?? [])];
+}
+
+/**
+ * What a call may do on the strength of the HTTP session that makes it, for a service that asks
+ * the question itself (the remote MCP chokepoint): whether the caller is the account holder in
+ * person, and every scope it holds. One helper, so no door can answer one half and forget the other.
+ */
+export function callAuthority(
+  auth: { roles: string[]; scopes?: string[]; federated?: boolean },
+): { ownerInPerson: boolean; scopes: string[] } {
+  return { ownerInPerson: isOwnerInPerson(auth), scopes: heldScopes(auth) };
 }

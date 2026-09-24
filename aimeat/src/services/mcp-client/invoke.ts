@@ -19,6 +19,9 @@
  * @structure RemoteCallResult · callRemoteTool · listRemoteTools · toolCacheHash
  * @usage const r = await callRemoteTool({ storage, config, server, tool, args, caller, scopes });
  * @version-history
+ *   v1.6.0 — 2026-09-24 — `ownerInPerson`: the door says whether the caller is the account holder in
+ *     person, and only then does the server's owner pass without a scope. An app grant resolves to
+ *     its owner's account and passed as them.
  *   v1.5.0 — 2026-09-24 — `scopes` is required and nothing is assumed when a door leaves it out:
  *     a missing list was read as mcp:use, which the capability door had never proved.
  *   v1.4.0 — 2026-09-24 — listRemoteTools refuses a tool list over MAX_TOOL_LIST_BYTES with
@@ -162,6 +165,13 @@ export interface RemoteCallInput {
    * holds (auth/effective-scopes.ts heldScopes for an HTTP session), and nothing is assumed here.
    */
   scopes: string[];
+  /**
+   * True only when the door proved the caller is the account holder in person (callAuthority in
+   * auth/effective-scopes.ts). Only then is the server's own owner spared the scope and any grant.
+   * Left out, the caller is not the owner in person, which is every MCP session (an agent) and
+   * every path with no session.
+   */
+  ownerInPerson?: boolean;
 }
 
 /**
@@ -399,6 +409,7 @@ export async function callRemoteTool(input: RemoteCallInput): Promise<RemoteCall
     // Required by the type. A caller the compiler never saw (a script, a test) that leaves it out
     // holds nothing, and is refused like one that holds nothing, rather than breaking the call.
     scopes: input.scopes ?? [],
+    ownerInPerson: input.ownerInPerson === true,
   });
   if (!access.allowed) {
     record('refused', access.code);
