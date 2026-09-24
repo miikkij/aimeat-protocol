@@ -19,6 +19,8 @@
  * @structure RemoteCallResult · callRemoteTool · listRemoteTools · toolCacheHash
  * @usage const r = await callRemoteTool({ storage, config, server, tool, args, caller });
  * @version-history
+ *   v1.4.0 — 2026-09-24 — listRemoteTools refuses a tool list over MAX_TOOL_LIST_BYTES with
+ *     TOOL_LIST_TOO_LARGE, parks the server with the reason, and stores nothing of it.
  *   v1.3.0 — 2026-09-17 — A 508 from the far side is LOOP_DETECTED, answered with 508, and does not
  *     park the server: only that call went round in a circle (hops.ts).
  *   v1.2.0 — 2026-09-16 — No morsel prices. The debit, its refund and the INSUFFICIENT refusal are
@@ -51,6 +53,16 @@ import { logger } from '../../utils/logger.js';
  */
 const CALL_TIMEOUT_MS = 60_000;
 
+/**
+ * The most this node keeps of one server's tool list, measured as it would be stored.
+ *
+ * A hundred tools with their full schemas come to 100 to 200 KB, so half a megabyte leaves room for
+ * the largest real servers. Without a ceiling one attachment decided how much this node stored and
+ * then served to every caller the server admits: a single 8 MB description was cached and answered
+ * in full. listRemoteTools is the one place a list is stored, so the ceiling holds for every door.
+ */
+const MAX_TOOL_LIST_BYTES = 512 * 1024;
+
 /** A proxied result. `ok: false` always carries `message`, and `message` is for a person. */
 export type RemoteCallResult =
   | { ok: true; content: unknown; structuredContent?: unknown; isError: boolean }
@@ -77,6 +89,8 @@ export type RemoteCallRefusal =
   | 'PRICE_UNSUPPORTED'
   /** An AIMEAT on the far side refused the call because it had already passed through it (hops.ts). */
   | 'LOOP_DETECTED'
+  /** The far side's tool list is larger than this node keeps (MAX_TOOL_LIST_BYTES). */
+  | 'TOOL_LIST_TOO_LARGE'
   | 'TOOL_FAILED';
 
 /**
@@ -115,6 +129,7 @@ export function statusForRemoteRefusal(code: RemoteCallRefusal): number {
       return 503;
     case 'UNREACHABLE':
     case 'UPSTREAM_UNAUTHORIZED':
+    case 'TOOL_LIST_TOO_LARGE':
     case 'TOOL_FAILED':
       return 502;
   }
@@ -264,6 +279,15 @@ export async function listRemoteTools(
       inputSchema: (t.inputSchema ?? {}) as Record<string, unknown>,
       ...(t.annotations ? { annotations: t.annotations as Record<string, unknown> } : {}),
     }));
+    // Refused before anything is stored, and the server parked with the reason the way a failed
+    // look parks it. The client is kept: the server answers, only its list is more than we keep.
+    const bytes = Buffer.byteLength(JSON.stringify(tools), 'utf8');
+    if (bytes > MAX_TOOL_LIST_BYTES) {
+      const message = `"${server.slug}" lists ${Math.ceil(bytes / 1024)} KB of tools, and this node `
+        + `keeps at most ${MAX_TOOL_LIST_BYTES / 1024} KB of one server's list, so nothing was stored.`;
+      await storage.setMcpServerStatus(server.id, 'unreachable', message);
+      return { ok: false, code: 'TOOL_LIST_TOO_LARGE', message };
+    }
     const hash = toolCacheHash(tools);
     const changed = hash !== server.toolCacheHash;
     await storage.setMcpServerToolCache(server.id, tools, hash);
