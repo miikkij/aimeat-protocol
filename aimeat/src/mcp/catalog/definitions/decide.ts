@@ -23,6 +23,8 @@
  * @structure decideTools -- AimeatToolDefinition[]
  * @usage imported by mcp/catalog/definitions.ts
  * @version-history
+ *   v1.2.1 — 2026-09-24 — aimeat_decide_run says a run does not send a record the node reads to
+ *     decide what it does: named in `keys` it is refused, under a `prefix` it is left out.
  *   v1.2.0 — 2026-09-23 — Decision providers: `provider` on aimeat_decide, aimeat_decide_run and
  *     aimeat_decision_list, stats by provider, and the providers in the settings read.
  *   v1.1.0 — 2026-09-20 — Decision rules: `rule` on aimeat_decide, aimeat_decide_run and
@@ -98,8 +100,8 @@ export const decideTools: AimeatToolDefinition[] = [
             provider: { type: 'string', description: 'For start: the decision provider every item is asked on. Leave out to let the node pick.' },
             questions: { type: 'object', description: 'For start: the questions, as for aimeat_decide. Leave out when `rule` is given.' },
             items: { type: 'array', description: 'For start: [{ subject, state }].' },
-            keys: { type: 'array', description: 'For start: owner memory keys; each record\'s value is one state.' },
-            prefix: { type: 'string', description: 'For start: every owner record under this key prefix.' },
+            keys: { type: 'array', description: 'For start: owner memory keys; each record\'s value is one state. A key the node reads to decide what it does (its AI and decision keys, a payout record) is refused.' },
+            prefix: { type: 'string', description: 'For start: every owner record under this key prefix, less the records the node reads to decide what it does.' },
             fields: { type: 'array', description: 'For start: keep only these top-level fields of each state.' },
             gates: { type: 'string', description: 'What the answers decide.' },
             thresholds: { type: 'object', description: 'The thresholds you will apply.' },

@@ -21,6 +21,7 @@
  *   - appMayWriteKey: owner passes, app refused, delegated agent refused, reserved grant passes
  * @usage cd aimeat && pnpm exec vitest run test/unit/reserved-keys.test.ts
  * @version-history
+ *   v1.x — 2026-09-24 — `__redirect__`, the first key only the node writes: exact, and reserved.
  *   v1.x — 2026-09-19 — `decide.` is the fourteenth: the owner's TypeSafe key and scrubber policy.
  *   v1.x — 2026-09-13 — `messages.organize.` is the thirteenth: the owner's archive and rules for the
  *     Messages list, which decide what the server shows them.
@@ -39,6 +40,7 @@
 import { describe, it, expect } from 'vitest';
 import {
     RESERVED_OWNER_KEY_PREFIXES, isReservedServerKey, appMayWriteKey,
+    SERVER_WRITTEN_KEYS, isServerWrittenKey, serverWrittenKeyRefusal,
 } from '../../src/utils/reserved-keys.js';
 
 /** The two records the August 2026 audit found unprotected, by their real production key names. */
@@ -116,6 +118,27 @@ describe('the list holds every prefix the server reads and acts on', () => {
         // Without the dot, 'profile' would also reserve 'profiles.*' and 'profile-notes.*', which
         // are ordinary user data and would start refusing an app that had always written them.
         for (const prefix of RESERVED_OWNER_KEY_PREFIXES) expect(prefix.endsWith('.')).toBe(true);
+    });
+});
+
+describe('a key only the node writes', () => {
+    it('is `__redirect__`, exactly, and it counts as reserved', () => {
+        // The public agent profile forwards every visitor to the address this record names, and it
+        // reads it in ANY namespace, an agent's and the owner's alike.
+        expect([...SERVER_WRITTEN_KEYS]).toEqual(['__redirect__']);
+        expect(isServerWrittenKey('__redirect__')).toBe(true);
+        expect(isReservedServerKey('__redirect__')).toBe(true);
+        // An address, not a prefix: the neighbours stay ordinary data.
+        expect(isServerWrittenKey('__redirect__.old')).toBe(false);
+        expect(isServerWrittenKey('redirect')).toBe(false);
+        expect(isServerWrittenKey(undefined)).toBe(false);
+    });
+
+    it('is refused to an app as every reserved key is, and says which act writes it', () => {
+        expect(appMayWriteKey(['app'], '__redirect__')).toBe(false);
+        const refusal = serverWrittenKeyRefusal('__redirect__');
+        expect(refusal.code).toBe('RESERVED_KEY');
+        expect(refusal.message).toContain('__redirect__');
     });
 });
 

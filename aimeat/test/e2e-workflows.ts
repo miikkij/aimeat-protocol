@@ -20,6 +20,8 @@
  *     unless asked; GET /:id/preflight; the three workflow prompts for a person's own AI.
  *   v1.6.0 — 2026-08-30 — An ai step's input_keys is held to the same undeclared-var check as its
  *     three siblings, with the declared-var save as the positive control.
+ *   v1.7.0 — 2026-09-24 — A step does not write, or send out, a key the node reads and trusts:
+ *     refused at save for a key written out, and at start for a key a variable builds.
  */
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -933,6 +935,48 @@ async function run() {
     assert(good.status === 200, `declared var in input_keys: expected 200, got ${good.status}: ${JSON.stringify(good.body)}`);
 
     await json('/v1/workflows/recipe-wf', { method: 'DELETE', headers: auth });
+  });
+
+  // ── a step never writes, or sends out, a record the node reads and trusts ──
+  // A step writes its answer to a key of the author's choosing and reads records to send to a model,
+  // to the public or to an app. Those are the node's own settings when the key is `openrouter.*`
+  // (where the AI key is sent), `ai-usage.*` (the spend cap) or `commerce.*` (the payout address), and
+  // the memory door refuses them to everyone but the owner. Checked at save for a key written out,
+  // and at start for a key a variable builds, because only then is the variable known.
+  await test('a workflow step does not write, or send out, a key the node reads and trusts', async () => {
+    const wf = (action: unknown, vars: unknown[] = []) => ({
+      title: { en_US: 'Reserved' }, description: { en_US: 'reserved key probe' },
+      trigger: { kind: 'manual' }, vars, on_step_fail: 'inspect',
+      steps: [{ id: 'only', description: { en_US: 'Only' }, required_to_function: 'none', action }],
+    });
+    const put = (id: string, body: unknown) => json(`/v1/workflows/${id}`, { method: 'PUT', headers: auth, body: JSON.stringify(body) });
+
+    const answerIntoSettings = await put('reserved-ai', wf({ kind: 'ai', prompt: 'Say hello.', result_to_key: 'openrouter.settings' }));
+    assert(answerIntoSettings.status === 400, `an ai answer into openrouter.settings: expected 400, got ${answerIntoSettings.status}`);
+    assert(JSON.stringify(answerIntoSettings.body.error).includes('openrouter.settings'), `the refusal names the key: ${JSON.stringify(answerIntoSettings.body.error)}`);
+
+    const publishPayout = await put('reserved-dp', wf({ kind: 'datapackage', name: 'payout', from_key: 'commerce.psp', changes: 'first' }));
+    assert(publishPayout.status === 400, `publishing commerce.psp: expected 400, got ${publishPayout.status}`);
+
+    const promptFromChat = await put('reserved-in', wf({ kind: 'ai', prompt: 'Summarise.', input_keys: ['chat.today'], result_to_key: 'wfreserved.summary' }));
+    assert(promptFromChat.status === 400, `sending chat.* to the model: expected 400, got ${promptFromChat.status}`);
+
+    // A key a variable builds is only known at start.
+    const byVar = await put('reserved-var', wf({ kind: 'ai', prompt: 'Say hello.', result_to_key: '{target}' },
+      [{ name: 'target', type: 'string', description: { en_US: 'Where the answer goes' } }]));
+    assert(byVar.status === 200, `a templated key saves: ${byVar.status} ${JSON.stringify(byVar.body.error)}`);
+    const refusedRun = await json('/v1/workflows/reserved-var/run', { method: 'POST', headers: auth, body: JSON.stringify({ mode: 'full', vars: { target: 'ai-usage.probe' } }) });
+    assert(refusedRun.status === 400, `a run whose variable lands on ai-usage.*: expected 400, got ${refusedRun.status} ${JSON.stringify(refusedRun.body.data ?? refusedRun.body.error)}`);
+    const runs = await json('/v1/workflows/reserved-var/runs?include=checks', { headers: auth });
+    assert(runs.body.data.count === 0, `nothing started: ${runs.body.data.count} runs`);
+
+    // POSITIVE CONTROL: the same workflow with an ordinary key starts.
+    const okRun = await json('/v1/workflows/reserved-var/run', { method: 'POST', headers: auth, body: JSON.stringify({ mode: 'full', target: 'sandbox', vars: { target: 'wfreserved.answer' } }) });
+    assert(okRun.status === 200, `an ordinary key runs: ${okRun.status} ${JSON.stringify(okRun.body.error)}`);
+
+    for (const id of ['reserved-ai', 'reserved-dp', 'reserved-in', 'reserved-var']) {
+      await json(`/v1/workflows/${id}?withRuns=true`, { method: 'DELETE', headers: auth });
+    }
   });
 
   console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total`);

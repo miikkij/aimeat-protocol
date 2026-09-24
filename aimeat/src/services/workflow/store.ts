@@ -14,7 +14,7 @@
  *   - key helpers: defKey / runKeyPrefix / runKey
  *   - CRUD: getWorkflow / listWorkflows / saveWorkflow / deleteWorkflow / listRuns / getRun
  *   - validation (pure, exported for tests): collectSignalKeys / collectVarRefs / detectCycle /
- *     missingAfterRefs
+ *     missingAfterRefs / reservedStepKeys + reservedStepKeyErrors
  *   - offer resolution: resolveStep (storage) → effective signals + deliverable location
  *   - buildBlueprint — derived structural graph (nodes + edges + keys touched)
  * @usage import { saveWorkflow, getWorkflow, buildBlueprint } from '../workflow/store.js';
@@ -36,10 +36,15 @@
  *     of failing — correct at run time, and the wrong place to find out about a typo.
  *   v1.8.0 — 2026-09-09 — `parallel` beside `fresh` is refused at save: fresh deletes the produced
  *     keys when a run starts, and with two runs in flight that is the other run's work.
+ *   v1.9.0 — 2026-09-24 — reservedStepKeys(): a step may not write, or send out of the node, a key the
+ *     node reads and trusts (utils/reserved-keys.ts). Refused at save for what the templates spell,
+ *     and by the engine at run start for the finished keys.
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { buildGAII } from '../../utils/gaii.js';
+import { isReservedServerKey, RESERVED_OWNER_KEY_PREFIXES, SERVER_WRITTEN_KEYS } from '../../utils/reserved-keys.js';
+import { template } from './engine-util.js';
 import {
   WorkflowDefInputSchema, WORKFLOW_ID_RE,
   type WorkflowDef, type WorkflowDefInput, type WorkflowStep, type WorkflowRun, type Signal,
@@ -176,6 +181,84 @@ async function resolveStep(
       deliverableKey: offer.deliverable?.location?.key,
     },
   };
+}
+
+// ── keys the node trusts ───────────────────────────────────────────────────────
+
+/** Could this key, or this `*` pattern, name a key the node reads and trusts? */
+function mayNameReservedKey(pattern: string): boolean {
+  const star = pattern.indexOf('*');
+  if (star < 0) return isReservedServerKey(pattern);
+  const head = pattern.slice(0, star);
+  return isReservedServerKey(head)
+    || RESERVED_OWNER_KEY_PREFIXES.some(p => p.startsWith(head))
+    || SERVER_WRITTEN_KEYS.some(k => k.startsWith(head));
+}
+
+/** The key or key_glob of every `llm` leaf in a signal tree: the records the node's model is shown. */
+function llmLeafKeys(signal: Signal | 'none' | undefined): string[] {
+  if (!signal || signal === 'none') return [];
+  const out: string[] = [];
+  const walk = (s: Signal): void => {
+    if ('all' in s) { s.all.forEach(walk); return; }
+    if ('any' in s) { s.any.forEach(walk); return; }
+    if ('when' in s) { walk(s.when); walk(s.then); return; }
+    if ('kind' in s && s.kind === 'llm') {
+      if (s.key) out.push(s.key);
+      if (s.key_glob) out.push(s.key_glob);
+    }
+  };
+  walk(signal);
+  return out;
+}
+
+/**
+ * The keys a workflow's steps would WRITE, or read to SEND OUT of the node, that the node itself reads
+ * and trusts (utils/reserved-keys.ts), each with the step it belongs to.
+ *
+ * A step writes its answer to a key of the author's choosing and reads records to show a model, to
+ * publish, or to push to an app. When the key is `openrouter.*`, `ai-usage.*` or `commerce.*` that is
+ * the address a decrypted AI key is sent to, the spend cap or a payout record, which the memory door
+ * refuses to anyone but the owner's own hand and which a decision run does not send out either. Each
+ * key is built the way the step builds it: variables templated in, and the sandbox prefix where that
+ * step applies one. At save the variables are unknown, so a key a variable completes is judged at
+ * start, when they are fixed for the whole run.
+ */
+export function reservedStepKeys(
+  steps: WorkflowStep[], resolved: ResolvedStep[], vars: Record<string, string>, keyPrefix = '',
+): Array<{ step: string; key: string }> {
+  const hits: Array<{ step: string; key: string }> = [];
+  const check = (step: string, tmpl: string | undefined, prefixed: boolean): void => {
+    if (!tmpl) return;
+    const key = (prefixed ? keyPrefix : '') + template(tmpl, vars);
+    if (mayNameReservedKey(key) && !hits.some(h => h.step === step && h.key === key)) hits.push({ step, key });
+  };
+  for (const step of steps) {
+    const a = step.action;
+    if (a?.kind === 'ai') {
+      check(step.id, a.prompt_key, false);
+      for (const k of a.input_keys ?? []) check(step.id, k, true);
+      check(step.id, a.result_to_key, true);
+    } else if (a?.kind === 'extension') {
+      check(step.id, a.result_to_key, true);
+    } else if (a?.kind === 'datapackage') {
+      check(step.id, a.from_key, true);
+    } else if (a?.kind === 'export-out') {
+      check(step.id, a.from, false);
+    } else if (a?.kind === 'human-input') {
+      check(step.id, a.answer_to_key, true);
+      check(step.id, a.reviews_key, true);
+    }
+  }
+  for (const r of resolved) {
+    for (const k of [...llmLeafKeys(r.success_signal), ...llmLeafKeys(r.required_to_function)]) check(r.stepId, k, true);
+  }
+  return hits;
+}
+
+/** The refusal for those keys, one line per key, worded once for save and start. */
+export function reservedStepKeyErrors(hits: Array<{ step: string; key: string }>): string[] {
+  return hits.map(h => `step "${h.step}": "${h.key}" is a key this node reads to decide what it does, so a workflow step does not write it or send it out`);
 }
 
 // ── save-time validation (offer-aware) ─────────────────────────────────────────
@@ -332,6 +415,10 @@ export async function validateWorkflow(
       if (!declaredVars.has(v)) errors.push(`step "${step.id}": signal references undeclared var "{${v}}"`);
     }
   }
+
+  // 6. no step writes, or sends out, a key the node trusts. Judged here on what the templates spell
+  // before any variable is known; the engine judges the finished keys again at run start.
+  errors.push(...reservedStepKeyErrors(reservedStepKeys(input.steps, resolved, {})));
 
   return { ok: errors.length === 0, errors, resolved: errors.length === 0 ? resolved : undefined };
 }

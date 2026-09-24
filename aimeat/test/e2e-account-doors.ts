@@ -24,6 +24,9 @@
  *   Phase 11 401 and 403 on every door
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-account-doors
  * @version-history
+ *   v1.1.0 — 2026-09-24 — 0a: the owner names the node writes under are refused on both
+ *     registration doors. 22b: only the porting path writes `__redirect__`; the owner, an agent and
+ *     a PUT over the ported pointer are refused, and the owner's own address forwards nobody.
  *   v1.0.0 — 2026-09-08 — Initial. Written from the routes rather than from the docs, so it records
  *     four branches that cannot be reached from outside (see the FINDING comments): the two
  *     INVALID_INPUT guards behind a required-field zod schema, and the cross-owner 403s that sit
@@ -156,6 +159,28 @@ console.log('Phase 1 — POST /v1/ghii validators');
 
 const registerGhii = (body: Record<string, unknown>) =>
     json('/v1/ghii', { method: 'POST', body: JSON.stringify(body) });
+
+// The node keeps records of its own under made-up owners: every security incident and quarantined
+// upload lives under `security-system@<node>`, and an unattended extension run names
+// `scheduler@<node>` as its caller. An account registered under either name would own that
+// namespace. test/unit/synthetic-owner-names.test.ts holds the list to the source; this is the door.
+await test('0a. The owner names the node writes under cannot be registered, on either registration door', async () => {
+    for (const name of ['security-system', 'scheduler']) {
+        const owners = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }) });
+        const ghii = await registerGhii({ username: name, display_name: 'Probe', password: 'AcctDoor1234' });
+        // An unfixed node creates the account. Remove it again, so one failing run leaves nothing.
+        for (const made of [owners, ghii]) {
+            if (made.status !== 201) continue;
+            const key = made.body.data?.private_key as string;
+            const ts = new Date().toISOString();
+            const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: name, timestamp: ts, signature: await signMsg(key, name + NODE_ID + ts) }) });
+            if (tok.body.ok) await json(`/v1/owners/${name}`, { method: 'DELETE', headers: auth(tok.body.data.token) });
+        }
+        assert(owners.status === 400 && owners.body.error?.code === 'INVALID_INPUT', `POST /v1/owners ${name}: ${owners.status} ${JSON.stringify(owners.body.error)}`);
+        assert(/reserved/i.test(owners.body.error?.message ?? ''), `the refusal says the name is reserved: ${owners.body.error?.message}`);
+        assert(ghii.status === 400 && ghii.body.error?.code === 'INVALID_INPUT', `POST /v1/ghii ${name}: ${ghii.status} ${JSON.stringify(ghii.body.error)}`);
+    }
+});
 
 await test('0. The registration limiter counts by IP: a bearer token does not buy a private bucket', async () => {
     // Two calls from the same address with two different tokens land in ONE bucket, so the second
@@ -424,6 +449,39 @@ await test('22. Porting succeeds while the balance holds, then answers 402 INSUF
     while (last.status === 200 && calls < 20) { last = await call(); calls++; }
     assert(last.status === 402, `after the balance runs out the port must answer 402, got ${last.status} after ${calls} calls`);
     assert(last.body.error?.code === 'INSUFFICIENT_MORSELS', `expected INSUFFICIENT_MORSELS, got ${last.body.error?.code}`);
+});
+
+// The public profile GET /v1/agents/:gaii answers a 301 to wherever `__redirect__` points when no
+// agent lives at that address, so that record is an instruction to every visitor. The porting path
+// is the one writer. A memory door that took it from the identity itself made the address of any
+// account, the owner's own included, an open redirect to a host of its choosing.
+await test('22b. Only the porting path writes the redirect pointer, and a self-written one forwards nobody', async () => {
+    // The porting path wrote one in test 22, under the agent it ported.
+    const porterGaii = `porter2#${P.name}@${NODE_ID}`;
+    const ported = await json(`/v1/memory/__redirect__?agent=${encodeURIComponent(porterGaii)}`, { headers: auth(P.token) });
+    assert(ported.status === 200 && ported.body.data?.value?.target_node_url === 'https://other.example',
+        `the porting path's pointer: ${ported.status} ${JSON.stringify(ported.body.data?.value ?? ported.body.error)}`);
+
+    const ownerGhii = `${P.name}@${NODE_ID}`;
+    const elsewhere = { target_node_url: 'https://acctdoor-redirect.example/landing?x=' };
+    const own = await json('/v1/memory', { method: 'POST', headers: auth(P.token), body: JSON.stringify({ key: '__redirect__', value: elsewhere, visibility: 'public' }) });
+    const profile = await fetch(`${BASE}/v1/agents/${encodeURIComponent(ownerGhii)}`, { redirect: 'manual' });
+    await profile.text();
+    // Whatever an unfixed node let through is removed before the verdict, so a failing run leaves nothing behind.
+    if (own.status === 200 || own.status === 201) await json('/v1/memory/__redirect__', { method: 'DELETE', headers: auth(P.token) });
+    assert(profile.status === 404, `the owner's address forwards nobody: ${profile.status} Location ${profile.headers.get('location')}`);
+    assert(own.status === 403 && own.body.error?.code === 'RESERVED_KEY', `the owner in person: ${own.status} ${JSON.stringify(own.body.error)}`);
+
+    const writer = await setupAgent(P, 'redirect-writer', ['memory:read', 'memory:write']);
+    const agentOwn = await json('/v1/memory', { method: 'POST', headers: auth(writer.token), body: JSON.stringify({ key: '__redirect__', value: elsewhere }) });
+    assert(agentOwn.status === 403 && agentOwn.body.error?.code === 'RESERVED_KEY', `an agent into its own namespace: ${agentOwn.status} ${JSON.stringify(agentOwn.body.error)}`);
+
+    // Rewriting the pointer the porting path wrote is the same act. The version is the stored one,
+    // so nothing but the key itself stands in the way.
+    const rewrite = await json('/v1/memory/__redirect__', { method: 'PUT', headers: auth(P.token), body: JSON.stringify({ value: elsewhere, version: ported.body.data?.version }) });
+    assert(rewrite.status === 403 && rewrite.body.error?.code === 'RESERVED_KEY', `rewriting the ported pointer: ${rewrite.status} ${JSON.stringify(rewrite.body.error)}`);
+    const unchanged = await json(`/v1/memory/__redirect__?agent=${encodeURIComponent(porterGaii)}`, { headers: auth(P.token) });
+    assert(unchanged.body.data?.value?.target_node_url === 'https://other.example', `the ported pointer is unchanged: ${JSON.stringify(unchanged.body.data?.value)}`);
 });
 
 // ─── Phase 6 — scopes and federate ───

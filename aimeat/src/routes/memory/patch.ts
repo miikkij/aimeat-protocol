@@ -25,6 +25,8 @@
  * @structure registerPatchRoutes(router, ctx) -> PATCH /v1/memory/:key
  * @usage mounted from src/routes/memory.ts alongside registerCrudRoutes
  * @version-history
+ *   v1.3.0 — 2026-09-24 — PATCH refuses a key only the node writes (`__redirect__`) with RESERVED_KEY,
+ *     whoever asks.
  *   v1.2.0 — 2026-09-16 — PATCH refuses openrouter.apikey and commerce.psp with SECRET_RECORD, and the
  *     answer shows a credential record redacted.
  *   v1.1.0 — 2026-09-13 — A workspace record in a space the manifest does not declare is refused
@@ -52,7 +54,7 @@ import { getActiveWorkflowEngine } from '../../services/workflow/engine.js';
 import { emitEcosystemMemoryWrite } from '../../services/ecosystem-events.js';
 import { runAutomationRecipesForWrite } from '../../services/ecosystem-automation.js';
 import { ecoMayWriteKey } from '../../services/ecosystem-access.js';
-import { appMayWriteKey } from '../../utils/reserved-keys.js';
+import { appMayWriteKey, isServerWrittenKey, serverWrittenKeyRefusal } from '../../utils/reserved-keys.js';
 import { isSecretRecordKey, secretRecordWriteRefusal, shownMemoryValue } from '../../services/secret-records.js';
 import { resolveWriteTarget } from './owner-target.js';
 import { isKeyArchived } from '../../services/archive.js';
@@ -110,6 +112,13 @@ export function registerPatchRoutes(router: Router, ctx: MemoryRouteCtx): void {
     }
     const gaii = target.gaii;
 
+    // A key only the node writes is refused to everyone, the owner included (utils/reserved-keys.ts).
+    // PATCH creates a key that is absent, so this is a create door as well as an update door.
+    if (isServerWrittenKey(key)) {
+      const refusal = serverWrittenKeyRefusal(key);
+      res.status(403).json(error(config.nodeId, refusal.code, refusal.message));
+      return;
+    }
     if (!appMayWriteKey(req.auth!.roles, key, target.delegatedOwnerWrite, target.reservedAllowed)) {
       res.status(403).json(error(config.nodeId, 'RESERVED_KEY', `The key "${key}" is managed by the account owner and cannot be written by an app.`));
       return;

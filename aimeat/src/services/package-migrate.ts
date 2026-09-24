@@ -29,6 +29,8 @@
  *   import { applyInstanceMigration } from '../services/package-migrate.js';
  *   const out = await applyInstanceMigration({ storage, config }, caller, { instanceId, targetVersion, actions });
  * @version-history
+ *   v1.1.0 — 2026-09-24 — A memory component that names a key the node trusts is refused with 403
+ *     RESERVED_KEY, for replace, custom and install_new alike, before anything is deleted.
  *   v1.0.0 — 2026-09-05 — Extraction out of routes/instances/migration.ts, plus the three fixes.
  */
 import YAML from 'yaml';
@@ -41,6 +43,7 @@ import {
     registerComponent, validateComponentContent, deleteComponent, computeHash,
 } from './component-registrar.js';
 import { registeredNameFor } from './package-install.js';
+import { reservedKeysInComponent, reservedComponentMessage } from './package-memory-component.js';
 import { planInstanceUpdate } from './package-update-plan.js';
 import { emitChange } from './event-bus.js';
 import { logger } from '../utils/logger.js';
@@ -240,6 +243,21 @@ export async function applyInstanceMigration(
                 ok: false, status: 400, code: 'INVALID_INPUT',
                 message: `Invalid action "${action.action}" for component "${compId}". Valid: ${MIGRATION_ACTIONS.join(', ')}`,
             };
+        }
+        // A memory component may not write a key the node reads and trusts, whichever action brings
+        // it (services/package-memory-component.ts). install_new is checked too: it deletes nothing,
+        // but the other actions in the same call would already have moved.
+        if (action.action !== 'skip') {
+            const target = targetCompMap.get(compId);
+            const type = target?.type ?? existingMap.get(compId)?.type ?? 'csm';
+            const content = action.action === 'install_new' ? (target?.content ?? '') : (action.content ?? target?.content ?? '');
+            const reserved = reservedKeysInComponent(type, content, nameFor(compId, type));
+            if (reserved.length > 0) {
+                return {
+                    ok: false, status: 403, code: 'RESERVED_KEY',
+                    message: `${reservedComponentMessage(compId, reserved)} Nothing was changed.`,
+                };
+            }
         }
         if (action.action !== 'replace' && action.action !== 'custom') continue;
 

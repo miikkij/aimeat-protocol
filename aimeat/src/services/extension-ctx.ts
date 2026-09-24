@@ -27,6 +27,8 @@
  *   const ctx = buildExtensionCtx({ config, storage, extMemoryOwner, caller, extConfig, log, files });
  *   await executeExtensionAction(script, ctx, …);
  * @version-history
+ *   v1.6.2 — 2026-09-24 — ctx.memory.set refuses a key only the node writes (`__redirect__`), as every
+ *     memory door does.
  *   v1.6.1 — 2026-09-16 — ctx.fetch passes its URL to the secret resolver, and a vault secret bound to
  *     another host refuses with SECRET_HOST before anything is sent.
  *   v1.6.0 — 2026-09-06 — ctx.fetch resolves `{{secret:NAME}}` in header VALUES from the caller's
@@ -63,6 +65,7 @@ import type { Storage } from '../storage/interface.js';
 import type { ExtensionCtx } from './extension-runtime.js';
 import type { EmailService } from './email.js';
 import { enforceExtensionMemoryLimits } from './quota.js';
+import { isServerWrittenKey, serverWrittenKeyRefusal } from '../utils/reserved-keys.js';
 import { extensionCrossNotify, safeNotificationLink } from './extension-notify.js';
 import { notify } from './notify.js';
 import { safeFetch } from '../utils/url-validator.js';
@@ -418,6 +421,9 @@ export function buildExtensionCtx(deps: ExtensionCtxDeps): ExtensionCtx {
             // block, so the guard adds no reach: an extension still cannot aim a write at another
             // namespace.
             set: async (key, value, opts) => {
+                // A key only the node writes (utils/reserved-keys.ts) is refused here as on every
+                // memory door: the public agent profile reads `__redirect__` in this namespace too.
+                if (isServerWrittenKey(key)) throw new Error(`RESERVED_KEY: ${serverWrittenKeyRefusal(key).message}`);
                 await enforceExtensionMemoryLimits(config, storage, extMemoryOwner, key, value);
                 // The extension is both the namespace and the hand: it writes into `ext:{name}`,
                 // which nothing else may write. Called from every success path below rather than

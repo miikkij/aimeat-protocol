@@ -15,6 +15,9 @@
  * @usage
  *   import { registerComponent, deleteComponent, fetchComponentContent, computeHash } from '../services/component-registrar.js';
  * @version-history
+ *   v1.7.0 — 2026-09-24 — A memory component that names a key the node trusts (utils/reserved-keys.ts)
+ *     is refused before its first entry is written, on a dry run too. The keys land in the installer's
+ *     namespace, and a package is somebody else's content.
  *   v1.6.0 — 2026-09-14 — An installed app keeps the data map its author wrote. The package carries
  *     the map document in `meta.app.datamap` and the installer writes it under the name this node
  *     gave the app, then stamps the manifest from it; the stamp itself cannot travel, because it
@@ -55,6 +58,7 @@ import { publishApp } from './app-publish.js';
 import { putProgramMap } from './data-map/data-map-access.js';
 import { forgetDependencies, appRef } from './dependency-map.js';
 import { odpsWriteRefusal, extensionOdpsKey } from './exchange-odps-write.js';
+import { memoryComponentEntries, reservedKeysInComponent, reservedComponentMessage } from './package-memory-component.js';
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -565,18 +569,17 @@ export async function registerComponent(
       }
 
       case 'memory': {
-        // Nothing to validate beyond the parse below, and the writes are keyed puts that cannot
-        // clash: a dry run for these two is a yes.
+        // Content: JSON { entries: [{ key, value, visibility?, tags? }] } or simple object; the
+        // author's keys are used as-is (package-memory-component.ts reads them).
+        const entries = memoryComponentEntries(content, registeredAs);
+        // The keys land in the INSTALLER's namespace, and a package is somebody else's content: none
+        // of them may be a key the node reads and trusts. Every entry is checked before the first
+        // write, and a dry run gives the same answer.
+        const reserved = reservedKeysInComponent(type, content, registeredAs);
+        if (reserved.length > 0) {
+          return { success: false, componentId, registeredAs, error: `RESERVED_KEY: ${reservedComponentMessage(componentId, reserved)}` };
+        }
         if (input.dryRun) break;
-        // Content: JSON { entries: [{ key, value, visibility?, tags? }] } or simple object
-        // When entries have explicit keys, use them as-is (no prefix).
-        // Fallback: store entire content under registeredAs key.
-        let parsed: { entries?: Array<{ key: string; value: unknown; visibility?: string; tags?: string[] }> };
-        try { parsed = JSON.parse(content); }
-        // eslint-disable-next-line aimeat/no-silent-catch -- the exception IS the answer here: the input is not of that shape
-        catch { parsed = { entries: [{ key: registeredAs, value: content }] }; }
-
-        const entries = parsed.entries ?? [{ key: registeredAs, value: parsed }];
         const storedKeys: string[] = [];
         for (const entry of entries) {
           // Use entry key as-is — the package author controls the final memory key names

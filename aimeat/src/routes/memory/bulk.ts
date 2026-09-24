@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Bulk + cross-user memory routes: export, import, bulk-delete, bundle (ZIP), discover, copy. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.5.0 — 2026-09-24 — bulk, import and copy refuse a key only the node writes (`__redirect__`),
+ *     whoever asks.
  *   v1.4.1 — 2026-09-16 — Export and bundle show a credential record redacted; bulk and import refuse
  *     openrouter.apikey and commerce.psp.
  *   v1.4.0 — 2026-09-16 — export and bundle refuse a federated session (requireLocalSession). Both read
@@ -28,7 +30,7 @@ import { checkMemoryQuota } from '../../services/quota.js';
 import { validateMemoryWrite } from '../../services/schema-validator.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../../mcp/index.js';
 import { emitChange, emitMemoryWritten } from '../../services/event-bus.js';
-import { appMayWriteKey } from '../../utils/reserved-keys.js';
+import { appMayWriteKey, isServerWrittenKey, serverWrittenKeyRefusal } from '../../utils/reserved-keys.js';
 import { isSecretRecordKey, secretRecordWriteRefusal, shownMemoryValue } from '../../services/secret-records.js';
 import { undeclaredSpaceForKey } from '../../services/workspace-write-items.js';
 import { odpsWriteRefusal } from '../../services/exchange-odps-write.js';
@@ -89,6 +91,7 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
       const key = e?.key;
       if (typeof key !== 'string' || !key) { preFailed.push({ key: String(key), status: 'failed', reason: 'missing key' }); continue; }
       if (key.startsWith('organism.')) { preFailed.push({ key, status: 'failed', reason: 'organism.* keys use the workspace publish path' }); continue; }
+      if (isServerWrittenKey(key)) { preFailed.push({ key, status: 'failed', reason: serverWrittenKeyRefusal(key).message }); continue; }
       if (!appMayWriteKey(req.auth!.roles, key)) { preFailed.push({ key, status: 'failed', reason: 'reserved key — managed by the account owner' }); continue; }
       if (isSecretRecordKey(key)) { preFailed.push({ key, status: 'failed', reason: secretRecordWriteRefusal(key).message }); continue; }
       if (isAnonymousGaii(gaii) && !key.startsWith('anonymous.')) { preFailed.push({ key, status: 'failed', reason: 'anonymous agents can only write anonymous.* keys' }); continue; }
@@ -236,6 +239,7 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
     for (const entry of entries) {
       const key = entry?.key;
       if (typeof key !== 'string' || !key) { failed.push({ key: String(key), reason: 'missing key' }); continue; }
+      if (isServerWrittenKey(key)) { failed.push({ key, reason: serverWrittenKeyRefusal(key).message }); continue; }
       if (!appMayWriteKey(req.auth!.roles, key)) { failed.push({ key, reason: 'reserved key — managed by the account owner' }); continue; }
       if (isSecretRecordKey(key)) { failed.push({ key, reason: secretRecordWriteRefusal(key).message }); continue; }
       if (isAnonymousGaii(gaii) && !key.startsWith('anonymous.')) { failed.push({ key, reason: 'anonymous agents can only write anonymous.* keys' }); continue; }
@@ -491,6 +495,13 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
 
     if (!source_gaii || !key) {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'source_gaii and key are required'));
+      return;
+    }
+    // The porting path writes its pointer as a PUBLIC record, so this door could copy another
+    // identity's into the caller's own namespace under the same key. Refused like every write door.
+    if (isServerWrittenKey(key)) {
+      const refusal = serverWrittenKeyRefusal(key);
+      res.status(403).json(error(config.nodeId, refusal.code, refusal.message));
       return;
     }
 

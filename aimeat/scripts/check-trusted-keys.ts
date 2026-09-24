@@ -43,6 +43,8 @@
  *   cd aimeat && pnpm check:trusted-keys:seed       # merge today's reads into the exemption file
  *   ... --root <dir>                                # scan a fixture tree instead of this one
  * @version-history
+ *   v2.1.0 — 2026-09-24 — "Covered by the denylist" asks isReservedServerKey, so a key only the node
+ *     writes (SERVER_WRITTEN_KEYS, refused on every memory door to every principal) counts as covered.
  *   v2.0.0 — 2026-08-14 — The gate finds the keys the audit found by hand. Each change has its own
  *     failing case in test/unit/check-trusted-keys.test.ts: the key argument is RESOLVED through
  *     module constants, key builders and key-forwarding helpers (v1 saw inline literals only, so H-6
@@ -59,7 +61,7 @@
 import { readFileSync, writeFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { RESERVED_OWNER_KEY_PREFIXES } from '../src/utils/reserved-keys.js';
+import { RESERVED_OWNER_KEY_PREFIXES, SERVER_WRITTEN_KEYS, isReservedServerKey } from '../src/utils/reserved-keys.js';
 
 /**
  * The tree to scan: the working directory, which `pnpm check:trusted-keys` sets to the package, or
@@ -127,9 +129,14 @@ function walk(dir: string, out: string[] = [], depth = 0): string[] {
     return out;
 }
 
-/** True when the key sits under a prefix the reserved-key guard already refuses for app tokens. */
+/**
+ * True when the memory doors already refuse the key: a reserved prefix (refused to an app token and a
+ * delegated write), or a key only the node itself writes (refused to every principal). Asked of
+ * utils/reserved-keys.ts rather than restated, so a new kind of reserved key counts here the day the
+ * doors start refusing it.
+ */
 function isReserved(key: string): boolean {
-    return RESERVED_OWNER_KEY_PREFIXES.some(p => key.startsWith(p));
+    return isReservedServerKey(key);
 }
 
 /**
@@ -561,7 +568,7 @@ export function main(): void {
     console.log('  ' + '─'.repeat(62));
     console.log(`  reads outside the guard   ${String(findings.length).padStart(4)}   (${distinct.size} distinct keys)`);
     console.log(`  found via a constant      ${String(viaConstant).padStart(4)}   (invisible to a literal-only scan)`);
-    console.log(`  covered by the denylist   ${String(reserved).padStart(4)}   ${RESERVED_OWNER_KEY_PREFIXES.join(' ')}`);
+    console.log(`  covered by the denylist   ${String(reserved).padStart(4)}   ${[...RESERVED_OWNER_KEY_PREFIXES, ...SERVER_WRITTEN_KEYS].join(' ')}`);
     console.log(`  under a system identity   ${String(systemIdentity).padStart(4)}   (out of reach of an owner-scoped token)`);
     console.log(`  key not resolvable        ${String(unresolved).padStart(4)}   (built from runtime values, not judged)`);
     console.log(`  exempt, reason written    ${String(known.size - unreviewed.length - reasonless.length).padStart(4)}`);

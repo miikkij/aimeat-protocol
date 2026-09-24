@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Per-key memory routes: GET/DELETE/PUT /v1/memory/:key, CORS management, and the public GET /v1/memory/:gaii/:key read. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.6.0 — 2026-09-24 — PUT refuses a key only the node writes (`__redirect__`) with RESERVED_KEY,
+ *     whoever asks.
  *   v1.5.1 — 2026-09-24 — The federated test is isForeignPrincipal(), the one question (secaudit 2026-09, F-1).
  *   v1.5.0 — 2026-09-16 — Every read answer shows a credential record redacted (shownMemoryValue), and
  *     PUT refuses openrouter.apikey and commerce.psp with SECRET_RECORD.
@@ -39,7 +41,7 @@ import { authorizeRead } from '../../services/access-guard.js';
 import { emitChange } from '../../services/event-bus.js';
 import { recordMemoryTouch } from '../../services/data-map/write-tally-buffer.js';
 import { ecoMayReadKey, ecoMayWriteKey } from '../../services/ecosystem-access.js';
-import { appMayWriteKey } from '../../utils/reserved-keys.js';
+import { appMayWriteKey, isServerWrittenKey, serverWrittenKeyRefusal } from '../../utils/reserved-keys.js';
 import { isSecretRecordKey, secretRecordWriteRefusal, shownMemoryValue } from '../../services/secret-records.js';
 import { stampAgentWrite, resolveAttachableProvenanceId } from '../../services/ai-provenance.js';
 import { ownerGhiiOf, isForeignPrincipal } from '../../utils/gaii.js';
@@ -298,6 +300,12 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
       return;
     }
 
+    // A key only the node writes is refused to everyone, the owner included (utils/reserved-keys.ts).
+    if (isServerWrittenKey(key)) {
+      const refusal = serverWrittenKeyRefusal(key);
+      res.status(403).json(error(config.nodeId, refusal.code, refusal.message));
+      return;
+    }
     // Reserved-key guard (DNA invariant #2): apps may not overwrite server-trusted owner keys
     // (openrouter.*/ai-usage.*/profile.*). See utils/reserved-keys.ts.
     if (!appMayWriteKey(req.auth!.roles, key)) {
