@@ -25309,7 +25309,7 @@ paths:
                 tags: { type: array, items: { type: string } }
                 icon: { type: string }
                 access_code: { type: string, description: 4-64 chars; gates downloads }
-                screenshot: { type: string, description: 'Base64 PNG, JPEG or WebP image, checked by its bytes before anything is published; anything else is refused with 400' }
+                screenshot: { type: string, description: 'Base64 PNG, JPEG, WebP, GIF or AVIF image, checked by its bytes before anything is published; anything else is refused with 400' }
                 screenshot_mime_type: { type: string, description: 'Optional. When given, image/png, image/jpeg or image/webp; the bytes decide what is stored' }
                 price_morsels: { type: number }
                 license_type: { type: string, enum: [single, lifetime] }
@@ -28445,7 +28445,7 @@ paths:
       description: >
         Returns the icon image the app's author uploaded, or 404 when it has none. No auth: it is
         the icon of a page anyone with the link can open. The app's own origin serves the same
-        bytes at /apple-touch-icon.png. Only a PNG, JPEG or WebP image is served, with the type its
+        bytes at /apple-touch-icon.png. Only a PNG, JPEG, WebP, GIF or AVIF image is served, with the type its
         bytes are rather than the type it was stored with; any other stored file answers 404.
       tags: [App Store]
       responses:
@@ -28467,7 +28467,7 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
         '404':
-          description: The app has no icon image, or the stored file is not a PNG, JPEG or WebP image
+          description: The app has no icon image, or the stored file is not a PNG, JPEG, WebP, GIF or AVIF image
     post:
       operationId: setAppIcon
       summary: Set or replace an app's icon image without re-publishing
@@ -28530,7 +28530,7 @@ paths:
       operationId: getAppScreenshot
       summary: Serve an app's screenshot image
       description: >
-        Returns the stored screenshot for the app, or 404 if none. No auth. Only a PNG, JPEG or WebP
+        Returns the stored screenshot for the app, or 404 if none. No auth. Only a PNG, JPEG, WebP, GIF or AVIF
         image is served, with the type its bytes are rather than the type it was stored with; any
         other stored file answers 404.
       tags: [App Store]
@@ -28553,7 +28553,7 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
         '404':
-          description: The app has no screenshot, or the stored file is not a PNG, JPEG or WebP image
+          description: The app has no screenshot, or the stored file is not a PNG, JPEG, WebP, GIF or AVIF image
     post:
       operationId: setAppScreenshot
       summary: Set or replace an app's screenshot without re-publishing
@@ -28561,7 +28561,7 @@ paths:
         Stores a base64-encoded image as the app's screenshot. The app's owner may set their
         own; a node operator may set any app's, so the screenshot worker can backfill defaults
         for apps that have none. Idempotent (overwrites any existing screenshot). Max 2 MB. The
-        bytes must be a PNG, JPEG or WebP image and are stored as the type they are; anything else,
+        bytes must be a PNG, JPEG, WebP, GIF or AVIF image and are stored as the type they are; anything else,
         or a `screenshot_mime_type` naming another type, is refused with 400.
       tags: [App Store]
       security:
@@ -28576,7 +28576,7 @@ paths:
               properties:
                 screenshot:
                   type: string
-                  description: Base64-encoded image data (PNG, JPEG or WebP).
+                  description: Base64-encoded image data (PNG, JPEG, WebP, GIF or AVIF).
                 screenshot_mime_type:
                   type: string
                   description: Optional. When given, image/png, image/jpeg or image/webp; the bytes decide what is stored.

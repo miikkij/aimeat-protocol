@@ -20,6 +20,7 @@
  * @structure registerAppIconRoutes() — GET and POST /v1/apps/:owner/:filename/icon
  * @usage registerAppIconRoutes(router, config, storage, appTarget); // from appsRouter
  * @version-history
+ *   v1.1.1 — 2026-09-24 — The refusal names the five pictures raster-image.ts accepts.
  *   v1.1.0 — 2026-09-24 — GET serves the icon only when its bytes are a PNG, JPEG or WebP image,
  *     typed by the bytes rather than by the stored label, and answers 404 otherwise (A7-2). The key
  *     could be written through the generic storage door with any type, and this door sent that type.
@@ -84,7 +85,7 @@ export function registerAppIconRoutes(
         // node's origin (A7-2). setStoredImageHeaders also sets nosniff and the stored-file CSP.
         if (!setStoredImageHeaders(res, { key: file.key, data: file.data, name: `${pictureName(filename)}-icon` })) {
             res.status(404).json(error(config.nodeId, 'NOT_FOUND',
-                `The file stored as the icon of "${filename}" is not a PNG, JPEG or WebP image, so it is not served.`));
+                `The file stored as the icon of "${filename}" is not a PNG, JPEG, WebP, GIF or AVIF image, so it is not served.`));
             return;
         }
         res.setHeader('Content-Length', file.size.toString());
