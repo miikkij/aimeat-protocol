@@ -201,19 +201,19 @@
       "digest": "sha256:d8f59aafdc69533011a59422"
     },
     "node:aimeat-node-operations": {
-      "reviewedOn": "2026-09-19",
+      "reviewedOn": "2026-09-24",
       "watches": [
         "aimeat/src/mcp/core-admin.ts"
       ],
-      "digest": "sha256:4e32d698c8810195fdb9810c"
+      "digest": "sha256:bd0275b0ac9ac6fb4bc75bdf"
     },
     "node:manage-my-agents": {
-      "reviewedOn": "2026-09-19",
+      "reviewedOn": "2026-09-24",
       "watches": [
         "aimeat/src/mcp/core.ts",
         "aimeat/src/mcp/catalog/definitions/agent-messaging.ts"
       ],
-      "digest": "sha256:84bbcd08b5daffc7101c4404"
+      "digest": "sha256:e5e6625a20d166cbad5ca126"
     },
     "node:manage-my-profile-data": {
       "reviewedOn": "2026-09-19",
@@ -231,7 +231,7 @@
         "aimeat/src/routes/agents-v2/agent-proposals.ts",
         "aimeat/src/data/basic-agents.ts"
       ],
-      "digest": "sha256:00b868aa4ed8da6abc72b59a"
+      "digest": "sha256:9771596bcddb7c9da8ef7041"
     },
     "node:set-up-content-pipeline": {
       "reviewedOn": "2026-09-19",
@@ -327,11 +327,11 @@
       "note": "It describes records on the node and ids in CLAUDE.md, not code in this tree."
     },
     "project:aimeat-pages-links": {
-      "reviewedOn": "2026-09-19",
+      "reviewedOn": "2026-09-24",
       "watches": [
         "aimeat/src/routes/organisms/workspace-ops.ts"
       ],
-      "digest": "sha256:2968dcef1e483ed52fba5271"
+      "digest": "sha256:e2d2a0836b7440e6c8b5b9f3"
     },
     "project:aimeat-video": {
       "reviewedOn": "2026-09-19",
@@ -447,18 +447,18 @@
       "aimeat/src/services/ai-provenance.ts": "b9a2e289865427a5"
     },
     "node:aimeat-node-operations": {
-      "aimeat/src/mcp/core-admin.ts": "db0624d23f6ee92b"
+      "aimeat/src/mcp/core-admin.ts": "17c66f53ecaa3360"
     },
     "node:manage-my-agents": {
-      "aimeat/src/mcp/core.ts": "28a39581b76d24e5",
-      "aimeat/src/mcp/catalog/definitions/agent-messaging.ts": "5b2ac322e20ad93c"
+      "aimeat/src/mcp/core.ts": "518c63f78a623d05",
+      "aimeat/src/mcp/catalog/definitions/agent-messaging.ts": "33da72e040c82a66"
     },
     "node:manage-my-profile-data": {
       "aimeat/src/routes/memory/shared.ts": "b91f8414d40a59c6"
     },
     "node:add-a-crew-agent": {
       "aimeat/src/routes/agents/device-auth.ts": "1cf5d3f6b45c5cb9",
-      "aimeat/src/mcp/catalog/scopes.ts": "1f0dcf0c42d49a90",
+      "aimeat/src/mcp/catalog/scopes.ts": "bb05d7f00aaef954",
       "aimeat/src/mcp/catalog/definitions/crew.ts": "f18f927aad1a04d6",
       "aimeat/src/routes/agents-v2/agent-proposals.ts": "1da72b752ee164bc",
       "aimeat/src/data/basic-agents.ts": "aff54b3a43cbd71d"
@@ -507,7 +507,7 @@
     },
     "project:aimeat-organism-records": {},
     "project:aimeat-pages-links": {
-      "aimeat/src/routes/organisms/workspace-ops.ts": "de8e54d3b83431f6"
+      "aimeat/src/routes/organisms/workspace-ops.ts": "9e7166d2cf677a2a"
     },
     "project:aimeat-video": {},
     "project:aimeat-writing": {
