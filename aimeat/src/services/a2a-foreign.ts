@@ -43,6 +43,8 @@
  * @structure ForeignPeer · identifyForeignCaller() · FOREIGN_HEADERS
  * @usage const who = await identifyForeignCaller(config, storage, req.headers);
  * @version-history
+ *   v1.2.0 — 2026-09-24 — The spend is keyed on the assertion's sub, aud and jti rather than its raw
+ *     bytes (services/assertion-spend.ts), so an empty jti is refused with the other missing claims.
  *   v1.1.0 — 2026-09-01 — The assertion is actually spent. v1.0.0's header claimed a spent `jti`
  *     and the code never recorded one, so every assertion on the payment road was replayable for
  *     its whole life. Found in review.
@@ -183,7 +185,9 @@ export async function identifyForeignCaller(
   }
 
   const claims = decodeClaims(assertion);
-  if (!claims || typeof claims.sub !== 'string' || typeof claims.jti !== 'string') {
+  // An empty jti is refused here with the others: the spend below keys on it, and an id that is
+  // the same for every assertion would make the second one read as "already used".
+  if (!claims || typeof claims.sub !== 'string' || typeof claims.jti !== 'string' || !claims.jti) {
     return refuse(401, 'A2A_ASSERTION_INVALID', 'The assertion must carry sub, aud, iat, exp and jti.');
   }
   if (claims.sub !== card.gaii) {

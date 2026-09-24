@@ -43,6 +43,8 @@
  *   const headers = await buildRelayClaim(storage, config, { audience, method, path, caller });
  *   const check = await verifyRelayClaim({ storage, config, peers }, req.headers, req.method, req.originalUrl);
  * @version-history
+ *   v1.1.0 — 2026-09-24 — The claim is spent by its identity (relay, aud, jti) instead of the
+ *     header's spelling, so a re-spelled copy is refused as spent (audit A4-3).
  *   v1.0.0 — 2026-09-03 — Initial (wish-vastaanottaja-voi-kieltaytya-relaysta).
  */
 import { randomUUID } from 'node:crypto';
@@ -51,7 +53,7 @@ import type { Storage } from '../storage/interface.js';
 import type { PeerInfo } from './federation.js';
 import { sign, verify } from '../auth/keypair.js';
 import { gatePeer } from './federation-peer-gate.js';
-import { spendAssertion } from './assertion-spend.js';
+import { spendAssertionIdentity } from './assertion-spend.js';
 
 /**
  * What a relaying node sends. Named here so the sender, the receiver and the docs cannot drift —
@@ -253,7 +255,10 @@ export async function verifyRelayClaim(
   //    rather than handing a replayable one back. The refusal says SPENT rather than invalid,
   //    because those are different problems for whoever has to fix them: an invalid claim means the
   //    signing is wrong, a spent one means the same claim went out twice.
-  const spend = await spendAssertion(deps.storage, `relay:${encoded}`, exp);
+  //    Spent by WHAT it is (the relay, this node and its jti, all checked above), never by the
+  //    header's spelling: base64url decoding ignores padding and skips characters outside its
+  //    alphabet, so one signed claim has endless spellings that decode to the same bytes.
+  const spend = await spendAssertionIdentity(deps.storage, { issuer: claim.relay, audience: claim.aud, jti: claim.jti }, exp);
   if (!spend.ok) {
     return refuse(403, 'RELAY_CLAIM_SPENT',
       'That relay claim has already been used. A claim is worth one forwarded request; sign a fresh one for the next.');

@@ -19,6 +19,8 @@
  *
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=agent-v2
  * @version-history
+ *   v1.2.0 — 2026-09-24 — A re-spelled copy of a spent assertion is refused as the same assertion
+ *     (audit A4-3).
  *   v1.1.0 — 2026-09-08 — Section 8a: approval credentials the agent, a connector that cannot take
  *     it on leaves it standing with the reason, attach repairs it once and refuses twice, attach is
  *     the owner in person, and a name already waiting returns the standing proposal.
@@ -192,6 +194,16 @@ function cardFor(offered: any, owner: string, key: TestKey, overrides: Record<st
 async function signAssertion(gaii: string, key: TestKey, over: Record<string, unknown> = {}) {
     const now = Math.floor(Date.now() / 1000);
     return signWith({ sub: gaii, aud: NODE_ID, iat: now, exp: now + 60, jti: randomUUID(), ...over }, key);
+}
+
+/**
+ * The same assertion, spelled differently. The last base64url character of an Ed25519 signature has
+ * four bits nobody reads, so changing only those gives a string that still verifies.
+ */
+function respell(jws: string): string {
+    const B64U = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+    const last = B64U.indexOf(jws[jws.length - 1]);
+    return jws.slice(0, -1) + B64U[(last & 0x30) | ((last + 1) & 0x0f)];
 }
 
 console.log('\n=== Agent v2: key, card, and the basic-agents button ===\n');
@@ -683,6 +695,20 @@ async function run() {
         const second = await json('/v1/agents/v2/token', { method: 'POST', body: JSON.stringify({ grant_type: KEY_GRANT, assertion }) });
         assert(second.status === 401, `expected 401 on replay, got ${second.status}`);
         assert(second.body?.error?.code === 'ASSERTION_REPLAYED', `expected ASSERTION_REPLAYED, got ${second.body?.error?.code}`);
+    });
+
+    await test('a re-spelled copy of a spent assertion is the same assertion (audit A4-3)', async () => {
+        // The spend used to be keyed on the raw string, so each of the sixteen spellings of one
+        // signature minted its own credential. It is keyed on the assertion's sub, aud and jti now.
+        const gaii = `workflow-manager#${a.owner}@${NODE_ID}`;
+        const assertion = await signAssertion(gaii, keysByAgent.get('workflow-manager')!);
+        const respelt = respell(assertion);
+        assert(respelt !== assertion, 'the copy is spelled differently');
+        const first = await json('/v1/agents/v2/token', { method: 'POST', body: JSON.stringify({ grant_type: KEY_GRANT, assertion }) });
+        assert(first.status === 200, `first mint ${first.status}`);
+        const copy = await json('/v1/agents/v2/token', { method: 'POST', body: JSON.stringify({ grant_type: KEY_GRANT, assertion: respelt }) });
+        assert(copy.status === 401, `the re-spelled copy minted a second credential: ${copy.status}`);
+        assert(copy.body?.error?.code === 'ASSERTION_REPLAYED', `refused as a replay, got ${copy.body?.error?.code}`);
     });
 
     await test('an assertion for another node is refused here', async () => {

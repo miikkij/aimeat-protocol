@@ -18,6 +18,8 @@
  *
  *   Node R (receiver) 40293. Peers: relay-ok (permitted), relay-demoted (allowRouting false).
  * @version-history
+ *   v1.2.0 — 2026-09-24 — A re-spelled copy of a spent claim is refused as the same claim
+ *     (audit A4-3).
  *   v1.1.0 — 2026-09-17 — A multi-hop hop is admitted to POST /v1/federation/route on its verified
  *     claim alone; a claim for another path, a claim on another owner door, and a request with
  *     neither are each refused.
@@ -173,6 +175,21 @@ await test('the same claim replayed is refused, and the refusal says SPENT rathe
     // The distinction matters to whoever has to fix it: "invalid" sends them to look at their
     // signing, "already used" sends them to look at why the same claim went out twice.
     assert(/already been used/i.test(body.error.message), `message: ${body.error.message}`);
+});
+
+await test('a re-spelled copy of a spent claim is the same claim, refused as SPENT (audit A4-3)', async () => {
+    // Base64url decoding ignores padding and skips characters outside its alphabet, so one claim has
+    // endless spellings that decode to the same signed bytes. The spend used to be keyed on the
+    // spelling, which made each copy a fresh claim. It is keyed on the relay, aud and jti now.
+    const h = await claimHeaders(okKeys, { relay: OK_NODE, method: 'GET', path: '/v1/health' });
+    const first = await fetch(`${BASE}/v1/health`, { headers: h });
+    assert(first.status === 200, `first use: ${first.status}`);
+    for (const respelt of [`${h['X-Relay-Claim']}=`, `${h['X-Relay-Claim']}==`, `${h['X-Relay-Claim']}!`]) {
+        const again = await fetch(`${BASE}/v1/health`, { headers: { ...h, 'X-Relay-Claim': respelt } });
+        assert(again.status === 403, `re-spelled as ...${respelt.slice(-3)}: ${again.status}`);
+        const body = await again.json() as any;
+        assert(body.error.code === 'RELAY_CLAIM_SPENT', `re-spelled as ...${respelt.slice(-3)}: ${body.error.code}`);
+    }
 });
 
 // ── Wrong proof ──────────────────────────────────────────────────────────────
