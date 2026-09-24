@@ -23,7 +23,10 @@
  *     unverified-download   an executable or archive fetched with curl, wget, Invoke-WebRequest or
  *                           gh release download in a step that does not check its sha256 against a
  *                           literal written in the same step (one literal per download);
- *     latest-release        a `releases/latest` address in a run script or an action input.
+ *     latest-release        a `releases/latest` address in a run script or an action input;
+ *     pip-unpinned          in any step, whatever the job holds, the pip rules below and a
+ *                           `python -m build` that fills its isolated environment from PyPI;
+ *     git-unpinned          in any step, a git+ address without @<commit>.
  *   Dependency code is DEPENDENCY_CODE: the package managers, builds and test runners these
  *   workflows run, each of which executes code from the dependency tree.
  *
@@ -31,7 +34,8 @@
  *     weights-revision      a snapshot_download or hf_hub_download call without revision= naming a
  *                           commit (a 40-character literal, or a name the code sets);
  *     pip-unpinned          a pip install of a package without ==, of a requirements file without
- *                           --require-hashes, or of a variable this gate cannot read;
+ *                           --require-hashes, or of a variable this gate cannot read; a local
+ *                           source (the checkout) without --no-deps --no-build-isolation;
  *     git-unpinned          a git clone in a file that checks out no fixed commit, or a git+ address
  *                           without @<commit>;
  *     unverified-download   an address of a release asset, archive, program or script in a file
@@ -49,6 +53,8 @@
  *   · composeFindings(file, text) · main() reads the three trees and prints `file:line  rule  what to do`
  * @usage cd aimeat && pnpm check:supply-chain
  * @version-history
+ *   v1.1.0 — 2026-09-24 — The pip rules hold in every workflow step, whatever the job holds, with a
+ *     build's isolated environment and a local install's dependencies counted as pip installs.
  *   v1.0.0 — 2026-09-24 — Initial. The release, MCP publish, scanner, CodeQL, semantic audit and
  *     nightly-sweep workflows, the model installer and the desktop's uv install were brought into
  *     line in the same change.
@@ -302,6 +308,8 @@ export function workflowFindings(file: string, text: string): Finding[] {
                 if (at >= 0) out.push({ file, line: lineAt(l, at), rule: 'latest-release', fix: `job "${jobId}": download a fixed release and check its sha256; releases/latest is whatever was published last` });
                 const pipe = PIPE_TO_SHELL.exec(l.text);
                 if (pipe) out.push({ file, line: lineAt(l, pipe.index), rule: 'pipe-to-shell', fix: `job "${jobId}": download the script or program to a file, check its sha256, then run the file` });
+                // Whatever the job holds: a read-only job's install still decides what its output is.
+                out.push(...installFindings(file, l).map(f => ({ ...f, fix: `job "${jobId}": ${f.fix}` })));
             }
         }
 
@@ -354,33 +362,68 @@ function keyValueProblem(sep: string, rest: string): 'empty' | 'fixed' | null {
     return /^[$<%{(]/.test(v) ? null : 'fixed';
 }
 
-/** Everything the pip-unpinned and git-unpinned rules find in one pip install command. */
+/** A path to local source (the checkout itself), not a package from an index. */
+const LOCAL_SOURCE = /^(?:\.{1,2}(?:[\\/].*)?|[\\/].+|[A-Za-z]:[\\/].*)$/;
+/** `python -m build` in its default isolated mode, which fills its environment from PyPI unpinned. */
+const ISOLATED_BUILD = /\bpython3?\s+-m\s+build\b(?![^\n]*(?:--no-isolation|\s-n\b))/;
+
+/** Everything the pip-unpinned rule finds in one pip install command. */
 function pipFindings(file: string, n: number, args: string): Finding[] {
     const out: Finding[] = [];
     const tokens = args.match(/'[^']*'|"[^"]*"|\S+/g) ?? [];
+    const unquote = (s: string): string => s.replace(/^['"]|['"]$/g, '').replace(/[;}]+$/, '');
     let hashes = false;
     let requirementsFile = false;
-    const packages: string[] = [];
+    let noDeps = false;
+    let noIsolation = false;
+    const packages: { spec: string; editable: boolean }[] = [];
     for (let i = 0; i < tokens.length; i++) {
         const t = tokens[i];
         if (COMMAND_END.has(t) || /^\d?>/.test(t)) break;
         if (t === '--require-hashes') { hashes = true; continue; }
+        if (t === '--no-deps') { noDeps = true; continue; }
+        if (t === '--no-build-isolation') { noIsolation = true; continue; }
         if (t.startsWith('-')) {
             const [name] = t.split('=');
             if (name === '-r' || name === '--requirement') requirementsFile = true;
-            if (name === '-e' || name === '--editable') packages.push(`-e ${tokens[i + 1] ?? ''}`);
+            if (name === '-e' || name === '--editable') packages.push({ spec: unquote(tokens[i + 1] ?? ''), editable: true });
             if (PIP_VALUE_OPTIONS.has(name) && !t.includes('=')) i++;
             continue;
         }
-        packages.push(t.replace(/^['"]|['"]$/g, '').replace(/[;}]+$/, ''));
+        packages.push({ spec: unquote(t), editable: false });
     }
     if (hashes) return out;
     if (requirementsFile) out.push({ file, line: n, rule: 'pip-unpinned', fix: 'install a requirements file with --require-hashes (a lock with a hash for every package)' });
-    for (const p of packages) {
-        if (/^git\+/.test(p)) continue; // the git-unpinned rule reads these
-        if (/^[$@]/.test(p)) out.push({ file, line: n, rule: 'pip-unpinned', fix: `"${p}" is a variable this gate cannot read; write the package out, pinned with ==` });
-        else if (p.startsWith('-e ')) out.push({ file, line: n, rule: 'pip-unpinned', fix: `an editable install (${p}) pins nothing; install a pinned version` });
-        else if (!p.includes('==')) out.push({ file, line: n, rule: 'pip-unpinned', fix: `pin "${p}" with == to the version the Docker lock carries` });
+    for (const { spec, editable } of packages) {
+        if (/^git\+/.test(spec)) continue; // the git-unpinned rule reads these
+        if (/^[$@]/.test(spec)) {
+            out.push({ file, line: n, rule: 'pip-unpinned', fix: `"${spec}" is a variable this gate cannot read; write the package out, pinned with ==` });
+        } else if (LOCAL_SOURCE.test(spec.replace(/\[[^\]]*\]$/, ''))) {
+            // The checkout's own source is pinned by the commit. What it pulls in is not, unless the
+            // dependencies and the build backend came from a hash-locked file first.
+            if (!noDeps || !noIsolation) out.push({ file, line: n, rule: 'pip-unpinned', fix: `a local install of "${spec}" fetches its dependencies and its build backend unpinned: install them from a hash-locked file, then this with --no-deps --no-build-isolation` });
+        } else if (editable) {
+            out.push({ file, line: n, rule: 'pip-unpinned', fix: `an editable install of "${spec}" pins nothing; install a pinned version` });
+        } else if (!spec.includes('==')) {
+            out.push({ file, line: n, rule: 'pip-unpinned', fix: `pin "${spec}" with ==, or install it from a hash-locked file with --require-hashes` });
+        }
+    }
+    return out;
+}
+
+/** What one command installs: pip packages, a build's backend, and git+ sources. */
+function installFindings(file: string, c: Command): Finding[] {
+    const out: Finding[] = [];
+    for (const m of c.text.matchAll(/\bpip3?\s+install\b/g)) {
+        out.push(...pipFindings(file, lineAt(c, m.index), c.text.slice(m.index + m[0].length)));
+    }
+    const build = ISOLATED_BUILD.exec(c.text);
+    if (build) out.push({ file, line: lineAt(c, build.index), rule: 'pip-unpinned', fix: 'python -m build fills an isolated environment from PyPI unpinned: install the build backend from a hash-locked file and build with --no-isolation' });
+    for (const m of c.text.matchAll(GIT_URL)) {
+        const at = m[0].lastIndexOf('@');
+        if (at < 0 || !COMMIT.test(m[0].slice(at + 1).replace(/[#)].*$/, ''))) {
+            out.push({ file, line: lineAt(c, m.index), rule: 'git-unpinned', fix: `pin ${m[0]} to a commit: <address>@<40-character sha>` });
+        }
     }
     return out;
 }
@@ -424,18 +467,10 @@ export function commandFindings(file: string, text: string): Finding[] {
                 out.push({ file, line: lineAt(l, m.index), rule: 'weights-revision', fix: 'download the weights at a fixed commit: revision=<the repository\'s commit sha>' });
             }
         }
-        for (const m of l.text.matchAll(/\bpip3?\s+install\b/g)) {
-            out.push(...pipFindings(file, lineAt(l, m.index), l.text.slice(m.index + m[0].length)));
-        }
+        out.push(...installFindings(file, l));
         const clone = (isScript ? SCRIPT_CLONE : /\bgit\s+(?:-C\s+\S+\s+)?clone\b/).exec(l.text);
         if (clone && !(isScript ? SCRIPT_CHECKOUT_COMMIT : CHECKOUT_COMMIT).test(codeText)) {
             out.push({ file, line: lineAt(l, clone.index), rule: 'git-unpinned', fix: 'check the clone out at a fixed commit: git -C <dir> checkout <40-character sha>' });
-        }
-        for (const m of l.text.matchAll(GIT_URL)) {
-            const at = m[0].lastIndexOf('@');
-            if (at < 0 || !COMMIT.test(m[0].slice(at + 1).replace(/[#)].*$/, ''))) {
-                out.push({ file, line: lineAt(l, m.index), rule: 'git-unpinned', fix: `pin ${m[0]} to a commit: <address>@<40-character sha>` });
-            }
         }
     }
     return out;
