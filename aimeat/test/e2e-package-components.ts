@@ -17,12 +17,16 @@
  *
  *   Refusals: install with no credential, a second owner installing a private package, and a second
  *   owner removing an instance that is not theirs. Part G: a memory component that names a key the
- *   node itself trusts is refused at install and at migration, before anything is written.
+ *   node itself trusts is refused at install and at migration, before anything is written. Part H:
+ *   a memory component writes into the owner's memory, which costs an agent or an app the words the
+ *   memory door asks.
  * @structure Setup · Part A msm register + read back · Part B memory register + read back ·
  *   Part C the parse ladder · Part D status hashing · Part E uninstall · Part F refusals ·
- *   Part G reserved keys
+ *   Part G reserved keys · Part H the owner-write words
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=package-components
  * @version-history
+ *   v1.2.0 -- 2026-09-24 -- Part H: an agent or an app grant installing or migrating a package with a
+ *     memory component answers for memory:write, and an agent also for memory:write-as-owner.
  *   v1.1.0 -- 2026-09-24 -- Part G: a package whose memory component names a reserved key is refused
  *     for the owner, for their agent, on a dry run and on both migration actions.
  *   v1.0.1 -- 2026-09-08 -- Compare memory objects independently of PostgreSQL JSON key order.
@@ -49,7 +53,7 @@ async function json(path: string, opts: RequestInit = {}) {
 }
 
 import * as ed from '@noble/ed25519';
-import { createHash } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 async function sign(privB64: string, msg: string): Promise<string> {
     return Buffer.from(await ed.signAsync(new TextEncoder().encode(msg), Buffer.from(privB64, 'base64'))).toString('base64');
@@ -660,8 +664,147 @@ await test('G5. Cleanup: whatever an unfixed node let through is removed', async
     }
 });
 
+// ── Part H: a memory component is a write into the owner's memory ─────────────
+console.log('\nPart H — who may write the owner\'s memory through a package');
+
+// A package installs under the OWNER whoever presses install, so its memory component writes into
+// the owner's namespace. The memory door asks memory:write for that, and memory:write-as-owner of a
+// principal that writes there from outside it (an agent). packages:write, which every agent holds,
+// had been enough for all of it.
+const OWNED_PREFIX = 'pkgcomp.owned';
+let ownedPkg!: Awaited<ReturnType<typeof createPackage>>;
+let plainPkg!: Awaited<ReturnType<typeof createPackage>>;
+let narrowAgent = '';
+
+// PKCE for the app grants below: each authorize and consent mints its own single-use code.
+const codeVerifier = randomBytes(32).toString('base64url');
+const codeChallenge = createHash('sha256').update(codeVerifier).digest('base64url');
+const APP_FILE = 'pkg-installer-app.html';
+const REDIRECT = 'http://localhost:9922/callback';
+
+/** An app grant of B's own app holding exactly `scopes`, through the real consent flow. */
+async function grantApp(scopes: string[]): Promise<string> {
+    const q = new URLSearchParams({
+        app: `${B.name}/${APP_FILE}`, response_type: 'code', scope: scopes.join(' '),
+        redirect_uri: REDIRECT, state: 'x', code_challenge: codeChallenge, code_challenge_method: 'S256',
+    });
+    const authz = await fetch(`${BASE}/v1/app-grants/authorize?${q}`, { redirect: 'manual' });
+    assert(authz.status === 302, `authorize: ${authz.status}`);
+    const rid = decodeURIComponent(/req=([^&]+)/.exec(authz.headers.get('location') ?? '')![1]);
+    const con = await json('/v1/app-grants/authorize-consent', {
+        method: 'POST', headers: authH(B.token), body: JSON.stringify({ request_id: rid }),
+    });
+    assert(con.status === 200 && con.body.ok, `consent: ${con.status} ${JSON.stringify(con.body)}`);
+    const code = new URL(con.body.data.redirect_url).searchParams.get('code') ?? '';
+    const tok = await json('/v1/app-grants/token', {
+        method: 'POST', body: JSON.stringify({ grant_type: 'authorization_code', code, code_verifier: codeVerifier, redirect_uri: REDIRECT }),
+    });
+    assert(tok.status === 200 && tok.body.ok, `token: ${tok.status} ${JSON.stringify(tok.body)}`);
+    return tok.body.data.access_token as string;
+}
+
+async function removeInstancesOf(token: string, groupId: string): Promise<void> {
+    for (const id of await instancesOf(token, groupId)) {
+        await json(`/v1/instances/${id}`, { method: 'DELETE', headers: authH(token), body: JSON.stringify({ removeComponents: true }) });
+    }
+}
+
+await test('H1. Setup: a public package with an ordinary memory component, one without, and an app of B\'s', async () => {
+    ownedPkg = await createPackage(A.token, `owned-kit-${Date.now()}`, [
+        { id: 'seed', type: 'memory', label: 'Seed', content: MEMORY_ENTRIES(OWNED_PREFIX), dependencies: [] },
+    ], 'public');
+    plainPkg = await createPackage(A.token, `plain-kit-${Date.now()}`, [
+        { id: 'sync', type: 'msm', label: 'Sync', content: MSM_YAML, dependencies: [] },
+    ], 'public');
+    const pub = await json('/v1/apps', {
+        method: 'POST', headers: authH(B.token),
+        body: JSON.stringify({ filename: APP_FILE, content: Buffer.from('<!DOCTYPE html><html><body>installer</body></html>').toString('base64'), name: 'Installer', description: 'installs packages', category: 'utility' }),
+    });
+    assert(pub.status === 201, `publish B's app: ${pub.status} ${JSON.stringify(pub.body.error)}`);
+    narrowAgent = await setupAgent(B, 'pkg-narrow', ['packages:write', 'memory:read']);
+});
+
+await test('H2. An agent holding packages:write but not the owner-write words is refused before anything registers', async () => {
+    const r = await json(`/v1/packages/${ownedPkg.encoded}/install`, {
+        method: 'POST', headers: authH(narrowAgent), body: JSON.stringify({ label: 'narrow' }),
+    });
+    // Whatever an unfixed node let through is removed before the verdict.
+    if (r.status === 201) await removeInstancesOf(B.token, ownedPkg.groupId);
+    assert(r.status === 403 && r.body.error?.code === 'SCOPE_DENIED',
+        `expected 403 SCOPE_DENIED, got ${r.status}: ${JSON.stringify(r.body.error ?? r.body.data)}`);
+    for (const word of ['memory:write', 'memory:write-as-owner']) {
+        assert(String(r.body.error?.message).includes(word), `the refusal names ${word}: ${r.body.error?.message}`);
+    }
+    const index = await json(`/v1/memory/${encodeURIComponent(`${OWNED_PREFIX}.index`)}`, { headers: authH(B.token) });
+    assert(index.status === 404, `nothing landed in the owner's memory: ${index.status}`);
+    assert((await instancesOf(B.token, ownedPkg.groupId)).length === 0, 'no instance was recorded');
+});
+
+await test('H3. The same agent installs a package with no memory component: it writes no memory', async () => {
+    const r = await json(`/v1/packages/${plainPkg.encoded}/install`, {
+        method: 'POST', headers: authH(narrowAgent), body: JSON.stringify({ label: 'plain' }),
+    });
+    assert(r.status === 201, `a package without memory costs packages:write alone: ${r.status} ${JSON.stringify(r.body.error)}`);
+    await removeInstancesOf(B.token, plainPkg.groupId);
+});
+
+await test('H4. An agent holding memory:write and memory:write-as-owner installs it, into the owner\'s memory', async () => {
+    const writer = await setupAgent(B, 'pkg-writer', ['packages:write', 'memory:write', 'memory:write-as-owner']);
+    const r = await json(`/v1/packages/${ownedPkg.encoded}/install`, {
+        method: 'POST', headers: authH(writer), body: JSON.stringify({ label: 'writer' }),
+    });
+    assert(r.status === 201, `with the owner-write words the install passes: ${r.status} ${JSON.stringify(r.body.error)}`);
+    const index = await json(`/v1/memory/${encodeURIComponent(`${OWNED_PREFIX}.index`)}`, { headers: authH(B.token) });
+    assert(index.status === 200, `the keys are the owner's: ${index.status}`);
+});
+
+await test('H5. A migration that registers a memory component asks the same, before anything is deleted', async () => {
+    const [instanceId] = await instancesOf(B.token, ownedPkg.groupId);
+    assert(!!instanceId, 'the writer\'s install is there to migrate');
+    await new Promise(r => setTimeout(r, 1100));   // a version is named by its time, to the second
+    const v2 = await json(`/v1/packages/${ownedPkg.encoded}/versions`, {
+        method: 'POST', headers: authH(A.token),
+        body: JSON.stringify({ changelog: 'new seed', status: 'published', components: [
+            { id: 'seed', type: 'memory', label: 'Seed', content: MEMORY_ENTRIES(`${OWNED_PREFIX}.v2`), dependencies: [] },
+        ] }),
+    });
+    assert(v2.status === 201, `v2 ${v2.status}: ${JSON.stringify(v2.body.error)}`);
+    const migrate = await json(`/v1/instances/${instanceId}/apply-migration`, {
+        method: 'POST', headers: authH(narrowAgent),
+        body: JSON.stringify({ targetVersion: v2.body.data.version, components: [{ componentId: 'seed', action: 'replace' }] }),
+    });
+    assert(migrate.status === 403 && migrate.body.error?.code === 'SCOPE_DENIED',
+        `apply-migration by the narrow agent: ${migrate.status} ${JSON.stringify(migrate.body.error ?? migrate.body.data)}`);
+    const update = await json(`/v1/instances/${instanceId}/update`, {
+        method: 'POST', headers: authH(narrowAgent), body: JSON.stringify({}),
+    });
+    assert(update.status === 403 && update.body.error?.code === 'SCOPE_DENIED',
+        `update by the narrow agent: ${update.status} ${JSON.stringify(update.body.error ?? update.body.data)}`);
+    const kept = await json(`/v1/memory/${encodeURIComponent(`${OWNED_PREFIX}.index`)}`, { headers: authH(B.token) });
+    assert(kept.status === 200, `the installed copy is still there: ${kept.status}`);
+    const moved = await json(`/v1/memory/${encodeURIComponent(`${OWNED_PREFIX}.v2.index`)}`, { headers: authH(B.token) });
+    assert(moved.status === 404, `the new version wrote nothing: ${moved.status}`);
+    await removeInstancesOf(B.token, ownedPkg.groupId);
+});
+
+await test('H6. An app grant writes the owner\'s memory as its own, so memory:write is its word', async () => {
+    const installOnly = await grantApp(['packages:write']);
+    const refused = await json(`/v1/packages/${ownedPkg.encoded}/install`, {
+        method: 'POST', headers: authH(installOnly), body: JSON.stringify({ label: 'app' }),
+    });
+    if (refused.status === 201) await removeInstancesOf(B.token, ownedPkg.groupId);
+    assert(refused.status === 403 && /memory:write/.test(refused.body.error?.message ?? ''),
+        `an app grant without memory:write: ${refused.status} ${JSON.stringify(refused.body.error ?? refused.body.data)}`);
+    const writes = await grantApp(['packages:write', 'memory:write']);
+    const allowed = await json(`/v1/packages/${ownedPkg.encoded}/install`, {
+        method: 'POST', headers: authH(writes), body: JSON.stringify({ label: 'app' }),
+    });
+    assert(allowed.status === 201, `an app grant with memory:write: ${allowed.status} ${JSON.stringify(allowed.body.error)}`);
+    await removeInstancesOf(B.token, ownedPkg.groupId);
+});
+
 await test('Cleanup: delete the packages and both owners', async () => {
-    for (const p of [mainPkg, ladderPkg, publicPkg, reservedPkg, migPkg].filter(Boolean)) {
+    for (const p of [mainPkg, ladderPkg, publicPkg, reservedPkg, migPkg, ownedPkg, plainPkg].filter(Boolean)) {
         const r = await json(`/v1/packages/${p.encoded}`, { method: 'DELETE', headers: authH(A.token) });
         assert(r.status === 200, `package delete ${p.groupId} → ${r.status}`);
     }

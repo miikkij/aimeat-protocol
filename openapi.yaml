@@ -41884,9 +41884,13 @@ paths:
       summary: Install package
       description: >-
         Install a package, creating an instance with registered components. A memory component
-        writes into the installer's namespace, so one that names a key this node reads to decide what
-        it does (an AI-provider setting, the spend cap, a payout record) is refused with 403
-        RESERVED_KEY before any component registers, for the owner too. A dry run answers the same.
+        writes into the owner's namespace, whoever installs, so one that names a key this node reads
+        to decide what it does (an AI-provider setting, the spend cap, a payout record) is refused
+        with 403 RESERVED_KEY before any component registers, for the owner too. And the write itself
+        costs what POST /v1/memory asks for a write there: an agent needs memory:write and
+        memory:write-as-owner, an app grant memory:write, or the install is refused with 403
+        SCOPE_DENIED before any component registers. A translation component counts the same, and an
+        ecosystem app is refused. The owner in person passes. A dry run answers the same.
       tags: [Instances]
       security:
         - BearerAuth: []
@@ -42084,7 +42088,10 @@ paths:
       description: >-
         Apply a migration to update an instance to a newer package version. A memory component that
         names a key this node reads to decide what it does is refused with 403 RESERVED_KEY, for
-        replace, custom and install_new alike, before anything is deleted.
+        replace, custom and install_new alike, before anything is deleted. A memory or translation
+        component brought by an agent or an app grant costs the words POST /v1/memory asks for a
+        write into the owner's namespace (see installPackage), or 403 SCOPE_DENIED, also before
+        anything is deleted.
       tags: [Instances]
       security:
         - BearerAuth: []
@@ -42141,6 +42148,8 @@ paths:
         edited is NOT overwritten: it comes back in `needsYou` with the address of the prompt that
         merges it, and its bytes are untouched. A component the new version dropped is reported in
         `removed` and left alone, because deleting a copy is a separate act. Everything else moves.
+        A memory or translation component moved by an agent or an app grant costs what
+        apply-migration asks for it.
       tags: [Instances]
       security:
         - BearerAuth: []

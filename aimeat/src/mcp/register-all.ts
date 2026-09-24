@@ -24,6 +24,8 @@
  * @usage
  *   registerAllServerTools(mcp, { storage, config, agentGaii: () => gaii, ... });
  * @version-history
+ *   v1.4.2 — 2026-09-24 — registerPackageTools gets the session's scopes: a memory component answers
+ *     for the words the memory door asks.
  *   v1.4.1 — 2026-09-24 — registerWorkflowTools gets the session's scopes: a step answers for the word
  *     its own door asks.
  *   v1.4.0 — 2026-09-24 — registerThemeTools: the node's themes, read and made from a chat.
@@ -198,7 +200,7 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     registerCompanyTools(mcp, storage, config, agentGaii);
     // peers: pulling a package from another node reads that node's address and key from the peer
     // record, never from the caller's arguments.
-    registerPackageTools(mcp, storage, config, agentGaii, peers);
+    registerPackageTools(mcp, storage, config, agentGaii, peers, scopes);
     registerPortfolioTools(mcp, storage, config, agentGaii);
     registerSurfaceLayoutTools(mcp, storage, config, agentGaii);
     registerAppUiTools(mcp, storage, config, agentGaii);
