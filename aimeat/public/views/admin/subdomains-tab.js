@@ -307,8 +307,8 @@ export default function SubdomainsAdminTab() {
 
       <${Modal} open=${!!deleting} onClose=${() => setDeleting(null)} title=${S('deleteTitle')}
         footer=${deleting && html`
-          <button type="button" class="og-door og-door--quiet" onClick=${() => setDeleting(null)}>${t('common.cancel')}</button>
-          <button class="adm-btn" disabled=${deleting.typed !== deleting.subdomain} onClick=${doDelete}>${S('delete')}</button>`}>
+          <button type="button" class="poster-action" onClick=${() => setDeleting(null)}>${t('common.cancel')}</button>
+          <button class="poster-slab poster-slab--control poster-slab--danger" disabled=${deleting.typed !== deleting.subdomain} onClick=${doDelete}>${S('delete')}</button>`}>
         ${deleting && html`
           <div class="adm-subs-ask">
             <p>${S('deleteLead')}</p>

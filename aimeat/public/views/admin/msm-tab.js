@@ -288,8 +288,8 @@ export default function MsmTab() {
       <${Modal} open=${!!removing} onClose=${() => setRemoving(null)}
         title=${removing ? M('dialog.deleteTitle', { name: removing.name }) : ''}
         footer=${removing && html`
-          <button type="button" class="og-door og-door--quiet" onClick=${() => setRemoving(null)}>${t('common.cancel')}</button>
-          <button type="button" class="og-door og-door--quiet og-door--danger"
+          <button type="button" class="poster-action" onClick=${() => setRemoving(null)}>${t('common.cancel')}</button>
+          <button type="button" class="poster-slab poster-slab--control poster-slab--danger"
             disabled=${busy || removing.typed !== removing.name} onClick=${doDelete}>${M('deleteIt')}</button>`}>
         ${removing && html`
           <div class="og-box poster-aside poster-aside--small">

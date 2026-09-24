@@ -335,8 +335,8 @@ export default function EcosystemTab({ onStats, showToast }) {
 
       <${Modal} open=${!!revokeApp} onClose=${() => setRevokeApp(null)} title=${t('profile.ecosystem.revokeTitle', { app: revokeApp || '' })}
         footer=${html`
-          <button class="btn-ghost" onClick=${() => setRevokeApp(null)}>${t('common.cancel')}</button>
-          <button class="btn-danger-solid" disabled=${revokeInput !== revokeApp} onClick=${onRevokeConfirm}>
+          <button class="poster-action" onClick=${() => setRevokeApp(null)}>${t('common.cancel')}</button>
+          <button class="poster-slab poster-slab--control poster-slab--danger" disabled=${revokeInput !== revokeApp} onClick=${onRevokeConfirm}>
             ${t('profile.ecosystem.revoke')}
           </button>`}>
         <p>${t('profile.ecosystem.revokeWarn', { app: revokeApp })}</p>

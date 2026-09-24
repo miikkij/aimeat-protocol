@@ -7,6 +7,8 @@
  *   modules, holds its own module state, has no back-dependency on the entry module. Carved from main.js.
  * @usage import { loadCortexExtensions, openCortexEditor, openPromptBuilder, getCortexOwnerToken } from './cortex.js'
  * @version-history
+ *   v1.4.0 — 2026-09-24 — The owner's edit door in the popup's footer is the library's action link
+ *     (Jouni's decision "Dialog actions").
  *   v1.3.0 — 2026-09-13 — The popup, the editor and the prompt builder are the site's one dialog
  *     (dialogs.js): the extension's name is the popup's title, its owner's edit door stands at the
  *     footer's start, and the prompt builder opens and closes like every other dialog instead of
@@ -161,7 +163,7 @@ function showCortexPopup(encodedName) {
       var isOwner = false;
       try { var _me = currentOwnerName(); isOwner = !!_me && ext.installed_by === _me; } catch(e) {}
       if (isOwner) {
-        ownerEl.innerHTML = '<button type="button" class="modal-btn secondary" onclick="window._launcher.openCortexEditor(\'' + encodedName + '\')">' + cortexEsc(t('cortex.edit')) + '</button>';
+        ownerEl.innerHTML = '<button type="button" class="poster-action" onclick="window._launcher.openCortexEditor(\'' + encodedName + '\')">' + cortexEsc(t('cortex.edit')) + '</button>';
       }
 
       el.innerHTML = html;

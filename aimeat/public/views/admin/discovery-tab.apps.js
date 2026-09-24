@@ -201,8 +201,8 @@ export function DiscoveryApps({ status, onChanged }) {
 
       <${Modal} open=${!!blocking} onClose=${() => setBlocking(null)} title=${S('apps.blockTitle', { name: blocking?.name ?? '' })}
         footer=${blocking && html`
-          <button type="button" class="og-door og-door--quiet" onClick=${() => setBlocking(null)}>${S('cancel')}</button>
-          <button type="button" class="og-slab og-slab--danger" disabled=${busy}
+          <button type="button" class="poster-action" onClick=${() => setBlocking(null)}>${S('cancel')}</button>
+          <button type="button" class="poster-slab poster-slab--control poster-slab--danger" disabled=${busy}
             onClick=${() => act(() => adminService.blockAppSeo(blocking.owner, blocking.filename, true, blocking.reason?.trim() || undefined), 'apps.blockedOk')}>${S('apps.block')}</button>`}>
         ${blocking && html`
           <p>${S('apps.blockBody')}</p>

@@ -10,6 +10,7 @@
  * @structure SHELL_DEMOS — { [id]: { variants: [{ name, render(ex) }], height?, emptyNote? } }
  * @usage import { SHELL_DEMOS } from './demos-shell.js';
  * @version-history
+ *   v1.1.0 — 2026-09-24 — The dialog's footer wears the action link and the loud action (decision 22).
  *   v1.0.0 — 2026-09-24 — Initial (UI consolidation: every part catalogued, every entry drawn).
  */
 import { h } from 'preact';
@@ -77,7 +78,7 @@ export const SHELL_DEMOS = {
   ] },
   toast: one('default', () => html`<div class="toast toast-success">Saved.</div>`),
   'section-header': one('default', () => html`<div><h2 class="section-title">Storage</h2><p class="section-desc">What this node keeps, and for how long.</p></div>`),
-  dialog: one('default', () => html`<dialog class="dlg" open><header class="dlg-head"><h2 class="dlg-title">Settings</h2><button type="button" class="dlg-close" aria-label="Close" dangerouslySetInnerHTML=${{ __html: CLOSE_ICON }}></button></header><div class="dlg-body"><p>The body scrolls; the header and footer stay.</p></div><footer class="dlg-foot"><button type="button" class="btn-ghost">Cancel</button><button type="button" class="btn-primary poster-slab">Save</button></footer></dialog>`),
+  dialog: one('default', () => html`<dialog class="dlg" open><header class="dlg-head"><h2 class="dlg-title">Settings</h2><button type="button" class="dlg-close" aria-label="Close" dangerouslySetInnerHTML=${{ __html: CLOSE_ICON }}></button></header><div class="dlg-body"><p>The body scrolls; the header and footer stay.</p></div><footer class="dlg-foot"><button type="button" class="poster-action">Cancel</button><button type="button" class="poster-slab poster-slab--control">Save</button></footer></dialog>`),
   'margin-pattern': one('default', () => html`<p>The pattern sits in the page margins of the home, the chat and the settings (set in the home's settings).</p>`),
   'notification-bell': one('with a count', () => html`<div class="notif-bell"><button type="button" class="notif-bell-btn">🔔<span class="poster-count poster-count--waiting poster-count--small notif-badge">7</span></button></div>`),
   'open-items-button': one('default', () => html`<button type="button" class="open-items-btn"><span class="open-items-btn-mark">○</span><span class="open-items-btn-count">3</span></button>`),

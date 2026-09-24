@@ -29,6 +29,8 @@
  *     as a slab and underlined words, one line about who published it and when); a filtered-out
  *     row's panel hides with it.
  *   v2.3.0 — 2026-09-03 — getServerAppRow(owner, filename): the server's own row for one app, for the detail's Needs section.
+ *   v2.4.0 — 2026-09-24 — The consents dialog's Close is the library's action link and Revoke the
+ *     loud action's danger tone (Jouni's decision "Dialog actions").
  */
 import { escapeHtml, jsArg, bareOwnerName, sameOwner, filterAttr } from './util.js';
 import { getAllApps, saveApp } from './db.js';
@@ -484,8 +486,8 @@ function openConsents(owner, filename, appName) {
     + '<div id="consents-body" style="font-size:.9rem;color:var(--text-muted)">' + t('common.loading') + '</div>'
     + '</div>'
     + '<footer class="dlg-foot">'
-    + '<button type="button" class="modal-btn secondary" data-dlg-close>' + escapeHtml(t('common.close')) + '</button>'
-    + '<button type="button" class="modal-btn danger" id="consents-revoke-btn" hidden>' + escapeHtml(t('consents.revoke')) + '</button>'
+    + '<button type="button" class="poster-action" data-dlg-close>' + escapeHtml(t('common.close')) + '</button>'
+    + '<button type="button" class="poster-slab poster-slab--control poster-slab--danger" id="consents-revoke-btn" hidden>' + escapeHtml(t('consents.revoke')) + '</button>'
     + '</footer>';
   document.body.appendChild(dlg);
   onDlgClose('consents-overlay', closeConsents);

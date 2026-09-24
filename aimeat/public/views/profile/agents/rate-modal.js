@@ -57,8 +57,8 @@ export default function RateModal({ open, onClose, onSubmit, submitting, existin
   }
   return html`<${Modal} open=${open} onClose=${onClose} title=${t('profile.agents.tasks.rate.title')}
     footer=${html`
-      <button class="btn-ghost" onClick=${onClose} disabled=${submitting}>${t('common.cancel') || 'Cancel'}</button>
-      <button class="btn-primary" onClick=${handleSend} disabled=${submitting || !stars}>
+      <button class="poster-action" onClick=${onClose} disabled=${submitting}>${t('common.cancel') || 'Cancel'}</button>
+      <button class="poster-slab poster-slab--control" onClick=${handleSend} disabled=${submitting || !stars}>
         ${submitting ? t('profile.agents.tasks.rate.submitting') : t('profile.agents.tasks.rate.submit')}
       </button>`}>
     <p class="pf-agd-modal-help">${t('profile.agents.tasks.rate.help')}</p>

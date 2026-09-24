@@ -168,8 +168,8 @@ export function DiscoveryInstant({ status, onChanged }) {
 
       <${Modal} open=${planOpen} onClose=${() => setPlanOpen(false)} title=${S('instant.planTitle')} size="lg"
         footer=${plan && html`
-          <button type="button" class="og-door og-door--quiet" onClick=${() => setPlanOpen(false)}>${S('instant.planClose')}</button>
-          <button type="button" class="og-slab" disabled=${!!sending || !can} onClick=${() => announce('all')}>${S('instant.planSend', { n: plan.url_count })}</button>`}>
+          <button type="button" class="poster-action" onClick=${() => setPlanOpen(false)}>${S('instant.planClose')}</button>
+          <button type="button" class="poster-slab poster-slab--control" disabled=${!!sending || !can} onClick=${() => announce('all')}>${S('instant.planSend', { n: plan.url_count })}</button>`}>
         ${plan && html`
           <div class="adm-disc-plan-hosts">
             ${plan.hosts.map((h_) => html`<span key=${h_.host} class="adm-disc-fchip">${h_.host.replace(/^https?:\/\//, '')} · ${h_.url_count}</span>`)}

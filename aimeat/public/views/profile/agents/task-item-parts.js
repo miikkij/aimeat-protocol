@@ -121,8 +121,8 @@ export function RequestChangesModal({ open, onClose, onSubmit, submitting }) {
   }
   return html`<${Modal} open=${open} onClose=${onClose} title=${t('profile.agents.tasks.requestChangesTitle')}
     footer=${html`
-      <button class="btn-ghost" onClick=${onClose} disabled=${submitting}>${t('common.cancel') || 'Cancel'}</button>
-      <button class="btn-primary" onClick=${handleSend} disabled=${submitting || !message.trim()}>
+      <button class="poster-action" onClick=${onClose} disabled=${submitting}>${t('common.cancel') || 'Cancel'}</button>
+      <button class="poster-slab poster-slab--control" onClick=${handleSend} disabled=${submitting || !message.trim()}>
         ${submitting ? t('profile.agents.tasks.requestChangesSending') : t('profile.agents.tasks.requestChangesSend')}
       </button>`}>
     <p class="pf-agd-modal-help">${t('profile.agents.tasks.requestChangesHelp')}</p>

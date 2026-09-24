@@ -20,6 +20,8 @@
  * @structure SAMPLES — { [decisionId]: [{ id, measure, solo?, render(), after }] } · PROPOSALS — { [decisionId]: { measure, render() } }
  * @usage import { SAMPLES, PROPOSALS } from './decision-samples.js';
  * @version-history
+ *   v3.2.0 — 2026-09-24 — Dialog actions built: "today" keeps the old footer (lab class .dl-was),
+ *     and Delete's after is the loud action's danger tone.
  *   v3.1.0 — 2026-09-24 — The icon button's pictures use the built shape (.poster-icon).
  *   v3.0.0 — 2026-09-23 — `solo` and `after` for every sample; the prompt card drawn with the
  *     underlined copy action the home's task chooser passes it (it was drawn with the red button of
@@ -70,8 +72,9 @@ const adm = (children) => html`<div class="adm">${children}</div>`;
 const sidebar = (count) => adm(html`<nav class="adm-sidebar"><button type="button" class="adm-nav-item">Owners ${count}</button></nav>`);
 /** Result cards sit inside a chat message, whose body sets their weight. */
 const inTurn = (children) => html`<div class="poster-turn-body">${children}</div>`;
-/** A dialog's footer, whose rules restyle the buttons inside it. */
-const foot = (children) => html`<dialog class="dlg" open><footer class="dlg-foot">${children}</footer></dialog>`;
+/** A dialog's footer as it was before decision 22 was built: the lab sheet keeps the footer's old
+    rules under .dl-was, so the picture of "today" stays the look Jouni chose from. */
+const foot = (children) => html`<dialog class="dlg dl-was" open><footer class="dlg-foot">${children}</footer></dialog>`;
 const tag = (tone, text) => html`<span class=${'dl-tag' + (tone ? ` dl-tag--${tone}` : '')}>${text}</span>`;
 const status = (tone, text) => html`<span class=${`dl-status dl-status--${tone}`}>${text}</span>`;
 const action = (text) => html`<a class="poster-action" href="#">${text}</a>`;
@@ -277,7 +280,8 @@ export const SAMPLES = {
       after: after('.poster-action', () => row(html`<button type="button" class="poster-action">Cancel</button>`)) },
     { id: 'confirm', measure: '.btn-primary', render: () => foot(html`<button type="button" class="btn-primary">Save</button>`),
       after: after('.poster-slab', () => row(html`<button type="button" class="poster-slab poster-slab--control">Save</button>`)) },
-    { id: 'danger', measure: '.btn-danger-solid', render: () => foot(html`<button type="button" class="btn-danger-solid">Delete</button>`), after: 'same' },
+    { id: 'danger', measure: '.btn-danger-solid', render: () => foot(html`<button type="button" class="btn-danger-solid">Delete</button>`),
+      after: after('.poster-slab', () => row(html`<button type="button" class="poster-slab poster-slab--control poster-slab--danger">Delete</button>`)) },
   ],
 };
 
@@ -328,7 +332,8 @@ export const PROPOSALS = {
   },
   'dialog-actions': {
     measure: '.poster-action',
-    render: () => row(html`<button type="button" class="poster-action">Cancel</button> <button type="button" class="poster-slab poster-slab--control">Save</button>`),
+    render: () => row(html`<button type="button" class="poster-action">Cancel</button> <button type="button" class="poster-slab poster-slab--control">Save</button>
+      <button type="button" class="poster-slab poster-slab--control poster-slab--danger">Delete</button>`),
   },
   'small-link': {
     measure: '.poster-action--more',

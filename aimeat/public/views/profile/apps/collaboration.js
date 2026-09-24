@@ -21,7 +21,7 @@ export function PublishDialog({ app, busy, onPublish, onClose }) {
   const [line, setLine] = useState('');
   // The submit sits in the footer, outside the form, and names the form it submits.
   return html`<${Modal} open=${true} title=${a('publishDraft')} onClose=${onClose} className="ap-publish-modal"
-    footer=${html`<button type="submit" form="ap-publish-form" class="btn-primary" disabled=${busy || (!!line.trim() && line.trim().length < 3)}>${a('publishDraft')}</button>`}>
+    footer=${html`<button type="submit" form="ap-publish-form" class="poster-slab poster-slab--control" disabled=${busy || (!!line.trim() && line.trim().length < 3)}>${a('publishDraft')}</button>`}>
     <form id="ap-publish-form" class="ap-form" onSubmit=${e => { e.preventDefault(); onPublish(app, line); }}>
       <p class="ap-hint">${a('publishConfirm', { name: nameOf(app) })}</p>
       <label class="ap-field ap-field--wide"><span class="og-label">${a('roadPublishLabel')}</span>

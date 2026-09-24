@@ -13,6 +13,8 @@
  *   that may never ship, and a part's sheet is catalogued and drawn by pages.
  * @usage Loaded by the lab's preview page only (views/design-lab/frame.js); no other page carries it.
  * @version-history
+ *   v1.3.0 — 2026-09-24 — The dialog footer's old rules under .dl-was, for the picture of "today"
+ *     of the built decision "Dialog actions".
  *   v1.2.0 — 2026-09-24 — The rules of built proposals removed (count, headings, box, aside; the icon
  *     button, the tab's reco colour and the dimmed action link of decisions 14-21).
  *   v1.1.0 — 2026-09-23 — The after-looks no class draws alone, and the solo rules.
@@ -65,3 +67,23 @@ html.dl-solo-page, html.dl-solo-page body { overflow: hidden; }
 /* The top bar hides the morsel count below 1180px, and a lab frame is narrower than that; inside a
    preview it is shown, so it can be seen beside the other counts. */
 .poster-specimen-stage .brand-morsels { display: inline-block !important; }
+
+/* Dialog actions as they were before Jouni's decision was built (2026-09-24): the footer's own rules
+   from components/dialog.css v1.2.0, unchanged but for the .dl-was class, so the decision's picture
+   of "today" still shows the look he chose from. No page carries .dl-was. */
+dialog.dlg.dl-was .dlg-foot .btn-ghost, dialog.dlg.dl-was .dlg-foot .btn-outline, dialog.dlg.dl-was .dlg-foot .btn-secondary {
+  display: inline-flex; align-items: center; min-height: 44px; padding: 0; background: none; box-shadow: none;
+  border: 0; border-radius: 0; color: var(--text);
+  font-family: var(--font-body); font-weight: var(--weight-heavy); font-size: var(--text-small); text-transform: uppercase; letter-spacing: .04em;
+  text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 5px; cursor: pointer;
+}
+dialog.dlg.dl-was .dlg-foot .btn-ghost:hover, dialog.dlg.dl-was .dlg-foot .btn-outline:hover, dialog.dlg.dl-was .dlg-foot .btn-secondary:hover { color: var(--accent); background: none; }
+dialog.dlg.dl-was .dlg-foot .btn-primary, dialog.dlg.dl-was .dlg-foot .btn-danger-solid {
+  display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 18px;
+  border: 0; border-radius: 0; background: var(--text); color: var(--bg); box-shadow: 4px 4px 0 var(--sun);
+  font-family: var(--font-body); font-weight: var(--font-poster-strong-weight); font-size: var(--text-small); text-transform: uppercase; letter-spacing: .04em;
+  cursor: pointer; transition: transform 120ms ease, box-shadow 120ms ease;
+}
+dialog.dlg.dl-was .dlg-foot .btn-danger-solid { background: var(--accent); color: #fff; box-shadow: 4px 4px 0 var(--text); }
+dialog.dlg.dl-was .dlg-foot .btn-primary:hover:not(:disabled) { color: var(--sun); background: var(--text); transform: translate(2px, 2px); box-shadow: 2px 2px 0 var(--sun); }
+dialog.dlg.dl-was .dlg-foot .btn-danger-solid:hover:not(:disabled) { background: var(--accent); transform: translate(2px, 2px); box-shadow: 2px 2px 0 var(--text); }
