@@ -11,6 +11,8 @@
  * @structure HomeFeed({ items }) · FeedRow({ item }) · line · when
  * @usage import { HomeFeed } from './feed.js';
  * @version-history
+ *   2026-09-24: memory_accessed_by_operator, one sentence per action (opened, searched, deleted,
+ *     restored), filed under access: the operator reaching into your entries is news you read here.
  *   2026-09-23: Composed from components/Timeline.js (Timeline, TimelineRow), which emits the
  *     markup this file wrote; the sentence and the category of each row stay here (UI
  *     consolidation phase 1, a move).
@@ -113,6 +115,13 @@ export function line(item) {
       return tr('home.feed.twoFactorRemoved', 'You turned off two-step sign-in.');
     case 'two_factor_reset_by_operator':
       return tr('home.feed.twoFactorResetByOperator', 'An operator removed two-step sign-in from your account. Turn it back on if this was not arranged with you.');
+    case 'memory_accessed_by_operator':
+      if (d.action === 'search') {
+        return tr('home.feed.operatorSearchedEntries', "An operator's search showed parts of {count} of your entries.").replace('{count}', d.count || '');
+      }
+      if (d.action === 'delete') return tr('home.feed.operatorDeletedEntry', 'An operator deleted your entry {key}.').replace('{key}', d.key || '');
+      if (d.action === 'restore') return tr('home.feed.operatorRestoredEntry', 'An operator restored your entry {key}.').replace('{key}', d.key || '');
+      return tr('home.feed.operatorOpenedEntry', 'An operator opened your entry {key}.').replace('{key}', d.key || '');
     case 'app_published':
       return tr('home.feed.appPublished', 'You published {name}.').replace('{name}', d.name || '');
     case 'app_updated':
@@ -220,7 +229,7 @@ export function kindCategory(kind) {
     'contract_started', 'contract_ended'].includes(k)) return 'money';
   if (['consent_granted', 'consent_revoked', 'app_granted', 'app_revoked', 'organism_joined',
     'organism_left', 'organism_member_joined', 'two_factor_armed', 'two_factor_removed',
-    'passkey_added', 'passkey_removed'].includes(k)) return 'access';
+    'passkey_added', 'passkey_removed', 'memory_accessed_by_operator'].includes(k)) return 'access';
   return 'system';
 }
 

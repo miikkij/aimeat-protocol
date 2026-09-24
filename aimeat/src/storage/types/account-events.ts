@@ -15,6 +15,9 @@
  * @usage
  *   import type { AccountEventInput } from '../storage/interface.js';
  * @version-history
+ *   v1.4.0 — 2026-09-24 — memory_accessed_by_operator: the operator opened, searched, deleted or
+ *     restored one of your entries (security audit A8-2). The most invasive read on the node left no
+ *     trace a person could see.
  *   v1.3.0 — 2026-09-04 — passkey_added and passkey_removed: a device that can sign in as you
  *     is the same kind of news as a second factor changing.
  *   v1.2.0 — 2026-09-04 — three kinds for two-step sign-in: armed, removed, and reset by an operator.
@@ -109,6 +112,12 @@ export type AccountEventKind =
   | 'two_factor_reset_by_operator'
   | 'passkey_added'
   | 'passkey_removed'
+  // Who reached into what you keep
+  //
+  // The operator opened, searched, deleted or restored one of your entries from the admin pages.
+  // `data.action` says which of the four, so one kind carries them; the per-call record of the same
+  // act is the operator's own UsageCall row, which names you as the account inspected.
+  | 'memory_accessed_by_operator'
   // Permissions and limits
   | 'consent_granted'
   | 'consent_revoked'

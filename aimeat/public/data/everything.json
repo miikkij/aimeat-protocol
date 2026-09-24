@@ -2755,10 +2755,10 @@
      "slug": "g-19-memory-across-accounts",
      "cells": [
       "<strong>Memory across accounts</strong>",
-      "Search, delete and restore records across owners.",
+      "Search, delete and restore records across owners. Each search, read, delete and restore of someone's entry is on that person's feed and in the operator's usage record.",
       "<code>/v1/admin/memory*</code>"
      ],
-     "plain": "Memory across accounts Search, delete and restore records across owners. /v1/admin/memory*"
+     "plain": "Memory across accounts Search, delete and restore records across owners. Each search, read, delete and restore of someone's entry is on that person's feed and in the operator's usage record. /v1/admin/memory*"
     },
     {
      "slug": "g-19-organism-break-glass",
