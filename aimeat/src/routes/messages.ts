@@ -21,6 +21,10 @@
  *   - GET    /v1/messages/contacts                         -- list contacts + states
  * @usage import { messagesRouter } from '../routes/messages.js'; app.use(messagesRouter(config, storage));
  * @version-history
+ *   v1.13.0 -- 2026-09-24 -- SECURITY (audit A5-3): POST /v1/messages and POST /v1/messages/broadcast
+ *     share one per-principal limiter, 30 a minute, the same shape the outbound send door has. They
+ *     had only the node-wide limiter, so one principal could send a 500-recipient broadcast again and
+ *     again inside it.
  *   v1.12.0 -- 2026-09-13 -- Every door here takes requireLocalSession(). A session signed in from
  *     another node carries roles:['owner'] and the LOCAL PART of its home GHII as `owner`, so the
  *     mailbox each door derived was whichever local account shares that name: a visitor read its
@@ -74,6 +78,7 @@ import type { Storage, DirectMessageRecord } from '../storage/interface.js';
 import type { PeerInfo } from '../services/federation.js';
 import { requireAuth, requireRole, requireScope, requireExternalPrincipal, requireLocalSession } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
+import { rateLimit } from '../middleware/rate-limit.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { conversationIdFor, messagePreview, deliveryTargetFor, isAddressableRecipient } from '../utils/messaging.js';
 import { emitChange } from '../services/event-bus.js';
@@ -100,8 +105,13 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
   /** Resolve the caller's effective identity (owner→GHII, agent/eco→sub). */
   const resolve = (req: Express.Request) => resolveIdentity(req.auth!, config.nodeId);
 
+  // The send doors are an amplification surface: a broadcast fans one request out to 500 people.
+  // ONE limiter for both, keyed by the principal, so a caller cannot trade one door's allowance for
+  // the other's. The same shape and number as the outbound send door (routes/outbound.ts sendLimit).
+  const sendLimit = rateLimit({ windowMs: 60_000, max: 30 });
+
   /* ── POST /v1/messages — send ── */
-  router.post('/v1/messages', requireAuth(), requireLocalSession(), requireExternalPrincipal(), requireScope('messages:send'), async (req, res) => {
+  router.post('/v1/messages', requireAuth(), requireLocalSession(), requireExternalPrincipal(), requireScope('messages:send'), sendLimit, async (req, res) => {
     const parsed = MessageSendSchema.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
@@ -271,7 +281,7 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
   });
 
   /* ── POST /v1/messages/broadcast — send one message to MANY (announcement / broadcast / poll) ── */
-  router.post('/v1/messages/broadcast', requireAuth(), requireLocalSession(), requireExternalPrincipal(), requireScope('messages:send'), async (req, res) => {
+  router.post('/v1/messages/broadcast', requireAuth(), requireLocalSession(), requireExternalPrincipal(), requireScope('messages:send'), sendLimit, async (req, res) => {
     const parsed = BroadcastSendSchema.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
