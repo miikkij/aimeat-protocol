@@ -49864,7 +49864,9 @@ paths:
       description: >
         The caller's own connections and no one else's. The credential is never part of any
         response; what comes back is enough to name the account in a picker and to see that it
-        needs attention.
+        needs attention. Any one of `connections:read`, `connections:use` or
+        `connections:read-through` is enough, because an app that may publish through a connection
+        or read through one has to be able to name it.
       tags: [Connections]
       security:
         - BearerAuth: []
@@ -50329,8 +50331,9 @@ paths:
         belongs behind a URL a browser will prefetch.
 
 
-        Needs `connections:use`, not `connections:read`. Reading the LIST of connections is knowing
-        what you attached; reading THROUGH one is spending it.
+        Needs `connections:read-through`. Reading the LIST of connections is knowing what you
+        attached (`connections:read`), publishing and sending through one is `connections:use`, and
+        reading what is IN one is its own permission, with its own sentence on the consent screen.
 
 
         The token never reaches the caller. It is spent here and the answer comes back.

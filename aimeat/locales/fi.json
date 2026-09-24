@@ -7022,7 +7022,8 @@
   "accesspage.verb.storage.write": "tallentaa",
   "accesspage.basePackage": "Peruspaketti",
   "accesspage.scope.ai.use": "käyttää tekoälyäsi sinun avaimellasi",
-  "accesspage.scope.connections.use": "julkaisee liittämilläsi tileillä",
+  "accesspage.scope.connections.use": "julkaisee ja lähettää liittämiesi tilien kautta",
+  "accesspage.scope.connections.read-through": "lukee sähköpostiasi ja muita liittämiäsi tilejä",
   "accesspage.scope.connections.read": "näkee, mitkä tilit olet liittänyt",
   "accesspage.scope.connections.write": "liittää ja irrottaa tilejä nimissäsi",
   "accesspage.scope.messages.send": "lähettää viestejä nimissäsi",
@@ -14807,7 +14808,8 @@
           },
           "connections": {
             "read": "Näe mitkä some- ja julkaisutilit olet liittänyt.",
-            "use": "Julkaise niihin sometileihin jotka olet jo liittänyt.",
+            "use": "Julkaise ja lähetä niiden tilien kautta, jotka olet jo liittänyt: päivitykset someen ja sähköpostit omasta postilaatikostasi. Tilien sisältöä tämä lupa ei avaa.",
+            "read-through": "Lue niiden tilien sisältöä, jotka olet jo liittänyt: hae sähköposteistasi, avaa viestejä ja liitteitä ja katso osoitteet, joista lähetät postia.",
             "write": "Liitä uusia sometilejä nimiisi ja irrota olemassa olevia."
           },
           "consent": {

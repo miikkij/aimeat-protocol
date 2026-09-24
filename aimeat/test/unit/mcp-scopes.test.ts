@@ -4,6 +4,8 @@
  *   wildcard-matching semantics (exact / domain:* / global *) that decide which tools the
  *   /v1/mcp surface registers per agent (F1), and the role->scope profile bundles.
  * @version-history
+ *   v1.2.0 -- 2026-09-24 -- Reading a connected mailbox is connections:read-through; connections:use,
+ *     the publish-and-send word, no longer offers the three mail read tools (security audit A5-1).
  *   v1.1.0 -- 2026-09-24 -- The operator's tools: every tool the catalog names as the operator's is
  *     registered only for a word no wildcard carries, so an operator's agent holding "Full access"
  *     or an ordinary word is offered none of them (security audit A8-1).
@@ -78,6 +80,31 @@ describe('scopeAllowsTool', () => {
  * and rewrote a CORS list. The list is derived from the catalog's own `caller: 'operator'` rather
  * than written out, so a new operator tool is covered on the day it is added.
  */
+/**
+ * Security audit A5-1. `connections:use` was described to the owner as publishing to accounts they
+ * connected, and it also opened the connected mailbox: search, open a message, fetch an attachment,
+ * list the send-as addresses. Reading through an account is its own word now, on every door.
+ */
+describe('reading a connected mailbox is its own word', () => {
+    const READ_TOOLS = ['aimeat_mail_search', 'aimeat_mail_read', 'aimeat_mail_aliases'];
+
+    it('the three read tools ride connections:read-through', () => {
+        for (const t of READ_TOOLS) expect(requiredScopeForTool(t)).toBe('connections:read-through');
+    });
+
+    it('the publish-and-send word alone is offered none of them', () => {
+        expect(READ_TOOLS.filter(t => scopeAllowsTool(['connections:use', 'outbound:send'], t))).toEqual([]);
+    });
+
+    it('the read word is offered them, and so is Full access, and neither changes what sends', () => {
+        for (const t of READ_TOOLS) {
+            expect(scopeAllowsTool(['connections:read-through'], t)).toBe(true);
+            expect(scopeAllowsTool(['*'], t)).toBe(true);
+        }
+        expect(requiredScopeForTool('aimeat_mail_send')).toBe('connections:use');
+    });
+});
+
 describe("the operator's tools cost their own tick", () => {
     const operatorTools = CLI_FALLBACK_TOOL_DEFINITIONS.filter(d => d.caller === 'operator').map(d => d.name);
 

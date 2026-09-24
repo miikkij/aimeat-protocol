@@ -1994,10 +1994,10 @@
      "slug": "g-12-connected-mailboxes",
      "cells": [
       "<strong>Connected mailboxes</strong>",
-      "Connect Gmail or Outlook, reading and sending separately; your AI searches, reads and sends through them over MCP. See <a href=\"https://github.com/miikkij/aimeat-protocol/blob/main/docs/connecting-an-outside-account.md\" target=\"_blank\" rel=\"noopener\">connecting-an-outside-account.md</a>.",
+      "Connect Gmail or Outlook, reading and sending separately; your AI searches, reads and sends through them over MCP. An app or agent needs its own permission to read the mail, separate from the one that publishes and sends. See <a href=\"https://github.com/miikkij/aimeat-protocol/blob/main/docs/connecting-an-outside-account.md\" target=\"_blank\" rel=\"noopener\">connecting-an-outside-account.md</a>.",
       "<code>/v1/connections</code>, <code>aimeat_mail_*</code>, <code>aimeat_connection_*</code>"
      ],
-     "plain": "Connected mailboxes Connect Gmail or Outlook, reading and sending separately; your AI searches, reads and sends through them over MCP. See connecting-an-outside-account.md. /v1/connections, aimeat_mail_*, aimeat_connection_*"
+     "plain": "Connected mailboxes Connect Gmail or Outlook, reading and sending separately; your AI searches, reads and sends through them over MCP. An app or agent needs its own permission to read the mail, separate from the one that publishes and sends. See connecting-an-outside-account.md. /v1/connections, aimeat_mail_*, aimeat_connection_*"
     },
     {
      "slug": "g-12-connected-social-accounts",

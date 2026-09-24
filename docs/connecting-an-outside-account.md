@@ -215,6 +215,11 @@ Seven tools, on all three MCP surfaces:
 `aimeat_mail_send` is registered only when the agent holds **both** `outbound:send` and
 `connections:use`. An agent without them does not see a tool that would refuse; it sees no tool.
 
+`aimeat_mail_search`, `aimeat_mail_read` and `aimeat_mail_aliases` read what is in the mailbox, and
+need `connections:read-through`, as does `POST /v1/connections/{id}/read/{resource}` behind them.
+`connections:use` publishes and sends; it does not read. An app granted before 2026-09-24 that
+reads mail needs the owner to grant the new word.
+
 ## Configuration
 
 Off by default. `AIMEAT_CONNECTIONS_ENABLED=true` turns the subsystem on; a provider with no client

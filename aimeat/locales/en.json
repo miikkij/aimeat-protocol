@@ -7023,7 +7023,8 @@
   "accesspage.verb.storage.write": "saves",
   "accesspage.basePackage": "The base package",
   "accesspage.scope.ai.use": "uses your AI with your key",
-  "accesspage.scope.connections.use": "publishes on the accounts you have connected",
+  "accesspage.scope.connections.use": "publishes and sends through the accounts you have connected",
+  "accesspage.scope.connections.read-through": "reads your mail and the other accounts you have connected",
   "accesspage.scope.connections.read": "sees which accounts you have connected",
   "accesspage.scope.connections.write": "connects and disconnects accounts in your name",
   "accesspage.scope.messages.send": "sends messages in your name",
@@ -14820,7 +14821,8 @@
           },
           "connections": {
             "read": "See which social and publishing accounts you have connected.",
-            "use": "Post to the social accounts you have already connected.",
+            "use": "Post and send through the accounts you have already connected: social posts, and email from your own mailbox. It does not read what is in them.",
+            "read-through": "Read what is in the accounts you have already connected: search your mail, open messages and attachments, and see the addresses you send from.",
             "write": "Connect new social accounts to your name and disconnect existing ones."
           },
           "consent": {

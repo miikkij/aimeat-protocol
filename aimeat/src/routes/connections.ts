@@ -28,6 +28,10 @@
  *   GET    /v1/connections/delegations/:did/quota -- allowance left, BEFORE anything is refused
  * @usage app.use(connectionsRouter(config, storage));
  * @version-history
+ *   v1.3.0 — 2026-09-24 — SECURITY (audit A5-1): reading THROUGH a connection takes its own word,
+ *     connections:read-through. It rode connections:use, which the owner is told publishes and
+ *     sends, so an app granted publishing could search the owner's mailbox and fetch attachments.
+ *     The connection list admits the new word too, so an app granted reading can name a connection.
  *   v1.2.0 — 2026-09-24 — The callback redirects through safeRedirectPath, so a return address a
  *     browser resolves to another site lands on the access page instead.
  *   v1.1.0 — 2026-08-02 — A publish to one's OWN connection runs through the shared runOwnPublish(),
@@ -332,16 +336,17 @@ export function connectionsRouter(config: AimeatConfig, storage: Storage): Route
 
   // ── GET /v1/connections ── the caller's own, never anyone else's.
   //
-  // `connections:use` is accepted alongside `connections:read` because a granted app holds only the
-  // former, and an app that may publish to a connection has to be able to NAME one. Building a test
-  // app against this capability is what surfaced it: the publish verb existed with no way to reach
-  // a connection id, which is a permission that cannot be exercised.
+  // `connections:use` and `connections:read-through` are accepted alongside `connections:read`
+  // because a granted app holds one of those and never the first, and an app that may publish to a
+  // connection, or read through one, has to be able to NAME it. Building a test app against this
+  // capability is what surfaced it: the publish verb existed with no way to reach a connection id,
+  // which is a permission that cannot be exercised.
   //
   // Safe because the projection is the gate, not the scope: toPublic() is the ONLY thing that ever
   // leaves this route, and it carries provider, account label and status — decision K1's answer to
   // "what may an app know" — while the credential and the provider's own scope vocabulary never
   // appear in it.
-  router.get('/v1/connections', requireAuth(), requireAnyScope('connections:read', 'connections:use'), async (req: Request, res: Response) => {
+  router.get('/v1/connections', requireAuth(), requireAnyScope('connections:read', 'connections:use', 'connections:read-through'), async (req: Request, res: Response) => {
     if (!capabilityOn(res)) return;
     const principal = resolve(req);
     res.json(success(config.nodeId, { connections: await listOwnConnections(storage, principal) }));
@@ -702,11 +707,13 @@ export function connectionsRouter(config: AimeatConfig, storage: Storage): Route
    * query string because a mail search is one, and nothing that costs somebody else's allowance
    * belongs behind a URL a browser will prefetch.
    *
-   * `connections:use` and not `connections:read`: reading the LIST of connections is knowing what
-   * you attached, while reading THROUGH one is spending it. An app granted only the first must not
-   * be able to read the mailbox.
+   * `connections:read-through`, neither `connections:read` nor `connections:use`. Reading the LIST
+   * of connections is knowing what you attached, publishing and sending through one is `use`, and
+   * reading what is IN one (a mailbox, its attachments, its send-as addresses) is a third favour
+   * with its own sentence on the consent screen. It rode `use` until 2026-09-24, so an app the owner
+   * allowed to publish could search their mail (security audit A5-1).
    */
-  router.post('/v1/connections/:id/read/:resource', requireAuth(), requireScope('connections:use'), async (req: Request, res: Response) => {
+  router.post('/v1/connections/:id/read/:resource', requireAuth(), requireScope('connections:read-through'), async (req: Request, res: Response) => {
     if (!capabilityOn(res)) return;
     const principal = resolve(req);
     // Absent and not-yours answer alike, as everywhere else in this file.

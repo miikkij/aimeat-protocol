@@ -5933,7 +5933,8 @@
   "accesspage.verb.storage.write": "guarda",
   "accesspage.basePackage": "El paquete base",
   "accesspage.scope.ai.use": "usa tu IA con tu clave",
-  "accesspage.scope.connections.use": "publica en las cuentas que conectaste",
+  "accesspage.scope.connections.use": "publica y envía a través de las cuentas que conectaste",
+  "accesspage.scope.connections.read-through": "lee tu correo y las otras cuentas que conectaste",
   "accesspage.scope.connections.read": "ve qué cuentas conectaste",
   "accesspage.scope.connections.write": "conecta y desconecta cuentas en tu nombre",
   "accesspage.scope.messages.send": "envía mensajes en tu nombre",
@@ -13030,7 +13031,8 @@
           },
           "connections": {
             "read": "Ver qué cuentas sociales y de publicación tienes conectadas.",
-            "use": "Publicar en las cuentas sociales que ya tienes conectadas.",
+            "use": "Publicar y enviar a través de las cuentas que ya tienes conectadas: publicaciones en redes sociales y correos desde tu propio buzón. No lee lo que hay en ellas.",
+            "read-through": "Leer lo que hay en las cuentas que ya tienes conectadas: buscar en tu correo, abrir mensajes y archivos adjuntos, y ver las direcciones desde las que envías.",
             "write": "Conectar cuentas sociales nuevas a tu nombre y desconectar las que ya tienes."
           },
           "consent": {
