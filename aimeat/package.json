@@ -216,6 +216,7 @@
     "check:field-reach": "tsx scripts/check-field-reach.ts --strict",
     "field-reach:measure": "tsx scripts/check-field-reach.ts --measure-only",
     "debt": "tsx scripts/debt.ts",
+    "ci:stats": "tsx scripts/ci-stats.ts",
     "check:liaison-surface": "tsx scripts/check-liaison-surface.ts --strict",
     "check:storage-parity": "tsx scripts/check-storage-parity.ts --strict",
     "check:audit-gates": "pnpm check:route-scopes && pnpm check:denial-coverage && pnpm check:outbound-fetch && pnpm check:trusted-keys && pnpm check:storage-parity && pnpm check:ext-entrypoints && pnpm check:shared-impl && pnpm check:surface-focus && pnpm check:invariants && pnpm check:deps && pnpm check:scope-parity && pnpm check:field-reach && pnpm check:sse-parity && pnpm check:copied-logic && pnpm check:liaison-surface",
