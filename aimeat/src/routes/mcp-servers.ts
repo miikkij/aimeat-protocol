@@ -12,7 +12,8 @@
  *
  *   ABSENT AND NOT-YOURS ANSWER IDENTICALLY. Every lookup goes through requireUsableServer(), which
  *   returns null for both, and the route answers one 404 body — otherwise the difference between
- *   the two answers enumerates other people's servers.
+ *   the two answers enumerates other people's servers. The doors that CHANGE a server ask
+ *   requireManageableServer() instead: an owner may use a node-wide server and never change it.
  *
  *   THREE WORDS, AND THE SPLIT IS THE DESIGN. `mcp:read` is knowing what is attached, `mcp:use` is
  *   spending it, `mcp:manage` is attaching another. An app granted only the first must not be able
@@ -38,6 +39,8 @@
  *   DELETE /v1/mcp-servers/:id              -- detach, and forget the credential
  * @usage app.use(mcpServersRouter(config, storage));
  * @version-history
+ *   v1.1.0 — 2026-09-24 — PATCH, DELETE and authorize on /:id resolve the server through
+ *     requireManageableServer, so a node-wide server answers 404 there for every owner it admits.
  *   v1.0.0 — 2026-09-16 — Phase 1 of the MCP proxy.
  */
 
@@ -55,7 +58,7 @@ import {
   type McpTransport, type McpServerCredential,
 } from '../models/mcp-server-schemas.js';
 import {
-  attachMcpServer, listUsableServers, requireUsableServer, detachMcpServer,
+  attachMcpServer, listUsableServers, requireUsableServer, requireManageableServer, detachMcpServer,
   updateMcpServerSettings, attachNodeServer, listNodeServers, setNodeServerPolicy,
   attachOrganismServer,
 } from '../services/mcp-client/registry.js';
@@ -77,6 +80,10 @@ export function mcpServersRouter(config: AimeatConfig, storage: Storage): Router
   /** Absent and not-yours, in one body. */
   const notFound = (res: Response): Response =>
     res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such MCP server.'));
+
+  /** The server a write door may change, or null. Node-wide rows change at /v1/mcp-servers/node/:id. */
+  const manageable = (req: Request) =>
+    requireManageableServer(storage, ownerOf(req), req.params.id as string, config);
 
   // ── Reading ─────────────────────────────────────────────────────────────────────────────────
 
@@ -422,7 +429,8 @@ export function mcpServersRouter(config: AimeatConfig, storage: Storage): Router
 
   router.post('/v1/mcp-servers/:id/authorize', requireAuth(), requireScope('mcp:manage'),
     async (req: Request, res: Response) => {
-      const server = await requireUsableServer(storage, ownerOf(req), req.params.id as string);
+      // A sign-in writes the credential onto the row, so it is a change and asks the manage question.
+      const server = await manageable(req);
       if (!server) return notFound(res);
 
       const b = (req.body ?? {}) as Record<string, unknown>;
@@ -537,7 +545,7 @@ export function mcpServersRouter(config: AimeatConfig, storage: Storage): Router
 
   router.patch('/v1/mcp-servers/:id', requireAuth(), requireScope('mcp:manage'),
     async (req: Request, res: Response) => {
-      const server = await requireUsableServer(storage, ownerOf(req), req.params.id as string);
+      const server = await manageable(req);
       if (!server) return notFound(res);
 
       const b = (req.body ?? {}) as Record<string, unknown>;
@@ -554,7 +562,7 @@ export function mcpServersRouter(config: AimeatConfig, storage: Storage): Router
 
   router.delete('/v1/mcp-servers/:id', requireAuth(), requireScope('mcp:manage'),
     async (req: Request, res: Response) => {
-      const server = await requireUsableServer(storage, ownerOf(req), req.params.id as string);
+      const server = await manageable(req);
       if (!server) return notFound(res);
 
       await detachMcpServer(storage, server);

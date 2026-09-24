@@ -12,6 +12,10 @@
  *   ABSENT AND NOT-YOURS ANSWER ALIKE. `requireUsableServer` returns null for both, deliberately:
  *   naming another owner's server id must not confirm that it exists.
  *
+ *   USING IS NOT MANAGING. `requireManageableServer` is the third sentence, and every door that
+ *   changes or removes a server asks it instead: a node-wide server is offered to many owners and
+ *   belongs to none of them.
+ *
  *   ATTACHING PROBES BEFORE IT SAVES. A server that cannot be reached, or that refuses the
  *   credential, is reported at the moment the owner is still looking at the form — not later, as a
  *   tool that mysteriously never answers. The probe also fills the tool cache, so the first real
@@ -20,9 +24,12 @@
  *   THE SLUG IS THE NAME AND IT NEVER CHANGES. It is what a caller says instead of a URL and what
  *   prefixes a flattened tool, so renaming it would silently break every grant naming it. Attach
  *   validates it; nothing updates it.
- * @structure attachMcpServer · listUsableServers · requireUsableServer · detachMcpServer
+ * @structure attachMcpServer · listUsableServers · requireUsableServer · requireManageableServer ·
+ *   detachMcpServer
  * @usage const server = await requireUsableServer(storage, ownerGhii, idOrSlug);
  * @version-history
+ *   v1.3.0 — 2026-09-24 — requireManageableServer: the write doors resolve a server through it, so a
+ *     node-wide server the operator offers is no longer changed or removed by the owners it admits.
  *   v1.2.0 — 2026-09-17 — All three attach doors refuse this AIMEAT's own address (SELF_ADDRESS),
  *     and a first look that comes back here by another spelling (LOOP_DETECTED) removes the row it
  *     just made, because an address cannot be edited and that row could never answer.
@@ -695,6 +702,35 @@ export async function requireUsableServer(
   }
   // Absent and not-yours answer alike, and a node-wide server this owner is not on the list for is
   // "not yours" — naming it must not confirm that the node offers it.
+  return null;
+}
+
+/**
+ * The server, if this caller may CHANGE it: switch it off, rename it, start its sign-in, detach it.
+ * Null when they may not, and null when there is none, for the reason requireUsableServer gives.
+ *
+ * An owner's server is its owner's. A group's server is its owners' and admins', the people who may
+ * attach one there. A node-wide server is nobody's through these doors, although it admits every
+ * owner it is offered to: the operator changes it at /v1/mcp-servers/node/:id, which admits the
+ * operator in person and nothing acting for them. Until 2026-09-24 the write doors asked
+ * requireUsableServer instead, and any owner on the list could switch the server off for everybody.
+ */
+export async function requireManageableServer(
+  storage: Storage, ownerGhii: string, idOrSlug: string, config: AimeatConfig,
+): Promise<McpServerRecord | null> {
+  const bySlug = await storage.findMcpServerBySlug(idOrSlug, 'owner', ownerGhii);
+  if (bySlug) return bySlug;
+
+  const byId = await storage.getMcpServer(idOrSlug);
+  if (byId?.ownership === 'owner' && byId.ownerGhii === ownerGhii) return byId;
+  if (byId?.ownership === 'organism' && byId.organismId) {
+    const organism = await storage.getOrganism(byId.organismId);
+    // Whole identities, never bare names: a roll lists this node's accounts, so `alice` on it is
+    // alice@<this node>, and an account called alice somewhere else is not on it.
+    const asGhii = (n: string): string => (n.includes('@') ? n : `${n}@${config.nodeId}`);
+    const governors = organism ? [...organismOwners(organism), ...(organism.admins ?? [])] : [];
+    if (governors.some((n) => asGhii(n) === ownerGhii)) return byId;
+  }
   return null;
 }
 
