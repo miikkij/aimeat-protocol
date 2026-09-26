@@ -16,6 +16,8 @@
  *   every REST route — including the session-resume branch, which asked nothing at all.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=owner-deactivation
  * @version-history
+ *   v1.0.1 — 2026-09-26 — The app grant's redirect is the app's own path with its owner: a node several
+ *     people share with no app origin now takes only an address bound to the requesting app.
  *   v1.0.0 — 2026-08-23 — Initial, with the deactivation feature itself (BR-04 phase 0).
  */
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
@@ -140,7 +142,9 @@ async function run() {
     // App grant in the victim's name (published app + PKCE consent flow).
     let appToken = '';
     const FILENAME = 'doomed-app.html';
-    const REDIRECT = `${BASE}/v1/apps/${FILENAME}`;
+    // The app's own path, owner included: on a node several people share with no app origin, the
+    // authorize door takes only an address bound to the requesting app (services/app-frame-redirect.ts).
+    const REDIRECT = `${BASE}/v1/apps/${victim.owner}/${FILENAME}`;
     await test('setup: the victim grants an app', async () => {
         const pub = await json('/v1/apps', {
             method: 'POST', headers: bearer(victim.ownerToken),
