@@ -5,6 +5,10 @@
  * @description The component bench: what a component may carry and what it may not. The good case
  *   is the part three measured builds each made by hand on 2026-09-20, a week grid a person ticks.
  * @version-history
+ *   v1.4.0 — 2026-09-26 — What an escape stands for, and what a string holds, is never read as
+ *     structure (e82c9f26d729): `p, .wkgrid\;.wkgrid` and a "{" in a string before a body rule are
+ *     refused, a string may hold a brace or a semicolon, and cssAsRead writes an escaped "/*" as "__".
+ *     Failed on the old code first.
  *   v1.3.0 — 2026-09-26 — An attribute value is read as a browser uses it (1a0a15eb7b20): a character
  *     reference other than &amp;, and a backslash, are refused, each of which made fill a url() the
  *     preview fetched. Failed on the old code first.
@@ -137,9 +141,34 @@ describe('the component bench', () => {
     expect(bad({ css: WEEK_GRID.css + '\n.wkgrid-x { --wkgrid-p: fixed; position: var(--wkgrid-p); color: var(--ak-ink); }' })).toThrow(/position/);
     // image-set() takes its address as a string, with no url( in sight.
     expect(bad({ css: WEEK_GRID.css + rule('background-image: image-set("https://evil.example/x.png" 1x)') })).toThrow(/no url\(\)/);
-    expect(cssAsRead('a\\62 c /* x */ "/*" \\2f\\2a d')).toBe('abc   "/*" /*d');
+    // An escaped "/*" opens no comment, and since e82c9f26d729 it does not come out as "/*" either:
+    // an escape that stands for anything but a name character is written "_", so no reader after
+    // this one can take it for structure.
+    expect(cssAsRead('a\\62 c /* x */ "/*" \\2f\\2a d')).toBe('abc   "/*" __d');
     // An escape a real component uses, a tick drawn by the stylesheet, still passes.
     expect(() => validateComponentBody({ ...WEEK_GRID, css: WEEK_GRID.css + '\n.wkgrid-cell[aria-pressed="true"]::after { content: "\\2713"; position: absolute; color: var(--ak-accent-ink); }' })).not.toThrow();
+  });
+
+  // e82c9f26d729, the second read: cssAsRead resolved an escape to its character, and the readers
+  // after it took that character, and every character inside a string, as structure. A browser reads
+  // `\;` as part of a class name and a "{" inside a string as text, so each of these styled the page
+  // around the component while the bench read it as staying inside.
+  it('never reads what an escape stands for, or what a string holds, as structure', () => {
+    // A browser reads the class `wkgrid;` and styles every p on the page; the bench read `.wkgrid`.
+    expect(bad({ css: WEEK_GRID.css + '\np, .wkgrid\\;.wkgrid { display: none; }' })).toThrow(/starts at one of its own classes/);
+    // The "{" in the string kept the bench inside @keyframes, so body was never looked at.
+    expect(bad({ css: WEEK_GRID.css + '\n@keyframes wkgrid-a { from { content: "{"; } }\nbody { display: none; }' })).toThrow(/starts at one of its own classes/);
+    expect(bad({ css: WEEK_GRID.css + '\n.wkgrid-a::before { content: "}"; }\nbody { display: none; }' })).toThrow(/starts at one of its own classes/);
+    // An escaped quote, written plain or in hex, does not end the string to a browser.
+    expect(bad({ css: WEEK_GRID.css + '\n.wkgrid-a::before { content: "\\22"; }\nbody { display: none; }' })).toThrow(/starts at one of its own classes/);
+    expect(bad({ css: WEEK_GRID.css + '\n.wkgrid-a::before { content: "\\""; }\nbody { display: none; }' })).toThrow(/starts at one of its own classes/);
+    // What an escape stands for is text in the reader's output unless it is a letter, a digit, "-" or
+    // "_": those are what spell url( or fixed, and nothing else can be structure.
+    expect(cssAsRead('.a\\;b "x\\"y" \\7b')).toBe('.a_b "x_y" _');
+    expect(selectorsOf('@keyframes k { from { content: "{"; } }\nbody { color: red; }')).toEqual(['body']);
+    expect(declarationsOf('.a { content: ";position: fixed"; color: red }')).toEqual(['content: ";position: fixed"', 'color: red']);
+    // A string may hold a brace, a semicolon or a quote of the other kind, and a real component passes.
+    expect(() => validateComponentBody({ ...WEEK_GRID, css: WEEK_GRID.css + '\n.wkgrid-cell[data-mark="{;}"]::after { content: "a;b{c}\'"; color: var(--ak-ink); }' })).not.toThrow();
   });
 
   // Served from the node's own origin, so a body stored before the bench learned a trick is not
@@ -177,6 +206,7 @@ describe('the component bench', () => {
     timed('selectors, open', () => complexSelectorOf('.a:is('.repeat(n)));
     timed('selectors, nested', () => complexSelectorOf(':is('.repeat(n) + '.a' + ')'.repeat(n)));
     timed('declarations', () => declarationsOf('animation '.repeat(n)));
+    timed('strings the readers step over', () => { selectorsOf('"{\''.repeat(n)); declarationsOf('";\''.repeat(n)); selectorListOf('",\''.repeat(n)); });
     timed('selectors', () => selectorsOf('@media '.repeat(n)));
     timed('var fallbacks', () => withoutVarFallbacks('var(--a,('.repeat(n)));
     // And through the bench itself, at the most it accepts.

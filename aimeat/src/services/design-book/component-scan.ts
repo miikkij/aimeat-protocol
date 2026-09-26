@@ -28,6 +28,12 @@
  *   complexSelectorOf · withoutVarFallbacks
  * @usage for (const tag of tagsOf(html)) { … }
  * @version-history
+ *   v1.3.0 — 2026-09-26 — What an escape stands for is never read as structure, nor what a string
+ *     holds (e82c9f26d729). cssAsRead writes an escape that stands for anything but a name character
+ *     as "_", and selectorsOf, declarationsOf, selectorListOf and closingOf step over strings with
+ *     one reader (stringEnd), ending a string where a browser ends it. `p, .wkgrid\;.wkgrid` read as
+ *     `.wkgrid` alone, and a "{" in a string kept selectorsOf inside @keyframes, so a rule after it
+ *     that styled the page was never checked.
  *   v1.2.1 — 2026-09-26 — attributesOf marks a value holding a character reference odd, `&amp;` apart
  *     (1a0a15eb7b20): a browser decodes it before the value is used, and the value was read as written.
  *   v1.2.0 — 2026-09-24 — selectorListOf and complexSelectorOf: a selector list split where a browser
@@ -151,11 +157,36 @@ export function attributesOf(text: string): Array<{ key: string; value: string; 
 
 const HEX = /[0-9a-fA-F]/;
 const CSS_NEWLINE = new Set(['\n', '\r', '\f']);
+/** An ASCII character a name is made of: a letter, a digit, "-" or "_". Past ASCII, every character is. */
+const ASCII_NAME_CHAR = /^[A-Za-z0-9_-]$/;
+/**
+ * What an escape stands for, as the readers after cssAsRead may see it. A name character is itself,
+ * because those are what spell `url(`, `@import` and `fixed`. Anything else becomes "_": to a
+ * browser an escaped character is always part of a name or of a string, never a ";", a brace, a
+ * quote or a comma, and a reader that met the character itself would take it for one.
+ */
+const escaped = (ch: string): string => (ASCII_NAME_CHAR.test(ch) || ch.charCodeAt(0) > 0x7f ? ch : '_');
+
+/**
+ * Where the string opened by the quote at `at` ends: the index after its closing quote, or the
+ * newline a browser ends it at, or the end of the text. Every reader below steps over a string with
+ * it, since a brace or a semicolon inside one is text. Meant for cssAsRead's output, where every
+ * quote is a real one: an escaped quote comes out as "_".
+ */
+function stringEnd(s: string, at: number): number {
+  const quote = s[at];
+  for (let i = at + 1; i < s.length; i++) {
+    if (s[i] === quote) return i + 1;
+    if (CSS_NEWLINE.has(s[i])) return i;
+  }
+  return s.length;
+}
 
 /**
  * The stylesheet as a browser's tokenizer reads it, so that a check reads what the browser reads:
- *   - every escape is resolved to the character it stands for: `u\rl(` is `url(`, `\75 rl(` is
- *     `url(` (up to six hex digits and one whitespace after them), `f\ixed` is `fixed`;
+ *   - every escape is resolved: `u\rl(` is `url(`, `\75 rl(` is `url(` (up to six hex digits and
+ *     one whitespace after them), `f\ixed` is `fixed`. An escape that stands for anything but a name
+ *     character comes out as "_" (see `escaped`), so `.a\;b` reads as the one class a browser reads;
  *   - a comment is blanked only where a browser has one: never inside a string (`content: "/*"`
  *     opens a string) and never behind a backslash (`\/*` is an escaped "/" and a "*"). An
  *     unclosed comment takes the rest, as a parser does;
@@ -182,13 +213,13 @@ export function cssAsRead(css: string): string {
         let j = i + 1;
         while (j < css.length && j < i + 7 && HEX.test(css[j])) j++;
         const cp = parseInt(css.slice(i + 1, j), 16);
-        out += cp === 0 || cp > 0x10FFFF || (cp >= 0xD800 && cp <= 0xDFFF) ? '�' : String.fromCodePoint(cp);
+        out += cp === 0 || cp > 0x10FFFF || (cp >= 0xD800 && cp <= 0xDFFF) ? '�' : escaped(String.fromCodePoint(cp));
         if (css[j] === '\r' && css[j + 1] === '\n') j += 2;
         else if (css[j] === ' ' || css[j] === '\t' || CSS_NEWLINE.has(css[j])) j++;
         i = j;
         continue;
       }
-      out += next;
+      out += escaped(next);
       i += 2;
       continue;
     }
@@ -212,12 +243,13 @@ export function cssAsRead(css: string): string {
   return out;
 }
 
-/** Every `property: value` of the stylesheet, as written, whatever rule it sits in. */
+/** Every `property: value` of the stylesheet, as written, whatever rule it sits in. Strings stepped over. */
 export function declarationsOf(css: string): string[] {
   const out: string[] = [];
   let from = 0;
   for (let i = 0; i <= css.length; i++) {
     const ch = css[i];
+    if (ch === '"' || ch === '\'') { i = stringEnd(css, i) - 1; continue; }
     if (i === css.length || ch === ';' || ch === '{' || ch === '}') {
       const piece = css.slice(from, i).trim();
       if (piece.includes(':')) out.push(piece);
@@ -230,7 +262,8 @@ export function declarationsOf(css: string): string[] {
 /**
  * The selector of every style rule, with at-rules seen through (`@media`, `@supports`, `@container`,
  * `@layer` wrap rules that still count) and `@keyframes` skipped whole (its `from`, `to` and
- * percentages are steps, not selectors).
+ * percentages are steps, not selectors). A brace or a semicolon inside a string is text: it opens
+ * or closes nothing, so it cannot hold the reader inside a block the browser has left.
  */
 export function selectorsOf(css: string): string[] {
   const out: string[] = [];
@@ -238,6 +271,7 @@ export function selectorsOf(css: string): string[] {
   let from = 0;
   for (let i = 0; i < css.length; i++) {
     const ch = css[i];
+    if (ch === '"' || ch === '\'') { i = stringEnd(css, i) - 1; continue; }
     if (ch === '{') {
       const prelude = css.slice(from, i).trim();
       if (prelude.startsWith('@')) stack.push(/^@(?:-[a-z]+-)?keyframes\b/i.test(prelude) ? 'keyframes' : 'at');
@@ -283,11 +317,9 @@ const IDENT_CHAR = /[\w\u0080-￿-]/;
 /** Where the bracket opened at `at` closes, strings stepped over, or -1 when it never does. */
 function closingOf(s: string, at: number, open: string, close: string): number {
   let depth = 0;
-  let quote = '';
   for (let i = at; i < s.length; i++) {
     const ch = s[i];
-    if (quote) { if (ch === quote) quote = ''; continue; }
-    if (ch === '"' || ch === '\'') quote = ch;
+    if (ch === '"' || ch === '\'') i = stringEnd(s, i) - 1;
     else if (ch === open) depth++;
     else if (ch === close && --depth === 0) return i;
   }
@@ -298,12 +330,10 @@ function closingOf(s: string, at: number, open: string, close: string): number {
 export function selectorListOf(text: string): string[] {
   const out: string[] = [];
   let depth = 0;
-  let quote = '';
   let from = 0;
   for (let i = 0; i < text.length; i++) {
     const ch = text[i];
-    if (quote) { if (ch === quote) quote = ''; continue; }
-    if (ch === '"' || ch === '\'') quote = ch;
+    if (ch === '"' || ch === '\'') i = stringEnd(text, i) - 1;
     else if (ch === '(' || ch === '[') depth++;
     else if (ch === ')' || ch === ']') depth = Math.max(0, depth - 1);
     else if (ch === ',' && depth === 0) { out.push(text.slice(from, i)); from = i + 1; }

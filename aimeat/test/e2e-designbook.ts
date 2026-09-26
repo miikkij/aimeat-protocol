@@ -9,6 +9,8 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=designbook
  * @version-history
+ *   v1.5.3 — 2026-09-26 — A component whose stylesheet hides a page rule behind an escaped ";" or a "{"
+ *     in a string is refused at propose (e82c9f26d729). Failed on the old code first (201).
  *   v1.5.2 — 2026-09-26 — A component whose SVG fill carries a character reference (`u&#114;l(`) is
  *     refused at propose (1a0a15eb7b20). Failed on the old code first (201).
  *   v1.5.1 — 2026-09-24 — A component whose stylesheet reaches beside it (`.wkgrid ~ p`) is refused at
@@ -471,6 +473,15 @@ const GOOD_BODY = {
         // A selector is read to its end: `.wkgrid ~ p` starts at the component and styles the page after it.
         const beside = await propose(`comp-bad-${stamp}`, body({ css: '.wkgrid { color: var(--ak-ink); }\n.wkgrid ~ p { color: var(--ak-accent); }' }));
         assert(beside.status === 422 && /beside it/.test(beside.body.error?.message ?? ''), `a rule reaching beside the component is refused: ${beside.status} ${JSON.stringify(beside.body?.error)}`);
+        // What an escape stands for, and what a string holds, is never structure (e82c9f26d729): a
+        // browser reads the class `wkgrid;` and styles every p, and reads the "{" as text and styles body.
+        for (const css of [
+            '.wkgrid { color: var(--ak-ink); }\np, .wkgrid\\;.wkgrid { display: none; }',
+            '.wkgrid { color: var(--ak-ink); }\n@keyframes wkgrid-a { from { content: "{"; } }\nbody { display: none; }',
+        ]) {
+            const hidden = await propose(`comp-bad-${stamp}`, body({ css }));
+            assert(hidden.status === 422 && /starts at one of its own classes/.test(hidden.body.error?.message ?? ''), `a rule the page gets is refused: ${hidden.status} ${JSON.stringify(hidden.body?.error)}`);
+        }
 
         // The app exists and wrote down what it made, and its owner has NOT said it turned out well.
         const page = APP(f).replace('</head>', `<script type="application/json" id="aimeat-build-notes">${JSON.stringify({ made: [{ name: 'week-grid', what: 'seven tappable days per row', why: 'the Book has no grid a person ticks' }] })}</` + 'script></head>');
