@@ -117,7 +117,8 @@
     <h3>2.3 Data automatically collected</h3>
     <ul>
       <li><strong>Technical logs:</strong> standard request logs (IP address, user agent, requested path, HTTP status, response time). Retained 30 days.</li>
-      <li><strong>Cookies and local storage:</strong> a sign-in cookie for authenticated browser use and a small importmap-version stamp for cache-busting. <strong>No analytics, no third-party tracking, no advertising cookies.</strong> See <a href="#cookies">section 8</a>.</li>
+      <li><strong>Visits to published apps:</strong> when someone opens an app published here, the node counts the visit for the app's owner, including whether the visitor was signed in. The owner sees numbers and never names: how many visits, how many of them by signed-in people, and how many different people. What kind of visitor it was (a person, a named AI or another program) and where a person came from are recorded only when the app's owner turns measurement on. The place is kept as a country, a region or a city, at the precision the owner chose, and never as an address.</li>
+      <li><strong>Cookies and local storage:</strong> a sign-in cookie for authenticated browser use and a small importmap-version stamp for cache-busting. <strong>No third-party analytics, no third-party tracking, no advertising cookies.</strong> See <a href="#cookies">section 8</a>.</li>
     </ul>
 
     <h2>3. Why your data is used (legal bases)</h2>
@@ -136,6 +137,7 @@
         <tr><td>Serving what you chose to publish, and letting search engines find it</td><td>Art. 6(1)(b) Contract, on your own publishing decision</td></tr>
         <tr><td>Recording how AI was used here, and marking generated content</td><td>Art. 6(1)(c) Legal obligation (EU AI Act Art. 50)</td></tr>
         <tr><td>Metering what each person spends of the node's own AI budget</td><td>Art. 6(1)(b) Contract</td></tr>
+        <tr><td>Counting visits to a published app for its owner</td><td>Art. 6(1)(f) Legitimate interest</td></tr>
       </tbody>
     </table>
 
@@ -202,6 +204,7 @@
         <tr><td>Shared workspaces and their version history</td><td>Until the group deletes the document; older versions are pruned to a per-node limit. Content you contributed to a group is not removed by deleting your own account, because it is the group's record</td></tr>
         <tr><td>Moderation reports, appeals and dispute records</td><td>Kept as the record of a decision that affected someone, including after the account that filed it is gone</td></tr>
         <tr><td>Authentication-failure log</td><td>A file of refused sign-in attempts, with IP addresses. It rotates by size rather than by age, because its volume is chosen by whoever is attacking rather than by this node</td></tr>
+        <tr><td>Visit records that name an account</td><td>13 months. After that only counts without names remain, so app owners keep their long-term figures</td></tr>
         <tr><td>Server access logs</td><td>30 days</td></tr>
         <tr><td>Backups</td><td>30 days, then automatically purged</td></tr>
       </tbody>
@@ -220,7 +223,7 @@
       <li><strong>Cookie consent record</strong> (strictly necessary): remembers your choice in the consent banner.</li>
     </ul>
     <p>Your browser also keeps a few of your own settings locally, such as the colour theme you picked. Those stay in your browser and are not sent to the server.</p>
-    <p><strong>No analytics, no third-party trackers, no advertising cookies, no fingerprinting.</strong> If you want to verify this, the source code is open at <a href="https://github.com/miikkij/aimeat-protocol">github.com/miikkij/aimeat-protocol</a>.</p>
+    <p><strong>No third-party analytics, no third-party trackers, no advertising cookies, no fingerprinting.</strong> If you want to verify this, the source code is open at <a href="https://github.com/miikkij/aimeat-protocol">github.com/miikkij/aimeat-protocol</a>.</p>
 
     <h2>9. Your rights (GDPR)</h2>
     <p>If you are in the European Economic Area, the United Kingdom, or another jurisdiction with similar protections, you have the following rights:</p>

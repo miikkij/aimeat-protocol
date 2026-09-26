@@ -11,6 +11,8 @@
  *   - seedCoreScheduledJobs(config, storage): builds the job list and createScheduledJob() for missing ones
  *
  * @version-history
+ *   v1.3.0 — 2026-09-25 — Seed core:usage-visit-retention (nightly, 03:40): the privacy notice's
+ *     thirteen months for a visit record that names an account.
  *   v1.2.0 — 2026-09-19 — Seed core:ai-decision-prune (nightly, 03:20; TARGET-080).
  *   v1.1.0 — 2026-08-14 — Seed core:usage-rollup (every 5 min) and core:usage-archive (nightly).
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
@@ -88,6 +90,9 @@ export async function seedCoreScheduledJobs(config: AimeatConfig, storage: Stora
   // nothing to a database that already has the job.
   jobs.push({ id: 'core:usage-rollup', name: 'Usage Rollup', coreHandler: 'usage-rollup', cron: '*/5 * * * *' });
   jobs.push({ id: 'core:usage-archive', name: 'Usage Archive Sweep', coreHandler: 'usage-archive', cron: '20 3 * * *' });
+  // The privacy notice's thirteen months for a visit record that names an account. Nightly at 03:40,
+  // after the archive sweep, so a row it folds is already where it will stay.
+  jobs.push({ id: 'core:usage-visit-retention', name: 'Usage Visit Retention', coreHandler: 'usage-visit-retention', cron: '40 3 * * *' });
 
   const now = new Date().toISOString();
   for (const def of jobs) {

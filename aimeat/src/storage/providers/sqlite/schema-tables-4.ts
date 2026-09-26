@@ -6,6 +6,8 @@
  *   domain and the outbound door). Split from schema-tables-3.ts at the max-file-lines
  *   boundary; idempotent (IF NOT EXISTS), applied after part 3.
  * @version-history
+ *   v1.10.0 — 2026-09-25 — Three partial indexes over the app opens that still name an account, for
+ *     the thirteen-month visit fold. Mirrors Postgres 0082.
  *   v1.9.0 — 2026-09-16 — secrets.hosts: the hosts a vault secret may be sent to. Mirrors Postgres 0078.
  *   v1.8.0 — 2026-09-16 — mcp_servers table: the remote MCP servers this node connects OUT to.
  *     Mirrors Postgres 0076.
@@ -425,6 +427,17 @@ export function applySchemaTables4(db: Database.Database): void {
     );
     CREATE INDEX IF NOT EXISTS idx_usage_rollup_read ON usage_rollup(cut, grain, bucket);
     CREATE INDEX IF NOT EXISTS idx_usage_rollup_owner ON usage_rollup(cut, ownerGhii, grain, bucket);
+
+    -- The app opens that still name an account: what the thirteen-month visit fold looks for
+    -- (services/usage/visit-retention.ts). Partial, so each holds only those rows and a folded one,
+    -- which carries '(signed-in)', leaves it. Literals, because a partial index is used only when
+    -- the query writes the same terms. Mirrors Postgres 0082.
+    CREATE INDEX IF NOT EXISTS idx_usage_calls_named_visit ON usage_calls(ts)
+      WHERE surface = 'app' AND ownerGhii <> '' AND ownerGhii <> '(signed-in)';
+    CREATE INDEX IF NOT EXISTS idx_usage_calls_archive_named_visit ON usage_calls_archive(ts)
+      WHERE surface = 'app' AND ownerGhii <> '' AND ownerGhii <> '(signed-in)';
+    CREATE INDEX IF NOT EXISTS idx_usage_rollup_named_visit ON usage_rollup(bucket)
+      WHERE grain = 'day' AND surface = 'app' AND ownerGhii <> '' AND ownerGhii <> '(signed-in)';
 
     -- One row per raw stream. Advanced in the SAME transaction as the deltas it accounts for,
     -- which is what makes the fold exactly-once.

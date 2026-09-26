@@ -12,28 +12,35 @@
  * @structure
  *   - usageMethods.appendUsageCall / listUsageCalls / *ForFold
  *   - usageMethods.archiveUsageRows
+ *   - usageMethods.foldNamedAppVisits (+ addIntoRow, moveOpensOutOfAppUse)
  *   - usageMethods.getUsageCursor / setUsageCursor / advanceUsageRollup
  *   - usageMethods.queryUsageRollup / clearUsageRollupRange
  * @usage Object.assign(PostgresKyselyStorage.prototype, usageMethods) in ../index.ts
  * @version-history
+ *   v1.1.0 — 2026-09-25 — foldNamedAppVisits: after thirteen months an app open keeps its count and
+ *     loses the visitor's account, in the hot table, the archive and the rollups.
  *   v1.0.0 — 2026-08-14 — Initial: three-layer usage telemetry substrate.
  */
 import { randomUUID } from 'node:crypto';
-import { sql } from 'kysely';
+import { sql, type Kysely } from 'kysely';
 import type {
   AgentUsageEvent,
   UsageCallRecord,
   UsageCallFilter,
   UsageRollupRow,
   UsageRollupDelta,
+  UsageRollupDims,
   UsageRollupFilter,
   UsageRollupCursor,
   UsageArchiveResult,
+  UsageVisitFoldResult,
   UsageFoldCursor,
   UsageSurface,
   UsageActorKind,
   UsageOutcome,
 } from '../../../interface.js';
+import { USAGE_FOLDED_VISITOR, APP_VISIT_ROLLUP_CUTS, APP_USE_CUT } from '../../../types/usage.js';
+import type { DB } from '../db-types.js';
 import type { PostgresKyselyStorage } from '../index.js';
 
 /** int8 comes back as a string; anything unparseable is 0 rather than NaN reaching a chart. */
@@ -132,6 +139,107 @@ function toEvent(r: Record<string, unknown>): AgentUsageEvent & { appId?: string
     appId: (r.appId as string) ?? '',
     surface: (r.surface as string) ?? '',
   };
+}
+
+// ── The thirteen-month visit fold ──
+
+/**
+ * "An app open that still names an account", written with literals: the partial indexes of
+ * migration 0082 are used only when a query's own WHERE clause writes the same terms, and a bound
+ * parameter would not. USAGE_FOLDED_VISITOR carries no quote character, which makes inlining it safe.
+ */
+const NAMED_OPEN = sql.raw(`"surface" = 'app' AND "ownerGhii" <> '' AND "ownerGhii" <> '${USAGE_FOLDED_VISITOR}'`);
+const VISIT_CUTS = sql.raw(APP_VISIT_ROLLUP_CUTS.map(c => `'${c}'`).join(', '));
+
+/** The metrics that add. durationMsMax takes the greater, and actorsSeen is set per fold. */
+const ADDING_METRICS = [
+  'calls', 'errors', 'refusals', 'tokensIn', 'tokensOut', 'costUsd', 'unpricedCalls',
+  'chargedUnits', 'durationMsSum',
+] as const;
+type AddingMetric = typeof ADDING_METRICS[number];
+type FoldMetrics = Record<AddingMetric, number> & { durationMsMax: number; actorsSeen: number };
+
+function addingMetricsOf(r: UsageRollupRow): Record<AddingMetric, number> {
+  const out = {} as Record<AddingMetric, number>;
+  for (const m of ADDING_METRICS) out[m] = r[m];
+  return out;
+}
+
+/**
+ * Add `metrics` into the row with the given key, creating it if it is not there. `actorsSeen` is
+ * the number of accounts folded into it, which on a folded row is exact: every named row it absorbs
+ * was one person, because the account is part of the key it came from.
+ */
+async function addIntoRow(
+  db: Kysely<DB>,
+  key: Pick<UsageRollupRow, 'cut' | 'grain' | 'bucket'> & UsageRollupDims,
+  m: FoldMetrics,
+  updatedAt: string,
+): Promise<void> {
+  await db.insertInto('UsageRollup').values({
+    id: randomUUID(),
+    cut: key.cut, grain: key.grain, bucket: key.bucket,
+    ownerGhii: key.ownerGhii, actorGaii: key.actorGaii, appId: key.appId,
+    model: key.model, provider: key.provider, surface: key.surface,
+    outcome: key.outcome, coordinate: key.coordinate, counterpartyGhii: key.counterpartyGhii,
+    calls: m.calls, errors: m.errors, refusals: m.refusals,
+    tokensIn: m.tokensIn, tokensOut: m.tokensOut, costUsd: m.costUsd,
+    unpricedCalls: m.unpricedCalls, chargedUnits: m.chargedUnits,
+    durationMsSum: m.durationMsSum, durationMsMax: m.durationMsMax,
+    actorsSeen: m.actorsSeen,
+    extra: '{}',
+    updatedAt,
+  }).onConflict(oc => oc
+    .columns(['cut', 'grain', 'bucket', 'ownerGhii', 'actorGaii', 'appId', 'model',
+              'provider', 'surface', 'outcome', 'coordinate', 'counterpartyGhii'])
+    .doUpdateSet({
+      calls: sql`"UsageRollup"."calls" + ${m.calls}`,
+      errors: sql`"UsageRollup"."errors" + ${m.errors}`,
+      refusals: sql`"UsageRollup"."refusals" + ${m.refusals}`,
+      tokensIn: sql`"UsageRollup"."tokensIn" + ${m.tokensIn}`,
+      tokensOut: sql`"UsageRollup"."tokensOut" + ${m.tokensOut}`,
+      costUsd: sql`"UsageRollup"."costUsd" + ${m.costUsd}`,
+      unpricedCalls: sql`"UsageRollup"."unpricedCalls" + ${m.unpricedCalls}`,
+      chargedUnits: sql`"UsageRollup"."chargedUnits" + ${m.chargedUnits}`,
+      durationMsSum: sql`"UsageRollup"."durationMsSum" + ${m.durationMsSum}`,
+      durationMsMax: sql`GREATEST("UsageRollup"."durationMsMax", ${m.durationMsMax})`,
+      actorsSeen: sql`"UsageRollup"."actorsSeen" + ${m.actorsSeen}`,
+      updatedAt,
+    })).execute();
+}
+
+/**
+ * The opens inside one person's APP_USE_CUT row for one app and day, moved to the unnamed row.
+ * `opens` is that person's `call.owner.tool` row for the app's surface, whose coordinate is the app
+ * id and whose numbers are the opens and nothing else. Clamped to what the row holds, so a history
+ * the two cuts disagree about can lose a name but never go below zero. Returns 1 when a row moved.
+ */
+async function moveOpensOutOfAppUse(db: Kysely<DB>, opens: UsageRollupRow, updatedAt: string): Promise<number> {
+  const found = await db.selectFrom('UsageRollup').selectAll()
+    .where('cut', '=', APP_USE_CUT).where('grain', '=', 'day').where('bucket', '=', opens.bucket)
+    .where('ownerGhii', '=', opens.ownerGhii).where('actorGaii', '=', '').where('appId', '=', opens.coordinate)
+    .where('model', '=', '').where('provider', '=', '').where('surface', '=', '').where('outcome', '=', '')
+    .where('coordinate', '=', '').where('counterpartyGhii', '=', '')
+    .executeTakeFirst();
+  if (!found) return 0;
+  const use = toRollup(found as unknown as Record<string, unknown>);
+
+  const moved = {} as Record<AddingMetric, number>;
+  const left = {} as Record<AddingMetric, number>;
+  for (const m of ADDING_METRICS) {
+    moved[m] = Math.min(use[m], opens[m]);
+    left[m] = use[m] - moved[m];
+  }
+  if (ADDING_METRICS.every(m => left[m] === 0)) {
+    await db.deleteFrom('UsageRollup').where('id', '=', use.id).execute();
+  } else {
+    await db.updateTable('UsageRollup').set({ ...left, updatedAt }).where('id', '=', use.id).execute();
+  }
+  await addIntoRow(db, {
+    cut: APP_USE_CUT, grain: 'day', bucket: use.bucket, ownerGhii: USAGE_FOLDED_VISITOR, actorGaii: '',
+    appId: use.appId, model: '', provider: '', surface: '', outcome: '', coordinate: '', counterpartyGhii: '',
+  }, { ...moved, durationMsMax: opens.durationMsMax, actorsSeen: 1 }, updatedAt);
+  return 1;
 }
 
 export const usageMethods = {
@@ -262,6 +370,57 @@ export const usageMethods = {
       usageCalls: Number(calls?.numDeletedRows ?? 0),
       usageEvents: Number(events?.numDeletedRows ?? 0),
     };
+  },
+
+  async foldNamedAppVisits(
+    this: PostgresKyselyStorage,
+    args: { beforeDay: string; batch: number },
+  ): Promise<UsageVisitFoldResult> {
+    const batch = Math.min(Math.max(args.batch, 1), 20_000);
+    const beforeTs = `${args.beforeDay}T00:00:00.000Z`;
+
+    // The raw rows keep the open and lose the account. The time goes to the start of its day: a
+    // count per app per day is what the promise leaves, and a time to the millisecond beside the
+    // same person's other calls would say who it was without the name.
+    const foldRaw = (table: 'UsageCall' | 'UsageCallArchive'): Promise<number> => this.transaction(async () => {
+      const picked = await sql<{ id: string }>`
+        SELECT "id" FROM ${sql.table(table)} WHERE ${NAMED_OPEN} AND "ts" < ${beforeTs}
+        ORDER BY "ts" ASC LIMIT ${batch}
+      `.execute(this.db);
+      const ids = picked.rows.map(r => r.id);
+      if (!ids.length) return 0;
+      await sql`
+        UPDATE ${sql.table(table)}
+        SET "ownerGhii" = ${USAGE_FOLDED_VISITOR}, "actorGaii" = ${USAGE_FOLDED_VISITOR}, "meta" = '{}'::jsonb,
+            "ts" = substr("ts", 1, 10) || 'T00:00:00.000Z'
+        WHERE "id" = ANY(${ids})
+      `.execute(this.db);
+      return ids.length;
+    });
+
+    const hotRows = await foldRaw('UsageCall');
+    const archiveRows = await foldRaw('UsageCallArchive');
+
+    const { rollupRows, appUseRows } = await this.transaction(async () => {
+      const picked = await sql<Record<string, unknown>>`
+        SELECT * FROM "UsageRollup" WHERE ${NAMED_OPEN} AND "grain" = 'day' AND "bucket" < ${args.beforeDay}
+          AND "cut" IN (${VISIT_CUTS}) ORDER BY "bucket" ASC LIMIT ${batch}
+      `.execute(this.db);
+      const named = picked.rows.map(toRollup);
+      const updatedAt = new Date().toISOString();
+      let moved = 0;
+      for (const r of named) {
+        // The person's row that mixes this app's opens with its paid calls, BEFORE the row that says
+        // how many opens there were is gone.
+        if (r.cut === 'call.owner.tool' && r.coordinate) moved += await moveOpensOutOfAppUse(this.db, r, updatedAt);
+        await addIntoRow(this.db, { ...r, ownerGhii: USAGE_FOLDED_VISITOR },
+          { ...addingMetricsOf(r), durationMsMax: r.durationMsMax, actorsSeen: 1 }, updatedAt);
+        await this.db.deleteFrom('UsageRollup').where('id', '=', r.id).execute();
+      }
+      return { rollupRows: named.length, appUseRows: moved };
+    });
+
+    return { hotRows, archiveRows, rollupRows, appUseRows };
   },
 
   // ── Layer 3 ──

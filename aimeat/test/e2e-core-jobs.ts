@@ -45,6 +45,8 @@
  * @usage
  *   cd aimeat && pnpm exec node --import tsx test/e2e-core-jobs.ts
  * @version-history
+ *   v1.1.0 -- 2026-09-25 -- core:usage-visit-retention: seeded, fired, and a visit made today keeps
+ *     its account.
  *   v1.0.0 -- 2026-09-08 -- Initial.
  */
 import { spawn, type ChildProcess } from 'node:child_process';
@@ -296,7 +298,7 @@ async function run(): Promise<void> {
         const jobs = await json('/v1/admin/scheduler/jobs', { headers: bearer(opToken) });
         const ids = new Set((jobs.body.data.jobs as Array<{ id: string }>).map(j => j.id));
         const wanted = [
-            'core:daily-allowance', 'core:usage-rollup', 'core:usage-archive', 'core:ai-job-log-prune',
+            'core:daily-allowance', 'core:usage-rollup', 'core:usage-archive', 'core:usage-visit-retention', 'core:ai-job-log-prune',
             'core:execution-log-prune', 'core:consent-audit-prune', 'core:invitation-expiry',
             'core:mailbox-cleanup', 'core:consent-expiry', 'core:nonce-cleanup',
             'core:designbook-aging', 'core:capability-aggregation', 'core:dispute-timeout',
@@ -523,6 +525,43 @@ async function run(): Promise<void> {
         assert(status.status === 200, `personal status: ${status.status} ${short(status.body)}`);
         assert(status.body.data.node_id === personalNodeId, `the anchor must survive: ${short(status.body.data)}`);
         assert(status.body.data.mailbox.items === 0, `mailbox items: ${status.body.data.mailbox.items}`);
+    });
+
+    await test('core:usage-visit-retention keeps the account on a visit made today', async () => {
+        const filename = `cj-visits-${STAMP}.html`;
+        const appId = `${opName}/${filename}`;
+        const pub = await json('/v1/apps', {
+            method: 'POST', headers: bearer(opToken),
+            body: JSON.stringify({
+                filename, content: Buffer.from('<!doctype html><p>visit</p>', 'utf-8').toString('base64'),
+                name: 'Core jobs visits', description: 'visit retention probe', category: 'utility', tags: ['test'],
+            }),
+        });
+        assert(pub.status === 201, `publish: ${pub.status} ${short(pub.body)}`);
+        // A signed-in open: the operator opening their own app, which is a visit like any other.
+        const opened = await fetch(`${BASE}/v1/apps/${opName}/${filename}`, { headers: bearer(opToken) });
+        await opened.arrayBuffer();
+        assert(opened.status === 200, `open: ${opened.status}`);
+        await sleep(1500);   // the call buffer flushes every 500 ms on this node
+        await fire('core:usage-rollup');
+
+        const namedOpens = async (): Promise<string[]> => {
+            const r = await json(`/v1/admin/usage/calls?app_id=${encodeURIComponent(appId)}&surface=app`, { headers: bearer(opToken) });
+            assert(r.status === 200, `usage calls: ${r.status} ${short(r.body)}`);
+            return (r.body.data.calls as Array<{ id: string; ownerGhii: string }>)
+                .filter(c => c.ownerGhii && c.ownerGhii !== '(signed-in)').map(c => c.id).sort();
+        };
+        const before = await namedOpens();
+        assert(before.length === 1, `the open must be on record with its account, got ${before.length}`);
+
+        await fire('core:usage-visit-retention');
+
+        // The window is thirteen months and the open is seconds old. What is pinned is the branch that
+        // runs every night: a visit inside the window keeps its name. Nothing reachable over HTTP can
+        // backdate a visit, so the folding branch is proven where storage can be written directly:
+        // test/unit/visit-retention.test.ts and e2e-app-visitors phase 5, on both backends.
+        const after = await namedOpens();
+        assert(JSON.stringify(after) === JSON.stringify(before), `a seconds-old visit must keep its account: ${short(before)} → ${short(after)}`);
     });
 
     // ── Phase 5 ───────────────────────────────────────────────────────────────

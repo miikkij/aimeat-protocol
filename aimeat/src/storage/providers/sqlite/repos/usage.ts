@@ -13,9 +13,12 @@
  * @structure
  *   - appendUsageCall / listUsageCalls / listUsageCallsForFold / listUsageEventsForFold
  *   - archiveUsageRows
+ *   - foldNamedAppVisits (+ addIntoRow, moveOpensOutOfAppUse)
  *   - getUsageCursor / setUsageCursor / advanceUsageRollup
  *   - queryUsageRollup / clearUsageRollupRange
  * @version-history
+ *   v1.1.0 — 2026-09-25 — foldNamedAppVisits: after thirteen months an app open keeps its count and
+ *     loses the visitor's account, in the hot table, the archive and the rollups.
  *   v1.0.0 — 2026-08-14 — Initial: three-layer usage telemetry substrate.
  */
 import { randomUUID } from 'node:crypto';
@@ -27,14 +30,17 @@ import type {
   UsageCallFilter,
   UsageRollupRow,
   UsageRollupDelta,
+  UsageRollupDims,
   UsageRollupFilter,
   UsageRollupCursor,
   UsageArchiveResult,
+  UsageVisitFoldResult,
   UsageFoldCursor,
   UsageSurface,
   UsageActorKind,
   UsageOutcome,
 } from '../../../interface.js';
+import { USAGE_FOLDED_VISITOR, APP_VISIT_ROLLUP_CUTS, APP_USE_CUT } from '../../../types/usage.js';
 
 type Row = Record<string, unknown>;
 
@@ -266,6 +272,143 @@ export function pruneUsageArchive(
   const calls = db.prepare('DELETE FROM usage_calls_archive WHERE ts < ?').run(before).changes;
   const events = db.prepare('DELETE FROM agent_usage_event_archive WHERE ts < ?').run(before).changes;
   return { usageCalls: calls, usageEvents: events };
+}
+
+// ── The thirteen-month visit fold ──
+
+/**
+ * "An app open that still names an account", written with literals: the partial indexes in
+ * schema-tables-4.ts are used only when a query writes the same terms. USAGE_FOLDED_VISITOR carries
+ * no quote character, which is what makes inlining it safe.
+ */
+const NAMED_OPEN = `surface = 'app' AND ownerGhii <> '' AND ownerGhii <> '${USAGE_FOLDED_VISITOR}'`;
+const VISIT_CUTS_SQL = APP_VISIT_ROLLUP_CUTS.map(c => `'${c}'`).join(', ');
+
+/** The metrics that add. durationMsMax takes the greater, and actorsSeen is set per fold. */
+const ADDING_METRICS = [
+  'calls', 'errors', 'refusals', 'tokensIn', 'tokensOut', 'costUsd', 'unpricedCalls',
+  'chargedUnits', 'durationMsSum',
+] as const;
+type AddingMetric = typeof ADDING_METRICS[number];
+
+/**
+ * Add `metrics` into the row with the given key, creating it if it is not there. `actorsSeen` is
+ * the number of accounts folded into it, which on a folded row is exact: every named row it absorbs
+ * was one person, because the account is part of the key it came from.
+ */
+function addIntoRow(
+  db: Database.Database,
+  key: Pick<UsageRollupRow, 'cut' | 'grain' | 'bucket'> & UsageRollupDims,
+  metrics: Record<AddingMetric, number> & { durationMsMax: number; actorsSeen: number },
+  updatedAt: string,
+): void {
+  db.prepare(
+    `INSERT INTO usage_rollup
+       (id, cut, grain, bucket, ownerGhii, actorGaii, appId, model, provider, surface, outcome,
+        coordinate, counterpartyGhii, calls, errors, refusals, tokensIn, tokensOut, costUsd,
+        unpricedCalls, chargedUnits, durationMsSum, durationMsMax, actorsSeen, extra, updatedAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '{}', ?)
+     ON CONFLICT(cut, grain, bucket, ownerGhii, actorGaii, appId, model, provider, surface,
+                 outcome, coordinate, counterpartyGhii)
+     DO UPDATE SET
+       calls         = usage_rollup.calls + excluded.calls,
+       errors        = usage_rollup.errors + excluded.errors,
+       refusals      = usage_rollup.refusals + excluded.refusals,
+       tokensIn      = usage_rollup.tokensIn + excluded.tokensIn,
+       tokensOut     = usage_rollup.tokensOut + excluded.tokensOut,
+       costUsd       = usage_rollup.costUsd + excluded.costUsd,
+       unpricedCalls = usage_rollup.unpricedCalls + excluded.unpricedCalls,
+       chargedUnits  = usage_rollup.chargedUnits + excluded.chargedUnits,
+       durationMsSum = usage_rollup.durationMsSum + excluded.durationMsSum,
+       durationMsMax = MAX(usage_rollup.durationMsMax, excluded.durationMsMax),
+       actorsSeen    = usage_rollup.actorsSeen + excluded.actorsSeen,
+       updatedAt     = excluded.updatedAt`
+  ).run(
+    randomUUID(), key.cut, key.grain, key.bucket, key.ownerGhii, key.actorGaii, key.appId, key.model,
+    key.provider, key.surface, key.outcome, key.coordinate, key.counterpartyGhii,
+    metrics.calls, metrics.errors, metrics.refusals, metrics.tokensIn, metrics.tokensOut,
+    metrics.costUsd, metrics.unpricedCalls, metrics.chargedUnits, metrics.durationMsSum,
+    metrics.durationMsMax, metrics.actorsSeen, updatedAt,
+  );
+}
+
+/**
+ * The opens inside one person's APP_USE_CUT row for one app and day, moved to the unnamed row.
+ * `opens` is that person's `call.owner.tool` row for the app's surface, whose coordinate is the app
+ * id and whose numbers are the opens and nothing else. Clamped to what the row holds, so a history
+ * the two cuts disagree about can lose a name but never go below zero. Returns 1 when a row moved.
+ */
+function moveOpensOutOfAppUse(db: Database.Database, opens: UsageRollupRow, updatedAt: string): number {
+  const found = db.prepare(
+    `SELECT * FROM usage_rollup WHERE cut = ? AND grain = 'day' AND bucket = ? AND ownerGhii = ?
+       AND actorGaii = '' AND appId = ? AND model = '' AND provider = '' AND surface = ''
+       AND outcome = '' AND coordinate = '' AND counterpartyGhii = ''`
+  ).get(APP_USE_CUT, opens.bucket, opens.ownerGhii, opens.coordinate) as Row | undefined;
+  if (!found) return 0;
+  const use = toRollup(found);
+
+  const moved = {} as Record<AddingMetric, number>;
+  for (const m of ADDING_METRICS) moved[m] = Math.min(use[m], opens[m]);
+  const left = ADDING_METRICS.map(m => use[m] - moved[m]);
+  if (left.every(v => v === 0)) {
+    db.prepare('DELETE FROM usage_rollup WHERE id = ?').run(use.id);
+  } else {
+    db.prepare(
+      `UPDATE usage_rollup SET ${ADDING_METRICS.map(m => `${m} = ?`).join(', ')}, updatedAt = ? WHERE id = ?`
+    ).run(...left, updatedAt, use.id);
+  }
+  addIntoRow(db, {
+    cut: APP_USE_CUT, grain: 'day', bucket: use.bucket, ownerGhii: USAGE_FOLDED_VISITOR, actorGaii: '',
+    appId: use.appId, model: '', provider: '', surface: '', outcome: '', coordinate: '', counterpartyGhii: '',
+  }, { ...moved, durationMsMax: opens.durationMsMax, actorsSeen: 1 }, updatedAt);
+  return 1;
+}
+
+export function foldNamedAppVisits(
+  db: Database.Database,
+  args: { beforeDay: string; batch: number },
+): UsageVisitFoldResult {
+  const batch = Math.min(Math.max(args.batch, 1), 20_000);
+  const beforeTs = `${args.beforeDay}T00:00:00.000Z`;
+
+  // The raw rows keep the open and lose the account. The time goes to the start of its day: a
+  // count per app per day is what the promise leaves, and a time to the millisecond beside the same
+  // person's other calls would say who it was without the name.
+  const foldRaw = (table: 'usage_calls' | 'usage_calls_archive'): number => db.transaction(() => {
+    const ids = (db.prepare(`SELECT id FROM ${table} WHERE ${NAMED_OPEN} AND ts < ? ORDER BY ts ASC LIMIT ?`)
+      .all(beforeTs, batch) as Array<{ id: string }>).map(r => r.id);
+    if (!ids.length) return 0;
+    const holes = ids.map(() => '?').join(',');
+    db.prepare(
+      `UPDATE ${table} SET ownerGhii = ?, actorGaii = ?, meta = '{}',
+         ts = substr(ts, 1, 10) || 'T00:00:00.000Z' WHERE id IN (${holes})`
+    ).run(USAGE_FOLDED_VISITOR, USAGE_FOLDED_VISITOR, ...ids);
+    return ids.length;
+  })();
+
+  const foldRollups = db.transaction((): { rollupRows: number; appUseRows: number } => {
+    const named = (db.prepare(
+      `SELECT * FROM usage_rollup WHERE ${NAMED_OPEN} AND grain = 'day' AND bucket < ?
+         AND cut IN (${VISIT_CUTS_SQL}) ORDER BY bucket ASC LIMIT ?`
+    ).all(args.beforeDay, batch) as Row[]).map(toRollup);
+    const updatedAt = new Date().toISOString();
+    let appUseRows = 0;
+    for (const r of named) {
+      // The person's row that mixes this app's opens with its paid calls, BEFORE the row that says
+      // how many opens there were is gone.
+      if (r.cut === 'call.owner.tool' && r.coordinate) appUseRows += moveOpensOutOfAppUse(db, r, updatedAt);
+      const metrics = {} as Record<AddingMetric, number>;
+      for (const m of ADDING_METRICS) metrics[m] = r[m];
+      addIntoRow(db, { ...r, ownerGhii: USAGE_FOLDED_VISITOR }, { ...metrics, durationMsMax: r.durationMsMax, actorsSeen: 1 }, updatedAt);
+      db.prepare('DELETE FROM usage_rollup WHERE id = ?').run(r.id);
+    }
+    return { rollupRows: named.length, appUseRows };
+  });
+
+  const hotRows = foldRaw('usage_calls');
+  const archiveRows = foldRaw('usage_calls_archive');
+  const { rollupRows, appUseRows } = foldRollups();
+  return { hotRows, archiveRows, rollupRows, appUseRows };
 }
 
 // ── Layer 3 ──

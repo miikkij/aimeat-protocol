@@ -25,6 +25,8 @@
  * @usage
  *   import { CUTS, cutsForStream } from './rollup-cuts.js';
  * @version-history
+ *   v1.1.1 — 2026-09-25 — Comment only: the cuts that name a visitor of an app lose the name after
+ *     thirteen months, and where that is decided.
  *   v1.1.0 — 2026-09-18 — call.app.visitor: an app's opens split by whether anybody was signed in,
  *     for the Visitors section of the App Catalog. Needs the rebuild on a node that already has
  *     history, or the split starts on the day this shipped.
@@ -102,7 +104,10 @@ export const CUTS: UsageCut[] = [
   // `surface` is in the key because an app id also rides on metered tool calls, and an author
   // asking who OPENED the app must not be answered with who called its paid tool. `ownerGhii` is
   // '' for an open nobody was signed in for, which is the whole split the author asks about; the
-  // reader (services/app-visitors.ts) answers counts and never hands the identities out.
+  // reader (services/app-visitors.ts) answers counts and never hands the identities out. After
+  // thirteen months the identity itself goes (services/usage/visit-retention.ts): this cut, the two
+  // owner cuts keyed by the surface and the opens inside call.owner.app are folded into rows that
+  // name nobody. A new cut keyed by a person is decided there, and a test fails until it is.
   { name: 'call.app.visitor', stream: 'call', dims: ['appId', 'surface', 'ownerGhii'], grains: DAY,
     answers: 'an app author: opens by signed-in people against opens by nobody signed in' },
 ];
