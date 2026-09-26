@@ -20,6 +20,10 @@
  *   dead connection gives
  * @usage cd aimeat && node --import tsx test/e2e-mail-connections.ts
  * @version-history
+ *   v1.2.0 — 2026-09-26 — An unverified alias is refused naming none of the mailbox's addresses:
+ *     the refusal names aimeat_mail_aliases and connections:read-through, where the list is read,
+ *     in the service (Phase 7) and at the send door, which sends nothing (Phase 8) (security audit
+ *     A5-1).
  *   v1.1.0 — 2026-09-24 — Phase 14 pinned the wrong favour (security audit A5-1). It asserted that an
  *     app holding connections:use reads the mailbox, while the owner was told that word publishes
  *     and nothing else. Reading through a connection is connections:read-through now: an app holding
@@ -461,10 +465,18 @@ try {
     assert('code' in res && res.code === 'MAILBOX_NEEDS_REAUTH', `got ${JSON.stringify(res)}`);
     assert('message' in res && /no longer accepts/.test(res.message), `the reason was dropped: ${JSON.stringify(res)}`);
   });
-  await test('an alias the provider has not verified is refused, with the ones it has', async () => {
+  await test('an alias the provider has not verified is refused, naming no address of the mailbox, only where the list is read', async () => {
+    // Sending takes connections:use; the list of addresses a mailbox may send as is a READ of the
+    // mailbox, and takes connections:read-through. So the refusal names the tool and the word, and
+    // none of the mailbox's own addresses (secaudit 2026-09, A5-1).
     const res = await resolveMailboxSender(ctx, ownerGhii, gmailSend, 'pending@mail.example.test');
     assert('code' in res && res.code === 'ALIAS_NOT_VERIFIED', `got ${JSON.stringify(res)}`);
-    assert('message' in res && /billing@mail.example.test/.test(res.message), 'the verified list was not offered');
+    const message = 'message' in res ? res.message : '';
+    assert(!message.includes('billing@mail.example.test') && !message.includes(up.mailbox),
+      `the refusal names the mailbox's own addresses: ${message}`);
+    assert(message.includes('pending@mail.example.test'), `the refusal does not name the alias that was asked for: ${message}`);
+    assert(message.includes('aimeat_mail_aliases') && message.includes('connections:read-through'),
+      `the refusal does not say where the list is read and which word that takes: ${message}`);
   });
   await test('a verified alias resolves to itself, and no alias to the account address', async () => {
     const alias = await resolveMailboxSender(ctx, ownerGhii, gmailSend, 'billing@mail.example.test');
@@ -478,6 +490,17 @@ try {
     const r = await api('/v1/outbound/contacts', { bearer: jwt, body: { name: 'Recipient', email: RECIPIENT } });
     assert(r.status === 201, `contact: ${r.status} ${r.data?.error?.message}`);
     contactId = r.data.data.contact.id as string;
+  });
+  await test('the send door refuses an unverified alias with the same sentence, and sends nothing', async () => {
+    const before = up.calls.length;
+    const r = await api('/v1/outbound/send', {
+      bearer: jwt,
+      body: { contact_id: contactId, kind: 'transactional', subject: 'Alias probe', body: 'Not sent.', connection_id: gmailSend, from_alias: 'pending@mail.example.test' },
+    });
+    assert(r.status === 400 && r.data?.error?.code === 'ALIAS_NOT_VERIFIED', `send: ${r.status} ${JSON.stringify(r.data?.error)}`);
+    const message = String(r.data.error.message ?? '');
+    assert(!message.includes('billing@mail.example.test') && message.includes('aimeat_mail_aliases'), `the door's sentence: ${message}`);
+    assert(!up.calls.slice(before).some((c) => c.host === 'gmail.googleapis.com' && c.path.endsWith('/messages/send')), 'a refused send reached Gmail');
   });
   await test('the message leaves as RFC 5322 through the mailbox, carrying every field it was given', async () => {
     const r = await api('/v1/outbound/send', {

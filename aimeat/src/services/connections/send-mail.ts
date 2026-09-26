@@ -24,6 +24,9 @@
  *   - listSendAsAliases                     -- the verified addresses a Gmail mailbox may send as
  * @usage const sender = await resolveMailboxSender(ctx, principal, connectionId, alias);
  * @version-history
+ *   v1.1.0 — 2026-09-26 — ALIAS_NOT_VERIFIED names only the alias that was asked for. The addresses a
+ *     mailbox may send as are listed by aimeat_mail_aliases, which takes connections:read-through,
+ *     and the refusal says so (secaudit 2026-09, A5-1).
  *   v1.0.0 — 2026-08-26 — Initial.
  */
 import MailComposer from 'nodemailer/lib/mail-composer/index.js';
@@ -127,11 +130,13 @@ export async function resolveMailboxSender(
     };
   }
   if (!verified.addresses.includes(alias)) {
+    // The refusal names no address of the mailbox's own. Which addresses it may send as is read from
+    // the mailbox, and reading takes connections:read-through, a word a sender may not hold. So it
+    // names the tool that lists them and the word that tool takes (secaudit 2026-09, A5-1).
     return {
       code: 'ALIAS_NOT_VERIFIED', status: 400,
-      message: verified.addresses.length
-        ? `That mailbox has not verified "${alias}". It may send as: ${verified.addresses.join(', ')}. Add and confirm the alias at the provider first; a new one can take a day to appear.`
-        : `That mailbox has no verified alias, so it can only send as ${accountAddress}.`,
+      message: `That mailbox has not verified "${alias}" as an address it may send as. Add and confirm the alias at the provider first; a new one can take a day to appear. `
+        + 'aimeat_mail_aliases (POST /v1/connections/{id}/read/sendAs) lists the addresses it may send as, and it takes the connections:read-through permission.',
     };
   }
   return { connectionId: conn.id, provider: provider.id, fromAddress: alias, accountAddress };
