@@ -117,7 +117,8 @@
     <h3>2.3 Automaattisesti kerättävät tiedot</h3>
     <ul>
       <li><strong>Tekniset lokit:</strong> tavanomaiset pyyntölokit (IP-osoite, käyttäjäagentti, pyydetty polku, HTTP-status, vasteaika). Säilytysaika 30 vrk.</li>
-      <li><strong>Evästeet ja paikalliset tallenteet:</strong> kirjautumiseväste tunnistautunutta selainkäyttöä varten ja pieni importmap-version leima välimuistin tyhjentämiseen. <strong>Ei analytiikkaa, ei kolmansien osapuolten seurantaa, ei mainosevästeitä.</strong> Katso <a href="#cookies">osio 8</a>.</li>
+      <li><strong>Käynnit julkaistuissa sovelluksissa:</strong> kun joku avaa täällä julkaistun sovelluksen, palvelu laskee käynnin sovelluksen omistajalle ja merkitsee, oliko kävijä kirjautunut. Omistaja näkee lukumäärät, ei koskaan nimiä: kuinka monta käyntiä oli, kuinka monessa niistä kävijä oli kirjautunut ja kuinka monta eri ihmistä kävi. Palvelu tallentaa kävijän tyypin (ihminen, nimetty tekoäly tai muu ohjelma) ja paikan, josta ihminen tuli, vain jos sovelluksen omistaja on ottanut kävijämittauksen käyttöön. Paikka tallennetaan maana, alueena tai kaupunkina sillä tarkkuudella, jonka omistaja on valinnut, eikä koskaan osoitteena.</li>
+      <li><strong>Evästeet ja paikalliset tallenteet:</strong> kirjautumiseväste tunnistautunutta selainkäyttöä varten ja pieni importmap-version leima välimuistin tyhjentämiseen. <strong>Ei kolmansien osapuolten analytiikkaa, ei kolmansien osapuolten seurantaa, ei mainosevästeitä.</strong> Katso <a href="#cookies">osio 8</a>.</li>
     </ul>
 
     <h2>3. Miksi tietojasi käsitellään (käsittelyperusteet)</h2>
@@ -136,6 +137,7 @@
         <tr><td>Julkaisemasi sisällön tarjoilu ja sen löytyminen hakukoneista</td><td>6(1)(b) Sopimus, oman julkaisupäätöksesi nojalla</td></tr>
         <tr><td>Tekoälyn käytön kirjaaminen ja tuotetun sisällön merkitseminen</td><td>6(1)(c) Lakisääteinen velvoite (EU:n tekoälyasetus 50 art.)</td></tr>
         <tr><td>Sen mittaaminen paljonko kukin käyttää solmun omaa tekoälybudjettia</td><td>6(1)(b) Sopimus</td></tr>
+        <tr><td>Julkaistun sovelluksen käyntien laskeminen sen omistajalle</td><td>6(1)(f) Oikeutettu etu</td></tr>
       </tbody>
     </table>
 
@@ -202,6 +204,7 @@
         <tr><td>Jaetut työtilat ja niiden versiohistoria</td><td>Kunnes ryhmä poistaa asiakirjan; vanhemmat versiot karsitaan solmun rajaan asti. Ryhmälle antamasi sisältö ei poistu oman tilisi poistolla, koska se on ryhmän tallenne</td></tr>
         <tr><td>Moderointi-ilmoitukset, valitukset ja riitojen tietueet</td><td>Säilytetään tallenteena päätöksestä joka kohdistui johonkuhun, myös sen jälkeen kun ilmoituksen tehnyt tili on poistettu</td></tr>
         <tr><td>Kirjautumisten epäonnistumisloki</td><td>Tiedosto torjutuista kirjautumisyrityksistä, IP-osoitteineen. Se kiertää koon mukaan eikä iän, koska sen määrän valitsee hyökkääjä eikä tämä solmu</td></tr>
+        <tr><td>Tiliin yhdistetyt käyntitiedot</td><td>13 kuukautta. Sen jälkeen niistä jää jäljelle vain lukumääriä ilman nimiä, joten sovellusten omistajilla säilyvät pitkän aikavälin luvut</td></tr>
         <tr><td>Palvelimen pääsylokit</td><td>30 vrk</td></tr>
         <tr><td>Varmuuskopiot</td><td>30 vrk, sitten automaattisesti poistetaan</td></tr>
       </tbody>
@@ -220,7 +223,7 @@
       <li><strong>Evästesuostumuksen tietue</strong> (välttämätön): muistaa suostumusbannerissa tekemäsi valinnan.</li>
     </ul>
     <p>Selaimesi säilyttää lisäksi paikallisesti muutamia omia asetuksiasi, kuten valitsemasi väriteeman. Ne pysyvät selaimessasi eikä niitä lähetetä palvelimelle.</p>
-    <p><strong>Ei analytiikkaa, ei kolmansien osapuolten seurantaa, ei mainosevästeitä, ei fingerprinttausta.</strong> Jos haluat varmistaa tämän, lähdekoodi on avoin osoitteessa <a href="https://github.com/miikkij/aimeat-protocol">github.com/miikkij/aimeat-protocol</a>.</p>
+    <p><strong>Ei kolmansien osapuolten analytiikkaa, ei kolmansien osapuolten seurantaa, ei mainosevästeitä, ei fingerprinttausta.</strong> Jos haluat varmistaa tämän, lähdekoodi on avoin osoitteessa <a href="https://github.com/miikkij/aimeat-protocol">github.com/miikkij/aimeat-protocol</a>.</p>
 
     <h2>9. Oikeutesi (GDPR)</h2>
     <p>Jos olet Euroopan talousalueella, Yhdistyneessä kuningaskunnassa tai muulla vastaavalla suoja-alueella, sinulla on seuraavat oikeudet:</p>

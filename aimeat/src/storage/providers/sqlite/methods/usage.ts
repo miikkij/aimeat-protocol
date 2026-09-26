@@ -6,9 +6,11 @@
  *   ../repos/usage.ts, which holds the SQL. Its own group rather than an addition to
  *   capability-agents.ts: usage telemetry is a domain, and that file is already near the
  *   max-file-lines boundary.
- * @structure usageMethods — layer 1 append/list, layer 2 archive, layer 3 fold + read
+ * @structure usageMethods — layer 1 append/list, layer 2 archive, layer 3 fold + read, and the
+ *   thirteen-month visit fold across all three
  * @usage Object.assign(SqliteStorage.prototype, usageMethods) in ../index.ts
  * @version-history
+ *   v1.1.0 — 2026-09-25 — foldNamedAppVisits.
  *   v1.0.0 — 2026-08-14 — Initial: three-layer usage telemetry substrate.
  */
 import type { SqliteStorage } from '../index.js';
@@ -21,6 +23,7 @@ import type {
   UsageRollupFilter,
   UsageRollupCursor,
   UsageArchiveResult,
+  UsageVisitFoldResult,
   UsageFoldCursor,
 } from '../../../interface.js';
 import * as usageRepo from '../repos/usage.js';
@@ -51,6 +54,13 @@ export const usageMethods = {
 
   async pruneUsageArchive(this: SqliteStorage, before: string): Promise<{ usageCalls: number; usageEvents: number }> {
     return usageRepo.pruneUsageArchive(this.db, before);
+  },
+
+  async foldNamedAppVisits(
+    this: SqliteStorage,
+    args: { beforeDay: string; batch: number },
+  ): Promise<UsageVisitFoldResult> {
+    return usageRepo.foldNamedAppVisits(this.db, args);
   },
 
   async getUsageCursor(this: SqliteStorage, stream: 'llm' | 'call'): Promise<UsageRollupCursor | null> {

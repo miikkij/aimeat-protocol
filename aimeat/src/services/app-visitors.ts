@@ -16,7 +16,9 @@
  *   COUNTS, NEVER IDENTITIES. The usage cut behind the signed-in split is keyed by the visitor's
  *   GHII, because that is what makes "how many different people" answerable. This file reads those
  *   rows and hands out a number. An author learns that four signed-in people opened the app and
- *   never which four: visiting somebody's app is not consent to be named to them.
+ *   never which four: visiting somebody's app is not consent to be named to them. After thirteen
+ *   months even the node forgets which four (services/usage/visit-retention.ts), and the day keeps
+ *   its counts.
  *
  *   THE STREAM ID IS A CONVENTION OWNED IN ONE PLACE. `pageStreamId(filename)` decides it, the serve
  *   path counts into it, and this file is the door that creates it, so no client ever has to
@@ -28,9 +30,12 @@
  * @usage
  *   const report = await readAppVisitors(storage, { app, days: 30, geoAvailable: config.geoHeaders });
  * @version-history
+ *   v1.1.0 — 2026-09-25 — Reads a day whose visitors were folded after thirteen months: its opens stay
+ *     signed-in, and its people are added from the count the fold kept.
  *   v1.0.0 — 2026-09-18 — Initial: the Visitors section of the App Catalog and its two MCP tools.
  */
 import type { Storage, AppRecord } from '../storage/interface.js';
+import { USAGE_FOLDED_VISITOR } from '../storage/interface.js';
 import { ownerGhiiOf } from '../utils/gaii.js';
 import { queryUsageRollupLive, usageComputedThrough, dayNDaysAgo } from './usage/usage-read.js';
 import { pageStreamId } from './signals/page-views.js';
@@ -59,7 +64,9 @@ export interface AppVisitorsReport {
     total: number;
     signed_in: number;
     anonymous: number;
-    /** How many DIFFERENT signed-in people. A number, never a list. */
+    /** How many DIFFERENT signed-in people. A number, never a list. On a day older than thirteen
+     *  months the names are gone, so such a day adds its own count and a person who came on two of
+     *  them counts twice. The window this report answers (VISITOR_DAYS_MAX) does not reach one. */
     signed_in_people: number;
     /** Every open since the app was published, from the catalogue's lifetime counter. */
     lifetime: number;
@@ -150,12 +157,17 @@ export async function readAppVisitors(storage: Storage, args: {
 
   const byDay = new Map<string, { signed_in: number; anonymous: number }>();
   const people = new Set<string>();
+  // A day older than thirteen months names nobody (services/usage/visit-retention.ts): its signed-in
+  // opens sit on one row whose actorsSeen says how many people were folded into it. Those are added
+  // day by day, because after the fold nobody can tell whether two days saw the same person.
+  let foldedPeople = 0;
   let signedIn = 0;
   let anonymous = 0;
   for (const r of rows) {
     if (r.surface !== 'app') continue;
     const day = byDay.get(r.bucket) ?? { signed_in: 0, anonymous: 0 };
-    if (r.ownerGhii) { day.signed_in += r.calls; signedIn += r.calls; people.add(r.ownerGhii); }
+    if (r.ownerGhii === USAGE_FOLDED_VISITOR) { day.signed_in += r.calls; signedIn += r.calls; foldedPeople += r.actorsSeen; }
+    else if (r.ownerGhii) { day.signed_in += r.calls; signedIn += r.calls; people.add(r.ownerGhii); }
     else { day.anonymous += r.calls; anonymous += r.calls; }
     byDay.set(r.bucket, day);
   }
@@ -210,7 +222,7 @@ export async function readAppVisitors(storage: Storage, args: {
     app: appId, days: args.days, from, to,
     opens: {
       total: signedIn + anonymous, signed_in: signedIn, anonymous,
-      signed_in_people: people.size, lifetime,
+      signed_in_people: people.size + foldedPeople, lifetime,
       series: [...byDay.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([day, v]) => ({ day, ...v })),
       computed_through: computedThrough,
     },

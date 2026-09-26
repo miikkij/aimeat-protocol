@@ -11,6 +11,8 @@
  *   - runDailyAllowanceJob / runWorkTimeoutJob / runMemoryTtlCleanupJob / runDisputeTimeoutJob / ...: the handlers
  *
  * @version-history
+ *   v1.6.0 — 2026-09-25 — usage-visit-retention: an app open older than thirteen months keeps its
+ *     count and loses the visitor's account, as the privacy notice says.
  *   v1.5.0 — 2026-09-19 — ai-decision-prune: decision records past their retention window (TARGET-080).
  *   v1.4.0 — 2026-09-13 — The work-expiry webhook goes through fireWebhook() like the two route
  *     paths, instead of a third hand-rolled fetch. work.callbackUrl is caller-supplied, so it
@@ -68,6 +70,12 @@ export function registerCoreHandlers(
   scheduler.registerCoreHandler('usage-archive', async () => {
     const { runUsageArchiveJob } = await import('./usage/archive-job.js');
     await runUsageArchiveJob(storage);
+  });
+  // The privacy notice's thirteen months: an app open older than that keeps its count and loses the
+  // visitor's account, in the hot table, the archive and the rollups. Visit records only.
+  scheduler.registerCoreHandler('usage-visit-retention', async () => {
+    const { runVisitRetentionJob } = await import('./usage/visit-retention.js');
+    await runVisitRetentionJob(storage);
   });
 
   // The operator's monthly compliance report, built from the month that ended and stored under

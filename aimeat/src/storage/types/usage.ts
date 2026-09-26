@@ -17,9 +17,13 @@
  *   - UsageRollupFilter                  -- how a read names a cut and a window
  *   - UsageRollupCursor                  -- the fold's per-stream watermark
  *   - UsageArchiveResult                 -- what one archive sweep moved
+ *   - USAGE_FOLDED_VISITOR / APP_VISIT_ROLLUP_CUTS / APP_USE_CUT / UsageVisitFoldResult
+ *                                        -- the thirteen-month fold of a visitor's account
  * @usage
  *   import type { UsageCallInput } from '../storage/interface.js';
  * @version-history
+ *   v1.2.0 — 2026-09-25 — The visit-retention fold: the marker a folded row carries instead of the
+ *     account, the cuts it folds, and what one sweep reports.
  *   v1.1.0 — 2026-09-16 — UsageSurface gains 'mcp-remote': a call the node proxied OUT to a remote
  *     MCP server, kept apart from 'mcp', which is a call somebody made IN.
  *   v1.0.0 — 2026-08-14 — Initial: three-layer usage telemetry substrate.
@@ -214,4 +218,41 @@ export interface UsageArchiveResult {
   usageCalls: number;
   usageEvents: number;
   hourRollupsPruned: number;
+}
+
+/**
+ * What an app-open record says in place of the visitor's account once the name has been folded
+ * away (services/usage/visit-retention.ts). It says one thing: somebody was signed in. Not empty,
+ * because '' already means "nobody was signed in" and the owner's split between the two must
+ * survive the fold. Written with parentheses because no account name, GHII, GAII or GEAI can
+ * contain them, so it can never be mistaken for a person. The storage providers write it into SQL
+ * as a literal (the partial indexes that find the named rows need a constant), so it carries no
+ * quote character and must never change: a new value would leave every folded row under the old.
+ */
+export const USAGE_FOLDED_VISITOR = '(signed-in)';
+
+/**
+ * The rollup cuts whose rows are app visits and nothing else: keyed by the visitor's account AND by
+ * the surface, and folded only where `surface = 'app'`. services/usage/rollup-cuts.ts declares them;
+ * test/unit/visit-retention.test.ts fails when a new cut keyed by a person is left undecided.
+ */
+export const APP_VISIT_ROLLUP_CUTS = ['call.app.visitor', 'call.owner.tool', 'call.owner.surface'] as const;
+
+/**
+ * The cut that keys a person to an app WITHOUT the surface, so one row holds their opens and their
+ * paid tool calls on that app together. Only the opens leave the name; how many there were is read
+ * from the `call.owner.tool` row of the same person, day and app, whose coordinate is the app id.
+ */
+export const APP_USE_CUT = 'call.owner.app';
+
+/** What one visit-retention sweep folded. */
+export interface UsageVisitFoldResult {
+  /** Raw open rows in the hot table that lost the account. */
+  hotRows: number;
+  /** Raw open rows in the archive that lost the account. */
+  archiveRows: number;
+  /** Rollup rows of APP_VISIT_ROLLUP_CUTS folded into the unnamed row beside them. */
+  rollupRows: number;
+  /** `call.owner.app` rows whose opens were moved to the unnamed row. */
+  appUseRows: number;
 }

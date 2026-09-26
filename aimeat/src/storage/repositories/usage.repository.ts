@@ -13,12 +13,15 @@
  * @structure
  *   - appendUsageCall / listUsageCalls          -- layer 1
  *   - archiveUsageRows                          -- layer 2, one bounded sweep
+ *   - foldNamedAppVisits                        -- the thirteen-month visit fold, all three layers
  *   - getUsageCursor / advanceUsageRollup       -- layer 3 write, transactional
  *   - queryUsageRollup / clearUsageRollupRange  -- layer 3 read + rebuild
  *   - listUsageEventsForFold / listUsageCallsForFold -- raw cursor reads the fold consumes
  * @usage
  *   import type { UsageRepository } from './repositories/usage.repository.js';
  * @version-history
+ *   v1.1.0 — 2026-09-25 — foldNamedAppVisits: the visitor's account leaves an app-open record
+ *     after thirteen months, and the count stays.
  *   v1.0.0 — 2026-08-14 — Initial: three-layer usage telemetry substrate.
  */
 
@@ -31,6 +34,7 @@ import type {
   UsageRollupFilter,
   UsageRollupCursor,
   UsageArchiveResult,
+  UsageVisitFoldResult,
 } from '../interface.js';
 
 /** A fold cursor position. '' for both fields means "from the beginning of the stream". */
@@ -67,6 +71,19 @@ export interface UsageRepository {
    * explicit operator action with an explicit date. Returns what it deleted.
    */
   pruneUsageArchive(before: string): Promise<{ usageCalls: number; usageEvents: number }>;
+  /**
+   * Fold the visitor's account out of the app-open records of every day before `beforeDay`
+   * (YYYY-MM-DD): one bounded sweep of the hot table, the archive and the rollups, each batch in its
+   * own transaction. Returns what it folded; a caller loops until every count is zero.
+   *
+   * WHAT IT TOUCHES, and nothing else: a raw row with surface 'app' and an account on it keeps the
+   * open, gets USAGE_FOLDED_VISITOR in place of the account and keeps its day and nothing finer; a
+   * rollup row of APP_VISIT_ROLLUP_CUTS with surface 'app' that names somebody is added into the row
+   * beside it that names nobody, and removed; and in the APP_USE_CUT row of that person, day and app
+   * only the opens move, so a paid call stays with whoever paid. Every open is still counted
+   * afterwards. services/usage/visit-retention.ts decides the day and says why.
+   */
+  foldNamedAppVisits(args: { beforeDay: string; batch: number }): Promise<UsageVisitFoldResult>;
 
   // ── Layer 3: serving ──
   getUsageCursor(stream: 'llm' | 'call'): Promise<UsageRollupCursor | null>;

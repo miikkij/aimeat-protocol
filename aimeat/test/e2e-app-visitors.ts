@@ -9,7 +9,12 @@
  *
  *   The refusals are measured: a second owner asking about this app, a second owner switching its
  *   measurement, an agent of the right owner holding the wrong scope, and an app that does not exist.
+ *
+ *   Phase 5 is the privacy notice's thirteen months: old visits are written into the node's own
+ *   database from this process, and the node's real job, fired through the operator's door, folds
+ *   the fourteen-month one and leaves the twelve-month one and a call of another kind alone.
  * @version-history
+ *   v1.1.0 — 2026-09-25 — Phase 5: core:usage-visit-retention on the runner's backend.
  *   v1.0.0 — 2026-09-18 — Initial.
  */
 
@@ -17,6 +22,12 @@
 
 import { createHash } from 'node:crypto';
 import * as ed from '@noble/ed25519';
+import type { Kysely } from 'kysely';
+import { createStorage, type StorageProvider } from '../src/storage/storage-factory.js';
+import { USAGE_FOLDED_VISITOR, type Storage } from '../src/storage/interface.js';
+import { rebuildUsageRollup } from '../src/services/usage/rollup-engine.js';
+import { readAppVisitors, type AppVisitorsReport } from '../src/services/app-visitors.js';
+import { pinnedSqlitePath, serverDbUrl } from './helpers/server-db.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -407,6 +418,115 @@ await test('19. an agent without the signals scope cannot call either tool', asy
   const still = (await json(reportUrl(), { headers: authed(A.token) })).body.data.measurement;
   assert(still.on === true, 'and nothing was switched');
 });
+
+console.log('\nPhase 5 — after thirteen months a visit keeps its count and loses the name');
+
+// Nothing reachable over HTTP can backdate a visit, so this phase writes old ones into the node's
+// own database from here, the way e2e-organism-scope-gate reaches its backend, and then drives the
+// node's real job through the operator's trigger door. On both backends: the runner pins which.
+const provider = (process.env.AIMEAT_DB ?? 'memory') as StorageProvider;
+const dbUrl = serverDbUrl();
+const sqlitePath = pinnedSqlitePath();
+// An in-memory backend lives inside the server process, and a second handle would open a DIFFERENT
+// empty database. That is a failure here rather than a skip: a phase that passes by not running
+// proves nothing, and the runner always pins one of the two backends it can reach.
+const canOpenBackend = (provider === 'sqlite' && !!sqlitePath) || (provider === 'postgres-kysely' && !!dbUrl);
+
+/** Noon UTC on the day `months` calendar months ago. */
+const monthsAgo = (months: number): string => {
+  const now = new Date();
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - months, now.getUTCDate(), 12, 0, 0)).toISOString();
+};
+
+/** One archived raw row by id. The archive has no read door on purpose, so this reads the table. */
+async function archivedOwner(storage: Storage, id: string): Promise<string | undefined> {
+  if (provider === 'sqlite') {
+    const db = (storage as unknown as { db: { prepare(sql: string): { get(...a: unknown[]): unknown } } }).db;
+    return (db.prepare('SELECT ownerGhii FROM usage_calls_archive WHERE id = ?').get(id) as { ownerGhii?: string } | undefined)?.ownerGhii;
+  }
+  const db = (storage as unknown as { db: Kysely<any> }).db;
+  return (await db.selectFrom('UsageCallArchive').select('ownerGhii').where('id', '=', id).executeTakeFirst())?.ownerGhii;
+}
+
+async function fireJob(jobId: string): Promise<void> {
+  const r = await json(`/v1/admin/scheduler/jobs/${jobId}/trigger`, { method: 'POST', headers: authed(A.token) });
+  assert(r.status === 200, `trigger ${jobId}: ${r.status} ${JSON.stringify(r.body)}`);
+  assert(r.body.data.job.lastRunResult === 'success', `${jobId} ran and failed: ${r.body.data.job.lastRunError}`);
+}
+
+{
+  let storage!: Storage;
+  const stamp = Date.now().toString(36).slice(-6);
+  const visitorOld = B.ghii;
+  const visitorNew = `vis12m${stamp}@${NODE_ID}`;
+  const oldOpenId = `e2e-visit-14m-${stamp}`;
+  const newOpenId = `e2e-visit-12m-${stamp}`;
+  const mcpId = `e2e-mcp-14m-${stamp}`;
+  const reportOf = (): Promise<AppVisitorsReport> =>
+    readAppVisitors(storage, { app: { owner: A.owner, filename }, days: 500, geoAvailable: true });
+  let before!: AppVisitorsReport;
+
+  await test('20. the job is seeded, and the fold stands still while old visits are written', async () => {
+    assert(canOpenBackend === true, `backend "${provider}" is not reachable from this process (no shared file or URL)`);
+    storage = await createStorage({ provider, sqlitePath, dbUrl });
+    const jobs = await json('/v1/admin/scheduler/jobs?type=core', { headers: authed(A.token) });
+    assert(jobs.status === 200, `the first owner is the operator: ${jobs.status}`);
+    assert((jobs.body.data.jobs as Array<{ id: string }>).some(j => j.id === 'core:usage-visit-retention'), 'core:usage-visit-retention is seeded');
+    const off = await json('/v1/admin/scheduler/jobs/core:usage-rollup', {
+      method: 'PATCH', headers: authed(A.token), body: JSON.stringify({ enabled: false }),
+    });
+    assert(off.status === 200, `stop the rollup cron: ${off.status}`);
+
+    // The opens above are counted through a buffer that flushes on a timer. Wait until every one of
+    // this app's opens is in the table, so the rebuild below counts each exactly once.
+    for (let i = 0; i < 40; i++) {
+      const seen = await json(`/v1/admin/usage/calls?app_id=${encodeURIComponent(APP_ID)}&surface=app&limit=2000`, { headers: authed(A.token) });
+      const stored = await storage.listUsageCalls({ appId: APP_ID, surface: 'app', limit: 2000 });
+      if (seen.body.data.count === stored.length) break;
+      await new Promise((r) => setTimeout(r, 500));
+    }
+
+    const base = { actorKind: 'owner' as const, surface: 'app' as const, coordinate: APP_ID, appId: APP_ID,
+      counterpartyGhii: A.ghii, outcome: 'ok' as const, reason: '', durationMs: 0, chargedUnits: 0, unit: '' as const,
+      currency: '', entitlementId: '', runId: '', meta: {} };
+    await storage.appendUsageCall([
+      { ...base, id: oldOpenId, ts: monthsAgo(14), ownerGhii: visitorOld, actorGaii: visitorOld },
+      { ...base, id: newOpenId, ts: monthsAgo(12), ownerGhii: visitorNew, actorGaii: visitorNew },
+      { ...base, id: mcpId, ts: monthsAgo(14), ownerGhii: visitorOld, actorGaii: visitorOld, surface: 'mcp', coordinate: 'aimeat_memory_write', appId: '', counterpartyGhii: '' },
+    ]);
+    // The fold counts them the way it counts everything, then the archive sweep moves them out of
+    // the hot table, where a year-old row belongs.
+    await rebuildUsageRollup(storage, { from: new Date(Date.now() - 500 * 86_400_000).toISOString().slice(0, 10) });
+    await fireJob('core:usage-archive');
+    assert(await archivedOwner(storage, oldOpenId) === visitorOld, 'the fourteen-month open is in the archive and still names the visitor');
+
+    before = await reportOf();
+    assert(before.opens.series.some(d => d.day === monthsAgo(14).slice(0, 10) && d.signed_in === 1), `the old open is counted: ${JSON.stringify(before.opens.series)}`);
+  });
+
+  await test('21. the retention job folds the fourteen-month visit, and only that', async () => {
+    await fireJob('core:usage-visit-retention');
+    assert(await archivedOwner(storage, oldOpenId) === USAGE_FOLDED_VISITOR, 'the fourteen-month open names nobody');
+    assert(await archivedOwner(storage, newOpenId) === visitorNew, 'the twelve-month open keeps its visitor');
+    assert(await archivedOwner(storage, mcpId) === visitorOld, 'a call of another kind is not a visit and keeps its account');
+    const rows = await storage.queryUsageRollup({ cut: 'call.app.visitor', grain: 'day', from: monthsAgo(14).slice(0, 10), to: monthsAgo(14).slice(0, 10), appId: APP_ID });
+    assert(!rows.some(r => r.ownerGhii === visitorOld), `the day's visitor row names nobody: ${JSON.stringify(rows.map(r => r.ownerGhii))}`);
+    assert(rows.some(r => r.ownerGhii === USAGE_FOLDED_VISITOR && r.calls === 1), 'and the open is still counted');
+  });
+
+  await test('22. the owner\'s report gives the same totals before and after', async () => {
+    const after = await reportOf();
+    assert(after.opens.total === before.opens.total, `total ${before.opens.total} → ${after.opens.total}`);
+    assert(after.opens.signed_in === before.opens.signed_in, `signed in ${before.opens.signed_in} → ${after.opens.signed_in}`);
+    assert(after.opens.anonymous === before.opens.anonymous, `anonymous ${before.opens.anonymous} → ${after.opens.anonymous}`);
+    assert(after.opens.signed_in_people === before.opens.signed_in_people, `people ${before.opens.signed_in_people} → ${after.opens.signed_in_people}`);
+    assert(JSON.stringify(after.opens.series) === JSON.stringify(before.opens.series), 'every day reads the same');
+    const on = await json('/v1/admin/scheduler/jobs/core:usage-rollup', {
+      method: 'PATCH', headers: authed(A.token), body: JSON.stringify({ enabled: true }),
+    });
+    assert(on.status === 200, `the rollup cron back on: ${on.status}`);
+  });
+}
 
 console.log(`\n═══ ${passed} passed, ${failed} failed ═══`);
 process.exit(failed > 0 ? 1 : 0);
