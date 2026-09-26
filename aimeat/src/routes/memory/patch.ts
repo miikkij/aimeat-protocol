@@ -25,6 +25,9 @@
  * @structure registerPatchRoutes(router, ctx) -> PATCH /v1/memory/:key
  * @usage mounted from src/routes/memory.ts alongside registerCrudRoutes
  * @version-history
+ *   v1.3.1 — 2026-09-26 — The provenance record a merge stamps is stored only once its swap lands
+ *     (secaudit 2026-09, N2). It was stored on every attempt, so each attempt that lost the swap left
+ *     a record about bytes that were never stored.
  *   v1.3.0 — 2026-09-24 — PATCH refuses a key only the node writes (`__redirect__`) with RESERVED_KEY,
  *     whoever asks.
  *   v1.2.0 — 2026-09-16 — PATCH refuses openrouter.apikey and commerce.psp with SECRET_RECORD, and the
@@ -37,7 +40,7 @@
  */
 
 import type { Router } from 'express';
-import type { MemoryRecord } from '../../storage/interface.js';
+import type { MemoryRecord, AiProvenanceRecordRow } from '../../storage/interface.js';
 import { requireAuth, requireExternalPrincipal, requireScope } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { resolveIdentity } from '../../utils/gaii.js';
@@ -60,7 +63,7 @@ import { resolveWriteTarget } from './owner-target.js';
 import { isKeyArchived } from '../../services/archive.js';
 import { undeclaredSpaceForKey } from '../../services/workspace-write-items.js';
 import { odpsWriteRefusal } from '../../services/exchange-odps-write.js';
-import { stampAgentWrite } from '../../services/ai-provenance.js';
+import { stampAgentWrite, storeHeldProvenance } from '../../services/ai-provenance.js';
 import { applyMergePatch } from '../../utils/json-merge-patch.js';
 import { type MemoryRouteCtx, isAnonymousGaii, visibilityToZone, memoryContentBytes } from './shared.js';
 
@@ -159,8 +162,13 @@ export function registerPatchRoutes(router: Router, ctx: MemoryRouteCtx): void {
     let mergedSize = 0;
     let keyCountForAlarm: number | undefined;
     let bytesForAlarm = 0;
+    // The provenance record of the attempt in hand, HELD until its swap lands and stored only then
+    // (below the loop). An attempt that loses the swap drops its own: the store is append-only, so a
+    // record about bytes that never landed could not be taken back (secaudit 2026-09, N2).
+    let held: AiProvenanceRecordRow[] = [];
 
     for (let attempt = 0; attempt < MAX_MERGE_ATTEMPTS && !record; attempt++) {
+      held = [];
       // Re-read on EVERY attempt. This is the whole point: a writer that lost the swap must merge its
       // subtree onto what the winner actually stored, not onto the stale copy it started from.
       const existing = await storage.getMemory(gaii, key);
@@ -240,6 +248,7 @@ export function registerPatchRoutes(router: Router, ctx: MemoryRouteCtx): void {
         nodeId: config.nodeId,
         baseUrl: config.baseUrl,
         enabled: config.aiProvenance,
+        held,
       });
 
       // Metadata is patch-like too: omit visibility/tags/ttl and the record keeps what it had. A
@@ -284,6 +293,8 @@ export function registerPatchRoutes(router: Router, ctx: MemoryRouteCtx): void {
         409, { attempts: MAX_MERGE_ATTEMPTS, last_seen_version: lastConflictVersion }));
       return;
     }
+    // Landed: the record the stored value names is stored now, before anything below announces it.
+    await storeHeldProvenance(storage, held);
 
     if (overageMorsels > 0) await chargeOverage(storage, gaii, overageMorsels, 'memory_overage');
 
