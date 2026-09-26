@@ -14700,7 +14700,10 @@ paths:
       summary: Import memory (restore/merge a backup)
       description: >
         Restore or merge a JSON backup produced by GET /v1/memory/export. Per-entry validation, quota,
-        and schema checks mirror POST /v1/memory; one invalid entry does not abort the run.
+        and schema checks mirror POST /v1/memory; one invalid entry does not abort the run. An
+        `organism.*` entry gets the organism rule POST /v1/memory applies (membership, the meta and
+        member namespaces, the consent layer); a refused entry is listed under `failed` with its code
+        (ACCESS_DENIED, CONSENT_REQUIRED, NOT_FOUND) and is not written.
       tags: [Memory]
       security:
         - BearerAuth: []
@@ -19270,7 +19273,10 @@ paths:
       description: |
         Copy a public memory entry from another user to your own memory.
         The source entry must have visibility 'public'. The copy is stored
-        with the specified visibility (defaults to 'private').
+        with the specified visibility (defaults to 'private'). The copy keeps the
+        source's key, so an `organism.*` key gets the organism rule POST /v1/memory
+        applies, and a caller that may not write it there is refused (403 ACCESS_DENIED
+        or CONSENT_REQUIRED, 404 NOT_FOUND for an organism that does not exist).
       tags: [Memory]
       security:
         - BearerAuth: []
@@ -19296,6 +19302,8 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+        '403':
+          $ref: '#/components/responses/AimeatError'
         '404':
           $ref: '#/components/responses/AimeatError'
         '422': { $ref: '#/components/responses/OdpsFieldTooLong' }
