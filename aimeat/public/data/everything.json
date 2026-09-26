@@ -1227,6 +1227,15 @@
      "plain": "Workflow triggers and run inputs Start manually, on a cron schedule with a time zone, or on matching memory writes, offer orders or ecosystem events. Declared variables let each run carry its own input. Dependent steps wait for their prerequisites; overlapping runs require an explicit setting. /v1/workflows/:id, /v1/workflows/:id/run, aimeat_workflow_save, aimeat_workflow_run"
     },
     {
+     "slug": "g-8-workflow-trigger-permission-check",
+     "cells": [
+      "<strong>Workflow trigger permission check</strong>",
+      "A run its own trigger starts acts on the permissions of whoever saved the workflow. If that agent or app is disconnected, or no longer holds a permission the steps need, the run does not start: the run list shows the refusal and why, and you get one notification with two choices, run it once as yourself or approve the permission again. Workflows you saved yourself are not affected.",
+      "<code>/v1/workflows/:id/runs</code>, <code>/v1/workflows/:id/runs/:runId/run-as-owner</code>, <code>aimeat_workflow_get</code>"
+     ],
+     "plain": "Workflow trigger permission check A run its own trigger starts acts on the permissions of whoever saved the workflow. If that agent or app is disconnected, or no longer holds a permission the steps need, the run does not start: the run list shows the refusal and why, and you get one notification with two choices, run it once as yourself or approve the permission again. Workflows you saved yourself are not affected. /v1/workflows/:id/runs, /v1/workflows/:id/runs/:runId/run-as-owner, aimeat_workflow_get"
+    },
+    {
      "slug": "g-8-workflow-checks-and-preflight",
      "cells": [
       "<strong>Workflow checks and preflight</strong>",
@@ -3353,6 +3362,6 @@
  "outro": "AIMEAT Feature List, reviewed 2026-09-15 against node 3.15.0. The contract is <code>openapi.yaml</code>; the specifications are RFC v4.0 Core and Platform; later changes are at <a href=\"/v1/changelog\">the change log</a>.",
  "counts": {
   "groups": 23,
-  "rows": 332
+  "rows": 333
  }
 }

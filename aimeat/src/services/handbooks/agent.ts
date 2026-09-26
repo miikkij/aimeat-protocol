@@ -7,6 +7,7 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/mcp/catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
+ *   v1.12.0 -- 2026-09-25 -- Workflows: a trigger's run answers to whoever saved the workflow.
  *   v1.11.0 -- 2026-09-25 -- Workflows: maxCostUsd caps what one run's ai steps spend, in US dollars.
  *   v1.10.1 -- 2026-09-23 -- The setup order starts with a provider; the key is the TypeSafe branch.
  *   v1.10.0 -- 2026-09-23 -- Decision providers: how the node picks one, and naming one.
@@ -75,7 +76,9 @@ deliverable location (an agent is "workflow-compatible" only when its offer publ
 workflow instead of chaining separate schedules when steps depend on each other; one trigger
 (schedule / manual / event) drives the whole chain, and a RED step fails only its dependent subtree.
 \`maxCostUsd\` on the definition caps what one run may spend on AI through its ai steps, in US dollars:
-the run stops before its next ai step once that much is spent, and says so on the run.
+the run stops before its next ai step once that much is spent, and says so on the run. A save makes you
+the workflow's saver: a run its own trigger starts answers to you, and does not start while you lack
+a permission its steps need (the run shows \`refused\`, and the owner is told once).
 
 **Be a good citizen — publish offers.** Your offers (\`agents.{your-name}.offers\`, written via
 \`aimeat_memory_write\` or the onboarding \`declare_services\` step) are how the owner finds "what can I

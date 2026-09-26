@@ -19,6 +19,8 @@
  *   serverWrittenKeyRefusal(key) · appMayWriteKey(roles, key, delegatedOwnerWrite?, reservedAllowed?)
  * @usage import { appMayWriteKey } from '../utils/reserved-keys.js';
  * @version-history
+ *   v1.14.0 — 2026-09-25 — `workflows.` joins the list: a trigger runs a saved definition on the
+ *     authority of the saver it names, and the engine advances a run from its record.
  *   v1.13.0 — 2026-09-25 — `packages.install-requests.` joins the list: an install request is an
  *     instruction the decision door performs as the owner.
  *   v1.12.0 — 2026-09-25 — `notif.` is written only by the node (SERVER_WRITTEN_KEY_PREFIXES). A
@@ -167,6 +169,15 @@ export const RESERVED_OWNER_KEY_PREFIXES = [
   // judged against the forgery. Only the filing path writes this prefix, server-side; the owner and
   // their agents settle it through /v1/package-install-requests. New prefix, nothing wrote it before.
   'packages.install-requests.',
+  // 2026-09-25: `workflows.def.<id>` is a workflow definition and `workflows.run.<id>.<runId>` a run's
+  // record. A trigger runs the saved definition on the authority of the principal it names as its
+  // saver (`savedBy`, services/workflow/trigger-authority.ts), and the engine advances a run in flight
+  // from its record, pinned definition included. Written past the workflow doors, either would name
+  // its own saver and its own steps. The writers are the workflow service and its routes, straight to
+  // storage; nothing in the source, the browser libraries or the Python package writes this prefix
+  // through the memory API (searched 2026-09-25). A step key under it is refused as well
+  // (services/workflow/store.ts reservedStepKeys), so no step writes a definition either.
+  'workflows.',
 ] as const;
 
 /**

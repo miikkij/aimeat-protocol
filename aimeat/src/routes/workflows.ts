@@ -18,6 +18,7 @@
  *   - DELETE /v1/workflows/:id                  remove def (?withRuns=true also drops its runs)
  *   - POST   /v1/workflows/:id/run              start a run (manual/test: signals-only | full, sandbox|live)
  *   - POST   /v1/workflows/:id/runs/:runId/cancel  abort an in-flight run
+ *   - POST   /v1/workflows/:id/runs/:runId/run-as-owner  "Run as me" on a refused trigger start (owner only)
  *   - POST   /v1/workflows/:id/runs/:runId/steps/:stepId/answer  answer a waiting-human step
  *   - GET    /v1/workflows/:id/health           run-health trend over the last N runs
  *   - GET    /v1/workflows/:id/blueprint        derived structural graph (nodes + edges + keys)
@@ -27,6 +28,10 @@
  *   import { workflowsRouter } from './routes/workflows.js';
  *   app.use(workflowsRouter(config, storage));
  * @version-history
+ *   v1.6.0 — 2026-09-25 — A save records who saved it (the session's identity, and an app's grant),
+ *     which a trigger's run answers to. POST /:id/runs/:runId/run-as-owner is "Run as me" on a
+ *     refused trigger start, behind requireOwnerPrincipal. Deleting a workflow closes its open
+ *     refusal, and a refused start adds no duration to the health.
  *   v1.5.0 — 2026-09-25 — PUT /:id answers `warnings` beside the saved definition when the body set
  *     costCapMorsels, which does nothing; the per-run cap is maxCostUsd.
  *   v1.4.0 — 2026-09-24 — PUT /:id and POST /:id/run answer 403 SCOPE_DENIED, the missing words named,
@@ -53,9 +58,10 @@ import type { Storage } from '../storage/interface.js';
 import type { Scheduler } from '../services/scheduler.js';
 import type { WorkflowEngine } from '../services/workflow/engine.js';
 import { success, error } from '../middleware/envelope.js';
-import { requireAuth, requireScope } from '../auth/middleware.js';
+import { requireAuth, requireScope, requireOwnerPrincipal } from '../auth/middleware.js';
 import { denyScope403 } from '../auth/deny.js';
 import type { WorkflowCaller } from '../services/workflow/step-authority.js';
+import { runRefusedAsOwner, clearRefusal } from '../services/workflow/trigger-authority.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { recordAccountEvent } from '../services/account-events.js';
 import { emitChange } from '../services/event-bus.js';
@@ -68,14 +74,19 @@ import { preflightWorkflow } from '../services/workflow/preflight.js';
 import { HUMAN_TIMEOUT_MIN_DEFAULT } from '../services/workflow/engine.js';
 import { WorkflowHumanAnswerSchema, type WorkflowDef, type WorkflowRun } from '../models/workflow-schemas.js';
 
+/** What the "Run as me" door says to anything that is not the account holder in person. */
+const RUN_AS_OWNER = 'This starts a workflow once on the account holder\'s own authority, so only they can press it. '
+  + 'An agent starts a run on its own permissions with POST /v1/workflows/{id}/run.';
+
 /** Derive a run-health trend from the recent runs (the "did it produce" trend, not just last run). */
 function computeHealth(def: WorkflowDef, runs: WorkflowRun[]) {
   const sample = runs.length;
   const lastRun = runs[0];
   const lastSuccess = runs.find(r => r.status === 'done');
-  // Mean wall-clock duration over completed runs (those with both timestamps).
+  // Mean wall-clock duration over completed runs (those with both timestamps). A refused start never
+  // ran, so it has no duration to count.
   const durations = runs
-    .filter(r => r.endedAt && r.startedAt)
+    .filter(r => r.endedAt && r.startedAt && r.status !== 'refused')
     .map(r => new Date(r.endedAt!).getTime() - new Date(r.startedAt).getTime())
     .filter(ms => ms >= 0);
   const meanDurationMs = durations.length
@@ -120,9 +131,12 @@ export function workflowsRouter(config: AimeatConfig, storage: Storage, schedule
   // namespace for storage regardless of whether the caller is the owner or one of their agents.
   const ownerGhiiOf = (req: Request): string => `${req.auth!.owner}@${config.nodeId}`;
 
-  /** The principal saving or starting a workflow, which answers for its steps (step-authority.ts). */
+  /** The principal saving or starting a workflow, which answers for its steps (step-authority.ts), and
+   *  whom a save records as its saver for the trigger's check at start (trigger-authority.ts). */
   const callerOf = (req: Request): WorkflowCaller => ({
     roles: req.auth!.roles, scopes: req.auth!.scopes ?? [], federated: req.auth!.federated === true,
+    principal: resolveIdentity(req.auth!, config.nodeId),
+    ...(req.auth!.app_grant ? { appGrant: req.auth!.app_grant } : {}),
   });
 
   // GET /v1/workflows — list the owner's workflows. ?include=health attaches each workflow's run-health
@@ -201,6 +215,8 @@ export function workflowsRouter(config: AimeatConfig, storage: Storage, schedule
     const ok = await deleteWorkflow(storage, ownerGhiiOf(req), id, { withRuns });
     if (!ok) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Workflow "${id}" not found`)); return; }
     await removeWorkflowTriggers(storage, scheduler, config.nodeId, id);
+    // A workflow saved later under the same id starts with no refusal of its own.
+    await clearRefusal(storage, config.nodeId, ownerGhiiOf(req), id);
     emitChange('workflows');
     void recordAccountEvent(storage, {
       ownerGhii: ownerGhiiOf(req),
@@ -282,6 +298,36 @@ export function workflowsRouter(config: AimeatConfig, storage: Storage, schedule
       }
     }
     res.json(success(config.nodeId, { runId: result.runId, mode }, [
+      { description: 'View the run', method: 'GET', url: `/v1/workflows/${id}/runs/${result.runId}` },
+    ]));
+  });
+
+  // POST /v1/workflows/:id/runs/:runId/run-as-owner — "Run as me", on a run the trigger could not
+  // start because its saver no longer holds what the steps need: start it once on the owner's own
+  // authority. The owner's door, so an agent cannot use it to step past its own permissions; the
+  // refusal keeps the run it led to, so a second press starts nothing (trigger-authority.ts).
+  router.post('/v1/workflows/:id/runs/:runId/run-as-owner', requireAuth(), requireOwnerPrincipal(RUN_AS_OWNER), async (req: Request, res: Response) => {
+    const id = req.params.id as string;
+    const refusedRunId = req.params.runId as string;
+    const ownerGhii = ownerGhiiOf(req);
+    const result = await runRefusedAsOwner(
+      { storage, config },
+      (o, n, w) => engine.startRun(o, n, w, { mode: 'full-live', caller: { roles: ['owner'], scopes: [] } }),
+      ownerGhii, req.auth!.owner, id, refusedRunId,
+    );
+    if (!result.ok) {
+      const status = result.code === 'NOT_FOUND' ? 404 : result.code === 'START_FAILED' ? 400 : 409;
+      const details = { ...(result.errors ? { errors: result.errors } : {}), ...(result.runId ? { runId: result.runId } : {}) };
+      res.status(status).json(error(config.nodeId, result.code === 'START_FAILED' ? 'WORKFLOW_RUN_FAILED' : result.code, result.message, undefined,
+        Object.keys(details).length ? details : undefined));
+      return;
+    }
+    emitChange('workflows');
+    void recordAccountEvent(storage, {
+      ownerGhii, kind: 'workflow_run_started', actorGaii: resolveIdentity(req.auth!, config.nodeId), subject: result.runId,
+      link: `/v1/profile?tab=workflows&run=${encodeURIComponent(result.runId)}`, data: { name: id, mode: 'full-live' },
+    }, config);
+    res.json(success(config.nodeId, { runId: result.runId, refusedRunId, mode: 'full-live' }, [
       { description: 'View the run', method: 'GET', url: `/v1/workflows/${id}/runs/${result.runId}` },
     ]));
   });

@@ -1341,6 +1341,104 @@ async function run() {
     }
   });
 
+  // ── a run the trigger starts answers to whoever saved the workflow (2026-09-25) ──
+  // Nobody sits at the screen when a schedule or an event starts a run, so the run acts on the
+  // authority of the principal that saved the workflow. If that principal is gone, or no longer holds
+  // the words the steps need, the run does not start: the refusal is on the run list, and the owner
+  // is told once, with a way to run it once as themselves and a way to approve the permissions again.
+  const triggered = (key: string) => ({
+    title: { en_US: 'On a write' }, description: { en_US: 'asks the owner when a key is written' },
+    trigger: { kind: 'event', on: 'memory.write', match: { key } }, vars: [], on_step_fail: 'inspect',
+    steps: [{
+      id: 'ask', description: { en_US: 'Ask' }, required_to_function: 'none',
+      action: { kind: 'human-input', question: { prompt: 'Go on?', options: [{ id: 'go', label: 'Go' }] }, answer_to_key: `${key.replace('.*', '')}.answer` },
+    }],
+  });
+  const refusalNotifs = async (): Promise<any[]> => {
+    const { body } = await json('/v1/notifications', { headers: auth });
+    return ((body.data?.notifications ?? []) as any[]).filter(n => n.type === 'workflow_run_refused');
+  };
+
+  await test('a workflow the owner saves in person names the owner as its saver, and its trigger starts a run as before', async () => {
+    const put = await json('/v1/workflows/owner-trig', { method: 'PUT', headers: auth, body: JSON.stringify(triggered('wfown.fire.*')) });
+    assert(put.status === 200, `save: ${put.status} ${JSON.stringify(put.body.error)}`);
+    assert(put.body.data.savedBy?.kind === 'owner', `the saved workflow says who saved it: ${JSON.stringify(put.body.data.savedBy)}`);
+    await writeMem('wfown.fire.1', 'go');
+    await sleep(800);
+    const runs = await json('/v1/workflows/owner-trig/runs', { headers: auth });
+    assert(runs.body.data.count === 1 && runs.body.data.runs[0].status === 'waiting-step',
+      `the trigger's run started and asked the owner: ${JSON.stringify(runs.body.data.runs?.map((r: any) => r.status))}`);
+    await json(`/v1/workflows/owner-trig/runs/${runs.body.data.runs[0].runId}/cancel`, { method: 'POST', headers: auth, body: '{}' });
+    await json('/v1/workflows/owner-trig?withRuns=true', { method: 'DELETE', headers: auth });
+  });
+
+  await test('a trigger does not start a run of a workflow whose saving agent lost a word it needs: one refusal on the run list, one notification with two actions, and "Run as me" starts it once as the owner', async () => {
+    const saver = await mintAgent('wf-trig-saver', ['workflow:read', 'workflow:write', 'memory:read']);
+    const put = await json('/v1/workflows/agent-trig', { method: 'PUT', headers: saver.headers, body: JSON.stringify(triggered('wftrig.fire.*')) });
+    assert(put.status === 200, `the agent saves it: ${put.status} ${JSON.stringify(put.body.error)}`);
+    // The owner takes memory:read away from that agent. The step reads the answer back, so it needs it.
+    const narrowed = await json('/v1/agents/wf-trig-saver/scopes', { method: 'PATCH', headers: auth, body: JSON.stringify({ scopes: ['workflow:read', 'workflow:write'] }) });
+    assert(narrowed.status === 200, `narrow the agent: ${narrowed.status} ${JSON.stringify(narrowed.body.error)}`);
+
+    const before = await refusalNotifs();
+    await writeMem('wftrig.fire.1', 'go');
+    await sleep(800);
+    await writeMem('wftrig.fire.2', 'go again');
+    await sleep(800);
+
+    const runs = await json('/v1/workflows/agent-trig/runs', { headers: auth });
+    assert(runs.body.data.count === 1, `two refused starts are one record: ${runs.body.data.count} ${JSON.stringify(runs.body.data.runs?.map((r: any) => r.status))}`);
+    const refused = runs.body.data.runs[0];
+    assert(refused.status === 'refused', `the run did not start: ${refused.status}`);
+    assert(refused.refusal?.attempts === 2, `the record counts both starts: ${JSON.stringify(refused.refusal)}`);
+    assert(/wf-trig-saver/.test(refused.reason ?? '') && /memory:read/.test(refused.reason ?? ''), `the reason names the agent and the word: ${refused.reason}`);
+    assert(Object.values(refused.steps).every((s: any) => s.state === 'skipped'), `no step ran: ${JSON.stringify(refused.steps)}`);
+    assert(put.body.data.savedBy?.kind === 'agent' && put.body.data.savedBy?.id === saver.gaii,
+      `the saved workflow names the agent that saved it: ${JSON.stringify(put.body.data.savedBy)}`);
+
+    const fresh = (await refusalNotifs()).filter(n => !before.some(b => b.id === n.id));
+    assert(fresh.length === 1, `one notification for two refused starts: ${fresh.length}`);
+    const note = fresh[0];
+    assert(/wf-trig-saver/.test(note.body) && /memory:read/.test(note.body), `the notification names the agent and the word: ${note.body}`);
+    const runAsMe = (note.actions ?? []).find((a: any) => a.id === 'run-as-me');
+    const approve = (note.actions ?? []).find((a: any) => a.id === 'approve-again');
+    assert((note.actions ?? []).length === 2, `two actions: ${JSON.stringify(note.actions)}`);
+    assert(runAsMe?.kind === 'api' && runAsMe.method === 'POST' && runAsMe.endpoint === `/v1/workflows/agent-trig/runs/${refused.runId}/run-as-owner`,
+      `"Run as me" calls the owner's door for this refusal: ${JSON.stringify(runAsMe)}`);
+    assert(approve?.kind === 'navigate' && /tab=agents/.test(approve.link) && /agent=wf-trig-saver/.test(approve.link),
+      `"Approve again" opens that agent's permissions: ${JSON.stringify(approve)}`);
+
+    // In chat: the owner's AI reads the same refusal with aimeat_workflow_get.
+    const reader = await mintAgent('wf-trig-reader', ['workflow:read']);
+    const got = await mcpCall(reader.token, 'aimeat_workflow_get', { id: 'agent-trig' });
+    assert(!got.isError && got.raw.includes('refused') && got.raw.includes('memory:read'), `MCP shows the refusal and why: ${got.raw.slice(0, 400)}`);
+
+    // "Run as me" is the owner's own door: the agent that saved it is refused, and nothing starts.
+    const byAgent = await json(runAsMe.endpoint, { method: 'POST', headers: saver.headers, body: '{}' });
+    assert(byAgent.status === 403, `an agent cannot run it as the owner: ${byAgent.status}`);
+    // Another account cannot reach it at all.
+    const otherName = `wfother${Date.now()}`;
+    const other = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: otherName, public_key: 'placeholder' }) });
+    assert(other.status === 201, `second owner: ${other.status}`);
+    const otherAuth = { Authorization: `Bearer ${await getToken(otherName, other.body.data.private_key, false)}` };
+    const foreign = await json(runAsMe.endpoint, { method: 'POST', headers: otherAuth, body: '{}' });
+    assert(foreign.status === 404, `another owner finds no such run: ${foreign.status}`);
+    const still = await json('/v1/workflows/agent-trig/runs', { headers: auth });
+    assert(still.body.data.count === 1, `the refused presses started nothing: ${still.body.data.count}`);
+
+    // The owner presses it, and the run starts on the owner's own authority.
+    const tap = await json(runAsMe.endpoint, { method: 'POST', headers: auth, body: '{}' });
+    assert(tap.status === 200 && typeof tap.body.data?.runId === 'string' && tap.body.data.runId !== refused.runId,
+      `"Run as me" starts a run: ${tap.status} ${JSON.stringify(tap.body.data ?? tap.body.error)}`);
+    const started = await json(`/v1/workflows/agent-trig/runs/${tap.body.data.runId}`, { headers: auth });
+    assert(started.body.data?.status === 'waiting-step', `the run is going and asks the owner: ${started.body.data?.status}`);
+    const again = await json(runAsMe.endpoint, { method: 'POST', headers: auth, body: '{}' });
+    assert(again.status === 409, `a second press starts nothing more: ${again.status}`);
+
+    await json(`/v1/workflows/agent-trig/runs/${tap.body.data.runId}/cancel`, { method: 'POST', headers: auth, body: '{}' });
+    await json('/v1/workflows/agent-trig?withRuns=true', { method: 'DELETE', headers: auth });
+  });
+
   console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total`);
   if (failed > 0) process.exit(1);
 }

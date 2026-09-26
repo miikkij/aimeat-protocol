@@ -47,6 +47,9 @@
  *     US dollars; a run that reaches it ends `stopped` with `reason` and `costCap`, and each step keeps
  *     its own `costUsd`. costCapMorsels is accepted and ignored: a morsel paces what agents store and
  *     is not money, and nothing ever read the field.
+ *   v1.11.0 — 2026-09-25 — WorkflowDef.savedBy names the principal whose save is in force; a run the
+ *     trigger starts answers to it. A run whose saver is gone, or lacks a word the steps need, is
+ *     not started: it is recorded with status `refused` and `refusal`, once per episode.
  */
 import { z } from 'zod';
 
@@ -388,6 +391,15 @@ export type WorkflowTrigger =
   // event's MAJOR version — the trigger is fail-safe (does NOT fire) on a major mismatch.
   | { kind: 'ecosystem.event'; app: string; on: string; version: number; match?: Record<string, string> };
 
+/**
+ * The principal whose save of a workflow is in force. `id` is how it is found again: the owner's GHII,
+ * an agent's GAII (a scoped access token's too), an ecosystem app's GEAI, or a hosted app's grant id.
+ */
+export interface WorkflowSaver {
+  kind: 'owner' | 'agent' | 'ecosystem' | 'app';
+  id: string;
+}
+
 export interface WorkflowDef {
   id: string;
   title: LocalizedString;
@@ -462,6 +474,14 @@ export interface WorkflowDef {
    * and a new save does not keep it. Definitions saved before then may still carry it.
    */
   costCapMorsels?: number | null;
+  /**
+   * Who saved this definition last, set by the save itself and never read from the body. A run the
+   * workflow's own trigger starts has nobody at the screen, so it answers to this principal: it must
+   * still exist and still hold the words the steps need (services/workflow/trigger-authority.ts).
+   * The owner in person is `owner` and is not checked. Absent on a definition saved before
+   * 2026-09-25; the trigger then asks `createdBy`, its first author.
+   */
+  savedBy?: WorkflowSaver;
   createdBy: string;                  // GAII/GHII of the author (audit)
   createdAt: string;
   updatedAt: string;
@@ -539,12 +559,25 @@ export interface WorkflowRun {
   vars: Record<string, string>;
   mode: 'full-live' | 'full-sandbox' | 'signals-only';
   keyPrefix?: string;                 // 'wf-test.<runId>.' in sandbox mode; '' otherwise
-  /** `stopped`: the node ended the run at its cost cap (see `costCap` and `reason`). */
-  status: 'running' | 'waiting-step' | 'red' | 'partial' | 'done' | 'cancelled' | 'stopped';
-  /** Why the node ended the run itself rather than a step finishing it, in words. */
+  /**
+   * `stopped`: the node ended the run at its cost cap (see `costCap` and `reason`). `refused`: the
+   * trigger's start found the saver gone or short of a word, so nothing ran (see `refusal`).
+   */
+  status: 'running' | 'waiting-step' | 'red' | 'partial' | 'done' | 'cancelled' | 'stopped' | 'refused';
+  /** Why the node ended the run itself, or did not start it, in words. */
   reason?: string;
   /** Set on a `stopped` run: the cap, what the ai steps had spent, and the ai step that did not start. */
   costCap?: { capUsd: number; spentUsd: number; stoppedBefore: string };
+  /**
+   * Set on a `refused` run. One record stands for every refused start until the workflow runs again:
+   * `attempts` counts them. `missing` names the words the saver lacks (empty when it is `gone`), and
+   * `ranAsOwner` is the run the owner started from it with their own authority.
+   */
+  refusal?: {
+    saver: WorkflowSaver; saverName: string; missing: string[]; gone: boolean;
+    attempts: number; lastAttemptAt: string;
+    ranAsOwner?: { runId: string; at: string };
+  };
   steps: Record<string, WorkflowRunStep>;
   /** Inspector tasks dispatched on RED steps (best-effort enrichment; the owner push is guaranteed). */
   inspections?: Array<{ stepId: string; taskId: string; reason: string; at: string }>;

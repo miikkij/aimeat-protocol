@@ -67,6 +67,9 @@
  *     ai step's model calls cost on the step, and tick stops the run before the next ai step once the
  *     sum has reached the cap. evalSignal and recordProgress moved to engine-observe.ts, skipSubtree
  *     and failDownstream to engine-readiness.ts, unchanged (max-file-lines).
+ *   v1.11.0 — 2026-09-25 — A run the trigger starts answers to whoever saved the workflow: gone, or
+ *     short of a word its steps need, and it does not start; startRun answers `refused` with the
+ *     refusal's record (trigger-authority.ts). A real start closes a refusal still open for it.
  */
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
@@ -89,6 +92,7 @@ import {
 } from './engine-steps.js';
 import { validateHumanAnswer, applyHumanAnswer } from './engine-human.js';
 import { spendsAi, stopAtCostCap } from './run-cost.js';
+import { refuseTriggerStart, clearRefusal } from './trigger-authority.js';
 import type {
   WorkflowDef, WorkflowRun, WorkflowRunStep,
 } from '../../models/workflow-schemas.js';
@@ -116,7 +120,7 @@ export interface StartRunOpts {
   mode: 'signals-only' | 'full-live' | 'full-sandbox';
   vars?: Record<string, string>;
   /** The principal starting the run, which answers for its steps (step-authority.ts). Absent for a
-   *  run the workflow's own trigger starts: that runs what was checked when it was saved. */
+   *  run the workflow's own trigger starts: that answers to whoever saved it (trigger-authority.ts). */
   caller?: WorkflowCaller;
 }
 
@@ -124,10 +128,12 @@ export interface StartRunOpts {
  * What startRun answers. `skipped: true` means NOTHING STARTED: a live run of this workflow is
  * already in flight, the definition does not set `parallel`, and `runId` is that run's id, not a
  * new one. Every door passes the flag on, because a skip that looks like a start is the failure no
- * metric shows (a partner's intake logged a case as started on exactly that, 2026-09-09).
+ * metric shows (a partner's intake logged a case as started on exactly that, 2026-09-09). With
+ * `refused`, nothing started either: a trigger's start found its saver gone or short of a word, and
+ * `runId` is the refusal's record.
  */
 export type StartRunResult =
-  | { runId: string; skipped: boolean }
+  | { runId: string; skipped: boolean; refused?: string }
   | { error: string[]; denied?: { needed: string[]; message: string } };
 
 export class WorkflowEngine {
@@ -198,6 +204,11 @@ export class WorkflowEngine {
         const refusal = stepScopeRefusal(missing);
         return { error: [refusal.message], denied: { needed: refusal.needed, message: refusal.message } };
       }
+    } else if (opts.mode !== 'signals-only') {
+      // Nobody at the screen: a trigger's run answers to whoever saved the workflow. Gone, or short of
+      // a word the steps need, and it does not start; the owner is told once (trigger-authority.ts).
+      const refused = await refuseTriggerStart({ storage: this.storage, config: this.config }, ownerGhii, def);
+      if (refused) return { runId: refused.runId, skipped: true, refused: refused.reason };
     }
 
     const v = await validateWorkflow(this.storage, this.config, ownerName, def);
@@ -244,6 +255,8 @@ export class WorkflowEngine {
       await this.runSignalsOnly(ownerGhii, run);
     } else {
       await this.persist(ownerGhii, run);
+      // It runs again: a refusal still open for it is over, and the next one is told anew.
+      await clearRefusal(this.storage, this.config.nodeId, ownerGhii, workflowId);
       // Under the run lock: an ecosystem action step's async reply (onPushTerminal, which also locks)
       // must not advance the run before this initial tick has persisted the 'dispatched' state.
       await this.withLock(runId, async () => {

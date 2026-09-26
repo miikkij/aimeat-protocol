@@ -11,6 +11,8 @@
  * @usage import { registerWorkflowTools } from './workflows.js';
  *   registerWorkflowTools(mcp, storage, config, () => agentGaii, scopes);
  * @version-history
+ *   v1.7.0 — 2026-09-25 — A save records this session's agent as the workflow's saver, and
+ *     aimeat_workflow_get's recent runs carry `reason` when the node stopped or refused a run.
  *   v1.6.0 — 2026-09-25 — aimeat_workflow_save answers `warnings` when the definition set
  *     costCapMorsels, which does nothing; the definition's description names maxCostUsd.
  *   v1.5.0 — 2026-09-24 — aimeat_workflow_save and aimeat_workflow_run pass the session's scopes, and
@@ -56,8 +58,9 @@ export function registerWorkflowTools(
   const owner = parseGAII(agentGaii)?.owner ?? '';
   const ownerGhii = `${owner}@${config.nodeId}`;
   // This session answers for what a workflow's steps do, at save and at start, on the same words
-  // the HTTP door asks (services/workflow/step-authority.ts). An MCP session is always an agent's.
-  const caller = { roles: ['agent'], scopes: sessionScopes };
+  // the HTTP door asks (services/workflow/step-authority.ts). An MCP session is always an agent's,
+  // and a save records that agent as the saver a trigger's run answers to (trigger-authority.ts).
+  const caller = { roles: ['agent'], scopes: sessionScopes, principal: agentGaii };
 
   const text = (data: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] });
   const err = (msg: string) => ({ content: [{ type: 'text' as const, text: msg }], isError: true });
@@ -142,8 +145,10 @@ export function registerWorkflowTools(
       if (!def) return err(`Workflow "${a.id}" not found`);
       const v = await validateWorkflow(storage, config, owner, def);
       const blueprint = v.ok && v.resolved ? buildBlueprint(def, v.resolved) : { stale: true, errors: v.errors };
+      // `reason` when the node ended a run itself or did not start it (a spending limit, a refused
+      // trigger start), so the owner's AI can say why without a second call.
       const runs = (await listRuns(storage, ownerGhii, a.id)).slice(0, 5)
-        .map(r => ({ runId: r.runId, status: r.status, mode: r.mode, startedAt: r.startedAt }));
+        .map(r => ({ runId: r.runId, status: r.status, mode: r.mode, startedAt: r.startedAt, ...(r.reason ? { reason: r.reason } : {}) }));
       return text({ definition: def, blueprint, recentRuns: runs });
     },
   );
