@@ -51,11 +51,15 @@
  *   node's. `key_source` and the record's keyScope say which one paid.
  * @structure
  *   DecideInput · DecideCaller · DecideResult · decideForOwner · listDecisions · getDecision ·
- *   reviewDecision · decisionStats · canonicalJson
+ *   DecisionReviewer · reviewDecision · decisionStats · canonicalJson
  * @usage
  *   const r = await decideForOwner(storage, config, { gaii, principal, appId, isOwner }, { state, questions });
  *   const g = await decideForOwner(storage, config, caller, { state, rule: 'send-reply' });
  * @version-history
+ *   v1.4.0 — 2026-09-25 — reviewDecision takes the reviewer as a principal and whether it is the
+ *     owner in person, refuses a review by the principal that asked for the decision (OWN_DECISION,
+ *     403) unless it is the owner in person, records the principal as `by`, and closes the owner's
+ *     item as the AI's when an agent reviewed.
  *   v1.3.2 — 2026-09-24 — A provider's variable is read by envKeyOf (providers.ts): an optional one
  *     left unset sends no key, as the built-in laya and von expect; a required one is still refused.
  *   v1.3.1 — 2026-09-23 — The call carries the operator's listed origin for this provider, so a node's
@@ -645,9 +649,17 @@ export async function getDecision(storage: Storage, gaii: string, id: string): P
   return row && row.ownerGhii === gaii ? row : null;
 }
 
+/** Who records a review, as the door that took it knows them. */
+export interface DecisionReviewer {
+  /** The exact principal: the owner's GHII in person, an agent's GAII, an app's GEAI. Recorded as `by`. */
+  principal: string;
+  /** The account holder in person, and nothing acting in their name (auth/effective-scopes.ts isOwnerInPerson). */
+  inPerson: boolean;
+}
+
 /** A person confirmed or overrode what the model decided. The one change a decision record accepts. */
 export async function reviewDecision(
-  storage: Storage, gaii: string, reviewer: string, id: string,
+  storage: Storage, gaii: string, reviewer: DecisionReviewer, id: string,
   input: { outcome?: unknown; note?: unknown; override?: unknown },
 ): Promise<AiDecisionRow | null> {
   if (input.outcome !== 'confirmed' && input.outcome !== 'overridden') {
@@ -656,8 +668,18 @@ export async function reviewDecision(
   if (input.note !== undefined && (typeof input.note !== 'string' || input.note.length > 2000)) {
     throw new DecideError('INVALID_BODY', 400, 'note must be text of at most 2000 characters.');
   }
+  // THE ONE WHO ASKED DOES NOT ANSWER. A gate stops an agent so that a person decides, and the agent
+  // it stopped could record that review itself, on either door, and close the owner's item. Asked
+  // here, once, so REST and MCP answer alike, and by the full identity, never a name. The owner in
+  // person may review what they asked themselves; any other of their agents may review this one.
+  const row = await getDecision(storage, gaii, id);
+  if (!row) return null;
+  if (!reviewer.inPerson && row.principal === reviewer.principal) {
+    throw new DecideError('OWN_DECISION', 403,
+      'An agent does not review a decision it asked for itself. The owner reviews it, in person or through another of their agents.');
+  }
   const review: AiDecisionReview = {
-    outcome: input.outcome, by: reviewer, at: new Date().toISOString(),
+    outcome: input.outcome, by: reviewer.principal, at: new Date().toISOString(),
     ...(typeof input.note === 'string' ? { note: input.note } : {}),
     ...(input.override !== undefined ? { override: input.override } : {}),
   };
@@ -666,10 +688,11 @@ export async function reviewDecision(
   emitChange('ai-decisions', gaii);
   // A gate stop put this decision on the owner's open items. They have now answered it, so the row
   // goes: here, so that the web, MCP and REST reviews all behave the same. Best-effort — the review
-  // is recorded either way, and a list that would not update must not undo it.
+  // is recorded either way, and a list that would not update must not undo it. The list says who
+  // closed it: the person, or the AI acting for them.
   try {
     const { closeItemsForDecision } = await import('../open-items.js');
-    if (await closeItemsForDecision(storage, gaii, id)) emitChange('open-items', gaii);
+    if (await closeItemsForDecision(storage, gaii, id, reviewer.inPerson ? 'person' : 'ai')) emitChange('open-items', gaii);
   } catch (err) {
     logger.warn('[decide] the review was recorded and its open item could not be closed', {
       owner: gaii, decision: id, error: String(err),

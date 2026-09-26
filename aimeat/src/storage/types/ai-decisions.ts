@@ -28,6 +28,8 @@
  * @usage
  *   import type { AiDecisionRow } from '../storage/interface.js';
  * @version-history
+ *   v1.2.1 — 2026-09-25 — A review's `by` names an app by its GEAI, and is never the principal that
+ *     asked for the decision unless that is the owner in person. No field changed.
  *   v1.2.0 — 2026-09-23 — Decision providers: a row carries `provider` and `providerKind`, a key
  *     scope may be 'none', and the list filters and the quality numbers group by provider.
  *   v1.1.0 — 2026-09-20 — Decision rules: a row carries `rule`, `ruleVersion`, `outcome` and
@@ -58,7 +60,8 @@ export interface AiDecisionQuestion {
 /** A person's verdict on a decision after the fact. */
 export interface AiDecisionReview {
   outcome: 'confirmed' | 'overridden';
-  /** Who reviewed it (a GHII or GAII). */
+  /** Who reviewed it: the owner's GHII in person, an agent's GAII, or an app's GEAI. Never the
+   *  principal that asked for the decision, unless that is the owner in person. */
   by: string;
   /** ISO timestamp. */
   at: string;

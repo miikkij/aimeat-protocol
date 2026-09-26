@@ -15731,7 +15731,12 @@ paths:
     post:
       operationId: reviewDecision
       summary: Record that a person confirmed or overrode a decision
-      description: The one change a decision record accepts. Requires an owner session or a token carrying `ai:use`.
+      description: >-
+        The one change a decision record accepts. Requires an owner session or a token carrying
+        `ai:use`. The principal that asked for the decision cannot review it (403 OWN_DECISION)
+        unless it is the owner in person; the owner, or another of their agents, reviews it. The
+        review's `by` names the principal that recorded it: the owner's GHII, an agent's GAII, or
+        an app's GEAI.
       tags: [Memory]
       security:
         - BearerAuth: []
@@ -15753,6 +15758,8 @@ paths:
           $ref: '#/components/responses/AimeatSuccess'
         '400':
           $ref: '#/components/responses/AimeatError'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/AimeatError'
 

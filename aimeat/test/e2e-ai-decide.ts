@@ -24,6 +24,9 @@
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-ai-decide.ts
  *   cd aimeat && pnpm exec node --env-file=.env.test.postgres-kysely --import tsx test/e2e-ai-decide.ts
  * @version-history
+ *   v1.7.0 — 2026-09-25 — 9f: the agent the gate stopped is refused a review of its own decision on
+ *     REST and on MCP, and the owner's item waits; another agent of the owner and the owner in person
+ *     review, the review names who did, and the list says an agent's close was the AI's.
  *   v1.6.0 — 2026-09-24 — 4f: a settings call refused for its policy, its class or its provider
  *     stores neither the key nor the choice (273435328c90). 11a2: a provider id is trimmed once, so a
  *     space before a node's id is the node's id, and a padded id of your own is deleted by its id
@@ -241,6 +244,27 @@ async function appGrantToken(owner: Owner): Promise<string> {
   });
   assert(tok.body.ok === true, `app token: ${JSON.stringify(tok.body.error)}`);
   return tok.body.data.access_token as string;
+}
+
+/** One MCP tools/call as the holder of `token`: a session, then the call. */
+async function mcpCall(token: string, name: string, args: Record<string, unknown>): Promise<any> {
+  let session = '';
+  const rpc = async (method: string, params: Record<string, unknown>, id: number) => {
+    const res = await fetch(`${BASE}/v1/mcp`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json', Accept: 'application/json, text/event-stream', Authorization: `Bearer ${token}`,
+        ...(session ? { 'mcp-session-id': session, 'mcp-protocol-version': '2025-03-26' } : {}),
+      },
+      body: JSON.stringify({ jsonrpc: '2.0', id, method, params }),
+    });
+    session = res.headers.get('mcp-session-id') ?? session;
+    const text = await res.text();
+    const events = text.split('\n').filter(l => l.startsWith('data:')).map(l => JSON.parse(l.slice(5).trim()));
+    return (events.find((e: any) => e.id === id) ?? (events.length ? events[0] : JSON.parse(text))) as any;
+  };
+  await rpc('initialize', { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 'decide-e2e', version: '1.0.0' } }, 1);
+  return rpc('tools/call', { name, arguments: args }, 2);
 }
 
 // A record shaped like a CRM contact and a mail, in Finnish, with English questions.
@@ -753,6 +777,47 @@ const QUESTIONS = {
     assert(r.body.data.outcome === 'ask', `no certainty is a person's call, got ${r.body.data.outcome}`);
     assert(r.body.data.result === null, `and no number is invented, got ${JSON.stringify(r.body.data.result)}`);
     assert(r.body.data.passed?.tone === true, 'the floor it could measure still passed');
+  });
+  // The gate asks a PERSON. The agent it stopped could review its own decision, on either door, and
+  // the owner's item then closed as answered by a person.
+  await test('9f. the agent the gate stopped cannot review its own decision; another agent of the owner and the owner in person can, and the review names who', async () => {
+    const stopped = async (draft: string): Promise<{ decision: string; item: string }> => {
+      const r = await runRule(agentAi, 'send-reply', { draft, question: 'q' });
+      assert(r.status === 200 && r.body.data.gate?.stopped === true, `the gate stopped it: ${JSON.stringify(r.body.data?.gate ?? r.body.error)}`);
+      const item = (await gateItems()).find((i: any) => i.object.id === r.body.data.decision_id);
+      assert(!!item?.id, 'the stop put an item on the owner\'s list');
+      return { decision: r.body.data.decision_id as string, item: item.id as string };
+    };
+    const mine = await stopped('UNSURE draft the agent may not wave through');
+    const theirs = await stopped('UNSURE draft the owner answers');
+    const review = (token: string, id: string, outcome: string) => json(`/v1/ai/decisions/${id}/review`, {
+      method: 'POST', headers: auth(token), body: JSON.stringify({ outcome }),
+    });
+
+    const self = await review(agentAi, mine.decision, 'confirmed');
+    assert(self.status === 403 && self.body.error?.code === 'OWN_DECISION', `REST: ${self.status} ${JSON.stringify(self.body.error ?? self.body.data?.record?.review)}`);
+    const viaTool = await mcpCall(agentAi, 'aimeat_decision_review', { decision_id: mine.decision, outcome: 'confirmed' });
+    assert(viaTool.result?.isError === true && String(viaTool.result?.content?.[0]?.text).startsWith('OWN_DECISION'),
+      `MCP: ${JSON.stringify(viaTool.result ?? viaTool.error).slice(0, 200)}`);
+    const untouched = (await json(`/v1/ai/decisions/${mine.decision}`, { headers: auth(A.token) })).body.data;
+    assert(untouched.record.review === undefined, `a review was recorded: ${JSON.stringify(untouched.record.review)}`);
+    assert((await gateItems()).some((i: any) => i.id === mine.item), 'the owner\'s item is still waiting');
+
+    // The owner's chat is an agent too: another agent of the owner holding ai:use answers it.
+    const reviewer = await connectAgent(A, 'reviewerbot', ['ai:use']);
+    const byOther = await review(reviewer, mine.decision, 'confirmed');
+    assert(byOther.status === 200 && byOther.body.data.record.review?.by === `reviewerbot#${A.gaii}`,
+      `another agent: ${byOther.status} ${JSON.stringify(byOther.body.error ?? byOther.body.data?.record?.review)}`);
+    const byOwner = await review(A.token, theirs.decision, 'overridden');
+    assert(byOwner.status === 200 && byOwner.body.data.record.review?.by === A.gaii,
+      `the owner in person: ${byOwner.status} ${JSON.stringify(byOwner.body.error ?? byOwner.body.data?.record?.review)}`);
+    assert(!(await gateItems()).some((i: any) => i.id === mine.item || i.id === theirs.item), 'both items are answered');
+
+    // The list says who closed each: an agent's review is the AI acting for the person.
+    const list = (await json('/v1/memory/open-items.list', { headers: auth(A.token) })).body.data?.value;
+    const closedBy = (id: string) => (list?.closed ?? []).find((c: any) => c.id === id)?.closedBy;
+    assert(closedBy(mine.item) === 'ai' && closedBy(theirs.item) === 'person',
+      `closed by ${closedBy(mine.item)} and ${closedBy(theirs.item)}`);
   });
 
   console.log('\nPhase 10: a key per agent');
