@@ -17,6 +17,16 @@
  *   square mono chip, 2px framed, selected on the sun; and the ink slab, which comes from
  *   .btn-primary rather than from here.
  * @version-history
+ *   v2.13.0 -- 2026-09-26 -- A small heading over a group of fields, a card or a note is the Sub-heading (.sub-heading: small ink headline letters); the coral small capitals, the bold ink words and the coral headline letters go (a unification: Jouni's decision "Sub-heading").
+ *   v2.12.0 -- 2026-09-25 -- The move box's sentences are the Attention note's own words; the blocked and ready lines keep their colour as a tone (a unification: Jouni's decision Attention note).
+ *   v2.11.0 -- 2026-09-25 -- What a press did, said where it was pressed, is the Form message (css/components/form-message.css, its error cut when refused); a place keeps only its margin, a unification: the look most tabs use.
+ *   v2.10.0 -- 2026-09-25 -- What chooses what a list or a panel shows is the tab (.poster-tab, its filter and attention tones); the agent tabs take the tab's own size, a unification: Jouni's decision Tabs and filters.
+ *   v2.9.0 -- 2026-09-25 -- Every quiet way on is the action link (.poster-action, its quiet tone where it sits among controls), and the one loud action is the dark block (.poster-slab, its control cut), a unification: Jouni's decisions Action link and Loud action.
+ *   v2.8.0 -- 2026-09-25 -- Every small number is the Count (.poster-count tally, waiting at the limit), a unification: Jouni's decision Count.
+ *   v2.7.0 -- 2026-09-25 -- Every time a thing happened or runs out is the Timestamp (.poster-time); a place keeps only its layout (a unification: Jouni's decision Timestamp).
+ *   v2.6.0 -- 2026-09-25 -- Every tag is the Tag (.poster-chip), a unification: Jouni's decision Tag.
+ *   v2.5.0 -- 2026-09-25 -- Every word that says a state is the Status (.poster-status fine, attention, danger), a unification: Jouni's decision Status.
+ *   v2.4.0 -- 2026-09-25 -- A grey line that explains is the Hint (poster-hint, css/components/hint.css); a place keeps only its margin (a unification: the look most tabs use).
  *   2026-09-13 -- Compose shared aside cuts; normalize one-off geometry under brief 10.7.
  *   v2.3.0 -- 2026-09-13 -- Compose state section headings from the shared B1 shape.
  *   v2.2.0 -- 2026-09-13 -- Compose the standalone page title from poster.css.
@@ -68,51 +78,7 @@
   margin-bottom: 1.2rem;
 }
 
-.flt-count {
-  font-weight: var(--font-poster-strong-weight);
-  font-size: 0.95rem;
-  color: var(--text);
-}
-
-/* Shape 4: square, mono, a 2px frame in the current colour. */
-.flt-chip {
-  border: 2px solid var(--text);
-  border-radius: 0;
-  background: transparent;
-  color: var(--text);
-  padding: 0.15rem 0.55rem;
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
-  font-weight: 500;
-  letter-spacing: 0;
-  cursor: pointer;
-}
-
-.flt-chip--warn {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
-/* The selected chip sits on the sun with ink words, which is how every selection reads inside. */
-.flt-chip--warn.is-on {
-  background: var(--sun);
-  border-color: var(--text);
-  color: var(--on-sun);
-}
-
-.flt-chip--ok {
-  border-color: var(--success);
-  color: var(--success-fg);
-  cursor: default;
-}
-
-/* What the filter took away, said where the filter is, because on an account whose healthy agents
-   are all below the fold pressing it changed nothing a person could see. */
-.flt-hidden {
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  color: var(--text-dim);
-}
+/* The "need attention" filter is the tab's filter tone with its attention tone (poster.css). */
 
 /* ── One state, one sentence, then its rows ──
    The note used to be per row. On this developer's own account that rendered the identical three
@@ -143,13 +109,10 @@
 
 /* The state words inherit the B1 slab's foreground in both themes. */
 
+/* The sentence is the Hint (css/components/hint.css); its place only. */
 .flt-group-note {
   margin: 0 0 0.8rem;
   max-width: 60ch;
-  font-size: 0.88rem;
-  font-weight: var(--font-poster-text-weight);
-  line-height: 1.5;
-  color: var(--text-dim);
 }
 
 /* Shape 1: a section under a 3px ink rule, its rows on hairlines, the page showing through. */
@@ -195,31 +158,9 @@
   color: var(--accent);
 }
 
-.flt-badge {
-  font-family: var(--font-mono);
-  font-size: 0.66rem;
-  font-weight: 500;
-  letter-spacing: 0;
-  text-transform: uppercase;
-  padding: 1px 7px;
-  border: 2px solid var(--border);
-  border-radius: 0;
-  background: transparent;
-  color: var(--text-dim);
-}
-
-.flt-badge--run {
-  border-color: var(--text);
-  color: var(--text);
-}
-
-/* Replaces the unlabelled 8x8 dot. Only on the rows where it is true, so it is a difference. */
+/* Replaces the unlabelled 8x8 dot. Only on the rows where it is true, so it is a difference: the
+   Status (poster.css, its fine tone); its place only. */
 .flt-live {
-  font-family: var(--font-mono);
-  font-size: 0.68rem;
-  text-transform: uppercase;
-  letter-spacing: 0;
-  color: var(--success-fg);
   white-space: nowrap;
 }
 
@@ -232,30 +173,17 @@
   white-space: nowrap;
 }
 
-.flt-row-move:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
 /* The answer to this row's press, on this row. It is the only place a person is looking after
    pressing a button that is a thousand pixels below the banner. */
-.flt-row-said {
+.flt .flt-row-said {
   margin: 0.4rem 0 0;
-  padding-left: 0.7rem;
-  border-left: 3px solid var(--text);
-  font-size: 0.85rem;
-  line-height: 1.45;
   max-width: 70ch;
 }
 
-.flt-row-said.is-ok { border-left-color: var(--success); color: var(--success-fg); }
-.flt-row-said.is-bad { border-left-color: var(--accent); color: var(--accent); }
 
-/* The countdown, the one thing a row has that its neighbours do not. */
+/* The countdown, the one thing a row has that its neighbours do not: the Timestamp (.poster-time);
+   its place only. */
 .flt-days {
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
-  color: var(--text-dim);
   white-space: nowrap;
 }
 
@@ -284,23 +212,13 @@
 
 .flt-migrate-head {
   margin: 0;
-  font-family: var(--font-poster);
-  font-weight: var(--font-poster-weight);
-  font-size: 1.35rem;
-  line-height: var(--font-poster-leading);
-  letter-spacing: var(--font-poster-tracking);
-  text-transform: uppercase;
-  color: var(--text);
 }
 
+/* The box's sentences are the Attention note's own words (.poster-aside); their place only. */
 .flt-migrate-line {
   margin: 0;
   min-width: 0;
   max-width: 60ch;
-  font-size: 0.92rem;
-  font-weight: var(--font-poster-text-weight);
-  line-height: 1.5;
-  color: var(--text);
 }
 
 /* What it needs, or that it has it. The one line whose answer changes what the person does next,
@@ -308,34 +226,17 @@
 .flt-migrate-line.is-blocked { color: var(--accent); font-weight: var(--font-poster-strong-weight); }
 .flt-migrate-line.is-ready { color: var(--success-fg); font-weight: var(--font-poster-strong-weight); }
 
-/* Full size, not btn-sm: this is the one thing on the page that acts. The slab itself is
-   .btn-primary — the shared shape, so it is the ink slab with the sun shadow wherever the poster
-   skin reaches, and this file does not draw a second one. */
+/* This is the one thing on the page that acts: the loud action (.poster-slab, its control cut,
+   which also dims it while it cannot be pressed). This file does not draw a second one. */
 .flt-migrate button { margin-top: 0.6rem; }
 
 /* The reassurance. True and worth saying, but it is not the problem or the action, so it does not
-   compete with either. */
-.flt-migrate-keeps { color: var(--text-dim); font-size: 0.88rem; }
-
-/* A DISABLED BUTTON HAS TO LOOK DISABLED. Measured on the real page: with no connector running
-   the button is correctly `disabled`, and it rendered at full opacity with a pointer cursor — so
-   the sentence beside it said "start your connector" while the control next to it invited a press
-   that would do nothing. The state is spelled out rather than assumed to be inherited. */
-.flt-migrate button:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-  transform: none;
-}
+   compete with either: the Hint (css/components/hint.css); its place only. */
+.flt-migrate-keeps { margin: 0; }
 
 /* The answer stays where the person is looking. Full width so it never squeezes the button. */
-.flt-migrate-outcome {
+.flt .flt-migrate-outcome {
   margin: 0.3rem 0 0;
-  font-size: 0.88rem;
-  color: var(--text-dim);
-}
-
-.flt-migrate-outcome.is-bad {
-  color: var(--accent);
 }
 
 @media (max-width: 600px) {

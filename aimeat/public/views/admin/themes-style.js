@@ -11,6 +11,7 @@
  * @structure StyleScreen (default) · GROUPS · tokenKey · ColourRow · contrastKey
  * @usage html`<${StyleScreen} theme=${theme} styleId=${id} vocabulary=${v} readOnly=${false} onBack=${fn} />`
  * @version-history
+ *   v1.1.0 — 2026-09-26 — The dark block and the words on it (--ink-ground, --on-ink-ground) are among the cards and panels (Jouni's decision "dark-ground").
  *   v1.0.0 — 2026-09-24 — Initial (UI consolidation phase 4, Themes & Styles S3).
  */
 import { h } from 'preact';
@@ -48,7 +49,7 @@ const GROUPS = [
   ['words', ['--text', '--text-bright', '--text-dim', '--text-muted']],
   ['accent', ['--accent', '--accent-bright', '--accent-deep', '--accent-glow', '--accent-subtle', '--accent-border']],
   ['sun', ['--sun', '--on-sun']],
-  ['cards', ['--card-bg', '--card-bg-hover', '--card-bg-solid', '--card-bg-alt', '--card-border']],
+  ['cards', ['--card-bg', '--card-bg-hover', '--card-bg-solid', '--card-bg-alt', '--card-border', '--ink-ground', '--on-ink-ground']],
   ['lines', ['--border', '--border-subtle', '--border-focus']],
   ['fields', ['--bg-input', '--bg-input-focus', '--control-bg', '--control-border', '--code-bg', '--scrollbar-thumb']],
   ['love', ['--love1', '--love2', '--love3', '--love4', '--love5']],

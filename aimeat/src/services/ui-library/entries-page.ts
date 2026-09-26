@@ -9,6 +9,10 @@
  * @structure PAGE_ENTRIES
  * @usage import { PAGE_ENTRIES } from './entries-page.js';
  * @version-history
+ *   v1.6.0 — 2026-09-26 — The Timeline is every list of what happened in Settings & Controls (Jouni's decision "Activity log", a unification).
+ *   v1.5.0 — 2026-09-26 — A list of things to do or of steps is the numbered list (components/NumberedIndex.js: IndexList with IndexItem, or IndexStep for a step that opens nothing): the overview's next steps with the line under each name and the first on the sun, the Wallet key steps, a calibration run's proposals, the MCP and Agents connect steps, the basic agents, a server's setup steps (the number said once), the ecosystem steps out of their grey box, the decision rules' order and the notes of your own AI use; a place keeps only its margin (a unification: Jouni's decision "Numbered list").
+ *   v1.4.0 — 2026-09-26 — The Masthead takes a page's own lines under the address and a picture that opens something; the Settings overview draws it (Jouni's decision "Person head").
+ *   v1.3.0 — 2026-09-25 — The hint entry: the look most Settings & Controls tabs draw, its classes (drawn as markup inside a row), and the slab tone (UI consolidation phase 5, a unification).
  *   v1.2.0 — 2026-09-24 — Specimen is active: Themes & Styles draws it too.
  *   v1.1.0 — 2026-09-23 — DiagonalBand deleted with ChatDoor (Jouni's decision); Specimen added.
  *   v1.0.0 — 2026-09-23 — Initial (UI consolidation phase 1).
@@ -56,11 +60,11 @@ export const PAGE_ENTRIES: UiEntryWritten[] = [
     },
     {
         id: 'hint', name: 'Hint', kind: 'component', status: 'active',
-        summary: 'A quiet line of help under a control.',
-        module: '/components/Hint.js', sheet: '/css/components/hint.css',
-        data: { shape: 'Hint({ children })', fields: { children: 'the help sentence' } },
-        useFor: ['One sentence that tells what a control does or what happens next.'],
-        variants: [],
+        summary: 'A quiet line of help near a control or a section: the body face, small and grey, with a gap above.',
+        module: '/components/Hint.js', sheet: '/css/components/hint.css', classes: ['poster-hint', 'poster-hint--slab'],
+        data: { shape: 'Hint({ children }) · <span class="poster-hint">…</span> inside a row · <small class="poster-hint poster-hint--slab">…</small>', fields: { children: 'the help sentence' } },
+        useFor: ['One sentence that tells what a control does or what happens next.', 'A grey paragraph that explains a section.'],
+        variants: [{ name: 'slab', class: 'poster-hint--slab', when: 'beside a loud action: the mono line that says what it does, or why it cannot be pressed yet' }],
         example: one('You can change the name later.'),
     },
     {
@@ -68,10 +72,10 @@ export const PAGE_ENTRIES: UiEntryWritten[] = [
         summary: 'The top of a person\'s page: the avatar in its frame, the name as a headline, the identity line, and the doors on the right.',
         module: '/components/Masthead.js', sheet: '/css/components/masthead.css',
         data: {
-            shape: 'Masthead({ avatarSvg, name, identity, identityTitle, children }) · MastheadButton({ onClick, children }) · MastheadCog',
-            fields: { avatarSvg: 'the avatar as an SVG string', name: 'the person\'s name', identity: 'their address on this node', identityTitle: 'the full identity on hover', children: 'the doors: links with poster-action, or a MastheadButton' },
+            shape: 'Masthead({ avatarSvg, name, identity, identityTitle, plate, onAvatar, avatarTitle, children }) · MastheadButton({ onClick, children }) · MastheadCog',
+            fields: { avatarSvg: 'the avatar as an SVG string', name: 'the person\'s name', identity: 'their address on this node', identityTitle: 'the full identity on hover', plate: 'what a page adds under the address (the Settings overview: this AIMEAT\'s address and its marks)', onAvatar: 'makes the picture a control that opens something', avatarTitle: 'the name of that control', children: 'the doors: links with poster-action, or a MastheadButton' },
         },
-        useFor: ['The home and any page that belongs to one person.'],
+        useFor: ['The home, the Settings overview and any page that belongs to one person.'],
         variants: [],
         example: { avatarSvg: '<svg…/>', name: 'Alice', identity: 'alice@aimeat.io', children: 'Settings' },
     },
@@ -177,14 +181,18 @@ export const PAGE_ENTRIES: UiEntryWritten[] = [
     },
     {
         id: 'numbered-index', name: 'NumberedIndex', kind: 'component', status: 'active',
-        summary: 'A numbered index: each row a name with its number and an arrow; the open one shows its steps in a record (poster.css .poster-record).',
+        summary: 'A numbered list: each row a name with its number and an arrow, a 2px ink rule under it; in the index the open one shows its steps in a record (poster.css .poster-record).',
         module: '/components/NumberedIndex.js', sheet: '/css/components/numbered-index.css',
         data: {
-            shape: 'NumberedIndex({ lead, label, tour, children, panel }) · IndexPanel({ what, steps, proof, children })',
-            fields: { lead: 'the line above the index', label: 'the list name, for a screen reader', tour: '{ href, label } for a guided tour', children: 'the rows (FoldButtons)', panel: 'the open row\'s IndexPanel', what: 'what the open one is', steps: 'its steps', proof: 'how a person knows it worked' },
+            shape: 'NumberedIndex({ lead, label, tour, children, panel }) · IndexItem({ on, expanded, onClick, first, line, end, children }) · IndexList({ steps, className, children }) · IndexStep({ line, end, children }) · IndexPanel({ what, steps, proof, children })',
+            fields: { lead: 'the line above the index', label: 'the list name, for a screen reader', tour: '{ href, label } for a guided tour', children: 'the rows (IndexItem, or IndexStep in a list of steps)', panel: 'the open row\'s IndexPanel', what: 'what the open one is', steps: 'its steps; on IndexList, a list of steps to read', proof: 'how a person knows it worked', line: 'a line under the name that says what the row gives you', first: 'the one to do first', end: 'a word that stands before the arrow' },
         },
-        useFor: ['A short set of things a person can learn to do, one opened at a time.'],
-        variants: [],
+        useFor: ['A short set of things a person can learn to do, one opened at a time.', 'Things to do next, under a page\'s own heading (IndexList).', 'A list of steps, or of short notes, in Settings (IndexList steps).'],
+        variants: [
+            { name: 'with a line', class: 'poster-index-line', prop: 'line', when: 'a line under the name says what the row gives you' },
+            { name: 'first', class: 'poster-index-item--first', prop: 'first', when: 'the one to do first: on the sun, every mark dark' },
+            { name: 'steps', class: 'poster-index-item--step', prop: 'IndexList steps', when: 'a list of steps or notes: a row that opens nothing' },
+        ],
         example: { lead: 'Things to try', rows: ['Make a page', 'Connect an agent'], panel: { what: 'A page with its own address', steps: ['Ask for it', 'Open it'], proof: 'It opens in a new tab.' } },
     },
     {
@@ -213,7 +221,7 @@ export const PAGE_ENTRIES: UiEntryWritten[] = [
             shape: 'Timeline({ title, band, quiet, more, children }) · TimelineList({ children }) · TimelineRow({ category, live, href, text, when })',
             fields: { title: 'the headline', band: 'drawn as a Band', quiet: '{ href, text } for a quiet period', more: '{ href, text } to the full record', category: 'made, agent, trouble, money, access or system', live: 'happening now (pulses)', text: 'what happened', when: 'the time' },
         },
-        useFor: ['A record of events, on the home and on the full history page.'],
+        useFor: ['A record of events, on the home and on the full history page.', 'Every list of what happened in Settings & Controls: an agent\'s activity (the kind tag before the line), an opened task\'s events, a workspace\'s activity and its recent decisions.'],
         variants: [
             { name: 'made', class: 'poster-timeline-item--made', prop: "category='made'", when: 'something was made' },
             { name: 'agent', class: 'poster-timeline-item--agent', prop: "category='agent'", when: 'an agent did it' },

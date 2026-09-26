@@ -8,17 +8,21 @@
  * @usage Linked from public/spa.html in the component block, whose order keeps the order these
  *   rules had when they were one sheet.
  * @version-history
+ *   v1.2.0 — 2026-09-26 — The rule over the rows and the line under each row read --shape-frame-heavy, --shape-frame and --shape-rule-colour (a move: the AIMEAT values equal the old ones).
+ *   v1.1.0 — 2026-09-26 — The line under a name, the first row on the sun with every mark dark, the
+ *     opened row's number dark, the rows alone (IndexList) and a step that opens nothing (IndexStep)
+ *     (Jouni's decision "Numbered list").
  *   v1.0.0 — 2026-09-23 — Moved unchanged from css/parts*.css (UI consolidation phase 1, a move).
  */
 
 /* ── Playbooks: a numbered index. Closed they are the rows; open, one shows its steps. ── */
 .poster-index-lead { margin: -0.4rem 0 1.2rem; font-size: var(--text-md); font-weight: var(--weight-semibold); color: var(--text-dim); line-height: 1.5; max-width: 44rem; }
 .poster-index .poster-named-row { border-top: 0; padding-top: 0; }
-.poster-index .poster-named-row-body { display: flex; flex-direction: column; gap: 0; border-top: 3px solid var(--text); counter-reset: poster-index; }
+.poster-index .poster-named-row-body { display: flex; flex-direction: column; gap: 0; border-top: var(--shape-frame-heavy) solid var(--shape-rule-colour); counter-reset: poster-index; }
 .poster-index .poster-index-item {
   display: flex; align-items: baseline; gap: 1.4rem; width: 100%;
   background: none; border: 0; cursor: pointer;
-  padding: 0.9rem 0; border-bottom: 2px solid var(--text);
+  padding: 0.9rem 0; border-bottom: var(--shape-frame) solid var(--shape-rule-colour);
   /* The row name at the strong weight, not black: heavier than the band's headline, the list
      out-shouted its own title. */
   font-family: var(--font-showroom-body); font-weight: var(--font-poster-strong-weight); font-size: 1.3rem; letter-spacing: -0.01em;
@@ -29,6 +33,20 @@
 .poster-index .poster-index-item::after { content: '\2192'; margin-left: auto; font-family: var(--font-poster); font-size: var(--text-lg); }
 .poster-index .poster-index-item:hover, .poster-index .poster-index-item--on { background: var(--sun); color: var(--on-sun); }
 .poster-index .poster-index-item--on::after { content: '\2193'; }
+/* The rows alone, under a page's own heading (IndexList): the same rule over them and the same count. */
+.poster-index-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0; border-top: var(--shape-frame-heavy) solid var(--shape-rule-colour); counter-reset: poster-index; }
+/* The tone with a line: the name, and under it what the row gives you (the overview's steps drew it). */
+.poster-index .poster-index-body { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.poster-index .poster-index-line { font-family: var(--font-showroom-body); font-size: .92rem; font-weight: var(--weight-semibold); letter-spacing: 0; line-height: 1.45; color: var(--text-dim); }
+/* The first tone: the one to do first, on the sun. */
+.poster-index .poster-index-item--first { background: var(--sun); color: var(--on-sun); }
+/* On the sun every mark takes the words-on-sun colour: the grey line read 2.7:1 there (1.3:1 dark),
+   the coral number about 2:1, and the arrow 1.5:1 in dark mode. The opened row is the same fix. */
+.poster-index .poster-index-item--first::before, .poster-index .poster-index-item--first::after,
+.poster-index .poster-index-item--first .poster-index-line, .poster-index .poster-index-item--on::before { color: var(--on-sun); }
+/* A step of a list of steps (IndexStep) opens nothing: no pointer, and no sun under it. */
+.poster-index .poster-index-item--step { cursor: auto; }
+.poster-index .poster-index-item--step:hover { background: none; color: var(--text); }
 .poster-index-tour { font-size: var(--text-note); color: var(--accent); text-decoration: underline; text-underline-offset: 4px; font-family: var(--font-mono); align-self: flex-start; margin-top: 0.8rem; }
 /* The opened playbook is poster.css .poster-record; this is only its distance from the index. */
 .poster-index-open { margin-top: 1rem; }

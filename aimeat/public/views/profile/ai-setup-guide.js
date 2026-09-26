@@ -14,6 +14,11 @@
  * @structure McpSetupGuide({ installClassName }) · InstructionsDialog({ open, onClose })
  * @usage import { McpSetupGuide, InstructionsDialog } from '/views/profile/ai-setup-guide.js';
  * @version-history
+ *   v2.6.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
+ *   v2.5.0 -- 2026-09-26 -- McpSetupGuide takes `stepRows`: the steps are then the numbered list's rows (IndexList), as the MCP tab and the Agents tab draw them (a unification: Jouni's decision "Numbered list"). Without it the part's classic list stays, as the home draws it.
+ *   v2.4.0 -- 2026-09-25 -- McpSetupGuide takes `facts`: the field table is then the Facts (css/components/facts.css), a unification: the look most tabs use. Without it the classic rows stay, for the pages that have not moved.
+ *   v2.3.0 -- 2026-09-25 -- Every drop-down is the Select field (.select-field, css/components/select-field.css); a place keeps only its width and margin (a unification: the look most tabs use).
+ *   2026-09-25 -- What chooses what a list or a panel shows is the tab (.poster-tab, with its fold and filter tones), a unification: Jouni's decision "Tabs and filters".
  *   2026-09-24 -- "Official instructions" is the action link's more tone (Jouni's decision "Small
  *     link").
  *   2026-09-24 -- The copy buttons (a field's Copy, Copy the command) are the underlined action link
@@ -40,6 +45,7 @@ import { CopyButton } from '/components/CopyButton.js';
 import { useAiTools } from '/views/profile/ai-tool-setup.js';
 import { InstructionBlock } from '/views/profile/instruction-block.js';
 import { McpInstallRow } from '/components/McpInstall.js';
+import { IndexList, IndexStep } from '/components/NumberedIndex.js';
 import { getOrganismsTab } from '/js/services/organisms.js';
 import { swallowed } from '/js/swallowed.js';
 
@@ -65,9 +71,32 @@ function ToolPicker({ tools, value, onPick, tabClass = 'ast-tool', activeClass =
     </div>`;
 }
 
-/** The parameter table: every field the tool's form asks for, and what to put in it. */
-function Params({ params }) {
+/** One field's value: the text with its copy door, or "leave empty". */
+function paramValue(v) {
+  return v
+    ? html`<code class="ast-code">${v}</code> <${CopyButton} text=${v} className="poster-action poster-action--small"
+        label=${tr('common.copy', 'Copy')} copiedLabel=${tr('common.copied', 'Copied')} />`
+    : html`<span class="ast-param-empty">${tr('setup.leaveEmpty', 'leave empty')}</span>`;
+}
+
+/**
+ * The parameter table: every field the tool's form asks for, and what to put in it. With `facts`
+ * the pairs are the Facts part (css/components/facts.css): the field's name as the row label, the
+ * value on the right, its note as the grey line under it.
+ */
+function Params({ params, facts = false }) {
   if (!params?.length) return null;
+  if (facts) {
+    return html`
+      <div class="ast-params">
+        <div class="ast-params-head">${tr('setup.paramsTitle', 'What to put in each field')}</div>
+        <div class="facts">
+          ${params.map((prm, i) => html`
+            <div class="facts-k poster-label" key=${'k' + i}>${prm.label}</div>
+            <div class="facts-v" key=${'v' + i}>${paramValue(prm.value)}${prm.note ? html`<small>${prm.note}</small>` : null}</div>`)}
+        </div>
+      </div>`;
+  }
   return html`
     <div class="ast-params">
       <div class="ast-params-head">${tr('setup.paramsTitle', 'What to put in each field')}</div>
@@ -78,7 +107,7 @@ function Params({ params }) {
             <div class="ast-param-label">${prm.label}</div>
             <div class="ast-param-value">
               ${v
-                ? html`<code class="ast-code">${v}</code><${CopyButton} text=${v} className="poster-action"
+                ? html`<code class="ast-code">${v}</code><${CopyButton} text=${v} className="poster-action poster-action--small"
                     label=${tr('common.copy', 'Copy')} copiedLabel=${tr('common.copied', 'Copied')} />`
                 : html`<span class="ast-param-empty">${tr('setup.leaveEmpty', 'leave empty')}</span>`}
             </div>
@@ -92,10 +121,11 @@ function Params({ params }) {
  * How to attach this node to one AI tool: the steps as things to click or type, every field value,
  * and the vendor's own page. `tabClass` / `activeClass`: the tool tabs' classes, so a poster-face
  * page can hand in its own shared tab (poster-tab / is-on) instead of restyling .ast-tool from
- * outside.
- * @param {{ installClassName?: string, tabClass?: string, activeClass?: string }} [props]
+ * outside. `facts`: the field table as the Facts part instead of the classic ruled rows.
+ * `stepRows`: the steps as the numbered list's rows (IndexList) instead of the part's classic list.
+ * @param {{ installClassName?: string, tabClass?: string, activeClass?: string, facts?: boolean, stepRows?: boolean }} [props]
  */
-export function McpSetupGuide({ installClassName = '', tabClass, activeClass } = {}) {
+export function McpSetupGuide({ installClassName = '', tabClass, activeClass, facts = false, stepRows = false } = {}) {
   const tools = useAiTools();
   const [toolId, setToolId] = useState(rememberedTool);
   const pick = (id) => {
@@ -120,18 +150,20 @@ export function McpSetupGuide({ installClassName = '', tabClass, activeClass } =
       ${tool.mcp.plans ? html`<p class="ast-plans">${tool.mcp.plans}</p>` : null}
       ${tool.mcp.warn ? html`<p class="ast-warn">${tool.mcp.warn}</p>` : null}
 
-      <ol class="ast-steps">
-        ${tool.mcp.steps.map((step, i) => html`<li key=${i}>${step}</li>`)}
-      </ol>
+      ${stepRows
+        ? html`<${IndexList} steps className="ast-step-rows">${tool.mcp.steps.map((step, i) => html`<${IndexStep} key=${i}>${step}<//>`)}<//>`
+        : html`<ol class="ast-steps">
+            ${tool.mcp.steps.map((step, i) => html`<li key=${i}>${step}</li>`)}
+          </ol>`}
 
       ${cmd ? html`
         <div class="ast-cmd">
           <pre class="ast-cmd-text">${cmd}</pre>
-          <${CopyButton} text=${cmd} className="poster-action"
+          <${CopyButton} text=${cmd} className="poster-action poster-action--small"
             label=${tr('setup.copyCmd', 'Copy the command')} copiedLabel=${tr('common.copied', 'Copied')} />
         </div>` : null}
 
-      <${Params} params=${tool.mcp.params} />
+      <${Params} params=${tool.mcp.params} facts=${facts} />
 
       ${tool.mcp.note ? html`<p class="ast-note">${tool.mcp.note}</p>` : null}
 
@@ -182,7 +214,7 @@ export function InstructionsDialog({ open, onClose }) {
         : html`
           ${orgs.length > 1 ? html`
             <label class="ast-label" for="ast-org">${tr('setup.whichOrg', 'Which organism?')}</label>
-            <select id="ast-org" class="input-field ast-select" value=${orgId} onChange=${(e) => setOrgId(e.target.value)}>
+            <select id="ast-org" class="select-field ast-select" value=${orgId} onChange=${(e) => setOrgId(e.target.value)}>
               ${orgs.map(o => html`<option value=${o.id} key=${o.id}>${o.name || o.id}</option>`)}
             </select>` : null}
           <${InstructionBlock} orgId=${orgId} />`}
@@ -190,7 +222,7 @@ export function InstructionsDialog({ open, onClose }) {
       ${tool ? html`
         <div class="ast-where">
           <div class="ast-where-head">${tr('setup.whereTitle', 'Where it goes in your tool')}</div>
-          <${ToolPicker} tools=${tools} value=${tool.id} onPick=${pick} />
+          <${ToolPicker} tools=${tools} value=${tool.id} onPick=${pick} tabClass="poster-tab" activeClass="is-on" />
           <p class="ast-where-path">${tool.instructions.where}</p>
           ${tool.instructions.docs ? html`
             <a class="poster-action poster-action--more ast-docs" href=${tool.instructions.docs} target="_blank" rel="noopener">

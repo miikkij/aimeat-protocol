@@ -1,0 +1,44 @@
+/**
+ * @file record-row.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description A record of a workspace's record space, one per row: its colour mark, a draft's state, the
+ *   record's title as a button that opens it (coral under the pointer), its tags and doors; opened, its
+ *   fields (or its editor) under a dashed hairline, and its comments. A draft's row has a warning rail
+ *   on the left. Inside a workspace page each record is a row over a hairline with no card. Drawn only
+ *   by views/profile/organisms/workspace/record-space.js; moved here unchanged with its class names out
+ *   of views/profile.css (the classic card), views/profile-poster.css (the poster face) and
+ *   views/organism.css (inside a page), in that order, so the later still wins (UI consolidation
+ *   phase 5, a move). The row's line (.pj-item) came with it, before the draft rail that overrides
+ *   its padding.
+ *   Shape values: the draft rail's 3px reads --shape-frame-heavy, the poster face's dashed 2px
+ *   --shape-frame, every corner --shape-corner (the classic card's, the fields' and the editor's).
+ *   Drawn as markup: <div class="pj-rec"><div class="pj-item pj-item-draft">…<button class="pj-rec-title">…</button>…</div>
+ *   <div class="pj-rec-fields">…</div></div>.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.1.0 -- 2026-09-26 -- The classic card's 8px corner and the fields' and the editor's 6px corners read --shape-corner (Jouni's note on the round's shape check: "tee samankaltaiseksi tyyli kuin muuallakin"); the header no longer names the decisions list, which is the Timeline now.
+ *   v1.0.0 -- 2026-09-26 -- Moved out of profile.css, profile-poster.css and organism.css (UI consolidation phase 5, a move).
+ */
+
+/* ── The classic card (was views/profile.css) ── */
+/* The row's line (the workspace's decisions list writes it too). */
+.pj-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.35rem 0; }
+/* Draft rows get a warn-coloured rail + a bordered, bolder DRAFT chip so the
+   draft state actually reads (the pale badge alone was nearly invisible). */
+.pj-item-draft { border-left: var(--shape-frame-heavy) solid var(--warn); padding-left: 0.5rem; }
+/* Each record is its own card with air around it, so stacked records read as separate units. */
+.pj-rec { border: 1px solid var(--border); background: var(--card); border-radius: var(--shape-corner); padding: 0.4rem 0.7rem; margin: 0.5rem 0; }
+.pj-rec-title { flex: 1; text-align: left; background: none; border: none; cursor: pointer; font-size: 0.9rem; color: var(--text); padding: 0; }
+.pj-rec-title:hover { color: var(--accent); }
+.pj-rec-fields { margin: 0.4rem 0 0.2rem; padding: 0.5rem 0.7rem; border-top: 1px solid var(--border); background: var(--bg-dim); border-radius: var(--shape-corner); }
+/* Inline editor — replaces the field view in the SAME card while editing (one editor at a time). */
+.pj-rec-edit { margin: 0.4rem 0 0.2rem; padding: 0.5rem 0.7rem; border-top: 1px solid var(--border); background: var(--bg-dim); border-radius: var(--shape-corner); }
+.pj-rec-edit-new { border-top: none; }
+
+/* ── The poster face (was views/profile-poster.css) ── */
+.pj-rec-fields, .pj-rec-edit { border-radius: var(--shape-corner); background: none; border-top: var(--shape-frame) dashed var(--border); }
+.pj-rec-title { font-weight: var(--font-poster-text-weight); }
+
+/* ── Inside a workspace page (was views/organism.css): the record loses the card ── */
+.og-page .pj-rec { border-radius: var(--shape-corner); border: 0; border-bottom: 1px solid var(--border); box-shadow: none; background: transparent; }

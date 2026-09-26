@@ -1,0 +1,33 @@
+/**
+ * @file facts.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description Facts: named values in two columns, the name (the row label, .poster-label) on the left
+ *   and its value on the right, with an optional grey line under the value; one column on a phone.
+ *   The look most Settings & Controls tabs already draw (skills, extensions, capabilities, libraries,
+ *   packages: identical copies), taken as the one look for this kind (UI consolidation phase 5).
+ *   Drawn as markup: <dl class="facts"><dt class="facts-k poster-label">…</dt><dd class="facts-v">…</dd></dl>.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.2.0 — 2026-09-26 — The value's warn tone, .facts-v--warn: a figure that needs a look in the Status's attention colour (formerly agents-detail.css .pf-agd-warning-text), a meaning.
+ *   v1.1.0 — 2026-09-25 — The Settings facts move onto it (a unification: the look most tabs use). The
+ *     grey line under a value leaves a Form message (small.form-message) to its own look, as the AI
+ *     tab's copy did.
+ *   v1.0.0 — 2026-09-25 — Initial, with the values of the copies in the Settings tabs (sk-kv, ex-kv,
+ *     cp-kv, lb-kv, pk-kv and their keys and values).
+ */
+
+.facts { display: grid; grid-template-columns: minmax(7rem, 10rem) minmax(0, 1fr); gap: .7rem 1.2rem; align-items: start; margin: .8rem 0 0; }
+/* The wide cut: a longer name column and more air above (an AI's rule, an opened panel's facts). */
+.facts--wide { grid-template-columns: minmax(8rem, 12rem) minmax(0, 1fr); margin-top: 1rem; }
+.facts-k { margin: 0; padding-top: .25rem; }
+.facts-v { margin: 0; font-size: .9rem; line-height: 1.5; color: var(--text); min-width: 0; overflow-wrap: anywhere; }
+/* The warn tone: a value that needs a look (policy issues above zero), in the attention colour. */
+.facts-v--warn { color: var(--warn-fg); }
+.facts-v small:where(:not(.form-message)) { display: block; margin-top: .15rem; font-size: .8rem; line-height: 1.45; color: var(--text-dim); }
+.facts-v .og-crumb-link { font-size: inherit; }
+
+@media (max-width: 860px) {
+  .facts, .facts--wide { grid-template-columns: 1fr; gap: .3rem 0; }
+  .facts-k { padding-top: .6rem; }
+}

@@ -1,0 +1,59 @@
+/**
+ * @file doc-tree.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The document tree of a workspace's document space: the index on the left (sections that
+ *   nest, each with its name, the documents under it with a drag grip, a series of parts folded under
+ *   one row) and the open document beside it; the open document's row on the sun with an ink rail.
+ *   Drawn by views/profile/organisms/workspace/doc-space.js.
+ *   Moved unchanged out of views/profile.css (the tree) and views/organism.css (its poster-face
+ *   overrides inside .og-page), in that order, so they keep their order against each other; the class
+ *   names stay. Shape values: the rail's 3px reads --shape-frame-heavy, the square corners
+ *   --shape-corner and the section name's capitals --shape-case-heading (the same values). The
+ *   index's and a row's corners read --shape-corner, a series' head (a button) --shape-corner-control;
+ *   the open row is marked by its ground (outside the page kit) or its ink rail (inside it).
+ *   NOTE: this file must be linked in spa.html, just before views/organism.css.
+ * @version-history
+ *   v1.2.0 -- 2026-09-26 -- The index's 10px corner and a row's 6px corner read --shape-corner, a series' head's 6px --shape-corner-control; the open row's inset 3px coral shadow goes, its ground stays (Jouni's note on the round's shape check: "tee samankaltaiseksi tyyli kuin muuallakin").
+ *   v1.1.0 -- 2026-09-26 -- A series' arrow (.pj-ov-chevron), a part of the tree left in views/profile.css, moved here unchanged (UI consolidation phase 5, a move).
+ *   v1.0.0 -- 2026-09-25 -- Moved out of views/profile.css and views/organism.css (UI consolidation phase 5, a move).
+ */
+
+/* ── The tree (was views/profile.css) ── */
+.pj-doc-link { background: none; border: none; color: var(--accent); cursor: pointer; font-size: 0.9rem; text-align: left; flex: 1; padding: 0; }
+.pj-doc-link:hover { text-decoration: underline; }
+.pj-docspace { display: flex; gap: 0.75rem; align-items: flex-start; }
+/* The left index/tree — white so a selected item's accent tint actually stands out against it. */
+.pj-doc-index { flex: 0 0 240px; min-width: 200px; border-radius: var(--shape-corner); padding: 0.5rem; background: var(--card); max-height: 460px; overflow: auto; }
+.pj-doc-main { flex: 1; min-width: 0; }
+.pj-sec { margin-bottom: 0.25rem; }
+.pj-sec .pj-sec { margin-left: 0.85rem; border-left: 1px solid var(--border); padding-left: 0.4rem; }
+.pj-sec-head { display: flex; align-items: center; gap: 0.2rem; }
+.pj-sec-name { flex: 1; font-weight: 600; font-size: 0.82rem; }
+.pj-sec-head .og-input { flex: 1; }
+.pj-sec-name.pj-muted { color: var(--muted); font-weight: 500; padding: 0.15rem 0; }
+.pj-sec-name-text { flex: 1; font-weight: 600; font-size: 0.82rem; cursor: text; }
+.pj-grip { cursor: grab; color: var(--muted); font-size: 0.8rem; user-select: none; }
+.pj-doc-item[draggable="true"] { cursor: grab; }
+.pj-doc-item { display: flex; align-items: center; gap: 0.3rem; padding: 0.15rem 0.3rem; border-radius: var(--shape-corner); }
+.pj-doc-item:hover { background: var(--bg-surface); }
+.pj-doc-item.active { background: var(--accent-subtle); }
+.pj-doc-item .pj-doc-link { flex: 1; font-size: 0.85rem; color: var(--text); }
+/* Multi-part document series collapsed under one row (niputus) — in the doc index. */
+.pj-doc-series-head { display: flex; align-items: center; gap: 0.3rem; width: 100%; padding: 0.15rem 0.3rem; border: 0; background: none; border-radius: var(--shape-corner-control); cursor: pointer; text-align: left; font-size: 0.85rem; font-weight: 600; color: var(--text); }
+.pj-doc-series-head:hover { background: var(--bg-surface); }
+.pj-doc-series-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The series' arrow (was views/profile.css). */
+.pj-ov-chevron { color: var(--muted); font-size: 0.8rem; width: 1em; flex-shrink: 0; }
+.pj-doc-series-parts { margin-left: 0.85rem; border-left: 1px solid var(--border); padding-left: 0.4rem; }
+@media (max-width: 640px) { .pj-docspace { flex-direction: column; } .pj-doc-index { flex: none; width: 100%; } }
+
+/* ── Inside a workspace page (was views/organism.css) ── */
+/* The document index and the document lose the card: paper, an ink rule, the sun on the open one. */
+.og-page .pj-doc-index { flex: 0 0 250px; border-radius: var(--shape-corner); background: transparent; padding: .4rem 0 0; max-height: none; }
+.og-page .pj-doc-item { border-radius: var(--shape-corner); border-left: var(--shape-frame-heavy) solid transparent; padding: .3rem .4rem .3rem .6rem; }
+.og-page .pj-doc-item.active { background: var(--sun); border-left-color: var(--text); }
+.og-page .pj-doc-item.active .pj-doc-link { color: var(--on-sun); font-weight: 800; }
+.og-page .pj-doc-item .pj-doc-link { font-size: .88rem; font-weight: 600; }
+.og-page .pj-sec-name-text { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: .8rem; letter-spacing: .05em; text-transform: var(--shape-case-heading); }
+.og-page .pj-docspace { gap: 2.75rem; }

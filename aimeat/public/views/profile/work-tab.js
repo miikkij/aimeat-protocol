@@ -6,6 +6,25 @@
  *   Displays inbox (received) and sent work items with accept/decline/deliver actions
  *   and a rating modal for completed deliveries.
  * @version-history
+ *   v1.15.0 -- 2026-09-26 -- Rating a work item is the library's Rating stars in the tone to give (css/components/rating-stars.css): dark up to the rating and up to the star under the pointer, instead of amber (a unification: Jouni's decision "Rating stars").
+ *   v1.14.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
+ *   v1.13.0 -- 2026-09-26 -- Every line that says a part is loading is the loading line: the quiet sentence with the blinking Loading mark, LoadingLine in views/profile/shared.js (a unification: the look most tabs use).
+ *   v1.12.0 -- 2026-09-25 -- The older tabs' remaining help lines are the Hint (.poster-hint); their own sizes and greys go, a place keeps its margin (a unification: the look most tabs use).
+ *   v1.11.0 -- 2026-09-25 -- A list drawn as classic cards is the Listing (css/components/listing.css), a row that opens shows the Listing's open panel; the card, its header, arrow and detail rules go (a unification: the look most tabs use).
+ *   v1.10.0 -- 2026-09-25 -- Every many-line field is the Text area (.og-textarea); a place keeps only its size and margin (a unification: the look most tabs use).
+ *   v1.9.0 -- 2026-09-25 -- The crumb is the full trail (Settings & Controls / the menu group / the tab), as in the kit tabs (a unification).
+ *   v1.8.0 -- 2026-09-25 -- The page head is the kit's crumb trail and page head (.og-crumb, .og-mast, .og-title, .og-desc), the look most tabs use (a unification).
+ *   v1.7.0 -- 2026-09-25 -- Every word that says a state is the Status (.poster-status fine, attention, danger, off), a unification: Jouni's decision Status.
+ *   v1.6.0 -- 2026-09-25 -- The row labels (field and key labels, column heads, box labels) wear .poster-label (Jouni's decision "Row label", a unification).
+ *   v1.5.0 — 2026-09-25 — Every quiet way on is the library's action link, .poster-action, with the
+ *     tone its meaning names: more for "show all" and more of a list, back, text for a plain grey
+ *     word, quiet (Jouni's decisions "Action link", "Panel action", "Dismiss", "Small link", "Step
+ *     button").
+ *   v1.4.0 — 2026-09-25 — The loud action is the library's dark block, .poster-slab: the control cut
+ *     where it sits in a row of controls or waits to be enabled, the danger tone for a delete that
+ *     cannot be undone (Jouni's decision "Loud action").
+ *   2026-09-25 -- The lines that say a list is empty (or has nothing to show yet) are the quiet sentence (.poster-quiet, QuietNote), a unification: Jouni's decision "Empty line".
+ *   2026-09-25 -- What chooses what a list or a panel shows is the tab (.poster-tab, with its fold and filter tones), a unification: Jouni's decision "Tabs and filters".
  *   2026-09-13 -- V2u: compose the tab strip top rule from poster.css.
  *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
  *   2026-09-13 — The rate and deliver dialogs' actions sit in their footers, Cancel first.
@@ -24,7 +43,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { Modal } from '/components/Modal.js';
 import { escHtml, timeAgo } from '/js/utils.js';
-import { Spinner } from './shared.js';
+import { LoadingLine } from './shared.js';
 import { listInbox, listSent, getWorkOverview, submitRating, acceptWork, rejectWork, deliverWork } from '/js/services/work.js';
 import { swallowed } from '/js/swallowed.js';
 
@@ -131,22 +150,20 @@ export default function WorkTab({ session, showToast, onStats }) {
 
   function statusBadgeClass(status) {
     switch (status) {
-      case 'completed': return 'badge-success';
+      case 'completed':
       case 'accepted':
-      case 'in_progress': return 'badge-info';
-      case 'delivered': return 'badge-warn';
-      case 'pending':
-      case 'offered': return 'badge-muted';
+      case 'in_progress': return 'poster-status--fine';
+      case 'delivered': return 'poster-status--attention';
       case 'rejected':
-      case 'cancelled': return 'badge-danger';
-      default: return 'badge-muted';
+      case 'cancelled': return 'poster-status--danger';
+      default: return 'poster-status--off';
     }
   }
 
   function renderList(items, type) {
-    if (!items) return html`<${Spinner} text=${t('profile.work.loading')} />`;
-    if (items.length === 0) return html`<div class="empty">${t(type === 'sent' ? 'profile.work.sentEmpty' : 'profile.work.empty')}</div>`;
-    return items.map(w => {
+    if (!items) return html`<${LoadingLine} text=${t('profile.work.loading')} />`;
+    if (items.length === 0) return html`<div class="poster-quiet">${t(type === 'sent' ? 'profile.work.sentEmpty' : 'profile.work.empty')}</div>`;
+    return html`<div class="listing listing--name-desc-doors">${items.map(w => {
       const tc = w.tc || w.id || w.work_id;
       const isLoading = actionLoading === tc;
       const status = w.status || '-';
@@ -154,50 +171,50 @@ export default function WorkTab({ session, showToast, onStats }) {
       const isActive = status === 'accepted' || status === 'in_progress';
 
       return html`
-        <div class="card poster-row--thing">
-          <div class="card-header">
-            <div class="card-title">${escHtml(w.description || w.action_name || '-')}</div>
-            <span class="badge ${statusBadgeClass(status)}">${status}</span>
-          </div>
-          <div class="card-subtitle">
+        <div class="listing-row" key=${tc}>
+          <div class="listing-name">${escHtml(w.description || w.action_name || '-')}</div>
+          <div class="listing-desc">
             ${type === 'sent' ? t('profile.work.provider') + ': ' + escHtml(w.provider_gaii || '-') : t('profile.work.from') + ': ' + escHtml(w.requester_gaii || '-')}
             ${w.price_morsels != null ? ' \u2502 ' + t('profile.work.cost') + ': ' + w.price_morsels + ' \u2764\uFE0F' : ''}
             ${w.created_at ? ' \u2502 ' + timeAgo(w.created_at) : ''}
           </div>
-
+          <div class="listing-doors">
+          <span class="poster-status ${statusBadgeClass(status)}">${status}</span>
           ${type === 'inbox' && isPending && html`
-            <div class="card-actions flex-row">
-              <button class="btn-primary btn-sm" disabled=${isLoading} onClick=${() => handleAccept(tc)}>
+              <button class="poster-slab poster-slab--control" disabled=${isLoading} onClick=${() => handleAccept(tc)}>
                 ${isLoading ? '...' : t('profile.work.accepted')}
               </button>
-              <button class="btn-outline btn-sm" disabled=${isLoading} onClick=${() => handleReject(tc)}>
+              <button class="poster-action poster-action--small poster-action--row" disabled=${isLoading} onClick=${() => handleReject(tc)}>
                 ${isLoading ? '...' : t('profile.work.declined')}
               </button>
-            </div>
           `}
 
           ${type === 'inbox' && isActive && html`
-            <div class="card-actions flex-row">
-              <button class="btn-primary btn-sm" disabled=${isLoading} onClick=${() => setDeliverModal({ tc, desc: w.description || w.action_name })}>
+              <button class="poster-slab poster-slab--control" disabled=${isLoading} onClick=${() => setDeliverModal({ tc, desc: w.description || w.action_name })}>
                 ${t('profile.work.deliver')}
               </button>
-            </div>
           `}
 
           ${type === 'sent' && w.status === 'delivered' && html`
-            <button class="btn-sm mt-xs" onClick=${() => setRateModal({ workId: tc, desc: w.description || w.action_name })}>${t('profile.work.rateBtn')}</button>
+            <button class="poster-action poster-action--small poster-action--row" onClick=${() => setRateModal({ workId: tc, desc: w.description || w.action_name })}>${t('profile.work.rateBtn')}</button>
           `}
+          </div>
         </div>
       `;
-    });
+    })}</div>`;
   }
 
   return html`
-    <div class="poster-page-title">${t('profile.work.title')}</div>
-    <div class="section-desc">${t('profile.work.desc')}</div>
+    <div class="og mb-1">
+      <div class="og-crumb"><span>${t('nav.profile')}</span><span>/</span><span>${t('profile.landing.menuBuildShare')}</span><span>/</span><span class="og-crumb-here">${t('profile.tabs.work')}</span></div>
+      <div class="og-mast"><div class="og-mast-words">
+        <div class="og-title poster-page-title">${t('profile.work.title')}</div>
+        <div class="og-desc">${t('profile.work.desc')}</div>
+      </div></div>
+    </div>
     <div class="sub-tabs poster-row--thing">
-      <button class="sub-tab ${workSubTab === 'inbox' ? 'active' : ''}" onClick=${() => setWorkSubTab('inbox')}>${t('profile.work.inbox')}</button>
-      <button class="sub-tab ${workSubTab === 'sent' ? 'active' : ''}" onClick=${() => setWorkSubTab('sent')}>${t('profile.work.sent')}</button>
+      <button class="poster-tab ${workSubTab === 'inbox' ? 'is-on' : ''}" onClick=${() => setWorkSubTab('inbox')}>${t('profile.work.inbox')}</button>
+      <button class="poster-tab ${workSubTab === 'sent' ? 'is-on' : ''}" onClick=${() => setWorkSubTab('sent')}>${t('profile.work.sent')}</button>
     </div>
     ${workSubTab === 'inbox' ? renderList(workInbox, 'inbox') : renderList(workSent, 'sent')}
 
@@ -220,13 +237,13 @@ function RateModal({ desc, onSubmit, onCancel }) {
       footer=${html`
         <button class="poster-action" onClick=${onCancel}>${t('profile.cancel')}</button>
         <button class="poster-slab poster-slab--control" onClick=${() => onSubmit(rating, comment)}>${t('profile.work.submitRating')}</button>`}>
-      <p class="text-meta mb-1">${t('profile.work.rateDesc')} ${escHtml(desc || '')}</p>
-      <div class="star-rating mb-1">
+      <p class="poster-hint mb-1">${t('profile.work.rateDesc')} ${escHtml(desc || '')}</p>
+      <div class="op-stars mb-1">
         ${[1,2,3,4,5].map(i => html`
-          <span class="star ${i <= rating ? 'active' : ''}" onClick=${() => setRating(i)}>\u2605</span>
+          <span class="op-star ${i <= rating ? 'on' : ''}" onClick=${() => setRating(i)}>\u2605</span>
         `)}
       </div>
-      <div class="form-row"><label>${t('profile.work.commentLabel')}</label><textarea class="input-field" rows="2" value=${comment} onInput=${e => setComment(e.target.value)}></textarea></div>
+      <div class="form-row"><label class="poster-label">${t('profile.work.commentLabel')}</label><textarea class="og-textarea" rows="2" value=${comment} onInput=${e => setComment(e.target.value)}></textarea></div>
     <//>`;
 }
 
@@ -239,10 +256,10 @@ function DeliverModal({ desc, loading, onSubmit, onCancel }) {
         <button class="poster-slab poster-slab--control" disabled=${loading} onClick=${() => onSubmit(result || undefined)}>
           ${loading ? t('profile.work.delivering') : t('profile.work.deliver')}
         </button>`}>
-      <p class="text-meta mb-1">${t('profile.work.delivering')}: ${escHtml(desc || '')}</p>
+      <p class="poster-hint mb-1">${t('profile.work.delivering')}: ${escHtml(desc || '')}</p>
       <div class="form-row">
-        <label>${t('profile.work.commentLabel')}</label>
-        <textarea class="input-field" rows="4" placeholder="Describe the completed work or attach results..."
+        <label class="poster-label">${t('profile.work.commentLabel')}</label>
+        <textarea class="og-textarea" rows="4" placeholder="Describe the completed work or attach results..."
           value=${result} onInput=${e => setResult(e.target.value)}></textarea>
       </div>
     <//>`;

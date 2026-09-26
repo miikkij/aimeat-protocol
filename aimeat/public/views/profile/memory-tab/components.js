@@ -7,6 +7,29 @@
  *   universal file preview modal, the drag-and-drop upload form, and the edit-memory modal.
  *   Extracted from memory-tab.js to satisfy max-file-lines.
  * @version-history
+ *   v1.17.0 -- 2026-09-26 -- A discovered value's preview is the Code block (css/components/code-block.css), a unification: Jouni's decision "Code block".
+ *   v1.16.0 -- 2026-09-26 -- A file's tag that takes itself off is the removable tag (.tag-removable) and its ✕ the Tag's remove mark (.poster-chip-x): grey, coral while the pointer is on the tag (a unification: Jouni's decision "Remove mark").
+ *   v1.15.0 -- 2026-09-26 -- A small heading over a group of fields, a card or a note is the Sub-heading (.sub-heading: small ink headline letters); the coral small capitals, the bold ink words and the coral headline letters go (a unification: Jouni's decision "Sub-heading").
+ *   v1.14.0 -- 2026-09-26 -- A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
+ *   v1.13.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
+ *   v1.12.0 -- 2026-09-25 -- The collection's items are the Listing (css/components/listing.css), a unification: the look most tabs use.
+ *   v1.11.0 -- 2026-09-25 -- Every drop-down is the Select field (.select-field, css/components/select-field.css); a place keeps only its width and margin (a unification: the look most tabs use).
+ *   v1.10.0 -- 2026-09-25 -- Every many-line field is the Text area (.og-textarea); a place keeps only its size and margin (a unification: the look most tabs use).
+ *   v1.9.0 -- 2026-09-25 -- Every one-line field is the Text field (.og-input); a place keeps only its layout (a unification: the look most tabs use).
+ *   v1.8.0 -- 2026-09-25 -- Every small number is the Count (.poster-count waiting or tally), a unification: Jouni's decision Count.
+ *   v1.7.0 -- 2026-09-25 -- Every tag is the Tag (.poster-chip and its tones, .poster-chips for a row), a unification: Jouni's decision Tag.
+ *   v1.6.0 -- 2026-09-25 -- The line a form says after it acted is the Form message; a refusal is its error tone (UI consolidation phase 5, a unification).
+ *   v1.5.0 -- 2026-09-25 -- The row labels (field and key labels, column heads, box labels) wear .poster-label (Jouni's decision "Row label", a unification).
+ *   v1.4.0 — 2026-09-25 — A button that is a mark, not a word (a delete or close mark, a menu's dots,
+ *     an arrow), is the library's small icon button, .poster-icon.poster-icon--small (Jouni's decision
+ *     "Icon button").
+ *   v1.3.0 — 2026-09-25 — Every quiet way on is the library's action link, .poster-action, with the
+ *     tone its meaning names: more for "show all" and more of a list, back, text for a plain grey
+ *     word, quiet (Jouni's decisions "Action link", "Panel action", "Dismiss", "Small link", "Step
+ *     button").
+ *   v1.2.0 — 2026-09-25 — The loud action is the library's dark block, .poster-slab: the control cut
+ *     where it sits in a row of controls or waits to be enabled, the danger tone for a delete that
+ *     cannot be undone (Jouni's decision "Loud action").
  *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
  *   v1.1.1 — 2026-09-13 — The file preview (extra large) and the edit dialog (large) keep their actions
  *     in the footer.
@@ -45,7 +68,7 @@ export function DiscoverPreview({ ownerGaii, memKey }) {
   if (err) return html`<div class="mem-discover-preview"><span class="text-meta-sm" style="color:var(--danger)">${err}</span></div>`;
   const text = typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value || '');
   const truncated = text.length > 2000 ? text.slice(0, 2000) + '\n...' : text;
-  return html`<div class="mem-discover-preview"><pre>${truncated}</pre></div>`;
+  return html`<div class="mem-discover-preview"><pre class="code-block">${truncated}</pre></div>`;
 }
 
 // Collection cart tray — lists gathered memory entries + files and exports them three ways:
@@ -118,45 +141,45 @@ export function CartTray({ cart, nodeUrl, orgs, onRemove, onClear, showToast }) 
   };
 
   return html`
-    <div class="mem-cart">
+    <div class="mem-cart poster-box">
       <div class="mem-cart-head" role="button" tabindex="0" onClick=${() => setOpen(o => !o)}>
-        <span class="mem-cart-title">🛒 ${t('profile.memory.cartTitle') || 'Collection'} <span class="mem-cart-count">${cart.length}</span></span>
+        <span class="mem-cart-title sub-heading">🛒 ${t('profile.memory.cartTitle') || 'Collection'} <span class="poster-count poster-count--waiting">${cart.length}</span></span>
         <span class="mem-cart-head-actions">
           <span class="pf-chevron ${open ? 'pf-chevron-open' : ''}">▼</span>
-          <button class="btn-ghost btn-sm" onClick=${(e) => { e.stopPropagation(); onClear(); }}>${t('profile.memory.cartClear') || 'Clear'}</button>
+          <button class="poster-action poster-action--small" onClick=${(e) => { e.stopPropagation(); onClear(); }}>${t('profile.memory.cartClear') || 'Clear'}</button>
         </span>
       </div>
       ${open && html`
         <div class="mem-cart-body">
-          <div class="mem-cart-list">
+          <div class="listing listing--mark-name-doors listing--cols mem-cart-list">
             ${cart.map(it => html`
-              <div class="mem-cart-item" key=${idOf(it)}>
-                <span class="mem-cart-item-icon">${it.kind === 'file' ? '📎' : '🧠'}</span>
-                <span class="mem-cart-item-label" title=${it.key}>${it.label || it.key}</span>
-                <button class="pj-icon-btn" title=${t('profile.memory.cartRemove') || 'Remove from collection'} onClick=${() => onRemove(idOf(it))}>✕</button>
+              <div class="listing-row" key=${idOf(it)}>
+                <div>${it.kind === 'file' ? '📎' : '🧠'}</div>
+                <div class="listing-name" title=${it.key}>${it.label || it.key}</div>
+                <div class="listing-doors"><button class="poster-icon poster-icon--small" title=${t('profile.memory.cartRemove') || 'Remove from collection'} onClick=${() => onRemove(idOf(it))}>✕</button></div>
               </div>`)}
           </div>
           <div class="mem-cart-actions">
             <${CopyButton} text=${urlList} label=${'📋 ' + (t('profile.memory.cartCopyUrls') || 'Copy URL list')}
-              className="btn-outline btn-sm" onCopied=${() => showToast(t('profile.memory.cartUrlsCopied') || 'URL list copied')} />
-            <button class="btn-outline btn-sm" onClick=${downloadText}>⬇ ${t('profile.memory.cartDownloadTxt') || 'URL list (.txt)'}</button>
-            <button class="btn-outline btn-sm" disabled=${zipping} onClick=${downloadZip}>${zipping ? '…' : '⬇ ' + (t('profile.memory.cartDownloadZip') || 'Download ZIP')}</button>
-            <button class="btn-outline btn-sm" onClick=${() => setSendOpen(s => !s)}>→ ${t('profile.memory.cartSend') || 'Send to workspace'}</button>
+              className="poster-action poster-action--small" onCopied=${() => showToast(t('profile.memory.cartUrlsCopied') || 'URL list copied')} />
+            <button class="poster-action poster-action--small" onClick=${downloadText}>⬇ ${t('profile.memory.cartDownloadTxt') || 'URL list (.txt)'}</button>
+            <button class="poster-action poster-action--small" disabled=${zipping} onClick=${downloadZip}>${zipping ? '…' : '⬇ ' + (t('profile.memory.cartDownloadZip') || 'Download ZIP')}</button>
+            <button class="poster-action poster-action--small" onClick=${() => setSendOpen(s => !s)}>→ ${t('profile.memory.cartSend') || 'Send to workspace'}</button>
           </div>
           ${sendOpen && html`
             <div class="mem-cart-send">
               ${(orgs || []).length === 0
                 ? html`<span class="text-meta-sm">${t('profile.memory.cartNoOrgs') || 'You are not in any organism workspaces yet.'}</span>`
                 : html`
-                  <select class="input-field mem-vis-select" value=${sendOrg} onChange=${e => pickOrg(e.target.value)}>
+                  <select class="select-field mem-vis-select" value=${sendOrg} onChange=${e => pickOrg(e.target.value)}>
                     <option value="">${t('profile.memory.cartPickOrg') || 'Choose organism…'}</option>
                     ${(orgs || []).map(o => html`<option key=${o.id} value=${o.id}>${o.name}</option>`)}
                   </select>
-                  <select class="input-field mem-vis-select" value=${sendWs} disabled=${!sendOrg} onChange=${e => setSendWs(e.target.value)}>
+                  <select class="select-field mem-vis-select" value=${sendWs} disabled=${!sendOrg} onChange=${e => setSendWs(e.target.value)}>
                     <option value="">${t('profile.memory.cartPickWs') || 'Choose workspace…'}</option>
                     ${workspaces.map(w => html`<option key=${w.id} value=${w.id}>${w.name || w.id}</option>`)}
                   </select>
-                  <button class="btn-primary btn-sm" disabled=${!sendWs || sending} onClick=${sendToWorkspace}>${sending ? '…' : (t('profile.memory.cartSendBtn') || 'Add as sources')}</button>`}
+                  <button class="poster-slab poster-slab--control" disabled=${!sendWs || sending} onClick=${sendToWorkspace}>${sending ? '…' : (t('profile.memory.cartSendBtn') || 'Add as sources')}</button>`}
             </div>`}
         </div>`}
     </div>`;
@@ -169,10 +192,10 @@ export function MemoryForm({ onSave, onCancel }) {
   const [tags, setTags] = useState('');
   return html`
     <div class="create-form poster-row--thing">
-      <div class="form-row"><label>${t('profile.memory.keyLabel')}</label><input class="input-field" placeholder=${t('profile.memory.keyPlaceholder')} value=${key} onInput=${e => setKey(e.target.value)} /></div>
-      <div class="form-row"><label>${t('profile.memory.valueLabel')}</label><textarea class="input-field" rows="3" placeholder=${t('profile.memory.valuePlaceholder')} value=${value} onInput=${e => setValue(e.target.value)}></textarea></div>
-      <div class="form-row"><label>${t('profile.memory.visLabel')}</label>
-        <select class="input-field" value=${vis} onChange=${e => setVis(e.target.value)}>
+      <div class="form-row"><label class="poster-label">${t('profile.memory.keyLabel')}</label><input class="og-input" placeholder=${t('profile.memory.keyPlaceholder')} value=${key} onInput=${e => setKey(e.target.value)} /></div>
+      <div class="form-row"><label class="poster-label">${t('profile.memory.valueLabel')}</label><textarea class="og-textarea" rows="3" placeholder=${t('profile.memory.valuePlaceholder')} value=${value} onInput=${e => setValue(e.target.value)}></textarea></div>
+      <div class="form-row"><label class="poster-label">${t('profile.memory.visLabel')}</label>
+        <select class="select-field" value=${vis} onChange=${e => setVis(e.target.value)}>
           ${/* No "group" option: a group is an audience, not a visibility. Create the record with
                 the visibility it should have for everyone else, then share the key space with a
                 group from the row or from Access — one share covers the keys written after it. */''}
@@ -182,10 +205,10 @@ export function MemoryForm({ onSave, onCancel }) {
           <option value="public">${t('profile.memory.visPublic')}</option>
         </select>
       </div>
-      <div class="form-row"><label>${t('profile.memory.tagsLabel')}</label><input class="input-field" placeholder=${t('profile.memory.tagsPlaceholder')} value=${tags} onInput=${e => setTags(e.target.value)} /></div>
+      <div class="form-row"><label class="poster-label">${t('profile.memory.tagsLabel')}</label><input class="og-input" placeholder=${t('profile.memory.tagsPlaceholder')} value=${tags} onInput=${e => setTags(e.target.value)} /></div>
       <div class="form-actions">
-        <button class="btn-primary" onClick=${() => { if (!key || !value) return; onSave(key, value, vis, tags, undefined); }}>${t('profile.memory.saveBtn')}</button>
-        <button class="btn-outline" onClick=${onCancel}>${t('profile.memory.cancelBtn')}</button>
+        <button class="poster-slab" onClick=${() => { if (!key || !value) return; onSave(key, value, vis, tags, undefined); }}>${t('profile.memory.saveBtn')}</button>
+        <button class="poster-action poster-action--small" onClick=${onCancel}>${t('profile.memory.cancelBtn')}</button>
       </div>
     </div>`;
 }
@@ -334,46 +357,46 @@ export function FileUploadForm({ onUpload, onCancel }) {
           ${fileItems.map((item, idx) => html`
             <div class="file-upload-item" key=${item.file.name + item.file.size}>
               <span class="pf-file-icon">${fileIcon(item.file.type)}</span>
-              <input class="input-field pf-flex-fill" value=${item.key}
+              <input class="og-input pf-flex-fill" value=${item.key}
                 onInput=${e => updateKey(idx, e.target.value)}
                 onClick=${e => e.stopPropagation()} />
               <span class="text-meta pf-nowrap pf-shrink-0">${Math.round(item.file.size / 1024)} KB</span>
-              <button class="btn-outline btn-sm pf-shrink-0" onClick=${() => removeFile(idx)}>✕</button>
+              <button class="poster-icon poster-icon--small pf-shrink-0" onClick=${() => removeFile(idx)}>✕</button>
             </div>
           `)}
         </div>
       `}
-      <div class="form-row"><label>${t('profile.files.visLabel')}</label>
-        <select class="input-field" value=${vis} onChange=${e => setVis(e.target.value)}>
+      <div class="form-row"><label class="poster-label">${t('profile.files.visLabel')}</label>
+        <select class="select-field" value=${vis} onChange=${e => setVis(e.target.value)}>
           <option value="private">${t('profile.files.visPrivate')}</option>
           <option value="owner">${t('profile.files.visOwner')}</option>
           <option value="group">Group</option>
           <option value="public">${t('profile.files.visPublic')}</option>
         </select>
       </div>
-      <div class="form-row"><label>${t('profile.files.tagsLabel') || 'Tags'}</label>
+      <div class="form-row"><label class="poster-label">${t('profile.files.tagsLabel') || 'Tags'}</label>
         <div class="flex-row">
-          <input class="input-field pf-flex-fill" placeholder=${t('profile.files.tagsPlaceholder') || 'Add tag and press Enter'}
+          <input class="og-input pf-flex-fill" placeholder=${t('profile.files.tagsPlaceholder') || 'Add tag and press Enter'}
             value=${tagInput} onInput=${e => setTagInput(e.target.value)}
             onKeyDown=${e => { if (e.key === 'Enter') { e.preventDefault(); addTag(); } }} />
-          <button type="button" class="btn-sm" onClick=${addTag}>+</button>
+          <button type="button" class="poster-icon poster-icon--small" onClick=${addTag}>+</button>
         </div>
         ${fileTags.length > 0 && html`
           <div class="file-tag-cloud mb-half">
             ${fileTags.map(tag => html`
-              <span class="file-tag-btn active" key=${tag} onClick=${() => removeTag(tag)}>
-                ${tag} ✕
+              <span class="poster-chip tag-removable" key=${tag} onClick=${() => removeTag(tag)}>
+                ${tag} <span class="poster-chip-x">✕</span>
               </span>
             `)}
           </div>
         `}
       </div>
       <div class="form-actions">
-        <button class="btn-primary" disabled=${fileItems.length === 0 || uploading}
+        <button class="poster-slab poster-slab--control" disabled=${fileItems.length === 0 || uploading}
           onClick=${handleSubmit}>
           ${uploading ? '...' : fileItems.length > 1 ? `${t('profile.files.uploadSaveBtn')} (${fileItems.length})` : t('profile.files.uploadSaveBtn')}
         </button>
-        <button class="btn-outline" onClick=${onCancel}>${t('profile.files.cancelBtn')}</button>
+        <button class="poster-action poster-action--small" onClick=${onCancel}>${t('profile.files.cancelBtn')}</button>
       </div>
     </div>`;
 }
@@ -398,15 +421,15 @@ export function EditMemoryModal({ memKey, initialValue, initialVisibility, initi
         <button class="poster-slab poster-slab--control" disabled=${!canSave}
           onClick=${() => onSave(value, vis, initialVersion, undefined)}>${t('profile.save')}</button>`}>
         <div class="form-row flex-row mb-half">
-          <label class="pf-label-inline">${t('profile.memory.visLabel')}</label>
+          <label class="poster-label pf-label-inline">${t('profile.memory.visLabel')}</label>
           ${/* Same as the create form: a group is an audience, not a visibility. Sharing a key
                 space with one is done from the row's share panel or the Access tab. */''}
-          <select class="input-field mem-vis-select" value=${vis} onChange=${e => setVis(e.target.value)}>
+          <select class="select-field mem-vis-select" value=${vis} onChange=${e => setVis(e.target.value)}>
             ${['private', 'owner', 'members', 'public'].map(v => html`<option key=${v} value=${v}>${t('knowledge.visibility.' + v)}</option>`)}
           </select>
         </div>
-        <textarea class="input-field mem-edit-textarea ${jsonError ? 'mem-edit-textarea--error' : ''}" rows="14"
+        <textarea class="og-textarea mem-edit-textarea ${jsonError ? 'mem-edit-textarea--error' : ''}" rows="14"
           value=${value} onInput=${e => setValue(e.target.value)}></textarea>
-        ${jsonError && html`<div class="mem-json-error">${t('profile.memory.invalidJson')} — ${jsonError}</div>`}
+        ${jsonError && html`<div class="form-message form-message--error">${t('profile.memory.invalidJson')} — ${jsonError}</div>`}
     <//>`;
 }

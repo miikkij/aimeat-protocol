@@ -13,6 +13,17 @@
  *   that may never ship, and a part's sheet is catalogued and drawn by pages.
  * @usage Loaded by the lab's preview page only (views/design-lab/frame.js); no other page carries it.
  * @version-history
+ *   v1.9.0 — 2026-09-26 — The last round of Settings: the suggested reply on the yellow, a delivery
+ *     row's small stars, and what Pebble's own entries would do (figure strip, top bar corners, band).
+ *   v1.8.0 — 2026-09-26 — Wave 4: a board member's ✗ grey at rest (decision "Remove mark").
+ *   v1.7.0 — 2026-09-25 — Wave 3: the stars' dark tone, the small reader, the question box on the
+ *     page's ground and the tabs' dark tone on the sun.
+ *   v1.6.0 — 2026-09-25 — The check line at the body's size (decision "Check line").
+ *   v1.5.0 — 2026-09-25 — The action link's small, row and lower-case tones for "Action link in
+ *     Settings"; the decision pictures stop answering the pointer; readable marks on the sun; the
+ *     person heading, the message's name line and the phone row of the typing box.
+ *   v1.4.0 — 2026-09-25 — The conflicts round of Settings & Controls: the numbered list's two kept
+ *     tones, the person heading in the conversation list, a list's column width and two stacked tones.
  *   v1.3.0 — 2026-09-24 — The dialog footer's old rules under .dl-was, for the picture of "today"
  *     of the built decision "Dialog actions".
  *   v1.2.0 — 2026-09-24 — The rules of built proposals removed (count, headings, box, aside; the icon
@@ -87,3 +98,131 @@ dialog.dlg.dl-was .dlg-foot .btn-primary, dialog.dlg.dl-was .dlg-foot .btn-dange
 dialog.dlg.dl-was .dlg-foot .btn-danger-solid { background: var(--accent); color: #fff; box-shadow: 4px 4px 0 var(--text); }
 dialog.dlg.dl-was .dlg-foot .btn-primary:hover:not(:disabled) { color: var(--sun); background: var(--text); transform: translate(2px, 2px); box-shadow: 2px 2px 0 var(--sun); }
 dialog.dlg.dl-was .dlg-foot .btn-danger-solid:hover:not(:disabled) { background: var(--accent); transform: translate(2px, 2px); box-shadow: 2px 2px 0 var(--text); }
+
+/* ── The conflicts round of Settings & Controls (2026-09-25) ── */
+/* A list as wide as its page's column: the chat's side column and Messages' list are narrow, and a
+   preview frame is wider. Layout only. */
+.poster-specimen-stage .dl-column { max-width: 21rem; }
+/* Two tones of a full-width part, one under the other. */
+.dl-stack { display: flex; flex-direction: column; gap: 1.25rem; }
+.dl-stack > .poster-specimen-tone { display: flex; }
+
+/* Numbered list: the overview's steps as the home's rows (.poster-index-item). The line under the
+   name from .pf-next-card-desc (profile.css); the first step on the sun from .pf-next-card--primary,
+   with the arrow kept, where the home's opened row (--on) turns it down. */
+.poster-index .dl-index-body { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.poster-index .dl-index-desc {
+  font-family: var(--font-showroom-body); font-size: .92rem; font-weight: var(--weight-semibold);
+  letter-spacing: 0; line-height: 1.45; color: var(--text-dim);
+}
+.poster-index .poster-index-item.dl-index-item--first { background: var(--sun); color: var(--on-sun); }
+/* On the sun every mark takes the words-on-sun colour: today the grey line reads 2.7:1 (1.3:1 dark),
+   the coral number about 2:1, and the arrow 1.5:1 in dark mode. The home's opened row is the same fix. */
+.poster-index .poster-index-item.dl-index-item--first::before, .poster-index .poster-index-item.dl-index-item--first::after,
+.poster-index .poster-index-item.dl-index-item--first .dl-index-desc,
+.poster-index .poster-index-item.dl-index-item--readable::before, .poster-index .poster-index-item.dl-index-item--readable::after { color: var(--on-sun); }
+
+/* Conversation list: under the section heading (the decided group heading), a person's heading that
+   opens and closes as today's does: the arrow, a small framed picture, the name, the presence word
+   and the two numbers, named. On the open (yellow) row the line under the name takes the
+   words-on-sun colour: grey there reads 2.7:1 (1.3:1 dark). */
+.dl-thread-person {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; width: 100%; padding: 10px 0 6px;
+  background: none; border: 0; color: var(--text); font: inherit; text-align: left; cursor: pointer;
+}
+.dl-thread-face { display: inline-block; width: 24px; height: 24px; overflow: hidden; flex: none; }
+.dl-thread-face svg { display: block; width: 100%; height: 100%; }
+.dl-thread-name { font-weight: var(--weight-heavy); font-size: .92rem; }
+.dl-readable .poster-thread--active .poster-thread-sub { color: var(--on-sun); }
+/* The line under the name carries the last message, so it keeps to one line, cut short, as the
+   Messages row cuts it today (.inbox-conv-preview). */
+.poster-thread .dl-thread-sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Message: a Messages message as the chat's turn. The sender's name keeps .inbox-bubble-who's look
+   (inbox-poster.css: .64rem 700, .08em, capitals, coral; yours in ink); the line under the message
+   wraps on a narrow screen; the read marks keep .inbox-tick--read's coral. */
+.dl-turn-who { font-family: var(--font-showroom-body); font-size: .64rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+.poster-turn--user .dl-turn-who { color: var(--text); }
+.poster-turn-meta.dl-turn-meta { flex-wrap: wrap; row-gap: 4px; }
+.dl-turn-read { color: var(--accent); }
+
+/* Typing box: Messages' row keeps a usable field on a phone. Below the composer's own phone width
+   the field takes the whole first line and the tools and the button go under it, the button on the right. */
+@media (max-width: 760px) {
+  .dl-row--stack .poster-composer-row { flex-wrap: wrap; }
+  .dl-row--stack .poster-composer-input { flex: 1 1 100%; }
+  .dl-row--stack .poster-composer-send { margin-left: auto; }
+}
+
+/* The decision pictures do not answer the pointer: a hover inside one (a yellow row, a delete square)
+   would show a state the picture is not about. Only the pictures drawn alone (.dl-solo); the
+   library's demos stay interactive. */
+.poster-specimen-stage.dl-solo, .poster-specimen-stage.dl-solo * { pointer-events: none; }
+
+/* Check line: the words beside a box or a dot at the body's size in ink, as Packages draws them
+   (.pk-compose-app: Archivo 16px 400, --text); the box itself is the browser's, as everywhere. */
+.dl-check-line { display: inline-flex; align-items: center; gap: .4rem; margin-right: 1rem; font-size: 1rem; font-weight: var(--weight-regular); color: var(--text); }
+
+/* Rating stars: the library's stars (rating-stars.css) in the proposal's tone, the given ones dark
+   instead of yellow; `shown` is the small size of a rating you read (from .agt-stars, 1rem). */
+.dl-stars .op-star.on { color: var(--text); }
+.dl-stars--shown .op-star { font-size: 1rem; padding: 0 .05rem; cursor: default; }
+
+/* Small reader: one small cut of the Markdown reader, from the agent README's values (headings
+   1.4 / 1.2 / 1.05rem, paragraphs .5rem apart). The words keep the reader's own size (.md-body sets
+   it, so a wrapper's font-size never reached them in any of these places). */
+.dl-md-small .md-body h1 { font-size: 1.4rem; }
+.dl-md-small .md-body h2 { font-size: 1.2rem; }
+.dl-md-small .md-body h3 { font-size: 1.05rem; }
+.dl-md-small .md-body p, .dl-md-small .md-body ul, .dl-md-small .md-body ol { margin: .5rem 0; }
+
+/* Question box: the waiting question on the page's ground (the .wp-ask values without the sun),
+   and the tabs' dark tone for the question kept on the sun. */
+.dl-ask-plain { padding: 1rem 1.2rem; border: 3px solid var(--text); background: var(--card-bg); color: var(--text); margin-top: .8rem; }
+.dl-ask-plain b { display: block; font-size: 1rem; font-weight: 800; line-height: 1.35; }
+.dl-ask-plain p { margin: .3rem 0 .7rem; font-size: .85rem; line-height: 1.5; color: var(--text-dim); }
+.dl-ask-plain .og-doors, .wp-ask .poster-specimen-row { margin-top: .8rem; }
+.wp-ask .poster-tab.dl-tab-ink { color: var(--on-sun); border-bottom-color: var(--on-sun); }
+.wp-ask .poster-tab.dl-tab-ink.is-on { background: var(--on-sun); color: var(--sun); }
+
+/* Action link in Settings: the small tone keeps the Settings door's values (.og-door,
+   organism-controls.css): the page's body face, .8rem, a 2px line, 1px under the words. In a dense
+   row it is .72rem (.sk-go .og-door and its kin); the lower-case tone is .og-door--quiet's (no
+   capitals, no letter spacing, .88rem), .72rem in a row as well. */
+.poster-action.dl-action--small { border-bottom-width: 2px; padding: 0 0 1px; font-family: var(--font-showroom-body); font-size: .8rem; }
+.poster-action.dl-action--row { font-size: .72rem; }
+.poster-action.dl-action--lower { text-transform: none; letter-spacing: 0; font-size: .88rem; }
+.poster-action.dl-action--lower.dl-action--row { font-size: .72rem; }
+
+/* Remove mark: a board member's ✗ at rest in the agent tag's grey (.agp-chips .pf-agd-tag-chip-remove,
+   agents-poster.css); the coral stays for the pointer, which a lab picture does not show. */
+.bp-member-list .bp-member-x.dl-x-rest { color: var(--text-dim); }
+
+/* ── The last round of Settings. A rule under [data-aimeat-theme="pebble"] draws what an entry of
+   Pebble's own would do; AIMEAT's frames never read it. ── */
+/* Suggested reply, the option: your own message's yellow (.og-ib .inbox-bubble--mine) with a dashed frame. */
+.og-ib .inbox-bubble--mine.dl-draft-sun { border-style: dashed; border-color: var(--on-sun); }
+.og-ib .inbox-bubble--mine.dl-draft-sun .inbox-draft-label { color: var(--on-sun); }
+/* Suggested reply, the proposal: the dashed box, its words in the text colour (not your own words'
+   ink on the yellow, which is dark on the dark page in dark mode). */
+.og-ib .inbox-bubble--draft.dl-draft-readable, .og-ib .inbox-bubble--draft.dl-draft-readable .md-body, .og-ib .inbox-bubble--draft.dl-draft-readable .md-body p { color: var(--text); }
+/* A delivery's status cell at its column's width, and the library's stars cut small for it. */
+.dl-cell-7 { width: 7rem; }
+.op-stars--shown.dl-stars--row { margin-left: .3rem; vertical-align: baseline; }
+.op-stars--shown.dl-stars--row .op-star { font-size: .7rem; padding: 0; }
+/* Figure strip words: Pebble's own entry at its headline weight; the option, the strong weight everywhere. */
+[data-aimeat-theme="pebble"] .dl-pebble-strip .og-strip span { font-weight: 600; }
+.dl-strip-strong .og-strip span { font-weight: var(--font-poster-strong-weight); }
+/* Contents rail: a lab frame has no viewport height to cap it, so the whole rail shows. The raised
+   shadow at every width (the proposal), and the option's own value with AIMEAT's 6 px as its default. */
+.dl-rail-stage .og-rail { max-height: none; position: static; }
+.og-rail.dl-rail-raised { box-shadow: var(--shape-shadow-raised); }
+.og-rail.dl-rail-value { box-shadow: var(--dl-shape-shadow-rail, 6px 6px 0 var(--sun)); }
+/* Classic cards, the option: Pebble's own card entry wins over Settings' section. */
+[data-aimeat-theme="pebble"] .pf .card.dl-card-theme { background: var(--bg-card); border: 1px solid var(--card-border); border-radius: 18px; box-shadow: var(--shape-shadow); padding: 2rem; }
+/* Top bar corners: Pebble's own entry (the proposal) and the shape value in every theme (the option). */
+[data-aimeat-theme="pebble"] .dl-pebble-entry :is(.topnav-center, .topnav-burger) { border-radius: var(--shape-corner-control); }
+.dl-corner-control :is(.topnav-center, .topnav-burger) { border-radius: var(--shape-corner-control); }
+.poster-specimen-stage .topnav-burger { display: inline-flex; }
+/* Pebble's band: its "stat" entry without the line that colours the band's figures. */
+[data-aimeat-theme="pebble"] .dl-pebble-fix .poster-stat-number--band { color: var(--bg); }

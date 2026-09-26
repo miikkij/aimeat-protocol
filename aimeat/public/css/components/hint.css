@@ -2,12 +2,23 @@
  * @file hint.css
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description A quiet line of help under a control. Drawn by components/Hint.js. Reads only the tokens in
+ * @description A quiet line of help near a control or a section. Drawn by components/Hint.js, or as markup
+ *   (<span class="poster-hint">…</span>) where the line sits inside a row. Reads only the tokens in
  *   theme.css and the shapes in poster.css; a page never styles it from outside.
+ *   The slab tone is the mono line beside a loud action that says what the action does, or why it
+ *   cannot be pressed yet: <small class="poster-hint poster-hint--slab">…</small>.
  * @usage Linked from public/spa.html in the component block, whose order keeps the order these
  *   rules had when they were one sheet.
  * @version-history
+ *   v1.1.0 — 2026-09-25 — The look 21 Settings & Controls tabs draw as identical copies: body face, .82rem,
+ *     line-height 1.5, the gap above rather than below; and the slab tone, with the values of the four
+ *     identical copies beside a loud action (UI consolidation phase 5, a unification). The home's
+ *     hints and the Themes & Styles hints change with it.
  *   v1.0.0 — 2026-09-23 — Moved unchanged from css/parts*.css (UI consolidation phase 1, a move).
  */
 
-.poster-hint { font-size: 0.88rem; color: var(--text-dim); margin: 0 0 0.6rem; }
+.poster-hint { margin: .7rem 0 0; font-family: var(--font-body); font-size: .82rem; line-height: 1.5; color: var(--text-dim); }
+.poster-hint--slab { display: block; margin: 0; max-width: 18rem; font-family: var(--font-mono); font-size: .7rem; text-align: right; }
+@media (max-width: 860px) {
+  .poster-hint--slab { text-align: left; }
+}

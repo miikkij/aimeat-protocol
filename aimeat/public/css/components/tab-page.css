@@ -1,0 +1,51 @@
+/**
+ * @file tab-page.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The page of a Settings & Controls tab in the poster face: the root (.og) that sets the headline
+ *   sizes and the body face, the two columns (the page and the contents rail), the dark contents rail
+ *   with its sun shadow, the tree that can take the rail's place, and the page variant.
+ *   Moved unchanged out of views/organism.css (the og- page kit shared by the Settings & Controls tabs,
+ *   the organism pages and the admin), under its own name; the class names stay, because every page
+ *   that draws the kit writes them. Corners, frames, shadows and letter case read the shape tokens.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.2.0 — 2026-09-26 — The contents rail is the ink ground (--ink-ground, --on-ink-ground): dark in both modes, so its sun labels read in dark mode (Jouni).
+ *   v1.1.0 — 2026-09-26 — The contents rail's corner reads --shape-corner (it has a ground); the rail's and the tree's label spacing read the label spacing (calc(var(--shape-tracking-label) * .6) and * .5) (a move: the AIMEAT values equal the old ones).
+ *   v1.0.0 — 2026-09-25 — Moved out of views/organism.css (UI consolidation phase 5, a move).
+ */
+
+.og { --poster-page-size: 2.8rem; --poster-section-size: 1.6rem; font-family: var(--font-showroom-body); color: var(--text); }
+.og-grid { display: grid; grid-template-columns: minmax(0, 1fr) 240px; gap: 2.75rem; align-items: start; margin-top: .5rem; }
+.og-main { display: flex; flex-direction: column; gap: 1.4rem; min-width: 0; }
+.og-rail { position: sticky; top: 1rem; max-height: calc(100vh - 6rem); overflow-y: auto; display: flex; flex-direction: column; gap: .4rem; padding: 1rem 1.1rem; background: var(--ink-ground); color: var(--on-ink-ground); border: var(--shape-frame-heavy) solid var(--shape-frame-colour); border-radius: var(--shape-corner); box-shadow: var(--shape-shadow-raised); }
+.og-rail-label { font-family: var(--font-poster); font-weight: var(--font-poster-weight); text-transform: var(--shape-case-heading); font-size: .75rem; letter-spacing: calc(var(--shape-tracking-label) * .6); color: var(--sun); margin-bottom: .25rem; }
+.og-rail-link { display: flex; align-items: baseline; gap: .6rem; width: 100%; background: none; border: 0; padding: 0; cursor: pointer; text-align: left; font-family: var(--font-showroom-body); font-size: .8rem; font-weight: 800; line-height: 1.4; color: var(--on-ink-ground); text-decoration: none; opacity: .65; }
+.og-rail-link:hover, .og-rail-link.on { opacity: 1; }
+.og-rail-link i { flex: 0 0 auto; min-width: 18px; font-family: var(--font-mono); font-size: .7rem; font-style: normal; color: var(--sun); }
+.og-rail-link em { margin-left: auto; font-family: var(--font-mono); font-size: .7rem; font-style: normal; color: var(--sun); }
+.og-rail hr { border: 0; border-top: 1px solid color-mix(in srgb, var(--on-ink-ground) 25%, transparent); margin: .3rem 0; width: 100%; }
+.og-tree { position: sticky; top: 1rem; max-height: calc(100vh - 6rem); overflow-y: auto; display: flex; flex-direction: column; gap: .2rem; padding: .2rem 0 0; }
+.og-tree-group { display: flex; flex-direction: column; margin-bottom: .8rem; }
+.og-tree-label { display: flex; align-items: baseline; gap: .6rem; padding: .6rem 0 .35rem; font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: .78rem; letter-spacing: calc(var(--shape-tracking-label) * .5); text-transform: var(--shape-case-heading); color: var(--text); }
+.og-tree-label em { margin-left: auto; font-family: var(--font-mono); font-size: .7rem; font-style: normal; color: var(--text-dim); }
+.og-tree-space { display: flex; flex-direction: column; }
+.og-tree-link { display: flex; align-items: baseline; gap: .6rem; width: 100%; background: none; border: 0; border-bottom: 1px solid var(--border); padding: .35rem 0; cursor: pointer; text-align: left; font-family: inherit; font-size: .82rem; font-weight: 700; color: var(--text); }
+.og-tree-link.on { background: var(--sun); color: var(--on-sun); margin: 0 -.4rem; padding: .35rem .4rem; }
+.og-tree-link:hover span { color: var(--accent); }
+.og-tree-link em { margin-left: auto; font-family: var(--font-mono); font-size: .7rem; font-style: normal; color: var(--text-dim); white-space: nowrap; }
+.og-tree-link em b { color: var(--accent); }
+.og-tree-doc { display: flex; align-items: center; gap: .4rem; width: 100%; background: none; border: 0; border-left: var(--shape-frame-heavy) solid transparent; padding: .3rem .4rem .3rem .7rem; cursor: pointer; text-align: left; font-family: inherit; font-size: .78rem; font-weight: 600; line-height: 1.3; color: var(--text-dim); }
+.og-tree-doc:hover { color: var(--text); }
+.og-tree-doc.on { background: var(--sun); border-left-color: var(--text); color: var(--on-sun); font-weight: 800; }
+.og-tree-more { font-weight: 400; }
+.og-tree hr { border: 0; border-top: 1px solid var(--border); margin: .2rem 0; width: 100%; }
+.og-tree .og-rail-toggle { color: var(--text); opacity: 1; padding: .4rem 0; }
+.og-tree .og-rail-toggle i { color: var(--accent); }
+.og-page .og-main { padding-top: .9rem; }
+
+@media (max-width: 1100px) {
+  .og-grid { grid-template-columns: 1fr; }
+  .og-rail { position: static; }
+  .og-tree { position: static; }
+}

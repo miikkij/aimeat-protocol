@@ -9,6 +9,10 @@
  *   modeSwitchHtml/wireModeSwitch · ensureAuthPillStyles · pillInitials.
  * @usage import { escHtml, modeSwitchHtml, wireModeSwitch } from './theme.js';
  * @version-history
+ *   v1.8.0 — 2026-09-26 — The pill's frames, its label's and its actions' letter case and spacing read the
+ *     page theme's shape values (--shape-frame, --shape-frame-colour, --shape-case-label and -action,
+ *     --shape-tracking-label and -action), each falling back to the value it replaces. The AIMEAT theme
+ *     draws the pill as before (a move); a theme such as Pebble now reaches it.
  *   v1.7.0 — 2026-09-24 — A style with one mode only (Themes & Styles): the switch stands down as on a
  *     fixed-light page, shows the mode the style keeps, and says the style is why. The kept mode
  *     carries the word "only" beside its icon, so the reason shows without a hover.
@@ -203,34 +207,43 @@ export function ensureAuthPillStyles() {
   var ink = 'var(--aimeat-ink)';
   var paper = 'var(--aimeat-paper)';
   var font = 'var(--aimeat-pill-font,var(--font-showroom-body,var(--font,system-ui,sans-serif)))';
+  // The frame, the letter case and the letter spacing read the page theme's shape values
+  // (theme.css --shape-*), each falling back to the value the pill always had, so a page without
+  // them, and the AIMEAT theme, draw the pill exactly as before, and a theme that sets them reaches it.
+  var frame = 'var(--shape-frame,2px) solid ';
+  var frameInk = 'var(--shape-frame-colour,' + ink + ')';
+  var frameCur = 'var(--shape-frame-colour,currentColor)';
+  var hot = 'var(--aimeat-pill-name,var(--accent,#E8564A))';
+  var labelCase = 'text-transform:var(--shape-case-label,uppercase);letter-spacing:calc(var(--shape-tracking-label,.1em) * .6)';
+  var actionCase = 'text-transform:var(--shape-case-action,uppercase);letter-spacing:var(--shape-tracking-action,.04em)';
   st.textContent = [
     inkVarsCss(['.aimeat-auth-wrap', '.aimeat-auth-out', '.aimeat-auth-pill']),
     '.aimeat-auth-pill{display:inline-flex;align-items:center;gap:10px;padding:4px 11px;',
-      'border:2px solid ' + ink + ';background:' + paper + ';color:' + ink + ';',
+      'border:' + frame + frameInk + ';background:' + paper + ';color:' + ink + ';',
       'border-radius:var(--aimeat-pill-radius,0);font-family:' + font + ';font-size:13px;line-height:1.4}',
     '.aimeat-auth-dot{display:inline-block;flex:0 0 auto;width:9px;height:9px;',
       'background:var(--aimeat-pill-live,var(--success,#10B981))}',
-    '.aimeat-auth-label{display:inline-flex;align-items:center;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase}',
+    '.aimeat-auth-label{display:inline-flex;align-items:center;font-size:11px;font-weight:800;' + labelCase + '}',
     '.aimeat-auth-ghii{font-weight:800;font-size:13px;color:var(--aimeat-pill-name,var(--accent,#E8564A))}',
     '.aimeat-auth-fed{display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;letter-spacing:.04em;',
-      'padding:1px 6px;border:2px solid currentColor}',
-    '.aimeat-auth-gear{appearance:none;background:none;border:2px solid currentColor;color:inherit;border-radius:0;',
+      'padding:1px 6px;border:' + frame + frameCur + '}',
+    '.aimeat-auth-gear{appearance:none;background:none;border:' + frame + frameCur + ';color:inherit;border-radius:0;',
       'padding:2px 7px;cursor:pointer;font-size:13px;line-height:1}',
-    '.aimeat-auth-logout{appearance:none;background:none;border:0;border-bottom:2px solid currentColor;border-radius:0;',
+    '.aimeat-auth-logout{appearance:none;background:none;border:0;border-bottom:' + frame + frameCur + ';border-radius:0;',
       'padding:0 0 1px;margin:0;cursor:pointer;color:inherit;font-family:inherit;font-size:11px;font-weight:800;',
-      'letter-spacing:.04em;text-transform:uppercase;line-height:1.4}',
-    '.aimeat-auth-logout:hover,.aimeat-auth-gear:hover{color:var(--aimeat-pill-name,var(--accent,#E8564A))}',
+      actionCase + ';line-height:1.4}',
+    '.aimeat-auth-logout:hover,.aimeat-auth-gear:hover{color:' + hot + ';border-color:' + hot + '}',
     /* Signed out: the cluster beside one ink slab with the sun's offset shadow. */
     '.aimeat-auth-out{display:inline-flex;align-items:center;gap:10px;color:' + ink + '}',
     '.aimeat-sign-btn{appearance:none;padding:8px 16px;background:var(--aimeat-pill-cta-bg,' + ink + ');',
       'color:var(--aimeat-pill-cta-fg,' + paper + ');border:0;border-radius:var(--aimeat-pill-radius,0);cursor:pointer;',
-      'font-family:' + font + ';font-size:12px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;line-height:1.4;',
+      'font-family:' + font + ';font-size:12px;font-weight:800;' + actionCase + ';line-height:1.4;',
       'box-shadow:4px 4px 0 var(--aimeat-pill-cta-shadow,var(--sun,#FFB52E));transition:transform .12s,box-shadow .12s}',
     '.aimeat-sign-btn:hover{transform:translate(2px,2px);box-shadow:2px 2px 0 var(--aimeat-pill-cta-shadow,var(--sun,#FFB52E))}',
     /* Compact: the account button, and the pill as its popover. */
     '.aimeat-auth-wrap{position:relative;display:inline-flex;align-items:center}',
     '.aimeat-auth-compact{display:none;align-items:center;gap:7px;padding:5px 11px 5px 9px;cursor:pointer;',
-      'background:' + paper + ';color:' + ink + ';border:2px solid ' + ink + ';border-radius:var(--aimeat-pill-radius,0);',
+      'background:' + paper + ';color:' + ink + ';border:' + frame + frameInk + ';border-radius:var(--aimeat-pill-radius,0);',
       'font-family:' + font + ';font-size:13px}',
     '.aimeat-auth-compact .cdot{width:8px;height:8px;flex:0 0 auto;background:var(--aimeat-pill-live,var(--success,#10B981))}',
     '.aimeat-auth-compact .cini{font-weight:800;letter-spacing:.3px;max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
@@ -250,7 +263,7 @@ export function ensureAuthPillStyles() {
       '.aimeat-auth-out>.aimeat-auth-wrap{position:static}',
       '.aimeat-auth-wrap>.aimeat-ctl{position:absolute;top:calc(100% + 8px);right:0;z-index:1000;',
         'display:none!important;flex-wrap:wrap;gap:8px;padding:10px 12px;',
-        'background:' + paper + ';color:' + ink + ';border:2px solid ' + ink + ';border-radius:var(--aimeat-pill-radius,0);',
+        'background:' + paper + ';color:' + ink + ';border:' + frame + frameInk + ';border-radius:var(--aimeat-pill-radius,0);',
         'max-width:calc(100vw - 24px);box-shadow:6px 6px 0 var(--aimeat-pill-cta-shadow,var(--sun,#FFB52E))}',
       '.aimeat-auth-wrap.aimeat-open>.aimeat-ctl{display:flex!important}',
     '}',

@@ -1,0 +1,24 @@
+/**
+ * @file people-list.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description Who has worked in a workspace or an organism: one entry per person under the participants'
+ *   chart, the person's line (a person mark, the name in bold, their tags, their node when it is not
+ *   this one in small grey words, their count) and under it their agents as Agent chips
+ *   (css/components/agent-chip.css). Drawn only by the People panel
+ *   (views/profile/organisms/participants-panel.js); moved here unchanged with its class names out of
+ *   views/profile.css (UI consolidation phase 5, a move). A person's framed card (.pj-part-owner) stays
+ *   in profile.css: the box is a question in the lab. It has no corner, frame, shadow or case.
+ *   Drawn as markup: <div class="pj-parts"><div class="pj-parts-list"><div class="pj-part-owner"><div class="pj-part-human">
+ *   <span>👤 <strong>…</strong></span><span class="poster-chip">…</span><span class="pj-part-node">🌐 …</span></div>
+ *   <div class="pj-part-agents">…</div></div></div></div>.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 -- 2026-09-26 -- Moved out of profile.css (UI consolidation phase 5, a move).
+ */
+
+.pj-parts { padding: 0.1rem; }
+.pj-parts-list { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.7rem; }
+.pj-part-human { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; font-size: 0.88rem; }
+.pj-part-node { font-size: 0.74rem; color: var(--muted); }
+.pj-part-agents { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.45rem; padding-left: 1.4rem; }

@@ -12,7 +12,20 @@
  * @version-history
  *   2026-09-26 — The upload form's access code is typed hidden, with an eye inside the field that
  *     shows it.
+ *   v1.16.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
+ *   v1.15.0 -- 2026-09-25 -- The apps with agents and the skill-to-app pairs are the Tag (.poster-chip, plain, in .poster-chips), a unification: Jouni's decision "Tag".
+ *   v1.14.0 -- 2026-09-25 -- Agents and skills is the Facts (facts, facts-k, facts-v), a unification: the look most tabs use.
+ *   v1.13.0 -- 2026-09-25 -- Every drop-down is the Select field (.select-field, css/components/select-field.css); a place keeps only its width and margin (a unification: the look most tabs use).
+ *   v1.12.0 -- 2026-09-25 -- Every many-line field is the Text area (.og-textarea); a place keeps only its size and margin (a unification: the look most tabs use).
+ *   v1.11.0 -- 2026-09-25 -- A lead or a paragraph that opens or explains a section is the og-lead; a grey one that explains is the Hint (UI consolidation phase 5, a unification).
+ *   v1.10.0 -- 2026-09-25 -- Every hint is the Hint (poster-hint, components/Hint.js), the look most Settings & Controls tabs draw (UI consolidation phase 5, a unification).
+ *   v1.9.0 -- 2026-09-25 -- The row labels (field and key labels, column heads, box labels) wear .poster-label (Jouni's decision "Row label", a unification).
+ *   v1.2.0 — 2026-09-25 — Every quiet way on is the library's action link, .poster-action, with the
+ *     tone its meaning names: more for "show all" and more of a list, back, text for a plain grey
+ *     word, quiet (Jouni's decisions "Action link", "Panel action", "Dismiss", "Small link", "Step
+ *     button").
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
+ *   v1.1.0 — 2026-09-25 — The og- page kit is library components: PageSection and FoldSection in /components, the kit's rules in css/components (tab-page, crumb-trail, page-head, figure-strip, page-section, fold-row, setting-box, form-fields, space-table) and css/views/organism-controls.css (UI consolidation phase 5, a move).
  *   v1.0.0 — 2026-09-02 — Initial. The crew-definition editor and its prompt moved here from
  *     apps-tab.js v1.8.0, where they sat on every card.
  */
@@ -21,8 +34,9 @@ import htm from 'htm';
 import { useState, useRef } from 'preact/hooks';
 const html = htm.bind(h);
 import { CopyButton } from '/components/CopyButton.js';
-import { Section } from '/views/profile/organisms/poster-parts.js';
+import { PageSection } from '/components/PageSection.js';
 import { a, nameOf, appRef, goTab } from './frame.js';
+import { Hint } from '/components/Hint.js';
 
 /* ── 04 · Agents and skills ───────────────────────────────────────────────────────────────────── */
 
@@ -35,43 +49,43 @@ export function secAgents(ctx) {
   const withSkill = apps.filter((x) => (bound[appRef(x)] || []).length).length;
   const picked = apps.find((x) => x.filename === ctx.agentPick) || null;
   return html`
-    <${Section} id="ap-agents" num="04" title=${a('secAgents')} count=${null}>
-      <div class="ap-kv">
-        <div class="ap-k">${a('agentsLabel')}</div>
-        <div class="ap-v">
+    <${PageSection} id="ap-agents" num="04" title=${a('secAgents')} count=${null}>
+      <div class="facts facts--wide ap-kv">
+        <div class="facts-k poster-label">${a('agentsLabel')}</div>
+        <div class="facts-v">
           ${withAgents.length ? a('agentsSome', { n: withAgents.length }) : a('agentsNone')}
           <small>${a('agentsNote')}</small>
-          ${withAgents.length ? html`<div class="ap-skl">${withAgents.map((x) => html`<span key=${appRef(x)}>${nameOf(x)} · ${x.manifest.cortex.agents.length}</span>`)}</div>` : null}
+          ${withAgents.length ? html`<div class="poster-chips ap-skl">${withAgents.map((x) => html`<span class="poster-chip" key=${appRef(x)}>${nameOf(x)} · ${x.manifest.cortex.agents.length}</span>`)}</div>` : null}
         </div>
-        <div class="ap-k">${a('skillsLabel')}</div>
-        <div class="ap-v">
+        <div class="facts-k poster-label">${a('skillsLabel')}</div>
+        <div class="facts-v">
           ${pairs.length ? a('skillsCount', { apps: withSkill, skills: pairs.length }) : a('skillsNone')}
           <small>${a('skillsNote', { n: apps.length - withSkill })}</small>
-          ${pairs.length ? html`<div class="ap-skl">${pairs.slice(0, 8).map((p) => html`<span key=${p.skill}>${p.skill} → ${p.app}</span>`)}${pairs.length > 8 ? html`<span>${a('more', { n: pairs.length - 8 })}</span>` : null}</div>` : null}
+          ${pairs.length ? html`<div class="poster-chips ap-skl">${pairs.slice(0, 8).map((p) => html`<span class="poster-chip" key=${p.skill}>${p.skill} → ${p.app}</span>`)}${pairs.length > 8 ? html`<span class="poster-chip">${a('more', { n: pairs.length - 8 })}</span>` : null}</div>` : null}
         </div>
       </div>
       <div class="og-doors ap-doors">
-        <button type="button" class="og-door og-door--quiet" onClick=${() => goTab('skills')}>${a('skillsDoor')}</button>
-        <${CopyButton} text=${skillPrompt(apps)} className="og-door og-door--quiet" label=${a('skillPromptDoor')} copiedLabel=${a('promptCopied')} onCopied=${() => ctx.showToast?.(a('promptCopiedToast'))} />
-        <button type="button" class="og-door og-door--quiet" onClick=${() => ctx.setAgentEditorOpen(!ctx.agentEditorOpen)}>${ctx.agentEditorOpen ? a('agentEditClose') : a('agentEditOpen')}</button>
+        <button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => goTab('skills')}>${a('skillsDoor')}</button>
+        <${CopyButton} text=${skillPrompt(apps)} className="poster-action poster-action--small poster-action--lower" label=${a('skillPromptDoor')} copiedLabel=${a('promptCopied')} onCopied=${() => ctx.showToast?.(a('promptCopiedToast'))} />
+        <button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => ctx.setAgentEditorOpen(!ctx.agentEditorOpen)}>${ctx.agentEditorOpen ? a('agentEditClose') : a('agentEditOpen')}</button>
       </div>
       ${ctx.agentEditorOpen ? html`
         <div class="ap-panel poster-aside">
-          <p class="ap-panel-lead">${a('agentEditHint')}</p>
+          <p class="og-lead">${a('agentEditHint')}</p>
           <label class="ap-field">
-            <span class="og-label">${a('agentEditPick')}</span>
-            <select class="og-input" value=${ctx.agentPick} onChange=${(e) => ctx.pickAgentApp(e.target.value)}>
+            <span class="poster-label">${a('agentEditPick')}</span>
+            <select class="select-field" value=${ctx.agentPick} onChange=${(e) => ctx.pickAgentApp(e.target.value)}>
               <option value="">–</option>
               ${apps.map((x) => html`<option key=${x.filename} value=${x.filename}>${nameOf(x)}${x.manifest?.cortex?.agents?.length ? ` · ${x.manifest.cortex.agents.length}` : ''}</option>`)}
             </select>
           </label>
           ${picked ? html`
-            <textarea class="og-input ap-json" rows="12" spellcheck="false" value=${ctx.agentJson} onInput=${(e) => ctx.setAgentJson(e.target.value)}></textarea>
+            <textarea class="og-textarea ap-json" rows="12" spellcheck="false" value=${ctx.agentJson} onInput=${(e) => ctx.setAgentJson(e.target.value)}></textarea>
             <div class="og-doors ap-doors">
-              <button type="button" class="og-door" disabled=${ctx.busy === 'agents'} onClick=${() => ctx.saveAgents(picked)}>${a('agentEditSave')}</button>
-              <${CopyButton} text=${ctx.agentPromptFor(picked)} className="og-door og-door--quiet" label=${a('agentEditCopy')} copiedLabel=${a('promptCopied')} onCopied=${() => ctx.showToast?.(a('agentEditCopied'))} />
+              <button type="button" class="poster-action poster-action--small" disabled=${ctx.busy === 'agents'} onClick=${() => ctx.saveAgents(picked)}>${a('agentEditSave')}</button>
+              <${CopyButton} text=${ctx.agentPromptFor(picked)} className="poster-action poster-action--small poster-action--lower" label=${a('agentEditCopy')} copiedLabel=${a('promptCopied')} onCopied=${() => ctx.showToast?.(a('agentEditCopied'))} />
             </div>
-            <p class="ap-hint">${a('agentClearHint')}</p>` : null}
+            <${Hint}>${a('agentClearHint')}<//>` : null}
         </div>` : null}
     <//>`;
 }
@@ -80,17 +94,17 @@ export function secAgents(ctx) {
 
 export function secBuild(ctx, { formOnly, num }) {
   return html`
-    <${Section} id="ap-build" num=${num} title=${formOnly ? a('uploadLabel') : a('secBuild')} count=${formOnly ? null : a('secBuildSub')}>
+    <${PageSection} id="ap-build" num=${num} title=${formOnly ? a('uploadLabel') : a('secBuild')} count=${formOnly ? null : a('secBuildSub')}>
       ${formOnly ? null : html`
         <div class="og-doors ap-doors ap-doors--top">
-          <${CopyButton} text=${ctx.buildPrompt} className="og-door" label=${a('promptDoor')} copiedLabel=${a('promptCopied')} disabled=${!ctx.buildPrompt} onCopied=${() => ctx.showToast?.(a('promptCopiedToast'))} />
-          <a class="og-door" href="/v1/aimeat-os" target="_blank" rel="noopener">${a('guideDoor')}</a>
-          <button type="button" class="og-door og-door--quiet" onClick=${() => goTab('appdev')}>${a('appdevDoor')}</button>
+          <${CopyButton} text=${ctx.buildPrompt} className="poster-action poster-action--small" label=${a('promptDoor')} copiedLabel=${a('promptCopied')} disabled=${!ctx.buildPrompt} onCopied=${() => ctx.showToast?.(a('promptCopiedToast'))} />
+          <a class="poster-action poster-action--small" href="/v1/aimeat-os" target="_blank" rel="noopener">${a('guideDoor')}</a>
+          <button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => goTab('appdev')}>${a('appdevDoor')}</button>
         </div>
-        <p class="ap-hint">${a('buildHint')}</p>
-        <span class="og-label ap-form-label">${a('uploadLabel')}</span>`}
+        <${Hint}>${a('buildHint')}<//>
+        <span class="poster-label ap-form-label">${a('uploadLabel')}</span>`}
       <${UploadForm} onUpload=${ctx.upload} busy=${ctx.busy === 'upload'} />
-      <p class="ap-hint">${a('uploadHint')}</p>
+      <${Hint}>${a('uploadHint')}<//>
     <//>`;
 }
 
@@ -108,10 +122,10 @@ function UploadForm({ onUpload, busy }) {
   const [roadmap, setRoadmap] = useState('');
   return html`
     <div class="ap-form">
-      <label class="ap-field"><span class="og-label">${a('fileLabel')}</span><input type="file" class="og-input ap-file" ref=${fileRef} accept=".html,.htm" /></label>
-      <label class="ap-field"><span class="og-label">${a('shotLabel')}</span><input type="file" class="og-input ap-file" ref=${shotRef} accept="image/*" /></label>
-      <label class="ap-field ap-field--wide"><span class="og-label">${a('descLabel')}</span><textarea class="og-input" rows="2" maxLength="2000" placeholder=${a('descPlaceholder')} value=${desc} onInput=${(e) => setDesc(e.target.value)}></textarea></label>
-      <label class="ap-field"><span class="og-label">${a('codeLabel')}</span>
+      <label class="ap-field"><span class="poster-label">${a('fileLabel')}</span><input type="file" class="og-input ap-file" ref=${fileRef} accept=".html,.htm" /></label>
+      <label class="ap-field"><span class="poster-label">${a('shotLabel')}</span><input type="file" class="og-input ap-file" ref=${shotRef} accept="image/*" /></label>
+      <label class="ap-field ap-field--wide"><span class="poster-label">${a('descLabel')}</span><textarea class="og-textarea" rows="2" maxLength="2000" placeholder=${a('descPlaceholder')} value=${desc} onInput=${(e) => setDesc(e.target.value)}></textarea></label>
+      <label class="ap-field"><span class="poster-label">${a('codeLabel')}</span>
         <span class="ap-secret">
           <input class="og-input" type=${showCode ? 'text' : 'password'} autocomplete="off" spellcheck="false" data-1p-ignore data-lpignore="true" placeholder=${a('codePlaceholder')} value=${code} onInput=${(e) => setCode(e.target.value)} />
           <button type="button" class="ap-secret-eye" aria-pressed=${showCode ? 'true' : 'false'} aria-label=${showCode ? a('codeHide') : a('codeShow')} title=${showCode ? a('codeHide') : a('codeShow')} onClick=${() => setShowCode((s) => !s)}>
@@ -122,10 +136,10 @@ function UploadForm({ onUpload, busy }) {
           </button>
         </span>
       </label>
-      <label class="ap-field ap-field--wide"><span class="og-label">${a('roadPublishLabel')}</span><textarea class="og-input" rows="2" maxLength="600" value=${roadmap} onInput=${e => setRoadmap(e.target.value)} /></label>
-      <p class="ap-hint ap-field--wide">${a('roadPublishHint')}</p>
+      <label class="ap-field ap-field--wide"><span class="poster-label">${a('roadPublishLabel')}</span><textarea class="og-textarea" rows="2" maxLength="600" value=${roadmap} onInput=${e => setRoadmap(e.target.value)} /></label>
+      <p class="poster-hint ap-field--wide">${a('roadPublishHint')}</p>
       <div class="ap-field ap-field--send">
-        <button type="button" class="og-door" disabled=${busy} onClick=${async () => {
+        <button type="button" class="poster-action poster-action--small" disabled=${busy} onClick=${async () => {
           const ok = await onUpload({ file: fileRef.current?.files?.[0], description: desc, screenshot: shotRef.current?.files?.[0], accessCode: code, roadmap });
           if (ok) { setDesc(''); setCode(''); setShowCode(false); setRoadmap(''); if (fileRef.current) fileRef.current.value = ''; if (shotRef.current) shotRef.current.value = ''; }
         }}>${a('publishFile')}</button>

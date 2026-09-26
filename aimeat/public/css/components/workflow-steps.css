@@ -1,0 +1,31 @@
+/**
+ * @file workflow-steps.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description A workflow's steps, one per row with a rule under it: the number in coral typewriter,
+ *   the step's name in bold with its agent in typewriter under it, what it takes and gives in grey
+ *   (the memory key in typewriter), and on the right its state and what was seen, a line each; on a
+ *   narrow screen the state goes under the words. Drawn only by the Workflows page (a workflow and
+ *   one of its runs); moved here unchanged with its class names (UI consolidation phase 5, a move).
+ *   Drawn as markup by views/profile/workflows/detail.js and run.js.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 — 2026-09-25 — Moved out of workflows-poster.css (UI consolidation phase 5, a move).
+ */
+
+.wp-step { display: grid; grid-template-columns: 2.4rem minmax(0, 1fr) minmax(0, 11rem); gap: 0 1rem; padding: .8rem 0; border-bottom: 1px solid var(--border); align-items: start; }
+.wp-step-n { font-family: var(--font-mono); font-size: .8rem; line-height: 1.6; color: var(--accent); }
+.wp-step-body { min-width: 0; }
+.wp-step-body > b { display: block; font-size: 1rem; font-weight: 800; line-height: 1.3; color: var(--text); overflow-wrap: anywhere; }
+.wp-step-body > b small { display: block; font-family: var(--font-mono); font-size: .72rem; font-weight: 400; color: var(--text-dim); margin-top: .1rem; }
+.wp-sig { margin-top: .3rem; font-size: .84rem; line-height: 1.5; color: var(--text-dim); max-width: 70ch; overflow-wrap: anywhere; }
+.wp-sig--key { font-family: var(--font-mono); font-size: .72rem; }
+.wp-step-st { text-align: right; font-family: var(--font-mono); font-size: .72rem; line-height: 1.55; color: var(--text-dim); }
+.wp-step-st span { display: block; }
+
+@media (max-width: 900px) {
+  .wp-step { grid-template-columns: 2rem minmax(0, 1fr); }
+  .wp-step-st { grid-column: 2; text-align: left; }
+  .wp-step-st b { margin-right: .6rem; }
+  .wp-step-st span { display: inline; margin-right: .6rem; }
+}

@@ -9,134 +9,120 @@
  *   confirmation panel, the question block, the check note, the runs table, the three roads and the
  *   paste box, the words list, and the form's rows. NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.26.0 -- 2026-09-26 -- The workflows table is the Listing (css/components/listing.css), a unification: the look most tabs use. The rules of wp-rows, wp-nm and wp-doors2 go (the narrow-screen columns move to its cut, listing--cols); the last run's word and what happened keep the runs table's cells.
+ *   v1.25.0 -- 2026-09-26 -- The line under a workflow's name is the Listing's (.listing-meta): its rule goes (a unification: Jouni's decision "Meta line").
+ *   v1.24.0 -- 2026-09-26 -- "Wait for an answer" is the Check line: its size and colour go, its row and place stay (a unification: Jouni's decision "Check line").
+ *   v1.23.0 -- 2026-09-26 -- A run's record is the Code block (css/components/code-block.css): the light frame goes and long lines wrap (a unification: Jouni's decision "Code block").
+ *   v1.22.0 -- 2026-09-26 -- A question waiting for the person is the Object box on the page's ground, its answers the Tab with the chosen one on the sun (a unification: Jouni's decision "Question box").
+ *   v1.21.0 -- 2026-09-26 -- The hairline over a part of the panel is the split (.og-split), a unification: the line Workflows and Boards drew alike.
+ *   v1.20.0 -- 2026-09-26 -- How to read this page is the Facts; a fold's paragraph is the lead and a read-only value under its label the Facts' value (a unification: the look most tabs use); the rail's dead base look goes.
+ *   v1.19.0 -- 2026-09-26 -- The cron, key, variable and step id fields are the Text field's code cut (.og-input--code), a unification: one cut for every identifier field.
+ *   v1.18.0 -- 2026-09-25 -- The pressed door's rule (.og-door.on) goes: a button that shows a panel and stays pressed is the Tab's fold tone (.poster-tab--fold.is-on), a unification: Jouni's decision "Tabs and filters".
+ *   v1.17.0 -- 2026-09-25 -- A road or an option you choose is the Choice tile (.poster-choice), a unification: the look most tabs use.
+ *   v1.16.0 -- 2026-09-25 -- A workflow's steps are the library's Workflow steps (css/components/workflow-steps.css), moved unchanged with their class names (UI consolidation phase 5, a move).
+ *   v1.15.0 -- 2026-09-25 -- The loading line's blinking mark is the library's Loading mark (css/components/loading-mark.css), moved unchanged out of five sheets (UI consolidation phase 5, a move).
+ *   v1.14.0 -- 2026-09-25 -- The named values in the confirmation and the settings fold are the Facts (css/components/facts.css), a unification: the look most tabs use. The rules of wp-kv, wp-kv-k and wp-kv-v go, with their phone rule.
+ *   v1.13.0 -- 2026-09-25 -- The runs table is the Listing (css/components/listing.css), a unification: the look most tabs use. The rules of wp-runs and its cells go; its narrow-screen columns move to its cut (listing--cols); the workflows table stays (its line under a name is in the body face, an open conflict).
+ *   v1.12.0 -- 2026-09-25 -- Every drop-down is the Select field (.select-field, css/components/select-field.css); a place keeps only its width and margin (a unification: the look most tabs use).
+ *   v1.11.0 -- 2026-09-25 -- Every word that says a state is the Status (.poster-status fine, attention, danger, off), a unification: Jouni's decision Status.
+ *   v1.10.0 -- 2026-09-25 -- Every tag is the Tag (.poster-chip and its tones, .poster-chips for a row), a unification: Jouni's decision Tag.
+ *   v1.9.0 -- 2026-09-25 -- The form message rules go: the line a form says after it acted is the Form message (css/components/form-message.css) (UI consolidation phase 5, a unification).
+ *   v1.8.0 -- 2026-09-25 -- The inline code rules go: code is the Code block's inline cut (css/components/code-block.css); the layout declarations of their places stay, on .code-inline (UI consolidation phase 5, a unification).
+ *   v1.7.0 -- 2026-09-25 -- The hint rules go: the hints are the Hint (css/components/hint.css); the layout declarations of their places stay, on .poster-hint (UI consolidation phase 5, a unification).
+ *   v1.6.0 -- 2026-09-25 -- The times' look is .poster-time; their rules here keep only their place (Jouni's decision "Timestamp", a unification).
+ *   v1.5.0 -- 2026-09-25 -- The rules that leave the row labels out keep their old weight, with :where (a correction to the "Row label" unification).
+ *   v1.4.0 -- 2026-09-25 -- The row labels' look is .poster-label; their rules here keep only their place (Jouni's decision "Row label", a unification).
+ *   v1.3.0 -- 2026-09-25 -- The quiet ways on are the library's action link (Jouni's decision "Action
+ *     link"): the rules that restyled og-door, the classic buttons and the text buttons here go; a
+ *     place's layout value moves to the new class.
+ *   v1.2.0 -- 2026-09-25 -- The loud action is the library's dark block, .poster-slab (Jouni's
+ *     decision "Loud action"): the rules that restyled the old og-slab and .btn-primary here go, and a
+ *     place's layout value moves to the new class.
+ *   2026-09-25 -- The empty lines are the quiet sentence (.poster-quiet, Jouni's decision "Empty line"): .og-empty's look goes, its place (margin 0) stays on the new class.
  *   v1.1.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.0.0 — 2026-08-30 — Initial.
  */
 
-.og-wp .og-chip--coral { border-color: var(--accent); color: var(--accent); }
-.og-wp .wp-chip--case { text-transform: none; }
-.og-wp .og-door.on { color: var(--accent); border-bottom-color: var(--accent); }
 .og-wp .og-choice-btn.on { background: var(--text); color: var(--card-bg); }
-.og-wp .og-empty { margin: 0; font-size: .9rem; color: var(--text-dim); }
-.og-wp .wp-hint { margin: .6rem 0 0; font-size: .82rem; line-height: 1.5; color: var(--text-dim); display: block; }
-.og-wp .og-field .wp-hint { margin-top: .2rem; }
-.og-wp .wp-prose { margin: 0; font-size: .92rem; line-height: 1.55; color: var(--text); }
+.og-wp .poster-quiet { margin: 0; }
+.og-wp .poster-hint { display: block; }
+.og-wp .og-field .poster-hint { margin-top: .2rem; }
+/* A fold's paragraph is the lead (.og-lead); here it keeps margin 0 in the fold's own gap. */
+.og-wp .wp-prose { margin: 0; }
 .og-wp .wp-bad { color: var(--accent); }
-.og-wp .wp-error { margin: .5rem 0 0; font-size: .85rem; color: var(--accent); }
-.og-wp .wp-mono { font-family: var(--font-mono); font-size: .85rem; }
-.og-wp .wp-loading { display: inline-block; padding-left: 1.1rem; position: relative; }
-.og-wp .wp-loading::before { content: ''; position: absolute; left: 0; top: .35em; width: .55em; height: .55em; background: var(--accent); animation: wpBlink 1s steps(2, start) infinite; }
-@keyframes wpBlink { to { visibility: hidden; } }
 .og-wp.og-page { --poster-page-size: 2.1rem; }
 .og-wp .og-rail-link.on { color: var(--accent); }
 .og-wp .wp-rail-static { cursor: default; }
 .og-wp .wp-rail-key { font-family: var(--font-mono); font-size: .72rem; text-transform: none; }
-.og-wp .og-label { display: block; }
+.og-wp .poster-label:where(:not(div)) { display: block; }
 .og-wp .og-fold > span:not(.og-fold-r):not(.og-fold-arrow) { white-space: nowrap; }
 .og-wp .og-fold-r { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.og-wp .wp-danger-row { margin-top: .8rem; padding-top: .8rem; border-top: 1px solid var(--border); }
+/* The last doors under their hairline are the split (.og-split, page-section.css); their space only. */
+.og-wp .wp-danger-row { margin-top: .8rem; padding-top: .8rem; }
 
 /* tones */
-.wp-m--ok b, .wp-st--ok { color: var(--success-fg, #1f8f5a); }
-.wp-m--bad b, .wp-st--bad { color: var(--accent); }
-.wp-m--wait b, .wp-st--wait { color: var(--warning-fg, #b8860b); }
-.wp-st--none { color: var(--text-dim); font-weight: 500; }
+.wp-m--ok b { color: var(--success-fg, #1f8f5a); }
+.wp-m--bad b { color: var(--accent); }
+.wp-m--wait b { color: var(--warning-fg, #b8860b); }
 
 /* ── The workflows table ────────────────────────────────────────────────────────────────────── */
-.wp-rows { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 9rem) 7rem minmax(0, 14rem) 8.5rem; gap: 0 1rem; align-items: center; }
-.wp-rows > div { padding: .6rem 0; border-bottom: 1px solid var(--border); min-width: 0; }
-.wp-rows--head > div { padding: 0 0 .35rem; border-bottom: 0; font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
-.wp-rows .wp-nm { font-weight: 800; font-size: .95rem; color: var(--text); }
-.wp-rows .wp-nm .og-tbl-name { white-space: normal; overflow-wrap: anywhere; }
-.wp-rows .wp-nm small { display: block; font-size: .78rem; font-weight: 400; color: var(--text-dim); margin-top: .1rem; }
-.wp-m { font-family: var(--font-mono); font-size: .72rem; line-height: 1.5; color: var(--text-dim); }
+/* The workflows table and the runs table are the Listing (css/components/listing.css); the last run's
+   word and what happened keep the runs table's cells (.wp-m). */
+.og-wp .listing-name .og-tbl-name { white-space: normal; overflow-wrap: anywhere; }
+.wp-m { line-height: 1.5; }
+.wp-m:where(:not(.poster-time)) { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); }
 .wp-m b { color: var(--text); font-weight: 500; }
 .wp-m--sub { font-family: inherit; font-size: .8rem; line-height: 1.45; color: var(--text); overflow-wrap: anywhere; }
-.wp-doors2 { white-space: nowrap; }
-.wp-doors2 .og-door { margin-left: .8rem; }
 
 /* ── A step ─────────────────────────────────────────────────────────────────────────────────── */
-.wp-step { display: grid; grid-template-columns: 2.4rem minmax(0, 1fr) minmax(0, 11rem); gap: 0 1rem; padding: .8rem 0; border-bottom: 1px solid var(--border); align-items: start; }
-.wp-step-n { font-family: var(--font-mono); font-size: .8rem; line-height: 1.6; color: var(--accent); }
-.wp-step-body { min-width: 0; }
-.wp-step-body > b { display: block; font-size: 1rem; font-weight: 800; line-height: 1.3; color: var(--text); overflow-wrap: anywhere; }
-.wp-step-body > b small { display: block; font-family: var(--font-mono); font-size: .72rem; font-weight: 400; color: var(--text-dim); margin-top: .1rem; }
-.wp-sig { margin-top: .3rem; font-size: .84rem; line-height: 1.5; color: var(--text-dim); max-width: 70ch; overflow-wrap: anywhere; }
-.wp-sig--key { font-family: var(--font-mono); font-size: .72rem; }
-.wp-step-st { text-align: right; font-family: var(--font-mono); font-size: .72rem; line-height: 1.55; color: var(--text-dim); }
-.wp-step-st b { display: block; font-family: inherit; font-size: .84rem; font-weight: 800; }
-.wp-step-st span { display: block; }
 
 /* ── The verdict, the confirmation, the check note, the question ────────────────────────────── */
-.wp-verdict { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1.2rem; align-items: center; padding: 1rem 1.1rem; border: 3px solid var(--text); margin: 1.2rem 0 0; }
+.wp-verdict { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1.2rem; align-items: center; padding: 1rem 1.1rem; margin: 1.2rem 0 0; }
 .wp-verdict--bad { border-color: var(--accent); }
 .wp-verdict--wait { border-color: var(--sun); }
 .wp-verdict b { display: block; font-size: 1.05rem; font-weight: 800; line-height: 1.35; color: var(--text); }
 .wp-verdict span { display: block; margin-top: .25rem; font-size: .85rem; line-height: 1.5; color: var(--text-dim); }
-.wp-confirm { margin: 1.2rem 0 0; padding: 1.2rem 1.4rem; border: 3px solid var(--text); background: var(--card-bg); box-shadow: 8px 8px 0 var(--text); }
+.wp-confirm { margin: 1.2rem 0 0; padding: 1.2rem 1.4rem; }
 .wp-confirm h3 { margin: 0; font-size: 1.3rem; font-weight: 800; line-height: 1.25; color: var(--text); }
-.wp-kv { display: grid; grid-template-columns: minmax(0, 10rem) minmax(0, 1fr); gap: .5rem 1rem; margin-top: 1rem; font-size: .9rem; line-height: 1.5; color: var(--text); }
-.wp-kv-k { font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); padding-top: .3rem; }
-.wp-kv-v { overflow-wrap: anywhere; }
 .wp-confirm .og-doors { margin-top: 1rem; }
 .wp-note { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .3rem 1rem; align-items: start; margin-top: .9rem; padding: .8rem 1rem; border: 2px solid var(--text); background: var(--card-bg); font-size: .85rem; line-height: 1.5; color: var(--text); }
 .wp-note b { grid-column: 1; font-weight: 800; }
 .wp-note > span { grid-column: 1; }
-.wp-note .og-door { grid-column: 2; grid-row: 1; }
+.wp-note .poster-action { grid-column: 2; grid-row: 1; }
 .wp-note--check { border-color: var(--accent); }
-.wp-ask { padding: 1rem 1.2rem; border: 3px solid var(--text); background: var(--sun); color: var(--on-sun); margin-top: .8rem; }
+/* A question waiting for the person is the Object box on the page's ground, its answers the Tab (Jouni's decision "Question box"). */
+.wp-ask { padding: 1rem 1.2rem; margin: .8rem 0 0; }
 .wp-ask b { display: block; font-size: 1rem; font-weight: 800; line-height: 1.35; }
-.wp-ask p { margin: .3rem 0 .7rem; font-size: .85rem; line-height: 1.5; }
-.wp-ask .og-choice { border-color: var(--on-sun); }
-.wp-ask .og-choice-btn { border-right-color: var(--on-sun); color: var(--on-sun); }
-.wp-ask .og-choice-btn.on { background: var(--on-sun); color: var(--sun); }
-.wp-ask-other { margin-top: .6rem; max-width: 30rem; border-bottom-color: var(--on-sun); color: var(--on-sun); }
+.wp-ask p { margin: .3rem 0 .7rem; font-size: .85rem; line-height: 1.5; color: var(--text-dim); }
+.wp-ask-other { margin-top: .6rem; max-width: 30rem; }
 .wp-ask .og-doors { margin-top: .8rem; }
-.wp-ask .og-slab { background: var(--on-sun); color: var(--sun); box-shadow: 4px 4px 0 var(--text); }
-.wp-ask .og-door { color: var(--on-sun); border-bottom-color: var(--on-sun); }
-
-/* ── The runs table ─────────────────────────────────────────────────────────────────────────── */
-.wp-runs { display: grid; grid-template-columns: 7rem 7rem minmax(0, 1fr) 3.5rem; gap: 0 1rem; align-items: center; }
-.wp-runs > div { padding: .55rem 0; border-bottom: 1px solid var(--border); min-width: 0; }
 
 /* ── The roads, the paste box, the words ────────────────────────────────────────────────────── */
 .wp-roads { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .8rem; }
-.wp-road { display: flex; flex-direction: column; gap: .35rem; padding: .9rem 1rem; border: 2px solid var(--text); background: var(--card-bg); font-size: .85rem; line-height: 1.5; color: var(--text-dim); cursor: pointer; }
-.wp-road b { font-weight: 800; font-size: .95rem; color: var(--text); }
+/* A road is the Choice tile (.poster-choice), the chosen one on the sun. */
+.wp-road { display: flex; flex-direction: column; gap: .35rem; }
 .wp-road p { margin: 0; }
 .wp-road-k { font-family: var(--font-mono); font-size: .7rem; color: var(--accent); }
 .wp-road .og-doors { margin-top: auto; padding-top: .4rem; }
-.wp-road .og-door { font-size: .72rem; }
-.wp-road.on { background: var(--sun); color: var(--on-sun); box-shadow: 4px 4px 0 var(--text); }
-.wp-road.on b, .wp-road.on .wp-road-k, .wp-road.on .og-door { color: var(--on-sun); border-bottom-color: var(--on-sun); }
+.wp-road.on .wp-road-k, .wp-road.on .poster-action { color: var(--on-sun); border-bottom-color: var(--on-sun); }
 .wp-paste { margin-top: .9rem; display: flex; flex-direction: column; gap: .5rem; }
-.wp-words { display: grid; grid-template-columns: minmax(0, 11rem) minmax(0, 1fr); gap: .35rem 1rem; font-size: .88rem; line-height: 1.5; color: var(--text); }
-.wp-words b { font-weight: 800; }
-.wp-words code { font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); margin-left: .3rem; }
+/* "How to read this page" is the Facts (css/components/facts.css). The rail's lines of checks and
+   states stay: a list in the dark contents rail, drawn on two pages of this tab only. */
+.wp-words { display: grid; gap: .35rem 1rem; line-height: 1.5; }
+.wp-words .code-inline { margin-left: .3rem; }
 .wp-words--rail { grid-template-columns: minmax(0, 1fr); padding: .3rem 0 0 .4rem; font-size: .78rem; color: var(--text-dim); }
-.wp-code { margin: 0; padding: .7rem .9rem; border: 1px solid var(--border); background: var(--card-bg); font-family: var(--font-mono); font-size: .7rem; line-height: 1.5; color: var(--text); overflow-x: auto; white-space: pre; max-height: 32rem; }
+/* A run's record is the Code block (css/components/code-block.css); its place and height only. */
+.wp-code.code-block { margin: 0; max-height: 32rem; overflow: auto; }
 
 /* ── The form ───────────────────────────────────────────────────────────────────────────────── */
 .wp-form .og-fields--2 { gap: 1.1rem 1.6rem; }
 .wp-inline-fields { display: grid; grid-template-columns: 8rem minmax(0, 1fr) minmax(0, 1fr); gap: 1rem; margin-top: .6rem; }
 .wp-field--narrow .og-input { max-width: 8rem; }
 .wp-var-row { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto; gap: .8rem; align-items: end; margin-top: .5rem; }
-.wp-check { display: flex; align-items: center; gap: .5rem; margin-top: .5rem; font-size: .85rem; color: var(--text); }
+.wp-check { display: flex; align-items: center; gap: .5rem; margin-top: .5rem; }
 .wp-choice--tight { margin-top: .5rem; align-items: center; }
 .wp-num { width: 5rem; margin-left: .6rem; }
-.og-wp select.og-input { appearance: auto; }
 
 @media (max-width: 900px) {
-  .wp-rows { grid-template-columns: minmax(0, 1fr) 7rem; }
-  .wp-rows--head { display: none; }
-  .wp-rows .wp-m:nth-child(5n + 2), .wp-rows .wp-m:nth-child(5n + 4) { display: none; }
-  .wp-doors2 .og-door { margin-left: .5rem; }
-  .wp-step { grid-template-columns: 2rem minmax(0, 1fr); }
-  .wp-step-st { grid-column: 2; text-align: left; }
-  .wp-step-st b, .wp-step-st span { display: inline; margin-right: .6rem; }
   .wp-verdict, .wp-note, .wp-roads, .wp-inline-fields, .wp-var-row, .wp-form .og-fields--2 { grid-template-columns: minmax(0, 1fr); }
-  .wp-runs { grid-template-columns: 6rem minmax(0, 1fr); }
-  .wp-runs > div:nth-child(4n + 2), .wp-runs > div:nth-child(4n + 4) { display: none; }
-  .wp-kv { grid-template-columns: minmax(0, 1fr); }
-  .wp-confirm { box-shadow: none; }
 }

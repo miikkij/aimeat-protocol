@@ -1,0 +1,27 @@
+/**
+ * @file access-log.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The access log: the reads of one group in time order, one per line under small heading
+ *   cells, in three columns (when, which key, the outcome), a rule under each cell; on a phone the
+ *   heading cells go and the three stack. Moved unchanged out of css/views/data-wallet-poster.css
+ *   (Data wallet, an opened trail group's rows), where it is the only place it is drawn (UI
+ *   consolidation phase 5, a move).
+ *   Drawn as markup: <div class="dw-grants dw-grants--rows"><div class="dw-gh poster-label">…</div>…
+ *   <div class="poster-time">when</div><div><code class="code-inline">key</code></div><div>outcome</div>…</div>.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 — 2026-09-25 — Initial: the rules of .dw-grants, moved unchanged from data-wallet-poster.css.
+ */
+
+/* the access rows of an opened group, time first: a log */
+.dw-grants { display: grid; gap: 0 1rem; margin-top: .4rem; }
+.dw-grants--rows { grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) 9rem; }
+.dw-grants > div { padding: .45rem 0; border-bottom: 1px solid var(--border); min-width: 0; overflow-wrap: anywhere; }
+.dw-grants > div:where(:not(.dw-gh, .poster-time)) { font-size: .85rem; line-height: 1.5; }
+.dw-grants > .dw-gh { padding: 0 0 .25rem; border-bottom: 0; }
+
+@media (max-width: 860px) {
+  .dw-grants, .dw-grants--rows { grid-template-columns: minmax(0, 1fr); }
+  .dw-grants > .dw-gh { display: none; }
+}

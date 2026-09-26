@@ -15,6 +15,10 @@
  *     change waits for the creator or an admin, or why it was refused, and reload to what is stored
  *     (the section refusal was swallowed). Sections come from the workspace read. Settings sets the
  *     workspace's rule for members' changes.
+ *   v2.2.0 — 2026-09-26 — Every line that says a part is loading is the loading line: the quiet sentence with the blinking Loading mark, LoadingLine in views/profile/shared.js (a unification: the look most tabs use).
+ *   v2.1.0 — 2026-09-25 — The loud action is the library's dark block, .poster-slab: the control cut
+ *     where it sits in a row of controls or waits to be enabled, the danger tone for a delete that
+ *     cannot be undone (Jouni's decision "Loud action").
  *   2026-09-13 — V1: compose page and B1 section headings from the shared poster classes.
  *   v2.0.0 — 2026-08-29 — The poster face (design canvas "AIMEAT Työtilan sivu", direction A). The render
  *     is one call into workspace/cover.js: the cover with its tables, the adaptive "New for you"
@@ -63,7 +67,7 @@ import htm from 'htm';
 import { onLiveUpdate } from '/lib/live-updates.js';
 const html = htm.bind(h);
 import { t, getLocale } from '/js/i18n.js';
-import { Spinner } from '/views/profile/shared.js';
+import { LoadingLine } from '/views/profile/shared.js';
 import { useConfirm } from '/components/Modal.js';
 import * as orgService from '/js/services/organisms.js';
 import { getGhii } from '/js/services/auth.js';
@@ -688,7 +692,7 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
 
   const back = buildBreadcrumb({ onBack, onBackToList, org, showSettings, guardWsDirty, setShowSettings, wsName, ws });
 
-  if (ws === undefined) return html`<div>${back}<${Spinner} text=${t('organisms.loading') || 'Loading...'} /></div>`;
+  if (ws === undefined) return html`<div>${back}<${LoadingLine} text=${t('organisms.loading') || 'Loading...'} /></div>`;
 
   if (ws === null) {
     return html`
@@ -696,7 +700,7 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
         ${back}
         <div class="poster-section-title">${(org.name || 'Organism')}</div>
         <div class="section-desc">${t('organisms.noWorkspace') || 'The workspace is created, but it is still empty. Give it a structure: the one-click project template covers goals, plans, deliverables and decisions, or describe below what this workspace is for and an AI designs the structure.'}</div>
-        <button class="btn-primary" onClick=${setup} disabled=${busy || genBusy}>${busy ? '...' : (t('organisms.setupWorkspace') || 'Set up workspace (project template)')}</button>
+        <button class="poster-slab poster-slab--control" onClick=${setup} disabled=${busy || genBusy}>${busy ? '...' : (t('organisms.setupWorkspace') || 'Set up workspace (project template)')}</button>
         <${WorkspaceGenerator} orgId=${orgId} wsId=${wsId} showToast=${showToast}
           onApplied=${load} onOpenSettings=${() => setShowSettings(true)} showRegenerate=${false}
           manifest=${null} genBusy=${genBusy} setGenBusy=${setGenBusy} />

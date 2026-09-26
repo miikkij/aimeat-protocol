@@ -8,6 +8,9 @@
  * @structure CONVERSATION_ENTRIES
  * @usage import { CONVERSATION_ENTRIES } from './entries-conversation.js';
  * @version-history
+ *   v1.4.0 — 2026-09-26 — The typing box is the chat's one row (.poster-composer and its stacked cut): the field with the thick line under it, the tools as framed squares, the dark block that sends with the page's word; Messages (and its Broadcast form) and an agent's Chat tab take it; the framed field, the round-cornered tools and the box's frame go (a unification: Jouni's decision "Typing box").
+ *   v1.3.0 — 2026-09-26 — A message is the chat's turn (components/Turn.js classes): your words bold on the sun, the other side's beside the pale coral spine, the name above the words, the time and the read marks under them with Copy and Listen, the other six actions behind one ⋯ (CardMenu inline); an agent's options are the chat's choices. The frame, the picture beside the other side, the action pill and the Chat tab's bubbles, pairing lines and small reader go; a suggested reply waiting for approval keeps its dashed box (a unification: Jouni's decision "Message").
+ *   v1.2.0 — 2026-09-26 — ThreadList's person tone (ThreadPerson) and Messages as a use (Jouni's decision "Conversation list").
  *   v1.1.0 — 2026-09-24 — The suggestion's caps variant removed (Jouni's decision "Suggestion").
  *   v1.0.0 — 2026-09-23 — Initial (UI consolidation phase 1).
  */
@@ -39,11 +42,14 @@ export const CONVERSATION_ENTRIES: UiEntryWritten[] = [
         summary: 'The person\'s conversations: one row each, the open one on the sun, a way to delete.',
         module: '/components/ThreadList.js', sheet: '/css/components/thread-list.css',
         data: {
-            shape: 'ThreadList({ threads, activeId, onOpen, onNew, onDelete, onClose, children })',
-            fields: { threads: '[{ id, title, turns }]', activeId: 'the open one', onOpen: 'open a thread', onNew: 'start one', onDelete: 'delete one', onClose: 'the phone\'s way back', children: 'what goes under the list in the rail' },
+            shape: 'ThreadList({ threads, activeId, onOpen, onNew, onDelete, onClose, children }) · ThreadPerson({ expanded, onClick, children })',
+            fields: { threads: '[{ id, title, turns }]', activeId: 'the open one', onOpen: 'open a thread', onNew: 'start one', onDelete: 'delete one', onClose: 'the phone\'s way back', children: 'what goes under the list in the rail; in ThreadPerson, its words', expanded: 'the person\'s conversations are shown' },
         },
-        useFor: ['The rail of the chat page, and its drawer on a phone.'],
-        variants: [{ name: 'active', class: 'poster-thread--active', when: 'the open conversation' }],
+        useFor: ['The rail of the chat page, and its drawer on a phone.', 'Messages: your conversations with people, grouped by person (the rows as markup, .poster-thread-list).'],
+        variants: [
+            { name: 'active', class: 'poster-thread--active', when: 'the open conversation; the line under its name is dark on the sun' },
+            { name: 'person', class: 'poster-thread-person', prop: 'ThreadPerson', when: 'a heading over one person\'s conversations that opens and closes them' },
+        ],
         example: { threads: [{ id: 't1', title: 'Make me a page', turns: 4 }], activeId: 't1' },
     },
     {
@@ -88,11 +94,12 @@ export const CONVERSATION_ENTRIES: UiEntryWritten[] = [
             shape: 'Turn({ turn, id }) · LiveTurn({ text, thought, tools, cards, busy }) · TurnError({ message, onRetry })',
             fields: { turn: '{ role: user|agent, text, at, model, tools, cards, attachments }', id: 'the key for reading it aloud', busy: 'LiveTurn: the answer is still being written', message: 'TurnError: why it could not run', onRetry: 'TurnError: send it again' },
         },
-        useFor: ['Each message in a conversation. The agent\'s words are Markdown, the person\'s are shown as typed.'],
+        useFor: ['Each message in a conversation. The agent\'s words are Markdown, the person\'s are shown as typed.', 'Messages and an agent\'s Chat tab: a message between two people, or between you and your agent, drawn as markup with these classes (the name line above the words, your Markdown in ink on the sun).'],
         variants: [
             { name: 'user', class: 'poster-turn--user', when: 'what the person said' },
             { name: 'agent', class: 'poster-turn--agent', when: 'what the agent said' },
             { name: 'live', class: 'poster-turn--live', when: 'an answer still being written' },
+            { name: 'name line', class: 'poster-turn-who', when: 'who said it, above the words, where two people talk' },
         ],
         example: { turn: { role: 'agent', text: 'Your page is ready.', at: '2026-09-23T10:42:00Z', model: 'claude-sonnet-5' } },
     },
@@ -167,8 +174,11 @@ export const CONVERSATION_ENTRIES: UiEntryWritten[] = [
                 busy: 'a turn is running', disabled: 'no agent here', note: 'why it is disabled', listening: 'a recording is being read',
             },
         },
-        useFor: ['The foot of a conversation. Enter sends, Shift+Enter opens a line.'],
-        variants: [{ name: 'error', class: 'poster-attachment--error', when: 'an attachment that failed to upload' }],
+        useFor: ['The foot of a conversation. Enter sends, Shift+Enter opens a line.', 'Messages, its Broadcast form and an agent\'s Chat tab: the row drawn as markup with these classes, with the page\'s own tools and button word.'],
+        variants: [
+            { name: 'error', class: 'poster-attachment--error', when: 'an attachment that failed to upload' },
+            { name: 'stacked', class: 'poster-composer--stack', when: 'three tools and a button beside the field: on a phone the field keeps the whole first line' },
+        ],
         example: { value: 'Make me a page about my team', busy: false, attachments: [] },
     },
 ];

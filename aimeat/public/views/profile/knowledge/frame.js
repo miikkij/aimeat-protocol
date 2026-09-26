@@ -10,6 +10,16 @@
  * @structure c · words · pkgId · statsOf · groupOf · packageRows · crumb · renderPage · entryText
  * @usage import { renderPage, packageRows, statsOf } from './frame.js';
  * @version-history
+ *   v1.9.0 -- 2026-09-26 -- The packages table is the Listing (listing, listing-row and its head row, name, words and doors cells; a group's heading inside it; listing--cols keeps the narrow-screen columns), a unification: the look most tabs use.
+ *   v1.8.0 -- 2026-09-26 -- The line under a package's name is the Listing's typewriter line (.listing-meta), a unification: Jouni's decision "Meta line".
+ *   v1.7.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
+ *   v1.6.0 -- 2026-09-25 -- Every tag is the Tag (.poster-chip and its tones, .poster-chips for a row), a unification: Jouni's decision Tag.
+ *   v1.5.0 -- 2026-09-25 -- Every time a thing happened wears .poster-time (Jouni's decision "Timestamp", a unification).
+ *   v1.4.0 -- 2026-09-25 -- The row labels (field and key labels, column heads, box labels) wear .poster-label (Jouni's decision "Row label", a unification).
+ *   v1.3.0 -- 2026-09-25 -- Every quiet way on is the library's action link, .poster-action, with the
+ *     tone its meaning names: more for "show all" and more of a list, back, text for a plain grey
+ *     word, quiet (Jouni's decisions "Action link", "Panel action", "Dismiss", "Small link", "Step
+ *     button").
  *   v1.2.0 -- 2026-09-13 -- Compose existing top rules from poster.css.
  *   v1.1.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.0.0 — 2026-08-30 — Initial.
@@ -85,17 +95,21 @@ export function entryText(data) {
 }
 
 /** Rows of a packages table: name and its line, entries, sharing, changed, a door. */
-export function packageRows(ctx, list) {
-  return html`<div class="kp-rows">
+export function packageRows(ctx, list, { head = false, label = null } = {}) {
+  return html`<div class="listing listing--cols listing--name-count-words-when-doors">
+    ${head ? rowsHead() : null}
+    ${label}
     ${list.map(pkg => { const m = manifestOf(pkg); const s = statsOf(m); const id = pkgId(pkg); return html`
-      <div class="kp-nm" key=${'n' + id}><button type="button" class="og-tbl-name" onClick=${() => ctx.pickView({ kind: 'package', id })}>${m.name || c('untitled')}</button><small>${subOf(m)}</small></div>
-      <div class="kp-m" key=${'e' + id}><b>${s.entries}</b> ${c('entriesWord', { n: s.entries })}${s.refs ? html`<br />${c('refsVerified', { v: s.verified, n: s.refs })}` : null}</div>
-      <div class="kp-w" key=${'s' + id}>${sharingWords(m, !!ctx.fedConsents?.[id]).join(' · ')}</div>
-      <div class="kp-m" key=${'u' + id}>${rel(m.updated || pkg.updated_at || pkg.updatedAt)}</div>
-      <div class="og-tbl-door" key=${'d' + id}><button type="button" class="og-door" onClick=${() => ctx.pickView({ kind: 'package', id })}>${c('open')}</button></div>`; })}
+      <div class="listing-row" key=${id}>
+        <div class="listing-name"><button type="button" class="og-tbl-name" onClick=${() => ctx.pickView({ kind: 'package', id })}>${m.name || c('untitled')}</button><small class="listing-meta">${subOf(m)}</small></div>
+        <div class="listing-desc"><b>${s.entries}</b> ${c('entriesWord', { n: s.entries })}${s.refs ? html`<br />${c('refsVerified', { v: s.verified, n: s.refs })}` : null}</div>
+        <div class="listing-desc">${sharingWords(m, !!ctx.fedConsents?.[id]).join(' · ')}</div>
+        <div class="poster-time">${rel(m.updated || pkg.updated_at || pkg.updatedAt)}</div>
+        <div class="listing-doors"><button type="button" class="poster-action poster-action--small poster-action--row" onClick=${() => ctx.pickView({ kind: 'package', id })}>${c('open')}</button></div>
+      </div>`; })}
   </div>`;
 }
-export const rowsHead = () => html`<div class="kp-rows kp-rows--head"><div>${c('colPackage')}</div><div>${c('colEntries')}</div><div>${c('colSharing')}</div><div>${c('colChanged')}</div><div></div></div>`;
+const rowsHead = () => html`<div class="listing-row listing-row--head"><div class="poster-label">${c('colPackage')}</div><div class="poster-label">${c('colEntries')}</div><div class="poster-label">${c('colSharing')}</div><div class="poster-label">${c('colChanged')}</div><div class="poster-label"></div></div>`;
 
 /* ── The crumb and the page frame ──────────────────────────────────────────────────────────── */
 export function crumb(ctx, parts) {
@@ -120,7 +134,7 @@ export function renderPage(ctx, { crumbs, title, chips = null, doors = null, str
       <div class="og-mast og-mast--page">
         <div class="og-mast-words">
           <h1 class="og-title poster-page-title kp-title--page">${title}</h1>
-          ${chips ? html`<div class="og-chips">${chips}</div>` : null}
+          ${chips ? html`<div class="poster-chips">${chips}</div>` : null}
         </div>
         ${doors ? html`<div class="og-mast-actions"><div class="og-doors">${doors}</div></div>` : null}
       </div>

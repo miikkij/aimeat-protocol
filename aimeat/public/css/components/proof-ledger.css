@@ -1,0 +1,26 @@
+/**
+ * @file proof-ledger.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The proof ledger: which model proved a library, whether it passed, what it cost, when,
+ *   and the evidence, one line per proof in five typewriter columns with a rule under each cell; the
+ *   verdict in green when it passed and in coral when it failed. On a phone only the model and the
+ *   verdict stay. Moved unchanged out of css/views/libraries-poster.css (Libraries, an opened
+ *   library's "Proven" value), where it is the only place it is drawn (UI consolidation phase 5, a
+ *   move).
+ *   Drawn as markup: <div class="lb-proof"><div>model</div><div class="ok|no">verdict</div><div>tokens</div>
+ *   <div>date</div><div>evidence</div>…</div>.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 — 2026-09-25 — Initial: the rules of .lb-proof, moved unchanged from libraries-poster.css.
+ */
+
+.lb-proof { display: grid; grid-template-columns: minmax(8rem, 11rem) 5rem 6rem 6.5rem minmax(0, 1fr); gap: 0 .8rem; font-family: var(--font-mono); font-size: .74rem; line-height: 1.5; margin-top: .2rem; }
+.lb-proof > div { padding: .3rem 0; border-bottom: 1px solid var(--border); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lb-proof .ok { color: var(--success-fg); font-weight: 700; }
+.lb-proof .no { color: var(--accent); font-weight: 700; }
+
+@media (max-width: 860px) {
+  .lb-proof { grid-template-columns: minmax(0, 1fr) 4rem; }
+  .lb-proof > div:nth-child(5n+3), .lb-proof > div:nth-child(5n+4), .lb-proof > div:nth-child(5n+5) { display: none; }
+}

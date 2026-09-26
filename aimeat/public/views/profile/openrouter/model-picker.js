@@ -12,6 +12,22 @@
  * @structure ModelPicker (the control) · ModelRow (one option) · SELECT_THRESHOLD
  * @usage <${ModelPicker} value=${model} onChange=${setModel} models=${models} modality="chat" />
  * @version-history
+ *   v1.12.0 — 2026-09-26 — A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
+ *   v1.11.0 — 2026-09-26 — The classic AI settings' model picker is the library's Model picker (css/components/model-picker.css): its frame, rows, group, empty line and show-all line; its own picker, row and meta rules go (a unification: the look most tabs use).
+ *   v1.10.0 — 2026-09-25 — The last lines that say nothing is there are the quiet sentence (.poster-quiet); the ecosystem's empty frame goes, its second line is the Hint (Jouni's decision "Empty line", a unification).
+ *   v1.9.0 — 2026-09-25 — An HTTP status in the node statistics and a model not in the list are the Status (.poster-status fine, attention or danger); the coloured words' rules go (Jouni's decision "Status", a unification).
+ *   v1.8.0 — 2026-09-25 — The model's page link (↗) and the agent's mail link are the small icon button (.poster-icon--small); their look goes, the mail icon keeps its drawing size (Jouni's decision "Icon button", a unification).
+ *   v1.7.0 — 2026-09-25 — A search field over a list is the Search line (.search-line with the Text field); a place keeps only its layout (a unification: the look most tabs use).
+ *   v1.6.0 — 2026-09-25 — Every drop-down is the Select field (.select-field, css/components/select-field.css); a place keeps only its width and margin (a unification: the look most tabs use).
+ *   v1.5.0 — 2026-09-25 — Every one-line field is the Text field (.og-input); a place keeps only its layout (a unification: the look most tabs use).
+ *   v1.4.0 — 2026-09-25 — Code inside a sentence or a value line is the code-inline cut of the Code block (UI consolidation phase 5, a unification).
+ *   v1.3.0 — 2026-09-25 — Every hint is the Hint (poster-hint, components/Hint.js), the look most Settings & Controls tabs draw (UI consolidation phase 5, a unification).
+ *   v1.2.0 — 2026-09-25 — The headings over lists wear .poster-day-title, grey (--quiet) over a record (Jouni's decision "Group heading", a unification).
+ *   v1.1.0 — 2026-09-25 — Every quiet way on is the library's action link, .poster-action, with the
+ *     tone its meaning names: more for "show all" and more of a list, back, text for a plain grey
+ *     word, quiet (Jouni's decisions "Action link", "Panel action", "Dismiss", "Small link", "Step
+ *     button").
+ *   2026-09-25 -- The lines that say a list is empty (or has nothing to show yet) are the quiet sentence (.poster-quiet, QuietNote), a unification: Jouni's decision "Empty line".
  *   v1.0.0 — 2026-08-01 — Initial version (OpenRouter settings rework).
  */
 import { h } from 'preact';
@@ -36,17 +52,14 @@ function ModelRow({ model, modality, selected, onPick, showLink }) {
   const price = priceLabelFor(model, modality);
   const ctx = contextLabel(model);
   return html`
-    <li class=${`pf-or-mrow${selected ? ' pf-or-mrow--on' : ''}`}>
-      <button type="button" class="pf-or-mpick" onClick=${() => onPick(model.id)} title=${model.id}>
-        <span class="pf-or-mname">${model.name || model.id}</span>
-        <span class="pf-or-mid">${model.id}</span>
-        <span class="pf-or-mmeta">
-          ${price ? html`<span class="pf-or-mprice">${price}</span>` : null}
-          ${ctx ? html`<span class="pf-or-mctx">${t('profile.openrouter.price.context', { n: ctx })}</span>` : null}
-        </span>
+    <li class=${`model-picker-row${selected ? ' is-on' : ''}`}>
+      <button type="button" onClick=${() => onPick(model.id)} title=${model.id}>
+        <span><b>${model.name || model.id}</b><code>${model.id}</code></span>
+        <span class="model-picker-price">${price || ''}</span>
+        <span class="model-picker-ctx">${ctx ? t('profile.openrouter.price.context', { n: ctx }) : ''}</span>
       </button>
       ${showLink ? html`
-        <a class="pf-or-mlink" href=${modelPageUrl(model.id)} target="_blank" rel="noopener"
+        <a class="poster-icon poster-icon--small" href=${modelPageUrl(model.id)} target="_blank" rel="noopener"
            title=${t('profile.openrouter.model.openPage')} aria-label=${t('profile.openrouter.model.openPage')}>↗</a>` : null}
     </li>`;
 }
@@ -95,7 +108,7 @@ export function ModelPicker({
   const richOnly = modality === 'transcription' || modality === 'speech';
   if (!richOnly && pool.length > 0 && pool.length <= SELECT_THRESHOLD && !allowCustom) {
     return html`
-      <select class="pf-or-select" value=${value} disabled=${disabled}
+      <select class="select-field" value=${value} disabled=${disabled}
               onChange=${(e) => onChange(e.target.value)}>
         ${allowNone ? html`<option value="">${noneLabel || t('profile.openrouter.model.none')}</option>` : null}
         ${pool.map((m) => html`<option key=${m.id} value=${m.id}>${m.name || m.id}</option>`)}
@@ -105,48 +118,48 @@ export function ModelPicker({
   const visible = query ? filtered : (showAll ? filtered : recommended);
 
   return html`
-    <div class=${`pf-or-picker${disabled ? ' pf-or-picker--off' : ''}`}>
+    <div class=${`model-picker pf-or-picker${disabled ? ' pf-or-picker--off' : ''}`}>
       <div class="pf-or-picker-head">
         <span class="pf-or-picked">
           ${value
-            ? html`<code class="pf-or-picked-id">${value}</code>`
-            : html`<span class="pf-or-picked-none">${noneLabel || t('profile.openrouter.model.none')}</span>`}
-          ${value && !selectedKnown ? html`<span class="pf-or-picked-warn">${t('profile.openrouter.model.notInList')}</span>` : null}
+            ? html`<code class="code-inline">${value}</code>`
+            : html`<span class="poster-quiet">${noneLabel || t('profile.openrouter.model.none')}</span>`}
+          ${value && !selectedKnown ? html`<span class="poster-status poster-status--attention pf-or-picked-warn">${t('profile.openrouter.model.notInList')}</span>` : null}
         </span>
         ${value && allowNone ? html`
-          <button type="button" class="btn-ghost btn-sm" disabled=${disabled}
+          <button type="button" class="poster-action poster-action--small" disabled=${disabled}
                   onClick=${() => onChange('')}>${t('profile.openrouter.model.clear')}</button>` : null}
       </div>
 
-      <input type="search" class="pf-or-input pf-or-msearch" value=${query} disabled=${disabled}
+      <input type="search" class="og-input" value=${query} disabled=${disabled}
              placeholder=${t('profile.openrouter.model.searchPlaceholder', { n: pool.length })}
              onInput=${(e) => setQuery(e.target.value)} />
 
       ${visible.length === 0
-        ? html`<div class="pf-or-mempty">${t('profile.openrouter.model.noMatch')}</div>`
+        ? html`<div class="poster-quiet model-picker-empty">${t('profile.openrouter.model.noMatch')}</div>`
         : html`
-          <ul class="pf-or-mlist" ref=${listRef}>
-            ${!query && !showAll ? html`<li class="pf-or-mgroup">${t('profile.openrouter.model.recommended')}</li>` : null}
+          <ul class="model-picker-list" ref=${listRef}>
+            ${!query && !showAll ? html`<li class="model-picker-group poster-day-title">${t('profile.openrouter.model.recommended')}</li>` : null}
             ${visible.map((m) => html`
               <${ModelRow} key=${m.id} model=${m} modality=${modality} selected=${m.id === value}
                            onPick=${onChange} showLink=${isOpenRouter} />`)}
           </ul>`}
 
       ${!query && !showAll && filtered.length > recommended.length ? html`
-        <button type="button" class="btn-ghost btn-sm pf-or-mall" onClick=${() => setShowAll(true)}>
+        <div class="model-picker-more"><button type="button" class="poster-action poster-action--more" onClick=${() => setShowAll(true)}>
           ${t('profile.openrouter.model.showAll', { n: filtered.length })}
-        </button>` : null}
+        </button></div>` : null}
 
       ${allowCustom ? html`
         <div class="pf-or-mcustom">
-          <input type="text" class="pf-or-input" value=${custom} disabled=${disabled}
+          <input type="text" class="og-input" value=${custom} disabled=${disabled}
                  placeholder=${t('profile.openrouter.model.customIdPlaceholder')}
                  onInput=${(e) => setCustom(e.target.value)} />
-          <button type="button" class="btn-outline btn-sm" disabled=${disabled || !custom.trim()}
+          <button type="button" class="poster-action poster-action--small" disabled=${disabled || !custom.trim()}
                   onClick=${() => { onChange(custom.trim()); setCustom(''); }}>
             ${t('profile.openrouter.model.customIdUse')}
           </button>
         </div>
-        <span class="pf-or-hint">${t('profile.openrouter.model.customIdHint')}</span>` : null}
+        <span class="poster-hint">${t('profile.openrouter.model.customIdHint')}</span>` : null}
     </div>`;
 }

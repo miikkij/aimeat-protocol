@@ -1,0 +1,17 @@
+/**
+ * @file crumb-trail.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The mono path above a tab page's headline: the steps as coral links, the page you are on in ink.
+ *   Moved unchanged out of views/organism.css (the og- page kit shared by the Settings & Controls tabs,
+ *   the organism pages and the admin), under its own name; the class names stay, because every page
+ *   that draws the kit writes them. Corners, frames, shadows and letter case read the shape tokens.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 — 2026-09-25 — Moved out of views/organism.css (UI consolidation phase 5, a move).
+ */
+
+.og-crumb { display: flex; gap: 8px; align-items: center; font-family: var(--font-mono); font-size: .8rem; color: var(--text-dim); }
+.og-crumb-link { background: none; border: 0; padding: 0; cursor: pointer; font: inherit; color: var(--accent); }
+.og-crumb-link:hover { color: var(--text); }
+.og-crumb-here { color: var(--text); }

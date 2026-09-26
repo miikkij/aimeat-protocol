@@ -8,6 +8,19 @@
  * @structure WorkspaceComments
  * @usage import { WorkspaceComments } from '/views/profile/organisms/workspace-comments.js';
  * @version-history
+ *   v1.8.0 — 2026-09-26 — A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
+ *   v1.7.0 — 2026-09-26 — When a comment was written is the Timestamp (.poster-time), not the tiny words (.pj-mini), a unification: Jouni's decision "Timestamp".
+ *   v1.6.0 — 2026-09-25 — Every many-line field is the Text area (.og-textarea); a place keeps only its size and margin (a unification: the look most tabs use).
+ *   v1.5.0 — 2026-09-25 — Every one-line field is the Text field (.og-input); a place keeps only its layout (a unification: the look most tabs use).
+ *   v1.4.0 — 2026-09-25 — The headings over lists wear .poster-day-title, grey (--quiet) over a record (Jouni's decision "Group heading", a unification).
+ *   v1.3.0 — 2026-09-25 — The row labels (field and key labels, column heads, box labels) wear .poster-label (Jouni's decision "Row label", a unification).
+ *   v1.2.0 — 2026-09-25 — Every quiet way on is the library's action link, .poster-action, with the
+ *     tone its meaning names: more for "show all" and more of a list, back, text for a plain grey
+ *     word, quiet (Jouni's decisions "Action link", "Panel action", "Dismiss", "Small link", "Step
+ *     button").
+ *   v1.1.0 — 2026-09-25 — The loud action is the library's dark block, .poster-slab: the control cut
+ *     where it sits in a row of controls or waits to be enabled, the danger tone for a delete that
+ *     cannot be undone (Jouni's decision "Loud action").
  *   v1.0.0 — 2026-06-19 — Extracted from organisms-tab.js during the module split.
  *   v1.1.0 — 2026-06-22 — Optional BATCHED mode (batched/initialComments/onReload): the parent fetches
  *     all visible threads in one /comments/batch request instead of each thread self-fetching +
@@ -80,7 +93,7 @@ export function WorkspaceComments({ orgId, ws, space, instanceId, showToast, bat
   const list = comments || [];
   return html`
     <div class="pj-comments">
-      <div class="detail-label">${(t('organisms.commentsHeading') || 'Comments') + (list.length ? ` (${list.length})` : '')}</div>
+      <div class="detail-label poster-day-title">${(t('organisms.commentsHeading') || 'Comments') + (list.length ? ` (${list.length})` : '')}</div>
       ${comments === null ? html`<div class="section-desc">…</div>` : null}
       ${comments !== null && list.length === 0 ? html`<div class="section-desc">${t('organisms.noComments') || 'No comments yet.'}</div>` : null}
       ${list.map(c => html`
@@ -90,20 +103,20 @@ export function WorkspaceComments({ orgId, ws, space, instanceId, showToast, bat
             ${c.parentId ? html`<span class="pj-mini"> · ${t('organisms.inReply') || 'reply'}</span>` : null}
             ${c.anchor?.quote ? html`<span class="pj-mini"> · “${(String(c.anchor.quote).slice(0, 80))}”</span>` : null}
             ${c.anchor?.section ? html`<span class="pj-mini"> · §${(c.anchor.section)}</span>` : null}
-            <span class="pj-mini"> · ${c.createdAt ? dt(c.createdAt) : ''}</span>
+            <span class="poster-time"> · ${c.createdAt ? dt(c.createdAt) : ''}</span>
           </div>
           <div class="pj-comment-body">${(c.body || '')}</div>
           <div class="pj-comment-actions">
-            <button class="btn-ghost btn-sm" disabled=${busy} onClick=${() => setReplyTo({ id: c.id, body: c.body })}>${t('organisms.reply') || 'Reply'}</button>
-            ${mine(c.author) ? html`<button class="btn-ghost btn-sm" disabled=${busy} onClick=${() => remove(c)}>${t('organisms.delete') || 'Delete'}</button>` : null}
+            <button class="poster-action poster-action--small" disabled=${busy} onClick=${() => setReplyTo({ id: c.id, body: c.body })}>${t('organisms.reply') || 'Reply'}</button>
+            ${mine(c.author) ? html`<button class="poster-action poster-action--small" disabled=${busy} onClick=${() => remove(c)}>${t('organisms.delete') || 'Delete'}</button>` : null}
           </div>
         </div>
       `)}
       <div class="pj-comment-compose">
-        ${replyTo ? html`<div class="pj-mini">${t('organisms.replyingTo') || 'Replying to'}: “${(String(replyTo.body || '').slice(0, 60))}” <button class="btn-ghost btn-sm" onClick=${() => setReplyTo(null)}>${t('organisms.cancel') || 'Cancel'}</button></div>` : null}
-        <input class="input-field input-sm" placeholder=${t('organisms.anchorQuotePlaceholder') || 'Optional: quote a passage to anchor the comment'} value=${anchorQuote} onInput=${(e) => setAnchorQuote(e.target.value)} />
-        <textarea class="input-field input-sm" rows="2" placeholder=${t('organisms.commentPlaceholder') || 'Add a comment…'} value=${body} onInput=${(e) => setBody(e.target.value)}></textarea>
-        <button class="btn-primary btn-sm" disabled=${busy || !body.trim()} onClick=${submit}>${t('organisms.postComment') || 'Comment'}</button>
+        ${replyTo ? html`<div class="pj-mini">${t('organisms.replyingTo') || 'Replying to'}: “${(String(replyTo.body || '').slice(0, 60))}” <button class="poster-action poster-action--small" onClick=${() => setReplyTo(null)}>${t('organisms.cancel') || 'Cancel'}</button></div>` : null}
+        <input class="og-input" placeholder=${t('organisms.anchorQuotePlaceholder') || 'Optional: quote a passage to anchor the comment'} value=${anchorQuote} onInput=${(e) => setAnchorQuote(e.target.value)} />
+        <textarea class="og-textarea" rows="2" placeholder=${t('organisms.commentPlaceholder') || 'Add a comment…'} value=${body} onInput=${(e) => setBody(e.target.value)}></textarea>
+        <button class="poster-slab poster-slab--control" disabled=${busy || !body.trim()} onClick=${submit}>${t('organisms.postComment') || 'Comment'}</button>
       </div>
     </div>
   `;

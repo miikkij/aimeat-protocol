@@ -25,6 +25,23 @@
  * @structure NewAgentPanel({ session, showToast, onCreated, agents, open, setOpen, onWaiting })
  * @usage <${NewAgentPanel} session=${session} showToast=${showToast} onCreated=${loadData} />
  * @version-history
+ *   v2.11.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
+ *   v2.10.0 -- 2026-09-26 -- An agent waiting to be attached is the Listing's who cell; the list's own size and weight go (a unification: the look most tabs use).
+ *   v2.9.0 -- 2026-09-25 -- The one line a folded section shows is its lead (.og-lead); it keeps only its margin (a unification: the look most tabs use).
+ *   v2.8.0 -- 2026-09-25 -- A grey line that explains is the Hint (poster-hint, css/components/hint.css); a place keeps only its margin (a unification: the look most tabs use).
+ *   v2.7.0 -- 2026-09-25 -- The agents waiting to be attached and the proposals waiting for you are the Listing (css/components/listing.css), a unification: the look most tabs use.
+ *   v2.6.0 -- 2026-09-25 -- A lead or a paragraph that opens or explains a section is the og-lead; a grey one that explains is the Hint (UI consolidation phase 5, a unification).
+ *   v2.5.0 -- 2026-09-25 -- Every hint is the Hint (poster-hint, components/Hint.js), the look most Settings & Controls tabs draw (UI consolidation phase 5, a unification).
+ *   v2.4.0 -- 2026-09-25 -- The row labels (field and key labels, column heads, box labels) wear .poster-label (Jouni's decision "Row label", a unification).
+ *   v2.3.0 — 2026-09-25 — Every quiet way on is the library's action link, .poster-action, with the
+ *     tone its meaning names: more for "show all" and more of a list, back, text for a plain grey
+ *     word, quiet (Jouni's decisions "Action link", "Panel action", "Dismiss", "Small link", "Step
+ *     button").
+ *   v2.2.0 — 2026-09-25 — The loud action is the library's dark block, .poster-slab: the control cut
+ *     where it sits in a row of controls or waits to be enabled, the danger tone for a delete that
+ *     cannot be undone (Jouni's decision "Loud action").
+ *   2026-09-25 -- What chooses what a list or a panel shows is the tab (.poster-tab, with its fold and filter tones), a unification: Jouni's decision "Tabs and filters".
+ *   v2.1.0 — 2026-09-25 — The og- page kit is library components: PageSection and FoldSection in /components, the kit's rules in css/components (tab-page, crumb-trail, page-head, figure-strip, page-section, fold-row, setting-box, form-fields, space-table) and css/views/organism-controls.css (UI consolidation phase 5, a move).
  *   v2.0.0 — 2026-09-14 — The poster face (design canvas "Your Agents"): a B1 section whose form is a
  *     label column with underlined fields, the starting shape as four tiles, reach and run as
  *     choice groups, one slab. The open state comes from the page, so its NEW AGENT slab can open
@@ -40,9 +57,10 @@ import { t } from '/js/i18n.js';
 import { apiGet, apiPost } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
 import { areaLine } from '/js/consent-vocab.js';
-import { Section } from '/views/profile/organisms/poster-parts.js';
+import { PageSection } from '/components/PageSection.js';
 import { CREW_TEMPLATES, buildTemplate } from './crew-templates.js';
 import { SCOPE_TEMPLATES } from './scope-model.js';
+import { Hint } from '/components/Hint.js';
 
 const p = (key, vars) => t('profile.agents.page.' + key, vars);
 
@@ -167,31 +185,31 @@ export default function NewAgentPanel({ session, showToast, onCreated, agents, o
   // is the ordinary case, and a repair only the creating tab knows about is no repair at all.
   const unattached = (agents ?? []).filter(a => a.identity_version === 2 && a.card_enrolled === false);
 
-  const door = html`<button type="button" class="og-door og-door--quiet" onClick=${() => setOpen(!open)}>${open ? p('close') : p('open')}</button>`;
+  const door = html`<button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => setOpen(!open)}>${open ? p('close') : p('open')}</button>`;
   const shapes = [...CREW_TEMPLATES.map(tpl => ({ id: tpl.id, name: t(tpl.nameKey), desc: t(tpl.descKey) })),
     { id: 'none', name: t('profile.agents.new.shapeNone'), desc: t('profile.agents.new.shapeNoneHint') }];
 
   return html`
-    <${Section} id="agp-new" num="02" title=${t('profile.agents.new.title')}
+    <${PageSection} id="agp-new" num="02" title=${t('profile.agents.new.title')}
       count=${waiting.length > 0 ? p('waitingCount', { n: waiting.length }) : null} doors=${door}>
       ${!open && waiting.length === 0 && unattached.length === 0
-        ? html`<p class="agp-folded">${t('profile.agents.new.desc')}</p>`
+        ? html`<p class="og-lead agp-folded">${t('profile.agents.new.desc')}</p>`
         : null}
 
       ${open && html`
-        <p class="agp-lead">${t('profile.agents.new.desc')}</p>
+        <p class="og-lead">${t('profile.agents.new.desc')}</p>
         <div class="agp-form">
-          <div class="agp-form-k">${t('profile.agents.new.name')}<small>${t('profile.agents.new.nameHint')}</small></div>
+          <div class="agp-form-k"><span class="poster-label">${t('profile.agents.new.name')}</span><small class="poster-hint">${t('profile.agents.new.nameHint')}</small></div>
           <div class="agp-form-v"><input class="og-input" type="text" value=${form.name} onInput=${set('name')} placeholder="news-watcher" /></div>
 
-          <div class="agp-form-k">${t('profile.agents.new.displayName')}</div>
+          <div class="agp-form-k poster-label">${t('profile.agents.new.displayName')}</div>
           <div class="agp-form-v"><input class="og-input" type="text" value=${form.displayName} onInput=${set('displayName')} placeholder=${form.name ? form.name : ''} /></div>
 
-          <div class="agp-form-k">${t('profile.agents.new.purpose')}</div>
+          <div class="agp-form-k poster-label">${t('profile.agents.new.purpose')}</div>
           <div class="agp-form-v"><textarea class="og-textarea" rows="2" value=${form.purpose} onInput=${set('purpose')}
             placeholder=${t('profile.agents.new.purposePlaceholder')}></textarea></div>
 
-          <div class="agp-form-k">${t('profile.agents.new.shape')}<small>${p('shapeHint')}</small></div>
+          <div class="agp-form-k"><span class="poster-label">${t('profile.agents.new.shape')}</span><small class="poster-hint">${p('shapeHint')}</small></div>
           <div class="agp-form-v">
             <div class="agp-choices" role="radiogroup" aria-label=${t('profile.agents.new.shape')}>
               ${shapes.map(s => html`
@@ -202,72 +220,78 @@ export default function NewAgentPanel({ session, showToast, onCreated, agents, o
             </div>
           </div>
 
-          <div class="agp-form-k">${t('profile.agents.new.reaches')}
+          <div class="agp-form-k"><span class="poster-label">${t('profile.agents.new.reaches')}</span>
             ${/* The wildcard has no areas to name — areaLine renders it as a bare asterisk, which
                   tells the reader nothing about what they are handing over. */''}
-            <small>${form.scopes === 'full' ? t('profile.agents.new.scopesFullHint') : areaLine(scopeList, t)}</small>
+            <small class="poster-hint">${form.scopes === 'full' ? t('profile.agents.new.scopesFullHint') : areaLine(scopeList, t)}</small>
           </div>
           <div class="agp-form-v">
-            <div class="og-choice" role="radiogroup" aria-label=${t('profile.agents.new.reaches')}>
+            <div class="pf-tabs" role="radiogroup" aria-label=${t('profile.agents.new.reaches')}>
               ${[['readonly', 'scopesReadonly'], ['standard', 'scopesStandard'], ['full', 'scopesFull']].map(([v, key]) => html`
-                <button type="button" key=${v} class=${`og-choice-btn ${form.scopes === v ? 'on' : ''}`}
+                <button type="button" key=${v} class=${`poster-tab ${form.scopes === v ? 'is-on' : ''}`}
                   role="radio" aria-checked=${form.scopes === v ? 'true' : 'false'} onClick=${pick('scopes', v)}>
                   ${t('profile.agents.new.' + key)}
                 </button>`)}
             </div>
           </div>
 
-          <div class="agp-form-k">${t('profile.agents.new.runModeLabel')}</div>
+          <div class="agp-form-k poster-label">${t('profile.agents.new.runModeLabel')}</div>
           <div class="agp-form-v">
-            <div class="og-choice" role="radiogroup" aria-label=${t('profile.agents.new.runModeLabel')}>
+            <div class="pf-tabs" role="radiogroup" aria-label=${t('profile.agents.new.runModeLabel')}>
               ${['spawn', 'resident'].map(v => html`
-                <button type="button" key=${v} class=${`og-choice-btn ${form.runMode === v ? 'on' : ''}`}
+                <button type="button" key=${v} class=${`poster-tab ${form.runMode === v ? 'is-on' : ''}`}
                   role="radio" aria-checked=${form.runMode === v ? 'true' : 'false'} onClick=${pick('runMode', v)}>
                   ${t('profile.agents.runMode.' + v)}
                 </button>`)}
             </div>
-            <p class="agp-hint">${form.runMode === 'spawn' ? t('profile.agents.new.runModeSpawnHint') : t('profile.agents.new.runModeResidentHint')}</p>
+            <${Hint}>${form.runMode === 'spawn' ? t('profile.agents.new.runModeSpawnHint') : t('profile.agents.new.runModeResidentHint')}<//>
           </div>
 
           <div class="agp-form-actions">
-            <button type="button" class="og-slab" disabled=${busy} onClick=${create}>
+            <button type="button" class="poster-slab poster-slab--control" disabled=${busy} onClick=${create}>
               ${busy ? t('profile.agents.new.working') : t('profile.agents.new.create')}
             </button>
-            <button type="button" class="og-door" onClick=${() => setOpen(false)}>${t('profile.agents.detail.zone2.cancel')}</button>
+            <button type="button" class="poster-action poster-action--small" onClick=${() => setOpen(false)}>${t('profile.agents.detail.zone2.cancel')}</button>
           </div>
         </div>`}
 
-      ${unattached.map(a => html`
-        <div class="agp-attach" key=${a.gaii || a.name}>
-          <span>${t('profile.agents.new.attachHint').replace('{name}', a.display_name || a.name)}</span>
-          <button type="button" class="og-door" disabled=${busy} onClick=${() => attach(a)}>
-            ${t('profile.agents.new.attach')}
-          </button>
-        </div>`)}
-
-      ${waiting.length > 0 && html`
-        <div class="agp-waiting poster-row--thing">
-          <span class="og-label">${t('profile.agents.new.waitingTitle')}</span>
-          ${waiting.map(pr => html`
-            <div class="agp-waiting-row" key=${pr.id}>
-              <div>
-                <div class="agp-waiting-name">${pr.display_name || pr.name}</div>
-                <div class="agp-waiting-desc">${pr.purpose}</div>
-                <div class="agp-waiting-meta">
-                  ${t('profile.agents.new.proposedBy').replace('{who}', pr.proposed_by)}
-                  ${(pr.scopes ?? []).length > 0 && html` · ${areaLine(pr.scopes, t)}`}
-                  ${!pr.crew_def && html` · ${t('profile.agents.new.noDefinition')}`}
-                </div>
-              </div>
-              <div class="agp-waiting-actions">
-                <button type="button" class="og-slab" disabled=${busy} onClick=${() => settle(pr, 'approve')}>
-                  ${t('profile.agents.new.approve')}
-                </button>
-                <button type="button" class="og-door" disabled=${busy} onClick=${() => settle(pr, 'decline')}>
-                  ${t('profile.agents.new.decline')}
+      ${unattached.length > 0 && html`
+        <div class="listing listing--name-state agp-attach">
+          ${unattached.map(a => html`
+            <div class="listing-row" key=${a.gaii || a.name}>
+              <div class="listing-who"><span>${t('profile.agents.new.attachHint').replace('{name}', a.display_name || a.name)}</span></div>
+              <div class="listing-doors">
+                <button type="button" class="poster-action poster-action--small poster-action--row" disabled=${busy} onClick=${() => attach(a)}>
+                  ${t('profile.agents.new.attach')}
                 </button>
               </div>
             </div>`)}
+        </div>`}
+
+      ${waiting.length > 0 && html`
+        <div class="agp-waiting poster-row--thing">
+          <span class="poster-label">${t('profile.agents.new.waitingTitle')}</span>
+          <div class="listing listing--name-desc-doors">
+            ${waiting.map(pr => html`
+              <div class="listing-row" key=${pr.id}>
+                <div class="listing-name">${pr.display_name || pr.name}</div>
+                <div class="listing-desc">${pr.purpose}
+                  <div class="agp-waiting-meta">
+                    ${t('profile.agents.new.proposedBy').replace('{who}', pr.proposed_by)}
+                    ${(pr.scopes ?? []).length > 0 && html` · ${areaLine(pr.scopes, t)}`}
+                    ${!pr.crew_def && html` · ${t('profile.agents.new.noDefinition')}`}
+                  </div>
+                </div>
+                <div class="listing-doors">
+                  <button type="button" class="poster-slab poster-slab--control" disabled=${busy} onClick=${() => settle(pr, 'approve')}>
+                    ${t('profile.agents.new.approve')}
+                  </button>
+                  <button type="button" class="poster-action poster-action--small poster-action--row" disabled=${busy} onClick=${() => settle(pr, 'decline')}>
+                    ${t('profile.agents.new.decline')}
+                  </button>
+                </div>
+              </div>`)}
+          </div>
         </div>`}
     <//>
   `;

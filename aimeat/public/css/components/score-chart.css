@@ -1,0 +1,27 @@
+/**
+ * @file score-chart.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The score chart of a calibration: the plot on the left, the legend beside it (its
+ *   title in typewriter, a square in each line's colour, the name cut with an ellipsis, the last
+ *   score in typewriter); on a phone the legend goes under the plot. The box around it is the Object
+ *   box (.poster-box). Drawn only by the calibrator; moved here unchanged with its class names (UI
+ *   consolidation phase 5, a move).
+ *   Drawn as markup by views/profile/calibrator/chart.js (ScoreChart).
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 — 2026-09-25 — Moved out of calibrator-poster.css (UI consolidation phase 5, a move).
+ */
+
+.cal-chart { display: grid; grid-template-columns: minmax(0, 1fr) 13rem; gap: 1rem; align-items: center; margin: 1rem 0 0; padding: .8rem; }
+.cal-chart svg { width: 100%; height: auto; display: block; }
+.cal-legend { display: flex; flex-direction: column; gap: .4rem; font-size: .82rem; }
+.cal-legend small { font-family: var(--font-mono); font-size: .68rem; color: var(--text-dim); margin-bottom: .2rem; }
+.cal-legend > div { display: flex; align-items: center; gap: .5rem; }
+.cal-legend i { width: .8rem; height: .8rem; flex: none; }
+.cal-legend span { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cal-legend b { font-family: var(--font-mono); font-size: .74rem; }
+
+@media (max-width: 860px) {
+  .cal-chart { grid-template-columns: minmax(0, 1fr); }
+}

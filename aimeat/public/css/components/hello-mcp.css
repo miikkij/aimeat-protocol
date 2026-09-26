@@ -4,11 +4,14 @@
  * SPDX-License-Identifier: MIT
  * @description Styles for the organism instruction block (`.ib-*`) and the per-tool setup guide
  *   (`.ast-*`), the two onboarding components the Agents page and every organism render in the
- *   classic shell. The MCP page renders the same components in the poster dress
- *   (views/mcp-poster.css). All colours are theme tokens.
+ *   classic shell. This is their look on every page, the MCP page included (Jouni's decision
+ *   "MCP guide", the option classic). All colours are theme tokens.
  * @structure .ib (instruction block) · .ib-tabs · .ib-block · .pj-org-instr · .ast (setup guide)
  * @usage loaded from spa.html
  * @version-history
+ *   v1.5.0 — 2026-09-26 — The "recommended" word's and the field list head's capitals and spacing read --shape-case-label and the label spacing (* .3, * .6), a move: the AIMEAT values equal the old ones.
+ *   v1.4.0 — 2026-09-26 — The description says this is the look everywhere: the MCP page no longer
+ *     dresses the guide (Jouni's decision "MCP guide", the option classic). No rule changes.
  *   v1.3.0 — 2026-09-24 — .ast-docs' own look removed: it is the action link's more tone.
  *   v1.2.0 — 2026-09-24 — "recommended" on a tab takes the tab's text colour.
  *   v1.1.0 — 2026-09-02 — The Hello MCP panel rules (`.hm-*`) removed with the panel: the MCP page
@@ -121,8 +124,8 @@
   font-size: 0.6875rem;
   font-weight: var(--weight-semibold);
   color: var(--accent);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
+  text-transform: var(--shape-case-label);
+  letter-spacing: calc(var(--shape-tracking-label) * .3);
 }
 /* On a tab it takes the tab's own text colour, which stays readable on the sun of the chosen tab
    (coral on the sun is not; Jouni's decision "Choice"). */
@@ -174,8 +177,8 @@
 .ast-params-head {
   font-size: var(--text-caption);
   font-weight: var(--weight-heavy);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+  text-transform: var(--shape-case-label);
+  letter-spacing: calc(var(--shape-tracking-label) * .6);
   color: var(--text-muted);
   margin-bottom: 0.45rem;
 }

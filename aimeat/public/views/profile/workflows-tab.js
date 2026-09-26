@@ -10,6 +10,7 @@
  * @structure WorkflowsTab (default) — state, loads, handlers, the ctx bag, render
  * @usage Registered in profile.js TABS as { id:'workflows', component: WorkflowsTab }.
  * @version-history
+ *   v2.1.0 -- 2026-09-25 -- The Settings & Controls frame and its side menu are library components (SettingsFrame, SideMenu; settings-frame.css, side-menu.css); the old .pf-shell, .pf-side- and .pf-content names are gone (UI consolidation phase 5, a move).
  *   v2.0.0 -- 2026-08-30 -- The poster face (design canvas "AIMEAT Työnkulkujen sivu", direction A).
  *     Check now answers on the page and starts nothing; Run opens a confirmation that says what will
  *     happen, how long, what it spends and where it starts, with a sandbox door; a question a run
@@ -116,7 +117,7 @@ export default function WorkflowsTab({ showToast }) {
     setView(v);
     setFolds(f => ({ ...f, settings: false, prompt: false, raw: false }));
     setConfirmState(null);
-    const box = document.querySelector('.page-content') || document.querySelector('.pf-content');
+    const box = document.querySelector('.page-content') || document.querySelector('.settings-frame-content');
     if (box) box.scrollTo({ top: 0 });
     if (v.kind === 'detail') { setRunsTab('runs'); loadDetail(v.id); }
     if (v.kind === 'run') { setRun(null); loadRun(v.id, v.runId); }

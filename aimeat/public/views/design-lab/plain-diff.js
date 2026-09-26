@@ -11,6 +11,9 @@
  * @structure plainDiff(today, after) → string[] (sentences, already translated)
  * @usage import { plainDiff } from '/views/design-lab/plain-diff.js';
  * @version-history
+ *   v1.4.0 — 2026-09-26 — A shadow comes, goes, grows or shrinks (the values' `shadow`).
+ *   v1.3.0 — 2026-09-25 — A line on the left side comes or goes (the values' `left`); "less bold"
+ *     where the weight falls, since "lighter" also reads as a colour (review of the conflicts round).
  *   v1.2.0 — 2026-09-23 — A mark (no letters) gets no letter sentences; "dimmed"; a box needs a frame
  *     or a ground; an unnamed face is "the letters change" (second review).
  *   v1.1.0 — 2026-09-23 — A box that becomes words is said once, not as frame, corner and room
@@ -87,7 +90,7 @@ export function plainDiff(today, after) {
     else say(b.size > a.size ? 'markBigger' : 'markSmaller', b.size > a.size ? 'The mark gets bigger.' : 'The mark gets smaller.');
   }
   // Weights of two different faces do not compare: a 500 in one can look thinner than a 400 in another.
-  if (letters && a.family === b.family && a.weight !== b.weight) say(b.weight > a.weight ? 'bolder' : 'lighter', b.weight > a.weight ? 'The letters get bolder.' : 'The letters get lighter.');
+  if (letters && a.family === b.family && a.weight !== b.weight) say(b.weight > a.weight ? 'bolder' : 'lighter', b.weight > a.weight ? 'The letters get bolder.' : 'The letters get less bold.');
   if (letters && today.case !== after.case) say(after.case === 'uppercase' ? 'capsOn' : 'capsOff', after.case === 'uppercase' ? 'The words are set in capitals.' : 'The words are no longer in capitals.');
   if (letters && today.tracking !== after.tracking) {
     const wider = num(after.tracking) > num(today.tracking);
@@ -127,6 +130,19 @@ export function plainDiff(today, after) {
       const more = room(after.padding) > room(today.padding);
       say(more ? 'roomMore' : 'roomLess', more ? 'There is more room inside it.' : 'There is less room inside it.');
     }
+  }
+  // A line on the left side only (a quoted request, a turn's spine): the frame above does not see it.
+  if (today.left && after.left && today.left !== after.left) {
+    if (after.left === 'none') say('leftOff', 'The line on its left goes.');
+    else if (today.left === 'none') say('leftOn', 'It gets a line on its left.');
+  }
+  // A shadow ("var(--sun) 6px 6px 0px 0px"): its size is the largest of its offsets and blur.
+  if (today.shadow && after.shadow && today.shadow !== after.shadow) {
+    const size = (v) => Math.max(0, ...[...String(v).matchAll(/(-?[\d.]+)px/g)].slice(0, 3).map((m) => Math.abs(num(m[1]))));
+    if (after.shadow === 'none') say('shadowOff', 'It loses its shadow.');
+    else if (today.shadow === 'none') say('shadowOn', 'It gets a shadow.');
+    else if (size(after.shadow) !== size(today.shadow)) say(size(after.shadow) > size(today.shadow) ? 'shadowBigger' : 'shadowSmaller', size(after.shadow) > size(today.shadow) ? 'Its shadow gets bigger.' : 'Its shadow gets smaller.');
+    else say('shadowOther', 'Its shadow changes.');
   }
   if (today.underline && after.underline && today.underline !== after.underline) {
     say(after.underline === 'yes' ? 'underlineOn' : 'underlineOff', after.underline === 'yes' ? 'The words get an underline.' : 'The words lose their underline.');

@@ -1,0 +1,40 @@
+/**
+ * @file space-table.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description A table of spaces: number, name with its marks, size, last change and a door; the head row in
+ *   coral capitals, hidden on a phone with the last-change column.
+ *   Moved unchanged out of views/organism.css (the og- page kit shared by the Settings & Controls tabs,
+ *   the organism pages and the admin), under its own name; the class names stay, because every page
+ *   that draws the kit writes them. Corners, frames, shadows and letter case read the shape tokens.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.2.0 — 2026-09-25 — The times' look is .poster-time; their rules here keep only their place (Jouni's decision "Timestamp", a unification).
+ *   v1.1.0 — 2026-09-25 — The row labels' look is .poster-label; their rules here keep only their place (Jouni's decision "Row label", a unification).
+ *   v1.0.0 — 2026-09-25 — Moved out of views/organism.css (UI consolidation phase 5, a move).
+ */
+
+/* ── The workspace cover: the tables of spaces ─────────────────────────────────────────────── */
+.og-tbl { display: grid; grid-template-columns: 2.6rem minmax(0, 1fr) auto minmax(0, 18rem) auto; gap: 0 1.1rem; align-items: center; }
+.og-tbl > div { padding: .55rem 0; border-bottom: 1px solid var(--border); min-width: 0; }
+.og-tbl--head > div { padding: 0 0 .35rem; border-bottom: 0; }
+.og-tbl-n { text-align: right; margin-right: 0; }
+.og-tbl-nm { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
+/* The visibility chips sit at the far end of the name cell, so they stand in one line down the
+   table against the size column instead of trailing each name wherever it happens to end. */
+.og-tbl-marks { margin-left: auto; flex: none; display: flex; align-items: center; gap: .4rem; }
+.og-tbl-name { background: none; border: 0; padding: 0; cursor: pointer; font-family: inherit; font-size: .97rem; font-weight: 800; color: var(--text); text-align: left; }
+.og-tbl-name:hover { color: var(--accent); }
+.og-tbl-last { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.og-tbl-last:where(:not(.poster-time)) { font-family: var(--font-mono); font-size: .75rem; color: var(--text-dim); }
+.og-tbl-go { background: none; border: 0; padding: 0; cursor: pointer; font: inherit; color: var(--text-dim); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.og-tbl-go:hover { color: var(--accent); }
+.og-tbl-dot { color: var(--border); }
+.og-tbl-door { text-align: right; }
+.og-tbl-door .og-door { font-size: .72rem; }
+
+@media (max-width: 1100px) {
+  .og-tbl { grid-template-columns: 2.6rem minmax(0, 1fr) auto; }
+  .og-tbl-last { display: none; }
+  .og-tbl--head { display: none; }
+}

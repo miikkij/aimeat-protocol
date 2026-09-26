@@ -15,6 +15,13 @@
  * @structure MapPage · offerHref · tile · columnsView · gridView · tilesView · treeView
  * @usage import { MapPage } from './map-page.js';  html`<${MapPage} ctx=${ctx} />`
  * @version-history
+ *   v1.5.0 — 2026-09-25 — A search field over a list is the Search line (.search-line with the Text field); a place keeps only its layout (a unification: the look most tabs use).
+ *   v1.4.0 — 2026-09-25 — A framed box around one thing is the Object box (.poster-box; on a grey ground its copy tone), in the tone its look already was (Jouni's decision "Object box", a unification).
+ *   v1.3.0 — 2026-09-25 — Every tag is the Tag (.poster-chip and its tones, .poster-chips for a row), a unification: Jouni's decision Tag.
+ *   v1.2.0 — 2026-09-25 — Every hint is the Hint (poster-hint, components/Hint.js), the look most Settings & Controls tabs draw (UI consolidation phase 5, a unification).
+ *   v1.1.0 — 2026-09-25 — The headings over lists wear .poster-day-title, grey (--quiet) over a record (Jouni's decision "Group heading", a unification).
+ *   2026-09-25 -- The lines that say a list is empty (or has nothing to show yet) are the quiet sentence (.poster-quiet, QuietNote), a unification: Jouni's decision "Empty line".
+ *   2026-09-25 -- What chooses what a list or a panel shows is the tab (.poster-tab, with its fold and filter tones), a unification: Jouni's decision "Tabs and filters".
  *   v1.0.0 — 2026-09-06 — Initial: tree, columns, grid and tiles, the search field, the new-tab link.
  */
 import { h } from 'preact';
@@ -27,6 +34,7 @@ import { Mermaid } from '/components/Mermaid.js';
 import { buildMermaid, filterOffers, NEED_DISPLAY_ORDER } from '/js/services/offers-grouping.js';
 import { groupItems } from './model.js';
 import { c, agentMark, renderPage } from './frame.js';
+import { Hint } from '/components/Hint.js';
 
 const MODES = ['tree', 'columns', 'grid', 'tiles'];
 const MODE_KEY = 'aimeat.offers.map-view';
@@ -52,7 +60,7 @@ const tile = (it, { line = false, compact = false } = {}) => html`
     ${line ? null : agentMark(it)}
   </a>`;
 
-const groupHead = (g) => html`<div class="op-col-h"><span>${needLabel(g.key)}</span><em>${g.items.length}</em></div>`;
+const groupHead = (g) => html`<div class="op-col-h poster-day-title"><span>${needLabel(g.key)}</span><em>${g.items.length}</em></div>`;
 
 /* ── Columns: one per need, side by side ───────────────────────────────────────────────────── */
 const columnsView = (groups) => html`
@@ -69,8 +77,8 @@ function gridView(groups, items) {
   const rows = [...byAgent.entries()].sort(([a, ai], [b, bi]) => first(ai) - first(bi) || a.localeCompare(b));
   return html`
     <div class=${`op-matrix op-matrix--n${groups.length}`}>
-      <div class="op-mx-head op-mx-head--agent">${c('colAgent')}</div>
-      ${groups.map(g => html`<div class="op-mx-head" key=${'h' + g.key}><span>${needLabel(g.key)}</span><em>${g.items.length}</em></div>`)}
+      <div class="op-mx-head op-mx-head--agent poster-day-title">${c('colAgent')}</div>
+      ${groups.map(g => html`<div class="op-mx-head poster-day-title" key=${'h' + g.key}><span>${needLabel(g.key)}</span><em>${g.items.length}</em></div>`)}
       ${rows.map(([agent, list]) => html`
         <div class=${`op-mx-agent ${list[0].online ? '' : 'op-mx-agent--off'}`} key=${'a' + agent}>${agentMark(list[0])}</div>
         ${groups.map(g => html`<div class="op-mx-cell" key=${agent + '/' + g.key}>${list.filter(it => it.need === g.key).map(it => tile(it, { line: true }))}</div>`)}`)}
@@ -80,7 +88,7 @@ function gridView(groups, items) {
 /* ── Tiles: a block per need, wider the more it holds ──────────────────────────────────────── */
 const tilesView = (groups) => html`
   <div class="op-blocks">
-    ${groups.map(g => html`<div class="op-block" key=${g.key} style=${`--op-n:${g.items.length}`}>
+    ${groups.map(g => html`<div class="op-block poster-box poster-box--copy" key=${g.key} style=${`--op-n:${g.items.length}`}>
       ${groupHead(g)}
       <div class="op-block-tiles">${g.items.map(it => tile(it, { compact: true }))}</div>
     </div>`)}
@@ -105,11 +113,11 @@ export function MapPage({ ctx }) {
   const shown = filterOffers(m.items, q, needLabels());
   const groups = groupItems(shown, 'need');
   const pick = (v) => { setMode(v); saveMode(v); };
-  const doors = MODES.map(id => html`<button type="button" class=${`og-door og-door--quiet ${mode === id ? 'on' : ''}`} key=${id} onClick=${() => pick(id)}>${t('profile.offers.mapView.' + id)}</button>`);
+  const doors = MODES.map(id => html`<button type="button" class=${`poster-tab poster-tab--fold ${mode === id ? 'is-on' : ''}`} key=${id} onClick=${() => pick(id)}>${t('profile.offers.mapView.' + id)}</button>`);
   const chips = html`
-    <span class="og-chip">${c('chipOffers', { n: m.items.length })}</span>
-    ${q.trim() ? html`<span class="og-chip og-chip--sun">${t('profile.offers.mapShown', { n: shown.length })}</span>` : null}`;
-  const body = !shown.length ? html`<p class="og-empty">${t('profile.offers.noMatch')}</p>`
+    <span class="poster-chip">${c('chipOffers', { n: m.items.length })}</span>
+    ${q.trim() ? html`<span class="poster-chip poster-chip--sun">${t('profile.offers.mapShown', { n: shown.length })}</span>` : null}`;
+  const body = !shown.length ? html`<p class="poster-quiet">${t('profile.offers.noMatch')}</p>`
     : mode === 'tree' ? treeView(ctx, groups)
     : mode === 'grid' ? html`<div class="op-map">${gridView(groups, shown)}</div>`
     : mode === 'tiles' ? tilesView(groups)
@@ -118,10 +126,10 @@ export function MapPage({ ctx }) {
     id: 'map', crumbs: [c('map')], title: t('profile.offers.mapTitle'), chips, doors,
     children: html`
       <p class="og-desc og-desc--page">${t('profile.offers.mapDesc')}</p>
-      <div class="op-search op-map-search">
-        <input type="search" value=${q} placeholder=${t('profile.offers.mapSearch')} aria-label=${t('profile.offers.mapSearch')} onInput=${(e) => setQ(e.target.value)} />
+      <div class="search-line op-map-search">
+        <input class="og-input" type="search" value=${q} placeholder=${t('profile.offers.mapSearch')} aria-label=${t('profile.offers.mapSearch')} onInput=${(e) => setQ(e.target.value)} />
       </div>
       ${body}
-      <p class="op-hint">${mode === 'tree' ? t('profile.offers.mapNote') : t('profile.offers.mapNoteTab')}</p>`,
+      <${Hint}>${mode === 'tree' ? t('profile.offers.mapNote') : t('profile.offers.mapNoteTab')}<//>`,
   });
 }

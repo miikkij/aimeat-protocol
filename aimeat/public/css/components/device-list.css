@@ -1,0 +1,27 @@
+/**
+ * @file device-list.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The devices signed in to an account, under its sign-in row on the Access page: three
+ *   columns (the device in bold with a typewriter line under it, its kind, when it was last seen,
+ *   right-aligned), a rule under each row, indented under the row above; on a phone the middle column
+ *   goes. Drawn only by the Access page; moved here unchanged with its class names (UI consolidation
+ *   phase 5, a move).
+ *   Drawn as markup by views/profile/access/page.js.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 — 2026-09-25 — Moved out of access-poster.css (UI consolidation phase 5, a move).
+ */
+
+.ac-devices { display: grid; grid-template-columns: minmax(0, 1.3fr) 7rem 9rem; gap: 0 1rem; margin: .2rem 0 0 1.4rem; }
+.ac-devices > div { padding: .4rem 0; border-bottom: 1px solid var(--border); min-width: 0; overflow-wrap: anywhere; }
+.ac-devices > div:where(:not(.ac-dh)) { font-size: .85rem; line-height: 1.5; }
+.ac-devices > div b { font-weight: 800; }
+.ac-devices > div small { display: block; font-family: var(--font-mono); font-size: .68rem; color: var(--text-dim); }
+.ac-devices > .ac-dh { padding: 0 0 .25rem; border-bottom: 0; }
+.ac-devices > .ac-dn { text-align: right; margin-right: 0; }
+
+@media (max-width: 860px) {
+  .ac-devices { grid-template-columns: minmax(0, 1fr) 4rem; margin-left: 0; }
+  .ac-devices > .ac-dh:nth-child(3), .ac-devices > div:nth-child(3n) { display: none; }
+}

@@ -25,10 +25,12 @@
  *
  *   The card underneath is often a link. Every click here stops before the card sees it, or opening
  *   the menu would also navigate away.
- * @structure CardMenu({ state, actions, label })
+ * @structure CardMenu({ state, actions, label, onOpened, inline })
  * @usage
  *   html`<${CardMenu} state=${'open'} actions=${[{ label: 'Copy', run: copy }]} />`
  * @version-history
+ *   v1.3.0 — 2026-09-26 — `inline`: the dots in a line of words (a message's line under it), and an
+ *     action's `danger` tone (Jouni's decision "Message": the six other actions of a message).
  *   v1.2.0 — 2026-09-24 — The rows are the shared menu row (Jouni's decision "Menu row").
  *   v1.1.0 — 2026-09-24 — The dots are the small icon button; the state fills stay (Jouni's decision
  *     "Icon button").
@@ -46,12 +48,17 @@ const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fa
 export function CardMenu({
   /** 'off' | 'open' | 'working' — the colour of the dots. */
   state = 'off',
-  /** [{ label, run, done }] — done shows a tick for a moment, for copy. */
+  /** [{ label, run, done, danger }] — done shows a tick for a moment, for copy; danger is the menu row's danger tone. */
   actions = [],
   /** What the dots are, for a screen reader and the tooltip. */
   label = null,
   /** Called the first time this menu is opened. The mat card uses it to retire its one-time hint. */
   onOpened = null,
+  /**
+   * null: in the card's top right corner. 'start' | 'end': in a line of words (a message's line under
+   * it), the menu opening from the dots' left or right edge, so it stays on the page.
+   */
+  inline = null,
 }) {
   const [open, setOpen] = useState(false);
   const [flash, setFlash] = useState(null);
@@ -84,7 +91,7 @@ export function CardMenu({
   const hint = label ?? tr('cardMenu.label', 'What you can do with this');
 
   return html`
-    <div class="card-menu" ref=${ref} onClick=${stop}>
+    <div class=${'card-menu' + (inline ? ` card-menu--inline card-menu--from-${inline}` : '')} ref=${ref} onClick=${stop}>
       <button type="button"
         class="poster-icon poster-icon--small card-menu-dots card-menu-dots--${state}"
         aria-haspopup="menu" aria-expanded=${open} aria-label=${hint} title=${hint}
@@ -94,7 +101,7 @@ export function CardMenu({
       ${open && html`
         <div class="card-menu-list" role="menu">
           ${actions.map((a, i) => html`
-            <button type="button" role="menuitem" key=${a.label} class="poster-menu-row card-menu-item"
+            <button type="button" role="menuitem" key=${a.label} class=${'poster-menu-row card-menu-item' + (a.danger ? ' poster-menu-row--danger' : '')}
               onClick=${(e) => { stop(e); run(a, i); }}>
               ${flash === i ? (a.doneLabel ?? tr('cardMenu.done', 'Done')) : a.label}
             </button>`)}

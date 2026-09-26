@@ -18,6 +18,23 @@
  *   - the two code-gated actions (regenerate, disable) ask for the code inline
  * @usage html`<${TwoFactorSection} twoFactor=${ov.two_factor} managed=${!!managedBy} ... />`
  * @version-history
+ *   v1.11.0 -- 2026-09-26 -- A small heading over a group of fields, a card or a note is the Sub-heading (.sub-heading: small ink headline letters); the coral small capitals, the bold ink words and the coral headline letters go (a unification: Jouni's decision "Sub-heading").
+ *   v1.10.0 -- 2026-09-26 -- A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
+ *   v1.9.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
+ *   v1.8.0 -- 2026-09-25 -- Every one-line field is the Text field (.og-input); a place keeps only its layout (a unification: the look most tabs use).
+ *   v1.7.0 -- 2026-09-25 -- Every word that says a state is the Status (.poster-status fine, attention, danger, off), a unification: Jouni's decision Status.
+ *   v1.6.0 -- 2026-09-25 -- Code inside a sentence or a value line is the code-inline cut of the Code block (UI consolidation phase 5, a unification).
+ *   v1.5.0 -- 2026-09-25 -- Every hint is the Hint (poster-hint, components/Hint.js), the look most Settings & Controls tabs draw (UI consolidation phase 5, a unification).
+ *   v1.4.0 -- 2026-09-25 -- The row labels (field and key labels, column heads, box labels) wear .poster-label (Jouni's decision "Row label", a unification).
+ *   v1.3.0 — 2026-09-25 — A delete, revoke or reset link keeps its coral as the action link's danger
+ *     tone, .poster-action--danger (Jouni's decision "Action link").
+ *   v1.2.0 — 2026-09-25 — Every quiet way on is the library's action link, .poster-action, with the
+ *     tone its meaning names: more for "show all" and more of a list, back, text for a plain grey
+ *     word, quiet (Jouni's decisions "Action link", "Panel action", "Dismiss", "Small link", "Step
+ *     button").
+ *   v1.1.0 — 2026-09-25 — The loud action is the library's dark block, .poster-slab: the control cut
+ *     where it sits in a row of controls or waits to be enabled, the danger tone for a delete that
+ *     cannot be undone (Jouni's decision "Loud action").
  *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
  *   v1.0.0 — 2026-09-04 — Initial. Closes the half-built TOTP feature: backend complete, no UI.
  */
@@ -115,131 +132,131 @@ export function TwoFactorSection({ twoFactor, managed, showToast, onChanged }) {
   if (setupData) {
     const codes = setupData.backup_codes || [];
     return html`
-      <h3 class="card-h3 mt-section">${t('profile.security.twoFactor.title')}</h3>
+      <h3 class="card-h3 sub-heading mt-section">${t('profile.security.twoFactor.title')}</h3>
       <div class="card poster-row--thing">
         <p class="pf-bold mb-half">${t('profile.security.twoFactor.setupStep1')}</p>
         ${setupData.qr_data_url && html`
           <img class="pf-2fa-qr" src=${setupData.qr_data_url}
             alt=${t('profile.security.twoFactor.qrAlt')} width="200" height="200" />
         `}
-        <p class="text-caption mb-half">${t('profile.security.twoFactor.manualEntry')}</p>
+        <p class="poster-hint mb-half">${t('profile.security.twoFactor.manualEntry')}</p>
         <div class="flex-row mb-1">
-          <code class="text-code pf-code-break">${setupData.totp_secret}</code>
-          <${CopyButton} text=${setupData.totp_secret || ''} className="btn-ghost btn-sm" />
+          <code class="code-inline pf-code-break">${setupData.totp_secret}</code>
+          <${CopyButton} text=${setupData.totp_secret || ''} className="poster-action poster-action--small" />
         </div>
 
         <p class="pf-bold mb-half">${t('profile.security.twoFactor.setupStep2')}</p>
-        <p class="text-caption mb-half">${t('profile.security.twoFactor.backupCodesOnce')}</p>
-        <div class="pf-2fa-codes mb-half">
-          ${codes.map(c => html`<code class="text-code" key=${c}>${c}</code>`)}
+        <p class="poster-hint mb-half">${t('profile.security.twoFactor.backupCodesOnce')}</p>
+        <div class="pf-2fa-codes poster-box poster-box--copy mb-half">
+          ${codes.map(c => html`<code class="code-inline" key=${c}>${c}</code>`)}
         </div>
-        <${CopyButton} text=${codes.join('\n')} className="btn-outline btn-sm"
+        <${CopyButton} text=${codes.join('\n')} className="poster-action poster-action--small"
           label=${t('profile.security.twoFactor.copyCodes')} />
 
         <p class="pf-bold mt-1 mb-half">${t('profile.security.twoFactor.setupStep3')}</p>
         <div class="flex-row">
-          <input class="input-field text-code pf-2fa-code-input" inputmode="numeric" maxlength="6"
+          <input class="og-input pf-2fa-code-input" inputmode="numeric" maxlength="6"
             autocomplete="one-time-code" placeholder="123456" value=${confirmCode}
             onInput=${e => setConfirmCode(onlyDigits(e.target.value))}
             onKeyDown=${e => { if (e.key === 'Enter' && !busy) confirmSetup(); }} />
-          <button class="btn-primary" disabled=${busy} onClick=${confirmSetup}>
+          <button class="poster-slab poster-slab--control" disabled=${busy} onClick=${confirmSetup}>
             ${busy ? t('profile.security.twoFactor.working') : t('profile.security.twoFactor.turnOn')}
           </button>
-          <button class="btn-ghost" disabled=${busy} onClick=${reset}>${t('profile.cancel')}</button>
+          <button class="poster-action poster-action--small" disabled=${busy} onClick=${reset}>${t('profile.cancel')}</button>
         </div>
-        <p class="text-caption mt-xs">${t('profile.security.twoFactor.notOnYet')}</p>
+        <p class="poster-hint mt-xs">${t('profile.security.twoFactor.notOnYet')}</p>
       </div>
     `;
   }
 
   // ── The resting state ──
   return html`
-    <h3 class="card-h3 mt-section">${t('profile.security.twoFactor.title')}</h3>
-    <p class="text-caption mb-1">${t('profile.security.twoFactor.desc')}</p>
+    <h3 class="card-h3 sub-heading mt-section">${t('profile.security.twoFactor.title')}</h3>
+    <p class="poster-hint mb-1">${t('profile.security.twoFactor.desc')}</p>
     <div class="card poster-row--thing">
       <div class="flex-between mb-half">
-        <span class="pf-bold">${t('profile.security.twoFactor.authenticatorApp')}</span>
-        <span class="badge ${tf.enabled ? 'badge-success' : 'badge-muted'}">
+        <span class="sub-heading">${t('profile.security.twoFactor.authenticatorApp')}</span>
+        <span class="poster-status ${tf.enabled ? 'poster-status--fine' : 'poster-status--off'}">
           ${tf.enabled ? t('profile.security.twoFactor.on') : t('profile.security.twoFactor.off')}
         </span>
       </div>
 
       ${!tf.enabled && html`
-        <p class="text-caption mb-half">
+        <p class="poster-hint mb-half">
           ${tf.pending
             ? t('profile.security.twoFactor.unfinished')
             : t('profile.security.twoFactor.offDesc')}
         </p>
-        <button class="btn-primary" disabled=${busy} onClick=${startSetup}>
+        <button class="poster-slab poster-slab--control" disabled=${busy} onClick=${startSetup}>
           ${busy ? t('profile.security.twoFactor.working') : t('profile.security.twoFactor.setUp')}
         </button>
       `}
 
       ${tf.enabled && html`
-        <p class="text-caption mb-half">
+        <p class="poster-hint mb-half">
           ${t('profile.security.twoFactor.codesLeft').replace('{n}', String(tf.backup_codes_left))}
         </p>
         ${tf.backup_codes_left === 0 && html`
-          <p class="text-caption pf-bold mb-half">${t('profile.security.twoFactor.noCodesLeft')}</p>
+          <p class="poster-hint pf-bold mb-half">${t('profile.security.twoFactor.noCodesLeft')}</p>
         `}
 
         ${newCodes && html`
-          <div class="pf-2fa-codes mb-half">
-            ${newCodes.map(c => html`<code class="text-code" key=${c}>${c}</code>`)}
+          <div class="pf-2fa-codes poster-box poster-box--copy mb-half">
+            ${newCodes.map(c => html`<code class="code-inline" key=${c}>${c}</code>`)}
           </div>
           <div class="flex-row mb-1">
-            <${CopyButton} text=${newCodes.join('\n')} className="btn-outline btn-sm"
+            <${CopyButton} text=${newCodes.join('\n')} className="poster-action poster-action--small"
               label=${t('profile.security.twoFactor.copyCodes')} />
-            <button class="btn-ghost btn-sm" onClick=${() => setNewCodes(null)}>
+            <button class="poster-action poster-action--small" onClick=${() => setNewCodes(null)}>
               ${t('profile.security.twoFactor.savedThem')}
             </button>
           </div>
-          <p class="text-caption mb-1">${t('profile.security.twoFactor.backupCodesOnce')}</p>
+          <p class="poster-hint mb-1">${t('profile.security.twoFactor.backupCodesOnce')}</p>
         `}
 
         ${action === null && html`
           <div class="flex-row">
-            <button class="btn-outline" onClick=${() => { setAction('regenerate'); setActionCode(''); setNewCodes(null); }}>
+            <button class="poster-action poster-action--small" onClick=${() => { setAction('regenerate'); setActionCode(''); setNewCodes(null); }}>
               ${t('profile.security.twoFactor.newCodes')}
             </button>
-            <button class="btn-danger-solid" onClick=${() => { setAction('disable'); setActionCode(''); setBackupCodeInput(''); setUseBackupCode(false); }}>
+            <button class="poster-action poster-action--small poster-action--danger" onClick=${() => { setAction('disable'); setActionCode(''); setBackupCodeInput(''); setUseBackupCode(false); }}>
               ${t('profile.security.twoFactor.turnOff')}
             </button>
           </div>
         `}
 
         ${action === 'regenerate' && html`
-          <p class="text-caption mb-half">${t('profile.security.twoFactor.newCodesAsk')}</p>
+          <p class="poster-hint mb-half">${t('profile.security.twoFactor.newCodesAsk')}</p>
           <div class="flex-row">
-            <input class="input-field text-code pf-2fa-code-input" inputmode="numeric" maxlength="6"
+            <input class="og-input pf-2fa-code-input" inputmode="numeric" maxlength="6"
               autocomplete="one-time-code" placeholder="123456" value=${actionCode}
               onInput=${e => setActionCode(onlyDigits(e.target.value))}
               onKeyDown=${e => { if (e.key === 'Enter' && !busy && actionCode.length === 6) doRegenerate(); }} />
-            <button class="btn-primary" disabled=${busy || actionCode.length !== 6} onClick=${doRegenerate}>
+            <button class="poster-slab poster-slab--control" disabled=${busy || actionCode.length !== 6} onClick=${doRegenerate}>
               ${busy ? t('profile.security.twoFactor.working') : t('profile.security.twoFactor.newCodes')}
             </button>
-            <button class="btn-ghost" onClick=${() => setAction(null)}>${t('profile.cancel')}</button>
+            <button class="poster-action poster-action--small" onClick=${() => setAction(null)}>${t('profile.cancel')}</button>
           </div>
         `}
 
         ${action === 'disable' && html`
-          <p class="text-caption mb-half">${t('profile.security.twoFactor.turnOffAsk')}</p>
+          <p class="poster-hint mb-half">${t('profile.security.twoFactor.turnOffAsk')}</p>
           ${useBackupCode
-            ? html`<input class="input-field text-code pf-2fa-code-input" maxlength="16"
+            ? html`<input class="og-input pf-2fa-code-input" maxlength="16"
                 placeholder=${t('profile.security.twoFactor.backupCodePlaceholder')} value=${backupCodeInput}
                 onInput=${e => setBackupCodeInput(e.target.value)} />`
-            : html`<input class="input-field text-code pf-2fa-code-input" inputmode="numeric" maxlength="6"
+            : html`<input class="og-input pf-2fa-code-input" inputmode="numeric" maxlength="6"
                 autocomplete="one-time-code" placeholder="123456" value=${actionCode}
                 onInput=${e => setActionCode(onlyDigits(e.target.value))} />`}
           <div class="flex-row mt-xs">
-            <button class="btn-danger-solid" disabled=${busy || (useBackupCode ? !backupCodeInput.trim() : actionCode.length !== 6)}
+            <button class="poster-slab poster-slab--control poster-slab--danger" disabled=${busy || (useBackupCode ? !backupCodeInput.trim() : actionCode.length !== 6)}
               onClick=${askDisable}>
               ${busy ? t('profile.security.twoFactor.working') : t('profile.security.twoFactor.turnOff')}
             </button>
-            <button class="btn-ghost" onClick=${() => { setUseBackupCode(!useBackupCode); setActionCode(''); setBackupCodeInput(''); }}>
+            <button class="poster-action poster-action--small" onClick=${() => { setUseBackupCode(!useBackupCode); setActionCode(''); setBackupCodeInput(''); }}>
               ${useBackupCode ? t('profile.security.twoFactor.useAppCode') : t('profile.security.twoFactor.useBackupCode')}
             </button>
-            <button class="btn-ghost" onClick=${() => setAction(null)}>${t('profile.cancel')}</button>
+            <button class="poster-action poster-action--small" onClick=${() => setAction(null)}>${t('profile.cancel')}</button>
           </div>
         `}
       `}

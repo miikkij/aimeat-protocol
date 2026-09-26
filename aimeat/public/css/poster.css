@@ -3,6 +3,24 @@
  * @description Shared poster and showroom shapes. Views compose these classes and own their layout.
  * @usage Linked immediately after theme.css in spa.html.
  * @version-history
+ *   v1.28.0 -- 2026-09-26 -- The pill corner stays on the tab and on the action link's tone with a ground (jump), and leaves the action link's underline; a disabled action's line reads --shape-rule-colour and the quiet tone's line --shape-frame (a move: the AIMEAT values equal the old ones).
+ *   v1.27.0 -- 2026-09-26 -- The Tag's frame colour reads --shape-frame-colour and its letter spacing --shape-tracking-action (a move: the AIMEAT values equal the old ones).
+ *   v1.26.0 -- 2026-09-26 -- The figure written on a meter, .poster-meter-figure: the Wallet meter's figure, taken by the AI budget bars too.
+ *   v1.25.0 -- 2026-09-26 -- The Tag's remove mark, .poster-chip-x: grey, coral under the pointer (Jouni's decision "Remove mark").
+ *   v1.24.0 -- 2026-09-26 -- The box's raised tone, .poster-box--raised: the heavier frame with the raised shadow for the thing that stands out (Jouni's decision "Box").
+ *   v1.23.0 -- 2026-09-26 -- The action link's Settings tones, .poster-action--small, --lower and --row: the size and thinner line of Settings' own way on (Jouni's decision "Action link in Settings").
+ *   v1.22.0 -- 2026-09-26 -- The avatar's agent tone, .poster-box--avatar.poster-box--agent (a dashed frame, grey initials), the look Contacts, Notifications, Email and MCP drew alike.
+ *   v1.21.0 -- 2026-09-25 -- A count inside the chosen tab keeps dark words on the sun (.poster-tab.is-on .poster-count).
+ *   v1.20.0 -- 2026-09-25 -- The icon button's pressed tone, .poster-icon.is-on (ink ground, the mark in the page ground's colour); the first page to wear it is Memory's collection button.
+ *   v1.19.0 -- 2026-09-25 -- The tab's attention tone, .poster-tab--attention (the Access filter "unused" keeps its coral).
+ *   v1.18.0 -- 2026-09-25 -- The action link's danger tone, .poster-action--danger: coral words and line
+ *     for an act that removes or revokes (Jouni's decision "Action link").
+ *   v1.17.0 -- 2026-09-25 -- A tab that cannot be chosen is dimmed (.poster-tab:disabled); the menu row's danger tone (.poster-menu-row--danger).
+ *   v1.16.0 -- 2026-09-25 -- The tab's filter tone, .poster-tab--filter, in the admin filters' values
+ *     (Jouni's decision "Tabs and filters", the admin filter look accepted as a tone).
+ *   v1.15.0 -- 2026-09-25 -- The Tag's tones (.poster-chip--sun, --coral, --ink) and a row of tags
+ *     (.poster-chips); the Status (.poster-status and its four tones), from the lab's accepted
+ *     proposals (Jouni's decisions "Tag" and "Status"); the chip's corner reads the pill corner.
  *   v1.14.0 -- 2026-09-24 -- The shapes read the theme's shape values (theme.css --shape-*): the corners,
  *     frames, shadows and letter case of the slab, the action link and tab, the label, the headings, the
  *     panel, box, frame, record, choice, sticker, icon, menu row and count. The values are today's, so
@@ -70,18 +88,36 @@
 /* Lifted from the home's ink-underlined action (formerly home.css .koti-link), including the unselected tab. */
 .poster-action, .poster-tab {
   display: inline-flex; align-items: center; gap: .4rem;
-  background: none; border: 0; border-bottom: var(--shape-frame-heavy) solid var(--shape-rule-colour); border-radius: var(--shape-corner-pill);
+  background: none; border: 0; border-bottom: var(--shape-frame-heavy) solid var(--shape-rule-colour);
   padding: 0 0 2px; cursor: pointer;
   font: inherit; font-weight: var(--weight-heavy); font-size: var(--text-body-sm); text-transform: var(--shape-case-action); letter-spacing: var(--shape-tracking-action);
   color: var(--text); text-decoration: none; white-space: nowrap;
 }
 .poster-action:hover, .poster-tab:hover { border-color: var(--accent); color: var(--accent); }
+/* The pill corner belongs to a tab, which a theme may give a ground; the action link's underline has
+   none, so a rounded theme does not bend its line. */
+.poster-tab { border-radius: var(--shape-corner-pill); }
 /* An action that cannot be pressed yet is dimmed and does not answer the pointer (Jouni's decision
    "Step button"; the dimming is the control slab's). */
-.poster-action:disabled { opacity: 0.45; cursor: default; border-color: var(--text); color: var(--text); }
+.poster-action:disabled { opacity: 0.45; cursor: default; border-color: var(--shape-rule-colour); color: var(--text); }
 /* @app-catalog:end */
 /* The source's later on-sun correction keeps selected words ink in both themes. */
 .poster-tab.is-on { background: var(--sun); color: var(--on-sun); text-decoration: none; padding: .2rem .5rem; }
+/* A tab that cannot be chosen now (the page is saving, or it counts nothing) is dimmed like the
+   action link that cannot be pressed (Jouni's decision "Step button"). */
+.poster-tab:disabled { opacity: 0.45; cursor: default; }
+/* A count inside a tab is the Count (.poster-count, tally); inside the chosen tab it keeps dark
+   words on the sun, as the tab's own words do. The Count has no frame, so only its words change. */
+.poster-tab.is-on .poster-count { color: var(--on-sun); }
+/* The action link's Settings tones (Jouni's decision "Action link in Settings"): the size and the
+   thinner line the Settings pages' own way on had (formerly .og-door, organism-controls.css). small:
+   in a page head or a section; lower: a softer way on ("Show 13 more", "Copy ref"; formerly
+   .og-door--quiet), with small; row: the same at the end of a dense row, with small. They come
+   before the other tones, which set their own size and line. */
+.poster-action--small { border-bottom-width: var(--shape-frame); padding: 0 0 1px; font-family: var(--font-showroom-body); font-size: .8rem; }
+.poster-action--lower { text-transform: none; letter-spacing: 0; font-size: .88rem; }
+.poster-action--lower.copied { color: var(--success-fg); border-color: var(--success-fg); }
+.poster-action--row { font-size: .72rem; }
 /* The action link's tones (Jouni's decision "Action link"): the looks he kept, each in its own
    values, so one component carries every quiet way on. A tone sets back what the base above sets
    and the look does not have. more: "Show all" under a list (formerly .poster-fold); quiet: the
@@ -93,7 +129,7 @@
   color: var(--accent); text-decoration: underline; text-underline-offset: 4px; white-space: normal;
 }
 .poster-action--more:hover { color: var(--text); }
-.poster-action--quiet { border-bottom-width: 2px; padding: 0 0 1px; font-family: var(--font-showroom-body); font-size: .78rem; line-height: normal; white-space: normal; }
+.poster-action--quiet { border-bottom-width: var(--shape-frame); padding: 0 0 1px; font-family: var(--font-showroom-body); font-size: .78rem; line-height: normal; white-space: normal; }
 .poster-action--quiet.copied { color: var(--success-fg); border-color: var(--success-fg); }
 .poster-action--back {
   display: inline-block; padding: 0; border: 0;
@@ -104,6 +140,11 @@
 .poster-action--text { padding: 0 6px; border: 0; gap: .35rem; font-family: var(--font-body); font-weight: var(--weight-medium); font-size: .7rem; line-height: normal; text-transform: none; letter-spacing: normal; color: var(--text-dim); }
 .poster-action--text:hover { color: var(--text); }
 .poster-action--text.copied { color: var(--success-fg); }
+/* danger: an act that removes or revokes (Settings' delete, revoke and reset links; formerly
+   .og-door--danger and the coral .btn-danger words): coral words and a coral line; under the pointer
+   the same as the action link's own hover. A difference that carries meaning stays a tone. */
+.poster-action--danger { color: var(--accent); border-bottom-color: var(--accent); }
+.poster-action--danger:hover { color: var(--accent); border-color: var(--accent); }
 /* Two small links Jouni kept as they look (decision "Small link"), each in the values it had with the
    classic button it wore, hover included. notice: "What does that mean?" under the AI notice
    (formerly .btn-ghost with .poster-ai-notice-more); jump: the jump to the latest message (formerly
@@ -116,7 +157,7 @@
 }
 .poster-action--notice:hover { color: var(--text); background: var(--control-bg); }
 .poster-action--jump {
-  display: inline-block; padding: 6px 12px; border: 0; background: var(--text); color: var(--bg); box-shadow: 4px 4px 0 var(--sun);
+  display: inline-block; padding: 6px 12px; border: 0; border-radius: var(--shape-corner-pill); background: var(--text); color: var(--bg); box-shadow: 4px 4px 0 var(--sun);
   font-family: var(--font); font-weight: var(--weight-heavy); font-size: 0.74rem; line-height: normal;
   text-transform: uppercase; letter-spacing: 0.04em; white-space: normal; transition: all 0.15s;
 }
@@ -141,6 +182,20 @@
 }
 .poster-tab--tile:hover { border-color: var(--text); color: var(--text); box-shadow: 3px 3px 0 var(--text); }
 .poster-tab--tile.is-on { background: var(--sun); color: var(--on-sun); padding: 0.35rem 0.7rem; box-shadow: 3px 3px 0 var(--text); }
+/* The tab's filter tone (Jouni's decision "Tabs and filters": the admin filters kept as they look;
+   the values of admin-hooks.css .adm-hook-fchip): small typewriter words in a grey frame with no
+   ground, frame and words turning ink under the pointer; the chosen one on the sun in an ink frame.
+   It sets back what the tab's base sets and the filter does not have. */
+.poster-tab--filter {
+  padding: 3px 9px; background: none; border: var(--shape-frame) solid var(--border); border-radius: var(--shape-corner-control);
+  font-family: var(--font-mono); font-size: .72rem; font-weight: var(--weight-medium); line-height: normal; text-transform: none; letter-spacing: normal;
+  color: var(--text-dim);
+}
+.poster-tab--filter:hover { border-color: var(--text); color: var(--text); }
+.poster-tab--filter.is-on { border-color: var(--text); background: var(--sun); color: var(--on-sun); padding: 3px 9px; }
+/* The tab's attention tone: a filter whose items need the person (Access, "unused" keys), coral in
+   frame and words while it is not chosen, as its coral chip was (formerly access-poster.css). */
+.poster-tab--attention:not(.is-on) { border-color: var(--accent); color: var(--accent); }
 
 /* @app-catalog:begin */
 /* The profile slab and the home's large door are the two cuts named in brief 10.3. */
@@ -183,6 +238,9 @@
 .poster-icon:hover { background: var(--sun); color: var(--on-sun); }
 .poster-icon:disabled { opacity: 0.45; cursor: default; background: var(--bg); color: var(--text); }
 .poster-icon--small { width: 28px; height: 28px; font-size: var(--text-note); }
+/* The pressed tone: an icon button that stays pressed while what it adds is in (a key in the
+   collection), ink ground with the page ground's colour for the mark, a chosen tab's contrast. */
+.poster-icon.is-on { background: var(--text); color: var(--bg); }
 
 /* The menu row (Jouni's decision "Menu row"): one choice in an opened menu, as the prompt card's
    rows are drawn (formerly .btn-ghost with .poster-prompt-menu-item, whose values these are): plain
@@ -196,6 +254,8 @@
 }
 .poster-menu-row:hover { border-color: var(--text-muted); color: var(--text); background: var(--control-bg); }
 .poster-menu-row + .poster-menu-row { border-top-color: var(--border); }
+/* A row that removes something keeps the danger colour it had in Settings' menus (a meaning, not a style). */
+.poster-menu-row--danger, .poster-menu-row--danger:hover { color: var(--danger-fg); }
 
 /* Boxes carry the object; dimensions, grids and placement belong to the view. */
 .poster-box, .poster-box.poster-box--avatar { border: var(--shape-frame) solid var(--shape-frame-colour); }
@@ -204,6 +264,10 @@
    on the grey ground with its parts padding themselves (the prompt card); row, one result in a list,
    with small padding (the chat's result card, whose kind edge is its own). */
 .poster-box--copy { background: var(--bg-dim); padding: 0; overflow: hidden; }
+/* raised (Jouni's decision "Box"): the thing that stands out, a row you opened or the way to take
+   first, in the heavier frame with the raised shadow (formerly the lead roads' own rules, the
+   opened row's .poster-frame and the opened panels' own frames). */
+.poster-box--raised { border-width: var(--shape-frame-heavy); box-shadow: var(--shape-shadow-raised); }
 .poster-box--row { background: var(--bg-card); padding: 8px 10px; }
 .poster-box.poster-box--avatar {
   display: flex; align-items: center; justify-content: center; box-sizing: border-box;
@@ -212,11 +276,18 @@
   color: var(--text);
 }
 .poster-box--avatar.poster-box--small { font-size: var(--text-note); }
+/* The avatar's agent tone: the mark of a sender that is not a person (an agent, an app, a mail
+   service not yet connected, a tool that is gone), a dashed frame and grey initials (formerly
+   contacts-poster.css .ct-av--agent, notifications and email .nt-av.ct-av--agent, mcp .mc-av--dash). */
+.poster-box--avatar.poster-box--agent { border-style: dashed; color: var(--text-dim); }
 .poster-box--meter { margin: 0; padding: 0; background: var(--bg); }
 .poster-box--meter rect { fill: var(--sun); shape-rendering: crispEdges; }
 .poster-box--meter.poster-box--quota { background: var(--card); }
 .poster-box--quota rect { fill: var(--accent); transition: width .3s; }
 .poster-box--quota.is-full rect { fill: var(--danger); }
+/* The figure written on a meter (the Wallet meter's, formerly morsel-flow.css .wal-bar span): small
+   typewriter figures in ink at the meter's left edge; the meter places it and sets its line height. */
+.poster-meter-figure { position: absolute; left: .5rem; top: 0; font-family: var(--font-mono); font-size: .72rem; color: var(--text); }
 .poster-frame { border: var(--shape-frame-heavy) solid var(--shape-frame-colour); border-radius: var(--shape-corner); box-shadow: var(--shape-shadow); background: var(--card); }
 .poster-record { padding: 1.2rem 1.4rem; border: var(--shape-frame-heavy) solid var(--shape-frame-colour); border-radius: var(--shape-corner); box-shadow: var(--shape-shadow-raised); background: var(--card); }
 /* A choice tile: one of a few boxed answers, the chosen one on the sun with an ink shadow
@@ -245,12 +316,34 @@
    person can wave away (the phone nudge, a thin dashed ink frame, small bold words). */
 .poster-aside--waiting { padding: .9rem 1rem; border: 2px dashed var(--text); background: var(--bg-dim); font-family: inherit; font-size: inherit; line-height: inherit; color: inherit; }
 .poster-aside--suggestion { padding: 8px 12px; border: 2px dashed var(--text); background: none; font-family: inherit; font-size: var(--text-sm); font-weight: var(--weight-semibold); line-height: 1.5; color: inherit; }
-/* contacts-poster.css .ct-tag, with the brief's explicit mono / 500 typography. */
+/* The Tag (Jouni's decision "Tag", 2026-09-23): one small framed word in the typewriter face that names
+   a kind, a version, a role or a relation, in four tones: plain names a thing; sun is the chosen one
+   or the one that counts now; coral is the one to notice; ink is the one that belongs to you. */
 .poster-chip {
-  display: inline-block; padding: .1rem .45rem; border: 1px solid var(--text); border-radius: 0;
-  font-family: var(--font-mono); font-size: var(--text-2xs); font-weight: var(--weight-medium); letter-spacing: .04em;
+  display: inline-block; padding: .1rem .45rem; border: 1px solid var(--shape-frame-colour); border-radius: var(--shape-corner-pill);
+  font-family: var(--font-mono); font-size: var(--text-2xs); font-weight: var(--weight-medium); letter-spacing: var(--shape-tracking-action);
   color: var(--text); background: transparent;
 }
+.poster-chip--sun { background: var(--sun); color: var(--on-sun); }
+.poster-chip--coral { border-color: var(--accent); color: var(--accent); }
+.poster-chip--ink { background: var(--text); color: var(--card-bg); }
+/* A row of tags. */
+.poster-chips { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; }
+/* The remove mark (Jouni's decision "Remove mark", 2026-09-26): the ✗ after a tag's name that takes a
+   tag or a member off, grey until the pointer is on it, then coral. The name stays the strongest thing
+   in the tag, and a row of tags does not read as a row of warnings. */
+.poster-chip-x { background: none; border: 0; padding: 0 0 0 .3rem; margin: 0; cursor: pointer; font: inherit; line-height: 1; color: var(--text-dim); }
+.poster-chip-x:hover { color: var(--accent); }
+/* The Status (Jouni's decision "Status", 2026-09-23): one small word in capitals on a pale colour that
+   says a state; a fill, never a frame, so it stays apart from a tag in the same row. */
+.poster-status {
+  display: inline-block; padding: 1px 7px; border-radius: var(--shape-corner-pill);
+  font-family: var(--font-mono); font-size: .66rem; font-weight: var(--weight-medium); text-transform: var(--shape-case-label);
+}
+.poster-status--fine { background: var(--success-bg); color: var(--success-fg); }
+.poster-status--attention { background: var(--warn-bg); color: var(--warn-fg); }
+.poster-status--danger { background: var(--danger-bg); color: var(--danger-fg); }
+.poster-status--off { background: var(--bg-surface); color: var(--text-dim); }
 .poster-crumb { font-family: var(--font-mono); font-weight: var(--weight-regular); font-size: var(--text-small); letter-spacing: 0; text-transform: none; color: var(--accent); }
 .poster-crumb::after { content: ' /'; }
 /* A small number (Jouni's decision "Count"): on coral when something waits for the person, without a

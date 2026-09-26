@@ -12,6 +12,16 @@
  * @structure ListPanel · rowIds
  * @usage <ListPanel requests conversations activeConv peerDisplay accept block openConversation openFolds toggleFold org />
  * @version-history
+ *   v1.6.0 — 2026-09-26 — A list of conversations is the chat's list (ThreadList's rows, .poster-thread): the name in bold, one quiet line with the time and the last message, the open one on the sun; a person's heading is its person tone (ThreadPerson) with the counts named; the row's archive square is the small icon button in the delete's place. Messages' rows, a broadcast's results list and an agent's Chat threads take it; their own row looks go (a unification: Jouni's decision "Conversation list").
+ *   v1.5.0 — 2026-09-25 — Every small number is the Count (.poster-count waiting or tally), a unification: Jouni's decision Count.
+ *   v1.4.0 — 2026-09-25 — Every tag is the Tag (.poster-chip and its tones, .poster-chips for a row), a unification: Jouni's decision Tag.
+ *   v1.3.0 — 2026-09-25 — Every time a thing happened wears .poster-time (Jouni's decision "Timestamp", a unification).
+ *   v1.2.0 — 2026-09-25 — The headings over lists wear .poster-day-title, grey (--quiet) over a record (Jouni's decision "Group heading", a unification).
+ *   v1.1.0 — 2026-09-25 — Every quiet way on is the library's action link, .poster-action, with the
+ *     tone its meaning names: more for "show all" and more of a list, back, text for a plain grey
+ *     word, quiet (Jouni's decisions "Action link", "Panel action", "Dismiss", "Small link", "Step
+ *     button").
+ *   2026-09-25 -- The lines that say a list is empty (or has nothing to show yet) are the quiet sentence (.poster-quiet, QuietNote), a unification: Jouni's decision "Empty line".
  *   v1.0.0 — 2026-09-13 — Moved out of panels.js and rebuilt around sections, closable groups, the
  *     archive and selection. The person group, the row and the broadcast fold are the ones panels.js
  *     had, with the fold generalised to the subject and rule folds.
@@ -23,6 +33,7 @@ import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { PresenceDot } from '/components/PresenceDot.js';
 import { Avatar } from './components.js';
+import { ThreadPerson } from '/components/ThreadList.js';
 import { peerName, isAgentPeer, subThreadLabel, groupConversations, stampShort, stampFull } from './helpers.js';
 
 const DAY_MS = 86_400_000;
@@ -59,9 +70,13 @@ export function ListPanel({ requests, conversations, activeConv, peerDisplay, ac
     return t('inbox.org.whyManual', { when: stampShort(a.since) });
   };
 
-  /** One conversation row. `nested` = inside a person or agent group; `labelPeer` = inside an opened fold. */
+  /**
+   * One conversation row: the chat's row (ThreadList's .poster-thread), the name in bold and one quiet
+   * line under it with the time and the last message. `nested` = inside a person or agent group;
+   * `labelPeer` = inside an opened fold.
+   */
   const convRow = (c, nested, labelPeer) => {
-    const active = !selecting && activeConv?.conversationId === c.conversationId ? ' inbox-conv--active' : '';
+    const active = !selecting && activeConv?.conversationId === c.conversationId ? ' poster-thread--active' : '';
     const picked = selecting && isSelected(c) ? ' inbox-conv--selected' : '';
     const sub = subThreadLabel(c.peerGhii);
     // An agent-owned conversation the owner aggregates (a DM the agent sent from its own inbox) — labelled
@@ -75,40 +90,28 @@ export function ListPanel({ requests, conversations, activeConv, peerDisplay, ac
       : via
         ? (nested ? `${t('inbox.viaAgent')} ${via}` : peerDisplay(c.peerGhii))
         : (nested ? (c.subject || (sub ? peerDisplay(c.peerGhii) : t('inbox.directThread'))) : peerDisplay(whoOf(c)));
-    // A nested row's mark is a word, not an emoji: an agent thread, a subject thread, or the direct one.
-    const icon = (via || sub) ? t('inbox.cover.markAgent') || 'ag' : (c.subject ? '#' : '·');
     const onClick = () => (selecting ? org.toggleSelected(rowIds(c)) : openConversation(c));
-    const button = html`
-      <button type="button" class=${`inbox-conv${active}${picked}${nested ? ' inbox-conv--nested' : ''}`} key=${c.conversationId}
-        aria-pressed=${selecting ? (isSelected(c) ? 'true' : 'false') : undefined} onClick=${onClick}>
-        ${selecting ? html`<span class="inbox-conv-check" aria-hidden="true">${isSelected(c) ? '✓' : ''}</span>` : null}
-        ${nested ? html`<span class="inbox-conv-subico">${icon}</span>` : html`<${Avatar} seed=${labelPeer ? foldedWho(c) : whoOf(c)} size=${40} />`}
-        <div class="inbox-conv-main">
-          <div class="inbox-conv-line1">
-            <span class="inbox-name">${escHtml(label)} ${(!c.groupAlias && (!nested || c.peerGhii?.includes('#'))) ? html`<${PresenceDot} ghii=${c.peerGhii} />` : ''}</span>
-            ${!nested && via ? html`<span class="inbox-via-chip">${t('inbox.viaAgent')} ${escHtml(via)}</span>` : ''}
-            ${c.broadcastCount ? html`<span class="inbox-via-chip">${t('inbox.broadcastRecipients', { count: String(c.broadcastCount) })}</span>` : ''}
-            ${c.fold ? html`<span class="inbox-via-chip">${t('inbox.org.foldCount', { count: String(c.fold.count) })}</span>` : ''}
-            <span class="inbox-conv-time" title=${c.updatedAt ? stampFull(c.updatedAt) : ''}>${c.updatedAt ? stampShort(c.updatedAt) : ''}</span>
-          </div>
-          <div class="inbox-conv-line2">
-            ${(!nested && c.subject) ? html`<span class="inbox-conv-subject">${escHtml(c.subject)}</span>` : ''}
-            <span class="inbox-conv-preview">${byAgent ? `${t('inbox.viaAgent')} ${byAgent}: ` : (c.lastDirection === 'outbound' ? `${t('inbox.youPrefix')} ` : '')}${escHtml(c.lastMessage || '')}</span>
-            ${c.unread > 0 ? html`<span class="inbox-conv-badge">${c.unread}</span>` : null}
-          </div>
-          ${c.archived && !labelPeer ? html`<div class="inbox-conv-why">${whyArchived(c)}</div>` : null}
-        </div>
-      </button>`;
-    if (selecting || labelPeer) return button;
-    // The row's own archive control is a sibling of the row, never inside it: a button in a button is
-    // not a control a keyboard or a screen reader can reach.
+    // The row's own archive control is a sibling of the row's button, never inside it: a button in a
+    // button is not a control a keyboard or a screen reader can reach.
     const back = c.section === 'archive';
     const word = back ? t('inbox.org.restoreConv') : t('inbox.org.archiveConv');
+    const chip = (text) => html` · <span class="poster-chip">${text}</span>`;
     return html`
-      <div class="inbox-conv-wrap" key=${'w' + c.conversationId}>
-        ${button}
-        <button type="button" class="inbox-conv-act" title=${word} aria-label=${`${word}: ${label}`}
-          onClick=${() => org.archive(rowIds(c), back)}><${BoxIcon} restore=${back} /></button>
+      <div class=${`poster-thread${active}${picked}`} key=${c.conversationId}>
+        <button type="button" class="poster-thread-open"
+          aria-pressed=${selecting ? (isSelected(c) ? 'true' : 'false') : undefined} onClick=${onClick}>
+          <span class="poster-thread-title">
+            ${selecting ? html`<span class="inbox-conv-check" aria-hidden="true">${isSelected(c) ? '✓' : ''}</span> ` : null}${escHtml(label)} ${(!c.groupAlias && (!nested || c.peerGhii?.includes('#'))) ? html`<${PresenceDot} ghii=${c.peerGhii} />` : ''}
+          </span>
+          <span class="poster-thread-sub" title=${c.updatedAt ? stampFull(c.updatedAt) : ''}>
+            ${c.updatedAt ? stampShort(c.updatedAt) : ''}${!nested && via ? chip(`${t('inbox.viaAgent')} ${escHtml(via)}`) : ''}${c.broadcastCount ? chip(t('inbox.broadcastRecipients', { count: String(c.broadcastCount) })) : ''}${c.fold ? chip(t('inbox.org.foldCount', { count: String(c.fold.count) })) : ''}${(!nested && c.subject) ? ` · ${escHtml(c.subject)}` : ''} · ${byAgent ? `${t('inbox.viaAgent')} ${byAgent}: ` : (c.lastDirection === 'outbound' ? `${t('inbox.youPrefix')} ` : '')}${escHtml(c.lastMessage || '')}
+          </span>
+          ${c.archived && !labelPeer ? html`<span class="poster-thread-sub">${whyArchived(c)}</span>` : null}
+        </button>
+        ${c.unread > 0 ? html`<span class="poster-count poster-count--waiting">${c.unread}</span>` : null}
+        ${selecting || labelPeer ? null : html`
+          <button type="button" class="poster-icon poster-icon--small poster-thread-del" title=${word} aria-label=${`${word}: ${label}`}
+            onClick=${() => org.archive(rowIds(c), back)}><${BoxIcon} restore=${back} /></button>`}
       </div>`;
   };
 
@@ -135,27 +138,32 @@ export function ListPanel({ requests, conversations, activeConv, peerDisplay, ac
   const unreadOf = (rows) => rows.reduce((n, c) => n + (c.unread || 0), 0);
   const countOf = (rows) => rows.reduce((n, c) => n + 1 + (c.folded?.length || 0), 0);
 
-  /** A person's or an agent's rows under a heading that closes. A single thread renders flat. */
+  /**
+   * A person's or an agent's rows under a heading that closes (ThreadList's person heading): the
+   * arrow, the picture, the name, the presence word and the two numbers, named. A single thread
+   * renders flat.
+   */
   const groupBlock = (key, seed, name, rows, presenceId) => {
     const open = !org.isCollapsed(key);
     const unread = unreadOf(rows);
     const ids = rows.flatMap(rowIds);
     const inArchive = rows[0]?.section === 'archive';
+    const word = t(inArchive ? 'inbox.org.restoreGroup' : 'inbox.org.archiveGroup', { count: String(ids.length) });
     return html`
       <div class="inbox-conv-group" key=${key}>
         <div class="inbox-conv-group-bar">
-          <button type="button" class="inbox-conv-group-head" aria-expanded=${open ? 'true' : 'false'} onClick=${() => org.toggleCollapsed(key)}>
+          <${ThreadPerson} expanded=${open} onClick=${() => org.toggleCollapsed(key)}>
             <${Chevron} open=${open} />
-            <${Avatar} seed=${seed} size=${28} />
-            <span class="inbox-name">${escHtml(name)} ${presenceId ? html`<${PresenceDot} ghii=${presenceId} />` : null}</span>
-            <span class="inbox-sec-count">${countOf(rows)}</span>
-            ${unread > 0 ? html`<span class="inbox-conv-badge">${unread}</span>` : null}
-          </button>
+            <${Avatar} seed=${seed} size=${24} />
+            <span class="poster-thread-person-name">${escHtml(name)}</span>
+            ${presenceId ? html`<${PresenceDot} ghii=${presenceId} label=${true} />` : null}
+            <span class="poster-count poster-count--tally">${t('inbox.org.foldCount', { count: String(countOf(rows)) })}</span>
+            ${unread > 0 ? html`<span class="poster-count poster-count--waiting">${t('inbox.org.unreadCount', { count: String(unread) })}</span>` : null}
+          <//>
           ${selecting
-            ? html`<button type="button" class="inbox-group-act inbox-group-act--pick" onClick=${() => org.toggleSelected(ids)}>${t('inbox.org.selectAll')}</button>`
-            : html`<button type="button" class="inbox-group-act" title=${t(inArchive ? 'inbox.org.restoreGroup' : 'inbox.org.archiveGroup', { count: String(ids.length) })}
-                aria-label=${`${t(inArchive ? 'inbox.org.restoreGroup' : 'inbox.org.archiveGroup', { count: String(ids.length) })}: ${name}`}
-                onClick=${() => org.archive(ids, inArchive)}><${BoxIcon} restore=${inArchive} /></button>`}
+            ? html`<button type="button" class="poster-action poster-action--quiet inbox-group-pick" onClick=${() => org.toggleSelected(ids)}>${t('inbox.org.selectAll')}</button>`
+            : html`<button type="button" class="poster-icon poster-icon--small inbox-group-act" title=${word}
+                aria-label=${`${word}: ${name}`} onClick=${() => org.archive(ids, inArchive)}><${BoxIcon} restore=${inArchive} /></button>`}
         </div>
         ${open ? rows.map(c => anyRow(c, true)) : null}
       </div>`;
@@ -186,13 +194,13 @@ export function ListPanel({ requests, conversations, activeConv, peerDisplay, ac
     const unread = unreadOf(rows);
     return html`
       <div class=${`inbox-sec inbox-sec--${key.split(':')[0]}`} key=${key}>
-        <button type="button" class="inbox-list-section inbox-sec-head" aria-expanded=${open ? 'true' : 'false'} onClick=${() => org.toggleCollapsed(key, closedByDefault)}>
+        <button type="button" class="inbox-list-section inbox-sec-head poster-day-title" aria-expanded=${open ? 'true' : 'false'} onClick=${() => org.toggleCollapsed(key, closedByDefault)}>
           <${Chevron} open=${open} />
           <span class="inbox-sec-name">${label}</span>
-          <span class="inbox-sec-count">${countOf(rows)}</span>
-          ${unread > 0 ? html`<span class="inbox-conv-badge">${unread}</span>` : null}
+          <span class="poster-count poster-count--tally">${countOf(rows)}</span>
+          ${unread > 0 ? html`<span class="poster-count poster-count--waiting">${unread}</span>` : null}
         </button>
-        ${open ? body(rows) : null}
+        ${open ? html`<div class="poster-thread-list">${body(rows)}</div>` : null}
       </div>`;
   };
 
@@ -216,7 +224,7 @@ export function ListPanel({ requests, conversations, activeConv, peerDisplay, ac
   return html`
     <div class=${`inbox-list${selecting ? ' inbox-list--selecting' : ''}`}>
       ${requests.length > 0 ? html`
-        <div class="inbox-list-section">${t('inbox.requests')} <span class="inbox-count">${requests.length}</span></div>
+        <div class="inbox-list-section poster-day-title">${t('inbox.requests')} <span class="poster-count poster-count--waiting">${requests.length}</span></div>
         ${requests.map(r => html`
           <div class="inbox-request" key=${r.contactId}>
             <div class="inbox-request-top">
@@ -228,8 +236,8 @@ export function ListPanel({ requests, conversations, activeConv, peerDisplay, ac
             </div>
             <div class="inbox-request-preview">${escHtml(r.preview || '')}</div>
             <div class="inbox-request-actions">
-              <button class="btn-success btn-sm" onClick=${() => accept(r.contactId)}>${t('inbox.accept')}</button>
-              <button class="btn-outline btn-sm" onClick=${() => block(r.contactId)}>${t('inbox.block')}</button>
+              <button class="poster-action" onClick=${() => accept(r.contactId)}>${t('inbox.accept')}</button>
+              <button class="poster-action" onClick=${() => block(r.contactId)}>${t('inbox.block')}</button>
             </div>
           </div>`)}` : null}
 
@@ -237,11 +245,11 @@ export function ListPanel({ requests, conversations, activeConv, peerDisplay, ac
         <div class="inbox-list-tools">
           ${selecting ? html`
             <span class="inbox-list-tools-count">${t('inbox.org.selectedCount', { count: String(selected.size) })}</span>
-            <button type="button" class="og-door" disabled=${!toArchive.length} onClick=${() => org.archive(toArchive, false, true)}>${t('inbox.org.archiveSelected', { count: String(toArchive.length) })}</button>
-            ${toRestore.length ? html`<button type="button" class="og-door" onClick=${() => org.archive(toRestore, true, true)}>${t('inbox.org.restoreSelected', { count: String(toRestore.length) })}</button>` : null}
-            <button type="button" class="og-door og-door--quiet" onClick=${() => org.endSelecting()}>${t('inbox.org.selectDone')}</button>`
-          : html`<button type="button" class="og-door og-door--quiet" onClick=${() => org.startSelecting()}>${t('inbox.org.select')}</button>`}
-        </div>` : html`<div class="inbox-empty-sm">${t('inbox.noConversations')}</div>`}
+            <button type="button" class="poster-action" disabled=${!toArchive.length} onClick=${() => org.archive(toArchive, false, true)}>${t('inbox.org.archiveSelected', { count: String(toArchive.length) })}</button>
+            ${toRestore.length ? html`<button type="button" class="poster-action" onClick=${() => org.archive(toRestore, true, true)}>${t('inbox.org.restoreSelected', { count: String(toRestore.length) })}</button>` : null}
+            <button type="button" class="poster-action poster-action--quiet" onClick=${() => org.endSelecting()}>${t('inbox.org.selectDone')}</button>`
+          : html`<button type="button" class="poster-action poster-action--quiet" onClick=${() => org.startSelecting()}>${t('inbox.org.select')}</button>`}
+        </div>` : html`<div class="poster-quiet inbox-empty-sm">${t('inbox.noConversations')}</div>`}
 
       ${section('people', t('inbox.org.sectionPeople'), people, peopleBody)}
       ${section('agents', t('inbox.org.sectionAgents'), agents, agentsBody)}

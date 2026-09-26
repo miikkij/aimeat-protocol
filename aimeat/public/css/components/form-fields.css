@@ -1,0 +1,33 @@
+/**
+ * @file form-fields.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The fields of a settings page: a column or two columns of fields, each a coral label over an
+ *   underlined input or a framed text area, and the row of actions under them.
+ *   Moved unchanged out of views/organism.css (the og- page kit shared by the Settings & Controls tabs,
+ *   the organism pages and the admin), under its own name; the class names stay, because every page
+ *   that draws the kit writes them. Corners, frames, shadows and letter case read the shape tokens.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.2.0 — 2026-09-26 — The Text field's code cut, .og-input--code: a field that holds an identifier, in the typewriter face (a unification: the workflow form's id fields).
+ *   v1.1.0 — 2026-09-25 — A Hint in the actions row keeps the row's margin 0, as the og-hint did (UI consolidation phase 5, a unification).
+ *   v1.0.0 — 2026-09-25 — Moved out of views/organism.css (UI consolidation phase 5, a move).
+ */
+
+.og-fields { display: flex; flex-direction: column; gap: 1.1rem; }
+.og-fields--2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.6rem; }
+.og-field { display: flex; flex-direction: column; gap: .4rem; }
+.og-label { font-size: .68rem; font-weight: 800; letter-spacing: .12em; text-transform: var(--shape-case-label); color: var(--accent); }
+.og-input { width: 100%; box-sizing: border-box; background: transparent; border: 0; border-bottom: var(--shape-frame-heavy) solid var(--shape-field-colour); padding: .45rem 0; font-family: var(--font-showroom-body); font-size: 1rem; font-weight: 600; color: var(--text); outline: none; }
+.og-input:focus { border-bottom-color: var(--accent); }
+/* The code cut: a field that holds an identifier (a cron line, a memory key, a variable or step id),
+   in the typewriter face, so what is typed reads as the id it is (formerly workflows-poster.css .wp-mono). */
+.og-input--code { font-family: var(--font-mono); font-size: .85rem; }
+.og-textarea { width: 100%; box-sizing: border-box; background: var(--card-bg); border: var(--shape-frame) solid var(--shape-field-colour); padding: .6rem .75rem; font-family: var(--font-showroom-body); font-size: .95rem; line-height: 1.5; color: var(--text); outline: none; resize: vertical; }
+.og-textarea:focus { border-color: var(--accent); }
+.og-actions { display: flex; align-items: center; gap: 1.4rem; flex-wrap: wrap; }
+.og-actions .og-hint, .og-actions .poster-hint { margin: 0; }
+
+@media (max-width: 1100px) {
+  .og-fields--2 { grid-template-columns: 1fr; }
+}

@@ -9,6 +9,15 @@
  * @structure buildHeatmap, hmCell (internal helpers), ActivityPanel
  * @usage import { ActivityPanel } from '/views/profile/organisms/activity-panel.js';
  * @version-history
+ *   v1.6.0 — 2026-09-26 — The recent activity log is the home's Timeline (components/Timeline.js): the time, a dot (made for a publish, the system's grey for an edit), one line with who, the agent's Tag, what they did and to what; the square dots and the small row go (a unification: Jouni's decision "Activity log").
+ *   v1.5.0 — 2026-09-26 — A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
+ *   v1.4.0 — 2026-09-26 — A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
+ *   v1.3.0 — 2026-09-25 — The agent beside an activity line is the Tag (.poster-chip), a unification: Jouni's decision "Tag".
+ *   v1.2.0 — 2026-09-25 — Every time a thing happened wears .poster-time (Jouni's decision "Timestamp", a unification).
+ *   v1.1.0 — 2026-09-25 — Every quiet way on is the library's action link, .poster-action, with the
+ *     tone its meaning names: more for "show all" and more of a list, back, text for a plain grey
+ *     word, quiet (Jouni's decisions "Action link", "Panel action", "Dismiss", "Small link", "Step
+ *     button").
  *   v1.0.0 — 2026-06-19 — Extracted from organisms-tab.js during the module split.
  */
 import { h } from 'preact';
@@ -21,6 +30,7 @@ import { dt } from '/js/format.js';
 import * as orgService from '/js/services/organisms.js';
 import { swallowed } from '/js/swallowed.js';
 import { calendar } from '/js/format.js';
+import { TimelineList, TimelineRow } from '/components/Timeline.js';
 
 /* Build a GitHub-style contribution calendar from activity events. Each day holds FOUR counters —
  * documents draft/published and records (schema'd) draft/published — so a cell can be drawn as a 2×2
@@ -91,10 +101,10 @@ export function ActivityPanel({ orgId, wsId }) {
   const { cols, monthLabels } = buildHeatmap(byDay, today);
 
   return html`
-    <div class="pj-chart">
+    <div class="pj-chart poster-box">
       <div class="pj-chart-head">
         <span class="pj-chart-title">${'📊 '}${t('organisms.activity') || 'Activity'}<span class="pj-act-count">${data.total} ${t('organisms.events') || 'events'}</span></span>
-        <button class="btn-ghost btn-sm" onClick=${() => setShow(s => !s)}>${show ? (t('organisms.hide') || 'Hide') : (t('organisms.show') || 'Show')}</button>
+        <button class="poster-action poster-action--small" onClick=${() => setShow(s => !s)}>${show ? (t('organisms.hide') || 'Hide') : (t('organisms.show') || 'Show')}</button>
       </div>
       ${show ? html`
         <div class="pj-act">
@@ -125,16 +135,10 @@ export function ActivityPanel({ orgId, wsId }) {
               <span>${t('organisms.more') || 'More'}</span>
             </div>
           </div>
-          <div class="pj-act-list">
-            ${events.slice(0, 20).map((e, i) => html`<div class="pj-act-item" key=${i}>
-              <span class="pj-act-dot ${e.action}"></span>
-              <span class="pj-act-time">${dt(e.at)}</span>
-              <span class="pj-act-who">${(e.actor)}</span>
-              ${e.agent ? html`<span class="pj-act-agent" title=${t('organisms.viaAgent') || 'via this agent'}>${'🤖 '}${(e.agent)}</span>` : null}
-              <span class="pj-act-act">${e.action === 'publish' ? (t('organisms.publishedVerb') || 'published') : (t('organisms.editedVerb') || 'edited')}</span>
-              <span class="pj-act-what">${(e.mode === 'document' ? '📄' : '🗂')} ${(e.type)}${' / '}${(e.instance)}</span>
-            </div>`)}
-          </div>
+          <${TimelineList}>
+            ${events.slice(0, 20).map((e, i) => html`<${TimelineRow} key=${i} category=${e.action === 'publish' ? 'made' : 'system'} when=${dt(e.at)}
+              text=${html`${(e.actor)}${e.agent ? html` <span class="poster-chip" title=${t('organisms.viaAgent') || 'via this agent'}>${'🤖 '}${(e.agent)}</span>` : null} ${e.action === 'publish' ? (t('organisms.publishedVerb') || 'published') : (t('organisms.editedVerb') || 'edited')} ${(e.mode === 'document' ? '📄' : '🗂')} ${(e.type)}${' / '}${(e.instance)}`} />`)}
+          <//>
         </div>` : null}
     </div>`;
 }

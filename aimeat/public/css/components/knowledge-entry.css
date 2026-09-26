@@ -1,0 +1,39 @@
+/**
+ * @file knowledge-entry.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description A knowledge package's reading: what it is about in a reading size; its entries, one per
+ *   row with a rule under it (the title as a button, coral under the pointer, its marks on the right;
+ *   an opened entry's text in a reading size), each entry's sources (verified in green typewriter,
+ *   unverified in coral, the link with a grey underline) and its relations as small framed buttons
+ *   (the relation in coral typewriter). Drawn only by the Knowledge page; moved here unchanged with
+ *   its class names (UI consolidation phase 5, a move).
+ *   Drawn as markup by views/profile/knowledge/package.js.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 — 2026-09-25 — Moved out of knowledge-poster.css (UI consolidation phase 5, a move).
+ */
+
+.kp-entry { padding: .7rem 0; border-bottom: 1px solid var(--border); }
+.kp-entry:last-child { border-bottom: 0; }
+.kp-entry-h { display: flex; align-items: center; gap: 1rem; }
+.kp-entry-title { background: none; border: 0; padding: 0; cursor: pointer; text-align: left; font-family: inherit; font-size: .97rem; font-weight: 800; color: var(--text); min-width: 0; overflow-wrap: anywhere; }
+.kp-entry-title:hover { color: var(--accent); }
+.kp-entry-r { margin-left: auto; display: flex; align-items: center; gap: .9rem; flex: none; }
+.kp-entry-text { margin: .6rem 0 0; font-size: .95rem; line-height: 1.6; max-width: 72ch; white-space: pre-wrap; overflow-wrap: anywhere; }
+.kp-about { margin: 0; font-size: 1rem; line-height: 1.6; max-width: 72ch; }
+.kp-refs { display: flex; flex-direction: column; gap: .25rem; margin-top: .6rem; }
+.kp-ref { display: flex; gap: .7rem; align-items: baseline; font-size: .85rem; }
+.kp-ref i { flex: 0 0 6.5rem; font-family: var(--font-mono); font-size: .7rem; font-style: normal; color: var(--success, #10B981); }
+.kp-ref i.kp-ref--no { color: var(--accent); }
+.kp-ref a { color: var(--text); text-decoration: none; border-bottom: 1px solid var(--border); }
+.kp-ref a:hover { color: var(--accent); border-bottom-color: var(--accent); }
+.kp-rels { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .6rem; }
+.kp-rel { background: none; border: 1px solid var(--border); padding: .1rem .5rem; cursor: pointer; font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); }
+.kp-rel b { color: var(--accent); font-weight: 500; margin-right: .35rem; }
+.kp-rel:hover { border-color: var(--accent); color: var(--text); }
+
+@media (max-width: 1100px) {
+  .kp-entry-h { flex-wrap: wrap; }
+  .kp-entry-r { margin-left: 0; flex-basis: 100%; }
+}

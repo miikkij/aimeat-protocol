@@ -10,6 +10,16 @@
  * @structure c · rel · day · parts · nameOf · initials · kindWord · stateWord · sortPeople · peopleRows · noAccountRows · agentRows · crumb · pageLinks · renderPage
  * @usage import { c, renderPage, peopleRows } from './frame.js';
  * @version-history
+ *   v1.9.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
+ *   v1.8.0 -- 2026-09-26 -- The mark of a sender that is not a person is the avatar's agent tone (.poster-box--agent, css/poster.css), a unification: the look Contacts, Notifications, Email and MCP drew alike.
+ *   v1.7.0 -- 2026-09-25 -- The three tables are the Listing (listing, listing-row and its name, words, who and doors cells, the mark in a cell of its own; the people table's heading row inside it), a unification: the look most tabs use.
+ *   v1.6.0 -- 2026-09-25 -- Every tag is the Tag (.poster-chip and its tones, .poster-chips for a row), a unification: Jouni's decision Tag.
+ *   v1.5.0 -- 2026-09-25 -- Every time a thing happened wears .poster-time (Jouni's decision "Timestamp", a unification).
+ *   v1.4.0 -- 2026-09-25 -- The row labels (field and key labels, column heads, box labels) wear .poster-label (Jouni's decision "Row label", a unification).
+ *   v1.3.0 -- 2026-09-25 -- Every quiet way on is the library's action link, .poster-action, with the
+ *     tone its meaning names: more for "show all" and more of a list, back, text for a plain grey
+ *     word, quiet (Jouni's decisions "Action link", "Panel action", "Dismiss", "Small link", "Step
+ *     button").
  *   2026-09-13 -- Compose the shared initials-box role and its measured size cut.
  *   v1.2.0 -- 2026-09-13 -- Compose existing top rules from poster.css.
  *   v1.1.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
@@ -61,46 +71,52 @@ export function sortPeople(rows) {
   });
 }
 
-const av = (r, agent) => html`<div class=${`ct-av poster-box poster-box--avatar ${agent ? 'ct-av--agent' : ''}`} aria-hidden="true">${initials(r)}</div>`;
-const tags = (r) => html`<span class="ct-tags">${r.relation ? html`<span class="ct-tag ct-tag--rel">${r.relation}</span>` : null}${(r.tags || []).map(x => html`<span class="ct-tag" key=${x}>${x}</span>`)}</span>`;
-const lastMsg = (r) => (r.last_message_at ? html`<b>${rel(r.last_message_at)}</b><small>${r.last_sender === r.contact_id ? '' : c('youWrote') + ' '}${r.last_message || ''}</small>` : html`<small>${c('noMessagesYet')}</small>`);
+const av = (r, agent) => html`<div><div class=${`ct-av poster-box poster-box--avatar ${agent ? 'poster-box--agent' : ''}`} aria-hidden="true">${initials(r)}</div></div>`;
+const tags = (r) => html`<span class="poster-chips">${r.relation ? html`<span class="poster-chip poster-chip--ink">${r.relation}</span>` : null}${(r.tags || []).map(x => html`<span class="poster-chip" key=${x}>${x}</span>`)}</span>`;
+const lastMsg = (r) => (r.last_message_at ? html`<b class="poster-time">${rel(r.last_message_at)}</b><small>${r.last_sender === r.contact_id ? '' : c('youWrote') + ' '}${r.last_message || ''}</small>` : html`<small>${c('noMessagesYet')}</small>`);
 
-/** Rows of the people table: who, relation and tags, shared organisms, last message, the doors. */
+/** Rows of the people table, under its heading row: who, relation and tags, shared organisms, last message, the doors. */
 export function peopleRows(ctx, rows) {
-  return html`<div class="ct-rows">
+  return html`<div class="listing listing--cols listing--mark-name-tags-shared-last-doors">
+    <div class="listing-row listing-row--head"><div class="poster-label"></div><div class="poster-label">${c('colName')}</div><div class="poster-label">${c('colRelation')}</div><div class="poster-label">${c('colShared')}</div><div class="poster-label">${c('colLast')}</div><div class="poster-label"></div></div>
     ${rows.map(r => html`
-      ${av(r)}
-      <div class="ct-nm" key=${'n' + r.contact_id}><button type="button" class="og-tbl-name" onClick=${() => ctx.openPerson(r.contact_id)}>${nameOf(r)}</button>${isPerson(r) ? html` <${PresenceDot} ghii=${r.contact_id} />` : null}<small>${parts(r.contact_id).owner} · ${originWords(r)}</small></div>
-      <div class="ct-w" key=${'t' + r.contact_id}>${tags(r)}</div>
-      <div class="ct-w ct-m" key=${'o' + r.contact_id}>${(r.shared_organisms || []).length ? r.shared_organisms.map(o => o.name).join(' · ') : '·'}</div>
-      <div class="ct-w ct-last" key=${'l' + r.contact_id}>${lastMsg(r)}</div>
-      <div class="og-tbl-door ct-doors" key=${'d' + r.contact_id}><button type="button" class="og-door og-door--quiet" onClick=${() => ctx.message(r.contact_id)}>${c('message')}</button><button type="button" class="og-door" onClick=${() => ctx.openPerson(r.contact_id)}>${c('open')}</button></div>`)}
+      <div class="listing-row" key=${r.contact_id}>
+        ${av(r)}
+        <div class="listing-name"><button type="button" class="og-tbl-name" onClick=${() => ctx.openPerson(r.contact_id)}>${nameOf(r)}</button>${isPerson(r) ? html` <${PresenceDot} ghii=${r.contact_id} />` : null}<small>${parts(r.contact_id).owner} · ${originWords(r)}</small></div>
+        <div>${tags(r)}</div>
+        <div><span class="ct-m">${(r.shared_organisms || []).length ? r.shared_organisms.map(o => o.name).join(' · ') : '·'}</span></div>
+        <div class="ct-last">${lastMsg(r)}</div>
+        <div class="listing-doors"><button type="button" class="poster-action poster-action--small poster-action--row poster-action--lower" onClick=${() => ctx.message(r.contact_id)}>${c('message')}</button><button type="button" class="poster-action poster-action--small poster-action--row" onClick=${() => ctx.openPerson(r.contact_id)}>${c('open')}</button></div>
+      </div>`)}
   </div>`;
 }
-export const peopleHead = () => html`<div class="ct-rows ct-rows--head"><div></div><div>${c('colName')}</div><div>${c('colRelation')}</div><div>${c('colShared')}</div><div>${c('colLast')}</div><div></div></div>`;
 
 /** Rows of the people without an account: who, tags, the note, the invitation, the doors. */
 export function noAccountRows(ctx, rows) {
-  return html`<div class="ct-rows ct-rows--mail">
+  return html`<div class="listing listing--cols listing--mark-name-tags-note-state-doors">
     ${rows.map(r => html`
-      ${av(r)}
-      <div class="ct-nm" key=${'n' + r.contact_id}><button type="button" class="og-tbl-name" onClick=${() => ctx.openPerson(r.contact_id)}>${nameOf(r)}</button><small>${r.email || ''}</small></div>
-      <div class="ct-w" key=${'t' + r.contact_id}>${tags(r)}</div>
-      <div class="ct-w ct-note" key=${'o' + r.contact_id}>${r.note || ''}</div>
-      <div class="ct-w ct-m" key=${'i' + r.contact_id}>${r.invitation ? c('inviteSent', { when: day(r.invitation.created_at) }) : c('notInvited')}</div>
-      <div class="og-tbl-door ct-doors" key=${'d' + r.contact_id}>${r.invitation ? null : html`<button type="button" class="og-door" disabled=${ctx.busy} onClick=${() => ctx.invite(r)}>${c('invite')}</button>`}<button type="button" class="og-door og-door--quiet" onClick=${() => ctx.openPerson(r.contact_id)}>${c('open')}</button></div>`)}
+      <div class="listing-row" key=${r.contact_id}>
+        ${av(r)}
+        <div class="listing-name"><button type="button" class="og-tbl-name" onClick=${() => ctx.openPerson(r.contact_id)}>${nameOf(r)}</button><small>${r.email || ''}</small></div>
+        <div>${tags(r)}</div>
+        <div class="listing-desc">${r.note || ''}</div>
+        <div><span class="ct-m">${r.invitation ? c('inviteSent', { when: day(r.invitation.created_at) }) : c('notInvited')}</span></div>
+        <div class="listing-doors">${r.invitation ? null : html`<button type="button" class="poster-action poster-action--small poster-action--row" disabled=${ctx.busy} onClick=${() => ctx.invite(r)}>${c('invite')}</button>`}<button type="button" class="poster-action poster-action--small poster-action--row poster-action--lower" onClick=${() => ctx.openPerson(r.contact_id)}>${c('open')}</button></div>
+      </div>`)}
   </div>`;
 }
 
 /** Rows of the agents and apps: who, whose, last message, the doors. */
 export function agentRows(ctx, rows) {
-  return html`<div class="ct-rows ct-rows--agents">
+  return html`<div class="listing listing--cols listing--mark-name-who-last-doors">
     ${rows.map(r => { const owner = ctx.personOf(r.owner); return html`
-      ${av(r, true)}
-      <div class="ct-nm" key=${'n' + r.contact_id}><span class="ct-nm-plain">${nameOf(r)}</span><small>${r.contact_id}</small></div>
-      <div class="ct-w" key=${'w' + r.contact_id}>${r.owner === ctx.me ? c('yours') : owner ? html`<button type="button" class="og-tbl-go" onClick=${() => ctx.openPerson(owner.contact_id)}>${nameOf(owner)}</button>` : parts(r.contact_id).owner}<small class="ct-kind">${kindWord(r.kind)}</small></div>
-      <div class="ct-w ct-last" key=${'l' + r.contact_id}>${lastMsg(r)}</div>
-      <div class="og-tbl-door ct-doors" key=${'d' + r.contact_id}><button type="button" class="og-door og-door--quiet" onClick=${() => ctx.message(r.contact_id)}>${c('message')}</button>${r.owner === ctx.me ? html`<button type="button" class="og-door" onClick=${() => ctx.openTab('agents')}>${c('open')}</button>` : owner ? html`<button type="button" class="og-door" onClick=${() => ctx.openPerson(owner.contact_id)}>${c('open')}</button>` : null}</div>`; })}
+      <div class="listing-row" key=${r.contact_id}>
+        ${av(r, true)}
+        <div class="listing-name"><span>${nameOf(r)}</span><small>${r.contact_id}</small></div>
+        <div class="listing-who">${r.owner === ctx.me ? c('yours') : owner ? html`<button type="button" class="og-tbl-go" onClick=${() => ctx.openPerson(owner.contact_id)}>${nameOf(owner)}</button>` : parts(r.contact_id).owner}<small>${kindWord(r.kind)}</small></div>
+        <div class="ct-last">${lastMsg(r)}</div>
+        <div class="listing-doors"><button type="button" class="poster-action poster-action--small poster-action--row poster-action--lower" onClick=${() => ctx.message(r.contact_id)}>${c('message')}</button>${r.owner === ctx.me ? html`<button type="button" class="poster-action poster-action--small poster-action--row" onClick=${() => ctx.openTab('agents')}>${c('open')}</button>` : owner ? html`<button type="button" class="poster-action poster-action--small poster-action--row" onClick=${() => ctx.openPerson(owner.contact_id)}>${c('open')}</button>` : null}</div>
+      </div>`; })}
   </div>`;
 }
 
@@ -127,9 +143,9 @@ export function renderPage(ctx, { crumbs, label = null, title, chips = null, doo
       ${crumb(ctx, crumbs)}
       <div class="og-mast og-mast--page">
         <div class="og-mast-words">
-          ${label ? html`<div class="og-label">${label}</div>` : null}
+          ${label ? html`<div class="poster-label">${label}</div>` : null}
           <h1 class="og-title poster-page-title ct-title--page">${title}</h1>
-          ${chips ? html`<div class="og-chips">${chips}</div>` : null}
+          ${chips ? html`<div class="poster-chips">${chips}</div>` : null}
         </div>
         ${doors ? html`<div class="og-mast-actions"><div class="og-doors">${doors}</div></div>` : null}
       </div>

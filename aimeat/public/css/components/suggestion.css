@@ -8,6 +8,7 @@
  * @usage Linked from public/spa.html in the component block, whose order keeps the order these
  *   rules had when they were one sheet.
  * @version-history
+ *   v1.2.0 — 2026-09-26 — The line under a suggestion reads --shape-frame-heavy and --shape-rule-colour, as the action link's does (a move: the AIMEAT values equal the old ones).
  *   v1.1.0 — 2026-09-24 — The starters' capitals (--caps) removed (Jouni's decision "Suggestion").
  *   v1.0.0 — 2026-09-23 — Moved unchanged from css/parts*.css (UI consolidation phase 1, a move).
  */
@@ -24,7 +25,7 @@
 /* A suggestion: underlined words a person can press instead of typing. The agent's choices wear it
    as it is; the starters on an empty conversation wear its capitals cut. */
 .poster-suggestion {
-  background: none; border: 0; border-bottom: 3px solid var(--text); border-radius: 0; box-shadow: none;
+  background: none; border: 0; border-bottom: var(--shape-frame-heavy) solid var(--shape-rule-colour); border-radius: 0; box-shadow: none;
   padding: 0 0 2px; cursor: pointer;
   font-family: inherit; font-weight: var(--weight-heavy); font-size: 0.88rem; color: var(--text);
 }

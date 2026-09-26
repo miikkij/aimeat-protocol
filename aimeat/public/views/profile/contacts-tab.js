@@ -10,6 +10,7 @@
  * @structure ContactsTab (default) — state, loads, handlers, the ctx bag, render
  * @usage Registered in views/profile.js TABS as id 'contacts'.
  * @version-history
+ *   v2.1.0 — 2026-09-25 — The Settings & Controls frame and its side menu are library components (SettingsFrame, SideMenu; settings-frame.css, side-menu.css); the old .pf-shell, .pf-side- and .pf-content names are gone (UI consolidation phase 5, a move).
  *   v2.0.0 — 2026-08-30 — The poster face (design canvas "AIMEAT Kontaktien sivu", direction A).
  *     People, people without an account and agents under their people are three sections instead
  *     of two lists; a person has a page; tags, links and the name are editable; an invitation
@@ -101,7 +102,7 @@ export default function ContactsTab({ showToast }) {
     setView(v);
     setEditing(false); setOrgChooser(false);
     setFolds(f => ({ ...f, perm: false }));
-    const box = document.querySelector('.page-content') || document.querySelector('.pf-content');
+    const box = document.querySelector('.page-content') || document.querySelector('.settings-frame-content');
     if (box) box.scrollTo({ top: 0 });
   }, []);
   const openPerson = (id) => pickView({ kind: 'person', id });

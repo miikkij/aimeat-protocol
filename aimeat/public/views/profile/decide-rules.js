@@ -20,6 +20,23 @@
  * @structure DecideRules({ available, providers }) · toRule / fromRule (the editor's draft ↔ the record)
  * @usage import { DecideRules } from './decide-rules.js'; html`<${DecideRules} available=${true} providers=${view} />`
  * @version-history
+ *   v1.17.0 — 2026-09-26 — A rule's lines beside its title are the Listing's typewriter line (.listing-meta), a unification: Jouni's decision "Meta line".
+ *   v1.16.0 — 2026-09-26 — "Gate" is the Check line (css/components/check-line.css), a unification: Jouni's decision "Check line".
+ *   v1.15.0 — 2026-09-26 — A small heading over a group of fields, a card or a note is the Sub-heading (.sub-heading: small ink headline letters); the coral small capitals, the bold ink words and the coral headline letters go (a unification: Jouni's decision "Sub-heading").
+ *   v1.13.0 — 2026-09-26 — A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
+ *   v1.12.0 — 2026-09-26 — A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
+ *   v1.11.0 — 2026-09-26 — A list of things to do or of steps is the numbered list (components/NumberedIndex.js: IndexList with IndexItem, or IndexStep for a step that opens nothing): the overview's next steps with the line under each name and the first on the sun, the Wallet key steps, a calibration run's proposals, the MCP and Agents connect steps, the basic agents, a server's setup steps (the number said once), the ecosystem steps out of their grey box, the decision rules' order and the notes of your own AI use; a place keeps only its margin (a unification: Jouni's decision "Numbered list").
+ *   v1.10.0 — 2026-09-26 — What trying a Decide rule gave, and a load of the rules that failed, are the Form message (its error tone for the failure); .pf-dr-tried and .pf-aitr-muted go (a unification: the look most tabs use).
+ *   v1.9.0 — 2026-09-26 — The last labels over a field, a meter or a chart are the row label (.poster-label): the Decide editors' field labels, the overview's quota names, the AI budget chart's title; their own looks go (a unification: Jouni's decision Row label).
+ *   v1.8.0 — 2026-09-26 — Every line that says a part is loading is the loading line: the quiet sentence with the blinking Loading mark, LoadingLine in views/profile/shared.js (a unification: the look most tabs use).
+ *   v1.7.0 — 2026-09-25 — The last lines that say nothing is there are the quiet sentence (.poster-quiet); the ecosystem's empty frame goes, its second line is the Hint (Jouni's decision "Empty line", a unification).
+ *   v1.6.0 — 2026-09-25 — Every drop-down is the Select field (.select-field, css/components/select-field.css); a place keeps only its width and margin (a unification: the look most tabs use).
+ *   v1.5.0 — 2026-09-25 — A grey help note is the Hint (poster-hint, components/Hint.js), as every other Settings hint (UI consolidation phase 5, a unification).
+ *   v1.4.0 — 2026-09-25 — The line a form says after it acted is the Form message; a refusal is its error tone (UI consolidation phase 5, a unification).
+ *   v1.3.0 — 2026-09-25 — Every quiet way on is the library's action link, .poster-action, with the
+ *     tone its meaning names: more for "show all" and more of a list, back, text for a plain grey
+ *     word, quiet (Jouni's decisions "Action link", "Panel action", "Dismiss", "Small link", "Step
+ *     button").
  *   v1.2.0 — 2026-09-23 — A message is drawn beside the control that caused it (the editor, the rule,
  *     the proposal), Cancel takes the editor's message with it, and what a provider cannot carry is
  *     said in the page's language from the fields the node sends.
@@ -36,6 +53,8 @@ import { num } from '/js/format.js';
 import { apiGet, apiPut, apiPost, apiDelete } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
 import { providerTitle } from './decide-providers.js';
+import { Hint } from '/components/Hint.js';
+import { IndexList, IndexStep } from '/components/NumberedIndex.js';
 
 const shortDay = (iso) => String(iso ?? '').slice(0, 10);
 const money = (usd) => `$${Number(usd || 0) < 1 ? Number(usd || 0).toFixed(4) : Number(usd || 0).toFixed(2)}`;
@@ -111,7 +130,7 @@ export function cannotCarryText(v) {
 /** A message where it was caused: `at` names the place, and only that place draws it. */
 function Note({ msg, at }) {
   if (!msg || msg.at !== at) return null;
-  return html`<p class=${msg.error ? 'pf-aitr-error pf-dr-pre' : 'pf-aitr-note'} role="status">${msg.key ? t(msg.key, msg.params) : msg.text}</p>`;
+  return html`<p class=${msg.error ? 'form-message form-message--error pf-dr-pre' : 'form-message'} role="status">${msg.key ? t(msg.key, msg.params) : msg.text}</p>`;
 }
 
 function RuleEditor({ draft, isNew, busy, providers, msg, onChange, onSave, onCancel }) {
@@ -119,26 +138,26 @@ function RuleEditor({ draft, isNew, busy, providers, msg, onChange, onSave, onCa
   const setQ = (i, k, v) => onChange({ ...draft, questions: draft.questions.map((q, n) => (n === i ? { ...q, [k]: v } : q)) });
   return html`
     <div class="pf-dr-editor">
-      <label class="pf-dr-field"><span>${t('decideRules.f.id')}</span>
+      <label class="pf-dr-field"><span class="poster-label">${t('decideRules.f.id')}</span>
         <input class="og-input og-input--mono" value=${draft.id} disabled=${!isNew || busy} placeholder="send-reply"
                onInput=${e => set('id', e.currentTarget.value)} /></label>
-      <label class="pf-dr-field"><span>${t('decideRules.f.title')}</span>
+      <label class="pf-dr-field"><span class="poster-label">${t('decideRules.f.title')}</span>
         <input class="og-input" value=${draft.title} disabled=${busy} onInput=${e => set('title', e.currentTarget.value)} /></label>
-      <label class="pf-dr-field"><span>${t('decideRules.f.decides')}</span>
+      <label class="pf-dr-field"><span class="poster-label">${t('decideRules.f.decides')}</span>
         <input class="og-input" value=${draft.decides} disabled=${busy} placeholder=${t('decideRules.f.decidesHint')}
                onInput=${e => set('decides', e.currentTarget.value)} /></label>
-      <label class="pf-dr-field"><span>${t('decideRules.f.sends')}</span>
+      <label class="pf-dr-field"><span class="poster-label">${t('decideRules.f.sends')}</span>
         <input class="og-input og-input--mono" value=${draft.sendsText} disabled=${busy} placeholder="draft, question"
                onInput=${e => set('sendsText', e.currentTarget.value)} /></label>
 
-      <h5 class="pf-dr-h">${t('decideRules.questions')}</h5>
-      <p class="pf-aitr-note">${t('decideRules.questionsHelp')}</p>
+      <h5 class="pf-dr-h sub-heading">${t('decideRules.questions')}</h5>
+      <${Hint}>${t('decideRules.questionsHelp')}<//>
       ${draft.questions.map((q, i) => html`
-        <div class="pf-dr-q" key=${i}>
+        <div class="pf-dr-q poster-box" key=${i}>
           <div class="pf-dr-q-top">
             <input class="og-input og-input--mono" aria-label=${t('decideRules.q.id')} placeholder=${t('decideRules.q.id')}
                    value=${q.id} disabled=${busy} onInput=${e => setQ(i, 'id', e.currentTarget.value)} />
-            <select class="og-input" aria-label=${t('decideRules.q.type')} value=${q.type} disabled=${busy}
+            <select class="select-field" aria-label=${t('decideRules.q.type')} value=${q.type} disabled=${busy}
                     onChange=${e => setQ(i, 'type', e.currentTarget.value)}>
               <option value="noul">${t('decideRules.type.noul')}</option>
               <option value="choice">${t('decideRules.type.choice')}</option>
@@ -154,52 +173,52 @@ function RuleEditor({ draft, isNew, busy, providers, msg, onChange, onSave, onCa
             <textarea class="og-textarea" rows="3" aria-label=${t(`decideRules.q.criteria.${q.type}`)} placeholder=${t(`decideRules.q.criteria.${q.type}`)}
                       value=${q.criteriaText} disabled=${busy} onInput=${e => setQ(i, 'criteriaText', e.currentTarget.value)}></textarea>`}
           ${draft.questions.length > 1 && html`
-            <button type="button" class="og-door og-door--quiet" disabled=${busy}
+            <button type="button" class="poster-action poster-action--small poster-action--lower" disabled=${busy}
                     onClick=${() => onChange({ ...draft, questions: draft.questions.filter((_, n) => n !== i) })}>
               ${t('decideRules.q.remove')}</button>`}
         </div>`)}
-      <button type="button" class="og-door og-door--quiet" disabled=${busy}
+      <button type="button" class="poster-action poster-action--small poster-action--lower" disabled=${busy}
               onClick=${() => onChange({ ...draft, questions: [...draft.questions, { ...EMPTY_Q }] })}>
         ${t('decideRules.q.add')}</button>
 
-      <h5 class="pf-dr-h">${t('decideRules.bands')}</h5>
-      <p class="pf-aitr-note">${t('decideRules.bandsHelp')}</p>
+      <h5 class="pf-dr-h sub-heading">${t('decideRules.bands')}</h5>
+      <${Hint}>${t('decideRules.bandsHelp')}<//>
       <div class="pf-dr-pair">
-        <label class="pf-dr-field"><span>${t('decideRules.f.act')}</span>
+        <label class="pf-dr-field"><span class="poster-label">${t('decideRules.f.act')}</span>
           <input class="og-input" type="number" step="any" min="0" max="1" value=${draft.act} disabled=${busy}
                  onInput=${e => set('act', e.currentTarget.value)} /></label>
-        <label class="pf-dr-field"><span>${t('decideRules.f.ask')}</span>
+        <label class="pf-dr-field"><span class="poster-label">${t('decideRules.f.ask')}</span>
           <input class="og-input" type="number" step="any" min="0" max="1" value=${draft.ask} disabled=${busy}
                  onInput=${e => set('ask', e.currentTarget.value)} /></label>
       </div>
 
-      <label class="pf-dr-field"><span>${t('decideRules.f.use')}</span>
-        <select class="og-input" value=${draft.use} disabled=${busy} onChange=${e => set('use', e.currentTarget.value)}>
+      <label class="pf-dr-field"><span class="poster-label">${t('decideRules.f.use')}</span>
+        <select class="select-field" value=${draft.use} disabled=${busy} onChange=${e => set('use', e.currentTarget.value)}>
           <option value="both">${t('decideRules.use.both')}</option>
           <option value="agent">${t('decideRules.use.agent')}</option>
           <option value="app">${t('decideRules.use.app')}</option>
         </select></label>
       ${providers && (providers.providers || []).length > 0 && html`
-        <label class="pf-dr-field"><span>${t('decideRules.f.provider')}</span>
-          <select class="og-input" value=${draft.provider} disabled=${busy} onChange=${e => set('provider', e.currentTarget.value)}>
+        <label class="pf-dr-field"><span class="poster-label">${t('decideRules.f.provider')}</span>
+          <select class="select-field" value=${draft.provider} disabled=${busy} onChange=${e => set('provider', e.currentTarget.value)}>
             <option value="">${t('decideRules.provider.any')}</option>
             ${providers.providers.map(p => html`<option key=${p.id} value=${p.id}>${p.title}</option>`)}
           </select></label>
-        <p class="pf-aitr-note">${t('decideRules.providerHelp')}</p>`}
-      <label class="pf-dr-check">
+        <${Hint}>${t('decideRules.providerHelp')}<//>`}
+      <label class="pf-dr-check check-line">
         <input type="checkbox" class="checkbox checkbox-sm" checked=${draft.gate} disabled=${busy}
                onChange=${() => set('gate', !draft.gate)} />
         ${' '}${t('decideRules.f.gate')}
       </label>
-      <label class="pf-dr-field"><span>${t('decideRules.f.sample')}</span>
+      <label class="pf-dr-field"><span class="poster-label">${t('decideRules.f.sample')}</span>
         <textarea class="og-textarea og-input--mono" rows="4" value=${draft.sampleText} disabled=${busy}
                   placeholder='{ "draft": "…", "question": "…" }'
                   onInput=${e => set('sampleText', e.currentTarget.value)}></textarea></label>
 
       <${Note} msg=${msg} at="editor" />
       <div class="og-doors">
-        <button type="button" class="og-door" onClick=${onSave} disabled=${busy}>${t('decideRules.save')}</button>
-        <button type="button" class="og-door og-door--quiet" onClick=${onCancel} disabled=${busy}>${t('decideRules.cancel')}</button>
+        <button type="button" class="poster-action poster-action--small" onClick=${onSave} disabled=${busy}>${t('decideRules.save')}</button>
+        <button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${onCancel} disabled=${busy}>${t('decideRules.cancel')}</button>
       </div>
     </div>`;
 }
@@ -272,34 +291,34 @@ export function DecideRules({ available, providers }) {
     setTried({ id, ...(r?.data ?? {}) });
   }, undefined, { at: `rule:${id}` });
 
-  if (!data) return html`<p class="pf-aitr-muted">${msg?.error ? msg.text : t('decideRules.loading')}</p>`;
+  if (!data) return msg?.error ? html`<p class="form-message form-message--error">${msg.text}</p>` : html`<p class="poster-quiet loading-mark">${t('decideRules.loading')}</p>`;
   const quality = data.quality || {};
 
   return html`
     <div class="pf-dr" id="decide-rules">
-      <h4 class="pf-aitr-sub">${t('decideRules.title')}</h4>
-      <p class="pf-aitr-note">${t('decideRules.desc')}</p>
-      <ol class="pf-dr-order">
-        ${[1, 2, 3, 4, 5, 6].map(n => html`<li key=${n}>${t(`decideRules.order.${n}`)}</li>`)}
-      </ol>
+      <h4 class="pf-aitr-sub sub-heading">${t('decideRules.title')}</h4>
+      <${Hint}>${t('decideRules.desc')}<//>
+      <${IndexList} steps className="pf-dr-order">
+        ${[1, 2, 3, 4, 5, 6].map(n => html`<${IndexStep} key=${n}>${t(`decideRules.order.${n}`)}<//>`)}
+      <//>
       <${Note} msg=${msg} at="top" />
 
       ${(data.proposals || []).length > 0 && html`
-        <h5 class="pf-dr-h">${t('decideRules.proposals')}</h5>
+        <h5 class="pf-dr-h sub-heading">${t('decideRules.proposals')}</h5>
         <ul class="pf-aitr-list">
           ${data.proposals.map(p => html`
-            <li key=${p.id} class="pf-aitr-row">
+            <li key=${p.id} class="pf-aitr-row poster-box">
               <span class="pf-aitr-row-main">${p.rule.title}</span>
-              <span class="pf-aitr-row-meta">${t('decideRules.proposedBy', { who: String(p.proposed_by).split('#')[0] })} · ${p.reason}</span>
-              <span class="pf-aitr-row-meta">${t('decideRules.decidesLine', { what: p.rule.decides })}</span>
+              <span class="pf-aitr-row-meta listing-meta">${t('decideRules.proposedBy', { who: String(p.proposed_by).split('#')[0] })} · ${p.reason}</span>
+              <span class="pf-aitr-row-meta listing-meta">${t('decideRules.decidesLine', { what: p.rule.decides })}</span>
               <span class="og-doors">
-                <button type="button" class="og-door" disabled=${busy}
+                <button type="button" class="poster-action poster-action--small" disabled=${busy}
                         onClick=${() => act(() => apiPost(`/v1/ai/decide/rule-proposals/${p.id}/approve`, {}), 'decideRules.approved', { at: `prop:${p.id}`, okAt: `rule:${p.rule.id}` })}>
                   ${t('decideRules.approve')}</button>
-                <button type="button" class="og-door og-door--quiet" disabled=${busy}
+                <button type="button" class="poster-action poster-action--small poster-action--lower" disabled=${busy}
                         onClick=${() => openEditor(fromRule(p.rule), true)}>
                   ${t('decideRules.readFirst')}</button>
-                <button type="button" class="og-door og-door--quiet" disabled=${busy}
+                <button type="button" class="poster-action poster-action--small poster-action--lower" disabled=${busy}
                         onClick=${() => act(() => apiPost(`/v1/ai/decide/rule-proposals/${p.id}/decline`, {}), 'decideRules.declined', { at: `prop:${p.id}`, okAt: 'top' })}>
                   ${t('decideRules.decline')}</button>
               </span>
@@ -307,36 +326,36 @@ export function DecideRules({ available, providers }) {
             </li>`)}
         </ul>`}
 
-      ${data.rules.length === 0 && !draft && html`<p class="pf-aitr-muted">${t('decideRules.none')}</p>`}
+      ${data.rules.length === 0 && !draft && html`<p class="poster-quiet">${t('decideRules.none')}</p>`}
       <ul class="pf-aitr-list">
         ${data.rules.map(r => {
           const q = quality[r.id] || { decisions: 0, gateStops: 0, overridden: 0, costUsd: 0 };
           return html`
-            <li key=${r.id} class="pf-aitr-row">
+            <li key=${r.id} class="pf-aitr-row poster-box">
               <span class="pf-aitr-row-main">${r.title}</span>
-              <span class="pf-aitr-row-meta">${t('decideRules.decidesLine', { what: r.decides })}</span>
-              <span class="pf-aitr-row-meta">
+              <span class="pf-aitr-row-meta listing-meta">${t('decideRules.decidesLine', { what: r.decides })}</span>
+              <span class="pf-aitr-row-meta listing-meta">
                 ${t(`decideRules.use.${r.use}`)} · ${r.gate ? t('decideRules.isGate') : t('decideRules.notGate')} · v${r.version}${r.provider ? ` · ${t('decideRules.runsOn', { provider: providerTitle(providers, r.provider) })}` : ''}
               </span>
-              <span class="pf-aitr-row-meta">
+              <span class="pf-aitr-row-meta listing-meta">
                 ${t('decideRules.quality', {
                   decisions: String(q.decisions), stops: String(q.gateStops), overridden: String(q.overridden),
                   cost: money(q.costUsd), changed: shortDay(r.updatedAt),
                 })}
               </span>
               <span class="og-doors">
-                <button type="button" class="og-door og-door--quiet" disabled=${busy}
+                <button type="button" class="poster-action poster-action--small poster-action--lower" disabled=${busy}
                         onClick=${() => openEditor(fromRule(r), false)}>${t('decideRules.edit')}</button>
-                <button type="button" class="og-door og-door--quiet" disabled=${busy || !available || r.sample === null}
+                <button type="button" class="poster-action poster-action--small poster-action--lower" disabled=${busy || !available || r.sample === null}
                         title=${!available ? t('decideRules.tryNeedsKey') : r.sample === null ? t('decideRules.tryNeedsSample') : ''}
                         onClick=${() => tryRule(r.id)}>${t('decideRules.try')}</button>
-                <button type="button" class="og-door og-door--quiet" disabled=${busy}
+                <button type="button" class="poster-action poster-action--small poster-action--lower" disabled=${busy}
                         onClick=${() => act(() => apiDelete(`/v1/ai/decide/rules/${encodeURIComponent(r.id)}`), 'decideRules.deleted', { at: `rule:${r.id}`, okAt: 'list' })}>
                   ${t('decideRules.delete')}</button>
               </span>
               <${Note} msg=${msg} at=${`rule:${r.id}`} />
               ${tried && tried.id === r.id && html`
-                <span class="pf-aitr-row-meta pf-dr-tried" role="status">
+                <span class="form-message" role="status">
                   ${/* A null result is not 0 %: it means the model returned no certainty at all, so
                        the bands had nothing to cut and the rule sent it to a person. Printing it as
                        zero would read as "the model was sure it is wrong". */''}
@@ -353,7 +372,7 @@ export function DecideRules({ available, providers }) {
 
       ${!draft && html`
         <div class="og-doors">
-          <button type="button" class="og-door" disabled=${busy} onClick=${() => openEditor({ ...EMPTY, questions: [{ ...EMPTY_Q }] }, true)}>
+          <button type="button" class="poster-action poster-action--small" disabled=${busy} onClick=${() => openEditor({ ...EMPTY, questions: [{ ...EMPTY_Q }] }, true)}>
             ${t('decideRules.new')}</button>
         </div>`}
       ${draft && html`<${RuleEditor} draft=${draft} isNew=${isNew} busy=${busy} providers=${providers} msg=${msg} onChange=${setDraft} onSave=${save} onCancel=${closeEditor} />`}

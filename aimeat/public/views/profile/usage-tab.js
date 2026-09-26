@@ -14,7 +14,7 @@
  *   MONEY AND ACTIVITY ARE NEVER SUMMED. The stat row changes with the report: a spend report leads
  *   with cost, an activity report leads with calls and shows how many were refused. A single grand
  *   total across both would be a number with no meaning.
- *   IT BORROWS NOTHING AND INVENTS NOTHING. Stats are the canonical `.stat-grid`/`.stat-card`, the
+ *   IT BORROWS NOTHING AND INVENTS NOTHING. Stats are the figure strip (`.og-strip`), the
  *   time window is the canonical `.seg`/`.seg-btn`, and only the wrapping report bar has classes of
  *   its own — eight long labels do not fit a joined segmented control on a phone. Its own classes
  *   are `pf-ureport-*` rather than `pf-usage-*`, which already belongs to the Home quota card: the
@@ -26,6 +26,14 @@
  *   - UsageTab (default) — fetch + render
  * @usage Registered in views/profile.js as the `usage` tab; menu entry in landing-page.cards.js.
  * @version-history
+ *   v1.7.0 -- 2026-09-26 -- Every line that says a part is loading is the loading line: the quiet sentence with the blinking Loading mark, LoadingLine in views/profile/shared.js (a unification: the look most tabs use).
+ *   v1.6.0 -- 2026-09-25 -- A line that says a load or a save failed is the Form message in its error tone (.form-message--error); the error lines' own rules go (a unification: the look most tabs use).
+ *   v1.5.0 -- 2026-09-25 -- A table of rows is the Listing (css/components/listing.css): the P&L lines, the accountants, the usage report, the AI spend per app, the security overrides and an agent's internal jobs; figures stand at the right of their column (a unification: the look most tabs use).
+ *   v1.4.0 -- 2026-09-25 -- The crumb is the full trail (Settings & Controls / the menu group / the tab), as in the kit tabs (a unification).
+ *   v1.3.0 -- 2026-09-25 -- A row of figures is the figure strip (og-strip, css/components/figure-strip.css), the look most Settings tabs draw (UI consolidation phase 5, a unification).
+ *   v1.2.0 -- 2026-09-25 -- The page head is the kit's crumb trail and page head (.og-crumb, .og-mast, .og-title, .og-desc), the look most tabs use (a unification).
+ *   2026-09-25 -- The lines that say a list is empty (or has nothing to show yet) are the quiet sentence (.poster-quiet, QuietNote), a unification: Jouni's decision "Empty line".
+ *   2026-09-25 -- What chooses what a list or a panel shows is the tab (.poster-tab, with its fold and filter tones), a unification: Jouni's decision "Tabs and filters".
  *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
  *   2026-09-13 — V1: compose page and B1 section headings from the shared poster classes.
  *   v1.1.0 — 2026-08-15 — House styles: .stat-grid/.stat-card and .seg/.seg-btn instead of a local
@@ -37,8 +45,7 @@ import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { Spinner } from './shared.js';
-import { DataTable } from '/components/DataTable.js';
+import { LoadingLine } from './shared.js';
 import { UsageChart, colorForIndex } from '/components/UsageChart.js';
 import { apiGet } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
@@ -164,43 +171,51 @@ export default function UsageTab() {
 
   return html`
     <div class="pf-ureport">
-      <h2 class="poster-page-title">${t('profile.usage.title')}</h2>
-      <p class="section-desc">${t('profile.usage.intro')}</p>
+      <div class="og mb-1">
+        <div class="og-crumb"><span>${t('nav.profile')}</span><span>/</span><span>${t('profile.landing.menuBusiness')}</span><span>/</span><span class="og-crumb-here">${t('profile.tabs.usage')}</span></div>
+        <div class="og-mast"><div class="og-mast-words">
+          <h2 class="og-title poster-page-title">${t('profile.usage.title')}</h2>
+          <p class="og-desc">${t('profile.usage.intro')}</p>
+        </div></div>
+      </div>
 
       <div class="pf-ureport-controls">
         <div class="pf-ureport-bar" role="group" aria-label=${t('profile.usage.reportGroupLabel')}>
           ${REPORTS.map(r => html`
             <button type="button"
-              class=${`pf-ureport-btn${r.id === report ? ' active' : ''}`}
+              class=${`poster-tab${r.id === report ? ' is-on' : ''}`}
               aria-pressed=${r.id === report}
               onClick=${() => setReport(r.id)}>${t(r.label)}</button>`)}
         </div>
-        <div class="seg" role="group" aria-label=${t('profile.usage.periodGroupLabel')}>
+        <div class="pf-tabs" role="group" aria-label=${t('profile.usage.periodGroupLabel')}>
           ${PERIODS.map(p => html`
             <button type="button"
-              class=${`seg-btn${p === period ? ' active' : ''}`}
+              class=${`poster-tab${p === period ? ' is-on' : ''}`}
               aria-pressed=${p === period}
               onClick=${() => setPeriod(p)}>${t(`profile.usage.period${p}`)}</button>`)}
         </div>
       </div>
 
-      ${error ? html`<p class="pf-ureport-error">${error}</p>` : null}
-      ${loading && !data ? html`<${Spinner} text=${t('profile.usage.loading')} />` : null}
+      ${error ? html`<p class="form-message form-message--error">${error}</p>` : null}
+      ${loading && !data ? html`<${LoadingLine} text=${t('profile.usage.loading')} />` : null}
 
       ${data ? html`
-        <div class="stat-grid">
+        <div class="og-strip pf-figures">
           ${statCards.map(c => html`
-            <div class="stat-card poster-row--thing">
-              <div class="stat-card-value">${c.value}</div>
-              <div class="stat-card-label">${c.label}</div>
+            <div>
+              <b>${c.value}</b>
+              <span>${c.label}</span>
             </div>`)}
         </div>
         ${chart}
         ${rows.length
-          ? html`<${DataTable} headers=${headers} rows=${rows} scroll=${true} />`
+          ? html`<div class=${`listing listing--cols ${headers.length > 4 ? 'listing--name-n-n-n-n' : 'listing--name-n-n-n'}`}>
+              <div class="listing-row listing-row--head">${headers.map((hd, i) => html`<div class=${`poster-label ${i ? 'listing-n' : ''}`}>${hd}</div>`)}</div>
+              ${rows.map((row, ri) => html`<div class="listing-row" key=${ri}>${row.map((cell, i) => html`<div class=${i ? 'listing-n' : 'listing-name'}>${cell}</div>`)}</div>`)}
+            </div>`
           // An empty report is a fact about this account, not a broken page — so it says which
           // question was asked and over what window, rather than showing a bare dash.
-          : html`<p class="pf-ureport-empty">${t('profile.usage.emptyFor')
+          : html`<p class="poster-quiet pf-ureport-empty">${t('profile.usage.emptyFor')
               .replace('{report}', t(current.label))
               .replace('{days}', t(`profile.usage.period${period}`))}</p>`}
       ` : null}

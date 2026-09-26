@@ -5,9 +5,11 @@
  * @description What the scheduler's cover and its pages share: the crumb, the page frame with its
  *   rail, the rail's page links, and the small words (who runs a schedule, how its last run went).
  *   Lives apart from cover.js so the detail page and the cover import one way only.
- * @structure c · hhmm · whoRuns · resultWord · lastRun · crumb · pageLinks · renderPage
+ * @structure c · hhmm · whoRuns · resultWord · resultStatus · lastRun · crumb · pageLinks · renderPage
  * @usage import { renderPage, whoRuns, c, hhmm } from './frame.js';
  * @version-history
+ *   v1.5.0 -- 2026-09-25 -- Every word that says a state is the Status (.poster-status fine, attention, danger, off), a unification: Jouni's decision Status.
+ *   v1.4.0 -- 2026-09-25 -- Every tag is the Tag (.poster-chip and its tones, .poster-chips for a row), a unification: Jouni's decision Tag.
  *   v1.3.0 -- 2026-09-13 -- Compose existing top rules from poster.css.
  *   v1.2.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.1.0 — 2026-09-12 — `loc()` is gone: it derived the date FORMAT from the page LANGUAGE, which
@@ -47,9 +49,11 @@ export function whoRuns(s) {
   return t('profile.scheduler.kind.core');
 }
 export const resultWord = (r) => (r ? c('result.' + r) : '');
+/** How a run went, as a Status: an error is danger, a skipped run is off, the rest is fine. */
+export const resultStatus = (r) => `poster-status poster-status--${r === 'error' ? 'danger' : r === 'skipped' ? 'off' : 'fine'}`;
 export function lastRun(s) {
   if (!s.lastRunAt) return html`<span class="og-tbl-dot">${t('profile.scheduler.never')}</span>`;
-  return html`${formatRelativeTime(s.lastRunAt)} · <b class=${`sc-res sc-res--${s.lastRunResult || 'success'}`}>${resultWord(s.lastRunResult || 'success')}</b>`;
+  return html`${formatRelativeTime(s.lastRunAt)} · <b class=${resultStatus(s.lastRunResult || 'success')}>${resultWord(s.lastRunResult || 'success')}</b>`;
 }
 
 /* ── The crumb and the page frame ──────────────────────────────────────────────────────────── */
@@ -80,7 +84,7 @@ export function renderPage(ctx, { id, crumbs, title, chips = null, doors = null,
       <div class="og-mast og-mast--page">
         <div class="og-mast-words">
           <h1 class="og-title poster-page-title sc-title--page">${title}</h1>
-          ${chips ? html`<div class="og-chips">${chips}</div>` : null}
+          ${chips ? html`<div class="poster-chips">${chips}</div>` : null}
         </div>
         ${doors ? html`<div class="og-mast-actions"><div class="og-doors">${doors}</div></div>` : null}
       </div>

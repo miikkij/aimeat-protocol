@@ -20,6 +20,22 @@
  * @structure SAMPLES — { [decisionId]: [{ id, measure, solo?, render(), after }] } · PROPOSALS — { [decisionId]: { measure, render() } }
  * @usage import { SAMPLES, PROPOSALS } from './decision-samples.js';
  * @version-history
+ *   v3.9.0 — 2026-09-26 — The last round of Settings (decision-samples-final.js) spread in.
+ *   v3.8.0 — 2026-09-25 — The conflicts round's samples, helpers and proposal pictures moved to
+ *     decision-samples-conflicts.js unchanged and spread in here (the file neared the 800-line
+ *     limit; a move).
+ *   v3.7.0 — 2026-09-25 — Box, sub-heading, Nodes head, check line and meta line, drawn as this
+ *     branch's pages draw them now.
+ *   v3.6.0 — 2026-09-25 — Code block: the framed, grey, grey-with-a-rule and light-framed looks with
+ *     their pages' classes, and the library's .code-block as the after.
+ *   v3.5.0 — 2026-09-25 — Action link in Settings: the Settings door in a page head, a row and
+ *     lower-case, and the action link's small tones that would keep their look. After a first-time
+ *     review: whole heads, readable marks on the sun, the conversation list's person heading that
+ *     opens and closes, a message's name, read marks and ⋯, the typing box with text and its phone row.
+ *   v3.4.0 — 2026-09-25 — The conflicts round of Settings & Controls: person head, numbered list,
+ *     conversation list, message and typing box, drawn by the home's, the chat's and the Settings
+ *     pages' own components (ProfileCard, ListPanel, MessageBubble, the inbox Composer).
+ *   v3.3.0 — 2026-09-25 — The Settings & Controls frame and its side menu are library components (SettingsFrame, SideMenu; settings-frame.css, side-menu.css); the old .pf-shell, .pf-side- and .pf-content names are gone (UI consolidation phase 5, a move).
  *   v3.2.0 — 2026-09-24 — Dialog actions built: "today" keeps the old footer (lab class .dl-was),
  *     and Delete's after is the loud action's danger tone.
  *   v3.1.0 — 2026-09-24 — The icon button's pictures use the built shape (.poster-icon).
@@ -58,8 +74,13 @@ import { ArchiveMore } from '/components/ArchiveSection.js';
 import { ConversationJump } from '/components/ConversationFrame.js';
 import { CLOSE_ICON } from '/js/dialog.js';
 import { WrapperPair } from './demos-steps.js';
+// The conflicts round of Settings & Controls, spread into SAMPLES and PROPOSALS below.
+import { CONFLICT_SAMPLES, CONFLICT_PROPOSALS } from './decision-samples-conflicts.js';
+// The last round of Settings, spread in the same way.
+import { FINAL_SAMPLES, FINAL_PROPOSALS } from './decision-samples-final.js';
 
 const html = htm.bind(h);
+
 const noop = () => {};
 const row = (children) => html`<div class="poster-specimen-row">${children}</div>`;
 const AT = '2026-09-23T10:42:00Z';
@@ -113,7 +134,7 @@ export const SAMPLES = {
       after: after('.dl-status', () => row(html`${status('fine', 'per day')} ${status('danger', 'per day')} ${status('off', 'quiet')}`)) },
   ],
   count: [
-    { id: 'count-coral', measure: '.pf-side-badge', solo: '.pf-side-badge, .open-items-count', render: () => row(html`<span class="pf-side-badge">3</span> <span class="open-items-count">5</span>`),
+    { id: 'count-coral', measure: '.side-menu-count', solo: '.side-menu-count, .open-items-count', render: () => row(html`<span class="side-menu-count">3</span> <span class="open-items-count">5</span>`),
       after: after('.poster-count', () => row(html`<span class="poster-count poster-count--waiting">3</span> <span class="poster-count poster-count--waiting">5</span>`)) },
     { id: 'count-bell', measure: '.notif-badge', render: () => row(html`<span class="poster-specimen-anchor"><span class="notif-badge">7</span></span>`),
       after: after('.poster-count', () => row(html`<span class="poster-specimen-anchor"><span class="poster-count poster-count--waiting poster-count--small">7</span></span>`)) },
@@ -283,6 +304,8 @@ export const SAMPLES = {
     { id: 'danger', measure: '.btn-danger-solid', render: () => foot(html`<button type="button" class="btn-danger-solid">Delete</button>`),
       after: after('.poster-slab', () => row(html`<button type="button" class="poster-slab poster-slab--control poster-slab--danger">Delete</button>`)) },
   ],
+  ...CONFLICT_SAMPLES,
+  ...FINAL_SAMPLES,
 };
 
 /** A tone of a proposal, captioned with its name under the example word. */
@@ -339,4 +362,6 @@ export const PROPOSALS = {
     measure: '.poster-action--more',
     render: () => row(html`${more('What does that mean?')} ${more('Use your own key →')} ${more('Show older')}`),
   },
+  ...CONFLICT_PROPOSALS,
+  ...FINAL_PROPOSALS,
 };

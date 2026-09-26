@@ -1,0 +1,39 @@
+/**
+ * @file figure-strip.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description Figures between two heavy ink rules: a number in the poster face, its word, a mono line under it;
+ *   two to a row on a phone.
+ *   Moved unchanged out of views/organism.css (the og- page kit shared by the Settings & Controls tabs,
+ *   the organism pages and the admin), under its own name; the class names stay, because every page
+ *   that draws the kit writes them. Corners, frames, shadows and letter case read the shape tokens.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.3.0 — 2026-09-26 — The part of a figure that says "of how many" (.og-strip-of: "/4" smaller, in grey), moved unchanged from knowledge-poster.css .kp-of (a move).
+ *   v1.2.0 — 2026-09-25 — A third state tone, danger (.og-strip-danger), for a figure that says a loss (UI consolidation phase 5, a unification: the P&L result's red stays a tone).
+ *   v1.1.0 — 2026-09-25 — A word in place of a figure (.og-strip-word) and two state tones, warn and fine (UI consolidation phase 5, a unification: a meaning a figure carried stays a tone).
+ *   v1.0.0 — 2026-09-25 — Moved out of views/organism.css (UI consolidation phase 5, a move).
+ */
+
+/* ── The strip of figures ──────────────────────────────────────────────────────────────────── */
+.og-strip { display: flex; margin-top: 1.5rem; border-top: var(--shape-frame-heavy) solid var(--shape-rule-colour); border-bottom: var(--shape-frame-heavy) solid var(--shape-rule-colour); }
+.og-strip > div { flex: 1 1 0; box-sizing: border-box; display: flex; align-items: baseline; flex-wrap: wrap; gap: .6rem; padding: .9rem 1.1rem .9rem 0; border-right: 1px solid var(--border); min-width: 0; }
+.og-strip > div + div { padding-left: 1.1rem; }
+.og-strip > div:last-child { border-right: 0; }
+.og-strip b { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 2.1rem; line-height: var(--font-poster-leading); letter-spacing: var(--font-poster-tracking); color: var(--text); }
+.og-strip b.og-strip-coral { color: var(--accent); font-size: 1.5rem; text-transform: var(--shape-case-heading); }
+/* A word where a number would stand ("Verified"), and a figure whose colour says a state: the Status
+   colours of attention and fine (Jouni's decision "Status"). */
+.og-strip b.og-strip-word { font-size: 1.5rem; text-transform: var(--shape-case-heading); }
+.og-strip b.og-strip-warn { color: var(--warn-fg); }
+.og-strip b.og-strip-fine { color: var(--success-fg); }
+.og-strip b.og-strip-danger { color: var(--danger-fg); }
+/* "Of how many": the part of a figure after the slash, smaller and grey (formerly knowledge-poster.css .kp-of). */
+.og-strip b .og-strip-of { font-size: 1.1rem; color: var(--text-dim); }
+.og-strip span { font-weight: 800; font-size: .9rem; }
+.og-strip small { flex-basis: 100%; font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+@media (max-width: 1100px) {
+  .og-strip { flex-wrap: wrap; }
+  .og-strip > div { flex-basis: 50%; border-right: 0; }
+}

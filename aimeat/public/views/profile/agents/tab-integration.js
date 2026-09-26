@@ -6,6 +6,25 @@
  *   during onboarding or production status (readiness, connection, platform, identity,
  *   what came after onboarding, and how to attach the agent elsewhere) after completion.
  * @version-history
+ *   v1.23.0 -- 2026-09-26 -- The comment on the quick-connect block says it draws its own look (Jouni's decision "MCP guide", the option classic); no markup changes.
+ *   v1.22.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
+ *   v1.21.0 -- 2026-09-26 -- Every line that says a part is loading is the loading line: the quiet sentence with the blinking Loading mark, LoadingLine in views/profile/shared.js (a unification: the look most tabs use).
+ *   v1.20.0 -- 2026-09-25 -- A list of things, one per row, is the Listing (css/components/listing.css), a unification: the look most tabs use.
+ *   v1.19.0 -- 2026-09-25 -- Every time a thing happened or runs out is the Timestamp (.poster-time); a place keeps only its layout (a unification: Jouni's decision Timestamp).
+ *   v1.18.0 -- 2026-09-25 -- Every word that says a state is the Status (.poster-status fine, attention, danger), a unification: Jouni's decision Status.
+ *   v1.17.0 -- 2026-09-25 -- The key and value rows are the Facts (css/components/facts.css), a unification: the look most tabs use.
+ *   v1.16.0 -- 2026-09-25 -- Every word that says a state is the Status (.poster-status fine, attention, danger, off), a unification: Jouni's decision Status.
+ *   v1.15.0 -- 2026-09-25 -- Every tag is the Tag (.poster-chip and its tones, .poster-chips for a row), a unification: Jouni's decision Tag.
+ *   v1.14.0 -- 2026-09-25 -- Every hint is the Hint (poster-hint, components/Hint.js), the look most Settings & Controls tabs draw (UI consolidation phase 5, a unification).
+ *   v1.13.0 -- 2026-09-25 -- The row labels (field and key labels, column heads, box labels) wear .poster-label (Jouni's decision "Row label", a unification).
+ *   v1.12.0 -- 2026-09-25 -- Every quiet way on is the library's action link, .poster-action, with the
+ *     tone its meaning names: more for "show all" and more of a list, back, text for a plain grey
+ *     word, quiet (Jouni's decisions "Action link", "Panel action", "Dismiss", "Small link", "Step
+ *     button").
+ *   v1.11.0 -- 2026-09-25 -- The loud action is the library's dark block, .poster-slab: the control
+ *     cut where it sits in a row of controls or waits to be enabled, the danger tone for a delete that
+ *     cannot be undone (Jouni's decision "Loud action").
+ *   2026-09-25 -- The lines that say a list is empty (or has nothing to show yet) are the quiet sentence (.poster-quiet, QuietNote), a unification: Jouni's decision "Empty line".
  *   2026-09-14 -- The poster face (agent-integration-poster.css). Readiness leads, and its steps are
  *     chips instead of a pill row plus two name lists that said the same thing; the delivery log moves
  *     inside Connection under its rows; every row is a key/value pair, every action an underlined door
@@ -73,6 +92,8 @@ import {
   getSkillBundleVersion, getSkillBundleUrl, updateSkillBundle,
   getDeliveryLog
 } from '/js/services/agent-integration.js';
+import { Hint } from '/components/Hint.js';
+import { stepStatusClass } from './agent-card-badges.js';
 
 const html = htm.bind(h);
 
@@ -235,13 +256,13 @@ curl -H "Authorization: Bearer <jwt>" -o skill-bundle.zip "${skillBundleUrl}" &&
   }
 
   if (loading) {
-    return html`<p class="agi-empty">${t('profile.loading')}</p>`;
+    return html`<p class="poster-quiet agi-empty loading-mark">${t('profile.loading')}</p>`;
   }
 
   // System agents (Secretary / company Secretary / specialists) are auto-provisioned and never run the
   // device-auth "Hello Integration" onboarding — show a short note instead of the 0/11 checklist.
   if (state === 'system') {
-    return html`<p class="agi-empty">${t('profile.agents.detail.internalAgentNote')}</p>`;
+    return html`<p class="poster-quiet agi-empty">${t('profile.agents.detail.internalAgentNote')}</p>`;
   }
 
   const isOnboarding = state === 'new' || state === 'onboarding';
@@ -276,26 +297,29 @@ curl -H "Authorization: Bearer <jwt>" -o skill-bundle.zip "${skillBundleUrl}" &&
 function sectionHead(label, aside) {
   return html`
     <div class="agi-sec-h">
-      <span class="og-label">${label}</span>
-      ${aside ? html`<span class="agi-mono">${aside}</span>` : ''}
+      <span class="poster-label">${label}</span>
+      ${aside ? html`<span class="poster-time agi-mono">${aside}</span>` : ''}
     </div>`;
 }
 
-/** One key/value pair. Both cells are direct children of the .agi-kv grid, so this is a fragment. */
+/**
+ * One pair of the Facts (css/components/facts.css). Both cells are direct children of the .facts
+ * grid, so this is a fragment. A value nobody has reported stays grey; a machine string is typewriter.
+ */
 function kv(key, value, { dim = false, mono = false } = {}) {
-  const cls = `agi-v${dim ? ' is-dim' : ''}${mono ? ' is-mono' : ''}`;
+  const cls = `${dim ? 'agi-dim' : ''}${mono ? ' agi-code' : ''}`.trim();
   return html`
-    <div class="agi-k">${key}</div>
-    <div class=${cls}>${value}</div>`;
+    <div class="facts-k poster-label">${key}</div>
+    <div class="facts-v">${cls ? html`<span class=${cls}>${value}</span>` : value}</div>`;
 }
 
-/** Every step of Hello Integration as a chip. The chip's frame carries the result. */
+/** Every step of Hello Integration as a Status: its tone carries the result. */
 function stepChips(steps) {
   if (!steps.length) return '';
   return html`
-    <div class="og-chips agi-steps">
+    <div class="agi-steps">
       ${steps.map(s => html`
-        <span key=${s.id} class="og-chip agi-step agi-step--${s.status}">
+        <span key=${s.id} class=${stepStatusClass(s.status)}>
           ${STEP_MARK[s.status] || '·'} ${tOr('agentOnboarding.steps.' + s.id, s.name || s.title || s.id)}
         </span>`)}
     </div>`;
@@ -313,20 +337,20 @@ function stepChips(steps) {
 function bundleDoors({ agentName, curlText, installCmdText, agentPromptText, handleUpdateBundle, updatingBundle, installLabel }) {
   return html`
     <div class="og-doors agi-doors">
-      <${CopyButton} text=${agentPromptText} className="og-slab"
+      <${CopyButton} text=${agentPromptText} className="poster-slab"
         label=${t('profile.agents.detail.integration.copyAgentPrompt')}
         copiedLabel=${'✓ ' + t('profile.agents.detail.integration.promptCopied')} />
-      <${CopyButton} text=${installCmdText} className="og-door"
+      <${CopyButton} text=${installCmdText} className="poster-action poster-action--small"
         label=${installLabel || t('profile.agents.skillBundle.reinstall')}
         copiedLabel=${'✓ ' + t('profile.agents.detail.integration.installCommandCopied')} />
       ${handleUpdateBundle ? html`
-        <button type="button" class="og-door" onClick=${handleUpdateBundle} disabled=${updatingBundle}>
+        <button type="button" class="poster-action poster-action--small" onClick=${handleUpdateBundle} disabled=${updatingBundle}>
           ${updatingBundle ? '...' : t('profile.agents.detail.integration.update')}
         </button>` : ''}
-      <a class="og-door" href=${getSkillBundleUrl(agentName)} download>
+      <a class="poster-action poster-action--small" href=${getSkillBundleUrl(agentName)} download>
         ${t('profile.agents.skillBundle.downloadZip')}
       </a>
-      <${CopyButton} text=${curlText} className="og-door"
+      <${CopyButton} text=${curlText} className="poster-action poster-action--small"
         label=${t('profile.agents.skillBundle.copyCurl')} />
     </div>`;
 }
@@ -338,10 +362,10 @@ function webhookForm({ webhookDraft, setWebhookDraft, handleSaveWebhook, handleC
       <input class="og-input" type="url" value=${webhookDraft}
         onInput=${e => setWebhookDraft(e.target.value)} placeholder="https://..." />
       <div class="og-doors">
-        <button type="button" class="og-door" onClick=${handleSaveWebhook} disabled=${savingWebhook}>
+        <button type="button" class="poster-action poster-action--small" onClick=${handleSaveWebhook} disabled=${savingWebhook}>
           ${savingWebhook ? '...' : t('common.save')}
         </button>
-        <button type="button" class="og-door og-door--quiet" onClick=${handleCancelWebhook}>
+        <button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${handleCancelWebhook}>
           ${t('common.cancel')}
         </button>
       </div>
@@ -379,9 +403,9 @@ function readinessSection({ steps, onboarding, handleRerun, rerunning }) {
     <section class="agi-sec agi-sec--full poster-row--thing">
       ${sectionHead(label, aside)}
       ${stepChips(steps)}
-      <p class="agi-hint">${hint}</p>
+      <${Hint}>${hint}<//>
       <div class="og-doors agi-doors">
-        <button type="button" class="og-door" onClick=${handleRerun} disabled=${rerunning}>
+        <button type="button" class="poster-action poster-action--small" onClick=${handleRerun} disabled=${rerunning}>
           ${rerunning ? '...' : t('profile.agents.detail.integration.rerun')}
         </button>
       </div>
@@ -399,14 +423,14 @@ function connectionSection(p) {
 
   const webhookValue = hasWebhook ? webhook.url : html`
     ${t('profile.agents.detail.integration.webhookNotConfigured')} ·${' '}
-    <button type="button" class="og-door og-door--quiet" onClick=${p.handleEditWebhook}>
+    <button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${p.handleEditWebhook}>
       ${t('profile.agents.detail.integration.setupWebhook')}
     </button>`;
 
   return html`
     <section class="agi-sec poster-row--thing">
       ${sectionHead(t('profile.agents.detail.connection'))}
-      <div class="agi-kv">
+      <div class="facts">
         ${kv(t('profile.agents.detail.integration.deliveryMethod'), delivery)}
         ${kv(t('profile.agents.webhook.url'), webhookValue, { dim: !hasWebhook })}
         ${hasWebhook ? kv(t('profile.agents.webhook.failCount'), webhook.failCount ?? 0) : ''}
@@ -420,10 +444,10 @@ function connectionSection(p) {
       </div>
       ${p.editingWebhook ? webhookForm(p) : (hasWebhook ? html`
         <div class="og-doors agi-doors">
-          <button type="button" class="og-door" onClick=${p.handleTestWebhook} disabled=${p.testing}>
+          <button type="button" class="poster-action poster-action--small" onClick=${p.handleTestWebhook} disabled=${p.testing}>
             ${p.testing ? '...' : t('profile.agents.webhook.test')}
           </button>
-          <button type="button" class="og-door og-door--quiet" onClick=${p.handleEditWebhook}>
+          <button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${p.handleEditWebhook}>
             ${t('profile.agents.detail.integration.editWebhook')}
           </button>
         </div>` : '')}
@@ -436,29 +460,25 @@ function deliveryLog({ displayDeliveries, handleShowAll, showAllDeliveries }) {
   if (!displayDeliveries.length) return '';
   return html`
     <div>
-      <table class="agi-log">
-        <thead>
-          <tr>
-            <th>${t('profile.agents.detail.integration.time')}</th>
-            <th>${t('profile.agents.detail.integration.event')}</th>
-            <th>${t('profile.agents.detail.integration.channel')}</th>
-            <th>${t('profile.agents.detail.integration.result')}</th>
-            <th>${t('profile.agents.detail.integration.latency')}</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${displayDeliveries.map((d, i) => html`
-            <tr key=${d.id || i}>
-              <td>${d.timestamp ? timeAgo(d.timestamp) : '--'}</td>
-              <td>${d.eventType || d.event || '--'}</td>
-              <td>${d.channel || '--'}</td>
-              <td class=${d.success ? 'is-ok' : 'is-bad'}>${d.success ? '✓' : '✗'}</td>
-              <td>${d.latencyMs ? `${(d.latencyMs / 1000).toFixed(1)}s` : '--'}</td>
-            </tr>`)}
-        </tbody>
-      </table>
+      <div class="listing listing--when-name-who-state-n agi-log">
+        <div class="listing-row listing-row--head">
+          <div class="poster-label">${t('profile.agents.detail.integration.time')}</div>
+          <div class="poster-label">${t('profile.agents.detail.integration.event')}</div>
+          <div class="poster-label">${t('profile.agents.detail.integration.channel')}</div>
+          <div class="poster-label">${t('profile.agents.detail.integration.result')}</div>
+          <div class="poster-label">${t('profile.agents.detail.integration.latency')}</div>
+        </div>
+        ${displayDeliveries.map((d, i) => html`
+          <div class="listing-row" key=${d.id || i}>
+            <div class="poster-time">${d.timestamp ? timeAgo(d.timestamp) : '--'}</div>
+            <div class="listing-name">${d.eventType || d.event || '--'}</div>
+            <div class="listing-who">${d.channel || '--'}</div>
+            <div><span class=${`poster-status ${d.success ? 'poster-status--fine' : 'poster-status--danger'}`}>${d.success ? '✓' : '✗'}</span></div>
+            <div class="listing-who">${d.latencyMs ? `${(d.latencyMs / 1000).toFixed(1)}s` : '--'}</div>
+          </div>`)}
+      </div>
       <div class="og-doors agi-doors">
-        <button type="button" class="og-door og-door--quiet" onClick=${handleShowAll}>
+        <button type="button" class="poster-action poster-action--more" onClick=${handleShowAll}>
           ${showAllDeliveries ? t('profile.agents.detail.showLess') : t('profile.agents.detail.showAll')}
         </button>
       </div>
@@ -478,7 +498,7 @@ function bundleSection(p) {
   return html`
     <section class="agi-sec poster-row--thing">
       ${sectionHead(tOr('profile.agents.detail.integration.platformAndBundle', 'Platform and skill bundle'))}
-      <div class="agi-kv">
+      <div class="facts">
         ${kv(
           t('profile.agents.detail.platform'),
           platformName ? `${platformName} · ${detection}` : notReported,
@@ -500,13 +520,13 @@ function identitySection(agent) {
   return html`
     <section class="agi-sec poster-row--thing">
       ${sectionHead(t('profile.agents.detail.identity'))}
-      <div class="agi-kv">
+      <div class="facts">
         ${kv('GAII', agent.gaii || '--', { mono: !!agent.gaii, dim: !agent.gaii })}
         ${agent.public_key ? kv(t('profile.agents.publicKey'), truncateKey(agent.public_key), { mono: true }) : ''}
         ${kv(t('profile.agents.created'), agent.created_at ? fmtDate(agent.created_at) : '--')}
         ${agent.roles?.length ? kv(
           t('profile.agents.detail.integration.roles'),
-          html`<span class="agi-roles">${agent.roles.map(r => html`<span key=${r} class="og-chip">${r}</span>`)}</span>`,
+          html`<span class="agi-roles">${agent.roles.map(r => html`<span key=${r} class="poster-chip">${r}</span>`)}</span>`,
         ) : ''}
       </div>
     </section>`;
@@ -519,7 +539,7 @@ function afterOnboardingSection(pc) {
   return html`
     <section class="agi-sec poster-row--thing">
       ${sectionHead(t('profile.agents.detail.integration.postOnboardingSetup'))}
-      <div class="agi-kv">
+      <div class="facts">
         ${kv(
           t('profile.agents.detail.integration.commandsRegistered'),
           pc.commands_registered ? yes('valueRegistered', 'Registered') : yes('valueNoneRegistered', 'None registered'),
@@ -548,13 +568,13 @@ function afterOnboardingSection(pc) {
 
 /**
  * The same agent in a second tool, or on a second machine, is this attachment made again.
- * McpQuickConnect owns the markup; agent-integration-poster.css puts the poster skin on it.
+ * McpQuickConnect owns the markup and its look (css/components/mcp-install.css).
  */
 function attachSection(serverName, label, lead) {
   return html`
     <section class="agi-sec agi-sec--full poster-row--thing agi-attach">
       ${sectionHead(label)}
-      ${lead ? html`<p class="agi-hint agi-lead">${lead}</p>` : ''}
+      ${lead ? html`<p class="poster-hint agi-lead">${lead}</p>` : ''}
       <${McpQuickConnect} serverName=${serverName} />
     </section>`;
 }
@@ -587,7 +607,7 @@ function renderOnboardingView({ onboarding, agentName, handleRerun, rerunning, c
           `${t('profile.agents.detail.integration.readinessScore')} ${pct}/100`,
         )}
         ${stepChips(steps)}
-        <p class="agi-hint">
+        <p class="poster-hint">
           ${passed > 0
             ? tOr('profile.agents.detail.integration.readinessHintGaps',
               'Some steps have not passed yet. Run Hello Integration again once the agent can complete them.')
@@ -595,7 +615,7 @@ function renderOnboardingView({ onboarding, agentName, handleRerun, rerunning, c
               'Nothing is ticked yet. The agent does these steps itself, over the connection above, once it can reach this node.')}
         </p>
         <div class="og-doors agi-doors">
-          <button type="button" class="og-door" onClick=${handleRerun} disabled=${rerunning}>
+          <button type="button" class="poster-action poster-action--small" onClick=${handleRerun} disabled=${rerunning}>
             ${rerunning ? '...' : (passed > 0
               ? t('profile.agents.detail.integration.rerun')
               : t('profile.agents.detail.integration.startOnboarding'))}
@@ -605,7 +625,7 @@ function renderOnboardingView({ onboarding, agentName, handleRerun, rerunning, c
 
       <section class="agi-sec agi-sec--full poster-row--thing">
         ${sectionHead(t('profile.agents.skillBundle.title'))}
-        <div class="agi-kv">
+        <div class="facts">
           ${kv(t('profile.agents.detail.platform'), platformName || notReported, { dim: !platformName })}
           ${kv(tOr('profile.agents.detail.integration.bundleAddress', 'Bundle address'), bundleUrl, { mono: true })}
         </div>

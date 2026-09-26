@@ -23,6 +23,18 @@
  *   import { AiTransparencyCard } from './ai-transparency-card.js';
  *   html`<${AiTransparencyCard} />`
  * @version-history
+ *   v1.13.0 — 2026-09-26 — A row's line beside its name is the Listing's typewriter line (.listing-meta); a time keeps the Timestamp (a unification: Jouni's decision "Meta line").
+ *   v1.12.0 — 2026-09-26 — A small heading over a group of fields, a card or a note is the Sub-heading (.sub-heading: small ink headline letters); the coral small capitals, the bold ink words and the coral headline letters go (a unification: Jouni's decision "Sub-heading").
+ *   v1.11.0 — 2026-09-26 — A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
+ *   v1.10.0 — 2026-09-26 — A sentence that says what the part below is for is the lead (.og-lead): the ecosystem app's value line, the AI transparency's unlabelled line, the compliance card's undocumented note; their own rules go (a unification: the look most tabs use).
+ *   v1.9.0 — 2026-09-26 — Every line that says a part is loading is the loading line: the quiet sentence with the blinking Loading mark, LoadingLine in views/profile/shared.js (a unification: the look most tabs use).
+ *   v1.8.0 — 2026-09-25 — A section that is one row until it is opened is the FoldSection (the folded row with its lead): the AI tab's decide, transparency and compliance cards and the classic AI settings; their own heads, chevrons and body rules go (a unification: the look most tabs use).
+ *   v1.7.0 — 2026-09-25 — The older tabs' remaining help lines are the Hint (.poster-hint); their own sizes and greys go, a place keeps its margin (a unification: the look most tabs use).
+ *   v1.6.0 — 2026-09-25 — A line that says a load or a save failed is the Form message in its error tone (.form-message--error); the error lines' own rules go (a unification: the look most tabs use).
+ *   v1.5.0 — 2026-09-25 — The last quiet ways on with a look of their own are the action link (.poster-action; the danger tone for detach, the small link for a link inside a part, the quiet cut in the account dialogs): pn-detach-btn, pn-setup-link, pf-aitr-row-link, pf-edit-link, pf-pw-eye and the door's underlined words; a place keeps only its layout (Jouni's decision "Action link", a unification).
+ *   v1.4.0 — 2026-09-25 — The four figures are the figure strip (og-strip); the unlabelled count keeps its warn colour as the strip's warn tone (a unification: the look most tabs use).
+ *   v1.3.0 — 2026-09-25 — A grey help note is the Hint (poster-hint, components/Hint.js), as every other Settings hint (UI consolidation phase 5, a unification).
+ *   v1.2.0 — 2026-09-25 — Every time a thing happened wears .poster-time (Jouni's decision "Timestamp", a unification).
  *   2026-09-13 — V1: compose page and B1 section headings from the shared poster classes.
  *   v1.1.0 — 2026-08-01 — i18n namespace renamed `aiTransparency.*` → `aiTransparencyMine.*`
  *     (TARGET-058 Phase 10b). It sat one character away from `transparency.*`, the PUBLIC page's
@@ -38,6 +50,8 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { apiGet } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
+import { Hint } from '/components/Hint.js';
+import { FoldSection } from '/components/FoldSection.js';
 
 /** `2026-08-01T18:42:00Z` → `2026-08-01 18:42`, in the reader's locale-neutral short form. */
 function shortTime(iso) {
@@ -91,56 +105,37 @@ export function AiTransparencyCard() {
 
   return html`
     <div class="pf-card pf-aitr">
-      <button type="button" class="pf-aitr-head" onClick=${() => setCollapsed(c => !c)}
-              aria-expanded=${!collapsed}>
-        <span class="poster-section-title">${t('aiTransparencyMine.title')}</span>
-        <span class="pf-aitr-chevron">${collapsed ? '+' : '−'}</span>
-      </button>
-      <p class="section-desc">${t('aiTransparencyMine.desc')}</p>
-
-      ${!collapsed && html`
+      <${FoldSection} num="" title=${t('aiTransparencyMine.title')} lead=${t('aiTransparencyMine.desc')} open=${!collapsed} onToggle=${() => setCollapsed(c => !c)}>
         <div class="pf-aitr-body">
-          ${loading && html`<p class="pf-aitr-muted">${t('aiTransparencyMine.loading')}</p>`}
-          ${error && html`<p class="pf-aitr-error">${error}</p>`}
+          ${loading && html`<p class="poster-quiet loading-mark">${t('aiTransparencyMine.loading')}</p>`}
+          ${error && html`<p class="form-message form-message--error">${error}</p>`}
 
           ${report && html`
-            <div class="pf-aitr-stats">
-              <div class=${'pf-aitr-stat' + (unlabelled > 0 ? ' pf-aitr-stat-warn' : '')}>
-                <span class="pf-aitr-num">${unlabelled}</span>
-                <span class="pf-aitr-lbl">${t('aiTransparencyMine.unlabelled')}</span>
-              </div>
-              <div class="pf-aitr-stat">
-                <span class="pf-aitr-num">${report.labelled ?? 0}</span>
-                <span class="pf-aitr-lbl">${t('aiTransparencyMine.labelled')}</span>
-              </div>
-              <div class="pf-aitr-stat">
-                <span class="pf-aitr-num">${report.public_total ?? 0}</span>
-                <span class="pf-aitr-lbl">${t('aiTransparencyMine.publicTotal')}</span>
-              </div>
-              <div class="pf-aitr-stat">
-                <span class="pf-aitr-num">${report.total ?? 0}</span>
-                <span class="pf-aitr-lbl">${t('aiTransparencyMine.total')}</span>
-              </div>
+            <div class="og-strip">
+              <div><b class=${unlabelled > 0 ? 'og-strip-warn' : ''}>${unlabelled}</b><span>${t('aiTransparencyMine.unlabelled')}</span></div>
+              <div><b>${report.labelled ?? 0}</b><span>${t('aiTransparencyMine.labelled')}</span></div>
+              <div><b>${report.public_total ?? 0}</b><span>${t('aiTransparencyMine.publicTotal')}</span></div>
+              <div><b>${report.total ?? 0}</b><span>${t('aiTransparencyMine.total')}</span></div>
             </div>
 
-            <p class="pf-aitr-note">${t('aiTransparencyMine.scopeNote')}</p>
+            <${Hint}>${t('aiTransparencyMine.scopeNote')}<//>
 
             ${unlabelled > 0 && html`
-              <p class="pf-aitr-warn-line">${t('aiTransparencyMine.unlabelledHelp')}</p>
+              <p class="og-lead">${t('aiTransparencyMine.unlabelledHelp')}</p>
               <ul class="pf-aitr-list">
                 ${(report.unlabelled_detail?.items ?? []).map(item => html`
-                  <li key=${item.id} class="pf-aitr-row">
+                  <li key=${item.id} class="pf-aitr-row poster-box">
                     <span class="pf-aitr-row-main">${item.pipeline || t('aiTransparencyMine.unknownSource')}</span>
-                    <span class="pf-aitr-row-meta">${shortTime(item.generated_at)}</span>
+                    <span class="pf-aitr-row-meta poster-time">${shortTime(item.generated_at)}</span>
                     ${item.record_url && html`
-                      <a class="pf-aitr-row-link" href=${item.record_url} target="_blank" rel="noopener noreferrer">
+                      <a class="poster-action poster-action--more" href=${item.record_url} target="_blank" rel="noopener noreferrer">
                         ${t('aiTransparencyMine.openRecord')}
                       </a>`}
                   </li>`)}
               </ul>
               ${report.unlabelled_detail
                 && report.unlabelled_detail.shown < report.unlabelled_detail.total
-                && html`<p class="pf-aitr-muted">
+                && html`<p class="poster-hint">
                   ${t('aiTransparencyMine.showingOf', {
                     shown: String(report.unlabelled_detail.shown),
                     total: String(report.unlabelled_detail.total),
@@ -149,29 +144,29 @@ export function AiTransparencyCard() {
             `}
 
             ${(report.apps_declaring_generation_with_gap ?? []).length > 0 && html`
-              <h4 class="pf-aitr-sub">${t('aiTransparencyMine.appsWithGap')}</h4>
+              <h4 class="pf-aitr-sub sub-heading">${t('aiTransparencyMine.appsWithGap')}</h4>
               <ul class="pf-aitr-list">
                 ${report.apps_declaring_generation_with_gap.map(a => html`
-                  <li key=${a.owner + '/' + a.filename} class="pf-aitr-row">
+                  <li key=${a.owner + '/' + a.filename} class="pf-aitr-row poster-box">
                     <span class="pf-aitr-row-main">${a.filename}</span>
-                    <span class="pf-aitr-row-meta">${a.gap}</span>
+                    <span class="pf-aitr-row-meta listing-meta">${a.gap}</span>
                   </li>`)}
               </ul>`}
           `}
 
           ${policy && html`
-            <h4 class="pf-aitr-sub">${t('aiTransparencyMine.policyTitle')}</h4>
-            <p class="pf-aitr-note">${policy.why}</p>
+            <h4 class="pf-aitr-sub sub-heading">${t('aiTransparencyMine.policyTitle')}</h4>
+            <${Hint}>${policy.why}<//>
             <ul class="pf-aitr-list">
               ${(policy.records ?? []).map(r => html`
-                <li key=${r.what} class="pf-aitr-policy">
+                <li key=${r.what} class="pf-aitr-policy poster-box">
                   <span class="pf-aitr-row-main">${r.what}</span>
-                  <span class="pf-aitr-row-meta">${t('aiTransparencyMine.retention')}: ${r.retention}</span>
-                  <span class="pf-aitr-row-meta">${t('aiTransparencyMine.neverContains')}: ${r.never_contains}</span>
+                  <span class="pf-aitr-row-meta listing-meta">${t('aiTransparencyMine.retention')}: ${r.retention}</span>
+                  <span class="pf-aitr-row-meta listing-meta">${t('aiTransparencyMine.neverContains')}: ${r.never_contains}</span>
                 </li>`)}
             </ul>
-            <p class="pf-aitr-note">${policy.note}</p>`}
-        </div>`}
+            <${Hint}>${policy.note}<//>`}
+        </div><//>
     </div>`;
 }
 

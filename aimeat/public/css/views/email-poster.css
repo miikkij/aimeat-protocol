@@ -8,76 +8,47 @@
  *   carries what email adds: the uses list, the mailbox rows with their delegations, the sent log,
  *   the letters rows, the mail log. NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.12.0 -- 2026-09-26 -- The dashed avatar is the avatar's agent tone in css/poster.css (.poster-box--agent); its rule here goes.
+ *   v1.11.0 -- 2026-09-25 -- The code field is the Text field as it is, a unification: the look most tabs use. Its typewriter face and wide letter spacing go; its width stays.
+ *   v1.10.0 -- 2026-09-25 -- The last emails from here are the Item grid (css/components/item-grid.css, two columns), a unification: the look most tabs use. The rules of .em-maillog and its phone rule go; its margin stays.
+ *   v1.9.0 -- 2026-09-25 -- A mailbox's delegation lines are a library part, css/components/delegation-lines.css (a move): their rules go from here unchanged; their place in the listing row stays.
+ *   v1.8.0 -- 2026-09-25 -- The sent log is a library part, css/components/sent-log.css (a move): its rules and its phone rules go from here unchanged.
+ *   v1.7.0 -- 2026-09-25 -- The uses of the address are a library part, css/components/uses-list.css (a move): their rules and their phone rule go from here unchanged.
+ *   v1.6.0 -- 2026-09-25 -- The mailboxes and the letters are the Listing (css/components/listing.css), a unification: the look most tabs use. The rules of em-mb, em-nm, em-w, em-ctl go; the mark keeps its box size and dashed edge, the delegation count its typewriter line, the delegations their place under the row.
+ *   v1.5.0 -- 2026-09-25 -- Every drop-down is the Select field (.select-field, css/components/select-field.css); a place keeps only its width and margin (a unification: the look most tabs use).
+ *   v1.4.0 -- 2026-09-25 -- The switch rules go: a setting that is on or off is the Switch (css/components/switch.css); a place's layout value stays here (UI consolidation phase 5, a unification).
+ *   v1.3.0 -- 2026-09-25 -- The hint rules go: the hints are the Hint (css/components/hint.css); the layout declarations of their places stay, on .poster-hint (UI consolidation phase 5, a unification).
+ *   v1.2.0 -- 2026-09-25 -- The times' look is .poster-time; their rules here keep only their place (Jouni's decision "Timestamp", a unification).
+ *   v1.1.0 -- 2026-09-25 -- The row labels' look is .poster-label; their rules here keep only their place (Jouni's decision "Row label", a unification).
+ *   2026-09-25 -- The empty lines are the quiet sentence (.poster-quiet, Jouni's decision "Empty line"): .og-empty's look goes, its place (margin 0) stays on the new class.
+ *   2026-09-25 -- The sent filters lose their rule: the tab (.poster-tab) now draws them (a unification: Jouni's decision "Tabs and filters").
  *   2026-09-13 -- Compose the shared initials box; retain only row dimensions and placement.
  *   v1.0.0 — 2026-08-30 — Initial.
  */
 
-.og-em .og-door.on { color: var(--accent); border-bottom-color: var(--accent); }
-.og-em .og-empty { margin: 0; font-size: .9rem; color: var(--text-dim); }
-.og-em .em-hint { margin: .6rem 0 0; font-size: .82rem; line-height: 1.5; color: var(--text-dim); display: block; }
+.og-em .poster-quiet { margin: 0; }
+.og-em .poster-hint { display: block; }
 .og-em .og-fold > span:not(.og-fold-r):not(.og-fold-arrow) { white-space: nowrap; }
 .og-em .og-fold-r { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .og-em .em-more { margin-top: .8rem; }
 .og-em .em-label { display: block; margin-top: 1.2rem; }
 .og-em .og-strip b.em-strip-addr { font-size: 1.35rem; overflow-wrap: anywhere; }
-.og-em .nt-sw.lock { color: var(--text-dim); }
-.og-em .nt-sw.lock i { border-color: var(--text-dim); background: var(--bg-dim); }
-.og-em .nt-sw.lock i::after { background: var(--text-dim); left: auto; right: 2px; }
 
-/* ── The uses of the address ────────────────────────────────────────────────────────────────── */
-.em-uses { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .3rem 1.8rem; }
-.em-uses > div { display: flex; gap: .7rem; align-items: baseline; padding: .55rem 0; border-bottom: 1px solid var(--border); font-size: .9rem; line-height: 1.5; }
-.em-uses i { font-style: normal; font-weight: 800; color: var(--success-fg, #1f8f5a); flex: 0 0 1rem; }
-.em-uses i.no { color: var(--text-dim); }
-.em-uses b { display: block; font-weight: 800; color: var(--text); }
-.em-uses small { display: block; color: var(--text-dim); font-size: .8rem; }
+/* ── The uses of the address: the Uses list (css/components/uses-list.css); the change form ─── */
 .em-form { margin-top: .2rem; }
 .em-form .og-input { width: 100%; box-sizing: border-box; }
-.em-form .em-code { max-width: 10rem; font-family: var(--font-mono); letter-spacing: .2em; }
+.em-form .em-code { max-width: 10rem; }
 .em-form-doors { margin-top: 1rem; }
 
-/* ── Mailboxes and letters ──────────────────────────────────────────────────────────────────── */
-.em-mb { display: grid; grid-template-columns: 2.2rem minmax(0, 1.2fr) minmax(0, 1fr) auto; gap: 0 1rem; align-items: center; }
-.em-mb > div { padding: .7rem 0; border-bottom: 1px solid var(--border); min-width: 0; }
+/* ── Mailboxes and letters: the Listing (css/components/listing.css) ─────────────────────────── */
 /* The mark is a whole box of its own here: the contacts and notifications rules are scoped to their rows. */
-.em-mb > .nt-av { width: 2.2rem; height: 2.2rem; }
-.em-mb > .nt-av.ct-av--agent { border-style: dashed; color: var(--text-dim); }
-.em-nm { font-weight: 800; font-size: .95rem; color: var(--text); }
-.em-nm small { display: block; font-family: var(--font-mono); font-size: .7rem; font-weight: 400; color: var(--text-dim); margin-top: .1rem; overflow-wrap: anywhere; }
-.em-w { font-size: .82rem; line-height: 1.45; color: var(--text-dim); }
-.em-w small { display: block; font-family: var(--font-mono); font-size: .7rem; }
-.em-ctl { display: flex; gap: .9rem; align-items: center; justify-content: flex-end; white-space: nowrap; }
-.em-deleg { grid-column: 2 / 5; padding: .2rem 0 .6rem; border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: .3rem; }
-.em-deleg > div { display: flex; gap: .8rem; align-items: baseline; font-size: .85rem; }
-.em-deleg b { font-weight: 800; }
-.em-deleg small { font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); flex: 1; }
-.em-select { max-width: 10rem; font-size: .8rem; }
+.og-em .nt-av { width: 2.2rem; height: 2.2rem; }
+/* How many delegations, on its own typewriter line under the words. */
+.og-em .listing-desc small { display: block; font-family: var(--font-mono); font-size: .7rem; }
+/* The delegations of a mailbox (css/components/delegation-lines.css): a line of the row's own under
+   the name, the words and the doors. */
+.og-em .listing-row > .em-deleg { grid-column: 2 / -1; row-gap: .3rem; }
+.em-select { max-width: 10rem; }
 
-/* ── The sent log and the mail log ──────────────────────────────────────────────────────────── */
-.em-log { display: grid; grid-template-columns: 6.5rem minmax(0, 1fr) minmax(0, 12rem) auto; gap: 0 1rem; align-items: start; }
-.em-log > div { padding: .6rem 0; border-bottom: 1px solid var(--border); min-width: 0; }
-.em-log--head > div { padding: 0 0 .35rem; border-bottom: 0; font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
-.em-m { font-family: var(--font-mono); font-size: .72rem; line-height: 1.5; color: var(--text-dim); }
-.em-m b { display: block; color: var(--text); font-weight: 500; }
-.em-what { font-size: .92rem; line-height: 1.45; color: var(--text); overflow-wrap: anywhere; }
-.em-what b { font-weight: 800; }
-.em-what small { display: block; color: var(--text-dim); font-size: .8rem; }
-.em-maillog { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .3rem 1.4rem; margin-top: .4rem; }
-.em-maillog > div { padding: .45rem 0; border-bottom: 1px solid var(--border); font-size: .88rem; }
-.em-maillog b { font-weight: 800; display: block; }
-.em-maillog small { font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); }
-
-/* ── Phone ──────────────────────────────────────────────────────────────────────────────────── */
-@media (max-width: 860px) {
-  .em-uses, .em-maillog { grid-template-columns: 1fr; }
-  .em-mb { grid-template-columns: 2.2rem minmax(0, 1fr); }
-  .em-mb > .em-w { display: none; }
-  .em-mb > .em-nm { border-bottom: 0; padding-bottom: .2rem; }
-  .em-mb > .em-ctl { grid-column: 2; justify-content: flex-start; flex-wrap: wrap; white-space: normal; padding-top: 0; }
-  .em-deleg { grid-column: 2 / 3; }
-  .em-log { grid-template-columns: minmax(0, 1fr) auto; grid-auto-flow: dense; }
-  .em-log--head { display: none; }
-  .em-log > .em-m:first-child, .em-log > .em-m { grid-column: 1; border-bottom: 0; padding-bottom: 0; }
-  .em-log > .em-what { grid-column: 1; padding-top: .1rem; }
-  .em-log > .og-tbl-door { grid-column: 2; grid-row: span 3; align-self: center; }
-}
+/* ── The sent log (css/components/sent-log.css); the mail log is the Item grid, in its place ── */
+.og-em .item-grid { margin-top: .4rem; }

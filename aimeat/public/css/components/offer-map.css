@@ -1,0 +1,45 @@
+/**
+ * @file offer-map.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The map of offers, in three flat views: columns (one per need, as many as fit at 10rem),
+ *   the grid (a row per agent, a column per need, scrolling inside the map when the main is narrow)
+ *   and blocks (one per need, wider the more it holds). An offer is a tile: a framed link on the card
+ *   ground with its title, a small "opens elsewhere" mark and its agent, the frame and the mark coral
+ *   under the pointer; a line tile in the grid and a compact tile in a block are smaller. A column's
+ *   head carries a typewriter count. Drawn only by the Offers page; moved here unchanged with its
+ *   class names (UI consolidation phase 5, a move). The tile's frame reads the shape tokens.
+ *   Drawn as markup by views/profile/offers/map-page.js.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 — 2026-09-25 — Moved out of offers-poster.css (UI consolidation phase 5, a move).
+ */
+
+.op-map { overflow-x: auto; }
+.op-tile { display: flex; flex-direction: column; gap: 3px; min-width: 0; padding: .4rem .6rem .45rem; border: var(--shape-frame) solid var(--shape-frame-colour); background: var(--card-bg); color: var(--text); text-decoration: none; font-family: var(--font-showroom-body); font-weight: 700; font-size: .78rem; line-height: 1.3; }
+.op-tile:hover { border-color: var(--accent); color: var(--text); }
+.op-tile:hover .op-tile-out { color: var(--accent); }
+.op-tile-t { display: flex; align-items: flex-start; gap: .5rem; min-width: 0; }
+.op-tile-t > span { flex: 1 1 auto; min-width: 0; overflow-wrap: break-word; }
+.op-tile-out { flex: none; margin-top: 2px; color: var(--text-dim); }
+.op-tile .op-agent { font-size: .68rem; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.op-tile--line { padding: .25rem .5rem; font-size: .74rem; }
+.op-tile--line .op-tile-t { align-items: center; }
+.op-tile--line .op-tile-t > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.op-tile--compact { padding: .3rem .5rem; font-size: .74rem; }
+.op-col-h { display: flex; align-items: baseline; gap: .5rem; padding: 0 0 .25rem; }
+.op-col-h > span { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.op-col-h em { font-family: var(--font-mono); font-size: .7rem; font-style: normal; letter-spacing: 0; text-transform: none; color: var(--text-dim); }
+.op-cols { display: grid; grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr)); gap: 1rem; }
+.op-col { display: flex; flex-direction: column; gap: .4rem; min-width: 0; }
+.op-matrix { display: grid; gap: 0 .75rem; align-items: stretch; min-width: 56rem; }
+.op-mx-agent, .op-mx-cell { display: flex; flex-direction: column; justify-content: center; gap: .25rem; min-width: 0; padding: .35rem 0; border-bottom: 1px solid var(--border); }
+.op-mx-head { display: flex; flex-direction: row; justify-content: center; align-items: baseline; gap: .5rem; min-width: 0; padding: 0 0 .25rem; }
+.op-mx-head > span { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.op-mx-head em { font-family: var(--font-mono); font-size: .7rem; font-style: normal; letter-spacing: 0; text-transform: none; color: var(--text-dim); }
+.op-mx-agent .op-agent { color: var(--text); font-weight: 500; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.op-mx-agent--off .op-agent { color: var(--text-dim); }
+.op-blocks { display: flex; flex-wrap: wrap; gap: 1rem; }
+.op-block { flex: var(--op-n, 1) 1 16rem; max-width: 100%; display: flex; flex-direction: column; gap: .6rem; min-width: 0; margin: 0; padding: .6rem .75rem .75rem; overflow: visible; }
+.op-block-tiles { display: flex; flex-wrap: wrap; gap: .4rem; align-content: flex-start; }
+.op-block-tiles .op-tile { flex: 0 1 auto; max-width: 100%; }

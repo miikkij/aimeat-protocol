@@ -9,6 +9,13 @@
  * @structure SHARED_DEMOS · SHAPE_DEMOS — { [id]: { variants: [{ name, render(ex) }], height?, emptyNote? } }
  * @usage import { SHARED_DEMOS, SHAPE_DEMOS } from './demos-shared.js';
  * @version-history
+ *   v1.12.0 — 2026-09-26 — The Markdown reader's small cut beside the full one (Jouni's decision "Small reader").
+ *   v1.11.0 — 2026-09-26 — The box's raised tone.
+ *   v1.10.0 — 2026-09-26 — The action link's Settings tones: small, lower and row.
+ *   v1.9.0 — 2026-09-26 — A message is the chat's turn (components/Turn.js classes): your words bold on the sun, the other side's beside the pale coral spine, the name above the words, the time and the read marks under them with Copy and Listen, the other six actions behind one ⋯ (CardMenu inline); an agent's options are the chat's choices. The frame, the picture beside the other side, the action pill and the Chat tab's bubbles, pairing lines and small reader go; a suggested reply waiting for approval keeps its dashed box (a unification: Jouni's decision "Message").
+ *   v1.8.0 — 2026-09-26 — The avatar's agent tone (.poster-box--agent) beside the plain and small avatars.
+ *   v1.7.0 — 2026-09-25 — The icon button's pressed tone (.poster-icon.is-on), beside the unpressed one.
+ *   v1.6.0 — 2026-09-25 — The Tag's four tones and the Status in the lab's library (Jouni's decisions "Tag" and "Status").
  *   v1.5.0 — 2026-09-24 — The action link's notice and jump tones.
  *   v1.4.0 — 2026-09-24 — The menu row's demo.
  *   v1.3.0 — 2026-09-24 — The tab's tile tone.
@@ -58,8 +65,10 @@ export const SHARED_DEMOS = {
     { name: 'off', render: (ex) => html`<${CardMenu} state="off" label=${ex.label} actions=${[{ label: 'Take it off your open items', run: noop }]} />` },
     { name: 'open', render: (ex) => html`<${CardMenu} state="open" label=${ex.label} actions=${[{ label: 'Take it off your open items', run: noop }]} />` },
     { name: 'working', render: (ex) => html`<${CardMenu} state="working" label=${ex.label} actions=${[{ label: 'Take it off your open items', run: noop }]} />` },
+    { name: 'inline, in a line of words', render: () => html`<div class="poster-time poster-turn-meta">10:42 <${CardMenu} inline="start" label="More" actions=${[{ label: 'Mark important', run: noop }, { label: 'Delete this message', run: noop, danger: true }]} /></div>` },
   ] },
-  'markdown': { variants: [{ name: 'every element', render: () => html`<${Markdown} text=${MARKDOWN} />` }] },
+  'markdown': { variants: [{ name: 'every element', render: () => html`<${Markdown} text=${MARKDOWN} />` },
+    { name: 'small', render: () => html`<${Markdown} text=${MARKDOWN} small />` }] },
   'ai-label': { variants: [
     { name: 'inline label', render: () => html`<${AiLabel} record=${AI_RECORD} recordUrl="#" variant="inline" />` },
     { name: 'block label', render: () => html`<${AiLabel} record=${AI_RECORD} recordUrl="#" variant="block" />` },
@@ -113,6 +122,9 @@ export const SHAPE_DEMOS = {
   'action': { variants: [
     { name: 'action', render: () => html`<a class="poster-action" href="#">Settings</a>` },
     { name: 'tab', render: () => html`<span><button type="button" class="poster-tab is-on">Chosen</button> <button type="button" class="poster-tab">Another</button></span>` },
+    { name: 'small', render: () => html`<button type="button" class="poster-action poster-action--small">New skill</button>` },
+    { name: 'lower', render: () => html`<button type="button" class="poster-action poster-action--small poster-action--lower">Show 13 more</button>` },
+    { name: 'row', render: () => html`<span><button type="button" class="poster-action poster-action--small poster-action--row">Open</button> <button type="button" class="poster-action poster-action--small poster-action--lower poster-action--row">Copy ref</button></span>` },
     { name: 'more', render: () => html`<button type="button" class="poster-action poster-action--more">Show all (12)</button>` },
     { name: 'quiet', render: () => html`<button type="button" class="poster-action poster-action--quiet">Copy conversation</button>` },
     { name: 'back', render: () => html`<a class="poster-action poster-action--back" href="#">↩ Back to your home</a>` },
@@ -134,13 +146,16 @@ export const SHAPE_DEMOS = {
     { name: 'default', render: () => html`<button type="button" class="poster-icon" aria-label="Attach a file">📎</button>` },
     { name: 'small', render: () => html`<button type="button" class="poster-icon poster-icon--small" aria-label="Delete">✗</button>` },
     { name: 'disabled', render: () => html`<button type="button" class="poster-icon" aria-label="Attach a file" disabled>📎</button>` },
+    { name: 'pressed', render: () => html`<button type="button" class="poster-icon poster-icon--small" aria-pressed="false" title="Add to collection">🛒</button> <button type="button" class="poster-icon poster-icon--small is-on" aria-pressed="true" title="Remove from collection">🛒</button>` },
   ] },
   'box': { variants: [
     { name: 'default', render: () => el('div', 'poster-box', 'A framed object.') },
+    { name: 'raised', render: () => el('div', 'poster-box poster-box--raised', 'The row you opened, or the way to take first.') },
     { name: 'copy', render: () => el('div', 'poster-box poster-box--copy', 'A text to copy.') },
     { name: 'row', render: () => el('div', 'poster-box poster-box--row', 'One result in a list.') },
     { name: 'avatar', render: () => el('span', 'poster-box poster-box--avatar', 'AB') },
     { name: 'avatar small', render: () => el('span', 'poster-box poster-box--avatar poster-box--small', 'AB') },
+    { name: 'avatar agent', render: () => el('span', 'poster-box poster-box--avatar poster-box--agent', 'AB') },
     { name: 'meter', render: () => html`<svg class="poster-box poster-box--meter" width="200" height="12"><rect width="120" height="12"></rect></svg>` },
     { name: 'quota', render: () => html`<svg class="poster-box poster-box--meter poster-box--quota" width="200" height="12"><rect width="80" height="12"></rect></svg>` },
   ] },
@@ -162,7 +177,12 @@ export const SHAPE_DEMOS = {
     { name: 'waiting', render: () => el('div', 'poster-aside poster-aside--waiting', 'The next move is in your AI chat.') },
     { name: 'suggestion', render: () => el('div', 'poster-aside poster-aside--suggestion', 'Put this on your phone.') },
   ] },
-  'chip': { variants: [{ name: 'default (kept for the chip decision)', render: () => el('span', 'poster-chip', 'music') }] },
+  'chip': { variants: [
+    { name: 'the four tones in a row', render: () => html`<span class="poster-chips"><span class="poster-chip">v1.4.0</span><span class="poster-chip poster-chip--sun">7 unread</span><span class="poster-chip poster-chip--coral">operator</span><span class="poster-chip poster-chip--ink">colleague</span></span>` },
+  ] },
+  'status': { variants: [
+    { name: 'the four tones', render: () => html`<span class="poster-chips"><span class="poster-status poster-status--fine">active</span><span class="poster-status poster-status--attention">paused</span><span class="poster-status poster-status--danger">revoked</span><span class="poster-status poster-status--off">archived</span></span>` },
+  ] },
   'crumb': { variants: [{ name: 'default', render: () => el('span', 'poster-crumb', 'Profile') }] },
   'count': { variants: [
     { name: 'waiting', render: () => el('span', 'poster-count poster-count--waiting', '3') },

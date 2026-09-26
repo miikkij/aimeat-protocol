@@ -1,0 +1,31 @@
+/**
+ * @file progress-steps.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The steps of a job the AI is doing now, one per line: the steps done in the success
+ *   colour with a ✓, the step now in bold with a →, the steps to come dimmed with a dot. Drawn only
+ *   by a notebook note while the AI sorts it (views/profile/notebook-card.js, under the Spinner);
+ *   moved here unchanged with its class names out of views/notebook.css (UI consolidation phase 5,
+ *   a move). It has no corner, frame, shadow or case.
+ *   Drawn as markup: <ol class="pf-nb-steps"><li class="pf-nb-step done">✓ …</li>
+ *   <li class="pf-nb-step active">→ …</li><li class="pf-nb-step">· …</li></ol>.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 -- 2026-09-26 -- Moved out of notebook.css (UI consolidation phase 5, a move).
+ */
+
+.pf-nb-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+.pf-nb-step {
+  font-size: 0.85em;
+  color: var(--text-dim, var(--text));
+  opacity: 0.6;
+}
+.pf-nb-step.active { opacity: 1; color: var(--text); font-weight: 600; }
+.pf-nb-step.done { opacity: 0.85; color: var(--success, var(--text)); }

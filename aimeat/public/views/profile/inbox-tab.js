@@ -14,6 +14,15 @@
  *   (./inbox-tab/use-thread-ux.js)
  * @usage Lazy-loaded profile tab; registered in profile.js TABS as id `messages`.
  * @version-history
+ *   v2.8.0 -- 2026-09-25 -- Every one-line field is the Text field (.og-input); a place keeps only its layout (a unification: the look most tabs use).
+ *   v2.7.0 -- 2026-09-25 -- Every tag is the Tag (.poster-chip and its tones, .poster-chips for a row), a unification: Jouni's decision Tag.
+ *   v2.6.0 -- 2026-09-25 -- Every quiet way on is the library's action link, .poster-action, with the
+ *     tone its meaning names: more for "show all" and more of a list, back, text for a plain grey
+ *     word, quiet (Jouni's decisions "Action link", "Panel action", "Dismiss", "Small link", "Step
+ *     button").
+ *   v2.5.0 -- 2026-09-25 -- The loud action is the library's dark block, .poster-slab: the control cut
+ *     where it sits in a row of controls or waits to be enabled, the danger tone for a delete that
+ *     cannot be undone (Jouni's decision "Loud action").
  *   v2.4.0 -- 2026-09-13 -- Compose inbox top rules from poster.css.
  *   v2.3.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v2.2.0 -- 2026-09-13 -- The list is in sections the server places (people, own agents, a rule's
@@ -682,17 +691,17 @@ export default function InboxTab({ showToast }) {
         <div class="og-mast-words">
           <h1 class="og-title poster-page-title">${isPage ? pageTitle : t('inbox.title')}${!isPage ? html`<small>
             <span>${(t('inbox.cover.figConvs') || '{n} conversations').replace('{n}', String(convTotal))}</span>
-            ${unreadTotal ? html`<span class="og-chip og-chip--sun">${(t('inbox.cover.figUnread') || '{n} unread').replace('{n}', String(unreadTotal))}</span>` : null}
-            ${requests.length ? html`<span class="og-chip">${(t('inbox.cover.figRequests') || '{n} requests').replace('{n}', String(requests.length))}</span>` : null}
-            ${archivedTotal ? html`<span class="og-chip">${t('inbox.org.figArchived', { n: String(archivedTotal) })}</span>` : null}
+            ${unreadTotal ? html`<span class="poster-chip poster-chip--sun">${(t('inbox.cover.figUnread') || '{n} unread').replace('{n}', String(unreadTotal))}</span>` : null}
+            ${requests.length ? html`<span class="poster-chip">${(t('inbox.cover.figRequests') || '{n} requests').replace('{n}', String(requests.length))}</span>` : null}
+            ${archivedTotal ? html`<span class="poster-chip">${t('inbox.org.figArchived', { n: String(archivedTotal) })}</span>` : null}
           </small>` : null}</h1>
         </div>
         ${!isPage ? html`<div class="og-mast-actions"><div class="og-doors og-ib-actions">
-          <button type="button" class="og-slab" onClick=${startCompose}>${t('inbox.new')}</button>
-          <button type="button" class="og-door" onClick=${startBroadcast}>${t('inbox.broadcast')}</button>
-          <button type="button" class=${`og-door${awaitingCount ? '' : ' og-door--quiet'}`} onClick=${() => { setMode('tracked'); setActiveConv(null); }} title=${awaitingCount ? t('inbox.trackReady') : ''}>${t('inbox.trackedTitle')}${activeTracked.length ? ` ${activeTracked.length}` : ''}</button>
-          ${recentBroadcasts.length ? html`<button type="button" class="og-door og-door--quiet" onClick=${() => { setMode('results'); setResultsId(null); setActiveConv(null); }}>${t('inbox.results')}</button>` : null}
-          <button type="button" class="og-door og-door--quiet" onClick=${openOrganize}>${t('inbox.org.door')}</button>
+          <button type="button" class="poster-slab" onClick=${startCompose}>${t('inbox.new')}</button>
+          <button type="button" class="poster-action" onClick=${startBroadcast}>${t('inbox.broadcast')}</button>
+          <button type="button" class=${`poster-action${awaitingCount ? '' : ' poster-action--quiet'}`} onClick=${() => { setMode('tracked'); setActiveConv(null); }} title=${awaitingCount ? t('inbox.trackReady') : ''}>${t('inbox.trackedTitle')}${activeTracked.length ? ` ${activeTracked.length}` : ''}</button>
+          ${recentBroadcasts.length ? html`<button type="button" class="poster-action poster-action--quiet" onClick=${() => { setMode('results'); setResultsId(null); setActiveConv(null); }}>${t('inbox.results')}</button>` : null}
+          <button type="button" class="poster-action poster-action--quiet" onClick=${openOrganize}>${t('inbox.org.door')}</button>
         </div></div>` : null}
       </div>
       <datalist id="inbox-contact-suggest">
@@ -731,7 +740,7 @@ export default function InboxTab({ showToast }) {
             <div class="inbox-compose-fields">
               <${ContactPicker} value=${to} onChange=${setTo} valueMode="full"
                 placeholder=${t('inbox.toPlaceholder')} />
-              <input class="inbox-input" type="text" placeholder=${t('inbox.subjectPlaceholder')}
+              <input class="og-input" type="text" placeholder=${t('inbox.subjectPlaceholder')}
                 value=${composeSubject} onInput=${(e) => setComposeSubject(e.target.value)} />
             </div>
             <${Composer} key="c-new" recipient=${to.trim()} sendLabel=${t('inbox.send')}

@@ -9,6 +9,22 @@
  *   an ink rule, and the pages (broadcast, tracked, results) with the head the mast already carries
  *   removed. Tokens only. NOTE: this file must be linked in spa.html after inbox.css.
  * @version-history
+ *   v1.15.0 -- 2026-09-26 -- The rule between the list and the conversation reads --shape-frame-heavy and --shape-rule-colour (a move: the AIMEAT values equal the old ones).
+ *   v1.14.0 -- 2026-09-26 -- The typing box is the chat's one row (.poster-composer and its stacked cut): the field with the thick line under it, the tools as framed squares, the dark block that sends with the page's word; Messages (and its Broadcast form) and an agent's Chat tab take it; the framed field, the round-cornered tools and the box's frame go (a unification: Jouni's decision "Typing box").
+ *   v1.13.0 -- 2026-09-26 -- A message is the chat's turn (components/Turn.js classes): your words bold on the sun, the other side's beside the pale coral spine, the name above the words, the time and the read marks under them with Copy and Listen, the other six actions behind one ⋯ (CardMenu inline); an agent's options are the chat's choices. The frame, the picture beside the other side, the action pill and the Chat tab's bubbles, pairing lines and small reader go; a suggested reply waiting for approval keeps its dashed box (a unification: Jouni's decision "Message").
+ *   v1.12.0 -- 2026-09-26 -- A list of conversations is the chat's list (ThreadList's rows, .poster-thread): the name in bold, one quiet line with the time and the last message, the open one on the sun; a person's heading is its person tone (ThreadPerson) with the counts named; the row's archive square is the small icon button in the delete's place. Messages' rows, a broadcast's results list and an agent's Chat threads take it; their own row looks go (a unification: Jouni's decision "Conversation list").
+ *   v1.11.0 -- 2026-09-25 -- The avatar's own frame, corners and ground go: it is the Object box's avatar cut (.poster-box--avatar, css/poster.css); its size stays here (UI consolidation phase 5, a unification).
+ *   v1.10.0 -- 2026-09-25 -- Every small number is the Count (.poster-count waiting or tally), a unification: Jouni's decision Count.
+ *   v1.9.0 -- 2026-09-25 -- Every tag is the Tag (.poster-chip and its tones, .poster-chips for a row), a unification: Jouni's decision Tag.
+ *   v1.8.0 -- 2026-09-25 -- The headings over lists wear .poster-day-title; their rules here keep only their place (Jouni's decision "Group heading", a unification).
+ *   v1.7.0 -- 2026-09-25 -- The row labels' look is .poster-label; their rules here keep only their place (Jouni's decision "Row label", a unification).
+ *   v1.6.0 -- 2026-09-25 -- A button that is a mark, not a word, is the library's small icon button,
+ *     .poster-icon--small (Jouni's decision "Icon button"): the rules that drew the old marks here go;
+ *     a place's layout value stays on its own class.
+ *   v1.5.0 -- 2026-09-25 -- The loud action is the library's dark block, .poster-slab (Jouni's
+ *     decision "Loud action"): the rules that restyled the old og-slab and .btn-primary here go, and a
+ *     place's layout value moves to the new class.
+ *   v1.4.0 -- 2026-09-25 -- Dead rules removed: selectors whose classes no file writes (UI consolidation phase 5, a move; the browser's reading proves only those went).
  *   v1.3.0 -- 2026-09-13 -- Compose inbox top rules from poster.css.
  *   v1.2.0 — 2026-09-13 — The list's sections, the archive boxes and the selection in the poster face:
  *     square corners, ink borders, a figure for the counts.
@@ -22,52 +38,38 @@
 .og-ib { gap: 0; }
 .og-ib .og-mast--page { margin-top: .6rem; }
 .og-ib .og-title small { align-items: center; }
-.og-ib .og-title small .og-chip { text-transform: none; }
 .og-ib-actions { flex-wrap: nowrap; }
-.og-ib-actions .og-slab { padding: .55rem .9rem; }
-.og-ib .inbox-head { display: none; }
 
 /* ── The two panes ─────────────────────────────────────────────────────────────────────────── */
 .og-ib .inbox-body { margin-top: 1.1rem; border-radius: 0; background: transparent; }
-.og-ib .inbox-list { border-right: 3px solid var(--text); padding: 0; gap: 0; }
-.og-ib .inbox-list-section { padding: .7rem .75rem .3rem; border-bottom: 1px solid var(--border); font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: .78rem; letter-spacing: .06em; color: var(--accent); }
-.og-ib .inbox-count, .og-ib .inbox-conv-badge { border-radius: 0; font-family: var(--font-mono); font-weight: 700; }
-.og-ib .inbox-avatar { border-radius: 0; border: 2px solid var(--text); box-sizing: border-box; }
-.og-ib .inbox-conv { border-radius: 0; border-bottom: 1px solid var(--border); border-left: 3px solid transparent; padding: .6rem .75rem; }
-.og-ib .inbox-conv:hover { background: var(--card-bg); }
-.og-ib .inbox-conv--active { background: var(--sun); border-left-color: var(--text); color: var(--on-sun); }
-.og-ib .inbox-conv--active .inbox-conv-preview, .og-ib .inbox-conv--active .inbox-conv-time, .og-ib .inbox-conv--active .inbox-conv-subject { color: var(--on-sun); }
-.og-ib .inbox-conv--nested { padding-left: 1.6rem; }
-.og-ib .inbox-conv-subico { width: 1.4rem; font-family: var(--font-mono); font-size: .7rem; opacity: 1; color: var(--accent); }
-.og-ib .inbox-conv-subject { font-family: var(--font-mono); }
-.og-ib .inbox-conv-group-head { padding: .6rem .75rem .2rem; }
-.og-ib .inbox-via-chip { border-radius: 0; font-family: var(--font-mono); }
+.og-ib .inbox-list { border-right: var(--shape-frame-heavy) solid var(--shape-rule-colour); padding: 0; gap: 0; }
+.og-ib .inbox-list-section { padding: .7rem .75rem .3rem; }
+/* The rows are the chat's rows (.poster-thread) and a person's heading its person tone (Jouni's
+   decision "Conversation list"); their room at the list's edges only. */
+.og-ib .inbox-list .poster-thread-open { padding: .6rem .75rem; }
+.og-ib .inbox-list .poster-thread { padding-right: .5rem; }
 .og-ib .inbox-request { border-radius: 0; border: 0; border-left: 3px solid var(--accent); border-bottom: 1px solid var(--border); padding: .7rem .75rem; }
 .og-ib .inbox-empty-sm { padding: .7rem .75rem; }
-/* The section headings keep the coral label face of .inbox-list-section; the count beside them is a figure. */
+/* The section headings are the day heading (.poster-day-title); the count beside them is the tally Count. */
 .og-ib .inbox-sec { gap: 0; }
 .og-ib .inbox-sec-head { gap: .45rem; }
-.og-ib .inbox-sec-count { font-family: var(--font-mono); letter-spacing: 0; color: var(--text-dim); }
 .og-ib .inbox-sec + .inbox-sec > .inbox-sec-head { border-top: 1px solid var(--border); }
-.og-ib .inbox-conv-group-bar { padding-right: .5rem; }
-.og-ib .inbox-conv-act, .og-ib .inbox-group-act, .og-ib .inbox-conv-check { border-radius: 0; border-color: var(--text); color: var(--text); }
-.og-ib .inbox-conv-act:hover, .og-ib .inbox-group-act:hover { border-color: var(--accent); color: var(--accent); }
+.og-ib .inbox-conv-group-bar { padding: 0 .5rem 0 .75rem; }
+.og-ib .inbox-conv-check { border-radius: 0; border-color: var(--text); color: var(--text); }
 .og-ib .inbox-list-tools { padding: .45rem .75rem; border-bottom: 1px solid var(--border); }
-.og-ib .inbox-conv--selected { background: var(--card-bg); border-left-color: var(--accent); }
-.og-ib .inbox-conv-why { font-family: var(--font-mono); }
+/* A row picked for archiving keeps its mark while picking: the card ground and a coral edge. */
+.og-ib .inbox-conv--selected { background: var(--card-bg); box-shadow: inset 3px 0 0 var(--accent); }
 
 /* ── The thread ────────────────────────────────────────────────────────────────────────────── */
 .og-ib .inbox-thread-head { padding: .6rem 1rem; border-bottom: 3px solid var(--text); }
 .og-ib .inbox-thread-subject { font-family: var(--font-mono); }
-.og-ib .inbox-thread-head .og-door { font-size: .72rem; }
 .og-ib .inbox-msgs { background: transparent; padding: 1rem; }
 .og-ib .inbox-day span { border-radius: 0; background: transparent; font-family: var(--font-mono); }
 .og-ib .inbox-bubble { border-radius: 0; border: 2px solid var(--text); background: var(--card-bg); }
-.og-ib .inbox-bubble--theirs { background: var(--card-bg); }
 .og-ib .inbox-bubble--mine { background: var(--sun); border-color: var(--sun); color: var(--on-sun); }
-.og-ib .inbox-bubble--mine .inbox-bubble-meta, .og-ib .inbox-bubble--mine .inbox-tick { color: var(--on-sun); }
-.og-ib .inbox-bubble-who { display: block; font-size: .64rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); margin-bottom: 2px; }
-.og-ib .inbox-bubble--mine .inbox-bubble-who { color: var(--on-sun); }
+/* A message is the chat's turn (turn.css carries the ink on the sun for your words; Jouni's decision
+   "Message"). The box rules here draw the one thing it does not: a suggested reply waiting for your
+   approval (panels.js, .inbox-bubble--draft), which keeps its dashed box. */
 
 /* Ink on the sun, all the way down. The bubble sets the ink on itself, but a message body is
    rendered markdown and .md-body sets `color: var(--text)` of its own, which the dark theme makes
@@ -100,17 +102,16 @@
 .og-ib .inbox-bubble--mine .md-body blockquote { background: transparent; color: var(--on-sun); border-left-color: var(--on-sun); }
 .og-ib .inbox-bubble--mine .md-body th,
 .og-ib .inbox-bubble--mine .md-body tbody tr:nth-child(even) { background: transparent; }
-/* The chip's own plate is a theme surface, so on the sun it reads as a hole. It takes the sun's own
-   ground and the ink border the poster face uses everywhere else. */
-.og-ib .inbox-bubble--mine .inbox-attach-chip { background: transparent; border-color: var(--on-sun); }
-.og-ib .inbox-bubble--mine .inbox-attach-chip--pending { opacity: 1; border-style: dashed; }
+/* An attachment in your message sits on the sun: the chip's own plate is a theme surface, so there it
+   reads as a hole. It takes the sun's own ground, the ink border and the ink words. */
+.og-ib .poster-turn--user .inbox-attach-chip { background: transparent; border-color: var(--on-sun); }
+.og-ib .poster-turn--user .inbox-attach-chip--pending { opacity: 1; border-style: dashed; }
+.og-ib .poster-turn--user .inbox-attach-name, .og-ib .poster-turn--user .inbox-attach-pending { color: var(--on-sun); }
 
-/* The meta badges wear the poster's square corners, and the ink when they sit on the sun. */
-.og-ib .inbox-ai-badge, .og-ib .inbox-model-badge { border-radius: 0; font-family: var(--font-mono); }
-.og-ib .inbox-bubble--mine .inbox-ai-badge,
-.og-ib .inbox-bubble--mine .inbox-model-badge { border-color: var(--on-sun); color: var(--on-sun); }
+/* The Tags take the ink when they sit on the sun: in the dark theme the Tag's own ink is
+   near-white, which does not read on the sun (the same trap as the body text above). */
+.og-ib .poster-thread--active .poster-chip { border-color: var(--on-sun); color: var(--on-sun); }
 .og-ib .inbox-bubble-quote { border-radius: 0; }
-.og-ib .inbox-composer { background: var(--card-bg); }
 .og-ib .inbox-panel--empty { border-left: 0; }
 .og-ib .inbox-empty { font-weight: 600; }
 
@@ -120,7 +121,6 @@
 .og-ib-page .inbox-panel { height: auto; }
 .og-ib-page .inbox-panel > .inbox-thread-head { display: none; }
 .og-ib-page .inbox-compose-fields { padding: 0 0 .8rem; }
-.og-ib-page .inbox-composer { border: 2px solid var(--text); }
 .og-ib-page .inbox-bc-modeopt { border-radius: 0; }
 .og-ib-page .inbox-bc-modeopt--on { background: var(--sun); color: var(--on-sun); border-color: var(--text); }
 

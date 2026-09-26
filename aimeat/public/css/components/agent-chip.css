@@ -1,0 +1,19 @@
+/**
+ * @file agent-chip.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description One agent under the person it works for, in a workspace's People panel: a small
+ *   framed chip with the agent's mark, its name and its count. Your own agent has a green frame; another
+ *   owner's agent (whose name you are not shown) is grey, dashed and faded. Drawn only by the organism
+ *   pages' People panel; moved here unchanged with its class names (UI consolidation phase 5, a move).
+ *   Its corner is a tag's, --shape-corner-pill.
+ *   Drawn as markup by views/profile/organisms/participants-panel.js.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.1.0 -- 2026-09-26 -- The 6px corner reads --shape-corner-pill, a tag's corner (Jouni's note on the round's shape check: "tee samankaltaiseksi tyyli kuin muuallakin").
+ *   v1.0.0 -- 2026-09-25 -- Moved out of profile.css (UI consolidation phase 5, a move).
+ */
+
+.pj-part-agent { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.8rem; border: 1px solid var(--border); border-radius: var(--shape-corner-pill); padding: 0.12rem 0.5rem; }
+.pj-part-agent.own { border-color: var(--success); }
+.pj-part-agent.ghost { color: var(--muted); border-style: dashed; opacity: 0.65; }

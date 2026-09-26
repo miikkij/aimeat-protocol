@@ -5,6 +5,25 @@
  * @description Messages tab with command palette, "/" autocomplete, and chat area.
  *   Wraps the existing messages subtab and adds command discovery.
  * @version-history
+ *   v1.20.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
+ *   v1.19.0 -- 2026-09-26 -- The field and Send are the chat's one row (.poster-composer): the field with the thick line under it and the dark block (a unification: Jouni's decision "Typing box").
+ *   v1.18.0 -- 2026-09-26 -- A message is the chat's turn (components/Turn.js classes): your words bold on the sun, the other side's beside the pale coral spine, the name above the words, the time and the read marks under them with Copy and Listen, the other six actions behind one ⋯ (CardMenu inline); an agent's options are the chat's choices. The frame, the picture beside the other side, the action pill and the Chat tab's bubbles, pairing lines and small reader go; a suggested reply waiting for approval keeps its dashed box (a unification: Jouni's decision "Message").
+ *   v1.17.0 -- 2026-09-26 -- A list of conversations is the chat's list (ThreadList's rows, .poster-thread): the name in bold, one quiet line with the time and the last message, the open one on the sun; a person's heading is its person tone (ThreadPerson) with the counts named; the row's archive square is the small icon button in the delete's place. Messages' rows, a broadcast's results list and an agent's Chat threads take it; their own row looks go (a unification: Jouni's decision "Conversation list").
+ *   v1.16.0 -- 2026-09-26 -- Every line that says a part is loading is the loading line: the quiet sentence with the blinking Loading mark, LoadingLine in views/profile/shared.js (a unification: the look most tabs use).
+ *   v1.15.0 -- 2026-09-26 -- The Chat tab's command palette is a folded row over the Listing (the command the inline code), no commands the quiet sentence, and Show more the action link's more tone (a unification: the look most tabs use).
+ *   v1.14.0 -- 2026-09-25 -- A line that says there is nothing (none, and the more under the running tasks) is the quiet sentence (.poster-quiet); a place keeps only its margin (a unification: Jouni's decision Empty line).
+ *   v1.13.0 -- 2026-09-25 -- Every tag is the Tag (.poster-chip and its tones, .poster-chips for a row), a unification: Jouni's decision Tag.
+ *   v1.12.0 -- 2026-09-25 -- Every time a thing happened wears .poster-time (Jouni's decision "Timestamp", a unification).
+ *   v1.11.0 -- 2026-09-25 -- The headings over lists wear .poster-day-title, grey (--quiet) over a record (Jouni's decision "Group heading", a unification).
+ *   v1.10.0 -- 2026-09-25 -- Every quiet way on is the library's action link, .poster-action, with the
+ *     tone its meaning names: more for "show all" and more of a list, back, text for a plain grey
+ *     word, quiet (Jouni's decisions "Action link", "Panel action", "Dismiss", "Small link", "Step
+ *     button").
+ *   v1.9.0 -- 2026-09-25 -- The loud action is the library's dark block, .poster-slab: the control cut
+ *     where it sits in a row of controls or waits to be enabled, the danger tone for a delete that
+ *     cannot be undone (Jouni's decision "Loud action").
+ *   2026-09-25 -- The lines that say a list is empty (or has nothing to show yet) are the quiet sentence (.poster-quiet, QuietNote), a unification: Jouni's decision "Empty line".
+ *   2026-09-25 -- What chooses what a list or a panel shows is the tab (.poster-tab, with its fold and filter tones), a unification: Jouni's decision "Tabs and filters".
  *   v1.8.0 -- 2026-08-01 -- TARGET-058 Phase 9 step 0: the AI label renders inside the message bubble
  *     from the row's own `ai_provenance`. This is the surface where a model writes prose straight
  *     into a person's reading, and until the message carried a provenance column there was nothing
@@ -75,33 +94,35 @@ function CommandPalette({ commands, onSend }) {
   if (!commands || commands.length === 0) {
     // No registered commands → one quiet line, not an expandable empty box.
     return html`
-      <div class="pf-agd-commands pf-agd-commands--empty" title=${t('profile.agents.detail.messages.commands.noCommandsHint')}>
+      <div class="poster-quiet pf-agd-commands--empty" title=${t('profile.agents.detail.messages.commands.noCommandsHint')}>
         <span>${t('profile.agents.detail.messages.commands.title')}</span>
-        <span class="pf-agd-none-inline">${t('profile.agents.detail.messages.commands.noCommands')}</span>
+        <span class="poster-quiet pf-agd-none-inline">${t('profile.agents.detail.messages.commands.noCommands')}</span>
       </div>
     `;
   }
 
   return html`
     <div class="pf-agd-commands">
-      <div class="pf-agd-commands-header" onClick=${() => setExpanded(!expanded)}>
-        <span>${t('profile.agents.detail.messages.commands.title')} (${commands.length} ${t('profile.agents.detail.messages.commands.available')})</span>
-        <span>${expanded ? '▼' : '▶'}</span>
-      </div>
+      <button type="button" class="og-fold og-fold--event" aria-expanded=${expanded} onClick=${() => setExpanded(!expanded)}>
+        <b>${t('profile.agents.detail.messages.commands.title')} (${commands.length} ${t('profile.agents.detail.messages.commands.available')})</b>
+        <span class="og-fold-arrow">${expanded ? '↓' : '→'}</span>
+      </button>
       ${expanded && html`
         <div class="pf-agd-commands-body">
           ${Object.entries(categories).map(([cat, cmds]) => html`
             <div key=${cat}>
-              <div class="pf-agd-commands-category">${cat}</div>
+              <div class="pf-agd-commands-category poster-day-title">${cat}</div>
+              <div class="listing listing--cols listing--name-desc-doors">
               ${cmds.map(cmd => html`
-                <div key=${cmd.name} class="pf-agd-command-row">
-                  <span class="pf-agd-command-name">${cmd.name}</span>
-                  <span class="pf-agd-command-desc">${cmd.description || ''}</span>
-                  <button class="btn-outline btn-sm" onClick=${() => onSend(cmd.name)}>
+                <div key=${cmd.name} class="listing-row">
+                  <div class="listing-name"><code class="code-inline">${cmd.name}</code></div>
+                  <div class="listing-desc">${cmd.description || ''}</div>
+                  <div class="listing-doors"><button class="poster-action poster-action--small poster-action--row" onClick=${() => onSend(cmd.name)}>
                     ${t('profile.agents.detail.messages.commands.send')}
-                  </button>
+                  </button></div>
                 </div>
               `)}
+              </div>
             </div>
           `)}
         </div>
@@ -285,41 +306,50 @@ export default function TabMessages({ agent, agentName, showToast }) {
     const locked = promptCtx?.locked || false;
     const answeredChoice = promptCtx?.answeredChoice ?? null;
     const otherChosen = prompt && answeredChoice != null && !prompt.options.includes(answeredChoice);
+    const mine = msg.direction === 'inbound';
+    // One message is the chat's turn (Jouni's decision "Message"): the owner's words on the sun, the
+    // agent's beside the pale coral spine, the time under it. pf-agd-msg-bubble names the words' box
+    // for the tests; it draws nothing of its own.
     return html`
-      <div key=${msg.id || msg.createdAt}>
-        <div class="pf-agd-msg-bubble ${msg.direction === 'inbound' ? 'pf-agd-msg-inbound' : 'pf-agd-msg-outbound'} ${isCommand ? 'pf-agd-msg-command' : ''} ${isReply ? 'pf-agd-msg-reply' : ''}">
-          ${isCommand && html`<span class="pf-agd-command-badge">${t('profile.agents.detail.messages.command')}</span>`}
-          ${msg.direction === 'outbound'
-            // Agent replies are markdown (LLM output). Render them safely via the
-            // shared vnode Markdown component. Owner-typed inbound messages stay
-            // literal — the input is a plain text field, not markdown.
-            ? html`<${Markdown} text=${msg.content || ''} />`
-            : msg.content}
-          ${/* TARGET-058: whether a label is owed was decided on the server and lives in
-                record.disclosure.required — AiLabel returns null when it is not. Inside the bubble,
-                because Art. 50(5) asks for the mark at first exposure to the content it describes,
-                not in a footer under the whole thread. */''}
-          <${AiLabel} record=${msg.ai_provenance?.record}
-                      recordUrl=${msg.ai_provenance?.record_url} variant="inline" />
+      <div class="pf-agd-msg" key=${msg.id || msg.createdAt}>
+        <div class=${`poster-turn poster-turn--${mine ? 'user' : 'agent'}`}>
+          <div class="poster-turn-body pf-agd-msg-bubble">
+            ${isCommand && html`<span class="poster-chip">${t('profile.agents.detail.messages.command')}</span>`}
+            ${!mine
+              // Agent replies are markdown (LLM output). Render them safely via the
+              // shared vnode Markdown component. Owner-typed inbound messages stay
+              // literal — the input is a plain text field, not markdown.
+              ? html`<${Markdown} text=${msg.content || ''} />`
+              : html`<p class="poster-turn-said">${msg.content}</p>`}
+            ${/* TARGET-058: whether a label is owed was decided on the server and lives in
+                  record.disclosure.required — AiLabel returns null when it is not. Inside the bubble,
+                  because Art. 50(5) asks for the mark at first exposure to the content it describes,
+                  not in a footer under the whole thread. */''}
+            <${AiLabel} record=${msg.ai_provenance?.record}
+                        recordUrl=${msg.ai_provenance?.record_url} variant="inline" />
+          </div>
+          ${msg.createdAt ? html`<div class="poster-time poster-turn-meta">
+            <span>${fmtTime(msg.createdAt, { hour: '2-digit', minute: '2-digit' })}</span><span>${timeAgo(msg.createdAt)}</span>
+          </div>` : null}
         </div>
-        <div class="pf-agd-msg-meta ${msg.direction === 'inbound' ? 'pf-agd-msg-meta-right' : ''}">
-          ${msg.createdAt ? html`<span class="pf-agd-msg-time">${fmtTime(msg.createdAt, { hour: '2-digit', minute: '2-digit' })}</span> ${timeAgo(msg.createdAt)}` : ''}
-        </div>
+        ${/* The agent's options are the chat's choices (the underlined words a person presses instead
+              of typing); "Other" is one more, which hands the question to the field. The answer shows
+              as the owner's own turn under it, as in the chat. The option classes name them for the
+              tests; they draw nothing of their own. */''}
         ${prompt && html`
           <div class="agd-msg-prompt">
-            <div class="agd-msg-prompt-q">${prompt.question}</div>
-            <div class="agd-msg-prompt-options">
+            <p class="agd-msg-prompt-q">${prompt.question}</p>
+            <div class="poster-choices">
               ${prompt.options.map(opt => html`
-                <button
-                  key=${opt}
-                  class="agd-msg-prompt-option ${answeredChoice === opt ? 'agd-msg-prompt-option--chosen' : ''}"
+                <button type="button" key=${opt}
+                  class=${`btn-outline poster-suggestion agd-msg-prompt-option${answeredChoice === opt ? ' agd-msg-prompt-option--chosen' : ''}`}
                   disabled=${locked || false}
                   onClick=${() => answerOption(prompt, msg.threadId, opt)}
                 >${opt}</button>
               `)}
               ${prompt.allowOther !== false && html`
-                <button
-                  class="agd-msg-prompt-option agd-msg-prompt-option--other ${otherChosen ? 'agd-msg-prompt-option--chosen' : ''}"
+                <button type="button"
+                  class=${`btn-outline poster-suggestion agd-msg-prompt-option agd-msg-prompt-option--other${otherChosen ? ' agd-msg-prompt-option--chosen' : ''}`}
                   disabled=${locked || false}
                   onClick=${() => chooseOther(prompt, msg.threadId)}
                 >${t('profile.agents.messages.promptOther')}</button>
@@ -332,7 +362,7 @@ export default function TabMessages({ agent, agentName, showToast }) {
   }
 
   if (loading && messages.length === 0) {
-    return html`<div class="pf-agd-empty">${t('profile.loading')}</div>`;
+    return html`<div class="poster-quiet pf-agd-empty loading-mark">${t('profile.loading')}</div>`;
   }
 
   return html`
@@ -340,11 +370,12 @@ export default function TabMessages({ agent, agentName, showToast }) {
       <${CommandPalette} commands=${commands} onSend=${(cmd) => handleSend(cmd)} />
 
       ${meaningfulThreads.length > 0 && html`
-        <div class="pf-agd-msg-threads">
-          <button class="pf-agd-msg-thread-btn ${!activeThread ? 'pf-agd-msg-thread-btn-active' : ''}"
-                  onClick=${() => setActiveThread(null)}>
-            ${t('profile.agents.messages.threads')}
-          </button>
+        <div class="pf-agd-msg-threads poster-thread-list">
+          <div class=${'poster-thread' + (!activeThread ? ' poster-thread--active' : '')}>
+            <button type="button" class="poster-thread-open" onClick=${() => setActiveThread(null)}>
+              <span class="poster-thread-title">${t('profile.agents.messages.threads')}</span>
+            </button>
+          </div>
           ${(() => {
             // Collapse a long thread list behind a "show more" toggle, but always
             // keep the currently-selected thread visible even when collapsed.
@@ -354,16 +385,18 @@ export default function TabMessages({ agent, agentName, showToast }) {
               if (active) visible = [active, ...visible];
             }
             return visible.map(thread => html`
-              <button key=${thread.threadId}
-                      class="pf-agd-msg-thread-btn ${activeThread === thread.threadId ? 'pf-agd-msg-thread-btn-active' : ''}"
-                      title=${thread.title || thread.lastMessage || ''}
-                      onClick=${() => setActiveThread(thread.threadId)}>
-                ${threadLabel(thread)}
-              </button>
+              <div key=${thread.threadId} class=${'poster-thread' + (activeThread === thread.threadId ? ' poster-thread--active' : '')}>
+                <button type="button" class="poster-thread-open"
+                        title=${thread.title || thread.lastMessage || ''}
+                        onClick=${() => setActiveThread(thread.threadId)}>
+                  <span class="poster-thread-title">${threadLabel(thread)}</span>
+                  <span class="poster-thread-sub">${thread.updatedAt ? fmtTime(thread.updatedAt, { hour: '2-digit', minute: '2-digit' }) + ' · ' : ''}${t('chat.turnCount', { n: String(thread.messageCount ?? 0) })}</span>
+                </button>
+              </div>
             `);
           })()}
           ${meaningfulThreads.length > THREAD_LIMIT && html`
-            <button class="pf-agd-msg-thread-btn pf-agd-msg-thread-more"
+            <button type="button" class="poster-action poster-action--more pf-agd-msg-thread-more"
                     onClick=${() => setShowAllThreads(v => !v)}>
               ${showAllThreads
                 ? t('profile.agents.messages.threadsShowLess')
@@ -374,7 +407,7 @@ export default function TabMessages({ agent, agentName, showToast }) {
       `}
 
       ${messages.length === 0 && !loading && html`
-        <div class="pf-agd-empty">${t('profile.agents.detail.empty.messages')}</div>
+        <div class="poster-quiet pf-agd-empty">${t('profile.agents.detail.empty.messages')}</div>
       `}
 
       ${messages.length > 0 && html`
@@ -426,7 +459,8 @@ export default function TabMessages({ agent, agentName, showToast }) {
         </div>
       `}
 
-      <div class="pf-agd-msg-input">
+      <div class="poster-composer poster-row--thing pf-agd-msg-input">
+        <div class="poster-composer-row">
         <div class="pf-agd-input-wrap">
           ${showAutocomplete && filteredCommands.length > 0 && html`
             <div class="pf-agd-autocomplete">
@@ -438,7 +472,7 @@ export default function TabMessages({ agent, agentName, showToast }) {
               `)}
             </div>
           `}
-          <textarea
+          <textarea class="poster-composer-input"
             ref=${inputRef}
             value=${draft}
             onInput=${handleInput}
@@ -447,9 +481,10 @@ export default function TabMessages({ agent, agentName, showToast }) {
             rows="1"
           />
         </div>
-        <button class="btn-primary btn-sm" onClick=${() => handleSend()} disabled=${sending || !draft.trim()}>
+        <button type="button" class="poster-slab poster-slab--control poster-composer-send" onClick=${() => handleSend()} disabled=${sending || !draft.trim()}>
           ${t('profile.agents.messages.send')}
         </button>
+        </div>
       </div>
       <div class="pf-agd-msg-meta">${t('profile.agents.detail.messages.hint')}</div>
     </div>

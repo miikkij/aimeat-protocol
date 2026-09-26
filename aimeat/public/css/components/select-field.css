@@ -1,0 +1,25 @@
+/**
+ * @file select-field.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description A drop-down: the browser's select in an ink frame on the page ground, its words in the
+ *   showroom face at 600, as wide as its place; the frame turns coral while it has the focus. The look
+ *   most Settings & Controls tabs already draw (the selects of the agents, ai, apps, companies, data
+ *   wallet, email, mcp, memory, notifications, skills and workflows tabs), taken as the one look for
+ *   this kind (UI consolidation phase 5). The frame and the corner read the shape tokens.
+ *   Drawn as markup: <select class="select-field">…</select>.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 — 2026-09-25 — Initial, with the values the selects of those tabs draw.
+ */
+
+.select-field {
+  width: 100%; box-sizing: border-box;
+  border: var(--shape-frame) solid var(--shape-field-colour); border-radius: var(--shape-corner-control);
+  background: var(--bg); color: var(--text);
+  padding: .45rem 0;
+  font-family: var(--font-showroom-body); font-size: 1rem; font-weight: 600;
+  cursor: pointer; outline: none;
+}
+.select-field:focus { border-color: var(--accent); }
+.select-field:disabled { cursor: not-allowed; }

@@ -20,6 +20,17 @@
  * @structure CrewLlmPicker({ agentName, menu, onSaved, showToast })
  * @usage <${CrewLlmPicker} agentName=${name} menu=${menu} onSaved=${reload} showToast=${showToast} />
  * @version-history
+ *   v1.7.0 — 2026-09-26 — A small heading over a group of fields, a card or a note is the Sub-heading (.sub-heading: small ink headline letters); the coral small capitals, the bold ink words and the coral headline letters go (a unification: Jouni's decision "Sub-heading").
+ *   v1.6.0 — 2026-09-26 — A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
+ *   v1.5.0 — 2026-09-26 — A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
+ *   v1.4.0 — 2026-09-25 — A grey line that explains is the Hint (poster-hint, css/components/hint.css); a place keeps only its margin (a unification: the look most tabs use).
+ *   v1.3.0 — 2026-09-25 — Every drop-down is the Select field (.select-field, css/components/select-field.css); a place keeps only its width and margin (a unification: the look most tabs use).
+ *   v1.2.0 — 2026-09-25 — The row labels (field and key labels, column heads, box labels) wear .poster-label (Jouni's decision "Row label", a unification).
+ *   v1.1.0 — 2026-09-25 — Every quiet way on is the library's action link, .poster-action, with the
+ *     tone its meaning names: more for "show all" and more of a list, back, text for a plain grey
+ *     word, quiet (Jouni's decisions "Action link", "Panel action", "Dismiss", "Small link", "Step
+ *     button").
+ *   2026-09-25 -- The lines that say a list is empty (or has nothing to show yet) are the quiet sentence (.poster-quiet, QuietNote), a unification: Jouni's decision "Empty line".
  *   v1.0.0 — 2026-09-09 — Initial. `llm_profile` had been carried in the definition and honoured by
  *     nothing since the JSON crew shipped.
  */
@@ -105,9 +116,9 @@ export default function CrewLlmPicker({ agentName, menu, onSaved, showToast }) {
   const nothingToOffer = profiles.length === 0 && models.length === 0;
 
   return html`
-    <div class="pf-agd-crew-llm">
-      <div class="pf-agd-section-title">${t(`${K}.title`)}</div>
-      <div class="pf-agd-help-text">${t(`${K}.hint`)}</div>
+    <div class="pf-agd-crew-llm poster-box">
+      <div class="pf-agd-section-title sub-heading">${t(`${K}.title`)}</div>
+      <div class="poster-hint pf-agd-help-text">${t(`${K}.hint`)}</div>
 
       ${nothingToOffer ? html`
         ${/* A CHOICE CAN EXIST WITH NO LIST TO SHOW IT IN: it was made while the agent was up, or
@@ -121,14 +132,14 @@ export default function CrewLlmPicker({ agentName, menu, onSaved, showToast }) {
               })}
             </span>
             ${!inherited && html`
-              <button type="button" class="btn-ghost btn-sm" disabled=${busy} onClick=${() => save('')}>
+              <button type="button" class="poster-action poster-action--small" disabled=${busy} onClick=${() => save('')}>
                 ${t(`${K}.clear`)}
               </button>`}
           </div>`}
-        <div class="pf-agd-help-text pf-agd-crew-llm-empty">${t(`${K}.noneKnown`)}</div>
+        <div class="poster-quiet pf-agd-crew-llm-empty">${t(`${K}.noneKnown`)}</div>
       ` : html`
         <div class="pf-agd-crew-llm-row">
-          <select class="input-field" disabled=${busy} value=${current} onChange=${e => save(e.target.value)}>
+          <select class="select-field" disabled=${busy} value=${current} onChange=${e => save(e.target.value)}>
             <option value="">${inherited ? t(`${K}.inherited`) : t(`${K}.unset`)}</option>
             ${profiles.length > 0 && html`
               <optgroup label=${t(`${K}.profiles`)}>
@@ -139,11 +150,11 @@ export default function CrewLlmPicker({ agentName, menu, onSaved, showToast }) {
                 ${models.map(m => html`<option key=${m.label} value=${`model:${m.label}`}>${m.label}</option>`)}
               </optgroup>`}
           </select>
-          <button type="button" class="btn-ghost btn-sm" disabled=${busy || !current} onClick=${saveDefault}>
+          <button type="button" class="poster-action poster-action--small" disabled=${busy || !current} onClick=${saveDefault}>
             ${t(`${K}.setDefault`)}
           </button>
         </div>
-        <div class="pf-agd-help-text">
+        <div class="poster-hint pf-agd-help-text">
           ${inherited && choice?.value
             ? t(`${K}.inheritedFrom`, { what: choice.value.profile || choice.value.label || '' })
             : t(menu?.source === 'runtime' ? `${K}.fromRuntime` : `${K}.fromCatalog`)}

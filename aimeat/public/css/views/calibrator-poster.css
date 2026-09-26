@@ -7,9 +7,36 @@
  *   file carries what the pages add: the rows of calibrations and of runs (name, scores, what did
  *   not pass, the door) and the run that opens under its row with the four steps as folds, the
  *   checkpoint table, the proposal lists, the numbered proposals and the three options, the paste
- *   box; the version rows and the two editors; the model rows and the picker; the score chart with
+ *   box; the version rows and the two editors; the model rows; the score chart with
  *   its legend; the two roads. NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v2.21.0 -- 2026-09-26 -- The ready-made request and a folded output are the Code block (css/components/code-block.css): their look goes, their place and height stay (a unification: Jouni's decision "Code block").
+ *   v2.20.0 -- 2026-09-26 -- A grey line that explains is the Hint (.poster-hint); the rule that drew it here goes and its place stays (a unification: the look most tabs use).
+ *   v2.19.0 -- 2026-09-26 -- A table's cells are the Listing's own: figures the figure cell (.listing-n), words the words cell (.listing-desc), a row of servers the Listing; the rules that drew them here go (a unification: the look most tabs use).
+ *   v2.18.0 -- 2026-09-26 -- A score is the small stat number (.poster-stat-number--small), as the wallet's amounts, a unification: the look most tabs use.
+ *   v2.17.0 -- 2026-09-26 -- A run's step is the fold row at its own size, a finished step its done tone (.og-fold--done), a unification.
+ *   v2.16.0 -- 2026-09-26 -- The rename field, the prompt and template text areas and the pasted answer are the Text field and Text area as they are: the rules that restyled them go (a unification).
+ *   v2.15.0 -- 2026-09-25 -- A line that says what happened after an action is the Form message, a failure in its error tone (a unification: the look most tabs use).
+ *   v2.14.0 -- 2026-09-25 -- A road or an option you choose is the Choice tile (.poster-choice), a unification: the look most tabs use.
+ *   v2.13.0 -- 2026-09-25 -- The score chart is the library's Score chart (css/components/score-chart.css), moved unchanged with its class names (UI consolidation phase 5, a move).
+ *   v2.12.0 -- 2026-09-25 -- A prompt's versions and its two editors are the library's Prompt versions (css/components/prompt-versions.css), moved unchanged with their class names (UI consolidation phase 5, a move).
+ *   v2.11.0 -- 2026-09-25 -- The opened run's parts are the library's Calibration run (css/components/calibration-run.css), moved unchanged with their class names (UI consolidation phase 5, a move).
+ *   v2.10.0 -- 2026-09-25 -- The model picker is the library's Model picker (css/components/model-picker.css), moved unchanged out of ai-poster.css and calibrator-poster.css (UI consolidation phase 5, a move).
+ *   v2.9.0 -- 2026-09-25 -- The calibrations, the runs and the models are the Listing (css/components/listing.css), a unification: the look most tabs use. The rules of cal-rows, cal-row, cal-ml, cal-mr and their cells go; the scores, a run's ink average, the model's name and id, the facts' typewriter and the grey archived name stay.
+ *   v2.8.0 -- 2026-09-25 -- A framed box's own frame and ground go: it is the Object box (.poster-box, css/poster.css); its place (margin, padding) stays here. The lead roads keep their own heavier look (Jouni's decision "Object box", a unification).
+ *   v2.7.0 -- 2026-09-25 -- Every tag is the Tag (.poster-chip and its tones, .poster-chips for a row), a unification: Jouni's decision Tag.
+ *   v2.6.0 -- 2026-09-25 -- The inline code rules go: code is the Code block's inline cut (css/components/code-block.css); the layout declarations of their places stay, on .code-inline (UI consolidation phase 5, a unification).
+ *   v2.5.0 -- 2026-09-25 -- The lead and paragraph rules go: they are the og-lead (css/components/page-section.css); the layout declarations of their places stay, on .og-lead (UI consolidation phase 5, a unification).
+ *   v2.4.0 -- 2026-09-25 -- The hint rules go: the hints are the Hint (css/components/hint.css); the layout declarations of their places stay, on .poster-hint (UI consolidation phase 5, a unification).
+ *   v2.3.0 -- 2026-09-25 -- The headings over lists wear .poster-day-title; their rules here keep only their place (Jouni's decision "Group heading", a unification).
+ *   v2.2.0 -- 2026-09-25 -- The row labels' look is .poster-label; their rules here keep only their place (Jouni's decision "Row label", a unification).
+ *   v1.2.0 — 2026-09-25 — The quiet ways on are the library's action link (Jouni's decision "Action
+ *     link"): the rules that restyled og-door, the classic buttons and the text buttons here go; a
+ *     place's layout value moves to the new class.
+ *   v1.1.0 — 2026-09-25 — The loud action is the library's dark block, .poster-slab (Jouni's decision
+ *     "Loud action"): the rules that restyled the old og-slab and .btn-primary here go, and a place's
+ *     layout value moves to the new class.
+ *   2026-09-25 -- .cal-empty is the quiet sentence (.poster-quiet, Jouni's decision "Empty line"): its look goes, its place stays; its bold words take the sentence's colour. So does the picker's .cal-pick-empty.
  *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   v1.0.1 — 2026-09-04 — Seen on aimeat.io: the score column was `auto` with unwrapped labels and
  *     took the row, the words column shrank to one letter, and the cells' `align-self: center` put
@@ -18,182 +45,70 @@
  *   v1.0.0 — 2026-09-04 — Initial (replaces calibrator.css v2.1.0).
  */
 
-.og-cal .og-door:disabled, .og-cal .og-slab:disabled { opacity: .5; cursor: default; }
 .og-cal .og-doors > a { text-decoration: none; }
-.og-cal .og-slab--sm { padding: .55rem .9rem; font-size: .74rem; }
 .og-cal .og-strip b.is-dim { color: var(--text-dim); }
-.og-cal .og-chip--coral { border-color: var(--accent); color: var(--accent); }
-.cal-hint { margin: .7rem 0 0; font-size: .82rem; line-height: 1.5; color: var(--text-dim); }
-.cal-para { margin: 0 0 .6rem; font-size: .95rem; line-height: 1.55; color: var(--text); }
-.cal-lead { margin: 0 0 .7rem; font-size: .95rem; line-height: 1.55; }
-.cal-empty { margin: 0; padding: .3rem 0 .8rem; font-size: .95rem; line-height: 1.55; font-weight: 600; color: var(--text-dim); }
-.cal-empty b { color: var(--text); font-weight: 800; }
-.cal-msg { display: block; margin: .4rem 0 0; font-size: .82rem; line-height: 1.5; color: var(--success-fg); }
-.cal-msg.is-err, .is-err { color: var(--accent); }
+.cal-empty { margin: 0; padding: .3rem 0 .8rem; }
+.is-err { color: var(--accent); }
 .is-good { color: var(--success-fg); }
 .is-mid { color: var(--text); }
 .is-low { color: var(--accent); }
 .is-dim { color: var(--text-dim); }
-.cal-slab-hint { display: block; font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); max-width: 18rem; text-align: right; }
 .cal-new { display: flex; align-items: flex-end; gap: 1rem; min-width: 22rem; }
 .cal-new .og-input { flex: 1 1 auto; min-width: 0; }
 .cal-rename { display: flex; align-items: flex-end; gap: 1rem; }
-.cal-rename .og-input { font-family: var(--font-poster); font-size: 1.6rem; font-weight: var(--font-poster-weight); text-transform: uppercase; }
 
-/* ── The rows: calibrations, runs ──────────────────────────────────────────────────────────── */
-/* Every column is bounded (minmax(0, …)): a long model label must wrap or clip inside its column,
-   never widen it. An `auto` score column with three unwrapped labels once took the whole row on
-   aimeat.io and left the words column one letter wide. The cells stretch to the row and centre their
-   content inside (align-content), so the bottom rule sits on the row's bottom in every cell. */
-.cal-rows { display: grid; grid-template-columns: minmax(10rem, 1fr) minmax(0, 1.2fr) minmax(0, 1.4fr) auto; gap: 0 1.1rem; align-items: stretch; }
-.cal-row { display: contents; }
-.cal-row > div { padding: .7rem 0; border-bottom: 1px solid var(--border); min-width: 0; display: grid; align-content: center; }
-.cal-row--head > div { padding: 0 0 .35rem; border-bottom: 0; font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
-.cal-row.is-open > div { border-bottom: 0; }
-.cal-row.is-archived .og-tbl-name { color: var(--text-dim); }
-.cal-nm small { display: block; margin-top: .15rem; font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); overflow-wrap: anywhere; }
-.cal-sc b { font-family: var(--font-poster); font-weight: var(--font-poster-weight); font-size: 1.5rem; line-height: 1; white-space: nowrap; }
+/* ── The rows: calibrations, runs: the Listing (css/components/listing.css) ─────────────────── */
+/* Every column is bounded (minmax(0, …), the cut in listing.css): a long model label must wrap or
+   clip inside its column, never widen it. An `auto` score column with three unwrapped labels once
+   took the whole row on aimeat.io and left the words column one letter wide. The score is the big
+   figure with its typewriter line; a run's scores sit side by side. An archived calibration and the
+   empty runs have a grey name; the average in a run's words is in ink. */
+.og-cal .listing-row.is-archived .og-tbl-name { color: var(--text-dim); }
+/* A score is the small stat number (.poster-stat-number--small, css/poster.css), as the wallet's amounts; it keeps its one line. */
+.cal-sc b { white-space: nowrap; }
 .cal-sc small { display: block; max-width: 100%; font-family: var(--font-mono); font-size: .68rem; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cal-sc--many { display: flex !important; gap: .6rem 1rem; flex-wrap: wrap; align-items: flex-end; align-content: center; }
+.cal-sc--many { display: flex; gap: .6rem 1rem; flex-wrap: wrap; align-items: flex-end; align-content: center; min-width: 0; }
 .cal-sc--many span { display: grid; min-width: 0; max-width: 9rem; }
-.cal-sc--many b { font-size: 1.25rem; }
-.cal-row > .cal-w { font-size: .85rem; line-height: 1.5; color: var(--text-dim); overflow-wrap: anywhere; }
 .cal-w b { color: var(--text); font-weight: 800; }
-.cal-row > .cal-go { display: flex; justify-content: flex-end; align-items: center; gap: .8rem; white-space: nowrap; }
-.cal-go .og-door { font-size: .72rem; }
-.cal-row > .cal-open, .cal-mr > .cal-open { grid-column: 1 / -1; display: block; margin: 0 0 .6rem; padding: 1rem 1.2rem 1.1rem; border: 3px solid var(--text); box-shadow: 8px 8px 0 var(--sun); background: var(--card-bg); font-size: .9rem; line-height: 1.55; color: var(--text); }
 .cal-run.is-empty .og-tbl-name { cursor: default; color: var(--text-dim); }
 
-/* ── The opened run: the steps as folds ────────────────────────────────────────────────────── */
-.cal-steps { display: flex; flex-direction: column; }
-.cal-step { border-top: 1px solid var(--border); }
-.cal-step:first-child { border-top: 0; }
-.cal-step .og-fold--toggle { font-size: .95rem; }
-.cal-step.is-done .og-fold--toggle i { color: var(--success-fg); }
-.cal-step-body { display: flex; flex-direction: column; gap: .8rem; padding: 0 0 1rem 2.5rem; }
-.cal-step-doors { display: flex; flex-direction: column; gap: .5rem; padding-top: .3rem; border-top: 1px dashed var(--border); }
-.cal-copies { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem 1.2rem; }
-.cal-copies small { font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); }
-.cal-run-doors { margin-top: 1rem; padding-top: .8rem; border-top: 1px solid var(--border); }
-.cal-m { display: flex; flex-direction: column; gap: .5rem; padding: .6rem .8rem; border-left: 3px solid var(--text); background: var(--bg-dim); }
-.cal-m-h { display: flex; align-items: baseline; gap: .8rem; flex-wrap: wrap; }
-.cal-m-h > b { font-weight: 800; }
-.cal-m-h small { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); }
-.cal-pct { margin-right: 0; }
+/* ── The opened run: the library's Calibration run (css/components/calibration-run.css); a step is
+   the fold row (a finished one its done tone, .og-fold--done); and the folded outputs ────────── */
 .cal-pre { border: 1px solid var(--border); background: var(--card-bg); }
 .cal-pre summary { cursor: pointer; padding: .35rem .6rem; font-size: .78rem; font-weight: 800; color: var(--text); }
-.cal-pre pre { margin: 0; padding: .5rem .7rem; max-height: 22rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--font-mono); font-size: .74rem; line-height: 1.5; border-top: 1px solid var(--border); }
-.cal-dims { display: grid; grid-template-columns: 1.4rem minmax(9rem, 1.2fr) minmax(0, 1fr) minmax(0, 1fr) 5.5rem; gap: 0 .8rem; font-size: .82rem; line-height: 1.45; }
-.cal-dims > div { padding: .35rem 0; border-bottom: 1px solid var(--border); min-width: 0; overflow-wrap: anywhere; }
-.cal-dims .cal-dh { padding: 0 0 .25rem; border-bottom: 0; font-size: .62rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
-.cal-dims b { font-weight: 800; }
-.cal-dims small { display: block; font-size: .74rem; color: var(--text-dim); }
-.cal-cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
-.cal-col { display: flex; flex-direction: column; gap: .4rem; min-width: 0; }
-.cal-ol { margin: 0; padding-left: 1.3rem; font-size: .86rem; line-height: 1.5; }
-.cal-ol li + li { margin-top: .3rem; }
-.cal-props { display: flex; flex-direction: column; }
-.cal-prop { display: grid; grid-template-columns: 2rem minmax(0, 1fr) auto; gap: .8rem; align-items: start; padding: .5rem 0; border-bottom: 1px solid var(--border); font-size: .88rem; line-height: 1.5; }
-.cal-prop-n { display: inline-grid; place-items: center; width: 1.6rem; height: 1.6rem; border: 2px solid var(--text); font-family: var(--font-mono); font-size: .74rem; font-weight: 800; }
-.cal-prop-n.is-on { background: var(--accent); border-color: var(--accent); color: #FFFFFF; }
-.cal-prop-t small { display: block; margin-top: .15rem; font-size: .78rem; color: var(--text-dim); }
-.cal-prop-tag { display: flex; flex-direction: column; gap: .2rem; align-items: flex-end; }
-.cal-prop-tag em { font-family: var(--font-mono); font-size: .66rem; font-style: normal; padding: 0 .4rem; border: 1px solid var(--border); color: var(--text-dim); white-space: nowrap; }
-.cal-prop-tag em.is-hi { border-color: var(--text); color: var(--text); font-weight: 800; }
+/* A folded output is the Code block (css/components/code-block.css); its place and height only. */
+.cal-pre .code-block { margin: 0; max-height: 22rem; overflow: auto; }
 .cal-opts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .8rem; }
-.cal-opt { display: flex; gap: .6rem; align-items: flex-start; padding: .6rem .8rem; border: 2px solid var(--text); background: var(--card-bg); cursor: pointer; font-size: .86rem; line-height: 1.45; }
-.cal-opt.is-on { background: var(--sun); color: var(--on-sun); }
+/* An option is the Choice tile (.poster-choice); here it lays its radio beside its words. */
+.cal-opt { display: flex; gap: .6rem; align-items: flex-start; }
 .cal-opt input { accent-color: var(--text); margin: .2rem 0 0; }
-.cal-opt b { display: block; font-weight: 800; }
-.cal-opt small { display: block; font-size: .76rem; color: inherit; opacity: .8; }
-.cal-apply { display: flex; align-items: center; gap: 1.2rem; flex-wrap: wrap; margin-top: .4rem; }
-.cal-apply small { font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); flex-basis: 100%; }
-.cal-paste { display: flex; flex-direction: column; gap: .5rem; padding: .7rem .8rem; border: 1px dashed var(--text); background: var(--card-bg); }
+.cal-opt small { display: block; }
 
-/* ── The versions and the two editors ──────────────────────────────────────────────────────── */
-.cal-vers { display: flex; flex-direction: column; margin-bottom: 1rem; }
-.cal-ver { display: grid; grid-template-columns: 5.5rem minmax(0, 1fr) auto; gap: 1rem; align-items: center; padding: .45rem 0; border-bottom: 1px solid var(--border); font-size: .88rem; }
-.cal-ver.is-on { background: var(--bg-dim); margin: 0 -.5rem; padding: .45rem .5rem; }
-.cal-ver-n { margin-right: 0; }
-.cal-ver-n small { display: block; margin-top: .15rem; font-family: var(--font-mono); font-size: .66rem; font-weight: 400; color: var(--text-dim); }
-.cal-ver-w { color: var(--text); overflow-wrap: anywhere; }
-.cal-ver-go { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); white-space: nowrap; }
-.cal-editors { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.4rem; }
-.cal-field { display: flex; flex-direction: column; gap: .4rem; min-width: 0; }
-.cal-field .og-label small { margin-left: .6rem; font-family: var(--font-mono); font-size: .66rem; letter-spacing: 0; text-transform: none; color: var(--text-dim); }
-.cal-field .og-textarea { font-family: var(--font-mono); font-size: .8rem; }
-.cal-save { display: flex; align-items: flex-end; gap: 1rem; margin-top: .9rem; }
-.cal-save .og-input { flex: 1 1 auto; min-width: 0; }
-.cal-save .og-slab { flex: none; white-space: nowrap; }
-.og-cal .og-fold-body .og-textarea { font-family: var(--font-mono); font-size: .78rem; }
+/* ── The versions and the two editors: the library's Prompt versions (css/components/prompt-versions.css);
+   a prompt, a template and a pasted answer are edited in the Text area as it is ─────────────── */
 
-/* ── The models: rows and the picker ───────────────────────────────────────────────────────── */
-.cal-ml { display: grid; grid-template-columns: 9rem minmax(0, 1.3fr) minmax(0, 1fr) auto; gap: 0 1rem; align-items: stretch; }
-.cal-mr { display: contents; }
-.cal-mr > div { padding: .7rem 0; border-bottom: 1px solid var(--border); min-width: 0; display: grid; align-content: center; }
-.cal-mr--head > div { padding: 0 0 .35rem; border-bottom: 0; font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
-.cal-mr.is-open > div { border-bottom: 0; }
-.cal-mr > .cal-role { font-size: .9rem; font-weight: 800; }
-.cal-role small { display: block; margin-top: .1rem; font-family: var(--font-mono); font-size: .7rem; font-weight: 400; color: var(--text-dim); }
-.cal-mr > .cal-model { font-size: .9rem; line-height: 1.4; overflow-wrap: anywhere; }
-.cal-model b { font-weight: 800; }
-.cal-model code { display: inline-block; margin-left: .4rem; font-family: var(--font-mono); font-size: .72rem; background: var(--bg-dim); padding: .05rem .35rem; }
-.cal-model small { display: block; margin-top: .15rem; font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); }
-.cal-mr > .cal-facts { font-family: var(--font-mono); font-size: .74rem; color: var(--text-dim); overflow-wrap: anywhere; }
-.cal-mr > .cal-go { display: flex; justify-content: flex-end; align-items: center; white-space: nowrap; }
+/* ── The models: the Listing (css/components/listing.css); the model's name in the who cell with its
+   id beside it, the facts in the words cell; and the picker ─────────────────────────────────────── */
+.cal-model .code-inline { margin-left: .4rem; }
+.og-cal .cal-facts { overflow-wrap: anywhere; }
 .cal-add { margin-top: .8rem; }
-.cal-add small { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); }
-.cal-pick { margin-top: .5rem; border: 2px solid var(--text); background: var(--bg); }
-.cal-pick .og-input { border: 0; border-bottom: 2px solid var(--text); padding: .45rem .75rem; }
-.cal-pick-group { padding: .4rem .75rem .1rem; font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
-.cal-pick-list { list-style: none; margin: 0; padding: 0; max-height: 24rem; overflow: auto; }
-.cal-pick-row { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) auto auto; gap: 0 .9rem; align-items: center; padding: .45rem .75rem; border-bottom: 1px solid var(--border); }
-.cal-pick-row.is-on { background: var(--sun); color: var(--on-sun); }
-.cal-pick-row.is-taken { opacity: .5; }
-.cal-pick-row button { all: unset; cursor: pointer; display: contents; }
-.cal-pick-row button:disabled { cursor: default; }
-.cal-pick-row b { font-size: .85rem; font-weight: 800; }
-.cal-pick-row code { display: block; font-family: var(--font-mono); font-size: .68rem; color: var(--text-dim); }
-.cal-pick-row .cal-pick-note { font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); }
-.cal-pick-row .cal-pick-price, .cal-pick-row .cal-pick-ctx { font-family: var(--font-mono); font-size: .72rem; text-align: right; white-space: nowrap; }
-.cal-pick-row .cal-pick-ctx { color: var(--text-dim); }
-.cal-pick-row.is-on code, .cal-pick-row.is-on .cal-pick-ctx, .cal-pick-row.is-on .cal-pick-note { color: var(--on-sun); }
-.cal-pick-more { display: flex; align-items: center; gap: 1rem; padding: .5rem .75rem; font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); }
-.cal-pick-empty { padding: .6rem .75rem; font-size: .85rem; color: var(--text-dim); }
+/* The line beside Add is the Hint (css/components/hint.css); its place in the row only. */
+.cal-add .poster-hint { margin: 0; }
+/* The picker is the library's Model picker (css/components/model-picker.css); here its field keeps its padding. */
+.cal-pick .og-input { padding: .45rem .75rem; }
 
-/* ── The chart ─────────────────────────────────────────────────────────────────────────────── */
-.cal-chart { display: grid; grid-template-columns: minmax(0, 1fr) 13rem; gap: 1rem; align-items: center; margin-top: 1rem; padding: .8rem; border: 2px solid var(--text); background: var(--card-bg); }
-.cal-chart svg { width: 100%; height: auto; display: block; }
-.cal-legend { display: flex; flex-direction: column; gap: .4rem; font-size: .82rem; }
-.cal-legend small { font-family: var(--font-mono); font-size: .68rem; color: var(--text-dim); margin-bottom: .2rem; }
-.cal-legend > div { display: flex; align-items: center; gap: .5rem; }
-.cal-legend i { width: .8rem; height: .8rem; flex: none; }
-.cal-legend span { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cal-legend b { font-family: var(--font-mono); font-size: .74rem; }
+/* ── The chart: the library's Score chart (css/components/score-chart.css) ──────────────────── */
 
 /* ── The two roads ─────────────────────────────────────────────────────────────────────────── */
 .cal-roads { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.2rem; }
-.cal-road { display: flex; flex-direction: column; gap: .5rem; padding: .9rem 1.1rem; border: 2px solid var(--text); background: var(--card-bg); font-size: .9rem; line-height: 1.55; }
-.cal-road.is-lead { border-width: 3px; box-shadow: 8px 8px 0 var(--sun); }
+/* A road is the Object box (.poster-box); the lead road is its raised tone (.poster-box--raised). */
+.cal-road { display: flex; flex-direction: column; gap: .5rem; margin: 0; padding: .9rem 1.1rem; font-size: .9rem; line-height: 1.55; }
 .cal-road p { margin: 0; }
-.cal-road pre { margin: 0; padding: .6rem .7rem; white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--font-mono); font-size: .74rem; line-height: 1.5; background: var(--bg-dim); border-left: 3px solid var(--text); }
+/* The ready-made request is the Code block (css/components/code-block.css); its place only. */
+.cal-road .code-block { margin: 0; }
 
 /* ── Phone ─────────────────────────────────────────────────────────────────────────────────── */
 @media (max-width: 860px) {
-  .cal-rows, .cal-ml { grid-template-columns: minmax(0, 1fr); }
-  .cal-row--head, .cal-mr--head { display: none; }
-  .cal-row > .cal-nm, .cal-row > .cal-sc, .cal-row > .cal-w, .cal-mr > .cal-role, .cal-mr > .cal-model, .cal-mr > .cal-facts { border-bottom: 0; padding-bottom: .15rem; }
-  .cal-row > .cal-sc, .cal-row > .cal-w, .cal-mr > .cal-model, .cal-mr > .cal-facts { padding-top: 0; }
-  .cal-row > .cal-go, .cal-mr > .cal-go { justify-content: flex-start; padding-top: .1rem; }
-  .cal-row > .cal-open, .cal-mr > .cal-open { padding: .8rem .8rem .9rem; }
-  .cal-step-body { padding-left: 0; }
-  .cal-cols, .cal-editors, .cal-roads, .cal-opts { grid-template-columns: minmax(0, 1fr); }
-  .cal-dims { grid-template-columns: 1.4rem minmax(0, 1fr); }
-  .cal-dims > div:nth-child(5n+3), .cal-dims > div:nth-child(5n+4), .cal-dims > div:nth-child(5n+5) { display: none; }
-  .cal-chart { grid-template-columns: minmax(0, 1fr); }
+  .cal-roads, .cal-opts { grid-template-columns: minmax(0, 1fr); }
   .cal-new { min-width: 0; width: 100%; flex-wrap: wrap; }
-  .cal-slab-hint { text-align: left; }
-  .cal-pick-row { grid-template-columns: minmax(0, 1fr) auto; }
-  .cal-pick-row .cal-pick-note { grid-column: 1 / -1; }
-  .cal-save { flex-wrap: wrap; }
 }

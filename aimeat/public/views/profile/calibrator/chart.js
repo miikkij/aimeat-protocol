@@ -9,6 +9,7 @@
  * @structure ScoreChart
  * @usage import { ScoreChart } from './chart.js';
  * @version-history
+ *   v1.1.0 — 2026-09-25 — A framed box around one thing is the Object box (.poster-box; on a grey ground its copy tone), in the tone its look already was (Jouni's decision "Object box", a unification).
  *   v1.0.1 — 2026-09-04 — Legend labels through labelWords.
  *   v1.0.0 — 2026-09-04 — Initial (replaces calibrator-chart.js v3.0.0 in the poster face).
  */
@@ -51,7 +52,7 @@ export function ScoreChart({ runs }) {
   }).filter((l) => l.points.length);
 
   return html`
-    <div class="cal-chart">
+    <div class="cal-chart poster-box">
       <svg viewBox=${`0 0 ${W} ${H}`} role="img" aria-label=${x('chartTitle')}>
         ${[0, 25, 50, 75, 100].map((p) => html`
           <line key=${'g' + p} x1=${PAD.left} y1=${yAt(p)} x2=${W - PAD.right} y2=${yAt(p)} stroke="var(--border)" stroke-width="1" />

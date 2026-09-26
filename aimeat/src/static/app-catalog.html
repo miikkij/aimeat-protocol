@@ -3203,15 +3203,18 @@ textarea.cx-code { resize: vertical; tab-size: 2; }
 /* Lifted from the home's ink-underlined action (formerly home.css .koti-link), including the unselected tab. */
 .poster-action, .poster-tab {
   display: inline-flex; align-items: center; gap: .4rem;
-  background: none; border: 0; border-bottom: var(--shape-frame-heavy) solid var(--shape-rule-colour); border-radius: var(--shape-corner-pill);
+  background: none; border: 0; border-bottom: var(--shape-frame-heavy) solid var(--shape-rule-colour);
   padding: 0 0 2px; cursor: pointer;
   font: inherit; font-weight: var(--weight-heavy); font-size: var(--text-body-sm); text-transform: var(--shape-case-action); letter-spacing: var(--shape-tracking-action);
   color: var(--text); text-decoration: none; white-space: nowrap;
 }
 .poster-action:hover, .poster-tab:hover { border-color: var(--accent); color: var(--accent); }
+/* The pill corner belongs to a tab, which a theme may give a ground; the action link's underline has
+   none, so a rounded theme does not bend its line. */
+.poster-tab { border-radius: var(--shape-corner-pill); }
 /* An action that cannot be pressed yet is dimmed and does not answer the pointer (Jouni's decision
    "Step button"; the dimming is the control slab's). */
-.poster-action:disabled { opacity: 0.45; cursor: default; border-color: var(--text); color: var(--text); }
+.poster-action:disabled { opacity: 0.45; cursor: default; border-color: var(--shape-rule-colour); color: var(--text); }
 /* @app-catalog:end */
 /* @app-catalog:begin */
 /* The profile slab and the home's large door are the two cuts named in brief 10.3. */

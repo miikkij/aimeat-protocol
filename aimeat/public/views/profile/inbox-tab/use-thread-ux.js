@@ -10,6 +10,7 @@
  *   Extracted from inbox-tab.js to satisfy max-file-lines.
  * @usage import { useThreadAutoScroll, useMobileComposerKeyboard } from './inbox-tab/use-thread-ux.js';
  * @version-history
+ *   v1.8.0 — 2026-09-25 — The Settings & Controls frame and its side menu are library components (SettingsFrame, SideMenu; settings-frame.css, side-menu.css); the old .pf-shell, .pf-side- and .pf-content names are gone (UI consolidation phase 5, a move).
  *   v1.7.0 — 2026-08-29 — --inbox-desk-avail is published on every width, so the phone's list view is
  *     measured too instead of assuming a header height.
  *   v1.6.1 — 2026-08-29 — The desktop pane is measured against .page-content's bottom edge minus the
@@ -178,7 +179,7 @@ export function useMobileComposerKeyboard(mode) {
       // header the poster mast no longer matches.
       const top = body.getBoundingClientRect().top;
       const region = body.closest('.page-content');
-      const shell = body.closest('.pf-content') || body.closest('.pf');
+      const shell = body.closest('.settings-frame-content') || body.closest('.pf');
       const bottom = region ? region.getBoundingClientRect().bottom : window.innerHeight;
       const pad = shell ? (parseFloat(getComputedStyle(shell).paddingBottom) || 0) : 20;
       const deskAvail = Math.max(isNarrow() ? 240 : 320, Math.round(bottom - top - pad - 8));

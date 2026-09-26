@@ -7,6 +7,7 @@
  * @structure c · rel · day · providerWord · kindWord · channelWord · Switch · crumb · pageLinks
  * @usage import { c, rel, Switch, crumb, pageLinks } from './frame.js';
  * @version-history
+ *   v1.1.0 — 2026-09-25 — A setting that is on or off is the library's Switch (components/Switch.js), the look most Settings tabs draw (UI consolidation phase 5, a unification).
  *   v1.0.0 — 2026-08-30 — Initial (design canvas "AIMEAT Sähköpostin sivu", direction A).
  */
 import { h } from 'preact';
@@ -33,10 +34,8 @@ export const kindWord = (kind) => (MAIL_KINDS.includes(kind) ? c('kind.' + kind)
 export const channelWord = (m) => c(m?.channel === 'inbox' ? 'via.inbox' : 'via.email');
 export const statusWord = (s) => c('status.' + (['sent', 'failed', 'suppressed', 'skipped'].includes(s) ? s : 'other'));
 
-/** The poster switch: the word on the left, the box on the right. */
-export function Switch({ on, label, disabled, locked, onToggle }) {
-  return html`<button type="button" class=${`nt-sw ${locked ? 'lock on' : on ? 'on' : 'off'}`} disabled=${disabled || locked} aria-pressed=${on ? 'true' : 'false'} onClick=${onToggle}>${label}<i></i></button>`;
-}
+/** The switch is the library's: the word on the left, the box on the right; `locked` is on for good. */
+export { Switch } from '/components/Switch.js';
 
 export function crumb() {
   return html`<div class="og-crumb"><span>${t('nav.profile')}</span><span>/</span><span class="og-crumb-here">${c('title')}</span></div>`;

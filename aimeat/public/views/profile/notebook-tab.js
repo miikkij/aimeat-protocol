@@ -11,6 +11,33 @@
  *   - NotebookTab (default export) — capture box, trust toggles, librarian search, inbox list → NoteCard
  * @usage html`<${NotebookTab} session=${session} showToast=${showToast} onStats=${onStats} />`
  * @version-history
+ *   v1.15.0 -- 2026-09-26 -- The three trust settings are the Check line (css/components/check-line.css), a unification: Jouni's decision "Check line".
+ *   v1.14.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
+ *   v1.13.0 -- 2026-09-26 -- The librarian's hits are the Listing (css/components/listing.css, name-desc-who-doors): the title with its key as the typewriter line under it, the producer and snippet as the words, the tag, Open (a unification: the look most tabs use).
+ *   v1.12.0 -- 2026-09-26 -- A hit's key wears the Key's face (.key-name, css/components/key-name.css) beside its small grey meta size (a unification: the look most tabs use).
+ *   v1.11.0 -- 2026-09-26 -- Every line that says a part is loading is the loading line: the quiet sentence with the blinking Loading mark, LoadingLine in views/profile/shared.js (a unification: the look most tabs use).
+ *   v1.10.0 -- 2026-09-25 -- A search field over a list is the Search line (.search-line with the Text field); a place keeps only its layout (a unification: the look most tabs use).
+ *   v1.10.0 -- 2026-09-25 -- Every drop-down is the Select field (.select-field, css/components/select-field.css); a place keeps only its width and margin (a unification: the look most tabs use).
+ *   v1.10.0 -- 2026-09-25 -- Every many-line field is the Text area (.og-textarea); a place keeps only its size and margin (a unification: the look most tabs use).
+ *   v1.9.0 -- 2026-09-25 -- Every drop-down is the Select field (.select-field, css/components/select-field.css); a place keeps only its width and margin (a unification: the look most tabs use).
+ *   v1.9.0 -- 2026-09-25 -- Every many-line field is the Text area (.og-textarea); a place keeps only its size and margin (a unification: the look most tabs use).
+ *   v1.8.0 -- 2026-09-25 -- Every many-line field is the Text area (.og-textarea); a place keeps only its size and margin (a unification: the look most tabs use).
+ *   v1.7.0 -- 2026-09-25 -- The crumb is the full trail (Settings & Controls / the menu group / the tab), as in the kit tabs (a unification).
+ *   v1.6.0 -- 2026-09-25 -- A section is the kit's section (PageSection in an .og page) and the line under its title is the lead (.og-lead), the look most tabs use (a unification).
+ *   v1.5.0 -- 2026-09-25 -- The page head is the kit's crumb trail and page head (.og-crumb, .og-mast, .og-title, .og-desc), the look most tabs use (a unification).
+ *   v1.4.0 -- 2026-09-25 -- Every tag is the Tag (.poster-chip and its tones, .poster-chips for a row), a unification: Jouni's decision Tag.
+ *   v1.3.0 — 2026-09-25 — A button that is a mark, not a word (a delete or close mark, a menu's dots,
+ *     an arrow), is the library's small icon button, .poster-icon.poster-icon--small (Jouni's decision
+ *     "Icon button").
+ *   v1.2.0 — 2026-09-25 — Every quiet way on is the library's action link, .poster-action, with the
+ *     tone its meaning names: more for "show all" and more of a list, back, text for a plain grey
+ *     word, quiet (Jouni's decisions "Action link", "Panel action", "Dismiss", "Small link", "Step
+ *     button").
+ *   v1.1.0 — 2026-09-25 — The loud action is the library's dark block, .poster-slab: the control cut
+ *     where it sits in a row of controls or waits to be enabled, the danger tone for a delete that
+ *     cannot be undone (Jouni's decision "Loud action").
+ *   2026-09-25 -- The lines that say a list is empty (or has nothing to show yet) are the quiet sentence (.poster-quiet, QuietNote), a unification: Jouni's decision "Empty line".
+ *   2026-09-25 -- What chooses what a list or a panel shows is the tab (.poster-tab, with its fold and filter tones), a unification: Jouni's decision "Tabs and filters".
  *   2026-09-13 -- V2u: compose the tab strip top rule from poster.css.
  *   2026-09-13 — V1: compose page and B1 section headings from the shared poster classes.
  *   v1.0.0 — 2026-06-19 — Initial: capture + librarian search (slice A).
@@ -26,7 +53,8 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
-import { Spinner } from './shared.js';
+import { LoadingLine } from './shared.js';
+import { PageSection } from '/components/PageSection.js';
 import * as memoryService from '/js/services/memory.js';
 import { getNotebookSettings, saveNotebookSettings } from '/js/services/notebook.js';
 import { listOrganisms } from '/js/services/organisms.js';
@@ -209,90 +237,94 @@ export default function NotebookTab({ session, showToast, onStats }) {
   }
 
   const renderHit = (hit) => html`
-    <div class="pf-nb-hit" key=${hit.key}>
-      <div class="pf-nb-hit-head">
-        <span class="pf-nb-hit-title">${escHtml(hit.title || hit.key)}</span>
-        ${hit.kind === 'knowledge'
-          ? html`<span class="badge badge-success">${t('profile.notebook.kindKnowledge')}${hit.contentType ? ` · ${escHtml(hit.contentType)}` : ''}</span>`
+    <div class="listing-row" key=${hit.key}>
+      <div class="listing-name">${escHtml(hit.title || hit.key)}<small title=${hit.key}>${escHtml(hit.key)}</small></div>
+      <div class="listing-desc">
+        ${searchScope === 'public' && html`<div>${t('profile.notebook.producer')}: ${escHtml(producerLabel(hit.producer))}</div>`}
+        ${hit.snippet && escHtml(hit.snippet)}
+      </div>
+      <div class="listing-who">${hit.kind === 'knowledge'
+          ? html`<span class="poster-chip">${t('profile.notebook.kindKnowledge')}${hit.contentType ? ` · ${escHtml(hit.contentType)}` : ''}</span>`
           : hit.organismId
-            ? html`<span class="badge badge-info">${escHtml(orgNames[hit.organismId] || hit.organismId)}</span>`
-            : html`<span class="badge">${t('profile.notebook.personalNote')}</span>`}
-      </div>
-      ${searchScope === 'public' && html`<div class="text-meta-sm pf-nb-hit-producer">${t('profile.notebook.producer')}: ${escHtml(producerLabel(hit.producer))}</div>`}
-      ${hit.snippet && html`<div class="pf-nb-hit-snippet">${escHtml(hit.snippet)}</div>`}
-      <div class="pf-nb-hit-foot">
-        <span class="text-meta-sm pf-nb-hit-key" title=${hit.key}>${escHtml(hit.key)}</span>
-        ${canOpen(hit) && html`<button class="btn-ghost btn-sm" onClick=${() => openHit(hit)}>${t('profile.notebook.openInMemory')}</button>`}
-      </div>
+            ? html`<span class="poster-chip">${escHtml(orgNames[hit.organismId] || hit.organismId)}</span>`
+            : html`<span class="poster-chip">${t('profile.notebook.personalNote')}</span>`}</div>
+      <div class="listing-doors">${canOpen(hit) && html`<button class="poster-action poster-action--small poster-action--row" onClick=${() => openHit(hit)}>${t('profile.notebook.openInMemory')}</button>`}</div>
     </div>
   `;
 
   return html`
     ${ConfirmUI}
-    <div class="poster-page-title">${t('profile.notebook.title')}</div>
-    <div class="section-desc">${t('profile.notebook.desc')}</div>
+    <div class="og">
+    <div class="mb-1">
+      <div class="og-crumb"><span>${t('nav.profile')}</span><span>/</span><span>${t('profile.landing.menuInformation')}</span><span>/</span><span class="og-crumb-here">${t('profile.tabs.notebook')}</span></div>
+      <div class="og-mast"><div class="og-mast-words">
+        <div class="og-title poster-page-title">${t('profile.notebook.title')}</div>
+        <div class="og-desc">${t('profile.notebook.desc')}</div>
+      </div></div>
+    </div>
 
     <div class="pf-nb-capture">
-      <textarea class="input-field pf-nb-textarea" rows="4"
+      <textarea class="og-textarea pf-nb-textarea" rows="4"
         placeholder=${t('profile.notebook.capturePlaceholder')}
         value=${draft} onInput=${e => setDraft(e.target.value)}></textarea>
       <div class="pf-nb-capture-actions">
-        <button class="btn-primary" disabled=${!draft.trim() || saving} onClick=${handleCapture}>
+        <button class="poster-slab poster-slab--control" disabled=${!draft.trim() || saving} onClick=${handleCapture}>
           ${saving ? '…' : t('profile.notebook.captureBtn')}
         </button>
         <span class="text-meta-sm">${t('profile.notebook.captureHint')}</span>
       </div>
       <div class="pf-nb-settings">
         <span class="text-meta-sm">${t('profile.notebook.trustTitle')}</span>
-        <label class="pf-nb-toggle"><input type="checkbox" checked=${settings.autoDetectIntent} onChange=${() => toggleSetting('autoDetectIntent')} /> ${t('profile.notebook.autoDetect')}</label>
-        <label class="pf-nb-toggle"><input type="checkbox" checked=${settings.autoRunPlan} onChange=${() => toggleSetting('autoRunPlan')} /> ${t('profile.notebook.autoRun')}</label>
-        <label class="pf-nb-toggle"><input type="checkbox" checked=${settings.autoDistribute} onChange=${() => toggleSetting('autoDistribute')} /> ${t('profile.notebook.autoDistribute')}</label>
+        <label class="pf-nb-toggle check-line"><input type="checkbox" checked=${settings.autoDetectIntent} onChange=${() => toggleSetting('autoDetectIntent')} /> ${t('profile.notebook.autoDetect')}</label>
+        <label class="pf-nb-toggle check-line"><input type="checkbox" checked=${settings.autoRunPlan} onChange=${() => toggleSetting('autoRunPlan')} /> ${t('profile.notebook.autoRun')}</label>
+        <label class="pf-nb-toggle check-line"><input type="checkbox" checked=${settings.autoDistribute} onChange=${() => toggleSetting('autoDistribute')} /> ${t('profile.notebook.autoDistribute')}</label>
       </div>
     </div>
 
-    <div class="poster-section-title pf-nb-section">${t('profile.notebook.librarianTitle')}</div>
-    <div class="section-desc">${t('profile.notebook.librarianDesc')}</div>
+    <${PageSection} title=${t('profile.notebook.librarianTitle')}>
+    <div class="og-lead">${t('profile.notebook.librarianDesc')}</div>
     <div class="sub-tabs poster-row--thing pf-nb-scope">
-      <button class="sub-tab ${searchScope === 'own' ? 'active' : ''}" onClick=${() => pickScope('own')}>${t('profile.notebook.scopeOwn')}</button>
-      <button class="sub-tab ${searchScope === 'public' ? 'active' : ''}" onClick=${() => pickScope('public')}>${t('profile.notebook.scopePublic')}</button>
+      <button class="poster-tab ${searchScope === 'own' ? 'is-on' : ''}" onClick=${() => pickScope('own')}>${t('profile.notebook.scopeOwn')}</button>
+      <button class="poster-tab ${searchScope === 'public' ? 'is-on' : ''}" onClick=${() => pickScope('public')}>${t('profile.notebook.scopePublic')}</button>
     </div>
     <div class="action-bar">
-      <div class="search-bar pf-nb-search">
-        <input type="text" class="input-field" placeholder=${t('profile.notebook.searchPlaceholder')}
+      <div class="search-line pf-nb-search">
+        <input type="text" class="og-input" placeholder=${t('profile.notebook.searchPlaceholder')}
           value=${query} onInput=${e => setQuery(e.target.value)}
           onKeyDown=${e => e.key === 'Enter' && handleSearch()} />
-        <button class="btn-primary" onClick=${handleSearch}>${t('profile.notebook.searchBtn')}</button>
+        <button class="poster-slab" onClick=${handleSearch}>${t('profile.notebook.searchBtn')}</button>
       </div>
     </div>
-    ${searching && html`<${Spinner} text=${t('profile.notebook.searching')} />`}
+    ${searching && html`<${LoadingLine} text=${t('profile.notebook.searching')} />`}
     ${!searching && hits !== null && html`
       ${hits.length === 0
-        ? html`<div class="empty">${t('profile.notebook.noHits')}</div>`
+        ? html`<div class="poster-quiet">${t('profile.notebook.noHits')}</div>`
         : html`
           <div class="text-meta-sm mb-half">${(t('profile.notebook.hitsCount') || '{n} results').replace('{n}', String(hits.length))}</div>
-          <div class="pf-nb-hits">${hits.map(renderHit)}</div>
+          <div class="listing listing--name-desc-who-doors">${hits.map(renderHit)}</div>
         `}
     `}
+    <//>
 
-    <div class="poster-section-title pf-nb-section">${t('profile.notebook.inboxTitle')}</div>
+    <${PageSection} title=${t('profile.notebook.inboxTitle')}>
     ${inbox === null
-      ? html`<${Spinner} text=${t('profile.notebook.inboxLoading')} />`
+      ? html`<${LoadingLine} text=${t('profile.notebook.inboxLoading')} />`
       : inbox.length === 0
-        ? html`<div class="empty">${t('profile.notebook.inboxEmpty')}</div>`
+        ? html`<div class="poster-quiet">${t('profile.notebook.inboxEmpty')}</div>`
         : html`
           <div class="action-bar pf-nb-inbox-bar">
-            <div class="search-bar pf-nb-search">
-              <input type="text" class="input-field" placeholder=${t('profile.notebook.filterPlaceholder')}
+            <div class="search-line pf-nb-search">
+              <input type="text" class="og-input" placeholder=${t('profile.notebook.filterPlaceholder')}
                 value=${inboxFilter} onInput=${e => setInboxFilter(e.target.value)} />
-              ${inboxFilter && html`<button class="btn-ghost btn-sm" onClick=${() => setInboxFilter('')}>✕</button>`}
+              ${inboxFilter && html`<button class="poster-icon poster-icon--small" onClick=${() => setInboxFilter('')}>✕</button>`}
             </div>
-            <select class="input-field pf-nb-sort" value=${inboxSort} onChange=${e => setInboxSort(e.target.value)}>
+            <select class="select-field pf-nb-sort" value=${inboxSort} onChange=${e => setInboxSort(e.target.value)}>
               <option value="new">${t('profile.notebook.sortNew')}</option>
               <option value="old">${t('profile.notebook.sortOld')}</option>
             </select>
           </div>
           ${visibleInbox().length === 0
-            ? html`<div class="empty">${t('profile.notebook.noMatch')}</div>`
+            ? html`<div class="poster-quiet">${t('profile.notebook.noMatch')}</div>`
             : html`<div class="pf-nb-inbox">
               ${visibleInbox().map(note => html`
                 <${NoteCard} key=${note.key} note=${note} showToast=${showToast} orgNames=${orgNames}
@@ -302,5 +334,7 @@ export default function NotebookTab({ session, showToast, onStats }) {
             </div>`}
         `
     }
+    <//>
+    </div>
   `;
 }

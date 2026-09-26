@@ -8,86 +8,64 @@
  *   rows on the cover, the facts grid with its consequences, the front-page choice row, the edit
  *   and SMTP grids, the events rows and the chat roads. NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.11.0 -- 2026-09-25 -- "No organisms yet" is the quiet sentence (.poster-quiet), a unification: Jouni's decision "Empty line". The rule of .co-hint goes; the file picker's label keeps its place (display block, margin .6rem above) on .co-file.
+ *   v1.10.0 -- 2026-09-25 -- The details not all filled in are the Status (attention), a unification: Jouni's decision "Status". The rule of .co-warn goes.
+ *   v1.9.0 -- 2026-09-25 -- What the front page shows is a choice: the Tab (.poster-tab), a unification: Jouni's decision "Choice". The joined buttons' rules go, the row takes the tabs' gap; the unused .og-door.on rule goes (no Companies door has it).
+ *   v1.8.0 -- 2026-09-25 -- The address preview under the name field is a library part, css/components/address-preview.css (a move): its rules go from here unchanged.
+ *   v1.7.0 -- 2026-09-25 -- The registered details and the name-and-value pairs are the Facts (css/components/facts.css), a unification: the look most tabs use. The rules of co-facts and co-kv go; a missing detail stays grey italics.
+ *   v1.6.0 -- 2026-09-25 -- The company rows are the Listing (css/components/listing.css), a unification: the look most tabs use. The rules of co-rows, co-nm, co-w, co-ctl go; the mark keeps its box size and the coral word stays.
+ *   v1.5.0 -- 2026-09-25 -- Every drop-down is the Select field (.select-field, css/components/select-field.css); a place keeps only its width and margin (a unification: the look most tabs use).
+ *   v1.4.0 -- 2026-09-25 -- Every many-line field is the Text area (.og-textarea); a place keeps only its size and margin (a unification: the look most tabs use).
+ *   v1.3.0 -- 2026-09-25 -- Every tag is the Tag (.poster-chip and its tones, .poster-chips for a row), a unification: Jouni's decision Tag.
+ *   v1.2.0 -- 2026-09-25 -- The row labels' look is .poster-label; their rules here keep only their place (Jouni's decision "Row label", a unification).
+ *   2026-09-25 -- The empty lines are the quiet sentence (.poster-quiet, Jouni's decision "Empty line"): .og-empty's look goes, its place (margin 0) stays on the new class.
  *   2026-09-13 -- Compose the shared initials box; retain only row dimensions and placement.
+ *   v1.1.0 — 2026-09-25 — Dead rules removed: selectors whose classes no file writes (UI consolidation phase 5, a move; the browser's reading proves only those went).
  *   v1.0.0 — 2026-08-31 — Initial.
  */
 
-.og-co .og-chip--coral { border-color: var(--accent); color: var(--accent); }
 .og-co .og-strip b.og-coral { color: var(--accent); }
-.og-co .og-door.on { color: var(--accent); border-bottom-color: var(--accent); }
-.og-co .og-empty { margin: 0; font-size: .9rem; color: var(--text-dim); }
-.og-co .co-hint { margin: .6rem 0 0; font-size: .82rem; line-height: 1.5; color: var(--text-dim); display: block; }
+.og-co .poster-quiet { margin: 0; }
 .og-co .og-fold > span:not(.og-fold-r):not(.og-fold-arrow) { white-space: nowrap; }
 .og-co .og-fold-r { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.og-co .co-more { margin-top: .8rem; }
 
-/* ── The company rows on the cover ──────────────────────────────────────────────────────────── */
-.co-rows { display: grid; grid-template-columns: 2.2rem minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr) auto; gap: 0 1rem; align-items: center; }
-.co-rows > div { padding: .7rem 0; border-bottom: 1px solid var(--border); min-width: 0; }
-.co-rows > .co-head { padding: 0 0 .35rem; border-bottom: 0; font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
-/* The mark is a whole box of its own: the row rule above would otherwise cut its bottom border. */
-.co-rows > .co-av { width: 2.2rem; height: 2.2rem; }
-.co-nm { font-weight: 800; font-size: .95rem; color: var(--text); }
-.co-nm small { display: block; font-family: var(--font-mono); font-size: .7rem; font-weight: 400; color: var(--text-dim); margin-top: .1rem; overflow-wrap: anywhere; }
-.co-w { font-size: .82rem; line-height: 1.45; color: var(--text-dim); }
-.co-w b { color: var(--text); font-weight: 800; }
-.co-w small { display: block; font-family: var(--font-mono); font-size: .7rem; }
-.co-w .co-warn { color: var(--accent); font-weight: 800; }
-.co-ctl { display: flex; gap: .9rem; align-items: center; justify-content: flex-end; white-space: nowrap; }
+/* ── The company rows on the cover: the Listing (css/components/listing.css) ────────────────── */
+.og-co .co-av { width: 2.2rem; height: 2.2rem; }
 
 /* ── Register a company ─────────────────────────────────────────────────────────────────────── */
 .co-create { display: flex; gap: 1rem; align-items: flex-end; }
 .co-create .co-field { flex: 1; min-width: 0; }
 .co-create .og-input { width: 100%; box-sizing: border-box; }
-.co-preview { margin: .5rem 0 0; font-family: var(--font-mono); font-size: .74rem; color: var(--text-dim); }
-.co-preview b { color: var(--accent); font-weight: 500; }
-.co-preview .taken { color: var(--danger-fg); font-weight: 700; }
+/* The address a name gets is the Address preview (css/components/address-preview.css). */
 
-/* ── The facts grid (what is filled in, what a gap costs) ───────────────────────────────────── */
-.co-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 1.6rem; }
-.co-facts > div { padding: .5rem 0; border-bottom: 1px solid var(--border); min-width: 0; font-size: .88rem; line-height: 1.45; }
-.co-facts .k { display: block; font-size: .64rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); }
-.co-facts .v { color: var(--text); font-weight: 600; overflow-wrap: anywhere; }
-.co-facts .v.miss { color: var(--text-dim); font-weight: 400; font-style: italic; }
+/* ── The registered details: the Facts (css/components/facts.css); a missing one in grey italics ── */
+.og-co .facts-v.miss { color: var(--text-dim); font-style: italic; }
 
 /* The edit form over the same grid: label over input, two columns. */
 .co-edit { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .7rem 1.6rem; }
 .co-edit label { display: block; min-width: 0; }
-.co-edit label span { display: block; font-size: .64rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); margin-bottom: .25rem; }
+.co-edit label span { display: block; margin-bottom: .25rem; }
 .co-edit .og-input { width: 100%; box-sizing: border-box; }
 .co-form-doors { margin-top: 1rem; }
 
 /* ── The front page choice ──────────────────────────────────────────────────────────────────── */
-.co-choice { display: flex; flex-wrap: wrap; }
-.co-choice button { border: 2px solid var(--text); border-right-width: 0; background: none; padding: .35rem .7rem; font: inherit; font-size: .78rem; font-weight: 700; color: var(--text-dim); cursor: pointer; }
-.co-choice button:last-child { border-right-width: 2px; }
-.co-choice button.on { background: var(--sun); color: var(--on-sun); }
+/* The choice is the Tab (.poster-tab); its row takes the tabs' gap where the joined look had none. */
+.co-choice { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem .9rem; }
 .co-front-ctl { margin-top: .8rem; display: flex; gap: .8rem; flex-wrap: wrap; align-items: center; }
-.co-front-ctl .og-input { min-width: 16rem; }
-.co-kv { display: grid; grid-template-columns: minmax(6rem, 10rem) minmax(0, 1fr); gap: .5rem 1.2rem; margin-top: .6rem; }
-.co-kv .k { font-size: .64rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); padding-top: .15rem; }
-.co-kv .v { font-size: .9rem; color: var(--text); overflow-wrap: anywhere; }
-.co-kv .v small { display: block; font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); margin-top: .1rem; }
-.co-html { width: 100%; box-sizing: border-box; font-family: var(--font-mono); font-size: .74rem; }
+.co-front-ctl .og-input, .co-front-ctl .select-field { min-width: 16rem; }
+.co-file { display: block; margin: .6rem 0 0; }
 .co-file input[type='file'] { display: none; }
 
 /* ── The SMTP grid (in the fold) ────────────────────────────────────────────────────────────── */
 .co-smtp { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .7rem 1.6rem; }
 .co-smtp label { display: block; min-width: 0; }
-.co-smtp label span { display: block; font-size: .64rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); margin-bottom: .25rem; }
+.co-smtp label span { display: block; margin-bottom: .25rem; }
 .co-smtp .og-input { width: 100%; box-sizing: border-box; }
 .co-smtp .co-check { display: flex; align-items: center; gap: .6rem; }
 .co-smtp .co-check span { margin-bottom: 0; }
 
 /* ── Phone ──────────────────────────────────────────────────────────────────────────────────── */
 @media (max-width: 860px) {
-  .co-rows { grid-template-columns: 2.2rem minmax(0, 1fr); }
-  .co-rows > .co-head { display: none; }
-  .co-rows > .co-w { display: none; }
-  .co-rows > .co-nm { border-bottom: 0; padding-bottom: .2rem; }
-  .co-rows > .co-ctl { grid-column: 2; justify-content: flex-start; padding-top: 0; }
-  .co-facts, .co-edit, .co-smtp { grid-template-columns: 1fr; }
+  .co-edit, .co-smtp { grid-template-columns: 1fr; }
   .co-create { flex-direction: column; align-items: stretch; }
-  .co-kv { grid-template-columns: 1fr; gap: .1rem 0; }
-  .co-kv .k { padding-top: .5rem; }
 }

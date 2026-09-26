@@ -13,6 +13,18 @@
  * @structure OrganismHome
  * @usage import { OrganismHome } from '/views/profile/organisms/home.js';
  * @version-history
+ *   v3.8.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
+ *   v3.7.0 -- 2026-09-25 -- Every word that says a state is the Status (.poster-status fine, attention, danger, off), a unification: Jouni's decision Status.
+ *   v3.6.0 -- 2026-09-25 -- Every tag is the Tag (.poster-chip and its tones, .poster-chips for a row), a unification: Jouni's decision Tag.
+ *   v3.5.0 -- 2026-09-25 -- Every hint is the Hint (poster-hint, components/Hint.js), the look most Settings & Controls tabs draw (UI consolidation phase 5, a unification).
+ *   v3.4.0 -- 2026-09-25 -- Every quiet way on is the library's action link, .poster-action, with the
+ *     tone its meaning names: more for "show all" and more of a list, back, text for a plain grey
+ *     word, quiet (Jouni's decisions "Action link", "Panel action", "Dismiss", "Small link", "Step
+ *     button").
+ *   v3.3.0 -- 2026-09-25 -- The loud action is the library's dark block, .poster-slab: the control cut
+ *     where it sits in a row of controls or waits to be enabled, the danger tone for a delete that
+ *     cannot be undone (Jouni's decision "Loud action").
+ *   v3.2.0 -- 2026-09-25 -- The og- page kit is library components: PageSection and FoldSection in /components, the kit's rules in css/components (tab-page, crumb-trail, page-head, figure-strip, page-section, fold-row, setting-box, form-fields, space-table) and css/views/organism-controls.css (UI consolidation phase 5, a move).
  *   v3.1.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v3.0.1 — 2026-08-29 — Section, Fold, tr and scrollTo moved to poster-parts.js so the workspace cover is
  *     built from the same pieces; pure extraction.
@@ -46,7 +58,10 @@ import { BoardPreview } from '/views/profile/organisms/panels.js';
 import { InstructionBlock } from '/views/profile/instruction-block.js';
 import { OrganismSettings } from '/views/profile/organisms/home-settings.js';
 import { swallowed } from '/js/swallowed.js';
-import { Section, Fold, tr, scrollTo } from '/views/profile/organisms/poster-parts.js';
+import { PageSection } from '/components/PageSection.js';
+import { FoldSection } from '/components/FoldSection.js';
+import { tr, scrollTo } from '/views/profile/organisms/poster-parts.js';
+import { Hint } from '/components/Hint.js';
 
 export function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, onBack, onChanged, onLeave }) {
   useViewCSS('/css/views/organism.css');
@@ -164,20 +179,20 @@ export function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, 
       <div class="og-mast">
         <div class="og-mast-words">
           <h1 class="og-title poster-page-title">${org.name || org.id}</h1>
-          <div class="og-chips">
-            <span class="og-chip">${typeLabel}</span>
-            <span class="og-chip">${t(`organisms.vis${(org.visibility || 'public')[0].toUpperCase()}${(org.visibility || 'public').slice(1)}`) || org.visibility}</span>
-            ${org.joinPolicy ? html`<span class="og-chip og-chip--dim">${t(`organisms.policyShort.${org.joinPolicy}`) || org.joinPolicy}</span>` : null}
-            ${org.createdAt ? html`<span class="og-chip og-chip--dim">${tr('organisms.createdAt', 'Created')} ${fmtDate(org.createdAt)}</span>` : null}
-            ${org.archived ? html`<span class="og-chip og-chip--sun">${tr('organisms.archived', 'Archived')}</span>` : null}
+          <div class="poster-chips">
+            <span class="poster-chip">${typeLabel}</span>
+            <span class="poster-chip">${t(`organisms.vis${(org.visibility || 'public')[0].toUpperCase()}${(org.visibility || 'public').slice(1)}`) || org.visibility}</span>
+            ${org.joinPolicy ? html`<span class="poster-chip">${t(`organisms.policyShort.${org.joinPolicy}`) || org.joinPolicy}</span>` : null}
+            ${org.createdAt ? html`<span class="poster-chip">${tr('organisms.createdAt', 'Created')} ${fmtDate(org.createdAt)}</span>` : null}
+            ${org.archived ? html`<span class="poster-status poster-status--off">${tr('organisms.archived', 'Archived')}</span>` : null}
           </div>
           ${org.description ? html`<p class="og-desc">${org.description}</p>` : null}
         </div>
         <div class="og-mast-actions">
-          <button type="button" class="og-slab" onClick=${openAiSection}>${tr('organisms.forAi', 'For your AI')}</button>
+          <button type="button" class="poster-slab" onClick=${openAiSection}>${tr('organisms.forAi', 'For your AI')}</button>
           <div class="og-doors">
-            <button type="button" class="og-door" onClick=${() => setView('settings')}>${tr('organisms.settings', 'Settings')}</button>
-            <button type="button" class="og-door og-door--quiet" onClick=${() => exportOrganismZip(org, showToast)}>${tr('organisms.exportBackup', 'Export backup')}</button>
+            <button type="button" class="poster-action poster-action--small" onClick=${() => setView('settings')}>${tr('organisms.settings', 'Settings')}</button>
+            <button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => exportOrganismZip(org, showToast)}>${tr('organisms.exportBackup', 'Export backup')}</button>
           </div>
         </div>
       </div>
@@ -191,45 +206,45 @@ export function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, 
 
       <div class="og-grid">
         <div class="og-main">
-          <${Section} id="og-workspaces" num="01" first=${true} title=${tr('organisms.tabWorkspaces', 'Workspaces')} count=${wsCount}>
+          <${PageSection} id="og-workspaces" num="01" first=${true} title=${tr('organisms.tabWorkspaces', 'Workspaces')} count=${wsCount}>
             <${WorkspaceList} org=${org} showToast=${showToast} onOpen=${onOpenWs} onCount=${setWsCount} />
-            <p class="og-hint">${tr('organisms.workspacesDesc', 'Each workspace is an independent space with its own documents, records and history.')}</p>
+            <${Hint}>${tr('organisms.workspacesDesc', 'Each workspace is an independent space with its own documents, records and history.')}<//>
           <//>
 
-          <${Section} id="og-members" num="02" title=${tr('organisms.tabMembers', 'Members')} count=${memberCount}>
+          <${PageSection} id="og-members" num="02" title=${tr('organisms.tabMembers', 'Members')} count=${memberCount}>
             <${OrgMemberManager} org=${org} ghii=${ghii} canManage=${canEdit} isCreator=${isCreator}
               showToast=${showToast} confirm=${confirm} onChanged=${onChanged} show="members" />
           <//>
 
-          <${Section} id="og-agents" num="03" title=${tr('organisms.tabAgents', 'Agents')} count=${agentCount}>
+          <${PageSection} id="og-agents" num="03" title=${tr('organisms.tabAgents', 'Agents')} count=${agentCount}>
             <${OrgAgentsPanel} org=${org} ghii=${ghii} canManage=${canEdit} showToast=${showToast} onChanged=${onChanged} />
           <//>
 
-          <${Section} id="og-board" num="04" title=${tr('organisms.tabBoard', 'Board')}>
+          <${PageSection} id="og-board" num="04" title=${tr('organisms.tabBoard', 'Board')}>
             ${org.boardId
               ? html`<${BoardPreview} boardId=${org.boardId} showToast=${showToast} />`
               : html`<p class="og-hint">${tr('organisms.noBoard', 'This organism has no board.')}</p>`}
           <//>
 
-          <${Section} id="og-history" num="05" title=${tr('organisms.happened', 'What has happened')} count=${timeline ? timeline.length : null}
-            doors=${fullTimeline ? null : html`<button type="button" class="og-door og-door--quiet" onClick=${() => setFullTimeline(true)}>${tr('organisms.fullTimeline', 'Full timeline →')}</button>`}>
+          <${PageSection} id="og-history" num="05" title=${tr('organisms.happened', 'What has happened')} count=${timeline ? timeline.length : null}
+            doors=${fullTimeline ? null : html`<button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => setFullTimeline(true)}>${tr('organisms.fullTimeline', 'Full timeline →')}</button>`}>
             ${fullTimeline ? html`<${TimelinePanel} orgId=${org.id} defaultOpen=${true} />` : html`<${TimelineRecent} rows=${timeline} limit=${5} />`}
           <//>
 
-          <${Fold} id="og-readme" num="06" title=${tr('organisms.readmeFold', 'README')} sub=${readmeTitle} open=${openReadme} onToggle=${() => setOpenReadme(o => !o)}>
+          <${FoldSection} id="og-readme" num="06" title=${tr('organisms.readmeFold', 'README')} sub=${readmeTitle} open=${openReadme} onToggle=${() => setOpenReadme(o => !o)}>
             ${readme || canEdit
               ? html`<${ReadmePanel} markdown=${readme} canEdit=${canEdit} kind="organism" name=${org.name} aiPromptSeed=${tocSeed} onSave=${saveReadme} />`
               : html`<p class="og-hint">${tr('organisms.readmeEmpty', 'No README yet.')}</p>`}
           <//>
 
-          <${Fold} id="og-map" num="07" title=${tr('organisms.mapAndToc', 'Map and table of contents')} open=${openMap} onToggle=${() => setOpenMap(o => !o)}>
-            <p class="og-hint">${tr('organisms.mapAndTocHint', 'The same structure two ways.')}</p>
+          <${FoldSection} id="og-map" num="07" title=${tr('organisms.mapAndToc', 'Map and table of contents')} open=${openMap} onToggle=${() => setOpenMap(o => !o)}>
+            <${Hint}>${tr('organisms.mapAndTocHint', 'The same structure two ways.')}<//>
             <${StructureMindmap} scope="organism" graph=${graph} onNavigate=${onMapNav} storageKey=${'org.' + org.id} defaultOpen />
             <${StructureOverview} label=${tr('organisms.structureOverviewOrg', 'Organism structure — table of contents')}
               load=${() => orgService.getOrganismOverview(org.id)} defaultOpen />
           <//>
 
-          <${Fold} id="og-ai" num="08" title=${tr('organisms.forAiTitle', 'Bring your AI here')} sub=${tr('organisms.forAiHint', '')} open=${openAi} onToggle=${() => setOpenAi(o => !o)}>
+          <${FoldSection} id="og-ai" num="08" title=${tr('organisms.forAiTitle', 'Bring your AI here')} sub=${tr('organisms.forAiHint', '')} open=${openAi} onToggle=${() => setOpenAi(o => !o)}>
             <p class="og-lead">${tr('organisms.instrBlockLead', 'Paste this into your AI’s instructions and every conversation starts already knowing this organism’s structure.')}</p>
             <${InstructionBlock} orgId=${org.id} />
           <//>

@@ -11,6 +11,16 @@
  * @structure WorkspaceApps
  * @usage import { WorkspaceApps } from '/views/profile/organisms/workspace-apps.js';
  * @version-history
+ *   v1.9.0 — 2026-09-26 — A small heading over a group of fields, a card or a note is the Sub-heading (.sub-heading: small ink headline letters); the coral small capitals, the bold ink words and the coral headline letters go (a unification: Jouni's decision "Sub-heading").
+ *   v1.8.0 — 2026-09-26 — A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
+ *   v1.7.0 — 2026-09-26 — A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
+ *   v1.6.0 — 2026-09-26 — Pin is the action link (.poster-action) and Unpin its danger tone (.poster-action--danger), not the classic buttons (a unification: Jouni's decision "Action link").
+ *   v1.5.0 — 2026-09-26 — The app picker's apps are the Listing (css/components/listing.css, name-tags-doors, columns kept on a phone), a unification: the look most tabs use.
+ *   v1.4.0 — 2026-09-26 — A pinned app the catalogue no longer has says so with the Status, attention (.poster-status--attention), a unification: Jouni's decision "Status".
+ *   v1.3.0 — 2026-09-25 — "Manage" (it opens the app picker, and says "Done" while it is open) is the action link (.poster-action); aria-expanded says it is open (a unification: Jouni's decision "Action link").
+ *   v1.2.0 — 2026-09-25 — A search field over a list is the Search line (.search-line with the Text field); a place keeps only its layout (a unification: the look most tabs use).
+ *   v1.1.0 — 2026-09-25 — Every hint is the Hint (poster-hint, components/Hint.js), the look most Settings & Controls tabs draw (UI consolidation phase 5, a unification).
+ *   2026-09-25 -- The lines that say a list is empty (or has nothing to show yet) are the quiet sentence (.poster-quiet, QuietNote), a unification: Jouni's decision "Empty line".
  *   v1.0.0 — 2026-07-02 — Initial: pinned-app cards + creator/admin pin/unpin picker.
  */
 import { h } from 'preact';
@@ -83,7 +93,7 @@ export function WorkspaceApps({ orgId, wsId, apps, canEdit, showToast, onChanged
         <div class="pj-app-name">${m.icon ? m.icon + ' ' : ''}${name}</div>
         ${desc ? html`<div class="pj-app-desc">${desc}</div>` : null}
         <div class="pj-app-meta">
-          ${catalog !== null && !rec ? html`<span class="pj-app-missing">${t('organisms.apps.missing') || 'Not in the catalog (removed?)'}</span>` : (m.authorDisplay || b.owner)}
+          ${catalog !== null && !rec ? html`<span class="poster-status poster-status--attention">${t('organisms.apps.missing') || 'Not in the catalog (removed?)'}</span>` : (m.authorDisplay || b.owner)}
         </div>
       </div>`;
   };
@@ -99,36 +109,36 @@ export function WorkspaceApps({ orgId, wsId, apps, canEdit, showToast, onChanged
     });
 
   return html`
-    <div class="pj-apps-strip">
+    <div class="pj-apps-strip poster-box">
       <div class="pj-apps-head">
-        <span class="pj-apps-title">${t('organisms.apps.title') || 'Apps'}</span>
-        <span class="pj-apps-hint">${t('organisms.apps.hint') || 'Pinned to this workspace — they open with it as context.'}</span>
+        <span class="pj-apps-title sub-heading">${t('organisms.apps.title') || 'Apps'}</span>
+        <span class="poster-hint">${t('organisms.apps.hint') || 'Pinned to this workspace — they open with it as context.'}</span>
         ${canEdit ? html`
-          <button class="btn-outline btn-sm ${showPicker ? 'pj-org-btn-active' : ''}" onClick=${() => setShowPicker(s => !s)}>
+          <button type="button" class="poster-action poster-action--small" aria-expanded=${showPicker ? 'true' : 'false'} onClick=${() => setShowPicker(s => !s)}>
             ${showPicker ? (t('organisms.apps.done') || 'Done') : ('⚙ ' + (t('organisms.apps.manage') || 'Manage'))}
           </button>` : null}
       </div>
       ${bound.length > 0
         ? html`<div class="pj-apps-grid">${bound.map(renderCard)}</div>`
-        : html`<div class="pj-apps-empty">${(t('organisms.apps.none') || 'No apps pinned yet.')}${canEdit ? ' ' + (t('organisms.apps.noneHint') || 'Pin a published app so members can launch it from here.') : ''}</div>`}
+        : html`<div class="poster-quiet pj-apps-empty">${(t('organisms.apps.none') || 'No apps pinned yet.')}${canEdit ? ' ' + (t('organisms.apps.noneHint') || 'Pin a published app so members can launch it from here.') : ''}</div>`}
       ${showPicker ? html`
         <div class="pj-apps-picker">
           <div class="section-desc">${t('organisms.apps.pickerDesc') || 'Pick published apps to show in this workspace. Pinning only adds a launch card — data access follows workspace access.'}</div>
-          <input type="text" class="input-field input-sm" placeholder=${t('organisms.apps.search') || 'Search apps…'}
+          <input type="text" class="og-input" placeholder=${t('organisms.apps.search') || 'Search apps…'}
             value=${q} onInput=${e => setQ(e.target.value)} />
-          ${catalog === null ? html`<div class="pj-apps-empty">…</div>`
-            : pickerRows.length === 0 ? html`<div class="pj-apps-empty">${ql ? (t('organisms.apps.noMatch') || 'No apps match.') : (t('organisms.apps.catalogEmpty') || 'No published apps on this node yet.')}</div>`
-            : pickerRows.map(a => {
+          ${catalog === null ? html`<div class="poster-quiet pj-apps-empty">…</div>`
+            : pickerRows.length === 0 ? html`<div class="poster-quiet pj-apps-empty">${ql ? (t('organisms.apps.noMatch') || 'No apps match.') : (t('organisms.apps.catalogEmpty') || 'No published apps on this node yet.')}</div>`
+            : html`<div class="listing listing--name-tags-doors listing--cols">${pickerRows.map(a => {
                 const pinned = bound.some(b => sameApp(a, b));
                 return html`
-                  <div key=${a.owner + '/' + a.filename} class="pj-apps-picker-row">
-                    <span class="pj-apps-picker-name">${a.manifest?.icon ? a.manifest.icon + ' ' : ''}${a.manifest?.name || a.filename}</span>
-                    <span class="pj-apps-picker-owner">${a.manifest?.authorDisplay || a.owner}</span>
-                    <button class="${pinned ? 'btn-danger btn-sm' : 'btn-outline btn-sm'}" disabled=${busy} onClick=${() => togglePin(a)}>
+                  <div key=${a.owner + '/' + a.filename} class="listing-row">
+                    <div class="listing-name">${a.manifest?.icon ? a.manifest.icon + ' ' : ''}${a.manifest?.name || a.filename}</div>
+                    <div class="listing-desc">${a.manifest?.authorDisplay || a.owner}</div>
+                    <div class="listing-doors"><button class="${pinned ? 'poster-action poster-action--small poster-action--row poster-action--danger' : 'poster-action poster-action--small poster-action--row'}" disabled=${busy} onClick=${() => togglePin(a)}>
                       ${pinned ? (t('organisms.apps.unpin') || 'Unpin') : (t('organisms.apps.pin') || 'Pin')}
-                    </button>
+                    </button></div>
                   </div>`;
-              })}
+              })}</div>`}
         </div>` : null}
     </div>`;
 }

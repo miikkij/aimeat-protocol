@@ -1,0 +1,26 @@
+/**
+ * @file uses-list.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The uses list: what a thing is used for, in two columns, one use per cell with a rule
+ *   under it: a mark first (a green tick when the use works now, a grey dot when it does not), then
+ *   the use in bold and a grey line that explains it; one column on a phone. Moved unchanged out of
+ *   css/views/email-poster.css (Email, "Your address": what the address is used for), where it is the
+ *   only place it is drawn (UI consolidation phase 5, a move).
+ *   Drawn as markup: <div class="em-uses"><div><i>✓</i><span><b>…</b><small>…</small></span></div>
+ *   <div><i class="no">·</i>…</div></div>.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 — 2026-09-25 — Initial: the rules of .em-uses, moved unchanged from email-poster.css.
+ */
+
+.em-uses { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .3rem 1.8rem; }
+.em-uses > div { display: flex; gap: .7rem; align-items: baseline; padding: .55rem 0; border-bottom: 1px solid var(--border); font-size: .9rem; line-height: 1.5; }
+.em-uses i { font-style: normal; font-weight: 800; color: var(--success-fg, #1f8f5a); flex: 0 0 1rem; }
+.em-uses i.no { color: var(--text-dim); }
+.em-uses b { display: block; font-weight: 800; color: var(--text); }
+.em-uses small { display: block; color: var(--text-dim); font-size: .8rem; }
+
+@media (max-width: 860px) {
+  .em-uses { grid-template-columns: 1fr; }
+}

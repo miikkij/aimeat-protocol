@@ -10,6 +10,8 @@
  *   - addTag / removeTag: local handlers that trim/dedupe and emit the updated array through onSave
  *
  * @version-history
+ *   v1.2.0 — 2026-09-26 — A tag's x is the Tag's remove mark (.poster-chip-x, poster.css): grey, coral while the pointer is on the tag (a unification: Jouni's decision "Remove mark").
+ *   v1.1.0 — 2026-09-25 — Every tag is the Tag (.poster-chip and its tones, .poster-chips for a row), a unification: Jouni's decision Tag.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { h } from 'preact';
@@ -43,8 +45,8 @@ export default function TagEditor({ tags, onSave, maxTags = 20 }) {
     <div class="tag-editor">
       <div class="tag-editor-pills">
         ${tags.map(tag => html`
-          <span class="tag-pill tag-removable" key=${tag} onClick=${() => removeTag(tag)}>
-            ${tag} <span class="tag-x">\u2715</span>
+          <span class="poster-chip tag-removable" key=${tag} onClick=${() => removeTag(tag)}>
+            ${tag} <span class="poster-chip-x">\u2715</span>
           </span>
         `)}
       </div>

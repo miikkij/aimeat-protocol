@@ -11,6 +11,7 @@
  * @structure buildBreadcrumb, buildWorkspaceModel
  * @usage import { buildWorkspaceModel } from '/views/profile/organisms/workspace/model.js';
  * @version-history
+ *   v1.3.0 -- 2026-09-25 -- The breadcrumb shown while a workspace loads is the crumb trail (.og-crumb, css/components/crumb-trail.css), as every page head draws it (a unification: the look most tabs use).
  *   v1.2.0 — 2026-08-29 — openGroup and scrollToSpace removed with the tab block (cover.js opens a space
  *     as a page; a group is a table on the cover).
  *   v1.0.0 — 2026-07-13 — Extracted from workspace.js (max-file-lines)
@@ -30,16 +31,16 @@ import { cap, PRIMARY_FIELD } from './helpers.js';
 export function buildBreadcrumb(ctx) {
   const { onBack, onBackToList, org, showSettings, guardWsDirty, setShowSettings, wsName, ws } = ctx;
   return html`
-    <div class="pj-org-breadcrumb">
-      <button class="pj-org-crumb-link" onClick=${onBackToList || onBack}>${t('organisms.title') || 'Organisms'}</button>
-      <span class="pj-org-crumb-sep">/</span>
-      <button class="pj-org-crumb-link" onClick=${onBack}>${(org.name || org.id || '')}</button>
-      <span class="pj-org-crumb-sep">/</span>
+    <div class="og-crumb">
+      <button type="button" class="og-crumb-link" onClick=${onBackToList || onBack}>${t('organisms.title') || 'Organisms'}</button>
+      <span>/</span>
+      <button type="button" class="og-crumb-link" onClick=${onBack}>${(org.name || org.id || '')}</button>
+      <span>/</span>
       ${showSettings ? html`
-        <button class="pj-org-crumb-link" onClick=${() => guardWsDirty(() => setShowSettings(false))}>${(wsName || ws?.manifest?.name || '…')}</button>
-        <span class="pj-org-crumb-sep">/</span>
-        <span>${t('organisms.settings') || 'Settings'}</span>
-      ` : html`<span>${(wsName || ws?.manifest?.name || '…')}</span>`}
+        <button type="button" class="og-crumb-link" onClick=${() => guardWsDirty(() => setShowSettings(false))}>${(wsName || ws?.manifest?.name || '…')}</button>
+        <span>/</span>
+        <span class="og-crumb-here">${t('organisms.settings') || 'Settings'}</span>
+      ` : html`<span class="og-crumb-here">${(wsName || ws?.manifest?.name || '…')}</span>`}
     </div>`;
 }
 

@@ -5,6 +5,31 @@
  * @description Sharing Groups section — CRUD for sharing groups with expandable
  *   member lists. Extracted from access-tab.js to satisfy max-file-lines.
  * @version-history
+ *   v1.20.0 -- 2026-09-26 -- Read and Write beside their check boxes are the Check line (css/components/check-line.css); the edit row's labels leave the row label (a unification: Jouni's decision "Check line").
+ *   v1.19.0 -- 2026-09-26 -- A small heading over a group of fields, a card or a note is the Sub-heading (.sub-heading: small ink headline letters); the coral small capitals, the bold ink words and the coral headline letters go (a unification: Jouni's decision "Sub-heading").
+ *   v1.18.0 -- 2026-09-26 -- A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
+ *   v1.17.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
+ *   v1.16.0 -- 2026-09-26 -- Every line that says a part is loading is the loading line: the quiet sentence with the blinking Loading mark, LoadingLine in views/profile/shared.js (a unification: the look most tabs use).
+ *   v1.15.0 -- 2026-09-25 -- The older tabs' remaining help lines are the Hint (.poster-hint); their own sizes and greys go, a place keeps its margin (a unification: the look most tabs use).
+ *   v1.14.0 -- 2026-09-25 -- A list drawn as classic cards is the Listing (css/components/listing.css), a row that opens shows the Listing's open panel; the card, its header, arrow and detail rules go (a unification: the look most tabs use).
+ *   v1.13.0 -- 2026-09-25 -- An opened group's details are the Facts (css/components/facts.css), a unification: the look most tabs use; the two tiles become two lines, the name on the left.
+ *   v1.12.0 -- 2026-09-25 -- A group's members and its shares are the Listing (css/components/listing.css), a unification: the look most tabs use.
+ *   v1.11.0 -- 2026-09-25 -- Every drop-down is the Select field (.select-field, css/components/select-field.css); a place keeps only its width and margin (a unification: the look most tabs use).
+ *   v1.10.0 -- 2026-09-25 -- Every many-line field is the Text area (.og-textarea); a place keeps only its size and margin (a unification: the look most tabs use).
+ *   v1.9.0 -- 2026-09-25 -- Every one-line field is the Text field (.og-input); a place keeps only its layout (a unification: the look most tabs use).
+ *   v1.8.0 -- 2026-09-25 -- Every word that says a state is the Status (.poster-status fine, attention, danger, off), a unification: Jouni's decision Status.
+ *   v1.7.0 -- 2026-09-25 -- Every tag is the Tag (.poster-chip and its tones, .poster-chips for a row), a unification: Jouni's decision Tag.
+ *   v1.6.0 -- 2026-09-25 -- The row labels (field and key labels, column heads, box labels) wear .poster-label (Jouni's decision "Row label", a unification).
+ *   v1.5.0 — 2026-09-25 — A delete, revoke or reset link keeps its coral as the action link's danger
+ *     tone, .poster-action--danger (Jouni's decision "Action link").
+ *   v1.4.0 — 2026-09-25 — Every quiet way on is the library's action link, .poster-action, with the
+ *     tone its meaning names: more for "show all" and more of a list, back, text for a plain grey
+ *     word, quiet (Jouni's decisions "Action link", "Panel action", "Dismiss", "Small link", "Step
+ *     button").
+ *   v1.3.0 — 2026-09-25 — The loud action is the library's dark block, .poster-slab: the control cut
+ *     where it sits in a row of controls or waits to be enabled, the danger tone for a delete that
+ *     cannot be undone (Jouni's decision "Loud action").
+ *   2026-09-25 -- The lines that say a list is empty (or has nothing to show yet) are the quiet sentence (.poster-quiet, QuietNote), a unification: Jouni's decision "Empty line".
  *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
  *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
  *   v1.2.0 — 2026-08-11 — Key-space shares: each group shows what it can actually reach, with add
@@ -21,6 +46,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { useConfirm } from '/components/Modal.js';
+import { QuietNote } from '/components/QuietNote.js';
 import { ContactPicker } from '/components/ContactPicker.js';
 import * as groupsApi from '/js/services/sharing-groups.js';
 import * as sharesApi from '/js/services/shares.js';
@@ -257,28 +283,26 @@ export function SharingGroupsSection({ showToast, initial }) {
   }, [confirm, showToast, loadGroups]);
 
   const renderMemberRow = (groupId, member) => html`
-    <div class="mem-item" key=${member.identifier}>
-      <span class="mem-key">${escHtml(member.identifier)}</span>
-      <span class="badge ${member.identifierType === 'gaii' ? 'badge-info' : 'badge-muted'}">${member.identifierType}</span>
-      <span class="badge ${member.permissions?.read ? 'badge-success' : 'badge-muted'}">
-        ${t('profile.access.sgRead') || 'read'}
-      </span>
-      <span class="badge ${member.permissions?.write ? 'badge-success' : 'badge-muted'}">
-        ${t('profile.access.sgWrite') || 'write'}
-      </span>
-      <button class="btn-ghost btn-danger btn-sm" onClick=${(e) => { e.stopPropagation(); handleRemoveMember(groupId, member.identifier); }}>
-        ${t('profile.access.sgRemove') || 'Remove'}
-      </button>
+    <div class="listing-row" key=${member.identifier}>
+      <div class="listing-name">${escHtml(member.identifier)}</div>
+      <div><span class="poster-chip">${member.identifierType}</span></div>
+      <div><span><span class="poster-status ${member.permissions?.read ? 'poster-status--fine' : 'poster-status--off'}">${t('profile.access.sgRead') || 'read'}</span> <span class="poster-status ${member.permissions?.write ? 'poster-status--fine' : 'poster-status--off'}">${t('profile.access.sgWrite') || 'write'}</span></span></div>
+      <div class="listing-doors">
+        <button class="poster-action poster-action--small poster-action--row poster-action--danger" onClick=${(e) => { e.stopPropagation(); handleRemoveMember(groupId, member.identifier); }}>
+          ${t('profile.access.sgRemove') || 'Remove'}
+        </button>
+      </div>
     </div>
   `;
 
   const renderShareRow = (share) => html`
-    <div class="mem-item" key=${share.id}>
-      <span class="mem-key" title=${share.key_pattern}>${escHtml(share.key_pattern)}</span>
-      ${share.note && html`<span class="text-meta-sm">${escHtml(share.note)}</span>`}
-      <button class="btn-ghost btn-danger btn-sm" onClick=${(e) => { e.stopPropagation(); handleRevokeShare(share); }}>
-        ${t('profile.access.shRevoke')}
-      </button>
+    <div class="listing-row" key=${share.id}>
+      <div class="listing-name"><span title=${share.key_pattern}>${escHtml(share.key_pattern)}</span>${share.note && html`<small>${escHtml(share.note)}</small>`}</div>
+      <div class="listing-doors">
+        <button class="poster-action poster-action--small poster-action--row poster-action--danger" onClick=${(e) => { e.stopPropagation(); handleRevokeShare(share); }}>
+          ${t('profile.access.shRevoke')}
+        </button>
+      </div>
     </div>
   `;
 
@@ -289,74 +313,68 @@ export function SharingGroupsSection({ showToast, initial }) {
     const groupShares = sharesOf(group.id);
 
     return html`
-      <div class="card ${isExpanded ? 'card-expanded' : ''} poster-row--thing" key=${group.id}>
-        <div class="card-header card-clickable" onClick=${() => setExpandedId(isExpanded ? null : group.id)}>
-          <span class="expand-icon">${isExpanded ? '▼' : '▶'}</span>
-          <div class="card-title">${escHtml(group.name)}</div>
-          <span class="badge badge-muted">${memberCount} ${t('profile.access.sgMembers') || 'members'}</span>
-          ${groupShares.length > 0 && html`
-            <span class="badge badge-info">${groupShares.length} ${t('profile.access.shTitle')}</span>
-          `}
+      <div class=${`listing-row sg-row ${isExpanded ? 'is-open' : ''}`} key=${group.id} onClick=${(e) => { if (!e.target.closest?.('.listing-open')) setExpandedId(isExpanded ? null : group.id); }}>
+        <div class="listing-name">${escHtml(group.name)}</div>
+        <div class="listing-desc">${group.description ? escHtml(group.description) : ''}</div>
+        <div class="listing-doors">
+            <span class="poster-chip">${memberCount} ${t('profile.access.sgMembers') || 'members'}</span>
+            ${groupShares.length > 0 && html`
+              <span class="poster-chip">${groupShares.length} ${t('profile.access.shTitle')}</span>
+            `}
+          <button type="button" class="poster-icon poster-icon--small">${isExpanded ? '▼' : '▶'}</button>
         </div>
-        ${group.description && html`
-          <div class="card-subtitle">${escHtml(group.description)}</div>
-        `}
 
         ${isExpanded && !isEditing && html`
-          <div class="card-detail">
-            <div class="detail-grid">
-              <div class="detail-item">
-                <span class="detail-label">${t('profile.access.sgDefaultPerms') || 'Default permissions'}</span>
-                <span class="detail-value">
-                  ${group.defaultPermissions?.read ? (t('profile.access.sgRead') || 'read') : ''} ${group.defaultPermissions?.write ? (t('profile.access.sgWrite') || 'write') : ''}
-                </span>
-              </div>
+          <div class="listing-open poster-box poster-box--raised">
+            <div class="facts">
+              <span class="facts-k poster-label">${t('profile.access.sgDefaultPerms') || 'Default permissions'}</span>
+              <span class="facts-v">
+                ${group.defaultPermissions?.read ? (t('profile.access.sgRead') || 'read') : ''} ${group.defaultPermissions?.write ? (t('profile.access.sgWrite') || 'write') : ''}
+              </span>
               ${group.createdAt && html`
-                <div class="detail-item">
-                  <span class="detail-label">${t('profile.access.sgCreatedAt') || 'Created'}</span>
-                  <span class="detail-value">${fmtDate(group.createdAt)}</span>
-                </div>
+                <span class="facts-k poster-label">${t('profile.access.sgCreatedAt') || 'Created'}</span>
+                <span class="facts-v">${fmtDate(group.createdAt)}</span>
               `}
             </div>
 
-            <h4 class="card-h3 mt-section">${t('profile.access.sgMemberList') || 'Members'}</h4>
+            <h4 class="card-h3 sub-heading mt-section">${t('profile.access.sgMemberList') || 'Members'}</h4>
             ${memberCount === 0
-              ? html`<div class="empty">${t('profile.access.sgNoMembers') || 'No members yet'}</div>`
-              : (group.members || []).map(m => renderMemberRow(group.id, m))
+              ? html`<div class="poster-quiet">${t('profile.access.sgNoMembers') || 'No members yet'}</div>`
+              : html`<div class="listing listing--cols listing--name-kind-state-doors">${(group.members || []).map(m => renderMemberRow(group.id, m))}</div>`
             }
 
-            <h4 class="card-h3 mt-section">${t('profile.access.shTitle')}</h4>
+            <h4 class="card-h3 sub-heading mt-section">${t('profile.access.shTitle')}</h4>
             ${groupShares.length === 0
-              ? html`<div class="empty">${t('profile.access.shNone')}</div>`
-              : groupShares.map(renderShareRow)
+              ? html`<div class="poster-quiet">${t('profile.access.shNone')}</div>`
+              : html`<div class="listing listing--cols listing--name-state">${groupShares.map(renderShareRow)}</div>`
             }
             ${sharingIn === group.id ? html`
               <div class="create-form poster-row--thing" onClick=${(e) => e.stopPropagation()}>
                 <div class="form-row">
-                  <label>${t('profile.access.shPattern')}</label>
-                  <input type="text" class="input-field input-sm" placeholder="deliveries.abc.**"
+                  <label class="poster-label">${t('profile.access.shPattern')}</label>
+                  <input type="text" class="og-input" placeholder="deliveries.abc.**"
                     value=${sharePattern} onInput=${e => setSharePattern(e.target.value)}
                     onKeyDown=${e => e.key === 'Enter' && handleCreateShare(group.id)} />
-                  <div class="text-meta-sm">${t('profile.access.shPatternHelp')}</div>
+                  <div class="poster-hint">${t('profile.access.shPatternHelp')}</div>
                 </div>
                 <div class="form-row">
-                  <label>${t('profile.access.shNote')}</label>
-                  <input type="text" class="input-field input-sm"
+                  <label class="poster-label">${t('profile.access.shNote')}</label>
+                  <input type="text" class="og-input"
                     placeholder=${t('profile.access.shNotePlaceholder')}
                     value=${shareNote} onInput=${e => setShareNote(e.target.value)} />
                 </div>
                 <div class="form-actions">
-                  <button class="btn-primary btn-sm" onClick=${() => handleCreateShare(group.id)} disabled=${sharingBusy}>
+                  <button class="poster-slab poster-slab--control" onClick=${() => handleCreateShare(group.id)} disabled=${sharingBusy}>
                     ${sharingBusy ? '...' : t('profile.access.shCreate')}
                   </button>
-                  <button class="btn-ghost btn-sm" onClick=${() => setSharingIn(null)}>
+                  <button class="poster-action poster-action--small" onClick=${() => setSharingIn(null)}>
                     ${t('profile.access.shCancel')}
                   </button>
                 </div>
               </div>
             ` : html`
               <div class="mb-half">
-                <button class="btn-outline btn-sm" onClick=${(e) => { e.stopPropagation(); setSharingIn(group.id); setSharePattern(''); setShareNote(''); }}>
+                <button class="poster-action poster-action--small" onClick=${(e) => { e.stopPropagation(); setSharingIn(group.id); setSharePattern(''); setShareNote(''); }}>
                   ${t('profile.access.shAdd')}
                 </button>
               </div>
@@ -365,45 +383,45 @@ export function SharingGroupsSection({ showToast, initial }) {
             ${addingTo === group.id ? html`
               <div class="create-form poster-row--thing">
                 <div class="form-row">
-                  <label>${t('profile.access.sgMemberIdentifier') || 'Identifier (GHII or GAII)'}</label>
+                  <label class="poster-label">${t('profile.access.sgMemberIdentifier') || 'Identifier (GHII or GAII)'}</label>
                   <${ContactPicker} value=${memberIdent} onChange=${setMemberIdent} valueMode="full"
                     placeholder=${'alice@node-id'} onSubmit=${() => handleAddMember(group.id)} />
                 </div>
                 <div class="form-row">
-                  <label>${t('profile.access.sgMemberType') || 'Type'}</label>
-                  <select class="input-field input-sm" value=${memberType} onChange=${e => setMemberType(e.target.value)}>
+                  <label class="poster-label">${t('profile.access.sgMemberType') || 'Type'}</label>
+                  <select class="select-field" value=${memberType} onChange=${e => setMemberType(e.target.value)}>
                     <option value="ghii">GHII</option>
                     <option value="gaii">GAII</option>
                   </select>
                 </div>
                 <div class="flex-row-wrap">
-                  <label class="flex-row">
+                  <label class="flex-row check-line">
                     <input type="checkbox" checked=${memberRead} onChange=${() => setMemberRead(!memberRead)} />
                     ${t('profile.access.sgRead') || 'Read'}
                   </label>
-                  <label class="flex-row">
+                  <label class="flex-row check-line">
                     <input type="checkbox" checked=${memberWrite} onChange=${() => setMemberWrite(!memberWrite)} />
                     ${t('profile.access.sgWrite') || 'Write'}
                   </label>
                 </div>
                 <div class="form-actions">
-                  <button class="btn-primary btn-sm" onClick=${() => handleAddMember(group.id)}>
+                  <button class="poster-slab poster-slab--control" onClick=${() => handleAddMember(group.id)}>
                     ${t('profile.access.sgAddMember') || 'Add'}
                   </button>
-                  <button class="btn-ghost btn-sm" onClick=${() => setAddingTo(null)}>
+                  <button class="poster-action poster-action--small" onClick=${() => setAddingTo(null)}>
                     ${t('profile.access.sgCancel') || 'Cancel'}
                   </button>
                 </div>
               </div>
             ` : html`
-              <div class="card-actions">
-                <button class="btn-outline btn-sm" onClick=${(e) => { e.stopPropagation(); setAddingTo(group.id); setMemberIdent(''); setMemberType('ghii'); setMemberRead(true); setMemberWrite(false); }}>
+              <div class="og-doors listing-open-doors">
+                <button class="poster-action poster-action--small" onClick=${(e) => { e.stopPropagation(); setAddingTo(group.id); setMemberIdent(''); setMemberType('ghii'); setMemberRead(true); setMemberWrite(false); }}>
                   ${t('profile.access.sgAddMember') || 'Add Member'}
                 </button>
-                <button class="btn-outline btn-sm" onClick=${(e) => { e.stopPropagation(); startEdit(group); }}>
+                <button class="poster-action poster-action--small" onClick=${(e) => { e.stopPropagation(); startEdit(group); }}>
                   ${t('profile.access.sgEdit') || 'Edit'}
                 </button>
-                <button class="btn-danger-solid btn-sm" onClick=${(e) => { e.stopPropagation(); handleDelete(group.id, group.name); }}>
+                <button class="poster-action poster-action--small poster-action--danger" onClick=${(e) => { e.stopPropagation(); handleDelete(group.id, group.name); }}>
                   ${t('profile.access.sgDelete') || 'Delete'}
                 </button>
               </div>
@@ -412,36 +430,36 @@ export function SharingGroupsSection({ showToast, initial }) {
         `}
 
         ${isExpanded && isEditing && html`
-          <div class="card-detail" onClick=${(e) => e.stopPropagation()}>
+          <div class="listing-open poster-box poster-box--raised" onClick=${(e) => e.stopPropagation()}>
             <div class="flex-col">
               <div class="form-row">
-                <label>${t('profile.access.sgGroupName') || 'Group name'}</label>
-                <input type="text" class="input-field input-sm"
+                <label class="poster-label">${t('profile.access.sgGroupName') || 'Group name'}</label>
+                <input type="text" class="og-input"
                   value=${editName} onInput=${e => setEditName(e.target.value)} />
               </div>
               <div class="form-row">
-                <label>${t('profile.access.sgDescription') || 'Description'}</label>
-                <textarea class="input-field input-sm" rows="2"
+                <label class="poster-label">${t('profile.access.sgDescription') || 'Description'}</label>
+                <textarea class="og-textarea" rows="2"
                   value=${editDesc} onInput=${e => setEditDesc(e.target.value)} />
               </div>
               <div class="form-row">
-                <label>${t('profile.access.sgDefaultPerms') || 'Default permissions'}</label>
+                <label class="poster-label">${t('profile.access.sgDefaultPerms') || 'Default permissions'}</label>
                 <div class="flex-row-wrap">
-                  <label class="flex-row">
+                  <label class="flex-row check-line">
                     <input type="checkbox" checked=${editRead} onChange=${() => setEditRead(!editRead)} />
                     ${t('profile.access.sgRead') || 'Read'}
                   </label>
-                  <label class="flex-row">
+                  <label class="flex-row check-line">
                     <input type="checkbox" checked=${editWrite} onChange=${() => setEditWrite(!editWrite)} />
                     ${t('profile.access.sgWrite') || 'Write'}
                   </label>
                 </div>
               </div>
               <div class="form-actions">
-                <button class="btn-primary btn-sm" onClick=${() => handleUpdate(group.id)} disabled=${saving}>
+                <button class="poster-slab poster-slab--control" onClick=${() => handleUpdate(group.id)} disabled=${saving}>
                   ${saving ? '...' : (t('profile.access.sgSave') || 'Save')}
                 </button>
-                <button class="btn-ghost btn-sm" onClick=${() => setEditingId(null)}>
+                <button class="poster-action poster-action--small" onClick=${() => setEditingId(null)}>
                   ${t('profile.access.sgCancel') || 'Cancel'}
                 </button>
               </div>
@@ -453,48 +471,48 @@ export function SharingGroupsSection({ showToast, initial }) {
   };
 
   return html`
-    <h3 class="card-h3 access-h3 mt-section" id="access-sharing-groups">${t('profile.access.sgTitle') || 'Sharing Groups'}</h3>
+    <h3 class="card-h3 sub-heading access-h3 mt-section" id="access-sharing-groups">${t('profile.access.sgTitle') || 'Sharing Groups'}</h3>
     <div class="section-desc">${t('profile.access.sgDesc')}</div>
 
     ${groups === null
-      ? html`<div class="empty">${t('profile.access.sgLoading') || 'Loading...'}</div>`
+      ? html`<div class="poster-quiet loading-mark">${t('profile.access.sgLoading') || 'Loading...'}</div>`
       : groups.length === 0
         ? (!showCreate && html`
             <div class="access-empty-row">
-              <span class="text-meta-sm">${t('profile.access.sgEmpty') || 'No sharing groups yet.'}</span>
-              <button class="btn-outline btn-sm" onClick=${() => setShowCreate(true)}>${t('profile.access.sgCreate') || 'New Group'}</button>
+              <${QuietNote}>${t('profile.access.sgEmpty') || 'No sharing groups yet.'}<//>
+              <button class="poster-action poster-action--small" onClick=${() => setShowCreate(true)}>${t('profile.access.sgCreate') || 'New Group'}</button>
             </div>`)
-        : groups.map(renderGroupCard)
+        : html`<div class="listing listing--name-desc-doors">${groups.map(renderGroupCard)}</div>`
     }
 
     ${!showCreate ? ((groups?.length || 0) > 0 && html`
       <div class="mb-1">
-        <button class="btn-outline" onClick=${() => setShowCreate(true)}>
+        <button class="poster-action poster-action--small" onClick=${() => setShowCreate(true)}>
           ${t('profile.access.sgCreate') || 'New Group'}
         </button>
       </div>
     `) : html`
       <div class="create-form poster-row--thing">
-        <h4 class="card-h3 mb-half">${t('profile.access.sgCreateTitle') || 'Create Sharing Group'}</h4>
+        <h4 class="card-h3 sub-heading mb-half">${t('profile.access.sgCreateTitle') || 'Create Sharing Group'}</h4>
         <div class="flex-col">
           <div class="form-row">
-            <label>${t('profile.access.sgGroupName') || 'Group name'}</label>
-            <input type="text" class="input-field input-sm"
+            <label class="poster-label">${t('profile.access.sgGroupName') || 'Group name'}</label>
+            <input type="text" class="og-input"
               placeholder=${t('profile.access.sgNamePlaceholder') || 'e.g. Team Alpha'}
               value=${formName} onInput=${e => setFormName(e.target.value)}
               onKeyDown=${e => e.key === 'Enter' && handleCreate()} />
           </div>
           <div class="form-row">
-            <label>${t('profile.access.sgDescription') || 'Description (optional)'}</label>
-            <textarea class="input-field input-sm" rows="2"
+            <label class="poster-label">${t('profile.access.sgDescription') || 'Description (optional)'}</label>
+            <textarea class="og-textarea" rows="2"
               placeholder=${t('profile.access.sgDescPlaceholder') || 'What is this group for?'}
               value=${formDesc} onInput=${e => setFormDesc(e.target.value)} />
           </div>
           <div class="form-actions">
-            <button class="btn-primary btn-sm" onClick=${handleCreate} disabled=${creating}>
+            <button class="poster-slab poster-slab--control" onClick=${handleCreate} disabled=${creating}>
               ${creating ? '...' : (t('profile.access.sgCreateBtn') || 'Create')}
             </button>
-            <button class="btn-ghost btn-sm" onClick=${() => setShowCreate(false)}>
+            <button class="poster-action poster-action--small" onClick=${() => setShowCreate(false)}>
               ${t('profile.access.sgCancel') || 'Cancel'}
             </button>
           </div>

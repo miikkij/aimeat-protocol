@@ -13,6 +13,12 @@
  * @structure TrackResponseModal({ open, msg, onClose, onDone, showToast, defaultMode, allowPark })
  * @usage import { TrackResponseModal } from '/views/profile/track-response-modal.js';
  * @version-history
+ *   v1.6.0 — 2026-09-26 — The classify step's spinner comes from /components/Spinner.js with the same words, since the profile's Spinner helper became LoadingLine (nothing on screen changes).
+ *   v1.5.0 — 2026-09-25 — Every drop-down is the Select field (.select-field, css/components/select-field.css); a place keeps only its width and margin (a unification: the look most tabs use).
+ *   v1.4.0 — 2026-09-25 — Every many-line field is the Text area (.og-textarea); a place keeps only its size and margin (a unification: the look most tabs use).
+ *   v1.3.0 — 2026-09-25 — Every one-line field is the Text field (.og-input); a place keeps only its layout (a unification: the look most tabs use).
+ *   v1.2.0 — 2026-09-25 — The line a form says after it acted is the Form message; a refusal is its error tone (UI consolidation phase 5, a unification).
+ *   v1.1.0 — 2026-09-25 — Every hint is the Hint (poster-hint, components/Hint.js), the look most Settings & Controls tabs draw (UI consolidation phase 5, a unification).
  *   v1.0.1 — 2026-09-13 — Each phase's actions sit in the dialog's footer.
  *   v1.0.0 — 2026-06-21 — Extracted from inbox-tab.js so the Notebook can reuse it; + park-to-notebook.
  */
@@ -23,11 +29,12 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { Modal } from '/components/Modal.js';
-import { Spinner } from './shared.js';
+import { Spinner } from '/components/Spinner.js';
 import * as tracked from '/js/services/tracked-responses.js';
 import { parkMessageToNotebook } from '/js/services/notebook.js';
 import { writeDraft, publishDraft, wsRoot } from '/js/services/organisms.js';
 import { NB_STEPS, firstLine } from './notebook-helpers.js';
+import { Hint } from '/components/Hint.js';
 
 export function TrackResponseModal({ open, msg, onClose, onDone, showToast, defaultMode = 'approve', allowPark = true }) {
   const [phase, setPhase] = useState('classify');   // 'classify' | 'review' | 'error'
@@ -163,56 +170,56 @@ export function TrackResponseModal({ open, msg, onClose, onDone, showToast, defa
     <${Modal} open=${open} onClose=${close} title=${t('inbox.trackResponse')} className="inbox-track-modal" footer=${footer}>
       ${phase === 'classify' ? html`
         <div class="inbox-track-classify">
-          <${Spinner} />
+          <${Spinner} text=${t('profile.loading')} />
           <div class="inbox-track-classify-step">${t('inbox.trackAiThinking')}</div>
           <div class="inbox-track-classify-sub">${t(NB_STEPS[step]) || ''}</div>
         </div>` : null}
 
       ${phase === 'error' ? html`
         <div class="inbox-track-form">
-          <p class="inbox-track-hint">${t('inbox.trackNeedsAi')}</p>
-          ${aiErr?.message ? html`<p class="inbox-tracked-err">${escHtml(aiErr.message)}</p>` : null}
+          <${Hint}>${t('inbox.trackNeedsAi')}<//>
+          ${aiErr?.message ? html`<p class="form-message form-message--error">${escHtml(aiErr.message)}</p>` : null}
         </div>` : null}
 
       ${phase === 'review' ? html`
         <div class="inbox-track-form">
-          <p class="inbox-track-hint">${t('inbox.trackHintAi')}</p>
+          <${Hint}>${t('inbox.trackHintAi')}<//>
           <label class="inbox-form-row">
             <span class="inbox-form-label">${t('inbox.trackOrganism')}</span>
-            <select class="inbox-input" value=${orgId} onChange=${(e) => { setOrgId(e.target.value); setWsId(''); }}>
+            <select class="select-field" value=${orgId} onChange=${(e) => { setOrgId(e.target.value); setWsId(''); }}>
               ${orgs.map(o => html`<option key=${o.id} value=${o.id}>${escHtml(o.name || o.id)}</option>`)}
             </select>
           </label>
           <label class="inbox-form-row">
             <span class="inbox-form-label">${t('inbox.trackWorkspace')}</span>
-            <select class="inbox-input" value=${wsId} onChange=${(e) => setWsId(e.target.value)} disabled=${!orgId}>
+            <select class="select-field" value=${wsId} onChange=${(e) => setWsId(e.target.value)} disabled=${!orgId}>
               <option value="">${t('inbox.trackChoose')}</option>
               ${workspaces.map(w => html`<option key=${w.id} value=${w.id}>${escHtml(w.name || w.id)}</option>`)}
             </select>
           </label>
           <label class="inbox-form-row">
             <span class="inbox-form-label">${t('inbox.trackType')}</span>
-            <select class="inbox-input" value=${namespace} onChange=${(e) => setNamespace(e.target.value)} disabled=${!recTypes.length}>
+            <select class="select-field" value=${namespace} onChange=${(e) => setNamespace(e.target.value)} disabled=${!recTypes.length}>
               ${recTypes.length === 0 ? html`<option value="">${t('inbox.trackNoTypes')}</option>` : null}
               ${recTypes.map(tp => html`<option key=${tp.namespace} value=${tp.namespace}>${escHtml(tp.name)}</option>`)}
             </select>
           </label>
           <label class="inbox-form-row">
             <span class="inbox-form-label">${t('inbox.trackTitle')}</span>
-            <input class="inbox-input" type="text" value=${title} onInput=${(e) => setTitle(e.target.value)} />
+            <input class="og-input" type="text" value=${title} onInput=${(e) => setTitle(e.target.value)} />
           </label>
           <label class="inbox-form-row">
             <span class="inbox-form-label">${t('inbox.trackContent')}</span>
-            <textarea class="inbox-input inbox-track-content" rows="4" value=${content} onInput=${(e) => setContent(e.target.value)}></textarea>
+            <textarea class="og-textarea" rows="4" value=${content} onInput=${(e) => setContent(e.target.value)}></textarea>
           </label>
           <label class="inbox-form-row">
             <span class="inbox-form-label">${t('inbox.trackReplyMode')}</span>
-            <select class="inbox-input" value=${replyMode} onChange=${(e) => setReplyMode(e.target.value)}>
+            <select class="select-field" value=${replyMode} onChange=${(e) => setReplyMode(e.target.value)}>
               <option value="approve">${t('inbox.trackModeApprove')}</option>
               <option value="auto">${t('inbox.trackModeAuto')}</option>
             </select>
           </label>
-          <p class="inbox-track-hint">${t('inbox.trackFillNote')}</p>
+          <${Hint}>${t('inbox.trackFillNote')}<//>
         </div>` : null}
     </${Modal}>`;
 }

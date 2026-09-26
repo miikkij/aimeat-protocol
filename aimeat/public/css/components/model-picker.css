@@ -1,0 +1,42 @@
+/**
+ * @file model-picker.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The model picker that opens under a row: a search field across the top, the
+ *   recommended group's heading, the models as rows (name and id, a trait or a note, the price, the
+ *   context) with the chosen one on the sun, a taken one dimmed, and a line with "show all" and how many
+ *   there are. Drawn one way in two tabs (the AI page's roles and a calibration's models, ai-pick and
+ *   cal-pick); moved here unchanged under one name (UI consolidation phase 5, a move). The frame and
+ *   the field's rule read the shape tokens.
+ *   Drawn as markup: <div class="model-picker"><input class="og-input">…<ul class="model-picker-list">
+ *   <li class="model-picker-row"><button>…</button></li></ul><div class="model-picker-more">…</div></div>.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 — 2026-09-25 — Moved out of ai-poster.css and calibrator-poster.css (UI consolidation phase 5, a move).
+ */
+
+.model-picker { margin-top: .5rem; border: var(--shape-frame) solid var(--shape-frame-colour); background: var(--bg); }
+.model-picker .og-input { border: 0; border-bottom: var(--shape-frame) solid var(--shape-field-colour); }
+.model-picker-group { padding: .4rem .75rem .1rem; }
+.model-picker-list { list-style: none; margin: 0; padding: 0; max-height: 24rem; overflow: auto; }
+.model-picker-row { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) auto auto; gap: 0 .9rem; align-items: center; padding: .45rem .75rem; border-bottom: 1px solid var(--border); }
+.model-picker-row.is-on { background: var(--sun); color: var(--on-sun); }
+.model-picker-row.is-taken { opacity: .5; }
+.model-picker-row b { font-size: .85rem; font-weight: 800; color: var(--text); }
+.model-picker-row code { display: block; font-family: var(--font-mono); font-size: .68rem; color: var(--text-dim); }
+/* A trait of the model in words (the AI page), or a note about it in typewriter (a calibration: "already added"). */
+.model-picker-row .model-picker-trait { font-size: .78rem; color: var(--text-dim); }
+.model-picker-row .model-picker-note { font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); }
+.model-picker-row .model-picker-price, .model-picker-row .model-picker-ctx { font-family: var(--font-mono); font-size: .72rem; text-align: right; white-space: nowrap; }
+.model-picker-row .model-picker-ctx { color: var(--text-dim); }
+.model-picker-row.is-on b, .model-picker-row.is-on code, .model-picker-row.is-on .model-picker-trait, .model-picker-row.is-on .model-picker-note, .model-picker-row.is-on .model-picker-ctx { color: var(--on-sun); }
+.model-picker-row a { color: inherit; text-decoration: none; }
+.model-picker-row button { all: unset; cursor: pointer; display: contents; }
+.model-picker-row button:disabled { cursor: default; }
+.model-picker-more { display: flex; align-items: center; gap: 1rem; padding: .5rem .75rem; font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); }
+.model-picker-empty { padding: .6rem .75rem; }
+
+@media (max-width: 860px) {
+  .model-picker-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .model-picker-row .model-picker-trait, .model-picker-row .model-picker-note { grid-column: 1 / -1; }
+}

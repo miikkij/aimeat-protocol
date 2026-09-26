@@ -7,6 +7,26 @@
  *   the agents as a table that opens into a card), the ink rail, the device-auth approvals, the
  *   scope modal.
  * @version-history
+ *   v4.14.0 -- 2026-09-26 -- The commands and prompts in Connect are the Code block (css/components/code-block.css), a unification: Jouni's decision "Code block".
+ *   v4.13.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
+ *   v4.12.0 -- 2026-09-26 -- A list of things to do or of steps is the numbered list (components/NumberedIndex.js: IndexList with IndexItem, or IndexStep for a step that opens nothing): the overview's next steps with the line under each name and the first on the sun, the Wallet key steps, a calibration run's proposals, the MCP and Agents connect steps, the basic agents, a server's setup steps (the number said once), the ecosystem steps out of their grey box, the decision rules' order and the notes of your own AI use; a place keeps only its margin (a unification: Jouni's decision "Numbered list").
+ *   v4.11.0 -- 2026-09-26 -- Every line that says a part is loading is the loading line: the quiet sentence with the blinking Loading mark, LoadingLine in views/profile/shared.js (a unification: the look most tabs use).
+ *   v4.10.0 -- 2026-09-25 -- The last labels over a field or a group wear .poster-label: the classic AI settings, the presence dialog, the scope groups, the ecosystem's trigger and sample, the scheduler's edit form, P&L's fields, the task runner's name; a place keeps its layout (Jouni's decision "Row label", a unification).
+ *   v4.9.0 -- 2026-09-25 -- Every quiet way on is the action link (.poster-action, its quiet tone where it sits among controls), and the one loud action is the dark block (.poster-slab, its control cut), a unification: Jouni's decisions Action link and Loud action.
+ *   v4.8.0 -- 2026-09-25 -- The one line a folded section shows is its lead (.og-lead); it keeps only its margin (a unification: the look most tabs use).
+ *   v4.7.0 -- 2026-09-25 -- The connect guide's fields are the Facts (css/components/facts.css; the guide takes `facts`), a unification: the look most tabs use.
+ *   v4.6.0 -- 2026-09-25 -- Every tag is the Tag (.poster-chip and its tones, .poster-chips for a row), a unification: Jouni's decision Tag.
+ *   v4.5.0 -- 2026-09-25 -- A lead or a paragraph that opens or explains a section is the og-lead; a grey one that explains is the Hint (UI consolidation phase 5, a unification).
+ *   v4.4.0 -- 2026-09-25 -- Every hint is the Hint (poster-hint, components/Hint.js), the look most Settings & Controls tabs draw (UI consolidation phase 5, a unification).
+ *   v4.3.0 -- 2026-09-25 -- Every quiet way on is the library's action link, .poster-action, with the
+ *     tone its meaning names: more for "show all" and more of a list, back, text for a plain grey
+ *     word, quiet (Jouni's decisions "Action link", "Panel action", "Dismiss", "Small link", "Step
+ *     button").
+ *   v4.2.0 -- 2026-09-25 -- The loud action is the library's dark block, .poster-slab: the control cut
+ *     where it sits in a row of controls or waits to be enabled, the danger tone for a delete that
+ *     cannot be undone (Jouni's decision "Loud action").
+ *   2026-09-25 -- What chooses what a list or a panel shows is the tab (.poster-tab, with its fold and filter tones), a unification: Jouni's decision "Tabs and filters".
+ *   v4.1.0 -- 2026-09-25 -- The og- page kit is library components: PageSection and FoldSection in /components, the kit's rules in css/components (tab-page, crumb-trail, page-head, figure-strip, page-section, fold-row, setting-box, form-fields, space-table) and css/views/organism-controls.css (UI consolidation phase 5, a move).
  *   v4.0.3 -- 2026-09-18 -- The connect prompt's model names come from the node
  *     (GET /v1/ai-tools, model_recommendation); without them it names no model.
  *   v4.0.2 -- 2026-09-18 -- The Hello Integration instruction is fetched from the node
@@ -99,7 +119,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { CopyButton } from '/components/CopyButton.js';
-import { Spinner } from './shared.js';
+import { LoadingLine } from './shared.js';
 import { apiGet, apiPost, apiPatch } from '/js/api.js';
 import { listAgents, updateAgentScopes, deleteAgent, getAgentGroups, saveAgentGroups } from '/js/services/agents.js';
 import { getNodeUrl } from '/js/services/auth.js';
@@ -107,7 +127,9 @@ import { timeAgo } from '/js/utils.js';
 import { useConfirm } from '/components/Modal.js';
 import { AgentConsent } from '/components/AgentConsent.js';
 import { McpSetupGuide } from './ai-setup-guide.js';
-import { Section, Fold, scrollTo } from '/views/profile/organisms/poster-parts.js';
+import { PageSection } from '/components/PageSection.js';
+import { FoldSection } from '/components/FoldSection.js';
+import { scrollTo } from '/views/profile/organisms/poster-parts.js';
 import { buildAgentPrompt, buildTaskRunnerPrompt, PLATFORMS, PLATFORM_KEYS, PLATFORM_LABELS } from './agents/connect-prompts.js';
 import { loadAgentOrder, saveAgentOrder, UNGROUPED_ID, loadCollapsedGroups, saveCollapsedGroups, loadSeen, saveSeen, markTabSeen, effectiveOrderedNames, matchesAgentQuery, popOutAgent, loadFold, saveFold } from './agents/tab-helpers.js';
 import { AgentSearch, FilterBar, ActiveTasksPanel, renderAgentGroups } from './agents/groups-render.js';
@@ -536,7 +558,7 @@ export default function AgentsTab({ session, showToast, onStats }) {
     } catch (e) { showToast(e.message || t('profile.unknownError'), true); }
   }
 
-  if (!agents) return html`<${Spinner} text=${t('profile.agents.loadingAgents')} />`;
+  if (!agents) return html`<${LoadingLine} text=${t('profile.agents.loadingAgents')} />`;
 
   // The figures. Ready and never-connected read the server's health verdict, the same one the
   // rows show, so the strip and the table cannot disagree.
@@ -552,7 +574,7 @@ export default function AgentsTab({ session, showToast, onStats }) {
   const openNew = () => { setNewOpen(true); requestAnimationFrame(() => scrollTo('agp-new')); };
   const openConnect = () => { setConnectOpen(true); saveFold(session?.owner, 'connect', true); requestAnimationFrame(() => scrollTo('agp-connect')); };
   const toggleConnect = () => { const next = !connectOpen; setConnectOpen(next); saveFold(session?.owner, 'connect', next); };
-  const connectDoor = html`<button type="button" class="og-door og-door--quiet" onClick=${toggleConnect}>${connectOpen ? p('close') : p('open')}</button>`;
+  const connectDoor = html`<button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${toggleConnect}>${connectOpen ? p('close') : p('open')}</button>`;
 
   return html`
     <div class="og og-agp">
@@ -560,19 +582,19 @@ export default function AgentsTab({ session, showToast, onStats }) {
       <div class="og-mast">
         <div class="og-mast-words">
           <h1 class="og-title poster-page-title">${t('profile.agents.title')} <small>${agents.length}</small></h1>
-          <div class="og-chips">
-            <span class="og-chip">${p('chipAgents', { n: agents.length })}</span>
-            <span class="og-chip">${p('chipReady', { n: ready })}</span>
-            <span class=${`og-chip ${waiting ? 'og-chip--coral' : 'og-chip--dim'}`}>${p('chipWaiting', { n: waiting })}</span>
-            ${problems.length > 0 ? html`<span class="og-chip og-chip--coral">${p('chipProblems', { n: problems.length })}</span>` : null}
-            ${federated > 0 ? html`<span class="og-chip og-chip--dim">${p('chipFederated', { n: federated })}</span>` : null}
-            ${tools > 0 ? html`<span class="og-chip og-chip--dim">${p('chipTools', { n: tools })}</span>` : null}
+          <div class="poster-chips">
+            <span class="poster-chip">${p('chipAgents', { n: agents.length })}</span>
+            <span class="poster-chip">${p('chipReady', { n: ready })}</span>
+            <span class=${`poster-chip ${waiting ? 'poster-chip--coral' : ''}`}>${p('chipWaiting', { n: waiting })}</span>
+            ${problems.length > 0 ? html`<span class="poster-chip poster-chip--coral">${p('chipProblems', { n: problems.length })}</span>` : null}
+            ${federated > 0 ? html`<span class="poster-chip">${p('chipFederated', { n: federated })}</span>` : null}
+            ${tools > 0 ? html`<span class="poster-chip">${p('chipTools', { n: tools })}</span>` : null}
           </div>
           <p class="og-desc">${p('lede')}</p>
         </div>
         <div class="og-mast-actions">
-          <button type="button" class="og-slab" onClick=${openNew}>${t('profile.agents.new.button')}</button>
-          <div class="og-doors"><button type="button" class="og-door" onClick=${openConnect}>${p('connectDoor')}</button></div>
+          <button type="button" class="poster-slab" onClick=${openNew}>${t('profile.agents.new.button')}</button>
+          <div class="og-doors"><button type="button" class="poster-action poster-action--small" onClick=${openConnect}>${p('connectDoor')}</button></div>
         </div>
       </div>
 
@@ -602,44 +624,44 @@ export default function AgentsTab({ session, showToast, onStats }) {
           <${NewAgentPanel} session=${session} showToast=${showToast} onCreated=${loadData} agents=${agents}
             open=${newOpen} setOpen=${setNewOpen} onWaiting=${setWaitingCount} />
 
-          <${Section} id="agp-connect" num="03" title=${p('secConnect')} count=${p('secConnectSub')} doors=${connectDoor}>
-            ${!connectOpen ? html`<p class="agp-folded">${p('connectLede')}</p>` : html`
-              <p class="agp-lead">${p('connectLede')}</p>
+          <${PageSection} id="agp-connect" num="03" title=${p('secConnect')} count=${p('secConnectSub')} doors=${connectDoor}>
+            ${!connectOpen ? html`<p class="og-lead agp-folded">${p('connectLede')}</p>` : html`
+              <p class="og-lead">${p('connectLede')}</p>
               ${/* The recommended road comes first and OPEN: the tool the person already pays for,
                     connected through their own app's connector settings. ai-tool-setup.ts has ranked
                     claude.ai first for months while this panel led with a terminal command; the panel
                     now agrees with its own data. */''}
-              <div class="agp-connect"><${McpSetupGuide} tabClass="poster-tab" activeClass="is-on" /></div>
+              <div class="agp-connect"><${McpSetupGuide} tabClass="poster-tab" activeClass="is-on" facts stepRows /></div>
 
               <div class="agp-connect-folds poster-row--thing">
-                <${Fold} id="agp-connect-cli" num="" title=${t('profile.agents.connectDeveloperTitle')} open=${cliExpanded} onToggle=${() => setCliExpanded(v => !v)}>
-                  <p class="text-caption mb-half"><strong>${t('profile.agents.connectOptionConnectorTitle')}</strong> ${t('profile.agents.connectOptionConnectorDesc')}</p>
-                  <p class="text-caption mb-1"><strong>${t('profile.agents.connectOptionFallbackTitle')}</strong> ${t('profile.agents.connectOptionFallbackDesc')}</p>
+                <${FoldSection} id="agp-connect-cli" num="" title=${t('profile.agents.connectDeveloperTitle')} open=${cliExpanded} onToggle=${() => setCliExpanded(v => !v)}>
+                  <p class="poster-hint mb-half"><strong>${t('profile.agents.connectOptionConnectorTitle')}</strong> ${t('profile.agents.connectOptionConnectorDesc')}</p>
+                  <p class="poster-hint mb-1"><strong>${t('profile.agents.connectOptionFallbackTitle')}</strong> ${t('profile.agents.connectOptionFallbackDesc')}</p>
 
                   <p class="mb-half text-bold">${t('profile.agents.cliInstall')}</p>
-                  <div class="agent-prompt-box"><code>npx aimeat connect --url ${getNodeUrl()} --owner ${session.owner}</code></div>
+                  <div class="code-block agent-prompt-box"><code>npx aimeat connect --url ${getNodeUrl()} --owner ${session.owner}</code></div>
                   <${CopyButton}
                     text=${`npx aimeat connect --url ${getNodeUrl()} --owner ${session.owner}`}
-                    className="btn-primary"
+                    className="poster-slab"
                     label=${t('profile.agents.copyCommand')}
                     />
 
                   <p class="mt-1 mb-half text-bold">${t('profile.agents.cliServe')}</p>
-                  <div class="agent-prompt-box"><code>npx aimeat connect serve</code></div>
+                  <div class="code-block agent-prompt-box"><code>npx aimeat connect serve</code></div>
 
-                  <p class="mt-1 text-caption">${t('profile.agents.cliDesc')}</p>
+                  <p class="mt-1 poster-hint">${t('profile.agents.cliDesc')}</p>
 
                   <p class="mt-1 mb-half text-bold">${t('profile.agents.agentInstructionTitle')}</p>
-                  <p class="text-caption mb-half">${t('profile.agents.agentInstructionDesc')}</p>
-                  <div class="agent-prompt-box">${helloPrompt || (helloFailed ? t('profile.agents.agentInstructionLoadFailed') : t('common.loading'))}</div>
+                  <p class="poster-hint mb-half">${t('profile.agents.agentInstructionDesc')}</p>
+                  <div class="code-block agent-prompt-box">${helloPrompt || (helloFailed ? t('profile.agents.agentInstructionLoadFailed') : t('common.loading'))}</div>
                   <${CopyButton}
                     text=${helloPrompt}
-                    className="btn-primary"
+                    className="poster-slab"
                     label=${t('profile.agents.copyAgentInstruction')}
                     />
 
                   <div class="pf-agent-divider poster-row--thing mt-1">
-                    <button class="expand-btn" onClick=${() => setPlatExpand(!platExpand)}>
+                    <button class="poster-action poster-action--small" onClick=${() => setPlatExpand(!platExpand)}>
                       <span>${t('profile.agents.noNodejs')}</span>
                       <span class="pf-chevron ${platExpand ? 'pf-chevron-open' : ''}">▼</span>
                     </button>
@@ -647,7 +669,7 @@ export default function AgentsTab({ session, showToast, onStats }) {
                       <div class="platform-instructions expanded">
                         <div class="platform-tabs poster-row--thing">
                           ${PLATFORM_KEYS.map(k => html`
-                            <button class="platform-tab ${k === activePlat ? 'active' : ''}" onClick=${() => setActivePlat(k)}>${t(PLATFORM_LABELS[k])}</button>
+                            <button class="poster-tab ${k === activePlat ? 'is-on' : ''}" onClick=${() => setActivePlat(k)}>${t(PLATFORM_LABELS[k])}</button>
                           `)}
                         </div>
                         ${/* SAFE: PLATFORMS is hardcoded developer constant, not user input */''}
@@ -657,37 +679,37 @@ export default function AgentsTab({ session, showToast, onStats }) {
                   </div>
                 <//>
 
-                <${Fold} id="agp-connect-paste" num="" title=${t('profile.agents.pasteAlt')} open=${pasteExpanded} onToggle=${() => setPasteExpanded(v => !v)}>
-                  <p class="text-caption mb-half">${t('profile.agents.pasteDesc')}</p>
-                  <div class="agent-prompt-box">${buildAgentPrompt(session, modelRec)}</div>
+                <${FoldSection} id="agp-connect-paste" num="" title=${t('profile.agents.pasteAlt')} open=${pasteExpanded} onToggle=${() => setPasteExpanded(v => !v)}>
+                  <p class="poster-hint mb-half">${t('profile.agents.pasteDesc')}</p>
+                  <div class="code-block agent-prompt-box">${buildAgentPrompt(session, modelRec)}</div>
                   <${CopyButton}
                     text=${buildAgentPrompt(session, modelRec)}
-                    className="btn-primary"
+                    className="poster-slab"
                     label=${t('common.copyPrompt')}
                     />
                 <//>
 
-                <${Fold} id="agp-connect-crew" num="" title=${t('profile.agents.taskRunner.title')} open=${taskRunnerExpanded} onToggle=${() => setTaskRunnerExpanded(v => !v)}>
-                  <p class="text-caption mb-half">${t('profile.agents.taskRunner.whatIs')}</p>
-                  <p class="text-caption mb-half">${t('profile.agents.taskRunner.whenToUse')}</p>
+                <${FoldSection} id="agp-connect-crew" num="" title=${t('profile.agents.taskRunner.title')} open=${taskRunnerExpanded} onToggle=${() => setTaskRunnerExpanded(v => !v)}>
+                  <p class="poster-hint mb-half">${t('profile.agents.taskRunner.whatIs')}</p>
+                  <p class="poster-hint mb-half">${t('profile.agents.taskRunner.whenToUse')}</p>
                   <p class="mb-half">
-                    <a class="pf-gh-link" href="https://github.com/miikkij/crewaimeat" target="_blank" rel="noopener">
+                    <a class="poster-action poster-action--small" href="https://github.com/miikkij/crewaimeat" target="_blank" rel="noopener">
                       ${GhMark}${t('profile.agents.taskRunner.repoLink')}
                     </a>
                   </p>
-                  <p class="text-caption mb-half"><strong>${t('profile.agents.taskRunner.exampleLabel')}</strong> ${t('profile.agents.taskRunner.exampleDesc')}</p>
+                  <p class="poster-hint mb-half"><strong>${t('profile.agents.taskRunner.exampleLabel')}</strong> ${t('profile.agents.taskRunner.exampleDesc')}</p>
                   <div class="mb-half mt-1">
-                    <label class="text-caption mb-half" for="pf-task-runner-name">${t('profile.agents.taskRunner.nameLabel')}</label>
+                    <label class="poster-label mb-half" for="pf-task-runner-name">${t('profile.agents.taskRunner.nameLabel')}</label>
                     <input id="pf-task-runner-name" type="text"
                            class="og-input"
                            placeholder="marketing-crew"
                            value=${taskRunnerName}
                            onInput=${(e) => setTaskRunnerName(e.target.value)} />
                   </div>
-                  <div class="agent-prompt-box">${buildTaskRunnerPrompt(session, taskRunnerName)}</div>
+                  <div class="code-block agent-prompt-box">${buildTaskRunnerPrompt(session, taskRunnerName)}</div>
                   <${CopyButton}
                     text=${buildTaskRunnerPrompt(session, taskRunnerName)}
-                    className="btn-primary"
+                    className="poster-slab"
                     label=${t('profile.agents.taskRunner.copyButton')}
                     />
                 <//>
@@ -695,9 +717,9 @@ export default function AgentsTab({ session, showToast, onStats }) {
             `}
           <//>
 
-          <${Section} id="agp-list" num="04" title=${p('secAgents')} count=${agents.length}>
+          <${PageSection} id="agp-list" num="04" title=${p('secAgents')} count=${agents.length}>
             ${agents.length === 0
-              ? html`<p class="agp-folded">${t('profile.agents.empty')}</p>`
+              ? html`<p class="og-lead agp-folded">${t('profile.agents.empty')}</p>`
               : html`
                 <${AgentSearch}
                   query=${query}

@@ -1,0 +1,16 @@
+/**
+ * @file tier-list.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The tier list: a short key of levels, each a coral typewriter mark (T1, T2, T3) in a
+ *   narrow column and what the level means beside it. Moved unchanged out of
+ *   css/views/appdev-poster.css (AppDev, "Start here": the three tiers of an app), where it is the
+ *   only place it is drawn (UI consolidation phase 5, a move).
+ *   Drawn as markup: <div class="ad-tier"><b>T1</b><span>…</span><b>T2</b><span>…</span></div>.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 — 2026-09-25 — Initial: the rules of .ad-tier, moved unchanged from appdev-poster.css.
+ */
+
+.ad-tier { display: grid; grid-template-columns: 3.5rem minmax(0, 1fr); gap: .35rem .9rem; margin-top: .8rem; font-size: .9rem; line-height: 1.5; color: var(--text); }
+.ad-tier b { font-family: var(--font-mono); font-size: .8rem; font-weight: 800; color: var(--accent); }

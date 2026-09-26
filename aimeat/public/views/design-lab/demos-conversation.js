@@ -9,12 +9,15 @@
  * @structure CONVERSATION_DEMOS — { [id]: { variants: [{ name, render(ex) }], height? } }
  * @usage import { CONVERSATION_DEMOS } from './demos-conversation.js';
  * @version-history
+ *   v1.4.0 — 2026-09-26 — The typing box is the chat's one row (.poster-composer and its stacked cut): the field with the thick line under it, the tools as framed squares, the dark block that sends with the page's word; Messages (and its Broadcast form) and an agent's Chat tab take it; the framed field, the round-cornered tools and the box's frame go (a unification: Jouni's decision "Typing box").
+ *   v1.3.0 — 2026-09-26 — A message is the chat's turn (components/Turn.js classes): your words bold on the sun, the other side's beside the pale coral spine, the name above the words, the time and the read marks under them with Copy and Listen, the other six actions behind one ⋯ (CardMenu inline); an agent's options are the chat's choices. The frame, the picture beside the other side, the action pill and the Chat tab's bubbles, pairing lines and small reader go; a suggested reply waiting for approval keeps its dashed box (a unification: Jouni's decision "Message").
+ *   v1.2.0 — 2026-09-26 — The conversation list's person heading (Jouni's decision "Conversation list").
  *   v1.1.0 — 2026-09-24 — The starters read as sentences (Jouni's decision "Suggestion").
  *   v1.0.0 — 2026-09-23 — Initial (UI consolidation phase 2, the library view).
  */
 import { h } from 'preact';
 import htm from 'htm';
-import { ThreadList } from '/components/ThreadList.js';
+import { ThreadList, ThreadPerson } from '/components/ThreadList.js';
 import { Turn, LiveTurn, TurnError } from '/components/Turn.js';
 import { Composer } from '/components/Composer.js';
 import { StatusBar } from '/components/AgentStatus.js';
@@ -84,6 +87,12 @@ export const CONVERSATION_DEMOS = {
   'thread-list': { variants: [
     { name: 'default', render: (ex) => html`<${ThreadList} threads=${ex.threads} activeId=${ex.activeId} onOpen=${noop} onNew=${noop} onDelete=${noop} onClose=${noop} />` },
     { name: 'empty', render: () => html`<${ThreadList} threads=${[]} onOpen=${noop} onNew=${noop} onDelete=${noop} onClose=${noop} />` },
+    { name: 'person', render: () => html`<div><${ThreadPerson} expanded=${true} onClick=${noop}>
+        <span class="poster-thread-person-name">mika</span>
+        <span class="poster-count poster-count--tally">3 conversations</span><span class="poster-count poster-count--waiting">2 unread</span><//>
+      <div class="poster-thread-list"><div class="poster-thread poster-thread--active"><button type="button" class="poster-thread-open">
+        <span class="poster-thread-title">Brand colours</span><span class="poster-thread-sub">10:42 · The client wants the coral a little warmer.</span></button>
+        <span class="poster-count poster-count--waiting">1</span></div></div></div>` },
   ] },
   'agent-status': { variants: [
     { name: 'the house pays', render: (ex) => html`<${StatusBar} status=${ex.status} onReset=${noop} />` },
@@ -104,6 +113,9 @@ export const CONVERSATION_DEMOS = {
     { name: 'live, thinking', render: () => html`<${LiveTurn} text="" thought="" tools=${[]} cards=${[]} busy=${true} />` },
     { name: 'live, running a tool', render: () => html`<${LiveTurn} text="Building your page" tools=${[{ title: 'aimeat_app_publish', status: 'pending' }]} cards=${[]} busy=${true} />` },
     { name: 'could not run', render: () => html`<${TurnError} message="The agent did not answer in time." onRetry=${noop} />` },
+    { name: 'with a name line (Messages)', render: () => html`<div class="poster-turn poster-turn--user"><span class="poster-label poster-turn-who">You</span>
+        <div class="poster-turn-body"><p class="poster-turn-said">Yes, within the palette. I will send two options.</p></div>
+        <div class="poster-time poster-turn-meta"><span>10:42</span><span>✓✓</span></div></div>` },
   ] },
   'result-card': { variants: [
     { name: 'every kind', render: () => html`<${ResultCards} cards=${['page', 'app', 'image', 'file', 'memory', 'workspace'].map((kind) => ({
@@ -127,5 +139,11 @@ export const CONVERSATION_DEMOS = {
     { name: 'attachments, one failed', render: () => html`<${Composer} value="" onInput=${noop} onSend=${noop} onStop=${noop} onAttach=${noop} onDropAttachment=${noop}
         attachments=${[{ id: 'a', name: 'photo.png', preview: '/og-image.png' }, { id: 'b', name: 'report.pdf', state: 'error', error: 'too large' }]} />` },
     { name: 'no agent here', render: () => html`<${Composer} value="" disabled=${true} note="There is no chat agent on this node." onInput=${noop} onSend=${noop} onStop=${noop} />` },
+    { name: 'stacked (Messages: three squares)', render: () => html`<div class="poster-composer poster-composer--stack poster-row--thing"><div class="poster-composer-row">
+        <textarea class="poster-composer-input" rows="1" placeholder="Write a message…">I will send two options.</textarea>
+        <button type="button" class="poster-icon poster-composer-tool" title="Attach a file">📎</button>
+        <button type="button" class="poster-icon poster-composer-tool" title="Record a voice message">🎤</button>
+        <button type="button" class="poster-icon poster-composer-tool" title="The bigger editor">⤢</button>
+        <button type="button" class="poster-slab poster-slab--control poster-composer-send">Reply</button></div></div>` },
   ] },
 };

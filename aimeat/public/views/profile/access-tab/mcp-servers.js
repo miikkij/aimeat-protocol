@@ -21,6 +21,21 @@
  * @structure McpServersSection — GET /v1/mcp-servers, attach, switch off, remove, and the tool list
  *   on demand.
  * @version-history
+ *   v1.9.0 — 2026-09-26 — A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
+ *   v1.8.0 — 2026-09-26 — A server's name wears the Key's face (.key-name, css/components/key-name.css); .mem-key keeps only its place (a unification: the look most tabs use).
+ *   v1.7.0 — 2026-09-25 — The older tabs' remaining help lines are the Hint (.poster-hint); their own sizes and greys go, a place keeps its margin (a unification: the look most tabs use).
+ *   v1.6.0 — 2026-09-25 — Every drop-down is the Select field (.select-field, css/components/select-field.css); a place keeps only its width and margin (a unification: the look most tabs use).
+ *   v1.5.0 — 2026-09-25 — Every one-line field is the Text field (.og-input); a place keeps only its layout (a unification: the look most tabs use).
+ *   v1.4.0 — 2026-09-25 — A delete, revoke or reset link keeps its coral as the action link's danger
+ *     tone, .poster-action--danger (Jouni's decision "Action link").
+ *   v1.3.0 — 2026-09-25 — Every quiet way on is the library's action link, .poster-action, with the
+ *     tone its meaning names: more for "show all" and more of a list, back, text for a plain grey
+ *     word, quiet (Jouni's decisions "Action link", "Panel action", "Dismiss", "Small link", "Step
+ *     button").
+ *   v1.2.0 — 2026-09-25 — The loud action is the library's dark block, .poster-slab: the control cut
+ *     where it sits in a row of controls or waits to be enabled, the danger tone for a delete that
+ *     cannot be undone (Jouni's decision "Loud action").
+ *   2026-09-25 -- The lines that say a list is empty (or has nothing to show yet) are the quiet sentence (.poster-quiet, QuietNote), a unification: Jouni's decision "Empty line".
  *   v1.1.0 — 2026-09-16 — Attach and sign-in are not retried. The shared client retries any 5xx, and
  *     attaching stores the row before it answers, so a dead address was retried into "you already
  *     have a server called X". Found by pressing the button in a real browser.
@@ -33,6 +48,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { useConfirm } from '/components/Modal.js';
+import { QuietNote } from '/components/QuietNote.js';
 import { api, apiGet, apiPatch, apiDelete } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
 
@@ -222,34 +238,34 @@ export function McpServersSection({ showToast }) {
     <div class="access-section">
       <${ConfirmUI} />
       <h3 class="access-h3">${t('profile.access.mcpTitle') || 'MCP servers'}</h3>
-      <p class="text-meta-sm">${t('profile.access.mcpIntro')
+      <p class="poster-hint">${t('profile.access.mcpIntro')
         || 'Other MCP servers you have attached. Your AI, your agents and your apps can use them, and the credential stays here in your own AIMEAT — nothing acting for you ever sees it.'}</p>
 
       ${servers.length === 0 && html`
-        <div class="mem-item"><span class="adm-text-dim">${t('profile.access.mcpEmpty') || 'No MCP servers attached yet.'}</span></div>
+        <div class="mem-item"><${QuietNote}>${t('profile.access.mcpEmpty') || 'No MCP servers attached yet.'}<//></div>
       `}
 
       ${servers.map(s => html`
         <div class="mem-item" key=${s.id}>
-          <span class="mem-key">${escHtml(s.title || s.slug)}</span>
+          <span class="mem-key key-name">${escHtml(s.title || s.slug)}</span>
           <span class="text-meta-sm">
             ${escHtml(s.slug)} · ${(t('profile.access.mcpToolCount') || '{n} tools')
               .replace('{n}', String(s.toolCount))}${statusNote(s) ? ' · ' + statusNote(s) : ''}
           </span>
           ${s.status === 'needs_reauth' && html`
-            <button class="btn-outline" disabled=${busy === s.id} onClick=${() => authorize(s)}>
+            <button class="poster-action poster-action--small" disabled=${busy === s.id} onClick=${() => authorize(s)}>
               ${t('profile.access.mcpSignIn') || 'Sign in'}
             </button>
           `}
-          <button class="btn-ghost" disabled=${busy === s.id} onClick=${() => showTools(s)}>
+          <button class="poster-action poster-action--small" disabled=${busy === s.id} onClick=${() => showTools(s)}>
             ${toolsFor === s.id
               ? (t('profile.access.mcpHideTools') || 'Hide tools')
               : (t('profile.access.mcpShowTools') || 'Show tools')}
           </button>
-          <button class="btn-outline" disabled=${busy === s.id} onClick=${() => toggle(s)}>
+          <button class="poster-action poster-action--small" disabled=${busy === s.id} onClick=${() => toggle(s)}>
             ${s.enabled ? (t('profile.access.mcpSwitchOff') || 'Switch off') : (t('profile.access.mcpSwitchOn') || 'Switch on')}
           </button>
-          <button class="btn-ghost btn-danger" onClick=${() => remove(s)}>
+          <button class="poster-action poster-action--small poster-action--danger" onClick=${() => remove(s)}>
             ${t('profile.access.mcpRemove') || 'Remove server'}
           </button>
         </div>
@@ -264,33 +280,33 @@ export function McpServersSection({ showToast }) {
         `}
       `)}
 
-      <button class="btn-ghost" onClick=${() => setAddOpen(!addOpen)}>
+      <button class="poster-action poster-action--small" onClick=${() => setAddOpen(!addOpen)}>
         ${addOpen ? (t('profile.access.mcpCancel') || 'Cancel') : (t('profile.access.mcpAdd') || 'Attach a server')}
       </button>
 
       ${addOpen && html`
         <div class="mem-item">
-          <input class="adm-input" placeholder=${t('profile.access.mcpName') || 'Short name, e.g. jira'}
+          <input class="og-input" placeholder=${t('profile.access.mcpName') || 'Short name, e.g. jira'}
             value=${draft.name} onInput=${e => setDraft({ ...draft, name: e.target.value })} />
-          <input class="adm-input" placeholder=${t('profile.access.mcpUrl') || 'Address (https)'}
+          <input class="og-input" placeholder=${t('profile.access.mcpUrl') || 'Address (https)'}
             value=${draft.url} onInput=${e => setDraft({ ...draft, url: e.target.value })} />
-          <input class="adm-input" placeholder=${t('profile.access.mcpTitleField') || 'What to call it (optional)'}
+          <input class="og-input" placeholder=${t('profile.access.mcpTitleField') || 'What to call it (optional)'}
             value=${draft.title} onInput=${e => setDraft({ ...draft, title: e.target.value })} />
-          <select class="adm-input" value=${draft.auth}
+          <select class="select-field" value=${draft.auth}
             onChange=${e => setDraft({ ...draft, auth: e.target.value })}>
             <option value="token">${t('profile.access.mcpAuthToken') || 'It gave me a token'}</option>
             <option value="oauth">${t('profile.access.mcpAuthOauth') || 'I sign in to it'}</option>
           </select>
           ${draft.auth === 'token' && html`
-            <input class="adm-input" type="password" autocomplete="off"
+            <input class="og-input" type="password" autocomplete="off"
               placeholder=${t('profile.access.mcpToken') || 'Token, if it needs one'}
               value=${draft.token} onInput=${e => setDraft({ ...draft, token: e.target.value })} />
-            <input class="adm-input" placeholder=${t('profile.access.mcpHeader') || 'Header for the token (optional)'}
+            <input class="og-input" placeholder=${t('profile.access.mcpHeader') || 'Header for the token (optional)'}
               value=${draft.header} onInput=${e => setDraft({ ...draft, header: e.target.value })} />
           `}
-          <p class="text-meta-sm">${t('profile.access.mcpAddNote')
+          <p class="poster-hint">${t('profile.access.mcpAddNote')
             || 'The address is checked before anything is saved, so a wrong address or token is reported now. The token is encrypted here and never shown again.'}</p>
-          <button class="btn-primary" disabled=${busy === 'attach'} onClick=${attach}>
+          <button class="poster-slab poster-slab--control" disabled=${busy === 'attach'} onClick=${attach}>
             ${busy === 'attach'
               ? (t('profile.access.mcpChecking') || 'Checking the server…')
               : (t('profile.access.mcpAttach') || 'Attach')}

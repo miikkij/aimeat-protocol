@@ -1,0 +1,26 @@
+/**
+ * @file how-roads.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description Three ways to do one thing, side by side in Object boxes: each its key in coral
+ *   typewriter, its name in bold, a grey sentence, and the line of code or the words that start it at
+ *   the bottom; one column on a phone. Drawn one way by Notifications, Companies and Email (all three
+ *   write nt-road, whose rules sat in notifications-poster.css); moved here unchanged with its class
+ *   names (UI consolidation phase 5, a move).
+ *   Drawn as markup: <div class="nt-roads"><div class="nt-road poster-box"><span class="nt-road-k">…</span>
+ *   <b>…</b><p>…</p><code class="code-inline">…</code></div>…</div>.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 — 2026-09-25 — Moved out of notifications-poster.css (UI consolidation phase 5, a move).
+ */
+
+.nt-roads { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .8rem; }
+.nt-road { display: flex; flex-direction: column; gap: .35rem; margin: 0; padding: .9rem 1rem; font-size: .85rem; line-height: 1.5; color: var(--text-dim); }
+.nt-road b { font-weight: 800; font-size: .95rem; color: var(--text); }
+.nt-road p { margin: 0; }
+.nt-road-k { font-family: var(--font-mono); font-size: .7rem; color: var(--accent); }
+.nt-road .code-inline { margin-top: auto; }
+
+@media (max-width: 860px) {
+  .nt-roads { grid-template-columns: 1fr; }
+}

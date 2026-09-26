@@ -14,6 +14,11 @@
  *   &preview=<key>&style=<style> wears the draft Themes & Styles sends under that key ·
  *   &look=<theme>&style=<style> wears a saved theme · &fk=<key> sends what it measured to the editor
  * @version-history
+ *   v1.6.0 — 2026-09-26 — The values carry `shadow`, so "What changes" can say a shadow grows,
+ *     shrinks, comes or goes (the last round: the contents rail's phone shadow). With `look=`, the
+ *     frame measures again after the theme's sheet has settled.
+ *   v1.5.0 — 2026-09-25 — The values carry `left`, a line on the left side only (a quoted request, a
+ *     turn's spine), so "What changes" can say it; scripts/design-lab-crops.ts reads it the same way.
  *   v1.4.0 — 2026-09-24 — Themes & Styles: `preview=<key>&style=` wears a keyed draft, `look=&style=` a
  *     saved theme and style (the lab's picker), and `fk=` sends the frame's measurements (frame-checks.js).
  *   v1.3.0 — 2026-09-24 — The lab's sheet (css/design-lab-proposals.css) is loaded by this page only.
@@ -77,12 +82,18 @@ function measureValues(el) {
     ? 'none' : `${Math.max(1, Math.round(width))}px ${s.borderTopStyle} ${colourName(s.borderTopColor)}`;
   const size = parseFloat(s.fontSize);
   const spacing = parseFloat(s.letterSpacing);
+  // A line on the left only, as a quoted request or a turn's spine has; a full frame is `frame`.
+  const lw = parseFloat(s.borderLeftWidth);
+  const left = s.borderLeftStyle === 'none' || !lw || colourName(s.borderLeftColor) === 'none'
+    || (lw === width && s.borderLeftStyle === s.borderTopStyle && s.borderLeftColor === s.borderTopColor)
+    ? 'none' : `${Math.max(1, Math.round(lw))}px ${s.borderLeftStyle} ${colourName(s.borderLeftColor)}`;
   return {
     font: `${family} ${rem(s.fontSize)} ${s.fontWeight}`,
     case: s.textTransform === 'none' ? 'as written' : s.textTransform,
     tracking: Number.isFinite(spacing) && size ? `${String(Math.round((spacing / size) * 100) / 100).replace(/^0\./, '.')}em` : 'normal',
     padding: s.padding.split(' ').map(rem).join(' '),
     frame: border,
+    left,
     radius: s.borderRadius === '0px' ? 'none' : s.borderRadius,
     fill: s.backgroundImage !== 'none' && s.backgroundImage.includes('gradient') ? 'a gradient' : colourName(s.backgroundColor),
     colour: colourName(s.color),
@@ -91,6 +102,9 @@ function measureValues(el) {
     // A mark (📎, ✗, ⋯) has no letters, so what the font does to it is not a change a person reads.
     letters: /\p{L}/u.test(el.textContent || '') ? 'yes' : 'no',
     dimmed: parseFloat(s.opacity) < 1 ? 'yes' : 'no',
+    // The shadow as written, its colour named ("var(--sun) 6px 6px 0px 0px"); the crop script does
+    // not compare it, since a page picture is 1280 px wide and a frame is often a phone's width.
+    shadow: s.boxShadow === 'none' ? 'none' : s.boxShadow.replace(/rgba?\([^)]*\)/g, (c) => colourName(c)),
   };
 }
 
@@ -274,8 +288,11 @@ export default function DesignLabFrame() {
     const ro = new ResizeObserver(report);
     ro.observe(stage.current);
     report();
-    return () => ro.disconnect();
-  }, [example, demo, v, solo, sendChecks]);
+    // A saved theme's sheet arrives after the first measure, often without changing a size, and a
+    // transition it starts (the slab's shadow) runs after that: measure again once it has settled.
+    const again = look ? [setTimeout(report, 900), setTimeout(report, 2000)] : [];
+    return () => { ro.disconnect(); again.forEach(clearTimeout); };
+  }, [example, demo, v, solo, sendChecks, look]);
 
   if (!demo) return html`<p class="poster-specimen-stage">${tr('designLab.noDemo', 'No demo for this component.')}</p>`;
   const variant = demo.variants[v] ?? demo.variants[0];

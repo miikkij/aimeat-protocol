@@ -18,6 +18,7 @@
  * @structure Style · StyleInput · OnlyMode · builtinStyles · prepareStyle · styleSheet · swatchOf
  * @usage import { builtinStyles, prepareStyle, styleSheet } from './styles.js';
  * @version-history
+ *   v1.1.0 — 2026-09-26 — A stored style without a token added since takes the AIMEAT style's value for it, so --ink-ground and --on-ink-ground do not refuse an older style (Jouni's decision "dark-ground").
  *   v1.0.0 — 2026-09-24 — Initial: the style level of the two-level model (was the branch's "theme").
  */
 import { readFileSync } from 'node:fs';
@@ -74,7 +75,9 @@ export function prepareStyle(input: StyleInput, base: Style): { style: Omit<Styl
     const name = (input.name ?? base.name).trim();
     if (!name || name.length > 60 || /[<>]/.test(name) || [...name].some((c) => c.charCodeAt(0) < 32)) refused.push('name: 1 to 60 characters, no angle brackets');
     const merge = (mode: 'light' | 'dark', given: TokenMap | undefined): TokenMap => {
-        const out: TokenMap = { ...base[mode] };
+        // A style stored before a token was added takes the AIMEAT style's value for it: the value
+        // theme.css already gave it, so it looks the same (--ink-ground reads the style's own --text).
+        const out: TokenMap = { ...builtinStyles()[0][mode], ...base[mode] };
         if (given !== undefined && (typeof given !== 'object' || given === null || Array.isArray(given))) { refused.push(`${mode}: an object of token → value`); return out; }
         for (const [token, value] of Object.entries(given ?? {})) {
             if (!isThemeToken(token)) { refused.push(`${mode} ${token}: not a token a style sets`); continue; }

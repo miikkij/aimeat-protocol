@@ -8,6 +8,8 @@
  * @usage Linked from public/spa.html in the component block, whose order keeps the order these
  *   rules had when they were one sheet.
  * @version-history
+ *   v1.3.0 — 2026-09-26 — The stacked cut, .poster-composer--stack: on a phone the field keeps the
+ *     whole width (Jouni's decision "Typing box").
  *   v1.2.0 — 2026-09-24 — The attachment and the field read the theme's shape values (a move).
  *   v1.1.0 — 2026-09-24 — The tools are the icon button; only their place stays here.
  *   v1.0.0 — 2026-09-23 — Moved unchanged from css/parts*.css (UI consolidation phase 1, a move).
@@ -78,6 +80,14 @@
    decision "Icon button"); this keeps their place in the row. */
 .poster-composer-tool { flex: 0 0 auto; }
 .poster-composer-send { flex: 0 0 auto; }
+/* The stacked cut (Messages): the button stands at the right end of the row even when the field is
+   not in it (the bigger editor above the row takes the field's place), and on a phone the field keeps
+   the whole first line and the tools and the button go under it, so there is room to write. */
+.poster-composer--stack .poster-composer-send { margin-left: auto; }
+@media (max-width: 760px) {
+  .poster-composer--stack .poster-composer-row { flex-wrap: wrap; }
+  .poster-composer--stack .poster-composer-input { flex: 1 1 100%; }
+}
 @media (max-width: 760px) {
   .poster-composer {
     padding: 8px 8px calc(10px + env(safe-area-inset-bottom, 0px)) 12px;

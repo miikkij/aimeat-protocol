@@ -12,6 +12,24 @@
  * @structure default export TabQuality({ agentName })
  * @usage rendered by agent-card.js renderTabContent() for the 'quality' tab
  * @version-history
+ *   v1.19.0 -- 2026-09-26 -- The line under a review's context is the Listing's typewriter line (.listing-meta), a unification: Jouni's decision "Meta line".
+ *   v1.18.0 -- 2026-09-26 -- Every star rating is the library's Rating stars (css/components/rating-stars.css): the reviews, the overall line and a rated row in the shown tone, dark and grey; the inline picker in the tone to give, dark up to the star under the pointer (a unification: Jouni's decision "Rating stars").
+ *   v1.17.0 -- 2026-09-26 -- A small heading over a group of fields, a card or a note is the Sub-heading (.sub-heading: small ink headline letters); the coral small capitals, the bold ink words and the coral headline letters go (a unification: Jouni's decision "Sub-heading").
+ *   v1.16.0 -- 2026-09-26 -- A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
+ *   v1.15.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
+ *   v1.14.0 -- 2026-09-26 -- Every line that says a part is loading is the loading line: the quiet sentence with the blinking Loading mark, LoadingLine in views/profile/shared.js (a unification: the look most tabs use).
+ *   v1.13.0 -- 2026-09-25 -- Every word that says a state is the Status (.poster-status fine, attention, danger), a unification: Jouni's decision Status.
+ *   v1.12.0 -- 2026-09-25 -- A grey line that explains is the Hint (poster-hint, css/components/hint.css); a place keeps only its margin (a unification: the look most tabs use).
+ *   v1.11.0 -- 2026-09-25 -- The custom metrics are the Facts (css/components/facts.css), a unification: the look most tabs use.
+ *   v1.10.0 -- 2026-09-25 -- A row of figures is the figure strip (og-strip, css/components/figure-strip.css), the look most Settings tabs draw (UI consolidation phase 5, a unification).
+ *   v1.9.0 -- 2026-09-25 -- Every tag is the Tag (.poster-chip and its tones, .poster-chips for a row), a unification: Jouni's decision Tag.
+ *   v1.8.0 -- 2026-09-25 -- Every time a thing happened wears .poster-time (Jouni's decision "Timestamp", a unification).
+ *   v1.7.0 -- 2026-09-25 -- The row labels (field and key labels, column heads, box labels) wear .poster-label (Jouni's decision "Row label", a unification).
+ *   v1.6.0 -- 2026-09-25 -- Every quiet way on is the library's action link, .poster-action, with the
+ *     tone its meaning names: more for "show all" and more of a list, back, text for a plain grey
+ *     word, quiet (Jouni's decisions "Action link", "Panel action", "Dismiss", "Small link", "Step
+ *     button").
+ *   2026-09-25 -- The lines that say a list is empty (or has nothing to show yet) are the quiet sentence (.poster-quiet, QuietNote), a unification: Jouni's decision "Empty line".
  *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
  *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
  *   v1.5.0 -- 2026-07-17 -- Card layout: performance full-width, reviews|rate side by
@@ -42,10 +60,11 @@ import { num, dateTime as fmtDateTime } from '/js/format.js';
 
 const html = htm.bind(h);
 
-/** Glyph row for an average star value (rounded to nearest whole star). */
+/** An average star value (rounded to the nearest whole star) as the Rating stars' shown tone
+ *  (css/components/rating-stars.css): the given stars dark, the others grey. */
 function starGlyphs(value) {
   const full = Math.max(0, Math.min(5, Math.round(value)));
-  return '★★★★★'.slice(0, full) + '☆☆☆☆☆'.slice(0, 5 - full);
+  return html`<span class="op-stars op-stars--shown" role="img" aria-label=${`${full}/5`}>${[1, 2, 3, 4, 5].map(n => html`<span key=${n} class=${`op-star${n <= full ? ' on' : ''}`} aria-hidden="true">★</span>`)}</span>`;
 }
 
 /** Localised context label, falling back to the raw enum value. */
@@ -70,9 +89,9 @@ function fmtWhen(s) {
 function InlineStars({ onPick, disabled }) {
   const [hover, setHover] = useState(0);
   return html`
-    <span class="pf-agd-inline-stars" role="radiogroup" onMouseLeave=${() => setHover(0)}>
+    <span class="op-stars" role="radiogroup" onMouseLeave=${() => setHover(0)}>
       ${[1, 2, 3, 4, 5].map(n => html`
-        <button key=${n} class="pf-agd-inline-star ${n <= hover ? 'pf-agd-inline-star--hot' : ''}"
+        <button key=${n} class="op-star ${n <= hover ? 'on' : ''}"
           disabled=${disabled} aria-label=${String(n)}
           onMouseEnter=${() => setHover(n)}
           onClick=${() => onPick(n)}>★</button>
@@ -147,7 +166,7 @@ export default function TabQuality({ agentName, showToast }) {
   useEffect(() => onLiveUpdate(['agents'], () => loadRef.current()), []);
 
   if (loading) {
-    return html`<div class="pf-agd-empty">${t('profile.loading')}</div>`;
+    return html`<div class="poster-quiet pf-agd-empty loading-mark">${t('profile.loading')}</div>`;
   }
 
   const perf = data?.performance || {};
@@ -162,34 +181,34 @@ export default function TabQuality({ agentName, showToast }) {
     <div class="pf-agd-quality pf-agd-card-grid">
       <!-- Performance -->
       <div class="pf-agd-card pf-agd-card--full poster-row--thing">
-      <div class="pf-agd-section-title">${t('profile.agents.detail.quality.performanceTitle')}</div>
-      <div class="pf-agd-quality-desc">${t('profile.agents.detail.quality.performanceDesc')}</div>
-      <div class="stat-grid">
-        <div class="stat-card poster-row--thing">
-          <div class="stat-card-value">${perf.tasks?.total ?? 0}</div>
-          <div class="stat-card-label">${t('profile.agents.detail.quality.tasksTotal')}</div>
+      <div class="pf-agd-section-title sub-heading">${t('profile.agents.detail.quality.performanceTitle')}</div>
+      <div class="poster-hint pf-agd-quality-desc">${t('profile.agents.detail.quality.performanceDesc')}</div>
+      <div class="og-strip pf-figures">
+        <div>
+          <b>${perf.tasks?.total ?? 0}</b>
+          <span>${t('profile.agents.detail.quality.tasksTotal')}</span>
         </div>
-        <div class="stat-card poster-row--thing">
-          <div class="stat-card-value">${perf.tasks?.completed ?? 0}</div>
-          <div class="stat-card-label">${t('profile.agents.detail.quality.tasksCompleted')}</div>
+        <div>
+          <b>${perf.tasks?.completed ?? 0}</b>
+          <span>${t('profile.agents.detail.quality.tasksCompleted')}</span>
         </div>
-        <div class="stat-card poster-row--thing">
-          <div class="stat-card-value">${perf.tasks?.successRate != null ? `${Math.round(perf.tasks.successRate * 100)}%` : '-'}</div>
-          <div class="stat-card-label">${t('profile.agents.detail.quality.successRate')}</div>
+        <div>
+          <b>${perf.tasks?.successRate != null ? `${Math.round(perf.tasks.successRate * 100)}%` : '-'}</b>
+          <span>${t('profile.agents.detail.quality.successRate')}</span>
         </div>
-        <div class="stat-card poster-row--thing">
-          <div class="stat-card-value">${fmtSeconds(perf.duration?.avgCompletionSeconds)}</div>
-          <div class="stat-card-label">${t('profile.agents.detail.quality.avgTime')}</div>
+        <div>
+          <b>${fmtSeconds(perf.duration?.avgCompletionSeconds)}</b>
+          <span>${t('profile.agents.detail.quality.avgTime')}</span>
         </div>
-        <div class="stat-card poster-row--thing">
-          <div class="stat-card-value">${perf.events?.total ?? 0}</div>
-          <div class="stat-card-label">${t('profile.agents.detail.quality.events')}</div>
+        <div>
+          <b>${perf.events?.total ?? 0}</b>
+          <span>${t('profile.agents.detail.quality.events')}</span>
         </div>
       </div>
       ${durKeys.length > 0 && html`
         <div class="pf-agd-quality-durations">
           ${durKeys.map(ctx => html`
-            <span key=${ctx} class="pf-agd-quality-dur-chip">
+            <span key=${ctx} class="poster-chip">
               ${ctxLabel(ctx)}: ${fmtSeconds(durByContext[ctx].avgSeconds)} (${durByContext[ctx].count})
             </span>
           `)}
@@ -200,10 +219,10 @@ export default function TabQuality({ agentName, showToast }) {
 
       <!-- Reviews by context -->
       <div class="pf-agd-card poster-row--thing">
-      <div class="pf-agd-section-title">${t('profile.agents.detail.quality.reviewsTitle')}</div>
-      <div class="pf-agd-quality-desc">${t('profile.agents.detail.quality.reviewsDesc')}</div>
+      <div class="pf-agd-section-title sub-heading">${t('profile.agents.detail.quality.reviewsTitle')}</div>
+      <div class="poster-hint pf-agd-quality-desc">${t('profile.agents.detail.quality.reviewsDesc')}</div>
       ${contextKeys.length === 0
-        ? html`<div class="pf-agd-empty">${t('profile.agents.detail.quality.noReviews')}</div>`
+        ? html`<div class="poster-quiet pf-agd-empty">${t('profile.agents.detail.quality.noReviews')}</div>`
         : html`
           <div class="pf-agd-quality-reviews">
             ${contextKeys.map(ctx => {
@@ -212,12 +231,12 @@ export default function TabQuality({ agentName, showToast }) {
                 <div key=${ctx} class="pf-agd-quality-review-row">
                   <div class="pf-agd-quality-review-head">
                     <span class="pf-agd-quality-ctx">${ctxLabel(ctx)}</span>
-                    <span class="pf-agd-quality-stars">${starGlyphs(s.avgStars)}</span>
+                    ${starGlyphs(s.avgStars)}
                     <span class="pf-agd-quality-avg">${Number(s.avgStars).toFixed(1)}</span>
                     <span class="pf-agd-quality-n">${t('profile.agents.detail.quality.ratings', { count: s.n })}</span>
-                    ${s.lowConfidence && html`<span class="pf-agd-quality-lowconf">${t('profile.agents.detail.quality.lowConfidence')}</span>`}
+                    ${s.lowConfidence && html`<span class="poster-status poster-status--attention">${t('profile.agents.detail.quality.lowConfidence')}</span>`}
                   </div>
-                  <div class="pf-agd-quality-review-meta">${t('profile.agents.detail.quality.grounded', { count: s.sourceGroundedN })}</div>
+                  <div class="pf-agd-quality-review-meta listing-meta">${t('profile.agents.detail.quality.grounded', { count: s.sourceGroundedN })}</div>
                 </div>
               `;
             })}
@@ -231,20 +250,20 @@ export default function TabQuality({ agentName, showToast }) {
 
       <!-- Rate deliverables (completed tasks the owner can rate) -->
       <div class="pf-agd-card poster-row--thing">
-      <div class="pf-agd-section-title">${t('profile.agents.detail.quality.pendingTitle')}</div>
-      <div class="pf-agd-quality-desc">${t('profile.agents.detail.quality.pendingDesc')}</div>
+      <div class="pf-agd-section-title sub-heading">${t('profile.agents.detail.quality.pendingTitle')}</div>
+      <div class="poster-hint pf-agd-quality-desc">${t('profile.agents.detail.quality.pendingDesc')}</div>
       ${doneTasks.length === 0
-        ? html`<div class="pf-agd-empty">${t('profile.agents.detail.quality.allRated')}</div>`
+        ? html`<div class="poster-quiet pf-agd-empty">${t('profile.agents.detail.quality.allRated')}</div>`
         : html`
           <div class="pf-agd-quality-pending">
             ${[...doneTasks].sort((a, b) => (a.rating ? 1 : 0) - (b.rating ? 1 : 0)).map(task => html`
-              <div key=${task.id} class="pf-agd-quality-pending-row">
+              <div key=${task.id} class="pf-agd-quality-pending-row poster-box">
                 <span class="pf-agd-quality-pending-title">${task.title || task.id}</span>
-                <span class="pf-agd-quality-pending-when" title=${task.completedAt || ''}>${fmtWhen(task.completedAt || task.updatedAt)}</span>
+                <span class="pf-agd-quality-pending-when poster-time" title=${task.completedAt || ''}>${fmtWhen(task.completedAt || task.updatedAt)}</span>
                 ${task.rating
                   ? html`
                     <span class="pf-agd-quality-pending-rated">${starGlyphs(task.rating.stars)} ${ctxLabel(task.rating.context)}</span>
-                    <button class="btn-ghost btn-sm" onClick=${() => setRateTarget(task)}>${t('profile.agents.tasks.rate.rerate')}</button>`
+                    <button class="poster-action poster-action--small" onClick=${() => setRateTarget(task)}>${t('profile.agents.tasks.rate.rerate')}</button>`
                   : html`<${InlineStars} onPick=${(n) => handleInlineRate(task, n)} disabled=${sendingRate} />`}
               </div>
             `)}
@@ -255,17 +274,15 @@ export default function TabQuality({ agentName, showToast }) {
 
       <!-- Custom metrics -->
       <div class="pf-agd-card pf-agd-card--full poster-row--thing">
-      <div class="pf-agd-section-title">${t('profile.agents.detail.quality.customTitle')}</div>
-      <div class="pf-agd-quality-desc">${t('profile.agents.detail.quality.customDesc')}</div>
+      <div class="pf-agd-section-title sub-heading">${t('profile.agents.detail.quality.customTitle')}</div>
+      <div class="poster-hint pf-agd-quality-desc">${t('profile.agents.detail.quality.customDesc')}</div>
       ${custom.length === 0
-        ? html`<div class="pf-agd-empty">${t('profile.agents.detail.quality.noCustom')}</div>`
+        ? html`<div class="poster-quiet pf-agd-empty">${t('profile.agents.detail.quality.noCustom')}</div>`
         : html`
-          <div class="pf-agd-quality-custom">
+          <div class="facts">
             ${custom.map(c => html`
-              <div key=${c.key} class="pf-agd-quality-custom-row">
-                <span class="pf-agd-quality-custom-key">${c.key}</span>
-                <span class="pf-agd-quality-custom-val">${typeof c.value === 'object' ? JSON.stringify(c.value) : String(c.value)}</span>
-              </div>
+              <span class="facts-k poster-label" key=${'k' + c.key}>${c.key}</span>
+              <span class="facts-v" key=${c.key}>${typeof c.value === 'object' ? JSON.stringify(c.value) : String(c.value)}</span>
             `)}
           </div>
         `}

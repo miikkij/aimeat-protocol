@@ -30,6 +30,15 @@
  * @usage routed at /v1/fleet by spa.html and routes/portal.ts, and embedded as the "Your agents"
  *   section of Settings & Controls via views/profile/fleet-tab.js, which passes `embedded`.
  * @version-history
+ *   v1.15.0 -- 2026-09-26 -- A small heading over a group of fields, a card or a note is the Sub-heading (.sub-heading: small ink headline letters); the coral small capitals, the bold ink words and the coral headline letters go (a unification: Jouni's decision "Sub-heading").
+ *   v1.14.0 -- 2026-09-25 -- What a press did, said where it was pressed, is the Form message (css/components/form-message.css, its error cut when refused); a place keeps only its margin, a unification: the look most tabs use.
+ *   v1.13.0 -- 2026-09-25 -- What chooses what a list or a panel shows is the tab (.poster-tab, its filter and attention tones); the agent tabs take the tab's own size, a unification: Jouni's decision Tabs and filters.
+ *   v1.12.0 -- 2026-09-25 -- Every quiet way on is the action link (.poster-action, its quiet tone where it sits among controls), and the one loud action is the dark block (.poster-slab, its control cut), a unification: Jouni's decisions Action link and Loud action.
+ *   v1.11.0 -- 2026-09-25 -- Every small number is the Count (.poster-count tally, waiting at the limit), a unification: Jouni's decision Count.
+ *   v1.10.0 -- 2026-09-25 -- Every time a thing happened or runs out is the Timestamp (.poster-time); a place keeps only its layout (a unification: Jouni's decision Timestamp).
+ *   v1.9.0 -- 2026-09-25 -- Every tag is the Tag (.poster-chip), a unification: Jouni's decision Tag.
+ *   v1.8.0 -- 2026-09-25 -- Every word that says a state is the Status (.poster-status fine, attention, danger), a unification: Jouni's decision Status.
+ *   v1.7.0 -- 2026-09-25 -- A grey line that explains is the Hint (poster-hint, css/components/hint.css); a place keeps only its margin (a unification: the look most tabs use).
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   v1.6.0 -- 2026-09-13 -- Compose state section headings from the shared B1 shape.
  *   v1.5.0 -- 2026-09-13 -- Compose the standalone page title from poster.css.
@@ -162,17 +171,17 @@ function MigrateBanner({ migration, migrating, outcome, onPress }) {
             in" and a group of 6 called "Never connected" — so the heading was wrong about a third
             of its own number, and a reader was left reconciling 18, 12, 6 and 19. The two reasons
             are the groups' to tell; this box is about the one press that fixes both. */''}
-      <h3 class="flt-migrate-head">${plural('fleet.migrate.headOne', 'fleet.migrate.head')}</h3>
+      <h3 class="flt-migrate-head sub-heading">${plural('fleet.migrate.headOne', 'fleet.migrate.head')}</h3>
       <p class="flt-migrate-line">${plural('fleet.migrate.whatOne', 'fleet.migrate.what')}</p>
-      <p class="flt-migrate-line flt-migrate-keeps">${t('fleet.migrate.keeps')}</p>
+      <p class="poster-hint flt-migrate-keeps">${t('fleet.migrate.keeps')}</p>
       ${/* Directly above the button, because it is the answer to "why can I not press this". */''}
       <p class="flt-migrate-line ${ready ? 'is-ready' : 'is-blocked'}">
         ${ready ? t('fleet.migrate.ready') : t('fleet.migrate.needConnector')}
       </p>
-      <button class="btn-primary" disabled=${migrating || !ready} onClick=${onPress}>
+      <button class="poster-slab poster-slab--control" disabled=${migrating || !ready} onClick=${onPress}>
         ${migrating ? t('fleet.migrate.working') : plural('fleet.migrate.actionOne', 'fleet.migrate.action')}
       </button>
-      ${outcome && html`<p class="flt-migrate-outcome ${outcome.ok ? '' : 'is-bad'}">${outcome.text}</p>`}
+      ${outcome && html`<p class="form-message flt-migrate-outcome ${outcome.ok ? '' : 'form-message--error'}">${outcome.text}</p>`}
     </div>
   `;
 }
@@ -405,29 +414,29 @@ export default function FleetView({ embedded = false, starter = null } = {}) {
           `}
           ${starter}
           ${!(migration && (migration.would_move ?? []).length > 0) && outcome && html`
-            <p class="flt-migrate-outcome ${outcome.ok ? '' : 'is-bad'}">${outcome.text}</p>
+            <p class="form-message flt-migrate-outcome ${outcome.ok ? '' : 'form-message--error'}">${outcome.text}</p>
           `}
 
           <div class="flt-summary">
-            <span class="flt-count">${agents.length === 1
+            <span class="poster-count poster-count--tally">${agents.length === 1
               ? t('fleet.countAgentsOne')
               : t('fleet.countAgents').replace('{n}', String(agents.length))}</span>
             ${problems.length > 0
-              ? html`<button class="flt-chip flt-chip--warn ${onlyProblems ? 'is-on' : ''}"
+              ? html`<button class="poster-tab poster-tab--filter poster-tab--attention ${onlyProblems ? 'is-on' : ''}"
                        onClick=${() => setOnlyProblems(!onlyProblems)}>
                        ${problems.length === 1
                          ? t('fleet.needAttentionOne')
                          : t('fleet.needAttention').replace('{n}', String(problems.length))}
                      </button>`
-              : html`<span class="flt-chip flt-chip--ok">${t('fleet.allFine')}</span>`}
+              : html`<span class="poster-status poster-status--fine">${t('fleet.allFine')}</span>`}
             ${/* PRESSING THE FILTER LOOKED LIKE IT DID NOTHING. On this account it hides one healthy
                   agent, 1300px down, so the visible list was byte-identical before and after and a
                   person concluded the control was broken. It says what it took away. */''}
             ${onlyProblems && html`
-              <span class="flt-hidden">${agents.length - problems.length === 1
+              <span class="poster-count poster-count--tally">${agents.length - problems.length === 1
                 ? t('fleet.hiddenOne')
                 : t('fleet.hidden').replace('{n}', String(agents.length - problems.length))}</span>
-              <button class="btn-ghost btn-sm" onClick=${() => setOnlyProblems(false)}>${t('fleet.showAll')}</button>
+              <button class="poster-action" onClick=${() => setOnlyProblems(false)}>${t('fleet.showAll')}</button>
             `}
           </div>
 
@@ -444,7 +453,7 @@ export default function FleetView({ embedded = false, starter = null } = {}) {
                   ? t('fleet.groupCountOne')
                   : t('fleet.groupCount').replace('{n}', String(g.rows.length))}</span>
               </h2>
-              <p class="flt-group-note">${groupNote(g.state, g.kind)}</p>
+              <p class="poster-hint flt-group-note">${groupNote(g.state, g.kind)}</p>
               <ul class="flt-list poster-row--thing">
                 ${g.rows.map(a => html`
                   <li class="flt-row" key=${a.gaii}>
@@ -456,12 +465,12 @@ export default function FleetView({ embedded = false, starter = null } = {}) {
                          onClick=${(e) => openAgent(e, a.name, embedded)}>
                         ${a.display_name || a.name}
                       </a>
-                      ${a.credential?.connected && html`<span class="flt-live">${t('fleet.connectedNow')}</span>`}
+                      ${a.credential?.connected && html`<span class="poster-status poster-status--fine flt-live">${t('fleet.connectedNow')}</span>`}
                       ${/* INTERACTIVE was on 16 of 19 rows: a badge on almost every row separates
                             nothing and just puts a second grey block after every name. It is the
                             default, so only a departure from it is worth a badge. */''}
-                      ${a.mode && a.mode !== 'interactive' && html`<span class="flt-badge">${t(`profile.agents.mode.${a.mode}`)}</span>`}
-                      ${a.run_mode && html`<span class="flt-badge flt-badge--run">${t(`profile.agents.runMode.${a.run_mode}`)}</span>`}
+                      ${a.mode && a.mode !== 'interactive' && html`<span class="poster-chip">${t(`profile.agents.mode.${a.mode}`)}</span>`}
+                      ${a.run_mode && html`<span class="poster-chip">${t(`profile.agents.runMode.${a.run_mode}`)}</span>`}
                       ${/* MOVE THIS ONE. The banner above moves everything at once, which is right
                             when a person wants the fleet fixed and useless when they want one agent
                             fixed — and one agent is what a person wants while they are testing, or
@@ -475,7 +484,7 @@ export default function FleetView({ embedded = false, starter = null } = {}) {
                             was theirs. The rest go disabled, which is true — one move at a time —
                             and says so without claiming to be busy. */''}
                       ${movable.has(a.name) && html`
-                        <button class="btn-ghost btn-sm flt-row-move"
+                        <button class="poster-action flt-row-move"
                                 disabled=${!!migrating || !connectorReady}
                                 title=${connectorReady ? '' : t('fleet.migrate.needConnector')}
                                 onClick=${() => migrate(a.name)}>
@@ -485,7 +494,7 @@ export default function FleetView({ embedded = false, starter = null } = {}) {
                       ${/* The credential kind moved to the group header: it is now part of what
                             DEFINES the group, so a badge repeating it on every row said nothing.
                             What is left here is the countdown, which differs row to row. */''}
-                      ${rowDetail(a.credential) && html`<span class="flt-days">${rowDetail(a.credential)}</span>`}
+                      ${rowDetail(a.credential) && html`<span class="poster-time flt-days">${rowDetail(a.credential)}</span>`}
                     </div>
                     ${(a.platform || a.stats?.tasks?.active > 0 || a.stats?.messages?.total > 0) && html`
                       <div class="flt-row-meta">
@@ -511,7 +520,7 @@ export default function FleetView({ embedded = false, starter = null } = {}) {
                     with nothing said. Measured against a live connector on 2026-09-03. It names the
                     agent, because the row it is about may no longer be above it. */''}
               ${rowOutcome?.group === `${g.state}-${g.kind}` && html`
-                <p class="flt-row-said ${rowOutcome.ok ? 'is-ok' : 'is-bad'}">
+                <p class="form-message flt-row-said ${rowOutcome.ok ? '' : 'form-message--error'}">
                   <strong>${rowOutcome.name}</strong> ${rowOutcome.text}
                 </p>
               `}

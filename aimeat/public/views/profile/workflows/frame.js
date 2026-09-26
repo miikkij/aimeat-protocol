@@ -7,7 +7,7 @@
  *   the one sentence that says what a run did, the rows of the workflows table, the crumb and the
  *   page frame with its rail. Every machine word (partial, output-red, count_nonempty) is turned
  *   into the reader's language here and nowhere else.
- * @structure c · loc · words (runWord, stepWord, triggerWords, signalWords, observedWords) · verdictOf · workflowRows · crumb · renderPage
+ * @structure c · loc · words (runWord, stepWord, triggerWords, signalWords, observedWords) · toneStatus · verdictOf · workflowRows · crumb · renderPage
  * @usage import { renderPage, verdictOf, signalWords } from './frame.js';
  * @version-history
  *   v1.3.1 -- 2026-09-26 -- A run stopped because its next AI step's estimate did not fit in what was
@@ -15,6 +15,16 @@
  *   v1.3.0 -- 2026-09-26 -- Words for a run the node stopped at its spending limit and one its trigger
  *            did not start, and the verdict says why in the reader's language: the cap, the spend
  *            and the step, or who saved the workflow and what they lack.
+ *   v1.9.0 -- 2026-09-26 -- The workflows table is the Listing (listing, listing-row and its head row, name, words and doors cells; listing--cols keeps the narrow-screen columns), a unification: the look most tabs use.
+ *   v1.8.0 -- 2026-09-26 -- The line under a workflow's name is the Listing's typewriter line (.listing-meta), a unification: Jouni's decision "Meta line".
+ *   v1.7.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
+ *   v1.6.0 -- 2026-09-25 -- Every word that says a state is the Status (.poster-status fine, attention, danger, off), a unification: Jouni's decision Status.
+ *   v1.5.0 -- 2026-09-25 -- Every tag is the Tag (.poster-chip and its tones, .poster-chips for a row), a unification: Jouni's decision Tag.
+ *   v1.4.0 -- 2026-09-25 -- The row labels (field and key labels, column heads, box labels) wear .poster-label (Jouni's decision "Row label", a unification).
+ *   v1.3.0 -- 2026-09-25 -- Every quiet way on is the library's action link, .poster-action, with the
+ *     tone its meaning names: more for "show all" and more of a list, back, text for a plain grey
+ *     word, quiet (Jouni's decisions "Action link", "Panel action", "Dismiss", "Small link", "Step
+ *     button").
  *   v1.2.0 -- 2026-09-13 -- Compose existing top rules from poster.css.
  *   v1.1.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.0.0 — 2026-08-30 — Initial (design canvas "AIMEAT Työnkulkujen sivu", direction A).
@@ -59,6 +69,8 @@ export const runWord = (s) => (s ? c(RUN_WORDS[s] || 'run.unknown') : '·');
 export const stepWord = (s) => (s ? c(STEP_WORDS[s] || 'step.pending') : '·');
 export const runTone = (s) => (s === 'done' ? 'ok' : s === 'partial' || s === 'red' || s === 'stopped' || s === 'refused' ? 'bad' : s === 'waiting-step' || s === 'running' ? 'wait' : '');
 export const stepTone = (s) => (s === 'green' ? 'ok' : s === 'output-red' || s === 'input-red' || s === 'timed-out' || s === 'agent-offline' ? 'bad' : s === 'waiting-human' || s === 'dispatched' ? 'wait' : '');
+/** A run's or a step's tone as a Status: ok is fine, bad is danger, wait needs a look, the rest is off. */
+export const toneStatus = (tone) => `poster-status poster-status--${({ ok: 'fine', bad: 'danger', wait: 'attention' })[tone] || 'off'}`;
 export const isRed = (s) => s === 'output-red' || s === 'input-red' || s === 'timed-out' || s === 'agent-offline';
 
 /** "every day at 00:17 (Helsinki)", "by hand", "when news.* is written". */
@@ -167,17 +179,20 @@ export function lastRunWords(item) {
 }
 
 /** Rows of the workflows table: name and its line, when it runs, the last run's word, what happened, the doors. */
-export function workflowRows(ctx, items) {
-  return html`<div class="wp-rows">
+export function workflowRows(ctx, items, { head = false } = {}) {
+  return html`<div class="listing listing--cols listing--name-trigger-state-words-doors">
+    ${head ? rowsHead() : null}
     ${items.map(item => { const def = item.def; const w = lastRunWords(item); const agents = new Set(def.steps.flatMap(s => Array.isArray(s.agent) ? s.agent : s.agent ? [s.agent] : [])); const gates = def.steps.filter(s => s.action?.kind === 'human-input').length; return html`
-      <div class="wp-nm" key=${'n' + def.id}><button type="button" class="og-tbl-name" onClick=${() => ctx.pickView({ kind: 'detail', id: def.id })}>${loc(def.title) || def.id}</button><small>${[c('stepsN', { n: def.steps.length }), agents.size ? c('agentsN', { n: agents.size }) : '', gates ? c('gatesN', { n: gates }) : ''].filter(Boolean).join(' · ')}</small></div>
-      <div class="wp-m" key=${'t' + def.id}>${triggerWords(def.trigger)}</div>
-      <div class=${`wp-m wp-m--${w.tone}`} key=${'s' + def.id}><b>${w.word}</b></div>
-      <div class="wp-m wp-m--sub" key=${'w' + def.id}>${w.sub}</div>
-      <div class="og-tbl-door wp-doors2" key=${'d' + def.id}><button type="button" class="og-door og-door--quiet" onClick=${() => ctx.handleCheck(def.id)}>${c('checkNow')}</button><button type="button" class="og-door" onClick=${() => ctx.pickView({ kind: 'detail', id: def.id })}>${item.waiting ? c('answer') : c('open')}</button></div>`; })}
+      <div class="listing-row" key=${def.id}>
+        <div class="listing-name"><button type="button" class="og-tbl-name" onClick=${() => ctx.pickView({ kind: 'detail', id: def.id })}>${loc(def.title) || def.id}</button><small class="listing-meta">${[c('stepsN', { n: def.steps.length }), agents.size ? c('agentsN', { n: agents.size }) : '', gates ? c('gatesN', { n: gates }) : ''].filter(Boolean).join(' · ')}</small></div>
+        <div class="listing-desc">${triggerWords(def.trigger)}</div>
+        <div class=${`wp-m wp-m--${w.tone}`}><b>${w.word}</b></div>
+        <div class="wp-m wp-m--sub">${w.sub}</div>
+        <div class="listing-doors"><button type="button" class="poster-action poster-action--small poster-action--row poster-action--lower" onClick=${() => ctx.handleCheck(def.id)}>${c('checkNow')}</button><button type="button" class="poster-action poster-action--small poster-action--row" onClick=${() => ctx.pickView({ kind: 'detail', id: def.id })}>${item.waiting ? c('answer') : c('open')}</button></div>
+      </div>`; })}
   </div>`;
 }
-export const rowsHead = () => html`<div class="wp-rows wp-rows--head"><div>${c('colWorkflow')}</div><div>${c('colTrigger')}</div><div>${c('colLast')}</div><div>${c('colWhat')}</div><div></div></div>`;
+const rowsHead = () => html`<div class="listing-row listing-row--head"><div class="poster-label">${c('colWorkflow')}</div><div class="poster-label">${c('colTrigger')}</div><div class="poster-label">${c('colLast')}</div><div class="poster-label">${c('colWhat')}</div><div class="poster-label"></div></div>`;
 
 /* ── The crumb and the page frame ──────────────────────────────────────────────────────────── */
 export function crumb(ctx, parts) {
@@ -203,9 +218,9 @@ export function renderPage(ctx, { crumbs, label = null, title, chips = null, doo
       ${crumb(ctx, crumbs)}
       <div class="og-mast og-mast--page">
         <div class="og-mast-words">
-          ${label ? html`<div class="og-label">${label}</div>` : null}
+          ${label ? html`<div class="poster-label">${label}</div>` : null}
           <h1 class="og-title poster-page-title wp-title--page">${title}</h1>
-          ${chips ? html`<div class="og-chips">${chips}</div>` : null}
+          ${chips ? html`<div class="poster-chips">${chips}</div>` : null}
         </div>
         ${doors ? html`<div class="og-mast-actions"><div class="og-doors">${doors}</div></div>` : null}
       </div>

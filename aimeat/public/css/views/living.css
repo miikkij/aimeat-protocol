@@ -13,6 +13,14 @@
  *   v1.3.0 — 2026-06-21 — Phase 3: status line + pause + cadence control.
  *   v1.4.0 — 2026-06-21 — Phase 4: automation controls (trust/triggers) + gated pending review.
  *   v1.5.0 — 2026-06-21 — Phase 5: per-section timeline + snapshot + aggregate chart.
+ *   v1.6.0 -- 2026-09-25 -- The one-line fields are the Text field (.og-input); the rules here keep only their place (a unification: the look most tabs use).
+ *   v1.7.0 -- 2026-09-25 -- Every many-line field is the Text area (.og-textarea); a place keeps only its size and margin (a unification: the look most tabs use).
+ *   v1.8.0 -- 2026-09-25 -- Every drop-down is the Select field (.select-field, css/components/select-field.css); a place keeps only its width and margin (a unification: the look most tabs use).
+ *   v1.9.0 -- 2026-09-26 -- The charter's Readable and YAML buttons are the Tab's fold tone (.poster-tab--fold, pressed .is-on): .pf-ld-cv-active goes (a unification: Jouni's decision "Tabs and filters").
+ *   v1.10.0 -- 2026-09-26 -- A section's pulse phase is the Status (.poster-status and a tone by what it says): .pf-ld-phase goes (a unification: Jouni's decision "Status").
+ *   v1.11.0 -- 2026-09-26 -- A dead rule goes (a move, nothing on screen changes): .pf-ld-ledger li's colour, which the profile's .pf .text-meta-sm on the same line always outranks.
+ *   v1.12.0 -- 2026-09-26 -- The templates and the deployed documents are the Listing: .pf-ld-card and .pf-ld-card-head go, .pf-ld-list keeps only its margin (a unification: the look most tabs use).
+ *   v1.13.0 -- 2026-09-26 -- The charter as YAML is the Code block (css/components/code-block.css): its own face goes, its place stays (a unification: Jouni's decision "Code block").
  */
 
 .pf-ld-timeline {
@@ -59,18 +67,8 @@
   flex-wrap: wrap;
   gap: var(--space-xs, 0.4rem);
 }
-.pf-ld-cadence {
-  background: var(--card);
-  color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm, 4px);
-  padding: 0.1rem 0.3rem;
-}
+.pf-ld-automation .select-field, .pf-ld-status .select-field, .pf-ld-timeline .select-field { width: auto; }
 
-.pf-ld-phase {
-  color: var(--accent, var(--text));
-  font-style: italic;
-}
 .pf-ld-ledger {
   list-style: none;
   margin: var(--space-xs, 0.4rem) 0 0;
@@ -79,7 +77,6 @@
   flex-direction: column;
   gap: 0.2rem;
 }
-.pf-ld-ledger li { color: var(--text-dim, var(--text)); }
 
 .pf-ld-author {
   display: flex;
@@ -87,7 +84,6 @@
   gap: var(--space-xs, 0.4rem);
   margin: var(--space-sm, 0.75rem) 0;
 }
-.pf-ld-author textarea { width: 100%; resize: vertical; font-family: inherit; }
 .pf-ld-author button { align-self: flex-start; }
 
 .pf-ld-charter-views {
@@ -96,7 +92,6 @@
   gap: var(--space-xs, 0.4rem);
   margin-top: var(--space-xs, 0.4rem);
 }
-.pf-ld-cv-active { color: var(--text); font-weight: 600; }
 .pf-ld-charter-box {
   background: var(--bg-dim, var(--card));
 
@@ -104,35 +99,12 @@
   padding: var(--space-sm, 0.75rem) var(--space-md, 1rem);
   margin-top: var(--space-xs, 0.4rem);
 }
-.pf-ld-yaml {
-  font-family: var(--font-mono, monospace);
-  font-size: 0.85em;
-  white-space: pre-wrap;
-  color: var(--text-dim, var(--text));
-  overflow-x: auto;
-}
+/* The charter as YAML is the Code block (css/components/code-block.css); its place only. */
+.pf-ld-yaml.code-block { margin-top: var(--space-xs, 0.4rem); }
 
-.pf-ld-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-sm, 0.75rem);
-  margin-top: var(--space-sm, 0.75rem);
-}
-.pf-ld-card {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius, 8px);
-  padding: var(--space-sm, 0.75rem) var(--space-md, 1rem);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-xs, 0.4rem);
-}
-.pf-ld-card-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-sm, 0.75rem);
-}
+/* The templates and the deployed documents are the Listing (css/components/listing.css); the list
+   keeps its place under the buttons over it. */
+.pf-ld-list { margin-top: var(--space-sm, 0.75rem); }
 .pf-ld-card-btns {
   display: flex;
   gap: var(--space-xs, 0.4rem);
@@ -159,8 +131,8 @@
   gap: var(--space-xs, 0.4rem);
   align-items: center;
 }
-.pf-ld-slot-row .input-field { flex: 1; }
-.pf-ld-slot-id { max-width: 9rem; font-family: var(--font-mono, monospace); }
+.pf-ld-slot-row .og-input { flex: 1; }
+.pf-ld-slot-id { max-width: 9rem; }
 
 .pf-ld-opened-head {
   display: flex;
@@ -181,10 +153,9 @@
   gap: var(--space-xs, 0.4rem);
 }
 .pf-ld-slot-edit-head { display: flex; align-items: baseline; gap: var(--space-sm, 0.75rem); }
-.pf-ld-slot-edit textarea { width: 100%; resize: vertical; font-family: inherit; }
 .pf-ld-slot-sources {
   display: flex;
   align-items: center;
   gap: var(--space-sm, 0.75rem);
 }
-.pf-ld-slot-sources .input-field { flex: 1; }
+.pf-ld-slot-sources .og-input { flex: 1; }

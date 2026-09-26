@@ -8,6 +8,7 @@
  * @usage Linked from public/spa.html in the component block, whose order keeps the order these
  *   rules had when they were one sheet.
  * @version-history
+ *   v1.1.0 — 2026-09-26 — The quiet nudge's dashed frame reads --shape-frame and --shape-frame-colour, the rule over the list --shape-frame-heavy and --shape-rule-colour (a move: the AIMEAT values equal the old ones).
  *   v1.0.0 — 2026-09-23 — Moved unchanged from css/parts*.css (UI consolidation phase 1, a move).
  */
 
@@ -17,12 +18,12 @@
    instead of a list that ends in the past. A door, not an alarm. */
 .poster-timeline-quiet {
   display: block; margin: 0 0 1rem; padding: 0.8rem 1rem;
-  border: 2px dashed var(--text);
+  border: var(--shape-frame) dashed var(--shape-frame-colour);
   font-size: var(--text-body); font-weight: var(--weight-semibold); color: var(--text); text-decoration: none;
   background: var(--surface);
 }
 .poster-timeline-quiet:hover { border-color: var(--accent); }
-.poster-timeline-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; border-top: 3px solid var(--text); }
+.poster-timeline-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; border-top: var(--shape-frame-heavy) solid var(--shape-rule-colour); }
 .poster-timeline-item {
   display: grid; grid-template-columns: 7rem 14px minmax(0, 1fr); align-items: center; gap: 1.1rem;
   padding: 0.75rem 0; border-bottom: 1px solid var(--border);

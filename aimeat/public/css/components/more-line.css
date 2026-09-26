@@ -1,0 +1,18 @@
+/**
+ * @file more-line.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The more line: the line under a list, with the way to show more and how many are
+ *   shown ("12 of 40") in small grey typewriter letters beside it, in one row. The same count as the
+ *   Search line's. Moved unchanged out of six identical copies (.sk-more, .pk-more, .cp-more,
+ *   .lb-more, .ex-more, .ad-more in the Skills, Packages, Capabilities, Libraries, Extensions and
+ *   AppDev sheets) under the part's name (UI consolidation phase 5, a move).
+ *   Drawn as markup: <div class="more-line"><button class="poster-action poster-action--more">…</button>
+ *   <small>12 of 40</small></div>.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 — 2026-09-25 — Initial: the rules of the six copies, unchanged, as .more-line.
+ */
+
+.more-line { display: flex; align-items: center; gap: 1rem; margin-top: .8rem; }
+.more-line small { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); }

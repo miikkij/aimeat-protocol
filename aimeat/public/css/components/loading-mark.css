@@ -1,0 +1,27 @@
+/**
+ * @file loading-mark.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The loading mark: a small coral square that blinks before the quiet sentence that says
+ *   something is loading. Moved unchanged out of the Settings sheets that drew it (UI consolidation
+ *   phase 5, a move): Contacts' copy keeps its page's scope as it had it (.og-ct .ct-loading); the five
+ *   identical copies of Discover, Knowledge, Boards, Workflows and Notifications are one name,
+ *   .og .loading-mark, with the specificity the copies had.
+ *   Drawn as markup: <p class="poster-quiet loading-mark">Loading…</p> inside a Settings page (.og), a classic
+ *   Settings tab (.pf) or a dialog (.dlg). In the profile views it is LoadingLine (views/profile/shared.js).
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.2.0 — 2026-09-26 — Every line that says a part is loading is the loading line: the quiet sentence with the blinking Loading mark, LoadingLine in views/profile/shared.js (a unification: the look most tabs use).
+ *   v1.1.0 — 2026-09-25 — The five copies of Discover, Knowledge, Boards, Workflows and Notifications,
+ *     moved unchanged as .og .loading-mark.
+ *   v1.0.0 — 2026-09-25 — Initial: the rules of .ct-loading and its blink, moved unchanged from
+ *     contacts-poster.css.
+ */
+
+.og-ct .ct-loading { display: inline-block; padding-left: 1.1rem; position: relative; }
+.og-ct .ct-loading::before { content: ''; position: absolute; left: 0; top: .35em; width: .55em; height: .55em; background: var(--accent); animation: ctBlink 1s steps(2, start) infinite; }
+@keyframes ctBlink { to { visibility: hidden; } }
+
+.og .loading-mark, .pf .loading-mark, .dlg .loading-mark { display: inline-block; padding-left: 1.1rem; position: relative; }
+.og .loading-mark::before, .pf .loading-mark::before, .dlg .loading-mark::before { content: ''; position: absolute; left: 0; top: .35em; width: .55em; height: .55em; background: var(--accent); animation: loadingMarkBlink 1s steps(2, start) infinite; }
+@keyframes loadingMarkBlink { to { visibility: hidden; } }

@@ -1,0 +1,19 @@
+/**
+ * @file tag-input.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description A field that holds a list of words as tags: the tags written so far, each a Tag with a small
+ *   x that takes it off (the Tag's remove mark, .poster-chip-x in poster.css), and a bare text field
+ *   after them in the same control frame; Enter or a comma adds the word. Drawn by TagInput
+ *   (views/profile/shared.js), for an organism's interests.
+ *   Moved unchanged out of views/profile.css; the class names stay. It reads the control tokens and
+ *   --radius; it has no literal corner, frame, shadow or case.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.1.0 -- 2026-09-26 -- The x is the Tag's remove mark (.poster-chip-x); .pj-tag-x goes (a unification: Jouni's decision "Remove mark").
+ *   v1.0.0 -- 2026-09-25 -- Moved out of views/profile.css (UI consolidation phase 5, a move).
+ */
+
+.pj-taginput { display: flex; flex-wrap: wrap; gap: 0.3rem; align-items: center; border: 1.5px solid var(--control-border); border-radius: var(--radius); background: var(--control-bg); padding: 0.3rem 0.45rem; }
+.pj-tag { display: inline-flex; align-items: center; gap: 0.25rem; }
+.pj-taginput-field { flex: 1; min-width: 90px; border: none; background: transparent; color: var(--text); font-size: 0.82rem; outline: none; padding: 0.15rem 0; }

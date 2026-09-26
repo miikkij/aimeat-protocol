@@ -10,6 +10,21 @@
  * @structure renderDocSpace
  * @usage import { renderDocSpace } from '/views/profile/organisms/workspace/doc-space.js';
  * @version-history
+ *   v1.10.0 -- 2026-09-26 -- A small heading over a group of fields, a card or a note is the Sub-heading (.sub-heading: small ink headline letters); the coral small capitals, the bold ink words and the coral headline letters go (a unification: Jouni's decision "Sub-heading").
+ *   v1.9.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
+ *   v1.8.0 -- 2026-09-25 -- Every one-line field is the Text field (.og-input); a place keeps only its layout (a unification: the look most tabs use).
+ *   v1.7.0 -- 2026-09-25 -- Every small number is the Count (.poster-count waiting or tally), a unification: Jouni's decision Count.
+ *   v1.6.0 -- 2026-09-25 -- Every word that says a state is the Status (.poster-status fine, attention, danger, off), a unification: Jouni's decision Status.
+ *   v1.5.0 -- 2026-09-25 -- Every tag is the Tag (.poster-chip and its tones, .poster-chips for a row), a unification: Jouni's decision Tag.
+ *   v1.4.0 -- 2026-09-25 -- The row labels (field and key labels, column heads, box labels) wear .poster-label (Jouni's decision "Row label", a unification).
+ *   v1.3.0 -- 2026-09-25 -- A button that is a mark, not a word (a delete or close mark, a menu's
+ *     dots, an arrow), is the library's small icon button, .poster-icon.poster-icon--small (Jouni's
+ *     decision "Icon button").
+ *   v1.2.0 -- 2026-09-25 -- Every quiet way on is the library's action link, .poster-action, with the
+ *     tone its meaning names: more for "show all" and more of a list, back, text for a plain grey
+ *     word, quiet (Jouni's decisions "Action link", "Panel action", "Dismiss", "Small link", "Step
+ *     button").
+ *   2026-09-25 -- The lines that say a list is empty (or has nothing to show yet) are the quiet sentence (.poster-quiet, QuietNote), a unification: Jouni's decision "Empty line".
  *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
  *   v1.1.0 -- 2026-09-13 -- Compose the document index top rule with poster-row--thing.
  *   v1.0.0 — 2026-07-13 — Extracted from workspace.js (max-file-lines)
@@ -19,6 +34,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { EmptyState } from '/components/EmptyState.js';
+import { QuietNote } from '/components/QuietNote.js';
 import { slugifyHeading } from '/components/Markdown.js';
 import { DocumentView, DocumentEditor } from '/views/profile/organisms/document.js';
 import { WorkspaceComments } from '/views/profile/organisms/workspace-comments.js';
@@ -53,12 +69,12 @@ export function renderDocSpace(ctx, ot) {
       <span class="pj-grip" title=${t('organisms.dragHint') || 'Drag into a section'}>⠿</span>
       <${ColorPicker} value=${itemColor(ot.name, d.id)} onPick=${(c) => setItemColor(ot.name, d.id, c)} />
       <button class="pj-doc-link" onClick=${() => setActiveDoc({ type: ot.name, mode: 'view', page: d })}>
-        ${d._draft ? html`<span class="badge badge-warn pj-mini">${t('organisms.draft') || 'draft'}</span> ` : ''}${d.title || d.id}
+        ${d._draft ? html`<span class="poster-status poster-status--attention">${t('organisms.draft') || 'draft'}</span> ` : ''}${d.title || d.id}
       </button>
       ${showArchived
-        ? html`<button class="pj-icon-btn" title=${t('organisms.unarchive') || 'Unarchive'} disabled=${busy} onClick=${() => setRecordArchived(ot, d.id, false)}>♻️</button>`
-        : html`<button class="pj-icon-btn" title=${t('organisms.archive') || 'Archive'} disabled=${busy} onClick=${() => setRecordArchived(ot, d.id, true)}>🗄️</button>`}
-      <button class="pj-icon-btn pj-doc-del" title=${t('organisms.delete') || 'Delete'} disabled=${busy} onClick=${() => removeObject(ot.namespace, d.id, d.title || d.id)}>🗑</button>
+        ? html`<button class="poster-icon poster-icon--small" title=${t('organisms.unarchive') || 'Unarchive'} disabled=${busy} onClick=${() => setRecordArchived(ot, d.id, false)}>♻️</button>`
+        : html`<button class="poster-icon poster-icon--small" title=${t('organisms.archive') || 'Archive'} disabled=${busy} onClick=${() => setRecordArchived(ot, d.id, true)}>🗄️</button>`}
+      <button class="poster-icon poster-icon--small pj-doc-del" title=${t('organisms.delete') || 'Delete'} disabled=${busy} onClick=${() => removeObject(ot.namespace, d.id, d.title || d.id)}>🗑</button>
     </div>`;
 
   // A section is a drop target — dragging a document onto it (or its header) files it here.
@@ -76,8 +92,8 @@ export function renderDocSpace(ctx, ot) {
         <button class="pj-doc-series-head" onClick=${() => setExpandedSeries(s => ({ ...s, [key]: !open }))}>
           <span class="pj-ov-chevron">${open ? '▾' : '▸'}</span>
           <span class="pj-doc-series-name">${g.base}</span>
-          <span class="pj-org-tab-count">${g.parts.length}</span>
-          ${g.parts.some(p => p._draft) ? html`<span class="badge badge-warn pj-mini">${t('organisms.draft') || 'draft'}</span>` : null}
+          <span class="poster-count poster-count--tally">${g.parts.length}</span>
+          ${g.parts.some(p => p._draft) ? html`<span class="poster-status poster-status--attention">${t('organisms.draft') || 'draft'}</span>` : null}
         </button>
         ${open ? html`<div class="pj-doc-series-parts">${g.parts.map(docItem)}</div>` : null}
       </div>`;
@@ -88,14 +104,14 @@ export function renderDocSpace(ctx, ot) {
       <div class="pj-sec-head">
         <${ColorPicker} value=${sec.color} onPick=${(c) => setSectionColor(ot.name, sec.id, c)} />
         ${editingSec === sec.id
-          ? html`<input class="input-field input-xs pj-sec-name" autofocus placeholder=${t('organisms.sectionName') || 'Section name'}
+          ? html`<input class="og-input" autofocus placeholder=${t('organisms.sectionName') || 'Section name'}
               value=${sec.name} onInput=${e => setSecName(ot.name, sec.id, e.target.value)}
               onBlur=${() => commitSecName(ot.name)} onKeyDown=${e => { if (e.key === 'Enter') e.target.blur(); }} />`
           : html`<span class="pj-sec-name-text" onDblClick=${() => setEditingSec(sec.id)}>${(sec.name || t('organisms.unnamed') || '(unnamed)')}</span>`}
-        <button class="pj-icon-btn" title=${t('organisms.rename') || 'Rename'} onClick=${() => setEditingSec(sec.id)}>✎</button>
-        <button class="pj-icon-btn" title=${t('organisms.newDocHere') || 'New document here'} onClick=${() => setActiveDoc({ type: ot.name, mode: 'edit', page: { id: '', title: '', markdown: '' }, sectionId: sec.id })}>+</button>
-        <button class="pj-icon-btn" title=${t('organisms.addSubsection') || 'Sub-section'} onClick=${() => addSection(ot.name, sec.id)}>⊕</button>
-        <button class="pj-icon-btn" title=${t('organisms.remove') || 'Remove'} onClick=${() => removeSection(ot.name, sec.id, sec.name)}>✕</button>
+        <button class="poster-icon poster-icon--small" title=${t('organisms.rename') || 'Rename'} onClick=${() => setEditingSec(sec.id)}>✎</button>
+        <button class="poster-icon poster-icon--small" title=${t('organisms.newDocHere') || 'New document here'} onClick=${() => setActiveDoc({ type: ot.name, mode: 'edit', page: { id: '', title: '', markdown: '' }, sectionId: sec.id })}>+</button>
+        <button class="poster-icon poster-icon--small" title=${t('organisms.addSubsection') || 'Sub-section'} onClick=${() => addSection(ot.name, sec.id)}>⊕</button>
+        <button class="poster-icon poster-icon--small" title=${t('organisms.remove') || 'Remove'} onClick=${() => removeSection(ot.name, sec.id, sec.name)}>✕</button>
       </div>
       ${renderDocList((sec.documents || []).map(id => docById[id]).filter(Boolean))}
       ${childrenOf(sec.id).map(renderSection)}
@@ -104,9 +120,9 @@ export function renderDocSpace(ctx, ot) {
   return html`
     <div class="pj-section poster-row--thing" key=${ot.name}>
       <div class="pj-section-head">
-        <span class="pj-section-title">${(wsT('type.' + ot.name) || ot.name)}<span class="pj-doc-tag">${t('organisms.docs') || 'docs'}</span></span>
-        <button class="btn-outline btn-sm" onClick=${() => addSection(ot.name, null)}>${'+ '}${t('organisms.section') || 'Section'}</button>
-        <button class="btn-outline btn-sm" onClick=${() => setActiveDoc({ type: ot.name, mode: 'edit', page: { id: '', title: '', markdown: '' } })}>${'+ '}${t('organisms.newPage') || 'New document'}</button>
+        <span class="pj-section-title sub-heading">${(wsT('type.' + ot.name) || ot.name)}<span class="poster-chip">${t('organisms.docs') || 'docs'}</span></span>
+        <button class="poster-action poster-action--small" onClick=${() => addSection(ot.name, null)}>${'+ '}${t('organisms.section') || 'Section'}</button>
+        <button class="poster-action poster-action--small" onClick=${() => setActiveDoc({ type: ot.name, mode: 'edit', page: { id: '', title: '', markdown: '' } })}>${'+ '}${t('organisms.newPage') || 'New document'}</button>
       </div>
       ${spaceDesc(ot) ? html`<div class="section-desc">${spaceDesc(ot)}</div>` : null}
       <div class="pj-docspace">
@@ -114,7 +130,7 @@ export function renderDocSpace(ctx, ot) {
           ${childrenOf(null).map(renderSection)}
           ${unsorted.length > 0 ? html`
             <div class="pj-sec" onDragOver=${allowDrop} onDrop=${dropOn(null)}><div class="pj-sec-head"><span class="pj-sec-name pj-muted">${t('organisms.unsorted') || 'Unsorted'}</span></div>${renderDocList(unsorted)}</div>` : null}
-          ${docs.length === 0 && secs.length === 0 ? html`<${EmptyState} text=${t('organisms.noneYet') || 'none yet'} />` : null}
+          ${docs.length === 0 && secs.length === 0 ? html`<${QuietNote}>${t('organisms.noneYet') || 'none yet'}<//>` : null}
         </div>
         <div class="pj-doc-main">
           ${(() => {

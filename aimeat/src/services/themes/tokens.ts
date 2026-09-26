@@ -8,7 +8,8 @@
  *   built-in AIMEAT theme is exactly today's look.
  *
  *   THE TOKEN LIST IS THE PALETTE BRIDGE'S LIST (theme.css `html[data-palette]`), plus the sun and the
- *   ink on it: what a built-in palette changes is what a theme may change. The semantic family
+ *   ink on it, and the ink ground and the words on it: what a built-in palette changes is what a theme
+ *   may change. The semantic family
  *   (success, warning, danger and their tints) is left out on purpose, as the bridge leaves it out: a
  *   warning keeps its colour whatever the theme.
  *
@@ -18,6 +19,7 @@
  * @structure ThemeTokenKind · THEME_TOKENS · CORE_TOKENS · THEME_FACES · FACE_SLOTS · faceStack
  * @usage import { THEME_TOKENS, THEME_FACES } from './tokens.js';
  * @version-history
+ *   v1.1.0 — 2026-09-26 — --ink-ground and --on-ink-ground are tokens a style sets (Jouni's decision "dark-ground").
  *   v1.0.0 — 2026-09-24 — Initial (UI consolidation phase 4, Themes & Styles).
  */
 
@@ -70,6 +72,8 @@ export const THEME_TOKENS: readonly ThemeToken[] = [
     { name: '--pf-callout-gradient', kind: 'gradient', what: 'a callout' },
     { name: '--sun', kind: 'colour', what: 'the sun: the dark block\'s shadow, the chosen tab, the section edge' },
     { name: '--on-sun', kind: 'colour', what: 'words on the sun' },
+    { name: '--ink-ground', kind: 'colour', what: 'the dark block (the contents rail, a page\'s thumbnail); it stays dark in dark mode' },
+    { name: '--on-ink-ground', kind: 'colour', what: 'words on the dark block' },
 ];
 
 /** The eight a person reads a theme by; the editor shows these first and folds the rest. */

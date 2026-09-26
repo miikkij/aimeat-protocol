@@ -8,6 +8,18 @@
  *   map of kinds, the rows of entries with the query words marked, the place cards and the result
  *   groups. NOTE: this file must be linked in spa.html (useViewCSS is a no-op).
  * @version-history
+ *   v1.12.0 -- 2026-09-26 -- A place's frame reads --shape-frame and --shape-frame-colour, its corner --shape-corner (it has a ground) (a move: the AIMEAT values equal the old ones).
+ *   v1.11.0 -- 2026-09-26 -- The map of kinds, the rows of entries and the hits are the Listing (css/components/listing.css), a unification: the look most tabs use. The grids, cells and narrow-screen columns of dv-kinds and dv-rows go (the columns move to their cuts, listing--cols); the kind and place words are the words cell; one line under an entry, two under a hit, the marked words and the headings in the hits stay.
+ *   v1.10.0 -- 2026-09-26 -- The line under a name is the Listing's (.listing-meta): its body face, size and colour go; one line in a row stays (a unification: Jouni's decision "Meta line").
+ *   v1.9.0 -- 2026-09-25 -- Discover's question desk is the library's Question desk (css/components/question-desk.css), moved unchanged with its class names (UI consolidation phase 5, a move).
+ *   v1.8.0 -- 2026-09-25 -- "Show more" under a list is the action link's more tone (.poster-action--more), a unification: the look most tabs use.
+ *   v1.7.0 -- 2026-09-25 -- The loading line's blinking mark is the library's Loading mark (css/components/loading-mark.css), moved unchanged out of five sheets (UI consolidation phase 5, a move).
+ *   v1.6.0 -- 2026-09-25 -- Every tag is the Tag (.poster-chip and its tones, .poster-chips for a row), a unification: Jouni's decision Tag.
+ *   v1.5.0 -- 2026-09-25 -- The hint rules go: the hints are the Hint (css/components/hint.css); the layout declarations of their places stay, on .poster-hint (UI consolidation phase 5, a unification).
+ *   v1.4.0 -- 2026-09-25 -- The headings over lists wear .poster-day-title; their rules here keep only their place (Jouni's decision "Group heading", a unification).
+ *   v1.3.0 -- 2026-09-25 -- The row labels' look is .poster-label; their rules here keep only their place (Jouni's decision "Row label", a unification).
+ *   2026-09-25 -- The empty lines are the quiet sentence (.poster-quiet, Jouni's decision "Empty line"): .og-empty's look goes, its place (margin 0) stays on the new class.
+ *   2026-09-25 -- The recent filters, the segment filters and the scope choice lose their rules: the tab (.poster-tab) now draws them (a unification: Jouni's decision "Tabs and filters"). The scope's count keeps its rule.
  *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   v1.2.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.1.0 -- 2026-09-13 -- V2: compose the search row's top rule from poster.css.
@@ -15,60 +27,32 @@
  *   v1.0.0 — 2026-08-30 — Initial.
  */
 
-.og-dv .og-chip--coral { border-color: var(--accent); color: var(--accent); }
-.og-dv .og-door.on { color: var(--accent); border-bottom-color: var(--accent); }
-.og-dv .og-empty { margin: 0; font-size: .9rem; color: var(--text-dim); }
-.og-dv .dv-loading { display: inline-block; padding-left: 1.1rem; position: relative; }
-.og-dv .dv-loading::before { content: ''; position: absolute; left: 0; top: .35em; width: .55em; height: .55em; background: var(--accent); animation: dvBlink 1s steps(2, start) infinite; }
-@keyframes dvBlink { to { visibility: hidden; } }
-.og-dv .dv-hint { margin: .6rem 0 0; font-size: .82rem; line-height: 1.5; color: var(--text-dim); }
-.og-dv .dv-more { margin: .8rem 0 0; font-size: .85rem; }
-.og-dv .dv-more button, .og-dv .dv-morerow button { background: none; border: 0; padding: 0; cursor: pointer; font: inherit; font-size: .85rem; font-weight: 800; color: var(--text); border-bottom: 2px solid var(--text); }
-.og-dv .dv-more button:hover, .og-dv .dv-morerow button:hover { color: var(--accent); border-bottom-color: var(--accent); }
+.og-dv .poster-quiet { margin: 0; }
+/* "Show more" is the action link's more tone (.poster-action--more); its line keeps its place. */
+.og-dv .dv-more { margin: .8rem 0 0; }
 .og-dv.og-page { --poster-page-size: 2.1rem; }
-.og-dv .dv-chip--btn { cursor: pointer; }
-.og-dv .dv-chip--btn:hover { border-color: var(--accent); color: var(--accent); }
 
 /* ── The search desk ────────────────────────────────────────────────────────────────────────── */
-.dv-desk { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .8rem 1.6rem; align-items: end; margin-top: 1.4rem; padding: 1.1rem 0; border-bottom: 3px solid var(--text); }
-.dv-field { width: 100%; min-width: 0; box-sizing: border-box; border: 0; border-bottom: 3px solid var(--text); background: transparent; padding: .5rem 0; font: inherit; font-size: 1.35rem; color: var(--text); }
-.dv-field:focus { outline: none; border-bottom-color: var(--accent); }
-.dv-field::placeholder { color: var(--text-dim); }
-.dv-scope .og-choice-btn { text-transform: uppercase; letter-spacing: .04em; font-size: .72rem; padding: .55rem .9rem; }
-.dv-scope .og-choice-btn i { font-family: var(--font-mono); font-size: .68rem; font-style: normal; margin-left: .4rem; opacity: .8; }
-.dv-desk .dv-hint { grid-column: 1 / -1; margin: 0; }
 
-/* ── The map of kinds ───────────────────────────────────────────────────────────────────────── */
-.dv-kinds { display: grid; grid-template-columns: 4.4rem minmax(0, 1fr) minmax(0, 1fr) 3.5rem; gap: 0 1.1rem; align-items: center; }
-.dv-kinds > div { padding: .6rem 0; border-bottom: 1px solid var(--border); min-width: 0; }
-.dv-kinds--head > div { padding: 0 0 .35rem; border-bottom: 0; font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
-.dv-kinds .dv-n { text-align: right; margin-right: 0; }
-.dv-kinds .dv-nm { font-weight: 800; font-size: .97rem; }
-.dv-kinds .dv-nm small { display: block; font-size: .8rem; font-weight: 400; color: var(--text-dim); margin-top: .1rem; }
-.dv-kinds .dv-where { font-family: var(--font-mono); font-size: .75rem; line-height: 1.5; color: var(--text-dim); }
-.dv-kinds .dv-where b { color: var(--text); font-weight: 500; }
-
-/* ── Rows of entries ────────────────────────────────────────────────────────────────────────── */
-.dv-rows { display: grid; grid-template-columns: 6rem minmax(0, 1fr) minmax(0, 13rem) 3.5rem; gap: 0 1.1rem; align-items: center; }
-.dv-rows > div { padding: .55rem 0; border-bottom: 1px solid var(--border); min-width: 0; }
-.dv-rows--head > div { padding: 0 0 .35rem; border-bottom: 0; font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
-.dv-rows--hits { grid-template-columns: minmax(0, 1fr) minmax(0, 13rem) 3.5rem; }
+/* ── The map of kinds, the rows of entries, the hits: the Listing (css/components/listing.css) ── */
+/* The count is the figure cell; the stat number's own right margin goes. */
+.og-dv .dv-n { margin-right: 0; }
 .dv-at { margin-right: 0; }
 .dv-at small { display: block; font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); margin-top: .2rem; }
-.dv-rows .dv-nm { font-weight: 800; font-size: .95rem; color: var(--text); }
-.dv-rows .dv-nm .og-tbl-name { white-space: normal; overflow-wrap: anywhere; }
-.dv-rows .dv-nm small { display: block; font-size: .8rem; font-weight: 400; color: var(--text-dim); margin-top: .1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.dv-rows--hits .dv-nm small { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.og-dv .listing-name .og-tbl-name { white-space: normal; overflow-wrap: anywhere; }
+/* The line under a name is the Listing's (.listing-meta); an entry keeps it to one line, a hit to two. */
+.dv-rows .listing-name small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dv-rows--hits .listing-name small { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+/* The query's words, marked on the sun. */
 .dv-rows mark { background: var(--sun); color: var(--on-sun); padding: 0 2px; }
-.dv-rows .dv-where { font-family: var(--font-mono); font-size: .72rem; line-height: 1.5; color: var(--text-dim); overflow-wrap: anywhere; }
-.dv-rows .dv-where b { color: var(--accent); font-weight: 500; }
-.dv-lbl { grid-column: 1 / -1; display: flex; align-items: baseline; padding: .9rem 0 .25rem !important; border-bottom: 1px solid var(--text) !important; font-family: var(--font-poster); font-weight: var(--font-poster-weight); text-transform: uppercase; font-size: .82rem; letter-spacing: .05em; color: var(--accent); }
+/* A kind's heading and its "show the rest" span the hits' row. */
+.dv-lbl { grid-column: 1 / -1; display: flex; align-items: baseline; padding: .9rem 0 .25rem; }
 .dv-lbl em { margin-left: auto; font-family: var(--font-mono); font-size: .7rem; font-style: normal; color: var(--text-dim); }
-.dv-morerow { grid-column: 1 / -1; padding: .5rem 0 !important; border-bottom: 0 !important; }
+.dv-morerow { grid-column: 1 / -1; padding: .5rem 0; }
 
 /* ── Places ─────────────────────────────────────────────────────────────────────────────────── */
 .dv-places { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .8rem; }
-.dv-place { display: flex; flex-direction: column; align-items: stretch; gap: .15rem; padding: .7rem .85rem; border: 2px solid var(--text); background: var(--card-bg); cursor: pointer; text-align: left; font-family: var(--font-showroom-body); color: var(--text); }
+.dv-place { display: flex; flex-direction: column; align-items: stretch; gap: .15rem; padding: .7rem .85rem; border: var(--shape-frame) solid var(--shape-frame-colour); border-radius: var(--shape-corner); background: var(--card-bg); cursor: pointer; text-align: left; font-family: var(--font-showroom-body); color: var(--text); }
 .dv-place:hover { border-color: var(--accent); }
 .dv-place b { font-weight: 800; font-size: .92rem; overflow-wrap: anywhere; }
 .dv-place small { font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); margin-bottom: .35rem; }
@@ -78,12 +62,6 @@
 .dv-ws--more { color: var(--text-dim); }
 
 @media (max-width: 1100px) {
-  .dv-desk { grid-template-columns: 1fr; }
-  .dv-kinds { grid-template-columns: 3.6rem minmax(0, 1fr) 3.5rem; }
-  .dv-kinds > .dv-where, .dv-kinds--head > div:nth-child(3) { display: none; }
-  .dv-rows { grid-template-columns: 5rem minmax(0, 1fr) 3.5rem; }
-  .dv-rows > .dv-where, .dv-rows--head > div:nth-child(3) { display: none; }
-  .dv-rows--hits { grid-template-columns: minmax(0, 1fr) 3.5rem; }
   .dv-places { grid-template-columns: 1fr; }
   .og-dv .og-fold { flex-wrap: wrap; row-gap: .35rem; }
   .og-dv .og-fold-r { white-space: normal; margin-left: 0; flex-basis: 100%; }

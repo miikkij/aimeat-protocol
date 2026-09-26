@@ -6,6 +6,28 @@
  *   and two-way sync. Shows files pushed by the agent (soul.md, AGENTS.md, etc).
  *   Supports edit, copy, download, and upload actions.
  * @version-history
+ *   v1.16.0 -- 2026-09-26 -- The configuration files are the Listing (css/components/listing.css, cut name-state): the name with its date or description on the grey line under it, the green dot beside it, the platform tag at the end; the file you pick opens under its own row in the raised panel, its text the Code block (a unification: Jouni's decision "File pick list").
+ *   v1.15.0 -- 2026-09-26 -- The run limits beside their check boxes are the Check line (css/components/check-line.css), a unification: Jouni's decision "Check line".
+ *   v1.14.0 -- 2026-09-26 -- A small heading over a group of fields, a card or a note is the Sub-heading (.sub-heading: small ink headline letters); the coral small capitals, the bold ink words and the coral headline letters go (a unification: Jouni's decision "Sub-heading").
+ *   v1.13.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
+ *   v1.12.0 -- 2026-09-26 -- Every line that says a part is loading is the loading line: the quiet sentence with the blinking Loading mark, LoadingLine in views/profile/shared.js (a unification: the look most tabs use).
+ *   v1.11.0 -- 2026-09-25 -- A dot that says a state (active, inactive, running, something unseen) is the status dot (css/components/status-dot.css), a unification: the look most tabs use.
+ *   v1.10.0 -- 2026-09-25 -- Every tag is the Tag (.poster-chip), a unification: Jouni's decision Tag.
+ *   v1.9.0 -- 2026-09-25 -- Every many-line field is the Text area (.og-textarea); a place keeps only its size and margin (a unification: the look most tabs use).
+ *   v1.9.0 -- 2026-09-25 -- Every one-line field is the Text field (.og-input); a place keeps only its layout (a unification: the look most tabs use).
+ *   v1.8.0 -- 2026-09-25 -- Every one-line field is the Text field (.og-input); a place keeps only its layout (a unification: the look most tabs use).
+ *   v1.7.0 -- 2026-09-25 -- A note that asks you to look or act is the Attention note (.poster-aside, its small cut; solid for an act that cannot be undone, the waiting tone while an agent onboards) (Jouni's decision "Attention note", a unification).
+ *   v1.6.0 -- 2026-09-25 -- The row labels (field and key labels, column heads, box labels) wear .poster-label (Jouni's decision "Row label", a unification).
+ *   v1.3.0 -- 2026-09-25 -- A delete, revoke or reset link keeps its coral as the action link's danger
+ *     tone, .poster-action--danger (Jouni's decision "Action link").
+ *   v1.2.0 -- 2026-09-25 -- Every quiet way on is the library's action link, .poster-action, with the
+ *     tone its meaning names: more for "show all" and more of a list, back, text for a plain grey
+ *     word, quiet (Jouni's decisions "Action link", "Panel action", "Dismiss", "Small link", "Step
+ *     button").
+ *   v1.1.0 -- 2026-09-25 -- The loud action is the library's dark block, .poster-slab: the control cut
+ *     where it sits in a row of controls or waits to be enabled, the danger tone for a delete that
+ *     cannot be undone (Jouni's decision "Loud action").
+ *   2026-09-25 -- The lines that say a list is empty (or has nothing to show yet) are the quiet sentence (.poster-quiet, QuietNote), a unification: Jouni's decision "Empty line".
  *   2026-09-20 -- The agent's AI section (agent-ai-section.js): its own keys, cap, gate and numbers.
  *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
  *   v1.0.0 -- 2026-05-24 -- Initial creation for Agent Detail Tab-View
@@ -61,24 +83,24 @@ function ScheduleBudgetSection({ agent, agentName, showToast }) {
 
   return html`
     <div class="sch-form sch-budget-section poster-row--thing">
-      <div class="pf-agd-section-title">${t('profile.scheduler.budgetTitle')}</div>
+      <div class="pf-agd-section-title sub-heading">${t('profile.scheduler.budgetTitle')}</div>
       <div class="section-desc">${t('profile.scheduler.budgetDesc')}</div>
       <div class="sch-constraints">
-        <label class="sch-check">
+        <label class="sch-check check-line">
           <input type="checkbox" checked=${maxRuns.enabled} onChange=${e => setMaxRuns(s => ({ ...s, enabled: e.target.checked }))} />
           ${t('profile.scheduler.maxRuns')}
           <input type="number" min="1" value=${maxRuns.limit} disabled=${!maxRuns.enabled}
-            onInput=${e => setMaxRuns(s => ({ ...s, limit: e.target.value }))} class="sch-num" />
+            onInput=${e => setMaxRuns(s => ({ ...s, limit: e.target.value }))} class="og-input sch-num" />
         </label>
-        <label class="sch-check">
+        <label class="sch-check check-line">
           <input type="checkbox" checked=${dailyLimit.enabled} onChange=${e => setDailyLimit(s => ({ ...s, enabled: e.target.checked }))} />
           ${t('profile.scheduler.dailyLimit')}
           <input type="number" min="0" step="0.1" value=${dailyLimit.limit} disabled=${!dailyLimit.enabled}
-            onInput=${e => setDailyLimit(s => ({ ...s, limit: e.target.value }))} class="sch-num" />
+            onInput=${e => setDailyLimit(s => ({ ...s, limit: e.target.value }))} class="og-input sch-num" />
         </label>
       </div>
       <div class="sch-form-actions">
-        <button class="btn-primary btn-sm" disabled=${saving} onClick=${save}>${saving ? t('profile.scheduler.saving') : t('profile.scheduler.budgetSave')}</button>
+        <button class="poster-slab poster-slab--control" disabled=${saving} onClick=${save}>${saving ? t('profile.scheduler.saving') : t('profile.scheduler.budgetSave')}</button>
       </div>
     </div>`;
 }
@@ -90,19 +112,19 @@ function AgentDangerZone({ agent, agentName, onDeleteClick }) {
   const [typed, setTyped] = useState('');
   if (!onDeleteClick) return null;
   return html`
-    <div class="pj-danger pj-danger-box">
+    <div class="pj-danger pj-danger-box poster-aside poster-aside--small poster-aside--irreversible">
       <div class="pj-danger-row">
         <div class="pj-danger-text">
           <div class="pj-danger-title">${t('profile.agents.detail.agent_config.deleteTitle') || 'Delete this agent'}</div>
           <div class="pj-danger-sub">${t('profile.agents.detail.agent_config.deleteDesc') || 'Removes the agent, its credentials and its task history. This cannot be undone.'}</div>
         </div>
-        <button class="btn-danger btn-sm" onClick=${() => { setOpen(o => !o); setTyped(''); }}>${t('profile.agents.deleteAgent')}…</button>
+        <button class="poster-action poster-action--small poster-action--danger" onClick=${() => { setOpen(o => !o); setTyped(''); }}>${t('profile.agents.deleteAgent')}…</button>
       </div>
       ${open && html`
         <div class="pj-danger-confirm">
-          <label class="pj-field"><span>${(t('profile.agents.detail.agent_config.deleteConfirmLabel') || 'Type the agent’s name to confirm') + ': ' + agentName}</span>
-            <input type="text" class="input-field input-sm" value=${typed} onInput=${(e) => setTyped(e.target.value)} placeholder=${agentName} /></label>
-          <button class="btn-danger btn-sm" disabled=${typed.trim() !== agentName}
+          <label class="pj-field"><span class="poster-label">${(t('profile.agents.detail.agent_config.deleteConfirmLabel') || 'Type the agent’s name to confirm') + ': ' + agentName}</span>
+            <input type="text" class="og-input" value=${typed} onInput=${(e) => setTyped(e.target.value)} placeholder=${agentName} /></label>
+          <button class="poster-slab poster-slab--control poster-slab--danger" disabled=${typed.trim() !== agentName}
             onClick=${() => onDeleteClick(agent.name)}>${t('profile.agents.deleteAgent')}</button>
         </div>
       `}
@@ -227,7 +249,7 @@ export default function TabAgentConfig({ agent, agentName, showToast, onDeleteCl
   }
 
   if (loading) {
-    return html`<div class="pf-agd-empty">${t('profile.loading')}</div>`;
+    return html`<div class="poster-quiet pf-agd-empty loading-mark">${t('profile.loading')}</div>`;
   }
 
   if (files.length === 0) {
@@ -236,10 +258,10 @@ export default function TabAgentConfig({ agent, agentName, showToast, onDeleteCl
         <${ScheduleBudgetSection} agent=${agent} agentName=${agentName} showToast=${showToast} />
         <${AgentAiSection} agentName=${agentName} showToast=${showToast} />
         <div class="pf-agd-config-upload">
-          <button class="btn-outline btn-sm" onClick=${handleUploadClick}>+ ${t('profile.agents.detail.agent_config.upload')}</button>
+          <button class="poster-action poster-action--small" onClick=${handleUploadClick}>+ ${t('profile.agents.detail.agent_config.upload')}</button>
           <input ref=${fileInputRef} type="file" accept=".md,.yaml,.yml,.json" class="pf-agd-hidden-input" onChange=${handleFileUpload} />
         </div>
-        <div class="pf-agd-empty">${t('profile.agents.detail.empty.agent_config')}</div>
+        <div class="poster-quiet pf-agd-empty">${t('profile.agents.detail.empty.agent_config')}</div>
         <${AgentDangerZone} agent=${agent} agentName=${agentName} onDeleteClick=${onDeleteClick} />
       </div>
     `;
@@ -250,50 +272,55 @@ export default function TabAgentConfig({ agent, agentName, showToast, onDeleteCl
       <${ScheduleBudgetSection} agent=${agent} agentName=${agentName} showToast=${showToast} />
       <${AgentAiSection} agentName=${agentName} showToast=${showToast} />
       <div class="pf-agd-config-upload">
-        <button class="btn-outline btn-sm" onClick=${handleUploadClick}>+ ${t('profile.agents.detail.agent_config.upload')}</button>
+        <button class="poster-action poster-action--small" onClick=${handleUploadClick}>+ ${t('profile.agents.detail.agent_config.upload')}</button>
         <input ref=${fileInputRef} type="file" accept=".md,.yaml,.yml,.json" class="pf-agd-hidden-input" onChange=${handleFileUpload} />
       </div>
 
-      <div class="pf-agd-config-list">
+      <div class="listing listing--name-state pf-agd-config-list">
         ${files.map(file => html`
           <div key=${file.key}
-               class="pf-agd-config-item ${selectedFile === file.key ? 'pf-agd-config-item--active' : ''}"
-               onClick=${() => selectFile(file)}>
-            ${file.active !== false && html`<span class="pf-agd-status-dot pf-agd-status-dot--active"></span>`}
-            <span class="pf-agd-config-name">${file.filename}</span>
-            ${file.description && html`<span class="pf-agd-config-desc">${file.description}</span>`}
-            ${!file.description && html`<span class="pf-agd-config-desc">${file.updatedAt ? `${t('profile.agents.tasks.updated')}: ${fmtDate(file.updatedAt)}` : ''}</span>`}
-            ${file.platform && html`<span class="pf-agd-config-platform">${file.platform}</span>`}
+               class=${`listing-row ${selectedFile === file.key ? 'is-open' : ''}`}
+               onClick=${(e) => { if (!e.target.closest?.('.listing-open')) selectFile(file); }}>
+            <div class="listing-name">
+              ${file.active !== false && html`<span class="status-dot pf-agd-status-dot status-dot--active"></span>`}
+              ${file.filename}
+              ${file.description && html`<small>${file.description}</small>`}
+              ${!file.description && html`<small>${file.updatedAt ? `${t('profile.agents.tasks.updated')}: ${fmtDate(file.updatedAt)}` : ''}</small>`}
+            </div>
+            <div class="listing-doors">${file.platform && html`<span class="poster-chip">${file.platform}</span>`}</div>
+            ${selectedFile === file.key && renderOpened()}
           </div>
         `)}
       </div>
+      <${AgentDangerZone} agent=${agent} agentName=${agentName} onDeleteClick=${onDeleteClick} />
+    </div>
+  `;
 
-      ${selectedFile && html`
-        <div>
+  /** The file you picked, opened under its own row (the Listing's opened panel, raised). */
+  function renderOpened() {
+    return html`
+        <div class="listing-open poster-box poster-box--raised">
           <div class="pf-agd-config-preview-header">
             <span>${t('profile.agents.detail.agent_config.viewing')}: ${files.find(f => f.key === selectedFile)?.filename || ''}</span>
             <div class="pf-agd-config-actions">
               ${!editing && html`
-                <button class="btn-outline btn-sm" onClick=${handleEdit}>${t('profile.agents.detail.agent_config.edit')}</button>
-                <button class="btn-outline btn-sm" onClick=${handleCopy}>${t('common.copy')}</button>
-                <button class="btn-outline btn-sm" onClick=${handleDownload}>${t('profile.agents.detail.agent_config.download')}</button>
+                <button class="poster-action poster-action--small" onClick=${handleEdit}>${t('profile.agents.detail.agent_config.edit')}</button>
+                <button class="poster-action poster-action--small" onClick=${handleCopy}>${t('common.copy')}</button>
+                <button class="poster-action poster-action--small" onClick=${handleDownload}>${t('profile.agents.detail.agent_config.download')}</button>
               `}
             </div>
           </div>
           ${editing ? html`
             <div class="pf-agd-config-edit">
-              <textarea class="pf-agd-config-textarea" value=${editContent} onInput=${(e) => setEditContent(e.target.value)}></textarea>
+              <textarea class="og-textarea pf-agd-config-textarea" value=${editContent} onInput=${(e) => setEditContent(e.target.value)}></textarea>
               <div class="pf-agd-form-actions">
-                <button class="btn-primary btn-sm" onClick=${handleSave}>${t('profile.agents.detail.agent_config.save')}</button>
-                <button class="btn-outline btn-sm" onClick=${handleCancelEdit}>${t('profile.agents.detail.agent_config.cancel')}</button>
+                <button class="poster-slab poster-slab--control" onClick=${handleSave}>${t('profile.agents.detail.agent_config.save')}</button>
+                <button class="poster-action poster-action--small" onClick=${handleCancelEdit}>${t('profile.agents.detail.agent_config.cancel')}</button>
               </div>
             </div>
           ` : html`
-            <div class="pf-agd-config-preview">${preview}</div>
+            <div class="code-block pf-agd-config-preview">${preview}</div>
           `}
-        </div>
-      `}
-      <${AgentDangerZone} agent=${agent} agentName=${agentName} onDeleteClick=${onDeleteClick} />
-    </div>
-  `;
+        </div>`;
+  }
 }

@@ -12,9 +12,28 @@
  * @structure renderPage · secWaiting · secKunto · secNewest · secFirst
  * @usage import { renderPage } from './apps/page.js';
  * @version-history
+ *   v1.16.0 -- 2026-09-26 -- A version's added and removed lines are the Code block (css/components/code-block.css), a unification: Jouni's decision "Code block".
+ *   v1.15.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
+ *   v1.14.0 -- 2026-09-26 -- Every line that says a part is loading is the loading line: the quiet sentence with the blinking Loading mark, LoadingLine in views/profile/shared.js (a unification: the look most tabs use).
+ *   v1.13.0 -- 2026-09-25 -- An app's rights in your name are the Tag (.poster-chip, plain, in .poster-chips), a unification: Jouni's decision "Tag".
+ *   v1.12.0 -- 2026-09-25 -- The apps that changed last are the Listing (listing, listing-row with its head row, and its name, words and doors cells), a unification: the look most tabs use. The initials box, the note and the open count sit in plain cells.
+ *   v1.11.0 -- 2026-09-25 -- Every word that says a state is the Status (.poster-status fine, attention, danger, off), a unification: Jouni's decision Status.
+ *   v1.10.0 -- 2026-09-25 -- Every tag is the Tag (.poster-chip and its tones, .poster-chips for a row), a unification: Jouni's decision Tag.
+ *   v1.9.0 -- 2026-09-25 -- A lead or a paragraph that opens or explains a section is the og-lead; a grey one that explains is the Hint (UI consolidation phase 5, a unification).
+ *   v1.8.0 -- 2026-09-25 -- Every hint is the Hint (poster-hint, components/Hint.js), the look most Settings & Controls tabs draw (UI consolidation phase 5, a unification).
+ *   v1.7.0 -- 2026-09-25 -- The row labels (field and key labels, column heads, box labels) wear .poster-label (Jouni's decision "Row label", a unification).
+ *   v1.6.0 -- 2026-09-25 -- Every quiet way on is the library's action link, .poster-action, with the
+ *     tone its meaning names: more for "show all" and more of a list, back, text for a plain grey
+ *     word, quiet (Jouni's decisions "Action link", "Panel action", "Dismiss", "Small link", "Step
+ *     button").
+ *   v1.5.0 -- 2026-09-25 -- The loud action is the library's dark block, .poster-slab: the control cut
+ *     where it sits in a row of controls or waits to be enabled, the danger tone for a delete that
+ *     cannot be undone (Jouni's decision "Loud action").
+ *   2026-09-25 -- The lines that say a list is empty (or has nothing to show yet) are the quiet sentence (.poster-quiet, QuietNote), a unification: Jouni's decision "Empty line".
  *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   2026-09-13 -- Compose the shared initials-box role and its measured size cut.
+ *   v1.4.0 -- 2026-09-25 -- The og- page kit is library components: PageSection and FoldSection in /components, the kit's rules in css/components (tab-page, crumb-trail, page-head, figure-strip, page-section, fold-row, setting-box, form-fields, space-table) and css/views/organism-controls.css (UI consolidation phase 5, a move).
  *   v1.3.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v1.0.0 — 2026-09-02 — Initial.
  *   v1.2.0 — 2026-09-08 — The builders section: who else may build these apps.
@@ -26,11 +45,13 @@ const html = htm.bind(h);
 import { t, getLocale } from '/js/i18n.js';
 import { num as fmtNum } from '/js/format.js';
 import { CopyButton } from '/components/CopyButton.js';
-import { Section, scrollTo } from '/views/profile/organisms/poster-parts.js';
+import { PageSection } from '/components/PageSection.js';
+import { scrollTo } from '/views/profile/organisms/poster-parts.js';
 import { a, day, rel, kb, nameOf, appRef, appUrl, catalogUrl, noteFor, initials, crumb, pageLinks, goTab } from './frame.js';
 import { secAgents, secBuild } from './build.js';
 import { CollaborationSection, PublishDialog } from './collaboration.js';
 import { secBuilders } from './builders.js';
+import { Hint } from '/components/Hint.js';
 
 export function renderPage(ctx) {
   const apps = ctx.apps || [];
@@ -42,7 +63,7 @@ export function renderPage(ctx) {
   const listed = apps.filter((x) => !x.parked && !x.operator_hidden).length;
   const opens = apps.reduce((s, x) => s + (x.downloads || 0), 0);
   const top = [...apps].sort((p, q) => (q.downloads || 0) - (p.downloads || 0)).slice(0, 2);
-  const chip = (text, cls = '') => html`<span class=${`og-chip ${cls}`}>${text}</span>`;
+  const chip = (text, cls = '') => html`<span class=${`poster-chip ${cls}`}>${text}</span>`;
   const fmt = (n) => fmtNum(n);
 
   const strip = none ? html`
@@ -69,29 +90,29 @@ export function renderPage(ctx) {
       <div class="og-mast">
         <div class="og-mast-words">
           <h1 class="og-title poster-page-title">${t('profile.tabs.apps')}<small>${a('titleSub')}</small></h1>
-          <div class="og-chips">
-            ${none ? chip(a('chipNone'), 'og-chip--coral') : chip(a('chipCount', { n: apps.length }))}
-            ${none ? chip(a('chipFirst'), 'og-chip--dim') : drafts.length ? chip(a('chipDrafts', { n: drafts.length }), 'og-chip--coral') : null}
-            ${none ? null : chip(a('chipOpens', { n: fmt(opens) }), 'og-chip--dim')}
+          <div class="poster-chips">
+            ${none ? chip(a('chipNone'), 'poster-chip--coral') : chip(a('chipCount', { n: apps.length }))}
+            ${none ? chip(a('chipFirst')) : drafts.length ? chip(a('chipDrafts', { n: drafts.length }), 'poster-chip--coral') : null}
+            ${none ? null : chip(a('chipOpens', { n: fmt(opens) }))}
           </div>
           <p class="og-desc">${none ? a('descEmpty') : a('desc')}</p>
         </div>
         <div class="og-mast-actions">
           ${none
-            ? html`<${CopyButton} text=${ctx.buildPrompt} className="og-slab" label=${a('promptDoor')} copiedLabel=${a('promptCopied')} disabled=${!ctx.buildPrompt} onCopied=${() => ctx.showToast?.(a('promptCopiedToast'))} />
+            ? html`<${CopyButton} text=${ctx.buildPrompt} className="poster-slab poster-slab--control" label=${a('promptDoor')} copiedLabel=${a('promptCopied')} disabled=${!ctx.buildPrompt} onCopied=${() => ctx.showToast?.(a('promptCopiedToast'))} />
               <div class="og-doors">
-                <button type="button" class="og-door" onClick=${() => scrollTo('ap-build')}>${a('uploadDoor')}</button>
-                <a class="og-door og-door--quiet" href=${catalogUrl()} target="_blank" rel="noopener">${a('catalogDoor')}</a>
+                <button type="button" class="poster-action poster-action--small" onClick=${() => scrollTo('ap-build')}>${a('uploadDoor')}</button>
+                <a class="poster-action poster-action--small poster-action--lower" href=${catalogUrl()} target="_blank" rel="noopener">${a('catalogDoor')}</a>
               </div>`
-            : html`<a class="og-slab" href=${catalogUrl()} target="_blank" rel="noopener">${a('catalogDoor')}</a>
-              <div class="og-doors"><button type="button" class="og-door" onClick=${() => scrollTo('ap-build')}>${a('uploadDoor')}</button></div>`}
+            : html`<a class="poster-slab" href=${catalogUrl()} target="_blank" rel="noopener">${a('catalogDoor')}</a>
+              <div class="og-doors"><button type="button" class="poster-action poster-action--small" onClick=${() => scrollTo('ap-build')}>${a('uploadDoor')}</button></div>`}
         </div>
       </div>
       ${strip}
       <div class="og-grid">
         <div class="og-main">
           ${none ? html`${secFirst(ctx)}${secWaiting(ctx, drafts, grants, '02')}${secKunto(ctx, '03')}${secBuild(ctx, { formOnly: true, num: '04' })}`
-            : loading ? html`<p class="og-empty">${t('common.loading')}</p>`
+            : loading ? html`<p class="poster-quiet loading-mark">${t('common.loading')}</p>`
             : html`${secWaiting(ctx, drafts, grants, '01')}${secKunto(ctx, '02')}${secNewest(ctx, apps)}${secAgents(ctx)}${secBuild(ctx, { formOnly: false, num: '05' })}${secBuilders(ctx)}`}
           ${!loading ? html`<${CollaborationSection} ctx=${ctx} />` : null}
         </div>
@@ -113,13 +134,13 @@ export function renderPage(ctx) {
 function secWaiting(ctx, drafts, grants, num) {
   const waiting = drafts.length + grants.length;
   return html`
-    <${Section} id="ap-waiting" num=${num} title=${a('secWaiting')} count=${waiting} first=${num === '01'}>
-      ${!waiting ? html`<p class="ap-empty">${ctx.apps && ctx.apps.length ? a('waitingEmpty') : a('waitingEmptyNew')}</p>` : html`
+    <${PageSection} id="ap-waiting" num=${num} title=${a('secWaiting')} count=${waiting} first=${num === '01'}>
+      ${!waiting ? html`<p class="poster-quiet ap-empty">${ctx.apps && ctx.apps.length ? a('waitingEmpty') : a('waitingEmptyNew')}</p>` : html`
         <div class="ap-rows">
           ${drafts.map((app) => draftRow(ctx, app))}
           ${grants.map((g) => grantRow(ctx, g))}
         </div>`}
-      <p class="ap-hint">${a('waitingHint')}</p>
+      <${Hint}>${a('waitingHint')}<//>
     <//>`;
 }
 
@@ -134,24 +155,24 @@ function draftRow(ctx, app) {
         <small>${a('draftMeta', { version: app.manifest?.version || '', date: day(app.created_at), opens: app.downloads || 0 })}</small>
       </div>
       <div class="ap-row-ctl">
-        <span class="og-chip og-chip--coral">${a('draftChip')}</span>
-        <button type="button" class="og-door" disabled=${busy} onClick=${() => ctx.publishDraft(app)}>${a('publishDraft')}</button>
-        <button type="button" class="og-door og-door--quiet" onClick=${() => ctx.toggleDiff(app)}>${open ? a('hideChanges') : a('viewChanges')}</button>
-        <button type="button" class="og-door og-door--quiet" disabled=${busy} onClick=${() => ctx.discardDraft(app)}>${a('discardDraft')}</button>
+        <span class="poster-status poster-status--attention">${a('draftChip')}</span>
+        <button type="button" class="poster-action poster-action--small" disabled=${busy} onClick=${() => ctx.publishDraft(app)}>${a('publishDraft')}</button>
+        <button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => ctx.toggleDiff(app)}>${open ? a('hideChanges') : a('viewChanges')}</button>
+        <button type="button" class="poster-action poster-action--small poster-action--lower" disabled=${busy} onClick=${() => ctx.discardDraft(app)}>${a('discardDraft')}</button>
       </div>
       ${open ? diffPanel(ctx.diff) : null}
     </div>`;
 }
 
 function diffPanel(diff) {
-  if (diff.state === 'loading') return html`<div class="ap-panel poster-aside"><p class="ap-empty">${a('diffLoading')}</p></div>`;
-  if (diff.state === 'failed') return html`<div class="ap-panel poster-aside"><p class="ap-empty">${a('diffFailed')}</p></div>`;
+  if (diff.state === 'loading') return html`<div class="ap-panel poster-aside"><p class="poster-quiet ap-empty loading-mark">${a('diffLoading')}</p></div>`;
+  if (diff.state === 'failed') return html`<div class="ap-panel poster-aside"><p class="poster-quiet ap-empty">${a('diffFailed')}</p></div>`;
   const d = diff.result;
   return html`
     <div class="ap-panel poster-aside">
       <p class="ap-panel-lead">${d.addedTotal || d.removedTotal ? a('diffTitle', { added: d.addedTotal, removed: d.removedTotal }) : a('diffNone')}</p>
-      ${d.added.length ? html`<span class="og-label">${a('diffAdded')}</span><pre class="ap-code ap-code--add">${d.added.join('\n')}</pre>` : null}
-      ${d.removed.length ? html`<span class="og-label">${a('diffRemoved')}</span><pre class="ap-code ap-code--del">${d.removed.join('\n')}</pre>` : null}
+      ${d.added.length ? html`<span class="poster-label">${a('diffAdded')}</span><pre class="code-block ap-code ap-code--add">${d.added.join('\n')}</pre>` : null}
+      ${d.removed.length ? html`<span class="poster-label">${a('diffRemoved')}</span><pre class="code-block ap-code ap-code--del">${d.removed.join('\n')}</pre>` : null}
     </div>`;
 }
 
@@ -165,11 +186,11 @@ function grantRow(ctx, g) {
         <small>${a('grantMeta', { n: (g.scopes || []).length, granted: day(g.granted_at), used: g.last_used_at ? rel(g.last_used_at) : a('grantNever') })}</small>
       </div>
       <div class="ap-row-ctl">
-        <span class="og-chip og-chip--sun">${a('grantChip')}</span>
-        <button type="button" class="og-door og-door--quiet" onClick=${() => ctx.toggleScopes(g)}>${open ? a('hideScopes') : a('viewScopes')}</button>
-        <button type="button" class="og-door og-door--quiet" disabled=${busy} onClick=${() => ctx.revokeGrant(g)}>${a('revokeGrant')}</button>
+        <span class="poster-chip poster-chip--sun">${a('grantChip')}</span>
+        <button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => ctx.toggleScopes(g)}>${open ? a('hideScopes') : a('viewScopes')}</button>
+        <button type="button" class="poster-action poster-action--small poster-action--lower" disabled=${busy} onClick=${() => ctx.revokeGrant(g)}>${a('revokeGrant')}</button>
       </div>
-      ${open ? html`<div class="ap-panel poster-aside"><p class="ap-panel-lead">${a('scopesLead', { origin: g.app_origin || g.app })}</p><div class="ap-scopes">${(g.scopes || []).map((s) => html`<span key=${s}>${s}</span>`)}</div></div>` : null}
+      ${open ? html`<div class="ap-panel poster-aside"><p class="og-lead">${a('scopesLead', { origin: g.app_origin || g.app })}</p><div class="poster-chips">${(g.scopes || []).map((s) => html`<span class="poster-chip" key=${s}>${s}</span>`)}</div></div>` : null}
     </div>`;
 }
 
@@ -187,19 +208,19 @@ function secKunto(ctx, num) {
   };
   const managePrompt = ctx.managePrompt();
   const doors = ctx.apps && ctx.apps.length
-    ? html`<${CopyButton} text=${managePrompt} className="og-door og-door--quiet" label=${a('manageDoor')} copiedLabel=${a('promptCopied')} onCopied=${() => ctx.showToast?.(a('promptCopiedToast'))} />`
+    ? html`<${CopyButton} text=${managePrompt} className="poster-action poster-action--small poster-action--lower" label=${a('manageDoor')} copiedLabel=${a('promptCopied')} onCopied=${() => ctx.showToast?.(a('promptCopiedToast'))} />`
     : null;
   return html`
-    <${Section} id="ap-kunto" num=${num} title=${a('secKunto')} count=${ctx.apps && ctx.apps.length ? a('secKuntoSub', { n: ctx.apps.length }) : null} doors=${doors}>
-      ${!ctx.apps || !ctx.apps.length ? html`<p class="ap-empty">${a('kuntoEmptyNew')}</p>`
-        : !k.rows.length ? html`<p class="ap-empty"><b>${a('kuntoAllGood')}</b></p>` : html`
+    <${PageSection} id="ap-kunto" num=${num} title=${a('secKunto')} count=${ctx.apps && ctx.apps.length ? a('secKuntoSub', { n: ctx.apps.length }) : null} doors=${doors}>
+      ${!ctx.apps || !ctx.apps.length ? html`<p class="poster-quiet ap-empty">${a('kuntoEmptyNew')}</p>`
+        : !k.rows.length ? html`<p class="poster-quiet ap-empty"><b>${a('kuntoAllGood')}</b></p>` : html`
         <div class="ap-kn">
           ${k.rows.map((r) => html`
             <div class=${`ap-kn-n poster-stat-number poster-stat-number--small ${r.loud ? 'ap-kn-n--loud' : ''}`} key=${'n' + r.key}>${r.n}</div>
             <div class="ap-kn-w" key=${'w' + r.key}><b>${a('kunto.' + r.key + '.what')}</b><small>${sub(r.key)}</small></div>
-            <div class="ap-kn-go" key=${'g' + r.key}><a class="og-door og-door--quiet" href=${catalogUrl({ filter: r.key })} target="_blank" rel="noopener">${a('kuntoShow', { n: r.n })}</a></div>`)}
+            <div class="ap-kn-go" key=${'g' + r.key}><a class="poster-action poster-action--small poster-action--row poster-action--lower" href=${catalogUrl({ filter: r.key })} target="_blank" rel="noopener">${a('kuntoShow', { n: r.n })}</a></div>`)}
         </div>`}
-      <p class="ap-hint">${a('kuntoHint')}</p>
+      <${Hint}>${a('kuntoHint')}<//>
     <//>`;
 }
 
@@ -208,28 +229,30 @@ function secKunto(ctx, num) {
 function secNewest(ctx, apps) {
   const rows = [...apps].sort((p, q) => String(q.created_at || '').localeCompare(String(p.created_at || ''))).slice(0, 6);
   const grantRefs = new Set((ctx.grants || []).map((g) => g.app));
-  const doors = html`<a class="og-door og-door--quiet" href=${catalogUrl()} target="_blank" rel="noopener">${a('allInCatalog', { n: apps.length })}</a>`;
+  const doors = html`<a class="poster-action poster-action--small poster-action--lower" href=${catalogUrl()} target="_blank" rel="noopener">${a('allInCatalog', { n: apps.length })}</a>`;
   return html`
-    <${Section} id="ap-newest" num="03" title=${a('secNewest')} count=${rows.length} doors=${doors}>
-      <div class="ap-list">
-        <div class="ap-head" aria-hidden="true"></div><div class="ap-head">${a('colApp')}</div><div class="ap-head">${a('colDesc')}</div><div class="ap-head">${a('colNote')}</div><div class="ap-head ap-head--r">${a('colOpens')}</div><div class="ap-head"></div>
+    <${PageSection} id="ap-newest" num="03" title=${a('secNewest')} count=${rows.length} doors=${doors}>
+      <div class="listing listing--cols listing--mark-name-desc-state-n-doors">
+        <div class="listing-row listing-row--head"><div class="poster-label" aria-hidden="true"></div><div class="poster-label">${a('colApp')}</div><div class="poster-label">${a('colDesc')}</div><div class="poster-label">${a('colNote')}</div><div class="poster-label ap-head--r">${a('colOpens')}</div><div class="poster-label"></div></div>
         ${rows.map((app) => {
           const ref = appRef(app);
           const flags = ctx.kunto?.flags?.[ref] || {};
           const legal = app.manifest?.legal ? Object.keys(app.manifest.legal).length : 0;
           return html`
-            <div class="ap-av poster-box poster-box--avatar poster-box--small" key=${'a' + ref} aria-hidden="true">${initials(nameOf(app))}</div>
-            <div class="ap-nm" key=${'n' + ref}>${nameOf(app)}<small>${a('rowMeta', { version: app.manifest?.version || '', n: app.version_number || 1, date: day(app.created_at), size: kb(app.size) })}</small></div>
-            <div class="ap-ds" key=${'d' + ref}>${app.manifest?.descriptions?.[getLocale()] || app.manifest?.description || ''}${requiresLine(app)}</div>
-            <div class="ap-st" key=${'s' + ref}>${noteFor(app, flags, grantRefs, legal)}</div>
-            <div class="ap-op" key=${'o' + ref}>${app.downloads || 0}</div>
-            <div class="ap-go" key=${'g' + ref}>
-              <a class="og-door" href=${appUrl(app)} target="_blank" rel="noopener" onClick=${() => ctx.recordOpen(app)}>${a('open')}</a>
-              <a class="og-door og-door--quiet" href=${catalogUrl({ q: nameOf(app) })} target="_blank" rel="noopener">${a('inCatalog')}</a>
+            <div class="listing-row" key=${ref}>
+              <div><div class="ap-av poster-box poster-box--avatar poster-box--small" aria-hidden="true">${initials(nameOf(app))}</div></div>
+              <div class="listing-name">${nameOf(app)}<small>${a('rowMeta', { version: app.manifest?.version || '', n: app.version_number || 1, date: day(app.created_at), size: kb(app.size) })}</small></div>
+              <div class="listing-desc"><span class="ap-ds">${app.manifest?.descriptions?.[getLocale()] || app.manifest?.description || ''}${requiresLine(app)}</span></div>
+              <div><span class="ap-st">${noteFor(app, flags, grantRefs, legal)}</span></div>
+              <div><span class="ap-op">${app.downloads || 0}</span></div>
+              <div class="listing-doors">
+                <a class="poster-action poster-action--small poster-action--row" href=${appUrl(app)} target="_blank" rel="noopener" onClick=${() => ctx.recordOpen(app)}>${a('open')}</a>
+                <a class="poster-action poster-action--small poster-action--row poster-action--lower" href=${catalogUrl({ q: nameOf(app) })} target="_blank" rel="noopener">${a('inCatalog')}</a>
+              </div>
             </div>`;
         })}
       </div>
-      <p class="ap-hint">${a('newestHint')}</p>
+      <${Hint}>${a('newestHint')}<//>
     <//>`;
 }
 
@@ -249,12 +272,12 @@ function requiresLine(app) {
 
 function secFirst(ctx) {
   return html`
-    <${Section} id="ap-first" num="01" title=${a('secFirst')} count=${null} first>
-      <p class="ap-empty"><b>${a('firstHead')}</b> ${a('firstBody')}</p>
+    <${PageSection} id="ap-first" num="01" title=${a('secFirst')} count=${null} first>
+      <p class="poster-quiet ap-empty"><b>${a('firstHead')}</b> ${a('firstBody')}</p>
       <div class="og-doors ap-doors">
-        <a class="og-door" href="/v1/aimeat-os" target="_blank" rel="noopener">${a('guideDoor')}</a>
-        <a class="og-door og-door--quiet" href=${catalogUrl()} target="_blank" rel="noopener">${a('communityDoor', { n: ctx.community })}</a>
-        <button type="button" class="og-door og-door--quiet" onClick=${() => goTab('appdev')}>${a('appdevDoor')}</button>
+        <a class="poster-action poster-action--small" href="/v1/aimeat-os" target="_blank" rel="noopener">${a('guideDoor')}</a>
+        <a class="poster-action poster-action--small poster-action--lower" href=${catalogUrl()} target="_blank" rel="noopener">${a('communityDoor', { n: ctx.community })}</a>
+        <button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${() => goTab('appdev')}>${a('appdevDoor')}</button>
       </div>
     <//>`;
 }

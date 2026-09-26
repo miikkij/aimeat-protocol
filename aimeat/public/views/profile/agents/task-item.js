@@ -7,6 +7,32 @@
  *   happened, details, memory entries, rating -- plus the actions row (start, request changes,
  *   triage, cancel, delete). The helpers it is built from live in ./task-item-parts.js.
  * @version-history
+ *   v2.19.0 — 2026-09-26 — A task's description is the Markdown reader's small cut (Markdown `small`), a unification: Jouni's decision "Small reader".
+ *   v2.18.0 — 2026-09-26 — An opened task's "What happened" is the home's Timeline (components/Timeline.js): the time, a dot for the kind (trouble, made, the agent's work), one line with the event and its message; the three-column table goes (a unification: Jouni's decision "Activity log").
+ *   v2.17.0 — 2026-09-26 — A rated task's stars are the library's Rating stars in the shown tone (css/components/rating-stars.css): the stars not given in --text-dim instead of --border (a unification: Jouni's decision "Rating stars").
+ *   v2.16.0 — 2026-09-26 — A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
+ *   v2.15.0 — 2026-09-26 — A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
+ *   v2.14.0 — 2026-09-26 — Every line that says a part is loading is the loading line: the quiet sentence with the blinking Loading mark, LoadingLine in views/profile/shared.js (a unification: the look most tabs use).
+ *   v2.13.0 — 2026-09-26 — An opened task's title is the record title's small cut (.poster-record-title--small) and the runs field the Text field at its own face; the rules that restyled them go (a unification).
+ *   v2.12.0 — 2026-09-25 — A task's deliverable key is inline code, the code-inline cut of the Code block, a unification: the look most tabs use.
+ *   v2.11.0 — 2026-09-25 — Every mark button is the icon button (.poster-icon, its small cut), a unification: Jouni's decision Icon button.
+ *   v2.10.0 — 2026-09-25 — Every small number is the Count (.poster-count tally, waiting at the limit), a unification: Jouni's decision Count.
+ *   v2.9.0 — 2026-09-25 — A task's details (deliverable, scope, rules) are the Facts (css/components/facts.css), a unification: the look most tabs use.
+ *   v2.8.0 — 2026-09-25 — A task's row is the Listing (css/components/listing.css), a unification: the look most tabs use. The opened record is the Listing's open panel inside the row, so a press inside it no longer reaches the row's toggle.
+ *   v2.7.0 — 2026-09-25 — Every word that says a state is the Status (.poster-status fine, attention, danger, off), a unification: Jouni's decision Status.
+ *   v2.6.0 — 2026-09-25 — Every tag is the Tag (.poster-chip and its tones, .poster-chips for a row), a unification: Jouni's decision Tag.
+ *   v2.5.0 — 2026-09-25 — Every time a thing happened wears .poster-time (Jouni's decision "Timestamp", a unification).
+ *   v2.4.0 — 2026-09-25 — The row labels (field and key labels, column heads, box labels) wear .poster-label (Jouni's decision "Row label", a unification).
+ *   v2.3.0 — 2026-09-25 — A delete, revoke or reset link keeps its coral as the action link's danger
+ *     tone, .poster-action--danger (Jouni's decision "Action link").
+ *   v2.2.0 — 2026-09-25 — Every quiet way on is the library's action link, .poster-action, with the
+ *     tone its meaning names: more for "show all" and more of a list, back, text for a plain grey
+ *     word, quiet (Jouni's decisions "Action link", "Panel action", "Dismiss", "Small link", "Step
+ *     button").
+ *   v2.1.0 — 2026-09-25 — The loud action is the library's dark block, .poster-slab: the control cut
+ *     where it sits in a row of controls or waits to be enabled, the danger tone for a delete that
+ *     cannot be undone (Jouni's decision "Loud action").
+ *   2026-09-25 -- The lines that say a list is empty (or has nothing to show yet) are the quiet sentence (.poster-quiet, QuietNote), a unification: Jouni's decision "Empty line".
  *   v2.0.0 — 2026-09-14 — The Tasks tab wears the poster face: agt- markup against
  *     css/views/agent-tasks-poster.css, the record box for an open task, the eye icon in place of
  *     the two emoji, doors and a slab in place of the old button classes. No behaviour change. The
@@ -41,6 +67,11 @@ import {
   RequestChangesModal,
   TaskMemoryEntry,
 } from './task-item-parts.js';
+import { TimelineList, TimelineRow } from '/components/Timeline.js';
+
+/** The Timeline's dot for a task event: a failure is trouble, a thing written or installed is made,
+ *  the rest is the agent's work. */
+const eventDot = (type = '') => (/fail|error/.test(type) ? 'trouble' : /memory_write|app_publish|extension_install/.test(type) ? 'made' : 'agent');
 
 export function TaskItem({ task, agentName, showToast, onRefresh, autoOpen = 0 }) {
   const [expanded, setExpanded] = useState(false);
@@ -142,6 +173,9 @@ export function TaskItem({ task, agentName, showToast, onRefresh, autoOpen = 0 }
   }, [agentName, task.id]);
 
   async function handleExpand(e) {
+    // The opened record sits inside the row (the Listing's open panel), so a press inside it
+    // reaches the row too; it belongs to the record, and goes on as it did before.
+    if (e.target.closest?.('.listing-open')) return;
     e.stopPropagation();
     if (expanded) { setExpanded(false); return; }
     setExpanded(true);
@@ -328,45 +362,43 @@ export function TaskItem({ task, agentName, showToast, onRefresh, autoOpen = 0 }
   ].filter(Boolean).join(' · ');
 
   // A fresh vnode per call: the closed row and the open record both show the chip at once.
-  const statusChip = () => html`<span class=${`og-chip agt-status ${statusChipClass(status)}`}>${statusLabel(status)}</span>`;
+  const statusChip = () => html`<span class=${`poster-status agt-status ${statusChipClass(status)}`}>${statusLabel(status)}</span>`;
   const stars = Math.max(0, Math.min(5, Math.round(rating?.stars || 0)));
   // The log part only appears once there is a log, a fetch in flight, or a recorded emptiness.
   const showLog = loadingEvents || (events && (events.length > 0 || !isQueued));
 
   return html`
-    <div ref=${taskRef}>
-      <div class="agt-row" onClick=${handleExpand}>
-        <div class="agt-nm">
-          <button
-            type="button"
-            class="agt-eye"
-            onClick=${handleToggleBlur}
-            title=${blurred ? t('profile.agents.tasks.unblurTitle') : t('profile.agents.tasks.blurTitle')}
-            aria-pressed=${blurred}
-          ><${EyeIcon} hidden=${blurred} /></button>
-          <span class=${`agt-nm-t ${blurred ? 'is-hidden' : ''} ${expanded ? 'is-open' : ''}`}>${task.title || task.id}</span>
-        </div>
-        <div class="agt-m">${progress || ''}</div>
-        <div class="agt-m">${task.createdAt ? timeAgo(task.createdAt) : ''}</div>
-        <div>${statusChip()}</div>
+    <div class=${`listing-row agt-row ${expanded ? 'is-open' : ''}`} onClick=${handleExpand}>
+      <div class="listing-name" ref=${taskRef}>
+        <button
+          type="button"
+          class="poster-icon poster-icon--small agt-eye"
+          onClick=${handleToggleBlur}
+          title=${blurred ? t('profile.agents.tasks.unblurTitle') : t('profile.agents.tasks.blurTitle')}
+          aria-pressed=${blurred}
+        ><${EyeIcon} hidden=${blurred} /></button>
+        <span class=${`agt-nm-t ${blurred ? 'is-hidden' : ''} ${expanded ? 'is-open' : ''}`}>${task.title || task.id}</span>
       </div>
+      <div><span class="poster-count poster-count--tally">${progress || ''}</span></div>
+      <div class="poster-time">${task.createdAt ? timeAgo(task.createdAt) : ''}</div>
+      <div>${statusChip()}</div>
 
       ${expanded && html`
-        <div class="poster-record agt-record">
+        <div class="listing-open poster-box poster-box--raised">
           <div class="agt-record-h">
-            <h3 class="poster-record-title agt-record-title">${task.title || task.id}</h3>
+            <h3 class="poster-record-title poster-record-title--small agt-record-title">${task.title || task.id}</h3>
             ${statusChip()}
           </div>
-          ${task.description && html`<div class="agt-desc"><${Markdown} text=${task.description} /></div>`}
-          ${stamps && html`<span class="agt-m agt-stamps">${stamps}</span>`}
+          ${task.description && html`<div class="agt-desc"><${Markdown} text=${task.description} small /></div>`}
+          ${stamps && html`<span class="agt-m agt-stamps poster-time">${stamps}</span>`}
 
           ${hasTodos && html`
             <div class="agt-part poster-row--thing">
               <div class="agt-part-h">
-                <span class="og-label">
+                <span class="poster-label">
                   ${t('profile.agents.tasks.todoLabel')} · ${tOr('profile.agents.tasks.todoCount', '{done} of {total}', { done: doneTodos, total: todos.length })}
                 </span>
-                ${planLine && html`<span class="agt-m">${planLine}</span>`}
+                ${planLine && html`<span class="poster-count poster-count--tally">${planLine}</span>`}
               </div>
               ${todos.map((td, i) => {
                 const tick = todoTick(td.status || 'pending');
@@ -375,22 +407,22 @@ export function TaskItem({ task, agentName, showToast, onRefresh, autoOpen = 0 }
                     <span class=${`agt-tick ${tick.cls}`}>${tick.glyph}</span>
                     <div class="agt-todo-b">
                       <b>${td.title}</b>
-                      <span class="og-chip og-chip--dim">${td.environment === 'aimeat' ? t('profile.agents.tasks.envAimeat') : t('profile.agents.tasks.envAgent')}</span>
+                      <span class="poster-chip">${td.environment === 'aimeat' ? t('profile.agents.tasks.envAimeat') : t('profile.agents.tasks.envAgent')}</span>
                       ${td.description && html`<div class="agt-sub">${td.description}</div>`}
                       ${td.environmentReason && html`<div class="agt-sub">${td.environmentReason}</div>`}
                       ${td.verification && html`<div class="agt-sub">${td.verification}</div>`}
                     </div>
                     <div class="agt-todo-r">
-                      ${td.estimateMinutes && html`<span class="agt-m">${td.estimateMinutes} ${t('profile.agents.tasks.minuteShort')}</span>`}
-                      ${td.completedAt && html`<span class="agt-m">${formatDateTime(td.completedAt)}</span>`}
+                      ${td.estimateMinutes && html`<span class="poster-count poster-count--tally">${td.estimateMinutes} ${t('profile.agents.tasks.minuteShort')}</span>`}
+                      ${td.completedAt && html`<span class="agt-m poster-time">${formatDateTime(td.completedAt)}</span>`}
                     </div>
                   </div>
                 `;
               })}
               ${outdatedTodos.length > 0 && html`
                 <div class="agt-history">
-                  <button type="button" class="og-door og-door--quiet" onClick=${(e) => { e.stopPropagation(); setShowOutdated(v => !v); }} aria-expanded=${showOutdated}>
-                    ${t('profile.agents.tasks.outdatedTodos')}<em>${outdatedTodos.length}</em>
+                  <button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${(e) => { e.stopPropagation(); setShowOutdated(v => !v); }} aria-expanded=${showOutdated}>
+                    ${t('profile.agents.tasks.outdatedTodos')}<span class="poster-count poster-count--tally">${outdatedTodos.length}</span>
                   </button>
                   ${showOutdated && outdatedTodos.map((td, i) => html`
                     <div class="agt-todo agt-todo--old" key=${td.id || 'old-' + i}>
@@ -406,67 +438,63 @@ export function TaskItem({ task, agentName, showToast, onRefresh, autoOpen = 0 }
             </div>
           `}
 
-          ${!hasTodos && isQueued && html`<div class="agt-empty">${t('profile.agents.tasks.builder.waitingTodos')}</div>`}
-          ${isRevisionRequested && html`<div class="agt-empty">${t('profile.agents.tasks.revisionWaiting')}</div>`}
+          ${!hasTodos && isQueued && html`<div class="poster-quiet agt-empty">${t('profile.agents.tasks.builder.waitingTodos')}</div>`}
+          ${isRevisionRequested && html`<div class="poster-quiet agt-empty">${t('profile.agents.tasks.revisionWaiting')}</div>`}
 
           ${showLog && html`
             <div class="agt-part poster-row--thing">
               <div class="agt-part-h">
-                <span class="og-label">${tOr('profile.agents.tasks.whatHappened', 'What happened')}</span>
+                <span class="poster-label">${tOr('profile.agents.tasks.whatHappened', 'What happened')}</span>
               </div>
-              ${loadingEvents && html`<div class="agt-empty">${t('profile.loading')}</div>`}
+              ${loadingEvents && html`<div class="poster-quiet agt-empty loading-mark">${t('profile.loading')}</div>`}
               ${events && events.length > 0 && html`
-                <div class="agt-log">
+                <${TimelineList}>
                   ${events.map(ev => html`
-                    <div class="agt-m" key=${(ev.id || ev.timestamp) + '-when'}>${ev.timestamp ? timeAgo(ev.timestamp) : ''}</div>
-                    <div class="agt-w" key=${(ev.id || ev.timestamp) + '-what'}>${ev.type || ''}</div>
-                    <div class="agt-msg" key=${(ev.id || ev.timestamp) + '-said'}>${ev.message || ''}</div>
+                    <${TimelineRow} key=${ev.id || ev.timestamp} category=${eventDot(ev.type)}
+                      when=${ev.timestamp ? timeAgo(ev.timestamp) : ''}
+                      text=${[ev.type, ev.message].filter(Boolean).join(': ')} />
                   `)}
-                </div>
+                <//>
               `}
-              ${events && events.length === 0 && !isQueued && html`<div class="agt-empty">${t('profile.agents.tasks.noEventsRecorded')}</div>`}
+              ${events && events.length === 0 && !isQueued && html`<div class="poster-quiet agt-empty">${t('profile.agents.tasks.noEventsRecorded')}</div>`}
             </div>
           `}
 
           ${hasDetails && html`
             <div class="agt-part poster-row--thing">
               <div class="agt-part-h">
-                <span class="og-label">${tOr('profile.agents.tasks.detailsLabel', 'Details')}</span>
+                <span class="poster-label">${tOr('profile.agents.tasks.detailsLabel', 'Details')}</span>
               </div>
-              ${task.deliverableKey && html`
-                <div class="agt-kv">
-                  <span class="agt-k">${t('profile.agents.tasks.deliverable')}</span>
-                  <span class="agt-v">
-                    <code class="agt-key">${task.deliverableKey}</code>
-                    <button type="button" class="og-door og-door--quiet" onClick=${(e) => { e.stopPropagation(); fetchDeliverable(); }}>
+              <div class="facts">
+                ${task.deliverableKey && html`
+                  <span class="facts-k poster-label">${t('profile.agents.tasks.deliverable')}</span>
+                  <span class="facts-v">
+                    <code class="code-inline">${task.deliverableKey}</code>
+                    <button type="button" class="poster-action poster-action--small poster-action--lower" onClick=${(e) => { e.stopPropagation(); fetchDeliverable(); }}>
                       ${t('profile.agents.tasks.viewDeliverable')}
                     </button>
                   </span>
-                </div>
-              `}
-              ${hasScope && html`
-                <div class="agt-kv">
-                  <span class="agt-k">${t('profile.agents.detail.tasks.scope')}</span>
-                  <span class="agt-v">
+                `}
+                ${hasScope && html`
+                  <span class="facts-k poster-label">${t('profile.agents.detail.tasks.scope')}</span>
+                  <span class="facts-v">
                     ${Array.isArray(task.scope)
                       ? task.scope.map((s, i) => html`<div key=${i}>${formatScopeEntry(s)}</div>`)
                       : formatScopeEntry(task.scope)}
                   </span>
-                </div>
-              `}
-              ${hasRules && html`
-                <div class="agt-kv">
-                  <span class="agt-k">${t('profile.agents.detail.tasks.rules')}</span>
-                  <span class="agt-v">
+                `}
+                ${hasRules && html`
+                  <span class="facts-k poster-label">${t('profile.agents.detail.tasks.rules')}</span>
+                  <span class="facts-v">
                     ${Array.isArray(task.rules) ? task.rules.map(r => html`<div key=${r}>${r}</div>`) : task.rules}
                   </span>
-                </div>
-              `}
+                `}
+              </div>
               ${deliverable && html`
                 ${deliverable.loading
-                  ? html`<div class="agt-empty">${t('profile.loading')}</div>`
+                  ? html`<div class="poster-quiet agt-empty loading-mark">${t('profile.loading')}</div>`
                   : deliverable.notFound
-                    ? html`<div class="agt-empty">${t('profile.agents.tasks.deliverableGone')}</div>`
+                    ? html`<div class="poster-quiet agt-empty">${t('profile.agents.tasks.deliverableGone')}</div>`
                     : html`<div class="agt-preview"><${DeliverableBody} value=${deliverable.value} alt=${task.title || task.description} /></div>`}
               `}
             </div>
@@ -475,12 +503,12 @@ export function TaskItem({ task, agentName, showToast, onRefresh, autoOpen = 0 }
           ${taskMemory && html`
             <div class="agt-part poster-row--thing">
               <div class="agt-part-h">
-                <span class="og-label">${t('profile.agents.tasks.memory.show')}</span>
+                <span class="poster-label">${t('profile.agents.tasks.memory.show')}</span>
               </div>
               ${taskMemory.loading
-                ? html`<div class="agt-empty">${t('profile.loading')}</div>`
+                ? html`<div class="poster-quiet agt-empty loading-mark">${t('profile.loading')}</div>`
                 : taskMemory.items.length === 0
-                  ? html`<div class="agt-empty">${t('profile.agents.tasks.memory.none')}</div>`
+                  ? html`<div class="poster-quiet agt-empty">${t('profile.agents.tasks.memory.none')}</div>`
                   : html`
                     <div class="pf-agd-task-memory-list">
                       ${taskMemory.items.map(it => html`<${TaskMemoryEntry} key=${it.key} entry=${it} />`)}
@@ -492,10 +520,10 @@ export function TaskItem({ task, agentName, showToast, onRefresh, autoOpen = 0 }
           ${rating && html`
             <div class="agt-part poster-row--thing">
               <div class="agt-part-h">
-                <span class="og-label">${t('profile.agents.tasks.rate.rated')}</span>
+                <span class="poster-label">${t('profile.agents.tasks.rate.rated')}</span>
               </div>
               <div class="agt-rating">
-                <span class="agt-stars">${'★'.repeat(stars)}<span class="agt-stars-off">${'★'.repeat(5 - stars)}</span></span>
+                <span class="op-stars op-stars--shown" role="img" aria-label=${`${stars}/5`}>${[1, 2, 3, 4, 5].map(n => html`<span key=${n} class=${`op-star${n <= stars ? ' on' : ''}`} aria-hidden="true">★</span>`)}</span>
                 <span class="agt-m">${t(`profile.agents.detail.quality.contexts.${rating.context}`)}</span>
                 ${rating.comment && html`<span class="agt-rating-note">${rating.comment}</span>`}
               </div>
@@ -504,35 +532,35 @@ export function TaskItem({ task, agentName, showToast, onRefresh, autoOpen = 0 }
 
           <div class="agt-actions">
             ${task.triage !== 'kept' && html`
-              <button type="button" class="og-door" onClick=${(e) => handleTriage(e, 'kept')} title=${t('profile.agents.tasks.triage.keepHint')}>★ ${t('profile.agents.tasks.triage.keep')}</button>
+              <button type="button" class="poster-action poster-action--small" onClick=${(e) => handleTriage(e, 'kept')} title=${t('profile.agents.tasks.triage.keepHint')}>★ ${t('profile.agents.tasks.triage.keep')}</button>
             `}
             ${task.triage !== 'archived' && html`
-              <button type="button" class="og-door" onClick=${(e) => handleTriage(e, 'archived')} title=${t('profile.agents.tasks.triage.archiveHint')}>${t('profile.agents.tasks.triage.archive')}</button>
+              <button type="button" class="poster-action poster-action--small" onClick=${(e) => handleTriage(e, 'archived')} title=${t('profile.agents.tasks.triage.archiveHint')}>${t('profile.agents.tasks.triage.archive')}</button>
             `}
             ${task.triage && html`
-              <button type="button" class="og-door" onClick=${(e) => handleTriage(e, null)}>${t('profile.agents.tasks.triage.restore')}</button>
+              <button type="button" class="poster-action poster-action--small" onClick=${(e) => handleTriage(e, null)}>${t('profile.agents.tasks.triage.restore')}</button>
             `}
-            <button type="button" class="og-door" onClick=${(e) => { e.stopPropagation(); fetchTaskMemory(); }}>
+            <button type="button" class="poster-action poster-action--small" onClick=${(e) => { e.stopPropagation(); fetchTaskMemory(); }}>
               ${t('profile.agents.tasks.memory.show')}
             </button>
             ${isDone && html`
-              <button type="button" class="og-door" onClick=${handleOpenRate}>
+              <button type="button" class="poster-action poster-action--small" onClick=${handleOpenRate}>
                 ${rating ? t('profile.agents.tasks.rate.rerate') : t('profile.agents.tasks.rate.button')}
               </button>
             `}
             ${canRequestChanges && html`
-              <button type="button" class="og-door" onClick=${handleOpenRevision}>${t('profile.agents.tasks.requestChanges')}</button>
+              <button type="button" class="poster-action poster-action--small" onClick=${handleOpenRevision}>${t('profile.agents.tasks.requestChanges')}</button>
             `}
             ${canStart && html`
-              <button type="button" class="og-slab" onClick=${handleStart} disabled=${starting}>
+              <button type="button" class="poster-slab poster-slab--control" onClick=${handleStart} disabled=${starting}>
                 ${starting ? t('profile.agents.tasks.starting') : t('profile.agents.tasks.startThisTask')}
               </button>
             `}
             ${(isActive || task.status === 'stalled') && html`
-              <button type="button" class="og-door og-door--danger" onClick=${handleCancel}>${t('profile.agents.tasks.cancel')}</button>
+              <button type="button" class="poster-action poster-action--small poster-action--danger agt-act-end" onClick=${handleCancel}>${t('profile.agents.tasks.cancel')}</button>
             `}
             ${canDelete && html`
-              <button type="button" class="og-door og-door--danger" onClick=${handleDelete}>${t('profile.agents.tasks.delete')}</button>
+              <button type="button" class="poster-action poster-action--small poster-action--danger agt-act-end" onClick=${handleDelete}>${t('profile.agents.tasks.delete')}</button>
             `}
           </div>
           <${ConfirmUI} />

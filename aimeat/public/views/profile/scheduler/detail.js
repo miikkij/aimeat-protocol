@@ -9,10 +9,32 @@
  *   from the execution log, what is coming in the next seven days, and the editor as a fold. The
  *   rail lists what fires at the same time and what the same agent created. Every write goes
  *   through the services the old card already called.
- * @structure renderDetail · limitsOf · runRows
+ * @structure renderDetail · limitsOf · runDot · runRows
  * @usage import { renderDetail } from './detail.js';
  * @version-history
+ *   v1.15.0 -- 2026-09-26 -- The runs are the Timeline (components/Timeline.js): the time over its day, a dot for what the run did (an error is trouble, a write is made, a task sent to an agent is the agent's work, the rest is the system), and one line with the result's Status kept before the trigger, the duration, the error and what it wrote or created (a unification: Jouni's decision "Activity log").
+ *   v1.14.0 -- 2026-09-26 -- What is coming is the Listing (listing, listing-row, the time and the zone in the words cell; listing--cols keeps the columns), a unification: the look most tabs use. The runs stay: a list of what happened (Jouni's decision "Activity log").
+ *   v1.13.0 -- 2026-09-26 -- A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
+ *   v1.12.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
+ *   v1.11.0 -- 2026-09-26 -- Every line that says a part is loading is the loading line: the quiet sentence with the blinking Loading mark, LoadingLine in views/profile/shared.js (a unification: the look most tabs use).
+ *   v1.10.0 -- 2026-09-25 -- What a schedule reads, writes, is for, is limited by and who runs it are the Facts (facts facts--wide, facts-k, facts-v), a unification: the look most tabs use.
+ *   v1.9.0 -- 2026-09-25 -- A framed box around one thing is the Object box (.poster-box; on a grey ground its copy tone), in the tone its look already was (Jouni's decision "Object box", a unification).
+ *   v1.8.0 -- 2026-09-25 -- Every word that says a state is the Status (.poster-status fine, attention, danger, off), a unification: Jouni's decision Status.
+ *   v1.7.0 -- 2026-09-25 -- Every tag is the Tag (.poster-chip and its tones, .poster-chips for a row), a unification: Jouni's decision Tag.
+ *   v1.6.0 -- 2026-09-25 -- Code inside a sentence or a value line is the code-inline cut of the Code block (UI consolidation phase 5, a unification).
+ *   v1.5.0 -- 2026-09-25 -- The row labels (field and key labels, column heads, box labels) wear .poster-label (Jouni's decision "Row label", a unification).
+ *   v1.4.0 — 2026-09-25 — A delete, revoke or reset link keeps its coral as the action link's danger
+ *     tone, .poster-action--danger (Jouni's decision "Action link").
+ *   v1.3.0 — 2026-09-25 — Every quiet way on is the library's action link, .poster-action, with the
+ *     tone its meaning names: more for "show all" and more of a list, back, text for a plain grey
+ *     word, quiet (Jouni's decisions "Action link", "Panel action", "Dismiss", "Small link", "Step
+ *     button").
+ *   v1.2.0 — 2026-09-25 — The loud action is the library's dark block, .poster-slab: the control cut
+ *     where it sits in a row of controls or waits to be enabled, the danger tone for a delete that
+ *     cannot be undone (Jouni's decision "Loud action").
+ *   2026-09-25 -- The lines that say a list is empty (or has nothing to show yet) are the quiet sentence (.poster-quiet, QuietNote), a unification: Jouni's decision "Empty line".
  *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
+ *   v1.1.0 — 2026-09-25 — The og- page kit is library components: PageSection and FoldSection in /components, the kit's rules in css/components (tab-page, crumb-trail, page-head, figure-strip, page-section, fold-row, setting-box, form-fields, space-table) and css/views/organism-controls.css (UI consolidation phase 5, a move).
  *   v1.0.0 — 2026-08-30 — Initial.
  */
 import { h } from 'preact';
@@ -21,12 +43,14 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { date as fmtDate } from '/js/format.js';
 import { formatRelativeTime } from '/views/profile/memory-tab/helpers.js';
-import { Section, Fold } from '/views/profile/organisms/poster-parts.js';
+import { PageSection } from '/components/PageSection.js';
+import { TimelineList, TimelineRow } from '/components/Timeline.js';
+import { FoldSection } from '/components/FoldSection.js';
 import { formatUntil, scheduleIo, describeDispatch } from '../schedule-item.js';
 import { cronWordsFor, zoneOf } from './cron-words.js';
 import { kindOf, nameOf, dayLabel } from './model.js';
 import { ScheduleEditForm } from './edit-form.js';
-import { renderPage, whoRuns, resultWord, c, hhmm } from './frame.js';
+import { renderPage, whoRuns, resultWord, resultStatus, c, hhmm } from './frame.js';
 
 function limitsOf(s) {
   const out = [];
@@ -38,17 +62,25 @@ function limitsOf(s) {
   return out.length ? out.join(' · ') : c('limitsNone');
 }
 
+/**
+ * The Timeline's dot for a run (components/Timeline.js categories): an error is trouble, a run that
+ * wrote records made something, one that sent a task went to an agent, the rest is the system.
+ */
+function runDot(r) {
+  if (r.result === 'error') return 'trouble';
+  if ((r.memoryWrites || []).length) return 'made';
+  if (r.taskId) return 'agent';
+  return 'system';
+}
+
 function runRows(runs) {
-  return html`<div class="sc-agenda sc-agenda--runs">
-    ${runs.map((r, i) => { const d = new Date(r.createdAt); return html`
-      <div class="sc-at poster-stat-number poster-stat-number--small" key=${'a' + i}>${hhmm(d)}<small>${dayLabel(d)}</small></div>
-      <div class="sc-nm sc-nm--run" key=${'n' + i}>
-        <b class=${`sc-res sc-res--${r.result}`}>${resultWord(r.result)}</b> · ${c('trigger.' + (r.trigger || 'cron'))}${r.durationMs ? ` · ${(r.durationMs / 1000).toFixed(1)} s` : ''}
-        ${r.errorMessage ? html`<small class="sc-err">${r.errorMessage}</small>` : null}
-      </div>
-      <div class="sc-who" key=${'w' + i}>${(r.memoryWrites || []).length ? html`${c('wroteTo')} ${r.memoryWrites.join(', ')}` : (r.taskId ? c('taskCreated') : '')}</div>
-      <div class="sc-in" key=${'i' + i}></div>`; })}
-  </div>`;
+  return html`<${TimelineList}>${runs.map((r, i) => {
+    const d = new Date(r.createdAt);
+    const writes = r.memoryWrites || [];
+    const did = writes.length ? ` · ${c('wroteTo')} ${writes.join(', ')}` : (r.taskId ? ` · ${c('taskCreated')}` : '');
+    return html`<${TimelineRow} key=${i} category=${runDot(r)} when=${html`${hhmm(d)}<br />${dayLabel(d)}`}
+      text=${html`<b class=${resultStatus(r.result)}>${resultWord(r.result)}</b> · ${c('trigger.' + (r.trigger || 'cron'))}${r.durationMs ? ` · ${(r.durationMs / 1000).toFixed(1)} s` : ''}${r.errorMessage ? `: ${r.errorMessage}` : ''}${did}`} />`;
+  })}<//>`;
 }
 
 export function renderDetail(ctx, s) {
@@ -64,21 +96,21 @@ export function renderDetail(ctx, s) {
   const runs = ctx.detail?.id === s.id ? (ctx.detail.runs || []) : [];
 
   const chips = html`
-    <span class=${`og-chip ${s.enabled === false ? 'og-chip--dim' : 'og-chip--sun'}`}>${s.enabled === false ? t('profile.scheduler.paused') : c('status.running')}</span>
-    <span class="og-chip">${cronWordsFor(s)}</span>
+    <span class=${`poster-status ${s.enabled === false ? 'poster-status--attention' : 'poster-status--fine'}`}>${s.enabled === false ? t('profile.scheduler.paused') : c('status.running')}</span>
+    <span class="poster-chip">${cronWordsFor(s)}</span>
     ${/* The effective zone, so a schedule that never named one still says which clock its hour
           belongs to. It was `s.timezone` alone, which is null for anything created without the
           field and left the chip off exactly where it was most needed. */''}
-    ${zoneOf(s) ? html`<span class="og-chip og-chip--dim sc-chip--mono">${zoneOf(s)}</span>` : null}
-    <span class="og-chip og-chip--dim sc-chip--mono">${s.cron}</span>
-    <span class="og-chip">${whoRuns(s)}</span>
-    ${s.createdByAgent ? html`<span class="og-chip og-chip--coral">${t('profile.scheduler.byAgent')}</span>` : null}`;
+    ${zoneOf(s) ? html`<span class="poster-chip">${zoneOf(s)}</span>` : null}
+    <span class="poster-chip">${s.cron}</span>
+    <span class="poster-chip">${whoRuns(s)}</span>
+    ${s.createdByAgent ? html`<span class="poster-chip poster-chip--coral">${t('profile.scheduler.byAgent')}</span>` : null}`;
 
   const doors = s.readOnly ? null : html`
-    <button type="button" class="og-slab" disabled=${busy} onClick=${() => ctx.onTrigger(s)}>${t('profile.scheduler.runNow')}</button>
-    <button type="button" class="og-door" disabled=${busy} onClick=${() => ctx.onToggle(s)}>${s.enabled === false ? t('profile.scheduler.resume') : t('profile.scheduler.pause')}</button>
-    <button type="button" class="og-door" onClick=${() => ctx.setEditOpen(v => !v)}>${t('profile.scheduler.edit')}</button>
-    <button type="button" class="og-door og-door--danger" disabled=${busy} onClick=${() => ctx.onCancel(s)}>${t('profile.scheduler.cancel')}</button>`;
+    <button type="button" class="poster-slab poster-slab--control" disabled=${busy} onClick=${() => ctx.onTrigger(s)}>${t('profile.scheduler.runNow')}</button>
+    <button type="button" class="poster-action poster-action--small" disabled=${busy} onClick=${() => ctx.onToggle(s)}>${s.enabled === false ? t('profile.scheduler.resume') : t('profile.scheduler.pause')}</button>
+    <button type="button" class="poster-action poster-action--small" onClick=${() => ctx.setEditOpen(v => !v)}>${t('profile.scheduler.edit')}</button>
+    <button type="button" class="poster-action poster-action--small poster-action--danger" disabled=${busy} onClick=${() => ctx.onCancel(s)}>${t('profile.scheduler.cancel')}</button>`;
 
   const strip = html`
     <div class="og-strip">
@@ -104,25 +136,25 @@ export function renderDetail(ctx, s) {
   return renderPage(ctx, {
     id: 'detail', crumbs: [nameOf(s)], title: nameOf(s), chips, doors, strip, rail,
     children: html`
-      <${Section} id="sc-what" num="01" title=${c('secWhat')} first=${true}>
-        ${d.title || d.body ? html`<div class="sc-prompt"><span class="og-label">${whatLabel}</span>${d.title ? html`<div class="sc-prompt-title">${d.title}</div>` : null}${d.body ? html`<div class="sc-prompt-body">${d.body}</div>` : null}</div>` : null}
-        <div class="sc-kv">
-          ${io ? html`<div class="k">${t('profile.scheduler.reads')}</div><div><code>${io.reads}</code></div><div class="k">${t('profile.scheduler.writes')}</div><div><code>${io.writes}</code></div>` : null}
-          ${s.purpose ? html`<div class="k">${c('kPurpose')}</div><div>${s.purpose}</div>` : null}
-          ${s.readOnly ? null : html`<div class="k">${t('profile.scheduler.constraints')}</div><div>${limitsOf(s)}</div>`}
-          ${s.agentName ? html`<div class="k">${t('profile.scheduler.col.agent')}</div><div>${s.agentName}</div>` : null}
-          ${s.readOnly ? html`<div class="k">${t('profile.scheduler.col.extension')}</div><div>${s.extensionName}${s.actionId ? ` / ${s.actionId}` : ''} · ${c('readOnlyNote')}</div>` : null}
+      <${PageSection} id="sc-what" num="01" title=${c('secWhat')} first=${true}>
+        ${d.title || d.body ? html`<div class="sc-prompt poster-box job-prompt"><span class="poster-label">${whatLabel}</span>${d.title ? html`<div class="job-prompt-title">${d.title}</div>` : null}${d.body ? html`<div class="job-prompt-body">${d.body}</div>` : null}</div>` : null}
+        <div class="facts facts--wide">
+          ${io ? html`<div class="facts-k poster-label">${t('profile.scheduler.reads')}</div><div class="facts-v"><code class="code-inline">${io.reads}</code></div><div class="facts-k poster-label">${t('profile.scheduler.writes')}</div><div class="facts-v"><code class="code-inline">${io.writes}</code></div>` : null}
+          ${s.purpose ? html`<div class="facts-k poster-label">${c('kPurpose')}</div><div class="facts-v">${s.purpose}</div>` : null}
+          ${s.readOnly ? null : html`<div class="facts-k poster-label">${t('profile.scheduler.constraints')}</div><div class="facts-v">${limitsOf(s)}</div>`}
+          ${s.agentName ? html`<div class="facts-k poster-label">${t('profile.scheduler.col.agent')}</div><div class="facts-v">${s.agentName}</div>` : null}
+          ${s.readOnly ? html`<div class="facts-k poster-label">${t('profile.scheduler.col.extension')}</div><div class="facts-v">${s.extensionName}${s.actionId ? ` / ${s.actionId}` : ''} · ${c('readOnlyNote')}</div>` : null}
         </div>
       <//>
-      <${Section} id="sc-runs" num="02" title=${c('secRuns')} count=${runs.length || null}>
-        ${runs.length ? runRows(runs) : html`<p class="og-empty">${ctx.detail?.loading ? t('profile.scheduler.cal.loading') : c('noRuns')}</p>`}
+      <${PageSection} id="sc-runs" num="02" title=${c('secRuns')} count=${runs.length || null}>
+        ${runs.length ? runRows(runs) : html`<p class=${`poster-quiet${ctx.detail?.loading ? ' loading-mark' : ''}`}>${ctx.detail?.loading ? t('profile.scheduler.cal.loading') : c('noRuns')}</p>`}
       <//>
-      <${Section} id="sc-coming" num="03" title=${c('secComing')}>
-        ${coming.length ? html`<div class="sc-agenda sc-agenda--coming">
-          ${coming.map((o, i) => html`<div class="sc-at poster-stat-number poster-stat-number--small" key=${'a' + i}>${hhmm(o.at)}<small>${dayLabel(o.at)}</small></div><div class="sc-who" key=${'w' + i}>${zoneOf(s)}</div>`)}
+      <${PageSection} id="sc-coming" num="03" title=${c('secComing')}>
+        ${coming.length ? html`<div class="listing listing--cols listing--when-words sc-list">
+          ${coming.map((o, i) => html`<div class="listing-row" key=${i}><div class="sc-at poster-stat-number poster-stat-number--small">${hhmm(o.at)}<small>${dayLabel(o.at)}</small></div><div class="listing-desc">${zoneOf(s)}</div></div>`)}
         </div>` : html`<p class="og-empty">${s.enabled === false ? t('profile.scheduler.paused') : (s.nextRunAt ? `${dayLabel(new Date(s.nextRunAt))} ${hhmm(new Date(s.nextRunAt))}` : c('noneNext'))}</p>`}
       <//>
-      ${s.readOnly ? null : html`<${Fold} id="sc-edit" num="04" title=${t('profile.scheduler.edit')} sub=${c('editSub')} open=${ctx.editOpen} onToggle=${() => ctx.setEditOpen(v => !v)}>
+      ${s.readOnly ? null : html`<${FoldSection} id="sc-edit" num="04" title=${t('profile.scheduler.edit')} sub=${c('editSub')} open=${ctx.editOpen} onToggle=${() => ctx.setEditOpen(v => !v)}>
         <${ScheduleEditForm} schedule=${s} showToast=${ctx.showToast} onSaved=${() => { ctx.setEditOpen(false); ctx.loadData(); }} onClose=${() => ctx.setEditOpen(false)} />
       <//>`}`,
   });

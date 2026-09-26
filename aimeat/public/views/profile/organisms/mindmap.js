@@ -15,6 +15,11 @@
  *   buildOrganismMindmap / buildWorkspaceMindmap (chart-type aware, used here + by the timeline)
  * @usage import { StructureMindmap } from '/views/profile/organisms/mindmap.js';
  * @version-history
+ *   v1.7.0 — 2026-09-26 — The map's three options are the Check line (css/components/check-line.css), a unification: Jouni's decision "Check line".
+ *   v1.6.0 — 2026-09-26 — A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
+ *   v1.5.0 — 2026-09-26 — The map opens under the FoldSection (components/FoldSection.js), a unification: the look most tabs use.
+ *   v1.4.0 — 2026-09-25 — Every drop-down is the Select field (.select-field, css/components/select-field.css); a place keeps only its width and margin (a unification: the look most tabs use).
+ *   v1.3.0 — 2026-09-25 — Every hint is the Hint (poster-hint, components/Hint.js), the look most Settings & Controls tabs draw (UI consolidation phase 5, a unification).
  *   v1.2.0 — 2026-08-29 — `defaultOpen`: the organism home puts the map inside a fold of its own, so
  *     the map opens with the fold instead of asking for a second click. The toggle names the map
  *     without an emoji in front of it.
@@ -30,6 +35,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { Mermaid } from '/components/Mermaid.js';
+import { FoldSection } from '/components/FoldSection.js';
 
 /** Sanitize a label for a Mermaid quoted flowchart string. */
 function mmdLabel(s) {
@@ -274,35 +280,32 @@ export function StructureMindmap({ scope, graph, onNavigate, label, storageKey, 
 
   return html`
     <div class="pj-mindmap">
-      <button class="pj-struct-toggle" aria-expanded=${open} onClick=${() => setOpen(o => !o)}>
-        <span class="pj-struct-caret">${open ? '▾' : '▸'}</span>
-        <span>${lbl}</span>
-      </button>
-      ${open ? html`
-        <div class="pj-mindmap-body card-detail">
+      <${FoldSection} num="" title=${lbl} open=${open} onToggle=${() => setOpen(o => !o)}>
+        <div class="pj-mindmap-body poster-box">
           <div class="pj-mindmap-opts">
             <label class="pj-mm-opt">
               <span>${t('mindmap.chart') || 'Chart'}</span>
-              <select class="input-field input-sm" value=${opts.chartType} onChange=${e => set({ chartType: e.target.value })}>
+              <select class="select-field" value=${opts.chartType} onChange=${e => set({ chartType: e.target.value })}>
                 ${CHART_TYPES.map(c => html`<option value=${c.key}>${t(c.label) || c.fallback}</option>`)}
               </select>
             </label>
             <label class="pj-mm-opt">
               <span>${t('mindmap.level') || 'Level'}</span>
-              <select class="input-field input-sm" value=${opts.level} onChange=${e => set({ level: e.target.value })}>
+              <select class="select-field" value=${opts.level} onChange=${e => set({ level: e.target.value })}>
                 ${LEVELS.map(l => html`<option value=${l.key}>${t(l.label) || l.fallback}</option>`)}
               </select>
             </label>
             ${scope === 'organism' ? html`
-              <label class="pj-mm-check"><input type="checkbox" checked=${opts.showUsers} onChange=${e => set({ showUsers: e.target.checked })} /> ${t('mindmap.showUsers') || 'Users'}</label>
+              <label class="pj-mm-check check-line"><input type="checkbox" checked=${opts.showUsers} onChange=${e => set({ showUsers: e.target.checked })} /> ${t('mindmap.showUsers') || 'Users'}</label>
             ` : null}
-            <label class="pj-mm-check"><input type="checkbox" checked=${opts.showActivity} onChange=${e => set({ showActivity: e.target.checked })} /> ${t('mindmap.showActivity') || 'Activity'}</label>
-            <label class="pj-mm-check"><input type="checkbox" checked=${opts.heatmap} onChange=${e => set({ heatmap: e.target.checked })} /> ${t('mindmap.heatmap') || 'Heatmap'}</label>
+            <label class="pj-mm-check check-line"><input type="checkbox" checked=${opts.showActivity} onChange=${e => set({ showActivity: e.target.checked })} /> ${t('mindmap.showActivity') || 'Activity'}</label>
+            <label class="pj-mm-check check-line"><input type="checkbox" checked=${opts.heatmap} onChange=${e => set({ heatmap: e.target.checked })} /> ${t('mindmap.heatmap') || 'Heatmap'}</label>
           </div>
           <div class="pj-mindmap-canvas of-mapwrap--clickable" onClick=${onMapClick}>
             <${Mermaid} chart=${src} />
           </div>
-          <div class="pj-mindmap-hint section-desc">${t('mindmap.clickHint') || 'Click a node to open it.'}</div>
-        </div>` : null}
+          <div class="poster-hint">${t('mindmap.clickHint') || 'Click a node to open it.'}</div>
+        </div>
+      <//>
     </div>`;
 }

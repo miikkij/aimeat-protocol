@@ -5,6 +5,28 @@
  * @description Profile tab for CORS origin management (GHII + per-agent): which web addresses may
  *   reach the account's API. Operator-only in the menu (the Infrastructure group).
  * @version-history
+ *   v1.21.0 -- 2026-09-26 -- A small heading over a group of fields, a card or a note is the Sub-heading (.sub-heading: small ink headline letters); the coral small capitals, the bold ink words and the coral headline letters go (a unification: Jouni's decision "Sub-heading").
+ *   v1.20.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
+ *   v1.19.0 -- 2026-09-26 -- Every line that says a part is loading is the loading line: the quiet sentence with the blinking Loading mark, LoadingLine in views/profile/shared.js (a unification: the look most tabs use).
+ *   v1.18.0 -- 2026-09-25 -- A node's agents, the CORS chain, the ecosystem's identifiers and its pairing code are inline code (.code-inline); their own mono looks go (a unification: the look most tabs use).
+ *   v1.17.0 -- 2026-09-25 -- The older tabs' remaining help lines are the Hint (.poster-hint); their own sizes and greys go, a place keeps its margin (a unification: the look most tabs use).
+ *   v1.16.0 -- 2026-09-25 -- A table of rows is the Listing (css/components/listing.css): the P&L lines, the accountants, the usage report, the AI spend per app, the security overrides and an agent's internal jobs; figures stand at the right of their column (a unification: the look most tabs use).
+ *   v1.15.0 -- 2026-09-25 -- Every many-line field is the Text area (.og-textarea); a place keeps only its size and margin (a unification: the look most tabs use).
+ *   v1.14.0 -- 2026-09-25 -- The crumb is the full trail (Settings & Controls / the menu group / the tab), as in the kit tabs (a unification).
+ *   v1.13.0 -- 2026-09-25 -- The page head is the kit's crumb trail and page head (.og-crumb, .og-mast, .og-title, .og-desc), the look most tabs use (a unification).
+ *   v1.12.0 -- 2026-09-25 -- Every tag is the Tag (.poster-chip and its tones, .poster-chips for a row), a unification: Jouni's decision Tag.
+ *   v1.11.0 -- 2026-09-25 -- Every hint is the Hint (poster-hint, components/Hint.js), the look most Settings & Controls tabs draw (UI consolidation phase 5, a unification).
+ *   v1.10.0 -- 2026-09-25 -- The row labels (field and key labels, column heads, box labels) wear .poster-label (Jouni's decision "Row label", a unification).
+ *   v1.9.0 — 2026-09-25 — A delete, revoke or reset link keeps its coral as the action link's danger
+ *     tone, .poster-action--danger (Jouni's decision "Action link").
+ *   v1.8.0 — 2026-09-25 — Every quiet way on is the library's action link, .poster-action, with the
+ *     tone its meaning names: more for "show all" and more of a list, back, text for a plain grey
+ *     word, quiet (Jouni's decisions "Action link", "Panel action", "Dismiss", "Small link", "Step
+ *     button").
+ *   v1.7.0 — 2026-09-25 — The loud action is the library's dark block, .poster-slab: the control cut
+ *     where it sits in a row of controls or waits to be enabled, the danger tone for a delete that
+ *     cannot be undone (Jouni's decision "Loud action").
+ *   2026-09-25 -- The lines that say a list is empty (or has nothing to show yet) are the quiet sentence (.poster-quiet, QuietNote), a unification: Jouni's decision "Empty line".
  *   2026-09-13 -- V2t: compose card and section top rules from poster.css.
  *   2026-09-13 — V1: compose page and B1 section headings from the shared poster classes.
  *   v1.6.0 — 2026-09-05 — Two-step sign-in, the passkeys and the sessions moved to the Access page,
@@ -36,12 +58,12 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
-import { Spinner } from './shared.js';
-import { DataTable } from '/components/DataTable.js';
+import { LoadingLine } from './shared.js';
 import { useConfirm } from '/components/Modal.js';
 import * as securityService from '/js/services/security.js';
 import { listAgents } from '/js/services/agents.js';
 import { swallowed } from '/js/swallowed.js';
+import { Hint } from '/components/Hint.js';
 
 export default function SecurityTab({ session, showToast }) {
   const { ConfirmUI } = useConfirm();
@@ -109,7 +131,7 @@ export default function SecurityTab({ session, showToast }) {
     } catch(e) { showToast(e.message || t('profile.error'), true); }
   }
 
-  if (loading || !securityData) return html`<${Spinner} text=${t('profile.security.loading')} />`;
+  if (loading || !securityData) return html`<${LoadingLine} text=${t('profile.security.loading')} />`;
 
   const ghii = securityData.ghii || {};
   const agentsCors = securityData.agents || [];
@@ -117,83 +139,89 @@ export default function SecurityTab({ session, showToast }) {
   const effectiveOrigins = ghii.effective || [];
 
   return html`
-    <div class="poster-page-title">${t('profile.security.title')}</div>
-    <div class="section-desc">${t('profile.security.desc')}</div>
+    <div class="og mb-1">
+      <div class="og-crumb"><span>${t('nav.profile')}</span><span>/</span><span>${t('profile.landing.menuInfra')}</span><span>/</span><span class="og-crumb-here">${t('profile.tabs.security')}</span></div>
+      <div class="og-mast"><div class="og-mast-words">
+        <div class="og-title poster-page-title">${t('profile.security.title')}</div>
+        <div class="og-desc">${t('profile.security.desc')}</div>
+      </div></div>
+    </div>
 
     ${securityData.managedBy && html`
       <div class="card mb-1 poster-row--thing">
-        <span class="pf-bold">${t('profile.security.managedTitle')}</span>
-        <p class="text-caption mb-0">${t('profile.security.managedDesc').replace('{name}', securityData.managedBy.name)}</p>
+        <span class="sub-heading">${t('profile.security.managedTitle')}</span>
+        <p class="poster-hint mb-0">${t('profile.security.managedDesc').replace('{name}', securityData.managedBy.name)}</p>
       </div>
     `}
 
-    <p class="text-caption mb-1">${t('profile.security.signInMoved')}</p>
+    <p class="poster-hint mb-1">${t('profile.security.signInMoved')}</p>
 
-    <h3 class="card-h3 mt-section">${t('profile.security.ghiiTitle')}</h3>
-    <p class="text-caption mb-1">${t('profile.security.ghiiDesc')}</p>
+    <h3 class="card-h3 sub-heading mt-section">${t('profile.security.ghiiTitle')}</h3>
+    <p class="poster-hint mb-1">${t('profile.security.ghiiDesc')}</p>
     <div class="card poster-row--thing">
       <div class="flex-between mb-half">
-        <span class="pf-bold">${t('profile.security.allowedOrigins')}</span>
-        <span class="badge ${isInherited ? 'badge-muted' : 'badge-success'}">${isInherited ? t('profile.security.inherited') : t('profile.security.custom')}</span>
+        <span class="sub-heading">${t('profile.security.allowedOrigins')}</span>
+        <span class=${`poster-chip ${isInherited ? '' : 'poster-chip--ink'}`}>${isInherited ? t('profile.security.inherited') : t('profile.security.custom')}</span>
       </div>
-      <div class="text-caption mb-half">
+      <div class="poster-hint mb-half">
         ${t('profile.security.effective')}: ${effectiveOrigins.includes('*') ? t('profile.security.wildcard') : effectiveOrigins.join(', ') || '-'}
       </div>
       ${corsEditGhii !== null ? html`
-        <textarea class="input-field text-code mb-half"
+        <textarea class="og-textarea mb-half"
           placeholder=${t('profile.security.originsPlaceholder')}
           value=${corsEditGhii}
           onInput=${e => setCorsEditGhii(e.target.value)}></textarea>
         <div class="flex-row">
-          <button class="btn-primary" onClick=${() => saveGhiiCors(corsEditGhii)}>${t('profile.security.save')}</button>
-          <button class="btn-danger-solid" onClick=${() => saveGhiiCors('')}>${t('profile.security.reset')}</button>
-          <button class="btn-ghost" onClick=${() => setCorsEditGhii(null)}>${t('profile.cancel')}</button>
+          <button class="poster-slab" onClick=${() => saveGhiiCors(corsEditGhii)}>${t('profile.security.save')}</button>
+          <button class="poster-action poster-action--small poster-action--danger" onClick=${() => saveGhiiCors('')}>${t('profile.security.reset')}</button>
+          <button class="poster-action poster-action--small" onClick=${() => setCorsEditGhii(null)}>${t('profile.cancel')}</button>
         </div>
       ` : html`
-        <button class="btn-outline" onClick=${() => setCorsEditGhii(ghii.allowed_origins ? ghii.allowed_origins.join('\\n') : '')}>${t('profile.security.edit')}</button>
+        <button class="poster-action poster-action--small" onClick=${() => setCorsEditGhii(ghii.allowed_origins ? ghii.allowed_origins.join('\\n') : '')}>${t('profile.security.edit')}</button>
       `}
     </div>
 
-    <h3 class="card-h3 mt-section">${t('profile.security.agentsTitle')}</h3>
-    <p class="text-caption mb-1">${t('profile.security.agentsDesc')}</p>
+    <h3 class="card-h3 sub-heading mt-section">${t('profile.security.agentsTitle')}</h3>
+    <p class="poster-hint mb-1">${t('profile.security.agentsDesc')}</p>
     ${agentsCors.length === 0
-      ? html`<div class="empty">${t('profile.security.noAgents')}</div>`
-      : html`<div class="card scroll-x poster-row--thing">
-          <${DataTable}
-            headers=${[t('profile.security.agent'), t('profile.security.origins'), t('profile.security.status'), '']}
-            rows=${agentsCors.map(ac => {
+      ? html`<div class="poster-quiet">${t('profile.security.noAgents')}</div>`
+      : html`<div class="card poster-row--thing">
+          <div class="listing listing--name-desc-state-doors">
+            <div class="listing-row listing-row--head">
+              ${[t('profile.security.agent'), t('profile.security.origins'), t('profile.security.status'), ''].map(hd => html`<div class="poster-label">${hd}</div>`)}
+            </div>
+            ${agentsCors.map(ac => {
               const agentName = (ac.gaii || '').split('#')[0] || ac.gaii;
               const hasCustom = ac.allowed_origins !== null && ac.allowed_origins !== undefined;
               const isEditing = corsEditAgent && corsEditAgent.name === agentName;
-              return [
-                html`<span class="text-code text-accent">${escHtml(agentName)}</span>`,
-                isEditing
-                  ? html`<textarea class="input-field text-code pf-textarea-sm"
+              return html`<div class="listing-row" key=${agentName}>
+                <div class="listing-name">${escHtml(agentName)}</div>
+                ${isEditing
+                  ? html`<div><textarea class="og-textarea pf-textarea-sm"
                       value=${corsEditAgent.value}
-                      onInput=${e => setCorsEditAgent({name: agentName, value: e.target.value})}></textarea>`
-                  : html`<span class="text-meta">${hasCustom ? (ac.allowed_origins || []).join(', ') : (ac.effective || []).join(', ')}</span>`,
-                hasCustom
-                  ? html`<span class="badge badge-success">${t('profile.security.custom')}</span>`
-                  : html`<span class="badge badge-muted">${t('profile.security.inheritedFrom')}: ${ac.inherited_from || t('profile.security.nodeDefault')}</span>`,
-                isEditing
-                  ? html`<div class="flex-row">
-                      <button class="btn-primary btn-sm" onClick=${() => saveAgentCors(agentName, corsEditAgent.value)}>${t('profile.security.save')}</button>
-                      <button class="btn-danger-solid btn-sm" onClick=${() => saveAgentCors(agentName, '')}>${t('profile.security.reset')}</button>
-                      <button class="btn-ghost btn-sm" onClick=${() => setCorsEditAgent(null)}>${t('profile.cancel')}</button>
-                    </div>`
-                  : html`<button class="btn-outline" onClick=${() => setCorsEditAgent({name: agentName, value: hasCustom ? (ac.allowed_origins || []).join('\\n') : ''})}>${t('profile.security.edit')}</button>`,
-              ];
+                      onInput=${e => setCorsEditAgent({name: agentName, value: e.target.value})}></textarea></div>`
+                  : html`<div class="listing-desc">${hasCustom ? (ac.allowed_origins || []).join(', ') : (ac.effective || []).join(', ')}</div>`}
+                <div>${hasCustom
+                  ? html`<span class="poster-chip poster-chip--ink">${t('profile.security.custom')}</span>`
+                  : html`<span class="poster-chip">${t('profile.security.inheritedFrom')}: ${ac.inherited_from || t('profile.security.nodeDefault')}</span>`}</div>
+                <div class="listing-doors">${isEditing
+                  ? html`
+                      <button class="poster-slab poster-slab--control" onClick=${() => saveAgentCors(agentName, corsEditAgent.value)}>${t('profile.security.save')}</button>
+                      <button class="poster-action poster-action--small poster-action--row poster-action--danger" onClick=${() => saveAgentCors(agentName, '')}>${t('profile.security.reset')}</button>
+                      <button class="poster-action poster-action--small poster-action--row" onClick=${() => setCorsEditAgent(null)}>${t('profile.cancel')}</button>`
+                  : html`<button class="poster-action poster-action--small poster-action--row" onClick=${() => setCorsEditAgent({name: agentName, value: hasCustom ? (ac.allowed_origins || []).join('\\n') : ''})}>${t('profile.security.edit')}</button>`}</div>
+              </div>`;
             })}
-          />
+          </div>
         </div>`
     }
 
-    <h3 class="card-h3 mt-section">${t('profile.security.inheritanceTitle')}</h3>
+    <h3 class="card-h3 sub-heading mt-section">${t('profile.security.inheritanceTitle')}</h3>
     <div class="card poster-row--thing">
-      <p class="text-caption">${t('profile.security.inheritanceDesc')}</p>
-      <div class="text-code text-meta text-accent mt-xs">
+      <${Hint}>${t('profile.security.inheritanceDesc')}<//>
+      <div class="mt-xs"><code class="code-inline">
         Memory key \u2192 Agent \u2192 GHII (your account) \u2192 Node default
-      </div>
+      </code></div>
     </div>
 
     <${ConfirmUI} />

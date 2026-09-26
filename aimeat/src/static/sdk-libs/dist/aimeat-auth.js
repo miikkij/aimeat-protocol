@@ -327,34 +327,40 @@
     var ink2 = "var(--aimeat-ink)";
     var paper2 = "var(--aimeat-paper)";
     var font2 = "var(--aimeat-pill-font,var(--font-showroom-body,var(--font,system-ui,sans-serif)))";
+    var frame = "var(--shape-frame,2px) solid ";
+    var frameInk = "var(--shape-frame-colour," + ink2 + ")";
+    var frameCur = "var(--shape-frame-colour,currentColor)";
+    var hot = "var(--aimeat-pill-name,var(--accent,#E8564A))";
+    var labelCase = "text-transform:var(--shape-case-label,uppercase);letter-spacing:calc(var(--shape-tracking-label,.1em) * .6)";
+    var actionCase = "text-transform:var(--shape-case-action,uppercase);letter-spacing:var(--shape-tracking-action,.04em)";
     st.textContent = [
       inkVarsCss([".aimeat-auth-wrap", ".aimeat-auth-out", ".aimeat-auth-pill"]),
       ".aimeat-auth-pill{display:inline-flex;align-items:center;gap:10px;padding:4px 11px;",
-      "border:2px solid " + ink2 + ";background:" + paper2 + ";color:" + ink2 + ";",
+      "border:" + frame + frameInk + ";background:" + paper2 + ";color:" + ink2 + ";",
       "border-radius:var(--aimeat-pill-radius,0);font-family:" + font2 + ";font-size:13px;line-height:1.4}",
       ".aimeat-auth-dot{display:inline-block;flex:0 0 auto;width:9px;height:9px;",
       "background:var(--aimeat-pill-live,var(--success,#10B981))}",
-      ".aimeat-auth-label{display:inline-flex;align-items:center;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase}",
+      ".aimeat-auth-label{display:inline-flex;align-items:center;font-size:11px;font-weight:800;" + labelCase + "}",
       ".aimeat-auth-ghii{font-weight:800;font-size:13px;color:var(--aimeat-pill-name,var(--accent,#E8564A))}",
       ".aimeat-auth-fed{display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;letter-spacing:.04em;",
-      "padding:1px 6px;border:2px solid currentColor}",
-      ".aimeat-auth-gear{appearance:none;background:none;border:2px solid currentColor;color:inherit;border-radius:0;",
+      "padding:1px 6px;border:" + frame + frameCur + "}",
+      ".aimeat-auth-gear{appearance:none;background:none;border:" + frame + frameCur + ";color:inherit;border-radius:0;",
       "padding:2px 7px;cursor:pointer;font-size:13px;line-height:1}",
-      ".aimeat-auth-logout{appearance:none;background:none;border:0;border-bottom:2px solid currentColor;border-radius:0;",
+      ".aimeat-auth-logout{appearance:none;background:none;border:0;border-bottom:" + frame + frameCur + ";border-radius:0;",
       "padding:0 0 1px;margin:0;cursor:pointer;color:inherit;font-family:inherit;font-size:11px;font-weight:800;",
-      "letter-spacing:.04em;text-transform:uppercase;line-height:1.4}",
-      ".aimeat-auth-logout:hover,.aimeat-auth-gear:hover{color:var(--aimeat-pill-name,var(--accent,#E8564A))}",
+      actionCase + ";line-height:1.4}",
+      ".aimeat-auth-logout:hover,.aimeat-auth-gear:hover{color:" + hot + ";border-color:" + hot + "}",
       /* Signed out: the cluster beside one ink slab with the sun's offset shadow. */
       ".aimeat-auth-out{display:inline-flex;align-items:center;gap:10px;color:" + ink2 + "}",
       ".aimeat-sign-btn{appearance:none;padding:8px 16px;background:var(--aimeat-pill-cta-bg," + ink2 + ");",
       "color:var(--aimeat-pill-cta-fg," + paper2 + ");border:0;border-radius:var(--aimeat-pill-radius,0);cursor:pointer;",
-      "font-family:" + font2 + ";font-size:12px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;line-height:1.4;",
+      "font-family:" + font2 + ";font-size:12px;font-weight:800;" + actionCase + ";line-height:1.4;",
       "box-shadow:4px 4px 0 var(--aimeat-pill-cta-shadow,var(--sun,#FFB52E));transition:transform .12s,box-shadow .12s}",
       ".aimeat-sign-btn:hover{transform:translate(2px,2px);box-shadow:2px 2px 0 var(--aimeat-pill-cta-shadow,var(--sun,#FFB52E))}",
       /* Compact: the account button, and the pill as its popover. */
       ".aimeat-auth-wrap{position:relative;display:inline-flex;align-items:center}",
       ".aimeat-auth-compact{display:none;align-items:center;gap:7px;padding:5px 11px 5px 9px;cursor:pointer;",
-      "background:" + paper2 + ";color:" + ink2 + ";border:2px solid " + ink2 + ";border-radius:var(--aimeat-pill-radius,0);",
+      "background:" + paper2 + ";color:" + ink2 + ";border:" + frame + frameInk + ";border-radius:var(--aimeat-pill-radius,0);",
       "font-family:" + font2 + ";font-size:13px}",
       ".aimeat-auth-compact .cdot{width:8px;height:8px;flex:0 0 auto;background:var(--aimeat-pill-live,var(--success,#10B981))}",
       ".aimeat-auth-compact .cini{font-weight:800;letter-spacing:.3px;max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}",
@@ -374,7 +380,7 @@
       ".aimeat-auth-out>.aimeat-auth-wrap{position:static}",
       ".aimeat-auth-wrap>.aimeat-ctl{position:absolute;top:calc(100% + 8px);right:0;z-index:1000;",
       "display:none!important;flex-wrap:wrap;gap:8px;padding:10px 12px;",
-      "background:" + paper2 + ";color:" + ink2 + ";border:2px solid " + ink2 + ";border-radius:var(--aimeat-pill-radius,0);",
+      "background:" + paper2 + ";color:" + ink2 + ";border:" + frame + frameInk + ";border-radius:var(--aimeat-pill-radius,0);",
       "max-width:calc(100vw - 24px);box-shadow:6px 6px 0 var(--aimeat-pill-cta-shadow,var(--sun,#FFB52E))}",
       ".aimeat-auth-wrap.aimeat-open>.aimeat-ctl{display:flex!important}",
       "}"
@@ -400,7 +406,7 @@
       ".aimeat-ctl{display:inline-flex;align-items:center;gap:6px}",
       /* Segmented group: one bordered pill, every option a button. */
       ".aimeat-seg{display:inline-flex;align-items:stretch;height:26px;flex:0 0 auto;",
-      "border:2px solid currentColor;border-radius:var(--aimeat-pill-radius,0);",
+      "border:var(--shape-frame,2px) solid var(--shape-frame-colour,currentColor);border-radius:var(--aimeat-pill-radius,0);",
       "overflow:hidden;background:transparent}",
       ".aimeat-seg button{appearance:none;border:0;background:transparent;color:currentColor;",
       'opacity:.6;font:700 11px/1 "Inter","Segoe UI",system-ui,sans-serif;letter-spacing:.4px;',
@@ -423,7 +429,7 @@
       ".aimeat-pop-wrap{position:relative;display:inline-flex;flex:0 0 auto}",
       ".aimeat-pop-btn{appearance:none;display:inline-flex;align-items:center;justify-content:center;",
       "gap:5px;height:26px;min-width:26px;padding:0 6px;background:transparent;",
-      "border:2px solid currentColor;border-radius:var(--aimeat-pill-radius,0);",
+      "border:var(--shape-frame,2px) solid var(--shape-frame-colour,currentColor);border-radius:var(--aimeat-pill-radius,0);",
       'cursor:pointer;color:currentColor;font:700 11px/1 "Inter","Segoe UI",system-ui,sans-serif;letter-spacing:.4px;',
       "transition:background var(--motion-fast,120ms) ease}",
       ".aimeat-pop-btn:hover{background:color-mix(in oklab,currentColor 12%,transparent)}",
@@ -438,7 +444,7 @@
       ".aimeat-pop.aimeat-pop-list{grid-template-columns:minmax(0,1fr)}",
       /* A group's name inside the popover (the node's themes above the theme's styles). */
       '.aimeat-pop-head{grid-column:1/-1;padding:6px 9px 2px;font:800 10px/1.2 "Inter","Segoe UI",system-ui,sans-serif;',
-      "letter-spacing:.06em;text-transform:uppercase;opacity:.7}",
+      "letter-spacing:calc(var(--shape-tracking-label,.1em) * .6);text-transform:var(--shape-case-label,uppercase);opacity:.7}",
       /* A sentence in the popover (why the light/dark switch is off): plain words, not a group name. */
       '.aimeat-pop-note{grid-column:1/-1;padding:4px 9px 6px;font:600 12px/1.35 "Inter","Segoe UI",system-ui,sans-serif}',
       ".aimeat-pop button{appearance:none;display:flex;align-items:center;gap:8px;padding:7px 9px;margin:0;",

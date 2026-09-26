@@ -12,6 +12,7 @@
    @usage Loaded first in spa.html <head>; the theme is toggled by /js/theme.js
      which flips the data-theme attribute on <html>.
    @version-history
+     v1.46.0 — 2026-09-26 — --ink-ground and --on-ink-ground: a dark block that stays dark in dark mode (the contents rail, the page thumbnail), so its sun labels read (Jouni: "yellow text on so light colored background. unreadable").
      v1.41.0 — 2026-09-24 — The shape tokens (--shape-corner…, --shape-frame…, --shape-shadow…,
        --shape-case…): the poster's corners, frames, shadows and letter case as values a theme sets,
        with today's values, read by the component sheets (a move).
@@ -297,6 +298,12 @@
      live counters; not a semantic colour (that is --warn) and it does not flip in dark mode. */
   --sun: #FFB52E;
 
+  /* The ink ground: a dark block with light words and sun labels (the contents rail, the page
+     thumbnail). In light mode it is the text colour; in dark mode it stays dark (below), so its sun
+     labels and light words stay readable. */
+  --ink-ground: var(--text);
+  --on-ink-ground: var(--bg);
+
   /* Layout */
   --nav-height: 56px;
 
@@ -412,6 +419,10 @@
    contrast. Text tiers verified WCAG-AA on both --bg and --bg-card.
    Aliases above point at these tokens, so they invert automatically. */
 [data-theme="dark"] {
+  /* The ink ground stays dark in dark mode: deeper than the page, with the page's light words. */
+  --ink-ground: color-mix(in srgb, var(--bg) 55%, #000);
+  --on-ink-ground: var(--text);
+
   /* Background */
   --bg: #14151A;
   --bg-surface: #23262F;

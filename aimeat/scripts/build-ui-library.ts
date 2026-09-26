@@ -26,6 +26,11 @@
  * @structure main() · parseRules() · classesIn() · tokensIn() · importGraph() · buildFacts() · problems()
  * @usage pnpm build:ui-library · pnpm check:ui-library
  * @version-history
+ *   v1.2.4 — 2026-09-26 — The last round's siblings too (decisions-final.js, decision-samples-final.js);
+ *     a text page (`textOnly: true`) needs no sample.
+ *   v1.2.3 — 2026-09-25 — The samples too: decision-samples.js and decision-samples-conflicts.js.
+ *   v1.2.2 — 2026-09-25 — The decisions are read from decisions-data.js and its sibling
+ *     decisions-conflicts.js, which the first spreads into its list.
  *   v1.2.1 — 2026-09-24 — usesClass escapes every regex metacharacter in a class name, not only '-'.
  *   v1.2.0 — 2026-09-23 — The design lab's decisions are held to their samples and crops.
  *   v1.1.0 — 2026-09-23 — The design lab's demos are held to the catalogue (phase 2).
@@ -326,8 +331,11 @@ export function problems(entries: UiEntrySource[], facts: Record<string, UiEntry
 export function decisionProblems(): string[] {
     const out: string[] = [];
     const dir = path.join(PUBLIC, 'views', 'design-lab');
-    const data = read(path.join(dir, 'decisions-data.js'));
-    const samples = read(path.join(dir, 'decision-samples.js'));
+    // The list is decisions-data.js with the conflicts round spread in from its sibling; both are read.
+    // The last round of Settings is spread in the same way, from decisions-final.js.
+    const data = ['decisions-data.js', 'decisions-conflicts.js', 'decisions-final.js'].map(f => read(path.join(dir, f))).join('\n');
+    // Likewise the samples: decision-samples.js first (its PROPOSALS marker splits the text), then the rounds' siblings.
+    const samples = ['decision-samples.js', 'decision-samples-conflicts.js', 'decision-samples-final.js'].map(f => read(path.join(dir, f))).join('\n');
     const blocks = (src: string, marker: RegExp): Map<string, string> => {
         const map = new Map<string, string>();
         const parts = src.split(marker);
@@ -340,6 +348,8 @@ export function decisionProblems(): string[] {
     // a sample's own data (a thread, a card) is not taken for either.
     const ids = (src: string, indent: number) => [...src.matchAll(new RegExp(`^ {${indent}}\\{ id: '([\\w-]+)'`, 'gm'))].map(m => m[1]);
     for (const [id, body] of decisions) {
+        // A text page (`textOnly: true`) says its options in words and draws no sample.
+        if (/^ {4}textOnly: true,$/m.test(body)) continue;
         const wanted = ids(/^ {4}variants: \[$([\s\S]*?)^ {4}\],$/m.exec(body)?.[1] ?? '', 6);
         const have = ids(sampleBlocks.get(id) ?? '', 4);
         for (const v of wanted) if (!have.includes(v)) out.push(`decision ${id}: variant "${v}" has no sample in decision-samples.js`);

@@ -8,76 +8,55 @@
  *   table, the sender rows with the switch, the device cards, the quiet-hours form, the three
  *   roads. NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.14.0 -- 2026-09-26 -- The groups under AIMEAT's sender row are the Panel (.poster-panel, its sun edge), a unification: the look the library carries for a part set apart by the sun.
+ *   v1.13.0 -- 2026-09-26 -- The dashed avatar is the avatar's agent tone in css/poster.css (.poster-box--agent); its rule here goes.
+ *   v1.12.0 -- 2026-09-25 -- The ways to do one thing are the library's How roads (css/components/how-roads.css), moved unchanged with their class names (UI consolidation phase 5, a move).
+ *   v1.11.0 -- 2026-09-25 -- A prerequisite's state and a muted sender are the Status (a unification: Jouni's decision "Status").
+ *   v1.10.0 -- 2026-09-25 -- The inbox rows are the library's Notification feed (css/components/notification-feed.css), moved unchanged with their class names (UI consolidation phase 5, a move).
+ *   v1.9.0 -- 2026-09-25 -- The loading line's blinking mark is the library's Loading mark (css/components/loading-mark.css), moved unchanged out of five sheets (UI consolidation phase 5, a move).
+ *   v1.8.0 -- 2026-09-25 -- The sender rows are the Listing (css/components/listing.css), a unification: the look most tabs use. The rules of nt-src-rows, nt-nm, nt-w, nt-ctl go; the mark keeps its box size and dashed edge.
+ *   v1.7.0 -- 2026-09-25 -- Every drop-down is the Select field (.select-field, css/components/select-field.css); a place keeps only its width and margin (a unification: the look most tabs use).
+ *   v1.6.0 -- 2026-09-25 -- The switch rules go: a setting that is on or off is the Switch (css/components/switch.css); a place's layout value stays here (UI consolidation phase 5, a unification).
+ *   v1.5.0 -- 2026-09-25 -- A framed box's own frame and ground go: it is the Object box (.poster-box, css/poster.css); its place (margin, padding) stays here (Jouni's decision "Object box", a unification).
+ *   v1.4.0 -- 2026-09-25 -- The inline code rules go: code is the Code block's inline cut (css/components/code-block.css); the layout declarations of their places stay, on .code-inline (UI consolidation phase 5, a unification).
+ *   v1.3.0 -- 2026-09-25 -- The hint rules go: the hints are the Hint (css/components/hint.css); the layout declarations of their places stay, on .poster-hint (UI consolidation phase 5, a unification).
+ *   v1.2.0 -- 2026-09-25 -- The times' look is .poster-time; their rules here keep only their place (Jouni's decision "Timestamp", a unification).
+ *   v1.1.0 -- 2026-09-25 -- The row labels' look is .poster-label; their rules here keep only their place (Jouni's decision "Row label", a unification).
+ *   2026-09-25 -- The empty lines are the quiet sentence (.poster-quiet, Jouni's decision "Empty line"): .og-empty's look goes, its place (margin 0) stays on the new class.
+ *   2026-09-25 -- The filters and the choice buttons lose their rules: the tab (.poster-tab) now draws them (a unification: Jouni's decision "Tabs and filters").
  *   2026-09-13 -- Compose the shared initials box; retain only row dimensions and placement.
  *   v1.0.0 — 2026-08-30 — Initial.
  */
 
-.og-nt .og-door.on { color: var(--accent); border-bottom-color: var(--accent); }
 .og-nt .og-door--coral { color: var(--accent); border-bottom-color: var(--accent); }
-.og-nt .og-choice-btn.on { background: var(--text); color: var(--card-bg); }
-.og-nt .og-empty { margin: 0; font-size: .9rem; color: var(--text-dim); }
-.og-nt .nt-hint { margin: .6rem 0 0; font-size: .82rem; line-height: 1.5; color: var(--text-dim); display: block; }
-.og-nt .nt-loading { display: inline-block; padding-left: 1.1rem; position: relative; }
-.og-nt .nt-loading::before { content: ''; position: absolute; left: 0; top: .35em; width: .55em; height: .55em; background: var(--accent); animation: ntBlink 1s steps(2, start) infinite; }
-@keyframes ntBlink { to { visibility: hidden; } }
+.og-nt .poster-quiet { margin: 0; }
+.og-nt .poster-hint { display: block; }
 .og-nt .og-fold > span:not(.og-fold-r):not(.og-fold-arrow) { white-space: nowrap; }
 .og-nt .og-fold-r { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .og-nt .nt-more { margin-top: .8rem; }
 
-/* ── The switch ─────────────────────────────────────────────────────────────────────────────── */
-/* The word on the left, the box on the right (2026-08-30, Jouni): in a column of rows the boxes line
-   up on the right edge instead of drifting with the length of each word. */
-.nt-sw { display: inline-flex; align-items: center; justify-content: flex-end; gap: .5rem; min-width: 5.2rem; background: none; border: 0; padding: 0; cursor: pointer; font-family: inherit; font-size: .68rem; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; color: var(--text); }
+/* ── The switch is the library's (css/components/switch.css); "muted" stands in its place ─────── */
 .nt-muted { min-width: 5.2rem; text-align: right; }
-.nt-sw i { width: 2.1rem; height: 1.1rem; border: 2px solid var(--text); position: relative; display: inline-block; box-sizing: border-box; }
-.nt-sw i::after { content: ''; position: absolute; top: 2px; left: 2px; width: .55rem; height: .55rem; background: var(--text); }
-.nt-sw.on i { background: var(--sun); }
-.nt-sw.on i::after { left: auto; right: 2px; }
-.nt-sw.off { color: var(--text-dim); }
-.nt-sw:disabled { opacity: .5; cursor: default; }
-.nt-muted { font-family: var(--font-mono); font-size: .72rem; color: var(--accent); }
 
 /* ── The inbox ──────────────────────────────────────────────────────────────────────────────── */
-.nt-rows { display: grid; grid-template-columns: 6.5rem minmax(0, 9rem) minmax(0, 1fr) auto; gap: 0 1rem; align-items: start; }
-.nt-rows > div { padding: .6rem 0; border-bottom: 1px solid var(--border); min-width: 0; }
-.nt-rows--head > div { padding: 0 0 .35rem; border-bottom: 0; font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
-.nt-when { font-family: var(--font-mono); font-size: .72rem; line-height: 1.5; color: var(--text-dim); }
-.nt-when b { display: block; color: var(--text); font-weight: 500; }
-.nt-src { font-weight: 800; font-size: .85rem; color: var(--text); overflow-wrap: anywhere; }
-.nt-src small { display: block; font-family: var(--font-mono); font-size: .68rem; font-weight: 400; color: var(--text-dim); }
-.nt-what { font-size: .92rem; line-height: 1.45; color: var(--text); overflow-wrap: anywhere; }
-.nt-what b { font-weight: 800; }
-.nt-what small { display: block; color: var(--text-dim); font-size: .82rem; }
-.nt-what em { display: block; font-style: normal; font-family: var(--font-mono); font-size: .72rem; margin-top: .2rem; }
-.nt-what em.ok { color: var(--success-fg, #1f8f5a); }
-.nt-what em.bad { color: var(--accent); }
-.nt-what.unread b::before { content: ''; display: inline-block; width: .5rem; height: .5rem; background: var(--accent); margin-right: .5rem; vertical-align: middle; }
-.nt-doors { white-space: nowrap; }
-.nt-doors .og-door { margin-left: .8rem; }
 
-/* ── Senders ────────────────────────────────────────────────────────────────────────────────── */
-.nt-src-rows { display: grid; grid-template-columns: 2.2rem minmax(0, 1.2fr) minmax(0, 1fr) auto; gap: 0 1rem; align-items: center; }
-.nt-src-rows > div { padding: .7rem 0; border-bottom: 1px solid var(--border); min-width: 0; }
+/* ── Senders: the Listing (css/components/listing.css) ───────────────────────────────────────── */
 /* The mark is a whole box of its own here: the contacts rule is scoped to its own rows. */
-.nt-src-rows > .nt-av { width: 2.2rem; height: 2.2rem; }
-.nt-src-rows > .nt-av.ct-av--agent { border-style: dashed; color: var(--text-dim); }
-.nt-nm { font-weight: 800; font-size: .95rem; color: var(--text); }
-.nt-nm small { display: block; font-family: var(--font-mono); font-size: .7rem; font-weight: 400; color: var(--text-dim); margin-top: .1rem; overflow-wrap: anywhere; }
-.nt-w { font-size: .82rem; line-height: 1.45; color: var(--text-dim); }
-.nt-ctl { display: flex; gap: .9rem; align-items: center; justify-content: flex-end; white-space: nowrap; }
-.nt-groups { margin: 0 0 .4rem 1.6rem; padding-left: 1rem; border-left: 3px solid var(--sun); }
+.og-nt .nt-av { width: 2.2rem; height: 2.2rem; }
+/* The groups under AIMEAT's row are the Panel (.poster-panel, its sun edge); their indent only. */
+.nt-groups { margin: 0 0 .4rem 1.6rem; padding-left: 1rem; }
 .nt-empty-senders { padding: .7rem 0; }
 
 /* ── Devices ────────────────────────────────────────────────────────────────────────────────── */
 .nt-dev { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .8rem; }
-.nt-dev-card { border: 2px solid var(--text); background: var(--card-bg); padding: .8rem .9rem; font-size: .85rem; line-height: 1.5; display: flex; flex-direction: column; gap: .3rem; }
+.nt-dev-card { margin: 0; padding: .8rem .9rem; font-size: .85rem; line-height: 1.5; display: flex; flex-direction: column; gap: .3rem; }
 .nt-dev-card.this { border-color: var(--accent); }
 .nt-dev-card.dim { border-style: dashed; color: var(--text-dim); }
 .nt-dev-card b { font-weight: 800; font-size: .95rem; color: var(--text); }
 .nt-dev-card.dim b { color: var(--text-dim); }
 .nt-dev-card small { font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); }
 .nt-dev-card .og-doors { margin-top: auto; padding-top: .4rem; flex-wrap: wrap; }
-.nt-select { max-width: 12rem; font-size: .8rem; }
+.nt-select { max-width: 12rem; }
 
 /* ── Quiet hours and the roads ──────────────────────────────────────────────────────────────── */
 .nt-kv { margin-top: .2rem; }
@@ -87,26 +66,9 @@
 .nt-dash { color: var(--text-dim); }
 .nt-choice { margin-bottom: .2rem; }
 .nt-form-doors { margin-top: 1rem; }
-.nt-roads { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .8rem; }
-.nt-road { display: flex; flex-direction: column; gap: .35rem; padding: .9rem 1rem; border: 2px solid var(--text); background: var(--card-bg); font-size: .85rem; line-height: 1.5; color: var(--text-dim); }
-.nt-road b { font-weight: 800; font-size: .95rem; color: var(--text); }
-.nt-road p { margin: 0; }
-.nt-road-k { font-family: var(--font-mono); font-size: .7rem; color: var(--accent); }
-.nt-road code { font-family: var(--font-mono); font-size: .74rem; color: var(--text); background: var(--bg-dim); padding: .2rem .4rem; overflow-wrap: anywhere; margin-top: auto; }
 
 /* ── Phone ──────────────────────────────────────────────────────────────────────────────────── */
 @media (max-width: 860px) {
-  .nt-rows { grid-template-columns: minmax(0, 1fr) auto; grid-auto-flow: dense; }
-  .nt-rows--head { display: none; }
-  .nt-rows > .nt-when { grid-column: 1; border-bottom: 0; padding-bottom: 0; }
-  .nt-rows > .nt-when b { display: inline; margin-right: .5rem; }
-  .nt-rows > .nt-src { display: none; }
-  .nt-rows > .nt-what { grid-column: 1; padding-top: .1rem; }
-  .nt-rows > .nt-doors { grid-column: 2; grid-row: span 2; align-self: center; }
-  .nt-src-rows { grid-template-columns: 2.2rem minmax(0, 1fr); }
-  .nt-src-rows > .nt-w { display: none; }
-  .nt-src-rows > .nt-ctl { grid-column: 2; justify-content: flex-start; border-top: 0; padding-top: 0; flex-wrap: wrap; white-space: normal; }
-  .nt-src-rows > .nt-nm { border-bottom: 0; padding-bottom: .2rem; }
-  .nt-dev, .nt-roads { grid-template-columns: 1fr; }
+  .nt-dev { grid-template-columns: 1fr; }
   .nt-groups { margin-left: .4rem; }
 }

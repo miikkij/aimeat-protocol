@@ -9,6 +9,17 @@
  * @structure ScheduleEditForm
  * @usage <${ScheduleEditForm} schedule=${s} showToast=${showToast} onSaved=${reload} onClose=${close} />
  * @version-history
+ *   v1.6.0 — 2026-09-26 — A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
+ *   v1.5.0 — 2026-09-25 — The last labels over a field or a group wear .poster-label: the classic AI settings, the presence dialog, the scope groups, the ecosystem's trigger and sample, the scheduler's edit form, P&L's fields, the task runner's name; a place keeps its layout (Jouni's decision "Row label", a unification).
+ *   v1.4.0 — 2026-09-25 — Every many-line field is the Text area (.og-textarea); a place keeps only its size and margin (a unification: the look most tabs use).
+ *   v1.3.0 — 2026-09-25 — Every one-line field is the Text field (.og-input); a place keeps only its layout (a unification: the look most tabs use).
+ *   v1.2.0 — 2026-09-25 — Every quiet way on is the library's action link, .poster-action, with the
+ *     tone its meaning names: more for "show all" and more of a list, back, text for a plain grey
+ *     word, quiet (Jouni's decisions "Action link", "Panel action", "Dismiss", "Small link", "Step
+ *     button").
+ *   v1.1.0 — 2026-09-25 — The loud action is the library's dark block, .poster-slab: the control cut
+ *     where it sits in a row of controls or waits to be enabled, the danger tone for a delete that
+ *     cannot be undone (Jouni's decision "Loud action").
  *   v1.0.0 — 2026-08-30 — Extracted from schedule-item.js v1.2.0; no behaviour change.
  */
 import { h } from 'preact';
@@ -55,34 +66,34 @@ export function ScheduleEditForm({ schedule: s, showToast, onSaved, onClose }) {
 
   return html`
     <div class="sch-edit">
-      <div class="sch-form-row"><label>${t('profile.scheduler.field.displayName')}</label>
-        <input type="text" value=${f.display_name} onInput=${e => set('display_name', e.target.value)} /></div>
-      <div class="sch-form-row"><label>${t('profile.scheduler.field.schedule')} (cron)</label>
-        <input type="text" class="sch-cron-input" value=${f.cron} onInput=${e => set('cron', e.target.value)} placeholder="0 7 * * *" /></div>
-      <div class="sch-form-row"><label>${t('profile.scheduler.ph.timezone')}</label>
-        <input type="text" value=${f.timezone} onInput=${e => set('timezone', e.target.value)} placeholder="Europe/Helsinki" /></div>
+      <div class="sch-form-row"><label class="poster-label">${t('profile.scheduler.field.displayName')}</label>
+        <input class="og-input" type="text" value=${f.display_name} onInput=${e => set('display_name', e.target.value)} /></div>
+      <div class="sch-form-row"><label class="poster-label">${t('profile.scheduler.field.schedule')} (cron)</label>
+        <input type="text" class="og-input" value=${f.cron} onInput=${e => set('cron', e.target.value)} placeholder="0 7 * * *" /></div>
+      <div class="sch-form-row"><label class="poster-label">${t('profile.scheduler.ph.timezone')}</label>
+        <input class="og-input" type="text" value=${f.timezone} onInput=${e => set('timezone', e.target.value)} placeholder="Europe/Helsinki" /></div>
 
       ${s.type === 'agent_task' && html`
-        <div class="sch-form-row"><label>${t('profile.scheduler.field.taskTitle')}</label>
-          <input type="text" value=${f.task_title} onInput=${e => set('task_title', e.target.value)} /></div>
-        <div class="sch-form-row"><label>${t('profile.scheduler.field.taskDescription')}</label>
-          <textarea rows="3" value=${f.task_description} onInput=${e => set('task_description', e.target.value)}></textarea></div>
+        <div class="sch-form-row"><label class="poster-label">${t('profile.scheduler.field.taskTitle')}</label>
+          <input class="og-input" type="text" value=${f.task_title} onInput=${e => set('task_title', e.target.value)} /></div>
+        <div class="sch-form-row"><label class="poster-label">${t('profile.scheduler.field.taskDescription')}</label>
+          <textarea class="og-textarea" rows="3" value=${f.task_description} onInput=${e => set('task_description', e.target.value)}></textarea></div>
       `}
       ${s.type === 'ai' && html`
-        <div class="sch-form-row"><label>${t('profile.scheduler.field.inputKeys')}</label>
-          <input type="text" value=${f.input_keys} onInput=${e => set('input_keys', e.target.value)} placeholder=${t('profile.scheduler.ph.inputKeys')} /></div>
-        <div class="sch-form-row"><label>${t('profile.scheduler.field.prompt')}</label>
-          <textarea rows="3" value=${f.prompt} onInput=${e => set('prompt', e.target.value)}></textarea></div>
-        <div class="sch-form-row"><label>${t('profile.scheduler.field.outputKey')}</label>
-          <input type="text" value=${f.output_key} onInput=${e => set('output_key', e.target.value)} placeholder=${t('profile.scheduler.ph.outputKey')} /></div>
+        <div class="sch-form-row"><label class="poster-label">${t('profile.scheduler.field.inputKeys')}</label>
+          <input class="og-input" type="text" value=${f.input_keys} onInput=${e => set('input_keys', e.target.value)} placeholder=${t('profile.scheduler.ph.inputKeys')} /></div>
+        <div class="sch-form-row"><label class="poster-label">${t('profile.scheduler.field.prompt')}</label>
+          <textarea class="og-textarea" rows="3" value=${f.prompt} onInput=${e => set('prompt', e.target.value)}></textarea></div>
+        <div class="sch-form-row"><label class="poster-label">${t('profile.scheduler.field.outputKey')}</label>
+          <input class="og-input" type="text" value=${f.output_key} onInput=${e => set('output_key', e.target.value)} placeholder=${t('profile.scheduler.ph.outputKey')} /></div>
       `}
 
-      <div class="sch-form-row"><label>${t('profile.scheduler.field.purpose')}</label>
-        <input type="text" value=${f.purpose} onInput=${e => set('purpose', e.target.value)} /></div>
+      <div class="sch-form-row"><label class="poster-label">${t('profile.scheduler.field.purpose')}</label>
+        <input class="og-input" type="text" value=${f.purpose} onInput=${e => set('purpose', e.target.value)} /></div>
 
       <div class="sch-form-actions">
-        <button class="btn-primary btn-sm" disabled=${busy} onClick=${onSave}>${busy ? t('profile.scheduler.saving') : t('profile.scheduler.save')}</button>
-        <button class="btn-outline btn-sm" disabled=${busy} onClick=${onClose}>${t('profile.scheduler.close')}</button>
+        <button class="poster-slab poster-slab--control" disabled=${busy} onClick=${onSave}>${busy ? t('profile.scheduler.saving') : t('profile.scheduler.save')}</button>
+        <button class="poster-action poster-action--small" disabled=${busy} onClick=${onClose}>${t('profile.scheduler.close')}</button>
       </div>
     </div>`;
 }

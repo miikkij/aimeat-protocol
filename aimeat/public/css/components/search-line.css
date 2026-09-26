@@ -1,0 +1,22 @@
+/**
+ * @file search-line.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The search line over a list: the field (the underlined input, .og-input) across the
+ *   row, and how many it found in small grey typewriter letters at its end; on a phone the count
+ *   wraps under the field. The look most Settings & Controls tabs already draw (the identical copies
+ *   in skills, extensions, capabilities, libraries, packages and app development), taken as the one
+ *   look for this kind (UI consolidation phase 5).
+ *   Drawn as markup: <div class="search-line"><input class="og-input" …><small>12 of 40</small></div>.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 — 2026-09-25 — Initial, with the values of the copies in the Settings tabs (xx-search).
+ */
+
+.search-line { display: flex; align-items: center; gap: 1rem; margin: .8rem 0 .6rem; }
+.search-line .og-input { flex: 1 1 auto; min-width: 0; }
+.search-line small { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); white-space: nowrap; }
+
+@media (max-width: 860px) {
+  .search-line { flex-wrap: wrap; }
+}

@@ -10,6 +10,17 @@
  * @structure OrganizePage({ org, showToast })
  * @usage <OrganizePage org=${org} showToast=${showToast} />
  * @version-history
+ *   v1.6.0 -- 2026-09-25 -- A setting that is on or off is the library's Switch (components/Switch.js), the look most Settings tabs draw (UI consolidation phase 5, a unification).
+ *   v1.5.0 -- 2026-09-25 -- Every hint is the Hint (poster-hint, components/Hint.js), the look most Settings & Controls tabs draw (UI consolidation phase 5, a unification).
+ *   v1.4.0 -- 2026-09-25 -- The row labels (field and key labels, column heads, box labels) wear .poster-label (Jouni's decision "Row label", a unification).
+ *   v1.3.0 -- 2026-09-25 -- Every quiet way on is the library's action link, .poster-action, with the
+ *     tone its meaning names: more for "show all" and more of a list, back, text for a plain grey
+ *     word, quiet (Jouni's decisions "Action link", "Panel action", "Dismiss", "Small link", "Step
+ *     button").
+ *   v1.2.0 -- 2026-09-25 -- The loud action is the library's dark block, .poster-slab: the control cut
+ *     where it sits in a row of controls or waits to be enabled, the danger tone for a delete that
+ *     cannot be undone (Jouni's decision "Loud action").
+ *   2026-09-25 -- What chooses what a list or a panel shows is the tab (.poster-tab, with its fold and filter tones), a unification: Jouni's decision "Tabs and filters".
  *   v1.1.0 -- 2026-09-13 -- Compose section headlines with poster-section-title.
  *   v1.0.0 — 2026-09-13 — Initial, with the Messages list's sections, rules and archive.
  */
@@ -18,15 +29,13 @@ import { useState } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
+import { Hint } from '/components/Hint.js';
+import { Switch } from '/components/Switch.js';
 
 const DAY_CHOICES = [7, 14, 30, 60, 90];
 const ACTIONS = ['fold', 'group', 'archive'];
 const SCOPES = ['agents', 'all'];
 const EMPTY_RULE = { name: '', action: 'group', scope: 'agents', with: '', subject: '', body: '', days: '' };
-
-/** The poster switch, the same markup the notification settings use (.nt-sw). */
-const Switch = ({ on, label, disabled, onToggle }) =>
-  html`<button type="button" class=${`nt-sw ${on ? 'on' : 'off'}`} disabled=${disabled} aria-pressed=${on ? 'true' : 'false'} onClick=${onToggle}>${label}<i></i></button>`;
 
 const actionWord = (a) => t(`inbox.org.action.${a}`);
 const scopeWord = (s) => t(`inbox.org.scope.${s}`);
@@ -80,61 +89,61 @@ export function OrganizePage({ org, showToast }) {
         <div class="inbox-org-line">
           <${Switch} on=${auto.enabled} disabled=${busy} label=${auto.enabled ? t('inbox.org.on') : t('inbox.org.off')}
             onToggle=${() => org.saveSettings({ auto_archive: { enabled: !auto.enabled } })} />
-          <span class="og-label" id="inbox-org-days">${t('inbox.org.autoDays')}</span>
-          <div class="og-choice" role="group" aria-labelledby="inbox-org-days">
-            ${DAY_CHOICES.map(d => html`<button type="button" key=${d} class=${`og-choice-btn ${auto.days === d ? 'on' : ''}`}
+          <span class="poster-label" id="inbox-org-days">${t('inbox.org.autoDays')}</span>
+          <div class="pf-tabs" role="group" aria-labelledby="inbox-org-days">
+            ${DAY_CHOICES.map(d => html`<button type="button" key=${d} class=${`poster-tab ${auto.days === d ? 'is-on' : ''}`}
               disabled=${busy || !auto.enabled} aria-pressed=${auto.days === d ? 'true' : 'false'} title=${t('inbox.org.days', { n: String(d) })}
               onClick=${() => org.saveSettings({ auto_archive: { days: d } })}>${d}</button>`)}
           </div>
         </div>
-        <p class="og-hint">${t('inbox.org.autoHint')}</p>
+        <${Hint}>${t('inbox.org.autoHint')}<//>
       </section>
 
       <section class="og-sec">
         <div class="og-sec-h"><h2 class="poster-section-title">${t('inbox.org.foldTitle')}</h2></div>
         <${Switch} on=${s.fold_same_subject} disabled=${busy} label=${s.fold_same_subject ? t('inbox.org.on') : t('inbox.org.off')}
           onToggle=${() => org.saveSettings({ fold_same_subject: !s.fold_same_subject })} />
-        <p class="og-hint">${t('inbox.org.foldHint')}</p>
+        <${Hint}>${t('inbox.org.foldHint')}<//>
       </section>
 
       <section class="og-sec">
         <div class="og-sec-h"><h2 class="poster-section-title">${t('inbox.org.rulesTitle')}${rules.length ? html` <small>${rules.length}</small>` : null}</h2></div>
-        <p class="og-hint">${t('inbox.org.rulesHint')}</p>
+        <${Hint}>${t('inbox.org.rulesHint')}<//>
         <div class="inbox-org-rules">
           ${rules.length === 0 ? html`<p class="og-hint">${t('inbox.org.rulesEmpty')}</p>` : rules.map(r => html`
             <div class=${`inbox-org-rule${r.enabled ? '' : ' is-off'}`} key=${r.id}>
               <div class="inbox-org-rule-words"><b>${r.name}</b><small>${ruleSummary(r)}</small></div>
               <${Switch} on=${r.enabled} disabled=${busy} label=${r.enabled ? t('inbox.org.ruleInUse') : t('inbox.org.rulePaused')} onToggle=${() => toggleRule(r)} />
-              <button type="button" class="og-door og-door--quiet" disabled=${busy} onClick=${() => org.saveSettings({ remove_rule: r.id })}>${t('inbox.org.ruleRemove')}</button>
+              <button type="button" class="poster-action poster-action--quiet" disabled=${busy} onClick=${() => org.saveSettings({ remove_rule: r.id })}>${t('inbox.org.ruleRemove')}</button>
             </div>`)}
         </div>
 
         <div class="inbox-org-form">
           <div class="og-fields og-fields--2">
-            <label class="og-field"><span class="og-label">${t('inbox.org.ruleName')}</span>
+            <label class="og-field"><span class="poster-label">${t('inbox.org.ruleName')}</span>
               <input class="og-input" maxlength="80" value=${draft.name} onInput=${e => set({ name: e.target.value })} /></label>
-            <div class="og-field inbox-org-wide"><span class="og-label">${t('inbox.org.ruleAction')}</span>
-              <div class="og-choice">${ACTIONS.map(a => html`<button type="button" key=${a} class=${`og-choice-btn ${draft.action === a ? 'on' : ''}`}
+            <div class="og-field inbox-org-wide"><span class="poster-label">${t('inbox.org.ruleAction')}</span>
+              <div class="pf-tabs">${ACTIONS.map(a => html`<button type="button" key=${a} class=${`poster-tab ${draft.action === a ? 'is-on' : ''}`}
                 aria-pressed=${draft.action === a ? 'true' : 'false'} onClick=${() => set({ action: a })}>${actionWord(a)}</button>`)}</div></div>
-            <label class="og-field"><span class="og-label">${t('inbox.org.ruleWith')}</span>
+            <label class="og-field"><span class="poster-label">${t('inbox.org.ruleWith')}</span>
               <input class="og-input" maxlength="200" list="inbox-contact-suggest" value=${draft.with} onInput=${e => set({ with: e.target.value })} /></label>
-            <label class="og-field"><span class="og-label">${t('inbox.org.ruleSubject')}</span>
+            <label class="og-field"><span class="poster-label">${t('inbox.org.ruleSubject')}</span>
               <input class="og-input" maxlength="200" value=${draft.subject} onInput=${e => set({ subject: e.target.value })} /></label>
-            <label class="og-field"><span class="og-label">${t('inbox.org.ruleBody')}</span>
+            <label class="og-field"><span class="poster-label">${t('inbox.org.ruleBody')}</span>
               <input class="og-input" maxlength="200" value=${draft.body} onInput=${e => set({ body: e.target.value })} /></label>
-            <label class="og-field"><span class="og-label">${t('inbox.org.ruleOlder')}</span>
+            <label class="og-field"><span class="poster-label">${t('inbox.org.ruleOlder')}</span>
               <input class="og-input" type="number" min="1" max="365" inputmode="numeric" value=${draft.days} onInput=${e => set({ days: e.target.value })} /></label>
-            <div class="og-field inbox-org-wide"><span class="og-label">${t('inbox.org.ruleScope')}</span>
-              <div class="og-choice">${SCOPES.map(sc => html`<button type="button" key=${sc} class=${`og-choice-btn ${draft.scope === sc ? 'on' : ''}`}
+            <div class="og-field inbox-org-wide"><span class="poster-label">${t('inbox.org.ruleScope')}</span>
+              <div class="pf-tabs">${SCOPES.map(sc => html`<button type="button" key=${sc} class=${`poster-tab ${draft.scope === sc ? 'is-on' : ''}`}
                 aria-pressed=${draft.scope === sc ? 'true' : 'false'} onClick=${() => set({ scope: sc })}>${scopeWord(sc)}</button>`)}</div></div>
           </div>
           <div class="og-actions inbox-org-actions">
-            <button type="button" class="og-slab" disabled=${busy} onClick=${addRule}>${t('inbox.org.ruleAdd')}</button>
-            <p class="og-hint">${t('inbox.org.ruleFormHint')}</p>
+            <button type="button" class="poster-slab poster-slab--control" disabled=${busy} onClick=${addRule}>${t('inbox.org.ruleAdd')}</button>
+            <${Hint}>${t('inbox.org.ruleFormHint')}<//>
           </div>
         </div>
       </section>
 
-      <p class="og-hint inbox-org-chat">${t('inbox.org.chatHint')}</p>
+      <p class="poster-hint inbox-org-chat">${t('inbox.org.chatHint')}</p>
     </div>`;
 }
