@@ -23,6 +23,8 @@
  * @structure decideTools -- AimeatToolDefinition[]
  * @usage imported by mcp/catalog/definitions.ts
  * @version-history
+ *   v1.2.2 — 2026-09-25 — aimeat_decision_review says a decision the agent asked for itself is refused
+ *     (OWN_DECISION), and that the review names the one who recorded it.
  *   v1.2.1 — 2026-09-24 — aimeat_decide_run says a run does not send a record the node reads to
  *     decide what it does: named in `keys` it is refused, under a `prefix` it is left out.
  *   v1.2.0 — 2026-09-23 — Decision providers: `provider` on aimeat_decide, aimeat_decide_run and
@@ -78,7 +80,7 @@ export const decideTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_decision_review',
-        description: 'Record that a person looked at a decision and confirmed it or overrode it. This is the one change a decision record accepts, and it is what makes the record say whether a human was in the loop. Record it when the person actually decided, not on their behalf.',
+        description: 'Record that a person looked at a decision and confirmed it or overrode it. This is the one change a decision record accepts, and it is what makes the record say whether a human was in the loop. Record it when the person actually decided, not on their behalf. A decision you asked for yourself is refused with OWN_DECISION: the owner reviews it, in person or through another of their agents. The review names you as the one who recorded it.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {

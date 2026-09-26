@@ -16,6 +16,8 @@
  * @structure registerDecideTools(mcp, storage, config, getAgentGaii)
  * @usage registerDecideTools(mcp, storage, config, () => agentGaii);
  * @version-history
+ *   v1.3.0 — 2026-09-25 — aimeat_decision_review names the session's agent as the reviewer, never the
+ *     owner in person, so the service refuses it a review of a decision it asked for itself.
  *   v1.2.0 — 2026-09-23 — Decision providers: `provider` on aimeat_decide, aimeat_decide_run and
  *     aimeat_decision_list, and stats by provider.
  *   v1.1.0 — 2026-09-20 — Decision rules: `rule` on aimeat_decide, aimeat_decide_run and
@@ -168,7 +170,9 @@ export function registerDecideTools(
     annotationsFor('aimeat_decision_review'),
     async (a) => {
       try {
-        const row = await reviewDecision(storage, ownerGhii, agentGaii, a.decision_id, {
+        // A tool session is always an agent, never the owner in person: the service refuses it a
+        // review of a decision it asked for itself.
+        const row = await reviewDecision(storage, ownerGhii, { principal: agentGaii, inPerson: false }, a.decision_id, {
           outcome: a.outcome,
           ...(a.note !== undefined ? { note: a.note } : {}),
           ...(a.override !== undefined ? { override: a.override } : {}),

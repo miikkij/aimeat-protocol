@@ -19,6 +19,9 @@
  * @structure decideRouter(config, storage)
  * @usage mounted in server-bootstrap/routes-loader.ts
  * @version-history
+ *   v1.4.0 — 2026-09-25 — POST /v1/ai/decisions/:id/review hands the service the reviewer as the
+ *     principal that acted (callerPrincipal, so an app is its GEAI) and whether it is the owner in
+ *     person; the service refuses the principal that asked for the decision (403 OWN_DECISION).
  *   v1.3.3 — 2026-09-24 — PUT /v1/ai/decide/settings hands the whole body to writeDecideSettings,
  *     which checks every field before it writes any (273435328c90). The door stored the key and the
  *     provider choice first and read the policy last, so a refused request had replaced the key.
@@ -43,7 +46,8 @@ import { assertAiUseAllowed } from '../auth/ai-gate.js';
 import { requireOwnerPrincipal, isOwnerPrincipal } from '../auth/account-security.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { success, error } from '../middleware/envelope.js';
-import { resolveIdentity, isForeignPrincipal } from '../utils/gaii.js';
+import { resolveIdentity, isForeignPrincipal, callerPrincipal } from '../utils/gaii.js';
+import { isOwnerInPerson } from '../auth/effective-scopes.js';
 import { AiCompletionError } from '../services/ai-completion.js';
 import { agentNameOf } from '../services/agent-ai-keys.js';
 import {
@@ -165,12 +169,15 @@ export function decideRouter(config: AimeatConfig, storage: Storage): Router {
     } catch (e) { fail(res, e); }
   });
 
-  // ── POST /v1/ai/decisions/:id/review ── a person confirmed or overrode it
+  // ── POST /v1/ai/decisions/:id/review ── a person confirmed or overrode it. The reviewer is named as
+  //    the principal that acted (an app by its GEAI, not by its owner's GHII), and the service refuses
+  //    the principal that asked for the decision unless it is the owner in person.
   router.post('/v1/ai/decisions/:id/review', requireAuth(), async (req: Request, res: Response) => {
     if (!assertAiUseAllowed(req, res, config.nodeId)) return;
     try {
+      const reviewer = { principal: callerPrincipal(req.auth!, config.nodeId), inPerson: isOwnerInPerson(req.auth!) };
       const row = await reviewDecision(storage, decideOwnerOf(req.auth!, config.nodeId),
-        resolveIdentity(req.auth!, config.nodeId), req.params.id as string, (req.body ?? {}) as Record<string, unknown>);
+        reviewer, req.params.id as string, (req.body ?? {}) as Record<string, unknown>);
       if (!row) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such decision.'));
       res.json(success(config.nodeId, row));
     } catch (e) { fail(res, e); }
