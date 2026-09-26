@@ -11,6 +11,8 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   v1.16.5 -- 2026-09-26 -- ai-transparency asks the declarer to name its own model, and names the
+ *            publish hint a declaration without one gets.
  *   v1.16.4 -- 2026-09-25 -- set-up-content-pipeline: a step that dispatches to an agent costs
  *            work:request of whoever saves the workflow.
  *   v1.16.3 -- 2026-09-25 -- diagnose-a-workflow reads a refused trigger start; set-up-content-pipeline
@@ -293,6 +295,12 @@ Every write tool takes an optional \`ai_provenance\` block:
 Only \`level\` is required once you send the block. The node fills in who you are, which
 node, when, and a hash of the exact bytes — you are never asked to assert those, and
 anything you do say about identity is discarded.
+
+**Name your own model in \`model\`**, as your provider names it, whenever a model made any of
+the content. Take it from your own configuration; do not ask the person. The node cannot fill
+it in for you: it did not watch the generation. Without it the public record says only who
+served the model (\`provider\`), and an app publish answers with the \`provenance-without-model\`
+hint.
 
 Declaring needs the \`provenance:write\` scope, because a declaration can assert that a
 person wrote or reviewed something. If you do not hold it, the call is refused with that

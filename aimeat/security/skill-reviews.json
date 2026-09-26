@@ -198,7 +198,7 @@
         "aimeat/src/mcp/ai-provenance-input.ts",
         "aimeat/src/services/ai-provenance.ts"
       ],
-      "digest": "sha256:0c2354bda291c05b2e339955"
+      "digest": "sha256:b80966a5147421b35aed1f20"
     },
     "node:aimeat-node-operations": {
       "reviewedOn": "2026-09-24",
@@ -443,8 +443,8 @@
       "aimeat/src/services/first-steps.ts": "8b9905de90360fa2"
     },
     "node:ai-transparency": {
-      "aimeat/src/mcp/ai-provenance-input.ts": "449e2c4e36182748",
-      "aimeat/src/services/ai-provenance.ts": "a2223237fdbca365"
+      "aimeat/src/mcp/ai-provenance-input.ts": "57edb88205226b6a",
+      "aimeat/src/services/ai-provenance.ts": "1f450c96ab3e52bd"
     },
     "node:aimeat-node-operations": {
       "aimeat/src/mcp/core-admin.ts": "17c66f53ecaa3360"
