@@ -1,32 +1,27 @@
 {
   "_note": "Shape literals in the component sheets where a theme shape value exists (src/services/themes/shapes.ts): recorded debt, not approval. A count may only go down: after a component reads the shape values, lower its counts or remove the file. Seeded 2026-09-24 on Jouni's word; only his decision permits re-seeding with pnpm check:shape-tokens --record.",
   "_measured": {
-    "date": "2026-09-24T19:48:48.781Z",
-    "files": 43,
-    "literals": 117,
+    "date": "2026-09-26T22:34:08.885Z",
+    "files": 40,
+    "literals": 107,
     "kinds": {
-      "frame": 36,
       "shadow": 37,
-      "case": 16,
-      "corner": 28
+      "case": 15,
+      "frame": 23,
+      "corner": 32
     }
   },
   "files": {
     "public/css/poster.css": {
-      "frame": 9,
       "shadow": 14,
       "case": 3,
-      "corner": 1
+      "frame": 8
     },
     "public/css/components/ai-label.css": {
       "frame": 1
     },
     "public/css/components/app-sandbox.css": {
       "corner": 1
-    },
-    "public/css/components/archive.css": {
-      "frame": 1,
-      "case": 1
     },
     "public/css/components/badge.css": {
       "case": 1
@@ -38,8 +33,8 @@
       "corner": 1,
       "case": 1
     },
-    "public/css/components/check-item.css": {
-      "frame": 2
+    "public/css/components/contact-card.css": {
+      "case": 1
     },
     "public/css/components/contact-picker.css": {
       "corner": 2,
@@ -47,10 +42,6 @@
     },
     "public/css/components/data-table.css": {
       "case": 1
-    },
-    "public/css/components/day-group.css": {
-      "case": 1,
-      "frame": 1
     },
     "public/css/components/dialog.css": {
       "corner": 1,
@@ -68,15 +59,14 @@
       "frame": 1,
       "case": 1
     },
-    "public/css/components/hello-mcp.css": {
-      "case": 2,
-      "frame": 1
-    },
     "public/css/components/image-deliverable.css": {
       "corner": 2
     },
     "public/css/components/install-cta.css": {
       "corner": 1
+    },
+    "public/css/components/link-preview.css": {
+      "case": 1
     },
     "public/css/components/managed-env.css": {
       "frame": 1
@@ -88,8 +78,12 @@
     "public/css/components/mcp-install.css": {
       "case": 1
     },
-    "public/css/components/numbered-index.css": {
-      "frame": 2
+    "public/css/components/mermaid.css": {
+      "corner": 1
+    },
+    "public/css/components/offer-card-view.css": {
+      "corner": 5,
+      "case": 1
     },
     "public/css/components/page-base.css": {
       "shadow": 6,
@@ -113,21 +107,17 @@
     "public/css/components/settings-door.css": {
       "case": 1
     },
-    "public/css/components/spinner.css": {
+    "public/css/components/setup-guide.css": {
       "frame": 1
     },
-    "public/css/components/stat-line.css": {
+    "public/css/components/spinner.css": {
       "frame": 1
     },
     "public/css/components/status-dot.css": {
       "shadow": 2
     },
     "public/css/components/suggestion.css": {
-      "frame": 1,
       "corner": 1
-    },
-    "public/css/components/swatch-picker.css": {
-      "frame": 1
     },
     "public/css/components/tags.css": {
       "corner": 1
@@ -138,13 +128,8 @@
     "public/css/components/thing-link.css": {
       "frame": 1
     },
-    "public/css/components/timeline.css": {
-      "frame": 2
-    },
     "public/css/components/toast.css": {
-      "shadow": 3,
-      "frame": 1,
-      "corner": 1
+      "shadow": 3
     },
     "public/css/components/toggle-switch.css": {
       "corner": 1,

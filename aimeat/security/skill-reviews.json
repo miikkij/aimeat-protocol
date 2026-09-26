@@ -50,11 +50,11 @@
       "note": "How to talk; nothing in the code decides it."
     },
     "node:aimeat-offering-choices": {
-      "reviewedOn": "2026-09-24",
+      "reviewedOn": "2026-09-26",
       "watches": [
         "aimeat/public/components/Suggestion.js"
       ],
-      "digest": "sha256:9b55bd778185c671e4b2bd08",
+      "digest": "sha256:86b02def2dd9f362271c4fcd",
       "note": "The choices format is parsed and drawn by this file (moved from views/chat/parts.js on 2026-09-23)."
     },
     "node:aimeat-paying-for-the-ai": {
@@ -294,7 +294,7 @@
         "aimeat/public/css/poster.css",
         "aimeat/public/lib/aimeat-fonts.css"
       ],
-      "digest": "sha256:35c93276fa5ef0f120f65467"
+      "digest": "sha256:81b3e60f2c10bdec6a10b3bd"
     },
     "project:aimeat-frontend-verify": {
       "reviewedOn": "2026-09-20",
@@ -360,7 +360,7 @@
     },
     "node:aimeat-activating-a-person": {},
     "node:aimeat-offering-choices": {
-      "aimeat/public/components/Suggestion.js": "411f0668de402bfa"
+      "aimeat/public/components/Suggestion.js": "c8ca8af7c09e778a"
     },
     "node:aimeat-paying-for-the-ai": {
       "aimeat/src/services/ai-completion.ts": "81e90001f1305d31"
@@ -491,7 +491,7 @@
     },
     "project:aimeat-design-language": {
       "aimeat/public/css/theme.css": "0429eb35699ac69e",
-      "aimeat/public/css/poster.css": "0252bb2aa52c0e2e",
+      "aimeat/public/css/poster.css": "5ddc8c98bf9d5a5b",
       "aimeat/public/lib/aimeat-fonts.css": "213a6ac05c5b8cce"
     },
     "project:aimeat-frontend-verify": {

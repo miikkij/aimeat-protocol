@@ -2,8 +2,8 @@
 name: aimeat-design-language
 description: "The AIMEAT design language in words and in numbers: the two faces (showroom outside, poster inside), the three type tokens every font on the site descends from, the four shapes, the colours, the wordmark, and the one place a value is changed (theme.css tokens) with the map of every surface a token reaches. Use before designing or styling anything that carries the AIMEAT name, before changing a font or a colour, and to judge whether a screen looks like this product."
 metadata:
-  version: 1.10.0
-  updated: 2026-09-26
+  version: 1.11.0
+  updated: 2026-09-27
   owner: Jouni Miikki
 ---
 
@@ -19,7 +19,10 @@ segmented control, the toast, the top bar) live in `aimeat/public/css/components
 That folder also holds the library parts Settings & Controls is drawn from (the page kit, the
 listing, the facts, the fields, the timeline, and every part only one page draws), one sheet
 each, each with its entry in the component catalogue (`src/services/ui-library/entries-*.ts`) and
-a demo in the design lab; they read the shape values like `poster.css` does.
+a demo in the design lab; they read the shape values like `poster.css` does. Since 2026-09-27 a
+Settings & Controls page writes no class at all: it calls the components (`components/Action.js`,
+`Mark.js`, `Note.js`, `List.js`, `Facts.js`, `Field.js`, `SettingsPage.js` and the rest) with data,
+and a component draws only its own class names and the `poster.css` shapes below.
 
 Type and colour tokens live in `aimeat/public/css/theme.css`, and nothing else does:
 `pnpm check:theme-tokens` refuses a rule there that is not a custom property. Font sizes and
@@ -221,15 +224,15 @@ dimensions. It does not re-declare the shape's font, rule, fill, padding or shad
 | Section and B1 headline | `.poster-section`, `.poster-section-title` |
 | Area governed by the selected tab | `.poster-panel` |
 | Hairline row; row that is the thing | `.poster-row`; `.poster-row--thing` |
-| Small coral label | `.poster-label` (also the prompt card's label; Jouni's decision "Row label") |
-| Underlined action, and its tones | `.poster-action`; `--more` ("Show all", every small way on inside a part), `--quiet` (a side column action), `--back` (the way back), `--text` (Listen, Copy, "Not now"), `--notice` ("What does that mean?"), `--jump` (the jump to the latest message), `--danger` (coral: an act that removes or revokes); in Settings & Controls a way on in a page head or a section is `--small`, a quiet one `--lower` (no capitals), and one in a list row's door cell `--row` (Jouni's decision "Settings door"); `:disabled` is dimmed (Jouni's decisions "Action link", "Panel action", "Step button", "Dismiss", "Small link"). Every button of a small panel, and a first step's button that is not the next move, is this link |
-| Tab and selected tab, and its tones | `.poster-tab`, `.poster-tab.is-on`; `.poster-tab--fold` (a small switch in a row, "Recent / Mine", and every button that shows or hides a panel and stays pressed while it is shown), `.poster-tab--tile` (a choice among named looks, the background pattern), `--filter` (what a list shows: small typewriter words in a grey frame), `--attention` (a filter whose items need the person); `:disabled` is dimmed; a Count inside a chosen tab keeps dark words on the sun (Jouni's decisions "Tabs and filters", "Choice") |
+| Small coral label | `.poster-label` (also the prompt card's label; Jouni's decision "Row label"); `--block` stands it on a line of its own |
+| Underlined action, and its tones | `.poster-action`; `--more` ("Show all", every small way on inside a part), `--quiet` (a side column action), `--back` (the way back), `--text` (Listen, Copy, "Not now"), `--notice` ("What does that mean?"), `--jump` (the jump to the latest message), `--danger` (coral: an act that removes or revokes); in Settings & Controls a way on in a page head or a section is `--small`, a quiet one `--lower` (no capitals), and one in a list row's door cell `--row` (Jouni's decision "Settings door"); `:disabled` is dimmed; `.is-on` (a pale coral ground) while what it started runs, as Listen while it reads (Jouni's decisions "Action link", "Panel action", "Step button", "Dismiss", "Small link"). Every button of a small panel, and a first step's button that is not the next move, is this link |
+| Tab and selected tab, and its tones | `.poster-tab`, `.poster-tab.is-on`; `.poster-tab--fold` (a small switch in a row, "Recent / Mine", and every button that shows or hides a panel and stays pressed while it is shown), `.poster-tab--tile` (a choice among named looks, the background pattern), `--filter` (what a list shows: small typewriter words in a grey frame), `--attention` (a filter whose items need the person); `:disabled` is dimmed; a Count inside a chosen tab takes the chosen tab's own words' colour (dark on the sun in AIMEAT; light on the accent in a style such as Pebble that chooses on the accent) (Jouni's decisions "Tabs and filters", "Choice") |
 | Loud action and the home's large door | `.poster-slab`, `.poster-slab--large`; the one big button of a place, and only the next move in the first steps (Jouni's decision "Loud action") |
 | Icon button | `.poster-icon` (44px, the composer), `.poster-icon--small` (28px, everywhere else): a square in a 2px ink frame, the sun under the pointer; a card's menu keeps its state fill; `.is-on` (ink ground) for a button that stays pressed (Jouni's decision "Icon button") |
 | Menu row | `.poster-menu-row`: one choice in an opened menu, plain words on a quiet ground, a thin line between rows; the menu around it is a column; `--danger` keeps a delete coral (Jouni's decision "Menu row") |
 | Box; frame; opened record | `.poster-box` with the tones `--copy` (a text to copy, on grey: the prompt card), `--row` (one result in a list) and `--raised` (the one thing that stands out: an opened row's panel, the way to take first; heavy frame and the raised shadow) (Jouni's decisions "Object box", "Box"); `.poster-frame`; `.poster-record` (the dialog is the site's own Modal; `.poster-dialog` was deleted on 2026-09-23) |
 | Dashed coral aside | `.poster-aside` with the tones `--waiting` (the next move is elsewhere) and `--suggestion` (a line to wave away) (Jouni's decision "Attention note") |
-| Tag; a row of tags; crumb | `.poster-chip` with the tones `--sun` ("you", "public"), `--coral` (a guest, "anyone", a broken rule), `--ink`; `.poster-chips` for a row; `.poster-chip-x`, the ✗ that takes a tag or a member off, grey and coral under the pointer (Jouni's decisions "Tag", "Remove mark"); `.poster-crumb` |
+| Tag; a row of tags; crumb | `.poster-chip` with the tones `--sun` ("you", "public"), `--coral` (a guest, "anyone", a broken rule), `--ink`, `--dim` (a tag that counts nothing yet: "0 workspaces"), `--fine` (green: a role that is granted, in css/components/mark.css); `.poster-chips` for a row; `.poster-chip-x`, the ✗ that takes a tag or a member off, grey and coral under the pointer (Jouni's decisions "Tag", "Remove mark"); `.poster-crumb` |
 | Word that says a state | `.poster-status` with `--fine` (green), `--attention` (sun), `--danger` (coral), `--off` (grey) (Jouni's decision "Status") |
 | Small number: waiting (on coral), tally (no ground), small (on an icon) | `.poster-count`, `--waiting`, `--tally`, `--small` (Jouni's decision "Count"; the bell and the open items use it; the morsel badge stays its own) |
 | When a thing happened | `.poster-time` (Jouni's decision "Timestamp"; the chat's message time and the home timeline) |
