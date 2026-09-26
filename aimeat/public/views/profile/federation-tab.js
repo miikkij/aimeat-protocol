@@ -70,7 +70,7 @@ export default function FederationTab() {
       desc=${t('profile.federation.desc')}>
     ${!federation ? html`<${LoadingLine} text=${t('profile.federation.loading')} />`
       : federation.length === 0 ? html`<${Note} kind="quiet">${t('profile.federation.empty')}<//>`
-      : html`<${PageSection} title=${t('profile.federation.peers')}>
+      : html`<${PageSection} band title=${t('profile.federation.peers')}>
           <${List} cols="name-desc-doors">
           ${federation.map(p => {
             const alive = p.status === 'active' || p.alive;

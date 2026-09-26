@@ -149,7 +149,7 @@ export function DocumentView({ page, busy, onEdit, onPublish, onWikiLink, onPopO
 
   const tools = html`
     ${hasBoth ? html`
-      <${Tabs} kind="view" value=${tab} onSelect=${setTab} items=${[
+      <${Tabs} tone="filter" kind="view" value=${tab} onSelect=${setTab} items=${[
         { value: 'draft', label: t('organisms.draftVersion') || 'Draft' },
         { value: 'published', label: t('organisms.publishedVersion') || 'Published' },
       ]} />` : null}

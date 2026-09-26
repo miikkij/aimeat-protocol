@@ -9,6 +9,7 @@
  *   it, its state colours, and the meter's size. Reads only theme tokens.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.4.0 — 2026-09-27 — The result (.figure-result and its parts), main's P&L result look.
  *   v1.3.0 — 2026-09-26 — Tinted's whole cut (.tinted--whole), from main's .ac-shost-h (additive, page group G3).
  *   v1.2.0 — 2026-09-26 — The quota meter's early warn step (.is-warn, --warn from 60 %), from main's
  *     .pf-or-spend-bar-fill.warn (additive, page group G4).
@@ -35,6 +36,15 @@
 
 /* ── The figure in a cell ─────────────────────────────────────────────────────────────────── */
 .figure { margin-right: 0; }
+/* The result (Figure.js Result): centred in its box, the words over the sum in small grey capitals,
+   the sum large and bold, a grey line under it (main's .pf-pnl-result, its values; the card around
+   it is the page's Card). */
+.figure-result { text-align: center; }
+.figure-result-label { font-size: .85rem; color: var(--text-dim); text-transform: var(--shape-case-label); letter-spacing: .05em; }
+.figure-result-value { margin: 4px 0; font-size: 2rem; font-weight: 700; color: var(--text); }
+.figure-result--fine .figure-result-value { color: var(--success-fg); }
+.figure-result--danger .figure-result-value { color: var(--danger-fg); }
+.figure-result-sub { font-size: .9rem; color: var(--text-dim); }
 .figure small { display: block; margin-top: .15rem; font-family: var(--font-mono); font-size: .66rem; font-weight: 400; color: var(--text-dim); }
 .figure--end { display: block; text-align: right; white-space: nowrap; }
 .figure--fine { color: var(--success-fg); }

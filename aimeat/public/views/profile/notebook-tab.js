@@ -299,7 +299,7 @@ export default function NotebookTab({ session, showToast, onStats }) {
       <//>
     <//>
 
-    <${Section} title=${t('profile.notebook.librarianTitle')}>
+    <${Section} band title=${t('profile.notebook.librarianTitle')}>
       <${Note} kind="lead">${t('profile.notebook.librarianDesc')}<//>
       <${Tabs} bar kind="view" value=${searchScope} onSelect=${pickScope} items=${[
         { value: 'own', label: t('profile.notebook.scopeOwn') },
@@ -316,7 +316,7 @@ export default function NotebookTab({ session, showToast, onStats }) {
       `}
     <//>
 
-    <${Section} title=${t('profile.notebook.inboxTitle')}>
+    <${Section} band title=${t('profile.notebook.inboxTitle')}>
     ${inbox === null
       ? html`<${Note} kind="loading">${t('profile.notebook.inboxLoading')}<//>`
       : inbox.length === 0

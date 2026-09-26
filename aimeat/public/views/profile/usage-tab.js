@@ -189,9 +189,9 @@ export default function UsageTab() {
   // bar wraps (eight long labels do not fit one line on a phone); the two stand apart in one row.
   const controls = html`
     <${Line} wrap align="start" justify="between" gap="medium" below="large">
-      <${Tabs} label=${t('profile.usage.reportGroupLabel')} value=${report} onSelect=${setReport}
+      <${Tabs} tone="filter" label=${t('profile.usage.reportGroupLabel')} value=${report} onSelect=${setReport}
         items=${REPORTS.map(r => ({ value: r.id, label: t(r.label) }))} />
-      <${Tabs} label=${t('profile.usage.periodGroupLabel')} value=${period} onSelect=${setPeriod}
+      <${Tabs} tone="filter" label=${t('profile.usage.periodGroupLabel')} value=${period} onSelect=${setPeriod}
         items=${PERIODS.map(p => ({ value: p, label: t(`profile.usage.period${p}`) }))} />
     <//>`;
 

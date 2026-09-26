@@ -9,6 +9,7 @@
  * @usage html`<${PageSection} id="sec-files" num="02" title="Files" count=${12} doors=${html`<button class="og-door">Upload</button>`}>…<//>`
  *        html`<${PageSection} plain first=${!canEdit}>…<//>` (a section with no headline: the rule on top and the body)
  * @version-history
+ *   2026-09-27 — `band`: the headline's band spans the column (the classic pages' look on main).
  *   v1.1.0 — 2026-09-26 — `plain`: a section without a headline, only the rule on top (or none with
  *     `first`) and the body, as the organism settings draw a member's "Leave" box (page group G2a; additive).
  *   v1.0.0 — 2026-09-25 — Moved out of views/profile/organisms/poster-parts.js (Section) with its markup
@@ -22,14 +23,16 @@ const html = htm.bind(h);
 /**
  * `count` wins over `num` beside the title; `first` drops the rule on top.
  * @param {{ id?: string, num?: any, title: any, count?: any, doors?: any, first?: boolean, plain?: boolean,
- *   children?: any }} props
+ *   band?: boolean, children?: any }} props
  */
-export function PageSection({ id, num, title, count, doors, first, plain, children }) {
+export function PageSection({ id, num, title, count, doors, first, plain, band, children }) {
   // plain (added by page group G2a): no headline; page-section.css draws the rule on top of a section without one.
   if (plain) return html`<section class=${`og-sec ${first ? 'og-sec--first' : ''}`} id=${id}>${children}</section>`;
+  // band: the headline's dark band spans the whole column, as the classic pages drew it on main
+  // (P&L, Nodes, Organisms, Notebook, Living documents, Federation, Chat sessions).
   return html`
     <section class=${`og-sec ${first ? 'og-sec--first' : ''}`} id=${id}>
-      <div class="og-sec-h">
+      <div class=${band ? 'og-sec-h og-sec-h--band' : 'og-sec-h'}>
         <h2 class="poster-section-title">${title}${count !== null && count !== undefined ? html`<small>${count}</small>` : html`<small>${num}</small>`}</h2>
         ${doors ? html`<div class="og-doors">${doors}</div>` : null}
       </div>

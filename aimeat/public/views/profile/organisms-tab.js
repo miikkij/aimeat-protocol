@@ -642,7 +642,7 @@ export default function OrganismsTab({ session, showToast, onStats }) {
 
     ${/* My Organisms */ ''}
     <${FileDrop} hidden accept=".zip,application/zip" inputRef=${orgFileRef} onChange=${(e) => { const f = e.target.files && e.target.files[0]; e.target.value = ''; doImportOrg(f); }} />
-    <${Section} title=${t('organisms.myOrganisms') || 'My Organisms'} doors=${html`
+    <${Section} band title=${t('organisms.myOrganisms') || 'My Organisms'} doors=${html`
       ${myOrganisms.length > 1 ? html`
         <${Select} fit title=${t('organisms.sortTitle') || 'Sort'} ariaLabel=${t('organisms.sortTitle') || 'Sort'} value=${sortMode}
           onChange=${(m) => { setSortMode(m); savePrefs(customOrder, m); }} options=${[
@@ -678,7 +678,7 @@ export default function OrganismsTab({ session, showToast, onStats }) {
 
     ${/* Discover */ ''}
     ${publicOrganisms.length > 0 && html`
-      <${Section} title=${t('organisms.discover') || 'Discover'}>
+      <${Section} band title=${t('organisms.discover') || 'Discover'}>
         <${List} cols=${ORG_COLS} keepCols>${publicOrganisms.map(org => renderOrgRow(org, false))}<//>
       <//>
     `}

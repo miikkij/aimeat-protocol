@@ -25,11 +25,14 @@
  *     tone = 'fine' | 'notice' | 'warn' | 'danger' | 'dim' | 'faint' (a word that says nothing is
  *     there, in the rule's grey: "never"); `strong` sets them in bold; `whole` keeps them on one line,
  *     never broken inside (one label of a host name, which broken at its hyphen reads as two).
- * @structure Figure(props) · Sticker({ figure, children }) · Meter(props) · Tinted({ tone, strong, whole, children })
+ * @structure Figure(props) · Result({ label, n, sub, tone }) · Sticker({ figure, children }) · Meter(props) ·
+ *   Tinted({ tone, strong, whole, children })
  * @usage html`<${Figure} small end tone="fine" n=${signed(amount)} sub=${x('unitMany')} />`
  *        html`<${Meter} quota pct=${pct} figure=${`${money(spent)} / ${money(budget)} · ${pct} %`} />`
  *        html`<${Tinted} strong tone="notice">${x('visWebOff')}<//>`
  * @version-history
+ *   v1.4.0 — 2026-09-27 — Result: one figure centred, its words over it and a line under it (the P&L's
+ *     result before taxes, as main drew it).
  *   v1.3.0 — 2026-09-26 — Tinted's `whole` option: words kept on one line (the Access page's secret
  *     host labels, main's .ac-shost-h); additive, page group G3.
  *   v1.2.0 — 2026-09-26 — Meter's `early` option: a quota meter that warns from 60 % (main's .warn step
@@ -49,6 +52,20 @@ const cx = (...parts) => parts.filter(Boolean).join(' ');
 const has = (x) => x !== undefined && x !== null && x !== false;
 const FIGURE_TONES = new Set(['fine', 'notice', 'dim']);
 const TINTS = new Set(['fine', 'notice', 'warn', 'danger', 'dim', 'faint']);
+
+/**
+ * A result: one figure centred in its box, its words over it and a line under it (the P&L's result
+ * before taxes on main: "RESULT BEFORE TAXES", the sum, the VAT line). `tone` fine or danger colours
+ * the sum.
+ * @param {{ label?: any, n: any, sub?: any, tone?: string }} props
+ */
+export function Result({ label, n, sub, tone }) {
+  return html`<div class=${cx('figure-result', (tone === 'fine' || tone === 'danger') && `figure-result--${tone}`)}>
+    ${has(label) ? html`<div class="figure-result-label">${label}</div>` : null}
+    <div class="figure-result-value">${n}</div>
+    ${has(sub) ? html`<div class="figure-result-sub">${sub}</div>` : null}
+  </div>`;
+}
 
 export function Figure({ n, sub, small, large, step, band, tone, end, title }) {
   const cls = cx('poster-stat-number', small && 'poster-stat-number--small', large && 'poster-stat-number--large',

@@ -157,7 +157,7 @@ export default function ChatSessionsTab({ session, showToast, onStats }) {
     ${chatSessions.length === 0
       ? html`<${Note} kind="quiet">${t('profile.chatSessions.empty')}<//>`
       : html`
-        <${PageSection} title=${t('profile.chatSessions.startedByYou')}>
+        <${PageSection} band title=${t('profile.chatSessions.startedByYou')}>
         <${Note} kind="lead">${t('profile.chatSessions.startedByYouDesc')}<//>
         <${List} cols="name-desc-doors">
         ${chatSessions.map(s => {
