@@ -28,6 +28,11 @@
  *   v1.9.0 — 2026-09-25 — The per-run cost cap is maxCostUsd: a run stops before its next ai step once
  *     its own ai steps have spent the cap, and says so (the cost comes from a stub provider on a free
  *     port). costCapMorsels still saves and the answer says it did nothing, on REST and MCP.
+ *   v1.10.0 — 2026-09-25 — A run the trigger starts answers to whoever saved the workflow: an agent
+ *     that lost a word is refused, one record and one notification with "Run as me" and "Approve
+ *     again"; the owner's own save is unaffected.
+ *   v1.11.0 — 2026-09-25 — An agent step costs work:request for a workflow saved from 2026-09-25 on,
+ *     at save, at a run and at the trigger; one saved before keeps running without it.
  */
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -935,7 +940,9 @@ async function run() {
       return { Authorization: `Bearer ${token}` };
     };
     const narrow = await mint('wf-narrow', ['memory:read']);
-    const scoped = await mint('wf-scoped', ['workflow:read', 'workflow:write', 'memory:read']);
+    // work:request beside the workflow words: WORKFLOW's steps give an agent work, which a save asks
+    // for since 2026-09-25. The setup changed with the rule; the words under test did not.
+    const scoped = await mint('wf-scoped', ['workflow:read', 'workflow:write', 'memory:read', 'work:request']);
 
     // WRITE: refused for the narrow agent, and nothing is written.
     const denied = await json('/v1/workflows/agent-denied-wf', {
@@ -1437,6 +1444,74 @@ async function run() {
 
     await json(`/v1/workflows/agent-trig/runs/${tap.body.data.runId}/cancel`, { method: 'POST', headers: auth, body: '{}' });
     await json('/v1/workflows/agent-trig?withRuns=true', { method: 'DELETE', headers: auth });
+  });
+
+  // ── an agent step costs work:request, for a workflow saved from 2026-09-25 on (2026-09-25) ──
+  // Giving one of the owner's agents work is what work:request names. A new save or update asks it
+  // of the saver, and a run asks it of the starter; each workflow keeps the rules it was saved under
+  // (`authority`), so one saved before keeps running without it, by hand and by its trigger.
+  const cancelOpen = async (id: string) => {
+    const runs = await json(`/v1/workflows/${id}/runs`, { headers: auth });
+    for (const r of runs.body.data?.runs ?? []) {
+      if (r.status === 'running' || r.status === 'waiting-step') await json(`/v1/workflows/${id}/runs/${r.runId}/cancel`, { method: 'POST', headers: auth, body: '{}' });
+    }
+  };
+
+  await test('a new save with an agent step asks the saver for work:request, and a workflow saved before still runs without it', async () => {
+    const noWord = await mintAgent('wf-giver-no', ['workflow:read', 'workflow:write', 'memory:read']);
+    const refused = await json('/v1/workflows/give-new', { method: 'PUT', headers: noWord.headers, body: JSON.stringify(WORKFLOW) });
+    assert(refused.status === 403 && refused.body.error?.code === 'SCOPE_DENIED' && /work:request/.test(refused.body.error?.message ?? ''),
+      `an agent step saved without work:request: ${refused.status} ${JSON.stringify(refused.body.error)}`);
+    assert((await json('/v1/workflows/give-new', { headers: auth })).status === 404, 'the refused save wrote nothing');
+
+    const withWord = await mintAgent('wf-giver', ['workflow:read', 'workflow:write', 'memory:read', 'work:request']);
+    const saved = await json('/v1/workflows/give-new', { method: 'PUT', headers: withWord.headers, body: JSON.stringify(WORKFLOW) });
+    assert(saved.status === 200 && saved.body.data.authority === 2,
+      `with work:request it saves, under the new rules: ${saved.status} ${JSON.stringify(saved.body.data?.authority ?? saved.body.error)}`);
+    const newRun = await json('/v1/workflows/give-new/run', { method: 'POST', headers: noWord.headers, body: JSON.stringify({ mode: 'full', target: 'sandbox' }) });
+    assert(newRun.status === 403 && /work:request/.test(newRun.body.error?.message ?? ''), `starting it without work:request: ${newRun.status}`);
+
+    // The same steps as a workflow saved before this change records them: no authority, no savedBy.
+    const old = { ...saved.body.data, id: 'give-old', createdBy: noWord.gaii };
+    delete old.authority;
+    delete old.savedBy;
+    const plant = await json('/v1/memory', { method: 'POST', headers: auth, body: JSON.stringify({ key: 'workflows.def.give-old', value: old, visibility: 'private' }) });
+    assert(plant.body?.ok === true, `record the older workflow: ${plant.status} ${JSON.stringify(plant.body.error)}`);
+    const oldRun = await json('/v1/workflows/give-old/run', { method: 'POST', headers: noWord.headers, body: JSON.stringify({ mode: 'full', target: 'sandbox' }) });
+    assert(oldRun.status === 200 && oldRun.body.data?.skipped !== true,
+      `a workflow saved before keeps running without work:request: ${oldRun.status} ${JSON.stringify(oldRun.body.error ?? oldRun.body.data)}`);
+
+    for (const id of ['give-new', 'give-old']) { await cancelOpen(id); await json(`/v1/workflows/${id}?withRuns=true`, { method: 'DELETE', headers: auth }); }
+  });
+
+  await test('a trigger asks the agent that saved a workflow for work:request only when it was saved under the new rules', async () => {
+    const giver = await mintAgent('wf-trig-giver', ['workflow:read', 'workflow:write', 'memory:read', 'work:request']);
+    const wf = { ...WORKFLOW, title: { en_US: 'Give on a write' }, trigger: { kind: 'event', on: 'memory.write', match: { key: 'wfgive.fire.*' } }, steps: [WORKFLOW.steps[0]] };
+    const put = await json('/v1/workflows/give-trig', { method: 'PUT', headers: giver.headers, body: JSON.stringify(wf) });
+    assert(put.status === 200, `the agent saves it: ${put.status} ${JSON.stringify(put.body.error)}`);
+    const narrowed = await json('/v1/agents/wf-trig-giver/scopes', { method: 'PATCH', headers: auth, body: JSON.stringify({ scopes: ['workflow:read', 'workflow:write', 'memory:read'] }) });
+    assert(narrowed.status === 200, `the owner takes work:request away: ${narrowed.status}`);
+
+    await writeMem('wfgive.fire.1', 'go');
+    await sleep(800);
+    let runs = await json('/v1/workflows/give-trig/runs', { headers: auth });
+    assert(runs.body.data.runs?.[0]?.status === 'refused' && /work:request/.test(runs.body.data.runs[0].reason ?? ''),
+      `saved under the new rules, its trigger asks for work:request: ${JSON.stringify(runs.body.data.runs?.map((r: any) => [r.status, r.reason]))}`);
+
+    // The same workflow as a save before this change recorded it: its first author, and no authority.
+    const def = (await json('/v1/workflows/give-trig', { headers: auth })).body.data;
+    delete def.authority;
+    delete def.savedBy;
+    const plant = await json('/v1/memory', { method: 'POST', headers: auth, body: JSON.stringify({ key: 'workflows.def.give-trig', value: def, visibility: 'private' }) });
+    assert(plant.body?.ok === true, `record it as the older save: ${plant.status} ${JSON.stringify(plant.body.error)}`);
+    await writeMem('wfgive.fire.2', 'go');
+    await sleep(800);
+    runs = await json('/v1/workflows/give-trig/runs', { headers: auth });
+    const started = (runs.body.data.runs ?? []).find((r: any) => r.status !== 'refused');
+    assert(started?.status === 'waiting-step', `saved before, its trigger's run starts: ${JSON.stringify(runs.body.data.runs?.map((r: any) => r.status))}`);
+
+    await cancelOpen('give-trig');
+    await json('/v1/workflows/give-trig?withRuns=true', { method: 'DELETE', headers: auth });
   });
 
   console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total`);

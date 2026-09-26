@@ -8,12 +8,15 @@
  *   model, a workflow that reads the owner's records costs memory:read, and a wildcard covers what it
  *   covers at every other door.
  * @version-history
+ *   v1.2.0 — 2026-09-25 — An agent step costs work:request for a workflow saved from 2026-09-25 on,
+ *     and nothing for one saved before. The old line asserting that it cost nothing was the rule
+ *     this change replaces.
  *   v1.1.0 — 2026-09-24 — A workflow that reads the owner's records costs memory:read.
  *   v1.0.0 — 2026-09-24 — Initial.
  */
 import { describe, it, expect } from 'vitest';
 import {
-    missingStepScopes, stepScopeRefusal, ownerInPerson, STEP_KIND_SCOPES,
+    missingStepScopes, stepScopeRefusal, ownerInPerson, STEP_KIND_SCOPES, WORKFLOW_AUTHORITY_VERSION,
 } from '../../src/services/workflow/step-authority.js';
 
 const def = (kinds: Array<string | undefined>, llmApproved = false) => ({
@@ -30,8 +33,10 @@ describe('the words a step costs', () => {
         expect([...STEP_KIND_SCOPES.datapackage].sort()).toEqual(['memory:read', 'memory:write', 'storage:write']);
         expect([...STEP_KIND_SCOPES['export-out']].sort()).toEqual(['memory:read', 'work:request']);
         expect(STEP_KIND_SCOPES['trigger-geai']).toEqual(['work:request']);
-        // An agent step works on the dispatched agent's own grant; a human-input step asks the owner.
-        expect(STEP_KIND_SCOPES.agent).toEqual([]);
+        // An agent step gives one of the owner's agents work, which is work:request (2026-09-25; it
+        // cost nothing before, and a workflow saved before then keeps that, see below). A
+        // human-input step asks the owner.
+        expect(STEP_KIND_SCOPES.agent).toEqual(['work:request']);
         expect(STEP_KIND_SCOPES['human-input']).toEqual([]);
     });
 
@@ -96,6 +101,26 @@ describe('a workflow that reads the owner\'s records costs memory:read', () => {
         const r = stepScopeRefusal(missingStepScopes(step({ action: { kind: 'human-input' }, success_signal: leaf }), agent([]), 'save'));
         expect(r.needed).toEqual(['memory:read']);
         expect(r.message).toContain('step "x" reads the owner\'s records');
+    });
+});
+
+describe('an agent step\'s word follows the rules the workflow was saved under', () => {
+    const agentStep = (authority?: number) => ({
+        steps: [{ id: 'give', agent: 'bot', offer: 'o', required_to_function: 'none', success_signal: undefined }] as never,
+        ...(authority !== undefined ? { authority } : {}),
+    });
+
+    it('a workflow saved from 2026-09-25 on asks work:request, and says it is an agent step', () => {
+        expect(WORKFLOW_AUTHORITY_VERSION).toBe(2);
+        const missing = missingStepScopes(agentStep(2), agent(['memory:read']), 'save');
+        expect(words(missing)).toEqual(['work:request']);
+        expect(stepScopeRefusal(missing).message).toContain('step "give" is an agent step');
+        expect(missingStepScopes(agentStep(2), agent(['memory:read', 'work:request']), 'full')).toEqual([]);
+    });
+
+    it('a workflow saved before keeps running as it was saved: its agent step asks nothing more', () => {
+        expect(missingStepScopes(agentStep(1), agent(['memory:read']), 'full')).toEqual([]);
+        expect(missingStepScopes(agentStep(), agent(['memory:read']), 'full')).toEqual([]);
     });
 });
 

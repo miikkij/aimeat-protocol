@@ -51,13 +51,15 @@
  *     save that sets costCapMorsels with a warning naming maxCostUsd; that field is not kept.
  *   v1.14.0 — 2026-09-25 — saveWorkflow records savedBy, the principal whose save is in force, taken
  *     from the session. A run the trigger starts answers to it (trigger-authority.ts).
+ *   v1.15.0 — 2026-09-25 — A save is checked under WORKFLOW_AUTHORITY_VERSION, which asks work:request
+ *     for an agent step, and keeps that version on the definition as `authority`.
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { buildGAII, parseGEAI } from '../../utils/gaii.js';
 import { isReservedServerKey, RESERVED_OWNER_KEY_PREFIXES, SERVER_WRITTEN_KEYS, SERVER_WRITTEN_KEY_PREFIXES } from '../../utils/reserved-keys.js';
 import { template } from './engine-util.js';
-import { missingStepScopes, stepScopeRefusal, saverFromCaller, type WorkflowCaller } from './step-authority.js';
+import { missingStepScopes, stepScopeRefusal, saverFromCaller, WORKFLOW_AUTHORITY_VERSION, type WorkflowCaller } from './step-authority.js';
 import { shownRun } from './run-redaction.js';
 import {
   WorkflowDefInputSchema, WORKFLOW_ID_RE,
@@ -495,9 +497,10 @@ export async function saveWorkflow(
   const input = parsed.data;
 
   // Each step costs the word its own door costs, and the saver answers for it before anything is
-  // read or written (step-authority.ts). The owner in person passes.
+  // read or written (step-authority.ts). The owner in person passes. A save is held to the current
+  // rules, an update of an older workflow included, and the definition keeps them as `authority`.
   if (caller) {
-    const missing = missingStepScopes(input, caller, 'save');
+    const missing = missingStepScopes({ ...input, authority: WORKFLOW_AUTHORITY_VERSION }, caller, 'save');
     if (missing.length > 0) {
       const refusal = stepScopeRefusal(missing);
       return { ok: false, errors: [refusal.message], denied: { needed: refusal.needed, message: refusal.message } };
@@ -532,6 +535,8 @@ export async function saveWorkflow(
     parallel: input.parallel ?? false,
     llm: input.llm,
     maxCostUsd: input.maxCostUsd ?? null,
+    // The rules this save was checked under; a run and the trigger ask the same (step-authority.ts).
+    authority: WORKFLOW_AUTHORITY_VERSION,
     // The principal this save puts in force, which a run the trigger starts answers to
     // (trigger-authority.ts). From the session, never from the body.
     ...(caller ? { savedBy: saverFromCaller(caller, ownerGhii) } : {}),

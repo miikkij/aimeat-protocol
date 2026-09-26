@@ -11,6 +11,8 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   v1.16.4 -- 2026-09-25 -- set-up-content-pipeline: a step that dispatches to an agent costs
+ *            work:request of whoever saves the workflow.
  *   v1.16.3 -- 2026-09-25 -- diagnose-a-workflow reads a refused trigger start; set-up-content-pipeline
  *            says the schedule runs on the saver's permissions.
  *   v1.16.2 -- 2026-09-25 -- diagnose-a-workflow reads a run the node stopped at its spending limit
@@ -522,7 +524,8 @@ A pipeline = a WORKFLOW definition (chained steps dispatched to agents) + a TRIG
   so on the run.
 - The schedule runs on the saver's permissions. The agent that saves the workflow must keep every
   permission its steps need; if the owner later takes one away, the scheduled run is refused and
-  the owner is asked, once.
+  the owner is asked, once. Chaining agents is giving them work, so a step that dispatches to an
+  agent costs \`work:request\`: ask the owner for it before saving, or the save answers SCOPE_DENIED.
 `,
   },
   {

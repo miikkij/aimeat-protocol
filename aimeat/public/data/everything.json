@@ -1230,10 +1230,10 @@
      "slug": "g-8-workflow-trigger-permission-check",
      "cells": [
       "<strong>Workflow trigger permission check</strong>",
-      "A run its own trigger starts acts on the permissions of whoever saved the workflow. If that agent or app is disconnected, or no longer holds a permission the steps need, the run does not start: the run list shows the refusal and why, and you get one notification with two choices, run it once as yourself or approve the permission again. Workflows you saved yourself are not affected.",
+      "A run its own trigger starts acts on the permissions of whoever saved the workflow. If that agent or app is disconnected, or no longer holds a permission the steps need, the run does not start: the run list shows the refusal and why, and you get one notification with two choices, run it once as yourself or approve the permission again. Workflows you saved yourself are not affected. A step that gives one of your agents work needs the saver to hold permission to give agents work; workflows saved before 2026-09-25 keep running as they were saved.",
       "<code>/v1/workflows/:id/runs</code>, <code>/v1/workflows/:id/runs/:runId/run-as-owner</code>, <code>aimeat_workflow_get</code>"
      ],
-     "plain": "Workflow trigger permission check A run its own trigger starts acts on the permissions of whoever saved the workflow. If that agent or app is disconnected, or no longer holds a permission the steps need, the run does not start: the run list shows the refusal and why, and you get one notification with two choices, run it once as yourself or approve the permission again. Workflows you saved yourself are not affected. /v1/workflows/:id/runs, /v1/workflows/:id/runs/:runId/run-as-owner, aimeat_workflow_get"
+     "plain": "Workflow trigger permission check A run its own trigger starts acts on the permissions of whoever saved the workflow. If that agent or app is disconnected, or no longer holds a permission the steps need, the run does not start: the run list shows the refusal and why, and you get one notification with two choices, run it once as yourself or approve the permission again. Workflows you saved yourself are not affected. A step that gives one of your agents work needs the saver to hold permission to give agents work; workflows saved before 2026-09-25 keep running as they were saved. /v1/workflows/:id/runs, /v1/workflows/:id/runs/:runId/run-as-owner, aimeat_workflow_get"
     },
     {
      "slug": "g-8-workflow-checks-and-preflight",
