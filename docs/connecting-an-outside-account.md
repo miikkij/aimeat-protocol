@@ -5,6 +5,7 @@
   deliberately cannot. Covers the read direction, the send direction, bring-your-own application,
   the Google alias path, and Microsoft's three differences.
 @version-history
+  2026-09-26 — The agents' button is the owner's one tap, POST /v1/agents/{name}/read-through.
   2026-09-26 — An unverified alias is refused naming only the alias asked for; the one-time notice
     names the owner's agents too, and an agent refused the read door is told the way.
   v1.0.0 — 2026-08-26 — Initial. The subsystem had shipped without a document, so the only way to
@@ -240,9 +241,11 @@ reads mail needs the owner to grant the new word, and there are two ways:
 An agent reads only the connections that are its own, and one that holds `connections:use` by name
 (not `*` or `connections:*`) reads its mailbox no more until its owner gives it the word. The same
 run tells each owner whose agents hold `connections:use` by name beside a mailbox of their own, in a
-notification of its own that names those agents, with a button per agent (three at most) that
-opens the agent's page, where the owner gives the word. An agent refused the read door is told the
-word, and that its owner gives it on the agent's page.
+notification of its own that names those agents, with a button per agent (three at most). The
+button is `POST /v1/agents/{name}/read-through`, the owner in person only: it adds that one word to
+that one agent, only to an agent that holds `connections:use`, and `DELETE` on the same address
+takes it away. An agent refused the read door is told the word, and that its owner gives it on the
+agent's page.
 
 A word the owner added by hand is recorded on the grant (`owner_added_scopes` in
 `GET /v1/app-grants`). A refresh and a silent sign-in bring a grant down to what the app declares,

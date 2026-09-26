@@ -11716,6 +11716,52 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /v1/agents/{name}/read-through:
+    post:
+      operationId: agentAllowReadThrough
+      summary: Let an agent that publishes through its accounts read them too
+      description: >-
+        Adds `connections:read-through` to this one agent's permissions and nothing else: the agent
+        may then read what is in its own connected accounts (its mail, the attachments, the addresses
+        it sends from). Until 2026-09-24 `connections:use` carried reading as well, so this is only for
+        an agent that holds `connections:use`; any other answers 409 NOT_ELIGIBLE, and its permissions
+        are changed on its page (PATCH /v1/agents/{name}/scopes). A server whose ceiling for agents
+        leaves the word out answers 400 INVALID_SCOPES. The agent's open sessions are told, as on a
+        scope change. Idempotent: an agent that can already read answers `added: false`. The owner in
+        person only: an app, an agent (unless the owner gave it `account:security`) and a session from
+        another node are refused with 403. The owner's one-time notice about their agents' mail calls
+        this door from a button per agent.
+      tags: [Identity]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { in: path, name: name, required: true, schema: { type: string }, description: Agent name (not full GAII) }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/AimeatError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/AimeatError' }
+    delete:
+      operationId: agentRemoveReadThrough
+      summary: Stop an agent reading what is in its accounts
+      description: >-
+        Takes `connections:read-through` out of this agent's permissions and leaves everything else; a
+        wider word (`*`, `connections:*`) is changed on its page. Idempotent: an agent without the word
+        answers `removed: false`. The owner in person only, as for POST.
+      tags: [Identity]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { in: path, name: name, required: true, schema: { type: string }, description: Agent name (not full GAII) }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/AimeatError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
   /v1/agents/{name}/cors:
     get:
       operationId: getAgentCors

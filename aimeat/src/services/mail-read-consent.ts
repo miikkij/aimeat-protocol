@@ -24,8 +24,9 @@
  *   AGENTS, IN A NOTICE OF THEIR OWN. An agent holding connections:use by name stopped reading its
  *   own mailbox the same day, and an agent reads only the connections that are its own. So the
  *   evidence is a mailbox this node can read under the agent's GAII, and the owner gets one notice
- *   naming those agents, with a button per agent that opens its page, where the owner gives the
- *   word. An agent holding "*" or "connections:*" reads on and is not named (secaudit 2026-09, A5-1).
+ *   naming those agents, with a button per agent that calls the owner's own door for it
+ *   (POST /v1/agents/:name/read-through). An agent holding "*" or "connections:*" reads on and is not
+ *   named (secaudit 2026-09, A5-1).
  *
  *   ONCE. A marker record under the node's own system identity (`system@<node>`, a reserved name no
  *   account can take), key MAIL_READ_CONSENT_KEY, says the run happened: the place every run-once boot
@@ -38,6 +39,9 @@
  *   migrateMailReadConsent
  * @usage migrateMailReadConsent(storage, config).catch(err => logger.error(…));   // once at boot
  * @version-history
+ *   v1.3.0 — 2026-09-26 — The agents' notice allows with one tap, as the apps' does: its button per
+ *     agent calls POST /v1/agents/:name/read-through, the owner's own door, instead of opening the
+ *     agent's page.
  *   v1.2.0 — 2026-09-26 — Agents too: an owner whose agents hold connections:use by name beside a
  *     mailbox of their own gets one notice naming them, with a button per agent that opens its page.
  *     The run reports `agents` beside `grants`, and `owners` counts the owners told anything
@@ -95,9 +99,9 @@ export function isEligibleAgent(agent: AgentRecord): boolean {
 
 /**
  * The notice for one owner about their agents: every agent named, and a button per agent, as many as
- * one notification carries, that opens that agent's page, where the owner gives the word. There is no
- * one-tap door here as there is for an app: an agent's permissions are the owner's own list, changed
- * on the agent's page.
+ * one notification carries, that calls the owner's own door for that agent
+ * (POST /v1/agents/:name/read-through), as the apps' notice does per app. An agent past the last
+ * button is named too, and the link opens the Agents page, where its permissions are.
  */
 export function agentMailReadNotice(agents: AgentRecord[]): NotifyInput {
   const names = agents.map(a => a.name).join(', ');
@@ -105,16 +109,18 @@ export function agentMailReadNotice(agents: AgentRecord[]): NotifyInput {
     type: MAIL_READ_AGENTS_TYPE,
     title: 'Your agents need their own permission to read mail',
     body: `These agents have a mailbox of their own connected here, and permission to publish and send through it: ${names}. `
-      + 'Until now that permission also let them read the mail in it. Reading has its own permission now: open the page of '
-      + 'each agent that should keep reading its mail, and allow it to read what is in its connected accounts.',
+      + 'Until now that permission also let them read the mail in it. Reading has its own permission now: allow it here, '
+      + 'or on the Agents page, for each agent that should keep reading its mail.',
     link: '/v1/profile#agents',
     i18n: { key: MAIL_READ_AGENTS_TYPE, vars: { agents: names } },
     actions: agents.slice(0, MAX_NOTIF_ACTIONS).map((a, i) => ({
-      id: `open_agent_${i + 1}`,
-      label: `Open ${a.name}`,
-      kind: 'navigate' as const,
-      link: `/v1/profile?tab=agents&agent=${encodeURIComponent(a.name)}`,
-      i18n: { key: `${MAIL_READ_AGENTS_TYPE}.open`, vars: { agent: a.name } },
+      id: `allow_agent_mail_read_${i + 1}`,
+      label: `Allow reading: ${a.name}`,
+      kind: 'api' as const,
+      method: 'POST' as const,
+      endpoint: `/v1/agents/${encodeURIComponent(a.name)}/read-through`,
+      style: 'primary' as const,
+      i18n: { key: `${MAIL_READ_AGENTS_TYPE}.allow`, vars: { agent: a.name } },
     })),
   };
 }
