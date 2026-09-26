@@ -5,6 +5,8 @@
  * @description The component bench: what a component may carry and what it may not. The good case
  *   is the part three measured builds each made by hand on 2026-09-20, a week grid a person ticks.
  * @version-history
+ *   v1.7.0 — 2026-09-26 — A stylesheet holding "</" is refused, in a comment or in a string, and the
+ *     preview and the snippet bench a stored one again; "<\/" inside a string passes.
  *   v1.6.0 — 2026-09-26 — The stylesheet is read by the CSS parser (e82c9f26d729): a string passes
  *     whatever it holds (url(, @import, !important, a colour, an escaped url(), and only a real var()
  *     reads the page's tokens; an escape spells the name it stands in, in any case (R\47 B( is rgb();
@@ -233,6 +235,20 @@ describe('the component bench', () => {
     expect(bad({ css: WEEK_GRID.css + '\n.wkgrid-x { background: \\55 RL(https://evil.example/x.png); }' })).toThrow(/no url\(\)/);
     // What follows a string is still read: the rule after it names the page and is refused.
     expect(bad({ css: WEEK_GRID.css + '\n.wkgrid-a::before { content: "a;b}{"; }\nbody { display: none; }' })).toThrow(/starts at one of its own classes/);
+  });
+
+  // The preview, and the page an app pastes the component into, put the stylesheet in a <style>
+  // element, which the first "</style" ends. No "</" is allowed anywhere, so the stylesheet reads the
+  // same wherever it lands.
+  it('carries no "</", so every page reads the stylesheet as the bench does', () => {
+    const commented = WEEK_GRID.css + '\n@media (width </* ) { } .wkgrid-x { background: url(https://evil.example/x.png) } @media ( */ 600px) { .wkgrid-y { color: var(--ak-ink); } }';
+    expect(bad({ css: commented })).toThrow(/carries no "<\/"/);
+    expect(componentPreviewHtml({ ...WEEK_GRID, css: commented } as unknown as ComponentBody)).not.toContain('evil.example');
+    const closing = WEEK_GRID.css + '\n.wkgrid-x::before { content: "</style><p>"; color: var(--ak-ink); }';
+    expect(bad({ css: closing })).toThrow(/carries no "<\/"/);
+    expect(() => componentSnippet({ ...WEEK_GRID, css: closing } as unknown as ComponentBody)).toThrow(/no longer passes/);
+    // Inside a string, "<\/" reads the same and passes.
+    expect(() => validateComponentBody({ ...WEEK_GRID, css: WEEK_GRID.css + '\n.wkgrid-x::before { content: "<\\/p>"; color: var(--ak-ink); }' })).not.toThrow();
   });
 
   // Served from the node's own origin, so a body stored before the bench learned a trick is not
