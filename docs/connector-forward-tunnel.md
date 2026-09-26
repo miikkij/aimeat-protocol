@@ -248,6 +248,21 @@ live. `stdio_params` / `http_params` remain for one-shot / CI use. See
   with a loopback Host for its port, no `Origin`, and the per-start secret from
   serve.json. The daemon holds the agent tokens, so local clients handle only
   that secret, never a node credential.
+- **One connector folder is one trust domain.** The folder (`AIMEAT_HOME`, else
+  `.aimeat` in the folder the command started in) holds the daemon's secret, the
+  agent tokens and the agent keys of every owner whose agents it serves. Every
+  program that can read it can act as every agent in it. Keep it readable by the
+  account that runs the daemon only, and when several people's agents share one
+  computer, give each person their own folder and daemon under their own
+  account. On Windows, a folder made below the drive root (for example
+  `C:\dev\project\.aimeat`) is readable by every account that can sign in,
+  because it inherits that from the drive. At start the daemon warns when other
+  accounts can read the secret, the tokens or the keys. On Windows it reads the
+  folder's access list; elsewhere it reads the modes of those files, because the
+  folder's own read bit lets other accounts list the names, not read the files.
+  The warning names those accounts and prints the command that makes the folder
+  private (`icacls` on Windows, `chmod` elsewhere). The daemon changes no
+  permission itself.
 - The forward bearer is the pinned JWT (no server-side expiry close — ~90-day
   agent JWTs overflow a single timer); the client reconnects with a fresh token
   before `token_expires_at`.

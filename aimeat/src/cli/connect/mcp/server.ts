@@ -31,10 +31,13 @@
  *     registers only that surface's tool allowlist (shared catalog/surfaces.ts); default 'all'.
  *   v2.2.0 -- 2026-06-10 -- Phase 4: `--http`/`--daemon` loopback daemon mode;
  *     extracted buildMcpServer() so the daemon creates one per local MCP session.
+ *   v2.3.0 -- 2026-09-26 -- The daemon warns once at start when other accounts on the computer can
+ *     read the connector home (../home-access.ts). It changes no permission (secaudit 2026-09, N7).
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { loadAllAgents } from '../config.js';
+import { loadAllAgents, getConfigDir } from '../config.js';
+import { checkConnectorHome } from '../home-access.js';
 import { buildRegistry, type AgentRegistry } from '../agent-registry.js';
 import { registerAllTools } from './tools/index.js';
 import { registerResources } from './resources.js';
@@ -100,6 +103,9 @@ export async function runServe(flags: Record<string, string>): Promise<void> {
     // The session's own registry, not the daemon's: it holds the one identity that session speaks
     // as, so every tool module's `registry.resolve()` has a single unambiguous answer.
     await runServeDaemon({ registry, buildMcp: (sessionRegistry) => buildMcpServer(role, sessionRegistry) });
+    // One connector home is one trust domain. Checked once, after the start; it only warns.
+    const homeWarning = checkConnectorHome(getConfigDir());
+    if (homeWarning) console.error(homeWarning.message);
     if (registry.list().some(isRunner)) {
       console.error('SECURITY: runner.command in per-agent config is exec\'d on task arrival. Trust your ~/.aimeat/ contents.');
     }
