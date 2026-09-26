@@ -71,9 +71,11 @@ Owner list operations include the owner's GHII data and the owned agents' data
 where that route permits aggregation. Use the route's existing shared aggregation
 helper and pagination. Do not copy a full-memory loop into a new list route.
 
-Keep federated owners, scoped agents and hosted-app grants distinct. Deriving a
-local GHII from a federated caller's bare owner name can expose a local namesake's
-data. `resolveIdentity()` preserves the home-node identity.
+Keep federated owners, scoped agents and hosted-app grants distinct. A visitor is
+named by its home GHII (`alice@their-node`); cutting that name at the '@' gives the
+local namesake `alice` and exposes her data. `resolveIdentity()` preserves the
+home-node identity, and `localAccountName()` / `localAccountOf()` in `utils/gaii.ts`
+are the only cuts of an identity to an account name (`pnpm check:identity-shortening`).
 
 For single-key operations, resolve the identity and apply the operation's ownership,
 scope and access checks. Identity resolution alone does not authorize a read or write.
