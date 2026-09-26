@@ -8,7 +8,8 @@
  *   What it proves:
  *     - a fresh app has no pages and ought to have terms and privacy; a priced app the whole set;
  *     - markdown is rendered on a page that names whose page it is, with the author's HTML
- *       escaped; an HTML page is served verbatim under the app's CSP; a URL redirects;
+ *       escaped; an HTML page is served verbatim; every page runs sandboxed like the app in its
+ *       frame; a URL redirects;
  *     - the page answers without the app's access code (pre-contract information);
  *     - the listing carries the state and not the content, to everyone; the owner's GET carries
  *       the documents, a stranger's does not;
@@ -21,6 +22,8 @@
  *
  *   Runs against a live server (E2E_BASE, default http://localhost:40251).
  * @version-history
+ *   v1.2.0 — 2026-09-26 — Every legal page runs sandboxed with the app frame's flags (A7-1). Failed
+ *     on the code before the fix: the CSP had no sandbox directive.
  *   v1.1.1 — 2026-09-26 — Under the default strict policy the reviewed page keeps its chip, and the
  *     chip names the reviewer instead of saying "AI-generated". Failed on the code before the fix.
  *   v1.1.0 — 2026-09-24 — An agent without provenance:write that declares how a legal page was
@@ -30,6 +33,7 @@
  */
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { APP_FRAME_SANDBOX } from '../src/utils/app-csp.js';
 ed.hashes.sha512 = (m: Uint8Array) =>
     new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -179,6 +183,23 @@ await test('Privacy as HTML: served verbatim under the app CSP', async () => {
     const p = await page('privacy');
     assert(p.status === 200 && p.text === PRIVACY_HTML, 'verbatim');
     assert(!!p.headers.get('content-security-policy'), 'CSP set');
+});
+
+// A7-1. The page is the owner's own document, served on the node's own address, and an HTML page
+// carries the owner's script. It runs in an opaque origin, the way the app itself does in its
+// frame: the same `sandbox` flags, never allow-same-origin, whatever format the page is in.
+await test('Every legal page runs sandboxed, with the app frame\'s flags and never the node\'s origin', async () => {
+    const want = [...APP_FRAME_SANDBOX].sort().join(' ');
+    for (const kind of ['terms', 'privacy']) {
+        const p = await page(kind);
+        assert(p.status === 200, `${kind}: status ${p.status}`);
+        const csp = p.headers.get('content-security-policy') ?? '';
+        const sandbox = csp.split(';').map(d => d.trim()).find(d => d === 'sandbox' || d.startsWith('sandbox '));
+        assert(!!sandbox, `${kind}: the CSP has no sandbox directive: ${csp}`);
+        const flags = sandbox!.split(/\s+/).slice(1);
+        assert(!flags.includes('allow-same-origin'), `${kind}: the page must not get the node's origin: ${sandbox}`);
+        assert([...flags].sort().join(' ') === want, `${kind}: the flags differ from the app frame's: ${sandbox}`);
+    }
 });
 
 await test('Support as a URL: redirects', async () => {

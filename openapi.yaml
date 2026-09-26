@@ -26453,7 +26453,8 @@ paths:
                     accessibility, cookies, support. A kind set to `{ format, content }` is
                     published or replaced; a kind set to null (or to `{ remove: true }`) is
                     removed; an absent kind is left alone. `format` is markdown (rendered by the node, every character escaped),
-                    html (served as written, under the app's own CSP) or url (an absolute https
+                    html (served as written: under the app's CSP on the app's own origin, and
+                    sandboxed like the app in its frame on the apex) or url (an absolute https
                     link; the page redirects there). Content is at most 200 kB. Each page is
                     served at /terms, /privacy, … on the app's origin and at
                     /v1/apps/{owner}/{filename}/legal/{kind} on the apex, linked from the app's
@@ -56359,9 +56360,11 @@ paths:
       operationId: getAppLegalPage
       summary: One of the app's own legal pages, as a page
       description: |
-        The page a reader gets: the owner's HTML verbatim under the app's CSP, a markdown page
-        rendered by the node (which says whose page it is and that the app, not the node, answers
-        for it), or a 302 to the URL the owner named. Served without the app's access code — a
+        The page a reader gets: the owner's HTML verbatim, a markdown page rendered by the node
+        (which says whose page it is and that the app, not the node, answers for it), or a 302 to
+        the URL the owner named. A page is served under the CSP the app's own bytes get in the
+        isolated frame, `sandbox` directive included, so it runs in an opaque origin and never as
+        the node's; its script runs, and it reads no cookie or stored data of the node. Served without the app's access code — a
         legal page is pre-contract information — and for a parked app; an operator-hidden app is
         404 to anyone but its owner. The same page is at /{kind} on the app's own origin.
       tags: [Apps]
