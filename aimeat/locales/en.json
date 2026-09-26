@@ -11770,6 +11770,8 @@
       "operatorSearchedEntries": "An operator's search showed parts of {count} of your entries.",
       "operatorDeletedEntry": "An operator deleted your entry {key}.",
       "operatorRestoredEntry": "An operator restored your entry {key}.",
+      "operatorAdminGrantedOne": "{name} got the permission to administer this installation because it had full access. You can take it away in the agent's settings.",
+      "operatorAdminGrantedMany": "{names} got the permission to administer this installation because they had full access. You can take it away in each agent's settings.",
       "appPublished": "You published {name}.",
       "appUpdated": "You updated {name}.",
       "recordPublished": "You published {name}.",

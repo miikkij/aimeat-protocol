@@ -11,6 +11,9 @@
  * @structure HomeFeed({ items }) · FeedRow({ item }) · line · when
  * @usage import { HomeFeed } from './feed.js';
  * @version-history
+ *   2026-09-25: operator_admin_granted, filed under access: which of the operator's full-access agents
+ *     the one-time migration gave the permission to administer the installation, one sentence for one
+ *     agent and one for several.
  *   2026-09-25: package_installed, a package somebody asked for and the owner approved, filed under
  *     made: one sentence for an install and one for an update, each naming who asked.
  *   2026-09-24: memory_accessed_by_operator, one sentence per action (opened, searched, deleted,
@@ -124,6 +127,10 @@ export function line(item) {
       if (d.action === 'delete') return tr('home.feed.operatorDeletedEntry', 'An operator deleted your entry {key}.').replace('{key}', d.key || '');
       if (d.action === 'restore') return tr('home.feed.operatorRestoredEntry', 'An operator restored your entry {key}.').replace('{key}', d.key || '');
       return tr('home.feed.operatorOpenedEntry', 'An operator opened your entry {key}.').replace('{key}', d.key || '');
+    case 'operator_admin_granted':
+      return d.count === '1'
+        ? tr('home.feed.operatorAdminGrantedOne', '{name} got the permission to administer this installation because it had full access. You can take it away in the agent\'s settings.').replace('{name}', d.names || '')
+        : tr('home.feed.operatorAdminGrantedMany', '{names} got the permission to administer this installation because they had full access. You can take it away in each agent\'s settings.').replace('{names}', d.names || '');
     case 'app_published':
       return tr('home.feed.appPublished', 'You published {name}.').replace('{name}', d.name || '');
     case 'app_updated':
@@ -236,7 +243,7 @@ export function kindCategory(kind) {
     'contract_started', 'contract_ended'].includes(k)) return 'money';
   if (['consent_granted', 'consent_revoked', 'app_granted', 'app_revoked', 'organism_joined',
     'organism_left', 'organism_member_joined', 'two_factor_armed', 'two_factor_removed',
-    'passkey_added', 'passkey_removed', 'memory_accessed_by_operator'].includes(k)) return 'access';
+    'passkey_added', 'passkey_removed', 'memory_accessed_by_operator', 'operator_admin_granted'].includes(k)) return 'access';
   return 'system';
 }
 
