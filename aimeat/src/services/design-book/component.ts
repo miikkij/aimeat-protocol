@@ -30,6 +30,9 @@
  * @structure COMPONENT_LIMITS · validateComponentBody(raw) · componentPreviewHtml(body) · componentSnippet(body)
  * @usage const body = validateComponentBody(raw);
  * @version-history
+ *   v1.5.1 — 2026-09-26 — A stylesheet carries no "</". A page reads it inside a <style> element, which
+ *     "</style" ends, so with none the text every page reads is the text the bench read. Inside a
+ *     string "<\/" reads the same and passes.
  *   v1.5.0 — 2026-09-26 — The stylesheet is benched as the CSS parser reads it (component-scan.ts
  *     readStylesheet, css-tree): @import, @font-face and @namespace, url(), image-set(), src(),
  *     image() and expression() are found among its tokens with every name's escapes resolved, and
@@ -197,6 +200,12 @@ const BINDINGS = new Set(['behavior', '-ms-behavior', '-moz-binding']);
 function checkStyles(css: string, prefix: string): void {
   // The parser's cost grows with how deep the stylesheet nests, so it reads no more than the ceiling.
   if (css.length > COMPONENT_LIMITS.css) refuse(`A component carries its stylesheet in \`css\`, up to ${COMPONENT_LIMITS.css} characters.`);
+  // A PAGE READS THE STYLESHEET INSIDE A <style> ELEMENT, the preview's and the one an app pastes it
+  // into, and the first "</style" ends that element. With no "</" at all, the text every page reads is
+  // the text the bench read.
+  if (css.includes('</')) {
+    refuse('A component\'s stylesheet carries no "</": the page it lands in reads "</style" as the end of the stylesheet. Inside a string, write "<\\/", which reads the same.');
+  }
   // READ BY THE CSS PARSER (component-scan.ts readStylesheet): the at-rules, functions and addresses
   // from its tokens, every name with its escapes resolved, since `u\72 l(` is url( to a browser; the
   // declarations and selectors from its parser. A string is one token: what it holds is text.

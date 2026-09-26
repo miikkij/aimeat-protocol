@@ -9,6 +9,8 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=designbook
  * @version-history
+ *   v1.5.6 — 2026-09-26 — A stylesheet holding "</" is refused at propose: a page reads it inside a
+ *     <style> element, which "</style" ends.
  *   v1.5.5 — 2026-09-26 — The stylesheet is read by the CSS parser (e82c9f26d729): a string naming url(
  *     passes, since a string is one token whatever it holds.
  *   v1.5.4 — 2026-09-26 — The markup is read by the HTML parser (1a0a15eb7b20): an address spelled with
@@ -486,6 +488,9 @@ const GOOD_BODY = {
             const hidden = await propose(`comp-bad-${stamp}`, body({ css }));
             assert(hidden.status === 422 && /starts at one of its own classes/.test(hidden.body.error?.message ?? ''), `a rule the page gets is refused: ${hidden.status} ${JSON.stringify(hidden.body?.error)}`);
         }
+        // A page reads the stylesheet inside a <style> element, which "</style" ends, so no "</" passes.
+        const closing = await propose(`comp-bad-${stamp}`, body({ css: '.wkgrid { color: var(--ak-ink); }\n.wkgrid-cell::after { content: "</style><p>"; }' }));
+        assert(closing.status === 422 && /carries no "<\/"/.test(closing.body.error?.message ?? ''), `a "</" in the stylesheet is refused: ${closing.status} ${JSON.stringify(closing.body?.error)}`);
 
         // The app exists and wrote down what it made, and its owner has NOT said it turned out well.
         const page = APP(f).replace('</head>', `<script type="application/json" id="aimeat-build-notes">${JSON.stringify({ made: [{ name: 'week-grid', what: 'seven tappable days per row', why: 'the Book has no grid a person ticks' }] })}</` + 'script></head>');
