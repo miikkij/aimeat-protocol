@@ -99,7 +99,7 @@ Components AIMEAT changed rather than copied verbatim: **world-atlas (Natural Ea
 
 ## Production dependencies
 
-The 462 npm packages that travel inside the `aimeat` package. Build and test
+The 464 npm packages that travel inside the `aimeat` package. Build and test
 tools are not listed: they do not ship, so they carry no obligation for you.
 
 | Package | Version | Licence |
@@ -274,6 +274,7 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [enabled](https://github.com/3rd-Eden/enabled#readme) | 2.0.0 | MIT |
 | [encodeurl](https://github.com/pillarjs/encodeurl#readme) | 2.0.0 | MIT |
 | [end-of-stream](https://github.com/mafintosh/end-of-stream) | 1.4.5 | MIT |
+| [entities](https://github.com/fb55/entities#readme) | 8.1.0 | BSD-2-Clause |
 | [env-paths](https://github.com/sindresorhus/env-paths#readme) | 4.0.0 | MIT |
 | [es-define-property](https://github.com/ljharb/es-define-property#readme) | 1.0.1 | MIT |
 | [es-errors](https://github.com/ljharb/es-errors#readme) | 1.3.0 | MIT |
@@ -417,6 +418,7 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [p-try](https://github.com/sindresorhus/p-try#readme) | 2.2.0 | MIT |
 | [pako](https://github.com/nodeca/pako) | 0.2.9 | MIT |
 | [pako](https://github.com/nodeca/pako) | 1.0.11 | (MIT AND Zlib) |
+| [parse5](https://parse5.js.org) | 8.0.1 | MIT |
 | [parseurl](https://github.com/pillarjs/parseurl#readme) | 1.3.3 | MIT |
 | [path-exists](https://github.com/sindresorhus/path-exists#readme) | 4.0.0 | MIT |
 | [path-key](https://github.com/sindresorhus/path-key#readme) | 3.1.1 | MIT |
@@ -5206,6 +5208,22 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
+### entities 8.1.0
+
+```text
+Copyright (c) Felix Böhm
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
+
+Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
+
+Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.
+
+THIS IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS,
+EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+```
+
 ### escape-html 1.0.3
 
 ```text
@@ -9206,6 +9224,30 @@ THE SOFTWARE.
 (The MIT License)
 
 Copyright (C) 2014-2017 by Vitaly Puzrin and Andrei Tuputcyn
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+```
+
+### parse5 8.0.1
+
+```text
+Copyright (c) 2013-2019 Ivan Nikulin (ifaaan@gmail.com, https://github.com/inikulin)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

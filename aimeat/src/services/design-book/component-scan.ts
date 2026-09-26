@@ -2,32 +2,34 @@
  * @file src/services/design-book/component-scan.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Reading a proposed component's markup and stylesheet ONE CHARACTER AT A TIME.
+ * @description Reading a proposed component's markup and stylesheet the way a browser reads them.
  *
- *   A component is text a stranger sends. The first version of its bench (component.ts) read that
- *   text with regular expressions whose parts could each give way to the next: a tag pattern that
- *   restarted at every `<`, a comment pattern that restarted at every `/*`, an `animation … infinite`
- *   pattern that restarted at every "animation". On text built to never close what it opens, each
- *   of those scans the rest of the input from every start, which is quadratic. CodeQL reported
- *   three of them the day the kind shipped (js/polynomial-redos, alerts 1646 to 1648).
+ *   THE MARKUP IS READ BY THE HTML PARSER ITSELF: parse5, the parsing algorithm of the WHATWG HTML
+ *   standard, which is what a browser runs (`readMarkup`). The checks get the elements it builds,
+ *   each attribute value DECODED as a browser decodes it, and the first thing that keeps the bench
+ *   from vouching for the markup: a parse error, a comment, or a "<" that starts no tag the parser
+ *   built. WHAT THE PARSER CANNOT READ CLEANLY IS REFUSED, because an allowlist is only as good as
+ *   the agreement on what the markup holds, and the parser's reading is the one a browser follows.
+ *   Its cost grows with how deep the markup nests, so the bench hands it no more than its ceiling
+ *   (COMPONENT_LIMITS in component.ts).
  *
- *   The answer is the one utils/html-blocks.ts gives for the publish checks: no pattern that can
- *   backtrack over the whole input. Every reader here walks the text once with an index, so its
- *   cost is the length of the text and nothing about its content changes that. The only regular
- *   expressions left are anchored at the start of a short slice this file has already cut.
- *
- *   UNCLOSED MEANS REFUSED, where a pattern used to mean "not matched". A `<` with no `>` is not
- *   skipped: `tagsOf` reports it, because skipping it is how markup gets past an allowlist.
- *
- *   WHAT THE READER CANNOT READ CLEANLY IS ODD, AND ODD IS REFUSED. Every place where a browser
- *   and this reader could part ways is marked, never stepped over: an "=" where a browser expects
- *   a name, a tag whose name does not follow its "<" at once, a closing tag carrying anything. And
- *   the stylesheet is read as a browser's tokenizer reads it (`cssAsRead`), escapes resolved, and
- *   each selector is read to its end (`complexSelectorOf`), since its end is what a rule styles.
- * @structure tagsOf · attributesOf · cssAsRead · declarationsOf · selectorsOf · selectorListOf ·
- *   complexSelectorOf · withoutVarFallbacks
- * @usage for (const tag of tagsOf(html)) { … }
+ *   THE STYLESHEET IS READ ONE CHARACTER AT A TIME. The first version of the bench read the text
+ *   with regular expressions whose parts could each give way to the next, and on text built to never
+ *   close what it opens each of those scanned the rest of the input from every start, which is
+ *   quadratic (CodeQL js/polynomial-redos, alerts 1646 to 1648). Every stylesheet reader here walks
+ *   the text once with an index, as utils/html-blocks.ts does for the publish checks. The stylesheet
+ *   is read as a browser's tokenizer reads it (`cssAsRead`), escapes resolved, and each selector is
+ *   read to its end (`complexSelectorOf`), since its end is what a rule styles. UNCLOSED MEANS
+ *   REFUSED, where a pattern used to mean "not matched".
+ * @structure readMarkup · cssAsRead · declarationsOf · selectorsOf · selectorListOf · complexSelectorOf ·
+ *   withoutVarFallbacks
+ * @usage const { elements, problem } = readMarkup(html);
  * @version-history
+ *   v1.4.0 — 2026-09-26 — The markup is read by the WHATWG HTML parser, parse5 (readMarkup, in place
+ *     of tagsOf and attributesOf), in the context the preview gives it, the inside of a <div>. The
+ *     checks read the elements it builds and every attribute value decoded as a browser decodes it,
+ *     character references of every spelling included, so a plain value may hold one. A parse error,
+ *     a comment, and a "<" that starts no tag the parser built are refused (1a0a15eb7b20).
  *   v1.3.0 — 2026-09-26 — What an escape stands for is never read as structure, nor what a string
  *     holds (e82c9f26d729). cssAsRead writes an escape that stands for anything but a name character
  *     as "_", and selectorsOf, declarationsOf, selectorListOf and closingOf step over strings with
@@ -49,110 +51,127 @@
  *     `url(` to a browser, and `content: "/*"` opens a string, not a comment.
  *   v1.0.0 — 2026-09-20 — Initial.
  */
+import { defaultTreeAdapter, html as HTML, parseFragment, type DefaultTreeAdapterTypes, type ParserError } from 'parse5';
 
-/**
- * One tag. `odd` is set when a browser would not read it as the tag this reader does: its name does
- * not follow the "<" or "</" at once (a browser reads that as text, or as a comment that ends at the
- * first ">"), or a closing tag carries anything after its name (a browser reads it as attributes).
- */
-export interface Tag { closing: boolean; name: string; attrs: string; odd: boolean }
+type ChildNode = DefaultTreeAdapterTypes.ChildNode;
+type Template = DefaultTreeAdapterTypes.Template;
 
-const LETTER = /[a-zA-Z]/;
-
-/** Every tag in the markup, in order. `unclosed` is set when a `<` never meets its `>`. */
-export function tagsOf(html: string): { tags: Tag[]; unclosed: boolean } {
-  const tags: Tag[] = [];
-  let at = html.indexOf('<');
-  while (at !== -1) {
-    // The tag ends at the first ">" OUTSIDE a quoted value, which is where a browser ends it.
-    // Ending at the first ">" of any kind reads `<div title="x>" onclick="…">` as the tag
-    // `div title="x` followed by text, and the handler the browser sees is never looked at.
-    let end = -1;
-    let quote = '';
-    for (let i = at + 1; i < html.length; i++) {
-      const ch = html[i];
-      if (quote) { if (ch === quote) quote = ''; }
-      else if (ch === '"' || ch === '\'') quote = ch;
-      else if (ch === '>') { end = i; break; }
-    }
-    if (end === -1) return { tags, unclosed: true };
-    // Nothing is trimmed off the front: a browser starts a tag only on a letter straight after
-    // "<" or "</". `< div` is text to it and `</ div` a comment that ends at the first ">", quoted
-    // or not, so whatever this reader would take for a quoted value there is markup to a browser.
-    let inner = html.slice(at + 1, end);
-    const closing = inner.startsWith('/');
-    if (closing) inner = inner.slice(1);
-    let odd = !LETTER.test(inner[0] ?? '');
-    let n = 0;
-    while (n < inner.length && /[\w:-]/.test(inner[n])) n++;
-    const attrs = inner.slice(n);
-    // A closing tag is its name and nothing else. A browser reads what follows the name as
-    // attributes, "=" and quotes included, and never shows them to anyone, so nothing there is
-    // needed and nothing there is checked: it is refused instead of skipped.
-    if (closing && attrs.trim()) odd = true;
-    tags.push({ closing, name: inner.slice(0, n).toLowerCase(), attrs, odd });
-    at = html.indexOf('<', end + 1);
-  }
-  return { tags, unclosed: false };
+/** One element as the HTML parser built it. */
+export interface MarkupElement {
+  /** The tag name, lower-cased as the allowlist spells it: an SVG `linearGradient` is `lineargradient`. */
+  name: string;
+  /**
+   * Each attribute with its qualified name lower-cased (`xlink:href` keeps its prefix), and its value
+   * DECODED, as a browser uses it: `u&#114;l(` comes out as `url(`, `A &ndash; B` as `A – B`.
+   */
+  attrs: Array<{ name: string; value: string }>;
 }
 
-/** What separates two attributes: HTML whitespace, and "/" (a browser starts the next attribute after it). */
-const SPACE = new Set([' ', '\t', '\n', '\r', '\f', '/']);
-/** What a browser skips around an "=": whitespace only. A "/" there is part of a name or a value. */
-const WHITESPACE = new Set([' ', '\t', '\n', '\r', '\f']);
+/** Why the markup cannot be vouched for, with what a message needs to say where. */
+export type MarkupProblem =
+  | { kind: 'comment' }
+  /** A tag that never meets its ">". */
+  | { kind: 'unclosed' }
+  /** An "=" where a browser expects an attribute's name. */
+  | { kind: 'equals'; element: string }
+  /** A closing tag carrying anything after its name; `rest` is what follows the name. */
+  | { kind: 'closing'; element: string; rest: string }
+  /** A "<" with no tag name straight after it, or after "</". */
+  | { kind: 'tag-start' }
+  /** A quote or an angle bracket in a name or a bare value, a missing value, a repeated name. */
+  | { kind: 'attribute'; element: string; attribute: string }
+  /** Any other place the parser reports the markup as not well formed, by its WHATWG error code. */
+  | { kind: 'unclean'; code: string; at: number }
+  /** A "<" the parser read as no tag: text inside <textarea> or <title>, or a tag HTML drops there. */
+  | { kind: 'stray'; at: number };
+
+/** The parse error codes that say where a tag ends, what starts one and what an attribute holds. */
+const UNCLOSED_CODES = new Set(['eof-in-tag', 'eof-before-tag-name']);
+const TAG_START_CODES = new Set([
+  'invalid-first-character-of-tag-name', 'unexpected-question-mark-instead-of-tag-name', 'missing-end-tag-name',
+  'incorrectly-opened-comment', 'cdata-in-html-content',
+]);
+const ATTRIBUTE_CODES = new Set([
+  'unexpected-character-in-attribute-name', 'unexpected-character-in-unquoted-attribute-value', 'missing-attribute-value',
+  'missing-whitespace-between-attributes', 'unexpected-solidus-in-tag', 'duplicate-attribute',
+]);
 
 /**
- * The attributes of one tag's text: name, and value with its quotes taken off (empty when bare).
- * `odd` marks an attribute a browser and this reader could disagree about: a quote or an angle
- * bracket in a name or in an unquoted value, a quoted value that never closes, an "=" where a
- * browser expects a name (it reads the "=" and what follows as the NAME, quotes and all, and ends
- * the tag at the first ">"), or a character reference in a value. The bench refuses those
- * outright, because an allowlist is only as good as the agreement on where a tag ends and on what
- * a value says. Nothing is dropped: an attribute with no name is returned with `key: ''`, odd, so
- * the one who reads the list sees it.
- *
- * A VALUE IS RETURNED AS WRITTEN, and a browser decodes its character references before anything
- * uses it: `u&#114;l(` is `url(` to a browser. So a value holding any reference is odd, except
- * `&amp;`, which decodes to a plain "&" that nothing decodes again.
+ * The context the markup is parsed in: the inside of a <div>, where the preview puts it. A fragment
+ * parsed with no context is parsed as the inside of a <template>, where a lone <td> is a cell; in a
+ * page it is dropped.
  */
-export function attributesOf(text: string): Array<{ key: string; value: string; odd: boolean }> {
-  const out: Array<{ key: string; value: string; odd: boolean }> = [];
-  const risky = (s: string) => s.includes('"') || s.includes('\'') || s.includes('`') || s.includes('<') || s.includes('>');
-  const decodes = (s: string) => s.replaceAll('&amp;', '').includes('&');
-  let i = 0;
-  const skip = (set: Set<string>) => { while (i < text.length && set.has(text[i])) i++; };
-  while (i < text.length) {
-    skip(SPACE);
-    if (i >= text.length) break;
-    const start = i;
-    while (i < text.length && !SPACE.has(text[i]) && text[i] !== '=') i++;
-    const key = text.slice(start, i).toLowerCase();
-    skip(WHITESPACE);
-    let value = '';
-    let odd = !key || risky(key);
-    if (text[i] === '=') {
-      i++;
-      skip(WHITESPACE);
-      const quote = text[i] === '"' || text[i] === '\'' ? text[i] : '';
-      if (quote) {
-        const close = text.indexOf(quote, i + 1);
-        if (close === -1) odd = true;
-        value = text.slice(i + 1, close === -1 ? text.length : close);
-        i = close === -1 ? text.length : close + 1;
-        if (value.includes('<') || value.includes('>') || decodes(value)) odd = true;
-      } else {
-        const from = i;
-        while (i < text.length && !WHITESPACE.has(text[i])) i++;
-        value = text.slice(from, i);
-        if (risky(value) || decodes(value)) odd = true;
-      }
-    }
-    // An empty name is always an "=" (the loop above stops only at one or at a separator, and
-    // separators were skipped), and the "=" branch always moves past it: no stray character is
-    // stepped over, and the loop always advances.
-    out.push({ key, value, odd });
+const CONTEXT = defaultTreeAdapter.createElement('div', HTML.NS.HTML, []);
+
+/** A start or end tag the parser read, by where it stands in the text. */
+interface TagSpan { start: number; end: number; name: string; closing: boolean; attrs: Record<string, { startOffset: number }> }
+
+/**
+ * The markup as the WHATWG HTML parser reads it (parse5, the parser the specification describes),
+ * with every element it built and the first thing that keeps the bench from vouching for it:
+ *   - a comment, which says nothing a component needs;
+ *   - a parse error, the parser's own word that a browser has to mend the markup its own way;
+ *   - a "<" that is the start of no tag the parser built. The parser drops some tags where they
+ *     stand (a <td> outside a row, an <html> inside a page, a <div> inside <select>) and reads
+ *     others as text (inside <textarea> or <title>). Such a "<" is a tag to a browser that reads the
+ *     text in another place, so every "<" has to be one of the tags the checks see.
+ * Elements come in document order, the contents of a <template> included. The walk is a loop, not
+ * a recursion, since a nesting depth is whatever the text says.
+ */
+export function readMarkup(html: string): { elements: MarkupElement[]; problem: MarkupProblem | null } {
+  const errors: ParserError[] = [];
+  const fragment = parseFragment(CONTEXT, html, { sourceCodeLocationInfo: true, onParseError: e => errors.push(e) });
+  const elements: MarkupElement[] = [];
+  const spans: TagSpan[] = [];
+  let comment = false;
+  const stack: ChildNode[] = [...fragment.childNodes].reverse();
+  while (stack.length) {
+    const node = stack.pop() as ChildNode;
+    if (node.nodeName === '#comment') comment = true;
+    if (!('tagName' in node)) continue;
+    const loc = node.sourceCodeLocation;
+    const attrLocs = loc?.attrs ?? {};
+    if (loc?.startTag) spans.push({ start: loc.startTag.startOffset, end: loc.startTag.endOffset, name: node.tagName, closing: false, attrs: attrLocs });
+    if (loc?.endTag) spans.push({ start: loc.endTag.startOffset, end: loc.endTag.endOffset, name: node.tagName, closing: true, attrs: {} });
+    elements.push({
+      name: node.tagName.toLowerCase(),
+      attrs: node.attrs.map(a => ({ name: (a.prefix ? `${a.prefix}:${a.name}` : a.name).toLowerCase(), value: a.value })),
+    });
+    const children = node.tagName === 'template' ? (node as Template).content.childNodes : node.childNodes;
+    for (let i = children.length - 1; i >= 0; i--) stack.push(children[i]);
   }
-  return out;
+  spans.sort((a, b) => a.start - b.start);
+  const spanAt = (at: number): TagSpan | undefined => spans.find(s => s.start <= at && at < s.end);
+
+  if (html.includes('<!--')) return { elements, problem: { kind: 'comment' } };
+  const first = errors.sort((a, b) => a.startOffset - b.startOffset)[0];
+  if (first) {
+    const span = spanAt(first.startOffset);
+    if (span?.closing) return { elements, problem: { kind: 'closing', element: span.name, rest: html.slice(span.start + 2 + span.name.length, span.end - 1) } };
+    if (first.code === 'unexpected-equals-sign-before-attribute-name') return { elements, problem: { kind: 'equals', element: span?.name ?? '' } };
+    if (UNCLOSED_CODES.has(first.code)) return { elements, problem: { kind: 'unclosed' } };
+    if (TAG_START_CODES.has(first.code)) return { elements, problem: { kind: 'tag-start' } };
+    if (ATTRIBUTE_CODES.has(first.code) && span) {
+      // The attribute the error sits in, or nearest before it: parse5 gives each one's place.
+      let attribute = '';
+      let from = -1;
+      for (const [attrName, where] of Object.entries(span.attrs)) {
+        if (where.startOffset <= first.startOffset && where.startOffset > from) { attribute = attrName; from = where.startOffset; }
+      }
+      return { elements, problem: { kind: 'attribute', element: span.name, attribute } };
+    }
+    return { elements, problem: { kind: 'unclean', code: first.code, at: first.startOffset } };
+  }
+  if (comment) return { elements, problem: { kind: 'tag-start' } };
+  // Every "<" stands inside a tag the parser built: at its start, or inside one of its quoted
+  // values, which the checks read on their own. The spans are sorted, so one sweep does it.
+  let s = 0;
+  let reach = -1;
+  for (let at = html.indexOf('<'); at !== -1; at = html.indexOf('<', at + 1)) {
+    while (s < spans.length && spans[s].start <= at) { reach = Math.max(reach, spans[s].end); s++; }
+    if (at >= reach) return { elements, problem: { kind: 'stray', at } };
+  }
+  return { elements, problem: null };
 }
 
 const HEX = /[0-9a-fA-F]/;
