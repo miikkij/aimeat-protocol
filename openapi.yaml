@@ -47295,6 +47295,11 @@ paths:
         and points at the person shape), 404 for a local identity that does not exist, 409 BLOCKED
         when the contact — or the account behind the address — is blocked. The block is checked
         before anything is written.
+
+        Saving a person by email says whether the address has an account here, so it counts as
+        an address lookup: one account has 20 in 10 minutes, shared with POST /v1/contacts/resolve
+        and by the owner and all their agents. Past that the answer is 429 RATE_LIMITED with
+        Retry-After, and nothing is written. A save by `contact_id` is not counted.
       tags: [Contacts]
       security:
         - BearerAuth: []
@@ -47346,6 +47351,7 @@ paths:
         '400': { $ref: '#/components/responses/BadRequest' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
+        '429': { $ref: '#/components/responses/RateLimited' }
 
   /v1/contacts/{contactId}:
     patch:
@@ -47590,8 +47596,8 @@ paths:
         The owner in person, or their agent holding `messages:read` (the permission the
         `aimeat_contact_resolve_email` tool declares, which asks this door); an app grant, an
         ecosystem app and a session from another node are refused. One account has 20 lookups
-        in 10 minutes, counted per owner: the owner and all their agents share them, and a
-        refusal answers 429 with Retry-After.
+        in 10 minutes, counted per owner: the owner and all their agents share them, a save by
+        email (POST /v1/contacts) counts as one, and a refusal answers 429 with Retry-After.
       tags: [Contacts]
       security:
         - BearerAuth: []

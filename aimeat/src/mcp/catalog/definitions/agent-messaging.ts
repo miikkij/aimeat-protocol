@@ -5,6 +5,8 @@
  * @description Handbook/onboarding, agent self-management (capabilities, activity, telemetry, tags, mode), owner-agent messaging, and federated direct-message (DM) tool definitions, plus aimeat_agents_list.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-09-25 — aimeat_contact_add and aimeat_contact_resolve_email say a save by email counts
+ *     against the same 20 lookups per account in 10 minutes.
  *   2026-09-25 — aimeat_contact_resolve_email answers an agent holding messages:read, and says one
  *     account has 20 lookups in 10 minutes, the owner and all their agents together.
  *   2026-09-24 — aimeat_contact_resolve_email says the lookup is the account holder's own and
@@ -445,7 +447,7 @@ export const agentMessagingTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_contact_add',
-        description: "Save someone to the owner's address book, in one of two ways. An IDENTITY on some node: pass contact_id (a bare local owner name, a GHII, a GAII or a GEAI); a local one that does not exist is refused. A PERSON who has no account here: pass name + email, plus anything else the owner knows (note, tags, links, relation) — that is how you record someone they follow, someone they mean to invite, or a plain email contact. If that address later belongs to a verified account here, the entry becomes that person automatically and nothing the owner wrote is lost. A blocked contact stays blocked (unblock via the Messages flow first).",
+        description: "Save someone to the owner's address book, in one of two ways. An IDENTITY on some node: pass contact_id (a bare local owner name, a GHII, a GAII or a GEAI); a local one that does not exist is refused. A PERSON who has no account here: pass name + email, plus anything else the owner knows (note, tags, links, relation) — that is how you record someone they follow, someone they mean to invite, or a plain email contact. If that address later belongs to a verified account here, the entry becomes that person automatically and nothing the owner wrote is lost. A blocked contact stays blocked (unblock via the Messages flow first). Saving a person by email counts as an address lookup: one account has 20 in 10 minutes, the owner and all their agents together, and past that the answer is RATE_LIMITED with the seconds to wait.",
         caller: 'agent',
         visibility: { publicMcp: true, connectorMcp: false, cliFallback: false },
         input: {
@@ -469,7 +471,7 @@ export const agentMessagingTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_contact_resolve_email',
-        description: 'Look up a LOCAL owner by email — EXACT match only (privacy-preserving hash; no enumeration or substring search). Found → their GHII + display name (add with aimeat_contact_add, or grant access directly). Not found → can_invite signals whether an email invitation could be sent instead (aimeat_organism_invite_email). The same door as POST /v1/contacts/resolve, on the messages:read permission. One account has 20 lookups in 10 minutes, the owner and all their agents together; past that the answer is RATE_LIMITED with the seconds to wait.',
+        description: 'Look up a LOCAL owner by email — EXACT match only (privacy-preserving hash; no enumeration or substring search). Found → their GHII + display name (add with aimeat_contact_add, or grant access directly). Not found → can_invite signals whether an email invitation could be sent instead (aimeat_organism_invite_email). The same door as POST /v1/contacts/resolve, on the messages:read permission. One account has 20 lookups in 10 minutes, the owner and all their agents together, and saving a person by email with aimeat_contact_add counts as one; past that the answer is RATE_LIMITED with the seconds to wait.',
         caller: 'agent',
         visibility: { publicMcp: true, connectorMcp: false, cliFallback: false },
         input: {
