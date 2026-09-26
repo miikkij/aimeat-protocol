@@ -13,6 +13,9 @@
  *   aimeat_contact_list, aimeat_contact_add, aimeat_contact_remove, aimeat_contact_resolve_email.
  * @usage import { registerContactTools } from './contacts.js';
  * @version-history
+ *   v1.5.0 — 2026-09-26 — aimeat_contact_invite answers a refusal as `CODE: message` (toolError): an
+ *     invitation counts as an address lookup (services/contact-invitations.ts), so over the account's
+ *     allowance it reads RATE_LIMITED, as on REST (secaudit 2026-09, A5-2).
  *   v1.4.0 — 2026-09-25 — aimeat_contact_add answers a refusal as `CODE: message` (toolError), so a
  *     save by email over the account's lookup allowance reads RATE_LIMITED, as on REST.
  *   v1.3.1 — 2026-09-25 — The note on aimeat_contact_resolve_email says what the route decides now: an
@@ -98,8 +101,10 @@ export function registerContactTools(
                 const { invitation, acceptUrl, emailSent } = await createContactInvitation(storage, config, { inviterName, email, message: message ?? null });
                 return { content: [{ type: 'text' as const, text: JSON.stringify({ status: 'invited', invitation: invitePublic(invitation), email_sent: emailSent, accept_url: acceptUrl }, null, 2) }] };
             } catch (e) {
-                const text = e instanceof ContactInvitationError ? e.message : errText(e);
-                return { content: [{ type: 'text' as const, text }], isError: true };
+                // With its code, as the REST door answers: an invitation counts as an address lookup
+                // and can be RATE_LIMITED, which an agent has to tell apart from a refused address.
+                if (e instanceof ContactInvitationError) return { ...toolError(e.code, e.message) };
+                return { content: [{ type: 'text' as const, text: errText(e) }], isError: true };
             }
         },
     );

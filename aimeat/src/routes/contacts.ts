@@ -15,6 +15,8 @@
  *   gate); POST /v1/contacts/resolve (email → GHII exact match, or invite fallback signal).
  * @usage app.use(contactsRouter(config, storage))
  * @version-history
+ *   v1.5.1 — 2026-09-26 — POST /invite answers the account's lookup limit as the other doors do: 429
+ *     RATE_LIMITED with Retry-After and retry_after_sec (the service counts each invitation).
  *   v1.5.0 — 2026-09-25 — The per-account lookup limit moves into the service, which a save by email
  *     also counts against (services/email-lookup-limit.ts); the resolve door's own limiter and the
  *     per-caller limiter on saves by email are gone, and a RATE_LIMITED refusal carries Retry-After.
@@ -134,7 +136,8 @@ export function contactsRouter(config: AimeatConfig, storage: Storage): Router {
 
   /* ── POST /v1/contacts/invite — invite a person to join this AIMEAT, no organism behind it. The
    * email goes out in the owner's name with their message; the accept link comes back so it can
-   * be handed over when mail is off. Same throttle as the organism email invite. ── */
+   * be handed over when mail is off. Same throttle as the organism email invite, and the service
+   * counts each invitation as an address lookup against the account (429 with Retry-After). ── */
   router.post('/v1/contacts/invite', requireAuth(), requireLocalSession(), requireRole('owner'), rateLimit({ max: 20, windowMs: 10 * 60 * 1000 }), async (req, res) => {
     const b = (req.body ?? {}) as Record<string, unknown>;
     try {
@@ -146,7 +149,13 @@ export function contactsRouter(config: AimeatConfig, storage: Storage): Router {
       });
       res.status(201).json(success(config.nodeId, { invitation: invitePublic(invitation), email_sent: emailSent, accept_url: acceptUrl }));
     } catch (e) {
-      if (e instanceof ContactInvitationError) { res.status(e.status).json(error(config.nodeId, e.code, e.message)); return; }
+      if (e instanceof ContactInvitationError) {
+        // An invitation counts as an address lookup (services/email-lookup-limit.ts): say when to come back.
+        const retry = e.details?.retry_after_sec;
+        if (e.code === 'RATE_LIMITED' && retry) res.setHeader('Retry-After', retry);
+        res.status(e.status).json(error(config.nodeId, e.code, e.message, e.status, e.details));
+        return;
+      }
       throw e;
     }
   });

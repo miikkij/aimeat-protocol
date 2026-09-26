@@ -5,12 +5,14 @@
  * @description How many email addresses one account may look up in ten minutes, on every contacts
  *   door that tells whether an address has an account here.
  *
- *   WHAT COUNTS. Two acts in services/contacts.ts, which every door reaches: the lookup itself
- *   (resolveContactEmail, behind POST /v1/contacts/resolve and the aimeat_contact_resolve_email
- *   tool that asks it) and saving a person by email (addContact with an email, behind POST
- *   /v1/contacts and aimeat_contact_add), because the saved record says the same thing: whether the
- *   address belongs to someone here. A malformed address is refused before it is counted, because it
- *   was never looked up.
+ *   WHAT COUNTS. Three acts, each in the service every door reaches: the lookup itself
+ *   (resolveContactEmail in services/contacts.ts, behind POST /v1/contacts/resolve and the
+ *   aimeat_contact_resolve_email tool that asks it), saving a person by email (addContact with an
+ *   email, behind POST /v1/contacts and aimeat_contact_add), and inviting a person
+ *   (createContactInvitation in services/contact-invitations.ts, behind POST /v1/contacts/invite and
+ *   aimeat_contact_invite), because the saved record and the invitation's answer say the same thing:
+ *   whether the address belongs to someone here. A malformed address is refused before it is
+ *   counted, because it was never looked up.
  *
  *   WHOSE ALLOWANCE. The ACCOUNT's, keyed by the owner GHII: the owner and every agent acting for
  *   them draw on one allowance, so connecting a second agent does not double what one person can
@@ -24,6 +26,8 @@
  *   const turn = takeEmailLookup(ownerGhii);
  *   if (!turn.ok) throw new ContactsError(429, turn.code, turn.message, { retry_after_sec: turn.retryAfterSec });
  * @version-history
+ *   v1.1.0 — 2026-09-26 — An invitation to a person counts too (services/contact-invitations.ts),
+ *     on both of its doors, and the refusal says so (secaudit 2026-09, A5-2).
  *   v1.0.0 — 2026-09-25 — Initial. The limit sat on the resolve door alone, so saving a person by
  *     email answered the same question without counting.
  */
@@ -54,7 +58,7 @@ export function takeEmailLookup(asker: string): { ok: true } | EmailLookupRefusa
     code: 'RATE_LIMITED',
     retryAfterSec: counted.retryAfterSec,
     message: `This account has looked up ${EMAIL_LOOKUP_LIMIT.max} email addresses in the last 10 minutes, the most one `
-      + `account may. Saving a person by email counts as a lookup. Try again in ${counted.retryAfterSec} seconds. `
+      + `account may. Saving a person by email and inviting one count as lookups. Try again in ${counted.retryAfterSec} seconds. `
       + 'The owner and their agents share this limit.',
   };
 }
