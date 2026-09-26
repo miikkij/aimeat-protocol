@@ -6,6 +6,9 @@
  *   /v1/admin/apps/similar, /v1/admin/apps/watermark/decode, /v1/admin/apps/:owner/:filename/moderate,
  *   DELETE /v1/admin/apps/:owner/:filename. Extracted from src/routes/apps.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.12.0 — 2026-09-26 — GET /v1/apps strips the owner's own notes through publicAppManifest
+ *     (services/app-public-manifest.ts), the one place the MCP read and the purchase receipt use as
+ *     well; what the listing shows is unchanged (secaudit 2026-09, A6-10).
  *   v1.11.0 — 2026-09-12 — GET /v1/admin/apps carries `screenshot_url`, the way the public listing
  *     already did. The operator's moderation page could not show the app it was about to take
  *     down, and the copy scan could not put a suspected copy beside the original it matched.
@@ -44,7 +47,7 @@ import { randomBytes } from 'node:crypto';
 import { validateOutboundUrl } from '../../utils/url-validator.js';
 import { decodeWatermark } from '../../utils/app-protect.js';
 import { scanCatalogForCopies } from '../../services/app-similarity.js';
-import { publicPosture } from '../../services/app-ai-posture.js';
+import { publicAppManifest } from '../../services/app-public-manifest.js';
 import type { CanonicalOwner } from './helpers.js';
 import { logger } from '../../utils/logger.js';
 import { appSeoState } from '../../services/app-seo.js';
@@ -157,38 +160,21 @@ export function registerCatalogueAdminRoutes(
             const forks = forksByApp[metricKey] ?? 0;
             const hasScreenshot = screenshotKeys.has(`${app.ownerGaii} apps/screenshots/${app.filename}`);
             // TARGET-058: the transparency posture is public — it is what the catalogue card's
-            // generative marker is drawn from, and an app being AI-generative is not a secret. The
-            // publish check's GAP is not: it is a note to the OWNER about their own app, so it is
-            // stripped for everyone else, here AND inside the manifest the card renders from.
+            // generative marker is drawn from, and an app being AI-generative is not a secret — and
+            // the data map travels on the same terms: where an app puts what is the promise it makes
+            // to whoever installs it. The publish checks' findings, the build-spec state and the
+            // reviewer log are the OWNER's own, and come off for everyone else, here AND inside the
+            // manifest the card renders from (services/app-public-manifest.ts, one place for every
+            // door that shows a manifest to somebody else).
             const isOwn = !!viewerGhii && app.ownerGaii === viewerGhii;
-            const posture = app.manifest.aiPosture;
-            const shownPosture = isOwn ? posture : publicPosture(posture);
-            // `specCheck` travels with the gap: whether the last publish carried the build spec is
-            // the owner's own business, and a public "built without reading the manual" badge would
-            // be a punishment nobody agreed to.
-            // The data map travels on exactly the same terms as the posture, and for the same reason.
-            // Where an app puts what is the promise it makes to whoever installs it, and an agent
-            // deciding whether to use it needs that before it touches anything — so the rows are
-            // public. The publish check's finding is the owner's own unfinished business, so
-            // The stamp is a summary and carries no rows, so the only owner-only thing on it is the
-            // finding. Strip that rather than the whole stamp: a stranger still needs to see WHERE
-            // an app puts data before they install it.
-            const dataMap = app.manifest.dataMap;
-            const shownDataMap = !dataMap ? undefined
-                : isOwn ? dataMap
-                : { ...dataMap, gap: undefined };
             const shownManifest = isOwn ? app.manifest : {
-                ...app.manifest,
-                ...(posture ? { aiPosture: shownPosture } : {}),
-                ...(dataMap ? { dataMap: shownDataMap } : {}),
-                ...(app.manifest.specCheck ? { specCheck: undefined } : {}),
-                // The reviewer's NAME is public — it is served in the app's own source. The log of
-                // who declared and withdrew it is the owner's audit trail, not a stranger's.
-                ...(app.manifest.authorshipLog ? { authorshipLog: undefined } : {}),
+                ...publicAppManifest(app.manifest),
                 // The legal pages travel as their STATE (kind, format, when); the text is read at
                 // /legal/:kind, not carried on every row of every listing.
                 ...(app.manifest.legal ? { legal: stripLegalContent(app.manifest).legal } : {}),
             };
+            const shownPosture = shownManifest.aiPosture;
+            const shownDataMap = shownManifest.dataMap;
             return {
                 owner: app.ownerName,
                 // Only on the `building=true` answer, and it is what stops a co-built app from

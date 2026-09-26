@@ -19,6 +19,8 @@
  *   sale, while the books keep the amount, the date and the app.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=app-store-license
  * @version-history
+ *   v1.2.0 — 2026-09-26 — The receipt's manifest carries none of the seller's own findings (A6-10).
+ *     Failed on the code before the fix: `dataMap.gap` was in it.
  *   v1.1.0 — 2026-09-24 — Erasure: a name registered again after its buyer or its seller deleted the
  *     account inherits no receipt, no sale, no paid content and no licence (audit A8-4).
  *   v1.0.0 — 2026-08-23 — Initial: purchase-as-owner, licence recognised for the owner's agent.
@@ -91,6 +93,25 @@ await test('The buyer purchases the app AS THE OWNER in person', async () => {
     const buy = await json('/v1/app-store/purchase', { ...auth(buyerTok), method: 'POST', body: JSON.stringify({ app_filename: PAID, app_owner: sellerName }) });
     if (buy.status === 403 && buy.body?.error?.code === 'APP_STORE_DISABLED') { marketplaceOn = false; console.log('    (skipped rest: marketplace disabled on this node)'); return; }
     assert(buy.status === 200 || buy.status === 201, `purchase: ${buy.status} ${JSON.stringify(buy.body)}`);
+});
+
+// A6-10. The receipt keeps a copy of the app's manifest, and the buyer reads it. The notes on a
+// manifest that are the seller's own (the publish checks' findings, the build-spec state) are
+// stripped from it, the way every other door that shows a manifest to somebody else strips them.
+await test('The buyer\'s receipt carries the app\'s manifest without the seller\'s own findings', async () => {
+    if (!marketplaceOn) return;
+    const own = await json(`/v1/datamap/apps/${sellerName}/${PAID}`, auth(sellerTok));
+    assert(own.status === 200 && !!own.body.data.stamp?.gap, `the seller's app carries a finding to strip: ${JSON.stringify(own.body.data?.stamp)}`);
+    const list = await json('/v1/app-store/purchases', auth(buyerTok));
+    const txId = (list.body.data?.purchases ?? []).find((p: any) => p.app_filename === PAID)?.transaction_id;
+    assert(!!txId, `the buyer has the purchase: ${JSON.stringify(list.body.data?.purchases)}`);
+    const receipt = await json(`/v1/app-store/purchases/${txId}`, auth(buyerTok));
+    assert(receipt.status === 200, `receipt: ${receipt.status}`);
+    const m = receipt.body.data.app_manifest ?? {};
+    assert(m.name === 'Licensed App', `the receipt keeps the manifest: ${JSON.stringify(m).slice(0, 200)}`);
+    assert(m.dataMap?.gap === undefined, `the buyer must not read the seller's data map finding: ${JSON.stringify(m.dataMap?.gap)}`);
+    assert(m.aiPosture?.gap === undefined && m.specCheck === undefined,
+        `nor the seller's other own notes: ${JSON.stringify({ gap: m.aiPosture?.gap, specCheck: m.specCheck })}`);
 });
 
 await test('The buyer\'s AGENT sees the licence the owner bought (cross-principal)', async () => {
