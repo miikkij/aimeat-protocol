@@ -223,7 +223,7 @@
       "digest": "sha256:184fb3a1ed1959b0032a449a"
     },
     "node:add-a-crew-agent": {
-      "reviewedOn": "2026-09-24",
+      "reviewedOn": "2026-09-26",
       "watches": [
         "aimeat/src/routes/agents/device-auth.ts",
         "aimeat/src/mcp/catalog/scopes.ts",
@@ -231,7 +231,7 @@
         "aimeat/src/routes/agents-v2/agent-proposals.ts",
         "aimeat/src/data/basic-agents.ts"
       ],
-      "digest": "sha256:9771596bcddb7c9da8ef7041"
+      "digest": "sha256:97bc17b536a262c40fee9bad"
     },
     "node:set-up-content-pipeline": {
       "reviewedOn": "2026-09-19",
@@ -458,7 +458,7 @@
     },
     "node:add-a-crew-agent": {
       "aimeat/src/routes/agents/device-auth.ts": "1cf5d3f6b45c5cb9",
-      "aimeat/src/mcp/catalog/scopes.ts": "bb05d7f00aaef954",
+      "aimeat/src/mcp/catalog/scopes.ts": "8948f7714b6c5031",
       "aimeat/src/mcp/catalog/definitions/crew.ts": "f18f927aad1a04d6",
       "aimeat/src/routes/agents-v2/agent-proposals.ts": "1da72b752ee164bc",
       "aimeat/src/data/basic-agents.ts": "aff54b3a43cbd71d"

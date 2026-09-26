@@ -33,6 +33,8 @@
  *   const filed = await fileInstallRequest({ storage, config }, ownerGhii, draft);
  *   await settleInstallRequest({ storage, config }, ownerGhii, request, 'declined', { by: decider });
  * @version-history
+ *   v1.0.1 — 2026-09-26 — The key builder is installRequestKey: check:trusted-keys resolves a builder by
+ *     its name across the tree, and read `requestKey` as app-members.ts's `appmemreq.` builder.
  *   v1.0.0 — 2026-09-25 — Initial: package installs by agents become requests.
  */
 import { createHash, randomUUID } from 'node:crypto';
@@ -109,7 +111,9 @@ const fail = (status: number, code: string, message: string): InstallRequestFail
 
 export interface RequestStoreCtx { storage: Storage; config: AimeatConfig }
 
-const requestKey = (id: string): string => `${INSTALL_REQUEST_PREFIX}${id}`;
+// A name of its own: check:trusted-keys resolves a key builder by its name across the tree, and
+// `requestKey` is already app-members.ts's, which builds a different prefix.
+const installRequestKey = (id: string): string => `${INSTALL_REQUEST_PREFIX}${id}`;
 const sha256 = (s: string): string => createHash('sha256').update(s).digest('hex');
 
 /**
@@ -134,7 +138,7 @@ function asRequest(value: unknown): PackageInstallRequest | null {
 
 export async function readInstallRequest(storage: Storage, ownerGhii: string, id: string): Promise<PackageInstallRequest | null> {
     if (!ID_SHAPE.test(id)) return null;
-    return asRequest((await storage.getMemory(ownerGhii, requestKey(id)))?.value);
+    return asRequest((await storage.getMemory(ownerGhii, installRequestKey(id)))?.value);
 }
 
 /** Every request on this account, newest first. */
@@ -174,10 +178,10 @@ export function summarizeRequest(request: PackageInstallRequest, now = Date.now(
 }
 
 async function putRequest(storage: Storage, ownerGhii: string, request: PackageInstallRequest): Promise<void> {
-    const row = await storage.getMemory(ownerGhii, requestKey(request.id));
+    const row = await storage.getMemory(ownerGhii, installRequestKey(request.id));
     const now = new Date().toISOString();
     await storage.setMemory({
-        key: requestKey(request.id),
+        key: installRequestKey(request.id),
         ownerGaii: ownerGhii,
         value: request as unknown as Record<string, unknown>,
         visibility: 'private',
