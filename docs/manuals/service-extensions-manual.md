@@ -588,8 +588,9 @@ Each extension declares resource limits in its manifest. The node enforces these
 | API calls per action | `limits.max_api_calls` | 500 on the node, and what a manifest asks for is capped by it | `AIMEAT_EXT_MAX_API_CALLS` |
 | Script size | N/A | N/A | `AIMEAT_EXT_MAX_CODE_SIZE_KB` (256 KB) |
 | Max extensions | N/A | N/A | `AIMEAT_EXT_MAX_INSTALLED` (20) |
+| One answer read by `ctx.fetch` | N/A | 4 MB | N/A: the same on every node, for every extension |
 
-If an action exceeds its timeout, the sandbox is terminated and an `EXTENSION_TIMEOUT` error is returned. If an action exceeds its API call limit, further API calls return errors.
+If an action exceeds its timeout, the sandbox is terminated and an `EXTENSION_TIMEOUT` error is returned. If an action exceeds its API call limit, further API calls return errors. An answer longer than 4 MB makes `ctx.fetch` throw `RESPONSE_TOO_LARGE: …`: the node stops reading at 4 MB and the script gets none of the answer, so ask a large source for one page at a time.
 
 ## Federation
 

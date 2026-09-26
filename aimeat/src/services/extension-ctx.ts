@@ -22,11 +22,15 @@
  * @structure
  *   - ExtensionCtxDeps — what a caller must supply, and what it may
  *   - buildExtensionCtx() — the core with guards applied, merged with the optional parts
- *   - decodeBody() — the shared charset detection the three copies each had their own version of
+ *   - decodeBody() — the shared charset detection the three copies each had their own version of,
+ *     on an answer read up to the outbound ceiling
  * @usage
  *   const ctx = buildExtensionCtx({ config, storage, extMemoryOwner, caller, extConfig, log, files });
  *   await executeExtensionAction(script, ctx, …);
  * @version-history
+ *   v1.6.5 — 2026-09-26 — ctx.fetch reads the answer through readBodyCapped up to OUTBOUND_READ_MAX_BYTES
+ *     (utils/read-capped.ts, 4 MB). Past it the rest is cancelled, nothing is decoded, and the call
+ *     throws `RESPONSE_TOO_LARGE: …`, the shape of every other refusal ctx.fetch makes (secaudit 2026-09, N3).
  *   v1.6.4 — 2026-09-26 — ctx.wallet.getBalance takes the caller's account name from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  *   v1.6.3 — 2026-09-24 — A ctx.fetch that carries a secret checks its address before the secret is
  *     resolved (919ef5f56d69). Resolving binds a first use to the host, and safeFetch refused the
@@ -73,6 +77,7 @@ import { isServerWrittenKey, serverWrittenKeyRefusal } from '../utils/reserved-k
 import { extensionCrossNotify, safeNotificationLink } from './extension-notify.js';
 import { notify } from './notify.js';
 import { safeFetch, validateOutboundUrl } from '../utils/url-validator.js';
+import { readBodyCapped, OUTBOUND_READ_MAX_BYTES } from '../utils/read-capped.js';
 import { parseGAII, ownerGhiiOf, localAccountName } from '../utils/gaii.js';
 import { resolveSecretForHeaders, secretPlaceholderNames, secretUnknownMessage, secretHostMessage } from './owner-secrets.js';
 import { logger } from '../utils/logger.js';
@@ -114,8 +119,7 @@ export interface ExtensionCtxDeps {
 
 /** Does the buffer contain a well-formed UTF-8 multibyte sequence? Used to overrule a charset label
  *  that says otherwise, which is what a CDN doing its own transcoding leaves behind. */
-function looksLikeUtf8(buf: ArrayBuffer): boolean {
-    const bytes = new Uint8Array(buf);
+function looksLikeUtf8(bytes: Uint8Array): boolean {
     for (let i = 0; i < bytes.length - 1; i++) {
         if (bytes[i] >= 0xC2 && bytes[i] <= 0xDF && (bytes[i + 1] & 0xC0) === 0x80) return true;
         if (bytes[i] >= 0xE0 && bytes[i] <= 0xEF && i + 2 < bytes.length &&
@@ -139,16 +143,24 @@ function looksLikeUtf8(buf: ArrayBuffer): boolean {
  * makes an undecodable charset a thrown error, which on the unattended roads is a failed run that
  * leaves the previous version standing. An extension that produces packages opts in with
  * `config: { strictCharset: true }` in its manifest.
+ *
+ * THE ANSWER IS READ UP TO A CEILING, counted while it arrives: OUTBOUND_READ_MAX_BYTES
+ * (utils/read-capped.ts, 4 MB), the one a connected account's read and a decision provider's answer
+ * share. Past it the rest of the stream is cancelled, nothing is decoded, and the call throws
+ * `RESPONSE_TOO_LARGE: …`. The code leads the message as it does in SECRET_UNKNOWN, because the
+ * message is all a script receives, and every road into the sandbox then carries the same code.
  */
-async function decodeBody(
-    resp: { arrayBuffer(): Promise<ArrayBuffer>; headers: Headers },
-    strictCharset = false,
-): Promise<string> {
-    const buf = await resp.arrayBuffer();
+async function decodeBody(resp: Response, strictCharset = false): Promise<string> {
+    const buf = await readBodyCapped(resp, OUTBOUND_READ_MAX_BYTES);
+    if (buf === null) {
+        throw new Error(`RESPONSE_TOO_LARGE: The answer is larger than ${OUTBOUND_READ_MAX_BYTES / (1024 * 1024)} MB, `
+            + 'the most ctx.fetch reads of one answer. Ask the source for less: fewer items, one page at a time, '
+            + 'or a shorter date range.');
+    }
     const ct = resp.headers.get('content-type') || '';
     let charset = (/charset=([^\s;]+)/i.exec(ct)?.[1] ?? '').toLowerCase();
     if (!charset) {
-        const peek = new TextDecoder('ascii').decode(buf.slice(0, 512));
+        const peek = new TextDecoder('ascii').decode(buf.subarray(0, 512));
         const xml = /encoding=['"]([^'"]+)['"]/i.exec(peek)?.[1];
         const meta = /<meta[^>]+charset=["']?([^\s"';>]+)/i.exec(peek)?.[1];
         charset = (xml || meta || 'utf-8').toLowerCase();
@@ -555,6 +567,8 @@ export function buildExtensionCtx(deps: ExtensionCtxDeps): ExtensionCtx {
             });
             // Opted in per extension, in its manifest config — so a feed reader keeps the forgiving
             // default and a package producer gets a failed run instead of a mojibake version.
+            // GUARD (2026-09-26): the answer is read up to the outbound ceiling and no further, and
+            // one past it throws RESPONSE_TOO_LARGE (decodeBody above).
             const text = await decodeBody(resp, deps.extConfig?.strictCharset === true);
             const headers: Record<string, string> = {};
             resp.headers.forEach((v, k) => { headers[k] = v; });

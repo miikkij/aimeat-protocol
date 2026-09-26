@@ -32,6 +32,11 @@
  *   A 2xx body is validated before it is returned: every requested question must be answered with
  *   its own type and a value of the right kind. A malformed answer is JEV_BAD_RESPONSE and is not
  *   retried, because the same request would get the same answer.
+ *
+ *   THE ANSWER IS READ UP TO A CEILING, counted while it arrives: OUTBOUND_READ_MAX_BYTES
+ *   (utils/read-capped.ts, 4 MB), the one a connected account's read and an extension's ctx.fetch
+ *   share. Past it the rest of the stream is cancelled, none of it is parsed, and the call fails
+ *   with JEV_TOO_LARGE, which is not retried for the same reason as JEV_BAD_RESPONSE.
  * @structure
  *   - SystemOneRequest, SystemOneAnswer, SystemOneResponse: the wire shapes
  *   - SystemOneRetryPolicy, DEFAULT_SYSTEMONE_RETRY: the retry numbers (TypeSafe SDK defaults)
@@ -44,6 +49,9 @@
  *   const res = await callSystemOne({ url: 'https://api.typesafe.ai/v1/systemone', key, request, providerName: 'TypeSafe' });
  *   res.answers.topic.choice; // 'billing'
  * @version-history
+ *   v2.2.0 — 2026-09-26 — The answer is read through readBodyCapped up to OUTBOUND_READ_MAX_BYTES
+ *     (utils/read-capped.ts, 4 MB); past it the call fails with JEV_TOO_LARGE, not retried
+ *     (secaudit 2026-09, N3).
  *   v2.1.0 — 2026-09-23 — allowOrigins: the private origins the operator listed for this provider go
  *     to safeFetch for this call only.
  *   v2.0.0 — 2026-09-23 — The generic System One client (was jev-client.ts): any provider, a null key
@@ -51,6 +59,7 @@
  *   v1.0.0 — 2026-09-19 — Initial: the Jev client for AIMEAT.decide (TARGET-080).
  */
 import { safeFetch } from '../../utils/url-validator.js';
+import { readBodyCapped, OUTBOUND_READ_MAX_BYTES } from '../../utils/read-capped.js';
 import type { JevQuestion, JevQuestionType } from './limits.js';
 
 /** What is sent to Jev. */
@@ -106,7 +115,8 @@ export const DEFAULT_SYSTEMONE_RETRY: SystemOneRetryPolicy = Object.freeze({
 /** Error codes a SystemOneError carries. */
 export type SystemOneErrorCode =
   | 'JEV_BAD_REQUEST' | 'JEV_UNAUTHORIZED' | 'JEV_FORBIDDEN' | 'JEV_NOT_FOUND' | 'JEV_TIMEOUT'
-  | 'JEV_INVALID' | 'JEV_RATE_LIMITED' | 'JEV_SERVER' | 'JEV_CONNECTION' | 'JEV_BAD_RESPONSE';
+  | 'JEV_INVALID' | 'JEV_RATE_LIMITED' | 'JEV_SERVER' | 'JEV_CONNECTION' | 'JEV_BAD_RESPONSE'
+  | 'JEV_TOO_LARGE';
 
 /** A failed Jev call. Never carries the key. */
 export class SystemOneError extends Error {
@@ -318,7 +328,7 @@ async function attempt(a: {
   const onOuter = (): void => ctl.abort();
   a.signal?.addEventListener('abort', onOuter, { once: true });
   let res: Response;
-  let text: string;
+  let bytes: Buffer | null;
   try {
     res = await a.fetchImpl(a.url, {
       method: 'POST',
@@ -330,7 +340,8 @@ async function attempt(a: {
       sensitiveHeaders: ['authorization'],
       ...(a.allowOrigins?.length ? { allowOrigins: a.allowOrigins } : {}),
     });
-    text = await res.text();
+    // Up to the outbound ceiling and no further; null once the answer passes it.
+    bytes = await readBodyCapped(res, OUTBOUND_READ_MAX_BYTES);
   } catch (err) {
     if (a.signal?.aborted) {
       throw new SystemOneError({ code: 'JEV_CONNECTION', message: 'The caller cancelled the decision request.', retryable: false });
@@ -347,7 +358,16 @@ async function attempt(a: {
     a.signal?.removeEventListener('abort', onOuter);
   }
 
-  const raw = parseBody(text);
+  if (bytes === null) {
+    throw new SystemOneError({
+      code: 'JEV_TOO_LARGE', status: res.status, retryable: false,
+      requestId: res.headers.get('x-typesafe-request-id') ?? null,
+      message: `${a.name} sent an answer larger than ${OUTBOUND_READ_MAX_BYTES / (1024 * 1024)} MB, `
+        + 'the most this node reads of one answer. None of it was used.',
+    });
+  }
+  // Decoded as res.text() decodes: UTF-8, with a leading byte order mark dropped.
+  const raw = parseBody(new TextDecoder().decode(bytes));
   // The adapter reshapes a 2xx answer only; an error body is read as the provider sent it.
   const parsed = a.adapter && res.status >= 200 && res.status < 300 && isObj(raw.json)
     ? { json: a.adapter(raw.json) as unknown, ok: raw.ok } : raw;

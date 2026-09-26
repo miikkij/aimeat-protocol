@@ -18,6 +18,8 @@
  * @usage import { buildExtensionPrompt } from '../services/build-extension-prompt.js';
  *   const { full, body } = buildExtensionPrompt(config, { lang: 'en', owner: 'alice' });
  * @version-history
+ *   v1.5.2 — 2026-09-26 — ADDITIVE: ctx.fetch reads at most 4 MB of one answer and throws
+ *     RESPONSE_TOO_LARGE past it (utils/read-capped.ts OUTBOUND_READ_MAX_BYTES; secaudit 2026-09, N3).
  *   v1.5.1 — 2026-09-13 — ADDITIVE: an action always needs a signed-in caller (public_access does
  *     nothing; serve public data through a public key and ?soft=1), and a workflow signal needs
  *     result_to_key to see an action's result. Two appdev pitfalls carried these and the prompt did not.
@@ -45,6 +47,10 @@
  *     config fields, and binary file I/O.
  */
 import type { AimeatConfig } from '../config.js';
+import { OUTBOUND_READ_MAX_BYTES } from '../utils/read-capped.js';
+
+/** How much of one answer ctx.fetch reads, in the megabytes the prompt says it in. */
+const FETCH_READ_MB = OUTBOUND_READ_MAX_BYTES / (1024 * 1024);
 
 export interface ExtensionPromptOpts {
   /** Reply language for the built extension's own copy; the instructions stay English. */
@@ -91,7 +97,7 @@ function sandboxSection(): string {
     '| `ctx.memory.search(prefix)` | `[{key, value}]` for every key under the prefix, private ones included |',
     '| `ctx.memory.delete(key)` | Remove one key; returns whether it existed |',
     '| `ctx.memory.getPublic(namespace, key)` | Read a PUBLIC key in another namespace (another `ext:` one, or an owner\'s), or null |',
-    '| `ctx.fetch(url, {method, headers, body})` | The only way out. Returns `{status, ok, text, headers}` |',
+    `| \`ctx.fetch(url, {method, headers, body})\` | The only way out. Returns \`{status, ok, text, headers}\`. Reads at most ${FETCH_READ_MB} MB of one answer, and throws \`RESPONSE_TOO_LARGE\` past that |`,
     '| `ctx.files.read(ref)` | A stored file as `{base64, mime, size, key}`, or null. Read with the CALLER\'s rights |',
     '| `ctx.files.write(key, base64, {mime, visibility})` | Store bytes under `ext/{name}/`, private unless `visibility: \'public\'`. Returns `{key, gaii, owner, url, size}`; `owner` is whose storage it landed in |',
     '| `ctx.datapackage.publish / validate / inferSchema / open / rows / fail` | AIMEAT Data Packages, built on the node. `publish` THROWS when the quality gate refuses; `validate` looks first without throwing |',
@@ -200,6 +206,8 @@ function sandboxSection(): string {
     'a member through an EXCHANGE grant notifies them and an extension cannot.',
     '',
     '`ctx.fetch` returns `text`, never a parsed body. Parse it yourself and handle a non-ok status.',
+    `It reads at most ${FETCH_READ_MB} MB of one answer. A longer answer makes the call throw`,
+    '`RESPONSE_TOO_LARGE: …` and returns none of it, so ask a large source for one page at a time.',
     '',
     'GATING AN APP: declare the app in your manifest `config:` as `app: owner/file.html`, and the node',
     'resolves the caller against that app\'s member roster BEFORE your script runs, handing you',

@@ -56,6 +56,8 @@
  *   const r = await decideForOwner(storage, config, { gaii, principal, appId, isOwner }, { state, questions });
  *   const g = await decideForOwner(storage, config, caller, { state, rule: 'send-reply' });
  * @version-history
+ *   v1.4.1 — 2026-09-26 — A provider answer past the outbound ceiling (JEV_TOO_LARGE) is PROVIDER_ERROR
+ *     502 with the client's sentence, which names the provider and the 4 MB limit (secaudit 2026-09, N3).
  *   v1.4.0 — 2026-09-25 — reviewDecision takes the reviewer as a principal and whether it is the
  *     owner in person, refuses a review by the principal that asked for the decision (OWN_DECISION,
  *     403) unless it is the owner in person, records the principal as `by`, and closes the owner's
@@ -342,6 +344,10 @@ function mapProviderError(e: SystemOneError, scope: AiDecisionKeyScope, provider
     case 'JEV_INVALID':
     case 'JEV_BAD_REQUEST':
       return new DecideError('PROVIDER_REJECTED', 422, `${name} refused the request: ${e.message}`, details);
+    // The provider did answer, with more than the node reads. The client's sentence names the
+    // provider and the ceiling; the code stays the one every provider failure has on every road.
+    case 'JEV_TOO_LARGE':
+      return new DecideError('PROVIDER_ERROR', 502, e.message, details);
     default:
       return new DecideError('PROVIDER_ERROR', 502, `The decision model did not answer: ${e.message}`, details);
   }

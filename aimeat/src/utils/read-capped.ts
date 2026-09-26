@@ -14,12 +14,19 @@
  *   capResponseBody is the same ceiling for a body this node does not read itself: it hands on a
  *   Response whose body stops at the ceiling, for a library that calls json() or reads the stream
  *   (the MCP SDK, through the guarded fetch in services/mcp-client/transport.ts).
- * @structure readBodyCapped(resp, maxBytes) · capResponseBody(resp, maxBytes) · ResponseTooLargeError
+ *
+ *   OUTBOUND_READ_MAX_BYTES is the ceiling itself for the three reads of an answer from a service a
+ *   person chose to call: a connected account, an extension's ctx.fetch and a decision provider.
+ * @structure OUTBOUND_READ_MAX_BYTES · readBodyCapped(resp, maxBytes) · capResponseBody(resp, maxBytes) ·
+ *   ResponseTooLargeError
  * @usage
  *   const body = await readBodyCapped(res, capBytes);
  *   if (body === null) return refuse(413, 'SIZE_EXCEEDED', 'That is over the limit.');
  *   const capped = capResponseBody(await safeFetch(url), 16 * 1024 * 1024);
+ *   const answer = await readBodyCapped(res, OUTBOUND_READ_MAX_BYTES);
  * @version-history
+ *   v1.2.0 — 2026-09-26 — OUTBOUND_READ_MAX_BYTES (4 MB): one ceiling for a connected account's read,
+ *     an extension's ctx.fetch and a decision provider's answer (secaudit 2026-09, N3).
  *   v1.1.1 — 2026-09-26 — capResponseBody refuses a status outside 200 to 599 and cancels its body
  *     unread: fetch hands back 600 or 999, and rebuilding the Response threw with the body half piped.
  *   v1.1.0 — 2026-09-26 — capResponseBody and ResponseTooLargeError: a body handed on to a library
@@ -27,6 +34,15 @@
  *   v1.0.0 — 2026-09-24 — Initial: promoted from services/connections/read.ts (secaudit 2026-09, A6-13).
  */
 import { logger } from './logger.js';
+
+/**
+ * How much of one answer this node reads from a service outside it that a person, or code acting
+ * for them, chose to call: a read from a connected account (services/connections/read.ts), an
+ * extension's ctx.fetch (services/extension-ctx.ts) and a decision provider's answer
+ * (services/decide/systemone-client.ts). One number, so the three cannot drift apart; 4 MB is the
+ * ceiling the connection read had first.
+ */
+export const OUTBOUND_READ_MAX_BYTES = 4 * 1024 * 1024;
 
 /**
  * The body as a Buffer, or null once it passes `maxBytes`. A response with no body is an empty

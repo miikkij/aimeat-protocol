@@ -217,7 +217,7 @@ price. Each action script exports a default function that receives `ctx`:
 |---|---|
 | `ctx.memory.get / set / delete / search / getVersioned` | The extension's own `ext:{name}` namespace |
 | `ctx.memory.getPublic(gaii, key)` | A public record in someone else's namespace, the caller's included |
-| `ctx.fetch(url, opts)` | Outbound HTTP, SSRF-guarded. Returns text and a status; it does not parse JSON for you |
+| `ctx.fetch(url, opts)` | Outbound HTTP, SSRF-guarded. Returns text and a status; it does not parse JSON for you. Reads at most 4 MB of one answer, and throws `RESPONSE_TOO_LARGE` past that |
 | `ctx.config` | The manifest's config, with `type: secret` fields decrypted only here |
 | `ctx.caller` | Who is calling: GAII, owner, roles. Absent on a scheduled run |
 | `ctx.instance` | This instance's id and per-instance config, when the extension supports instances |

@@ -29,16 +29,19 @@
  *   v1.1.0 -- 2026-09-24 -- The streamed, capped read moves to utils/read-capped.ts so the package
  *     pull can share it instead of holding a whole body before measuring it (secaudit 2026-09,
  *     A6-13). Same cap, same answers here.
+ *   v1.1.1 -- 2026-09-26 -- The cap is OUTBOUND_READ_MAX_BYTES from utils/read-capped.ts, the one
+ *     an extension's ctx.fetch and a decision provider's answer read with too. Still 4 MB, same
+ *     answers here (secaudit 2026-09, N3).
  */
 import type { ConnectContext } from './oauth.js';
 import { ensureFreshCredential } from './refresh.js';
 import { findProvider } from './providers.js';
 import { safeFetch } from '../../utils/url-validator.js';
-import { readBodyCapped } from '../../utils/read-capped.js';
+import { readBodyCapped, OUTBOUND_READ_MAX_BYTES } from '../../utils/read-capped.js';
 import { logger } from '../../utils/logger.js';
 
-/** How much one read may bring back. A mailbox is unbounded; a response is not. */
-const MAX_RESPONSE_BYTES = 4 * 1024 * 1024;
+// How much one read may bring back is OUTBOUND_READ_MAX_BYTES (utils/read-capped.ts). A mailbox is
+// unbounded; a response is not.
 
 /** How long a provider gets to answer before the caller is told it did not. */
 const TIMEOUT_MS = 20_000;
@@ -128,7 +131,7 @@ export async function readResource(
         if (body === null) {
             return {
                 ok: false, code: 'TOO_LARGE',
-                message: `That is more than ${Math.round(MAX_RESPONSE_BYTES / 1024 / 1024)} MB of answer. Ask for a smaller window: fewer items, or a date range.`,
+                message: `That is more than ${Math.round(OUTBOUND_READ_MAX_BYTES / 1024 / 1024)} MB of answer. Ask for a smaller window: fewer items, or a date range.`,
             };
         }
         return { ok: true, resource: resourceName, provider: provider.id, data: body };
@@ -152,7 +155,7 @@ export async function readResource(
  */
 async function readCapped(resp: Response): Promise<unknown | null> {
     if (!resp.body) return null;
-    const body = await readBodyCapped(resp, MAX_RESPONSE_BYTES);
+    const body = await readBodyCapped(resp, OUTBOUND_READ_MAX_BYTES);
     if (body === null) return null;
 
     const text = body.toString('utf8');
