@@ -13,6 +13,10 @@
  * @structure zod schemas · sendErr mapper · outboundRouter
  * @usage app.use(outboundRouter(config, storage)) in routes-loader
  * @version-history
+ *   v1.4.0 — 2026-09-25 — Whether an address has an account here reaches the owner in person only:
+ *     a contact's `ghii` on the save, the list, the opt-out and the bounce answers, and the `channel`
+ *     of a send, its log rows and its refusal's details, are left out for an agent, an app and any
+ *     other principal acting for the owner. Saving stays uncounted, so bulk imports keep working.
  *   v1.3.0 — 2026-09-13 — A send that did not go out answers an error envelope instead of 200: code
  *     SEND_FAILED, 502 when the channel refused or failed it, 503 when the node had nothing to send
  *     through, and the send-log id plus the reason in error.details. A send that went out keeps 200
@@ -32,6 +36,8 @@ import { z } from 'zod';
 import type { AimeatConfig } from '../config-types.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireScope } from '../auth/middleware.js';
+import { isOwnerInPerson } from '../auth/effective-scopes.js';
+import type { OutboundContactRecord, OutboundMessageRecord } from '../models/outbound-schemas.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { parseDisclosure } from '../services/outbound/ai-disclosure.js';
 import {
@@ -111,11 +117,35 @@ const SendSchema = z.object({
  *     rainbow-table entry for an address on every read.
  * Written as a deny-list on a spread, which is the pattern that let emailHash out the moment the
  * column existed; the fields are named here so the next one added is a deliberate choice.
+ *
+ * A third leaves only for the owner in person: `ghii`, the account the address belongs to. It says
+ * whether the address has an account here, which is the email lookup's answer, and the lookup is
+ * limited per account (services/email-lookup-limit.ts) while saving a contact here is not, so an app
+ * could otherwise save addresses in bulk and read the answers back. The owner still sees it here and
+ * in their own address book.
  */
-function publicContact(c: import('../models/outbound-schemas.js').OutboundContactRecord): Record<string, unknown> {
+function publicContact(c: OutboundContactRecord, seesAccounts: boolean): Record<string, unknown> {
   const safe: Record<string, unknown> = { ...c };
   delete safe.optOutToken;
   delete safe.emailHash;
+  if (!seesAccounts) delete safe.ghii;
+  return safe;
+}
+
+/**
+ * Who learns which addresses have an account here: the owner in person, and nobody acting in their
+ * name (auth/effective-scopes.ts isOwnerInPerson). A send's `channel` says the same thing as a
+ * contact's `ghii`, because only an address with an account here takes the inbox, so it follows the
+ * same rule on the send, its log and its refusal.
+ */
+function seesAccounts(req: Request): boolean {
+  return !!req.auth && isOwnerInPerson(req.auth);
+}
+
+/** A send-log row as this caller may read it: without `channel` unless they see accounts. */
+function publicMessage(m: OutboundMessageRecord, sees: boolean): Record<string, unknown> {
+  const safe: Record<string, unknown> = { ...m };
+  if (!sees) delete safe.channel;
   return safe;
 }
 
@@ -124,7 +154,7 @@ function publicContact(c: import('../models/outbound-schemas.js').OutboundContac
  * next action is the log read that lists it, so a caller holding only the error can still find the
  * attempt: the id to match, and the status filter that narrows the list to rows like it.
  */
-function sendErr(res: Response, config: AimeatConfig, e: unknown): boolean {
+function sendErr(res: Response, config: AimeatConfig, e: unknown, sees = true): boolean {
   if (e instanceof OutboundError) {
     const hints = e.details
       ? [{
@@ -133,7 +163,10 @@ function sendErr(res: Response, config: AimeatConfig, e: unknown): boolean {
         url: `/v1/outbound/log?status=${encodeURIComponent(e.details.status)}`,
       }]
       : undefined;
-    res.status(e.statusCode).json(error(config.nodeId, e.code, e.message, e.statusCode, e.details, hints));
+    // The channel tried says whether the address has an account here; see seesAccounts().
+    const details: Record<string, unknown> | undefined = e.details ? { ...e.details } : undefined;
+    if (details && !sees) delete details.channel;
+    res.status(e.statusCode).json(error(config.nodeId, e.code, e.message, e.statusCode, details, hints));
     return true;
   }
   return false;
@@ -156,9 +189,9 @@ export function outboundRouter(config: AimeatConfig, storage: Storage): Router {
       }
       const contact = await ensureContact(storage, resolve(req), parsed.data);
       emitChange('outbound', resolve(req));
-      res.status(201).json(success(config.nodeId, { contact: publicContact(contact) }));
+      res.status(201).json(success(config.nodeId, { contact: publicContact(contact, seesAccounts(req)) }));
     } catch (e) {
-      if (!sendErr(res, config, e)) throw e;
+      if (!sendErr(res, config, e, seesAccounts(req))) throw e;
     }
   });
 
@@ -176,7 +209,8 @@ export function outboundRouter(config: AimeatConfig, storage: Storage): Router {
       storage.listOutboundContacts({ ...query, limit: perPage, offset: (page - 1) * perPage }),
       storage.countOutboundContacts(query),
     ]);
-    const contacts = rows.map(publicContact);
+    const sees = seesAccounts(req);
+    const contacts = rows.map(c => publicContact(c, sees));
     res.json(success(config.nodeId, { contacts, total }, undefined, { page, per_page: perPage, total }));
   });
 
@@ -187,7 +221,7 @@ export function outboundRouter(config: AimeatConfig, storage: Storage): Router {
       emitChange('outbound', resolve(req));
       res.json(success(config.nodeId, { removed: contact.id }));
     } catch (e) {
-      if (!sendErr(res, config, e)) throw e;
+      if (!sendErr(res, config, e, seesAccounts(req))) throw e;
     }
   });
 
@@ -202,9 +236,9 @@ export function outboundRouter(config: AimeatConfig, storage: Storage): Router {
       const contact = await requireOwnContact(storage, resolve(req), req.params.id as string);
       const updated = await setOptOut(storage, contact, optedOut);
       emitChange('outbound', resolve(req));
-      res.json(success(config.nodeId, { contact: publicContact(updated) }));
+      res.json(success(config.nodeId, { contact: publicContact(updated, seesAccounts(req)) }));
     } catch (e) {
-      if (!sendErr(res, config, e)) throw e;
+      if (!sendErr(res, config, e, seesAccounts(req))) throw e;
     }
   });
 
@@ -217,14 +251,14 @@ export function outboundRouter(config: AimeatConfig, storage: Storage): Router {
         const cleared = { ...contact, bounceCount: 0, suppressedAt: null, updatedAt: new Date().toISOString() };
         await storage.updateOutboundContact(cleared);
         emitChange('outbound', resolve(req));
-        res.json(success(config.nodeId, { contact: publicContact(cleared) }));
+        res.json(success(config.nodeId, { contact: publicContact(cleared, seesAccounts(req)) }));
         return;
       }
       const updated = await recordBounce(storage, contact);
       emitChange('outbound', resolve(req));
-      res.json(success(config.nodeId, { contact: publicContact(updated) }));
+      res.json(success(config.nodeId, { contact: publicContact(updated, seesAccounts(req)) }));
     } catch (e) {
-      if (!sendErr(res, config, e)) throw e;
+      if (!sendErr(res, config, e, seesAccounts(req))) throw e;
     }
   });
 
@@ -288,11 +322,13 @@ export function outboundRouter(config: AimeatConfig, storage: Storage): Router {
       // in details), and sendErr below answers it. It answered 200 with data.status 'failed' until
       // the developer decided otherwise on 2026-09-13, and a caller reading the status or `ok` took
       // a message nobody received for a sent one.
+      // The channel says whether the address has an account here: only the owner in person reads it.
+      const sees = seesAccounts(req);
       res.json(success(config.nodeId, {
-        message: result.log, channel: result.channel, status: result.status,
+        message: publicMessage(result.log, sees), ...(sees ? { channel: result.channel } : {}), status: result.status,
       }));
     } catch (e) {
-      if (!sendErr(res, config, e)) throw e;
+      if (!sendErr(res, config, e, seesAccounts(req))) throw e;
     }
   });
 
@@ -364,10 +400,12 @@ export function outboundRouter(config: AimeatConfig, storage: Storage): Router {
         ? owner
         : (typeof req.query.sent_by === 'string' ? req.query.sent_by : undefined),
     };
-    const [messages, total] = await Promise.all([
+    const [rows, total] = await Promise.all([
       storage.listOutboundMessages({ ...query, limit: perPage, offset: (page - 1) * perPage }),
       storage.countOutboundMessages(query),
     ]);
+    const sees = seesAccounts(req);
+    const messages = rows.map(m => publicMessage(m, sees));
     res.json(success(config.nodeId, { messages, total }, undefined, { page, per_page: perPage, total }));
   });
 

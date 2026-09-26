@@ -23,6 +23,8 @@
  * @structure registerConnectionTools(mcp, storage, config, getAgentGaii, scopes)
  * @usage registerConnectionTools(mcp, storage, config, () => agentGaii, scopes);
  * @version-history
+ *   v1.3.0 — 2026-09-25 — aimeat_mail_send leaves out the `channel`, on a send and on a refusal: it
+ *     says whether the address has an account here, which only the owner in person reads.
  *   v1.2.0 — 2026-09-13 — aimeat_mail_send reads the failed send from the SEND_FAILED error
  *     sendOutbound now throws (the REST route answers the same error with 502 or 503), and returns
  *     its code, the send-log row and the reason. A suppressed or opted-out recipient names its
@@ -243,8 +245,11 @@ export function registerConnectionTools(
                         ...(ai_disclosure ? { aiDisclosure: { level: ai_disclosure } } : {}),
                         ...(theme ? { theme } : {}),
                     });
+                    // No `channel`: it says whether the address has an account here, which only the
+                    // owner in person reads (routes/outbound.ts seesAccounts), and a tool session is
+                    // always an agent.
                     return ok({
-                        status: result.status, channel: result.channel, message_id: result.log.id,
+                        status: result.status, message_id: result.log.id,
                         note: 'Handed over to the provider. Delivery is theirs from here; a bounce shows up on the contact.',
                     });
                 } catch (err) {
@@ -255,10 +260,12 @@ export function registerConnectionTools(
                     // carries in details, beside the code and the sentence, so every door says the
                     // same thing about the same attempt.
                     if (err.details) {
+                        const details: Record<string, unknown> = { ...err.details };
+                        delete details.channel;
                         return {
                             content: [{
                                 type: 'text',
-                                text: JSON.stringify({ code: err.code, ...err.details, note: err.message }, null, 2),
+                                text: JSON.stringify({ code: err.code, ...details, note: err.message }, null, 2),
                             }],
                             isError: true,
                         };
