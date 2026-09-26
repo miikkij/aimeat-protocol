@@ -29,6 +29,9 @@
  *   import { applyInstanceMigration } from '../services/package-migrate.js';
  *   const out = await applyInstanceMigration({ storage, config }, caller, { instanceId, targetVersion, actions });
  * @version-history
+ *   v1.3.0 — 2026-09-25 — The words a caller lacks for a memory component are gathered through the
+ *     whole pre-flight and refused once at its end, carrying `missing`, the target version and the
+ *     instance, so a door can file a request for the owner that the node would then carry out.
  *   v1.2.0 — 2026-09-24 — A memory or translation component brought by an agent or an app grant costs
  *     the memory door's write words (memoryComponentWriteRefusal), asked before anything is deleted.
  *   v1.1.0 — 2026-09-24 — A memory component that names a key the node trusts is refused with 403
@@ -69,9 +72,20 @@ export interface MigrateOutcome {
     newVersion: string;
 }
 
+/**
+ * A refusal. On SCOPE_DENIED for a memory component it also names the words the caller lacks, the
+ * target version and the instance as it stood, which is what a request for the owner records.
+ */
+export interface PackageMigrateRefusal {
+    ok: false; status: number; code: string; message: string;
+    missing?: string[];
+    target?: PackageRecord;
+    instance?: PackageInstanceRecord;
+}
+
 export type PackageMigrateResult =
     | { ok: true; outcome: MigrateOutcome }
-    | { ok: false; status: number; code: string; message: string };
+    | PackageMigrateRefusal;
 
 /** One component the owner has edited, and the door that merges it. */
 export interface NeedsYouEntry {
@@ -96,7 +110,7 @@ export interface InstanceUpdateAnswer {
 
 export type InstanceUpdateResult =
     | { ok: true; answer: InstanceUpdateAnswer }
-    | { ok: false; status: number; code: string; message: string };
+    | PackageMigrateRefusal;
 
 export interface PackageMigrateDeps { storage: Storage; config: AimeatConfig }
 export interface PackageMigrateCaller {
@@ -243,6 +257,12 @@ export async function applyInstanceMigration(
     const failedComponents: { componentId: string; error: string }[] = [];
     const newInstalledComponents: InstalledComponent[] = [];
 
+    // The words this caller lacks for a memory component, gathered rather than refused on the spot:
+    // the rest of the checks still run, so a request filed from this refusal is one the node would
+    // carry out, and the owner is never asked to approve content it would then turn down.
+    const missingWords = new Set<string>();
+    let lackingComponent = '';
+
     // Refuse content this node will not accept BEFORE anything is deleted. `replace` and `custom`
     // both delete the existing component and then register the new one.
     for (const action of actions) {
@@ -270,8 +290,12 @@ export async function applyInstanceMigration(
             }
             // The component writes into the owner's memory, so the caller answers for that write.
             const writeRefusal = memoryComponentWriteRefusal([{ id: compId, type }], caller, ownerGhii);
-            if (writeRefusal) {
+            if (writeRefusal && writeRefusal.missing.length === 0) {
                 return { ok: false, status: writeRefusal.status, code: writeRefusal.code, message: `${writeRefusal.message} Nothing was changed.` };
+            }
+            if (writeRefusal) {
+                for (const word of writeRefusal.missing) missingWords.add(word);
+                lackingComponent ||= compId;
             }
         }
         if (action.action !== 'replace' && action.action !== 'custom') continue;
@@ -318,6 +342,17 @@ export async function applyInstanceMigration(
                 message: `Component "${compId}" was not applied: ${wouldRegister.error ?? 'registration would fail'}`,
             };
         }
+    }
+
+    // Everything else holds; only the words are missing. Nothing has been deleted or written.
+    if (missingWords.size > 0) {
+        const missing = [...missingWords];
+        return {
+            ok: false, status: 403, code: 'SCOPE_DENIED',
+            message: `Component "${lackingComponent}" writes into the owner's memory, which needs ${missing.map(s => `"${s}"`).join(' and ')}, `
+                + `and this session does not carry ${missing.length === 1 ? 'it' : 'them'}. Nothing was changed.`,
+            missing, target: targetPkg, instance,
+        };
     }
 
     for (const action of actions) {

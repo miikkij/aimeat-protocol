@@ -5,6 +5,8 @@
  * @description MCP tool registrations for app/package management -- publishing,
  *   listing, retrieving, archiving versions, version history, sanctioned forks, and drafts (staging).
  * @version-history
+ *   v1.9.0 -- 2026-09-25 -- aimeat_package_install_requests over GET /v1/package-install-requests(/:id)
+ *     and POST /v1/package-install-requests/:id/decision.
  *   v1.8.1 -- 2026-09-13 -- aimeat_app_publish declares cortex_agents and sends them as cortex.agents,
  *     as the node's own tool has since 2026-07-16.
  *   v1.8.0 -- 2026-09-11 -- aimeat_seo_announce over POST /v1/admin/seo/indexnow (plan: true reads
@@ -114,6 +116,22 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
     if (version !== undefined) body.version = version;
     if (dry_run !== undefined) body.dry_run = dry_run;
     return out(await client.post(`/v1/packages/${encodeURIComponent(group_id)}/install`, body));
+  });
+
+  // An install that needed words this agent lacked came back as a request (202, awaiting_owner).
+  // This lists the owner's requests and lets an agent of theirs answer one, on the node's own rule.
+  mcp.tool('aimeat_package_install_requests', descriptionFor('aimeat_package_install_requests'), {
+    request_id: z.string().optional().describe('One request. Omit to list them all.'),
+    decision: z.enum(['approve', 'decline']).optional().describe('Decide the request named by request_id.'),
+  }, annotationsFor('aimeat_package_install_requests'), async ({ request_id, decision }) => {
+    if (decision !== undefined) {
+      if (!request_id) {
+        return { content: [{ type: 'text' as const, text: 'INVALID_INPUT: Name the request to decide with request_id. List them by calling this tool with no arguments.' }], isError: true };
+      }
+      return out(await client.post(`/v1/package-install-requests/${encodeURIComponent(request_id)}/decision`, { decision }));
+    }
+    if (request_id) return out(await client.get(`/v1/package-install-requests/${encodeURIComponent(request_id)}`));
+    return out(await client.get('/v1/package-install-requests'));
   });
 
   // ───────────────────────────────────────────────────────────────────────────────────────────────

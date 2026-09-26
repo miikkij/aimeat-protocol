@@ -9,6 +9,8 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   v1.55.0 -- 2026-09-25 -- Add e2e-package-install-requests.ts to ALL_SUITES: an agent's install
+ *            that needs words it lacks becomes a request the owner answers. Not in the guard tier.
  *   v1.54.1 -- 2026-09-25 -- The port STOP message no longer says nothing is written down above
  *            40650 (suites name 40665, 40672, 40701, 40702 and 40961); it names the grep that
  *            answers the question and the cross-session trap (docs/pitfalls.md §96).
@@ -723,6 +725,9 @@ const ALL_SUITES = [
     // The msm and memory component types through compose, install, status, and uninstall: the arms
     // of component-registrar no package in the sweep had ever carried.
     'test/e2e-package-components.ts',
+    // An agent's install that needs words it lacks becomes a request the owner (or an agent of theirs
+    // holding the words) answers: the door, the MCP twin, expiry, decline, and the reserved prefix.
+    'test/e2e-package-install-requests.ts',
     'test/e2e-federation-packages.ts',
     'test/e2e-businesslauncher.ts',
     'test/e2e-company-brain.ts',

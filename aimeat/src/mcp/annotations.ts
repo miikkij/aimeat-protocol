@@ -23,6 +23,7 @@
  *     async ({ key }) => { ... }
  *   );
  * @version-history
+ *   2026-09-25 — aimeat_package_install_requests (a write that installs on approval; idempotent).
  *   2026-09-24 — aimeat_theme_policy_set (idempotent, nothing destroyed).
  *   2026-09-24 — aimeat_theme_style_save and aimeat_theme_component_css_set (writes, nothing destroyed).
  *   2026-09-24 — aimeat_theme_list and aimeat_theme_get (read-only), aimeat_theme_save (a write).
@@ -371,6 +372,10 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     // Not idempotent: each install mints a fresh instance with its own component names, so calling
     // it twice leaves two copies rather than one.
     aimeat_package_install: { title: 'Install Package', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    // Lists and reads, and decides: approving installs what was asked, declining closes it. Idempotent:
+    // a second decision on a settled request is refused and changes nothing. Not destructive: it
+    // installs or updates, and a migration it approves checks every part before replacing any.
+    aimeat_package_install_requests: { title: 'Package Install Requests', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_app_list: { title: 'List Apps', readOnlyHint: true },
     aimeat_app_get: { title: 'Get App', readOnlyHint: true },
     aimeat_app_versions: { title: 'List App Versions', readOnlyHint: true },

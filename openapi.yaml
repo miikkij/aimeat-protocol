@@ -3854,6 +3854,78 @@ components:
           type: string
           format: date-time
 
+    PackageInstallRequestFiled:
+      type: object
+      description: >-
+        What an install, update or migration door answers with 202 when the caller lacks the words a
+        memory part needs. Asking again for the same thing returns the standing request.
+      required: [request_id, status, act, missing, expires_at, already_waiting, next_step]
+      properties:
+        request_id: { type: string, format: uuid }
+        status: { type: string, enum: [awaiting_owner] }
+        act: { type: string, enum: [install, update, migrate] }
+        missing:
+          type: array
+          items: { type: string }
+          description: The permission words the caller lacks, e.g. memory:write-as-owner.
+        expires_at: { type: string, format: date-time, description: Seven days from the request. }
+        already_waiting: { type: boolean, description: True when this is a request the same caller already filed. }
+        next_step: { type: string, description: What happens now, in a sentence an agent can pass on. }
+
+    PackageInstallRequest:
+      type: object
+      description: An install, update or migration an agent or an app asked for and could not do alone.
+      required: [id, act, state, package, requested_by, missing, created_at, expires_at]
+      properties:
+        id: { type: string, format: uuid }
+        act: { type: string, enum: [install, update, migrate] }
+        state:
+          type: string
+          enum: [awaiting_owner, approved, declined, expired, outdated]
+          description: '`outdated`: the package version or the installed copy changed after the request, so it was not carried out.'
+        package:
+          type: object
+          properties:
+            group_id: { type: string }
+            name: { type: string }
+            version: { type: string }
+        instance_id: { type: string, nullable: true, description: The installed copy an update or a migration moves. }
+        label: { type: string, nullable: true }
+        actions:
+          type: array
+          nullable: true
+          description: A migration's actions, without their content.
+          items:
+            type: object
+            properties:
+              componentId: { type: string }
+              action: { type: string, enum: [replace, skip, custom, install_new] }
+              has_content: { type: boolean }
+        memory_parts:
+          type: array
+          items: { type: string }
+          description: The components that write into the owner's memory.
+        requested_by:
+          type: object
+          properties:
+            principal: { type: string, description: The agent's GAII, or the app's eco identity. }
+            kind: { type: string, enum: [agent, app] }
+            app: { type: string, description: 'owner/filename, for an app grant.' }
+        missing:
+          type: array
+          items: { type: string }
+        created_at: { type: string, format: date-time }
+        expires_at: { type: string, format: date-time }
+        decided_at: { type: string, format: date-time, nullable: true }
+        decided_by: { type: string, nullable: true, description: The owner's GHII or the deciding agent's GAII; null when it expired. }
+        outcome:
+          type: object
+          nullable: true
+          properties:
+            instance_id: { type: string }
+            version: { type: string }
+            reason: { type: string }
+
     InstalledComponent:
       type: object
       required: [componentId, type, registeredAs, originalHash, customized]
@@ -41970,9 +42042,13 @@ paths:
         to decide what it does (an AI-provider setting, the spend cap, a payout record) is refused
         with 403 RESERVED_KEY before any component registers, for the owner too. And the write itself
         costs what POST /v1/memory asks for a write there: an agent needs memory:write and
-        memory:write-as-owner, an app grant memory:write, or the install is refused with 403
-        SCOPE_DENIED before any component registers. A translation component counts the same, and an
-        ecosystem app is refused. The owner in person passes. A dry run answers the same.
+        memory:write-as-owner, an app grant memory:write. An agent or an app grant without them gets
+        202 and a request for the owner instead of a refusal: nothing registers until the owner, or an
+        agent of theirs holding the words, approves it at POST
+        /v1/package-install-requests/{id}/decision. A dry run by such a caller answers the preview
+        with `status: would_await_owner` and `missing`. A translation component writes only the
+        installed copy's own `i18n.<registered name>` record and costs nothing beyond packages:write.
+        An ecosystem app is refused. The owner in person passes.
       tags: [Instances]
       security:
         - BearerAuth: []
@@ -42003,12 +42079,157 @@ paths:
                     properties:
                       data:
                         $ref: '#/components/schemas/PackageInstanceRecord'
+        '202':
+          description: The install waits for the owner. Nothing was registered.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PackageInstallRequestFiled'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
           description: Package not found
+
+  /v1/package-install-requests:
+    get:
+      operationId: listPackageInstallRequests
+      summary: The account's package install requests
+      description: >-
+        Installs, updates and migrations an agent or an app asked for and could not do alone, newest
+        first. The owner and their agents see every request; an app grant sees the ones it filed. A
+        request is decidable for seven days; after that it reads `expired`. Requires packages:write
+        (an owner session passes).
+      tags: [Instances]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: '`data` is `{ requests, waiting }`.'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          requests:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/PackageInstallRequest'
+                          waiting: { type: integer, description: How many still wait for a decision. }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /v1/package-install-requests/{id}:
+    get:
+      operationId: getPackageInstallRequest
+      summary: One package install request
+      tags: [Instances]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: '`data` is `{ request }`.'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          request:
+                            $ref: '#/components/schemas/PackageInstallRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: No such request on this account, or one an app did not file.
+
+  /v1/package-install-requests/{id}/decision:
+    post:
+      operationId: decidePackageInstallRequest
+      summary: Approve or decline a package install request
+      description: >-
+        The owner in person decides any request; this is the door the notification's Approve and
+        Decline run with the owner's session. An agent of the owner may decline any request it did not
+        file, and may approve one only when it did not file it and holds packages:write, memory:write
+        and memory:write-as-owner (403 OWN_REQUEST, 403 SCOPE_DENIED otherwise). An app grant, an
+        ecosystem app and a visitor from another node are refused with 403 ACCESS_DENIED. Approving
+        re-checks the request first: 410 EXPIRED after seven days, 409 OUTDATED when the package
+        version or the installed copy changed after it was asked; both settle the request and tell
+        the one who asked. Then the install, update or migration runs as the owner; if it fails the
+        request stays waiting. The one who asked is told the outcome (an agent by an Agent v2
+        message whose context is the request id), and an approval is recorded as an account event.
+      tags: [Instances]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision]
+              properties:
+                decision: { type: string, enum: [approve, decline] }
+      responses:
+        '200':
+          description: >-
+            `data` is `{ decision, request }`, plus `instance` (install), `update` (update) or
+            `migration` (migration) when it was approved.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          decision: { type: string, enum: [approve, decline] }
+                          request:
+                            $ref: '#/components/schemas/PackageInstallRequest'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: No such request on this account.
+        '409':
+          description: '`ALREADY_SETTLED` or `OUTDATED`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '410':
+          description: '`EXPIRED`: seven days passed before anyone decided it.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
 
   /v1/instances:
     get:
@@ -42170,10 +42391,11 @@ paths:
       description: >-
         Apply a migration to update an instance to a newer package version. A memory component that
         names a key this node reads to decide what it does is refused with 403 RESERVED_KEY, for
-        replace, custom and install_new alike, before anything is deleted. A memory or translation
-        component brought by an agent or an app grant costs the words POST /v1/memory asks for a
-        write into the owner's namespace (see installPackage), or 403 SCOPE_DENIED, also before
-        anything is deleted.
+        replace, custom and install_new alike, before anything is deleted. A memory component brought
+        by an agent or an app grant costs the words POST /v1/memory asks for a write into the owner's
+        namespace (see installPackage). Without them, and with every other check passed, the answer is
+        202 and a request for the owner carrying these actions; nothing is deleted or written until it
+        is approved.
       tags: [Instances]
       security:
         - BearerAuth: []
@@ -42212,6 +42434,17 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+        '202':
+          description: The migration waits for the owner. Nothing was deleted or written.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PackageInstallRequestFiled'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -42230,8 +42463,9 @@ paths:
         edited is NOT overwritten: it comes back in `needsYou` with the address of the prompt that
         merges it, and its bytes are untouched. A component the new version dropped is reported in
         `removed` and left alone, because deleting a copy is a separate act. Everything else moves.
-        A memory or translation component moved by an agent or an app grant costs what
-        apply-migration asks for it.
+        A memory component moved by an agent or an app grant costs what apply-migration asks for it;
+        without those words the answer is 202 and a request for the owner, and nothing moves until it
+        is approved.
       tags: [Instances]
       security:
         - BearerAuth: []
@@ -42290,6 +42524,17 @@ paths:
                             type: object
                             nullable: true
                             description: Null on a dry run, and when nothing could be applied safely.
+        '202':
+          description: The update waits for the owner. Nothing moved.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PackageInstallRequestFiled'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':

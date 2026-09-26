@@ -6,6 +6,8 @@
  *   itself (dry_run validation, component registration, @activate-cron firing, rollback on failure)
  *   lives in the service, so this door and the MCP tool run the same code.
  * @version-history
+ *   v1.7.0 — 2026-09-25 — An agent or an app grant lacking the words a memory part needs gets 202 and
+ *     a request for the owner instead of 403 (services/package-install-requests.ts installOrRequest).
  *   v1.6.0 — 2026-09-24 — The session's roles and scopes go to installPackage, which asks them for a
  *     package whose memory component writes into the owner's memory.
  *   v1.5.0 — 2026-09-14 — requireLocalSession, as on every other instance door: the install files
@@ -33,9 +35,10 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { requireAuth, requireScope, requireLocalSession } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
-import { installPackage } from '../../services/package-install.js';
+import { installOrRequest, requestedBody } from '../../services/package-install-requests.js';
 import { resolveGhii } from '../../utils/ghii-resolver.js';
 import type { Scheduler } from '../../services/scheduler.js';
+import { actCallerOf } from './install-requests.js';
 
 export function registerInstallRoutes(
   router: Router,
@@ -59,9 +62,9 @@ export function registerInstallRoutes(
 
     const { label, version, dry_run: dryRun } = req.body ?? {};
 
-    const out = await installPackage(
+    const out = await installOrRequest(
       { storage, config, scheduler },
-      { owner, sub: req.auth!.sub, ownerGhii, roles: req.auth!.roles, scopes: req.auth!.scopes ?? [], federated: req.auth!.federated },
+      actCallerOf(req, owner, ownerGhii),
       { groupId, label, version, dryRun: dryRun === true },
     );
 
@@ -72,6 +75,14 @@ export function registerInstallRoutes(
 
     if (out.kind === 'dry-run') {
       res.json(success(config.nodeId, out.preview));
+      return;
+    }
+
+    // Accepted, not done: the owner decides. The request's own door is where it can be read.
+    if (out.kind === 'requested') {
+      res.status(202).json(success(config.nodeId, requestedBody(out), [
+        { description: 'Where this request stands', method: 'GET', url: `/v1/package-install-requests/${out.request.id}` },
+      ]));
       return;
     }
 

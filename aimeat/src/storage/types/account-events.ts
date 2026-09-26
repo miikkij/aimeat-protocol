@@ -15,6 +15,8 @@
  * @usage
  *   import type { AccountEventInput } from '../storage/interface.js';
  * @version-history
+ *   v1.5.0 — 2026-09-25 — package_installed: an install or update an agent or an app asked for, done
+ *     because it was approved.
  *   v1.4.0 — 2026-09-24 — memory_accessed_by_operator: the operator opened, searched, deleted or
  *     restored one of your entries (security audit A8-2). The most invasive read on the node left no
  *     trace a person could see.
@@ -61,6 +63,10 @@ export type AccountEventKind =
   // What the account gained the ability to do
   | 'skill_installed'
   | 'extension_installed'
+  // A package somebody else asked for, installed or updated because the owner (or an agent of theirs
+  // holding the words) approved it. `data.act` is install or update, `data.who` who asked; the actor
+  // is who approved. A package the owner installs by hand is not news: they pressed the button.
+  | 'package_installed'
   // Money
   | 'payment_received'
   | 'payment_sent'

@@ -6,6 +6,8 @@
  *   and apply a migration to an instance (replace/skip/custom/install_new actions).
  *   Extracted from src/routes/instances.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.5.0 — 2026-09-25 — apply-migration and update answer 202 with a request for the owner when an
+ *     agent or an app grant lacks the words a memory part needs, instead of 403.
  *   v1.4.0 — 2026-09-24 — apply-migration and update hand the session's roles and scopes to the
  *     service, which asks them for a memory component that writes into the owner's memory.
  *   v1.3.0 — 2026-09-14 — requireLocalSession on all three doors, as on the rest of the instance
@@ -34,7 +36,8 @@ import { requireAuth, requireScope, requireLocalSession } from '../../auth/middl
 import { success, error } from '../../middleware/envelope.js';
 import { fetchComponentContent } from '../../services/component-registrar.js';
 import { resolveGhii } from '../../utils/ghii-resolver.js';
-import { applyInstanceMigration, updateInstanceToLatest } from '../../services/package-migrate.js';
+import { migrateOrRequest, updateOrRequest, requestedBody } from '../../services/package-install-requests.js';
+import { actCallerOf as callerOf } from './install-requests.js';
 
 // ── Register migration routes ─────────────────────────────────────────
 
@@ -190,12 +193,17 @@ export function registerMigrationRoutes(
     const ownerGaii = await resolveGhii(storage, owner, config);
     const { targetVersion, components: migrationActions } = req.body ?? {};
 
-    const out = await applyInstanceMigration({ storage, config },
-      { owner, ownerGhii: ownerGaii, sub: req.auth!.sub, roles: req.auth!.roles, scopes: req.auth!.scopes ?? [], federated: req.auth!.federated },
+    const out = await migrateOrRequest({ storage, config }, callerOf(req, owner, ownerGaii),
       { instanceId: id, targetVersion, actions: migrationActions });
 
     if (!out.ok) {
       res.status(out.status).json(error(config.nodeId, out.code, out.message));
+      return;
+    }
+    if ('kind' in out) {
+      res.status(202).json(success(config.nodeId, requestedBody(out), [
+        { description: 'Where this request stands', method: 'GET', url: `/v1/package-install-requests/${out.request.id}` },
+      ]));
       return;
     }
 
@@ -219,12 +227,17 @@ export function registerMigrationRoutes(
     const id = req.params.id as string;
     const owner = req.auth!.owner;
     const ownerGaii = await resolveGhii(storage, owner, config);
-    const out = await updateInstanceToLatest({ storage, config },
-      { owner, ownerGhii: ownerGaii, sub: req.auth!.sub, roles: req.auth!.roles, scopes: req.auth!.scopes ?? [], federated: req.auth!.federated },
+    const out = await updateOrRequest({ storage, config }, callerOf(req, owner, ownerGaii),
       { instanceId: id, dryRun: req.body?.dry_run === true });
 
     if (!out.ok) {
       res.status(out.status).json(error(config.nodeId, out.code, out.message));
+      return;
+    }
+    if ('kind' in out) {
+      res.status(202).json(success(config.nodeId, requestedBody(out), [
+        { description: 'Where this request stands', method: 'GET', url: `/v1/package-install-requests/${out.request.id}` },
+      ]));
       return;
     }
 

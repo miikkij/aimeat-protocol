@@ -24,6 +24,8 @@
  * @usage
  *   registerAllServerTools(mcp, { storage, config, agentGaii: () => gaii, ... });
  * @version-history
+ *   v1.8.0 — 2026-09-25 — registerPackageInstallRequestTools: an agent of the owner lists, approves
+ *     or declines package install requests from a chat, with the session's scopes.
  *   v1.7.0 — 2026-09-24 — The boards, skills, cortex, page-layout and theme groups receive the
  *     session's scopes: each asks the operator question of the agent (security audit A8-1).
  *   v1.6.0 — 2026-09-24 — registerContactTools receives the session's bearer: the email lookup asks
@@ -98,6 +100,7 @@ import { registerNotifyTools } from './notify.js';
 import { registerContactTools } from './contacts.js';
 import { registerCompanyTools } from './companies.js';
 import { registerPackageTools } from './packages.js';
+import { registerPackageInstallRequestTools } from './package-install-requests.js';
 import { registerPortfolioTools } from './portfolio.js';
 import { registerSurfaceLayoutTools } from './surface-layout.js';
 import { registerAppUiTools } from './app-ui.js';
@@ -209,6 +212,8 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     // peers: pulling a package from another node reads that node's address and key from the peer
     // record, never from the caller's arguments.
     registerPackageTools(mcp, storage, config, agentGaii, peers, scopes);
+    // The requests an install that lacked the words became, answered from a chat.
+    registerPackageInstallRequestTools(mcp, storage, config, agentGaii, scopes);
     registerPortfolioTools(mcp, storage, config, agentGaii);
     registerSurfaceLayoutTools(mcp, storage, config, agentGaii, scopes);
     registerAppUiTools(mcp, storage, config, agentGaii);

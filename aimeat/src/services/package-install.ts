@@ -20,6 +20,10 @@
  *   import { installPackage } from '../services/package-install.js';
  *   const out = await installPackage({ storage, config, scheduler }, caller, { groupId });
  * @version-history
+ *   v1.3.0 — 2026-09-25 — A SCOPE_DENIED refusal names the words the caller lacks (`missing`) and the
+ *     version it would have installed (`target`), so the doors can turn it into a request for the
+ *     owner (package-install-requests.ts). A dry run by such a caller answers the preview with
+ *     `status: 'would_await_owner'` instead of the refusal: the real call waits, it does not fail.
  *   v1.2.0 — 2026-09-24 — The caller carries its roles and scopes, and a package with a memory
  *     component costs an agent memory:write and memory:write-as-owner, an app grant memory:write, as
  *     the memory door asks for a write into the owner's namespace. Refused before any component
@@ -95,12 +99,25 @@ export interface PackageInstallPreview {
         dependencies: string[];
     }>;
     label: string;
+    /** Present when this caller lacks words the install needs: the real call files a request. */
+    status?: 'would_await_owner';
+    missing?: string[];
+}
+
+/**
+ * A refusal. On SCOPE_DENIED for a memory component it also names the words the caller lacks and the
+ * package version it resolved, which is everything a request for the owner needs to record.
+ */
+export interface PackageInstallRefusal {
+    ok: false; status: number; code: string; message: string;
+    missing?: string[];
+    target?: PackageRecord;
 }
 
 export type PackageInstallResult =
     | { ok: true; kind: 'dry-run'; preview: PackageInstallPreview }
     | { ok: true; kind: 'installed'; instance: PackageInstanceRecord }
-    | { ok: false; status: number; code: string; message: string };
+    | PackageInstallRefusal;
 
 /**
  * Topological sort by component dependencies (depth-first). A component that names another in its
@@ -239,10 +256,16 @@ export async function installPackage(
             };
         }
     }
-    // And writing the owner's memory at all costs what the memory door asks of this caller.
+    // And writing the owner's memory at all costs what the memory door asks of this caller. Words the
+    // caller lacks are not the end of it: the doors file a request for the owner from this refusal,
+    // so it carries what was missing and which version it would have been. A dry run says so instead.
     const writeRefusal = memoryComponentWriteRefusal(pkg.components, caller, ownerGhii);
-    if (writeRefusal) {
-        return { ok: false, status: writeRefusal.status, code: writeRefusal.code, message: `${writeRefusal.message} Nothing was installed.` };
+    const awaitsOwner = writeRefusal?.code === 'SCOPE_DENIED' && writeRefusal.missing.length > 0;
+    if (writeRefusal && !(awaitsOwner && isDryRun)) {
+        return {
+            ok: false, status: writeRefusal.status, code: writeRefusal.code, message: `${writeRefusal.message} Nothing was installed.`,
+            ...(awaitsOwner ? { missing: writeRefusal.missing, target: pkg } : {}),
+        };
     }
 
     // ── Dry run: validate without registering ────────────────────────
@@ -270,6 +293,7 @@ export async function installPackage(
                 installOrder: componentOrder,
                 components: validationResults,
                 label: instanceLabel,
+                ...(awaitsOwner ? { status: 'would_await_owner' as const, missing: writeRefusal!.missing } : {}),
             },
         };
     }

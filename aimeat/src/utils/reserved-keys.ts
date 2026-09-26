@@ -19,6 +19,8 @@
  *   serverWrittenKeyRefusal(key) · appMayWriteKey(roles, key, delegatedOwnerWrite?, reservedAllowed?)
  * @usage import { appMayWriteKey } from '../utils/reserved-keys.js';
  * @version-history
+ *   v1.13.0 — 2026-09-25 — `packages.install-requests.` joins the list: an install request is an
+ *     instruction the decision door performs as the owner.
  *   v1.12.0 — 2026-09-25 — `notif.` is written only by the node (SERVER_WRITTEN_KEY_PREFIXES). A
  *     notification carries buttons the owner's browser runs with the owner's own session, so a
  *     principal that could write one could make the owner's next click call any door in their name.
@@ -156,6 +158,15 @@ export const RESERVED_OWNER_KEY_PREFIXES = [
   // scrubber obeys: an app that could write it could turn off the cleaning of its own traffic. The
   // owner's routes (PUT /v1/ai/decide/settings) are the writers. New prefix, nothing wrote it before.
   'decide.',
+  // 2026-09-25: `packages.install-requests.<id>` is an install an agent or an app asked for and could
+  // not do alone (services/package-install-request-store.ts), and the decision door ACTS on it: it
+  // reads the package, the version, the options and the requester out of that record and installs
+  // them as the owner. The words the requester lacked are written into the record when it is filed,
+  // so a principal that could write the key directly could forge a request naming any package, any
+  // migration content and nothing missing, and an agent of the owner approving from a chat would be
+  // judged against the forgery. Only the filing path writes this prefix, server-side; the owner and
+  // their agents settle it through /v1/package-install-requests. New prefix, nothing wrote it before.
+  'packages.install-requests.',
 ] as const;
 
 /**

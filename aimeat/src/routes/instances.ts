@@ -13,6 +13,8 @@
  *   - ./instances/manage.ts — GET /v1/instances, GET/:id, GET/:id/status,
  *     GET/:id/check-update, DELETE /:id
  *   - ./instances/migration.ts — POST /:id/migration-prompt, POST /:id/apply-migration
+ *   - ./instances/install-requests.ts — the install requests an agent or an app files, and the
+ *     decision door the owner and their agents answer them on
  * @usage
  *   import { instancesRouter } from '../routes/instances.js';
  *   app.use(instancesRouter(config, storage));
@@ -23,6 +25,7 @@
  *   v2.0.0 — 2026-03-15 — full implementation: component registration, rollback,
  *     dry_run, hash comparison, migration apply, component deletion
  *   v2.2.0 — 2026-07-13 — extract handler groups to ./instances/{install,manage,migration}.ts (max-file-lines)
+ *   v2.3.0 — 2026-09-25 — ./instances/install-requests.ts: the package install requests and their decision door
  */
 
 import { Router } from 'express';
@@ -32,6 +35,7 @@ import type { Scheduler } from '../services/scheduler.js';
 import { registerInstallRoutes } from './instances/install.js';
 import { registerManageRoutes } from './instances/manage.js';
 import { registerMigrationRoutes } from './instances/migration.js';
+import { registerInstallRequestRoutes } from './instances/install-requests.js';
 
 // ── Router factory ────────────────────────────────────────────────────
 
@@ -58,6 +62,9 @@ export function instancesRouter(
 
   // POST /:id/migration-prompt, POST /:id/apply-migration
   registerMigrationRoutes(router, config, storage);
+
+  // GET /v1/package-install-requests(/:id), POST /v1/package-install-requests/:id/decision
+  registerInstallRequestRoutes(router, config, storage, scheduler);
 
   return router;
 }
