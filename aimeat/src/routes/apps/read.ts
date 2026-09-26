@@ -10,6 +10,8 @@
  *   - registerReadRoutes() — versions, forks, lineage, screenshot GET/POST/DELETE, app download
  * @usage registerReadRoutes(router, config, storage, canonicalOwner); // from appsRouter
  * @version-history
+ *   v1.10.2 — 2026-09-26 — The visible AI label's reviewer re-decision is told whether the app is
+ *     public (no access code, not parked), instead of assuming it.
  *   v1.10.1 — 2026-09-24 — GIF and AVIF screenshots are pictures too, stored and served as such.
  *   v1.10.0 — 2026-09-24 — The screenshot GET serves only a PNG, JPEG or WebP image, typed by its
  *     bytes, and answers 404 otherwise; the screenshot POST refuses anything else and stores the
@@ -652,7 +654,11 @@ export function registerReadRoutes(
                 // The owner's switch (services/app-marks.ts); on unless they turned it off.
                 badge: appBadgeOn(app.manifest),
                 provenance: prov,
-                visibleLabel: { config, locale: detectLocale(req.headers['accept-language']) },
+                visibleLabel: {
+                    config, locale: detectLocale(req.headers['accept-language']),
+                    // As the publish decides it: an access code or a park makes the app private.
+                    publiclyReadable: !app.accessCode && !app.parked,
+                },
                 // The named reviewer, when the account holder declared one: served in the head,
                 // and the visible content label is decided again with that declaration.
                 reviewedBy: appReviewedBy(app.manifest),

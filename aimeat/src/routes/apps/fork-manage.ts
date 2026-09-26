@@ -6,6 +6,8 @@
  *   PATCH /v1/apps/:filename (rename/access-code/parked/forkable/protection/cortex), DELETE /v1/apps/:filename.
  *   Extracted from src/routes/apps.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.6.2 — 2026-09-26 — The marks update is told the node's label policy, so the reviewer note
+ *     says what the visible label does on this node.
  *   v1.6.1 — 2026-09-24 — PATCH asks the provenance scope a legal declaration needs before its first
  *     write too (508c32904067): an agent holding app:write and not provenance:write renamed, parked
  *     and re-coded the app, and only the legal block, read last, answered 403.
@@ -507,6 +509,7 @@ export function registerForkManageRoutes(
                 ...('marks' in body ? { marks: body.marks } : {}),
                 ...('author' in body ? { author: body.author } : {}),
                 actor: { ghii: ownerGhii, ownerPrincipal },
+                labelPolicy: config.aiLabelPublic,
             });
             if ('error' in out) {
                 const code = out.status === 403 ? 'ACCESS_DENIED' : out.status === 404 ? 'NOT_FOUND' : 'INVALID_INPUT';

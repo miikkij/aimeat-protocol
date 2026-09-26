@@ -36,6 +36,9 @@
  *   const out = await applyOwnerMarksUpdate(storage, { ownerGaii, filename },
  *     { marks: body.marks, author: body.author, actor: { ghii, ownerPrincipal } });
  * @version-history
+ *   v1.2.0 — 2026-09-26 — `labelPolicy`: the declaration's note says the visible label stays on a
+ *     public app under the node's strict policy, and now names the reviewer, instead of saying it
+ *     comes off on every node.
  *   v1.1.0 — 2026-08-29 — Every change also lands in the app's audit log (services/app-audit.ts).
  *   v1.0.0 — 2026-08-29 — Initial: badge and install switches, the named reviewer, the log.
  */
@@ -131,6 +134,8 @@ export interface MarksUpdateInput {
   marks?: unknown;
   author?: unknown;
   actor: MarksActor;
+  /** The node's visible-label policy (config.aiLabelPublic), so the note says what the label does. */
+  labelPolicy?: AimeatConfig['aiLabelPublic'];
 }
 
 export type MarksUpdateResult =
@@ -198,8 +203,13 @@ export async function applyOwnerMarksUpdate(
     } else if (author !== null && author !== current) {
       update.authorship = { name: author, declaredBy: input.actor.ghii, declaredAt: at };
       update.authorshipLog = appendLog(before.authorshipLog, { at, by: input.actor.ghii, action: 'declared', name: author });
-      notes.push(`${author} now answers for this app as its reviewer. The name is served in the app's source, `
-        + 'the visible AI-generated label comes off, and the machine-readable provenance stays as it was. '
+      // What the visible label does next depends on the NODE's policy, and the note says which,
+      // because the old sentence ("the label comes off") was false on every strict node.
+      const label = input.labelPolicy === 'strict'
+        ? `On a public app the visible label stays, because this node also labels what the law does not require, and it now says that ${author} reviewed the app. `
+        : 'The visible AI-generated label comes off. ';
+      notes.push(`${author} now answers for this app as its reviewer. The name is served in the app's source. `
+        + label + 'The machine-readable provenance stays as it was. '
         + 'This is on the record: every declaration and withdrawal is kept with the name and the time.');
     }
   }

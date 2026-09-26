@@ -46,6 +46,8 @@
  *   const body = applyServeMarks(app.data, {
  *     badge: true, provenance: prov, visibleLabel: { config, locale }, discovery, headMeta });
  * @version-history
+ *   v1.5.0 — 2026-09-26 — `visibleLabel.publiclyReadable`: the app as served now, for the
+ *     reviewer's re-decision of the visible label. Absent means public, so the goldens are unchanged.
  *   v1.4.1 — 2026-09-13 — Comment only: the publish now strips what this pass writes
  *     (services/app-serve-marks-strip.ts), and a new mark here needs its rule there. Output unchanged.
  *   v1.4.0 — 2026-09-13 — The `#aimeat-app-ref` identity block is written at the start of the head
@@ -148,7 +150,15 @@ export interface ServeMarksSpec {
    * Also render the VISIBLE AI label. Opt-in per caller: the machine-readable marks belong on every
    * HTML face, the chip belongs only where a person is looking at a running app.
    */
-  visibleLabel?: { config: AimeatConfig; locale: Locale };
+  visibleLabel?: {
+    config: AimeatConfig; locale: Locale;
+    /**
+     * Whether anyone can read this app right now. Only the reviewer's re-decision reads it (the
+     * strict policy labels only what anyone can read); absent means yes, which is what every
+     * caller assumed before 2026-09-26 and what a legal page served without the access code is.
+     */
+    publiclyReadable?: boolean;
+  };
   /**
    * The natural person who declared they reviewed this app and answer for it
    * (manifest.authorship, services/app-marks.ts). Served as `<meta name="author">` and

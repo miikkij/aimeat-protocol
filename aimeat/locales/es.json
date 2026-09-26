@@ -2758,6 +2758,7 @@
     "originalLong": "Lo escribió una persona. No intervino ninguna IA.",
     "unstatedLong": "No sabemos si intervino una IA en esto.",
     "reviewed": "Borrador de IA, revisado por {{name}}.",
+    "reviewedShort": "Borrador de IA, revisado por una persona.",
     "detailsLink": "Cómo se hizo esto",
     "policyLong": "Un modelo intervino en esto. Aquí se declara incluso donde la ley no lo exige.",
     "interactionTitle": "Estás hablando con un asistente de IA",

@@ -29,6 +29,8 @@
  *   AI-disclosure marks; the visible-label half is proven in test/unit/app-marks.test.ts and
  *   test/unit/app-serve-marks-strip.test.ts.
  * @version-history
+ *   v1.2.1 — 2026-09-26 — The reviewer note on a strict node says the visible label stays, not that
+ *     it comes off. Failed on the code before the fix.
  *   v1.2.0 — 2026-09-13 — Phase 5, the developer's decision that a served copy is stored without the
  *     node's serve marks: every publish door, the refusal that still applies, the cross-owner refusal
  *     and identity, and the lookalike app.
@@ -217,6 +219,9 @@ await test('The account holder declares the reviewer', async () => {
     assert(Array.isArray(body.data.authorshipLog) && body.data.authorshipLog.length === 1, 'one log entry');
     assert(body.data.authorshipLog[0].action === 'declared' && body.data.authorshipLog[0].name === REVIEWER, 'log entry says declared + name');
     assert(/answers for this app/.test(body.data.note), `note: ${body.data.note}`);
+    // This test node runs the default STRICT label policy, where the label stays on a public app
+    // and names the reviewer. The note said "the label comes off" on every node until 2026-09-26.
+    assert(/the visible label stays/.test(body.data.note) && !/comes off/.test(body.data.note), `note says what strict does: ${body.data.note}`);
 });
 
 await test('The served head carries the name, machine-readable', async () => {

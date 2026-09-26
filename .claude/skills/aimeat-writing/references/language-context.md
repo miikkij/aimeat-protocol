@@ -112,6 +112,8 @@ everywhere at once, and say so in the Changes section.
 | whoever opened an app | a person, a named AI or another program; "visitor" says nothing about which | visitor | kävijä | visitante |
 | counting what kind of visitor came | off until the app's owner switches it on; then each visit is a person, a named AI or another bot, and people may be placed by country, region or city | visitor measurement | kävijämittaus | medición de visitantes |
 | a person who opened an app without an account session | the node knows nothing about them, and the word says only that | not signed in | kirjautumaton | sin iniciar sesión |
+| the person who read an AI draft and answers for it | named on an app by its owner in person; the visible AI label then names them or comes off, by the operator's label setting | reviewer (the act: reviewed) | katselmoija (the act on the label: tarkistanut) | revisor (the act: revisado) |
+| the mark that tells a person AI made something | the chip on a served app and the words beside it; the operator's setting decides whether it also marks what the law does not require | visible AI label | näkyvä tekoälymerkintä | etiqueta visible de IA |
 
 ## Never translated, in any language
 
@@ -220,6 +222,11 @@ service, the directory, the token, the identifier and the username: the test nam
 
 ## Changes
 
+- **2026-09-26** — reviewer and visible AI label, with the strict-policy wording of the label and
+  the App Catalog's Marks section. The catalog already said *katselmoija* for the person and the
+  label already said *tarkistanut* for the act; both stay as they ship, and the row says which is
+  which so the next writer does not pick a third. *Merkintä* in *tekoälymerkintä* is the label and
+  not the stored entry of the row above; the compound keeps the two apart.
 - **2026-09-18** — open, visitor, visitor measurement and not signed in, with the App Catalog's
   Visitors section (en and fi; the Spanish column is decided here and not yet on a screen).
   *Kävijämittaus* is the word Finnish web analytics already uses. *Kirjautumaton* was chosen over

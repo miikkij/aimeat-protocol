@@ -15,6 +15,9 @@
  *   person, and the note it returns is what the person is told.
  * @usage import { marksOnOpen, marksSectionInner, marksToggle, marksDeclare, marksWithdraw } from './marks.js';
  * @version-history
+ *   v1.1.0 — 2026-09-26 — Reads the node's visible-label policy from the public GET
+ *     /v1/ai-transparency (posture.visible_label). Under `strict` the reviewer text says that the
+ *     label stays on a public app and names the reviewer, instead of promising it comes off.
  *   v1.0.0 — 2026-08-29 — Initial.
  */
 import { escapeHtml } from './util.js';
@@ -31,6 +34,26 @@ var mkAppId = '';
 var mkState = 'off';   // 'off' | 'loading' | 'ready' | 'error'
 var mkData = null;     // { marks, authorship, log, posture, agents, cortex }
 var mkBusy = false;
+var mkPolicy = null;   // the node's visible-label policy: 'strict' | 'light' | 'off', null until read
+
+/**
+ * The node's label policy decides what a named reviewer does to the visible label, so the section
+ * must not promise before it knows. Read once per page; a failed read leaves it null, and the
+ * section then says what `strict` says, because that promise is the one that is never false.
+ */
+function loadPolicy() {
+  if (mkPolicy !== null) return;
+  fetch(apiBase() + '/v1/ai-transparency')
+    .then(function (r) { return r.json(); })
+    .then(function (res) {
+      var p = res && res.data && res.data.posture && res.data.posture.visible_label;
+      mkPolicy = typeof p === 'string' ? p : 'strict';
+      rerender();
+    })
+    .catch(function () { mkPolicy = 'strict'; rerender(); });
+}
+
+function strictLabel() { return mkPolicy !== 'light' && mkPolicy !== 'off'; }
 
 function apiBase() {
   var cfg = loadConfig();
@@ -51,6 +74,7 @@ export function marksOnOpen(owner, appId, isOwn) {
   mkBusy = false; mkData = null;
   if (!isOwn || !owner || !appId) { mkState = 'off'; mkOwner = ''; mkAppId = ''; return; }
   mkOwner = owner; mkAppId = appId; mkState = 'loading';
+  loadPolicy();
   var token = getCortexOwnerToken();
   fetch(apiBase() + '/v1/apps?limit=200', { headers: token ? { 'Authorization': 'Bearer ' + token } : {} })
     .then(function (r) { return r.json(); })
@@ -182,7 +206,7 @@ export function marksSectionInner() {
 
   html += '<h4>' + escapeHtml(t('marks.authorTitle')) + '</h4>';
   if (d.authorship) {
-    html += '<p class="mk-author-is">' + escapeHtml(fill(t('marks.authorIs'), { name: d.authorship.name, when: fmtDate(d.authorship.declaredAt) })) + '</p>'
+    html += '<p class="mk-author-is">' + escapeHtml(fill(t(strictLabel() ? 'marks.authorIsStrict' : 'marks.authorIs'), { name: d.authorship.name, when: fmtDate(d.authorship.declaredAt) })) + '</p>'
       + '<div class="dtl-btn-row">' + dtlBtn(t('marks.withdraw'), 'window._launcher.marksWithdraw()', { disabled: mkBusy }) + '</div>';
   } else {
     html += '<p class="dtl-ai-status">' + escapeHtml(t('marks.authorNone')) + '</p>'
@@ -193,7 +217,7 @@ export function marksSectionInner() {
       + '</div>';
   }
   html += '<div class="mk-aside">' + escapeHtml(t('marks.audited')) + '</div>'
-    + '<p class="mk-legal">' + escapeHtml(t('marks.legal')) + ' '
+    + '<p class="mk-legal">' + escapeHtml(t(strictLabel() ? 'marks.legalStrict' : 'marks.legal')) + ' '
     + '<a class="mk-legal-link" href="' + LAW_URL + '" target="_blank" rel="noopener">' + escapeHtml(t('marks.legalLink')) + ' →</a></p>';
 
   html += seesHtml(d);

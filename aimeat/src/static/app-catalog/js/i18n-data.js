@@ -5,6 +5,8 @@
  *   stay in main.js and import this table. Keep en + fi keys in lockstep (Rule 4).
  * @usage import { I18N } from './i18n-data.js'
  * @version-history
+ *   v1.4.0 — 2026-09-26 — marks.authorIsStrict and marks.legalStrict (en, fi): what a named reviewer
+ *     does to the visible AI label on a server whose label policy is strict.
  *   v1.3.0 — 2026-09-13 — The extension popup's and editor's words (cortex.loading … cortex.manifestEmpty),
  *     which were English literals with emoji, and legal.recommended (en, fi).
  *   v1.2.0 — 2026-09-12 — detail.railTitle (en, fi).
@@ -808,6 +810,7 @@ export const I18N = {
       'marks.authorTitle': 'Who answers for this app',
       'marks.authorNone': 'Nobody has declared. The AI-generated label follows the provenance record.',
       'marks.authorIs': 'Reviewed by {name}, declared {when}. The name is served in the app\'s source and the visible AI-generated label is off.',
+      'marks.authorIsStrict': 'Reviewed by {name}, declared {when}. The name is served in the app\'s source. On a public app the visible label stays, because this server also labels what the law does not require, and it says that {name} reviewed the app.',
       'marks.authorLabel': 'Reviewer\'s name',
       'marks.authorPh': 'First name Last name',
       'marks.authorEmpty': 'Write the reviewer\'s name first.',
@@ -815,6 +818,7 @@ export const I18N = {
       'marks.withdraw': 'Withdraw',
       'marks.audited': 'This is on the record. Every declaration and withdrawal is kept with the name, the account that made it and the time, and the named person answers for what the app publishes. Only you, signed in as yourself, can make it; an agent working in your name cannot.',
       'marks.legal': 'The declaration lifts the visible "AI-generated" label: when a person has reviewed the content and answers for it, the law does not require the label on it (EU AI Act, Article 50(4)). It does not lift the notice an app shows when it talks to a person as an AI (Article 50(1)); that stays whoever reviewed the app. The machine-readable provenance stays as well, so anyone reading the source still sees that synthesis may have happened.',
+      'marks.legalStrict': 'When a person has reviewed the content and answers for it, the law does not require the visible "AI-generated" label (EU AI Act, Article 50(4)). This server also labels what the law does not require, so on a public app the label stays and says who reviewed the app. Only the operator of this server can change that setting. A reviewed app behind an access code carries no label. The notice an app shows when it talks to a person as an AI (Article 50(1)) stays whoever reviewed the app. The machine-readable provenance stays as well, so anyone reading the source still sees that synthesis may have happened.',
       'marks.legalLink': 'Read Article 50',
       'marks.seesTitle': 'What this node sees about AI in this app',
       'marks.seesGenerates': 'Generates',
@@ -1901,6 +1905,7 @@ export const I18N = {
       'marks.authorTitle': 'Kuka vastaa tästä apista',
       'marks.authorNone': 'Kukaan ei ole ilmoittautunut. Tekoälymerkintä seuraa alkuperätietuetta.',
       'marks.authorIs': 'Katselmoinut {name}, ilmoitettu {when}. Nimi tarjoillaan appin lähdekoodissa ja näkyvä tekoälymerkintä on pois.',
+      'marks.authorIsStrict': 'Katselmoinut {name}, ilmoitettu {when}. Nimi näkyy sovelluksen lähdekoodissa. Julkisessa sovelluksessa näkyvä merkintä pysyy, koska tämä palvelin merkitsee myös sen, mitä laki ei vaadi. Merkinnässä lukee, että {name} on tarkistanut sovelluksen.',
       'marks.authorLabel': 'Katselmoijan nimi',
       'marks.authorPh': 'Etunimi Sukunimi',
       'marks.authorEmpty': 'Kirjoita ensin katselmoijan nimi.',
@@ -1908,6 +1913,7 @@ export const I18N = {
       'marks.withdraw': 'Peru',
       'marks.audited': 'Tämä jää kirjaan. Jokainen ilmoitus ja peruutus säilyy nimen, tilin ja ajan kanssa, ja nimetty henkilö vastaa siitä, mitä appi julkaisee. Vain sinä itse kirjautuneena voit tehdä sen; nimissäsi toimiva agentti ei voi.',
       'marks.legal': 'Ilmoitus poistaa näkyvän "tekoälyn tuottama" -merkinnän: kun ihminen on katselmoinut sisällön ja vastaa siitä, laki ei vaadi merkintää (EU:n tekoälyasetus, 50 artiklan 4 kohta). Se ei poista ilmoitusta, jonka appi näyttää keskustellessaan ihmisen kanssa tekoälynä (50 artiklan 1 kohta); se pysyy, katselmoi appin kuka tahansa. Koneluettava alkuperätieto pysyy myös, joten lähdekoodin lukija näkee edelleen, että synteesiä on voinut tapahtua.',
+      'marks.legalStrict': 'Kun ihminen on katselmoinut sisällön ja vastaa siitä, laki ei vaadi näkyvää "tekoälyn tuottama" -merkintää (EU:n tekoälyasetus, 50 artiklan 4 kohta). Tämä palvelin merkitsee myös sen, mitä laki ei vaadi. Siksi julkisessa sovelluksessa merkintä pysyy, ja siinä lukee, kuka sovelluksen tarkisti. Asetusta voi muuttaa vain palvelimen ylläpitäjä. Katselmoidussa sovelluksessa, joka on pääsykoodin takana, ei ole merkintää. Ilmoitus, jonka sovellus näyttää keskustellessaan ihmisen kanssa tekoälynä (50 artiklan 1 kohta), pysyy aina. Myös koneluettava alkuperätieto pysyy, joten lähdekoodin lukija näkee edelleen, että synteesiä on voinut tapahtua.',
       'marks.legalLink': 'Lue 50 artikla',
       'marks.seesTitle': 'Mitä tämä node näkee appin tekoälykäytöstä',
       'marks.seesGenerates': 'Tuottaa',

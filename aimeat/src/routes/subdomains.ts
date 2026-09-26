@@ -14,6 +14,8 @@
  *            The operator CRUD lives in subdomain-admin.ts.
  * @usage app.use(subdomainServeRouter(config, storage)); // BEFORE bootstrapRouter
  * @version-history
+ *   v1.21.1 — 2026-09-26 — The visible AI label's reviewer re-decision is told whether the app is
+ *     public (no access code, not parked), instead of assuming it.
  *   v1.21.0 — 2026-09-18 — serveApp counts the page view (services/signals/page-views.ts) for a page
  *     its owner opted in. The counter was called from the apex route alone, and with the app origin
  *     on the apex only redirects here, so an opted-in page counted nothing where visitors land.
@@ -372,7 +374,9 @@ async function serveApp(res: Response, storage: Storage, app: AppRecord, csp: st
       // The owner's switch (services/app-marks.ts); on unless they turned it off.
       badge: appBadgeOn(app.manifest),
       provenance: prov,
-      visibleLabel: visible,
+      // Public or not as the publish decides it (services/app-publish.ts): an access code or a
+      // park makes the app private, and the reviewer's re-decision of the label reads that.
+      visibleLabel: visible ? { ...visible, publiclyReadable: !app.accessCode && !app.parked } : undefined,
       // The named reviewer, when the account holder declared one: served in the head, and the
       // visible content label is decided again with that declaration.
       reviewedBy: appReviewedBy(app.manifest),
