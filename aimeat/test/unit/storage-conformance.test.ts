@@ -272,11 +272,12 @@ describe('storage providers agree on what they do, not just on their signatures'
         }
     }, 60_000);
 
-    // A deleted username is released for reuse. Two kinds of row outlived an erasure under a
-    // coordinate the next holder of the name gets: an action the owner published in person, which is
-    // stored under the bare name the cascade did not walk, and an AI provenance record, which is kept
-    // on purpose and named `name@node` as its owner (secaudit 2026-09: A8-4, N6). Soft assertions, so
-    // every provider reports its own result rather than the first failure hiding the second.
+    // A deleted username is released for reuse, so nothing the erasure keeps may sit under a
+    // coordinate the next holder of the name gets: an action the owner published in person, stored
+    // under the bare name, goes with the account, and an AI provenance record, which is kept on
+    // purpose, names the erasure's pseudonym as its owner (secaudit 2026-09: A8-4, N6). Soft
+    // assertions, so every provider reports its own result rather than the first failure hiding the
+    // second.
     it('deleteOwner takes the actions the owner published in person, under the bare name', async () => {
         for (const { name, storage } of provs) {
             const p = await seedErasable(storage);

@@ -25,7 +25,7 @@
  *   const out = await pullPackage({ storage, config, peers }, caller, { groupId, nodeId });
  * @version-history
  *   v1.2.1 — 2026-09-26 — The node card (64 KB) and the upstream statement (256 KB) are read through
- *     utils/read-capped.ts too; both were read whole with json() (secaudit 2026-09, N3).
+ *     utils/read-capped.ts too (secaudit 2026-09, N3).
  *   v1.2.0 — 2026-09-24 — The package body is read through utils/read-capped.ts, which stops at
  *     packageMaxSizeMb while the stream arrives (secaudit 2026-09, A6-13). A source that sent no
  *     Content-Length passed the declared-size check, and arrayBuffer() then held its whole answer
