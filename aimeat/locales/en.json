@@ -1072,7 +1072,7 @@
         "search": "an endpoint, an IP address, a fingerprint or a name",
         "time": "Time",
         "answer": "Answer",
-        "door": "Door",
+        "door": "Endpoint",
         "source": "Source",
         "credential": "Credential",
         "reason": "Reason",
