@@ -6,6 +6,9 @@
  *   human-input ask delivery, step-failure + finish notifications, agent-offline heads-up, and
  *   fresh-mode output clearing. Extracted from engine.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.5.0 — 2026-09-25 — OnPushTerminal carries what the step's own model calls cost, for the run's
+ *     cost cap. A run the node stopped at that cap is finished, so its owner's finish notification
+ *     says so.
  *   v1.4.0 — 2026-09-08 — A dispatched task emits `task_assigned` on the connector tunnel, at both
  *     places this file creates one. It never did: the engine writes its own record straight to
  *     storage and copied agent-task-write.ts's webhook line without the emitDelivery on the line
@@ -46,6 +49,7 @@ import { emitDelivery } from '../event-bus.js';
 import { runExtensionActionAsSystem, type SystemRunResult } from '../extension-system-run.js';
 import { publishPackage, recordFailure } from '../datapackage/store.js';
 import { loc, template } from './engine-util.js';
+import { usd } from './run-cost.js';
 import { dispatchAiStep } from './engine-ai-step.js';
 import { dispatchInspector } from './engine-inspector.js';
 import { isAgentStep, anyAgentReachable, AGENT_OFFLINE_GRACE_MS } from './engine-reachability.js';
@@ -62,10 +66,11 @@ export interface StepDeps {
   emailService?: EmailService;
 }
 
-/** Callback into the engine's non-task terminal path for ecosystem action steps. */
-export type OnPushTerminal = (ownerGhii: string, workflowId: string, runId: string, stepId: string, ok: boolean) => void | Promise<void>;
+/** Callback into the engine's non-task terminal path for ecosystem action steps. `costUsd` is what the
+ *  step's own model calls cost (an ai step), for the run's cost cap. */
+export type OnPushTerminal = (ownerGhii: string, workflowId: string, runId: string, stepId: string, ok: boolean, costUsd?: number) => void | Promise<void>;
 
-const TERMINAL_RUN = new Set<WorkflowRun['status']>(['done', 'partial', 'red', 'cancelled']);
+const TERMINAL_RUN = new Set<WorkflowRun['status']>(['done', 'partial', 'red', 'cancelled', 'stopped']);
 const FAILED_STEP = new Set<WorkflowRunStep['state']>(['input-red', 'output-red', 'timed-out', 'agent-offline']);
 
 /** Dispatch a step's agent task(s); tag with the workflow-run scope for onTaskTerminal. */
@@ -659,10 +664,12 @@ export async function onRunFinished(deps: StepDeps, ownerGhii: string, run: Work
 
   const name = loc(run.defSnapshot.title) || run.workflowId;
   const succeeded = run.status === 'done';
+  const stopped = run.status === 'stopped';
   const outcome = succeeded ? 'succeeded'
     : run.status === 'cancelled' ? 'was cancelled'
+    : stopped ? 'stopped at its spending limit'
     : 'finished with failures';
-  const title = `Workflow "${name}" ${succeeded ? 'succeeded' : run.status === 'cancelled' ? 'cancelled' : 'failed'}`;
+  const title = `Workflow "${name}" ${succeeded ? 'succeeded' : run.status === 'cancelled' ? 'cancelled' : stopped ? 'stopped at its spending limit' : 'failed'}`;
 
   // Per-step log + a short header (duration, failed-step roster).
   const stepLog = run.defSnapshot.steps
@@ -676,6 +683,7 @@ export async function onRunFinished(deps: StepDeps, ownerGhii: string, run: Work
     : null;
   const header = [
     `Workflow "${name}" ${outcome}.`,
+    stopped && run.reason ? run.reason : null,
     durMin !== null ? `Duration: ~${durMin} min.` : null,
     failedSteps.length ? `Failed steps: ${failedSteps.join(', ')}.` : null,
   ].filter(Boolean).join(' ');
@@ -687,8 +695,11 @@ export async function onRunFinished(deps: StepDeps, ownerGhii: string, run: Work
     type: succeeded ? 'workflow_finished' : 'workflow_failed',
     title, body, link,
     i18n: {
-      key: succeeded ? 'workflow_finished' : run.status === 'cancelled' ? 'workflow_cancelled' : 'workflow_failed',
-      vars: { name, minutes: durMin ?? 0, failed: failedSteps.join(', '), steps: run.defSnapshot.steps.map(s => `${s.id}: ${run.steps[s.id]?.state ?? 'unknown'}`).join(' · ') },
+      key: succeeded ? 'workflow_finished' : run.status === 'cancelled' ? 'workflow_cancelled' : stopped ? 'workflow_stopped' : 'workflow_failed',
+      vars: {
+        name, minutes: durMin ?? 0, failed: failedSteps.join(', '), steps: run.defSnapshot.steps.map(s => `${s.id}: ${run.steps[s.id]?.state ?? 'unknown'}`).join(' · '),
+        ...(run.costCap ? { cap: usd(run.costCap.capUsd), spent: usd(run.costCap.spentUsd) } : {}),
+      },
     },
   });
 

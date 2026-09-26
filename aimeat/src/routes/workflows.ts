@@ -27,6 +27,8 @@
  *   import { workflowsRouter } from './routes/workflows.js';
  *   app.use(workflowsRouter(config, storage));
  * @version-history
+ *   v1.5.0 — 2026-09-25 — PUT /:id answers `warnings` beside the saved definition when the body set
+ *     costCapMorsels, which does nothing; the per-run cap is maxCostUsd.
  *   v1.4.0 — 2026-09-24 — PUT /:id and POST /:id/run answer 403 SCOPE_DENIED, the missing words named,
  *     when a step needs a word its own door asks and the saving or starting principal lacks it
  *     (services/workflow/step-authority.ts). workflow:write alone had published owner records and
@@ -185,7 +187,9 @@ export function workflowsRouter(config: AimeatConfig, storage: Storage, schedule
       link: `/v1/profile?tab=workflows&id=${encodeURIComponent(id)}`,
       data: { name: workflowTitle(result.def, id) },
     }, config);
-    res.json(success(config.nodeId, result.def, [
+    // `warnings`: saved, and something in the body did nothing (costCapMorsels). Beside the definition
+    // rather than instead of it, so a caller reading the saved workflow reads the same shape as before.
+    res.json(success(config.nodeId, { ...result.def!, ...(result.warnings?.length ? { warnings: result.warnings } : {}) }, [
       { description: 'View the blueprint', method: 'GET', url: `/v1/workflows/${id}/blueprint` },
     ]));
   });

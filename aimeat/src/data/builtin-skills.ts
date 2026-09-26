@@ -11,6 +11,9 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   v1.16.2 -- 2026-09-25 -- diagnose-a-workflow reads a run the node stopped at its spending limit
+ *            (maxCostUsd): the run's reason, its costCap, and each step's costUsd. set-up-content-
+ *            pipeline sets that limit when steps call the owner's own model.
  *   v1.16.1 -- 2026-09-25 -- aimeat-node-operations says why the admin tools can be missing: they reach
  *            an operator's agent only while it holds operator:admin. That line put this file past
  *            800, so the two runbooks moved unchanged to builtin-skills.runbooks.ts, spread back in
@@ -512,6 +515,9 @@ A pipeline = a WORKFLOW definition (chained steps dispatched to agents) + a TRIG
 ## Principles
 - Show the owner the workflow definition BEFORE saving; \`aimeat_workflow_save\` is a write.
 - Start with a manual run, then schedule.
+- When steps call the owner's own model (\`action.kind: "ai"\`), set \`maxCostUsd\` on the
+  definition: a run that goes wrong then stops before its next ai step at a known cost, and says
+  so on the run.
 `,
   },
   {
@@ -661,6 +667,10 @@ metadata:
    sets them — \`resume: true\` re-evaluates steps against reality instead of restart-and-skip,
    and \`skip_done: true\` leaves a step whose output already exists alone. Safe to suggest a
    retry after fixing the cause.
+6. **A run the node ended itself:** status \`stopped\` means the run reached its spending limit
+   (\`maxCostUsd\`, US dollars per run): its \`reason\` and \`costCap\` say what the ai steps had spent
+   and which ai step did not start, and each step carries its own \`costUsd\`. Raising the limit
+   is a change to the definition, so it waits for the owner like any other.
 
 ## Principles
 - Diagnose before touching: collect the evidence from steps 1-4 and present the likely cause.

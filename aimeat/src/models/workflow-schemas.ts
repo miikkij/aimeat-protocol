@@ -43,6 +43,10 @@
  *     for every workflow and answered with the first run's id, bare, so a partner's intake logged a
  *     case as started that never was. Default false keeps the one-run guard; `fresh` beside it is
  *     refused at save. The ai action gains `reasoning`, passed to the provider as given.
+ *   v1.10.0 — 2026-09-25 — WorkflowDef.maxCostUsd, a per-run cap on what the run's ai steps spend, in
+ *     US dollars; a run that reaches it ends `stopped` with `reason` and `costCap`, and each step keeps
+ *     its own `costUsd`. costCapMorsels is accepted and ignored: a morsel paces what agents store and
+ *     is not money, and nothing ever read the field.
  */
 import { z } from 'zod';
 
@@ -443,7 +447,21 @@ export interface WorkflowDef {
    */
   parallel?: boolean;
   llm?: { approved: boolean };        // owner consent to use the node OpenRouter for `llm` leaves
-  costCapMorsels?: number | null;     // optional per-workflow cap (OpenRouter also caps per key)
+  /**
+   * The most one run may spend on the owner's AI through its ai steps, in US dollars. The engine adds
+   * up what each ai step's model calls cost, as the node recorded it, and before it starts the next ai
+   * step it stops the run once the sum has reached this: the run ends `stopped`, with the cap and the
+   * spend in `costCap` and in words in `reason`. A step already running finishes. Absent or null: no
+   * cap. The node's model judging `llm` signals is not counted here; the owner's daily AI budget
+   * bounds that, and every other AI call, whatever this says.
+   */
+  maxCostUsd?: number | null;
+  /**
+   * Ignored since 2026-09-25, and nothing read it before: a morsel paces what agents store and is not
+   * money, so it cannot cap a spend. A save that sets it is answered with a warning naming maxCostUsd,
+   * and a new save does not keep it. Definitions saved before then may still carry it.
+   */
+  costCapMorsels?: number | null;
   createdBy: string;                  // GAII/GHII of the author (audit)
   createdAt: string;
   updatedAt: string;
@@ -492,6 +510,11 @@ export interface WorkflowRunStep {
     answeredAt?: string;
     answer?: { picks: string[]; pick: string; other?: string; by: string };
   };
+  /**
+   * What this step's own model calls cost, in US dollars, as the node recorded them: an ai step's
+   * completions, a retry's added on. The run's cost cap (WorkflowDef.maxCostUsd) adds these up.
+   */
+  costUsd?: number;
 }
 
 /**
@@ -516,7 +539,12 @@ export interface WorkflowRun {
   vars: Record<string, string>;
   mode: 'full-live' | 'full-sandbox' | 'signals-only';
   keyPrefix?: string;                 // 'wf-test.<runId>.' in sandbox mode; '' otherwise
-  status: 'running' | 'waiting-step' | 'red' | 'partial' | 'done' | 'cancelled';
+  /** `stopped`: the node ended the run at its cost cap (see `costCap` and `reason`). */
+  status: 'running' | 'waiting-step' | 'red' | 'partial' | 'done' | 'cancelled' | 'stopped';
+  /** Why the node ended the run itself rather than a step finishing it, in words. */
+  reason?: string;
+  /** Set on a `stopped` run: the cap, what the ai steps had spent, and the ai step that did not start. */
+  costCap?: { capUsd: number; spentUsd: number; stoppedBefore: string };
   steps: Record<string, WorkflowRunStep>;
   /** Inspector tasks dispatched on RED steps (best-effort enrichment; the owner push is guaranteed). */
   inspections?: Array<{ stepId: string; taskId: string; reason: string; at: string }>;
@@ -710,6 +738,9 @@ export const WorkflowDefInputSchema = z.object({
   skip_done: z.boolean().optional(),
   parallel: z.boolean().optional(),
   llm: z.object({ approved: z.boolean() }).optional(),
+  /** US dollars per run; see WorkflowDef.maxCostUsd. */
+  maxCostUsd: z.number().positive().max(10000).nullable().optional(),
+  /** Accepted and ignored; the save answers with a warning. See WorkflowDef.costCapMorsels. */
   costCapMorsels: z.number().int().nonnegative().nullable().optional(),
 });
 

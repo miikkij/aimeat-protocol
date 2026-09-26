@@ -6773,6 +6773,8 @@
   "notiftext.workflow_failed.body": "No produjo: {failed} · unos {minutes} min · {steps}",
   "notiftext.workflow_cancelled.title": "El flujo \"{name}\" fue cancelado",
   "notiftext.workflow_cancelled.body": "unos {minutes} min · {steps}",
+  "notiftext.workflow_stopped.title": "El flujo \"{name}\" se detuvo al llegar a su límite de gasto",
+  "notiftext.workflow_stopped.body": "Sus pasos de IA habían gastado {spent}, y el límite es de {cap} por ejecución · unos {minutes} min · {steps}",
   "notiftext.workflow_agent_offline.title": "Flujo \"{name}\": un agente no responde",
   "notiftext.workflow_agent_offline.body": "El paso {step} fue enviado, pero {agents} parece desconectado; falla en unos {minutes} min si el agente no se conecta.",
   "notiftext.workflow_input_needed.title": "El flujo \"{name}\" te pregunta",

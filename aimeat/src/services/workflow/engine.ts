@@ -63,6 +63,10 @@
  *     the node trusts (store.ts reservedStepKeys). A variable can complete a key only at start.
  *   v1.9.0 — 2026-09-24 — startRun takes the starting principal and refuses, with `denied`, a run
  *     whose steps need a word it lacks (step-authority.ts). A trigger's own run passes no caller.
+ *   v1.10.0 — 2026-09-25 — The run's cost cap (maxCostUsd, run-cost.ts): onPushTerminal keeps what an
+ *     ai step's model calls cost on the step, and tick stops the run before the next ai step once the
+ *     sum has reached the cap. evalSignal and recordProgress moved to engine-observe.ts, skipSubtree
+ *     and failDownstream to engine-readiness.ts, unchanged (max-file-lines).
  */
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
@@ -72,8 +76,8 @@ import type { PushService } from '../push.js';
 import type { EmailService } from '../email.js';
 import { emitChange } from '../event-bus.js';
 import { logger } from '../../utils/logger.js';
-import { evaluateSignal, extractProgress, type SignalEvalCtx } from './signal-eval.js';
 import { buildEvalCtx } from './eval-context.js';
+import { evalSignal, recordProgress } from './engine-observe.js';
 import { getWorkflow, validateWorkflow, runKey, reservedStepKeys, reservedStepKeyErrors, type ResolvedStep } from './store.js';
 import { missingStepScopes, stepScopeRefusal, type WorkflowCaller } from './step-authority.js';
 import { readEventTriggers, readEcosystemEventTriggers, readActiveRuns, reconcileActiveRun } from './lifecycle.js';
@@ -84,8 +88,9 @@ import {
   dispatchStep, askHumanInput, maybeAlertAgentOffline, onStepFail, onRunFinished, clearRunOutputs, type StepDeps,
 } from './engine-steps.js';
 import { validateHumanAnswer, applyHumanAnswer } from './engine-human.js';
+import { spendsAi, stopAtCostCap } from './run-cost.js';
 import type {
-  WorkflowDef, WorkflowRun, WorkflowRunStep, Signal,
+  WorkflowDef, WorkflowRun, WorkflowRunStep,
 } from '../../models/workflow-schemas.js';
 
 export { isAgentReachable } from './engine-reachability.js';
@@ -101,7 +106,7 @@ export const HUMAN_TIMEOUT_MIN_DEFAULT = 1440;
 
 // The readiness rules live in engine-readiness.ts. Imported for use here AND re-exported, because
 // they are this module's published surface: routes import the timeout, tests the decision helpers.
-import { computeReadySteps, runOutcome, isHumanGate } from './engine-readiness.js';
+import { computeReadySteps, runOutcome, failDownstream } from './engine-readiness.js';
 export { computeReadySteps, runOutcome } from './engine-readiness.js';
 
 export interface StartRunOpts {
@@ -265,10 +270,10 @@ export class WorkflowEngine {
       const rs = run.steps[step.id];
       const reads = new Set<string>();
       // input
-      const input = await this.evalSignal(r?.required_to_function, ctx, reads);
+      const input = await evalSignal(r?.required_to_function, ctx, reads);
       if (!input.ok) { rs.state = 'input-red'; rs.inputObserved = input.observed; rs.reads = [...reads]; continue; }
       // output
-      const output = await this.evalSignal(r?.success_signal, ctx, reads);
+      const output = await evalSignal(r?.success_signal, ctx, reads);
       rs.outputObserved = output.observed;
       rs.reads = [...reads];
       rs.state = output.ok ? 'green' : 'output-red';
@@ -286,6 +291,7 @@ export class WorkflowEngine {
     const ctx = buildEvalCtx(this.storage, this.config, ownerGhii, run);
     let dispatchedAny = false;
     let mutated = false;
+    let stopped = false;
 
     // Fixpoint: a step reaching a TERMINAL state this tick (green via skip-done, or input-red) can
     // unblock its dependents, so keep re-computing ready steps until only dispatched (non-terminal)
@@ -299,11 +305,11 @@ export class WorkflowEngine {
         const r = resolved.get(step.id);
         const rs = run.steps[step.id];
         const reads = new Set<string>();
-        const input = await this.evalSignal(r?.required_to_function, ctx, reads);
+        const input = await evalSignal(r?.required_to_function, ctx, reads);
         rs.reads = [...reads];
         if (!input.ok) {
           rs.state = 'input-red'; rs.inputObserved = input.observed; rs.endedAt = now;
-          this.failDownstream(run, step.id);
+          failDownstream(run, step.id);
           await this.onStepFail(ownerGhii, run, step.id, 'input-red');
           advancedTerminal = true; mutated = true;
           continue;
@@ -313,12 +319,12 @@ export class WorkflowEngine {
         // redoing completed work. (fresh cleared outputs at run start, so it never skips there.)
         if (run.defSnapshot.skip_done) {
           const outReads = new Set<string>(rs.reads);
-          const output = await this.evalSignal(r?.success_signal, ctx, outReads);
+          const output = await evalSignal(r?.success_signal, ctx, outReads);
           rs.reads = [...outReads];
           if (output.ok) {
             rs.state = 'green'; rs.startedAt = rs.startedAt ?? now; rs.endedAt = now;
             rs.outputObserved = output.observed;
-            this.recordProgress(rs, output.observed);
+            recordProgress(rs, output.observed);
             if (r?.deliverableKey) rs.writes = [...new Set([...rs.writes, template(r.deliverableKey, run.vars)])];
             advancedTerminal = true; mutated = true;
             continue;
@@ -332,21 +338,25 @@ export class WorkflowEngine {
           mutated = true;
           continue;
         }
+        // An ai step spends the owner's AI. Once the run's own ai steps have spent the workflow's
+        // maxCostUsd, the run stops here instead of starting another (run-cost.ts).
+        if (spendsAi(step) && stopAtCostCap(run, step.id, now)) { stopped = true; mutated = true; break; }
         // dispatch (fresh-mode output clearing happens ONCE at run start — see clearRunOutputs)
-        const taskIds = await dispatchStep(this.stepDeps(), ownerGhii, run, step, r, (o, w, rid, s, ok) => this.onPushTerminal(o, w, rid, s, ok));
+        const taskIds = await dispatchStep(this.stepDeps(), ownerGhii, run, step, r, (o, w, rid, s, ok, cost) => this.onPushTerminal(o, w, rid, s, ok, cost));
         rs.state = 'dispatched'; rs.taskIds = taskIds; rs.startedAt = now; rs.notBefore = undefined;
         dispatchedAny = true; mutated = true;
         // Heads-up if we just dispatched to an offline agent (the sweep fails it after the grace).
         await maybeAlertAgentOffline(this.stepDeps(), ownerGhii, run, step);
       }
       // Only dispatched (non-terminal) steps remained this pass ⇒ nothing new can be unblocked now.
-      if (!advancedTerminal) break;
+      if (stopped || !advancedTerminal) break;
     }
 
-    const outcome = runOutcome(run.steps);
-    if (outcome !== 'running') {
+    // A run stopped at its cost cap already carries its status, end and reason (run-cost.ts).
+    const outcome = stopped ? 'stopped' : runOutcome(run.steps);
+    if (outcome === 'done' || outcome === 'partial') {
       run.status = outcome; run.endedAt = new Date().toISOString();
-    } else {
+    } else if (outcome === 'running') {
       run.status = Object.values(run.steps).some(s => s.state === 'dispatched' || s.state === 'waiting-human') ? 'waiting-step' : 'running';
     }
     await this.persist(ownerGhii, run);
@@ -381,11 +391,11 @@ export class WorkflowEngine {
       const ctx = buildEvalCtx(this.storage, this.config, ownerGhii, run);
       const reads = new Set<string>(rs.reads);
 
-      const output = await this.evalSignal(r?.success_signal, ctx, reads);
+      const output = await evalSignal(r?.success_signal, ctx, reads);
       const now = new Date().toISOString();
       rs.outputObserved = output.observed;
       rs.reads = [...reads];
-      this.recordProgress(rs, output.observed);
+      recordProgress(rs, output.observed);
       if (r?.deliverableKey) rs.writes = [...new Set([...rs.writes, template(r.deliverableKey, run.vars)])];
 
       const stepDef = run.defSnapshot.steps.find(s => s.id === stepId)!;
@@ -400,7 +410,7 @@ export class WorkflowEngine {
         rs.notBefore = new Date(Date.now() + stepDef.retry.backoff_min * 60_000).toISOString();
       } else {
         rs.state = 'output-red'; rs.endedAt = now;
-        this.failDownstream(run, stepId);
+        failDownstream(run, stepId);
         await this.onStepFail(ownerGhii, run, stepId, 'output-red');
       }
 
@@ -448,7 +458,7 @@ export class WorkflowEngine {
             rs.state = 'skipped'; rs.endedAt = nowIso;
           } else {
             rs.state = 'timed-out'; rs.endedAt = nowIso;
-            this.failDownstream(r, step.id);
+            failDownstream(r, step.id);
             await this.onStepFail(ownerGhii, r, step.id, 'timed-out');
           }
           changed = true;
@@ -462,12 +472,12 @@ export class WorkflowEngine {
         // leaves after we parked. Re-check-before-failing recovers it instead of discarding the work.
         const rdef = resolved.get(step.id);
         const reads = new Set<string>(rs.reads);
-        const output = await this.evalSignal(rdef?.success_signal, ctx, reads);
+        const output = await evalSignal(rdef?.success_signal, ctx, reads);
         rs.reads = [...reads];
 
         // Track fill progress (count_nonempty leaves). A rising count = the crew is still filling
         // keys (in-progress); a flat count = stuck.
-        const increased = this.recordProgress(rs, output.observed);
+        const increased = recordProgress(rs, output.observed);
         if (increased) changed = true;
 
         if (output.ok) {
@@ -489,7 +499,7 @@ export class WorkflowEngine {
         if (isAgentStep(step) && producedNothing && sinceDispatch >= AGENT_OFFLINE_GRACE_MS
             && !(await anyAgentReachable(this.storage, this.config, ownerName, step))) {
           rs.state = 'agent-offline'; rs.endedAt = nowIso;
-          this.failDownstream(r, step.id);
+          failDownstream(r, step.id);
           await this.onStepFail(ownerGhii, r, step.id, 'agent-offline');
           changed = true;
           continue;
@@ -509,7 +519,7 @@ export class WorkflowEngine {
           rs.notBefore = new Date(now + step.retry.backoff_min * 60_000).toISOString();
         } else {
           rs.state = 'timed-out'; rs.endedAt = nowIso;
-          this.failDownstream(r, step.id);
+          failDownstream(r, step.id);
           await this.onStepFail(ownerGhii, r, step.id, 'timed-out');
         }
         changed = true;
@@ -626,101 +636,33 @@ export class WorkflowEngine {
     return out;
   }
 
-  /** Evaluate a signal (or 'none'/undefined → pass), accumulating the keys it reads. */
-  private async evalSignal(signal: Signal | 'none' | undefined, ctx: SignalEvalCtx, reads: Set<string>): Promise<{ ok: boolean; observed: unknown }> {
-    if (!signal || signal === 'none') return { ok: true, observed: { skipped: 'none' } };
-    // wrap ctx.read/listGlob to record reads
-    const tracking: SignalEvalCtx = {
-      ...ctx,
-      read: async (k) => { reads.add(k); return ctx.read(k); },
-      listGlob: async (g) => { reads.add(g); return ctx.listGlob(g); },
-    };
-    return evaluateSignal(signal, tracking);
-  }
-
-  /**
-   * Mark every step that (transitively) depends on a failed step as skipped (partial-fail policy).
-   *
-   * A HUMAN GATE IS NOT SWEPT AWAY WITH THE SUBTREE. It is left pending, and computeReadySteps asks
-   * it once its deps are terminal and one of them is green — the person then decides on what did get
-   * made. The cascade also stops there rather than skipping what comes AFTER the gate: those steps
-   * are the answer's business, and skipping them now would decide on the person's behalf. If the
-   * gate never becomes askable, or times out, this runs again from the gate and they are skipped
-   * then.
-   */
-  private skipSubtree(run: WorkflowRun, failedId: string): void {
-    const byId = new Map(run.defSnapshot.steps.map(s => [s.id, s]));
-    const dependents = (id: string): string[] => run.defSnapshot.steps.filter(s => (s.after ?? []).includes(id)).map(s => s.id);
-    const queue = [...dependents(failedId)];
-    while (queue.length) {
-      const id = queue.shift()!;
-      const rs = run.steps[id];
-      if (!rs || rs.state !== 'pending') continue;
-      const def = byId.get(id);
-      if (def && isHumanGate(def) && (def.after ?? []).some(d => run.steps[d]?.state === 'green')) continue;
-      rs.state = 'skipped';
-      queue.push(...dependents(id));
-    }
-  }
-
-  /**
-   * On a step failure, decide the fate of its dependents. Default policy skips the whole subtree.
-   * Under `resume`, skip NOTHING here: computeReadySteps lets each dependent become ready once its
-   * deps are terminal, and tick re-evaluates the dependent's OWN required_to_function against current
-   * memory — so a dependent whose input the crew actually produced runs, and one whose input is
-   * genuinely missing goes input-red (which cascades the same way). This is the "re-evaluate against
-   * reality" contract; it is safe only when crew stages are idempotent, hence opt-in.
-   */
-  private failDownstream(run: WorkflowRun, failedId: string): void {
-    if (run.defSnapshot.resume) return;
-    this.skipSubtree(run, failedId);
-  }
-
-  /**
-   * Sample a dispatched step's fill progress from its success-signal `observed` (count_nonempty
-   * leaves). Records rs.progress and returns whether the count rose since the last sample — the
-   * watchdog treats a rising count as "still filling" (slides the no-progress deadline) and a flat
-   * one as "stuck". No-op (returns false) for signals with no countable leaf.
-   */
-  private recordProgress(rs: WorkflowRunStep, observed: unknown): boolean {
-    const prog = extractProgress(observed);
-    if (!prog) return false;
-    // Baseline 0 (not -1): a step sitting at 0 keys must NOT read as "progressed" on its first sample,
-    // else a genuinely-stuck step would slide its deadline forever instead of timing out.
-    const prevCount = rs.progress?.count ?? 0;
-    const increasing = prog.count > prevCount;
-    const nowIso = new Date().toISOString();
-    rs.progress = {
-      count: prog.count,
-      min: prog.min,
-      increasing,
-      lastProgressAt: increasing ? nowIso : (rs.progress?.lastProgressAt ?? rs.startedAt ?? nowIso),
-    };
-    return increasing;
-  }
+  // evalSignal and recordProgress live in engine-observe.ts, skipSubtree and failDownstream in
+  // engine-readiness.ts: moved unchanged on 2026-09-25 (max-file-lines).
 
   /**
    * The non-task completion path for ecosystem action steps — the parallel of onTaskTerminal that
    * reuses the same lock + success_signal evaluation + partial-fail + tick. `ok` is whether the
    * push-ack / capability-response succeeded; a step is green iff ok AND its success_signal (if any)
-   * passes.
+   * passes. `costUsd` is what the step's own model calls cost (an ai step), kept on the step for the
+   * run's cost cap.
    */
-  async onPushTerminal(ownerGhii: string, workflowId: string, runId: string, stepId: string, ok: boolean): Promise<void> {
+  async onPushTerminal(ownerGhii: string, workflowId: string, runId: string, stepId: string, ok: boolean, costUsd?: number): Promise<void> {
     await this.withLock(runId, async () => {
       const rec = await this.storage.getMemory(ownerGhii, runKey(workflowId, runId));
       if (!rec) return;
       const run = rec.value as WorkflowRun;
       const rs = run.steps[stepId];
       if (!rs || rs.state !== 'dispatched') return; // already resolved / not awaiting
+      if (costUsd && costUsd > 0) rs.costUsd = (rs.costUsd ?? 0) + costUsd;
 
       const r = this.resolvedMap(run).get(stepId);
       const ctx = buildEvalCtx(this.storage, this.config, ownerGhii, run);
       const reads = new Set<string>(rs.reads);
-      const output = await this.evalSignal(r?.success_signal, ctx, reads);
+      const output = await evalSignal(r?.success_signal, ctx, reads);
       const now = new Date().toISOString();
       rs.outputObserved = output.observed;
       rs.reads = [...reads];
-      this.recordProgress(rs, output.observed);
+      recordProgress(rs, output.observed);
 
       const stepDef = run.defSnapshot.steps.find(s => s.id === stepId)!;
       if (ok && output.ok) {
@@ -730,7 +672,7 @@ export class WorkflowEngine {
         rs.notBefore = new Date(Date.now() + stepDef.retry.backoff_min * 60_000).toISOString();
       } else {
         rs.state = 'output-red'; rs.endedAt = now;
-        this.failDownstream(run, stepId);
+        failDownstream(run, stepId);
         await this.onStepFail(ownerGhii, run, stepId, 'output-red');
       }
       await this.tick(ownerGhii, run);

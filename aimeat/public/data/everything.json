@@ -1254,6 +1254,15 @@
      "plain": "Workflow run history and recovery Inspect each step's outcome, output evidence, timing and the health trend across runs. Configure step timeouts and supported retries with a delay. In-flight run state survives a server restart; a cancel action stops further workflow progress. /v1/workflows/:id/runs, /v1/workflows/:id/health, /v1/workflows/:id/runs/:runId/cancel"
     },
     {
+     "slug": "g-8-workflow-spending-limit",
+     "cells": [
+      "<strong>Workflow spending limit</strong>",
+      "Cap what one run may spend on AI through its AI steps, in US dollars. Before the next AI step starts, a run whose AI steps have spent the limit stops, keeps what the finished steps produced and says how much was spent. Each step records its own AI cost. The daily AI budget still applies to every AI call.",
+      "<code>maxCostUsd</code> on <code>/v1/workflows/:id</code>, <code>aimeat_workflow_save</code>"
+     ],
+     "plain": "Workflow spending limit Cap what one run may spend on AI through its AI steps, in US dollars. Before the next AI step starts, a run whose AI steps have spent the limit stops, keeps what the finished steps produced and says how much was spent. Each step records its own AI cost. The daily AI budget still applies to every AI call. maxCostUsd on /v1/workflows/:id, aimeat_workflow_save"
+    },
+    {
      "slug": "g-8-workflow-human-decisions",
      "cells": [
       "<strong>Workflow human decisions</strong>",
@@ -3344,6 +3353,6 @@
  "outro": "AIMEAT Feature List, reviewed 2026-09-15 against node 3.15.0. The contract is <code>openapi.yaml</code>; the specifications are RFC v4.0 Core and Platform; later changes are at <a href=\"/v1/changelog\">the change log</a>.",
  "counts": {
   "groups": 23,
-  "rows": 331
+  "rows": 332
  }
 }
