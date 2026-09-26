@@ -13,6 +13,9 @@
  *   reason EMAIL_DISABLED. That answer is what "every policy gate passed" looks like: a refusal from
  *   a gate is 400, 403, 404, 422 or 429 and never reaches the transport.
  * @version-history
+ *   v1.5.0 — 2026-09-25 — Test 18: an app holding outbound:send saves an address that has an account
+ *     here and is not told so, on the save, the list, the send or the log; the owner in person still
+ *     sees the link on the list, the log and the address book.
  *   v1.4.0 — 2026-09-15 — Test 6c: a contact that is the sender's own address takes the email
  *     channel. It took the inbox channel and answered 500 on a duplicate message key on a live node.
  *   v1.3.0 — 2026-09-13 — POST /v1/outbound/send answers a send that did not go out with SEND_FAILED
@@ -34,7 +37,7 @@
 
 // Run: cd aimeat && pnpm exec tsx test/e2e-outbound.ts
 
-import { createHash } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import * as ed from '@noble/ed25519';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
@@ -723,6 +726,75 @@ await test('17. a REAL unsubscribe token opts the recipient out, and the page gi
     body: JSON.stringify({ contact_id: contactId, kind: 'transactional', subject: 'Lasku', body: 'x' }),
   });
   assertNoTransport(transactional, 'transactional after opt-out');
+});
+
+/** A grant for a new app of `ownerCtx` carrying exactly `scope`, through the consent the owner presses. */
+async function appGrant(ownerCtx: { token: string; owner: string }, scope: string): Promise<string> {
+  const filename = `obapp${Date.now().toString(36).slice(-5)}.html`;
+  const pub = await json('/v1/apps', {
+    method: 'POST', headers: authed(ownerCtx.token),
+    body: JSON.stringify({ filename, content: Buffer.from('<!DOCTYPE html><html><body>outbound</body></html>').toString('base64'),
+      name: 'Outbound Probe', description: 'outbound e2e probe app', category: 'utility' }),
+  });
+  assert(pub.status === 201, `publish ${pub.status}: ${JSON.stringify(pub.body?.error)}`);
+  const verifier = randomBytes(32).toString('base64url');
+  const redirect = 'http://localhost:9911/callback';
+  const q = new URLSearchParams({ app: `${ownerCtx.owner}/${filename}`, response_type: 'code', scope, redirect_uri: redirect,
+    code_challenge: createHash('sha256').update(verifier).digest('base64url'), code_challenge_method: 'S256' });
+  const res = await fetch(`${BASE}/v1/app-grants/authorize?${q}`, { redirect: 'manual' });
+  const m = /req=([^&]+)/.exec(res.headers.get('location') ?? '');
+  assert(!!m, `consent redirect expected, got ${res.status}`);
+  const con = await json('/v1/app-grants/authorize-consent', {
+    method: 'POST', headers: authed(ownerCtx.token), body: JSON.stringify({ request_id: decodeURIComponent(m![1]) }),
+  });
+  const code = new URL(con.body.data.redirect_url).searchParams.get('code') ?? '';
+  const tok = await json('/v1/app-grants/token', {
+    method: 'POST', body: JSON.stringify({ grant_type: 'authorization_code', code, code_verifier: verifier, redirect_uri: redirect }),
+  });
+  assert(tok.body.ok === true, `app token: ${JSON.stringify(tok.body.error)}`);
+  return tok.body.data.access_token as string;
+}
+
+// Saving a contact is uncounted, so an app can save addresses in bulk. What the save must not do is
+// tell anyone but the owner in person which of those addresses have an account here: that is the
+// email lookup's answer, and the lookup is limited per account.
+await test('18. an app that saves an address with an account here is not told so; the owner in person still sees the link', async () => {
+  const C = await makeOwner('obapp');
+  const recipientGhii = `${recipientUsername}@${NODE_ID}`;
+  const app = await appGrant(C, 'outbound:send');
+
+  const saved = await json('/v1/outbound/contacts', {
+    method: 'POST', headers: authed(app), body: JSON.stringify({ name: 'Tunnettu Henkilö', email: recipientEmail }),
+  });
+  assert(saved.status === 201, `the app's save: ${saved.status} ${JSON.stringify(saved.body.error)}`);
+  const contactId = saved.body.data.contact.id as string;
+  assert(!('ghii' in saved.body.data.contact), `the save told the app the account: ${JSON.stringify(saved.body.data.contact.ghii)}`);
+  const listed = await json('/v1/outbound/contacts', { headers: authed(app) });
+  const row = (listed.body.data.contacts as any[]).find(c => c.id === contactId);
+  assert(!!row && !('ghii' in row), `the app's read-back carries the account: ${JSON.stringify(row?.ghii)}`);
+
+  // The owner in person still sees the link: on the outbound list, and as the person in their address book.
+  const own = await json('/v1/outbound/contacts', { headers: authed(C.token) });
+  const ownRow = (own.body.data.contacts as any[]).find(c => c.id === contactId);
+  assert(ownRow?.ghii === recipientGhii, `the owner's outbound list: ${JSON.stringify(ownRow?.ghii)}`);
+  const book = await json('/v1/contacts', { headers: authed(C.token) });
+  assert((book.body.data.contacts as any[]).some(c => c.contact_id === recipientGhii),
+    `the owner's address book: ${JSON.stringify((book.body.data.contacts as any[]).map(c => c.contact_id))}`);
+
+  // A send goes to the inbox only when the address has an account, so its channel says the same thing.
+  const sent = await json('/v1/outbound/send', {
+    method: 'POST', headers: authed(app), body: JSON.stringify({ contact_id: contactId, kind: 'transactional', subject: 'Kuitti', body: 'Kiitos.' }),
+  });
+  assert(sent.status === 200 && sent.body.data.status === 'sent', `the app's send: ${sent.status} ${JSON.stringify(sent.body.error ?? sent.body.data)}`);
+  assert(!('channel' in sent.body.data) && !('channel' in sent.body.data.message),
+    `the send told the app the channel: ${JSON.stringify([sent.body.data.channel, sent.body.data.message?.channel])}`);
+  const appLog = await json(`/v1/outbound/log?contact_id=${encodeURIComponent(contactId)}`, { headers: authed(app) });
+  assert(appLog.status === 200 && appLog.body.data.messages.length === 1 && !('channel' in appLog.body.data.messages[0]),
+    `the app's log read: ${JSON.stringify(appLog.body.data?.messages ?? appLog.body.error)}`);
+
+  const ownLog = await json(`/v1/outbound/log?contact_id=${encodeURIComponent(contactId)}`, { headers: authed(C.token) });
+  assert(ownLog.body.data.messages.length === 1 && ownLog.body.data.messages[0].channel === 'inbox',
+    `the owner's log read: ${JSON.stringify(ownLog.body.data?.messages?.map((m: any) => m.channel))}`);
 });
 
 console.log(`\n${passed} passed, ${failed} failed out of ${passed + failed}`);

@@ -60432,7 +60432,12 @@ paths:
       operationId: listOutboundContacts
       tags: [Outbound]
       summary: List saved outbound recipients
-      description: The owner's recipient registry. The per-contact unsubscribe token is never included — it is the recipient's capability, not the owner's.
+      description: >-
+        The owner's recipient registry. The per-contact unsubscribe token is never included — it is
+        the recipient's capability, not the owner's. A contact's `ghii` (the account its address
+        belongs to) is included for the owner in person only: an agent, an app or any other
+        principal acting for the owner does not get it, because it says whether an address has an
+        account here, which the email lookup answers within a per-account limit.
       security: [{ BearerAuth: [] }]
       parameters:
         - { name: opted_out, in: query, schema: { type: boolean } }
@@ -60448,7 +60453,7 @@ paths:
       operationId: createOutboundContact
       tags: [Outbound]
       summary: Save an outbound recipient
-      description: 'Creates (or returns, deduped by lower-cased address) a saved recipient. If the email belongs to a registered user on this node, the contact carries their GHII and sends prefer the AIMEAT inbox channel. Requires scope outbound:send.'
+      description: 'Creates (or returns, deduped by lower-cased address) a saved recipient. If the email belongs to a registered user on this node, the contact is linked to their GHII and sends prefer the AIMEAT inbox channel; the answer carries that `ghii` for the owner in person only, as GET does. Saving is not counted against the email lookup limit, so bulk imports work. Requires scope outbound:send.'
       security: [{ BearerAuth: [] }]
       requestBody:
         required: true
@@ -60483,7 +60488,7 @@ paths:
       operationId: setOutboundContactOptOut
       tags: [Outbound]
       summary: Toggle a recipient's marketing opt-out (owner side)
-      description: The recipient's own path is the public unsubscribe link in every marketing email. Opt-out blocks marketing sends; transactional and invoice sends still deliver.
+      description: The recipient's own path is the public unsubscribe link in every marketing email. Opt-out blocks marketing sends; transactional and invoice sends still deliver. The contact in the answer carries `ghii` for the owner in person only, as GET /v1/outbound/contacts does.
       security: [{ BearerAuth: [] }]
       parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
       requestBody:
@@ -60504,7 +60509,7 @@ paths:
       operationId: recordOutboundContactBounce
       tags: [Outbound]
       summary: Record a bounce (or clear the suppression)
-      description: 'The third bounce suppresses the address — every send to it is refused until the owner clears it with { clear: true }.'
+      description: 'The third bounce suppresses the address — every send to it is refused until the owner clears it with { clear: true }. The contact in the answer carries `ghii` for the owner in person only, as GET /v1/outbound/contacts does.'
       security: [{ BearerAuth: [] }]
       parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
       requestBody:
@@ -60610,7 +60615,9 @@ paths:
           description: >-
             The message went out: handed to the AIMEAT inbox or the mail provider. This is not a
             delivery; a bounce shows up on the contact afterwards. A send that did not go out never
-            answers 200.
+            answers 200. `channel`, here, on the send-log row and in a refusal's details, is
+            included for the owner in person only: only an address with an account here takes the
+            inbox, so it says what a contact's `ghii` says.
           content:
             application/json:
               schema:
@@ -60622,7 +60629,7 @@ paths:
                         type: object
                         properties:
                           status: { type: string, enum: [sent] }
-                          channel: { type: string, enum: [inbox, email] }
+                          channel: { type: string, enum: [inbox, email], description: The owner in person only. }
                           message:
                             type: object
                             description: The send-log row.
@@ -60638,7 +60645,7 @@ paths:
         '422':
           description: >-
             SUPPRESSED or OPTED_OUT. The refused attempt is in the send log, and error.details names
-            it: { message_id, status (suppressed | skipped), channel, reason }.
+            it: { message_id, status (suppressed | skipped), channel (the owner in person only), reason }.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/AimeatEnvelope' }
@@ -60664,11 +60671,11 @@ paths:
                           code: { type: string, enum: [SEND_FAILED] }
                           details:
                             type: object
-                            required: [message_id, status, channel, reason]
+                            required: [message_id, status, reason]
                             properties:
                               message_id: { type: string, description: 'The send-log row, as GET /v1/outbound/log lists it' }
                               status: { type: string, enum: [failed] }
-                              channel: { type: string, enum: [inbox, email] }
+                              channel: { type: string, enum: [inbox, email], description: The owner in person only. }
                               reason: { type: string }
         '503':
           description: >-
@@ -60689,11 +60696,11 @@ paths:
                           code: { type: string, enum: [SEND_FAILED] }
                           details:
                             type: object
-                            required: [message_id, status, channel, reason]
+                            required: [message_id, status, reason]
                             properties:
                               message_id: { type: string }
                               status: { type: string, enum: [failed] }
-                              channel: { type: string, enum: [inbox, email] }
+                              channel: { type: string, enum: [inbox, email], description: The owner in person only. }
                               reason: { type: string, enum: [EMAIL_DISABLED] }
   /v1/outbound/themes:
     get:
@@ -60745,7 +60752,7 @@ paths:
       operationId: listOutboundLog
       tags: [Outbound]
       summary: Read the append-only send log
-      description: Every attempt — sent, failed, suppressed, skipped — with channel, kind and error. The GDPR-answerable record of what left this node.
+      description: Every attempt — sent, failed, suppressed, skipped — with kind and error, and with the channel for the owner in person only (it says whether the address has an account here). The GDPR-answerable record of what left this node.
       security: [{ BearerAuth: [] }]
       parameters:
         - { name: contact_id, in: query, schema: { type: string } }
