@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description Bulk + cross-user memory routes: export, import, bulk-delete, bundle (ZIP), discover, copy. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.6.0 — 2026-09-26 — import and copy ask the organism rule (services/organism-namespace-access.ts)
+ *     for an `organism.*` key, as the shared writer does for every other write door; import lists a
+ *     refused entry under failed[] with its code (secaudit 2026-09, A6-9).
  *   v1.5.0 — 2026-09-24 — bulk, import and copy refuse a key only the node writes (`__redirect__`),
  *     whoever asks.
  *   v1.4.1 — 2026-09-16 — Export and bundle show a credential record redacted; bulk and import refuse
@@ -20,7 +23,7 @@
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/memory.ts (max-file-lines)
  */
 
-import type { Router } from 'express';
+import type { Router, Request } from 'express';
 import { ZipArchive } from 'archiver';
 import type { MemoryRecord } from '../../storage/interface.js';
 import { requireAuth, requireRole, requireScope, requireExternalPrincipal, requireLocalSession } from '../../auth/middleware.js';
@@ -33,6 +36,7 @@ import { emitChange, emitMemoryWritten } from '../../services/event-bus.js';
 import { appMayWriteKey, isServerWrittenKey, serverWrittenKeyRefusal } from '../../utils/reserved-keys.js';
 import { isSecretRecordKey, secretRecordWriteRefusal, shownMemoryValue } from '../../services/secret-records.js';
 import { undeclaredSpaceForKey } from '../../services/workspace-write-items.js';
+import { checkOrganismNamespaceAccess } from '../../services/organism-namespace-access.js';
 import { odpsWriteRefusal } from '../../services/exchange-odps-write.js';
 import type { BulkWriteItem } from '../../services/db/memory-db-service.js';
 import { type MemoryRouteCtx, isAnonymousGaii } from './shared.js';
@@ -42,6 +46,16 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
   // Data-access redesign (Phase 1): the batched write/import + owner-scope reads run through the
   // Application-DB-Service (ctx.memoryDb) so each is ONE operation (batched reads + bulk upsert).
   const { config, storage, stats, resolve, memoryDb } = ctx;
+
+  /**
+   * The organism rule (services/organism-namespace-access.ts) for a key this file writes under
+   * `principal`, the identity the record lands under, as services/memory-write.ts asks it for
+   * POST /v1/memory and the MCP write. Null for a key outside `organism.`.
+   */
+  const organismWriteRefusal = (req: Request, principal: string, key: string) =>
+    checkOrganismNamespaceAccess({ storage, config }, {
+      principal, owner: String(req.auth!.owner ?? ''), roles: req.auth!.roles ?? [],
+    }, key, 'write');
 
   // POST /v1/memory/bulk — write MANY entries in one request (agent auth). Net-new batched write: the
   // service batches the existing-key lookup + byte-sum + key-count and commits the valid rows together,
@@ -231,7 +245,9 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
     // Per-entry protocol pre-filter (reserved-key + anonymous namespace) — bad entries go straight to
     // failed[]; the survivors are handed to the service. NOTE: organism.* keys are allowed here (unlike
     // /v1/memory/bulk) — the injected validate runs the workspace write-guards per entry, exactly as the
-    // old import did, so append-only / create-only manifests are still honoured.
+    // old import did, so append-only / create-only manifests are still honoured. Who may write an
+    // organism key at all is the organism rule, asked per entry below, because this door writes
+    // through writeMany rather than the shared writer that asks it for every other write door.
     const failed: { key: string; reason: string }[] = [];
     const items: BulkWriteItem[] = [];
     const renameOf = new Map<string, string>();   // targetKey -> original key (for the summary/events)
@@ -244,6 +260,11 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
       if (isSecretRecordKey(key)) { failed.push({ key, reason: secretRecordWriteRefusal(key).message }); continue; }
       if (isAnonymousGaii(gaii) && !key.startsWith('anonymous.')) { failed.push({ key, reason: 'anonymous agents can only write anonymous.* keys' }); continue; }
       if (key.startsWith('organism.')) {
+        // Membership, the organism's and a workspace's meta namespaces, the member namespaces and the
+        // consent layer: the same answer POST /v1/memory gets. Without it a member stored a copy of a
+        // workspace's manifest under their own name, and a non-member stored any organism key.
+        const refusal = await organismWriteRefusal(req, gaii, key);
+        if (refusal) { failed.push({ key, reason: `${refusal.code}: ${refusal.message}` }); continue; }
         const undeclared = await undeclaredSpaceForKey(storage, key);
         if (undeclared) { failed.push({ key, reason: `UNDECLARED_SPACE: ${undeclared.message}` }); continue; }
       }
@@ -502,6 +523,13 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
     if (isServerWrittenKey(key)) {
       const refusal = serverWrittenKeyRefusal(key);
       res.status(403).json(error(config.nodeId, refusal.code, refusal.message));
+      return;
+    }
+    // The copy lands under the caller's own name with the source's key, so an organism key is a
+    // write into that organism like any other, and gets the organism rule's answer.
+    const orgRefusal = await organismWriteRefusal(req, callerGaii, key);
+    if (orgRefusal) {
+      res.status(orgRefusal.status).json(error(config.nodeId, orgRefusal.code, orgRefusal.message));
       return;
     }
 

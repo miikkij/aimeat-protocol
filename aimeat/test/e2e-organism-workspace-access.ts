@@ -11,6 +11,9 @@
  *   v1.2.0 — 2026-09-24 — The workspace's meta namespace (secaudit 2026-09, A6-9): a contributor
  *     writes the content and is refused the manifest and the share record; an admin and the
  *     workspace's own creator still write it.
+ *   v1.3.0 — 2026-09-26 — 17d and 17e (A6-9): the import door and the public copy door ask the same
+ *     organism rule. Failed on the code before the fix: B's manifest copy and C's key were stored
+ *     (created: 1), and C's agent copied the organism key (200).
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=organism-workspace-access
 
@@ -290,6 +293,51 @@ await test('17c. A plain member who creates a workspace still writes that worksp
     // Provisioning wrote the readme under B's name, so this is an update of B's own record: 200.
     const r = await json('/v1/memory', { method: 'POST', headers: auth(B.token), body: JSON.stringify({ key: `organism.${orgId}.w.${own}.meta.readme`, value: '# B own\n\nWritten by the workspace\'s creator.', visibility: 'private' }) });
     assert(r.status === 200, `the creator's own meta write ${r.status}: ${JSON.stringify(r.body.error)}`);
+});
+
+// ─── The same rule on the two doors that write a named key without the shared writer: the backup
+//     import and the public copy (secaudit 2026-09, A6-9). The import let an organism key through with
+//     only the declared-space check, so a member stored a copy of the manifest under their own name
+//     and a non-member stored any organism key; the copy door asked nothing at all. ───
+await test('17d. The import door asks the organism rule: B\'s manifest copy and C\'s key are refused and not stored; admin D still imports', async () => {
+    const planted = { manifestVersion: '1.0', id: orgId, name: 'Coordination', kind: 'project', status: 'active', objectTypes: [{ name: 'task', schemaRef: 'schema:task@1', namespace: 'shared.tasks', backing: 'memory', writeRole: 'member', cardinality: 'many', versioned: true, mode: 'records' }, { name: 'extra', schemaRef: 'schema:task@1', namespace: 'extra', backing: 'memory', writeRole: 'member', cardinality: 'many', versioned: true, mode: 'records' }] };
+    const manifestKey = `${root()}.meta.manifest`;
+    const b = await json('/v1/memory/import', { method: 'POST', headers: auth(B.token), body: JSON.stringify({ entries: [{ key: manifestKey, value: planted }], mode: 'overwrite' }) });
+    assert(b.status === 200, `B's import answers ${b.status}: ${JSON.stringify(b.body.error)}`);
+    assert(b.body.data.created === 0 && b.body.data.updated === 0, `B's manifest copy must not be stored: ${JSON.stringify(b.body.data)}`);
+    const bFail = (b.body.data.failed as any[]).find(f => f.key === manifestKey);
+    assert(!!bFail && /ACCESS_DENIED/.test(bFail.reason), `B's entry is listed as refused, with the code: ${JSON.stringify(b.body.data.failed)}`);
+    const bOwn = await json(`/v1/memory/export?prefix=${encodeURIComponent(`${root()}.meta.`)}`, { headers: auth(B.token) });
+    assert(!(bOwn.body.data.entries as any[]).some(e => e.key === manifestKey), `B holds no manifest copy: ${JSON.stringify(bOwn.body.data.entries)}`);
+
+    const cKey = `organism.${orgId}.shared.notes.c-${Date.now()}`;
+    const c = await json('/v1/memory/import', { method: 'POST', headers: auth(C!.token), body: JSON.stringify({ entries: [{ key: cKey, value: { note: 'not a member' } }] }) });
+    assert(c.status === 200 && c.body.data.created === 0, `a non-member's organism key must not be stored: ${c.status} ${JSON.stringify(c.body.data ?? c.body.error)}`);
+    assert((c.body.data.failed as any[]).some(f => f.key === cKey && /ACCESS_DENIED/.test(f.reason)), `C's entry is listed as refused: ${JSON.stringify(c.body.data.failed)}`);
+
+    const d = await json('/v1/memory/import', { method: 'POST', headers: auth(D!.token), body: JSON.stringify({ entries: [{ key: `${root()}.meta.readme`, value: '# Coordination\n\nImported by an admin.' }], mode: 'overwrite' }) });
+    assert(d.status === 200 && d.body.data.updated === 1 && d.body.data.failed.length === 0, `an organism manager still imports WS meta: ${JSON.stringify(d.body.data ?? d.body.error)}`);
+});
+
+await test('17e. The public copy door asks the same rule: C\'s agent cannot copy an organism key, and still copies an ordinary one', async () => {
+    const ag = await json('/v1/agents', { method: 'POST', headers: auth(C!.token), body: JSON.stringify({ name: `copier${Date.now() % 100000}`, owner: C!.name, scopes: ['memory:read', 'memory:write'] }) });
+    assert(ag.status === 201, `C's agent ${ag.status}: ${JSON.stringify(ag.body.error)}`);
+    const gaii = ag.body.data.agent.gaii as string;
+    const ts = new Date().toISOString();
+    const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ gaii, timestamp: ts, signature: await sign(ag.body.data.private_key, gaii + ts) }) });
+    assert(tok.status === 200, `C's agent token ${tok.status}`);
+    const agentToken = tok.body.data.token as string;
+
+    const orgKey = `organism.${orgId}.shared.pub-${Date.now()}`;
+    const plainKey = `pubnote-${Date.now()}`;
+    for (const key of [orgKey, plainKey]) {
+        const w = await json('/v1/memory', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ key, value: { text: 'public' }, visibility: 'public' }) });
+        assert(w.status === 201, `A writes ${key} ${w.status}: ${JSON.stringify(w.body.error)}`);
+    }
+    const refused = await json('/v1/memory/copy', { method: 'POST', headers: auth(agentToken), body: JSON.stringify({ source_gaii: A_GHII, key: orgKey }) });
+    assert(refused.status === 403, `a non-member's agent copying an organism key must be refused, got ${refused.status}: ${JSON.stringify(refused.body.data ?? refused.body.error)}`);
+    const copied = await json('/v1/memory/copy', { method: 'POST', headers: auth(agentToken), body: JSON.stringify({ source_gaii: A_GHII, key: plainKey }) });
+    assert(copied.status === 200, `an ordinary public key still copies: ${copied.status} ${JSON.stringify(copied.body.error)}`);
 });
 
 await test('18. removing a member closes the question they left open', async () => {
