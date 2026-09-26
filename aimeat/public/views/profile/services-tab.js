@@ -51,7 +51,7 @@ import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { useConfirm } from '/components/Modal.js';
 import { SettingsPage } from '/components/SettingsPage.js';
-import { Tabs } from '/components/Tabs.js';
+import { Tabs, TabPanel } from '/components/Tabs.js';
 import { List, Row, Name, Desc, Doors, Panel } from '/components/List.js';
 import { Facts } from '/components/Facts.js';
 import { Mark, Marks, Code } from '/components/Mark.js';
@@ -281,7 +281,7 @@ export default function ServicesTab({ session, showToast, onStats }) {
           { value: 'mine', label: t('profile.services.mine') },
           { value: 'catalogue', label: t('profile.services.catalogue') },
         ]} />
-      ${svcSubTab === 'mine' ? renderMyServices() : renderCatalogue()}
+      <${TabPanel} value=${svcSubTab}>${svcSubTab === 'mine' ? renderMyServices() : renderCatalogue()}<//>
     <//>
   `;
 }

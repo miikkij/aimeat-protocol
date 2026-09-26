@@ -55,7 +55,7 @@ import { VisibilityPill } from '/views/profile/shared.js';
 import { Markdown } from '/components/Markdown.js';
 import { DocView, DocSplit } from '/components/DocView.js';
 import { Facts } from '/components/Facts.js';
-import { Tabs } from '/components/Tabs.js';
+import { Tabs, TabPanel } from '/components/Tabs.js';
 import { Action, Loud, Icon } from '/components/Action.js';
 import { Box } from '/components/Box.js';
 import { Note } from '/components/Note.js';
@@ -164,7 +164,7 @@ export function DocumentView({ page, busy, onEdit, onPublish, onWikiLink, onPopO
 
   return html`
     <${DocView} title=${shown.title || shown.id || page.id} tools=${tools} facts=${facts} framed=${!inPage} onClick=${onDocClick}>
-      <${Markdown} text=${rendered} onWikiLink=${onWikiLink} />
+      <${TabPanel} value=${hasBoth ? tab : 'only'}><${Markdown} text=${rendered} onWikiLink=${onWikiLink} /><//>
     <//>`;
 }
 

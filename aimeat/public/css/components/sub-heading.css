@@ -3,17 +3,19 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The sub-heading: a small heading over a group of fields, a card or a note inside a
- *   section, in small ink headline letters (the heading face, .9rem, 600, no capitals), the look the
- *   AI page gave its own (.pf-aitr-sub, .pf-cmp-sub). The coral small capitals stay for a field's
- *   label (.poster-label) and the heading over a list (.poster-day-title), so the three do not look
- *   alike (Jouni's decision "Sub-heading"). The part sets no margin: a place keeps its own.
- *   Drawn as markup: <h4 class="sub-heading">…</h4> (any element: a heading, a span, a b).
+ *   section, in small bold ink letters of the body face (Archivo, .9rem, 700, no capitals). The coral
+ *   small capitals stay for a field's label (.poster-label) and the heading over a list
+ *   (.poster-day-title), so the three do not look alike (Jouni's decision "Sub-heading"). The part
+ *   sets no margin: a place keeps its own. Drawn by components/SubHeading.js.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.1.0 — 2026-09-27 — The body face at 700 instead of the headline face at 600: the headline face
+ *     (Fjalla One) has one weight, so the browser faked the bold and the small headings looked smudged
+ *     (Security's CORS headings, Node stats' panels). The design language allows no synthesised bold.
  *   v1.0.0 — 2026-09-26 — Initial: the AI page's sub-heading, one part for every sub-heading in Settings (a unification: Jouni's decision "Sub-heading").
  */
 
 .sub-heading {
-  font-family: var(--font-display); font-size: .9rem; font-weight: 600; line-height: 1.25;
-  letter-spacing: var(--display-tracking, 0); text-transform: none; color: var(--text);
+  font-family: var(--font-body); font-size: .9rem; font-weight: 700; line-height: 1.25;
+  letter-spacing: 0; text-transform: none; color: var(--text);
 }

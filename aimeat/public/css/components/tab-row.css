@@ -11,6 +11,9 @@
  *   shape. The row under a page head is .tab-row--bar with .poster-row--thing.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.1.0 — 2026-09-27 — Every tab of a row is one box, chosen or not (no jump when one is chosen); the
+ *     ground and words change over 150ms; .tab-panel fades the chosen view in (about 180ms); no motion
+ *     under prefers-reduced-motion.
  *   v1.0.1 — 2026-09-27 — The row under a page head wears only .tab-row--bar (with the heavy rule);
  *     the page's .pf .sub-tabs rules are gone from profile.css and profile-poster.css.
  *   v1.0.0 — 2026-09-26 — Initial (component plan C9, page parts).
@@ -21,3 +24,18 @@
 /* The row right under a page head (with the heavy rule of .poster-row--thing): the values the
    page's .pf .sub-tabs had in profile-poster.css and profile.css. */
 .tab-row--bar { display: flex; align-items: center; gap: .4rem .9rem; padding: 0; margin-bottom: 1.2rem; }
+/* Every tab of a row is the same box whether it is chosen or not, so choosing one does not move the
+   row: the chosen tab's padding (poster.css .poster-tab.is-on) is every tab's here. The filter and
+   tile tones already keep one padding. The ground and the words change over 150ms, as main's tab
+   buttons did. */
+/* :where() keeps the weight of this rule at a style's own tab rule, so a style that gives its tabs
+   one padding of its own (Pebble) still wins, chosen or not. */
+:where(.tab-row, .tab-row--bar) > .poster-tab:not(.poster-tab--filter):not(.poster-tab--tile) { padding: .2rem .5rem; }
+:is(.tab-row, .tab-row--bar) > .poster-tab { transition: background-color .15s ease, color .15s ease, border-color .15s ease; }
+/* The part a view tab shows (components/Tabs.js TabPanel) fades in when the chosen tab changes. */
+.tab-panel { animation: tab-panel-in .18s ease-out; }
+@keyframes tab-panel-in { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  :is(.tab-row, .tab-row--bar) > .poster-tab { transition: none; }
+  .tab-panel { animation: none; }
+}

@@ -26,11 +26,14 @@
  *
  *   Tab: one tab alone (a button that shows a panel and stays pressed): `on`, `tone`, `count`,
  *   `attention`, `disabled`, `title`, `ariaLabel`, `pressed` (says aria-pressed), `expanded`.
- * @structure Tabs(props) · Tab(props)
+ * @structure Tabs(props) · Tab(props) · TabPanel({ value, id, label, children })
  * @usage html`<${Tabs} tone="filter" value=${F.who} onSelect=${(v) => set({ who: v })}
  *          items=${[{ value: '', label: x('facetAll'), count: 12 }, { value: 'bound', label: x('facetBound'), count: 3 }]} />`
  *        html`<${Tabs} bar kind="view" value=${sub} onSelect=${setSub} items=${[{ value: 'nodes', label: t('profile.tabs.nodes') }]} />`
  * @version-history
+ *   v1.1.0 — 2026-09-27 — TabPanel: the part a view tab shows, which fades in (about 180ms) when the
+ *     chosen tab changes, and stands still under reduced motion. Every tab of a row keeps one box
+ *     whether chosen or not (tab-row.css), so choosing one no longer moves the row.
  *   v1.0.1 — 2026-09-27 — The row under a page head draws only its own name, .tab-row--bar, which
  *     already carried every value of the page's .pf .sub-tabs (a move, same look).
  *   v1.0.0 — 2026-09-26 — Initial: the poster-tab rows every page wrote by hand (.pf-tabs, .sub-tabs,
@@ -96,6 +99,15 @@ export function Tabs({ items, value, onSelect, tone, kind = 'choice', label, lab
       })}
       ${children}
     </div>`;
+}
+
+/**
+ * What a row of view tabs shows: the part for the chosen tab. It fades in when the chosen tab changes
+ * (a new element for each value), and stands still for a person who asks for reduced motion.
+ * @param {{ value: any, id?: string, label?: string, children?: any }} props
+ */
+export function TabPanel({ value, id, label, children }) {
+  return html`<div class="tab-panel" key=${String(value)} id=${id} role="tabpanel" aria-label=${label}>${children}</div>`;
 }
 
 export default Tabs;
