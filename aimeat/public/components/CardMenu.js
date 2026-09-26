@@ -29,6 +29,10 @@
  * @usage
  *   html`<${CardMenu} state=${'open'} actions=${[{ label: 'Copy', run: copy }]} />`
  * @version-history
+ *   v1.5.0 — 2026-09-27 — The menu is placed from the dots' rectangle (fixed) and opens upward when
+ *     there is no room below, so a scrolling parent (the Messages thread) never clips it; it follows
+ *     the dots while a parent scrolls. The arrow keys move between the rows, and Escape gives the
+ *     focus back to the dots.
  *   v1.4.0 — 2026-09-26 — An action `{ divider: true }` draws a line between two groups of rows (the
  *     Settings kebab menu had one; KebabMenu in views/profile/shared.js is this menu now).
  *   v1.3.0 — 2026-09-26 — `inline`: the dots in a line of words (a message's line under it), and an
@@ -40,7 +44,7 @@
  *     repeated the card's own heading and left a 10px dot alone in the whitespace under it.
  */
 import { h } from 'preact';
-import { useState, useEffect, useRef } from 'preact/hooks';
+import { useState, useEffect, useLayoutEffect, useRef } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
 
@@ -65,17 +69,62 @@ export function CardMenu({
   const [open, setOpen] = useState(false);
   const [flash, setFlash] = useState(null);
   const ref = useRef(null);
+  const dotsRef = useRef(null);
+  const listRef = useRef(null);
 
   // Clicking anywhere else closes it, which is what every menu in the world does and what a person
-  // tries first when they opened one by accident.
+  // tries first when they opened one by accident. Escape closes it and gives the focus back to the
+  // dots; the arrow keys move between the rows.
   useEffect(() => {
     if (!open) return undefined;
     const away = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
-    const esc = (e) => { if (e.key === 'Escape') setOpen(false); };
+    const keys = (e) => {
+      if (e.key === 'Escape') { setOpen(false); dotsRef.current?.focus(); return; }
+      if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+      const rows = [...(listRef.current?.querySelectorAll('[role="menuitem"]') || [])];
+      if (!rows.length) return;
+      e.preventDefault();
+      const at = rows.indexOf(/** @type {any} */ (document.activeElement));
+      const next = e.key === 'ArrowDown' ? (at + 1) % rows.length : (at <= 0 ? rows.length - 1 : at - 1);
+      /** @type {HTMLElement} */ (rows[next]).focus();
+    };
     document.addEventListener('mousedown', away);
-    document.addEventListener('keydown', esc);
-    return () => { document.removeEventListener('mousedown', away); document.removeEventListener('keydown', esc); };
+    document.addEventListener('keydown', keys);
+    return () => { document.removeEventListener('mousedown', away); document.removeEventListener('keydown', keys); };
   }, [open]);
+
+  // The menu stands on the page, not in its card: it is placed from the dots' rectangle (fixed), so a
+  // scrolling parent (a message thread, a list) never clips it, and it opens upward when there is no
+  // room below the dots. It follows the dots while the page or a parent scrolls.
+  useLayoutEffect(() => {
+    if (!open) return undefined;
+    const place = () => {
+      const dots = dotsRef.current;
+      const list = listRef.current;
+      if (!dots || !list) return;
+      const b = dots.getBoundingClientRect();
+      const gap = 4;
+      const h = list.offsetHeight;
+      const w = list.offsetWidth;
+      const vh = window.innerHeight;
+      const vw = window.innerWidth;
+      const below = vh - b.bottom - gap;
+      const above = b.top - gap;
+      const up = below < h && above > below;
+      let top = up ? b.top - gap - h : b.bottom + gap;
+      top = Math.max(gap, Math.min(top, vh - h - gap));
+      let left = inline === 'start' ? b.left : b.right - w;
+      left = Math.max(gap, Math.min(left, vw - w - gap));
+      list.style.top = `${Math.round(top)}px`;
+      list.style.left = `${Math.round(left)}px`;
+      list.classList.toggle('card-menu-list--up', up);
+      list.classList.add('card-menu-list--placed');
+    };
+    place();
+    window.addEventListener('scroll', place, true);
+    window.addEventListener('resize', place);
+    return () => { window.removeEventListener('scroll', place, true); window.removeEventListener('resize', place); };
+  }, [open, inline]);
 
   const stop = (e) => { e.preventDefault(); e.stopPropagation(); };
 
@@ -94,14 +143,14 @@ export function CardMenu({
 
   return html`
     <div class=${'card-menu' + (inline ? ` card-menu--inline card-menu--from-${inline}` : '')} ref=${ref} onClick=${stop}>
-      <button type="button"
+      <button type="button" ref=${dotsRef}
         class="poster-icon poster-icon--small card-menu-dots card-menu-dots--${state}"
         aria-haspopup="menu" aria-expanded=${open} aria-label=${hint} title=${hint}
         onClick=${(e) => { stop(e); if (!open) onOpened?.(); setOpen(v => !v); }}>
         <span aria-hidden="true">⋯</span>
       </button>
       ${open && html`
-        <div class="card-menu-list" role="menu">
+        <div class="card-menu-list" role="menu" ref=${listRef}>
           ${actions.map((a, i) => a.divider ? html`<div class="card-menu-sep" role="separator" key=${'sep' + i}></div>` : html`
             <button type="button" role="menuitem" key=${a.label} class=${'poster-menu-row card-menu-item' + (a.danger ? ' poster-menu-row--danger' : '')}
               onClick=${(e) => { stop(e); run(a, i); }}>

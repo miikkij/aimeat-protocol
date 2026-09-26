@@ -9,6 +9,9 @@
  *   rendered black and unpositioned, 140px down the card instead of in its corner. A stylesheet
  *   nobody loads is not a stylesheet.
  * @version-history
+ *   v1.5.0 — 2026-09-27 — The list is fixed on the page (CardMenu.js places it from the dots, upward
+ *     when there is no room below), so a scrolling parent no longer clips it; its rows are actions in
+ *     the full text colour, the accent under the pointer and on focus, Delete in its danger colour.
  *   v1.4.0 — 2026-09-26 — The line between two groups of rows (.card-menu-sep), for the Settings menus that had one.
  *   v1.3.0 — 2026-09-26 — The inline place: the dots in a line of words (Jouni's decision "Message").
  *   v1.2.0 — 2026-09-24 — The rows are the shared menu row.
@@ -48,19 +51,30 @@
 @keyframes card-menu-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
 @media (prefers-reduced-motion: reduce) { .card-menu-dots--working { animation: none; } }
 
+/* The list stands on the page, placed by CardMenu.js from the dots' rectangle (below them, or above
+   when there is no room below), so no scrolling parent clips it. It stays hidden until it is placed,
+   so it never flashes at the page's corner. */
 .card-menu-list {
-  position: absolute; top: calc(100% + 0.25rem); right: 0; min-width: 14rem;
+  position: fixed; top: 0; left: 0; z-index: 1000; min-width: 14rem; max-height: calc(100vh - 8px); overflow-y: auto;
   display: flex; flex-direction: column;
   background: var(--bg-card); border: 1px solid var(--border);
   border-radius: var(--radius-sm); box-shadow: var(--shadow-lg, 0 8px 24px rgba(0,0,0,.18));
-  overflow: hidden;
+  visibility: hidden;
 }
+.card-menu-list--placed { visibility: visible; }
 /* In a line of words (CardMenu inline): the dots stand where they are written, and the menu opens
    from their left (from-start) or right edge (from-end), so it stays on the page. */
 .card-menu--inline { position: relative; top: auto; right: auto; display: inline-flex; }
-.card-menu--from-start .card-menu-list { left: 0; right: auto; }
-/* The rows are the shared menu row (poster.css .poster-menu-row, Jouni's decision "Menu row"). */
+/* The rows are the shared menu row (poster.css .poster-menu-row, Jouni's decision "Menu row"): an
+   action, so its words are the full text colour, and the accent under the pointer and on focus; a
+   row that removes something keeps its danger colour. */
 .card-menu-item { cursor: pointer; }
+.card-menu-list .card-menu-item { color: var(--text); }
+.card-menu-list .card-menu-item:hover,
+.card-menu-list .card-menu-item:focus-visible { color: var(--accent); outline: none; border-color: var(--accent); }
+.card-menu-list .card-menu-item.poster-menu-row--danger { color: var(--danger-fg); }
+.card-menu-list .card-menu-item.poster-menu-row--danger:hover,
+.card-menu-list .card-menu-item.poster-menu-row--danger:focus-visible { color: var(--danger-fg); border-color: var(--danger-fg); }
 /* A line between two groups of rows (an action item { divider: true }), as the Settings kebab
    menu drew it (.pj-menu-sep). */
 .card-menu-sep { height: 1px; background: var(--border); margin: 0.25rem 0.3rem; }

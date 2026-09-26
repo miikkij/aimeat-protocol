@@ -30,6 +30,8 @@
  *   box with the arrow out of it. `pick` on a group: the "select all" word while selecting.
  *   `openLabel` on a row: its tooltip, the whole name where the row cuts it short (an agent's threads).
  * @version-history
+ *   v1.2.0 — 2026-09-27 — A row's archive square no longer wears the chat's delete class, whose rule
+ *     showed it on the open row: it shows under the pointer and on keyboard focus only, as on main.
  *   v1.1.0 — 2026-09-26 — ConversationRow `openLabel`: the row's tooltip (an agent's Messages tab
  *     titles each thread with its whole title or last message, as main does); additive.
  *   v1.0.0 — 2026-09-26 — Initial, from views/profile/inbox-tab/list-panel.js with its behaviour
@@ -182,7 +184,7 @@ export function ConversationRow({
           ${why ? html`<span class="conversation-row-why">${why}</span>` : null}
         </span>
       </button>
-      ${archive ? html`<${ArchiveSquare} archive=${archive} extra="poster-thread-del" />` : null}
+      ${archive ? html`<${ArchiveSquare} archive=${archive} />` : null}
     </div>`;
 }
 

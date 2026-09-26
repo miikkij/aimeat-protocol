@@ -11,6 +11,9 @@
  *   from outside.
  * @usage Linked from public/spa.html in the component block, after thread-list.css.
  * @version-history
+ *   v1.0.2 — 2026-09-27 — The archive square no longer shows on the open row: only under the pointer and
+ *     on keyboard focus, as main had it, so the open row's date stays readable. The open row's subject,
+ *     date, marks and tags take the row's own words' colour (inherit), readable in Pebble's dark mode.
  *   v1.0.1 — 2026-09-26 — The coral left edges read var(--shape-frame-heavy) (3px in AIMEAT), not a
  *     literal (check:shape-tokens; fix pass).
  *   v1.0.0 — 2026-09-26 — Initial, moved with their values from css/views/inbox.css and
@@ -107,25 +110,26 @@
 }
 .conversation-row-preview { flex: 1; min-width: 0; }
 .conversation-row-why { font-family: var(--font-mono); font-size: 11px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-/* On the open row everything on the sun is ink: grey or coral there does not read. */
+/* On the open row everything takes the row's own words' colour (ink on the sun in AIMEAT; a style
+   that draws the open row on its own ground, Pebble's dark mode, is followed): grey or coral there
+   does not read. */
 .poster-thread--active .conversation-row-subject,
 .poster-thread--active .conversation-row-why,
 .poster-thread--active .conversation-row-mark,
-.poster-thread--active .conversation-row-line .poster-time { color: var(--on-sun); }
-.poster-thread--active .conversation-row-line .poster-chip { border-color: var(--on-sun); color: var(--on-sun); }
+.poster-thread--active .conversation-row-line .poster-time { color: inherit; }
+.poster-thread--active .conversation-row-line .poster-chip { border-color: currentColor; color: inherit; }
 /* A row picked while selecting: the card ground and a coral edge. */
 .conversation-row--selected { background: var(--card-bg); box-shadow: var(--shape-frame-heavy) 0 0 var(--accent) inset; }
 .conversation-check {
   flex: none; display: inline-flex; align-items: center; justify-content: center;
   width: 18px; height: 18px; border: var(--shape-frame) solid var(--shape-frame-colour); font-size: 12px; line-height: 1; color: var(--text);
 }
-/* The row's archive square is the chat's delete place (.poster-thread-del): it shows on the open row,
-   under the pointer and on keyboard focus, and takes no press while hidden, so a press beside the
-   date never archives. */
+/* The row's archive square is the chat's delete place (.poster-thread-del): as on main it shows only
+   under the pointer and on keyboard focus (not on the open row, where it covered the date), and takes
+   no press while hidden, so a press beside the date never archives. */
 /* It sits over the row's top right corner, as main placed it, so the row keeps the list's whole width. */
-.conversation-row > .conversation-act { position: absolute; top: 6px; right: 6px; pointer-events: none; }
+.conversation-row > .conversation-act { position: absolute; top: 6px; right: 6px; opacity: 0; transition: opacity .15s; pointer-events: none; }
 .conversation-row:hover > .conversation-act,
-.conversation-row.poster-thread--active > .conversation-act,
 .conversation-row > .conversation-act:focus-visible { opacity: 1; pointer-events: auto; }
 
 /* ── A folded row's disclosure, on the nesting rail under the row it belongs to ── */
