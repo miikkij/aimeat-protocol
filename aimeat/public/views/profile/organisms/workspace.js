@@ -10,6 +10,11 @@
  * @structure PRIMARY_FIELD (const), Workspace
  * @usage import { Workspace } from '/views/profile/organisms/workspace.js';
  * @version-history
+ *   2026-09-25 — A member's change goes through the member change doors and the page shows what
+ *     happened: saving sections, filing a new document under a section and adding a space say when the
+ *     change waits for the creator or an admin, or why it was refused, and reload to what is stored
+ *     (the section refusal was swallowed). Sections come from the workspace read. Settings sets the
+ *     workspace's rule for members' changes.
  *   2026-09-13 — V1: compose page and B1 section headings from the shared poster classes.
  *   v2.0.0 — 2026-08-29 — The poster face (design canvas "AIMEAT Työtilan sivu", direction A). The render
  *     is one call into workspace/cover.js: the cover with its tables, the adaptive "New for you"
@@ -70,6 +75,9 @@ import { WorkspaceGenerator } from './workspace/generator.js';
 import { renderWorkspaceView } from './workspace/cover.js';
 import { buildBreadcrumb, buildWorkspaceModel } from './workspace/model.js';
 import { swallowed } from '/js/swallowed.js';
+
+/** A refusal from a member change door, as the page says it: with the node's own reason. */
+const refusedText = (e) => (t('organisms.change.refused') || 'Not saved: {reason}').replace('{reason}', (e && e.message) || '');
 
 /* ───────────────── Organism workspace (manifest-driven) ─────────────────
  * Any organism can have a governed workspace. If it has no manifest yet, offer
@@ -203,7 +211,9 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
         orgService.getWorkspaceActivity(orgId, wsId).catch(() => ({ events: [] })),
         orgService.getAllColors(orgId, wsId).catch(err => { swallowed('workspace', err); return ({}); }),
       ]);
-      setApprovals(ap); setGateOn(!!(cfg?.gates?.publish?.enabled)); setSectionsByType(secs);
+      // The workspace read carries each document space's section index (the copy that counts); the
+      // memory read saw only the caller's own copies, so a member saw an empty tree.
+      setApprovals(ap); setGateOn(!!(cfg?.gates?.publish?.enabled)); setSectionsByType(w.sections || secs);
       setWsEvents(act?.events || []); setColorsByType(cols);
     }
     setWs(w && w.manifest ? w : null);
@@ -400,24 +410,39 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
       const r = await orgService.writeDraft(orgId, wsId, ot.namespace, id, { id, title: page.title, markdown: page.markdown });
       if (r?.ok === false) { showToast(r?.error?.message || 'Document rejected'); }
       else {
+        // Filing it under the section is a change to the workspace's sections: the door says whether it
+        // landed, waits for the creator or an admin, or was refused, and the page says so.
+        let saved = t('organisms.pageSaved') || 'Document saved';
         if (sectionId) {
           const secs = (sectionsByType[ot.name] || []).map(s => s.id === sectionId
             ? { ...s, documents: [...(s.documents || []).filter(d => d !== id), id] } : s);
-          await orgService.saveSections(orgId, wsId, ot.name, secs).catch(err => { swallowed('workspace: secs', err); });
+          try {
+            const r = await orgService.saveSections(orgId, wsId, ot.name, secs);
+            if (orgService.changeOutcome(r) === 'pending') saved = t('organisms.change.filedPending') || 'Document saved. It goes into the section once the creator or an admin approves the change.';
+          } catch (err) { saved = refusedText(err); }
         }
         // Reload, then open the just-saved document (view mode). renderDocSpace re-resolves the id
         // to the fresh merged entry, so the new draft shows with its badge instead of the empty state.
-        showToast(t('organisms.pageSaved') || 'Document saved'); await load(); setActiveDoc({ type: ot.name, mode: 'view', page: { id } });
+        showToast(saved); await load(); setActiveDoc({ type: ot.name, mode: 'view', page: { id } });
       }
     } catch (e) { showToast((e && e.message) || 'Failed to save document'); }
     finally { setBusy(false); }
   }, [orgId, wsId, sectionsByType, showToast, load]);
 
-  // ── Section index ops (persist organism.{id}.meta.sections.{typeName}) ──
+  // ── Section index ops, through the member change door. A change that waits for the creator or an
+  // admin, or one the node refused, is said on the page, and the page reloads to what is stored. ──
+  const persistSections = useCallback(async (typeName, sections) => {
+    try {
+      const r = await orgService.saveSections(orgId, wsId, typeName, sections);
+      if (orgService.changeOutcome(r) !== 'pending') return;
+      showToast(t('organisms.change.pending') || "Sent to the workspace's creator and admins for approval.");
+    } catch (e) { showToast(refusedText(e)); }
+    await load();
+  }, [orgId, wsId, showToast, load]);
   const updateSections = useCallback(async (typeName, sections) => {
     setSectionsByType(s => ({ ...s, [typeName]: sections }));
-    await orgService.saveSections(orgId, wsId, typeName, sections).catch(e => showToast((e && e.message) || 'Failed to save sections'));
-  }, [orgId, wsId, showToast]);
+    await persistSections(typeName, sections);
+  }, [persistSections]);
   const addSection = (typeName, parentId) => {
     const id = 'sec-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
     updateSections(typeName, [...(sectionsByType[typeName] || []), { id, name: '', parentId: parentId || null, documents: [] }]);
@@ -439,7 +464,7 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
   const sectionsRef = useRef(sectionsByType); sectionsRef.current = sectionsByType;
   const setSecName = (typeName, secId, name) =>
     setSectionsByType(s => ({ ...s, [typeName]: (s[typeName] || []).map(x => x.id === secId ? { ...x, name } : x) }));
-  const commitSecName = (typeName) => { setEditingSec(null); orgService.saveSections(orgId, wsId, typeName, sectionsRef.current[typeName] || []).catch(err => { swallowed('workspace: commitSecName', err); }); };
+  const commitSecName = (typeName) => { setEditingSec(null); persistSections(typeName, sectionsRef.current[typeName] || []); };
 
   // ── Optional color tags. Section colors live on the section object (persisted via updateSections);
   // per-document/record colors live in a parallel meta.colors map (persisted via saveColors). ──
@@ -600,14 +625,30 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
     setBusy(true);
     try {
       // Manual adds are document spaces ONLY — a record type needs a schema the user can't author
-      // by hand; those are designed with AI via Settings → Process (restructure).
-      await orgService.addSpace(orgId, wsId, ws.manifest, newSpaceName.trim(), 'document');
-      showToast(t('organisms.spaceAdded') || 'Space added');
+      // by hand; those are designed with AI via Settings → Process (restructure). The member change
+      // door adds it at once, or sends it to the workspace's creator and admins, and says which.
+      const r = await orgService.addSpace(orgId, wsId, ws.manifest, newSpaceName.trim(), 'document');
+      const outcome = orgService.changeOutcome(r);
+      showToast(outcome === 'pending' ? (t('organisms.change.pending') || "Sent to the workspace's creator and admins for approval.")
+        : outcome === 'unchanged' ? (t('organisms.change.spaceExists') || 'That space is already in this workspace.')
+          : (t('organisms.spaceAdded') || 'Space added'));
       setNewSpaceName(''); setShowSpaces(false);
       await load();
-    } catch (e) { showToast((e && e.message) || 'Failed to add space'); }
+    } catch (e) { showToast(refusedText(e)); }
     finally { setBusy(false); }
   }, [newSpaceName, ws, wsId, orgId, showToast, load]);
+
+  // The workspace's rule for its members' changes. The creator or an organism admin sets it; the
+  // node refuses anyone else, and the page says so.
+  const setMemberChanges = useCallback(async (rule) => {
+    setBusy(true);
+    try {
+      await orgService.setMemberChangeRule(orgId, wsId, rule);
+      showToast(t('organisms.memberChanges.saved') || 'Rule saved');
+      await load();
+    } catch (e) { showToast(refusedText(e)); }
+    finally { setBusy(false); }
+  }, [orgId, wsId, showToast, load]);
 
   const removeSpaceHandler = useCallback((typeName) => {
     confirm(
@@ -694,7 +735,7 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
     setSecName, commitSecName, setSectionColor, addSection, removeSection, spaceDesc, wsT,
     savePage, publish, popOut, reloadComments, cKey, commentsByKey, startAdd, saveDraft, cancelForm,
     draftsFor, objectsFor, toggleExpand, startEdit, reopen, isDocSpace, pickTab, REL_DESC, agentMenuItems,
-    guardWsDirty, saveSettings, wsDirty, resetSettingsForm, removeSpaceHandler, addSpaceHandler, delWorkspace,
+    guardWsDirty, saveSettings, wsDirty, resetSettingsForm, removeSpaceHandler, addSpaceHandler, delWorkspace, setMemberChanges,
     patchShare, isDocPublic, anythingPublic, docTypes, toggleGate, resolve, instanceTitle, showSettings,
   };
 

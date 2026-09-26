@@ -14,6 +14,8 @@
  * @usage html`<${NoteCard} note=${note} showToast=${showToast} orgNames=${orgNames} settings=${settings}
  *                autoEnrich=${auto} onChanged=${loadInbox} onOrgsChanged=${loadOrgNames} onDelete=${handleDelete} />`
  * @version-history
+ *   2026-09-25 -- Filing into a workspace whose new document space waits for an approval says so and
+ *     keeps the note (one note, or the chunks of a distributed one); nothing is filed in between.
  *   2026-09-13 -- V2w: compose remaining profile section top rules from poster.css.
  *   v1.1.1 — 2026-06-23 — Fix: Skip on an enrichment step was disabled whenever ANY step was running
  *     (so during an auto-run batch every Skip was dead). Skip is now only disabled for the step actually
@@ -161,7 +163,7 @@ export default function NoteCard({ note, showToast, orgNames, settings, autoEnri
     if (e.organismId === NEW && !e.organismName.trim()) { showToast(t('profile.notebook.orgNameRequired'), true); return; }
     setMaterializing(true);
     try {
-      await materializeDocument({
+      const res = await materializeDocument({
         organismId: e.organismId === NEW ? null : e.organismId,
         organismName: e.organismName,
         workspaceId: (e.organismId === NEW || e.workspaceId === NEW) ? null : e.workspaceId,
@@ -171,6 +173,9 @@ export default function NoteCard({ note, showToast, orgNames, settings, autoEnri
         markdown: e.markdown,
         sourceKey: note.key,
       });
+      // The workspace first needs a document space, and adding one waits for its creator or an
+      // admin: nothing was filed and the note stays, so the suggestion stays open to file again.
+      if (res?.pending) { showToast(t('profile.notebook.spacePending') || 'This workspace has no document space yet. Its creator and admins were asked to add one; file the note again once they approve.'); return; }
       showToast(t('profile.notebook.materialized'));
       setSuggest(null);
       onChanged?.();
@@ -279,10 +284,13 @@ export default function NoteCard({ note, showToast, orgNames, settings, autoEnri
     setDistrib(s => ({ ...s, busy: true, filedCount: 0 }));
     try {
       let filed = 0;
-      await distributeChunks(selected, note.key, (_i, status) => {
+      const results = await distributeChunks(selected, note.key, (_i, status) => {
         if (status === 'done') { filed++; setDistrib(s => s ? { ...s, filedCount: filed } : s); }
       });
-      showToast((t('profile.notebook.distributed') || 'Filed {n} documents').replace('{n}', String(selected.length)));
+      const waiting = (results || []).filter(r => r?.pending).length;
+      showToast(waiting
+        ? (t('profile.notebook.distributedPending') || 'Filed: {n}. Waiting for an approval: {m}. The note stays.').replace('{n}', String(selected.length - waiting)).replace('{m}', String(waiting))
+        : (t('profile.notebook.distributed') || 'Filed {n} documents').replace('{n}', String(selected.length)));
       setDistrib(null);
       onChanged?.();
       onOrgsChanged?.();

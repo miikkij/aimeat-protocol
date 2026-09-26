@@ -28,10 +28,19 @@
  *     activity log/heatmap — the document-path counterpart to the v1.2.0 record fix.
  *   v1.4.0 — 2026-07-19 — parkConversationToNotebook: capture a whole inbox thread (transcript + inline
  *     image embeds, optional summary) as one notebook entry for the "→ Notebook" conversation capture.
+ *   v1.5.0 — 2026-09-25 — Filing into a workspace without a document space asks for one through the
+ *     member change door instead of writing the manifest: added at once when the workspace lets the
+ *     caller, otherwise sent to its creator and admins, and materializeDocument answers `pending` with
+ *     nothing written and the note kept (distributeChunks keeps the note while any chunk waits). A
+ *     refusal is thrown with its reason; it was swallowed. The manifest is read through the workspace
+ *     read, which a member of somebody else's workspace can make.
  */
 import { api, apiPost } from '/js/api.js';
 import { createMemory, getMemory, deleteMemory } from '/js/services/memory.js';
-import { createOrganism, saveManifest, listWorkspaces, saveWorkspaceRegistry, wsRoot, writeDraft, publishDraft } from '/js/services/organisms.js';
+import {
+  createOrganism, saveManifest, listWorkspaces, saveWorkspaceRegistry, wsRoot, writeDraft, publishDraft,
+  getWorkspace, addWorkspaceSpaces, changeOutcome,
+} from '/js/services/organisms.js';
 import { handleOf } from '/js/services/messages-ai-prompts.js';
 import { swallowed } from '/js/swallowed.js';
 
@@ -179,11 +188,12 @@ function newWorkspaceManifest(orgId, name) {
   return { manifestVersion: '1.0', id: orgId, name: name || 'Notebook', kind: 'project', status: 'active', objectTypes: [docSpaceObjectType()] };
 }
 
-/** Read a workspace manifest (raw value), or null if it has none / is unreadable. */
+/** Read a workspace's manifest through the workspace read (the copy that counts, for any member who
+ *  can read it), or null if it has none / is unreadable. A memory read saw only the caller's own copy,
+ *  so in somebody else's workspace it found no manifest at all. */
 async function readManifest(orgId, wsId) {
   try {
-    const r = await getMemory(`${wsRoot(orgId, wsId)}.meta.manifest`);
-    return r?.data?.value || null;
+    return (await getWorkspace(orgId, wsId))?.manifest || null;
   } catch (err) { swallowed('notebook: readManifest', err); return null; }
 }
 
@@ -198,7 +208,9 @@ async function readManifest(orgId, wsId) {
  * @param {string} plan.title
  * @param {string} plan.markdown
  * @param {string} [plan.sourceKey]      Inbox note key to delete once filed.
- * @returns {Promise<{organismId:string, workspaceId:string, space:string, docId:string}>}
+ * @returns {Promise<{organismId:string, workspaceId:string, space?:string, docId?:string, pending?:{suggestionId:string|null}}>}
+ *   `pending` when the workspace had no document space and adding one waits for its creator's or an
+ *   admin's approval: nothing was written and the source note is kept.
  */
 export async function materializeDocument(plan) {
   let { organismId, workspaceId, space } = plan;
@@ -235,9 +247,12 @@ export async function materializeDocument(plan) {
     if (existingDoc?.namespace) {
       space = existingDoc.namespace;
     } else if (manifest) {
-      // Best-effort: add a default document space to the manifest so the doc renders.
-      const updated = { ...manifest, objectTypes: [...(manifest.objectTypes || []), docSpaceObjectType()] };
-      await saveManifest(organismId, workspaceId, updated).catch(err => { swallowed('notebook: existingDoc', err); });
+      // A default document space, asked of the workspace through the member change door: added at
+      // once for its creator or an admin, or when the workspace lets members change it directly;
+      // otherwise its creator and admins are asked, and the note waits here until they approve. A
+      // refusal throws with the node's reason, which the page shows.
+      const r = await addWorkspaceSpaces(organismId, workspaceId, [docSpaceObjectType()]);
+      if (changeOutcome(r) === 'pending') return { organismId, workspaceId, pending: { suggestionId: r?.suggestion?.id || null } };
       space = DOC_SPACE;
     } else {
       space = DOC_SPACE;
@@ -270,11 +285,12 @@ export async function materializeDocument(plan) {
  * The source inbox note is dropped ONLY after every chunk has been filed.
  * @param {Array} chunks  DistributeChunk[] from distributeNote().
  * @param {string} [sourceKey]  Inbox note key to delete once all chunks are filed.
- * @param {(index:number, status:'running'|'done'|'failed', result?:object)=>void} [onProgress]
+ * @param {(index:number, status:'running'|'done'|'pending'|'failed', result?:object)=>void} [onProgress]
  * @returns {Promise<Array>} per-chunk materialize results
  */
 export async function distributeChunks(chunks, sourceKey, onProgress) {
   const results = [];
+  let waiting = 0;               // chunks whose workspace first needs a document space an admin approves
   let notebookFallback = null;   // { organismId, workspaceId, space } for unplaced chunks
   for (let i = 0; i < chunks.length; i++) {
     const c = chunks[i];
@@ -297,6 +313,7 @@ export async function distributeChunks(chunks, sourceKey, onProgress) {
     }
     try {
       const res = await materializeDocument(plan);   // no sourceKey — don't delete per chunk
+      if (res.pending) { waiting++; results.push(res); onProgress?.(i, 'pending', res); continue; }
       if (unplaced && !notebookFallback) notebookFallback = { organismId: res.organismId, workspaceId: res.workspaceId, space: res.space };
       results.push(res);
       onProgress?.(i, 'done', res);
@@ -305,6 +322,7 @@ export async function distributeChunks(chunks, sourceKey, onProgress) {
       throw e;   // surface the failure; source note is NOT deleted so nothing is lost
     }
   }
-  if (sourceKey) await deleteMemory(sourceKey).catch(err => { swallowed('notebook: distributeChunks', err); });
+  // A chunk that waits for an approval was not filed, so the note stays until it can be.
+  if (sourceKey && !waiting) await deleteMemory(sourceKey).catch(err => { swallowed('notebook: distributeChunks', err); });
   return results;
 }

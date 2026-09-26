@@ -11976,6 +11976,20 @@
     "spaceName": "Nombre del espacio nuevo",
     "addSpace": "+ Agregar",
     "spaceAdded": "Espacio agregado",
+    "change": {
+      "pending": "Se envió al creador y a los administradores del espacio de trabajo para que lo aprueben.",
+      "filedPending": "Documento guardado. Se agrega a la sección cuando el creador o un administrador apruebe el cambio.",
+      "refused": "No se guardó: {reason}",
+      "spaceExists": "Ese espacio ya está en este espacio de trabajo."
+    },
+    "memberChanges": {
+      "title": "Cambios de los miembros",
+      "hint": "Cuando un miembro que no es el creador ni un administrador agrega un espacio o cambia secciones:",
+      "label": "Su cambio",
+      "suggest": "espera hasta que el creador o un administrador lo apruebe",
+      "direct": "se hace de inmediato, con su nombre",
+      "saved": "Regla guardada"
+    },
     "spaceRemoved": "Espacio quitado",
     "removeSpace": "Quitar el espacio",
     "confirmRemoveSpace": "¿Quitar \"{name}\" de este espacio de trabajo? Sus datos se quedan en memoria (huérfanos) pero la sección desaparece.",
@@ -16001,6 +16015,8 @@
   "profile.notebook.distributeNone": "No hay nada que repartir.",
   "profile.notebook.distributePickOne": "Elige al menos una pieza.",
   "profile.notebook.distributed": "{n} documentos archivados",
+  "profile.notebook.distributedPending": "Documentos archivados: {n}. Esperan aprobación: {m}. La nota se conserva.",
+  "profile.notebook.spacePending": "Este espacio de trabajo aún no tiene un espacio de documentos. Se pidió a su creador y a sus administradores que agreguen uno; archiva la nota otra vez cuando lo aprueben.",
   "profile.notebook.enrichBtn": "Enriquecer",
   "profile.notebook.enrichedPreview": "Vista previa de la nota enriquecida",
   "profile.notebook.fieldBody": "Documento",

@@ -13752,6 +13752,20 @@
     "spaceName": "Uuden tilan nimi",
     "addSpace": "+ Lisää",
     "spaceAdded": "Tila lisätty",
+    "change": {
+      "pending": "Lähetetty työtilan luojalle ja ylläpitäjille hyväksyttäväksi.",
+      "filedPending": "Dokumentti tallennettu. Se lisätään osioon, kun luoja tai ylläpitäjä hyväksyy muutoksen.",
+      "refused": "Ei tallennettu: {reason}",
+      "spaceExists": "Tämä tila on jo työtilassa."
+    },
+    "memberChanges": {
+      "title": "Jäsenten muutokset",
+      "hint": "Kun jäsen, joka ei ole luoja eikä ylläpitäjä, lisää tilan tai muuttaa osioita:",
+      "label": "Hänen muutoksensa",
+      "suggest": "odottaa, kunnes luoja tai ylläpitäjä hyväksyy sen",
+      "direct": "tehdään heti, ja siihen merkitään hänen nimensä",
+      "saved": "Sääntö tallennettu"
+    },
     "spaceRemoved": "Tila poistettu",
     "removeSpace": "Poista tila",
     "confirmRemoveSpace": "Poistetaanko \"{name}\" tästä työtilasta? Sen data säilyy muistissa (orpona) mutta osio katoaa.",
@@ -17955,6 +17969,8 @@
   "profile.notebook.distributeNone": "Ei mitään jaettavaa.",
   "profile.notebook.distributePickOne": "Valitse vähintään yksi pala.",
   "profile.notebook.distributed": "Arkistoitu {n} dokumenttia",
+  "profile.notebook.distributedPending": "Arkistoitu: {n}. Odottaa hyväksyntää: {m}. Muistiinpano säilyy.",
+  "profile.notebook.spacePending": "Työtilassa ei vielä ole dokumenttitilaa. Sen luojaa ja ylläpitäjiä pyydettiin lisäämään se. Arkistoi muistiinpano uudelleen, kun he ovat hyväksyneet sen.",
   "profile.notebook.enrichBtn": "Rikasta",
   "profile.notebook.enrichedPreview": "Rikastetun muistiinpanon esikatselu",
   "profile.notebook.fieldBody": "Sisältö",

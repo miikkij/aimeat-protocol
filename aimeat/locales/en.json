@@ -13765,6 +13765,20 @@
     "spaceName": "New space name",
     "addSpace": "+ Add",
     "spaceAdded": "Space added",
+    "change": {
+      "pending": "Sent to the workspace's creator and admins for approval.",
+      "filedPending": "Document saved. It goes into the section once the creator or an admin approves the change.",
+      "refused": "Not saved: {reason}",
+      "spaceExists": "That space is already in this workspace."
+    },
+    "memberChanges": {
+      "title": "Members' changes",
+      "hint": "When a member who is neither the creator nor an admin adds a space or changes sections:",
+      "label": "Their change",
+      "suggest": "waits until the creator or an admin approves it",
+      "direct": "is made at once, with their name on it",
+      "saved": "Rule saved"
+    },
     "spaceRemoved": "Space removed",
     "removeSpace": "Remove space",
     "confirmRemoveSpace": "Remove \"{name}\" from this workspace? Its data is kept in memory (orphaned) but the section disappears.",
@@ -17972,6 +17986,8 @@
   "profile.notebook.distributeNone": "Nothing to distribute.",
   "profile.notebook.distributePickOne": "Select at least one piece.",
   "profile.notebook.distributed": "Filed {n} documents",
+  "profile.notebook.distributedPending": "Filed: {n}. Waiting for an approval: {m}. The note stays.",
+  "profile.notebook.spacePending": "This workspace has no document space yet. Its creator and admins were asked to add one; file the note again once they approve.",
   "profile.notebook.enrichBtn": "Enrich",
   "profile.notebook.enrichedPreview": "Enriched note preview",
   "profile.notebook.fieldBody": "Document",
