@@ -21,6 +21,11 @@
  *   const service = new AiJobService(config, storage);
  *   await service.startJob({ prompt, result_key }, { ownerGhii, createdBy });
  * @version-history
+ *   v1.2.0 — 2026-09-26 — A job reads no record the node keeps for itself and writes its answer over
+ *     none (services/ai-job-keys.ts, the rule the scheduled AI job asks too): prompt_key, input_keys
+ *     and result_key are asked at the start and again when a restart brings a queued job back. A
+ *     reserved result_key now answers 403 RESERVED_KEY, as the memory doors do, where it answered
+ *     400 INVALID_BODY (secaudit 2026-09: 573704db10ed).
  *   v1.1.0 — 2026-09-20 — An agent's job is paid by its owner, in the agent's name (aiPayerOf), as
  *     POST /v1/ai/complete pays. The job and its result stay in the caller's namespace.
  *   v1.0.0 — 2026-08-31 — Initial.
@@ -32,7 +37,7 @@ import type { EmailService } from '../email.js';
 import { SlotPool, SlotAbortedError } from '../slot-pool.js';
 import { completeForOwner, AiCompletionError } from '../ai-completion.js';
 import { aiPayerOf } from '../agent-ai-keys.js';
-import { isReservedServerKey } from '../../utils/reserved-keys.js';
+import { aiJobKeyRefusal } from '../ai-job-keys.js';
 import { parseGAII } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
 import { assembleJobPrompt } from './prompt.js';
@@ -87,6 +92,7 @@ export class AiJobService implements AiJobStarter {
         const chainDepth = ctx.chainDepth ?? 0;
 
         this.assertResultKey(ownerGhii, input.result_key);
+        this.assertKeysInReach(input);
 
         if (chainDepth > this.config.aiJobMaxChain) {
             throw new AiJobError('AI_JOB_CHAIN_TOO_DEEP', 422,
@@ -389,11 +395,18 @@ export class AiJobService implements AiJobStarter {
             throw new AiJobError('INVALID_BODY', 400,
                 `result_key "${key}" names a namespace. A job writes into its own owner's namespace and nowhere else.`);
         }
-        if (isReservedServerKey(key)) {
-            throw new AiJobError('INVALID_BODY', 400,
-                `result_key "${key}" falls under a prefix this node reads and trusts for behaviour. Pick a key of your own.`);
-        }
         void ownerGhii;
+    }
+
+    /**
+     * What a job reads into its prompt and where it writes its answer: none of the records the node
+     * keeps for itself. The one rule both kinds of AI job ask (services/ai-job-keys.ts). Asked at the
+     * start and again when a restart brings a queued job back, so a job stored before the rule is
+     * held to it too; the prompt assembly asks once more at the read.
+     */
+    private assertKeysInReach(spec: { prompt_key?: string; input_keys?: string[]; result_key: string }): void {
+        const refusal = aiJobKeyRefusal({ promptKey: spec.prompt_key, inputKeys: spec.input_keys, outputKey: spec.result_key });
+        if (refusal) throw new AiJobError(refusal.code, refusal.status, refusal.message);
     }
 
     /**
@@ -457,6 +470,9 @@ export class AiJobService implements AiJobStarter {
 
             if (job.state === 'queued') {
                 try {
+                    // Held to the start's rule about the keys first: a job queued before the rule
+                    // existed must not come back reading or writing a record the node keeps.
+                    this.assertKeysInReach(job);
                     // Re-assembled rather than carried: the assembled prompt lives in the dead
                     // process's heap, and the record has the fields it was built from.
                     const prompt = await assembleJobPrompt({ storage: this.storage, config: this.config }, job.owner, job);

@@ -6,6 +6,8 @@
  *   authorization, lifecycle, agent budget defaults, cross-agent targeting, occurrences.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-agent-schedules
  * @version-history
+ *   v1.2.0 — 2026-09-26 — 4g/4h: an ai schedule naming a record the node keeps for itself, as input
+ *     or as output, is refused 403 RESERVED_KEY on create and on edit (secaudit 2026-09: A6-1).
  *   v1.1.0 — 2026-08-11 — 4e/4f: the length cut on description/purpose and cron validation on EDIT.
  *     Both moved into services/schedule-write.ts with the August 2026 audit step 8, where the MCP
  *     schedule tools now call them too; neither had a test on this door either.
@@ -177,6 +179,45 @@ await test('4d. Patching an ai schedule cannot smuggle a foreign namespace in (C
     });
     assert(status === 403, `expected 403, got ${status}: ${JSON.stringify(body)}`);
     assert(body.error?.code === 'NAMESPACE_DENIED', `code: ${JSON.stringify(body.error)}`);
+});
+
+// A scheduled AI job sends every record it reads to the model provider and writes its answer where
+// the schedule says, so it reads none of the records the node keeps for itself and writes over none
+// of them (services/ai-job-keys.ts): the AI settings and key, the payout record, the spend cap, a key
+// only the node writes. Refused on create, on edit, and again when it fires (secaudit 2026-09: A6-1).
+await test('4g. An ai schedule naming a record the node keeps, as input or as output, is refused 403 RESERVED_KEY', async () => {
+    for (const extra of [
+        { input_keys: ['news.raw', 'openrouter.settings'] },
+        { input_keys: ['commerce.psp'] },
+        { output_key: 'openrouter.settings' },
+        { output_key: 'notif.schedule' },
+    ]) {
+        const { status, body } = await json('/v1/schedules', {
+            method: 'POST', headers: auth1,
+            body: JSON.stringify({ kind: 'ai', cron: '0 7 * * *', display_name: 'kept', prompt: 'Repeat the input.', ...extra }),
+        });
+        // An unfixed node stores it. Remove it again, so a failing run leaves nothing behind.
+        if (status === 201) await json(`/v1/schedules/${body.data.schedule.id}`, { method: 'DELETE', headers: auth1 });
+        assert(status === 403 && body.error?.code === 'RESERVED_KEY',
+            `${JSON.stringify(extra)}: expected 403 RESERVED_KEY, got ${status}: ${JSON.stringify(body.error ?? body.data)}`);
+    }
+});
+
+await test('4h. An edit cannot put a record the node keeps into an ai schedule', async () => {
+    for (const input of [
+        { prompt: 'Repeat the input.', inputKeys: ['openrouter.settings'] },
+        { prompt: 'Repeat the input.', inputKeys: ['news.raw'], outputKey: 'ai-usage.daily' },
+    ]) {
+        const { status, body } = await json(`/v1/schedules/${aiScheduleId}`, {
+            method: 'PATCH', headers: auth1, body: JSON.stringify({ input }),
+        });
+        assert(status === 403 && body.error?.code === 'RESERVED_KEY',
+            `${JSON.stringify(input)}: expected 403 RESERVED_KEY, got ${status}: ${JSON.stringify(body.error ?? body.data)}`);
+    }
+    const { body } = await json(`/v1/schedules/${aiScheduleId}`, { headers: auth1 });
+    const kept = body.data?.schedule?.input;
+    assert(JSON.stringify(kept?.inputKeys) === '["news.raw"]' && kept?.outputKey === undefined,
+        `the refused edits changed the schedule: ${JSON.stringify(kept)}`);
 });
 
 // August 2026 audit step 8: create, edit and cancel moved into services/schedule-write.ts so the MCP

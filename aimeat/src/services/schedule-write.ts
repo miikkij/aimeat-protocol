@@ -40,6 +40,10 @@
  *   const out = await createScheduleRecord({ storage, config, scheduler }, caller, body);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   v1.2.0 — 2026-09-26 — An `ai` schedule reads no record the node keeps for itself and writes its
+ *     answer over none: create and edit refuse such an input or output key with 403 RESERVED_KEY
+ *     (services/ai-job-keys.ts, the rule the AI job asks too). The fire asks again, for schedules
+ *     stored earlier (secaudit 2026-09: A6-1, 573704db10ed).
  *   v1.1.0 — 2026-08-13 — triggerScheduleRecord(): "run it now" joins the other three. It was the one
  *     schedule operation living in the router alone, which is why it existed on HTTP and nowhere else
  *     — and a chat that can create a morning job but cannot run it once has no way to prove the job
@@ -50,6 +54,7 @@ import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, ScheduledJobRecord, ScheduleConstraint, AgentTaskScope, AgentRecord } from '../storage/interface.js';
 import { buildGAII, isSameOwner } from '../utils/gaii.js';
+import { aiJobKeyRefusal } from './ai-job-keys.js';
 import { emitChange } from './event-bus.js';
 import { mergeConstraintDefaults, knownConstraintTypes } from './schedule-constraints.js';
 import { checkScheduleGate, isValidCron, type ScheduleKind } from './schedule-gate.js';
@@ -84,7 +89,7 @@ export type ScheduleWriteErrorCode =
     | 'INVALID_INPUT' | 'CONNECTION_UNAVAILABLE' | 'NO_SUCH_FILE'
     | 'AGENT_NOT_FOUND' | 'AGENT_REQUIRED'
     | 'INVALID_EXTENSION_JOB' | 'EXTENSION_NOT_FOUND'
-    | 'INVALID_AI_JOB' | 'NAMESPACE_DENIED'
+    | 'INVALID_AI_JOB' | 'NAMESPACE_DENIED' | 'RESERVED_KEY'
     | 'INVALID_TASK_TEMPLATE'
     | 'INVALID_ECO_JOB' | 'ECO_APP_NOT_FOUND' | 'CAPABILITY_NOT_DECLARED'
     | 'SCHEDULER_UNAVAILABLE' | 'TRIGGER_FAILED';
@@ -307,6 +312,10 @@ export async function createScheduleRecord(
                 message: `input_namespaces may only name your own identities; "${foreign}" is not one of yours.`,
             };
         }
+        // Every input goes to the model provider and the answer lands at output_key, so neither may
+        // name a record the node keeps for itself. The fire asks again (scheduler-remote-jobs.ts).
+        const kept = aiJobKeyRefusal({ inputKeys: body.input_keys, outputKey: body.output_key });
+        if (kept) return { ok: false, ...kept };
         base.input = {
             inputKeys: Array.isArray(body.input_keys) ? body.input_keys : [],
             inputNamespaces: Array.isArray(body.input_namespaces) ? body.input_namespaces : undefined,
@@ -428,7 +437,10 @@ export async function updateScheduleRecord(
         // Same rule as create for an `ai` job's input namespaces, and for the same reason: a gate that
         // only runs on create is walked around by editing the schedule afterwards.
         if (job.type === 'ai') {
-            const p = patch.input as { inputNamespaces?: unknown; input_namespaces?: unknown };
+            const p = patch.input as {
+                inputNamespaces?: unknown; input_namespaces?: unknown;
+                inputKeys?: unknown; input_keys?: unknown; outputKey?: unknown; output_key?: unknown;
+            };
             const foreign = foreignNamespace(job.ownerScope ?? ownerScope, p.inputNamespaces ?? p.input_namespaces);
             if (foreign) {
                 return {
@@ -436,6 +448,14 @@ export async function updateScheduleRecord(
                     message: `input_namespaces may only name your own identities; "${foreign}" is not one of yours.`,
                 };
             }
+            // The create's rule about the records the node keeps, on the input that replaces the old
+            // one. Both spellings, as the namespace check above reads both.
+            const listed = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
+            const kept = aiJobKeyRefusal({
+                inputKeys: [...listed(p.inputKeys), ...listed(p.input_keys)],
+                outputKey: p.outputKey ?? p.output_key,
+            });
+            if (kept) return { ok: false, ...kept };
         }
         updates.input = patch.input as Record<string, unknown>;
     }

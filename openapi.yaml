@@ -5176,11 +5176,11 @@ components:
         agent_name: { type: string, description: 'Target agent (required for agent_task; optional association for ai/extension).' }
         constraints: { type: array, items: { $ref: '#/components/schemas/ScheduleConstraint' } }
         prompt: { type: string, description: 'ai: instruction applied to the input memory values.' }
-        input_keys: { type: array, items: { type: string }, description: 'ai: owner memory keys fed in as context.' }
+        input_keys: { type: array, items: { type: string }, description: 'ai: owner memory keys fed in as context. Each one goes to the model provider, so a key naming a record this node keeps for itself (an AI key, a payout setting, a spend limit) is refused with 403 RESERVED_KEY.' }
         input_namespaces: { type: array, items: { type: string } }
         system_prompt: { type: string }
         model: { type: string }
-        output_key: { type: string, description: 'ai: memory key for the result (auto-generated if omitted).' }
+        output_key: { type: string, description: 'ai: memory key for the result (auto-generated if omitted). A key naming a record this node keeps for itself is refused with 403 RESERVED_KEY.' }
         output_visibility: { type: string, enum: [private, owner, public] }
         task_template:
           type: object
@@ -14971,14 +14971,16 @@ paths:
                   description: >
                     An owner-namespace key holding the prompt text (a string, or an object with a
                     `prompt` field). Changing the prompt is then a memory write rather than a code
-                    change.
+                    change. Refused (403 `RESERVED_KEY`) when it names a record this node keeps for
+                    itself, such as an AI key, a payout setting or a spend limit.
                 input_keys:
                   type: array
                   items: { type: string }
                   description: >
                     Owner-scope memory keys read and appended to the prompt, labelled by key. The
                     model has no tools and cannot read anything itself; a missing record is stated
-                    as such in the prompt.
+                    as such in the prompt. Everything read goes to the model provider, so a key naming
+                    a record this node keeps for itself is refused (403 `RESERVED_KEY`).
                 reasoning:
                   type: object
                   description: >
@@ -14995,7 +14997,8 @@ paths:
                   type: string
                   description: >
                     Where the answer is written, in the owner's own namespace. Refused when it names
-                    another namespace or falls under a prefix the server reads and trusts.
+                    another namespace (400) or a record this node keeps for itself (403
+                    `RESERVED_KEY`).
                 result_visibility:
                   type: string
                   enum: [private, owner, public]
@@ -15034,7 +15037,8 @@ paths:
           description: >
             `AI_JOB_CALLBACK_FORBIDDEN` — `on_done` names an extension action this account cannot
             call. Same wording whichever way it fails: which extensions exist is not a stranger's
-            business.
+            business. `RESERVED_KEY` — `prompt_key`, an `input_keys` entry or `result_key` names a
+            record this node keeps for itself, such as an AI key, a payout setting or a spend limit.
           content:
             application/json:
               schema:
@@ -44314,6 +44318,17 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: >
+            `SCOPE_DENIED` — the caller lacks the scope the schedule's kind drives.
+            `NAMESPACE_DENIED` — an `ai` schedule names an input namespace outside its owner.
+            `RESERVED_KEY` — an `ai` schedule's `input_keys` or `output_key` names a record this node
+            keeps for itself, such as an AI key, a payout setting or a spend limit. An edit
+            (PATCH) that puts one into `input` is refused the same way.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
         '404':
           $ref: '#/components/responses/NotFound'
   /v1/schedules/occurrences:
