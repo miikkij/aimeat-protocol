@@ -30,10 +30,13 @@
  * @usage
  *   const doc = isClientIdUrl(clientId) ? await resolveClientIdMetadata(clientId) : null;
  * @version-history
+ *   v1.0.1 — 2026-09-26 — The document is read with its 32 KB cap while it arrives
+ *     (utils/read-capped.ts); text() read all of it before the cap was asked (secaudit 2026-09, N3).
  *   v1.0.0 — 2026-09-04 — Initial: MCP 2025-11-25's recommended registration, and the successor to
  *     the DCR endpoint 2026-07-28 deprecates.
  */
 import { safeFetch } from '../utils/url-validator.js';
+import { readBodyCapped } from '../utils/read-capped.js';
 import { cached, TTL } from './cache.js';
 import { logger } from '../utils/logger.js';
 
@@ -134,7 +137,14 @@ export async function resolveClientIdMetadata(clientId: string): Promise<ClientI
         logger.info('client-id metadata: the document did not answer', { clientId, status: res.status });
         return null;
       }
-      body = await res.text();
+      // The cap holds while the document arrives: text() held all of it before parseClientDocument
+      // could measure it, and the address is one a stranger chose.
+      const bytes = await readBodyCapped(res, MAX_BYTES);
+      if (!bytes) {
+        logger.warn('client-id metadata: the document is too large to be one', { clientId, over: MAX_BYTES });
+        return null;
+      }
+      body = bytes.toString('utf8');
     } catch (err) {
       // Includes safeFetch's own refusal, which is the one that matters: `Fetch blocked: …` means a
       // caller pointed this node at an address it may not reach.
