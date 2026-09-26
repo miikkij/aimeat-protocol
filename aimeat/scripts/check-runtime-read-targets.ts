@@ -22,6 +22,8 @@
  *   cd aimeat && pnpm check:runtime-read-targets            # report
  *   cd aimeat && pnpm check:runtime-read-targets --strict   # the CI gate
  * @version-history
+ *   v1.1.0 — 2026-09-26 — Two more members, both the visit-retention fold (SQLite and Postgres), whose
+ *     table is one of a typed pair, never input.
  *   v1.0.0 — 2026-09-04 — Initial, after the read-path audit found this class has exactly one member.
  */
 import { resolve, dirname } from 'node:path';
@@ -42,6 +44,14 @@ const ALLOWED: Record<string, string> = {
         'The full-text search picks between memory_fts (live rows) and memory_archive_fts (archived '
         + 'ones), which is why the table is an argument. It names `m.deletedAt IS NULL` itself — the '
         + 'clause it was missing when a deleted record came back from a text search on 2026-09-03.',
+    'src/storage/providers/sqlite/repos/usage.ts:ids':
+        'The visit-retention fold runs one statement on the hot usage table and on its archive, so the '
+        + 'table is an argument typed as exactly those two names (usage_calls | usage_calls_archive), '
+        + 'never input. Its filter is NAMED_OPEN, the one clause both tables share. Written 2026-09-25.',
+    'src/storage/providers/postgres-kysely/methods/usage.ts:picked':
+        'The Postgres twin of the visit-retention fold: the table is typed as exactly UsageCall | '
+        + 'UsageCallArchive and passed through sql.table(), never input; the filter is NAMED_OPEN, the '
+        + 'same clause as the SQLite fold. Written 2026-09-25.',
 };
 
 export function main(): boolean {
