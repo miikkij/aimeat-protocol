@@ -16,12 +16,16 @@
  *   door. A run started by the workflow's own trigger has no caller to ask; it answers to the
  *   principal that saved the workflow, whose words are asked again when it starts
  *   (trigger-authority.ts).
- * @structure STEP_KIND_SCOPES · LLM_SCOPES · MEMORY_READ_SCOPES · WorkflowCaller · ownerInPerson(caller) ·
- *   saverFromCaller(caller, ownerGhii) · missingStepScopes(def, caller, mode) · stepScopeRefusal(missing)
+ * @structure WORKFLOW_AUTHORITY_VERSION · STEP_KIND_SCOPES · stepKindScopes(kind, authority) · LLM_SCOPES ·
+ *   MEMORY_READ_SCOPES · WorkflowCaller · ownerInPerson(caller) · saverFromCaller(caller, ownerGhii) ·
+ *   missingStepScopes(def, caller, mode) · stepScopeRefusal(missing)
  * @usage
  *   const missing = missingStepScopes(def, caller, 'full');
  *   if (missing.length > 0) return stepScopeRefusal(missing);   // 403 SCOPE_DENIED, the words named
  * @version-history
+ *   v1.3.0 — 2026-09-25 — An agent step costs work:request, the word for giving an agent work, for a
+ *     workflow saved under WORKFLOW_AUTHORITY_VERSION 2; a workflow keeps the rules it was saved
+ *     under, so one saved before keeps its agent steps free, at a run and at its trigger.
  *   v1.2.0 — 2026-09-25 — WorkflowCaller carries who the caller is, and saverFromCaller turns it into
  *     the saver a save records, for the trigger's check of that saver's words at start.
  *   v1.1.1 — 2026-09-24 — ownerInPerson asks utils/scope-coverage.ts ownerBypassesScopes, which the
@@ -37,15 +41,23 @@ import type { WorkflowStep, Signal, WorkflowSaver } from '../../models/workflow-
 export type StepKind = 'agent' | 'human-input' | 'ai' | 'extension' | 'datapackage' | 'export-out' | 'trigger-geai';
 
 /**
+ * The rules a workflow is saved under, kept on it as `authority`. 1, or absent, is a definition saved
+ * before 2026-09-25: its agent steps cost no word, and it keeps running that way, by hand and by its
+ * trigger. 2 asks work:request for them. Every save from then on writes the current version, so an
+ * update of an older workflow is held to the new rules like a new one.
+ */
+export const WORKFLOW_AUTHORITY_VERSION = 2;
+
+/**
  * The words each kind of step costs: what the door that does the same thing directly asks for.
  *
- * A kind with no words acts through somebody else's grant or through the owner in person. An agent
- * step hands a task to one of the owner's agents, which then works on its own permissions; the task
- * door (POST /v1/agents/:name/tasks) lets a same-owner agent do that without a word of its own. A
- * human-input step asks the owner.
+ * An agent step hands a task to one of the owner's agents, which then works on its own permissions.
+ * Giving an agent work is what work:request names, so a workflow saved under the current rules asks
+ * it of whoever saves or starts it (stepKindScopes keeps an older workflow's agent steps free). A
+ * human-input step asks the owner, and costs nothing.
  */
 export const STEP_KIND_SCOPES: Readonly<Record<StepKind, readonly string[]>> = {
-    agent: [],
+    agent: ['work:request'],
     'human-input': [],
     // The owner's model and budget: every AI door asks ai:use (auth/ai-gate.ts, the AI jobs routes).
     ai: ['ai:use'],
@@ -134,18 +146,27 @@ function kindOf(step: Pick<WorkflowStep, 'action'>): StepKind {
     return (step.action?.kind ?? 'agent') as StepKind;
 }
 
+/** The words a kind of step costs under the rules a definition was saved with (`authority`). */
+export function stepKindScopes(kind: StepKind, authority: number): readonly string[] {
+    // Saved before agent steps had a price: they keep running as they were saved.
+    if (kind === 'agent' && authority < 2) return [];
+    return STEP_KIND_SCOPES[kind] ?? [];
+}
+
 /** One word the caller lacks, with the first step that needs it, so a refusal can point at it. */
 export interface MissingStepScope { scope: string; step: string; kind: StepKind | 'llm' | 'read' }
 
 /**
  * The words this workflow needs that the caller does not hold, each once. A signals-only check
  * dispatches no step, so it is asked about the records it reads and the model that judges the `llm`
- * signals; a full run and a save are asked about every step as well.
+ * signals; a full run and a save are asked about every step as well. `authority` is the rules the
+ * definition was saved under; a save passes WORKFLOW_AUTHORITY_VERSION, and absent means 1.
  */
 export function missingStepScopes(
     def: {
         steps: Array<Pick<WorkflowStep, 'id' | 'action' | 'success_signal' | 'required_to_function'>>;
         llm?: { approved?: boolean };
+        authority?: number;
     },
     caller: WorkflowCaller,
     mode: 'save' | 'full' | 'signals-only',
@@ -156,9 +177,10 @@ export function missingStepScopes(
         if (!needs.some(n => n.scope === scope)) needs.push({ scope, step, kind });
     };
     if (mode !== 'signals-only') {
+        const authority = def.authority ?? 1;
         for (const step of def.steps) {
             const kind = kindOf(step);
-            for (const scope of STEP_KIND_SCOPES[kind] ?? []) need(scope, step.id, kind);
+            for (const scope of stepKindScopes(kind, authority)) need(scope, step.id, kind);
         }
     }
     for (const step of def.steps) {
@@ -182,7 +204,7 @@ export function stepScopeRefusal(missing: MissingStepScope[]): { status: 403; co
         ? `"${m.scope}" (llm.approved lets the node's model judge the signals)`
         : m.kind === 'read'
             ? `"${m.scope}" (step "${shownStepId(m.step)}" reads the owner's records)`
-            : `"${m.scope}" (step "${shownStepId(m.step)}" is ${m.kind === 'ai' || m.kind === 'extension' || m.kind === 'export-out' ? 'an' : 'a'} ${m.kind} step)`));
+            : `"${m.scope}" (step "${shownStepId(m.step)}" is ${/^[aeiou]/.test(m.kind) ? 'an' : 'a'} ${m.kind} step)`));
     return {
         status: 403, code: 'SCOPE_DENIED',
         needed: missing.map(m => m.scope),

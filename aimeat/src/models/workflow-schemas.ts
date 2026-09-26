@@ -50,6 +50,7 @@
  *   v1.11.0 — 2026-09-25 — WorkflowDef.savedBy names the principal whose save is in force; a run the
  *     trigger starts answers to it. A run whose saver is gone, or lacks a word the steps need, is
  *     not started: it is recorded with status `refused` and `refusal`, once per episode.
+ *   v1.12.0 — 2026-09-25 — WorkflowDef.authority, the rules a save was checked under.
  */
 import { z } from 'zod';
 
@@ -482,6 +483,11 @@ export interface WorkflowDef {
    * 2026-09-25; the trigger then asks `createdBy`, its first author.
    */
   savedBy?: WorkflowSaver;
+  /**
+   * The rules the save was checked under (step-authority.ts WORKFLOW_AUTHORITY_VERSION). 2 asks
+   * work:request for an agent step; absent is 1, a save before 2026-09-25, whose agent steps stay free.
+   */
+  authority?: number;
   createdBy: string;                  // GAII/GHII of the author (audit)
   createdAt: string;
   updatedAt: string;

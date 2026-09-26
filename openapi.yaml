@@ -5629,6 +5629,13 @@ components:
               properties:
                 kind: { type: string, enum: [owner, agent, ecosystem, app] }
                 id: { type: string, description: 'The owner GHII, an agent GAII, an ecosystem app GEAI, or a hosted app grant id.' }
+            authority:
+              type: integer
+              description: >-
+                The rules the save was checked under, set by the save. 2 asks `work:request` for an
+                agent step, of the saver, of whoever starts a run, and of the saver again when the
+                trigger starts one. Absent means 1, a workflow saved before 2026-09-25, whose agent
+                steps cost no word.
             createdAt: { type: string, format: date-time }
             updatedAt: { type: string, format: date-time }
     WorkflowBlueprint:
@@ -44587,7 +44594,8 @@ paths:
         `commerce.*` and the rest of the reserved keys). An export-out or trigger-geai step names
         only an app of this owner on this node. Authorable by the owner or an agent holding
         `workflow:write`, and a step costs the word its own door asks (403 SCOPE_DENIED names the
-        missing one): `ai:use` for an ai step or `llm.approved`, `ext:invoke` for an extension
+        missing one): `work:request` for an agent step (giving an agent work), `ai:use` for an ai
+        step or `llm.approved`, `ext:invoke` for an extension
         step, `memory:read` + `storage:write` + `memory:write` for a datapackage step,
         `memory:read` + `work:request` for export-out, `work:request` for trigger-geai, and
         `memory:read` for a workflow that reads the owner's records (every signal leaf and every
@@ -44596,7 +44604,9 @@ paths:
         spend, in US dollars; `costCapMorsels` does nothing, and a save that sets it answers with
         `warnings`. The save records its principal as `savedBy`: a run the workflow's own trigger
         starts answers to it, and is refused (status `refused`, one notification to the owner) when
-        that principal is gone or no longer holds a permission the steps need.
+        that principal is gone or no longer holds a permission the steps need. Every save records
+        `authority: 2`, the rules it was checked under; a workflow saved before 2026-09-25 has none,
+        and its agent steps keep costing no word, at a run and at its trigger.
       tags: [Workflows]
       security:
         - BearerAuth: []
