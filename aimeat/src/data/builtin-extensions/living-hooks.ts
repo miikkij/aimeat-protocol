@@ -25,6 +25,11 @@
  * @usage
  *   import { LIVING_HOOKS } from '../data/builtin-extensions/index.js';
  * @version-history
+ *   v1.1.2 — 2026-09-26 — send and read answer TOO_LARGE for an answer past the 4 MB the node reads,
+ *     the code a read over 1 MB answers as well, so a caller gets one code for an answer that was
+ *     too large whatever its size. What a ctx.fetch failure answers is written once, in
+ *     livingFetchFailure (living-hooks-lib.ts). The version moves because a kept version keeps its
+ *     code, and so that the seeder replaces an installed copy (secaudit 2026-09, N3).
  *   v1.1.1 — 2026-09-14 — livingHost ends the authority at a backslash, so the allowlist judges the
  *     host the fetch will actually use. WITHOUT THIS BUMP the fix reaches no node that already has
  *     the extension: the seeder only replaces an installed copy when the shipped version is newer,
@@ -42,7 +47,7 @@ import { LIVING_HOOKS_LIB_JS } from './living-hooks-lib.js';
 import { LIVING_HOOKS_GATE_JS } from './living-hooks-gate.js';
 
 /** The version the node ships. The seeder compares this against what is installed. */
-export const LIVING_HOOKS_VERSION = '1.1.1';
+export const LIVING_HOOKS_VERSION = '1.1.2';
 
 /**
  * The manifest, in the same YAML the install route reads from anybody else. It goes through
@@ -199,15 +204,13 @@ export default async function (ctx, input) {
   try {
     res = await ctx.fetch(open.url, { method: method, headers: head.headers, body: payload });
   } catch (err) {
-    // The node fills {{secret:NAME}} inside ctx.fetch and throws when a name is not set, so a
-    // missing secret arrives here as an error rather than as a refusal this script built. It keeps
-    // its own code: "you named a secret nobody stored" and "the far end did not answer" are two
-    // different problems, and only one of them is fixed by looking at the receiver.
-    var lhMsg = err && err.message ? err.message : String(err);
-    if (lhMsg.indexOf('SECRET_UNKNOWN:') === 0) {
-      return livingRefuse('SECRET_UNKNOWN', lhMsg.slice(15).replace(/^\s+/, ''));
-    }
-    return livingRefuse('UPSTREAM_FAILED', 'The call to ' + open.host + ' did not complete: ' + lhMsg);
+    // The node fills {{secret:NAME}} inside ctx.fetch and throws when a name is not set, and it
+    // throws for an answer past the 4 MB it reads, so both arrive here as errors rather than as
+    // refusals this script built. Each keeps a code of its own (livingFetchFailure): "you named a
+    // secret nobody stored" and "the answer was too large" are not fixed by looking at whether the
+    // receiver answered.
+    var sendFailure = livingFetchFailure(open.host, err);
+    return livingRefuse(sendFailure.code, sendFailure.message);
   }
   var ms = Date.now() - startedAt;
   if (!res.ok) {
@@ -257,13 +260,11 @@ export default async function (ctx, input) {
   try {
     res = await ctx.fetch(open.url, { method: 'GET', headers: head.headers });
   } catch (err) {
-    // Same as send: a secret the vault does not hold arrives as a throw from ctx.fetch and keeps
-    // its own code, because it is fixed in the vault and not at the far end.
-    var lhMsg = err && err.message ? err.message : String(err);
-    if (lhMsg.indexOf('SECRET_UNKNOWN:') === 0) {
-      return livingRefuse('SECRET_UNKNOWN', lhMsg.slice(15).replace(/^\s+/, ''));
-    }
-    return livingRefuse('UPSTREAM_FAILED', 'The call to ' + open.host + ' did not complete: ' + lhMsg);
+    // Same as send: a secret the vault does not hold and an answer past the 4 MB the node reads
+    // arrive as throws from ctx.fetch and keep their own codes. An answer that large is TOO_LARGE,
+    // the code the 1 MB check below answers, so a caller gets one code whatever the size.
+    var readFailure = livingFetchFailure(open.host, err);
+    return livingRefuse(readFailure.code, readFailure.message);
   }
   if (!res.ok) {
     return livingRefuse('UPSTREAM_FAILED', open.host + ' answered ' + res.status + '.', { status: res.status });

@@ -15,15 +15,22 @@
  *   - the ceiling: one exported number, 4 MB
  *   - ctx.fetch: stops at the ceiling and throws RESPONSE_TOO_LARGE; exactly the ceiling decodes
  *     whole with its charset; what a script sees, caught and uncaught; the scheduled road's error
+ *   - living-hooks: TOO_LARGE for an answer over its own 1 MB and for one past the 4 MB ceiling, on
+ *     read and on send, through the scripts the node ships and the real context builder
  *   - callSystemOne: stops at the ceiling with JEV_TOO_LARGE and no retry; exactly the ceiling parses
  *   - readResource: exactly the same ceiling is read, one byte past it is TOO_LARGE
  * @usage cd aimeat && pnpm exec vitest run test/unit/outbound-read-cap.test.ts
  * @version-history
+ *   v1.1.0 — 2026-09-26 — living-hooks answers one code, TOO_LARGE, for an answer that is too large
+ *     whatever its size, on read and on send (secaudit 2026-09, N3).
  *   v1.0.0 — 2026-09-26 — Initial (secaudit 2026-09, N3).
  */
 import { describe, it, expect, vi } from 'vitest';
 import type { AimeatConfig } from '../../src/config.js';
+import { loadConfig } from '../../src/config.js';
 import type { Storage } from '../../src/storage/interface.js';
+import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
+import { LIVING_HOOKS } from '../../src/data/builtin-extensions/living-hooks.js';
 import type { SystemOneRequest } from '../../src/services/decide/systemone-client.js';
 
 const CHUNK = 64 * 1024;
@@ -158,6 +165,47 @@ describe("an extension's ctx.fetch", () => {
             storageOwnerGhii: 'alice@node-1', logLabel: 'scheduler', producerKind: 'extension',
         })).rejects.toThrow(/^RESPONSE_TOO_LARGE: /);
         expect(far.state.pulled).toBeLessThanOrEqual(CHUNKS_TO_CROSS + 1);
+        expect(far.state.cancelled).toBe(true);
+    });
+});
+
+// The extension the node ships to read an outside value into a living document. A read over its own
+// 1 MB ceiling is TOO_LARGE, and so is any answer past the 4 MB the node reads, on read and on send:
+// one code for an answer that was too large, whatever its size.
+describe('living-hooks, the extension the node ships', () => {
+    type Refusal = { error?: { code?: string; message?: string } };
+    const hooksConfig = loadConfig().config;
+    const run = (action: 'read' | 'send', input: Record<string, unknown>) => executeExtensionAction(
+        LIVING_HOOKS.scripts[`${action}.js`],
+        buildExtensionCtx({
+            config: hooksConfig, storage: new SqliteStorage(':memory:') as never, extMemoryOwner: 'ext:living-hooks',
+            caller: { gaii: 'alice@node-1', owner: 'alice', roles: ['owner'] },
+            extConfig: { allow_hosts: ['feed.example'] }, logPrefix: '[ext:living-hooks]',
+        }),
+        input, limits,
+    ) as Promise<Refusal>;
+
+    it('read: an answer over its own 1 MB is TOO_LARGE', async () => {
+        answer = () => new Response(farStream(32).stream, { status: 200 });
+        const out = await run('read', { url: URL_BIG, raw: true });
+        expect(out.error?.code).toBe('TOO_LARGE');
+    });
+
+    it('read: an answer past the 4 MB the node reads is TOO_LARGE as well, and says 4 MB', async () => {
+        const far = farStream(TEN_TIMES);
+        answer = () => new Response(far.stream, { status: 200 });
+        const out = await run('read', { url: URL_BIG, raw: true });
+        expect(out.error?.code).toBe('TOO_LARGE');
+        expect(out.error?.message).toContain('4 MB');
+        expect(far.state.cancelled).toBe(true);
+    });
+
+    it('send: a receiver that answers past 4 MB is TOO_LARGE, and says 4 MB', async () => {
+        const far = farStream(TEN_TIMES);
+        answer = () => new Response(far.stream, { status: 200 });
+        const out = await run('send', { url: 'https://feed.example/hook', body: { state: 'on' } });
+        expect(out.error?.code).toBe('TOO_LARGE');
+        expect(out.error?.message).toContain('4 MB');
         expect(far.state.cancelled).toBe(true);
     });
 });
