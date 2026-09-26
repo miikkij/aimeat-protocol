@@ -155,10 +155,10 @@ export function SourcesPanel({ orgId, wsId, showToast }) {
 
     ${picking ? html`
       <${Box}>
-        <${Tabs} kind="view" value=${tab} onSelect=${setTab}
+        <${Tabs} tone="filter" kind="view" value=${tab} onSelect=${setTab}
           items=${['memory', 'storage', 'knowledge'].map(tk => ({ value: tk, label: `${SRC_ICON[tk]} ${t('organisms.src_' + tk) || tk}` }))} />
         ${tab !== 'storage' ? html`
-          <${Tabs} value=${scope} onSelect=${setScope} items=${[
+          <${Tabs} tone="filter" value=${scope} onSelect=${setScope} items=${[
             { value: 'mine', label: t('organisms.mine') || 'Mine' },
             { value: 'discover', label: t('organisms.discover') || 'Discover' },
           ]} />` : null}

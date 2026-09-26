@@ -142,7 +142,7 @@ function NodesList({ session, showToast, onStats }) {
   };
 
   return html`
-    <${Section} title=${t('profile.nodes.title')} first>
+    <${Section} band title=${t('profile.nodes.title')} first>
     <${Space} below="large"><${Loud} onClick=${() => setShowNodeForm(!showNodeForm)}>${t('profile.nodes.addBtn')}<//><//>
     ${showNodeForm && html`<${NodeForm} onRegister=${handleRegister} onCancel=${() => setShowNodeForm(false)} />`}
     ${!nodes ? html`<${LoadingLine} text=${t('profile.nodes.loading')} />`

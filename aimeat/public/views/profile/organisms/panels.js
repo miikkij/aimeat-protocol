@@ -141,7 +141,7 @@ export function IncomingInvitations({ showToast, onChanged }) {
   };
   if (!invites.length) return null;
   return html`
-    <${PageSection} title=${t('organisms.youAreInvited') || 'You’re invited'}>
+    <${PageSection} band title=${t('organisms.youAreInvited') || 'You’re invited'}>
       <${List} cols="name-doors" keepCols>
         ${invites.map(({ membership, organism }) => html`
           <${ListRow} key=${organism.id}>

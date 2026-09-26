@@ -326,7 +326,7 @@ export default function LivingTab({ session, showToast }) {
   // ── Render: template editor ──
 
   const renderEditor = () => html`
-    <${Section} title=${editing.id && templates?.some(x => x.id === editing.id) ? t('profile.living.editTemplate') : t('profile.living.newTemplate')}>
+    <${Section} band title=${editing.id && templates?.some(x => x.id === editing.id) ? t('profile.living.editTemplate') : t('profile.living.newTemplate')}>
       <${Stack}>
         <${TextField} label=${t('profile.living.fieldTitle')} value=${editing.title} onInput=${v => patchEditing({ title: v })} />
         <${TextField} label=${t('profile.living.fieldDescription')} value=${editing.description} onInput=${v => patchEditing({ description: v })} />
@@ -370,7 +370,7 @@ export default function LivingTab({ session, showToast }) {
   // ── Render: deploy panel ──
 
   const renderDeploy = () => html`
-    <${Section} title=${t('profile.living.deployTitle').replace('{title}', deploying.template.title)}>
+    <${Section} band title=${t('profile.living.deployTitle').replace('{title}', deploying.template.title)}>
       <${Stack}>
         ${orgs.length === 0
           ? html`<${Note} kind="quiet">${t('profile.living.noOrgs')}<//>`
@@ -395,7 +395,7 @@ export default function LivingTab({ session, showToast }) {
     const st = opened.config.status || {};
     const lastPulse = st.last_pulse ? fmtDateTime(st.last_pulse) : t('profile.living.never');
     return html`
-      <${Section} title=${escHtml(opened.config.title)} doors=${html`
+      <${Section} band title=${escHtml(opened.config.title)} doors=${html`
         <${Loud} control disabled=${pulsing} onClick=${handlePulse}>${pulsing ? t('profile.living.pulsing') : `↻ ${t('profile.living.pulseNow')}`}<//>
         <${Action} small onClick=${togglePause}>${st.paused ? t('profile.living.resume') : t('profile.living.pause')}<//>
         <${Action} small onClick=${handleSaveSnapshot}>${t('profile.living.saveSnapshot')}<//>
@@ -488,7 +488,7 @@ export default function LivingTab({ session, showToast }) {
       ${editing && renderEditor()}
 
       ${!editing && !deploying && html`
-        <${Section} title=${t('profile.living.templatesTitle')}>
+        <${Section} band title=${t('profile.living.templatesTitle')}>
           <${Note} kind="lead">${t('profile.living.templatesDesc')}<//>
           <${Stack} above="medium" below="medium">
             <${TextArea} rows=${2} placeholder=${t('profile.living.authorPh')} value=${need} onInput=${v => setNeed(v)} />
@@ -517,7 +517,7 @@ export default function LivingTab({ session, showToast }) {
           <//>
         <//>
 
-        <${Section} title=${t('profile.living.instancesTitle')}>
+        <${Section} band title=${t('profile.living.instancesTitle')}>
           <${Note} kind="lead">${t('profile.living.instancesDesc')}<//>
           <${List} cols="name-desc-who-doors" apart loading=${instances === null ? t('profile.living.loading') : false}
             empty=${t('profile.living.noInstances')}>
