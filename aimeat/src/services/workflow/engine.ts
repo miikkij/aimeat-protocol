@@ -71,6 +71,12 @@
  *     short of a word its steps need, and it does not start; startRun answers `refused` with the
  *     refusal's record (trigger-authority.ts). A real start closes a refusal still open for it.
  *   v1.11.1 — 2026-09-26 — sweepRun takes the owner's account name from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
+ *   v1.12.0 — 2026-09-26 — Under maxCostUsd an ai step holds what it is expected to cost while it
+ *     runs: startRun gives each ai step its estimate from the workflow's recent runs, tick starts an
+ *     ai step only when it fits and otherwise leaves it pending, and stops the run after the pass when
+ *     a step waits and no ai step runs (run-cost.ts admitAiStep, stopWhenNoRoomComes); persist drops
+ *     the hold of every step no longer running, and onPushTerminal keeps a step's cost even when the
+ *     step was moved on while its call ran (secaudit 2026-09, A6-11).
  */
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
@@ -83,7 +89,7 @@ import { logger } from '../../utils/logger.js';
 import { localAccountName } from '../../utils/gaii.js';
 import { buildEvalCtx } from './eval-context.js';
 import { evalSignal, recordProgress } from './engine-observe.js';
-import { getWorkflow, validateWorkflow, runKey, reservedStepKeys, reservedStepKeyErrors, type ResolvedStep } from './store.js';
+import { getWorkflow, validateWorkflow, listRuns, runKey, reservedStepKeys, reservedStepKeyErrors, type ResolvedStep } from './store.js';
 import { missingStepScopes, stepScopeRefusal, type WorkflowCaller } from './step-authority.js';
 import { readEventTriggers, readEcosystemEventTriggers, readActiveRuns, reconcileActiveRun } from './lifecycle.js';
 import { fireMemoryWrite, fireOfferOrdered, fireEcosystemEvent, type TriggerDeps } from './engine-triggers.js';
@@ -93,7 +99,7 @@ import {
   dispatchStep, askHumanInput, maybeAlertAgentOffline, onStepFail, onRunFinished, clearRunOutputs, type StepDeps,
 } from './engine-steps.js';
 import { validateHumanAnswer, applyHumanAnswer } from './engine-human.js';
-import { spendsAi, stopAtCostCap } from './run-cost.js';
+import { spendsAi, capUsd, admitAiStep, stopWhenNoRoomComes, pinCostEstimates, dropEndedReservations } from './run-cost.js';
 import { refuseTriggerStart, clearRefusal } from './trigger-authority.js';
 import type {
   WorkflowDef, WorkflowRun, WorkflowRunStep,
@@ -246,6 +252,8 @@ export class WorkflowEngine {
     const now = new Date().toISOString();
     const steps: Record<string, WorkflowRunStep> = {};
     for (const s of def.steps) steps[s.id] = { state: 'pending', attempt: 0, reads: [], writes: [] };
+    // Under a cost cap, each ai step starts with the most it cost in recent runs as its estimate.
+    if (opts.mode !== 'signals-only' && capUsd(def) !== null) pinCostEstimates(def, steps, await listRuns(this.storage, ownerGhii, workflowId));
 
     const run: WorkflowRun = {
       runId, workflowId, defSnapshot: def, resolved: v.resolved, vars,
@@ -307,6 +315,9 @@ export class WorkflowEngine {
     let dispatchedAny = false;
     let mutated = false;
     let stopped = false;
+    // ai steps waiting for room under the cost cap: no ai step ends inside one tick, so they wait for
+    // the rest of it, and their signals are not asked again in a later pass.
+    const waiting = new Set<string>();
 
     // Fixpoint: a step reaching a TERMINAL state this tick (green via skip-done, or input-red) can
     // unblock its dependents, so keep re-computing ready steps until only dispatched (non-terminal)
@@ -317,6 +328,7 @@ export class WorkflowEngine {
       if (ready.length === 0) break;
       let advancedTerminal = false;
       for (const step of ready) {
+        if (waiting.has(step.id)) continue;
         const r = resolved.get(step.id);
         const rs = run.steps[step.id];
         const reads = new Set<string>();
@@ -353,9 +365,10 @@ export class WorkflowEngine {
           mutated = true;
           continue;
         }
-        // An ai step spends the owner's AI. Once the run's own ai steps have spent the workflow's
-        // maxCostUsd, the run stops here instead of starting another (run-cost.ts).
-        if (spendsAi(step) && stopAtCostCap(run, step.id, now)) { stopped = true; mutated = true; break; }
+        // An ai step spends the owner's AI. Under maxCostUsd it starts only when what it is expected to
+        // cost fits beside what the run has spent and what its running ai steps hold; otherwise it
+        // stays pending, and after the pass the run stops if no ai step is running (run-cost.ts).
+        if (spendsAi(step) && admitAiStep(run, step.id) === 'wait') { waiting.add(step.id); continue; }
         // dispatch (fresh-mode output clearing happens ONCE at run start — see clearRunOutputs)
         const taskIds = await dispatchStep(this.stepDeps(), ownerGhii, run, step, r, (o, w, rid, s, ok, cost) => this.onPushTerminal(o, w, rid, s, ok, cost));
         rs.state = 'dispatched'; rs.taskIds = taskIds; rs.startedAt = now; rs.notBefore = undefined;
@@ -364,8 +377,10 @@ export class WorkflowEngine {
         await maybeAlertAgentOffline(this.stepDeps(), ownerGhii, run, step);
       }
       // Only dispatched (non-terminal) steps remained this pass ⇒ nothing new can be unblocked now.
-      if (stopped || !advancedTerminal) break;
+      if (!advancedTerminal) break;
     }
+    // ai steps left waiting with no ai step running get no room back: the run stops at its cap.
+    if (stopWhenNoRoomComes(run, [...waiting], now)) { stopped = true; mutated = true; }
 
     // A run stopped at its cost cap already carries its status, end and reason (run-cost.ts).
     const outcome = stopped ? 'stopped' : runOutcome(run.steps);
@@ -659,7 +674,7 @@ export class WorkflowEngine {
    * reuses the same lock + success_signal evaluation + partial-fail + tick. `ok` is whether the
    * push-ack / capability-response succeeded; a step is green iff ok AND its success_signal (if any)
    * passes. `costUsd` is what the step's own model calls cost (an ai step), kept on the step for the
-   * run's cost cap.
+   * run's cost cap in place of what the step held while it ran.
    */
   async onPushTerminal(ownerGhii: string, workflowId: string, runId: string, stepId: string, ok: boolean, costUsd?: number): Promise<void> {
     await this.withLock(runId, async () => {
@@ -667,8 +682,13 @@ export class WorkflowEngine {
       if (!rec) return;
       const run = rec.value as WorkflowRun;
       const rs = run.steps[stepId];
-      if (!rs || rs.state !== 'dispatched') return; // already resolved / not awaiting
-      if (costUsd && costUsd > 0) rs.costUsd = (rs.costUsd ?? 0) + costUsd;
+      if (!rs) return;
+      // What the step's model calls cost is kept whatever became of the step while they ran (a
+      // cancel, a timeout, the watchdog finding its output first): the owner paid for them, and the
+      // cap and the next run's estimate count them. Its reservation goes when the run is saved.
+      const paid = typeof costUsd === 'number' && Number.isFinite(costUsd) && costUsd > 0;
+      if (paid) rs.costUsd = (rs.costUsd ?? 0) + costUsd;
+      if (rs.state !== 'dispatched') { if (paid) await this.persist(ownerGhii, run); return; } // already resolved / not awaiting
 
       const r = this.resolvedMap(run).get(stepId);
       const ctx = buildEvalCtx(this.storage, this.config, ownerGhii, run);
@@ -726,6 +746,8 @@ export class WorkflowEngine {
   }
 
   private async persist(ownerGhii: string, run: WorkflowRun): Promise<void> {
+    // A step holds its share of the cost cap only while it runs, however it stopped running.
+    dropEndedReservations(run);
     // Terminal-run finish notification (owner opt-in) — mutates run.notifiedFinish so it's persisted
     // below and fires exactly once across every terminal path (tick / cancelRun / sweep).
     await onRunFinished(this.stepDeps(), ownerGhii, run);

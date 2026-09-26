@@ -38,6 +38,9 @@
  *   v1.13.0 — 2026-09-26 — A6-11: what the node's model spends judging an llm signal counts toward
  *     maxCostUsd, and past the cap the judge is not asked. Failed on the code before the fix: the
  *     judged run ended `done` with both ai steps run.
+ *   v1.14.0 — 2026-09-26 — Two ai steps in one pass under maxCostUsd: each holds what it is expected
+ *     to cost before it starts, so a pair that would pass the cap does not both start, a pair that
+ *     fits still starts together, and a step that does not fit beside a running one waits for it.
  */
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -1401,6 +1404,103 @@ async function run() {
     } finally {
       await json('/v1/openrouter/settings', { method: 'DELETE', headers: auth });
       for (const id of ['judge-counted', 'judge-past-cap']) await json(`/v1/workflows/${id}?withRuns=true`, { method: 'DELETE', headers: auth });
+      await provider.close();
+    }
+  });
+
+  // Two ai steps with no order between them start in the same pass, before either cost is known. So
+  // the engine sets aside what each ai step is expected to cost before it starts: the most it cost in
+  // the workflow's recent runs. A step whose estimate does not fit beside what the running steps hold
+  // waits for them, and when none is running the run stops at its cap.
+  await test('maxCostUsd holds when two ai steps start in the same pass: each step\'s expected cost is set aside before it starts', async () => {
+    const provider = await startFakeAiProvider(0);
+    const answer = (cost: number) => chatJson('the answer', { usage: { prompt_tokens: 5, completion_tokens: 5, total_tokens: 10, cost } });
+    const spent = (run: any): number => Object.values(run.steps as Record<string, { costUsd?: number }>)
+      .reduce((sum, s) => sum + (s.costUsd ?? 0), run.signalCostUsd ?? 0);
+    const callsInFlight = async (n: number): Promise<number> => {
+      const until = Date.now() + 5000;
+      while (provider.requestsFor('chat').length < n && Date.now() < until) await sleep(50);
+      return provider.requestsFor('chat').length;
+    };
+    try {
+      provider.setDefault('chat', answer(0.02));
+      const aim = await json('/v1/memory', {
+        method: 'POST', headers: auth,
+        body: JSON.stringify({ key: 'openrouter.settings', visibility: 'private', value: { provider: 'custom', baseUrl: provider.baseUrl, model: 'stub/test-model', daily_budget_usd: 5 } }),
+      });
+      assert(aim.body?.ok === true, `point the owner at the stub: ${aim.status} ${JSON.stringify(aim.body.error)}`);
+      const wf = (cap?: number) => ({
+        title: { en_US: 'Side by side' }, description: { en_US: 'two answers with no order between them' },
+        trigger: { kind: 'manual' }, vars: [], on_step_fail: 'inspect',
+        ...(cap !== undefined ? { maxCostUsd: cap } : {}),
+        steps: [
+          { id: 'left', description: { en_US: 'Left' }, required_to_function: 'none', action: { kind: 'ai', prompt: 'Say one thing.', result_to_key: 'wfpar.left' } },
+          { id: 'right', description: { en_US: 'Right' }, required_to_function: 'none', action: { kind: 'ai', prompt: 'Say another thing.', result_to_key: 'wfpar.right' } },
+        ],
+      });
+      const startOnce = async (cap?: number): Promise<string> => {
+        const put = await json('/v1/workflows/cost-parallel', { method: 'PUT', headers: auth, body: JSON.stringify(wf(cap)) });
+        assert(put.status === 200, `save: ${put.status} ${JSON.stringify(put.body.error)}`);
+        const start = await json('/v1/workflows/cost-parallel/run', { method: 'POST', headers: auth, body: JSON.stringify({ mode: 'full' }) });
+        assert(start.status === 200, `run: ${start.status} ${JSON.stringify(start.body.error)}`);
+        return start.body.data.runId as string;
+      };
+
+      // HISTORY: with no cap both steps run, and each costs two cents.
+      const history = await waitForRunEnd('cost-parallel', await startOnce());
+      assert(history.status === 'done' && Math.abs(spent(history) - 0.04) < 1e-9,
+        `the uncapped run spends two cents a step: ${history.status} ${JSON.stringify(history.steps)}`);
+
+      // THE CAP HOLDS. Three cents, and each step is expected to cost two: the second does not start
+      // beside the first, and once the first has spent its two, the second's two do not fit.
+      provider.reset();
+      const capped = await waitForRunEnd('cost-parallel', await startOnce(0.03));
+      assert(capped.status === 'stopped', `the run stops rather than start both steps: ${capped.status} ${JSON.stringify(capped.steps)}`);
+      assert(spent(capped) <= 0.03 + 1e-9, `the run stays within its cap: it spent ${spent(capped)}`);
+      assert(provider.requestsFor('chat').length === 1, `the model was asked once: ${provider.requestsFor('chat').length}`);
+      assert(capped.costCap?.stoppedBefore === 'right' && Math.abs((capped.costCap?.neededUsd ?? 0) - 0.02) < 1e-9
+        && Math.abs((capped.costCap?.spentUsd ?? 0) - 0.02) < 1e-9,
+        `the stop names the step, what it was expected to cost and what was spent: ${JSON.stringify(capped.costCap)}`);
+      assert(/0\.02/.test(capped.reason ?? '') && /0\.03/.test(capped.reason ?? ''), `the reason says it in words: ${capped.reason}`);
+      assert(Object.values(capped.steps as Record<string, { reservedUsd?: number }>).every(s => s.reservedUsd === undefined),
+        `a stopped run holds nothing back: ${JSON.stringify(capped.steps)}`);
+
+      // BOTH FIT. Under five cents the two steps still start together: the provider holds each call
+      // open, and both calls arrive before either is answered. Each running step holds its estimate.
+      provider.reset();
+      provider.setDefault('chat', { kind: 'hold' });
+      const sideId = await startOnce(0.05);
+      const together = await callsInFlight(2);
+      const holding = (await json(`/v1/workflows/cost-parallel/runs/${sideId}`, { headers: auth })).body.data;
+      provider.setDefault('chat', answer(0.02));
+      provider.releaseHeld();
+      assert(together === 2, `both steps asked the model before either answered: ${together}`);
+      assert(['left', 'right'].every(id => Math.abs((holding?.steps?.[id]?.reservedUsd ?? 0) - 0.02) < 1e-9),
+        `each running step holds what it is expected to cost: ${JSON.stringify(holding?.steps)}`);
+      const side = await waitForRunEnd('cost-parallel', sideId);
+      assert(side.status === 'done' && Math.abs(spent(side) - 0.04) < 1e-9, `both steps ran: ${side.status} ${JSON.stringify(side.steps)}`);
+      assert(['left', 'right'].every(id => side.steps[id].reservedUsd === undefined), `a finished step holds nothing back: ${JSON.stringify(side.steps)}`);
+
+      // WAITS, THEN FITS. Under three and a half cents the second step waits while the first runs.
+      // The first costs one cent this time, which leaves room for the second's estimate of two.
+      provider.reset();
+      provider.setDefault('chat', { kind: 'hold' });
+      const waitId = await startOnce(0.035);
+      await callsInFlight(1);
+      await sleep(500);
+      const alone = provider.requestsFor('chat').length;
+      const waiting = (await json(`/v1/workflows/cost-parallel/runs/${waitId}`, { headers: auth })).body.data;
+      provider.setDefault('chat', answer(0.01));
+      provider.releaseHeld();
+      assert(alone === 1, `the second step waits while the first runs: ${alone} calls in flight`);
+      assert(waiting?.steps?.right?.state === 'pending' && waiting?.status === 'waiting-step', `it waits as a pending step: ${JSON.stringify(waiting?.steps)}`);
+      const waited = await waitForRunEnd('cost-parallel', waitId);
+      assert(waited.status === 'done' && Math.abs(spent(waited) - 0.02) < 1e-9,
+        `the second step started once the first's real cost left room: ${waited.status} ${JSON.stringify(waited.steps)}`);
+      assert(provider.requestsFor('chat').length === 2, `each step asked the model once: ${provider.requestsFor('chat').length}`);
+    } finally {
+      await json('/v1/openrouter/settings', { method: 'DELETE', headers: auth });
+      await json('/v1/workflows/cost-parallel?withRuns=true', { method: 'DELETE', headers: auth });
       await provider.close();
     }
   });

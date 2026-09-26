@@ -10,6 +10,8 @@
  * @structure c · loc · words (runWord, stepWord, triggerWords, signalWords, observedWords) · verdictOf · workflowRows · crumb · renderPage
  * @usage import { renderPage, verdictOf, signalWords } from './frame.js';
  * @version-history
+ *   v1.3.1 -- 2026-09-26 -- A run stopped because its next AI step's estimate did not fit in what was
+ *            left of the spending limit says so: the step, the estimate, the spend and the limit.
  *   v1.3.0 -- 2026-09-26 -- Words for a run the node stopped at its spending limit and one its trigger
  *            did not start, and the verdict says why in the reader's language: the cap, the spend
  *            and the step, or who saved the workflow and what they lack.
@@ -134,7 +136,9 @@ export function verdictOf(run) {
   // numbers and names the run keeps, in the reader's language (the run's own `reason` is English).
   if (run.status === 'stopped') {
     const cap = run.costCap;
-    const head = cap ? c('verdict.stopped', { step: name(cap.stoppedBefore), spent: money(cap.spentUsd), cap: money(cap.capUsd) }) : c('verdict.stoppedPlain');
+    // neededUsd: the next ai step's estimate did not fit in what was left, before the cap was spent.
+    const words = cap && { step: name(cap.stoppedBefore), spent: money(cap.spentUsd), cap: money(cap.capUsd), needed: money(cap.neededUsd || 0) };
+    const head = !cap ? c('verdict.stoppedPlain') : cap.neededUsd ? c('verdict.stoppedEstimate', words) : c('verdict.stopped', words);
     return { tone: 'bad', head, sub: c('verdict.doneSub', { n: green, total: steps.length, when, took }) };
   }
   if (run.status === 'refused') {

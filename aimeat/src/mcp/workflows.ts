@@ -11,6 +11,8 @@
  * @usage import { registerWorkflowTools } from './workflows.js';
  *   registerWorkflowTools(mcp, storage, config, () => agentGaii, scopes);
  * @version-history
+ *   v1.7.2 — 2026-09-26 — aimeat_workflow_save's definition says what maxCostUsd counts and that an
+ *     ai step starts only when its expected cost fits in what is left (secaudit 2026-09, A6-11).
  *   v1.7.1 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts),
  *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  *   v1.7.0 — 2026-09-25 — A save records this session's agent as the workflow's saver, and
@@ -73,7 +75,7 @@ export function registerWorkflowTools(
     descriptionFor('aimeat_workflow_save'),
     {
       id: z.string().describe('Workflow id (lowercase slug). Creating with an existing id updates it.'),
-      definition: z.record(z.string(), z.unknown()).describe('The workflow descriptor: { title, description (both localized string | {locale:text}), trigger {kind:"schedule"|"manual"|"event", cron?, timezone?, on?, match?}, vars[], steps[{id, agent, offer, after?, description, required_to_function?, success_signal?, retry?, timeout_min}], on_step_fail:"inspect", llm?{approved}, maxCostUsd? }. Signals/deliverable.location are inherited from each step\'s offer; a step using an `llm` signal leaf requires llm.approved=true. maxCostUsd (US dollars, per run) stops a run before its next ai step once its ai steps have spent that much. Rejected if the graph is not a DAG or an offer is not workflow-compatible.'),
+      definition: z.record(z.string(), z.unknown()).describe('The workflow descriptor: { title, description (both localized string | {locale:text}), trigger {kind:"schedule"|"manual"|"event", cron?, timezone?, on?, match?}, vars[], steps[{id, agent, offer, after?, description, required_to_function?, success_signal?, retry?, timeout_min}], on_step_fail:"inspect", llm?{approved}, maxCostUsd? }. Signals/deliverable.location are inherited from each step\'s offer; a step using an `llm` signal leaf requires llm.approved=true. maxCostUsd (US dollars, per run) caps what a run spends on AI, its ai steps and the judging of its llm signals together: an ai step starts only when what it is expected to cost fits in what is left, and otherwise waits for the running ai steps or stops the run. Rejected if the graph is not a DAG or an offer is not workflow-compatible.'),
       propose: z.boolean().optional().describe('Operator flow: return a diff vs the current definition + a single-use confirm_token WITHOUT saving. Default false (direct save, unchanged behavior).'),
       confirm_token: z.string().optional().describe('Token from the propose step — applies exactly the proposed definition.'),
     },
