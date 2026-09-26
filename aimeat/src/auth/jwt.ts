@@ -6,9 +6,13 @@
  *   token revocation. Issues credentials for every authenticated principal — owner (GHII), agent
  *   (GAII), and ecosystem app (GEAI). Optional claims (mcp_client, federated, eco_app, …) are threaded
  *   conditionally so tokens stay minimal.
- * @structure initNodeKeys / AccountDisabledError / issueJWT / verifyJWT (+ asVisitor) / generateSessionId / revokeToken / isRevoked
+ * @structure initNodeKeys / AccountDisabledError / issueJWT / verifyJWT (+ asVisitor) / generateSessionId / tokenIdOf / revokeToken / isRevoked
  * @usage import { issueJWT, verifyJWT } from '../auth/jwt.js';
  * @version-history
+ *   v1.5.0 — 2026-09-26 — A token is revoked and checked under its id (tokenIdOf: the hash of the
+ *     header and claims its signature covers), not under its string, so every spelling of a revoked
+ *     token is refused. isRevoked also reads the old key, the hash of the string, so a token revoked
+ *     before this change stays revoked (secaudit 2026-09, N4).
  *   v1.4.0 — 2026-09-24 — verifyJWT reads a federated token as a VISITOR: role `federated` and its
  *     home GHII as `owner` and `sub`, whatever the token says. Every consumer of a token goes
  *     through here (the global auth middleware, MCP, the tunnels, device approval, OAuth consent), so
@@ -213,8 +217,37 @@ export async function verifyJWT(token: string): Promise<VerifiedToken | null> {
 
 // ── Token Revocation (storage-backed with in-memory cache) ─────────────
 
-/** Hash a raw JWT token to a fixed-length hex string for storage. */
-function hashToken(token: string): string {
+/** Keeps a token id apart from the other hashes the revoked-token table holds (spent assertions). */
+const TOKEN_ID_PREFIX = 'jwt-signed:';
+
+/**
+ * A token's id: the hash of what its signature covers, the header and the claims. A token is
+ * revoked and checked under this, never under its string.
+ *
+ * WHY NOT THE STRING. An Ed25519 signature is 64 bytes in 86 base64url characters, so the last
+ * character carries four bits nobody reads, and verifyJWT accepts all sixteen spellings of one
+ * signature. A key made from the string names one spelling of sixteen. The header and the claims
+ * are signed exactly as written, so every copy that verifies has the same ones (secaudit 2026-09,
+ * N4; the assertion spend keys the same way, services/assertion-spend.ts).
+ *
+ * WHY NOT THE jti ALONE. Not every token carries one (an MCP OAuth access token, an app grant's
+ * token, a personal access token's exchange), and an owner's web session keeps one jti across every
+ * refresh, so there a jti names the session and not the token. The claims carry the jti where there
+ * is one, beside iat and exp, so this id is one token's and nothing wider.
+ */
+export function tokenIdOf(token: string): string {
+  const cut = token.lastIndexOf('.');
+  const signed = cut > 0 ? token.slice(0, cut) : token;
+  return createHash('sha256').update(`${TOKEN_ID_PREFIX}${signed}`).digest('hex');
+}
+
+/**
+ * Where a revocation made before 2026-09-26 was filed: the hash of the token's exact string. Read
+ * as well as the id, so a token revoked before this change stays revoked. Remove it once the
+ * longest-lived token revoked before then has expired: 90 days (AIMEAT_AGENT_JWT_TTL) after this
+ * change is on every node.
+ */
+function spellingHashOf(token: string): string {
   return createHash('sha256').update(token).digest('hex');
 }
 
@@ -255,22 +288,24 @@ export function initRevocationStorage(storage: Storage): void {
 }
 
 /**
- * Revoke a token. Persists to storage and updates the in-memory cache.
+ * Revoke a token, under its id (tokenIdOf), so every spelling of it is revoked. Persists to storage
+ * and updates the in-memory cache.
  */
 export async function revokeToken(token: string, expiresAt: number): Promise<void> {
-  const hash = hashToken(token);
+  const id = tokenIdOf(token);
 
   // Persist to storage
   if (_storage) {
-    await _storage.revokeToken(hash, expiresAt);
+    await _storage.revokeToken(id, expiresAt);
   }
 
   // Update cache
-  revocationCache.set(hash, { revoked: true, cachedAt: Date.now() });
+  revocationCache.set(id, { revoked: true, cachedAt: Date.now() });
 
-  // P2: if this exact bearer holds a live connector tunnel, push `auth_revoked` + close it now so the
-  // agent re-auths immediately instead of probing for liveness. Decoupled via a registered hook (the
-  // tunnel manager registers it) so this foundational auth module never imports the tunnel.
+  // P2: if this token, in any spelling (the tunnel matches on tokenIdOf), holds a live connector
+  // tunnel, push `auth_revoked` + close it now so the agent re-auths immediately instead of probing
+  // for liveness. Decoupled via a registered hook (the tunnel manager registers it) so this
+  // foundational auth module never imports the tunnel.
   try {
     _onTokenRevoked?.(token);
   } catch (err) {
@@ -288,22 +323,30 @@ let _onTokenRevoked: ((token: string) => void) | null = null;
 export function setTokenRevokedHook(fn: ((token: string) => void) | null): void { _onTokenRevoked = fn; }
 
 /**
- * Check if a token has been revoked.
- * Uses in-memory cache as L1, falls back to storage for cache misses.
+ * Check if a token has been revoked: under its id, which every spelling of it shares, and under the
+ * hash of its exact string, where a revocation made before 2026-09-26 was filed (spellingHashOf).
  */
 export async function isRevoked(token: string): Promise<boolean> {
-  const hash = hashToken(token);
+  if (await revokedUnder(tokenIdOf(token))) return true;
+  return revokedUnder(spellingHashOf(token));
+}
 
+/**
+ * One key of the revoked-token table: the in-memory cache as L1, storage on a miss. Each key has its
+ * own cache entry: the old key differs per spelling, so its answer is never cached under the id that
+ * every spelling shares.
+ */
+async function revokedUnder(key: string): Promise<boolean> {
   // L1: Check in-memory cache
-  const cached = revocationCache.get(hash);
+  const cached = revocationCache.get(key);
   if (cached && (Date.now() - cached.cachedAt) < CACHE_TTL_MS) {
     return cached.revoked;
   }
 
   // L2: Check storage
   if (_storage) {
-    const revoked = await _storage.isTokenRevoked(hash);
-    revocationCache.set(hash, { revoked, cachedAt: Date.now() });
+    const revoked = await _storage.isTokenRevoked(key);
+    revocationCache.set(key, { revoked, cachedAt: Date.now() });
     return revoked;
   }
 
