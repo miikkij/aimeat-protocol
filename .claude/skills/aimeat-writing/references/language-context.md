@@ -118,6 +118,8 @@ everywhere at once, and say so in the Changes section.
 | a person who opened an app without an account session | the node knows nothing about them, and the word says only that | not signed in | kirjautumaton | sin iniciar sesión |
 | the person who read an AI draft and answers for it | named on an app by its owner in person; the visible AI label then names them or comes off, by the operator's label setting | reviewer (the act: reviewed) | katselmoija (the act on the label: tarkistanut) | revisor (the act: revisado) |
 | the mark that tells a person AI made something | the chip on a served app and the words beside it; the operator's setting decides whether it also marks what the law does not require | visible AI label | näkyvä tekoälymerkintä | etiqueta visible de IA |
+| a chain of steps one trigger runs | agents, the owner's own model, extensions and questions to the person, each step checked for whether it produced | workflow | työnkulku | flujo de trabajo (flujo in a title that names it) |
+| the most one workflow run may spend on AI | US dollars per run; the run stops before its next AI step once its AI steps have spent that much | spending limit | kulukatto | límite de gasto |
 
 ## Never translated, in any language
 
@@ -231,6 +233,11 @@ service, the directory, the token, the identifier and the username: the test nam
   label already said *tarkistanut* for the act; both stay as they ship, and the row says which is
   which so the next writer does not pick a third. *Merkintä* in *tekoälymerkintä* is the label and
   not the stored entry of the row above; the compound keeps the two apart.
+- **2026-09-25** — workflow and spending limit, with a workflow's per-run cap on AI spend.
+  *Työnkulku* and *flujo* are what the Workflows page and its notifications already ship; the row
+  records them. *Kulukatto* is the word Finnish already uses for a cost cap (Formula 1's budget cap,
+  the cap on consumer credit costs), and *límite de gasto* is the plain Spanish. English says
+  *spending limit* on a person's surface; *maxCostUsd* is the field. No cold reader has seen them yet.
 - **2026-09-25** — space, section, suggestion and member changes, with the doors through which a
   workspace member adds a space or files sections. *Tila* / *espacio* and *osio* / *sección* are what
   the workspace page already shipped; *ehdotus* is the word the decision rules' page already uses for

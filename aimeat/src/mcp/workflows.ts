@@ -11,6 +11,8 @@
  * @usage import { registerWorkflowTools } from './workflows.js';
  *   registerWorkflowTools(mcp, storage, config, () => agentGaii, scopes);
  * @version-history
+ *   v1.6.0 — 2026-09-25 — aimeat_workflow_save answers `warnings` when the definition set
+ *     costCapMorsels, which does nothing; the definition's description names maxCostUsd.
  *   v1.5.0 — 2026-09-24 — aimeat_workflow_save and aimeat_workflow_run pass the session's scopes, and
  *     answer SCOPE_DENIED when a step needs a word the session lacks, as the HTTP door does.
  *   v1.4.0 — 2026-09-09 — aimeat_workflow_run says when nothing started: `skipped: true` and the id
@@ -66,7 +68,7 @@ export function registerWorkflowTools(
     descriptionFor('aimeat_workflow_save'),
     {
       id: z.string().describe('Workflow id (lowercase slug). Creating with an existing id updates it.'),
-      definition: z.record(z.string(), z.unknown()).describe('The workflow descriptor: { title, description (both localized string | {locale:text}), trigger {kind:"schedule"|"manual"|"event", cron?, timezone?, on?, match?}, vars[], steps[{id, agent, offer, after?, description, required_to_function?, success_signal?, retry?, timeout_min}], on_step_fail:"inspect", llm?{approved} }. Signals/deliverable.location are inherited from each step\'s offer; a step using an `llm` signal leaf requires llm.approved=true. Rejected if the graph is not a DAG or an offer is not workflow-compatible.'),
+      definition: z.record(z.string(), z.unknown()).describe('The workflow descriptor: { title, description (both localized string | {locale:text}), trigger {kind:"schedule"|"manual"|"event", cron?, timezone?, on?, match?}, vars[], steps[{id, agent, offer, after?, description, required_to_function?, success_signal?, retry?, timeout_min}], on_step_fail:"inspect", llm?{approved}, maxCostUsd? }. Signals/deliverable.location are inherited from each step\'s offer; a step using an `llm` signal leaf requires llm.approved=true. maxCostUsd (US dollars, per run) stops a run before its next ai step once its ai steps have spent that much. Rejected if the graph is not a DAG or an offer is not workflow-compatible.'),
       propose: z.boolean().optional().describe('Operator flow: return a diff vs the current definition + a single-use confirm_token WITHOUT saving. Default false (direct save, unchanged behavior).'),
       confirm_token: z.string().optional().describe('Token from the propose step — applies exactly the proposed definition.'),
     },
@@ -114,7 +116,12 @@ export function registerWorkflowTools(
       if (!result.ok) return err(`Validation failed:\n- ${(result.errors ?? []).join('\n- ')}`);
       const scheduler = getActiveScheduler();
       if (scheduler) await syncWorkflowTriggers(storage, scheduler, config.nodeId, result.def!, ownerGhii, agentGaii);
-      return text({ saved: true, id: a.id, trigger: result.def!.trigger.kind, steps: result.def!.steps.length });
+      // `warnings`: saved, and something in the definition did nothing (costCapMorsels), said where
+      // the AI that saved it reads the answer.
+      return text({
+        saved: true, id: a.id, trigger: result.def!.trigger.kind, steps: result.def!.steps.length,
+        ...(result.warnings?.length ? { warnings: result.warnings } : {}),
+      });
     },
   );
 

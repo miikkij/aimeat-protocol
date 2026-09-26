@@ -28,14 +28,18 @@
  *   - chatJson / chatErrorBody / sseChat / modelsJson / transcriptionJson / imageJson /
  *     providerStatus — the reply shapes, so a suite states intent rather than JSON
  * @usage
- *   const provider = await startFakeAiProvider(40315);
+ *   const provider = await startFakeAiProvider(40315);   // or 0: any free port, read back from `port`
  *   provider.queue('chat', chatJson('hello'));
  *   // … point the node at provider.baseUrl and drive it …
  *   await provider.close();
  * @version-history
+ *   v1.1.0 — 2026-09-25 — Port 0 takes any free port, and `port` and `baseUrl` name the one bound. A
+ *     suite on the shared node reads the stub's address from the owner's settings at call time, so it
+ *     needs no fixed port that another session's run could already hold.
  *   v1.0.0 — 2026-09-08 — Initial creation, with e2e-ai-provider-stub.ts.
  */
 import { createServer, type Server, type ServerResponse } from 'node:http';
+import type { AddressInfo } from 'node:net';
 
 /** Which door of the provider a request arrived at. `other` is anything else, recorded not refused. */
 export type StubRoute = 'chat' | 'models' | 'transcriptions' | 'images' | 'other';
@@ -262,6 +266,8 @@ export async function startFakeAiProvider(port: number): Promise<FakeAiProvider>
     });
 
     await new Promise<void>(resolve => { server.listen(port, '127.0.0.1', () => resolve()); });
+    // The port actually bound: the one asked for, or the free one the system picked for 0.
+    const bound = (server.address() as AddressInfo).port;
 
     const releaseHeld = (): void => {
         while (held.length) {
@@ -278,8 +284,8 @@ export async function startFakeAiProvider(port: number): Promise<FakeAiProvider>
     };
 
     return {
-        port,
-        baseUrl: `http://127.0.0.1:${port}/v1`,
+        port: bound,
+        baseUrl: `http://127.0.0.1:${bound}/v1`,
         requests,
         requestsFor: (route) => requests.filter(r => r.route === route),
         lastRequest: (route) => {

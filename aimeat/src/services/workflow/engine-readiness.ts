@@ -2,16 +2,19 @@
  * @file src/services/workflow/engine-readiness.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Which steps may start now, whether a human gate has anything to decide about, and
- *   what a run's step states add up to. Pure decision helpers, extracted from engine.ts to satisfy
- *   max-file-lines; a move, with no change to what any of them answers.
+ * @description Which steps may start now, whether a human gate has anything to decide about, what
+ *   a run's step states add up to, and what a failed step does to the steps that depend on it. Pure
+ *   decision helpers, extracted from engine.ts to satisfy max-file-lines; a move, with no change to
+ *   what any of them answers.
  * @structure TERMINAL_STEP_STATES · isHumanGate · gateHasSomethingToDecide · computeReadySteps ·
- *   runOutcome
+ *   runOutcome · skipSubtree · failDownstream
  * @usage  imported by engine.ts, which re-exports computeReadySteps and runOutcome for its tests
  * @version-history
+ *   v1.1.0 — 2026-09-25 — skipSubtree and failDownstream moved here from engine.ts, unchanged, to make
+ *     room there for the run's cost cap and the trigger's check of who saved the workflow.
  *   v1.0.0 — 2026-09-04 — Extracted when the human-gate rule pushed engine.ts past 800 lines.
  */
-import type { WorkflowDef, WorkflowRunStep, WorkflowStep } from '../../models/workflow-schemas.js';
+import type { WorkflowDef, WorkflowRun, WorkflowRunStep, WorkflowStep } from '../../models/workflow-schemas.js';
 
 export const TERMINAL_STEP_STATES = new Set<WorkflowRunStep['state']>(
   ['green', 'input-red', 'output-red', 'timed-out', 'skipped', 'agent-offline'],
@@ -72,4 +75,42 @@ export function runOutcome(steps: Record<string, WorkflowRunStep>): 'done' | 'pa
   const all = Object.values(steps);
   if (all.some(s => !TERMINAL_STEP_STATES.has(s.state))) return 'running';
   return all.every(s => s.state === 'green') ? 'done' : 'partial';
+}
+
+/**
+ * Mark every step that (transitively) depends on a failed step as skipped (partial-fail policy).
+ *
+ * A HUMAN GATE IS NOT SWEPT AWAY WITH THE SUBTREE. It is left pending, and computeReadySteps asks
+ * it once its deps are terminal and one of them is green — the person then decides on what did get
+ * made. The cascade also stops there rather than skipping what comes AFTER the gate: those steps
+ * are the answer's business, and skipping them now would decide on the person's behalf. If the
+ * gate never becomes askable, or times out, this runs again from the gate and they are skipped
+ * then.
+ */
+export function skipSubtree(run: WorkflowRun, failedId: string): void {
+  const byId = new Map(run.defSnapshot.steps.map(s => [s.id, s]));
+  const dependents = (id: string): string[] => run.defSnapshot.steps.filter(s => (s.after ?? []).includes(id)).map(s => s.id);
+  const queue = [...dependents(failedId)];
+  while (queue.length) {
+    const id = queue.shift()!;
+    const rs = run.steps[id];
+    if (!rs || rs.state !== 'pending') continue;
+    const def = byId.get(id);
+    if (def && isHumanGate(def) && (def.after ?? []).some(d => run.steps[d]?.state === 'green')) continue;
+    rs.state = 'skipped';
+    queue.push(...dependents(id));
+  }
+}
+
+/**
+ * On a step failure, decide the fate of its dependents. Default policy skips the whole subtree.
+ * Under `resume`, skip NOTHING here: computeReadySteps lets each dependent become ready once its
+ * deps are terminal, and tick re-evaluates the dependent's OWN required_to_function against current
+ * memory — so a dependent whose input the crew actually produced runs, and one whose input is
+ * genuinely missing goes input-red (which cascades the same way). This is the "re-evaluate against
+ * reality" contract; it is safe only when crew stages are idempotent, hence opt-in.
+ */
+export function failDownstream(run: WorkflowRun, failedId: string): void {
+  if (run.defSnapshot.resume) return;
+  skipSubtree(run, failedId);
 }

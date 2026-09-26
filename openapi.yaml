@@ -5590,7 +5590,27 @@ components:
           description: Owner consent to use the node OpenRouter for `llm` signal leaves.
           properties:
             approved: { type: boolean }
-        costCapMorsels: { type: integer, nullable: true, description: 'Optional per-workflow cap.' }
+        maxCostUsd:
+          type: number
+          nullable: true
+          exclusiveMinimum: 0
+          maximum: 10000
+          description: >-
+            The most one run may spend on the owner's AI through its `ai` steps, in US dollars. The
+            node adds up what each ai step's model calls cost, as it recorded them, and before it
+            starts the next ai step it stops the run once the sum has reached this: the run ends with
+            status `stopped`, `costCap` holds the cap and the spend, and `reason` says it in words. A
+            step already running finishes and keeps its result. Absent or null: no cap. The node's
+            model judging `llm` signals is not counted here; the owner's daily AI budget bounds that
+            and every other AI call.
+        costCapMorsels:
+          type: integer
+          nullable: true
+          deprecated: true
+          description: >-
+            Ignored since 2026-09-25, and nothing read it before: a morsel paces what agents store and
+            is not money, so it cannot cap a spend. A save that sets it still succeeds, is not kept, and
+            answers with `warnings` naming maxCostUsd.
     WorkflowDef:
       allOf:
         - $ref: '#/components/schemas/WorkflowDefInput'
@@ -5626,7 +5646,18 @@ components:
       properties:
         runId: { type: string }
         workflowId: { type: string }
-        status: { type: string, enum: [running, waiting-step, red, partial, done, cancelled] }
+        status:
+          type: string
+          enum: [running, waiting-step, red, partial, done, cancelled, stopped]
+          description: '`stopped`: the node ended the run at its cost cap (maxCostUsd); `costCap` and `reason` say why.'
+        reason: { type: string, description: 'Why the node ended the run itself rather than a step finishing it, in words.' }
+        costCap:
+          type: object
+          description: 'On a `stopped` run: the cap, what its ai steps had spent (US dollars), and the ai step that did not start.'
+          properties:
+            capUsd: { type: number }
+            spentUsd: { type: number }
+            stoppedBefore: { type: string }
         mode: { type: string, enum: [full-live, full-sandbox, signals-only] }
         vars: { type: object, additionalProperties: { type: string } }
         steps:
@@ -5636,6 +5667,7 @@ components:
             properties:
               state: { type: string, enum: [pending, input-red, dispatched, green, output-red, timed-out, skipped, agent-offline, waiting-human] }
               attempt: { type: integer }
+              costUsd: { type: number, description: 'What this step''s own model calls cost, in US dollars, as the node recorded them (an ai step; a retry adds to it).' }
               taskIds: { type: array, items: { type: string } }
               reads: { type: array, items: { type: string } }
               writes: { type: array, items: { type: string } }
@@ -44523,7 +44555,9 @@ paths:
         `memory:read` + `work:request` for export-out, `work:request` for trigger-geai, and
         `memory:read` for a workflow that reads the owner's records (every signal leaf and every
         agent step reads one). The owner in person passes. A run's observation of a credential
-        record is served as the memory doors show it.
+        record is served as the memory doors show it. `maxCostUsd` caps what one run's ai steps may
+        spend, in US dollars; `costCapMorsels` does nothing, and a save that sets it answers with
+        `warnings`.
       tags: [Workflows]
       security:
         - BearerAuth: []
@@ -44535,7 +44569,9 @@ paths:
               $ref: '#/components/schemas/WorkflowDefInput'
       responses:
         '200':
-          description: Workflow saved
+          description: >-
+            Workflow saved. `warnings`, beside the saved definition, names anything in the body that
+            did nothing (costCapMorsels, which is ignored; the per-run cap is maxCostUsd).
           content:
             application/json:
               schema:
@@ -44543,7 +44579,12 @@ paths:
                   - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
-                      data: { $ref: '#/components/schemas/WorkflowDef' }
+                      data:
+                        allOf:
+                          - $ref: '#/components/schemas/WorkflowDef'
+                          - type: object
+                            properties:
+                              warnings: { type: array, items: { type: string }, description: 'Present only when something in the body did nothing.' }
         '400':
           description: Validation failed (error.details.errors[] lists the problems)
           content:

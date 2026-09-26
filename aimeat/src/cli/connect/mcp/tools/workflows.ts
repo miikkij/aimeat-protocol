@@ -6,6 +6,8 @@
  *   MCP (src/mcp/workflows.ts) so `aimeat connect serve --surface agent` exposes the same
  *   save/get/run tools locally. Thin REST wrappers over /v1/workflows.
  * @version-history
+ *   v1.4.0 -- 2026-09-25 -- workflow_save's definition names maxCostUsd, the per-run cap on what a
+ *     run's ai steps spend; the route's `warnings` reach the caller with the rest of its answer.
  *   v1.3.0 -- 2026-09-06 -- workflow_answer takes workflow_id + picks/other. It sent { answer } at a
  *     route reading { picks, other }, so every human-input answer given through this door left the
  *     run parked -- the same broken shape the CLI dispatch carried.
@@ -28,7 +30,7 @@ export function registerWorkflowTools(mcp: McpServer, registry: AgentRegistry): 
 
   mcp.tool('aimeat_workflow_save', descriptionFor('aimeat_workflow_save'), {
     id: z.string().describe('Workflow id (lowercase slug); existing id = update.'),
-    definition: z.record(z.string(), z.unknown()).describe('The workflow descriptor: { title, description, trigger, vars[], steps[], on_step_fail:"inspect", llm?{approved} }. Validated against the offer contract + DAG on save.'),
+    definition: z.record(z.string(), z.unknown()).describe('The workflow descriptor: { title, description, trigger, vars[], steps[], on_step_fail:"inspect", llm?{approved}, maxCostUsd? }. Validated against the offer contract + DAG on save. maxCostUsd (US dollars, per run) stops a run before its next ai step once its ai steps have spent that much.'),
   }, annotationsFor('aimeat_workflow_save'), async ({ id, definition }) => {
     return out(await client.put(`/v1/workflows/${encodeURIComponent(id)}`, definition as Record<string, unknown>));
   });

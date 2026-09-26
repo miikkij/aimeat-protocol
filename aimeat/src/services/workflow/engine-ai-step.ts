@@ -25,6 +25,9 @@
  *     and is asked again the same bounded number of times. `reasoning` on the action reaches the
  *     provider as given, and `uncapped` keeps the owner's max_tokens preference off this step,
  *     which is what "NO TOKEN CAP" below had claimed and the completion service had not honoured.
+ *   v1.4.0 — 2026-09-25 — The step adds up what its model calls cost, as the node recorded each one,
+ *     and hands the sum to onPushTerminal whether it ends green or red, for the run's cost cap
+ *     (WorkflowDef.maxCostUsd). A call the provider answered is spent even when the step fails.
  */
 import type { StepDeps, OnPushTerminal } from './engine-steps.js';
 import type { WorkflowRun, WorkflowStep } from '../../models/workflow-schemas.js';
@@ -55,6 +58,9 @@ export function dispatchAiStep(
 ): void {
   const { workflowId, runId } = run;
   const stepId = step.id;
+  // What this step's model calls cost, as the node recorded each: the run's cost cap adds it up. A
+  // JSON retry is a second call, and a step that fails after the provider answered has still spent.
+  let spentUsd = 0;
 
   const fire = async (): Promise<void> => {
     // The prompt comes from a record when one is named, so changing it is a memory write. The
@@ -96,13 +102,18 @@ export function dispatchAiStep(
     // An empty answer never reaches here: the transport asks again and then throws with the
     // provider's finish_reason, and that throw is this step's red. `reasoning` goes to the provider
     // as the action wrote it; `uncapped` keeps the owner's max_tokens preference off this call.
-    const ask = () => completeForOwner(deps.storage, deps.config, ownerGhii, {
-      prompt,
-      ...(action.model ? { model: action.model } : {}),
-      ...(action.reasoning ? { reasoning: action.reasoning } : {}),
-      uncapped: true,
-      appId: `workflow:${workflowId}`,
-    });
+    const ask = async () => {
+      const answer = await completeForOwner(deps.storage, deps.config, ownerGhii, {
+        prompt,
+        ...(action.model ? { model: action.model } : {}),
+        ...(action.reasoning ? { reasoning: action.reasoning } : {}),
+        uncapped: true,
+        appId: `workflow:${workflowId}`,
+      });
+      const cost = answer.usage?.costUsd;
+      if (typeof cost === 'number' && Number.isFinite(cost) && cost > 0) spentUsd += cost;
+      return answer;
+    };
     let r = await ask();
 
     if (action.result_to_key) {
@@ -134,9 +145,9 @@ export function dispatchAiStep(
   };
 
   fire()
-    .then(() => onPushTerminal(ownerGhii, workflowId, runId, stepId, true))
+    .then(() => onPushTerminal(ownerGhii, workflowId, runId, stepId, true, spentUsd))
     .catch(err => {
       logger.warn(`workflow ${workflowId} run ${runId}: ai step "${stepId}" failed`, { error: String(err) });
-      return onPushTerminal(ownerGhii, workflowId, runId, stepId, false);
+      return onPushTerminal(ownerGhii, workflowId, runId, stepId, false, spentUsd);
     });
 }

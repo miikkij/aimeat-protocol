@@ -47,6 +47,8 @@
  *   v1.12.0 — 2026-09-25 — A `*` pattern that could reach a prefix only the node writes (`notif.`) is
  *     a reserved step key too, asked of SERVER_WRITTEN_KEY_PREFIXES rather than of the prefixes it
  *     happens to share a head with.
+ *   v1.13.0 — 2026-09-25 — saveWorkflow keeps maxCostUsd, the per-run cap in US dollars, and answers a
+ *     save that sets costCapMorsels with a warning naming maxCostUsd; that field is not kept.
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
@@ -461,7 +463,17 @@ export interface SaveResult {
   ok: boolean; def?: WorkflowDef; errors?: string[];
   /** Set when the saver lacks a word a step needs (step-authority.ts): the door answers 403. */
   denied?: { needed: string[]; message: string };
+  /** Saved, and something in the body did nothing. Every door passes these on to the caller. */
+  warnings?: string[];
 }
+
+/**
+ * What a save says about costCapMorsels. The field was never read, and it could not have capped a
+ * spend if it had been: a morsel paces what agents store and is not money. A caller that set it is
+ * told, where they will read it, rather than left believing a cap is in force.
+ */
+export const COST_CAP_MORSELS_WARNING = 'costCapMorsels does nothing and was not saved: a morsel paces what agents may store and is '
+  + 'not money, so it cannot cap what a run spends. To cap what one run may spend on AI, set maxCostUsd (US dollars per run).';
 
 /**
  * Validate + persist a workflow definition under the owner GHII namespace. `createdBy` records the
@@ -517,7 +529,7 @@ export async function saveWorkflow(
     skip_done: input.skip_done ?? false,
     parallel: input.parallel ?? false,
     llm: input.llm,
-    costCapMorsels: input.costCapMorsels ?? null,
+    maxCostUsd: input.maxCostUsd ?? null,
     createdBy: prior?.createdBy ?? createdBy,
     createdAt: prior?.createdAt ?? now,
     updatedAt: now,
@@ -535,7 +547,7 @@ export async function saveWorkflow(
     updatedAt: now,
   });
 
-  return { ok: true, def };
+  return { ok: true, def, ...(typeof input.costCapMorsels === 'number' ? { warnings: [COST_CAP_MORSELS_WARNING] } : {}) };
 }
 
 /** True if any leaf in the signal tree is an `llm` leaf. */

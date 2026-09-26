@@ -7907,6 +7907,8 @@
   "notiftext.workflow_failed.body": "Did not produce: {failed} · about {minutes} min · {steps}",
   "notiftext.workflow_cancelled.title": "Workflow \"{name}\" was cancelled",
   "notiftext.workflow_cancelled.body": "about {minutes} min · {steps}",
+  "notiftext.workflow_stopped.title": "Workflow \"{name}\" stopped at its spending limit",
+  "notiftext.workflow_stopped.body": "Its AI steps had spent {spent}, and the limit is {cap} per run · about {minutes} min · {steps}",
   "notiftext.workflow_agent_offline.title": "Workflow \"{name}\": an agent does not answer",
   "notiftext.workflow_agent_offline.body": "Step {step} was dispatched but {agents} looks offline; it fails in about {minutes} min unless the agent connects.",
   "notiftext.workflow_input_needed.title": "Workflow \"{name}\" asks you",

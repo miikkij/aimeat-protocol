@@ -25,6 +25,9 @@
  *   v1.8.0 — 2026-09-24 — A step costs the word its own door costs, at save and at start, for the
  *     principal that saves or starts it; the owner in person passes. An ecosystem step reaches only
  *     the owner's own connected app.
+ *   v1.9.0 — 2026-09-25 — The per-run cost cap is maxCostUsd: a run stops before its next ai step once
+ *     its own ai steps have spent the cap, and says so (the cost comes from a stub provider on a free
+ *     port). costCapMorsels still saves and the answer says it did nothing, on REST and MCP.
  */
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -64,10 +67,70 @@ async function getToken(ownerOrGaii: string, privKey: string, isAgent: boolean):
   return body.data.token;
 }
 
+import { startFakeAiProvider, chatJson } from './helpers/fake-ai-provider.js';
+
+function parseSSE(text: string): any[] {
+  const out: any[] = [];
+  const NL = String.fromCharCode(10);
+  for (const evt of text.split(NL + NL)) {
+    let data = '';
+    for (const line of evt.trim().split(NL)) if (line.startsWith('data: ')) data += line.slice(6);
+    if (data) { try { out.push(JSON.parse(data)); } catch { /* not a JSON frame */ } }
+  }
+  return out;
+}
+
+/** One MCP tool call on a fresh session: what an owner's own AI sees when it calls the tool. */
+async function mcpCall(token: string, name: string, args: Record<string, unknown>): Promise<{ raw: string; isError: boolean }> {
+  let sessionId = '';
+  let id = 1;
+  const rpc = async (method: string, params: Record<string, unknown>) => {
+    const res = await fetch(`${BASE}/v1/mcp`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json', Accept: 'application/json, text/event-stream',
+        Authorization: `Bearer ${token}`,
+        ...(sessionId ? { 'mcp-session-id': sessionId, 'mcp-protocol-version': '2025-03-26' } : {}),
+      },
+      body: JSON.stringify({ jsonrpc: '2.0', id: id++, method, params }),
+    });
+    const sid = res.headers.get('mcp-session-id');
+    if (sid) sessionId = sid;
+    const ct = res.headers.get('content-type') ?? '';
+    if (ct.includes('text/event-stream')) return parseSSE(await res.text())[0] ?? {};
+    return await res.json() as any;
+  };
+  await rpc('initialize', { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 'Workflows E2E', version: '1.0.0' } });
+  const out = await rpc('tools/call', { name, arguments: args });
+  return { raw: out?.result?.content?.[0]?.text ?? JSON.stringify(out?.error ?? out), isError: !!out?.result?.isError };
+}
+
 const ownerName = `wfowner${Date.now()}`;
 const agentName = 'wf-bot';
 let ownerToken = '';
 let auth = {};
+
+/** A fresh agent of this owner holding exactly `scopes`: a token's words are fixed when it is minted. */
+async function mintAgent(name: string, scopes: string[]): Promise<{ token: string; gaii: string; headers: Record<string, string> }> {
+  const reg = await json('/v1/agents', {
+    method: 'POST', headers: auth,
+    body: JSON.stringify({ name, owner: ownerName, capabilities: ['memory'], scopes }),
+  });
+  assert(reg.status === 201, `create ${name}: ${reg.status} ${JSON.stringify(reg.body)}`);
+  const token = await getToken(reg.body.data.agent.gaii, reg.body.data.private_key, true);
+  return { token, gaii: reg.body.data.agent.gaii as string, headers: { Authorization: `Bearer ${token}` } };
+}
+
+/** Poll a run until it is no longer running or waiting on a step, and return it as the door serves it. */
+async function waitForRunEnd(id: string, runId: string, ms = 10_000): Promise<any> {
+  const until = Date.now() + ms;
+  for (;;) {
+    const r = await json(`/v1/workflows/${id}/runs/${runId}`, { headers: auth });
+    const status = r.body.data?.status;
+    if ((status && status !== 'running' && status !== 'waiting-step') || Date.now() > until) return r.body.data;
+    await sleep(250);
+  }
+}
 
 async function writeMem(key: string, value: string) {
   const { status, body } = await json('/v1/memory', { method: 'POST', headers: auth, body: JSON.stringify({ key, value, visibility: 'private' }) });
@@ -1197,6 +1260,85 @@ async function run() {
 
     await json('/v1/openrouter/settings', { method: 'DELETE', headers: auth });
     await json('/v1/workflows/sig-cred?withRuns=true', { method: 'DELETE', headers: auth });
+  });
+
+  // ── the per-run cost cap is in US dollars (2026-09-25) ──
+  // A morsel paces what agents store; it is not money, so costCapMorsels could never cap a spend, and
+  // nothing ever read it. The cap is maxCostUsd, per run: the engine adds up what the run's own ai
+  // steps' model calls cost, and before the next ai step starts it stops the run once the sum has
+  // reached the cap.
+  await test('costCapMorsels still saves, and the answer says it did nothing and names maxCostUsd (REST and MCP)', async () => {
+    const wf = {
+      title: { en_US: 'Morsel cap' }, description: { en_US: 'the old field' },
+      trigger: { kind: 'manual' }, vars: [], on_step_fail: 'inspect', costCapMorsels: 5,
+      steps: [{ id: 'ask', description: { en_US: 'Ask' }, required_to_function: 'none',
+        action: { kind: 'human-input', question: { prompt: 'Go?', options: [{ id: 'go', label: 'Go' }] } } }],
+    };
+    const saved = await json('/v1/workflows/morsel-cap', { method: 'PUT', headers: auth, body: JSON.stringify(wf) });
+    assert(saved.status === 200, `the old field still saves: ${saved.status} ${JSON.stringify(saved.body.error)}`);
+    const warned = JSON.stringify(saved.body.data?.warnings ?? []);
+    assert(warned.includes('costCapMorsels') && warned.includes('maxCostUsd'),
+      `REST: the answer must say the field did nothing and name maxCostUsd: ${warned}`);
+    // Without the field there is nothing to say.
+    const { costCapMorsels: _dropped, ...plain } = wf;
+    void _dropped;
+    const quiet = await json('/v1/workflows/morsel-cap', { method: 'PUT', headers: auth, body: JSON.stringify(plain) });
+    assert(quiet.status === 200 && quiet.body.data?.warnings === undefined, `no field, no warning: ${JSON.stringify(quiet.body.data?.warnings)}`);
+    // The same over MCP, which is where an owner's own AI saves a workflow.
+    const saver = await mintAgent('wf-mcp-saver', ['workflow:read', 'workflow:write']);
+    const out = await mcpCall(saver.token, 'aimeat_workflow_save', { id: 'morsel-cap-mcp', definition: wf });
+    assert(!out.isError, `MCP save: ${out.raw}`);
+    assert(out.raw.includes('costCapMorsels') && out.raw.includes('maxCostUsd'), `MCP: the answer must say the same: ${out.raw}`);
+    for (const id of ['morsel-cap', 'morsel-cap-mcp']) await json(`/v1/workflows/${id}?withRuns=true`, { method: 'DELETE', headers: auth });
+  });
+
+  await test('maxCostUsd stops a run once its ai steps have spent the cap, before the next ai step starts, and says why', async () => {
+    // The node talks to a real provider on loopback: its own settings, its own socket, its own
+    // accounting. Only the far side of the wire is the stub, and every answer costs two cents.
+    const provider = await startFakeAiProvider(0);
+    try {
+      provider.setDefault('chat', chatJson('the answer', { usage: { prompt_tokens: 5, completion_tokens: 5, total_tokens: 10, cost: 0.02 } }));
+      const aim = await json('/v1/memory', {
+        method: 'POST', headers: auth,
+        body: JSON.stringify({ key: 'openrouter.settings', visibility: 'private', value: { provider: 'custom', baseUrl: provider.baseUrl, model: 'stub/test-model', daily_budget_usd: 5 } }),
+      });
+      assert(aim.body?.ok === true, `point the owner at the stub: ${aim.status} ${JSON.stringify(aim.body.error)}`);
+      const wf = (cap?: number) => ({
+        title: { en_US: 'Two answers' }, description: { en_US: 'first, then second' },
+        trigger: { kind: 'manual' }, vars: [], on_step_fail: 'inspect',
+        ...(cap !== undefined ? { maxCostUsd: cap } : {}),
+        steps: [
+          { id: 'first', description: { en_US: 'First' }, required_to_function: 'none', action: { kind: 'ai', prompt: 'Say one thing.', result_to_key: 'wfcost.first' } },
+          { id: 'second', after: ['first'], description: { en_US: 'Second' }, required_to_function: 'none', action: { kind: 'ai', prompt: 'Say another thing.', result_to_key: 'wfcost.second' } },
+        ],
+      });
+
+      const put = await json('/v1/workflows/cost-capped', { method: 'PUT', headers: auth, body: JSON.stringify(wf(0.01)) });
+      assert(put.status === 200, `save with a cap: ${put.status} ${JSON.stringify(put.body.error)}`);
+      assert(put.body.data.maxCostUsd === 0.01, `the cap is kept on the workflow: ${JSON.stringify(put.body.data.maxCostUsd)}`);
+      const start = await json('/v1/workflows/cost-capped/run', { method: 'POST', headers: auth, body: JSON.stringify({ mode: 'full' }) });
+      assert(start.status === 200, `run: ${start.status} ${JSON.stringify(start.body.error)}`);
+      const run = await waitForRunEnd('cost-capped', start.body.data.runId);
+      assert(run.status === 'stopped', `the run stops at its cap: ${run.status} ${JSON.stringify(run.steps)}`);
+      assert(run.steps.first.state === 'green' && Math.abs((run.steps.first.costUsd ?? 0) - 0.02) < 1e-9,
+        `the step that crossed the cap finished, and kept what it cost: ${JSON.stringify(run.steps.first)}`);
+      assert(run.steps.second.state === 'skipped', `the next ai step did not start: ${run.steps.second.state}`);
+      assert(/0\.01/.test(run.reason ?? '') && /0\.02/.test(run.reason ?? ''), `the reason names the cap and the spend: ${run.reason}`);
+      assert(provider.requestsFor('chat').length === 1, `the model was asked once, not twice: ${provider.requestsFor('chat').length}`);
+
+      // POSITIVE CONTROL: the same workflow with no cap runs both steps, as before.
+      provider.reset();
+      const open = await json('/v1/workflows/cost-open', { method: 'PUT', headers: auth, body: JSON.stringify(wf()) });
+      assert(open.status === 200, `save without a cap: ${open.status} ${JSON.stringify(open.body.error)}`);
+      const openStart = await json('/v1/workflows/cost-open/run', { method: 'POST', headers: auth, body: JSON.stringify({ mode: 'full' }) });
+      const openRun = await waitForRunEnd('cost-open', openStart.body.data.runId);
+      assert(openRun.status === 'done', `a run with no cap is unchanged: ${openRun.status} ${JSON.stringify(openRun.steps)}`);
+      assert(provider.requestsFor('chat').length === 2, `both steps asked the model: ${provider.requestsFor('chat').length}`);
+    } finally {
+      await json('/v1/openrouter/settings', { method: 'DELETE', headers: auth });
+      for (const id of ['cost-capped', 'cost-open']) await json(`/v1/workflows/${id}?withRuns=true`, { method: 'DELETE', headers: auth });
+      await provider.close();
+    }
   });
 
   console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total`);

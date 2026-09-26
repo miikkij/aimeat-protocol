@@ -7,6 +7,8 @@
  * @structure workflowTools[] -- the shell handler table, registered by tool-call.ts
  * @usage import { workflowTools } from './tool-call-defs-workflows.js';
  * @version-history
+ *   v1.3.0 -- 2026-09-25 -- aimeat_workflow_save's description names maxCostUsd, the per-run cap on
+ *     what a run's ai steps spend in US dollars.
  *   v1.2.0 -- 2026-09-06 -- aimeat_workflow_answer stops reading the legacy `answer` object. It
  *     never worked (the route reads picks/other) and the dispatch refuses an undeclared name now,
  *     so the compatibility the comment promised could not happen.
@@ -25,7 +27,7 @@ export const workflowTools: ConnectCliToolDefinition[] = [
     // ── Agent Workflows (shell-callable parity with the MCP + connector surfaces) ──
     {
         name: 'aimeat_workflow_save',
-        description: 'Create/update a workflow. `definition` is the full descriptor (title, description, trigger, vars[], steps[], on_step_fail, llm?); validated against the offer contract + DAG on save.',
+        description: 'Create/update a workflow. `definition` is the full descriptor (title, description, trigger, vars[], steps[], on_step_fail, llm?, maxCostUsd?); validated against the offer contract + DAG on save. maxCostUsd (US dollars, per run) stops a run before its next ai step once its ai steps have spent that much.',
         input: {
             id: { type: 'string', required: true, description: 'Workflow id (lowercase slug); existing id = update.' },
             definition: { type: 'object', required: true, description: 'The workflow descriptor.' },
