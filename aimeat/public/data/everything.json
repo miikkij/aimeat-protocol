@@ -1266,10 +1266,10 @@
      "slug": "g-8-workflow-spending-limit",
      "cells": [
       "<strong>Workflow spending limit</strong>",
-      "Cap what one run may spend on AI through its AI steps, in US dollars. Before the next AI step starts, a run whose AI steps have spent the limit stops, keeps what the finished steps produced and says how much was spent. Each step records its own AI cost. The daily AI budget still applies to every AI call.",
+      "Cap what one run may spend on AI, in US dollars: its AI steps and your model judging its worded checks count together. Before the next AI step starts, a run that has spent the limit stops, keeps what the finished steps produced and says how much was spent. Past the limit a worded check is not sent to the model, and it passes. Each step records its own AI cost, and the run records what the judging cost. The daily AI budget still applies to every AI call.",
       "<code>maxCostUsd</code> on <code>/v1/workflows/:id</code>, <code>aimeat_workflow_save</code>"
      ],
-     "plain": "Workflow spending limit Cap what one run may spend on AI through its AI steps, in US dollars. Before the next AI step starts, a run whose AI steps have spent the limit stops, keeps what the finished steps produced and says how much was spent. Each step records its own AI cost. The daily AI budget still applies to every AI call. maxCostUsd on /v1/workflows/:id, aimeat_workflow_save"
+     "plain": "Workflow spending limit Cap what one run may spend on AI, in US dollars: its AI steps and your model judging its worded checks count together. Before the next AI step starts, a run that has spent the limit stops, keeps what the finished steps produced and says how much was spent. Past the limit a worded check is not sent to the model, and it passes. Each step records its own AI cost, and the run records what the judging cost. The daily AI budget still applies to every AI call. maxCostUsd on /v1/workflows/:id, aimeat_workflow_save"
     },
     {
      "slug": "g-8-workflow-human-decisions",

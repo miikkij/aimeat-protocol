@@ -52,8 +52,12 @@
  *     not started: it is recorded with status `refused` and `refusal`, once per episode.
  *   v1.12.0 — 2026-09-25 — WorkflowDef.authority, the rules a save was checked under.
  *   v1.12.1 — 2026-09-26 — costCapMorsels names its removal: 4.0.0.
+ *   v1.13.0 — 2026-09-26 — WorkflowRun.signalCostUsd: what the node's model cost judging the run's
+ *     `llm` signals, counted toward maxCostUsd (secaudit 2026-09, A6-11). The signal grammar moved
+ *     unchanged to workflow-signals.ts and is re-exported here (max-file-lines).
  */
 import { z } from 'zod';
+import { SignalSchema, type Signal } from './workflow-signals.js';
 
 // ── Localized string ─────────────────────────────────────────────────────────
 // A plain string, or a { locale: text } map (e.g. { en_US: "…", fi_FI: "…" }).
@@ -63,69 +67,9 @@ export const LocalizedStringSchema = z.union([
 ]);
 export type LocalizedString = z.infer<typeof LocalizedStringSchema>;
 
-// ── Signal grammar (crew spec §3) ──────────────────────────────────────────────
-// A signal is a tree evaluated against owner memory, with {var} templated from run params.
-//   - deterministic leaf — no LLM (the whole happy path) over a `key` or `key_glob`
-//   - llm leaf — judgment, evaluated by the node's OpenRouter, opt-in + consent-gated
-//   - composite — all / any / when-then (the cheap gate guards the expensive check)
-
-export type DeterministicSignal =
-  | { kind: 'deterministic'; key?: string; key_glob?: string; op: 'exists' }
-  | { kind: 'deterministic'; key?: string; key_glob?: string; op: 'nonempty' }
-  | { kind: 'deterministic'; key?: string; key_glob?: string; op: 'json_valid' }
-  // `path` counts the non-empty entries INSIDE one record (an object's values, or an array's
-  // elements) instead of counting matching keys. Added 2026-08-09 so a pipeline can consolidate its
-  // per-item keys into one record without breaking the very step that verifies it.
-  | { kind: 'deterministic'; key?: string; key_glob?: string; op: 'count_nonempty'; min: number; path?: string }
-  | { kind: 'deterministic'; key?: string; key_glob?: string; op: 'json_schema'; schema: Record<string, unknown> }
-  | { kind: 'deterministic'; key?: string; key_glob?: string; op: 'json_field'; path: string; min?: number; equals?: unknown; nonempty?: boolean };
-
-export type LlmSignal = { kind: 'llm'; key?: string; key_glob?: string; ask: string };
-
-export type Signal =
-  | DeterministicSignal
-  | LlmSignal
-  | { all: Signal[] }
-  | { any: Signal[] }
-  | { when: Signal; then: Signal };
-
-// Common leaf fields — a leaf targets exactly one of key | key_glob (enforced by the evaluator).
-const leafTarget = {
-  key: z.string().max(400).optional(),
-  key_glob: z.string().max(400).optional(),
-};
-
-const DeterministicLeafSchema = z.discriminatedUnion('op', [
-  z.object({ kind: z.literal('deterministic'), ...leafTarget, op: z.literal('exists') }),
-  z.object({ kind: z.literal('deterministic'), ...leafTarget, op: z.literal('nonempty') }),
-  z.object({ kind: z.literal('deterministic'), ...leafTarget, op: z.literal('json_valid') }),
-  z.object({ kind: z.literal('deterministic'), ...leafTarget, op: z.literal('count_nonempty'), min: z.number().int().nonnegative(), path: z.string().min(1).max(200).optional() }),
-  z.object({ kind: z.literal('deterministic'), ...leafTarget, op: z.literal('json_schema'), schema: z.record(z.string(), z.unknown()) }),
-  z.object({
-    kind: z.literal('deterministic'), ...leafTarget, op: z.literal('json_field'),
-    path: z.string().min(1).max(200),
-    min: z.number().optional(),
-    equals: z.unknown().optional(),
-    nonempty: z.boolean().optional(),
-  }),
-]);
-
-const LlmLeafSchema = z.object({
-  kind: z.literal('llm'),
-  ...leafTarget,
-  ask: z.string().min(1).max(2000),
-});
-
-// Recursive: composites nest signals. z.lazy breaks the cycle.
-export const SignalSchema: z.ZodType<Signal> = z.lazy(() =>
-  z.union([
-    DeterministicLeafSchema,
-    LlmLeafSchema,
-    z.object({ all: z.array(SignalSchema).min(1).max(50) }),
-    z.object({ any: z.array(SignalSchema).min(1).max(50) }),
-    z.object({ when: SignalSchema, then: SignalSchema }),
-  ]),
-) as z.ZodType<Signal>;
+// ── Signal grammar (crew spec §3): in workflow-signals.ts, re-exported here unchanged ─
+export { SignalSchema };
+export type { DeterministicSignal, LlmSignal, Signal } from './workflow-signals.js';
 
 // ── Descriptor + run-record types (Zod for WorkflowDef added in Phase 3) ───────
 // Stored in owner memory: workflows.def.<id> (descriptor), workflows.run.<id>.<runId> (run).
@@ -462,12 +406,13 @@ export interface WorkflowDef {
   parallel?: boolean;
   llm?: { approved: boolean };        // owner consent to use the node OpenRouter for `llm` leaves
   /**
-   * The most one run may spend on the owner's AI through its ai steps, in US dollars. The engine adds
-   * up what each ai step's model calls cost, as the node recorded it, and before it starts the next ai
-   * step it stops the run once the sum has reached this: the run ends `stopped`, with the cap and the
-   * spend in `costCap` and in words in `reason`. A step already running finishes. Absent or null: no
-   * cap. The node's model judging `llm` signals is not counted here; the owner's daily AI budget
-   * bounds that, and every other AI call, whatever this says.
+   * The most one run may spend on the owner's AI, in US dollars: through its ai steps, and through the
+   * node's model judging its `llm` signals. The engine adds up what each call cost, as the node
+   * recorded it, and before it starts the next ai step it stops the run once the sum has reached this:
+   * the run ends `stopped`, with the cap and the spend in `costCap` and in words in `reason`. A step
+   * already running finishes. Once the sum has reached this the judge is not asked, and its leaf passes
+   * as it does when the judge is unavailable. Absent or null: no cap. The owner's daily AI budget
+   * bounds every AI call as well, whatever this says.
    */
   maxCostUsd?: number | null;
   /**
@@ -573,8 +518,13 @@ export interface WorkflowRun {
   status: 'running' | 'waiting-step' | 'red' | 'partial' | 'done' | 'cancelled' | 'stopped' | 'refused';
   /** Why the node ended the run itself, or did not start it, in words. */
   reason?: string;
-  /** Set on a `stopped` run: the cap, what the ai steps had spent, and the ai step that did not start. */
+  /** Set on a `stopped` run: the cap, what the run had spent on AI, and the ai step that did not start. */
   costCap?: { capUsd: number; spentUsd: number; stoppedBefore: string };
+  /**
+   * What the node's model cost judging this run's `llm` signals, in US dollars, as the node recorded
+   * it. It counts toward maxCostUsd beside the steps' own `costUsd` (services/workflow/run-cost.ts).
+   */
+  signalCostUsd?: number;
   /**
    * Set on a `refused` run. One record stands for every refused start until the workflow runs again:
    * `attempts` counts them. `missing` names the words the saver lacks (empty when it is `gone`), and

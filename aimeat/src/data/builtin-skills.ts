@@ -11,6 +11,8 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   v1.16.6 -- 2026-09-26 -- diagnose-a-workflow: a stopped run's costCap is what the run spent on AI,
+ *            the judging of its llm signals included, and the run carries that part as signalCostUsd.
  *   v1.16.5 -- 2026-09-26 -- ai-transparency asks the declarer to name its own model, and names the
  *            publish hint a declaration without one gets.
  *   v1.16.4 -- 2026-09-25 -- set-up-content-pipeline: a step that dispatches to an agent costs
@@ -684,8 +686,9 @@ metadata:
    and \`skip_done: true\` leaves a step whose output already exists alone. Safe to suggest a
    retry after fixing the cause.
 6. **A run the node ended itself:** status \`stopped\` means the run reached its spending limit
-   (\`maxCostUsd\`, US dollars per run): its \`reason\` and \`costCap\` say what the ai steps had spent
-   and which ai step did not start, and each step carries its own \`costUsd\`. Raising the limit
+   (\`maxCostUsd\`, US dollars per run): its \`reason\` and \`costCap\` say what the run had spent on
+   AI and which ai step did not start. Each step carries its own \`costUsd\`, and \`signalCostUsd\` is
+   what the node's model cost judging the run's \`llm\` signals. Raising the limit
    is a change to the definition, so it waits for the owner like any other. Status \`refused\`
    means the trigger did not start the run: the agent or app that saved the workflow
    (\`savedBy\`) is disconnected or lost a permission its steps need, and \`refusal.missing\` names

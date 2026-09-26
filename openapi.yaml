@@ -5599,13 +5599,14 @@ components:
           exclusiveMinimum: 0
           maximum: 10000
           description: >-
-            The most one run may spend on the owner's AI through its `ai` steps, in US dollars. The
-            node adds up what each ai step's model calls cost, as it recorded them, and before it
-            starts the next ai step it stops the run once the sum has reached this: the run ends with
-            status `stopped`, `costCap` holds the cap and the spend, and `reason` says it in words. A
-            step already running finishes and keeps its result. Absent or null: no cap. The node's
-            model judging `llm` signals is not counted here; the owner's daily AI budget bounds that
-            and every other AI call.
+            The most one run may spend on the owner's AI, in US dollars: through its `ai` steps, and
+            through the node's model judging its `llm` signals. The node adds up what each call cost,
+            as it recorded them, and before it starts the next ai step it stops the run once the sum
+            has reached this: the run ends with status `stopped`, `costCap` holds the cap and the
+            spend, and `reason` says it in words. A step already running finishes and keeps its
+            result. Once the sum has reached this the judge is not asked, and its `llm` leaf passes as
+            it does when the judge is unavailable. Absent or null: no cap. The owner's daily AI budget
+            bounds every AI call as well.
         costCapMorsels:
           type: integer
           nullable: true
@@ -5700,11 +5701,14 @@ components:
                 at: { type: string, format: date-time }
         costCap:
           type: object
-          description: 'On a `stopped` run: the cap, what its ai steps had spent (US dollars), and the ai step that did not start.'
+          description: 'On a `stopped` run: the cap, what the run had spent on AI (US dollars), and the ai step that did not start.'
           properties:
             capUsd: { type: number }
             spentUsd: { type: number }
             stoppedBefore: { type: string }
+        signalCostUsd:
+          type: number
+          description: What the node's model cost judging this run's `llm` signals, in US dollars, as the node recorded it. It counts toward maxCostUsd beside each step's own `costUsd`.
         mode: { type: string, enum: [full-live, full-sandbox, signals-only] }
         vars: { type: object, additionalProperties: { type: string } }
         steps:
@@ -44634,8 +44638,9 @@ paths:
         `memory:read` + `work:request` for export-out, `work:request` for trigger-geai, and
         `memory:read` for a workflow that reads the owner's records (every signal leaf and every
         agent step reads one). The owner in person passes. A run's observation of a credential
-        record is served as the memory doors show it. `maxCostUsd` caps what one run's ai steps may
-        spend, in US dollars; `costCapMorsels` does nothing, and a save that sets it answers with
+        record is served as the memory doors show it. `maxCostUsd` caps what one run may spend on AI
+        (its ai steps and the judging of its llm signals), in US dollars; `costCapMorsels` does
+        nothing, and a save that sets it answers with
         `warnings`. The save records its principal as `savedBy`: a run the workflow's own trigger
         starts answers to it, and is refused (status `refused`, one notification to the owner) when
         that principal is gone or no longer holds a permission the steps need. Every save records

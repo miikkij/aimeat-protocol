@@ -6,10 +6,12 @@
  *   what counts as spent, when the run stops, and what it says when it does. The whole road, with the
  *   cost coming from a provider, is test/e2e-workflows.ts.
  * @version-history
+ *   v1.1.0 — 2026-09-26 — What the node's model costs judging a run's llm signals counts toward the
+ *     cap (A6-11). Failed on the code before the fix: the two functions did not exist.
  *   v1.0.0 — 2026-09-25 — Initial.
  */
 import { describe, it, expect } from 'vitest';
-import { spentUsd, stopAtCostCap, spendsAi, usd } from '../../src/services/workflow/run-cost.js';
+import { spentUsd, stopAtCostCap, spendsAi, usd, recordSignalCost, costCapReached } from '../../src/services/workflow/run-cost.js';
 import type { WorkflowRun, WorkflowRunStep } from '../../src/models/workflow-schemas.js';
 
 const step = (state: WorkflowRunStep['state'], costUsd?: number): WorkflowRunStep =>
@@ -73,6 +75,32 @@ describe('the cap', () => {
 
     it('counts reaching it exactly as reaching it', () => {
         expect(stopAtCostCap(run(0.02, { a: step('green', 0.02), b: step('pending') }), 'b', NOW)).toBe(true);
+    });
+
+    // A6-11. The node's model judging an `llm` signal spends the owner's AI too.
+    it('counts what the node\'s model cost judging the run\'s llm signals', () => {
+        const r = run(0.03, { a: step('green', 0.02), b: step('pending') });
+        recordSignalCost(r, 0.02);
+        expect(spentUsd(r)).toBeCloseTo(0.04, 10);
+        expect(stopAtCostCap(r, 'b', NOW)).toBe(true);
+        expect(r.costCap).toEqual({ capUsd: 0.03, spentUsd: 0.04, stoppedBefore: 'b' });
+    });
+
+    it('keeps only an amount as the judge\'s cost, and adds each call to the last', () => {
+        const r = run(1, { a: step('green') });
+        for (const bad of [Number.NaN, -1, 0, Number.POSITIVE_INFINITY]) recordSignalCost(r, bad);
+        expect(r.signalCostUsd).toBeUndefined();
+        recordSignalCost(r, 0.01);
+        recordSignalCost(r, 0.005);
+        expect(r.signalCostUsd).toBeCloseTo(0.015, 10);
+    });
+
+    it('says when the run has reached it, so the judge is not asked past it', () => {
+        expect(costCapReached(run(undefined, { a: step('green', 5) }))).toBe(false);
+        expect(costCapReached(run(0.05, { a: step('green', 0.02) }))).toBe(false);
+        const r = run(0.03, { a: step('green', 0.02) });
+        recordSignalCost(r, 0.01);
+        expect(costCapReached(r)).toBe(true);
     });
 });
 
