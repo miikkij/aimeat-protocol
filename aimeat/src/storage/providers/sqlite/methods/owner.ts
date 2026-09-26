@@ -4,6 +4,10 @@
  * SPDX-License-Identifier: MIT
  * @description Owner and Memory storage methods. Extracted from sqlite/index.ts to satisfy max-file-lines; bodies verbatim, bound to SqliteStorage via prototype merge.
  * @version-history
+ *   v1.11.0 -- 2026-09-26 -- deleteOwner deletes the actions the owner published in person, stored
+ *     under the bare account name, and rewrites the owner and principal of the kept AI provenance
+ *     records to the erasure's pseudonym (repos/ai-provenance-erasure.ts). A freed name inherits
+ *     neither (secaudit 2026-09: A8-4, N6).
  *   v1.10.0 -- 2026-09-24 -- deleteOwner rewrites the erased person out of the purchase receipts they
  *     are a party to (repos/app-purchase-erasure.ts). The receipts stay for the other side's books.
  *   v1.9.0 -- 2026-09-08 -- countMemoryWithOrigins, for the operator's CORS page.
@@ -43,6 +47,7 @@ import type { MemoryTextHit, MemoryTextSearchOpts, MemoryVersionRecord } from '.
 import { resolveGroupId } from '../../../memory-sharing.js';
 import { pseudonymiseWriter } from '../repos/memory-tally.js';
 import { pseudonymisePurchaseParties } from '../repos/app-purchase-erasure.js';
+import { pseudonymiseProvenanceOwner } from '../repos/ai-provenance-erasure.js';
 import { erasedPartyPseudonym } from '../../../erased-party.js';
 import type { SqliteStorage } from '../index.js';
 import { searchTextMemory, countMemory as countMemoryRepo, countMemoryWithOrigins as countMemoryWithOriginsRepo, sumMemoryBytes as sumMemoryBytesRepo, sumMemoryBytesForOwners as sumMemoryBytesForOwnersRepo, archivedSql, archiveMemoryByKey as archiveMemoryByKeyRepo, unarchiveMemoryByRoot as unarchiveMemoryByRootRepo, unarchiveMemoryByKey as unarchiveMemoryByKeyRepo, countArchivedByKeyPrefix as countArchivedByKeyPrefixRepo } from '../repos/memory.js';
@@ -125,6 +130,11 @@ export const ownerMethods = {
         this.cascadeDeleteAgentData(row.ghii);
       }
 
+      // 3c. An action the owner published in person. It is stored under the bare account name (the
+      // owner session's raw `sub`), which neither pass above walks, and the name is released for
+      // reuse, so the next holder of the name could change or delete it.
+      this.db.prepare('DELETE FROM actions WHERE providerGaii = ?').run(name);
+
       // What this person WROTE into somebody else's namespace is that other owner's record of who
       // touched their data, so it is pseudonymised rather than deleted — removing it would silently
       // turn their "four hands" into three. The node id comes from a GHII, so this runs while one is
@@ -135,7 +145,11 @@ export const ownerMethods = {
       // The purchase receipts this person is a party to stay, because each one is also the other
       // side's book entry. The name leaves them: it is released for reuse, and every purchase read
       // keys on it. One pseudonym for the whole erasure, so the books still see one party.
-      pseudonymisePurchaseParties(this.db, name, ghiiRows.map(r => r.ghii), erasedPartyPseudonym());
+      const pseudonym = erasedPartyPseudonym();
+      pseudonymisePurchaseParties(this.db, name, ghiiRows.map(r => r.ghii), pseudonym);
+      // The AI provenance records stay too, for the content that outlives the account. The name
+      // leaves the two columns every owner read keys on, under the same pseudonym.
+      pseudonymiseProvenanceOwner(this.db, name, ghiiRows.map(r => r.ghii), pseudonym);
 
       // 4. Delete GHII records for this owner
       this.db.prepare('DELETE FROM ghiis WHERE ownerName = ?').run(name);
