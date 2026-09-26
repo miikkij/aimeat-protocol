@@ -59568,7 +59568,7 @@ paths:
       operationId: installAdminExtension
       tags: [Admin]
       summary: Install a bundled extension
-      description: Operator only. One-click installs a bundled extension by name from disk.
+      description: Operator only. One-click installs a bundled extension by name from disk, and keeps its version, so `name@version` answers with the code installed here.
       security:
         - BearerAuth: []
       parameters:
@@ -59608,7 +59608,11 @@ paths:
       summary: Reinstall a bundled extension
       description: |
         Operator only. Re-reads the extension's files from disk and updates the installed record
-        (or installs fresh if not yet installed), preserving existing instances.
+        (or installs fresh if not yet installed), preserving existing instances. The version it
+        deploys is kept, so `name@version` answers with that code. A version is kept once: other
+        code under a version already kept is refused with 409 VERSION_EXISTS before anything is
+        written, and the change needs a new version in extension.yaml. The same code again is no
+        conflict.
       security:
         - BearerAuth: []
       parameters:
@@ -59640,6 +59644,7 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
   /v1/admin/extensions/available/{name}/actions:
     post:
       operationId: addAdminExtensionAction

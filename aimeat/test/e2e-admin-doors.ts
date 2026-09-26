@@ -16,6 +16,9 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts \
  *     --test=e2e-admin-doors
  * @version-history
+ *   v1.1.0 — 2026-09-26 — A6-7: the bundled install and the reinstall keep the version they deploy,
+ *     and a reinstall with other code under a kept version is refused 409. Failed on the code before
+ *     the fix: no version was kept, and the reinstall answered 200.
  *   v1.0.0 — 2026-09-08 — Written for the coverage work. admin-extensions.ts had no suite at all.
  */
 import * as ed from '@noble/ed25519';
@@ -359,6 +362,49 @@ try {
         const { status } = await json('/v1/admin/extensions/available/no-such-extension/reinstall',
             op({ method: 'POST' }));
         assert(status === 404, `expected 404, got ${status}`);
+    });
+
+    // A6-7. `name@version` is an address an app pins, and a version is kept once. The operator's two
+    // doors deploy code like every other door, so they keep what they deploy and refuse other code
+    // under a version already kept; the operator gives the change a new version on disk.
+    const keptVersions = async (name: string): Promise<{ current: string; versions: string[] }> => {
+        const v = await json(`/v1/extensions/${name}/versions`, op());
+        assert(v.status === 200, `versions of ${name}: ${v.status} ${JSON.stringify(v.body)}`);
+        return { current: v.body.data.current, versions: (v.body.data.versions as any[]).map(x => x.version) };
+    };
+    const liveScript = async (name: string, action: string): Promise<string> => {
+        const a = await json(`/v1/extensions/${name}/actions/${action}`, op());
+        assert(a.status === 200, `action ${name}/${action}: ${a.status} ${JSON.stringify(a.body)}`);
+        return a.body.data.action.scriptContent as string;
+    };
+
+    await test('A bundled install and a reinstall keep the version they deployed', async () => {
+        for (const name of ['membership-behaviors', 'rest-connector']) {
+            const { current, versions } = await keptVersions(name);
+            assert(versions.includes(current), `${name} ${current} is live and not kept: ${JSON.stringify(versions)}`);
+        }
+    });
+
+    await test('A reinstall with other code under a kept version → 409 VERSION_EXISTS, and the live code is unchanged', async () => {
+        const first = await json(`/v1/admin/extensions/available/${scaffoldName}/reinstall`, op({ method: 'POST' }));
+        assert(first.status === 200 && first.body.data.reinstalled === false, `first deploy: ${first.status} ${JSON.stringify(first.body)}`);
+        const { current, versions } = await keptVersions(scaffoldName);
+        assert(versions.includes(current), `the deployed version is not kept: ${current} ${JSON.stringify(versions)}`);
+        const original = await liveScript(scaffoldName, 'list');
+
+        const other = `export default async function(ctx, input) {\n  return { items: [], total: 0, marker: 'other-code-${stamp}' };\n}\n`;
+        const put = await json(`/v1/admin/extensions/available/${scaffoldName}/scripts/list`, op({ method: 'PUT', body: JSON.stringify({ scriptContent: other }) }));
+        assert(put.status === 200, `script on disk: ${put.status}`);
+        const again = await json(`/v1/admin/extensions/available/${scaffoldName}/reinstall`, op({ method: 'POST' }));
+        assert(again.status === 409 && again.body.error?.code === 'VERSION_EXISTS',
+            `other code under ${current} must be refused, got ${again.status}: ${JSON.stringify(again.body)}`);
+        assert(await liveScript(scaffoldName, 'list') === original, 'the refused reinstall changed the code that runs');
+
+        // The kept code again under the same version is no conflict.
+        const back = await json(`/v1/admin/extensions/available/${scaffoldName}/scripts/list`, op({ method: 'PUT', body: JSON.stringify({ scriptContent: original }) }));
+        assert(back.status === 200, `script back on disk: ${back.status}`);
+        const same = await json(`/v1/admin/extensions/available/${scaffoldName}/reinstall`, op({ method: 'POST' }));
+        assert(same.status === 200 && same.body.data.reinstalled === true, `the kept code again: ${same.status} ${JSON.stringify(same.body)}`);
     });
 
     console.log('\nSection A — refusals');
