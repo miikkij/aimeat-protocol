@@ -5,6 +5,10 @@
  * @description The component bench: what a component may carry and what it may not. The good case
  *   is the part three measured builds each made by hand on 2026-09-20, a week grid a person ticks.
  * @version-history
+ *   v1.5.0 — 2026-09-26 — The markup is read by the HTML parser (1a0a15eb7b20): a character reference
+ *     of any spelling is decoded, so a plain value holding one passes and an address spelled with one
+ *     is refused as an address; a reference without its ";" is refused as markup that does not read
+ *     cleanly; a tag the parser drops or reads as text is refused; readMarkup is timed at the ceiling.
  *   v1.4.0 — 2026-09-26 — What an escape stands for, and what a string holds, is never read as
  *     structure (e82c9f26d729): `p, .wkgrid\;.wkgrid` and a "{" in a string before a body rule are
  *     refused, a string may hold a brace or a semicolon, and cssAsRead writes an escaped "/*" as "__".
@@ -26,7 +30,7 @@ import { describe, it, expect } from 'vitest';
 import { validateComponentBody, componentPreviewHtml, componentSnippet, type ComponentBody } from '../../src/services/design-book/component.js';
 import { validatePartInput, PART_KINDS } from '../../src/services/design-book/validate.js';
 import {
-  attributesOf, complexSelectorOf, cssAsRead, declarationsOf, selectorListOf, selectorsOf, tagsOf, withoutVarFallbacks,
+  complexSelectorOf, cssAsRead, declarationsOf, readMarkup, selectorListOf, selectorsOf, withoutVarFallbacks,
 } from '../../src/services/design-book/component-scan.js';
 
 const WEEK_GRID = {
@@ -94,33 +98,74 @@ describe('the component bench', () => {
     expect(bad({ html: '<div class="wkgrid"></div title="><script>alert(1)</script>">' })).toThrow(/closing tag carries nothing/);
     expect(bad({ html: '<div class="wkgrid"></ div title="><script>alert(1)</script>">' })).toThrow(/right after "<" or "<\/"/);
     expect(bad({ html: '<div class="wkgrid">< div title="x"></div>' })).toThrow(/right after "<" or "<\/"/);
-    // The reader says so itself: nothing it could not read is dropped on the floor.
-    expect(attributesOf(' class="wkgrid" ="><script>x</script>"')).toEqual([
-      { key: 'class', value: 'wkgrid', odd: false },
-      { key: '', value: '><script>x</script>', odd: true },
-    ]);
-    expect(tagsOf('<div></ div title="><script>x</script>">').tags[1]).toMatchObject({ closing: true, odd: true });
+    // The reader says so itself, from the parser's own error: nothing it could not read is dropped on the floor.
+    expect(readMarkup('<div class="wkgrid" ="><script>x</script>"></div>').problem).toEqual({ kind: 'equals', element: 'div' });
+    expect(readMarkup('<div></ div title="><script>x</script>">').problem).toEqual({ kind: 'tag-start' });
+    expect(readMarkup('<div></div title="x">').problem).toEqual({ kind: 'closing', element: 'div', rest: ' title="x"' });
     // What a browser and the bench agree on still passes: a self-closing SVG path, a bare attribute.
     expect(() => validateComponentBody({ ...WEEK_GRID, html: '<div class="wkgrid" hidden><svg class="wkgrid-i" viewBox="0 0 8 8"><path class="wkgrid-p" d="M0 0L8 8"/></svg><br/></div >' })).not.toThrow();
   });
 
   // 1a0a15eb7b20, the value: a browser decodes a character reference in an attribute value before
   // anything uses it, and reads an SVG presentation attribute (fill, stroke) as a style value, where
-  // an escape resolves. Each of these put a url() the bench read past into the preview, and the
-  // browser fetched it.
-  it('reads an attribute value as a browser uses it: no character reference but &amp;, and no escape', () => {
+  // an escape resolves. The checks read the decoded value, and a value holding a backslash is refused.
+  it('reads an attribute value as a browser uses it: decoded, and with no escape', () => {
     const svg = (attr: string) => ({ html: `<svg class="wkgrid-i" viewBox="0 0 8 8"><rect class="wkgrid-r" width="8" height="8" ${attr}></rect></svg>` });
-    expect(bad(svg('fill="u&#114;l(https://e.example/p.svg#g)"'))).toThrow(/character reference/);
-    expect(bad(svg('fill="&#x75;rl(https://e.example/p.svg#g)"'))).toThrow(/character reference/);
-    expect(bad(svg('fill="url&lpar;https://e.example/p.svg#g)"'))).toThrow(/character reference/);
-    expect(bad(svg('fill=u&#114;l(https://e.example/p.svg#g)'))).toThrow(/character reference/);
     expect(bad(svg('fill="u\\72 l(https://e.example/p.svg#g)"'))).toThrow(/backslash/);
     expect(bad(svg('stroke="u\\rl(https://e.example/p.svg#g)"'))).toThrow(/backslash/);
-    // The reader says so itself.
-    expect(attributesOf(' fill="u&#114;l(x)"')[0]).toMatchObject({ key: 'fill', odd: true });
-    // &amp; stays: it decodes to a plain "&", which nothing decodes again.
-    expect(attributesOf(' aria-label="Read &amp; write"')[0]).toMatchObject({ value: 'Read &amp; write', odd: false });
+    expect(bad(svg('stroke="u&#92;rl(https://e.example/p.svg#g)"'))).toThrow(/backslash/);
+    // The reader hands over what a browser uses: every reference decoded, whatever its spelling.
+    const [, rect] = readMarkup('<svg><rect fill="u&#114;l(x)" stroke="&#x75;rl(y)" aria-label="A &ndash; B &amp; C" data-a="&lpar;"></rect></svg>').elements;
+    expect(rect.attrs).toEqual([
+      { name: 'fill', value: 'url(x)' }, { name: 'stroke', value: 'url(y)' }, { name: 'aria-label', value: 'A – B & C' }, { name: 'data-a', value: '(' },
+    ]);
+    // An SVG name comes back lower-cased, as the allowlist spells it, and a prefixed one keeps its prefix.
+    expect(readMarkup('<svg viewBox="0 0 8 8"><linearGradient xlink:href="#g"></linearGradient></svg>').elements).toEqual([
+      { name: 'svg', attrs: [{ name: 'viewbox', value: '0 0 8 8' }] },
+      { name: 'lineargradient', attrs: [{ name: 'xlink:href', value: '#g' }] },
+    ]);
     expect(() => validateComponentBody({ ...WEEK_GRID, html: WEEK_GRID.html.replace('aria-label="This week"', 'aria-label="Read &amp; write"') })).not.toThrow();
+  });
+
+  // What the parser builds is what is checked, so a tag it drops or reads as text is refused where it
+  // stands: to a browser that reads the same text in another place, it is a tag.
+  it('checks every tag the parser builds, and refuses a "<" that starts none', () => {
+    expect(bad({ html: '<div class="wkgrid"><td class="wkgrid-c" onclick="x()">1</td></div>' })).toThrow(/starts no tag a browser reads in that place/);
+    expect(bad({ html: '<textarea class="wkgrid-t"><script>alert(1)</script></textarea>' })).toThrow(/starts no tag a browser reads in that place/);
+    expect(bad({ html: '<select class="wkgrid-s"><option>a</option><title><script>alert(1)</script></title></select>' })).toThrow(/may not carry <script>|starts no tag/);
+    expect(bad({ html: '<div class="wkgrid"><body onload="x()"></body></div>' })).toThrow(/starts no tag a browser reads in that place/);
+    expect(bad({ html: '<svg class="wkgrid-i"><![CDATA[><script>alert(1)</script>]]></svg>' })).toThrow(/starts no tag a browser reads in that place/);
+    expect(bad({ html: '<div class="wkgrid">x</p></div>' })).toThrow(/starts no tag a browser reads in that place/);
+    expect(bad({ html: '<div class="wkgrid"/>' })).toThrow(/does not read cleanly/);
+    // Markup a browser and the parser agree on passes: a table with its rows, a list closed by its end
+    // tag, text with its references, a textarea whose text holds no "<".
+    for (const html of [
+      '<table class="wkgrid"><tr><td>1</td></tr></table>',
+      '<ul class="wkgrid"><li>a<li>b</ul>',
+      '<p class="wkgrid">Tom &amp; Jerry &lt;3 &copy; 2026</p>',
+      '<textarea class="wkgrid-t">a &lt; b</textarea>',
+      '<pre class="wkgrid">\nx</pre>',
+    ]) {
+      expect(() => validateComponentBody({ ...WEEK_GRID, html }), html).not.toThrow();
+    }
+  });
+
+  // 1a0a15eb7b20, read by the HTML parser: a character reference is decoded where a browser decodes
+  // it, and the decoded value is what the checks read. A plain value holding one passes; an address
+  // spelled with one is refused as an address.
+  it('decodes every character reference in a value, and checks what it decodes to', () => {
+    const labelled = (label: string) => ({ ...WEEK_GRID, html: WEEK_GRID.html.replace('aria-label="This week"', `aria-label="${label}"`) });
+    expect(() => validateComponentBody(labelled('Mon &ndash; Sun'))).not.toThrow();
+    expect(() => validateComponentBody(labelled('&#169; 2026, Tom &#x26; Jerry'))).not.toThrow();
+    expect(() => validateComponentBody(labelled('Read &AMP; write'))).not.toThrow();
+    const svg = (attr: string) => ({ html: `<svg class="wkgrid-i" viewBox="0 0 8 8"><rect class="wkgrid-r" width="8" height="8" ${attr}></rect></svg>` });
+    expect(bad(svg('fill="u&#114;l(https://e.example/p.svg#g)"'))).toThrow(/may not carry an address/);
+    expect(bad(svg('fill="&#x75;rl(https://e.example/p.svg#g)"'))).toThrow(/may not carry an address/);
+    expect(bad(svg('fill="url&lpar;https://e.example/p.svg#g)"'))).toThrow(/may not carry an address/);
+    expect(bad(svg('fill=u&#114;l(https://e.example/p.svg#g)'))).toThrow(/may not carry an address/);
+    // Without its semicolon a reference still decodes, and the parser says the markup is not clean.
+    expect(bad(svg('fill="u&#114l(https://e.example/p.svg#g)"'))).toThrow(/does not read cleanly/);
+    expect(bad({ html: WEEK_GRID.html.replace('aria-label="This week"', 'aria-label="&copy 2026"') })).toThrow(/does not read cleanly/);
   });
 
   // e82c9f26d729: a browser resolves CSS escapes, so each of these is url(), @import, fixed or
@@ -197,8 +242,14 @@ describe('the component bench', () => {
       run();
       expect(performance.now() - started, name).toBeLessThan(400);
     };
-    timed('tags', () => tagsOf('<a '.repeat(n)));
-    timed('attributes', () => attributesOf('a= '.repeat(n)));
+    // The HTML parser's cost grows with how deep the markup nests (every new element looks down the
+    // stack of open ones), so it is handed no more than the bench's ceiling. Measured 2026-09-26 at
+    // 12 000 characters: 80 ms for the worst of seventeen shapes, and 9.4 s for <div> at 200 000.
+    const ceiling = (unit: string, head = '') => head + unit.repeat(Math.floor((12_000 - head.length) / unit.length));
+    for (const [shape, unit, head] of [
+      ['tags', '<a '], ['attributes', 'a= ', '<div '], ['nesting', '<div>'], ['list items', '<li>', '<ul>'], ['misnesting', '<b>x</i>'],
+      ['stray end tags', '</p>'], ['formatting', '<a><p>'], ['tables', '<table>'], ['references', '&#', '<div title="'],
+    ]) timed(`markup, ${shape}`, () => readMarkup(ceiling(unit, head)));
     timed('comments', () => cssAsRead('/* '.repeat(n)));
     timed('strings', () => cssAsRead('"a\\'.repeat(n)));
     timed('escapes', () => cssAsRead('\\75 '.repeat(n)));
@@ -211,6 +262,11 @@ describe('the component bench', () => {
     timed('var fallbacks', () => withoutVarFallbacks('var(--a,('.repeat(n)));
     // And through the bench itself, at the most it accepts.
     timed('the bench, markup', () => { try { validateComponentBody({ ...WEEK_GRID, html: '<div class="wkgrid">' + '<a '.repeat(3900) }); } catch { /* refused is the right answer */ } });
+    timed('the bench, markup nesting', () => { try { validateComponentBody({ ...WEEK_GRID, html: ceiling('<div class="wkgrid">') }); } catch { /* refused is the right answer */ } });
+    // The stored body a preview benches again gets the same ceiling, whatever its length.
+    timed('the preview, a stored body past the ceiling', () => {
+      expect(componentPreviewHtml({ ...WEEK_GRID, html: '<div class="wkgrid">' + '<div>'.repeat(40_000) } as unknown as ComponentBody)).toMatch(/no longer passes/);
+    });
     timed('the bench, styles', () => { try { validateComponentBody({ ...WEEK_GRID, css: '.wkgrid { color: var(--ak-ink); }' + 'animation '.repeat(1100) }); } catch { /* refused is the right answer */ } });
     timed('the bench, selectors', () => { try { validateComponentBody({ ...WEEK_GRID, css: '.wkgrid { color: var(--ak-ink); }\n.wkgrid' + ':is(.wkgrid'.repeat(900) + ')'.repeat(900) + ' { color: var(--ak-ink); }' }); } catch { /* refused is the right answer */ } });
   });

@@ -288,6 +288,7 @@
     "nodemailer": "^10.0.10",
     "openid-client": "^6.8.8",
     "otpauth": "^9.5.2",
+    "parse5": "8.0.1",
     "pdfkit": "^0.19.1",
     "pg": "^8.23.0",
     "playwright-core": "1.62.1",

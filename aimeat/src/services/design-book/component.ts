@@ -30,6 +30,11 @@
  * @structure COMPONENT_LIMITS · validateComponentBody(raw) · componentPreviewHtml(body) · componentSnippet(body)
  * @usage const body = validateComponentBody(raw);
  * @version-history
+ *   v1.4.0 — 2026-09-26 — The markup is benched as the HTML parser reads it (component-scan.ts
+ *     readMarkup, parse5): the elements a browser builds, with every attribute value decoded, so a
+ *     plain value may hold a character reference and an address spelled with one is refused as an
+ *     address. A parse error, a comment and a "<" that starts no tag the parser built are refused,
+ *     each in its own words, and the parser reads no more than the ceiling (1a0a15eb7b20).
  *   v1.3.1 — 2026-09-26 — An attribute value is benched as a browser uses it (1a0a15eb7b20): a value
  *     holding a character reference other than &amp; is refused, since a browser decodes it before
  *     use (`u&#114;l(` is url(), and so is one holding a backslash, since a browser reads an SVG
@@ -63,8 +68,8 @@
  */
 import { DesignBookError } from './errors.js';
 import {
-  attributesOf, complexSelectorOf, cssAsRead, declarationsOf, selectorListOf, selectorsOf, tagsOf, withoutVarFallbacks,
-  type Compound,
+  complexSelectorOf, cssAsRead, declarationsOf, readMarkup, selectorListOf, selectorsOf, withoutVarFallbacks,
+  type Compound, type MarkupProblem,
 } from './component-scan.js';
 
 export const COMPONENT_LIMITS = { html: 12_000, css: 12_000, use: 600, why: 400, whyMin: 20 } as const;
@@ -82,7 +87,6 @@ export interface ComponentBody {
 }
 
 const PREFIX_RE = /^[a-z][a-z0-9]{1,11}$/;
-const LETTER_FIRST = /^[a-z]/;
 
 /** The only positions a component may take: it stays where the app puts it, and says so in a word. */
 const POSITIONS = new Set(['static', 'relative', 'absolute']);
@@ -108,35 +112,46 @@ const refuse = (message: string): never => { throw new DesignBookError('BODY_INV
 
 const str = (v: unknown): string => (typeof v === 'string' ? v : '');
 
+const TAG_START_REFUSAL = 'A tag starts with its element\'s name right after "<" or "</". With a space or anything but a letter there, a browser reads it as text or as a comment ending at the first ">", '
+  + 'so the bench and the browser would disagree about what is markup. A "<" in text is written &lt;.';
+const ODD_ATTRIBUTE_REFUSAL = (element: string, key: string) => `On <${element}>, the attribute "${key.slice(0, 40)}" carries a quote or an angle bracket where a browser and this bench could read the tag differently. `
+  + 'Write every value in double quotes, with no quote, "<" or ">" inside it.';
+
+/** What the bench says when the HTML parser's reading keeps it from vouching for the markup (component-scan.ts readMarkup). */
+function markupRefusal(problem: MarkupProblem, html: string): string {
+  switch (problem.kind) {
+    case 'comment': return 'A component\'s markup carries no comments: say what it is in `use`.';
+    case 'unclosed': return 'A component\'s markup has a "<" that never meets its ">". Every tag is closed, and a "<" in text is written &lt;.';
+    case 'equals':
+      return `On <${problem.element}>, an "=" stands where a browser expects an attribute's name. A browser reads the "=" and what follows it as the name, quotes included, and ends the tag at the first ">". `
+        + 'Every attribute is a name, "=", and a value in double quotes.';
+    case 'closing':
+      return `A closing tag carries nothing but its name: "</${problem.element}${problem.rest.slice(0, 40)}>" does not, and a browser reads what follows the name as attributes, quotes and all. Write </${problem.element}>.`;
+    case 'tag-start': return TAG_START_REFUSAL;
+    case 'attribute': return ODD_ATTRIBUTE_REFUSAL(problem.element, problem.attribute);
+    case 'unclean':
+      return `The markup does not read cleanly as HTML at character ${problem.at} (${problem.code}). A browser mends such markup in a way of its own, and the bench vouches only for markup that reads cleanly. `
+        + 'Close every tag, write every value in double quotes, and end every character reference with ";".';
+    case 'stray':
+      return `The "<" at character ${problem.at} ("${html.slice(problem.at, problem.at + 30)}") starts no tag a browser reads in that place: it is text inside <textarea> or <title>, or a tag HTML drops where it stands, `
+        + 'such as a <td> outside a table row. A "<" in text is written &lt;, and every tag stands where HTML allows it.';
+  }
+}
+
 function checkMarkup(html: string, prefix: string): void {
-  if (html.includes('<!--')) refuse('A component\'s markup carries no comments: say what it is in `use`.');
-  // Read with an index and never with a pattern over the whole text (component-scan.ts says why).
-  const { tags, unclosed } = tagsOf(html);
-  if (unclosed) refuse('A component\'s markup has a "<" that never meets its ">". Every tag is closed, and a "<" in text is written &lt;.');
-  for (const tag of tags) {
-    const name = tag.name;
-    // Odd before anything else: the name and the attributes below are what THIS reader made of
-    // the tag, and a browser made something else of it (component-scan.ts).
-    if (tag.odd) {
-      refuse(tag.closing && LETTER_FIRST.test(tag.name)
-        ? `A closing tag carries nothing but its name: "</${name}${tag.attrs.slice(0, 40)}>" does not, and a browser reads what follows the name as attributes, quotes and all. Write </${name}>.`
-        : 'A tag starts with its element\'s name right after "<" or "</". With a space or anything but a letter there, a browser reads it as text or as a comment ending at the first ">", '
-          + 'so the bench and the browser would disagree about what is markup. A "<" in text is written &lt;.');
-    }
+  // The parser's cost grows with how deep the markup nests, so it reads no more than the ceiling.
+  if (html.length > COMPONENT_LIMITS.html) refuse(`A component carries its markup in \`html\`, up to ${COMPONENT_LIMITS.html} characters.`);
+  // READ BY THE HTML PARSER (component-scan.ts readMarkup): the elements a browser builds, and every
+  // attribute value decoded as a browser decodes it, so a check below reads what a browser uses.
+  const { elements, problem } = readMarkup(html);
+  if (problem) refuse(markupRefusal(problem, html));
+  for (const { name, attrs } of elements) {
     if (!ELEMENTS.has(name)) {
       refuse(`A component's markup may not carry <${name}>. It is structure and nothing else: no script, style, link, iframe, object, embed, form, img, video, audio or anchor. `
         + 'A picture or a link is the app\'s to add, where it knows the address.');
     }
-    if (tag.closing) continue;
-    for (const { key, value, odd } of attributesOf(tag.attrs)) {
-      if (odd && !key) {
-        refuse(`On <${name}>, an "=" stands where a browser expects an attribute's name. A browser reads the "=" and what follows it as the name, quotes included, and ends the tag at the first ">". `
-          + 'Every attribute is a name, "=", and a value in double quotes.');
-      }
-      if (odd) {
-        refuse(`On <${name}>, the attribute "${key.slice(0, 40)}" carries a quote or an angle bracket, or a character reference, where a browser and this bench could read it differently. `
-          + 'Write every value in double quotes, with no quote, "<", ">" or "&" inside it: "&amp;" is the one character reference allowed.');
-      }
+    for (const { name: key, value } of attrs) {
+      if (key.includes('`') || value.includes('<') || value.includes('>')) refuse(ODD_ATTRIBUTE_REFUSAL(name, key));
       if (!(ATTRIBUTES.has(key) || key.startsWith('data-') || key.startsWith('aria-'))) {
         refuse(`A component's markup may not carry the attribute "${key}" on <${name}>. Allowed: class, id, role, data-*, aria-*, the form and table attributes, and the SVG drawing attributes. `
           + 'An event handler is the app\'s to wire, in its own script.');
