@@ -21,6 +21,8 @@
  *   - appMayWriteKey: owner passes, app refused, delegated agent refused, reserved grant passes
  * @usage cd aimeat && pnpm exec vitest run test/unit/reserved-keys.test.ts
  * @version-history
+ *   v1.x — 2026-09-25 — `workflows.` is the sixteenth: a trigger runs a saved definition on the
+ *     authority of the saver it names, and the engine advances a run from its record.
  *   v1.x — 2026-09-25 — `packages.install-requests.` is the fifteenth: an install request the
  *     decision door performs as the owner.
  *   v1.x — 2026-09-25 — `notif.`, the first PREFIX only the node writes: a notification's buttons run
@@ -52,7 +54,7 @@ const ACCOUNTANTS_KEY = 'finance.accountants';
 const PSP_KEY = 'commerce.psp';
 
 describe('the list holds every prefix the server reads and acts on', () => {
-    it('carries all fifteen, and a removal is a test failure rather than a silent regression', () => {
+    it('carries all sixteen, and a removal is a test failure rather than a silent regression', () => {
         // `messages.organize.` (2026-09-13): the owner's archive and rules for their Messages list.
         // The server composes the list with it, so an app that could write it could archive the
         // message warning the owner about that very app.
@@ -76,8 +78,11 @@ describe('the list holds every prefix the server reads and acts on', () => {
         // owner's.
         // `packages.install-requests.` (2026-09-25): an install an agent or an app could not do alone,
         // waiting for the owner. The decision door installs what the record names, as the owner.
+        // `workflows.` (2026-09-25): a trigger runs the saved definition on the authority of the
+        // principal it names as its saver, and the engine advances a run from its record. Written
+        // past the workflow doors, either could name its own saver and its own steps.
         expect([...RESERVED_OWNER_KEY_PREFIXES].sort()).toEqual(
-            ['agents.proposals.', 'ai-usage.', 'ai.jobs.', 'audit.', 'chat.', 'commerce.', 'crews.llm.', 'decide.', 'finance.', 'messages.organize.', 'notifications.', 'openrouter.', 'packages.install-requests.', 'profile.', 'signals.'],
+            ['agents.proposals.', 'ai-usage.', 'ai.jobs.', 'audit.', 'chat.', 'commerce.', 'crews.llm.', 'decide.', 'finance.', 'messages.organize.', 'notifications.', 'openrouter.', 'packages.install-requests.', 'profile.', 'signals.', 'workflows.'],
         );
     });
 
@@ -89,6 +94,17 @@ describe('the list holds every prefix the server reads and acts on', () => {
         expect(appMayWriteKey(['owner'], key)).toBe(true);
         expect(isReservedServerKey('packages.favourites')).toBe(false);
         expect(isReservedServerKey('packages.install-requestsx.1')).toBe(false);
+    });
+
+    it('refuses a granted app and a delegated agent the workflow records, and lets the owner write them', () => {
+        for (const key of ['workflows.def.nightly', 'workflows.run.nightly.r1']) {
+            expect(isReservedServerKey(key)).toBe(true);
+            expect(appMayWriteKey(['app'], key)).toBe(false);
+            expect(appMayWriteKey(['agent'], key, true)).toBe(false);
+            expect(appMayWriteKey(['owner'], key)).toBe(true);
+        }
+        // The dot matters: a key that only starts with the word is somebody's own data.
+        expect(isReservedServerKey('workflowsnotes.today')).toBe(false);
     });
 
     it('refuses a granted app the decision key and the scrubber policy, and lets the owner write them', () => {

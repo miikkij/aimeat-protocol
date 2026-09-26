@@ -49,13 +49,15 @@
  *     happens to share a head with.
  *   v1.13.0 — 2026-09-25 — saveWorkflow keeps maxCostUsd, the per-run cap in US dollars, and answers a
  *     save that sets costCapMorsels with a warning naming maxCostUsd; that field is not kept.
+ *   v1.14.0 — 2026-09-25 — saveWorkflow records savedBy, the principal whose save is in force, taken
+ *     from the session. A run the trigger starts answers to it (trigger-authority.ts).
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { buildGAII, parseGEAI } from '../../utils/gaii.js';
 import { isReservedServerKey, RESERVED_OWNER_KEY_PREFIXES, SERVER_WRITTEN_KEYS, SERVER_WRITTEN_KEY_PREFIXES } from '../../utils/reserved-keys.js';
 import { template } from './engine-util.js';
-import { missingStepScopes, stepScopeRefusal, type WorkflowCaller } from './step-authority.js';
+import { missingStepScopes, stepScopeRefusal, saverFromCaller, type WorkflowCaller } from './step-authority.js';
 import { shownRun } from './run-redaction.js';
 import {
   WorkflowDefInputSchema, WORKFLOW_ID_RE,
@@ -530,6 +532,9 @@ export async function saveWorkflow(
     parallel: input.parallel ?? false,
     llm: input.llm,
     maxCostUsd: input.maxCostUsd ?? null,
+    // The principal this save puts in force, which a run the trigger starts answers to
+    // (trigger-authority.ts). From the session, never from the body.
+    ...(caller ? { savedBy: saverFromCaller(caller, ownerGhii) } : {}),
     createdBy: prior?.createdBy ?? createdBy,
     createdAt: prior?.createdAt ?? now,
     updatedAt: now,

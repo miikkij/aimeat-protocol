@@ -5618,6 +5618,17 @@ components:
           properties:
             id: { type: string }
             createdBy: { type: string, description: 'Author GAII/GHII (audit).' }
+            savedBy:
+              type: object
+              description: >-
+                Who saved this definition last, from the session and never from the body. A run the
+                workflow's own trigger starts answers to it: before such a run starts, this principal
+                must still exist and hold every permission the steps need, or the run is refused. The
+                owner in person (`owner`) is not checked. Absent on a definition saved before
+                2026-09-25, whose first author (`createdBy`) stands in.
+              properties:
+                kind: { type: string, enum: [owner, agent, ecosystem, app] }
+                id: { type: string, description: 'The owner GHII, an agent GAII, an ecosystem app GEAI, or a hosted app grant id.' }
             createdAt: { type: string, format: date-time }
             updatedAt: { type: string, format: date-time }
     WorkflowBlueprint:
@@ -5648,9 +5659,35 @@ components:
         workflowId: { type: string }
         status:
           type: string
-          enum: [running, waiting-step, red, partial, done, cancelled, stopped]
-          description: '`stopped`: the node ended the run at its cost cap (maxCostUsd); `costCap` and `reason` say why.'
-        reason: { type: string, description: 'Why the node ended the run itself rather than a step finishing it, in words.' }
+          enum: [running, waiting-step, red, partial, done, cancelled, stopped, refused]
+          description: >-
+            `stopped`: the node ended the run at its cost cap (maxCostUsd); `costCap` and `reason` say
+            why. `refused`: the workflow's own trigger found the principal that saved it gone, or
+            short of a permission the steps need, so nothing ran; `refusal` and `reason` say which.
+        reason: { type: string, description: 'Why the node ended the run itself, or did not start it, in words.' }
+        refusal:
+          type: object
+          description: >-
+            On a `refused` run. One record stands for every refused start until the workflow runs
+            again; `attempts` counts them. The owner is told once, with "Run as me"
+            (POST /v1/workflows/{id}/runs/{runId}/run-as-owner) and a link to the saver's permissions.
+          properties:
+            saver:
+              type: object
+              properties:
+                kind: { type: string, enum: [owner, agent, ecosystem, app] }
+                id: { type: string }
+            saverName: { type: string }
+            missing: { type: array, items: { type: string }, description: 'The permissions the saver lacks; empty when it is gone.' }
+            gone: { type: boolean }
+            attempts: { type: integer }
+            lastAttemptAt: { type: string, format: date-time }
+            ranAsOwner:
+              type: object
+              description: The run the owner started from this refusal, on their own authority.
+              properties:
+                runId: { type: string }
+                at: { type: string, format: date-time }
         costCap:
           type: object
           description: 'On a `stopped` run: the cap, what its ai steps had spent (US dollars), and the ai step that did not start.'
@@ -44557,7 +44594,9 @@ paths:
         agent step reads one). The owner in person passes. A run's observation of a credential
         record is served as the memory doors show it. `maxCostUsd` caps what one run's ai steps may
         spend, in US dollars; `costCapMorsels` does nothing, and a save that sets it answers with
-        `warnings`.
+        `warnings`. The save records its principal as `savedBy`: a run the workflow's own trigger
+        starts answers to it, and is refused (status `refused`, one notification to the owner) when
+        that principal is gone or no longer holds a permission the steps need.
       tags: [Workflows]
       security:
         - BearerAuth: []
@@ -44858,6 +44897,63 @@ paths:
                       data: { $ref: '#/components/schemas/WorkflowRun' }
         '404':
           $ref: '#/components/responses/NotFound'
+  /v1/workflows/{id}/runs/{runId}/run-as-owner:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+      - name: runId
+        in: path
+        required: true
+        schema: { type: string, description: 'A run with status `refused`.' }
+    post:
+      operationId: runRefusedWorkflowAsOwner
+      summary: '"Run as me": start a refused trigger run once, on the owner''s own authority'
+      description: >
+        A run the workflow's own trigger starts answers to the principal that saved the workflow;
+        when that principal is gone or lacks a permission the steps need, the run is refused and the
+        owner is notified with this action. It starts one full live run now as the owner, whose
+        authority covers every step, and records the new run on the refusal, so a second press
+        answers 409. Only the account holder in person may press it (requireOwnerPrincipal): an agent
+        starts runs on its own permissions through POST /v1/workflows/{id}/run. 404 when this
+        account has no such run, 409 when the run was not refused, was already started this way, or
+        a run is already in flight.
+      tags: [Workflows]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: The run started
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          runId: { type: string, description: 'The run this press started.' }
+                          refusedRunId: { type: string }
+                          mode: { type: string, enum: [full-live] }
+        '400':
+          description: The workflow could not start (error.details.errors[] lists why)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: The run was not refused, was already started as the owner, or a run is in flight
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
   /v1/workflows/{id}/runs/{runId}/cancel:
     parameters:
       - name: id

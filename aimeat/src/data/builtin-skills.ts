@@ -11,6 +11,8 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   v1.16.3 -- 2026-09-25 -- diagnose-a-workflow reads a refused trigger start; set-up-content-pipeline
+ *            says the schedule runs on the saver's permissions.
  *   v1.16.2 -- 2026-09-25 -- diagnose-a-workflow reads a run the node stopped at its spending limit
  *            (maxCostUsd): the run's reason, its costCap, and each step's costUsd. set-up-content-
  *            pipeline sets that limit when steps call the owner's own model.
@@ -518,6 +520,9 @@ A pipeline = a WORKFLOW definition (chained steps dispatched to agents) + a TRIG
 - When steps call the owner's own model (\`action.kind: "ai"\`), set \`maxCostUsd\` on the
   definition: a run that goes wrong then stops before its next ai step at a known cost, and says
   so on the run.
+- The schedule runs on the saver's permissions. The agent that saves the workflow must keep every
+  permission its steps need; if the owner later takes one away, the scheduled run is refused and
+  the owner is asked, once.
 `,
   },
   {
@@ -670,7 +675,11 @@ metadata:
 6. **A run the node ended itself:** status \`stopped\` means the run reached its spending limit
    (\`maxCostUsd\`, US dollars per run): its \`reason\` and \`costCap\` say what the ai steps had spent
    and which ai step did not start, and each step carries its own \`costUsd\`. Raising the limit
-   is a change to the definition, so it waits for the owner like any other.
+   is a change to the definition, so it waits for the owner like any other. Status \`refused\`
+   means the trigger did not start the run: the agent or app that saved the workflow
+   (\`savedBy\`) is disconnected or lost a permission its steps need, and \`refusal.missing\` names
+   it. The owner either runs it once as themselves from the notification, approves the
+   permission again, or saves the workflow in person so the trigger runs on their authority.
 
 ## Principles
 - Diagnose before touching: collect the evidence from steps 1-4 and present the likely cause.

@@ -13,14 +13,17 @@
  *   same thing directly refused it. Now each kind of step costs the word its own door costs, and the
  *   workflow is checked when it is saved and again when a run is started, for the principal that
  *   saves or starts it. The account holder in person passes, as requireScope lets them pass every
- *   door. A run started by the workflow's own trigger has no caller to ask; it runs what was checked
- *   when the definition was saved.
+ *   door. A run started by the workflow's own trigger has no caller to ask; it answers to the
+ *   principal that saved the workflow, whose words are asked again when it starts
+ *   (trigger-authority.ts).
  * @structure STEP_KIND_SCOPES · LLM_SCOPES · MEMORY_READ_SCOPES · WorkflowCaller · ownerInPerson(caller) ·
- *   missingStepScopes(def, caller, mode) · stepScopeRefusal(missing)
+ *   saverFromCaller(caller, ownerGhii) · missingStepScopes(def, caller, mode) · stepScopeRefusal(missing)
  * @usage
  *   const missing = missingStepScopes(def, caller, 'full');
  *   if (missing.length > 0) return stepScopeRefusal(missing);   // 403 SCOPE_DENIED, the words named
  * @version-history
+ *   v1.2.0 — 2026-09-25 — WorkflowCaller carries who the caller is, and saverFromCaller turns it into
+ *     the saver a save records, for the trigger's check of that saver's words at start.
  *   v1.1.1 — 2026-09-24 — ownerInPerson asks utils/scope-coverage.ts ownerBypassesScopes, which the
  *     package install now asks too; the rule is written once.
  *   v1.1.0 — 2026-09-24 — A workflow that reads the owner's records costs memory:read, on a check
@@ -28,7 +31,7 @@
  *   v1.0.0 — 2026-09-24 — Initial.
  */
 import { scopeIsCovered, ownerBypassesScopes } from '../../utils/scope-coverage.js';
-import type { WorkflowStep, Signal } from '../../models/workflow-schemas.js';
+import type { WorkflowStep, Signal, WorkflowSaver } from '../../models/workflow-schemas.js';
 
 /** Every kind of step. A step with no `action` is an agent step. */
 export type StepKind = 'agent' | 'human-input' | 'ai' | 'extension' | 'datapackage' | 'export-out' | 'trigger-geai';
@@ -101,6 +104,22 @@ export interface WorkflowCaller {
     roles: string[];
     scopes: string[];
     federated?: boolean;
+    /** Who this is, as the save records it: resolveIdentity() on HTTP, the agent's GAII over MCP. */
+    principal?: string;
+    /** The grant a hosted app's token was issued under: the app's own identity carries the owner's name. */
+    appGrant?: string;
+}
+
+/**
+ * The principal a save records as its saver, and the trigger later asks again. The owner in person
+ * is not checked at the trigger, as no door checks them; everything else is found again by the id
+ * this returns, so a token's own name is not enough for an app, whose token names the owner.
+ */
+export function saverFromCaller(caller: WorkflowCaller, ownerGhii: string): WorkflowSaver {
+    if (ownerInPerson(caller)) return { kind: 'owner', id: ownerGhii };
+    if (caller.roles.includes('app')) return { kind: 'app', id: caller.appGrant ?? caller.principal ?? '' };
+    if (caller.roles.includes('ecosystem')) return { kind: 'ecosystem', id: caller.principal ?? '' };
+    return { kind: 'agent', id: caller.principal ?? '' };
 }
 
 /**

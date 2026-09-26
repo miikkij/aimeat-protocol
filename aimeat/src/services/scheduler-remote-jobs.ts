@@ -12,6 +12,8 @@
  *     a prompt. The routes refuse it now too; this covers jobs stored before that gate existed.
  *   v1.2.0 — 2026-09-09 — A workflow job whose start was skipped (a run already in flight) records
  *     a skip with the reason, not a write naming the other run as if this job had started it.
+ *   v1.3.0 — 2026-09-25 — A workflow job whose start was refused (the saver no longer holds what the
+ *     steps need) records a skip with the refusal's reason.
  */
 import type { AimeatConfig } from '../config.js';
 import { recordMemoryTouch } from './data-map/write-tally-buffer.js';
@@ -115,6 +117,9 @@ export async function runWorkflowJob(job: ScheduledJobRecord): Promise<JobRunRes
   if (!engine) return { reads: [], writes: [], skipped: true, skipReason: 'workflow engine not started' };
   const result = await engine.startRun(owner, owner.split('@')[0], workflowId, { mode: 'full-live' });
   if ('error' in result) throw new Error(`workflow run failed to start: ${result.error.join('; ')}`);
+  // Refused, not failed: whoever saved the workflow no longer holds what its steps need, the refusal
+  // is on the workflow's run list, and the owner was told. Nothing to retry until they act.
+  if (result.refused) return { reads: [], writes: [], skipped: true, skipReason: result.refused };
   if (result.skipped) {
     return { reads: [], writes: [], skipped: true, skipReason: `a run of "${workflowId}" is already in flight (${result.runId}); set parallel: true on the workflow to let runs overlap` };
   }
