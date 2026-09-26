@@ -30,6 +30,9 @@
  * @structure stub AI provider · owner/agent setup · one describe-ish block per acceptance item
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=ai-provenance
  * @version-history
+ *   v1.5.0 — 2026-09-26 — Erasure: a name registered again after its owner deleted the account
+ *     holds none of the previous person's records, in the owner's list, the owner view or the hash
+ *     lookup (secaudit 2026-09: A8-4).
  *   v1.4.0 — 2026-08-12 — The markdown mirror's signatory line is held against what the JSON route
  *     answered rather than against this process's AIMEAT_AI_COP_SECTIONS. The server fills unset keys
  *     from aimeat/.env, so on a machine whose own node has signed the Code of Practice the two
@@ -76,8 +79,9 @@ async function sign(privB64: string, msg: string): Promise<string> {
 const auth = (t: string) => ({ Authorization: `Bearer ${t}` });
 const sha256 = (s: string) => `sha256:${createHash('sha256').update(s).digest('hex')}`;
 
-async function setupOwner(label: string) {
-    const name = `prov${label}${Date.now()}`.toLowerCase();
+/** A fresh owner, or `exactName` when a test needs to register one name twice. */
+async function setupOwner(label: string, exactName?: string) {
+    const name = exactName ?? `prov${label}${Date.now()}`.toLowerCase();
     let reg = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: name, display_name: 'Prov', password: 'Provenance1234' }) });
     for (let i = 0; reg.status === 429 && i < 8; i++) {
         await new Promise(r => setTimeout(r, 1500));
@@ -997,6 +1001,41 @@ async function startStub(): Promise<void> {
             body: JSON.stringify({ targetType: 'app', targetId: `${a.name}/some-app.html`, reason: 'undisclosed_ai' }),
         });
         assert(r.status === 201, `app flag ${r.status}: ${JSON.stringify(r.body?.error)}`);
+    });
+
+    // ── 13. Erasure: a name registered again holds none of the records ──
+    // A record outlives its account, because it answers "which model made these bytes" for content
+    // that can outlive it. A deleted username is released for reuse, and the owner's list, the owner
+    // view and the owner's hash lookup key on `name@node`, so the next person to register the name
+    // read the previous person's records as their own (secaudit 2026-09: A8-4).
+    await test('A name registered again after its owner deleted the account holds none of their provenance records', async () => {
+        const first = await setupOwner('erase');
+        const text = `Words an erased owner declared, ${Date.now()}.`;
+        const decl = await json('/v1/provenance', {
+            method: 'POST', headers: auth(first.token),
+            body: JSON.stringify({ level: 'ai-generated', humanInvolvement: 'none', content: text, generator: { model: 'some/model' } }),
+        });
+        assert(decl.status === 201, `declare ${decl.status}: ${JSON.stringify(decl.body?.error)}`);
+        const id = decl.body.data.id as string;
+        const before = await json('/v1/ai-transparency/mine', { headers: auth(first.token) });
+        assert((before.body.data?.recent?.items ?? []).some((i: any) => i.id === id), 'the owner lists their own record before the erasure');
+
+        const del = await json(`/v1/owners/${first.name}`, { method: 'DELETE', headers: auth(first.token) });
+        assert(del.status === 200, `delete ${del.status}: ${JSON.stringify(del.body?.error)}`);
+        const again = await setupOwner('erase', first.name);
+
+        const mine = await json('/v1/ai-transparency/mine', { headers: auth(again.token) });
+        const view = await json(`/v1/provenance/${id}`, { headers: auth(again.token) });
+        const byHash = await json(`/v1/provenance/by-hash/${sha256(text).replace('sha256:', '')}`, { headers: auth(again.token) });
+        await json(`/v1/owners/${again.name}`, { method: 'DELETE', headers: auth(again.token) });
+
+        assert(mine.status === 200, `mine ${mine.status}`);
+        assert(!(mine.body.data.recent.items ?? []).some((i: any) => i.id === id),
+            `the new account lists the previous person's record: ${JSON.stringify(mine.body.data.recent.items)}`);
+        assert(mine.body.data.recent.total === 0, `the new account holds records it never made: ${mine.body.data.recent.total}`);
+        assert(view.status === 404, `the new account opened the previous person's record: ${view.status}`);
+        assert(byHash.status === 200 && byHash.body.data.count === 0,
+            `the hash lookup handed the new account the old record: ${JSON.stringify(byHash.body.data ?? byHash.body.error)}`);
     });
 
     // LAST, deliberately: this exhausts a 60-per-minute IP bucket, and every anonymous by-hash

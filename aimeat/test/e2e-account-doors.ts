@@ -22,8 +22,11 @@
  *   Phase 9  POST /v1/agents refusals, platform detection, GET /v1/agents/verify
  *   Phase 10 POST /v1/agents/connect (connectivity key)
  *   Phase 11 401 and 403 on every door
+ *   Phase 12 erasure: a name registered again inherits no action published in person
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-account-doors
  * @version-history
+ *   v1.2.0 — 2026-09-26 — 55: a name registered again after its owner deleted the account holds
+ *     none of the actions they published in person (secaudit 2026-09: N6).
  *   v1.1.0 — 2026-09-24 — 0a: the owner names the node writes under are refused on both
  *     registration doors. 22b: only the porting path writes `__redirect__`; the owner, an agent and
  *     a PUT over the ported pointer are refused, and the owner's own address forwards nobody.
@@ -886,6 +889,49 @@ await test('54. The operator sees nothing of A\'s agents through another owner\'
     // the operator role is not a way into somebody else's fleet through these names.
     const r = await json(`/v1/agents/${agentA.name}/cors`, { headers: auth(OP.token) });
     assert(r.status === 404, `the operator's own fleet has no such agent, got ${r.status}`);
+});
+
+// ─── Phase 12 — erasure ───
+// A deleted username is released for reuse. An owner who publishes an action in person stores it
+// under the bare account name, and the deletion cascade walked only the GHII and the agents, so the
+// action outlived the account and the next holder of the name could change or delete it
+// (secaudit 2026-09: N6).
+console.log('Phase 12 — erasure');
+
+await test('55. A name registered again after its owner deleted the account holds none of the actions they published in person', async () => {
+    const first = await setupOwner('erase');
+    const actionId = `acctdoor-erase-${Date.now().toString(36)}`;
+    const pub = await json('/v1/actions', {
+        method: 'POST', headers: auth(first.token),
+        body: JSON.stringify({
+            id: actionId, display_name: 'Published in person', description: 'An action its owner published without an agent.',
+            // The search matches a tag, not the id, so the id is a tag as well.
+            input_schema: { type: 'object' }, output_schema: { type: 'object' }, pricing: { base_morsels: 0 }, tags: ['test', actionId],
+        }),
+    });
+    assert(pub.status === 201, `publish ${pub.status}: ${JSON.stringify(pub.body?.error)}`);
+    const found = await json(`/v1/actions?q=${encodeURIComponent(actionId)}`);
+    assert((found.body.data?.actions ?? []).some((a: any) => a.id === actionId), 'the search finds the action before the erasure');
+    const del = await json(`/v1/owners/${first.name}`, { method: 'DELETE', headers: auth(first.token) });
+    assert(del.status === 200, `delete ${del.status}: ${JSON.stringify(del.body?.error)}`);
+
+    const listed = await json(`/v1/actions?q=${encodeURIComponent(actionId)}`);
+    const survivors = (listed.body.data?.actions ?? []).filter((a: any) => a.id === actionId);
+
+    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: first.name, public_key: 'placeholder' }) });
+    assert(reg.status === 201, `register the freed name again: ${reg.status} ${JSON.stringify(reg.body?.error)}`);
+    const ts = new Date().toISOString();
+    const tok = await json('/v1/auth/token', {
+        method: 'POST',
+        body: JSON.stringify({ owner: first.name, timestamp: ts, signature: await signMsg(reg.body.data.private_key, first.name + NODE_ID + ts) }),
+    });
+    assert(tok.body.ok === true, `token for the new account: ${JSON.stringify(tok.body?.error)}`);
+    // On an unfixed node this call is the new account deleting the previous person's action.
+    const reach = await json(`/v1/actions/${encodeURIComponent(actionId)}`, { method: 'DELETE', headers: auth(tok.body.data.token) });
+    await json(`/v1/owners/${first.name}`, { method: 'DELETE', headers: auth(tok.body.data.token) });
+
+    assert(survivors.length === 0, `the action outlived its owner's account: ${JSON.stringify(survivors)}`);
+    assert(reach.status === 404, `the new account reached the previous person's action: ${reach.status}`);
 });
 
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total`);

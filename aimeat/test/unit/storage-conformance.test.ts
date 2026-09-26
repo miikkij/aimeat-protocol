@@ -20,6 +20,9 @@
  *   - the cases: delete cascade, transaction lookup, memory listing order, push subscriptions
  * @usage cd aimeat && pnpm exec vitest run test/unit/storage-conformance.test.ts
  * @version-history
+ *   v1.5.0 -- 2026-09-26 -- deleteOwner leaves nothing a new account under the same name inherits:
+ *     an action published under the bare name goes, and a kept AI provenance record names the
+ *     erasure's pseudonym instead of the person (secaudit 2026-09: A8-4, N6).
  *   v1.4.0 -- 2026-09-07 -- Fail on a configured Postgres connection error; CI requires both providers.
  *   v1.3.0 — 2026-09-04 — Six tables join the seed and the cascade check: memory version history,
  *     the owner's agent defaults, the two usage tables, group shares and the ecosystem-app handshake.
@@ -176,6 +179,41 @@ async function seedOwner(s: Storage, name: string): Promise<{ ghii: string; gaii
     return { ghii, gaii, groupId };
 }
 
+/**
+ * One owner with an agent, an action published in person under the bare account name (what an owner
+ * session stores: its raw `sub`), one published by the agent, two AI provenance records of theirs
+ * and one of a stranger's.
+ */
+async function seedErasable(s: Storage) {
+    const owner = `confer${Date.now()}${Math.floor(Math.random() * 1000)}`;
+    const node = 'aimeat-conformance-001';
+    const ghii = `${owner}@${node}`;
+    const gaii = `bot#${owner}@${node}`;
+    const stranger = `confstranger${Date.now()}${Math.floor(Math.random() * 1000)}@${node}`;
+    const now = new Date().toISOString();
+    await s.createOwner({ name: owner, displayName: owner, publicKey: 'pk', roles: ['owner'], createdAt: now });
+    await s.createGHII({
+        username: owner, nodeId: node, ghii, displayName: owner, verificationLevel: 0,
+        ownerName: owner, totpEnabled: false, morselBalance: 0, loginCount: 0, createdAt: now, updatedAt: now,
+    });
+    await s.createAgent({
+        name: 'bot', owner, gaii, publicKey: 'pk', trustScore: 50, morselBalance: 0,
+        capabilities: [], createdAt: now, lastSeen: now,
+    });
+    for (const [id, providerGaii] of [['conf-in-person', owner], ['conf-by-agent', gaii]]) {
+        await s.createAction({
+            id, providerGaii, displayName: id, description: 'conformance', inputSchema: {}, outputSchema: {},
+            pricing: { baseMorsels: 0 }, tags: [], createdAt: now, updatedAt: now,
+        });
+    }
+    const statement = { spec: 'aimeat.provenance/v1', level: 'ai-generated', humanInvolvement: 'none', generatedAt: now } as const;
+    const ids = { own: randomUUID(), agent: randomUUID(), stranger: randomUUID() };
+    for (const [id, ownerGhii, principal] of [[ids.own, ghii, ghii], [ids.agent, ghii, gaii], [ids.stranger, stranger, stranger]]) {
+        await s.createAiProvenance({ id, ownerGhii, principal, contentHash: null, generatedAt: now, createdAt: now, record: statement });
+    }
+    return { owner, ghii, gaii, stranger, ids, statement };
+}
+
 /** Everything the cascade must leave empty, read back through the Storage interface. */
 async function leftovers(s: Storage, owner: string, ghii: string, _gaii: string) {
     return {
@@ -226,6 +264,38 @@ describe('storage providers agree on what they do, not just on their signatures'
             for (const [field, value] of Object.entries(r)) {
                 expect(value, `${name}: ${field} survived the delete`).toBe(field === 'ghii' ? false : 0);
             }
+        }
+    }, 60_000);
+
+    // A deleted username is released for reuse. Two kinds of row outlived an erasure under a
+    // coordinate the next holder of the name gets: an action the owner published in person, which is
+    // stored under the bare name the cascade did not walk, and an AI provenance record, which is kept
+    // on purpose and named `name@node` as its owner (secaudit 2026-09: A8-4, N6). Soft assertions, so
+    // every provider reports its own result rather than the first failure hiding the second.
+    it('deleteOwner takes the actions the owner published in person, under the bare name', async () => {
+        for (const { name, storage } of provs) {
+            const p = await seedErasable(storage);
+            await storage.deleteOwner(p.owner);
+            expect.soft(await storage.listActionsByProvider(p.owner), `${name}: the action published in person survived`).toEqual([]);
+            expect.soft(await storage.listActionsByProvider(p.gaii), `${name}: the agent's action survived`).toEqual([]);
+        }
+    }, 60_000);
+
+    it('deleteOwner keeps the AI provenance records and takes the name out of them', async () => {
+        const erased = /^erased:[0-9a-f]{24}$/;
+        for (const { name, storage } of provs) {
+            const p = await seedErasable(storage);
+            await storage.deleteOwner(p.owner);
+            const kept = [await storage.getAiProvenance(p.ids.own), await storage.getAiProvenance(p.ids.agent)];
+            for (const row of kept) {
+                expect.soft(row, `${name}: a provenance record outlives the account`).toBeDefined();
+                expect.soft(row?.ownerGhii, `${name}: the kept record still names its owner`).toMatch(erased);
+                expect.soft(row?.principal, `${name}: the kept record still names its principal`).toMatch(erased);
+                expect.soft(row?.record, `${name}: the statement itself is kept as it was`).toEqual(p.statement);
+            }
+            expect.soft(kept[0]?.ownerGhii, `${name}: one pseudonym for the whole erasure`).toBe(kept[1]?.ownerGhii);
+            expect.soft((await storage.listAiProvenance({ ownerGhii: p.ghii })).total, `${name}: the freed name still lists the records`).toBe(0);
+            expect.soft((await storage.getAiProvenance(p.ids.stranger))?.ownerGhii, `${name}: somebody else's record changed`).toBe(p.stranger);
         }
     }, 60_000);
 

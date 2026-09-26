@@ -28,9 +28,14 @@
  * @structure
  *   - cascadeDeleteIdentityData(db, gaii) — every owner-scoped table for ONE identity (GHII or GAII)
  *   - pseudonymisePurchasePartiesDb(db, name, ghiis, pseudonym) — the kept receipts, without the name
+ *   - pseudonymiseProvenanceOwnerDb(db, name, ghiis, pseudonym) — the kept AI provenance, without it
  *   - deleteOwnerCascade(db, name) — agents + GHIIs through the cascade, then the owner-level tables
  * @usage Called by identityMethods.deleteOwner inside one db.transaction().
  * @version-history
+ *   v1.5.0 — 2026-09-26 — deleteOwnerCascade deletes the actions the owner published in person, stored
+ *     under the bare account name, and pseudonymiseProvenanceOwnerDb rewrites the owner and principal
+ *     of the kept AI provenance records to the erasure's pseudonym. A freed name inherits neither
+ *     (secaudit 2026-09: A8-4, N6).
  *   v1.4.0 — 2026-09-24 — pseudonymisePurchasePartiesDb: the purchase receipts an erased person is a
  *     party to are kept for the other side's books and rewritten to a pseudonym no account can hold
  *     (audit A8-4). deleteOwnerCascade calls it.
@@ -218,6 +223,37 @@ export async function pseudonymisePurchasePartiesDb(
 }
 
 /**
+ * Take an erased person out of the two columns that say whose AI provenance record it is, and keep
+ * the record.
+ *
+ * A record outlives the account, because it answers "which model made these bytes" for content that
+ * can outlive it (the "AiProvenance" entry in security/storage-parity-exemptions.json). But the
+ * owner's list, the owner view, the owner's hash lookup and attaching a record to new content all
+ * key on `ownerGhii`, and a deleted username is released for reuse. So a record that kept
+ * `name@node` there belonged to whoever registered the name next. `ownerGhii` and `principal` become
+ * the erasure's pseudonym. The statement itself (`record`) stays as it was: it is what the readers of
+ * the content are owed, and no read decides access on it.
+ *
+ * `principal` can be the person's GHII, an agent or app acting for them (`…#name@node`), or the bare
+ * name an owner session once stored, so it is matched the way the purchase receipts match a party.
+ * Postgres LIKE escapes with a backslash by default, which is how partyIdentities escapes.
+ */
+export async function pseudonymiseProvenanceOwnerDb(
+  db: Db, name: string, ghiis: string[], pseudonym: string,
+): Promise<number> {
+  const { exact, suffixPatterns } = partyIdentities(name, ghiis);
+  const r = await db.updateTable('AiProvenance')
+    .set({ ownerGhii: pseudonym, principal: pseudonym })
+    .where(eb => eb.or([
+      eb('ownerGhii', 'in', exact),
+      eb('principal', 'in', exact),
+      ...suffixPatterns.map(p => eb('principal', 'like', p)),
+    ]))
+    .executeTakeFirst();
+  return Number(r?.numUpdatedRows ?? 0);
+}
+
+/**
  * Delete an owner and everything owner-scoped underneath. Runs every agent GAII and every GHII
  * through {@link cascadeDeleteIdentityData}, then clears the tables keyed by the owner NAME.
  * Returns true when an Owner row was actually removed.
@@ -231,6 +267,11 @@ export async function deleteOwnerCascade(db: Db, name: string): Promise<boolean>
   const ghiis = await db.selectFrom('Ghii').select('ghii').where('ownerName', '=', name).execute();
   for (const g of ghiis) await cascadeDeleteIdentityData(db, g.ghii);
 
+  // An action the owner published in person. It is stored under the bare account name (the owner
+  // session's raw `sub`), which neither pass above walks, and the name is released for reuse, so the
+  // next holder of the name could change or delete it.
+  await db.deleteFrom('Action').where('providerGaii', '=', name).execute();
+
   // What this person WROTE into somebody else's namespace is that other owner's record of who
   // touched their data, so it is pseudonymised rather than deleted — removing it would silently turn
   // their "four hands" into three. Runs before the GHII rows go, because the node id comes from one.
@@ -240,7 +281,11 @@ export async function deleteOwnerCascade(db: Db, name: string): Promise<boolean>
   // The purchase receipts this person is a party to stay, because each one is also the other side's
   // book entry. The name leaves them: it is released for reuse, and every purchase read keys on it.
   // One pseudonym for the whole erasure, so the books still see one party.
-  await pseudonymisePurchasePartiesDb(db, name, ghiis.map(g => g.ghii), erasedPartyPseudonym());
+  const pseudonym = erasedPartyPseudonym();
+  await pseudonymisePurchasePartiesDb(db, name, ghiis.map(g => g.ghii), pseudonym);
+  // The AI provenance records stay too, for the content that outlives the account. The name leaves
+  // the two columns every owner read keys on, under the same pseudonym.
+  await pseudonymiseProvenanceOwnerDb(db, name, ghiis.map(g => g.ghii), pseudonym);
 
   await db.deleteFrom('Ghii').where('ownerName', '=', name).execute();
 

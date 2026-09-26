@@ -10,9 +10,14 @@
  *   would take it away from the other one, so it stays (security/storage-parity-exemptions.json,
  *   "AppPurchase").
  *
+ *   An AI provenance record outlives its owner for a like reason: it answers "which model made these
+ *   bytes" for content that can outlive the account ("AiProvenance" in the same file).
+ *
  *   WHY THE NAME CANNOT STAY IN IT. A deleted username is released for reuse (decision 2026-08-10),
  *   and every purchase read keys on `name@node`. A receipt that kept the name therefore belonged to
  *   whoever registered that name next: the receipts, the paid content in them and a valid licence.
+ *   The owner's reads of a provenance record key on its `ownerGhii` in the same way, so a kept record
+ *   takes the same pseudonym there and in `principal`, and its statement stays as it was.
  *
  *   WHY A RANDOM TOKEN AND NOT A HASH OF THE NAME. A hash of the name gives the same value for the
  *   next person who holds that name, and anyone who guesses a name can compute it. A random token is
@@ -26,6 +31,8 @@
  *   import { erasedPartyPseudonym, partyIdentities } from '../../../erased-party.js';
  *   const { exact, suffixPatterns } = partyIdentities(name, ghiis);
  * @version-history
+ *   v1.1.0 — 2026-09-26 — The AI provenance records an erased person owns take the same pseudonym, in
+ *     both cascades (secaudit 2026-09: A8-4). No change to the rule itself.
  *   v1.0.0 — 2026-09-24 — Initial: the purchase receipts an erased buyer or seller is a party to
  *     (audit A8-4).
  */
