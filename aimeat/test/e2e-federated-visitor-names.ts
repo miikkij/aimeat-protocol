@@ -19,6 +19,8 @@
  *   peer door before the visitors sign in.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-federated-visitor-names
  * @version-history
+ *   v1.1.0 — 2026-09-26 — A visitor saves and starts no workflow here, whatever its scopes (secaudit
+ *     2026-09, A6-4).
  *   v1.0.0 — 2026-09-26 — Initial: a group's MCP server is attached and reached by its own members,
  *     never by a visitor named like one (secaudit 2026-09, a0ecb62eafb3).
  */
@@ -72,7 +74,7 @@ const homeNodeId = `aimeat-fake-home-vn-${stamp}`;
  *  need so that each case is refused for the name and not for a missing scope. */
 const VISITOR_SCOPES = [
     'memory:read', 'memory:write', 'catalogue:read', 'social:read', 'work:request', 'boards:read', 'social:write', 'boards:write',
-    'mcp:read', 'mcp:manage',
+    'mcp:read', 'mcp:manage', 'workflow:read', 'workflow:write',
 ];
 
 let homeKeys = { publicKey: '', privateKey: '' };
@@ -156,7 +158,7 @@ async function run() {
         const c = claims(visitorToken);
         assert(c.federated === true && c.owner === `${namesake}@${homeNodeId}` && JSON.stringify(c.roles) === '["federated"]',
             `the session this suite is about: ${JSON.stringify({ federated: c.federated, owner: c.owner, roles: c.roles })}`);
-        for (const scope of ['memory:write', 'mcp:manage']) {
+        for (const scope of ['memory:write', 'mcp:manage', 'workflow:write']) {
             assert((c.scopes ?? []).includes(scope), `the visitor needs ${scope} for the cases below: ${JSON.stringify(c.scopes)}`);
         }
 
@@ -199,6 +201,25 @@ async function run() {
         const hers = await json('/v1/mcp-servers', as(alice.token));
         assert(hers.status === 200 && JSON.stringify(hers.body.data ?? '').includes('teamwiki'),
             `positive control: the owner sees her group's server: ${hers.status} ${JSON.stringify(hers.body?.data ?? hers.body?.error).slice(0, 300)}`);
+    });
+
+    // ── Workflows (secaudit 2026-09, A6-4) ──
+    // A workflow is this node's own automation, stored and run under an account of this node. A
+    // visitor has no account here, so saving or starting one is refused at the door, whatever words
+    // the peer granted, before the body is read.
+    await test('A visitor cannot save or start a workflow here, whatever its scopes; the owner reaches the door', async () => {
+        const id = `vn-wf-${stamp}`;
+        for (const [who, token] of [['the visitor named like the owner', visitorToken], ['the control visitor', strangerToken]] as const) {
+            const save = await json(`/v1/workflows/${id}`, as(token, { method: 'PUT', body: JSON.stringify({}) }));
+            assert(save.status === 403 && save.body?.error?.code === 'FORBIDDEN',
+                `${who} reached the workflow save door: ${save.status} ${JSON.stringify(save.body?.error ?? save.body?.data).slice(0, 200)}`);
+            const start = await json(`/v1/workflows/${id}/run`, as(token, { method: 'POST', body: JSON.stringify({}) }));
+            assert(start.status === 403 && start.body?.error?.code === 'FORBIDDEN',
+                `${who} reached the workflow start door: ${start.status} ${JSON.stringify(start.body?.error ?? start.body?.data).slice(0, 200)}`);
+        }
+        // Positive control: the owner in person passes the door, and meets the body check behind it.
+        const own = await json(`/v1/workflows/${id}`, as(alice.token, { method: 'PUT', body: JSON.stringify({}) }));
+        assert(own.status === 400, `positive control: the owner's empty save is refused for its body, not at the door: ${own.status} ${JSON.stringify(own.body?.error).slice(0, 200)}`);
     });
 }
 

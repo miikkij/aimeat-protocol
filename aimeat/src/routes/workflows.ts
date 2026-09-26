@@ -28,6 +28,8 @@
  *   import { workflowsRouter } from './routes/workflows.js';
  *   app.use(workflowsRouter(config, storage));
  * @version-history
+ *   v1.6.1 — 2026-09-26 — PUT /:id and POST /:id/run take requireLocalSession(): a visitor signed in
+ *     from another node saves and starts no workflow here (secaudit 2026-09, A6-4).
  *   v1.6.0 — 2026-09-25 — A save records who saved it (the session's identity, and an app's grant),
  *     which a trigger's run answers to. POST /:id/runs/:runId/run-as-owner is "Run as me" on a
  *     refused trigger start, behind requireOwnerPrincipal. Deleting a workflow closes its open
@@ -58,7 +60,7 @@ import type { Storage } from '../storage/interface.js';
 import type { Scheduler } from '../services/scheduler.js';
 import type { WorkflowEngine } from '../services/workflow/engine.js';
 import { success, error } from '../middleware/envelope.js';
-import { requireAuth, requireScope, requireOwnerPrincipal } from '../auth/middleware.js';
+import { requireAuth, requireScope, requireOwnerPrincipal, requireLocalSession } from '../auth/middleware.js';
 import { denyScope403 } from '../auth/deny.js';
 import type { WorkflowCaller } from '../services/workflow/step-authority.js';
 import { runRefusedAsOwner, clearRefusal } from '../services/workflow/trigger-authority.js';
@@ -175,7 +177,9 @@ export function workflowsRouter(config: AimeatConfig, storage: Storage, schedule
   });
 
   // PUT /v1/workflows/:id — create or update (validated against the offer contract + DAG).
-  router.put('/v1/workflows/:id', requireAuth(), requireScope('workflow:write'), async (req: Request, res: Response) => {
+  // A visitor signed in from another node saves and starts nothing here: a workflow is this node's
+  // own automation, stored and run under an account of this node, and a visitor has none.
+  router.put('/v1/workflows/:id', requireAuth(), requireLocalSession(), requireScope('workflow:write'), async (req: Request, res: Response) => {
     const id = req.params.id as string;
     const createdBy = resolveIdentity(req.auth!, config.nodeId);
     const existed = !!(await getWorkflow(storage, ownerGhiiOf(req), id));
@@ -231,7 +235,7 @@ export function workflowsRouter(config: AimeatConfig, storage: Storage, schedule
   // POST /v1/workflows/:id/run — manual / test run.
   // body: { mode: 'signals-only'|'full', target?: 'sandbox'|'live' (full only), vars?: {} }.
   // full + target='sandbox' namespaces all keys under wf-test.<runId>. so it never clobbers prod.
-  router.post('/v1/workflows/:id/run', requireAuth(), requireScope('workflow:write'), async (req: Request, res: Response) => {
+  router.post('/v1/workflows/:id/run', requireAuth(), requireLocalSession(), requireScope('workflow:write'), async (req: Request, res: Response) => {
     const id = req.params.id as string;
     const mode = req.body?.mode === 'full'
       ? (req.body?.target === 'sandbox' ? 'full-sandbox' : 'full-live')
