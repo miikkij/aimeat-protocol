@@ -6,6 +6,8 @@
  *   version, ownership), drafts are consumed, an unchanged re-publish is change-guard skipped, and the
  *   route's authorization holds (non-member → 403, publish review gate → 409).
  * @version-history
+ *   v1.1.0 — 2026-09-26 — A record the batch refuses opens none of its embedded files, and the record
+ *     it publishes does (secaudit 2026-09, N1). Failed on the old code first.
  *   v1.0.0 — 2026-07-15 — Initial: batch publish happy path + parity-with-single + change-guard + auth.
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=organism-bulk-publish
@@ -132,6 +134,40 @@ await test('NO_DRAFT for an instance with no draft', async () => {
     const r = await json(`/v1/organisms/${orgId}/workspace/records/publish`, { method: 'POST', headers: authA(), body: JSON.stringify({ ws: WS, namespace: NS, instances: ['nope'] }) });
     assert(r.status === 200, `status ${r.status}`);
     assert(r.body.data.failed === 1 && r.body.data.results[0].code === 'NO_DRAFT', `expected NO_DRAFT, got ${JSON.stringify(r.body.data)}`);
+});
+
+// REFUSE BEFORE YOU WRITE (secaudit 2026-09, N1). Opening a document's embedded files to the
+// workspace's members is a write, and the batch publish did it for each record before asking that
+// record's own refusals: an append-only space refused the record, nothing was published, and its
+// file was already readable by every member.
+await test('A record the batch refuses opens none of its embedded files; the record it publishes does', async () => {
+    const LOG = 'shared.log';
+    const manifest = { manifestVersion: '1.0', id: orgId, name: 'WS', kind: 'project', status: 'active', objectTypes: [
+        { name: 'task', schemaRef: 'schema:task@1', namespace: NS, backing: 'memory', writeRole: 'member', cardinality: 'many', mode: 'records' },
+        { name: 'entry', schemaRef: 'schema:entry@1', namespace: LOG, backing: 'memory', writeRole: 'member', cardinality: 'many', mode: 'records', create_only: true },
+    ] };
+    // The setup wrote this manifest, so this write replaces it (200).
+    const mr = await json('/v1/memory', { method: 'POST', headers: authA(), body: JSON.stringify({ key: `${root()}.meta.manifest`, value: manifest, visibility: 'private' }) });
+    assert(mr.status === 200, `manifest ${mr.status}`);
+    const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+    const key = `img/bp-refused-${Date.now()}.png`;
+    const up = await json('/v1/storage', { method: 'POST', headers: authA(), body: JSON.stringify({ key, data: PNG, mime_type: 'image/png', visibility: 'private' }) });
+    assert(up.status === 201, `upload ${up.status}: ${JSON.stringify(up.body?.error)}`);
+    const visibility = async () => (await fetch(`${BASE}/v1/storage/${key}`, { method: 'HEAD', headers: authA() })).headers.get('x-aimeat-visibility');
+    assert(await visibility() === 'private', 'the file starts private');
+    const publish = (records: unknown[]) => json(`/v1/organisms/${orgId}/workspace/records/publish`, { method: 'POST', headers: authA(), body: JSON.stringify({ ws: WS, namespace: LOG, records }) });
+
+    const first = await publish([{ id: 'e1', value: { id: 'e1', title: 'First' } }]);
+    assert(first.status === 200 && first.body.data.published === 1, `first ${first.status} ${JSON.stringify(first.body.data ?? first.body.error)}`);
+    const embed = { title: 'Second', markdown: `# Second\n\n![x](/v1/storage/${key})` };
+    const refused = await publish([{ id: 'e1', value: { id: 'e1', ...embed } }]);
+    assert(refused.status === 200 && refused.body.data.failed === 1 && refused.body.data.published === 0, `the append-only space refused it: ${JSON.stringify(refused.body.data ?? refused.body.error)}`);
+    assert(await visibility() === 'private', `a record the batch refused opened its file: ${await visibility()}`);
+
+    // The record that lands is the one that opens it to the members.
+    const landed = await publish([{ id: 'e2', value: { id: 'e2', ...embed } }]);
+    assert(landed.status === 200 && landed.body.data.published === 1, `landed ${JSON.stringify(landed.body.data ?? landed.body.error)}`);
+    assert(await visibility() !== 'private', 'the record that landed scoped the file to the workspace');
 });
 
 await test('Missing namespace/instances → 400; non-member → 403', async () => {

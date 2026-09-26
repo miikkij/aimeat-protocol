@@ -8,6 +8,10 @@
  *   invitation gates, archive handler) that every organism route group shares; the module-level
  *   fresherRec/roleSatisfies are pure utilities the route handlers reference directly.
  * @version-history
+ *   v1.10.1 — 2026-09-26 — publishDraftsBatch opens a document's embedded files to the workspace only
+ *     for the records that passed their refusals, after the batch has written (secaudit 2026-09, N1).
+ *     It opened them while planning each record, so one the append-only, expected-version or schema
+ *     check then refused had already made its files readable by every member.
  *   v1.10.0 — 2026-09-24 — canReadWs, readWsManifests, readWsManifestValue and readShareMeta read the
  *     copy that counts (services/workspace-meta.ts), and both publish paths take the space's settings
  *     from it; the first copy the store returned, or the freshest, had decided who reads and what is shared.
@@ -317,6 +321,9 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
     const toUpsert: MemoryRecord[] = [];
     const toDelete: { ownerGaii: string; key: string }[] = [];
     const toEmit: Array<{ owner: string; key: string }> = [];
+    // The values of the records that passed every refusal, whose embedded files are opened to the
+    // workspace's members once the batch has written (see the loop).
+    const toScope: unknown[] = [];
     const results: Array<{ instance: string; ok: boolean; version?: number; skipped?: boolean; code?: 'NO_DRAFT' | 'INVALID'; violations?: unknown }> = [];
 
     for (const instance of instances) {
@@ -328,7 +335,11 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
         ? { value: direct.value, ownerGaii: publisher, visibility: (direct.visibility ?? 'owner') as MemoryRecord['visibility'], tags: [] as string[] }
         : items.filter(r => r.key === `${base}.draft`).reduce<MemoryRecord | null>((best, r) => fresherRec(best, r), null);
       if (!draft) { results.push({ instance, ok: false, code: 'NO_DRAFT' }); continue; }
-      const draftValue = await normalizeDocValueImages(storage, config, draft.value, ownerGhii.split('@')[0], ws ? `${organismId}/${ws}` : undefined);
+      // The URLs are rewritten with NO workspaceRef, so nothing is opened yet: passing it makes every
+      // embedded file readable by the workspace's members as a side effect, and this record's own
+      // refusals below (append-only, expected version, schema) can still refuse it. Opened after the
+      // batch has written, for the records that passed, as publishDraft does (N1).
+      const draftValue = await normalizeDocValueImages(storage, config, draft.value, ownerGhii.split('@')[0]);
       const expectedVersion = expectedVersions?.[instance] ?? null;
 
       const maxN = maxVersionOf(versionsByBase.get(base) ?? []);
@@ -340,6 +351,7 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
       // effect). Runs FIRST — a byte-identical write is never a guard conflict (mirrors checkWriteGuard).
       if (existingLatest && JSON.stringify(existingLatest.value) === JSON.stringify(draftValue)) {
         if (!direct) for (const d of draftCopies(items, base)) toDelete.push({ ownerGaii: d.ownerGaii, key: `${base}.draft` });
+        toScope.push(draftValue);
         results.push({ instance, ok: true, version: maxN, skipped: true });
         continue;
       }
@@ -382,6 +394,7 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
       // Consume the draft (none for a direct import) — EVERY copy of it, see draftCopies.
       if (!direct) for (const d of draftCopies(items, base)) toDelete.push({ ownerGaii: d.ownerGaii, key: `${base}.draft` });
       toEmit.push({ owner: latestOwner, key: `${base}.latest` });
+      toScope.push(draftValue);
       results.push({ instance, ok: true, version: n });
     }
 
@@ -397,6 +410,9 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
         if (toDelete.length) { if (storage.bulkDeleteMemory) await storage.bulkDeleteMemory(toDelete); else for (const r of toDelete) await storage.deleteMemory(r.ownerGaii, r.key); }
       });
     }
+    // Past every refusal and the write: the published documents' images may now be scoped to the
+    // members who can read them. A record the batch refused opens nothing.
+    if (ws) for (const v of toScope) await scopeDocImagesToWorkspace(storage, config, v, ownerGhii.split('@')[0], `${organismId}/${ws}`);
     // Fire Tracked-Response evaluation for each published record (gated O(1) in the subscriber).
     for (const e of toEmit) emitMemoryWritten(e.owner, e.key);
     return { results };
