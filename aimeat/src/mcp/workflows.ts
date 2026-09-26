@@ -11,6 +11,8 @@
  * @usage import { registerWorkflowTools } from './workflows.js';
  *   registerWorkflowTools(mcp, storage, config, () => agentGaii, scopes);
  * @version-history
+ *   v1.7.1 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts),
+ *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  *   v1.7.0 — 2026-09-25 — A save records this session's agent as the workflow's saver, and
  *     aimeat_workflow_get's recent runs carry `reason` when the node stopped or refused a run.
  *   v1.6.0 — 2026-09-25 — aimeat_workflow_save answers `warnings` when the definition set
@@ -38,7 +40,7 @@ import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 import { emitChange } from '../services/event-bus.js';
-import { parseGAII } from '../utils/gaii.js';
+import { localAccountName } from '../utils/gaii.js';
 import { getActiveScheduler } from '../services/scheduler.js';
 import { getActiveWorkflowEngine, HUMAN_TIMEOUT_MIN_DEFAULT } from '../services/workflow/engine.js';
 import {
@@ -55,7 +57,7 @@ export function registerWorkflowTools(
   sessionScopes: string[] = [],
 ): void {
   const agentGaii = getAgentGaii();
-  const owner = parseGAII(agentGaii)?.owner ?? '';
+  const owner = localAccountName(agentGaii);
   const ownerGhii = `${owner}@${config.nodeId}`;
   // This session answers for what a workflow's steps do, at save and at start, on the same words
   // the HTTP door asks (services/workflow/step-authority.ts). An MCP session is always an agent's,

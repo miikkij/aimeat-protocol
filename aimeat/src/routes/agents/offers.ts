@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description Agent offers routes (publish/read per-agent offers, owner aggregate feed, callable-offer invoke with settlement). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.6.2 — 2026-09-26 — Whether the caller owns the agent is asked with localAccountName
+ *     (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local
+ *     namesake (secaudit 2026-09, F-1).
  *   v1.6.1 — 2026-09-24 — …and whether the caller is the owner in person (callAuthority), so an app
  *     under a grant is never taken for its owner.
  *   v1.6.0 — 2026-09-24 — The offer invoke hands the capability service the session's scopes
@@ -32,7 +35,7 @@ import type { Storage } from '../../storage/interface.js';
 import { requireAuth, requireRole, requireScope } from '../../auth/middleware.js';
 import { callAuthority } from '../../auth/effective-scopes.js';
 import { success, error } from '../../middleware/envelope.js';
-import { buildGAII, resolveIdentity } from '../../utils/gaii.js';
+import { buildGAII, resolveIdentity, localAccountName } from '../../utils/gaii.js';
 import { emitChange } from '../../services/event-bus.js';
 import { OffersDocSchema, type Offer } from '../../models/offer-schemas.js';
 import { evaluateOfferPrereqs, offerHasPrereqs } from '../../services/offer-prereqs.js';
@@ -97,7 +100,7 @@ export function registerOffersRoutes(router: Router, config: AimeatConfig, stora
     const doc = (rec?.value as { version?: number; updatedAt?: string; offers?: Offer[] } | undefined) ?? {};
     const offers = doc.offers ?? [];
     const agent = await storage.getAgent(agentGaii);
-    const isOwnerOfAgent = !!agent && agent.owner === (owner.includes('@') ? owner.split('@')[0] : owner);
+    const isOwnerOfAgent = !!agent && agent.owner === localAccountName(owner);
     res.json(success(config.nodeId, {
       ...doc,
       offers: isOwnerOfAgent ? offers : offers.filter(o => o.visibility === 'public' || o.visibility === 'unlisted'),

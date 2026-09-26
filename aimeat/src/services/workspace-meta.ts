@@ -69,9 +69,11 @@
  *     are the additive space union and the meta write, moved out unchanged so the member change doors
  *     (services/workspace-member-changes.ts) add a space the way this path does. NOT_CREATOR names
  *     those doors.
+ *   v1.12.1 — 2026-09-26 — bareOwnerOf takes the account name from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  */
 import type { Storage, MemoryRecord, ArchiveFilter } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
+import { localAccountName } from '../utils/gaii.js';
 import { validateMemoryWrite } from './schema-validator.js';
 
 export class WorkspaceMetaError extends Error {
@@ -287,7 +289,7 @@ export interface WorkspaceRegistration {
 
 /** The bare owner behind a memory owner id: `agent#owner@node` and `owner@node` both give `owner`. */
 function bareOwnerOf(gaii: string): string {
-  return (gaii.includes('#') ? gaii.slice(gaii.indexOf('#') + 1) : gaii).split('@')[0];
+  return localAccountName(gaii);
 }
 
 /** The node an owner id belongs to: what follows its last `@`. */

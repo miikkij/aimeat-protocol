@@ -18,6 +18,7 @@
  *     .catch(err => logger.error('recordPublicActivity failed', { error: String(err) }));
  * @version-history
  *   v1.0.0 — 2026-06-16 — Initial: public landing activity feed (events + SSE).
+ *   v1.0.1 — 2026-09-26 — nameSegment takes an owner's account name from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  */
 import { randomUUID } from 'node:crypto';
 import type { Storage } from '../storage/interface.js';
@@ -25,6 +26,7 @@ import type { AimeatConfig } from '../config.js';
 import { emitPublicActivity } from './event-bus.js';
 import type { PublicActivityEvent } from './event-bus.js';
 import { logger } from '../utils/logger.js';
+import { localAccountName } from '../utils/gaii.js';
 
 export type PublicActivityCategory = PublicActivityEvent['category'];
 
@@ -38,7 +40,7 @@ const systemGhiiFor = (nodeId: string): string => `system@${nodeId}`;
 /** Reduce a GAII/GHII to its display name segment — never leak a full private path. */
 function nameSegment(identity: string): string {
   if (!identity) return '';
-  return identity.includes('#') ? identity.split('#')[0] : identity.split('@')[0];
+  return identity.includes('#') ? identity.split('#')[0] : localAccountName(identity);
 }
 
 export interface RecordPublicActivityInput {

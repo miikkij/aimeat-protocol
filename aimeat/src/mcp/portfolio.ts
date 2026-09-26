@@ -21,6 +21,8 @@
  * @structure registerPortfolioTools(mcp, storage, config, getAgentGaii)
  * @usage registerPortfolioTools(mcp, storage, config, getAgentGaii);
  * @version-history
+ *   v1.1.1 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts),
+ *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  *   v1.1.0 — 2026-09-03 — The answer names addresses this node serves. It used to hand back
  *     `/p/{owner}`, which no route has ever answered (404 on aimeat.io, measured 2026-09-03), so the
  *     one thing the person was told to look at was a dead link. Now `url` is the apex page and
@@ -32,7 +34,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { parseGAII } from '../utils/gaii.js';
+import { parseGAII, localAccountName } from '../utils/gaii.js';
 import { descriptionFor } from './catalog/shape.js';
 import { annotationsFor } from './annotations.js';
 import { portfolioWriteGaii, portfolioStandaloneUrl, writePortfolioHtml } from '../routes/portfolio.js';
@@ -66,8 +68,7 @@ export function registerPortfolioTools(
         },
         annotationsFor('aimeat_portfolio_publish'),
         async ({ html }): Promise<TextResult> => {
-            const parsed = parseGAII(getAgentGaii());
-            const owner = parsed?.owner;
+            const owner = parseGAII(getAgentGaii()) ? localAccountName(getAgentGaii()) : '';
             if (!owner) {
                 return out({ error: 'NO_OWNER', message: 'Could not resolve the owner from this session' }, true);
             }

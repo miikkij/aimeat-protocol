@@ -10,6 +10,8 @@
  *   import { registerPromptsTools } from './prompts.js';
  *   registerPromptsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.7.1 -- 2026-09-26 -- The caller's account name comes from localAccountName (utils/gaii.ts),
+ *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  *   2026-09-19 — aimeat_handbook_get serves the ATELIER specification in parts
  *     ("build-app-atelier", "build-app-atelier/<id>"). It had no MCP door at all, so a chat could
  *     not read the guide of the track a new app is built on.
@@ -52,7 +54,7 @@ import { buildAtelierPrompt } from '../services/build-atelier-prompt.js';
 import { atelierPieceIds } from '../services/build-atelier-layers.js';
 import { atelierPieceWithBook } from '../services/build-atelier-book.js';
 import { toolError } from './tool-error.js';
-import { parseGaiiLoose } from '../utils/gaii.js';
+import { parseGaiiLoose, localAccountName } from '../utils/gaii.js';
 import { V2_ROLES, toolsForSurface, type SurfaceRole } from './catalog/surfaces.js';
 
 export function registerPromptsTools(
@@ -84,7 +86,7 @@ export function registerPromptsTools(
             // baseline tasks opened with. A tier is still served when it is asked for by name.
             if (surface || !tier) {
                 const which: SurfaceRole = surface ?? (role === 'all' ? 'full' : role);
-                const ownerName = parseGaiiLoose(getAgentGaii()).owner || undefined;
+                const ownerName = localAccountName(getAgentGaii()) || undefined;
                 // The same guidance the handshake carried, for the agent that treats the handbook
                 // as its operating guide and re-reads it when a task is new to it. Appended to the
                 // markdown rather than to a managed prompt's `content`, which has to keep saying

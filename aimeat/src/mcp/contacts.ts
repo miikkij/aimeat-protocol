@@ -13,6 +13,8 @@
  *   aimeat_contact_list, aimeat_contact_add, aimeat_contact_remove, aimeat_contact_resolve_email.
  * @usage import { registerContactTools } from './contacts.js';
  * @version-history
+ *   v1.5.1 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts),
+ *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  *   v1.5.0 — 2026-09-26 — aimeat_contact_invite answers a refusal as `CODE: message` (toolError): an
  *     invitation counts as an address lookup (services/contact-invitations.ts), so over the account's
  *     allowance it reads RATE_LIMITED, as on REST (secaudit 2026-09, A5-2).
@@ -38,7 +40,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
-import { parseGaiiLoose } from '../utils/gaii.js';
+import { localAccountName } from '../utils/gaii.js';
 import {
     ContactsError, listContactsMerged, addContact, removeContact, parseContactInclude,
     type AddContactInput,
@@ -64,7 +66,7 @@ export function registerContactTools(
 ): void {
     /** Contacts belong to the OWNER — resolve the agent's owner GHII (never a client-supplied id). */
     const ownerGhii = (): string => {
-        const owner = parseGaiiLoose(getAgentGaii()).owner || getAgentGaii();
+        const owner = localAccountName(getAgentGaii());
         return owner.includes('@') ? owner : `${owner}@${config.nodeId}`;
     };
     const errText = (e: unknown): string =>
@@ -97,7 +99,7 @@ export function registerContactTools(
         annotationsFor('aimeat_contact_invite'),
         async ({ email, message }) => {
             try {
-                const inviterName = parseGaiiLoose(getAgentGaii()).owner || getAgentGaii().split('@')[0];
+                const inviterName = localAccountName(getAgentGaii());
                 const { invitation, acceptUrl, emailSent } = await createContactInvitation(storage, config, { inviterName, email, message: message ?? null });
                 return { content: [{ type: 'text' as const, text: JSON.stringify({ status: 'invited', invitation: invitePublic(invitation), email_sent: emailSent, accept_url: acceptUrl }, null, 2) }] };
             } catch (e) {

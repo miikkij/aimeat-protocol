@@ -14,13 +14,15 @@
  *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
  *     from shared annotations.ts for Connectors Directory compliance.
  *   v1.2.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
+ *   v1.2.1 -- 2026-09-26 -- The caller's account name comes from localAccountName (utils/gaii.ts),
+ *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { parseGaiiLoose } from '../utils/gaii.js';
+import { localAccountName } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 
@@ -46,9 +48,9 @@ export function registerWalletExtendedTools(
             const effectiveLimit = limit ?? 20;
 
             // Resolve to owner GHII — transactions are stored under GHII, not agent GAII
-            const parsed = parseGaiiLoose(agentGaii);
-            const ghiiRecord = await storage.getGHIIByOwner(parsed.owner);
-            const identity = ghiiRecord ? ghiiRecord.ghii : `${parsed.owner}@${config.nodeId}`;
+            const ownerName = localAccountName(agentGaii);
+            const ghiiRecord = await storage.getGHIIByOwner(ownerName);
+            const identity = ghiiRecord ? ghiiRecord.ghii : `${ownerName}@${config.nodeId}`;
 
             const transactions = await storage.getTransactions(identity, effectiveLimit);
 

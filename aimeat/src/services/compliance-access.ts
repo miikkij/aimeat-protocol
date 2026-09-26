@@ -30,6 +30,8 @@
  *   const refusal = await complianceRefusal(storage, { gaii, scopes }, COMPLIANCE_READ_SCOPE);
  *   if (refusal) return refuse(refusal);
  * @version-history
+ *   v1.2.1 — 2026-09-26 — The identity check names the account with localAccountName (utils/gaii.ts),
+ *     the one cut of an identity to an account name (secaudit 2026-09, F-1). Nothing it answers changed.
  *   v1.2.0 — 2026-09-24 — The decision is services/operator-principal.ts askOperator(), the one
  *     operator question every door asks; this file keeps its sentences. Nothing it answers changed.
  *   v1.1.0 — 2026-08-23 — SECURITY (audit AI-triage, invariant 13): the scope demand keys on the
@@ -38,7 +40,7 @@
  *   v1.0.0 — 2026-08-23 — BR-02, ring 1 (node-wide).
  */
 import type { Storage } from '../storage/interface.js';
-import { parseGAII } from '../utils/gaii.js';
+import { localAccountName } from '../utils/gaii.js';
 import { askOperator } from './operator-principal.js';
 
 export interface ComplianceCaller {
@@ -57,8 +59,7 @@ export interface ComplianceCaller {
 export async function complianceRefusal(
   storage: Storage, caller: ComplianceCaller, scope: string,
 ): Promise<string | null> {
-  const parsed = parseGAII(caller.gaii);
-  const ownerName = parsed?.owner ?? caller.gaii.split('@')[0];
+  const ownerName = localAccountName(caller.gaii);
   if (!ownerName) {
     return 'This is for whoever runs this installation, and this session has no identity to check.';
   }

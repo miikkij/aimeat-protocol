@@ -40,11 +40,12 @@
  *   v1.0.0 — 2026-06-15 — Created for B7 (approval gate) + B8 (deliver-advisory over the connector
  *     tunnel): drain the advisory outbox on automation-task completion, deliver or gate, and (for the
  *     gated path) park the payload on a pending key until the owner approves/rejects.
+ *   v1.0.1 — 2026-09-26 — The owner's account name comes from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  */
 import type { Storage, AgentTaskRecord, MemoryRecord, EcoAutomationRecipe } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
 import { getActiveConnectTunnelManager } from './connect-tunnel.js';
-import { buildGEAI } from '../utils/gaii.js';
+import { buildGEAI, localAccountName } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 
 /** The discriminator stored on an `advisory-delivery` pending record (so the approve route knows it). */
@@ -155,7 +156,7 @@ export async function processAutomationAdvisories(
 
     const app = auto.app;
     const ownerGhii = task.ownerGaii; // owner GHII (owner@node), set by materialiseAgentTask
-    const ownerName = ownerGhii.split('@')[0];
+    const ownerName = localAccountName(ownerGhii);
 
     // Load the recipe so requireApproval reflects the owner's CURRENT setting (the task's stamped value
     // is a snapshot; prefer the live recipe, fall back to the snapshot if the recipe is gone).

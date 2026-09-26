@@ -12,6 +12,8 @@
  * @structure registerDmMessageTools(mcp, storage, config, getAgentGaii, peers)
  * @usage import { registerDmMessageTools } from './dm-messages.js';
  * @version-history
+ *   v1.11.2 -- 2026-09-26 -- The caller's account name comes from localAccountName (utils/gaii.ts),
+ *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  *   v1.11.1 -- 2026-09-25 -- The comment on aimeat_dm_broadcast's isOperator: false states the rule the
  *     other tools apply now: an operator's agent counts as the operator only with operator:admin.
  *   v1.11.0 -- 2026-09-24 -- SECURITY (audit A5-3): the four send tools count against the account's
@@ -78,7 +80,7 @@ import type { DeliveryCtx } from '../services/message-delivery.js';
 import { MessageAttachmentInputSchema, InteractiveQuestionSchema } from '../models/message-schemas.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
-import { parseGaiiLoose } from '../utils/gaii.js';
+import { parseGaiiLoose, localAccountName } from '../utils/gaii.js';
 import { fileRefFor } from '../services/file-refs.js';
 import type { DirectMessageAttachment } from '../storage/interface.js';
 import { aiProvenanceInputs, toDeclaredProvenance } from './ai-provenance-input.js';
@@ -480,16 +482,15 @@ export function registerDmMessageTools(
         annotationsFor('aimeat_dm_delete_as_owner'),
         async ({ message_id }) => {
             const agentGaii = getAgentGaii();
-            const parsed = parseGaiiLoose(agentGaii);
             // The SAME service the REST door calls, so the two surfaces cannot come to different
             // answers about whose mailbox this is.
-            const gone = await deleteOwnerMessage(storage, { owner: parsed.owner }, config.nodeId, message_id);
+            const gone = await deleteOwnerMessage(storage, { owner: localAccountName(agentGaii) }, config.nodeId, message_id);
             if (!gone) {
                 return { isError: true, content: [{ type: 'text' as const, text: JSON.stringify({ error: "No such message in your owner's mailbox.", code: 'NOT_FOUND', message_id }) }] };
             }
             // Audit: an agent removed something from a person's mailbox, and there is no undo. The log
             // is the only durable record of which agent did it.
-            logger.info('dm deleted as owner (delegated)', { agent: agentGaii, owner: `${parsed.owner}@${config.nodeId}`, messageId: message_id });
+            logger.info('dm deleted as owner (delegated)', { agent: agentGaii, owner: `${localAccountName(agentGaii)}@${config.nodeId}`, messageId: message_id });
             return { content: [{ type: 'text' as const, text: JSON.stringify({ deleted: true, message_id }, null, 2) }] };
         },
     );

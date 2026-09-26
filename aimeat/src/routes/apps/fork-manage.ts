@@ -6,6 +6,9 @@
  *   PATCH /v1/apps/:filename (rename/access-code/parked/forkable/protection/cortex), DELETE /v1/apps/:filename.
  *   Extracted from src/routes/apps.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.6.3 — 2026-09-26 — The fork's source owner comes from localAccountName (utils/gaii.ts), which
+ *     keeps an identity of another node whole, so it never names the local namesake
+ *     (secaudit 2026-09, F-1).
  *   v1.6.2 — 2026-09-26 — The marks update is told the node's label policy, so the reviewer note
  *     says what the visible label does on this node.
  *   v1.6.1 — 2026-09-24 — PATCH asks the provenance scope a legal declaration needs before its first
@@ -41,7 +44,7 @@ import { requireAuth, requireScope } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
 import { forkApp, deleteOwnedApp } from '../../services/app-lifecycle.js';
-import { resolveIdentity, ownerGhiiOf } from '../../utils/gaii.js';
+import { resolveIdentity, ownerGhiiOf, localAccountName } from '../../utils/gaii.js';
 import { sanitizeProtection, invalidateProtectionCache } from '../../utils/app-protect.js';
 import { applyOwnerSeoUpdate, appSeoState, parseOwnerSeoInput } from '../../services/app-seo.js';
 import {
@@ -165,7 +168,7 @@ export function registerForkManageRoutes(
     router.post('/v1/apps/:owner/:filename/fork', requireAuth(), requireScope('app:write'), async (req, res) => {
         const sourceOwnerParam = req.params.owner as string;
         const sourceFilename = req.params.filename as string;
-        const sourceOwner = sourceOwnerParam.includes('@') ? sourceOwnerParam.split('@')[0] : sourceOwnerParam;
+        const sourceOwner = localAccountName(sourceOwnerParam);
 
         const body = req.body ?? {};
         const newFilename = typeof body.new_filename === 'string' ? body.new_filename.trim() : '';

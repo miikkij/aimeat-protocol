@@ -50,13 +50,14 @@
  *   v1.2.0 — 2026-09-13 — stageAppDraft removes the node's serve marks from a served copy before the
  *     slot is written (stripServedMarks, the function publishApp uses) and names them in
  *     servedMarksRemoved, so every draft door stores the source rather than the served page.
+ *   v1.2.1 — 2026-09-26 — resolveAppTargetScope takes the caller's account name from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  */
 import { randomBytes } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type {
   Storage, AppManifest, AppProtection, AppRecord, AppDraftRecord,
 } from '../storage/interface.js';
-import { parseGAII } from '../utils/gaii.js';
+import { parseGAII, localAccountName } from '../utils/gaii.js';
 import { resolveAppTarget, type AppDevAct } from './app-dev-grant.js';
 import { DesignBookReasons } from './design-book/reasons.js';
 import { logger } from '../utils/logger.js';
@@ -106,7 +107,7 @@ export async function resolveAppTargetScope(
   const parsed = parseGAII(input.principal);
   if (!parsed) return null;
   const t = await resolveAppTarget(storage, config, {
-    callerOwner: parsed.owner,
+    callerOwner: localAccountName(input.principal),
     requestedOwner: input.owner,
     filename: input.filename,
     act: input.act,

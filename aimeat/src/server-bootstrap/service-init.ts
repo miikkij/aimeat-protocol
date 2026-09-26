@@ -29,10 +29,12 @@
  *     (services/mail-read-consent.ts).
  *   v1.5.0 — 2026-09-25 — A persisted peer comes back with its own relay-claim setting and its last
  *     claimed and unclaimed relay times.
- *   v1.8.0 — 2026-09-26 — The comment at migrateMailReadConsent() says it tells owners about their
- *     agents too. No code changed here.
+ *   v1.8.2 — 2026-09-26 — normalizeAppOwnerNames gets this node's id and strips only its own suffix,
+ *     so a visitor's app is never folded into the local namesake's (secaudit 2026-09, A6-4).
  *   v1.8.1 — 2026-09-26 — The same comment: the agents' buttons let each agent read again, as the
  *     apps' do. No code changed here.
+ *   v1.8.0 — 2026-09-26 — The comment at migrateMailReadConsent() says it tells owners about their
+ *     agents too. No code changed here.
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage, MaintenanceState } from '../storage/interface.js';
@@ -262,8 +264,9 @@ export async function initializeServices(
   // Data hygiene: legacy publish paths stored app ownerName as the full GHII
   // (owner@node). The catalog "my apps" filter and the by-owner-name delete
   // sweep both key on the bare name, so those rows were stranded as
-  // unmanageable "community" apps. Normalize them to the bare owner name (idempotent).
-  storage.normalizeAppOwnerNames()
+  // unmanageable "community" apps. Normalize them to the bare owner name (idempotent). Only this
+  // node's own suffix is stripped: a visitor's home name stays whole, or it names the local namesake.
+  storage.normalizeAppOwnerNames(config.nodeId)
     .then(count => { if (count > 0) logger.info(`Normalized ${count} legacy app ownerName row(s) to bare owner names`); })
     // After ownerName is bare, fold any ownerGaii buckets the same owner forked
     // across identity forms (dashboard bare name vs MCP/PAT full GHII) into one

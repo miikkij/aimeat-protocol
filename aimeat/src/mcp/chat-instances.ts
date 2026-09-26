@@ -19,13 +19,15 @@
  *     It calls registerChatInstance (services/chat-instance-write.ts), the same write POST
  *     /v1/chat-instances uses, so the GHII check, the isAnonymous flag and the change event are
  *     decided once. The tool keeps its own text rendering.
+ *   v1.3.1 -- 2026-09-26 -- The caller's account name comes from localAccountName (utils/gaii.ts),
+ *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  */
 
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { parseGaiiLoose } from '../utils/gaii.js';
+import { localAccountName } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 import { registerChatInstance } from '../services/chat-instance-write.js';
@@ -42,7 +44,7 @@ export function registerChatInstancesTools(
 
     /** Resolve owner name from agent GAII */
     function ownerName(): string {
-        return parseGaiiLoose(agentGaii).owner;
+        return localAccountName(agentGaii);
     }
 
     // ── Resource: chat instance ──

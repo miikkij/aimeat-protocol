@@ -15,6 +15,8 @@
  *   owner: no owner role, and a name (its home GHII) that no local account can have.
  * @usage cd aimeat && pnpm exec vitest run test/unit/federated-principal.test.ts
  * @version-history
+ *   v1.2.0 — 2026-09-26 — localAccountOf: an account of this node, or none (secaudit 2026-09, F-1 as a
+ *     class).
  *   v1.1.0 — 2026-09-26 — localAccountName: this node's identities, another node's, and a visitor
  *     a route composed with this node's id (secaudit 2026-09, F-1 as a class).
  *   v1.0.0 — 2026-09-24 — Initial (secaudit 2026-09, root cause F-1).
@@ -31,7 +33,7 @@ vi.mock('../../src/utils/logger.js', () => ({
 import { initNodeKeys, issueJWT, verifyJWT, type VerifiedToken } from '../../src/auth/jwt.js';
 import { generateKeyPair } from '../../src/auth/keypair.js';
 import { isOwnerPrincipal, requireRole, requireScope } from '../../src/auth/middleware.js';
-import { homeIdentityOf, isForeignPrincipal, localAccountName, resolveIdentity, setThisNodeId } from '../../src/utils/gaii.js';
+import { homeIdentityOf, isForeignPrincipal, localAccountName, localAccountOf, resolveIdentity, setThisNodeId } from '../../src/utils/gaii.js';
 
 const NODE = 'aimeat-local-001-dev';
 const HOME = 'aimeat-peer-home-001';
@@ -169,5 +171,23 @@ describe('localAccountName', () => {
         // home GHII, so the composed name ends in this node. Cut at the first '@' it was the namesake.
         expect(localAccountName(`alice@${HOME}@${NODE}`)).toBe(`alice@${HOME}`);
         expect(localAccountName(`bot#alice@${HOME}@${NODE}`)).toBe(`alice@${HOME}`);
+    });
+});
+
+describe('localAccountOf', () => {
+    beforeAll(() => setThisNodeId(NODE));
+    afterAll(() => setThisNodeId(null));
+
+    it('names the account of an identity on this node', () => {
+        expect(localAccountOf('alice')).toBe('alice');
+        expect(localAccountOf(`alice@${NODE}`)).toBe('alice');
+        expect(localAccountOf(`bot#alice@${NODE}`)).toBe('alice');
+    });
+
+    it('names none for an identity of another node, composed or not, and none for nothing', () => {
+        expect(localAccountOf(`alice@${HOME}`)).toBeNull();
+        expect(localAccountOf(`bot#alice@${HOME}`)).toBeNull();
+        expect(localAccountOf(`alice@${HOME}@${NODE}`)).toBeNull();
+        expect(localAccountOf('')).toBeNull();
     });
 });

@@ -11,6 +11,9 @@
  *   - PUT /v1/admin/agents/:gaii/cors: refuse a missing agent, then services/cors-overview.ts setCorsList
  *
  * @version-history
+ *   v1.2.1 — 2026-09-26 — The app owner behind a grant comes from localAccountName (utils/gaii.ts),
+ *     which keeps an identity of another node whole, so it never names the local namesake
+ *     (secaudit 2026-09, F-1).
  *   v1.2.0 — 2026-09-08 — The agent CORS write goes through services/cors-overview.ts (setCorsList),
  *     the one implementation the aimeat_admin_cors_set tool calls too.
  *   v1.1.0 — 2026-08-18 — The operator can see what a principal MAY DO, not only that it exists.
@@ -29,6 +32,7 @@ import { success, error } from '../middleware/envelope.js';
 import { setCorsList } from '../services/cors-overview.js';
 import { parseAppScopes } from '../services/protected-resource.js';
 import { logger } from '../utils/logger.js';
+import { localAccountName } from '../utils/gaii.js';
 
 /**
  * What the app behind a grant target declares TODAY, or null when it declares nothing.
@@ -43,7 +47,7 @@ async function declaredScopesOfApp(storage: Storage, target: string): Promise<st
     if (slash <= 0 || slash === target.length - 1) return null;   // portfolio: or malformed
     const owner = target.slice(0, slash);
     const filename = target.slice(slash + 1);
-    const bare = owner.includes('@') ? owner.split('@')[0] : owner;
+    const bare = localAccountName(owner);
     const app = await storage.getAppByOwnerName(bare, filename).catch(err => {
         logger.warn('admin-agents: could not read the app behind a grant', { target, error: String(err) });
         return null;

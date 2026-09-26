@@ -18,6 +18,7 @@
  *   v1.2.0 -- 2026-07-10 -- Aggregate the per-creator workspace registry across all members
  *     (listOrganismWorkspaceEntries) — reading only the exporter's own record made exports empty
  *     for any exporter who didn't personally create the workspaces.
+ *   v1.2.1 -- 2026-09-26 -- The exporter's account name comes from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  */
 import { ZipArchive } from 'archiver';
 import type { Storage } from '../storage/interface.js';
@@ -25,6 +26,7 @@ import type { AimeatConfig } from '../config.js';
 import { collectWorkspace } from './workspace-export.js';
 import { listOrganismWorkspaceEntries } from './workspace-meta.js';
 import { logger } from '../utils/logger.js';
+import { localAccountName } from '../utils/gaii.js';
 
 export const ORG_EXPORT_VERSION = '1.0';
 
@@ -44,7 +46,7 @@ export async function exportOrganism(
   // SECURITY (C-5): an org manager (creator/admin) reads every workspace live, so their bundle
   // carries every workspace. For everyone else collectWorkspace decides per workspace and throws on
   // the ones they cannot read, which the loop below already skips.
-  const membership = await storage.getMembership(orgId, exporterGaii.split('@')[0].split('#').pop() ?? '');
+  const membership = await storage.getMembership(orgId, localAccountName(exporterGaii));
   const isOrgManager = membership?.status === 'active'
     && (membership.role === 'creator' || membership.role === 'admin');
 

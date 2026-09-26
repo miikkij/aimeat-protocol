@@ -19,6 +19,8 @@
  * @usage registerAccessTools(mcp, storage, config, agentGaii) — from mcp/register-all.ts
  * @version-history
  *   v1.0.0 — 2026-09-05 — Initial (design canvas "AIMEAT Pääsy-sivu", decision 8).
+ *   v1.0.1 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts),
+ *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { AimeatConfig } from '../config.js';
@@ -26,7 +28,7 @@ import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 import { createAccessTabService } from '../services/db/access-tab-db-service.js';
-import { ownerGhiiOf } from '../utils/gaii.js';
+import { ownerGhiiOf, localAccountName } from '../utils/gaii.js';
 
 export function registerAccessTools(
     mcp: McpServer,
@@ -40,7 +42,7 @@ export function registerAccessTools(
         // The human behind this session, whichever principal is speaking: the keys are the owner's,
         // and an agent asking about "my access" is asking about the account it acts within.
         const ownerGhii = ownerGhiiOf(getAgentGaii());
-        const ownerName = ownerGhii.split('@')[0];
+        const ownerName = localAccountName(ownerGhii);
         // No session id: a tool call is not one of the person's browser sessions, so nothing is
         // marked "current". The list still says how many are open and on which devices.
         const data = await accessDb.overview(ownerName, ownerGhii, undefined);

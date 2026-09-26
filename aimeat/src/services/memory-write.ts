@@ -29,6 +29,8 @@
  *   const out = await writeMemoryRecord({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   v1.9.1 — 2026-09-26 — The organism rule names the writer with localAccountName, so a visitor from
+ *     another node is never a member under the local namesake's name (secaudit 2026-09, A6-3).
  *   v1.9.0 — 2026-09-24 — RESERVED_KEY for a key only the node writes (`__redirect__`): refused for
  *     every principal and in every namespace, the owner and an agent's own included.
  *   v1.8.1 — 2026-09-24 — The federated test is isForeignPrincipal(), the one question (secaudit 2026-09, F-1).
@@ -88,7 +90,7 @@ import { logger } from '../utils/logger.js';
 import { recordMemoryTouch } from './data-map/write-tally-buffer.js';
 import { checkOrganismNamespaceAccess } from './organism-namespace-access.js';
 import { misdirectedCrewKey } from './crew-def-store.js';
-import { parseGAII, isForeignPrincipal } from '../utils/gaii.js';
+import { parseGAII, isForeignPrincipal, localAccountName } from '../utils/gaii.js';
 import { undeclaredSpaceForKey } from './workspace-write-items.js';
 import { odpsWriteRefusal } from './exchange-odps-write.js';
 import { isSecretRecordKey, secretRecordWriteRefusal } from './secret-records.js';
@@ -289,8 +291,10 @@ export async function writeMemoryRecord(
     //     workspace content, any active member rewrote the meta.* workspace registry that every
     //     access decision reads, and one member overwrote another's private member namespace.
     if (input.key.startsWith('organism.')) {
-        const ownerName = parseGAII(caller.principal)?.owner
-            ?? caller.principal.split('@')[0].split('#').pop() ?? '';
+        // The member is named by localAccountName: a principal of another node keeps its whole name,
+        // which is on no roll here, as the read and delete doors already pass it. It is never taken
+        // for the local account that shares its local part.
+        const ownerName = localAccountName(caller.principal);
         const refusal = await checkOrganismNamespaceAccess({ storage, config }, {
             principal: caller.principal, owner: ownerName, roles: caller.roles,
         }, input.key, 'write');

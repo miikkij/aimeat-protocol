@@ -25,12 +25,14 @@
  *     materialise an agent task per configured agent.
  *   v1.1.0 — 2026-06-15 — B5 organism routing: resolve the recipe organism, grant the agent access,
  *     and stamp the task with recipe provenance + organism + email/approval (consumed by B6).
+ *   v1.1.1 — 2026-09-26 — The writer's account comes from localAccountOf, so a write by a visitor from
+ *     another node fires no recipe of the local namesake (secaudit 2026-09, F-1).
  */
 import type { Storage, OrganismRecord } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
 import { globToRegExp } from './workflow/signal-eval.js';
 import { getActiveScheduler } from './scheduler.js';
-import { parseGaiiLoose, buildGAII } from '../utils/gaii.js';
+import { localAccountOf, buildGAII } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 
 /** A recipe's keyGlob matches a written key using the same glob grammar the event plane uses. */
@@ -122,7 +124,9 @@ export async function runAutomationRecipesForWrite(
   writerIdentity: string,
   key: string,
 ): Promise<void> {
-  const owner = parseGaiiLoose(writerIdentity).owner;
+  // The writer's account on this node. A writer from another node has none here, so its write fires
+  // no recipe of the local account that shares its name.
+  const owner = writerIdentity.includes('@') ? localAccountOf(writerIdentity) : null;
   if (!owner) return;
 
   let recipes;

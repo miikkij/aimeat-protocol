@@ -7,6 +7,7 @@
  *   Supports special @activate trigger: runs on extension activation AND every server startup.
  *   Every execution creates an ExecutionLogEntry with timing, result, and memory I/O.
  * @version-history
+ *   v2.15.1 — 2026-09-26 — notifyOwner takes the owner's account name from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  *   v2.15.0 — 2026-09-08 — Both places that materialise an agent task emit task_assigned on the
  *     connector tunnel. The comment above one of them already said "same channels a normally-created
  *     task uses" and that was not true: a webhook subscriber heard about a scheduled task and an
@@ -86,6 +87,7 @@ import { evaluateConstraints, applyAfterRun } from './schedule-constraints.js';
 import { emitChange, emitDelivery } from './event-bus.js';
 import { emitResourceUpdated } from '../mcp/resource-events.js';
 import { logger } from '../utils/logger.js';
+import { localAccountName } from '../utils/gaii.js';
 import { SlotPool } from './slot-pool.js';
 import { runExtensionJob } from './scheduler-extension-job.js';
 import { runAiJob, runWorkflowJob, runEcoCapabilityJob } from './scheduler-remote-jobs.js';
@@ -516,7 +518,7 @@ export class Scheduler {
   /** Send an owner push notification (best-effort; no-op if push disabled). */
   private notifyOwner(job: ScheduledJobRecord, title: string, body: string): void {
     if (!this.pushService?.enabled || !job.ownerScope) return;
-    const ownerName = job.ownerScope.split('@')[0];
+    const ownerName = localAccountName(job.ownerScope);
     const label = job.displayName || job.name;
     this.pushService.sendNotification(ownerName, {
       title,

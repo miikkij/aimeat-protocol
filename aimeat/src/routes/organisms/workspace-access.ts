@@ -6,6 +6,9 @@
  *   email invitations, provisioned-code ("key") invitations, and the PUBLIC invitation token flow.
  *   Extracted from src/routes/organisms.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.11.1 — 2026-09-26 — The grantee's account in the grant and revoke doors comes from
+ *     localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never
+ *     names the local namesake (secaudit 2026-09, F-1).
  *   v1.11.0 — 2026-09-25 — The access decision (grant or revoke, the record, the notification) and
  *     requestStatus move to services/workspace-access-decision.ts unchanged, so the MCP decide path
  *     records and tells the requester as this route does.
@@ -55,7 +58,7 @@ import type { Storage, MemoryRecord } from '../../storage/interface.js';
 import { success, error } from '../../middleware/envelope.js';
 import { requireAuth, requireRole, requireScope } from '../../auth/middleware.js';
 import { rateLimit } from '../../middleware/rate-limit.js';
-import { resolveIdentity, parseGaiiLoose, isSameOwner, validateOwnerName } from '../../utils/gaii.js';
+import { resolveIdentity, isSameOwner, validateOwnerName, localAccountName } from '../../utils/gaii.js';
 import { authorizeRead } from '../../services/access-guard.js';
 import { emitChange } from '../../services/event-bus.js';
 import { notify } from '../../services/notify.js';
@@ -361,7 +364,7 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
     }
     const createdBy = await requireWsManager(req, res, id, ws);
     if (!createdBy) return;
-    const granteeOwnerName = parseGaiiLoose(grantee).owner || grantee;
+    const granteeOwnerName = localAccountName(grantee);
     if (granteeOwnerName === createdBy) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'The creator already has full access to their workspace')); return; }
     await setWorkspaceRole(`${createdBy}@${config.nodeId}`, id, ws as string, grantee, role, 'grant', req.auth!.owner as string);
     await notify(storage, `${granteeOwnerName}@${config.nodeId}`, {
@@ -381,7 +384,7 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
     const createdBy = await requireWsManager(req, res, id, ws);
     if (!createdBy) return;
     const revoked = await revokeWorkspaceRole(`${createdBy}@${config.nodeId}`, id, ws as string, grantee);
-    res.json(success(config.nodeId, { ws, grantee: parseGaiiLoose(grantee).owner || grantee, revoked }));
+    res.json(success(config.nodeId, { ws, grantee: localAccountName(grantee), revoked }));
   });
 
   /* ══ Email invitations — invite people NOT yet in the system into this organism (+ workspaces) ══

@@ -30,13 +30,14 @@
  * @usage
  *   const report = await readAppVisitors(storage, { app, days: 30, geoAvailable: config.geoHeaders });
  * @version-history
+ *   v1.1.1 — 2026-09-26 — parseAppId takes the owner's account name from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  *   v1.1.0 — 2026-09-25 — Reads a day whose visitors were folded after thirteen months: its opens stay
  *     signed-in, and its people are added from the count the fold kept.
  *   v1.0.0 — 2026-09-18 — Initial: the Visitors section of the App Catalog and its two MCP tools.
  */
 import type { Storage, AppRecord } from '../storage/interface.js';
 import { USAGE_FOLDED_VISITOR } from '../storage/interface.js';
-import { ownerGhiiOf } from '../utils/gaii.js';
+import { ownerGhiiOf, localAccountName } from '../utils/gaii.js';
 import { queryUsageRollupLive, usageComputedThrough, dayNDaysAgo } from './usage/usage-read.js';
 import { pageStreamId } from './signals/page-views.js';
 import { getStream, saveStream, readReport, type SignalReport } from './signals/signal-service.js';
@@ -124,7 +125,7 @@ export function parseAppId(appId: string): AppRef | null {
   const slash = appId.indexOf('/');
   if (slash <= 0 || slash === appId.length - 1) return null;
   const owner = appId.slice(0, slash);
-  return { owner: owner.includes('@') ? owner.split('@')[0] : owner, filename: appId.slice(slash + 1) };
+  return { owner: localAccountName(owner), filename: appId.slice(slash + 1) };
 }
 
 async function loadApp(storage: Storage, ref: AppRef): Promise<AppRecord> {

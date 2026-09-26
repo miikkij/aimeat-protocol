@@ -20,6 +20,9 @@
  * @structure registerAppIconRoutes() — GET and POST /v1/apps/:owner/:filename/icon
  * @usage registerAppIconRoutes(router, config, storage, appTarget); // from appsRouter
  * @version-history
+ *   v1.1.2 — 2026-09-26 — The owner segment is read with localAccountName (utils/gaii.ts), which
+ *     keeps an identity of another node whole, so it never names the local namesake
+ *     (secaudit 2026-09, F-1).
  *   v1.1.1 — 2026-09-24 — The refusal names the five pictures raster-image.ts accepts.
  *   v1.1.0 — 2026-09-24 — GET serves the icon only when its bytes are a PNG, JPEG or WebP image,
  *     typed by the bytes rather than by the stored label, and answers 404 otherwise (A7-2). The key
@@ -35,6 +38,7 @@ import { emitChange } from '../../services/event-bus.js';
 import { decodeStrictBase64 } from '../../utils/base64.js';
 import { setStoredImageHeaders } from '../../utils/file-download-headers.js';
 import { appIconKey } from '../../services/app-seo.js';
+import { localAccountName } from '../../utils/gaii.js';
 import { appTargetOr, type AppTargetFor } from './helpers.js';
 
 /** Defence in depth against a traversal in the filename segment, as every app route applies it. */
@@ -47,7 +51,7 @@ function badFilename(filename: string): boolean {
 }
 
 /** Tolerate the legacy full-GHII owner segment (owner@node) in old links. */
-const bareOwner = (segment: string): string => (segment.includes('@') ? segment.split('@')[0] : segment);
+const bareOwner = (segment: string): string => localAccountName(segment);
 
 /** The app's filename without `.html`, for the name a saved picture gets. */
 const pictureName = (filename: string): string => filename.replace(/\.html?$/i, '') || 'app';

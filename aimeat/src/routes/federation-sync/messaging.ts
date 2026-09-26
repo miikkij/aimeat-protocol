@@ -5,6 +5,9 @@
  * @description Federation messaging + memory-replication routes — signed peer replicate, human↔human
  *   direct message, operator broadcast, delivery/read receipt, and attachment download grant. Extracted from federation-sync.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.3.1 — 2026-09-26 — The recipient's account comes from localAccountName (utils/gaii.ts), which
+ *     keeps an identity of another node whole, so it never names the local namesake
+ *     (secaudit 2026-09, F-1).
  *   v1.3.0 — 2026-09-06 — A federated announcement carries its title: the peer's `subject` is bounded
  *     and stored, and a titled one opens a thread of its own rather than being buried in the pair
  *     thread under whatever that was already called.
@@ -35,7 +38,7 @@ import { verify } from '../../auth/keypair.js';
 import { emitChange, emitDelivery } from '../../services/event-bus.js';
 import { emitResourceUpdated } from '../../mcp/index.js';
 import { notify } from '../../services/notify.js';
-import { parseGaiiLoose, isSameOwner } from '../../utils/gaii.js';
+import { parseGaiiLoose, isSameOwner, localAccountName } from '../../utils/gaii.js';
 import { messagePreview, conversationIdFor, deliveryTargetFor } from '../../utils/messaging.js';
 import { isAliasAddress, receiveRemoteSupportMessage } from '../../services/message-alias.js';
 import { listOperatorGhiis } from '../../services/operators.js';
@@ -242,7 +245,7 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Recipient is not hosted on this node'));
             return;
         }
-        const ownerRec = await storage.getOwner(parsedDelivery.owner);
+        const ownerRec = await storage.getOwner(localAccountName(deliveryGhii));
         if (!ownerRec) {
             res.status(404).json(error(config.nodeId, 'RECIPIENT_NOT_FOUND', `No such recipient: ${deliveryGhii}`));
             return;

@@ -41,6 +41,7 @@
  *   await reconcileOwnerOfferings(storage, ownerGhii, { appId: 'prh.html' });
  *   res.json({ ..., exchange: exchangeOutcome(await reconcileAfterSourceWrite(storage, gaii, key), ask) });
  * @version-history
+ *   v1.6.1 — 2026-09-26 — The owner's account name comes from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1). ownerGhiiOf hands over to the one in utils/gaii.ts rather than keep a copy.
  *   v1.6.0 — 2026-09-13 — List once, as the developer decided: when a flagged app-tool binds a flagged
  *     extension action without lockedInput, only the tool is listed and the action is skipped with
  *     DUPLICATE_OF {app}/{tool} (a listing it had is delisted; its contracts keep their price). Tools of
@@ -74,6 +75,7 @@ import { mergeOdpsExtras, mergeProvenance, inheritAiProvenance, offeringOdpsOver
 import { hasSchema, usageTermsOf, provenanceOf, moneyPricesOf, contentHash, prices, pacingTollOf } from './exchange-source-terms.js';
 import type { ReconcileChange, ReconcileReport, DesiredListing } from './exchange-projection-types.js';
 import { logger } from '../utils/logger.js';
+import { ownerGhiiOf as ownerGhiiOfPrincipal, localAccountName } from '../utils/gaii.js';
 
 export type { ReconcileChange, ReconcileReport } from './exchange-projection-types.js';
 
@@ -89,9 +91,7 @@ const offeringKey = (o: Offering): string => listingKey(o.kind, o.ext, o.action,
  * to trigger the reconcile.
  */
 export function ownerGhiiOf(principal: string): string {
-  const [namePart, host] = principal.split('@');
-  const owner = namePart.includes('#') ? namePart.split('#').pop()! : namePart;
-  return host ? `${owner}@${host}` : owner;
+  return ownerGhiiOfPrincipal(principal);
 }
 
 // ── SOURCE → DESIRED LISTINGS ────────────────────────────────────────────────
@@ -314,7 +314,7 @@ export async function reconcileOwnerOfferings(
      unwanted — one agent browsing the market would delist the lot. The write path already
      normalised; the browse path did not, and one asymmetry was enough. */
   const ownerGhii = ownerGhiiOf(principal);
-  const ownerName = ownerGhii.split('@')[0].split('#').pop() ?? ownerGhii;
+  const ownerName = localAccountName(ownerGhii);
   const scoped = !!(opts?.appId || opts?.extName || opts?.agentName);
   const changes: ReconcileChange[] = [];
 
@@ -692,7 +692,7 @@ export async function migrateLegacyOfferings(
   storage: Storage, ownerGhii: string, opts?: { dryRun?: boolean },
 ): Promise<ReconcileReport & { orphans: string[]; flagged: string[] }> {
   const dryRun = opts?.dryRun === true;
-  const ownerName = ownerGhii.split('@')[0].split('#').pop() ?? ownerGhii;
+  const ownerName = localAccountName(ownerGhii);
   const legacy = (await listAllOfferings(storage)).filter(o => o.providerOwner === ownerName && o.state === 'listed' && !o.auto);
   const orphans: string[] = []; const flagged: string[] = [];
 

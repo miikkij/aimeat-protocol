@@ -14,6 +14,8 @@
  *   import { buildAppdevOverview } from '../services/appdev-overview.js';
  *   const overview = await buildAppdevOverview(storage, config, identity, { model, sections });
  * @version-history
+ *   v1.3.1 — 2026-09-26 — ownerOf() names the caller's account with localAccountOf, so a visitor from
+ *     another node has no owner here instead of the local namesake's (secaudit 2026-09, A3-1).
  *   v1.3.0 — 2026-09-13 — The learned-pitfall section lists every active entry the caller can read,
  *     own and shared by other owners, critical first; `model` orders it and marks `same_model`
  *     instead of filtering to the entries that model wrote. The drill-down names the doors that can
@@ -35,7 +37,7 @@
 
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { parseGAII } from '../utils/gaii.js';
+import { isGEAI, localAccountOf } from '../utils/gaii.js';
 import { getLibraryPacks } from '../data/library-packs.js';
 import { getAppTemplateIndex } from '../data/app-templates.js';
 import { getAppdevPitfallIndex, getAppdevPitfallFacets } from '../data/appdev-pitfalls.js';
@@ -66,14 +68,14 @@ function capped<T>(items: T[]): { items: T[]; total: number; truncated: boolean 
     return { items: items.slice(0, CAP), total: items.length, truncated: items.length > CAP };
 }
 
-/** Resolve the caller (GHII or GAII) to its owner name + owner GHII. */
+/**
+ * Resolve the caller (GHII or GAII) to its owner name + owner GHII. An ecosystem app has no owner
+ * here, as before, and neither has an identity of another node: a visitor sees its own, never the
+ * local namesake's apps, skills and pitfalls.
+ */
 function ownerOf(callerGaii: string, config: AimeatConfig): { owner: string | null; ownerGhii: string } {
-    const parsed = parseGAII(callerGaii);
-    if (parsed?.owner) return { owner: parsed.owner, ownerGhii: `${parsed.owner}@${config.nodeId}` };
-    if (callerGaii.includes('@') && !callerGaii.includes('#')) {
-        return { owner: callerGaii.split('@')[0], ownerGhii: callerGaii };
-    }
-    return { owner: null, ownerGhii: callerGaii };
+    const owner = isGEAI(callerGaii) ? null : localAccountOf(callerGaii);
+    return owner ? { owner, ownerGhii: `${owner}@${config.nodeId}` } : { owner: null, ownerGhii: callerGaii };
 }
 
 export async function buildAppdevOverview(

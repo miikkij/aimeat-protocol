@@ -15,11 +15,13 @@
  * @usage import { proposeTemplate, listTemplateProposals } from './app-template-proposals.js';
  * @version-history
  *   v1.0.0 — 2026-07-19 — initial (AppDev KB Phase 6).
+ *   v1.0.1 — 2026-09-26 — The caller's account comes from localAccountOf, so a visitor from another
+ *     node has none here and never reaches the local namesake's proposals (secaudit 2026-09, F-1).
  */
 
 import type { AimeatConfig } from '../config.js';
 import type { Storage, MemoryRecord } from '../storage/interface.js';
-import { parseGAII } from '../utils/gaii.js';
+import { isGEAI, localAccountOf } from '../utils/gaii.js';
 import type { ContributionProof } from '../models/contribution-proof.js';
 
 const ID_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -72,13 +74,10 @@ export interface ProposeTemplateInput {
     composes?: string[];
 }
 
+/** The caller's account on this node and its GHII; none for an ecosystem app or another node's identity. */
 function ownerGhiiOf(callerGaii: string, config: AimeatConfig): { owner: string; ownerGhii: string } | null {
-    const parsed = parseGAII(callerGaii);
-    if (parsed?.owner) return { owner: parsed.owner, ownerGhii: `${parsed.owner}@${config.nodeId}` };
-    if (callerGaii.includes('@') && !callerGaii.includes('#')) {
-        return { owner: callerGaii.split('@')[0], ownerGhii: callerGaii };
-    }
-    return null;
+    const owner = isGEAI(callerGaii) ? null : localAccountOf(callerGaii);
+    return owner ? { owner, ownerGhii: `${owner}@${config.nodeId}` } : null;
 }
 
 /** Upsert a proposal (same id replaces — proposals are meant to improve over time). */

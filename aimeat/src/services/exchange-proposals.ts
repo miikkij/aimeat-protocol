@@ -16,12 +16,14 @@
  *   const p = await putProposal(storage, {...});
  *   const ent = await supersedeWithProposal(storage, proposal, existingEntitlement);
  * @version-history
+ *   v1.1.1 — 2026-09-26 — ownerOfGaii takes the account name from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  *   v1.1.0 — 2026-07-27 — Supersede reads the CONTRACT, not whatever currently authorises the call: a
  *     provider's grant is not terms to renegotiate.
  *   v1.0.0 — 2026-07-21 — Initial renegotiation: propose / accept (supersede + archive) / decline / withdraw.
  */
 import { randomUUID } from 'node:crypto';
 import type { Storage } from '../storage/interface.js';
+import { localAccountName } from '../utils/gaii.js';
 import {
   archiveEntitlement, createEntitlement, readContractForCall,
   type EntitlementUnit, type MeteredEntitlement,
@@ -30,7 +32,7 @@ import {
 const NS = 'exchange-proposal';
 const keyOf = (id: string): string => `xprop.${id}`;
 
-export const ownerOfGaii = (gaii: string): string => gaii.split('@')[0].split('#').pop() ?? gaii;
+export const ownerOfGaii = (gaii: string): string => localAccountName(gaii);
 
 /** A proposed change to a live contract, pending the counterparty's decision. */
 export interface ContractProposal {

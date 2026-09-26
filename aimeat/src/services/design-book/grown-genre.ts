@@ -33,9 +33,11 @@
  * @usage const page = await grownGenrePage(storage, config, body);   // null when it no longer stands
  * @version-history
  *   v1.0.0 — 2026-09-20 — Initial.
+ *   v1.0.1 — 2026-09-26 — The proposer's account name comes from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
+import { localAccountName } from '../../utils/gaii.js';
 import { DesignBookError } from './errors.js';
 import { DesignBookReasons } from './reasons.js';
 
@@ -137,7 +139,7 @@ export async function grownGenrePage(storage: Storage, config: AimeatConfig, own
 export async function grownGenrePublishing(
   storage: Storage, config: AimeatConfig, proposerGhii: string, body: GrownGenreBody,
 ): Promise<{ earned: boolean; why: string }> {
-  if (body.app.owner.toLowerCase() !== proposerGhii.split('@')[0].toLowerCase()) {
+  if (body.app.owner.toLowerCase() !== localAccountName(proposerGhii).toLowerCase()) {
     throw new DesignBookError('NOT_YOUR_APP', 'A genre is offered by the owner of the app it grew out of. body.app.owner is your own owner name.', 403);
   }
   if (!(await storage.getApp(proposerGhii, body.app.filename))) {

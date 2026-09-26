@@ -11,6 +11,8 @@
  *   import { registerExtensionsTools } from './extensions.js';
  *   registerExtensionsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v2.4.2 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts),
+ *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  *   v2.4.1 — 2026-09-13 — An install refusal carries its details (ODPS_FIELD_TOO_LONG names the field,
  *     its length, the cap and the room left).
  *   v2.4.0 — 2026-09-13 — aimeat_extension_get takes include_source and returns each action's
@@ -70,7 +72,7 @@ import { enforcePaywall } from '../routes/extensions/paywall.js';
 import { createRefusalRecorder, refusalText } from '../routes/extensions/metered-response.js';
 import { takeDesignations } from '../commerce/beneficiary-designation.js';
 import type { ExtensionCtx } from '../services/extension-runtime.js';
-import { parseGAII, ownerGhiiOf } from '../utils/gaii.js';
+import { ownerGhiiOf, localAccountName } from '../utils/gaii.js';
 import { makeExtensionDataPackage } from '../services/datapackage/ext-capability.js';
 import { canManageExtensionAs } from '../routes/extensions/permissions.js';
 import {
@@ -97,7 +99,7 @@ export function registerExtensionsTools(
 ): void {
     const agentGaii = getAgentGaii();
     /** The caller's owner GHII, the key the app listing decides visibility by. */
-    const viewerGhii = () => { const o = parseGAII(agentGaii)?.owner; return o ? `${o}@${config.nodeId}` : undefined; };
+    const viewerGhii = () => { const o = localAccountName(agentGaii); return o ? `${o}@${config.nodeId}` : undefined; };
     /** The dependants of one extension, with the names of apps this caller may see. */
     const usedByFor = async (name: string) => {
         const { visible } = await visibleAppRefs(storage, viewerGhii());
@@ -114,8 +116,7 @@ export function registerExtensionsTools(
      * token in the modern flow asks for. Written once so the four call sites cannot drift apart.
      */
     function resolveCaller(): { owner: string; roles: string[]; scopes: string[] } {
-        const owner = parseGAII(getAgentGaii())?.owner
-            ?? (getAgentGaii().includes('@') ? getAgentGaii().split('@')[0] : 'mcp-agent');
+        const owner = getAgentGaii().includes('@') ? localAccountName(getAgentGaii()) : 'mcp-agent';
         return { owner, roles: ['agent'], scopes: sessionScopes };
     }
 
@@ -292,14 +293,14 @@ export function registerExtensionsTools(
             // when the manifest declares it (services/extension-workspace.ts). A refusal reaches
             // the caller as the action's error text, which carries the service's code and words.
             const wsCap = attachExtensionWorkspace({ config, storage, ext, actionId: action.id,
-                caller: { gaii: agentGaii, owner: parseGAII(agentGaii)?.owner ?? agentGaii, roles: ['agent'], scopes: sessionScopes } });
+                caller: { gaii: agentGaii, owner: localAccountName(agentGaii), roles: ['agent'], scopes: sessionScopes } });
             const ctx: ExtensionCtx = buildExtensionCtx({
                 config, storage, extMemoryOwner,
                 extension: { name: ext.name, owner: ext.installedBy },
                 workspace: wsCap.workspace,
                 caller: {
                     gaii: agentGaii,
-                    owner: parseGAII(agentGaii)?.owner ?? agentGaii,
+                    owner: localAccountName(agentGaii),
                     roles: ['agent'],
                     // The session's own scopes, the same list the workspace capability above is
                     // built with. A script that holds a permission word must see the same answer
@@ -319,7 +320,7 @@ export function registerExtensionsTools(
                 files: makeExtensionFiles({
                     config, storage,
                     callerGaii: agentGaii,
-                    callerOwner: parseGAII(agentGaii)?.owner,
+                    callerOwner: localAccountName(agentGaii),
                     extName: ext.name,
                 }),
                 // Same capability as the REST road, and deliberately the same TARGET: a data package
@@ -344,7 +345,7 @@ export function registerExtensionsTools(
                 notify: buildExtensionNotify({
                     storage, config, extName: ext.name,
                     recipientGaii: agentGaii,
-                    recipientOwner: parseGAII(agentGaii)?.owner ?? agentGaii,
+                    recipientOwner: localAccountName(agentGaii),
                 }),
                 // No SMTP identity belongs to an MCP session. Refusing with a logged false is the
                 // behaviour every extension was written against; an absent capability would turn

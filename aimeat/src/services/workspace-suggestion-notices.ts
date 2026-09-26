@@ -25,8 +25,10 @@
  *   await noticeRequester(storage, approval, 'approved');
  * @version-history
  *   v1.0.0 — 2026-09-25 — Initial: the member change doors (workspace actions for plain members).
+ *   v1.0.1 — 2026-09-26 — ownerNameOf takes the account name from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  */
 import type { Storage, PendingApprovalRecord } from '../storage/interface.js';
+import { localAccountName } from '../utils/gaii.js';
 import { notify } from './notify.js';
 import { emitChange } from './event-bus.js';
 
@@ -75,8 +77,7 @@ export function noticeFactsOf(approval: PendingApprovalRecord): SuggestionNotice
 
 /** The bare account name behind a GHII or a GAII: `bot#bob@node` and `bob@node` both give `bob`. */
 export function ownerNameOf(identity: string): string {
-    const afterHash = identity.includes('#') ? identity.slice(identity.indexOf('#') + 1) : identity;
-    return afterHash.split('@')[0];
+    return localAccountName(identity);
 }
 
 /** The GHII a notification to this identity's person goes to: the agent part is dropped. */

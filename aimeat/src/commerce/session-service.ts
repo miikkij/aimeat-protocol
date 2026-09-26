@@ -15,6 +15,9 @@
  *   updateSessionItems · cancelSession · completeSession
  * @usage import { createSession, completeSession } from '../commerce/session-service.js';
  * @version-history
+ *   v2.5.1 — 2026-09-26 — The buyer and seller names on the payment rows come from localAccountName
+ *     (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local
+ *     namesake (secaudit 2026-09, F-1).
  *   v2.5.0 — 2026-09-01 — `bookSessionlessSale`: the seller's fee and split legs for a MONEY sale
  *     with no checkout session behind it, which is what a buyer from another node makes over the
  *     A2A door. Same rate, same two functions, placed beside the leg it must stay in step with.
@@ -53,6 +56,7 @@ import { readSplit, computeSplit, type DynamicDesignation } from './beneficiary-
 import { bookBeneficiaryShares } from './beneficiary-book.js';
 import { takeDesignations } from './beneficiary-designation.js';
 import { emitChange } from '../services/event-bus.js';
+import { localAccountName } from '../utils/gaii.js';
 
 export { CommerceError } from './errors.js';
 
@@ -553,12 +557,12 @@ export async function completeSession(
   void recordAccountEvent(storage, {
     ownerGhii: session.buyerGhii, kind: 'payment_sent', actorGaii: session.buyerGhii,
     subject: session.id, link: `/v1/profile?tab=wallet&checkout=${encodeURIComponent(session.id)}`,
-    data: { amount, what, who: session.sellerGhii.split('@')[0] },
+    data: { amount, what, who: localAccountName(session.sellerGhii) },
   }, config);
   void recordAccountEvent(storage, {
     ownerGhii: session.sellerGhii, kind: 'payment_received', actorGaii: session.buyerGhii,
     subject: session.id, link: `/v1/profile?tab=wallet&order=${encodeURIComponent(session.id)}`,
-    data: { amount, what, who: session.buyerOwner ?? session.buyerGhii.split('@')[0] },
+    data: { amount, what, who: session.buyerOwner ?? localAccountName(session.buyerGhii) },
   }, config);
   void recordAccountEvent(storage, {
     ownerGhii: session.buyerGhii, kind: 'checkout_completed', actorGaii: session.buyerGhii,

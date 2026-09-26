@@ -18,6 +18,8 @@
  *     unknown-owner skip, idempotency.
  *   v1.2.0 — 2026-07-19 — convert from a standalone tsx script (process.exit + hand-rolled
  *     counters) to a vitest describe/it suite so it runs under `pnpm test`.
+ *   v1.3.0 — 2026-09-26 — normalizeAppOwnerNames(nodeId): a name of another node stays whole
+ *     (secaudit 2026-09, A6-4).
  */
 import { describe, it, expect } from 'vitest';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
@@ -69,7 +71,7 @@ describe('app owner hygiene migrations (SqliteStorage)', () => {
     // Modern row: ownerName already bare — must be left untouched.
     await storage.createApp(appRow('bob@node-x', 'bob', 'modern.html', 1));
 
-    const updated = await storage.normalizeAppOwnerNames();
+    const updated = await storage.normalizeAppOwnerNames('node-x');
     assert(updated === 2, `rewrites exactly the 2 GHII-ownerName rows (got ${updated})`);
 
     const legacy = await storage.getAppByOwnerName('alice', 'legacy.html');
@@ -81,8 +83,28 @@ describe('app owner hygiene migrations (SqliteStorage)', () => {
     const modern = await storage.getAppByOwnerName('bob', 'modern.html');
     assert(modern?.ownerName === 'bob', 'already-bare ownerName untouched');
 
-    const second = await storage.normalizeAppOwnerNames();
+    const second = await storage.normalizeAppOwnerNames('node-x');
     assert(second === 0, `idempotent — second pass updates 0 rows (got ${second})`);
+
+    storage.close();
+  });
+
+  it('normalizeAppOwnerNames leaves a name of ANOTHER node whole', async () => {
+    // A visitor from another node publishes under its own home name. Cut at the '@' that name was the
+    // LOCAL account sharing its local part, and mergeForkedAppBuckets then folded the visitor's app
+    // into her bucket (secaudit 2026-09, A6-4). Only this node's own suffix is stripped.
+    const storage = new SqliteStorage(':memory:');
+    await storage.createApp(appRow('carol@home-node@node-x', 'carol@home-node', 'visitor.html', 1));
+    await storage.createApp(appRow('carol@node-x', 'carol@node-x', 'own.html', 1));
+
+    const updated = await storage.normalizeAppOwnerNames('node-x');
+    assert(updated === 1, `rewrites only the row of this node (got ${updated})`);
+
+    const visitor = await storage.getAppByOwnerName('carol@home-node', 'visitor.html');
+    assert(visitor?.ownerName === 'carol@home-node', `the visitor keeps its home name (got "${visitor?.ownerName}")`);
+    assert(!(await storage.getAppByOwnerName('carol', 'visitor.html')), 'the local namesake does not own the visitor\'s app');
+    const own = await storage.getAppByOwnerName('carol', 'own.html');
+    assert(own?.ownerName === 'carol', `this node's own suffix is still stripped (got "${own?.ownerName}")`);
 
     storage.close();
   });

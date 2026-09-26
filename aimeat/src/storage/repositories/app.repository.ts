@@ -38,6 +38,8 @@
  *   v1.9.0 — 2026-08-25 — Add listAppVersionSizes(): the version line without its payload, so the
  *     publish response can tell an author how fast their app is growing and how near the ceiling
  *     it is. Reading it through listAppVersions would cost a gigabyte on a long-lived app.
+ *   v1.9.1 — 2026-09-26 — normalizeAppOwnerNames(nodeId) strips only this node's own suffix, so a
+ *     visitor's app keeps its owner's home name (secaudit 2026-09, A6-4).
  */
 import type { AppRecord, AppSummaryRecord, AppVersionSize, AppDraftRecord, AppListOptions, AppForkRecord } from '../interface.js';
 
@@ -217,10 +219,12 @@ export interface AppRepository {
      * (`owner@node`) instead of the bare owner name. The catalog "my apps"
      * filter and the by-owner-name delete sweep both key on the bare name, so
      * those rows got stranded as un-manageable "community" apps. Rewrite any
-     * `ownerName` containing '@' to its bare prefix. Idempotent — once
-     * normalized, no row matches. Returns the number of rows updated.
+     * `ownerName` that ends in THIS node's `@nodeId` to the name before it. A
+     * name of another node (a visitor's own home GHII) is left whole, so it
+     * never becomes the local account that shares its local part.
+     * Idempotent — once normalized, no row matches. Returns the number of rows updated.
      */
-    normalizeAppOwnerNames(): Promise<number>;
+    normalizeAppOwnerNames(nodeId: string): Promise<number>;
     /**
      * Data hygiene: legacy publish paths keyed an app's storage bucket
      * (`ownerGaii`) off the caller's raw `owner` claim, which varies by identity

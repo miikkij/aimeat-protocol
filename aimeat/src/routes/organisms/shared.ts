@@ -8,10 +8,11 @@
  *   invitation gates, archive handler) that every organism route group shares; the module-level
  *   fresherRec/roleSatisfies are pure utilities the route handlers reference directly.
  * @version-history
+ *   v1.10.2 — 2026-09-26 — The publisher's account and bareOwner come from localAccountName
+ *     (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local
+ *     namesake (secaudit 2026-09, F-1).
  *   v1.10.1 — 2026-09-26 — publishDraftsBatch opens a document's embedded files to the workspace only
  *     for the records that passed their refusals, after the batch has written (secaudit 2026-09, N1).
- *     It opened them while planning each record, so one the append-only, expected-version or schema
- *     check then refused had already made its files readable by every member.
  *   v1.10.0 — 2026-09-24 — canReadWs, readWsManifests, readWsManifestValue and readShareMeta read the
  *     copy that counts (services/workspace-meta.ts), and both publish paths take the space's settings
  *     from it; the first copy the store returned, or the freshest, had decided who reads and what is shared.
@@ -54,7 +55,7 @@ import { requireAuth, requireExternalPrincipal, requireScope } from '../../auth/
 import { verifyShareToken } from '../../services/share-token.js';
 import { emitChange, emitMemoryWritten } from '../../services/event-bus.js';
 import { normalizeDocValueImages, scopeDocImagesToWorkspace } from '../../services/doc-images.js';
-import { resolveIdentity, isSameOwner, isGEAI } from '../../utils/gaii.js';
+import { resolveIdentity, isSameOwner, isGEAI, localAccountName } from '../../utils/gaii.js';
 import { authorizeRead } from '../../services/access-guard.js';
 import { ecoMayReadKey } from '../../services/ecosystem-access.js';
 import { validateMemoryWrite, validateValueAgainstSchema } from '../../services/schema-validator.js';
@@ -195,14 +196,14 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
     // embedded file readable by the workspace's members as a side effect, and the line below can
     // still refuse the publish. Same ordering defect as the draft door, same fix (doc-images.ts
     // scopeDocImagesToWorkspace). The rewritten URL is identical either way.
-    const draftValue = await normalizeDocValueImages(storage, config, draft.value, ownerGhii.split('@')[0]);
+    const draftValue = await normalizeDocValueImages(storage, config, draft.value, localAccountName(ownerGhii));
 
     const validation = await validateMemoryWrite(`${base}.latest`, draftValue, storage, { viaPublish: true, expectedVersion });
     if (!validation.valid) return { ok: false, code: 'INVALID', violations: validation.errors };
 
     // Past the refusal: the document is being published, so its images may be scoped to the members
     // who are about to be able to read it.
-    if (ws) await scopeDocImagesToWorkspace(storage, config, draftValue, ownerGhii.split('@')[0], `${organismId}/${ws}`);
+    if (ws) await scopeDocImagesToWorkspace(storage, config, draftValue, localAccountName(ownerGhii), `${organismId}/${ws}`);
 
     const versionRefs = await listVersionRefs(storage, base);
     const maxN = maxVersionOf(versionRefs);
@@ -339,7 +340,7 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
       // embedded file readable by the workspace's members as a side effect, and this record's own
       // refusals below (append-only, expected version, schema) can still refuse it. Opened after the
       // batch has written, for the records that passed, as publishDraft does (N1).
-      const draftValue = await normalizeDocValueImages(storage, config, draft.value, ownerGhii.split('@')[0]);
+      const draftValue = await normalizeDocValueImages(storage, config, draft.value, localAccountName(ownerGhii));
       const expectedVersion = expectedVersions?.[instance] ?? null;
 
       const maxN = maxVersionOf(versionsByBase.get(base) ?? []);
@@ -412,7 +413,7 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
     }
     // Past every refusal and the write: the published documents' images may now be scoped to the
     // members who can read them. A record the batch refused opens nothing.
-    if (ws) for (const v of toScope) await scopeDocImagesToWorkspace(storage, config, v, ownerGhii.split('@')[0], `${organismId}/${ws}`);
+    if (ws) for (const v of toScope) await scopeDocImagesToWorkspace(storage, config, v, localAccountName(ownerGhii), `${organismId}/${ws}`);
     // Fire Tracked-Response evaluation for each published record (gated O(1) in the subscriber).
     for (const e of toEmit) emitMemoryWritten(e.owner, e.key);
     return { results };
@@ -432,7 +433,7 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
   // ── Workspace access (per-workspace, creator-controlled, consent-backed) ──
 
   const wsRegPrefix = (id: string) => `organism.${id}.meta.workspaces`;
-  const bareOwner = (gaii: string) => (gaii.includes('#') ? gaii.split('#')[1] : gaii).split('@')[0];
+  const bareOwner = (gaii: string) => localAccountName(gaii);
 
   /** Find a workspace's registry entry across every member's registry (one key per owner). */
   const findWsEntry = async (id: string, ws: string): Promise<{ id: string; name?: string; createdBy?: string; createdAt?: string; ownerGaii: string } | null> => {

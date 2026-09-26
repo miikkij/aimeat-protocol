@@ -10,6 +10,8 @@
  *   import { registerSharingGroupTools } from './sharing-groups.js';
  *   registerSharingGroupTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.4.1 -- 2026-09-26 -- The caller's account name comes from localAccountName (utils/gaii.ts),
+ *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  *   v1.1.0 -- 2026-09-08 -- A refusal carries its code (`CODE: message`), as the REST doors and the
  *     neighbouring MCP files do; an agent had only the sentence to match on (e2e-mcp-groups-shares).
  *   v1.0.0 -- 2026-05-21 -- Initial creation for Agent Dashboard Phase 1
@@ -29,7 +31,7 @@ import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { GroupShareRecord, Storage } from '../storage/interface.js';
-import { parseGAII } from '../utils/gaii.js';
+import { parseGAII, localAccountName } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 import { emitChange } from '../services/event-bus.js';
@@ -59,7 +61,7 @@ export function registerSharingGroupTools(
     /** Resolve the owner's GHII (owner@nodeId) from the agent's GAII. */
     function getOwnerGhii(): string {
         const parsed = parseGAII(agentGaii);
-        if (parsed) return `${parsed.owner}@${config.nodeId}`;
+        if (parsed) return `${localAccountName(agentGaii)}@${config.nodeId}`;
         // Fallback: treat agentGaii as an owner name
         return `${agentGaii}@${config.nodeId}`;
     }

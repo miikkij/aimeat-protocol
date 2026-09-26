@@ -32,6 +32,7 @@
  * @usage
  *   import { publishSkill, resolveSkillRef, listSkillLibrary } from '../services/skills.js';
  * @version-history
+ *   v1.3.1 -- 2026-09-26 -- listSkillsByBinding takes a skill owner's account name from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  *   v1.3.0 -- 2026-09-03 -- What the Skills page needed the registry to say (design canvas "AIMEAT
  *     Taidot-sivu"): setSkillVisibility() changes who may read a skill without a republish (no
  *     version bump, no snapshot); resolve carries `versions`, the retained snapshots a pin can
@@ -49,6 +50,7 @@ import { recordAccountEvent } from './account-events.js';
 import type { Storage, MemoryRecord } from '../storage/interface.js';
 import { validateSkillFiles, SkillValidationError, SKILL_NAME_RE } from './skill-md.js';
 import { canReadWorkspace } from './workspace-access.js';
+import { localAccountName } from '../utils/gaii.js';
 
 // The addresses (ref grammar, scope owner, key conventions) live in skill-refs.ts since 2026-09-03.
 import {
@@ -478,7 +480,7 @@ export async function listSkillsByBinding(
   const out: SkillSummary[] = [];
   for (const r of records) {
     const isNode = r.ownerGaii === systemGhii;
-    const skillOwner = isNode ? null : (r.ownerGaii.includes('@') ? r.ownerGaii.split('@')[0] : r.ownerGaii);
+    const skillOwner = isNode ? null : localAccountName(r.ownerGaii);
     if (!mayRead(r, isNode ? 'node' : 'user', skillOwner, accessor)) continue;
     out.push(toSummary(r, isNode ? 'node' : 'user', skillOwner));
   }

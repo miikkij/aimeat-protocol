@@ -13,6 +13,9 @@
  *   pitfallEntryKey · PITFALL_* constants
  * @usage import { listLearnedPitfalls, setPitfallFlags } from './appdev-kb.js';
  * @version-history
+ *   v1.3.1 -- 2026-09-26 -- ownerOf() names the caller's account with localAccountOf, so a visitor
+ *     from another node reads and writes its own learned pitfalls, never the local namesake's
+ *     (secaudit 2026-09, A3-1).
  *   v1.3.0 -- 2026-09-13 -- filterPitfalls() takes preferModel: ordering inside a severity class,
  *     never a filter. The research overview now builds its learned section from this step instead of
  *     keeping only the entries the caller's own model had written. A learned entry carries
@@ -33,7 +36,7 @@
 
 import type { AimeatConfig } from '../config.js';
 import type { Storage, MemoryRecord } from '../storage/interface.js';
-import { parseGAII } from '../utils/gaii.js';
+import { isGEAI, localAccountOf } from '../utils/gaii.js';
 import { emitChange } from './event-bus.js';
 import { writeMemoryRecord } from './memory-write.js';
 
@@ -75,11 +78,13 @@ export function pitfallEntryKey(category: string, slug: string): string {
     return `${PITFALL_PREFIX}${slugifyKb(category)}/${slug.toLowerCase()}`;
 }
 
+/**
+ * The account on this node behind the caller, or null. An ecosystem app names none, as it never has,
+ * and an identity of another node names none either: a visitor then works in its own namespace,
+ * never in the namesake's.
+ */
 function ownerOf(callerGaii: string, _config: AimeatConfig): string | null {
-    const parsed = parseGAII(callerGaii);
-    if (parsed?.owner) return parsed.owner;
-    if (callerGaii.includes('@') && !callerGaii.includes('#')) return callerGaii.split('@')[0];
-    return null;
+    return isGEAI(callerGaii) ? null : localAccountOf(callerGaii);
 }
 
 /**

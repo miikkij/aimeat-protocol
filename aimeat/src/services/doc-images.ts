@@ -20,6 +20,7 @@
  *   import { normalizeDocValueImages } from '../services/doc-images.js';
  *   const v = await normalizeDocValueImages(storage, config, draft.value, ownerName, `${orgId}/${ws}`);
  * @version-history
+ *   v1.1.1 — 2026-09-26 — bareOwnerOf takes the account name from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  *   v1.1.0 — 2026-09-13 — An embed URL's query and fragment are dropped before the key is read, so a
  *     versioned_url (?v=) pasted into a document is scoped like its unversioned twin.
  *   v1.0.0 — 2026-07-11 — Extracted so the MCP write, MCP publish, and REST publish paths share one
@@ -30,6 +31,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { normalizeWorkspaceRefs } from '../utils/workspace-ref.js';
 import { logger } from '../utils/logger.js';
+import { localAccountName } from '../utils/gaii.js';
 
 /** Matches an image embed whose URL is one of the three owner/storage forms. Groups: (1) `![alt](`,
  *  (2) the URL, (3) `)`. Kept in step with the frontend STORAGE_IMG_RE, broadened to also catch the
@@ -38,8 +40,7 @@ const DOC_IMG_RE = /(!\[[^\]]*\]\()(\/v1\/(?:storage\/|memory\/files\/|pub\/[^/)
 
 /** Bare owner name of any identity: `agent#owner@node` → `owner`, `owner@node` → `owner`. */
 function bareOwnerOf(gaii: string): string {
-  const afterHash = gaii.includes('#') ? gaii.split('#')[1] : gaii;
-  return afterHash.split('@')[0];
+  return localAccountName(gaii);
 }
 
 /** Per-segment decode of a URL key path back to the stored key (keys can contain slashes). */

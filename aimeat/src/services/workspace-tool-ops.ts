@@ -28,6 +28,8 @@
  *   const r = await readWorkspaceOp({ storage, config }, caller, { organismId, ws });
  *   if (!r.ok) return fail(r.message);
  * @version-history
+ *   v1.5.2 — 2026-09-26 — workspaceCallerOf takes the owner name from the door, always; it no longer
+ *     cuts one from the principal itself (secaudit 2026-09, F-1).
  *   v1.5.1 — 2026-09-26 — The held provenance record is stored through storeHeldProvenance, the one
  *     call every compare-and-swap door now makes once its write lands (secaudit 2026-09, N2).
  *   v1.5.0 — 2026-09-25 — A draft written with `section` is filed through the member change door
@@ -115,16 +117,17 @@ const refuse = (status: number, code: string, message: string, details?: Record<
     ({ ok: false, status, code, message, ...(details ? { details } : {}) });
 
 /**
- * Build the caller from a principal. The owner name is taken from the session when the door knows
- * it (an owner GHII carries no `#`, so parsing cannot recover it from an agent-shaped id) and from
- * the GAII otherwise, which is what the MCP door has always done.
+ * Build the caller from a principal. The owner name is the door's to give: the session knows it (an
+ * owner GHII carries no `#`, so parsing cannot recover it from an agent-shaped id), and every door
+ * names it with localAccountName, which keeps a visitor from another node whole. This function used
+ * to cut one itself when none was given, and no door relied on that.
  */
 export function workspaceCallerOf(
-    args: { principal: string; ownerName?: string; roles: string[] },
+    args: { principal: string; ownerName: string; roles: string[] },
     config: AimeatConfig,
 ): WorkspaceOpsCaller {
     const parsed = parseGAII(args.principal);
-    const ownerName = args.ownerName ?? (parsed ? parsed.owner : args.principal.split('@')[0]);
+    const ownerName = args.ownerName;
     const ownerGhii = `${ownerName}@${config.nodeId}`;
     return {
         principal: args.principal, ownerName, ownerGhii,

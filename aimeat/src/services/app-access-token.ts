@@ -33,10 +33,12 @@
  * @version-history
  *   v1.0.0 — 2026-08-11 — Initial. Audit H-19: gate the unlock rather than the app HTML, so a
  *     code-gated app stops being the exception to H-2 origin isolation.
+ *   v1.0.1 — 2026-09-26 — bare() takes the account name from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  */
 import { SignJWT, jwtVerify } from 'jose';
 import { randomUUID } from 'node:crypto';
 import { getNodeCryptoKeys } from '../auth/jwt.js';
+import { localAccountName } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 
 /**
@@ -53,9 +55,9 @@ export interface AppAccessTokenPayload {
     filename: string;
 }
 
-/** The bare owner name, with any `@node-id` suffix removed. */
+/** The owner's account name, with this node's `@node-id` removed; another node's identity stays whole. */
 function bare(owner: string): string {
-    return owner.includes('@') ? owner.split('@')[0] : owner;
+    return localAccountName(owner);
 }
 
 /**

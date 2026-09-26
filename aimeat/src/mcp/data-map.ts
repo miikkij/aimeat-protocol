@@ -18,6 +18,8 @@
  *   import { registerDataMapTools } from './data-map.js';
  *   registerDataMapTools(mcp, storage, config, () => agentGaii, () => scopes);
  * @version-history
+ *   v1.0.2 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts),
+ *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  *   v1.0.1 — 2026-09-20 — The `data_map` parameter says spec /2 and shows a whole object
  *     (DATA_MAP_PARAM in the catalog). It said /1, which the service refuses.
  *   v1.0.0 — 2026-08-25 — TARGET-073.
@@ -26,7 +28,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { ownerGhiiOf } from '../utils/gaii.js';
+import { localAccountName } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 import { DATA_MAP_PARAM } from './catalog/definitions/data-map.js';
@@ -50,7 +52,7 @@ export function registerDataMapTools(
     const principal = getAgentGaii();
     return {
       principal,
-      ownerName: ownerGhiiOf(principal).split('@')[0],
+      ownerName: localAccountName(principal),
       roles: ['agent'],
       scopes: getScopes(),
     };

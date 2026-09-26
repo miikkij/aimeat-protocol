@@ -27,6 +27,7 @@
  *   const ctx = buildExtensionCtx({ config, storage, extMemoryOwner, caller, extConfig, log, files });
  *   await executeExtensionAction(script, ctx, …);
  * @version-history
+ *   v1.6.4 — 2026-09-26 — ctx.wallet.getBalance takes the caller's account name from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  *   v1.6.3 — 2026-09-24 — A ctx.fetch that carries a secret checks its address before the secret is
  *     resolved (919ef5f56d69). Resolving binds a first use to the host, and safeFetch refused the
  *     address only after that, so a refused address stayed the secret's one permitted host.
@@ -72,7 +73,7 @@ import { isServerWrittenKey, serverWrittenKeyRefusal } from '../utils/reserved-k
 import { extensionCrossNotify, safeNotificationLink } from './extension-notify.js';
 import { notify } from './notify.js';
 import { safeFetch, validateOutboundUrl } from '../utils/url-validator.js';
-import { parseGAII, ownerGhiiOf } from '../utils/gaii.js';
+import { parseGAII, ownerGhiiOf, localAccountName } from '../utils/gaii.js';
 import { resolveSecretForHeaders, secretPlaceholderNames, secretUnknownMessage, secretHostMessage } from './owner-secrets.js';
 import { logger } from '../utils/logger.js';
 import { recordMemoryTouch } from './data-map/write-tally-buffer.js';
@@ -219,7 +220,7 @@ export function buildExtensionWallet(deps: {
         getBalance: async () => {
             const parsed = parseGAII(callerGaii);
             if (!parsed) return 0;
-            const ghii = await storage.getGHIIByOwner(parsed.owner);
+            const ghii = await storage.getGHIIByOwner(localAccountName(callerGaii));
             return ghii?.morselBalance ?? 0;
         },
     };

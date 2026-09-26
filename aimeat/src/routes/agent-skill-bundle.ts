@@ -11,6 +11,8 @@
  * @version-history
  *   v1.0.0 -- 2026-05-23 -- Initial creation for Agent Integration Phase A
  *   v1.0.1 -- 2026-06-13 -- archiver v8: archiver('zip') -> new ZipArchive()
+ *   v1.0.2 -- 2026-09-26 -- The agent's owner name comes from localAccountName (utils/gaii.ts), which
+ *     keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  */
 
 import { Router } from 'express';
@@ -20,7 +22,7 @@ import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { refuseNotYours } from '../middleware/refusals.js';
 import { requireAuth } from '../auth/middleware.js';
-import { buildGAII } from '../utils/gaii.js';
+import { buildGAII, localAccountName } from '../utils/gaii.js';
 import { generateBundle } from '../services/skill-bundle/generator.js';
 import { HermesAdapter } from '../services/skill-bundle/hermes-adapter.js';
 import { GenericAdapter } from '../services/skill-bundle/generic-adapter.js';
@@ -37,7 +39,7 @@ export function agentSkillBundleRouter(config: AimeatConfig, storage: Storage): 
   async function buildContext(agentName: string, agentGaii: string): Promise<BundleContext> {
     const agent = await storage.getAgent(agentGaii);
 
-    const ownerName = agentGaii.split('#')[1]?.split('@')[0] ?? '';
+    const ownerName = localAccountName(agentGaii);
     const ownerGhii = `${ownerName}@${config.nodeId}`;
 
     const systemRules = (config.agentSystemPrinciples ?? []).map((text, idx) => ({

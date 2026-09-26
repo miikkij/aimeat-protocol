@@ -5,12 +5,16 @@
  * @description Extension write/manage permission helpers — role/scope gates and ownership guard.
  *   Extracted from src/routes/extensions.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.1.1 — 2026-09-26 — The creator and installer names come from localAccountName (utils/gaii.ts),
+ *     which keeps an identity of another node whole, so it never names the local namesake
+ *     (secaudit 2026-09, F-1).
  *   v1.1.0 — 2026-08-10 — resolveGatedApp(): the runtime half of the config.app owner check, for
  *     records written before the install gate existed. A mismatch reads as no gating.
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/extensions.ts (max-file-lines)
  */
 import type { Request } from 'express';
 import type { AimeatConfig } from '../../config.js';
+import { localAccountName } from '../../utils/gaii.js';
 
 // Does this caller have permission to write extensions?
 // Operator role bypasses everything. Owner role respects the configured
@@ -86,7 +90,7 @@ export function canSeeExtensionInstanceAs(
 ): boolean {
   if (caller.roles.includes('operator')) return true;
   // createdBy is a bare owner name; accept a GHII/GAII form defensively, as resolveGatedApp does.
-  const creator = createdBy.toLowerCase().split('@')[0].split('#').pop() ?? '';
+  const creator = localAccountName(createdBy.toLowerCase());
   return caller.owner.toLowerCase() === creator;
 }
 
@@ -117,6 +121,6 @@ export function resolveGatedApp(ext: { config?: Record<string, unknown>; install
   if (!declared) return null;
   const appOwner = (declared.split('/')[0] ?? '').toLowerCase();
   // installedBy is a bare owner name, but accept a GHII/GAII form defensively.
-  const installer = ext.installedBy.toLowerCase().split('@')[0].split('#').pop() ?? '';
+  const installer = localAccountName(ext.installedBy.toLowerCase());
   return appOwner === installer ? declared : null;
 }

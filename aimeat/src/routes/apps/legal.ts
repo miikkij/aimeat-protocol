@@ -19,9 +19,11 @@
  *   the MCP tool, both through services/app-legal.ts.
  * @structure registerLegalRoutes(router, config, storage, canonicalOwner)
  * @version-history
+ *   v1.3.1 — 2026-09-26 — The second lookup's owner comes from localAccountName (utils/gaii.ts), which
+ *     keeps an identity of another node whole, so it never names the local namesake
+ *     (secaudit 2026-09, F-1).
  *   v1.3.0 — 2026-09-26 — The page is served with the app frame's sandboxed CSP (sandboxedCsp,
- *     utils/app-csp.ts APP_FRAME_SANDBOX), so it runs in an opaque origin and never as the node's
- *     (secaudit 2026-09, A7-1).
+ *     utils/app-csp.ts APP_FRAME_SANDBOX), so it runs in an opaque origin (secaudit 2026-09, A7-1).
  *   v1.2.0 — 2026-09-02 — `?playtest=true` on the audit read: the same service the MCP door calls
  *     opens the app in a headless browser and answers with the eight things a game gets wrong. The
  *     flag is read once, normalized, so `?playtest=false` never counts as yes.
@@ -50,6 +52,7 @@ import { auditAppWithPlaytest } from '../../services/app-playtest.js';
 import { applyServeMarks } from '../../services/app-serve-marks.js';
 import { loadServedProvenance, setProvenanceHeaders } from '../../services/ai-provenance-marks.js';
 import { appReviewedBy } from '../../services/app-marks.js';
+import { localAccountName } from '../../utils/gaii.js';
 import type { CanonicalOwner } from './helpers.js';
 
 export function registerLegalRoutes(
@@ -70,7 +73,8 @@ export function registerLegalRoutes(
   /** The app, or null; false when the viewer may not know it exists. */
   async function visibleApp(req: Request, owner: string, filename: string): Promise<AppRecord | null | 'hidden'> {
     let app = await storage.getAppByOwnerName(owner, filename);
-    if (!app && owner.includes('@')) app = await storage.getAppByOwnerName(owner.split('@')[0], filename);
+    const bare = localAccountName(owner);
+    if (!app && bare !== owner) app = await storage.getAppByOwnerName(bare, filename);
     if (!app) return null;
     if (app.operatorHidden) {
       const isOperator = !!req.auth?.roles?.includes('operator');

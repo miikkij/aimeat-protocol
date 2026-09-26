@@ -16,6 +16,8 @@
  * @structure registerDecideTools(mcp, storage, config, getAgentGaii)
  * @usage registerDecideTools(mcp, storage, config, () => agentGaii);
  * @version-history
+ *   v1.3.1 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts),
+ *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  *   v1.3.0 — 2026-09-25 — aimeat_decision_review names the session's agent as the reviewer, never the
  *     owner in person, so the service refuses it a review of a decision it asked for itself.
  *   v1.2.0 — 2026-09-23 — Decision providers: `provider` on aimeat_decide, aimeat_decide_run and
@@ -30,7 +32,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
-import { parseGAII } from '../utils/gaii.js';
+import { localAccountName } from '../utils/gaii.js';
 import { AiCompletionError } from '../services/ai-completion.js';
 import {
   decideForOwner, listDecisions, getDecision, reviewDecision, decisionStats, ruleCallerKind, DecideError, type DecideCaller,
@@ -50,7 +52,7 @@ export function registerDecideTools(
   getAgentGaii: () => string,
 ): void {
   const agentGaii = getAgentGaii();
-  const owner = parseGAII(agentGaii)?.owner ?? '';
+  const owner = localAccountName(agentGaii);
   const ownerGhii = `${owner}@${config.nodeId}`;
 
   const text = (data: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] });

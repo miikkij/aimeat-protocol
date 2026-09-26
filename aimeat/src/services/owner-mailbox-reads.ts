@@ -38,13 +38,14 @@
  *   if (!reader) → 403
  *   const { conversations } = await readOwnerConversations(storage, reader);
  * @version-history
+ *   v1.0.2 — 2026-09-26 — delegateReaderFor takes the owner's account name from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  *   v1.0.1 — 2026-09-24 — The federated test is isForeignPrincipal(), the one question (secaudit 2026-09, F-1).
  *   v1.0.0 — 2026-09-12 — Initial: messages:read-as-owner for agents, and the messages:read door for
  *     apps, on the four mailbox reads that were owner-session only.
  */
 import type { Storage, DirectMessageRecord, ConversationRecord } from '../storage/interface.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
-import { parseGaiiLoose, isForeignPrincipal } from '../utils/gaii.js';
+import { isForeignPrincipal, localAccountName } from '../utils/gaii.js';
 import { createMessagingDbService, type OwnerConversation } from './db/messaging-db-service.js';
 import { createMessagesInboxService, type InboxOverview } from './db/messages-inbox-db-service.js';
 import { withMessageProvenance } from './message-provenance.js';
@@ -107,7 +108,7 @@ export function mailboxReaderOf(auth: MailboxPrincipal, nodeId: string): Mailbox
  * the session GAII is enough: the mailbox is that GAII's own owner's.
  */
 export function delegateReaderFor(agentGaii: string, nodeId: string): MailboxReader {
-  const { owner } = parseGaiiLoose(agentGaii);
+  const owner = localAccountName(agentGaii);
   return { kind: 'delegate', ownerGhii: `${owner}@${nodeId}`, ownerName: owner, actor: agentGaii };
 }
 

@@ -13,6 +13,9 @@
  *   one-time token, and retries with `x-aimeat-pay-token`; the paywall verifies + consumes it (D1/D3).
  * @structure enforcePaywall · PaywallOutcome
  * @version-history
+ *   v1.8.1 — 2026-09-26 — The caller's owner comes from localAccountName (utils/gaii.ts), which keeps
+ *     an identity of another node whole, so a visitor never calls free as the local namesake
+ *     (secaudit 2026-09, F-1).
  *   v1.8.0 — 2026-08-11 — The internal pass is checked against the call it is being spent on
  *     (August 2026 audit H-17). It carried `coordExt`/`coordAction` from the day it was written and
  *     this file read neither, so a pass minted for one product stood the paywall down on any other.
@@ -54,7 +57,7 @@ import { appSpendRefusal } from '../../services/metered-access.js';
 import { respondMeteredRefusal } from './metered-response.js';
 import { burnPacingToll, resolvePacingToll } from './pacing.js';
 import { resolveGatedApp } from './permissions.js';
-import { ownerGhiiOf } from '../../utils/gaii.js';
+import { ownerGhiiOf, localAccountName } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
 
 type ExtAction = ExtensionRecord['actions'][number];
@@ -245,9 +248,9 @@ export async function enforcePaywall(args: {
 }): Promise<PaywallOutcome> {
   const { config, storage, ext, action, callerGaii, res, payToken, internalPass, namedAppTool, session } = args;
   const ownerName = ext.installedBy;
-  // Owner from any principal form: GHII (owner@node), GAII (agent#owner@node), or bare name.
-  // (parseGAII only recognises the GAII form, so extract directly to catch owner GHII sessions.)
-  const callerOwner = callerGaii.split('@')[0].split('#').pop() ?? callerGaii;
+  // The owner behind any principal form (owner@node, agent#owner@node, or a bare name) comes from
+  // localAccountName, which keeps a visitor from another node whole.
+  const callerOwner = localAccountName(callerGaii);
 
   // 0. A door that KNOWS which product was asked for has already ruled on this call. The app-tool
   //    routes, the commerce checkout and the MCP twin all invoke the capability over this node's own

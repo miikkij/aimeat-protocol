@@ -18,13 +18,16 @@
  *   const { webhookDispatcher, stats } = await initProcessBuffers(config, storage);
  * @version-history
  *   v1.0.0 — 2026-08-27 — Pure extraction from routes-loader.ts (which was at 799 of 800 lines).
+ *   v1.0.1 — 2026-09-26 — The owner in the cache tag comes from localAccountName (utils/gaii.ts),
+ *     which keeps an identity of another node whole, so it never names the local namesake
+ *     (secaudit 2026-09, F-1).
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { createWebhookDispatcher } from '../services/webhook-dispatcher.js';
 import { onChangeEvent } from '../services/event-bus.js';
 import { invalidateTag } from '../services/cache.js';
-import { parseGaiiLoose } from '../utils/gaii.js';
+import { localAccountName } from '../utils/gaii.js';
 import { initStats } from '../services/stats.js';
 import { configureAuthAudit } from '../services/auth-audit.js';
 import { initTelemetryBuffer } from '../services/telemetry-buffer.js';
@@ -69,7 +72,7 @@ export async function initProcessBuffers(config: AimeatConfig, storage: Storage)
   onChangeEvent((evt) => {
     invalidateTag(`domain:${evt.domain}`);
     if (evt.ownerGaii) {
-      const owner = parseGaiiLoose(evt.ownerGaii).owner;
+      const owner = localAccountName(evt.ownerGaii);
       if (owner) invalidateTag(`owner:${owner}:${evt.domain}`);
     }
   });

@@ -6,6 +6,9 @@
  *   /v1/admin/apps/similar, /v1/admin/apps/watermark/decode, /v1/admin/apps/:owner/:filename/moderate,
  *   DELETE /v1/admin/apps/:owner/:filename. Extracted from src/routes/apps.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.12.1 — 2026-09-26 — The app owner in the moderate and delete doors comes from localAccountName
+ *     (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local
+ *     namesake (secaudit 2026-09, F-1).
  *   v1.12.0 — 2026-09-26 — GET /v1/apps strips the owner's own notes through publicAppManifest
  *     (services/app-public-manifest.ts), the one place the MCP read and the purchase receipt use as
  *     well; what the listing shows is unchanged (secaudit 2026-09, A6-10).
@@ -36,7 +39,7 @@
  */
 import type { Router } from 'express';
 import { listAppsBuiltFor, levelName } from '../../services/app-dev-grant.js';
-import { resolveIdentity } from '../../utils/gaii.js';
+import { resolveIdentity, localAccountName } from '../../utils/gaii.js';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import type { PeerInfo } from '../../services/federation.js';
@@ -382,7 +385,7 @@ export function registerCatalogueAdminRoutes(
     router.post('/v1/admin/apps/:owner/:filename/moderate', requireAuth(), requireRole('operator'), async (req, res) => {
         const ownerParam = req.params.owner as string;
         const filename = req.params.filename as string;
-        const owner = ownerParam.includes('@') ? ownerParam.split('@')[0] : ownerParam;
+        const owner = localAccountName(ownerParam);
 
         const body = req.body ?? {};
         if (typeof body.hidden !== 'boolean') {
@@ -430,7 +433,7 @@ export function registerCatalogueAdminRoutes(
     router.delete('/v1/admin/apps/:owner/:filename', requireAuth(), requireRole('operator'), async (req, res) => {
         const ownerParam = req.params.owner as string;
         const filename = req.params.filename as string;
-        const owner = ownerParam.includes('@') ? ownerParam.split('@')[0] : ownerParam;
+        const owner = localAccountName(ownerParam);
 
         // Sweep every bucket holding this owner+filename (handles legacy shadow
         // buckets), deleting all versions + the screenshot each time.

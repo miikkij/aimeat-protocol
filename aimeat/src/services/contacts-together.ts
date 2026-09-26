@@ -12,6 +12,7 @@
  * @usage const t = await contactTogether(storage, config, ownerGhii, contactGhii, conversations);
  * @version-history
  *   v1.0.0 — 2026-08-30 — Initial (design canvas "AIMEAT Kontaktien sivu", direction A).
+ *   v1.0.1 — 2026-09-26 — bare() takes the account name from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
@@ -19,6 +20,7 @@ import type { OrganismMembershipRecord } from '../storage/interface.js';
 import type { ConversationSummary } from '../storage/repositories/direct-message.repository.js';
 import { canReadWorkspace } from './workspace-access.js';
 import { logger } from '../utils/logger.js';
+import { localAccountName } from '../utils/gaii.js';
 
 /** An organism both are active members of, with the CONTACT's role in it. */
 export interface SharedOrganism { id: string; name: string; role: OrganismMembershipRecord['role']; }
@@ -35,7 +37,7 @@ export interface ContactTogether { organisms: SharedOrganism[]; workspaces: Shar
  */
 export const SHARED_LOOKUP_CAP = 200;
 
-const bare = (ghii: string): string => ghii.split('@')[0];
+const bare = (ghii: string): string => localAccountName(ghii);
 
 /** The organisms one owner is an active member of, keyed by organism id. Memberships are keyed by
  *  the BARE owner name (the same key the organism routes use), so a full GHII is reduced first. */

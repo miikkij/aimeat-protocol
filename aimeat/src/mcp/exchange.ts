@@ -18,6 +18,8 @@
  *   import { registerExchangeTools } from './exchange.js';
  *   registerExchangeTools(mcp, storage, config, () => agentGaii);
  * @version-history
+ *   v1.4.1 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts),
+ *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  *   v1.4.0 — 2026-08-01 — TARGET-058 Phase 4: aimeat_exchange_offering_get returns the offering
  *     descriptor's provenance record. A listing is prose — value proposition, SLA, data-quality
  *     claims — and a buyer's agent deciding whether to accept a contract should be able to tell a
@@ -35,7 +37,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { parseGaiiLoose } from '../utils/gaii.js';
+import { localAccountName } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 import { readProvenance } from './ai-provenance-result.js';
@@ -55,7 +57,7 @@ import {
 import { getInterfaceVersion } from '../services/app-tool-interfaces.js';
 
 function ownerOf(gaii: string): string {
-    return gaii.split('@')[0].split('#').pop() ?? gaii;
+    return localAccountName(gaii);
 }
 
 /** Shape a metered entitlement for the consumer-facing view (mirrors src/routes/exchange.ts `view`). */
@@ -95,7 +97,7 @@ export function registerExchangeTools(
     getAgentGaii: () => string,
 ): void {
     const agentGaii = getAgentGaii();
-    const owner = parseGaiiLoose(agentGaii).owner;
+    const owner = localAccountName(agentGaii);
     // The consumer/requester identity is the CALLER's own resolved GAII (never from input), so a caller
     // can only accept/post/off/bid on their own behalf — the same guarantee resolveIdentity gives REST.
     const consumerGaii = agentGaii;

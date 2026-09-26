@@ -20,6 +20,8 @@
  *   import { registerCommerceTools } from './commerce.js';
  *   registerCommerceTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.6.1 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts),
+ *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  *   v1.6.0 — 2026-09-24 — SECURITY (audit A8-1): aimeat_commerce_beneficiary_approve asks the operator
  *     question of the agent through services/operator-principal.ts, so reading another account's
  *     approval state and recording one take operator:admin; recording keeps its own word too. The role
@@ -57,7 +59,7 @@ import type { AimeatConfig } from '../config.js';
 import { sealPspRecord, pspSecretHint } from '../commerce/psp-secrets.js';
 import { getEncryptionKey } from '../services/encryption.js';
 import type { Storage } from '../storage/interface.js';
-import { parseGaiiLoose } from '../utils/gaii.js';
+import { localAccountName } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor, responseFormatSchema, shapeResponse } from './catalog/shape.js';
 import { AppToolsDocSchema, appToolsKey, appIdFromToolsKey } from '../models/app-tool-schemas.js';
@@ -133,7 +135,7 @@ export function registerCommerceTools(
     if (!config.commerceEnabled) return;
 
     const agentGaii = getAgentGaii();
-    const owner = parseGaiiLoose(agentGaii).owner;
+    const owner = localAccountName(agentGaii);
     const ownerGhii = `${owner}@${config.nodeId}`;
 
     /**
@@ -312,7 +314,7 @@ export function registerCommerceTools(
         },
         annotationsFor('aimeat_app_tools_get'),
         async ({ app_id, owner: ownerArg }) => {
-            const targetOwner = (ownerArg ?? owner).split('@')[0] as string;
+            const targetOwner = localAccountName(ownerArg ?? owner);
             const rec = await storage.getMemory(`${targetOwner}@${config.nodeId}`, appToolsKey(app_id));
             // Cross-owner reads require the record to be PUBLIC — a private manifest is
             // indistinguishable from a missing one (mirrors the WebMCP listing gate).

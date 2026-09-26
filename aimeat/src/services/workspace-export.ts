@@ -27,12 +27,13 @@
  *   v1.3.0 — 2026-09-24 — The gate, and the manifest, readme, sources and config the bundle carries,
  *     come from the copies that count (services/workspace-meta.ts), not the first copy the scan
  *     returned for the gate and the last one the loop met for the bundle.
+ *   v1.3.1 — 2026-09-26 — The exporter's account name comes from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  */
 import { ZipArchive } from 'archiver';
 import type { Storage, MemoryRecord } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
 import { authorizeRead } from './access-guard.js';
-import { isSameOwner } from '../utils/gaii.js';
+import { isSameOwner, localAccountName } from '../utils/gaii.js';
 import { workspaceMetaReader } from './workspace-meta.js';
 import { logger } from '../utils/logger.js';
 
@@ -85,7 +86,7 @@ export async function collectWorkspace(
   // (GAII) keep the consent-bounded path, matching their live read rights.
   let isActiveMemberOwner = false;
   if (!exporterGaii.includes('#')) {
-    const m = await storage.getMembership(orgId, exporterGaii.split('@')[0]);
+    const m = await storage.getMembership(orgId, localAccountName(exporterGaii));
     isActiveMemberOwner = !!m && m.status === 'active';
   }
 

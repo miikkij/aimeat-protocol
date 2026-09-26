@@ -14,6 +14,8 @@
  * @structure registerMemoryBinTools(mcp, deps)
  * @usage registerMemoryBinTools(mcp, { storage, config, agentGaii });
  * @version-history
+ *   v1.0.2 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts),
+ *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  *   v1.0.1 — 2026-09-24 — aimeat_memory_restore hands the service the agent role, as the delete
  *     does, now that restore asks the organism namespace rule too (A6-12).
  *   v1.0.0 — 2026-09-03 — Extracted from core.ts (max-file-lines), with the tools it holds.
@@ -22,7 +24,7 @@ import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { parseGAII } from '../utils/gaii.js';
+import { localAccountName } from '../utils/gaii.js';
 import { descriptionFor } from './catalog/shape.js';
 import { annotationsFor } from './annotations.js';
 import { flexibleBoolean } from './schema-flags.js';
@@ -46,9 +48,8 @@ mcp.tool(
     },
     annotationsFor('aimeat_memory_delete'),
     async ({ key, owner_scope }) => {
-        const parsed = parseGAII(agentGaii);
         const out = await deleteMemoryRecord({ storage, config }, {
-            caller: agentGaii, ownerName: parsed?.owner ?? agentGaii, key,
+            caller: agentGaii, ownerName: localAccountName(agentGaii), key,
             ownerScope: owner_scope === true,
             // An agent session, never an operator one: this surface is minted per agent, so the
             // organism namespace check and the append-only guard inside the service both apply.
@@ -73,9 +74,8 @@ mcp.tool(
     },
     annotationsFor('aimeat_memory_restore'),
     async ({ key, owner_scope }) => {
-        const parsed = parseGAII(agentGaii);
         const out = await restoreMemoryRecord({ storage, config }, {
-            caller: agentGaii, ownerName: parsed?.owner ?? agentGaii, key,
+            caller: agentGaii, ownerName: localAccountName(agentGaii), key,
             ownerScope: owner_scope === true,
             // As the delete above: an agent session, so the organism namespace check and the
             // append-only guard inside the service both apply to putting a record back too.

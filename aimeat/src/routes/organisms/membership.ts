@@ -7,6 +7,9 @@
  *   invite-time role + workspace grants, pending-invite edit/cancel), DIRECT member add, and agent
  *   attach/detach. Extracted from src/routes/organisms.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.5.1 — 2026-09-26 — The member and agent owner names come from localAccountName (utils/gaii.ts),
+ *     which keeps an identity of another node whole, so it never names the local namesake
+ *     (secaudit 2026-09, F-1).
  *   v1.5.0 — 2026-08-25 — The member-removal rules move to services/organism-member-remove.ts so the
  *     MCP surfaces can remove a member through the same refusals, agent detach, grant revoke and
  *     notice. The route keeps its gate and its envelope and decides nothing else.
@@ -30,7 +33,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { success, error } from '../../middleware/envelope.js';
 import { requireAuth, requireRole, optionalAuth } from '../../auth/middleware.js';
-import { parseGaiiLoose } from '../../utils/gaii.js';
+import { parseGaiiLoose, localAccountName } from '../../utils/gaii.js';
 import { emitChange } from '../../services/event-bus.js';
 import { notify } from '../../services/notify.js';
 import { canSeeMembers, rosterCallerFromAuth } from '../../services/organism-privacy.js';
@@ -80,7 +83,7 @@ export function registerOrganismMembershipRoutes(router: Router, config: AimeatC
     const canSeeAgents = (callerMembership?.status === 'active') || !!req.auth?.roles.includes('operator');
     if (canSeeAgents) {
       // ONE `owner IN (…)` query for every member's agents, not one getAgentsByOwner per member.
-      const ownerNames = members.map(m => (m.ghii.includes('#') ? m.ghii.split('#')[1] : m.ghii).split('@')[0]);
+      const ownerNames = members.map(m => localAccountName(m.ghii));
       const agentsByOwner = await storage.getAgentsByOwners([...new Set(ownerNames)]);
       const enriched = members.map((m, i) => ({
         ...m,
@@ -612,7 +615,7 @@ export function registerOrganismMembershipRoutes(router: Router, config: AimeatC
       return;
     }
     const parsed = parseGaiiLoose(agent_gaii);
-    if (!parsed.agent || parsed.owner !== callerGhii) {
+    if (!parsed.agent || localAccountName(agent_gaii) !== callerGhii) {
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You can only attach your own agents'));
       return;
     }
@@ -648,8 +651,7 @@ export function registerOrganismMembershipRoutes(router: Router, config: AimeatC
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found'));
       return;
     }
-    const parsed = parseGaiiLoose(agentGaii);
-    const ownsAgent = parsed.owner === callerGhii;
+    const ownsAgent = localAccountName(agentGaii) === callerGhii;
     const isAdmin = isOrganismOwner(organism, callerGhii) || organism.admins.includes(callerGhii);
     if (!ownsAgent && !isAdmin) {
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the agent owner or an organism admin can detach it'));

@@ -19,12 +19,13 @@
  * @usage import { createAttestation, signAttestation } from '../services/attestation.js';
  * @version-history
  *   v1.0.0 — 2026-08-06 — Initial dual-sign service (TINKI phase 1)
+ *   v1.0.1 — 2026-09-26 — A party's account name comes from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  */
 import { createHash, randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { verify } from '../auth/keypair.js';
-import { parseGAII } from '../utils/gaii.js';
+import { localAccountName } from '../utils/gaii.js';
 import { CommerceError } from '../commerce/errors.js';
 
 /** Reserved server-only namespace — see the header for why no principal can write here. */
@@ -65,8 +66,7 @@ async function publicKeyFor(storage: Storage, identity: string): Promise<string 
     const agent = await storage.getAgent(identity);
     return agent?.publicKey ?? null;
   }
-  const parsed = parseGAII(identity);
-  const owner = parsed?.owner ?? identity.split('@')[0];
+  const owner = localAccountName(identity);
   if (!owner) return null;
   const rec = await storage.getOwner(owner);
   return rec?.publicKey ?? null;

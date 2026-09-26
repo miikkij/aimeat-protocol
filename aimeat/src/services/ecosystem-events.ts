@@ -16,6 +16,8 @@
  * @usage import { emitEcosystemMemoryWrite } from '../services/ecosystem-events.js';
  * @version-history
  *   v1.0.0 — 2026-06-14 — Created for ecosystem events & triggers (chunk 2).
+ *   v1.0.1 — 2026-09-26 — emitEcosystemMemoryWrite names the writer's account with localAccountOf, so a
+ *     visitor's write is never announced to the local namesake's apps (secaudit 2026-09, F-1).
  */
 import { randomUUID } from 'node:crypto';
 import type { Storage } from '../storage/interface.js';
@@ -23,7 +25,7 @@ import type { AimeatConfig } from '../config.js';
 import { emitDelivery } from './event-bus.js';
 import { buildEcosystemEnvelope } from '../models/ecosystem-event-schemas.js';
 import { globToRegExp } from './workflow/signal-eval.js';
-import { parseGaiiLoose } from '../utils/gaii.js';
+import { localAccountOf } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 
 const SUBSCRIPTIONS_KEY = 'ecosystem.subscriptions';
@@ -120,7 +122,8 @@ export async function emitOutboundEcosystemEvent(
 
 /** Outbound `memory.write` — fired at the memory write site for any GEAI watching the owner's keys. */
 export async function emitEcosystemMemoryWrite(storage: Storage, config: AimeatConfig, writerIdentity: string, key: string): Promise<void> {
-  const owner = parseGaiiLoose(writerIdentity).owner;
+  // A writer from another node has no account here, so its write reaches no app of the local namesake.
+  const owner = writerIdentity.includes('@') ? localAccountOf(writerIdentity) : null;
   if (!owner) return;
   const ownerGhii = `${owner}@${config.nodeId}`;
   await emitOutboundEcosystemEvent(storage, config, ownerGhii, 'memory.write', { key, owner_gaii: writerIdentity });

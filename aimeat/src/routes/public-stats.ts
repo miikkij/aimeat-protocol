@@ -26,6 +26,9 @@
  *     windowed read returned NOTHING on a busy node, where the window is all activity rows
  *     (aimeat.io served items: [] because of it). Reads are newestFirst so the window is the
  *     recent one on both backends — Postgres paged by key order.
+ *   v1.4.1 — 2026-09-26 — An owner's name in the ticker comes from localAccountName (utils/gaii.ts),
+ *     which keeps an identity of another node whole, so it never names the local namesake
+ *     (secaudit 2026-09, F-1).
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -34,11 +37,12 @@ import { success } from '../middleware/envelope.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { cached, TTL } from '../services/cache.js';
 import { logger } from '../utils/logger.js';
+import { localAccountName } from '../utils/gaii.js';
 
 export function publicStatsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
 
-  const agentNameOf = (gaii: string) => (gaii.includes('#') ? gaii.split('#')[0] : gaii.split('@')[0]);
+  const agentNameOf = (gaii: string) => (gaii.includes('#') ? gaii.split('#')[0] : localAccountName(gaii));
   const isToday = (iso?: string) => !!iso && iso.slice(0, 10) === new Date().toISOString().slice(0, 10);
   // The reserved non-actor identity: activity-feed entries, seeded built-in skills, ecosystem
   // subscriptions. Nothing it owns is somebody DOING something, so no public counter counts it.

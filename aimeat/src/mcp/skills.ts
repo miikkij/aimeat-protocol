@@ -14,6 +14,8 @@
  *   import { registerSkillsTools } from './skills.js';
  *   registerSkillsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
  * @version-history
+ *   v1.2.1 -- 2026-09-26 -- The caller's account name comes from localAccountName (utils/gaii.ts),
+ *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  *   v1.2.0 -- 2026-09-24 -- SECURITY (audit A8-1): node-scope publishing and visibility, which put a
  *     skill into every member's library, ask the operator question of the agent through
  *     services/operator-principal.ts, so they take operator:admin. It was read off the owner record,
@@ -26,7 +28,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { parseGAII } from '../utils/gaii.js';
+import { parseGAII, localAccountName } from '../utils/gaii.js';
 import { resolveOperatorAgentName, OPERATOR_AGENT_REFUSAL } from '../services/operator-principal.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
@@ -50,7 +52,7 @@ export function registerSkillsTools(
 ): void {
     const agentGaii = getAgentGaii();
     const parsed = parseGAII(agentGaii);
-    const ownerName = parsed?.owner ?? null;
+    const ownerName = parsed ? localAccountName(agentGaii) : null;
 
     // Node scope is the operator's, asked of THIS AGENT: an operator account's agent holding
     // operator:admin (services/operator-principal.ts), never the owner record alone.

@@ -27,6 +27,9 @@
  *                                       POST /v1/admin/apps/:owner/:filename/seo-approve
  * @usage registerAdminSeoRoutes(router, config, storage, canonicalOwner);
  * @version-history
+ *   v1.1.1 — 2026-09-26 — The app owner in the two per-app doors comes from localAccountName
+ *     (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local
+ *     namesake (secaudit 2026-09, F-1).
  *   v1.1.0 — 2026-09-11 — The key file checked from outside, the newest five notices and what a
  *     whole-site notice would carry in the status; the plan and the send doors for it. The MCP tool
  *     aimeat_seo_announce calls the same two service functions the doors call.
@@ -44,6 +47,7 @@ import { readIndexNowRuns } from '../services/indexnow-log.js';
 import { planAnnouncement, announceEverything, type AnnounceScope } from '../services/indexnow-site.js';
 import { safeFetch } from '../utils/url-validator.js';
 import { logger } from '../utils/logger.js';
+import { localAccountName } from '../utils/gaii.js';
 import type { CanonicalOwner } from './apps/helpers.js';
 
 /** How long one answer about the key file is believed before it is fetched again. */
@@ -251,7 +255,7 @@ export function registerAdminSeoRoutes(
     async (req, res) => {
       const ownerParam = req.params.owner as string;
       const filename = req.params.filename as string;
-      const owner = ownerParam.includes('@') ? ownerParam.split('@')[0] : ownerParam;
+      const owner = localAccountName(ownerParam);
       const body = req.body ?? {};
       if (typeof body.blocked !== 'boolean') {
         res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'blocked must be a boolean'));
@@ -293,7 +297,7 @@ export function registerAdminSeoRoutes(
     async (req, res) => {
       const ownerParam = req.params.owner as string;
       const filename = req.params.filename as string;
-      const owner = ownerParam.includes('@') ? ownerParam.split('@')[0] : ownerParam;
+      const owner = localAccountName(ownerParam);
       const body = req.body ?? {};
       if (typeof body.approved !== 'boolean') {
         res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'approved must be a boolean'));

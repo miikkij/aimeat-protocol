@@ -12,6 +12,7 @@
  * @structure safeNotificationLink, extensionCrossNotify
  * @usage if (opts?.to) return extensionCrossNotify(storage, config, ext.name, opts.to, message, opts);
  * @version-history
+ *   v1.3.1 — 2026-09-26 — The target's account name comes from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  *   v1.3.0 — 2026-09-24 — A relative link is kept only when safeRedirectPath says it is a path of
  *     this node, so `/\host` (which a browser reads as `//host`) falls back like any other address.
  *   v1.2.0 — 2026-08-30 — The notification names the extension as its source and lives in the bell
@@ -25,6 +26,7 @@ import type { Storage } from '../storage/interface.js';
 import { notify } from './notify.js';
 import { logger } from '../utils/logger.js';
 import { safeRedirectPath } from '../utils/same-origin-path.js';
+import { localAccountName } from '../utils/gaii.js';
 
 /**
  * Where an extension's notification may lead. A notification is a message the node delivers in its
@@ -65,7 +67,7 @@ export async function extensionCrossNotify(
   message: string,
   opts?: { title?: string; priority?: string; channel?: string; link?: string },
 ): Promise<boolean> {
-  const targetOwner = String(to).split('@')[0];
+  const targetOwner = localAccountName(String(to));
   if (!targetOwner) return false;
   const targetGhii = `${targetOwner}@${config.nodeId}`;
   const ghii = await storage.getGHII(targetGhii);

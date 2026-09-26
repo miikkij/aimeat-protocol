@@ -15,6 +15,7 @@
  *   - scanOwnerDue(storage, config, ownerGaii) — pulse the owner's own due instances (manual trigger)
  *   - pulseInstanceServer(storage, config, ownerGaii, loc, cfg) — one instance, self-fulfilled
  * @version-history
+ *   v1.3.1 — 2026-09-26 — The owner's account name comes from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  *   v1.3.0 — 2026-09-08 — A section's dispatched task emits task_assigned. "The running crew picks
  *     it up" was the assumption, and being picked up without polling is what a wake is for.
  *     → pitfalls §58
@@ -30,6 +31,7 @@ import { randomUUID } from 'node:crypto';
 import type { Storage, MemoryRecord, AgentTaskRecord } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
 import { logger } from '../utils/logger.js';
+import { localAccountName } from '../utils/gaii.js';
 import { completeForOwner, AiCompletionError } from './ai-completion.js';
 import { librarianSearch } from './librarian.js';
 import type { PushService } from './push.js';
@@ -92,7 +94,7 @@ async function notifyStop(services: LivingNotify | undefined, storage: Storage, 
   const body = `"${title}" stopped refreshing: ${reason}`;
   try {
     if (services.push?.enabled) {
-      await services.push.sendNotification(ownerGaii.split('@')[0], { title: 'Living document retired', body, url: '/v1/profile?tab=living', tag: 'living:retired' });
+      await services.push.sendNotification(localAccountName(ownerGaii), { title: 'Living document retired', body, url: '/v1/profile?tab=living', tag: 'living:retired' });
     }
   } catch (err) { logger.warn('notifyStop: push best-effort', { error: String(err) }); }
   try {
@@ -169,7 +171,7 @@ async function addSrc(storage: Storage, ownerGaii: string, loc: Loc, slot: strin
 
 /** Create a queued offer task for a section's agent (fire-and-forget; the running crew picks it up). */
 async function dispatchAgentTask(storage: Storage, config: AimeatConfig, ownerGaii: string, agentName: string, offerId: string, query: string): Promise<string> {
-  const ownerName = ownerGaii.split('@')[0];
+  const ownerName = localAccountName(ownerGaii);
   const agentGaii = `${agentName}#${ownerName}@${config.nodeId}`;
   const now = new Date().toISOString();
   const record: AgentTaskRecord = {
@@ -240,7 +242,7 @@ export async function pulseInstanceServer(
   storage: Storage, config: AimeatConfig, ownerGaii: string, loc: Loc, cfg: Record<string, unknown>,
   services?: LivingNotify,
 ): Promise<{ derived: number; costUsd: number; retired: boolean }> {
-  const ownerName = ownerGaii.split('@')[0];
+  const ownerName = localAccountName(ownerGaii);
   const charter = (cfg.charter as { scope?: string; trust?: { derive?: string } }) || {};
   const gated = charter.trust?.derive === 'gated';
   const sections = Array.isArray(cfg.template) ? cfg.template as Array<Record<string, unknown>> : [];

@@ -12,10 +12,12 @@
  *   - requestStorageGrant(ctx, message, attachment) — recipient→origin signed grant + download
  * @usage import { duplicateMessageAttachments } from '../services/attachment-duplication.js';
  * @version-history
+ *   v1.2.3 -- 2026-09-26 -- readFromOwnAgents takes the account name from localAccountName
+ *     (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local
+ *     namesake (secaudit 2026-09, F-1).
  *   v1.2.2 -- 2026-09-26 -- A cross-node copy reads the peer's download up to the size the
  *     attachment declares, and its grant answer up to 64 KB, with the ceiling holding while the bytes
- *     arrive (utils/read-capped.ts). The download was read whole with arrayBuffer() after the quota
- *     had been checked against the declared size (secaudit 2026-09, N3).
+ *     arrive (utils/read-capped.ts) (secaudit 2026-09, N3).
  *   v1.2.1 -- 2026-09-08 -- A same-node file the named principal does not have is looked for under
  *     that account's own agents, so messages written before the send-side fix heal on the next sweep
  *     rather than expiring unread.
@@ -37,7 +39,7 @@ import { sign } from '../auth/keypair.js';
 import { checkStorageQuota } from './quota.js';
 import { notify } from './notify.js';
 import { logger } from '../utils/logger.js';
-import { parseGaiiLoose } from '../utils/gaii.js';
+import { parseGaiiLoose, localAccountName } from '../utils/gaii.js';
 import { safeFetch } from '../utils/url-validator.js';
 import { readBodyCapped } from '../utils/read-capped.js';
 
@@ -107,7 +109,7 @@ async function fetchAttachmentBytes(ctx: AttachmentCtx, message: DirectMessageRe
 
 /** The sender account's own agents, searched for a file the named principal does not have. */
 async function readFromOwnAgents(ctx: AttachmentCtx, att: DirectMessageAttachment): Promise<Buffer | null> {
-  const { owner } = parseGaiiLoose(att.ownerGhii);
+  const owner = localAccountName(att.ownerGhii);
   const agents = await ctx.storage.getAgentsByOwner(owner).catch(err => {
     logger.warn('attachment duplication: agent lookup failed', { error: String(err), owner });
     return [];

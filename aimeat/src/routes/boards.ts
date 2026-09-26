@@ -13,6 +13,8 @@
  *   - resolve(): identity resolution via resolveIdentity for owner-scoped writes
  *
  * @version-history
+ *   v1.8.2 — 2026-09-26 — The board's owner in the members door comes from localAccountName, so a board
+ *     a visitor from another node owns is never the local namesake's (secaudit 2026-09, F-1).
  *   v1.8.1 — 2026-09-24 — The federated test is isForeignPrincipal(), the one question (secaudit 2026-09, F-1).
  *   v1.8.0 — 2026-09-12 — GET /v1/boards says how many live notices each board carries and when the
  *     newest was written (storage.boardPostCounts, one grouped query for the listing). A listing is
@@ -81,7 +83,7 @@ import {
   createBoard, subscribeToBoard, reactToBoardPost, unreactToBoardPost, setBoardMembers, setBoardRules, deleteBoardById, boardRulesBlock,
   publicBoardCeiling,
 } from '../services/board-write.js';
-import { resolveIdentity, isSameOwner, parseGaiiLoose, isForeignPrincipal } from '../utils/gaii.js';
+import { resolveIdentity, isSameOwner, localAccountName, isForeignPrincipal } from '../utils/gaii.js';
 import {
   loadServedProvenance, loadServedProvenanceMany, provenanceItemBlock, setProvenanceHeaders,
 } from '../services/ai-provenance-marks.js';
@@ -264,9 +266,10 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the board owner (owner session) or operator can manage members'));
       return;
     }
-    // Non-operator owner sessions must own the board
+    // Non-operator owner sessions must own the board. The board's owner comes from localAccountName,
+    // which keeps an owner of another node whole, so a visitor's board is never the namesake's.
     if (!isOperatorOwner) {
-      const boardOwner = parseGaiiLoose(board.ownerGaii).owner;
+      const boardOwner = localAccountName(board.ownerGaii);
       if (req.auth!.owner !== boardOwner) {
         res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You do not own this board'));
         return;

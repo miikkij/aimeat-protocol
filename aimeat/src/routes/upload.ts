@@ -24,6 +24,9 @@
  *   import { uploadRouter } from '../routes/upload.js';
  *   app.use(uploadRouter(config, storage));
  * @version-history
+ *   v1.19.1 — 2026-09-26 — The app, extension, skill and cortex uploads name their owner with
+ *     localAccountName, so an upload by a visitor from another node lands under its own name, as the
+ *     direct doors already do, never under the local namesake (secaudit 2026-09, F-1).
  *   v1.19.0 — 2026-09-24 — SECURITY (audit A8-1): the cortex ZIP's namespace claim asks the uploading
  *     principal through services/operator-principal.ts, with the agent's current grant from its own
  *     record (a presigned token carries no scopes), so it takes operator:admin as the inline door
@@ -134,7 +137,7 @@ import { writeStorageFile } from '../services/storage-file-write.js';
 import { safeUnzip, ZipSecurityError } from '../services/safe-zip.js';
 import { SkillValidationError, isAllowedSkillPath } from '../services/skill-md.js';
 import { publishSkill, type SkillScope } from '../services/skills.js';
-import { parseGAII } from '../utils/gaii.js';
+import { parseGAII, localAccountName } from '../utils/gaii.js';
 import { operatorName } from '../services/operator-principal.js';
 import { publishApp } from '../services/app-publish.js';
 import { servedMarksResponse } from '../services/app-serve-marks-strip.js';
@@ -271,9 +274,10 @@ async function handleAppUpload(
     // agent uploads, or the owner's GHII (owner@node) for owner uploads. Either
     // way the canonical app bucket is the owner GHII and the display/URL name is
     // the BARE owner — never the @node-suffixed form, which would fork the app
-    // into a second bucket (see canonicalOwner() in routes/apps.ts).
+    // into a second bucket (see canonicalOwner() in routes/apps.ts). localAccountName keeps a
+    // visitor's own name whole, as the direct publish door does, never the local namesake's.
     const parsed = parseGAII(sub);
-    const ownerName = parsed ? parsed.owner : (sub.includes('@') ? sub.split('@')[0] : sub);
+    const ownerName = localAccountName(sub);
     const ownerGaii = parsed ? `${parsed.owner}@${parsed.node}` : sub;
     const filename = meta.filename as string;
 
@@ -449,9 +453,9 @@ async function handleExtensionUpload(
     // Derived BEFORE the manifest is parsed, because the manifest check for config.app compares
     // the named app's owner against the installer. The token subject is a full GAII
     // (agent#owner@node) for agent uploads and the owner's GHII (owner@node) for owner / app-grant
-    // uploads; parseGAII returns null for the GHII form.
-    const parsedSub = parseGAII(sub);
-    const ownerName = parsedSub ? parsedSub.owner : (sub.includes('@') ? sub.split('@')[0] : sub);
+    // uploads. localAccountName gives the owner of either, and keeps a visitor's own name whole, as
+    // the inline install door does, so it never installs under the local namesake.
+    const ownerName = localAccountName(sub);
 
     const result = await parseExtensionZip(data, config, ownerName);
     if (!result.ok) {
@@ -609,8 +613,7 @@ async function handleSkillUpload(
     res: Response, config: AimeatConfig, storage: Storage,
     sub: string, meta: Record<string, unknown>, data: Buffer,
 ): Promise<void> {
-    const parsedSub = parseGAII(sub);
-    const ownerName = parsedSub ? parsedSub.owner : (sub.includes('@') ? sub.split('@')[0] : sub);
+    const ownerName = localAccountName(sub);
     const metaScope = meta.scope as SkillScope;
     const scope: SkillScope = metaScope === 'node' ? 'node' : metaScope === 'workspace' ? 'workspace' : 'user';
     const visibility = meta.visibility as 'owner' | 'members' | 'public' | undefined;
@@ -672,8 +675,7 @@ async function handleCortexUpload(
     res: Response, config: AimeatConfig, storage: Storage,
     sub: string, data: Buffer,
 ): Promise<void> {
-    const parsed = parseGAII(sub);
-    const ownerName = parsed?.owner ?? sub;
+    const ownerName = localAccountName(sub);
 
     // The ZIP is this door's own business: magic bytes, entry extraction, the manifest.yaml + libs/
     // layout. What comes out of it is the manifest text and the lib sources, which is what the

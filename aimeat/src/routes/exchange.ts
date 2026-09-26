@@ -20,6 +20,8 @@
  *   import { exchangeRouter } from './routes/exchange.js';
  *   app.use(exchangeRouter(config, storage));
  * @version-history
+ *   v1.7.1 — 2026-09-26 — The owner behind a principal comes from localAccountName, which keeps another
+ *     node's identity whole; the local ownerOf() copy of the cut is gone (secaudit 2026-09, F-1).
  *   v1.7.0 — 2026-09-24 — The notice to the other party of a proposal is the node's own message, so
  *     it does not count against the sending account's message limit (services/message-send-limit.ts).
  *   v1.6.0 — 2026-09-01 — Work that was paid up front at the A2A door delivers without a second
@@ -48,7 +50,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireScope, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
-import { resolveIdentity, ownerGhiiOf } from '../utils/gaii.js';
+import { resolveIdentity, ownerGhiiOf, localAccountName } from '../utils/gaii.js';
 import { commerceFeePercent } from '../services/marketplace-fee.js';
 import { percentFee } from '../commerce/money.js';
 import {
@@ -73,10 +75,6 @@ import { notifyGrantIssued, notifyGrantsRevoked } from '../services/membership-n
 import {
   type AgentWork, newWorkId, putWork, getWork, listWorkByConsumer, listWorkByProvider,
 } from '../services/exchange-work.js';
-
-function ownerOf(gaii: string): string {
-  return gaii.split('@')[0].split('#').pop() ?? gaii;
-}
 
 /**
  * The exact principal string a grant must be keyed by — the one the gate will see on the call.
@@ -283,7 +281,7 @@ export function exchangeRouter(config: AimeatConfig, storage: Storage): Router {
       return res.status(400).json(error(config.nodeId, 'INVALID_CONSUMER',
         `"${rawConsumer}" is not a principal shape this node can grant to. Name an owner ("alice" or "alice@${config.nodeId}") or one of their agents ("bot#alice@${config.nodeId}").`));
     }
-    if (ownerOf(consumer) === owner) {
+    if (localAccountName(consumer) === owner) {
       return res.status(400).json(error(config.nodeId, 'GRANT_TO_SELF',
         'You already call your own capability free — a grant to yourself would only add a record that never applies.'));
     }
@@ -430,7 +428,7 @@ export function exchangeRouter(config: AimeatConfig, storage: Storage): Router {
     if (!ext || !action) return res.status(400).json(error(config.nodeId, 'BAD_REQUEST', 'ext and action are required'));
 
     const ent = await readContractForCall(storage, consumerGaii, ext, action);
-    if (!ent || ownerOf(ent.consumerGaii) !== owner) {
+    if (!ent || localAccountName(ent.consumerGaii) !== owner) {
       return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No entitlement of yours for that capability'));
     }
     const ok = mode === 'revoke'

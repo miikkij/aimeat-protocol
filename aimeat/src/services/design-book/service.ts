@@ -34,6 +34,7 @@
  *   const book = new DesignBookService(storage, config);
  *   const out = await book.propose(callerGaii, raw, provenance);
  * @version-history
+ *   v1.9.1 — 2026-09-26 — adopt() and keep() take the caller's account name from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  *   v1.9.0 — 2026-09-20 — A genre may grow out of an app (grown-genre.ts): propose answers whether
  *     it earned the shelf, the map lists the ones whose app still stands, and grownGenre() is what
  *     the template doors and the preview ask.
@@ -72,6 +73,7 @@
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, MemoryRecord } from '../../storage/interface.js';
+import { localAccountName } from '../../utils/gaii.js';
 import { resolveAppOwnerScope } from '../app-owner-scope.js';
 import { systemGhiiFor } from '../compliance-register.js';
 import { provenanceForWrite } from '../ai-provenance.js';
@@ -469,11 +471,10 @@ export class DesignBookService {
 
     const apps = new AppUiService(this.storage, this.config);
     // The caller's OWN app, whichever door they came through: an owner session hands in a GHII
-    // (name@node), an agent a GAII (agent#name@node) — the owner name is the part before the
-    // separator either way, and the app is looked up under it, never under a client-supplied one.
-    const callerOwnerName = callerGaii.includes('#')
-      ? callerGaii.slice(callerGaii.indexOf('#') + 1, callerGaii.indexOf('@'))
-      : callerGaii.slice(0, callerGaii.indexOf('@'));
+    // (name@node), an agent a GAII (agent#name@node) — the owner name is the account on this node
+    // either way (an identity of another node stays whole and finds no app), and the app is looked
+    // up under it, never under a client-supplied one.
+    const callerOwnerName = localAccountName(callerGaii);
     const app = await this.storage.getAppByOwnerName(callerOwnerName, filename);
     if (!app) {
       throw new DesignBookError('NOT_FOUND',
@@ -606,9 +607,7 @@ export class DesignBookService {
     app: string; kept: boolean; version: number; took: Array<{ part: string; why: string }>;
     made: Array<{ name: string; what: string; why: string }>; next: string;
   }> {
-    const ownerName = callerGaii.includes('#')
-      ? callerGaii.slice(callerGaii.indexOf('#') + 1, callerGaii.indexOf('@'))
-      : callerGaii.slice(0, callerGaii.indexOf('@'));
+    const ownerName = localAccountName(callerGaii);
     const app = await this.storage.getAppByOwnerName(ownerName, filename);
     if (!app) throw new DesignBookError('NOT_FOUND', `No published app "${filename}" under your owner "${ownerName}".`, 404);
     const out = await new DesignBookReasons(this.storage, this.config).keep({ ownerGhii: app.ownerGaii, ownerName, filename, kept });

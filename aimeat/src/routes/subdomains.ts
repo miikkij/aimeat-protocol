@@ -14,6 +14,9 @@
  *            The operator CRUD lives in subdomain-admin.ts.
  * @usage app.use(subdomainServeRouter(config, storage)); // BEFORE bootstrapRouter
  * @version-history
+ *   v1.21.2 — 2026-09-26 — Every owner name here (the app target, the draft token, the frame grant,
+ *     the path form) comes from localAccountName (utils/gaii.ts), which keeps an identity of another
+ *     node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  *   v1.21.1 — 2026-09-26 — The visible AI label's reviewer re-decision is told whether the app is
  *     public (no access code, not parked), instead of assuming it.
  *   v1.21.0 — 2026-09-18 — serveApp counts the page view (services/signals/page-views.ts) for a page
@@ -128,6 +131,7 @@ import { prefersMarkdown } from '../services/markdown-negotiation.js';
 import { serveAppAgentFace } from '../services/agent-face.js';
 import { resolvePublishedPortfolio } from './portfolio.js';
 import { logger } from '../utils/logger.js';
+import { localAccountName } from '../utils/gaii.js';
 import { registerAppOriginWebmcp } from './subdomain-webmcp.js';
 import { registerAppOriginDocs, appOriginFor } from './subdomain-origin-docs.js';
 import { detectLocale, type Locale } from '../i18n.js';
@@ -193,8 +197,9 @@ export async function resolveAppTarget(storage: Storage, target: string): Promis
   const filename = target.slice(slash + 1);
   let app = await storage.getAppByOwnerName(owner, filename);
   // Backward-compat: target may carry the full GHII as the owner segment
-  if (!app && owner.includes('@')) {
-    app = await storage.getAppByOwnerName(owner.split('@')[0], filename);
+  const bare = localAccountName(owner);
+  if (!app && bare !== owner) {
+    app = await storage.getAppByOwnerName(bare, filename);
   }
   return app;
 }
@@ -454,7 +459,7 @@ async function serveDraftPreview(
   const slash = siteTarget.indexOf('/');
   const owner = slash > 0 ? siteTarget.slice(0, slash) : '';
   const filename = slash > 0 ? siteTarget.slice(slash + 1) : '';
-  const bareOwner = owner.includes('@') ? owner.split('@')[0] : owner;
+  const bareOwner = localAccountName(owner);
 
   let claim;
   try {
@@ -465,7 +470,7 @@ async function serveDraftPreview(
     return;
   }
   // Bind the token to THIS subdomain's app: same filename, same owner.
-  const claimBareOwner = claim.sub.includes('@') ? claim.sub.split('@')[0] : claim.sub;
+  const claimBareOwner = localAccountName(claim.sub);
   if (claim.filename !== filename || claimBareOwner !== bareOwner) {
     res.status(403).json(error(config.nodeId, 'TOKEN_INVALID', 'Draft preview token does not match this app'));
     return;
@@ -648,7 +653,7 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
       const tFile = slash > 0 ? site.target.slice(slash + 1) : '';
       try {
         const grant = await verifyFrameToken(frameToken);
-        const grantOwner = grant.sub.includes('@') ? grant.sub.split('@')[0] : grant.sub;
+        const grantOwner = localAccountName(grant.sub);
         if (grantOwner === tOwner && grant.filename === tFile) grantedOrigin = grant.origin;
       } catch (err) { logger.warn('notFound: not a usable grant → strict CSP', { error: String(err) }); }
     }
@@ -713,7 +718,7 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
     // Only treat genuine app HTML filenames as app requests; anything else (API
     // segments like /v1/..., assets) falls through to normal routing.
     if (!/\.html?$/i.test(filename) || filename.includes('..')) return next();
-    const bareOwner = owner.includes('@') ? owner.split('@')[0] : owner;
+    const bareOwner = localAccountName(owner);
     const app = await resolveAppTarget(storage, `${bareOwner}/${filename}`);
     if (!app) return next();
     if (appIsRestricted(config, app) && !(await appAccessGranted(req.query.access, app.ownerName, app.filename))) {

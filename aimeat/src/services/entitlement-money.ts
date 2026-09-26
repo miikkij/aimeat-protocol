@@ -16,6 +16,7 @@
  *   if (!s.ok) // deny; else keep s.trackingCode for a later refund
  * @version-history
  *   v1.0.0 — 2026-07-20 — Initial money accrual rail for the entitlement gateway (EXCHANGE money unit).
+ *   v1.0.1 — 2026-09-26 — ownerOf takes the account name from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
@@ -25,6 +26,7 @@ import { TEST_MONEY_HANDLER_ID } from '../commerce/test-money-handler.js';
 import { percentFee } from '../commerce/money.js';
 import { recordMoneyPlatformFee } from '../commerce/session-service.js';
 import { logger } from '../utils/logger.js';
+import { localAccountName } from '../utils/gaii.js';
 
 /** The invoice/receivable rail that accrues real money without a live per-call PSP charge (prod EE). */
 const ACCRUAL_HANDLER_ID = 'io.aimeat.invoice';
@@ -39,7 +41,7 @@ export function resolveAccrualHandler(currency: string): PaymentHandler | null {
     ?? null;
 }
 
-const ownerOf = (ghii: string): string => ghii.split('@')[0].split('#').pop() ?? ghii;
+const ownerOf = (ghii: string): string => localAccountName(ghii);
 
 /**
  * Settle ONE metered call in real money: collect the price from the consumer, pay the provider its net

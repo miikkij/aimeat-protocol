@@ -9,6 +9,8 @@
  * @structure registerNotifyTools(mcp, storage, config, getAgentGaii)
  * @usage import { registerNotifyTools } from './notify.js';
  * @version-history
+ *   v1.1.1 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts),
+ *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  *   v1.1.0 — 2026-09-07 — Reads `created`, not only `muted`. The try/catch below was correct and
  *     unreachable: the service had already turned a storage failure into a result. Measured against
  *     a storage that refuses every write, this was the ONE tool of 318 on this surface that
@@ -21,7 +23,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
-import { parseGaiiLoose } from '../utils/gaii.js';
+import { localAccountName } from '../utils/gaii.js';
 import { createPrincipalNotification, NotificationCreateError } from '../services/notification-create.js';
 
 export function registerNotifyTools(mcp: McpServer, storage: Storage, config: AimeatConfig, getAgentGaii: () => string): void {
@@ -37,7 +39,7 @@ export function registerNotifyTools(mcp: McpServer, storage: Storage, config: Ai
         annotationsFor('aimeat_notify'),
         async ({ title, body, link, type }) => {
             const gaii = getAgentGaii();
-            const owner = parseGaiiLoose(gaii).owner || gaii.split('@')[0];
+            const owner = localAccountName(gaii);
             try {
                 const r = await createPrincipalNotification(storage, config, { owner, sub: gaii, roles: ['agent'] }, { title, body, link, type });
                 if (r.muted) {

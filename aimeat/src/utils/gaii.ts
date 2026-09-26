@@ -13,10 +13,14 @@
  *   - GEAI: parseGEAI / buildGEAI / isValidGEAI / validateAppName / isGEAI / ECO_PREFIX
  *   - resolveIdentity (owner→GHII, agent/ecosystem→sub verbatim), parseGaiiLoose, isSameOwner
  *   - isForeignPrincipal / homeIdentityOf / FEDERATED_ROLE: a session signed in on another node
- *   - setThisNodeId / localAccountName: the account an identity names on THIS node, or none
+ *   - setThisNodeId / localAccountName / localAccountOf: the account an identity names on THIS node,
+ *     for a lookup (another node's identity comes back whole) or a decision (it comes back null)
  *   - Chat instance + device-auth user-code helpers
  * @usage import { resolveIdentity, parseGEAI, isGEAI } from '../utils/gaii.js';
  * @version-history
+ *   v1.7.0 — 2026-09-26 — localAccountOf, the same cut for a caller that branches on "is this one of
+ *     ours". Every other cut of an identity to an account name in src/ now goes through one of the
+ *     two, and `pnpm check:identity-shortening` holds it (secaudit 2026-09, F-1 as a class).
  *   v1.6.2 — 2026-09-26 — localAccountName cuts at the LAST '@', so a visitor a route composed with
  *     this node's id (`alice@their-node@this-node`) stays `alice@their-node` instead of becoming the
  *     local namesake (secaudit 2026-09, F-1 as a class).
@@ -278,6 +282,23 @@ export function localAccountName(identity: string): string {
   if (thisNodeId && at >= 0 && s.slice(at + 1) !== thisNodeId) return s;
   const afterHash = s.includes('#') ? s.slice(s.indexOf('#') + 1) : s;
   return afterHash.includes('@') ? afterHash.slice(0, afterHash.lastIndexOf('@')) : afterHash;
+}
+
+/**
+ * The account an identity names on THIS node, or null when it names none here: an identity of
+ * another node, or an empty one.
+ *
+ * The same cut as localAccountName, for a caller that DECIDES on the answer ("is this caller one of
+ * ours, and which account") rather than looking a name up. localAccountName hands another node's
+ * identity back whole, which finds nobody in a lookup; a caller that branches on "has an owner" needs
+ * to hear "no" instead, or it goes on with a name that is not an account.
+ *
+ * These two are the only places an identity is cut to an account name. `pnpm check:identity-shortening`
+ * refuses a new cut anywhere else, and lists the few that are right as they are with the reason.
+ */
+export function localAccountOf(identity: string): string | null {
+  const name = localAccountName(identity);
+  return name && !name.includes('@') ? name : null;
 }
 
 export function resolveIdentity(

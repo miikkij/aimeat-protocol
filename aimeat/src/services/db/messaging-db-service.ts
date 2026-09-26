@@ -13,6 +13,7 @@
  * @structure MessagingDbService.ownerConversations(ownerGhii, ownerName, { agentThreads }) → { conversations } in a read scope
  * @usage const { conversations } = await createMessagingDbService(storage).ownerConversations(ghii, owner);
  * @version-history
+ *   v1.5.1 — 2026-09-26 — The owner comparisons take account names from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so a visitor never counts as the local namesake (secaudit 2026-09, F-1).
  *   v1.5.0 — 2026-09-13 — The list is organised with the owner's own record before it is returned:
  *     each row carries its section (people, own agents, a rule's heading, archive), why it is
  *     archived, and the folds inside each section (services/inbox-organize/). foldBroadcasts moved
@@ -36,7 +37,7 @@
 import type { Storage } from '../../storage/interface.js';
 import type { ConversationSummary } from '../../storage/repositories/direct-message.repository.js';
 import { runInReadScope } from '../../storage/read-scope/read-scope.js';
-import { parseGaiiLoose } from '../../utils/gaii.js';
+import { localAccountName } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
 import { organizeConversations, type InboxSection, type RowArchive, type RowFold } from '../inbox-organize/organize.js';
 import { readInboxOrganize } from '../inbox-organize/record.js';
@@ -120,7 +121,7 @@ export class MessagingDbService {
       const agentConvs: OwnerConversation[] = [];
       for (const a of agentThreads ? agents : []) {
         for (const c of (byOwner[a.gaii] ?? [])) {
-          if (parseGaiiLoose(c.peerGhii).owner === ownerName) continue;
+          if (localAccountName(c.peerGhii) === ownerName) continue;
           agentConvs.push({ ...c, viaAgent: a.gaii });
         }
       }
@@ -176,7 +177,7 @@ export class MessagingDbService {
     return rows.map(row => {
       const convo = byId.get(row.conversationId);
       if (!convo) return row;
-      const readerOpenedIt = parseGaiiLoose(convo.createdBy).owner === parseGaiiLoose(readerGhii).owner;
+      const readerOpenedIt = localAccountName(convo.createdBy) === localAccountName(readerGhii);
       const address = convo.alias ?? `group:${convo.id}`;
       // Who spoke last, when it was not this person. `viaAgent` rows are already read under the agent,
       // so the tag would say nothing there; on the owner's own row it is the whole point.

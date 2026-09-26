@@ -21,6 +21,9 @@
  *   const paced = await burnPacingToll({ config, storage, callerGaii, providerOwner, label, toll, res });
  *   if (!paced.ok) return { ok: false };   // 402 already sent
  * @version-history
+ *   v1.4.1 — 2026-09-26 — The own-capability exemption names the caller's account with localAccountName
+ *     (utils/gaii.ts), which keeps an identity of another node whole, so a visitor is never taken for
+ *     the local namesake (secaudit 2026-09, F-1).
  *   v1.4.0 — 2026-08-10 — res widened to PaywallResponder (Express Response still satisfies it).
  *     money-only contract is paced too (it previously had no morsel brake of any kind).
  *   v1.3.0 — 2026-07-28 — The burn moved to services/metered-settlement.ts so the chokepoint can
@@ -38,7 +41,7 @@ import type { Storage } from '../../storage/interface.js';
 import { error } from '../../middleware/envelope.js';
 import { paymentChallenge } from '../../commerce/x402.js';
 import { burnPacingTollFor } from '../../services/metered-settlement.js';
-import { ownerGhiiOf } from '../../utils/gaii.js';
+import { localAccountName } from '../../utils/gaii.js';
 
 /**
  * How many morsels this call burns. A per-capability value wins when the source declares one; otherwise
@@ -69,7 +72,7 @@ export async function burnPacingToll(args: {
 }): Promise<{ ok: boolean }> {
   const { config, storage, callerGaii, providerOwner, label, toll, res } = args;
   if (toll <= 0) return { ok: true };
-  if (providerOwner && ownerGhiiOf(callerGaii).split('@')[0] === providerOwner) return { ok: true };
+  if (providerOwner && localAccountName(callerGaii) === providerOwner) return { ok: true };
 
   const burned = await burnPacingTollFor({ config, storage, caller: callerGaii, label, toll, payer: null });
   if (!burned) {

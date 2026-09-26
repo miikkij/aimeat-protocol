@@ -21,6 +21,8 @@
  *   aimeat_package_list, aimeat_package_get, aimeat_package_status_set, aimeat_package_install.
  * @usage import { registerPackageTools } from './packages.js';
  * @version-history
+ *   v1.3.1 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts),
+ *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  *   v1.3.0 — 2026-09-25 — install and update go through installOrRequest / updateOrRequest: without
  *     the words a memory part needs, the answer is a request for the owner, as on the HTTP door.
  *   v1.2.0 — 2026-09-24 — install and update hand the session's scopes to the service, which asks
@@ -48,7 +50,7 @@ import { pullPackage } from '../services/package-pull.js';
 import type { PeerInfo } from '../services/federation.js';
 import { getActiveScheduler } from '../services/scheduler.js';
 import { resolveGhii } from '../utils/ghii-resolver.js';
-import { parseGaiiLoose } from '../utils/gaii.js';
+import { localAccountName } from '../utils/gaii.js';
 
 /** A package row as a conversation needs it: what it is, not every byte it holds. */
 function packageSummary(pkg: { packageGroupId: string; name: string; author: string; version: string; status: string; visibility: string; description: string; category: string; tags: string[]; components: { id: string; type: string; label: string }[] }) {
@@ -77,7 +79,7 @@ export function registerPackageTools(
     /** The owner this agent acts for. Never a caller-supplied id. */
     const ownerOf = (): string => {
         const gaii = getAgentGaii();
-        return parseGaiiLoose(gaii).owner || gaii;
+        return localAccountName(gaii);
     };
     /** What this session answers for when a component writes into the owner's memory. */
     const grant = { roles: ['agent'], scopes: sessionScopes };
@@ -234,7 +236,7 @@ export function registerPackageTools(
     }, annotationsFor('aimeat_package_install'), async ({ group_id, label, version, dry_run: dryRun }) => {
         // Packages install under the OWNER, so resolve the agent's owner and never a supplied id.
         const gaii = getAgentGaii();
-        const owner = parseGaiiLoose(gaii).owner || gaii;
+        const owner = localAccountName(gaii);
         const ownerGhii = await resolveGhii(storage, owner, config);
 
         const out = await installOrRequest(

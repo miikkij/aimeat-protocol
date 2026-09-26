@@ -15,13 +15,15 @@
  *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
  *     from shared annotations.ts for Connectors Directory compliance.
  *   v1.2.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
+ *   v1.2.1 -- 2026-09-26 -- The caller's account name comes from localAccountName (utils/gaii.ts),
+ *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  */
 
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { parseGaiiLoose } from '../utils/gaii.js';
+import { localAccountName } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 import { grantConsent, revokeConsent } from '../services/consent-write.js';
@@ -41,8 +43,7 @@ export function registerConsentTools(
 
     /** Resolve owner GHII from agent GAII */
     function ownerGhii(): string {
-        const parsed = parseGaiiLoose(agentGaii);
-        return `${parsed.owner}@${config.nodeId}`;
+        return `${localAccountName(agentGaii)}@${config.nodeId}`;
     }
 
     // ── Resource: consent record ──

@@ -25,6 +25,8 @@
  *   const refused = await refuseTriggerStart({ storage, config }, ownerGhii, def);
  *   if (refused) return { runId: refused.runId, skipped: true, refused: refused.reason };
  * @version-history
+ *   v1.1.1 — 2026-09-26 — An agent saver's account comes from localAccountOf, so a saver of another
+ *     node never has its tokens looked up under the local namesake (secaudit 2026-09, F-1).
  *   v1.1.0 — 2026-09-26 — "Run as me" and "Approve again" carry their own locale keys, so the bell and
  *     the Notifications page say them in the reader's language.
  *   v1.0.0 — 2026-09-25 — Initial.
@@ -32,7 +34,7 @@
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
-import { isGEAI, parseGaiiLoose } from '../../utils/gaii.js';
+import { isGEAI, parseGaiiLoose, localAccountOf } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
 import { notify, type NotifAction } from '../notify.js';
 import { emitChange } from '../event-bus.js';
@@ -65,7 +67,9 @@ export interface SaverNow { name: string; gone: boolean; scopes: string[]; appro
  */
 export async function saverAuthority(storage: Storage, saver: WorkflowSaver): Promise<SaverNow> {
   if (saver.kind === 'agent') {
-    const { agent: name, owner } = parseGaiiLoose(saver.id);
+    const name = parseGaiiLoose(saver.id).agent;
+    // The account whose tokens are searched: this node's, never the namesake of another node's saver.
+    const owner = saver.id.includes('@') ? localAccountOf(saver.id) : null;
     const record = saver.id ? await storage.getAgent(saver.id) : null;
     if (record) {
       return { name: record.name, gone: false, scopes: record.defaultScopes ?? [], approveLink: `/v1/profile?tab=agents&agent=${encodeURIComponent(record.name)}` };

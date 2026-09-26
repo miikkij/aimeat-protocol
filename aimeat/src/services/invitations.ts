@@ -21,6 +21,7 @@
  *   const membership = await createNameInvitation(storage, config, { organism, inviterGhii, inviteeRaw, role, workspaces });
  *   await revokeDepartedMemberAccess(storage, config, { organism, departing });
  * @version-history
+ *   v1.8.1 — 2026-09-26 — A workspace creator's and a departing member's account names come from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  *   v1.8.0 — 2026-08-25 — Withdraw and edit find a pending invitation through
  *     services/invitation-lookup.ts, which also matches a legacy row keyed by the full GHII. Such a
  *     row was listed as pending and refused as absent, and the VIP organism on prod held one since
@@ -58,7 +59,7 @@ import { getActiveEmailService } from './email.js';
 import { formatForPerson } from './display-prefs.js';
 import { grantWorkspaceRole, revokeWorkspaceRole } from './workspace-roles.js';
 import { findPendingInvitation, membershipOwner } from './invitation-lookup.js';
-import { parseGaiiLoose } from '../utils/gaii.js';
+import { localAccountName } from '../utils/gaii.js';
 import { isValidEmail } from '../utils/email-validator.js';
 
 export const INVITE_DEFAULT_EXPIRY_DAYS = 7;
@@ -334,7 +335,7 @@ export async function findWorkspaceEntry(
 
 /** The bare owner behind a memory record's owner identity (`agent#owner@node` / `owner@node` → `owner`). */
 function bareOwnerOf(gaii: string): string {
-  return (gaii.includes('#') ? gaii.split('#')[1] : gaii).split('@')[0];
+  return localAccountName(gaii);
 }
 
 /**
@@ -412,7 +413,7 @@ export async function revokeDepartedMemberAccess(
   const { organism, departing } = args;
 
   // Agents are listed by full GAII (`claude#alice@node`); the owner segment ties one to a person.
-  const detachedAgents = organism.agentGaiis.filter(g => parseGaiiLoose(g).owner === departing);
+  const detachedAgents = organism.agentGaiis.filter(g => localAccountName(g) === departing);
   if (detachedAgents.length) {
     await storage.updateOrganism(organism.id, {
       agentGaiis: organism.agentGaiis.filter(g => !detachedAgents.includes(g)),

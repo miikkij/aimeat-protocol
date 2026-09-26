@@ -19,11 +19,13 @@
  *     ceiling at 100 000 against a shipped default of 1 000, so the two principals that would have
  *     failed loudest never failed at all and nobody learned anything. Monitoring is what makes a
  *     raised ceiling safe.
+ *   v1.0.1 — 2026-09-26 — The recipient's account comes from localAccountOf, so the alarm for a
+ *     visitor's namespace never goes to the local namesake (secaudit 2026-09, F-1).
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { notify } from './notify.js';
-import { parseGaiiLoose } from '../utils/gaii.js';
+import { localAccountOf } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 
 /** Percentages at which the owner is told. 80 leaves room to reshape; 95 says it is nearly over. */
@@ -64,7 +66,9 @@ async function resolveRecipient(storage: Storage, gaii: string, nodeId: string):
     const ext = await storage.getExtension(name);
     return ext?.installedBy ? `${ext.installedBy}@${nodeId}` : null;
   }
-  const { owner } = parseGaiiLoose(gaii);
+  // A principal of another node has no owner here, so its alarm reaches nobody rather than the local
+  // account that shares its name.
+  const owner = gaii.includes('@') ? localAccountOf(gaii) : null;
   return owner ? `${owner}@${nodeId}` : null;
 }
 

@@ -16,6 +16,8 @@
  * @usage
  *   import { registerOperatorConfigTools } from './operator-config.js';
  * @version-history
+ *   v1.3.1 -- 2026-09-26 -- The caller's account name comes from localAccountName (utils/gaii.ts),
+ *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  *   v1.3.0 -- 2026-08-11 -- aimeat_operator_agent_configure writes through
  *     services/agent-profile-write.ts, which the two REST doors for these fields already call.
  *     Three things the shared writer does and this tool did not. Tags were stored verbatim, so
@@ -48,7 +50,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AgentRecord } from '../storage/interface.js';
-import { parseGAII } from '../utils/gaii.js';
+import { localAccountName } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 import { mintConfirmToken, verifyConfirmToken, ConfirmTokenError } from '../services/operator-confirm.js';
@@ -114,7 +116,7 @@ export function registerOperatorConfigTools(
     sessionScopes: string[] = [],
 ): void {
     const agentGaii = getAgentGaii();
-    const callerOwner = parseGAII(agentGaii)?.owner ?? null;
+    const callerOwner = localAccountName(agentGaii) || null;
 
     const err = (text: string) => ({ content: [{ type: 'text' as const, text }], isError: true });
     const ok = (payload: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(payload, null, 2) }] });

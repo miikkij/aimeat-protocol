@@ -26,12 +26,13 @@
  * @usage const outcome = await fireOnDone({ storage, config, service, emailService }, job);
  * @version-history
  *   v1.0.0 — 2026-08-31 — Initial.
+ *   v1.0.1 — 2026-09-26 — The job owner's account name comes from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import type { EmailService } from '../email.js';
 import { runExtensionActionAsSystem } from '../extension-system-run.js';
-import { parseGAII } from '../../utils/gaii.js';
+import { localAccountName } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
 import { buildExtensionAi } from './ext-capability.js';
 import type { AiJobRecord, AiJobChainStop, AiJobStarter } from './types.js';
@@ -56,7 +57,7 @@ export async function fireOnDone(deps: OnDoneDeps, job: AiJobRecord): Promise<On
     const { storage, config, service, emailService } = deps;
     if (!job.on_done) return { ok: true };
 
-    const ownerName = parseGAII(job.owner)?.owner ?? job.owner.split('@')[0];
+    const ownerName = localAccountName(job.owner);
 
     // Where a refusal of the NEXT job lands. Filled in by ctx.ai.start while the action is running,
     // read after it returns — an action may swallow the decision it was handed, and the chain still

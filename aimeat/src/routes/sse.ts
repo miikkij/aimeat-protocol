@@ -11,6 +11,9 @@
  * @structure sseRouter(config, storage) -> Router
  * @usage app.use(sseRouter(config, storage)); client: EventSource('/v1/events?ticket=...')
  * @version-history
+ *   v1.5.1 -- 2026-09-26 -- The owner segment an event is matched on comes from localAccountName
+ *     (utils/gaii.ts), which keeps an identity of another node whole, so a visitor's stream never
+ *     hears the local namesake's events (secaudit 2026-09, F-1).
  *   v1.5.0 -- 2026-07-25 -- Open the stream immediately (`retry:` + `:open` flushed on connect,
  *     keepalive 30s -> 15s): the first byte used to be the 30s keepalive, which is
  *     indistinguishable from a hung connection and gets streams dropped by proxies with a short
@@ -38,7 +41,7 @@ import { requireAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { onChangeEvent, offChangeEvent } from '../services/event-bus.js';
 import type { ChangeEvent } from '../services/event-bus.js';
-import { resolveIdentity, parseGaiiLoose } from '../utils/gaii.js';
+import { resolveIdentity, localAccountName } from '../utils/gaii.js';
 import { presence } from '../services/presence.js';
 import { allowedDomains, filterDomains, isOwnerPrincipal } from '../auth/sse-domain-scopes.js';
 
@@ -151,7 +154,7 @@ export function sseRouter(config: AimeatConfig, _storage: Storage): Router {
     //  2. TYPED COALESCE — accumulate the SET of changed domains during the window and flush
     //     `data: {"domains":[...]}`, so the client re-fetches only the affected views instead
     //     of everything. Leading-edge: the first change in a quiet window goes immediately.
-    const ownerKey = parseGaiiLoose(t.presenceGhii).owner;
+    const ownerKey = localAccountName(t.presenceGhii);
     const COALESCE_MS = 1000;
     let lastSent = 0;
     let trailingTimer: ReturnType<typeof setTimeout> | null = null;
@@ -166,7 +169,7 @@ export function sseRouter(config: AimeatConfig, _storage: Storage): Router {
     };
     const handler = (evt: ChangeEvent): void => {
       // Owner-private events for a different owner are not this client's business.
-      if (evt.ownerGaii && parseGaiiLoose(evt.ownerGaii).owner !== ownerKey) return;
+      if (evt.ownerGaii && localAccountName(evt.ownerGaii) !== ownerKey) return;
       // Scope gate: a restricted principal (app grant, agent, eco app) is told only about the
       // domains its granted scopes cover. The payload is just a domain name, but the name plus
       // its timing is metadata the owner never consented to hand this app.

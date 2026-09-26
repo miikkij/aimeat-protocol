@@ -14,6 +14,9 @@
  *     GET .../instances (hosted instances of the agent + their PUBLIC offers/prices)
  * @usage registered from appsRouter() in src/routes/apps.ts
  * @version-history
+ *   v1.2.2 — 2026-09-26 — The supplied target owner and the app owner in the URL come from
+ *     localAccountName too, which keeps an identity of another node whole, so neither names the
+ *     local namesake (secaudit 2026-09, F-1).
  *   v1.2.1 — 2026-09-24 — bareOwner(req) is localAccountName: a visitor's home GHII stays whole and
  *     never names the local account sharing its local part (secaudit 2026-09, F-1).
  *   v1.2.0 — 2026-09-06 — The shelf's `online` counts a live connector socket, so a hosted agent
@@ -77,7 +80,7 @@ async function resolveDeployContext(
     const owner = bareOwner(req);
     const suppliedTarget = (req.body?.owner ?? req.body?.target_owner ?? req.query?.owner) as string | undefined;
     if (typeof suppliedTarget === 'string' && suppliedTarget.length > 0) {
-        const bare = suppliedTarget.includes('@') ? suppliedTarget.split('@')[0] : suppliedTarget;
+        const bare = localAccountName(suppliedTarget);
         if (bare !== owner) {
             res.status(403).json(error(config.nodeId, 'CROSS_OWNER_FORBIDDEN',
                 'You can only deploy onto your own agents. Leave the owner out and it will use yours.'));
@@ -89,7 +92,7 @@ async function resolveDeployContext(
     const filename = req.params.filename as string;
     const agentName = req.params.agentName as string;
     const app = await storage.getAppByOwnerName(
-        appOwner.includes('@') ? appOwner.split('@')[0] : appOwner, filename);
+        localAccountName(appOwner), filename);
     // Foreign apps are deployable only when publicly runnable — parked, operator-hidden and
     // access-coded apps stay invisible to non-owners (404, matching the download routes).
     if (!app || (app.ownerName !== owner && (app.parked || app.operatorHidden || app.accessCode))) {
@@ -175,7 +178,7 @@ export function registerAppAgentRoutes(router: Router, config: AimeatConfig, sto
         const agentName = req.params.agentName as string;
         const viewer = req.auth && !req.auth.anonymous ? bareOwner(req) : null;
         const app = await storage.getAppByOwnerName(
-            appOwnerParam.includes('@') ? appOwnerParam.split('@')[0] : appOwnerParam, filename);
+            localAccountName(appOwnerParam), filename);
         if (!app || (app.ownerName !== viewer && (app.parked || app.operatorHidden || app.accessCode))) {
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'App not found'));
             return;

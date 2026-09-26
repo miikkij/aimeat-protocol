@@ -18,6 +18,8 @@
  *   import { registerAgentScheduleTools } from './agent-schedules.js';
  *   registerAgentScheduleTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.3.1 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts),
+ *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  *   v1.3.0 — 2026-09-05 — An extension schedule can carry the action's own `input` (and an
  *     `instance_id`), which POST /v1/schedules has stored since it was written while no tool surface
  *     declared it. Until now every scheduled action ran on its built-in defaults, which is rarely
@@ -39,7 +41,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
-import { parseGAII } from '../utils/gaii.js';
+import { parseGAII, localAccountName } from '../utils/gaii.js';
 import { emitChange } from '../services/event-bus.js';
 import { createScheduleRecord, updateScheduleRecord, deleteScheduleRecord, triggerScheduleRecord } from '../services/schedule-write.js';
 import type { ScheduleWriteCaller } from '../services/schedule-write.js';
@@ -57,7 +59,7 @@ export function registerAgentScheduleTools(
 ): void {
   const agentGaii = getAgentGaii();
   const parsed = parseGAII(agentGaii);
-  const owner = parsed?.owner ?? '';
+  const owner = parsed ? localAccountName(agentGaii) : '';
   const ownerScope = `${owner}@${config.nodeId}`;
   const selfName = agentGaii.split('#')[0];
 

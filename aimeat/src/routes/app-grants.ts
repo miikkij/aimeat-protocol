@@ -20,6 +20,9 @@
  *     routes/app-grants-manage.ts.
  * @usage app.use(appGrantsRouter(config, storage));
  * @version-history
+ *   v1.17.1 — 2026-09-26 — The app owner behind a grant target comes from localAccountName
+ *     (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local
+ *     namesake (secaudit 2026-09, F-1).
  *   v1.17.0 — 2026-09-26 — The App Catalog's preview asks the same way, on every node: `?app=` is
  *     answered wherever a page of the node asks, and the app's own path is a bound redirect on every
  *     node (services/app-frame-redirect.ts). The catalog handed the owner's session to the code it
@@ -108,7 +111,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
-import { resolveIdentity } from '../utils/gaii.js';
+import { resolveIdentity, localAccountName } from '../utils/gaii.js';
 import { issueJWT } from '../auth/jwt.js';
 import { readRefreshCookie } from '../services/owner-session.js';
 import { PORTFOLIO_TARGET_PREFIX, resolveAppOriginTarget, resolveFrameAppTarget } from '../services/app-origin-target.js';
@@ -170,7 +173,7 @@ async function declaredScopesOf(storage: Storage, target: string): Promise<strin
   if (slash <= 0 || slash === target.length - 1) return null;
   const owner = target.slice(0, slash);
   const filename = target.slice(slash + 1);
-  const bare = owner.includes('@') ? owner.split('@')[0] : owner;
+  const bare = localAccountName(owner);
   const app = await storage.getAppByOwnerName(bare, filename).catch(err => {
     logger.warn('app-grants: could not read the app behind a grant target', { target, error: String(err) });
     return null;

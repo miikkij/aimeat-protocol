@@ -24,6 +24,9 @@
  * @structure assembleJobPrompt(deps, ownerGhii, spec) → string (throws RESERVED_KEY, AI_JOB_PROMPT_TOO_LARGE)
  * @usage const prompt = await assembleJobPrompt({ storage, config }, ownerGhii, job);
  * @version-history
+ *   v1.1.1 — 2026-09-26 — The owner's account name comes from localAccountName (utils/gaii.ts), which
+ *     keeps an identity of another node whole, so it never names the local namesake
+ *     (secaudit 2026-09, F-1).
  *   v1.1.0 — 2026-09-26 — Refuses, before the first read, a prompt_key or input key naming a record
  *     the node keeps for itself (secaudit 2026-09: 573704db10ed).
  *   v1.0.0 — 2026-08-31 — Initial.
@@ -32,7 +35,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { getOwnerScopeMemory } from '../owner-memory.js';
 import { aiJobKeyRefusal } from '../ai-job-keys.js';
-import { parseGAII } from '../../utils/gaii.js';
+import { localAccountName } from '../../utils/gaii.js';
 import { AiJobError } from './types.js';
 
 export interface PromptSpec {
@@ -51,7 +54,7 @@ const asText = (value: unknown): string =>
 async function readOwnerRecord(
     storage: Storage, nodeId: string, ownerGhii: string, key: string,
 ): Promise<unknown | undefined> {
-    const ownerName = parseGAII(ownerGhii)?.owner ?? ownerGhii.split('@')[0];
+    const ownerName = localAccountName(ownerGhii);
     const rec = await getOwnerScopeMemory(storage, nodeId, ownerName, key);
     return rec?.value;
 }

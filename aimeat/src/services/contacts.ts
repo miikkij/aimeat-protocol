@@ -26,6 +26,7 @@
  *   resolveContactEmail; resolveOwnerByVerifiedEmail; promoteContactsForVerifiedEmail.
  * @usage const { contacts } = await listContactsMerged(storage, config, ownerGhii, { q });
  * @version-history
+ *   v2.4.1 — 2026-09-26 — The inviter's and a resolved owner's account names come from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  *   v2.4.0 — 2026-09-25 — resolveContactEmail takes the asker, and it and a save by email both count
  *     against the account's 20 lookups in 10 minutes before the address is read (ContactsError 429
  *     RATE_LIMITED, `details.retry_after_sec`). The limit sat on the resolve door alone.
@@ -57,7 +58,7 @@ import { inviteEmailHash } from './invitations.js';
 import { getActiveEmailService } from './email.js';
 import { ensureContact, updateContactCard, sendOutbound, OutboundError } from './outbound/outbound-service.js';
 import { revokeContactHandles } from './contact-handles.js';
-import { parseGaiiLoose } from '../utils/gaii.js';
+import { parseGaiiLoose, localAccountName } from '../utils/gaii.js';
 import {
   MAIL_PREFIX, identityKind, isIdentityShaped, localIdentityExists, type IdentityKind,
 } from './local-identity.js';
@@ -355,7 +356,7 @@ export async function listContactsMerged(
   }
   if (include.has('invites')) {
     // One query per person without an account, under the same cap the shared-organisms column has.
-    const inviter = ownerGhii.split('@')[0];
+    const inviter = localAccountName(ownerGhii);
     let looked = 0;
     for (const r of out) {
       if (r.kind !== 'mail') continue;
@@ -615,7 +616,7 @@ export async function resolveContactEmail(storage: Storage, asker: string, email
   if (!clean || !isValidEmail(clean)) throw new ContactsError(400, 'INVALID_INPUT', 'A valid "email" is required');
   countAddressLookup(asker);
   const rec = await storage.getGHIIByEmailHash(inviteEmailHash(clean));
-  if (rec) return { found: true, ghii: rec.ghii, owner: rec.ghii.split('@')[0], display_name: rec.displayName ?? null };
+  if (rec) return { found: true, ghii: rec.ghii, owner: localAccountName(rec.ghii), display_name: rec.displayName ?? null };
   return { found: false, can_invite: !!getActiveEmailService()?.enabled };
 }
 
@@ -684,5 +685,5 @@ export async function resolveOwnerByVerifiedEmail(storage: Storage, email: strin
     return { ok: false, code: 'AMBIGUOUS', message: 'That email maps to more than one account — contact the node operator.' };
   }
   const rec = verified[0];
-  return { ok: true, ownerName: rec.ownerName ?? rec.ghii.split('@')[0], ghii: rec.ghii };
+  return { ok: true, ownerName: rec.ownerName ?? localAccountName(rec.ghii), ghii: rec.ghii };
 }
