@@ -73,7 +73,7 @@ import { Mark, Code } from '/components/Mark.js';
 import { Note } from '/components/Note.js';
 import { Card } from '/components/Card.js';
 import { Choice } from '/components/Choice.js';
-import { Tabs } from '/components/Tabs.js';
+import { Tabs, TabPanel } from '/components/Tabs.js';
 import { TextField, TextArea } from '/components/TextField.js';
 import { SubHeading } from '/components/SubHeading.js';
 import { Row as Line, Stack, Split, Space } from '/components/Layout.js';
@@ -377,7 +377,7 @@ export default function TabCrew({ agentName, showToast }) {
           `}
           <${Note}>${t(`${K}.limitNote`)}<//>
 
-          ${view === 'json' ? html`
+          <${TabPanel} value=${view}>${view === 'json' ? html`
             <div>
               <${TextArea} code rows=${24} value=${jsonText} ariaLabel=${t(`${K}.actions.json`)}
                 onInput=${setJsonText} onBlur=${applyJson} />
@@ -388,7 +388,7 @@ export default function TabCrew({ agentName, showToast }) {
             <${CrewSection} doc=${doc} onChange=${edit} errors=${errors} runtimeTools=${menu?.tools} decideTools=${decideTools} />
             <${RunSection} doc=${doc} onChange=${edit} errors=${errors} />
             <${ContractSection} doc=${doc} onChange=${edit} errors=${errors} />
-          `}
+          `}<//>
 
           <${Split} above="none">
             <${SubHeading}>${t(`${K}.actions.tryRun`)}<//>

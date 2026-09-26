@@ -50,7 +50,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { UsageChart, colorForIndex } from '/components/UsageChart.js';
 import { SettingsPage } from '/components/SettingsPage.js';
-import { Tabs } from '/components/Tabs.js';
+import { Tabs, TabPanel } from '/components/Tabs.js';
 import { Note } from '/components/Note.js';
 import { FigureStrip } from '/components/FigureStrip.js';
 import { List, Row, Name, Num } from '/components/List.js';
@@ -205,7 +205,7 @@ export default function UsageTab() {
       ${error ? html`<${Note} kind="message" error>${error}<//>` : null}
       ${loading && !data ? html`<${Note} kind="loading">${t('profile.usage.loading')}<//>` : null}
 
-      ${data ? html`
+      ${data ? html`<${TabPanel} value=${`${report}-${period}`} label=${t(REPORTS.find(r => r.id === report)?.label || '')}>
         <${FigureStrip} lead items=${statCards.map(c => ({ key: c.label, n: c.value, label: c.label }))} />
         ${chart}
         <${List} keepCols cols=${headers.length > 4 ? 'name-n-n-n-n' : 'name-n-n-n'}
@@ -215,6 +215,6 @@ export default function UsageTab() {
           render=${(row, ri) => html`<${Row} key=${ri}>${row.map((cell, i) => (i
             ? html`<${Num} key=${i}>${cell}<//>`
             : html`<${Name} key=${i}>${cell}<//>`))}<//>`} />
-      ` : null}
+      <//>` : null}
     <//>`;
 }

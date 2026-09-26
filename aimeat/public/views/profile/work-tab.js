@@ -48,7 +48,7 @@ import { t } from '/js/i18n.js';
 import { Modal } from '/components/Modal.js';
 import { escHtml, timeAgo } from '/js/utils.js';
 import { SettingsPage } from '/components/SettingsPage.js';
-import { Tabs } from '/components/Tabs.js';
+import { Tabs, TabPanel } from '/components/Tabs.js';
 import { List, Row, Name, Desc, Doors } from '/components/List.js';
 import { Mark } from '/components/Mark.js';
 import { Action, Loud } from '/components/Action.js';
@@ -224,7 +224,7 @@ export default function WorkTab({ session, showToast, onStats }) {
         { value: 'inbox', label: t('profile.work.inbox') },
         { value: 'sent', label: t('profile.work.sent') },
       ]} />
-      ${workSubTab === 'inbox' ? renderList(workInbox, 'inbox') : renderList(workSent, 'sent')}
+      <${TabPanel} value=${workSubTab}>${workSubTab === 'inbox' ? renderList(workInbox, 'inbox') : renderList(workSent, 'sent')}<//>
 
       ${rateModal && html`<${RateModal} desc=${rateModal.desc}
         onSubmit=${(r, c) => handleRate(rateModal.workId, r, c)}

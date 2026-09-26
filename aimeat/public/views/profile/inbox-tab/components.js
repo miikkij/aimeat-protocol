@@ -110,7 +110,7 @@ import { Action, Loud, Icon } from '/components/Action.js';
 import { Mark, Label } from '/components/Mark.js';
 import { Note } from '/components/Note.js';
 import { Box } from '/components/Box.js';
-import { Tabs } from '/components/Tabs.js';
+import { Tabs, TabPanel } from '/components/Tabs.js';
 import { TextField, TextArea } from '/components/TextField.js';
 import { Select } from '/components/Select.js';
 import { Check } from '/components/Check.js';
@@ -289,12 +289,12 @@ export function ReplyWithAiPopover({ title, build, onClose, showToast }) {
         onCopied=${() => showToast?.(t('inbox.ai.copied'))}>${t('common.copy')}<//>`}>
       <${Stack} gap="medium">
         ${modeTabs([{ value: MODES.COPY, label: t('common.copyPrompt') }, { value: MODES.MCP, label: t('inbox.ai.modeMcp') }], mode, setMode)}
-        <${Box} tone="edge">
+        <${TabPanel} value=${mode}><${Box} tone="edge">
           <${Stack} gap="medium">
             <${Note}>${mode === MODES.COPY ? t('inbox.ai.hintCopy') : t('inbox.ai.hintMcp')}<//>
             <${TextArea} readOnly rows=${14} value=${text} />
           <//>
-        <//>
+        <//><//>
       <//>
     <//>`;
 }
@@ -345,7 +345,7 @@ export function ConversationToNotebookPopover({ title, promptText, runServerSumm
           { value: 'copy', label: t('common.copyPrompt') },
           { value: 'raw', label: t('inbox.notebook.modeRaw') },
         ], mode, setMode)}
-        <${Box} tone="edge">
+        <${TabPanel} value=${mode}><${Box} tone="edge">
           <${Stack} gap="medium">
           ${mode === 'ai' ? html`
             <${Note}>${t('inbox.notebook.hintAi')}<//>
@@ -380,7 +380,7 @@ export function ConversationToNotebookPopover({ title, promptText, runServerSumm
             <//>
           `}
           <//>
-        <//>
+        <//><//>
       <//>
     <//>`;
 }

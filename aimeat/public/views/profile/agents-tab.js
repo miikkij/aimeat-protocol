@@ -141,7 +141,7 @@ import { Action, Actions, Loud } from '/components/Action.js';
 import { Code } from '/components/Mark.js';
 import { Note } from '/components/Note.js';
 import { SubHeading } from '/components/SubHeading.js';
-import { Tabs } from '/components/Tabs.js';
+import { Tabs, TabPanel } from '/components/Tabs.js';
 import { TextField } from '/components/TextField.js';
 import { Stack, Split } from '/components/Layout.js';
 import { HowTo } from '/components/HowTo.js';
@@ -688,7 +688,7 @@ export default function AgentsTab({ session, showToast, onStats }) {
                       <${Tabs} bar kind="view" label=${t('profile.agents.noNodejs')} value=${activePlat} onSelect=${setActivePlat}
                         items=${PLATFORM_KEYS.map(k => ({ value: k, key: k, label: t(PLATFORM_LABELS[k]) }))} />
                       ${/* SAFE: PLATFORMS is hardcoded developer constant, not user input */''}
-                      <${HowTo} html=${PLATFORMS[activePlat]} />
+                      <${TabPanel} value=${activePlat}><${HowTo} html=${PLATFORMS[activePlat]} /><//>
                     `}
                   <//>
                 <//>

@@ -54,7 +54,7 @@ import { LoadingLine } from './shared.js';
 import { useConfirm } from '/components/Modal.js';
 import { SettingsPage } from '/components/SettingsPage.js';
 import { Section } from '/components/Section.js';
-import { Tabs, Tab } from '/components/Tabs.js';
+import { Tabs, Tab, TabPanel } from '/components/Tabs.js';
 import { List, Row, Name, Desc, Doors, Panel } from '/components/List.js';
 import { Facts, FactLine } from '/components/Facts.js';
 import { Card } from '/components/Card.js';
@@ -243,7 +243,7 @@ export default function NodesTab(props) {
       desc=${t('profile.nodes.desc')}>
       <${Tabs} bar kind="view" value=${sub} onSelect=${setSub}
         items=${[{ value: 'nodes', label: t('profile.tabs.nodes') }, { value: 'stats', label: t('profile.tabs.nodeStats') }]} />
-      ${sub === 'nodes' ? html`<${NodesList} ...${props} />` : html`<${NodeStatsTab} ...${props} />`}
+      <${TabPanel} value=${sub}>${sub === 'nodes' ? html`<${NodesList} ...${props} />` : html`<${NodeStatsTab} ...${props} />`}<//>
     <//>
   `;
 }

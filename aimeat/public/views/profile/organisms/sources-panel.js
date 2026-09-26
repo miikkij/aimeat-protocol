@@ -44,7 +44,7 @@ import { List, Row as ListRow, Name, Desc, Cell, Doors, SearchLine } from '/comp
 import { Action, Actions, Icon } from '/components/Action.js';
 import { Mark } from '/components/Mark.js';
 import { Box } from '/components/Box.js';
-import { Tabs } from '/components/Tabs.js';
+import { Tabs, TabPanel } from '/components/Tabs.js';
 import { HeadDesc } from '/components/SubHeading.js';
 import { fmtBytes } from '/js/format.js';
 import { swallowed } from '/js/swallowed.js';
@@ -165,10 +165,10 @@ export function SourcesPanel({ orgId, wsId, showToast }) {
         <${SearchLine} value=${q} onInput=${e => setQ(e.target.value)} onEnter=${doSearch} placeholder=${t('organisms.searchSources') || 'Search…'}>
           <${Action} small onClick=${doSearch} disabled=${loading}>${t('organisms.search') || 'Search'}<//>
         <//>
-        <${List} cols="name-tags-doors" keepCols scroll loading=${loading ? (t('organisms.loading') || 'Loading…') : false}
+        <${TabPanel} value=${tab}><${List} cols="name-tags-doors" keepCols scroll loading=${loading ? (t('organisms.loading') || 'Loading…') : false}
           empty=${t('organisms.noResults') || 'No results'}>
           ${results.slice(0, 100).map(resultRow)}
-        <//>
+        <//><//>
       <//>` : null}
 
     <${List} cols="mark-name-tags-doors" keepCols empty=${t('organisms.noSources') || 'No sources yet'}>
