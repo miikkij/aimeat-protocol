@@ -9,6 +9,9 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   v1.60.0 -- 2026-09-26 -- Add e2e-federated-visitor-names.ts to ALL_SUITES: a visitor from another
+ *            node keeps its own name wherever code turns an identity into an account name (secaudit
+ *            2026-09, F-1 as a class and a0ecb62eafb3).
  *   v1.59.0 -- 2026-09-26 -- Add e2e-app-frame.ts to ALL_SUITES: apps on a node several people share
  *            with no app origin run in an isolated frame (audit A7-1). It boots a node of its own on
  *            40266, with the app origin off, so it starts with one owner and adds the second itself.
@@ -838,6 +841,7 @@ const ALL_SUITES = [
     'test/e2e-dm-read-as-owner.ts',
     'test/e2e-inbox-organize.ts',
     'test/e2e-federated-namesake.ts',
+    'test/e2e-federated-visitor-names.ts',
     'test/e2e-interactive-messages.ts',
     'test/e2e-broadcast.ts',
     'test/e2e-chat-capabilities.ts',

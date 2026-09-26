@@ -28,6 +28,10 @@
  *   detachMcpServer
  * @usage const server = await requireUsableServer(storage, ownerGhii, idOrSlug);
  * @version-history
+ *   v1.5.0 — 2026-09-26 — A group's server compares whole identities on every road: attaching one takes
+ *     the caller's owner GHII instead of a name, and organismAdmits and requireManageableServer ask the
+ *     one onRoll(), so a visitor from another node named like a member, admin or owner is none of
+ *     them here (secaudit 2026-09, a0ecb62eafb3).
  *   v1.4.0 — 2026-09-24 — An attach whose first look finds a tool list larger than this node keeps
  *     is refused as TOOL_LIST_TOO_LARGE rather than UNREACHABLE, because the server did answer.
  *   v1.3.0 — 2026-09-24 — requireManageableServer: the write doors resolve a server through it, so a
@@ -58,6 +62,7 @@ import { mcpClientPool } from './pool.js';
 import { recordAccountEvent } from '../account-events.js';
 import { organismOwners } from '../organism-ownership.js';
 import { listWorkspaceMemberRoles } from '../workspace-roles.js';
+import { localAccountName } from '../../utils/gaii.js';
 import { emitChange } from '../event-bus.js';
 
 export interface AttachInput {
@@ -505,11 +510,8 @@ export async function organismAdmits(
   const organism = await storage.getOrganism(server.organismId);
   if (!organism) return false;
 
-  const bare = ownerGhii.split('@')[0];
-  const inOrganism = organismOwners(organism).some((o) => o.split('@')[0] === bare)
-    || (organism.admins ?? []).some((a) => a.split('@')[0] === bare)
-    || (organism.members ?? []).some((m) => m.split('@')[0] === bare);
-  if (!inOrganism) return false;
+  const roll = [...organismOwners(organism), ...(organism.admins ?? []), ...(organism.members ?? [])];
+  if (!onRoll(roll, ownerGhii, config.nodeId)) return false;
 
   // Bound to the organism as a whole: membership is the answer.
   if (!server.ws) return true;
@@ -521,9 +523,21 @@ export async function organismAdmits(
     orgId: server.organismId,
     ws: server.ws,
   });
-  const role = roles.get(bare)?.role;
+  // The roles are keyed by this node's account names (listWorkspaceMemberRoles), which is what
+  // localAccountName gives for an owner here.
+  const role = roles.get(localAccountName(ownerGhii))?.role;
   if (!role) return false;
   return wantToCall ? role === 'contributor' : true;
+}
+
+/**
+ * Is this owner on one of an organism's rolls? Whole identities, never bare names: a roll lists this
+ * node's accounts, so `alice` on it is alice@<this node>, and an account called alice somewhere else
+ * is not on it. Every road to a group's server asks this one test: using it, listing it, attaching
+ * one, and changing or removing one.
+ */
+function onRoll(roll: readonly string[], ownerGhii: string, nodeId: string): boolean {
+  return roll.some((n) => (n.includes('@') ? n : `${n}@${nodeId}`) === ownerGhii);
 }
 
 /**
@@ -537,8 +551,8 @@ export async function organismAdmits(
 export async function attachOrganismServer(input: Omit<AttachInput, 'ownerGhii'> & {
   organismId: string;
   ws?: string | null;
-  /** The bare owner name of whoever is attaching, to test against the organism. */
-  callerName: string;
+  /** The owner GHII of whoever is attaching (an agent's is its owner's), to test against the rolls. */
+  callerGhii: string;
 }): Promise<AttachResult> {
   const { storage, config, slug, organismId } = input;
 
@@ -556,11 +570,8 @@ export async function attachOrganismServer(input: Omit<AttachInput, 'ownerGhii'>
   }
 
   const organism = await storage.getOrganism(organismId);
-  const bare = input.callerName.split('@')[0];
-  const mayAttach = !!organism && (
-    organismOwners(organism).some((o) => o.split('@')[0] === bare)
-    || (organism.admins ?? []).some((a) => a.split('@')[0] === bare)
-  );
+  const mayAttach = !!organism
+    && onRoll([...organismOwners(organism), ...(organism.admins ?? [])], input.callerGhii, config.nodeId);
   // Absent and not-allowed answer alike: naming an organism id must not confirm it exists.
   if (!mayAttach) {
     return {
@@ -731,11 +742,8 @@ export async function requireManageableServer(
   if (byId?.ownership === 'owner' && byId.ownerGhii === ownerGhii) return byId;
   if (byId?.ownership === 'organism' && byId.organismId) {
     const organism = await storage.getOrganism(byId.organismId);
-    // Whole identities, never bare names: a roll lists this node's accounts, so `alice` on it is
-    // alice@<this node>, and an account called alice somewhere else is not on it.
-    const asGhii = (n: string): string => (n.includes('@') ? n : `${n}@${config.nodeId}`);
     const governors = organism ? [...organismOwners(organism), ...(organism.admins ?? [])] : [];
-    if (governors.some((n) => asGhii(n) === ownerGhii)) return byId;
+    if (onRoll(governors, ownerGhii, config.nodeId)) return byId;
   }
   return null;
 }

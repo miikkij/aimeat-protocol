@@ -39,6 +39,9 @@
  *   DELETE /v1/mcp-servers/:id              -- detach, and forget the credential
  * @usage app.use(mcpServersRouter(config, storage));
  * @version-history
+ *   v1.4.1 — 2026-09-26 — POST /organism hands the service the caller's owner GHII, which the group's
+ *     rolls are compared against whole, so a visitor from another node named like the group's owner
+ *     is refused as NOT_ALLOWED (secaudit 2026-09, a0ecb62eafb3).
  *   v1.4.0 — 2026-09-24 — SECURITY (audit A8-1): the node registry doors ask operator:admin of
  *     anything acting for the operator, the word aimeat_mcp_registry_* asks. They asked mcp:manage,
  *     the word for attaching a server to one's OWN account, so an operator's agent allowed that could
@@ -194,13 +197,12 @@ export function mcpServersRouter(config: AimeatConfig, storage: Storage): Router
         storage, config,
         organismId,
         ...(typeof b.ws === 'string' && b.ws ? { ws: b.ws } : {}),
-        // The bare owner name, because that is what an organism's rolls are compared against, and
-        // `req.auth.owner` is the one field that carries the HUMAN's name on every principal:
-        // an owner session, an agent JWT, an app grant and an ecosystem token alike. Splitting
-        // resolveIdentity() instead gave an agent `claude#alice`, which is on nobody's roll, so
-        // every agent was refused from its own owner's group. Found by an E2E arm written because
-        // check:field-reach noticed this door had no agent twin.
-        callerName: req.auth!.owner as string,
+        // The HUMAN behind the caller, as a whole identity: an owner session, an agent, an app grant
+        // and an ecosystem token all resolve to the same owner GHII here, and the group's rolls are
+        // compared in whole identities too, so a principal of another node is on none of them.
+        // (Splitting resolveIdentity() into a name gave an agent `claude#alice`, on nobody's roll;
+        // check:field-reach found that when this door had no agent twin.)
+        callerGhii: ownerOf(req),
         createdBy: callerPrincipal(req.auth!, config.nodeId),
         slug: name,
         title: typeof b.title === 'string' && b.title ? b.title : name,
