@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description Per-key memory routes: GET/DELETE/PUT /v1/memory/:key, CORS management, and the public GET /v1/memory/:gaii/:key read. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.6.2 — 2026-09-26 — PUT stores the provenance record it stamps only once the version-checked
+ *     write lands (secaudit 2026-09, N2). It was stored before the write, so a write that lost the
+ *     swap answered 409 and left a record about bytes that were never stored.
  *   v1.6.1 — 2026-09-24 — POST /v1/memory/:key/restore carries workspaceAccess as the delete does,
  *     hands the service the caller's roles, and says the service's organism or append-only refusal
  *     as it is instead of as NOT_RESTORABLE (A6-12).
@@ -30,6 +33,7 @@
  */
 
 import type { Router } from 'express';
+import type { AiProvenanceRecordRow } from '../../storage/interface.js';
 import { deleteMemoryRecord, restoreMemoryRecord } from '../../services/memory-bin.js';
 import { requireAuth, requireRole, requireScope, requireExternalPrincipal } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
@@ -46,7 +50,7 @@ import { recordMemoryTouch } from '../../services/data-map/write-tally-buffer.js
 import { ecoMayReadKey, ecoMayWriteKey } from '../../services/ecosystem-access.js';
 import { appMayWriteKey, isServerWrittenKey, serverWrittenKeyRefusal } from '../../utils/reserved-keys.js';
 import { isSecretRecordKey, secretRecordWriteRefusal, shownMemoryValue } from '../../services/secret-records.js';
-import { stampAgentWrite, resolveAttachableProvenanceId } from '../../services/ai-provenance.js';
+import { stampAgentWrite, resolveAttachableProvenanceId, storeHeldProvenance } from '../../services/ai-provenance.js';
 import { ownerGhiiOf, isForeignPrincipal } from '../../utils/gaii.js';
 import { loadServedProvenance, envelopeMeta, setProvenanceHeaders } from '../../services/ai-provenance-marks.js';
 import { type MemoryRouteCtx, isAnonymousGaii, visibilityToZone, memoryContentBytes } from './shared.js';
@@ -419,6 +423,10 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
     // private record is done by attaching it to something public, so an unchecked id here would let
     // a caller publish someone else's statement.
     const attached = await resolveAttachableProvenanceId(storage, ownerGhiiOf(effectiveGaii), ai_provenance_id);
+    // A stamped record is HELD until the version-checked write below lands, and stored only then:
+    // the store is append-only, so a record about bytes a lost swap never stored could not be taken
+    // back (secaudit 2026-09, N2).
+    const held: AiProvenanceRecordRow[] = [];
     const aiProvenanceId = attached
       ?? (value !== undefined
         ? await stampAgentWrite(storage, {
@@ -430,6 +438,7 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
           nodeId: config.nodeId,
           baseUrl: config.baseUrl,
           enabled: config.aiProvenance,
+          held,
         })
         : existing.aiProvenanceId);
     const newRecord = {
@@ -461,6 +470,8 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
     } else {
       record = await storage.setMemory(newRecord);
     }
+    // Landed: the record it names is stored now, before anything below reads or announces it.
+    await storeHeldProvenance(storage, held);
 
     // Who has had their hands on this key. `gaii` is the caller, `effectiveGaii` the namespace it
     // lands in — an agent writing into its owner's store is both, and that is the difference the

@@ -28,6 +28,8 @@
  *   const r = await readWorkspaceOp({ storage, config }, caller, { organismId, ws });
  *   if (!r.ok) return fail(r.message);
  * @version-history
+ *   v1.5.1 — 2026-09-26 — The held provenance record is stored through storeHeldProvenance, the one
+ *     call every compare-and-swap door now makes once its write lands (secaudit 2026-09, N2).
  *   v1.5.0 — 2026-09-25 — A draft written with `section` is filed through the member change door
  *     (services/workspace-member-changes.ts fileDocumentInSection): into the section index that counts,
  *     or as a suggestion when the workspace asks its members to suggest. Each item says how its filing
@@ -81,7 +83,7 @@ import { normalizeWriteItems, resolveWriteItem, type ResolvedWriteItem } from '.
 import { findWorkspaceRecord, writeWorkspaceRecord } from './workspace-write.js';
 import { fileDocumentInSection, isRefusal } from './workspace-member-changes.js';
 import { writeProvenanceEcho, readProvenanceMany } from '../mcp/ai-provenance-result.js';
-import { provenanceForWrite, stampAutonomousOutput, type DeclaredProvenance } from './ai-provenance.js';
+import { provenanceForWrite, stampAutonomousOutput, storeHeldProvenance, type DeclaredProvenance } from './ai-provenance.js';
 import type { AiProvenanceLevel, AiProvenanceMethod } from '../models/ai-provenance-schemas.js';
 import { memoryContentBytes } from '../routes/memory/shared.js';
 import { logger } from '../utils/logger.js';
@@ -432,7 +434,7 @@ export async function writeWorkspaceDraftsOp(
         const outcome = await writeWorkspaceRecord({ storage, config }, {
             key, value: v, owner: caller.ownerGhii, prev, aiProvenanceId: provenanceId, principal: caller.principal,
             ...(args.ifVersion !== undefined ? { ifVersion: args.ifVersion } : {}),
-            onLanded: async () => { for (const row of held) await storage.createAiProvenance(row); },
+            onLanded: () => storeHeldProvenance(storage, held),
         });
         if (!outcome.written) {
             return refuse(409, 'VERSION_CONFLICT',

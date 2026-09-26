@@ -29,6 +29,7 @@
  * @structure
  *   - contentHashOf(bytes)            — `sha256:<hex>`, node:crypto, no dependency
  *   - mintProvenance(storage, …)      — build + validate + persist, returns the stored row
+ *   - storeHeldProvenance(storage, held) — what a compare-and-swap door held, stored once it landed
  *   - provenanceForWrite(storage, …)  — THE decision a write surface makes: attach / declare / Mint-3
  *   - provenanceDeclarationRefusal(…) — its refusal, asked before a door's first write
  *   - declarationLacksModel(declared) — a model made it and the declaration does not say which
@@ -43,6 +44,8 @@
  *   import { mintProvenance, contentHashOf } from './ai-provenance.js';
  *   const row = await mintProvenance(storage, { stampedBy: 'node', ... , content });
  * @version-history
+ *   v1.3.5 — 2026-09-26 — storeHeldProvenance(): the held rows stored once a write has landed, one
+ *     call for every compare-and-swap door (secaudit 2026-09, N2).
  *   v1.3.4 — 2026-09-26 — declarationLacksModel(): the app publish warns a declarer that named no
  *     model, after a GPT-6 build's record read only "Served by openai".
  *   v1.3.3 — 2026-09-26 — buildDisclosure(): a label the node policy adds to REVIEWED content says
@@ -265,6 +268,15 @@ export async function mintProvenance(
   if (held) held.push(row);
   else await storage.createAiProvenance(row);
   return row;
+}
+
+/**
+ * Store the records a write held back (`held` above), once that write has landed. The one call
+ * every compare-and-swap door makes after its swap wins; a door whose swap lost drops its list
+ * instead. The list is emptied, so a retry loop that reuses it cannot store a row twice.
+ */
+export async function storeHeldProvenance(storage: Storage, held: AiProvenanceRecordRow[]): Promise<void> {
+  for (const row of held.splice(0)) await storage.createAiProvenance(row);
 }
 
 /**

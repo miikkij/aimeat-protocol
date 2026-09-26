@@ -34,6 +34,9 @@
  *   const res = await appendToDocument({ storage, config }, caller,
  *     { organismId, wsId, space: 'notes', id: 'doc-x', markdown: '## Found\n\n…' });
  * @version-history
+ *   v1.2.1 — 2026-09-26 — The edit's provenance record is stored only once its swap lands: built and
+ *     held before the write, stored by writeWorkspaceRecord's onLanded (secaudit 2026-09, N2). It was
+ *     stored on every attempt, so each attempt that lost the swap left a record about bytes never stored.
  *   v1.2.0 — 2026-09-24 — The space is resolved from the workspace creator's copy of the manifest
  *     (readWorkspaceManifest takes the node id; secaudit 2026-09, A6-9).
  *   v1.1.0 — 2026-09-13 — A space the manifest does not declare is the shared 422 UNDECLARED_SPACE
@@ -43,7 +46,7 @@
  *   v1.0.0 — 2026-09-02 — Initial (wish-workspace-append-ja-osiomuokkaus).
  */
 import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
+import type { Storage, AiProvenanceRecordRow } from '../storage/interface.js';
 import { checkOrganismNamespaceAccess } from './organism-namespace-access.js';
 import { readWorkspaceManifest } from './workspace-meta.js';
 import { resolveSpace, type WriteObjectType } from './workspace-write-items.js';
@@ -51,7 +54,7 @@ import { archivedRefusal } from './workspace-write-guards.js';
 import { memoryCeilings } from './memory-ceilings.js';
 import { validateMemoryWrite } from './schema-validator.js';
 import { findWorkspaceRecord, writeWorkspaceRecord } from './workspace-write.js';
-import { provenanceForWrite } from './ai-provenance.js';
+import { provenanceForWrite, storeHeldProvenance } from './ai-provenance.js';
 import { memoryContentBytes } from '../routes/memory/shared.js';
 import { emitChange } from './event-bus.js';
 import { insertAt, isHeadingLine, locateSection, replaceRange } from './workspace-doc-markdown.js';
@@ -292,6 +295,11 @@ async function editDocument(
         // it: the merged document is what a reader gets, and a statement about only the added block
         // would describe something nobody can read back. No caller declaration is accepted here —
         // see the note on these tools in scripts/check-ai-disclosure.ts.
+        //
+        // HELD, NOT STORED, until the swap below lands (onLanded). The draft names the record's id
+        // in the same swap, so the record is built and checked here; an attempt that loses the
+        // swap drops it. The store is append-only, so one stored first could not be taken back.
+        const held: AiProvenanceRecordRow[] = [];
         const aiProvenanceId = await provenanceForWrite(storage, {
             principal: caller.principal,
             content: memoryContentBytes(next),
@@ -301,6 +309,7 @@ async function editDocument(
             nodeId: config.nodeId,
             baseUrl: config.baseUrl,
             enabled: config.aiProvenance,
+            held,
         });
 
         // 7. The swap. The draft keeps whatever identity already holds it — an append is not the act
@@ -314,6 +323,7 @@ async function editDocument(
             ifVersion: draft ? draft.version : null,
             principal: caller.principal,
             ...(aiProvenanceId ? { aiProvenanceId } : {}),
+            onLanded: () => storeHeldProvenance(storage, held),
         });
         if (!outcome.written) { lastVersion = outcome.version; continue; }
 
