@@ -10,6 +10,7 @@
  * @structure SDK_PACKS: LibraryPack[]
  * @usage Imported by ../library-packs.ts (registry assembly). Do not import directly.
  * @version-history
+ *   v1.15.3 — 2026-09-25 — aimeat-auth's aiDoc says where an app runs and what it has there: its own grant, and in the isolated frame localStorage but not the node's cookies, IndexedDB or service workers.
  *   v1.15.2 — 2026-09-24 — aimeat-workflows' aiDoc says a workflow reading the owner's records costs memory:read.
  *   v1.15.1 — 2026-09-24 — aimeat-workflows' aiDoc names the scope each kind of step costs.
  *   v1.15.0 — 2026-09-19 — aimeat-decide joins after aimeat-ai, from library-packs/sdk-decide.ts.
@@ -100,7 +101,7 @@ export const SDK_PACKS: LibraryPack[] = [
     requires: [],
     license: 'MIT',
     apiSurface: 'AIMEAT.auth',
-    aiDoc: 'Login UI, Ed25519 auth, JWT lifecycle, session management. Show the app from mountLoginButton(sel, { onSession(session, { restored }) }): it runs once for every session that becomes available, the restore on page load (restored: true) and a sign-in (false), so it is the one handler a page needs. onLogin still fires ONLY on a fresh sign-in; never reload the page from either. For a sign-in button of your own, call AIMEAT.auth.signIn() from its click handler: the consent popup on an app origin, the sign-in modal elsewhere; it resolves to the session or null. login() only restores and never opens anything. mountLoginButton is compact on phones by default; pass compact:false to keep the full row. session.fetch() returns already-parsed JSON: check res.ok before res.data, because a refusal resolves as a value. getSession() is null for a signed-out visitor: check it before every data call a visitor can reach.',
+    aiDoc: 'Login UI, Ed25519 auth, JWT lifecycle, session management. Show the app from mountLoginButton(sel, { onSession(session, { restored }) }): it runs once for every session that becomes available, the restore on page load (restored: true) and a sign-in (false), so it is the one handler a page needs. onLogin still fires ONLY on a fresh sign-in; never reload the page from either. For a sign-in button of your own, call AIMEAT.auth.signIn() from its click handler: the consent popup on an app origin, the sign-in modal elsewhere; it resolves to the session or null. login() only restores and never opens anything. mountLoginButton is compact on phones by default; pass compact:false to keep the full row. session.fetch() returns already-parsed JSON: check res.ok before res.data, because a refusal resolves as a value. getSession() is null for a signed-out visitor: check it before every data call a visitor can reach. The app never gets the node\'s own sign-in, only its own grant: on its own address (app origin), and on a node several people share with no app addresses, in an isolated frame whose origin is opaque, where these same calls work unchanged and localStorage works, but the node\'s cookies, IndexedDB and service workers do not.',
     changelog: [],
     tierHint: 'T1',
     interviewTriggers: [],

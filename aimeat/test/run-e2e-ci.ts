@@ -9,6 +9,9 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   v1.59.0 -- 2026-09-26 -- Add e2e-app-frame.ts to ALL_SUITES: apps on a node several people share
+ *            with no app origin run in an isolated frame (audit A7-1). It boots a node of its own on
+ *            40266, with the app origin off, so it starts with one owner and adds the second itself.
  *   v1.58.0 -- 2026-09-25 -- Add e2e-workspace-member-changes.ts to ALL_SUITES: a plain member adds a
  *            space and changes sections under the workspace's rule, and the decision on a member's
  *            suggestion (REST and MCP). Not in the guard tier.
@@ -293,6 +296,9 @@ const ALL_SUITES = [
     'test/e2e-app-dev-grant.ts',
     'test/e2e-app-roadmap.ts',
     'test/e2e-app-silent.ts',
+    // Self-spawns with the app origin OFF on a fresh database: one owner first, then a second, which
+    // is the moment every app moves into the isolated frame (audit A7-1).
+    'test/e2e-app-frame.ts',
     // Self-spawns with the app-origin flag ON: it needs a real app-grant token to prove the
     // SSE change domains are scope-gated (an app must not learn what it has no scope for).
     'test/e2e-sse.ts',

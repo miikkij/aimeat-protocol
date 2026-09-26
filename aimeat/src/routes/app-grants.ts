@@ -20,6 +20,12 @@
  *     routes/app-grants-manage.ts.
  * @usage app.use(appGrantsRouter(config, storage));
  * @version-history
+ *   v1.16.0 — 2026-09-26 — The isolated frame (audit A7-1). On a node several people share with no
+ *     app origin, the page that holds an app in its frame asks the silent bridge by the app's name
+ *     (`?app=owner/filename`) instead of by an address the app does not have, and the visible flow
+ *     accepts that page's own address as the redirect, bound to the app it names. On such a node
+ *     no other address on the node's own origin is accepted as a redirect. That rule and apexOrigin
+ *     live in services/app-frame-redirect.ts, which keeps this file under the line ceiling.
  *   v1.15.0 — 2026-09-26 — A word the owner added to a grant by hand (ownerAddedScopes) stays through
  *     every rewrite: the refresh and the silent sign-in that follow the app's declaration down, and a
  *     consent that did not list it. A consent screen that listed it and left it unticked takes it
@@ -101,7 +107,8 @@ import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { issueJWT } from '../auth/jwt.js';
 import { readRefreshCookie } from '../services/owner-session.js';
-import { PORTFOLIO_TARGET_PREFIX, resolveAppOriginTarget } from '../services/app-origin-target.js';
+import { PORTFOLIO_TARGET_PREFIX, resolveAppOriginTarget, resolveFrameAppTarget } from '../services/app-origin-target.js';
+import { apexOrigin, frameRedirect } from '../services/app-frame-redirect.js';
 import { parseAppScopes } from '../services/protected-resource.js';
 import { afterApproval, heldOwnerAdded, narrowToDeclared } from '../services/app-grant-scopes.js';
 import type { AppGrantRecord } from '../storage/interface.js';
@@ -247,13 +254,6 @@ function verifyPkce(codeVerifier: string, codeChallenge: string, method: 'S256' 
   return computed === codeChallenge;
 }
 
-/** The node's own origin (scheme + host + port), lowercased — what a same-origin caller's `Origin`
- *  header says when it is present. '' when baseUrl is unparseable, which then matches nothing. */
-function apexOrigin(config: AimeatConfig): string {
-  // eslint-disable-next-line aimeat/no-silent-catch -- the exception IS the answer: an unparseable baseUrl has no origin
-  try { return new URL(config.baseUrl).origin.toLowerCase(); } catch { return ''; }
-}
-
 export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
 
@@ -310,6 +310,9 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
     return { ok: true, origin: u.origin };
   }
 
+  // Which redirect is the node itself, and which is the page that holds an app in a frame:
+  // services/app-frame-redirect.ts (frameRedirect), moved out unchanged at the line ceiling.
+
   // ── GET /v1/app-grants/scopes ── the grantable scope vocabulary, machine-readable + public.
   // Apps and agentic coders check this BEFORE declaring <meta name="aimeat-scopes">: requesting
   // ANY name outside the vocabulary fails the whole authorize with INVALID_SCOPE, and guessing
@@ -350,7 +353,11 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
     if ((method !== 'S256' && method !== 'plain') || !codeChallenge) {
       return res.status(400).json(error(config.nodeId, 'PKCE_REQUIRED', 'code_challenge with code_challenge_method S256 (or plain on non-secure-context clients) is required'));
     }
-    const rd = validRedirect(redirectUri);
+    let rd = validRedirect(redirectUri);
+    // On a node that runs apps in the isolated frame, the node's own address is a redirect only as the
+    // frame page of exactly this app (frameRedirect above), and never as any other page.
+    const frame = await frameRedirect(config, storage, redirectUri, app);
+    if (frame.onNode) rd = frame.bound ? { ok: true, origin: frame.origin } : { ok: false };
     if (!rd.ok) {
       return res.status(400).json(error(config.nodeId, 'INVALID_REDIRECT_URI', 'redirect_uri must be an absolute http(s) URL on the app origin'));
     }
@@ -376,7 +383,9 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
     // its own origin. A bound request is what makes own-app auto-approve safe on the consent page
     // (parity with the silent bridge, which binds by origin the same way). Path-form apps share the
     // bare app host → cannot be bound → they keep the manual consent screen.
-    let originBound = false;
+    // The frame page of exactly this app is bound to it the way a per-app subdomain is: the node
+    // serves that page for this app alone, and the page names only the app it was served for.
+    let originBound = frame.bound;
     const appHostL = (config.appHost || '').toLowerCase();
     const coHostL = (config.coOriginEnabled ? (config.coHost || '') : '').toLowerCase();
     const rdHost = new URL(redirectUri).hostname.toLowerCase();
@@ -568,13 +577,24 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
     // Origin → grant target, resolved by the one function that knows the binding
     // (services/app-origin-target.ts). The origin is a value the CALLER writes; nothing downstream
     // trusts it beyond what this node actually publishes at that hostname.
-    const resolvedOrigin = await resolveAppOriginTarget(config, storage, String(req.query.origin ?? ''));
+    //
+    // `app` instead of `origin` is the isolated frame's page (audit A7-1): on a node several people
+    // share with no app origin, an app has no address of its own, so the page holding it names it.
+    // The caller check above is what makes that safe: only a page of the node's own can be here, and
+    // on such a node no app runs in the node's origin any more.
+    const frameApp = typeof req.query.app === 'string' ? req.query.app.trim() : '';
+    const resolvedOrigin = frameApp
+      ? await resolveFrameAppTarget(config, storage, frameApp)
+      : await resolveAppOriginTarget(config, storage, String(req.query.origin ?? ''));
     if (!resolvedOrigin.ok) return reply({ ok: false, error: resolvedOrigin.error });
     const grantTarget = resolvedOrigin.target;   // "owner/file.html" or "portfolio:<username>"
     const grantName = resolvedOrigin.name;       // human label for consent surfaces
     const grantOwner = resolvedOrigin.owner;     // bare owner whose own visit auto-approves
-    // The origin as the resolver accepted it, for the grant row's display/redirect field.
-    const grantOriginHost = new URL(String(req.query.origin ?? '')).hostname.toLowerCase();
+    // The origin as the resolver accepted it, for the grant row's display/redirect field. An app in the
+    // isolated frame runs at the node's own address, so that is what its row shows.
+    const grantOrigin = frameApp
+      ? apexOrigin(config)
+      : `https://${new URL(String(req.query.origin ?? '')).hostname.toLowerCase()}`;
 
     // A word outside the vocabulary refuses the whole list, whoever is signed in, so it is answered
     // before the session is read. The answer names the app and the words: it used to be a bare
@@ -655,7 +675,7 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
     // word the owner added by hand stays on the grant through this, whatever the app declares.
     const ownerGhii = `${owner}@${config.nodeId}`;
     const minted = await upsertGrant(
-      { app: grantTarget, appName: grantName, appOrigin: `https://${grantOriginHost}`, owner, gaii: ownerGhii, scopes },
+      { app: grantTarget, appName: grantName, appOrigin: grantOrigin, owner, gaii: ownerGhii, scopes },
       existing,
     );
     const { grantId, rawRefresh } = minted;

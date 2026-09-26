@@ -10,6 +10,12 @@
  *   - registerReadRoutes() — versions, forks, lineage, screenshot GET/POST/DELETE, app download
  * @usage registerReadRoutes(router, config, storage, canonicalOwner); // from appsRouter
  * @version-history
+ *   v1.12.0 — 2026-09-26 — The isolated frame (audit A7-1). On a node several people share with no
+ *     app origin, a browser opening an app gets the page that holds it in an opaque-origin frame, and
+ *     the app's bytes (the draft preview's too) go out only under the CSP `sandbox` directive
+ *     (inline-frame.ts). `?mode=frame` is the frame's own request, sandboxed on every node and
+ *     redirected like `inline` where an app origin exists. They ran in the node's own origin, beside
+ *     the session of whoever opened them.
  *   v1.11.0 — 2026-09-26 — The unlock page types the code hidden, with an eye inside the field that
  *     shows it (a nonce'd script, left out when there is no nonce); its Finnish says "sovellus".
  *     The body box includes its padding, so the page no longer scrolls 32 px up and down.
@@ -76,6 +82,7 @@ import { applyAppProtection, hasAnyProtection } from '../../utils/app-protect.js
 import { prefersMarkdown } from '../../services/markdown-negotiation.js';
 import { serveAppAgentFace } from '../../services/agent-face.js';
 import { appOriginUrl, appTargetOr, type AppTargetFor, type CanonicalOwner } from './helpers.js';
+import { runnableAnswer, sendFrameHost, sandboxedCsp, withFrameShim, type RunnableAnswer } from './inline-frame.js';
 import { logger } from '../../utils/logger.js';
 import { recordAppOpen } from '../../services/usage/record-app-open.js';
 import { countPageView } from '../../services/signals/page-views.js';
@@ -494,13 +501,22 @@ export function registerReadRoutes(
                 res.status(404).json(error(config.nodeId, 'NOT_FOUND', `No draft exists for "${filename}"`));
                 return;
             }
+            // A draft is runnable whatever `mode` says, so it takes the same isolated frame as the live
+            // app on a node several people share: a draft can be another person's work (a fork, or a
+            // builder holding a development right), opened by the app's owner.
+            let draftAnswer: RunnableAnswer = 'plain';
+            if (!req.appOrigin) {
+                draftAnswer = await runnableAnswer(config, storage, req, req.query.mode === 'frame' ? 'frame' : 'inline');
+                if (draftAnswer === 'host') { sendFrameHost(res); return; }
+            }
             res.setHeader('Content-Type', appContentType(draft.mimeType));
             const draftIsHtml = /html/i.test(draft.mimeType);
-            const draftBody = draftIsHtml ? applyServeMarks(draft.data, { badge: true }) : draft.data;
+            let draftBody = draftIsHtml ? applyServeMarks(draft.data, { badge: true }) : draft.data;
+            if (draftAnswer === 'sandboxed' && draftIsHtml) draftBody = withFrameShim(draftBody);
             res.setHeader('Content-Length', draftBody.length.toString());
             // Same inline CSP a published app gets, so the draft behaves identically to
             // what it will once published. A draft is never cached (no-store).
-            res.setHeader('Content-Security-Policy', appCsp());
+            res.setHeader('Content-Security-Policy', draftAnswer === 'sandboxed' ? sandboxedCsp(config) : appCsp());
             res.setHeader('Cache-Control', 'no-store');
             res.setHeader('X-Content-Type-Options', 'nosniff');
             res.status(200).send(draftBody);
@@ -598,6 +614,9 @@ export function registerReadRoutes(
         }
 
         const mode = req.query.mode as string | undefined;
+        // `frame` is the isolated frame's own request for the bytes (inline-frame.ts). It is as
+        // runnable as `inline`, so every rule below that is about a runnable app applies to it.
+        const runnable = mode === 'inline' || mode === 'frame';
 
         // H-2: never serve RUNNABLE app HTML from the apex (authenticated SPA) origin. When the app
         // origin is provisioned (flag on) and this request arrived on the apex, an inline (runnable)
@@ -618,7 +637,7 @@ export function registerReadRoutes(
         // not execute the HTML it fetched. The access-code half WAS a problem: the unlock page is
         // served as HTML to an unauthenticated browser, so after the right code the app ran on the
         // apex, which is the one origin an author asking for protection least wants it on.
-        if (mode === 'inline' && config.appOriginEnabled && config.appHost && !req.appOrigin) {
+        if (runnable && config.appOriginEnabled && config.appHost && !req.appOrigin) {
             const target = await appOriginUrl(config, storage, owner, filename);
             const gated = !!app.accessCode
                 || (config.marketplaceEnabled && !!app.manifest.priceMorsels && app.manifest.priceMorsels > 0);
@@ -641,10 +660,19 @@ export function registerReadRoutes(
             return;
         }
 
+        // Audit A7-1: with no app origin, a node several people share runs the app in an isolated frame.
+        // A browser opening it gets the page that holds the frame and none of the app's bytes; the
+        // bytes themselves go out sandboxed below. A node one person uses answers 'plain', as before.
+        let answer: RunnableAnswer = 'plain';
+        if (runnable && !req.appOrigin) {
+            answer = await runnableAnswer(config, storage, req, mode === 'frame' ? 'frame' : 'inline');
+            if (answer === 'host') { sendFrameHost(res); return; }
+        }
+
         // Copy-protection `noRawDownload`: the owner can block the raw (attachment)
         // source download so the app is only delivered in runnable inline form. The
         // owner + operators may still download their own source (backup/management).
-        if (mode !== 'inline' && app.manifest.protection?.noRawDownload) {
+        if (!runnable && app.manifest.protection?.noRawDownload) {
             const isOperator = !!req.auth?.roles?.includes('operator');
             let isOwner = false;
             if (req.auth) { const { owner: viewerOwner } = await canonicalOwner(req); isOwner = viewerOwner === app.ownerName; }
@@ -673,7 +701,7 @@ export function registerReadRoutes(
         // the hash downloads the source rather than the rendered page.
         const prov = await loadServedProvenance(storage, config, app.aiProvenanceId);
         setProvenanceHeaders(res, prov);
-        let body = (mode === 'inline' && isHtml)
+        let body = (runnable && isHtml)
             // The visible label rides ONLY on the inline (runnable) form. A raw download stays
             // byte-for-byte, which is what keeps the content hash in the record verifiable.
             ? applyServeMarks(app.data, {
@@ -703,7 +731,7 @@ export function registerReadRoutes(
                 },
             })
             : app.data;
-        if (mode === 'inline' && isHtml && hasAnyProtection(app.manifest.protection)) {
+        if (runnable && isHtml && hasAnyProtection(app.manifest.protection)) {
             body = applyAppProtection(body, {
                 protection: app.manifest.protection!,
                 config,
@@ -714,11 +742,14 @@ export function registerReadRoutes(
                 servedAt: new Date().toISOString(),
             });
         }
+        // Last, so it is in front of everything the passes above added as well as the app's own lines.
+        if (answer === 'sandboxed' && isHtml) body = withFrameShim(body);
         res.setHeader('Content-Length', body.length.toString());
 
-        if (mode === 'inline') {
-            // No apex argument: this response comes FROM the apex, so 'self' already covers it.
-            res.setHeader('Content-Security-Policy', appCsp());
+        if (runnable) {
+            // No apex argument: this response comes FROM the apex, so 'self' already covers it. The
+            // isolated frame's bytes carry the `sandbox` directive, which is what makes their origin opaque.
+            res.setHeader('Content-Security-Policy', answer === 'sandboxed' ? sandboxedCsp(config) : appCsp());
             // Force browsers to always validate with the server (ETag round-trip).
             // Without this, heuristic caching can keep users on a stale app
             // version for hours after a republish. We still respond 304 when

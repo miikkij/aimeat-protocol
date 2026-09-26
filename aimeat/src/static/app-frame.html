@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<!--
+  @file src/static/app-frame.html
+  @description The page that holds a published app in an isolated frame. A node that several people
+    share and that has no app origin serves it at the app's own address
+    (/v1/apps/<owner>/<file>?mode=inline) to a browser that opens the app (routes/apps/inline-frame.ts).
+    It carries none of the app's bytes: app-frame.js builds the frame, whose origin is opaque, and gets
+    the app its own grant. The node's session stays on this page.
+  @version-history
+    v1.0.0 — 2026-09-25 — Initial (audit A7-1: apps on shared nodes without an app origin).
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>AIMEAT</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/icons/icon-192.png" type="image/png" sizes="192x192">
+<style>
+  html, body { margin: 0; height: 100%; background: Canvas; color: CanvasText; }
+  #aimeat-app-frame { display: block; border: 0; width: 100%; height: 100%; }
+  #aimeat-frame-bar {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 2147483647;
+    display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; justify-content: center;
+    padding: 10px 16px; background: #14141c; color: #fff;
+    font: 500 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, .28);
+  }
+  #aimeat-frame-bar button {
+    font: inherit; padding: 6px 14px; border-radius: 9999px; cursor: pointer;
+    border: 1px solid #ffffff66; background: transparent; color: #fff;
+  }
+  #aimeat-frame-bar button.primary { background: #E8564A; border-color: #E8564A; }
+  #aimeat-frame-bar button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+</style>
+<script src="/app-frame.js" defer></script>
+</head>
+<body></body>
+</html>

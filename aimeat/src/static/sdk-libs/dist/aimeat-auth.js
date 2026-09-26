@@ -2228,8 +2228,50 @@
     return { verifier, challenge: verifier, method: "plain" };
   }
 
+  // src/static/sdk-libs/auth/app-frame.js
+  function inIsolatedFrame() {
+    try {
+      var f = (
+        /** @type {any} */
+        window.__AIMEAT_FRAME__
+      );
+      return !!(f && f.host) && window.parent !== window;
+    } catch {
+      return false;
+    }
+  }
+  var sequence = 0;
+  function askFrameHost(op, payload, timeoutMs) {
+    return new Promise(function(resolve) {
+      var id = "f" + ++sequence + "-" + Math.random().toString(36).slice(2);
+      var host = location.protocol + "//" + location.host;
+      var timer = null;
+      function done(value) {
+        window.removeEventListener("message", onMessage);
+        if (timer) clearTimeout(timer);
+        resolve(value);
+      }
+      function onMessage(e) {
+        if (e.source !== window.parent || e.origin !== host) return;
+        var d = e.data || {};
+        if (d.type !== "aimeat_frame_res" || d.id !== id) return;
+        done(d.result === void 0 ? null : d.result);
+      }
+      window.addEventListener("message", onMessage);
+      if (timeoutMs) timer = setTimeout(function() {
+        done(null);
+      }, timeoutMs);
+      try {
+        window.parent.postMessage(Object.assign({ type: "aimeat_frame_req", id, op }, payload || {}), host);
+      } catch {
+        done(null);
+      }
+    });
+  }
+
   // src/static/sdk-libs/auth/app-origin.js
   function isAppOrigin() {
+    if (inIsolatedFrame()) return true;
     try {
       return location.origin !== new URL(APEX_URL).origin;
     } catch {
@@ -2244,6 +2286,7 @@
     });
   }
   function silentAppToken() {
+    if (inIsolatedFrame()) return askFrameHost("login", { scope: appDeclaredScopes() }, 8e3);
     return new Promise(function(resolve) {
       var apexOrigin;
       try {
@@ -2289,6 +2332,9 @@
     }
   }
   function apexLogout() {
+    if (inIsolatedFrame()) return askFrameHost("logout", {}, 8e3).then(function(r) {
+      return !!(r && r.ok);
+    });
     return new Promise(function(resolve) {
       var apexOrigin;
       try {
@@ -2328,6 +2374,9 @@
     });
   }
   async function requestConsentPopup(app, scopeStr, manage) {
+    if (inIsolatedFrame()) {
+      return askFrameHost("consent", { scope: scopeStr || appDeclaredScopes(), manage: !!manage }, 15 * 60 * 1e3);
+    }
     var apexOrigin;
     try {
       apexOrigin = new URL(APEX_URL).origin;
@@ -2941,7 +2990,7 @@
       if (res && res.access_token) return _buildAppSession(res.access_token, res.app || s._app, res.own != null ? !!res.own : s._own, void 0, false);
       return null;
     },
-    /** True when running inside a published app on its isolated origin (not the apex). */
+    /** True inside a published app that is kept apart from the node: on its own origin, or in the node's isolated frame. */
     isAppOrigin() {
       return isAppOrigin();
     },
@@ -3299,5 +3348,5 @@
     aimeatRestoreMode();
   }
   var ns = attach("auth", auth);
-  ns.version = "2026-09-24-001";
+  ns.version = "2026-09-25-001";
 })();
