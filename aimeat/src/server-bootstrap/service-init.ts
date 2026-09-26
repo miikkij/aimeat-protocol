@@ -31,6 +31,8 @@
  *     claimed and unclaimed relay times.
  *   v1.8.0 — 2026-09-26 — The comment at migrateMailReadConsent() says it tells owners about their
  *     agents too. No code changed here.
+ *   v1.8.1 — 2026-09-26 — The same comment: the agents' buttons let each agent read again, as the
+ *     apps' do. No code changed here.
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage, MaintenanceState } from '../storage/interface.js';
@@ -245,8 +247,8 @@ export async function initializeServices(
   // Reading a connected mailbox took its own word on 2026-09-24, and no existing grant was given it.
   // Once per node, each owner whose apps held connections:use beside a mailbox this node can read is
   // told so in one notice, with a button per app that lets it read again, and each owner whose agents
-  // held it by name beside a mailbox of their own in another, with a button per agent that opens its
-  // page. The marker it leaves keeps it from repeating.
+  // held it by name beside a mailbox of their own in another, with a button per agent that does the
+  // same. The marker it leaves keeps it from repeating.
   migrateMailReadConsent(storage, config)
     .catch(err => logger.error('Failed to send the mail read notice', { error: String(err) }));
 

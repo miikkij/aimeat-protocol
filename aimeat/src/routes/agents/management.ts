@@ -2,8 +2,13 @@
  * @file src/routes/agents/management.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Agent lifecycle management routes (export, import, rekey, port, scopes, federate, delete, CORS). Extracted from agents.ts to satisfy max-file-lines.
+ * @description Agent lifecycle management routes (export, import, rekey, port, scopes, read-through, federate, delete, CORS). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.9.0 -- 2026-09-26 -- POST and DELETE /v1/agents/:name/read-through: the owner, signed in
+ *     themselves, adds connections:read-through to one agent that holds connections:use, or takes it
+ *     away, as POST /v1/app-grants/:grantId/read-through does for an app. The agents' mail notice
+ *     calls it. PATCH scopes' two announcements moved into announceScopes(), unchanged, so all three
+ *     doors say it the same way.
  *   v1.8.0 -- 2026-09-16 -- POST /v1/agents/:gaii/export refuses a federated session. It compared the
  *     owner NAME, so a visitor could export the agents of the local account with the same name.
  *   v1.7.0 -- 2026-09-09 -- Five guards that could not fire are gone: four cross-owner 403s that sat
@@ -32,9 +37,11 @@ import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { generateKeyPair } from '../../auth/keypair.js';
-import { requireAuth, requireRole, requireRoleOrScope, requireLocalSession } from '../../auth/middleware.js';
+import { requireAuth, requireRole, requireRoleOrScope, requireLocalSession, requireOwnerPrincipal } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { buildGAII } from '../../utils/gaii.js';
+import { scopeIsCovered } from '../../utils/scope-coverage.js';
+import { READ_THROUGH_SCOPE } from '../../services/app-grant-scopes.js';
 import { calculateTrustScore } from '../../services/trust.js';
 import { fireHook } from '../../utils/fire-hook.js';
 import { emitChange } from '../../services/event-bus.js';
@@ -42,6 +49,27 @@ import { evictAgentTelemetry } from '../../services/telemetry-buffer.js';
 import { emitToolListChanged } from '../../mcp/index.js';
 import { getActiveConnectTunnelManager } from '../../services/connect-tunnel.js';
 import { logger } from '../../utils/logger.js';
+
+/** Why the read-through doors are the owner's in person: letting an agent read mail is consent. */
+const READ_IN_PERSON = 'Letting an agent read your mail is your own decision, so only you, signed in yourself, can make it here.';
+
+/**
+ * An agent's permissions changed: tell the two places that hold the old list. Moved unchanged out of
+ * PATCH /v1/agents/:name/scopes, so the read-through doors say it the same way.
+ */
+function announceScopes(gaii: string): void {
+  // The agent's open MCP sessions registered the tools THESE scopes allowed, so the list they
+  // hold is now wrong. Saying so is the difference between the person reconnecting the connector
+  // by hand after every permission change and not having to think about it at all.
+  emitToolListChanged(gaii);
+  // …and the tool list is only half of it. An open MCP session re-lists its tools on that signal,
+  // but a connector holds a MINTED token whose scopes were fixed when it was minted, for up to an
+  // hour, and nothing told it otherwise: the node's own /v1/agents said the agent held the new
+  // word while every call it made was refused for lacking it. This frame asks for a fresh mint and
+  // nothing else — it must never be auth_revoked, which stops the identity, because then ADDING a
+  // permission would kill the agent.
+  getActiveConnectTunnelManager()?.notifyScopesChanged(gaii);
+}
 
 export function registerManagementRoutes(router: Router, config: AimeatConfig, storage: Storage): void {
   // POST /v1/agents/:gaii/export — Export agent data for portability (owner auth)
@@ -356,17 +384,7 @@ export function registerManagementRoutes(router: Router, config: AimeatConfig, s
       return;
     }
 
-    // The agent's open MCP sessions registered the tools THESE scopes allowed, so the list they
-    // hold is now wrong. Saying so is the difference between the person reconnecting the connector
-    // by hand after every permission change and not having to think about it at all.
-    emitToolListChanged(updated.gaii);
-    // …and the tool list is only half of it. An open MCP session re-lists its tools on that signal,
-    // but a connector holds a MINTED token whose scopes were fixed when it was minted, for up to an
-    // hour, and nothing told it otherwise: the node's own /v1/agents said the agent held the new
-    // word while every call it made was refused for lacking it. This frame asks for a fresh mint and
-    // nothing else — it must never be auth_revoked, which stops the identity, because then ADDING a
-    // permission would kill the agent.
-    getActiveConnectTunnelManager()?.notifyScopesChanged(updated.gaii);
+    announceScopes(updated.gaii);
 
     res.json(success(config.nodeId, {
       gaii: updated.gaii,
@@ -374,6 +392,71 @@ export function registerManagementRoutes(router: Router, config: AimeatConfig, s
     }, [
       { description: 'Re-authenticate to get a new JWT with updated scopes', method: 'POST', url: '/v1/auth/token' },
     ]));
+    emitChange('agents');
+  });
+
+  /**
+   * POST /v1/agents/:name/read-through — let this agent read what is in its connected accounts: its
+   * mail, the attachments, the addresses it sends from. Adds connections:read-through to this one
+   * agent's permissions and nothing else, the owner signed in themselves. The agents' mail notice
+   * (services/mail-read-consent.ts) puts this door on a button per agent, as the apps' notice puts
+   * POST /v1/app-grants/:grantId/read-through on one per app.
+   *
+   * Only for an agent that already holds connections:use. Until 2026-09-24 that word also opened the
+   * mailbox, so this gives such an agent back the reach it had, on the owner's say; any other
+   * widening is the agent's page. Idempotent: an agent that can already read answers `added: false`.
+   */
+  router.post('/v1/agents/:name/read-through', requireAuth(), requireOwnerPrincipal(READ_IN_PERSON), async (req, res) => {
+    const agent = (await storage.getAgentsByOwner(req.auth!.owner)).find(a => a.name === (req.params.name as string));
+    if (!agent) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Agent not found'));
+    const held = agent.defaultScopes ?? [];
+    if (scopeIsCovered(held, READ_THROUGH_SCOPE)) {
+      return res.json(success(config.nodeId, { agent: agent.name, gaii: agent.gaii, added: false, scopes: held }));
+    }
+    if (!held.includes('connections:use')) {
+      return res.status(409).json(error(config.nodeId, 'NOT_ELIGIBLE',
+        `${agent.name} may not use its connected accounts, so there is nothing for it to read through. `
+        + 'If it should read mail, give it that permission on its page under Agents.'));
+    }
+    // The server's ceiling for agents, read the way every scope door reads it: a word "*" or
+    // "connections:*" covers counts as allowed.
+    if (!scopeIsCovered(config.maxAgentScopes, READ_THROUGH_SCOPE)) {
+      return res.status(400).json(error(config.nodeId, 'INVALID_SCOPES', 'This server does not let agents read what is in connected accounts. Ask whoever runs it.'));
+    }
+    const updated = await storage.updateAgent(agent.gaii, { defaultScopes: [...held, READ_THROUGH_SCOPE] });
+    if (!updated) {
+      return res.status(500).json(error(config.nodeId, 'INTERNAL', 'This one is on us — the permission could not be saved. It is already reported; try again in a moment.'));
+    }
+    announceScopes(updated.gaii);
+    res.json(success(config.nodeId, { agent: agent.name, gaii: updated.gaii, added: true, scopes: updated.defaultScopes }, [
+      { description: 'Take it away again', method: 'DELETE', url: `/v1/agents/${encodeURIComponent(agent.name)}/read-through` },
+    ]));
+    emitChange('agents');
+  });
+
+  /**
+   * DELETE /v1/agents/:name/read-through — this agent no longer reads its mail. Takes
+   * connections:read-through out of its permissions and leaves everything else; a wider word ("*",
+   * "connections:*") is the agent's page. Idempotent: an agent without the word answers
+   * `removed: false`.
+   */
+  router.delete('/v1/agents/:name/read-through', requireAuth(), requireOwnerPrincipal(READ_IN_PERSON), async (req, res) => {
+    const agent = (await storage.getAgentsByOwner(req.auth!.owner)).find(a => a.name === (req.params.name as string));
+    if (!agent) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Agent not found'));
+    const held = agent.defaultScopes ?? [];
+    if (!held.includes(READ_THROUGH_SCOPE)) {
+      return res.json(success(config.nodeId, { agent: agent.name, gaii: agent.gaii, removed: false, scopes: held }));
+    }
+    const scopes = held.filter(s => s !== READ_THROUGH_SCOPE);
+    if (scopes.length === 0) {
+      return res.status(400).json(error(config.nodeId, 'BAD_REQUEST', 'This is the only permission the agent holds. Change its permissions on its page under Agents instead.'));
+    }
+    const updated = await storage.updateAgent(agent.gaii, { defaultScopes: scopes });
+    if (!updated) {
+      return res.status(500).json(error(config.nodeId, 'INTERNAL', 'This one is on us — the permission could not be saved. It is already reported; try again in a moment.'));
+    }
+    announceScopes(updated.gaii);
+    res.json(success(config.nodeId, { agent: agent.name, gaii: updated.gaii, removed: true, scopes: updated.defaultScopes }));
     emitChange('agents');
   });
 

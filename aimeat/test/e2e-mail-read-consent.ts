@@ -15,9 +15,10 @@
  *     grants page's door or on the same door; a refresh does not bring it back
  *   - an app without the word is refused the mailbox, told the word and how an app asks for it
  *   - an owner whose agent holds connections:use by name beside a mailbox of its own gets one notice
- *     of its own about agents, with a button that opens that agent's page; an agent holding "*" or
- *     the word, one whose mailbox only sends and one with no mailbox are not named; the agent is
- *     refused its mailbox and told that its owner gives the word on its page
+ *     of its own about agents, with a button that calls the owner's door for that agent; an agent
+ *     holding "*" or the word, one whose mailbox only sends and one with no mailbox are not named;
+ *     the agent is refused its mailbox and told that its owner gives the word on its page; the tap
+ *     adds the word to that agent alone, the owner's in person, and DELETE takes it away
  *   The silent sign-in half of "the owner's word holds" needs an app origin, so it lives in
  *   test/e2e-app-silent.ts Phase 5.
  *
@@ -27,6 +28,10 @@
  *   has not run it yet.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mail-read-consent
  * @version-history
+ *   v1.3.0 — 2026-09-26 — The agents' button calls POST /v1/agents/:name/read-through (test 1b), and
+ *     tests 7 and 7b press it as the bell does: the word goes to that agent alone, only the owner in
+ *     person may, it is idempotent, an agent that may not use its accounts is NOT_ELIGIBLE, and DELETE
+ *     takes the word away again.
  *   v1.2.0 — 2026-09-26 — Agents: owner D's agents, one named in a notice of its own (test 1b), the
  *     run's count of agents (test 1), no second notice (test 2), and the agent's own refusal at the
  *     read door (test 6b) (secaudit 2026-09, A5-1).
@@ -209,6 +214,7 @@ await test('Setup: four owners, six apps, the grants made before reading had a w
     ag.allowed = await agentOf(D, 'mrc-allowed', ['connections:use', READ_WORD]);        // holds the word already
     ag.sender = await agentOf(D, 'mrc-sender', ['connections:use']);                     // its mailbox only sends
     ag.quiet = await agentOf(D, 'mrc-quiet', ['connections:use']);                       // no mailbox at all
+    ag.plain = await agentOf(D, 'mrc-plain', ['memory:read']);                           // may not use accounts at all
     agentMailbox = `conn-mrc-d-reader-${Date.now()}`;
     const gmailRead = ['https://www.googleapis.com/auth/gmail.readonly'];
     await storage.createConnection(row(agentMailbox, ag.reader.gaii, 'google-mail', gmailRead));
@@ -222,6 +228,9 @@ await test('Setup: four owners, six apps, the grants made before reading had a w
 });
 
 const door = (grantId: string) => `/v1/app-grants/${encodeURIComponent(grantId)}/read-through`;
+const agentDoor = (name: string) => `/v1/agents/${encodeURIComponent(name)}/read-through`;
+/** The button test 1b found on D's notice, pressed in test 7 the way the bell presses it. */
+let agentButton: { method: string; endpoint: string } | null = null;
 
 // The state of a node that has not run the migration yet: the grants and the mailbox exist, and
 // the marker does not.
@@ -264,7 +273,7 @@ await test('1. Run over the grants the node already holds, it tells each owner w
     assert((await mailNotices(B.token)).length === 0, 'B, whose mail connection only sends, is told nothing');
 });
 
-await test('1b. An owner whose agent holds connections:use by name beside a mailbox of its own is told once, with a button that opens that agent', async () => {
+await test('1b. An owner whose agent holds connections:use by name beside a mailbox of its own is told once, with a button that lets that agent read again', async () => {
     // secaudit 2026-09, A5-1: the agent stopped reading its own mailbox on the split, and the notice
     // above names apps only.
     const mine = await agentMailNotices(D.token);
@@ -274,11 +283,13 @@ await test('1b. An owner whose agent holds connections:use by name beside a mail
     assert(n.i18n?.key === 'agent_mail_read_consent' && n.i18n?.vars?.agents === ag.reader.name, `said in the reader's language: ${JSON.stringify(n.i18n)}`);
     const text = `${n.title} ${n.body}`;
     assert(text.includes(ag.reader.name), `the agent that stopped reading is named: ${text}`);
-    for (const other of [ag.wild, ag.allowed, ag.sender, ag.quiet]) assert(!text.includes(other.name), `${other.name} is not named: ${text}`);
+    for (const other of [ag.wild, ag.allowed, ag.sender, ag.quiet, ag.plain]) assert(!text.includes(other.name), `${other.name} is not named: ${text}`);
     const acts = n.actions as any[];
     assert(acts.length === 1, `a button per agent, got ${JSON.stringify(acts)}`);
-    assert(acts[0].kind === 'navigate' && acts[0].link === `/v1/profile?tab=agents&agent=${ag.reader.name}`, `the button opens that agent's page: ${JSON.stringify(acts[0])}`);
-    assert(acts[0].i18n?.key === 'agent_mail_read_consent.open' && acts[0].i18n?.vars?.agent === ag.reader.name, `the button is said in the reader's language: ${JSON.stringify(acts[0].i18n)}`);
+    assert(acts[0].kind === 'api' && acts[0].method === 'POST' && acts[0].endpoint === agentDoor(ag.reader.name),
+        `the button calls the owner's door for that agent: ${JSON.stringify(acts[0])}`);
+    assert(acts[0].i18n?.key === 'agent_mail_read_consent.allow' && acts[0].i18n?.vars?.agent === ag.reader.name, `the button is said in the reader's language: ${JSON.stringify(acts[0].i18n)}`);
+    agentButton = acts[0];
     assert((await mailNotices(D.token)).length === 0, 'D, who has no apps, is told nothing about apps');
     for (const o of [A, B, C]) assert((await agentMailNotices(o.token)).length === 0, `${o.name}, whose agents have no mailbox, is told nothing about agents`);
 });
@@ -385,6 +396,46 @@ await test('6b. An agent without the word is refused its own mailbox, and told t
     assert(msg.includes(READ_WORD), `the refusal names the word: ${msg}`);
     assert(/owner/i.test(msg) && msg.includes('Agents'), `the refusal says its owner gives the word on the agent's page: ${msg}`);
     assert((r.headers.get('www-authenticate') ?? '').includes(`scope="${READ_WORD}"`), `the challenge header names it: ${r.headers.get('www-authenticate')}`);
+});
+
+const scopesOf = async (gaii: string) => [...((await storage.getAgent(gaii))?.defaultScopes ?? [])].sort();
+
+await test('7. The owner\'s tap on the agent\'s button adds connections:read-through and nothing else, to that agent alone; only the owner in person may', async () => {
+    const before: Record<string, string[]> = {};
+    for (const a of Object.values(ag)) before[a.gaii] = await scopesOf(a.gaii);
+
+    // SECURITY: the door is the owner's own, as the apps' door is.
+    const none = await json(agentDoor(ag.reader.name), { method: 'POST' });
+    assert(none.status === 401, `no session: ${none.status}`);
+    const self = await json(agentDoor(ag.reader.name), { method: 'POST', headers: auth(ag.reader.token) });
+    assert(self.status === 403, `the agent itself: ${self.status} ${JSON.stringify(self.body.error)}`);
+    const other = await json(agentDoor(ag.reader.name), { method: 'POST', headers: auth(A.token) });
+    assert(other.status === 404, `another owner: ${other.status} ${JSON.stringify(other.body.error)}`);
+    assert(JSON.stringify(await scopesOf(ag.reader.gaii)) === JSON.stringify(before[ag.reader.gaii]), 'a refused call changed the agent');
+
+    // Pressed the way the bell presses it: the stored button's method and endpoint (test 1b holds them
+    // to the door), the owner's session.
+    const tap = await json(agentButton?.endpoint ?? agentDoor(ag.reader.name), { method: agentButton?.method ?? 'POST', headers: auth(D.token) });
+    assert(tap.status === 200 && tap.body.data.added === true, `the tap: ${tap.status} ${JSON.stringify(tap.body.error ?? tap.body.data)}`);
+    for (const a of Object.values(ag)) {
+        const expected = a.gaii === ag.reader.gaii ? [...before[a.gaii], READ_WORD].sort() : before[a.gaii];
+        assert(JSON.stringify(await scopesOf(a.gaii)) === JSON.stringify(expected), `${a.name}: ${JSON.stringify(before[a.gaii])} → ${JSON.stringify(await scopesOf(a.gaii))}`);
+    }
+    const again = await json(agentDoor(ag.reader.name), { method: 'POST', headers: auth(D.token) });
+    assert(again.status === 200 && again.body.data.added === false, `a second tap: ${again.status} ${JSON.stringify(again.body.data ?? again.body.error)}`);
+    const plain = await json(agentDoor(ag.plain.name), { method: 'POST', headers: auth(D.token) });
+    assert(plain.status === 409 && plain.body.error?.code === 'NOT_ELIGIBLE', `an agent that may not use its accounts: ${plain.status} ${JSON.stringify(plain.body.error)}`);
+    assert(JSON.stringify(await scopesOf(ag.plain.gaii)) === JSON.stringify(before[ag.plain.gaii]), 'the refused agent was changed');
+});
+
+await test('7b. The owner takes it away on the same door, and only that word goes', async () => {
+    const other = await json(agentDoor(ag.reader.name), { method: 'DELETE', headers: auth(A.token) });
+    assert(other.status === 404, `another owner takes it away: ${other.status}`);
+    const del = await json(agentDoor(ag.reader.name), { method: 'DELETE', headers: auth(D.token) });
+    assert(del.status === 200 && del.body.data.removed === true, `take away: ${del.status} ${JSON.stringify(del.body.error ?? del.body.data)}`);
+    assert(JSON.stringify(await scopesOf(ag.reader.gaii)) === JSON.stringify(['connections:use', 'memory:read']), `after taking it away: ${JSON.stringify(await scopesOf(ag.reader.gaii))}`);
+    const again = await json(agentDoor(ag.reader.name), { method: 'DELETE', headers: auth(D.token) });
+    assert(again.status === 200 && again.body.data.removed === false, `a second removal: ${again.status} ${JSON.stringify(again.body.data ?? again.body.error)}`);
 });
 
 await storage.close?.();
