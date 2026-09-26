@@ -375,6 +375,12 @@ fn remove_entry(text: &str, key: &str, name: &str) -> Result<String, String> {
 // ── Writing the file safely ─────────────────────────────────────────────────
 
 /// Replace a file's content, keeping one copy of the original and never leaving a half-file.
+///
+/// The replacement keeps the permissions of the file it replaces. A client's config can hold the
+/// person's other secrets, and on macOS and Linux a new file gets the default mode, 0644, which
+/// anyone on the machine can read. So the temporary file is readable by its owner alone from the
+/// moment it exists, and takes the old file's mode before it replaces it. Windows keeps who may
+/// read a file in an access list that the new file takes from the folder the old one is in.
 fn write_config(path: &Path, content: &str) -> Result<(), String> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)
@@ -389,11 +395,40 @@ fn write_config(path: &Path, content: &str) -> Result<(), String> {
             .map_err(|e| format!("Could not keep a copy of {}: {}", path.display(), e))?;
     }
     let temp = path.with_extension("aimeat-tmp");
-    fs::write(&temp, content).map_err(|e| format!("Could not write {}: {}", temp.display(), e))?;
+    write_private(&temp, content)
+        .map_err(|e| format!("Could not write {}: {}", temp.display(), e))?;
+    #[cfg(unix)]
+    keep_mode(path, &temp).map_err(|e| {
+        let _ = fs::remove_file(&temp);
+        format!("Could not keep the permissions of {}: {}", path.display(), e)
+    })?;
     fs::rename(&temp, path).map_err(|e| {
         let _ = fs::remove_file(&temp);
         format!("Could not replace {}: {}", path.display(), e)
     })
+}
+
+/// Write `content` to a new file that, on macOS and Linux, only its owner can read.
+fn write_private(temp: &Path, content: &str) -> std::io::Result<()> {
+    use std::io::Write;
+    // A temporary file that a crash left behind keeps the mode it had, so it goes first.
+    let _ = fs::remove_file(temp);
+    let mut options = fs::OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    std::os::unix::fs::OpenOptionsExt::mode(&mut options, 0o600);
+    options.open(temp)?.write_all(content.as_bytes())
+}
+
+/// Give the temporary file the mode of the file it replaces. A file that did not exist yet stays
+/// at 0600.
+#[cfg(unix)]
+fn keep_mode(path: &Path, temp: &Path) -> std::io::Result<()> {
+    match fs::metadata(path) {
+        Ok(meta) => fs::set_permissions(temp, meta.permissions()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(e) => Err(e),
+    }
 }
 
 // ── What the frontend calls ─────────────────────────────────────────────────
@@ -752,5 +787,33 @@ mod tests {
         assert!(!file.with_extension("aimeat-tmp").exists());
 
         let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_rewrite_keeps_the_mode_the_file_had_and_a_new_file_starts_private() {
+        // A client's config can hold the person's other secrets: a file kept at 0600 stays at 0600
+        // after the app edits it, a file left at 0644 is not narrowed, and a new one starts at 0600.
+        use std::os::unix::fs::PermissionsExt;
+        let dir = std::env::temp_dir().join(format!("aimeat-connectors-mode-{}", std::process::id()));
+        let _ = fs::create_dir_all(&dir);
+        let private = dir.join("mcp.json");
+        let readable = dir.join("settings.json");
+        let fresh = dir.join("new.json");
+        for (file, mode) in [(&private, 0o600), (&readable, 0o644)] {
+            fs::write(file, r#"{"a":1}"#).unwrap();
+            fs::set_permissions(file, fs::Permissions::from_mode(mode)).unwrap();
+        }
+
+        for file in [&private, &readable, &fresh] {
+            write_config(file, r#"{"a":2}"#).unwrap();
+        }
+        let mode = |file: &PathBuf| fs::metadata(file).unwrap().permissions().mode() & 0o777;
+        let modes = format!("{:o} {:o} {:o}", mode(&private), mode(&readable), mode(&fresh));
+        let content = fs::read_to_string(&private).unwrap();
+        let _ = fs::remove_dir_all(&dir);
+
+        assert_eq!(content, r#"{"a":2}"#);
+        assert_eq!(modes, "600 644 600");
     }
 }
