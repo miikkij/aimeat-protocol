@@ -6,6 +6,9 @@
  *   human-input ask delivery, step-failure + finish notifications, agent-offline heads-up, and
  *   fresh-mode output clearing. Extracted from engine.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.5.2 — 2026-09-26 — A run stopped because its next ai step's estimate did not fit under the
+ *     cost cap is finished with its own words: the step, its estimate, the spend and the cap
+ *     (workflow_stopped_estimate; secaudit 2026-09, A6-11).
  *   v1.5.1 — 2026-09-26 — The owner's account name comes from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  *   v1.5.0 — 2026-09-25 — OnPushTerminal carries what the step's own model calls cost, for the run's
  *     cost cap. A run the node stopped at that cap is finished, so its owner's finish notification
@@ -666,11 +669,14 @@ export async function onRunFinished(deps: StepDeps, ownerGhii: string, run: Work
   const name = loc(run.defSnapshot.title) || run.workflowId;
   const succeeded = run.status === 'done';
   const stopped = run.status === 'stopped';
+  // Stopped because the next ai step's estimate did not fit in what was left: the run stayed within the cap.
+  const estimated = stopped && !!run.costCap?.neededUsd;
+  const stopWords = estimated ? 'stopped to stay within its spending limit' : 'stopped at its spending limit';
   const outcome = succeeded ? 'succeeded'
     : run.status === 'cancelled' ? 'was cancelled'
-    : stopped ? 'stopped at its spending limit'
+    : stopped ? stopWords
     : 'finished with failures';
-  const title = `Workflow "${name}" ${succeeded ? 'succeeded' : run.status === 'cancelled' ? 'cancelled' : stopped ? 'stopped at its spending limit' : 'failed'}`;
+  const title = `Workflow "${name}" ${succeeded ? 'succeeded' : run.status === 'cancelled' ? 'cancelled' : stopped ? stopWords : 'failed'}`;
 
   // Per-step log + a short header (duration, failed-step roster).
   const stepLog = run.defSnapshot.steps
@@ -696,10 +702,12 @@ export async function onRunFinished(deps: StepDeps, ownerGhii: string, run: Work
     type: succeeded ? 'workflow_finished' : 'workflow_failed',
     title, body, link,
     i18n: {
-      key: succeeded ? 'workflow_finished' : run.status === 'cancelled' ? 'workflow_cancelled' : stopped ? 'workflow_stopped' : 'workflow_failed',
+      key: succeeded ? 'workflow_finished' : run.status === 'cancelled' ? 'workflow_cancelled'
+        : estimated ? 'workflow_stopped_estimate' : stopped ? 'workflow_stopped' : 'workflow_failed',
       vars: {
         name, minutes: durMin ?? 0, failed: failedSteps.join(', '), steps: run.defSnapshot.steps.map(s => `${s.id}: ${run.steps[s.id]?.state ?? 'unknown'}`).join(' · '),
-        ...(run.costCap ? { cap: usd(run.costCap.capUsd), spent: usd(run.costCap.spentUsd) } : {}),
+        ...(run.costCap ? { cap: usd(run.costCap.capUsd), spent: usd(run.costCap.spentUsd), step: run.costCap.stoppedBefore } : {}),
+        ...(run.costCap?.neededUsd ? { needed: usd(run.costCap.neededUsd) } : {}),
       },
     },
   });

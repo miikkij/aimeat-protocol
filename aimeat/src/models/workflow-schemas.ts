@@ -55,6 +55,9 @@
  *   v1.13.0 — 2026-09-26 — WorkflowRun.signalCostUsd: what the node's model cost judging the run's
  *     `llm` signals, counted toward maxCostUsd (secaudit 2026-09, A6-11). The signal grammar moved
  *     unchanged to workflow-signals.ts and is re-exported here (max-file-lines).
+ *   v1.14.0 — 2026-09-26 — Under maxCostUsd an ai step holds what it is expected to cost while it
+ *     runs: WorkflowRunStep.estimateUsd and reservedUsd, and costCap.neededUsd on a run stopped by
+ *     an estimate (secaudit 2026-09, A6-11).
  */
 import { z } from 'zod';
 import { SignalSchema, type Signal } from './workflow-signals.js';
@@ -408,11 +411,16 @@ export interface WorkflowDef {
   /**
    * The most one run may spend on the owner's AI, in US dollars: through its ai steps, and through the
    * node's model judging its `llm` signals. The engine adds up what each call cost, as the node
-   * recorded it, and before it starts the next ai step it stops the run once the sum has reached this:
-   * the run ends `stopped`, with the cap and the spend in `costCap` and in words in `reason`. A step
-   * already running finishes. Once the sum has reached this the judge is not asked, and its leaf passes
-   * as it does when the judge is unavailable. Absent or null: no cap. The owner's daily AI budget
-   * bounds every AI call as well, whatever this says.
+   * recorded it. Before an ai step starts, the engine sets aside what the step is expected to cost
+   * (its `estimateUsd`, else an equal share of the cap nobody holds, split across the ai steps not yet
+   * started), and the step starts only when what the run has spent, what its running ai steps hold and
+   * that estimate stay within this. So ai steps that fit together still start together. A step that
+   * does not fit waits while another ai step runs; with none running, the run ends `stopped`, with the
+   * cap, the spend and the step's estimate in `costCap` and in words in `reason`. A step already
+   * running finishes. A step that costs more than its estimate takes the run past this by the
+   * difference. Once the spend has reached this the judge is not asked, and its leaf passes as it does
+   * when the judge is unavailable. Absent or null: no cap. The owner's daily AI budget bounds every AI
+   * call as well, whatever this says.
    */
   maxCostUsd?: number | null;
   /**
@@ -487,6 +495,18 @@ export interface WorkflowRunStep {
    * completions, a retry's added on. The run's cost cap (WorkflowDef.maxCostUsd) adds these up.
    */
   costUsd?: number;
+  /**
+   * Under a cost cap: what this ai step is expected to cost, in US dollars, set when the run starts.
+   * It is the most the step cost in the workflow's last ten finished runs that ran it with the same
+   * action. Absent when there is no such run.
+   */
+  estimateUsd?: number;
+  /**
+   * Under a cost cap, while this ai step runs: what the engine set aside for it from the cap before
+   * it started, in US dollars (its `estimateUsd`, else its share of the cap nobody held). Removed when
+   * the step ends, and `costUsd` then says what it cost.
+   */
+  reservedUsd?: number;
 }
 
 /**
@@ -518,8 +538,12 @@ export interface WorkflowRun {
   status: 'running' | 'waiting-step' | 'red' | 'partial' | 'done' | 'cancelled' | 'stopped' | 'refused';
   /** Why the node ended the run itself, or did not start it, in words. */
   reason?: string;
-  /** Set on a `stopped` run: the cap, what the run had spent on AI, and the ai step that did not start. */
-  costCap?: { capUsd: number; spentUsd: number; stoppedBefore: string };
+  /**
+   * Set on a `stopped` run: the cap, what the run had spent on AI, and the ai step that did not start.
+   * `neededUsd` is that step's estimate, present when the run had not spent the cap and the estimate
+   * did not fit in what was left.
+   */
+  costCap?: { capUsd: number; spentUsd: number; stoppedBefore: string; neededUsd?: number };
   /**
    * What the node's model cost judging this run's `llm` signals, in US dollars, as the node recorded
    * it. It counts toward maxCostUsd beside the steps' own `costUsd` (services/workflow/run-cost.ts).
