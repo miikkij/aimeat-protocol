@@ -2,6 +2,9 @@
  * @file app-publish-atomic.test.ts
  * @description A required roadmap note and app version either both commit or neither does.
  * @version-history
+ *   v1.2.0 - 2026-09-26 - A dry run refuses a provenance declaration the caller may not make, as the
+ *     real publish does, and the real publish refuses it before storing anything (bbfbeca149de).
+ *     Failed on the old code first.
  *   v1.1.0 - 2026-09-24 - A dry run refuses a new app with no description, as the real publish does
  *     (bbfbeca149de). Failed on the old code first.
  *   v1.0.0 - 2026-09-08 - Exercise failures against real SQLite transactions.
@@ -54,5 +57,21 @@ describe('atomic app publication', () => {
     // An update carries its description forward, so silence passes there, dry or not.
     expect(await publishApp(storage, config, input)).not.toHaveProperty('refusal');
     expect(await publishApp(storage, config, { ...bare, dryRun: true })).toEqual({ dryRun: true });
+  });
+  // The same, for the last refusal a publish makes: an agent declaring how the bytes were made
+  // without provenance:write. It was thrown by the provenance mint below the dry-run return, so a
+  // dry run answered "would pass" to a publish that then refused (bbfbeca149de).
+  it('a dry run refuses a provenance declaration the caller may not make, as the real publish does', async () => {
+    const { storage, input } = setup();
+    const minting = { ...config, aiProvenance: true } as AimeatConfig;
+    const declaring = {
+      ...input, callerGaii: 'bot#alice@node-test',
+      declaredProvenance: { level: 'ai-generated' as const, model: 'test-model' },
+    };
+    expect(await publishApp(storage, minting, { ...declaring, dryRun: true })).toMatchObject({ refusal: { status: 403, code: 'SCOPE_DENIED' } });
+    expect(await publishApp(storage, minting, declaring)).toMatchObject({ refusal: { status: 403, code: 'SCOPE_DENIED' } });
+    expect(await storage.getLatestVersionNumber(input.ownerGhii, input.filename)).toBe(0);
+    // Without the declaration the node stamps the agent's write itself, which needs no word.
+    expect(await publishApp(storage, minting, { ...input, callerGaii: 'bot#alice@node-test', dryRun: true })).toEqual({ dryRun: true });
   });
 });

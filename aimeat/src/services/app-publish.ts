@@ -40,6 +40,9 @@
  *   });
  *   if ('refusal' in out) return res.status(out.refusal.status).json(error(...));
  * @version-history
+ *   2026-09-26 — A provenance declaration the caller may not make (no provenance:write) is refused
+ *     above the dry-run return, 403 SCOPE_DENIED with the held scopes (bbfbeca149de): the mint threw
+ *     it below the return, so a dry run answered "would pass" to a publish that then refused.
  *   2026-09-26 — A declared ai_provenance that names no model earns the `provenance-without-model`
  *     hint: a GPT-6 build of material-lab published a record that read only "Served by openai".
  *   2026-09-24 — A new app's missing description is refused above the dry-run return
@@ -97,7 +100,7 @@ import type { Storage, AppManifest, AppManifestCortex, AppProtection } from '../
 import { emitChange } from './event-bus.js';
 import { recordPublicActivity } from './public-activity.js';
 import { recordAccountEvent } from './account-events.js';
-import { provenanceForWrite, declarationLacksModel, type DeclaredProvenance } from './ai-provenance.js';
+import { provenanceForWrite, provenanceDeclarationRefusal, declarationLacksModel, type DeclaredProvenance } from './ai-provenance.js';
 import { lintAppAiDisclosure, type AppAiLintResult } from './app-ai-posture.js';
 import { lintAppArtifact, type AppArtifactFinding } from './app-artifact-lint.js';
 import { stripServedMarks, type ServedMarkRemoval } from './app-serve-marks-strip.js';
@@ -345,11 +348,28 @@ export async function publishApp(
     };
   }
 
+  // A declaration of how the bytes were made is the caller's to make only with provenance:write.
+  // provenanceForWrite below throws that refusal after the manifest is built, which is under the dry
+  // run; asked here, without minting, a dry run answers it as the real publish does (bbfbeca149de).
+  const provenanceRefused = await provenanceDeclarationRefusal(storage, {
+    principal: callerGaii, declared: input.declaredProvenance, declaredId: input.declaredProvenanceId,
+    enabled: config.aiProvenance,
+  });
+  if (provenanceRefused) {
+    return {
+      refusal: {
+        status: 403, code: provenanceRefused.code, message: provenanceRefused.message,
+        details: { held_scopes: provenanceRefused.heldScopes },
+      },
+    };
+  }
+
   // A DRY RUN STOPS HERE, and this line is only correct because of how the rest of the function is
   // ordered. Every refusal publishApp can make is ABOVE it — the publish right, the roadmap, the
-  // per-owner quota, the artifact lint, the delegated-settings check and a new app's description —
-  // and everything below builds the manifest, mints provenance and writes. `pnpm check:route-scopes`
-  // will not tell you that; the `return { refusal` sites will.
+  // per-owner quota, the artifact lint, the delegated-settings check, a new app's description and a
+  // provenance declaration the caller may not make — and everything below builds the manifest, mints
+  // provenance and writes. `pnpm check:route-scopes` will not tell you that; the `return { refusal`
+  // sites will.
   //
   // WHO ASKS FOR ONE. services/package-migrate.ts, whose `replace` and `custom` actions delete the
   // owner's installed component before registering its replacement. Without a way to ask "would
