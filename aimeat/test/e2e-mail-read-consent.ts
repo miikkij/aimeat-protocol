@@ -14,6 +14,10 @@
  *   - a refresh keeps the word the owner added, and it goes when the owner takes it away, on the
  *     grants page's door or on the same door; a refresh does not bring it back
  *   - an app without the word is refused the mailbox, told the word and how an app asks for it
+ *   - an owner whose agent holds connections:use by name beside a mailbox of its own gets one notice
+ *     of its own about agents, with a button that opens that agent's page; an agent holding "*" or
+ *     the word, one whose mailbox only sends and one with no mailbox are not named; the agent is
+ *     refused its mailbox and told that its owner gives the word on its page
  *   The silent sign-in half of "the owner's word holds" needs an app origin, so it lives in
  *   test/e2e-app-silent.ts Phase 5.
  *
@@ -23,6 +27,9 @@
  *   has not run it yet.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mail-read-consent
  * @version-history
+ *   v1.2.0 — 2026-09-26 — Agents: owner D's agents, one named in a notice of its own (test 1b), the
+ *     run's count of agents (test 1), no second notice (test 2), and the agent's own refusal at the
+ *     read door (test 6b) (secaudit 2026-09, A5-1).
  *   v1.1.0 — 2026-09-26 — The marker is read under system@<node>, key migrations.mail-read-consent,
  *     where services/mail-read-consent.ts now records it beside the operator:admin migration.
  *   v1.0.0 — 2026-09-25 — Initial.
@@ -105,8 +112,24 @@ async function grant(owner: { token: string }, app: string, scopes: string[]) {
 }
 
 const grantsOf = async (token: string) => (await json('/v1/app-grants', { headers: auth(token) })).body.data.grants as Array<{ grant_id: string; app: string; scopes: string[] }>;
-const mailNotices = async (token: string) => ((await json('/v1/notifications?limit=200', { headers: auth(token) })).body.data.notifications || [])
-    .filter((n: any) => n.type === 'app_mail_read_consent');
+const noticesOf = async (token: string, type: string) => ((await json('/v1/notifications?limit=200', { headers: auth(token) })).body.data.notifications || [])
+    .filter((n: any) => n.type === type);
+const mailNotices = (token: string) => noticesOf(token, 'app_mail_read_consent');
+const agentMailNotices = (token: string) => noticesOf(token, 'agent_mail_read_consent');
+
+/** An agent of `owner` holding exactly `scopes`, with a token of its own. */
+async function agentOf(owner: { name: string; token: string }, name: string, scopes: string[]) {
+    const made = await json('/v1/agents', {
+        method: 'POST', headers: auth(owner.token),
+        body: JSON.stringify({ name, owner: owner.name, capabilities: ['memory'], scopes }),
+    });
+    assert(made.status === 201, `agent ${name}: ${made.status} ${JSON.stringify(made.body.error)}`);
+    const gaii = made.body.data.agent.gaii as string;
+    const ts = new Date().toISOString();
+    const at = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ gaii, timestamp: ts, signature: await sign(made.body.data.private_key, gaii + ts) }) });
+    assert(at.body.ok === true, `agent token ${name}: ${JSON.stringify(at.body.error)}`);
+    return { name, gaii, token: at.body.data.token as string };
+}
 /** The server's own configuration, as far as this run needs it: the node id the records carry. */
 const nodeConfig = (): AimeatConfig => ({ ...loadConfig().config, nodeId: NODE_ID });
 
@@ -131,8 +154,11 @@ if (!storage) {
 let A: Awaited<ReturnType<typeof setupOwner>>;   // uses the apps, and has a Gmail the node may read
 let B: Awaited<ReturnType<typeof setupOwner>>;   // publishes the apps; uses one, and can only send mail
 let C: Awaited<ReturnType<typeof setupOwner>>;   // four apps that may publish, and an Outlook mailbox
+let D: Awaited<ReturnType<typeof setupOwner>>;   // no apps: agents, some with a mailbox of their own
 const g: Record<string, { access_token: string; refresh_token: string; grant_id: string; scope: string }> = {};
+const ag: Record<string, Awaited<ReturnType<typeof agentOf>>> = {};
 let mailbox = '';
+let agentMailbox = '';
 
 await test('0. The node ran the mail read migration at boot and left its marker', async () => {
     // The runner boots a fresh node for this suite, and the run is fire-and-forget after storage
@@ -143,7 +169,7 @@ await test('0. The node ran the mail read migration at boot and left its marker'
     assert(status === 'done', `marker ${MARKER_NS}/${MARKER_KEY} says ${JSON.stringify(status)}: the node did not run the migration at boot`);
 });
 
-await test('Setup: three owners, six apps, the grants made before reading had a word of its own, three mail connections', async () => {
+await test('Setup: four owners, six apps, the grants made before reading had a word of its own, mail connections for three owners and four agents', async () => {
     A = await setupOwner('a'); B = await setupOwner('b'); C = await setupOwner('c');
     await publish(B.token, 'mail-reader.html', 'Mail Reader', 'memory:read connections:use', CODE);
     await publish(B.token, 'social-poster.html', 'Social Poster', 'memory:read connections:use', CODE);
@@ -174,8 +200,24 @@ await test('Setup: three owners, six apps, the grants made before reading had a 
     await storage.createConnection(row(mailbox, A.ghii, 'google-mail', ['https://www.googleapis.com/auth/gmail.readonly']));
     await storage.createConnection(row(`conn-mrc-b-${Date.now()}`, B.ghii, 'google-mail-send', ['https://www.googleapis.com/auth/gmail.send']));
     await storage.createConnection(row(`conn-mrc-c-${Date.now()}`, C.ghii, 'microsoft-mail', ['Mail.Read', 'User.Read', 'offline_access']));
+
+    // D's agents. An agent reads only the connections that are its own, so each mailbox below is
+    // connected under the agent's own GAII.
+    D = await setupOwner('d');
+    ag.reader = await agentOf(D, 'mrc-reader', ['memory:read', 'connections:use']);     // named: may send, cannot read
+    ag.wild = await agentOf(D, 'mrc-wild', ['*']);                                       // the word is inside "*"
+    ag.allowed = await agentOf(D, 'mrc-allowed', ['connections:use', READ_WORD]);        // holds the word already
+    ag.sender = await agentOf(D, 'mrc-sender', ['connections:use']);                     // its mailbox only sends
+    ag.quiet = await agentOf(D, 'mrc-quiet', ['connections:use']);                       // no mailbox at all
+    agentMailbox = `conn-mrc-d-reader-${Date.now()}`;
+    const gmailRead = ['https://www.googleapis.com/auth/gmail.readonly'];
+    await storage.createConnection(row(agentMailbox, ag.reader.gaii, 'google-mail', gmailRead));
+    await storage.createConnection(row(`conn-mrc-d-wild-${Date.now()}`, ag.wild.gaii, 'google-mail', gmailRead));
+    await storage.createConnection(row(`conn-mrc-d-allowed-${Date.now()}`, ag.allowed.gaii, 'google-mail', gmailRead));
+    await storage.createConnection(row(`conn-mrc-d-sender-${Date.now()}`, ag.sender.gaii, 'google-mail-send', ['https://www.googleapis.com/auth/gmail.send']));
+
     const held = await storage.listConnections({});
-    assert([A.ghii, B.ghii, C.ghii].every(p => held.some(c => c.principal === p)), `the three connections are stored: ${held.length}`);
+    assert([A.ghii, B.ghii, C.ghii, ag.reader.gaii].every(p => held.some(c => c.principal === p)), `the connections are stored: ${held.length}`);
     assert(Object.keys(g).length === 9, `nine grants: ${Object.keys(g).join(', ')}`);
 });
 
@@ -183,7 +225,7 @@ const door = (grantId: string) => `/v1/app-grants/${encodeURIComponent(grantId)}
 
 // The state of a node that has not run the migration yet: the grants and the mailbox exist, and
 // the marker does not.
-let migrate: ((s: Storage, c: AimeatConfig) => Promise<{ ran: boolean; owners: number; grants: number }>) | null = null;
+let migrate: ((s: Storage, c: AimeatConfig) => Promise<{ ran: boolean; owners: number; grants: number; agents?: number }>) | null = null;
 
 await test('1. Run over the grants the node already holds, it tells each owner with a readable mailbox once, naming the apps that may publish', async () => {
     const mod = await import('../src/services/mail-read-consent.js').catch(() => null) as any;
@@ -191,7 +233,8 @@ await test('1. Run over the grants the node already holds, it tells each owner w
     assert(typeof migrate === 'function', 'this node has no mail read migration (services/mail-read-consent.ts)');
     await storage.deleteMemory(MARKER_NS, MARKER_KEY);
     const out = await migrate!(storage, nodeConfig());
-    assert(out.ran === true && out.owners === 2 && out.grants === 6, `the run: ${JSON.stringify(out)}`);
+    // A and C are told about their apps, D about one agent of its own (test 1b).
+    assert(out.ran === true && out.owners === 3 && out.grants === 6 && out.agents === 1, `the run: ${JSON.stringify(out)}`);
 
     const mine = await mailNotices(A.token);
     assert(mine.length === 1, `A has one notice, got ${mine.length}`);
@@ -221,11 +264,32 @@ await test('1. Run over the grants the node already holds, it tells each owner w
     assert((await mailNotices(B.token)).length === 0, 'B, whose mail connection only sends, is told nothing');
 });
 
+await test('1b. An owner whose agent holds connections:use by name beside a mailbox of its own is told once, with a button that opens that agent', async () => {
+    // secaudit 2026-09, A5-1: the agent stopped reading its own mailbox on the split, and the notice
+    // above names apps only.
+    const mine = await agentMailNotices(D.token);
+    assert(mine.length === 1, `D has one notice about its agents, got ${mine.length}`);
+    const n = mine[0];
+    assert(n.source?.kind === 'aimeat', `the node sent it: ${JSON.stringify(n.source)}`);
+    assert(n.i18n?.key === 'agent_mail_read_consent' && n.i18n?.vars?.agents === ag.reader.name, `said in the reader's language: ${JSON.stringify(n.i18n)}`);
+    const text = `${n.title} ${n.body}`;
+    assert(text.includes(ag.reader.name), `the agent that stopped reading is named: ${text}`);
+    for (const other of [ag.wild, ag.allowed, ag.sender, ag.quiet]) assert(!text.includes(other.name), `${other.name} is not named: ${text}`);
+    const acts = n.actions as any[];
+    assert(acts.length === 1, `a button per agent, got ${JSON.stringify(acts)}`);
+    assert(acts[0].kind === 'navigate' && acts[0].link === `/v1/profile?tab=agents&agent=${ag.reader.name}`, `the button opens that agent's page: ${JSON.stringify(acts[0])}`);
+    assert(acts[0].i18n?.key === 'agent_mail_read_consent.open' && acts[0].i18n?.vars?.agent === ag.reader.name, `the button is said in the reader's language: ${JSON.stringify(acts[0].i18n)}`);
+    assert((await mailNotices(D.token)).length === 0, 'D, who has no apps, is told nothing about apps');
+    for (const o of [A, B, C]) assert((await agentMailNotices(o.token)).length === 0, `${o.name}, whose agents have no mailbox, is told nothing about agents`);
+});
+
 await test('2. It runs once: a second run tells nobody again', async () => {
     assert(typeof migrate === 'function', 'no migration to run');
     const out = await migrate!(storage, nodeConfig());
     assert(out.ran === false, `the second run did something: ${JSON.stringify(out)}`);
     assert((await mailNotices(A.token)).length === 1, 'A was told twice');
+    const dNotices = (await agentMailNotices(D.token)).length;
+    assert(dNotices === 1, `D holds one notice about its agents after the second run, got ${dNotices}`);
 });
 
 await test('3. SECURITY: the door is the owner\'s own: refused without a session, to another owner, to the app, to the owner\'s agent', async () => {
@@ -311,6 +375,15 @@ await test('6. An app without the word is refused the mailbox, and told the word
     const msg = String(r.body.error?.message ?? '');
     assert(msg.includes(READ_WORD), `the refusal names the word: ${msg}`);
     assert(msg.includes('aimeat-scopes') && /consent|approve/i.test(msg), `the refusal says how an app asks for it: ${msg}`);
+    assert((r.headers.get('www-authenticate') ?? '').includes(`scope="${READ_WORD}"`), `the challenge header names it: ${r.headers.get('www-authenticate')}`);
+});
+
+await test('6b. An agent without the word is refused its own mailbox, and told the word and that its owner gives it on its page', async () => {
+    const r = await json(`/v1/connections/${encodeURIComponent(agentMailbox)}/read/messages`, { method: 'POST', headers: auth(ag.reader.token), body: '{}' });
+    assert(r.status === 403 && r.body.error?.code === 'SCOPE_DENIED', `refusal: ${r.status} ${JSON.stringify(r.body.error)}`);
+    const msg = String(r.body.error?.message ?? '');
+    assert(msg.includes(READ_WORD), `the refusal names the word: ${msg}`);
+    assert(/owner/i.test(msg) && msg.includes('Agents'), `the refusal says its owner gives the word on the agent's page: ${msg}`);
     assert((r.headers.get('www-authenticate') ?? '').includes(`scope="${READ_WORD}"`), `the challenge header names it: ${r.headers.get('www-authenticate')}`);
 });
 
