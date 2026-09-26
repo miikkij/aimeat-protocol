@@ -31,6 +31,7 @@
  *   - mintProvenance(storage, …)      — build + validate + persist, returns the stored row
  *   - provenanceForWrite(storage, …)  — THE decision a write surface makes: attach / declare / Mint-3
  *   - provenanceDeclarationRefusal(…) — its refusal, asked before a door's first write
+ *   - declarationLacksModel(declared) — a model made it and the declaration does not say which
  *   - stampAutonomousOutput(…)        — the stamp for output the node produced on its own initiative;
  *                                       the "only substantive review upgrades it" rule lives here
  *   - stampAgentWrite(storage, …)     — MINT-3: the default for a non-human principal that declared
@@ -42,6 +43,8 @@
  *   import { mintProvenance, contentHashOf } from './ai-provenance.js';
  *   const row = await mintProvenance(storage, { stampedBy: 'node', ... , content });
  * @version-history
+ *   v1.3.4 — 2026-09-26 — declarationLacksModel(): the app publish warns a declarer that named no
+ *     model, after a GPT-6 build's record read only "Served by openai".
  *   v1.3.3 — 2026-09-26 — buildDisclosure(): a label the node policy adds to REVIEWED content says
  *     so ("AI-drafted, reviewed by {name}" or "…by a person") instead of "AI-generated". Optional
  *     `opts.reviewer` carries the declared name. Every other reason keeps its words.
@@ -375,6 +378,16 @@ export interface DeclaredProvenance {
   provider?: string;
   sources?: AiProvenanceSource[];
   notes?: string;
+}
+
+/**
+ * Does this declaration say a model made the content without saying which model? The node cannot
+ * fill the gap: on a declaration it witnessed nothing, and an owner token has no agent record to
+ * read a registered model from. So the declarer is told, and the next declaration can name it.
+ * `original` is left alone, because no model was involved.
+ */
+export function declarationLacksModel(declared: DeclaredProvenance | undefined): boolean {
+  return !!declared && declared.level !== 'original' && !declared.model?.trim();
 }
 
 /**

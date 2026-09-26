@@ -41,6 +41,8 @@
  *         declared: toDeclaredProvenance(ai_provenance), declaredId: ai_provenance_id, ... });
  *     });
  * @version-history
+ *   v1.2.1 — 2026-09-26 — `model` asks the declarer for its OWN model id. A GPT-6 build of
+ *     material-lab declared `provider: "openai"` and no model, so its record could not say which one.
  *   v1.2.0 — 2026-08-01 — TARGET-058. parseDeclaredProvenanceInput(): the same validation + mapping
  *     for the doors that have no zod of their own. The app publish surface had four of them and only
  *     ONE carried a declaration, so the recommended presigned route published every app with
@@ -95,7 +97,9 @@ export const AiProvenanceBlockSchema = z.object({
     + 'SUBSTANCE and can reject it counts: a skim, a spell-check or clicking publish is '
     + "'light-review' at most. Omitted means 'none'."),
   model: z.string().optional().describe(
-    "The model that produced it, as the provider names it, e.g. 'anthropic/claude-opus-5'."),
+    "The model that produced it, as the provider names it, e.g. 'anthropic/claude-opus-5'. "
+    + 'When you made it, this is YOUR OWN model id: self-identify from your own configuration, never '
+    + 'ask the person. Without it the record says only who served the model, never which one.'),
   provider: z.string().optional().describe(
     "Who served the model, when that is not obvious from its name — e.g. 'openrouter' in front of "
     + "someone else's model. Say it when you route through an intermediary, because 'which model' "

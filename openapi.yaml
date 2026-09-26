@@ -830,7 +830,10 @@ components:
             `light-review` at most. Omitted means `none`.
         model:
           type: string
-          description: The model that produced it, as the provider names it.
+          description: >
+            The model that produced it, as the provider names it. When the declarer made it, this is
+            its own model id. Without it the record says only who served the model, never which one,
+            and an app publish answers with the `provenance-without-model` hint.
           example: anthropic/claude-opus-5
         provider:
           type: string
