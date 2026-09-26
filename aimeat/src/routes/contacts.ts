@@ -15,6 +15,9 @@
  *   gate); POST /v1/contacts/resolve (email → GHII exact match, or invite fallback signal).
  * @usage app.use(contactsRouter(config, storage))
  * @version-history
+ *   v1.6.0 — 2026-09-26 — POST /invite admits the owner's agent holding messages:send beside the owner
+ *     in person, as aimeat_contact_invite does and the connector's tool, which asks this door, now
+ *     can; an app grant, an ecosystem app and a visitor from another node stay out.
  *   v1.5.1 — 2026-09-26 — POST /invite answers the account's lookup limit as the other doors do: 429
  *     RATE_LIMITED with Retry-After and retry_after_sec (the service counts each invitation).
  *   v1.5.0 — 2026-09-25 — The per-account lookup limit moves into the service, which a save by email
@@ -137,8 +140,15 @@ export function contactsRouter(config: AimeatConfig, storage: Storage): Router {
   /* ── POST /v1/contacts/invite — invite a person to join this AIMEAT, no organism behind it. The
    * email goes out in the owner's name with their message; the accept link comes back so it can
    * be handed over when mail is off. Same throttle as the organism email invite, and the service
-   * counts each invitation as an address lookup against the account (429 with Retry-After). ── */
-  router.post('/v1/contacts/invite', requireAuth(), requireLocalSession(), requireRole('owner'), rateLimit({ max: 20, windowMs: 10 * 60 * 1000 }), async (req, res) => {
+   * counts each invitation as an address lookup against the account (429 with Retry-After).
+   *
+   * WHO. The owner in person, or their agent holding messages:send, the word aimeat_contact_invite
+   * declares; the connector's tool asks this door, so the node's tool, the connector's and REST give
+   * one answer (the developer's ruling of 2026-09-26). requireRole('agent') admits the owner and their
+   * agents and keeps an app grant and an ecosystem app out; requireScope then waves the owner in
+   * person through and holds an agent to the word. A visitor from another node stays out
+   * (requireLocalSession). ── */
+  router.post('/v1/contacts/invite', requireAuth(), requireLocalSession(), requireRole('agent'), requireScope('messages:send'), rateLimit({ max: 20, windowMs: 10 * 60 * 1000 }), async (req, res) => {
     const b = (req.body ?? {}) as Record<string, unknown>;
     try {
       const { invitation, acceptUrl, emailSent } = await createContactInvitation(storage, config, {

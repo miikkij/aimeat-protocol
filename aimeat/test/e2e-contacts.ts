@@ -5,6 +5,9 @@
  *   contact never resets the DM first-contact gate), blocked-row handling, the q filter,
  *   cross-owner isolation, and exact-match email resolve (found / not-found / invalid / unauth).
  * @version-history
+ *   v1.7.0 — 2026-09-26 — Test 33: an agent holding messages:send invites on POST /v1/contacts/invite
+ *     as over the tool, in its owner's name and on its owner's allowance; an agent without the word
+ *     is refused on both doors (the developer's ruling of 2026-09-26: enable safely).
  *   v1.6.0 — 2026-09-26 — Test 32: an invitation draws on the same per-account allowance, on REST and
  *     over aimeat_contact_invite, and past it both refuse RATE_LIMITED (REST with Retry-After);
  *     another account is not slowed (secaudit 2026-09, A5-2).
@@ -665,6 +668,38 @@ await test('32. An invitation answers whether an address has an account here, so
 
     const other = await json('/v1/contacts/invite', { method: 'POST', headers: auth(B.token), body: JSON.stringify({ email: `b-invited-${Date.now()}@example.com` }) });
     assert(other.status === 201, `another account's invitation: ${other.status} ${JSON.stringify(other.body.error)}`);
+});
+
+await test('33. An agent holding messages:send invites on REST as over MCP, in its owner\'s name and on its owner\'s allowance; without the word it is refused on both', async () => {
+    // The REST door took the owner in person only while aimeat_contact_invite took an agent holding
+    // messages:send, and the connector's tool asks the REST door: three answers to one question.
+    const G = await setupOwner('g');
+    const sender = await agentOf(G, 'invitesendbot', ['messages:send']);
+    const reader = await agentOf(G, 'invitereadbot', ['messages:read']);
+    const invite = (token: string, email: string) => json('/v1/contacts/invite', { method: 'POST', headers: auth(token), body: JSON.stringify({ email }) });
+
+    const first = await invite(sender.token, `g-agent-${Date.now()}@example.com`);
+    assert(first.status === 201, `the agent's invitation on REST: ${first.status} ${JSON.stringify(first.body.error)}`);
+    assert(first.body.data.invitation.invited_by === G.name, `it goes out in the owner's name: ${JSON.stringify(first.body.data.invitation)}`);
+
+    const refused = await invite(reader.token, `g-reader-${Date.now()}@example.com`);
+    assert(refused.status === 403, `an agent without messages:send on REST: ${refused.status} ${JSON.stringify(refused.body.data ?? refused.body.error)}`);
+    // The tool is not registered for a session without the word, and the SDK answers "not found".
+    const over = await mcpCallAs(reader.gaii, reader.key, 'aimeat_contact_invite', { email: `g-reader-mcp-${Date.now()}@example.com` });
+    assert(over.result?.isError === true && String(over.result?.content?.[0]?.text).includes('not found'),
+        `the tool answered an agent without the word: ${JSON.stringify(over.result ?? over.error).slice(0, 200)}`);
+
+    // The account's allowance: the agent's invitation above was one, the owner's lookups make it 20.
+    for (let i = 0; i < 19; i++) {
+        const r = await lookup(G.token, `g-lookup-${i}-${Date.now()}@example.com`);
+        assert(r.status === 200, `the owner's lookup ${i + 2}: ${r.status} ${JSON.stringify(r.body.error)}`);
+    }
+    const res21 = await fetch(`${BASE}/v1/contacts/invite`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', ...auth(sender.token) }, body: JSON.stringify({ email: `g-agent-late-${Date.now()}@example.com` }),
+    });
+    const body21 = await res21.json() as any;
+    assert(res21.status === 429 && body21.error?.code === 'RATE_LIMITED', `the agent's 21st on REST: ${res21.status} ${JSON.stringify(body21.error ?? body21.data)}`);
+    assert(Number(res21.headers.get('retry-after')) > 0, `it says when to try again: ${res21.headers.get('retry-after')}`);
 });
 
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total`);

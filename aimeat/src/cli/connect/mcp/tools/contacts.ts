@@ -4,9 +4,12 @@
  * SPDX-License-Identifier: MIT
  * @description Connector MCP registrations for the OWNER's contacts (address book) — parity with the
  *   server MCP (src/mcp/contacts.ts) so `aimeat connect serve --surface agent` exposes list/add/remove/
- *   resolve_email locally. Thin proxies over the shared /v1/contacts routes (owner-role), so both
- *   surfaces behave identically.
+ *   resolve_email/invite locally. Thin proxies over the shared /v1/contacts routes, so both surfaces
+ *   behave identically: the routes decide who may call them (resolve takes an agent holding
+ *   messages:read, invite one holding messages:send; the rest the owner).
  * @version-history
+ *   v1.2.1 -- 2026-09-26 -- Header only: POST /v1/contacts/invite admits an agent holding
+ *     messages:send, so aimeat_contact_invite works here for the agents the server MCP serves.
  *   v1.2.0 -- 2026-08-30 -- aimeat_contact_list takes include; aimeat_contact_invite proxies
  *     POST /v1/contacts/invite. Parameter for parameter with the server MCP.
  *   v1.1.0 -- 2026-08-17 -- TARGET-063: aimeat_contact_add takes name + email (a person with no
