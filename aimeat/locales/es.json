@@ -6358,6 +6358,8 @@
   "appspage.descPlaceholder": "Una o dos frases sobre qué hace la aplicación. Tu IA puede escribirlas.",
   "appspage.codeLabel": "Código de acceso, si no es pública",
   "appspage.codePlaceholder": "vacío = pública",
+  "appspage.codeShow": "Mostrar el código de acceso",
+  "appspage.codeHide": "Ocultar el código de acceso",
   "appspage.publishFile": "Publicar el archivo",
   "appspage.uploadHint": "El archivo se publica de inmediato en su propia dirección, y la descripción se ve en el lanzador y en tu página pública de muestra (portafolio). Al publicar, la página dice si la aplicación se hizo con la guía de construcción vigente.",
   "appspage.uploaded": "Aplicación publicada",

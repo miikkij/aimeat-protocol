@@ -9,6 +9,7 @@
  *   apps that changed last, the agents-and-skills facts, the form for a finished file.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   2026-09-26 — .ap-secret and .ap-secret-eye: the upload form's access code hidden behind an eye.
  *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
  *   2026-09-13 -- Compose shared aside cuts; normalize one-off geometry under brief 10.7.
  *   2026-09-13 -- Compose the shared initials box; retain only row dimensions and placement.
@@ -87,6 +88,18 @@
 .ap-field--wide { grid-column: 1 / -1; }
 .ap-field--send { display: flex; justify-content: flex-end; align-items: end; }
 .ap-file { padding: .4rem 0; font-size: .85rem; }
+/* The access code, typed hidden: the eye sits inside the field's right end (build.js UploadForm). */
+.ap-secret { position: relative; display: block; }
+/* Three classes and the element, so it outranks profile-poster.css's `.pf input[type=password]`
+   padding reset (0,2,1), which otherwise put the typed code under the eye. */
+.ap-form .ap-secret input.og-input { padding-right: 2.75rem; }
+.ap-secret-eye {
+  position: absolute; right: 2px; top: 50%; transform: translateY(-50%);
+  width: 2.5rem; height: 2.1rem; display: inline-flex; align-items: center; justify-content: center;
+  padding: 0; border: 0; background: transparent; color: var(--text); cursor: pointer;
+}
+.ap-secret-eye:hover { color: var(--accent); }
+.ap-secret-eye:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* ── Phone ─────────────────────────────────────────────────────────────────────────────────── */
 @media (max-width: 860px) {

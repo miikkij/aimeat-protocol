@@ -7492,6 +7492,8 @@
   "appspage.descPlaceholder": "One or two sentences on what the app does. Your AI can write it.",
   "appspage.codeLabel": "Access code, if not public",
   "appspage.codePlaceholder": "empty = public",
+  "appspage.codeShow": "Show the access code",
+  "appspage.codeHide": "Hide the access code",
   "appspage.publishFile": "Publish the file",
   "appspage.uploadHint": "The file is published at its own address at once, and the description shows in the launcher and on your public showcase page (portfolio). On publishing, the page says whether the app was built on the current build guide.",
   "appspage.uploaded": "App published",

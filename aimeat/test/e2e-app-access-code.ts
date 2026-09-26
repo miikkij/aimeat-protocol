@@ -14,6 +14,8 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=e2e-app-access-code
  * @version-history
+ *   v1.1.0 — 2026-09-26 — The unlock page types the code hidden, its eye runs under the response's
+ *     CSP nonce, and its Finnish says "sovellus". Failed on the code before the change.
  *   v1.0.0 — 2026-08-07 — Initial.
  */
 
@@ -127,6 +129,18 @@ await test('Anonymous BROWSER navigation without code → 403 HTML unlock page w
     assert((res.headers.get('content-type') ?? '').includes('text/html'), 'must be an HTML page');
     assert(text.includes('<form') && text.includes('name="code"'), 'page must carry the code form');
     assert(text.includes('name="mode"'), 'other query params must be preserved as hidden inputs');
+});
+
+await test('The code is typed hidden, and the eye beside it runs under the page nonce', async () => {
+    const res = await fetch(`${BASE}${appPath}?mode=inline`, { headers: { Accept: 'text/html', 'Accept-Language': 'fi' } });
+    const text = await res.text();
+    assert(/<input type="password" id="code" name="code"/.test(text), 'the code field is a password field');
+    assert(text.includes('id="eye"') && text.includes('aria-label="Näytä pääsykoodi"'), 'the eye is there and says what it does');
+    // The eye's script must carry THIS response's nonce, or the CSP blocks it and the eye is dead.
+    const nonce = /'nonce-([0-9a-f]+)'/.exec(res.headers.get('content-security-policy') ?? '')?.[1];
+    assert(!!nonce && text.includes(`<script nonce="${nonce}">`), `script nonce matches the CSP (${nonce})`);
+    // Jouni, 2026-09-26: the Finnish page says "sovellus", never "appi".
+    assert(text.includes('Tämä sovellus on suojattu koodilla') && !/\bapp(i|in)\b/i.test(text), 'Finnish says sovellus');
 });
 
 await test('Wrong code on a browser navigation → unlock page with the mismatch line', async () => {
