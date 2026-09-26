@@ -12,6 +12,9 @@
  * @structure ContactInvitationError · createContactInvitation · pendingContactInvitation
  * @usage const { invitation, acceptUrl, emailSent } = await createContactInvitation(storage, config, { inviterName, email, message });
  * @version-history
+ *   v1.1.0 — 2026-09-26 — An invitation counts as an address lookup against the inviter's account
+ *     (takeEmailLookup), before the address is read, on every door; a refusal is 429 RATE_LIMITED
+ *     with retry_after_sec (secaudit 2026-09, A5-2).
  *   v1.0.0 — 2026-08-30 — Initial (design canvas "AIMEAT Kontaktien sivu", direction A).
  */
 import { randomBytes, randomUUID } from 'node:crypto';
@@ -21,6 +24,7 @@ import type { InvitationRecord } from '../storage/repositories/invitation.reposi
 import { hashInviteToken, inviteEmailHash, INVITE_DEFAULT_EXPIRY_DAYS } from './invitations.js';
 import { getActiveEmailService } from './email.js';
 import { contactInviteEmail } from './email-templates.js';
+import { takeEmailLookup } from './email-lookup-limit.js';
 import { isValidEmail } from '../utils/email-validator.js';
 
 /** How many invitations one person may have open at once, organism ones included. */
@@ -29,7 +33,7 @@ const DAY_MS = 86_400_000;
 
 /** A refusal the caller maps to its own error shape (HTTP envelope / MCP text). */
 export class ContactInvitationError extends Error {
-  constructor(public status: number, public code: string, message: string) {
+  constructor(public status: number, public code: string, message: string, public details?: { retry_after_sec?: number }) {
     super(message);
     this.name = 'ContactInvitationError';
   }
@@ -65,10 +69,11 @@ export async function pendingContactInvitation(
 /**
  * Mint and send a person-to-person invitation to join this AIMEAT.
  *
- * Refuses before it writes: a malformed address, an address that already has a verified account
- * here (that person is added as a contact, not invited), an invitation of the inviter's own that
- * is still open to the same address, and an inviter with too many open invitations. The email is
- * best-effort; the accept URL comes back so the inviter can hand it over when mail is off.
+ * Refuses before it writes: a malformed address, an account that has used its address lookups, an
+ * address that already has a verified account here (that person is added as a contact, not
+ * invited), an invitation of the inviter's own that is still open to the same address, and an
+ * inviter with too many open invitations. The email is best-effort; the accept URL comes back so the
+ * inviter can hand it over when mail is off.
  */
 export async function createContactInvitation(
   storage: Storage, config: AimeatConfig, input: ContactInvitationInput,
@@ -79,6 +84,13 @@ export async function createContactInvitation(
   }
   const emailHash = inviteEmailHash(cleanEmail);
   const inviterGhii = `${input.inviterName}@${config.nodeId}`;
+
+  // AN INVITATION IS AN ADDRESS LOOKUP. Its answer says whether the address has an account here
+  // (ALREADY_HERE), so it draws on the account's lookups (services/email-lookup-limit.ts) before the
+  // address is read, as the resolve door and a save by email do. The REST door and
+  // aimeat_contact_invite both come here, so both count (secaudit 2026-09, A5-2).
+  const turn = takeEmailLookup(inviterGhii);
+  if (!turn.ok) throw new ContactInvitationError(429, turn.code, turn.message, { retry_after_sec: turn.retryAfterSec });
 
   const existing = await storage.getGHIIByEmailHash(emailHash);
   if (existing?.emailVerifiedAt) {

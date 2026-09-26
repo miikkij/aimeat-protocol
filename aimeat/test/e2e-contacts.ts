@@ -5,6 +5,9 @@
  *   contact never resets the DM first-contact gate), blocked-row handling, the q filter,
  *   cross-owner isolation, and exact-match email resolve (found / not-found / invalid / unauth).
  * @version-history
+ *   v1.6.0 — 2026-09-26 — Test 32: an invitation draws on the same per-account allowance, on REST and
+ *     over aimeat_contact_invite, and past it both refuse RATE_LIMITED (REST with Retry-After);
+ *     another account is not slowed (secaudit 2026-09, A5-2).
  *   v1.5.0 — 2026-09-25 — Test 31: saving a person by email draws on the same per-account allowance
  *     as the lookup, on REST and over MCP, and another account is not slowed.
  *   v1.4.0 — 2026-09-25 — Tests 28–30: an agent holding messages:read looks an address up on the REST
@@ -630,6 +633,38 @@ await test('31. Saving a person by email tells the same thing, so it draws on th
 
     const other = await json('/v1/contacts', { method: 'POST', headers: auth(B.token), body: JSON.stringify({ name: 'Not Slowed', email: `b-saved-${Date.now()}@example.com` }) });
     assert(other.status === 201, `another account's save: ${other.status} ${JSON.stringify(other.body.error)}`);
+});
+
+await test('32. An invitation answers whether an address has an account here, so it draws on the same allowance: on REST and over MCP, and another account is not slowed', async () => {
+    // Its refusal ALREADY_HERE is the lookup's answer, and aimeat_contact_invite reaches the same
+    // service as the REST door, so both count (secaudit 2026-09, A5-2).
+    const F = await setupOwner('f');
+    const inviter = await agentOf(F, 'invitebot', ['messages:send']);
+    const invite = (email: string) => json('/v1/contacts/invite', { method: 'POST', headers: auth(F.token), body: JSON.stringify({ email }) });
+    for (let i = 0; i < 10; i++) {
+        const r = await invite(`f-rest-${i}-${Date.now()}@example.com`);
+        assert(r.status === 201, `the owner's invitation ${i + 1}: ${r.status} ${JSON.stringify(r.body.error)}`);
+    }
+    for (let i = 0; i < 9; i++) {
+        const r = await mcpCallAs(inviter.gaii, inviter.key, 'aimeat_contact_invite', { email: `f-mcp-${i}-${Date.now()}@example.com` });
+        assert(r.result?.isError !== true && String(r.result?.content?.[0]?.text).includes('"invited"'),
+            `the agent's invitation ${i + 11}: ${JSON.stringify(r.result ?? r.error).slice(0, 200)}`);
+    }
+    const twentieth = await lookup(F.token, `f-lookup-${Date.now()}@example.com`);
+    assert(twentieth.status === 200, `the twentieth, a lookup: ${twentieth.status} ${JSON.stringify(twentieth.body.error)}`);
+
+    const res21 = await fetch(`${BASE}/v1/contacts/invite`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', ...auth(F.token) }, body: JSON.stringify({ email: `f-one-too-many-${Date.now()}@example.com` }),
+    });
+    const body21 = await res21.json() as any;
+    assert(res21.status === 429 && body21.error?.code === 'RATE_LIMITED', `the 21st, an invitation on REST: ${res21.status} ${JSON.stringify(body21.error ?? body21.data)}`);
+    assert(Number(res21.headers.get('retry-after')) > 0, `it says when to try again: ${res21.headers.get('retry-after')}`);
+    const over = await mcpCallAs(inviter.gaii, inviter.key, 'aimeat_contact_invite', { email: `f-still-too-many-${Date.now()}@example.com` });
+    assert(over.result?.isError === true && String(over.result?.content?.[0]?.text).startsWith('RATE_LIMITED'),
+        `the next, an invitation over MCP: ${JSON.stringify(over.result ?? over.error).slice(0, 200)}`);
+
+    const other = await json('/v1/contacts/invite', { method: 'POST', headers: auth(B.token), body: JSON.stringify({ email: `b-invited-${Date.now()}@example.com` }) });
+    assert(other.status === 201, `another account's invitation: ${other.status} ${JSON.stringify(other.body.error)}`);
 });
 
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total`);
