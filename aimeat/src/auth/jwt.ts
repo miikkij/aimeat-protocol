@@ -9,6 +9,9 @@
  * @structure initNodeKeys / AccountDisabledError / issueJWT / verifyJWT (+ asVisitor) / generateSessionId / tokenIdOf / revokeToken / isRevoked
  * @usage import { issueJWT, verifyJWT } from '../auth/jwt.js';
  * @version-history
+ *   v1.5.1 — 2026-09-26 — The old-key read (spellingHashOf) names its removal: the first release made
+ *     90 days after 3.20.0 reaches the nodes, when every token revoked before v1.5.0 has expired.
+ *     No flag, because turning it off early would bring a revoked token back (invariant 16).
  *   v1.5.0 — 2026-09-26 — A token is revoked and checked under its id (tokenIdOf: the hash of the
  *     header and claims its signature covers), not under its string, so every spelling of a revoked
  *     token is refused. isRevoked also reads the old key, the hash of the string, so a token revoked
@@ -243,9 +246,13 @@ export function tokenIdOf(token: string): string {
 
 /**
  * Where a revocation made before 2026-09-26 was filed: the hash of the token's exact string. Read
- * as well as the id, so a token revoked before this change stays revoked. Remove it once the
- * longest-lived token revoked before then has expired: 90 days (AIMEAT_AGENT_JWT_TTL) after this
- * change is on every node.
+ * as well as the id, so a token revoked before this change stays revoked.
+ *
+ * DEPRECATED, REMOVED ON A DATE (invariant 16). No flag: it is on wherever it ships, because turning
+ * it off would bring a revoked token back. It is removed, together with its read in isRevoked, in
+ * the first release made 90 days after 3.20.0 reaches the nodes. By then every token revoked before
+ * this change has expired: 90 days (AIMEAT_AGENT_JWT_TTL, 7776000 s by default) is the longest a
+ * token lives.
  */
 function spellingHashOf(token: string): string {
   return createHash('sha256').update(token).digest('hex');
