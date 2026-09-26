@@ -189,35 +189,51 @@ grants something (an agent's scopes, an agent's key, an ecosystem app's access).
 principal guard is one list, `AUTHORIZATION_GATES` in `scripts/inventory/principals.ts` — this script
 and `check:route-scopes` used to carry one each and they disagreed about four names.
 
-#### 11c. On a FEDERATED session the name is somebody else's account
+#### 11c. A session from ANOTHER node is a visitor, and its name is never cut back to a local one
 
 Everything above reads the name as "this human, or something acting for them". There is one principal
-where that is false, and it is the worst case of the invariant: a session signed in from ANOTHER node
-carries `owner` = the local part of an account that lives elsewhere. On this node that string names a
-DIFFERENT PERSON — whichever local account happens to share it.
+where that is false, and it is the worst case of the invariant: a session signed in from ANOTHER node.
+Its person lives elsewhere, and the local part of their name can equal a LOCAL account's name, which
+belongs to a different person.
 
 Measured on 2026-09-13 (`test/e2e-federated-namesake.ts`): a visitor signed in as `alice@their-node`
 read local `alice`'s PRIVATE memory, wrote into her namespace, and `GET /v1/ghii/me` answered with her
 profile, its account-security half included. A peer's operator can create any account name on their
 own node, so this was impersonation of any local account BY NAME, from any peer whose federated
-sign-in an operator had switched on. `requireRole('owner')` admitted it, because the mint hands a
-federated session `roles:['owner']`.
+sign-in an operator had switched on. Until 2026-09-24 the login minted such a session with
+`roles:['owner']` and the bare local part as `owner`, so every door that asked the role or looked the
+account up by the name answered for the local namesake.
 
-The root was `resolveIdentity` composing `${auth.owner}@${nodeId}`: correct for a local owner, and for
-a visitor it stamps THIS node's suffix onto a name that belongs to another node's account. A federated
-session now resolves to its HOME GHII (`${owner}@${homeNode}`), which is what RFC v4.0 Core §31 means
-by a visitor acting "under their own identity" and what `routes/memory/federation.ts` had always used.
+**What the session is now.** `verifyJWT()` reads every federated token, old ones included, as a
+visitor: role `federated` and no other, and its HOME GHII (`alice@their-node`) as both `sub` and
+`owner`. `resolveIdentity` returns that GHII, which is what RFC v4.0 Core §31 means by a visitor acting
+"under their own identity". No gate that asks for the account holder admits it:
+`requireRole('owner')`, `isOwnerPrincipal()`, `requireOwnerSession()` and `requireLocalSession()`
+refuse it, and `requireScope` gives it no owner bypass, only the scopes this node grants its peer. A
+door that looks the account up by `req.auth!.owner` finds nobody, because no local account has a name
+with a node in it. The one question is `isForeignPrincipal(auth)`; never `auth.federated` inline.
 
-Fixing the resolver is half of it, for the reason 11a gives: **a door that SCOPES by the bare name
-never calls the resolver at all.** Four such doors were reachable by a visitor and each is now closed
-to one — the memory owner-scope fan-outs (including `?owner_scope=true` and `?agent=`), `GET
-/v1/ghii/me`, the board member door and the two work reads.
+**The cut is the other half.** Code that CUTS an identity to an account name at the '@'
+(`x.split('@')[0]`, `parseGaiiLoose(x).owner`, `parseGAII(x)?.owner ?? x.split('@')[0]`) makes
+`alice@their-node` into `alice` again, whether the identity is the caller or one a visitor stored.
+Fixing the session does not reach it, and the September 2026 audit's check of the fixes found such
+cuts in services the session fix never touched. Two helpers in `src/utils/gaii.ts` are
+now the only cuts. `localAccountName()` is for a lookup: it cuts an identity of THIS node as before
+and hands another node's identity back whole, so the lookup finds nobody. It cuts at the LAST '@',
+because routes compose the caller as `${req.auth!.owner}@${config.nodeId}`, and for a visitor that is
+`alice@their-node@this-node`. `localAccountOf()` is for a decision: the same cut, and null for an
+identity of another node. `isSameOwner` compares the node as well as the name.
 
-*Check:* when a handler reads `req.auth!.owner`, ask what it means for a visitor from another node.
-If the answer is "the local account with that name", the door needs `!req.auth!.federated` beside the
-owner-session test, or the resolved identity instead of the name. `requireScope` has excluded
-federated sessions from the owner bypass since 2026-09-08 for the same reason; the name-keyed doors
-are the same question one level down.
+*Check:* when code turns an identity into an account name, it calls `localAccountName` (to look a name
+up) or `localAccountOf` (to decide whether the caller has an account here). When a door asks "is this
+the account holder", it asks a principal guard or `isForeignPrincipal`, never the role or the name
+inline. A capability that is this node's own automation, such as saving or starting a workflow, takes
+`requireLocalSession()`.
+
+*Gate:* `pnpm check:identity-shortening`, since 2026-09-26. It parses every file under `src/` and
+refuses a new cut outside `utils/gaii.ts`. Its `ALLOWED` map names the few cuts that are right as they
+are, each with the sentence that says why: an email's local part, the name a person types for a new
+account, a value that keeps its node.
 
 ### 12. A role is granted, never inherited at mint time
 `POST /v1/auth/token` read the owner record and copied the owner's `owner` and `operator` roles onto
